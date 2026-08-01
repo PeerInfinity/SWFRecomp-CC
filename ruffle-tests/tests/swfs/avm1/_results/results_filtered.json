@@ -6,18 +6,18 @@
     "total_available": 717,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 41,
+    "ignored_count": 24,
     "filtered": true
   },
-  "total": 676,
-  "pass": 642,
+  "total": 693,
+  "pass": 649,
   "ruffle_matched": 12,
-  "fail": 22,
-  "pass_rate": 95.0,
-  "effective_pass": 654,
-  "effective_pass_rate": 96.7,
+  "fail": 32,
+  "pass_rate": 93.7,
+  "effective_pass": 661,
+  "effective_pass_rate": 95.4,
   "breakdown": {
-    "output_mismatch": 22,
+    "output_mismatch": 32,
     "ruffle_matched": 12
   },
   "tests": [
@@ -3767,6 +3767,98 @@
       "status": "pass"
     },
     {
+      "test": "file_reference_browse_cancel",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.051,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 1.06,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_download_cancel",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.992,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 7,
+        "matching_lines": 1
+      },
+      "duration": 1.0,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=2, expected=7)",
+      "actual_output": "// fileref.download cancel\nundefined",
+      "expected_output": "// fileref.download cancel\ntrue\n// onCancel\nC:undefined\nN:undefined\nT:undefined\n-----"
+    },
+    {
+      "test": "file_reference_download_httperror_dns_error",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.136,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 13,
+        "matching_lines": 1
+      },
+      "duration": 1.14,
+      "status": "output_mismatch",
+      "detail": "12 line(s) differ (actual=2, expected=13)",
+      "actual_output": "// fileref.download (http error)\nundefined",
+      "expected_output": "// fileref.download (http error)\ntrue\n// onSelect\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\nError opening URL 'http://invalid-domain.domain/test?debug-error-dns'\n// onIoError\nC:undefined\nN:debug-success.txt\nT:.txt\n-----"
+    },
+    {
+      "test": "file_reference_download_httperror_status_code",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.986,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 23,
+        "matching_lines": 1
+      },
+      "duration": 0.99,
+      "status": "output_mismatch",
+      "detail": "22 line(s) differ (actual=2, expected=23)",
+      "actual_output": "// fileref.download (http error)\nundefined",
+      "expected_output": "// fileref.download (http error)\ntrue\n// onSelect\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onOpen\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\nError opening URL 'http://example.com/test?debug-error-statuscode'\n// onIoError\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onProgress\nC:undefined\nN:debug-success.txt\nT:.txt\n-----"
+    },
+    {
+      "test": "file_reference_download_success",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.02,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 34,
+        "matching_lines": 10
+      },
+      "duration": 1.03,
+      "status": "output_mismatch",
+      "detail": "24 line(s) differ (actual=14, expected=34)",
+      "actual_output": "... (2 lines before) ...\n// fileref.browse([{ description: '' }])\nfalse\n// fileref.browse([{ extension: '' }])\nfalse\n// fileref.download()\nundefined\n// fileref.download('@')\nundefined\n// fileref.download('baddomain')\nundefined\n// fileref.download success\nundefined",
+      "expected_output": "... (2 lines before) ...\n// fileref.browse([{ description: '' }])\nfalse\n// fileref.browse([{ extension: '' }])\nfalse\n// fileref.download()\nfalse\n// fileref.download('@')\nfalse\n// fileref.download('baddomain')\nfalse\n// fileref.download success\ntrue\n// onSelect\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onOpen\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onProgress\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onComplete\nC:undefined\nN:debug-success.txt\nT:.txt\n-----"
+    },
+    {
       "test": "file_reference_list_asbroadcaster",
       "phases": {
         "recomp": 0.0,
@@ -3829,6 +3921,63 @@
       },
       "duration": 1.22,
       "status": "pass"
+    },
+    {
+      "test": "file_reference_upload_httperror_dns_error",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.271,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 18,
+        "matching_lines": 8
+      },
+      "duration": 1.28,
+      "status": "output_mismatch",
+      "detail": "10 line(s) differ (actual=8, expected=18)",
+      "actual_output": "... (3 lines before) ...\nC:undefined\nN:test.txt\nT:.txt\n-----\n// upload http failure (invalid url)",
+      "expected_output": "... (3 lines before) ...\nC:undefined\nN:test.txt\nT:.txt\n-----\n// upload http failure (invalid url)\n// onOpen\nC:undefined\nN:test.txt\nT:.txt\n-----\n// onIoError\nC:undefined\nN:test.txt\nT:.txt\n-----"
+    },
+    {
+      "test": "file_reference_upload_httperror_status_code",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.211,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 23,
+        "matching_lines": 8
+      },
+      "duration": 1.22,
+      "status": "output_mismatch",
+      "detail": "15 line(s) differ (actual=8, expected=23)",
+      "actual_output": "... (3 lines before) ...\nC:undefined\nN:test.txt\nT:.txt\n-----\n// upload http failure (status code)",
+      "expected_output": "... (3 lines before) ...\nC:undefined\nN:test.txt\nT:.txt\n-----\n// upload http failure (status code)\n// onOpen\nC:undefined\nN:test.txt\nT:.txt\n-----\n// onProgress\nC:undefined\nN:test.txt\nT:.txt\n13/13\n-----\n// onHttpError\nC:undefined\nN:test.txt\nT:.txt"
+    },
+    {
+      "test": "file_reference_upload_success",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.279,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 23,
+        "matching_lines": 8
+      },
+      "duration": 1.29,
+      "status": "output_mismatch",
+      "detail": "15 line(s) differ (actual=8, expected=23)",
+      "actual_output": "... (3 lines before) ...\nC:undefined\nN:test.txt\nT:.txt\n-----\n// upload success",
+      "expected_output": "... (3 lines before) ...\nC:undefined\nN:test.txt\nT:.txt\n-----\n// upload success\n// onOpen\nC:undefined\nN:test.txt\nT:.txt\n-----\n// onProgress\nC:undefined\nN:test.txt\nT:.txt\n-----\n// onComplete\nC:undefined\nN:test.txt\nT:.txt\n-----"
     },
     {
       "test": "focus_keyboard_press",
@@ -4085,6 +4234,44 @@
       },
       "duration": 1.23,
       "status": "pass"
+    },
+    {
+      "test": "form_loader_encoding_2",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.664,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "duration": 20.68,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=3, expected=3)",
+      "actual_output": "UTF8: \u00c4\u00d6\u00dc \u00df - \u7247\u4eee\nIso Latin-1: \u0116\u0720\ufffd\nShift Jis: \u0550\u027c\u05bc",
+      "expected_output": "UTF8: \u00c3\u201e\u00c3\u2013\u00c3\u0153 \u00c3\u0178 - \u00e7\u2030\u2021\u00e4\u00bb\u00ae\nIso Latin-1: \u00c4\u00d6\u00dc \u00df\nShift Jis: \u2022\u00d0\u2030\u00bc\u2013\u00bc"
+    },
+    {
+      "test": "form_loader_encoding_3",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.246,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "duration": 1.26,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=3, expected=3)",
+      "actual_output": "UTF8: \u00c4\u00d6\u00dc \u00df - \u7247\u4eee\u540d\nIso Latin-1: \u0116\u0720\ufffd\nShift Jis: \u0550\u027c\u05bc",
+      "expected_output": "UTF8: \u00c4\u00d6\u00dc \u00df - \u7247\u4eee\u540d\nIso Latin-1: \u00c4\u00d6\u00dc \u00df\nShift Jis: \u7247\u4eee\u540d"
     },
     {
       "test": "frame_size_translated_negative",
@@ -8644,6 +8831,22 @@
       "status": "pass"
     },
     {
+      "test": "string_paths_reference_launder",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.259,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 1.27,
+      "status": "pass"
+    },
+    {
       "test": "string_paths_timer",
       "phases": {
         "recomp": 0.0,
@@ -8706,6 +8909,25 @@
       },
       "duration": 1.3,
       "status": "pass"
+    },
+    {
+      "test": "string_relational_compare",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.175,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "duration": 20.18,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=4, expected=4)",
+      "actual_output": "\"A\" < \"B\"\ntrue\n\"\\uFF61\" < \"\\uD800\\uDC02\"\nfalse",
+      "expected_output": "\"A\" < \"B\"\ntrue\n\"\\uFF61\" < \"\\uD800\\uDC02\"\ntrue"
     },
     {
       "test": "stylesheet",
@@ -10873,6 +11095,86 @@
         "matching_lines": 10
       },
       "duration": 1.1,
+      "status": "pass"
+    },
+    {
+      "test": "xml_socket",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 15.751,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 15.76,
+      "status": "pass"
+    },
+    {
+      "test": "xml_socket_close_in_handler",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.989,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 1.0,
+      "status": "pass"
+    },
+    {
+      "test": "xml_socket_connect_null",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 16.002,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 16.01,
+      "status": "pass"
+    },
+    {
+      "test": "xml_socket_on_data",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.995,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.0,
+      "status": "pass"
+    },
+    {
+      "test": "xml_socket_segmented",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.142,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 29,
+        "expected_lines": 29,
+        "matching_lines": 29
+      },
+      "duration": 0.15,
       "status": "pass"
     },
     {

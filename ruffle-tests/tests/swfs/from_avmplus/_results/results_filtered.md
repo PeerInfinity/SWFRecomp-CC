@@ -6,27 +6,27 @@
 
 **Run Duration**: 141m 31s
 
-**Filtered**: 0 tests ignored out of 1574 available
+**Filtered**: 2 tests ignored out of 1574 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1574 |
-| Passing | **1458** (92.6%) |
+| Total tests | 1572 |
+| Passing | **1458** (92.7%) |
 | Ruffle-matched | 51 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1509** (95.9%) |
-| Failing | 65 |
-| Total expected lines | 85996 |
-| Matching lines | 85214 (99.1%) |
-| Mismatched lines | 782 |
+| Effective pass | **1509** (96.0%) |
+| Failing | 63 |
+| Total expected lines | 85970 |
+| Matching lines | 85202 (99.1%) |
+| Mismatched lines | 768 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 61 | 93.8% |
-| Runtime Error | 4 | 6.2% |
+| Output Mismatch | 59 | 93.7% |
+| Runtime Error | 4 | 6.3% |
 
 ## Passing Tests
 
@@ -1555,7 +1555,7 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**29 tests** within reach
+**28 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
@@ -1581,13 +1581,12 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 20 | `e4x/XML/e13_4_4_32/v9` | 88.9% | 8 | 9 | 1 |  |
 | 21 | `e4x/XML/e13_4_4_36` | 81.2% | 13 | 16 | 3 |  |
 | 22 | `ecma3/ObjectObjects/isPrototypeOf` | 75.0% | 6 | 8 | 2 |  |
-| 23 | `ecma3/Statements/eforin_001` | 75.0% | 12 | 16 | 4 |  |
-| 24 | `ecma3/String/e15_5_5_1` | 70.0% | 7 | 10 | 3 |  |
-| 25 | `as3/Definitions/Super/SuperRuntimeError` | 66.7% | 2 | 3 | 1 |  |
-| 26 | `ecma3/Unicode/utf8count` | 66.7% | 2 | 3 | 1 |  |
-| 27 | `regress/bug_550958` | 66.7% | 2 | 3 | 1 |  |
-| 28 | `e4x/Statements/e12_1` | 64.7% | 11 | 17 | 6 |  |
-| 29 | `e4x/Expressions/e11_1_2` | 50.0% | 12 | 24 | 12 |  |
+| 23 | `ecma3/String/e15_5_5_1` | 70.0% | 7 | 10 | 3 |  |
+| 24 | `as3/Definitions/Super/SuperRuntimeError` | 66.7% | 2 | 3 | 1 |  |
+| 25 | `ecma3/Unicode/utf8count` | 66.7% | 2 | 3 | 1 |  |
+| 26 | `regress/bug_550958` | 66.7% | 2 | 3 | 1 |  |
+| 27 | `e4x/Statements/e12_1` | 64.7% | 11 | 17 | 6 |  |
+| 28 | `e4x/Expressions/e11_1_2` | 50.0% | 12 | 24 | 12 |  |
 
 ## Segfaults
 
@@ -1610,7 +1609,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**61 tests** with output mismatch, sorted by match rate (best first)
+**59 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -1636,42 +1635,40 @@ No timeouts.
 | 20 | `e4x/XML/e13_4_4_32/v9` | 88.9% | 8/9 | 9 | 9 |  |
 | 21 | `e4x/XML/e13_4_4_36` | 81.2% | 13/16 | 16 | 16 |  |
 | 22 | `ecma3/ObjectObjects/isPrototypeOf` | 75.0% | 6/8 | 8 | 8 |  |
-| 23 | `ecma3/Statements/eforin_001` | 75.0% | 12/16 | 16 | 16 |  |
-| 24 | `ecma3/String/e15_5_5_1` | 70.0% | 7/10 | 10 | 10 |  |
-| 25 | `as3/Definitions/Super/SuperRuntimeError` | 66.7% | 2/3 | 3 | 3 |  |
-| 26 | `ecma3/Unicode/utf8count` | 66.7% | 2/3 | 3 | 3 |  |
-| 27 | `regress/bug_550958` | 66.7% | 2/3 | 2 | 3 |  |
-| 28 | `e4x/Statements/e12_1` | 64.7% | 11/17 | 17 | 17 |  |
-| 29 | `e4x/Expressions/e11_1_2` | 50.0% | 12/24 | 24 | 20 |  |
-| 30 | `regress/bug_539328` | 46.7% | 7/15 | 8 | 15 |  |
-| 31 | `e4x/Expressions/e11_1_4` | 37.8% | 14/37 | 37 | 34 |  |
-| 32 | `as3/Expressions/QualifiedReferences/WildcardOperator` | 33.3% | 1/3 | 3 | 3 |  |
-| 33 | `ecma3/Exceptions/exception_011_rt` | 33.3% | 1/3 | 1 | 3 |  |
-| 34 | `ecma3/Expressions/e11_6_1_3` | 33.3% | 3/9 | 9 | 9 |  |
-| 35 | `e4x/Expressions/e11_3_1` | 28.6% | 10/35 | 35 | 20 |  |
-| 36 | `e4x/XML/e13_4_4_2` | 26.7% | 4/15 | 14 | 15 |  |
-| 37 | `as3/String/localeCompare_585791/v9` | 25.0% | 2/8 | 8 | 8 |  |
-| 38 | `as3/Definitions/Classes/Ext/ExtPublicClassPriv` | 16.7% | 1/6 | 6 | 6 |  |
-| 39 | `e4x/Regress/regress-524214` | 9.1% | 1/11 | 11 | 3 |  |
-| 40 | `as3/Definitions/Classes/ClassDef/Bug118272Package` | 0.0% | 0/6 | 6 | 6 |  |
-| 41 | `as3/Definitions/Variable/AccessPrivateClassVariable_rt` | 0.0% | 0/1 | 1 | 1 |  |
-| 42 | `as3/RuntimeErrors/Error1050CannotConvertToPrimitive` | 0.0% | 0/2 | 1 | 2 |  |
-| 43 | `as3/RuntimeErrors/Error1052InvalidUriPassed` | 0.0% | 0/1 | 1 | 1 |  |
-| 44 | `as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor` | 0.0% | 0/1 | 1 | 1 |  |
-| 45 | `as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp` | 0.0% | 0/1 | 0 | 1 |  |
-| 46 | `as3/RuntimeErrors/Error1075MathNotAFunction` | 0.0% | 0/1 | 1 | 1 |  |
-| 47 | `as3/RuntimeErrors/Error1076MathNotAConstructor` | 0.0% | 0/1 | 1 | 1 |  |
-| 48 | `as3/RuntimeErrors/Error1081ReadSealedErrorNs` | 0.0% | 0/1 | 1 | 1 |  |
-| 49 | `as3/RuntimeErrors/Error1115NotAConstructor/v10` | 0.0% | 0/3 | 3 | 3 |  |
-| 50 | `as3/RuntimeErrors/Error1117InvalidXmlName` | 0.0% | 0/2 | 1 | 2 |  |
-| 51 | `as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand` | 0.0% | 0/2 | 1 | 2 |  |
-| 52 | `as3/RuntimeErrors/Error1120CannotDeleteProperty` | 0.0% | 0/1 | 1 | 1 |  |
-| 53 | `e4x/Global/e13_1_2_1` | 0.0% | 0/10 | 0 | 10 |  |
-| 54 | `e4x/Global/isXMLNameTypeErr` | 0.0% | 0/5 | 3 | 5 |  |
-| 55 | `e4x/Regress/regress-263935` | 0.0% | 0/3 | 3 | 2 |  |
-| 56 | `ecma3/Exceptions/exception_001_rt` | 0.0% | 0/1 | 1 | 1 |  |
-| 57 | `ecma3/Exceptions/exception_002_rt` | 0.0% | 0/1 | 0 | 1 |  |
-| 58 | `ecma3/Exceptions/expression_005_rt` | 0.0% | 0/1 | 1 | 1 |  |
-| 59 | `ecma3/Expressions/e11_2_2_10_rt` | 0.0% | 0/1 | 1 | 1 |  |
-| 60 | `ecma3/Statements/e12_10` | 0.0% | 0/1 | 1 | 1 |  |
-| 61 | `ecma3/Statements/eforin_002` | 0.0% | 0/10 | 10 | 10 |  |
+| 23 | `ecma3/String/e15_5_5_1` | 70.0% | 7/10 | 10 | 10 |  |
+| 24 | `as3/Definitions/Super/SuperRuntimeError` | 66.7% | 2/3 | 3 | 3 |  |
+| 25 | `ecma3/Unicode/utf8count` | 66.7% | 2/3 | 3 | 3 |  |
+| 26 | `regress/bug_550958` | 66.7% | 2/3 | 2 | 3 |  |
+| 27 | `e4x/Statements/e12_1` | 64.7% | 11/17 | 17 | 17 |  |
+| 28 | `e4x/Expressions/e11_1_2` | 50.0% | 12/24 | 24 | 20 |  |
+| 29 | `regress/bug_539328` | 46.7% | 7/15 | 8 | 15 |  |
+| 30 | `e4x/Expressions/e11_1_4` | 37.8% | 14/37 | 37 | 34 |  |
+| 31 | `as3/Expressions/QualifiedReferences/WildcardOperator` | 33.3% | 1/3 | 3 | 3 |  |
+| 32 | `ecma3/Exceptions/exception_011_rt` | 33.3% | 1/3 | 1 | 3 |  |
+| 33 | `ecma3/Expressions/e11_6_1_3` | 33.3% | 3/9 | 9 | 9 |  |
+| 34 | `e4x/Expressions/e11_3_1` | 28.6% | 10/35 | 35 | 20 |  |
+| 35 | `e4x/XML/e13_4_4_2` | 26.7% | 4/15 | 14 | 15 |  |
+| 36 | `as3/String/localeCompare_585791/v9` | 25.0% | 2/8 | 8 | 8 |  |
+| 37 | `as3/Definitions/Classes/Ext/ExtPublicClassPriv` | 16.7% | 1/6 | 6 | 6 |  |
+| 38 | `e4x/Regress/regress-524214` | 9.1% | 1/11 | 11 | 3 |  |
+| 39 | `as3/Definitions/Classes/ClassDef/Bug118272Package` | 0.0% | 0/6 | 6 | 6 |  |
+| 40 | `as3/Definitions/Variable/AccessPrivateClassVariable_rt` | 0.0% | 0/1 | 1 | 1 |  |
+| 41 | `as3/RuntimeErrors/Error1050CannotConvertToPrimitive` | 0.0% | 0/2 | 1 | 2 |  |
+| 42 | `as3/RuntimeErrors/Error1052InvalidUriPassed` | 0.0% | 0/1 | 1 | 1 |  |
+| 43 | `as3/RuntimeErrors/Error1064CannotCallMethodAsConstructor` | 0.0% | 0/1 | 1 | 1 |  |
+| 44 | `as3/RuntimeErrors/Error1074IllegalWriteToReadOnlyProp` | 0.0% | 0/1 | 0 | 1 |  |
+| 45 | `as3/RuntimeErrors/Error1075MathNotAFunction` | 0.0% | 0/1 | 1 | 1 |  |
+| 46 | `as3/RuntimeErrors/Error1076MathNotAConstructor` | 0.0% | 0/1 | 1 | 1 |  |
+| 47 | `as3/RuntimeErrors/Error1081ReadSealedErrorNs` | 0.0% | 0/1 | 1 | 1 |  |
+| 48 | `as3/RuntimeErrors/Error1115NotAConstructor/v10` | 0.0% | 0/3 | 3 | 3 |  |
+| 49 | `as3/RuntimeErrors/Error1117InvalidXmlName` | 0.0% | 0/2 | 1 | 2 |  |
+| 50 | `as3/RuntimeErrors/Error1119DeleteDoesNotSupportXMLListOperand` | 0.0% | 0/2 | 1 | 2 |  |
+| 51 | `as3/RuntimeErrors/Error1120CannotDeleteProperty` | 0.0% | 0/1 | 1 | 1 |  |
+| 52 | `e4x/Global/e13_1_2_1` | 0.0% | 0/10 | 0 | 10 |  |
+| 53 | `e4x/Global/isXMLNameTypeErr` | 0.0% | 0/5 | 3 | 5 |  |
+| 54 | `e4x/Regress/regress-263935` | 0.0% | 0/3 | 3 | 2 |  |
+| 55 | `ecma3/Exceptions/exception_001_rt` | 0.0% | 0/1 | 1 | 1 |  |
+| 56 | `ecma3/Exceptions/exception_002_rt` | 0.0% | 0/1 | 0 | 1 |  |
+| 57 | `ecma3/Exceptions/expression_005_rt` | 0.0% | 0/1 | 1 | 1 |  |
+| 58 | `ecma3/Expressions/e11_2_2_10_rt` | 0.0% | 0/1 | 1 | 1 |  |
+| 59 | `ecma3/Statements/e12_10` | 0.0% | 0/1 | 1 | 1 |  |

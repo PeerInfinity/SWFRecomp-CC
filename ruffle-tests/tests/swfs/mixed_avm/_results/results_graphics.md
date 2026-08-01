@@ -1,18 +1,18 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-01 14:06 UTC
+**Date**: 2026-08-01 19:38 UTC
 
-**Git SHA**: `feb8882b09`
+**Git SHA**: `c4496a4c8f`
 
-**Run Duration**: 1m 15s
+**Run Duration**: 1m 20s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 11 |
-| Passing | **3** (27.3%) |
-| Failing | 8 |
+| Passing | **4** (36.4%) |
+| Failing | 7 |
 | Total expected lines | 53 |
 | Matching lines | 19 (35.8%) |
 | Mismatched lines | 34 |
@@ -21,28 +21,28 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 8 | 100.0% |
+| Output Mismatch | 7 | 100.0% |
 
 ## Passing Tests
 
-**3 tests passing**
+**4 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm1_doabc` | 1 | 1.8s |  |
-| 2 | `avm1_sprite_sc_ignored` | 3 | 20.8s |  |
-| 3 | `avm2_doaction` | 1 | 7.6s |  |
+| 1 | `avm1_doabc` | 1 | 1.9s |  |
+| 2 | `avm1_loads_avm2_doaction` | 2 | 2.0s |  |
+| 3 | `avm1_sprite_sc_ignored` | 3 | 20.4s |  |
+| 4 | `avm2_doaction` | 1 | 7.9s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**2 tests** within reach
+**1 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `avm1_loads_avm2_doaction` | 50.0% | 2 | 4 | 2 |  |
-| 2 | `avm2_loads_avm1_loads_into_root` | 50.0% | 1 | 2 | 1 |  |
+| 1 | `avm2_loads_avm1_loads_into_root` | 50.0% | 1 | 2 | 1 |  |
 
 ## Segfaults
 
@@ -58,15 +58,14 @@ No timeouts.
 
 ## All Output Mismatches
 
-**8 tests** with output mismatch, sorted by match rate (best first)
+**7 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `avm1_loads_avm2_doaction` | 50.0% | 2/4 | 4 | 2 |  |
-| 2 | `avm2_loads_avm1_loads_into_root` | 50.0% | 1/2 | 1 | 2 |  |
-| 3 | `avm1_loads_avm2` | 42.9% | 3/7 | 3 | 7 |  |
-| 4 | `avm2_loads_avm1_v10` | 37.5% | 3/8 | 8 | 8 |  |
-| 5 | `avm2_loads_avm1_loads_avm2_doabc` | 33.3% | 1/3 | 1 | 3 |  |
-| 6 | `avm2_loads_avm1_doabc` | 25.0% | 1/4 | 1 | 4 |  |
-| 7 | `avm2_loads_avm1_v9` | 25.0% | 2/8 | 8 | 8 |  |
-| 8 | `avm2_loads_avm1` | 7.1% | 1/14 | 6 | 14 |  |
+| 1 | `avm2_loads_avm1_loads_into_root` | 50.0% | 1/2 | 1 | 2 |  |
+| 2 | `avm1_loads_avm2` | 42.9% | 3/7 | 3 | 7 |  |
+| 3 | `avm2_loads_avm1_v10` | 37.5% | 3/8 | 8 | 8 |  |
+| 4 | `avm2_loads_avm1_loads_avm2_doabc` | 33.3% | 1/3 | 1 | 3 |  |
+| 5 | `avm2_loads_avm1_doabc` | 25.0% | 1/4 | 1 | 4 |  |
+| 6 | `avm2_loads_avm1_v9` | 25.0% | 2/8 | 8 | 8 |  |
+| 7 | `avm2_loads_avm1` | 7.1% | 1/14 | 6 | 14 |  |

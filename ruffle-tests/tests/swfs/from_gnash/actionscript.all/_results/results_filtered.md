@@ -6,19 +6,19 @@
 
 **Run Duration**: 34m 23s
 
-**Filtered**: 7 tests ignored out of 243 available
+**Filtered**: 4 tests ignored out of 243 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 236 |
-| Passing | **132** (55.9%) |
+| Total tests | 239 |
+| Passing | **135** (56.5%) |
 | Ruffle-matched | 95 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **227** (96.2%) |
+| Effective pass | **230** (96.2%) |
 | Failing | 9 |
-| Total expected lines | 31358 |
-| Matching lines | 29253 (93.3%) |
+| Total expected lines | 31544 |
+| Matching lines | 29439 (93.3%) |
 | Mismatched lines | 2105 |
 
 ### Failure Breakdown
@@ -29,7 +29,7 @@
 
 ## Passing Tests
 
-**132 tests passing**
+**135 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -156,15 +156,18 @@
 | 121 | `flash-v6` | 10 | 2.1s |  |
 | 122 | `flash-v7` | 10 | 1.7s |  |
 | 123 | `flash-v8` | 41 | 21.1s |  |
-| 124 | `getvariable-v6` | 64 | 3.4s |  |
-| 125 | `swap-v5` | 7 | 15.1s |  |
-| 126 | `swap-v6` | 7 | 0.4s |  |
-| 127 | `swap-v7` | 7 | 1.1s |  |
-| 128 | `swap-v8` | 7 | 1.0s |  |
-| 129 | `targetPath-v5` | 12 | 1.4s |  |
-| 130 | `targetPath-v6` | 23 | 1.6s |  |
-| 131 | `targetPath-v7` | 23 | 1.2s |  |
-| 132 | `targetPath-v8` | 23 | 1.0s |  |
+| 124 | `getvariable-v5` | 58 | 3.2s |  |
+| 125 | `getvariable-v6` | 64 | 3.4s |  |
+| 126 | `getvariable-v7` | 64 | 3.4s |  |
+| 127 | `getvariable-v8` | 64 | 1.6s |  |
+| 128 | `swap-v5` | 7 | 15.1s |  |
+| 129 | `swap-v6` | 7 | 0.4s |  |
+| 130 | `swap-v7` | 7 | 1.1s |  |
+| 131 | `swap-v8` | 7 | 1.0s |  |
+| 132 | `targetPath-v5` | 12 | 1.4s |  |
+| 133 | `targetPath-v6` | 23 | 1.6s |  |
+| 134 | `targetPath-v7` | 23 | 1.2s |  |
+| 135 | `targetPath-v8` | 23 | 1.0s |  |
 
 ## Ruffle-Matched Tests
 

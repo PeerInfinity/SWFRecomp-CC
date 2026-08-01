@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-01T07:44:04.216778+00:00",
-    "old_git_sha": "07c119c505f95a40da0202e5ecad8338829daf95",
-    "new_timestamp": "2026-08-01T14:06:41.163552+00:00",
-    "new_git_sha": "feb8882b09e238e91ab6444099d6cca237e3a4f9",
+    "old_timestamp": "2026-08-01T14:06:41.163552+00:00",
+    "old_git_sha": "feb8882b09e238e91ab6444099d6cca237e3a4f9",
+    "new_timestamp": "2026-08-01T19:38:38.315180+00:00",
+    "new_git_sha": "c4496a4c8f4be6b07972ae68916ed14a82923185",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 1560,
     "old_total": 1574,
     "old_pass_rate": 95.8,
-    "new_pass": 1508,
-    "new_ruffle_matched": 52,
-    "new_effective_pass": 1560,
+    "new_pass": 1510,
+    "new_ruffle_matched": 53,
+    "new_effective_pass": 1563,
     "new_total": 1574,
-    "new_pass_rate": 95.8,
+    "new_pass_rate": 95.9,
     "old_mismatched_lines": 612,
-    "new_mismatched_lines": 612,
+    "new_mismatched_lines": 605,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 7,
+    "newly_passing": 3,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 1574,
+    "status_changed": 3,
+    "unchanged": 1571,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3/RuntimeErrors/Error1081ReadSealedErrorNs",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "e4x/Statements/e12_1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 14
+      },
+      "new_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      }
+    },
+    {
+      "test": "ecma3/Number/toLocaleString_rt",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 44
+      },
+      "new_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 47
+      }
+    }
+  ]
 }

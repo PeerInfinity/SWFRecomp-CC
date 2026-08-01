@@ -6,18 +6,18 @@
     "total_available": 1221,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 227,
+    "ignored_count": 53,
     "filtered": true
   },
-  "total": 994,
-  "pass": 795,
+  "total": 1168,
+  "pass": 927,
   "ruffle_matched": 2,
-  "fail": 197,
-  "pass_rate": 80.0,
-  "effective_pass": 797,
-  "effective_pass_rate": 80.2,
+  "fail": 239,
+  "pass_rate": 79.4,
+  "effective_pass": 929,
+  "effective_pass_rate": 79.5,
   "breakdown": {
-    "output_mismatch": 194,
+    "output_mismatch": 236,
     "runtime_error": 3,
     "ruffle_matched": 2
   },
@@ -116,6 +116,74 @@
       },
       "duration": 17.27,
       "status": "pass"
+    },
+    {
+      "test": "agal_compiler",
+      "phases": {
+        "recomp": 0.029,
+        "compile": 7.667,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 7.71,
+      "status": "pass"
+    },
+    {
+      "test": "air_datagram_socket",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.744,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.75,
+      "status": "pass"
+    },
+    {
+      "test": "air_hidden_lookup",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.316,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 5.33,
+      "status": "pass"
+    },
+    {
+      "test": "air_ifilepromise",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.256,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable IFilePromise is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 5.27,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
+      "expected_output": "IFilePromise: [class IFilePromise]"
     },
     {
       "test": "all_classes/accessibility/swf10",
@@ -512,6 +580,25 @@
       "detail": "116 line(s) differ (actual=19, expected=116)",
       "actual_output": "<type name=\"flash.xml::XMLDocument\" base=\"flash.xml.XMLNode\" isDynamic=\"true\" isFinal=\"false\" isStatic=\"true\">\n  <constructor>\n      <parameter index=\"1\" type=\"*\" optional=\"true\"/>\n  </constructor>\n  <extendsClass type=\"Object\"/>\n  <extendsClass type=\"flash.xml.XMLNode\"/>\n</type>\n<type name=\"flash.xml::XMLNode\" base=\"Object\" isDynamic=\"true\" isFinal=\"false\" isStatic=\"true\">\n  <constructor>\n      <parameter index=\"1\" type=\"*\" optional=\"true\"/>\n  </constructor>\n  <extendsClass type=\"Object\"/>\n</type>\n<type name=\"flash.xml::XMLNodeType\" base=\"Object\" isDynamic=\"false\" isFinal=\"true\" isStatic=\"true\">\n  <constructor>\n      <parameter index=\"1\" type=\"*\" optional=\"true\"/>\n  </constructor>\n  <extendsClass type=\"Object\"/>\n</type>",
       "expected_output": "<type name=\"flash.xml::XMLDocument\" base=\"Class\" isDynamic=\"true\" isFinal=\"true\" isStatic=\"true\">\n  <accessor name=\"prototype\" access=\"readonly\" type=\"*\" declaredBy=\"Class\"/>\n  <extendsClass type=\"Class\"/>\n  <extendsClass type=\"Object\"/>\n  <factory type=\"flash.xml::XMLDocument\">\n      <accessor name=\"attributes\" access=\"readwrite\" type=\"Object\" declaredBy=\"flash.xml::XMLNode\"/>\n      <accessor name=\"childNodes\" access=\"readonly\" type=\"Array\" declaredBy=\"flash.xml::XMLNode\"/>\n      <accessor name=\"localName\" access=\"readonly\" type=\"String\" declaredBy=\"flash.xml::XMLNode\"/>\n      <accessor name=\"namespaceURI\" access=\"readonly\" type=\"String\" declaredBy=\"flash.xml::XMLNode\"/>\n      <accessor name=\"prefix\" access=\"readonly\" type=\"String\" declaredBy=\"flash.xml::XMLNode\"/>\n      <constructor>\n          <parameter index=\"1\" type=\"String\" optional=\"true\"/>\n    </constructor>\n      <extendsClass type=\"Object\"/>\n      <extendsClass type=\"flash.xml::XMLNode\"/>\n      <method name=\"appendChild\" declaredBy=\"flash.xml::XMLNode\" returnType=\"void\">\n          <parameter index=\"1\" type=\"flash.xml::XMLNode\" optional=\"false\"/>\n    </method>\n      <method name=\"cloneNode\" declaredBy=\"flash.xml::XMLNode\" returnType=\"flash.xml::XMLNode\">\n          <parameter index=\"1\" type=\"Boolean\" optional=\"false\"/>\n    </method>\n      <method name=\"createElement\" declaredBy=\"flash.xml::XMLDocument\" returnType=\"flash.xml::XMLNode\">\n          <parameter index=\"1\" type=\"String\" optional=\"false\"/>\n    </method>\n      <method name=\"createTextNode\" declaredBy=\"flash.xml::XMLDocument\" returnType=\"flash.xml::XMLNode\">\n          <parameter index=\"1\" type=\"String\" optional=\"false\"/>\n    </method>\n      <method name=\"getNamespaceForPrefix\" declaredBy=\"flash.xml::XMLNode\" returnType=\"String\">\n          <parameter index=\"1\" type=\"String\" optional=\"false\"/>\n    </method>\n      <method name=\"getPrefixForNamespace\" declaredBy=\"flash.xml::XMLNode\" returnType=\"String\">\n          <parameter index=\"1\" type=\"String\" optional=\"false\"/>\n    </method>\n      <method name=\"hasChildNodes\" declaredBy=\"flash.xml::XMLNode\" returnType=\"Boolean\"/>\n      <method name=\"insertBefore\" declaredBy=\"flash.xml::XMLNode\" returnType=\"void\">\n          <parameter index=\"1\" type=\"flash.xml::XMLNode\" optional=\"false\"/>\n          <parameter index=\"2\" type=\"flash.xml::XMLNode\" optional=\"false\"/>\n    </method>\n      <method name=\"parseXML\" declaredBy=\"flash.xml::XMLDocument\" returnType=\"void\">\n          <parameter index=\"1\" type=\"String\" optional=\"false\"/>\n    </method>\n      <method name=\"removeNode\" declaredBy=\"flash.xml::XMLNode\" returnType=\"void\"/>\n      <method name=\"toString\" declaredBy=\"flash.xml::XMLDocument\" returnType=\"String\"/>\n      <variable name=\"docTypeDecl\" type=\"Object\"/>\n      <variable name=\"firstChild\" type=\"flash.xml::XMLNode\"/>\n      <variable name=\"idMap\" type=\"Object\"/>\n      <variable name=\"ignoreWhite\" type=\"Boolean\"/>\n      <variable name=\"lastChild\" type=\"flash.xml::XMLNode\"/>\n      <variable name=\"nextSibling\" type=\"flash.xml::XMLNode\"/>\n      <variable name=\"nodeName\" type=\"String\"/>\n... (66 lines after) ..."
+    },
+    {
+      "test": "amf_array_serialization",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 6.489,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 17,
+        "matching_lines": 6
+      },
+      "duration": 6.51,
+      "status": "output_mismatch",
+      "detail": "11 line(s) differ (actual=6, expected=17)",
+      "actual_output": "... (1 lines before) ...\nByteArray AMF0 Read: dense_0\n--- Testing ByteArray AMF3 ---\n--- Testing LocalConnection ---\n--- Testing NetConnection AMF0 ---\n--- Testing NetConnection AMF3 ---",
+      "expected_output": "... (1 lines before) ...\nByteArray AMF0 Read: dense_0\n--- Testing ByteArray AMF3 ---\n--- Testing LocalConnection ---\n--- Testing NetConnection AMF0 ---\n--- Testing NetConnection AMF3 ---\nLC Received: 1672531200000\nNavigator::fetch:\n  URL: http://localhost:8000/\n  Method: POST\n  Mime-Type: application/x-amf\n  Body: [00, 00, 00, 00, 00, 01, 00, 0E, 74, 65, 73, 74, 2E, 61, 76, 6D, 32, 2E, 61, 6D, 66, 30, 00, 02, 2F, 31, 00, 00, 00, B6, 0A, 00, 00, 00, 06, 0A, 00, 00, 00, 02, 02, 00, 07, 64, 65, 6E, 73, 65, 5F, 30, 02, 00, 07, 64, 65, 6E, 73, 65, 5F, 31, 0A, 00, 00, 00, 06, 02, 00, 08, 73, 70, 61, 72, 73, 65, 5F, 30, 06, 06, 06, 06, 02, 00, 08, 73, 70, 61, 72, 73, 65, 5F, 35, 08, 00, 00, 00, 01, 00, 01, 30, 02, 00, 07, 6D, 69, 78, 65, 64, 5F, 30, 00, 0B, 63, 75, 73, 74, 6F, 6D, 5F, 70, 72, 6F, 70, 02, 00, 0C, 63, 75, 73, 74, 6F, 6D, 5F, 76, 61, 6C, 75, 65, 00, 00, 09, 03, 00, 01, 30, 02, 00, 06, 66, 61, 6B, 65, 5F, 30, 00, 06, 6C, 65, 6E, 67, 74, 68, 00, 3F, F0, 00, 00, 00, 00, 00, 00, 00, 00, 09, 0B, 42, 78, 56, AA, 0C, 80, 00, 00, 00, 00, 0A, 00, 00, 00, 01, 0A, 00, 00, 00, 02, 02, 00, 06, 64, 65, 65, 70, 5F, 30, 02, 00, 06, 64, 65, 65, 70, 5F, 31]\nNavigator::fetch:\n  URL: http://localhost:8000/\n  Method: POST\n  Mime-Type: application/x-amf\n  Body: [00, 03, 00, 00, 00, 01, 00, 0E, 74, 65, 73, 74, 2E, 61, 76, 6D, 32, 2E, 61, 6D, 66, 33, 00, 02, 2F, 31, 00, 00, 00, 96, 0A, 00, 00, 00, 06, 11, 09, 05, 01, 06, 0F, 64, 65, 6E, 73, 65, 5F, 30, 06, 0F, 64, 65, 6E, 73, 65, 5F, 31, 11, 09, 03, 03, 35, 06, 11, 73, 70, 61, 72, 73, 65, 5F, 35, 01, 06, 11, 73, 70, 61, 72, 73, 65, 5F, 30, 11, 09, 03, 17, 63, 75, 73, 74, 6F, 6D, 5F, 70, 72, 6F, 70, 06, 19, 63, 75, 73, 74, 6F, 6D, 5F, 76, 61, 6C, 75, 65, 01, 06, 0F, 6D, 69, 78, 65, 64, 5F, 30, 11, 0A, 0B, 01, 03, 30, 06, 0D, 66, 61, 6B, 65, 5F, 30, 0D, 6C, 65, 6E, 67, 74, 68, 04, 01, 01, 11, 08, 01, 42, 78, 56, AA, 0C, 80, 00, 00, 11, 09, 03, 01, 09, 05, 01, 06, 0D, 64, 65, 65, 70, 5F, 30, 06, 0D, 64, 65, 65, 70, 5F, 31]"
     },
     {
       "test": "amf_custom_obj",
@@ -1537,6 +1624,23 @@
       "status": "pass"
     },
     {
+      "test": "away3d_advanced_shallow_water_demo",
+      "phases": {
+        "recomp": 1.527,
+        "compile": 76.103,
+        "run": 0.008
+      },
+      "num_frames": 20,
+      "error_signature": "TypeError: Error #1006: identity is not a function.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 77.65,
+      "status": "pass"
+    },
+    {
       "test": "bevel_filter",
       "phases": {
         "recomp": 0.0,
@@ -1605,6 +1709,22 @@
       "status": "pass"
     },
     {
+      "test": "bitmap_pixelsnapping",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.61,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 24.62,
+      "status": "pass"
+    },
+    {
       "test": "bitmap_properties",
       "phases": {
         "recomp": 0.0,
@@ -1637,6 +1757,22 @@
       "status": "pass"
     },
     {
+      "test": "bitmap_subclass_properties",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.874,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 5.89,
+      "status": "pass"
+    },
+    {
       "test": "bitmap_timeline",
       "phases": {
         "recomp": 0.0,
@@ -1666,6 +1802,107 @@
         "matching_lines": 1
       },
       "duration": 42.32,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_applyfilter_blur",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.678,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable BlurFilter is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.69,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_applyfilter_colormatrix",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.755,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ColorMatrixFilter is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.77,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_applyfilter_destpoint",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.053,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ColorMatrixFilter is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.06,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_applyfilter_destpoint_edges",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.567,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable BlurFilter is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.58,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_clone",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.681,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 5.69,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_colortransform",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.839,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable PNGEncoderOptions is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.85,
       "status": "pass"
     },
     {
@@ -1717,6 +1954,39 @@
       "status": "pass"
     },
     {
+      "test": "bitmapdata_copychannel",
+      "phases": {
+        "recomp": 0.131,
+        "compile": 21.809,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable BitmapDataChannel is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.95,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_copypixels",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.483,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 23
+      },
+      "duration": 19.49,
+      "status": "pass"
+    },
+    {
       "test": "bitmapdata_copypixels_blend_over",
       "phases": {
         "recomp": 0.005,
@@ -1762,6 +2032,200 @@
         "matching_lines": 7
       },
       "duration": 4.35,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 19.108,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.12,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_colortransform",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.357,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.37,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_cpu_overwrite_gpu",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.229,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.24,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_filters",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.075,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ColorMatrixFilter is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.08,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_masks",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.386,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.4,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_rotation",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.327,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.34,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_self_via_graphic",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.297,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.31,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_stage",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 18.908,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 18.92,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_drawwithquality",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 4.485,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.5,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_embedded",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.407,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 4.42,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_fillrect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.349,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.36,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_filter_sourcerect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 18.902,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable BlurFilter is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 18.91,
       "status": "pass"
     },
     {
@@ -1861,6 +2325,22 @@
       "status": "pass"
     },
     {
+      "test": "bitmapdata_opaque",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.325,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.33,
+      "status": "pass"
+    },
+    {
       "test": "bitmapdata_pixeldissolve",
       "phases": {
         "recomp": 0.0,
@@ -1874,6 +2354,22 @@
         "matching_lines": 1037
       },
       "duration": 19.18,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_pixeldissolve_image",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.482,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.5,
       "status": "pass"
     },
     {
@@ -1922,6 +2418,22 @@
         "matching_lines": 26
       },
       "duration": 4.41,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_sync",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.375,
+        "run": 0.004
+      },
+      "num_frames": 6,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.38,
       "status": "pass"
     },
     {
@@ -2026,6 +2538,58 @@
       "detail": "1 line(s) differ (actual=1, expected=1)",
       "actual_output": "null blendMode should not be set",
       "expected_output": "2007"
+    },
+    {
+      "test": "blend_multiply_alpha",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.959,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.97,
+      "status": "pass"
+    },
+    {
+      "test": "blend_scroll",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.53,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.54,
+      "status": "pass"
+    },
+    {
+      "test": "blend_shader_luma_lighten",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 5.132,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "duration": 5.15,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=1, expected=3)",
+      "actual_output": "Loaded!",
+      "expected_output": "Loaded!\nCaught error: TypeError: Error #2007: Parameter data must be non-null.\nAfter blendShader: shader"
     },
     {
       "test": "blur_filter",
@@ -3764,6 +4328,39 @@
       "status": "pass"
     },
     {
+      "test": "displayobject_blendmode",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.497,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.51,
+      "status": "pass"
+    },
+    {
+      "test": "displayobject_colortransform_nested",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.436,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "error_signature": "ReferenceError: Error #1056: Cannot create property color on flash.geom.ColorTransform.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.45,
+      "status": "pass"
+    },
+    {
       "test": "displayobject_early_init",
       "phases": {
         "recomp": 0.078,
@@ -3816,6 +4413,22 @@
         "matching_lines": 1
       },
       "duration": 24.35,
+      "status": "pass"
+    },
+    {
+      "test": "displayobject_getbounds_shape",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.276,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.29,
       "status": "pass"
     },
     {
@@ -3941,6 +4554,22 @@
       "status": "pass"
     },
     {
+      "test": "displayobject_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.493,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 5.5,
+      "status": "pass"
+    },
+    {
       "test": "displayobject_mask_self_referential",
       "phases": {
         "recomp": 0.0,
@@ -4005,6 +4634,25 @@
       "status": "pass"
     },
     {
+      "test": "displayobject_opaque_background",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.987,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 5
+      },
+      "duration": 24.0,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=6, expected=6)",
+      "actual_output": "null\n255\nnull\n255\nundefined\n255",
+      "expected_output": "null\n255\nnull\n255\nnull\n255"
+    },
+    {
       "test": "displayobject_parent",
       "phases": {
         "recomp": 0.0,
@@ -4050,6 +4698,22 @@
         "matching_lines": 1284
       },
       "duration": 5.55,
+      "status": "pass"
+    },
+    {
+      "test": "displayobject_set_matrix_nested",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.072,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.08,
       "status": "pass"
     },
     {
@@ -4793,6 +5457,22 @@
       "status": "pass"
     },
     {
+      "test": "edittext_always_show_selection",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.397,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.41,
+      "status": "pass"
+    },
+    {
       "test": "edittext_antialiastype",
       "phases": {
         "recomp": 0.0,
@@ -4838,6 +5518,38 @@
         "matching_lines": 39
       },
       "duration": 5.8,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_autosize_align",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.354,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.37,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_autosize_height_dynamic",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.236,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 60
+      },
+      "duration": 24.25,
       "status": "pass"
     },
     {
@@ -4902,6 +5614,22 @@
         "matching_lines": 490
       },
       "duration": 6.84,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_autosize_lazy_bounds_visual",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.215,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 24.23,
       "status": "pass"
     },
     {
@@ -5062,6 +5790,38 @@
         "matching_lines": 8
       },
       "duration": 5.42,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_get_char_index_at_point",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.756,
+        "run": 0.115
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 25.88,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_get_line_index_at_point",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.784,
+        "run": 0.032
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 25.82,
       "status": "pass"
     },
     {
@@ -5949,6 +6709,38 @@
       "expected_output": "Error\n\tat Test$cinit()\n\tat global$init()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat MethodInfo-1()\n\tat MethodInfo-2()\n\tat global$init()\n\tat test_fla::MainTimeline/frame1()\n100\ntest message\nTest\nTest: test message\nTest: test message\n\tat global$init()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat Test()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat Test/uri::f()\n\tat Test()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat Test/get getter()\n\tat Test()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat Test$/class_method()\n\tat Test/get getter()\n\tat Test()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat Test/set setter()\n\tat Test()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat Test$/class_method()\n\tat Test/set setter()\n\tat Test()\n\tat test_fla::MainTimeline/frame1()\nError\n\tat Test$/class_method()\n\tat Test()\n\tat test_fla::MainTimeline/frame1()"
     },
     {
+      "test": "error_stack_trace_debug_swf17",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.992,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.0,
+      "status": "pass"
+    },
+    {
+      "test": "error_stack_trace_debug_swf18",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.42,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.43,
+      "status": "pass"
+    },
+    {
       "test": "error_stack_trace_edge_cases",
       "phases": {
         "recomp": 0.0,
@@ -5966,6 +6758,38 @@
       "detail": "6 line(s) differ (actual=4, expected=6)",
       "actual_output": "Error\n\tat Test()\nError\n\tat Test()",
       "expected_output": "toString called (1)\nfrom toString\n\tat Test()\ntoString called (2)\nnull\n\tat Test()"
+    },
+    {
+      "test": "error_stack_trace_release_swf17",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.458,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.47,
+      "status": "pass"
+    },
+    {
+      "test": "error_stack_trace_release_swf18",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.394,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.41,
+      "status": "pass"
     },
     {
       "test": "error_throwerror",
@@ -6562,6 +7386,150 @@
       "status": "pass"
     },
     {
+      "test": "filereference_browse_cancel",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.484,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 5.49,
+      "status": "pass"
+    },
+    {
+      "test": "filereference_browse_select",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.566,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 5.58,
+      "status": "pass"
+    },
+    {
+      "test": "filereference_load",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.486,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 5.5,
+      "status": "pass"
+    },
+    {
+      "test": "filereference_save",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.538,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 16
+      },
+      "duration": 5.55,
+      "status": "pass"
+    },
+    {
+      "test": "filereference_save_and_browse",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.54,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 42,
+        "expected_lines": 42,
+        "matching_lines": 42
+      },
+      "duration": 5.55,
+      "status": "pass"
+    },
+    {
+      "test": "filereference_save_and_load",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.502,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      },
+      "duration": 5.51,
+      "status": "pass"
+    },
+    {
+      "test": "filereference_uninitialized",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.415,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 5.43,
+      "status": "pass"
+    },
+    {
+      "test": "filereferencelist_browse_cancel",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.418,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 5.43,
+      "status": "pass"
+    },
+    {
+      "test": "filereferencelist_browse_select",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.441,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 5.45,
+      "status": "pass"
+    },
+    {
       "test": "filter_rewind",
       "phases": {
         "recomp": 0.0,
@@ -6917,6 +7885,70 @@
         "matching_lines": 20
       },
       "duration": 23.75,
+      "status": "pass"
+    },
+    {
+      "test": "focus_root_movie",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.815,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 23.83,
+      "status": "pass"
+    },
+    {
+      "test": "focus_stage",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.399,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.41,
+      "status": "pass"
+    },
+    {
+      "test": "focusrect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 6.091,
+        "run": 0.004
+      },
+      "num_frames": 14,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 6.1,
+      "status": "pass"
+    },
+    {
+      "test": "focusrect_focuslost",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.461,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 5.47,
       "status": "pass"
     },
     {
@@ -7772,6 +8804,122 @@
       "expected_output": "... (2 lines before) ...\n40.35\nMain constructor\nconstructing child:\nMyText constructor\nmy shape:\n0\n0"
     },
     {
+      "test": "graphics_bad_direct_commands",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.851,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 5.86,
+      "status": "pass"
+    },
+    {
+      "test": "graphics_bitmap_fill",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.664,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable GraphicsBitmapFill is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.68,
+      "status": "pass"
+    },
+    {
+      "test": "graphics_bitmaps",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.683,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1006: lineBitmapStyle is not a function.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.69,
+      "status": "pass"
+    },
+    {
+      "test": "graphics_direct_commands",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.55,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable CapsStyle is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.56,
+      "status": "pass"
+    },
+    {
+      "test": "graphics_draw_triangles",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.627,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 98,
+        "expected_lines": 98,
+        "matching_lines": 98
+      },
+      "duration": 24.64,
+      "status": "pass"
+    },
+    {
+      "test": "graphics_gradients",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.504,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable GradientType is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.51,
+      "status": "pass"
+    },
+    {
+      "test": "graphics_gradients_nulls",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.412,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.42,
+      "status": "pass"
+    },
+    {
       "test": "graphics_path",
       "phases": {
         "recomp": 0.0,
@@ -7802,6 +8950,22 @@
         "matching_lines": 0
       },
       "duration": 5.45,
+      "status": "pass"
+    },
+    {
+      "test": "graphics_simple_shapes",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.522,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.53,
       "status": "pass"
     },
     {
@@ -9009,6 +10173,70 @@
       "status": "pass"
     },
     {
+      "test": "loader_events",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 5.908,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 92,
+        "expected_lines": 92,
+        "matching_lines": 92
+      },
+      "duration": 5.93,
+      "status": "pass"
+    },
+    {
+      "test": "loader_image",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.529,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 5.54,
+      "status": "pass"
+    },
+    {
+      "test": "loader_jpegxr",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.812,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 25.82,
+      "status": "pass"
+    },
+    {
+      "test": "loader_jpegxr_alpha",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.383,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 24.39,
+      "status": "pass"
+    },
+    {
       "test": "loader_load",
       "phases": {
         "recomp": 0.008,
@@ -9027,6 +10255,22 @@
       "detail": "4 line(s) differ (actual=126, expected=128)",
       "actual_output": "... (75 lines before) ...\nTest 3\n// request.url\nhttp://localhost:8000\n\n// request.data\naaa=bbb&cccc=true\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: aaa=bbb&cccc=true\n\nTest 4\n// request.url\nhttp://localhost:8000\n\n// request.data\na=b\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: a=b\n\n... (1 lines after) ...",
       "expected_output": "... (75 lines before) ...\nTest 3\n// request.url\nhttp://localhost:8000\n\n// request.data\ncccc=true&aaa=bbb\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: cccc=true&aaa=bbb\n\nTest 4\n// request.url\nhttp://localhost:8000\n\n// request.data\na=b\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: a=b\n\n... (3 lines after) ..."
+    },
+    {
+      "test": "loader_loadbytes_events",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 5.915,
+        "run": 0.004
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 5.93,
+      "status": "pass"
     },
     {
       "test": "loader_loadbytes_invalid_png",
@@ -9312,6 +10556,25 @@
       "status": "pass"
     },
     {
+      "test": "localconnection_send",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.49,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 4,
+        "matching_lines": 0
+      },
+      "duration": 4.5,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=0, expected=4)",
+      "actual_output": "",
+      "expected_output": "TypeError: Error #2007: Parameter connectionName must be non-null.\nTypeError: Error #2007: Parameter connectionName must be non-null.\nTypeError: Error #2007: Parameter methodName must be non-null.\n[StatusEvent type=\"status\" bubbles=false cancelable=false eventPhase=2 code=null level=\"error\"]"
+    },
+    {
       "test": "lshift",
       "phases": {
         "recomp": 0.0,
@@ -9325,6 +10588,22 @@
         "matching_lines": 1058
       },
       "duration": 12.97,
+      "status": "pass"
+    },
+    {
+      "test": "mask_reapply",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.659,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 4.67,
       "status": "pass"
     },
     {
@@ -9624,6 +10903,22 @@
       "status": "pass"
     },
     {
+      "test": "mouse_pick_dobj_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.575,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 4.58,
+      "status": "pass"
+    },
+    {
       "test": "mouse_pick_loader_avm1",
       "phases": {
         "recomp": 0.0,
@@ -9656,6 +10951,38 @@
         "matching_lines": 7
       },
       "duration": 21.09,
+      "status": "pass"
+    },
+    {
+      "test": "mouse_pick_non_interactive_bitmap_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.908,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 20.92,
+      "status": "pass"
+    },
+    {
+      "test": "mouse_pick_non_interactive_dobj_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.527,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 4.54,
       "status": "pass"
     },
     {
@@ -10946,6 +12273,76 @@
       "status": "pass"
     },
     {
+      "test": "netconnection_close",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.57,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 5.58,
+      "status": "pass"
+    },
+    {
+      "test": "netconnection_properties",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.678,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 78,
+        "expected_lines": 78,
+        "matching_lines": 78
+      },
+      "duration": 5.69,
+      "status": "pass"
+    },
+    {
+      "test": "netconnection_send_remote",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 5.858,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 50,
+        "matching_lines": 2
+      },
+      "duration": 5.88,
+      "status": "output_mismatch",
+      "detail": "48 line(s) differ (actual=2, expected=50)",
+      "actual_output": "# Start of Test 1\n[onResult works] started",
+      "expected_output": "# Start of Test 1\n[onResult works] started\nNavigator::fetch:\n  URL: http://localhost:8000/test1\n  Method: POST\n  Mime-Type: application/x-amf\n  Body: [00, 00, 00, 00, 00, 01, 00, 0B, 74, 65, 73, 74, 2E, 6D, 65, 74, 68, 6F, 64, 00, 02, 2F, 31, 00, 00, 00, 35, 0A, 00, 00, 00, 04, 02, 00, 0A, 41, 72, 67, 75, 6D, 65, 6E, 74, 20, 31, 01, 01, 00, 40, 5E, C0, 00, 00, 00, 00, 00, 03, 00, 03, 6B, 65, 79, 02, 00, 0C, 48, 65, 6C, 6C, 6F, 20, 57, 6F, 72, 6C, 64, 21, 00, 00, 09]\n[onResult works] passed!\n# End of Test 1\n\n# Start of Test 2\n[onNetStatus] event.info.code = NetConnection.Connect.Closed\n[onNetStatus] event.info.level = status\n[onStatus works] started\nNavigator::fetch:\n  URL: http://localhost:8000/test2\n  Method: POST\n  Mime-Type: application/x-amf\n  Body: [00, 00, 00, 00, 00, 01, 00, 0B, 74, 65, 73, 74, 2E, 6D, 65, 74, 68, 6F, 64, 00, 02, 2F, 31, 00, 00, 00, 05, 0A, 00, 00, 00, 00]\n[onStatus works] passed!\n# End of Test 2\n\n# Start of Test 3\n[onNetStatus] event.info.code = NetConnection.Connect.Closed\n[onNetStatus] event.info.level = status\n[Call 1 with headers] started\n[Call 2 with headers] started\nNavigator::fetch:\n  URL: http://localhost:8000/test3\n  Method: POST\n  Mime-Type: application/x-amf\n  Body: [00, 00, 00, 02, 00, 08, 52, 65, 71, 75, 69, 72, 65, 64, 01, 00, 00, 00, 08, 02, 00, 05, 76, 61, 6C, 75, 65, 00, 09, 44, 75, 70, 6C, 69, 63, 61, 74, 65, 00, 00, 00, 00, 01, 05, 00, 02, 00, 0B, 74, 65, 73, 74, 2E, 6D, 65, 74, 68, 6F, 64, 00, 02, 2F, 31, 00, 00, 00, 05, 0A, 00, 00, 00, 00, 00, 0B, 74, 65, 73, 74, 2E, 6D, 65, 74, 68, 6F, 64, 00, 02, 2F, 32, 00, 00, 00, 05, 0A, 00, 00, 00, 00]\n[Call 1 with headers] passed!\n[Call 2 with headers] passed!\n# End of Test 3\n\n# Start of Test 4\n[onNetStatus] event.info.code = NetConnection.Connect.Closed\n[onNetStatus] event.info.level = status\n[Expected failure] started\nNavigator::fetch:\n  URL: http://localhost:8000/test4\n  Method: POST\n  Mime-Type: application/x-amf\n  Body: [00, 00, 00, 00, 00, 01, 00, 07, 66, 61, 69, 6C, 75, 72, 65, 00, 02, 2F, 31, 00, 00, 00, 05, 0A, 00, 00, 00, 00]\n[onNetStatus] event.info.code = NetConnection.Call.Failed\n[onNetStatus] event.info.description = HTTP: Failed\n[onNetStatus] event.info.details = http://localhost:8000/test4\n[onNetStatus] event.info.level = error\n# End of Test 4"
+    },
+    {
+      "test": "netconnection_serialize_arrays",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 5.551,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 6,
+        "matching_lines": 1
+      },
+      "duration": 5.57,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=1, expected=6)",
+      "actual_output": "--- Testing NetConnection Array Serialization ---",
+      "expected_output": "--- Testing NetConnection Array Serialization ---\nNavigator::fetch:\n  URL: http://localhost:8000/\n  Method: POST\n  Mime-Type: application/x-amf\n  Body: [00, 00, 00, 00, 00, 01, 00, 0B, 74, 65, 73, 74, 2E, 61, 72, 72, 61, 79, 73, 00, 02, 2F, 31, 00, 00, 00, 1C, 0A, 00, 00, 00, 01, 0A, 00, 00, 00, 02, 02, 00, 06, 72, 65, 61, 6C, 5F, 30, 02, 00, 06, 72, 65, 61, 6C, 5F, 31]"
+    },
+    {
       "test": "netfilterevent",
       "phases": {
         "recomp": 0.0,
@@ -10964,6 +12361,38 @@
       "detail": "10 line(s) differ (actual=0, expected=10)",
       "actual_output": "",
       "expected_output": "[NetTransformEvent type=\"netfilter\" bubbles=false cancelable=false eventPhase=2 header=null data=]\n[NetTransformEvent type=\"netfilter\" bubbles=false cancelable=false eventPhase=2 header=null data=]\n[NetTransformEvent type=\"netfilter\" bubbles=false cancelable=true eventPhase=2 header= data=null]\n[NetTransformEvent type=\"netfilter\" bubbles=false cancelable=true eventPhase=2 header= data=null]\n[NetTransformEvent type=\"netfilter\" bubbles=true cancelable=false eventPhase=2 header= data=]\nevent.header === a: true\nevent.data === b: true\n[NetTransformEvent type=\"netfilter\" bubbles=true cancelable=false eventPhase=2 header= data=]\nclone.header === a: true\nclone.data === b: true"
+    },
+    {
+      "test": "netstream_client",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.684,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 5.69,
+      "status": "pass"
+    },
+    {
+      "test": "netstream_connect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.517,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 5.53,
+      "status": "pass"
     },
     {
       "test": "newactivation_in_script_init",
@@ -11597,6 +13026,603 @@
       "detail": "5 line(s) differ (actual=40, expected=40)",
       "actual_output": "// Default values (stage)\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// Default values (root)\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// Default values (object)\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// Before setting\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// After setting to non-null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// After setting to null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// After setting stage to null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// After setting root to null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null",
       "expected_output": "// Default values (stage)\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = [object PerspectiveProjection]\n// Default values (root)\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = [object PerspectiveProjection]\n// Default values (object)\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// Before setting\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// After setting to non-null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = [object PerspectiveProjection]\n// After setting to null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = null\n// After setting stage to null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = [object PerspectiveProjection]\n// After setting root to null\n  z = 0\n  matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\n  matrix3D = null\n  perspectiveProjection = [object PerspectiveProjection]"
+    },
+    {
+      "test": "pixelbender_ceil",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.548,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 16,
+        "expected_lines": 77,
+        "matching_lines": 5
+      },
+      "duration": 4.56,
+      "status": "output_mismatch",
+      "detail": "72 line(s) differ (actual=16, expected=77)",
+      "actual_output": "ii\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()\nfi\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()\nif\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()\nff\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()",
+      "expected_output": "ii\nError: ArgumentError: Error #2004: One of the parameters is invalid.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test/testLoadingShader()\n\tat Test()\nfi\nError: ArgumentError: Error #2004: One of the parameters is invalid.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test/testLoadingShader()\n\tat Test()\nif\nError: ArgumentError: Error #2004: One of the parameters is invalid.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test/testLoadingShader()\n\tat Test()\nff\n0 -> ff666666\n0 -> ff666666\n0.1 -> ff666aff\n0.1 -> ff6a6a6a\n0.4 -> ff686aff\n0.4 -> ff6a6a6a\n0.5 -> ff686aff\n0.5 -> ff6a6a6a\n0.6 -> ff686aff\n0.6 -> ff6a6a6a\n0.9 -> ff6a6aff\n0.9 -> ff6a6a6a\n1 -> ff6a6aff\n1 -> ff6a6a6a\n1.1 -> ff6a6eff\n1.1 -> ff6e6e6e\n1.4 -> ff6c6eff\n1.4 -> ff6e6e6e\n1.5 -> ff6c6eff\n1.5 -> ff6e6e6e\n1.6 -> ff6c6eff\n1.6 -> ff6e6e6e\n1.9 -> ff6e6eff\n1.9 -> ff6e6e6e\n2 -> ff6e6eff\n... (27 lines after) ..."
+    },
+    {
+      "test": "pixelbender_conditional",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.134,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 138,
+        "matching_lines": 0
+      },
+      "duration": 24.14,
+      "status": "output_mismatch",
+      "detail": "138 line(s) differ (actual=0, expected=138)",
+      "actual_output": "",
+      "expected_output": "if: 0 -> ff000000\n=================\nselect: 0 -> ff000000\n=================\nif: 0.1 -> ff000000\n=================\nselect: 0.1 -> ff000000\n=================\nif: 0.5 -> ff000000\n=================\nselect: 0.5 -> ff000000\n=================\nif: 0.9 -> ff000000\n=================\nselect: 0.9 -> ff000000\n=================\nif: 1 -> ff00ffff\n=================\nselect: 1 -> ff00ffff\n=================\nif: 1.1 -> ff00ffff\n=================\nselect: 1.1 -> ff00ffff\n=================\nif: 1.5 -> ff00ffff\n=================\nselect: 1.5 -> ff00ffff\n=================\nif: 1.9 -> ff00ffff\n=================\nselect: 1.9 -> ff00ffff\n=================\nif: 2 -> ff00ffff\n=================\nselect: 2 -> ff000000\n=================\nif: 2.5 -> ff00ffff\n=================\nselect: 2.5 -> ff000000\n=================\nif: -0.1 -> ff000000\n=================\nselect: -0.1 -> ff000000\n=================\nif: -0.5 -> ff000000\n=================\nselect: -0.5 -> ff000000\n=================\nif: -0.9 -> ff000000\n=================\n... (88 lines after) ..."
+    },
+    {
+      "test": "pixelbender_conversions",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.543,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 270,
+        "matching_lines": 1
+      },
+      "duration": 5.55,
+      "status": "output_mismatch",
+      "detail": "269 line(s) differ (actual=1, expected=270)",
+      "actual_output": "bool->float 0",
+      "expected_output": "bool->float 0\nResult: ffff0000\n=================\nint->bool 0\nResult: ffff0000\n=================\nint->float 0\nResult: ffff0000\n=================\nfloat->bool 0\nResult: ffff0000\n=================\nfloat->int 0\nResult: ffff0000\n=================\nbool->float 0.1\nResult: ffff0000\n=================\nint->bool 0.1\nResult: ffff0000\n=================\nint->float 0.1\nResult: ffff0000\n=================\nfloat->bool 0.1\nResult: ffffff00\n=================\nfloat->int 0.1\nResult: ffff0000\n=================\nbool->float 0.5\nResult: ffff0000\n=================\nint->bool 0.5\nResult: ffff0000\n=================\nint->float 0.5\nResult: ffff0000\n=================\nfloat->bool 0.5\nResult: ffffff00\n=================\nfloat->int 0.5\nResult: ffff0000\n=================\nbool->float 0.9\nResult: ffff0000\n=================\nint->bool 0.9\nResult: ffff0000\n... (220 lines after) ..."
+    },
+    {
+      "test": "pixelbender_dithering",
+      "phases": {
+        "recomp": 0.186,
+        "compile": 26.092,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 8,
+        "matching_lines": 0
+      },
+      "duration": 26.29,
+      "status": "output_mismatch",
+      "detail": "8 line(s) differ (actual=0, expected=8)",
+      "actual_output": "",
+      "expected_output": "Shader metadata: description Value: Ordered Dithering\nShader parameter: matrixHeight Value: 4\nShader parameter: matrixWidth Value: 4\nShader metadata: name Value: OrderDithering\nShader metadata: namespace Value: YourNamespace\nShader input: src Value: null\nShader metadata: vendor Value: YourVendor\nShader metadata: version Value: 1"
+    },
+    {
+      "test": "pixelbender_div",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.333,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 36,
+        "matching_lines": 1
+      },
+      "duration": 5.34,
+      "status": "output_mismatch",
+      "detail": "35 line(s) differ (actual=1, expected=36)",
+      "actual_output": "Input: 4, 4",
+      "expected_output": "Input: 4, 4\nResult: ff01ffff\n=================\nInput: 2, 8\nResult: ff0040ff\n=================\nInput: 2, 16\nResult: ff0020ff\n=================\nInput: 2, 8\nResult: ff0040ff\n=================\nInput: 8, 1\nResult: ff08ffff\n=================\nInput: 8, 2\nResult: ff04ffff\n=================\nInput: -8, -2\nResult: ff04ff00\n=================\nInput: -2, -8\nResult: ff004000\n=================\nInput: 0, 2\nResult: ff000000\n=================\nInput: 2.5, 8\nResult: ff0050ff\n=================\nInput: 2.1, 8\nResult: ff0043ff\n=================\nInput: 2.9, 8\nResult: ff005cff\n================="
+    },
+    {
+      "test": "pixelbender_effect_BlurredFocus",
+      "phases": {
+        "recomp": 0.176,
+        "compile": 26.734,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 26.92,
+      "status": "pass"
+    },
+    {
+      "test": "pixelbender_effect_glassDisplace",
+      "phases": {
+        "recomp": 0.319,
+        "compile": 10.265,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 10.61,
+      "status": "pass"
+    },
+    {
+      "test": "pixelbender_effect_glassDisplace_shaderfilter",
+      "phases": {
+        "recomp": 0.324,
+        "compile": 25.611,
+        "run": 0.016
+      },
+      "num_frames": 10,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 4,
+        "matching_lines": 0
+      },
+      "duration": 25.96,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=0, expected=4)",
+      "actual_output": "",
+      "expected_output": "Flowers rect: (x=0, y=0, w=500, h=375)\nShaderFilter equal: false\nShader equal: true\nDest rect: (x=0, y=0, w=512, h=512)"
+    },
+    {
+      "test": "pixelbender_effect_smudge",
+      "phases": {
+        "recomp": 0.167,
+        "compile": 7.959,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.15,
+      "status": "pass"
+    },
+    {
+      "test": "pixelbender_effect_tintype",
+      "phases": {
+        "recomp": 0.161,
+        "compile": 7.048,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 7.22,
+      "status": "pass"
+    },
+    {
+      "test": "pixelbender_effect_twirl",
+      "phases": {
+        "recomp": 0.209,
+        "compile": 8.119,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.35,
+      "status": "pass"
+    },
+    {
+      "test": "pixelbender_eof",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.865,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 7,
+        "matching_lines": 1
+      },
+      "duration": 4.87,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=3, expected=7)",
+      "actual_output": "Error compiling ShaderEof\nReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test()",
+      "expected_output": "Error compiling ShaderEof\nError: Error #2030: End of file was encountered.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test()"
+    },
+    {
+      "test": "pixelbender_images",
+      "phases": {
+        "recomp": 0.167,
+        "compile": 6.641,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.82,
+      "status": "pass"
+    },
+    {
+      "test": "pixelbender_input",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.16,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 103,
+        "matching_lines": 4
+      },
+      "duration": 23.17,
+      "status": "output_mismatch",
+      "detail": "99 line(s) differ (actual=4, expected=103)",
+      "actual_output": "========== 1 CHANNEL(S) ==========\n\n--- Vector.<Number> ---\nVector exact (4/4 floats)",
+      "expected_output": "\n========== 1 CHANNEL(S) ==========\n\n--- Vector.<Number> ---\nVector exact (4/4 floats)\n  Success, output: 16 floats\nVector 1 extra (5/4 floats)\n  Success, output: 16 floats\nVector 1 extra (1 pixel) (5/4 floats)\n  Success, output: 16 floats\nVector 1 short (3/4 floats)\n  Error: 2165\nVector 1 short (1 pixel) (3/4 floats)\n  Error: 2165\n\n--- ByteArray ---\nByteArray exact (4/4 floats)\n  Success, output: 16 floats\nByteArray 1 extra (5/4 floats)\n  Success, output: 16 floats\nByteArray 1 extra (1 pixel) (5/4 floats)\n  Success, output: 16 floats\nByteArray 1 short (3/4 floats)\n  Error: 2165\nByteArray 1 short (1 pixel) (3/4 floats)\n  Error: 2165\n\n========== 2 CHANNEL(S) ==========\n\n--- Vector.<Number> ---\nVector exact (8/8 floats)\n  Success, output: 16 floats\nVector 1 extra (9/8 floats)\n  Success, output: 16 floats\nVector 2 extra (1 pixel) (10/8 floats)\n  Success, output: 16 floats\nVector 1 short (7/8 floats)\n  Error: 2165\nVector 2 short (1 pixel) (6/8 floats)\n  Error: 2165\n\n--- ByteArray ---\nByteArray exact (8/8 floats)\n  Success, output: 16 floats\nByteArray 1 extra (9/8 floats)\n  Success, output: 16 floats\nByteArray 2 extra (1 pixel) (10/8 floats)\n  Success, output: 16 floats\nByteArray 1 short (7/8 floats)\n  Error: 2165\n... (54 lines after) ..."
+    },
+    {
+      "test": "pixelbender_logicalnot",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.803,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 20,
+        "matching_lines": 0
+      },
+      "duration": 4.81,
+      "status": "output_mismatch",
+      "detail": "20 line(s) differ (actual=0, expected=20)",
+      "actual_output": "",
+      "expected_output": "0 -> ff666200\n1 -> ff6a5e00\n2 -> ff6e5a00\n51 -> ffff0000\n32000 -> ffff0000\n32767 -> ffff0000\n-1 -> ff626600\n-2 -> ff5e6a04\n-3 -> ff5a6e08\n-4 -> ff56720c\n-5 -> ff527610\n-6 -> ff4e7a14\n-9 -> ff428620\n-10 -> ff3e8a24\n-20 -> ff16b24c\n-30 -> ff00da74\n-40 -> ff00ff9b\n-1000 -> ff00ffff\n-32000 -> ff00ffff\n-32768 -> ff00ffff"
+    },
+    {
+      "test": "pixelbender_malformed_data",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 22.918,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 190,
+        "matching_lines": 0
+      },
+      "duration": 22.93,
+      "status": "output_mismatch",
+      "detail": "190 line(s) differ (actual=0, expected=190)",
+      "actual_output": "",
+      "expected_output": "Testing value '1,2,3' (length 3)\nDefault value\n  data: 0,600,0,400\nAfter setting\n  data: 1,2,3\nAfter started\n  data: 1,2,3\n=================\nTesting value '1,2,3,4,5,6' (length 6)\nDefault value\n  data: 0,600,0,400\nAfter setting\n  data: 1,2,3,4,5,6\nAfter started\n  data: 1,2,3,4,5,6\n=================\nTesting value '' (length 0)\nDefault value\n  data: 0,600,0,400\nAfter setting\n  data: \nAfter started\n  data: \n=================\nTesting value 'test' (length 1)\nDefault value\n  data: 0,600,0,400\nAfter setting\n  data: test\nError while starting: ArgumentError: Error #2004: One of the parameters is invalid.\nAfter started\n  data: test\n=================\nTesting value '' (length 1)\nDefault value\n  data: 0,600,0,400\nAfter setting\n  data: \nError while starting: ArgumentError: Error #2004: One of the parameters is invalid.\nAfter started\n  data: \n=================\nTesting value '' (length 1)\nDefault value\n  data: 0,600,0,400\nAfter setting\n  data: \nError while starting: ArgumentError: Error #2004: One of the parameters is invalid.\nAfter started\n  data: \n... (140 lines after) ..."
+    },
+    {
+      "test": "pixelbender_multiple_out_params",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.875,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 4.88,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=0, expected=1)",
+      "actual_output": "",
+      "expected_output": "ff999999"
+    },
+    {
+      "test": "pixelbender_no_out_param",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.046,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "duration": 5.05,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=2, expected=6)",
+      "actual_output": "ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test()",
+      "expected_output": "ArgumentError: Error #2004: One of the parameters is invalid.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test()"
+    },
+    {
+      "test": "pixelbender_outputs",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.188,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 13,
+        "matching_lines": 0
+      },
+      "duration": 5.2,
+      "status": "output_mismatch",
+      "detail": "13 line(s) differ (actual=5, expected=13)",
+      "actual_output": "Error while creating: ReferenceError: Error #1065: Variable ShaderJob is not defined.\nError while creating: ReferenceError: Error #1065: Variable ShaderJob is not defined.\nError while creating: ReferenceError: Error #1065: Variable ShaderJob is not defined.\nError while creating: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n=== Invalid target tests ===",
+      "expected_output": "Error while starting: ArgumentError: Error #2162: The Shader output type is not compatible for this operation.\n=================\nError while starting: ArgumentError: Error #2162: The Shader output type is not compatible for this operation.\n=================\nResult: ff00ff\nResult: ffff00ff\n=================\nResult: ff00ff\nResult: ffff00ff\n=================\n=== Invalid target tests ===\nSprite: ArgumentError: Error #2004: One of the parameters is invalid.\nObject: ArgumentError: Error #2004: One of the parameters is invalid."
+    },
+    {
+      "test": "pixelbender_padding_bytes",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.847,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 66,
+        "expected_lines": 22,
+        "matching_lines": 0
+      },
+      "duration": 4.86,
+      "status": "output_mismatch",
+      "detail": "66 line(s) differ (actual=66, expected=22)",
+      "actual_output": "56: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n57: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n58: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n62: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n72: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n73: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n74: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n75: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n76: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n77: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n78: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n88: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n89: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n90: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n91: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n92: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n\tat Test()\n93: ReferenceError: Error #1065: Variable Shader is not defined.\n\tat Test/testShader()\n... (16 lines after) ...",
+      "expected_output": "56: ffffff00\n57: ffffff00\n58: ffffff00\n62: ffffff00\n72: ffffff00\n73: ffffff00\n74: ffffff00\n75: ffffff00\n76: ffffff00\n77: ffffff00\n78: ffffff00\n88: ffffff00\n89: ffffff00\n90: ffffff00\n91: ffffff00\n92: ffffff00\n93: ffffff00\n94: ffffff00\n102: ffffff00\n106: ffffff00\n110: ffffff00\n118: ffffff00"
+    },
+    {
+      "test": "pixelbender_param_qualifier",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.019,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 256,
+        "expected_lines": 512,
+        "matching_lines": 0
+      },
+      "duration": 5.03,
+      "status": "output_mismatch",
+      "detail": "512 line(s) differ (actual=256, expected=512)",
+      "actual_output": "0: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n1: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n2: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n3: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n4: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n5: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n6: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n7: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n8: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n9: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n10: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n11: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n12: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n13: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n14: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n15: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n16: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n17: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n18: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n19: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n20: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n21: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n22: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n23: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n24: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n25: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n26: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n27: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n28: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n29: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n30: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n31: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n32: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n33: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n34: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n35: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n36: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n37: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n38: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n39: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n40: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n41: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n42: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n43: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n44: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n45: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n46: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n47: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n48: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n49: in (ReferenceError: Error #1065: Variable Shader is not defined.)\n... (206 lines after) ...",
+      "expected_output": "0: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n1: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n2: out\n3: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n4: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n5: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n6: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n7: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n8: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n9: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n10: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n11: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n12: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n13: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n14: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n15: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n16: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n17: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n18: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n19: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n20: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n21: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n22: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n23: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n24: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n25: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n26: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n27: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n28: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n29: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n30: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n31: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n32: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n33: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n34: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n35: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n36: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n37: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n38: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n39: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n40: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n41: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n42: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n43: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n44: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n45: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n46: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n47: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n48: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n49: in (ArgumentError: Error #2004: One of the parameters is invalid.)\n... (462 lines after) ..."
+    },
+    {
+      "test": "pixelbender_parameters",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.568,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1563,
+        "matching_lines": 1
+      },
+      "duration": 5.58,
+      "status": "output_mismatch",
+      "detail": "1562 line(s) differ (actual=1, expected=1563)",
+      "actual_output": "Testing selector 0, value 'null'",
+      "expected_output": "Testing selector 0, value 'null'\nDefault params:\n  selector=0\n  pBool=1\n  pInt=128\n  pFloat=128\n  pPixel1=0.5\n  pFloat2=128,128\n  pFloat3=128,128,128\n  pFloat4=128,128,128,128\n  pBool2=1,1\n  pBool3=1,1,1\n  pBool4=1,1,1,1\n  pInt2=128,128\n  pInt3=128,128,128\n  pInt4=128,128,128,128\n  pPixel2=0.5,0.5\n  pPixel3=0.5,0.5,0.5\n  pPixel4=0.5,0.5,0.5,0.5\n  pFloat2x2=128,128,128,128\n  pFloat3x3=128,128,128,128,128,128,128,128,128\n  pFloat4x4=128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128\nResult: ffff0000\n=================\nTesting selector 1, value 'null'\nResult: ff000000\n=================\nTesting selector 1, value 'null'\nResult: ff000000\n=================\nTesting selector 1, value ''\nResult: ff000000\n=================\nTesting selector 1, value '256'\nResult: ff000000\n=================\nTesting selector 1, value '256,256'\nResult: ff000000\n=================\nTesting selector 1, value '256,256,256'\nResult: ff000000\n=================\nTesting selector 1, value '0,0,256'\nResult: ff000000\n=================\nTesting selector 1, value '0,0,test'\nResult: ff000000\n=================\nTesting selector 1, value 'test'\nError while starting: ArgumentError: Error #2004: One of the parameters is invalid.\n... (1513 lines after) ..."
+    },
+    {
+      "test": "pixelbender_parameters_bool",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.655,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 240,
+        "matching_lines": 0
+      },
+      "duration": 5.66,
+      "status": "output_mismatch",
+      "detail": "240 line(s) differ (actual=0, expected=240)",
+      "actual_output": "",
+      "expected_output": "Default params:\n  selector=0\n  pBool=1\n  pBool2=0,1\nAfter setting params:\n  selector=0\n  pBool=0\n  pBool2=0,1\nResult: ff0000ff\n=================\nDefault params:\n  selector=0\n  pBool=1\n  pBool2=0,1\nAfter setting params:\n  selector=0\n  pBool=1\n  pBool2=0,1\nResult: ff000000\n=================\nDefault params:\n  selector=0\n  pBool=1\n  pBool2=0,1\nAfter setting params:\n  selector=0\n  pBool=-1\n  pBool2=0,1\nResult: ff000000\n=================\nDefault params:\n  selector=0\n  pBool=1\n  pBool2=0,1\nAfter setting params:\n  selector=0\n  pBool=0.1\n  pBool2=0,1\nResult: ff0000ff\n=================\nDefault params:\n  selector=0\n  pBool=1\n  pBool2=0,1\nAfter setting params:\n  selector=0\n  pBool=0.5\n  pBool2=0,1\nResult: ff0000ff\n=================\n... (190 lines after) ..."
+    },
+    {
+      "test": "pixelbender_parameters_int_vs_bool",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.523,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 54,
+        "matching_lines": 0
+      },
+      "duration": 5.53,
+      "status": "output_mismatch",
+      "detail": "54 line(s) differ (actual=0, expected=54)",
+      "actual_output": "",
+      "expected_output": "Value: 0\nResult: ff000006\n=================\nValue: 0.1\nResult: ff000006\n=================\nValue: 0.5\nResult: ff000006\n=================\nValue: 0.9\nResult: ff000006\n=================\nValue: 1\nResult: ff020208\n=================\nValue: 1.1\nResult: ff020208\n=================\nValue: 1.5\nResult: ff020208\n=================\nValue: 1.9\nResult: ff020208\n=================\nValue: 2\nResult: ff04040a\n=================\nValue: 2.5\nResult: ff04040a\n=================\nValue: -0.1\nResult: ff000006\n=================\nValue: -0.5\nResult: ff000006\n=================\nValue: -0.9\nResult: ff000006\n=================\nValue: -1\nResult: ff000004\n=================\nValue: -1.1\nResult: ff000004\n=================\nValue: -1.5\nResult: ff000004\n=================\nValue: -2\nResult: ff000002\n... (4 lines after) ..."
+    },
+    {
+      "test": "pixelbender_parse_errors",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.851,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "duration": 4.86,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=6, expected=6)",
+      "actual_output": "[object ReferenceError]\n1065\n[object ReferenceError]\n1065\n[object ReferenceError]\n1065",
+      "expected_output": "[object ArgumentError]\n2004\n[object EOFError]\n2030\n[object EOFError]\n2030"
+    },
+    {
+      "test": "pixelbender_rsqrt",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.814,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 24,
+        "matching_lines": 1
+      },
+      "duration": 4.82,
+      "status": "output_mismatch",
+      "detail": "23 line(s) differ (actual=1, expected=24)",
+      "actual_output": "Input: 0",
+      "expected_output": "Input: 0\nResult: ffffff00\n=================\nInput: 1\nResult: ffffff00\n=================\nInput: 5\nResult: ffff7200\n=================\nInput: 9\nResult: ffff5500\n=================\nInput: 16\nResult: ffff4000\n=================\nInput: 256\nResult: ffff1000\n=================\nInput: -1\nResult: ffff0000\n=================\nInput: -16\nResult: ffff0000\n================="
+    },
+    {
+      "test": "pixelbender_select_kinds",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.004,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 0
+      },
+      "duration": 5.01,
+      "status": "output_mismatch",
+      "detail": "8 line(s) differ (actual=8, expected=8)",
+      "actual_output": "Error compiling shader 1: ReferenceError: Error #1065: Variable Shader is not defined.\nError compiling shader 2: ReferenceError: Error #1065: Variable Shader is not defined.\nError compiling shader 3: ReferenceError: Error #1065: Variable Shader is not defined.\nError compiling shader 4: ReferenceError: Error #1065: Variable Shader is not defined.\nError compiling shader 5: ReferenceError: Error #1065: Variable Shader is not defined.\nError compiling shader 6: ReferenceError: Error #1065: Variable Shader is not defined.\nError compiling shader 7: ReferenceError: Error #1065: Variable Shader is not defined.\nError compiling shader 8: ReferenceError: Error #1065: Variable Shader is not defined.",
+      "expected_output": "Shader 1 compiled\nError compiling shader 2: ArgumentError: Error #2004: One of the parameters is invalid.\nError compiling shader 3: ArgumentError: Error #2004: One of the parameters is invalid.\nError compiling shader 4: ArgumentError: Error #2004: One of the parameters is invalid.\nError compiling shader 5: ArgumentError: Error #2004: One of the parameters is invalid.\nError compiling shader 6: ArgumentError: Error #2004: One of the parameters is invalid.\nError compiling shader 7: ArgumentError: Error #2004: One of the parameters is invalid.\nShader 8 compiled"
+    },
+    {
+      "test": "pixelbender_shaderdata",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.842,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderData is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 49,
+        "matching_lines": 0
+      },
+      "duration": 4.85,
+      "status": "output_mismatch",
+      "detail": "49 line(s) differ (actual=0, expected=49)",
+      "actual_output": "",
+      "expected_output": "[object ShaderData]\ndescription: A shader that does nothing, but does it well. (String)\nname: DoNothing (String)\nnamespace: Adobe::Example (String)\notherSrc: [object ShaderInput] (flash.display::ShaderInput)\n name: otherSrc (String)\n channels: 4\n height: 0\n index: 1\n height: 0\n input: null\n width: 0\nradius: [object ShaderParameter] (flash.display::ShaderParameter)\n defaultValue: 25 (Array)\n  0: 25 (int)\n description: The radius of the effect (String)\n maxValue: 50 (Array)\n  0: 50 (int)\n minValue: 0 (Array)\n  0: 0 (int)\n name: radius (String)\n index: 1\n type: float\n value: 25\nsize: [object ShaderParameter] (flash.display::ShaderParameter)\n defaultValue: 50,50 (Array)\n  0: 50 (int)\n  1: 50 (int)\n description: The size of the image to which the kernel is applied (String)\n maxValue: 100,100.5 (Array)\n  0: 100 (int)\n  1: 100.5 (Number)\n minValue: 0,0 (Array)\n  0: 0 (int)\n  1: 0 (int)\n name: size (String)\n index: 0\n type: float2\n value: 50,50\nsrc: [object ShaderInput] (flash.display::ShaderInput)\n name: src (String)\n channels: 4\n height: 0\n index: 0\n height: 0\n input: null\n width: 0\nvendor: Adobe examples (String)\nversion: 1 (int)"
+    },
+    {
+      "test": "pixelbender_shaderdata_setter",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.191,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 99,
+        "matching_lines": 3
+      },
+      "duration": 5.2,
+      "status": "output_mismatch",
+      "detail": "96 line(s) differ (actual=3, expected=99)",
+      "actual_output": "=== Testing shader parameter values actually received by shader ===\n\n=== Test 1: Normal - shader.data.amount.value = [0.4] ===",
+      "expected_output": "=== Testing shader parameter values actually received by shader ===\n\n=== Test 1: Normal - shader.data.amount.value = [0.4] ===\nStored value: [object ShaderParameter]\nStored type: object\nOutput pixel RGB: 102, 102, 102\nShader received (approx): 0.4000\n\n=== Test 2: Array on data - shader.data.amount = [0.75] ===\nStored value: 0.75\nStored type: object\nOutput pixel RGB: 51, 51, 51\nShader received (approx): 0.2000\n\n=== Test 3: Primitive number - shader.data.amount = 0.299 ===\nStored value: 0.299\nStored type: number\nOutput pixel RGB: 51, 51, 51\nShader received (approx): 0.2000\n\n=== Test 4: Integer - shader.data.amount = 1 ===\nStored value: 1\nStored type: number\nOutput pixel RGB: 51, 51, 51\nShader received (approx): 0.2000\n\n=== Test 5: Zero - shader.data.amount = 0 ===\nStored value: 0\nStored type: number\nOutput pixel RGB: 51, 51, 51\nShader received (approx): 0.2000\n\n=== Test 6: Negative - shader.data.amount = -0.5 ===\nStored value: -0.5\nStored type: number\nOutput pixel RGB: 51, 51, 51\nShader received (approx): 0.2000\n\n=== Test 7: Boolean true - shader.data.amount = true ===\nStored value: true\nStored type: boolean\nOutput pixel RGB: 51, 51, 51\nShader received (approx): 0.2000\n\n=== Test 8: Boolean false - shader.data.amount = false ===\nStored value: false\nStored type: boolean\nOutput pixel RGB: 51, 51, 51\nShader received (approx): 0.2000\n\n... (49 lines after) ..."
+    },
+    {
+      "test": "pixelbender_sign",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.137,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable ShaderJob is not defined.",
+      "lines": {
+        "actual_lines": 16,
+        "expected_lines": 60,
+        "matching_lines": 5
+      },
+      "duration": 5.15,
+      "status": "output_mismatch",
+      "detail": "55 line(s) differ (actual=16, expected=60)",
+      "actual_output": "ii\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()\nfi\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()\nif\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()\nff\nError: ReferenceError: Error #1065: Variable ShaderJob is not defined.\n\tat Test/testLoadingShader()\n\tat Test()",
+      "expected_output": "ii\nError: ArgumentError: Error #2004: One of the parameters is invalid.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test/testLoadingShader()\n\tat Test()\nfi\nError: ArgumentError: Error #2004: One of the parameters is invalid.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test/testLoadingShader()\n\tat Test()\nif\nError: ArgumentError: Error #2004: One of the parameters is invalid.\n\tat flash.display::ShaderData/_setByteCode()\n\tat flash.display::ShaderData()\n\tat flash.display::Shader/set byteCode()\n\tat flash.display::Shader()\n\tat Test/testLoadingShader()\n\tat Test()\nff\n0 -> ff666666\n0 -> ff666666\n0 -> ff666666\n0 -> ff666666\n0 -> ff666666\n0 -> ff666666\n0.1 -> ff666aff\n0.1 -> ff6a6a6a\n0.1 -> ff6a6a6a\n1 -> ff6a6aff\n1 -> ff6a6a6a\n1 -> ff6a6a6a\n100 -> ffff6aff\n100 -> ff6a6a6a\n100 -> ff6a6a6a\n-0.1 -> ff666200\n-0.1 -> ff626262\n-0.1 -> ff626262\n-1 -> ff626200\n-1 -> ff626262\n-1 -> ff626262\n-100 -> ff006200\n-100 -> ff626262\n-100 -> ff626262\nInfinity -> ffff6aff\n... (10 lines after) ..."
+    },
+    {
+      "test": "pixelbender_vector_output",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.172,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Shader is not defined.",
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 11,
+        "matching_lines": 1
+      },
+      "duration": 5.18,
+      "status": "output_mismatch",
+      "detail": "10 line(s) differ (actual=1, expected=11)",
+      "actual_output": "=== 4-channel (pixel4) test ===",
+      "expected_output": "=== 4-channel (pixel4) test ===\nResult length: 4\nresult[0] = 52.5\nresult[1] = 61.5\nresult[2] = 8\nresult[3] = 99.25\n=== 3-channel (pixel3) test ===\nResult length: 3\nresult[0] = 52.5\nresult[1] = 61.5\nresult[2] = 8"
     },
     {
       "test": "place_and_lookup/swf10",
@@ -12766,6 +14792,22 @@
       "status": "pass"
     },
     {
+      "test": "simplebutton_childevents_sprite",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.518,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 5.53,
+      "status": "pass"
+    },
+    {
       "test": "simplebutton_childprops",
       "phases": {
         "recomp": 0.013,
@@ -12961,6 +15003,294 @@
       "status": "pass"
     },
     {
+      "test": "socket_after_disconnect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.565,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 5.58,
+      "status": "pass"
+    },
+    {
+      "test": "socket_close",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.375,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 5.39,
+      "status": "pass"
+    },
+    {
+      "test": "socket_connect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.561,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 5.57,
+      "status": "pass"
+    },
+    {
+      "test": "socket_errors",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.992,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 56,
+        "expected_lines": 56,
+        "matching_lines": 56
+      },
+      "duration": 6.0,
+      "status": "pass"
+    },
+    {
+      "test": "socket_read_big",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.496,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      },
+      "duration": 25.51,
+      "status": "pass"
+    },
+    {
+      "test": "socket_read_little",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.201,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      },
+      "duration": 2.21,
+      "status": "pass"
+    },
+    {
+      "test": "socket_read_write_object",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.613,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 5.62,
+      "status": "pass"
+    },
+    {
+      "test": "socket_write_big",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.763,
+        "run": 0.215
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "duration": 5.98,
+      "status": "pass"
+    },
+    {
+      "test": "socket_write_little",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.642,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 5.65,
+      "status": "pass"
+    },
+    {
+      "test": "sound_embeddedprops",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.814,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      },
+      "duration": 5.83,
+      "status": "pass"
+    },
+    {
+      "test": "sound_play",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.887,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "duration": 5.9,
+      "status": "pass"
+    },
+    {
+      "test": "sound_valueof",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.789,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
+      },
+      "duration": 5.8,
+      "status": "pass"
+    },
+    {
+      "test": "soundchannel_soundtransform",
+      "phases": {
+        "recomp": 0.035,
+        "compile": 26.773,
+        "run": 0.004
+      },
+      "num_frames": 49,
+      "lines": {
+        "actual_lines": 835,
+        "expected_lines": 835,
+        "matching_lines": 835
+      },
+      "duration": 26.82,
+      "status": "pass"
+    },
+    {
+      "test": "soundchannel_soundtransform_exists",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 24.904,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 24.92,
+      "status": "pass"
+    },
+    {
+      "test": "soundchannel_stop",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.02,
+        "run": 0.004
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 25.03,
+      "status": "pass"
+    },
+    {
+      "test": "soundmixer_buffertime",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.618,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 5.63,
+      "status": "pass"
+    },
+    {
+      "test": "soundmixer_stopall",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.419,
+        "run": 0.004
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 25.43,
+      "status": "pass"
+    },
+    {
+      "test": "soundtransform",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 11.043,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 442,
+        "expected_lines": 442,
+        "matching_lines": 442
+      },
+      "duration": 11.06,
+      "status": "pass"
+    },
+    {
       "test": "space_justifier_clone",
       "phases": {
         "recomp": 0.0,
@@ -12979,6 +15309,522 @@
       "detail": "12 line(s) differ (actual=0, expected=12)",
       "actual_output": "",
       "expected_output": "trace(sj.locale == sj2.locale);\ntrue\ntrace(sj.lineJustification == sj2.lineJustification);\ntrue\ntrace(sj.letterSpacing == sj2.letterSpacing);\ntrue\ntrace(sj.minimumSpacing == sj2.minimumSpacing);\ntrue\ntrace(sj.maximumSpacing == sj2.maximumSpacing);\ntrue\ntrace(sj.optimumSpacing == sj2.optimumSpacing);\ntrue"
+    },
+    {
+      "test": "sprite_with_frames",
+      "phases": {
+        "recomp": 0.014,
+        "compile": 25.03,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.06,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_agal_cross_product",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 8.142,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.15,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_agal_upload_errors",
+      "phases": {
+        "recomp": 0.038,
+        "compile": 8.42,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 66,
+        "matching_lines": 0
+      },
+      "duration": 8.47,
+      "status": "output_mismatch",
+      "detail": "66 line(s) differ (actual=0, expected=66)",
+      "actual_output": "",
+      "expected_output": "valid: uploaded\nsampler_conflict: Error: Error #3696: AGAL validation failed: Second use of sampler register needs to specify the exact same properties. At token 2 of fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\nbad_header: ArgumentError: Error #3612: Programs must be in little endian format.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\ntruncated: ArgumentError: Error #3612: Programs must be in little endian format.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\nempty: ArgumentError: Error #3615: AGAL validation failed: Program size below minimum length for  program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\nbad_version: Error: Error #3615: AGAL validation failed: Program size below minimum length for fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\nbad_shader_type: Error: Error #3615: AGAL validation failed: Program size below minimum length for fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\nbad_opcode: Error: Error #3620: AGAL validation failed: Invalid opcode, value out of range: 255 at token 1 of fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\nsource_output: Error: Error #3646: AGAL validation failed: Can not read from output register for source operand 1 at token 1 of fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\nsource_sampler: Error: Error #3638: AGAL validation failed: Sampler register only allowed as second operand in texture instructions for source operand 1 at token 1 of fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\ndest_constant: Error: Error #3652: AGAL validation failed: Constant registers can not be written to for destination operand at token 1 of fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\ndest_attribute: Error: Error #3651: AGAL validation failed: Attribute registers can not be written to for destination operand at token 1 of vertex program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\ndest_sampler: Error: Error #3649: AGAL validation failed: Sampler registers can not be written to for destination operand at token 1 of fragment program.\n\tat flash.display3D::Program3D/upload()\n\tat Test/tryUpload()\n\tat Test/contextCreated()\ndest_fragreg: Error: Error #3749: AGAL validation failed: Depth output register index out of bounds for destination operand at token 1 of fragment program.\n... (16 lines after) ..."
+    },
+    {
+      "test": "stage3d_bitmap",
+      "phases": {
+        "recomp": 0.141,
+        "compile": 30.233,
+        "run": 0.004
+      },
+      "num_frames": 50,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 30.39,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_blend",
+      "phases": {
+        "recomp": 0.036,
+        "compile": 27.869,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable Context3DBlendFactor is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 81,
+        "matching_lines": 0
+      },
+      "duration": 27.92,
+      "status": "output_mismatch",
+      "detail": "81 line(s) differ (actual=0, expected=81)",
+      "actual_output": "",
+      "expected_output": "Blending with: source=destinationAlpha dest=destinationAlpha\nBlending with: source=destinationAlpha dest=destinationColor\nBlending with: source=destinationAlpha dest=one\nBlending with: source=destinationAlpha dest=oneMinusDestinationAlpha\nBlending with: source=destinationAlpha dest=oneMinusSourceAlpha\nBlending with: source=destinationAlpha dest=oneMinusSourceColor\nBlending with: source=destinationAlpha dest=sourceAlpha\nBlending with: source=destinationAlpha dest=sourceColor\nBlending with: source=destinationAlpha dest=zero\nBlending with: source=destinationColor dest=destinationAlpha\nBlending with: source=destinationColor dest=destinationColor\nBlending with: source=destinationColor dest=one\nBlending with: source=destinationColor dest=oneMinusDestinationAlpha\nBlending with: source=destinationColor dest=oneMinusSourceAlpha\nBlending with: source=destinationColor dest=oneMinusSourceColor\nBlending with: source=destinationColor dest=sourceAlpha\nBlending with: source=destinationColor dest=sourceColor\nBlending with: source=destinationColor dest=zero\nBlending with: source=one dest=destinationAlpha\nBlending with: source=one dest=destinationColor\nBlending with: source=one dest=one\nBlending with: source=one dest=oneMinusDestinationAlpha\nBlending with: source=one dest=oneMinusSourceAlpha\nBlending with: source=one dest=oneMinusSourceColor\nBlending with: source=one dest=sourceAlpha\nBlending with: source=one dest=sourceColor\nBlending with: source=one dest=zero\nBlending with: source=oneMinusDestinationAlpha dest=destinationAlpha\nBlending with: source=oneMinusDestinationAlpha dest=destinationColor\nBlending with: source=oneMinusDestinationAlpha dest=one\nBlending with: source=oneMinusDestinationAlpha dest=oneMinusDestinationAlpha\nBlending with: source=oneMinusDestinationAlpha dest=oneMinusSourceAlpha\nBlending with: source=oneMinusDestinationAlpha dest=oneMinusSourceColor\nBlending with: source=oneMinusDestinationAlpha dest=sourceAlpha\nBlending with: source=oneMinusDestinationAlpha dest=sourceColor\nBlending with: source=oneMinusDestinationAlpha dest=zero\nBlending with: source=oneMinusSourceAlpha dest=destinationAlpha\nBlending with: source=oneMinusSourceAlpha dest=destinationColor\nBlending with: source=oneMinusSourceAlpha dest=one\nBlending with: source=oneMinusSourceAlpha dest=oneMinusDestinationAlpha\nBlending with: source=oneMinusSourceAlpha dest=oneMinusSourceAlpha\nBlending with: source=oneMinusSourceAlpha dest=oneMinusSourceColor\nBlending with: source=oneMinusSourceAlpha dest=sourceAlpha\nBlending with: source=oneMinusSourceAlpha dest=sourceColor\nBlending with: source=oneMinusSourceAlpha dest=zero\nBlending with: source=oneMinusSourceColor dest=destinationAlpha\nBlending with: source=oneMinusSourceColor dest=destinationColor\nBlending with: source=oneMinusSourceColor dest=one\nBlending with: source=oneMinusSourceColor dest=oneMinusDestinationAlpha\nBlending with: source=oneMinusSourceColor dest=oneMinusSourceAlpha\n... (31 lines after) ..."
+    },
+    {
+      "test": "stage3d_context3d_string_args",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 6.791,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 158,
+        "matching_lines": 0
+      },
+      "duration": 6.8,
+      "status": "output_mismatch",
+      "detail": "158 line(s) differ (actual=0, expected=158)",
+      "actual_output": "",
+      "expected_output": "=== setCulling ===\ntriangleFace 'none': OK\ntriangleFace 'back': OK\ntriangleFace 'front': OK\ntriangleFace 'frontAndBack': OK\ntriangleFace 'None': ArgumentError: Error #2008: Parameter triangleFaceToCull must be one of the accepted values.\ntriangleFace 'NONE': ArgumentError: Error #2008: Parameter triangleFaceToCull must be one of the accepted values.\ntriangleFace 'Front': ArgumentError: Error #2008: Parameter triangleFaceToCull must be one of the accepted values.\ntriangleFace 'BACK': ArgumentError: Error #2008: Parameter triangleFaceToCull must be one of the accepted values.\ntriangleFace 'FrontAndBack': ArgumentError: Error #2008: Parameter triangleFaceToCull must be one of the accepted values.\ntriangleFace 'frontandback': ArgumentError: Error #2008: Parameter triangleFaceToCull must be one of the accepted values.\ntriangleFace 'garbage': ArgumentError: Error #2008: Parameter triangleFaceToCull must be one of the accepted values.\n=== setProgramConstants ===\nprogramType 'vertex' (matrix): OK\nprogramType 'fragment' (matrix): OK\nprogramType 'vertex' (vector): OK\nprogramType 'fragment' (vector): OK\nprogramType 'Vertex': ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\nprogramType 'VERTEX': ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\nprogramType 'Fragment': ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\nprogramType 'FRAGMENT': ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\nprogramType 'garbage': ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\nprogramType 'Vertex' (vector): ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\nprogramType 'FRAGMENT' (vector): ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\nprogramType 'garbage' (vector): ArgumentError: Error #2008: Parameter programType must be one of the accepted values.\n=== setStencilActions ===\ntriangleFace 'none': OK\ntriangleFace 'back': OK\ntriangleFace 'front': OK\ntriangleFace 'frontAndBack': OK\ntriangleFace 'None': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'NONE': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'Front': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'FRONT': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'Back': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'BACK': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'FrontAndBack': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'frontandback': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'FRONTANDBACK': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace 'garbage': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ntriangleFace '': ArgumentError: Error #2008: Parameter triangleFace must be one of the accepted values.\ncompareMode 'never': OK\ncompareMode 'less': OK\ncompareMode 'equal': OK\ncompareMode 'lessEqual': OK\ncompareMode 'greater': OK\ncompareMode 'notEqual': OK\ncompareMode 'greaterEqual': OK\ncompareMode 'always': OK\ncompareMode 'Always': ArgumentError: Error #2008: Parameter compareMode must be one of the accepted values.\n... (108 lines after) ..."
+    },
+    {
+      "test": "stage3d_errors",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.84,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 7,
+        "matching_lines": 0
+      },
+      "duration": 5.85,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=0, expected=7)",
+      "actual_output": "",
+      "expected_output": "Caught error with all 0 or false: Error: Error #3780: Requested width of backbuffer is not in allowed range 32 to 16384.\nCaught error: Error: Error #3780: Requested width of backbuffer is not in allowed range 32 to 16384.\nCaught error: Error: Error #3781: Requested height of backbuffer is not in allowed range 32 to 16384.\nCaught error: Error: Error #3780: Requested width of backbuffer is not in allowed range 32 to 16384.\nCaught error: Error: Error #3781: Requested height of backbuffer is not in allowed range 32 to 16384.\nCaught error: ArgumentError: Error #2008: Parameter vertexStreamFormat must be one of the accepted values.\nDone"
+    },
+    {
+      "test": "stage3d_errors_atf",
+      "phases": {
+        "recomp": 0.061,
+        "compile": 7.109,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "duration": 7.18,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=0, expected=3)",
+      "actual_output": "",
+      "expected_output": "#1: 3679\n#2: 3675\n#3: 3679"
+    },
+    {
+      "test": "stage3d_errors_swf_29",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.957,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "duration": 5.97,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=0, expected=6)",
+      "actual_output": "",
+      "expected_output": "Caught error: Error: Error #3669: Bad input size. errorID: 3669\nCaught error: Error: Error #3669: Bad input size. errorID: 3669\nCaught error: Error: Error #3669: Bad input size. errorID: 3669\nCaught error: Error: Error #3669: Bad input size. errorID: 3669\nCaught error: ArgumentError: Error #2008: Parameter vertexStreamFormat must be one of the accepted values. errorID: 2008\nDone"
+    },
+    {
+      "test": "stage3d_float1_index",
+      "phases": {
+        "recomp": 0.034,
+        "compile": 27.344,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.39,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_fractal",
+      "phases": {
+        "recomp": 0.039,
+        "compile": 26.958,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.01,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_ignore_sampler_override",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 27.034,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.05,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_multistage_triangle",
+      "phases": {
+        "recomp": 0.035,
+        "compile": 8.136,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: length)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "duration": 8.18,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=0, expected=3)",
+      "actual_output": "",
+      "expected_output": "Available stage3ds: 4\nConfiguring first stage3D\nConfiguring second stage3D"
+    },
+    {
+      "test": "stage3d_program_constants_bytearray_be",
+      "phases": {
+        "recomp": 0.043,
+        "compile": 28.271,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 28.33,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_program_constants_bytearray_le",
+      "phases": {
+        "recomp": 0.043,
+        "compile": 8.689,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.74,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_program_constants_invalid_input",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 6.568,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 21,
+        "matching_lines": 0
+      },
+      "duration": 6.58,
+      "status": "output_mismatch",
+      "detail": "21 line(s) differ (actual=0, expected=21)",
+      "actual_output": "",
+      "expected_output": "=== Vector Tests ===\nTest 1: 3669\nTest 2: 3669\nTest 3: 3669\nTest 4: Success\n=== ByteArray Tests ===\nTest 5: 3669\nTest 6: 3669\nTest 7: 3669\nTest 8: 3669\nTest 9: 3669\nTest 10: Success\nTest 11: 3669\nTest 12: Success\nTest 13: 3669\nTest 14: 3669\nTest 15: 2008\nTest 16: 2008\n=== Matrix Tests ===\nTest 17: 2008\nDone"
+    },
+    {
+      "test": "stage3d_raytrace",
+      "phases": {
+        "recomp": 0.809,
+        "compile": 29.51,
+        "run": 0.004
+      },
+      "num_frames": 80,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 30.34,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_rotating_cube",
+      "phases": {
+        "recomp": 0.044,
+        "compile": 8.701,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.76,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_sampler",
+      "phases": {
+        "recomp": 0.029,
+        "compile": 6.858,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.9,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_sampler_partial_upload",
+      "phases": {
+        "recomp": 0.027,
+        "compile": 6.532,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.57,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_stencil",
+      "phases": {
+        "recomp": 0.031,
+        "compile": 21.846,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.89,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_texture",
+      "phases": {
+        "recomp": 0.147,
+        "compile": 10.003,
+        "run": 0.004
+      },
+      "num_frames": 5,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 10.16,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_texture_bytearray",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.378,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 7.39,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_texture_bytearray_compressed_alpha",
+      "phases": {
+        "recomp": 0.036,
+        "compile": 6.766,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.81,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_texture_bytearray_compressed_raw_alpha",
+      "phases": {
+        "recomp": 0.059,
+        "compile": 7.643,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 7.71,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_triangle",
+      "phases": {
+        "recomp": 0.026,
+        "compile": 6.64,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.68,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_triangle_bytes4",
+      "phases": {
+        "recomp": 0.026,
+        "compile": 6.691,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.73,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_triangle_float1",
+      "phases": {
+        "recomp": 0.026,
+        "compile": 6.28,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.32,
+      "status": "pass"
+    },
+    {
+      "test": "stage3d_triangle_index_upload",
+      "phases": {
+        "recomp": 0.026,
+        "compile": 6.302,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1010: A term is undefined and has no properties. (accessing field: 0)",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.34,
+      "status": "pass"
     },
     {
       "test": "stage3d_x_y",
@@ -13521,6 +16367,22 @@
       "status": "pass"
     },
     {
+      "test": "string_relational_compare",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.993,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 24.0,
+      "status": "pass"
+    },
+    {
       "test": "string_replace",
       "phases": {
         "recomp": 0.0,
@@ -14017,6 +16879,22 @@
       "status": "pass"
     },
     {
+      "test": "symbol_class_conflict",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.375,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 5.38,
+      "status": "pass"
+    },
+    {
       "test": "symbol_class_root_not_zero",
       "phases": {
         "recomp": 0.0,
@@ -14202,6 +17080,22 @@
         "matching_lines": 32
       },
       "duration": 5.42,
+      "status": "pass"
+    },
+    {
+      "test": "tab_ordering_stage_tab_children_remove_root",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 5.306,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 5.32,
       "status": "pass"
     },
     {
@@ -14949,6 +17843,78 @@
       },
       "duration": 4.01,
       "status": "pass"
+    },
+    {
+      "test": "url_loader",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 3.99,
+        "run": 0.004
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 25,
+        "matching_lines": 25
+      },
+      "duration": 4.0,
+      "status": "pass"
+    },
+    {
+      "test": "url_vars",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 3.978,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1006: decode is not a function.",
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 27,
+        "matching_lines": 3
+      },
+      "duration": 3.99,
+      "status": "output_mismatch",
+      "detail": "24 line(s) differ (actual=3, expected=27)",
+      "actual_output": "foo=a\nfoo=0&foo=1&foo=2\n0,1,2",
+      "expected_output": "foo=a\nfoo=0&foo=1&foo=2\n0,1,2\n0,1,2,3,4\n%F0%9F%98%AD=0&%F0%9F%98%AD=%F0%9F%98%AD&%F0%9F%98%AD=2\n0,\ud83d\ude2d,2\nhello=world,test=%F0%9F%98%80\nworld\nhi!\n\ud83d\ude00,1,equals=test\nundefined\nnull\n10\nstring\n1\nhi,bye\n=\n\n,b\nhello=world%3D2\ns p a c e !\n[object Object]\nhello%3Dworld=world,te%20st=equals%3Dtest,test=1,test=2%203\n1,2 3,4\nequals=test,hi bye\n1,2 3,4,1\nequals=test,hi bye,hi"
+    },
+    {
+      "test": "urlrequest",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 22.303,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 22.31,
+      "status": "pass"
+    },
+    {
+      "test": "urlstream_basic",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.001,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "ReferenceError: Error #1065: Variable URLStream is not defined.",
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 5,
+        "matching_lines": 0
+      },
+      "duration": 4.01,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=0, expected=5)",
+      "actual_output": "",
+      "expected_output": "Event: open event: [Event type=\"open\" bubbles=false cancelable=false eventPhase=2] bytesAvailable: 0\nEvent: progress event: [ProgressEvent type=\"progress\" bubbles=false cancelable=false eventPhase=2 bytesLoaded=31 bytesTotal=31] bytesAvailable: 31\nEvent: complete event: [Event type=\"complete\" bubbles=false cancelable=false eventPhase=2] bytesAvailable: 31\nRead string: This is a string from a file\nBytes available: 0"
     },
     {
       "test": "urshift",
@@ -16460,6 +19426,22 @@
         "matching_lines": 47
       },
       "duration": 4.35,
+      "status": "pass"
+    },
+    {
+      "test": "xml_socket",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 4.511,
+        "run": 0.004
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "duration": 4.52,
       "status": "pass"
     },
     {

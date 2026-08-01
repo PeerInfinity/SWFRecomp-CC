@@ -6,18 +6,18 @@
     "total_available": 1574,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 0,
+    "ignored_count": 2,
     "filtered": true
   },
-  "total": 1574,
+  "total": 1572,
   "pass": 1458,
   "ruffle_matched": 51,
-  "fail": 65,
-  "pass_rate": 92.6,
+  "fail": 63,
+  "pass_rate": 92.7,
   "effective_pass": 1509,
-  "effective_pass_rate": 95.9,
+  "effective_pass_rate": 96.0,
   "breakdown": {
-    "output_mismatch": 61,
+    "output_mismatch": 59,
     "runtime_error": 4,
     "ruffle_matched": 51
   },
@@ -20148,25 +20148,6 @@
       "status": "pass"
     },
     {
-      "test": "ecma3/Statements/eforin_001",
-      "phases": {
-        "recomp": 0.017,
-        "compile": 6.408,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 12
-      },
-      "duration": 6.44,
-      "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=16, expected=16)",
-      "actual_output": "object[0] PASSED!\nobject[year] PASSED!\nobject[company] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\nobject[0] PASSED!\nobject[year] PASSED!\nobject[company] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == values[0] PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == object[properties[0]] PASSED!",
-      "expected_output": "object[0] PASSED!\nobject[company] PASSED!\nobject[year] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\nobject[0] PASSED!\nobject[company] PASSED!\nobject[year] PASSED!\nobject[length] PASSED!\nobject.length PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == values[0] PASSED!\ncheck break out of for...in PASSED!\nproperties.length PASSED!\nobject[properties[0]] == object[properties[0]] PASSED!"
-    },
-    {
       "test": "ecma3/Statements/eforin_001_500476",
       "phases": {
         "recomp": 0.011,
@@ -20181,25 +20162,6 @@
       },
       "duration": 5.91,
       "status": "pass"
-    },
-    {
-      "test": "ecma3/Statements/eforin_002",
-      "phases": {
-        "recomp": 0.016,
-        "compile": 6.233,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 0
-      },
-      "duration": 6.26,
-      "status": "output_mismatch",
-      "detail": "10 line(s) differ (actual=10, expected=10)",
-      "actual_output": "for...in loop in a with loop.  (true)[value] == value PASSED!\nfor...in loop in a with loop.  (true)[valueOf] == valueOf PASSED!\nfor...in loop in a with loop.  (true)[toString] == toString PASSED!\nfor...in loop in a with loop.  (true)[toNumber] == toNumber PASSED!\nfor...in loop in a with loop.  (true)[toBoolean] == toBoolean PASSED!\nwith loop in a for...in loop.  (true)[value] == value PASSED!\nwith loop in a for...in loop.  (true)[valueOf] == valueOf PASSED!\nwith loop in a for...in loop.  (true)[toString] == toString PASSED!\nwith loop in a for...in loop.  (true)[toNumber] == toNumber PASSED!\nwith loop in a for...in loop.  (true)[toBoolean] == toBoolean PASSED!",
-      "expected_output": "for...in loop in a with loop.  (true)[toString] == toString PASSED!\nfor...in loop in a with loop.  (true)[value] == value PASSED!\nfor...in loop in a with loop.  (true)[toNumber] == toNumber PASSED!\nfor...in loop in a with loop.  (true)[toBoolean] == toBoolean PASSED!\nfor...in loop in a with loop.  (true)[valueOf] == valueOf PASSED!\nwith loop in a for...in loop.  (true)[toString] == toString PASSED!\nwith loop in a for...in loop.  (true)[value] == value PASSED!\nwith loop in a for...in loop.  (true)[toNumber] == toNumber PASSED!\nwith loop in a for...in loop.  (true)[toBoolean] == toBoolean PASSED!\nwith loop in a for...in loop.  (true)[valueOf] == valueOf PASSED!"
     },
     {
       "test": "ecma3/Statements/eif_001",

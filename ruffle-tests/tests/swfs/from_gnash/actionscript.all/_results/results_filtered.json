@@ -6,15 +6,15 @@
     "total_available": 243,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 7,
+    "ignored_count": 4,
     "filtered": true
   },
-  "total": 236,
-  "pass": 132,
+  "total": 239,
+  "pass": 135,
   "ruffle_matched": 95,
   "fail": 9,
-  "pass_rate": 55.9,
-  "effective_pass": 227,
+  "pass_rate": 56.5,
+  "effective_pass": 230,
   "effective_pass_rate": 96.2,
   "breakdown": {
     "output_mismatch": 9,
@@ -3662,6 +3662,22 @@
       "status": "pass"
     },
     {
+      "test": "getvariable-v5",
+      "phases": {
+        "recomp": 0.018,
+        "compile": 3.18,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 58,
+        "expected_lines": 58,
+        "matching_lines": 58
+      },
+      "duration": 3.21,
+      "status": "pass"
+    },
+    {
       "test": "getvariable-v6",
       "phases": {
         "recomp": 0.02,
@@ -3675,6 +3691,38 @@
         "matching_lines": 64
       },
       "duration": 3.36,
+      "status": "pass"
+    },
+    {
+      "test": "getvariable-v7",
+      "phases": {
+        "recomp": 0.02,
+        "compile": 3.399,
+        "run": 0.004
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      },
+      "duration": 3.43,
+      "status": "pass"
+    },
+    {
+      "test": "getvariable-v8",
+      "phases": {
+        "recomp": 0.02,
+        "compile": 1.558,
+        "run": 0.008
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      },
+      "duration": 1.59,
       "status": "pass"
     },
     {
