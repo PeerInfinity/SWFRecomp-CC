@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-31T23:03:09.622963+00:00",
+    "timestamp": "2026-07-31T23:26:31.509869+00:00",
     "git_sha": "569a215e41996a040fe63e2b3dfbc58dba9bcad0",
-    "duration_seconds": 11947.61,
+    "duration_seconds": 11941.95,
     "total_available": 1224,
     "shards": 30,
     "expected_shards": 30
@@ -18194,7 +18194,7 @@
       "test": "string_match",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.3,
+        "compile": 7.385,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18203,14 +18203,14 @@
         "expected_lines": 51,
         "matching_lines": 51
       },
-      "duration": 19.58,
+      "duration": 7.66,
       "status": "pass"
     },
     {
       "test": "string_relational_compare",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.031,
+        "compile": 7.048,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18219,14 +18219,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 7.3,
+      "duration": 7.32,
       "status": "pass"
     },
     {
       "test": "string_replace",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.207,
+        "compile": 7.308,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18235,14 +18235,14 @@
         "expected_lines": 51,
         "matching_lines": 51
       },
-      "duration": 7.48,
+      "duration": 7.58,
       "status": "pass"
     },
     {
       "test": "string_search",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.201,
+        "compile": 7.241,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18251,14 +18251,14 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 7.48,
+      "duration": 7.52,
       "status": "pass"
     },
     {
       "test": "string_slice_substr_substring",
       "phases": {
         "recomp": 0.0,
-        "compile": 8.108,
+        "compile": 8.347,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18267,14 +18267,14 @@
         "expected_lines": 170,
         "matching_lines": 170
       },
-      "duration": 8.38,
+      "duration": 8.62,
       "status": "pass"
     },
     {
       "test": "string_split",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.134,
+        "compile": 7.214,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18283,14 +18283,14 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 7.41,
+      "duration": 7.49,
       "status": "pass"
     },
     {
       "test": "string_substr_negative",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.967,
+        "compile": 7.016,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18299,14 +18299,14 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 7.24,
+      "duration": 7.29,
       "status": "pass"
     },
     {
       "test": "string_substr_weird",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.966,
+        "compile": 7.041,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18315,14 +18315,14 @@
         "expected_lines": 182,
         "matching_lines": 182
       },
-      "duration": 7.24,
+      "duration": 7.32,
       "status": "pass"
     },
     {
       "test": "stylesheet",
       "phases": {
-        "recomp": 0.015,
-        "compile": 7.566,
+        "recomp": 0.014,
+        "compile": 7.722,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18331,7 +18331,7 @@
         "expected_lines": 221,
         "matching_lines": 220
       },
-      "duration": 7.86,
+      "duration": 8.01,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=221, expected=221)",
       "actual_output": "... (64 lines before) ...\n\n/// parseCSS: selector with spaces\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: selector with special characters\nstyleSheet.getStyle(\"a.b.c-d!#@$\ufffd\ufffd\") = {\n    \"worked\" = string \"honestly, I'm surprised too! \"\n}\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: case sensitivity in selector\nstyleSheet.getStyle(\"key\") = {\n    \"color\" = string \"pink\"\n}\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: no selector\nstyleSheet.getStyle(\"\") = {\n    \"color\" = string \"\"\n}\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: escapes?\nstyleSheet.getStyle(\"test\\\\\") = {\n    \"color\" = string \"\\\\\"\n}\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: strings?\nstyleSheet.getStyle(\"\\\"test\\\"\") = {\n    \"color\" = string \"\\\"red\\\"\"\n}\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: selector names contains }\nstyleSheet.getStyle(\"a}\") = {}\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: unclosed block\nstyleSheet.getStyle(\"a\") = {}\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: only selector\nstyleSheet.getStyle(\"nonexistant\") = {}\n\n/// parseCSS: empty property name\nstyleSheet.getStyle(\"a\") = {\n    \"\" = string \"\"\n}\nstyleSheet.getStyle(\"nonexistant\") = {}\n... (107 lines after) ...",
@@ -18341,7 +18341,7 @@
       "test": "stylesheet_parse_color",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.056,
+        "compile": 7.143,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18350,7 +18350,7 @@
         "expected_lines": 69,
         "matching_lines": 65
       },
-      "duration": 7.33,
+      "duration": 7.42,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=69, expected=69)",
       "actual_output": "CSS: .s { color: #ff0000 ;}\n  string color: #ff0000 \n  parsed color: 0\nCSS: .s { color: #ff0000 0;}\n  string color: #ff0000 0\n  parsed color: 0\nCSS: .s { color: #ff0000  }\n  string color: #ff0000  \n  parsed color: 0\nCSS: .s { color: #ff0000  0}\n  string color: #ff0000  0\n  parsed color: 0\nCSS: .s { color: #ff0000\t }\n  string color: #ff0000\t \n  parsed color: 0\nCSS: .s { color: #ff0000\t 0}\n  string color: #ff0000\t 0\n  parsed color: 0\nCSS: .s { color: #ff0000 \\n }\n  string color: #ff0000 \n  parsed color: 0\nCSS: .s { color: \t#ff0000;}\n  string color: #ff0000\n  parsed color: ff0000\nCSS: .s { color: \t #ff0000;}\n  string color: #ff0000\n  parsed color: ff0000\nCSS: .s { color:\t #ff0000;}\n  string color: #ff0000\n  parsed color: ff0000\nCSS: .s { color:\\n #ff0000;}\n  string color: #ff0000\n  parsed color: ff0000\nCSS: .s { color: \\n #ff0000;}\n  string color: #ff0000\n  parsed color: ff0000\nCSS: .s { color: \\n#ff0000;}\n  string color: #ff0000\n  parsed color: ff0000\nCSS: .s { color: #6;}\n  string color: #6\n  parsed color: 6\nCSS: .s { color: #66;}\n  string color: #66\n  parsed color: 66\nCSS: .s { color: #666;}\n  string color: #666\n  parsed color: 666\nCSS: .s { color: #6666;}\n  string color: #6666\n... (19 lines after) ...",
@@ -18360,7 +18360,7 @@
       "test": "stylesheet_transform",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.408,
+        "compile": 7.502,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18369,7 +18369,7 @@
         "expected_lines": 307,
         "matching_lines": 304
       },
-      "duration": 7.68,
+      "duration": 7.78,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=307, expected=307)",
       "actual_output": "... (28 lines before) ...\nformat = null\n\n/// Number\nstyle = {}\n\nformat = null\n\n/// Color\n// styleSheet.transform({\"color\": \"red\"})\ncolor = number 0\n// styleSheet.transform({\"color\": \"\"})\ncolor = null\n// styleSheet.transform({\"color\": \"123\"})\ncolor = number 0\n// styleSheet.transform({\"color\": \"#\"})\ncolor = number 0\n// styleSheet.transform({\"color\": \"#1\"})\ncolor = number 1\n// styleSheet.transform({\"color\": \"#12\"})\ncolor = number 18\n// styleSheet.transform({\"color\": \"#123\"})\ncolor = number 291\n// styleSheet.transform({\"color\": \"#1234\"})\ncolor = number 4660\n// styleSheet.transform({\"color\": \"#12345\"})\ncolor = number 74565\n// styleSheet.transform({\"color\": \"#123456\"})\ncolor = number 1193046\n// styleSheet.transform({\"color\": \"#1234567\"})\ncolor = number 0\n// styleSheet.transform({\"color\": \"#red\"})\ncolor = number 0\n\n/// Display\n// styleSheet.transform({\"display\": \"inline\"})\ndisplay = string \"inline\"\n// styleSheet.transform({\"display\": \"block\"})\ndisplay = string \"block\"\n// styleSheet.transform({\"display\": \"none\"})\ndisplay = string \"none\"\n// styleSheet.transform({\"display\": \"invalid\"})\ndisplay = string \"block\"\n// styleSheet.transform({\"display\": \"\"})\ndisplay = string \"block\"\n\n/// Font Family\n// styleSheet.transform({\"fontFamily\": \"\"})\nfont = null\n// styleSheet.transform({\"fontFamily\": \"mono, sans-serif, serif\"})\nfont = string \"_typewriter,_sans,_serif\"\n... (229 lines after) ...",
@@ -18379,7 +18379,7 @@
       "test": "sub_super_same_field",
       "phases": {
         "recomp": 0.008,
-        "compile": 3.013,
+        "compile": 3.009,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18388,7 +18388,7 @@
         "expected_lines": 12,
         "matching_lines": 6
       },
-      "duration": 3.3,
+      "duration": 3.29,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=12, expected=12)",
       "actual_output": "In LevelOne: [object LevelOne] this.pubSameName = pubSameName-LevelOne this.internalSameName = internalSameName-LevelOne\nIn LevelOne: [object LevelOne] this.pubSameName = pubSameName-fromTest this.internalSameName = internalSameName-fromTest\nIn LevelOne: [object LevelTwo] this.pubSameName = pubSameName-LevelTwo this.internalSameName = pubSameName-LevelTwo\nIn LevelTwo: [object LevelTwo] this.pubSameName = pubSameName-LevelTwo this.internalSameName = pubSameName-LevelTwo\nIn LevelOne: [object LevelTwo] this.pubSameName = pubSameName-fromTest this.internalSameName = internalSameName-fromTest\nIn LevelTwo: [object LevelTwo] this.pubSameName = pubSameName-fromTest this.internalSameName = internalSameName-fromTest\nIn LevelOne: [object LevelThree] this.pubSameName = pubSameName-LevelThree this.internalSameName = pubSameName-LevelThree\nIn LevelTwo: [object LevelThree] this.pubSameName = pubSameName-LevelThree this.internalSameName = pubSameName-LevelThree\nIn LevelThree: [object LevelThree] this.pubSameName = pubSameName-LevelThree this.internalSameName = pubSameName-LevelThree\nIn LevelOne: [object LevelThree] this.pubSameName = pubSameName-fromTest this.internalSameName = internalSameName-fromTest\nIn LevelTwo: [object LevelThree] this.pubSameName = pubSameName-fromTest this.internalSameName = internalSameName-fromTest\nIn LevelThree: [object LevelThree] this.pubSameName = pubSameName-fromTest this.internalSameName = internalSameName-fromTest",
@@ -18397,8 +18397,8 @@
     {
       "test": "subclass_superclass_linked_symbol",
       "phases": {
-        "recomp": 0.0,
-        "compile": 7.52,
+        "recomp": 0.015,
+        "compile": 7.607,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18407,7 +18407,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 7.8,
+      "duration": 7.9,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=6, expected=4)",
       "actual_output": "SuperClass before super(): this.target_from_superclass=null\nSuperClass after  super(): this.target_from_superclass=null\nSubClass before super(): this.target_from_subclass = null this.target_from_superclass=null\nSuperClass before super(): this.target_from_superclass=null\nSuperClass after  super(): this.target_from_superclass=null\nSubClass after  super(): this.target_from_subclass = [object TargetClip] this.target_from_superclass=null",
@@ -18416,8 +18416,8 @@
     {
       "test": "subtract",
       "phases": {
-        "recomp": 0.033,
-        "compile": 18.261,
+        "recomp": 0.03,
+        "compile": 19.567,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18426,14 +18426,14 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 18.57,
+      "duration": 19.87,
       "status": "pass"
     },
     {
       "test": "super_get_call",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.048,
+        "compile": 7.1,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18442,14 +18442,14 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 7.32,
+      "duration": 7.37,
       "status": "pass"
     },
     {
       "test": "supercall_two_classobjects",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.04,
+        "compile": 7.158,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18458,14 +18458,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.31,
+      "duration": 7.43,
       "status": "pass"
     },
     {
       "test": "supercalls_coerce",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.092,
+        "compile": 7.181,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18474,7 +18474,7 @@
         "expected_lines": 8,
         "matching_lines": 1
       },
-      "duration": 7.37,
+      "duration": 7.46,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=8, expected=8)",
       "actual_output": "super getter called\nsuper setter called\n#3: 1063\n#4: 1077\n#5: 1037\n#6: 1070\n#7: 1010\n[object SuperTest]",
@@ -18484,7 +18484,7 @@
       "test": "supercalls_weird",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.952,
+        "compile": 7.054,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18494,7 +18494,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 7.23,
+      "duration": 7.33,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -18504,7 +18504,7 @@
       "test": "superinterface_call",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.057,
+        "compile": 7.158,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18514,7 +18514,7 @@
         "expected_lines": 20,
         "matching_lines": 15
       },
-      "duration": 7.33,
+      "duration": 7.43,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=15, expected=20)",
       "actual_output": "... (10 lines before) ...\nParentTwo method\nGrandParentOne method\nGrandParentTwo method\n\nCalling through interface",
@@ -18524,7 +18524,7 @@
       "test": "superinterface_instanceof",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.048,
+        "compile": 7.126,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18533,7 +18533,7 @@
         "expected_lines": 18,
         "matching_lines": 4
       },
-      "duration": 7.32,
+      "duration": 7.4,
       "status": "output_mismatch",
       "detail": "14 line(s) differ (actual=18, expected=18)",
       "actual_output": "baseObj is [class FirstInterface]: false\nbaseObj is [class FirstInterfaceParent]: false\nbaseObj is [class FirstInterfaceGrandparent]: false\nbaseObj is [class SecondInterface]: false\nbaseObj is [class SecondInterfaceParent]: false\nbaseObj is [class SecondInterfaceGrandparent]: false\nbaseObj is [class SuperInterface]: false\nbaseObj is [class SuperInterfaceParent]: false\nbaseObj is [class SuperInterfaceGrandparent]: false\nsuperObj is [class FirstInterface]: false\nsuperObj is [class FirstInterfaceParent]: false\nsuperObj is [class FirstInterfaceGrandparent]: false\nsuperObj is [class SecondInterface]: false\nsuperObj is [class SecondInterfaceParent]: false\nsuperObj is [class SecondInterfaceGrandparent]: false\nsuperObj is [class SuperInterface]: false\nsuperObj is [class SuperInterfaceParent]: false\nsuperObj is [class SuperInterfaceGrandparent]: false",
@@ -18543,7 +18543,7 @@
       "test": "swf8",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.968,
+        "compile": 7.018,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18552,14 +18552,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.24,
+      "duration": 7.29,
       "status": "pass"
     },
     {
       "test": "swf_10_queued_goto_scripts_construct",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.357,
+        "compile": 7.448,
         "run": 0.265
       },
       "num_frames": 2,
@@ -18568,15 +18568,15 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 7.63,
+      "duration": 7.72,
       "status": "pass"
     },
     {
       "test": "swf_9_goto_in_construct_frame",
       "phases": {
         "recomp": 0.009,
-        "compile": 26.096,
-        "run": 0.315
+        "compile": 26.858,
+        "run": 0.265
       },
       "num_frames": 3,
       "lines": {
@@ -18584,7 +18584,7 @@
         "expected_lines": 20,
         "matching_lines": 8
       },
-      "duration": 26.43,
+      "duration": 27.14,
       "ruffle_diff_count": 12,
       "ours_diff_count": 12,
       "status": "ruffle_matched",
@@ -18594,8 +18594,8 @@
       "test": "swf_9_goto_in_enter_frame",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.083,
-        "run": 0.315
+        "compile": 7.168,
+        "run": 0.266
       },
       "num_frames": 3,
       "lines": {
@@ -18603,15 +18603,15 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 7.42,
+      "duration": 7.45,
       "status": "pass"
     },
     {
       "test": "swf_9_goto_in_enter_frame_simple",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.095,
-        "run": 0.315
+        "compile": 7.174,
+        "run": 0.265
       },
       "num_frames": 3,
       "lines": {
@@ -18619,14 +18619,14 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 7.43,
+      "duration": 7.46,
       "status": "pass"
     },
     {
       "test": "swf_9_queued_goto_scripts",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.116,
+        "compile": 7.149,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18635,14 +18635,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 7.39,
+      "duration": 7.42,
       "status": "pass"
     },
     {
       "test": "swf_9_queued_goto_scripts_construct",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.072,
+        "compile": 1.038,
         "run": 0.265
       },
       "num_frames": 2,
@@ -18651,14 +18651,14 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 1.35,
+      "duration": 1.31,
       "status": "pass"
     },
     {
       "test": "swf_9_versioning",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.006,
+        "compile": 6.995,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18667,15 +18667,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.28,
+      "duration": 7.27,
       "status": "pass"
     },
     {
       "test": "swf_wrong_frame_count",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.358,
-        "run": 0.315
+        "compile": 7.382,
+        "run": 0.265
       },
       "num_frames": 11,
       "lines": {
@@ -18683,14 +18683,14 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 7.68,
+      "duration": 7.66,
       "status": "pass"
     },
     {
       "test": "swf_wrong_frame_count_isplaying",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.729,
+        "compile": 26.325,
         "run": 0.265
       },
       "num_frames": 11,
@@ -18699,15 +18699,15 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 26.0,
+      "duration": 26.6,
       "status": "pass"
     },
     {
       "test": "swz",
       "phases": {
         "recomp": 0.007,
-        "compile": 7.66,
-        "run": 0.315
+        "compile": 7.697,
+        "run": 0.265
       },
       "num_frames": 10,
       "lines": {
@@ -18715,7 +18715,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 7.99,
+      "duration": 7.98,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -18725,7 +18725,7 @@
       "test": "symbol_class_binary_data",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.048,
+        "compile": 7.089,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18734,14 +18734,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 7.32,
+      "duration": 7.36,
       "status": "pass"
     },
     {
       "test": "symbol_class_conflict",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.234,
+        "compile": 7.273,
         "run": 0.315
       },
       "num_frames": 2,
@@ -18750,7 +18750,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 7.8,
+      "duration": 7.82,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -18768,7 +18768,7 @@
       "test": "symbol_class_root_not_zero",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.933,
+        "compile": 7.025,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18777,14 +18777,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.21,
+      "duration": 7.3,
       "status": "pass"
     },
     {
       "test": "symbolclass_invalid_utf8",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.019,
+        "compile": 7.182,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18793,14 +18793,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.29,
+      "duration": 7.46,
       "status": "pass"
     },
     {
       "test": "system_exit",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.013,
+        "compile": 7.147,
         "run": 0.265
       },
       "num_frames": 2,
@@ -18809,7 +18809,7 @@
         "expected_lines": 3,
         "matching_lines": 0
       },
-      "duration": 7.29,
+      "duration": 7.42,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=2, expected=3)",
       "actual_output": "TypeError: Error #1006: exit is not a function.\n\tat Test()",
@@ -18819,7 +18819,7 @@
       "test": "system_setclipboard_null",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.07,
+        "compile": 7.095,
         "run": 0.265
       },
       "num_frames": 1,
@@ -18828,7 +18828,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 7.34,
+      "duration": 7.37,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=1)",
       "actual_output": "1006",
@@ -18838,8 +18838,8 @@
       "test": "tab_ordering_arrows",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.097,
-        "run": 0.515
+        "compile": 28.359,
+        "run": 0.516
       },
       "num_frames": 2,
       "lines": {
@@ -18847,15 +18847,15 @@
         "expected_lines": 998,
         "matching_lines": 998
       },
-      "duration": 27.63,
+      "duration": 28.89,
       "status": "pass"
     },
     {
       "test": "tab_ordering_automatic_advanced",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.707,
-        "run": 0.517
+        "compile": 7.839,
+        "run": 0.466
       },
       "num_frames": 2,
       "lines": {
@@ -18863,14 +18863,14 @@
         "expected_lines": 184,
         "matching_lines": 184
       },
-      "duration": 8.23,
+      "duration": 8.32,
       "status": "pass"
     },
     {
       "test": "tab_ordering_automatic_basic",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.111,
+        "compile": 7.281,
         "run": 0.265
       },
       "num_frames": 2,
@@ -18879,7 +18879,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 7.39,
+      "duration": 7.56,
       "status": "pass"
     },
     {
