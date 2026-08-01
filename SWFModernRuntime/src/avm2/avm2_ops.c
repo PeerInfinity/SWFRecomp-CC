@@ -39,13 +39,19 @@ static E4XName e4x_name_from_qext(const Avm2QNameExt* q, int force_attr)
 	return n;
 }
 
-// E4XName from a popped RTQName namespace + a name string. An empty-URI
-// (public) namespace rebuilds via string_to_multiname (dxns handling).
+// E4XName from a popped RTQName namespace + a name string. Only the ANY
+// namespace (kind 0 — `Namespace(new QName(null, x))`, pool index 0) is
+// "any"; every other Namespace object is an EXPLICIT qualifier, INCLUDING
+// `new Namespace()` / `new Namespace("")` whose URI is empty. An empty
+// explicit URI is the NO-namespace, so `none::*` must match only
+// unqualified nodes rather than everything, and it must NOT be rebuilt via
+// string_to_multiname (which would re-qualify it onto the current default
+// xml namespace) — e4x/Regress/regress-263935, e4x/Statements/e12_1 case 8.
 static E4XName e4x_name_from_rtns(Avm2Context* ctx, Avm2Value ns_val,
                                   const Avm2String* local, int attr)
 {
 	Avm2NamespaceExt* n = avm2_namespace_ext_of(ns_val);
-	if (n != NULL && n->uri != NULL && n->uri->len > 0)
+	if (n != NULL && n->uri != NULL && n->kind != 0)
 	{
 		E4XName name;
 		memset(&name, 0, sizeof(name));
@@ -62,8 +68,7 @@ static E4XName e4x_name_from_rtns(Avm2Context* ctx, Avm2Value ns_val,
 	}
 	if (local == NULL)
 	{
-		// `ns::*` where the runtime namespace has an empty URI: any name,
-		// any namespace (the `*` branch of avm2_e4x_name_from_string).
+		// `*::*` — the any namespace with the any name.
 		E4XName name;
 		memset(&name, 0, sizeof(name));
 		name.any_ns = 1;
@@ -1879,9 +1884,15 @@ Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32
 	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub, 0);
 }
 
+// `attr` / `any_name` are the two facts the READ path already derives from
+// the multiname (attribute kind, name index 0). The write and delete paths
+// used to hard-code 0 / non-NULL, so `x1.@ns::['v'] = '555'` built a plain
+// element name and CREATED a `<ns:v>` child instead of setting the
+// attribute (e4x/Expressions/e11_1_2).
 static void setproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
                                     Avm2Value ns_val, const char* name,
-                                    uint32_t name_len, Avm2Value value)
+                                    uint32_t name_len, Avm2Value value,
+                                    int attr, int any_name)
 {
 	Avm2Context* ctx = act->ctx;
 	if (value_is_null_like(recv))
@@ -1890,8 +1901,9 @@ static void setproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 	}
 	if (avm2_value_is_xmlish(recv))
 	{
-		E4XName n = e4x_name_from_rtns(ctx, ns_val,
-		                               avm2_string_new(ctx, name, name_len), 0);
+		E4XName n = e4x_name_from_rtns(
+			ctx, ns_val,
+			any_name ? NULL : avm2_string_new(ctx, name, name_len), attr);
 		if (avm2_xml_set_name(ctx, recv, &n, value)) return;
 	}
 	Avm2PropKey key;
@@ -1916,14 +1928,15 @@ void avm2_op_setproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_i
 	const char* name;
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-	setproperty_rtns_common(act, recv, ns_val, name, name_len, value);
+	setproperty_rtns_common(act, recv, ns_val, name, name_len, value,
+	                        mn_is_attribute_kind(act->file->data, mn_idx),
+	                        act->file->data->multinames[mn_idx].name == 0);
 }
 
 void avm2_op_setproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 Avm2Value ns_val, Avm2Value name_val, Avm2Value value)
 {
 	recv = unbox_scope_prim(recv);
-	(void) mn_idx;
 	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 	if (q != NULL)
 	{
@@ -1931,12 +1944,14 @@ void avm2_op_setproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn
 		return;
 	}
 	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
-	setproperty_rtns_common(act, recv, ns_val, s->utf8, s->len, value);
+	setproperty_rtns_common(act, recv, ns_val, s->utf8, s->len, value,
+	                        mn_is_attribute_kind(act->file->data, mn_idx), 0);
 }
 
 static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
                                             Avm2Value ns_val, const char* name,
-                                            uint32_t name_len)
+                                            uint32_t name_len, int attr,
+                                            int any_name)
 {
 	Avm2Context* ctx = act->ctx;
 	if (value_is_null_like(recv))
@@ -1945,8 +1960,9 @@ static Avm2Value deleteproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 	}
 	if (avm2_value_is_xmlish(recv))
 	{
-		E4XName n = e4x_name_from_rtns(ctx, ns_val,
-		                               avm2_string_new(ctx, name, name_len), 0);
+		E4XName n = e4x_name_from_rtns(
+			ctx, ns_val,
+			any_name ? NULL : avm2_string_new(ctx, name, name_len), attr);
 		Avm2Value out;
 		if (avm2_xml_delete_name(ctx, recv, &n, &out)) return out;
 	}
@@ -1980,20 +1996,24 @@ Avm2Value avm2_op_deleteproperty_rtns(Avm2Activation* act, Avm2Value recv, uint3
 	const char* name;
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-	return deleteproperty_rtns_common(act, recv, ns_val, name, name_len);
+	return deleteproperty_rtns_common(
+		act, recv, ns_val, name, name_len,
+		mn_is_attribute_kind(act->file->data, mn_idx),
+		act->file->data->multinames[mn_idx].name == 0);
 }
 
 Avm2Value avm2_op_deleteproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                         Avm2Value ns_val, Avm2Value name_val)
 {
-	(void) mn_idx;
 	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 	if (q != NULL)
 	{
 		return deleteproperty_qname(act, recv, q);
 	}
 	const Avm2String* s = avm2_coerce_to_string(act->ctx, name_val);
-	return deleteproperty_rtns_common(act, recv, ns_val, s->utf8, s->len);
+	return deleteproperty_rtns_common(
+		act, recv, ns_val, s->utf8, s->len,
+		mn_is_attribute_kind(act->file->data, mn_idx), 0);
 }
 
 // ---------------------------------------------------------------------------

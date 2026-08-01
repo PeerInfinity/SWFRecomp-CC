@@ -966,6 +966,11 @@ int avm2_xml_delete_name(Avm2Context* ctx, Avm2Value recv, const E4XName* name,
 				{
 					avm2_e4x_remove_child(node->parent, node);
 				}
+				// `delete list[i]` DETACHES: the removed node's parent()
+				// must read undefined and its childIndex() -1 (the name
+				// paths already null it via avm2_e4x_remove_matching /
+				// avm2_e4x_delete_by_index) — avm2/xml_list_delete_clear_parent.
+				node->parent = NULL;
 			}
 		}
 		*out = avm2_bool(true);
@@ -1639,6 +1644,16 @@ static Avm2Value n_xml_set_namespace(Avm2Activation* act)
 static Avm2Value n_xml_add_namespace(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	// avmplus declares addNamespace(ns) with one REQUIRED parameter, so the
+	// zero-argument call is an argument-count mismatch, not a call with
+	// `undefined` (which is legal and is a no-op). e4x/XML/e13_4_4_17 only
+	// checks that something throws; e13_4_4_2 grades the code.
+	if (act->argc < 1)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #1063: Argument count mismatch on "
+		                 "XML/addNamespace(). Expected 1, got 0.");
+	}
 	E4XNode* node = this_xml_node(act);
 	E4XNamespace ns = ns_from_value(ctx, arg_or_undef(act, 0));
 	avm2_e4x_add_in_scope_namespace(ctx, node, &ns);
@@ -1954,10 +1969,33 @@ static Avm2Value n_xml_has_simple_content(Avm2Activation* act)
 	return avm2_bool(avm2_e4x_has_simple_content(this_xml_node(act)) != 0);
 }
 
-// maybe_escape_child (e4x.rs): SWF<=9 wraps non-XML args; movie>=21
-// detaches an XML arg from its old parent.
-static Avm2Value maybe_escape_child(Avm2Context* ctx, Avm2Value child)
+// Ruffle Activation::caller_movie_or_root().version(): the SWF version of the
+// movie whose code called this native — NOT the root's. A native builtin's own
+// `act->file` is NULL, so the caller is the nearest debug-callstack frame that
+// HAS an ABC file; no such frame means the MAIN movie. (avm2/xml_appendchild_swf_v21
+// is a v20 root that Loader-loads a v21 child: the >=21 detach rule is the
+// CHILD's, and reading the global ctx->swf_version got the root's v20.)
+static uint8_t xml_caller_swf_version(Avm2Activation* act)
 {
+	const Avm2AbcFileData* data = (act->file != NULL) ? act->file->data : NULL;
+	if (data == NULL)
+	{
+		Avm2Context* c = act->ctx;
+		for (uint32_t i = c->call_depth; i > 0 && data == NULL; i--)
+		{
+			Avm2AbcFileRt* f = c->call_frames[i - 1].method.file;
+			if (f != NULL) data = f->data;
+		}
+	}
+	const Avm2MovieTables* mv = avm2_display_movie_for_abc(data);
+	return (mv != NULL) ? mv->swf_version : act->ctx->swf_version;
+}
+
+// maybe_escape_child (e4x.rs): SWF<=9 wraps non-XML args (ROOT swf version);
+// caller-movie >=21 detaches an XML arg from its old parent.
+static Avm2Value maybe_escape_child(Avm2Activation* act, Avm2Value child)
+{
+	Avm2Context* ctx = act->ctx;
 	int is_xmlish = avm2_value_is_xmlish(child);
 	if (ctx->swf_version <= 9)
 	{
@@ -1966,7 +2004,7 @@ static Avm2Value maybe_escape_child(Avm2Context* ctx, Avm2Value child)
 		E4XNode* node = xml_init_node(ctx, avm2_string(s));
 		return avm2_object_value(avm2_xml_object_for_node(ctx, node));
 	}
-	if (ctx->swf_version >= 21)
+	if (xml_caller_swf_version(act) >= 21)
 	{
 		Avm2XmlExt* xe = avm2_xml_ext_of(child);
 		if (xe != NULL && xe->node->parent != NULL)
@@ -1985,7 +2023,7 @@ static Avm2Value n_xml_append_child(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	E4XNode* node = this_xml_node(act);
-	Avm2Value child = maybe_escape_child(ctx, arg_or_undef(act, 0));
+	Avm2Value child = maybe_escape_child(act, arg_or_undef(act, 0));
 	// children = this.[[Get]]("*"); children.[[Put]](children.length, child)
 	E4XName any;
 	memset(&any, 0, sizeof(any));
@@ -2000,7 +2038,7 @@ static Avm2Value n_xml_prepend_child(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	E4XNode* node = this_xml_node(act);
-	Avm2Value child = maybe_escape_child(ctx, arg_or_undef(act, 0));
+	Avm2Value child = maybe_escape_child(act, arg_or_undef(act, 0));
 	avm2_e4x_insert_value(ctx, node, 0, child);
 	return act->this_val;
 }
@@ -2011,7 +2049,7 @@ static Avm2Value xml_insert_child(Avm2Activation* act, int after)
 	Avm2Context* ctx = act->ctx;
 	E4XNode* node = this_xml_node(act);
 	Avm2Value child1 = arg_or_undef(act, 0);
-	Avm2Value child2 = maybe_escape_child(ctx, arg_or_undef(act, 1));
+	Avm2Value child2 = maybe_escape_child(act, arg_or_undef(act, 1));
 	if (node->kind != E4X_ELEMENT) return avm2_undefined();
 
 	E4XNode* ref = NULL;
@@ -2115,6 +2153,15 @@ static Avm2Value n_xml_replace(Avm2Activation* act)
 				avm2_xmllist_push(ctx, ce, avm2_e4x_deep_copy(ctx, vl->items[i]));
 			}
 			value = avm2_object_value(copy);
+		}
+		else if (ctx->swf_version <= 9)
+		{
+			// avmplus XMLObject.cpp:1540 (Ruffle xml.rs `replace`): at ROOT
+			// SWF <= 9 a non-XML value is run through the XML constructor
+			// first, so markup PARSES ("<phone>1234567</phone>" becomes an
+			// element, not a text node) — e4x/XML/e13_4_4_32/v9. From v10 on
+			// the string is used verbatim (the /v10 sibling grades that).
+			value = xml_construct(ctx, NULL, &value, 1);
 		}
 	}
 	uint32_t idx;
