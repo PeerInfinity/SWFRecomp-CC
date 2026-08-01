@@ -142,6 +142,20 @@ typedef struct WebGPURenderContext
 	WGPUBindGroupLayout composite_bgl;
 	WGPUPipelineLayout composite_pipeline_layout;
 
+	// --- Blend-mode LAYER compositing (lazy, on the first non-trivial blend) ---
+	// Flash blends a display object's whole rendered subtree against the backdrop
+	// ONCE instead of per draw call; see render_webgpu_composite_blend().
+	int blend_resources_created;
+	int offscreen_depth;               // >0 while rendering into filter_tex_a
+	WGPUTexture main_color_texture;    // this frame's RESOLVED colour target
+	WGPUTexture filter_ds_texture;     // offscreen pass's OWN depth-stencil, so the
+	WGPUTextureView filter_ds_view;    //   main pass's clip-mask stencil survives
+	WGPUBuffer blend_params_buf;       // 32-byte all-zero uniform for composite_wgsl
+	WGPURenderPipeline blend_layer_pipeline[15];   // trivial: screen / add / subtract
+	WGPURenderPipeline blend_shader_pipeline[15];  // complex: multiply / lighten / ...
+	WGPUBindGroupLayout blend_shader_bgl;
+	WGPUPipelineLayout blend_shader_pl;
+
 	// --- SDL window (native only) ---
 #if !defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
 	struct SDL_Window* window;
@@ -273,6 +287,14 @@ void render_webgpu_end_offscreen_pass(WebGPURenderContext* context);
 void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float blur_y, u8 quality, float strength, float r, float g, float b, float a, int colorize);
 void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
+// Blend-mode layer compositing: 1 when this mode must be rendered to its own
+// layer and composited once, 0 when the caller should keep the legacy per-draw
+// pipeline (nested layers, or a backdrop we cannot sample).
+int  render_webgpu_blend_mode_is_layered(WebGPURenderContext* context, u8 blend_mode);
+// Snapshot the frame into filter_tex_b. Call while the main pass is SUSPENDED.
+void render_webgpu_capture_backdrop(WebGPURenderContext* context, u8 blend_mode);
+// Composite the layer in filter_tex_a into the resumed main pass.
+void render_webgpu_composite_blend(WebGPURenderContext* context, u8 blend_mode, u32 stencil_ref);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
 
 #ifdef OFFSCREEN_RENDER

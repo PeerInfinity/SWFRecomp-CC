@@ -905,7 +905,8 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	WGPUSurfaceConfiguration surf_config = {0};
 	surf_config.device = ctx->device;
 	surf_config.format = ctx->surface_format;
-	surf_config.usage = WGPUTextureUsage_RenderAttachment;
+	// CopySrc: complex blend modes snapshot the resolved frame as their backdrop.
+	surf_config.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
 	surf_config.alphaMode = WGPUCompositeAlphaMode_Auto;
 	surf_config.width = ctx->width;
 	surf_config.height = ctx->height;
@@ -1459,18 +1460,26 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	assert(ctx->stencil_test_pipeline != NULL);
 
 	// --- Blend mode pipelines ---
-	// Reset to normal depth-stencil state and normal color output
+	// Legacy per-draw blend pipelines. The layer-composite path in
+	// render_webgpu_composite_blend() supersedes these for stage/sprite display
+	// objects; they remain the fallback for nested-layer and filter+blend cases.
+	//
+	// Every one of them uses BlendComponent::OVER for ALPHA (ruffle
+	// render/wgpu/src/blend.rs: Add and Subtract are `alpha: OVER`). A saturating,
+	// min/max-ing or subtracting alpha component destroys the destination alpha:
+	// `subtract` used to compute dst.a - src.a, which over an opaque backdrop is
+	// 0, so the object rendered as a fully transparent HOLE.
 	rp_desc.depthStencil = &ds_normal;
 	rp_desc.fragment = &frag_state;
 
-	// Add (blend mode 8): SrcAlpha / One / Add
+	// Add (blend mode 8): SrcAlpha / One / Add colour, OVER alpha
 	{
 		WGPUBlendState blend_add = {0};
 		blend_add.color.srcFactor = WGPUBlendFactor_SrcAlpha;
 		blend_add.color.dstFactor = WGPUBlendFactor_One;
 		blend_add.color.operation = WGPUBlendOperation_Add;
 		blend_add.alpha.srcFactor = WGPUBlendFactor_One;
-		blend_add.alpha.dstFactor = WGPUBlendFactor_One;
+		blend_add.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
 		blend_add.alpha.operation = WGPUBlendOperation_Add;
 
 		WGPUColorTargetState ct_add = color_target;
@@ -1491,8 +1500,8 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		blend_lighten.color.dstFactor = WGPUBlendFactor_One;
 		blend_lighten.color.operation = WGPUBlendOperation_Max;
 		blend_lighten.alpha.srcFactor = WGPUBlendFactor_One;
-		blend_lighten.alpha.dstFactor = WGPUBlendFactor_One;
-		blend_lighten.alpha.operation = WGPUBlendOperation_Max;
+		blend_lighten.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend_lighten.alpha.operation = WGPUBlendOperation_Add;
 
 		WGPUColorTargetState ct_lighten = color_target;
 		ct_lighten.blend = &blend_lighten;
@@ -1512,8 +1521,8 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		blend_darken.color.dstFactor = WGPUBlendFactor_One;
 		blend_darken.color.operation = WGPUBlendOperation_Min;
 		blend_darken.alpha.srcFactor = WGPUBlendFactor_One;
-		blend_darken.alpha.dstFactor = WGPUBlendFactor_One;
-		blend_darken.alpha.operation = WGPUBlendOperation_Min;
+		blend_darken.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend_darken.alpha.operation = WGPUBlendOperation_Add;
 
 		WGPUColorTargetState ct_darken = color_target;
 		ct_darken.blend = &blend_darken;
@@ -1532,9 +1541,9 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		blend_sub.color.srcFactor = WGPUBlendFactor_SrcAlpha;
 		blend_sub.color.dstFactor = WGPUBlendFactor_One;
 		blend_sub.color.operation = WGPUBlendOperation_ReverseSubtract;
-		blend_sub.alpha.srcFactor = WGPUBlendFactor_SrcAlpha;
-		blend_sub.alpha.dstFactor = WGPUBlendFactor_One;
-		blend_sub.alpha.operation = WGPUBlendOperation_ReverseSubtract;
+		blend_sub.alpha.srcFactor = WGPUBlendFactor_One;
+		blend_sub.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend_sub.alpha.operation = WGPUBlendOperation_Add;
 
 		WGPUColorTargetState ct_sub = color_target;
 		ct_sub.blend = &blend_sub;
@@ -1871,9 +1880,13 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	ctx->dynamic_vertex_used = 0;
 	ctx->dynamic_gradient_used = 0;
 	ctx->dynamic_bitmap_used = 0;
+	// main_color_texture is whatever this frame's MSAA resolve target is; the
+	// complex blend modes snapshot it as their backdrop. NULL disables them.
+	ctx->main_color_texture = NULL;
 #ifdef OFFSCREEN_RENDER
 	// Headless: use the persistent offscreen texture as resolve target
 	ctx->surface_view = ctx->offscreen_view;
+	ctx->main_color_texture = ctx->offscreen_texture;
 #else
 	ctx->browser_capture_active = 0;
 #if defined(__EMSCRIPTEN__)
@@ -1884,6 +1897,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 		// (the canvas simply doesn't update for one tick) so the readback is a
 		// direct GPU copy that never touches the saturated present queue.
 		ctx->surface_view = ctx->browser_capture_view;
+		ctx->main_color_texture = ctx->browser_capture_texture;
 		ctx->browser_capture_active = 1;
 	}
 	else
@@ -1900,6 +1914,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 		}
 
 		ctx->surface_view = wgpuTextureCreateView(surf_tex.texture, NULL);
+		ctx->main_color_texture = surf_tex.texture;
 	}
 #endif
 
@@ -3068,7 +3083,10 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 	ftex_desc.format = ctx->surface_format;
 	ftex_desc.mipLevelCount = 1;
 	ftex_desc.sampleCount = 1;
-	ftex_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding;
+	// CopyDst so filter_tex_b can receive the backdrop snapshot the complex blend
+	// shaders sample (render_webgpu_capture_backdrop).
+	ftex_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding
+	                | WGPUTextureUsage_CopyDst;
 	ctx->filter_tex_a = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
 	ftex_desc.label = WGPU_LABEL("filter_tex_b");
 	ctx->filter_tex_b = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
@@ -3254,6 +3272,391 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Blend-mode LAYER compositing
+// ---------------------------------------------------------------------------
+// Flash does NOT blend each of an object's draw calls against the live backdrop.
+// It renders the object's whole subtree into a transparent layer and composites
+// that layer against the backdrop exactly once (ruffle
+// render/wgpu/src/surface/commands.rs:679-790). Doing it per draw makes an
+// object's own overlapping sub-shapes blend with themselves — that was the
+// blown-out overlap inside the wordmark in visual/blend_modes/add.
+//
+// Three of the fourteen modes composite with fixed hardware blend factors
+// ("trivial", ruffle render/wgpu/src/blend.rs:76-105); seven need a shader that
+// samples BOTH the layer and the backdrop ("complex",
+// render/wgpu/shaders/blend/*.wgsl). Alpha (11) and Erase (12) are handled by
+// the caller: with no Layer above them Flash ignores the object entirely
+// (surface.rs:239-244), and we have no layer groups yet, so that is always true.
+// Layer (2) itself still falls through to normal.
+//
+// The layer texture is filter_tex_a, which begin_offscreen_pass clears to
+// (0,0,0,0) and draws into with SrcAlpha/OneMinusSrcAlpha — so it comes out
+// PREMULTIPLIED, exactly ruffle's layer surface.
+
+static int blend_mode_is_trivial_layer(u8 m) { return m == 4 || m == 8 || m == 9; }
+static int blend_mode_is_complex(u8 m)
+{
+	return m == 3 || m == 5 || m == 6 || m == 7 || m == 10 || m == 13 || m == 14;
+}
+
+int render_webgpu_blend_mode_is_layered(WebGPURenderContext* ctx, u8 blend_mode)
+{
+	if (!ctx->renderer_ok) return 0;
+	// Nested layers would need a texture pool; an inner blend object falls back to
+	// the legacy per-draw pipeline rather than clobbering the outer layer.
+	if (ctx->offscreen_depth > 0) return 0;
+	if (blend_mode_is_trivial_layer(blend_mode)) return 1;
+	// A complex blend samples the backdrop, so the resolved main colour target has
+	// to be copyable. It always is headless; in the browser it depends on the
+	// surface configuration.
+	if (blend_mode_is_complex(blend_mode)) return ctx->main_color_texture != NULL;
+	return 0;
+}
+
+// Fragment stage of the seven complex blends, ported from ruffle
+// render/wgpu/shaders/blend/{multiply,lighten,darken,difference,invert,overlay,
+// hardlight}.wgsl. Both inputs are premultiplied; `s`/`d` are the
+// un-premultiplied colours the Flash blend function is defined on.
+//
+// `discard` where the layer is empty is what lets these run with NO hardware
+// blending (ruffle's BlendState::REPLACE) without erasing the frame outside the
+// object. dst.a == 0 returns src, which is exactly the limit of compose() there
+// and avoids 0/0 in dst.rgb/dst.a.
+static const char* blend_shader_wgsl_head =
+	"@group(0) @binding(0) var parent_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(1) var current_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(2) var tex_samp: sampler;\n"
+	"\n"
+	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+	"\n"
+	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+	"  var positions = array<vec2f, 6>(\n"
+	"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+	"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+	"  );\n"
+	"  var uvs = array<vec2f, 6>(\n"
+	"    vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),\n"
+	"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
+	"  );\n"
+	"  var out: VSOut;\n"
+	"  out.pos = vec4f(positions[vi], 0.0, 1.0);\n"
+	"  out.uv = uvs[vi];\n"
+	"  return out;\n"
+	"}\n"
+	"\n"
+	"fn compose(src: vec4f, dst: vec4f, b: vec3f) -> vec4f {\n"
+	"  return vec4f(src.rgb * (1.0 - dst.a) + dst.rgb * (1.0 - src.a) + src.a * dst.a * b,\n"
+	"               src.a + dst.a * (1.0 - src.a));\n"
+	"}\n"
+	"fn hard_mix(s: vec3f, d: vec3f, sel: vec3<bool>) -> vec3f {\n"
+	"  return select(vec3f(1.0) - 2.0 * (vec3f(1.0) - d) * (vec3f(1.0) - s), 2.0 * s * d, sel);\n"
+	"}\n";
+
+// %s = entry-point name, %s = blend function over `s` (src) and `d` (dst)
+static const char* blend_shader_wgsl_frag =
+	"@fragment fn %s(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"  let dst = textureSample(parent_tex, tex_samp, uv);\n"
+	"  let src = textureSample(current_tex, tex_samp, uv);\n"
+	"  if (src.a > 0.0) {\n"
+	"    if (dst.a > 0.0) {\n"
+	"      let s = src.rgb / src.a;\n"
+	"      let d = dst.rgb / dst.a;\n"
+	"      return compose(src, dst, %s);\n"
+	"    } else {\n"
+	"      return src;\n"
+	"    }\n"
+	"  } else {\n"
+	"    discard;\n"
+	"  }\n"
+	"  return dst;\n"
+	"}\n";
+
+typedef struct { u8 mode; const char* entry; const char* func; } BlendShaderDef;
+
+static const BlendShaderDef blend_shader_defs[] = {
+	{  3, "fs_multiply",   "s * d" },
+	{  5, "fs_lighten",    "max(s, d)" },
+	{  6, "fs_darken",     "min(s, d)" },
+	{  7, "fs_difference", "abs(d - s)" },
+	{ 10, "fs_invert",     "vec3f(1.0) - d" },
+	{ 13, "fs_overlay",    "hard_mix(s, d, d <= vec3f(0.5))" },
+	{ 14, "fs_hardlight",  "hard_mix(s, d, s <= vec3f(0.5))" },
+};
+#define BLEND_SHADER_COUNT ((int)(sizeof(blend_shader_defs) / sizeof(blend_shader_defs[0])))
+
+static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok) return;
+	if (ctx->blend_resources_created) return;
+	render_webgpu_ensure_filter_resources(ctx);
+	ctx->blend_resources_created = 1;
+
+	// The offscreen pass needs its OWN depth-stencil (see begin_offscreen_pass).
+	{
+		WGPUTextureDescriptor td = {0};
+		td.label = WGPU_LABEL("filter_depth_stencil");
+		td.dimension = WGPUTextureDimension_2D;
+		td.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
+		td.format = WGPUTextureFormat_Depth24PlusStencil8;
+		td.mipLevelCount = 1;
+		td.sampleCount = 4;
+		td.usage = WGPUTextureUsage_RenderAttachment;
+		ctx->filter_ds_texture = wgpuDeviceCreateTexture(ctx->device, &td);
+		WGPUTextureViewDescriptor vd = {0};
+		vd.mipLevelCount = 1;
+		vd.arrayLayerCount = 1;
+		ctx->filter_ds_view = wgpuTextureCreateView(ctx->filter_ds_texture, &vd);
+	}
+
+	// composite_wgsl's params, permanently zero (no offset, no tint). A dedicated
+	// buffer keeps blend composites independent of the filter path's per-call
+	// writes into filter_quad_buffer.
+	{
+		WGPUBufferDescriptor bd = {0};
+		bd.label = WGPU_LABEL("blend_params");
+		bd.size = 32;
+		bd.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
+		ctx->blend_params_buf = wgpuDeviceCreateBuffer(ctx->device, &bd);
+		float zeros[8] = {0};
+		wgpuQueueWriteBuffer(ctx->queue, ctx->blend_params_buf, 0, zeros, 32);
+	}
+
+	// --- Trivial layer composites: composite_pipeline with a different blend
+	//     state. Colour factors from ruffle blend.rs:76-105; alpha is OVER on all
+	//     three, so an opaque backdrop stays opaque. ---
+	{
+		WGPUShaderModule sm = create_shader(ctx->device, composite_wgsl, "blend_layer_shader");
+
+		WGPUColorTargetState ct = {0};
+		ct.format = ctx->surface_format;
+		ct.writeMask = WGPUColorWriteMask_All;
+
+		WGPUFragmentState fs = {0};
+		fs.module = sm;
+		fs.entryPoint = WGPU_LABEL("fs_main");
+		fs.targetCount = 1;
+		fs.targets = &ct;
+
+		// Same stencil-Equal / no-write depth-stencil as composite_pipeline, so a
+		// blend-mode object inside a clip mask stays clipped.
+		WGPUDepthStencilState ds = {0};
+		ds.format = WGPUTextureFormat_Depth24PlusStencil8;
+		ds.depthWriteEnabled = 0;
+		ds.depthCompare = WGPUCompareFunction_Always;
+		ds.stencilFront.compare = WGPUCompareFunction_Equal;
+		ds.stencilFront.failOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.passOp = WGPUStencilOperation_Keep;
+		ds.stencilBack = ds.stencilFront;
+		ds.stencilReadMask = 0xFF;
+		ds.stencilWriteMask = 0x00;
+
+		WGPURenderPipelineDescriptor rpd = {0};
+		rpd.layout = ctx->composite_pipeline_layout;
+		rpd.vertex.module = sm;
+		rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+		rpd.fragment = &fs;
+		rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+		rpd.multisample.count = 4;
+		rpd.multisample.mask = 0xFFFFFFFF;
+		rpd.depthStencil = &ds;
+
+		static const struct {
+			u8 mode; WGPUBlendFactor dst; WGPUBlendOperation op; const char* label;
+		} trivial[] = {
+			{ 4, WGPUBlendFactor_OneMinusSrc, WGPUBlendOperation_Add,             "blend_layer_screen" },
+			{ 8, WGPUBlendFactor_One,         WGPUBlendOperation_Add,             "blend_layer_add" },
+			{ 9, WGPUBlendFactor_One,         WGPUBlendOperation_ReverseSubtract, "blend_layer_subtract" },
+		};
+		for (int i = 0; i < 3; i++)
+		{
+			WGPUBlendState bs = {0};
+			bs.color.srcFactor = WGPUBlendFactor_One;
+			bs.color.dstFactor = trivial[i].dst;
+			bs.color.operation = trivial[i].op;
+			bs.alpha.srcFactor = WGPUBlendFactor_One;
+			bs.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+			bs.alpha.operation = WGPUBlendOperation_Add;
+			ct.blend = &bs;
+			rpd.label = WGPU_LABEL(trivial[i].label);
+			ctx->blend_layer_pipeline[trivial[i].mode] =
+				wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		}
+		wgpuShaderModuleRelease(sm);
+	}
+
+	// --- Complex blends: one pipeline per mode, no hardware blending. ---
+	{
+		WGPUBindGroupLayoutEntry entries[3] = {0};
+		entries[0].binding = 0;
+		entries[0].visibility = WGPUShaderStage_Fragment;
+		entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+		entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+		entries[1].binding = 1;
+		entries[1].visibility = WGPUShaderStage_Fragment;
+		entries[1].texture.sampleType = WGPUTextureSampleType_Float;
+		entries[1].texture.viewDimension = WGPUTextureViewDimension_2D;
+		entries[2].binding = 2;
+		entries[2].visibility = WGPUShaderStage_Fragment;
+		entries[2].sampler.type = WGPUSamplerBindingType_Filtering;
+
+		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+		bgl_desc.label = WGPU_LABEL("blend_shader_bgl");
+		bgl_desc.entryCount = 3;
+		bgl_desc.entries = entries;
+		ctx->blend_shader_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
+
+		WGPUPipelineLayoutDescriptor pl_desc = {0};
+		pl_desc.bindGroupLayoutCount = 1;
+		pl_desc.bindGroupLayouts = &ctx->blend_shader_bgl;
+		ctx->blend_shader_pl = wgpuDeviceCreatePipelineLayout(ctx->device, &pl_desc);
+
+		// One module holding all seven fragment entry points.
+		size_t cap = strlen(blend_shader_wgsl_head) + 1;
+		for (int i = 0; i < BLEND_SHADER_COUNT; i++)
+			cap += strlen(blend_shader_wgsl_frag) + strlen(blend_shader_defs[i].entry)
+			     + strlen(blend_shader_defs[i].func) + 8;
+		char* src = (char*) malloc(cap);
+		size_t len = (size_t) snprintf(src, cap, "%s", blend_shader_wgsl_head);
+		for (int i = 0; i < BLEND_SHADER_COUNT; i++)
+			len += (size_t) snprintf(src + len, cap - len, blend_shader_wgsl_frag,
+				blend_shader_defs[i].entry, blend_shader_defs[i].func);
+
+		WGPUShaderModule sm = create_shader(ctx->device, src, "blend_shader");
+		free(src);
+
+		WGPUColorTargetState ct = {0};
+		ct.format = ctx->surface_format;
+		ct.writeMask = WGPUColorWriteMask_All;
+		ct.blend = NULL;   // == ruffle's BlendState::REPLACE; `discard` masks it
+
+		WGPUDepthStencilState ds = {0};
+		ds.format = WGPUTextureFormat_Depth24PlusStencil8;
+		ds.depthWriteEnabled = 0;
+		ds.depthCompare = WGPUCompareFunction_Always;
+		ds.stencilFront.compare = WGPUCompareFunction_Equal;
+		ds.stencilFront.failOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.passOp = WGPUStencilOperation_Keep;
+		ds.stencilBack = ds.stencilFront;
+		ds.stencilReadMask = 0xFF;
+		ds.stencilWriteMask = 0x00;
+
+		for (int i = 0; i < BLEND_SHADER_COUNT; i++)
+		{
+			WGPUFragmentState fs = {0};
+			fs.module = sm;
+			fs.entryPoint = WGPU_LABEL(blend_shader_defs[i].entry);
+			fs.targetCount = 1;
+			fs.targets = &ct;
+
+			WGPURenderPipelineDescriptor rpd = {0};
+			rpd.label = WGPU_LABEL("blend_shader_pipeline");
+			rpd.layout = ctx->blend_shader_pl;
+			rpd.vertex.module = sm;
+			rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+			rpd.fragment = &fs;
+			rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+			rpd.multisample.count = 4;
+			rpd.multisample.mask = 0xFFFFFFFF;
+			rpd.depthStencil = &ds;
+			ctx->blend_shader_pipeline[blend_shader_defs[i].mode] =
+				wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		}
+		wgpuShaderModuleRelease(sm);
+	}
+}
+
+// Snapshot the frame so far into filter_tex_b, the "parent" the complex blends
+// sample. MUST be called while the main pass is SUSPENDED — that is when the
+// MSAA resolve into surface_view/offscreen_view has already happened.
+void render_webgpu_capture_backdrop(WebGPURenderContext* ctx, u8 blend_mode)
+{
+	if (!ctx->renderer_ok) return;
+	if (!blend_mode_is_complex(blend_mode)) return;   // trivial modes blend in HW
+	if (ctx->main_color_texture == NULL) return;
+	render_webgpu_ensure_blend_resources(ctx);
+
+	WGPUTexelCopyTextureInfo src = {0};
+	src.texture = ctx->main_color_texture;
+	src.mipLevel = 0;
+	src.origin = (WGPUOrigin3D){0, 0, 0};
+	src.aspect = WGPUTextureAspect_All;
+
+	WGPUTexelCopyTextureInfo dst = {0};
+	dst.texture = ctx->filter_tex_b;
+	dst.mipLevel = 0;
+	dst.origin = (WGPUOrigin3D){0, 0, 0};
+	dst.aspect = WGPUTextureAspect_All;
+
+	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
+	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+}
+
+// Composite the layer in filter_tex_a onto the resumed main pass.
+void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 stencil_ref)
+{
+	if (!ctx->renderer_ok) return;
+	render_webgpu_ensure_blend_resources(ctx);
+
+	WGPUBindGroup bg = NULL;
+	WGPURenderPipeline pipeline = NULL;
+
+	if (blend_mode_is_complex(blend_mode))
+	{
+		pipeline = ctx->blend_shader_pipeline[blend_mode];
+		WGPUBindGroupEntry e[3] = {0};
+		e[0].binding = 0;
+		e[0].textureView = ctx->filter_view_b;   // backdrop ("parent")
+		e[1].binding = 1;
+		e[1].textureView = ctx->filter_view_a;   // this object's layer ("current")
+		e[2].binding = 2;
+		e[2].sampler = ctx->filter_sampler;
+		WGPUBindGroupDescriptor bd = {0};
+		bd.layout = ctx->blend_shader_bgl;
+		bd.entryCount = 3;
+		bd.entries = e;
+		bg = wgpuDeviceCreateBindGroup(ctx->device, &bd);
+	}
+	else
+	{
+		pipeline = ctx->blend_layer_pipeline[blend_mode];
+		WGPUBindGroupEntry e[3] = {0};
+		e[0].binding = 0;
+		e[0].textureView = ctx->filter_view_a;
+		e[1].binding = 1;
+		e[1].sampler = ctx->filter_sampler;
+		e[2].binding = 2;
+		e[2].buffer = ctx->blend_params_buf;
+		e[2].size = 32;
+		WGPUBindGroupDescriptor bd = {0};
+		bd.layout = ctx->composite_bgl;
+		bd.entryCount = 3;
+		bd.entries = e;
+		bg = wgpuDeviceCreateBindGroup(ctx->device, &bd);
+	}
+
+	if (pipeline == NULL || bg == NULL)
+	{
+		if (bg) wgpuBindGroupRelease(bg);
+		return;
+	}
+
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, stencil_ref);
+	wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
+
+	// Restore the normal pipeline + bind groups the display loop expects.
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+
+	wgpuBindGroupRelease(bg);
+}
+
 void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
@@ -3302,6 +3705,8 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
 	render_webgpu_ensure_filter_resources(ctx);
+	render_webgpu_ensure_blend_resources(ctx);
+	ctx->offscreen_depth++;
 
 	// Use a SEPARATE MSAA texture (filter_msaa_view) so we don't clobber
 	// the main pass content stored in ctx->msaa_view during suspend.
@@ -3313,9 +3718,12 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 	color_att.storeOp = WGPUStoreOp_Store;
 	color_att.clearValue = (WGPUColor){0.0, 0.0, 0.0, 0.0};
 
-	// Depth-stencil required because render_pipeline was created with it
+	// Depth-stencil required because render_pipeline was created with it. It has
+	// to be the offscreen pass's OWN texture: this pass clears + discards the
+	// stencil, and doing that to depth_stencil_view would destroy the main pass's
+	// active clip mask (the resumed pass reloads it with loadOp=Load).
 	WGPURenderPassDepthStencilAttachment ds_att = {0};
-	ds_att.view = ctx->depth_stencil_view;
+	ds_att.view = ctx->filter_ds_view ? ctx->filter_ds_view : ctx->depth_stencil_view;
 	ds_att.depthLoadOp = WGPULoadOp_Clear;
 	ds_att.depthStoreOp = WGPUStoreOp_Discard;
 	ds_att.depthClearValue = 1.0f;
@@ -3341,6 +3749,7 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
+	if (ctx->offscreen_depth > 0) ctx->offscreen_depth--;
 	if (ctx->render_pass)
 	{
 		wgpuRenderPassEncoderEnd(ctx->render_pass);
@@ -3505,6 +3914,18 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		wgpuRenderPipelineRelease(ctx->stencil_test_pipeline);
 	if (ctx->blend_premul_pipeline)
 		wgpuRenderPipelineRelease(ctx->blend_premul_pipeline);
+	for (int bm = 0; bm < 15; bm++)
+	{
+		if (ctx->blend_layer_pipeline[bm])
+			wgpuRenderPipelineRelease(ctx->blend_layer_pipeline[bm]);
+		if (ctx->blend_shader_pipeline[bm])
+			wgpuRenderPipelineRelease(ctx->blend_shader_pipeline[bm]);
+	}
+	if (ctx->blend_shader_pl) wgpuPipelineLayoutRelease(ctx->blend_shader_pl);
+	if (ctx->blend_shader_bgl) wgpuBindGroupLayoutRelease(ctx->blend_shader_bgl);
+	if (ctx->blend_params_buf) wgpuBufferRelease(ctx->blend_params_buf);
+	if (ctx->filter_ds_view) wgpuTextureViewRelease(ctx->filter_ds_view);
+	if (ctx->filter_ds_texture) wgpuTextureRelease(ctx->filter_ds_texture);
 	if (ctx->compute_pipeline)
 		wgpuComputePipelineRelease(ctx->compute_pipeline);
 

@@ -3053,6 +3053,13 @@ static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
 }
 
 // Helper: render a single object into the current render pass
+// >0 while a display list is being rasterised into the STENCIL (clip-mask
+// capture) rather than the colour target. A blend-mode object inside a mask
+// shape must not suspend the pass to build a layer — the mask is mid-capture and
+// the layer composite would write colour. It just draws into the stencil as
+// usual, which is all a mask needs.
+static int g_clip_mask_capture = 0;
+
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
 	if (cxform_forces_invisible(app_context, obj->cxform_id)) return;
@@ -3194,6 +3201,31 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		if (obj->clip_depth == 0 && cxform_forces_invisible(app_context, obj->cxform_id))
 			continue;
 
+		// Blend modes on a NESTED entry. The two root loops (tagShowFrame /
+		// tagRerenderFrame) handled these; this recursive renderer did not — and
+		// the visual/blend_modes suite authors its blend objects INSIDE a sprite,
+		// so they rendered as plain normal-over. Same three cases as the root
+		// loops; see the comments there.
+		if (obj->clip_depth == 0 && !g_clip_mask_capture)
+		{
+			// Alpha / Erase with no Layer above them: Flash drops the draw.
+			if (obj->blend_mode == 11 || obj->blend_mode == 12)
+				continue;
+			if (obj->filter_type == 0
+			    && renderer_blend_mode_is_layered(context, obj->blend_mode))
+			{
+				renderer_suspend_pass(context);
+				renderer_capture_backdrop(context, obj->blend_mode);
+				renderer_begin_offscreen_pass(context);
+				render_single_object(app_context, obj);
+				renderer_end_offscreen_pass(context);
+				renderer_resume_pass(context);
+				renderer_composite_blend(context, obj->blend_mode,
+					active_clip_depth > 0 ? 1 : 0);
+				continue;
+			}
+		}
+
 		// This entry is a clip mask: render it into the stencil buffer (not the
 		// color target) and clip subsequent depths up to clip_depth to it.
 		if (obj->clip_depth > 0)
@@ -3218,8 +3250,10 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			else if (mch->type == CHAR_TYPE_SPRITE)
 			{
 				renderer_begin_clip_mask(context);
+				g_clip_mask_capture++;
 				if (obj->sprite_display_list != NULL)
 					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+				g_clip_mask_capture--;
 				renderer_end_clip_mask(context);
 				active_clip_depth = obj->clip_depth;
 			}
@@ -5180,8 +5214,10 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			} else if (ch->type == CHAR_TYPE_SPRITE) {
 				// Sprite clip mask: render sprite content + Drawing API into stencil
 				renderer_begin_clip_mask(context);
+				g_clip_mask_capture++;
 				if (obj->sprite_display_list != NULL)
 					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+				g_clip_mask_capture--;
 				// Also render Drawing API shapes drawn into this sprite's MC
 				if (obj->instance_name != NULL) {
 					DrawingRenderInfo dinfos[64];
@@ -5194,9 +5230,31 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			}
 			continue;
 		}
-		if (obj->blend_mode > 1)
+		// Alpha (11) / Erase (12) with no Layer above them are IGNORED by Flash —
+		// the draw is dropped entirely (ruffle render/wgpu/src/surface.rs:239-244,
+		// "An Alpha or Erase with no Layer above it should be ignored"). We have no
+		// layer groups yet, so "no layer above" is unconditionally true. When layer
+		// groups land, this condition becomes a layer-stack query.
+		int blend_skip = (obj->blend_mode == 11 || obj->blend_mode == 12);
+		// Non-trivial blend modes render the object's whole subtree into a layer
+		// and composite it once. Filter+blend on the same object both want
+		// filter_tex_a, so blend keeps the legacy per-draw pipeline there.
+		int blend_layered = !blend_skip && obj->filter_type == 0
+			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
+		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, obj->blend_mode);
-		if (obj->filter_type != 0) {
+		if (blend_skip) {
+			// nothing drawn
+		} else if (blend_layered) {
+			renderer_suspend_pass(context);
+			renderer_capture_backdrop(context, obj->blend_mode);
+			renderer_begin_offscreen_pass(context);
+			render_single_object(app_context, obj);
+			renderer_end_offscreen_pass(context);
+			renderer_resume_pass(context);
+			renderer_composite_blend(context, obj->blend_mode,
+				active_clip_depth > 0 ? 1 : 0);
+		} else if (obj->filter_type != 0) {
 			renderer_suspend_pass(context);
 			renderer_begin_offscreen_pass(context);
 			render_single_object(app_context, obj);
@@ -5242,12 +5300,12 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			} else {
 				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
 			}
-			if (obj->blend_mode > 1)
+			if (obj->blend_mode > 1 && !blend_layered)
 				renderer_set_blend_mode(context, obj->blend_mode);
 		} else {
 			render_single_object(app_context, obj);
 		}
-		if (obj->blend_mode > 1)
+		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, 0);
 	}
 	if (active_clip_depth > 0)
@@ -6133,8 +6191,10 @@ void tagShowFrame(SWFAppContext* app_context)
 			{
 				// Sprite clip mask: render sprite content + Drawing API into stencil
 				renderer_begin_clip_mask(context);
+				g_clip_mask_capture++;
 				if (obj->sprite_display_list != NULL)
 					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
+				g_clip_mask_capture--;
 				// Also render Drawing API shapes drawn into this sprite's MC
 				if (obj->instance_name != NULL) {
 					DrawingRenderInfo dinfos[64];
@@ -6148,12 +6208,34 @@ void tagShowFrame(SWFAppContext* app_context)
 			continue;
 		}
 
+		// Alpha (11) / Erase (12) with no Layer above them are IGNORED by Flash;
+		// see the matching comment in the stage display loop.
+		int blend_skip = (obj->blend_mode == 11 || obj->blend_mode == 12);
+		// Non-trivial blend modes render into their own layer and composite once.
+		int blend_layered = !blend_skip && obj->filter_type == 0
+			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
+
 		// Set blend mode if non-default
-		if (obj->blend_mode > 1)
+		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, obj->blend_mode);
 
+		if (blend_skip)
+		{
+			// nothing drawn
+		}
+		else if (blend_layered)
+		{
+			renderer_suspend_pass(context);
+			renderer_capture_backdrop(context, obj->blend_mode);
+			renderer_begin_offscreen_pass(context);
+			render_single_object(app_context, obj);
+			renderer_end_offscreen_pass(context);
+			renderer_resume_pass(context);
+			renderer_composite_blend(context, obj->blend_mode,
+				active_clip_depth > 0 ? 1 : 0);
+		}
 		// Check if this object has a visual filter
-		if (obj->filter_type != 0)
+		else if (obj->filter_type != 0)
 		{
 			// Filtered rendering: suspend -> offscreen -> blur -> resume -> composite
 			renderer_suspend_pass(context);
@@ -6224,7 +6306,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			}
 
 			// Re-bind blend state after filter pipeline switches
-			if (obj->blend_mode > 1)
+			if (obj->blend_mode > 1 && !blend_layered)
 				renderer_set_blend_mode(context, obj->blend_mode);
 		}
 		else
@@ -6233,7 +6315,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 
 		// Restore default blend mode
-		if (obj->blend_mode > 1)
+		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, 0);
 
 #ifndef OFFSCREEN_RENDER

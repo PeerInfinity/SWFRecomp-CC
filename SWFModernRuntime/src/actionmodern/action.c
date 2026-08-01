@@ -49513,6 +49513,11 @@ void actionSetMember(SWFAppContext* app_context)
 					// Out of range after byte truncation: keep previous value
 				}
 				// All other types (boolean, object, movieclip, etc.): keep previous value
+				// Mirror onto the display-list entry — that is the only blend_mode the
+				// renderer reads (tagPlaceObject3 writes the same field). Without this
+				// a script-set mc.blendMode is a pixel no-op.
+				if (mc->display_obj != NULL)
+					((DisplayObject*) mc->display_obj)->blend_mode = mc->blend_mode;
 				return;
 			}
 			// filters setter: store array on dynamic_props (getter does the cloning)

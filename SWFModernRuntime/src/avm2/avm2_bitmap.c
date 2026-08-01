@@ -118,10 +118,13 @@ static uint32_t blend_over(uint32_t dest, uint32_t src)
 
 // BitmapData.draw() blend modes beyond normal/layer. Values >0 route the CPU
 // raster through blend_mode_apply() per pixel; 0 keeps the blend_over/copy fast
-// paths. Only the modes Seedling's day/night compositor needs are implemented
-// (MULTIPLY night tint, HARDLIGHT solidBmp, ADD snow); other modes fall through
-// to BM_NORMAL (blend_over), i.e. the prior behaviour — no regression.
-enum { BM_NORMAL = 0, BM_MULTIPLY, BM_HARDLIGHT, BM_ADD };
+// paths. All of Flash's non-shader modes are covered except alpha/erase (which
+// have their own BitmapData quirk, handled at the call site) and layer/normal.
+enum {
+	BM_NORMAL = 0, BM_MULTIPLY, BM_HARDLIGHT, BM_ADD,
+	BM_SUBTRACT, BM_SCREEN, BM_LIGHTEN, BM_DARKEN,
+	BM_DIFFERENCE, BM_INVERT, BM_OVERLAY
+};
 
 // ADD = the trivial hardware blend (render/wgpu/src/blend.rs TrivialBlend::Add):
 // premultiplied src + dst, clamped, all four channels.
@@ -134,15 +137,43 @@ static uint32_t blend_add(uint32_t dst, uint32_t src)
 	return CMK(r, g, b, a);
 }
 
-// MULTIPLY / HARDLIGHT = the "complex" blend the wgpu shaders run
-// (render/wgpu/shaders/blend/{multiply,hardlight}.wgsl). src/dst are
+// SUBTRACT / SCREEN are the other two trivial hardware blends (blend.rs:76-105).
+// Colour is a plain factor combination on PREMULTIPLIED values; alpha is
+// BlendComponent::OVER (all three trivial modes use it), so an opaque
+// destination stays opaque.
+static uint32_t blend_over_alpha(uint32_t dst, uint32_t src)
+{
+	uint32_t sa = CA(src);
+	uint32_t a = sa + (CA(dst) * (255 - sa)) / 255;
+	return a > 255 ? 255 : a;
+}
+
+static uint32_t blend_subtract(uint32_t dst, uint32_t src)
+{
+	int r = (int) CR(dst) - (int) CR(src); if (r < 0) r = 0;
+	int g = (int) CG(dst) - (int) CG(src); if (g < 0) g = 0;
+	int b = (int) CB(dst) - (int) CB(src); if (b < 0) b = 0;
+	return CMK((uint32_t) r, (uint32_t) g, (uint32_t) b, blend_over_alpha(dst, src));
+}
+
+static uint32_t blend_screen(uint32_t dst, uint32_t src)
+{
+	// src + dst * (1 - src), per channel, on premultiplied values.
+	uint32_t r = CR(src) + (CR(dst) * (255 - CR(src))) / 255; if (r > 255) r = 255;
+	uint32_t g = CG(src) + (CG(dst) * (255 - CG(src))) / 255; if (g > 255) g = 255;
+	uint32_t b = CB(src) + (CB(dst) * (255 - CB(src))) / 255; if (b > 255) b = 255;
+	return CMK(r, g, b, blend_over_alpha(dst, src));
+}
+
+// The "complex" blends the wgpu shaders run
+// (render/wgpu/shaders/blend/*.wgsl). src/dst are
 // premultiplied; blend_func operates on UN-premultiplied channels; the result
 // is premultiplied:
 //   out.rgb = src*(1-da) + dst*(1-sa) + sa*da*B(src/sa, dst/da)
 //   out.a   = sa + da*(1-sa)
-// src.a==0 -> discard (leave dst). dst.a==0 -> src (both modes reduce to it;
-// avoids the shader's 0/0 in dst/da, which never arises for the opaque Seedling
-// buffers anyway).
+// src.a==0 -> discard (leave dst). dst.a==0 -> src (EVERY mode reduces to it —
+// the formula's limit at da=0 is exactly src — and it avoids the shader's 0/0
+// in dst/da).
 static uint32_t blend_complex(int mode, uint32_t dst, uint32_t src)
 {
 	double sa = CA(src) / 255.0, da = CA(dst) / 255.0;
@@ -153,15 +184,39 @@ static uint32_t blend_complex(int mode, uint32_t dst, uint32_t src)
 	double usr = sr / sa, usg = sg / sa, usb = sb / sa;   // un-premultiplied src
 	double udr = dr / da, udg = dg / da, udb = db / da;   // un-premultiplied dst
 	double br, bg, bb;
-	if (mode == BM_MULTIPLY)
+	switch (mode)
 	{
+	case BM_MULTIPLY:
 		br = usr * udr; bg = usg * udg; bb = usb * udb;
-	}
-	else  // BM_HARDLIGHT
-	{
+		break;
+	case BM_LIGHTEN:
+		br = usr > udr ? usr : udr;
+		bg = usg > udg ? usg : udg;
+		bb = usb > udb ? usb : udb;
+		break;
+	case BM_DARKEN:
+		br = usr < udr ? usr : udr;
+		bg = usg < udg ? usg : udg;
+		bb = usb < udb ? usb : udb;
+		break;
+	case BM_DIFFERENCE:
+		br = udr > usr ? udr - usr : usr - udr;
+		bg = udg > usg ? udg - usg : usg - udg;
+		bb = udb > usb ? udb - usb : usb - udb;
+		break;
+	case BM_INVERT:
+		br = 1.0 - udr; bg = 1.0 - udg; bb = 1.0 - udb;
+		break;
+	case BM_OVERLAY:  // branches on DST
+		br = udr <= 0.5 ? 2.0 * usr * udr : 1.0 - 2.0 * (1.0 - udr) * (1.0 - usr);
+		bg = udg <= 0.5 ? 2.0 * usg * udg : 1.0 - 2.0 * (1.0 - udg) * (1.0 - usg);
+		bb = udb <= 0.5 ? 2.0 * usb * udb : 1.0 - 2.0 * (1.0 - udb) * (1.0 - usb);
+		break;
+	default:  // BM_HARDLIGHT — same as overlay but branches on SRC
 		br = usr <= 0.5 ? 2.0 * usr * udr : 1.0 - 2.0 * (1.0 - udr) * (1.0 - usr);
 		bg = usg <= 0.5 ? 2.0 * usg * udg : 1.0 - 2.0 * (1.0 - udg) * (1.0 - usg);
 		bb = usb <= 0.5 ? 2.0 * usb * udb : 1.0 - 2.0 * (1.0 - udb) * (1.0 - usb);
+		break;
 	}
 	double outr = sr * (1.0 - da) + dr * (1.0 - sa) + sa * da * br;
 	double outg = sg * (1.0 - da) + dg * (1.0 - sa) + sa * da * bg;
@@ -181,6 +236,8 @@ static uint32_t blend_complex(int mode, uint32_t dst, uint32_t src)
 static uint32_t blend_mode_apply(int mode, uint32_t dst, uint32_t src)
 {
 	if (mode == BM_ADD) return blend_add(dst, src);
+	if (mode == BM_SUBTRACT) return blend_subtract(dst, src);
+	if (mode == BM_SCREEN) return blend_screen(dst, src);
 	return blend_complex(mode, dst, src);
 }
 
@@ -2203,8 +2260,8 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		return avm2_undefined();
 
 	// blendMode (arg 3): default "normal". alpha/erase are handled as the Flash
-	// no-op-for-BitmapData quirk; multiply/hardlight/add route the raster through
-	// blend_mode_apply(); everything else stays normal (blend_over).
+	// no-op-for-BitmapData quirk; every other named mode routes the raster through
+	// blend_mode_apply(). "normal", "layer" and "shader" stay on blend_over.
 	int blend_alpha_or_erase = 0;
 	int blend_mode = BM_NORMAL;
 	if (arg_present(act, 3))
@@ -2214,9 +2271,16 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		{
 			if (strcmp(bm->utf8, "alpha") == 0 || strcmp(bm->utf8, "erase") == 0)
 				blend_alpha_or_erase = 1;
-			else if (strcmp(bm->utf8, "multiply") == 0) blend_mode = BM_MULTIPLY;
-			else if (strcmp(bm->utf8, "hardlight") == 0) blend_mode = BM_HARDLIGHT;
-			else if (strcmp(bm->utf8, "add") == 0) blend_mode = BM_ADD;
+			else if (strcmp(bm->utf8, "multiply") == 0)   blend_mode = BM_MULTIPLY;
+			else if (strcmp(bm->utf8, "hardlight") == 0)  blend_mode = BM_HARDLIGHT;
+			else if (strcmp(bm->utf8, "add") == 0)        blend_mode = BM_ADD;
+			else if (strcmp(bm->utf8, "subtract") == 0)   blend_mode = BM_SUBTRACT;
+			else if (strcmp(bm->utf8, "screen") == 0)     blend_mode = BM_SCREEN;
+			else if (strcmp(bm->utf8, "lighten") == 0)    blend_mode = BM_LIGHTEN;
+			else if (strcmp(bm->utf8, "darken") == 0)     blend_mode = BM_DARKEN;
+			else if (strcmp(bm->utf8, "difference") == 0) blend_mode = BM_DIFFERENCE;
+			else if (strcmp(bm->utf8, "invert") == 0)     blend_mode = BM_INVERT;
+			else if (strcmp(bm->utf8, "overlay") == 0)    blend_mode = BM_OVERLAY;
 		}
 	}
 
