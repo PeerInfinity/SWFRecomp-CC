@@ -1,9 +1,10 @@
 // String builtin class + methods (port of Ruffle globals/string.rs).
 //
-// Representation note: Avm2String is UTF-8 bytes; AVM2 strings are UTF-16
-// code units. Indexing/length here is byte-based, which is identical for
-// ASCII (virtually the whole tranche-1 corpus). Non-ASCII index math is a
-// known divergence to revisit with a WString port.
+// Representation note: Avm2String holds canonical WTF-8 (see the long comment
+// above avm2_string_concat in avm2_value.c) — UTF-8 extended so an unpaired
+// UTF-16 surrogate can be stored as a 3-byte ED A0..BF xx sequence, with a
+// high+low neighbour pair always folded into the 4-byte astral form. Every
+// index and length below is in UTF-16 code units, decoded from those bytes.
 
 #include <math.h>
 #include <stdio.h>
@@ -131,6 +132,74 @@ static uint32_t utf16_to_byte(const Avm2String* s, uint32_t u16idx)
 	return i > s->len ? s->len : i;
 }
 
+// Write one UTF-16 code unit as (W)TF-8: a surrogate becomes its 3-byte WTF-8
+// form, everything else its ordinary UTF-8 form. Returns the byte count.
+static uint32_t wtf8_put_unit(char* out, uint32_t unit)
+{
+	if (unit < 0x80) { out[0] = (char) unit; return 1; }
+	if (unit < 0x800)
+	{
+		out[0] = (char) (0xC0 | (unit >> 6));
+		out[1] = (char) (0x80 | (unit & 0x3F));
+		return 2;
+	}
+	out[0] = (char) (0xE0 | (unit >> 12));
+	out[1] = (char) (0x80 | ((unit >> 6) & 0x3F));
+	out[2] = (char) (0x80 | (unit & 0x3F));
+	return 3;
+}
+
+// Extract the UTF-16 code-unit range [start, end) as canonical WTF-8.
+//
+// The only interesting case is a range boundary that falls INSIDE an astral
+// code point: `"\u{20B9F}".substring(0, 1)` is one lone high surrogate, not the
+// whole character. Ranges that don't split anything are a plain byte copy.
+static Avm2Value make_sub16(Avm2Context* ctx, const Avm2String* s,
+                            uint32_t start, uint32_t end)
+{
+	if (end <= start) return make_str(ctx, "", 0);
+	// A split astral pair costs at most 3 bytes per side against the 4 it
+	// replaces, so the output is never longer than the input + 2.
+	char* out = avm2_alloc(ctx, s->len + 3);
+	uint32_t n = 0;
+	uint32_t u = 0;  // code-unit index of the codepoint at byte i
+	for (uint32_t i = 0; i < s->len && u < end; )
+	{
+		unsigned char c = (unsigned char) s->utf8[i];
+		uint32_t clen;
+		if (c < 0x80) clen = 1;
+		else if (c < 0xE0) clen = 2;
+		else if (c < 0xF0) clen = 3;
+		else clen = 4;
+		uint32_t units = clen == 4 ? 2 : 1;
+		if (u + units > start)
+		{
+			if (units == 1 || (u >= start && u + units <= end))
+			{
+				memcpy(out + n, s->utf8 + i, clen);
+				n += clen;
+			}
+			else
+			{
+				// Astral codepoint clipped on one side: emit the surviving
+				// half as a lone surrogate.
+				uint32_t cp = (uint32_t) (c & 0x07);
+				for (uint32_t k = 1; k < clen && i + k < s->len; k++)
+				{
+					cp = (cp << 6) | ((unsigned char) s->utf8[i + k] & 0x3F);
+				}
+				cp -= 0x10000;
+				uint32_t unit = u >= start ? (0xD800 + (cp >> 10))
+				                           : (0xDC00 + (cp & 0x3FF));
+				n += wtf8_put_unit(out + n, unit);
+			}
+		}
+		u += units;
+		i += clen;
+	}
+	return make_str(ctx, out, n);
+}
+
 // Map a byte offset to a UTF-16 index.
 static uint32_t byte_to_utf16(const Avm2String* s, uint32_t byteoff)
 {
@@ -172,9 +241,11 @@ static Avm2Value string_char_at(Avm2Activation* act)
 	}
 	if (bl == 4)
 	{
-		// Astral codepoint: charAt yields ONE code unit — a lone surrogate,
-		// which the UTF-8 output surfaces as U+FFFD (Ruffle's conversion).
-		return make_str(act->ctx, "\xEF\xBF\xBD", 3);
+		// Astral codepoint: charAt yields ONE code unit — the lone surrogate
+		// half, stored in its WTF-8 form.
+		char buf[4];
+		uint32_t bn = wtf8_put_unit(buf, (uint32_t) unit);
+		return make_str(act->ctx, buf, bn);
 	}
 	return make_str(act->ctx, s->utf8 + bs, bl);
 }
@@ -219,10 +290,11 @@ static Avm2Value string_from_char_code(Avm2Activation* act)
 				i++;
 			}
 		}
-		if (cp >= 0xD800 && cp <= 0xDFFF)
-		{
-			cp = 0xFFFD;  // lone surrogate → replacement char in UTF-8
-		}
+		// A surrogate that found no partner stays a lone surrogate: it is a
+		// legal AVM2 code unit and survives in the WTF-8 storage, so
+		// `fromCharCode(0xDC00).charCodeAt(0) === 0xDC00`
+		// (ecma3/String/e15_5_4_5_4) and `encodeURI` can still see it and
+		// throw #1052 (as3/RuntimeErrors/Error1052InvalidUriPassed).
 		if (cp < 0x80) out[n++] = (char) cp;
 		else if (cp < 0x800)
 		{
@@ -353,13 +425,7 @@ static Avm2Value string_slice(Avm2Activation* act)
 	uint32_t len16 = utf16_length(s);
 	uint32_t start = string_wrapping_index(arg_f64_def(act, 0, 0.0), len16);
 	uint32_t end = string_wrapping_index(arg_f64_def(act, 1, (double) 0x7fffffff), len16);
-	if (start < end)
-	{
-		uint32_t bs = utf16_to_byte(s, start);
-		uint32_t be = utf16_to_byte(s, end);
-		return make_str(act->ctx, s->utf8 + bs, be - bs);
-	}
-	return make_str(act->ctx, "", 0);
+	return make_sub16(act->ctx, s, start, end);
 }
 
 Avm2Value avm2_string_split_plain(Avm2Activation* act)
@@ -392,16 +458,19 @@ Avm2Value avm2_string_split_plain(Avm2Activation* act)
 		}
 		// One element per UTF-16 code unit, NOT per UTF-8 byte: mirrors
 		// charAt above, including the astral case (a 4-byte codepoint is
-		// two units, each a lone surrogate that surfaces as U+FFFD).
+		// two units, each a lone surrogate in WTF-8 form).
 		uint32_t len16 = utf16_length(s);
 		for (uint32_t i = 0; i < len16 && i < limit; i++)
 		{
 			uint32_t bs = 0;
 			uint32_t bl = 0;
-			if (utf16_unit_at(s, i, &bs, &bl) < 0) break;
+			int32_t unit = utf16_unit_at(s, i, &bs, &bl);
+			if (unit < 0) break;
 			if (bl == 4)
 			{
-				avm2_array_push(ctx, arr, make_str(ctx, "\xEF\xBF\xBD", 3));
+				char buf[4];
+				uint32_t bn = wtf8_put_unit(buf, (uint32_t) unit);
+				avm2_array_push(ctx, arr, make_str(ctx, buf, bn));
 			}
 			else
 			{
@@ -460,10 +529,7 @@ static Avm2Value string_substr(Avm2Activation* act)
 	uint64_t end64 = (uint64_t) start + (uint64_t) lenf;
 	uint32_t len16 = utf16_length(s);
 	uint32_t end = end64 > len16 ? len16 : (uint32_t) end64;
-	if (end <= start) return make_str(act->ctx, "", 0);
-	uint32_t bs = utf16_to_byte(s, start);
-	uint32_t be = utf16_to_byte(s, end);
-	return make_str(act->ctx, s->utf8 + bs, be - bs);
+	return make_sub16(act->ctx, s, start, end);
 }
 
 static Avm2Value string_substring(Avm2Activation* act)
@@ -478,9 +544,7 @@ static Avm2Value string_substring(Avm2Activation* act)
 		start = end;
 		end = t;
 	}
-	uint32_t bs = utf16_to_byte(s, start);
-	uint32_t be = utf16_to_byte(s, end);
-	return make_str(act->ctx, s->utf8 + bs, be - bs);
+	return make_sub16(act->ctx, s, start, end);
 }
 
 // Case-map one BMP code point via the Flash-compatible tables

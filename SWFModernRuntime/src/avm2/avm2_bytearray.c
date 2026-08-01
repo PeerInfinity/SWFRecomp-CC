@@ -352,6 +352,23 @@ static const Avm2String* avm_utf8_lenient(Avm2Context* ctx, const uint8_t* bytes
 		uint32_t consumed;
 		uint32_t cp = avm_utf8_next(bytes + i, n - i, &consumed);
 		i += consumed;
+		// CESU-8 in, canonical WTF-8 out: the decoder happily yields a bare
+		// surrogate for an ED A0..BF sequence, and a high one immediately
+		// followed by a low one is ONE astral character, not two units — so
+		// fold it back into the 3 bytes just written. avm2/invalid_utf8
+		// writes ED A0 BD ED B0 8C into a ByteArray and traces "🐌".
+		if (cp >= 0xDC00 && cp <= 0xDFFF && out >= 3)
+		{
+			unsigned char* p = (unsigned char*) buf + out - 3;
+			if (p[0] == 0xED && p[1] >= 0xA0 && p[1] <= 0xAF)
+			{
+				uint32_t hi = ((uint32_t) (p[0] & 0x0F) << 12)
+				            | ((uint32_t) (p[1] & 0x3F) << 6)
+				            | (uint32_t) (p[2] & 0x3F);
+				out -= 3;
+				cp = 0x10000 + ((hi - 0xD800) << 10) + (cp - 0xDC00);
+			}
+		}
 		out += utf8_encode(cp, buf + out);
 	}
 	buf[out] = '\0';

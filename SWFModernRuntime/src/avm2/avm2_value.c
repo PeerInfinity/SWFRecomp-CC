@@ -94,14 +94,79 @@ const Avm2String* avm2_string_from_literal(Avm2Context* ctx, const char* lit)
 	return avm2_string_new(ctx, lit, (uint32_t) strlen(lit));
 }
 
+// --- canonical WTF-8 -------------------------------------------------------
+//
+// AVM2 strings are sequences of UTF-16 code units and an unpaired surrogate is
+// a perfectly ordinary value (`String.fromCharCode(0xDC00)`), which strict
+// UTF-8 cannot represent. Storage is therefore WTF-8: UTF-8 extended so that
+// U+D800..U+DFFF may appear as the 3-byte sequence ED A0 80 .. ED BF BF (never
+// valid UTF-8, so nothing else can collide with it).
+//
+// The form is CANONICAL: a high surrogate immediately followed by a low one is
+// ALWAYS stored as the 4-byte UTF-8 of the combined astral code point, never as
+// the 6-byte CESU-8 pair. That invariant is what keeps `avm2_string_equals`
+// (a memcmp) equivalent to code-unit equality — `"\u{20B9F}"` and
+// `fromCharCode(0xD842) + fromCharCode(0xDF9F)` must compare equal
+// (ecma3/Unicode/utf8count).
+//
+// Concatenation is the only operation that can bring an unpaired high and an
+// unpaired low together, so it re-normalizes the seam. (This is exactly the
+// WTF-8 spec's concatenation rule.) Every other producer emits canonical form
+// directly.
+
+// s ends with an unpaired high surrogate (ED A0..AF xx)?
+static bool wtf8_ends_with_high_surrogate(const Avm2String* s)
+{
+	if (s->len < 3) return false;
+	const unsigned char* p = (const unsigned char*) s->utf8 + s->len - 3;
+	return p[0] == 0xED && p[1] >= 0xA0 && p[1] <= 0xAF
+	    && (p[2] & 0xC0) == 0x80;
+}
+
+// s starts with an unpaired low surrogate (ED B0..BF xx)?
+static bool wtf8_starts_with_low_surrogate(const Avm2String* s)
+{
+	if (s->len < 3) return false;
+	const unsigned char* p = (const unsigned char*) s->utf8;
+	return p[0] == 0xED && p[1] >= 0xB0 && p[1] <= 0xBF
+	    && (p[2] & 0xC0) == 0x80;
+}
+
+static uint32_t wtf8_decode3(const unsigned char* p)
+{
+	return ((uint32_t) (p[0] & 0x0F) << 12) | ((uint32_t) (p[1] & 0x3F) << 6)
+	     | (uint32_t) (p[2] & 0x3F);
+}
+
 const Avm2String* avm2_string_concat(Avm2Context* ctx, const Avm2String* a, const Avm2String* b)
 {
-	Avm2String* s = avm2_alloc(ctx, sizeof(Avm2String) + a->len + b->len + 1);
+	// WTF-8 seam: an unpaired high surrogate at the end of `a` followed by an
+	// unpaired low surrogate at the start of `b` re-forms one astral code
+	// point, shrinking the result by two bytes (3 + 3 -> 4).
+	bool join = wtf8_ends_with_high_surrogate(a) && wtf8_starts_with_low_surrogate(b);
+	uint32_t total = a->len + b->len - (join ? 2u : 0u);
+	Avm2String* s = avm2_alloc(ctx, sizeof(Avm2String) + total + 1);
 	char* bytes = (char*) (s + 1);
-	memcpy(bytes, a->utf8, a->len);
-	memcpy(bytes + a->len, b->utf8, b->len);
-	bytes[a->len + b->len] = '\0';
-	s->len = a->len + b->len;
+	if (join)
+	{
+		uint32_t hi = wtf8_decode3((const unsigned char*) a->utf8 + a->len - 3);
+		uint32_t lo = wtf8_decode3((const unsigned char*) b->utf8);
+		uint32_t cp = 0x10000u + ((hi - 0xD800u) << 10) + (lo - 0xDC00u);
+		memcpy(bytes, a->utf8, a->len - 3);
+		char* w = bytes + (a->len - 3);
+		w[0] = (char) (0xF0 | (cp >> 18));
+		w[1] = (char) (0x80 | ((cp >> 12) & 0x3F));
+		w[2] = (char) (0x80 | ((cp >> 6) & 0x3F));
+		w[3] = (char) (0x80 | (cp & 0x3F));
+		memcpy(w + 4, b->utf8 + 3, b->len - 3);
+	}
+	else
+	{
+		memcpy(bytes, a->utf8, a->len);
+		memcpy(bytes + a->len, b->utf8, b->len);
+	}
+	bytes[total] = '\0';
+	s->len = total;
 	s->utf8 = bytes;
 	avm2_gc_enroll_string(s);
 	return s;

@@ -842,10 +842,25 @@ static Avm2Value native_trace(Avm2Activation* act)
 		// NUL bytes vanish from FP/Ruffle trace output; \r normalizes to
 		// \n (the Ruffle test framework's trace log semantics —
 		// edittext_newline_stripping prints "hello\rworld" as two lines).
+		//
+		// The trace stream is genuine UTF-8, so the WTF-8 escape hatch stops
+		// here: an unpaired surrogate (ED A0..BF xx, a byte pattern strict
+		// UTF-8 never produces) prints as U+FFFD, matching Ruffle's
+		// WString -> to_utf8_lossy at its own trace boundary. A PAIRED
+		// surrogate is already stored as 4-byte UTF-8 and passes straight
+		// through, which is what avm2/invalid_utf8 pins ("🐌", not CESU-8).
 		for (uint32_t j = 0; j < s->len; j++)
 		{
 			char c = s->utf8[j];
 			if (c == '\0') continue;
+			if ((unsigned char) c == 0xED && j + 2 < s->len
+			    && (unsigned char) s->utf8[j + 1] >= 0xA0
+			    && ((unsigned char) s->utf8[j + 2] & 0xC0) == 0x80)
+			{
+				fputs("\xEF\xBF\xBD", stdout);
+				j += 2;
+				continue;
+			}
 			fputc(c == '\r' ? '\n' : c, stdout);
 		}
 	}
@@ -1126,7 +1141,10 @@ static uint32_t utf8_next_cp(const Avm2String* s, uint32_t* i)
 	return cp;
 }
 
-// Append `cp` to `out` as UTF-8; returns the number of bytes written.
+// Append `cp` to `out` as (W)TF-8; returns the number of bytes written. A code
+// point in the surrogate range takes the ordinary 3-byte path, which is exactly
+// its WTF-8 form (see avm2_string_concat in avm2_value.c) — that is how an
+// unpaired surrogate survives round trips through unescape / decodeURI.
 static uint32_t utf8_put_cp(char* out, uint32_t cp)
 {
 	if (cp < 0x80) { out[0] = (char) cp; return 1; }
@@ -1229,9 +1247,11 @@ static Avm2Value global_unescape(Avm2Activation* act)
 		if (cp >= 0)
 		{
 			// escape() emits an astral character as its two surrogate halves,
-			// so unescape has to put them back together — otherwise
-			// unescape(escape("\u{1F60A}")) yields two U+FFFDs (our strings are
-			// UTF-8 and cannot hold a lone surrogate).
+			// so unescape puts them back together. That is not just a
+			// convenience: canonical WTF-8 REQUIRES a high surrogate followed
+			// by a low one to be stored as the combined 4-byte form, or byte
+			// equality would stop matching code-unit equality. A surrogate
+			// with no partner is kept as a lone surrogate.
 			if (cp >= 0xD800 && cp <= 0xDBFF)
 			{
 				int32_t lo = unescape_unit_at(s, i + 6);
@@ -1241,7 +1261,6 @@ static Avm2Value global_unescape(Avm2Activation* act)
 					i += 6;
 				}
 			}
-			if (cp >= 0xD800 && cp <= 0xDFFF) cp = 0xFFFD;
 			n += utf8_put_cp(out + n, (uint32_t) cp);
 			i += 6;
 		}
@@ -1293,7 +1312,9 @@ static int uri_is_reserved(unsigned char c)
 	    || c == '#';
 }
 
-static Avm2Value uri_encode(Avm2Activation* act, int keep_reserved)
+_Noreturn static void uri_throw(Avm2Context* ctx, const char* fn);
+
+static Avm2Value uri_encode(Avm2Activation* act, int keep_reserved, const char* fn)
 {
 	Avm2Context* ctx = act->ctx;
 	const Avm2String* s = uri_arg_string(act);
@@ -1302,6 +1323,18 @@ static Avm2Value uri_encode(Avm2Activation* act, int keep_reserved)
 	for (uint32_t i = 0; i < s->len; i++)
 	{
 		unsigned char c = (unsigned char) s->utf8[i];
+		// ECMA-262 §15.1.3.1 step 8: an unpaired surrogate is not encodable
+		// and raises URIError. Our storage is WTF-8, so a lone surrogate is
+		// visible right here as ED A0..BF xx — a byte pattern strict UTF-8
+		// never produces, so no valid character can be mistaken for one.
+		// (A PAIRED surrogate is stored as the 4-byte astral form and encodes
+		// normally, which is what step 8 asks for.)
+		if (c == 0xED && i + 2 < s->len
+		    && (unsigned char) s->utf8[i + 1] >= 0xA0
+		    && ((unsigned char) s->utf8[i + 2] & 0xC0) == 0x80)
+		{
+			uri_throw(ctx, fn);
+		}
 		if (uri_is_unescaped(c) || (keep_reserved && uri_is_reserved(c)))
 		{
 			out[n++] = (char) c;
@@ -1371,19 +1404,31 @@ static Avm2Value uri_decode(Avm2Activation* act, int keep_reserved, const char* 
 		if (cp > 0x10FFFF) uri_throw(ctx, fn);
 		// ECMA-262 rejects a decoded surrogate; Flash accepts it (Tamarin
 		// regress/bug_538107 requires "%ED%B0%80%ED%A0%80" to decode to a
-		// 2-unit string rather than throw). Our strings are UTF-8 and cannot
-		// hold a lone surrogate, so each becomes U+FFFD — still one UTF-16
-		// unit apiece, which is what the test measures.
-		if (cp >= 0xD800 && cp <= 0xDFFF) cp = 0xFFFD;
+		// 2-unit string rather than throw), and WTF-8 storage can hold it.
+		// Canonical form still applies: a high surrogate immediately followed
+		// by a low one has to collapse into the astral code point, so fold it
+		// back into the 3 bytes just written.
+		if (cp >= 0xDC00 && cp <= 0xDFFF && n >= 3)
+		{
+			unsigned char* p = (unsigned char*) out + n - 3;
+			if (p[0] == 0xED && p[1] >= 0xA0 && p[1] <= 0xAF)
+			{
+				uint32_t hi = ((uint32_t) (p[0] & 0x0F) << 12)
+				            | ((uint32_t) (p[1] & 0x3F) << 6)
+				            | (uint32_t) (p[2] & 0x3F);
+				n -= 3;
+				cp = 0x10000 + ((hi - 0xD800) << 10) + (cp - 0xDC00);
+			}
+		}
 		n += utf8_put_cp(out + n, cp);
 	}
 	return avm2_string(avm2_string_new(ctx, out, n));
 }
 
 static Avm2Value global_encode_uri(Avm2Activation* act)
-{ return uri_encode(act, 1); }
+{ return uri_encode(act, 1, "encodeURI"); }
 static Avm2Value global_encode_uri_component(Avm2Activation* act)
-{ return uri_encode(act, 0); }
+{ return uri_encode(act, 0, "encodeURIComponent"); }
 static Avm2Value global_decode_uri(Avm2Activation* act)
 { return uri_decode(act, 1, "decodeURI"); }
 static Avm2Value global_decode_uri_component(Avm2Activation* act)
