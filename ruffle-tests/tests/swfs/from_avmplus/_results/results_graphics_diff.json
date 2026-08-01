@@ -1,162 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-01T03:29:50.761386+00:00",
-    "old_git_sha": "375373786d2d491b520dca4d4e5ce510df219d1c",
-    "new_timestamp": "2026-08-01T06:45:19.653117+00:00",
-    "new_git_sha": "3ebcb54f10d279086d22572e1eddf74cf321b4a7",
+    "old_timestamp": "2026-08-01T06:45:19.653117+00:00",
+    "old_git_sha": "3ebcb54f10d279086d22572e1eddf74cf321b4a7",
+    "new_timestamp": "2026-08-01T07:44:04.216778+00:00",
+    "new_git_sha": "07c119c505f95a40da0202e5ecad8338829daf95",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1501,
+    "old_pass": 1508,
     "old_ruffle_matched": 52,
-    "old_effective_pass": 1553,
+    "old_effective_pass": 1560,
     "old_total": 1574,
-    "old_pass_rate": 95.4,
+    "old_pass_rate": 95.8,
     "new_pass": 1508,
     "new_ruffle_matched": 52,
     "new_effective_pass": 1560,
     "new_total": 1574,
     "new_pass_rate": 95.8,
-    "old_mismatched_lines": 637,
+    "old_mismatched_lines": 612,
     "new_mismatched_lines": 612,
     "increased_mismatches": 0,
-    "decreased_mismatches": 25,
-    "newly_passing": 7,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 7,
-    "unchanged": 1566,
+    "status_changed": 0,
+    "unchanged": 1574,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "as3/RuntimeErrors/Error1115NotAConstructor/v10",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "e4x/Expressions/e11_1_2",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 23,
-        "expected_lines": 20,
-        "matching_lines": 17
-      },
-      "new_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      }
-    },
-    {
-      "test": "e4x/Global/e13_1_2_1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 293,
-        "expected_lines": 10,
-        "matching_lines": 7
-      },
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      }
-    },
-    {
-      "test": "e4x/Regress/regress-263935",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "e4x/Statements/e12_1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 13
-      },
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 14
-      }
-    },
-    {
-      "test": "e4x/XML/e13_4_4_17",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 18
-      },
-      "new_lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      }
-    },
-    {
-      "test": "e4x/XML/e13_4_4_2",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 14,
-        "expected_lines": 15,
-        "matching_lines": 4
-      },
-      "new_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      }
-    },
-    {
-      "test": "e4x/XML/e13_4_4_32/v9",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 8
-      },
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    }
-  ]
+  "changes": []
 }
