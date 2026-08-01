@@ -852,9 +852,24 @@ Two ranking corrections this session produced:
 | 3 | `a62c4ce61` `da8a5f5df` | `30599630053` + `30601250181` | 4079 -> 4094 / 4422 (92.6%) | +15 |
 | 4 | `a28b3e2cb` | `30638028597` | 4094 -> 4110 / 4422 (92.9%) | +16 |
 | 5 | `b4d4457f1` | `30659262052` | 4110 -> 4121 / 4422 (93.2%) | +11 |
-| 6 | `569a215e4` `2ab0c01be` | `30670004778` + `30673203712` | **4121 -> 4129 / 4422 (93.4%)** | **+8** |
+| 6 | `569a215e4` `2ab0c01be` | `30670004778` + `30673203712` | 4121 -> 4129 / 4422 (93.4%) | +8 |
+| 7 | `77bb5e660`..`73c786e3f` (8 commits, parallel fan-out) | `30679378384` | **4129 -> 4153 / 4424 (93.9%)** | **+24** |
 
-**Current headline: 4129 / 4422 effective (93.4%), 293 failing.**
+**Current headline: 4153 / 4424 effective (93.9%), 271 failing.**
+Session 7 was a two-wave multi-agent fan-out (six diagnosis agents, seven
+worktree implementation agents, one combined CI run): child-movie font
+tables, activation-class model, WTF-8 string storage, uncaught-error
+re-land bundle (net measured), per-depth tag queue, e4x prefix minting,
+plus riders — details `polish-sweep-arc.md` §9. One predicted regression
+(`visual/definefont4`, TLF compose invariant now surfaced by tracing;
+owner: future TLF arc). **The uncaught-error tracing is LANDED** — that
+worklist is closed. The ABC-verifier type-lattice arc is scoped
+(`abc-verifier-type-lattice-arc.md`, +2). CORRECTION to this map's tails
+list: "name-only font characters" was mispriced — glyph-less DefineFont3
+already worked and DefineFont4 appears only in 4 already-passing tests
+(+0); the real mechanism was child-movie font tables, now shipped.
+
+Old headline (session 6): 4129 / 4422 effective (93.4%), 293 failing.
 Histogram `pass` 3886, `ruffle_matched` 243, `output_mismatch` 290,
 `runtime_error` **2** (was 7), `recomp_fail` 1, and still **no segfault /
 timeout / compile_fail bucket at all**. Zero regressions in every session.

@@ -1318,3 +1318,82 @@ Reached but not finished, and why — all still on the board:
 
 Everything in §5.5, §6.6 and §7.7 still stands, minus
 `property_priority_chained` and `e4x/Regress/regress-524214` (shipped).
+
+## 9. Session 7 (2026-07-31/08-01) — the parallel fan-out: +24 vs +21 predicted, ONE predicted regression
+
+Baseline `46dcf3a06` (4129/4424) → **4153/4424 (93.9%)**, CI `30679378384`
+(graphics/`categories=full`, success). avm2 1078→**1095** (+17),
+from_avmplus 1545→**1553** (+8), visual 138→137 (−1). Histogram:
+output_mismatch 292→268, ruffle_matched +1 (a GAIN —
+`uncaught_errors_stringified`), runtime_error/recomp_fail flat, OTHER
+STATUS MOVES: **zero** (no disguised `pass → ruffle_matched`).
+
+**Method: two-wave multi-agent fan-out, run in one evening.** Wave 1 = six
+parallel read-only diagnosis/scoping agents (triage regen, verifier-lattice
+scoping, pixel viewport, two singles deep-dives, fonts + uncaught re-measure).
+Wave 2 = seven parallel implementation agents in ISOLATED WORKTREES, each
+delivering a patch + canary report; patches applied to master serially with
+per-patch headline re-verification, one trivial conflict, one combined CI run.
+Eight commits `77bb5e660`..`73c786e3f`.
+
+Landed: child-movie font tables (+2) · activation class /
+`with(primitive)` box / callstatic scope (+3) · e4x prefix minting /
+parseFloat SWF≤10 / per-depth tag queue / String AS3 keys (+4) ·
+setClipboard #2007 / Fixed16 saturation / root-class binding (+3) ·
+uncaught-error re-land bundle (measured net +4 in isolation) · viewport-size
+offscreen capture (trace +0 BY DESIGN — image-axis measurement fix) ·
+WTF-8 string storage (+5). Also: the ABC-verifier type-lattice arc is
+SCOPED (`abc-verifier-type-lattice-arc.md`, +2 predicted, conservative
+direction settled).
+
+**The regression is the predicted one**: `visual/definefont4`
+pass→output_mismatch — a 0-byte-silence test now printing the #1009 the
+re-landed tracing surfaces; the root cause is a TLF compose invariant
+(`TextFlowLine.getLineLeading` walks past the paragraph's leaf chain),
+diagnosed in the bundle report and owned by a future TLF arc. The bundle's
+OTHER predicted regression (`away3d_advanced_shallow_water_demo`) did NOT
+materialize — it is a full pass on the merged tree: a sibling wave-2 patch
+(most plausibly the root-class character binding; Flex `BitmapAsset` is a
+child-SWF character class) closed the chain the bundle exposed in
+isolation. **Cross-patch synergy is real: an in-isolation ledger is a
+LOWER bound for a merged wave.**
+
+### 9.1 Corrections to earlier sections (measured this session)
+
+- §5.5 `issue_8630_placeremoveplace{,_scriptremove}`: NOT "TextField-bounds
+  × timeline" — no TextField exists in either SWF. It is same-frame
+  place/remove queue semantics (Ruffle `QueuedTagList`: a queued Remove
+  annihilates an earlier queued Add). Shipped, minus the
+  `transformed_by_script` gate (one line of `_scriptremove`, deferred).
+- §5.5 `parse_float_swf10`: NOT "three causes" — one cause (SWF≤10
+  accumulator span, bugzilla-513018), 4 lines. Shipped.
+- §5.5 `scopes_dont_cache/order-{1,2}`: shipped in session 6, stale entry.
+- §6.6 `hasOwnProperty`: NOT the ES3 prototype surface — String's instance
+  methods were public-keyed instead of AS3-keyed. Shipped.
+- §8.7 `supercalls_weird`: the "shared condition with
+  `array_access_interpreter`" trap DOES NOT EXIST (that test contains no
+  super opcode; the code comment at the throw site is a misattribution).
+  Real remaining blocker: `super.prototype` in a STATIC method needs a
+  class-side super chain. Script-init super binds to Object (~8 lines,
+  ready) but does not land the test alone.
+- Session-1's astral-plane verdict ("WTF-8 storage or pair-combining in
+  every decoder — not polish") was HALF wrong: the decoders were already
+  WTF-8-shaped; only six `cp=0xFFFD` discard sites + a concat seam-fold
+  were needed. Population was 5 direct (+`stylesheet` as a bonus), not 2.
+- The uncaught-error ledger goes stale on BOTH sides: the "+2" gain had
+  been carried unmeasured since 2026-07-26 and was really +6; blocker 1
+  (away3d #1065) was just a missing `ContextMenuEvent`.
+
+### 9.2 Still open with diagnosed causes
+
+From §8.7 minus shipped: `supercalls_weird` (class-side super chain),
+`verify_typecheck` + `rtqname_not_namespace` case 3 (the scoped
+type-lattice arc), `scope_optimizations` (static early binding — NOT the
+lattice arc). New from session 7: `_scriptremove` final line
+(`transformed_by_script`, six setters, wide blast radius); `avm2/bom`
+(three causes: BOM strip, UTF-16 decode, URLVariables order — the last is
+dispositioned RUFFLE_VS_FLASH); `e13_1_2_1` (XML 1.0 name-char tables,
+the predicate exists TWICE); `avm1/form_loader_encoding_{2,3}` (AVM1
+legacy charsets); main-movie root-class binding + child non-root bindings
+(riders follow-up); embedded Flex `BitmapAsset` chain (away3d's next
+error if the character-binding synergy ever regresses).
