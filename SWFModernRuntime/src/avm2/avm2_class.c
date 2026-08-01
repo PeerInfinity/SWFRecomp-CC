@@ -630,6 +630,7 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 					Avm2SlotMeta meta;
 					memset(&meta, 0, sizeof(meta));
 					meta.used = 1;
+					meta.is_class_trait = (t->kind == 4);
 					meta.type_mn = t->type_mn;
 					meta.type_file = file;
 					meta.value = t->value;
@@ -665,6 +666,20 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 			case 3:  // Setter
 			{
 				const Avm2AbcMethodData* m = &file->data->methods[t->method_or_class];
+				// FIRST-BINDING record (avmplus MethodEnv). A MethodInfo gets
+				// exactly one MethodEnv — the one made where it was first
+				// bound — and `callstatic` dispatches through it, so the
+				// callee's scope is the one captured HERE, not the caller's.
+				// First writer wins: when a class trait is NewClass'ed twice,
+				// both class objects share the FIRST one's captured scope
+				// (avm2/getouterscope_two_classobjects prints 50 four times).
+				if (scope != NULL && file->method_env_scope != NULL
+				    && t->method_or_class < file->data->method_count
+				    && file->method_env_scope[t->method_or_class] == NULL)
+				{
+					file->method_env_scope[t->method_or_class] = scope;
+					file->method_env_class[t->method_or_class] = defining_class;
+				}
 				Avm2MethodRef ref;
 				ref.fn = m->fn;
 				ref.file = file;
@@ -851,6 +866,13 @@ static Avm2Value slot_default_for(Avm2Context* ctx, const Avm2SlotMeta* m)
 		tmp.type_mn = m->type_mn;
 		tmp.type_file = m->type_file;
 		return slot_type_default(ctx, &tmp);
+	}
+	// A Class trait's slot holds `null` until its script init NewClass'es into
+	// it (Ruffle vtable.rs `TraitKind::Class { .. } => Value::Null`). It has no
+	// declared type, so it would otherwise land on `undefined` below.
+	if (m->is_class_trait)
+	{
+		return avm2_null();
 	}
 	return avm2_undefined();
 }

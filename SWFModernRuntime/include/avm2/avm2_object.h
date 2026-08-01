@@ -77,6 +77,15 @@ struct Avm2Object
 	// so object_is_dynamic() honours this bit ahead of the class flags.
 	// Lives in the padding after `kind`: no sizeof or field-offset change.
 	uint8_t is_prototype;
+	// This object is the transparent box `avm2_op_pushscope` wraps a PRIMITIVE
+	// scope in (`with (7)`). The primitive itself lives in slots[1] (a
+	// GC-traced slot), and every property GET/SET/CALL entry point unboxes the
+	// receiver before use, so a method found through the box runs with the
+	// primitive as `this` (ecma3/Statements/e12_10: `with (7) x = valueOf()`
+	// must yield a number). The box is created ONLY here and is reachable only
+	// from a scope stack / Avm2ScopeChain, so unboxing cannot be observed
+	// anywhere else. Lives in the padding after `kind`: no sizeof change.
+	uint8_t is_prim_box;
 	Avm2Class* cls;           // class this object is an instance of
 	Avm2Object* proto;        // prototype link (ES3 chain, dynamic reads)
 	const Avm2VTable* vtable; // instance vtable (usually &cls->ivtable) or own

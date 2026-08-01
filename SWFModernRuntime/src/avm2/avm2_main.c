@@ -130,6 +130,17 @@ void avm2_gc_mark_roots_main(Avm2Context* ctx)
 				mark_class_roots(file->classes[c]);
 			}
 		}
+		// CallStatic method envs pin the scope chain a method was FIRST bound
+		// with (avm2_op_callstatic). Those chains are normally reachable from
+		// their vtable entry, but this table can outlive that reachability, so
+		// trace it directly — same reasoning as mark_class_roots' scopes.
+		if (file->method_env_scope != NULL)
+		{
+			for (uint32_t m = 0; m < file->data->method_count; m++)
+			{
+				avm2_gc_mark_scope(file->method_env_scope[m]);
+			}
+		}
 	}
 }
 
@@ -153,6 +164,21 @@ static Avm2AbcFileRt* avm2_abc_load(Avm2Context* ctx, const Avm2AbcFileData* dat
 	memset(file->script_init_state, AVM2_SCRIPT_UNINITIALIZED, data->script_count);
 	file->classes = avm2_alloc(ctx, data->class_count * sizeof(Avm2Class*));
 	memset(file->classes, 0, data->class_count * sizeof(Avm2Class*));
+	if (data->method_count > 0)
+	{
+		file->activation_classes =
+			avm2_alloc(ctx, data->method_count * sizeof(Avm2Class*));
+		memset(file->activation_classes, 0,
+		       data->method_count * sizeof(Avm2Class*));
+		file->method_env_scope =
+			avm2_alloc(ctx, data->method_count * sizeof(Avm2ScopeChain*));
+		memset(file->method_env_scope, 0,
+		       data->method_count * sizeof(Avm2ScopeChain*));
+		file->method_env_class =
+			avm2_alloc(ctx, data->method_count * sizeof(Avm2Class*));
+		memset(file->method_env_class, 0,
+		       data->method_count * sizeof(Avm2Class*));
+	}
 #ifndef SWF_NO_CLASS_MEMO
 	file->coerce_class_memo =
 		avm2_alloc(ctx, data->multiname_count * sizeof(Avm2Class*));

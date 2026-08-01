@@ -619,6 +619,24 @@ struct Avm2AbcFileRt
 	// resolutions are cached (a type name is transiently unresolvable during
 	// its own cinit; the domain is append-only so a non-NULL hit is permanent).
 	Avm2Class** coerce_class_memo;
+	// (method_index -> synthetic activation class) for NewActivation. avmplus
+	// mints ONE sealed+final class per method at verify time (Ruffle
+	// verify.rs create_activation_class / Class::for_activation), so the class
+	// is per-method, not per-call. Sized to data->method_count; NULL = not
+	// minted yet. Deliberately NOT flagged AVM2_CLASS_FLAG_SYNTH_CATCH: that
+	// flag makes the GC free the class with the object, and this one is shared
+	// across every activation of the method (classes are immortal — see
+	// avm2_main.c mark_class_roots; this one has no class_object/prototype/
+	// scope so it needs no marking at all).
+	Avm2Class** activation_classes;
+	// (method_index -> first vtable binding) for CallStatic. avmplus gives a
+	// MethodInfo exactly ONE MethodEnv — the one from its FIRST binding — and
+	// `callstatic` dispatches through it, so the callee runs on the scope
+	// captured where the method was first installed, NOT on the caller's scope
+	// (avm2/getouterscope_two_classobjects prints 50 four times because both
+	// methods were first bound by the FIRST NewClass). First writer wins.
+	Avm2ScopeChain** method_env_scope;
+	Avm2Class** method_env_class;
 };
 
 // Activation record passed to every emitted method body and native method.

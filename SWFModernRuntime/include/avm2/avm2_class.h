@@ -74,6 +74,13 @@ typedef struct Avm2SlotMeta
 {
 	uint8_t used;
 	uint8_t is_function_trait;
+	// ABC trait kind 4 (Class). Such a slot carries NO declared type (type_mn
+	// is 0), so without this bit it would default to `undefined`; avmplus and
+	// Ruffle default it to `null` (Ruffle vtable.rs
+	// `TraitKind::Class { .. } => Value::Null`). Observable whenever a class
+	// trait's slot is read before its defining script assigns it
+	// (avm2/getouterscope_two_classobjects line 1).
+	uint8_t is_class_trait;
 	uint32_t type_mn;
 	Avm2AbcFileRt* type_file;
 	Avm2AbcDefault value;

@@ -153,6 +153,24 @@ static int value_is_null_like(Avm2Value v)
 	return v.kind == AVM2_VALUE_UNDEFINED || v.kind == AVM2_VALUE_NULL;
 }
 
+// Unwrap the transparent primitive-scope box `avm2_op_pushscope` makes for
+// `with (<primitive>)`. Applied to the RECEIVER at every property get/set/call
+// entry point so a method found through the box runs with the primitive as
+// `this` (`with (7) x = valueOf()` must give a number, not the box —
+// from_avmplus/ecma3/Statements/e12_10). Resolution on the primitive is
+// already equivalent (avm2_value_vtable -> class ivtable, avm2_value_proto ->
+// class prototype), so this is pure receiver substitution. The flag can only
+// be set by pushscope, and the box is unreachable outside a scope chain.
+static Avm2Value unbox_scope_prim(Avm2Value v)
+{
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL && v.u.obj->is_prim_box
+	    && v.u.obj->slot_count > 1)
+	{
+		return v.u.obj->slots[1];
+	}
+	return v;
+}
+
 // Is `obj` allowed to grow dynamic props? Array kind is NOT automatically
 // dynamic any more: a sealed `extends Array` subclass carries element storage
 // below SWF 13 (avm2_class_instance_kind) and must still answer the sealed
@@ -743,12 +761,14 @@ static Avm2Value getproperty_static_impl(Avm2Activation* act, Avm2Value recv,
 
 Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
 {
+	recv = unbox_scope_prim(recv);
 	return getproperty_static_impl(act, recv, mn_idx, NULL);
 }
 
 Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
                                         uint32_t mn_idx, Avm2InlineCache* ic)
 {
+	recv = unbox_scope_prim(recv);
 	// Fast path: same receiver vtable (and unchanged entry count) as the cached
 	// resolve → replay the resolved entry, skipping the multiname match. A
 	// matching vt guarantees the receiver is a non-null, non-xmlish object whose
@@ -818,6 +838,7 @@ static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
 Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                   Avm2Value name_val, int interp)
 {
+	recv = unbox_scope_prim(recv);
 	Avm2Context* ctx = act->ctx;
 	(void) mn_idx;
 	{
@@ -1157,12 +1178,14 @@ static void setproperty_impl(Avm2Activation* act, Avm2Value recv, uint32_t mn_id
 void avm2_op_setproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 Avm2Value value)
 {
+	recv = unbox_scope_prim(recv);
 	setproperty_impl(act, recv, mn_idx, value, 0, NULL);
 }
 
 void avm2_op_setproperty_static_ic(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                    Avm2Value value, Avm2InlineCache* ic)
 {
+	recv = unbox_scope_prim(recv);
 	// Fast path: cached receiver vtable (unchanged count) → replay the resolved
 	// slot/setter entry directly. A matching vt is a non-null, non-xmlish object
 	// whose primary find hits this entry, so this is byte-identical to the full
@@ -1406,6 +1429,7 @@ static void setproperty_dyn_impl(Avm2Activation* act, Avm2Value recv, uint32_t m
 void avm2_op_setproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                              Avm2Value name_val, Avm2Value value, int interp)
 {
+	recv = unbox_scope_prim(recv);
 	setproperty_dyn_impl(act, recv, mn_idx, name_val, value, interp, 0);
 }
 
@@ -1792,6 +1816,7 @@ Avm2Value avm2_op_pushnamespace(Avm2Activation* act, uint32_t ns_idx)
 Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                    Avm2Value ns_val)
 {
+	recv = unbox_scope_prim(recv);
 	Avm2Context* ctx = act->ctx;
 	const char* name;
 	uint32_t name_len;
@@ -1820,6 +1845,7 @@ Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t
 Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                      Avm2Value ns_val, Avm2Value name_val)
 {
+	recv = unbox_scope_prim(recv);
 	Avm2Context* ctx = act->ctx;
 	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 	if (q != NULL)
@@ -1879,6 +1905,7 @@ static void setproperty_rtns_common(Avm2Activation* act, Avm2Value recv,
 void avm2_op_setproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                               Avm2Value ns_val, Avm2Value value)
 {
+	recv = unbox_scope_prim(recv);
 	const char* name;
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
@@ -1888,6 +1915,7 @@ void avm2_op_setproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_i
 void avm2_op_setproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 Avm2Value ns_val, Avm2Value name_val, Avm2Value value)
 {
+	recv = unbox_scope_prim(recv);
 	(void) mn_idx;
 	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
 	if (q != NULL)
@@ -2034,11 +2062,20 @@ Avm2Object* avm2_op_pushscope(Avm2Activation* act, Avm2Value v)
 	// A primitive scope (p-code can push anything): box it — vtable and
 	// prototype-chain lookups on the box behave like the primitive
 	// (findprop_global_prototype pushes the number 4 as its global scope).
+	// The box is TRANSPARENT: it keeps the primitive in slots[1] and every
+	// property get/set/call entry point unboxes the receiver, so a method
+	// resolved through the box runs with the primitive as `this`
+	// (`with (7) x = valueOf()` — ecma3/Statements/e12_10). Ruffle's scope
+	// entry holds a Value outright; keeping the box means Avm2ScopeEntry
+	// (and ~20 op signatures plus the GetScopeObject emission) stay as they
+	// are.
 	Avm2Context* ctx = act->ctx;
-	Avm2Object* box = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 1);
+	Avm2Object* box = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 2);
 	box->cls = avm2_value_class(ctx, v);
 	box->vtable = &box->cls->ivtable;
 	box->proto = box->cls->prototype_obj;
+	box->is_prim_box = 1;
+	box->slots[1] = v;
 	return box;
 }
 
@@ -2897,12 +2934,14 @@ static Avm2Value callproperty_static_impl(Avm2Activation* act, Avm2Value recv,
 Avm2Value avm2_op_callproperty(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                const Avm2Value* args, uint32_t argc)
 {
+	recv = unbox_scope_prim(recv);
 	return callproperty_static_impl(act, recv, mn_idx, args, argc, NULL);
 }
 
 Avm2Value avm2_op_callproperty_ic(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                   const Avm2Value* args, uint32_t argc, Avm2InlineCache* ic)
 {
+	recv = unbox_scope_prim(recv);
 	// Fast path: same receiver vtable (and unchanged entry count) as the cached
 	// resolve → replay the resolved entry, skipping the multiname match. A
 	// matching vt guarantees a non-null, non-xmlish object whose primary find
@@ -2931,6 +2970,7 @@ static Avm2Value callproperty_qname(Avm2Activation* act, Avm2Value recv,
 Avm2Value avm2_op_callproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                    Avm2Value name_val, const Avm2Value* args, uint32_t argc)
 {
+	recv = unbox_scope_prim(recv);
 	Avm2Context* ctx = act->ctx;
 	(void) mn_idx;
 	{
@@ -2994,6 +3034,7 @@ static Avm2Value callproperty_qname(Avm2Activation* act, Avm2Value recv,
 Avm2Value avm2_op_callproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                     Avm2Value ns_val, const Avm2Value* args, uint32_t argc)
 {
+	recv = unbox_scope_prim(recv);
 	Avm2Context* ctx = act->ctx;
 	const char* name;
 	uint32_t name_len;
@@ -3017,6 +3058,7 @@ Avm2Value avm2_op_callproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint3
                                       Avm2Value ns_val, Avm2Value name_val,
                                       const Avm2Value* args, uint32_t argc)
 {
+	recv = unbox_scope_prim(recv);
 	(void) mn_idx;
 	Avm2Context* ctx = act->ctx;
 	const Avm2QNameExt* q = avm2_qname_ext_of(name_val);
@@ -3068,6 +3110,25 @@ Avm2Value avm2_op_callstatic(Avm2Activation* act, uint32_t method_index, Avm2Val
 {
 	const Avm2AbcMethodData* m = &act->file->data->methods[method_index];
 	Avm2MethodRef ref = { m->fn, act->file, m->debug_name, method_index };
+	// avmplus dispatches CallStatic through the MethodInfo's MethodEnv, and a
+	// MethodInfo has exactly ONE — the one from its FIRST binding. So the
+	// callee runs on the scope captured where it was first installed in a
+	// vtable, NOT on the caller's `act->outer` (which is what a naive reading
+	// of "static call" gives and what threw #1065 here). Methods that were
+	// never installed in a vtable have no env; fall back to the caller's.
+	Avm2ScopeChain* env_scope = NULL;
+	Avm2Class* env_class = NULL;
+	if (act->file->method_env_scope != NULL
+	    && method_index < act->file->data->method_count)
+	{
+		env_scope = act->file->method_env_scope[method_index];
+		env_class = act->file->method_env_class[method_index];
+	}
+	if (env_scope != NULL)
+	{
+		return avm2_call_method_ref(act->ctx, &ref, env_class, env_scope,
+		                            recv, args, argc);
+	}
 	return avm2_call_method_ref(act->ctx, &ref, NULL, act->outer, recv, args, argc);
 }
 
@@ -3360,7 +3421,45 @@ Avm2Value avm2_op_newactivation(Avm2Activation* act, uint32_t method_index)
 	avm2_vtable_add_traits(ctx, vt, act->file, m->body_traits, m->body_trait_count,
 	                       act->bound_class, act->outer);
 	Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, vt->slot_count + 1);
-	obj->cls = ctx->builtins.object_class;
+	// avmplus gives the activation object a synthetic SEALED + FINAL class
+	// with NO superclass and NO prototype (Ruffle Class::for_activation +
+	// verify.rs create_activation_class; op_new_activation passes `None` for
+	// the proto). That single model produces all three of activation_class's
+	// probes: a missing property READ is #1069 (sealed, not #1081), and a
+	// dynamic WRITE is #1056. It also stops `toString` resolving through
+	// Object's prototype, which is what makes probe 1 a #1069 too.
+	//
+	// The class is minted ONCE PER METHOD and cached on the file (avmplus
+	// makes it at verify time): newactivation runs on every call of every
+	// method with NEED_ACTIVATION, so a per-call mint would be a hot alloc.
+	// The per-call VTABLE above stays per-call (no_index, GC'd with the
+	// object); only the class is shared, and it is deliberately NOT flagged
+	// AVM2_CLASS_FLAG_SYNTH_CATCH — that flag frees the class with the object.
+	Avm2Class* acls = NULL;
+	if (act->file->activation_classes != NULL
+	    && method_index < act->file->data->method_count)
+	{
+		acls = act->file->activation_classes[method_index];
+	}
+	if (acls == NULL)
+	{
+		acls = avm2_alloc(ctx, sizeof(Avm2Class));
+		memset(acls, 0, sizeof(Avm2Class));
+		// Named after the method (Ruffle uses the method's pool name in the
+		// public ns) so error text reads the method, not "Object".
+		const char* nm = (m->debug_name != NULL) ? m->debug_name : "activation";
+		acls->name.name = nm;
+		acls->name.name_len = (uint32_t) strlen(nm);
+		acls->name.ns_uri = "";
+		acls->name.ns_len = 0;
+		acls->flags = AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+		if (act->file->activation_classes != NULL
+		    && method_index < act->file->data->method_count)
+		{
+			act->file->activation_classes[method_index] = acls;
+		}
+	}
+	obj->cls = acls;
 	obj->vtable = vt;
 	avm2_slots_init_defaults(ctx, obj, vt);
 	return avm2_object_value(obj);
