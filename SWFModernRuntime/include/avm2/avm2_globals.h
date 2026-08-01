@@ -462,6 +462,12 @@ typedef struct Avm2DisplayObjectExt
 	// RUNNING_CONSTRUCT_FRAME): nested construct_frame passes skip its
 	// still-unconstructed children (constructors_vs_timeline).
 	uint8_t running_construct_frame;
+	// Ruffle DisplayObjectFlags::TRANSFORMED_BY_SCRIPT. Sticky, never cleared:
+	// once AS writes a transform attribute (x/y/rotation/scaleX/scaleY/alpha,
+	// Transform.matrix=, Transform.colorTransform=, an EditText's width/height),
+	// timeline PlaceObject tags stop applying to this object at all
+	// (apply_place_object, Ruffle display_object.rs:2514).
+	uint8_t transformed_by_script;
 	uint16_t char_id;            // 0 = script-created (or root)
 	// Renderable shape geometry (solid/stroke/gradient fills), resolved from
 	// char_id at place-time (avm2_generated_shape_geom). shape_vert_count == 0

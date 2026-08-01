@@ -518,8 +518,20 @@ static double clamp_fixed16(double v)
 	return v;
 }
 
+// Ruffle DisplayObjectBase::set_transformed_by_script(true). Sticky flag: an
+// AS write to a transform attribute permanently stops the timeline's
+// PlaceObject tags from re-applying to this object (see apply_place_object).
+// Every Ruffle call site passes `true`; nothing ever clears it.
+static inline void mark_transformed_by_script(Avm2DisplayObjectExt* ext)
+{
+	if (ext != NULL) ext->transformed_by_script = 1;
+}
+
 static void set_rotation_internal(Avm2DisplayObjectExt* ext, double deg)
 {
+	// Ruffle display_object.rs:511 marks BEFORE the NaN early-return below,
+	// so a NaN rotation still counts as a script transform.
+	mark_transformed_by_script(ext);
 	cache_scale_rotation(ext);
 	ext->rotation_deg = deg;
 	double rad = deg * (M_PI / 180.0);
@@ -534,6 +546,7 @@ static void set_rotation_internal(Avm2DisplayObjectExt* ext, double deg)
 
 static void set_scale_x_internal(Avm2DisplayObjectExt* ext, double unit)
 {
+	mark_transformed_by_script(ext);
 	cache_scale_rotation(ext);
 	ext->scale_x = unit;  // NaN stored verbatim (getter reports it)
 	double calc = isnan(unit) ? 0.0 : unit;
@@ -545,6 +558,7 @@ static void set_scale_x_internal(Avm2DisplayObjectExt* ext, double unit)
 
 static void set_scale_y_internal(Avm2DisplayObjectExt* ext, double unit)
 {
+	mark_transformed_by_script(ext);
 	cache_scale_rotation(ext);
 	ext->scale_y = unit;
 	double calc = isnan(unit) ? 0.0 : unit;
@@ -1642,6 +1656,12 @@ static void apply_place_object(Avm2Context* ctx, Avm2Object* child,
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, child);
 	if (ext == NULL) return;
+	// Ruffle display_object.rs:2514 — "PlaceObject tags only apply if this
+	// object has not been dynamically moved by AS code." The gate wraps the
+	// WHOLE body (matrix, cxform, blend, cacheAsBitmap, visible, ratio,
+	// filters); name / clip_depth are purposely outside it and are applied by
+	// instantiate_child, not here.
+	if (ext->transformed_by_script) return;
 	apply_place_matrix(ext, op);
 	if (op->flags & AVM2_TLF_HAS_CXFORM)
 	{
@@ -3583,6 +3603,7 @@ static Avm2Value do_set_x(Avm2Activation* act)
 			off = avm2_text_bounds_x_offset(act->ctx, this_obj(act), ext->scale_x);
 		}
 		ext->mtx_tx = twips_from_pixels(avm2_coerce_to_number(act->ctx, act->args[0])) - off;
+		mark_transformed_by_script(ext);
 	}
 	return avm2_undefined();
 }
@@ -3612,6 +3633,7 @@ static Avm2Value do_set_y(Avm2Activation* act)
 			off = avm2_text_bounds_y_offset(act->ctx, this_obj(act), ext->scale_y);
 		}
 		ext->mtx_ty = twips_from_pixels(avm2_coerce_to_number(act->ctx, act->args[0])) - off;
+		mark_transformed_by_script(ext);
 	}
 	return avm2_undefined();
 }
@@ -3929,7 +3951,10 @@ static void set_width_height(Avm2Activation* act, int is_width)
 	if (ext->edittext != NULL)
 	{
 		// EditText bounds semantics (Ruffle EditText::set_width/set_height):
-		// the bounds resize, not the scale.
+		// the bounds resize, not the scale. Both of those Ruffle setters mark
+		// transformed_by_script themselves (edit_text.rs:2651/:2667); the
+		// non-EditText arm below is covered transitively via set_scale_*.
+		mark_transformed_by_script(ext);
 		if (is_width) avm2_text_set_width_px(act->ctx, this_obj(act), value);
 		else avm2_text_set_height_px(act->ctx, this_obj(act), value);
 		return;
@@ -4006,6 +4031,7 @@ static Avm2Value do_set_alpha(Avm2Activation* act)
 		else if (v <= -32768.0) f = -32768;
 		else f = (int16_t) v;
 		ext->alpha_fixed8 = f;
+		mark_transformed_by_script(ext);
 	}
 	return avm2_undefined();
 }
@@ -9408,6 +9434,10 @@ static Avm2Value transform_set_matrix(Avm2Activation* act)
 	Avm2TransformExt* text = self->native_ext;
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
 	if (ext == NULL) return avm2_undefined();
+	// Ruffle avm2/globals/flash/geom/transform.rs:87. NOTE: only the Transform
+	// object's own matrix= setter marks; DisplayObject.transform = ... writes
+	// the matrix directly and does NOT mark (see do_set_transform).
+	mark_transformed_by_script(ext);
 	Avm2Object* m = act->args[0].u.obj;
 	ext->mtx_a = (float) matrix_get_prop(ctx, m, "a");
 	ext->mtx_b = (float) matrix_get_prop(ctx, m, "b");
@@ -9592,6 +9622,9 @@ static Avm2Value transform_set_color_transform(Avm2Activation* act)
 	}
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
 	if (ext == NULL) return avm2_undefined();
+	// Ruffle avm2/globals/flash/geom/transform.rs:50 (same asymmetry as
+	// matrix=: DisplayObject.transform = ... does NOT mark).
+	mark_transformed_by_script(ext);
 	Avm2Object* ct = v.u.obj;
 	ext->cx_rm = to_fixed8(avm2_coerce_to_number(ctx, ct->slots[1]));
 	ext->cx_gm = to_fixed8(avm2_coerce_to_number(ctx, ct->slots[2]));
