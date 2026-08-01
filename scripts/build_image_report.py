@@ -83,6 +83,31 @@ def census_suite(suite):
     return out
 
 
+def run_provenance():
+    """CI run identity, for the `metadata` block. Empty when run locally.
+
+    Sourced from the automatic GitHub Actions environment (`GITHUB_RUN_ID` and
+    friends are set in EVERY step, so no workflow edit is needed), falling back
+    to the explicit `RUN_URL` the images steps already export. These JSONs only
+    change when an `images=true` run merges, so "which run produced this" is the
+    first question any later diff asks — see scripts/image_status_diff.py.
+    """
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    url = os.environ.get("RUN_URL")
+    if not url and run_id and repo:
+        url = f"{server}/{repo}/actions/runs/{run_id}"
+    out = {}
+    if run_id:
+        out["run_id"] = run_id
+    if url:
+        out["run_url"] = url
+    if os.environ.get("GITHUB_RUN_ATTEMPT"):
+        out["run_attempt"] = os.environ["GITHUB_RUN_ATTEMPT"]
+    return out
+
+
 def classify_absence(trace_status):
     """Why a censused comparison produced no record."""
     if trace_status is None:
@@ -183,6 +208,11 @@ def build_suite(suite, stem):
             "git_sha": data.get("metadata", {}).get("git_sha"),
             "source": f"{stem}.json",
             "incomplete": data.get("metadata", {}).get("incomplete", False),
+            # Which CI run produced this file. Without it a stale side can be
+            # named by SHA but not linked, and these JSONs only change when an
+            # `images=true` run merges — so the run is the thing you actually
+            # want to open. scripts/image_status_diff.py prints them.
+            **run_provenance(),
         },
         "tests_with_comparisons": len(census),
         "comparisons": len(rows),

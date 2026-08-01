@@ -314,6 +314,14 @@ the 293-line test causes this 4-line known-failure test to fail.
 
 ### `bitmap_data_thorough/pixelDissolve` — Flash-specific Feistel return value (Ruffle panics)
 
+> **Axis note (2026-08-01, session 9 pixel triage).** This entry is **trace-axis
+> only** — the ~38 diffs are output *lines*. The test has no `[image_comparisons]`
+> block at all, so it disposes of nothing on the pixel side; earlier triage
+> prototypes wrongly carried it as an image disposition.
+
+<!-- image-axis: none -->
+
+
 **Ruffle test.toml:**
 ```toml
 num_frames = 1
@@ -555,7 +563,14 @@ both differ from Flash. This is the MSAA-vs-Flash-analytic-rasterizer gap — Fl
 coverage rasterizer + thin-stroke pixel-hinting produces crisp edges/seams that a
 4× MSAA renderer (ours and Ruffle's alike) antialiases into a sub-pixel blend.
 
-### `display_object_properties` — MSAA edge/stroke antialiasing (~192 image px)
+### `display_object_properties` — MSAA edge/stroke antialiasing (~192 image px) — **STALE: now PASSES**
+
+> **Status note (2026-08-01, session 9 pixel triage).** As of the image baseline at
+> `375373786` this comparison **passes** — it is not in the failing set at all.
+> The entry is kept for the mechanism it documents (and because a tolerance-budget
+> change could resurface it), but it is stale as a live accepted diff. Do not
+> count it when tallying dispositioned pixel work; `scripts/image_triage.py`
+> reports it under "DISPOSITIONED BUT NOT FAILING" rather than silently dropping it.
 
 `us-vs-Flash = 192`, `us-vs-Ruffle = 0`, `Ruffle-vs-Flash = 192`. Thin 1px diff
 lines along shape edges where our (and Ruffle's) MSAA antialiasing differs from
@@ -583,7 +598,7 @@ banding in the diff), a distinct next target. Do not file these as accepted.
 
 | Test | Category | Diff pairs | Decision |
 |------|----------|-----------|----------|
-| `display_object_properties` | Graphics: MSAA edge AA vs Flash analytic/hairline | ~192 img px | Accept; we==Ruffle, both differ from Flash |
+| ~~`display_object_properties`~~ | ~~Graphics: MSAA edge AA vs Flash analytic/hairline~~ | ~~192 img px~~ | **STALE — image comparison now PASSES** (baseline `375373786`); kept for the mechanism only |
 | `date` | Platform UB (NaN/Infinity year cast) | ~9 | Accept; no portable fix |
 | `date` | Float precision (TimezoneOffset extreme dates) | ~1 | Accept; edge case |
 | `date` | Inconsistent expected output (UTCHours at −8.64e15) | ~18 | Accept; Ruffle test bug |
@@ -604,7 +619,7 @@ banding in the diff), a distinct next target. Do not file these as accepted.
 | `from_shumway/avm1/text-bind` | Image: device-font file mismatch — text ~14px too low (test ships a 0.7656 em NotoSans + fonts.conf; we use our 1.069 em bundled Noto, which matches Ruffle's default fallback) | ~1900 px | Accept; device-font vertical metrics depend on which font resolves `_sans`; we match Ruffle's default |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
-| `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
+| `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 (trace lines; **no image comparison exists**) | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
 | `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision | ~52k image outliers, max diff 64 | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render, residual diff is decoder fixed-point arithmetic |
 | `watch_special_recursion_swf7` | Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay; no `output.ruffle.txt` | ~part of test | Accept; segfault fixed, o1 matches Flash (65 fires); see Category 10 |
 | `watch_special_recursion_double_swf7` | Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay | ~63 | Accept; segfault fixed; see Category 10 |

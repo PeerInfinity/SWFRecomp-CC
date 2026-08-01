@@ -73187,27 +73187,46 @@ void actionUpdateHighlightState(void)
 int actionGetFocusRectInfo(FocusRectInfo* out)
 {
 	if (g_focused_mc == NULL) return 0;
-	if (g_highlight_state < 1) return 0;
+	// Ruffle caches the highlight's VISIBILITY at focus-change time
+	// (FocusTracker::update_highlight, called only from set_internal when the
+	// focused object actually changes, and from cycle()); rendering then just
+	// asks `highlight().is_visible()` and recomputes the BOUNDS fresh. So a
+	// later `_focusrect = false` with no intervening focus change does NOT hide
+	// an already-visible highlight, while a later _x/_xscale change DOES move
+	// it. Re-deriving `fr` here every frame got the second half right and the
+	// first half wrong (visual/focus_highlight/focus_highlight_move output.05).
+	// actionUpdateHighlightState() owns the _focusrect walk; 2 == ACTIVE_VISIBLE.
+	if (g_highlight_state != 2) return 0;
 
-	// Check per-object _focusrect with parent chain inheritance.
-	// Walk from focused MC up to root; first non-null value wins.
-	float fr = -1.0f;
-	MovieClip* mc = g_focused_mc;
-	while (mc != NULL) {
-		if (mc->focusrect != -1.0f) { fr = mc->focusrect; break; }
-		mc = mc->parent;
-	}
-	if (fr == -1.0f) {
-		extern MovieClip root_movieclip;
-		fr = root_movieclip.focusrect;
-	}
-	// Default (null/-1) = true; 0 = false; > 0 = true
-	if (fr == 0.0f) return 0;
-
-	// Get local content bounds for the focused MC (children-composed, twips)
+	// Get local content bounds for the focused MC (children-composed, twips).
+	//
+	// Buttons are the exception: they are always highlighted using their
+	// HIT-test bounds, never the bounds of whichever state is currently showing
+	// (Ruffle Avm1Button::highlight_bounds — "their bounds usually change on
+	// hover, which would cause the automatic tab order to change during
+	// tabbing"). A button whose hit area resolves to nothing gets no highlight
+	// at all, even when its up state draws something.
 	DisplayObject* _fr_dl = NULL; size_t _fr_dl_max = 0;
 	double _fr_xmin_tw, _fr_ymin_tw, _fr_xmax_tw, _fr_ymax_tw;
-	if (!(resolveMCDisplayList(g_focused_mc, &_fr_dl, &_fr_dl_max)
+	int _fr_have_bounds = 0;
+	{
+		extern int ng_getButtonHighlightBounds(size_t char_id, s32* out_xmin,
+			s32* out_xmax, s32* out_ymin, s32* out_ymax);
+		DisplayObject* _fr_dobj = (DisplayObject*)g_focused_mc->display_obj;
+		if (_fr_dobj != NULL && _fr_dobj->char_id != 0) {
+			s32 hx0, hx1, hy0, hy1;
+			int br = ng_getButtonHighlightBounds(_fr_dobj->char_id,
+			                                    &hx0, &hx1, &hy0, &hy1);
+			if (br < 0) return 0;   // button with no hit area -> no highlight
+			if (br > 0) {
+				_fr_xmin_tw = (double)hx0; _fr_xmax_tw = (double)hx1;
+				_fr_ymin_tw = (double)hy0; _fr_ymax_tw = (double)hy1;
+				_fr_have_bounds = 1;
+			}
+		}
+	}
+	if (!_fr_have_bounds
+	    && !(resolveMCDisplayList(g_focused_mc, &_fr_dl, &_fr_dl_max)
 	      && ng_localBoundsOfDL(_fr_dl, _fr_dl_max, &_fr_xmin_tw, &_fr_ymin_tw, &_fr_xmax_tw, &_fr_ymax_tw)))
 		return 0;
 

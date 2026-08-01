@@ -669,7 +669,22 @@ the rendering *architecture*, not a defect. Confirm with
 `ruffle-tests/triage_image_tests.py <test>` (renders Ruffle at 4× and reports
 us-vs-Flash / us-vs-Ruffle / Ruffle-vs-Flash).
 
-### `simple_loop_test` (misc-ming.all/loop) — hairline-stroke pixel-snapping (121–724 image px/frame)
+### `simple_loop_test` (misc-ming.all/loop) — hairline-stroke pixel-snapping (121–724 image px/frame) — **FRAMES 1–2 ONLY**
+
+> **Scope correction (2026-08-01, session 9 pixel triage).** This entry is valid
+> for `frame1` (242 excess px) and `frame2` (483). It is **not** valid for
+> `frame3`–`frame7`, which are 7442 / 7683 / 14400 / 14702 / 21600 excess px —
+> up to **30× the accepted magnitude** — and whose mechanisms are not
+> antialiasing at all: `frame3` and `frame6` are `blank_render` (we draw a flat
+> empty frame where Flash shows the coloured bars), `frame4`/`frame5` are
+> `extra_element` (we draw bars Flash has already cleared) and `frame7` is
+> `missing_element`. "We drew nothing" next to "we drew something extra" inside
+> one test is a **timeline loop phase off-by-one**, not a rasterizer gap — and it
+> is live work, not an accepted diff. `scripts/image_triage.py` flags exactly this
+> shape under FRAME-PHASE SUSPECTS. Do not treat frames 3–7 as dispositioned.
+
+<!-- image-axis: frames 1-2 only -->
+
 
 Draws three 60×60px bars (red/green/blue) placed abutting at integer pixel
 boundaries (x=0/60/120), each with a `lineStyle width="1"` (1-twip ≈ 0.05px
@@ -710,7 +725,8 @@ means reimplementing Flash hairline hinting at disproportionate risk.
 
 | Test | Diff Lines | Root Cause | Our Behavior | Spec |
 |------|-----------|------------|-------------|------|
-| simple_loop_test (misc-ming/loop) | 121–724 img px/frame | Flash hairline (≤1px stroke) pixel-snapping; MSAA antialiases the sub-pixel-straddling hairline instead | Matches Ruffle (us-vs-Ruffle=0); both differ from Flash | Flash pixel-hinting for hairlines (Ruffle doesn't implement it either) |
+| simple_loop_test (misc-ming/loop) **frames 1–2 only** | 121–724 img px/frame | Flash hairline (≤1px stroke) pixel-snapping; MSAA antialiases the sub-pixel-straddling hairline instead | Matches Ruffle (us-vs-Ruffle=0); both differ from Flash | Flash pixel-hinting for hairlines (Ruffle doesn't implement it either) |
+| simple_loop_test **frames 3–7** | 7442–21600 img px/frame | **NOT accepted** — timeline loop phase off-by-one (blank_render / extra_element / missing_element), see the scope correction above | Frames drawn out of phase | Live work |
 | Math-v5 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | Math-v6 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | Math-v7 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |

@@ -1152,6 +1152,12 @@ static void insert_at_index(Avm2Context* ctx, Avm2Object* parent, Avm2Object* ch
 static Avm2Object* g_stage_focus;
 static void set_focus(Avm2Context* ctx, Avm2Object* new_focus);
 
+// Focus-highlight state (Ruffle focus_tracker.rs `Highlight`):
+// 0 = Inactive, 1 = ActiveHidden, 2 = ActiveVisible. Cached at focus-change
+// time; see avm2_update_highlight for how it is derived and avm2_render_walk
+// for where it is consumed.
+static int g_avm2_highlight = 0;
+
 static void full_remove_child(Avm2Context* ctx, Avm2DisplayObjectExt* pext,
                               Avm2Object* child)
 {
@@ -12113,6 +12119,10 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 					button == 0 ? "mouseDown" : button == 1 ? "middleMouseDown"
 					: "rightMouseDown", NULL, 0, 1, button);
 			}
+			// Player::should_reset_highlight: a LEFT mouse-down always kills
+			// the highlight, whether or not the focus moved. (The extra SWF<9
+			// cases — move / right / up — can't apply: AVM2 content is SWF 9+.)
+			if (button == 0) g_avm2_highlight = 0;
 		}
 		else
 		{
@@ -12182,6 +12192,7 @@ static void input_handle_text(Avm2Context* ctx, int32_t codepoint);
 static void input_handle_text_control(Avm2Context* ctx, const char* ctrl);
 static void input_handle_tab(Avm2Context* ctx, int shift);
 static void set_focus(Avm2Context* ctx, Avm2Object* new_focus);
+static void avm2_update_highlight(Avm2Context* ctx);
 
 static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
 {
@@ -12455,6 +12466,11 @@ static void set_focus(Avm2Context* ctx, Avm2Object* new_focus)
 			avm2_string_from_literal(ctx, "focusIn"), 1, 0, old, 0, 0, "none");
 		avm2_dispatch_event(ctx, new_focus, ev);
 	}
+	// "The highlight always follows the focus" (FocusTracker::set_internal).
+	// Only a real focus CHANGE recomputes it — the early return above is what
+	// makes `stage.stageFocusRect = false; stage.focus = <already focused>`
+	// leave a visible highlight alone.
+	avm2_update_highlight(ctx);
 }
 
 // Ruffle Player::update_focus_on_mouse_press + FocusTracker::set_by_mouse.
@@ -12600,6 +12616,56 @@ static void obj_world_topleft(Avm2Context* ctx, Avm2Object* obj,
 	*y = r.ymin;
 }
 
+// ---------------------------------------------------------------------------
+// Focus highlight (Ruffle focus_tracker.rs `Highlight`)
+// ---------------------------------------------------------------------------
+// 0 = Inactive, 1 = ActiveHidden, 2 = ActiveVisible. The state is CACHED at
+// focus-change time (`g_avm2_highlight`, declared above) and only the bounds
+// are recomputed at render time, which is what makes `stageFocusRect` /
+// `focusRect` writes that are *not* followed by a focus change invisible to an
+// already-drawn highlight.
+
+// Ruffle InteractiveObject::is_highlight_enabled — the object's own focusRect
+// (Object-typed: null/undefined means "inherit"), falling back to the stage's.
+// The `movie().version() >= 6` arm is unconditional here: AVM2 is SWF 9+.
+static int obj_is_highlight_enabled(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (e != NULL && e->focus_rect_set) return e->focus_rect_val != 0;
+	return g_stage_focus_rect != 0;
+}
+
+// Ruffle InteractiveObject::is_highlightable, plus the per-type overrides:
+//   Stage        -> false ("Stage cannot be highlighted")
+//   MovieClip    -> !is_root && is_highlight_enabled
+//   EditText     -> false ("TextField is incapable of rendering a highlight")
+static int obj_is_highlightable(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
+	if (e == NULL || e->is_stage) return 0;
+	if (e->edittext != NULL) return 0;
+	if (e->is_root) return 0;
+	return obj_is_highlight_enabled(ctx, obj);
+}
+
+// Ruffle FocusTracker::calculate_highlight. Degenerate bounds (invalid, or a
+// single point) hide the highlight without deactivating it — that is FP's
+// "clip focused before it had any content" behaviour, and it is also what
+// keeps `focus_highlight_empty_clip` blank.
+static void avm2_update_highlight(Avm2Context* ctx)
+{
+	if (g_stage_focus == NULL) { g_avm2_highlight = 0; return; }
+	if (!obj_is_highlightable(ctx, g_stage_focus)) { g_avm2_highlight = 1; return; }
+	Rect r;
+	obj_highlight_bounds(ctx, g_stage_focus, &r);
+	if (!r.valid || (r.xmin == r.xmax && r.ymin == r.ymax))
+	{
+		g_avm2_highlight = 1;
+		return;
+	}
+	g_avm2_highlight = 2;
+}
+
 typedef struct { Avm2Object* obj; int32_t tab_index; int has_index;
                  double key; uint32_t fill_ord; } TabEnt;
 
@@ -12736,6 +12802,11 @@ static void input_handle_tab(Avm2Context* ctx, int shift)
 		}
 	}
 	focus_change_by_key(ctx, next, 9, shift);
+	// FocusTracker::cycle updates the highlight AGAIN after set_by_key, and
+	// unconditionally: Tab onto the object that already holds focus (a one-entry
+	// tab order, or a mouse press that reset the highlight without moving the
+	// focus) must still re-activate it.
+	avm2_update_highlight(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -14300,6 +14371,29 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 		avm2_render_node(ctx, ext->render_list[i], &world, alpha);
 }
 
+// Focus highlight, drawn on TOP of the whole stage (Ruffle
+// Stage::render_viewport calls focus_tracker().render_highlight AFTER
+// self.render). Yellow 3px outline drawn INSIDE the focused object's world
+// highlight bounds, matching RenderContext::draw_rect_outline. The visibility
+// decision is the cached `g_avm2_highlight`; only the bounds are fresh.
+static void avm2_render_highlight(Avm2Context* ctx)
+{
+	if (g_avm2_highlight != 2 || g_stage_focus == NULL) return;
+	Rect r;
+	obj_highlight_bounds(ctx, g_stage_focus, &r);
+	if (!r.valid) return;
+	float t  = 3.0f * 20.0f;                 // HIGHLIGHT_THICKNESS, twips
+	float fx = (float) r.xmin, fy = (float) r.ymin;
+	float fw = (float) (r.xmax - r.xmin), fh = (float) (r.ymax - r.ymin);
+	if (fw <= 0.0f || fh <= 0.0f) return;
+	// Transform slot 0 is identity (see avm2_render_bitmap's fallback), so
+	// these world-twips rects go straight through stage_to_ndc.
+	renderer_draw_rect(context, fx, fy, fw, t, 1, 1, 0, 1, 0, 0);              // top
+	renderer_draw_rect(context, fx, fy + fh - t, fw, t, 1, 1, 0, 1, 0, 0);     // bottom
+	renderer_draw_rect(context, fx, fy, t, fh, 1, 1, 0, 1, 0, 0);              // left
+	renderer_draw_rect(context, fx + fw - t, fy, t, fh, 1, 1, 0, 1, 0, 0);     // right
+}
+
 static void avm2_render_walk(Avm2Context* ctx)
 {
 	renderer_open_pass(context);
@@ -14308,6 +14402,7 @@ static void avm2_render_walk(Avm2Context* ctx)
 	Mat id = mat_identity();
 	if (ctx->stage != NULL)
 		avm2_render_node(ctx, ctx->stage, &id, 1.0);
+	avm2_render_highlight(ctx);
 	renderer_close_pass(context);
 }
 

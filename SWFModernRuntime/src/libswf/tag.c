@@ -10367,6 +10367,57 @@ size_t ng_getButtonHitCharId(size_t char_id)
 	return dictionary[char_id].button_hit_char_id;
 }
 
+// Focus-highlight bounds for a BUTTON character (Ruffle
+// Avm1Button::highlight_bounds). A button is *always* highlighted using its
+// hit-test bounds, never the bounds of the state that happens to be showing:
+// the visible children swap on hover, so keying the highlight (and the
+// automatic tab order) off the hit area is what keeps both stable.
+//
+// Returns:
+//    1 = char_id is a button; out_* hold its hit shape's LOCAL (button-space)
+//        twips AABB with the hit record's placement matrix applied,
+//   -1 = char_id is a button whose hit area resolves to nothing (no highlight),
+//    0 = char_id is not a button (caller falls back to display-list bounds).
+int ng_getButtonHighlightBounds(size_t char_id, s32* out_xmin, s32* out_xmax,
+                                s32* out_ymin, s32* out_ymax)
+{
+	if (char_id >= dictionary_capacity) return 0;
+	if (dictionary[char_id].type != CHAR_TYPE_BUTTON) return 0;
+
+	u32 hit_xf_id = dictionary[char_id].button_hit_transform_id;
+	size_t hit_cid = 0;
+	Character* hit_ch = resolve_hit_shape(dictionary[char_id].button_hit_char_id,
+	                                      &hit_xf_id, &hit_cid, 0);
+	if (hit_ch == NULL || hit_cid == 0) return -1;
+
+	s32 xmin, xmax, ymin, ymax;
+	if (!ng_getCharBoundsForRatio(hit_cid, 0, &xmin, &xmax, &ymin, &ymax))
+		return -1;
+
+	// Apply the hit record's own placement matrix (scale + translate; button
+	// records are axis-aligned in practice, and the rotation terms would only
+	// widen an AABB we immediately re-AABB in world space anyway).
+	if (hit_xf_id > 0) {
+		float (*td)[16] =
+			g_active_transform_data ? g_active_transform_data : transform_data;
+		float sx = td[hit_xf_id][0];
+		float sy = td[hit_xf_id][5];
+		float tx = td[hit_xf_id][12];
+		float ty = td[hit_xf_id][13];
+		float x0 = (float)xmin * sx + tx, x1 = (float)xmax * sx + tx;
+		float y0 = (float)ymin * sy + ty, y1 = (float)ymax * sy + ty;
+		if (x1 < x0) { float t = x0; x0 = x1; x1 = t; }
+		if (y1 < y0) { float t = y0; y0 = y1; y1 = t; }
+		xmin = (s32)x0; xmax = (s32)x1; ymin = (s32)y0; ymax = (s32)y1;
+	}
+
+	if (out_xmin) *out_xmin = xmin;
+	if (out_xmax) *out_xmax = xmax;
+	if (out_ymin) *out_ymin = ymin;
+	if (out_ymax) *out_ymax = ymax;
+	return 1;
+}
+
 // Phase 1e: yield instance names of children that were in the OLD state
 // of this button but are not at the same (depth, char_id) in the NEW state.
 // Caller passes the button's DisplayObject; if it doesn't match the most
