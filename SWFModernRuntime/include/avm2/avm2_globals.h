@@ -412,6 +412,11 @@ typedef struct Avm2EventExt
 	// 5th constructor argument is an Error OBJECT, not the errorID its
 	// ErrorEvent base takes.
 	Avm2Object* error_obj;
+	// --- ContextMenuEvent ---
+	// `mouseTarget` reuses `related_object` above (both are the InteractiveObject
+	// the pointer was over); `contextMenuOwner` is the menu's own owner and needs
+	// its own slot.
+	Avm2Object* context_menu_owner;
 } Avm2EventExt;
 
 // DisplayObject instance state (avm2_display.c). One struct serves the

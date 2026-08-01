@@ -120,6 +120,13 @@ _Noreturn void avm2_unimplemented_op(Avm2Activation* act, const char* op_name, u
 _Noreturn void avm2_verify_error_body(Avm2Activation* act, const char* message)
 {
 	// Reachable VerifyError bodies throw a catchable VerifyError.
+	//
+	// FP rejects the method at VERIFY time — before the frame that would name
+	// it is pushed — so the error's getStackTrace() is empty. Our verify body
+	// is emitted inside that very method, so the snapshot has to be suppressed
+	// explicitly or an uncaught #1011 prints a frame FP never had
+	// (avm2/verify_illegal_opcode expects the error line alone).
+	act->ctx->suppress_stack_snapshot = 1;
 	avm2_throw_error(act->ctx, act->ctx->builtins.verify_error_class, "%s", message);
 }
 

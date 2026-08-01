@@ -427,6 +427,17 @@ void avm2_builtin_add_method_as3(Avm2Context* ctx, Avm2Class* cls, const char* n
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
 
+// "get x" / "set x" — the way FP names an accessor's stack frame
+// ("at flash.display::BitmapData/get width()" — bitmapdata_zero_size).
+static const char* accessor_debug_name(Avm2Context* ctx, const char* prefix,
+                                       const char* name)
+{
+	size_t nlen = strlen(name);
+	char* out = avm2_alloc(ctx, nlen + 5);
+	snprintf(out, nlen + 5, "%s%s", prefix, name);
+	return out;
+}
+
 void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn)
 {
@@ -436,7 +447,7 @@ void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	e.kind = AVM2_PROP_GETTER;
 	e.method.fn = fn;
 	e.method.file = NULL;
-	e.method.debug_name = name;
+	e.method.debug_name = accessor_debug_name(ctx, "get ", name);
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
@@ -450,15 +461,10 @@ void avm2_builtin_add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 	e.kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
 	// FP stack frames name accessors "get x"/"set x"
 	// ("at flash.text::TextFormat/set display()" — textformat_display).
-	size_t nlen = strlen(name);
-	char* gname = avm2_alloc(ctx, nlen + 5);
-	char* sname = avm2_alloc(ctx, nlen + 5);
-	snprintf(gname, nlen + 5, "get %s", name);
-	snprintf(sname, nlen + 5, "set %s", name);
 	e.method.fn = getter;
-	e.method.debug_name = gname;
+	e.method.debug_name = accessor_debug_name(ctx, "get ", name);
 	e.setter.fn = setter;
-	e.setter.debug_name = sname;
+	e.setter.debug_name = accessor_debug_name(ctx, "set ", name);
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
@@ -505,9 +511,9 @@ void avm2_builtin_add_static_getset(Avm2Context* ctx, Avm2Class* cls, const char
 	e.key = builtin_key("", name);
 	e.kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
 	e.method.fn = getter;
-	e.method.debug_name = name;
+	e.method.debug_name = accessor_debug_name(ctx, "get ", name);
 	e.setter.fn = setter;
-	e.setter.debug_name = name;
+	e.setter.debug_name = accessor_debug_name(ctx, "set ", name);
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, vt, &e);
 }

@@ -77,6 +77,13 @@ struct Avm2Context
 	// throw lands or it recurses on its own diagnosis. The reserved headroom
 	// below stack_budget is what that construction runs in.
 	uint8_t stack_overflow_pending;
+	// Set for the duration of ONE Error construction whose stack tail must be
+	// empty. FP verifies a method BEFORE its frame exists, so a VerifyError's
+	// getStackTrace() has no frames at all — but our verify bodies are emitted
+	// INSIDE the method they reject, so error_init would snapshot the very
+	// frame FP never pushed (avm2/verify_illegal_opcode expects the error line
+	// alone). Cleared by error_init.
+	uint8_t suppress_stack_snapshot;
 };
 
 void runSWF_avm2(SWFAppContext* app_context);

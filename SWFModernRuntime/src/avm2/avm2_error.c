@@ -239,12 +239,35 @@ void avm2_try_pop_frame(Avm2TryFrame* tf)
 
 static void print_uncaught(Avm2Context* ctx, Avm2Value v)
 {
-	// Diagnostics only (stderr): uncaught errors don't produce trace output.
+	// Ruffle Avm2::uncaught_error (avm2.rs): in Debug player mode — what the
+	// test harness runs — Flash Player TRACES the error that escaped, so the
+	// line lands in the graded output. The text is Error::to_string(): the
+	// value coerced to a string, followed by the call stack the Error captured
+	// when it was built (the same "\n\tat X()" tail getStackTrace prints).
+	// A thrown non-Error value has no tail and prints on its own.
 	//
 	// Only frames the PLAYER LOOP discards reach here — a catch-all the
 	// runtime installs to render the error itself is marked `silent`
 	// (loader_error_in_root_ctor would otherwise print its line twice).
 	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	const Avm2String* tail = NULL;
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+	{
+		Avm2Value* t = avm2_object_find_dynamic(v.u.obj, "__stacktrace_tail",
+		                                        17);
+		if (t != NULL && t->kind == AVM2_VALUE_STRING) tail = t->u.str;
+	}
+	if (tail == NULL)
+	{
+		// A thrown NON-Error value carries no snapshot, but FP still names the
+		// frame the throw escaped from ("undefined\n\tat global$init()" —
+		// ecma3/Exceptions/exception_011_rt). print_uncaught runs before the
+		// longjmp unwinds, so the current stack IS the throw site's.
+		tail = callstack_snapshot(ctx);
+	}
+	printf("%.*s", (int) s->len, s->utf8);
+	if (tail != NULL) printf("%.*s", (int) tail->len, tail->utf8);
+	putchar('\n');
 	fflush(stdout);
 	fprintf(stderr, "AVM2 uncaught error: %.*s\n", (int) s->len, s->utf8);
 }
@@ -407,9 +430,21 @@ static Avm2Value error_init(Avm2Activation* act)
 		: avm2_integer(0);
 	Avm2DynProp* p = avm2_object_set_dynamic(ctx, self, "errorID", 7, eid);
 	p->dont_enum = 1;
-	// FP debug player snapshots the call stack at construction.
+	// FP debug player snapshots the call stack at construction — except for a
+	// verifier-raised error, which FP builds before the rejected method's frame
+	// exists (see Avm2Context.suppress_stack_snapshot).
+	const Avm2String* tail;
+	if (ctx->suppress_stack_snapshot)
+	{
+		ctx->suppress_stack_snapshot = 0;
+		tail = avm2_string_from_literal(ctx, "");
+	}
+	else
+	{
+		tail = callstack_snapshot(ctx);
+	}
 	p = avm2_object_set_dynamic(ctx, self, "__stacktrace_tail", 17,
-	                            avm2_string(callstack_snapshot(ctx)));
+	                            avm2_string(tail));
 	p->dont_enum = 1;
 	return avm2_undefined();
 }

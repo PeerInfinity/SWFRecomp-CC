@@ -1064,6 +1064,73 @@ static Avm2Value fe_to_string(Avm2Activation* act)
 	                                 args, 8);
 }
 
+// --- flash.events.ContextMenuEvent -----------------------------------------
+//
+// Ruffle ContextMenuEvent.as. Headless never raises one, but any movie that
+// builds a right-click menu getlexes the class (away3d's SimpleGUI does, and a
+// missing class is a #1065 that kills the whole script). `mouseTarget` shares
+// the ext's `related_object` slot — MouseEvent's relatedObject is the same
+// "InteractiveObject under the pointer" — and `contextMenuOwner` has its own.
+static Avm2Value cme_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	ext->related_object = arg_obj(act, 3);
+	ext->context_menu_owner = arg_obj(act, 4);
+	return avm2_undefined();
+}
+
+static Avm2Value cme_get_owner(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	return ext->context_menu_owner != NULL
+		? avm2_object_value(ext->context_menu_owner) : avm2_null();
+}
+static Avm2Value cme_set_owner(Avm2Activation* act)
+{ this_event(act)->context_menu_owner = arg_obj(act, 0); return avm2_undefined(); }
+
+static Avm2Value cme_get_mouse_target_inaccessible(Avm2Activation* act)
+{ return avm2_bool(this_event(act)->related_object_inaccessible != 0); }
+static Avm2Value cme_set_mouse_target_inaccessible(Avm2Activation* act)
+{
+	this_event(act)->related_object_inaccessible = arg_bool(act, 0);
+	return avm2_undefined();
+}
+
+static Avm2Value cme_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"ContextMenuEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"mouseTarget", "contextMenuOwner"
+	};
+	Avm2Value args[7];
+	for (int i = 0; i < 7; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 7);
+}
+
+static Avm2Class* g_context_menu_event_class;
+
+static Avm2Value cme_clone(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EventExt* ext = this_event(act);
+	Avm2Value args[5];
+	args[0] = avm2_string(ext->type != NULL ? ext->type
+		: avm2_string_from_literal(ctx, ""));
+	args[1] = avm2_bool(ext->bubbles != 0);
+	args[2] = avm2_bool(ext->cancelable != 0);
+	args[3] = ext->related_object != NULL
+		? avm2_object_value(ext->related_object) : avm2_null();
+	args[4] = ext->context_menu_owner != NULL
+		? avm2_object_value(ext->context_menu_owner) : avm2_null();
+	return avm2_class_construct(ctx, g_context_menu_event_class, args, 5);
+}
+
 Avm2Object* avm2_mouse_event_new(Avm2Context* ctx, const Avm2String* type,
                                  int bubbles, int cancelable, double local_x,
                                  double local_y, Avm2Object* related,
@@ -1760,6 +1827,28 @@ static void register_input_events(Avm2Context* ctx)
 		for (size_t i = 0; i < sizeof(tc) / sizeof(tc[0]); i++)
 			avm2_builtin_add_static_const(ctx, te, tc[i].n,
 				avm2_string(avm2_string_from_literal(ctx, tc[i].v)));
+	}
+
+	// flash.events.ContextMenuEvent.
+	{
+		Avm2Class* cme = avm2_builtin_class(ctx, "flash.events",
+		                                    "ContextMenuEvent", b->event_class);
+		cme->instance_init.fn = cme_init;
+		cme->instance_init.debug_name = "ContextMenuEvent";
+		g_context_menu_event_class = cme;
+		avm2_builtin_add_getset(ctx, cme, "mouseTarget",
+		                        me_get_related, me_set_related);
+		avm2_builtin_add_getset(ctx, cme, "contextMenuOwner",
+		                        cme_get_owner, cme_set_owner);
+		avm2_builtin_add_getset(ctx, cme, "isMouseTargetInaccessible",
+		                        cme_get_mouse_target_inaccessible,
+		                        cme_set_mouse_target_inaccessible);
+		event_override_method(ctx, cme, "toString", cme_to_string);
+		event_override_method(ctx, cme, "clone", cme_clone);
+		avm2_builtin_add_static_const(ctx, cme, "MENU_ITEM_SELECT",
+			avm2_string(avm2_string_from_literal(ctx, "menuItemSelect")));
+		avm2_builtin_add_static_const(ctx, cme, "MENU_SELECT",
+			avm2_string(avm2_string_from_literal(ctx, "menuSelect")));
 	}
 
 	// flash.events.KeyboardEvent.
