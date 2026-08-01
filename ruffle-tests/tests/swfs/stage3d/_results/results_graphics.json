@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-01T07:44:04.292600+00:00",
-    "git_sha": "07c119c505f95a40da0202e5ecad8338829daf95",
-    "duration_seconds": 42.82,
+    "timestamp": "2026-08-01T14:06:41.236789+00:00",
+    "git_sha": "feb8882b09e238e91ab6444099d6cca237e3a4f9",
+    "duration_seconds": 43.34,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -20,7 +20,7 @@
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.459,
+        "compile": 6.964,
         "run": 0.466
       },
       "num_frames": 126,
@@ -29,15 +29,15 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 7.94,
+      "duration": 7.44,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.317,
-        "run": 0.315
+        "compile": 6.641,
+        "run": 0.265
       },
       "num_frames": 12,
       "lines": {
@@ -45,15 +45,15 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 7.65,
+      "duration": 6.91,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.035,
-        "compile": 9.58,
-        "run": 0.315
+        "recomp": 0.019,
+        "compile": 7.846,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -61,7 +61,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 10.23,
+      "duration": 8.29,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -70,7 +70,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 592737,
+            "mean_diff": 121.1476,
+            "outliers": 592737,
+            "max_outliers": 782,
+            "tolerance": 1,
+            "excess_outliers": 591955
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -78,9 +92,9 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.015,
-        "compile": 6.463,
-        "run": 0.215
+        "recomp": 0.032,
+        "compile": 9.495,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -88,7 +102,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.86,
+      "duration": 10.12,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -97,7 +111,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 659254,
+            "mean_diff": 141.5051,
+            "outliers": 657946,
+            "max_outliers": 0,
+            "tolerance": 1,
+            "excess_outliers": 657946
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -105,9 +133,9 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.031,
-        "compile": 9.276,
-        "run": 0.265
+        "recomp": 0.036,
+        "compile": 9.645,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -115,7 +143,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 9.85,
+      "duration": 10.3,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -124,7 +152,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 658934,
+            "mean_diff": 109.5241,
+            "outliers": 657072,
+            "max_outliers": 0,
+            "tolerance": 1,
+            "excess_outliers": 657072
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
