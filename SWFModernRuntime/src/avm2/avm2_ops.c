@@ -2136,7 +2136,26 @@ static int scope_defines_mn(Avm2Activation* act, const Avm2ScopeEntry* se, uint3
 	if (se->obj == NULL) return 0;
 	if (!se->is_with)
 	{
-		return avm2_vtable_find_mn(se->obj->vtable, act->file->data, mn_idx) != NULL;
+		if (avm2_vtable_find_mn(se->obj->vtable, act->file->data, mn_idx) != NULL)
+		{
+			return 1;
+		}
+		// Same fallback resolve_key already applies (see the AVM2_OBJ_CLASS arm
+		// there): a class object's own vtable holds only its static traits;
+		// `Class`'s instance members come from class_class->ivtable. A class
+		// object sits on the scope chain of every one of its methods, so a bare
+		// `prototype` inside a static method must find it there
+		// (avm2/supercalls_weird). NOTE: class_class is built before Object's
+		// hasOwnProperty/isPrototypeOf/propertyIsEnumerable are registered
+		// (avm2_globals.c:3432 vs :3471) and avm2_builtin_class copies the super
+		// ivtable at creation time, so this ivtable holds exactly one entry,
+		// `prototype`. Reordering that init would silently widen this fallback.
+		if (se->obj->kind == AVM2_OBJ_CLASS && act->ctx->builtins.class_class != NULL)
+		{
+			return avm2_vtable_find_mn(&act->ctx->builtins.class_class->ivtable,
+			                           act->file->data, mn_idx) != NULL;
+		}
+		return 0;
 	}
 	Avm2Value sv = avm2_object_value(se->obj);
 	if (avm2_value_is_xmlish(sv))
@@ -2171,8 +2190,21 @@ static int scope_defines_named(Avm2Activation* act, const Avm2ScopeEntry* se,
 	if (se->obj == NULL) return 0;
 	if (!se->is_with)
 	{
-		return avm2_vtable_find_mn_named(se->obj->vtable, act->file->data, mn_idx,
-		                                 name, name_len) != NULL;
+		if (avm2_vtable_find_mn_named(se->obj->vtable, act->file->data, mn_idx,
+		                              name, name_len) != NULL)
+		{
+			return 1;
+		}
+		// Class-object fallback, same as scope_defines_mn above (kept in sync
+		// deliberately: no corpus consumer today, but leaving the MultinameL
+		// half behind is how the next `_dyn`-shaped bug gets written).
+		if (se->obj->kind == AVM2_OBJ_CLASS && act->ctx->builtins.class_class != NULL)
+		{
+			return avm2_vtable_find_mn_named(&act->ctx->builtins.class_class->ivtable,
+			                                 act->file->data, mn_idx,
+			                                 name, name_len) != NULL;
+		}
+		return 0;
 	}
 	Avm2Value sv = avm2_object_value(se->obj);
 	if (avm2_value_is_xmlish(sv))
@@ -3159,14 +3191,54 @@ Avm2Value avm2_op_callstatic(Avm2Activation* act, uint32_t method_index, Avm2Val
 	return avm2_call_method_ref(act->ctx, &ref, NULL, act->outer, recv, args, argc);
 }
 
+// Is this frame CLASS-SIDE (a static method or a class initializer)? Its
+// receiver is the bound class's own class object. Ruffle models these as
+// methods of the c_class, whose superclass is ALWAYS `Class` — flat, never the
+// base class's c_class (class.rs:530-534, `class.super_class =
+// Some(class_class)`), because AS3 does not inherit static traits.
+static int frame_is_class_side(const Avm2Activation* act)
+{
+	return act->bound_class != NULL
+	    && act->this_val.kind == AVM2_VALUE_OBJECT
+	    && act->this_val.u.obj != NULL
+	    && act->this_val.u.obj->kind == AVM2_OBJ_CLASS
+	    && act->this_val.u.obj->class_ref == act->bound_class;
+}
+
 // Super dispatch: resolve on the bound class's SUPERCLASS vtable.
 static Avm2Class* super_class_of(Avm2Activation* act)
 {
+	Avm2Context* ctx = act->ctx;
+	if (act->bound_class == NULL)
+	{
+		// A SCRIPT INIT is bound to the synthetic `global` class, whose base is
+		// Object (Ruffle globals/global_scope.rs create_class + script.rs:630
+		// MethodAssociation::classbound(global_class, true)). We keep
+		// bound_class NULL there on purpose — avm2_callstack_frame_name prints
+		// `global$init()` only on that fallthrough, and
+		// avm2_op_constructsuper's bound_class == NULL early return is what
+		// keeps avm2/array_access_interpreter passing — so the global base is
+		// supplied here instead. avm2/supercalls_weird calls
+		// super.AS3::hasOwnProperty on the script global.
+		if (act->this_val.kind == AVM2_VALUE_OBJECT
+		    && act->this_val.u.obj != NULL
+		    && act->this_val.u.obj->cls == ctx->builtins.global_class)
+		{
+			return ctx->builtins.object_class;
+		}
+	}
+	else if (frame_is_class_side(act))
+	{
+		return ctx->builtins.class_class;
+	}
 	if (act->bound_class == NULL || act->bound_class->super_class == NULL)
 	{
-		// avmplus VerifyError 1035 (catchable) — array_access_interpreter
-		// probes JIT-vs-interpreter behavior with an illegal super op.
-		avm2_throw_error(act->ctx, act->ctx->builtins.verify_error_class,
+		// avmplus VerifyError 1035 (catchable). NOTE: contrary to an older
+		// comment here, avm2/array_access_interpreter does NOT pin this
+		// condition — it has no get/set/callsuper at all, and its script-init
+		// ConstructSuper returns early in avm2_op_constructsuper before
+		// reaching this function.
+		avm2_throw_error(ctx, ctx->builtins.verify_error_class,
 		                 "Error #1035: Illegal super expression found in method.");
 	}
 	return act->bound_class->super_class;
