@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "timestamp": "2026-08-01T03:29:53.934920+00:00",
+    "timestamp": "2026-08-01T14:06:44.000010+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "375373786d2d491b520dca4d4e5ce510df219d1c",
+    "git_sha": "feb8882b09e238e91ab6444099d6cca237e3a4f9",
     "source": "results_graphics.json",
-    "incomplete": false
+    "incomplete": false,
+    "run_id": "30701749687",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/30701749687",
+    "run_attempt": "1"
   },
   "tests_with_comparisons": 5,
   "comparisons": 5,

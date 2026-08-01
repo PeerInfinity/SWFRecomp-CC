@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-01T07:44:04.253652+00:00",
-    "git_sha": "07c119c505f95a40da0202e5ecad8338829daf95",
-    "duration_seconds": 216.36,
+    "timestamp": "2026-08-01T14:06:41.197789+00:00",
+    "git_sha": "feb8882b09e238e91ab6444099d6cca237e3a4f9",
+    "duration_seconds": 208.23,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30,
@@ -24,8 +24,8 @@
       "test": "auto_size/height",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.022,
-        "run": 0.516
+        "compile": 27.334,
+        "run": 0.365
       },
       "num_frames": 1,
       "lines": {
@@ -33,7 +33,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 27.64,
+      "duration": 27.78,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -42,7 +42,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 300,
+            "height": 250,
+            "total_channels": 300000,
+            "max_diff": 255,
+            "diff_channels": 21732,
+            "mean_diff": 13.9715,
+            "outliers": 21732,
+            "max_outliers": 3,
+            "tolerance": 0,
+            "excess_outliers": 21729
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -50,9 +64,9 @@
     {
       "test": "auto_size/return",
       "phases": {
-        "recomp": 0.068,
-        "compile": 27.164,
-        "run": 0.315
+        "recomp": 0.062,
+        "compile": 26.912,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -60,7 +74,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 27.78,
+      "duration": 27.44,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -69,7 +83,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 375,
+            "total_channels": 825000,
+            "max_diff": 255,
+            "diff_channels": 25206,
+            "mean_diff": 6.5305,
+            "outliers": 25206,
+            "max_outliers": 18,
+            "tolerance": 0,
+            "excess_outliers": 25188
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -77,9 +105,9 @@
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.066,
-        "compile": 26.552,
-        "run": 0.315
+        "recomp": 0.0,
+        "compile": 23.183,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -87,7 +115,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 27.15,
+      "duration": 23.6,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -96,7 +124,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 500,
+            "height": 350,
+            "total_channels": 700000,
+            "max_diff": 255,
+            "diff_channels": 45177,
+            "mean_diff": 14.7653,
+            "outliers": 45177,
+            "max_outliers": 18,
+            "tolerance": 0,
+            "excess_outliers": 45159
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -105,8 +147,8 @@
       "test": "br_at_start",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.591,
-        "run": 0.315
+        "compile": 1.938,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -114,7 +156,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.05,
+      "duration": 2.69,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -123,7 +165,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 17137,
+            "mean_diff": 4.3369,
+            "outliers": 14419,
+            "max_outliers": 8,
+            "tolerance": 128,
+            "excess_outliers": 14411
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -132,7 +188,7 @@
       "test": "html_entity_parsing",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.774,
+        "compile": 7.381,
         "run": 0.265
       },
       "num_frames": 1,
@@ -141,7 +197,7 @@
         "expected_lines": 213,
         "matching_lines": 99
       },
-      "duration": 7.05,
+      "duration": 7.66,
       "status": "output_mismatch",
       "detail": "118 line(s) differ (actual=217, expected=213)",
       "actual_output": "Source: This is an ampersand: &amp;\nParsed: This is an ampersand: &\n\nSource: This is a less-than sign: &lt;\nParsed: This is a less-than sign: <\n\nSource: This is a greater-than sign: &gt;\nParsed: This is a greater-than sign: >\n\nSource: This is a quotation mark: &quot;\nParsed: This is a quotation mark: \"\n\nSource: This is an apostrophe: &apos;\nParsed: This is an apostrophe: '\n\nSource: This is a non-breaking space: &nbsp;\nParsed: This is a non-breaking space: \u00a0\n\nSource: &amp;\nParsed: &\n\nSource: &quot; is a quotation mark\nParsed: \" is a quotation mark\n\nSource: Suppose we have two objects, &quot;foo&quot; and &quot;bar&quot;\nParsed: Suppose we have two objects, \"foo\" and \"bar\"\n\nSource: This is how you write an empty string: &quot;&quot;\nParsed: This is how you write an empty string: \"\"\n\nSource: This entity should not be valid: &jjjjj;\nParsed: This entity should not be valid: &jjjjj;\n\nSource: This entity should not be valid: &1;\nParsed: This entity should not be valid: &1;\n\nSource: This entity should not be valid: &x2;\nParsed: This entity should not be valid: &x2;\n\nSource: This entity should not be valid: &;\nParsed: This entity should not be valid: &;\n\nSource: This is not an entity: amp;\nParsed: This is not an entity: amp;\n\nSource: ;\nParsed: ;\n\nSource: This is not an entity: &amp\nParsed: This is not an entity: &amp\n... (167 lines after) ...",
@@ -151,7 +207,7 @@
       "test": "links_in_scrolled_text",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.117,
+        "compile": 2.044,
         "run": 0.215
       },
       "num_frames": 2,
@@ -160,7 +216,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 2.34,
+      "duration": 2.27,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -170,8 +226,8 @@
       "test": "style_changes_in_html",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.899,
-        "run": 0.215
+        "compile": 15.173,
+        "run": 0.165
       },
       "num_frames": 1,
       "lines": {
@@ -179,7 +235,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.23,
+      "duration": 15.41,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -188,7 +244,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 175,
+            "total_channels": 385000,
+            "max_diff": 103,
+            "diff_channels": 27250,
+            "mean_diff": 3.8849,
+            "outliers": 27250,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 27250
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -197,8 +267,8 @@
       "test": "text_caret_placement_align",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.197,
-        "run": 0.315
+        "compile": 26.586,
+        "run": 0.316
       },
       "num_frames": 2,
       "lines": {
@@ -206,14 +276,14 @@
         "expected_lines": 248,
         "matching_lines": 248
       },
-      "duration": 22.52,
+      "duration": 26.93,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
-        "recomp": 0.0,
-        "compile": 27.81,
+        "recomp": 0.045,
+        "compile": 29.835,
         "run": 0.315
       },
       "num_frames": 2,
@@ -222,15 +292,15 @@
         "expected_lines": 244,
         "matching_lines": 244
       },
-      "duration": 28.14,
+      "duration": 30.21,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
-        "recomp": 0.0,
-        "compile": 28.297,
-        "run": 0.315
+        "recomp": 0.034,
+        "compile": 25.741,
+        "run": 0.265
       },
       "num_frames": 2,
       "lines": {
@@ -238,15 +308,15 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 28.63,
+      "duration": 26.05,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.97,
-        "run": 0.215
+        "compile": 17.41,
+        "run": 0.165
       },
       "num_frames": 2,
       "lines": {
@@ -254,7 +324,7 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 22.19,
+      "duration": 17.58,
       "status": "pass"
     }
   ]
