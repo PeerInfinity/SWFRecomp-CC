@@ -271,6 +271,67 @@ static uint8_t g_stage_invalidated_flag;
 static const Avm2MovieTables* g_child_movies[AVM2_MAX_CHILD_MOVIES];
 static uint32_t g_child_movie_count;
 
+// char_for_class, but also across CHILD movies (Ruffle `class_symbol`, which
+// is keyed by the class's OWN movie). g_symbol_map is built ONCE, at stage
+// build, from the main movie's rows, so a class defined by a Loader-loaded SWF
+// is invisible to char_for_class. Matching goes the other way here: a child
+// class's binding is looked up in the tables of the movie that DEFINES it, by
+// qualified name — the class object itself cannot be reached by name from the
+// root scope when the child loaded into a fresh ApplicationDomain, which is
+// exactly the case Font.registerFont on a getDefinition() result hits.
+// Kept a separate entry point so the hot instantiation path stays a pointer
+// scan; only script code that can name a child's class needs the slow arm.
+uint16_t avm2_display_child_char_for_class(Avm2Context* ctx, Avm2Class* cls)
+{
+	(void) ctx;
+	uint16_t id = char_for_class(cls);
+	if (id != 0) return id;
+	for (Avm2Class* c = cls; c != NULL; c = c->super_class)
+	{
+		if (c->instance_init.file == NULL) continue;  // builtin
+		const Avm2MovieTables* t =
+			avm2_display_movie_for_abc(c->instance_init.file->data);
+		if (t == NULL) continue;                      // the MAIN movie: done above
+		char qn[256];
+		avm2_class_qname_buf(c, qn, sizeof(qn));
+		for (uint32_t i = 0; i < t->symbol_class_count; i++)
+		{
+			if (t->symbol_classes[i].char_id == 0) continue;
+			const char* n = t->symbol_classes[i].class_name;
+			if (n != NULL && strcmp(n, qn) == 0) return t->symbol_classes[i].char_id;
+		}
+	}
+	return 0;
+}
+
+// Exported for avm2_text.c (Font.registerFont / Font.enumerateFonts): the font
+// tables are the one character kind whose lookups live outside this file.
+uint32_t avm2_display_child_movie_count(void)
+{
+	return g_child_movie_count;
+}
+
+const Avm2MovieTables* avm2_display_child_movie(uint32_t i)
+{
+	return i < g_child_movie_count ? g_child_movies[i] : NULL;
+}
+
+// Ruffle Activation::caller_movie_or_root(): which movie does this ABC file
+// belong to? NULL = the MAIN movie (whose tables are the avm2_generated_*
+// globals, not an Avm2MovieTables), which is also the answer for a file that
+// no child claims.
+const Avm2MovieTables* avm2_display_movie_for_abc(const Avm2AbcFileData* f)
+{
+	if (f == NULL) return NULL;
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->abc_file_count; i++)
+			if (t->abc_files[i] == f) return t;
+	}
+	return NULL;
+}
+
 static const Avm2TimelineData* timeline_for_char(uint16_t char_id)
 {
 	for (uint32_t i = 0; i < avm2_generated_timeline_count; i++)

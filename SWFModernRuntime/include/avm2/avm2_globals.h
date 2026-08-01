@@ -839,9 +839,19 @@ void avm2_graphics_cpu_composite(Avm2Context* ctx, Avm2Object* obj,
                                  uint32_t* buf, int W, int H, int transparent);
 // SymbolClass char bound to a class (walks the class hierarchy); 0 = none.
 uint16_t avm2_display_char_for_class(Avm2Class* cls);
+// Same, but also across CHILD movies (whose SymbolClass rows never enter the
+// main symbol map). Font.registerFont's lookup.
+uint16_t avm2_display_child_char_for_class(Avm2Context* ctx, Avm2Class* cls);
 // Build the stage + root (SymbolClass char 0 / bound placed symbols) and
 // remember them on ctx. Called from runSWF_avm2 after script eager-init.
 void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name);
+// The CHILD movies loaded through flash.display.Loader, in load order. The
+// MAIN movie is never in this list — it stays on the avm2_generated_* globals.
+uint32_t avm2_display_child_movie_count(void);
+const Avm2MovieTables* avm2_display_child_movie(uint32_t i);
+// Which movie does this ABC file belong to? NULL = the MAIN movie (Ruffle
+// Activation::caller_movie_or_root()'s `or_root` arm).
+const Avm2MovieTables* avm2_display_movie_for_abc(const Avm2AbcFileData* f);
 // Does the movie DEFINE this character? (Ruffle library.character_by_id.)
 // A SymbolClass binding to an id that names nothing binds the ROOT class.
 int avm2_display_char_is_defined(uint16_t char_id);

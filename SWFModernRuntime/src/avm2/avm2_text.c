@@ -2247,6 +2247,17 @@ static const Avm2FontData* font_by_id(uint16_t font_id)
 			return &avm2_generated_fonts[i];
 		}
 	}
+	// Then every CHILD movie, exactly like avm2_display.c's char lookups: a
+	// font embedded in a Loader-loaded SWF is a real Character::Font, and its
+	// ids are already offset by the child's char_id_base at emission, so a
+	// bare id stays a unique key across movies.
+	for (uint32_t m = 0, mc = avm2_display_child_movie_count(); m < mc; m++)
+	{
+		const Avm2MovieTables* t = avm2_display_child_movie(m);
+		if (t == NULL) continue;
+		for (uint32_t i = 0; i < t->font_count; i++)
+			if (t->fonts[i].font_id == font_id) return &t->fonts[i];
+	}
 	return NULL;
 }
 
@@ -7751,10 +7762,9 @@ static uint32_t g_registered_font_count;
 
 static void font_native_init(Avm2Context* ctx, Avm2Object* obj)
 {
-	(void) ctx;
 	Avm2FontExt* fe = (Avm2FontExt*) obj->native_ext;
 	fe->font = NULL;
-	uint16_t char_id = avm2_display_char_for_class(obj->cls);
+	uint16_t char_id = avm2_display_child_char_for_class(ctx, obj->cls);
 	if (char_id != 0)
 	{
 		fe->font = font_by_id(char_id);
@@ -7832,6 +7842,21 @@ static int font_name_ci_cmp(const char* a, const char* b)
 	return strcasecmp(a, b);
 }
 
+// Ruffle Activation::caller_movie_or_root(): the movie whose code called this
+// native. A native builtin's own `act->file` is NULL, so the caller is the
+// nearest debug-callstack frame that HAS an ABC file. NULL = the MAIN movie.
+static const Avm2MovieTables* font_caller_movie(Avm2Activation* act)
+{
+	if (act->file != NULL) return avm2_display_movie_for_abc(act->file->data);
+	Avm2Context* ctx = act->ctx;
+	for (uint32_t i = ctx->call_depth; i > 0; i--)
+	{
+		Avm2AbcFileRt* f = ctx->call_frames[i - 1].method.file;
+		if (f != NULL) return avm2_display_movie_for_abc(f->data);
+	}
+	return NULL;
+}
+
 static Avm2Value font_enumerate_fonts(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -7842,9 +7867,16 @@ static Avm2Value font_enumerate_fonts(Avm2Activation* act)
 	{
 		list[n++] = g_registered_fonts[i];
 	}
-	for (uint32_t i = 0; i < avm2_generated_font_count && n < 128; i++)
+	// Ruffle font.rs enumerate_fonts: the globally REGISTERED fonts, then the
+	// embedded fonts of `caller_movie_or_root()` — NOT the root's. A font.swf
+	// loaded through Loader sees its OWN embedded fonts, and the loader sees
+	// none of them until one is registered.
+	const Avm2MovieTables* mv = font_caller_movie(act);
+	const Avm2FontData* embedded = mv != NULL ? mv->fonts : avm2_generated_fonts;
+	uint32_t embedded_count = mv != NULL ? mv->font_count : avm2_generated_font_count;
+	for (uint32_t i = 0; i < embedded_count && n < 128; i++)
 	{
-		const Avm2FontData* fd = &avm2_generated_fonts[i];
+		const Avm2FontData* fd = &embedded[i];
 		if (fd->has_layout) list[n++] = fd;
 	}
 	// Stable insertion sort by case-insensitive name.
@@ -7876,11 +7908,19 @@ static Avm2Value font_register_font(Avm2Activation* act)
 	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
 	    && v.u.obj->kind == AVM2_OBJ_CLASS)
 	{
-		uint16_t char_id = avm2_display_char_for_class(v.u.obj->class_ref);
+		uint16_t char_id =
+			avm2_display_child_char_for_class(ctx, v.u.obj->class_ref);
 		const Avm2FontData* fd = char_id != 0 ? font_by_id(char_id) : NULL;
 		if (fd != NULL)
 		{
-			if (g_registered_font_count < 64)
+			// Idempotent per font (Ruffle library.register_global_font keys the
+			// font by its own identity): font_registerfont loads the same
+			// font.swf twice and registers its CustomFont from each copy, and
+			// expects enumerateFonts to keep reporting 2, not 3. A second load
+			// of one child re-uses its tables, so the Avm2FontData* is the key.
+			uint32_t j = 0;
+			while (j < g_registered_font_count && g_registered_fonts[j] != fd) j++;
+			if (j == g_registered_font_count && g_registered_font_count < 64)
 			{
 				g_registered_fonts[g_registered_font_count++] = fd;
 			}
