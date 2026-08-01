@@ -22,6 +22,17 @@ redistribute into the graded failure bands; their 1x siblings already failed
 on the same content). §"Twelve failures…" below is therefore RESOLVED as an
 instrument gap; the content gaps it unmasked remain.
 
+**Update 2026-08-01 session 9 (run `30701749687`, at `feb8882b0`): 172/566
+pass (30.4%), +13, zero regressions on either axis.** The graphics-setup
+session shipped the triage/canary/accounting instruments (see
+`graphics-fanout-playbook.md`) plus one rider: the focus-rect highlight fix
+(+11 ledgered flips, all landed, plus 2 unpredicted riders
+`avm2/bitmapdata_draw_stage` and `avm2/displayobject_set_matrix_nested`, and
+17 band improvements). The denominator is now correctly 566 unique
+comparisons — the earlier 567 double-counted one nested `from_shumway/avm1`
+comparison. Tables below regenerated from this run; the narrative sections
+after them still describe the 2026-07-31 characterisation run.
+
 ## How to reproduce this
 
 ```bash
@@ -58,20 +69,20 @@ deterministic. Local Dawn runs are advisory only.
 | metric | count | share |
 |---|---:|---:|
 | comparisons | 566 | 100.0% |
-| pass | 159 | 28.1% |
-| fail | 403 | 71.2% |
+| pass | 172 | 30.4% |
+| fail | 390 | 68.9% |
 | skip | 4 | 0.7% |
 | — of which produced no render at all | 5 | 0.9% |
 | — failures Ruffle itself marks known_failure | 23 | 4.1% |
 
-379 tests carry `[image_comparisons]`; 290 have at least one failing comparison.
+379 tests carry `[image_comparisons]`; 285 have at least one failing comparison.
 
 ## Per suite
 
 | suite | comparisons | pass | fail | skip | no_render | pass rate |
 |---|---:|---:|---:|---:|---:|---:|
-| `visual` | 213 | 32 | 180 | 1 | 0 | 15.0% |
-| `avm2` | 123 | 32 | 91 | 0 | 0 | 26.0% |
+| `visual` | 213 | 37 | 175 | 1 | 0 | 17.4% |
+| `avm2` | 123 | 40 | 83 | 0 | 0 | 32.5% |
 | `from_shumway` | 123 | 30 | 93 | 0 | 5 | 24.4% |
 | `avm1` | 69 | 60 | 9 | 0 | 0 | 87.0% |
 | `from_gnash/misc-ming.all` | 18 | 0 | 18 | 0 | 0 | 0.0% |
@@ -81,7 +92,7 @@ deterministic. Local Dawn runs are advisory only.
 | `stage3d` | 3 | 0 | 3 | 0 | 0 | 0.0% |
 | `from_gnash/misc-swfmill.all` | 2 | 2 | 0 | 0 | 0 | 100.0% |
 | `import_assets` | 1 | 0 | 1 | 0 | 0 | 0.0% |
-| **total** | **566** | **159** | **403** | **4** | **5** | **28.1%** |
+| **total** | **566** | **172** | **390** | **4** | **5** | **30.4%** |
 
 ## Outlier-magnitude histogram
 
@@ -89,24 +100,22 @@ Failures binned by `excess_outliers` — channels past the test's OWN `max_outli
 
 | band | failures | share of failures | |
 |---|---:|---:|---|
-| a_epsilon (<=100 channels over) | 22 | 5.5% | `##` |
-| b_tiny (<0.1% of channels) | 22 | 5.5% | `##` |
-| c_small (0.1-1%) | 76 | 18.9% | `#####` |
-| d_moderate (1-10%) | 117 | 29.0% | `########` |
-| e_large (10-50%) | 104 | 25.8% | `#######` |
-| f_catastrophic (>=50%) | 45 | 11.2% | `###` |
-| no_render | 5 | 1.2% | `#` |
-| size_mismatch | 12 | 3.0% | `#` |
+| a_epsilon (<=100 channels over) | 22 | 5.6% | `##` |
+| b_tiny (<0.1% of channels) | 22 | 5.6% | `##` |
+| c_small (0.1-1%) | 76 | 19.5% | `#####` |
+| d_moderate (1-10%) | 112 | 28.7% | `########` |
+| e_large (10-50%) | 108 | 27.7% | `########` |
+| f_catastrophic (>=50%) | 45 | 11.5% | `###` |
+| no_render | 5 | 1.3% | `#` |
 
 Peak single-channel difference on the same failures (an orthogonal axis: a huge count of 1-LSB drifts and a handful of totally wrong pixels both fail, and they mean very different things):
 
 | max_diff | failures |
 |---|---:|
-| 0 | 12 |
 | 1-2 | 2 |
 | 9-32 | 1 |
-| 33-128 | 30 |
-| 129-255 | 353 |
+| 33-128 | 31 |
+| 129-255 | 351 |
 | unknown | 5 |
 
 ## Failure families
@@ -119,18 +128,18 @@ Clustered by test-name/feature keyword. A family is a hypothesis about which sub
 | Shumway acid render tests | 49 | 0 | 5 |
 | Filters (blur/glow/drop-shadow/…) | 32 | 0 | 0 |
 | Stage3D / AGAL / shaders | 32 | 0 | 17 |
-| BitmapData / drawing API | 29 | 0 | 0 |
+| BitmapData / drawing API | 28 | 0 | 0 |
 | Video / NetStream | 24 | 0 | 16 |
 | Blend modes | 23 | 0 | 0 |
 | Masks / clipping | 20 | 0 | 0 |
 | Gradients | 19 | 1 | 0 |
 | (unclassified) | 19 | 0 | 2 |
-| Focus highlight / focus rect | 18 | 0 | 0 |
 | Text: embedded fonts / glyphs | 15 | 0 | 0 |
 | Timeline / frames | 11 | 7 | 0 |
 | Buttons | 11 | 0 | 1 |
-| Scale-9 / transforms / matrices | 9 | 0 | 3 |
+| Scale-9 / transforms / matrices | 8 | 0 | 3 |
 | Morph shapes / tweens | 8 | 0 | 0 |
+| Focus highlight / focus rect | 7 | 0 | 0 |
 | Shapes / fills / tessellation | 6 | 0 | 0 |
 | Loader / external assets | 5 | 0 | 1 |
 | Display list / depth / visibility | 1 | 0 | 0 |
@@ -143,16 +152,19 @@ Clustered by test-name/feature keyword. A family is a hypothesis about which sub
 | `visual` | video/deblocking | output | 3243005 / 0 | 255 | f_catastrophic (>=50%) |
 | `avm2` | pixelbender_dithering | output | 2764800 / 19929 | 162 | f_catastrophic (>=50%) |
 | `avm2` | stage3d_stencil | output | 1920000 / 0 | 255 | f_catastrophic (>=50%) |
-| `avm2` | away3d_advanced_shallow_water_demo | output | 1619525 / 400 | 255 | f_catastrophic (>=50%) |
+| `avm2` | stage_scale_factor | output | 1912924 / 0 | 254 | f_catastrophic (>=50%) |
+| `avm2` | away3d_advanced_shallow_water_demo | output | 1333837 / 400 | 255 | e_large (10-50%) |
 | `avm2` | stage3d_fractal | output | 1101097 / 100 | 255 | f_catastrophic (>=50%) |
 | `avm2` | stage3d_blend | output | 1019956 / 4975 | 255 | e_large (10-50%) |
 | `avm2` | pixelbender_effect_glassDisplace_shaderfilter | output | 879464 / 380 | 255 | e_large (10-50%) |
 | `visual` | filters/blur_quality | output | 821415 / 0 | 255 | e_large (10-50%) |
 | `avm2` | stage3d_ignore_sampler_override | output | 788484 / 1935 | 255 | f_catastrophic (>=50%) |
+| `avm2` | pixelbender_effect_glassDisplace | output | 787546 / 1003 | 255 | e_large (10-50%) |
 | `from_shumway` | acid/acid-big | output | 786432 / 20 | 255 | f_catastrophic (>=50%) |
 | `visual` | filters/blur_fractional | output | 774090 / 0 | 255 | e_large (10-50%) |
 | `visual` | video/colorconversion/vp6 | output | 771570 / 0 | 255 | f_catastrophic (>=50%) |
 | `visual` | video/vp6_dispsize | output | 771570 / 0 | 255 | f_catastrophic (>=50%) |
+| `avm2` | pixelbender_effect_twirl | output | 754200 / 1003 | 255 | e_large (10-50%) |
 | `visual` | video/colorconversion/vp6a | output | 731370 / 0 | 240 | f_catastrophic (>=50%) |
 | `from_shumway` | acid/acid-text-5 | output | 709635 / 0 | 255 | e_large (10-50%) |
 | `visual` | filters/bevel_full | output | 693304 / 18 | 255 | e_large (10-50%) |
@@ -162,9 +174,6 @@ Clustered by test-name/feature keyword. A family is a hypothesis about which sub
 | `stage3d` | scissor_rectangle_invalid | output | 657072 / 0 | 255 | f_catastrophic (>=50%) |
 | `visual` | filters/bevel_outer | output | 648832 / 18 | 255 | e_large (10-50%) |
 | `from_shumway` | bitmapbuttons | output | 618042 / 0 | 255 | f_catastrophic (>=50%) |
-| `avm2` | stage3d_texture | output | 615306 / 117 | 255 | f_catastrophic (>=50%) |
-| `visual` | filters/bevel_inner | output | 606316 / 18 | 254 | e_large (10-50%) |
-| `avm2` | stage3d_agal_cross_product | output | 599874 / 10 | 255 | f_catastrophic (>=50%) |
 
 ### Closest misses
 
@@ -193,8 +202,8 @@ Clustered by test-name/feature keyword. A family is a hypothesis about which sub
 | `avm2` | displayobject_hittestpoint_boundary | output | 976 / 900 | 255 |
 | `visual` | cache_as_bitmap/edittext_hscroll | output.01 | 96 / 0 | 255 |
 | `from_shumway` | flash_text_TextField2 | output | 115 / 10 | 247 |
-| `visual` | focus_highlight/focus_highlight_avm1_button | output.02 | 168 / 0 | 204 |
 | `avm2` | error_stack_trace_release_swf17 | output | 200 / 0 | 255 |
+| `visual` | fonts/advance_u16 | output | 216 / 0 | 255 |
 
 ## Skips
 
