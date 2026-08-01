@@ -5941,16 +5941,10 @@ static void ul_set_data(Avm2Context* ctx, Avm2UrlLoaderExt* ext,
 		ext->data = v;
 		return;
 	}
-	// "text" and "variables". Ruffle strips a leading BOM before handing the
-	// string on.
-	const uint8_t* p = body;
-	if (len >= 3 && p != NULL && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF)
-	{
-		p += 3;
-		len -= 3;
-	}
-	ext->data = avm2_string(avm2_string_new(ctx, (const char*) (p != NULL ? p : ""),
-	                                       len));
+	// "text" and "variables". Ruffle honours a leading BOM before handing the
+	// string on; avm2_strip_bom is the same helper ByteArray.toString uses,
+	// so UTF-16LE/BE responses decode too.
+	ext->data = avm2_string(avm2_strip_bom(ctx, body, len));
 	// dataFormat="variables" hands that string to URLVariables, whose ctor
 	// decodes the query string (Ruffle set_data: `urlvariables.construct(
 	// &[strip_bom(body)])`). An empty body constructs an empty bag, which is

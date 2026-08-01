@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_e4x.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -125,32 +126,6 @@ const Avm2String* avm2_qname_to_string(Avm2Context* ctx, const Avm2QNameExt* ext
 // Namespace constructor (Ruffle globals/namespace.rs namespace_constructor)
 // ---------------------------------------------------------------------------
 
-// avmplus is_xml_name (AvmCore.cpp isXMLName), ASCII arm; non-ASCII bytes
-// are treated as name characters (the corpus only exercises ASCII).
-static int ns_is_xml_name(const Avm2String* s)
-{
-	if (s->len == 0) return 0;
-	const unsigned char* b = (const unsigned char*) s->utf8;
-	unsigned char c0 = b[0];
-	if (!((c0 >= 'A' && c0 <= 'Z') || (c0 >= 'a' && c0 <= 'z') || c0 == '_'
-	      || c0 >= 0x80))
-	{
-		return 0;
-	}
-	for (uint32_t i = 1; i < s->len; i++)
-	{
-		unsigned char c = b[i];
-		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-		    || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'
-		    || c >= 0x80)
-		{
-			continue;
-		}
-		return 0;
-	}
-	return 1;
-}
-
 static Avm2Value namespace_construct(Avm2Context* ctx, Avm2Class* cls,
                                      const Avm2Value* args, uint32_t argc)
 {
@@ -218,7 +193,7 @@ static Avm2Value namespace_construct(Avm2Context* ctx, Avm2Class* cls,
 			                 "Error #1098: Illegal prefix %.*s for no namespace.",
 			                 (int) prefix_str->len, prefix_str->utf8);
 		}
-		if (prefix_str->len > 0 && !ns_is_xml_name(prefix_str))
+		if (prefix_str->len > 0 && !avm2_e4x_is_xml_name(prefix_str))
 		{
 			prefix = NULL;
 		}

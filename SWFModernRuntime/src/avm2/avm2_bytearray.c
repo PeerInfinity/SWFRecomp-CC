@@ -824,25 +824,32 @@ static Avm2Value ba_clear(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-static Avm2Value ba_to_string(Avm2Activation* act)
+// Decode a byte run to a string honouring a leading byte-order mark: UTF-8
+// (EF BB BF), UTF-16LE (FF FE) or UTF-16BE (FE FF); no BOM means lenient
+// UTF-8. Ruffle's strip_bom + AvmString::new_utf8_bytes — shared so that
+// ByteArray.toString and URLLoader/URLStream text decoding cannot drift.
+const Avm2String* avm2_strip_bom(Avm2Context* ctx, const uint8_t* b, uint32_t n)
 {
-	Avm2Context* ctx = act->ctx;
-	Avm2ByteArrayExt* ba = this_ba(act);
-	const uint8_t* b = ba->bytes;
-	uint32_t n = ba->len;
+	if (b == NULL) n = 0;
 	if (n >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF)
 	{
-		return avm2_string(avm_utf8_lenient(ctx, b + 3, n - 3));
+		return avm_utf8_lenient(ctx, b + 3, n - 3);
 	}
 	if (n >= 2 && b[0] == 0xFF && b[1] == 0xFE)
 	{
-		return avm2_string(utf16_to_utf8(ctx, b + 2, n - 2, 1));
+		return utf16_to_utf8(ctx, b + 2, n - 2, 1);
 	}
 	if (n >= 2 && b[0] == 0xFE && b[1] == 0xFF)
 	{
-		return avm2_string(utf16_to_utf8(ctx, b + 2, n - 2, 0));
+		return utf16_to_utf8(ctx, b + 2, n - 2, 0);
 	}
-	return avm2_string(avm_utf8_lenient(ctx, b, n));
+	return avm_utf8_lenient(ctx, (n != 0) ? b : (const uint8_t*) "", n);
+}
+
+static Avm2Value ba_to_string(Avm2Activation* act)
+{
+	Avm2ByteArrayExt* ba = this_ba(act);
+	return avm2_string(avm2_strip_bom(act->ctx, ba->bytes, ba->len));
 }
 
 // --- scalar reads ---

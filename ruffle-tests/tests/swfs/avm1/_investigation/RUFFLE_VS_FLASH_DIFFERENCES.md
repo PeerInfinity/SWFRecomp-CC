@@ -285,8 +285,8 @@ on `movieclip_begin_gradient_fill` / `movieclip_line_gradient_style`.
 
 ## AVM2 dynamic-property enumeration order: `URLVariables.toString`
 
-**Test:** `avm2/loader_load` (124/128 — two of the four remaining lines;
-the other two are the uncaught-error tracing held back in `d1c307c51`)
+**Tests:** `avm2/loader_load` (126/128 — both remaining lines),
+`avm2/bom` (3 of its 9 lines)
 
 `URLVariables.toString` (Ruffle `globals/flash/net/URLVariables.as`) joins the
 bag's properties with `&` **in `for (p in this)` order**. That order is not
@@ -309,3 +309,33 @@ crate changes.
 
 **Decision:** keep insertion order. `loader_load` cannot pass on any amount of
 Loader work.
+
+### Same mechanism, second test: `avm2/bom`
+
+`avm2/bom` loads one `lastName=Jones&firstName=Tom` fixture three times (UTF-8,
+UTF-16LE, UTF-16BE) through `URLLoader` in each of the three `dataFormat`
+modes. Its three `dataFormat=variables` lines trace a `URLVariables` built from
+that body, so they are the same `for (p in this)` join as above. The fixture's
+on-disk order is `lastName` then `firstName` — verified with `xxd`, and
+independently by the test's own `dataFormat=text` line, which round-trips the
+body verbatim and matches — yet the expected output is `firstName` first:
+
+```
+-  URLLoader dataFormat=variables utf8: firstName=Tom&lastName=Jones
++  URLLoader dataFormat=variables utf8: lastName=Jones&firstName=Tom
+```
+
+Nothing in the test re-orders the pairs, so the expectation is purely Ruffle's
+`hashbrown` bucket order. Unlike `loader_load`, which merely happens to be
+unreproducible, `bom` has no route to `ruffle_matched` either: that status needs
+both `known_failure = true` in `test.toml` and a sibling `output.ruffle.txt`
+(`verify_output.py`), and `bom` has neither — Ruffle *passes* it, so `output.txt`
+**is** Ruffle's own output.
+
+**Decision:** `avm2/bom` stays `output_mismatch` permanently, ceiling 6/9. Its
+other two failing lines *were* real bugs on our side (UTF-16LE/BE bodies were
+handed to the string constructor as raw bytes instead of being BOM-decoded) and
+are fixed — `ul_set_data` now shares `avm2_strip_bom` with `ByteArray.toString`.
+Note this is a `RUFFLE_VS_FLASH_DIFFERENCES.md` entry, not an
+`ACCEPTED_DIFFS.md` one, so — as with `loader_load` and `url_vars` — it is
+**not** added to `ignored_tests.txt`.

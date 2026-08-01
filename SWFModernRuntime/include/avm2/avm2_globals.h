@@ -225,6 +225,13 @@ typedef struct Avm2ByteArrayExt
 // NULL when the value is not a ByteArray (subclasses included).
 Avm2ByteArrayExt* avm2_bytearray_ext_of(Avm2Value v);
 
+// Decode a byte run to a string honouring a leading BOM (UTF-8 / UTF-16LE /
+// UTF-16BE; no BOM means lenient UTF-8) — Ruffle's strip_bom. Shared by
+// ByteArray.toString and URLLoader/URLStream text decoding. `bytes` may be
+// NULL when `len` is 0.
+const Avm2String* avm2_strip_bom(Avm2Context* ctx, const uint8_t* bytes,
+                                 uint32_t len);
+
 // flash.net.Socket reuses the whole IDataInput/IDataOutput body set over a
 // buffer PAIR: reads drain the inbound buffer, writes fill the outbound one.
 // avm2_net.c registers a resolver so those bodies can be shared verbatim.
