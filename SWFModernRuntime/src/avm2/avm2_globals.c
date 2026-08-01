@@ -1287,6 +1287,157 @@ static Avm2Value global_unescape(Avm2Activation* act)
 	return avm2_string(avm2_string_new(ctx, out, n));
 }
 
+// --- flash.utils.escapeMultiByte / unescapeMultiByte ---
+//
+// These are NOT escape/unescape: they work on the string's UTF-8 *bytes*, the
+// unreserved set is only [0-9A-Za-z], and both stop at the first NUL.
+// (globals/flash/utils.rs; graded by the avm2 `escape_multi_byte` test.)
+
+// Flash's lenient UTF-8 decode (ruffle_wstr utils.rs DecodeAvmUtf8), used on a
+// run of decoded %XX bytes. It differs from strict UTF-8 in three ways: a
+// malformed or truncated sequence yields its LEAD BYTE as a Latin-1 code point
+// and consumes exactly one byte, sequences in the surrogate range are kept
+// as-is rather than replaced, and a 4-byte lead reads only 3 continuation
+// bytes. `n` is the number of bytes left and must be >= 1.
+static uint32_t mb_utf8_next(const uint8_t* p, uint32_t n, uint32_t* consumed)
+{
+	uint8_t first = p[0];
+	uint32_t ones = 0;
+	while (ones < 8 && (first & (0x80u >> ones)) != 0) ones++;
+	*consumed = 1;
+	if (ones <= 1) return first;
+	uint32_t mb = (ones - 1 < 3) ? ones - 1 : 3;
+	if (mb + 1 > n) return first;
+	uint32_t ch = (ones >= 8) ? 0 : (uint32_t) (first & (0xFFu >> ones));
+	for (uint32_t k = 1; k <= mb; k++)
+	{
+		uint8_t b = p[k];
+		if ((b & 0xC0) != 0x80) return first;
+		ch = (ch << 6) | (b & 0x3F);
+	}
+	if (ch < 0x80) return first;
+	*consumed = 1 + mb;
+	return ch;
+}
+
+// Append one code point in canonical WTF-8. Ruffle accumulates UTF-16 units,
+// where a high surrogate followed by a low one simply IS one astral character;
+// our strings store that as the single 4-byte form, so fold the pair back
+// (same rule as avm_utf8_lenient in avm2_bytearray.c).
+static void mb_append_cp(char* out, uint32_t* n, uint32_t cp)
+{
+	if (cp >= 0xDC00 && cp <= 0xDFFF && *n >= 3)
+	{
+		unsigned char* p = (unsigned char*) out + *n - 3;
+		if (p[0] == 0xED && p[1] >= 0xA0 && p[1] <= 0xAF)
+		{
+			uint32_t hi = ((uint32_t) (p[0] & 0x0F) << 12)
+			            | ((uint32_t) (p[1] & 0x3F) << 6)
+			            | (uint32_t) (p[2] & 0x3F);
+			*n -= 3;
+			cp = 0x10000 + ((hi - 0xD800) << 10) + (cp - 0xDC00);
+		}
+	}
+	*n += utf8_put_cp(out + *n, cp);
+}
+
+// escapeMultiByte: to_utf8_lossy of the string — an unpaired surrogate becomes
+// U+FFFD, which is why escapeMultiByte(String(<ED B0 80>)) is "%EF%BF%BD" and
+// not the bytes back — then every byte that is not an ASCII alphanumeric
+// becomes "%XX". Note "_" and "-" ARE escaped, unlike escape()'s set.
+static const Avm2String* mb_escape(Avm2Context* ctx, const Avm2String* s)
+{
+	char* out = (char*) avm2_alloc(ctx, (size_t) s->len * 3 + 4);
+	uint32_t n = 0;
+	for (uint32_t i = 0; i < s->len; )
+	{
+		uint32_t cp = utf8_next_cp(s, &i);
+		if (cp >= 0xD800 && cp <= 0xDFFF) cp = 0xFFFD;
+		char enc[4];
+		uint32_t m = utf8_put_cp(enc, cp);
+		for (uint32_t k = 0; k < m; k++)
+		{
+			unsigned char c = (unsigned char) enc[k];
+			if (c == 0) return avm2_string_new(ctx, out, n);
+			if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+			    || (c >= '0' && c <= '9')) out[n++] = (char) c;
+			else n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
+		}
+	}
+	return avm2_string_new(ctx, out, n);
+}
+
+// One "%XX" body: two hex digits, CONSUMING whatever it looked at even when it
+// fails (Ruffle's handle_percent drives the same char iterator, so "%GA" drops
+// only "%G" and still emits the "A", while "%AG" drops all three). -1 = the
+// escape is malformed.
+static int mb_percent_pair(const Avm2String* s, uint32_t* i)
+{
+	int d[2];
+	for (int k = 0; k < 2; k++)
+	{
+		if (*i >= s->len) return -1;
+		uint32_t cp = utf8_next_cp(s, i);
+		d[k] = (cp < 0x80) ? hex_digit((char) cp) : -1;
+		if (d[k] < 0) return -1;
+	}
+	return (d[0] << 4) | d[1];
+}
+
+// unescapeMultiByte: literal characters pass through (stopping at the first NUL
+// — but a NUL *inside* a broken escape is just a bad hex digit), and a RUN of
+// consecutive "%XX" escapes is collected into ONE byte group that is then
+// decoded with the lenient rules above. The grouping is what makes
+// "%F0%9F%91%BE" a single astral character while "%F0%9F%91" is three Latin-1
+// ones.
+static const Avm2String* mb_unescape(Avm2Context* ctx, const Avm2String* s)
+{
+	char* out = (char*) avm2_alloc(ctx, (size_t) s->len * 4 + 8);
+	uint8_t* grp = (uint8_t*) avm2_alloc(ctx, (size_t) s->len + 1);
+	uint32_t n = 0;
+	uint32_t i = 0;
+	while (i < s->len)
+	{
+		uint32_t cp = utf8_next_cp(s, &i);
+		if (cp == 0) break;
+		if (cp != '%')
+		{
+			// bs.chars() yields Err for a lone surrogate, which Ruffle maps to
+			// the replacement character before the loop ever sees it.
+			if (cp >= 0xD800 && cp <= 0xDFFF) cp = 0xFFFD;
+			mb_append_cp(out, &n, cp);
+			continue;
+		}
+		uint32_t ng = 0;
+		for (;;)
+		{
+			int b = mb_percent_pair(s, &i);
+			if (b < 0) break;
+			grp[ng++] = (uint8_t) b;
+			if (i >= s->len || s->utf8[i] != '%') break;
+			i++;   // consume the '%' that starts the next escape
+		}
+		for (uint32_t k = 0; k < ng; )
+		{
+			uint32_t used;
+			uint32_t g = mb_utf8_next(grp + k, ng - k, &used);
+			k += used;
+			mb_append_cp(out, &n, g);
+		}
+	}
+	return avm2_string_new(ctx, out, n);
+}
+
+static Avm2Value global_escape_multi_byte(Avm2Activation* act)
+{
+	return avm2_string(mb_escape(act->ctx, uri_arg_string(act)));
+}
+
+static Avm2Value global_unescape_multi_byte(Avm2Activation* act)
+{
+	return avm2_string(mb_unescape(act->ctx, uri_arg_string(act)));
+}
+
 // --- encodeURI / encodeURIComponent / decodeURI / decodeURIComponent ---
 //
 // ECMA-262 §15.1.3. Both directions work on the UTF-8 *byte* sequence, which
@@ -2669,24 +2820,6 @@ static Avm2Value urlreq_get_headers(Avm2Activation* act)
 static Avm2Value urlreq_set_headers(Avm2Activation* act)
 { Avm2UrlRequestExt* e = urlreq_ext(act); if (e && act->argc > 0) e->request_headers = act->args[0]; return avm2_undefined(); }
 
-// flash.utils.escapeMultiByte (globals/flash/utils.rs): ASCII alphanumerics
-// pass through, every other BYTE of the UTF-8 becomes %XX, and the string ends
-// at the first NUL. URLVariables.toString escapes both halves of every pair.
-static const Avm2String* urlvars_escape(Avm2Context* ctx, const Avm2String* s)
-{
-	char* out = (char*) avm2_alloc(ctx, s->len * 3 + 1);
-	uint32_t n = 0;
-	for (uint32_t i = 0; i < s->len; i++)
-	{
-		unsigned char c = (unsigned char) s->utf8[i];
-		if (c == 0) break;
-		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-		    || (c >= '0' && c <= '9')) out[n++] = (char) c;
-		else n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
-	}
-	return avm2_string_new(ctx, out, n);
-}
-
 // URLVariables.toString (URLVariables.as): "k=v" pairs joined with "&", in
 // enumeration order. An Array value expands to one pair per element, which is
 // how decode() represents a name that appeared more than once.
@@ -2712,7 +2845,7 @@ static Avm2Value urlvars_to_string(Avm2Activation* act)
 		Avm2Value kv = avm2_object_enumerant_name(ctx, self, e);
 		Avm2Value vv = avm2_object_enumerant_value(ctx, self, e);
 		const Avm2String* pe =
-			urlvars_escape(ctx, avm2_coerce_to_string(ctx, kv));
+			mb_escape(ctx, avm2_coerce_to_string(ctx, kv));
 		Avm2Object* arr = (vv.kind == AVM2_VALUE_OBJECT) ? vv.u.obj : NULL;
 		Avm2ArrayExt* ax = (arr != NULL) ? avm2_array_ext(arr) : NULL;
 		uint32_t count = (ax != NULL) ? ax->length : 1;
@@ -2729,10 +2862,103 @@ static Avm2Value urlvars_to_string(Avm2Activation* act)
 			acc = avm2_string_concat(ctx, acc, pe);
 			acc = avm2_string_concat(ctx, acc, eq);
 			acc = avm2_string_concat(ctx, acc,
-				urlvars_escape(ctx, avm2_coerce_to_string(ctx, ev)));
+				mb_escape(ctx, avm2_coerce_to_string(ctx, ev)));
 		}
 	}
 	return avm2_string(acc);
+}
+
+// URLVariables.decode (URLVariables.as): "&"-separated "name=value" pairs.
+// Every pair must contain a "=" (#2101 otherwise, thrown before anything is
+// stored). Three details are load-bearing and all come straight from the AS
+// source:
+//   * the split index is taken BEFORE the "+" substitution, and
+//     `pair.AS3::replace("+", " ")` with a *string* pattern replaces only the
+//     FIRST occurrence — in the whole pair, so a "+" in the name consumes the
+//     substitution and a later one in the value survives as a literal "+";
+//   * both halves then go through unescapeMultiByte, not unescape;
+//   * a name that repeats accumulates: `null`/`undefined` (loose ==) is
+//     overwritten, an existing Array is pushed onto, anything else — including
+//     an empty string — becomes a two-element Array.
+static void urlvars_decode_string(Avm2Context* ctx, Avm2Value self,
+                                  const Avm2String* str)
+{
+	uint32_t start = 0;
+	for (uint32_t i = 0; i <= str->len; i++)
+	{
+		if (i < str->len && str->utf8[i] != '&') continue;
+		uint32_t len = i - start;
+		const char* pair = str->utf8 + start;
+		start = i + 1;
+		uint32_t eq = len;
+		for (uint32_t k = 0; k < len; k++)
+			if (pair[k] == '=') { eq = k; break; }
+		if (eq == len)
+		{
+			avm2_throw_error(ctx, ctx->builtins.error_class,
+			                 "Error #2101: The String passed to "
+			                 "URLVariables.decode() must be a URL-encoded query "
+			                 "string containing name/value pairs.");
+		}
+		char* buf = (char*) avm2_alloc(ctx, (size_t) len + 1);
+		memcpy(buf, pair, len);
+		for (uint32_t k = 0; k < len; k++)
+			if (buf[k] == '+') { buf[k] = ' '; break; }
+		const Avm2String* key = mb_unescape(ctx, avm2_string_new(ctx, buf, eq));
+		const Avm2String* val = mb_unescape(ctx,
+			avm2_string_new(ctx, buf + eq + 1, len - eq - 1));
+		int found = 0;
+		Avm2Value cur = avm2_get_public_property(ctx, self, key->utf8, key->len,
+		                                         &found);
+		Avm2Value nv = avm2_string(val);
+		if (!found || cur.kind == AVM2_VALUE_NULL
+		    || cur.kind == AVM2_VALUE_UNDEFINED)
+		{
+			avm2_set_public_property(ctx, self, key->utf8, key->len, nv);
+		}
+		else if (cur.kind == AVM2_VALUE_OBJECT
+		         && avm2_array_ext(cur.u.obj) != NULL)
+		{
+			avm2_array_push(ctx, cur.u.obj, nv);
+		}
+		else
+		{
+			Avm2Value both[2] = { cur, nv };
+			avm2_set_public_property(ctx, self, key->utf8, key->len,
+				avm2_object_value(avm2_array_from_values(ctx, both, 2)));
+		}
+	}
+}
+
+// URLVariables(str:String = null) — the AS ctor guards with `if (str)`, so a
+// missing, null or EMPTY argument leaves the bag empty rather than decoding ""
+// (which would be a #2101, since "".split("&") is [""]).
+static Avm2Value urlvars_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc == 0 || val_is_nullish(act->args[0])) return avm2_undefined();
+	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+	if (s != NULL && s->len != 0) urlvars_decode_string(ctx, act->this_val, s);
+	return avm2_undefined();
+}
+
+static Avm2Value urlvars_decode(Avm2Activation* act)
+{
+	if (act->argc > 0)
+	{
+		urlvars_decode_string(act->ctx, act->this_val,
+		                      avm2_coerce_to_string(act->ctx, act->args[0]));
+	}
+	return avm2_undefined();
+}
+
+// The URLLoader "variables" data format builds one of these off the response
+// body (avm2_display.c ul_set_data), so the class has to be reachable there.
+static Avm2Class* g_urlvariables_class = NULL;
+
+Avm2Class* avm2_url_variables_class(void)
+{
+	return g_urlvariables_class;
 }
 
 // URLRequestHeader(name:String = "", value:String = "") — both params coerce
@@ -3009,7 +3235,11 @@ static void register_net(Avm2Context* ctx)
 	{
 		Avm2Class* uv = avm2_builtin_class(ctx, "flash.net", "URLVariables",
 		                                   b->object_class);
+		uv->instance_init.fn = urlvars_ctor;
+		uv->instance_init.debug_name = "URLVariables";
+		avm2_builtin_add_method_n(ctx, uv, "decode", urlvars_decode, 1);
 		avm2_builtin_add_method(ctx, uv, "toString", urlvars_to_string);
+		g_urlvariables_class = uv;
 	}
 
 	// flash.net.URLLoader (extends EventDispatcher). The load pipeline reads
@@ -3323,6 +3553,10 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	avm2_builtin_add_global_fn_n(ctx, "decodeURIComponent",
 	                             global_decode_uri_component, 1);
 	builtin_add_global_fn_ns(ctx, "flash.system", "fscommand", global_fscommand);
+	builtin_add_global_fn_ns(ctx, "flash.utils", "escapeMultiByte",
+	                         global_escape_multi_byte);
+	builtin_add_global_fn_ns(ctx, "flash.utils", "unescapeMultiByte",
+	                         global_unescape_multi_byte);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getQualifiedClassName",
 	                         global_get_qualified_class_name);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "getDefinitionByName",

@@ -833,6 +833,9 @@ void avm2_register_display(Avm2Context* ctx);
 // Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
 void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
 void avm2_display_wire_url_stream(Avm2Context* ctx, Avm2Class* us);
+// flash.net.URLVariables, or NULL before register_net has run. The URLLoader
+// "variables" data format constructs one off the response body.
+Avm2Class* avm2_url_variables_class(void);
 // NULL when obj is not a DisplayObject descendant.
 Avm2DisplayObjectExt* avm2_display_ext_of(Avm2Context* ctx, Avm2Object* obj);
 // Build a flash.text.engine.TextLine. The ONLY sanctioned path: script

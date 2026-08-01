@@ -5941,9 +5941,8 @@ static void ul_set_data(Avm2Context* ctx, Avm2UrlLoaderExt* ext,
 		ext->data = v;
 		return;
 	}
-	// "text" (and, for now, "variables" — no test exercises URLVariables as a
-	// URLLoader *response*, only as a request body, so parsing it would be
-	// untested code). Ruffle strips a leading BOM before handing the string on.
+	// "text" and "variables". Ruffle strips a leading BOM before handing the
+	// string on.
 	const uint8_t* p = body;
 	if (len >= 3 && p != NULL && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF)
 	{
@@ -5952,6 +5951,19 @@ static void ul_set_data(Avm2Context* ctx, Avm2UrlLoaderExt* ext,
 	}
 	ext->data = avm2_string(avm2_string_new(ctx, (const char*) (p != NULL ? p : ""),
 	                                       len));
+	// dataFormat="variables" hands that string to URLVariables, whose ctor
+	// decodes the query string (Ruffle set_data: `urlvariables.construct(
+	// &[strip_bom(body)])`). An empty body constructs an empty bag, which is
+	// what the #2032 arm needs.
+	if (ul_format_is(ext, "variables"))
+	{
+		Avm2Class* uvc = avm2_url_variables_class();
+		if (uvc != NULL)
+		{
+			Avm2Value arg = ext->data;
+			ext->data = avm2_class_construct(ctx, uvc, &arg, 1);
+		}
+	}
 }
 
 static void us_deliver(Avm2Context* ctx, const Avm2PendingUrlLoad* pl);
