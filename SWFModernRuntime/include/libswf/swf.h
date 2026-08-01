@@ -301,8 +301,25 @@ typedef struct SWFAppContext
 	size_t transform_data_size;
 
 #ifndef NO_GRAPHICS
+	// Stage size, in *stage* pixels (the SWF header frame size). Anything that
+	// reasons in stage coordinates — tag.c's drop-shadow/bevel NDC offsets, the
+	// AVM2 dynamic-bitmap budget — must keep reading these.
 	int width;
 	int height;
+
+	// Render-target size, in device pixels. Ruffle renders a test at its
+	// [player_options] viewport_dimensions, which need not match the movie box;
+	// the offscreen colour target, the readback buffer and the captured PNG are
+	// all sized off these. 0 means "not set" -> fall back to width/height.
+	int render_width;
+	int render_height;
+	// StageScaleMode::ShowAll fit: stage_scale is the uniform min-fit factor
+	// from stage px to render px; stage_fit_{x,y} are the fraction of the render
+	// target the fitted content covers on each axis (1.0 on the axis that fits
+	// exactly, < 1.0 on the letterboxed one). 0 means "not set" -> 1.0f.
+	float stage_scale;
+	float stage_fit_x;
+	float stage_fit_y;
 
 	const float* stage_to_ndc;
 

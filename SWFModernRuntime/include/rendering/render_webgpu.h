@@ -16,8 +16,14 @@ typedef struct SWFAppContext SWFAppContext;
 
 typedef struct WebGPURenderContext
 {
+	// Render-target size in device pixels (SWFAppContext::render_{width,height},
+	// which is the viewport, not necessarily the movie box).
 	int width;
 	int height;
+	// Uniform ShowAll fit factor from stage px to render px. 1.0 when the
+	// render target is the stage size. Filter kernel radii are in target pixels
+	// and have to be scaled by it.
+	float stage_scale;
 
 	const float* stage_to_ndc;
 

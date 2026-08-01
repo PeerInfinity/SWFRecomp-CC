@@ -14280,8 +14280,11 @@ void avm2_render_init(Avm2Context* ctx)
 	SWFAppContext* app = ctx->app;
 	context = renderer_new();
 
-	context->width = app->width;
-	context->height = app->height;
+	// Render target = declared viewport when the harness gave us one, stage size
+	// otherwise. app->width/height stay stage pixels (see swfStart).
+	context->width = app->render_width > 0 ? app->render_width : app->width;
+	context->height = app->render_height > 0 ? app->render_height : app->height;
+	context->stage_scale = app->stage_scale > 0.0f ? app->stage_scale : 1.0f;
 	context->stage_to_ndc = app->stage_to_ndc;
 	context->bitmap_count = app->bitmap_count;
 	context->bitmap_highest_w = app->bitmap_highest_w;

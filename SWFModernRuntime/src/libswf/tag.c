@@ -5211,11 +5211,17 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				obj->filter_color_r, obj->filter_color_g,
 				obj->filter_color_b, obj->filter_color_a, colorize);
 			renderer_resume_pass(context);
+			// dist_px is a STAGE-pixel offset; the composite quad is in render-
+			// target NDC, so 2/stage_width converts it and stage_fit_{x,y}
+			// account for the fitted content covering only part of the target.
+			// Both are 1.0 unless the viewport aspect differs from the movie's.
+			float fit_x = app_context->stage_fit_x > 0.0f ? app_context->stage_fit_x : 1.0f;
+			float fit_y = app_context->stage_fit_y > 0.0f ? app_context->stage_fit_y : 1.0f;
 			if (is_shadow) {
 				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
 				float dist_px = obj->filter_distance;
-				float ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
-				float oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				float ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
+				float oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
 				renderer_composite_filtered(context, ox, -oy, 0, 0, 0, 0);
 				render_single_object(app_context, obj);
 			} else if (is_glow) {
@@ -5224,8 +5230,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			} else if (is_bevel) {
 				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
 				float dist_px = obj->filter_distance;
-				float sox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
-				float soy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				float sox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
+				float soy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
 				renderer_composite_filtered(context, sox, -soy,
 					obj->filter_color_r, obj->filter_color_g,
 					obj->filter_color_b, obj->filter_color_a);
@@ -6172,13 +6178,19 @@ void tagShowFrame(SWFAppContext* app_context)
 			// 3. Resume main pass and composite
 			renderer_resume_pass(context);
 
+			// Stage-pixel offset -> render-target NDC; see the matching comment
+			// in tagRerenderFrame. Both fits are 1.0 unless the viewport aspect
+			// differs from the movie's.
+			float fit_x = app_context->stage_fit_x > 0.0f ? app_context->stage_fit_x : 1.0f;
+			float fit_y = app_context->stage_fit_y > 0.0f ? app_context->stage_fit_y : 1.0f;
+
 			if (is_shadow)
 			{
 				// DropShadow: composite shadow with offset, then render original on top
 				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
 				float dist_px = obj->filter_distance;
-				float offset_ndc_x = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
-				float offset_ndc_y = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				float offset_ndc_x = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
+				float offset_ndc_y = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
 				renderer_composite_filtered(context, offset_ndc_x, -offset_ndc_y, 0, 0, 0, 0);
 				render_single_object(app_context, obj);
 			}
@@ -6193,8 +6205,8 @@ void tagShowFrame(SWFAppContext* app_context)
 				// Bevel: composite shadow + highlight at opposite offsets, then original
 				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
 				float dist_px = obj->filter_distance;
-				float shadow_ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width;
-				float shadow_oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height;
+				float shadow_ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
+				float shadow_oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
 				// Shadow: offset in angle direction, tinted with shadow color
 				renderer_composite_filtered(context, shadow_ox, -shadow_oy,
 					obj->filter_color_r, obj->filter_color_g,

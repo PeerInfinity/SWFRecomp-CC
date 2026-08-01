@@ -3351,9 +3351,16 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 	float texel_w = 1.0f / (float)ctx->width;
 	float texel_h = 1.0f / (float)ctx->height;
 
-	// Convert blur (in pixels) to radius (half-width of kernel, capped at 31)
-	float radius_x = blur_x * 0.5f;
-	float radius_y = blur_y * 0.5f;
+	// Convert blur (in pixels) to radius (half-width of kernel, capped at 31).
+	// blur_x/blur_y arrive in the filtered object's own coordinate space; Flash
+	// filter sizes scale with the concatenated matrix, so a stage rendered at 2x
+	// must blur with a 2x kernel. texel_w/h above are in TARGET pixels, so the
+	// radius has to be scaled by the stage fit — otherwise a 2x render halves
+	// the apparent blur. This is exactly what the *_scales_with_screen tests
+	// assert. stage_scale is 1.0 whenever the target is the stage size.
+	float stage_scale = ctx->stage_scale > 0.0f ? ctx->stage_scale : 1.0f;
+	float radius_x = blur_x * stage_scale * 0.5f;
+	float radius_y = blur_y * stage_scale * 0.5f;
 	if (radius_x > 31.0f) radius_x = 31.0f;
 	if (radius_y > 31.0f) radius_y = 31.0f;
 	if (radius_x < 1.0f) radius_x = 1.0f;

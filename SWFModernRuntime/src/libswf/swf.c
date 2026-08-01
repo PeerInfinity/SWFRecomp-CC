@@ -1478,8 +1478,15 @@ void swfStart(SWFAppContext* app_context)
 {
 	context = renderer_new();
 
-	context->width = app_context->width;
-	context->height = app_context->height;
+	// The renderer's width/height are the RENDER TARGET, which is the declared
+	// viewport when the harness gave us one and the stage size otherwise.
+	// app_context->width/height stay stage pixels — see SWFAppContext.
+	context->width = app_context->render_width > 0
+		? app_context->render_width : app_context->width;
+	context->height = app_context->render_height > 0
+		? app_context->render_height : app_context->height;
+	context->stage_scale = app_context->stage_scale > 0.0f
+		? app_context->stage_scale : 1.0f;
 
 	context->stage_to_ndc = app_context->stage_to_ndc;
 

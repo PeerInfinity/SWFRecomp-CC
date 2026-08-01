@@ -11,7 +11,11 @@ struct FlashbangContext
 {
 	int width;
 	int height;
-	
+
+	// Uniform ShowAll fit factor from stage px to render px (see
+	// SWFAppContext::stage_scale). 1.0 when the target is the stage size.
+	float stage_scale;
+
 	const float* stage_to_ndc;
 	
 	size_t bitmap_count;

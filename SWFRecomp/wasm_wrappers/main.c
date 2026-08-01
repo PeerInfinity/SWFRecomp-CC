@@ -1,6 +1,7 @@
 #include <recomp.h>
 #include <swf.h>
 #include <out.h>
+#include <string.h>
 #include "constants.h"
 
 #ifndef FRAME_RATE
@@ -110,6 +111,55 @@ int main(int argc, char* argv[]) {
     app_context.width = FRAME_WIDTH;
     app_context.height = FRAME_HEIGHT;
     app_context.stage_to_ndc = stage_to_ndc;
+#if defined(VIEWPORT_WIDTH) && defined(VIEWPORT_HEIGHT)
+    // The test harness declares a [player_options] viewport_dimensions and
+    // Ruffle renders at THAT size, not at the SWF header stage size, fitting
+    // the movie box into it with StageScaleMode::ShowAll (uniform min-fit) and
+    // the default centred StageAlign. Reproduce both halves here: render at the
+    // viewport size, and bake the fit into stage_to_ndc.
+    //
+    // Baking it into the projection (rather than calling SetViewport on the
+    // fitted sub-rect) is deliberate: Ruffle's tests run with
+    // should_letterbox() == false, so its view_bounds are *extended* into the
+    // margins and content positioned outside the movie box is drawn there.
+    // SetViewport would clip it instead. The margins are ordinary stage
+    // background, not black bars.
+    {
+        static float fit_stage_to_ndc[16];
+        float sx = (float) VIEWPORT_WIDTH / (float) FRAME_WIDTH;
+        float sy = (float) VIEWPORT_HEIGHT / (float) FRAME_HEIGHT;
+        float s = (sx < sy) ? sx : sy;                                  // ShowAll
+        float kx = (float) FRAME_WIDTH  * s / (float) VIEWPORT_WIDTH;   // fitted w / VW
+        float ky = (float) FRAME_HEIGHT * s / (float) VIEWPORT_HEIGHT;  // fitted h / VH
+
+        app_context.render_width  = VIEWPORT_WIDTH;
+        app_context.render_height = VIEWPORT_HEIGHT;
+        app_context.stage_scale   = s;
+        app_context.stage_fit_x   = kx;
+        app_context.stage_fit_y   = ky;
+
+        // Centred align collapses the correction to a pure scale, with no
+        // translation term: with ox = (VW - nw)/2, NDC' = kx*NDC + (2*ox/VW +
+        // kx - 1) and that bracket is identically zero. So scale row 0 of the
+        // column-major matrix by kx and row 1 by ky. When the aspect ratios
+        // match (every 2x test, and every test whose viewport equals its movie
+        // box), kx == ky == 1 and the matrix is bit-identical to the original.
+        memcpy(fit_stage_to_ndc, stage_to_ndc, sizeof(fit_stage_to_ndc));
+        fit_stage_to_ndc[0]  *= kx;  fit_stage_to_ndc[4]  *= kx;
+        fit_stage_to_ndc[8]  *= kx;  fit_stage_to_ndc[12] *= kx;
+        fit_stage_to_ndc[1]  *= ky;  fit_stage_to_ndc[5]  *= ky;
+        fit_stage_to_ndc[9]  *= ky;  fit_stage_to_ndc[13] *= ky;
+        app_context.stage_to_ndc = fit_stage_to_ndc;
+    }
+#else
+    // Browser / game / host builds never define VIEWPORT_*: render target ==
+    // stage, fit is the identity, stage_to_ndc is untouched.
+    app_context.render_width  = FRAME_WIDTH;
+    app_context.render_height = FRAME_HEIGHT;
+    app_context.stage_scale   = 1.0f;
+    app_context.stage_fit_x   = 1.0f;
+    app_context.stage_fit_y   = 1.0f;
+#endif
     app_context.bitmap_count = BITMAP_COUNT;
     app_context.bitmap_highest_w = BITMAP_HIGHEST_W;
     app_context.bitmap_highest_h = BITMAP_HIGHEST_H;

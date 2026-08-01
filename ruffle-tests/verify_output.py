@@ -561,7 +561,18 @@ def export_failing_images(out_dir, test_name, cmp_name, actual_png):
 
 
 def preprocess_input_json(src, dst, scale_factor=1.0):
-    """Convert input.json to simple line-based event format. Returns wait_count."""
+    """Convert input.json to simple line-based event format. Returns wait_count.
+
+    Mouse coordinates in input.json are in the viewport's device pixels, so they
+    are divided down to stage pixels here. NOTE: the divisor should really be the
+    ShowAll fit (min(VW/FW, VH/FH)) that the renderer applies, not the declared
+    scale_factor. Only two tests in the corpus ship an input.json AND a
+    viewport that differs from the movie box (avm2/stage_scale_factor,
+    avm1/mouse_pos_with_scale_factor), and in both the fit happens to equal
+    scale_factor (2.0), so the two agree today. That is a coincidence, not a
+    design: a future test with fit != scale_factor and mouse input would need
+    this to divide by the fit instead.
+    """
     with open(src) as f:
         events = json.load(f)
     lines = []

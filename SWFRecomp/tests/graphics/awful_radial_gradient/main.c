@@ -11,6 +11,15 @@ int main()
 	app_context.width = FRAME_WIDTH;
 	app_context.height = FRAME_HEIGHT;
 	
+	// app_context is an uninitialised local here, so the render-target /
+	// stage-fit fields have to be set explicitly. No viewport override in
+	// these tests: render target == stage, fit == identity.
+	app_context.render_width = FRAME_WIDTH;
+	app_context.render_height = FRAME_HEIGHT;
+	app_context.stage_scale = 1.0f;
+	app_context.stage_fit_x = 1.0f;
+	app_context.stage_fit_y = 1.0f;
+	
 	app_context.stage_to_ndc = stage_to_ndc;
 	
 	app_context.bitmap_count = BITMAP_COUNT;
