@@ -225,6 +225,18 @@ typedef struct SymbolClassMap
 } SymbolClassMap;
 static SymbolClassMap* g_symbol_map;
 static uint32_t g_symbol_map_count;
+static uint32_t g_symbol_map_cap;
+
+static void symbol_map_add(Avm2Class* cls, uint16_t char_id)
+{
+	if (cls == NULL || char_id == 0) return;
+	if (g_symbol_map_count >= g_symbol_map_cap) return;
+	for (uint32_t i = 0; i < g_symbol_map_count; i++)
+		if (g_symbol_map[i].cls == cls) return;   // first binding wins
+	g_symbol_map[g_symbol_map_count].cls = cls;
+	g_symbol_map[g_symbol_map_count].char_id = char_id;
+	g_symbol_map_count++;
+}
 
 static uint16_t char_for_class(Avm2Class* cls)
 {
@@ -486,6 +498,26 @@ static void cache_scale_rotation(Avm2DisplayObjectExt* ext)
 	ext->scale_rot_cached = 1;
 }
 
+// A display object's matrix is SWF 16.16 fixed point (swf::Fixed16 in Ruffle's
+// swf/src/types/matrix.rs), and Fixed16::from_f64 is a *saturating* i32 cast.
+// So a/b/c/d top out at i32::MAX/65536 = 32767.999984741211 no matter how big
+// the requested scale is. `scaleX`/`scaleY` are a separate cached double that
+// never round-trips through the matrix, which is why `Video.width = 16777215`
+// reads back scaleX = 52428.8 but width = 320 * 32768 = 10485760: the bounds
+// are transformed by the CAPPED matrix. Only the saturation is modelled here,
+// not the 1/65536 quantization — our mtx_* fields are already floats and the
+// quantization would perturb every rotated matrix in the corpus.
+#define AVM2_FIXED16_MAX 32767.999984741211
+#define AVM2_FIXED16_MIN (-32768.0)
+
+static double clamp_fixed16(double v)
+{
+	if (isnan(v)) return 0.0;  // Rust's float->int cast maps NaN to 0
+	if (v > AVM2_FIXED16_MAX) return AVM2_FIXED16_MAX;
+	if (v < AVM2_FIXED16_MIN) return AVM2_FIXED16_MIN;
+	return v;
+}
+
 static void set_rotation_internal(Avm2DisplayObjectExt* ext, double deg)
 {
 	cache_scale_rotation(ext);
@@ -494,10 +526,10 @@ static void set_rotation_internal(Avm2DisplayObjectExt* ext, double deg)
 	if (isnan(rad)) return;  // NaN rotation leaves the matrix untouched
 	double cos_x = cos(rad), sin_x = sin(rad);
 	double cos_y = cos(rad + ext->skew), sin_y = sin(rad + ext->skew);
-	ext->mtx_a = (float) (ext->scale_x * cos_x);
-	ext->mtx_b = (float) (ext->scale_x * sin_x);
-	ext->mtx_c = (float) (ext->scale_y * -sin_y);
-	ext->mtx_d = (float) (ext->scale_y * cos_y);
+	ext->mtx_a = (float) clamp_fixed16(ext->scale_x * cos_x);
+	ext->mtx_b = (float) clamp_fixed16(ext->scale_x * sin_x);
+	ext->mtx_c = (float) clamp_fixed16(ext->scale_y * -sin_y);
+	ext->mtx_d = (float) clamp_fixed16(ext->scale_y * cos_y);
 }
 
 static void set_scale_x_internal(Avm2DisplayObjectExt* ext, double unit)
@@ -507,8 +539,8 @@ static void set_scale_x_internal(Avm2DisplayObjectExt* ext, double unit)
 	double calc = isnan(unit) ? 0.0 : unit;
 	double rot = ext->rotation_deg * (M_PI / 180.0);
 	if (isnan(rot)) rot = 0.0;
-	ext->mtx_a = (float) (cos(rot) * calc);
-	ext->mtx_b = (float) (sin(rot) * calc);
+	ext->mtx_a = (float) clamp_fixed16(cos(rot) * calc);
+	ext->mtx_b = (float) clamp_fixed16(sin(rot) * calc);
 }
 
 static void set_scale_y_internal(Avm2DisplayObjectExt* ext, double unit)
@@ -518,8 +550,8 @@ static void set_scale_y_internal(Avm2DisplayObjectExt* ext, double unit)
 	double calc = isnan(unit) ? 0.0 : unit;
 	double rot = ext->rotation_deg * (M_PI / 180.0);
 	if (isnan(rot)) rot = 0.0;
-	ext->mtx_c = (float) (-sin(rot + ext->skew) * calc);
-	ext->mtx_d = (float) (cos(rot + ext->skew) * calc);
+	ext->mtx_c = (float) clamp_fixed16(-sin(rot + ext->skew) * calc);
+	ext->mtx_d = (float) clamp_fixed16(cos(rot + ext->skew) * calc);
 }
 
 // ---------------------------------------------------------------------------
@@ -3451,8 +3483,11 @@ void avm2_display_run_tick(Avm2Context* ctx)
 void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
 {
 	// Symbol map (class -> char) for `new SymbolClass()` instantiation.
-	g_symbol_map = avm2_alloc(ctx, (avm2_generated_symbol_class_count + 1)
-	                                   * sizeof(SymbolClassMap));
+	// +AVM2_MAX_CHILD_MOVIES: a Loader-loaded movie adds its own root binding
+	// (loader_boot_child_swf) after the stage is built.
+	g_symbol_map_cap = avm2_generated_symbol_class_count + 1
+	                   + AVM2_MAX_CHILD_MOVIES;
+	g_symbol_map = avm2_alloc(ctx, g_symbol_map_cap * sizeof(SymbolClassMap));
 	g_symbol_map_count = 0;
 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 	{
@@ -3460,13 +3495,7 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
 		if (avm2_generated_symbol_classes[i].class_name == NULL) continue;
 		Avm2Class* cls =
 			class_for_dotted_name(ctx, avm2_generated_symbol_classes[i].class_name);
-		if (cls != NULL)
-		{
-			g_symbol_map[g_symbol_map_count].cls = cls;
-			g_symbol_map[g_symbol_map_count].char_id =
-				avm2_generated_symbol_classes[i].char_id;
-			g_symbol_map_count++;
-		}
+		symbol_map_add(cls, avm2_generated_symbol_classes[i].char_id);
 	}
 
 	// Stage singleton.
@@ -5331,6 +5360,18 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 				printf("TypeError: Error #2023: Class %.*s$ must inherit from"
 				       " Sprite to link to the root.\n",
 				       (int) bound->name.name_len, bound->name.name);
+			// movie_clip.rs preload_symbol_class, the `None =>` arm: a binding
+			// whose id names no character does NOT stop at "this is the root
+			// class" — Ruffle also registers the root clip itself AS that
+			// character ("We also need to register this MovieClip as a
+			// character now"), so a later script `new RootClass()` instantiates
+			// a fresh copy of the root TIMELINE, children and all. We key the
+			// symbol map by the timeline's own char (base + 0), which is the
+			// same object under a different id. Without it,
+			// `new getDefinition("LoadableMain")()` comes up childless and
+			// `instance.myChild` reads null (instantiate_root_character).
+			if (root_cls != ctx->builtins.movieclip_class)
+				symbol_map_add(root_cls, root_char);
 		}
 	}
 

@@ -1986,6 +1986,25 @@ static Avm2Value system_noop(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// `System.setClipboard(string:String)` — there is no host clipboard in a
+// headless/native run, so the write itself is a no-op. What IS observable is
+// the argument check: Ruffle's system.rs set_clipboard reads the argument via
+// `get_string_non_null(activation, 0, "text")`, so a null (or the undefined
+// that the String coercion turns INTO null) throws TypeError #2007 before the
+// UI backend is ever touched.
+static Avm2Value system_set_clipboard(Avm2Activation* act)
+{
+	if (act->argc == 0
+	    || act->args[0].kind == AVM2_VALUE_NULL
+	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
+	{
+		avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter %s must be non-null.", "text");
+	}
+	(void) avm2_coerce_to_string(act->ctx, act->args[0]);
+	return avm2_undefined();
+}
+
 // flash.system.System: gc/pauseForGCIfCollectionImminent no-ops (tests
 // call System.gc() between phases; aborting there kills the frame script).
 static void register_system(Avm2Context* ctx)
@@ -1995,6 +2014,8 @@ static void register_system(Avm2Context* ctx)
 	avm2_builtin_add_static_method(ctx, cls, "gc", system_noop);
 	avm2_builtin_add_static_method(ctx, cls, "pauseForGCIfCollectionImminent",
 	                               system_noop);
+	avm2_builtin_add_static_method(ctx, cls, "setClipboard",
+	                               system_set_clipboard);
 }
 
 // flash.system.Security — minimal. Native/headless runs from a local file, so
