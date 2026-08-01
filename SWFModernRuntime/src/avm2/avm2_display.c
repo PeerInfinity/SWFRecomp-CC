@@ -754,10 +754,10 @@ static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
 	// A SimpleButton has no inherent bounds and is not a container: its box
 	// comes from the child for the CURRENT state, which lives in btn_up /
 	// btn_over / … rather than the render list (Ruffle avm2_button.rs
-	// bounds_with_transform). Trace runs never leave the Up state.
-	if (ext->btn_up != NULL || ext->btn_over != NULL || ext->btn_down != NULL)
+	// bounds_with_transform reads get_state_child(self.state())). Without
+	// mouse input the state never leaves Up, so this is the Up child.
 	{
-		Avm2Object* state = ext->btn_up;
+		Avm2Object* state = avm2_button_state_child(ext);
 		if (state != NULL)
 		{
 			Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, state);
@@ -2993,6 +2993,13 @@ static void render_apply_text_bounds(Avm2Context* ctx, Avm2Object* obj,
 	if (visible && ext->edittext != NULL)
 	{
 		avm2_text_apply_pending_bounds(ctx, obj);
+	}
+	// A SimpleButton's state child is not in render_list; a TextField inside
+	// the painted state still needs its lazy autosize flushed before the
+	// render pass reads its bounds.
+	{
+		Avm2Object* bst = avm2_button_state_child(ext);
+		if (bst != NULL) render_apply_text_bounds(ctx, bst, visible);
 	}
 	for (uint32_t i = 0; i < ext->render_len; i++)
 	{
@@ -10206,6 +10213,14 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 		g_timeline_instantiation = 0;
 		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
 		cext->char_id = rec->char_id;
+		// A button record's character is placed exactly like a timeline
+		// child, so it needs the SAME place-time resolution (place_child /
+		// replace_child_character both do both halves). Without the shape
+		// half a DefineShape state child ends up with shape_vert_count 0 and
+		// the render walk has nothing to draw — which is why every
+		// DefineButton2 in the corpus rendered blank even once the walk arm
+		// existed.
+		resolve_shape_geom(cext, rec->char_id);
 		resolve_static_text(cext, rec->char_id);
 		cext->timeline = timeline_for_char(rec->char_id);
 		cext->instantiated_by_timeline = 1;
@@ -10400,8 +10415,16 @@ static Avm2Value btn_state_set(Avm2Activation* act, size_t off)
 		? act->args[0].u.obj : NULL;
 	Avm2Object* old = *(Avm2Object**) ((char*) ext + off);
 	int child_was_on_stage = (v != NULL) && is_on_stage(ctx, v);
-	// The rendered state is always Up in trace tests (no mouse input).
-	int is_cur_state = (off == offsetof(Avm2DisplayObjectExt, btn_up));
+	// Only the child for the button's CURRENT state is parented to the button
+	// and gets the added/removed + framescript broadcasts (Ruffle
+	// set_state_child). Without mouse input btn_state never leaves Up, so this
+	// is btn_up in every trace test; hitTestState is never "current".
+	static const size_t cur_off[3] = {
+		offsetof(Avm2DisplayObjectExt, btn_up),
+		offsetof(Avm2DisplayObjectExt, btn_over),
+		offsetof(Avm2DisplayObjectExt, btn_down),
+	};
+	int is_cur_state = (off == cur_off[ext->btn_state < 3 ? ext->btn_state : 0]);
 	*(Avm2Object**) ((char*) ext + off) = v;
 
 	// Ruffle set_state_child: the new child is pulled out of its current
@@ -10464,6 +10487,59 @@ BTN_STATE(up, btn_up)
 BTN_STATE(over, btn_over)
 BTN_STATE(down, btn_down)
 BTN_STATE(hit, btn_hit)
+
+// --- SimpleButton state machine (Ruffle avm2_button.rs set_state/:279-288) ---
+//
+// Swap which state child the button paints and measures. NOTHING moves into or
+// out of a render list: a SimpleButton is not a container, and the passing
+// numChildren/getChildAt/parent tests (simplebutton_structure, _childshuffle,
+// _childprops, _multi_children) depend on it staying one. Only `parent`
+// bookkeeping moves, exactly as Ruffle's set_state does — the render walks key
+// off btn_up/btn_over/btn_down via avm2_button_state_child, never off parent.
+//
+// Deviation from Ruffle, deliberate: Ruffle's all_state_children() also clears
+// hitTestState's parent here. Ours leaves btn_hit alone — button_create_state
+// parents every timeline state child to the button, run_mouse_pick and
+// obj_highlight_bounds both read btn_hit, and no corpus test observes
+// hitTestState.parent. Changing it would be churn with no yield.
+static void button_set_state(Avm2Context* ctx, Avm2Object* button, uint8_t st)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, button);
+	if (ext == NULL || ext->btn_state == st) return;
+	ext->btn_state = st;
+	Avm2Object* all[3] = { ext->btn_up, ext->btn_over, ext->btn_down };
+	for (int i = 0; i < 3; i++)
+	{
+		if (all[i] == NULL) continue;
+		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, all[i]);
+		if (e != NULL && e->parent == button) e->parent = NULL;
+	}
+	Avm2Object* cur = avm2_button_state_child(ext);
+	if (cur != NULL)
+	{
+		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, cur);
+		if (e != NULL)
+		{
+			e->parent = button;
+			mark_attached(ctx, e, button);
+		}
+	}
+}
+
+// Ruffle avm2_button.rs::event_dispatch's clip-event -> ButtonState table
+// (:736-743). Called at the six dispatch points in update_mouse_state, each
+// time BEFORE the matching AVM2 event goes out, mirroring Ruffle's
+// handle_clip_event-then-event_dispatch_to_avm2 order. No-op on anything that
+// is not a SimpleButton, and on a button whose state does not actually change.
+#define BTN_ST_UP    0
+#define BTN_ST_OVER  1
+#define BTN_ST_DOWN  2
+static void button_clip_state(Avm2Context* ctx, Avm2Object* obj, uint8_t st)
+{
+	if (obj == NULL || obj->cls == NULL) return;
+	if (!class_is_a(obj->cls, ctx->builtins.simple_button_class)) return;
+	button_set_state(ctx, obj, st);
+}
 
 STUB_GETSET(btn_enabled, "__enabled", avm2_bool(true))
 STUB_GETSET(btn_handcursor, "__useHandCursor", avm2_bool(true))
@@ -12077,13 +12153,41 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 		if (left_down)
 		{
 			g_mouse_hovered = new_over;
-			if (cur_over != NULL) dispatch_roll_out(ctx, cur_over, new_over);
-			if (new_over != NULL) dispatch_roll_over(ctx, new_over, cur_over);
+			// Ruffle queues the PRESSED object's DragOut/DragOver first and
+			// the AS3 RollOut/RollOver after, so for a button that is both
+			// pressed and rolled the later event wins the state
+			// (player.rs:1636-1723 + avm2_button.rs:736-743).
+			Avm2Object* down_obj = g_mouse_pressed[0];
+			if (down_obj != NULL)
+			{
+				if (down_obj == cur_over)
+					button_clip_state(ctx, down_obj, BTN_ST_OVER);   // DragOut
+				else if (down_obj == new_over)
+					button_clip_state(ctx, down_obj, BTN_ST_DOWN);   // DragOver
+			}
+			if (cur_over != NULL)
+			{
+				button_clip_state(ctx, cur_over, BTN_ST_UP);         // RollOut
+				dispatch_roll_out(ctx, cur_over, new_over);
+			}
+			if (new_over != NULL)
+			{
+				button_clip_state(ctx, new_over, BTN_ST_OVER);       // RollOver
+				dispatch_roll_over(ctx, new_over, cur_over);
+			}
 		}
 		else
 		{
-			if (cur_over != NULL) dispatch_roll_out(ctx, cur_over, new_over);
-			if (new_over != NULL) dispatch_roll_over(ctx, new_over, cur_over);
+			if (cur_over != NULL)
+			{
+				button_clip_state(ctx, cur_over, BTN_ST_UP);         // RollOut
+				dispatch_roll_out(ctx, cur_over, new_over);
+			}
+			if (new_over != NULL)
+			{
+				button_clip_state(ctx, new_over, BTN_ST_OVER);       // RollOver
+				dispatch_roll_over(ctx, new_over, cur_over);
+			}
 		}
 	}
 	g_mouse_hovered = new_over;
@@ -12104,6 +12208,11 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 			if (over != NULL)
 			{
 				g_mouse_pressed[button] = over;
+				// ClipEvent::Press -> ButtonState::Down. Only the LEFT button
+				// is in Avm2Button's table (Right/MiddlePress fall through).
+				// Same clip-event tier as text_mouse_press below, so it lands
+				// before the AVM2 mouseDown, exactly like Ruffle.
+				if (button == 0) button_clip_state(ctx, over, BTN_ST_DOWN);
 				// Ruffle's dispatch loop runs handle_clip_event (EditText's
 				// caret placement) BEFORE update_focus_on_mouse_press.
 				if (button == 0) text_mouse_press(ctx, over, g_left_click_index);
@@ -12130,6 +12239,12 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 			Avm2Object* over = g_mouse_hovered;
 			const char* up_type = button == 0 ? "mouseUp"
 				: button == 1 ? "middleMouseUp" : "rightMouseUp";
+			// ClipEvent::MouseUpInside goes to the HOVERED object first
+			// (player.rs:1777-1787) -> ButtonState::Up. A release inside the
+			// same button immediately re-raises it to Over below, so the net
+			// effect there is Over — which is what Flash shows after a click.
+			if (button == 0 && over != NULL)
+				button_clip_state(ctx, over, BTN_ST_UP);
 			dispatch_mouse(ctx, over != NULL ? over : stage, up_type, NULL, 0, 1,
 			               button);
 			int released_inside = (g_mouse_pressed[button] == over);
@@ -12137,6 +12252,8 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 			{
 				Avm2Object* down = g_mouse_pressed[button];
 				Avm2Object* rt = down != NULL ? down : stage;
+				// ClipEvent::Release -> ButtonState::Over (left button only).
+				if (button == 0) button_clip_state(ctx, rt, BTN_ST_OVER);
 				if (button == 0)
 				{
 					int is_double = (g_left_click_index % 2) != 0;
@@ -12159,11 +12276,16 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 				Avm2Object* down = g_mouse_pressed[button];
 				if (button == 0)
 				{
+					// ClipEvent::ReleaseOutside -> ButtonState::Up.
+					if (down != NULL) button_clip_state(ctx, down, BTN_ST_UP);
 					dispatch_mouse(ctx, down != NULL ? down : stage,
 					               "releaseOutside", NULL, 0, 1, 0);
-					// New object rolled over immediately.
+					// New object rolled over immediately (RollOver -> Over).
 					if (g_mouse_hovered != NULL)
+					{
+						button_clip_state(ctx, g_mouse_hovered, BTN_ST_OVER);
 						dispatch_roll_over(ctx, g_mouse_hovered, cur_over);
+					}
 				}
 			}
 			g_mouse_pressed[button] = NULL;
@@ -13816,6 +13938,15 @@ static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
 	avm2_graphics_cpu_composite(ctx, obj, world.a, world.b, world.c, world.d,
 	                            world.tx, world.ty, alpha, fb, fbw, fbh, 0);
 
+	// SimpleButton: paint the current state child (Ruffle render_self). It
+	// lives in btn_up/btn_over/btn_down, never in render_list, so the loop
+	// below cannot reach it. Kept in lockstep with avm2_render_node or the
+	// CPU dump and the GPU render diverge on every button.
+	{
+		Avm2Object* bst = avm2_button_state_child(ext);
+		if (bst != NULL) avm2_cpu_walk(ctx, bst, &world, alpha, fb, fbw, fbh);
+	}
+
 	for (uint32_t i = 0; i < ext->render_len; i++)
 		avm2_cpu_walk(ctx, ext->render_list[i], &world, alpha, fb, fbw, fbh);
 }
@@ -14366,6 +14497,17 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 
 	// T4: script-drawn Graphics geometry (independent of a timeline shape).
 	avm2_render_graphics(ctx, obj, &world, alpha);
+
+	// SimpleButton (Ruffle avm2_button.rs::render_self): paint the child for
+	// the CURRENT state, and only that one — never the hit area, and no Up
+	// fallback when the current state has no records. The state children are
+	// deliberately NOT in render_list (a button is not a container; the
+	// numChildren/getChildAt semantics simplebutton_structure asserts depend
+	// on that), so this arm is the only way they are ever drawn.
+	{
+		Avm2Object* bst = avm2_button_state_child(ext);
+		if (bst != NULL) avm2_render_node(ctx, bst, &world, alpha);
+	}
 
 	for (uint32_t i = 0; i < ext->render_len; i++)
 		avm2_render_node(ctx, ext->render_list[i], &world, alpha);

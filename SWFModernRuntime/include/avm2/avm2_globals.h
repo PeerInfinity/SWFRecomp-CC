@@ -577,6 +577,10 @@ typedef struct Avm2DisplayObjectExt
 	Avm2Object* btn_hit;
 	uint8_t btn_states_created;
 	uint8_t btn_weird_order;  // one-shot framescript order after construction
+	// Ruffle avm2_button.rs `state: Cell<ButtonState>` — which state child is
+	// currently painted / measured. 0 = Up (the memset-0 default, and the only
+	// value a trace run without mouse input ever sees), 1 = Over, 2 = Down.
+	uint8_t btn_state;
 
 	// --- Bitmap (flash.display.Bitmap; avm2_bitmap.c) ---
 	Avm2Object* bitmap_data;         // the BitmapData object (NULL = none)
@@ -620,6 +624,26 @@ typedef struct Avm2DisplayObjectExt
 
 // Compatibility alias: MovieClip state is the shared display ext.
 typedef Avm2DisplayObjectExt Avm2MovieClipExt;
+
+// Ruffle avm2_button.rs `get_state_child(self.state())`: the ONE child a
+// SimpleButton paints / measures for its current state. NULL when that state
+// has no records — Ruffle does NOT fall back to Up, and never paints the hit
+// area. A SimpleButton is deliberately not a container (`render_len` is always
+// 0 on one), so every walk that wants to see through a button has to come
+// here; and the answer must be keyed off these fields, never off the child's
+// `parent`, because assigning the same Shape to two state slots leaves its
+// `parent` NULL while `btn_up` still points at it.
+// Returns NULL on every non-button (btn_state is 0 and btn_up is NULL), so
+// call sites need no class check — the cost is one load and one branch.
+static inline Avm2Object* avm2_button_state_child(const Avm2DisplayObjectExt* ext)
+{
+	switch (ext->btn_state)
+	{
+		case 1:  return ext->btn_over;
+		case 2:  return ext->btn_down;
+		default: return ext->btn_up;
+	}
+}
 
 // flash.events registration (avm2_events.c): Event (real internal state,
 // clone/formatToString/preventDefault family), EventDispatcher (3-phase

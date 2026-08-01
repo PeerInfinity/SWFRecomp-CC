@@ -2118,6 +2118,28 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	                            dst->pixels, (int) dst->width, (int) dst->height,
 	                            dst->transparency);
 
+	// SimpleButton: BitmapData.draw(container) must see the button's current
+	// state child, which is NOT in render_list (a button is not a container).
+	// Same arm as avm2_render_node / avm2_cpu_walk — keep the three together.
+	{
+		Avm2Object* bst = avm2_button_state_child(ext);
+		Avm2DisplayObjectExt* sext = bst != NULL
+			? avm2_display_ext_of(ctx, bst) : NULL;
+		if (sext != NULL)
+		{
+			double sa = sext->mtx_a, sb = sext->mtx_b;
+			double sc = sext->mtx_c, sd = sext->mtx_d;
+			double stx = (double) sext->mtx_tx, sty = (double) sext->mtx_ty;
+			bd_draw_shape_walk(ctx, dst, bst,
+			                   wa * sa + wc * sb, wb * sa + wd * sb,
+			                   wa * sc + wc * sd, wb * sc + wd * sd,
+			                   wa * stx + wc * sty + wtx,
+			                   wb * stx + wd * sty + wty,
+			                   alpha * ((double) sext->alpha_fixed8 / 256.0),
+			                   depth + 1);
+		}
+	}
+
 	for (uint32_t i = 0; i < ext->render_len; i++)
 	{
 		Avm2Object* child = ext->render_list[i];
