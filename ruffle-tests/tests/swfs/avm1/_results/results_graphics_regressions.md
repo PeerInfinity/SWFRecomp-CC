@@ -1,18 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 651/717 passing | Graphics: 670/718 passing
+Trace: 651/717 passing | Graphics: 672/718 passing
 
-## Graphics Regressions (3 tests)
+## Graphics Regressions (0 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-| # | Test | Graphics Status | Detail |
-|---|------|-----------------|--------|
-| 1 | `focusrect_property_swf6` | Output Mismatch | 1236/1237 lines match |
-| 2 | `globals_swf6` | Output Mismatch | 301/304 lines match |
-| 3 | `textfield_props_swf6` | Output Mismatch | 53/210 lines match |
+No regressions.
 
-## Graphics Improvements (22 tests)
+## Graphics Improvements (21 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -36,7 +32,6 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 16 | `form_loader_encoding_2` | Output Mismatch | 0/3 lines match |
 | 17 | `form_loader_encoding_3` | Output Mismatch | 1/3 lines match |
 | 18 | `localconnection_top_level` | Output Mismatch | 4/7 lines match |
-| 19 | `native_objects_swf6` | Output Mismatch | 114/115 lines match |
-| 20 | `netconnection_send_remote` | Output Mismatch | 2/50 lines match |
-| 21 | `netconnection_serialize_arrays` | Output Mismatch | 1/6 lines match |
-| 22 | `string_relational_compare` | Output Mismatch | 3/4 lines match |
+| 19 | `netconnection_send_remote` | Output Mismatch | 2/50 lines match |
+| 20 | `netconnection_serialize_arrays` | Output Mismatch | 1/6 lines match |
+| 21 | `string_relational_compare` | Output Mismatch | 3/4 lines match |
