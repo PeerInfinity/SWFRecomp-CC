@@ -80,3 +80,38 @@ void swf_log_navigate(const char* url, size_t url_len,
 // the Host/Port line — avm1/xml_socket_connect_null grades that literally).
 // Called from swf_socket_connect on every connect attempt, script or not.
 void swf_log_connect_socket(const char* host, size_t host_len, int port);
+
+// ---------------------------------------------------------------------------
+// Legacy charset decoding (AVM1 form loader)
+// ---------------------------------------------------------------------------
+//
+// `loadVariables` / `loadVariablesNum` do NOT read their payload as UTF-8
+// unconditionally. Ruffle's `load_form_into_object`
+// (core/src/loader.rs:1004-1022) picks the encoding like this:
+//
+//   if System.useCodepage        -> sniff the bytes (chardetng)
+//   else if root SWF version <=5 -> windows-1252
+//   else                         -> verbatim (bytes are handed on untouched
+//                                   and only later lossily read as UTF-8)
+//
+// and only then runs form-urlencoded parsing. Every other loader
+// (LoadVars.load, XML.load, StyleSheet.load) is unconditionally UTF-8 in
+// Ruffle, so this API must stay wired to the form-loader path alone.
+typedef enum
+{
+	LEGACY_CS_UTF8 = 0,        // verbatim passthrough — never re-encoded
+	LEGACY_CS_WINDOWS_1252,
+	LEGACY_CS_SHIFT_JIS
+} LegacyCharset;
+
+// Stand-in for chardetng. Strict-UTF-8 wins; otherwise a stream that is valid
+// Shift-JIS *and* contains at least one real double-byte sequence is SJIS;
+// everything else is windows-1252.
+LegacyCharset legacy_charset_detect(const unsigned char* body, int len);
+
+// Decode `len` bytes to a malloc'd, NUL-terminated UTF-8 buffer (caller frees;
+// NULL on allocation failure). `out_len` is optional and receives the decoded
+// byte count. LEGACY_CS_UTF8 is a verbatim memcpy — deliberately not validated
+// or re-encoded, so the default form-loader path stays byte-identical.
+char* legacy_charset_to_utf8(const unsigned char* body, int len,
+                             LegacyCharset cs, int* out_len);

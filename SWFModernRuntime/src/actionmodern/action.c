@@ -4806,6 +4806,27 @@ static ASFunction g_textrenderer_ctor;
 static ASFunction g_tr_setAATable_func;
 static int g_tr_init = 0;
 
+// System.useCodepage as a plain truthiness test. Ruffle's form loader reads
+// `context.system.use_codepage` (a backend bool kept in sync with the AS
+// property); we read the AS property directly, since that is the only writer.
+// Used by actionGetURL2's loadVariables branch to pick a legacy charset.
+static int avm1_system_use_codepage(void)
+{
+	if (g_system_object == NULL) return 0;
+	ActionVar* v = getProperty(g_system_object, "useCodepage", 11);
+	if (v == NULL) return 0;
+	switch (v->type)
+	{
+		case ACTION_STACK_VALUE_BOOLEAN:   return v->data.numeric_value != 0;
+		case ACTION_STACK_VALUE_F32:       return VAL(float, &v->data.numeric_value) != 0.0f;
+		case ACTION_STACK_VALUE_F64:       return VAL(double, &v->data.numeric_value) != 0.0;
+		case ACTION_STACK_VALUE_STRING:    return v->str_size != 0;
+		case ACTION_STACK_VALUE_NULL:
+		case ACTION_STACK_VALUE_UNDEFINED: return 0;
+		default:                           return 1;
+	}
+}
+
 // --- ASSetPropFlags (Function2Ptr callable via both CallFunction and CallMethod) ---
 static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVar* args, u32 num_args, ActionVar* registers, void* this_obj)
 {
@@ -47514,14 +47535,33 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 		if (_lv_mc != NULL && url_utf8[0] != '\0') {
 			DataFileEntry* data = findDataFile(url_utf8);
 			if (data != NULL && data->content != NULL && data->content_length > 0) {
-				// Make a mutable copy of the content for in-place parsing
-				// Data files are small (< 1KB), safe for stack allocation
 				int _lv_len = data->content_length;
 				if (_lv_len > 4096) _lv_len = 4096;
-				char _lv_buf[4097];
-				memcpy(_lv_buf, data->content, _lv_len);
-				_lv_buf[_lv_len] = '\0';
-				parseURLEncodedVars(app_context, _lv_buf, _lv_mc);
+
+				// The form loader is charset-aware; every other loader
+				// (LoadVars.load, XML.load, StyleSheet.load) is not. Mirrors
+				// Ruffle's load_form_into_object (core/src/loader.rs:1004-1022):
+				// useCodepage sniffs, else a root SWF of version <= 5 is
+				// windows-1252, else the bytes pass through untouched.
+				// The version has to be the ROOT movie's — g_swf_version is
+				// swapped per call frame, g_main_movie_swf_version is not.
+				LegacyCharset _lv_cs;
+				if (avm1_system_use_codepage()) {
+					_lv_cs = legacy_charset_detect((const unsigned char*) data->content, _lv_len);
+				} else if (g_main_movie_swf_version <= 5) {
+					_lv_cs = LEGACY_CS_WINDOWS_1252;
+				} else {
+					_lv_cs = LEGACY_CS_UTF8;   // verbatim
+				}
+
+				// Heap, not the old 4097-byte stack buffer: decoding expands
+				// (up to 3x) and parseURLEncodedVars mutates its argument.
+				char* _lv_buf = legacy_charset_to_utf8((const unsigned char*) data->content,
+				                                       _lv_len, _lv_cs, NULL);
+				if (_lv_buf != NULL) {
+					parseURLEncodedVars(app_context, _lv_buf, _lv_mc);
+					free(_lv_buf);
+				}
 			}
 		}
 		return;
