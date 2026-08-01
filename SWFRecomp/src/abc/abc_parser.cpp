@@ -194,6 +194,58 @@ namespace abc
 		return mn;
 	}
 
+	// avmplus names a method in its verify errors as `Class/member()` (the
+	// declaring trait, not the method_info's own name — ASC leaves those
+	// empty). Static members read `Class$/member()`; a class/instance
+	// initializer reads just `Class()`.
+	static std::string qnameLocalName(const ConstantPool& pool, u32 mn_index)
+	{
+		if (mn_index == 0 || mn_index >= pool.multinames.size()) return "";
+		u32 s_index = pool.multinames[mn_index].name;
+		if (s_index == 0 || s_index >= pool.strings.size()) return "";
+		return pool.strings[s_index];
+	}
+
+	static bool traitNamesMethod(const AbcTrait& t, u32 method_index)
+	{
+		return (t.kind == TraitKindType::Method || t.kind == TraitKindType::Getter
+		        || t.kind == TraitKindType::Setter
+		        || t.kind == TraitKindType::Function)
+		    && t.method_or_class == method_index;
+	}
+
+	static std::string methodDisplayName(const AbcFile& out, u32 method_index)
+	{
+		for (size_t i = 0; i < out.instances.size(); ++i)
+		{
+			const AbcInstance& inst = out.instances[i];
+			std::string cls = qnameLocalName(out.pool, inst.name);
+			for (size_t ti = 0; ti < inst.traits.size(); ++ti)
+			{
+				if (traitNamesMethod(inst.traits[ti], method_index))
+				{
+					return cls + "/"
+					     + qnameLocalName(out.pool, inst.traits[ti].name) + "()";
+				}
+			}
+			if (inst.init_method == method_index) return cls + "()";
+			if (i < out.classes.size())
+			{
+				const AbcClass& cd = out.classes[i];
+				for (size_t ti = 0; ti < cd.traits.size(); ++ti)
+				{
+					if (traitNamesMethod(cd.traits[ti], method_index))
+					{
+						return cls + "$/"
+						     + qnameLocalName(out.pool, cd.traits[ti].name) + "()";
+					}
+				}
+				if (cd.init_method == method_index) return cls + "$()";
+			}
+		}
+		return "method_info " + std::to_string(method_index);
+	}
+
 	static void readConstantPool(AbcReader& r, ConstantPool& pool)
 	{
 		// Each count includes the implicit entry 0; a count of 0 or 1 means
@@ -559,21 +611,30 @@ namespace abc
 			AbcMethodBody body = readMethodBody(r);
 			if (body.method >= out.methods.size())
 			{
+				// FP rejects the whole ABC with a catchable #1027 at load.
 				throw AbcError("method body references out-of-range method "
-				               + std::to_string(body.method));
+				               + std::to_string(body.method),
+				               1027,
+				               "Method_info " + std::to_string(body.method)
+				               + " exceeds method_count="
+				               + std::to_string(out.methods.size()) + ".");
 			}
 			if (out.methods[body.method].body >= 0)
 			{
 				// FP throws error 1121 here.
 				throw AbcError("duplicate method body for method "
-				               + std::to_string(body.method));
+				               + std::to_string(body.method),
+				               1121,
+				               "Method " + methodDisplayName(out, body.method)
+				               + " has a duplicate method body.");
 			}
 			out.methods[body.method].body = (s32) i;
 			out.method_bodies.push_back(body);
 		}
 	}
 
-	bool parseAbc(const u8* data, size_t len, AbcFile& out, string& error)
+	bool parseAbc(const u8* data, size_t len, AbcFile& out, string& error,
+	              AbcLoadError* player)
 	{
 		try
 		{
@@ -584,6 +645,16 @@ namespace abc
 		catch (const AbcError& e)
 		{
 			error = e.what();
+			if (player != nullptr)
+			{
+				// avmplus's blanket answer for an ABC it cannot read.
+				player->code = e.player_code != 0 ? e.player_code : 1107;
+				player->message = "Error #" + std::to_string(player->code) + ": "
+				                + (e.player_code != 0
+				                   ? e.player_text
+				                   : string("The ABC data is corrupt, attempt to "
+				                            "read out of bounds."));
+			}
 			return false;
 		}
 	}

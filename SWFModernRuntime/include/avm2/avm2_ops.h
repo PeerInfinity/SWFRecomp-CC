@@ -376,6 +376,9 @@ Avm2Value avm2_op_construct(Avm2Activation* act, Avm2Value ctor,
                             const Avm2Value* args, uint32_t argc);
 Avm2Value avm2_op_constructprop(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 const Avm2Value* args, uint32_t argc);
+Avm2Value avm2_op_constructprop_init(Avm2Activation* act, Avm2Value recv,
+                                     uint32_t mn_idx, const Avm2Value* args,
+                                     uint32_t argc);
 Avm2Value avm2_op_constructprop_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                     Avm2Value name, const Avm2Value* args, uint32_t argc);
 void avm2_op_constructsuper(Avm2Activation* act, Avm2Value recv,

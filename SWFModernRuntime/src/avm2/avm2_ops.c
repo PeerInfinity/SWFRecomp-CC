@@ -3419,6 +3419,34 @@ Avm2Value avm2_op_construct(Avm2Activation* act, Avm2Value ctor,
 	return avm2_construct_value(act->ctx, ctor, args, argc);
 }
 
+// `constructprop` on a value that is neither a Class nor a Function throws
+// #1007 from avm2_construct_value — EXCEPT when the name resolved to a SLOT
+// trait and the SWF's ROOT version is < 11, where avmplus's interpreter
+// raises #1115 "%1 is not a constructor." instead (Ruffle value.rs
+// Value::construct_prop, the `Property::Slot | ConstSlot` branch gated on
+// `root_swf.version() < 11 && is_interpreter()`).
+// `as3/RuntimeErrors/Error1115NotAConstructor/v10` grades this spelling and
+// its v11 sibling grades the #1007 one. The slot restriction matters: a
+// missing/dynamic property keeps #1007 at every version, and a method trait
+// keeps #1064.
+static void constructprop_v10_gate(Avm2Activation* act, Avm2Value recv,
+                                   uint32_t mn_idx, Avm2Value ctor)
+{
+	Avm2Context* ctx = act->ctx;
+	if (ctx->swf_version >= 11) return;
+	if (ctor.kind == AVM2_VALUE_OBJECT && ctor.u.obj != NULL
+	    && (ctor.u.obj->kind == AVM2_OBJ_CLASS
+	        || ctor.u.obj->kind == AVM2_OBJ_FUNCTION))
+	{
+		return;
+	}
+	Resolved r;
+	if (!resolve_mn(act, recv, mn_idx, &r)) return;
+	if (r.entry == NULL || r.entry->kind != AVM2_PROP_SLOT) return;
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1115: value is not a constructor.");
+}
+
 Avm2Value avm2_op_constructprop(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                                 const Avm2Value* args, uint32_t argc)
 {
@@ -3438,6 +3466,24 @@ Avm2Value avm2_op_constructprop(Avm2Activation* act, Avm2Value recv, uint32_t mn
 	}
 	Avm2Value ctor = avm2_op_getproperty_static(act, recv, mn_idx);
 	return avm2_construct_value(act->ctx, ctor, args, argc);
+}
+
+// Same op, emitted only inside a class/script INITIALIZER body — the
+// only methods avmplus runs in interpreter mode, and therefore the only
+// place the SWF<11 #1115 spelling applies (avm2/construct_errors_swf10
+// grades the #1007 spelling for the very same shape inside a normal
+// method at SWF 10).
+Avm2Value avm2_op_constructprop_init(Avm2Activation* act, Avm2Value recv,
+                                     uint32_t mn_idx, const Avm2Value* args,
+                                     uint32_t argc)
+{
+	if (act->ctx->swf_version < 11 && recv.kind == AVM2_VALUE_OBJECT)
+	{
+		Avm2Value ctor = avm2_op_getproperty_static(act, recv, mn_idx);
+		constructprop_v10_gate(act, recv, mn_idx, ctor);
+		return avm2_construct_value(act->ctx, ctor, args, argc);
+	}
+	return avm2_op_constructprop(act, recv, mn_idx, args, argc);
 }
 
 Avm2Value avm2_op_constructprop_dyn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,

@@ -2272,23 +2272,49 @@ namespace abc
 				s32 scope;
 			};
 			std::vector<s32> scope_at(out.ops.size(), -1);
+			std::vector<char> simulated(out.ops.size(), 0);
 			std::vector<SimEntry> sim_list;
+			std::vector<SimEntry> handler_list;
 
-			sim_list.push_back({ 0, 0, 0 });
+			// A catch target's entry state is KNOWN before any code runs, so
+			// avmplus (which verifies in offset order) has it on record by the
+			// time normal control flow branches there — a disagreement is then
+			// #1030/#1031, not whatever the handler body would have hit on its
+			// own. Record those states up front and simulate the handler
+			// bodies only after the normal flow is exhausted; otherwise a
+			// LIFO walk simulates the handler first and reports its downstream
+			// #1024 instead (avm2/verify_exception_target_two_jumps).
 			for (const IrException& e : out.exceptions)
 			{
-				if (e.active)
+				if (!e.active) continue;
+				if (e.target_op >= out.ops.size())
 				{
-					// Catch entry: operand stack holds only the thrown value;
-					// the local scope stack is cleared.
-					sim_list.push_back({ e.target_op, 1, 0 });
+					return fail(err, 1020, "code cannot fall off the end of a method");
 				}
+				// Catch entry: operand stack holds only the thrown value;
+				// the local scope stack is cleared.
+				if (stack_at[e.target_op] < 0)
+				{
+					stack_at[e.target_op] = 1;
+					scope_at[e.target_op] = 0;
+				}
+				handler_list.push_back({ e.target_op, 1, 0 });
 			}
+			sim_list.push_back({ 0, 0, 0 });
 
-			while (!sim_list.empty())
+			while (!sim_list.empty() || !handler_list.empty())
 			{
-				SimEntry entry = sim_list.back();
-				sim_list.pop_back();
+				SimEntry entry;
+				if (!sim_list.empty())
+				{
+					entry = sim_list.back();
+					sim_list.pop_back();
+				}
+				else
+				{
+					entry = handler_list.back();
+					handler_list.pop_back();
+				}
 
 				if (entry.idx >= out.ops.size())
 				{
@@ -2315,10 +2341,11 @@ namespace abc
 						                  "scope depth unbalanced at op "
 						                  + to_string(entry.idx));
 					}
-					continue;
+					if (simulated[entry.idx]) continue;
 				}
 				stack_at[entry.idx] = entry.stack;
 				scope_at[entry.idx] = entry.scope;
+				simulated[entry.idx] = 1;
 
 				const IrOp& op = out.ops[entry.idx];
 				u32 pops, pushes;

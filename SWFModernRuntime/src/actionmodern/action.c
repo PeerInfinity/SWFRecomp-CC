@@ -281,14 +281,29 @@ static inline uint32_t u16_decode_codepoint(const uint16_t* s, u32 len, u32* idx
 	return u;
 }
 
-// Lexicographic comparison of two UTF-16 strings by raw code unit (Flash/ECMAScript semantics)
+// Lexicographic comparison of two UTF-16 strings by CODE POINT.
+//
+// AVM1 stores strings as UTF-8 and Flash's relational operators compare those
+// bytes, which is code-point order — NOT the UTF-16 code-unit order ES uses.
+// The two only disagree once a supplementary character is involved: raw units
+// put every surrogate pair (0xD800..) below U+E000..U+FFFF, so "｡" would
+// sort ABOVE "𐀂" (= U+10002) even though its code point is lower.
+// `avm1/string_relational_compare` grades exactly that pair, and both Flash
+// and Ruffle answer `true`. Equality callers are unaffected either way.
 static int u16_cmp(const uint16_t* a, u32 a_len, const uint16_t* b, u32 b_len)
 {
-	u32 min_len = a_len < b_len ? a_len : b_len;
-	for (u32 i = 0; i < min_len; i++) {
-		if (a[i] != b[i]) return (int)a[i] - (int)b[i];
+	u32 ia = 0, ib = 0;
+	while (ia < a_len && ib < b_len) {
+		if (a[ia] == b[ib]) { ia++; ib++; continue; }
+		u32 ja = ia, jb = ib;
+		uint32_t ca = u16_decode_codepoint(a, a_len, &ja);
+		uint32_t cb = u16_decode_codepoint(b, b_len, &jb);
+		if (ca != cb) return ca < cb ? -1 : 1;
+		ia = ja; ib = jb;
 	}
-	return (int)a_len - (int)b_len;
+	if (ia < a_len) return 1;
+	if (ib < b_len) return -1;
+	return 0;
 }
 
 // Fast ASCII-to-UTF-16 conversion (for number strings which are always ASCII)
@@ -587,6 +602,14 @@ bool setVariableOnLocalScope(const char* var_name, ActionVar* value)
 // ==================================================================
 
 int g_swf_version = 5;       // SWF version — set at startup from constants.h
+
+// The `TextField` global constructor only exists from SWF 7 on: at SWF 6
+// `new TextField()` is `new undefined()` and yields undefined
+// (avm1/native_objects_swf6 line 56, where Flash and Ruffle agree; the
+// swf7/swf8 siblings get a real native instance). TextField INSTANCES and
+// TextField.prototype exist at every version — only the global name is gated.
+#define TEXTFIELD_CTOR_MIN_SWF_VERSION 7
+
 int g_main_movie_swf_version = 5;  // Main movie's SWF version — set once by main.c, never
                                    // swapped during child-SWF/import context switches. Used
                                    // for root_movieclip.swf_version so getSWFVersion() on
@@ -39559,6 +39582,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// ---- TextField ----
 	initTextFieldPrototype(app_context);
+	if (g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
 	{
 		ActionVar tf_cv = {0};
 		tf_cv.type = ACTION_STACK_VALUE_FUNCTION;
@@ -40052,7 +40076,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_OBJ("Mouse", 5, g_mouse_obj);
 	REG_OBJ("Key", 3, g_key_obj);
 	REG_FUNC("Button", 6, &g_stub_ctors[1]);
-	REG_FUNC("TextField", 9, &g_textfield_constructor);
+	if (g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
+		REG_FUNC("TextField", 9, &g_textfield_constructor);
 	REG_FUNC("TextFormat", 10, &g_textformat_constructor);
 	REG_OBJ("Stage", 5, g_stage_obj);
 	REG_FUNC("Video", 5, &g_stub_ctors[16]);
@@ -42235,7 +42260,8 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)mc_ctor);
 			return;
 		}
-		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "TextField", 9))
+		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "TextField", 9)
+		         && g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
 		{
 			// Return the built-in TextField constructor as a function
 			initTextFieldPrototype(app_context);
@@ -54481,7 +54507,8 @@ void actionNewObject(SWFAppContext* app_context)
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
 	}
-	else if (strcmp(ctor_name, "TextField") == 0)
+	else if (strcmp(ctor_name, "TextField") == 0
+	         && g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
 	{
 		// Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype

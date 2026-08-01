@@ -21,8 +21,28 @@ namespace abc
 	public:
 		bool eof;
 
+		// avmplus's own spelling of the same rejection, when we know it:
+		// `player_code` is the Error #NNNN and `player_text` the filled
+		// message body. Left 0/"" for failures we have no spelling for.
+		int player_code = 0;
+		std::string player_text;
+
 		explicit AbcError(const std::string& msg, bool is_eof = false)
 			: std::runtime_error(msg), eof(is_eof) {}
+
+		AbcError(const std::string& msg, int code, const std::string& text)
+			: std::runtime_error(msg), eof(false), player_code(code),
+			  player_text(text) {}
+	};
+
+	// A load failure as the PLAYER reports it: avmplus raises a catchable
+	// VerifyError for a malformed ABC instead of ignoring the tag. `code` 0
+	// means we have no avmplus spelling for this failure, and the caller
+	// substitutes the generic #1107 "ABC data is corrupt" text.
+	struct AbcLoadError
+	{
+		int code = 0;
+		std::string message;  // "Error #NNNN: ..." (the traced form)
 	};
 
 	class AbcReader
@@ -243,6 +263,11 @@ namespace abc
 	void parseAbcFile(AbcReader& reader, AbcFile& out);
 
 	// Non-throwing wrapper: returns false and fills `error` on failure.
-	bool parseAbc(const u8* data, size_t len, AbcFile& out, std::string& error);
+	// When `player` is given it also receives the error the PLAYER reports
+	// for this file: avmplus rejects a malformed ABC with a catchable
+	// VerifyError at load rather than ignoring the tag, so the recompiler
+	// emits a throwing stub instead of dropping the DoABC (swf.cpp).
+	bool parseAbc(const u8* data, size_t len, AbcFile& out, std::string& error,
+	              AbcLoadError* player = nullptr);
 }
 }

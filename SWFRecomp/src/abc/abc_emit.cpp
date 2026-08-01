@@ -1542,8 +1542,16 @@ namespace abc
 				}
 				else
 				{
+					// Only a class/script initializer runs in avmplus's
+					// "interpreter mode", and only there does a SWF<11
+					// constructprop on a non-constructible SLOT report
+					// #1115 instead of #1007 (Ruffle value.rs
+					// Value::construct_prop; method.rs is_interpreted, set
+					// for cinit + script init only).
 					out << "\tsp -= " << (op.arg2 + 1) << "; stk[sp] = "
-					    << "avm2_op_constructprop(act, stk[sp], " << op.arg1
+					    << (bc.interp_mode ? "avm2_op_constructprop_init(act, stk[sp], "
+					                       : "avm2_op_constructprop(act, stk[sp], ")
+					    << op.arg1
 					    << ", &stk[sp + 1], " << op.arg2 << "); sp++;" << endl;
 				}
 				return true;
@@ -3869,6 +3877,51 @@ namespace abc
 			}
 			out << "};" << endl;
 		}
+	}
+
+	void AbcEmitter::emitAbcLoadError(const string& message)
+	{
+		// A minimal but structurally complete ABC: one method, one body, one
+		// script whose init IS that body. The body is marked unverified, so
+		// the normal emitter path writes an avm2_verify_error_body() stub for
+		// it — the same mechanism a per-body verify failure already uses. The
+		// runtime eager-inits each file's last script at load, so the
+		// VerifyError surfaces there (uncaught unless the SWF catches it),
+		// and every definition the file would have carried stays missing,
+		// which is what avmplus does with a rejected ABC.
+		AbcFile stub;
+		stub.minor_version = 16;
+		stub.major_version = 46;
+		stub.pool.ints.push_back(0);
+		stub.pool.uints.push_back(0);
+		stub.pool.doubles.push_back(0.0);
+		stub.pool.strings.push_back(string());
+		stub.pool.namespaces.push_back(AbcNamespace());
+		stub.pool.ns_sets.push_back(NamespaceSet());
+		stub.pool.multinames.push_back(AbcMultiname());
+
+		AbcMethod m;
+		m.return_type = 0;
+		m.name = 0;
+		m.body = 0;
+		stub.methods.push_back(m);
+
+		AbcMethodBody b;
+		b.method = 0;
+		b.max_stack = 1;
+		b.num_locals = 1;
+		b.init_scope_depth = 0;
+		b.max_scope_depth = 1;
+		stub.method_bodies.push_back(b);
+
+		AbcScript sc;
+		sc.init_method = 0;
+		stub.scripts.push_back(sc);
+
+		std::vector<EmitBody> bodies(1);
+		bodies[0].verified = false;
+		bodies[0].verify_error = message;
+		emitAbcTag(stub, bodies);
 	}
 
 	void AbcEmitter::finalize(const std::vector<std::pair<u16, string>>& symbol_bindings,

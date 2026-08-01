@@ -49,6 +49,13 @@ namespace abc
 		// `bodies` is parallel to abc.method_bodies.
 		void emitAbcTag(const AbcFile& abc, const std::vector<EmitBody>& bodies);
 
+		// Emits a one-script stub tag whose script initializer throws
+		// `message` as a VerifyError at load. Used when the ABC cannot be
+		// parsed or validated AT ALL: avmplus reports such a file with a
+		// catchable VerifyError, so dropping the DoABC (the old behaviour)
+		// silently swallowed an error the SWF grades.
+		void emitAbcLoadError(const std::string& message);
+
 		// Writes abc_gen.h + abc_registry.c. Call once, after all tags.
 		void finalize(const std::vector<std::pair<u16, std::string>>& symbol_bindings,
 		              u8 swf_version);

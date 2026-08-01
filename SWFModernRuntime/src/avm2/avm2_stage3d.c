@@ -1555,6 +1555,23 @@ static Avm2Value matrix3d_xform(Avm2Activation* act, int kind, int prepend)
 			az = m3d_component(act->ctx, axis, "z");
 		}
 		m3d_build_rotation(t, deg, ax, ay, az);
+		// The optional third argument is a pivot point: the rotation happens
+		// about `pivot` rather than about the origin, i.e.
+		//   v' = (v - p) * R + p  =  v * R + (p - p * R)
+		// (row-vector convention, translation in m[12..14]).
+		Avm2Object* pivot = s3d_arg_object(act, 2);
+		if (pivot != NULL)
+		{
+			double px = m3d_component(act->ctx, pivot, "x");
+			double py = m3d_component(act->ctx, pivot, "y");
+			double pz = m3d_component(act->ctx, pivot, "z");
+			double rx = px * t[0] + py * t[4] + pz * t[8];
+			double ry = px * t[1] + py * t[5] + pz * t[9];
+			double rz = px * t[2] + py * t[6] + pz * t[10];
+			t[12] = px - rx;
+			t[13] = py - ry;
+			t[14] = pz - rz;
+		}
 	}
 	else
 	{

@@ -6216,9 +6216,24 @@ namespace SWFRecomp
 
 				abc::AbcFile abc_file;
 				std::string abc_error;
-				if (!abc::parseAbc(abc_data, abc_len, abc_file, abc_error))
+				abc::AbcLoadError abc_load_error;
+				// A file-level parse/validate failure is NOT a reason to drop
+				// the tag: avmplus raises a catchable VerifyError at load and
+				// leaves every definition the file carried undefined. Emitting
+				// nothing hid that error AND the #1065s that follow from the
+				// missing classes (avm2/verify_method_info_{oob,duplicate}).
+				// Per-BODY verify failures already travel this way; these are
+				// the same contract one level up.
+				if (!abc::parseAbc(abc_data, abc_len, abc_file, abc_error,
+				                   &abc_load_error))
 				{
 					fprintf(stderr, "DoABC: parse failed: %s\n", abc_error.c_str());
+					if (abc_emitter == nullptr)
+					{
+						abc_emitter = new abc::AbcEmitter(
+							"RecompiledABC", abc_symbol_prefix, abc_char_id_base);
+					}
+					abc_emitter->emitAbcLoadError(abc_load_error.message);
 				}
 				else
 				{
@@ -6227,6 +6242,13 @@ namespace SWFRecomp
 					{
 						fprintf(stderr, "DoABC: validation failed: %s (%s)\n",
 						        verr.message.c_str(), verr.detail.c_str());
+						if (abc_emitter == nullptr)
+						{
+							abc_emitter = new abc::AbcEmitter(
+								"RecompiledABC", abc_symbol_prefix,
+								abc_char_id_base);
+						}
+						abc_emitter->emitAbcLoadError(verr.message);
 					}
 					else
 					{

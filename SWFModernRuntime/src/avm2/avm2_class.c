@@ -1600,12 +1600,42 @@ Avm2Object* avm2_value_proto(Avm2Context* ctx, Avm2Value v)
 
 static void resolve_interfaces(Avm2Context* ctx, Avm2Class* cls)
 {
-	if (cls->interfaces != NULL || cls->interface_count == 0) return;
-	cls->interfaces = avm2_alloc(ctx, cls->interface_count * sizeof(Avm2Class*));
+	if (cls->interface_count == 0) return;
+	if (cls->interfaces == NULL)
+	{
+		uint32_t bytes = cls->interface_count * (uint32_t) sizeof(Avm2Class*);
+		cls->interfaces = avm2_alloc(ctx, bytes);
+		memset(cls->interfaces, 0, bytes);
+	}
+	// Cache only NON-NULL answers, exactly as avm2_class_for_mn does. A class
+	// is set up (newclass) before the script's later classes exist, so an
+	// interface declared AFTER its implementor in the same script resolves to
+	// NULL at that moment; freezing that NULL made `implements X` invisible
+	// forever (superinterface_call: `var v: BaseInterface = concrete` threw
+	// #1034). Re-resolve the misses on each call — once a name resolves, the
+	// domain's append-only identity makes the answer permanent.
+	if (cls->interface_mns == NULL) return;
+	int resolved_now = 0;
 	for (uint32_t i = 0; i < cls->interface_count; i++)
 	{
+		if (cls->interfaces[i] != NULL) continue;
 		cls->interfaces[i] = avm2_class_for_mn(ctx, cls->iface_file,
 		                                       cls->interface_mns[i]);
+		if (cls->interfaces[i] != NULL) resolved_now = 1;
+	}
+	// The interface-namespace method aliases (add_iface_aliases_from) are
+	// installed at newclass time off this same list, so an interface that
+	// only resolves now never got its aliases: `iface_typed.method()` would
+	// raise #1069. Install them the moment the interface becomes visible.
+	if (resolved_now && (cls->flags & AVM2_CLASS_FLAG_INTERFACE) == 0)
+	{
+		for (uint32_t i = 0; i < cls->interface_count; i++)
+		{
+			if (cls->interfaces[i] != NULL)
+			{
+				add_iface_aliases_from(ctx, cls, cls->interfaces[i]);
+			}
+		}
 	}
 }
 
