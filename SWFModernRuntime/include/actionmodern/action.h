@@ -651,6 +651,13 @@ typedef struct AttachedBitmapInfo {
 	u32 height;
 	float x_twips;            // position in stage coordinates (twips)
 	float y_twips;
+	// GPU transform slot holding the MC's full AS transform (_x/_y/_xscale/
+	// _yscale/_rotation), allocated per tick by apply_dynamic_mc_transforms.
+	// Non-zero means the quad must be drawn at the LOCAL origin through this
+	// slot instead of at x_twips/y_twips through identity — otherwise
+	// _xscale = -100 and friends have no effect at all on the render.
+	u32 xform_slot;
+	float alpha;              // 0..100, for the cxform slot
 } AttachedBitmapInfo;
 
 typedef void (*AttachedBitmapCallback)(const AttachedBitmapInfo* info, void* user_data);
@@ -682,6 +689,24 @@ typedef struct TextFieldRenderInfo {
 	int has_border;
 	u32 border_color;      // 24-bit RGB
 	float x, y, w, h;     // position and size in pixels
+	// World matrix of the field. When has_matrix != 0, x/y are the box origin
+	// in FIELD-LOCAL pixels (the createTextField visual offset, usually 0) and
+	// w/h are the box size in field-local pixels; the renderer emits the box
+	// in local twips through this matrix, so _xscale/_yscale/_rotation and any
+	// ancestor matrix survive. When has_matrix == 0 (orphan DefineEditText
+	// path) x/y/w/h are pre-composed stage pixels and the matrix is identity.
+	// m_tx / m_ty are in TWIPS; a/b/c/d are unitless.
+	// When has_matrix != 0, w/h are the RAW local field size and edge_x/edge_y
+	// say whether Flash's extra right/bottom edge pixel applies. That pixel is
+	// a DEVICE pixel (it comes from rasterising the border polyline), so the
+	// renderer adds it after dividing by the matrix's per-axis scale.
+	int has_matrix;
+	int edge_x, edge_y;
+	// !embedFonts. Device-font boxes take Ruffle's axis-aligned, pixel-snapped
+	// `draw_device_text_box` instead of the matrix-transformed one.
+	int device_font;
+	float m_a, m_b, m_c, m_d;
+	float m_tx, m_ty;
 } TextFieldRenderInfo;
 
 // Get text field count and info for rendering. Returns count of text fields.

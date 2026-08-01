@@ -26335,6 +26335,46 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 
 // Iterate all text field MovieClips in child_mc_cache and report their render info.
 // Used by tag.c to render text field backgrounds/borders in graphics mode.
+// World (stage) matrix for an MC: its local matrix composed up the parent
+// chain. a/b/c/d unitless, tx/ty in twips. Same composition as step 1 of
+// mc_get_local_mouse — factored out here for the textfield box renderer.
+static void tf_world_matrix(MovieClip* mc,
+	float* out_a, float* out_b, float* out_c, float* out_d,
+	float* out_tx, float* out_ty)
+{
+	float wa, wb, wc, wd;
+	int32_t wtx, wty;
+	getLocalMatrixForMC_render(mc, &wa, &wb, &wc, &wd, &wtx, &wty);
+	for (MovieClip* par = mc->parent; par != NULL; par = par->parent) {
+		float pa, pb, pc, pd;
+		int32_t ptx, pty;
+		getLocalMatrixForMC_render(par, &pa, &pb, &pc, &pd, &ptx, &pty);
+		float mtxf = (float)wtx, mtyf = (float)wty;
+		float na = pa * wa + pc * wb;
+		float nb = pb * wa + pd * wb;
+		float nc = pa * wc + pc * wd;
+		float nd = pb * wc + pd * wd;
+		int32_t ntx = (int32_t)rintf(pa * mtxf + pc * mtyf) + ptx;
+		int32_t nty = (int32_t)rintf(pb * mtxf + pd * mtyf) + pty;
+		wa = na; wb = nb; wc = nc; wd = nd; wtx = ntx; wty = nty;
+	}
+	*out_a = wa; *out_b = wb; *out_c = wc; *out_d = wd;
+	*out_tx = (float)wtx; *out_ty = (float)wty;
+}
+
+// Ruffle's device-font transform cull (core/src/display_object/edit_text.rs
+// `is_transform_positive_scale_only`, called from `render_self` ~2698): an
+// EditText that is NOT using embedded font outlines is not rendered at all
+// when its world transform is rotated, sheared or reflected. Flash tolerates a
+// small shear; Ruffle's ALLOWED_SHEAR of 0.006 is deliberately loose because
+// the computed shear differs slightly between the two.
+static int tf_transform_positive_scale_only(float a, float b, float c, float d)
+{
+	const float ALLOWED_SHEAR = 0.006f;
+	return fabsf(b) < ALLOWED_SHEAR && fabsf(c) < ALLOWED_SHEAR
+	    && a > 0.0f && d > 0.0f;
+}
+
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 {
 	int count = 0;
@@ -26384,13 +26424,23 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 			if (voy) vis_off_y = (float)varToDoubleSimple(voy);
 		}
 
-		// Compose parent-chain translations (see actionIterateTextFieldGlyphs
-		// for the rationale). mc->x/y are local-to-parent.
-		float world_x = mc->x;
-		float world_y = mc->y;
-		for (MovieClip* p = mc->parent; p != NULL; p = p->parent) {
-			world_x += p->x;
-			world_y += p->y;
+		// Full world matrix (not just the parent-chain translation sum this
+		// used to compose): the box has to carry _xscale/_yscale/_rotation and
+		// any ancestor `transform.matrix`. mc->width/height stay the field's
+		// LOCAL, unscaled size — the matrix supplies the scale.
+		float wm_a, wm_b, wm_c, wm_d, wm_tx, wm_ty;
+		tf_world_matrix(mc, &wm_a, &wm_b, &wm_c, &wm_d, &wm_tx, &wm_ty);
+
+		// Device-font cull (Ruffle edit_text.rs:2698). embedFonts defaults to
+		// false, i.e. device font, so a rotated/sheared/reflected field draws
+		// nothing at all.
+		int embed_fonts = 0;
+		{
+			ActionVar* v = getProperty(props, "embedFonts", 10);
+			if (v && varToDoubleSimple(v) != 0.0) embed_fonts = 1;
+			if (!embed_fonts
+			    && !tf_transform_positive_scale_only(wm_a, wm_b, wm_c, wm_d))
+				continue;
 		}
 
 		TextFieldRenderInfo info;
@@ -26398,12 +26448,20 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 		info.background_color = bg_color;
 		info.has_border = has_border;
 		info.border_color = bd_color;
-		info.x = world_x + vis_off_x;
-		info.y = world_y + vis_off_y;
-		// Flash includes the right/bottom edge pixel (+1) for positive-dimension text fields,
-		// but not for negative-dimension ones (where the visual offset adjusts the origin).
-		info.w = mc->width + (vis_off_x == 0.0f ? 1.0f : 0.0f);
-		info.h = mc->height + (vis_off_y == 0.0f ? 1.0f : 0.0f);
+		info.x = vis_off_x;
+		info.y = vis_off_y;
+		// RAW local size — the renderer adds Flash's right/bottom edge pixel in
+		// DEVICE space (it comes from rasterising the border polyline, so it
+		// does not scale with the field). Negative-dimension fields don't get
+		// it (their visual offset already adjusts the origin).
+		info.w = mc->width;
+		info.h = mc->height;
+		info.has_matrix = 1;
+		info.edge_x = (vis_off_x == 0.0f) ? 1 : 0;
+		info.edge_y = (vis_off_y == 0.0f) ? 1 : 0;
+		info.device_font = !embed_fonts;
+		info.m_a = wm_a; info.m_b = wm_b; info.m_c = wm_c; info.m_d = wm_d;
+		info.m_tx = wm_tx; info.m_ty = wm_ty;
 
 		cb(&info, user_data);
 		count++;
@@ -28471,9 +28529,13 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
 		info.pixels = mc->attached_bitmap_pixels;
 		info.width = mc->attached_bitmap_width;
 		info.height = mc->attached_bitmap_height;
-		// Position in stage coordinates (pixels → twips)
+		// Position in stage coordinates (pixels → twips). Only used when there
+		// is no per-tick transform slot for this MC (as_set_flags == 0); the
+		// slot already bakes _x/_y in, so the renderer draws at local origin.
 		info.x_twips = mc->x * 20.0f;
 		info.y_twips = mc->y * 20.0f;
+		info.xform_slot = mc->dynamic_xform_slot;
+		info.alpha = (float)mc->alpha;
 		cb(&info, user_data);
 		count++;
 	}

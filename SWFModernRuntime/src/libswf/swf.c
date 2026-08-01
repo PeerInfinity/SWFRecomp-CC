@@ -184,6 +184,20 @@ int g_goto_inlined_in_caller_frame = 0;
 // that follows a natural backward timeline wrap; consulted by tagPlaceObject2.
 int g_loopback_replay = 0;
 int g_loopback_replay_armed = 0;
+#ifdef OFFSCREEN_RENDER
+// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK) — DEFERRED BY ONE TICK.
+// The natural end-of-movie wrap is a *next-tick* event: tick N still displays
+// the last frame, tick N+1 displays frame 0. Applying the promoted goto inside
+// tick N (which is what setting goto_from_action there used to do) ran
+// frame_funcs[0] before the tick's captures, so the last frame was never
+// displayed and every later capture was one tick early. Key test:
+// from_gnash/misc-ming.all/loop/simple_loop_test (period 3 instead of 4).
+// See the consumption site at the top of the tick loop.
+static int g_pending_natural_wrap_promote = 0;
+// Set for exactly the tick that replays frame 0 under the deferred promotion,
+// so the close-out half (catch_up_backward reset + unsurvivor sweep) runs once.
+static int g_wrap_promote_active = 0;
+#endif
 
 extern void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame);
 extern void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target_frame);
@@ -532,6 +546,27 @@ void tagMain(SWFAppContext* app_context)
 
 		current_frame = next_frame;
 #ifdef OFFSCREEN_RENDER
+		// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK), *deferred half*.
+		// The previous tick's end-of-movie wrap asked for survives_rewind
+		// cleanup semantics; apply the cleanup here, at the top of the tick
+		// that actually replays frame 0, and let this tick's own
+		// frame_funcs[current_frame] be the replay. This mirrors the
+		// `target <= original_frame` arm of the catch-up loop below with
+		// target = 0 (clear_after -> rewindCleanup -> catch_up_backward=1 ->
+		// frame_funcs[0] -> catch_up_backward=0 -> cleanup_unplaced_after),
+		// minus the in-tick frame execution that used to steal a tick.
+		if (g_pending_natural_wrap_promote)
+		{
+			g_pending_natural_wrap_promote = 0;
+			ng_display_clear_after(app_context, current_frame);
+			actionRewindCleanup(app_context);
+			extern int g_natural_wrap_cleanup_pending;
+			g_natural_wrap_cleanup_pending = 1;
+			catch_up_backward = 1;
+			catch_up_target = current_frame;
+			g_wrap_promote_active = 1;
+		}
+
 		// Capture scheduling: request a readback before this tick's frame
 		// renders. With HEADLESS_RENDER_ENABLED on, this is a no-op unless
 		// CAPTURE_TRIGGERS asks for the current tick or any last_frame.
@@ -945,6 +980,17 @@ void tagMain(SWFAppContext* app_context)
 #endif
 			g_loopback_replay = 0;
 #ifdef OFFSCREEN_RENDER
+			// Phase 4 deferred promotion, close-out half — mirrors the
+			// catch-up loop's `catch_up_backward = 0;
+			// ng_display_cleanup_unplaced_after(target)` tail.
+			if (g_wrap_promote_active)
+			{
+				g_wrap_promote_active = 0;
+				catch_up_backward = 0;
+				ng_display_cleanup_unplaced_after(app_context, current_frame);
+			}
+#endif
+#ifdef OFFSCREEN_RENDER
 			// If a goto inside the script inlined the target frame's body
 			// AND the recompiler-emitted last-frame wrap-back fired
 			// afterward (signature: next_frame=0; manual_next_frame=1),
@@ -977,6 +1023,16 @@ void tagMain(SWFAppContext* app_context)
 		}
 
 #ifdef OFFSCREEN_RENDER
+		// Safety net: if the frame_func gate above declined to run (root
+		// stopped / past-last-frame), the deferred promotion's close-out
+		// never fired. Never leave catch_up_backward latched across a tick.
+		if (g_wrap_promote_active)
+		{
+			g_wrap_promote_active = 0;
+			catch_up_backward = 0;
+			ng_display_cleanup_unplaced_after(app_context, current_frame);
+		}
+
 		// Fallback flush: if frame_func didn't run (root stopped,
 		// past-last-frame, ...), flush enter_frame here so clip event
 		// ENTER_FRAME and onEnterFrame handlers still fire.
@@ -1104,9 +1160,20 @@ void tagMain(SWFAppContext* app_context)
 				}
 			}
 			if (has_stale) {
-				goto_from_action = 1;
-				extern int g_natural_wrap_cleanup_pending;
-				g_natural_wrap_cleanup_pending = 1;
+				// DEFERRED BY ONE TICK (see g_pending_natural_wrap_promote).
+				// Setting goto_from_action here made the catch-up loop below
+				// run frame_funcs[0] inside THIS tick, before
+				// capture_tick_after_events / capture_tick_post_frame — so the
+				// movie's last frame was never displayed and every later
+				// capture was one tick early (simple_loop_test rendered with
+				// period 3 where Flash/Ruffle have period 4). The promotion
+				// exists for the survives_rewind *cleanup* semantics, not to
+				// re-execute the frame early, so hand the cleanup to the top
+				// of the next tick and let that tick's own frame_funcs[0] be
+				// the replay. The light wrap path below is suppressed for the
+				// same reason (it would clear the display list the deferred
+				// half still wants to diff against).
+				g_pending_natural_wrap_promote = 1;
 			}
 		}
 #endif
@@ -1311,6 +1378,14 @@ void tagMain(SWFAppContext* app_context)
 			int _wrap_is_last_tick = (tick_count >= max_ticks);
 #else
 			int _wrap_is_last_tick = 0;
+#endif
+#ifdef OFFSCREEN_RENDER
+			// The Phase-4 deferred promotion owns this wrap — it will run the
+			// survives_rewind cleanup at the top of the next tick. Running the
+			// light path here as well would clear the display list a tick
+			// early (the tick's captures already happened, but the deferred
+			// half's modify-vs-replace decisions read the pre-wrap entries).
+			if (g_pending_natural_wrap_promote) _wrap_is_last_tick = 1;
 #endif
 			if (!goto_from_action && next_frame < current_frame && !_wrap_is_last_tick)
 			{

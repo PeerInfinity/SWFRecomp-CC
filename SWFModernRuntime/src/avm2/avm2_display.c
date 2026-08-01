@@ -14156,6 +14156,81 @@ static void avm2_world_to_mat16(const Mat* m, float out[16])
 	out[12] = (float) m->tx; out[13] = (float) m->ty; out[14] = 0.0f; out[15] = 1.0f;
 }
 
+// ---------------------------------------------------------------------------
+// Concatenated colour transform for the node currently being rendered.
+//
+// The render walk used to propagate ALPHA ONLY: every leaf writer hard-coded
+// `mult = (1,1,1,alpha), add = 0`, so `transform.colorTransform`'s RGB
+// multipliers and addends (stored on the ext as cx_rm/gm/bm + cx_ra/ga/ba/aa,
+// and read back correctly by the getter) never reached the renderer at all.
+// avm2/displayobject_colortransform_nested rendered the untouched 0xCCCCCC
+// shape where Flash shows a flat red. avm2_render_node now maintains the full
+// concatenated transform here and every writer allocates its slot from it.
+// The GPU side already supported it — apply_cxform in render_webgpu.c is a
+// full mat4 multiply + vec4 add.
+// ---------------------------------------------------------------------------
+typedef struct { float mult[4]; float add[4]; } Avm2Cx;
+
+static const Avm2Cx AVM2_CX_IDENTITY = { { 1.0f, 1.0f, 1.0f, 1.0f },
+                                         { 0.0f, 0.0f, 0.0f, 0.0f } };
+static Avm2Cx g_avm2_cur_cx = { { 1.0f, 1.0f, 1.0f, 1.0f },
+                                { 0.0f, 0.0f, 0.0f, 0.0f } };
+
+// out = outer(inner):  mult = outer.mult * inner.mult (channel-wise, the
+// multipliers are diagonal), add = outer.mult * inner.add + outer.add.
+static void avm2_cx_compose(Avm2Cx* out, const Avm2Cx* outer, const Avm2Cx* inner)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		out->mult[i] = outer->mult[i] * inner->mult[i];
+		out->add[i]  = outer->mult[i] * inner->add[i] + outer->add[i];
+	}
+}
+
+// This node's OWN colour transform, from its ext fields. Multipliers are 8.8
+// fixed; addends are i16 in 0..255 units, which the GPU cxform wants as 0..1.
+static void avm2_cx_of_ext(Avm2Cx* out, const Avm2DisplayObjectExt* ext)
+{
+	out->mult[0] = (float) ext->cx_rm / 256.0f;
+	out->mult[1] = (float) ext->cx_gm / 256.0f;
+	out->mult[2] = (float) ext->cx_bm / 256.0f;
+	out->mult[3] = (float) ext->alpha_fixed8 / 256.0f;
+	out->add[0]  = (float) ext->cx_ra / 255.0f;
+	out->add[1]  = (float) ext->cx_ga / 255.0f;
+	out->add[2]  = (float) ext->cx_ba / 255.0f;
+	out->add[3]  = (float) ext->cx_aa / 255.0f;
+}
+
+static int avm2_cx_is_identity(const Avm2Cx* cx)
+{
+	for (int i = 0; i < 4; i++)
+		if (fabs((double) cx->mult[i] - 1.0) > 0.001
+		    || fabs((double) cx->add[i]) > 0.001)
+			return 0;
+	return 1;
+}
+
+// Allocate a GPU cxform slot for g_avm2_cur_cx. Slot 0 is identity, so the
+// common "no colour transform anywhere on the chain" case costs nothing.
+static uint32_t avm2_alloc_cx_slot(void)
+{
+	if (avm2_cx_is_identity(&g_avm2_cur_cx)) return 0;
+	if (g_avm2_cxform_next >= context->cxform_slot_count) return 0;
+	float cx[20];
+	memset(cx, 0, sizeof(cx));
+	cx[0]  = g_avm2_cur_cx.mult[0];
+	cx[5]  = g_avm2_cur_cx.mult[1];
+	cx[10] = g_avm2_cur_cx.mult[2];
+	cx[15] = g_avm2_cur_cx.mult[3];
+	cx[16] = g_avm2_cur_cx.add[0];
+	cx[17] = g_avm2_cur_cx.add[1];
+	cx[18] = g_avm2_cur_cx.add[2];
+	cx[19] = g_avm2_cur_cx.add[3];
+	uint32_t cxid = g_avm2_cxform_next++;
+	renderer_write_cxform(context, cxid, cx);
+	return cxid;
+}
+
 // Blit one Bitmap node: its BitmapData's premultiplied-ARGB pixels as a
 // textured quad under the node's world matrix + concatenated alpha. The
 // renderer uses a premultiplied-alpha blend, and the pixel store is already
@@ -14186,17 +14261,10 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
 		renderer_write_transform(context, xid, m16);
 	}
 
-	// Concatenated-alpha cxform slot (0 = identity for the common alpha == 1).
-	uint32_t cxid = 0;
-	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
-	{
-		float cx[20];
-		memset(cx, 0, sizeof(cx));
-		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;  // r/g/b multiply = 1
-		cx[15] = (float) alpha;                      // alpha multiply
-		cxid = g_avm2_cxform_next++;
-		renderer_write_cxform(context, cxid, cx);
-	}
+	// Full concatenated colour transform (see avm2_alloc_cx_slot); this used
+	// to be an alpha-only matrix, which dropped every RGB colorTransform.
+	(void) alpha;
+	uint32_t cxid = avm2_alloc_cx_slot();
 
 	renderer_draw_bitmap_quad_scaled(context, bd->pixels,
 		bd->width, bd->height, bd->width, bd->height,
@@ -14229,17 +14297,10 @@ static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
 		renderer_write_transform(context, xid, m16);
 	}
 
-	// Concatenated-alpha cxform slot (0 = identity for the common alpha == 1).
-	uint32_t cxid = 0;
-	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
-	{
-		float cx[20];
-		memset(cx, 0, sizeof(cx));
-		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;  // r/g/b multiply = 1
-		cx[15] = (float) alpha;                      // alpha multiply
-		cxid = g_avm2_cxform_next++;
-		renderer_write_cxform(context, cxid, cx);
-	}
+	// Full concatenated colour transform (see avm2_alloc_cx_slot); this used
+	// to be an alpha-only matrix, which dropped every RGB colorTransform.
+	(void) alpha;
+	uint32_t cxid = avm2_alloc_cx_slot();
 
 	renderer_draw_shape(context, ext->shape_vert_offset, ext->shape_vert_count,
 	                    xid, cxid);
@@ -14302,16 +14363,10 @@ static void avm2_render_morph(Avm2Context* ctx, Avm2Object* obj,
 		xid = g_avm2_xform_next++;
 		renderer_write_transform(context, xid, m16);
 	}
-	uint32_t cxid = 0;
-	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
-	{
-		float cx[20];
-		memset(cx, 0, sizeof(cx));
-		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;
-		cx[15] = (float) alpha;
-		cxid = g_avm2_cxform_next++;
-		renderer_write_cxform(context, cxid, cx);
-	}
+	// Full concatenated colour transform (see avm2_alloc_cx_slot); this used
+	// to be an alpha-only matrix, which dropped every RGB colorTransform.
+	(void) alpha;
+	uint32_t cxid = avm2_alloc_cx_slot();
 
 	uint32_t t = 0;
 	while (t + 3 <= n)
@@ -14370,16 +14425,10 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 		xid = g_avm2_xform_next++;
 		renderer_write_transform(context, xid, m16);
 	}
-	uint32_t cxid = 0;
-	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
-	{
-		float cx[20];
-		memset(cx, 0, sizeof(cx));
-		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;
-		cx[15] = (float) alpha;
-		cxid = g_avm2_cxform_next++;
-		renderer_write_cxform(context, cxid, cx);
-	}
+	// Full concatenated colour transform (see avm2_alloc_cx_slot); this used
+	// to be an alpha-only matrix, which dropped every RGB colorTransform.
+	(void) alpha;
+	uint32_t cxid = avm2_alloc_cx_slot();
 
 	for (uint32_t i = 0; i < g->path_count; i++)
 	{
@@ -14428,16 +14477,10 @@ static void avm2_text_slots(const Mat* world, double alpha,
 		xid = g_avm2_xform_next++;
 		renderer_write_transform(context, xid, m16);
 	}
-	uint32_t cxid = 0;
-	if (alpha < 0.999 && g_avm2_cxform_next < context->cxform_slot_count)
-	{
-		float cx[20];
-		memset(cx, 0, sizeof(cx));
-		cx[0] = 1.0f; cx[5] = 1.0f; cx[10] = 1.0f;
-		cx[15] = (float) alpha;
-		cxid = g_avm2_cxform_next++;
-		renderer_write_cxform(context, cxid, cx);
-	}
+	// Full concatenated colour transform (see avm2_alloc_cx_slot); this used
+	// to be an alpha-only matrix, which dropped every RGB colorTransform.
+	(void) alpha;
+	uint32_t cxid = avm2_alloc_cx_slot();
 	*out_xid = xid;
 	*out_cxid = cxid;
 }
@@ -14798,7 +14841,8 @@ static void avm2_render_statictext(Avm2Context* ctx, Avm2Object* obj,
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
 static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
-                             const Mat* parent_world, double parent_alpha)
+                             const Mat* parent_world, double parent_alpha,
+                             const Avm2Cx* parent_cx)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
@@ -14807,6 +14851,15 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	Mat local = ext_matrix(ext);
 	Mat world = mat_mul(parent_world, &local);
 	double alpha = parent_alpha * ((double) ext->alpha_fixed8 / 256.0);
+
+	// Concatenate this node's FULL colour transform onto the parent's and
+	// publish it for the leaf writers below (they read g_avm2_cur_cx via
+	// avm2_alloc_cx_slot). The node renders its own content before recursing,
+	// and every child re-publishes on entry, so a single global is enough.
+	Avm2Cx own_cx, node_cx;
+	avm2_cx_of_ext(&own_cx, ext);
+	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
+	g_avm2_cur_cx = node_cx;
 
 	if (ext->is_bitmap)
 		avm2_render_bitmap(ctx, obj, &world, alpha);
@@ -14834,11 +14887,11 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// on that), so this arm is the only way they are ever drawn.
 	{
 		Avm2Object* bst = avm2_button_state_child(ext);
-		if (bst != NULL) avm2_render_node(ctx, bst, &world, alpha);
+		if (bst != NULL) avm2_render_node(ctx, bst, &world, alpha, &node_cx);
 	}
 
 	for (uint32_t i = 0; i < ext->render_len; i++)
-		avm2_render_node(ctx, ext->render_list[i], &world, alpha);
+		avm2_render_node(ctx, ext->render_list[i], &world, alpha, &node_cx);
 }
 
 // Focus highlight, drawn on TOP of the whole stage (Ruffle
@@ -14869,9 +14922,10 @@ static void avm2_render_walk(Avm2Context* ctx)
 	renderer_open_pass(context);
 	g_avm2_xform_next = g_avm2_xform_base;
 	g_avm2_cxform_next = g_avm2_cxform_base;
+	g_avm2_cur_cx = AVM2_CX_IDENTITY;
 	Mat id = mat_identity();
 	if (ctx->stage != NULL)
-		avm2_render_node(ctx, ctx->stage, &id, 1.0);
+		avm2_render_node(ctx, ctx->stage, &id, 1.0, &AVM2_CX_IDENTITY);
 	avm2_render_highlight(ctx);
 	renderer_close_pass(context);
 }

@@ -2751,11 +2751,53 @@ static int build_attached_mc_local_xform(DisplayObject* obj, float out[16],
 	return 0;
 }
 
+static void compose_cxform20(float out[20], const float* outer, const float* inner);
+
+// Is this 20-float cxform the identity (mult = I, add = 0)?
+static int cx_is_identity(const float cx[20])
+{
+	for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++) {
+			float want = (i == j) ? 1.0f : 0.0f;
+			if (fabsf(cx[j*4 + i] - want) > 1e-6f) return 0;
+		}
+	for (int i = 0; i < 4; i++)
+		if (fabsf(cx[16 + i]) > 1e-6f) return 0;
+	return 1;
+}
+
+// Seed the recursive cxform composition from a ROOT display-list entry: its
+// runtime override when it has one, otherwise its baked placement slot.
+// Returns 1 (and fills out) only when the result is non-identity — an identity
+// seed is passed down as NULL so children keep their own baked slots and the
+// dynamic-slot budget is untouched.
+static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
+	float out[20])
+{
+	if (obj->cx_overridden) {
+		build_cxform_from_obj(out, obj);
+		return !cx_is_identity(out);
+	}
+	extern float cxform_data[];
+	u32 baked = (app_context->cxform_data_size > 0)
+		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
+	if (obj->cxform_id != 0 && obj->cxform_id < baked) {
+		memcpy(out, &cxform_data[obj->cxform_id * 20], 20 * sizeof(float));
+		return !cx_is_identity(out);
+	}
+	return 0;
+}
+
+// `parent_cx` carries the parent's concatenated colour transform as VALUES
+// (NULL = identity). Passing values rather than the parent's GPU slot id is
+// what lets this compose instead of inherit — the slot itself can't be read
+// back from the GPU.
 static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 	size_t dl_max_depth, const float parent_composed[16],
-	int parent_cx_override, u32 parent_cxform_id)
+	const float* parent_cx, u32 parent_cxform_id)
 {
 	const float* transforms = (const float*)app_context->transform_data;
+	if (parent_cx != NULL && cx_is_identity(parent_cx)) parent_cx = NULL;
 
 	for (size_t i = 1; i <= dl_max_depth; ++i)
 	{
@@ -2840,53 +2882,85 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			renderer_write_transform(context, obj->transform_id, composed);
 		}
 
-		// Color transform for this child and its subtree.
-		// A child entry's OWN runtime override (obj->cx_overridden — e.g. an
-		// AS `_alpha` write on an attachMovie'd clip, synced by
-		// mcSyncAlphaToDisplayObj) takes effect here: build a per-tick
-		// dynamic cxform slot from the entry's cx_* fields, multiplying the
-		// parent's alpha in when the parent also carries an override (the
-		// common nesting case; full channel-wise composition is still TODO).
-		// Otherwise inherit the parent's cxform as before (no composition —
-		// works when the child has an identity cxform).
-		int eff_cx_override = parent_cx_override;
-		u32 eff_cxform_id = parent_cxform_id;
-		int want_own_cx = 0;
-		float cx[20];
+		// Color transform for this child and its subtree — TRUE composition
+		// (out = parent(child)), not inheritance. The old code had exactly two
+		// states: "inherit the parent's slot" or "use the child's own slot".
+		// So a static PlaceObject cxform on an INTERMEDIATE sprite was dropped
+		// one level down (visual/cache_as_bitmap/nested_color_transform), and a
+		// parent `_alpha` REPLACED rather than multiplied a child's static
+		// alpha (visual/cache_as_bitmap/color_transform: we drew 0.30 where
+		// Flash draws 0.30 * 0.50). compose_cxform20 was already correct and
+		// already here; what was missing was the parent's VALUES.
+		float own_cx[20];
+		int have_own = 0;
 		if (obj->cx_overridden) {
 			// Timeline-placed child whose entry carries a runtime cxform
 			// (mcSyncAlphaToDisplayObj writes through mc->display_obj, which
 			// IS this entry for timeline children).
-			build_cxform_from_obj(cx, obj);
-			want_own_cx = 1;
+			build_cxform_from_obj(own_cx, obj);
+			have_own = 1;
 		} else if (attached_mc != NULL && (attached_mc->as_set_flags & 32)) {
 			// attachMovie-placed child: its display_obj is a STANDALONE
 			// struct (see build_attached_mc_local_xform), so runtime state
 			// lives on the MC — mirror the spatial overlay and build an
 			// alpha-only cxform from mc->alpha.
-			memset(cx, 0, sizeof(cx));
-			cx[0] = cx[5] = cx[10] = 1.0f;
-			cx[15] = attached_mc->alpha / 100.0f;
-			if (cx[15] < 0.0f) cx[15] = 0.0f;
-			want_own_cx = 1;
+			memset(own_cx, 0, sizeof(own_cx));
+			own_cx[0] = own_cx[5] = own_cx[10] = 1.0f;
+			own_cx[15] = attached_mc->alpha / 100.0f;
+			if (own_cx[15] < 0.0f) own_cx[15] = 0.0f;
+			have_own = 1;
+		} else {
+			// Static PlaceObject cxform on this entry — previously only ever
+			// consulted at the ROOT call sites, and silently dropped here.
+			extern float cxform_data[];
+			u32 baked_cx = (app_context->cxform_data_size > 0)
+				? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
+			if (obj->cxform_id != 0 && obj->cxform_id < baked_cx) {
+				memcpy(own_cx, &cxform_data[obj->cxform_id * 20], sizeof(own_cx));
+				have_own = 1;
+			}
 		}
-		if (want_own_cx) {
-			// (When the parent ALSO carries an override, the child's own
-			// slot wins un-composed — the parent slot lives GPU-side so its
-			// values can't be read back here. Channel-true parent*child
-			// composition stays with the cxform-composition TODO below.)
+
+		float eff_cx[20];
+		int eff_cx_valid = 0;
+		if (parent_cx != NULL && have_own) {
+			compose_cxform20(eff_cx, parent_cx, own_cx);
+			eff_cx_valid = 1;
+		} else if (parent_cx != NULL) {
+			memcpy(eff_cx, parent_cx, sizeof(eff_cx));
+			eff_cx_valid = 1;
+		} else if (have_own) {
+			memcpy(eff_cx, own_cx, sizeof(eff_cx));
+			eff_cx_valid = 1;
+		}
+
+		// Slot economy: only MINT a slot when the composition genuinely
+		// produced something neither side already owns. There are just 256
+		// dynamic cxform slots per tick (render_webgpu.c ~1095), and a fade on
+		// a container with dozens of children must not burn one per child —
+		// that would exhaust the pool and silently drop the tint.
+		//   * no parent cxform              -> keep the child's own slot
+		//   * parent cxform, child has none -> INHERIT the parent's slot
+		//   * both                          -> mint the composed slot
+		u32 eff_slot = obj->cxform_id;
+		if (parent_cx != NULL && !have_own) {
+			eff_slot = parent_cxform_id;
+		} else if (eff_cx_valid
+		           && (parent_cx != NULL || obj->cx_overridden
+		               || (attached_mc != NULL && (attached_mc->as_set_flags & 32)))) {
 			u32 cx_slot = g_next_dynamic_cxform_slot;
 			if (cx_slot < g_cxform_slot_capacity) {
 				g_next_dynamic_cxform_slot++;
-				renderer_write_cxform(context, cx_slot, cx);
-				eff_cx_override = 1;
-				eff_cxform_id = cx_slot;
+				renderer_write_cxform(context, cx_slot, eff_cx);
+				eff_slot = cx_slot;
 			}
 		}
-		if (eff_cx_override && obj->cxform_id != eff_cxform_id) {
+		if (obj->cxform_id != eff_slot) {
 			cxform_overrides_push(obj, obj->cxform_id);
-			obj->cxform_id = eff_cxform_id;
+			obj->cxform_id = eff_slot;
 		}
+		const float* child_cx = (eff_cx_valid && !cx_is_identity(eff_cx))
+			? eff_cx : NULL;
 
 		switch (ch->type)
 		{
@@ -2966,7 +3040,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				if (obj->sprite_display_list != NULL)
 					compose_children(app_context,
 						obj->sprite_display_list, obj->sprite_max_depth,
-						composed, eff_cx_override, eff_cxform_id);
+						composed, child_cx, eff_slot);
 				break;
 			}
 
@@ -3014,7 +3088,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
 					compose_children(app_context,
 						obj->sprite_display_list, obj->sprite_max_depth,
-						composed, eff_cx_override, eff_cxform_id);
+						composed, child_cx, eff_slot);
 				break;
 			}
 
@@ -4437,22 +4511,170 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	float w = info->w * 20.0f;
 	float h = info->h * 20.0f;
 
+	// The box used to be drawn in stage space through transform slot 0
+	// (identity) with the field's *unscaled* local size — so _xscale /
+	// _yscale / _rotation and any ancestor matrix were silently discarded
+	// (visual/edittext/edittext_border_transform drew axis-aligned squares
+	// where Flash draws diamonds and parallelograms). When the producer
+	// supplies a world matrix, allocate a GPU transform slot for it and emit
+	// the box in FIELD-LOCAL twips through that slot instead.
+	u32 xform_slot = 0;
+	float bt = 20.0f;   // border thickness along y, in local twips
+	float bl = 20.0f;   // border thickness along x, in local twips
+	int line_rect = 0;  // draw the border as Ruffle's open line-rect polyline
+	int device_box = (info->has_matrix && info->device_font);
+	if (device_box) {
+		// DEVICE fonts take Ruffle's `draw_device_text_box` (edit_text.rs
+		// ~2845): the bounds are transformed, then their axis-aligned SCREEN
+		// box is pixel-snapped and drawn upright — a device-font box never
+		// rotates or shears with the matrix, not even for the small rotations
+		// that survive the positive-scale-only cull above. Drawing it through
+		// the matrix instead put visual/edittext/edittext_device_transform_
+		// small_rotation (a CI-passing test) right on its outlier limit.
+		float lx0 = x, ly0 = y, lx1 = x + w, ly1 = y + h;
+		float cxs[4] = {
+			info->m_a * lx0 + info->m_c * ly0 + info->m_tx,
+			info->m_a * lx1 + info->m_c * ly0 + info->m_tx,
+			info->m_a * lx0 + info->m_c * ly1 + info->m_tx,
+			info->m_a * lx1 + info->m_c * ly1 + info->m_tx,
+		};
+		float cys[4] = {
+			info->m_b * lx0 + info->m_d * ly0 + info->m_ty,
+			info->m_b * lx1 + info->m_d * ly0 + info->m_ty,
+			info->m_b * lx0 + info->m_d * ly1 + info->m_ty,
+			info->m_b * lx1 + info->m_d * ly1 + info->m_ty,
+		};
+		float minx = cxs[0], maxx = cxs[0], miny = cys[0], maxy = cys[0];
+		for (int k = 1; k < 4; k++) {
+			if (cxs[k] < minx) minx = cxs[k];
+			if (cxs[k] > maxx) maxx = cxs[k];
+			if (cys[k] < miny) miny = cys[k];
+			if (cys[k] > maxy) maxy = cys[k];
+		}
+		// round_to_pixel_ties_even on origin and extent, independently.
+		x = rintf(minx / 20.0f) * 20.0f;
+		y = rintf(miny / 20.0f) * 20.0f;
+		w = rintf((maxx - minx) / 20.0f) * 20.0f;
+		h = rintf((maxy - miny) / 20.0f) * 20.0f;
+		xform_slot = 0;   // already in stage twips
+		line_rect = 1;
+		// The edge pixel is added AFTER the background draw (below) — the
+		// background is exactly the bounds; the edge belongs to the border.
+	} else if (info->has_matrix) {
+		u32 slot = g_next_dynamic_xform_slot;
+		if (slot < g_xform_slot_capacity) {
+			g_next_dynamic_xform_slot++;
+			float xf[16] = {
+				1.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f,
+			};
+			xf[0]  = info->m_a;
+			xf[1]  = info->m_b;
+			xf[4]  = info->m_c;
+			xf[5]  = info->m_d;
+			xf[12] = info->m_tx;
+			xf[13] = info->m_ty;
+			renderer_write_transform(context, slot, xf);
+			xform_slot = slot;
+			line_rect = 1;
+		} else {
+			// Slot pool exhausted — fall back to the old stage-space draw so
+			// the box at least appears at the right origin.
+			x += info->m_tx;
+			y += info->m_ty;
+		}
+		// Flash keeps the border 1 device pixel wide regardless of the
+		// transform (edit_text.rs `draw_line_rect`: "line width of the border
+		// is always 1px regardless of zoom and transform"), and the extra
+		// right/bottom edge pixel is likewise a device pixel. We draw the box
+		// as filled rects in LOCAL space, so divide both by the matrix's
+		// per-axis scale.
+		float sx = sqrtf(info->m_a * info->m_a + info->m_b * info->m_b);
+		float sy = sqrtf(info->m_c * info->m_c + info->m_d * info->m_d);
+		if (sx > 1e-4f) bl = 20.0f / sx;
+		if (sy > 1e-4f) bt = 20.0f / sy;
+	}
+
 	if (info->has_background) {
 		float r = ((info->background_color >> 16) & 0xFF) / 255.0f;
 		float g = ((info->background_color >> 8) & 0xFF) / 255.0f;
 		float b = (info->background_color & 0xFF) / 255.0f;
-		renderer_draw_rect(context, x, y, w, h, r, g, b, 1.0f, 0, 0);
+		// The background is exactly the field's bounds — Ruffle's
+		// `draw_rect(bg, create_box(width, height, x_min, y_min))`. The extra
+		// edge pixel belongs to the BORDER polyline only.
+		renderer_draw_rect(context, x, y, w, h, r, g, b, 1.0f, xform_slot, 0);
+	}
+
+	if (device_box) {
+		// Already axis-aligned in screen space — the edge pixel is a plain
+		// +1 device pixel on the right/bottom.
+		if (info->edge_x) w += bl;
+		if (info->edge_y) h += bt;
+	} else if (info->has_matrix) {
+		// Flash's extra edge pixel is added on the SCREEN +x / +y side. We
+		// draw axis-aligned rects in LOCAL space, so map the two screen unit
+		// directions back through the inverse matrix and grow along whichever
+		// local axis each one mostly points down. Identity keeps the old
+		// "w += 1px" behaviour; a reflection grows on the local -x/-y side
+		// (otherwise the whole box lands a pixel too far left/up); a 90°
+		// rotation swaps which local axis each screen edge grows.
+		float det = info->m_a * info->m_d - info->m_b * info->m_c;
+		int plain = 1;
+		if (fabsf(det) > 1e-6f) {
+			// local delta (twips) for one screen pixel along +x and +y
+			float ux =  info->m_d * 20.0f / det, uy = -info->m_b * 20.0f / det;
+			float vx = -info->m_c * 20.0f / det, vy =  info->m_a * 20.0f / det;
+			struct { int on; float dx, dy; } edges[2] = {
+				{ info->edge_x, ux, uy },
+				{ info->edge_y, vx, vy },
+			};
+			for (int e = 0; e < 2; e++) {
+				if (!edges[e].on) continue;
+				float dx = edges[e].dx, dy = edges[e].dy;
+				if (fabsf(dx) >= fabsf(dy)) {
+					if (dx < 0.0f) { x += dx; }
+					w += fabsf(dx);
+					if (e != 0 || dx < 0.0f) plain = 0;
+				} else {
+					if (dy < 0.0f) { y += dy; }
+					h += fabsf(dy);
+					if (e != 1 || dy < 0.0f) plain = 0;
+				}
+			}
+		} else {
+			if (info->edge_x) w += bl;
+			if (info->edge_y) h += bt;
+			plain = 0;
+		}
+		// The half-open border polyline drops its far corner in SCREEN space;
+		// only in the plain positive-scale case does that coincide with the
+		// local bottom-right one, so restrict the open outline to that case.
+		if (!plain) line_rect = 0;
 	}
 
 	if (info->has_border) {
 		float r = ((info->border_color >> 16) & 0xFF) / 255.0f;
 		float g = ((info->border_color >> 8) & 0xFF) / 255.0f;
 		float b = (info->border_color & 0xFF) / 255.0f;
-		float t = 20.0f;  // 1 pixel border thickness in twips
-		renderer_draw_rect(context, x, y, w, t, r, g, b, 1.0f, 0, 0);         // top
-		renderer_draw_rect(context, x, y + h - t, w, t, r, g, b, 1.0f, 0, 0); // bottom
-		renderer_draw_rect(context, x, y + t, t, h - 2*t, r, g, b, 1.0f, 0, 0); // left
-		renderer_draw_rect(context, x + w - t, y + t, t, h - 2*t, r, g, b, 1.0f, 0, 0); // right
+		if (line_rect) {
+			// Ruffle traces the border as an OPEN polyline
+			// (x0,y0)->(x1,y0)->(x1,y1)->(x0,y1)->(x0,y0), so the
+			// bottom-right corner pixel is drawn exactly once — i.e. not at
+			// all, once each segment is half-open at its far end. Reproducing
+			// that is what the last few outliers of
+			// visual/edittext/edittext_border_transform are.
+			renderer_draw_rect(context, x, y, w, bt, r, g, b, 1.0f, xform_slot, 0);                    // top
+			renderer_draw_rect(context, x, y + h - bt, w - bl, bt, r, g, b, 1.0f, xform_slot, 0);      // bottom
+			renderer_draw_rect(context, x, y + bt, bl, h - bt, r, g, b, 1.0f, xform_slot, 0);          // left
+			renderer_draw_rect(context, x + w - bl, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0); // right
+		} else {
+			renderer_draw_rect(context, x, y, w, bt, r, g, b, 1.0f, xform_slot, 0);            // top
+			renderer_draw_rect(context, x, y + h - bt, w, bt, r, g, b, 1.0f, xform_slot, 0);   // bottom
+			renderer_draw_rect(context, x, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0);          // left
+			renderer_draw_rect(context, x + w - bl, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0); // right
+		}
 	}
 }
 
@@ -4999,6 +5221,33 @@ static void masked_drawing_render_cb(const DrawingMCInfo* masked, const DrawingM
 static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user_data)
 {
 	(void)user_data;
+	// Every attached / loaded bitmap used to be drawn with transform_id 0
+	// (identity) and its position BAKED into the quad's twips, so _xscale,
+	// _yscale, _rotation, transform.matrix and _alpha were all discarded —
+	// visual/scale_rotation_cache's `_xscale = -100` had literally no effect
+	// on the render. apply_dynamic_mc_transforms already builds the right slot
+	// (it handles negative scale correctly); route through it, drawing at the
+	// local origin because the slot bakes _x/_y in. MCs with no AS-set
+	// transform get slot 0 and keep the old stage-space path unchanged.
+	if (info->xform_slot != 0) {
+		u32 cx_slot = 0;
+		if (info->alpha < 99.99f) {
+			u32 slot = g_next_dynamic_cxform_slot;
+			if (slot < g_cxform_slot_capacity) {
+				g_next_dynamic_cxform_slot++;
+				float cx[20];
+				memset(cx, 0, sizeof(cx));
+				cx[0] = cx[5] = cx[10] = 1.0f;
+				cx[15] = info->alpha / 100.0f;
+				if (cx[15] < 0.0f) cx[15] = 0.0f;
+				renderer_write_cxform(context, slot, cx);
+				cx_slot = slot;
+			}
+		}
+		renderer_draw_bitmap_quad(context, info->pixels, info->width,
+			info->height, 0.0f, 0.0f, info->xform_slot, cx_slot);
+		return;
+	}
 	renderer_draw_bitmap_quad(context, info->pixels, info->width, info->height,
 		info->x_twips, info->y_twips, 0, 0);
 }
@@ -5118,10 +5367,12 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				} else {
 					sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				float seed_cx[20];
+				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+					? seed_cx : NULL;
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
-					sprite_xform,
-					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+					sprite_xform, seed, obj->cxform_id);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
@@ -5149,10 +5400,12 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				} else {
 					btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				float seed_cx[20];
+				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+					? seed_cx : NULL;
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
-					btn_xform,
-					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+					btn_xform, seed, obj->cxform_id);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_TEXT)
@@ -5341,7 +5594,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
 			}
 			compose_children(app_context, d->sprite_display_list,
-				d->sprite_max_depth, mc_xform, 0, 0);
+				d->sprite_max_depth, mc_xform, NULL, 0);
 			render_display_list(app_context, d->sprite_display_list,
 				d->sprite_max_depth);
 		}
@@ -5546,7 +5799,7 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	float mc_xform[16];
 	hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
 	compose_children(app_context, d->sprite_display_list,
-		d->sprite_max_depth, mc_xform, 0, 0);
+		d->sprite_max_depth, mc_xform, NULL, 0);
 	render_display_list(app_context, d->sprite_display_list,
 		d->sprite_max_depth);
 }
@@ -6016,10 +6269,12 @@ void tagShowFrame(SWFAppContext* app_context)
 				} else {
 					sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				float seed_cx[20];
+				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+					? seed_cx : NULL;
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
-					sprite_xform,
-					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+					sprite_xform, seed, obj->cxform_id);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
@@ -6070,10 +6325,12 @@ void tagShowFrame(SWFAppContext* app_context)
 				} else {
 					btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				float seed_cx[20];
+				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
+					? seed_cx : NULL;
 				compose_children(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
-					btn_xform,
-					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+					btn_xform, seed, obj->cxform_id);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_TEXT)
