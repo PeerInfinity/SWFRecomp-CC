@@ -603,12 +603,13 @@ bool setVariableOnLocalScope(const char* var_name, ActionVar* value)
 
 int g_swf_version = 5;       // SWF version — set at startup from constants.h
 
-// The `TextField` global constructor only exists from SWF 7 on: at SWF 6
-// `new TextField()` is `new undefined()` and yields undefined
-// (avm1/native_objects_swf6 line 56, where Flash and Ruffle agree; the
-// swf7/swf8 siblings get a real native instance). TextField INSTANCES and
-// TextField.prototype exist at every version — only the global name is gated.
-#define TEXTFIELD_CTOR_MIN_SWF_VERSION 7
+// NOTE on TextField and SWF versions: do NOT version-gate the TextField
+// global or its construction. avm1/native_objects_swf6 line 56 (Flash
+// capture, known_failure upstream) wants `new TextField()` -> undefined at
+// SWF 6, but avm1/textfield_props_swf6 (Ruffle-passing) and the gnash
+// TextField-v5 / toString_valueOf-v5/v6 Ruffle oracles all pin an OBJECT at
+// v5/v6 — the upstream corpus contradicts itself, and satisfying that one
+// line costs seven tests. See ACCEPTED_DIFFS.md "native_objects_swf6".
 
 int g_main_movie_swf_version = 5;  // Main movie's SWF version — set once by main.c, never
                                    // swapped during child-SWF/import context switches. Used
@@ -39582,7 +39583,6 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// ---- TextField ----
 	initTextFieldPrototype(app_context);
-	if (g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
 	{
 		ActionVar tf_cv = {0};
 		tf_cv.type = ACTION_STACK_VALUE_FUNCTION;
@@ -40076,8 +40076,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_OBJ("Mouse", 5, g_mouse_obj);
 	REG_OBJ("Key", 3, g_key_obj);
 	REG_FUNC("Button", 6, &g_stub_ctors[1]);
-	if (g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
-		REG_FUNC("TextField", 9, &g_textfield_constructor);
+	REG_FUNC("TextField", 9, &g_textfield_constructor);
 	REG_FUNC("TextFormat", 10, &g_textformat_constructor);
 	REG_OBJ("Stage", 5, g_stage_obj);
 	REG_FUNC("Video", 5, &g_stub_ctors[16]);
@@ -42260,8 +42259,7 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)mc_ctor);
 			return;
 		}
-		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "TextField", 9)
-		         && g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
+		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "TextField", 9))
 		{
 			// Return the built-in TextField constructor as a function
 			initTextFieldPrototype(app_context);
@@ -54507,8 +54505,7 @@ void actionNewObject(SWFAppContext* app_context)
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
 	}
-	else if (strcmp(ctor_name, "TextField") == 0
-	         && g_swf_version >= TEXTFIELD_CTOR_MIN_SWF_VERSION)
+	else if (strcmp(ctor_name, "TextField") == 0)
 	{
 		// Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype
