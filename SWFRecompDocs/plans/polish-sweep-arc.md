@@ -1490,3 +1490,79 @@ arc), C3.3 (trailing #1065 after file-level VerifyError: net 0, wins
 resolution above), and the stale `avm2/ignored_tests.txt` bucket
 (`url_vars`, `url_loader`, `urlrequest` listed but passing — prune pass
 wanted).
+
+
+## 11. Session 10 (2026-08-01) — the DUAL-AXIS fan-out: trace +12 exact, pixels +45 vs +34
+
+Baseline `feb8882b0` (4176/4424 trace, 172/566 pixels) → `c4496a4c8`:
+**trace 4188/4424 (94.7%)**, **pixels 217/566 (38.3%)**. ONE CI run
+`30713776612` (graphics/`categories=full`/`images=true`) graded both axes.
+**Zero regressions on either axis, zero other status moves.** 8 commits
+`734a0fc2f`..`c4496a4c8`; raw reports `session10-fanout-reports/` (8 wave-1
++ 8 wave-2). First session drawing targets from BOTH boards
+per the user's dual-axis direction; the two-wave shape held unchanged.
+
+### 11.1 Ledger
+
+Trace +12: hygiene (heavy_tesselation recomp-timeout 30→300s, e12_1 DXNS
+×2 sites) · symbols (B5 AS3-tag suppression, B8a never-placed-binding gate)
+· singles (StyleSheet ×2, StaticText.text ×2, hittesting full-pass +
+getobjectsunderpoint rider) · taxonomy (toLocaleString_rt→ruffle_matched,
+Error1081 full pass). Pixels +45 (predicted +34; 11 riders): text 14+
+(edittext_selection_leading ×12 + autosize riders) · phase-cxform 13
+(border_transform 4, cxform 5, attached-bitmap 3, loop-phase 1) · button 5
+· blend 2 flips + 15 band moves 56–96% · riders incl. acid-blend-2 ×2 more
+frames, define_font_glyph_table_overlap, acid-child. Band accounting:
+improved 65 / worsened 22, ALL worsened fail→fail (caret_empty hairline
+family +36 channels from the device-box corner-pixel trade; place_object_test
++73%; cab/masks .03/.04 ~+70% — flag for the next pixel board).
+
+### 11.2 Method notes (what changed vs s7–s9)
+
+1. **The near-pass well is a closed inventory**: 59 candidates, ZERO refill
+   after s8's +23. Both error-string keys stayed dry; the paying key was
+   capability-gap × oracle-conflict cross-checking.
+2. **Wave-1 evidence-finishing agents now REFUTE briefs, profitably.**
+   Four brief errors caught before they cost anything: PerspectiveProjection
+   was NOT an oracle conflict (test.toml tolerance already covers it — back
+   in the live pool); C3.3's "net 0" hid a ruffle_matched demotion; the B7
+   GC-retry probe was use-after-free by construction (locals are invisible
+   to the collector — scoped as the "GC during long loops" arc, do NOT
+   re-file as polish); B6's diagnosis was inverted (state children must be
+   ADDED to getObjectsUnderPoint, and reporting the SUBTREE beats Ruffle).
+3. **The 8-patch serial merge hit ONE textual + ONE semantic conflict, same
+   file**: text's alpha-only `avm2_text_slots` vs phase-cxform's full
+   `avm2_alloc_cx_slot` (resolved: full cxform wins), and button's new
+   `avm2_render_node` call site vs phase-cxform's widened signature
+   (compile_fail at merge, fixed by passing `&node_cx`). When two patches
+   restructure the same walk, headline-re-check EVERY patch pair that
+   touches it — the per-patch checks caught it immediately.
+4. **Graphics slices priced by mechanism flip cleanly; near-pass counts do
+   not.** simple_loop_test "5 flips" was 1 flip + 4 demotions-to-hairline
+   (the phase fix was still right — the residue is now single-mechanism).
+   Blend "12 of 23" was 2 flips + 15 near-total band moves: `max_outliers=0`
+   means only zero-residual flips, and the residual is ONE pre-existing
+   extra element inside blend groups (visible pre-patch; the follow-on lead
+   that likely unlocks the whole directory).
+5. **Trade recorded**: EditText device-box now draws its bottom-right corner
+   (3 border_transform flips) at the cost of edittext_device_transform_
+   small_rotation sitting at exactly 11/11 outliers and caret_empty's
+   hairline excess rising 48→84. Revert = `line_rect = 0` in the device_box
+   branch of `textfield_render_cb`, cost −3 flips.
+
+### 11.3 Left on the board
+
+Trace: `graphic_linkage` (script-`new` vs timeline instantiation
+discriminator in `display_native_init` — own batch, high-traffic arm);
+B8b lazy script inits (rewrite of the step-3/4 contract the from_avmplus
+drivers pin); B9 device-font test.toml TTFs (scope first); B7 → the GC arc
+(shadow stack vs conservative C-stack scan, w2-taxonomy report §B7);
+PerspectiveProjectionClass (~2 mechanisms, +1); loader_duplicate_class
+cause C; heavy_tesselation is now a pixel candidate.
+Pixels: blend residual extra-element (one mechanism, likely most of
+`visual/blend_modes`); masks (4 defects, A=stencil-union gating 2 flips
+HIGH risk, full slice needs the AVM2 T7 arc — wave1-gfx-masks report);
+`avm2_button_scroll_rect`/`bitmapbuttons` (need AVM2 clipping / bitmap
+fills); button2 states ×3 (Fix B landed, needs mouse-driven repro);
+cacheAsBitmap = CARRIER (7 real cmps = alpha-mask path + size gates, pair
+with a Filters arc); cab/masks .03/.04 + place_object_test worsened bands.

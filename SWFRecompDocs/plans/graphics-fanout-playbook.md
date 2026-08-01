@@ -246,3 +246,48 @@ halo_penumbra 16/15 · row_banded 13/13 · rest ≤6 each.
 - `hairline_edge_drift` is presumed lavapipe-AA until `triage_image_tests.py`
   says otherwise for a specific test; `blank_render` is dominated by
   unimplemented backends (Stage3D 26, video 9) — arc-sized, not sweep-sized.
+
+## 9. Session-10 state of the board (2026-08-01)
+
+**Closeout run `30713776612` at `c4496a4c8`: 217/566 (38.3%), +45, zero
+regressions on either axis** (from 172/566 at `feb8882b0`). Full ledger:
+`polish-sweep-arc.md` §11; reports `session10-fanout-reports/`.
+
+Corrections to §8's leads, measured this session:
+
+- **Blend**: F0–F4/F6/F7-AVM1 landed. Only 2 flips (`max_outliers=0` needs
+  zero residual) but 15 band moves of 56–96%. The residual on ~all
+  `visual/blend_modes` tests is ONE pre-existing extra element inside the
+  blend group (golden 217 / before 227 / after 255 on `add`) — single
+  mechanism, the top pixel lead going forward. F5 (layer groups) and
+  F7-AVM2 remain.
+- **SimpleButton**: walk arm + state machine + `resolve_shape_geom` landed
+  (+5). `cache_as_bitmap/avm2_button` was NOT AVM2 (AVM1 libswf path —
+  wave-1's DoABC gate over-matched). Remaining: `button2` ×3 (state repro),
+  `avm2_button_scroll_rect` (needs AVM2 clipping, excess GREW now that the
+  button draws), `bitmapbuttons` (bitmap fills).
+- **Text**: `edittext_selection_leading` ×12 + riders all landed (+14).
+  T3 device-font outlines still the deferred arc. New: CPU-raster
+  box/selection port unblocks `cache_as_bitmap/edittext_selection` ×3.
+- **Masks**: wave-1 diagnosis says the §8 "gating bug" framing was wrong —
+  FOUR defects (stencil accumulates per-pass so mask N tests the union;
+  every EditText ORs its rect in; setMask unread by tag.c loops; scrollRect
+  is a stub; AVM2 render walk reads none of clip_depth/mask/scroll_rect).
+  Defect A alone = 2 flips at HIGH text-family risk; the full 8–15 needs
+  the AVM2 T7 arc (3–4 sessions). `wave1-gfx-masks.md` has the plan; the
+  regression suite still has NO mask test.
+- **cacheAsBitmap = CARRIER** (wave1-gfx-cab-misc): 25 of 32 cmps route to
+  mask/EditText/scrollRect/button/cxform owners; only 7 need a real cache
+  (Ruffle's alpha-mask path + the swf-version size gates — land gates and
+  cache together or `swf_9/10_too_big` regress). Pair with a Filters arc.
+- **Frame phase**: `simple_loop_test` period now Ruffle-exact (+1 flip,
+  frames 3–7 demoted to the hairline class). `timeline_loop` is a DIFFERENT
+  mechanism (byte-identical A/B under the phase fix). `offset_translation`
+  should be retired as a cluster (the ±8px shift probe saturates on small
+  images — cab-misc report §8).
+- Worsened-band watchlist for the next board: `edittext_caret_empty` ×12
+  (48→84, the device-box corner trade), `place_object_test` (+73%),
+  `cache_as_bitmap/masks [.03/.04]` (~+70%).
+- New playbook rule (w2-button trap): worktree test-dir copies need
+  `--recompile` on FIRST use — a `RecompiledABC` copied mid-write from the
+  main tree reads as `compile_fail` even sequentially.
