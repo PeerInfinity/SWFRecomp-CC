@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-01T02:48:45.622885+00:00",
-    "git_sha": "73c786e3fa45240696226f7916bcf393a34056eb",
-    "duration_seconds": 125.5,
+    "timestamp": "2026-08-01T03:29:50.816745+00:00",
+    "git_sha": "375373786d2d491b520dca4d4e5ce510df219d1c",
+    "duration_seconds": 127.1,
     "total_available": 6,
     "shards": 30,
     "expected_shards": 30,
@@ -24,8 +24,8 @@
       "test": "device_font_glyph_fallback",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.409,
-        "run": 0.215
+        "compile": 25.116,
+        "run": 0.165
       },
       "num_frames": 1,
       "lines": {
@@ -33,7 +33,7 @@
         "expected_lines": 36,
         "matching_lines": 29
       },
-      "duration": 26.63,
+      "duration": 25.29,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=36, expected=36)",
       "actual_output": "Text: a\n  Text runs:\n    Text runs (1):\n    from 0 to 1: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0: x=2, y=2, width=6, height=13.6\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width=6\nText: ab\n  Text runs:\n    Text runs (1):\n    from 0 to 2: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0: x=2, y=2, width=6, height=13.6\n    1:\n      x=8, y=2\n      width is zero? false\n      height is zero? false\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width is zero? false\n    width is 10? false\nText: b\n  Text runs:\n    Text runs (1):\n    from 0 to 1: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0:\n      x=2, y=2\n      width is zero? false\n      height is zero? false\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width is zero? false\n    width is 10? false",
@@ -43,7 +43,7 @@
       "test": "device_font_kerning",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.855,
+        "compile": 27.52,
         "run": 0.215
       },
       "num_frames": 1,
@@ -52,7 +52,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 27.1,
+      "duration": 27.76,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -61,7 +61,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 100,
+            "height": 50,
+            "total_channels": 20000,
+            "max_diff": 255,
+            "diff_channels": 2424,
+            "mean_diff": 30.906,
+            "outliers": 2424,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 2424
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "output_mismatch",
@@ -73,7 +87,7 @@
       "test": "device_font_list",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.829,
+        "compile": 26.868,
         "run": 0.215
       },
       "num_frames": 1,
@@ -82,7 +96,7 @@
         "expected_lines": 64,
         "matching_lines": 6
       },
-      "duration": 27.06,
+      "duration": 27.09,
       "status": "output_mismatch",
       "detail": "58 line(s) differ (actual=48, expected=64)",
       "actual_output": "Testing CSS font list fallback:\n  Embedded? = false\n  Font list? = Totally Unknown, TestFontA , TestFontB\nTesting TextFormat font list fallback:\n  Embedded? = false\n  Font list? = Totally Unknown, TestFontA , TestFontB\nTesting CSS font list fallback:\n  Embedded? = false\n  Font list? =  testFOntB  , TestFontA , TestFontB\nTesting TextFormat font list fallback:\n  Embedded? = false\n  Font list? =  testFOntB  , TestFontA , TestFontB\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = Totally Unknown, EmbeddedTestFontA, EmbeddedTestFontB\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = Totally Unknown, EmbeddedTestFontA, EmbeddedTestFontB\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA  \nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA  \nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA  \nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA  \nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   embeddedTESTFonta\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   embeddedTESTFonta",
@@ -91,9 +105,9 @@
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.197,
-        "compile": 26.515,
-        "run": 0.516
+        "recomp": 0.192,
+        "compile": 29.465,
+        "run": 0.566
       },
       "num_frames": 1,
       "lines": {
@@ -101,7 +115,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.8,
+      "duration": 30.88,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -110,7 +124,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 1000,
+            "total_channels": 2200000,
+            "max_diff": 255,
+            "diff_channels": 121914,
+            "mean_diff": 13.195,
+            "outliers": 121914,
+            "max_outliers": 0,
+            "tolerance": 3,
+            "excess_outliers": 121914
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -119,8 +147,8 @@
       "test": "embed_matching/match_style",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.937,
-        "run": 0.315
+        "compile": 7.368,
+        "run": 0.317
       },
       "num_frames": 1,
       "lines": {
@@ -128,7 +156,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.51,
+      "duration": 7.94,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -137,7 +165,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 7389,
+            "mean_diff": 0.7404,
+            "outliers": 7389,
+            "max_outliers": 0,
+            "tolerance": 3,
+            "excess_outliers": 7389
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -146,8 +188,8 @@
       "test": "embed_matching/no_font_found",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.542,
-        "run": 0.316
+        "compile": 7.289,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -155,7 +197,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.02,
+      "duration": 7.77,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -164,7 +206,20 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": true
+          "known_failure": true,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
