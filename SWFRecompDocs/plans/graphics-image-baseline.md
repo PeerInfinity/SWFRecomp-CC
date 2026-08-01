@@ -12,6 +12,16 @@ on trace.** Those are two different instruments measuring two different things
 and neither number corrects the other. See §"What this instrument can and
 can't tell us" before quoting either.
 
+**Update 2026-08-01 (run `30680942974`, at `375373786`): size_mismatch is
+12 → 0.** The viewport-size capture fix (`82571d4ed` — render target now
+viewport-sized with ShowAll min-fit, centred, unclipped margins; blur kernel
+scales with stage_scale) landed with zero trace impact, and every formerly
+short-circuited test now reaches a real pixel comparison. Image passes:
+**159/567** — unchanged, exactly as the fix's scoping predicted (the twelve
+redistribute into the graded failure bands; their 1x siblings already failed
+on the same content). §"Twelve failures…" below is therefore RESOLVED as an
+instrument gap; the content gaps it unmasked remain.
+
 ## How to reproduce this
 
 ```bash
