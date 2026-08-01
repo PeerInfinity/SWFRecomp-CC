@@ -1066,3 +1066,255 @@ Everything in §5.5 and §6.6 still stands, minus `newclass_mismatched` and
 - **`e4x/Regress/regress-524214`** — `x.@* = 1` (wildcard attribute
   ASSIGNMENT) writes the wrong attribute set. The read half of the
   wildcard rule shipped this session; the write half is its own site.
+
+## 8. Session 6 — the runtime-name half of the multiname
+
+Baseline `a9055f5e3` (CI `30659262052` + `30661785041`). Commits
+`569a215e4` + `2ab0c01be`; CI `30670004778` then `30673203712`
+(graphics/`categories=full`, `images=false`):
+**4121 -> 4129 / 4422 (93.4%)**, avm2 1074 -> 1078 (+4), from_avmplus
+1541 -> 1545 (+4). `pass` 3879 -> 3886, `ruffle_matched` 242 -> 243,
+`output_mismatch` 293 -> 290, **`runtime_error` 7 -> 2**, `recomp_fail`
+1 -> 1, still no segfault / timeout / compile_fail bucket.
+**Zero regressions.** One other status move, and it is the intended one:
+`avm2/rtqname_not_namespace` runtime_error -> output_mismatch (0/12 ->
+9/12 lines). The first CI run also moved
+`avm2/getter_different_namespace_setter` pass -> ruffle_matched, which
+looked free and was not — §8.5.
+
+Run `30670004778` first came back red with `Shard 26/30` failed. Every
+*verify* step in that shard succeeded; the only failed step was
+**"Upload misc results"**, an artifact-upload flake, which then failed
+`Combine Results` with `INCOMPLETE RUN`. `gh run rerun <id> --failed`
+recovered it. Worth checking the failing shard's STEP list before
+treating a red `categories=full` run as a code problem — the step name
+tells you immediately whether any test actually ran badly.
+
+### 8.1 Step 0 — the list regenerated again
+
+| | tranche 0 | s3 | s4 | s5 | now |
+|---|---:|---:|---:|---:|---:|
+| candidates | 172 | 136 | 122 | 110 | **102** |
+| avm2 | 82 | 67 | 55 | 50 | 48 |
+| from_avmplus | 48 | 37 | 35 | 28 | 22 |
+| from_shumway | 21 | 12 | 12 | 12 | 12 |
+
+Gap histogram `0:5 1:33 2:23 3:15 4:15 5:11`; status `output_mismatch 97`,
+`runtime_error 4`, `recomp_fail 1`. Predicted ~99, got 102 — the list
+keeps regenerating rather than depleting, for the fifth session running.
+
+### 8.2 Step 1 — one dead key, one that CAME BACK, and the axis that paid
+
+- Session 3's key (`Counter` over `error_signature`): **15 of 102** carry a
+  signature, largest group **2**. Still dry, as §6.2 and §7.2 found.
+- Session 4's key (`expected: Error #NNNN got: no error` on the expected
+  side) returned **zero** in session 5. It returns **nine** here.
+  **A mined-out key is not permanently dead — it refills as other fixes
+  push tests into the window.** Re-run both cheap keys every session; they
+  cost about a minute. (Those nine were not worth taking as a group this
+  time — six want the uncaught-error trace, which is still blocked, and
+  three want verifier operand typing — but the *measurement* is what
+  stops you from skipping the key next session on a stale belief.)
+
+The axis that paid is the direct continuation of session 5's. Session 5
+clustered on **the multiname's NAMESPACE half**; this session's cluster is
+**the multiname's NAME half — the runtime-named (`{rt-name}` / MultinameL)
+forms**. Nothing in the diff text groups them: `inner-value` vs `||`,
+`sanity check base object 3 FAILED!`, `superclass-field1`, an
+`AVM2: unimplemented op` abort and a `AVM2 fatal:` abort all turned out to
+be the same structure mishandled in five different places.
+
+The tell was **`status == runtime_error`**, one of the structural axes the
+session-5 brief listed as unmined. There are only 7 in the whole corpus,
+so reading all 7 costs minutes — and 4 of them printed a stderr line
+naming the mechanism outright:
+
+| test | stderr |
+|---|---|
+| `from_avmplus/misc/bug_508617` | `unimplemented op InitProperty mn[66] {ns-set 6}::{rt-name}` |
+| `from_avmplus/as3/Definitions/Super/SuperProps` | `unimplemented op InitProperty mn[84] {ns-set 4}::{rt-name}` |
+| `from_avmplus/as3/Definitions/Super/SuperInForLoop` | `unimplemented op SetSuper mn[52] {ns-set 1}::{rt-name}` |
+| `avm2/rtqname_not_namespace` | `lazy-ns property op: popped namespace is not a Namespace value` |
+
+**`runtime_error` is the cheapest axis in the corpus to read** — the
+population is tiny and each member hands you a stderr string that names
+its own mechanism, which is more than any diff line does. Run it first.
+
+### 8.3 Batches
+
+| Batch | Cluster | Predicted | Actual |
+|---|---|---|---|
+| 15 | MultinameL resolution: scope walk, InitProperty/SetSuper emission | +5 | **+5** |
+| 16 | ns-set trait priority: most-derived DEFINING CLASS wins | +1 | **+2** |
+| 17 | two `avm2_fatal`s that should be catchable errors | +1 | **+1** |
+| 18 | E4X wildcard attribute WRITE (§7.7 leftover) | +1 | **+1** |
+
+Batch 16 scored +2 rather than +1 on its second cut: the first cut
+(entry-index order) took `property_priority_chained` but silently pushed
+`getter_different_namespace_setter` from Flash-correct to Ruffle-bug
+compatible — see §8.5. The `defining_class` rule takes both.
+
+### 8.4 What each fix actually was
+
+- **`avm2_op_findproperty_dyn` did `(void) mn_idx`.** A MultinameL takes
+  its local name off the stack but its namespace SET is still static, and
+  we threw the set away and searched public-only. The correct order is
+  **the whole ns set at EACH scope level**, never one namespace across the
+  whole chain: `scopes_dont_cache` is built precisely to pin that — its set
+  is `{outer, inner}` and the answer is the inner global *only* because it
+  sits higher on the scope stack, so a namespace-outer loop returns
+  `outer-value` and looks plausible. `avm2_vtable_find_mn_named` was
+  already the right per-level primitive and was already in the tree; it
+  just had no caller on the scope path.
+- **The lazy-multiname arms existed for four ops and were missing for
+  five.** GetProperty / SetProperty / DeleteProperty / FindProperty all had
+  `mnLazyName` / `mnLazyNs` arms; InitProperty, GetSuper, SetSuper,
+  CallSuper and CallSuperVoid `return false` and fell through to
+  `avm2_unimplemented_op`. The verifier's stack model already accounted for
+  the extra lazy pops (`pops = 2 + lazy`), so the emission was a two-line
+  arm per op once the runtime entry points existed. InitProperty differs
+  from SetProperty by exactly one flag (`allow_const`), and Get/SetSuper by
+  exactly how `name` and the super-vtable entry are obtained — all three
+  became shared bodies rather than copies.
+- **A ns-set trait lookup can match SEVERAL entries, and the winner is the
+  one whose DEFINING CLASS is most derived.** `property_priority_chained`
+  has the base declare `field1` *internal* + `field2` *public* and the
+  subclass declare `field1` *public* + `field2` *internal*, with a read
+  site whose set holds both — so two vtable entries match and only priority
+  decides. Ruffle's rule reads as "most recently inserted", encoded
+  entirely in `PropertyMap::insert` doing **`bucket.insert(0, ...)`** — it
+  PREPENDS, so `get_for_multiname`'s `.next()` yields it.
+  **The one-line behaviour of a container (`insert(0, ..)` vs `push`) can
+  BE the semantics** — reading `get_trait` alone says nothing.
+  But copying that as "our flattened vtable appends, so take the LAST
+  match" is **wrong**, and the corpus says so: see §8.5. The rule that
+  satisfies both directions is *per-vtable, most-derived class first*,
+  which on a flattened vtable means comparing each match's
+  `defining_class` depth and, on a TIE, keeping the FIRST — so every
+  single-match lookup (the overwhelming majority, and all builtins, whose
+  entries carry no defining class) behaves exactly as before. Exact-key
+  lookups are untouched: one `(name, ns)` pair has one entry.
+- **The `!mn_public` gate was too narrow.** `getproperty_dyn` /
+  `setproperty_dyn` consulted the ns-set trait lookup only when the set had
+  no public namespace ("dict.test::[name]"). But ASC's ns set for
+  `obj[expr]` inside a class routinely holds the package/internal
+  namespaces **alongside** public — `SuperProps` reads an `internal var y`
+  as `this["y"]` from such a site — so a public-key-only lookup misses the
+  fixed property entirely and returns the `String` slot default `null`.
+  A trait also beats a dynamic property (Ruffle runs `VTable::get_trait`
+  first), so the widened lookup runs *before* the public-key resolve.
+- **Two `avm2_fatal`s were catchable errors.** An RTQName/RTQNameL whose
+  namespace operand is not a Namespace is a **VerifyError #1058** reported
+  at the op, and a declared-but-bodyless ABC method is a **VerifyError
+  #1001** reported at the CALL. Both tests catch the throw and print
+  `e.errorID`, so a fatal loses the whole test rather than one line. #1001
+  names the method the way a stack frame does (`Class/method()`), which is
+  `avm2_class_qname_colons_buf` + the debug name, not the debug name alone.
+- **The E4X wildcard-attribute WRITE was one early `return`.**
+  `x.@* = 1` must keep the FIRST matching attribute, delete the rest and
+  assign to it, and must never CREATE one. `avm2_e4x_remove_matching`
+  already implemented exactly that (`any_name` included), and
+  `xml_set_local` bailed on `name->local == NULL` two lines before reaching
+  it. Session 5 shipped the read half; the write half was a deletion.
+
+### 8.5 A `ruffle_matched` status move hid a real regression
+
+The first CI run (`30670004778`) scored **+8 with zero regressions** — and
+its `OTHER STATUS MOVES` line carried one entry that was not harmless:
+
+```
+avm2/getter_different_namespace_setter: pass -> ruffle_matched
+```
+
+`pass` and `ruffle_matched` are both effective passes, so the corpus
+counter did not move and no regression check fires. But the two statuses
+mean opposite things about correctness: the test had been matching
+`output.txt` (**Flash**) and was now matching `output.ruffle.txt`
+(**Ruffle**) — and its `test.toml` carries `known_failure = true`, i.e.
+upstream knows Ruffle gets it wrong. The "last match wins" shortcut had
+turned a Flash-correct test into a Ruffle-bug-compatible one.
+
+**A `pass -> ruffle_matched` move is a REGRESSION in disguise whenever the
+test is a `known_failure` upstream.** It costs nothing in the score, so
+nothing flags it; the only defence is reading the OTHER STATUS MOVES line
+and asking, for each entry, which oracle each side was matching. (This is
+the mirror image of the `known_failure upstream = Ruffle NOT the oracle`
+lesson: there it stops you *trusting* Ruffle's output, here it stops you
+*drifting into* it.)
+
+Better still, the answer was written down in advance. The same
+`test.toml` says:
+
+> Correct handling requires per-vtable lookup; with flattened vtables,
+> overridden traits would need to be hackily promoted ahead of inherited
+> traits.
+
+That is a precise description of the shortcut *and* of why it fails —
+sitting in the config file of the test the shortcut breaks. **Before
+implementing a resolution-order rule, read the `test.toml` of every test
+that exercises it, not just the one you are fixing**; upstream comments
+its known-hard cases where the failure will happen, not where the fix
+goes.
+
+The fix (§8.4) compares `defining_class` depth instead of entry index.
+Under it, `getter_different_namespace_setter` is a full **`pass`** —
+Flash-correct, and strictly better than Ruffle, which still fails it.
+
+### 8.6 Method notes
+
+- **`runtime_error` is a 7-element population that self-describes.** See
+  §8.2. Compare with the ≤5-line diff window, which is 102 rows of text
+  you have to interpret.
+- **Re-measure a "dead" clustering key every session.** Session 4's key
+  went 9 -> 0 -> 9. Beliefs about which axis is mined out go stale exactly
+  as fast as the candidate list regenerates.
+- **The perf shape of a widened lookup matters more than the widening.**
+  Removing the `!mn_public` gate put `avm2_vtable_find_mn_named` on the
+  dynamic-property path for *every* `obj[expr]`, and it was written as a
+  find-per-namespace loop — 7-9 hashes and 7-9 bucket walks for one
+  bucket's worth of work. It was rewritten to hash once and walk the
+  bucket once, testing each same-name entry against the whole set, before
+  the gate was widened. (Same shape as §7.6's eager-`snprintf` trap: fix
+  the cost before you multiply the call count.)
+- **Instrument the vtable BUILD, not the lookup.** `property_priority_chained`
+  looked like a lookup-order bug and is one — but the fact that made it
+  legible was a four-line probe at the trait-append site printing the ns
+  KIND of each entry. It showed `field1` internal/`field2` public in the
+  base and the reverse in the subclass, which is the entire test. Guessing
+  from the read side would have suggested "the subclass override didn't
+  replace", which is false — there was never anything to replace.
+- **Strip probes with a targeted edit** (§7.6's lesson, applied): the
+  probe and the real fix were both in `avm2_class.c`, and a
+  `git checkout` would have taken both.
+
+### 8.7 Taken and deliberately NOT taken
+
+Reached but not finished, and why — all still on the board:
+
+- **`avm2/verify_typecheck` (+ case 3 of `avm2/rtqname_not_namespace`, +
+  `avm2/scope_optimizations`)** all want the same missing thing: a
+  **static type lattice in the ABC verifier**. `verify_typecheck` wants
+  #1058 for `lookupswitch` on a Number, #1051 for `getslot` through a
+  `CoerceA`'d value and #1026 twice for a slot index past `slotCount`;
+  `rtqname_not_namespace` case 3 passes a REAL Namespace that has been
+  `CoerceA`'d to `*`, which avmplus rejects at verify time on the static
+  type alone. This is a genuine feature, and its failure mode is
+  dangerous in a way the others are not: the rule is "throw when the
+  operand is not PROVABLY typed", so any gap in our inference becomes a
+  spurious #1058 on working code. Size it as its own arc, with the
+  conservative direction settled first.
+  (`rtqname_not_namespace` still improved 0/12 -> 9/12 and left
+  `runtime_error`.)
+- **`avm2/supercalls_weird`** — `super.hasOwnProperty(...)` in a SCRIPT
+  init. Flash prints `true`; we (and, reading `activation.rs`
+  `bound_superclass_object: None` plus the `type_aware.rs` `CallSuper`
+  arm, Ruffle) throw #1035. The site is shared with the condition
+  `array_access_interpreter` pins, so it is exactly the brief's "never
+  widen a condition" trap. Needs evidence about what avmplus binds as a
+  script init's class before touching it.
+- **`avm2/getouterscope_two_classobjects`** — two causes (`null` vs
+  `undefined` on line 1, and a `#1065 field` after line 9), so the
+  MultinameL fix alone cannot land it.
+
+Everything in §5.5, §6.6 and §7.7 still stands, minus
+`property_priority_chained` and `e4x/Regress/regress-524214` (shipped).
