@@ -84,6 +84,18 @@ static int mn_is_attribute_kind(const Avm2AbcFileData* data, uint32_t mn_idx)
 	return k == 0x0d || k == 0x10 || k == 0x12 || k == 0x0e || k == 0x1c;
 }
 
+// Is the site multiname the NAMESPACE-SET form (Multiname / MultinameA /
+// MultinameL / MultinameLA) rather than a QName? This is exactly Ruffle's
+// Multiname::has_multiple_ns() -- the HAS_MULTIPLE_NS flag is set for those
+// four ABC kinds and for no other, regardless of how many namespaces the set
+// actually holds (multiname.rs:239-260). It is the discriminator between
+// #1081 and #1069 on a failed non-public read; see getproperty_common.
+static int mn_is_nsset_kind(const Avm2AbcFileData* data, uint32_t mn_idx)
+{
+	uint8_t k = data->multinames[mn_idx].kind;
+	return k == 0x09 || k == 0x0e || k == 0x1b || k == 0x1c;
+}
+
 // Lazy-name fill keeps the multiname's static ns set (handle_input then
 // adds public): a plain rebuilt name gains the compiler set so
 // use-namespace lookups still match (xml_explicit_use_namespace).
@@ -651,7 +663,7 @@ static int mn_is_wildcard_name(const Avm2AbcFileData* data, uint32_t mn_idx)
 static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
                                     const char* name, uint32_t name_len,
                                     int resolved_ok, const Resolved* r,
-                                    int mn_public, int mn_attr)
+                                    int mn_public, int mn_attr, int mn_nsset)
 {
 	Avm2Context* ctx = act->ctx;
 	if (resolved_ok)
@@ -665,21 +677,25 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
 	// (Toplevel: `isAttr() || !containsAnyPublicNamespace()`; as3/Vector/
 	// bug_678952 reads `v.@attr` off a sealed Vector and asserts #1081).
 	//
-	// Do NOT widen this to `!mn_public`: a non-public QName miss on a
+	// Do NOT widen this to plain `!mn_public`: a non-public QName miss on a
 	// SEALED receiver is #1069, which avm2/catch_class (`AS3::hasOwnProperty`
 	// on the catch scope object) and as3/Definitions/Classes/Ext/
-	// AccStatPropViaSubClass (a static in the base class's namespace,
-	// reached through the subclass) both pin. Tried in the polish sweep and
-	// reverted -- it cost those two to win one.
+	// AccStatPropViaSubClass (`obj.ns1::date`) both pin. That widening was
+	// tried in the polish sweep and reverted -- it cost those two to win one.
 	//
-	// The remaining #1081 case, as3/RuntimeErrors/Error1081ReadSealedErrorNs,
-	// is NOT reachable from here: it reads a PUBLIC name (`a.name`) off a
-	// sealed, interface-typed receiver, so Ruffle's own split
-	// (script_object.rs get_dynamic_property: `!valid_dynamic_name() &&
-	// has_multiple_ns()`, where valid_dynamic_name is
-	// `contains_public_namespace() && !is_attribute()`) never even fires --
-	// that #1081 comes from a different site, which a future batch has to
-	// identify rather than broadening the condition here.
+	// The discriminator is the multiname KIND, not the namespace. Ruffle's
+	// script_object.rs get_dynamic_property picks InvalidNsRead (#1081) over
+	// InvalidRead (#1069) on `!valid_dynamic_name()` exactly when
+	// `has_multiple_ns()`, and HAS_MULTIPLE_NS is set for the ns-SET ABC
+	// kinds (Multiname/MultinameA/MultinameL/MultinameLA) and nothing else.
+	// So a non-public ns-SET miss is #1081 while a non-public QName miss
+	// stays #1069:
+	//   as3/RuntimeErrors/Error1081ReadSealedErrorNs reads `a.name` where
+	//   `a:IClass`, and ASC compiles that to `mn {ns-set}::name` whose set
+	//   holds the single non-public interface namespace `IClass` -- ns-set
+	//   form, no public ns => #1081.
+	//   catch_class's site is `http://adobe.com/AS3/2006/builtin::hasOwnProperty`
+	//   and AccStatPropViaSubClass's is `ns1::date` -- both QNames => #1069.
 	int dynamic = recv.kind == AVM2_VALUE_OBJECT && object_is_dynamic(recv.u.obj);
 	if (dynamic && mn_public)
 	{
@@ -687,9 +703,10 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
 	}
 	char cn[160];
 	class_name_of(ctx, recv, cn, sizeof(cn));
+	int ns_read = dynamic || mn_attr || (mn_nsset && !mn_public);
 	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
 	                 "Error #%s: Property %.*s not found on %s and there is "
-	                 "no default value.", (dynamic || mn_attr) ? "1081" : "1069",
+	                 "no default value.", ns_read ? "1081" : "1069",
 	                 (int) name_len, name, cn);
 }
 
@@ -768,7 +785,8 @@ static Avm2Value getproperty_static_impl(Avm2Activation* act, Avm2Value recv,
 	}
 	return getproperty_common(act, recv, name, name_len, ok, &r,
 	                          avm2_mn_has_public_ns(act->file->data, mn_idx),
-	                          mn_is_attribute_kind(act->file->data, mn_idx));
+	                          mn_is_attribute_kind(act->file->data, mn_idx),
+	                          mn_is_nsset_kind(act->file->data, mn_idx));
 }
 
 Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx)
@@ -946,14 +964,16 @@ Avm2Value avm2_op_getproperty_dyn(Avm2Activation* act, Avm2Value recv, uint32_t 
 			r2.entry = e;
 			return getproperty_common(act, recv, ns->utf8, ns->len, 1, &r2,
 			                          mn_public,
-			                          mn_is_attribute_kind(act->file->data, mn_idx));
+			                          mn_is_attribute_kind(act->file->data, mn_idx),
+			                          mn_is_nsset_kind(act->file->data, mn_idx));
 		}
 	}
 	Avm2PropKey key = avm2_public_key(ns->utf8, ns->len);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, mn_public, &r);
 	return getproperty_common(act, recv, ns->utf8, ns->len, ok, &r, mn_public,
-	                          mn_is_attribute_kind(act->file->data, mn_idx));
+	                          mn_is_attribute_kind(act->file->data, mn_idx),
+	                          mn_is_nsset_kind(act->file->data, mn_idx));
 }
 
 static void setproperty_miss(Avm2Context* ctx, Avm2Value recv,
@@ -977,7 +997,9 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 	{
 		// Proto-chain element hit: a write shadows on the receiver, exactly
 		// as a proto-chain dyn-prop hit does (and #1056 where it cannot).
-		if (!object_is_dynamic(recv.u.obj))
+		// Primitive receivers can reach the proto walk too -- see the dyn
+		// branch below.
+		if (recv.kind != AVM2_VALUE_OBJECT || !object_is_dynamic(recv.u.obj))
 		{
 			setproperty_miss(ctx, recv, name, name_len, value);
 			return;
@@ -1029,7 +1051,11 @@ static void setproperty_resolved(Avm2Context* ctx, Avm2Value recv, const Resolve
 		// as3/Vector/vectorIndexRangeExceptions sets Vector.<*>.prototype.bar
 		// and then asserts #1056 for `v['bar'] = x` (while the READ still
 		// resolves through the proto chain).
-		if (!object_is_dynamic(recv.u.obj))
+		// A PRIMITIVE receiver reaches here too -- `o:Number = new Number();
+		// o.toLocaleString = f` finds the name on Number.prototype and nowhere
+		// else -- and is never dynamic, so it must not read recv.u.obj
+		// (ecma3/Number/toLocaleString_rt).
+		if (recv.kind != AVM2_VALUE_OBJECT || !object_is_dynamic(recv.u.obj))
 		{
 			setproperty_miss(ctx, recv, name, name_len, value);
 			return;
@@ -1739,7 +1765,8 @@ static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
 	}
 	Resolved r;
 	int ok = resolve_generic_key(ctx, recv, &key, pub, any_ns, &r);
-	return getproperty_common(act, recv, key.name, key.name_len, ok, &r, pub, 0);
+	// A runtime QName is a QName: Ruffle sets IS_QNAME, never HAS_MULTIPLE_NS.
+	return getproperty_common(act, recv, key.name, key.name_len, ok, &r, pub, 0, 0);
 }
 
 static void setproperty_nonpublic_miss(Avm2Context* ctx, Avm2Value recv,
@@ -1851,7 +1878,7 @@ Avm2Value avm2_op_getproperty_rtns(Avm2Activation* act, Avm2Value recv, uint32_t
 	int pub = key_from_ns_value(act->ctx, ns_val, name, name_len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
-	return getproperty_common(act, recv, name, name_len, ok, &r, pub, 0);
+	return getproperty_common(act, recv, name, name_len, ok, &r, pub, 0, 0);
 }
 
 Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
@@ -1881,7 +1908,7 @@ Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32
 	int pub = key_from_ns_value(act->ctx, ns_val, s->utf8, s->len, &key);
 	Resolved r;
 	int ok = resolve_key(ctx, recv, &key, pub, &r);
-	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub, 0);
+	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub, 0, 0);
 }
 
 // `attr` / `any_name` are the two facts the READ path already derives from

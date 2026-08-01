@@ -585,7 +585,17 @@ static void add_number_methods(Avm2Context* ctx, Avm2Class* cls,
                                Avm2MethodFn proto_value_of)
 {
 	avm2_builtin_add_method(ctx, cls, "toString", number_to_string);
-	avm2_builtin_add_method(ctx, cls, "toLocaleString", number_to_string);
+	// No `toLocaleString` TRAIT. avmplus's Number/int/uint declare toString,
+	// valueOf, toFixed, toExponential and toPrecision, but toLocaleString
+	// exists only as a *prototype function* (ES3 compat) -- it is absent from
+	// the AS3 Object and Number class surfaces alike. The difference is
+	// observable: writing a method name that IS a trait reports #1037
+	// (ecma3/Exceptions/number_003_rt `o.valueOf = ...`, number_004_rt
+	// `o.toString = ...`, both on `new Number()`), while writing
+	// toLocaleString finds no trait, so the sealed receiver reports #1056
+	// (ecma3/Number/toLocaleString_rt). Ordinary `n.toLocaleString()` calls
+	// still resolve through the prototype entry added below, whose numeric
+	// arm is number_to_string.
 	avm2_builtin_add_method(ctx, cls, "valueOf", number_value_of);
 	avm2_builtin_add_method(ctx, cls, "toFixed", number_to_fixed);
 	avm2_builtin_add_method(ctx, cls, "toExponential", number_to_exponential);
