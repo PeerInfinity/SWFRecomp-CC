@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-29 03:45 UTC
+**Date**: 2026-08-02 09:26 UTC
 
-**Git SHA**: `72fdc5e933`
+**Git SHA**: `b4c983ea4c`
 
-**Run Duration**: 0m 34s
+**Run Duration**: 0m 39s
 
 **Filtered**: 0 tests ignored out of 5 available
 
@@ -13,25 +13,23 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 5 |
-| Passing | **1** (20.0%) |
-| Failing | 4 |
+| Passing | **5** (100.0%) |
+| Failing | 0 |
 | Total expected lines | 208 |
-| Matching lines | 0 (0.0%) |
-| Mismatched lines | 208 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Output Mismatch | 4 | 100.0% |
+| Matching lines | 208 (100.0%) |
+| Mismatched lines | 0 |
 
 ## Passing Tests
 
-**1 tests passing**
+**5 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `scissor_rectangle` | 0 | 6.1s |  |
+| 1 | `request_matching_profiles` | 190 | 6.5s |  |
+| 2 | `request_profiles` | 16 | 6.4s |  |
+| 3 | `sampler_odd_size` | 1 | 8.8s |  |
+| 4 | `scissor_rectangle` | 0 | 8.8s |  |
+| 5 | `scissor_rectangle_invalid` | 1 | 8.7s |  |
 
 ## Near-Passing Tests
 
@@ -55,11 +53,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**4 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `request_matching_profiles` | 0.0% | 0/190 | 0 | 190 |  |
-| 2 | `request_profiles` | 0.0% | 0/16 | 0 | 16 |  |
-| 3 | `sampler_odd_size` | 0.0% | 0/1 | 0 | 1 |  |
-| 4 | `scissor_rectangle_invalid` | 0.0% | 0/1 | 0 | 1 |  |
+No output mismatches.
