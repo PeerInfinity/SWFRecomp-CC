@@ -28396,6 +28396,56 @@ static void drawingBeginNewFill(DrawingState* ds)
 	if (ds->pen_set) drawingAddCmd(ds, 0, ds->pen_x, ds->pen_y, 0, 0);
 }
 
+// Flash's drawing cursor starts at the clip's ORIGIN, not "unset": a lineTo or
+// curveTo issued with no preceding moveTo draws from (0, 0). Ruffle models this
+// as `Drawing::cursor: Point::ZERO` in core/src/drawing.rs, and every path it
+// opens is seeded with `MoveTo(self.cursor)`. Without this seed our command
+// stream starts at the lineTo's ENDPOINT (drawingFinalizePath's "start a
+// contour if the first cmd is a LINE" fallback), so the first segment silently
+// disappears — visual/drawing_api/cursor loses its whole red diagonal.
+static void drawingEnsurePen(DrawingState* ds)
+{
+	if (ds->pen_set) return;
+	ds->pen_x = 0.0f;
+	ds->pen_y = 0.0f;
+	ds->pen_set = 1;
+	drawingAddCmd(ds, 0, 0.0f, 0.0f, 0, 0);  // MOVE_TO origin
+}
+
+// lineStyle() ENDS the current stroke and starts a new one at the cursor, so a
+// style change mid-polyline yields two separately-styled paths (Ruffle
+// `Drawing::set_line_style`: it pushes `current_line` and re-opens a fresh
+// `DrawingLine` seeded with `MoveTo(cursor)`). Previously the style was simply
+// overwritten on the DrawingState, so ALL segments recorded since the last
+// path boundary took the LAST style — visual/drawing_api/cursor drew its red
+// diagonal and green vertical as one green polyline.
+//
+// Restricted to the no-fill case on purpose. With a fill open, Ruffle defers
+// the stroke into `pending_lines` and leaves the fill's command list unbroken;
+// our DrawPath carries one fill AND one line style, so splitting there would
+// cut the fill polygon in half. Deferred strokes are a separate change, and no
+// comparison currently needs them.
+//
+// The split is also skipped when the style is UNCHANGED. Ruffle splits
+// unconditionally, but two adjacent paths with identical styles rasterize the
+// same as one, and merging them keeps a `lineStyle`-per-segment drawing under
+// the 64-DrawPath-per-MC cap in actionIterateDrawings (fillDrawingInfos
+// truncates silently, so a needless split could DROP geometry).
+static void drawingBeginNewLineStyle(DrawingState* ds, int new_has_line,
+	float w, float r, float g, float b, float a)
+{
+	if (ds->has_fill || ds->has_gradient || ds->has_bitmap_fill) return;
+	if (ds->has_line == new_has_line
+	    && (!new_has_line || (ds->line_w == w && ds->line_r == r
+	                          && ds->line_g == g && ds->line_b == b
+	                          && ds->line_a == a && !ds->has_line_gradient)))
+	{
+		return;  // no observable change — keep accumulating one path
+	}
+	if (ds->cmd_count > 0) drawingFinalizePath(ds);
+	if (ds->pen_set) drawingAddCmd(ds, 0, ds->pen_x, ds->pen_y, 0, 0);
+}
+
 // Clear all drawing data for an MC.
 static void drawingClear(MovieClip* mc)
 {
@@ -59072,6 +59122,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					float x = (float)varToDouble(&args[0]);
 					float y = (float)varToDouble(&args[1]);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+					drawingEnsurePen(ds);   // implicit start at the origin
 					// Always fold endpoints into bounds (covers fills); when a line
 					// style is active, expand by the FULL line thickness on each side
 					// (Flash semantics — not half) at both endpoints with the current
@@ -59093,6 +59144,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					float ax = (float)varToDouble(&args[2]);
 					float ay = (float)varToDouble(&args[3]);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+					drawingEnsurePen(ds);   // implicit start at the origin
 					float h = ds->has_line ? ds->line_w : 0.0f;
 					if (ds->pen_set) {
 						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
@@ -59107,22 +59159,31 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				}
 			} else if (func_name_len == 9 && strncmp(func_name, "lineStyle", 9) == 0) {
 				DrawingState* ds = getOrCreateDrawingState(_with_mc);
-				if (num_args == 0) {
-					ds->has_line = 0; ds->line_w = 0;
-				} else {
+				// Resolve the new style FIRST — see the CallMethod handler.
+				int new_has_line = 0;
+				float thickness = 0.0f, lr = 0.0f, lg = 0.0f, lb = 0.0f, alpha = 1.0f;
+				if (num_args > 0) {
 					// Use varToDoubleSWF so an Object with `valueOf()` (e.g. `thick = {valueOf:()=>20}`)
 					// coerces to its numeric value rather than 0.
-					float thickness = (float)varToDoubleSWF(app_context, &args[0], g_swf_version);
+					thickness = (float)varToDoubleSWF(app_context, &args[0], g_swf_version);
 					u32 rgb = (num_args >= 2) ? (u32)varToDoubleSWF(app_context, &args[1], g_swf_version) : 0;
-					float alpha = 1.0f;
 					if (num_args >= 3) {
 						alpha = (float)varToDoubleSWF(app_context, &args[2], g_swf_version) / 100.0f;
 						if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
 					}
+					lr = ((rgb >> 16) & 0xFF) / 255.0f;
+					lg = ((rgb >> 8) & 0xFF) / 255.0f;
+					lb = (rgb & 0xFF) / 255.0f;
+					new_has_line = 1;
+				}
+				drawingBeginNewLineStyle(ds, new_has_line, thickness, lr, lg, lb, alpha);
+				if (!new_has_line) {
+					ds->has_line = 0; ds->line_w = 0;
+				} else {
 					ds->line_w = thickness;
-					ds->line_r = ((rgb >> 16) & 0xFF) / 255.0f;
-					ds->line_g = ((rgb >> 8) & 0xFF) / 255.0f;
-					ds->line_b = (rgb & 0xFF) / 255.0f;
+					ds->line_r = lr;
+					ds->line_g = lg;
+					ds->line_b = lb;
 					ds->line_a = alpha;
 					ds->has_line = 1;
 				}
@@ -70242,6 +70303,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				float x = (float)varToDouble(&args[0]);
 				float y = (float)varToDouble(&args[1]);
 				DrawingState* ds = getOrCreateDrawingState(mc);
+				drawingEnsurePen(ds);   // implicit start at the origin
 				float h = ds->has_line ? ds->line_w : 0.0f;
 				if (ds->pen_set) {
 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
@@ -70266,6 +70328,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				float ax = (float)varToDouble(&args[2]);
 				float ay = (float)varToDouble(&args[3]);
 				DrawingState* ds = getOrCreateDrawingState(mc);
+				drawingEnsurePen(ds);   // implicit start at the origin
 				float h = ds->has_line ? ds->line_w : 0.0f;
 				if (ds->pen_set) {
 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
@@ -70413,24 +70476,36 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// lineStyle([thickness [, rgb [, alpha]]]) — set line style
 			if (mc != NULL) {
 				DrawingState* ds = getOrCreateDrawingState(mc);
-				if (num_args == 0) {
-					// No args: clear line style
-					ds->has_line = 0; ds->line_w = 0;
-				} else {
+				// Resolve the new style FIRST: a style change ends the current
+				// stroke and starts a new one at the cursor (Ruffle
+				// Drawing::set_line_style), so the segments recorded so far must
+				// be finalized while ds still holds the OLD style.
+				int new_has_line = 0;
+				float thickness = 0.0f, lr = 0.0f, lg = 0.0f, lb = 0.0f, alpha = 1.0f;
+				if (num_args > 0) {
 					// Use varToDoubleSWF so an Object with `valueOf()` coerces to its
 					// numeric value rather than 0.
-					float thickness = (float)varToDoubleSWF(app_context, &args[0], g_swf_version);
+					thickness = (float)varToDoubleSWF(app_context, &args[0], g_swf_version);
 					u32 rgb = 0;
-					float alpha = 1.0f;
 					if (num_args >= 2) rgb = (u32)varToDoubleSWF(app_context, &args[1], g_swf_version);
 					if (num_args >= 3) {
 						alpha = (float)varToDoubleSWF(app_context, &args[2], g_swf_version) / 100.0f;
 						if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
 					}
+					lr = ((rgb >> 16) & 0xFF) / 255.0f;
+					lg = ((rgb >> 8) & 0xFF) / 255.0f;
+					lb = (rgb & 0xFF) / 255.0f;
+					new_has_line = 1;
+				}
+				drawingBeginNewLineStyle(ds, new_has_line, thickness, lr, lg, lb, alpha);
+				if (!new_has_line) {
+					// No args: clear line style
+					ds->has_line = 0; ds->line_w = 0;
+				} else {
 					ds->line_w = thickness;
-					ds->line_r = ((rgb >> 16) & 0xFF) / 255.0f;
-					ds->line_g = ((rgb >> 8) & 0xFF) / 255.0f;
-					ds->line_b = (rgb & 0xFF) / 255.0f;
+					ds->line_r = lr;
+					ds->line_g = lg;
+					ds->line_b = lb;
 					ds->line_a = alpha;
 					ds->has_line = 1;
 				}

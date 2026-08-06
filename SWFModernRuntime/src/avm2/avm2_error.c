@@ -587,9 +587,56 @@ const Avm2String* avm2_error_stack_string(Avm2Context* ctx, Avm2Value v)
 	return avm2_string_concat(ctx, head, tail->u.str);
 }
 
+// The debug/release player split (Ruffle globals/error.rs get_stack_trace).
+// Flash Player 11.5 (player version 18) made stack traces available in the
+// RELEASE player too, but only for SWF>=18; a SWF<18 (or an older player)
+// gets a trace in flashplayerdebugger and `null` in flashplayer. We always
+// emulate a modern player (>= 18 — Ruffle's DEFAULT_PLAYER_VERSION is 32 and
+// no test overrides it), so Ruffle's two-term gate
+//   (player_version >= 18 && caller_movie.version() >= 18) || mode == Debug
+// reduces to `caller SWF >= 18 || debug player`.
+//
+// The player mode is a harness knob, not an SWF flag: Ruffle's test framework
+// assumes flashplayerdebugger unless test.toml sets
+// `[player_options] mode = "Release"`, which verify_output.py mirrors as
+// -DSWF_PLAYER_MODE_RELEASE. Only the four avm2/error_stack_trace_{debug,
+// release}_swf1{7,8} tests set it; `release_swf17` is the one combination
+// that must return null (its stage renders red instead of blue).
+#ifdef SWF_PLAYER_MODE_RELEASE
+#define AVM2_PLAYER_IS_DEBUG 0
+#else
+#define AVM2_PLAYER_IS_DEBUG 1
+#endif
+
+// Ruffle Activation::caller_movie_or_root().version(): the SWF version of the
+// movie whose code called this native, NOT the root's. Same walk as
+// avm2_xml.c's xml_caller_swf_version — a native builtin's own `act->file` is
+// NULL, so the caller is the nearest debug-callstack frame that HAS an ABC
+// file; no such frame means the main movie.
+static uint8_t error_caller_swf_version(Avm2Activation* act)
+{
+	const Avm2AbcFileData* data = (act->file != NULL) ? act->file->data : NULL;
+	if (data == NULL)
+	{
+		Avm2Context* c = act->ctx;
+		for (uint32_t i = c->call_depth; i > 0 && data == NULL; i--)
+		{
+			Avm2AbcFileRt* f = c->call_frames[i - 1].method.file;
+			if (f != NULL) data = f->data;
+		}
+	}
+	const Avm2MovieTables* mv = (data != NULL) ? avm2_display_movie_for_abc(data)
+	                                           : NULL;
+	return (mv != NULL) ? mv->swf_version : (uint8_t) act->ctx->swf_version;
+}
+
 static Avm2Value error_get_stack_trace(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
+	if (!AVM2_PLAYER_IS_DEBUG && error_caller_swf_version(act) < 18)
+	{
+		return avm2_null();
+	}
 	if (act->this_val.kind != AVM2_VALUE_OBJECT) return avm2_null();
 	Avm2Value* tail = avm2_object_find_dynamic(act->this_val.u.obj,
 	                                           "__stacktrace_tail", 17);

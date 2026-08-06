@@ -901,6 +901,28 @@ def get_runtime_is_air(test_dir):
                           toml_path.read_text(), re.MULTILINE))
 
 
+def get_player_mode_is_release(test_dir):
+    """True when test.toml sets `[player_options] mode = "Release"`.
+
+    Ruffle's `PlayerMode` is the flashplayer / flashplayerdebugger split, and
+    its test framework assumes the DEBUGGER unless a test opts out
+    (`tests/framework/src/options/player.rs`:
+    `.with_player_mode(self.mode.unwrap_or(PlayerMode::Debug))`) — note that
+    this inverts ruffle_core's own `PlayerMode::default()`, which is Release.
+    So the harness default here is Debug and the flag marks the exception.
+
+    Observable in `Error.getStackTrace()`, which returns null in the release
+    player for SWF<18 (avm2/error_stack_trace_release_swf17 renders a red
+    stage for exactly that reason). Only the four
+    avm2/error_stack_trace_{debug,release}_swf1{7,8} tests set the key.
+    """
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return False
+    return bool(re.search(r'^\s*mode\s*=\s*"Release"\s*$',
+                          toml_path.read_text(), re.MULTILINE))
+
+
 def get_epsilon(test_dir):
     """Parse [approximations] epsilon from test.toml.
 
@@ -2427,6 +2449,8 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         extra_defines.append("-DLOG_FETCH=1")
     if get_runtime_is_air(test_dir):
         extra_defines.append("-DSWF_RUNTIME_AIR=1")
+    if get_player_mode_is_release(test_dir):
+        extra_defines.append("-DSWF_PLAYER_MODE_RELEASE=1")
     if is_avm2:
         extra_defines.append("-DSWF_AVM2")
     viewport = get_viewport_dimensions(test_dir)
@@ -2846,6 +2870,8 @@ def compile_wasm(test_dir, num_frames, build_dir):
         extra_defines.append("-DLOG_FETCH=1")
     if get_runtime_is_air(test_dir):
         extra_defines.append("-DSWF_RUNTIME_AIR=1")
+    if get_player_mode_is_release(test_dir):
+        extra_defines.append("-DSWF_PLAYER_MODE_RELEASE=1")
     if has_children:
         extra_defines.append("-DHAS_CHILD_MOVIES")
     if has_data_files:
