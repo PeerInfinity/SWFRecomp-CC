@@ -34779,6 +34779,26 @@ static ActionVar builtin_mcl_getProgress(SWFAppContext* app_context, ActionVar* 
 
 // Fire all queued MCL load events (called from tagShowFrame).
 // Sequence per Flash/Ruffle spec:
+// The ImportAssets GET. Ruffle issues it from MovieClip::preload
+// (movie_clip.rs::import_assets), i.e. before ANY frame script runs, so this
+// is called from tagInit() rather than the frame body — otherwise the fetch
+// block prints after frame 1's trace. Flash Player skips an empty URL
+// entirely ("FP does not attempt to load the url if it is empty"), which is
+// what keeps import_assets/empty_url fetch-free. The request is issued for
+// every non-empty URL, including one that resolves to a recompiled child SWF.
+void actionPreloadImportAssets(SWFAppContext* app_context, const char* url)
+{
+	(void) app_context;
+#if SWF_LOG_FETCH_ENABLED
+	if (url == NULL || url[0] == '\0') return;
+	swf_log_fetch_queue(url, strlen(url), "GET", 3, NULL, 0, NULL, 0,
+	                    NULL, 0, 0, 0);
+	swf_log_fetch_flush();
+#else
+	(void) url;
+#endif
+}
+
 // ImportAssets: load an imported SWF's init function (DoInitAction scripts)
 // in the current context. Called from recompiled code when an ImportAssets2 tag
 // references another SWF file.

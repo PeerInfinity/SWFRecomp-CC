@@ -4879,6 +4879,15 @@ namespace SWFRecomp
 					// char_id aren't degraded.
 					defined_chars.insert(char_id);
 				}
+				// The FETCH for the imported URL happens at preload time,
+				// not when the frame runs: Ruffle handles ImportAssets/2
+				// inside MovieClip::preload (movie_clip.rs:481/567/753),
+				// which scans the whole tag stream before frame 1's
+				// DoAction. tagInit() is our equivalent window
+				// (libswf/swf_core.c:882, libswf/swf.c:1689), so the log
+				// block lands ahead of every frame trace.
+				tag_init << endl << "\tactionPreloadImportAssets(app_context, \""
+				         << import_url << "\");";
 				// Buffer into the current-frame prologue so imports
 				// resolve at the top of frame_N's body, in stream order
 				// with DoInitAction (required by do_init_action_child).

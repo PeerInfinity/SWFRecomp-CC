@@ -219,6 +219,9 @@ void actionQueueDynamicChildUnloads(MovieClip* parent_mc);
 void actionFirePendingLoadInits(SWFAppContext* app_context);
 // ImportAssets: load an imported SWF's init function in the current context
 void actionImportAssets(SWFAppContext* app_context, const char* url);
+// ImportAssets: issue the imported URL's GET at PRELOAD time (called from
+// tagInit, before any frame script) — Ruffle MovieClip::preload.
+void actionPreloadImportAssets(SWFAppContext* app_context, const char* url);
 // Query button MC state for the button state machine in tag.c
 // Returns mc->visible for the named button MC (1=visible, 0=hidden; defaults to 1 if MC not found)
 int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);

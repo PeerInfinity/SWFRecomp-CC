@@ -141,6 +141,32 @@ void avm2_callstack_rename_frame(Avm2Context* ctx, Avm2MethodFn own_fn,
 	avm2_callstack_push(ctx, &ref, NULL);
 }
 
+// Is this frame's method a CLASS (static) trait of `cls`? Ruffle binds a
+// static method to the class's c_class ("Test$"), whose traits are exactly the
+// entries of our class object's vtable — so a hit here is what makes the frame
+// read "Test$/class_method()" instead of "Test/class_method()".
+static int frame_is_class_trait(const Avm2Class* cls, const Avm2MethodRef* m)
+{
+	if (cls == NULL || m->file == NULL || cls->class_object == NULL) return 0;
+	const Avm2VTable* vt = cls->class_object->vtable;
+	if (vt == NULL) return 0;
+	for (uint32_t i = 0; i < vt->count; i++)
+	{
+		const Avm2PropEntry* e = &vt->entries[i];
+		if (e->kind == AVM2_PROP_SLOT) continue;
+		if (e->method.file == m->file
+		    && e->method.method_index == m->method_index
+		    && e->method.fn == m->fn)
+			return 1;
+		if ((e->kind == AVM2_PROP_SETTER || e->kind == AVM2_PROP_GETSET)
+		    && e->setter.file == m->file
+		    && e->setter.method_index == m->method_index
+		    && e->setter.fn == m->fn)
+			return 1;
+	}
+	return 0;
+}
+
 void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
                                char* buf, int size)
 {
@@ -153,7 +179,18 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
 		int is_iinit = f->bound_class->instance_init.fn == m->fn
 		               && f->bound_class->instance_init.file == m->file
 		               && f->bound_class->instance_init.method_index == m->method_index;
-		if (is_iinit)
+		// The STATIC initializer is the c_class's instance init in Ruffle's
+		// model, and a c_class initializer prints "<QName>$cinit"
+		// (function.rs:317-325). Ours is a field on the same class.
+		int is_cinit = !is_iinit && m->file != NULL
+		               && f->bound_class->class_init.file == m->file
+		               && f->bound_class->class_init.method_index == m->method_index
+		               && f->bound_class->class_init.fn == m->fn;
+		if (is_cinit)
+		{
+			snprintf(buf, size, "%s$cinit()", cq);
+		}
+		else if (is_iinit)
 		{
 			snprintf(buf, size, "%s()", cq);
 		}
@@ -171,10 +208,18 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
 			{
 				const char* slash = strrchr(dn, '/');
 				if (slash != NULL) dn = slash + 1;
-				const char* colon = strrchr(dn, ':');
-				if (colon != NULL) dn = colon + 1;
+				// "uri::f" is FP's own spelling of a user-namespaced trait
+				// (built in avm2_vtable_add_traits) and must survive; the
+				// mxmlc package prefix this strip exists for uses a SINGLE
+				// colon ("test_fla:frame1").
+				if (strstr(dn, "::") == NULL)
+				{
+					const char* colon = strrchr(dn, ':');
+					if (colon != NULL) dn = colon + 1;
+				}
 			}
-			snprintf(buf, size, "%s/%s()", cq, dn);
+			snprintf(buf, size, frame_is_class_trait(f->bound_class, m)
+			                    ? "%s$/%s()" : "%s/%s()", cq, dn);
 		}
 		return;
 	}
@@ -195,6 +240,17 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
 	const Avm2AbcMethodData* md = &m->file->data->methods[m->method_index];
 	if (md->is_function)
 	{
+		// Ruffle method.rs::method_name: `method_info.name == 0` means the
+		// method has NO name (None) and the frame is spelled by its ABC
+		// method index; a name index that merely points at the empty string
+		// is Some("") and prints "<anonymous>". The recompiler preserves the
+		// difference by emitting a NULL debug_name for index 0 (ASC/Flash-IDE
+		// builds name every method 0; mxmlc builds point at "").
+		if (md->debug_name == NULL && m->debug_name == NULL)
+		{
+			snprintf(buf, size, "MethodInfo-%u()", m->method_index);
+			return;
+		}
 		snprintf(buf, size, "Function/%s()",
 		         (m->debug_name != NULL && m->debug_name[0] != '\0')
 		         ? m->debug_name : "<anonymous>");

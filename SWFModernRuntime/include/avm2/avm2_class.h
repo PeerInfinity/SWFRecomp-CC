@@ -145,6 +145,12 @@ struct Avm2Class
 	uint8_t flags;
 	Avm2VTable ivtable;            // instance vtable (inherited + own)
 	Avm2MethodRef instance_init;
+	// The static initializer (ABC class_info.cinit). Ruffle models the static
+	// side as a separate c_class whose instance_init IS this method, which is
+	// how a cinit frame gets spelled "Test$cinit()" (function.rs::
+	// display_function). We keep one class per ABC class, so the ref lives
+	// here. Zeroed for builtins (they have no ABC cinit).
+	Avm2MethodRef class_init;
 	Avm2ScopeChain* scope;         // class scope: captured at NewClass (statics/cinit)
 	Avm2ScopeChain* iscope;        // instance scope: class scope + [class object]
 	                               // (instance traits + instance_init outer chain)

@@ -3841,7 +3841,17 @@ namespace abc
 				{
 					out << "NULL";
 				}
-				out << ", \"" << escapeCString(abc.pool.strings[m.name]) << "\", "
+				// `method_info.name == 0` is the ABC "no name at all" index and
+				// is NOT the same as an index pointing at the empty string:
+				// avmplus/Ruffle (method.rs::method_name) return None for the
+				// former and Some("") for the latter, which is exactly what
+				// separates a "MethodInfo-N()" stack frame from a
+				// "Function/<anonymous>()" one. Emitting `pool.strings[0]`
+				// collapses both to "", so index 0 becomes a NULL debug_name.
+				out << ", ";
+				if (m.name == 0) out << "NULL";
+				else out << "\"" << escapeCString(abc.pool.strings[m.name]) << "\"";
+				out << ", "
 				    << (unsigned) m.flags << ", "
 				    << (is_function[mi] ? 1 : 0) << ", "
 				    << m.params.size() << ", "

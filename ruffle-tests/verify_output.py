@@ -1197,6 +1197,46 @@ def decompressed_swf_bytes(swf_path):
     return b"FWS" + raw[3:8] + body
 
 
+def generate_root_swf_bytes(test_dir, build_dir):
+    """Emit `root_swf_bytes.c` — the ROOT movie's own decompressed image.
+
+    `LoaderInfo.bytes` on the root/stage LoaderInfo returns the movie's
+    decompressed image (Ruffle `loader_info.rs::get_bytes` -> `root.data()`),
+    which is what `avm2/loaderinfo_quine` prints. The runtime already knows how
+    to hand a ByteArray back (`avm2_display.c::li_get_bytes`); the only thing
+    missing was a generated symbol carrying the root movie's bytes, so this
+    writes one and `avm2_display.c` picks it up through a weak default.
+
+    The gate is load-bearing: the corpus is 4478 test SWFs / 70.4 MB
+    decompressed, and emitting all of them as C initializer lists is ~280 MB of
+    generated source. Only embed when the decompressed image contains the ASCII
+    substring b"bytes" (any ABC that names the `bytes` property has it in its
+    string pool) — 61 of 2468 AVM2 tests, ~1.8 MB — plus a hard 512 KB cap. A
+    false negative just degrades to the old empty-ByteArray behaviour.
+
+    The file is always written (with null/0 when the gate says skip) so the
+    generated source set has the same shape for every test.
+    """
+    data = None
+    swf = test_dir / "test.swf"
+    if swf.exists():
+        img = decompressed_swf_bytes(swf)
+        if img and b"bytes" in img and len(img) <= 512 * 1024:
+            data = img
+    lines = ["// Auto-generated: root movie image for LoaderInfo.bytes."]
+    if data:
+        lines.append("static const unsigned char root_swf_bytes_data[] = {")
+        for i in range(0, len(data), 16):
+            lines.append("    " + "".join(f"{b}," for b in data[i:i + 16]))
+        lines.append("};")
+        lines.append("const unsigned char* g_root_swf_bytes = root_swf_bytes_data;")
+        lines.append(f"unsigned int g_root_swf_bytes_len = {len(data)};")
+    else:
+        lines.append("const unsigned char* g_root_swf_bytes = 0;")
+        lines.append("unsigned int g_root_swf_bytes_len = 0;")
+    (build_dir / "root_swf_bytes.c").write_text("\n".join(lines) + "\n")
+
+
 def _sanitize_prefix(filename):
     """Convert a filename like 'target.swf' to a C-safe identifier prefix like 'target'."""
     name = filename.rsplit(".", 1)[0]  # strip extension
@@ -2417,6 +2457,9 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
 
     if has_children:
         generate_movie_registry(child_prefixes, build_dir)
+
+    # The root movie's own image, for LoaderInfo.bytes (gated — see the helper).
+    generate_root_swf_bytes(test_dir, build_dir)
 
     # Handle data files (loadVariables tests: testvars.txt, etc.)
     data_files = find_data_files(test_dir)

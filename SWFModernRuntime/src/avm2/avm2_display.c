@@ -4489,6 +4489,18 @@ static const Avm2String* root_swf_url(Avm2Context* ctx)
 #endif
 }
 
+// The ROOT movie's own decompressed image, for `LoaderInfo.bytes` (Ruffle
+// loader_info.rs::get_bytes -> root.data()). Defined by generated
+// `root_swf_bytes.c` when the build embeds it; the weak defaults below keep
+// every other build (and every hand-built deploy) linking with bytes == null,
+// which degrades to the empty ByteArray we returned before. Same weak-symbol
+// override pattern as libswf/shape_hit_test.c's `path_data`.
+// NOTE: deliberately NOT const-qualified objects. A `const` weak variable with
+// an initializer gets constant-folded inside this TU at -O2 (gcc emits no
+// relocation at all), so the strong generated definition would never be read.
+__attribute__((weak)) const unsigned char* g_root_swf_bytes = 0;
+__attribute__((weak)) unsigned int         g_root_swf_bytes_len = 0;
+
 static Avm2Object* loaderinfo_new(Avm2Context* ctx, uint8_t kind)
 {
 	Avm2Class* cls = ctx->builtins.loader_info_class;
@@ -4505,6 +4517,11 @@ static Avm2Object* loaderinfo_new(Avm2Context* ctx, uint8_t kind)
 			// `init` (movie_clip.rs::player_root_movie / context.rs).
 			ext->expose_content = 1;
 			ext->bytes_loaded = ext->bytes_total = root_swf_size();
+			// `bytes` is the DECOMPRESSED image, not the on-disk file, so it
+			// is independent of bytes_total above (loaderinfo_quine: a 662-byte
+			// CWS whose bytes.length is 1003).
+			ext->bytes = g_root_swf_bytes;
+			ext->bytes_len = g_root_swf_bytes_len;
 		}
 		if (kind == LI_KIND_ROOT)
 		{

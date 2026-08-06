@@ -696,10 +696,32 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 					const char* pfx = (t->kind == 2) ? "get "
 					                  : (t->kind == 3) ? "set " : "";
 					size_t pl = strlen(pfx);
-					char* nm = avm2_alloc(ctx, pl + e.key.name_len + 1);
+					// A trait declared in a USER namespace (ABC kind 0x08,
+					// `namespace my_ns = "uri"`) is named by its QUALIFIED
+					// name — "Test/uri::f()", not "Test/f()" (Ruffle
+					// function.rs: `method_trait.name().namespace()
+					// .is_namespace()` -> to_qualified_name). Package /
+					// package-internal / protected / private traits (0x16-
+					// 0x1a, 0x05) keep the local name.
+					const char* uri = NULL;
+					size_t ul = 0;
+					if (e.key.ns_kind == 0x08 && e.key.ns_uri != NULL
+					    && e.key.ns_len > 0)
+					{
+						uri = e.key.ns_uri;
+						ul = e.key.ns_len;
+					}
+					size_t sep = (ul > 0) ? 2 : 0;
+					char* nm = avm2_alloc(ctx, pl + ul + sep + e.key.name_len + 1);
 					memcpy(nm, pfx, pl);
-					memcpy(nm + pl, e.key.name, e.key.name_len);
-					nm[pl + e.key.name_len] = '\0';
+					if (ul > 0)
+					{
+						memcpy(nm + pl, uri, ul);
+						nm[pl + ul] = ':';
+						nm[pl + ul + 1] = ':';
+					}
+					memcpy(nm + pl + ul + sep, e.key.name, e.key.name_len);
+					nm[pl + ul + sep + e.key.name_len] = '\0';
 					ref.debug_name = nm;
 				}
 
@@ -1303,6 +1325,15 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	cls->instance_init.debug_name = iinit->debug_name;
 	cls->instance_init.method_index = cd->instance_init;
 
+	// Remember the static initializer too — a cinit frame is named after the
+	// class ("Test$cinit()"), which the frame renderer cannot derive from the
+	// method alone.
+	const Avm2AbcMethodData* cinitd = &file->data->methods[cd->class_init];
+	cls->class_init.fn = cinitd->fn;
+	cls->class_init.file = file;
+	cls->class_init.debug_name = cinitd->debug_name;
+	cls->class_init.method_index = cd->class_init;
+
 	// Inherit the flattened instance vtable, then append own traits
 	// (vtable.rs model). Inherited protected-ns entries are re-keyed onto
 	// this class's protected namespace so subclass protected access
@@ -1385,8 +1416,7 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
 	class_setup_prototype(ctx, cls);
 
 	// Run the static initializer now (Ruffle runs it during NewClass).
-	const Avm2AbcMethodData* cinit = &file->data->methods[cd->class_init];
-	Avm2MethodRef cinit_ref = { cinit->fn, file, cinit->debug_name, cd->class_init };
+	Avm2MethodRef cinit_ref = cls->class_init;
 	avm2_call_method_ref(ctx, &cinit_ref, cls, scope,
 	                     avm2_object_value(cobj), NULL, 0);
 
