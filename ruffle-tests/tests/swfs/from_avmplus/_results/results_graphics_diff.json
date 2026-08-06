@@ -1,81 +1,49 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-01T14:06:41.163552+00:00",
-    "old_git_sha": "feb8882b09e238e91ab6444099d6cca237e3a4f9",
-    "new_timestamp": "2026-08-01T19:38:38.315180+00:00",
-    "new_git_sha": "c4496a4c8f4be6b07972ae68916ed14a82923185",
+    "old_timestamp": "2026-08-01T19:38:38.315180+00:00",
+    "old_git_sha": "c4496a4c8f4be6b07972ae68916ed14a82923185",
+    "new_timestamp": "2026-08-06T06:23:32.624181+00:00",
+    "new_git_sha": "6de65043250d5a56e0e2841896d2c523d0f39b06",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1508,
-    "old_ruffle_matched": 52,
-    "old_effective_pass": 1560,
+    "old_pass": 1510,
+    "old_ruffle_matched": 53,
+    "old_effective_pass": 1563,
     "old_total": 1574,
-    "old_pass_rate": 95.8,
-    "new_pass": 1510,
+    "old_pass_rate": 95.9,
+    "new_pass": 1511,
     "new_ruffle_matched": 53,
-    "new_effective_pass": 1563,
+    "new_effective_pass": 1564,
     "new_total": 1574,
-    "new_pass_rate": 95.9,
-    "old_mismatched_lines": 612,
-    "new_mismatched_lines": 605,
+    "new_pass_rate": 96.0,
+    "old_mismatched_lines": 605,
+    "new_mismatched_lines": 604,
     "increased_mismatches": 0,
-    "decreased_mismatches": 7,
-    "newly_passing": 3,
+    "decreased_mismatches": 1,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 1571,
+    "status_changed": 1,
+    "unchanged": 1573,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "as3/RuntimeErrors/Error1081ReadSealedErrorNs",
+      "test": "regress/bug_550958",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 0
+        "actual_lines": 5,
+        "expected_lines": 3,
+        "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "e4x/Statements/e12_1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 14
-      },
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "ecma3/Number/toLocaleString_rt",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 48,
-        "expected_lines": 48,
-        "matching_lines": 44
-      },
-      "new_lines": {
-        "actual_lines": 48,
-        "expected_lines": 48,
-        "matching_lines": 47
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
       }
     }
   ]

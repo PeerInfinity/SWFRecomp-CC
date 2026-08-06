@@ -1,47 +1,42 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-01 19:38 UTC
+**Date**: 2026-08-06 06:23 UTC
 
-**Git SHA**: `c4496a4c8f`
+**Git SHA**: `6de6504325`
 
-**Run Duration**: 2m 5s
+**Run Duration**: 2m 9s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 6 |
-| Passing | **3** (50.0%) |
-| Failing | 3 |
+| Passing | **6** (100.0%) |
+| Failing | 0 |
 | Total expected lines | 104 |
-| Matching lines | 35 (33.7%) |
-| Mismatched lines | 69 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Output Mismatch | 3 | 100.0% |
+| Matching lines | 104 (100.0%) |
+| Mismatched lines | 0 |
 
 ## Passing Tests
 
-**3 tests passing**
+**6 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `embed_matching/fallback_preferences` | 0 | 28.8s |  |
-| 2 | `embed_matching/match_style` | 0 | 8.4s |  |
-| 3 | `embed_matching/no_font_found` | 0 | 6.3s |  |
+| 1 | `device_font_glyph_fallback` | 36 | 26.6s |  |
+| 2 | `device_font_kerning` | 4 | 28.0s |  |
+| 3 | `device_font_list` | 64 | 27.3s |  |
+| 4 | `embed_matching/fallback_preferences` | 0 | 29.8s |  |
+| 5 | `embed_matching/match_style` | 0 | 8.9s |  |
+| 6 | `embed_matching/no_font_found` | 0 | 7.7s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `device_font_glyph_fallback` | 80.6% | 29 | 36 | 7 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -57,10 +52,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**3 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `device_font_glyph_fallback` | 80.6% | 29/36 | 36 | 36 |  |
-| 2 | `device_font_list` | 9.4% | 6/64 | 48 | 64 |  |
-| 3 | `device_font_kerning` | 0.0% | 0/4 | 4 | 4 |  |
+No output mismatches.

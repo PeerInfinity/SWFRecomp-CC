@@ -1,23 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `767a301d2bae` (2026-07-29T01:40:49.669240+00:00)
-**Current:** `72fdc5e933a6` (2026-07-29T03:45:41.188620+00:00)
+**Previous:** `72fdc5e933a6` (2026-07-29T03:45:41.188620+00:00)
+**Current:** `b4c983ea4c3d` (2026-08-02T09:26:35.744301+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 131 | 135 | +4 |
+| Passing | 135 | 135 | 0 |
 | Total | 243 | 243 | 0 |
-| Pass rate | 53.9% | 55.6% | +1.7% |
-| Mismatched lines | 8451 | 8435 | -16 |
-|   Decreased | | | -16 |
+| Pass rate | 55.6% | 55.6% | 0% |
+| Mismatched lines | 8435 | 8432 | -3 |
+|   Decreased | | | -5 |
+|   Increased | | | +2 |
 
-## Newly Passing (4)
+## Line Count Changed (7)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `XMLSocket-v5` | ruffle_matched | 31/35 | 35/35 |
-| `XMLSocket-v6` | ruffle_matched | 31/35 | 35/35 |
-| `XMLSocket-v7` | ruffle_matched | 31/35 | 35/35 |
-| `XMLSocket-v8` | ruffle_matched | 31/35 | 35/35 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `TextField-v6` | output_mismatch | 466/545 | 467/545 | -1 |
+| `TextField-v7` | output_mismatch | 475/570 | 476/570 | -1 |
+| `TextField-v8` | output_mismatch | 477/571 | 478/571 | -1 |
+| `array-v7` | output_mismatch | 603/654 | 604/654 | -1 |
+| `array-v8` | output_mismatch | 603/654 | 604/654 | -1 |
+| `array-v5` | output_mismatch | 552/560 | 551/560 | +1 |
+| `array-v6` | output_mismatch | 624/644 | 623/644 | +1 |

@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-29T03:45:41.124655+00:00",
-    "git_sha": "72fdc5e933a6c32ecea4be6e398c9a3aac819699",
-    "duration_seconds": 42.95,
+    "timestamp": "2026-08-02T09:26:35.689104+00:00",
+    "git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "duration_seconds": 42.43,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "avm1_imports_avm1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.617,
+        "compile": 1.595,
         "run": 0.004
       },
       "num_frames": 1,
@@ -31,7 +31,7 @@
         "expected_lines": 6,
         "matching_lines": 0
       },
-      "duration": 1.63,
+      "duration": 1.6,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=7, expected=6)",
       "actual_output": "Hello from right_eye.swf\nHello from test.swf\nGuy_with_hat loaded!\nCircle loaded!\nSquare loaded!\nLeft eye loaded!\nRight eye loaded!",
@@ -41,7 +41,7 @@
       "test": "avm1_non_swf_import",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.057,
+        "compile": 20.49,
         "run": 0.004
       },
       "num_frames": 4,
@@ -50,7 +50,7 @@
         "expected_lines": 6,
         "matching_lines": 0
       },
-      "duration": 21.07,
+      "duration": 20.5,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=3, expected=6)",
       "actual_output": "frame 1\nframe 2\nframe 3",
@@ -60,7 +60,7 @@
       "test": "empty_url",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.078,
+        "compile": 20.148,
         "run": 0.002
       },
       "num_frames": 2,
@@ -69,7 +69,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 20.08,
+      "duration": 20.15,
       "status": "pass"
     }
   ]

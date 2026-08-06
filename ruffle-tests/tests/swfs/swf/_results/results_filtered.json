@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-29T03:45:41.120202+00:00",
-    "git_sha": "72fdc5e933a6c32ecea4be6e398c9a3aac819699",
-    "duration_seconds": 41.99,
+    "timestamp": "2026-08-02T09:26:35.684780+00:00",
+    "git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "duration_seconds": 43.76,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -24,7 +24,7 @@
       "test": "convolution_filter_big_matrix",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.139,
+        "compile": 19.497,
         "run": 0.002
       },
       "num_frames": 16,
@@ -33,14 +33,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 20.15,
+      "duration": 19.5,
       "status": "pass"
     },
     {
       "test": "swf_length_too_long",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.356,
+        "compile": 1.342,
         "run": 0.004
       },
       "num_frames": 16,
@@ -49,7 +49,7 @@
         "expected_lines": 18,
         "matching_lines": 12
       },
-      "duration": 1.37,
+      "duration": 1.35,
       "ruffle_diff_count": 6,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -59,7 +59,7 @@
       "test": "swf_length_too_short_no_end",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.369,
+        "compile": 1.367,
         "run": 0.004
       },
       "num_frames": 16,
@@ -75,8 +75,8 @@
       "test": "swf_length_too_short_no_second_frame",
       "phases": {
         "recomp": 0.0,
-        "compile": 17.507,
-        "run": 0.002
+        "compile": 19.975,
+        "run": 0.004
       },
       "num_frames": 16,
       "lines": {
@@ -84,14 +84,14 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 17.51,
+      "duration": 19.98,
       "status": "pass"
     },
     {
       "test": "swf_length_zero",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.285,
+        "compile": 1.259,
         "run": 0.002
       },
       "num_frames": 16,
@@ -100,7 +100,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.29,
+      "duration": 1.26,
       "status": "pass"
     }
   ]

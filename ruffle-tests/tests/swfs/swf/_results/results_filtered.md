@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-07-29 03:45 UTC
+**Date**: 2026-08-02 09:26 UTC
 
-**Git SHA**: `72fdc5e933`
+**Git SHA**: `b4c983ea4c`
 
-**Run Duration**: 0m 42s
+**Run Duration**: 0m 44s
 
 **Filtered**: 0 tests ignored out of 5 available
 
@@ -27,9 +27,9 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `convolution_filter_big_matrix` | 2 | 20.1s |  |
+| 1 | `convolution_filter_big_matrix` | 2 | 19.5s |  |
 | 2 | `swf_length_too_short_no_end` | 19 | 1.4s |  |
-| 3 | `swf_length_too_short_no_second_frame` | 18 | 17.5s |  |
+| 3 | `swf_length_too_short_no_second_frame` | 18 | 20.0s |  |
 | 4 | `swf_length_zero` | 0 | 1.3s |  |
 
 ## Ruffle-Matched Tests
