@@ -3311,8 +3311,20 @@ def ruffle_subset_match(our_actual, flash_expected, ruffle_actual, epsilon=None,
     return our.issubset(ruffle), len(our), len(ruffle)
 
 
-def _test_is_known_failure(test_dir):
-    """Return True if test.toml sets `known_failure = true` at the top level.
+def _test_is_known_failure(test_dir, expected_filename=None):
+    """Return True if test.toml marks the GRADED run as a Ruffle known_failure.
+
+    Two shapes are honored:
+      1. `known_failure = true` at the top level (the common case).
+      2. `known_failure = true` inside the `[subtests.NAME]` table whose
+         `output_path` is the file we actually graded against. Upstream Ruffle
+         scopes known_failure per subtest (e.g. from_gnash
+         `action_order/action_execution_order_test` marks only its `fp10`
+         variant), and `resolve_expected_filename` grades the highest-version
+         variant — so a subtest-scoped flag is the one that governs the run.
+         Without this arm the `output.fpN.ruffle.txt` oracle that
+         verify_output already knows how to name could never be consulted.
+
     Uses tomllib (3.11+) so parsing matches the existing toml usage."""
     toml_path = test_dir / "test.toml"
     if not toml_path.is_file():
@@ -3323,7 +3335,21 @@ def _test_is_known_failure(test_dir):
             data = tomllib.load(f)
     except Exception:
         return False
-    return bool(data.get("known_failure"))
+    if data.get("known_failure"):
+        return True
+    if not expected_filename:
+        return False
+    subtests = data.get("subtests")
+    if not isinstance(subtests, dict):
+        return False
+    for variant in subtests.values():
+        if not isinstance(variant, dict):
+            continue
+        if variant.get("output_path") != expected_filename:
+            continue
+        if variant.get("known_failure"):
+            return True
+    return False
 
 
 def compare_output(actual, expected, epsilon=None, number_patterns=None):
@@ -4251,7 +4277,7 @@ def main():
             ruffle_actual_path = test_dir / ruffle_actual_name
             ruffle_matched = False
             if (ruffle_actual_path.is_file()
-                    and _test_is_known_failure(test_dir)):
+                    and _test_is_known_failure(test_dir, expected_filename)):
                 try:
                     ruffle_actual = (
                         ruffle_actual_path

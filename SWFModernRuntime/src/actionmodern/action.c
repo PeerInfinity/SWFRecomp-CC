@@ -21174,6 +21174,23 @@ int g_root_enterframe_eligible = 0;
 // Higher levels are synthetic MCs created by loadMovieNum/loadClip.
 #define MAX_LEVELS 128
 MovieClip* g_levels[MAX_LEVELS];  // g_levels[0] = &root_movieclip, set in ensureGlobalInit
+// Highest N for which g_levels[N] has ever been minted (0 = none). Bounds the
+// level scans below so content that never calls loadMovieNum pays nothing.
+static int g_levels_high_water = 0;
+
+// A _levelN (N > 0) root owns a SYNTHETIC DisplayObject (allocated lazily in
+// actionFirePendingDirectLoads' is_level branch) that lives in no display list,
+// so set_enterframe_eligible_recursive never reaches it. Callers that gate on
+// `display_obj->enterframe_eligible` must route level roots through the
+// dynamic-MC gate (mc_enterframe_eligible) instead. Cheap: the loop body is a
+// pointer compare and the bound is 0 for content without levels.
+int actionIsLoadedLevelRootMC(MovieClip* mc)
+{
+	if (mc == NULL) return 0;
+	for (int i = 1; i <= g_levels_high_water; i++)
+		if (g_levels[i] == mc) return 1;
+	return 0;
+}
 
 static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
     if (level_num < 0 || level_num >= MAX_LEVELS) return NULL;
@@ -21199,6 +21216,7 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
     mc->xscale = 100;
     mc->yscale = 100;
     g_levels[level_num] = mc;
+    if (level_num > g_levels_high_water) g_levels_high_water = level_num;
     // Register in child_mc_cache so lookups find it
     if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
         child_mc_cache[child_mc_count++] = mc;
@@ -35361,10 +35379,17 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		// (which walks ALL display lists including button children) and consumed here.
 		// This ensures: 1) init tick skipped (sprite_initialized < 2 → flag not set),
 		// 2) removed buttons' children skipped (parent char_id=0 → walk skips them).
-		if (mc->display_obj != NULL) {
+		if (mc->display_obj != NULL && !actionIsLoadedLevelRootMC(mc)) {
 			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
 			if (!dobj->enterframe_eligible) continue;
 			dobj->enterframe_eligible = 0; // consume
+		} else if (mc->display_obj != NULL) {
+			// _levelN root: its synthetic DisplayObject is in no display list,
+			// so set_enterframe_eligible_recursive never arms
+			// enterframe_eligible and the level's own `this.onEnterFrame`
+			// could never fire. Use the dynamic-MC gate (skip the load tick,
+			// fire every tick after) — key test: avm1/remove_different_level.
+			if (!mc->mc_enterframe_eligible) continue;
 		} else {
 			// Dynamic MCs (createEmptyMovieClip, etc.) without display_obj:
 			// Skip on creation tick, allow on subsequent ticks.
@@ -35490,6 +35515,11 @@ void actionMarkDynamicMCsEnterFrameEligible(void)
 		if (_ef_mc != NULL && _ef_mc->display_obj == NULL) {
 			_ef_mc->mc_enterframe_eligible = 1;
 		}
+	}
+	// _levelN roots ride the same gate even though they DO carry a (synthetic,
+	// display-list-less) display_obj — see actionIsLoadedLevelRootMC.
+	for (int _lv = 1; _lv <= g_levels_high_water; _lv++) {
+		if (g_levels[_lv] != NULL) g_levels[_lv]->mc_enterframe_eligible = 1;
 	}
 }
 
