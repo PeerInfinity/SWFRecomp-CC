@@ -3669,8 +3669,28 @@ static void register_class_object_lengths(Avm2Context* ctx)
 		{ b->number_class,   1 },
 		{ b->int_class,      1 },
 		{ b->uint_class,     1 },
-		{ b->regexp_class,   2 },
+		// Flash reports 1, not ECMA-262's 2 (avm2/static_length pins it).
+		{ b->regexp_class,   1 },
 		{ b->date_class,     7 },
+		// Every Error subclass takes (message, id) but reports arity 1, the
+		// same as avmplus's Error. avm2/static_length names the first twelve;
+		// the four AIR/IO siblings share the shape.
+		{ b->error_class,               1 },
+		{ b->type_error_class,          1 },
+		{ b->reference_error_class,     1 },
+		{ b->argument_error_class,      1 },
+		{ b->range_error_class,         1 },
+		{ b->verify_error_class,        1 },
+		{ b->eval_error_class,          1 },
+		{ b->security_error_class,      1 },
+		{ b->definition_error_class,    1 },
+		{ b->uri_error_class,           1 },
+		{ b->syntax_error_class,        1 },
+		{ b->uninitialized_error_class, 1 },
+		{ b->io_error_class,            1 },
+		{ b->eof_error_class,           1 },
+		{ b->memory_error_class,        1 },
+		{ b->illegal_operation_error_class, 1 },
 	};
 	for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++)
 	{
@@ -3740,6 +3760,27 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_proto_add_function(ctx, b->class_class->prototype_obj, "toString",
 	                        class_proto_to_string);
 	avm2_builtin_add_getter(ctx, b->class_class, "prototype", class_get_prototype);
+	// Class extends Object, so a CLASS OBJECT answers Object's ES3 trio too
+	// (`SomeClass.propertyIsEnumerable('x')` -> false; avm2/property_is_enumerable
+	// pins it). class_class is minted at :3432, before the trio is registered on
+	// object_class just above, and avm2_builtin_class snapshots the super ivtable
+	// at creation time — so the copy never happened and the class-object fallback
+	// in avm2_ops.c (resolve_key / resolve_mn) found only `prototype`. Restate the
+	// three by hand rather than reordering init, which would widen that fallback
+	// to every Object instance member at once.
+	// Function is minted in the same bootstrap breath as Class (:3714) and
+	// missed the same snapshot, so `someFunction.propertyIsEnumerable('x')`
+	// hit #1006 too (property_is_enumerable's ES3-constructor half).
+	Avm2Class* es3_trio_hosts[2] = { b->class_class, b->function_class };
+	for (int i = 0; i < 2; i++)
+	{
+		avm2_builtin_add_method(ctx, es3_trio_hosts[i], "hasOwnProperty",
+		                        object_as3_has_own_property);
+		avm2_builtin_add_method(ctx, es3_trio_hosts[i], "isPrototypeOf",
+		                        object_proto_is_prototype_of);
+		avm2_builtin_add_method(ctx, es3_trio_hosts[i], "propertyIsEnumerable",
+		                        object_proto_property_is_enumerable);
+	}
 
 	// XML/XMLList: the E4X engine (avm2_xml.c / avm2_e4x.c).
 	avm2_register_xml(ctx);

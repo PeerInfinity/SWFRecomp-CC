@@ -517,8 +517,11 @@ typedef struct Avm2ButtonData
 typedef struct Avm2BitmapData
 {
 	uint16_t char_id;
-	uint16_t width;
-	uint16_t height;
+	// 32-bit: a PNG smuggled through DefineBitsJPEG2/3 (SWF8+) carries u32
+	// dimensions and can exceed 65535 (see visual/define_bits_jpeg2_huge).
+	// DefineBitsLossless is u16-limited, but the field is shared.
+	uint32_t width;
+	uint32_t height;
 	uint8_t transparency;
 	// Straight RGBA, width*height*4 bytes (NULL if decode failed). When
 	// z_len != 0 the pointer is instead a zlib DEFLATE stream of length z_len

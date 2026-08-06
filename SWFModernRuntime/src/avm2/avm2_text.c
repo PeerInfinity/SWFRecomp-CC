@@ -1131,6 +1131,21 @@ static uint16_t* et_units_plain(Avm2Context* ctx, const Avm2EditTextExt* et,
 	return u;
 }
 
+// Ruffle swf_is_whitespace (see swf_is_ws below, declared later).
+static int ent_ws(char c)
+{
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+// Digit value of `c` in `radix` (10 or 16), or -1.
+static int ent_digit(char c, int radix)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (radix == 16 && c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (radix == 16 && c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return -1;
+}
+
 // Decode &entities; in [p, p+n) into sb (process_html_entity).
 static void html_decode_entities(Avm2Context* ctx, SB* sb, const char* p, uint32_t n)
 {
@@ -1162,46 +1177,58 @@ static void html_decode_entities(Avm2Context* ctx, SB* sb, const char* p, uint32
 		else if (ENT_EQ("nbsp")) sb_cp(ctx, sb, 0xA0);
 		else if (name_len >= 2 && name[0] == '#')
 		{
-			const char* digits;
-			uint32_t dl;
-			int radix;
-			if (name[1] == 'x' || name[1] == 'X')
+			// Numeric entity. Flash's parser (Ruffle
+			// core/src/html/text_format.rs process_html_entity) is much looser
+			// than XML's, and text/html_entity_parsing pins every corner:
+			//  * whitespace (space/tab/CR/LF) around the numeral is TRIMMED,
+			//    so "&# 60;" and "&#x\n26;" are valid;
+			//  * ONE leading '+'/'-' is accepted, but it is tested on the
+			//    UNTRIMMED character right after '#'/'x' -- "&#+ 40;" is not
+			//    an entity, and neither is "&#  x3b;" (the 'x' must be
+			//    adjacent to the '#');
+			//  * only a LOWERCASE 'x' selects hex: "&#X28;" is a decimal parse
+			//    of "X28" and therefore invalid, which is what Flash reports;
+			//  * the digit run stops at the first character that is not a
+			//    digit in the radix, and everything from there to the ';' is
+			//    discarded ("&#40a;" is '(');
+			//  * accumulation is WRAPPING u16, so "&#127183;" is
+			//    127183 & 0xFFFF and "&#-50;" is 65486 -- no overflow reject.
+			// Only a numeral that parses to nothing at all falls back to
+			// copying the source text verbatim.
+			int radix = (name[1] == 'x') ? 16 : 10;
+			uint32_t si = (radix == 16) ? 2u : 1u;
+			const char* q = name + si;
+			uint32_t ql = name_len - si;
+			while (ql > 0 && ent_ws(q[0])) { q++; ql--; }
+			while (ql > 0 && ent_ws(q[ql - 1])) ql--;
+			uint32_t nsi = (si < name_len
+			                && (name[si] == '+' || name[si] == '-')) ? 1u : 0u;
+			uint32_t end = nsi;
+			while (end < ql && ent_digit(q[end], radix) >= 0) end++;
+			uint32_t d0 = 0;
+			int neg = 0;
+			if (end > 0 && (q[0] == '+' || q[0] == '-'))
 			{
-				// Only the trailing 4 hex digits are used.
-				digits = name + 2;
-				dl = name_len - 2;
-				if (dl > 4) { digits += dl - 4; dl = 4; }
-				radix = 16;
+				neg = (q[0] == '-');
+				d0 = 1;
+			}
+			if (end > d0)
+			{
+				uint16_t acc = 0;
+				for (uint32_t k = d0; k < end; k++)
+				{
+					int d = ent_digit(q[k], radix);
+					acc = (uint16_t) (acc * (unsigned) radix);
+					acc = neg ? (uint16_t) (acc - (unsigned) d)
+					          : (uint16_t) (acc + (unsigned) d);
+				}
+				// A lone surrogate half is not a scalar value: emit nothing.
+				if (acc < 0xD800 || acc > 0xDFFF) sb_cp(ctx, sb, acc);
 			}
 			else
 			{
-				digits = name + 1;
-				dl = name_len - 1;
-				if (dl > 16) { digits += dl - 16; dl = 16; }
-				radix = 10;
-			}
-			uint64_t val = 0;
-			int ok = dl > 0;
-			for (uint32_t k = 0; k < dl && ok; k++)
-			{
-				int d;
-				char c = digits[k];
-				if (c >= '0' && c <= '9') d = c - '0';
-				else if (radix == 16 && c >= 'a' && c <= 'f') d = c - 'a' + 10;
-				else if (radix == 16 && c >= 'A' && c <= 'F') d = c - 'A' + 10;
-				else { ok = 0; break; }
-				val = val * radix + d;
-				if (val > 0x10FFFF) val = 0x110000;  // invalid marker
-			}
-			if (ok && val <= 0x10FFFF && !(val >= 0xD800 && val <= 0xDFFF))
-			{
-				sb_cp(ctx, sb, (uint32_t) val);
-			}
-			else if (!ok)
-			{
 				sb_bytes(ctx, sb, p + i, j - i + 1);
 			}
-			// A valid-syntax but out-of-range codepoint emits nothing.
 		}
 		else
 		{

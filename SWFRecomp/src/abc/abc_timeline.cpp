@@ -548,7 +548,9 @@ bool decodeLossless(int version, int format, uint32_t w, uint32_t h,
 struct BitmapAsset
 {
 	uint16_t char_id;
-	uint16_t width, height;
+	// u32, not u16: a PNG smuggled through DefineBitsJPEG2/3 (SWF8+) can be
+	// wider/taller than 65535. Mirrors Avm2BitmapData in avm2_abc.h.
+	uint32_t width, height;
 	uint8_t transparency;
 	std::vector<uint8_t> rgba;  // empty if decode failed
 };
@@ -1502,8 +1504,8 @@ struct Scanner
 				                        jpeg_tables.size(), alpha_z, alpha_z_len,
 				                        w, h, ba.rgba))
 				{
-					ba.width = (uint16_t) w;
-					ba.height = (uint16_t) h;
+					ba.width = w;
+					ba.height = h;
 					ci.bounds[0] = 0;
 					ci.bounds[1] = (int32_t) w * 20;
 					ci.bounds[2] = 0;
@@ -1542,8 +1544,8 @@ struct Scanner
 				if (format == 3) num_colors = body.u8();  // BitmapColorTableSize
 				BitmapAsset ba;
 				ba.char_id = ci.char_id;
-				ba.width = (uint16_t) w;
-				ba.height = (uint16_t) h;
+				ba.width = (uint32_t) w;
+				ba.height = (uint32_t) h;
 				ba.transparency = (version == 2) ? 1 : 0;
 				// Remaining body bytes are the zlib-compressed pixel data.
 				if (body.p < body.end)

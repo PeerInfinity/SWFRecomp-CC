@@ -653,8 +653,21 @@ Avm2Value avm2_coerce_to_primitive(Avm2Context* ctx, Avm2Value v, int hint)
 	}
 	if (hint == 0)
 	{
-		// Default hint: Number (Date would be String; no Date yet).
+		// ES3 8.6.2.6 [[DefaultValue]] with no hint: Number for every object
+		// except Date, whose [[DefaultValue]] uses the String hint (15.9.6),
+		// so `date + x` concatenates rather than adding milliseconds.
+		// ecma3/Expressions/e11_6_1_3 pins exactly that. Only the `add`
+		// operator passes hint 0, so the arm is confined to `+`.
 		hint = 1;
+		for (Avm2Class* c = (v.u.obj != NULL) ? v.u.obj->cls : NULL;
+		     c != NULL; c = c->super_class)
+		{
+			if (c == ctx->builtins.date_class)
+			{
+				hint = 2;
+				break;
+			}
+		}
 	}
 	const char* first = (hint == 2) ? "toString" : "valueOf";
 	const char* second = (hint == 2) ? "valueOf" : "toString";

@@ -685,6 +685,16 @@ static Avm2Value js_normalize(Avm2Value v)
 	return v;
 }
 
+// A Function value has no JSON representation: avmplus OMITS it as an object
+// property and writes `null` for it in an array or at the top level
+// (avm2/json_stringify_function pins all three). A CLASS object is emphatically
+// NOT a function here — it stringifies like any other object.
+static int js_is_function(Avm2Value v)
+{
+	return v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
+	       && v.u.obj->kind == AVM2_OBJ_FUNCTION;
+}
+
 static Avm2Value js_iter_get(JSer* js, Avm2Object* obj, uint32_t i,
                              const char* key, uint32_t key_len)
 {
@@ -803,7 +813,7 @@ static void js_serialize_object(JSer* js, StrBuf* b, Avm2Object* obj)
 			Avm2Value value = avm2_get_public_property(
 				ctx, avm2_object_value(obj), key->utf8, key->len, NULL);
 			Avm2Value mapped = js_map_value(js, key->utf8, key->len, value);
-			if (mapped.kind == AVM2_VALUE_UNDEFINED) continue;
+			if (mapped.kind == AVM2_VALUE_UNDEFINED || js_is_function(mapped)) continue;
 			js_obj_entry(js, b, &first, key->utf8, key->len, mapped);
 		}
 	}
@@ -832,15 +842,35 @@ static void js_serialize_object(JSer* js, StrBuf* b, Avm2Object* obj)
 				continue;
 			}
 			Avm2Value mapped = js_map_value(js, e->key.name, e->key.name_len, value);
-			if (mapped.kind == AVM2_VALUE_UNDEFINED) continue;
+			if (mapped.kind == AVM2_VALUE_UNDEFINED || js_is_function(mapped)) continue;
 			js_obj_entry(js, b, &first, e->key.name, e->key.name_len, mapped);
 		}
+		// A class object's `static const`s are stored here as DONT-ENUM
+		// dynamic props (avm2_builtin_add_static_const); avmplus declares them
+		// as real class traits, so JSON.stringify serializes them
+		// (`JSON.stringify(Object)` -> `{"length":1,...}`). Only class objects
+		// get that relaxation — every other dont-enum prop still skips.
+		int is_class = (obj->kind == AVM2_OBJ_CLASS);
 		for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
 		{
-			if (p->dont_enum) continue;
+			if (p->dont_enum && !is_class) continue;
 			Avm2Value mapped = js_map_value(js, p->name.utf8, p->name.len, p->value);
-			if (mapped.kind == AVM2_VALUE_UNDEFINED) continue;
+			if (mapped.kind == AVM2_VALUE_UNDEFINED || js_is_function(mapped)) continue;
 			js_obj_entry(js, b, &first, p->name.utf8, p->name.len, mapped);
+		}
+		// `prototype` reaches a class object through Class's ivtable getter,
+		// not through the class's own (static) vtable, so neither walk above
+		// sees it. avmplus keeps it as a slot on the class object and
+		// stringifies it last.
+		if (is_class && obj->class_ref != NULL
+		    && obj->class_ref->prototype_obj != NULL)
+		{
+			Avm2Value pv = avm2_object_value(obj->class_ref->prototype_obj);
+			Avm2Value mapped = js_map_value(js, "prototype", 9, pv);
+			if (mapped.kind != AVM2_VALUE_UNDEFINED && !js_is_function(mapped))
+			{
+				js_obj_entry(js, b, &first, "prototype", 9, mapped);
+			}
 		}
 	}
 	js->depth--;
@@ -881,6 +911,13 @@ static void js_serialize_value(JSer* js, StrBuf* b, Avm2Value v)
 		case AVM2_VALUE_OBJECT:
 		{
 			Avm2Object* obj = v.u.obj;
+			if (obj->kind == AVM2_OBJ_FUNCTION)
+			{
+				// No JSON representation. Reached only from an array element
+				// or the top level; object properties drop out earlier.
+				sb_lit(b, "null");
+				return;
+			}
 			for (uint32_t i = 0; i < js->stack_n; i++)
 			{
 				if (js->stack[i] == obj) throw_1129(ctx);

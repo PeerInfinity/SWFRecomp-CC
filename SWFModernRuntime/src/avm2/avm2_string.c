@@ -404,6 +404,17 @@ static Avm2Value string_locale_compare(Avm2Activation* act)
 	}
 	const Avm2String* s = this_string(act);
 	Avm2Value other_v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (ctx->swf_version < 11
+	    && (other_v.kind == AVM2_VALUE_NULL
+	        || other_v.kind == AVM2_VALUE_UNDEFINED))
+	{
+		// avmplus bug 585791: before SWF11, a null/undefined argument is not
+		// coerced to "null"/"undefined" at all — the comparison answers 1 for
+		// an empty receiver and 0 for any other. Ruffle globals/string.rs
+		// locale_compare gates the same quirk on version() < 11;
+		// as3/String/localeCompare_585791/{v9,v12} pin both sides.
+		return avm2_integer(s->len == 0 ? 1 : 0);
+	}
 	const Avm2String* other = avm2_coerce_to_string(ctx, other_v);
 	uint32_t la = utf16_length(s);
 	uint32_t lb = utf16_length(other);
@@ -443,7 +454,11 @@ Avm2Value avm2_string_split_plain(Avm2Activation* act)
 	{
 		return avm2_object_value(arr);
 	}
-	if (delim_v.kind == AVM2_VALUE_UNDEFINED)
+	// ES3 15.5.4.14: only a *missing* separator returns the whole string.
+	// An explicit `undefined` is ToString'd like any other value, so
+	// "…".split(void 0) splits on the literal "undefined"
+	// (ecma3/String/e15_5_4_8_2 pins this).
+	if (act->argc == 0)
 	{
 		avm2_array_push(ctx, arr, avm2_string(s));
 		return avm2_object_value(arr);
