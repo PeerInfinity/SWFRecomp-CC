@@ -2653,6 +2653,33 @@ void render_webgpu_end_clip(WebGPURenderContext* ctx)
 	restore_draw_pipeline(ctx);
 }
 
+// Save / restore the active clip reference around a NESTED mask (AVM2 walk).
+//
+// end_clip zeroes mask_ref, which is right for the tag.c loops (their clip
+// ranges are siblings), but the AVM2 render walk can open a mask inside an
+// already-masked subtree: `a.mask = m` on a child of a clipDepth range, or a
+// clipDepth range inside a masked container. Without a restore the inner
+// end_clip drops the OUTER clip for every later sibling.
+//
+// Restoring costs no geometry replay: the stencil is cleared once per pass, so
+// the texels the enclosing mask wrote still hold its reference. The one thing
+// this cannot recover is the region where the inner mask overwrote the outer
+// reference (Replace, not Increment) — nesting still does not intersect, which
+// is the same flat-mask limitation the tag.c loops have had since s11.
+u32 render_webgpu_clip_ref(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok) return 0;
+	return ctx->mask_ref;
+}
+
+void render_webgpu_restore_clip(WebGPURenderContext* ctx, u32 ref)
+{
+	if (!ctx->renderer_ok) return;
+	if (ctx->mask_capture_depth > 0) return;
+	ctx->mask_ref = ref;
+	restore_draw_pipeline(ctx);
+}
+
 void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
 {
 	if (!ctx->renderer_ok) return;

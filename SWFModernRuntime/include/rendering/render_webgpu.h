@@ -285,6 +285,13 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* context, const float* x
 void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip(WebGPURenderContext* context);
+// Save / restore the ACTIVE clip reference around a nested mask. The stencil
+// texels an enclosing mask wrote are still in the buffer (nothing clears them
+// mid-pass), so restoring an enclosing clip is just re-binding the stencil-test
+// pipeline at its reference — no geometry replay. Used by the AVM2 render walk,
+// where a masked subtree can contain another masked node.
+u32  render_webgpu_clip_ref(WebGPURenderContext* context);
+void render_webgpu_restore_clip(WebGPURenderContext* context, u32 ref);
 void render_webgpu_close_pass(WebGPURenderContext* context);
 void render_webgpu_compose_text_transforms(WebGPURenderContext* context, const char* transform_data, u32 place_transform_id, u32 glyph_start, size_t count);
 void render_webgpu_compose_sprite_transform(WebGPURenderContext* context, const char* transform_data, u32 parent_transform_id, u32 child_transform_id);
