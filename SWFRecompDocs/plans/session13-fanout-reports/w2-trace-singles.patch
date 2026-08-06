@@ -1,0 +1,364 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index 03200611d..7cd0f5cb4 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -212,6 +212,9 @@ void actionQueueDynamicChildUnloads(MovieClip* parent_mc);
+ void actionFirePendingLoadInits(SWFAppContext* app_context);
+ // ImportAssets: load an imported SWF's init function in the current context
+ void actionImportAssets(SWFAppContext* app_context, const char* url);
++// ImportAssets: issue the imported URL's GET at PRELOAD time (called from
++// tagInit, before any frame script) — Ruffle MovieClip::preload.
++void actionPreloadImportAssets(SWFAppContext* app_context, const char* url);
+ // Query button MC state for the button state machine in tag.c
+ // Returns mc->visible for the named button MC (1=visible, 0=hidden; defaults to 1 if MC not found)
+ int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
+diff --git a/SWFModernRuntime/include/avm2/avm2_class.h b/SWFModernRuntime/include/avm2/avm2_class.h
+index 1db10d4f8..ac69c3342 100644
+--- a/SWFModernRuntime/include/avm2/avm2_class.h
++++ b/SWFModernRuntime/include/avm2/avm2_class.h
+@@ -138,6 +138,12 @@ struct Avm2Class
+ 	uint8_t flags;
+ 	Avm2VTable ivtable;            // instance vtable (inherited + own)
+ 	Avm2MethodRef instance_init;
++	// The static initializer (ABC class_info.cinit). Ruffle models the static
++	// side as a separate c_class whose instance_init IS this method, which is
++	// how a cinit frame gets spelled "Test$cinit()" (function.rs::
++	// display_function). We keep one class per ABC class, so the ref lives
++	// here. Zeroed for builtins (they have no ABC cinit).
++	Avm2MethodRef class_init;
+ 	Avm2ScopeChain* scope;         // class scope: captured at NewClass (statics/cinit)
+ 	Avm2ScopeChain* iscope;        // instance scope: class scope + [class object]
+ 	                               // (instance traits + instance_init outer chain)
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index e77ea0f5a..391ed8fc1 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -34570,6 +34570,26 @@ static ActionVar builtin_mcl_getProgress(SWFAppContext* app_context, ActionVar*
+ 
+ // Fire all queued MCL load events (called from tagShowFrame).
+ // Sequence per Flash/Ruffle spec:
++// The ImportAssets GET. Ruffle issues it from MovieClip::preload
++// (movie_clip.rs::import_assets), i.e. before ANY frame script runs, so this
++// is called from tagInit() rather than the frame body — otherwise the fetch
++// block prints after frame 1's trace. Flash Player skips an empty URL
++// entirely ("FP does not attempt to load the url if it is empty"), which is
++// what keeps import_assets/empty_url fetch-free. The request is issued for
++// every non-empty URL, including one that resolves to a recompiled child SWF.
++void actionPreloadImportAssets(SWFAppContext* app_context, const char* url)
++{
++	(void) app_context;
++#if SWF_LOG_FETCH_ENABLED
++	if (url == NULL || url[0] == '\0') return;
++	swf_log_fetch_queue(url, strlen(url), "GET", 3, NULL, 0, NULL, 0,
++	                    NULL, 0, 0, 0);
++	swf_log_fetch_flush();
++#else
++	(void) url;
++#endif
++}
++
+ // ImportAssets: load an imported SWF's init function (DoInitAction scripts)
+ // in the current context. Called from recompiled code when an ImportAssets2 tag
+ // references another SWF file.
+diff --git a/SWFModernRuntime/src/avm2/avm2_class.c b/SWFModernRuntime/src/avm2/avm2_class.c
+index aa01af7f9..88c9b3e79 100644
+--- a/SWFModernRuntime/src/avm2/avm2_class.c
++++ b/SWFModernRuntime/src/avm2/avm2_class.c
+@@ -696,10 +696,32 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
+ 					const char* pfx = (t->kind == 2) ? "get "
+ 					                  : (t->kind == 3) ? "set " : "";
+ 					size_t pl = strlen(pfx);
+-					char* nm = avm2_alloc(ctx, pl + e.key.name_len + 1);
++					// A trait declared in a USER namespace (ABC kind 0x08,
++					// `namespace my_ns = "uri"`) is named by its QUALIFIED
++					// name — "Test/uri::f()", not "Test/f()" (Ruffle
++					// function.rs: `method_trait.name().namespace()
++					// .is_namespace()` -> to_qualified_name). Package /
++					// package-internal / protected / private traits (0x16-
++					// 0x1a, 0x05) keep the local name.
++					const char* uri = NULL;
++					size_t ul = 0;
++					if (e.key.ns_kind == 0x08 && e.key.ns_uri != NULL
++					    && e.key.ns_len > 0)
++					{
++						uri = e.key.ns_uri;
++						ul = e.key.ns_len;
++					}
++					size_t sep = (ul > 0) ? 2 : 0;
++					char* nm = avm2_alloc(ctx, pl + ul + sep + e.key.name_len + 1);
+ 					memcpy(nm, pfx, pl);
+-					memcpy(nm + pl, e.key.name, e.key.name_len);
+-					nm[pl + e.key.name_len] = '\0';
++					if (ul > 0)
++					{
++						memcpy(nm + pl, uri, ul);
++						nm[pl + ul] = ':';
++						nm[pl + ul + 1] = ':';
++					}
++					memcpy(nm + pl + ul + sep, e.key.name, e.key.name_len);
++					nm[pl + ul + sep + e.key.name_len] = '\0';
+ 					ref.debug_name = nm;
+ 				}
+ 
+@@ -1302,6 +1324,15 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
+ 	cls->instance_init.debug_name = iinit->debug_name;
+ 	cls->instance_init.method_index = cd->instance_init;
+ 
++	// Remember the static initializer too — a cinit frame is named after the
++	// class ("Test$cinit()"), which the frame renderer cannot derive from the
++	// method alone.
++	const Avm2AbcMethodData* cinitd = &file->data->methods[cd->class_init];
++	cls->class_init.fn = cinitd->fn;
++	cls->class_init.file = file;
++	cls->class_init.debug_name = cinitd->debug_name;
++	cls->class_init.method_index = cd->class_init;
++
+ 	// Inherit the flattened instance vtable, then append own traits
+ 	// (vtable.rs model). Inherited protected-ns entries are re-keyed onto
+ 	// this class's protected namespace so subclass protected access
+@@ -1384,8 +1415,7 @@ Avm2Class* avm2_class_define(Avm2Context* ctx, Avm2AbcFileRt* file, uint32_t cla
+ 	class_setup_prototype(ctx, cls);
+ 
+ 	// Run the static initializer now (Ruffle runs it during NewClass).
+-	const Avm2AbcMethodData* cinit = &file->data->methods[cd->class_init];
+-	Avm2MethodRef cinit_ref = { cinit->fn, file, cinit->debug_name, cd->class_init };
++	Avm2MethodRef cinit_ref = cls->class_init;
+ 	avm2_call_method_ref(ctx, &cinit_ref, cls, scope,
+ 	                     avm2_object_value(cobj), NULL, 0);
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 632b18b9e..e0b50af8d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -4489,6 +4489,18 @@ static const Avm2String* root_swf_url(Avm2Context* ctx)
+ #endif
+ }
+ 
++// The ROOT movie's own decompressed image, for `LoaderInfo.bytes` (Ruffle
++// loader_info.rs::get_bytes -> root.data()). Defined by generated
++// `root_swf_bytes.c` when the build embeds it; the weak defaults below keep
++// every other build (and every hand-built deploy) linking with bytes == null,
++// which degrades to the empty ByteArray we returned before. Same weak-symbol
++// override pattern as libswf/shape_hit_test.c's `path_data`.
++// NOTE: deliberately NOT const-qualified objects. A `const` weak variable with
++// an initializer gets constant-folded inside this TU at -O2 (gcc emits no
++// relocation at all), so the strong generated definition would never be read.
++__attribute__((weak)) const unsigned char* g_root_swf_bytes = 0;
++__attribute__((weak)) unsigned int         g_root_swf_bytes_len = 0;
++
+ static Avm2Object* loaderinfo_new(Avm2Context* ctx, uint8_t kind)
+ {
+ 	Avm2Class* cls = ctx->builtins.loader_info_class;
+@@ -4505,6 +4517,11 @@ static Avm2Object* loaderinfo_new(Avm2Context* ctx, uint8_t kind)
+ 			// `init` (movie_clip.rs::player_root_movie / context.rs).
+ 			ext->expose_content = 1;
+ 			ext->bytes_loaded = ext->bytes_total = root_swf_size();
++			// `bytes` is the DECOMPRESSED image, not the on-disk file, so it
++			// is independent of bytes_total above (loaderinfo_quine: a 662-byte
++			// CWS whose bytes.length is 1003).
++			ext->bytes = g_root_swf_bytes;
++			ext->bytes_len = g_root_swf_bytes_len;
+ 		}
+ 		if (kind == LI_KIND_ROOT)
+ 		{
+diff --git a/SWFModernRuntime/src/avm2/avm2_error.c b/SWFModernRuntime/src/avm2/avm2_error.c
+index e7f0dfe21..b9a83619d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_error.c
++++ b/SWFModernRuntime/src/avm2/avm2_error.c
+@@ -141,6 +141,32 @@ void avm2_callstack_rename_frame(Avm2Context* ctx, Avm2MethodFn own_fn,
+ 	avm2_callstack_push(ctx, &ref, NULL);
+ }
+ 
++// Is this frame's method a CLASS (static) trait of `cls`? Ruffle binds a
++// static method to the class's c_class ("Test$"), whose traits are exactly the
++// entries of our class object's vtable — so a hit here is what makes the frame
++// read "Test$/class_method()" instead of "Test/class_method()".
++static int frame_is_class_trait(const Avm2Class* cls, const Avm2MethodRef* m)
++{
++	if (cls == NULL || m->file == NULL || cls->class_object == NULL) return 0;
++	const Avm2VTable* vt = cls->class_object->vtable;
++	if (vt == NULL) return 0;
++	for (uint32_t i = 0; i < vt->count; i++)
++	{
++		const Avm2PropEntry* e = &vt->entries[i];
++		if (e->kind == AVM2_PROP_SLOT) continue;
++		if (e->method.file == m->file
++		    && e->method.method_index == m->method_index
++		    && e->method.fn == m->fn)
++			return 1;
++		if ((e->kind == AVM2_PROP_SETTER || e->kind == AVM2_PROP_GETSET)
++		    && e->setter.file == m->file
++		    && e->setter.method_index == m->method_index
++		    && e->setter.fn == m->fn)
++			return 1;
++	}
++	return 0;
++}
++
+ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+                                char* buf, int size)
+ {
+@@ -153,7 +179,18 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+ 		int is_iinit = f->bound_class->instance_init.fn == m->fn
+ 		               && f->bound_class->instance_init.file == m->file
+ 		               && f->bound_class->instance_init.method_index == m->method_index;
+-		if (is_iinit)
++		// The STATIC initializer is the c_class's instance init in Ruffle's
++		// model, and a c_class initializer prints "<QName>$cinit"
++		// (function.rs:317-325). Ours is a field on the same class.
++		int is_cinit = !is_iinit && m->file != NULL
++		               && f->bound_class->class_init.file == m->file
++		               && f->bound_class->class_init.method_index == m->method_index
++		               && f->bound_class->class_init.fn == m->fn;
++		if (is_cinit)
++		{
++			snprintf(buf, size, "%s$cinit()", cq);
++		}
++		else if (is_iinit)
+ 		{
+ 			snprintf(buf, size, "%s()", cq);
+ 		}
+@@ -171,10 +208,18 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+ 			{
+ 				const char* slash = strrchr(dn, '/');
+ 				if (slash != NULL) dn = slash + 1;
+-				const char* colon = strrchr(dn, ':');
+-				if (colon != NULL) dn = colon + 1;
++				// "uri::f" is FP's own spelling of a user-namespaced trait
++				// (built in avm2_vtable_add_traits) and must survive; the
++				// mxmlc package prefix this strip exists for uses a SINGLE
++				// colon ("test_fla:frame1").
++				if (strstr(dn, "::") == NULL)
++				{
++					const char* colon = strrchr(dn, ':');
++					if (colon != NULL) dn = colon + 1;
++				}
+ 			}
+-			snprintf(buf, size, "%s/%s()", cq, dn);
++			snprintf(buf, size, frame_is_class_trait(f->bound_class, m)
++			                    ? "%s$/%s()" : "%s/%s()", cq, dn);
+ 		}
+ 		return;
+ 	}
+@@ -195,6 +240,17 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+ 	const Avm2AbcMethodData* md = &m->file->data->methods[m->method_index];
+ 	if (md->is_function)
+ 	{
++		// Ruffle method.rs::method_name: `method_info.name == 0` means the
++		// method has NO name (None) and the frame is spelled by its ABC
++		// method index; a name index that merely points at the empty string
++		// is Some("") and prints "<anonymous>". The recompiler preserves the
++		// difference by emitting a NULL debug_name for index 0 (ASC/Flash-IDE
++		// builds name every method 0; mxmlc builds point at "").
++		if (md->debug_name == NULL && m->debug_name == NULL)
++		{
++			snprintf(buf, size, "MethodInfo-%u()", m->method_index);
++			return;
++		}
+ 		snprintf(buf, size, "Function/%s()",
+ 		         (m->debug_name != NULL && m->debug_name[0] != '\0')
+ 		         ? m->debug_name : "<anonymous>");
+diff --git a/SWFRecomp/src/abc/abc_emit.cpp b/SWFRecomp/src/abc/abc_emit.cpp
+index 0630754f3..a38493cdd 100644
+--- a/SWFRecomp/src/abc/abc_emit.cpp
++++ b/SWFRecomp/src/abc/abc_emit.cpp
+@@ -3841,7 +3841,17 @@ namespace abc
+ 				{
+ 					out << "NULL";
+ 				}
+-				out << ", \"" << escapeCString(abc.pool.strings[m.name]) << "\", "
++				// `method_info.name == 0` is the ABC "no name at all" index and
++				// is NOT the same as an index pointing at the empty string:
++				// avmplus/Ruffle (method.rs::method_name) return None for the
++				// former and Some("") for the latter, which is exactly what
++				// separates a "MethodInfo-N()" stack frame from a
++				// "Function/<anonymous>()" one. Emitting `pool.strings[0]`
++				// collapses both to "", so index 0 becomes a NULL debug_name.
++				out << ", ";
++				if (m.name == 0) out << "NULL";
++				else out << "\"" << escapeCString(abc.pool.strings[m.name]) << "\"";
++				out << ", "
+ 				    << (unsigned) m.flags << ", "
+ 				    << (is_function[mi] ? 1 : 0) << ", "
+ 				    << m.params.size() << ", "
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index bd7f473ad..9e2f5a86e 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -4853,6 +4853,15 @@ namespace SWFRecomp
+ 					// char_id aren't degraded.
+ 					defined_chars.insert(char_id);
+ 				}
++				// The FETCH for the imported URL happens at preload time,
++				// not when the frame runs: Ruffle handles ImportAssets/2
++				// inside MovieClip::preload (movie_clip.rs:481/567/753),
++				// which scans the whole tag stream before frame 1's
++				// DoAction. tagInit() is our equivalent window
++				// (libswf/swf_core.c:882, libswf/swf.c:1689), so the log
++				// block lands ahead of every frame trace.
++				tag_init << endl << "\tactionPreloadImportAssets(app_context, \""
++				         << import_url << "\");";
+ 				// Buffer into the current-frame prologue so imports
+ 				// resolve at the top of frame_N's body, in stream order
+ 				// with DoInitAction (required by do_init_action_child).
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 736dda21f..64ae1e44a 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -1175,6 +1175,46 @@ def decompressed_swf_bytes(swf_path):
+     return b"FWS" + raw[3:8] + body
+ 
+ 
++def generate_root_swf_bytes(test_dir, build_dir):
++    """Emit `root_swf_bytes.c` — the ROOT movie's own decompressed image.
++
++    `LoaderInfo.bytes` on the root/stage LoaderInfo returns the movie's
++    decompressed image (Ruffle `loader_info.rs::get_bytes` -> `root.data()`),
++    which is what `avm2/loaderinfo_quine` prints. The runtime already knows how
++    to hand a ByteArray back (`avm2_display.c::li_get_bytes`); the only thing
++    missing was a generated symbol carrying the root movie's bytes, so this
++    writes one and `avm2_display.c` picks it up through a weak default.
++
++    The gate is load-bearing: the corpus is 4478 test SWFs / 70.4 MB
++    decompressed, and emitting all of them as C initializer lists is ~280 MB of
++    generated source. Only embed when the decompressed image contains the ASCII
++    substring b"bytes" (any ABC that names the `bytes` property has it in its
++    string pool) — 61 of 2468 AVM2 tests, ~1.8 MB — plus a hard 512 KB cap. A
++    false negative just degrades to the old empty-ByteArray behaviour.
++
++    The file is always written (with null/0 when the gate says skip) so the
++    generated source set has the same shape for every test.
++    """
++    data = None
++    swf = test_dir / "test.swf"
++    if swf.exists():
++        img = decompressed_swf_bytes(swf)
++        if img and b"bytes" in img and len(img) <= 512 * 1024:
++            data = img
++    lines = ["// Auto-generated: root movie image for LoaderInfo.bytes."]
++    if data:
++        lines.append("static const unsigned char root_swf_bytes_data[] = {")
++        for i in range(0, len(data), 16):
++            lines.append("    " + "".join(f"{b}," for b in data[i:i + 16]))
++        lines.append("};")
++        lines.append("const unsigned char* g_root_swf_bytes = root_swf_bytes_data;")
++        lines.append(f"unsigned int g_root_swf_bytes_len = {len(data)};")
++    else:
++        lines.append("const unsigned char* g_root_swf_bytes = 0;")
++        lines.append("unsigned int g_root_swf_bytes_len = 0;")
++    (build_dir / "root_swf_bytes.c").write_text("\n".join(lines) + "\n")
++
++
+ def _sanitize_prefix(filename):
+     """Convert a filename like 'target.swf' to a C-safe identifier prefix like 'target'."""
+     name = filename.rsplit(".", 1)[0]  # strip extension
+@@ -2396,6 +2436,9 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
+     if has_children:
+         generate_movie_registry(child_prefixes, build_dir)
+ 
++    # The root movie's own image, for LoaderInfo.bytes (gated — see the helper).
++    generate_root_swf_bytes(test_dir, build_dir)
++
+     # Handle data files (loadVariables tests: testvars.txt, etc.)
+     data_files = find_data_files(test_dir)
+     has_data_files = len(data_files) > 0

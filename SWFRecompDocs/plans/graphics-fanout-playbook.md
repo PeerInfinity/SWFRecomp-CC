@@ -369,3 +369,39 @@ Ledger: `polish-sweep-arc.md` §13; reports `session12-fanout-reports/`.
   a real bug); AVM2 static-bitmap upload (bitmapbuttons blockers A+B
   confirmed but DEFER — tol 4 / max_out 0 on resampled JPEG unwinnable);
   Stage3D (30 cmps) + video (21) backends arc-sized.
+
+## 12. Session-13 state of the board (2026-08-06)
+
+**Closeout run `31130292354` at `fb36ba110`: 301/567 (53.1%), +15, zero
+regressions, bands improved 15 / worsened 5 (all fail→fail).** Ledger:
+`polish-sweep-arc.md` §14; reports `session13-fanout-reports/`.
+
+- **Embedded video renders.** Recompiler video-scoped char-id-0 alias
+  (id 0→0x4000, gated on video presence) + Ruffle-exact BT.601 fixed-point
+  YUV. VP6 family byte-exact ×4; h263 −98% to c_small (IDCT-level,
+  dispositioned Cat 9 rewrite); deblocking NOT dispositioned (implementable:
+  stream cap + flags byte + deblock port).
+- **Adaptive curve subdivision** (num_passes = max(6, ceil(sqrt(d/8tol))))
+  replaced the fixed 6-chord flattening: +7 incl. six timeline_loop
+  hairline_edge_drift members. hairline_edge_drift is therefore ≥2
+  mechanisms — re-triage the cluster; splitter is whether the SWF carries a
+  large-deviation quadratic. lroundf REFUTED (costs headroom); morph
+  gated out (index-paired vertices). Side effect: simple_shapes/masks tie
+  pair worsened 1686→2624 (still c_small, still dispositioned).
+- **Masks: defects B and C landed.** B = AVM1 setMask timeline content
+  (MovieClip-registry pairing, no DisplayObject* stored; clip_depth=0
+  retirement coupling; 0 flips, text_field_mask −100% to 56 excess).
+  C = AVM2 scrollRect crop (avm2_button_scroll_rect → a_epsilon 9 excess —
+  one lavapipe corner pixel from flipping). cache_as_bitmap/masks family
+  moved −75..−95% with output.07 flipping. Remaining mask residuals all
+  point at Equal/IncrementClamp stencil intersection (3 named
+  beneficiaries) and the AVM1 scrollRect translate.
+- **Dispositions**: simple_shapes/masks pair + h263 now resolve HARD via
+  ACCEPTED_DIFFS entries (verified through image_triage's resolver — the
+  mechanism is doc-driven, no script change). Filters bevel family drifted
+  +6-7% (fail→fail) — family remains struck from flip leads.
+- **Top remaining leads**: bitmap-fill U-pinning (acid-bitmap-fill 100k,
+  acid-bitmap-draw_quality ×194k — biggest cluster); Equal/IncrementClamp;
+  vertex-placement at curve joints (acid-blend-2 output.26); AVM1
+  scrollRect translate; deblocking; Stage3D (30) + remaining video (16)
+  backends arc-sized.

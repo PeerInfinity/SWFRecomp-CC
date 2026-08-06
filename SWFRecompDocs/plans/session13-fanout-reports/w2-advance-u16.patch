@@ -1,0 +1,258 @@
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index d1d9e68eb..7e13eed38 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -193,7 +193,7 @@ void tagScriptLimits(u16 max_recursion, u16 timeout);
+ void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
+ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
+     s16 ascent, s16 descent, s16 leading, int em_square,
+-    const u16* code_table, const s16* advance_table, size_t glyph_count);
++    const u16* code_table, const s32* advance_table, size_t glyph_count);
+ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base);
+ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id);
+ void tagVideoFrame(SWFAppContext* app_context, u16 char_id, u16 frame_num,
+@@ -503,14 +503,14 @@ void ng_record_csm(size_t text_id, const char* anti_alias_type, const char* grid
+ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic);
+ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
+     s16 ascent, s16 descent, s16 leading, int em_square,
+-    const u16* code_table, const s16* advance_table, size_t glyph_count);
++    const u16* code_table, const s32* advance_table, size_t glyph_count);
+ void ng_record_font_glyph_base(u16 font_id, size_t glyph_base);
+ int ng_find_font_with_metrics(u16 font_id);
+ int ng_font_find_glyph(int font_idx, u16 code_point);
+ size_t ng_font_get_glyph_base(int font_idx);
+ int ng_font_is_builtin(int font_idx);
+ int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square);
+-s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx);
++s32 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx);
+ void ng_setTabStops(const int* stops_twips, int count, u16 font_height);
+ void ng_clearTabStops(void);
+ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
+diff --git a/SWFModernRuntime/src/libswf/ng_shared.c b/SWFModernRuntime/src/libswf/ng_shared.c
+index 44ad121a7..cf680fbd0 100644
+--- a/SWFModernRuntime/src/libswf/ng_shared.c
++++ b/SWFModernRuntime/src/libswf/ng_shared.c
+@@ -373,7 +373,9 @@ static struct {
+ 	s16 leading;
+ 	int em_square;
+ 	u16 code_table[MAX_FONT_GLYPHS];
+-	s16 advance_table[MAX_FONT_GLYPHS];
++	/* u16 on the wire (Ruffle Glyph::advance: u16); s32 keeps 33000 intact
++	   and leaves -1 free as the "no such glyph" sentinel. */
++	s32 advance_table[MAX_FONT_GLYPHS];
+ 	size_t glyph_count;
+ 	size_t glyph_base;
+ 	int is_builtin;
+@@ -389,7 +391,7 @@ static const u16 builtin_noto_sans_codes[] = {
+ 	96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,
+ 	112,113,114,115,116,117,118,119,120,121,122,123,124,125,126
+ };
+-static const s16 builtin_noto_sans_advances[] = {
++static const s32 builtin_noto_sans_advances[] = {
+ 	260,269,408,646,572,831,732,225,300,300,551,572,268,322,268,372,
+ 	572,572,572,572,572,572,572,572,572,572,268,268,572,572,572,434,
+ 	899,639,650,632,730,556,519,728,741,339,273,619,524,907,760,781,
+@@ -403,7 +405,7 @@ static const s16 builtin_noto_sans_advances[] = {
+ #define BUILTIN_NOTO_SANS_LEADING 0
+ #define BUILTIN_NOTO_SANS_EM 1000
+ 
+-static s16 builtin_font_glyph_advance(u16 code_point)
++static s32 builtin_font_glyph_advance(u16 code_point)
+ {
+ 	if (code_point >= 32 && code_point <= 126)
+ 		return builtin_noto_sans_advances[code_point - 32];
+@@ -456,7 +458,7 @@ int ng_find_font_with_metrics(u16 font_id)
+ 	return -1;
+ }
+ 
+-static s16 ng_font_glyph_advance(int font_idx, u16 code_point)
++static s32 ng_font_glyph_advance(int font_idx, u16 code_point)
+ {
+ 	for (size_t j = 0; j < ng_fonts[font_idx].glyph_count; j++) {
+ 		if (ng_fonts[font_idx].code_table[j] == code_point)
+@@ -502,7 +504,7 @@ int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square)
+ 	return 1;
+ }
+ 
+-s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx)
++s32 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx)
+ {
+ 	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return -1;
+ 	if (glyph_idx < 0 || (size_t)glyph_idx >= ng_fonts[font_idx].glyph_count) return -1;
+@@ -533,7 +535,7 @@ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, i
+ 
+ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
+     s16 ascent, s16 descent, s16 leading, int em_square,
+-    const u16* code_table, const s16* advance_table, size_t glyph_count)
++    const u16* code_table, const s32* advance_table, size_t glyph_count)
+ {
+ 	(void)app_context;
+ 	for (size_t i = 0; i < ng_font_count; i++) {
+@@ -1156,7 +1158,7 @@ static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
+ 	size_t i = start;
+ 	while (i < end) {
+ 		u16 cp = ng_decode_utf8_char(text, end, &i);
+-		s16 adv = ng_font_glyph_advance(font_idx, cp);
++		s32 adv = ng_font_glyph_advance(font_idx, cp);
+ 		int glyph_twips = 0;
+ 		if (adv >= 0) {
+ 			int raw = (int)((float)adv * (float)font_height / (float)em);
+@@ -1305,7 +1307,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
+ 			while (char_pos < seg_end) {
+ 				size_t next_pos = char_pos;
+ 				u16 cp = ng_decode_utf8_char(text, seg_end, &next_pos);
+-				s16 adv = ng_font_glyph_advance(font_idx, cp);
++				s32 adv = ng_font_glyph_advance(font_idx, cp);
+ 				int gw = 0;
+ 				if (adv >= 0) {
+ 					int raw = (int)((float)adv * (float)font_height / (float)em);
+@@ -1399,7 +1401,7 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
+ 				continue;
+ 			}
+ 			u16 code_point = ng_decode_utf8_char(text, text_len, &i);
+-			s16 adv = ng_font_glyph_advance(fi, code_point);
++			s32 adv = ng_font_glyph_advance(fi, code_point);
+ 			int glyph_twips = 0;
+ 			if (adv >= 0) {
+ 				int raw = (int)((float)adv * (float)font_height / (float)em);
+@@ -1583,7 +1585,7 @@ static int ng_measure_substr_mixed_twips(int font_idx, int em,
+ 				fh = run_font_heights[r]; break;
+ 			}
+ 		}
+-		s16 adv = ng_font_glyph_advance(font_idx, cp);
++		s32 adv = ng_font_glyph_advance(font_idx, cp);
+ 		int glyph_twips = 0;
+ 		if (adv >= 0) {
+ 			int raw = (int)((float)adv * (float)fh / (float)em);
+@@ -1758,7 +1760,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
+ 					while (char_pos < seg_end) {
+ 						size_t next_pos = char_pos;
+ 						u16 cp = ng_decode_utf8_char(hline, seg_end, &next_pos);
+-						s16 adv = ng_font_glyph_advance(fi, cp);
++						s32 adv = ng_font_glyph_advance(fi, cp);
+ 						int gw = 0;
+ 						if (adv >= 0) {
+ 							u16 cfh = GET_FONT_HEIGHT_AT(line_start + char_pos);
+@@ -2042,7 +2044,7 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
+ 		size_t old_i = i;
+ 		u16 cp = ng_decode_utf8_char(text, text_len, &i);
+ 
+-		s16 adv = ng_font_glyph_advance(fi, cp);
++		s32 adv = ng_font_glyph_advance(fi, cp);
+ 		float glyph_px = 0;
+ 		if (adv >= 0) {
+ 			int raw_twips = (int)((float)adv * (float)font_height / (float)em);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 9ead5f394..da3d3c055 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -4990,7 +4990,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 
+ 			int glyph_idx = ng_font_find_glyph(font_idx, cp);
+ 			if (glyph_idx < 0) continue;
+-			s16 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
++			s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
+ 			if (adv >= 0 && cur_par < MAX_TF_PARAGRAPHS) {
+ 				float scale = (float)cur_fh / (float)em_square;
+ 				pars[cur_par].width += (float)adv * scale;
+@@ -5081,7 +5081,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 				} else { cp = c0; p += 1; }
+ 				int gi = ng_font_find_glyph(font_idx, cp);
+ 				if (gi >= 0) {
+-					s16 a = ng_font_glyph_advance_by_idx(font_idx, gi);
++					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
+ 					if (a >= 0)
+ 						caret_off += (float)a * ((float)info->font_height / (float)em_square);
+ 				}
+@@ -5138,7 +5138,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 				} else { cp = c0; p += 1; }
+ 				int gi = ng_font_find_glyph(font_idx, cp);
+ 				if (gi >= 0) {
+-					s16 a = ng_font_glyph_advance_by_idx(font_idx, gi);
++					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
+ 					if (a >= 0) xx += (float)a * sscale;
+ 				}
+ 				cc++;
+@@ -5272,7 +5272,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		} // end glyph-outline-available guard
+ 
+ 		// Advance x by glyph advance width
+-		s16 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
++		s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
+ 		if (adv >= 0) {
+ 			x_pos += (float)adv * scale;
+ 		}
+@@ -11484,7 +11484,7 @@ void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name
+ 
+ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
+     s16 ascent, s16 descent, s16 leading, int em_square,
+-    const u16* code_table, const s16* advance_table, size_t glyph_count)
++    const u16* code_table, const s32* advance_table, size_t glyph_count)
+ {
+ 	ng_record_font_metrics(app_context, font_id, ascent, descent, leading, em_square,
+ 	    code_table, advance_table, glyph_count);
+diff --git a/SWFRecomp/include/swf.hpp b/SWFRecomp/include/swf.hpp
+index 7df615b79..e8d08069f 100644
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -248,7 +248,12 @@ namespace SWFRecomp
+ 
+ 		std::unordered_map<u16, float> font_em_square;  // font_id → EM square size
+ 		std::unordered_map<u16, std::vector<u16>> font_code_tables;  // font_id → code table (index=glyph, value=char code)
+-		std::unordered_map<u16, std::vector<s16>> font_advance_tables;  // font_id → per-glyph advance widths
++		// Per-glyph advance widths. The DefineFont2/3 layout advance is an
++		// UNSIGNED 16-bit value (Ruffle `swf/src/read.rs` `Glyph::advance: u16`),
++		// so a 33000-twip advance must survive as 33000, not −32536. Stored as
++		// s32 so the widened range fits and the "no advance" sentinel (−1)
++		// used by the runtime lookups stays out of band.
++		std::unordered_map<u16, std::vector<s32>> font_advance_tables;  // font_id → per-glyph advance widths
+ 		std::unordered_map<u16, size_t> font_glyph_bases;  // font_id → base index in global glyph_data
+ 		std::unordered_map<u16, std::string> font_names;  // font_id → font name string
+ 		std::unordered_map<u16, bool> font_bold_flags;    // font_id → bold flag
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index bd7f473ad..7b039fc2c 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -2334,15 +2334,21 @@ namespace SWFRecomp
+ 						font_descent[font_id] = (s16) tag.fields[1].value;
+ 						font_leading[font_id] = (s16) tag.fields[2].value;
+ 
+-						// Advance table: num_entries SI16 values
++						// Advance table: num_entries UI16 values.
++						// The SWF spec calls the FontAdvanceTable entries SI16,
++						// but Flash and Ruffle both read them UNSIGNED
++						// (Ruffle `swf/src/read.rs`, `Glyph::advance: u16`), so an
++						// advance of 33000 twips must stay 33000 instead of
++						// wrapping to −32536 and throwing the glyph off-screen
++						// (`visual/fonts/advance_u16`). Widened to s32 on our side.
+ 						font_advance_tables[font_id].resize(num_entries);
+ 						for (u16 i = 0; i < num_entries; ++i)
+ 						{
+ 							tag.clearFields();
+ 							tag.setFieldCount(1);
+-							tag.configureNextField(SWF_FIELD_SI16);
++							tag.configureNextField(SWF_FIELD_UI16);
+ 							tag.parseFields(cur_pos);
+-							font_advance_tables[font_id][i] = (s16) tag.fields[0].value;
++							font_advance_tables[font_id][i] = (s32) tag.fields[0].value;
+ 						}
+ 					}
+ 
+@@ -2380,7 +2386,7 @@ namespace SWFRecomp
+ 						font_code_tables[font_id].push_back(cp);
+ 						int adv_em = 0, lsb = 0;
+ 						stbtt_GetCodepointHMetrics(&g_device_font, cp, &adv_em, &lsb);
+-						font_advance_tables[font_id].push_back((s16)(adv_em * ttf_scale));
++						font_advance_tables[font_id].push_back((s32)(adv_em * ttf_scale));
+ 					}
+ 					// stb_truetype returns descent as a negative number; flip
+ 					// to the positive convention used by DefineFont layout.
+@@ -2638,7 +2644,7 @@ namespace SWFRecomp
+ 							tag_init << (u16)codes[i];
+ 						}
+ 						tag_init << "};" << endl
+-								 << "\t\t" << "static const s16 font_" << font_id << "_advances[] = {";
++								 << "\t\t" << "static const s32 font_" << font_id << "_advances[] = {";
+ 						for (size_t i = 0; i < advances.size(); i++) {
+ 							if (i > 0) tag_init << ",";
+ 							tag_init << advances[i];

@@ -1693,3 +1693,70 @@ acid-blend-2 B-channel halving in blend composite (may re-open capped
 blend_modes rows); filters struck from flip leads (shared low-amplitude
 render residual vs 0-18 budgets); simple_shapes/masks 1686 = rasterizer tie
 at MSAA=1, reclassify hairline_edge_drift, do NOT re-book as mask work.
+
+## 14. Session 13 (2026-08-06) — dual-axis fan-out #5: trace +8, pixels +15, zero regressions
+
+Commits `8fdda9ca9..fb36ba110` (9 patches + hygiene, 10 commits), results
+merge from run `31130292354` (graphics/full/images=true). Trace effective
+4229→**4237** (+8, intersection 4427, histogram clean — no new crash
+statuses). Pixels 286→**301/567 (53.1%)** (+15, denominator stable).
+6 wave-1 + 9 wave-2 + 1 hygiene agent; reports in
+`session13-fanout-reports/`.
+
+### 14.1 Ledger
+
+Trace (+8): describeType P0-P2 (+3: describe_type_basic, describe_type_json,
+bug_539328 ruffle_matched); action-order rider (+2: remove_different_level
+level-root enterFrame eligibility, action_execution_order_test via
+subtest-scoped known_failure harness fix); trace singles (+3:
+loaderinfo_quine root_swf_bytes weak-symbol embed, avm1_non_swf_import
+tag_init preload fetch, error_stack_trace all-four naming rules).
+
+Pixels (+15): video VP6 family ×4 (char-id-0 recompiler alias + BT.601
+exact YUV); curve-subdiv ×7 (acid-blend-2 output.15 + timeline_loop ×6);
+pixel rider ×2 (release_swf17 getStackTrace null, drawing_api/cursor
+moveTo/lineStyle path-split); advance_u16 ×1; cache_as_bitmap/masks
+output.07 ×1 (mask work bonus). avm2_button_scroll_rect landed a_epsilon
+(9 excess) — predicted flip became near-pass. Band moves: 15 improved
+(text_field_mask −100%, h263 −98%, scroll_rect_mask −97%,
+displayobject_scrollrect −94%, cache_as_bitmap/masks family −75..−95%,
+netstream_play_flv −97%); worsened: simple_shapes/masks tie pair +56%
+(c_small→c_small, dispositioned rasterizer tie, curve-geometry side
+effect) and bevel family +6-7% (fail→fail, filters already struck).
+
+### 14.2 Method notes (deltas vs s12)
+
+- Wave-1 refutation rate was the session's defining feature: 8 material
+  refutations before implementation spent anything (T7 "scoping" label
+  collision + 2.6× line undercount; char-id-0 21-sites→56 killed the
+  occupied-flag refactor; acid-blend-2 B-halving → single stray pixel →
+  curve flattening; mask-B s10 pricing 2 flips→0-1; ImportAssets one-liner
+  wrong layer; lroundf refuted empirically; output.26 chord-joint pixel).
+- `refs/stash` is SHARED across worktrees — two agents popped each other's
+  stashes (both recovered). Worktree A/B legs must use `git diff` +
+  `git apply -R`, never stash.
+- Curve-subdiv grading: local Dawn reproduced all 67 CI comparison numbers
+  exactly (before leg), making local grading CI-fidelity for tests where
+  local==CI-actual — check per test, don't assume either way.
+- Detached-sweep stale pollers re-notify the coordinator repeatedly after
+  agent completion; harmless, ignore them.
+- Serial merge with per-patch headline re-check: 9 patches, zero textual
+  and zero semantic conflicts (sibling-files-in-brief practice held).
+
+### 14.3 Left on the board
+
+Trace: T7 P3 (recompiler ABC metadata → describe_type_metadata, +1) and
+P4 playerglobal descriptor slices (+3/+11/+6, arc-sized;
+describe_type_native is the clean pilot); AVM1 tick-pipeline arc (test11:
+per-clip EF+advance adjacency, 3 of 5 assertions — an arc, not a rider);
+avm2_loads_avm1 needs AVM1-child-execution AND LocalConnection bridge (two
+arcs). Pixels: vertex-placement defect at curve joints (acid-blend-2
+output.26, spun out of curve-subdiv); bitmap-fill U-pinning
+(acid-bitmap-fill 100k + acid-bitmap-draw_quality ×194k — biggest single
+pixel lead); Equal/IncrementClamp stencil intersection (3 named
+beneficiaries incl. displayobject_scrollrect residual 12382);
+AVM1 scrollRect translate (scroll_rect_mask residual 11310, transform-
+composition work); deblocking (MAX_EMBEDDED_VIDEO_STREAMS 8→16 + flags
+byte + 559-line deblock port); hairline_edge_drift is ≥2 mechanisms —
+splitter is "large-deviation DefineShape quadratic present", worth a
+re-triage after curve-subdiv.

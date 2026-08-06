@@ -1,0 +1,86 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 632b18b9e..bf8bafd18 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -15430,6 +15430,38 @@ static void avm2_push_clip_mask(Avm2Context* ctx, Avm2Object* mask_obj,
+ 	g_avm2_cur_cx = saved_cx;
+ }
+ 
++// scrollRect crop (Ruffle display_object.rs::apply_standard_mask_and_scroll):
++// "There are two parts to 'DisplayObject.scrollRect': a scroll effect
++// (translation), and a crop effect." This is the crop half — a w x h rectangle
++// at the node's LOCAL ORIGIN under the node's OWN world matrix
++// (`cur_transform.matrix * Matrix::scale(w, h)`, captured BEFORE the scroll
++// translation is pushed, so the crop box never moves with the content).
++//
++// Ruffle draws a unit rect scaled to the rect's PIXEL size because its renderer
++// space is pixels; ours is twips, so the quad is (0,0)-(w,h) twips directly.
++// The colour is irrelevant (the stencil-write pipeline has colour writes off),
++// and cxform slot 0 is identity, so this consumes one xform slot and nothing
++// else. A degenerate rect (w or h == 0) writes no stencil texels and therefore
++// hides the subtree — which is Ruffle's and Flash's behaviour for a zero-sized
++// scrollRect, not an accident of this code.
++static void avm2_push_scroll_rect_mask(const Mat* world,
++                                       const Avm2DisplayObjectExt* ext)
++{
++	float w = (float) (ext->sr_xmax - ext->sr_xmin);
++	float h = (float) (ext->sr_ymax - ext->sr_ymin);
++	uint32_t xid = 0;                 // identity fallback if slots run out
++	if (g_avm2_xform_next < context->xform_slot_count)
++	{
++		float m16[16];
++		avm2_world_to_mat16(world, m16);
++		xid = g_avm2_xform_next++;
++		renderer_write_transform(context, xid, m16);
++	}
++	renderer_begin_clip_mask(context);
++	renderer_draw_rect(context, 0.0f, 0.0f, w, h, 1.0f, 1.0f, 1.0f, 1.0f, xid, 0);
++	renderer_end_clip_mask(context);
++}
++
+ // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
+ // world matrix + concatenated alpha down the tree. Invisible subtrees are
+ // culled, matching render_apply_text_bounds.
+@@ -15481,6 +15513,31 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 		}
+ 	}
+ 
++	// scrollRect — the crop, then the scroll. Ruffle pushes this stencil AFTER
++	// the DisplayObject.mask one ("this mask is applied *in addition to* a mask
++	// defined with DisplayObject.mask"), and our flat Replace stencil cannot
++	// intersect two masks (§6.2 of the s12 mask report), so the inner one wins
++	// — putting it in Ruffle's order makes scrollRect the winner, which is what
++	// Ruffle's own render order produces for the degenerate case.
++	//
++	// The crop rect is built from the PRE-translate world matrix; only the
++	// content and the subtree below get the (-x_min, -y_min) shift. Deliberate
++	// divergence from Ruffle, documented rather than modelled: Ruffle pushes
++	// the scroll translation before it composes the DisplayObject.mask matrix,
++	// so a scrolled-AND-masked object conjugates its mask by the translate. We
++	// render the masker under its own world matrix in both cases.
++	uint32_t saved_sr_ref = 0;
++	int pushed_scroll_rect = 0;
++	if (ext->has_scroll_rect && g_avm2_mask_capture == 0)
++	{
++		saved_sr_ref = renderer_clip_ref(context);
++		avm2_push_scroll_rect_mask(&world, ext);   // publishes no colour xform
++		pushed_scroll_rect = 1;
++		Mat sr_tr = { 1.0, 0.0, 0.0, 1.0,
++		              -(double) ext->sr_xmin, -(double) ext->sr_ymin };
++		world = mat_mul(&world, &sr_tr);
++	}
++
+ 	if (ext->is_bitmap)
+ 		avm2_render_bitmap(ctx, obj, &world, alpha);
+ 	else if (ext->is_morph_shape && ext->shape_vert_count > 0)
+@@ -15572,6 +15629,10 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 			renderer_restore_clip(context, pre_clip_ref);
+ 	}
+ 
++	// LIFO: the scroll-rect crop closes before the DisplayObject.mask it was
++	// opened inside (Ruffle deactivates/pops the scroll rect first too).
++	if (pushed_scroll_rect)
++		renderer_restore_clip(context, saved_sr_ref);
+ 	if (pushed_mask)
+ 		renderer_restore_clip(context, saved_clip_ref);
+ }

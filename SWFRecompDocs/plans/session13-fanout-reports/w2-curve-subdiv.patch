@@ -1,0 +1,68 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index bd7f473ad..008ef4159 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -8117,7 +8117,41 @@ namespace SWFRecomp
+ 						anchor.x = control.x + anchor_delta_x;
+ 						anchor.y = control.y - anchor_delta_y;
+ 						
++						// Adaptive flattening. The maximum deviation of a quadratic Bezier
++						// from its chord is |control - (current + anchor)/2| / 2 twips
++						// (attained at t = 0.5), and equal-parameter subdivision into N
++						// pieces scales it by 1/N^2. Solve for the smallest N that keeps
++						// the deviation under the tolerance. Clamped to [6, 64]: 6 was the
++						// historical fixed count, so this only ever REFINES a curve, never
++						// coarsens one; 64 bounds shape_data growth.
++						//
++						// Morph shapes keep the fixed 6: their end-shape edges are
++						// flattened by a separate loop below and paired with these start
++						// vertices BY INDEX (morph_index), so the two counts must agree,
++						// and an adaptive count computed independently from two different
++						// curves would not.
+ 						u32 num_passes = 6;
++						if (!is_morph)
++						{
++							const float curve_flatten_tol_twips = 1.0f;   // 0.05 px at 1:1
++
++							float dev_x = (float) control.x - 0.5f * ((float) current.x + (float) anchor.x);
++							float dev_y = (float) control.y - 0.5f * ((float) current.y + (float) anchor.y);
++							float dev = 0.5f * sqrtf(dev_x*dev_x + dev_y*dev_y);
++
++							if (dev > curve_flatten_tol_twips)
++							{
++								float n = ceilf(sqrtf(dev / curve_flatten_tol_twips));
++								if (n > 64.0f)
++								{
++									n = 64.0f;
++								}
++								if (n > (float) num_passes)
++								{
++									num_passes = (u32) n;
++								}
++							}
++						}
+ 
+ 						// Emit CurveTo path command (control + anchor, before subdivision)
+ 						emitPath(3.0f, (float)control.x, (float)(FRAME_HEIGHT - control.y));
+@@ -8495,6 +8529,9 @@ namespace SWFRecomp
+ 									morph_end_geo_buf.push_back({4.0f, (float)anch.x, (float)(FRAME_HEIGHT - anch.y)});
+ 								}
+ 
++								// Fixed 6, matching the start-shape morph arm above: these
++								// vertices are paired with the start shape's BY INDEX, so
++								// the two counts must agree.
+ 								u32 passes = 6;
+ 								for (u32 p = 1; p <= passes; ++p)
+ 								{
+@@ -9509,6 +9546,11 @@ namespace SWFRecomp
+ 			float t = (float) i / passes;
+ 			float u = 1.0f - t;
+ 
++			// NOTE: the truncating cast is deliberate, not an oversight — see
++			// w2-curve-subdiv-report.md §"lroundf refuted". Rounding here is the
++			// more "correct" operation (truncation is a systematic -0.5 twip bias)
++			// but it measurably COSTS headroom on every acid-blend-2 comparison
++			// we can grade at full fidelity, and adds an outlier to output.26.
+ 			s32 x = (s32) (u*u*current.x + 2*u*t*control.x + t*t*anchor.x);
+ 			s32 y = (s32) (u*u*current.y + 2*u*t*control.y + t*t*anchor.y);
+ 
