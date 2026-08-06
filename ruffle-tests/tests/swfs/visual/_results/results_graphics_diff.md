@@ -1,20 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6de65043250d` (2026-08-06T06:23:32.683725+00:00)
-**Current:** `1f8396f5799f` (2026-08-06T10:26:29.739290+00:00)
+**Previous:** `1f8396f5799f` (2026-08-06T10:26:29.739290+00:00)
+**Current:** `fb36ba11005c` (2026-08-06T23:55:08.713030+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 139 | 140 | +1 |
+| Passing | 140 | 140 | 0 |
 | Total | 143 | 143 | 0 |
-| Pass rate | 97.2% | 97.9% | +0.7% |
-| Mismatched lines | 55 | 49 | -6 |
-|   Decreased | | | -6 |
+| Pass rate | 97.9% | 97.9% | 0% |
+| Mismatched lines | 49 | 49 | 0 |
 
-## Newly Passing (1)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `define_bits_jpeg2_huge` | output_mismatch | 13/19 | 19/19 |
+No changes detected.
