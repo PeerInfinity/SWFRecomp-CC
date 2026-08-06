@@ -373,7 +373,9 @@ static struct {
 	s16 leading;
 	int em_square;
 	u16 code_table[MAX_FONT_GLYPHS];
-	s16 advance_table[MAX_FONT_GLYPHS];
+	/* u16 on the wire (Ruffle Glyph::advance: u16); s32 keeps 33000 intact
+	   and leaves -1 free as the "no such glyph" sentinel. */
+	s32 advance_table[MAX_FONT_GLYPHS];
 	size_t glyph_count;
 	size_t glyph_base;
 	int is_builtin;
@@ -389,7 +391,7 @@ static const u16 builtin_noto_sans_codes[] = {
 	96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,
 	112,113,114,115,116,117,118,119,120,121,122,123,124,125,126
 };
-static const s16 builtin_noto_sans_advances[] = {
+static const s32 builtin_noto_sans_advances[] = {
 	260,269,408,646,572,831,732,225,300,300,551,572,268,322,268,372,
 	572,572,572,572,572,572,572,572,572,572,268,268,572,572,572,434,
 	899,639,650,632,730,556,519,728,741,339,273,619,524,907,760,781,
@@ -403,7 +405,7 @@ static const s16 builtin_noto_sans_advances[] = {
 #define BUILTIN_NOTO_SANS_LEADING 0
 #define BUILTIN_NOTO_SANS_EM 1000
 
-static s16 builtin_font_glyph_advance(u16 code_point)
+static s32 builtin_font_glyph_advance(u16 code_point)
 {
 	if (code_point >= 32 && code_point <= 126)
 		return builtin_noto_sans_advances[code_point - 32];
@@ -456,7 +458,7 @@ int ng_find_font_with_metrics(u16 font_id)
 	return -1;
 }
 
-static s16 ng_font_glyph_advance(int font_idx, u16 code_point)
+static s32 ng_font_glyph_advance(int font_idx, u16 code_point)
 {
 	for (size_t j = 0; j < ng_fonts[font_idx].glyph_count; j++) {
 		if (ng_fonts[font_idx].code_table[j] == code_point)
@@ -502,7 +504,7 @@ int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square)
 	return 1;
 }
 
-s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx)
+s32 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx)
 {
 	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return -1;
 	if (glyph_idx < 0 || (size_t)glyph_idx >= ng_fonts[font_idx].glyph_count) return -1;
@@ -533,7 +535,7 @@ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, i
 
 void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
-    const u16* code_table, const s16* advance_table, size_t glyph_count)
+    const u16* code_table, const s32* advance_table, size_t glyph_count)
 {
 	(void)app_context;
 	for (size_t i = 0; i < ng_font_count; i++) {
@@ -1156,7 +1158,7 @@ static int ng_measure_substr_twips(int font_idx, int em, u16 font_height,
 	size_t i = start;
 	while (i < end) {
 		u16 cp = ng_decode_utf8_char(text, end, &i);
-		s16 adv = ng_font_glyph_advance(font_idx, cp);
+		s32 adv = ng_font_glyph_advance(font_idx, cp);
 		int glyph_twips = 0;
 		if (adv >= 0) {
 			int raw = (int)((float)adv * (float)font_height / (float)em);
@@ -1305,7 +1307,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 			while (char_pos < seg_end) {
 				size_t next_pos = char_pos;
 				u16 cp = ng_decode_utf8_char(text, seg_end, &next_pos);
-				s16 adv = ng_font_glyph_advance(font_idx, cp);
+				s32 adv = ng_font_glyph_advance(font_idx, cp);
 				int gw = 0;
 				if (adv >= 0) {
 					int raw = (int)((float)adv * (float)font_height / (float)em);
@@ -1399,7 +1401,7 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 				continue;
 			}
 			u16 code_point = ng_decode_utf8_char(text, text_len, &i);
-			s16 adv = ng_font_glyph_advance(fi, code_point);
+			s32 adv = ng_font_glyph_advance(fi, code_point);
 			int glyph_twips = 0;
 			if (adv >= 0) {
 				int raw = (int)((float)adv * (float)font_height / (float)em);
@@ -1583,7 +1585,7 @@ static int ng_measure_substr_mixed_twips(int font_idx, int em,
 				fh = run_font_heights[r]; break;
 			}
 		}
-		s16 adv = ng_font_glyph_advance(font_idx, cp);
+		s32 adv = ng_font_glyph_advance(font_idx, cp);
 		int glyph_twips = 0;
 		if (adv >= 0) {
 			int raw = (int)((float)adv * (float)fh / (float)em);
@@ -1758,7 +1760,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 					while (char_pos < seg_end) {
 						size_t next_pos = char_pos;
 						u16 cp = ng_decode_utf8_char(hline, seg_end, &next_pos);
-						s16 adv = ng_font_glyph_advance(fi, cp);
+						s32 adv = ng_font_glyph_advance(fi, cp);
 						int gw = 0;
 						if (adv >= 0) {
 							u16 cfh = GET_FONT_HEIGHT_AT(line_start + char_pos);
@@ -2042,7 +2044,7 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
 		size_t old_i = i;
 		u16 cp = ng_decode_utf8_char(text, text_len, &i);
 
-		s16 adv = ng_font_glyph_advance(fi, cp);
+		s32 adv = ng_font_glyph_advance(fi, cp);
 		float glyph_px = 0;
 		if (adv >= 0) {
 			int raw_twips = (int)((float)adv * (float)font_height / (float)em);

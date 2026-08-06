@@ -5104,7 +5104,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 			int glyph_idx = ng_font_find_glyph(font_idx, cp);
 			if (glyph_idx < 0) continue;
-			s16 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
+			s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
 			if (adv >= 0 && cur_par < MAX_TF_PARAGRAPHS) {
 				float scale = (float)cur_fh / (float)em_square;
 				pars[cur_par].width += (float)adv * scale;
@@ -5195,7 +5195,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				} else { cp = c0; p += 1; }
 				int gi = ng_font_find_glyph(font_idx, cp);
 				if (gi >= 0) {
-					s16 a = ng_font_glyph_advance_by_idx(font_idx, gi);
+					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
 					if (a >= 0)
 						caret_off += (float)a * ((float)info->font_height / (float)em_square);
 				}
@@ -5252,7 +5252,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				} else { cp = c0; p += 1; }
 				int gi = ng_font_find_glyph(font_idx, cp);
 				if (gi >= 0) {
-					s16 a = ng_font_glyph_advance_by_idx(font_idx, gi);
+					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
 					if (a >= 0) xx += (float)a * sscale;
 				}
 				cc++;
@@ -5386,7 +5386,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		} // end glyph-outline-available guard
 
 		// Advance x by glyph advance width
-		s16 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
+		s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
 		if (adv >= 0) {
 			x_pos += (float)adv * scale;
 		}
@@ -11689,7 +11689,7 @@ void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name
 
 void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
-    const u16* code_table, const s16* advance_table, size_t glyph_count)
+    const u16* code_table, const s32* advance_table, size_t glyph_count)
 {
 	ng_record_font_metrics(app_context, font_id, ascent, descent, leading, em_square,
 	    code_table, advance_table, glyph_count);

@@ -2336,15 +2336,21 @@ namespace SWFRecomp
 						font_descent[font_id] = (s16) tag.fields[1].value;
 						font_leading[font_id] = (s16) tag.fields[2].value;
 
-						// Advance table: num_entries SI16 values
+						// Advance table: num_entries UI16 values.
+						// The SWF spec calls the FontAdvanceTable entries SI16,
+						// but Flash and Ruffle both read them UNSIGNED
+						// (Ruffle `swf/src/read.rs`, `Glyph::advance: u16`), so an
+						// advance of 33000 twips must stay 33000 instead of
+						// wrapping to −32536 and throwing the glyph off-screen
+						// (`visual/fonts/advance_u16`). Widened to s32 on our side.
 						font_advance_tables[font_id].resize(num_entries);
 						for (u16 i = 0; i < num_entries; ++i)
 						{
 							tag.clearFields();
 							tag.setFieldCount(1);
-							tag.configureNextField(SWF_FIELD_SI16);
+							tag.configureNextField(SWF_FIELD_UI16);
 							tag.parseFields(cur_pos);
-							font_advance_tables[font_id][i] = (s16) tag.fields[0].value;
+							font_advance_tables[font_id][i] = (s32) tag.fields[0].value;
 						}
 					}
 
@@ -2382,7 +2388,7 @@ namespace SWFRecomp
 						font_code_tables[font_id].push_back(cp);
 						int adv_em = 0, lsb = 0;
 						stbtt_GetCodepointHMetrics(&g_device_font, cp, &adv_em, &lsb);
-						font_advance_tables[font_id].push_back((s16)(adv_em * ttf_scale));
+						font_advance_tables[font_id].push_back((s32)(adv_em * ttf_scale));
 					}
 					// stb_truetype returns descent as a negative number; flip
 					// to the positive convention used by DefineFont layout.
@@ -2640,7 +2646,7 @@ namespace SWFRecomp
 							tag_init << (u16)codes[i];
 						}
 						tag_init << "};" << endl
-								 << "\t\t" << "static const s16 font_" << font_id << "_advances[] = {";
+								 << "\t\t" << "static const s32 font_" << font_id << "_advances[] = {";
 						for (size_t i = 0; i < advances.size(); i++) {
 							if (i > 0) tag_init << ",";
 							tag_init << advances[i];
