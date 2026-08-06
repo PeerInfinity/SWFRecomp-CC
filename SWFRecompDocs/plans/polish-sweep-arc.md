@@ -1566,3 +1566,71 @@ HIGH risk, full slice needs the AVM2 T7 arc — wave1-gfx-masks report);
 fills); button2 states ×3 (Fix B landed, needs mouse-driven repro);
 cacheAsBitmap = CARRIER (7 real cmps = alpha-mask path + size gates, pair
 with a Filters arc); cab/masks .03/.04 + place_object_test worsened bands.
+
+## 12. Session 11 (2026-08-05) — dual-axis fan-out #3: trace +17, pixels +40, zero regressions
+
+Baseline `c4496a4c8`-run (4188/4424, 217/566) → `6de650432`: **trace
+effective 4203/4422 intersection (+17 vs +15 predicted, 0 regressions, 0
+other status moves)**, **pixels 257/566 (45.4%, +40, 0 regressions, bands
+improved 73 / worsened 0)**. ONE CI run `31075033086`
+(graphics/`categories=full`/`images=true`). 8 wave-1 + 8 wave-2 Opus agents,
+9 commits `bed9d894b`..`6de650432` + results merge. Reports:
+`session11-fanout-reports/`.
+
+### 12.1 Ledger
+
+Trace +17: triage-batch +7 (B1 malformed-sibling IOError ×2, DocType case,
+constructsuper #1009, System.exit #2017, B4 dual load-cancel queues, B5
+SWF≥17 API gate) · b9-fonts +4 (device-font TTF trio + scale_x rider; 2 more
+at known_failure ceiling → ruffle_matched) · display-singles +2
+(graphic_linkage, PerspectiveProjectionClass) · b8b-lazyinit +2 (doabc
+normal+goto; delayed_symbolclass 16/28→2/28 blocked on frame-1 LAZY,
+out of charter) · 2 unattributed riders. Pixels +40: quality-MSAA 24
+(17 predicted + 7 sweep) · caret_empty ×12 · button2 ×3 · acid-clip 1
+(masks clobber fix). masks excess 248261→1686 (defect-A × MSAA combined,
+better than either alone). New `regression/mask_sibling_union` (first mask
+regression test, byte-exact golden).
+
+### 12.2 Method notes (deltas vs s10)
+
+1. **The dominant pixel mechanism was found by CONVERGENCE**: three
+   independent wave-1 agents (blend, masks, clipping) each hit the same
+   wall — goldens exported at `quality="low"` = 1-sample vs our hard-coded
+   4× MSAA. The "one extra element in blend groups" premise from s10 was
+   REFUTED; the probe pixel was an AA fringe saturating under `add`.
+2. **Wave-1 refutations again paid before implementation**: GC arc (census
+   = 1 test, and even a perfect collector converts it OOM→timeout — real
+   owner is a dependent-string arc, 2-3 sessions for +1, not scheduled);
+   B8b "arc-sized rewrite" (real blast radius: 9 SWFs corpus-wide);
+   loader_duplicate_class cause C (only pays as full A+B+C batch); CAB
+   standalone (6 of 7 cmps are mask-arc debt); bitmapbuttons (whole-stage
+   AVM2 static-bitmap upload gap, not a button bug).
+3. **A stalled wave-2 agent was revived by SendMessage** after ~105 min
+   idle (detached background sweep = no wake-up ever). Probe first
+   (transcript mtime + ps + deliverables), then message with "resume
+   actively, cap the sweep, finalize" — it delivered +24 within the hour.
+4. **Serial merge: 8 patches, ZERO textual conflicts** (agents were told
+   siblings' file lists up front and kept edits localized/wrapper-shaped);
+   the quality×masks `render_webgpu.c` semantic pair was CI-ruled clean.
+5. **Upstream corpus drift observed at CI**: download_tests.sh removed
+   `avm2/av_networking_params` + `av_tag_data` (passing locally from cache)
+   and added 4 new failing tests (`av_classes`,
+   `avm1movie_addcallback_call`, `flash_trace`, `groupelement_text`) —
+   denominator moves, not regressions.
+
+### 12.3 Left on the board
+
+Trace: triage's B2 verifier method_info is a hard oracle conflict
+(verify_method_info_oob pins the opposite — leave); B6 morph hit-test is
+recompiler-side (stroke tessellation missing from shape_data); the 4 new
+upstream tests; `edittext_device_transform_layout` (bounds.x_min+GUTTER
+layout offset, wide blast radius, ~+1); number→string tie-break
+(half-away-from-zero vs tie-to-even; corpus-wide risk, isolated by the PP
+work, 14 lines in avm2/perspective_projection); gap 6-10 shoulder (37
+tests); dependent-string arc (bug_483783, 2-3 sessions, +1 — not
+scheduled). Pixels: masks residual now single-mechanism c_small (1686) —
+next mask defects B/C/D per wave1-gfx-masks; `avm2/mask_reapply` tag-path
+no-op mask (new unowned bucket); scrollRect stencil sketch ready
+(wave1-gfx-clipping §8) but needs its flips unblocked; blend_modes capped
+at a_epsilon by sub-pixel ties (do NOT scope); F5 layer groups + F7-AVM2
+remain; AVM2 static-bitmap upload (bitmapbuttons blocker) unscoped.

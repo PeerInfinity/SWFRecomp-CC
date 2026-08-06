@@ -291,3 +291,43 @@ Corrections to §8's leads, measured this session:
 - New playbook rule (w2-button trap): worktree test-dir copies need
   `--recompile` on FIRST use — a `RecompiledABC` copied mid-write from the
   main tree reads as `compile_fail` even sequentially.
+
+## 10. Session-11 state of the board (2026-08-05)
+
+**Closeout run `31075033086` at `6de650432`: 257/566 (45.4%), +40, zero
+regressions, bands improved 73 / worsened 0** (from 217/566 at
+`c4496a4c8`). Ledger: `polish-sweep-arc.md` §12; reports
+`session11-fanout-reports/`.
+
+- **quality-aware MSAA is the headline mechanism** (24 flips): goldens
+  exported at `quality="low"` are 1-sample; `MSAA_SAMPLES` macro (default
+  4) + `verify_output.py` passes `-DMSAA_SAMPLES=1` for low. STANDING
+  INVARIANT: any new pipeline in `render_webgpu.c` must use `MSAA_SAMPLES`,
+  never a literal 4, or pipeline creation fails loudly at count 1. It also
+  retired s9/s10's "blend extra-element" lead — that was the AA fringe.
+- **blend_modes is now CAPPED at a_epsilon** (18-60 channels, sub-pixel
+  rasterisation ties at `max_outliers=0`) — do not scope; F5 layer groups
+  (`layer_alpha`/`layer_erase`) and F7-AVM2 are the only live blend items.
+- **Masks**: defect A (per-mask stencil refs) + clobber fixes landed;
+  `masks`/`masks_equal_clipdepth` 248261→1686 (c_small, single-mechanism
+  residual). acid-clip FLIPPED via the clobber fix. Defects B/C/D and the
+  AVM2 walk (clip_depth/mask/scroll_rect all unread) remain the mask arc.
+  First mask regression test exists now (`regression/mask_sibling_union`,
+  byte-exact golden, axis-aligned by design). `avm2/mask_reapply` is a NEW
+  unowned bucket: a tag.c-path mask that does nothing even solo.
+- **caret_empty ×12 flipped** (corner middle-path on the EMBEDDED branch +
+  un-gated caret renderer + collapsed-selection caret predicate + caret
+  drawn OUTSIDE the field stencil). The s10 worsened-band watchlist is
+  fully dispositioned: caret_empty recovered, place_object_test KEEP
+  (MAX_DYNAMIC_VERTICES raise exposed pre-existing AVM1 text divergence on
+  a double-known_failure test; lesson — A/B any renderer capacity raise on
+  the image axis), cab/masks KEEP (correct cxform exposed unplumbed AVM2
+  .mask; rows are mask-blocked).
+- **button2 ×3 flipped**: buttonMode + `_up/_over/_down` frame labels
+  (Ruffle MovieClip mechanism, not SimpleButton). MouseUpInside must not
+  reach the arm.
+- Remaining leads by size: text/auto_size family band-moved -81..-100%
+  under B9 device fonts (near-pass now: height 12, match_style 12, glyph 6,
+  duplicate_font 3 — a cheap next slice); masks arc; AVM2 static-bitmap
+  upload (bitmapbuttons, whole-stage blank); scrollRect stencil (sketch
+  ready, flips blocked); Stage3D/video blank_render backends (arc-sized).

@@ -87,3 +87,9 @@ weird_superinterface_properties
 # 2026-08-01 prune kept it.
 bytearray_oom
 number_tostring
+
+# 2026-08-05 s11 wave-1 triage: recorded won't-dos (need the real Flex
+# framework_*.swz executed under AOT — impossible; see avm2
+# CURRENT_STATUS.md:476 and loader-arc tranche-6 scoreboard).
+loader_applicationDomain
+swz
