@@ -2207,6 +2207,32 @@ static Avm2Value system_set_clipboard(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// `System.exit(code)` — only a SWF in the trusted-local sandbox may terminate
+// the player; everything the harness runs is untrusted, so FP throws
+// SecurityError #2017 without ever exiting (avm2/system_exit grades the
+// getStackTrace text, not the exit). FP spells a CLASS-side frame with a `$`
+// on the class ("flash.system::System$/exit()"), but avm2_callstack_frame_name
+// has no way to tell a static builtin frame from an instance one — both carry
+// bound_class — so swap this call's own frame for a synthetic native one
+// (bound_class NULL + file NULL => the debug_name is printed verbatim, the
+// same idiom as avm2_display.c's "Error$/throwError"). We never return, and
+// the longjmp to the catch unwinds call_depth anyway, so no pop is needed.
+static Avm2Value system_exit(Avm2Activation* act)
+{
+	static const Avm2MethodRef exit_frame =
+		{ NULL, NULL, "flash.system::System$/exit", 0, 0 };
+	Avm2Context* c = act->ctx;
+	if (c->call_depth > 0
+	    && c->call_frames[c->call_depth - 1].method.fn == system_exit)
+	{
+		avm2_callstack_pop(c);
+	}
+	avm2_callstack_push(act->ctx, &exit_frame, NULL);
+	avm2_throw_error(act->ctx, act->ctx->builtins.security_error_class,
+	                 "Error #2017: Only trusted local files may cause the "
+	                 "Flash Player to exit.");
+}
+
 // flash.system.System: gc/pauseForGCIfCollectionImminent no-ops (tests
 // call System.gc() between phases; aborting there kills the frame script).
 static void register_system(Avm2Context* ctx)
@@ -2218,6 +2244,7 @@ static void register_system(Avm2Context* ctx)
 	                               system_noop);
 	avm2_builtin_add_static_method(ctx, cls, "setClipboard",
 	                               system_set_clipboard);
+	avm2_builtin_add_static_method_n(ctx, cls, "exit", system_exit, 1);
 }
 
 // flash.system.Security — minimal. Native/headless runs from a local file, so

@@ -5797,7 +5797,17 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
 	{
 		out->data = NULL;
 		out->len = m->file_size;
-		out->content_type = LI_CT_SWF;
+		// A registry entry is normally a real SWF, but a sibling .swf the
+		// recompiler could not read is registered as a BYTE-ONLY SHELL
+		// (verify_output.py generate_malformed_movie_file) purely so this
+		// lookup resolves. A shell is exactly the entry with no frame_funcs —
+		// every real child, image shell and self-load has them — and its bytes
+		// sniff as LI_CT_UNKNOWN (0-byte or header-less), which is what routes
+		// loader_deliver into the #2124 "unknown type" ioError Flash raises
+		// (from_shumway/as3-loader/bug1157243/{empty,invalid}).
+		out->content_type = (m->frame_funcs == NULL)
+			? loader_sniff(m->raw_bytes, m->raw_bytes_len)
+			: LI_CT_SWF;
 		// AVM2 child (loader-arc tranche 6): its emitted tables and its
 		// decompressed bytes. Both stay NULL for an AVM1 child or an image
 		// shell, which is exactly the pre-tranche-6 behaviour.

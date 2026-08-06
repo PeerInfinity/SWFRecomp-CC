@@ -1950,15 +1950,38 @@ void avm2_register_events(Avm2Context* ctx)
 		{ "TAB_INDEX_CHANGE", "tabIndexChange" }, { "UNLOAD", "unload" },
 		{ "FULLSCREEN", "fullScreen" },
 		{ "CONTEXT3D_CREATE", "context3DCreate" },
-		{ "TEXTURE_READY", "textureReady" }, { "VIDEO_FRAME", "videoFrame" },
-		{ "SUSPEND", "suspend" }, { "CHANNEL_MESSAGE", "channelMessage" },
-		{ "CHANNEL_STATE", "channelState" }, { "WORKER_STATE", "workerState" },
+		{ "TEXTURE_READY", "textureReady" },
+		{ "SUSPEND", "suspend" },
 	};
 	for (size_t i = 0; i < sizeof(consts) / sizeof(consts[0]); i++)
 	{
 		avm2_builtin_add_static_const(
 			ctx, event, consts[i].name,
 			avm2_string(avm2_string_from_literal(ctx, consts[i].v)));
+	}
+	// API-versioned surface. Ruffle Event.as tags these `[API("682")]`, which
+	// is avmplus api-version 682-660 = 22 = SWF_17, so they only exist for
+	// SWF 17+ content. The gate is on the ROOT movie's version, not the
+	// defining SWF's: avm2/cross_api_version_call_older (root v43, child v12)
+	// sees `workerState`, while cross_api_version_call_newer (root v12, child
+	// v43) must see `undefined`. avm2/all_classes/events/swf{9,10,11,12}
+	// likewise omit all four; swf30 lists them.
+	// (Same idiom as avm2_number.c's API-680 `swf_version >= 16` Math-on-
+	// Number gate and avm2_globals.c's JSON-at-13 gate.)
+	if (ctx->swf_version >= 17)
+	{
+		static const struct { const char* name; const char* v; } api682[] = {
+			{ "VIDEO_FRAME", "videoFrame" },
+			{ "CHANNEL_MESSAGE", "channelMessage" },
+			{ "CHANNEL_STATE", "channelState" },
+			{ "WORKER_STATE", "workerState" },
+		};
+		for (size_t i = 0; i < sizeof(api682) / sizeof(api682[0]); i++)
+		{
+			avm2_builtin_add_static_const(
+				ctx, event, api682[i].name,
+				avm2_string(avm2_string_from_literal(ctx, api682[i].v)));
+		}
 	}
 
 	// flash.events.EventPhase.

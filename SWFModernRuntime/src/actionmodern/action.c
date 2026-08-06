@@ -23696,6 +23696,14 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		MovieClip* mc = loads[i].target;
 		MovieEntry* entry = loads[i].entry;
 		if (mc == NULL || entry == NULL) continue;
+		// removeMovieClip between the loadMovie and this drain CANCELS the
+		// load — the child's init/frame0 must not run at all
+		// (avm1/load_cancel_via_removemovieclip; same rule as the MCL queue
+		// in actionFirePendingLoadInits). Level targets are never removed
+		// this way, so this only ever fires for clip targets.
+		if (mc->avm1_removed || mc->pending_removal || mc->depth == INT_MIN) {
+			continue;
+		}
 
 		// Set child SWF URL, version, movie_id, frame counts, byte_size on target MC
 		constructChildURL(mc->url, sizeof(mc->url), entry->filename);
@@ -34621,9 +34629,28 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     // Copy and reset _this_tick (handlers may queue more loads into either
     // bucket via chained loadClips).
     PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
-    for (int i = 0; i < count; i++) loads[i] = g_pending_mcl_loads_this_tick[i];
+    int live = 0;
+    for (int i = 0; i < count; i++) {
+        // A removeMovieClip between queue time and drain time CANCELS the
+        // load: Flash fires no part of the onLoadStart/Progress/Complete/Init
+        // sequence for a target that no longer exists
+        // (avm1/load_cancel_via_removemovieclip). Drop the entry entirely
+        // rather than skipping individual handlers — the child movie's own
+        // init must not run either. Removal shows up as any of the three
+        // dead-clip markers (the same trio action.c uses elsewhere, e.g. the
+        // clip-event gate): a deferred removal is `pending_removal` with a
+        // shifted depth, a finalized one is `depth == INT_MIN`.
+        MovieClip* t = g_pending_mcl_loads_this_tick[i].target;
+        if (t != NULL && (t->avm1_removed || t->pending_removal
+                          || t->depth == INT_MIN)) {
+            continue;
+        }
+        loads[live++] = g_pending_mcl_loads_this_tick[i];
+    }
     g_pending_mcl_load_count_this_tick = 0;
     g_pending_mcl_load_count -= count;
+    count = live;
+    if (count == 0) return;
 
     // Pre-phase: Set child SWF URLs and versions on target MCs (before events fire, so mc._url is correct)
     for (int i = 0; i < count; i++) {

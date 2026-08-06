@@ -1233,6 +1233,56 @@ def _detect_image_child(swf_path):
     return None
 
 
+def generate_malformed_movie_file(child_swf_name, build_dir, file_size,
+                                  raw_bytes, movie_id=1):
+    """Generate a MovieEntry shell for a sibling .swf the recompiler can't read.
+
+    An empty or garbage "SWF" has no frames to emit, so `recompile_child_swf`
+    fails and — before this — no registry entry existed at all, which made
+    `loader_resolve_url` miss and the AVM2 `Loader.load` stay silent. Flash
+    instead fetches the bytes, fails to sniff them, and raises IOError #2124
+    ("Loaded file is an unknown type") — see from_shumway/as3-loader/bug1157243.
+    The shell carries only what that path reads: the filename it is keyed on,
+    the byte count for the progress events, and the raw bytes the runtime
+    sniffs (`avm2_display.c loader_resolve_url`). frame_funcs/init_func are
+    NULL because nothing may ever execute this "movie".
+
+    AVM2 parents only: an AVM1 `loadMovie` of a bad .swf must keep failing with
+    `getBytesTotal() == -1` (avm1/movieclip_state_values pins exactly that for
+    its own two header-less .swf files), and AVM1 reads the same registry.
+    """
+    prefix = _sanitize_prefix(child_swf_name)
+    lines = []
+    lines.append(f"// Auto-generated malformed-SWF MovieEntry for {child_swf_name}")
+    lines.append("#include <libswf/swf.h>")
+    lines.append("")
+    raw_ptr, raw_len = "NULL", 0
+    if raw_bytes:
+        raw_len = len(raw_bytes)
+        lines.append(f"static const u8 {prefix}_raw_bytes[] = {{")
+        for i in range(0, raw_len, 16):
+            lines.append("    " + "".join(f"{b}," for b in raw_bytes[i:i + 16]))
+        lines.append("};")
+        raw_ptr = f"{prefix}_raw_bytes"
+    lines.append(f"MovieEntry {prefix}_movie_entry = {{")
+    lines.append(f'    .filename = "{child_swf_name}",')
+    lines.append(f"    .frame_funcs = NULL,")
+    lines.append(f"    .init_func = NULL,")
+    lines.append(f"    .swf_version = 0,")
+    lines.append(f"    .frame_count = 0,")
+    lines.append(f"    .stage_width = 0,")
+    lines.append(f"    .stage_height = 0,")
+    lines.append(f"    .file_size = {file_size},")
+    lines.append(f"    .movie_id = {movie_id},")
+    lines.append(f"    .transform_data_ptr = NULL,")
+    lines.append(f"    .raw_bytes = {raw_ptr},")
+    lines.append(f"    .raw_bytes_len = {raw_len},")
+    lines.append(f"}};")
+    out_path = build_dir / f"movie_{prefix}.c"
+    out_path.write_text("\n".join(lines))
+    return prefix
+
+
 def generate_image_movie_file(child_swf_name, build_dir, image_width, image_height, file_size, movie_id=1):
     """Generate a synthetic MovieEntry C file for an image loaded via loadMovie.
 
@@ -2220,6 +2270,19 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
                     for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', child_defs.read_text(errors="replace")):
                         child_max = max(child_max, int(m.group(1)))
                     next_string_id_offset += child_max + 1
+        elif is_avm2:
+            # Recompilation failed: the file is not a readable SWF (empty, or
+            # header-less garbage). Register a byte-only shell anyway so
+            # `Loader.load` RESOLVES it and reports the #2124 "unknown type"
+            # ioError Flash reports, instead of staying silent
+            # (from_shumway/as3-loader/bug1157243/{empty,invalid}).
+            # AVM2 parents only — see generate_malformed_movie_file.
+            prefix = generate_malformed_movie_file(
+                child_name, build_dir, child_file_size,
+                child_swf.read_bytes() if child_swf.exists() else None,
+                movie_id=child_movie_id)
+            if prefix:
+                child_prefixes.append(prefix)
 
     # Handle self-loading SWFs (test.swf loads itself into a child MC)
     self_load = get_self_load(test_dir)

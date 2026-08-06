@@ -3532,6 +3532,16 @@ void avm2_op_constructsuper(Avm2Activation* act, Avm2Value recv,
 		(void) argc;
 		return;
 	}
+	// Inside a real constructor body the receiver is `this`, but the op is
+	// reachable with an explicit null/undefined receiver (`PushNull; Coerce
+	// Test; ConstructSuper`). avmplus runs the super constructor against the
+	// receiver, so a null one is a null-object access: #1009 (#1010 for
+	// undefined). Must come AFTER the script-initializer early return above,
+	// whose receiver is the global object and is legitimately unbound.
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(act->ctx, recv, NULL, 0);
+	}
 	Avm2Class* super = super_class_of(act);
 	// Builtin bases have a no-op instance_init stub — their real constructor
 	// semantics live in native_construct, which allocates and so cannot run

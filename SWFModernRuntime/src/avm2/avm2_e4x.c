@@ -1558,6 +1558,24 @@ static int starts_with(Parser* ps, const char* s)
 	return ps->pos + n <= ps->len && memcmp(ps->p + ps->pos, s, n) == 0;
 }
 
+// Case-insensitive variant. avmplus's XML scanner matches the DOCTYPE
+// keyword without regard to case (`<!DocType html>` parses like
+// `<!DOCTYPE html>`); every other markup keyword stays case-sensitive.
+static int starts_with_ci(Parser* ps, const char* s)
+{
+	uint32_t n = (uint32_t) strlen(s);
+	if (ps->pos + n > ps->len) return 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		char a = ps->p[ps->pos + i];
+		char b = s[i];
+		if (a >= 'A' && a <= 'Z') a = (char) (a - 'A' + 'a');
+		if (b >= 'A' && b <= 'Z') b = (char) (b - 'A' + 'a');
+		if (a != b) return 0;
+	}
+	return 1;
+}
+
 // Entity decoding (Ruffle avm2_unescape): the five named entities +
 // numeric character refs; undecodable entities are preserved verbatim.
 static void decode_entities(Parser* ps, Buf* out, const char* s, uint32_t len)
@@ -2041,7 +2059,7 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
 			handle_text_cdata(&ps, t, 0);
 			ps.pos += 3;
 		}
-		else if (starts_with(&ps, "<!DOCTYPE") || starts_with(&ps, "<!doctype"))
+		else if (starts_with_ci(&ps, "<!DOCTYPE"))
 		{
 			// Skip to the matching '>' (with [..] internal subset).
 			ps.pos += 9;

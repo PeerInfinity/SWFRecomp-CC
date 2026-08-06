@@ -1,0 +1,304 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 1b898cdf7..cc05dc2b3 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -23696,6 +23696,14 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+ 		MovieClip* mc = loads[i].target;
+ 		MovieEntry* entry = loads[i].entry;
+ 		if (mc == NULL || entry == NULL) continue;
++		// removeMovieClip between the loadMovie and this drain CANCELS the
++		// load — the child's init/frame0 must not run at all
++		// (avm1/load_cancel_via_removemovieclip; same rule as the MCL queue
++		// in actionFirePendingLoadInits). Level targets are never removed
++		// this way, so this only ever fires for clip targets.
++		if (mc->avm1_removed || mc->pending_removal || mc->depth == INT_MIN) {
++			continue;
++		}
+ 
+ 		// Set child SWF URL, version, movie_id, frame counts, byte_size on target MC
+ 		constructChildURL(mc->url, sizeof(mc->url), entry->filename);
+@@ -34621,9 +34629,28 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
+     // Copy and reset _this_tick (handlers may queue more loads into either
+     // bucket via chained loadClips).
+     PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
+-    for (int i = 0; i < count; i++) loads[i] = g_pending_mcl_loads_this_tick[i];
++    int live = 0;
++    for (int i = 0; i < count; i++) {
++        // A removeMovieClip between queue time and drain time CANCELS the
++        // load: Flash fires no part of the onLoadStart/Progress/Complete/Init
++        // sequence for a target that no longer exists
++        // (avm1/load_cancel_via_removemovieclip). Drop the entry entirely
++        // rather than skipping individual handlers — the child movie's own
++        // init must not run either. Removal shows up as any of the three
++        // dead-clip markers (the same trio action.c uses elsewhere, e.g. the
++        // clip-event gate): a deferred removal is `pending_removal` with a
++        // shifted depth, a finalized one is `depth == INT_MIN`.
++        MovieClip* t = g_pending_mcl_loads_this_tick[i].target;
++        if (t != NULL && (t->avm1_removed || t->pending_removal
++                          || t->depth == INT_MIN)) {
++            continue;
++        }
++        loads[live++] = g_pending_mcl_loads_this_tick[i];
++    }
+     g_pending_mcl_load_count_this_tick = 0;
+     g_pending_mcl_load_count -= count;
++    count = live;
++    if (count == 0) return;
+ 
+     // Pre-phase: Set child SWF URLs and versions on target MCs (before events fire, so mc._url is correct)
+     for (int i = 0; i < count; i++) {
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 09cf79b9c..3176de74e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -5752,7 +5752,17 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
+ 	{
+ 		out->data = NULL;
+ 		out->len = m->file_size;
+-		out->content_type = LI_CT_SWF;
++		// A registry entry is normally a real SWF, but a sibling .swf the
++		// recompiler could not read is registered as a BYTE-ONLY SHELL
++		// (verify_output.py generate_malformed_movie_file) purely so this
++		// lookup resolves. A shell is exactly the entry with no frame_funcs —
++		// every real child, image shell and self-load has them — and its bytes
++		// sniff as LI_CT_UNKNOWN (0-byte or header-less), which is what routes
++		// loader_deliver into the #2124 "unknown type" ioError Flash raises
++		// (from_shumway/as3-loader/bug1157243/{empty,invalid}).
++		out->content_type = (m->frame_funcs == NULL)
++			? loader_sniff(m->raw_bytes, m->raw_bytes_len)
++			: LI_CT_SWF;
+ 		// AVM2 child (loader-arc tranche 6): its emitted tables and its
+ 		// decompressed bytes. Both stay NULL for an AVM1 child or an image
+ 		// shell, which is exactly the pre-tranche-6 behaviour.
+diff --git a/SWFModernRuntime/src/avm2/avm2_e4x.c b/SWFModernRuntime/src/avm2/avm2_e4x.c
+index 9e9e0ae19..a3ba060f7 100644
+--- a/SWFModernRuntime/src/avm2/avm2_e4x.c
++++ b/SWFModernRuntime/src/avm2/avm2_e4x.c
+@@ -1558,6 +1558,24 @@ static int starts_with(Parser* ps, const char* s)
+ 	return ps->pos + n <= ps->len && memcmp(ps->p + ps->pos, s, n) == 0;
+ }
+ 
++// Case-insensitive variant. avmplus's XML scanner matches the DOCTYPE
++// keyword without regard to case (`<!DocType html>` parses like
++// `<!DOCTYPE html>`); every other markup keyword stays case-sensitive.
++static int starts_with_ci(Parser* ps, const char* s)
++{
++	uint32_t n = (uint32_t) strlen(s);
++	if (ps->pos + n > ps->len) return 0;
++	for (uint32_t i = 0; i < n; i++)
++	{
++		char a = ps->p[ps->pos + i];
++		char b = s[i];
++		if (a >= 'A' && a <= 'Z') a = (char) (a - 'A' + 'a');
++		if (b >= 'A' && b <= 'Z') b = (char) (b - 'A' + 'a');
++		if (a != b) return 0;
++	}
++	return 1;
++}
++
+ // Entity decoding (Ruffle avm2_unescape): the five named entities +
+ // numeric character refs; undecodable entities are preserved verbatim.
+ static void decode_entities(Parser* ps, Buf* out, const char* s, uint32_t len)
+@@ -2041,7 +2059,7 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
+ 			handle_text_cdata(&ps, t, 0);
+ 			ps.pos += 3;
+ 		}
+-		else if (starts_with(&ps, "<!DOCTYPE") || starts_with(&ps, "<!doctype"))
++		else if (starts_with_ci(&ps, "<!DOCTYPE"))
+ 		{
+ 			// Skip to the matching '>' (with [..] internal subset).
+ 			ps.pos += 9;
+diff --git a/SWFModernRuntime/src/avm2/avm2_events.c b/SWFModernRuntime/src/avm2/avm2_events.c
+index db2f07410..ae55d97b5 100644
+--- a/SWFModernRuntime/src/avm2/avm2_events.c
++++ b/SWFModernRuntime/src/avm2/avm2_events.c
+@@ -1950,9 +1950,8 @@ void avm2_register_events(Avm2Context* ctx)
+ 		{ "TAB_INDEX_CHANGE", "tabIndexChange" }, { "UNLOAD", "unload" },
+ 		{ "FULLSCREEN", "fullScreen" },
+ 		{ "CONTEXT3D_CREATE", "context3DCreate" },
+-		{ "TEXTURE_READY", "textureReady" }, { "VIDEO_FRAME", "videoFrame" },
+-		{ "SUSPEND", "suspend" }, { "CHANNEL_MESSAGE", "channelMessage" },
+-		{ "CHANNEL_STATE", "channelState" }, { "WORKER_STATE", "workerState" },
++		{ "TEXTURE_READY", "textureReady" },
++		{ "SUSPEND", "suspend" },
+ 	};
+ 	for (size_t i = 0; i < sizeof(consts) / sizeof(consts[0]); i++)
+ 	{
+@@ -1960,6 +1959,30 @@ void avm2_register_events(Avm2Context* ctx)
+ 			ctx, event, consts[i].name,
+ 			avm2_string(avm2_string_from_literal(ctx, consts[i].v)));
+ 	}
++	// API-versioned surface. Ruffle Event.as tags these `[API("682")]`, which
++	// is avmplus api-version 682-660 = 22 = SWF_17, so they only exist for
++	// SWF 17+ content. The gate is on the ROOT movie's version, not the
++	// defining SWF's: avm2/cross_api_version_call_older (root v43, child v12)
++	// sees `workerState`, while cross_api_version_call_newer (root v12, child
++	// v43) must see `undefined`. avm2/all_classes/events/swf{9,10,11,12}
++	// likewise omit all four; swf30 lists them.
++	// (Same idiom as avm2_number.c's API-680 `swf_version >= 16` Math-on-
++	// Number gate and avm2_globals.c's JSON-at-13 gate.)
++	if (ctx->swf_version >= 17)
++	{
++		static const struct { const char* name; const char* v; } api682[] = {
++			{ "VIDEO_FRAME", "videoFrame" },
++			{ "CHANNEL_MESSAGE", "channelMessage" },
++			{ "CHANNEL_STATE", "channelState" },
++			{ "WORKER_STATE", "workerState" },
++		};
++		for (size_t i = 0; i < sizeof(api682) / sizeof(api682[0]); i++)
++		{
++			avm2_builtin_add_static_const(
++				ctx, event, api682[i].name,
++				avm2_string(avm2_string_from_literal(ctx, api682[i].v)));
++		}
++	}
+ 
+ 	// flash.events.EventPhase.
+ 	{
+diff --git a/SWFModernRuntime/src/avm2/avm2_globals.c b/SWFModernRuntime/src/avm2/avm2_globals.c
+index 761eace69..1c152111f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_globals.c
++++ b/SWFModernRuntime/src/avm2/avm2_globals.c
+@@ -2207,6 +2207,32 @@ static Avm2Value system_set_clipboard(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// `System.exit(code)` — only a SWF in the trusted-local sandbox may terminate
++// the player; everything the harness runs is untrusted, so FP throws
++// SecurityError #2017 without ever exiting (avm2/system_exit grades the
++// getStackTrace text, not the exit). FP spells a CLASS-side frame with a `$`
++// on the class ("flash.system::System$/exit()"), but avm2_callstack_frame_name
++// has no way to tell a static builtin frame from an instance one — both carry
++// bound_class — so swap this call's own frame for a synthetic native one
++// (bound_class NULL + file NULL => the debug_name is printed verbatim, the
++// same idiom as avm2_display.c's "Error$/throwError"). We never return, and
++// the longjmp to the catch unwinds call_depth anyway, so no pop is needed.
++static Avm2Value system_exit(Avm2Activation* act)
++{
++	static const Avm2MethodRef exit_frame =
++		{ NULL, NULL, "flash.system::System$/exit", 0, 0 };
++	Avm2Context* c = act->ctx;
++	if (c->call_depth > 0
++	    && c->call_frames[c->call_depth - 1].method.fn == system_exit)
++	{
++		avm2_callstack_pop(c);
++	}
++	avm2_callstack_push(act->ctx, &exit_frame, NULL);
++	avm2_throw_error(act->ctx, act->ctx->builtins.security_error_class,
++	                 "Error #2017: Only trusted local files may cause the "
++	                 "Flash Player to exit.");
++}
++
+ // flash.system.System: gc/pauseForGCIfCollectionImminent no-ops (tests
+ // call System.gc() between phases; aborting there kills the frame script).
+ static void register_system(Avm2Context* ctx)
+@@ -2218,6 +2244,7 @@ static void register_system(Avm2Context* ctx)
+ 	                               system_noop);
+ 	avm2_builtin_add_static_method(ctx, cls, "setClipboard",
+ 	                               system_set_clipboard);
++	avm2_builtin_add_static_method_n(ctx, cls, "exit", system_exit, 1);
+ }
+ 
+ // flash.system.Security — minimal. Native/headless runs from a local file, so
+diff --git a/SWFModernRuntime/src/avm2/avm2_ops.c b/SWFModernRuntime/src/avm2/avm2_ops.c
+index 3a0ec5f41..063765f45 100644
+--- a/SWFModernRuntime/src/avm2/avm2_ops.c
++++ b/SWFModernRuntime/src/avm2/avm2_ops.c
+@@ -3532,6 +3532,16 @@ void avm2_op_constructsuper(Avm2Activation* act, Avm2Value recv,
+ 		(void) argc;
+ 		return;
+ 	}
++	// Inside a real constructor body the receiver is `this`, but the op is
++	// reachable with an explicit null/undefined receiver (`PushNull; Coerce
++	// Test; ConstructSuper`). avmplus runs the super constructor against the
++	// receiver, so a null one is a null-object access: #1009 (#1010 for
++	// undefined). Must come AFTER the script-initializer early return above,
++	// whose receiver is the global object and is legitimately unbound.
++	if (value_is_null_like(recv))
++	{
++		avm2_throw_null_or_undefined(act->ctx, recv, NULL, 0);
++	}
+ 	Avm2Class* super = super_class_of(act);
+ 	// Builtin bases have a no-op instance_init stub — their real constructor
+ 	// semantics live in native_construct, which allocates and so cannot run
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index fa17bcc07..6b7a85942 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -1233,6 +1233,56 @@ def _detect_image_child(swf_path):
+     return None
+ 
+ 
++def generate_malformed_movie_file(child_swf_name, build_dir, file_size,
++                                  raw_bytes, movie_id=1):
++    """Generate a MovieEntry shell for a sibling .swf the recompiler can't read.
++
++    An empty or garbage "SWF" has no frames to emit, so `recompile_child_swf`
++    fails and — before this — no registry entry existed at all, which made
++    `loader_resolve_url` miss and the AVM2 `Loader.load` stay silent. Flash
++    instead fetches the bytes, fails to sniff them, and raises IOError #2124
++    ("Loaded file is an unknown type") — see from_shumway/as3-loader/bug1157243.
++    The shell carries only what that path reads: the filename it is keyed on,
++    the byte count for the progress events, and the raw bytes the runtime
++    sniffs (`avm2_display.c loader_resolve_url`). frame_funcs/init_func are
++    NULL because nothing may ever execute this "movie".
++
++    AVM2 parents only: an AVM1 `loadMovie` of a bad .swf must keep failing with
++    `getBytesTotal() == -1` (avm1/movieclip_state_values pins exactly that for
++    its own two header-less .swf files), and AVM1 reads the same registry.
++    """
++    prefix = _sanitize_prefix(child_swf_name)
++    lines = []
++    lines.append(f"// Auto-generated malformed-SWF MovieEntry for {child_swf_name}")
++    lines.append("#include <libswf/swf.h>")
++    lines.append("")
++    raw_ptr, raw_len = "NULL", 0
++    if raw_bytes:
++        raw_len = len(raw_bytes)
++        lines.append(f"static const u8 {prefix}_raw_bytes[] = {{")
++        for i in range(0, raw_len, 16):
++            lines.append("    " + "".join(f"{b}," for b in raw_bytes[i:i + 16]))
++        lines.append("};")
++        raw_ptr = f"{prefix}_raw_bytes"
++    lines.append(f"MovieEntry {prefix}_movie_entry = {{")
++    lines.append(f'    .filename = "{child_swf_name}",')
++    lines.append(f"    .frame_funcs = NULL,")
++    lines.append(f"    .init_func = NULL,")
++    lines.append(f"    .swf_version = 0,")
++    lines.append(f"    .frame_count = 0,")
++    lines.append(f"    .stage_width = 0,")
++    lines.append(f"    .stage_height = 0,")
++    lines.append(f"    .file_size = {file_size},")
++    lines.append(f"    .movie_id = {movie_id},")
++    lines.append(f"    .transform_data_ptr = NULL,")
++    lines.append(f"    .raw_bytes = {raw_ptr},")
++    lines.append(f"    .raw_bytes_len = {raw_len},")
++    lines.append(f"}};")
++    out_path = build_dir / f"movie_{prefix}.c"
++    out_path.write_text("\n".join(lines))
++    return prefix
++
++
+ def generate_image_movie_file(child_swf_name, build_dir, image_width, image_height, file_size, movie_id=1):
+     """Generate a synthetic MovieEntry C file for an image loaded via loadMovie.
+ 
+@@ -2220,6 +2270,19 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
+                     for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', child_defs.read_text(errors="replace")):
+                         child_max = max(child_max, int(m.group(1)))
+                     next_string_id_offset += child_max + 1
++        elif is_avm2:
++            # Recompilation failed: the file is not a readable SWF (empty, or
++            # header-less garbage). Register a byte-only shell anyway so
++            # `Loader.load` RESOLVES it and reports the #2124 "unknown type"
++            # ioError Flash reports, instead of staying silent
++            # (from_shumway/as3-loader/bug1157243/{empty,invalid}).
++            # AVM2 parents only — see generate_malformed_movie_file.
++            prefix = generate_malformed_movie_file(
++                child_name, build_dir, child_file_size,
++                child_swf.read_bytes() if child_swf.exists() else None,
++                movie_id=child_movie_id)
++            if prefix:
++                child_prefixes.append(prefix)
+ 
+     # Handle self-loading SWFs (test.swf loads itself into a child MC)
+     self_load = get_self_load(test_dir)
