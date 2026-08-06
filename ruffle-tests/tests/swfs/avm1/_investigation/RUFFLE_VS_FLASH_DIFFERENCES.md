@@ -324,7 +324,8 @@ FNV-1a plus hashbrown's SIMD bucket layout, which would break the moment either
 crate changes.
 
 **Decision:** keep insertion order. `loader_load` cannot pass on any amount of
-Loader work.
+Loader work. Added to `ruffle-tests/tests/swfs/avm2/ignored_tests.txt`
+(suite-local) 2026-08-06 — see "Ignore-list scope" below.
 
 ### Same mechanism, second test: `avm2/bom`
 
@@ -352,6 +353,87 @@ both `known_failure = true` in `test.toml` and a sibling `output.ruffle.txt`
 other two failing lines *were* real bugs on our side (UTF-16LE/BE bodies were
 handed to the string constructor as raw bytes instead of being BOM-decoded) and
 are fixed — `ul_set_data` now shares `avm2_strip_bom` with `ByteArray.toString`.
-Note this is a `RUFFLE_VS_FLASH_DIFFERENCES.md` entry, not an
-`ACCEPTED_DIFFS.md` one, so — as with `loader_load` and `url_vars` — it is
-**not** added to `ignored_tests.txt`.
+
+### Ignore-list scope for `loader_load` / `bom` (corrected 2026-08-06, session 13)
+
+<!-- image-axis: none -->
+
+This section previously ended "it is **not** added to `ignored_tests.txt`",
+reasoning that a `RUFFLE_VS_FLASH_DIFFERENCES.md` entry does not carry
+CLAUDE.md's ACCEPTED_DIFFS → ignore-list obligation. That is right about the
+**global** list and wrong about the suite-local one, and the cost was measurable:
+with both tests unlisted, `loader_load` (gap 2) and `bom` (gap 3) were the two
+cheapest-looking rows in the entire 4400-test corpus and headed *every* near-pass
+regeneration. The session-13 board audit re-costed them from scratch before
+noticing they were already ruled unwinnable here
+(`SWFRecompDocs/plans/session13-fanout-reports/wave1-board-audit.md` §4.3(c)).
+
+- **Suite-local** (`ruffle-tests/tests/swfs/avm2/ignored_tests.txt`): **added**
+  2026-08-06, following the s11 precedent for `loader_applicationDomain` / `swz`
+  at that file's tail. A suite-local entry is TRACE-axis triage only.
+- **Global** (`ruffle-tests/ignored_tests.txt`): **deliberately not added.** Per
+  that file's header (traps 1–2), a global entry is *also* an image-axis
+  disposition — `scripts/image_triage.py` returns `image_axis=True` for it. Both
+  `test.toml`s were checked: neither test has an `[[image_comparisons]]` block,
+  so a global entry would buy nothing and mislabel the pixel board.
+
+The same split applies to `url_vars`, which passes and needs no entry at all.
+
+## Ruffle-internal rope-string introspection: `ruffle::isDependent()`
+
+**Test:** `avm2/dependent_strings` (84 expected / 83 actual / 46 matching —
+38 differing lines)
+
+<!-- image-axis: none -->
+
+The test's own `test.toml` says it outright: `# NOTE: this is a Ruffle-only
+test.` `Test.as` opens with
+
+```actionscript
+namespace ruffle = "__ruffle__";
+
+function print(text) {
+    trace(text);
+    try {
+        trace(text.ruffle::isDependent());
+    } catch(e) {
+        trace();
+    }
+}
+```
+
+and then prints ~40 strings built by `substr`, `+=` concatenation (narrow and
+wide/UTF-16), and substring-of-concat, asking each one whether it is
+"dependent". `isDependent()` is **not a Flash API**. It is a debug hook Ruffle
+exposes in a private `__ruffle__` namespace onto its own *rope string*
+representation (`core/src/string`): a Ruffle `AvmString` may be either an owned
+buffer or a dependent slice/rope that borrows another string's storage, and this
+method reports which. The expected `true`/`false` sequence is therefore a
+transcript of Ruffle's internal allocation heuristics — when its concatenation
+path decides to build a rope versus copy, and at which lengths and widths.
+
+Our strings are ordinary owned UTF-8/UTF-16 buffers, so the method does not
+exist, the call throws, the test's own `catch` runs, and `trace()` with no
+argument prints a blank line. Every string line matches; every boolean line is
+blank on our side:
+
+```diff
+  abcd
+- true
++
+  bcd
+- true
++
+```
+
+**Flash Player would produce exactly what we produce** — an undefined method in
+an unknown namespace throws there too, and the test would print the same blank
+lines. So the graded `output.txt` is not a Flash oracle at all; it is Ruffle
+describing its own string internals.
+
+**Decision:** never fix. Matching would mean re-implementing Ruffle's rope-string
+model *and* its allocation thresholds, purely to report them back. Added to
+`ruffle-tests/tests/swfs/avm2/ignored_tests.txt` (suite-local) 2026-08-06;
+**not** added to the global `ruffle-tests/ignored_tests.txt` — the test has no
+`[[image_comparisons]]` block, so a global entry would wrongly disposition a
+pixel-axis row (same reasoning as `loader_load` / `bom` above).

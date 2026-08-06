@@ -91,5 +91,39 @@ number_tostring
 # 2026-08-05 s11 wave-1 triage: recorded won't-dos (need the real Flex
 # framework_*.swz executed under AOT — impossible; see avm2
 # CURRENT_STATUS.md:476 and loader-arc tranche-6 scoreboard).
+# Documented in avm1/_investigation/ACCEPTED_DIFFS.md Category 13 (2026-08-06).
 loader_applicationDomain
 swz
+
+# --- 2026-08-06 s13 hygiene: dispositioned won't-dos that were never listed ---
+# Each of these is already ruled unwinnable in a disposition doc; without an
+# entry here they head every near-pass regeneration (loader_load sat at gap 2
+# and bom at gap 3 — the two cheapest-looking rows in the whole corpus — and
+# were re-costed from scratch by the s13 board audit before it noticed the
+# ruling). SUITE-LOCAL deliberately: a global ruffle-tests/ignored_tests.txt
+# entry is ALSO an image-axis disposition (that file's header, traps 1-2), and
+# none of these four tests has an [[image_comparisons]] block, so a global entry
+# would buy nothing and mislabel the pixel board.
+#
+# loader_load, bom: Ruffle enumerates AVM2 dynamic properties in hashbrown
+#   bucket order; URLVariables.toString joins in `for (p in this)` order. We and
+#   Flash use insertion order. Unreproducible without emulating FNV-1a + the
+#   hashbrown SIMD bucket layout. bom's ceiling is 6/9, loader_load's 126/128.
+#   avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
+#   "AVM2 dynamic-property enumeration order: URLVariables.toString".
+# dependent_strings: the test calls text.ruffle::isDependent() under
+#   `namespace ruffle = "__ruffle__"` — a Ruffle-internal debug hook onto its
+#   rope-string representation, with no Flash equivalent. We throw, the test's
+#   own catch traces a blank line, and all 38 boolean rows blank. Flash would do
+#   the same; output.txt is Ruffle describing its own string internals. Same doc,
+#   "Ruffle-internal rope-string introspection: ruffle::isDependent()".
+# verify_method_info_duplicate: its expected trailing #1065 contradicts the
+#   PASSING sibling verify_method_info_oob, whose output.txt is the VerifyError
+#   alone; both errors come out of the same abc_parser.cpp loop, so emitting the
+#   #1065 flips this test and demotes _oob pass -> ruffle_matched. NOTE: _oob is
+#   deliberately NOT listed here — it passes, and listing a passing test hides a
+#   win (the 2026-08-01 prune criterion). avm1 ACCEPTED_DIFFS.md Category 2.
+loader_load
+bom
+dependent_strings
+verify_method_info_duplicate

@@ -111,6 +111,53 @@ already marked `known_failure = true` and listed in `ruffle-tests/ignored_tests.
 (`new TextField()` returns an object in all SWF versions where the class exists), accept the
 1-line diff in `native_objects_swf6`.
 
+### `avm2/verify_method_info_duplicate` — trailing `#1065` contradicts a PASSING sibling (1 diff line of 2)
+
+<!-- image-axis: none -->
+
+Two `avm2` tests patch one byte of the same ASC-built SWF to corrupt its
+`method_info` table, and both are `known_failure = true` upstream. Both errors are
+raised from the *same loop* in our ABC parser, ten lines apart
+(`SWFRecomp/src/abc/abc_parser.cpp`, `readMethodBody`): `#1027` for an
+out-of-range method index, `#1121` for a duplicate method body. In both cases the
+whole ABC is rejected at load, so the root `SymbolClass 0 → Test` binding cannot
+resolve. Their captured Flash expectations disagree about what that prints:
+
+| test | `output.txt` (graded) | `output.ruffle.txt` | our actual | status |
+|---|---|---|---|---|
+| `avm2/verify_method_info_oob` | `#1027` **alone** | `#1027` + `#1065` | `#1027` alone | **pass** |
+| `avm2/verify_method_info_duplicate` | `#1121` + `ReferenceError #1065: Variable Test is not defined.` | (same 2 lines) | `#1121` alone | `output_mismatch` (1/2) |
+
+```
+  VerifyError: Error #1121: Method Test/hello() has a duplicate method body.
+- ReferenceError: Error #1065: Variable Test is not defined.
++ <end of actual>
+```
+
+Emitting the trailing `#1065` after a file-level VerifyError — a ~5-line change
+in `avm2_display_build_stage`'s `bound == NULL` arm — flips `_duplicate` to
+**pass** and simultaneously demotes `_oob` from `pass` (Flash-correct) to
+`ruffle_matched` (Ruffle-correct-only). Because `ruffle_matched` still counts in
+`effective_pass`, the headline would read "+1, zero regressions" while a
+Flash-matching test had silently been made Flash-wrong — the
+`ruffle-matched-hides-regression` trap, diagnosed twice (session 10
+`wave1-trace-leads.md` §"VERDICT: SKIP the blind version", session 11
+`w2-triage-batch-report.md` §B2).
+
+The only way to take the +1 is to key the `#1065` on load-error code `== 1121`,
+i.e. to hard-code the inconsistency between two Flash captures into the runtime.
+There is no parse-stage property that distinguishes the two SWFs (they differ by
+one patched byte, and both errors come out of the same loop), so no principled
+discriminator exists.
+
+**Decision:** accept the 1-line diff; keep `_oob` Flash-correct. Listed in
+`ruffle-tests/tests/swfs/avm2/ignored_tests.txt` (suite-local — the test has no
+`[[image_comparisons]]` block, so a global entry would wrongly disposition a
+pixel-axis row). **`verify_method_info_oob` is NOT ignore-listed: it passes**, and
+listing a passing test hides a win (the 2026-08-01 prune criterion). Session 13's
+board audit recommended ignore-listing both; the second half of that
+recommendation is refuted by the results file.
+
 ---
 
 ## Category 3: Flash Implementation Quirks We Do Not Replicate
@@ -474,15 +521,75 @@ The divergence is specific to this test's bundled custom font.
 
 ## Category 9: Video Decoder Implementation Differences
 
-Image-comparison tests that render decoded FLV frames at pixel-perfect parity with
-Ruffle. Ruffle uses the pure-Rust `h263-rs` + `h263-rs-yuv` crates for Sorenson Spark
-(FLV codec 2); we use libavcodec's `flv1` decoder + libswscale for YUV→RGB. Both are
-valid H.263/Spark decoders and produce visually identical output, but they use
-different fixed-point arithmetic internally (h263-rs-yuv: 16.16 with explicit
-TV→full range expansion; swscale: its own routine with auto-detected colorspace).
-Per-channel results typically differ by 1-3 levels in solid regions and up to ~140
-at frame edges (different bilinear resampling). See
-`SWFRecompDocs/plans/video-codec-support-plan.md`.
+Image-comparison tests that render decoded FLV frames against a Ruffle-captured
+golden. Ruffle decodes Sorenson Spark (FLV codec 2) with the pure-Rust `h263-rs`
+crate and VP6 (codecs 4/5) with `nihav`; we use libavcodec (`flv1`, `vp6f`,
+`vp6a`). See `SWFRecompDocs/plans/video-codec-support-plan.md`.
+
+> **Mechanism correction (2026-08-06, session 13).** This category previously
+> blamed "different fixed-point arithmetic internally" in the *decoders*
+> (h263-rs-yuv 16.16 vs "swscale's own routine"), and put the drift at 1–3 levels
+> in solid regions. That framing was wrong, and it made the whole video family
+> look permanently inherent. The dominant term was never the decoder — it was
+> **`sws_scale`'s YUV→RGB conversion** in `video_codec.c::decode_via_libavcodec`,
+> which interpolates chroma and rounds differently from Ruffle. Measured by
+> reconstructing both paths offline against the goldens
+> (`SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-charid0.md` §5):
+>
+> | test | via `sws_scale` (old) | via Ruffle's exact BT.601 integer conversion |
+> |---|---:|---:|
+> | `vp6` / `vp6_dispsize` | 449 774 outliers, max 3 | **0, byte-exact** |
+> | `vp6_alphaoffset` | — | **0, byte-exact** |
+> | `vp6a` | — | 118 outliers, max 1 (`tolerance = 1` ⇒ passes) |
+> | `h263` | 392 707 outliers, max 4 | 10 808 outliers, max 2 |
+>
+> So **libavcodec's VP6F/VP6A decode is bit-identical to Ruffle's** — the VP6
+> family is exact once the conversion is right, and is no longer an accepted
+> diff. Ruffle's rule (`h263-rs-yuv::bt601::yuv420_to_rgba`) is 16.16 fixed point
+> with **nearest-neighbour chroma** — its own comment says *"This is not the most
+> correct, or nicest, but it's what Flash Player does."* — and the session-13
+> video patch ports it verbatim in place of `sws_scale`.
+>
+> What survives the correction is genuinely decoder-level, and only for Spark:
+> libavcodec's H.263 IDCT differs from `h263-rs`'s f32 basis-table IDCT
+> (`h263/src/decoder/cpu/idct.rs`). See the `h263` entry below.
+
+### `visual/video/colorconversion/h263` — Spark IDCT precision (10 808 outlier channels, max 2)
+
+<!-- image-axis: visual/video/colorconversion/h263 output -->
+
+640×480, `tolerance = 0`, `max_outliers = 0`, `quality = "low"`. The trace side
+passes; only the image comparison fails.
+
+After the exact BT.601 conversion above, the residual is **spatially uniform over
+the whole frame at max ±2** — the signature of IDCT precision, not of colour.
+Sweeping every libavcodec `idct_algo` (0…30 + 128, with and without
+`AV_CODEC_FLAG_BITEXACT`) moves the count but never to zero:
+
+```
+FF_IDCT_FAAN (20)    3 outliers, max 1     <- a single pixel, (447,289)
+FF_IDCT_XVID (14)    4 671
+FF_IDCT_INT  (1)     8 450
+everything else     10 808
+```
+
+Even the best arm fails `max_outliers = 0`. FAAN gets closest precisely because
+it, like `h263-rs`, is a **float** IDCT — and shipping a float IDCT is a
+determinism hazard across CI shards with different CPU feature sets (two runs at
+the same SHA must be byte-identical; see `verify_output.py`'s `MOCK_DATE_TIME`
+determinism contract). Matching exactly would mean replacing libavcodec's H.263
+decoder wholesale with a port of `h263-rs`, not configuring it.
+
+**Decision:** accept the image comparison permanently. Not added to any ignore
+list: the **trace test passes**, and a global `ruffle-tests/ignored_tests.txt`
+entry is the only kind that carries an image-axis disposition — which this entry
+already supplies to `scripts/image_triage.py` via the scope marker above.
+
+**Explicitly NOT dispositioned:** `visual/video/deblocking` is live work, not this
+category. Its gap is that Ruffle applies `h263-rs-deblock::deblock()` post-decode
+when the picture requests it and libavcodec does not, plus
+`MAX_EMBEDDED_VIDEO_STREAMS = 8` silently dropping streams 9–12 of its 12. Both
+are implementable.
 
 ### `netstream_play_flv` — Sorenson Spark pixel parity (~52k outliers, max diff 64)
 
@@ -492,13 +599,17 @@ GPU-side matrix-scale rendering for the Video display object
 (`renderer_draw_bitmap_quad_scaled`, see
 `SWFRecompDocs/plans/video-display-flash-parity-plan.md`), the decoded frame is
 rendered at the SWF-declared bounds (160×120) per Flash's documented Video
-render rule; the on-stage size matches expected. The remaining diff is purely
-**libavcodec H.263 vs Ruffle's `h263-rs-yuv` pixel precision**: libavcodec's
-YUV→RGB output drifts 1-3 levels per channel from Ruffle's pure-Rust decoder in
-solid regions, plus larger drifts at the resampling boundary where the GPU
-sample-stretch (320×234 → 160×120) interacts with codec-output differences.
-Both are valid H.263/Spark decoders; the difference is fixed-point arithmetic
-choices, not a correctness gap.
+render rule; the on-stage size matches expected.
+
+The remaining diff had two terms, and the mechanism note at the top of this
+category corrects which one dominated. The **colour-conversion** term
+(`sws_scale`'s chroma interpolation) is removed by the session-13 port of
+Ruffle's exact BT.601 integer conversion. What is left is the same Spark
+**IDCT precision** difference documented in the `h263` entry above, plus the
+resampling boundary where the GPU sample-stretch (320×234 → 160×120) magnifies
+it. Both are valid H.263/Spark decoders; the residual is arithmetic precision,
+not a correctness gap. (This test was not re-measured post-patch — expect the
+band to move sharply down; only the flip is not expected.)
 
 **Decision:** Accept; content decodes correctly and renders at the correct
 on-stage size. Trace test continues to pass.
@@ -580,6 +691,11 @@ coverage rasterizer + thin-stroke pixel-hinting produces crisp edges/seams that 
 > change could resurface it), but it is stale as a live accepted diff. Do not
 > count it when tallying dispositioned pixel work; `scripts/image_triage.py`
 > reports it under "DISPOSITIONED BUT NOT FAILING" rather than silently dropping it.
+>
+> **Re-confirmed 2026-08-06 (session 13 hygiene)** against the current baseline
+> `1f8396f57` / CI run `31090651530`: `avm1/display_object_properties [output]`
+> is `status = pass`, `excess_outliers = 0`. Still stale, still kept for the
+> mechanism only.
 
 `us-vs-Flash = 192`, `us-vs-Ruffle = 0`, `Ruffle-vs-Flash = 192`. Thin 1px diff
 lines along shape edges where our (and Ruffle's) MSAA antialiasing differs from
@@ -600,6 +716,54 @@ tests `movieclip_begin_gradient_fill` (1266 px) and `movieclip_line_gradient_sty
 (1052 px) still fail, but **Ruffle ≈ Flash there (180/151 px) while we are far off**
 → a real SWFRecomp **gradient color-ramp/banding** gap (the diagonal-stripe/arc
 banding in the diff), a distinct next target. Do not file these as accepted.
+
+### `visual/simple_shapes/masks` + `visual/simple_shapes/masks_equal_clipdepth` — 1-sample rasteriser tie (1686 outlier channels each)
+
+<!-- image-axis: both tests, the single `output` comparison of each -->
+
+**This is NOT mask work. Do not book it in a mask session.** The two comparisons
+are identical (550×400, `tolerance = 0`, `max_outliers = 0`, excess 1686, mean
+diff 0.4727, ink IoU 1.00 — 0.19% of channels). `scripts/image_triage.py`
+clusters them as `same_geometry_wrong_fill`, which is also the board's
+highest-yield head, so before this entry existed every board regeneration
+re-surfaced them at the top of the top cluster and every mask session re-costed
+them.
+
+Session 12's mask agent rendered `masks` at HEAD and diffed it pixel-by-pixel
+(`session12-fanout-reports/w2-gfx-masks-report.md` §4):
+
+```
+1686 outlier channels = 776 mismatching pixels
+bbox (17,8)-(544,388)            <- the WHOLE stage, not a mask region
+dominant pairs:  422 px  actual (255,0,0)    expected (255,255,255)
+                 177 px  actual (0,0,0)      expected (255,255,255)
+                  43 px  actual (0,0,0)      expected (0,153,255)
+```
+
+Every differing pixel is a swap between two **saturated** palette colours with no
+intermediate values anywhere — the signature of `quality = "low"` →
+`MSAA_SAMPLES = 1`, where a sample either lands inside an edge or outside it.
+These are one-pixel slivers along curve boundaries spread over the entire image:
+our tessellator and Flash's rasteriser disagree about which side of a sample
+point an edge falls on. It is the `hairline_edge_drift` A-INHERENT family,
+mis-clustered only because the erosion test needs a thickness the 1-sample
+render never produces.
+
+The mask machinery in these two tests is *correct*: `visual/simple_shapes/masks`
+has **no `DoABC` tag** (so the AVM2 display walk cannot reach it) and uses
+neither `setMask` nor `scrollRect`, so none of the open mask defects (B: AVM1
+`setMask` vs display-list content, C: AVM2 `scrollRect`) can touch it. Their
+excess went 248261 → 1686 in s11 when the real mask defect (clipDepth clobber)
+was fixed; the 1686 is what was underneath.
+
+**Decision:** Accept, capped with the fonts/blend AA family. Reaching 0 would
+mean matching Flash's exact sample positions at 1× — the same architectural gap
+as `from_gnash …/loop/simple_loop_test`. Not added to any ignore list: the trace
+side of both tests passes, and this entry is what dispositions the pixel axis
+(the `image-axis` marker above is what `image_triage.py` reads). **Standing
+invariant:** the marker is scoped to the `output` comparison of these two tests
+only — if a *new* comparison or a materially larger excess appears here, it is
+not covered and must be re-triaged.
 
 ---
 
@@ -682,11 +846,73 @@ and would still leave Ruffle unmatched. Added to
 
 ---
 
+## Category 13: AOT Ceiling — Runtime-Loaded ABC (Flex `framework_*.swz`)
+
+SWFRecomp is an ahead-of-time recompiler: every ABC in the corpus is translated
+to C at build time. A SWF fetched *at runtime* and handed to
+`Loader.loadBytes()` therefore cannot define classes — there is no bytecode
+interpreter in the runtime to execute it. Two `avm2` tests load the real
+325 305-byte Adobe Flex `framework_4.5.0.20967.swz` (shipped in the test
+directory, pinned by a SHA-256 `URLRequest.digest`) and then read `mx.*`
+definitions back out of an ApplicationDomain. Both are permanent won't-dos.
+
+This is a *ceiling*, not a bug: closing it would mean shipping an AVM2
+interpreter alongside the recompiled code, which is the opposite of the
+project's AOT design (`swfrecomp-purpose-beat-ruffle-perf`).
+
+### `avm2/loader_applicationDomain` — Flex framework SWZ (4 diff lines of 4)
+
+<!-- image-axis: none -->
+
+`Test.as` `URLLoader`s `framework_4.5.0.20967.swz` as BINARY, `loadBytes()`s it
+into `ApplicationDomain.currentDomain`, and traces
+`getDefinitionByName("mx.events.PropertyChangeEvent")`,
+`getDefinitionByName("mx.core.ByteArrayAsset")` and `getDefinitionByName("Test")`
+twice (once through the shared domain, once through a domain-less child Loader).
+
+```
+expected:                          actual:
+[class PropertyChangeEvent]        (no output)
+[class ByteArrayAsset]
+[class Test]
+[class Test]
+```
+
+Every traced value depends on `mx.*` classes that exist only inside the SWZ's
+ABC. Nothing is traced before them, so the test produces 0 matching lines.
+
+**Decision: accept permanently.** Listed in
+`ruffle-tests/tests/swfs/avm2/ignored_tests.txt` since s11. Suite-local,
+deliberately — the test has no `[[image_comparisons]]`, so a global entry would
+wrongly disposition a pixel-axis row (see that file's header, traps 1–2).
+See `avm2/_investigation/CURRENT_STATUS.md:476` and the loader-arc tranche-6
+scoreboard.
+
+### `avm2/swz` — Flex framework SWZ, domain-relative lookup (2 diff lines of 2)
+
+<!-- image-axis: none -->
+
+Same SWZ, same fetch, but reads the definitions off the *child* Loader's
+`contentLoaderInfo.applicationDomain`:
+
+```
+expected:                          actual:
+[class ByteArrayAsset]             (no output)
+[class BitmapAsset]
+```
+
+Identical mechanism and identical ceiling.
+
+**Decision: accept permanently.** Listed in
+`ruffle-tests/tests/swfs/avm2/ignored_tests.txt` (suite-local, same rationale).
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
 |------|----------|-----------|----------|
-| ~~`display_object_properties`~~ | ~~Graphics: MSAA edge AA vs Flash analytic/hairline~~ | ~~192 img px~~ | **STALE — image comparison now PASSES** (baseline `375373786`); kept for the mechanism only |
+| ~~`display_object_properties`~~ | ~~Graphics: MSAA edge AA vs Flash analytic/hairline~~ | ~~192 img px~~ | **STALE — image comparison now PASSES** (re-confirmed at baseline `1f8396f57`, run `31090651530`); kept for the mechanism only |
 | `date` | Platform UB (NaN/Infinity year cast) | ~9 | Accept; no portable fix |
 | `date` | Float precision (TimezoneOffset extreme dates) | ~1 | Accept; edge case |
 | `date` | Inconsistent expected output (UTCHours at −8.64e15) | ~18 | Accept; Ruffle test bug |
@@ -708,8 +934,14 @@ and would still leave Ruffle unmatched. Added to
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 (trace lines; **no image comparison exists**) | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
-| `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision | ~52k image outliers, max diff 64 | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render, residual diff is decoder fixed-point arithmetic |
+| `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | ~52k image outliers, max diff 64 | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected 2026-08-06: the colour half was `sws_scale`, now ported exactly; the residual is Spark IDCT precision × the GPU sample-stretch |
+| `visual/video/colorconversion/h263` | Spark IDCT precision after the exact BT.601 port (Category 9) | 10 808 image outlier channels, max 2 | Accept (image axis only; trace passes). Every `idct_algo` arm still fails `max_outliers = 0`, and the closest one is a float IDCT = CI determinism hazard |
+| `visual/simple_shapes/masks` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels (776 px), ink IoU 1.00 | Accept, capped with the AA family. **Not mask work** — no `DoABC`, no `setMask`, no `scrollRect`; defects B/C cannot reach it |
+| `visual/simple_shapes/masks_equal_clipdepth` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels, identical to the row above | Accept; same mechanism, same decision |
+| `avm2/verify_method_info_duplicate` | Cross-test inconsistent Flash captures (Category 2) — the trailing `#1065` contradicts the PASSING `verify_method_info_oob` | 1 of 2 | Accept; the +1 is only reachable by keying the error on `1121`, which would demote `_oob` to `ruffle_matched`. Suite-local ignore only |
 | `watch_special_recursion_swf7` | Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay; no `output.ruffle.txt` | ~part of test | Accept; segfault fixed, o1 matches Flash (65 fires); see Category 10 |
 | `watch_special_recursion_double_swf7` | Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay | ~63 | Accept; segfault fixed; see Category 10 |
 | `from_avmplus/ecma3/Statements/eforin_001` | Implementation-defined `for...in` order (Category 12) | 4 of 16 | Accept; every line is `PASSED!` on both sides, only the sequence differs; avmplus, Ruffle and we produce three different orders and none is insertion order |
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
+| `avm2/loader_applicationDomain` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 4 of 4 | Accept; would require shipping an AVM2 interpreter |
+| `avm2/swz` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 2 of 2 | Accept; same mechanism as `loader_applicationDomain` |
