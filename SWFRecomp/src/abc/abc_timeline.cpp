@@ -3,6 +3,7 @@
 // SWFModernRuntime/include/avm2/avm2_abc.h ("Static timeline tables").
 
 #include <abc/abc_timeline.hpp>
+#include <abc/abc_devicefont.hpp>
 
 #include <cmath>
 #include <cstdio>
@@ -757,7 +758,12 @@ struct FontDef
 	uint16_t em_square = 1024;
 	int32_t ascent = 0, descent = 0, leading = 0;
 	std::vector<uint16_t> codes;
-	std::vector<int16_t> advances;
+	// SWF DefineFont2/3 ADVANCETABLE entries are UNSIGNED 16-bit (Ruffle
+	// swf/src/read.rs:1079 `read_u16`, swf::Glyph::advance is u16). Keeping
+	// them in an int16 truncated any advance >= 32768 to a negative number —
+	// e.g. a upem-1000 face with a 1600-unit advance embedded at em 20480
+	// lands exactly on 32768 and measured as -32px.
+	std::vector<int32_t> advances;
 	// Flattened contour polylines in font units (quadratic curves subdivided
 	// at parse time). Contours of glyph g are contour indices
 	// [glyph_contour_start[g], glyph_contour_start[g+1]); contour k's points
@@ -1446,7 +1452,7 @@ struct Scanner
 						fd.leading = (int16_t) body.u16();
 						for (uint16_t i = 0; i < nglyphs; i++)
 						{
-							fd.advances.push_back((int16_t) body.u16());
+							fd.advances.push_back((int32_t) body.u16());
 						}
 						// Glyph bounds + kerning follow; not needed.
 					}
@@ -2090,7 +2096,7 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		}
 		if (!fd.advances.empty())
 		{
-			out << "static const int16_t font_" << i << "_advances[] = { ";
+			out << "static const int32_t font_" << i << "_advances[] = { ";
 			for (auto a : fd.advances) out << a << ", ";
 			out << "};\n";
 		}
@@ -2146,6 +2152,14 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	}
 	out << "const uint32_t avm2_generated_font_count = " << sc.fonts.size()
 	    << ";\n\n";
+
+	// Device fonts declared in the test harness's test.toml (B9). Player-level
+	// state, so only the main movie emits them — a child movie's tables are
+	// symbol-prefixed and would otherwise duplicate the registry.
+	if (info.symbol_prefix.empty())
+	{
+		emitDeviceFonts(out);
+	}
 
 	// Static text (DefineText/2): a flat glyph-placement table + per-char range
 	// (mirrors avm2_generated_shape_geom). scale resolves HERE (text_height /

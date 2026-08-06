@@ -414,7 +414,10 @@ typedef struct Avm2FontData
 	int32_t ascent, descent, leading;  // font units (has_layout)
 	uint32_t glyph_count;
 	const uint16_t* codes;   // glyph index -> character code
-	const int16_t* advances; // glyph index -> advance, font units (has_layout)
+	// glyph index -> advance, font units (has_layout). Widened past int16
+	// because the SWF ADVANCETABLE is UNSIGNED 16-bit (Ruffle read.rs:1079)
+	// and a DefineFont3 face can legitimately store 32768.
+	const int32_t* advances;
 	// Glyph outlines: contour polylines in font units, curves pre-flattened
 	// at recompile time. All NULL when outlines are unavailable (device
 	// fallback font, older generated tables). Contours of glyph g are
@@ -426,6 +429,19 @@ typedef struct Avm2FontData
 	const uint32_t* glyph_pt_start;       // glyph_count+1 entries
 	const uint32_t* glyph_contour_ends;   // absolute pair indices
 	const uint32_t* glyph_contour_start;  // glyph_count+1 entries
+	// Kerning pairs from the TTF `kern` table, in character codes (B9). Only
+	// device faces declared in test.toml carry these; SWF-embedded faces leave
+	// them NULL/0. Ruffle reads `kern` ONLY, never GPOS (font.rs:261-269).
+	const uint16_t* kern_left;
+	const uint16_t* kern_right;
+	const int16_t* kern_value;   // font units
+	uint32_t kern_count;
+	// Per-glyph fallback chain (test.toml [font_sorts]): indices into
+	// avm2_generated_device_fonts, in order, main face FIRST. Ruffle
+	// FontSet::from_fonts (font.rs:1492) — metrics and kerning always come
+	// from the main face, only the glyph lookup walks the chain.
+	const uint32_t* fallback;
+	uint32_t fallback_count;
 } Avm2FontData;
 
 // One rendered glyph of a TextField, as collected by
@@ -554,6 +570,10 @@ extern const Avm2EditTextData avm2_generated_edittexts[];
 extern const uint32_t avm2_generated_edittext_count;
 extern const Avm2FontData avm2_generated_fonts[];
 extern const uint32_t avm2_generated_font_count;
+// Device faces declared in the test harness's test.toml (B9). Player-level
+// state, so only the main movie's table exists (never symbol-prefixed).
+extern const Avm2FontData avm2_generated_device_fonts[];
+extern const uint32_t avm2_generated_device_font_count;
 extern const Avm2StaticGlyph avm2_generated_static_glyphs[];
 extern const uint32_t avm2_generated_static_glyph_count;
 extern const Avm2StaticTextData avm2_generated_statictexts[];

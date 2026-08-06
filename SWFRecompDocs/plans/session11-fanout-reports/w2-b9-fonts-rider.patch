@@ -1,0 +1,164 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 9072e8f9d..33133f735 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -796,6 +796,10 @@ struct Avm2EditTextExt
+ 	uint8_t ime_active;
+ 	uint32_t ime_start, ime_end;
+ 	const Avm2String* ime_text;
++	// The DisplayObject this ext hangs off. A pure BACK-edge (the object owns
++	// the ext, so it always outlives it) used only to read the concatenated
++	// matrix for device_font_scale_x.
++	Avm2Object* owner;
+ };
+ typedef struct Avm2EditTextExt Avm2EditTextExt;
+ 
+@@ -2285,6 +2289,7 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
+ 	Avm2EditTextExt* et = avm2_alloc(ctx, sizeof(Avm2EditTextExt));
+ 	memset(et, 0, sizeof(*et));
+ 	ext->edittext = et;
++	et->owner = obj;
+ 
+ 	et->aa_advanced = 0;  // TextRenderSettings::default() = Normal
+ 	et->grid_fit = 1;     // pixel
+@@ -3566,6 +3571,74 @@ static void et_free_layout(Avm2Context* ctx, LLayout* l)
+ 	heap_free(ctx->app, l);
+ }
+ 
++// ---------------------------------------------------------------------------
++// Device-font layout scale (Ruffle edit_text.rs:767-817)
++//
++//   fn device_font_scale_x(self) -> f32 { let m = self.local_to_global_matrix();
++//                                         m.d / m.a }
++//
++// Device text cannot be scaled independently in x and y, so the layout space
++// is pre-divided by the ratio of the concatenated y-scale to the x-scale:
++// layout_to_local_matrix gains a `scale(scale_x, 1)`, content width divides by
++// it and autosize width multiplies back. Identically 1 whenever a == d, i.e.
++// for every uniformly-scaled field — which is all of the corpus except the
++// four edittext_device_transform_* tests.
++// ---------------------------------------------------------------------------
++
++// local_to_global_matrix (display_object.rs:1487-1512) restricted to the two
++// components device_font_scale_x reads. Stops at the Stage, whose matrix is
++// deliberately excluded.
++static float et_device_font_scale_x(Avm2Context* ctx, const Avm2EditTextExt* et)
++{
++	if (!et->device_font || et->owner == NULL) return 1.0f;
++	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, et->owner);
++	if (ext == NULL) return 1.0f;
++	// Concatenate 2x2 blocks: m = parent * m, i.e.
++	//   a' = pa*a + pc*b,  b' = pb*a + pd*b,  c' = pa*c + pc*d,  d' = pb*c + pd*d
++	float a = ext->mtx_a, b = ext->mtx_b, c = ext->mtx_c, d = ext->mtx_d;
++	Avm2Object* p = ext->parent;
++	while (p != NULL)
++	{
++		Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, p);
++		if (pe == NULL || pe->is_stage) break;
++		float na = pe->mtx_a * a + pe->mtx_c * b;
++		float nb = pe->mtx_b * a + pe->mtx_d * b;
++		float nc = pe->mtx_a * c + pe->mtx_c * d;
++		float nd = pe->mtx_b * c + pe->mtx_d * d;
++		a = na; b = nb; c = nc; d = nd;
++		p = pe->parent;
++	}
++	if (a == 0.0f) return 1.0f;  // Ruffle would divide by zero; stay inert
++	float s = d / a;
++	if (!isfinite(s) || s == 0.0f) return 1.0f;
++	return s;
++}
++
++// local_width_to_layout_width / layout_width_to_local_width (edit_text.rs:802-817).
++static int32_t local_w_to_layout_w(int32_t w, float scale_x)
++{
++	if (scale_x == 1.0f) return w;
++	return twips_from_px(((double) w / 20.0) / (double) scale_x);
++}
++
++static int32_t layout_w_to_local_w(int32_t w, float scale_x)
++{
++	if (scale_x == 1.0f) return w;
++	return twips_from_px(((double) w / 20.0) * (double) scale_x);
++}
++
++// One layout-space x coordinate through layout_to_local_matrix's scale half.
++// Matrix * Point rounds the f32 product ties-to-even into an i32
++// (render/src/matrix.rs:301) BEFORE the integral translation is added, so the
++// gutter must stay outside this.
++static int32_t layout_x_to_local_x(int32_t x, float scale_x)
++{
++	if (scale_x == 1.0f) return x;
++	float v = (float) x * scale_x;
++	if (!isfinite(v)) return 0;
++	return (int32_t) nearbyintf(v);
++}
++
+ // EditText::relayout.
+ static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
+ {
+@@ -3574,11 +3647,13 @@ static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
+ 	int is_input = !et->read_only;
+ 	int is_word_wrap = et->word_wrap;
+ 	int32_t padding = GUTTER * 2;
++	float scale_x = et_device_font_scale_x(ctx, et);
+ 
+ 	LLayout* layout;
+ 	if (et->autosize == 0 || is_word_wrap)
+ 	{
+-		int32_t content_width = et->bounds_w - padding;
++		int32_t content_width = local_w_to_layout_w(et->bounds_w, scale_x)
++		                        - padding;
+ 		layout = layout_spans_known_width(ctx, et, units, unit_len,
+ 		                                  content_width, is_input, is_word_wrap);
+ 	}
+@@ -3607,7 +3682,8 @@ static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
+ 	{
+ 		if (!is_word_wrap)
+ 		{
+-			int32_t width = layout->text_w + padding;
++			int32_t width = layout_w_to_local_w(layout->text_w, scale_x)
++			                + padding;
+ 			if (is_input) width += twips_from_px(2.5);
+ 			switch (et->autosize)
+ 			{
+@@ -7695,7 +7771,9 @@ static Avm2Value txt_get_text_width(Avm2Activation* act)
+ 	Avm2EditTextExt* et = this_et(act);
+ 	if (et == NULL) return avm2_undefined();
+ 	LLayout* l = et_layout(act->ctx, et);
+-	return avm2_number((double) l->text_w / 20.0);
++	// EditText::measure_text runs text_size through layout_to_local_matrix.
++	float sx = et_device_font_scale_x(act->ctx, et);
++	return avm2_number((double) layout_x_to_local_x(l->text_w, sx) / 20.0);
+ }
+ 
+ static Avm2Value txt_get_text_height(Avm2Activation* act)
+@@ -7989,9 +8067,14 @@ static Avm2Value txt_get_line_metrics(Avm2Activation* act)
+ 	LLayout* l = et_layout(ctx, et);
+ 	if (n < 0 || (uint32_t) n >= l->line_count) throw_2006(ctx);
+ 	LLine* line = &l->lines[n];
++	// EditText::line_metrics runs the line's bounds through
++	// layout_to_local_matrix, which for device text carries the x scale.
++	float sx = et_device_font_scale_x(ctx, et);
++	int32_t lx = layout_x_to_local_x(line->x, sx);
++	int32_t lw = layout_x_to_local_x(line->x + line->w, sx) - lx;
+ 	Avm2Value args[6];
+-	args[0] = avm2_number((double) (line->x + GUTTER) / 20.0);
+-	args[1] = avm2_number((double) line->w / 20.0);
++	args[0] = avm2_number((double) (lx + GUTTER) / 20.0);
++	args[1] = avm2_number((double) lw / 20.0);
+ 	args[2] = avm2_number((double) (line->h + line->leading) / 20.0);
+ 	args[3] = avm2_number((double) line->ascent / 20.0);
+ 	args[4] = avm2_number((double) line->descent / 20.0);
+@@ -8050,6 +8133,12 @@ static Avm2Value txt_get_char_boundaries(Avm2Activation* act)
+ 		uint32_t si = (uint32_t) (et->scroll - 1);
+ 		if (si > 0 && si < l->line_count) vscroll_off = l->lines[si].y;
+ 	}
++	// layout -> local also carries the device-font x scale (edit_text.rs:774).
++	{
++		float sx = et_device_font_scale_x(ctx, et);
++		x_min = layout_x_to_local_x(x_min, sx);
++		x_max = layout_x_to_local_x(x_max, sx);
++	}
+ 	x_min += GUTTER;
+ 	x_max += GUTTER;
+ 	y_min += GUTTER - vscroll_off;

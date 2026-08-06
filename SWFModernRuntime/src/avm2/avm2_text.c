@@ -796,6 +796,10 @@ struct Avm2EditTextExt
 	uint8_t ime_active;
 	uint32_t ime_start, ime_end;
 	const Avm2String* ime_text;
+	// The DisplayObject this ext hangs off. A pure BACK-edge (the object owns
+	// the ext, so it always outlives it) used only to read the concatenated
+	// matrix for device_font_scale_x.
+	Avm2Object* owner;
 };
 typedef struct Avm2EditTextExt Avm2EditTextExt;
 
@@ -2285,6 +2289,7 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
 	Avm2EditTextExt* et = avm2_alloc(ctx, sizeof(Avm2EditTextExt));
 	memset(et, 0, sizeof(*et));
 	ext->edittext = et;
+	et->owner = obj;
 
 	et->aa_advanced = 0;  // TextRenderSettings::default() = Normal
 	et->grid_fit = 1;     // pixel
@@ -2467,7 +2472,7 @@ static const uint16_t noto_codes[] = {
 	8212, 8216, 8217, 8218, 8220, 8221, 8222, 8224, 8225, 8226, 8230, 8240,
 	8249, 8250, 8364, 8482,
 };
-static const int16_t noto_advances[] = {
+static const int32_t noto_advances[] = {
 	5320, 7850, 10280, 13370, 11710, 16950, 14990, 6680, 7240, 7240, 12430,
 	11280, 5120, 6960, 5490, 8790, 11280, 11280, 11280, 11280, 11280, 11280,
 	11280, 11280, 11280, 11280, 6030, 6030, 11280, 11280, 11280, 10600,
@@ -2518,6 +2523,59 @@ static const Avm2FontData* find_embedded_font(const Avm2String* name,
 	return NULL;
 }
 
+// One exact device-face probe: FontQuery(Device, name, bold, italic), whose
+// PartialEq compares the LOWERCASED name (font.rs:24-52).
+static const Avm2FontData* find_device_font(const char* name, uint32_t len,
+                                            int bold, int italic)
+{
+	for (uint32_t i = 0; i < avm2_generated_device_font_count; i++)
+	{
+		const Avm2FontData* fd = &avm2_generated_device_fonts[i];
+		if (fd->name == NULL) continue;
+		if (strlen(fd->name) != len) continue;
+		if (strncasecmp(name, fd->name, len) != 0) continue;
+		if ((fd->bold != 0) != (bold != 0)) continue;
+		if ((fd->italic != 0) != (italic != 0)) continue;
+		return fd;
+	}
+	return NULL;
+}
+
+// Rust `str::trim` — strips Unicode whitespace; ASCII whitespace is all the
+// corpus needs and all the layout code can see here.
+static int is_ws(char c)
+{
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f'
+	       || c == '\v';
+}
+
+// Ruffle html/layout.rs:562-598: split the format's font name on ',', trim
+// each entry, return the first registered device face. NULL when the whole
+// list misses (Ruffle then goes to a DefaultFont; we keep the baked-in Noto).
+static const Avm2FontData* find_device_font_list(const Avm2String* name,
+                                                 int bold, int italic)
+{
+	if (name == NULL || avm2_generated_device_font_count == 0) return NULL;
+	uint32_t i = 0;
+	while (i <= name->len)
+	{
+		uint32_t start = i;
+		while (i < name->len && name->utf8[i] != ',') i++;
+		uint32_t end = i;
+		while (start < end && is_ws(name->utf8[start])) start++;
+		while (end > start && is_ws(name->utf8[end - 1])) end--;
+		if (end > start)
+		{
+			const Avm2FontData* fd = find_device_font(name->utf8 + start,
+			                                          end - start, bold, italic);
+			if (fd != NULL) return fd;
+		}
+		if (i >= name->len) break;
+		i++;  // past the comma
+	}
+	return NULL;
+}
+
 // Ruffle resolve_font: embedded lookup by name+bold+italic (only when the
 // field embeds fonts), else the device fallback.
 //
@@ -2557,6 +2615,24 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
 			return f;
 		}
 	}
+	// Device path. Ruffle html/layout.rs:563-600: a device font name is a
+	// COMMA-SEPARATED LIST, each entry `.trim()`-ed, matched case-insensitively
+	// (FontQuery compares lowercase names); the first entry that resolves wins
+	// for the whole span, and missing glyphs walk that family's font_sorts
+	// chain rather than the rest of the list. An embedded field whose name
+	// matched nothing falls through to here too (Ruffle's "we don't support
+	// DefineFont4" comment) — that is why this is not gated on device_font.
+	{
+		const Avm2FontData* fd = find_device_font_list(fmt->font,
+		                                               fmt->bold != 0,
+		                                               fmt->italic != 0);
+		if (fd != NULL)
+		{
+			f.data = fd;
+			f.is_device = 1;
+			return f;
+		}
+	}
 	f.data = &noto_device_font;
 	f.is_device = 1;
 	return f;
@@ -2584,6 +2660,46 @@ static int glyph_advance_units(const Avm2FontData* fd, uint32_t cp, int32_t* out
 			*out = fd->advances != NULL ? fd->advances[i] : 0;
 			return 1;
 		}
+	}
+	return 0;
+}
+
+// FontSet::resolve_glyph (font.rs:1529-1541): the main face first, then its
+// font_sorts fallbacks in order. The RESOLVING face is what scales the
+// advance — Ruffle's `scale = height / resolution.font.scale()` — so hand it
+// back to the caller.
+static int resolve_glyph_units(const LFont* f, uint32_t cp,
+                               const Avm2FontData** out_font, int32_t* out_units)
+{
+	if (glyph_advance_units(f->data, cp, out_units))
+	{
+		*out_font = f->data;
+		return 1;
+	}
+	for (uint32_t i = 0; i < f->data->fallback_count; i++)
+	{
+		uint32_t idx = f->data->fallback[i];
+		if (idx >= avm2_generated_device_font_count) continue;
+		const Avm2FontData* fb = &avm2_generated_device_fonts[idx];
+		if (fb == f->data) continue;
+		if (glyph_advance_units(fb, cp, out_units))
+		{
+			*out_font = fb;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// Font::get_kerning_offset (font.rs:325-341) — the MAIN face's `kern` table
+// only, in that face's font units. 0 when the pair is absent.
+static int32_t kerning_units(const Avm2FontData* fd, uint32_t left, uint32_t right)
+{
+	if (fd->kern_value == NULL) return 0;
+	for (uint32_t i = 0; i < fd->kern_count; i++)
+	{
+		if (fd->kern_left[i] == left && fd->kern_right[i] == right)
+			return fd->kern_value[i];
 	}
 	return 0;
 }
@@ -2622,15 +2738,34 @@ static EvalParams eval_params(const Avm2TextFormatFields* fmt)
 	return p;
 }
 
-// Per-character advance (Ruffle Font::evaluate). Returns twips.
-static int32_t char_advance(const LFont* f, EvalParams p, uint32_t cp)
+// Ruffle Font::evaluate (font.rs:889):
+//   kerning_enabled = has_kerning_info() && (font_type().is_device() || params.kerning)
+// A DEVICE face always kerns, whatever TextFormat.kerning says.
+static int kerning_enabled(const LFont* f, EvalParams p)
+{
+	if (f->data->kern_value == NULL || f->data->kern_count == 0) return 0;
+	return f->is_device || p.kerning;
+}
+
+// Per-character advance (Ruffle Font::evaluate). `next_cp` is the following
+// codepoint of the same run (0 at the end), used only for kerning. Returns
+// twips.
+static int32_t char_advance(const LFont* f, EvalParams p, uint32_t cp,
+                            uint32_t next_cp)
 {
 	int32_t units;
-	if (!glyph_advance_units(f->data, cp, &units))
+	const Avm2FontData* gf;
+	if (!resolve_glyph_units(f, cp, &gf, &units))
 	{
 		return 0;  // no glyph, zero advance
 	}
-	float scale = (float) p.height / (float) f->data->em_square;
+	// Kerning comes from the MAIN face even when the glyph came from a
+	// fallback, and is added BEFORE scaling (font.rs:896-903).
+	if (next_cp != 0 && kerning_enabled(f, p))
+	{
+		units += kerning_units(f->data, cp, next_cp);
+	}
+	float scale = (float) p.height / (float) gf->em_square;
 	if (f->is_device)
 	{
 		int32_t unspaced = round_to_pixel((int32_t) ((float) units * scale));
@@ -2642,21 +2777,39 @@ static int32_t char_advance(const LFont* f, EvalParams p, uint32_t cp)
 
 // Measure a run of UTF-16 units (surrogates folded into codepoints):
 // max(x + advance) over the run.
+// Folds a UTF-16 surrogate pair at `u[i]` into one codepoint; `*step` gets the
+// number of units consumed.
+static uint32_t units_cp_at(const uint16_t* u, uint32_t n, uint32_t i,
+                            uint32_t* step)
+{
+	uint32_t cp = u[i];
+	*step = 1;
+	if (cp >= 0xD800 && cp < 0xDC00 && i + 1 < n
+	    && u[i + 1] >= 0xDC00 && u[i + 1] < 0xE000)
+	{
+		cp = 0x10000 + ((cp - 0xD800) << 10) + (u[i + 1] - 0xDC00);
+		*step = 2;
+	}
+	return cp;
+}
+
 static int32_t measure_units(const LFont* f, EvalParams p,
                              const uint16_t* u, uint32_t n)
 {
 	int32_t width = 0, x = 0;
 	for (uint32_t i = 0; i < n; )
 	{
-		uint32_t cp = u[i];
-		uint32_t step = 1;
-		if (cp >= 0xD800 && cp < 0xDC00 && i + 1 < n
-		    && u[i + 1] >= 0xDC00 && u[i + 1] < 0xE000)
+		uint32_t step;
+		uint32_t cp = units_cp_at(u, n, i, &step);
+		// Font::evaluate peeks the next char of THIS run only, so kerning
+		// never crosses a run/box boundary.
+		uint32_t next_cp = 0;
+		if (i + step < n)
 		{
-			cp = 0x10000 + ((cp - 0xD800) << 10) + (u[i + 1] - 0xDC00);
-			step = 2;
+			uint32_t nstep;
+			next_cp = units_cp_at(u, n, i + step, &nstep);
 		}
-		int32_t adv = char_advance(f, p, cp);
+		int32_t adv = char_advance(f, p, cp, next_cp);
 		if (x + adv > width) width = x + adv;
 		x += adv;
 		i += step;
@@ -2787,15 +2940,16 @@ static void lc_append_text_fragment(LCtx* lc, uint32_t start, uint32_t end,
 	int32_t x = 0;
 	for (uint32_t i = 0; i < n; )
 	{
-		uint32_t cp = lc->text[start + i];
-		uint32_t step = 1;
-		if (cp >= 0xD800 && cp < 0xDC00 && i + 1 < n
-		    && lc->text[start + i + 1] >= 0xDC00 && lc->text[start + i + 1] < 0xE000)
+		uint32_t step;
+		uint32_t cp = units_cp_at(lc->text + start, n, i, &step);
+		// Font::evaluate peeks only inside this fragment.
+		uint32_t next_cp = 0;
+		if (i + step < n)
 		{
-			cp = 0x10000 + ((cp - 0xD800) << 10) + (lc->text[start + i + 1] - 0xDC00);
-			step = 2;
+			uint32_t nstep;
+			next_cp = units_cp_at(lc->text + start, n, i + step, &nstep);
 		}
-		int32_t adv = char_advance(&lc->font, p, cp);
+		int32_t adv = char_advance(&lc->font, p, cp, next_cp);
 		x += adv;
 		for (uint32_t k = 0; k < step; k++) b.char_end[i + k] = x;
 		i += step;
@@ -3417,6 +3571,74 @@ static void et_free_layout(Avm2Context* ctx, LLayout* l)
 	heap_free(ctx->app, l);
 }
 
+// ---------------------------------------------------------------------------
+// Device-font layout scale (Ruffle edit_text.rs:767-817)
+//
+//   fn device_font_scale_x(self) -> f32 { let m = self.local_to_global_matrix();
+//                                         m.d / m.a }
+//
+// Device text cannot be scaled independently in x and y, so the layout space
+// is pre-divided by the ratio of the concatenated y-scale to the x-scale:
+// layout_to_local_matrix gains a `scale(scale_x, 1)`, content width divides by
+// it and autosize width multiplies back. Identically 1 whenever a == d, i.e.
+// for every uniformly-scaled field — which is all of the corpus except the
+// four edittext_device_transform_* tests.
+// ---------------------------------------------------------------------------
+
+// local_to_global_matrix (display_object.rs:1487-1512) restricted to the two
+// components device_font_scale_x reads. Stops at the Stage, whose matrix is
+// deliberately excluded.
+static float et_device_font_scale_x(Avm2Context* ctx, const Avm2EditTextExt* et)
+{
+	if (!et->device_font || et->owner == NULL) return 1.0f;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, et->owner);
+	if (ext == NULL) return 1.0f;
+	// Concatenate 2x2 blocks: m = parent * m, i.e.
+	//   a' = pa*a + pc*b,  b' = pb*a + pd*b,  c' = pa*c + pc*d,  d' = pb*c + pd*d
+	float a = ext->mtx_a, b = ext->mtx_b, c = ext->mtx_c, d = ext->mtx_d;
+	Avm2Object* p = ext->parent;
+	while (p != NULL)
+	{
+		Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, p);
+		if (pe == NULL || pe->is_stage) break;
+		float na = pe->mtx_a * a + pe->mtx_c * b;
+		float nb = pe->mtx_b * a + pe->mtx_d * b;
+		float nc = pe->mtx_a * c + pe->mtx_c * d;
+		float nd = pe->mtx_b * c + pe->mtx_d * d;
+		a = na; b = nb; c = nc; d = nd;
+		p = pe->parent;
+	}
+	if (a == 0.0f) return 1.0f;  // Ruffle would divide by zero; stay inert
+	float s = d / a;
+	if (!isfinite(s) || s == 0.0f) return 1.0f;
+	return s;
+}
+
+// local_width_to_layout_width / layout_width_to_local_width (edit_text.rs:802-817).
+static int32_t local_w_to_layout_w(int32_t w, float scale_x)
+{
+	if (scale_x == 1.0f) return w;
+	return twips_from_px(((double) w / 20.0) / (double) scale_x);
+}
+
+static int32_t layout_w_to_local_w(int32_t w, float scale_x)
+{
+	if (scale_x == 1.0f) return w;
+	return twips_from_px(((double) w / 20.0) * (double) scale_x);
+}
+
+// One layout-space x coordinate through layout_to_local_matrix's scale half.
+// Matrix * Point rounds the f32 product ties-to-even into an i32
+// (render/src/matrix.rs:301) BEFORE the integral translation is added, so the
+// gutter must stay outside this.
+static int32_t layout_x_to_local_x(int32_t x, float scale_x)
+{
+	if (scale_x == 1.0f) return x;
+	float v = (float) x * scale_x;
+	if (!isfinite(v)) return 0;
+	return (int32_t) nearbyintf(v);
+}
+
 // EditText::relayout.
 static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
 {
@@ -3425,11 +3647,13 @@ static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
 	int is_input = !et->read_only;
 	int is_word_wrap = et->word_wrap;
 	int32_t padding = GUTTER * 2;
+	float scale_x = et_device_font_scale_x(ctx, et);
 
 	LLayout* layout;
 	if (et->autosize == 0 || is_word_wrap)
 	{
-		int32_t content_width = et->bounds_w - padding;
+		int32_t content_width = local_w_to_layout_w(et->bounds_w, scale_x)
+		                        - padding;
 		layout = layout_spans_known_width(ctx, et, units, unit_len,
 		                                  content_width, is_input, is_word_wrap);
 	}
@@ -3458,7 +3682,8 @@ static void et_relayout(Avm2Context* ctx, Avm2EditTextExt* et)
 	{
 		if (!is_word_wrap)
 		{
-			int32_t width = layout->text_w + padding;
+			int32_t width = layout_w_to_local_w(layout->text_w, scale_x)
+			                + padding;
 			if (is_input) width += twips_from_px(2.5);
 			switch (et->autosize)
 			{
@@ -7546,7 +7771,9 @@ static Avm2Value txt_get_text_width(Avm2Activation* act)
 	Avm2EditTextExt* et = this_et(act);
 	if (et == NULL) return avm2_undefined();
 	LLayout* l = et_layout(act->ctx, et);
-	return avm2_number((double) l->text_w / 20.0);
+	// EditText::measure_text runs text_size through layout_to_local_matrix.
+	float sx = et_device_font_scale_x(act->ctx, et);
+	return avm2_number((double) layout_x_to_local_x(l->text_w, sx) / 20.0);
 }
 
 static Avm2Value txt_get_text_height(Avm2Activation* act)
@@ -7840,9 +8067,14 @@ static Avm2Value txt_get_line_metrics(Avm2Activation* act)
 	LLayout* l = et_layout(ctx, et);
 	if (n < 0 || (uint32_t) n >= l->line_count) throw_2006(ctx);
 	LLine* line = &l->lines[n];
+	// EditText::line_metrics runs the line's bounds through
+	// layout_to_local_matrix, which for device text carries the x scale.
+	float sx = et_device_font_scale_x(ctx, et);
+	int32_t lx = layout_x_to_local_x(line->x, sx);
+	int32_t lw = layout_x_to_local_x(line->x + line->w, sx) - lx;
 	Avm2Value args[6];
-	args[0] = avm2_number((double) (line->x + GUTTER) / 20.0);
-	args[1] = avm2_number((double) line->w / 20.0);
+	args[0] = avm2_number((double) (lx + GUTTER) / 20.0);
+	args[1] = avm2_number((double) lw / 20.0);
 	args[2] = avm2_number((double) (line->h + line->leading) / 20.0);
 	args[3] = avm2_number((double) line->ascent / 20.0);
 	args[4] = avm2_number((double) line->descent / 20.0);
@@ -7900,6 +8132,12 @@ static Avm2Value txt_get_char_boundaries(Avm2Activation* act)
 	{
 		uint32_t si = (uint32_t) (et->scroll - 1);
 		if (si > 0 && si < l->line_count) vscroll_off = l->lines[si].y;
+	}
+	// layout -> local also carries the device-font x scale (edit_text.rs:774).
+	{
+		float sx = et_device_font_scale_x(ctx, et);
+		x_min = layout_x_to_local_x(x_min, sx);
+		x_max = layout_x_to_local_x(x_max, sx);
 	}
 	x_min += GUTTER;
 	x_max += GUTTER;
