@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-06T10:26:29.734863+00:00",
-    "git_sha": "1f8396f5799facba702fc3a1a72bda6974146a73",
-    "duration_seconds": 127.53,
+    "timestamp": "2026-08-06T23:55:08.707368+00:00",
+    "git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
+    "duration_seconds": 125.92,
     "total_available": 6,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "device_font_glyph_fallback",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.33,
-        "run": 0.216
+        "compile": 26.532,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -29,14 +29,14 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 26.56,
+      "duration": 26.76,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.489,
+        "compile": 26.17,
         "run": 0.265
       },
       "num_frames": 1,
@@ -45,7 +45,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 26.78,
+      "duration": 26.46,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -77,7 +77,7 @@
       "test": "device_font_list",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.461,
+        "compile": 26.011,
         "run": 0.215
       },
       "num_frames": 1,
@@ -86,15 +86,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 26.69,
+      "duration": 26.24,
       "status": "pass"
     },
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.201,
-        "compile": 29.414,
-        "run": 0.667
+        "recomp": 0.351,
+        "compile": 28.48,
+        "run": 0.666
       },
       "num_frames": 1,
       "lines": {
@@ -102,7 +102,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 30.83,
+      "duration": 30.08,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -134,7 +134,7 @@
       "test": "embed_matching/match_style",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.834,
+        "compile": 7.347,
         "run": 0.415
       },
       "num_frames": 1,
@@ -143,7 +143,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.48,
+      "duration": 7.99,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -175,7 +175,7 @@
       "test": "embed_matching/no_font_found",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.361,
+        "compile": 7.551,
         "run": 0.315
       },
       "num_frames": 1,
@@ -184,7 +184,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.84,
+      "duration": 8.04,
       "image_comparisons": {
         "output": {
           "status": "pass",

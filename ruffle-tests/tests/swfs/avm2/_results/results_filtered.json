@@ -6,18 +6,18 @@
     "total_available": 1225,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 55,
+    "ignored_count": 59,
     "filtered": true
   },
-  "total": 1170,
+  "total": 1166,
   "pass": 1082,
   "ruffle_matched": 3,
-  "fail": 85,
-  "pass_rate": 92.5,
+  "fail": 81,
+  "pass_rate": 92.8,
   "effective_pass": 1085,
-  "effective_pass_rate": 92.7,
+  "effective_pass_rate": 93.1,
   "breakdown": {
-    "output_mismatch": 85,
+    "output_mismatch": 81,
     "ruffle_matched": 3
   },
   "tests": [
@@ -2555,25 +2555,6 @@
       "status": "pass"
     },
     {
-      "test": "bom",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 24.948,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 6
-      },
-      "duration": 24.96,
-      "status": "output_mismatch",
-      "detail": "3 line(s) differ (actual=9, expected=9)",
-      "actual_output": "... (1 lines before) ...\nByteArray UTF-16 Little endian: \u2200x\nByteArray UTF-16 Big endian: \u2200x\nURLLoader dataFormat=text utf8: lastName=Jones&firstName=Tom\nURLLoader dataFormat=text utf16le: lastName=Jo\u2200nes&firstName=Tom\nURLLoader dataFormat=text utf16be: lastName=Jo\u2200nes&firstName=Tom\nURLLoader dataFormat=variables utf8: lastName=Jones&firstName=Tom\nURLLoader dataFormat=variables utf16le: lastName=Jo%E2%88%80nes&firstName=Tom\nURLLoader dataFormat=variables utf16be: lastName=Jo%E2%88%80nes&firstName=Tom",
-      "expected_output": "... (1 lines before) ...\nByteArray UTF-16 Little endian: \u2200x\nByteArray UTF-16 Big endian: \u2200x\nURLLoader dataFormat=text utf8: lastName=Jones&firstName=Tom\nURLLoader dataFormat=text utf16le: lastName=Jo\u2200nes&firstName=Tom\nURLLoader dataFormat=text utf16be: lastName=Jo\u2200nes&firstName=Tom\nURLLoader dataFormat=variables utf8: firstName=Tom&lastName=Jones\nURLLoader dataFormat=variables utf16le: firstName=Tom&lastName=Jo%E2%88%80nes\nURLLoader dataFormat=variables utf16be: firstName=Tom&lastName=Jo%E2%88%80nes"
-    },
-    {
       "test": "boolean_constr",
       "phases": {
         "recomp": 0.0,
@@ -3952,25 +3933,6 @@
       "detail": "12 line(s) differ (actual=28, expected=28)",
       "actual_output": "In SecondFrameChild class initializer\nIn SecondFrameChild script initializer\nIn FourthFrameChild class initializer\nIn FourthFrameChild script initializer\nIn constructor\nFinished constructor\nCalled frameConstructed\nMain framescript 1\nCalled init event!\nCalled complete event!\nCalled enterFrame\nSecondFrameChild: [class SecondFrameChild]\nFourthFrameChild: [class FourthFrameChild]\nConstructed SecondFrameChild\nCalled frameConstructed\nMain framescript 2\nCalled enterFrame\nSecondFrameChild: [class SecondFrameChild]\nFourthFrameChild: [class FourthFrameChild]\nCalled frameConstructed\nMain framescript 3 - running gotoAndPlay(5)\nCalled frameConstructed\nMain framescript 5\nCalled enterFrame\nSecondFrameChild: [class SecondFrameChild]\nFourthFrameChild: [class FourthFrameChild]\nCalled frameConstructed\nMain framescript 1",
       "expected_output": "In constructor\nFinished constructor\nCalled frameConstructed\nMain framescript 1\nCalled init event!\nCalled complete event!\nIn SecondFrameChild class initializer\nIn SecondFrameChild script initializer\nCalled enterFrame\nSecondFrameChild: [class SecondFrameChild]\nIn FourthFrameChild class initializer\nIn FourthFrameChild script initializer\nFourthFrameChild: [class FourthFrameChild]\nConstructed SecondFrameChild\nCalled frameConstructed\nMain framescript 2\nCalled enterFrame\nSecondFrameChild: [class SecondFrameChild]\nFourthFrameChild: [class FourthFrameChild]\nCalled frameConstructed\nMain framescript 3 - running gotoAndPlay(5)\nCalled frameConstructed\nMain framescript 5\nCalled enterFrame\nSecondFrameChild: [class SecondFrameChild]\nFourthFrameChild: [class FourthFrameChild]\nCalled frameConstructed\nMain framescript 1"
-    },
-    {
-      "test": "dependent_strings",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 6.449,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 83,
-        "expected_lines": 84,
-        "matching_lines": 46
-      },
-      "duration": 6.46,
-      "status": "output_mismatch",
-      "detail": "38 line(s) differ (actual=83, expected=84)",
-      "actual_output": "--- substrings ---\nabcd\n\nbcd\n\ncd\n\nd\n\n\n\n--- pure concat ---\naaaaa\n\naaaaaaaaaa\n\naaaaaaaaaaaaaaa\n\naaaaaaaaaaaaaaaaaaaa\n\naaaaaaaaaaaaaaaaaaaaaaaaa\n\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\n--- pure concat, wide ---\n\u0105\u0105aaaa\n\n\u0105\u0105aaaa\u0105aaaa\n\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\n\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\n\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\n\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\n\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\n\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\n\n--- wide concat, then substring ---\n\u01051234\u0119\u0105\n\n1234\u0119\u0105\n\n... (33 lines after) ...",
-      "expected_output": "--- substrings ---\nabcd\ntrue\nbcd\ntrue\ncd\ntrue\nd\nfalse\n\nfalse\n--- pure concat ---\naaaaa\nfalse\naaaaaaaaaa\nfalse\naaaaaaaaaaaaaaa\ntrue\naaaaaaaaaaaaaaaaaaaa\ntrue\naaaaaaaaaaaaaaaaaaaaaaaaa\ntrue\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntrue\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nfalse\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntrue\n--- pure concat, wide ---\n\u0105\u0105aaaa\nfalse\n\u0105\u0105aaaa\u0105aaaa\ntrue\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\ntrue\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\ntrue\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\ntrue\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\ntrue\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\nfalse\n\u0105\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\u0105aaaa\ntrue\n--- wide concat, then substring ---\n\u01051234\u0119\u0105\ntrue\n1234\u0119\u0105\ntrue\n... (34 lines after) ..."
     },
     {
       "test": "describe_type_basic",
@@ -10018,26 +9980,6 @@
       },
       "duration": 25.25,
       "status": "pass"
-    },
-    {
-      "test": "loader_load",
-      "phases": {
-        "recomp": 0.008,
-        "compile": 8.213,
-        "run": 0.004
-      },
-      "num_frames": 10,
-      "error_signature": "TypeError: Error #1034: Type Coercion failed: cannot convert Object@00000000000 to flash.net.URLRequest.",
-      "lines": {
-        "actual_lines": 128,
-        "expected_lines": 128,
-        "matching_lines": 126
-      },
-      "duration": 8.23,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=128, expected=128)",
-      "actual_output": "... (75 lines before) ...\nTest 3\n// request.url\nhttp://localhost:8000\n\n// request.data\naaa=bbb&cccc=true\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: aaa=bbb&cccc=true\n\nTest 4\n// request.url\nhttp://localhost:8000\n\n// request.data\na=b\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: a=b\n\n... (3 lines after) ...",
-      "expected_output": "... (75 lines before) ...\nTest 3\n// request.url\nhttp://localhost:8000\n\n// request.data\ncccc=true&aaa=bbb\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: cccc=true&aaa=bbb\n\nTest 4\n// request.url\nhttp://localhost:8000\n\n// request.data\na=b\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: a=b\n\n... (3 lines after) ..."
     },
     {
       "test": "loader_loadbytes_events",
@@ -18012,26 +17954,6 @@
       },
       "duration": 6.63,
       "status": "pass"
-    },
-    {
-      "test": "verify_method_info_duplicate",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.528,
-        "run": 0.004
-      },
-      "num_frames": 2,
-      "error_signature": "VerifyError: Error #1121: Method Test/hello() has a duplicate method body.",
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 2,
-        "matching_lines": 1
-      },
-      "duration": 0.54,
-      "status": "output_mismatch",
-      "detail": "1 line(s) differ (actual=1, expected=2)",
-      "actual_output": "VerifyError: Error #1121: Method Test/hello() has a duplicate method body.",
-      "expected_output": "VerifyError: Error #1121: Method Test/hello() has a duplicate method body.\nReferenceError: Error #1065: Variable Test is not defined."
     },
     {
       "test": "verify_method_info_oob",

@@ -1,15 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6de65043250d` (2026-08-06T06:23:32.669096+00:00)
-**Current:** `1f8396f5799f` (2026-08-06T10:26:29.728133+00:00)
+**Previous:** `1f8396f5799f` (2026-08-06T10:26:29.728133+00:00)
+**Current:** `fb36ba11005c` (2026-08-06T23:55:08.698811+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1 | 1 | 0 |
+| Passing | 1 | 2 | +1 |
 | Total | 3 | 3 | 0 |
-| Pass rate | 33.3% | 33.3% | 0% |
-| Mismatched lines | 12 | 12 | 0 |
+| Pass rate | 33.3% | 66.7% | +33.4% |
+| Mismatched lines | 12 | 6 | -6 |
+|   Decreased | | | -6 |
 
-No changes detected.
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `avm1_non_swf_import` | output_mismatch | 0/6 | 6/6 |

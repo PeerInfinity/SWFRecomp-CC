@@ -6,26 +6,26 @@
 
 **Run Duration**: 195m 32s
 
-**Filtered**: 55 tests ignored out of 1225 available
+**Filtered**: 59 tests ignored out of 1225 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1170 |
-| Passing | **1082** (92.5%) |
+| Total tests | 1166 |
+| Passing | **1082** (92.8%) |
 | Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1085** (92.7%) |
-| Failing | 85 |
-| Total expected lines | 133462 |
-| Matching lines | 111320 (83.4%) |
-| Mismatched lines | 22142 |
+| Effective pass | **1085** (93.1%) |
+| Failing | 81 |
+| Total expected lines | 133239 |
+| Matching lines | 111141 (83.4%) |
+| Mismatched lines | 22098 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 85 | 100.0% |
+| Output Mismatch | 81 | 100.0% |
 
 ## Passing Tests
 
@@ -1130,32 +1130,28 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**22 tests** within reach
+**18 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `loader_load` | 98.4% | 126 | 128 | 2 |  |
-| 2 | `perspective_projection` | 94.8% | 1368 | 1443 | 75 |  |
-| 3 | `simplebutton_soundtransform` | 93.5% | 829 | 887 | 58 |  |
-| 4 | `cross_api_version_call_newer` | 91.7% | 11 | 12 | 1 |  |
-| 5 | `error_stack_trace` | 84.4% | 38 | 45 | 7 |  |
-| 6 | `matrix` | 83.4% | 282 | 338 | 56 |  |
-| 7 | `number_convert_edge_cases` | 82.2% | 148 | 180 | 32 |  |
-| 8 | `textblock_line_changes` | 79.1% | 125 | 158 | 33 |  |
-| 9 | `graphic_linkage` | 77.8% | 7 | 9 | 2 |  |
-| 10 | `tab_ordering_properties` | 76.6% | 561 | 732 | 171 |  |
-| 11 | `large_preload_image_from_bytes` | 76.0% | 19 | 25 | 6 |  |
-| 12 | `displayobject_transform` | 75.3% | 67 | 89 | 22 |  |
-| 13 | `scope_optimizations` | 75.0% | 3 | 4 | 1 |  |
-| 14 | `button_nested_frame_simple` | 69.2% | 27 | 39 | 12 |  |
-| 15 | `bom` | 66.7% | 6 | 9 | 3 |  |
-| 16 | `large_preload_from_url` | 59.3% | 16 | 27 | 11 |  |
-| 17 | `delayed_symbolclass` | 57.1% | 16 | 28 | 12 |  |
-| 18 | `dependent_strings` | 54.8% | 46 | 84 | 38 |  |
-| 19 | `orphan_removeobject` | 53.0% | 340 | 641 | 301 |  |
-| 20 | `mouse_pick_avm1_root` | 50.0% | 1 | 2 | 1 |  |
-| 21 | `sub_super_same_field` | 50.0% | 6 | 12 | 6 |  |
-| 22 | `verify_method_info_duplicate` | 50.0% | 1 | 2 | 1 |  |
+| 1 | `perspective_projection` | 94.8% | 1368 | 1443 | 75 |  |
+| 2 | `simplebutton_soundtransform` | 93.5% | 829 | 887 | 58 |  |
+| 3 | `cross_api_version_call_newer` | 91.7% | 11 | 12 | 1 |  |
+| 4 | `error_stack_trace` | 84.4% | 38 | 45 | 7 |  |
+| 5 | `matrix` | 83.4% | 282 | 338 | 56 |  |
+| 6 | `number_convert_edge_cases` | 82.2% | 148 | 180 | 32 |  |
+| 7 | `textblock_line_changes` | 79.1% | 125 | 158 | 33 |  |
+| 8 | `graphic_linkage` | 77.8% | 7 | 9 | 2 |  |
+| 9 | `tab_ordering_properties` | 76.6% | 561 | 732 | 171 |  |
+| 10 | `large_preload_image_from_bytes` | 76.0% | 19 | 25 | 6 |  |
+| 11 | `displayobject_transform` | 75.3% | 67 | 89 | 22 |  |
+| 12 | `scope_optimizations` | 75.0% | 3 | 4 | 1 |  |
+| 13 | `button_nested_frame_simple` | 69.2% | 27 | 39 | 12 |  |
+| 14 | `large_preload_from_url` | 59.3% | 16 | 27 | 11 |  |
+| 15 | `delayed_symbolclass` | 57.1% | 16 | 28 | 12 |  |
+| 16 | `orphan_removeobject` | 53.0% | 340 | 641 | 301 |  |
+| 17 | `mouse_pick_avm1_root` | 50.0% | 1 | 2 | 1 |  |
+| 18 | `sub_super_same_field` | 50.0% | 6 | 12 | 6 |  |
 
 ## Segfaults
 
@@ -1171,92 +1167,88 @@ No timeouts.
 
 ## All Output Mismatches
 
-**85 tests** with output mismatch, sorted by match rate (best first)
+**81 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `loader_load` | 98.4% | 126/128 | 128 | 128 |  |
-| 2 | `perspective_projection` | 94.8% | 1368/1443 | 1443 | 1443 |  |
-| 3 | `simplebutton_soundtransform` | 93.5% | 829/887 | 887 | 887 |  |
-| 4 | `cross_api_version_call_newer` | 91.7% | 11/12 | 12 | 12 |  |
-| 5 | `error_stack_trace` | 84.4% | 38/45 | 45 | 45 |  |
-| 6 | `matrix` | 83.4% | 282/338 | 286 | 338 |  |
-| 7 | `number_convert_edge_cases` | 82.2% | 148/180 | 180 | 180 |  |
-| 8 | `textblock_line_changes` | 79.1% | 125/158 | 158 | 158 |  |
-| 9 | `graphic_linkage` | 77.8% | 7/9 | 9 | 9 |  |
-| 10 | `tab_ordering_properties` | 76.6% | 561/732 | 732 | 732 |  |
-| 11 | `large_preload_image_from_bytes` | 76.0% | 19/25 | 25 | 25 |  |
-| 12 | `displayobject_transform` | 75.3% | 67/89 | 89 | 89 |  |
-| 13 | `scope_optimizations` | 75.0% | 3/4 | 4 | 4 |  |
-| 14 | `button_nested_frame_simple` | 69.2% | 27/39 | 39 | 27 |  |
-| 15 | `bom` | 66.7% | 6/9 | 9 | 9 |  |
-| 16 | `large_preload_from_url` | 59.3% | 16/27 | 17 | 27 |  |
-| 17 | `delayed_symbolclass` | 57.1% | 16/28 | 28 | 28 |  |
-| 18 | `dependent_strings` | 54.8% | 46/84 | 83 | 84 |  |
-| 19 | `orphan_removeobject` | 53.0% | 340/641 | 641 | 636 |  |
-| 20 | `mouse_pick_avm1_root` | 50.0% | 1/2 | 2 | 2 |  |
-| 21 | `sub_super_same_field` | 50.0% | 6/12 | 12 | 12 |  |
-| 22 | `verify_method_info_duplicate` | 50.0% | 1/2 | 1 | 2 |  |
-| 23 | `loader_duplicate_class` | 46.9% | 23/49 | 49 | 48 |  |
-| 24 | `static_length` | 45.8% | 11/24 | 24 | 24 |  |
-| 25 | `event_handler_exception` | 45.5% | 5/11 | 10 | 11 |  |
-| 26 | `textblock_recreateline` | 40.8% | 40/98 | 89 | 98 |  |
-| 27 | `textfield_input_events` | 36.0% | 9/25 | 24 | 25 |  |
-| 28 | `large_preload_from_bytes` | 35.3% | 18/51 | 25 | 51 |  |
-| 29 | `property_is_enumerable` | 21.9% | 25/114 | 27 | 114 |  |
-| 30 | `appdomain_lookup_edge_cases` | 21.9% | 7/32 | 11 | 32 |  |
-| 31 | `method_association` | 20.0% | 1/5 | 4 | 5 |  |
-| 32 | `doabc_and_symbolclass_script_init_normal` | 16.7% | 1/6 | 6 | 6 |  |
-| 33 | `xml_list_ctor_errors` | 14.7% | 5/34 | 28 | 34 |  |
-| 34 | `displayobject_getrect` | 12.5% | 2/16 | 5 | 16 |  |
-| 35 | `doabc_and_symbolclass_script_init_goto` | 12.5% | 1/8 | 8 | 7 |  |
-| 36 | `supercalls_coerce` | 12.5% | 1/8 | 8 | 8 |  |
-| 37 | `mouse_pick_loader_avm1` | 11.9% | 5/42 | 40 | 42 |  |
-| 38 | `stage_properties2` | 10.8% | 23/213 | 171 | 213 |  |
-| 39 | `primitive_valueOf` | 8.8% | 25/285 | 240 | 285 |  |
-| 40 | `proxy_not_overridden` | 7.4% | 4/54 | 45 | 54 |  |
-| 41 | `primitive_toString` | 7.2% | 20/277 | 240 | 277 |  |
-| 42 | `error_throwerror` | 5.8% | 6/103 | 57 | 103 |  |
-| 43 | `number_convert_errors` | 4.6% | 40/871 | 685 | 871 |  |
-| 44 | `timer_invalid_delay` | 3.3% | 1/30 | 12 | 30 |  |
-| 45 | `external_interface` | 2.9% | 3/105 | 8 | 105 |  |
-| 46 | `focus_events_mixed_avm_edittext` | 2.0% | 1/49 | 31 | 49 |  |
-| 47 | `displayobject_early_init` | 1.9% | 1/54 | 51 | 54 |  |
-| 48 | `all_classes/accessibility/swf9` | 1.4% | 1/73 | 20 | 73 |  |
-| 49 | `all_classes/accessibility/swf10` | 1.1% | 1/88 | 20 | 88 |  |
-| 50 | `all_classes/accessibility/swf30` | 1.1% | 1/88 | 20 | 88 |  |
-| 51 | `all_classes/display3D/swf12` | 0.9% | 1/109 | 109 | 61 |  |
-| 52 | `describe_type_basic` | 0.7% | 1/152 | 71 | 152 |  |
-| 53 | `describe_type_json` | 0.3% | 1/301 | 5 | 301 |  |
-| 54 | `all_classes/display3D/swf30` | 0.2% | 1/412 | 109 | 412 |  |
-| 55 | `loaderinfo_quine` | 0.1% | 1/1005 | 2 | 1005 |  |
-| 56 | `all_classes/display/swf9` | 0.1% | 1/1959 | 357 | 1959 |  |
-| 57 | `all_classes/display/swf10` | 0.0% | 1/2569 | 357 | 2569 |  |
-| 58 | `all_classes/display/swf11` | 0.0% | 1/2593 | 357 | 2593 |  |
-| 59 | `all_classes/display/swf12` | 0.0% | 1/2593 | 357 | 2593 |  |
-| 60 | `all_classes/display/swf13` | 0.0% | 1/2671 | 357 | 2671 |  |
-| 61 | `all_classes/display/swf30` | 0.0% | 1/2936 | 357 | 2936 |  |
-| 62 | `accessibilityimplementation` | 0.0% | 0/18 | 4 | 18 |  |
-| 63 | `all_classes/display3D/swf13` | 0.0% | 0/326 | 109 | 326 |  |
-| 64 | `all_classes/errors/swf10` | 0.0% | 0/140 | 56 | 140 |  |
-| 65 | `all_classes/errors/swf30` | 0.0% | 0/140 | 56 | 140 |  |
-| 66 | `all_classes/errors/swf9` | 0.0% | 0/121 | 56 | 121 |  |
-| 67 | `all_classes/security/swf12` | 0.0% | 0/19 | 3 | 19 |  |
-| 68 | `all_classes/security/swf13` | 0.0% | 0/53 | 3 | 53 |  |
-| 69 | `all_classes/security/swf30` | 0.0% | 0/53 | 3 | 53 |  |
-| 70 | `all_classes/xml/swf30` | 0.0% | 0/116 | 19 | 116 |  |
-| 71 | `all_classes/xml/swf9` | 0.0% | 0/116 | 19 | 116 |  |
-| 72 | `constructsuper_null` | 0.0% | 0/2 | 2 | 2 |  |
-| 73 | `currency_parse_result` | 0.0% | 0/7 | 2 | 7 |  |
-| 74 | `describe_type_metadata` | 0.0% | 0/125 | 7 | 125 |  |
-| 75 | `describe_type_native` | 0.0% | 0/23 | 6 | 23 |  |
-| 76 | `error_stack_trace_edge_cases` | 0.0% | 0/6 | 4 | 6 |  |
-| 77 | `groupelement_text` | 0.0% | 0/156 | 3 | 156 |  |
-| 78 | `id3_info` | 0.0% | 0/8 | 0 | 8 |  |
-| 79 | `json_stringify_function` | 0.0% | 0/12 | 12 | 12 |  |
-| 80 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
-| 81 | `native_menu_basic` | 0.0% | 0/19 | 3 | 19 |  |
-| 82 | `netfilterevent` | 0.0% | 0/10 | 2 | 10 |  |
-| 83 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
-| 84 | `stage_display_state` | 0.0% | 0/6 | 2 | 6 |  |
-| 85 | `system_exit` | 0.0% | 0/3 | 2 | 3 |  |
+| 1 | `perspective_projection` | 94.8% | 1368/1443 | 1443 | 1443 |  |
+| 2 | `simplebutton_soundtransform` | 93.5% | 829/887 | 887 | 887 |  |
+| 3 | `cross_api_version_call_newer` | 91.7% | 11/12 | 12 | 12 |  |
+| 4 | `error_stack_trace` | 84.4% | 38/45 | 45 | 45 |  |
+| 5 | `matrix` | 83.4% | 282/338 | 286 | 338 |  |
+| 6 | `number_convert_edge_cases` | 82.2% | 148/180 | 180 | 180 |  |
+| 7 | `textblock_line_changes` | 79.1% | 125/158 | 158 | 158 |  |
+| 8 | `graphic_linkage` | 77.8% | 7/9 | 9 | 9 |  |
+| 9 | `tab_ordering_properties` | 76.6% | 561/732 | 732 | 732 |  |
+| 10 | `large_preload_image_from_bytes` | 76.0% | 19/25 | 25 | 25 |  |
+| 11 | `displayobject_transform` | 75.3% | 67/89 | 89 | 89 |  |
+| 12 | `scope_optimizations` | 75.0% | 3/4 | 4 | 4 |  |
+| 13 | `button_nested_frame_simple` | 69.2% | 27/39 | 39 | 27 |  |
+| 14 | `large_preload_from_url` | 59.3% | 16/27 | 17 | 27 |  |
+| 15 | `delayed_symbolclass` | 57.1% | 16/28 | 28 | 28 |  |
+| 16 | `orphan_removeobject` | 53.0% | 340/641 | 641 | 636 |  |
+| 17 | `mouse_pick_avm1_root` | 50.0% | 1/2 | 2 | 2 |  |
+| 18 | `sub_super_same_field` | 50.0% | 6/12 | 12 | 12 |  |
+| 19 | `loader_duplicate_class` | 46.9% | 23/49 | 49 | 48 |  |
+| 20 | `static_length` | 45.8% | 11/24 | 24 | 24 |  |
+| 21 | `event_handler_exception` | 45.5% | 5/11 | 10 | 11 |  |
+| 22 | `textblock_recreateline` | 40.8% | 40/98 | 89 | 98 |  |
+| 23 | `textfield_input_events` | 36.0% | 9/25 | 24 | 25 |  |
+| 24 | `large_preload_from_bytes` | 35.3% | 18/51 | 25 | 51 |  |
+| 25 | `property_is_enumerable` | 21.9% | 25/114 | 27 | 114 |  |
+| 26 | `appdomain_lookup_edge_cases` | 21.9% | 7/32 | 11 | 32 |  |
+| 27 | `method_association` | 20.0% | 1/5 | 4 | 5 |  |
+| 28 | `doabc_and_symbolclass_script_init_normal` | 16.7% | 1/6 | 6 | 6 |  |
+| 29 | `xml_list_ctor_errors` | 14.7% | 5/34 | 28 | 34 |  |
+| 30 | `displayobject_getrect` | 12.5% | 2/16 | 5 | 16 |  |
+| 31 | `doabc_and_symbolclass_script_init_goto` | 12.5% | 1/8 | 8 | 7 |  |
+| 32 | `supercalls_coerce` | 12.5% | 1/8 | 8 | 8 |  |
+| 33 | `mouse_pick_loader_avm1` | 11.9% | 5/42 | 40 | 42 |  |
+| 34 | `stage_properties2` | 10.8% | 23/213 | 171 | 213 |  |
+| 35 | `primitive_valueOf` | 8.8% | 25/285 | 240 | 285 |  |
+| 36 | `proxy_not_overridden` | 7.4% | 4/54 | 45 | 54 |  |
+| 37 | `primitive_toString` | 7.2% | 20/277 | 240 | 277 |  |
+| 38 | `error_throwerror` | 5.8% | 6/103 | 57 | 103 |  |
+| 39 | `number_convert_errors` | 4.6% | 40/871 | 685 | 871 |  |
+| 40 | `timer_invalid_delay` | 3.3% | 1/30 | 12 | 30 |  |
+| 41 | `external_interface` | 2.9% | 3/105 | 8 | 105 |  |
+| 42 | `focus_events_mixed_avm_edittext` | 2.0% | 1/49 | 31 | 49 |  |
+| 43 | `displayobject_early_init` | 1.9% | 1/54 | 51 | 54 |  |
+| 44 | `all_classes/accessibility/swf9` | 1.4% | 1/73 | 20 | 73 |  |
+| 45 | `all_classes/accessibility/swf10` | 1.1% | 1/88 | 20 | 88 |  |
+| 46 | `all_classes/accessibility/swf30` | 1.1% | 1/88 | 20 | 88 |  |
+| 47 | `all_classes/display3D/swf12` | 0.9% | 1/109 | 109 | 61 |  |
+| 48 | `describe_type_basic` | 0.7% | 1/152 | 71 | 152 |  |
+| 49 | `describe_type_json` | 0.3% | 1/301 | 5 | 301 |  |
+| 50 | `all_classes/display3D/swf30` | 0.2% | 1/412 | 109 | 412 |  |
+| 51 | `loaderinfo_quine` | 0.1% | 1/1005 | 2 | 1005 |  |
+| 52 | `all_classes/display/swf9` | 0.1% | 1/1959 | 357 | 1959 |  |
+| 53 | `all_classes/display/swf10` | 0.0% | 1/2569 | 357 | 2569 |  |
+| 54 | `all_classes/display/swf11` | 0.0% | 1/2593 | 357 | 2593 |  |
+| 55 | `all_classes/display/swf12` | 0.0% | 1/2593 | 357 | 2593 |  |
+| 56 | `all_classes/display/swf13` | 0.0% | 1/2671 | 357 | 2671 |  |
+| 57 | `all_classes/display/swf30` | 0.0% | 1/2936 | 357 | 2936 |  |
+| 58 | `accessibilityimplementation` | 0.0% | 0/18 | 4 | 18 |  |
+| 59 | `all_classes/display3D/swf13` | 0.0% | 0/326 | 109 | 326 |  |
+| 60 | `all_classes/errors/swf10` | 0.0% | 0/140 | 56 | 140 |  |
+| 61 | `all_classes/errors/swf30` | 0.0% | 0/140 | 56 | 140 |  |
+| 62 | `all_classes/errors/swf9` | 0.0% | 0/121 | 56 | 121 |  |
+| 63 | `all_classes/security/swf12` | 0.0% | 0/19 | 3 | 19 |  |
+| 64 | `all_classes/security/swf13` | 0.0% | 0/53 | 3 | 53 |  |
+| 65 | `all_classes/security/swf30` | 0.0% | 0/53 | 3 | 53 |  |
+| 66 | `all_classes/xml/swf30` | 0.0% | 0/116 | 19 | 116 |  |
+| 67 | `all_classes/xml/swf9` | 0.0% | 0/116 | 19 | 116 |  |
+| 68 | `constructsuper_null` | 0.0% | 0/2 | 2 | 2 |  |
+| 69 | `currency_parse_result` | 0.0% | 0/7 | 2 | 7 |  |
+| 70 | `describe_type_metadata` | 0.0% | 0/125 | 7 | 125 |  |
+| 71 | `describe_type_native` | 0.0% | 0/23 | 6 | 23 |  |
+| 72 | `error_stack_trace_edge_cases` | 0.0% | 0/6 | 4 | 6 |  |
+| 73 | `groupelement_text` | 0.0% | 0/156 | 3 | 156 |  |
+| 74 | `id3_info` | 0.0% | 0/8 | 0 | 8 |  |
+| 75 | `json_stringify_function` | 0.0% | 0/12 | 12 | 12 |  |
+| 76 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
+| 77 | `native_menu_basic` | 0.0% | 0/19 | 3 | 19 |  |
+| 78 | `netfilterevent` | 0.0% | 0/10 | 2 | 10 |  |
+| 79 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
+| 80 | `stage_display_state` | 0.0% | 0/6 | 2 | 6 |  |
+| 81 | `system_exit` | 0.0% | 0/3 | 2 | 3 |  |
