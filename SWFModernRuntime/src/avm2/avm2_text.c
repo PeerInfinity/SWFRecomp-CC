@@ -8241,10 +8241,16 @@ static Avm2Value txt_get_char_boundaries(Avm2Activation* act)
 		x_min = layout_x_to_local_x(x_min, sx);
 		x_max = layout_x_to_local_x(x_max, sx);
 	}
-	x_min += GUTTER;
-	x_max += GUTTER;
-	y_min += GUTTER - vscroll_off;
-	y_max += GUTTER - vscroll_off;
+	// The layout origin also carries the field's bounds origin
+	// (edit_text.rs:774-790 layout_to_local_matrix translates by
+	// bounds.x_min/y_min + GUTTER). Read et->bounds_x/y RAW: Ruffle's
+	// char_bounds (edit_text.rs:2413) reads self.0.bounds.get() and never
+	// applies pending lazy autosize bounds, so do NOT route through
+	// avm2_text_self_bounds()/et_apply_lazy_bounds() here.
+	x_min += et->bounds_x + GUTTER;
+	x_max += et->bounds_x + GUTTER;
+	y_min += et->bounds_y + GUTTER - vscroll_off;
+	y_max += et->bounds_y + GUTTER - vscroll_off;
 	if (x_max - x_min == 0) return avm2_null();
 	Avm2Value args[4];
 	args[0] = avm2_number((double) x_min / 20.0);
