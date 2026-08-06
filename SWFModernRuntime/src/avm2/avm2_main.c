@@ -381,6 +381,115 @@ static int symbol_char_is_placed(uint16_t char_id)
 }
 
 // ---------------------------------------------------------------------------
+// Per-frame DoABC + SymbolClass (Ruffle movie_clip.rs::run_abc_and_symbol_tags)
+// ---------------------------------------------------------------------------
+//
+// The first time a frame executes, Ruffle (a) loads every DoABC tag in THAT
+// frame — no script initializer runs, but a non-LAZY_INITIALIZE tag's final
+// script is held back as an "eager script"; (b) resolves that frame's
+// SymbolClass rows in order, which triggers the lazy init of whichever script
+// defines each class; (c) only then runs the held-back eager initializers.
+//
+// SAFE SLICE: only frames >= 1 (0-based) are handled here. Frame 0 keeps the
+// existing boot path in runSWF_avm2 byte-for-byte — it loads its ABCs, eager-
+// inits their last scripts regardless of the LAZY bit, and resolves its
+// SymbolClass rows inside avm2_display_build_stage. Honouring LAZY for frame-0
+// content, or reordering the frame-0 symbol/eager steps, would change which
+// scripts run at all for ~1572 multi-script ABCs and buys nothing.
+//
+// Corpus-wide this reaches exactly 9 SWFs; `g_has_deferred_tags` makes it a
+// single load+branch for the other 4934.
+
+// Non-zero when any DoABC tag or SymbolClass row lives beyond frame 0.
+static int g_has_deferred_tags = -1;   // -1 = not computed yet
+// Per-ABC "eager final script already run" (NULL until first needed).
+static uint8_t* g_abc_eager_done;
+// Per-SymbolClass-row "already resolved" (NULL until first needed).
+static uint8_t* g_symbol_row_done;
+
+// Resolve the frame's SymbolClass rows: definition lookup only, never a
+// construct (avm2_display.c owns instantiation). Defined there because the
+// class->character map it feeds is display-local.
+extern void avm2_display_resolve_frame_symbols(Avm2Context* ctx,
+                                               uint32_t frame_idx,
+                                               uint8_t* row_done);
+
+static void compute_deferred_tags(Avm2Context* ctx)
+{
+	g_has_deferred_tags = 0;
+	for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
+	{
+		if (avm2_generated_abc_frames[i] != 0) g_has_deferred_tags = 1;
+	}
+	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+	{
+		if (avm2_generated_symbol_class_frames[i] != 0) g_has_deferred_tags = 1;
+	}
+	if (!g_has_deferred_tags) return;
+	if (avm2_generated_abc_file_count > 0)
+	{
+		g_abc_eager_done = avm2_alloc(ctx, avm2_generated_abc_file_count);
+		memset(g_abc_eager_done, 0, avm2_generated_abc_file_count);
+		// Frame 0's eager scripts already ran in runSWF_avm2 step 3.
+		for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
+		{
+			if (avm2_generated_abc_frames[i] == 0) g_abc_eager_done[i] = 1;
+		}
+	}
+	if (avm2_generated_symbol_class_count > 0)
+	{
+		g_symbol_row_done = avm2_alloc(ctx, avm2_generated_symbol_class_count);
+		memset(g_symbol_row_done, 0, avm2_generated_symbol_class_count);
+		// Frame 0's rows were resolved by avm2_display_build_stage.
+		for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+		{
+			if (avm2_generated_symbol_class_frames[i] == 0)
+				g_symbol_row_done[i] = 1;
+		}
+	}
+}
+
+void avm2_run_frame_tags(Avm2Context* ctx, uint32_t frame_idx)
+{
+	if (ctx == NULL || frame_idx == 0) return;
+	if (g_has_deferred_tags < 0) compute_deferred_tags(ctx);
+	if (!g_has_deferred_tags) return;
+
+	// (a) load this frame's ABC files. No script initializer runs here.
+	for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
+	{
+		if (avm2_generated_abc_frames[i] != frame_idx) continue;
+		if (i >= ctx->file_count || ctx->files[i] != NULL) continue;
+		const Avm2DomainScope* saved = ctx->domain.loading;
+		ctx->domain.loading = avm2_domain_root_scope(ctx);
+		ctx->files[i] = avm2_abc_load(ctx, avm2_generated_abc_files[i]);
+		ctx->domain.loading = saved;
+	}
+
+	// (b) resolve this frame's SymbolClass rows, in tag order.
+	avm2_display_resolve_frame_symbols(ctx, frame_idx, g_symbol_row_done);
+
+	// (c) then the held-back eager final scripts of this frame's non-lazy ABCs.
+	for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
+	{
+		if (avm2_generated_abc_frames[i] != frame_idx) continue;
+		if (avm2_generated_abc_lazy[i]) continue;
+		if (g_abc_eager_done != NULL && g_abc_eager_done[i]) continue;
+		if (g_abc_eager_done != NULL) g_abc_eager_done[i] = 1;
+		if (i >= ctx->file_count || ctx->files[i] == NULL) continue;
+		if (ctx->files[i]->data->script_count == 0) continue;
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			avm2_script_ensure_init(ctx->files[i],
+			                        ctx->files[i]->data->script_count - 1);
+		}
+		avm2_try_pop_frame(&top);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
@@ -427,9 +536,14 @@ void runSWF_avm2(SWFAppContext* app_context)
 	ctx->domain.loading = avm2_domain_root_scope(ctx);
 	ctx->file_count = avm2_generated_abc_file_count;
 	ctx->files = avm2_alloc(ctx, ctx->file_count * sizeof(Avm2AbcFileRt*));
+	// …frame 0's files, that is: a DoABC tag in a later frame is not loaded
+	// until that frame first executes (avm2_run_frame_tags). Its slot stays
+	// NULL — every ctx->files walker already NULL-checks (gc mark roots).
 	for (uint32_t i = 0; i < ctx->file_count; i++)
 	{
-		ctx->files[i] = avm2_abc_load(ctx, avm2_generated_abc_files[i]);
+		ctx->files[i] = avm2_generated_abc_frames[i] == 0
+			? avm2_abc_load(ctx, avm2_generated_abc_files[i])
+			: NULL;
 	}
 
 	// Step 2: SymbolClass bindings were recorded by the recompiler; the
@@ -464,7 +578,7 @@ void runSWF_avm2(SWFAppContext* app_context)
 	// uncaught error aborts that script only.
 	for (uint32_t i = 0; i < ctx->file_count; i++)
 	{
-		if (ctx->files[i]->data->script_count > 0)
+		if (ctx->files[i] != NULL && ctx->files[i]->data->script_count > 0)
 		{
 			Avm2TryFrame top;
 			avm2_try_push_catch_all(ctx, &top);

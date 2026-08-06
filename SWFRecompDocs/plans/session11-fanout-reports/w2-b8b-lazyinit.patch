@@ -1,0 +1,419 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_abc.h b/SWFModernRuntime/include/avm2/avm2_abc.h
+index a8947b627..bc9e5d76c 100644
+--- a/SWFModernRuntime/include/avm2/avm2_abc.h
++++ b/SWFModernRuntime/include/avm2/avm2_abc.h
+@@ -194,6 +194,19 @@ extern const uint32_t avm2_generated_abc_file_count;
+ extern const Avm2SymbolClassBinding avm2_generated_symbol_classes[];
+ extern const uint32_t avm2_generated_symbol_class_count;
+ extern const uint8_t avm2_generated_swf_version;
++// Frame scoping for the two tag classes Ruffle runs per-frame
++// (movie_clip.rs::run_abc_and_symbol_tags). Parallel to the arrays above:
++// 0-based frame index of the DoABC tag / SymbolClass row, plus the DoABC2
++// LAZY_INITIALIZE bit. All-zero for every movie whose AVM2 tags live in
++// frame 1, which is 4934 of the 4943 corpus SWFs.
++extern const uint32_t avm2_generated_abc_frames[];
++extern const uint8_t avm2_generated_abc_lazy[];
++extern const uint32_t avm2_generated_symbol_class_frames[];
++
++// Runs frame `frame_idx`'s (0-based) held-back DoABC + SymbolClass tags once.
++// No-op for frame 0 (the boot path already ran it) and for movies with no
++// deferred tags at all. Defined in avm2_main.c.
++void avm2_run_frame_tags(Avm2Context* ctx, uint32_t frame_idx);
+ 
+ // ---------------------------------------------------------------------------
+ // Static timeline tables (Stage 5): emitted by the recompiler's
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 09cf79b9c..ea0484dc7 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -1521,6 +1521,35 @@ static Avm2Class* class_for_dotted_name(Avm2Context* ctx, const char* dotted)
+ 	return class_for_dotted_name_in(ctx, avm2_domain_root_scope(ctx), dotted);
+ }
+ 
++// Step (b) of Ruffle's run_abc_and_symbol_tags: resolve the SymbolClass rows
++// of frame `frame_idx` (0-based), in tag order. The domain lookup is what
++// triggers the lazy init of the script that defines each class — we look up
++// and record the class->character binding, never construct. `row_done` (may be
++// NULL) is the per-row idempotency flag owned by avm2_main.c.
++void avm2_display_resolve_frame_symbols(Avm2Context* ctx, uint32_t frame_idx,
++                                        uint8_t* row_done);
++void avm2_display_resolve_frame_symbols(Avm2Context* ctx, uint32_t frame_idx,
++                                        uint8_t* row_done)
++{
++	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
++	{
++		if (avm2_generated_symbol_class_frames[i] != frame_idx) continue;
++		if (row_done != NULL && row_done[i]) continue;
++		if (row_done != NULL) row_done[i] = 1;
++		const char* cname = avm2_generated_symbol_classes[i].class_name;
++		if (cname == NULL) continue;
++		uint16_t cid = avm2_generated_symbol_classes[i].char_id;
++		Avm2TryFrame top;
++		avm2_try_push_catch_all(ctx, &top);
++		if (setjmp(top.jb) == 0)
++		{
++			Avm2Class* cls = class_for_dotted_name(ctx, cname);
++			if (cid != 0) symbol_map_add(cls, cid);
++		}
++		avm2_try_pop_frame(&top);
++	}
++}
++
+ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
+ {
+ 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+@@ -1945,6 +1974,11 @@ static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_displa
+ 	}
+ 
+ 	uint32_t frame_idx = ext->current_frame;  // 0-based index of the NEW frame
++	// This frame's DoABC + SymbolClass tags run before its display ops drain
++	// (Ruffle movie_clip.rs:1438 — after decode_tags queues the AS3 places,
++	// before removals/placements execute). Root timeline only; a sprite's
++	// tag stream carries neither tag class.
++	if (obj == ctx->root) avm2_run_frame_tags(ctx, frame_idx);
+ 	const Avm2TimelineData* tl = ext->timeline;
+ 	uint32_t op_start = tl->frame_op_starts[frame_idx];
+ 	uint32_t op_end = tl->frame_op_starts[frame_idx + 1];
+@@ -2744,6 +2778,9 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
+ 	uint32_t op_index = 0;
+ 	for (uint16_t f = from_frame + 1; f <= clamped; f++)
+ 	{
++		// Skipped frames still run their DoABC/SymbolClass tags
++		// (Ruffle movie_clip.rs:1749, inside the goto walk).
++		if (obj == ctx->root) avm2_run_frame_tags(ctx, (uint32_t) (f - 1));
+ 		uint32_t s = tl->frame_op_starts[f - 1];
+ 		uint32_t e = tl->frame_op_starts[f];
+ 		for (uint32_t i = s; i < e; i++)
+@@ -3530,10 +3567,18 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
+ 	                   + AVM2_MAX_CHILD_MOVIES;
+ 	g_symbol_map = avm2_alloc(ctx, g_symbol_map_cap * sizeof(SymbolClassMap));
+ 	g_symbol_map_count = 0;
++	// Frame-0 rows only: a SymbolClass row in a later frame is resolved when
++	// THAT frame first executes (avm2_run_frame_tags -> the sibling
++	// avm2_display_resolve_frame_symbols below), because resolving it here
++	// eagerly runs the defining script's initializer at boot — which is what
++	// avm2/delayed_symbolclass and avm2/doabc_and_symbolclass_script_init_*
++	// grade. All-zero frames for every movie whose tags live in frame 1, so
++	// this loop is unchanged there.
+ 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+ 	{
+ 		if (avm2_generated_symbol_classes[i].char_id == 0) continue;
+ 		if (avm2_generated_symbol_classes[i].class_name == NULL) continue;
++		if (avm2_generated_symbol_class_frames[i] != 0) continue;
+ 		Avm2Class* cls =
+ 			class_for_dotted_name(ctx, avm2_generated_symbol_classes[i].class_name);
+ 		symbol_map_add(cls, avm2_generated_symbol_classes[i].char_id);
+diff --git a/SWFModernRuntime/src/avm2/avm2_main.c b/SWFModernRuntime/src/avm2/avm2_main.c
+index b55571205..a94eca2aa 100644
+--- a/SWFModernRuntime/src/avm2/avm2_main.c
++++ b/SWFModernRuntime/src/avm2/avm2_main.c
+@@ -380,6 +380,115 @@ static int symbol_char_is_placed(uint16_t char_id)
+ 	return 0;
+ }
+ 
++// ---------------------------------------------------------------------------
++// Per-frame DoABC + SymbolClass (Ruffle movie_clip.rs::run_abc_and_symbol_tags)
++// ---------------------------------------------------------------------------
++//
++// The first time a frame executes, Ruffle (a) loads every DoABC tag in THAT
++// frame — no script initializer runs, but a non-LAZY_INITIALIZE tag's final
++// script is held back as an "eager script"; (b) resolves that frame's
++// SymbolClass rows in order, which triggers the lazy init of whichever script
++// defines each class; (c) only then runs the held-back eager initializers.
++//
++// SAFE SLICE: only frames >= 1 (0-based) are handled here. Frame 0 keeps the
++// existing boot path in runSWF_avm2 byte-for-byte — it loads its ABCs, eager-
++// inits their last scripts regardless of the LAZY bit, and resolves its
++// SymbolClass rows inside avm2_display_build_stage. Honouring LAZY for frame-0
++// content, or reordering the frame-0 symbol/eager steps, would change which
++// scripts run at all for ~1572 multi-script ABCs and buys nothing.
++//
++// Corpus-wide this reaches exactly 9 SWFs; `g_has_deferred_tags` makes it a
++// single load+branch for the other 4934.
++
++// Non-zero when any DoABC tag or SymbolClass row lives beyond frame 0.
++static int g_has_deferred_tags = -1;   // -1 = not computed yet
++// Per-ABC "eager final script already run" (NULL until first needed).
++static uint8_t* g_abc_eager_done;
++// Per-SymbolClass-row "already resolved" (NULL until first needed).
++static uint8_t* g_symbol_row_done;
++
++// Resolve the frame's SymbolClass rows: definition lookup only, never a
++// construct (avm2_display.c owns instantiation). Defined there because the
++// class->character map it feeds is display-local.
++extern void avm2_display_resolve_frame_symbols(Avm2Context* ctx,
++                                               uint32_t frame_idx,
++                                               uint8_t* row_done);
++
++static void compute_deferred_tags(Avm2Context* ctx)
++{
++	g_has_deferred_tags = 0;
++	for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
++	{
++		if (avm2_generated_abc_frames[i] != 0) g_has_deferred_tags = 1;
++	}
++	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
++	{
++		if (avm2_generated_symbol_class_frames[i] != 0) g_has_deferred_tags = 1;
++	}
++	if (!g_has_deferred_tags) return;
++	if (avm2_generated_abc_file_count > 0)
++	{
++		g_abc_eager_done = avm2_alloc(ctx, avm2_generated_abc_file_count);
++		memset(g_abc_eager_done, 0, avm2_generated_abc_file_count);
++		// Frame 0's eager scripts already ran in runSWF_avm2 step 3.
++		for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
++		{
++			if (avm2_generated_abc_frames[i] == 0) g_abc_eager_done[i] = 1;
++		}
++	}
++	if (avm2_generated_symbol_class_count > 0)
++	{
++		g_symbol_row_done = avm2_alloc(ctx, avm2_generated_symbol_class_count);
++		memset(g_symbol_row_done, 0, avm2_generated_symbol_class_count);
++		// Frame 0's rows were resolved by avm2_display_build_stage.
++		for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
++		{
++			if (avm2_generated_symbol_class_frames[i] == 0)
++				g_symbol_row_done[i] = 1;
++		}
++	}
++}
++
++void avm2_run_frame_tags(Avm2Context* ctx, uint32_t frame_idx)
++{
++	if (ctx == NULL || frame_idx == 0) return;
++	if (g_has_deferred_tags < 0) compute_deferred_tags(ctx);
++	if (!g_has_deferred_tags) return;
++
++	// (a) load this frame's ABC files. No script initializer runs here.
++	for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
++	{
++		if (avm2_generated_abc_frames[i] != frame_idx) continue;
++		if (i >= ctx->file_count || ctx->files[i] != NULL) continue;
++		const Avm2DomainScope* saved = ctx->domain.loading;
++		ctx->domain.loading = avm2_domain_root_scope(ctx);
++		ctx->files[i] = avm2_abc_load(ctx, avm2_generated_abc_files[i]);
++		ctx->domain.loading = saved;
++	}
++
++	// (b) resolve this frame's SymbolClass rows, in tag order.
++	avm2_display_resolve_frame_symbols(ctx, frame_idx, g_symbol_row_done);
++
++	// (c) then the held-back eager final scripts of this frame's non-lazy ABCs.
++	for (uint32_t i = 0; i < avm2_generated_abc_file_count; i++)
++	{
++		if (avm2_generated_abc_frames[i] != frame_idx) continue;
++		if (avm2_generated_abc_lazy[i]) continue;
++		if (g_abc_eager_done != NULL && g_abc_eager_done[i]) continue;
++		if (g_abc_eager_done != NULL) g_abc_eager_done[i] = 1;
++		if (i >= ctx->file_count || ctx->files[i] == NULL) continue;
++		if (ctx->files[i]->data->script_count == 0) continue;
++		Avm2TryFrame top;
++		avm2_try_push_catch_all(ctx, &top);
++		if (setjmp(top.jb) == 0)
++		{
++			avm2_script_ensure_init(ctx->files[i],
++			                        ctx->files[i]->data->script_count - 1);
++		}
++		avm2_try_pop_frame(&top);
++	}
++}
++
+ // ---------------------------------------------------------------------------
+ // Entry
+ // ---------------------------------------------------------------------------
+@@ -427,9 +536,14 @@ void runSWF_avm2(SWFAppContext* app_context)
+ 	ctx->domain.loading = avm2_domain_root_scope(ctx);
+ 	ctx->file_count = avm2_generated_abc_file_count;
+ 	ctx->files = avm2_alloc(ctx, ctx->file_count * sizeof(Avm2AbcFileRt*));
++	// …frame 0's files, that is: a DoABC tag in a later frame is not loaded
++	// until that frame first executes (avm2_run_frame_tags). Its slot stays
++	// NULL — every ctx->files walker already NULL-checks (gc mark roots).
+ 	for (uint32_t i = 0; i < ctx->file_count; i++)
+ 	{
+-		ctx->files[i] = avm2_abc_load(ctx, avm2_generated_abc_files[i]);
++		ctx->files[i] = avm2_generated_abc_frames[i] == 0
++			? avm2_abc_load(ctx, avm2_generated_abc_files[i])
++			: NULL;
+ 	}
+ 
+ 	// Step 2: SymbolClass bindings were recorded by the recompiler; the
+@@ -464,7 +578,7 @@ void runSWF_avm2(SWFAppContext* app_context)
+ 	// uncaught error aborts that script only.
+ 	for (uint32_t i = 0; i < ctx->file_count; i++)
+ 	{
+-		if (ctx->files[i]->data->script_count > 0)
++		if (ctx->files[i] != NULL && ctx->files[i]->data->script_count > 0)
+ 		{
+ 			Avm2TryFrame top;
+ 			avm2_try_push_catch_all(ctx, &top);
+diff --git a/SWFRecomp/include/abc/abc_emit.hpp b/SWFRecomp/include/abc/abc_emit.hpp
+index d4655aafb..c33772293 100644
+--- a/SWFRecomp/include/abc/abc_emit.hpp
++++ b/SWFRecomp/include/abc/abc_emit.hpp
+@@ -57,8 +57,13 @@ namespace abc
+ 		void emitAbcLoadError(const std::string& message);
+ 
+ 		// Writes abc_gen.h + abc_registry.c. Call once, after all tags.
++		// `symbol_frames` is parallel to `symbol_bindings` and `abc_frames` is
++		// parallel to the emitted tag list; both may be short/empty, in which
++		// case the missing entries emit frame 0 / eager (today's behaviour).
+ 		void finalize(const std::vector<std::pair<u16, std::string>>& symbol_bindings,
+-		              u8 swf_version);
++		              u8 swf_version,
++		              const std::vector<u32>& symbol_frames = {},
++		              const std::vector<std::pair<u32, u8>>& abc_frames = {});
+ 
+ 		int tagCount() const { return next_tag_index_; }
+ 
+diff --git a/SWFRecomp/include/swf.hpp b/SWFRecomp/include/swf.hpp
+index 116a0bd6b..7df615b79 100644
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -307,6 +307,14 @@ namespace SWFRecomp
+ 		// SymbolClass (tag 76) bindings: (char_id, AS3 class name).
+ 		// Consumed by the AVM2 emitter's finalize (abc_registry.c).
+ 		std::vector<std::pair<u16, std::string>> symbol_class_bindings;
++		// 0-based frame index each SymbolClass row above lives in (parallel to
++		// symbol_class_bindings). Ruffle resolves a frame's SymbolClass rows
++		// when that frame FIRST executes, not at load
++		// (movie_clip.rs::run_abc_and_symbol_tags).
++		std::vector<u32> symbol_class_frames;
++		// Per emitted ABC tag: {0-based frame index, LAZY_INITIALIZE bit}.
++		// Parallel to avm2_generated_abc_files[].
++		std::vector<std::pair<u32, u8>> abc_tag_frames;
+ 		// AVM2 C emitter (RecompiledABC/), created on the first DoABC tag.
+ 		// finalizeAbcEmit() writes the registry after all tags are parsed
+ 		// (called from recompile()).
+diff --git a/SWFRecomp/src/abc/abc_emit.cpp b/SWFRecomp/src/abc/abc_emit.cpp
+index 1ee7a57a1..0630754f3 100644
+--- a/SWFRecomp/src/abc/abc_emit.cpp
++++ b/SWFRecomp/src/abc/abc_emit.cpp
+@@ -3925,7 +3925,9 @@ namespace abc
+ 	}
+ 
+ 	void AbcEmitter::finalize(const std::vector<std::pair<u16, string>>& symbol_bindings,
+-	                          u8 swf_version)
++	                          u8 swf_version,
++	                          const std::vector<u32>& symbol_frames,
++	                          const std::vector<std::pair<u32, u8>>& abc_frames)
+ 	{
+ 		if (next_tag_index_ == 0) return;
+ 		ensureDir();
+@@ -3982,7 +3984,44 @@ namespace abc
+ 			    << "avm2_generated_symbol_class_count = "
+ 			    << symbol_bindings.size() << ";" << endl
+ 			    << "const uint8_t " << prefix_ << "avm2_generated_swf_version = "
+-			    << (unsigned) swf_version << ";" << endl;
++			    << (unsigned) swf_version << ";" << endl << endl;
++
++			// Frame scoping (Ruffle movie_clip.rs::run_abc_and_symbol_tags):
++			// a DoABC tag is loaded, and a SymbolClass row resolved, the first
++			// time ITS frame executes — not at movie load. Frame 0 keeps the
++			// boot path; these arrays are what lets the runtime hold the rest
++			// back. Entries default to frame 0 / eager, which is exactly
++			// today's behaviour for every movie whose tags are all in frame 0.
++			out << "const uint32_t " << prefix_
++			    << "avm2_generated_abc_frames[] =" << endl << "{" << endl;
++			for (int i = 0; i < next_tag_index_; i++)
++			{
++				u32 f = (size_t) i < abc_frames.size() ? abc_frames[i].first : 0u;
++				out << "\t" << f << "," << endl;
++			}
++			if (next_tag_index_ == 0) out << "\t0,  // placeholder" << endl;
++			out << "};" << endl;
++
++			out << "const uint8_t " << prefix_
++			    << "avm2_generated_abc_lazy[] =" << endl << "{" << endl;
++			for (int i = 0; i < next_tag_index_; i++)
++			{
++				u8 lz = (size_t) i < abc_frames.size() ? abc_frames[i].second : (u8) 0;
++				out << "\t" << (unsigned) lz << "," << endl;
++			}
++			if (next_tag_index_ == 0) out << "\t0,  // placeholder" << endl;
++			out << "};" << endl;
++
++			out << "const uint32_t " << prefix_
++			    << "avm2_generated_symbol_class_frames[] =" << endl
++			    << "{" << endl;
++			for (size_t i = 0; i < symbol_bindings.size(); i++)
++			{
++				u32 f = i < symbol_frames.size() ? symbol_frames[i] : 0u;
++				out << "\t" << f << "," << endl;
++			}
++			if (symbol_bindings.empty()) out << "\t0,  // placeholder" << endl;
++			out << "};" << endl;
+ 		}
+ 	}
+ }
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index ba3ffd191..78f07121a 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -287,7 +287,8 @@ namespace SWFRecomp
+ 		if (abc_emitter != nullptr)
+ 		{
+ 			int abc_tag_count = abc_emitter->tagCount();
+-			abc_emitter->finalize(symbol_class_bindings, header.version);
++			abc_emitter->finalize(symbol_class_bindings, header.version,
++			                      symbol_class_frames, abc_tag_frames);
+ 			printf("DoABC: wrote RecompiledABC registry (%d tag(s), %zu SymbolClass binding(s))\n",
+ 			       abc_emitter->tagCount(), symbol_class_bindings.size());
+ 			delete abc_emitter;
+@@ -4767,6 +4768,11 @@ namespace SWFRecomp
+ 							cur_pos += 1;  // NUL
+ 						}
+ 						symbol_class_bindings.push_back({ symbol_char_id, symbol_name });
++						// frame_N has already been opened when this tag is
++						// interpreted, so the frame being built is
++						// next_frame_i - 1 (same convention as FRAME_LABEL).
++						symbol_class_frames.push_back(
++							next_frame_i > 0 ? (u32) (next_frame_i - 1) : 0u);
+ 					}
+ 					printf("SymbolClass: recorded %zu binding(s) (no-op until AVM2 codegen)\n",
+ 					       symbol_class_bindings.size());
+@@ -6234,6 +6240,18 @@ namespace SWFRecomp
+ 				const abc::u8* abc_data = (const abc::u8*) cur_pos;
+ 				size_t abc_len = tag.length;
+ 
++				// DoABC2 (82) Flags bit 0 = kDoAbcLazyInitializeFlag. Tag 72
++				// (DoABCDefine) carries no flags and is always eager, matching
++				// Ruffle (avm2.rs::do_abc with DoAbc2Flag::empty()).
++				u8 abc_lazy = 0;
++				if (tag.code == SWF_TAG_DO_ABC && abc_len >= 4)
++				{
++					abc_lazy = (abc_data[0] & 1) ? 1 : 0;
++				}
++				// frame_N is already open (see FRAME_LABEL), so the frame this
++				// tag belongs to is next_frame_i - 1.
++				u32 abc_frame = next_frame_i > 0 ? (u32) (next_frame_i - 1) : 0u;
++
+ 				if (tag.code == SWF_TAG_DO_ABC && abc_len >= 4)
+ 				{
+ 					const abc::u8* p = abc_data + 4;  // skip Flags
+@@ -6318,11 +6336,23 @@ namespace SWFRecomp
+ 					}
+ 				}
+ 
++				// Record (frame, lazy) for however many registry entries this
++				// tag produced. Doing it by tagCount() covers all three emit
++				// paths (parse error, verify error, normal) uniformly, and
++				// leaves the vector empty when a path emits no entry at all.
++				if (abc_emitter != nullptr)
++				{
++					while (abc_tag_frames.size() < (size_t) abc_emitter->tagCount())
++					{
++						abc_tag_frames.push_back({ abc_frame, abc_lazy });
++					}
++				}
++
+ 				cur_pos = body_start + tag.length;
+ 
+ 				break;
+ 			}
+-			
++
+ 			case SWF_TAG_DEFINE_BUTTON:
+ 			case SWF_TAG_DEFINE_BUTTON_2:
+ 			{

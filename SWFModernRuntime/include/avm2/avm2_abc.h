@@ -194,6 +194,19 @@ extern const uint32_t avm2_generated_abc_file_count;
 extern const Avm2SymbolClassBinding avm2_generated_symbol_classes[];
 extern const uint32_t avm2_generated_symbol_class_count;
 extern const uint8_t avm2_generated_swf_version;
+// Frame scoping for the two tag classes Ruffle runs per-frame
+// (movie_clip.rs::run_abc_and_symbol_tags). Parallel to the arrays above:
+// 0-based frame index of the DoABC tag / SymbolClass row, plus the DoABC2
+// LAZY_INITIALIZE bit. All-zero for every movie whose AVM2 tags live in
+// frame 1, which is 4934 of the 4943 corpus SWFs.
+extern const uint32_t avm2_generated_abc_frames[];
+extern const uint8_t avm2_generated_abc_lazy[];
+extern const uint32_t avm2_generated_symbol_class_frames[];
+
+// Runs frame `frame_idx`'s (0-based) held-back DoABC + SymbolClass tags once.
+// No-op for frame 0 (the boot path already ran it) and for movies with no
+// deferred tags at all. Defined in avm2_main.c.
+void avm2_run_frame_tags(Avm2Context* ctx, uint32_t frame_idx);
 
 // ---------------------------------------------------------------------------
 // Static timeline tables (Stage 5): emitted by the recompiler's

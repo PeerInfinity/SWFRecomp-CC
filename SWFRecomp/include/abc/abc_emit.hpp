@@ -57,8 +57,13 @@ namespace abc
 		void emitAbcLoadError(const std::string& message);
 
 		// Writes abc_gen.h + abc_registry.c. Call once, after all tags.
+		// `symbol_frames` is parallel to `symbol_bindings` and `abc_frames` is
+		// parallel to the emitted tag list; both may be short/empty, in which
+		// case the missing entries emit frame 0 / eager (today's behaviour).
 		void finalize(const std::vector<std::pair<u16, std::string>>& symbol_bindings,
-		              u8 swf_version);
+		              u8 swf_version,
+		              const std::vector<u32>& symbol_frames = {},
+		              const std::vector<std::pair<u32, u8>>& abc_frames = {});
 
 		int tagCount() const { return next_tag_index_; }
 

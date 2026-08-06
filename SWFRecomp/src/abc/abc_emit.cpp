@@ -3925,7 +3925,9 @@ namespace abc
 	}
 
 	void AbcEmitter::finalize(const std::vector<std::pair<u16, string>>& symbol_bindings,
-	                          u8 swf_version)
+	                          u8 swf_version,
+	                          const std::vector<u32>& symbol_frames,
+	                          const std::vector<std::pair<u32, u8>>& abc_frames)
 	{
 		if (next_tag_index_ == 0) return;
 		ensureDir();
@@ -3982,7 +3984,44 @@ namespace abc
 			    << "avm2_generated_symbol_class_count = "
 			    << symbol_bindings.size() << ";" << endl
 			    << "const uint8_t " << prefix_ << "avm2_generated_swf_version = "
-			    << (unsigned) swf_version << ";" << endl;
+			    << (unsigned) swf_version << ";" << endl << endl;
+
+			// Frame scoping (Ruffle movie_clip.rs::run_abc_and_symbol_tags):
+			// a DoABC tag is loaded, and a SymbolClass row resolved, the first
+			// time ITS frame executes — not at movie load. Frame 0 keeps the
+			// boot path; these arrays are what lets the runtime hold the rest
+			// back. Entries default to frame 0 / eager, which is exactly
+			// today's behaviour for every movie whose tags are all in frame 0.
+			out << "const uint32_t " << prefix_
+			    << "avm2_generated_abc_frames[] =" << endl << "{" << endl;
+			for (int i = 0; i < next_tag_index_; i++)
+			{
+				u32 f = (size_t) i < abc_frames.size() ? abc_frames[i].first : 0u;
+				out << "\t" << f << "," << endl;
+			}
+			if (next_tag_index_ == 0) out << "\t0,  // placeholder" << endl;
+			out << "};" << endl;
+
+			out << "const uint8_t " << prefix_
+			    << "avm2_generated_abc_lazy[] =" << endl << "{" << endl;
+			for (int i = 0; i < next_tag_index_; i++)
+			{
+				u8 lz = (size_t) i < abc_frames.size() ? abc_frames[i].second : (u8) 0;
+				out << "\t" << (unsigned) lz << "," << endl;
+			}
+			if (next_tag_index_ == 0) out << "\t0,  // placeholder" << endl;
+			out << "};" << endl;
+
+			out << "const uint32_t " << prefix_
+			    << "avm2_generated_symbol_class_frames[] =" << endl
+			    << "{" << endl;
+			for (size_t i = 0; i < symbol_bindings.size(); i++)
+			{
+				u32 f = i < symbol_frames.size() ? symbol_frames[i] : 0u;
+				out << "\t" << f << "," << endl;
+			}
+			if (symbol_bindings.empty()) out << "\t0,  // placeholder" << endl;
+			out << "};" << endl;
 		}
 	}
 }

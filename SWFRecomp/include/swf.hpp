@@ -307,6 +307,14 @@ namespace SWFRecomp
 		// SymbolClass (tag 76) bindings: (char_id, AS3 class name).
 		// Consumed by the AVM2 emitter's finalize (abc_registry.c).
 		std::vector<std::pair<u16, std::string>> symbol_class_bindings;
+		// 0-based frame index each SymbolClass row above lives in (parallel to
+		// symbol_class_bindings). Ruffle resolves a frame's SymbolClass rows
+		// when that frame FIRST executes, not at load
+		// (movie_clip.rs::run_abc_and_symbol_tags).
+		std::vector<u32> symbol_class_frames;
+		// Per emitted ABC tag: {0-based frame index, LAZY_INITIALIZE bit}.
+		// Parallel to avm2_generated_abc_files[].
+		std::vector<std::pair<u32, u8>> abc_tag_frames;
 		// AVM2 C emitter (RecompiledABC/), created on the first DoABC tag.
 		// finalizeAbcEmit() writes the registry after all tags are parsed
 		// (called from recompile()).

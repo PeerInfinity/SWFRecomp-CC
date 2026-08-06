@@ -1521,6 +1521,35 @@ static Avm2Class* class_for_dotted_name(Avm2Context* ctx, const char* dotted)
 	return class_for_dotted_name_in(ctx, avm2_domain_root_scope(ctx), dotted);
 }
 
+// Step (b) of Ruffle's run_abc_and_symbol_tags: resolve the SymbolClass rows
+// of frame `frame_idx` (0-based), in tag order. The domain lookup is what
+// triggers the lazy init of the script that defines each class — we look up
+// and record the class->character binding, never construct. `row_done` (may be
+// NULL) is the per-row idempotency flag owned by avm2_main.c.
+void avm2_display_resolve_frame_symbols(Avm2Context* ctx, uint32_t frame_idx,
+                                        uint8_t* row_done);
+void avm2_display_resolve_frame_symbols(Avm2Context* ctx, uint32_t frame_idx,
+                                        uint8_t* row_done)
+{
+	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
+	{
+		if (avm2_generated_symbol_class_frames[i] != frame_idx) continue;
+		if (row_done != NULL && row_done[i]) continue;
+		if (row_done != NULL) row_done[i] = 1;
+		const char* cname = avm2_generated_symbol_classes[i].class_name;
+		if (cname == NULL) continue;
+		uint16_t cid = avm2_generated_symbol_classes[i].char_id;
+		Avm2TryFrame top;
+		avm2_try_push_catch_all(ctx, &top);
+		if (setjmp(top.jb) == 0)
+		{
+			Avm2Class* cls = class_for_dotted_name(ctx, cname);
+			if (cid != 0) symbol_map_add(cls, cid);
+		}
+		avm2_try_pop_frame(&top);
+	}
+}
+
 static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 {
 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
@@ -1945,6 +1974,11 @@ static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_displa
 	}
 
 	uint32_t frame_idx = ext->current_frame;  // 0-based index of the NEW frame
+	// This frame's DoABC + SymbolClass tags run before its display ops drain
+	// (Ruffle movie_clip.rs:1438 — after decode_tags queues the AS3 places,
+	// before removals/placements execute). Root timeline only; a sprite's
+	// tag stream carries neither tag class.
+	if (obj == ctx->root) avm2_run_frame_tags(ctx, frame_idx);
 	const Avm2TimelineData* tl = ext->timeline;
 	uint32_t op_start = tl->frame_op_starts[frame_idx];
 	uint32_t op_end = tl->frame_op_starts[frame_idx + 1];
@@ -2744,6 +2778,9 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 	uint32_t op_index = 0;
 	for (uint16_t f = from_frame + 1; f <= clamped; f++)
 	{
+		// Skipped frames still run their DoABC/SymbolClass tags
+		// (Ruffle movie_clip.rs:1749, inside the goto walk).
+		if (obj == ctx->root) avm2_run_frame_tags(ctx, (uint32_t) (f - 1));
 		uint32_t s = tl->frame_op_starts[f - 1];
 		uint32_t e = tl->frame_op_starts[f];
 		for (uint32_t i = s; i < e; i++)
@@ -3530,10 +3567,18 @@ void avm2_display_build_stage(Avm2Context* ctx, const char* root_class_name)
 	                   + AVM2_MAX_CHILD_MOVIES;
 	g_symbol_map = avm2_alloc(ctx, g_symbol_map_cap * sizeof(SymbolClassMap));
 	g_symbol_map_count = 0;
+	// Frame-0 rows only: a SymbolClass row in a later frame is resolved when
+	// THAT frame first executes (avm2_run_frame_tags -> the sibling
+	// avm2_display_resolve_frame_symbols below), because resolving it here
+	// eagerly runs the defining script's initializer at boot — which is what
+	// avm2/delayed_symbolclass and avm2/doabc_and_symbolclass_script_init_*
+	// grade. All-zero frames for every movie whose tags live in frame 1, so
+	// this loop is unchanged there.
 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 	{
 		if (avm2_generated_symbol_classes[i].char_id == 0) continue;
 		if (avm2_generated_symbol_classes[i].class_name == NULL) continue;
+		if (avm2_generated_symbol_class_frames[i] != 0) continue;
 		Avm2Class* cls =
 			class_for_dotted_name(ctx, avm2_generated_symbol_classes[i].class_name);
 		symbol_map_add(cls, avm2_generated_symbol_classes[i].char_id);

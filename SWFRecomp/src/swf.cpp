@@ -287,7 +287,8 @@ namespace SWFRecomp
 		if (abc_emitter != nullptr)
 		{
 			int abc_tag_count = abc_emitter->tagCount();
-			abc_emitter->finalize(symbol_class_bindings, header.version);
+			abc_emitter->finalize(symbol_class_bindings, header.version,
+			                      symbol_class_frames, abc_tag_frames);
 			printf("DoABC: wrote RecompiledABC registry (%d tag(s), %zu SymbolClass binding(s))\n",
 			       abc_emitter->tagCount(), symbol_class_bindings.size());
 			delete abc_emitter;
@@ -4767,6 +4768,11 @@ namespace SWFRecomp
 							cur_pos += 1;  // NUL
 						}
 						symbol_class_bindings.push_back({ symbol_char_id, symbol_name });
+						// frame_N has already been opened when this tag is
+						// interpreted, so the frame being built is
+						// next_frame_i - 1 (same convention as FRAME_LABEL).
+						symbol_class_frames.push_back(
+							next_frame_i > 0 ? (u32) (next_frame_i - 1) : 0u);
 					}
 					printf("SymbolClass: recorded %zu binding(s) (no-op until AVM2 codegen)\n",
 					       symbol_class_bindings.size());
@@ -6234,6 +6240,18 @@ namespace SWFRecomp
 				const abc::u8* abc_data = (const abc::u8*) cur_pos;
 				size_t abc_len = tag.length;
 
+				// DoABC2 (82) Flags bit 0 = kDoAbcLazyInitializeFlag. Tag 72
+				// (DoABCDefine) carries no flags and is always eager, matching
+				// Ruffle (avm2.rs::do_abc with DoAbc2Flag::empty()).
+				u8 abc_lazy = 0;
+				if (tag.code == SWF_TAG_DO_ABC && abc_len >= 4)
+				{
+					abc_lazy = (abc_data[0] & 1) ? 1 : 0;
+				}
+				// frame_N is already open (see FRAME_LABEL), so the frame this
+				// tag belongs to is next_frame_i - 1.
+				u32 abc_frame = next_frame_i > 0 ? (u32) (next_frame_i - 1) : 0u;
+
 				if (tag.code == SWF_TAG_DO_ABC && abc_len >= 4)
 				{
 					const abc::u8* p = abc_data + 4;  // skip Flags
@@ -6318,11 +6336,23 @@ namespace SWFRecomp
 					}
 				}
 
+				// Record (frame, lazy) for however many registry entries this
+				// tag produced. Doing it by tagCount() covers all three emit
+				// paths (parse error, verify error, normal) uniformly, and
+				// leaves the vector empty when a path emits no entry at all.
+				if (abc_emitter != nullptr)
+				{
+					while (abc_tag_frames.size() < (size_t) abc_emitter->tagCount())
+					{
+						abc_tag_frames.push_back({ abc_frame, abc_lazy });
+					}
+				}
+
 				cur_pos = body_start + tag.length;
 
 				break;
 			}
-			
+
 			case SWF_TAG_DEFINE_BUTTON:
 			case SWF_TAG_DEFINE_BUTTON_2:
 			{
