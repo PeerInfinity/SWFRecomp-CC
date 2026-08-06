@@ -5040,7 +5040,17 @@ typedef struct Avm2PendingLoad
 	uint32_t raw_bytes_len;
 	uint8_t content_type;
 	uint8_t data_static;       // `data` is generated-static (safe to alias)
+	// A registry SWF that really is a movie (it has frame_funcs, so it is not
+	// a malformed byte shell) but carries NO AVM2 tables — i.e. an AVM1 child.
+	// Deliberately narrower than `content_type == LI_CT_SWF && tables == NULL`,
+	// which a bundled data-file SWF also satisfies.
+	uint8_t avm1_child;
 } Avm2PendingLoad;
+
+// The AVM1Movie wrapper an AVM2 movie sees around a loaded AVM1 child. The
+// class is [Ruffle(Abstract)] to script, so only this internal mint may build
+// one; defined next to the class down in the display registry.
+static Avm2Object* avm1movie_mint(Avm2Context* ctx);
 
 // Loads issued in one frame all resolve at the next frame's start; a handful
 // is all any test (or game) has in flight at once.
@@ -5656,6 +5666,27 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 		if (from_bytes) lx->pending_boot = pl->tables;
 		else loader_boot_child_swf(ctx, li, lx, pl->tables);
 	}
+	else if (pl->content_type == LI_CT_SWF && pl->avm1_child)
+	{
+		// An AVM1 child has no AVM2 root to boot, but the AVM2 side still sees
+		// an AVM1Movie wrapper: it is `content` and, per movie_loader_complete,
+		// the Loader's child at index 0. We do not execute the child's AVM1
+		// timeline yet, so the wrapper is a live but empty DisplayObject —
+		// enough for `loader.content as AVM1Movie` and for the call/addCallback
+		// surface that avm1movie_addcallback_call grades.
+		Avm2Object* mov = avm1movie_mint(ctx);
+		if (mov != NULL)
+		{
+			lx->content = mov;
+			lx->expose_content = 1;
+			Avm2LoaderExt* lext = loader_ext_of(ctx, lx->loader);
+			if (lext != NULL)
+			{
+				lext->content = mov;
+				insert_at_index(ctx, lx->loader, mov, 0);
+			}
+		}
+	}
 	// Third `bytes` state: the real source bytes, now that content is loaded.
 	// Only bundled assets are kept — their storage is generated-static and
 	// outlives everything. A loadBytes source ByteArray can be resized or
@@ -5816,6 +5847,7 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
 		// decompressed bytes. Both stay NULL for an AVM1 child or an image
 		// shell, which is exactly the pre-tranche-6 behaviour.
 		out->tables = (const Avm2MovieTables*) m->avm2_tables;
+		out->avm1_child = (m->frame_funcs != NULL && m->avm2_tables == NULL);
 		out->swf_bytes = m->swf_bytes;
 		out->swf_bytes_len = m->swf_bytes_len;
 		out->raw_bytes = m->raw_bytes;
@@ -11302,6 +11334,80 @@ static void morphshape_native_init(Avm2Context* ctx, Avm2Object* obj)
 	display_native_init(ctx, obj);
 }
 
+// flash.display.AVM1Movie — the DisplayObject wrapper an AVM2 movie sees
+// around a loaded AVM1 child.
+//
+// It is [Ruffle(Abstract)] to script (abstract_classes asserts `new
+// AVM1Movie()` is #2012) but the RUNTIME mints one, from loader_deliver, for
+// every AVM1 child a Loader resolves. So it takes TextLine's shape rather than
+// the unconditional display_native_init_abstract: a module flag armed only
+// across avm1movie_mint. (It cannot reuse MorphShape's g_timeline_instantiation
+// gate — this mint comes from the loader, not from timeline placement.)
+static Avm2Class* g_avm1movie_class;
+static int g_avm1movie_mint_ok;
+
+static void avm1movie_native_init(Avm2Context* ctx, Avm2Object* obj)
+{
+	if (!g_avm1movie_mint_ok)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2012: AVM1Movie$ class cannot be instantiated.");
+		return;
+	}
+	display_native_init(ctx, obj);
+}
+
+static Avm2Object* avm1movie_mint(Avm2Context* ctx)
+{
+	if (g_avm1movie_class == NULL) return NULL;
+	g_avm1movie_mint_ok = 1;
+	Avm2Object* obj = display_alloc_instance(ctx, g_avm1movie_class);
+	g_avm1movie_mint_ok = 0;
+	return obj;
+}
+
+// Both methods are declared with required parameters (call(functionName,
+// ...rest) takes 1; addCallback(name, fn) takes 2) and both bodies are nothing
+// but `Error.throwError(Error, 2014)`.
+//
+// The two errors sit at DIFFERENT stack depths, which is the whole point of
+// avm1movie_addcallback_call: #1063 is conceptually raised by the CALLER, so
+// the callee frame is popped first (throw_1063 does the same for script
+// methods); #2014 is raised from inside the method, through a synthetic
+// Error$/throwError frame above it.
+static _Noreturn void avm1movie_throw_1063(Avm2Activation* act, const char* method,
+                                           uint32_t expected)
+{
+	Avm2Context* ctx = act->ctx;
+	char cq[160];
+	avm2_class_qname_colons_buf(g_avm1movie_class, cq, sizeof(cq));
+	uint32_t got = act->argc;
+	avm2_callstack_pop(ctx);
+	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	                 "Error #1063: Argument count mismatch on %s/%s(). "
+	                 "Expected %u, got %u.", cq, method, expected, got);
+}
+
+static _Noreturn void avm1movie_throw_2014(Avm2Context* ctx)
+{
+	static const Avm2MethodRef throwerror = { NULL, NULL, "Error$/throwError", 0 };
+	avm2_callstack_push(ctx, &throwerror, NULL);
+	avm2_throw_error(ctx, ctx->builtins.error_class,
+	                 "Error #2014: Feature is not available at this time.");
+}
+
+static Avm2Value avm1movie_call(Avm2Activation* act)
+{
+	if (act->argc < 1) avm1movie_throw_1063(act, "call", 1);
+	avm1movie_throw_2014(act->ctx);
+}
+
+static Avm2Value avm1movie_add_callback(Avm2Activation* act)
+{
+	if (act->argc < 2) avm1movie_throw_1063(act, "addCallback", 2);
+	avm1movie_throw_2014(act->ctx);
+}
+
 // flash.text.StaticText.text (Ruffle display_object/text.rs::Text::text).
 // The character content of a DefineText/2 character, reconstructed by mapping
 // each placed glyph back through its font's glyph-index -> character-code
@@ -13773,12 +13879,17 @@ void avm2_register_display(Avm2Context* ctx)
 	g_statictext_class = statictext;
 
 	// flash.display.AVM1Movie — the DisplayObject wrapper an AVM2 movie sees
-	// around a loaded AVM1 child. We do not execute cross-VM children yet, so
-	// nothing ever mints one; the class exists to resolve.
+	// around a loaded AVM1 child. loader_deliver mints one for every AVM1
+	// child, so the [Ruffle(Abstract)] gate is CONDITIONAL (avm1movie_mint) —
+	// a script `new AVM1Movie()` still raises #2012 (abstract_classes).
 	{
 		Avm2Class* avm1movie = avm2_builtin_class(ctx, "flash.display",
 		                                          "AVM1Movie", dobj);
-		avm1movie->native_init = display_native_init_abstract;
+		avm1movie->native_init = avm1movie_native_init;
+		g_avm1movie_class = avm1movie;
+		avm2_builtin_add_method_n(ctx, avm1movie, "call", avm1movie_call, 1);
+		avm2_builtin_add_method_n(ctx, avm1movie, "addCallback",
+		                          avm1movie_add_callback, 2);
 	}
 
 	// flash.display.Graphics (bounds-only stub); graphics getter on both
