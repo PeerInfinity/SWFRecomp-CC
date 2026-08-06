@@ -35,6 +35,8 @@ from_shumway/timeline/timeline_as2_5        # timeline / frames               7 
 from_shumway/acid/acid-gradient-0           # gradients                       1 cmp
 regression/avm2_timeline_stroke_gradient    # stroke + gradient  (tol 255)    1 cmp
 regression/avm2_timeline_gradients          # gradient fill, AVM2 timeline    1 cmp
+regression/mask_sibling_union               # 2 sibling clipDepth masks       1 cmp
+                                            #   repo golden, exact at tol 0
 
 # tier=2  (CI-failing / skipped; A/B signal only)
 visual/simple_shapes/masks                  # mask compositing (largest gap)

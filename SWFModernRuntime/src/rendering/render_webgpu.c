@@ -1943,6 +1943,14 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	ds_att.stencilStoreOp = WGPUStoreOp_Store; // Store for filter suspend/resume
 	ds_att.stencilClearValue = 0;
 
+	// This Clear is the ONLY stencil reset in the pass, so per-mask references
+	// have to be unique WITHIN it. Restart the allocator here (and drop any
+	// clip state a previous pass left behind).
+	ctx->mask_ref = 0;
+	ctx->mask_ref_next = 0;
+	ctx->mask_capture_depth = 0;
+	ctx->mask_save_sp = 0;
+
 	WGPURenderPassDescriptor rp_desc = {0};
 	rp_desc.label = WGPU_LABEL("render_pass");
 	rp_desc.colorAttachmentCount = 1;
@@ -2080,6 +2088,59 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 
 	// Issue draw call
 	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
+}
+
+// ---------------------------------------------------------------------------
+// Clip-mask stencil state helpers
+// ---------------------------------------------------------------------------
+
+// Bind the pipeline a normal (colour-writing) draw must use RIGHT NOW: the
+// stencil-test pipeline at the active clip's reference while a clip mask is
+// open, the plain render pipeline otherwise.
+//
+// EVERY site that clobbers the pipeline for its own draw has to come back
+// through here instead of unconditionally re-binding render_pipeline — an
+// unconditional re-bind drops the stencil test, so a bitmap, a blend-mode
+// object or a filtered object drawn inside a mask silently lost its clip.
+static void restore_draw_pipeline(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok || ctx->render_pass == NULL) return;
+	if (ctx->mask_ref != 0)
+	{
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
+		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+	}
+	else
+	{
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	}
+}
+
+// Allocate the next per-mask stencil reference.
+//
+// The stencil is 8-bit and the pass clears it exactly once, so after 255 masks
+// in ONE pass the references would alias earlier ones and the union bug would
+// come back. Fall back to a mid-pass clear: a screen-covering rect through the
+// stencil-WRITE pipeline (Always/Replace, colour writes off) with reference 0
+// rewrites every texel to 0, after which the allocator can restart. No corpus
+// test reaches this (the busiest frame in the graded corpus has 6 masks;
+// from_shumway/invalidClipDepth's 257 masks are one PER FRAME), but a real
+// movie can. The rect is deliberately enormous because the stage transform is
+// arbitrary at this point — it is clipped to the viewport in NDC.
+static u32 alloc_mask_ref(WebGPURenderContext* ctx)
+{
+	if (ctx->mask_ref_next >= 255u)
+	{
+		if (ctx->render_pass != NULL)
+		{
+			wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
+			wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 0);
+			render_webgpu_draw_rect(ctx, -4.0e6f, -4.0e6f, 8.0e6f, 8.0e6f,
+				0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
+		}
+		ctx->mask_ref_next = 0;
+	}
+	return ++ctx->mask_ref_next;
 }
 
 // ---------------------------------------------------------------------------
@@ -2375,8 +2436,8 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 	// Switch to premultiplied alpha blending for bitmap rendering
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
 	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
-	// Restore normal blend pipeline
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	// Restore normal blend pipeline — and the ACTIVE CLIP with it.
+	restore_draw_pipeline(ctx);
 }
 
 // Unscaled wrapper — quad geometry matches source dims (no GPU sample-stretch).
@@ -2522,7 +2583,7 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 	// Premultiplied blend (bitmap data is pre-multiplied via fillRect).
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
 	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	restore_draw_pipeline(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -2531,24 +2592,41 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
+	// A mask that is a SPRITE re-enters the display-list walk (tag.c's
+	// g_clip_mask_capture branch), and a clipDepth entry INSIDE that subtree
+	// calls begin/end_clip_mask again. Those inner pairs must not allocate a
+	// second reference: the allocator would walk away from the outer mask, and
+	// the inner end_clip_mask would switch COLOUR WRITES back on in the middle
+	// of a mask capture. Everything drawn inside the capture belongs to the
+	// same mask, so the inner pair is a no-op and the outer reference stands.
+	if (ctx->mask_capture_depth++ > 0) return;
+	ctx->mask_ref = alloc_mask_ref(ctx);
 	// Switch to stencil-write pipeline: draws to stencil buffer only (no color)
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
-	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
 }
 
 void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
-	// Switch to stencil-test pipeline: only draws where stencil == 1 (inside mask)
+	if (ctx->mask_capture_depth > 0) ctx->mask_capture_depth--;
+	if (ctx->mask_capture_depth > 0) return;   // still capturing the outer mask
+	// Switch to stencil-test pipeline: only draws where stencil == THIS mask's
+	// reference. Each mask owns its own value, so mask N no longer tests the
+	// union of masks 1..N.
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
-	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 1);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
 }
 
 void render_webgpu_end_clip(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
+	// A nested display-list walk under a sprite mask runs its own clip loop and
+	// can call end_clip while the outer capture is still open; ignore it.
+	if (ctx->mask_capture_depth > 0) return;
 	// Switch back to normal pipeline (no stencil testing)
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	ctx->mask_ref = 0;
+	restore_draw_pipeline(ctx);
 }
 
 void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
@@ -2561,8 +2639,17 @@ void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
 		case 6: pipeline = ctx->blend_darken_pipeline; break;
 		case 8: pipeline = ctx->blend_add_pipeline; break;
 		case 9: pipeline = ctx->blend_subtract_pipeline; break;
-		default: pipeline = ctx->render_pipeline; break; // Normal or unsupported
+		default:
+			// Normal or unsupported — and this is also how the display loops
+			// UNDO a blend mode (`set_blend_mode(context, 0)`), so it has to
+			// come back to the active clip, not to a bare render_pipeline.
+			restore_draw_pipeline(ctx);
+			return;
 	}
+	// NOTE: the legacy per-draw blend pipelines carry no stencil test, so a
+	// blend-mode object inside a clip mask is unclipped for the duration of its
+	// draw. The layer-composite path (render_webgpu_composite_blend) DOES test
+	// the stencil and is what the display loops use for non-trivial modes.
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, pipeline);
 }
 
@@ -3645,11 +3732,16 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 
 
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, pipeline);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
-	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, stencil_ref);
+	// The caller's stencil_ref is only a boolean "is a clip active" (it passed a
+	// literal 1 back when every mask wrote 1). The reference is per-mask now, so
+	// take it from the context — 0 when no clip is open, which is exactly what
+	// the caller's "no clip" case meant.
+	(void)stencil_ref;
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
 	wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
 
 	// Restore the normal pipeline + bind groups the display loop expects.
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	restore_draw_pipeline(ctx);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
@@ -3694,8 +3786,10 @@ void render_webgpu_resume_pass(WebGPURenderContext* ctx)
 
 	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
 
-	// Re-bind everything
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	// Re-bind everything. The stencil is reloaded (loadOp = Load), so the clip
+	// mask that was open when the pass was suspended is still there — come back
+	// to it rather than to a bare render_pipeline.
+	restore_draw_pipeline(ctx);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
@@ -3707,6 +3801,22 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 	render_webgpu_ensure_filter_resources(ctx);
 	render_webgpu_ensure_blend_resources(ctx);
 	ctx->offscreen_depth++;
+
+	// The offscreen pass has its OWN depth-stencil, which it CLEARS below — the
+	// main pass's clip mask does not exist in it, and any mask opened inside it
+	// belongs to that cleared stencil. Park the clip state so (a) draws inside
+	// the offscreen pass are not stencil-tested against a reference that is 0
+	// everywhere there, and (b) an inner mask cannot zero the outer clip that
+	// the resumed main pass still needs.
+	if (ctx->mask_save_sp >= 0
+	    && ctx->mask_save_sp < (int)(sizeof(ctx->mask_save_ref) / sizeof(ctx->mask_save_ref[0])))
+	{
+		ctx->mask_save_ref[ctx->mask_save_sp] = ctx->mask_ref;
+		ctx->mask_save_cap[ctx->mask_save_sp] = ctx->mask_capture_depth;
+	}
+	ctx->mask_save_sp++;
+	ctx->mask_ref = 0;
+	ctx->mask_capture_depth = 0;
 
 	// Use a SEPARATE MSAA texture (filter_msaa_view) so we don't clobber
 	// the main pass content stored in ctx->msaa_view during suspend.
@@ -3739,8 +3849,10 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 
 	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
 
-	// Bind the main pipeline (MSAA 4x compatible)
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	// Bind the main pipeline (MSAA 4x compatible). mask_ref was just parked at 0,
+	// so this resolves to render_pipeline — routed through the helper so the one
+	// rule about which pipeline a draw starts from lives in one place.
+	restore_draw_pipeline(ctx);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
@@ -3750,6 +3862,16 @@ void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
 	if (ctx->offscreen_depth > 0) ctx->offscreen_depth--;
+	// Un-park the main pass's clip state (see begin_offscreen_pass).
+	if (ctx->mask_save_sp > 0)
+	{
+		ctx->mask_save_sp--;
+		if (ctx->mask_save_sp < (int)(sizeof(ctx->mask_save_ref) / sizeof(ctx->mask_save_ref[0])))
+		{
+			ctx->mask_ref = ctx->mask_save_ref[ctx->mask_save_sp];
+			ctx->mask_capture_depth = ctx->mask_save_cap[ctx->mask_save_sp];
+		}
+	}
 	if (ctx->render_pass)
 	{
 		wgpuRenderPassEncoderEnd(ctx->render_pass);
@@ -3886,11 +4008,14 @@ void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
 
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->composite_pipeline);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
-	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 0);
+	// composite_pipeline stencil-tests Equal, so a hard-coded 0 composited a
+	// filtered object OUTSIDE any enclosing mask. Use the active clip's
+	// reference; it is 0 when no clip is open, i.e. unchanged in the common case.
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
 	wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
 
-	// Restore normal pipeline
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+	// Restore normal pipeline (and the active clip with it)
+	restore_draw_pipeline(ctx);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);

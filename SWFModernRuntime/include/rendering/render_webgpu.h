@@ -156,6 +156,19 @@ typedef struct WebGPURenderContext
 	WGPUBindGroupLayout blend_shader_bgl;
 	WGPUPipelineLayout blend_shader_pl;
 
+	// --- Clip-mask stencil isolation ---
+	// The stencil attachment is cleared exactly ONCE per render pass (= once per
+	// frame), so every clip mask writing the same hard-coded reference value (1)
+	// made mask N test the UNION of masks 1..N: the first mask in a frame worked,
+	// every later one was a no-op that retroactively widened the earlier ones.
+	// Each mask now takes its own reference out of `mask_ref_next`.
+	u32 mask_ref;             // stencil reference of the ACTIVE clip (0 = none)
+	u32 mask_ref_next;        // per-pass monotonic allocator, 1..255
+	u32 mask_capture_depth;   // >0 while writing mask geometry (nested sprite masks)
+	int mask_save_sp;         // depth of the offscreen-pass save stack
+	u32 mask_save_ref[8];     // {mask_ref, mask_capture_depth} parked across an
+	u32 mask_save_cap[8];     //   offscreen pass, which owns a CLEARED stencil
+
 	// --- SDL window (native only) ---
 #if !defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
 	struct SDL_Window* window;

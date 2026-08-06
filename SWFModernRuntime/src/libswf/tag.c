@@ -5451,12 +5451,17 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	u32 active_clip_depth = 0;
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
-		DisplayObject* obj = &display_list[i];
-		if (obj->char_id == 0) continue;
+		// End an active clip BEFORE the empty-depth skip, matching
+		// render_display_list and tagShowFrame. With the skip first, an EMPTY
+		// depth immediately after a clip range never reached the end-of-range
+		// check, so the clip stayed active for the next non-empty depth and
+		// content past the range kept being clipped.
 		if (active_clip_depth > 0 && i > active_clip_depth) {
 			renderer_end_clip(context);
 			active_clip_depth = 0;
 		}
+		DisplayObject* obj = &display_list[i];
+		if (obj->char_id == 0) continue;
 		if (obj->clip_depth > 0) {
 			Character* ch = &dictionary[obj->char_id];
 			if (ch->type == CHAR_TYPE_SHAPE) {
