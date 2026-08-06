@@ -94,6 +94,13 @@ struct MovieClip {
 	void* drawing_state;   // DrawingState* (lazily allocated, used by Drawing API)
 	void* mask_mc;         // MovieClip* that masks this MC (set by setMask), NULL if none
 	u8 is_mask;            // 1 if this MC is used as a mask for another MC (skip normal rendering)
+	// Inverse of mask_mc: the MovieClip* this MC masks (Ruffle's masker->maskee
+	// link). Set/cleared only through the setMask pair registry in action.c.
+	// NEVER store a DisplayObject* for mask pairing — MovieClip structs are
+	// immortal (tombstoned at depth == INT_MIN, never freed), display-list
+	// entries are relocatable and reclaimable. See
+	// SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
+	void* maskee_mc;
 	// AS2 event dispatch state
 	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
@@ -643,6 +650,23 @@ int actionIterateMaskedDrawings(DrawingMaskedCallback cb, void* user_data);
 // Get Drawing API paths for a specific MovieClip (by instance name).
 // Returns the number of paths filled into out[]. Used by tag.c for sprite clip masks.
 int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo* out, int max_out);
+
+// --- AVM1 setMask pairing (mask defect B) -----------------------------------
+// The registry of live `maskee.setMask(masker)` pairs. All state lives on
+// MovieClip (immortal); no DisplayObject* is ever stored. tag.c's paint loops
+// use these to (a) suppress a live masker as ordinary content and (b) push the
+// masker's geometry into the stencil around the maskee.
+//
+// Number of registered pairs. 0 in every movie that never calls setMask, which
+// is the one-branch fast-out at the top of each paint hook.
+int actionAvm1MaskPairCount(void);
+// Copy up to `max` live pairs into the caller's arrays (MovieClip* each).
+// "Live" = both partners are non-tombstoned. Returns the number written.
+int actionAvm1GetMaskPairs(void** out_maskees, void** out_maskers, int max);
+// 1 when `mc_ptr` is the masker of a live pair (skip it as content).
+int actionAvm1IsLiveMasker(const void* mc_ptr);
+// The masker MovieClip* of the live pair whose maskee is `mc_ptr`, else NULL.
+void* actionAvm1MaskerForMC(const void* mc_ptr);
 
 // Attached bitmap iteration: callback for rendering BitmapData attached to MCs
 typedef struct AttachedBitmapInfo {

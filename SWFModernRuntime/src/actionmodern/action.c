@@ -26410,6 +26410,9 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 		if (!MC_IS_TEXTFIELD(mc)) continue;
 		if (mc->dynamic_props == NULL) continue;
 		if (!mc->visible) continue;
+		// A live setMask masker is never painted as ordinary content — it only
+		// contributes to its maskee's stencil (mask defect B).
+		if (actionAvm1IsLiveMasker(mc)) continue;
 
 		ASObject* props = (ASObject*)mc->dynamic_props;
 
@@ -28594,6 +28597,142 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 	return count;
 }
 
+// ---------------------------------------------------------------------------
+// AVM1 setMask pairing registry (mask defect B)
+// ---------------------------------------------------------------------------
+// `maskee.setMask(masker)` used to be honoured only when BOTH clips carried
+// Drawing-API geometry (actionIterateDrawings / actionIterateMaskedDrawings) —
+// a timeline-placed sprite, a DefineShape or an EditText was neither clipped
+// nor suppressed. The renderer needs the pairing, and the renderer works in
+// display-list entries, so the temptation is to hang a `DisplayObject*` off the
+// entry. That is a use-after-free: entries are relocated by ng_spriteDLRealloc,
+// freed by ng_freeSpriteDL and reclaimed by depth reuse, and none of those
+// funnels would scrub such a pointer.
+//
+// So: the pairing is MovieClip-identity based. MovieClip structs are allocated
+// once and NEVER freed (dead clips are tombstoned with depth == INT_MIN — see
+// actionReclaimDeadChildMCSlots), so a stored MovieClip* can go stale but never
+// invalid, and staleness is a read-time predicate. The only DisplayObject* the
+// mask code touches is `mc->display_obj`, read fresh at the point of use (it is
+// the one entry pointer the realloc/free funnels already maintain).
+//
+// Design: SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §3.
+#define AVM1_MASK_MAX_PAIRS 64
+typedef struct { MovieClip* maskee; MovieClip* masker; } Avm1MaskPair;
+static Avm1MaskPair g_avm1_mask_pairs[AVM1_MASK_MAX_PAIRS];
+static int g_avm1_mask_pair_count = 0;
+
+// A pair is inert once either partner is tombstoned; nothing has to be cleared
+// when a clip is removed, rewound or re-cloned.
+static int avm1_mask_mc_live(const MovieClip* mc)
+{
+	return mc != NULL && mc->depth != INT_MIN;
+}
+
+// Ruffle's DisplayObject::set_mask clears clip_depth on BOTH objects, so a
+// timeline clipDepth range that is later re-purposed by setMask stops acting as
+// its own stencil. AVM2 landed this in s12 (avm2_display.c:4217/4229); AVM1
+// needs it for the same reason — masker suppression WITHOUT the retirement
+// loses a patch on avm1/mask_reapply's deliberately-backwards second pair.
+static void avm1_mask_retire_clip_depth(MovieClip* mc)
+{
+	if (mc == NULL || mc->display_obj == NULL) return;
+	((DisplayObject*)mc->display_obj)->clip_depth = 0;
+}
+
+// Drop the pair whose maskee is `maskee` (if any), clearing both directions.
+static void avm1_mask_unpair_maskee(MovieClip* maskee)
+{
+	if (maskee == NULL) return;
+	for (int i = 0; i < g_avm1_mask_pair_count; i++) {
+		if (g_avm1_mask_pairs[i].maskee != maskee) continue;
+		MovieClip* masker = g_avm1_mask_pairs[i].masker;
+		if (masker != NULL && masker->maskee_mc == (void*)maskee) {
+			masker->maskee_mc = NULL;
+			masker->is_mask = 0;
+		}
+		maskee->mask_mc = NULL;
+		g_avm1_mask_pairs[i] = g_avm1_mask_pairs[--g_avm1_mask_pair_count];
+		return;
+	}
+	// Registry miss (pair predates the registry / overflowed it): still clear
+	// the direct links so state can't get stuck.
+	if (maskee->mask_mc != NULL) {
+		MovieClip* masker = (MovieClip*)maskee->mask_mc;
+		if (masker->maskee_mc == (void*)maskee) {
+			masker->maskee_mc = NULL;
+			masker->is_mask = 0;
+		}
+		maskee->mask_mc = NULL;
+	}
+}
+
+// Drop the pair whose masker is `masker` (a clip can mask only one target).
+static void avm1_mask_unpair_masker(MovieClip* masker)
+{
+	if (masker == NULL) return;
+	for (int i = 0; i < g_avm1_mask_pair_count; i++) {
+		if (g_avm1_mask_pairs[i].masker != masker) continue;
+		avm1_mask_unpair_maskee(g_avm1_mask_pairs[i].maskee);
+		return;
+	}
+	masker->maskee_mc = NULL;
+	masker->is_mask = 0;
+}
+
+static void avm1_mask_pair(MovieClip* maskee, MovieClip* masker)
+{
+	if (maskee == NULL || masker == NULL || maskee == masker) return;
+	avm1_mask_unpair_maskee(maskee);
+	avm1_mask_unpair_masker(masker);
+	maskee->mask_mc = masker;
+	masker->maskee_mc = maskee;
+	masker->is_mask = 1;
+	// Ruffle set_mask: both objects stop being their own clipDepth stencil.
+	avm1_mask_retire_clip_depth(maskee);
+	avm1_mask_retire_clip_depth(masker);
+	if (g_avm1_mask_pair_count < AVM1_MASK_MAX_PAIRS)
+		g_avm1_mask_pairs[g_avm1_mask_pair_count++] = (Avm1MaskPair){ maskee, masker };
+}
+
+int actionAvm1MaskPairCount(void)
+{
+	return g_avm1_mask_pair_count;
+}
+
+int actionAvm1GetMaskPairs(void** out_maskees, void** out_maskers, int max)
+{
+	int n = 0;
+	for (int i = 0; i < g_avm1_mask_pair_count && n < max; i++) {
+		MovieClip* maskee = g_avm1_mask_pairs[i].maskee;
+		MovieClip* masker = g_avm1_mask_pairs[i].masker;
+		if (!avm1_mask_mc_live(maskee) || !avm1_mask_mc_live(masker)) continue;
+		out_maskees[n] = maskee;
+		out_maskers[n] = masker;
+		n++;
+	}
+	return n;
+}
+
+int actionAvm1IsLiveMasker(const void* mc_ptr)
+{
+	const MovieClip* mc = (const MovieClip*)mc_ptr;
+	if (mc == NULL || !mc->is_mask) return 0;
+	if (!avm1_mask_mc_live(mc)) return 0;
+	return avm1_mask_mc_live((const MovieClip*)mc->maskee_mc);
+}
+
+void* actionAvm1MaskerForMC(const void* mc_ptr)
+{
+	const MovieClip* mc = (const MovieClip*)mc_ptr;
+	if (mc == NULL || mc->mask_mc == NULL) return NULL;
+	if (!avm1_mask_mc_live(mc)) return NULL;
+	MovieClip* masker = (MovieClip*)mc->mask_mc;
+	if (!avm1_mask_mc_live(masker)) return NULL;
+	if (masker->maskee_mc != (const void*)mc) return NULL;
+	return masker;
+}
+
 int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
 {
 	int count = 0;
@@ -28660,6 +28799,8 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->depth == INT_MIN) continue;
 		if (!mc->visible) continue;
+		// Live setMask masker: stencil-only, never ordinary content.
+		if (actionAvm1IsLiveMasker(mc)) continue;
 		if (mc->attached_bitmap_pixels == NULL) continue;
 
 		AttachedBitmapInfo info;
@@ -70769,10 +70910,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (args != NULL) FREE(args);
 			if (mask_arg.type == ACTION_STACK_VALUE_NULL || mask_arg.type == ACTION_STACK_VALUE_UNDEFINED) {
 				// Remove mask
-				if (mc != NULL && mc->mask_mc != NULL) {
-					((MovieClip*)mc->mask_mc)->is_mask = 0;
-					mc->mask_mc = NULL;
-				}
+				avm1_mask_unpair_maskee(mc);
 				PUSH(ACTION_STACK_VALUE_BOOLEAN, 1);
 				return;
 			}
@@ -70827,11 +70965,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 			if (mask_mc != NULL && mc != NULL) {
-				// Clear any previous mask
-				if (mc->mask_mc != NULL)
-					((MovieClip*)mc->mask_mc)->is_mask = 0;
-				mc->mask_mc = mask_mc;
-				mask_mc->is_mask = 1;
+				// Registers the pair, clears any previous pairing on EITHER
+				// side, and retires clip_depth on both entries (Ruffle
+				// DisplayObject::set_mask). See the registry block above
+				// actionIterateDrawings.
+				avm1_mask_pair(mc, mask_mc);
 			}
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, (mask_mc != NULL) ? 1 : 0);
 			return;

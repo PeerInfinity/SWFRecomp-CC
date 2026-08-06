@@ -3134,6 +3134,80 @@ static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
 // usual, which is all a mask needs.
 static int g_clip_mask_capture = 0;
 
+// ---------------------------------------------------------------------------
+// AVM1 setMask (mask defect B) — paint-time pairing hooks
+// ---------------------------------------------------------------------------
+// `maskee.setMask(masker)` used to be honoured only for Drawing-API clips
+// (actionIterateMaskedDrawings); timeline sprites, DefineShapes and EditTexts
+// were neither clipped nor suppressed. These helpers give the three display
+// list loops the two halves Ruffle has: a masker is never painted as ordinary
+// content, and a maskee is painted with the masker's geometry in the stencil.
+//
+// The pairing lives entirely on MovieClip (immortal; tombstoned, never freed).
+// The only DisplayObject* touched is `mc->display_obj`, RE-READ at every use —
+// storing one would dangle across ng_spriteDLRealloc / ng_freeSpriteDL and
+// silently re-target on depth reuse. Design + the UAF that killed the previous
+// sketch: SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
+#define AVM1_MASK_PAINT_MAX 64
+
+// Non-NULL only while draw_mc_mask_geometry replays ONE text field's glyphs
+// into a stencil; textfield_glyph_render_cb ignores every other field then.
+static MovieClip* g_avm1_mask_glyph_only_mc = NULL;
+
+static void draw_mc_mask_geometry(SWFAppContext* app_context, MovieClip* masker);
+
+// Does display-list entry `obj` belong to MovieClip `mc`? `mc->display_obj` is
+// the authoritative key; root-placed EditText wrappers have display_obj == NULL
+// (edittext-wrapper-no-display-obj-invalidate), so fall back to the instance
+// name — the same name-keyed route the sprite clipDepth branch already uses for
+// Drawing-API paths.
+static int avm1_mc_owns_entry(const MovieClip* mc, const DisplayObject* obj)
+{
+	if (mc == NULL || obj == NULL) return 0;
+	if (mc->display_obj != NULL) return mc->display_obj == (const void*)obj;
+	if (obj->instance_name == NULL || mc->name[0] == '\0') return 0;
+	return strcmp(obj->instance_name, mc->name) == 0;
+}
+
+// The masker whose stencil must wrap `obj`, or NULL when `obj` is not a maskee.
+static MovieClip* avm1_masker_for_entry(const DisplayObject* obj)
+{
+	if (obj == NULL || actionAvm1MaskPairCount() == 0) return NULL;
+	void* maskees[AVM1_MASK_PAINT_MAX];
+	void* maskers[AVM1_MASK_PAINT_MAX];
+	int n = actionAvm1GetMaskPairs(maskees, maskers, AVM1_MASK_PAINT_MAX);
+	for (int i = 0; i < n; i++)
+		if (avm1_mc_owns_entry((const MovieClip*)maskees[i], obj))
+			return (MovieClip*)maskers[i];
+	return NULL;
+}
+
+// 1 when `obj` is the masker of a live pair — Ruffle never paints those.
+static int entry_is_live_masker(const DisplayObject* obj)
+{
+	if (obj == NULL || actionAvm1MaskPairCount() == 0) return 0;
+	void* maskees[AVM1_MASK_PAINT_MAX];
+	void* maskers[AVM1_MASK_PAINT_MAX];
+	int n = actionAvm1GetMaskPairs(maskees, maskers, AVM1_MASK_PAINT_MAX);
+	for (int i = 0; i < n; i++)
+		if (avm1_mc_owns_entry((const MovieClip*)maskers[i], obj))
+			return 1;
+	return 0;
+}
+
+// Open the masker's stencil and return the clip reference to restore after the
+// maskee is painted. Pair with renderer_restore_clip (NOT renderer_end_clip):
+// end_clip zeroes mask_ref and would drop an enclosing clipDepth range for
+// every later sibling (the s12 fix on the AVM2 walk, same shape).
+static u32 avm1_mask_push(SWFAppContext* app_context, MovieClip* masker)
+{
+	u32 saved = renderer_clip_ref(context);
+	renderer_begin_clip_mask(context);
+	draw_mc_mask_geometry(app_context, masker);
+	renderer_end_clip_mask(context);
+	return saved;
+}
+
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
 	if (cxform_forces_invisible(app_context, obj->cxform_id)) return;
@@ -3379,17 +3453,34 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 	// nested renderer did not — so a sprite's mask shape was drawn as ordinary
 	// visible geometry (Pacman's title "C" showed the white wedge mask box
 	// instead of clipping the yellow pacman). Mirror the root loops' handling.
+	// Closing a nested clip range with renderer_end_clip ZEROES mask_ref, which
+	// is right when this walk owns the whole stencil but wrong when it was
+	// entered under one: a clipDepth range inside a clipped sprite (or inside a
+	// setMask'd maskee) dropped the ENCLOSING clip for everything drawn after
+	// it. Restore the reference this call started with instead — restore_clip(0)
+	// is byte-identical to end_clip, so the common (unclipped) entry is
+	// unchanged. Same fix s12 made on the AVM2 walk (avm2_display.c:15548+).
+	u32 pre_clip_ref = renderer_clip_ref(context);
 	u32 active_clip_depth = 0;
 	for (size_t i = 1; i <= dl_max_depth; ++i)
 	{
 		if (active_clip_depth > 0 && i > active_clip_depth)
 		{
-			renderer_end_clip(context);
+			renderer_restore_clip(context, pre_clip_ref);
 			active_clip_depth = 0;
 		}
 
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
+
+		// AVM1 setMask pairing (mask defect B). One branch when nothing in the
+		// movie ever called setMask.
+		MovieClip* avm1_masker = NULL;
+		if (actionAvm1MaskPairCount() != 0) {
+			if (entry_is_live_masker(obj)) continue;   // masker: stencil only
+			avm1_masker = avm1_masker_for_entry(obj);
+		}
+
 		// Honor AS-set _visible=false on a nested entry (and its whole subtree).
 		// SetProperty/SetMember _visible syncs the MC's _visible onto this entry's
 		// as_hidden via mc->display_obj. Mirrors the same skip in the main display
@@ -3490,6 +3581,11 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		}
 #endif
 
+		// setMask maskee: push the masker's stencil around this entry's paint.
+		u32 avm1_mask_saved_clip = 0;
+		if (avm1_masker != NULL)
+			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
+
 		Character* ch = &dictionary[obj->char_id];
 		switch (ch->type)
 		{
@@ -3566,9 +3662,12 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 				break;
 		}
+
+		if (avm1_masker != NULL)
+			renderer_restore_clip(context, avm1_mask_saved_clip);
 	}
 	if (active_clip_depth > 0)
-		renderer_end_clip(context);
+		renderer_restore_clip(context, pre_clip_ref);
 }
 #endif // NO_GRAPHICS
 
@@ -4845,6 +4944,15 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	SWFAppContext* _gd_ctx = (SWFAppContext*)user_data;
 	size_t glyph_data_entries = _gd_ctx ? (_gd_ctx->glyph_data_size / sizeof(u32)) : 0;
 
+	// AVM1 setMask (mask defect B). While draw_mc_mask_geometry replays a
+	// masker field into the stencil only that field is drawn; in the ordinary
+	// glyph pass a live masker field is not drawn as content at all.
+	if (g_avm1_mask_glyph_only_mc != NULL) {
+		if (info->mc != (void*)g_avm1_mask_glyph_only_mc) return;
+	} else if (info->mc != NULL && actionAvm1IsLiveMasker(info->mc)) {
+		return;
+	}
+
 	int font_idx = ng_find_font_with_metrics(info->font_id);
 	if (font_idx < 0) return;
 
@@ -4870,7 +4978,13 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	float mask_y = info->y * 20.0f + bymin_off;
 	float mask_w = info->w * 20.0f - 2.0f * gutter_twips;
 	float mask_h = info->h * 20.0f;
-	int has_clip = (mask_w > 0.0f && mask_h > 0.0f);
+	// Suppressed while this field is being rasterised INTO a stencil: Ruffle's
+	// EditText bounds mask is a nested mask inside a mask capture and is
+	// therefore ignored (our renderer already no-ops the nested begin/end pair;
+	// only the rect draw itself needs gating). Without this the masked glyphs
+	// would be cut off at the field's right edge (~x=192 in text_field_mask)
+	// instead of running the full width of the text.
+	int has_clip = (mask_w > 0.0f && mask_h > 0.0f) && !g_clip_mask_capture;
 	if (has_clip) {
 		renderer_begin_clip_mask(context);
 		renderer_draw_rect(context, mask_x, mask_y, mask_w, mask_h, 1.0f, 1.0f, 1.0f, 1.0f, 0, 0);
@@ -5393,6 +5507,57 @@ static void render_drawing_mc_paths_fill_only(const DrawingMCInfo* mc_info)
 	}
 }
 
+// Rasterise a setMask masker's geometry into the stencil (mask defect B).
+// Called between renderer_begin_clip_mask / renderer_end_clip_mask. A masker
+// can be more than one of the three kinds, so all that apply are drawn.
+// `masker->display_obj` is read FRESH here and never stored.
+static void draw_mc_mask_geometry(SWFAppContext* app_context, MovieClip* masker)
+{
+	if (masker == NULL) return;
+
+	// (1) Timeline entry — shape / morph shape / sprite (or button) subtree.
+	//     Same routes as the sprite clipDepth branch in the root loops.
+	DisplayObject* md = (DisplayObject*)masker->display_obj;
+	if (md != NULL && md->char_id != 0 && (size_t)md->char_id < dictionary_capacity) {
+		Character* mch = &dictionary[md->char_id];
+		g_clip_mask_capture++;
+		if (mch->type == CHAR_TYPE_SHAPE) {
+			renderer_draw_shape(context, mch->shape_offset, mch->size,
+				md->transform_id, md->cxform_id);
+		} else if (mch->type == CHAR_TYPE_MORPH_SHAPE) {
+			renderer_draw_shape(context, mch->morph_start_offset, mch->morph_start_size,
+				md->transform_id, md->cxform_id);
+		} else if ((mch->type == CHAR_TYPE_SPRITE || mch->type == CHAR_TYPE_BUTTON)
+		           && md->sprite_display_list != NULL) {
+			render_display_list(app_context, md->sprite_display_list, md->sprite_max_depth);
+		}
+		g_clip_mask_capture--;
+	}
+
+	// (2) Drawing-API geometry drawn into the masker. Fill triangles only —
+	//     Flash masks ignore the mask clip's line style.
+	if (masker->drawing_state != NULL && masker->name[0] != '\0') {
+		DrawingRenderInfo dinfos[64];
+		int dn = actionGetMCDrawingPathsByName(masker->name, dinfos, 64);
+		if (dn > 0) {
+			DrawingMCInfo dmc = { dn, dinfos };
+			render_drawing_mc_paths_fill_only(&dmc);
+		}
+	}
+
+	// (3) EditText wrapper — its glyph fills. The field-bounds clip inside
+	//     textfield_glyph_render_cb is a NESTED mask, which Ruffle's renderer
+	//     ignores inside a capture, so it is suppressed while g_clip_mask_capture
+	//     is set: the stencil becomes the glyph silhouette, not the field box.
+	if (masker->ng_textfield_idx >= 0 || masker->ng_textfield_idx == -2) {
+		g_clip_mask_capture++;
+		g_avm1_mask_glyph_only_mc = masker;
+		actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
+		g_avm1_mask_glyph_only_mc = NULL;
+		g_clip_mask_capture--;
+	}
+}
+
 // Callback for actionIterateMaskedDrawings: stencil-masked rendering.
 static void masked_drawing_render_cb(const DrawingMCInfo* masked, const DrawingMCInfo* mask, void* user_data)
 {
@@ -5656,6 +5821,12 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		}
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
+		// AVM1 setMask pairing (mask defect B) — see render_display_list.
+		MovieClip* avm1_masker = NULL;
+		if (actionAvm1MaskPairCount() != 0) {
+			if (entry_is_live_masker(obj)) continue;
+			avm1_masker = avm1_masker_for_entry(obj);
+		}
 		if (obj->clip_depth > 0) {
 			Character* ch = &dictionary[obj->char_id];
 			if (ch->type == CHAR_TYPE_SHAPE) {
@@ -5693,6 +5864,11 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		// filter_tex_a, so blend keeps the legacy per-draw pipeline there.
 		int blend_layered = !blend_skip && obj->filter_type == 0
 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
+		// setMask maskee: the masker's geometry becomes the stencil for this
+		// entry's paint, restored (not ended) afterwards.
+		u32 avm1_mask_saved_clip = 0;
+		if (avm1_masker != NULL)
+			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
 		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, obj->blend_mode);
 		if (blend_skip) {
@@ -5715,6 +5891,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		}
 		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, 0);
+		if (avm1_masker != NULL)
+			renderer_restore_clip(context, avm1_mask_saved_clip);
 	}
 	if (active_clip_depth > 0)
 		renderer_end_clip(context);
@@ -5909,6 +6087,9 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	extern MovieClip root_movieclip;
 	if (mc->display_obj == NULL) return;            // no sprite content
 	if (!mc->visible) return;                       // AS-set _visible=false
+	// A live setMask masker is stencil-only, never ordinary content
+	// (mask defect B).
+	if (actionAvm1IsLiveMasker(mc)) return;
 	// Timeline-placed root children point into the global display_list and were
 	// already drawn by the main render loop.
 	uintptr_t dl_lo = (uintptr_t)display_list;
@@ -5955,8 +6136,16 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
 	compose_children(app_context, d->sprite_display_list,
 		d->sprite_max_depth, mc_xform, NULL, 0);
+	// setMask maskee: dynamic clips with display-list content get the same
+	// stencil push/restore as timeline entries (mask defect B).
+	MovieClip* avm1_masker = (MovieClip*)actionAvm1MaskerForMC(mc);
+	u32 avm1_mask_saved_clip = 0;
+	if (avm1_masker != NULL)
+		avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
 	render_display_list(app_context, d->sprite_display_list,
 		d->sprite_max_depth);
+	if (avm1_masker != NULL)
+		renderer_restore_clip(context, avm1_mask_saved_clip);
 }
 
 #if !defined(NO_GRAPHICS)
@@ -6576,6 +6765,14 @@ void tagShowFrame(SWFAppContext* app_context)
 			continue;
 		}
 
+		// AVM1 setMask pairing (mask defect B) — see render_display_list.
+		MovieClip* avm1_masker = NULL;
+		if (actionAvm1MaskPairCount() != 0)
+		{
+			if (entry_is_live_masker(obj)) continue;
+			avm1_masker = avm1_masker_for_entry(obj);
+		}
+
 		// Honor AS-set _visible=false on a timeline-placed object: skip rendering
 		// it (and its whole subtree). actionSetProperty syncs the MC's _visible
 		// onto this entry's as_hidden via mc->display_obj — a name lookup from
@@ -6627,6 +6824,11 @@ void tagShowFrame(SWFAppContext* app_context)
 		int blend_layered = !blend_skip && obj->filter_type == 0
 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
 
+		// setMask maskee: push the masker's geometry as this entry's stencil.
+		u32 avm1_mask_saved_clip = 0;
+		if (avm1_masker != NULL)
+			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
+
 		// Set blend mode if non-default
 		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, obj->blend_mode);
@@ -6663,6 +6865,9 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Restore default blend mode
 		if (obj->blend_mode > 1 && !blend_layered && !blend_skip)
 			renderer_set_blend_mode(context, 0);
+
+		if (avm1_masker != NULL)
+			renderer_restore_clip(context, avm1_mask_saved_clip);
 
 #ifndef OFFSCREEN_RENDER
 		// Interleave attached (child_mc_cache) clips parented to THIS timeline
