@@ -15283,6 +15283,14 @@ static void avm2_render_statictext(Avm2Context* ctx, Avm2Object* obj,
 	heap_free(ctx->app, gl);
 }
 
+// >0 while a timeline clip layer is being rasterised into the STENCIL rather
+// than the colour target. Mirrors tag.c's g_clip_mask_capture. Ruffle renders a
+// mask subtree even when visible == false
+// (DisplayObjectContainer::render_children: `child.visible() ||
+// context.commands.drawing_mask()`), so the visibility cull below is suspended
+// for the duration of a capture.
+static int g_avm2_mask_capture = 0;
+
 // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
@@ -15292,7 +15300,7 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
-	if (!ext->is_stage && !ext->visible) return;
+	if (!ext->is_stage && !ext->visible && g_avm2_mask_capture == 0) return;
 
 	Mat local = ext_matrix(ext);
 	Mat world = mat_mul(parent_world, &local);
@@ -15336,8 +15344,48 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 		if (bst != NULL) avm2_render_node(ctx, bst, &world, alpha, &node_cx);
 	}
 
+	// Timeline clip layers (PlaceObject2/3 clipDepth). A child with
+	// clip_depth > 0 is NEVER painted: it is rasterised into the stencil and
+	// masks every later sibling whose depth is <= clip_depth. This walk had no
+	// clipping of any kind, so a masked subtree rendered as the UNION of mask
+	// and content instead of their intersection (from_shumway/acid/acid: the
+	// nose is an ellipse at depth 186 clipped by a diamond at depth 185 with
+	// clipDepth 187 — we drew the diamond AND the whole ellipse).
+	//
+	// Model: Ruffle's DisplayObjectContainer::render_children, reduced to the
+	// single active range per container that tag.c's AVM1 display-list loop
+	// (:5506-5545) already uses. Ranges nested inside a sprite mask are
+	// absorbed by render_webgpu's mask_capture_depth (:2616-2643), so an inner
+	// begin/end pair cannot steal the outer mask's stencil reference.
+	int32_t active_clip_depth = 0;
 	for (uint32_t i = 0; i < ext->render_len; i++)
-		avm2_render_node(ctx, ext->render_list[i], &world, alpha, &node_cx);
+	{
+		Avm2Object* child = ext->render_list[i];
+		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+		if (cext != NULL)
+		{
+			// End the active range BEFORE the child is considered, so the
+			// first sibling past clip_depth draws unclipped.
+			if (active_clip_depth > 0 && cext->depth > active_clip_depth)
+			{
+				renderer_end_clip(context);
+				active_clip_depth = 0;
+			}
+			if (cext->clip_depth > 0)
+			{
+				renderer_begin_clip_mask(context);
+				g_avm2_mask_capture++;
+				avm2_render_node(ctx, child, &world, alpha, &node_cx);
+				g_avm2_mask_capture--;
+				renderer_end_clip_mask(context);
+				active_clip_depth = cext->clip_depth;
+				continue;   // the mask itself is never painted
+			}
+		}
+		avm2_render_node(ctx, child, &world, alpha, &node_cx);
+	}
+	if (active_clip_depth > 0)
+		renderer_end_clip(context);
 }
 
 // Focus highlight, drawn on TOP of the whole stage (Ruffle
@@ -15408,14 +15456,33 @@ void avm2_render_init(Avm2Context* ctx)
 	context->cxform_data = app->cxform_data;
 	context->cxform_data_size = app->cxform_data_size;
 
-	// Dynamic bitmap-layer dims. AVM2 has no static bitmaps (BITMAP_COUNT 0),
-	// so the dynamic layer is sized to dynamic_bitmap_max_{w,h}+1 (render_webgpu
-	// init) and every runtime BitmapData blits into it. Cover the whole stage;
-	// larger BitmapData is skipped (blank) in avm2_render_bitmap.
+	// Dynamic bitmap-layer dims. The dynamic layer is sized to
+	// dynamic_bitmap_max_{w,h}+1 (render_webgpu init) and every runtime
+	// BitmapData blits into it; larger BitmapData is skipped (blank) in
+	// avm2_render_bitmap. Cover the whole stage AND every embedded bitmap
+	// character: an AVM2 movie that places a DefineBits* character directly
+	// seeds its BitmapData from that character (avm2_bitmap_seed_timeline),
+	// and those are routinely LARGER than the stage — from_shumway/acid's
+	// acid-color (1840x1840 on a 550x400 stage), acid-image (861x737 on
+	// 512x512) and acid-big (2080x1100 on 512x512) all rendered blank because
+	// the cap was stage-only.
+	//
+	// This costs zero extra VRAM: the shared static+dynamic texture array in
+	// create_buffers_and_upload is already allocated at
+	// max(bitmap_highest+1, dynamic_bitmap_max+1) (render_webgpu.c:1219-1230),
+	// so raising dynamic_bitmap_max UP TO bitmap_highest cannot raise that
+	// maximum. It does raise the per-frame sub-region upload
+	// (render_webgpu.c:2366-2399, (src+1)^2 texels) for movies that actually
+	// draw such a bitmap — acceptable for the corpus, and worth noting for a
+	// browser title with a giant atlas drawn every frame.
 	uint32_t maxdim = app->width > app->height ? app->width : app->height;
 	if (maxdim < 256) maxdim = 256;
 	context->dynamic_bitmap_max_w = maxdim;
 	context->dynamic_bitmap_max_h = maxdim;
+	if ((uint32_t) app->bitmap_highest_w > context->dynamic_bitmap_max_w)
+		context->dynamic_bitmap_max_w = (uint32_t) app->bitmap_highest_w;
+	if ((uint32_t) app->bitmap_highest_h > context->dynamic_bitmap_max_h)
+		context->dynamic_bitmap_max_h = (uint32_t) app->bitmap_highest_h;
 
 	// Stage background (opaque); g_stage_color was set by build_stage.
 	context->red   = (u8) ((g_stage_color >> 16) & 0xFF);
