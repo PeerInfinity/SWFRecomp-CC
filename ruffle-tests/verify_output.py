@@ -2010,6 +2010,34 @@ def get_mock_date_time(test_dir):
     return None
 
 
+def get_msaa_samples(test_dir):
+    """Parse [player_options].with_renderer.quality from test.toml and map it to
+    an MSAA sample count, mirroring Ruffle's StageQuality::sample_count()
+    (ruffle/render/src/quality.rs:66-76): Low -> 1, everything else -> 4.
+
+    Ruffle renders `quality = "low"` goldens with NO antialiasing, so grading our
+    always-4x render against them leaves a coverage fringe on every non-axis-
+    aligned edge. The value is passed to the runtime as -DMSAA_SAMPLES=N.
+
+    Medium (2) / 8 / 16 are clamped to 4: the corpus has exactly one `medium`
+    comparison (already passing) and clamping removes a Dawn/lavapipe sample-count
+    portability failure mode. Absent or unrecognised quality -> 4 (unchanged).
+    """
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return 4
+    text = toml_path.read_text()
+    # Inline-table spelling used throughout the corpus:
+    #   with_renderer = { optional = true, quality = "low" }
+    m = re.search(r"with_renderer\s*=\s*\{[^}]*quality\s*=\s*\"(\w+)\"", text)
+    if not m:
+        # Flat spelling, e.g. a [player_options] section with `quality = "low"`.
+        m = re.search(r"^\s*quality\s*=\s*\"(\w+)\"", text, re.MULTILINE)
+    if not m:
+        return 4
+    return 1 if m.group(1).lower() == "low" else 4
+
+
 def get_log_fetch(test_dir):
     """Parse log_fetch from test.toml.
 
@@ -2452,6 +2480,12 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         mode_defines = ["-DUSE_WEBGPU", "-DOFFSCREEN_RENDER", "-DNDEBUG"]
         if has_image_comparisons:
             mode_defines.append("-DHEADLESS_RENDER_ENABLED")
+        # Stage quality -> MSAA sample count (render_webgpu.c). Only emitted when
+        # it differs from the runtime default of 4, so every quality != "low"
+        # test keeps a byte-identical compile command (and its ccache entry).
+        msaa_samples = get_msaa_samples(test_dir)
+        if msaa_samples != 4:
+            mode_defines.append(f"-DMSAA_SAMPLES={msaa_samples}")
         mode_includes = [
             f"-I{inc}/rendering",
             f"-I{STB_DIR}",

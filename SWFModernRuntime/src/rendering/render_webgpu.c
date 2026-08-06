@@ -32,6 +32,24 @@
 #define WGPU_LABEL(s) ((WGPUStringView){.data = (s), .length = WGPU_STRLEN})
 
 // ---------------------------------------------------------------------------
+// Antialiasing sample count. Flash's Stage.quality selects the AA level; Ruffle
+// maps StageQuality::Low -> 1 sample, Medium -> 2, High/Best -> 4
+// (ruffle/render/src/quality.rs). The test harness passes -DMSAA_SAMPLES=N per
+// test from [player_options].with_renderer.quality so low-quality goldens (which
+// Ruffle renders with NO antialiasing at all) are graded against a matching
+// render. Unset — browser, every game/demo build, and every quality != "low"
+// test — keeps the historical 4x, so those paths are bit-identical.
+//
+// At MSAA_SAMPLES == 1 the multisample colour targets have no resolve step: the
+// passes render straight into the single-sample destination (see the guarded
+// attachment pairs in begin_pass / resume_pass / begin_offscreen_pass).
+// Must live outside the OFFSCREEN_RENDER / __EMSCRIPTEN__ include block above.
+// ---------------------------------------------------------------------------
+#ifndef MSAA_SAMPLES
+#define MSAA_SAMPLES 4
+#endif
+
+// ---------------------------------------------------------------------------
 // Browser-WASM render perf counters (per close_pass): writeBuffer call/byte
 // count + draw-call count + queue-submit time, published to JS via
 // swf_render_stats(...) on window.__swfRender for the Ruffle-vs-SWFRecomp
@@ -1237,7 +1255,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		ctx->bitmap_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
 
-	// --- MSAA texture (4x) ---
+	// --- MSAA texture (MSAA_SAMPLES x) ---
 	{
 		WGPUTextureDescriptor tex_desc = {0};
 		tex_desc.label = WGPU_LABEL("msaa_texture");
@@ -1245,7 +1263,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		tex_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
 		tex_desc.format = ctx->surface_format;
 		tex_desc.mipLevelCount = 1;
-		tex_desc.sampleCount = 4;
+		tex_desc.sampleCount = MSAA_SAMPLES;
 		tex_desc.usage = WGPUTextureUsage_RenderAttachment;
 		ctx->msaa_texture = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
 
@@ -1263,7 +1281,7 @@ static void create_textures(WebGPURenderContext* ctx)
 		tex_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
 		tex_desc.format = WGPUTextureFormat_Depth24PlusStencil8;
 		tex_desc.mipLevelCount = 1;
-		tex_desc.sampleCount = 4;
+		tex_desc.sampleCount = MSAA_SAMPLES;
 		tex_desc.usage = WGPUTextureUsage_RenderAttachment;
 		ctx->depth_stencil_texture = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
 
@@ -1419,7 +1437,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	rp_desc.vertex.buffers = &vb_layout;
 	rp_desc.fragment = &frag_state;
 	rp_desc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-	rp_desc.multisample.count = 4;
+	rp_desc.multisample.count = MSAA_SAMPLES;
 	rp_desc.multisample.mask = ~0u;
 	rp_desc.depthStencil = &ds_normal;
 
@@ -1926,8 +1944,14 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	// Begin render pass with MSAA
 	WGPURenderPassColorAttachment color_att = {0};
 	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#if MSAA_SAMPLES == 1
+	// No antialiasing: render straight into the destination, no resolve.
+	color_att.view = ctx->surface_view;
+	color_att.resolveTarget = NULL;
+#else
 	color_att.view = ctx->msaa_view;
 	color_att.resolveTarget = ctx->surface_view;
+#endif
 	color_att.loadOp = WGPULoadOp_Clear;
 	color_att.storeOp = WGPUStoreOp_Store; // Store so filters can suspend/resume pass
 	color_att.clearValue = (WGPUColor){
@@ -3184,7 +3208,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 	ctx->filter_view_a = wgpuTextureCreateView(ctx->filter_tex_a, &fview_desc);
 	ctx->filter_view_b = wgpuTextureCreateView(ctx->filter_tex_b, &fview_desc);
 
-	// --- Separate MSAA 4x texture for offscreen rendering ---
+	// --- Separate MSAA texture for offscreen rendering ---
 	{
 		WGPUTextureDescriptor msaa_desc = {0};
 		msaa_desc.label = WGPU_LABEL("filter_msaa");
@@ -3192,7 +3216,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		msaa_desc.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
 		msaa_desc.format = ctx->surface_format;
 		msaa_desc.mipLevelCount = 1;
-		msaa_desc.sampleCount = 4;
+		msaa_desc.sampleCount = MSAA_SAMPLES;
 		msaa_desc.usage = WGPUTextureUsage_RenderAttachment;
 		ctx->filter_msaa_texture = wgpuDeviceCreateTexture(ctx->device, &msaa_desc);
 		ctx->filter_msaa_view = wgpuTextureCreateView(ctx->filter_msaa_texture, NULL);
@@ -3342,7 +3366,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
 		rpd.fragment = &fs;
 		rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-		rpd.multisample.count = 4;
+		rpd.multisample.count = MSAA_SAMPLES;
 		rpd.multisample.mask = 0xFFFFFFFF;
 		rpd.depthStencil = &ds;
 		ctx->composite_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
@@ -3487,7 +3511,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 		td.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
 		td.format = WGPUTextureFormat_Depth24PlusStencil8;
 		td.mipLevelCount = 1;
-		td.sampleCount = 4;
+		td.sampleCount = MSAA_SAMPLES;
 		td.usage = WGPUTextureUsage_RenderAttachment;
 		ctx->filter_ds_texture = wgpuDeviceCreateTexture(ctx->device, &td);
 		WGPUTextureViewDescriptor vd = {0};
@@ -3545,7 +3569,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 		rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
 		rpd.fragment = &fs;
 		rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-		rpd.multisample.count = 4;
+		rpd.multisample.count = MSAA_SAMPLES;
 		rpd.multisample.mask = 0xFFFFFFFF;
 		rpd.depthStencil = &ds;
 
@@ -3645,7 +3669,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 			rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
 			rpd.fragment = &fs;
 			rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-			rpd.multisample.count = 4;
+			rpd.multisample.count = MSAA_SAMPLES;
 			rpd.multisample.mask = 0xFFFFFFFF;
 			rpd.depthStencil = &ds;
 			ctx->blend_shader_pipeline[blend_shader_defs[i].mode] =
@@ -3766,8 +3790,13 @@ void render_webgpu_resume_pass(WebGPURenderContext* ctx)
 	// Resume the main render pass with loadOp=Load to preserve existing content + stencil
 	WGPURenderPassColorAttachment color_att = {0};
 	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#if MSAA_SAMPLES == 1
+	color_att.view = ctx->surface_view;
+	color_att.resolveTarget = NULL;
+#else
 	color_att.view = ctx->msaa_view;
 	color_att.resolveTarget = ctx->surface_view;
+#endif
 	color_att.loadOp = WGPULoadOp_Load;
 	color_att.storeOp = WGPUStoreOp_Store;
 
@@ -3822,8 +3851,13 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 	// the main pass content stored in ctx->msaa_view during suspend.
 	WGPURenderPassColorAttachment color_att = {0};
 	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#if MSAA_SAMPLES == 1
+	color_att.view = ctx->filter_view_a;
+	color_att.resolveTarget = NULL;
+#else
 	color_att.view = ctx->filter_msaa_view;
 	color_att.resolveTarget = ctx->filter_view_a;
+#endif
 	color_att.loadOp = WGPULoadOp_Clear;
 	color_att.storeOp = WGPUStoreOp_Store;
 	color_att.clearValue = (WGPUColor){0.0, 0.0, 0.0, 0.0};
