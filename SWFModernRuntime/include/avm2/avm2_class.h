@@ -49,6 +49,13 @@ typedef struct Avm2PropEntry
 	uint8_t kind;  // Avm2PropKind
 	uint8_t is_const;               // Const trait: writable only via InitProperty
 	uint8_t is_function_trait;      // Function trait: slot defaults to a closure
+	// Interface-namespace ALIAS (avm2_class.c add_iface_aliases_from): a copy
+	// of a public implementation re-keyed into an implemented interface's
+	// namespace so an interface-typed call site resolves. It is our dispatch
+	// machinery, not a trait avmplus has, so trait ENUMERATION
+	// (avmplus.describeTypeJSON) must skip it or every implemented member is
+	// reported twice.
+	uint8_t is_iface_alias;
 	uint32_t slot_index;
 	uint32_t type_mn;               // slot type multiname (coerce on write); 0 = any
 	Avm2AbcFileRt* type_file;       // file whose pools type_mn/value index (NULL = none)
@@ -283,6 +290,9 @@ Avm2Value avm2_class_construct(Avm2Context* ctx, Avm2Class* cls,
 // with the numeric-duality special cases for the builtin primitive classes.
 bool avm2_value_is_of_type(Avm2Context* ctx, Avm2Value v, Avm2Class* type_class);
 bool avm2_class_has_interface(Avm2Context* ctx, Avm2Class* cls, Avm2Class* iface);
+// Fill `cls->interfaces` from `cls->interface_mns` (idempotent; misses are
+// re-tried on every call). Exposed for describeType's all_interfaces walk.
+void avm2_class_resolve_interfaces(Avm2Context* ctx, Avm2Class* cls);
 
 // The class of a value (primitives map to their builtin classes; panics on
 // null/undefined — callers null-check first).

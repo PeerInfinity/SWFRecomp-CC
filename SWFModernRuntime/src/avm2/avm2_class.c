@@ -1216,6 +1216,7 @@ static void add_iface_aliases_from(Avm2Context* ctx, Avm2Class* cls, Avm2Class* 
 		if (own == NULL) continue;
 		Avm2PropEntry alias = *own;
 		alias.key = ie->key;
+		alias.is_iface_alias = 1;  // dispatch-only; never enumerated as a trait
 		avm2_vtable_append(ctx, &cls->ivtable, &alias);
 	}
 	resolve_interfaces(ctx, iface);
@@ -1650,6 +1651,11 @@ static void resolve_interfaces(Avm2Context* ctx, Avm2Class* cls)
 			}
 		}
 	}
+}
+
+void avm2_class_resolve_interfaces(Avm2Context* ctx, Avm2Class* cls)
+{
+	if (cls != NULL) resolve_interfaces(ctx, cls);
 }
 
 // Does `cls` implement `iface` directly or transitively?

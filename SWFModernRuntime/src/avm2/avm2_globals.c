@@ -1755,12 +1755,7 @@ static Avm2Value global_get_definition_by_name(Avm2Activation* act)
 	throw_1065_for_definition(ctx, s->utf8, s->len);
 }
 
-// flash.utils.describeType: builds a real E4X <type> tree (Ruffle
-// avmplus.as describeType over describeTypeJSON). Scope: attributes,
-// the extendsClass chain, the constructor (signature from emitted class
-// data when available; builtins report the avmplus 1-optional-* form),
-// and Object's three AS3 instance methods (declaredBy Object). Trait
-// enumeration for arbitrary classes is not modeled yet.
+// E4X construction primitives shared by the describeType emitter below.
 static void dt_set_attr(Avm2Context* ctx, E4XNode* elem, const char* name,
                         const char* value)
 {
@@ -1841,6 +1836,936 @@ static Avm2Value global_describe_type_utils(Avm2Activation* act)
 	return global_describe_type(act);
 }
 
+// ---------------------------------------------------------------------------
+// avmplus.describeType / avmplus.describeTypeJSON
+// ---------------------------------------------------------------------------
+//
+// Ruffle splits this in two and we mirror the split verbatim:
+//   * globals/avmplus.rs describe_type_json — a plain Object holding the
+//     class's traits ({name, isDynamic, isFinal, isStatic, traits{...}}),
+//   * globals/avmplus.as describeType       — pure AS that walks that object
+//     into an E4X <type>, then calls describeTypeJSON a SECOND time with
+//     USE_ITRAITS to build the nested <factory>.
+//
+// The intermediate here is a C struct (DtDesc) rather than a live AS object,
+// so the two emitters share one description. The order in which the XML
+// emitter appends elements and sets attributes is a literal transcription of
+// avmplus.as `copyTraits`/`copyParams`/`copyUriAndMetadata` (bases,
+// interfaces, constructor, variables, accessors, methods) because
+// from_avmplus/regress/bug_539328 compares the raw toString(), and because
+// ATTRIBUTE order is never normalized by the tests' normalizeXML() helper.
+//
+// Not modelled yet (see SWFRecompDocs/plans/session13-fanout-reports/
+// wave1-t7-describetype.md): ABC trait metadata (P3) and a typed descriptor
+// for the flash.* builtin surface (P4). Builtin members therefore report
+// returnType/type "*" and no parameters, which is why the avm2/all_classes/*
+// rows still fail.
+
+enum
+{
+	DT_HIDE_NSURI_METHODS  = 1u << 0,
+	DT_INCLUDE_BASES       = 1u << 1,
+	DT_INCLUDE_INTERFACES  = 1u << 2,
+	DT_INCLUDE_VARIABLES   = 1u << 3,
+	DT_INCLUDE_ACCESSORS   = 1u << 4,
+	DT_INCLUDE_METHODS     = 1u << 5,
+	DT_INCLUDE_METADATA    = 1u << 6,
+	DT_INCLUDE_CONSTRUCTOR = 1u << 7,
+	DT_INCLUDE_TRAITS      = 1u << 8,
+	DT_USE_ITRAITS         = 1u << 9,
+	DT_HIDE_OBJECT         = 1u << 10,
+};
+
+// avmplus.as FLASH10_FLAGS — everything except USE_ITRAITS.
+#define DT_FLASH10_FLAGS 0x05FFu
+
+// Folded "public" namespace kind (avm2_ns_fold maps 0x08 → 0x16). Ruffle's
+// `is_public_ignoring_ns`: the AS3 builtin namespace and an interface's own
+// namespace are public-KIND with a non-empty URI, and both are described
+// (with a @uri attribute); private/protected/internal traits never are.
+#define DT_NS_PUBLIC 0x16
+
+#define DT_AS3_URI "http://adobe.com/AS3/2006/builtin"
+
+typedef struct DtParam
+{
+	char* type;
+	uint8_t optional;
+} DtParam;
+
+typedef struct DtMember
+{
+	char* name;
+	char* type;          // variable type / accessor type / method returnType
+	const char* access;  // static literal: readonly/readwrite/writeonly
+	char* declared_by;   // accessors + methods only
+	char* uri;           // NULL = no @uri / `uri: null`
+	DtParam* params;     // methods only
+	uint32_t param_count;
+} DtMember;
+
+typedef struct DtMembers
+{
+	DtMember* v;
+	uint32_t n;
+	uint32_t cap;
+} DtMembers;
+
+typedef struct DtStrings
+{
+	char** v;
+	uint32_t n;
+	uint32_t cap;
+} DtStrings;
+
+typedef struct DtDesc
+{
+	int valid;          // 0 = describeTypeJSON returned Null (USE_ITRAITS miss)
+	uint32_t flags;
+	char* name;
+	int is_dynamic;
+	int is_final;
+	int is_static;
+	DtStrings bases;
+	DtStrings interfaces;
+	DtMembers variables;
+	DtMembers accessors;
+	DtMembers methods;
+	DtParam* ctor_params;
+	uint32_t ctor_param_count;
+	int has_ctor;
+} DtDesc;
+
+// The description is scratch: built, emitted, freed. It never outlives the
+// call (avm2_string_from_literal copies), so plain malloc keeps repeated
+// describeType calls — all_classes/* runs 65 of them — off the AVM2 heap.
+static char* dt_sndup(const char* s, uint32_t n)
+{
+	char* out = (char*) malloc(n + 1);
+	if (out == NULL) return NULL;
+	if (n > 0) memcpy(out, s, n);
+	out[n] = '\0';
+	return out;
+}
+
+static char* dt_sdup(const char* s)
+{
+	return dt_sndup(s, (uint32_t) strlen(s));
+}
+
+static void dt_strings_push(DtStrings* v, char* s)
+{
+	if (s == NULL) return;
+	if (v->n == v->cap)
+	{
+		v->cap = v->cap ? v->cap * 2 : 8;
+		v->v = (char**) realloc(v->v, v->cap * sizeof(char*));
+	}
+	v->v[v->n++] = s;
+}
+
+static DtMember* dt_members_push(DtMembers* v)
+{
+	if (v->n == v->cap)
+	{
+		v->cap = v->cap ? v->cap * 2 : 8;
+		v->v = (DtMember*) realloc(v->v, v->cap * sizeof(DtMember));
+	}
+	DtMember* m = &v->v[v->n++];
+	memset(m, 0, sizeof(*m));
+	return m;
+}
+
+static void dt_params_free(DtParam* p, uint32_t n)
+{
+	for (uint32_t i = 0; i < n; i++) free(p[i].type);
+	free(p);
+}
+
+static void dt_members_free(DtMembers* v)
+{
+	for (uint32_t i = 0; i < v->n; i++)
+	{
+		free(v->v[i].name);
+		free(v->v[i].type);
+		free(v->v[i].declared_by);
+		free(v->v[i].uri);
+		dt_params_free(v->v[i].params, v->v[i].param_count);
+	}
+	free(v->v);
+}
+
+static void dt_strings_free(DtStrings* v)
+{
+	for (uint32_t i = 0; i < v->n; i++) free(v->v[i]);
+	free(v->v);
+}
+
+static void dt_desc_free(DtDesc* d)
+{
+	free(d->name);
+	dt_strings_free(&d->bases);
+	dt_strings_free(&d->interfaces);
+	dt_members_free(&d->variables);
+	dt_members_free(&d->accessors);
+	dt_members_free(&d->methods);
+	dt_params_free(d->ctor_params, d->ctor_param_count);
+	memset(d, 0, sizeof(*d));
+}
+
+static char* dt_class_qname(const Avm2Class* cls)
+{
+	char buf[512];
+	avm2_class_qname_colons_buf(cls, buf, (int) sizeof(buf));
+	return dt_sdup(buf);
+}
+
+static int dt_class_named(const Avm2Class* cls, const char* ns, const char* name)
+{
+	size_t nl = strlen(ns);
+	size_t ml = strlen(name);
+	return cls != NULL && cls->name.ns_len == nl && cls->name.name_len == ml
+	       && memcmp(cls->name.ns_uri, ns, nl) == 0
+	       && memcmp(cls->name.name, name, ml) == 0;
+}
+
+// Ruffle `display_name(method.return_type())` — a multiname printed as
+// "ns::Name" / "Name" / "*", with TypeName (Vector.<T>) spelled out.
+static int dt_mn_name_buf(const Avm2AbcFileData* data, uint32_t mn_idx,
+                          char* buf, int size)
+{
+	if (data == NULL || mn_idx == 0) return snprintf(buf, size, "*");
+	const Avm2AbcMultiname* mn = &data->multinames[mn_idx];
+	if (mn->kind == 0x1d)  // TypeName: Vector.<T>
+	{
+		char base[256];
+		char param[256];
+		dt_mn_name_buf(data, mn->base_type, base, (int) sizeof(base));
+		uint32_t p = (mn->type_param_count >= 1) ? mn->type_params[0] : 0;
+		dt_mn_name_buf(data, p, param, (int) sizeof(param));
+		return snprintf(buf, size, "%s.<%s>", base, param);
+	}
+	Avm2PropKey k;
+	if (avm2_propkey_from_qname(data, mn_idx, &k))
+	{
+		if (k.ns_len > 0)
+		{
+			return snprintf(buf, size, "%.*s::%.*s",
+			                (int) k.ns_len, k.ns_uri,
+			                (int) k.name_len, k.name);
+		}
+		return snprintf(buf, size, "%.*s", (int) k.name_len, k.name);
+	}
+	const char* n = NULL;
+	uint32_t nl = 0;
+	avm2_mn_name(data, mn_idx, &n, &nl);
+	if (nl == 0 || n == NULL) return snprintf(buf, size, "*");
+	return snprintf(buf, size, "%.*s", (int) nl, n);
+}
+
+static char* dt_type_name(const Avm2AbcFileRt* file, uint32_t mn_idx)
+{
+	if (file == NULL || file->data == NULL || mn_idx == 0) return dt_sdup("*");
+	char buf[512];
+	dt_mn_name_buf(file->data, mn_idx, buf, (int) sizeof(buf));
+	return dt_sdup(buf);
+}
+
+static const Avm2AbcMethodData* dt_method_data(const Avm2MethodRef* m)
+{
+	if (m == NULL || m->file == NULL || m->file->data == NULL) return NULL;
+	return &m->file->data->methods[m->method_index];
+}
+
+// Object's three AS3 instance methods are registered PUBLIC in our runtime
+// (dispatch folds AS3 onto public), but avmplus declares them in the AS3
+// builtin namespace and describeType prints that URI — plus a Boolean return
+// and one optional `*` parameter. Recognised here rather than by re-keying
+// the registration, which would change what avm2_vtable_find_public (and so
+// `obj.hasOwnProperty`) sees.
+static int dt_is_object_as3_method(Avm2Context* ctx, const Avm2PropEntry* e)
+{
+	if (e->kind != AVM2_PROP_METHOD || e->key.ns_len != 0) return 0;
+	const Avm2Builtins* b = &ctx->builtins;
+	if (e->defining_class == b->object_class) return 1;
+	// The trio is RESTATED by hand on Class and Function (a bootstrap
+	// ordering artefact — see the es3_trio_hosts loop). avmplus declares them
+	// once, on Object, and inherits: describeType must say so, or the static
+	// side of every class prints three spurious methods that HIDE_OBJECT
+	// would otherwise have removed.
+	if (e->defining_class != b->class_class
+	    && e->defining_class != b->function_class)
+	{
+		return 0;
+	}
+	static const char* const trio[3] = {
+		"hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable"
+	};
+	for (int i = 0; i < 3; i++)
+	{
+		uint32_t n = (uint32_t) strlen(trio[i]);
+		if (e->key.name_len == n && memcmp(e->key.name, trio[i], n) == 0) return 1;
+	}
+	return 0;
+}
+
+// avmplus declares the instance methods of the TOP-LEVEL native classes
+// (Object, int, Number, String, Array, ...) in the AS3 builtin namespace;
+// ours are registered public because avm2_propkey_matches folds AS3 onto
+// public and dispatch does not care. describeType does: without the avmplus
+// spelling, HIDE_NSURI_METHODS never fires and `describeType(1)` prints
+// int's five inherited Number methods that Flash suppresses. flash.* classes
+// keep their public spelling (playerglobal really does declare them public),
+// which is why the test is on the DEFINING class having no package.
+static int dt_native_as3_method(const Avm2PropEntry* e)
+{
+	return e->kind == AVM2_PROP_METHOD && e->key.ns_len == 0
+	       && e->method.file == NULL && e->defining_class != NULL
+	       && e->defining_class->name.ns_len == 0;
+}
+
+// A trait's namespace as describeType sees it, plus its ORIGIN. Ruffle
+// compares namespaces with `exact_version_match`, so playerglobal's AS3 and a
+// SWF's own AS3 are DIFFERENT namespaces even though the URI is identical —
+// that is what lets `Base`'s AS3:: members survive HIDE_NSURI_METHODS while
+// `int`'s inherited ones do not. We have no API versions; native-vs-ABC is
+// the same distinction with the same effect.
+// ABC-defined classes carry the file their iinit came from; builtins do not.
+static int dt_class_is_native(const Avm2Class* c)
+{
+	return c == NULL || c->instance_init.file == NULL;
+}
+
+static void dt_entry_ns(Avm2Context* ctx, const Avm2PropEntry* e,
+                        const char** uri, uint32_t* len, int* native)
+{
+	// Origin is taken from the DECLARING class, not the method ref: a
+	// setter-only entry leaves `method` empty, and a native method inherited
+	// into an ABC subclass must keep its native origin.
+	const Avm2Class* dc = (e->kind == AVM2_PROP_SETTER
+	                       && e->setter_defining_class != NULL)
+		? e->setter_defining_class : e->defining_class;
+	*native = dt_class_is_native(dc);
+	if (e->key.ns_len > 0)
+	{
+		*uri = e->key.ns_uri;
+		*len = e->key.ns_len;
+		return;
+	}
+	if (dt_is_object_as3_method(ctx, e) || dt_native_as3_method(e))
+	{
+		*uri = DT_AS3_URI;
+		*len = (uint32_t) (sizeof(DT_AS3_URI) - 1);
+		return;
+	}
+	*uri = NULL;
+	*len = 0;
+}
+
+static char* dt_entry_uri(Avm2Context* ctx, const Avm2PropEntry* e)
+{
+	const char* uri = NULL;
+	uint32_t len = 0;
+	int native = 0;
+	dt_entry_ns(ctx, e, &uri, &len, &native);
+	if (uri == NULL || len == 0) return NULL;
+	return dt_sndup(uri, len);
+}
+
+static void dt_iface_add(Avm2Context* ctx, DtStrings* out, Avm2Class* iface,
+                         const Avm2Class** seen, uint32_t* nseen, uint32_t cap)
+{
+	if (iface == NULL || *nseen >= cap) return;
+	for (uint32_t i = 0; i < *nseen; i++)
+	{
+		if (seen[i] == iface) return;
+	}
+	seen[(*nseen)++] = iface;
+	dt_strings_push(out, dt_class_qname(iface));
+	avm2_class_resolve_interfaces(ctx, iface);
+	for (uint32_t i = 0; i < iface->interface_count; i++)
+	{
+		if (iface->interfaces != NULL)
+		{
+			dt_iface_add(ctx, out, iface->interfaces[i], seen, nseen, cap);
+		}
+	}
+}
+
+// Ruffle `class_def.all_interfaces()`: every interface reachable from the
+// class OR any superclass, transitively through super-interfaces.
+static void dt_collect_interfaces(Avm2Context* ctx, Avm2Class* cls, DtStrings* out)
+{
+	const Avm2Class* seen[128];
+	uint32_t nseen = 0;
+	for (Avm2Class* c = cls; c != NULL; c = c->super_class)
+	{
+		if (c->interface_count == 0) continue;
+		avm2_class_resolve_interfaces(ctx, c);
+		for (uint32_t i = 0; i < c->interface_count; i++)
+		{
+			if (c->interfaces != NULL)
+			{
+				dt_iface_add(ctx, out, c->interfaces[i], seen, &nseen, 128);
+			}
+		}
+	}
+}
+
+static void dt_fill_params(DtParam** out, uint32_t* out_n,
+                           const Avm2AbcFileRt* file, const Avm2AbcMethodData* m)
+{
+	if (m == NULL || m->param_count == 0) return;
+	DtParam* p = (DtParam*) calloc(m->param_count, sizeof(DtParam));
+	if (p == NULL) return;
+	for (uint32_t i = 0; i < m->param_count; i++)
+	{
+		p[i].type = dt_type_name(file, m->param_types != NULL ? m->param_types[i] : 0);
+		p[i].optional = (uint8_t) (m->optionals != NULL && m->optionals[i].has_value);
+	}
+	*out = p;
+	*out_n = m->param_count;
+}
+
+static void dt_one_param(DtParam** out, uint32_t* out_n, const char* type,
+                         int optional)
+{
+	DtParam* p = (DtParam*) calloc(1, sizeof(DtParam));
+	if (p == NULL) return;
+	p[0].type = dt_sdup(type);
+	p[0].optional = (uint8_t) (optional != 0);
+	*out = p;
+	*out_n = 1;
+}
+
+// HIDE_NSURI_METHODS (avmplus TypeDescriber.cpp:237, Ruffle avmplus.rs:158):
+// every non-empty namespace that declares a METHOD in the SUPERCLASS shadows
+// every trait of this class in that namespace. That is what hides a
+// subclass's own AS3:: members once its base declares any.
+typedef struct DtSkipNs
+{
+	const char* uri[16];
+	uint32_t len[16];
+	uint8_t native[16];
+	uint32_t n;
+} DtSkipNs;
+
+static void dt_skip_ns_build(Avm2Context* ctx, DtSkipNs* s,
+                             const Avm2VTable* super_vt)
+{
+	s->n = 0;
+	if (super_vt == NULL) return;
+	for (uint32_t i = 0; i < super_vt->count && s->n < 16; i++)
+	{
+		const Avm2PropEntry* e = &super_vt->entries[i];
+		if (e->kind != AVM2_PROP_METHOD) continue;
+		const char* uri = NULL;
+		uint32_t len = 0;
+		int native = 0;
+		dt_entry_ns(ctx, e, &uri, &len, &native);
+		if (uri == NULL || len == 0) continue;
+		int seen = 0;
+		for (uint32_t j = 0; j < s->n; j++)
+		{
+			if (s->len[j] == len && s->native[j] == (uint8_t) native
+			    && memcmp(s->uri[j], uri, len) == 0)
+			{
+				seen = 1;
+				break;
+			}
+		}
+		if (!seen)
+		{
+			s->uri[s->n] = uri;
+			s->len[s->n] = len;
+			s->native[s->n] = (uint8_t) native;
+			s->n++;
+		}
+	}
+}
+
+static int dt_skip_ns_has(Avm2Context* ctx, const DtSkipNs* s,
+                          const Avm2PropEntry* e)
+{
+	const char* uri = NULL;
+	uint32_t len = 0;
+	int native = 0;
+	dt_entry_ns(ctx, e, &uri, &len, &native);
+	if (uri == NULL || len == 0) return 0;
+	for (uint32_t j = 0; j < s->n; j++)
+	{
+		if (s->len[j] == len && s->native[j] == (uint8_t) native
+		    && memcmp(s->uri[j], uri, len) == 0)
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
+                              const DtSkipNs* skip, uint32_t flags)
+{
+	if (vt == NULL) return;
+	for (uint32_t i = 0; i < vt->count; i++)
+	{
+		const Avm2PropEntry* e = &vt->entries[i];
+		// Interface-namespace aliases are OUR dispatch machinery
+		// (avm2_class.c add_iface_aliases_from), not traits avmplus has.
+		if (e->is_iface_alias) continue;
+		if (avm2_ns_fold(e->key.ns_kind) != DT_NS_PUBLIC) continue;
+		if ((flags & DT_HIDE_NSURI_METHODS) && dt_skip_ns_has(ctx, skip, e))
+		{
+			continue;
+		}
+		if (e->kind == AVM2_PROP_SLOT)
+		{
+			if (!(flags & DT_INCLUDE_VARIABLES)) continue;
+			DtMember* m = dt_members_push(&d->variables);
+			m->name = dt_sndup(e->key.name, e->key.name_len);
+			m->access = e->is_const ? "readonly" : "readwrite";
+			m->type = dt_type_name(e->type_file, e->type_mn);
+			m->uri = dt_entry_uri(ctx, e);
+		}
+		else if (e->kind == AVM2_PROP_METHOD)
+		{
+			if (!(flags & DT_INCLUDE_METHODS)) continue;
+			int from_object = e->defining_class == ctx->builtins.object_class
+			                  || dt_is_object_as3_method(ctx, e);
+			if ((flags & DT_HIDE_OBJECT) && from_object) continue;
+			DtMember* m = dt_members_push(&d->methods);
+			m->name = dt_sndup(e->key.name, e->key.name_len);
+			m->declared_by = from_object ? dt_sdup("Object")
+				: (e->defining_class != NULL
+					? dt_class_qname(e->defining_class) : dt_sdup("*"));
+			m->uri = dt_entry_uri(ctx, e);
+			const Avm2AbcMethodData* md = dt_method_data(&e->method);
+			if (md != NULL)
+			{
+				m->type = dt_type_name(e->method.file, md->return_type_mn);
+				dt_fill_params(&m->params, &m->param_count, e->method.file, md);
+			}
+			else if (dt_is_object_as3_method(ctx, e))
+			{
+				m->type = dt_sdup("Boolean");
+				dt_one_param(&m->params, &m->param_count, "*", 1);
+			}
+			else
+			{
+				m->type = dt_sdup("*");
+			}
+		}
+		else  // GETTER / SETTER / GETSET
+		{
+			if (!(flags & DT_INCLUDE_ACCESSORS)) continue;
+			DtMember* m = dt_members_push(&d->accessors);
+			m->name = dt_sndup(e->key.name, e->key.name_len);
+			m->access = (e->kind == AVM2_PROP_GETSET) ? "readwrite"
+			          : (e->kind == AVM2_PROP_GETTER) ? "readonly"
+			                                          : "writeonly";
+			// Ruffle: a getter's type is its RETURN type, a setter-only
+			// accessor's is its first PARAMETER type.
+			if (e->kind == AVM2_PROP_SETTER)
+			{
+				Avm2Class* dc = e->setter_defining_class != NULL
+					? e->setter_defining_class : e->defining_class;
+				m->declared_by = dc != NULL ? dt_class_qname(dc) : dt_sdup("*");
+				const Avm2AbcMethodData* md = dt_method_data(&e->setter);
+				m->type = (md != NULL && md->param_count > 0)
+					? dt_type_name(e->setter.file,
+					               md->param_types != NULL ? md->param_types[0] : 0)
+					: dt_sdup("*");
+			}
+			else
+			{
+				m->declared_by = e->defining_class != NULL
+					? dt_class_qname(e->defining_class) : dt_sdup("*");
+				const Avm2AbcMethodData* md = dt_method_data(&e->method);
+				m->type = (md != NULL) ? dt_type_name(e->method.file,
+				                                      md->return_type_mn)
+				                       : dt_sdup("*");
+			}
+			m->uri = dt_entry_uri(ctx, e);
+		}
+	}
+}
+
+// Builtin `public static const`s live as read-only dynamic props on the class
+// object (avm2_builtin_add_static_const), not as slots, so the static side
+// has to walk that list too. The declared type is recovered from the stored
+// value, which is exactly enough for the constant-only enum classes.
+static void dt_collect_static_consts(Avm2Context* ctx, DtDesc* d, Avm2Class* cls)
+{
+	(void) ctx;
+	if (cls->class_object == NULL) return;
+	for (Avm2DynProp* p = cls->class_object->dyn_props; p != NULL; p = p->next)
+	{
+		if (p->dead || !p->read_only || p->key_obj != NULL) continue;
+		DtMember* m = dt_members_push(&d->variables);
+		m->name = dt_sndup(p->name.utf8, p->name.len);
+		m->access = "readonly";
+		switch (p->value.kind)
+		{
+		case AVM2_VALUE_INTEGER: m->type = dt_sdup("int"); break;
+		case AVM2_VALUE_NUMBER:  m->type = dt_sdup("Number"); break;
+		case AVM2_VALUE_STRING:  m->type = dt_sdup("String"); break;
+		case AVM2_VALUE_BOOL:    m->type = dt_sdup("Boolean"); break;
+		default:                 m->type = dt_sdup("*"); break;
+		}
+	}
+}
+
+static void dt_collect_ctor(Avm2Context* ctx, DtDesc* d, Avm2Class* cls)
+{
+	if (cls->flags & AVM2_CLASS_FLAG_INTERFACE) return;
+	const Avm2MethodRef* init = &cls->instance_init;
+	if (init->file != NULL)
+	{
+		const Avm2AbcMethodData* m = dt_method_data(init);
+		if (m == NULL || m->param_count == 0) return;
+		dt_fill_params(&d->ctor_params, &d->ctor_param_count, init->file, m);
+		d->has_ctor = d->ctor_param_count > 0;
+		return;
+	}
+	// Native builtins: no signature is recorded at registration, so the
+	// avmplus shell's 1-optional-`*` form is the fallback. Object takes none;
+	// Dictionary's `(weakKeys:Boolean = false)` is spelled out.
+	if (cls == ctx->builtins.object_class || cls == ctx->builtins.class_class)
+	{
+		return;
+	}
+	if (dt_class_named(cls, "flash.utils", "Dictionary"))
+	{
+		dt_one_param(&d->ctor_params, &d->ctor_param_count, "Boolean", 1);
+	}
+	else
+	{
+		dt_one_param(&d->ctor_params, &d->ctor_param_count, "*", 1);
+	}
+	d->has_ctor = d->ctor_param_count > 0;
+}
+
+// Ruffle instance_class_describe_type: null/undefined map to the synthetic
+// `null`/`void` classes, an atom-range integer to `int`.
+static Avm2Class* dt_class_for_value(Avm2Context* ctx, Avm2Value v, int* is_class)
+{
+	*is_class = 0;
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
+	    && v.u.obj->kind == AVM2_OBJ_CLASS)
+	{
+		*is_class = 1;
+		return v.u.obj->class_ref;
+	}
+	if (v.kind == AVM2_VALUE_INTEGER && v.u.i < (1 << 28) && v.u.i >= -(1 << 28))
+	{
+		return ctx->builtins.int_class;
+	}
+	if (v.kind == AVM2_VALUE_NUMBER)
+	{
+		int32_t i = (int32_t) v.u.d;
+		return (v.u.d == (double) i && !(v.u.d == 0.0 && signbit(v.u.d))
+		        && i < (1 << 28) && i >= -(1 << 28))
+			? ctx->builtins.int_class : ctx->builtins.number_class;
+	}
+	return avm2_value_class(ctx, v);
+}
+
+// The `$`-class model. avmplus gives every class TWO Traits: the instance
+// traits and the class ("C$") traits whose base is `Class`. Describing a
+// Class VALUE describes the latter — constant attributes
+// (isDynamic/isFinal/isStatic all true, verified against all 14 <type>
+// blocks of describe_type_basic), bases [Class, Object], the static traits,
+// and the `prototype` accessor inherited from `Class` — while the USE_ITRAITS
+// pass describes the instance side and becomes the <factory>. We have no
+// separate c_class object, so the static side is synthesised from
+// class_object->vtable plus Class's own instance vtable.
+static void dt_describe(Avm2Context* ctx, Avm2Value v, uint32_t flags, DtDesc* d)
+{
+	memset(d, 0, sizeof(*d));
+	d->flags = flags;
+	int is_class = 0;
+	Avm2Class* cls = dt_class_for_value(ctx, v, &is_class);
+	if (cls == NULL) return;
+	int class_side = is_class;
+	if (flags & DT_USE_ITRAITS)
+	{
+		// Ruffle: i_class() is None for an instance class → Value::Null.
+		if (!is_class) return;
+		class_side = 0;
+	}
+	d->valid = 1;
+	d->name = dt_class_qname(cls);
+	d->is_static = is_class;
+	if (class_side)
+	{
+		d->is_dynamic = 1;
+		d->is_final = 1;
+	}
+	else
+	{
+		d->is_dynamic = (cls->flags & AVM2_CLASS_FLAG_SEALED) == 0;
+		d->is_final = (cls->flags & AVM2_CLASS_FLAG_FINAL) != 0;
+	}
+
+	const Avm2VTable* super_vt = class_side
+		? &ctx->builtins.class_class->ivtable
+		: (cls->super_class != NULL ? &cls->super_class->ivtable : NULL);
+	DtSkipNs skip;
+	dt_skip_ns_build(ctx, &skip, super_vt);
+
+	if (flags & DT_INCLUDE_BASES)
+	{
+		if (class_side)
+		{
+			dt_strings_push(&d->bases, dt_sdup("Class"));
+			dt_strings_push(&d->bases, dt_sdup("Object"));
+		}
+		else
+		{
+			for (Avm2Class* b = cls->super_class; b != NULL; b = b->super_class)
+			{
+				dt_strings_push(&d->bases, dt_class_qname(b));
+			}
+		}
+	}
+	if ((flags & DT_INCLUDE_INTERFACES) && !class_side)
+	{
+		dt_collect_interfaces(ctx, cls, &d->interfaces);
+	}
+
+	if (class_side)
+	{
+		dt_collect_vtable(ctx, d, &ctx->builtins.class_class->ivtable, &skip, flags);
+		if (cls->class_object != NULL)
+		{
+			dt_collect_vtable(ctx, d, cls->class_object->vtable, &skip, flags);
+		}
+		// `Object$`/`int$`/`Class$`'s `<constant name="length" type="int"/>`
+		// needs no special case: register_class_object_lengths already
+		// installs it as a read-only static const.
+		if (flags & DT_INCLUDE_VARIABLES) dt_collect_static_consts(ctx, d, cls);
+	}
+	else
+	{
+		dt_collect_vtable(ctx, d, &cls->ivtable, &skip, flags);
+		if (flags & DT_INCLUDE_CONSTRUCTOR) dt_collect_ctor(ctx, d, cls);
+	}
+}
+
+// --- describeTypeJSON: the plain-object form -------------------------------
+
+static Avm2Object* dt_json_object(Avm2Context* ctx)
+{
+	Avm2Object* o = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
+	o->cls = ctx->builtins.object_class;
+	o->proto = ctx->builtins.object_class->prototype_obj;
+	return o;
+}
+
+static void dt_json_set(Avm2Context* ctx, Avm2Object* o, const char* key,
+                        Avm2Value v)
+{
+	avm2_object_set_dynamic(ctx, o, key, (uint32_t) strlen(key), v);
+}
+
+static Avm2Value dt_json_str(Avm2Context* ctx, const char* s)
+{
+	if (s == NULL) return avm2_null();
+	return avm2_string(avm2_string_from_literal(ctx, s));
+}
+
+static Avm2Value dt_json_params(Avm2Context* ctx, const DtParam* p, uint32_t n)
+{
+	Avm2Object* arr = avm2_array_new(ctx, 0);
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2Object* po = dt_json_object(ctx);
+		dt_json_set(ctx, po, "type", dt_json_str(ctx, p[i].type));
+		dt_json_set(ctx, po, "optional", avm2_bool(p[i].optional != 0));
+		avm2_array_push(ctx, arr, avm2_object_value(po));
+	}
+	return avm2_object_value(arr);
+}
+
+typedef enum
+{
+	DT_JSON_VARIABLE = 0,
+	DT_JSON_ACCESSOR = 1,
+	DT_JSON_METHOD = 2,
+} DtJsonKind;
+
+static Avm2Value dt_json_members(Avm2Context* ctx, const DtMembers* mv,
+                                 DtJsonKind kind, uint32_t flags)
+{
+	Avm2Object* arr = avm2_array_new(ctx, 0);
+	for (uint32_t i = 0; i < mv->n; i++)
+	{
+		const DtMember* m = &mv->v[i];
+		Avm2Object* o = dt_json_object(ctx);
+		dt_json_set(ctx, o, "name", dt_json_str(ctx, m->name));
+		if (kind == DT_JSON_VARIABLE)
+		{
+			dt_json_set(ctx, o, "type", dt_json_str(ctx, m->type));
+			dt_json_set(ctx, o, "access", dt_json_str(ctx, m->access));
+		}
+		else if (kind == DT_JSON_ACCESSOR)
+		{
+			dt_json_set(ctx, o, "access", dt_json_str(ctx, m->access));
+			dt_json_set(ctx, o, "type", dt_json_str(ctx, m->type));
+			dt_json_set(ctx, o, "declaredBy", dt_json_str(ctx, m->declared_by));
+		}
+		else
+		{
+			dt_json_set(ctx, o, "returnType", dt_json_str(ctx, m->type));
+			dt_json_set(ctx, o, "declaredBy", dt_json_str(ctx, m->declared_by));
+		}
+		dt_json_set(ctx, o, "uri", dt_json_str(ctx, m->uri));
+		if (kind == DT_JSON_METHOD)
+		{
+			dt_json_set(ctx, o, "parameters",
+			            dt_json_params(ctx, m->params, m->param_count));
+		}
+		// Trait metadata is not modelled yet (P3): the array is always empty,
+		// and Ruffle reports `null` for an accessor with no metadata.
+		int want_md = (flags & DT_INCLUDE_METADATA) != 0
+		              && kind != DT_JSON_ACCESSOR;
+		dt_json_set(ctx, o, "metadata",
+		            want_md ? avm2_object_value(avm2_array_new(ctx, 0))
+		                    : avm2_null());
+		avm2_array_push(ctx, arr, avm2_object_value(o));
+	}
+	return avm2_object_value(arr);
+}
+
+static Avm2Value dt_json_strings(Avm2Context* ctx, const DtStrings* sv)
+{
+	Avm2Object* arr = avm2_array_new(ctx, 0);
+	for (uint32_t i = 0; i < sv->n; i++)
+	{
+		avm2_array_push(ctx, arr, dt_json_str(ctx, sv->v[i]));
+	}
+	return avm2_object_value(arr);
+}
+
+static Avm2Value dt_json_build(Avm2Context* ctx, const DtDesc* d)
+{
+	uint32_t flags = d->flags;
+	Avm2Object* o = dt_json_object(ctx);
+	dt_json_set(ctx, o, "name", dt_json_str(ctx, d->name));
+	dt_json_set(ctx, o, "isDynamic", avm2_bool(d->is_dynamic != 0));
+	dt_json_set(ctx, o, "isFinal", avm2_bool(d->is_final != 0));
+	dt_json_set(ctx, o, "isStatic", avm2_bool(d->is_static != 0));
+	if (!(flags & DT_INCLUDE_TRAITS))
+	{
+		dt_json_set(ctx, o, "traits", avm2_null());
+		return avm2_object_value(o);
+	}
+	Avm2Object* t = dt_json_object(ctx);
+	dt_json_set(ctx, t, "bases", (flags & DT_INCLUDE_BASES)
+		? dt_json_strings(ctx, &d->bases) : avm2_null());
+	dt_json_set(ctx, t, "interfaces", (flags & DT_INCLUDE_INTERFACES)
+		? dt_json_strings(ctx, &d->interfaces) : avm2_null());
+	dt_json_set(ctx, t, "variables", (flags & DT_INCLUDE_VARIABLES)
+		? dt_json_members(ctx, &d->variables, DT_JSON_VARIABLE, flags)
+		: avm2_null());
+	dt_json_set(ctx, t, "accessors", (flags & DT_INCLUDE_ACCESSORS)
+		? dt_json_members(ctx, &d->accessors, DT_JSON_ACCESSOR, flags)
+		: avm2_null());
+	dt_json_set(ctx, t, "methods", (flags & DT_INCLUDE_METHODS)
+		? dt_json_members(ctx, &d->methods, DT_JSON_METHOD, flags)
+		: avm2_null());
+	// Flash only reports a constructor when it takes at least one parameter.
+	dt_json_set(ctx, t, "constructor",
+	            (d->has_ctor && (flags & DT_INCLUDE_CONSTRUCTOR))
+		? dt_json_params(ctx, d->ctor_params, d->ctor_param_count)
+		: avm2_null());
+	dt_json_set(ctx, t, "metadata", (flags & DT_INCLUDE_METADATA)
+		? avm2_object_value(avm2_array_new(ctx, 0)) : avm2_null());
+	dt_json_set(ctx, o, "traits", avm2_object_value(t));
+	return avm2_object_value(o);
+}
+
+// --- describeType: the XML form (avmplus.as, transcribed) ------------------
+
+static void dt_copy_params(Avm2Context* ctx, E4XNode* xml, const DtParam* p,
+                           uint32_t n)
+{
+	for (uint32_t i = 0; i < n; i++)
+	{
+		dt_param(ctx, xml, (int) i + 1, p[i].type != NULL ? p[i].type : "*",
+		         p[i].optional);
+	}
+}
+
+static void dt_copy_traits(Avm2Context* ctx, E4XNode* xml, const DtDesc* d)
+{
+	uint32_t flags = d->flags;
+	for (uint32_t i = 0; i < d->bases.n; i++)
+	{
+		E4XNode* e = dt_child(ctx, xml, "extendsClass");
+		dt_set_attr(ctx, e, "type", d->bases.v[i]);
+	}
+	for (uint32_t i = 0; i < d->interfaces.n; i++)
+	{
+		E4XNode* e = dt_child(ctx, xml, "implementsInterface");
+		dt_set_attr(ctx, e, "type", d->interfaces.v[i]);
+	}
+	if (d->has_ctor && (flags & DT_INCLUDE_CONSTRUCTOR))
+	{
+		E4XNode* e = dt_child(ctx, xml, "constructor");
+		dt_copy_params(ctx, e, d->ctor_params, d->ctor_param_count);
+	}
+	for (uint32_t i = 0; i < d->variables.n; i++)
+	{
+		const DtMember* m = &d->variables.v[i];
+		int ro = m->access != NULL && strcmp(m->access, "readonly") == 0;
+		E4XNode* e = dt_child(ctx, xml, ro ? "constant" : "variable");
+		dt_set_attr(ctx, e, "name", m->name);
+		dt_set_attr(ctx, e, "type", m->type != NULL ? m->type : "*");
+		if (m->uri != NULL) dt_set_attr(ctx, e, "uri", m->uri);
+	}
+	for (uint32_t i = 0; i < d->accessors.n; i++)
+	{
+		const DtMember* m = &d->accessors.v[i];
+		E4XNode* e = dt_child(ctx, xml, "accessor");
+		dt_set_attr(ctx, e, "name", m->name);
+		dt_set_attr(ctx, e, "access", m->access);
+		dt_set_attr(ctx, e, "type", m->type != NULL ? m->type : "*");
+		dt_set_attr(ctx, e, "declaredBy",
+		            m->declared_by != NULL ? m->declared_by : "*");
+		if (m->uri != NULL) dt_set_attr(ctx, e, "uri", m->uri);
+	}
+	for (uint32_t i = 0; i < d->methods.n; i++)
+	{
+		const DtMember* m = &d->methods.v[i];
+		E4XNode* e = dt_child(ctx, xml, "method");
+		dt_set_attr(ctx, e, "name", m->name);
+		dt_set_attr(ctx, e, "declaredBy",
+		            m->declared_by != NULL ? m->declared_by : "*");
+		dt_set_attr(ctx, e, "returnType", m->type != NULL ? m->type : "*");
+		dt_copy_params(ctx, e, m->params, m->param_count);
+		if (m->uri != NULL) dt_set_attr(ctx, e, "uri", m->uri);
+	}
+}
+
+static Avm2Value global_describe_type_json(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	uint32_t flags = (act->argc > 1)
+		? avm2_coerce_to_u32(ctx, act->args[1]) : DT_FLASH10_FLAGS;
+	DtDesc d;
+	dt_describe(ctx, v, flags, &d);
+	if (!d.valid)
+	{
+		dt_desc_free(&d);
+		return avm2_null();
+	}
+	Avm2Value out = dt_json_build(ctx, &d);
+	dt_desc_free(&d);
+	return out;
+}
+
 static Avm2Value global_describe_type(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -1850,6 +2775,8 @@ static Avm2Value global_describe_type(Avm2Activation* act)
 	{
 		return avm2_object_value(avm2_xml_object_for_node(ctx, type));
 	}
+	uint32_t flags = (act->argc > 1)
+		? avm2_coerce_to_u32(ctx, act->args[1]) : DT_FLASH10_FLAGS;
 	Avm2Value v = act->args[0];
 	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
 	{
@@ -1861,124 +2788,32 @@ static Avm2Value global_describe_type(Avm2Activation* act)
 		dt_set_attr(ctx, type, "isStatic", "false");
 		return avm2_object_value(avm2_xml_object_for_node(ctx, type));
 	}
-	int is_static = v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
-	                && v.u.obj->kind == AVM2_OBJ_CLASS;
-	Avm2Class* cls;
-	if (is_static)
-	{
-		cls = v.u.obj->class_ref;
-	}
-	else if (v.kind == AVM2_VALUE_INTEGER
-	         && v.u.i < (1 << 28) && v.u.i >= -(1 << 28))
-	{
-		// avmplus atom-int range (same rule as getQualifiedClassName).
-		cls = ctx->builtins.int_class;
-	}
-	else if (v.kind == AVM2_VALUE_NUMBER)
-	{
-		int32_t i = (int32_t) v.u.d;
-		cls = (v.u.d == (double) i && !(v.u.d == 0.0 && signbit(v.u.d))
-		       && i < (1 << 28) && i >= -(1 << 28))
-			? ctx->builtins.int_class : ctx->builtins.number_class;
-	}
-	else
-	{
-		cls = avm2_value_class(ctx, v);
-	}
-	char nb[256];
-	if (cls->name.ns_len > 0)
-	{
-		snprintf(nb, sizeof(nb), "%.*s::%.*s",
-		         (int) cls->name.ns_len, cls->name.ns_uri,
-		         (int) cls->name.name_len, cls->name.name);
-	}
-	else
-	{
-		snprintf(nb, sizeof(nb), "%.*s",
-		         (int) cls->name.name_len, cls->name.name);
-	}
-	dt_set_attr(ctx, type, "name", nb);
-	if (cls->super_class != NULL)
-	{
-		char bb[256];
-		avm2_class_qname_buf(cls->super_class, bb, sizeof(bb));
-		dt_set_attr(ctx, type, "base", bb);
-	}
-	dt_set_attr(ctx, type, "isDynamic",
-	            (cls->flags & AVM2_CLASS_FLAG_SEALED) == 0 ? "true" : "false");
-	dt_set_attr(ctx, type, "isFinal",
-	            (cls->flags & AVM2_CLASS_FLAG_FINAL) != 0 ? "true" : "false");
-	dt_set_attr(ctx, type, "isStatic", is_static ? "true" : "false");
 
-	for (Avm2Class* b = cls->super_class; b != NULL; b = b->super_class)
+	DtDesc d;
+	dt_describe(ctx, v, flags, &d);
+	if (!d.valid)
 	{
-		char bb[256];
-		avm2_class_qname_buf(b, bb, sizeof(bb));
-		E4XNode* ec = dt_child(ctx, type, "extendsClass");
-		dt_set_attr(ctx, ec, "type", bb);
+		dt_desc_free(&d);
+		return avm2_object_value(avm2_xml_object_for_node(ctx, type));
 	}
+	dt_set_attr(ctx, type, "name", d.name);
+	if (d.bases.n != 0) dt_set_attr(ctx, type, "base", d.bases.v[0]);
+	dt_set_attr(ctx, type, "isDynamic", d.is_dynamic ? "true" : "false");
+	dt_set_attr(ctx, type, "isFinal", d.is_final ? "true" : "false");
+	dt_set_attr(ctx, type, "isStatic", d.is_static ? "true" : "false");
+	dt_copy_traits(ctx, type, &d);
+	dt_desc_free(&d);
 
-	if (cls != ctx->builtins.object_class)
+	DtDesc itraits;
+	dt_describe(ctx, v, flags | DT_USE_ITRAITS, &itraits);
+	if (itraits.valid)
 	{
-		E4XNode* ctor = dt_child(ctx, type, "constructor");
-		const Avm2MethodRef* init = &cls->instance_init;
-		if (init->file != NULL)
-		{
-			const Avm2AbcMethodData* m =
-				&init->file->data->methods[init->method_index];
-			for (uint32_t i = 0; i < m->param_count; i++)
-			{
-				char tb[256] = "*";
-				uint32_t tmn = m->param_types[i];
-				if (tmn != 0)
-				{
-					Avm2PropKey k;
-					if (avm2_propkey_from_qname(init->file->data, tmn, &k))
-					{
-						if (k.ns_len > 0)
-						{
-							snprintf(tb, sizeof(tb), "%.*s::%.*s",
-							         (int) k.ns_len, k.ns_uri,
-							         (int) k.name_len, k.name);
-						}
-						else
-						{
-							snprintf(tb, sizeof(tb), "%.*s",
-							         (int) k.name_len, k.name);
-						}
-					}
-				}
-				int opt = m->optionals != NULL && m->optionals[i].has_value;
-				dt_param(ctx, ctor, (int) i + 1, tb, opt);
-			}
-		}
-		else
-		{
-			// Builtin natives: the avmplus shell reports one optional-any
-			// parameter (int/uint/Number/Boolean/String/Object family).
-			dt_param(ctx, ctor, 1, "*", 1);
-		}
-		if (ctor->child_count == 0)
-		{
-			avm2_e4x_delete_by_index(type, (uint32_t) avm2_e4x_child_index(ctor));
-		}
+		E4XNode* factory = dt_child(ctx, type, "factory");
+		dt_set_attr(ctx, factory, "type", itraits.name);
+		dt_copy_traits(ctx, factory, &itraits);
 	}
+	dt_desc_free(&itraits);
 
-	if (cls == ctx->builtins.object_class && !is_static)
-	{
-		static const char* const trio[3] = {
-			"hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable"
-		};
-		for (int i = 0; i < 3; i++)
-		{
-			E4XNode* me = dt_child(ctx, type, "method");
-			dt_set_attr(ctx, me, "name", trio[i]);
-			dt_set_attr(ctx, me, "declaredBy", "Object");
-			dt_set_attr(ctx, me, "returnType", "Boolean");
-			dt_param(ctx, me, 1, "*", 1);
-			dt_set_attr(ctx, me, "uri", "http://adobe.com/AS3/2006/builtin");
-		}
-	}
 	return avm2_object_value(avm2_xml_object_for_node(ctx, type));
 }
 
@@ -2877,6 +3712,9 @@ static void register_capabilities(Avm2Context* ctx)
 
 static void builtin_add_global_fn_ns(Avm2Context* ctx, const char* ns,
                                      const char* name, Avm2MethodFn fn);
+static void builtin_add_global_fn_ns_kind(Avm2Context* ctx, const char* ns,
+                                          const char* name, Avm2MethodFn fn,
+                                          uint8_t ns_kind);
 
 // ============ flash.net URL stack (minimal, headless) ============
 // The Newgrounds-API wrappers around FlashPunk games (Seedling) build
@@ -3653,6 +4491,28 @@ static void builtin_add_global_fn_ns(Avm2Context* ctx, const char* ns,
 	avm2_domain_add(ctx, &key, NULL, 0);
 }
 
+// Same, but keyed in an explicit (non-public) namespace KIND. avmplus.as
+// declares `describeTypeJSON` **internal** to package avmplus, and ASC emits
+// the call site as a QName in PackageInternalNs("avmplus") (kind 0x17) — a
+// kind avm2_ns_fold deliberately does NOT fold onto public, so the ordinary
+// package registration never matches it.
+static void builtin_add_global_fn_ns_kind(Avm2Context* ctx, const char* ns,
+                                          const char* name, Avm2MethodFn fn,
+                                          uint8_t ns_kind)
+{
+	char dbuf[160];
+	snprintf(dbuf, sizeof(dbuf), "global/%s%s%s", ns, ns[0] ? "::" : "", name);
+	char* dname = avm2_alloc(ctx, strlen(dbuf) + 1);
+	strcpy(dname, dbuf);
+	Avm2MethodRef ref = { fn, NULL, dname, 0 };
+	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
+	                                      avm2_object_value(ctx->builtin_globals), true);
+	Avm2PropKey key = builtin_key(ns, name);
+	key.ns_kind = ns_kind;
+	builtin_global_define(ctx, key, avm2_object_value(fnobj));
+	avm2_domain_add(ctx, &key, NULL, 0);
+}
+
 void avm2_builtin_add_flash_utils_fn(Avm2Context* ctx, const char* name,
                                      Avm2MethodFn fn)
 {
@@ -3729,6 +4589,15 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	                         global_describe_type_utils);
 	builtin_add_global_fn_ns(ctx, "avmplus", "describeType",
 	                         global_describe_type);
+	// avmplus.as declares describeTypeJSON `internal` to package avmplus, and
+	// ASC compiles the call site in avm2/describe_type_json's `package
+	// avmplus` helper to a QName in PackageInternalNs("avmplus") — kind 0x17,
+	// which never folds onto public. Registered under both kinds so an
+	// explicit `avmplus.describeTypeJSON(...)` also resolves.
+	builtin_add_global_fn_ns_kind(ctx, "avmplus", "describeTypeJSON",
+	                              global_describe_type_json, 0x17);
+	builtin_add_global_fn_ns(ctx, "avmplus", "describeTypeJSON",
+	                         global_describe_type_json);
 	// The avmplus describeTypeJSON flag constants (avmplus.as).
 	{
 		static const struct { const char* name; int32_t v; } dtflags[] = {
