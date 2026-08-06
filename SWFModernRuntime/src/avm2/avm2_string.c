@@ -683,6 +683,9 @@ static Avm2Value string_proto_receiver(Avm2Activation* act, const char* meth)
 	{
 		return make_str(ctx, "", 0);
 	}
+	// AS3 playerglobal shim: FP's trace carries the throwError frame
+	// (avm2/primitive_toString, primitive_valueOf). Per-site opt-in.
+	avm2_callstack_push_throwerror(ctx);
 	avm2_throw_error(ctx, ctx->builtins.type_error_class,
 	                 "Error #1004: Method String.prototype.%s was invoked on an "
 	                 "incompatible object.", meth);

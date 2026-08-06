@@ -427,6 +427,26 @@ void avm2_builtin_add_method_as3(Avm2Context* ctx, Avm2Class* cls, const char* n
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }
 
+// See avm2_globals.h: rename an existing public instance method's stack frame
+// without touching its key (so dispatch is untouched).
+void avm2_builtin_set_debug_name(Avm2Context* ctx, Avm2Class* cls,
+                                 const char* name, const char* debug_name)
+{
+	(void) ctx;
+	uint32_t nlen = (uint32_t) strlen(name);
+	for (uint32_t i = 0; i < cls->ivtable.count; i++)
+	{
+		Avm2PropEntry* e = &cls->ivtable.entries[i];
+		if (e->kind == AVM2_PROP_METHOD && e->key.ns_len == 0
+		    && e->key.name_len == nlen
+		    && memcmp(e->key.name, name, nlen) == 0)
+		{
+			e->method.debug_name = debug_name;
+			return;
+		}
+	}
+}
+
 // "get x" / "set x" — the way FP names an accessor's stack frame
 // ("at flash.display::BitmapData/get width()" — bitmapdata_zero_size).
 static const char* accessor_debug_name(Avm2Context* ctx, const char* prefix,
@@ -534,7 +554,12 @@ void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char*
 void avm2_proto_add_function_n(Avm2Context* ctx, Avm2Object* proto, const char* name,
                                Avm2MethodFn fn, uint32_t param_count)
 {
-	Avm2MethodRef ref = { fn, NULL, name, 0, param_count };
+	// FP's ES3 prototype shims are anonymous playerglobal closures, so a
+	// frame inside one is spelled "Function/<anonymous>()", never by the
+	// property it was installed under (avm2/primitive_toString wants that
+	// for `Boolean.prototype.toString.call(x)`; we used to print
+	// "toString()"). Native debug_names print verbatim, `/` and all.
+	Avm2MethodRef ref = { fn, NULL, "Function/<anonymous>", 0, param_count };
 	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
 	                                      avm2_undefined(), false);
 	avm2_object_set_dynamic(ctx, proto, name, (uint32_t) strlen(name),

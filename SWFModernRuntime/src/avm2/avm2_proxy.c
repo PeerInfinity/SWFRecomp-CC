@@ -14,6 +14,7 @@
 // package-kind keys with that URI, so avm2_propkey_is_public stays false
 // and public lookups miss them (proxy_getproperty's p.proxy_var probe).
 
+#include <stdio.h>
 #include <string.h>
 
 #include <avm2/avm2_class.h>
@@ -97,6 +98,8 @@ int avm2_proxy_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_t idx,
 
 static _Noreturn void proxy_unimplemented(Avm2Context* ctx, int code, const char* what)
 {
+	// Proxy.as is AS3 playerglobal, so FP's trace carries the throwError frame.
+	avm2_callstack_push_throwerror(ctx);
 	avm2_throw_error(ctx, ctx->builtins.illegal_operation_error_class,
 	                 "Error #%d: The Proxy class does not implement %s. "
 	                 "It must be overridden by a subclass.", code, what);
@@ -163,7 +166,15 @@ static void proxy_add_ns_method(Avm2Context* ctx, Avm2Class* cls, const char* na
 	e.key.ns_len = sizeof(PROXY_NS) - 1;
 	e.kind = AVM2_PROP_METHOD;
 	e.method.fn = fn;
-	e.method.debug_name = name;
+	// FP spells a non-public builtin method's frame with its namespace URI
+	// ("flash.utils::Proxy/http://…/flash/proxy::getProperty()"), and a
+	// native debug_name is printed verbatim by avm2_callstack_frame_name.
+	{
+		size_t nlen = strlen(name);
+		char* qual = avm2_alloc(ctx, sizeof(PROXY_NS) + 2 + nlen);
+		snprintf(qual, sizeof(PROXY_NS) + 2 + nlen, "%s::%s", PROXY_NS, name);
+		e.method.debug_name = qual;
+	}
 	e.defining_class = cls;
 	avm2_vtable_append(ctx, &cls->ivtable, &e);
 }

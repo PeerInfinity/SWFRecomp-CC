@@ -117,15 +117,43 @@ static void number_proto_receiver_check(Avm2Activation* act, Avm2Class* cls,
 	{
 		return;
 	}
+	// The prototype shims are AS3 playerglobal, so FP's trace carries the
+	// "Error$/throwError()" frame (avm2/primitive_toString, primitive_valueOf).
+	// Per-site opt-in — see avm2_error.h.
+	avm2_callstack_push_throwerror(act->ctx);
 	avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
 	                 "Error #1004: Method %s.prototype.%s was invoked on an "
 	                 "incompatible object.", cls_name, meth);
 }
 
-#define DEFINE_NUMBER_PROTO_SHIMS(tag, cls_field, cls_name)                    \
+// How strict each shim is about a NUMERIC receiver. FP's three prototypes do
+// not agree, and avm2/primitive_{toString,valueOf} pin every cell of the
+// table with `Cls.prototype.m.call(v)` over {1.5, uint(2), -2}:
+//
+//            | Number | int      | uint
+//   toString | any    | integral | any        <- uint.toString(1.5) -> "1.5"
+//   valueOf  | any    | integral | uint-exact <- uint.valueOf(-2) throws #1004
+//
+// (i.e. only uint's two halves disagree with each other — an avmplus
+// implementation asymmetry, not a typo: both tests show it, for both signs.)
+static bool numeric_receiver_ok(Avm2Value v, int strict)
+{
+	if (!numeric_receiver(v)) return false;
+	if (strict == 0) return true;
+	double d = (v.kind == AVM2_VALUE_INTEGER) ? (double) v.u.i : v.u.d;
+	if (!isfinite(d) || d != (double) (int64_t) d) return false;
+	return strict == 1 || d >= 0.0;
+}
+
+#define NUM_RECV_ANY 0
+#define NUM_RECV_INT 1
+#define NUM_RECV_UINT 2
+
+#define DEFINE_NUMBER_PROTO_SHIMS(tag, cls_field, cls_name, ts_strict, vo_strict) \
 	static Avm2Value tag##_proto_to_string(Avm2Activation* act)                \
 	{                                                                          \
-		if (numeric_receiver(act->this_val)) return number_to_string(act);     \
+		if (numeric_receiver_ok(act->this_val, ts_strict))                     \
+			return number_to_string(act);                                      \
 		number_proto_receiver_check(act, act->ctx->builtins.cls_field,         \
 		                            cls_name, "toString");                     \
 		Avm2Activation zero = *act;                                            \
@@ -134,15 +162,19 @@ static void number_proto_receiver_check(Avm2Activation* act, Avm2Class* cls,
 	}                                                                          \
 	static Avm2Value tag##_proto_value_of(Avm2Activation* act)                 \
 	{                                                                          \
-		if (numeric_receiver(act->this_val)) return act->this_val;             \
+		if (numeric_receiver_ok(act->this_val, vo_strict))                     \
+			return act->this_val;                                              \
 		number_proto_receiver_check(act, act->ctx->builtins.cls_field,         \
 		                            cls_name, "valueOf");                      \
 		return avm2_number(0.0);                                               \
 	}
 
-DEFINE_NUMBER_PROTO_SHIMS(number, number_class, "Number")
-DEFINE_NUMBER_PROTO_SHIMS(int, int_class, "int")
-DEFINE_NUMBER_PROTO_SHIMS(uint, uint_class, "uint")
+DEFINE_NUMBER_PROTO_SHIMS(number, number_class, "Number",
+                          NUM_RECV_ANY, NUM_RECV_ANY)
+DEFINE_NUMBER_PROTO_SHIMS(int, int_class, "int",
+                          NUM_RECV_INT, NUM_RECV_INT)
+DEFINE_NUMBER_PROTO_SHIMS(uint, uint_class, "uint",
+                          NUM_RECV_ANY, NUM_RECV_UINT)
 
 static Avm2Value number_to_fixed(Avm2Activation* act)
 {

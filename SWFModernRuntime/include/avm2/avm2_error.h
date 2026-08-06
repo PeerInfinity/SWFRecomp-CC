@@ -57,6 +57,24 @@ void avm2_stack_check(Avm2Context* ctx);
 // Debug call stack (avm2_class.c pushes/pops around every invocation).
 void avm2_callstack_push(Avm2Context* ctx, const Avm2MethodRef* m, Avm2Class* bound_class);
 void avm2_callstack_pop(Avm2Context* ctx);
+// FP's playerglobal is AS3 code that raises through Error.throwError, so an
+// "Error$/throwError()" frame sits atop the trace; its C++-implemented core
+// does NOT. Call this immediately before avm2_throw_error at the sites whose
+// FP counterpart is AS3 (avm2/system_exit's expected trace has no such frame —
+// this must stay a PER-SITE OPT-IN and never move inside avm2_throw_error).
+// No pop is needed: the longjmp unwinds call_depth to the catching frame.
+void avm2_callstack_push_throwerror(Avm2Context* ctx);
+// A native frame FP has no name for at all. It still occupies a line in the
+// stack trace, but an EMPTY one (no "\tat"), which is how the E4X scanner's
+// frame shows up (avm2/xml_list_ctor_errors). Same per-site opt-in and same
+// no-pop-needed contract as above.
+void avm2_callstack_push_unnamed(Avm2Context* ctx);
+// Replace the innermost frame (if it is `own_fn`'s) with a synthetic native
+// one named verbatim — how a class-side ("Class$/m()") or namespaced builtin
+// frame is spelled, which the generic renderer cannot derive from a vtable
+// entry. Also used to name a native accessor's frame ("Class/set p()").
+void avm2_callstack_rename_frame(Avm2Context* ctx, Avm2MethodFn own_fn,
+                                 const char* name);
 // FP-style frame name ("Test()", "test_fla::MainTimeline/frame1()",
 // "global/flash.utils::getDefinitionByName()", "Function/<anonymous>()").
 void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,

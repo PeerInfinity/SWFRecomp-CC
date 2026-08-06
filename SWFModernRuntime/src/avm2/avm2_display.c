@@ -3233,6 +3233,9 @@ static void timer_check_delay(Avm2Context* ctx, double delay)
 {
 	if (!isfinite(delay) || delay < 0)
 	{
+		// Timer.as raises through Error.throwError (avm2/timer_invalid_delay
+		// grades the frame) — per-site opt-in, see avm2_error.h.
+		avm2_callstack_push_throwerror(ctx);
 		avm2_throw_error(ctx, ctx->builtins.range_error_class,
 		                 "Error #2066: The Timer delay specified is out of range.");
 	}
@@ -3303,10 +3306,11 @@ static Avm2Value timer_set_delay(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
 	if (ext == NULL) return avm2_undefined();
-	// Ruffle Timer.as quirk: the setter validates the OLD delay (getter),
-	// not the incoming value — so the new value is never range-checked.
-	timer_check_delay(ctx, ext->delay);
+	// Ruffle Timer.as `set delay` range-checks the INCOMING value (and FP
+	// agrees — avm2/timer_invalid_delay expects `timer.delay = NaN` on a
+	// valid Timer to throw #2066 from a "Timer/set delay()" frame).
 	double v = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0;
+	timer_check_delay(ctx, v);
 	ext->delay = v;
 	if (ext->timer_entry_id != 0)
 	{
@@ -11013,6 +11017,54 @@ static Avm2Value stage_set_align(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static Avm2Value stage_throw_2071(Avm2Activation* act);
+
+// `stage.scrollRect = <not a Rectangle>` — FP coerces a setter's argument to
+// its declared type BEFORE entering the body, so the #1034 that a bad value
+// raises comes from the CALL SITE and carries no "Stage/set scrollRect()"
+// frame (avm2/stage_properties2), unlike the #2071 a well-typed value gets
+// (avm2/stage_overriden_setters sets it to null and does see #2071).
+static Avm2Value stage_set_scroll_rect(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	if (v.kind != AVM2_VALUE_NULL && v.kind != AVM2_VALUE_UNDEFINED)
+	{
+		int found = 0;
+		Avm2Value cv = avm2_find_definition(ctx, "flash.geom.Rectangle", 20,
+		                                    &found);
+		if (found && cv.kind == AVM2_VALUE_OBJECT && cv.u.obj != NULL
+		    && cv.u.obj->kind == AVM2_OBJ_CLASS
+		    && !avm2_value_is_of_type(ctx, v, cv.u.obj->class_ref))
+		{
+			avm2_callstack_pop(ctx);  // the coercion precedes this frame
+			(void) avm2_coerce_to_class(ctx, cv.u.obj->class_ref, v);
+		}
+	}
+	return stage_throw_2071(act);
+}
+
+// Stage.colorCorrection: a plain String property whose declared type is
+// non-nullable, so `= null` fails the ARGUMENT coercion with #2007 rather
+// than the #2071 the DisplayObject-surface setters raise (avm2/stage_properties2).
+static Avm2Value stage_get_color_correction(Avm2Activation* act)
+{
+	return avm2_string(avm2_string_from_literal(act->ctx, "default"));
+}
+
+static Avm2Value stage_set_color_correction(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc < 1 || act->args[0].kind == AVM2_VALUE_NULL
+	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter %s must be non-null.",
+		                 "colorCorrection");
+	}
+	return avm2_undefined();
+}
+
 static Avm2Value stage_get_scale_mode(Avm2Activation* act)
 {
 	return avm2_string(avm2_string_from_literal(act->ctx, "showAll"));
@@ -11082,6 +11134,9 @@ static Avm2Value stage_invalidate(Avm2Activation* act)
 // Stage overrides most DisplayObject setters to throw (plain Error).
 static Avm2Value stage_throw_2071(Avm2Activation* act)
 {
+	// Stage.as is AS3 playerglobal: it raises through Error.throwError
+	// (avm2/stage_properties2 grades the frame). Per-site opt-in.
+	avm2_callstack_push_throwerror(act->ctx);
 	Avm2Context* ctx = act->ctx;
 	avm2_throw_error(ctx, ctx->builtins.error_class,
 	                 "Error #2071: The Stage class does not implement this property or method.");
@@ -11341,6 +11396,17 @@ static Avm2Value sprite_ctor_init(Avm2Activation* act)
 // Registration
 // ===========================================================================
 
+// "get x" / "set x" — how FP names an accessor's stack frame (the same
+// prebuilt-debug_name convention avm2_globals.c's accessor_debug_name uses).
+static const char* disp_accessor_debug_name(Avm2Context* ctx, const char* prefix,
+                                            const char* name)
+{
+	size_t nlen = strlen(name);
+	char* out = avm2_alloc(ctx, nlen + 5);
+	snprintf(out, nlen + 5, "%s%s", prefix, name);
+	return out;
+}
+
 static void add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
                        Avm2MethodFn getter, Avm2MethodFn setter)
 {
@@ -11358,9 +11424,13 @@ static void add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
 		{
 			e->kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
 			e->method.fn = getter;
-			e->method.debug_name = name;
+			// FP names an accessor frame "get x"/"set x" — the same spelling
+			// avm2_builtin_add_getset gives the append path below, which the
+			// in-place branch used to drop (avm2/stage_properties2 wanted
+			// "flash.display::Stage/set height()", we printed ".../height()").
+			e->method.debug_name = disp_accessor_debug_name(ctx, "get ", name);
 			e->setter.fn = setter;
-			e->setter.debug_name = name;
+			e->setter.debug_name = disp_accessor_debug_name(ctx, "set ", name);
 			e->defining_class = cls;
 			// Both halves are ours now — drop any per-setter binding the
 			// inherited entry carried.
@@ -13945,6 +14015,7 @@ void avm2_register_display(Avm2Context* ctx)
 			{ "cacheAsBitmap", do_cab_get }, { "contextMenu", do_contextmenu_get },
 			{ "filters", do_get_filters }, { "focusRect", io_get_focus_rect },
 			{ "height", do_get_height }, { "mask", do_get_mask },
+			{ "mouseEnabled", io_get_mouse_enabled },
 			{ "name", do_get_name }, { "opaqueBackground", do_opaquebg_get },
 			{ "rotation", do_get_rotation }, { "rotationX", do_get_zero },
 			{ "rotationY", do_get_zero }, { "rotationZ", do_get_rotation },
@@ -13959,7 +14030,16 @@ void avm2_register_display(Avm2Context* ctx)
 		{
 			add_getset(ctx, stage, ov[i].name, ov[i].getter, stage_throw_2071);
 		}
+		// scrollRect's declared parameter type is checked BEFORE the body
+		// runs, so a non-Rectangle loses to #1034 rather than #2071.
+		add_getset(ctx, stage, "scrollRect", do_scrollrect_get,
+		           stage_set_scroll_rect);
 		avm2_builtin_add_getter(ctx, stage, "textSnapshot", stage_throw_2071);
+		// Stage-only property; not a 2071 thrower — `stage.colorCorrection =
+		// null` fails the ARGUMENT coercion instead, with no throwError frame
+		// (avm2/stage_properties2's last case).
+		add_getset(ctx, stage, "colorCorrection", stage_get_color_correction,
+		           stage_set_color_correction);
 	}
 
 	// flash.display string-constant classes (Bitmap.pixelSnapping, blendMode,

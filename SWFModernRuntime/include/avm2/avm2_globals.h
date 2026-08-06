@@ -140,6 +140,13 @@ void avm2_builtin_add_method_n(Avm2Context* ctx, Avm2Class* cls, const char* nam
 // prototype). Invisible to dispatch, visible to hasOwnProperty.
 void avm2_builtin_add_method_as3(Avm2Context* ctx, Avm2Class* cls, const char* name,
                                  Avm2MethodFn fn);
+// Override the stack-frame spelling of an already-registered public instance
+// method. FP names a method declared in a non-public namespace with its URI
+// ("Function/http://adobe.com/AS3/2006/builtin::call()"), but our keys stay
+// public so dispatch is unaffected; only the debug_name moves. `debug_name`
+// must be a string literal or another allocation that outlives the context.
+void avm2_builtin_set_debug_name(Avm2Context* ctx, Avm2Class* cls,
+                                 const char* name, const char* debug_name);
 void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn);
 // Instance accessor pair (setter may be NULL for a getter-only prop).

@@ -1523,6 +1523,11 @@ typedef struct Parser
 static _Noreturn void parse_error(Parser* ps, const char* fmt, const Avm2String* arg)
 {
 	Avm2Context* ctx = ps->ctx;
+	// FP's E4X scanner frame has no name at all, and its stack trace shows it
+	// as a bare empty line between the message and the first named frame
+	// (avm2/xml_list_ctor_errors — the one non-parser error in that test, the
+	// #1050, has no such line). See avm2_error.h's unnamed-frame convention.
+	avm2_callstack_push_unnamed(ctx);
 	if (arg != NULL)
 	{
 		avm2_throw_error(ctx, ctx->builtins.type_error_class, fmt,

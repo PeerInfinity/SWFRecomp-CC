@@ -402,6 +402,15 @@ void avm2_register_function_builtins(Avm2Context* ctx)
 	// ecma3/Function/e15_3_4_3_1 pins 2 and e15_3_4_4_1_rt pins 1.
 	avm2_builtin_add_method_n(ctx, cls, "call", fn_call, 1);
 	avm2_builtin_add_method_n(ctx, cls, "apply", fn_apply, 2);
+	// Both traits live in the AS3 BUILTIN namespace in playerglobal, and FP
+	// spells a non-public method's frame with its namespace URI
+	// ("Function/http://adobe.com/AS3/2006/builtin::call()" —
+	// avm2/primitive_toString, avm2/error_throwerror). Our keys stay public
+	// (dispatch folds AS3<->public); only the frame name is corrected here.
+	avm2_builtin_set_debug_name(ctx, cls, "call",
+	                            "http://adobe.com/AS3/2006/builtin::call");
+	avm2_builtin_set_debug_name(ctx, cls, "apply",
+	                            "http://adobe.com/AS3/2006/builtin::apply");
 	avm2_builtin_add_getter(ctx, cls, "length", fn_get_length);
 	// ES3-compat layer on Function.prototype (Ruffle globals/Function.as).
 	avm2_proto_add_function_n(ctx, cls->prototype_obj, "call", fn_call, 1);

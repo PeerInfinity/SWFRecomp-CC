@@ -109,6 +109,38 @@ void avm2_callstack_pop(Avm2Context* ctx)
 	if (ctx->call_depth > 0) ctx->call_depth--;
 }
 
+// See avm2_error.h: the synthetic "Error$/throwError()" frame FP's AS3
+// playerglobal contributes. PER-SITE OPT-IN — avm2/system_exit's expected
+// trace proves a blanket push inside avm2_throw_error would be wrong.
+void avm2_callstack_push_throwerror(Avm2Context* ctx)
+{
+	static const Avm2MethodRef throwerror = { NULL, NULL, "Error$/throwError", 0 };
+	avm2_callstack_push(ctx, &throwerror, NULL);
+}
+
+// See avm2_error.h: a nameless native frame, rendered as an empty line.
+void avm2_callstack_push_unnamed(Avm2Context* ctx)
+{
+	static const Avm2MethodRef unnamed = { NULL, NULL, "", 0 };
+	avm2_callstack_push(ctx, &unnamed, NULL);
+}
+
+// See avm2_error.h. `name` must outlive the frame (a string literal, or a
+// registration-time allocation).
+void avm2_callstack_rename_frame(Avm2Context* ctx, Avm2MethodFn own_fn,
+                                 const char* name)
+{
+	if (ctx->call_depth > 0
+	    && ctx->call_frames[ctx->call_depth - 1].method.fn == own_fn)
+	{
+		avm2_callstack_pop(ctx);
+	}
+	Avm2MethodRef ref;
+	memset(&ref, 0, sizeof(ref));
+	ref.debug_name = name;
+	avm2_callstack_push(ctx, &ref, NULL);
+}
+
 void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
                                char* buf, int size)
 {
@@ -128,13 +160,20 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
 		else
 		{
 			// mxmlc debug names are qualified ("test_fla:MainTimeline/
-			// test_fla:frame1"); keep only the final segment.
+			// test_fla:frame1"); keep only the final segment. A NATIVE
+			// method's debug_name is built here, not by a compiler, so it is
+			// printed verbatim — that is what lets a builtin registered in a
+			// non-public namespace carry its URI ("flash.utils::Proxy/
+			// http://www.adobe.com/2006/actionscript/flash/proxy::getProperty()").
 			const char* dn = (m->debug_name != NULL && m->debug_name[0] != '\0')
 				? m->debug_name : "<anonymous>";
-			const char* slash = strrchr(dn, '/');
-			if (slash != NULL) dn = slash + 1;
-			const char* colon = strrchr(dn, ':');
-			if (colon != NULL) dn = colon + 1;
+			if (m->file != NULL)
+			{
+				const char* slash = strrchr(dn, '/');
+				if (slash != NULL) dn = slash + 1;
+				const char* colon = strrchr(dn, ':');
+				if (colon != NULL) dn = colon + 1;
+			}
 			snprintf(buf, size, "%s/%s()", cq, dn);
 		}
 		return;
@@ -142,7 +181,14 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
 	if (m->file == NULL)
 	{
 		// Native: debug_name is prebuilt (globals register the full
-		// "global/ns::name" form).
+		// "global/ns::name" form). An EMPTY debug_name is the deliberate
+		// "unnamed frame" marker (avm2_callstack_push_unnamed) — it prints
+		// as nothing, and callstack_snapshot drops the "\tat " with it.
+		if (m->debug_name != NULL && m->debug_name[0] == '\0')
+		{
+			if (size > 0) buf[0] = '\0';
+			return;
+		}
 		snprintf(buf, size, "%s()", m->debug_name != NULL ? m->debug_name : "<native>");
 		return;
 	}
@@ -193,7 +239,9 @@ static const Avm2String* callstack_snapshot(Avm2Context* ctx)
 	{
 		char name[176];
 		avm2_callstack_frame_name(ctx, &ctx->call_frames[i], name, sizeof(name));
-		n += (uint32_t) snprintf(buf + n, sizeof(buf) - n, "\n\tat %s", name);
+		n += (uint32_t) (name[0] == '\0'
+			? snprintf(buf + n, sizeof(buf) - n, "\n")
+			: snprintf(buf + n, sizeof(buf) - n, "\n\tat %s", name));
 	}
 	return avm2_string_new(ctx, buf, n);
 }
@@ -546,9 +594,14 @@ static Avm2Value error_get_stack_trace(Avm2Activation* act)
 	Avm2Value* tail = avm2_object_find_dynamic(act->this_val.u.obj,
 	                                           "__stacktrace_tail", 17);
 	if (tail == NULL) return avm2_null();
-	// First line is the error's toString().
-	Avm2Value head = error_proto_to_string(act);
-	return avm2_string(avm2_string_concat(ctx, head.u.str, tail->u.str));
+	// First line is the error's toString() — a REAL call, so a script that
+	// replaces Error.prototype.toString sees its side effects and its return
+	// value here (avm2/error_stack_trace_edge_cases). A non-string return is
+	// coerced, so an override returning null yields the literal "null".
+	Avm2Value head = avm2_call_public_property(ctx, act->this_val,
+	                                           "toString", 8, NULL, 0);
+	return avm2_string(avm2_string_concat(ctx, avm2_coerce_to_string(ctx, head),
+	                                      tail->u.str));
 }
 
 // Error-message table for Error.getErrorMessage, generated from Ruffle
@@ -1303,6 +1356,82 @@ static Avm2Value error_get_error_message(Avm2Activation* act)
 	return avm2_string(avm2_string_new(ctx, buf, (uint32_t) n));
 }
 
+// Error.throwError(type:Class, index:uint, ...rest) — the entry point FP's AS3
+// playerglobal raises every one of its own errors through, and which scripts
+// may call directly (avm2/error_throwerror). It takes getErrorMessage(index),
+// substitutes %1..%9 from `rest` in a SINGLE pass (so a replacement that is
+// itself "%1" stays literal), and throws `new type(message, index)`.
+//
+// Missing arguments substitute as the empty string — "Error #1044: MethodInfo-
+// unsupported flags=." is the real FP text for throwError(Error, 1044).
+#define AVM2_THROWERROR_MAX_ARGS 6
+static Avm2Value error_throw_error(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	// FP spells a class-side frame with a `$` on the class, which the generic
+	// renderer cannot derive from a static vtable entry (same idiom as
+	// system_exit). This call never returns, so the frame needs no pop.
+	avm2_callstack_rename_frame(ctx, error_throw_error, "Error$/throwError");
+
+	Avm2Class* cls = NULL;
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
+	    && act->args[0].u.obj != NULL)
+	{
+		cls = act->args[0].u.obj->class_ref;
+	}
+	if (cls == NULL) cls = ctx->builtins.error_class;
+	double index = (act->argc > 1) ? avm2_coerce_to_number(ctx, act->args[1]) : 0;
+	int32_t id = (int32_t) index;
+	const char* tmpl = (id >= 0) ? raw_error_message((uint32_t) id) : NULL;
+
+	char buf[1024];
+	int n = snprintf(buf, sizeof(buf), "Error #%d", id);
+	if (tmpl != NULL)
+	{
+		n += snprintf(buf + n, sizeof(buf) - (size_t) n, ": ");
+		// The substitution runs inside String.replace with a closure
+		// replacer, and each argument is coerced to String there — so an
+		// argument whose toString() throws (avm2/error_throwerror's
+		// TrojanHorse) surfaces with those intermediate frames on the stack.
+		static const Avm2MethodRef anon = { NULL, NULL, "Function/<anonymous>", 0 };
+		static const Avm2MethodRef repl = { NULL, NULL, "String$/_replace", 0 };
+		avm2_callstack_push(ctx, &anon, NULL);
+		avm2_callstack_push(ctx, &repl, NULL);
+		for (const char* p = tmpl; *p != '\0' && n < (int) sizeof(buf) - 1; )
+		{
+			if (p[0] == '%' && p[1] >= '1' && p[1] <= '9')
+			{
+				uint32_t idx = (uint32_t) (p[1] - '1') + 2;
+				// FP's throwError declares six OPTIONAL arguments, not a rest
+				// parameter: throwError(Error, 3723, "a".."j") substitutes
+				// %1..%6 and leaves %7/%8 empty (avm2/error_throwerror).
+				if (idx < act->argc && idx < 2 + AVM2_THROWERROR_MAX_ARGS)
+				{
+					const Avm2String* s =
+						avm2_coerce_to_string(ctx, act->args[idx]);
+					n += snprintf(buf + n, sizeof(buf) - (size_t) n, "%.*s",
+					              (int) s->len, s->utf8);
+				}
+				p += 2;
+				continue;
+			}
+			buf[n++] = *p++;
+			buf[n] = '\0';
+		}
+		avm2_callstack_pop(ctx);
+		avm2_callstack_pop(ctx);
+	}
+	if (n < 0) n = 0;
+	if (n > (int) sizeof(buf) - 1) n = (int) sizeof(buf) - 1;
+
+	Avm2Value args[2];
+	args[0] = avm2_string(avm2_string_new(ctx, buf, (uint32_t) n));
+	// The id reaches the constructor as a Number, not an int — CustomError's
+	// `arg.constructor` trace in avm2/error_throwerror pins "[class Number]".
+	args[1] = avm2_number(index);
+	avm2_throw(ctx, avm2_class_construct(ctx, cls, args, 2));
+}
+
 // Error(...) call = new Error(...) (Ruffle globals/error.rs call handler).
 static Avm2Value error_call(Avm2Context* ctx, Avm2Class* cls,
                             const Avm2Value* args, uint32_t argc)
@@ -1338,6 +1467,8 @@ static Avm2Class* make_error_class(Avm2Context* ctx, const char* name, Avm2Class
 		avm2_builtin_add_method(ctx, cls, "getStackTrace", error_get_stack_trace);
 		avm2_builtin_add_static_method_n(ctx, cls, "getErrorMessage",
 		                                 error_get_error_message, 1);
+		avm2_builtin_add_static_method_n(ctx, cls, "throwError",
+		                                 error_throw_error, 2);
 		avm2_builtin_add_getter(ctx, cls, "errorID", error_get_error_id);
 
 		// Error.prototype is itself an ERROR instance (avmplus
