@@ -53,6 +53,9 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_end_offscreen_pass(ctx)              render_webgpu_end_offscreen_pass(ctx)
 #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) render_webgpu_run_blur(ctx, bx, by, q, s, r, g, b, a, c)
 #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) render_webgpu_composite_filtered(ctx, ox, oy, tr, tg, tb, ta)
+#define renderer_snapshot_filter_source(ctx)           render_webgpu_snapshot_filter_source(ctx)
+#define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) \
+	render_webgpu_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs)
 #define renderer_ensure_filter_resources(ctx)          render_webgpu_ensure_filter_resources(ctx)
 #define renderer_blend_mode_is_layered(ctx, m)         render_webgpu_blend_mode_is_layered(ctx, m)
 #define renderer_capture_backdrop(ctx, m)              render_webgpu_capture_backdrop(ctx, m)
@@ -107,6 +110,8 @@ typedef FlashbangContext RenderContext;
 #define renderer_end_offscreen_pass(ctx)              ((void)0)
 #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) ((void)0)
 #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) ((void)0)
+#define renderer_snapshot_filter_source(ctx)           ((void)0)
+#define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) ((void)0)
 #define renderer_ensure_filter_resources(ctx)          ((void)0)
 #define renderer_blend_mode_is_layered(ctx, m)         (0)
 #define renderer_capture_backdrop(ctx, m)              ((void)0)

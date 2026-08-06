@@ -133,14 +133,29 @@ typedef struct WebGPURenderContext
 	WGPUTexture filter_msaa_texture;   // separate MSAA 4x texture for offscreen rendering
 	WGPUTextureView filter_msaa_view;
 	WGPUSampler filter_sampler;        // linear, clamp-to-edge
-	WGPUBuffer filter_quad_buffer;     // 6-vertex fullscreen NDC quad
-	WGPUBuffer blur_params_buf;        // uniform: direction(vec2f), texel_size(vec2f), radius(f32), strength(f32), color(vec4f) = 48 bytes padded to 64
 	WGPURenderPipeline blur_pipeline;
 	WGPUBindGroupLayout blur_bgl;
 	WGPUPipelineLayout blur_pipeline_layout;
 	WGPURenderPipeline composite_pipeline;  // draws filtered result into MSAA main pass
 	WGPUBindGroupLayout composite_bgl;
 	WGPUPipelineLayout composite_pipeline_layout;
+	// --- Filter COMPOSITION (inner / knockout / compositeSource) ---
+	// Flash composes a glow/bevel against the UNBLURRED source, which the
+	// filter_tex_a -> filter_tex_b ping-pong destroys, so the source is
+	// snapshotted before the blur runs. See render_webgpu_compose_filter().
+	WGPUTexture filter_src_tex;             // snapshot of the unfiltered source
+	WGPUTextureView filter_src_view;
+	WGPURenderPipeline compose_pipeline;
+	WGPUBindGroupLayout compose_bgl;
+	WGPUPipelineLayout compose_pipeline_layout;
+	// --- Filter uniform RING ---
+	// wgpuQueueWriteBuffer is ordered against Submit, NOT against the commands
+	// already encoded on the pending encoder: every write issued during a frame
+	// lands before ANY draw in that frame runs. A single re-written uniform
+	// buffer therefore serves every filter draw in the frame with the LAST
+	// value written. Each write takes its own 256-byte slot instead.
+	WGPUBuffer filter_uniform_ring;
+	u32 filter_uniform_cursor;             // next free slot, reset per frame
 
 	// --- Blend-mode LAYER compositing (lazy, on the first non-trivial blend) ---
 	// Flash blends a display object's whole rendered subtree against the backdrop
@@ -306,6 +321,20 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* context);
 void render_webgpu_end_offscreen_pass(WebGPURenderContext* context);
 void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float blur_y, u8 quality, float strength, float r, float g, float b, float a, int colorize);
 void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
+// Copy the offscreen source out of filter_tex_a before the blur ping-pong
+// overwrites it. Call with the main pass SUSPENDED, between
+// render_webgpu_end_offscreen_pass() and render_webgpu_run_blur().
+void render_webgpu_snapshot_filter_source(WebGPURenderContext* context);
+// Compose a blurred filter (filter_tex_a) against the snapshotted source per
+// Flash's inner/knockout/compositeSource rules. kind 0 = glow/drop-shadow
+// (c1 = glow colour, variant = inner), kind 1 = bevel (c1 = highlight,
+// c2 = shadow, variant = 0 outer / 1 inner / 2 full). blur_off_* is a UV-space
+// offset added to the blurred sample (bevel also samples at -blur_off).
+void render_webgpu_compose_filter(WebGPURenderContext* context, int kind,
+	float blur_off_x, float blur_off_y,
+	float c1r, float c1g, float c1b, float c1a,
+	float c2r, float c2g, float c2b, float c2a,
+	float strength, int variant, int knockout, int composite_source);
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
 // Blend-mode layer compositing: 1 when this mode must be rendered to its own
 // layer and composited once, 0 when the caller should keep the legacy per-draw

@@ -1898,6 +1898,10 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	ctx->dynamic_vertex_used = 0;
 	ctx->dynamic_gradient_used = 0;
 	ctx->dynamic_bitmap_used = 0;
+	// Filter uniform slots only have to stay distinct WITHIN a frame (the frame's
+	// commands have all run by the time the next frame's writes land), so the
+	// ring restarts here rather than growing without bound.
+	ctx->filter_uniform_cursor = 0;
 	// main_color_texture is whatever this frame's MSAA resolve target is; the
 	// complex blend modes snapshot it as their backdrop. NULL disables them.
 	ctx->main_color_texture = NULL;
@@ -3121,17 +3125,26 @@ void render_webgpu_update_colors(WebGPURenderContext* ctx,
 // Filter support: WGSL shaders, resource creation, blur + composite passes
 // ---------------------------------------------------------------------------
 
+// Flash's blur is a BOX blur, not a gaussian: one pass averages a window
+// `full_size` texels wide, the two outermost texels carry a fractional weight,
+// and the filter's `quality` counts how many times that box runs per axis.
+// Weights and the linear-sampling fusion are ported from ruffle
+// render/wgpu/shaders/filter/blur.wgsl + render/wgpu/src/filters/blur.rs,
+// which follow fgiesen's "fast blurs 2" fractional-box formulation. The C-side
+// half of the port is blur_box_kernel() next to render_webgpu_run_blur().
 static const char* blur_wgsl =
 	"struct Params {\n"
 	"  direction: vec2f,\n"     // (1,0) for H, (0,1) for V
 	"  texel_size: vec2f,\n"    // 1/width, 1/height
-	"  radius: f32,\n"
+	"  full_size: f32,\n"       // box width in texels; the weights sum to this
+	"  m: f32,\n"               // unit-weight texel PAIRS either side of centre
+	"  m2: f32,\n"              // m * 2
+	"  first_weight: f32,\n"    // fractional weight of the outermost texel
+	"  last_offset: f32,\n"     // sub-texel offset that fuses the last pair
+	"  last_weight: f32,\n"     // 1 + first_weight
 	"  strength: f32,\n"
-	"  color: vec4f,\n"         // for colorize (glow/shadow)
 	"  colorize: f32,\n"        // 0=blur, 1=colorize alpha
-	"  pad1: f32,\n"
-	"  pad2: f32,\n"
-	"  pad3: f32,\n"
+	"  color: vec4f,\n"         // for colorize (glow/shadow)
 	"}\n"
 	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
 	"@group(0) @binding(1) var in_samp: sampler;\n"
@@ -3155,17 +3168,32 @@ static const char* blur_wgsl =
 	"}\n"
 	"\n"
 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
-	"  let r = i32(params.radius);\n"
-	"  let sigma = max(params.radius * 0.5, 0.001);\n"
+	"  let step = params.direction * params.texel_size;\n"
+	// Pre-shift so the first unit-weight texel sits at offset 0. Ruffle does
+	// this in the vertex stage; doing it here is the same arithmetic and keeps
+	// the uniform buffer out of the vertex shader's visibility set.
+	"  let base = uv - step * params.m;\n"
 	"  var total = vec4f(0.0);\n"
-	"  var weight_sum = 0.0;\n"
-	"  for (var i = -r; i <= r; i++) {\n"
-	"    let offset = vec2f(f32(i)) * params.direction * params.texel_size;\n"
-	"    let w = exp(-f32(i*i) / (2.0 * sigma * sigma));\n"
-	"    total += textureSample(in_tex, in_samp, uv + offset) * w;\n"
-	"    weight_sum += w;\n"
+	// The outermost texel on the low side, at the fractional weight.
+	"  total += textureSample(in_tex, in_samp, base - step) * params.first_weight;\n"
+	// The unit-weight interior: sampling exactly between two texels with a
+	// linear sampler returns their average, so one sample x2 covers a pair.
+	"  var center = vec4f(0.0);\n"
+	"  for (var i = 0.5; i < params.m2; i = i + 2.0) {\n"
+	"    center += textureSample(in_tex, in_samp, base + step * i);\n"
 	"  }\n"
-	"  var result = total / weight_sum;\n"
+	"  total += center * 2.0;\n"
+	// The last pair, fused into one sample: last_offset/last_weight are chosen
+	// so texel m lands on weight 1 and texel m+1 on first_weight.
+	"  total += textureSample(in_tex, in_samp,\n"
+	"      base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
+	"  var result = total / params.full_size;\n"
+	"  if (params.full_size > 1.0) {\n"
+	// Imitate FP's fixed-point accumulator (ruffle blur.wgsl does the same).
+	// Skipped for the full_size<=1 identity pass, where an 8-bit round-trip
+	// through floor() could shave a level off an already-exact copy.
+	"    result = floor(result * 255.0) / 255.0;\n"
+	"  }\n"
 	"  result = clamp(result * params.strength, vec4f(0.0), vec4f(1.0));\n"
 	"  if (params.colorize > 0.5) {\n"
 	"    let a2 = result.a * params.color.a;\n"
@@ -3207,6 +3235,147 @@ static const char* composite_wgsl =
 	"  return select(c, tinted, params.offset_and_mode.z > 0.5);\n"
 	"}\n";
 
+// Flash's glow/drop-shadow/bevel filters do not simply draw a blurred copy
+// behind the object: the SWF filter flag byte carries inner, knockout and
+// compositeSource bits that decide how the filter output is combined with the
+// UNBLURRED source. This shader is a direct port of ruffle
+// render/wgpu/shaders/filter/{glow,bevel}.wgsl, fused into one module with a
+// `kind` selector, since we have a single composite pipeline slot.
+//
+// The blurred texture contributes only its ALPHA; strength and the filter
+// colour are applied here (ruffle does the same), which is why
+// render_webgpu_run_blur is now called with strength=1/colorize=0 for these
+// filter kinds. `src_tex` is the snapshot taken by
+// render_webgpu_snapshot_filter_source() before the blur ping-pong ran.
+//
+// compositeSource=0 is also how the caller asks for "filter output only" when
+// it intends to draw the crisp source itself with a normal draw call — the
+// over-blend then reproduces the compositeSource=1 formula exactly, so the
+// common outer+compositeSource case keeps its MSAA-sharp source.
+static const char* compose_wgsl =
+	"struct Params {\n"
+	"  color1: vec4f,\n"   // glow colour / bevel highlight (straight alpha in .a)
+	"  color2: vec4f,\n"   // bevel shadow
+	"  blur_off: vec4f,\n" // xy = UV offset added to the blurred sample
+	"  mode: vec4f,\n"     // x=kind (0 glow, 1 bevel), y=variant, z=knockout, w=composite_source
+	"  misc: vec4f,\n"     // x=strength
+	"}\n"
+	"@group(0) @binding(0) var blur_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(1) var in_samp: sampler;\n"
+	"@group(0) @binding(2) var<uniform> params: Params;\n"
+	"@group(0) @binding(3) var src_tex: texture_2d<f32>;\n"
+	"\n"
+	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+	"\n"
+	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+	"  var positions = array<vec2f, 6>(\n"
+	"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+	"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+	"  );\n"
+	"  var uvs = array<vec2f, 6>(\n"
+	"    vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),\n"
+	"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
+	"  );\n"
+	"  var out: VSOut;\n"
+	"  out.pos = vec4f(positions[vi], 0.0, 1.0);\n"
+	"  out.uv = uvs[vi];\n"
+	"  return out;\n"
+	"}\n"
+	"\n"
+	// Returns 1 inside the texture, 0 outside. Everything outside the blurred
+	// texture reads as fully transparent (ruffle zeroes it the same way; our
+	// sampler is ClampToEdge, which would smear the border instead). The MASK
+	// is computed here rather than an early return, because WGSL requires
+	// textureSample to sit in uniform control flow: all three samples below are
+	// taken unconditionally and only their VALUES are gated.
+	"fn in_bounds(uv: vec2f) -> f32 {\n"
+	"  let ok = uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0;\n"
+	"  return select(0.0, 1.0, ok);\n"
+	"}\n"
+	"\n"
+	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"  let knockout = params.mode.z > 0.5;\n"
+	"  let composite_source = params.mode.w > 0.5;\n"
+	"  let uv_l = uv + params.blur_off.xy;\n"
+	"  let uv_r = uv - params.blur_off.xy;\n"
+	"  let dest = textureSample(src_tex, in_samp, uv);\n"
+	"  let blur_l = textureSample(blur_tex, in_samp, uv_l).a * in_bounds(uv_l);\n"
+	"  let blur_r = textureSample(blur_tex, in_samp, uv_r).a * in_bounds(uv_r);\n"
+	"  if (params.mode.x < 0.5) {\n"
+	// ---- glow / drop shadow ----
+	"    let blur = blur_l;\n"
+	"    let inner = params.mode.y > 0.5;\n"
+	"    var color = vec4f(params.color1.rgb, 1.0);\n"
+	"    if (inner) {\n"
+	"      let alpha = params.color1.a * saturate((1.0 - blur) * params.misc.x);\n"
+	"      if (knockout) {\n"
+	"        color = color * alpha * dest.a;\n"
+	"      } else if (composite_source) {\n"
+	"        color = color * alpha * dest.a + dest * (1.0 - alpha);\n"
+	"      } else {\n"
+	// Intentionally the same as knockout for inner; outer differs. Flash quirk,
+	// documented in ruffle glow.wgsl.
+	"        color = color * alpha * dest.a;\n"
+	"      }\n"
+	"    } else {\n"
+	"      let alpha = params.color1.a * saturate(blur * params.misc.x);\n"
+	"      if (knockout) {\n"
+	"        color = color * alpha * (1.0 - dest.a);\n"
+	"      } else if (composite_source) {\n"
+	"        color = color * alpha * (1.0 - dest.a) + dest;\n"
+	"      } else {\n"
+	"        color = color * alpha;\n"
+	"      }\n"
+	"    }\n"
+	"    return color;\n"
+	"  }\n"
+	// ---- bevel ----
+	// The bevel is the DIFFERENCE of the blurred alpha sampled either side of
+	// the light direction: positive difference lights, negative shades.
+	"  let hc = vec4f(params.color1.rgb * params.color1.a, params.color1.a);\n"
+	"  let sc = vec4f(params.color2.rgb * params.color2.a, params.color2.a);\n"
+	"  let hi_a = saturate((blur_l - blur_r) * params.misc.x);\n"
+	"  let sh_a = saturate((blur_r - blur_l) * params.misc.x);\n"
+	"  let glow = hc * hi_a + sc * sh_a;\n"
+	"  let is_outer = params.mode.y < 0.5 || params.mode.y > 1.5;\n"
+	"  let is_inner = params.mode.y > 0.5;\n"
+	"  if (is_inner && is_outer) {\n"
+	"    if (knockout || !composite_source) { return glow; }\n"
+	"    return dest - dest * glow.a + glow;\n"
+	"  } else if (is_inner) {\n"
+	"    if (knockout) { return glow * dest.a; }\n"
+	"    if (composite_source) { return glow * dest.a + dest * (1.0 - glow.a); }\n"
+	"    return glow * dest.a;\n"
+	"  }\n"
+	"  if (knockout) { return glow - glow * dest.a; }\n"
+	"  if (composite_source) { return dest + glow - glow * dest.a; }\n"
+	"  return glow;\n"
+	"}\n";
+
+// --- Filter uniform ring ---
+// See the `filter_uniform_ring` comment in render_webgpu.h: a uniform buffer
+// that is re-written between draws of the SAME frame does not work, because
+// wgpuQueueWriteBuffer is ordered against Submit rather than against the
+// commands already on the encoder. Every filter draw takes its own slot.
+//
+// This was the mechanism behind three separate wrong renders: the blur's H
+// pass ran with the V pass's direction/kernel (so every blur was one-axis),
+// a bevel's shadow composite ran with the highlight's tint, and every filter
+// composition in a frame ran with the last object's inner/knockout flags.
+#define FILTER_UNIFORM_SLOT   256u   // >= minUniformBufferOffsetAlignment
+// A filtered object uses 2*quality blur slots + 1 composition slot, so 1024
+// slots covers ~145 filtered objects in a single frame. Beyond that the ring
+// wraps and the aliasing returns; no test in the corpus comes close.
+#define FILTER_UNIFORM_SLOTS  1024u  // 256 KB
+
+static u32 filter_uniform_push(WebGPURenderContext* ctx, const void* data, size_t size)
+{
+	u32 offset = ctx->filter_uniform_cursor * FILTER_UNIFORM_SLOT;
+	ctx->filter_uniform_cursor = (ctx->filter_uniform_cursor + 1) % FILTER_UNIFORM_SLOTS;
+	wgpuQueueWriteBuffer(ctx->queue, ctx->filter_uniform_ring, offset, data, size);
+	return offset;
+}
+
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
@@ -3222,18 +3391,24 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 	ftex_desc.mipLevelCount = 1;
 	ftex_desc.sampleCount = 1;
 	// CopyDst so filter_tex_b can receive the backdrop snapshot the complex blend
-	// shaders sample (render_webgpu_capture_backdrop).
+	// shaders sample (render_webgpu_capture_backdrop); CopySrc so filter_tex_a
+	// can be snapshotted into filter_src_tex before the blur overwrites it.
 	ftex_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding
-	                | WGPUTextureUsage_CopyDst;
+	                | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc;
 	ctx->filter_tex_a = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
 	ftex_desc.label = WGPU_LABEL("filter_tex_b");
 	ctx->filter_tex_b = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
+	// The unblurred source the composition shader needs as `dest`.
+	ftex_desc.label = WGPU_LABEL("filter_src");
+	ftex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+	ctx->filter_src_tex = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
 
 	WGPUTextureViewDescriptor fview_desc = {0};
 	fview_desc.mipLevelCount = 1;
 	fview_desc.arrayLayerCount = 1;
 	ctx->filter_view_a = wgpuTextureCreateView(ctx->filter_tex_a, &fview_desc);
 	ctx->filter_view_b = wgpuTextureCreateView(ctx->filter_tex_b, &fview_desc);
+	ctx->filter_src_view = wgpuTextureCreateView(ctx->filter_src_tex, &fview_desc);
 
 	// --- Separate MSAA texture for offscreen rendering ---
 	{
@@ -3259,13 +3434,14 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 	samp_desc.maxAnisotropy = 1;
 	ctx->filter_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 
-	// --- Blur params uniform buffer (64 bytes) ---
+	// --- Filter uniform ring (blur params, composite params, compose params) ---
 	{
 		WGPUBufferDescriptor buf_desc = {0};
-		buf_desc.label = WGPU_LABEL("blur_params");
-		buf_desc.size = 64;
+		buf_desc.label = WGPU_LABEL("filter_uniform_ring");
+		buf_desc.size = (u64)FILTER_UNIFORM_SLOT * FILTER_UNIFORM_SLOTS;
 		buf_desc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
-		ctx->blur_params_buf = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
+		ctx->filter_uniform_ring = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
+		ctx->filter_uniform_cursor = 0;
 	}
 
 	// --- Blur pipeline ---
@@ -3400,13 +3576,81 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		wgpuShaderModuleRelease(comp_sm);
 	}
 
-	// --- Composite params uniform buffer (32 bytes: offset+mode vec4f + tint vec4f) ---
+	// --- Filter composition pipeline (inner / knockout / compositeSource) ---
+	// Same target, blend and stencil configuration as composite_pipeline; the
+	// only structural difference is the 4th binding (the source snapshot).
 	{
-		WGPUBufferDescriptor buf_desc = {0};
-		buf_desc.label = WGPU_LABEL("composite_params");
-		buf_desc.size = 32;
-		buf_desc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
-		ctx->filter_quad_buffer = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
+		WGPUBindGroupLayoutEntry entries[4] = {0};
+		entries[0].binding = 0;
+		entries[0].visibility = WGPUShaderStage_Fragment;
+		entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+		entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+		entries[1].binding = 1;
+		entries[1].visibility = WGPUShaderStage_Fragment;
+		entries[1].sampler.type = WGPUSamplerBindingType_Filtering;
+		entries[2].binding = 2;
+		entries[2].visibility = WGPUShaderStage_Fragment;
+		entries[2].buffer.type = WGPUBufferBindingType_Uniform;
+		entries[2].buffer.minBindingSize = 80;
+		entries[3].binding = 3;
+		entries[3].visibility = WGPUShaderStage_Fragment;
+		entries[3].texture.sampleType = WGPUTextureSampleType_Float;
+		entries[3].texture.viewDimension = WGPUTextureViewDimension_2D;
+
+		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+		bgl_desc.entryCount = 4;
+		bgl_desc.entries = entries;
+		ctx->compose_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
+
+		WGPUPipelineLayoutDescriptor pl_desc = {0};
+		pl_desc.bindGroupLayoutCount = 1;
+		pl_desc.bindGroupLayouts = &ctx->compose_bgl;
+		ctx->compose_pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &pl_desc);
+
+		WGPUShaderModule sm = create_shader(ctx->device, compose_wgsl, "compose_shader");
+
+		WGPUColorTargetState ct = {0};
+		ct.format = ctx->surface_format;
+		ct.writeMask = WGPUColorWriteMask_All;
+		WGPUBlendState blend = {0};
+		blend.color.srcFactor = WGPUBlendFactor_One;
+		blend.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend.color.operation = WGPUBlendOperation_Add;
+		blend.alpha.srcFactor = WGPUBlendFactor_One;
+		blend.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend.alpha.operation = WGPUBlendOperation_Add;
+		ct.blend = &blend;
+
+		WGPUFragmentState fs = {0};
+		fs.module = sm;
+		fs.entryPoint = WGPU_LABEL("fs_main");
+		fs.targetCount = 1;
+		fs.targets = &ct;
+
+		WGPUDepthStencilState ds = {0};
+		ds.format = WGPUTextureFormat_Depth24PlusStencil8;
+		ds.depthWriteEnabled = 0;
+		ds.depthCompare = WGPUCompareFunction_Always;
+		ds.stencilFront.compare = WGPUCompareFunction_Equal;
+		ds.stencilFront.failOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+		ds.stencilFront.passOp = WGPUStencilOperation_Keep;
+		ds.stencilBack = ds.stencilFront;
+		ds.stencilReadMask = 0xFF;
+		ds.stencilWriteMask = 0x00;
+
+		WGPURenderPipelineDescriptor rpd = {0};
+		rpd.label = WGPU_LABEL("compose_pipeline");
+		rpd.layout = ctx->compose_pipeline_layout;
+		rpd.vertex.module = sm;
+		rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+		rpd.fragment = &fs;
+		rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+		rpd.multisample.count = MSAA_SAMPLES;
+		rpd.multisample.mask = 0xFFFFFFFF;
+		rpd.depthStencil = &ds;
+		ctx->compose_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		wgpuShaderModuleRelease(sm);
 	}
 }
 
@@ -3549,7 +3793,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 
 	// composite_wgsl's params, permanently zero (no offset, no tint). A dedicated
 	// buffer keeps blend composites independent of the filter path's per-call
-	// writes into filter_quad_buffer.
+	// writes into the filter uniform ring.
 	{
 		WGPUBufferDescriptor bd = {0};
 		bd.label = WGPU_LABEL("blend_params");
@@ -3941,6 +4185,45 @@ void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
 	}
 }
 
+// One axis of Flash's fractional box blur, as six shader uniforms.
+// `out` receives {full_size, m, m2, first_weight, last_offset, last_weight};
+// see blur_wgsl above for how the fragment shader consumes them. Ported from
+// ruffle render/wgpu/src/filters/blur.rs.
+static void blur_box_kernel(float full_size, float out[6])
+{
+	// FP caps the window at 255 texels.
+	if (full_size > 255.0f) full_size = 255.0f;
+	if (!(full_size > 1.0f))
+	{
+		// A window of 1 texel or less is a no-op. Ruffle skips the pass; we
+		// keep it, because the filter_tex_a/filter_tex_b ping-pong needs both
+		// axes to run for the result to land back in filter_tex_a. These
+		// weights make the pass an exact copy: weight 1 on the centre texel,
+		// sampled dead on its centre, and the shader skips the 8-bit round.
+		out[0] = 1.0f; out[1] = 0.0f; out[2] = 0.0f;
+		out[3] = 0.0f; out[4] = 0.0f; out[5] = 1.0f;
+		return;
+	}
+	// How far the window reaches past the centre texel, either side.
+	float radius = (full_size - 1.0f) * 0.5f;
+	// ceil, not floor: with a whole-number radius this leaves alpha at 1 rather
+	// than 0, so the outermost two texels fuse into a single sample instead of
+	// wasting one and dividing by zero below.
+	float m = ceilf(radius) - 1.0f;
+	// Almost the fractional part of radius, quantised to 1/255 to imitate FP's
+	// fixed-point weights.
+	float alpha = floorf((radius - m) * 255.0f) / 255.0f;
+	out[0] = full_size;
+	out[1] = m;
+	out[2] = m * 2.0f;
+	out[3] = alpha;
+	// Offset the fused last sample so the next-to-last texel ends up at weight
+	// 1 and the last at weight alpha. alpha == 0 only when radius - m rounds
+	// below 1/255, and then the pair degenerates to a single unit-weight texel.
+	out[4] = (alpha > 0.0f) ? alpha / (1.0f + alpha) : 0.0f;
+	out[5] = alpha + 1.0f;
+}
+
 void render_webgpu_run_blur(WebGPURenderContext* ctx,
 	float blur_x, float blur_y, u8 quality,
 	float strength, float r, float g, float b, float a, int colorize)
@@ -3949,24 +4232,21 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 	float texel_w = 1.0f / (float)ctx->width;
 	float texel_h = 1.0f / (float)ctx->height;
 
-	// Convert blur (in pixels) to radius (half-width of kernel, capped at 31).
-	// blur_x/blur_y arrive in the filtered object's own coordinate space; Flash
-	// filter sizes scale with the concatenated matrix, so a stage rendered at 2x
-	// must blur with a 2x kernel. texel_w/h above are in TARGET pixels, so the
-	// radius has to be scaled by the stage fit — otherwise a 2x render halves
-	// the apparent blur. This is exactly what the *_scales_with_screen tests
-	// assert. stage_scale is 1.0 whenever the target is the stage size.
+	// blur_x/blur_y arrive in the filtered object's own coordinate space, and
+	// are the FULL width of Flash's box window (not a radius). Flash scales
+	// filter sizes with the STAGE matrix, and scales (size - 1) so a 1px window
+	// stays a no-op at any zoom — ruffle swf/src/types/blur_filter.rs
+	// ::scale_blur. texel_w/h are in TARGET pixels, so without this a 2x render
+	// would halve the apparent blur; that is what the *_scales_with_screen
+	// tests assert. stage_scale is 1.0 whenever the target is the stage size.
 	float stage_scale = ctx->stage_scale > 0.0f ? ctx->stage_scale : 1.0f;
-	float radius_x = blur_x * stage_scale * 0.5f;
-	float radius_y = blur_y * stage_scale * 0.5f;
-	if (radius_x > 31.0f) radius_x = 31.0f;
-	if (radius_y > 31.0f) radius_y = 31.0f;
-	if (radius_x < 1.0f) radius_x = 1.0f;
-	if (radius_y < 1.0f) radius_y = 1.0f;
+	float kx[6], ky[6];
+	blur_box_kernel((blur_x - 1.0f) * stage_scale + 1.0f, kx);
+	blur_box_kernel((blur_y - 1.0f) * stage_scale + 1.0f, ky);
 
-	// Params layout (64 bytes):
-	// vec2f direction (8), vec2f texel_size (8), f32 radius (4), f32 strength (4),
-	// vec4f color (16), f32 colorize (4), f32 pad1 (4), f32 pad2 (4), f32 pad3 (4) = 56 bytes padded to 64
+	// Params layout (64 bytes): vec2f direction (8), vec2f texel_size (8),
+	// f32 full_size/m/m2/first_weight (16), f32 last_offset/last_weight/
+	// strength/colorize (16), vec4f color (16).
 	float params[16]; // 64 bytes
 
 	for (u8 q = 0; q < quality; q++)
@@ -3974,13 +4254,16 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		// Horizontal blur: filter_tex_a -> filter_tex_b
 		params[0] = 1.0f; params[1] = 0.0f;   // direction
 		params[2] = texel_w; params[3] = texel_h; // texel_size
-		params[4] = radius_x;                    // radius
-		params[5] = (q == quality - 1) ? strength : 1.0f; // strength (only on last pass)
-		params[6] = r; params[7] = g; params[8] = b; params[9] = a; // color
-		params[10] = (q == quality - 1 && colorize) ? 1.0f : 0.0f; // colorize (only on last pass)
-		params[11] = 0; params[12] = 0; params[13] = 0;
-
-		wgpuQueueWriteBuffer(ctx->queue, ctx->blur_params_buf, 0, params, 64);
+		params[4] = kx[0]; params[5] = kx[1]; params[6] = kx[2]; params[7] = kx[3];
+		params[8] = kx[4]; params[9] = kx[5];
+		// strength and colorize belong to the V half of the final pass only.
+		// They used to be written once per quality iteration and left in place
+		// for the V pass too, so a glow with strength s and alpha a came out at
+		// s^2 / a^2 (glow_with_alpha_strength). Flash applies both exactly once,
+		// after every blur pass (ruffle glow.wgsl composites them separately).
+		params[10] = 1.0f;                                 // strength: V pass only
+		params[11] = 0.0f;                                 // colorize: V pass only
+		params[12] = r; params[13] = g; params[14] = b; params[15] = a; // color
 
 		// Create bind group for H-blur: read filter_tex_a
 		WGPUBindGroupEntry bg_entries[3] = {0};
@@ -3989,7 +4272,8 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		bg_entries[1].binding = 1;
 		bg_entries[1].sampler = ctx->filter_sampler;
 		bg_entries[2].binding = 2;
-		bg_entries[2].buffer = ctx->blur_params_buf;
+		bg_entries[2].buffer = ctx->filter_uniform_ring;
+		bg_entries[2].offset = filter_uniform_push(ctx, params, 64);
 		bg_entries[2].size = 64;
 
 		WGPUBindGroupDescriptor bg_desc = {0};
@@ -4021,11 +4305,13 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 
 		// Vertical blur: filter_tex_b -> filter_tex_a
 		params[0] = 0.0f; params[1] = 1.0f; // direction = vertical
-		params[4] = radius_y;
-
-		wgpuQueueWriteBuffer(ctx->queue, ctx->blur_params_buf, 0, params, 64);
+		params[4] = ky[0]; params[5] = ky[1]; params[6] = ky[2]; params[7] = ky[3];
+		params[8] = ky[4]; params[9] = ky[5];
+		params[10] = (q == quality - 1) ? strength : 1.0f;
+		params[11] = (q == quality - 1 && colorize) ? 1.0f : 0.0f;
 
 		bg_entries[0].textureView = ctx->filter_view_b;
+		bg_entries[2].offset = filter_uniform_push(ctx, params, 64);
 		bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
 
 		color_att.view = ctx->filter_view_a;
@@ -4049,7 +4335,7 @@ void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
 	// offset_x/y are in NDC space; tint rgba = 0 means passthrough
 	float has_tint = (tint_r != 0 || tint_g != 0 || tint_b != 0 || tint_a != 0) ? 1.0f : 0.0f;
 	float params[8] = {offset_x, offset_y, has_tint, 0, tint_r, tint_g, tint_b, tint_a};
-	wgpuQueueWriteBuffer(ctx->queue, ctx->filter_quad_buffer, 0, params, 32);
+	u32 params_offset = filter_uniform_push(ctx, params, 32);
 
 	// Create bind group for composite: read filter_tex_a
 	WGPUBindGroupEntry bg_entries[3] = {0};
@@ -4058,7 +4344,8 @@ void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
 	bg_entries[1].binding = 1;
 	bg_entries[1].sampler = ctx->filter_sampler;
 	bg_entries[2].binding = 2;
-	bg_entries[2].buffer = ctx->filter_quad_buffer;
+	bg_entries[2].buffer = ctx->filter_uniform_ring;
+	bg_entries[2].offset = params_offset;
 	bg_entries[2].size = 32;
 
 	WGPUBindGroupDescriptor bg_desc = {0};
@@ -4076,6 +4363,84 @@ void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
 	wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
 
 	// Restore normal pipeline (and the active clip with it)
+	restore_draw_pipeline(ctx);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+
+	wgpuBindGroupRelease(bg);
+}
+
+// Copy the offscreen source out of filter_tex_a before run_blur's ping-pong
+// overwrites it. Must run with the main pass suspended (a texture-to-texture
+// copy cannot be encoded inside a render pass).
+void render_webgpu_snapshot_filter_source(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok) return;
+	render_webgpu_ensure_filter_resources(ctx);
+
+	WGPUTexelCopyTextureInfo src = {0};
+	src.texture = ctx->filter_tex_a;
+	src.mipLevel = 0;
+	src.origin = (WGPUOrigin3D){0, 0, 0};
+	src.aspect = WGPUTextureAspect_All;
+
+	WGPUTexelCopyTextureInfo dst = {0};
+	dst.texture = ctx->filter_src_tex;
+	dst.mipLevel = 0;
+	dst.origin = (WGPUOrigin3D){0, 0, 0};
+	dst.aspect = WGPUTextureAspect_All;
+
+	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
+	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+}
+
+// Compose the blurred filter against the snapshotted source; see compose_wgsl.
+void render_webgpu_compose_filter(WebGPURenderContext* ctx, int kind,
+	float blur_off_x, float blur_off_y,
+	float c1r, float c1g, float c1b, float c1a,
+	float c2r, float c2g, float c2b, float c2a,
+	float strength, int variant, int knockout, int composite_source)
+{
+	if (!ctx->renderer_ok) return;
+
+	// 80 bytes: color1, color2, blur_off, mode, misc — five vec4f.
+	float params[20] = {0};
+	params[0] = c1r; params[1] = c1g; params[2] = c1b; params[3] = c1a;
+	params[4] = c2r; params[5] = c2g; params[6] = c2b; params[7] = c2a;
+	params[8] = blur_off_x; params[9] = blur_off_y;
+	params[12] = (float)kind;
+	params[13] = (float)variant;
+	params[14] = knockout ? 1.0f : 0.0f;
+	params[15] = composite_source ? 1.0f : 0.0f;
+	params[16] = strength;
+	u32 params_offset = filter_uniform_push(ctx, params, 80);
+
+	WGPUBindGroupEntry bg_entries[4] = {0};
+	bg_entries[0].binding = 0;
+	bg_entries[0].textureView = ctx->filter_view_a;   // blurred
+	bg_entries[1].binding = 1;
+	bg_entries[1].sampler = ctx->filter_sampler;
+	bg_entries[2].binding = 2;
+	bg_entries[2].buffer = ctx->filter_uniform_ring;
+	bg_entries[2].offset = params_offset;
+	bg_entries[2].size = 80;
+	bg_entries[3].binding = 3;
+	bg_entries[3].textureView = ctx->filter_src_view; // unblurred source
+
+	WGPUBindGroupDescriptor bg_desc = {0};
+	bg_desc.layout = ctx->compose_bgl;
+	bg_desc.entryCount = 4;
+	bg_desc.entries = bg_entries;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->compose_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
+	// Same stencil-reference rule as render_webgpu_composite_filtered: honour
+	// the enclosing clip mask instead of a hard-coded 0.
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+	wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
+
 	restore_draw_pipeline(ctx);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
@@ -4172,14 +4537,18 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->filter_view_b) wgpuTextureViewRelease(ctx->filter_view_b);
 	if (ctx->filter_tex_b) wgpuTextureRelease(ctx->filter_tex_b);
 	if (ctx->filter_sampler) wgpuSamplerRelease(ctx->filter_sampler);
-	if (ctx->blur_params_buf) wgpuBufferRelease(ctx->blur_params_buf);
-	if (ctx->filter_quad_buffer) wgpuBufferRelease(ctx->filter_quad_buffer);
+	if (ctx->filter_uniform_ring) wgpuBufferRelease(ctx->filter_uniform_ring);
 	if (ctx->blur_pipeline) wgpuRenderPipelineRelease(ctx->blur_pipeline);
 	if (ctx->blur_bgl) wgpuBindGroupLayoutRelease(ctx->blur_bgl);
 	if (ctx->blur_pipeline_layout) wgpuPipelineLayoutRelease(ctx->blur_pipeline_layout);
 	if (ctx->composite_pipeline) wgpuRenderPipelineRelease(ctx->composite_pipeline);
 	if (ctx->composite_bgl) wgpuBindGroupLayoutRelease(ctx->composite_bgl);
 	if (ctx->composite_pipeline_layout) wgpuPipelineLayoutRelease(ctx->composite_pipeline_layout);
+	if (ctx->filter_src_view) wgpuTextureViewRelease(ctx->filter_src_view);
+	if (ctx->filter_src_tex) wgpuTextureRelease(ctx->filter_src_tex);
+	if (ctx->compose_pipeline) wgpuRenderPipelineRelease(ctx->compose_pipeline);
+	if (ctx->compose_bgl) wgpuBindGroupLayoutRelease(ctx->compose_bgl);
+	if (ctx->compose_pipeline_layout) wgpuPipelineLayoutRelease(ctx->compose_pipeline_layout);
 
 	// Release surface
 	if (ctx->surface) wgpuSurfaceRelease(ctx->surface);

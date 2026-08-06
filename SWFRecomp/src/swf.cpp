@@ -3972,11 +3972,17 @@ namespace SWFRecomp
 									// GradientGlow/Bevel flags: InnerShadow(7) Knockout(6) CompositeSource(5) OnTop(4) Passes(3-0)
 									parsed_filter_quality = gg_fl & 0x0F;
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									// Pack inner/knockout/onTop into 3-bit flags for ext filter data
+									// parsed_filter_flags feeds tagSetFilter, which the renderer
+									// reads with the layout of the filter TYPE it was mapped to
+									// (here: glow). Bit 0 must therefore be compositeSource, not
+									// onTop — an onTop-in-bit-0 encoding made every gradient glow
+									// look like hideObject and drop its own source. onTop has no
+									// meaning for a glow and is discarded; mc.filters reflection
+									// uses the separate all_filters entry (cf.flags) below.
 									u8 inner = (gg_fl >> 7) & 1;
 									u8 knockout = (gg_fl >> 6) & 1;
-									u8 on_top = (gg_fl >> 4) & 1;
-									parsed_filter_flags = (inner << 2) | (knockout << 1) | on_top;
+									u8 composite_src = (gg_fl >> 5) & 1;
+									parsed_filter_flags = (inner << 2) | (knockout << 1) | composite_src;
 									// Store full gradient data for mc.filters
 									ext_filter_type = 7; // GradientGlow
 									ext_grad_count = nc < 16 ? nc : 16;
@@ -4168,10 +4174,16 @@ namespace SWFRecomp
 									// GradientBevel flags: InnerShadow(7) Knockout(6) CompositeSource(5) OnTop(4) Passes(3-0)
 									parsed_filter_quality = gb_fl & 0x0F;
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
+									// Mapped to filter type 4 (bevel), so use the BEVEL flag layout
+									// the renderer decodes: bit0 onTop, bit1 compositeSource,
+									// bit2 knockout, bit3 inner. (The old 3-bit glow-shaped packing
+									// put knockout where compositeSource belongs.)
 									u8 gb_inner = (gb_fl >> 7) & 1;
 									u8 gb_knockout = (gb_fl >> 6) & 1;
+									u8 gb_composite = (gb_fl >> 5) & 1;
 									u8 gb_on_top = (gb_fl >> 4) & 1;
-									parsed_filter_flags = (gb_inner << 2) | (gb_knockout << 1) | gb_on_top;
+									parsed_filter_flags = (gb_inner << 3) | (gb_knockout << 2)
+									                    | (gb_composite << 1) | gb_on_top;
 									// Store full gradient data for mc.filters
 									ext_filter_type = 8; // GradientBevel
 									ext_grad_count = nc < 16 ? nc : 16;
@@ -5586,7 +5598,9 @@ namespace SWFRecomp
 												sp_filter_angle = (float)(s32)gb_ang/65536.0f; sp_filter_distance = (float)(s32)gb_dist/65536.0f;
 												sp_filter_strength = (float)gb_str/256.0f;
 												sp_filter_quality = gb_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
-												sp_filter_flags = (gb_fl >> 5) & 0x07;
+												// Mapped to type 4: bevel flag layout (bit0 onTop,
+												// bit1 compositeSource, bit2 knockout, bit3 inner).
+												sp_filter_flags = (gb_fl >> 4) & 0x0F;
 											}
 											break;
 										}

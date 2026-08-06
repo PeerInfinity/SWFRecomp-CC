@@ -3218,6 +3218,138 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Filtered-object rendering: blur + Flash's composition rules
+// ---------------------------------------------------------------------------
+// A glow / drop-shadow / bevel is not simply "blurred copy behind the object".
+// The SWF filter flag byte carries inner, knockout and compositeSource bits
+// that decide how the filter output combines with the UNBLURRED source; see
+// compose_wgsl in render_webgpu.c for the formulas (ported from ruffle
+// render/wgpu/shaders/filter/{glow,bevel}.wgsl).
+//
+// filter_flags layout, as parsed by SWFRecomp/src/swf.cpp and decoded the same
+// way by the mc.filters reflection in actionmodern/action.c:
+//   DropShadow / Glow (type 2, 3): bit0 compositeSource, bit1 knockout, bit2 inner
+//   Bevel (type 4):    bit0 onTop, bit1 compositeSource, bit2 knockout, bit3 inner
+//
+// Whenever the formula ends in a plain "+ dest" the source is drawn with a
+// REAL draw call instead of being sampled out of the snapshot, because
+// `filter_output` then `source` over it reproduces the compositeSource formula
+// exactly and keeps the source MSAA-sharp. That is the common case, and it is
+// bit-identical to what this code did before composition existed.
+static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
+{
+	int is_shadow = (obj->filter_type == 2);
+	int is_glow   = (obj->filter_type == 3);
+	int is_bevel  = (obj->filter_type == 4);
+
+	u8 flags = obj->filter_flags;
+	int f_inner, f_knockout, f_composite, bevel_type = 0;
+	if (is_bevel)
+	{
+		f_inner     = (flags >> 3) & 1;
+		f_knockout  = (flags >> 2) & 1;
+		f_composite = (flags >> 1) & 1;
+		int f_on_top = flags & 1;
+		// ruffle bevel.rs: onTop wins over inner ("full"), else inner, else outer.
+		bevel_type = f_on_top ? 2 : (f_inner ? 1 : 0);
+	}
+	else
+	{
+		f_composite = flags & 1;
+		f_knockout  = (flags >> 1) & 1;
+		f_inner     = (flags >> 2) & 1;
+	}
+	// ruffle bevel.rs hard-codes composite_source = 1 for bevels.
+	if (is_bevel) f_composite = 1;
+
+	// The composition shader needs the unblurred source only when the formula
+	// references dest.a. Everything else is "filter output, then draw the
+	// source normally", which needs no snapshot.
+	int needs_source_tex = is_bevel
+		? (f_knockout || bevel_type != 0)
+		: (f_inner || f_knockout);
+	// Whether we draw the crisp source ourselves rather than sampling it.
+	int draw_source_after  = is_bevel
+		? (!f_knockout && bevel_type == 0)
+		: (!f_inner && !f_knockout && f_composite);
+	// "full" bevel is glow OVER source, so the source must already be in the
+	// framebuffer when the filter output lands.
+	int draw_source_before = is_bevel && !f_knockout && bevel_type == 2;
+	// What the shader is told: 0 whenever we supply the source ourselves.
+	int shader_composite = (draw_source_after || draw_source_before) ? 0 : f_composite;
+
+	renderer_suspend_pass(context);
+	renderer_begin_offscreen_pass(context);
+	render_single_object(app_context, obj);
+	renderer_end_offscreen_pass(context);
+	if (needs_source_tex)
+		renderer_snapshot_filter_source(context);
+
+	// Plain blur keeps the legacy path (BlurFilter has no composition flags);
+	// for the composed kinds, strength and the filter colour are applied by the
+	// composition shader instead of inside the blur, because inner needs the
+	// RAW blurred alpha ((1 - blur) * strength, not 1 - blur*strength).
+	int legacy = !(is_shadow || is_glow || is_bevel);
+	renderer_run_blur(context,
+		obj->filter_blur_x, obj->filter_blur_y,
+		obj->filter_quality,
+		legacy ? obj->filter_strength : 1.0f,
+		obj->filter_color_r, obj->filter_color_g,
+		obj->filter_color_b, obj->filter_color_a, 0);
+
+	renderer_resume_pass(context);
+
+	if (legacy)
+	{
+		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+		return;
+	}
+
+	// Stage-pixel offset -> UV offset on the blurred texture. stage_fit_{x,y}
+	// account for fitted content covering only part of the target; both are 1.0
+	// unless the viewport aspect differs from the movie's.
+	float fit_x = app_context->stage_fit_x > 0.0f ? app_context->stage_fit_x : 1.0f;
+	float fit_y = app_context->stage_fit_y > 0.0f ? app_context->stage_fit_y : 1.0f;
+	// SWF stores the filter angle as FIXED **radians** (spec: DROPSHADOWFILTER
+	// "Radian angle of the drop shadow"), and swf.cpp keeps it in that unit —
+	// the mc.filters reflection in action.c converts it to degrees on the way
+	// out. The render path used to multiply by pi/180 as if it were degrees,
+	// which put every non-zero-angle shadow and bevel in the wrong direction.
+	float angle_rad = obj->filter_angle;
+	float dist_px = (is_shadow || is_bevel) ? obj->filter_distance : 0.0f;
+	float du = cosf(angle_rad) * dist_px / (float)app_context->width * fit_x;
+	float dv = sinf(angle_rad) * dist_px / (float)app_context->height * fit_y;
+
+	if (draw_source_before)
+		render_single_object(app_context, obj);
+
+	if (is_bevel)
+	{
+		// ruffle filters.rs: the HIGHLIGHT samples at +offset, the shadow at
+		// -offset, and the bevel is their difference.
+		renderer_compose_filter(context, 1, du, dv,
+			obj->filter_highlight_r, obj->filter_highlight_g,
+			obj->filter_highlight_b, obj->filter_highlight_a,
+			obj->filter_color_r, obj->filter_color_g,
+			obj->filter_color_b, obj->filter_color_a,
+			obj->filter_strength, bevel_type, f_knockout, shader_composite);
+	}
+	else
+	{
+		// ruffle drop_shadow.rs passes (-x, -y): sampling the blur "back" by the
+		// offset displaces the shadow forward along the light direction.
+		renderer_compose_filter(context, 0, -du, -dv,
+			obj->filter_color_r, obj->filter_color_g,
+			obj->filter_color_b, obj->filter_color_a,
+			0.0f, 0.0f, 0.0f, 0.0f,
+			obj->filter_strength, f_inner, f_knockout, shader_composite);
+	}
+
+	if (draw_source_after)
+		render_single_object(app_context, obj);
+}
+
 // Compose two 20-float cxforms (5 vec4: column-major mat4 `mult` + vec4 `add`,
 // applied as out = mult*color + add — see apply_cxform in render_webgpu.c) so
 // that `out = outer(inner(color))`. mult = outer.mult * inner.mult;
@@ -5575,51 +5707,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			renderer_composite_blend(context, obj->blend_mode,
 				active_clip_depth > 0 ? 1 : 0);
 		} else if (obj->filter_type != 0) {
-			renderer_suspend_pass(context);
-			renderer_begin_offscreen_pass(context);
-			render_single_object(app_context, obj);
-			renderer_end_offscreen_pass(context);
-			int is_shadow = (obj->filter_type == 2);
-			int is_glow = (obj->filter_type == 3);
-			int is_bevel = (obj->filter_type == 4);
-			int colorize = is_shadow || is_glow;
-			renderer_run_blur(context,
-				obj->filter_blur_x, obj->filter_blur_y,
-				obj->filter_quality, obj->filter_strength,
-				obj->filter_color_r, obj->filter_color_g,
-				obj->filter_color_b, obj->filter_color_a, colorize);
-			renderer_resume_pass(context);
-			// dist_px is a STAGE-pixel offset; the composite quad is in render-
-			// target NDC, so 2/stage_width converts it and stage_fit_{x,y}
-			// account for the fitted content covering only part of the target.
-			// Both are 1.0 unless the viewport aspect differs from the movie's.
-			float fit_x = app_context->stage_fit_x > 0.0f ? app_context->stage_fit_x : 1.0f;
-			float fit_y = app_context->stage_fit_y > 0.0f ? app_context->stage_fit_y : 1.0f;
-			if (is_shadow) {
-				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
-				float dist_px = obj->filter_distance;
-				float ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
-				float oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
-				renderer_composite_filtered(context, ox, -oy, 0, 0, 0, 0);
-				render_single_object(app_context, obj);
-			} else if (is_glow) {
-				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
-				render_single_object(app_context, obj);
-			} else if (is_bevel) {
-				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
-				float dist_px = obj->filter_distance;
-				float sox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
-				float soy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
-				renderer_composite_filtered(context, sox, -soy,
-					obj->filter_color_r, obj->filter_color_g,
-					obj->filter_color_b, obj->filter_color_a);
-				renderer_composite_filtered(context, -sox, soy,
-					obj->filter_highlight_r, obj->filter_highlight_g,
-					obj->filter_highlight_b, obj->filter_highlight_a);
-				render_single_object(app_context, obj);
-			} else {
-				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
-			}
+			render_filtered_object(app_context, obj);
 			if (obj->blend_mode > 1 && !blend_layered)
 				renderer_set_blend_mode(context, obj->blend_mode);
 		} else {
@@ -6561,73 +6649,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Check if this object has a visual filter
 		else if (obj->filter_type != 0)
 		{
-			// Filtered rendering: suspend -> offscreen -> blur -> resume -> composite
-			renderer_suspend_pass(context);
-
-			// 1. Render object into offscreen (MSAA resolve to filter_tex_a)
-			renderer_begin_offscreen_pass(context);
-			render_single_object(app_context, obj);
-			renderer_end_offscreen_pass(context);
-
-			// 2. Apply blur
-			int is_shadow = (obj->filter_type == 2);
-			int is_glow = (obj->filter_type == 3);
-			int is_bevel = (obj->filter_type == 4);
-			int colorize = is_shadow || is_glow;
-			renderer_run_blur(context,
-				obj->filter_blur_x, obj->filter_blur_y,
-				obj->filter_quality, obj->filter_strength,
-				obj->filter_color_r, obj->filter_color_g,
-				obj->filter_color_b, obj->filter_color_a,
-				colorize);
-
-			// 3. Resume main pass and composite
-			renderer_resume_pass(context);
-
-			// Stage-pixel offset -> render-target NDC; see the matching comment
-			// in tagRerenderFrame. Both fits are 1.0 unless the viewport aspect
-			// differs from the movie's.
-			float fit_x = app_context->stage_fit_x > 0.0f ? app_context->stage_fit_x : 1.0f;
-			float fit_y = app_context->stage_fit_y > 0.0f ? app_context->stage_fit_y : 1.0f;
-
-			if (is_shadow)
-			{
-				// DropShadow: composite shadow with offset, then render original on top
-				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
-				float dist_px = obj->filter_distance;
-				float offset_ndc_x = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
-				float offset_ndc_y = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
-				renderer_composite_filtered(context, offset_ndc_x, -offset_ndc_y, 0, 0, 0, 0);
-				render_single_object(app_context, obj);
-			}
-			else if (is_glow)
-			{
-				// Glow: composite glow behind, then render original on top
-				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
-				render_single_object(app_context, obj);
-			}
-			else if (is_bevel)
-			{
-				// Bevel: composite shadow + highlight at opposite offsets, then original
-				float angle_rad = obj->filter_angle * 3.14159265f / 180.0f;
-				float dist_px = obj->filter_distance;
-				float shadow_ox = cosf(angle_rad) * dist_px * 2.0f / (float)app_context->width * fit_x;
-				float shadow_oy = sinf(angle_rad) * dist_px * 2.0f / (float)app_context->height * fit_y;
-				// Shadow: offset in angle direction, tinted with shadow color
-				renderer_composite_filtered(context, shadow_ox, -shadow_oy,
-					obj->filter_color_r, obj->filter_color_g,
-					obj->filter_color_b, obj->filter_color_a);
-				// Highlight: offset in opposite direction, tinted with highlight color
-				renderer_composite_filtered(context, -shadow_ox, shadow_oy,
-					obj->filter_highlight_r, obj->filter_highlight_g,
-					obj->filter_highlight_b, obj->filter_highlight_a);
-				render_single_object(app_context, obj);
-			}
-			else
-			{
-				// Pure blur: just composite the blurred result
-				renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
-			}
+			render_filtered_object(app_context, obj);
 
 			// Re-bind blend state after filter pipeline switches
 			if (obj->blend_mode > 1 && !blend_layered)
