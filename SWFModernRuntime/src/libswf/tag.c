@@ -5091,10 +5091,17 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 #endif
 
 		// Newline: advance y, reset x and consume next paragraph's offset.
+		// The line advance carries the format's LEADING (Ruffle
+		// html/layout.rs:452 — line height is ascent + descent +
+		// line_leading_adjustment(), and :254 "Flash Player ignores
+		// font-provided leading", so it is the span's leading only). Without it
+		// every line after the first sat `leading` px too high:
+		// visual/fonts/leading_define_font's leading=2 fields put their second
+		// line on row 22 instead of the golden's row 24, in all four font blocks.
 		if (cp == '\n' || cp == '\r') {
 			par_idx++;
 			x_pos = base_x + (par_idx < par_count ? par_x_offset[par_idx] : 0.0f);
-			y_pos += (float)info->font_height;
+			y_pos += (float)info->font_height + (float)info->leading_twips;
 			continue;
 		}
 

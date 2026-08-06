@@ -27036,6 +27036,22 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		info.left_margin_twips = left_margin_twips;
 		info.right_margin_twips = right_margin_twips;
 		info.indent_twips = indent_twips;
+		// Leading (twips) for the renderer's line advance. Same resolution the
+		// measurement path uses (actionTextFieldHeight), MINUS its 40-twip
+		// createTextField default: Ruffle treats an unset TextFormat.leading as
+		// 0, and visual/fonts/leading_define_font's leading=null / leading=0
+		// fields line up with the golden at zero.
+		{
+			s32 _ld = 0;
+			ActionVar* _ld_prop = getProperty(props, "_tf_leading", 11);
+			if (_ld_prop != NULL && _ld_prop->type == ACTION_STACK_VALUE_F64) {
+				double _ldv; memcpy(&_ldv, &_ld_prop->data.numeric_value, sizeof(double));
+				_ld = (s32)_ldv;
+			} else if (mc->ng_textfield_idx >= 0) {
+				_ld = (s32)ng_getTextFieldLeading(mc->ng_textfield_idx);
+			}
+			info.leading_twips = _ld;
+		}
 		// Text origin offset from the placement matrix by the static DefineEditText
 		// bounds-RECT min (Ruffle edit_text.rs translate(bounds.x_min+GUTTER,...)).
 		// Dynamic/createTextField fields (ng_textfield_idx==-2) have no static
@@ -27374,6 +27390,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.left_margin_twips = (s32) ng_getTextFieldLeftMargin(tf_idx);
 	info.right_margin_twips = (s32) ng_getTextFieldRightMargin(tf_idx);
 	info.indent_twips = (s32) ng_getTextFieldIndent(tf_idx);
+	info.leading_twips = (s32) ng_getTextFieldLeading(tf_idx);
 	// Text origin is offset from the placement matrix by the bounds-RECT min
 	// (matches Ruffle edit_text.rs: translate(bounds.x_min + GUTTER, ...)).
 	info.bounds_xmin_twips = (s32) bxmin;

@@ -14955,6 +14955,17 @@ static void avm2_text_slots(const Mat* world, double alpha,
 // shear still land, because the corner points are transformed by hand.
 // ---------------------------------------------------------------------------
 
+// Stage quality, as seen by the EditText box painter. Ruffle maps
+// StageQuality::Low -> 1 MSAA sample and every other quality -> 4
+// (render/src/quality.rs), and the test harness passes the matching
+// -DMSAA_SAMPLES=N on every gcc invocation, but ONLY when it differs from the
+// default of 4 (verify_output.py:2483-2488) — so `MSAA_SAMPLES == 1` is an
+// exact StageQuality::Low predicate once the default is restored here. Same
+// guard render_webgpu.c:48-49 uses.
+#ifndef MSAA_SAMPLES
+#define MSAA_SAMPLES 4
+#endif
+
 // Twips rounding helpers mirroring Ruffle's Twips methods.
 static double tw_trunc_to_pixel(double t) { return trunc(t / 20.0) * 20.0; }
 static double tw_round_to_pixel_ties_even(double t)
@@ -15060,18 +15071,34 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 	}
 
 	// draw_text_box: box matrix = world * create_box(w_px, h_px, x_min, y_min),
-	// then EditTextPixelSnapping for the default (high) quality
-	// (edit_text.rs:3613-3630).
+	// then EditTextPixelSnapping (edit_text.rs:3603-3632). That helper has TWO
+	// arms and picks on the STAGE QUALITY:
+	//
+	//   StageQuality::Low -> round tx/ty to whole pixels and leave the scale
+	//                        alone ("we do not need to snap scale, because at
+	//                        low quality antialiasing is disabled anyway");
+	//   anything else     -> trunc tx/ty and round the scale terms, which is
+	//                        tuned for the default (high) quality.
+	//
+	// Applying the high arm unconditionally collapsed every FRACTIONAL box
+	// height at quality = "low": text/auto_size/width's autosized fields are
+	// 77.75 px tall, nearbyint(77.75 - 0.35) = 77, and the bottom border landed
+	// a row early on all six fields (2514 of its 2520 differing pixels).
 	double ba = world->a * wpx, bbm = world->b * wpx;
 	double bcm = world->c * hpx, bd = world->d * hpx;
 	double btx = trunc(world->a * bb[0] + world->c * bb[1] + world->tx);
 	double bty = trunc(world->b * bb[0] + world->d * bb[1] + world->ty);
+#if MSAA_SAMPLES == 1
+	btx = tw_round_to_pixel_ties_even(btx);
+	bty = tw_round_to_pixel_ties_even(bty);
+#else
 	int x_snap = fabs(bcm) < 0.001 || fabs(bd) < 0.001;
 	int y_snap = fabs(ba) < 0.001 || fabs(bbm) < 0.001;
 	btx = tw_trunc_to_pixel(btx + 2.0);
 	bty = tw_trunc_to_pixel(bty + 2.0);
 	if (x_snap) { ba = nearbyint(ba - 0.35); bbm = nearbyint(bbm - 0.35); }
 	if (y_snap) { bcm = nearbyint(bcm - 0.35); bd = nearbyint(bd - 0.35); }
+#endif
 	double p[8] = {
 		btx,                      bty,
 		ba * 20.0 + btx,          bbm * 20.0 + bty,
@@ -15093,11 +15120,33 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 		// bottom-right corner is antialiased to 0x6F6F6F rather than solid — well
 		// inside the test's tolerance of 128, and much closer than leaving it
 		// blank (144 off white).
+		//
+		// ...but that "all four corners" reading only holds while the box lands
+		// on WHOLE pixels. When the bottom edge sits at a fractional pixel
+		// position the shared bottom-right corner is produced by neither
+		// segment: the right edge's line stops short of that pixel (its end
+		// point is inside the pixel without crossing it) and the bottom edge's
+		// run starts one pixel further in. Measured off the two goldens:
+		//   avm2/edittext_autosize_height_dynamic  36 x 44 at the origin
+		//     -> rows 0 and 44 both x = 0..36, cols 0 and 36 both y = 0..44;
+		//   text/auto_size/width                   210 x 77.75 at (30,30)
+		//     -> top row x = 30..240 and left col y = 30..108, but bottom row
+		//        only x = 30..239 and right col only y = 30..107, i.e. (240,108)
+		//        is white.
+		// Only the Low arm above can leave `bd` fractional (the high arm
+		// nearbyint()s it), so this cannot move a default-quality field — and
+		// the corpus has exactly two quality = "low" AVM2 EditText comparisons.
+		// The fractional-WIDTH case is unmeasured; it is left drawing the full
+		// corner, i.e. unchanged from before.
 		double bx = btx, by = bty, bw = ba * 20.0, bh = bd * 20.0;
+		int frac_bottom = fabs((by + bh) / 20.0
+		                       - nearbyint((by + bh) / 20.0)) > 1e-6;
 		avm2_border_rect(bx, by, bw + 20.0, 20.0, bc, alpha);        // top
-		avm2_border_rect(bx, by + bh, bw + 20.0, 20.0, bc, alpha);   // bottom
+		avm2_border_rect(bx, by + bh, frac_bottom ? bw : bw + 20.0,
+		                 20.0, bc, alpha);                           // bottom
 		avm2_border_rect(bx, by, 20.0, bh + 20.0, bc, alpha);        // left
-		avm2_border_rect(bx + bw, by, 20.0, bh + 20.0, bc, alpha);   // right
+		avm2_border_rect(bx + bw, by, 20.0,
+		                 frac_bottom ? bh : bh + 20.0, bc, alpha);   // right
 		return;
 	}
 	// Rotated / sheared: fall back to Ruffle's emulated 1px line rects, whose
@@ -15255,12 +15304,46 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 	uint32_t sel_color = 0;
 	uint32_t sn = avm2_edittext_collect_selection(ctx, obj, &sel, &sel_color);
 	Avm2GlyphPlacement* gl = NULL;
-	int32_t clip[4];
+	int32_t clip[4] = { 0, 0, 0, 0 };
 	uint32_t n = avm2_edittext_collect_glyphs(ctx, obj, &gl, clip);
 	if (sn > 0 || n > 0)
 	{
 		uint32_t xid = 0, cxid = 0;
 		avm2_text_slots(world, alpha, &xid, &cxid);
+		// Field clipping mask (stencil): gutter-inset horizontally, full height
+		// vertically. Ruffle's EditText::render_self pushes exactly this mask
+		// (bounds.grow_x(-GUTTER)) around the layout and pops it afterwards, and
+		// the AVM1 twin has always honoured it (tag.c
+		// textfield_glyph_render_cb). The AVM2 path COLLECTED the rect and threw
+		// it away, so anything the layout put past the field's right edge or
+		// below its bottom edge was painted anyway — text/auto_size/return draws
+		// four whole runs of text outside its fields that the golden does not
+		// have. The rect comes back in FIELD-LOCAL twips, the same space the
+		// glyph placements use, so it rides the same transform slot; the box and
+		// border were already drawn ABOVE, outside the mask, which is also the
+		// order Ruffle uses.
+		int has_clip = (n > 0 && clip[2] > 0 && clip[3] > 0);
+#if defined(USE_WEBGPU)
+		// ...but never while some OUTER clip is already active. Each mask owns
+		// its own stencil reference, so writing the field rect on top of a live
+		// mask would punch that value out of the outer mask's region, and the
+		// matching renderer_end_clip would drop the outer clip for everything
+		// drawn afterwards (s11 mask defect B). The AVM2 walk grew a clipDepth
+		// clip loop in session 12 (w2-gfx-bitmapmax), so this is reachable:
+		// an EditText sibling inside a live clip range falls back to the
+		// pre-patch behaviour (unclipped glyphs) instead of corrupting the
+		// range. Proper nesting needs a stencil stack, which is a renderer
+		// change and out of scope here.
+		if (has_clip && context != NULL && context->mask_ref != 0) has_clip = 0;
+#endif
+		if (has_clip)
+		{
+			renderer_begin_clip_mask(context);
+			renderer_draw_rect(context, (float) clip[0], (float) clip[1],
+			                   (float) clip[2], (float) clip[3],
+			                   1.0f, 1.0f, 1.0f, 1.0f, xid, 0);
+			renderer_end_clip_mask(context);
+		}
 		for (uint32_t i = 0; i < sn; i++)
 			renderer_draw_rect(context,
 			                   (float) sel[i * 4], (float) sel[i * 4 + 1],
@@ -15270,6 +15353,7 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 			                   (float) (sel_color & 0xFF) / 255.0f,
 			                   1.0f, xid, cxid);
 		avm2_render_glyphs(ctx, gl, n, xid, cxid);
+		if (has_clip) renderer_end_clip(context);
 	}
 	if (sel != NULL) heap_free(ctx->app, sel);
 	if (gl != NULL) heap_free(ctx->app, gl);

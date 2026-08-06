@@ -744,6 +744,13 @@ typedef struct TextFieldGlyphInfo {
     s32 left_margin_twips;
     s32 right_margin_twips;
     s32 indent_twips;
+    // Line-to-line leading in twips, from the field's TextFormat (or the
+    // DefineEditText tag's layout leading). Ruffle's line height is
+    // `max_ascent + max_descent + line_leading_adjustment()`, where the
+    // adjustment is the span's leading and font-provided leading is ignored
+    // outright (html/layout.rs:252-255). 0 when unset — which is what Ruffle
+    // uses for a field whose TextFormat never set `leading`.
+    s32 leading_twips;
     // The field's local bounds-RECT min (twips). Flash/Ruffle lay text out at
     // matrix.translate(bounds.x_min + GUTTER, ...) (edit_text.rs), i.e. the text
     // origin is offset from the placement matrix by the bounds-RECT min. info.x/y
