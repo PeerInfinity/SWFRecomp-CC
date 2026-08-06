@@ -1,22 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c4496a4c8f4b` (2026-08-01T19:38:38.367201+00:00)
-**Current:** `6de65043250d` (2026-08-06T06:23:32.677884+00:00)
+**Previous:** `6de65043250d` (2026-08-06T06:23:32.677884+00:00)
+**Current:** `1f8396f5799f` (2026-08-06T10:26:29.734863+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 3 | 6 | +3 |
+| Passing | 6 | 6 | 0 |
 | Total | 6 | 6 | 0 |
-| Pass rate | 50.0% | 100.0% | +50.0% |
-| Mismatched lines | 69 | 0 | -69 |
-|   Decreased | | | -69 |
+| Pass rate | 100.0% | 100.0% | 0% |
+| Mismatched lines | 0 | 0 | 0 |
 
-## Newly Passing (3)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `device_font_glyph_fallback` | output_mismatch | 29/36 | 36/36 |
-| `device_font_kerning` | output_mismatch | 0/4 | 4/4 |
-| `device_font_list` | output_mismatch | 6/64 | 64/64 |
+No changes detected.

@@ -6,18 +6,18 @@
     "total_available": 1225,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 53,
+    "ignored_count": 55,
     "filtered": true
   },
-  "total": 1172,
+  "total": 1170,
   "pass": 1082,
   "ruffle_matched": 3,
-  "fail": 87,
-  "pass_rate": 92.3,
+  "fail": 85,
+  "pass_rate": 92.5,
   "effective_pass": 1085,
-  "effective_pass_rate": 92.6,
+  "effective_pass_rate": 92.7,
   "breakdown": {
-    "output_mismatch": 87,
+    "output_mismatch": 85,
     "ruffle_matched": 3
   },
   "tests": [
@@ -9840,25 +9840,6 @@
       "status": "pass"
     },
     {
-      "test": "loader_applicationDomain",
-      "phases": {
-        "recomp": 0.007,
-        "compile": 6.788,
-        "run": 0.004
-      },
-      "num_frames": 4,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 4,
-        "matching_lines": 0
-      },
-      "duration": 6.81,
-      "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=0, expected=4)",
-      "actual_output": "",
-      "expected_output": "[class PropertyChangeEvent]\n[class ByteArrayAsset]\n[class Test]\n[class Test]"
-    },
-    {
       "test": "loader_bitmap_transparency",
       "phases": {
         "recomp": 0.0,
@@ -16359,25 +16340,6 @@
       },
       "duration": 24.68,
       "status": "pass"
-    },
-    {
-      "test": "swz",
-      "phases": {
-        "recomp": 0.007,
-        "compile": 6.991,
-        "run": 0.004
-      },
-      "num_frames": 10,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "duration": 7.01,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=0, expected=2)",
-      "actual_output": "",
-      "expected_output": "[class ByteArrayAsset]\n[class BitmapAsset]"
     },
     {
       "test": "symbol_class_binary_data",

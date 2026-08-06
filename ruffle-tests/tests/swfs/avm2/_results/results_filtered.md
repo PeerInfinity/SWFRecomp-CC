@@ -6,26 +6,26 @@
 
 **Run Duration**: 195m 32s
 
-**Filtered**: 53 tests ignored out of 1225 available
+**Filtered**: 55 tests ignored out of 1225 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1172 |
-| Passing | **1082** (92.3%) |
+| Total tests | 1170 |
+| Passing | **1082** (92.5%) |
 | Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1085** (92.6%) |
-| Failing | 87 |
-| Total expected lines | 133468 |
+| Effective pass | **1085** (92.7%) |
+| Failing | 85 |
+| Total expected lines | 133462 |
 | Matching lines | 111320 (83.4%) |
-| Mismatched lines | 22148 |
+| Mismatched lines | 22142 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 87 | 100.0% |
+| Output Mismatch | 85 | 100.0% |
 
 ## Passing Tests
 
@@ -1171,7 +1171,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**87 tests** with output mismatch, sorted by match rate (best first)
+**85 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -1254,11 +1254,9 @@ No timeouts.
 | 77 | `groupelement_text` | 0.0% | 0/156 | 3 | 156 |  |
 | 78 | `id3_info` | 0.0% | 0/8 | 0 | 8 |  |
 | 79 | `json_stringify_function` | 0.0% | 0/12 | 12 | 12 |  |
-| 80 | `loader_applicationDomain` | 0.0% | 0/4 | 0 | 4 |  |
-| 81 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
-| 82 | `native_menu_basic` | 0.0% | 0/19 | 3 | 19 |  |
-| 83 | `netfilterevent` | 0.0% | 0/10 | 2 | 10 |  |
-| 84 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
-| 85 | `stage_display_state` | 0.0% | 0/6 | 2 | 6 |  |
-| 86 | `swz` | 0.0% | 0/2 | 0 | 2 |  |
-| 87 | `system_exit` | 0.0% | 0/3 | 2 | 3 |  |
+| 80 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
+| 81 | `native_menu_basic` | 0.0% | 0/19 | 3 | 19 |  |
+| 82 | `netfilterevent` | 0.0% | 0/10 | 2 | 10 |  |
+| 83 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
+| 84 | `stage_display_state` | 0.0% | 0/6 | 2 | 6 |  |
+| 85 | `system_exit` | 0.0% | 0/3 | 2 | 3 |  |

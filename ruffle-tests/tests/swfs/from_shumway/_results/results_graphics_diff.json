@@ -1,81 +1,49 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-01T19:38:38.406186+00:00",
-    "old_git_sha": "c4496a4c8f4be6b07972ae68916ed14a82923185",
-    "new_timestamp": "2026-08-06T06:23:32.717435+00:00",
-    "new_git_sha": "6de65043250d5a56e0e2841896d2c523d0f39b06",
+    "old_timestamp": "2026-08-06T06:23:32.717435+00:00",
+    "old_git_sha": "6de65043250d5a56e0e2841896d2c523d0f39b06",
+    "new_timestamp": "2026-08-06T10:26:29.764859+00:00",
+    "new_git_sha": "1f8396f5799facba702fc3a1a72bda6974146a73",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 186,
+    "old_pass": 189,
     "old_ruffle_matched": 14,
-    "old_effective_pass": 200,
+    "old_effective_pass": 203,
     "old_total": 229,
-    "old_pass_rate": 81.2,
+    "old_pass_rate": 82.5,
     "new_pass": 189,
     "new_ruffle_matched": 14,
     "new_effective_pass": 203,
     "new_total": 229,
     "new_pass_rate": 82.5,
-    "old_mismatched_lines": 702,
-    "new_mismatched_lines": 696,
+    "old_mismatched_lines": 696,
+    "new_mismatched_lines": 695,
     "increased_mismatches": 0,
-    "decreased_mismatches": 6,
-    "newly_passing": 3,
+    "decreased_mismatches": 1,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 226,
+    "status_changed": 0,
+    "unchanged": 228,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "as3-loader/bug1157243/empty",
+      "test": "avm1movie",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 1,
-        "matching_lines": 0
+        "actual_lines": 7,
+        "expected_lines": 13,
+        "matching_lines": 5
       },
       "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "as3-loader/bug1157243/invalid",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm2/flash/geom/perspectiveprojection/PerspectiveProjectionClass",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 16
-      },
-      "new_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
+        "actual_lines": 10,
+        "expected_lines": 13,
+        "matching_lines": 6
       }
     }
   ]
