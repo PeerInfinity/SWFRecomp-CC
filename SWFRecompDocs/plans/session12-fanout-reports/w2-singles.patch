@@ -1,0 +1,144 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 33133f735..e3b8a8d0a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -8139,10 +8139,16 @@ static Avm2Value txt_get_char_boundaries(Avm2Activation* act)
+ 		x_min = layout_x_to_local_x(x_min, sx);
+ 		x_max = layout_x_to_local_x(x_max, sx);
+ 	}
+-	x_min += GUTTER;
+-	x_max += GUTTER;
+-	y_min += GUTTER - vscroll_off;
+-	y_max += GUTTER - vscroll_off;
++	// The layout origin also carries the field's bounds origin
++	// (edit_text.rs:774-790 layout_to_local_matrix translates by
++	// bounds.x_min/y_min + GUTTER). Read et->bounds_x/y RAW: Ruffle's
++	// char_bounds (edit_text.rs:2413) reads self.0.bounds.get() and never
++	// applies pending lazy autosize bounds, so do NOT route through
++	// avm2_text_self_bounds()/et_apply_lazy_bounds() here.
++	x_min += et->bounds_x + GUTTER;
++	x_max += et->bounds_x + GUTTER;
++	y_min += et->bounds_y + GUTTER - vscroll_off;
++	y_max += et->bounds_y + GUTTER - vscroll_off;
+ 	if (x_max - x_min == 0) return avm2_null();
+ 	Avm2Value args[4];
+ 	args[0] = avm2_number((double) x_min / 20.0);
+diff --git a/SWFModernRuntime/src/avm2/avm2_value.c b/SWFModernRuntime/src/avm2/avm2_value.c
+index 7578757d8..4b85dd418 100644
+--- a/SWFModernRuntime/src/avm2/avm2_value.c
++++ b/SWFModernRuntime/src/avm2/avm2_value.c
+@@ -492,6 +492,101 @@ bool avm2_string_to_f64(Avm2Context* ctx, const char* s, uint32_t len, bool stri
+ // Number → string (Ruffle value.rs coerce_to_string Number arm)
+ // ---------------------------------------------------------------------------
+ 
++// Exact-midpoint tie-break, Rust-style. glibc's printf is correctly rounded
++// and resolves an exact decimal tie TO-EVEN; Rust's f64 Display (which Ruffle
++// prints through) resolves it AWAY FROM ZERO. They disagree only when the
++// double's exact decimal expansion terminates exactly one digit past the
++// shortest round-tripping precision, with that digit a '5'
++// (e.g. 966.67828369140625 -> glibc "966.6782836914062", Rust
++// "966.6782836914063"). Rewrites digs[0..prec] / *exp10 in place and returns
++// 1 when it re-rounds. `d` is > 0 and finite; only called for prec >= 13, so
++// the big exact-expansion buffer never lands on the hot path.
++#define AVM2_EXACT_PREC 767
++static int tie_round_away_from_zero(double d, int prec, char* digs, int* exp10)
++{
++	// Stage 0 (arithmetic filter, no formatting): a tie needs d's EXACT decimal
++	// expansion to terminate at prec+2 significant digits. Writing d = m * 2^p
++	// with m an odd integer, that expansion is m*5^-p (p < 0) or m*2^p (p >= 0),
++	// so its digit count is computable with one log10. Almost every double is
++	// far too long and exits here, which keeps the two snprintf stages below off
++	// the hot path. One digit of slack absorbs any log10 rounding; stage 2 is
++	// still the authority, so a false accept costs nothing but time.
++	{
++		int e2;
++		double fr = frexp(d, &e2);
++		uint64_t m = (uint64_t) ldexp(fr, 53);
++		int p = e2 - 53;
++		while (m != 0 && (m & 1u) == 0) { m >>= 1; p++; }
++		double lg = log10((double) m)
++		            + (p < 0 ? (-p) * 0.69897000433601880   // log10(5)
++		                     :   p  * 0.30102999566398120); // log10(2)
++		if ((int) floor(lg) + 1 > prec + 3) return 0;
++	}
++
++	// Stage 1 (cheap filter): print one extra significant digit. A true tie
++	// always shows a '5' there; the overwhelming majority of values do not.
++	char probe[64];
++	snprintf(probe, sizeof(probe), "%.*e", prec + 1, d);
++	int seen = 0;
++	char last = 0;
++	for (const char* p = probe; *p != '\0' && *p != 'e' && *p != 'E'; p++)
++	{
++		if (*p >= '0' && *p <= '9') { last = *p; seen++; }
++	}
++	if (seen != prec + 2 || last != '5') return 0;
++
++	// Stage 2: glibc prints a double's EXACT decimal expansion at any
++	// precision, zero-padded. 768 significant digits covers every finite f64
++	// (the longest, 2^-1074, needs 751), so this is exact, not rounded.
++	char ex[AVM2_EXACT_PREC + 32];
++	snprintf(ex, sizeof(ex), "%.*e", AVM2_EXACT_PREC, d);
++	char dig[AVM2_EXACT_PREC + 4];
++	int m = 0;
++	for (const char* q = ex; *q != '\0'; q++)
++	{
++		if (*q >= '0' && *q <= '9') dig[m++] = *q;
++		else if (*q == 'e' || *q == 'E') break;
++	}
++	if (m < prec + 2 || dig[prec + 1] != '5') return 0;
++	for (int i = prec + 2; i < m; i++) if (dig[i] != '0') return 0;
++
++	// Exact midpoint. Away from zero, and d > 0, so round up.
++	char up[24];
++	for (int i = 0; i <= prec; i++) up[i] = dig[i];
++	int carry = 1;
++	for (int i = prec; i >= 0 && carry != 0; i--)
++	{
++		if (up[i] == '9') up[i] = '0';
++		else { up[i]++; carry = 0; }
++	}
++	int e = *exp10;
++	if (carry != 0)
++	{
++		// 99..9 -> 100..0: shift and bump the exponent.
++		for (int i = prec; i > 0; i--) up[i] = up[i - 1];
++		up[0] = '1';
++		e++;
++	}
++
++	// Safety net: Rust only ever emits a representation that round-trips, so
++	// if the away-from-zero neighbour does not, keep glibc's answer.
++	char chk[48];
++	int cn = 0;
++	chk[cn++] = up[0];
++	if (prec > 0)
++	{
++		chk[cn++] = '.';
++		for (int i = 1; i <= prec; i++) chk[cn++] = up[i];
++	}
++	snprintf(chk + cn, sizeof(chk) - (size_t) cn, "e%d", e);
++	if (strtod(chk, NULL) != d) return 0;
++
++	for (int i = 0; i <= prec; i++) digs[i] = up[i];
++	*exp10 = e;
++	return 1;
++}
++#undef AVM2_EXACT_PREC
++
+ // Shortest decimal digit string that round-trips `d` (> 0, finite).
+ // Writes the significant digits (no dot) to digs (cap >= 20) and the
+ // power-of-ten of the first digit to *exp10. Mirrors Rust's f64 Display.
+@@ -518,6 +613,12 @@ static int shortest_digits(double d, char* digs, int* exp10)
+ 					break;
+ 				}
+ 			}
++			// glibc broke an exact decimal tie to-even; Rust (and so Ruffle)
++			// breaks it away from zero. Re-round when they disagree.
++			if (prec >= 13 && n == prec + 1)
++			{
++				tie_round_away_from_zero(d, prec, digs, &e);
++			}
+ 			// Trim trailing zeros (keep at least one digit).
+ 			while (n > 1 && digs[n - 1] == '0') n--;
+ 			digs[n] = '\0';

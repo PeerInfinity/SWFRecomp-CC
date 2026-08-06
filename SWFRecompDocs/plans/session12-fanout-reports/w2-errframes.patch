@@ -1,0 +1,613 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_error.h b/SWFModernRuntime/include/avm2/avm2_error.h
+index 1d9d4766b..22829e778 100644
+--- a/SWFModernRuntime/include/avm2/avm2_error.h
++++ b/SWFModernRuntime/include/avm2/avm2_error.h
+@@ -57,6 +57,24 @@ void avm2_stack_check(Avm2Context* ctx);
+ // Debug call stack (avm2_class.c pushes/pops around every invocation).
+ void avm2_callstack_push(Avm2Context* ctx, const Avm2MethodRef* m, Avm2Class* bound_class);
+ void avm2_callstack_pop(Avm2Context* ctx);
++// FP's playerglobal is AS3 code that raises through Error.throwError, so an
++// "Error$/throwError()" frame sits atop the trace; its C++-implemented core
++// does NOT. Call this immediately before avm2_throw_error at the sites whose
++// FP counterpart is AS3 (avm2/system_exit's expected trace has no such frame —
++// this must stay a PER-SITE OPT-IN and never move inside avm2_throw_error).
++// No pop is needed: the longjmp unwinds call_depth to the catching frame.
++void avm2_callstack_push_throwerror(Avm2Context* ctx);
++// A native frame FP has no name for at all. It still occupies a line in the
++// stack trace, but an EMPTY one (no "\tat"), which is how the E4X scanner's
++// frame shows up (avm2/xml_list_ctor_errors). Same per-site opt-in and same
++// no-pop-needed contract as above.
++void avm2_callstack_push_unnamed(Avm2Context* ctx);
++// Replace the innermost frame (if it is `own_fn`'s) with a synthetic native
++// one named verbatim — how a class-side ("Class$/m()") or namespaced builtin
++// frame is spelled, which the generic renderer cannot derive from a vtable
++// entry. Also used to name a native accessor's frame ("Class/set p()").
++void avm2_callstack_rename_frame(Avm2Context* ctx, Avm2MethodFn own_fn,
++                                 const char* name);
+ // FP-style frame name ("Test()", "test_fla::MainTimeline/frame1()",
+ // "global/flash.utils::getDefinitionByName()", "Function/<anonymous>()").
+ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 78cb5db8a..8688f03b1 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -140,6 +140,13 @@ void avm2_builtin_add_method_n(Avm2Context* ctx, Avm2Class* cls, const char* nam
+ // prototype). Invisible to dispatch, visible to hasOwnProperty.
+ void avm2_builtin_add_method_as3(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                                  Avm2MethodFn fn);
++// Override the stack-frame spelling of an already-registered public instance
++// method. FP names a method declared in a non-public namespace with its URI
++// ("Function/http://adobe.com/AS3/2006/builtin::call()"), but our keys stay
++// public so dispatch is unaffected; only the debug_name moves. `debug_name`
++// must be a string literal or another allocation that outlives the context.
++void avm2_builtin_set_debug_name(Avm2Context* ctx, Avm2Class* cls,
++                                 const char* name, const char* debug_name);
+ void avm2_builtin_add_getter(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                              Avm2MethodFn fn);
+ // Instance accessor pair (setter may be NULL for a getter-only prop).
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index d3edab107..bba643613 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -3233,6 +3233,9 @@ static void timer_check_delay(Avm2Context* ctx, double delay)
+ {
+ 	if (!isfinite(delay) || delay < 0)
+ 	{
++		// Timer.as raises through Error.throwError (avm2/timer_invalid_delay
++		// grades the frame) — per-site opt-in, see avm2_error.h.
++		avm2_callstack_push_throwerror(ctx);
+ 		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+ 		                 "Error #2066: The Timer delay specified is out of range.");
+ 	}
+@@ -3303,10 +3306,11 @@ static Avm2Value timer_set_delay(Avm2Activation* act)
+ 	Avm2Context* ctx = act->ctx;
+ 	Avm2TimerObjExt* ext = timer_obj_ext(act->this_val.u.obj);
+ 	if (ext == NULL) return avm2_undefined();
+-	// Ruffle Timer.as quirk: the setter validates the OLD delay (getter),
+-	// not the incoming value — so the new value is never range-checked.
+-	timer_check_delay(ctx, ext->delay);
++	// Ruffle Timer.as `set delay` range-checks the INCOMING value (and FP
++	// agrees — avm2/timer_invalid_delay expects `timer.delay = NaN` on a
++	// valid Timer to throw #2066 from a "Timer/set delay()" frame).
+ 	double v = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0;
++	timer_check_delay(ctx, v);
+ 	ext->delay = v;
+ 	if (ext->timer_entry_id != 0)
+ 	{
+@@ -11013,6 +11017,54 @@ static Avm2Value stage_set_align(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++static Avm2Value stage_throw_2071(Avm2Activation* act);
++
++// `stage.scrollRect = <not a Rectangle>` — FP coerces a setter's argument to
++// its declared type BEFORE entering the body, so the #1034 that a bad value
++// raises comes from the CALL SITE and carries no "Stage/set scrollRect()"
++// frame (avm2/stage_properties2), unlike the #2071 a well-typed value gets
++// (avm2/stage_overriden_setters sets it to null and does see #2071).
++static Avm2Value stage_set_scroll_rect(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
++	if (v.kind != AVM2_VALUE_NULL && v.kind != AVM2_VALUE_UNDEFINED)
++	{
++		int found = 0;
++		Avm2Value cv = avm2_find_definition(ctx, "flash.geom.Rectangle", 20,
++		                                    &found);
++		if (found && cv.kind == AVM2_VALUE_OBJECT && cv.u.obj != NULL
++		    && cv.u.obj->kind == AVM2_OBJ_CLASS
++		    && !avm2_value_is_of_type(ctx, v, cv.u.obj->class_ref))
++		{
++			avm2_callstack_pop(ctx);  // the coercion precedes this frame
++			(void) avm2_coerce_to_class(ctx, cv.u.obj->class_ref, v);
++		}
++	}
++	return stage_throw_2071(act);
++}
++
++// Stage.colorCorrection: a plain String property whose declared type is
++// non-nullable, so `= null` fails the ARGUMENT coercion with #2007 rather
++// than the #2071 the DisplayObject-surface setters raise (avm2/stage_properties2).
++static Avm2Value stage_get_color_correction(Avm2Activation* act)
++{
++	return avm2_string(avm2_string_from_literal(act->ctx, "default"));
++}
++
++static Avm2Value stage_set_color_correction(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	if (act->argc < 1 || act->args[0].kind == AVM2_VALUE_NULL
++	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
++	{
++		avm2_throw_error(ctx, ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter %s must be non-null.",
++		                 "colorCorrection");
++	}
++	return avm2_undefined();
++}
++
+ static Avm2Value stage_get_scale_mode(Avm2Activation* act)
+ {
+ 	return avm2_string(avm2_string_from_literal(act->ctx, "showAll"));
+@@ -11082,6 +11134,9 @@ static Avm2Value stage_invalidate(Avm2Activation* act)
+ // Stage overrides most DisplayObject setters to throw (plain Error).
+ static Avm2Value stage_throw_2071(Avm2Activation* act)
+ {
++	// Stage.as is AS3 playerglobal: it raises through Error.throwError
++	// (avm2/stage_properties2 grades the frame). Per-site opt-in.
++	avm2_callstack_push_throwerror(act->ctx);
+ 	Avm2Context* ctx = act->ctx;
+ 	avm2_throw_error(ctx, ctx->builtins.error_class,
+ 	                 "Error #2071: The Stage class does not implement this property or method.");
+@@ -11341,6 +11396,17 @@ static Avm2Value sprite_ctor_init(Avm2Activation* act)
+ // Registration
+ // ===========================================================================
+ 
++// "get x" / "set x" — how FP names an accessor's stack frame (the same
++// prebuilt-debug_name convention avm2_globals.c's accessor_debug_name uses).
++static const char* disp_accessor_debug_name(Avm2Context* ctx, const char* prefix,
++                                            const char* name)
++{
++	size_t nlen = strlen(name);
++	char* out = avm2_alloc(ctx, nlen + 5);
++	snprintf(out, nlen + 5, "%s%s", prefix, name);
++	return out;
++}
++
+ static void add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
+                        Avm2MethodFn getter, Avm2MethodFn setter)
+ {
+@@ -11358,9 +11424,13 @@ static void add_getset(Avm2Context* ctx, Avm2Class* cls, const char* name,
+ 		{
+ 			e->kind = (setter != NULL) ? AVM2_PROP_GETSET : AVM2_PROP_GETTER;
+ 			e->method.fn = getter;
+-			e->method.debug_name = name;
++			// FP names an accessor frame "get x"/"set x" — the same spelling
++			// avm2_builtin_add_getset gives the append path below, which the
++			// in-place branch used to drop (avm2/stage_properties2 wanted
++			// "flash.display::Stage/set height()", we printed ".../height()").
++			e->method.debug_name = disp_accessor_debug_name(ctx, "get ", name);
+ 			e->setter.fn = setter;
+-			e->setter.debug_name = name;
++			e->setter.debug_name = disp_accessor_debug_name(ctx, "set ", name);
+ 			e->defining_class = cls;
+ 			// Both halves are ours now — drop any per-setter binding the
+ 			// inherited entry carried.
+@@ -13945,6 +14015,7 @@ void avm2_register_display(Avm2Context* ctx)
+ 			{ "cacheAsBitmap", do_cab_get }, { "contextMenu", do_contextmenu_get },
+ 			{ "filters", do_get_filters }, { "focusRect", io_get_focus_rect },
+ 			{ "height", do_get_height }, { "mask", do_get_mask },
++			{ "mouseEnabled", io_get_mouse_enabled },
+ 			{ "name", do_get_name }, { "opaqueBackground", do_opaquebg_get },
+ 			{ "rotation", do_get_rotation }, { "rotationX", do_get_zero },
+ 			{ "rotationY", do_get_zero }, { "rotationZ", do_get_rotation },
+@@ -13959,7 +14030,16 @@ void avm2_register_display(Avm2Context* ctx)
+ 		{
+ 			add_getset(ctx, stage, ov[i].name, ov[i].getter, stage_throw_2071);
+ 		}
++		// scrollRect's declared parameter type is checked BEFORE the body
++		// runs, so a non-Rectangle loses to #1034 rather than #2071.
++		add_getset(ctx, stage, "scrollRect", do_scrollrect_get,
++		           stage_set_scroll_rect);
+ 		avm2_builtin_add_getter(ctx, stage, "textSnapshot", stage_throw_2071);
++		// Stage-only property; not a 2071 thrower — `stage.colorCorrection =
++		// null` fails the ARGUMENT coercion instead, with no throwError frame
++		// (avm2/stage_properties2's last case).
++		add_getset(ctx, stage, "colorCorrection", stage_get_color_correction,
++		           stage_set_color_correction);
+ 	}
+ 
+ 	// flash.display string-constant classes (Bitmap.pixelSnapping, blendMode,
+diff --git a/SWFModernRuntime/src/avm2/avm2_e4x.c b/SWFModernRuntime/src/avm2/avm2_e4x.c
+index a3ba060f7..c989df5b7 100644
+--- a/SWFModernRuntime/src/avm2/avm2_e4x.c
++++ b/SWFModernRuntime/src/avm2/avm2_e4x.c
+@@ -1523,6 +1523,11 @@ typedef struct Parser
+ static _Noreturn void parse_error(Parser* ps, const char* fmt, const Avm2String* arg)
+ {
+ 	Avm2Context* ctx = ps->ctx;
++	// FP's E4X scanner frame has no name at all, and its stack trace shows it
++	// as a bare empty line between the message and the first named frame
++	// (avm2/xml_list_ctor_errors — the one non-parser error in that test, the
++	// #1050, has no such line). See avm2_error.h's unnamed-frame convention.
++	avm2_callstack_push_unnamed(ctx);
+ 	if (arg != NULL)
+ 	{
+ 		avm2_throw_error(ctx, ctx->builtins.type_error_class, fmt,
+diff --git a/SWFModernRuntime/src/avm2/avm2_error.c b/SWFModernRuntime/src/avm2/avm2_error.c
+index b1db5d585..e7f0dfe21 100644
+--- a/SWFModernRuntime/src/avm2/avm2_error.c
++++ b/SWFModernRuntime/src/avm2/avm2_error.c
+@@ -109,6 +109,38 @@ void avm2_callstack_pop(Avm2Context* ctx)
+ 	if (ctx->call_depth > 0) ctx->call_depth--;
+ }
+ 
++// See avm2_error.h: the synthetic "Error$/throwError()" frame FP's AS3
++// playerglobal contributes. PER-SITE OPT-IN — avm2/system_exit's expected
++// trace proves a blanket push inside avm2_throw_error would be wrong.
++void avm2_callstack_push_throwerror(Avm2Context* ctx)
++{
++	static const Avm2MethodRef throwerror = { NULL, NULL, "Error$/throwError", 0 };
++	avm2_callstack_push(ctx, &throwerror, NULL);
++}
++
++// See avm2_error.h: a nameless native frame, rendered as an empty line.
++void avm2_callstack_push_unnamed(Avm2Context* ctx)
++{
++	static const Avm2MethodRef unnamed = { NULL, NULL, "", 0 };
++	avm2_callstack_push(ctx, &unnamed, NULL);
++}
++
++// See avm2_error.h. `name` must outlive the frame (a string literal, or a
++// registration-time allocation).
++void avm2_callstack_rename_frame(Avm2Context* ctx, Avm2MethodFn own_fn,
++                                 const char* name)
++{
++	if (ctx->call_depth > 0
++	    && ctx->call_frames[ctx->call_depth - 1].method.fn == own_fn)
++	{
++		avm2_callstack_pop(ctx);
++	}
++	Avm2MethodRef ref;
++	memset(&ref, 0, sizeof(ref));
++	ref.debug_name = name;
++	avm2_callstack_push(ctx, &ref, NULL);
++}
++
+ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+                                char* buf, int size)
+ {
+@@ -128,13 +160,20 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+ 		else
+ 		{
+ 			// mxmlc debug names are qualified ("test_fla:MainTimeline/
+-			// test_fla:frame1"); keep only the final segment.
++			// test_fla:frame1"); keep only the final segment. A NATIVE
++			// method's debug_name is built here, not by a compiler, so it is
++			// printed verbatim — that is what lets a builtin registered in a
++			// non-public namespace carry its URI ("flash.utils::Proxy/
++			// http://www.adobe.com/2006/actionscript/flash/proxy::getProperty()").
+ 			const char* dn = (m->debug_name != NULL && m->debug_name[0] != '\0')
+ 				? m->debug_name : "<anonymous>";
+-			const char* slash = strrchr(dn, '/');
+-			if (slash != NULL) dn = slash + 1;
+-			const char* colon = strrchr(dn, ':');
+-			if (colon != NULL) dn = colon + 1;
++			if (m->file != NULL)
++			{
++				const char* slash = strrchr(dn, '/');
++				if (slash != NULL) dn = slash + 1;
++				const char* colon = strrchr(dn, ':');
++				if (colon != NULL) dn = colon + 1;
++			}
+ 			snprintf(buf, size, "%s/%s()", cq, dn);
+ 		}
+ 		return;
+@@ -142,7 +181,14 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+ 	if (m->file == NULL)
+ 	{
+ 		// Native: debug_name is prebuilt (globals register the full
+-		// "global/ns::name" form).
++		// "global/ns::name" form). An EMPTY debug_name is the deliberate
++		// "unnamed frame" marker (avm2_callstack_push_unnamed) — it prints
++		// as nothing, and callstack_snapshot drops the "\tat " with it.
++		if (m->debug_name != NULL && m->debug_name[0] == '\0')
++		{
++			if (size > 0) buf[0] = '\0';
++			return;
++		}
+ 		snprintf(buf, size, "%s()", m->debug_name != NULL ? m->debug_name : "<native>");
+ 		return;
+ 	}
+@@ -193,7 +239,9 @@ static const Avm2String* callstack_snapshot(Avm2Context* ctx)
+ 	{
+ 		char name[176];
+ 		avm2_callstack_frame_name(ctx, &ctx->call_frames[i], name, sizeof(name));
+-		n += (uint32_t) snprintf(buf + n, sizeof(buf) - n, "\n\tat %s", name);
++		n += (uint32_t) (name[0] == '\0'
++			? snprintf(buf + n, sizeof(buf) - n, "\n")
++			: snprintf(buf + n, sizeof(buf) - n, "\n\tat %s", name));
+ 	}
+ 	return avm2_string_new(ctx, buf, n);
+ }
+@@ -546,9 +594,14 @@ static Avm2Value error_get_stack_trace(Avm2Activation* act)
+ 	Avm2Value* tail = avm2_object_find_dynamic(act->this_val.u.obj,
+ 	                                           "__stacktrace_tail", 17);
+ 	if (tail == NULL) return avm2_null();
+-	// First line is the error's toString().
+-	Avm2Value head = error_proto_to_string(act);
+-	return avm2_string(avm2_string_concat(ctx, head.u.str, tail->u.str));
++	// First line is the error's toString() — a REAL call, so a script that
++	// replaces Error.prototype.toString sees its side effects and its return
++	// value here (avm2/error_stack_trace_edge_cases). A non-string return is
++	// coerced, so an override returning null yields the literal "null".
++	Avm2Value head = avm2_call_public_property(ctx, act->this_val,
++	                                           "toString", 8, NULL, 0);
++	return avm2_string(avm2_string_concat(ctx, avm2_coerce_to_string(ctx, head),
++	                                      tail->u.str));
+ }
+ 
+ // Error-message table for Error.getErrorMessage, generated from Ruffle
+@@ -1303,6 +1356,82 @@ static Avm2Value error_get_error_message(Avm2Activation* act)
+ 	return avm2_string(avm2_string_new(ctx, buf, (uint32_t) n));
+ }
+ 
++// Error.throwError(type:Class, index:uint, ...rest) — the entry point FP's AS3
++// playerglobal raises every one of its own errors through, and which scripts
++// may call directly (avm2/error_throwerror). It takes getErrorMessage(index),
++// substitutes %1..%9 from `rest` in a SINGLE pass (so a replacement that is
++// itself "%1" stays literal), and throws `new type(message, index)`.
++//
++// Missing arguments substitute as the empty string — "Error #1044: MethodInfo-
++// unsupported flags=." is the real FP text for throwError(Error, 1044).
++#define AVM2_THROWERROR_MAX_ARGS 6
++static Avm2Value error_throw_error(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	// FP spells a class-side frame with a `$` on the class, which the generic
++	// renderer cannot derive from a static vtable entry (same idiom as
++	// system_exit). This call never returns, so the frame needs no pop.
++	avm2_callstack_rename_frame(ctx, error_throw_error, "Error$/throwError");
++
++	Avm2Class* cls = NULL;
++	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
++	    && act->args[0].u.obj != NULL)
++	{
++		cls = act->args[0].u.obj->class_ref;
++	}
++	if (cls == NULL) cls = ctx->builtins.error_class;
++	double index = (act->argc > 1) ? avm2_coerce_to_number(ctx, act->args[1]) : 0;
++	int32_t id = (int32_t) index;
++	const char* tmpl = (id >= 0) ? raw_error_message((uint32_t) id) : NULL;
++
++	char buf[1024];
++	int n = snprintf(buf, sizeof(buf), "Error #%d", id);
++	if (tmpl != NULL)
++	{
++		n += snprintf(buf + n, sizeof(buf) - (size_t) n, ": ");
++		// The substitution runs inside String.replace with a closure
++		// replacer, and each argument is coerced to String there — so an
++		// argument whose toString() throws (avm2/error_throwerror's
++		// TrojanHorse) surfaces with those intermediate frames on the stack.
++		static const Avm2MethodRef anon = { NULL, NULL, "Function/<anonymous>", 0 };
++		static const Avm2MethodRef repl = { NULL, NULL, "String$/_replace", 0 };
++		avm2_callstack_push(ctx, &anon, NULL);
++		avm2_callstack_push(ctx, &repl, NULL);
++		for (const char* p = tmpl; *p != '\0' && n < (int) sizeof(buf) - 1; )
++		{
++			if (p[0] == '%' && p[1] >= '1' && p[1] <= '9')
++			{
++				uint32_t idx = (uint32_t) (p[1] - '1') + 2;
++				// FP's throwError declares six OPTIONAL arguments, not a rest
++				// parameter: throwError(Error, 3723, "a".."j") substitutes
++				// %1..%6 and leaves %7/%8 empty (avm2/error_throwerror).
++				if (idx < act->argc && idx < 2 + AVM2_THROWERROR_MAX_ARGS)
++				{
++					const Avm2String* s =
++						avm2_coerce_to_string(ctx, act->args[idx]);
++					n += snprintf(buf + n, sizeof(buf) - (size_t) n, "%.*s",
++					              (int) s->len, s->utf8);
++				}
++				p += 2;
++				continue;
++			}
++			buf[n++] = *p++;
++			buf[n] = '\0';
++		}
++		avm2_callstack_pop(ctx);
++		avm2_callstack_pop(ctx);
++	}
++	if (n < 0) n = 0;
++	if (n > (int) sizeof(buf) - 1) n = (int) sizeof(buf) - 1;
++
++	Avm2Value args[2];
++	args[0] = avm2_string(avm2_string_new(ctx, buf, (uint32_t) n));
++	// The id reaches the constructor as a Number, not an int — CustomError's
++	// `arg.constructor` trace in avm2/error_throwerror pins "[class Number]".
++	args[1] = avm2_number(index);
++	avm2_throw(ctx, avm2_class_construct(ctx, cls, args, 2));
++}
++
+ // Error(...) call = new Error(...) (Ruffle globals/error.rs call handler).
+ static Avm2Value error_call(Avm2Context* ctx, Avm2Class* cls,
+                             const Avm2Value* args, uint32_t argc)
+@@ -1338,6 +1467,8 @@ static Avm2Class* make_error_class(Avm2Context* ctx, const char* name, Avm2Class
+ 		avm2_builtin_add_method(ctx, cls, "getStackTrace", error_get_stack_trace);
+ 		avm2_builtin_add_static_method_n(ctx, cls, "getErrorMessage",
+ 		                                 error_get_error_message, 1);
++		avm2_builtin_add_static_method_n(ctx, cls, "throwError",
++		                                 error_throw_error, 2);
+ 		avm2_builtin_add_getter(ctx, cls, "errorID", error_get_error_id);
+ 
+ 		// Error.prototype is itself an ERROR instance (avmplus
+diff --git a/SWFModernRuntime/src/avm2/avm2_function.c b/SWFModernRuntime/src/avm2/avm2_function.c
+index 83624db93..1f8f375eb 100644
+--- a/SWFModernRuntime/src/avm2/avm2_function.c
++++ b/SWFModernRuntime/src/avm2/avm2_function.c
+@@ -402,6 +402,15 @@ void avm2_register_function_builtins(Avm2Context* ctx)
+ 	// ecma3/Function/e15_3_4_3_1 pins 2 and e15_3_4_4_1_rt pins 1.
+ 	avm2_builtin_add_method_n(ctx, cls, "call", fn_call, 1);
+ 	avm2_builtin_add_method_n(ctx, cls, "apply", fn_apply, 2);
++	// Both traits live in the AS3 BUILTIN namespace in playerglobal, and FP
++	// spells a non-public method's frame with its namespace URI
++	// ("Function/http://adobe.com/AS3/2006/builtin::call()" —
++	// avm2/primitive_toString, avm2/error_throwerror). Our keys stay public
++	// (dispatch folds AS3<->public); only the frame name is corrected here.
++	avm2_builtin_set_debug_name(ctx, cls, "call",
++	                            "http://adobe.com/AS3/2006/builtin::call");
++	avm2_builtin_set_debug_name(ctx, cls, "apply",
++	                            "http://adobe.com/AS3/2006/builtin::apply");
+ 	avm2_builtin_add_getter(ctx, cls, "length", fn_get_length);
+ 	// ES3-compat layer on Function.prototype (Ruffle globals/Function.as).
+ 	avm2_proto_add_function_n(ctx, cls->prototype_obj, "call", fn_call, 1);
+diff --git a/SWFModernRuntime/src/avm2/avm2_globals.c b/SWFModernRuntime/src/avm2/avm2_globals.c
+index 1c152111f..cd6d79531 100644
+--- a/SWFModernRuntime/src/avm2/avm2_globals.c
++++ b/SWFModernRuntime/src/avm2/avm2_globals.c
+@@ -427,6 +427,26 @@ void avm2_builtin_add_method_as3(Avm2Context* ctx, Avm2Class* cls, const char* n
+ 	avm2_vtable_append(ctx, &cls->ivtable, &e);
+ }
+ 
++// See avm2_globals.h: rename an existing public instance method's stack frame
++// without touching its key (so dispatch is untouched).
++void avm2_builtin_set_debug_name(Avm2Context* ctx, Avm2Class* cls,
++                                 const char* name, const char* debug_name)
++{
++	(void) ctx;
++	uint32_t nlen = (uint32_t) strlen(name);
++	for (uint32_t i = 0; i < cls->ivtable.count; i++)
++	{
++		Avm2PropEntry* e = &cls->ivtable.entries[i];
++		if (e->kind == AVM2_PROP_METHOD && e->key.ns_len == 0
++		    && e->key.name_len == nlen
++		    && memcmp(e->key.name, name, nlen) == 0)
++		{
++			e->method.debug_name = debug_name;
++			return;
++		}
++	}
++}
++
+ // "get x" / "set x" — the way FP names an accessor's stack frame
+ // ("at flash.display::BitmapData/get width()" — bitmapdata_zero_size).
+ static const char* accessor_debug_name(Avm2Context* ctx, const char* prefix,
+@@ -534,7 +554,12 @@ void avm2_builtin_add_static_const(Avm2Context* ctx, Avm2Class* cls, const char*
+ void avm2_proto_add_function_n(Avm2Context* ctx, Avm2Object* proto, const char* name,
+                                Avm2MethodFn fn, uint32_t param_count)
+ {
+-	Avm2MethodRef ref = { fn, NULL, name, 0, param_count };
++	// FP's ES3 prototype shims are anonymous playerglobal closures, so a
++	// frame inside one is spelled "Function/<anonymous>()", never by the
++	// property it was installed under (avm2/primitive_toString wants that
++	// for `Boolean.prototype.toString.call(x)`; we used to print
++	// "toString()"). Native debug_names print verbatim, `/` and all.
++	Avm2MethodRef ref = { fn, NULL, "Function/<anonymous>", 0, param_count };
+ 	Avm2Object* fnobj = avm2_function_new(ctx, &ref, NULL, NULL,
+ 	                                      avm2_undefined(), false);
+ 	avm2_object_set_dynamic(ctx, proto, name, (uint32_t) strlen(name),
+diff --git a/SWFModernRuntime/src/avm2/avm2_number.c b/SWFModernRuntime/src/avm2/avm2_number.c
+index 6bcf96222..fbff84c31 100644
+--- a/SWFModernRuntime/src/avm2/avm2_number.c
++++ b/SWFModernRuntime/src/avm2/avm2_number.c
+@@ -117,15 +117,43 @@ static void number_proto_receiver_check(Avm2Activation* act, Avm2Class* cls,
+ 	{
+ 		return;
+ 	}
++	// The prototype shims are AS3 playerglobal, so FP's trace carries the
++	// "Error$/throwError()" frame (avm2/primitive_toString, primitive_valueOf).
++	// Per-site opt-in — see avm2_error.h.
++	avm2_callstack_push_throwerror(act->ctx);
+ 	avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
+ 	                 "Error #1004: Method %s.prototype.%s was invoked on an "
+ 	                 "incompatible object.", cls_name, meth);
+ }
+ 
+-#define DEFINE_NUMBER_PROTO_SHIMS(tag, cls_field, cls_name)                    \
++// How strict each shim is about a NUMERIC receiver. FP's three prototypes do
++// not agree, and avm2/primitive_{toString,valueOf} pin every cell of the
++// table with `Cls.prototype.m.call(v)` over {1.5, uint(2), -2}:
++//
++//            | Number | int      | uint
++//   toString | any    | integral | any        <- uint.toString(1.5) -> "1.5"
++//   valueOf  | any    | integral | uint-exact <- uint.valueOf(-2) throws #1004
++//
++// (i.e. only uint's two halves disagree with each other — an avmplus
++// implementation asymmetry, not a typo: both tests show it, for both signs.)
++static bool numeric_receiver_ok(Avm2Value v, int strict)
++{
++	if (!numeric_receiver(v)) return false;
++	if (strict == 0) return true;
++	double d = (v.kind == AVM2_VALUE_INTEGER) ? (double) v.u.i : v.u.d;
++	if (!isfinite(d) || d != (double) (int64_t) d) return false;
++	return strict == 1 || d >= 0.0;
++}
++
++#define NUM_RECV_ANY 0
++#define NUM_RECV_INT 1
++#define NUM_RECV_UINT 2
++
++#define DEFINE_NUMBER_PROTO_SHIMS(tag, cls_field, cls_name, ts_strict, vo_strict) \
+ 	static Avm2Value tag##_proto_to_string(Avm2Activation* act)                \
+ 	{                                                                          \
+-		if (numeric_receiver(act->this_val)) return number_to_string(act);     \
++		if (numeric_receiver_ok(act->this_val, ts_strict))                     \
++			return number_to_string(act);                                      \
+ 		number_proto_receiver_check(act, act->ctx->builtins.cls_field,         \
+ 		                            cls_name, "toString");                     \
+ 		Avm2Activation zero = *act;                                            \
+@@ -134,15 +162,19 @@ static void number_proto_receiver_check(Avm2Activation* act, Avm2Class* cls,
+ 	}                                                                          \
+ 	static Avm2Value tag##_proto_value_of(Avm2Activation* act)                 \
+ 	{                                                                          \
+-		if (numeric_receiver(act->this_val)) return act->this_val;             \
++		if (numeric_receiver_ok(act->this_val, vo_strict))                     \
++			return act->this_val;                                              \
+ 		number_proto_receiver_check(act, act->ctx->builtins.cls_field,         \
+ 		                            cls_name, "valueOf");                      \
+ 		return avm2_number(0.0);                                               \
+ 	}
+ 
+-DEFINE_NUMBER_PROTO_SHIMS(number, number_class, "Number")
+-DEFINE_NUMBER_PROTO_SHIMS(int, int_class, "int")
+-DEFINE_NUMBER_PROTO_SHIMS(uint, uint_class, "uint")
++DEFINE_NUMBER_PROTO_SHIMS(number, number_class, "Number",
++                          NUM_RECV_ANY, NUM_RECV_ANY)
++DEFINE_NUMBER_PROTO_SHIMS(int, int_class, "int",
++                          NUM_RECV_INT, NUM_RECV_INT)
++DEFINE_NUMBER_PROTO_SHIMS(uint, uint_class, "uint",
++                          NUM_RECV_ANY, NUM_RECV_UINT)
+ 
+ static Avm2Value number_to_fixed(Avm2Activation* act)
+ {
+diff --git a/SWFModernRuntime/src/avm2/avm2_proxy.c b/SWFModernRuntime/src/avm2/avm2_proxy.c
+index e51353095..42ed4b921 100644
+--- a/SWFModernRuntime/src/avm2/avm2_proxy.c
++++ b/SWFModernRuntime/src/avm2/avm2_proxy.c
+@@ -14,6 +14,7 @@
+ // package-kind keys with that URI, so avm2_propkey_is_public stays false
+ // and public lookups miss them (proxy_getproperty's p.proxy_var probe).
+ 
++#include <stdio.h>
+ #include <string.h>
+ 
+ #include <avm2/avm2_class.h>
+@@ -97,6 +98,8 @@ int avm2_proxy_enumerant_value(Avm2Context* ctx, Avm2Object* obj, uint32_t idx,
+ 
+ static _Noreturn void proxy_unimplemented(Avm2Context* ctx, int code, const char* what)
+ {
++	// Proxy.as is AS3 playerglobal, so FP's trace carries the throwError frame.
++	avm2_callstack_push_throwerror(ctx);
+ 	avm2_throw_error(ctx, ctx->builtins.illegal_operation_error_class,
+ 	                 "Error #%d: The Proxy class does not implement %s. "
+ 	                 "It must be overridden by a subclass.", code, what);
+@@ -163,7 +166,15 @@ static void proxy_add_ns_method(Avm2Context* ctx, Avm2Class* cls, const char* na
+ 	e.key.ns_len = sizeof(PROXY_NS) - 1;
+ 	e.kind = AVM2_PROP_METHOD;
+ 	e.method.fn = fn;
+-	e.method.debug_name = name;
++	// FP spells a non-public builtin method's frame with its namespace URI
++	// ("flash.utils::Proxy/http://…/flash/proxy::getProperty()"), and a
++	// native debug_name is printed verbatim by avm2_callstack_frame_name.
++	{
++		size_t nlen = strlen(name);
++		char* qual = avm2_alloc(ctx, sizeof(PROXY_NS) + 2 + nlen);
++		snprintf(qual, sizeof(PROXY_NS) + 2 + nlen, "%s::%s", PROXY_NS, name);
++		e.method.debug_name = qual;
++	}
+ 	e.defining_class = cls;
+ 	avm2_vtable_append(ctx, &cls->ivtable, &e);
+ }
+diff --git a/SWFModernRuntime/src/avm2/avm2_string.c b/SWFModernRuntime/src/avm2/avm2_string.c
+index 2a46a9aca..691024bda 100644
+--- a/SWFModernRuntime/src/avm2/avm2_string.c
++++ b/SWFModernRuntime/src/avm2/avm2_string.c
+@@ -668,6 +668,9 @@ static Avm2Value string_proto_receiver(Avm2Activation* act, const char* meth)
+ 	{
+ 		return make_str(ctx, "", 0);
+ 	}
++	// AS3 playerglobal shim: FP's trace carries the throwError frame
++	// (avm2/primitive_toString, primitive_valueOf). Per-site opt-in.
++	avm2_callstack_push_throwerror(ctx);
+ 	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+ 	                 "Error #1004: Method String.prototype.%s was invoked on an "
+ 	                 "incompatible object.", meth);

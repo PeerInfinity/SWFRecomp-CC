@@ -1634,3 +1634,62 @@ no-op mask (new unowned bucket); scrollRect stencil sketch ready
 (wave1-gfx-clipping §8) but needs its flips unblocked; blend_modes capped
 at a_epsilon by sub-pixel ties (do NOT scope); F5 layer groups + F7-AVM2
 remain; AVM2 static-bitmap upload (bitmapbuttons blocker) unscoped.
+
+## 13. Session 12 (2026-08-06) — dual-axis fan-out #4: trace +25, pixels +28, zero regressions
+
+### 13.1 Ledger
+
+Closeout run `31090651530` at `1f8396f57` (10 commits `2ed78f692`..`1f8396f57`,
+results merge `9c7a2dcb2`): trace effective **4204 → 4229 intersection (+25,
+vs ~+25 predicted)**, pixels **258 → 286/567 (50.4%, +28)**, **zero
+regressions and zero worsened bands on both axes**, 38 bands improved.
+7 wave-1 + 9 wave-2 + 1 rider + 1 reconciliation agent; 11 patches, reports
+in `session12-fanout-reports/`.
+
+Per-patch trace yield: w2-xs +8 (8/8 exact-pin singles), w2-errframes +8
+(T1 stack-trace frames, 41% of live mismatched lines), w2-avclasses +5,
+w2-avm1movie +1, w2-singles +2, w2-textblock +1 eff. Pixels: bitmapmax+masks
+pair +23 predicted → acid×16 + acid-clip-3×2 + acid-color/image/big +4 +
+mask_reapply, plus riders pixelbender_effect_twirl, acid-textfield-scroll,
+flash_text_TextField2; autosize +2 (auto_size/width at exactly 18=limit,
+leading_define_font). Filters pair: 0 flips by design, 12/13 comparisons
+-17..-93%, two engine-wide bug fixes (uniform ring: writeBuffer-vs-Submit
+ordering made every blur single-axis; radians-vs-degrees filter angles).
+
+### 13.2 Method notes (deltas vs s11)
+
+- Mid-flight scope collision (bitmapmax and masks both implementing AVM2
+  clipDepth) was resolved by SendMessage: warn the still-running agent, then
+  delegate the reconciliation to it (superset merge, union canary). Cost one
+  extra agent-cycle; caught before merge by `git apply --check` stacking.
+- Rider-on-top-of-sibling-patch worked: filters-inner applied
+  w2-gfx-filters.patch in its worktree, committed locally, delivered a
+  stacked diff. Pair landed as one commit (land-together-or-drop).
+- The isolation guard can block worktree agents from writing deliverables to
+  the main tree — copy them out of `<worktree>/SWFRecompDocs/...` instead.
+- "s11 worsened textblock_line_changes" was refuted by bisect: upstream
+  REWROTE the test (expected_lines 158→282). Gap-histogram diffs must also
+  diff expected_lines; stale local mirrors report the old numbers.
+- Wave-1 refutation rate stayed high and profitable: F5 (0 flips), fonts
+  "cheap head" (unit error: channels ≠ comparisons), acid "gradient ramp"
+  (actually missing AVM2 clipDepth), B6 morph "recompiler emits it" (only
+  into the AVM1 tag stream), filters "~11 cmps" (budgets vs residual).
+
+### 13.3 Left on the board
+
+Trace: T7 describeType is the largest mechanism (24 live tests, ~6800
+lines) — needs a scoping doc, not a patch. loaderinfo_quine (1004 lines,
+LoaderInfo.bytes). ImportAssets fetch-queue one-liner (+1, action.c:34563
+entry==NULL early return). mixed_avm/avm2_loads_avm1_v9 one line from pass
+(needs AVM1 child execution, dual-VM arc). advance_u16 recompiler s16→u16
+(solved in w2-gfx-autosize-report §7, unshipped: generated-ABI reach).
+C3b MethodInfo-N naming needs ABC debug_name modeling (recompiler item).
+s11 hygiene never applied: ignore-list recs for avm2/loader_applicationDomain
++ avm2/swz (need ACCEPTED_DIFFS entries first). Pixels: mask defect B (s10
+design has a UAF — redesign), defect C AVM2 scrollRect half (~20 lines,
+w2-gfx-masks v1 report §6.1); char-id-0 "empty depth" sentinel blocks all 5
+embedded-video tests (h263 blank + VP6 worth 0 until fixed, 21 tag.c sites);
+acid-blend-2 B-channel halving in blend composite (may re-open capped
+blend_modes rows); filters struck from flip leads (shared low-amplitude
+render residual vs 0-18 budgets); simple_shapes/masks 1686 = rasterizer tie
+at MSAA=1, reclassify hairline_edge_drift, do NOT re-book as mask work.

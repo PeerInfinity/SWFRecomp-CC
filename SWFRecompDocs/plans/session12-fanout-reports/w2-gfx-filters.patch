@@ -1,0 +1,197 @@
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 862db0ced..6dbf26a45 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -3094,17 +3094,26 @@ void render_webgpu_update_colors(WebGPURenderContext* ctx,
+ // Filter support: WGSL shaders, resource creation, blur + composite passes
+ // ---------------------------------------------------------------------------
+ 
++// Flash's blur is a BOX blur, not a gaussian: one pass averages a window
++// `full_size` texels wide, the two outermost texels carry a fractional weight,
++// and the filter's `quality` counts how many times that box runs per axis.
++// Weights and the linear-sampling fusion are ported from ruffle
++// render/wgpu/shaders/filter/blur.wgsl + render/wgpu/src/filters/blur.rs,
++// which follow fgiesen's "fast blurs 2" fractional-box formulation. The C-side
++// half of the port is blur_box_kernel() next to render_webgpu_run_blur().
+ static const char* blur_wgsl =
+ 	"struct Params {\n"
+ 	"  direction: vec2f,\n"     // (1,0) for H, (0,1) for V
+ 	"  texel_size: vec2f,\n"    // 1/width, 1/height
+-	"  radius: f32,\n"
++	"  full_size: f32,\n"       // box width in texels; the weights sum to this
++	"  m: f32,\n"               // unit-weight texel PAIRS either side of centre
++	"  m2: f32,\n"              // m * 2
++	"  first_weight: f32,\n"    // fractional weight of the outermost texel
++	"  last_offset: f32,\n"     // sub-texel offset that fuses the last pair
++	"  last_weight: f32,\n"     // 1 + first_weight
+ 	"  strength: f32,\n"
+-	"  color: vec4f,\n"         // for colorize (glow/shadow)
+ 	"  colorize: f32,\n"        // 0=blur, 1=colorize alpha
+-	"  pad1: f32,\n"
+-	"  pad2: f32,\n"
+-	"  pad3: f32,\n"
++	"  color: vec4f,\n"         // for colorize (glow/shadow)
+ 	"}\n"
+ 	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
+ 	"@group(0) @binding(1) var in_samp: sampler;\n"
+@@ -3128,17 +3137,32 @@ static const char* blur_wgsl =
+ 	"}\n"
+ 	"\n"
+ 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+-	"  let r = i32(params.radius);\n"
+-	"  let sigma = max(params.radius * 0.5, 0.001);\n"
++	"  let step = params.direction * params.texel_size;\n"
++	// Pre-shift so the first unit-weight texel sits at offset 0. Ruffle does
++	// this in the vertex stage; doing it here is the same arithmetic and keeps
++	// the uniform buffer out of the vertex shader's visibility set.
++	"  let base = uv - step * params.m;\n"
+ 	"  var total = vec4f(0.0);\n"
+-	"  var weight_sum = 0.0;\n"
+-	"  for (var i = -r; i <= r; i++) {\n"
+-	"    let offset = vec2f(f32(i)) * params.direction * params.texel_size;\n"
+-	"    let w = exp(-f32(i*i) / (2.0 * sigma * sigma));\n"
+-	"    total += textureSample(in_tex, in_samp, uv + offset) * w;\n"
+-	"    weight_sum += w;\n"
++	// The outermost texel on the low side, at the fractional weight.
++	"  total += textureSample(in_tex, in_samp, base - step) * params.first_weight;\n"
++	// The unit-weight interior: sampling exactly between two texels with a
++	// linear sampler returns their average, so one sample x2 covers a pair.
++	"  var center = vec4f(0.0);\n"
++	"  for (var i = 0.5; i < params.m2; i = i + 2.0) {\n"
++	"    center += textureSample(in_tex, in_samp, base + step * i);\n"
++	"  }\n"
++	"  total += center * 2.0;\n"
++	// The last pair, fused into one sample: last_offset/last_weight are chosen
++	// so texel m lands on weight 1 and texel m+1 on first_weight.
++	"  total += textureSample(in_tex, in_samp,\n"
++	"      base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
++	"  var result = total / params.full_size;\n"
++	"  if (params.full_size > 1.0) {\n"
++	// Imitate FP's fixed-point accumulator (ruffle blur.wgsl does the same).
++	// Skipped for the full_size<=1 identity pass, where an 8-bit round-trip
++	// through floor() could shave a level off an already-exact copy.
++	"    result = floor(result * 255.0) / 255.0;\n"
+ 	"  }\n"
+-	"  var result = total / weight_sum;\n"
+ 	"  result = clamp(result * params.strength, vec4f(0.0), vec4f(1.0));\n"
+ 	"  if (params.colorize > 0.5) {\n"
+ 	"    let a2 = result.a * params.color.a;\n"
+@@ -3914,6 +3938,45 @@ void render_webgpu_end_offscreen_pass(WebGPURenderContext* ctx)
+ 	}
+ }
+ 
++// One axis of Flash's fractional box blur, as six shader uniforms.
++// `out` receives {full_size, m, m2, first_weight, last_offset, last_weight};
++// see blur_wgsl above for how the fragment shader consumes them. Ported from
++// ruffle render/wgpu/src/filters/blur.rs.
++static void blur_box_kernel(float full_size, float out[6])
++{
++	// FP caps the window at 255 texels.
++	if (full_size > 255.0f) full_size = 255.0f;
++	if (!(full_size > 1.0f))
++	{
++		// A window of 1 texel or less is a no-op. Ruffle skips the pass; we
++		// keep it, because the filter_tex_a/filter_tex_b ping-pong needs both
++		// axes to run for the result to land back in filter_tex_a. These
++		// weights make the pass an exact copy: weight 1 on the centre texel,
++		// sampled dead on its centre, and the shader skips the 8-bit round.
++		out[0] = 1.0f; out[1] = 0.0f; out[2] = 0.0f;
++		out[3] = 0.0f; out[4] = 0.0f; out[5] = 1.0f;
++		return;
++	}
++	// How far the window reaches past the centre texel, either side.
++	float radius = (full_size - 1.0f) * 0.5f;
++	// ceil, not floor: with a whole-number radius this leaves alpha at 1 rather
++	// than 0, so the outermost two texels fuse into a single sample instead of
++	// wasting one and dividing by zero below.
++	float m = ceilf(radius) - 1.0f;
++	// Almost the fractional part of radius, quantised to 1/255 to imitate FP's
++	// fixed-point weights.
++	float alpha = floorf((radius - m) * 255.0f) / 255.0f;
++	out[0] = full_size;
++	out[1] = m;
++	out[2] = m * 2.0f;
++	out[3] = alpha;
++	// Offset the fused last sample so the next-to-last texel ends up at weight
++	// 1 and the last at weight alpha. alpha == 0 only when radius - m rounds
++	// below 1/255, and then the pair degenerates to a single unit-weight texel.
++	out[4] = (alpha > 0.0f) ? alpha / (1.0f + alpha) : 0.0f;
++	out[5] = alpha + 1.0f;
++}
++
+ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 	float blur_x, float blur_y, u8 quality,
+ 	float strength, float r, float g, float b, float a, int colorize)
+@@ -3922,24 +3985,21 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 	float texel_w = 1.0f / (float)ctx->width;
+ 	float texel_h = 1.0f / (float)ctx->height;
+ 
+-	// Convert blur (in pixels) to radius (half-width of kernel, capped at 31).
+-	// blur_x/blur_y arrive in the filtered object's own coordinate space; Flash
+-	// filter sizes scale with the concatenated matrix, so a stage rendered at 2x
+-	// must blur with a 2x kernel. texel_w/h above are in TARGET pixels, so the
+-	// radius has to be scaled by the stage fit — otherwise a 2x render halves
+-	// the apparent blur. This is exactly what the *_scales_with_screen tests
+-	// assert. stage_scale is 1.0 whenever the target is the stage size.
++	// blur_x/blur_y arrive in the filtered object's own coordinate space, and
++	// are the FULL width of Flash's box window (not a radius). Flash scales
++	// filter sizes with the STAGE matrix, and scales (size - 1) so a 1px window
++	// stays a no-op at any zoom — ruffle swf/src/types/blur_filter.rs
++	// ::scale_blur. texel_w/h are in TARGET pixels, so without this a 2x render
++	// would halve the apparent blur; that is what the *_scales_with_screen
++	// tests assert. stage_scale is 1.0 whenever the target is the stage size.
+ 	float stage_scale = ctx->stage_scale > 0.0f ? ctx->stage_scale : 1.0f;
+-	float radius_x = blur_x * stage_scale * 0.5f;
+-	float radius_y = blur_y * stage_scale * 0.5f;
+-	if (radius_x > 31.0f) radius_x = 31.0f;
+-	if (radius_y > 31.0f) radius_y = 31.0f;
+-	if (radius_x < 1.0f) radius_x = 1.0f;
+-	if (radius_y < 1.0f) radius_y = 1.0f;
+-
+-	// Params layout (64 bytes):
+-	// vec2f direction (8), vec2f texel_size (8), f32 radius (4), f32 strength (4),
+-	// vec4f color (16), f32 colorize (4), f32 pad1 (4), f32 pad2 (4), f32 pad3 (4) = 56 bytes padded to 64
++	float kx[6], ky[6];
++	blur_box_kernel((blur_x - 1.0f) * stage_scale + 1.0f, kx);
++	blur_box_kernel((blur_y - 1.0f) * stage_scale + 1.0f, ky);
++
++	// Params layout (64 bytes): vec2f direction (8), vec2f texel_size (8),
++	// f32 full_size/m/m2/first_weight (16), f32 last_offset/last_weight/
++	// strength/colorize (16), vec4f color (16).
+ 	float params[16]; // 64 bytes
+ 
+ 	for (u8 q = 0; q < quality; q++)
+@@ -3947,11 +4007,16 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 		// Horizontal blur: filter_tex_a -> filter_tex_b
+ 		params[0] = 1.0f; params[1] = 0.0f;   // direction
+ 		params[2] = texel_w; params[3] = texel_h; // texel_size
+-		params[4] = radius_x;                    // radius
+-		params[5] = (q == quality - 1) ? strength : 1.0f; // strength (only on last pass)
+-		params[6] = r; params[7] = g; params[8] = b; params[9] = a; // color
+-		params[10] = (q == quality - 1 && colorize) ? 1.0f : 0.0f; // colorize (only on last pass)
+-		params[11] = 0; params[12] = 0; params[13] = 0;
++		params[4] = kx[0]; params[5] = kx[1]; params[6] = kx[2]; params[7] = kx[3];
++		params[8] = kx[4]; params[9] = kx[5];
++		// strength and colorize belong to the V half of the final pass only.
++		// They used to be written once per quality iteration and left in place
++		// for the V pass too, so a glow with strength s and alpha a came out at
++		// s^2 / a^2 (glow_with_alpha_strength). Flash applies both exactly once,
++		// after every blur pass (ruffle glow.wgsl composites them separately).
++		params[10] = 1.0f;                                 // strength: V pass only
++		params[11] = 0.0f;                                 // colorize: V pass only
++		params[12] = r; params[13] = g; params[14] = b; params[15] = a; // color
+ 
+ 		wgpuQueueWriteBuffer(ctx->queue, ctx->blur_params_buf, 0, params, 64);
+ 
+@@ -3994,7 +4059,10 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 
+ 		// Vertical blur: filter_tex_b -> filter_tex_a
+ 		params[0] = 0.0f; params[1] = 1.0f; // direction = vertical
+-		params[4] = radius_y;
++		params[4] = ky[0]; params[5] = ky[1]; params[6] = ky[2]; params[7] = ky[3];
++		params[8] = ky[4]; params[9] = ky[5];
++		params[10] = (q == quality - 1) ? strength : 1.0f;
++		params[11] = (q == quality - 1 && colorize) ? 1.0f : 0.0f;
+ 
+ 		wgpuQueueWriteBuffer(ctx->queue, ctx->blur_params_buf, 0, params, 64);
+ 

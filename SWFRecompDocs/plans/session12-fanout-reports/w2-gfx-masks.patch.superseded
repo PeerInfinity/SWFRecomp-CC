@@ -1,0 +1,262 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index 052a958d0..975c1b106 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -285,6 +285,13 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* context, const float* x
+ void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
+ void render_webgpu_end_clip_mask(WebGPURenderContext* context);
+ void render_webgpu_end_clip(WebGPURenderContext* context);
++// Save / restore the ACTIVE clip reference around a nested mask. The stencil
++// texels an enclosing mask wrote are still in the buffer (nothing clears them
++// mid-pass), so restoring an enclosing clip is just re-binding the stencil-test
++// pipeline at its reference — no geometry replay. Used by the AVM2 render walk,
++// where a masked subtree can contain another masked node.
++u32  render_webgpu_clip_ref(WebGPURenderContext* context);
++void render_webgpu_restore_clip(WebGPURenderContext* context, u32 ref);
+ void render_webgpu_close_pass(WebGPURenderContext* context);
+ void render_webgpu_compose_text_transforms(WebGPURenderContext* context, const char* transform_data, u32 place_transform_id, u32 glyph_start, size_t count);
+ void render_webgpu_compose_sprite_transform(WebGPURenderContext* context, const char* transform_data, u32 parent_transform_id, u32 child_transform_id);
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index bc36e6072..50861a43a 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -30,6 +30,8 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_begin_clip_mask(ctx)              render_webgpu_begin_clip_mask(ctx)
+ #define renderer_end_clip_mask(ctx)                render_webgpu_end_clip_mask(ctx)
+ #define renderer_end_clip(ctx)                     render_webgpu_end_clip(ctx)
++#define renderer_clip_ref(ctx)                     render_webgpu_clip_ref(ctx)
++#define renderer_restore_clip(ctx, ref)            render_webgpu_restore_clip(ctx, ref)
+ #define renderer_close_pass(ctx)                   render_webgpu_close_pass(ctx)
+ #define renderer_free(app, ctx)                    render_webgpu_free(app, ctx)
+ #define renderer_upload_bitmap(ctx, o, s, w, h)    render_webgpu_upload_bitmap(ctx, o, s, w, h)
+@@ -82,6 +84,8 @@ typedef FlashbangContext RenderContext;
+ #define renderer_begin_clip_mask(ctx)              ((void)0)
+ #define renderer_end_clip_mask(ctx)                ((void)0)
+ #define renderer_end_clip(ctx)                     ((void)0)
++#define renderer_clip_ref(ctx)                     (0u)
++#define renderer_restore_clip(ctx, ref)            ((void)0)
+ #define renderer_close_pass(ctx)                   flashbang_close_pass(ctx)
+ #define renderer_free(app, ctx)                    flashbang_free(app, ctx)
+ #define renderer_upload_bitmap(ctx, o, s, w, h)    flashbang_upload_bitmap(ctx, o, s, w, h)
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index d3edab107..f5cb8fa11 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -4195,6 +4195,13 @@ static Avm2Value do_get_mask(Avm2Activation* act)
+ // Ruffle DisplayObject::set_mask keeps the pair symmetric: the old mask loses
+ // its maskee back-pointer, the new one gains it. The pick walk reads `maskee`
+ // to know an object is "only there to mask" and can never be a mouse target.
++//
++// It also does `self.set_clip_depth(0)` AND `mask.set_clip_depth(0)`: an AS
++// mask assignment RETIRES any timeline clip range either object was part of,
++// so the two mask mechanisms can never both be live on the same pair. That is
++// the whole point of `avm2/mask_reapply`, whose second pair assigns the mask
++// backwards (`mask2.mask = maskee2`) — clearing mask2's clip_depth is what
++// turns its clipDepth-5 timeline range into a plain AS-masked object.
+ static Avm2Value do_set_mask(Avm2Activation* act)
+ {
+ 	Avm2Object* self = this_obj(act);
+@@ -4203,6 +4210,7 @@ static Avm2Value do_set_mask(Avm2Activation* act)
+ 	{
+ 		Avm2Object* next = (act->args[0].kind == AVM2_VALUE_OBJECT)
+ 			? act->args[0].u.obj : NULL;
++		ext->clip_depth = 0;
+ 		if (ext->mask != NULL && ext->mask != next)
+ 		{
+ 			Avm2DisplayObjectExt* old = avm2_display_ext_of(act->ctx, ext->mask);
+@@ -4212,7 +4220,11 @@ static Avm2Value do_set_mask(Avm2Activation* act)
+ 		if (next != NULL)
+ 		{
+ 			Avm2DisplayObjectExt* mext = avm2_display_ext_of(act->ctx, next);
+-			if (mext != NULL) mext->maskee = self;
++			if (mext != NULL)
++			{
++				mext->clip_depth = 0;
++				mext->maskee = self;
++			}
+ 		}
+ 	}
+ 	return avm2_undefined();
+@@ -15092,6 +15104,46 @@ static void avm2_render_statictext(Avm2Context* ctx, Avm2Object* obj,
+ 	heap_free(ctx->app, gl);
+ }
+ 
++// ---------------------------------------------------------------------------
++// Masks in the AVM2 render walk (T7)
++// ---------------------------------------------------------------------------
++// Until this landed, `avm2_render_node` read NONE of `ext->clip_depth`,
++// `ext->mask` or `ext->maskee` — all three were stored faithfully and consumed
++// only by the pick walk (hit_test_shape_obj / the clip-layer walk). The paint
++// walk therefore painted every masker as ordinary content and clipped no
++// maskee, which is both halves of `avm2/displayobject_mask` and the whole of
++// `avm2/mask_reapply` (a pure timeline-clipDepth movie that carries a DoABC
++// tag, so it renders here and not through tag.c's loops).
++//
++// Model: Ruffle `display_object.rs::render_base` + `container.rs::
++// render_children`, on top of the flat single-reference stencil the tag.c loops
++// already use. `g_avm2_drawing_mask` is Ruffle's `commands.drawing_mask()`:
++// while it is set, `visible` is ignored for the whole subtree and a masker is
++// not suppressed (it IS the thing being drawn).
++static uint32_t g_avm2_drawing_mask;
++
++static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
++                             const Mat* parent_world, double parent_alpha,
++                             const Avm2Cx* parent_cx);
++
++// Write MASK_OBJ's geometry into the stencil, then switch to the stencil-test
++// pipeline. `mask_parent_world` is the world matrix of the mask's PARENT —
++// avm2_render_node applies the mask's own local matrix on entry. Ruffle renders
++// the masker under its OWN local_to_global, never the maskee's.
++static void avm2_push_clip_mask(Avm2Context* ctx, Avm2Object* mask_obj,
++                                const Mat* mask_parent_world)
++{
++	Avm2Cx saved_cx = g_avm2_cur_cx;
++	renderer_begin_clip_mask(context);
++	g_avm2_drawing_mask++;
++	avm2_render_node(ctx, mask_obj, mask_parent_world, 1.0, &AVM2_CX_IDENTITY);
++	g_avm2_drawing_mask--;
++	renderer_end_clip_mask(context);
++	// The mask subtree republished g_avm2_cur_cx on every node; the maskee's
++	// leaf writers must not inherit the masker's colour transform.
++	g_avm2_cur_cx = saved_cx;
++}
++
+ // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
+ // world matrix + concatenated alpha down the tree. Invisible subtrees are
+ // culled, matching render_apply_text_bounds.
+@@ -15101,7 +15153,13 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ {
+ 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+ 	if (ext == NULL) return;
+-	if (!ext->is_stage && !ext->visible) return;
++	// Ruffle container.rs: "The 'visible' flag is ignored for all descendants
++	// of a mask" — setting `visible = false` on a masker is the standard way to
++	// keep it off screen, and honouring it here would produce an empty stencil.
++	if (!ext->is_stage && !ext->visible && g_avm2_drawing_mask == 0) return;
++	// Ruffle DisplayObject::render: an object that masks something else is
++	// never painted as content on its own account.
++	if (ext->maskee != NULL && g_avm2_drawing_mask == 0) return;
+ 
+ 	Mat local = ext_matrix(ext);
+ 	Mat world = mat_mul(parent_world, &local);
+@@ -15116,6 +15174,28 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
+ 	g_avm2_cur_cx = node_cx;
+ 
++	// DisplayObject.mask — clip this node AND its whole subtree to the masker's
++	// silhouette. The masker lives elsewhere in the tree, so its stencil pass
++	// runs under its own parent's world matrix, not ours. Nested masks save and
++	// restore the enclosing clip reference (see render_webgpu_restore_clip);
++	// while we are drawing mask geometry ourselves, a mask on the mask is
++	// ignored, matching Ruffle's `render_self` (not `render`) for the masker.
++	uint32_t saved_clip_ref = 0;
++	int pushed_mask = 0;
++	if (ext->mask != NULL && g_avm2_drawing_mask == 0)
++	{
++		Avm2DisplayObjectExt* mext = avm2_display_ext_of(ctx, ext->mask);
++		if (mext != NULL)
++		{
++			Mat mpw = mext->parent != NULL
++				? display_world_matrix(ctx, mext->parent) : mat_identity();
++			saved_clip_ref = renderer_clip_ref(context);
++			avm2_push_clip_mask(ctx, ext->mask, &mpw);
++			pushed_mask = 1;
++			g_avm2_cur_cx = node_cx;
++		}
++	}
++
+ 	if (ext->is_bitmap)
+ 		avm2_render_bitmap(ctx, obj, &world, alpha);
+ 	else if (ext->is_morph_shape && ext->shape_vert_count > 0)
+@@ -15145,8 +15225,51 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 		if (bst != NULL) avm2_render_node(ctx, bst, &world, alpha, &node_cx);
+ 	}
+ 
+-	for (uint32_t i = 0; i < ext->render_len; i++)
+-		avm2_render_node(ctx, ext->render_list[i], &world, alpha, &node_cx);
++	// Timeline clip layers (Ruffle container.rs::render_children). A child with
++	// clip_depth > 0 is NEVER painted as content: it masks the depth range
++	// (its own depth, clip_depth]. The range closes at the first later child
++	// whose depth passes clip_depth, and at the end of the list.
++	//
++	// Our stencil is flat (one active reference, no intersection), exactly as
++	// in tag.c's three loops, so a clip range opened inside an enclosing mask
++	// replaces it rather than intersecting; the enclosing reference is restored
++	// when the range closes.
++	{
++		int32_t clip_depth = 0;
++		uint32_t pre_clip_ref = 0;
++		for (uint32_t i = 0; i < ext->render_len; i++)
++		{
++			Avm2Object* child = ext->render_list[i];
++			Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
++			if (cext == NULL) continue;
++
++			if (clip_depth > 0 && cext->depth > clip_depth)
++			{
++				renderer_restore_clip(context, pre_clip_ref);
++				clip_depth = 0;
++			}
++
++			if (cext->clip_depth > 0 && g_avm2_drawing_mask == 0)
++			{
++				if (clip_depth > 0)
++					renderer_restore_clip(context, pre_clip_ref);
++				else
++					pre_clip_ref = renderer_clip_ref(context);
++				avm2_push_clip_mask(ctx, child, &world);
++				g_avm2_cur_cx = node_cx;
++				clip_depth = cext->clip_depth;
++				continue;
++			}
++
++			avm2_render_node(ctx, child, &world, alpha, &node_cx);
++			g_avm2_cur_cx = node_cx;
++		}
++		if (clip_depth > 0)
++			renderer_restore_clip(context, pre_clip_ref);
++	}
++
++	if (pushed_mask)
++		renderer_restore_clip(context, saved_clip_ref);
+ }
+ 
+ // Focus highlight, drawn on TOP of the whole stage (Ruffle
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 862db0ced..7dce14464 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -2653,6 +2653,33 @@ void render_webgpu_end_clip(WebGPURenderContext* ctx)
+ 	restore_draw_pipeline(ctx);
+ }
+ 
++// Save / restore the active clip reference around a NESTED mask (AVM2 walk).
++//
++// end_clip zeroes mask_ref, which is right for the tag.c loops (their clip
++// ranges are siblings), but the AVM2 render walk can open a mask inside an
++// already-masked subtree: `a.mask = m` on a child of a clipDepth range, or a
++// clipDepth range inside a masked container. Without a restore the inner
++// end_clip drops the OUTER clip for every later sibling.
++//
++// Restoring costs no geometry replay: the stencil is cleared once per pass, so
++// the texels the enclosing mask wrote still hold its reference. The one thing
++// this cannot recover is the region where the inner mask overwrote the outer
++// reference (Replace, not Increment) — nesting still does not intersect, which
++// is the same flat-mask limitation the tag.c loops have had since s11.
++u32 render_webgpu_clip_ref(WebGPURenderContext* ctx)
++{
++	if (!ctx->renderer_ok) return 0;
++	return ctx->mask_ref;
++}
++
++void render_webgpu_restore_clip(WebGPURenderContext* ctx, u32 ref)
++{
++	if (!ctx->renderer_ok) return;
++	if (ctx->mask_capture_depth > 0) return;
++	ctx->mask_ref = ref;
++	restore_draw_pipeline(ctx);
++}
++
+ void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
+ {
+ 	if (!ctx->renderer_ok) return;

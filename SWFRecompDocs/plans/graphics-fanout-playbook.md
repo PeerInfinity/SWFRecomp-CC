@@ -331,3 +331,41 @@ regressions, bands improved 73 / worsened 0** (from 217/566 at
   duplicate_font 3 — a cheap next slice); masks arc; AVM2 static-bitmap
   upload (bitmapbuttons, whole-stage blank); scrollRect stencil (sketch
   ready, flips blocked); Stage3D/video blank_render backends (arc-sized).
+
+## 11. Session-12 state of the board (2026-08-06)
+
+**Closeout run `31090651530` at `1f8396f57`: 286/567 (50.4%), +28, zero
+regressions, bands improved 38 / worsened 0** (from 258/567 at `6de650432`;
+note pass-count restated 257→258 and denominator 566→567 by upstream drift).
+Ledger: `polish-sweep-arc.md` §13; reports `session12-fanout-reports/`.
+
+- **Headline mechanism: AVM2 clipDepth masking existed nowhere** — the acid
+  ×16 "gradient ramp" cluster was actually mask-union-instead-of-intersection.
+  `avm2_render_node` now runs the tag.c single-active-range clip loop +
+  masker suppression + `DisplayObject.mask` + nested `clip_ref/restore_clip`
+  (bitmapmax + masks-v2 superset merge). Riders: pixelbender_effect_twirl,
+  acid-textfield-scroll, flash_text_TextField2.
+- **Dynamic-bitmap cap** now `max(stage, bitmap_highest)` — oversized-bitmap
+  blank_render class closed (+4).
+- **Filters: mechanism now correct, family struck from flip leads.** Box-blur
+  kernel + inner/knockout/compositeSource composition landed; 12/13
+  comparisons improved -17..-93%; residual is a shared low-amplitude render
+  error vs 0-18 outlier budgets. Two engine-wide fixes rode along: uniform
+  ring buffer (writeBuffer-vs-Submit ordering — every blur had been
+  single-axis) and radians-not-degrees filter angles.
+- **EditText**: quality-gated pixel snapping (`MSAA_SAMPLES==1` = Low arm) +
+  fractional-bottom-edge corner drop flipped auto_size/width at exactly
+  18=limit; AVM2 glyph stencil clip wired (auto_size/return → a_epsilon);
+  AVM1 line advance now honors TextFormat.leading (leading_define_font).
+- **Dispositions to respect**: fonts near-pass family (height/match_style/
+  glyph/duplicate_font) = 1-5px AA stair-step ties, capped like blend_modes;
+  simple_shapes/masks 1686 = rasterizer tie, NOT mask work; frame-phase
+  channel exhausted; quality/MSAA axis closed.
+- **Remaining leads**: mask defect C AVM2-scrollRect half (~20 lines, v1
+  report §6.1) + defect B redesign (s10 sketch has a UAF); char-id-0 depth
+  sentinel (blocks all 5 embedded-video comparisons incl. h263-on-supported-
+  codec — cheapest big diagnosis, 21 tag.c sites); acid-blend-2 B-channel
+  halving in the blend composite (evidence the capped blend_modes rows hide
+  a real bug); AVM2 static-bitmap upload (bitmapbuttons blockers A+B
+  confirmed but DEFER — tol 4 / max_out 0 on resampled JPEG unwinnable);
+  Stage3D (30 cmps) + video (21) backends arc-sized.

@@ -1,0 +1,381 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_abc.h b/SWFModernRuntime/include/avm2/avm2_abc.h
+index 445776845..f156f14b3 100644
+--- a/SWFModernRuntime/include/avm2/avm2_abc.h
++++ b/SWFModernRuntime/include/avm2/avm2_abc.h
+@@ -517,8 +517,11 @@ typedef struct Avm2ButtonData
+ typedef struct Avm2BitmapData
+ {
+ 	uint16_t char_id;
+-	uint16_t width;
+-	uint16_t height;
++	// 32-bit: a PNG smuggled through DefineBitsJPEG2/3 (SWF8+) carries u32
++	// dimensions and can exceed 65535 (see visual/define_bits_jpeg2_huge).
++	// DefineBitsLossless is u16-limited, but the field is shared.
++	uint32_t width;
++	uint32_t height;
+ 	uint8_t transparency;
+ 	// Straight RGBA, width*height*4 bytes (NULL if decode failed). When
+ 	// z_len != 0 the pointer is instead a zlib DEFLATE stream of length z_len
+diff --git a/SWFModernRuntime/src/avm2/avm2_globals.c b/SWFModernRuntime/src/avm2/avm2_globals.c
+index 1c152111f..6c8c429fe 100644
+--- a/SWFModernRuntime/src/avm2/avm2_globals.c
++++ b/SWFModernRuntime/src/avm2/avm2_globals.c
+@@ -3669,8 +3669,28 @@ static void register_class_object_lengths(Avm2Context* ctx)
+ 		{ b->number_class,   1 },
+ 		{ b->int_class,      1 },
+ 		{ b->uint_class,     1 },
+-		{ b->regexp_class,   2 },
++		// Flash reports 1, not ECMA-262's 2 (avm2/static_length pins it).
++		{ b->regexp_class,   1 },
+ 		{ b->date_class,     7 },
++		// Every Error subclass takes (message, id) but reports arity 1, the
++		// same as avmplus's Error. avm2/static_length names the first twelve;
++		// the four AIR/IO siblings share the shape.
++		{ b->error_class,               1 },
++		{ b->type_error_class,          1 },
++		{ b->reference_error_class,     1 },
++		{ b->argument_error_class,      1 },
++		{ b->range_error_class,         1 },
++		{ b->verify_error_class,        1 },
++		{ b->eval_error_class,          1 },
++		{ b->security_error_class,      1 },
++		{ b->definition_error_class,    1 },
++		{ b->uri_error_class,           1 },
++		{ b->syntax_error_class,        1 },
++		{ b->uninitialized_error_class, 1 },
++		{ b->io_error_class,            1 },
++		{ b->eof_error_class,           1 },
++		{ b->memory_error_class,        1 },
++		{ b->illegal_operation_error_class, 1 },
+ 	};
+ 	for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++)
+ 	{
+@@ -3740,6 +3760,27 @@ void avm2_globals_init(Avm2Context* ctx)
+ 	avm2_proto_add_function(ctx, b->class_class->prototype_obj, "toString",
+ 	                        class_proto_to_string);
+ 	avm2_builtin_add_getter(ctx, b->class_class, "prototype", class_get_prototype);
++	// Class extends Object, so a CLASS OBJECT answers Object's ES3 trio too
++	// (`SomeClass.propertyIsEnumerable('x')` -> false; avm2/property_is_enumerable
++	// pins it). class_class is minted at :3432, before the trio is registered on
++	// object_class just above, and avm2_builtin_class snapshots the super ivtable
++	// at creation time — so the copy never happened and the class-object fallback
++	// in avm2_ops.c (resolve_key / resolve_mn) found only `prototype`. Restate the
++	// three by hand rather than reordering init, which would widen that fallback
++	// to every Object instance member at once.
++	// Function is minted in the same bootstrap breath as Class (:3714) and
++	// missed the same snapshot, so `someFunction.propertyIsEnumerable('x')`
++	// hit #1006 too (property_is_enumerable's ES3-constructor half).
++	Avm2Class* es3_trio_hosts[2] = { b->class_class, b->function_class };
++	for (int i = 0; i < 2; i++)
++	{
++		avm2_builtin_add_method(ctx, es3_trio_hosts[i], "hasOwnProperty",
++		                        object_as3_has_own_property);
++		avm2_builtin_add_method(ctx, es3_trio_hosts[i], "isPrototypeOf",
++		                        object_proto_is_prototype_of);
++		avm2_builtin_add_method(ctx, es3_trio_hosts[i], "propertyIsEnumerable",
++		                        object_proto_property_is_enumerable);
++	}
+ 
+ 	// XML/XMLList: the E4X engine (avm2_xml.c / avm2_e4x.c).
+ 	avm2_register_xml(ctx);
+diff --git a/SWFModernRuntime/src/avm2/avm2_json.c b/SWFModernRuntime/src/avm2/avm2_json.c
+index a47eacc1c..87bea12a3 100644
+--- a/SWFModernRuntime/src/avm2/avm2_json.c
++++ b/SWFModernRuntime/src/avm2/avm2_json.c
+@@ -685,6 +685,16 @@ static Avm2Value js_normalize(Avm2Value v)
+ 	return v;
+ }
+ 
++// A Function value has no JSON representation: avmplus OMITS it as an object
++// property and writes `null` for it in an array or at the top level
++// (avm2/json_stringify_function pins all three). A CLASS object is emphatically
++// NOT a function here — it stringifies like any other object.
++static int js_is_function(Avm2Value v)
++{
++	return v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
++	       && v.u.obj->kind == AVM2_OBJ_FUNCTION;
++}
++
+ static Avm2Value js_iter_get(JSer* js, Avm2Object* obj, uint32_t i,
+                              const char* key, uint32_t key_len)
+ {
+@@ -803,7 +813,7 @@ static void js_serialize_object(JSer* js, StrBuf* b, Avm2Object* obj)
+ 			Avm2Value value = avm2_get_public_property(
+ 				ctx, avm2_object_value(obj), key->utf8, key->len, NULL);
+ 			Avm2Value mapped = js_map_value(js, key->utf8, key->len, value);
+-			if (mapped.kind == AVM2_VALUE_UNDEFINED) continue;
++			if (mapped.kind == AVM2_VALUE_UNDEFINED || js_is_function(mapped)) continue;
+ 			js_obj_entry(js, b, &first, key->utf8, key->len, mapped);
+ 		}
+ 	}
+@@ -832,16 +842,36 @@ static void js_serialize_object(JSer* js, StrBuf* b, Avm2Object* obj)
+ 				continue;
+ 			}
+ 			Avm2Value mapped = js_map_value(js, e->key.name, e->key.name_len, value);
+-			if (mapped.kind == AVM2_VALUE_UNDEFINED) continue;
++			if (mapped.kind == AVM2_VALUE_UNDEFINED || js_is_function(mapped)) continue;
+ 			js_obj_entry(js, b, &first, e->key.name, e->key.name_len, mapped);
+ 		}
++		// A class object's `static const`s are stored here as DONT-ENUM
++		// dynamic props (avm2_builtin_add_static_const); avmplus declares them
++		// as real class traits, so JSON.stringify serializes them
++		// (`JSON.stringify(Object)` -> `{"length":1,...}`). Only class objects
++		// get that relaxation — every other dont-enum prop still skips.
++		int is_class = (obj->kind == AVM2_OBJ_CLASS);
+ 		for (Avm2DynProp* p = obj->dyn_props; p != NULL; p = p->next)
+ 		{
+-			if (p->dont_enum) continue;
++			if (p->dont_enum && !is_class) continue;
+ 			Avm2Value mapped = js_map_value(js, p->name.utf8, p->name.len, p->value);
+-			if (mapped.kind == AVM2_VALUE_UNDEFINED) continue;
++			if (mapped.kind == AVM2_VALUE_UNDEFINED || js_is_function(mapped)) continue;
+ 			js_obj_entry(js, b, &first, p->name.utf8, p->name.len, mapped);
+ 		}
++		// `prototype` reaches a class object through Class's ivtable getter,
++		// not through the class's own (static) vtable, so neither walk above
++		// sees it. avmplus keeps it as a slot on the class object and
++		// stringifies it last.
++		if (is_class && obj->class_ref != NULL
++		    && obj->class_ref->prototype_obj != NULL)
++		{
++			Avm2Value pv = avm2_object_value(obj->class_ref->prototype_obj);
++			Avm2Value mapped = js_map_value(js, "prototype", 9, pv);
++			if (mapped.kind != AVM2_VALUE_UNDEFINED && !js_is_function(mapped))
++			{
++				js_obj_entry(js, b, &first, "prototype", 9, mapped);
++			}
++		}
+ 	}
+ 	js->depth--;
+ 	if (!first && js->indent != NULL) js_newline_indent(js, b);
+@@ -881,6 +911,13 @@ static void js_serialize_value(JSer* js, StrBuf* b, Avm2Value v)
+ 		case AVM2_VALUE_OBJECT:
+ 		{
+ 			Avm2Object* obj = v.u.obj;
++			if (obj->kind == AVM2_OBJ_FUNCTION)
++			{
++				// No JSON representation. Reached only from an array element
++				// or the top level; object properties drop out earlier.
++				sb_lit(b, "null");
++				return;
++			}
+ 			for (uint32_t i = 0; i < js->stack_n; i++)
+ 			{
+ 				if (js->stack[i] == obj) throw_1129(ctx);
+diff --git a/SWFModernRuntime/src/avm2/avm2_string.c b/SWFModernRuntime/src/avm2/avm2_string.c
+index 2a46a9aca..dcc83ad2a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_string.c
++++ b/SWFModernRuntime/src/avm2/avm2_string.c
+@@ -404,6 +404,17 @@ static Avm2Value string_locale_compare(Avm2Activation* act)
+ 	}
+ 	const Avm2String* s = this_string(act);
+ 	Avm2Value other_v = act->argc > 0 ? act->args[0] : avm2_undefined();
++	if (ctx->swf_version < 11
++	    && (other_v.kind == AVM2_VALUE_NULL
++	        || other_v.kind == AVM2_VALUE_UNDEFINED))
++	{
++		// avmplus bug 585791: before SWF11, a null/undefined argument is not
++		// coerced to "null"/"undefined" at all — the comparison answers 1 for
++		// an empty receiver and 0 for any other. Ruffle globals/string.rs
++		// locale_compare gates the same quirk on version() < 11;
++		// as3/String/localeCompare_585791/{v9,v12} pin both sides.
++		return avm2_integer(s->len == 0 ? 1 : 0);
++	}
+ 	const Avm2String* other = avm2_coerce_to_string(ctx, other_v);
+ 	uint32_t la = utf16_length(s);
+ 	uint32_t lb = utf16_length(other);
+@@ -443,7 +454,11 @@ Avm2Value avm2_string_split_plain(Avm2Activation* act)
+ 	{
+ 		return avm2_object_value(arr);
+ 	}
+-	if (delim_v.kind == AVM2_VALUE_UNDEFINED)
++	// ES3 15.5.4.14: only a *missing* separator returns the whole string.
++	// An explicit `undefined` is ToString'd like any other value, so
++	// "…".split(void 0) splits on the literal "undefined"
++	// (ecma3/String/e15_5_4_8_2 pins this).
++	if (act->argc == 0)
+ 	{
+ 		avm2_array_push(ctx, arr, avm2_string(s));
+ 		return avm2_object_value(arr);
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 33133f735..c74457098 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -1131,6 +1131,21 @@ static uint16_t* et_units_plain(Avm2Context* ctx, const Avm2EditTextExt* et,
+ 	return u;
+ }
+ 
++// Ruffle swf_is_whitespace (see swf_is_ws below, declared later).
++static int ent_ws(char c)
++{
++	return c == ' ' || c == '\t' || c == '\n' || c == '\r';
++}
++
++// Digit value of `c` in `radix` (10 or 16), or -1.
++static int ent_digit(char c, int radix)
++{
++	if (c >= '0' && c <= '9') return c - '0';
++	if (radix == 16 && c >= 'a' && c <= 'f') return c - 'a' + 10;
++	if (radix == 16 && c >= 'A' && c <= 'F') return c - 'A' + 10;
++	return -1;
++}
++
+ // Decode &entities; in [p, p+n) into sb (process_html_entity).
+ static void html_decode_entities(Avm2Context* ctx, SB* sb, const char* p, uint32_t n)
+ {
+@@ -1162,46 +1177,58 @@ static void html_decode_entities(Avm2Context* ctx, SB* sb, const char* p, uint32
+ 		else if (ENT_EQ("nbsp")) sb_cp(ctx, sb, 0xA0);
+ 		else if (name_len >= 2 && name[0] == '#')
+ 		{
+-			const char* digits;
+-			uint32_t dl;
+-			int radix;
+-			if (name[1] == 'x' || name[1] == 'X')
++			// Numeric entity. Flash's parser (Ruffle
++			// core/src/html/text_format.rs process_html_entity) is much looser
++			// than XML's, and text/html_entity_parsing pins every corner:
++			//  * whitespace (space/tab/CR/LF) around the numeral is TRIMMED,
++			//    so "&# 60;" and "&#x\n26;" are valid;
++			//  * ONE leading '+'/'-' is accepted, but it is tested on the
++			//    UNTRIMMED character right after '#'/'x' -- "&#+ 40;" is not
++			//    an entity, and neither is "&#  x3b;" (the 'x' must be
++			//    adjacent to the '#');
++			//  * only a LOWERCASE 'x' selects hex: "&#X28;" is a decimal parse
++			//    of "X28" and therefore invalid, which is what Flash reports;
++			//  * the digit run stops at the first character that is not a
++			//    digit in the radix, and everything from there to the ';' is
++			//    discarded ("&#40a;" is '(');
++			//  * accumulation is WRAPPING u16, so "&#127183;" is
++			//    127183 & 0xFFFF and "&#-50;" is 65486 -- no overflow reject.
++			// Only a numeral that parses to nothing at all falls back to
++			// copying the source text verbatim.
++			int radix = (name[1] == 'x') ? 16 : 10;
++			uint32_t si = (radix == 16) ? 2u : 1u;
++			const char* q = name + si;
++			uint32_t ql = name_len - si;
++			while (ql > 0 && ent_ws(q[0])) { q++; ql--; }
++			while (ql > 0 && ent_ws(q[ql - 1])) ql--;
++			uint32_t nsi = (si < name_len
++			                && (name[si] == '+' || name[si] == '-')) ? 1u : 0u;
++			uint32_t end = nsi;
++			while (end < ql && ent_digit(q[end], radix) >= 0) end++;
++			uint32_t d0 = 0;
++			int neg = 0;
++			if (end > 0 && (q[0] == '+' || q[0] == '-'))
+ 			{
+-				// Only the trailing 4 hex digits are used.
+-				digits = name + 2;
+-				dl = name_len - 2;
+-				if (dl > 4) { digits += dl - 4; dl = 4; }
+-				radix = 16;
++				neg = (q[0] == '-');
++				d0 = 1;
+ 			}
+-			else
+-			{
+-				digits = name + 1;
+-				dl = name_len - 1;
+-				if (dl > 16) { digits += dl - 16; dl = 16; }
+-				radix = 10;
+-			}
+-			uint64_t val = 0;
+-			int ok = dl > 0;
+-			for (uint32_t k = 0; k < dl && ok; k++)
+-			{
+-				int d;
+-				char c = digits[k];
+-				if (c >= '0' && c <= '9') d = c - '0';
+-				else if (radix == 16 && c >= 'a' && c <= 'f') d = c - 'a' + 10;
+-				else if (radix == 16 && c >= 'A' && c <= 'F') d = c - 'A' + 10;
+-				else { ok = 0; break; }
+-				val = val * radix + d;
+-				if (val > 0x10FFFF) val = 0x110000;  // invalid marker
+-			}
+-			if (ok && val <= 0x10FFFF && !(val >= 0xD800 && val <= 0xDFFF))
++			if (end > d0)
+ 			{
+-				sb_cp(ctx, sb, (uint32_t) val);
++				uint16_t acc = 0;
++				for (uint32_t k = d0; k < end; k++)
++				{
++					int d = ent_digit(q[k], radix);
++					acc = (uint16_t) (acc * (unsigned) radix);
++					acc = neg ? (uint16_t) (acc - (unsigned) d)
++					          : (uint16_t) (acc + (unsigned) d);
++				}
++				// A lone surrogate half is not a scalar value: emit nothing.
++				if (acc < 0xD800 || acc > 0xDFFF) sb_cp(ctx, sb, acc);
+ 			}
+-			else if (!ok)
++			else
+ 			{
+ 				sb_bytes(ctx, sb, p + i, j - i + 1);
+ 			}
+-			// A valid-syntax but out-of-range codepoint emits nothing.
+ 		}
+ 		else
+ 		{
+diff --git a/SWFModernRuntime/src/avm2/avm2_value.c b/SWFModernRuntime/src/avm2/avm2_value.c
+index 7578757d8..fe8f8b058 100644
+--- a/SWFModernRuntime/src/avm2/avm2_value.c
++++ b/SWFModernRuntime/src/avm2/avm2_value.c
+@@ -653,8 +653,21 @@ Avm2Value avm2_coerce_to_primitive(Avm2Context* ctx, Avm2Value v, int hint)
+ 	}
+ 	if (hint == 0)
+ 	{
+-		// Default hint: Number (Date would be String; no Date yet).
++		// ES3 8.6.2.6 [[DefaultValue]] with no hint: Number for every object
++		// except Date, whose [[DefaultValue]] uses the String hint (15.9.6),
++		// so `date + x` concatenates rather than adding milliseconds.
++		// ecma3/Expressions/e11_6_1_3 pins exactly that. Only the `add`
++		// operator passes hint 0, so the arm is confined to `+`.
+ 		hint = 1;
++		for (Avm2Class* c = (v.u.obj != NULL) ? v.u.obj->cls : NULL;
++		     c != NULL; c = c->super_class)
++		{
++			if (c == ctx->builtins.date_class)
++			{
++				hint = 2;
++				break;
++			}
++		}
+ 	}
+ 	const char* first = (hint == 2) ? "toString" : "valueOf";
+ 	const char* second = (hint == 2) ? "valueOf" : "toString";
+diff --git a/SWFRecomp/src/abc/abc_timeline.cpp b/SWFRecomp/src/abc/abc_timeline.cpp
+index a0f4a33af..253ca3afa 100644
+--- a/SWFRecomp/src/abc/abc_timeline.cpp
++++ b/SWFRecomp/src/abc/abc_timeline.cpp
+@@ -548,7 +548,9 @@ bool decodeLossless(int version, int format, uint32_t w, uint32_t h,
+ struct BitmapAsset
+ {
+ 	uint16_t char_id;
+-	uint16_t width, height;
++	// u32, not u16: a PNG smuggled through DefineBitsJPEG2/3 (SWF8+) can be
++	// wider/taller than 65535. Mirrors Avm2BitmapData in avm2_abc.h.
++	uint32_t width, height;
+ 	uint8_t transparency;
+ 	std::vector<uint8_t> rgba;  // empty if decode failed
+ };
+@@ -1502,8 +1504,8 @@ struct Scanner
+ 				                        jpeg_tables.size(), alpha_z, alpha_z_len,
+ 				                        w, h, ba.rgba))
+ 				{
+-					ba.width = (uint16_t) w;
+-					ba.height = (uint16_t) h;
++					ba.width = w;
++					ba.height = h;
+ 					ci.bounds[0] = 0;
+ 					ci.bounds[1] = (int32_t) w * 20;
+ 					ci.bounds[2] = 0;
+@@ -1542,8 +1544,8 @@ struct Scanner
+ 				if (format == 3) num_colors = body.u8();  // BitmapColorTableSize
+ 				BitmapAsset ba;
+ 				ba.char_id = ci.char_id;
+-				ba.width = (uint16_t) w;
+-				ba.height = (uint16_t) h;
++				ba.width = (uint32_t) w;
++				ba.height = (uint32_t) h;
+ 				ba.transparency = (version == 2) ? 1 : 0;
+ 				// Remaining body bytes are the zlib-compressed pixel data.
+ 				if (body.p < body.end)
