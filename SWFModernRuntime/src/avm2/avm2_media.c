@@ -650,6 +650,481 @@ static Avm2Value avtagdata_get_local_time(Avm2Activation* act)
 }
 
 // ---------------------------------------------------------------------------
+// The rest of the flash.media.AV* value-object family (13 classes)
+// ---------------------------------------------------------------------------
+//
+// AVTagData above is the shape they all share: a constructor that coerces its
+// arguments into DECLARED slot types, then getter-only (for two of them,
+// get/set) access to the results. That slot typing is most of what av_classes
+// grades -- `new AVABRParameters("hello", 2.2, 3.3, 4.4)` reads back 2/3/4
+// because those slots are `int`, and AVTrackInfo's 7.7 reads back as the
+// STRING "7.7" while its 8.8 reads back as the int 8.
+//
+// The backing store is a fixed set of dont-enum dynamic props "_av0".."_av10",
+// so the GC traces them for free (no native_ext, no mark hook), and one
+// accessor per slot INDEX serves every class in the family.
+
+#define AV_MAX_SLOTS 11
+
+static const char* const AV_SLOT_NAMES[AV_MAX_SLOTS] = {
+	"_av0", "_av1", "_av2", "_av3", "_av4", "_av5",
+	"_av6", "_av7", "_av8", "_av9", "_av10"
+};
+
+static Avm2Value av_slot_get(Avm2Activation* act, int i)
+{
+	const char* n = AV_SLOT_NAMES[i];
+	return avm2_get_public_property(act->ctx, act->this_val, n,
+	                                (uint32_t) strlen(n), NULL);
+}
+
+// 'S' String, 'I' int, 'N' Number, 'B' Boolean, 'O' a typed object slot.
+static Avm2Value av_coerce(Avm2Context* ctx, Avm2Value v, char type)
+{
+	switch (type)
+	{
+		case 'S':
+			// String is nullable, so null/undefined survive as null.
+			return (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+				? avm2_null() : avm2_string(avm2_coerce_to_string(ctx, v));
+		case 'I': return avm2_integer(avm2_coerce_to_i32(ctx, v));
+		case 'N': return avm2_number(avm2_coerce_to_number(ctx, v));
+		case 'B': return avm2_bool(avm2_coerce_to_boolean(v));
+		default:  return (v.kind == AVM2_VALUE_OBJECT) ? v : avm2_null();
+	}
+}
+
+static void av_slot_put(Avm2Activation* act, int i, Avm2Value v)
+{
+	if (act->this_val.kind != AVM2_VALUE_OBJECT) return;
+	const char* n = AV_SLOT_NAMES[i];
+	avm2_object_set_dynamic(act->ctx, act->this_val.u.obj, n,
+	                        (uint32_t) strlen(n), v)->dont_enum = 1;
+}
+
+static Avm2Value av_slot_set(Avm2Activation* act, int i, char type)
+{
+	Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+	av_slot_put(act, i, av_coerce(act->ctx, v, type));
+	return avm2_undefined();
+}
+
+// A constructor body IS the declared parameter-type string, nothing more.
+static Avm2Value av_ctor(Avm2Activation* act, const char* types)
+{
+	for (int i = 0; types[i] != '\0' && i < AV_MAX_SLOTS; i++)
+	{
+		Avm2Value v = ((uint32_t) i < act->argc) ? act->args[i]
+		                                        : avm2_undefined();
+		av_slot_put(act, i, av_coerce(act->ctx, v, types[i]));
+	}
+	return avm2_undefined();
+}
+
+#define AV_GETTER(i)                                                          \
+	static Avm2Value av_get_##i(Avm2Activation* act)                          \
+	{ return av_slot_get(act, i); }
+#define AV_SETTER_S(i)                                                        \
+	static Avm2Value av_set_s##i(Avm2Activation* act)                         \
+	{ return av_slot_set(act, i, 'S'); }
+#define AV_SETTER_I(i)                                                        \
+	static Avm2Value av_set_i##i(Avm2Activation* act)                         \
+	{ return av_slot_set(act, i, 'I'); }
+
+AV_GETTER(0)  AV_GETTER(1)  AV_GETTER(2)  AV_GETTER(3)
+AV_GETTER(4)  AV_GETTER(5)  AV_GETTER(6)  AV_GETTER(7)
+AV_GETTER(8)  AV_GETTER(9)  AV_GETTER(10)
+// Only two of the family are writable at all: AVCaptionStyle (11 String
+// props) and AVABRParameters (one String plus three ints).
+AV_SETTER_S(0)  AV_SETTER_S(1)  AV_SETTER_S(2)  AV_SETTER_S(3)
+AV_SETTER_S(4)  AV_SETTER_S(5)  AV_SETTER_S(6)  AV_SETTER_S(7)
+AV_SETTER_S(8)  AV_SETTER_S(9)  AV_SETTER_S(10)
+AV_SETTER_I(1)  AV_SETTER_I(2)  AV_SETTER_I(3)
+
+#undef AV_GETTER
+#undef AV_SETTER_S
+#undef AV_SETTER_I
+
+static Avm2MethodFn const AV_GETTERS[AV_MAX_SLOTS] = {
+	av_get_0, av_get_1, av_get_2, av_get_3, av_get_4, av_get_5,
+	av_get_6, av_get_7, av_get_8, av_get_9, av_get_10
+};
+
+static Avm2Value avabrparams_ctor(Avm2Activation* act)
+{ return av_ctor(act, "SIII"); }
+static Avm2Value avabrprofile_ctor(Avm2Activation* act)
+{ return av_ctor(act, "III"); }
+static Avm2Value avcuepoint_ctor(Avm2Activation* act)
+{ return av_ctor(act, "ON"); }
+static Avm2Value avresult_ctor(Avm2Activation* act)
+{ return av_ctor(act, "I"); }
+// AVInsertionResult extends AVResult, but a builtin class's instance_init is
+// never chained (avm2_class_construct calls only the most-derived one), so it
+// writes its inherited `result` slot itself.
+static Avm2Value avinsertion_ctor(Avm2Activation* act)
+{ return av_ctor(act, "IIB"); }
+static Avm2Value avperiodinfo_ctor(Avm2Activation* act)
+{ return av_ctor(act, "NNNIIIIIBN"); }
+static Avm2Value avplaystate_ctor(Avm2Activation* act)
+{ return av_ctor(act, "I"); }
+static Avm2Value avtimeline_ctor(Avm2Activation* act)
+{ return av_ctor(act, "SNNIIIIB"); }
+static Avm2Value avtrackinfo_ctor(Avm2Activation* act)
+{ return av_ctor(act, "SSBBBBSI"); }
+
+// AVCaptionStyle takes no arguments; every field initialises to "" EXCEPT
+// bottomInset, which initialises to the string "0".
+static Avm2Value avcaptionstyle_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	for (int i = 0; i < 11; i++)
+	{
+		av_slot_put(act, i, avm2_string(
+			avm2_string_from_literal(ctx, (i == 2) ? "0" : "")));
+	}
+	return avm2_undefined();
+}
+
+static void av_iconst(Avm2Context* ctx, Avm2Class* cls, const char* n, int32_t v)
+{ avm2_builtin_add_static_const(ctx, cls, n, avm2_integer(v)); }
+
+static void av_sconst(Avm2Context* ctx, Avm2Class* cls, const char* n,
+                      const char* v)
+{
+	avm2_builtin_add_static_const(ctx, cls, n,
+	                              avm2_string(avm2_string_from_literal(ctx, v)));
+}
+
+// Register names[0..n) as getter-only props bound to slots first_slot..+n.
+static void av_add_ro_props(Avm2Context* ctx, Avm2Class* cls,
+                            const char* const* names, int n, int first_slot)
+{
+	for (int i = 0; i < n; i++)
+	{
+		avm2_builtin_add_getset(ctx, cls, names[i],
+		                        AV_GETTERS[first_slot + i], NULL);
+	}
+}
+
+static Avm2Class* av_class(Avm2Context* ctx, const char* name, Avm2Class* super,
+                           Avm2MethodFn ctor)
+{
+	Avm2Class* cls = avm2_builtin_class(ctx, "flash.media", name, super);
+	if (ctor != NULL)
+	{
+		cls->instance_init.fn = ctor;
+		cls->instance_init.debug_name = name;
+	}
+	return cls;
+}
+
+static void register_av_classes(Avm2Context* ctx)
+{
+	Avm2Class* obj = ctx->builtins.object_class;
+	Avm2Class* ed = ctx->builtins.event_dispatcher_class;
+	if (ed == NULL) ed = obj;
+
+	// --- AVABRParameters
+	{
+		Avm2Class* cls = av_class(ctx, "AVABRParameters", obj,
+		                          avabrparams_ctor);
+		avm2_builtin_add_getset(ctx, cls, "policy", av_get_0, av_set_s0);
+		avm2_builtin_add_getset(ctx, cls, "startBitsPerSecond",
+		                        av_get_1, av_set_i1);
+		avm2_builtin_add_getset(ctx, cls, "minBitsPerSecond",
+		                        av_get_2, av_set_i2);
+		avm2_builtin_add_getset(ctx, cls, "maxBitsPerSecond",
+		                        av_get_3, av_set_i3);
+		av_sconst(ctx, cls, "AGGRESSIVE", "aggressive");
+		av_sconst(ctx, cls, "CONSERVATIVE", "conservative");
+		av_sconst(ctx, cls, "MODERATE", "moderate");
+	}
+
+	// --- AVABRProfileInfo
+	{
+		static const char* const props[] = {
+			"bitsPerSecond", "width", "height"
+		};
+		Avm2Class* cls = av_class(ctx, "AVABRProfileInfo", obj,
+		                          avabrprofile_ctor);
+		av_add_ro_props(ctx, cls, props, 3, 0);
+	}
+
+	// --- AVCaptionStyle
+	{
+		static const char* const props[] = {
+			"backgroundColor", "backgroundOpacity", "bottomInset", "edgeColor",
+			"fillColor", "fillOpacity", "font", "fontColor", "fontEdge",
+			"fontOpacity", "size"
+		};
+		static Avm2MethodFn const setters[] = {
+			av_set_s0, av_set_s1, av_set_s2, av_set_s3, av_set_s4, av_set_s5,
+			av_set_s6, av_set_s7, av_set_s8, av_set_s9, av_set_s10
+		};
+		static const struct { const char* n; const char* v; } consts[] = {
+			{ "DEFAULT", "default" },
+			{ "NONE", "none" },
+			{ "MONOSPACE_WITH_SERIFS", "monospaced_with_serifs" },
+			{ "MONOSPACED_WITHOUT_SERIFS", "monospaced_without_serifs" },
+			{ "PROPORTIONAL_WITH_SERIFS", "proportional_with_serifs" },
+			{ "PROPORTIONAL_WITHOUT_SERIFS", "proportional_without_serifs" },
+			{ "CASUAL", "casual" },
+			{ "CURSIVE", "cursive" },
+			{ "DEPRESSED", "depressed" },
+			{ "RAISED", "raised" },
+			{ "SMALL_CAPITALS", "small_capitals" },
+			{ "UNIFORM", "uniform" },
+			{ "SMALL", "small" },
+			{ "MEDIUM", "medium" },
+			{ "LARGE", "large" },
+			{ "BRIGHT_MAGENTA", "bright_magenta" },
+			{ "MAGENTA", "magenta" },
+			{ "DARK_MAGENTA", "dark_magenta" },
+			{ "BRIGHT_RED", "bright_red" },
+			{ "RED", "red" },
+			{ "DARK_RED", "dark_red" },
+			{ "BRIGHT_YELLOW", "bright_yellow" },
+			{ "YELLOW", "yellow" },
+			{ "DARK_YELLOW", "dark_yellow" },
+			{ "BRIGHT_GREEN", "bright_green" },
+			{ "GREEN", "green" },
+			{ "DARK_GREEN", "dark_green" },
+			{ "BRIGHT_CYAN", "bright_cyan" },
+			{ "CYAN", "cyan" },
+			{ "DARK_CYAN", "dark_cyan" },
+			{ "BRIGHT_BLUE", "bright_blue" },
+			{ "BLUE", "blue" },
+			{ "DARK_BLUE", "dark_blue" },
+			{ "BRIGHT_WHITE", "bright_white" },
+			{ "WHITE", "white" },
+			{ "GRAY", "gray" },
+			{ "BLACK", "black" },
+			// Not a transposition: FP really does put the side LAST.
+			{ "LEFT_DROP_SHADOW", "drop_shadow_left" },
+			{ "RIGHT_DROP_SHADOW", "drop_shadow_right" },
+		};
+		Avm2Class* cls = av_class(ctx, "AVCaptionStyle", obj,
+		                          avcaptionstyle_ctor);
+		for (int i = 0; i < 11; i++)
+			avm2_builtin_add_getset(ctx, cls, props[i], AV_GETTERS[i],
+			                        setters[i]);
+		for (size_t i = 0; i < sizeof(consts) / sizeof(consts[0]); i++)
+			av_sconst(ctx, cls, consts[i].n, consts[i].v);
+	}
+
+	// --- AVCuePoint: the Dictionary is held BY IDENTITY, not stringified.
+	{
+		static const char* const props[] = { "dictionary", "localTime" };
+		Avm2Class* cls = av_class(ctx, "AVCuePoint", obj, avcuepoint_ctor);
+		av_add_ro_props(ctx, cls, props, 2, 0);
+	}
+
+	// --- AVResult, then AVInsertionResult which extends it.
+	Avm2Class* avresult;
+	{
+		static const char* const props[] = { "result" };
+		static const struct { const char* n; int32_t v; } consts[] = {
+			{ "END_OF_PERIOD", -1 },
+			{ "SUCCESS", 0 },
+			{ "ASYNC_OPERATION_IN_PROGRESS", 1 },
+			{ "EOF", 2 },
+			{ "DECODER_FAILED", 3 },
+			{ "DEVICE_OPEN_ERROR", 4 },
+			{ "FILE_NOT_FOUND", 5 },
+			{ "GENERIC_ERROR", 6 },
+			{ "IRRECOVERABLE_ERROR", 7 },
+			{ "LOST_CONNECTION_RECOVERABLE", 8 },
+			{ "NO_FIXED_SIZE", 9 },
+			{ "NOT_IMPLEMENTED", 10 },
+			{ "OUT_OF_MEMORY", 11 },
+			{ "PARSE_ERROR", 12 },
+			{ "SIZE_UNKNOWN", 13 },
+			{ "UNDERFLOW", 14 },
+			{ "UNSUPPORTED_CONFIGURATION", 15 },
+			{ "UNSUPPORTED_OPERATION", 16 },
+			{ "WAITING_FOR_INIT", 17 },
+			{ "INVALID_PARAMETER", 18 },
+			{ "INVALID_OPERATION", 19 },
+			{ "ONLY_ALLOWED_IN_PAUSED_STATE", 20 },
+			{ "INVALID_WITH_AUDIO_ONLY_FILE", 21 },
+			{ "PREVIOUS_STEP_SEEK_IN_PROGRESS", 22 },
+			{ "RESOURCE_NOT_SPECIFIED", 23 },
+			{ "RANGE_ERROR", 24 },
+			{ "INVALID_SEEK_TIME", 25 },
+			{ "FILE_STRUCTURE_INVALID", 26 },
+			{ "COMPONENT_CREATION_FAILURE", 27 },
+			{ "DRM_INIT_ERROR", 28 },
+			{ "CONTAINER_NOT_SUPPORTED", 29 },
+			{ "SEEK_FAILED", 30 },
+			{ "CODEC_NOT_SUPPORTED", 31 },
+			{ "NETWORK_UNAVAILABLE", 32 },
+			{ "NETWORK_ERROR", 33 },
+			{ "OVERFLOW", 34 },
+			{ "VIDEO_PROFILE_NOT_SUPPORTED", 35 },
+			{ "PERIOD_NOT_LOADED", 36 },
+			{ "INVALID_REPLACE_DURATION", 37 },
+			{ "CALLED_FROM_WRONG_THREAD", 38 },
+			{ "FRAGMENT_READ_ERROR", 39 },
+			{ "OPERATION_ABORTED", 40 },
+			{ "UNSUPPORTED_HLS_VERSION", 41 },
+			{ "CANNOT_FAIL_OVER", 42 },
+			{ "HTTP_TIME_OUT", 43 },
+			{ "NETWORK_DOWN", 44 },
+			{ "NO_USEABLE_BITRATE_PROFILE", 45 },
+			{ "BAD_MANIFEST_SIGNATURE", 46 },
+			{ "CANNOT_LOAD_PLAY_LIST", 47 },
+			{ "REPLACEMENT_FAILED", 48 },
+			{ "SWITCH_TO_ASYMMETRIC_PROFILE", 49 },
+			{ "LIVE_WINDOW_MOVED_BACKWARD", 50 },
+			{ "CURRENT_PERIOD_EXPIRED", 51 },
+			{ "CONTENT_LENGTH_MISMATCH", 52 },
+			{ "PERIOD_HOLD", 53 },
+			{ "LIVE_HOLD", 54 },
+			{ "BAD_MEDIA_INTERLEAVING", 55 },
+			{ "DRM_NOT_AVAILABLE", 56 },
+			{ "PLAYBACK_NOT_ENABLED", 57 },
+			{ "BAD_MEDIASAMPLE_FOUND", 58 },
+			{ "RANGE_SPANS_READHEAD", 59 },
+			{ "POSTROLL_WITH_LIVE_NOT_ALLOWED", 60 },
+			{ "INTERNAL_ERROR", 61 },
+			{ "SPS_PPS_FOUND_OUTSIDE_AVCC", 62 },
+			{ "PARTIAL_REPLACEMENT", 63 },
+			{ "RENDITION_M3U8_ERROR", 64 },
+			{ "NULL_OPERATION", 65 },
+			{ "SEGMENT_SKIPPED_ON_FAILURE", 66 },
+			{ "INCOMPATIBLE_RENDER_MODE", 67 },
+			{ "PROTOCOL_NOT_SUPPORTED", 68 },
+			{ "INCOMPATIBLE_VERSION", 69 },
+			{ "MANIFEST_FILE_UNEXPECTEDLY_CHANGED", 70 },
+			{ "CANNOT_SPLIT_TIMELINE", 71 },
+			{ "CANNOT_ERASE_TIMELINE", 72 },
+			{ "DID_NOT_GET_NEXT_FRAGMENT", 73 },
+			{ "NO_TIMELINE", 74 },
+			{ "LISTENER_NOT_FOUND", 75 },
+			{ "AUDIO_START_ERROR", 76 },
+			{ "NO_AUDIO_SINK", 77 },
+			{ "FILE_OPEN_ERROR", 78 },
+			{ "FILE_WRITE_ERROR", 79 },
+			{ "FILE_READ_ERROR", 80 },
+			{ "ID3_PARSE_ERROR", 81 },
+			{ "SECURITY_ERROR", 82 },
+			{ "TIMELINE_TOO_SHORT", 83 },
+			{ "AUDIO_ONLY_STREAM_START", 84 },
+			{ "AUDIO_ONLY_STREAM_END", 85 },
+			{ "CANNOT_HANDLE_MAIN_MANIFEST_UPDATE", 86 },
+			{ "KEY_NOT_FOUND", 87 },
+			{ "INVALID_KEY", 88 },
+			{ "KEY_SERVER_NOT_FOUND", 89 },
+			{ "MAIN_MANIFEST_UPDATE_TO_BE_HANDLED", 90 },
+			{ "UNREPORTED_TIME_DISCONTINUITY_FOUND", 91 },
+			// The crypto block is NOT contiguous with the rest: 92..299 are
+			// unassigned.
+			{ "CRYPTO_ALGORITHM_NOT_SUPPORTED", 300 },
+			{ "CRYPTO_ERROR_CORRUPTED_DATA", 301 },
+			{ "CRYPTO_ERROR_BUFFER_TOO_SMALL", 302 },
+			{ "CRYPTO_ERROR_BAD_CERTIFICATE", 303 },
+			{ "CRYPTO_ERROR_DIGEST_UPDATE", 304 },
+			{ "CRYPTO_ERROR_DIGEST_FINISH", 305 },
+			{ "CRYPTO_ERROR_BAD_PARAMETER", 306 },
+			{ "CRYPTO_ERROR_UNKNOWN", 307 },
+		};
+		avresult = av_class(ctx, "AVResult", obj, avresult_ctor);
+		av_add_ro_props(ctx, avresult, props, 1, 0);
+		for (size_t i = 0; i < sizeof(consts) / sizeof(consts[0]); i++)
+			av_iconst(ctx, avresult, consts[i].n, consts[i].v);
+	}
+	{
+		static const char* const props[] = {
+			"periodIndex", "insertedBeforeReadHead"
+		};
+		Avm2Class* cls = av_class(ctx, "AVInsertionResult", avresult,
+		                          avinsertion_ctor);
+		av_add_ro_props(ctx, cls, props, 2, 1);
+	}
+
+	// --- AVPeriodInfo: 3 Numbers, 5 ints, 1 Boolean, 1 Number.
+	{
+		static const char* const props[] = {
+			"localStartTime", "virtualStartTime", "duration",
+			"firstCuePointIndex", "lastCuePointIndex",
+			"firstSubscribedTagIndex", "lastSubscribedTagIndex",
+			"userData", "supportsTrickPlay", "targetDuration"
+		};
+		Avm2Class* cls = av_class(ctx, "AVPeriodInfo", obj, avperiodinfo_ctor);
+		av_add_ro_props(ctx, cls, props, 10, 0);
+	}
+
+	// --- AVPlayState: nine int consts, 0..8, in declaration order.
+	{
+		static const char* const props[] = { "state" };
+		static const char* const consts[] = {
+			"UNINITIALIZED", "READY", "BUFFERING", "PLAYING", "PAUSED",
+			"EOF", "SUSPENDED", "TRICK_PLAY", "UNRECOVERABLE_ERROR"
+		};
+		Avm2Class* cls = av_class(ctx, "AVPlayState", obj, avplaystate_ctor);
+		av_add_ro_props(ctx, cls, props, 1, 0);
+		for (int i = 0; i < 9; i++) av_iconst(ctx, cls, consts[i], i);
+	}
+
+	// --- AVSource / AVSegmentedSource / AVStream: EventDispatcher subclasses
+	//     with no instance state of their own (AVStream's `source` argument is
+	//     not readable back).
+	Avm2Class* avsource = av_class(ctx, "AVSource", ed, NULL);
+	{
+		static const struct { const char* n; const char* v; } consts[] = {
+			// The casing really is inconsistent upstream: the two protocol
+			// names are upper-case, every content kind is lower-case.
+			{ "AUDIO", "audio" },
+			{ "AUDIO_DESCRIPTION", "audiodescription" },
+			{ "AUDIO_LANGUAGE", "audiolanguage" },
+			{ "AUDIO_PID", "audiopid" },
+			{ "DASH", "DASH" },
+			{ "DATA", "data" },
+			{ "DATA_DESCRIPTION", "datadescription" },
+			{ "HLS", "HLS" },
+			{ "VIDEO", "video" },
+			{ "VIDEO_DESCRIPTION", "videodescription" },
+		};
+		Avm2Class* cls = av_class(ctx, "AVSegmentedSource", avsource, NULL);
+		for (size_t i = 0; i < sizeof(consts) / sizeof(consts[0]); i++)
+			av_sconst(ctx, cls, consts[i].n, consts[i].v);
+	}
+	{
+		Avm2Class* cls = av_class(ctx, "AVStream", ed, NULL);
+		av_sconst(ctx, cls, "HARDWARE", "hardware");
+		// "sofware" is not a typo here -- it is FP's typo, and av_classes
+		// pins it verbatim.
+		av_sconst(ctx, cls, "SOFTWARE", "sofware");
+		av_sconst(ctx, cls, "UNDEFINED", "undefined");
+	}
+
+	// --- AVTimeline
+	{
+		static const char* const props[] = {
+			"type", "virtualStartTime", "virtualDuration", "firstPeriodIndex",
+			"lastPeriodIndex", "firstSubscribedTagIndex",
+			"lastSubscribedTagIndex", "complete"
+		};
+		Avm2Class* cls = av_class(ctx, "AVTimeline", obj, avtimeline_ctor);
+		av_add_ro_props(ctx, cls, props, 8, 0);
+	}
+
+	// --- AVTrackInfo: dataTrackInfoServiceType is a STRING slot while pid is
+	//     an int, so 7.7 reads back "7.7" and 8.8 reads back 8.
+	{
+		static const char* const props[] = {
+			"description", "language", "defaultTrack", "autoSelect", "forced",
+			"activity", "dataTrackInfoServiceType", "pid"
+		};
+		Avm2Class* cls = av_class(ctx, "AVTrackInfo", obj, avtrackinfo_ctor);
+		av_add_ro_props(ctx, cls, props, 8, 0);
+		av_sconst(ctx, cls, "DTI_608_CAPTIONS", "DTI608Captions");
+		av_sconst(ctx, cls, "DTI_708_CAPTIONS", "DTI708Captions");
+		av_sconst(ctx, cls, "DTI_WEBVTT_CAPTIONS", "DTIWebVTTCaptions");
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -739,4 +1214,8 @@ void avm2_register_media(Avm2Context* ctx)
 		avm2_builtin_add_getset(ctx, tag, "localTime", avtagdata_get_local_time,
 		                        NULL);
 	}
+
+	// The other 13 flash.media.AV* value objects (AVNetworkingParams is the
+	// 15th and lives in avm2_net.c, next to the rest of the networking API).
+	register_av_classes(ctx);
 }

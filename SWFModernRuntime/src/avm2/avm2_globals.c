@@ -2558,6 +2558,69 @@ static Avm2Value printjoboptions_ctor(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// flash.trace.Trace — all-static, and in the RELEASE player (which is what
+// flash_trace captures, per its test.toml) every one of its four methods is a
+// constant: setLevel/setListener are no-ops there, so the two level fields
+// stay 0 and the listener stays null forever. What the test actually pins is
+// the DECLARED arity of each method (1/0/2/1, optional params included),
+// which is why they register through avm2_builtin_add_static_method_n.
+static Avm2Value flashtrace_get_level(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_integer(0);
+}
+
+static Avm2Value flashtrace_get_listener(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();
+}
+
+static Avm2Value flashtrace_setter_noop(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+// flash.globalization.CurrencyParseResult(value = NaN, symbol = "") — a
+// two-field read-only value object. CurrencyFormatter is NOT needed: nothing
+// in the corpus parses, it only constructs these directly.
+static Avm2Value currencyparseresult_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->this_val.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	Avm2Object* self = act->this_val.u.obj;
+	double value = (act->argc > 0) ? avm2_coerce_to_number(ctx, act->args[0])
+	                               : (double) NAN;
+	Avm2Value sym;
+	if (act->argc > 1 && act->args[1].kind != AVM2_VALUE_UNDEFINED)
+	{
+		sym = (act->args[1].kind == AVM2_VALUE_NULL)
+			? avm2_null()
+			: avm2_string(avm2_coerce_to_string(ctx, act->args[1]));
+	}
+	else
+	{
+		sym = avm2_string(avm2_string_from_literal(ctx, ""));
+	}
+	avm2_object_set_dynamic(ctx, self, "_value", 6,
+	                        avm2_number(value))->dont_enum = 1;
+	avm2_object_set_dynamic(ctx, self, "_currencyString", 15,
+	                        sym)->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value currencyparseresult_get_value(Avm2Activation* act)
+{
+	return avm2_get_public_property(act->ctx, act->this_val, "_value", 6, NULL);
+}
+
+static Avm2Value currencyparseresult_get_string(Avm2Activation* act)
+{
+	return avm2_get_public_property(act->ctx, act->this_val, "_currencyString",
+	                                15, NULL);
+}
+
 // flash.crypto.generateRandomBytes(n): a package-level FUNCTION, not a class
 // member. Deterministic here on purpose — the corpus grades only the length,
 // and a seeded stream keeps runs byte-identical.
@@ -2654,6 +2717,45 @@ static void register_platform_stubs(Avm2Context* ctx)
 	// flash.crypto.generateRandomBytes.
 	builtin_add_global_fn_ns(ctx, "flash.crypto", "generateRandomBytes",
 	                         crypto_generate_random_bytes);
+
+	// flash.trace.Trace — the package's only class, and a pure table.
+	{
+		Avm2Class* cls = avm2_builtin_class(ctx, "flash.trace", "Trace", obj);
+		avm2_builtin_add_static_const(ctx, cls, "OFF", avm2_integer(0));
+		avm2_builtin_add_static_const(ctx, cls, "METHODS", avm2_integer(1));
+		avm2_builtin_add_static_const(ctx, cls, "METHODS_WITH_ARGS",
+		                              avm2_integer(2));
+		avm2_builtin_add_static_const(ctx, cls, "METHODS_AND_LINES",
+		                              avm2_integer(3));
+		avm2_builtin_add_static_const(ctx, cls, "METHODS_AND_LINES_WITH_ARGS",
+		                              avm2_integer(4));
+		// FILE/LISTENER are the two `target` selectors, and are declared
+		// UNTYPED upstream (still typeof "number").
+		avm2_builtin_add_static_const(ctx, cls, "FILE", avm2_integer(1));
+		avm2_builtin_add_static_const(ctx, cls, "LISTENER", avm2_integer(2));
+		avm2_builtin_add_static_method_n(ctx, cls, "getLevel",
+		                                 flashtrace_get_level, 1);
+		avm2_builtin_add_static_method_n(ctx, cls, "getListener",
+		                                 flashtrace_get_listener, 0);
+		avm2_builtin_add_static_method_n(ctx, cls, "setLevel",
+		                                 flashtrace_setter_noop, 2);
+		avm2_builtin_add_static_method_n(ctx, cls, "setListener",
+		                                 flashtrace_setter_noop, 1);
+	}
+
+	// flash.globalization.CurrencyParseResult — the first (and so far only)
+	// class in the flash.globalization package.
+	{
+		Avm2Class* cls = avm2_builtin_class(ctx, "flash.globalization",
+		                                    "CurrencyParseResult", obj);
+		cls->flags |= AVM2_CLASS_FLAG_FINAL;
+		cls->instance_init.fn = currencyparseresult_ctor;
+		cls->instance_init.debug_name = "CurrencyParseResult";
+		avm2_builtin_add_getset(ctx, cls, "value",
+		                        currencyparseresult_get_value, NULL);
+		avm2_builtin_add_getset(ctx, cls, "currencyString",
+		                        currencyparseresult_get_string, NULL);
+	}
 
 
 #ifdef SWF_RUNTIME_AIR

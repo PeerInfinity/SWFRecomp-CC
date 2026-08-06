@@ -1520,6 +1520,80 @@ static Avm2Value nse_to_string(Avm2Activation* act)
 static void sconst(Avm2Context* ctx, Avm2Class* cls, const char* n, const char* v)
 { avm2_builtin_add_static_const(ctx, cls, n, avm2_string(avm2_string_from_literal(ctx, v))); }
 
+// flash.events.NetFilterEvent — Event plus two ByteArray public VARS, held by
+// identity (netfilterevent grades `clone.header === a`). They live in
+// dont-enum dynamic props rather than the shared Avm2EventExt so the GC traces
+// them for free and no other event pays for the two extra fields.
+static Avm2Class* g_net_filter_event_class;
+
+static Avm2Value nfe_field(Avm2Activation* act, const char* n, uint32_t nlen)
+{ return avm2_get_public_property(act->ctx, act->this_val, n, nlen, NULL); }
+
+static void nfe_put(Avm2Activation* act, const char* n, uint32_t nlen,
+                    Avm2Value v)
+{
+	if (act->this_val.kind != AVM2_VALUE_OBJECT) return;
+	avm2_object_set_dynamic(act->ctx, act->this_val.u.obj, n, nlen,
+	                        v.kind == AVM2_VALUE_OBJECT ? v : avm2_null())
+		->dont_enum = 1;
+}
+
+static Avm2Value net_filter_init(Avm2Activation* act)
+{
+	Avm2EventExt* ext = this_event(act);
+	ext->type = act->argc > 0 ? avm2_coerce_to_string(act->ctx, act->args[0]) : NULL;
+	ext->bubbles = arg_bool(act, 1);
+	ext->cancelable = arg_bool(act, 2);
+	nfe_put(act, "_header", 7, act->argc > 3 ? act->args[3] : avm2_null());
+	nfe_put(act, "_data", 5, act->argc > 4 ? act->args[4] : avm2_null());
+	return avm2_undefined();
+}
+
+static Avm2Value nfe_get_header(Avm2Activation* act)
+{ return nfe_field(act, "_header", 7); }
+static Avm2Value nfe_set_header(Avm2Activation* act)
+{
+	if (act->argc > 0) nfe_put(act, "_header", 7, act->args[0]);
+	return avm2_undefined();
+}
+static Avm2Value nfe_get_data(Avm2Activation* act)
+{ return nfe_field(act, "_data", 5); }
+static Avm2Value nfe_set_data(Avm2Activation* act)
+{
+	if (act->argc > 0) nfe_put(act, "_data", 5, act->args[0]);
+	return avm2_undefined();
+}
+
+static Avm2Value nfe_clone(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EventExt* ext = this_event(act);
+	Avm2Value args[5];
+	args[0] = avm2_string(ext->type != NULL ? ext->type
+		: avm2_string_from_literal(ctx, ""));
+	args[1] = avm2_bool(ext->bubbles != 0);
+	args[2] = avm2_bool(ext->cancelable != 0);
+	args[3] = nfe_field(act, "_header", 7);
+	args[4] = nfe_field(act, "_data", 5);
+	return avm2_class_construct(ctx, g_net_filter_event_class, args, 5);
+}
+
+static Avm2Value nfe_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	// The class name in the rendered string really is NetTransformEvent —
+	// an FP naming leftover that Ruffle replicates and this test pins.
+	static const char* const fields[] = {
+		"NetTransformEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"header", "data"
+	};
+	Avm2Value args[7];
+	for (int i = 0; i < 7; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 7);
+}
+
 // Cached for the C-side constructors below (avm2_progress_event_new /
 // avm2_io_error_event_new), which the Loader pipeline dispatches from.
 static Avm2Class* g_progress_event_class;
@@ -1615,6 +1689,18 @@ static void register_net_events(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, nse, "info", nse_get_info, nse_set_info);
 	event_override_method(ctx, nse, "toString", nse_to_string);
 	sconst(ctx, nse, "NET_STATUS", "netStatus");
+
+	// flash.events.NetFilterEvent (extends Event). No static const of its own
+	// upstream — the type string is whatever the RTMP filter chain passes.
+	Avm2Class* nfe = avm2_builtin_class(ctx, "flash.events", "NetFilterEvent",
+	                                    b->event_class);
+	nfe->instance_init.fn = net_filter_init;
+	nfe->instance_init.debug_name = "NetFilterEvent";
+	g_net_filter_event_class = nfe;
+	avm2_builtin_add_getset(ctx, nfe, "header", nfe_get_header, nfe_set_header);
+	avm2_builtin_add_getset(ctx, nfe, "data", nfe_get_data, nfe_set_data);
+	event_override_method(ctx, nfe, "clone", nfe_clone);
+	event_override_method(ctx, nfe, "toString", nfe_to_string);
 }
 
 // The Loader pipeline (avm2_display.c) dispatches these from C; both events

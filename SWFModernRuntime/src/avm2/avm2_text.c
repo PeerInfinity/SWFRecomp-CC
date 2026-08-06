@@ -5530,6 +5530,7 @@ static Avm2Class* g_tabstop_class;
 static Avm2Class* g_contentelement_class;
 static Avm2Class* g_textelement_class;
 static Avm2Class* g_groupelement_class;
+static Avm2Class* g_graphicelement_class;
 static Avm2Class* g_textjustifier_class;
 static Avm2Class* g_spacejustifier_class;
 static Avm2Class* g_eastasianjustifier_class;
@@ -6146,10 +6147,23 @@ static Avm2ContentElementExt* ce_ext(Avm2Object* o)
 		? (Avm2ContentElementExt*) o->native_ext : NULL;
 }
 
-// GroupElement.text is the concatenation of its children's text; every other
-// element type returns its own stored text (null for a bare ContentElement).
+// GroupElement.text folds its children's text; every other element type
+// returns its own stored text (null for a bare ContentElement, the empty
+// string for a GraphicElement). NULL means the AS3 value `null`.
 static const Avm2String* ce_text_of(Avm2Context* ctx, Avm2Object* o);
 
+// FP's fold is null-PROPAGATING, and asymmetrically so — ported from Ruffle's
+// core/src/avm2/object/content_element_object.rs::text():
+//
+//   * a non-null child is concatenated onto the result, or ADOPTED when the
+//     result is still null;
+//   * a null child POISONS an EMPTY result back to null...
+//   * ...but leaves a non-empty result completely alone, and does nothing to
+//     an already-null one.
+//
+// That asymmetry is the whole point of groupelement_text: it is why
+// [GraphicElement, GroupElement] reads null while [GroupElement,
+// GraphicElement] — the identical set of children, reversed — reads "".
 static const Avm2String* group_text_of(Avm2Context* ctx, Avm2Object* o)
 {
 	Avm2ContentElementExt* ce = ce_ext(o);
@@ -6157,19 +6171,33 @@ static const Avm2String* group_text_of(Avm2Context* ctx, Avm2Object* o)
 		? avm2_vector_ext(ce->elements) : NULL;
 	SB sb;
 	sb_init(&sb);
+	int have = 0;   // the fold's `result` is Some(sb) rather than None
 	for (uint32_t i = 0; v != NULL && i < v->length; i++)
 	{
 		Avm2Value e = v->elems[i];
 		const Avm2String* t = e.kind == AVM2_VALUE_OBJECT
 			? ce_text_of(ctx, e.u.obj) : NULL;
-		if (t != NULL) sb_bytes(ctx, &sb, t->utf8, t->len);
+		if (t != NULL)
+		{
+			// Concat and adopt are the same operation when sb is empty.
+			sb_bytes(ctx, &sb, t->utf8, t->len);
+			have = 1;
+		}
+		else if (have && sb.len == 0)
+		{
+			have = 0;
+		}
 	}
+	if (!have) return NULL;
 	return avm2_string_new(ctx, sb.buf != NULL ? sb.buf : "", sb.len);
 }
 
 static const Avm2String* ce_text_of(Avm2Context* ctx, Avm2Object* o)
 {
 	if (obj_is_class(o, g_groupelement_class)) return group_text_of(ctx, o);
+	// A GraphicElement's text is the EMPTY STRING, never null — and the
+	// difference is load-bearing for the fold above.
+	if (obj_is_class(o, g_graphicelement_class)) return empty_string(ctx);
 	Avm2ContentElementExt* ce = ce_ext(o);
 	return ce != NULL ? ce->text : NULL;
 }
@@ -6514,6 +6542,40 @@ static Avm2Value ge_ctor(Avm2Activation* act)
 	sub.args = &elements;
 	sub.argc = 1;
 	ge_set_elements(&sub);
+	return avm2_undefined();
+}
+
+// --- GraphicElement --------------------------------------------------------
+//
+// GraphicElement(graphic, elementWidth = 15, elementHeight = 15,
+//                elementFormat = null, eventMirror = null,
+//                textRotation = "rotate0")
+//
+// Ruffle stubs the graphic itself (nothing is ever laid out or drawn from
+// one), and so do we: what the corpus grades is that the class EXISTS, that
+// it is a ContentElement (so a Vector.<ContentElement> accepts it), and that
+// its `text` is the empty string — see ce_text_of.
+static Avm2Value grel_ctor(Avm2Activation* act)
+{
+	ce_init(act, arg_or_undef(act, 3));   // super(elementFormat, ...)
+	return avm2_undefined();
+}
+
+static Avm2Value grel_get_graphic(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();
+}
+
+static Avm2Value grel_get_element_size(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number(15.0);
+}
+
+static Avm2Value grel_set_noop(Avm2Activation* act)
+{
+	(void) act;
 	return avm2_undefined();
 }
 
@@ -7521,6 +7583,19 @@ static void fte_register_value_objects(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, ge, "replaceElements", ge_replace_elements);
 	avm2_builtin_add_method(ctx, ge, "splitTextElement",
 	                        ge_split_text_element);
+
+	Avm2Class* grel = avm2_builtin_class(ctx, "flash.text.engine",
+	                                     "GraphicElement", ce);
+	g_graphicelement_class = grel;
+	grel->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+	grel->instance_init.fn = grel_ctor;
+	grel->instance_init.debug_name = "GraphicElement";
+	avm2_builtin_add_getset(ctx, grel, "graphic", grel_get_graphic,
+	                        grel_set_noop);
+	avm2_builtin_add_getset(ctx, grel, "elementWidth", grel_get_element_size,
+	                        grel_set_noop);
+	avm2_builtin_add_getset(ctx, grel, "elementHeight", grel_get_element_size,
+	                        grel_set_noop);
 
 	// --- the justifiers ---
 	Avm2Class* tj = avm2_builtin_class(ctx, "flash.text.engine",

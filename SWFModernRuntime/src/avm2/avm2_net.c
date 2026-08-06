@@ -2025,8 +2025,12 @@ static Avm2Value avnp_init(Avm2Activation* act)
 	e->down_url = (act->argc > 3)
 		? avm2_string(avm2_coerce_to_string(act->ctx, act->args[3]))
 		: avm2_string(avm2_string_from_literal(act->ctx, ""));
-	// appendRandomQueryParameter has no initializer, so it reads as null.
-	e->query_param = avm2_null();
+	// appendRandomQueryParameter takes no constructor argument, but it DOES
+	// have an initializer -- AVNetworkingParams.as declares
+	// `private var _appendRandomQueryParameter:String = "";` -- so it reads
+	// back as the empty string, not null (av_classes grades both the
+	// default-params and provided-params blocks on this).
+	e->query_param = avm2_string(avm2_string_from_literal(act->ctx, ""));
 	return avm2_undefined();
 }
 
