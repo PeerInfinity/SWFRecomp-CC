@@ -6921,6 +6921,13 @@ static Avm2Value tl_set_validity(Avm2Activation* act)
 	else ok = 1;
 	if (!ok) throw_2008(ctx, "validity");
 	tl->validity = s;
+	// TextLineValidity.STATIC means "still valid, but the TextBlock no longer
+	// holds a reference to it" — so the transition INTO "static" releases the
+	// line from its block and `textBlock` reads back null. Only the exact
+	// string "static" does this; "invalid" (and any user string) leaves the
+	// back-edge alone. Graded by textblock_line_changes, whose oracle and
+	// output.ruffle.txt agree on all six lines.
+	if (str_is(s, "static")) tl->text_block = NULL;
 	return avm2_undefined();
 }
 
@@ -7347,7 +7354,12 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
 	tl->block_chain = tb->lines_head;
 	tb->lines_head = line;
 	tb->creation_result = fte_lit(ctx, "success");
-	tb->first_line = line;
+	// `firstLine` is the HEAD of the chain, not the newest line: only a
+	// creation with a null previousLine starts a new chain and re-seats it.
+	// textblock_line_changes grades all ten of its `First line in block:`
+	// lines, including the two that read `line-unknown` after a null-prev
+	// createTextLine displaces the original head.
+	if (pl == NULL) tb->first_line = line;
 	return avm2_object_value(line);
 }
 
@@ -7383,13 +7395,45 @@ static Avm2Value tb_create_text_line(Avm2Activation* act)
 	return r;
 }
 
+// recreateTextLine re-runs line creation IN PLACE: the same TextLine object
+// comes back (text layout modules depend on the identity), re-anchored after
+// `previousLine` and made the block's newest line. The argument taxonomy is
+// createTextLine's, and all three arms raise through Error.throwError — see
+// textblock_recreateline's four graded stack traces.
 static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 {
+	Avm2Context* ctx = act->ctx;
 	Avm2Value tlv = arg_or_undef(act, 0);
-	if (tlv.kind != AVM2_VALUE_OBJECT) fte_throw_2004(act->ctx);
-	// A non-null previousLine is unsupported; text layout modules depend on
-	// the same TextLine coming back, so it is returned unchanged.
-	if (arg_or_undef(act, 1).kind == AVM2_VALUE_OBJECT) return avm2_null();
+	if (tlv.kind != AVM2_VALUE_OBJECT) tb_throw_2004_via_throwerror(ctx);
+	Avm2TextLineExt* tl = textline_ext_of(tlv.u.obj);
+	if (tl == NULL) tb_throw_2004_via_throwerror(ctx);
+	Avm2Value pv = arg_or_undef(act, 1);
+	Avm2Object* prev = pv.kind == AVM2_VALUE_OBJECT ? pv.u.obj : NULL;
+	Avm2TextLineExt* pl = prev != NULL ? textline_ext_of(prev) : NULL;
+	if (prev != NULL
+	    && (pl == NULL || !str_is(pl->validity, "valid")
+	        || pl->text_block != this_obj(act)))
+	{
+		tb_throw_2004_via_throwerror(ctx);
+	}
+	double width = act->argc > 2 ? avm2_coerce_to_number(ctx, act->args[2])
+	                             : 1000000.0;
+	if (width < 0.0 || width > 1000000.0) tb_throw_2004_via_throwerror(ctx);
+	// A recreated line is a freshly created line that kept its identity: it
+	// re-joins the block and is valid again, whatever it was before. The reset
+	// sequence at the tail of textblock_line_changes recreates five released
+	// lines in a row, and each one is the NEXT call's previousLine — so
+	// without this the chain fails its own #2004 argument check.
+	tl->validity = fte_lit(ctx, "valid");
+	tl->text_block = this_obj(act);
+	tl->specified_width = width;
+	tl->previous_line = prev;
+	if (pl != NULL) pl->next_line = tlv.u.obj;
+	// The recreated line becomes the tail of the chain; the line that used to
+	// follow it keeps its own (now stale) previousLine, exactly as FP leaves it.
+	tl->next_line = NULL;
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb != NULL && prev == NULL) tb->first_line = tlv.u.obj;
 	return tlv;
 }
 
