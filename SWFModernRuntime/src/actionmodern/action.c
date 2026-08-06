@@ -26757,6 +26757,17 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 	return out_pos;
 }
 
+// 1 when a text field is editable — Ruffle's `!EditTextFlag::READ_ONLY`, which
+// our runtime surfaces as the AS `type` property ("input" vs "dynamic").
+// Ruffle only renders a bare caret on an editable field (edit_text.rs:1063).
+static int tf_is_editable(ASObject* props)
+{
+	ActionVar* ty = getProperty(props, "type", 4);
+	if (ty == NULL || ty->type != ACTION_STACK_VALUE_STRING) return 1;
+	const uint16_t* tyu = varGetU16Ptr(ty);
+	return (ty->str_size == 5 && tyu != NULL && tyu[0] == 'i') ? 1 : 0;
+}
+
 // Iterate text fields and provide glyph rendering info (text content, font, color).
 int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 {
@@ -26895,28 +26906,48 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		} else {
 			ActionVar* text_var = getProperty(props, "text", 4);
 			if (!text_var || text_var->type != ACTION_STACK_VALUE_STRING) continue;
-			if (text_var->str_size == 0) continue;
-			const uint16_t* u16ptr = varGetU16Ptr(text_var);
-			if (!u16ptr) continue;
-			u16_to_utf8(u16ptr, text_var->str_size, _tfg_utf8, sizeof(_tfg_utf8));
-			utf8_len = strlen(_tfg_utf8);
-			if (utf8_len == 0) continue;
-			text_utf8 = _tfg_utf8;
-			// Synthesize a single run carrying the DefineEditText tag's static
-			// alignment so the renderer's paragraph layout applies center /
-			// right alignment. Without a run, the renderer defaults cur_align
-			// to 0 (left) regardless of what the tag specified. Static
-			// textfields without a TFRunTable (no htmlText, no styleSheet)
-			// need this to position centered button labels correctly.
-			if (mc->ng_textfield_idx >= 0) {
+			if (text_var->str_size == 0) {
+				// An empty field has no glyphs, but Ruffle still lays out one
+				// (empty) line box and draws the CARET on it when the field holds
+				// focus (visual/edittext/edittext_caret_empty). Route focused
+				// empty fields through with a zero-length run so the renderer can
+				// place that caret at the line's alignment-adjusted origin;
+				// everything else is still skipped outright.
+				if (mc != g_focused_mc || mc->ng_textfield_idx < 0) continue;
+				if (!tf_is_editable(props)) continue;
+				text_utf8 = "";
+				utf8_len = 0;
 				_tfg_runs[0].byte_start = 0;
-				_tfg_runs[0].byte_length = (u32)utf8_len;
+				_tfg_runs[0].byte_length = 0;
 				_tfg_runs[0].color = text_color & 0x00FFFFFF;
 				_tfg_runs[0].font_height = font_height;
 				_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
 				_tfg_runs[0].bullet = 0;
 				runs_out = _tfg_runs;
 				run_count_out = 1;
+			} else {
+				const uint16_t* u16ptr = varGetU16Ptr(text_var);
+				if (!u16ptr) continue;
+				u16_to_utf8(u16ptr, text_var->str_size, _tfg_utf8, sizeof(_tfg_utf8));
+				utf8_len = strlen(_tfg_utf8);
+				if (utf8_len == 0) continue;
+				text_utf8 = _tfg_utf8;
+				// Synthesize a single run carrying the DefineEditText tag's static
+				// alignment so the renderer's paragraph layout applies center /
+				// right alignment. Without a run, the renderer defaults cur_align
+				// to 0 (left) regardless of what the tag specified. Static
+				// textfields without a TFRunTable (no htmlText, no styleSheet)
+				// need this to position centered button labels correctly.
+				if (mc->ng_textfield_idx >= 0) {
+					_tfg_runs[0].byte_start = 0;
+					_tfg_runs[0].byte_length = (u32)utf8_len;
+					_tfg_runs[0].color = text_color & 0x00FFFFFF;
+					_tfg_runs[0].font_height = font_height;
+					_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
+					_tfg_runs[0].bullet = 0;
+					runs_out = _tfg_runs;
+					run_count_out = 1;
+				}
 			}
 		}
 
@@ -27017,26 +27048,39 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			info.bounds_xmin_twips = _bxmin;
 			info.bounds_ymin_twips = _bymin;
 		}
-		// Draw the caret only on the keyboard-focused field (never in headless /
-		// offscreen runs, where nothing is focused → CI render output unchanged).
-		info.caret_char = (mc == g_focused_mc && g_selection_caret >= 0)
-			? g_selection_caret : -1;
 		info.mc = (void*)mc;
-		// Selection range for the focused field (browser-only highlight). A
-		// select-all maps to [0, text length]; a normal non-empty range maps
-		// directly. Collapsed / unfocused → no selection.
+		// Caret + selection range for the keyboard-focused field. Mirrors
+		// Ruffle's `EditText::visible_selection` (edit_text.rs:1059):
+		//
+		//   * a NON-collapsed selection renders as a highlight, never a caret;
+		//   * a COLLAPSED selection renders as a bare caret, but only while the
+		//     field has focus AND is editable (not READ_ONLY, i.e. type=="input").
+		//
+		// AVM1 key/programmatic focus selects the whole text
+		// (focus_tracker.rs::update_edittext_selection →
+		// `TextSelection::for_range(0, length)`), which our runtime models as
+		// g_tf_select_all. On an EMPTY field that range is collapsed — i.e. a
+		// caret at index 0 — which is exactly what
+		// visual/edittext/edittext_caret_empty captures after each Tab.
+		info.caret_char = -1;
 		info.sel_begin = -1;
 		info.sel_end = -1;
 		if (mc == g_focused_mc) {
+			ActionVar* _sel_tp = getProperty(props, "text", 4);
+			int _sel_tl = (_sel_tp != NULL && _sel_tp->type == ACTION_STACK_VALUE_STRING)
+				? (int)_sel_tp->str_size : 0;
+			int _sel_lo, _sel_hi, _caret;
 			if (g_tf_select_all) {
-				ActionVar* _sel_tp = getProperty(props, "text", 4);
-				int _sel_tl = (_sel_tp != NULL && _sel_tp->type == ACTION_STACK_VALUE_STRING)
-					? (int)_sel_tp->str_size : 0;
-				if (_sel_tl > 0) { info.sel_begin = 0; info.sel_end = _sel_tl; }
-			} else if (g_selection_begin >= 0 && g_selection_end >= 0
-			           && g_selection_begin != g_selection_end) {
-				info.sel_begin = g_selection_begin;
-				info.sel_end = g_selection_end;
+				_sel_lo = 0; _sel_hi = _sel_tl; _caret = 0;
+			} else {
+				_sel_lo = g_selection_begin; _sel_hi = g_selection_end;
+				_caret = g_selection_caret;
+			}
+			if (_sel_lo >= 0 && _sel_hi >= 0 && _sel_lo != _sel_hi) {
+				info.sel_begin = _sel_lo;
+				info.sel_end = _sel_hi;
+			} else if (_caret >= 0 && tf_is_editable(props)) {
+				info.caret_char = _caret;
 			}
 		}
 

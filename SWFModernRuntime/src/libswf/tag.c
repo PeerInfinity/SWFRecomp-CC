@@ -4578,7 +4578,16 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 			xf[13] = info->m_ty;
 			renderer_write_transform(context, slot, xf);
 			xform_slot = slot;
-			line_rect = 1;
+			// EMBEDDED-font boxes take Ruffle's OTHER box painter: `draw_text_box`
+			// (edit_text.rs ~2930) emits a single `draw_line_rect`, whose index
+			// list is a CLOSED strip (`descriptors.rs: indices_line_rect =
+			// [0,1,2,3,0]`) — Ruffle's own doc comment on it says "the
+			// bottom-right corner of the border is NOT missing (usually)". Only
+			// `draw_device_text_box` (the branch above) hand-rolls four separate
+			// `draw_line` calls and genuinely drops that corner. Opening the
+			// corner here too cost visual/edittext/edittext_caret_empty 36
+			// channels per comparison (golden 95,95,95 vs our 255,255,255).
+			line_rect = 0;
 		} else {
 			// Slot pool exhausted — fall back to the old stage-space draw so
 			// the box at least appears at the right origin.
@@ -4651,6 +4660,9 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 		// The half-open border polyline drops its far corner in SCREEN space;
 		// only in the plain positive-scale case does that coincide with the
 		// local bottom-right one, so restrict the open outline to that case.
+		// (Dead since the embedded branch above sets line_rect = 0 outright —
+		// only the device branch opens the corner. Kept as a guard in case the
+		// embedded box ever goes back to the open outline.)
 		if (!plain) line_rect = 0;
 	}
 
@@ -4705,8 +4717,9 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	if (font_idx < 0) return;
 
 	s16 ascent = 0;
+	s16 descent = 0;   // caret height is ascent + descent (edit_text.rs:1277)
 	int em_square = 1024;
-	if (!ng_font_get_metrics(font_idx, &ascent, NULL, &em_square)) return;
+	if (!ng_font_get_metrics(font_idx, &ascent, &descent, &em_square)) return;
 	if (em_square == 0) return;
 
 	size_t glyph_base = ng_font_get_glyph_base(font_idx);
@@ -4856,6 +4869,21 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			cur_par++;
 		}
 		par_count = cur_par;
+		if (par_count == 0) {
+			// Empty text (text_len == 0). Ruffle still lays out ONE line box for
+			// an empty field (core/src/html/layout.rs), and a focused editable
+			// field draws its caret at that line's alignment-adjusted origin —
+			// which is what visual/edittext/edittext_caret_empty captures. The
+			// producer only routes an empty field here when it is focused, so
+			// this synthesised paragraph exists solely to give the caret its x.
+			pars[0].start_byte = 0;
+			pars[0].end_byte = 0;
+			pars[0].width = 0.0f;
+			pars[0].align = (info->runs && info->run_count > 0) ? info->runs[0].align : 0;
+			pars[0].bullet = 0;
+			pars[0].first_fh = info->font_height;
+			par_count = 1;
+		}
 	}
 
 	// Compute per-paragraph x_offset = left_alignment_offset + alignment_offset.
@@ -5002,10 +5030,16 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// the pen position at the caret's character index so we can draw a caret bar
 	// after the glyph pass. char_count counts decoded codepoints (== UTF-16 units
 	// for the BMP); caret_x stays <0 until the caret index is reached.
-	// Browser-WASM only: the caret is an interactive element; OFFSCREEN / headless
-	// CI captures must stay caret-free (a test's Selection.setFocus would otherwise
-	// add a caret bar and diverge from Ruffle's baseline).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	//
+	// This used to be gated to browser-WASM on the premise that "OFFSCREEN /
+	// headless CI captures must stay caret-free … or we diverge from Ruffle's
+	// baseline". That premise is REFUTED: Ruffle's own goldens for
+	// visual/edittext/edittext_caret_empty contain the caret bar (a 1-px black
+	// column inside each focused field). Ruffle renders the caret whenever
+	// `visible_selection()` is a collapsed caret on a focused, editable field
+	// (edit_text.rs:1059) — headless included. The producer applies that same
+	// predicate, so caret_char < 0 for every field Ruffle would leave bare.
+#ifndef NO_GRAPHICS
 	size_t caret_count = 0;
 	float caret_x = -1.0f;
 	float caret_baseline = y_pos;
@@ -5047,7 +5081,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 		// Record the caret x at its character index (pen position before this
 		// char is laid out, on the current line's baseline).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#ifndef NO_GRAPHICS
 		if (info->caret_char >= 0 && caret_x < 0.0f &&
 		    caret_count == (size_t)info->caret_char) {
 			caret_x = x_pos;
@@ -5107,19 +5141,44 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	#undef MAX_TF_PARAGRAPHS
 
 	// Caret at (or past) the end of the text — pen is at its final position.
-	// Draw a thin vertical bar at the insertion point, in the text color,
-	// spanning the line's em height. Browser-WASM only (see tracking note above).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// (Empty field: the draw loop never ran, so x_pos is still the synthesised
+	// paragraph's alignment-adjusted origin, which is exactly where Ruffle puts
+	// the caret.)
+#ifndef NO_GRAPHICS
 	if (info->caret_char >= 0 && caret_x < 0.0f &&
 	    (size_t)info->caret_char >= caret_count) {
 		caret_x = x_pos;
 		caret_baseline = y_pos;
 	}
+#endif
+
+	if (has_clip) {
+		renderer_end_clip(context);
+	}
+
+	// Draw a thin vertical bar at the insertion point, in the text color.
+	//
+	// AFTER renderer_end_clip on purpose: Ruffle stashes the caret in
+	// `EditTextRenderState::draw_caret_command` and replays it outside the text
+	// mask ("We have to draw the caret outside of the text mask",
+	// edit_text.rs::render_caret). It matters — a right-aligned empty field puts
+	// the caret exactly ON the gutter-inset mask's right edge, so drawing it
+	// inside the clip erases it (visual/edittext/edittext_caret_empty
+	// output.05/.07/.11).
+	//
+	// Geometry mirrors edit_text.rs:
+	//  * height = (ascent + descent) scaled to the line's font height
+	//    (`let caret_height = ascent + descent;`, L1277) — NOT the em height.
+	//  * x/y are pixel-snapped the way `EditTextPixelSnapping::apply` does for
+	//    quality >= medium: `(tx + Twips::new(2)).trunc_to_pixel()`.
+#ifndef NO_GRAPHICS
 	if (info->caret_char >= 0 && caret_x >= 0.0f) {
 		float scale_b = (float)baseline_fh / (float)em_square;
 		float caret_top = caret_baseline - (float)ascent * scale_b;
-		float caret_h = (float)baseline_fh;
-		float caret_w = 20.0f; // ~1px
+		float caret_h = (float)(ascent + descent) * scale_b;
+		float caret_w = 20.0f; // 1px, independent of zoom (Ruffle draws a line)
+		caret_x   = floorf((caret_x + 2.0f) / 20.0f) * 20.0f;
+		caret_top = floorf((caret_top + 2.0f) / 20.0f) * 20.0f;
 		float cr = ((info->text_color >> 16) & 0xFF) / 255.0f;
 		float cg = ((info->text_color >> 8) & 0xFF) / 255.0f;
 		float cb = (info->text_color & 0xFF) / 255.0f;
@@ -5127,10 +5186,6 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			cr, cg, cb, 1.0f, 0, 0);
 	}
 #endif
-
-	if (has_clip) {
-		renderer_end_clip(context);
-	}
 }
 
 // Helper: render a single drawing path (fill + stroke), handling gradients
