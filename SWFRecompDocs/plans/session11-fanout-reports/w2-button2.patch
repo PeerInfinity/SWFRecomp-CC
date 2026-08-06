@@ -1,0 +1,71 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 09cf79b9c..3b4f181a6 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -10542,11 +10542,50 @@ static void button_set_state(Avm2Context* ctx, Avm2Object* button, uint8_t st)
+ #define BTN_ST_UP    0
+ #define BTN_ST_OVER  1
+ #define BTN_ST_DOWN  2
+-static void button_clip_state(Avm2Context* ctx, Avm2Object* obj, uint8_t st)
++
++// label_to_frame's const char* twin (:6930): labels are 0-based in the table,
++// exposed 1-based; -1 when absent.
++static int label_to_frame_cstr(const Avm2DisplayObjectExt* ext, const char* label)
++{
++	if (ext == NULL || ext->timeline == NULL) return -1;
++	for (uint32_t i = 0; i < ext->timeline->label_count; i++)
++	{
++		if (strcmp(ext->timeline->labels[i].label, label) == 0)
++			return (int) ext->timeline->labels[i].frame + 1;
++	}
++	return -1;
++}
++
++// MovieClip-as-button. Ruffle MovieClip::event_dispatch
++// (movie_clip.rs:2908-2925) sends a buttonMode clip that carries _up/_over/
++// _down frame labels to the matching frame on a mouse state change, with
++// stop = true. MovieClip's table is NOT Avm2Button's — it has no
++// MouseUpInside row — so that one call site passes mc_states = 0.
++static void button_clip_state_ex(Avm2Context* ctx, Avm2Object* obj, uint8_t st,
++                                 int mc_states)
+ {
+ 	if (obj == NULL || obj->cls == NULL) return;
+-	if (!class_is_a(obj->cls, ctx->builtins.simple_button_class)) return;
+-	button_set_state(ctx, obj, st);
++	if (class_is_a(obj->cls, ctx->builtins.simple_button_class))
++	{
++		button_set_state(ctx, obj, st);
++		return;
++	}
++	if (!mc_states) return;
++	if (!class_is_a(obj->cls, ctx->builtins.movieclip_class)) return;
++	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
++	// Ruffle is_button_mode (movie_clip.rs:2299): for AVM2 content only
++	// forced_button_mode (= the buttonMode property) can be set; the AVM1
++	// clip-handler probe needs an object1, which AVM2 clips never have.
++	if (ext == NULL || !ext->button_mode) return;
++	const char* lbl = st == BTN_ST_UP ? "_up"
++	                : st == BTN_ST_OVER ? "_over" : "_down";
++	int f = label_to_frame_cstr(ext, lbl);
++	if (f > 0) mc_goto_frame(ctx, obj, (uint16_t) f, 1);
++}
++
++static void button_clip_state(Avm2Context* ctx, Avm2Object* obj, uint8_t st)
++{
++	button_clip_state_ex(ctx, obj, st, 1);
+ }
+ 
+ STUB_GETSET(btn_enabled, "__enabled", avm2_bool(true))
+@@ -12327,8 +12366,11 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
+ 			// (player.rs:1777-1787) -> ButtonState::Up. A release inside the
+ 			// same button immediately re-raises it to Over below, so the net
+ 			// effect there is Over — which is what Flash shows after a click.
++			// MouseUpInside is in Avm2Button's table but NOT MovieClip's
++			// (movie_clip.rs:2908-2914), so mc_states = 0 here: a buttonMode
++			// clip must not take an _up goto between Press and Release.
+ 			if (button == 0 && over != NULL)
+-				button_clip_state(ctx, over, BTN_ST_UP);
++				button_clip_state_ex(ctx, over, BTN_ST_UP, 0);
+ 			dispatch_mouse(ctx, over != NULL ? over : stage, up_type, NULL, 0, 1,
+ 			               button);
+ 			int released_inside = (g_mouse_pressed[button] == over);
