@@ -18,6 +18,15 @@
 #include <libswf/capture.h>
 #endif
 
+// Generated per-test; supplies VIDEO_HIGHEST_W/H (largest DefineVideoStream
+// declared dimensions in this SWF, 0 when the movie has no embedded video).
+// Guarded so a stale RecompiledTags/ from before that emission still builds.
+#if defined(__has_include)
+#  if __has_include("constants.h")
+#    include "constants.h"
+#  endif
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 
@@ -1642,6 +1651,29 @@ void swfStart(SWFAppContext* app_context)
 		if ((u32)max_h > context->dynamic_bitmap_max_h)
 			context->dynamic_bitmap_max_h = (u32)max_h;
 	}
+
+	// Embedded video (DefineVideoStream + VideoFrame) draws each decoded frame
+	// through renderer_draw_bitmap_quad_scaled, which drops any source larger
+	// than dynamic_bitmap_max_{w,h} (render_webgpu.c) — and the AVM1 default is
+	// 256×256, so a 640×480 video frame is silently discarded and the stage
+	// stays blank.
+	//
+	// VIDEO_HIGHEST_W/H are recompiler-emitted per-SWF (0 when the movie has no
+	// DefineVideoStream), so this raise is GATED ON VIDEO PRESENCE and cannot
+	// move a non-video test. That gate is load-bearing: dynamic_bitmap_max
+	// feeds the bitmap texture array's padded dimensions
+	// (render_webgpu.c create_buffers_and_upload), which the shader's UV
+	// normalisation divides by — raising it unconditionally would shift every
+	// bitmap render in the corpus.
+#if defined(VIDEO_HIGHEST_W) && defined(VIDEO_HIGHEST_H)
+	if (VIDEO_HIGHEST_W > 0 && VIDEO_HIGHEST_H > 0) {
+		u32 vw = (u32)VIDEO_HIGHEST_W, vh = (u32)VIDEO_HIGHEST_H;
+		if (vw > 2048) vw = 2048;
+		if (vh > 2048) vh = 2048;
+		if (vw > context->dynamic_bitmap_max_w) context->dynamic_bitmap_max_w = vw;
+		if (vh > context->dynamic_bitmap_max_h) context->dynamic_bitmap_max_h = vh;
+	}
+#endif
 
 	renderer_init(app_context, context);
 

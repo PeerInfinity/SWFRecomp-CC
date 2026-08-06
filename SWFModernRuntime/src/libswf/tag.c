@@ -11497,6 +11497,15 @@ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
 {
+	// The video's dictionary entry is never written (video is detected via
+	// ng_isVideoChar before the dictionary switch, and the zeroed entry's
+	// CHAR_TYPE_SHAPE / size 0 is what the render branch's early return
+	// assumes) — but several display-list walks index dictionary[char_id]
+	// UNCONDITIONALLY, so the slot still has to exist. Required by the
+	// recompiler's char-id-0 → 0x4000 video alias, whose id is outside the
+	// initial dictionary allocation.
+	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_video(app_context, char_id, width, height, codec_id);
 #else

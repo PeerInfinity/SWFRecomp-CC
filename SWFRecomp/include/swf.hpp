@@ -246,6 +246,39 @@ namespace SWFRecomp
 		std::unordered_map<u16, size_t> char_id_to_bitmap_id;
 		std::vector<Vertex> bitmap_sizes;
 
+		// --- Embedded video (DefineVideoStream / VideoFrame) ---------------
+		//
+		// SWF character id 0 is a legal id for a Define* tag, but the runtime
+		// display list uses `char_id == 0` as its "this depth is empty"
+		// sentinel (188 read sites across tag.c / tag_stubs.c / action.c /
+		// avm2_display.c). A PlaceObject2 carrying HasCharacter with
+		// CharacterId 0 therefore populates a depth that every render walk
+		// then skips, and the object never draws.
+		//
+		// A corpus-wide scan (all 4949 SWFs, every Define* family plus every
+		// PlaceObject{,2,3} with HasCharacter) found character id 0 used in
+		// exactly 5 files, all of them DefineVideoStream-based video tests.
+		// So instead of reworking the runtime sentinel we give character id 0
+		// a synthetic non-zero runtime id, decided here and applied at the
+		// three places the id travels (DefineVideoStream, VideoFrame stream
+		// id, PlaceObject character id). Every other SWF in the corpus is
+		// bit-for-bit unaffected because `video_zero_alias` stays 0.
+		//
+		// The alias must stay small: several runtime walks index
+		// `dictionary[obj->char_id]` unconditionally, so an id outside the
+		// dictionary capacity would be an OOB read rather than a blank frame.
+		// tagDefineVideoStream ENSURE_SIZEs the dictionary to cover it.
+		static const u16 VIDEO_ZERO_ALIAS = 0x4000;
+		u16 video_zero_alias = 0;   // 0 = no DefineVideoStream used id 0
+
+		// Largest declared DefineVideoStream dimensions in this SWF (0 if the
+		// movie has no embedded video). Emitted as VIDEO_HIGHEST_W/H so the
+		// runtime can raise dynamic_bitmap_max_{w,h} for video frames WITHOUT
+		// raising it corpus-wide (that value feeds the bitmap texture array's
+		// padded dimensions, which the shader's UV normalisation divides by).
+		size_t video_highest_w = 0;
+		size_t video_highest_h = 0;
+
 		std::unordered_map<u16, float> font_em_square;  // font_id → EM square size
 		std::unordered_map<u16, std::vector<u16>> font_code_tables;  // font_id → code table (index=glyph, value=char code)
 		std::unordered_map<u16, std::vector<s16>> font_advance_tables;  // font_id → per-glyph advance widths

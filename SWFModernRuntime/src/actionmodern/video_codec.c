@@ -36,6 +36,10 @@ int video_codec_supported(int codec_id)
 #ifdef SWF_HAVE_LIBAVCODEC
 		case 2: // Sorenson Spark
 			return avcodec_find_decoder(AV_CODEC_ID_FLV1) != NULL;
+		case 4: // On2 VP6
+			return avcodec_find_decoder(AV_CODEC_ID_VP6F) != NULL;
+		case 5: // On2 VP6 with alpha
+			return avcodec_find_decoder(AV_CODEC_ID_VP6A) != NULL;
 #endif
 		default:
 			return 0;
@@ -43,6 +47,92 @@ int video_codec_supported(int codec_id)
 }
 
 #ifdef SWF_HAVE_LIBAVCODEC
+
+// ---------------------------------------------------------------------------
+// BT.601 YUV 4:2:0 → RGBA, byte-for-byte Ruffle's h263-rs-yuv `bt601`
+// (yuv/src/bt601.rs) as used by ruffle_render's Bitmap::to_rgba for BOTH the
+// Spark and VP6 decoders.
+//
+// This deliberately replaces libswscale. sws_scale interpolates chroma and
+// rounds differently, which put ~48% of the channels of every embedded-video
+// frame 1-3 levels off the Ruffle golden — enough to fail at tolerance 0 while
+// looking visually identical. libavcodec's VP6F/VP6A decode is bit-identical
+// to Ruffle's nihav VP6 decode, so with this conversion the VP6 tests come out
+// byte-exact.
+//
+// The two properties that matter and that swscale does NOT have:
+//   * chroma is NEAREST-NEIGHBOUR — one Cb/Cr sample is reused verbatim for
+//     all four corresponding luma pixels. bt601.rs: "This is not the most
+//     correct, or nicest, but it's what Flash Player does."
+//   * 16.16 fixed point with a +32768 round and the reduced→full range
+//     expansion folded into the coefficients.
+//
+// Alpha (VP6A / AV_PIX_FMT_YUVA420P) comes from plane 3 at full resolution,
+// and RGB is clamped to it (bitmap.rs: "RGB components need to be clamped to
+// alpha to avoid invalid premultiplied colors") — the renderer's bitmap quad
+// path expects premultiplied ARGB.
+// ---------------------------------------------------------------------------
+static int yuv420_frame_is_supported(int pix_fmt)
+{
+	return pix_fmt == AV_PIX_FMT_YUV420P || pix_fmt == AV_PIX_FMT_YUVA420P;
+}
+
+static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
+                                       unsigned char* rgba)
+{
+	const uint8_t* yp  = frame->data[0];
+	const uint8_t* cbp = frame->data[1];
+	const uint8_t* crp = frame->data[2];
+	const uint8_t* ap  = (frame->format == AV_PIX_FMT_YUVA420P) ? frame->data[3] : NULL;
+
+	const int yls  = frame->linesize[0];
+	const int cbls = frame->linesize[1];
+	const int crls = frame->linesize[2];
+	const int als  = ap ? frame->linesize[3] : 0;
+
+	for (int y = 0; y < h; y++) {
+		const uint8_t* yrow  = yp  + (size_t)y * (size_t)yls;
+		const uint8_t* cbrow = cbp + (size_t)(y >> 1) * (size_t)cbls;
+		const uint8_t* crrow = crp + (size_t)(y >> 1) * (size_t)crls;
+		const uint8_t* arow  = ap ? ap + (size_t)y * (size_t)als : NULL;
+		unsigned char* out   = rgba + (size_t)y * (size_t)w * 4;
+
+		for (int x = 0; x < w; x++) {
+			// 76309   == round((255/219) * 65536)
+			// 104597  == round((255/224) * 1.402 * 65536)
+			// -53279  == round(-(255/224) * 1.402 * (0.299/0.587) * 65536)
+			// -25675  == round(-(255/224) * 1.772 * (0.114/0.587) * 65536)
+			// 132201  == round((255/224) * 1.772 * 65536)
+			int32_t gray = ((int32_t)yrow[x] - 16) * 76309;
+			int32_t cb   = (int32_t)cbrow[x >> 1] - 128;   // nearest chroma
+			int32_t cr   = (int32_t)crrow[x >> 1] - 128;
+
+			int32_t r = gray + cr * 104597 + 32768;
+			int32_t g = gray + cr * -53279 + cb * -25675 + 32768;
+			int32_t b = gray + cb * 132201 + 32768;
+
+			// clamp(v >> 16, 0, 255). Shifting only non-negative values keeps
+			// this free of C's implementation-defined `>>` on negatives; a
+			// negative numerator can only ever clamp to 0 anyway.
+			r = (r < 0) ? 0 : (r >> 16); if (r > 255) r = 255;
+			g = (g < 0) ? 0 : (g >> 16); if (g > 255) g = 255;
+			b = (b < 0) ? 0 : (b >> 16); if (b > 255) b = 255;
+
+			int32_t a = 255;
+			if (arow) {
+				a = (int32_t)arow[x];
+				if (r > a) r = a;
+				if (g > a) g = a;
+				if (b > a) b = a;
+			}
+
+			out[x * 4 + 0] = (unsigned char)r;
+			out[x * 4 + 1] = (unsigned char)g;
+			out[x * 4 + 2] = (unsigned char)b;
+			out[x * 4 + 3] = (unsigned char)a;
+		}
+	}
+}
 
 static enum AVCodecID map_flv_codec_id(int codec_id)
 {
@@ -86,36 +176,36 @@ static int decode_via_libavcodec(int codec_id,
 	int h = frame->height;
 	if (w <= 0 || h <= 0) goto done;
 
-	sws = sws_getContext(w, h, (enum AVPixelFormat)frame->format,
-	                     w, h, AV_PIX_FMT_RGBA,
-	                     SWS_BILINEAR, NULL, NULL, NULL);
-	if (!sws) goto done;
-
-	// Ruffle's h263-rs-yuv uses ITU-R BT.601 with TV-range YUV input
-	// (16..235 luma, 16..240 chroma) expanded to full-range RGB output
-	// (0..255). H.263 / Sorenson Spark streams don't carry colorspace tags so
-	// swscale auto-detection can pick the wrong matrix or range and shift
-	// solid colors by 1-3 levels. Force the choice explicitly.
-	{
-		const int* inv_table = sws_getCoefficients(SWS_CS_ITU601);
-		const int* table     = sws_getCoefficients(SWS_CS_DEFAULT);
-		sws_setColorspaceDetails(sws,
-		                          inv_table, /*srcRange=*/0,   // limited / TV
-		                          table,     /*dstRange=*/1,   // full
-		                          /*brightness=*/0,
-		                          /*contrast=*/1 << 16,
-		                          /*saturation=*/1 << 16);
-	}
-
 	rgba = (unsigned char*)malloc((size_t)w * (size_t)h * 4 + SWS_DST_SLACK);
 	if (!rgba) goto done;
 
-	uint8_t* dst_data[4] = { rgba, NULL, NULL, NULL };
-	int dst_linesize[4] = { w * 4, 0, 0, 0 };
-	if (sws_scale(sws, (const uint8_t* const*)frame->data, frame->linesize,
-	              0, h, dst_data, dst_linesize) <= 0) {
-		free(rgba); rgba = NULL;
-		goto done;
+	if (yuv420_frame_is_supported(frame->format)) {
+		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601.
+		yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
+	} else {
+		// Any other decoded pixel format (e.g. an H.264 profile that isn't
+		// 8-bit 4:2:0) still goes through libswscale.
+		sws = sws_getContext(w, h, (enum AVPixelFormat)frame->format,
+		                     w, h, AV_PIX_FMT_RGBA,
+		                     SWS_BILINEAR, NULL, NULL, NULL);
+		if (!sws) { free(rgba); rgba = NULL; goto done; }
+		{
+			const int* inv_table = sws_getCoefficients(SWS_CS_ITU601);
+			const int* table     = sws_getCoefficients(SWS_CS_DEFAULT);
+			sws_setColorspaceDetails(sws,
+			                          inv_table, /*srcRange=*/0,   // limited / TV
+			                          table,     /*dstRange=*/1,   // full
+			                          /*brightness=*/0,
+			                          /*contrast=*/1 << 16,
+			                          /*saturation=*/1 << 16);
+		}
+		uint8_t* dst_data[4] = { rgba, NULL, NULL, NULL };
+		int dst_linesize[4] = { w * 4, 0, 0, 0 };
+		if (sws_scale(sws, (const uint8_t* const*)frame->data, frame->linesize,
+		              0, h, dst_data, dst_linesize) <= 0) {
+			free(rgba); rgba = NULL;
+			goto done;
+		}
 	}
 
 	*out_w = w;
@@ -282,39 +372,42 @@ int video_decoder_decode(VideoDecoderCtx* ctx, int frame_type,
 	int h = frame->height;
 	if (w <= 0 || h <= 0) goto done;
 
-	// (Re)build sws context if dimensions or pixel format changed.
-	if (!ctx->sws || ctx->sws_w != w || ctx->sws_h != h ||
-	    ctx->sws_pixfmt != frame->format) {
-		if (ctx->sws) { sws_freeContext(ctx->sws); ctx->sws = NULL; }
-		ctx->sws = sws_getContext(w, h, (enum AVPixelFormat)frame->format,
-		                          w, h, AV_PIX_FMT_RGBA,
-		                          SWS_BILINEAR, NULL, NULL, NULL);
-		if (!ctx->sws) goto done;
-		ctx->sws_w = w; ctx->sws_h = h; ctx->sws_pixfmt = frame->format;
-
-		// Same explicit BT.601 limited→full range coercion as the one-shot
-		// path: H.263 / Spark streams don't carry colorspace tags so swscale
-		// auto-detection can pick a wrong matrix and shift colors by 1-3
-		// levels. Match Ruffle's h263-rs-yuv (BT.601, TV→full).
-		const int* inv_table = sws_getCoefficients(SWS_CS_ITU601);
-		const int* table     = sws_getCoefficients(SWS_CS_DEFAULT);
-		sws_setColorspaceDetails(ctx->sws,
-		                          inv_table, /*srcRange=*/0,
-		                          table,     /*dstRange=*/1,
-		                          /*brightness=*/0,
-		                          /*contrast=*/1 << 16,
-		                          /*saturation=*/1 << 16);
-	}
-
 	rgba = (unsigned char*)malloc((size_t)w * (size_t)h * 4 + SWS_DST_SLACK);
 	if (!rgba) goto done;
 
-	uint8_t* dst_data[4] = { rgba, NULL, NULL, NULL };
-	int dst_linesize[4] = { w * 4, 0, 0, 0 };
-	if (sws_scale(ctx->sws, (const uint8_t* const*)frame->data, frame->linesize,
-	              0, h, dst_data, dst_linesize) <= 0) {
-		free(rgba); rgba = NULL;
-		goto done;
+	if (yuv420_frame_is_supported(frame->format)) {
+		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601. This is
+		// the path every embedded DefineVideoStream (Spark / VP6 / VP6A) and
+		// every FLV NetStream frame takes.
+		yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
+	} else {
+		// (Re)build sws context if dimensions or pixel format changed.
+		if (!ctx->sws || ctx->sws_w != w || ctx->sws_h != h ||
+		    ctx->sws_pixfmt != frame->format) {
+			if (ctx->sws) { sws_freeContext(ctx->sws); ctx->sws = NULL; }
+			ctx->sws = sws_getContext(w, h, (enum AVPixelFormat)frame->format,
+			                          w, h, AV_PIX_FMT_RGBA,
+			                          SWS_BILINEAR, NULL, NULL, NULL);
+			if (!ctx->sws) { free(rgba); rgba = NULL; goto done; }
+			ctx->sws_w = w; ctx->sws_h = h; ctx->sws_pixfmt = frame->format;
+
+			const int* inv_table = sws_getCoefficients(SWS_CS_ITU601);
+			const int* table     = sws_getCoefficients(SWS_CS_DEFAULT);
+			sws_setColorspaceDetails(ctx->sws,
+			                          inv_table, /*srcRange=*/0,
+			                          table,     /*dstRange=*/1,
+			                          /*brightness=*/0,
+			                          /*contrast=*/1 << 16,
+			                          /*saturation=*/1 << 16);
+		}
+
+		uint8_t* dst_data[4] = { rgba, NULL, NULL, NULL };
+		int dst_linesize[4] = { w * 4, 0, 0, 0 };
+		if (sws_scale(ctx->sws, (const uint8_t* const*)frame->data, frame->linesize,
+		              0, h, dst_data, dst_linesize) <= 0) {
+			free(rgba); rgba = NULL;
+			goto done;
+		}
 	}
 
 	*out_w = w;

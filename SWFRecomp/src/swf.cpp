@@ -1031,6 +1031,8 @@ namespace SWFRecomp
 								 << "#define BITMAP_COUNT " << to_string(current_bitmap) << endl
 								 << "#define BITMAP_HIGHEST_W " << to_string(highest_w) << endl
 								 << "#define BITMAP_HIGHEST_H " << to_string(highest_h) << endl
+								 << "#define VIDEO_HIGHEST_W " << to_string(video_highest_w) << endl
+								 << "#define VIDEO_HIGHEST_H " << to_string(video_highest_h) << endl
 								 << "#define SWF_USE_NETWORK " << (use_network ? "1" : "0");
 
 		// Add FRAME_COUNT to out.h for ActionCall opcode
@@ -3386,6 +3388,14 @@ namespace SWFRecomp
 				u16 char_id = (u16) tag.fields[0].value;
 				u16 depth = (u16) tag.fields[1].value;
 
+				// PlaceObject (tag 4) always names a character, so id 0 here is
+				// a real reference — route it through the video alias. Symmetry
+				// only: no corpus SWF places character 0 with tag 4.
+				if (char_id == 0 && video_zero_alias != 0)
+				{
+					char_id = video_zero_alias;
+				}
+
 				// Place-before-define: PlaceObject (tag 4) referencing a char_id
 				// that has not yet been registered by an earlier DefineSprite.
 				// Flash treats this as a failed placement. Degrade to char_id=0
@@ -3570,6 +3580,16 @@ namespace SWFRecomp
 					tag.parseFields(cur_pos);
 
 					char_id = (u16) tag.fields[0].value;
+				}
+
+				// HasCharacter + CharacterId 0 is a genuine placement of
+				// character 0, but the runtime reads char_id 0 as "no
+				// character / modify existing". Route it through the video
+				// alias so the two cases stay distinguishable. No-op unless
+				// this movie's DefineVideoStream claimed id 0.
+				if (has_character && char_id == 0 && video_zero_alias != 0)
+				{
+					char_id = video_zero_alias;
 				}
 
 				// Place-before-define: PO2/3 referencing a char_id whose
@@ -4940,6 +4960,14 @@ namespace SWFRecomp
 				u16 vf_stream_id = (u16) tag.fields[0].value;
 				u16 vf_frame_num = (u16) tag.fields[1].value;
 
+				// Keep frame storage keyed under the same id the display
+				// object asks for (see swf.hpp `video_zero_alias`) — without
+				// this the object draws but every frame lookup misses.
+				if (vf_stream_id == 0 && video_zero_alias != 0)
+				{
+					vf_stream_id = video_zero_alias;
+				}
+
 				size_t payload_size = tag.length - 4;
 				size_t payload_offset = current_video_byte;
 				const unsigned char* payload_bytes = (const unsigned char*)(cur_pos + 4);
@@ -4983,6 +5011,24 @@ namespace SWFRecomp
 				u16 video_width   = (u16) tag.fields[2].value;
 				u16 video_height  = (u16) tag.fields[3].value;
 				u8 video_codec_id = (u8) cur_pos[9]; // byte after the 4 UI16s + flags byte
+
+				// Character id 0 collides with the runtime's "empty depth"
+				// display-list sentinel — alias it to a synthetic non-zero id
+				// for the whole movie. See swf.hpp `video_zero_alias`.
+				if (video_char_id == 0)
+				{
+					video_zero_alias = VIDEO_ZERO_ALIAS;
+					video_char_id = video_zero_alias;
+				}
+				else if (video_char_id == VIDEO_ZERO_ALIAS)
+				{
+					fprintf(stderr, "WARNING: DefineVideoStream claims character id 0x%X, "
+					                "which is reserved as the char-id-0 video alias\n",
+					        (unsigned) VIDEO_ZERO_ALIAS);
+				}
+
+				if (video_width > video_highest_w) video_highest_w = video_width;
+				if (video_height > video_highest_h) video_highest_h = video_height;
 
 				// Register video char_id for place-before-define tracking.
 				defined_chars.insert(video_char_id);
@@ -5295,6 +5341,13 @@ namespace SWFRecomp
 								sub_tag.configureNextField(SWF_FIELD_UI16);
 								sub_tag.parseFields(cur_pos);
 								char_id = (u16) sub_tag.fields[0].value;
+							}
+
+							// Same char-id-0 video alias as the root-timeline
+							// PO2/3 branch (see swf.hpp `video_zero_alias`).
+							if (has_character && char_id == 0 && video_zero_alias != 0)
+							{
+								char_id = video_zero_alias;
 							}
 
 							// Note: place-before-define is intentionally NOT
