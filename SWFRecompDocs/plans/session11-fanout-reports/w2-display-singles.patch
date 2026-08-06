@@ -1,0 +1,308 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 09cf79b9c..179e3d44e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -9727,15 +9727,127 @@ static double pp_slot(Avm2Context* ctx, Avm2Object* o, const char* n,
+ 	return v != NULL ? avm2_coerce_to_number(ctx, *v) : dflt;
+ }
+ 
++// --- the DisplayObject's Option<PerspectiveProjection> ----------------------
++// Ruffle keeps the projection on DisplayObjectBase as an Option
++// (display_object.rs:274), NOT on the AS object — the AS object is a view.
++// We keep the same option in four dont_enum dynamic slots on the display
++// object: __pphas (0/1) plus __ppfov/__ppcx/__ppcy. An ABSENT __pphas means
++// "not materialised yet": Ruffle seeds the stage (stage.rs:196) and the root
++// (context.rs:402) eagerly with set_perspective_projection(None), whose
++// Stage/MovieClip overrides refuse None; we do the same lazily on first read.
++
++static void do_pp_default(Avm2DisplayObjectExt* ext,
++                          double* fov, double* cx, double* cy)
++{
++	*fov = 55.0;
++	if (ext != NULL && ext->is_root && !ext->is_stage)
++	{
++		// movie_clip.rs:2773-2784 — a root's default centre is
++		// (movie.width()/2, movie.height()/2), not the flat (250, 250).
++		// Twips -> pixels is /20, then halved: /40.
++		*cx = (double) (avm2_generated_stage_rect[1]
++		                - avm2_generated_stage_rect[0]) / 40.0;
++		*cy = (double) (avm2_generated_stage_rect[3]
++		                - avm2_generated_stage_rect[2]) / 40.0;
++		return;
++	}
++	// stage.rs:880-882 get_or_insert_default(), and the hard default.
++	*cx = 250.0;
++	*cy = 250.0;
++}
++
++static void do_pp_set(Avm2Context* ctx, Avm2Object* target, int has,
++                      double fov, double cx, double cy)
++{
++	if (target == NULL) return;
++	avm2_object_set_dynamic(ctx, target, "__pphas", 7,
++	                        avm2_number(has ? 1.0 : 0.0))->dont_enum = 1;
++	if (!has) return;
++	avm2_object_set_dynamic(ctx, target, "__ppfov", 7, avm2_number(fov))
++		->dont_enum = 1;
++	avm2_object_set_dynamic(ctx, target, "__ppcx", 6, avm2_number(cx))
++		->dont_enum = 1;
++	avm2_object_set_dynamic(ctx, target, "__ppcy", 6, avm2_number(cy))
++		->dont_enum = 1;
++}
++
++// 1 = the display object has a projection (and *fov/*cx/*cy are filled).
++static int do_pp_get(Avm2Context* ctx, Avm2Object* target,
++                     double* fov, double* cx, double* cy)
++{
++	if (target == NULL) return 0;
++	if (avm2_object_find_dynamic(target, "__pphas", 7) == NULL)
++	{
++		Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, target);
++		if (ext == NULL || (!ext->is_stage && !ext->is_root)) return 0;
++		do_pp_default(ext, fov, cx, cy);
++		do_pp_set(ctx, target, 1, *fov, *cx, *cy);
++		return 1;
++	}
++	if (pp_slot(ctx, target, "__pphas", 7, 0.0) == 0.0) return 0;
++	*fov = pp_slot(ctx, target, "__ppfov", 7, 55.0);
++	*cx = pp_slot(ctx, target, "__ppcx", 6, 250.0);
++	*cy = pp_slot(ctx, target, "__ppcy", 6, 250.0);
++	return 1;
++}
++
++// The display object a PerspectiveProjection is a view of, if any.
++static Avm2Object* pp_target(Avm2Object* self)
++{
++	Avm2Value* t = self != NULL
++		? avm2_object_find_dynamic(self, "__target", 8) : NULL;
++	return (t != NULL && t->kind == AVM2_VALUE_OBJECT) ? t->u.obj : NULL;
++}
++
++// Ruffle object_to_perspective_projection (geom/transform.rs:235-257): once
++// the object carries a display object its OWN slots are ignored entirely —
++// the DO's live option wins, and an empty option reads as the hard default.
++static void pp_read(Avm2Activation* act, Avm2Object* self,
++                    double* fov, double* cx, double* cy)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Object* t = pp_target(self);
++	if (t != NULL)
++	{
++		if (do_pp_get(ctx, t, fov, cx, cy)) return;
++		*fov = 55.0;
++		*cx = 250.0;
++		*cy = 250.0;
++		return;
++	}
++	*fov = pp_slot(ctx, self, "__fov", 5, 55.0);
++	*cx = pp_slot(ctx, self, "__cx", 4, 250.0);
++	*cy = pp_slot(ctx, self, "__cy", 4, 250.0);
++}
++
++// Ruffle sync_from_display_object -> set slot -> sync_to_display_object
++// (geom/perspective_projection.rs:165-227). The write-through is skipped when
++// the DO's option is empty, exactly as sync_to_display_object bails.
++static void pp_write(Avm2Activation* act, Avm2Object* self,
++                     double fov, double cx, double cy)
++{
++	Avm2Context* ctx = act->ctx;
++	if (self == NULL) return;
++	avm2_object_set_dynamic(ctx, self, "__fov", 5, avm2_number(fov))
++		->dont_enum = 1;
++	avm2_object_set_dynamic(ctx, self, "__cx", 4, avm2_number(cx))
++		->dont_enum = 1;
++	avm2_object_set_dynamic(ctx, self, "__cy", 4, avm2_number(cy))
++		->dont_enum = 1;
++	Avm2Object* t = pp_target(self);
++	double ofov, ocx, ocy;
++	if (t != NULL && do_pp_get(ctx, t, &ofov, &ocx, &ocy))
++		do_pp_set(ctx, t, 1, fov, cx, cy);
++}
++
+ // The projection width: 500 unless the object is a non-stage DisplayObject,
+ // in which case it is the stage width.
+ static double pp_width(Avm2Activation* act, Avm2Object* self)
+ {
+ 	Avm2Context* ctx = act->ctx;
+-	Avm2Value* t = self != NULL
+-		? avm2_object_find_dynamic(self, "__target", 8) : NULL;
+-	if (t == NULL || t->kind != AVM2_VALUE_OBJECT) return 500.0;
+-	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, t->u.obj);
++	Avm2Object* t = pp_target(self);
++	if (t == NULL) return 500.0;
++	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, t);
+ 	if (ext == NULL || ext->is_stage) return 500.0;
+ 	return (double) ((avm2_generated_stage_rect[1]
+ 	                  - avm2_generated_stage_rect[0]) / 20);
+@@ -9743,10 +9855,17 @@ static double pp_width(Avm2Activation* act, Avm2Object* self)
+ 
+ static double pp_focal_length(Avm2Activation* act, Avm2Object* self)
+ {
+-	double fov = pp_slot(act->ctx, self, "__fov", 5, 55.0);
++	double fov, cx, cy;
++	pp_read(act, self, &fov, &cx, &cy);
+ 	double rad = fov * (M_PI / 180.0);
+-	// Ruffle computes this half in f32 (`... as f32`), so keep the cast.
+-	return (double) (float) ((pp_width(act, self) / 2.0) * tan((M_PI - rad) / 2.0));
++	// render/src/perspective_projection.rs:33-36:
++	//     (width / 2.0) * f64::tan((PI - rad) / 2.0) as f32
++	// `as` binds tighter than `*`, so the TANGENT is narrowed to f32 first
++	// and the multiply then runs entirely in f32 (width is an f32 param).
++	// Narrowing only the finished product instead misses 58 of the 179
++	// expected values in avm2/perspective_projection.
++	float w = (float) pp_width(act, self);
++	return (double) ((w / 2.0f) * (float) tan((M_PI - rad) / 2.0));
+ }
+ 
+ static Avm2Value pp_init(Avm2Activation* act)
+@@ -9765,7 +9884,9 @@ static Avm2Value pp_init(Avm2Activation* act)
+ 
+ static Avm2Value pp_get_fov(Avm2Activation* act)
+ {
+-	return avm2_number(pp_slot(act->ctx, this_obj(act), "__fov", 5, 55.0));
++	double fov, cx, cy;
++	pp_read(act, this_obj(act), &fov, &cx, &cy);
++	return avm2_number(fov);
+ }
+ 
+ static Avm2Value pp_set_fov(Avm2Activation* act)
+@@ -9780,8 +9901,11 @@ static Avm2Value pp_set_fov(Avm2Activation* act)
+ 		                 "must be greater than 0 and less than 180.");
+ 	}
+ 	if (self != NULL)
+-		avm2_object_set_dynamic(ctx, self, "__fov", 5, avm2_number(fov))
+-			->dont_enum = 1;
++	{
++		double ofov, cx, cy;
++		pp_read(act, self, &ofov, &cx, &cy);
++		pp_write(act, self, fov, cx, cy);
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -9806,18 +9930,21 @@ static Avm2Value pp_set_focal_length(Avm2Activation* act)
+ 	}
+ 	double fov = atan((pp_width(act, self) / 2.0) / fl) / (M_PI / 180.0) * 2.0;
+ 	if (self != NULL)
+-		avm2_object_set_dynamic(ctx, self, "__fov", 5, avm2_number(fov))
+-			->dont_enum = 1;
++	{
++		double ofov, cx, cy;
++		pp_read(act, self, &ofov, &cx, &cy);
++		pp_write(act, self, fov, cx, cy);
++	}
+ 	return avm2_undefined();
+ }
+ 
+ static Avm2Value pp_get_center(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+-	Avm2Object* self = this_obj(act);
++	double fov, cx, cy;
++	pp_read(act, this_obj(act), &fov, &cx, &cy);
+ 	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
+-	Avm2Value a[2] = { avm2_number(pp_slot(ctx, self, "__cx", 4, 250.0)),
+-	                   avm2_number(pp_slot(ctx, self, "__cy", 4, 250.0)) };
++	Avm2Value a[2] = { avm2_number(cx), avm2_number(cy) };
+ 	return avm2_class_construct(ctx, avm2_display_point_class(ctx), a, 2);
+ }
+ 
+@@ -9831,8 +9958,9 @@ static Avm2Value pp_set_center(Avm2Activation* act)
+ 		avm2_get_public_property(ctx, p, "x", 1, NULL));
+ 	double y = avm2_coerce_to_number(ctx,
+ 		avm2_get_public_property(ctx, p, "y", 1, NULL));
+-	avm2_object_set_dynamic(ctx, self, "__cx", 4, avm2_number(x))->dont_enum = 1;
+-	avm2_object_set_dynamic(ctx, self, "__cy", 4, avm2_number(y))->dont_enum = 1;
++	double fov, ocx, ocy;
++	pp_read(act, self, &fov, &ocx, &ocy);
++	pp_write(act, self, fov, x, y);
+ 	return avm2_undefined();
+ }
+ 
+@@ -9856,8 +9984,10 @@ static Avm2Value pp_to_matrix3d(Avm2Activation* act)
+ 	return avm2_class_construct(ctx, m3d, &arg, 1);
+ }
+ 
+-// transform.perspectiveProjection: the override stored on the target, else a
+-// freshly minted default for the stage/root, else null.
++// transform.perspectiveProjection: Ruffle geom/transform.rs:375-403 mints a
++// FRESH PerspectiveProjection view on every read and stamps its displayObject
++// slot, so two reads are never `===` (PerspectiveProjectionClass grades that).
++// Null iff the display object's own option is empty.
+ static Avm2Value transform_get_perspective_projection(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -9866,10 +9996,8 @@ static Avm2Value transform_get_perspective_projection(Avm2Activation* act)
+ 		return avm2_null();
+ 	Avm2Object* target = ((Avm2TransformExt*) self->native_ext)->target;
+ 	if (target == NULL) return avm2_null();
+-	Avm2Value* stored = avm2_object_find_dynamic(target, "__pproj", 7);
+-	if (stored != NULL && stored->kind == AVM2_VALUE_OBJECT) return *stored;
+-	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, target);
+-	if (ext == NULL || (!ext->is_stage && !ext->is_root)) return avm2_null();
++	double fov, cx, cy;
++	if (!do_pp_get(ctx, target, &fov, &cx, &cy)) return avm2_null();
+ 	Avm2Value pp = avm2_class_construct(ctx, g_pperspective_class, NULL, 0);
+ 	if (pp.kind == AVM2_VALUE_OBJECT)
+ 	{
+@@ -9889,16 +10017,31 @@ static Avm2Value transform_set_perspective_projection(Avm2Activation* act)
+ 	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_null();
+ 	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+ 	{
+-		avm2_object_set_dynamic(ctx, v.u.obj, "__target", 8,
+-		                        avm2_object_value(target))->dont_enum = 1;
+-		avm2_object_set_dynamic(ctx, target, "__pproj", 7, v)->dont_enum = 1;
++		// transform.rs:406-424 reads the argument down to a plain
++		// {fov, centre} struct and stores THAT on the display object: the
++		// caller's object is never bound to anything, so a standalone
++		// PerspectiveProjection keeps reporting the width-500 focal length
++		// after being assigned (avm2/perspective_projection).
++		double fov, cx, cy;
++		pp_read(act, v.u.obj, &fov, &cx, &cy);
++		do_pp_set(ctx, target, 1, fov, cx, cy);
+ 	}
+ 	else
+ 	{
+-		// "No override" — the stage/root getter then re-mints its default,
+-		// while a plain object goes back to null.
+-		avm2_object_set_dynamic(ctx, target, "__pproj", 7, avm2_null())
+-			->dont_enum = 1;
++		// Stage (stage.rs:880-882) and a root MovieClip (movie_clip.rs:
++		// 2773-2784) both refuse None and re-mint their per-kind default;
++		// every other display object really does go back to null.
++		Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, target);
++		if (ext != NULL && (ext->is_stage || ext->is_root))
++		{
++			double fov, cx, cy;
++			do_pp_default(ext, &fov, &cx, &cy);
++			do_pp_set(ctx, target, 1, fov, cx, cy);
++		}
++		else
++		{
++			do_pp_set(ctx, target, 0, 0.0, 0.0, 0.0);
++		}
+ 	}
+ 	return avm2_undefined();
+ }
+@@ -10894,6 +11037,21 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
+ 		ext->placed_by_avm2_script = 1;
+ 		ext->constructed = 1;
+ 		uint16_t char_id = char_for_class(obj->cls);
++		// Ruffle consults class_symbol in exactly four display allocators
++		// (sprite, simple_button, bitmap, video). shape_allocator
++		// (display/shape.rs:11) builds a bare `Graphic::empty` and never
++		// looks the symbol up, so a Shape-linked class constructed from
++		// SCRIPT has no character at all -- its bounds are empty, not the
++		// DefineShape's (avm2/graphic_linkage). Timeline placement is
++		// unaffected: it goes through the g_timeline_instantiation arm.
++		// Deliberately NOT extended to TextField: text_field_allocator
++		// ignores linkage too, but avm2_text_edittext_init above already
++		// encodes that and avm2/edit_text_linkage passes today.
++		if (char_id != 0 && ctx->builtins.shape_class != NULL
++		    && class_is_a(obj->cls, ctx->builtins.shape_class))
++		{
++			char_id = 0;
++		}
+ 		if (char_id != 0)
+ 		{
+ 			ext->char_id = char_id;
