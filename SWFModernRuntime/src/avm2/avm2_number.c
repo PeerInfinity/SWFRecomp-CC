@@ -450,38 +450,119 @@ static int32_t avm2_random_pure_hasher(int32_t iSeed)
 	return iResult;
 }
 
-static int32_t avm2_generate_random_number(void)
+// The build's own boot seed. MOCK_DATE_TIME is a -D and the artifact hash is
+// what pins it; the reset hook below COMPOSES with it (seed 0 means "back to
+// this build's boot state") rather than replacing it.
+static uint32_t avm2_random_boot_seed(void)
 {
-	if (g_avm2_rng.uValue == 0)
-	{
-		uint32_t seed;
 #ifdef MOCK_DATE_TIME
-		seed = (uint32_t) ((int64_t) (MOCK_DATE_TIME) * 1000LL);
+	return (uint32_t) ((int64_t) (MOCK_DATE_TIME) * 1000LL);
 #else
-		seed = 987654321u;
+	return 987654321u;
 #endif
-		int n = 31;
-		g_avm2_rng.uValue = seed;
-		g_avm2_rng.uSequenceLength = (uint32_t) ((1ULL << n) - 1ULL);
-		g_avm2_rng.uXorMask = avm2_random_xor_masks[n - 2];
-	}
-	if (g_avm2_rng.uValue & 1u)
+}
+
+static void avm2_random_seed(Avm2RandomFast* r, uint32_t seed)
+{
+	int n = 31;
+	r->uValue = (seed == 0) ? avm2_random_boot_seed() : seed;
+	r->uSequenceLength = (uint32_t) ((1ULL << n) - 1ULL);
+	r->uXorMask = avm2_random_xor_masks[n - 2];
+}
+
+static int32_t avm2_random_next(Avm2RandomFast* r)
+{
+	if (r->uValue == 0) avm2_random_seed(r, 0);
+	if (r->uValue & 1u)
 	{
-		g_avm2_rng.uValue = (g_avm2_rng.uValue >> 1) ^ g_avm2_rng.uXorMask;
+		r->uValue = (r->uValue >> 1) ^ r->uXorMask;
 	}
 	else
 	{
-		g_avm2_rng.uValue >>= 1;
+		r->uValue >>= 1;
 	}
-	int32_t aNum = (int32_t) g_avm2_rng.uValue;
+	int32_t aNum = (int32_t) r->uValue;
 	aNum = avm2_random_pure_hasher(aNum * 71L);
 	return aNum & 0x7FFFFFFF;
+}
+
+static int32_t avm2_generate_random_number(void)
+{
+	return avm2_random_next(&g_avm2_rng);
 }
 
 static Avm2Value math_random(Avm2Activation* act)
 {
 	(void) act;
 	int32_t raw = avm2_generate_random_number();
+	return avm2_number((double) raw / 2147483648.0);
+}
+
+// ── swfmodern.Rng — the determinism hooks ────────────────────────────────
+//
+// `Math.random()` is one global 31-bit XOR-shift LFSR whose whole state is
+// the single uint32 above, so a page's draw sequence is a pure function of
+// its boot seed and of HOW MANY DRAWS HAVE HAPPENED. That second half is the
+// problem this class exists for: a harness replaying a recorded input tape
+// can prove the game REPRODUCES (same page, same tape, same rocks) without
+// being able to PREDICT anything, because the stream position at the start of
+// the interesting window is the whole page's history — every Tile and Enemy
+// constructed since load, every sound index rolled, every frame of camera
+// shake. No readout carries that number.
+//
+// `reset(seed)` deletes the question instead of answering it: after it, a
+// model owes only the draws the window itself consumes. `state`/`setState`
+// exist so an instrument can SAMPLE the stream (draw N values, then put the
+// state back) without perturbing the run it is measuring.
+//
+// `cosmetic()` is the second half: a SEPARATE generator, so cooperative
+// content can route draws whose values nothing gameplay-visible reads (sprite
+// frames, particle jitter, sound indices) off the main stream, where they
+// otherwise shift every gameplay draw that follows. Nothing routes itself —
+// only the content knows which of its own draws are which — so this is inert
+// until something calls it, and `Math.random()` is untouched either way.
+//
+// Reachable from AS3 as flash.utils.getDefinitionByName("swfmodern.Rng"); a
+// build without it throws #1065 there, which is a loud absence rather than a
+// silent unseeded run.
+static Avm2RandomFast g_avm2_rng_cosmetic;
+
+static uint32_t rng_arg_u32(Avm2Activation* act, uint32_t i)
+{
+	if (act->argc <= i) return 0;
+	double v = avm2_coerce_to_number(act->ctx, act->args[i]);
+	if (!isfinite(v) || v < 0.0) return 0;
+	return (uint32_t) fmod(v, 4294967296.0);
+}
+
+static Avm2Value rng_state(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number((double) g_avm2_rng.uValue);
+}
+
+static Avm2Value rng_set_state(Avm2Activation* act)
+{
+	avm2_random_seed(&g_avm2_rng, rng_arg_u32(act, 0));
+	return avm2_undefined();
+}
+
+static Avm2Value rng_cosmetic_state(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_number((double) g_avm2_rng_cosmetic.uValue);
+}
+
+static Avm2Value rng_set_cosmetic_state(Avm2Activation* act)
+{
+	avm2_random_seed(&g_avm2_rng_cosmetic, rng_arg_u32(act, 0));
+	return avm2_undefined();
+}
+
+static Avm2Value rng_cosmetic(Avm2Activation* act)
+{
+	(void) act;
+	int32_t raw = avm2_random_next(&g_avm2_rng_cosmetic);
 	return avm2_number((double) raw / 2147483648.0);
 }
 
@@ -729,4 +810,21 @@ void avm2_register_number(Avm2Context* ctx)
 	avm2_builtin_add_static_const(ctx, math, "PI", avm2_number(3.141592653589793));
 	avm2_builtin_add_static_const(ctx, math, "SQRT1_2", avm2_number(0.7071067811865476));
 	avm2_builtin_add_static_const(ctx, math, "SQRT2", avm2_number(1.4142135623730951));
+
+	// The determinism hooks (see swfmodern.Rng above). Its own class in its
+	// own package rather than four more statics on Math: Math's surface is
+	// graded against avmplus and this is a runtime instrument, not ECMA.
+	// ⛓ `setState` IS `reset` for this generator — the state is one uint32
+	// and the seed is written straight into it, so "reset to seed s" and
+	// "put the state back to s" are the same call. 0 means the build's own
+	// boot seed (and is not a reachable state: the LFSR never enters 0).
+	Avm2Class* rng = avm2_builtin_class(ctx, "swfmodern", "Rng", b->object_class);
+	rng->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+	avm2_builtin_add_static_method_n(ctx, rng, "state", rng_state, 0);
+	avm2_builtin_add_static_method_n(ctx, rng, "setState", rng_set_state, 1);
+	avm2_builtin_add_static_method_n(ctx, rng, "cosmeticState",
+	                                 rng_cosmetic_state, 0);
+	avm2_builtin_add_static_method_n(ctx, rng, "setCosmeticState",
+	                                 rng_set_cosmetic_state, 1);
+	avm2_builtin_add_static_method_n(ctx, rng, "cosmetic", rng_cosmetic, 0);
 }
