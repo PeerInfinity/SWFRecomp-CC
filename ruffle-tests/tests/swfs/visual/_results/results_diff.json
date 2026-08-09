@@ -1,109 +1,97 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-29T03:45:41.141164+00:00",
-    "old_git_sha": "72fdc5e933a6c32ecea4be6e398c9a3aac819699",
-    "new_timestamp": "2026-08-02T09:26:35.702647+00:00",
-    "new_git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "old_timestamp": "2026-08-02T09:26:35.702647+00:00",
+    "old_git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "new_timestamp": "2026-08-09T08:51:22.975061+00:00",
+    "new_git_sha": "0a99be1a92dee5a4f000bdf1a0809c47b9e27fc5",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 136,
+    "old_pass": 138,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 136,
+    "old_effective_pass": 138,
     "old_total": 143,
-    "old_pass_rate": 95.1,
-    "new_pass": 138,
-    "new_ruffle_matched": 0,
-    "new_effective_pass": 138,
+    "old_pass_rate": 96.5,
+    "new_pass": 140,
+    "new_ruffle_matched": 2,
+    "new_effective_pass": 142,
     "new_total": 143,
-    "new_pass_rate": 96.5,
-    "old_mismatched_lines": 112,
-    "new_mismatched_lines": 98,
+    "new_pass_rate": 97.9,
+    "old_mismatched_lines": 98,
+    "new_mismatched_lines": 49,
     "increased_mismatches": 0,
-    "decreased_mismatches": 14,
-    "newly_passing": 3,
-    "newly_failing": 1,
+    "decreased_mismatches": 49,
+    "newly_passing": 4,
+    "newly_failing": 0,
     "status_changed": 4,
-    "unchanged": 138,
+    "unchanged": 139,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm2_button_scroll_rect",
+      "test": "define_bits_jpeg2_huge",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "define_bits_jpeg2_huge",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 2,
+        "actual_lines": 19,
         "expected_lines": 19,
-        "matching_lines": 2
+        "matching_lines": 13
       },
       "new_lines": {
         "actual_lines": 19,
         "expected_lines": 19,
-        "matching_lines": 13
+        "matching_lines": 19
       }
     },
     {
-      "test": "definefont4",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 24,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "filters/avm1_convolution_initialization",
+      "test": "edittext/edittext_device_transform_basic",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 17
+        "actual_lines": 24,
+        "expected_lines": 24,
+        "matching_lines": 12
       },
       "new_lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 18
+        "actual_lines": 24,
+        "expected_lines": 24,
+        "matching_lines": 24
       }
     },
     {
-      "test": "simple_shapes/heavy_tesselation",
+      "test": "edittext/edittext_device_transform_metrics",
       "change_type": "changed",
-      "old_status": "recomp_fail",
-      "new_status": "pass",
-      "old_lines": null,
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 20
+      },
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 32
+      }
+    },
+    {
+      "test": "edittext/edittext_device_transform_negative",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 120,
+        "expected_lines": 120,
+        "matching_lines": 60
+      },
+      "new_lines": {
+        "actual_lines": 120,
+        "expected_lines": 120,
+        "matching_lines": 79
       }
     }
   ]

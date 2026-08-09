@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-29T03:45:41.162714+00:00",
-    "old_git_sha": "72fdc5e933a6c32ecea4be6e398c9a3aac819699",
-    "new_timestamp": "2026-08-02T09:26:35.718372+00:00",
-    "new_git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "old_timestamp": "2026-08-02T09:26:35.718372+00:00",
+    "old_git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "new_timestamp": "2026-08-09T08:51:22.990460+00:00",
+    "new_git_sha": "0a99be1a92dee5a4f000bdf1a0809c47b9e27fc5",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 70,
     "old_total": 70,
     "old_pass_rate": 100.0,
-    "new_pass": 70,
+    "new_pass": 71,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 70,
-    "new_total": 70,
+    "new_effective_pass": 71,
+    "new_total": 71,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 70,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "mask_sibling_union",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    }
+  ]
 }

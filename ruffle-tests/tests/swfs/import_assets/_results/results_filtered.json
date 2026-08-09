@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-02T09:26:35.689104+00:00",
-    "git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
-    "duration_seconds": 42.43,
+    "timestamp": "2026-08-09T08:51:22.961980+00:00",
+    "git_sha": "0a99be1a92dee5a4f000bdf1a0809c47b9e27fc5",
+    "duration_seconds": 43.82,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30,
@@ -10,21 +10,21 @@
     "filtered": true
   },
   "total": 3,
-  "pass": 1,
+  "pass": 2,
   "ruffle_matched": 0,
-  "fail": 2,
-  "pass_rate": 33.3,
-  "effective_pass": 1,
-  "effective_pass_rate": 33.3,
+  "fail": 1,
+  "pass_rate": 66.7,
+  "effective_pass": 2,
+  "effective_pass_rate": 66.7,
   "breakdown": {
-    "output_mismatch": 2
+    "output_mismatch": 1
   },
   "tests": [
     {
       "test": "avm1_imports_avm1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.595,
+        "compile": 1.67,
         "run": 0.004
       },
       "num_frames": 1,
@@ -33,7 +33,7 @@
         "expected_lines": 6,
         "matching_lines": 0
       },
-      "duration": 1.6,
+      "duration": 1.68,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=7, expected=6)",
       "actual_output": "Hello from right_eye.swf\nHello from test.swf\nGuy_with_hat loaded!\nCircle loaded!\nSquare loaded!\nLeft eye loaded!\nRight eye loaded!",
@@ -43,26 +43,23 @@
       "test": "avm1_non_swf_import",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.49,
+        "compile": 21.416,
         "run": 0.004
       },
       "num_frames": 4,
       "lines": {
-        "actual_lines": 3,
+        "actual_lines": 6,
         "expected_lines": 6,
-        "matching_lines": 0
+        "matching_lines": 6
       },
-      "duration": 20.5,
-      "status": "output_mismatch",
-      "detail": "6 line(s) differ (actual=3, expected=6)",
-      "actual_output": "frame 1\nframe 2\nframe 3",
-      "expected_output": "Navigator::fetch:\n  URL: dummy.png\n  Method: GET\nframe 1\nframe 2\nframe 3"
+      "duration": 21.42,
+      "status": "pass"
     },
     {
       "test": "empty_url",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.148,
+        "compile": 20.521,
         "run": 0.002
       },
       "num_frames": 2,
@@ -71,7 +68,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 20.15,
+      "duration": 20.53,
       "status": "pass"
     }
   ]

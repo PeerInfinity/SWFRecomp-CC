@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-02T09:26:35.684780+00:00",
-    "git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
-    "duration_seconds": 43.76,
+    "timestamp": "2026-08-09T08:51:22.957778+00:00",
+    "git_sha": "0a99be1a92dee5a4f000bdf1a0809c47b9e27fc5",
+    "duration_seconds": 44.49,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -20,7 +20,7 @@
       "test": "convolution_filter_big_matrix",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.497,
+        "compile": 19.991,
         "run": 0.002
       },
       "num_frames": 16,
@@ -29,14 +29,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.5,
+      "duration": 20.0,
       "status": "pass"
     },
     {
       "test": "swf_length_too_long",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.342,
+        "compile": 1.46,
         "run": 0.004
       },
       "num_frames": 16,
@@ -45,7 +45,7 @@
         "expected_lines": 18,
         "matching_lines": 12
       },
-      "duration": 1.35,
+      "duration": 1.47,
       "ruffle_diff_count": 6,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -55,7 +55,7 @@
       "test": "swf_length_too_short_no_end",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.367,
+        "compile": 1.371,
         "run": 0.004
       },
       "num_frames": 16,
@@ -71,7 +71,7 @@
       "test": "swf_length_too_short_no_second_frame",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.975,
+        "compile": 20.031,
         "run": 0.004
       },
       "num_frames": 16,
@@ -80,14 +80,14 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 19.98,
+      "duration": 20.04,
       "status": "pass"
     },
     {
       "test": "swf_length_zero",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.259,
+        "compile": 1.3,
         "run": 0.002
       },
       "num_frames": 16,
@@ -96,7 +96,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.26,
+      "duration": 1.31,
       "status": "pass"
     }
   ]
