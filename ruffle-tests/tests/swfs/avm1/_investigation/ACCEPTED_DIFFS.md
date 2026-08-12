@@ -616,7 +616,53 @@ on-stage size. Trace test continues to pass.
 
 ---
 
-## Category 10: Watch Handler Deep Re-entrancy (SWF7 Recursion Depth)
+## Category 10: Watch Handler Deep Re-entrancy (SWF7 Recursion Depth) — **RESOLVED 2026-08-12**
+
+> **RESOLUTION (2026-08-12, session 14 wave-2 `w2-watch-family`).** This category
+> is no longer an accepted diff. All four SWF7 variants
+> (`watch_recursion_swf7`, `watch_recursion_double_swf7` and their lingering
+> old-name duplicates `watch_special_recursion_swf7`,
+> `watch_special_recursion_double_swf7`) now **pass byte-exactly** —
+> 1042/1042 and 3118/3118 lines against the Flash oracle — and both SWF7 entries
+> were removed from `ignored_tests.txt`.
+>
+> The "separate deep semantic gap" diagnosis below was wrong. There was **one**
+> mechanism, in two parts:
+>
+> 1. **Flash runs a single re-entry counter per property, shared by the `watch`
+>    handler and the `addProperty` getter/setter.** We ran two independent ones
+>    (`watch_firing_depth` for the watcher, `countActiveAccessorEntry` for the
+>    accessors), each capped at `accessorReentryLimit()`. Flash increments **one**
+>    counter for all three and, once it reaches the limit (1 at SWF6, 65 at
+>    SWF7+), bypasses getter, setter **and** watcher alike, bottoming out at the
+>    property's underlying stored value. This is why the innermost (65th) handler
+>    in `watch_recursion_swf7` reads `o2.prop` as `undefined`, assigns `"c"`
+>    without the setter firing, and reads it back as `"c"`: at watch nesting 65
+>    the accessors are *already* blocked even though no accessor is on the stack.
+>    The counts pin the model with no slack — 129 getter + 65 setter fires
+>    against 65 watch fires in the single case, and in the double case
+>    257 `prop1`-getter / 259 `prop2`-getter fires, whose −4/−2 asymmetry is
+>    exactly the two frames where each property's own watch depth reaches 65.
+> 2. **The `MAX_SPECIAL_DEPTH` (66) total-nesting cap was stale.** It was added
+>    when 130-deep interpreter recursion overflowed the 8MB main stack; the
+>    2026-07-02 `RLIMIT_STACK` constructor removed that constraint (the
+>    `virtual_property_recursion` family already recurses 130 deep through the
+>    same frames), but the watch guard kept the 66 cap and truncated
+>    `watch_recursion_double_swf7` at 1596 of its 3118 lines. It is now
+>    `MAX_WATCH_NESTING` (200), above the legal 130.
+>
+> Implementation: `action.c` `virtualAccessorBlocked()` (adds the watch half via
+> `watch_firing_depth_recv`) and the new `watchReentryBlocked()` used by all
+> three watch dispatch sites (object `SetMember`, timeline `SetVariable`,
+> MovieClip `SetMember`).
+>
+> **The SWF6 variants remain `ruffle_matched`, and their residual is now
+> trailing-whitespace only.** After the fix their line counts are exact
+> (18/18 and 46/46) and the sole mismatching lines are `  o2.prop: ` vs the
+> expected `  o2.prop:` — SWF6 stringifies `undefined` as `""`, so the trace
+> literal's own trailing space survives in our output but was stripped from the
+> checked-in `output.txt`. That is an expected-file artifact (see Category 1),
+> not a behavioural gap; the model reproduces SWF6 exactly.
 
 > **Rename note (2026-07-02):** upstream renamed this family
 > `watch_special_recursion_*` → `watch_recursion_*` (and the sibling
@@ -642,10 +688,10 @@ the C stack (`action.c`, `g_watch_firing` / `watch_firing_depth`).
 
 | Test | Result | Why not full match |
 |------|--------|--------------------|
-| `watch_special_recursion_swf6` | **ruffle_matched** | o1 matches Flash exactly; o2 residual ⊆ Ruffle's diff |
-| `watch_special_recursion_double_swf6` | **ruffle_matched** | same |
-| `watch_special_recursion_swf7` | accepted diff | ships **no** `output.ruffle.txt` (no RM target); o1 matches Flash (65 fires) but the o2 `addProperty`+`watch` interplay is a separate deep semantic gap |
-| `watch_special_recursion_double_swf7` | accepted diff | has `output.ruffle.txt`, but ~63 RM-blocker lines remain in the o2 section, and Flash's 130-deep mutual recursion would overflow our C stack regardless |
+| `watch_special_recursion_swf6` | **ruffle_matched** | ~~o1 matches Flash exactly; o2 residual ⊆ Ruffle's diff~~ → since 2026-08-12 the residual is 1 trailing-space line |
+| `watch_special_recursion_double_swf6` | **ruffle_matched** | same (4 trailing-space lines) |
+| `watch_special_recursion_swf7` | ~~accepted diff~~ **PASS** (2026-08-12) | ~~ships no `output.ruffle.txt`; the o2 `addProperty`+`watch` interplay is a separate deep semantic gap~~ — refuted, see the resolution note above |
+| `watch_special_recursion_double_swf7` | ~~accepted diff~~ **PASS** (2026-08-12) | ~~~63 RM-blocker lines in the o2 section, and Flash's 130-deep mutual recursion would overflow our C stack~~ — refuted; the stack limit was already lifted in 2026-07 |
 
 ### `watch_special_recursion_swf7` / `watch_special_recursion_double_swf7` — deep recursion + o2 interplay
 
@@ -657,8 +703,16 @@ section, where a property has **both** an `addProperty` getter/setter **and** a
 replicating Flash's combined accessor+watch dispatch ordering and a non-recursive
 130-deep evaluation; not worth it for two `known_failure` SWF7 variants.
 
-**Decision:** Accept; segfault eliminated (the real bug). swf6 variants pass
-(ruffle_matched); swf7 variants added to `ignored_tests.txt`.
+**Decision (2026-07-02, SUPERSEDED):** Accept; segfault eliminated (the real
+bug). swf6 variants pass (ruffle_matched); swf7 variants added to
+`ignored_tests.txt`.
+
+**Decision (2026-08-12, current):** Not an accepted diff. All four SWF7 dirs
+pass byte-exactly; both entries removed from `ignored_tests.txt`. See the
+resolution note at the top of this category. Kept here for the mechanism and as
+a record of a wrong "unmatchable" ruling that survived two sessions — the
+paragraph above reads as a semantics gap but was two counters that Flash keeps
+as one, plus an obsolete stack-safety cap.
 
 ---
 
@@ -939,8 +993,8 @@ Identical mechanism and identical ceiling.
 | `visual/simple_shapes/masks` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels (776 px), ink IoU 1.00 | Accept, capped with the AA family. **Not mask work** — no `DoABC`, no `setMask`, no `scrollRect`; defects B/C cannot reach it |
 | `visual/simple_shapes/masks_equal_clipdepth` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels, identical to the row above | Accept; same mechanism, same decision |
 | `avm2/verify_method_info_duplicate` | Cross-test inconsistent Flash captures (Category 2) — the trailing `#1065` contradicts the PASSING `verify_method_info_oob` | 1 of 2 | Accept; the +1 is only reachable by keying the error on `1121`, which would demote `_oob` to `ruffle_matched`. Suite-local ignore only |
-| `watch_special_recursion_swf7` | Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay; no `output.ruffle.txt` | ~part of test | Accept; segfault fixed, o1 matches Flash (65 fires); see Category 10 |
-| `watch_special_recursion_double_swf7` | Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay | ~63 | Accept; segfault fixed; see Category 10 |
+| ~~`watch_special_recursion_swf7`~~ (= `watch_recursion_swf7`) | ~~Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 1042/1042. De-listed from `ignored_tests.txt`; see Category 10** |
+| ~~`watch_special_recursion_double_swf7`~~ (= `watch_recursion_double_swf7`) | ~~Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 3118/3118. De-listed; see Category 10** |
 | `from_avmplus/ecma3/Statements/eforin_001` | Implementation-defined `for...in` order (Category 12) | 4 of 16 | Accept; every line is `PASSED!` on both sides, only the sequence differs; avmplus, Ruffle and we produce three different orders and none is insertion order |
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
 | `avm2/loader_applicationDomain` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 4 of 4 | Accept; would require shipping an AVM2 interpreter |

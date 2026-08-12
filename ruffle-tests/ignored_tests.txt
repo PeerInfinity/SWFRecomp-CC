@@ -172,20 +172,16 @@ bitmap_data_thorough/pixelDissolve
 # SWFRecompDocs/plans/video-codec-support-plan.md.
 netstream_play_flv
 
-# --- Watch deep re-entrancy (SWF7 recursion depth) ---
-# New upstream tests. Setting a watched property from inside its own watch
-# handler re-fires it; in SWF7+ Flash recurses 65 (single) / 130 (mutual)
-# levels deep before bottoming out. The single-property o1 section now matches
-# Flash exactly (we previously SEGFAULTED on unbounded C-stack recursion; now
-# bounded — see action.c g_watch_firing / accessorReentryLimit). Full match is
-# unreachable: watch_recursion_swf7 ships no output.ruffle.txt (no RM
-# target), and the o2 addProperty+watch interplay (~63 lines) is a separate deep
-# semantic gap. (The C-stack limit is no longer a factor: 2026-07-02 the
-# runtime raises RLIMIT_STACK and survives 130+ deep accessor recursion — the
-# virtual_property_recursion family now passes — but the watch-vs-getter
-# firing-order gap remains.) The swf6 variants DO pass (ruffle_matched). See ACCEPTED_DIFFS.md
-# Category 10. NOTE: upstream renamed watch_special_recursion_* →
-# watch_recursion_* (test.swf byte-identical; old-name dirs may linger locally
-# because download_tests.sh doesn't --clean). Entries updated 2026-07-02.
-watch_recursion_swf7
-watch_recursion_double_swf7
+# --- Watch deep re-entrancy (SWF7 recursion depth) — RESOLVED 2026-08-12 ---
+# watch_recursion_swf7 and watch_recursion_double_swf7 were listed here as
+# accepted diffs ("the o2 addProperty+watch interplay is a separate deep
+# semantic gap"). That diagnosis was wrong and both now PASS byte-exactly
+# (1042/1042 and 3118/3118) — de-listed, do not re-add. The gap was a single
+# mechanism: Flash runs ONE re-entry counter per property covering watch
+# handlers AND addProperty accessors together (limit 1 at SWF6, 65 at SWF7+),
+# where we ran two independent ones; plus a stale MAX_SPECIAL_DEPTH (66) total
+# cap that truncated the legally-130-deep mutual case. See ACCEPTED_DIFFS.md
+# Category 10 and action.c virtualAccessorBlocked() / watchReentryBlocked().
+# NOTE (still current): upstream renamed watch_special_recursion_* →
+# watch_recursion_* (test.swf byte-identical; old-name dirs linger locally
+# because download_tests.sh doesn't --clean) — the old-name dirs pass too.

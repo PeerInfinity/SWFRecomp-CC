@@ -964,6 +964,53 @@ static void watch_firing_push(ASObject* obj, MovieClip* mc, const char* prop, u3
 static void watch_firing_pop(void) {
 	if (g_watch_firing_count > 0) g_watch_firing_count--;
 }
+// Receiver-keyed variant: counts firing entries for `recv` on EITHER slot (the
+// object site pushes (obj, NULL), the MC/timeline sites push (NULL, mc)), so an
+// accessor dispatch — which only ever holds one opaque receiver pointer — can
+// read the watch half of the shared per-property re-entry counter. See the
+// "unified special-access counter" note above virtualAccessorBlocked().
+// NULL receiver returns 0 (never let a NULL this_obj alias the mc-keyed rows).
+static int watch_firing_depth_recv(const void* recv, const char* prop, u32 len) {
+	if (recv == NULL || prop == NULL) return 0;
+	int c = 0;
+	for (int i = 0; i < g_watch_firing_count; i++)
+		if (((const void*)g_watch_firing[i].obj == recv || (const void*)g_watch_firing[i].mc == recv) &&
+		    g_watch_firing[i].len == len && strncmp(g_watch_firing[i].prop, prop, len) == 0)
+			c++;
+	return c;
+}
+// Total nesting cap for watch re-fire, the non-fatal backstop that keeps a
+// runaway handler off the C stack. Flash's own legal depth on the mutually
+// recursive "double" tests is 130 (accessorReentryLimit() == 65 on each of two
+// distinct properties), so this must sit above that — it used to be
+// MAX_SPECIAL_DEPTH (66), which truncated watch_recursion_double_swf7 at half
+// its output. The 8MB-main-stack worry that motivated 66 is gone: the
+// RLIMIT_STACK constructor above raises the soft limit to 64MB and the
+// virtual_property_recursion family already recurses 130 deep through the same
+// interpreter frames. Must stay <= MAX_WATCH_FIRING (pushes past that silently
+// drop and would stop the depth guard from counting).
+#define MAX_WATCH_NESTING 200
+// Shared re-entry check for the three watch dispatch sites (object SetMember,
+// timeline SetVariable, MovieClip SetMember). Returns nonzero when the handler
+// must NOT re-fire and the value is committed directly instead.
+//
+// The first term is the watch half of the unified special-access counter, the
+// second the addProperty half — see the block comment above
+// virtualAccessorBlocked() for the model and the Flash-oracle derivation. The
+// accessor half is keyed by (receiver, name) rather than by vprop entry id
+// because the dispatch sites hold a receiver, not an ASProperty; the two keys
+// only diverge when one proto entry is shared by several receivers, and a
+// watcher is registered per receiver anyway.
+static int watchReentryBlocked(ASObject* obj, MovieClip* mc, const char* prop, u32 len)
+{
+	if (g_watch_firing_count >= MAX_WATCH_NESTING) return 1;
+	void* recv = (obj != NULL) ? (void*)obj : (void*)mc;
+	int accessor_nesting = 0;
+	if (recv != NULL && len <= 63)
+		accessor_nesting = countActiveAccessor(recv, prop, len, 0) +
+		                   countActiveAccessor(recv, prop, len, 1);
+	return watch_firing_depth(obj, mc, prop, len) + accessor_nesting >= accessorReentryLimit();
+}
 
 // Object.registerClass(symbolName, constructorFunc)
 // Returns true on success, false on invalid args.
@@ -8204,11 +8251,37 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 // re-entrancy rule (see the ActiveAccessor block comment), invoking the
 // accessor while under the limit and falling back to the property's
 // underlying stored value once it's reached.
+//
+// UNIFIED SPECIAL-ACCESS COUNTER (watch + addProperty share ONE limit).
+// Flash does not run two independent re-entry counters for a property that has
+// BOTH an addProperty getter/setter and a watch handler: watch-handler
+// invocations and accessor invocations increment the SAME per-property counter,
+// and once it reaches accessorReentryLimit() (1 for SWF6, 65 for SWF7+) ALL
+// three — getter, setter, and watcher — are bypassed and the access bottoms out
+// at the property's underlying stored value.
+//
+// Derived from the o2 sections of watch_recursion{,_double}_swf{6,7} (Flash
+// oracle), which pin it exactly. In watch_recursion_swf7 the innermost (65th)
+// watch handler reads `o2.prop` as `undefined` and, after assigning "c" without
+// re-firing the watcher, reads it back as "c" — i.e. at watch nesting 65 the
+// getter and the setter are both already blocked, even though no accessor is
+// itself on the stack. The counts fall out of the model with no slack: 129
+// getter + 65 setter fires against 65 watch fires (a handler's 2 reads and 1
+// commit are suppressed only in the frame where the sum hits the limit), and in
+// the double variant 257 prop1-getter / 259 prop2-getter fires, whose −4/−2
+// asymmetry is exactly the two frames (k=129 for prop1, k=130 for both) where
+// each property's own watch depth reaches 65 first.
+//
+// Adding the watch half here is what the accessor side needs; the reverse
+// direction (accessor nesting feeding the watch check) is applied at the three
+// watch dispatch sites via watchReentryBlocked().
 static int virtualAccessorBlocked(ASProperty* prop, void* this_obj, u8 is_setter)
 {
+	int watch_nesting = watch_firing_depth_recv(this_obj, prop->name, prop->name_length);
 	if (g_swf_version <= 6)
-		return countActiveAccessor(this_obj, prop->name, prop->name_length, is_setter) >= accessorReentryLimit();
-	return countActiveAccessorEntry(vpropEntryId(prop)) >= accessorReentryLimit();
+		return countActiveAccessor(this_obj, prop->name, prop->name_length, is_setter) + watch_nesting
+		       >= accessorReentryLimit();
+	return countActiveAccessorEntry(vpropEntryId(prop)) + watch_nesting >= accessorReentryLimit();
 }
 
 static ActionVar invokeVirtualGetter(SWFAppContext* app_context, ASProperty* prop, void* this_obj)
@@ -43965,8 +44038,7 @@ void actionSetVariable(SWFAppContext* app_context)
 					// commits without re-firing. Without this the re-fire
 					// recursed on the C stack and SEGFAULTED
 					// (regression/watch_timeline_reentrant).
-					if (watch_firing_depth(NULL, _sv_ctx, var_name, var_name_len) < accessorReentryLimit()
-					    && g_watch_firing_count < MAX_SPECIAL_DEPTH)
+					if (!watchReentryBlocked(NULL, _sv_ctx, var_name, var_name_len))
 					{
 						watch_firing_push(NULL, _sv_ctx, var_name, var_name_len);
 						invokeWatchCallback(app_context, _wf, &_we->user_data, NULL,
@@ -49029,15 +49101,16 @@ void actionSetMember(SWFAppContext* app_context)
 							// version-specific depth (1 for SWF6, 65 for SWF7+); past
 							// that the value is committed without re-firing. Avoids
 							// the unbounded C-stack recursion (→ segfault) Ruffle has
-							// on these known_failure properties. The second clause is
-							// a hard total-nesting safety cap for the mutually-
-							// recursive "double" case (prop1↔prop2): Flash's true
-							// depth there (130 each) would overflow our C stack, so we
-							// bound combined nesting at MAX_SPECIAL_DEPTH like the
-							// accessor recursion does (no crash; output diverges but
-							// these SWF7 variants are unmatchable recursively anyway).
-							if (watch_firing_depth(obj, NULL, prop_name, prop_name_len) >= accessorReentryLimit()
-							    || g_watch_firing_count >= MAX_SPECIAL_DEPTH)
+							// on these known_failure properties. The depth counted is
+							// the UNIFIED special-access counter — watch fires plus
+							// addProperty accessor fires on the same property share one
+							// Flash limit (see virtualAccessorBlocked). The safety
+							// backstop inside watchReentryBlocked is now
+							// MAX_WATCH_NESTING (200), not MAX_SPECIAL_DEPTH (66):
+							// the mutually recursive "double" case legally reaches 130
+							// (65 on each of prop1/prop2) and 66 truncated it at half
+							// its output.
+							if (watchReentryBlocked(obj, NULL, prop_name, prop_name_len))
 								break;
 							// Get old value via prototype chain (Flash includes inherited values)
 							// IMPORTANT: copy old value before invoking callback, because
@@ -51055,8 +51128,7 @@ void actionSetMember(SWFAppContext* app_context)
 								// without re-firing. Without this the re-fire recursed
 								// on the C stack (the Site A sibling SEGFAULTED;
 								// regression/watch_timeline_reentrant covers the class).
-								if (watch_firing_depth(NULL, mc, prop_name, prop_name_len) < accessorReentryLimit()
-								    && g_watch_firing_count < MAX_SPECIAL_DEPTH)
+								if (!watchReentryBlocked(NULL, mc, prop_name, prop_name_len))
 								{
 									watch_firing_push(NULL, mc, prop_name, prop_name_len);
 									invokeWatchCallback(app_context, _wf, &g_watch_table[_wi].user_data,
