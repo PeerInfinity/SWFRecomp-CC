@@ -683,6 +683,13 @@ us-vs-Flash / us-vs-Ruffle / Ruffle-vs-Flash).
 > because the mechanism is real and a tolerance/quality change could resurface
 > frames 1–2 — and because the scope marker is what keeps a future frame-3
 > failure classified as *live work* rather than silently accepted.
+>
+> **Re-confirmed 2026-08-12 (session 14 hygiene)** at baseline `fb36ba110` /
+> CI run `31130292354`: all seven comparisons are still `status = pass`,
+> `outliers = 0`, `max_diff = 0`. Session 14's wave-1 board audit §5 listed
+> this entry as "stale and still unapplied" — the *stale* half is right, the
+> *unapplied* half is **refuted**: the status note above was applied by session
+> 13 and only the baseline citation needed moving forward.
 
 > **Scope correction (2026-08-01, session 9 pixel triage).** This entry is valid
 > for `frame1` (242 excess px) and `frame2` (483). It is **not** valid for

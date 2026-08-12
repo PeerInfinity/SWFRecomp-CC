@@ -312,9 +312,28 @@ specified anywhere; each player just exposes its own property store:
   `hashbrown` table (`core/src/avm2/dynamic_map.rs`), and enumerates in *bucket*
   order. `loader_load` sets `vars.aaa` then `vars.cccc` and expects
   `cccc=true&aaa=bbb` — pure hash artifact.
-- **We** (and Flash) enumerate in insertion order, so we emit
+- **We** enumerate in insertion order, so we emit
   `aaa=bbb&cccc=true`, on both the `trace(request.data)` line and the
   `Body:` line of the navigator log.
+
+> **Reason corrected 2026-08-12 (session 14 wave-1 board audit §3.2).** This
+> bullet used to read "**We** (and Flash) enumerate in insertion order". The
+> parenthesis is factually wrong and has been struck: the Flash VM does **not**
+> enumerate dynamic properties in insertion order. `from_avmplus` *is* Adobe
+> Tamarin's own acceptance suite, so its checked-in `output.txt` files record
+> real Flash-VM order — and `from_avmplus/ecma3/Statements/eforin_002`, whose
+> object is built by the successive assignments
+> `value, valueOf, toString, toNumber, toBoolean`, expects
+> `toString, value, toNumber, toBoolean, valueOf`. That is Tamarin's
+> `InlineHashtable` slot/bucket layout, not insertion order. Three engines,
+> three orders — see `ACCEPTED_DIFFS.md` Category 12 for the full table.
+>
+> **The decisions in this section are unchanged**: Ruffle's expectations for
+> `loader_load` and `bom` are still its own `hashbrown` bucket order and still
+> unreproducible, and we still keep insertion order. What changes is the
+> *reason* — insertion order is defensible because it is the ES2015+ rule for
+> string keys and because no player's hash layout is reproducible, **not**
+> because it is what Flash does. Do not defend it as "Flash-matching" again.
 
 Ruffle's own `avm2/url_vars` test documents the problem in a source comment —
 *"Ruffle's property iteration order is not consistent with Flash's (yet)"* — and

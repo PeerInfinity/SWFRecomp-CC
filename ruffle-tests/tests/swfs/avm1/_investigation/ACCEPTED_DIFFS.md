@@ -156,7 +156,13 @@ discriminator exists.
 pixel-axis row). **`verify_method_info_oob` is NOT ignore-listed: it passes**, and
 listing a passing test hides a win (the 2026-08-01 prune criterion). Session 13's
 board audit recommended ignore-listing both; the second half of that
-recommendation is refuted by the results file.
+recommendation is refuted by the results file. **Re-verified 2026-08-12 (session
+14 hygiene) at baseline `fb36ba110` / run `31130292354`: `verify_method_info_oob`
+is `status = pass` and `verify_method_info_duplicate` `output_mismatch` (1/2),
+unchanged.** The recommendation to list `_oob` has now been raised in three
+sessions and refuted in all three — it must not be listed while it passes;
+the standing note lives in `avm2/ignored_tests.txt` beside the `_duplicate`
+entry.
 
 ---
 
@@ -585,13 +591,56 @@ list: the **trace test passes**, and a global `ruffle-tests/ignored_tests.txt`
 entry is the only kind that carries an image-axis disposition — which this entry
 already supplies to `scripts/image_triage.py` via the scope marker above.
 
-**Explicitly NOT dispositioned:** `visual/video/deblocking` is live work, not this
-category. Its gap is that Ruffle applies `h263-rs-deblock::deblock()` post-decode
-when the picture requests it and libavcodec does not, plus
-`MAX_EMBEDDED_VIDEO_STREAMS = 8` silently dropping streams 9–12 of its 12. Both
-are implementable.
+### `visual/video/deblocking` — Spark IDCT precision, one Cb level on one chroma row (104 outlier channels, max 4)
 
-### `netstream_play_flv` — Sorenson Spark pixel parity (~52k outliers, max diff 64)
+<!-- image-axis: visual/video/deblocking output -->
+
+1024×1536 (12 tiled `DefineVideoStream`s), `tolerance = 0`, `max_outliers = 0`.
+The trace side passes; only the image comparison fails.
+
+**Superseded note (2026-08-12, session 14 `w2-gfx-deblock`).** This entry
+replaces the "Explicitly NOT dispositioned: `visual/video/deblocking` is live
+work" paragraph that stood here. The live work is **done**: the H.263 Annex J
+deblocking filter is ported (`video_codec.c`, strength from `PQUANT` via
+`video_deblock_strength()`), the `DefineVideoStream` flags byte is now read and
+threaded through `ng_record_video` → `video_decoder_create`, and
+`MAX_EMBEDDED_VIDEO_STREAMS` went 8 → 16 (this test has 12; streams 9–12 were
+being silently dropped). Measured band move:
+**2 906 999 → 104 outlier channels, max 255 → 4, mean 56.2435 → 0.0000**
+(−99.9964 %), with **11 of the 12 streams byte-exact**. Details:
+`SWFRecompDocs/plans/session14-fanout-reports/w2-gfx-deblock-report.md` §3.2/§3a.
+
+What remains is the **same mechanism as the `h263` entry above** — libavcodec's
+H.263 IDCT vs `h263-rs`'s f32 basis-table IDCT — and it is now pinned tightly:
+
+- All 104 channels are in **stream 9 only**, on **chroma row 232** (luma rows
+  464–465 of that 496² picture), in three short runs of chroma columns.
+- Each is **one Cb level**: R never moves, G moves by 1 on four channels, B by
+  2 or 4 — exactly the fingerprint of a ±1 Cb sample through the BT.601
+  integer conversion (`B = gray + cb·132201 >> 16`, 2.017 levels per step).
+- It is **not** a filter-lane bug: stream 9's planes are 496×496 luma and
+  248×248 chroma, both exactly divisible by 8, so the filter's
+  remainder-lane behaviour cannot express itself there at all. Stream 9 is also
+  the least-quantised 496² stream (`PQUANT 2`, 13 305-byte payload vs
+  6 376–6 542 for streams 10–12), i.e. the most retained coefficients and the
+  largest IDCT rounding surface.
+
+**Decision:** accept the image comparison permanently, capped with the `h263`
+entry — every `idct_algo` arm was already swept for that test and none reaches
+`max_outliers = 0`, the closest being a float IDCT that is a CI determinism
+hazard across shards. Not added to any ignore list: the trace test passes, and
+the `image-axis` scope marker above is what dispositions the pixel axis for
+`scripts/image_triage.py`. **Standing invariant:** the marker is scoped to the
+single `output` comparison of this test — a new comparison, or a materially
+larger excess, is not covered and must be re-triaged.
+
+Two riders from the same measurement, deliberately **not** dispositioned here:
+`from_gnash …/Video-EmbedSquareTest` (189 channels at *exactly* 255 in a 26-row
+band — a missing/extra element, not a decode artifact; it is misfiled in the
+video bucket) and `visual/video/h264{,_multinalu}` (codec 7, never reaches the
+Spark path; a decoder arc).
+
+### `netstream_play_flv` — Sorenson Spark pixel parity (44 outliers, max diff 3)
 
 The trace test (22/22) passes — `onStatus` events, NetStream lifecycle, and FLV
 metadata parsing all match Ruffle. After the 2026-05-13 Phase 1 landing of
@@ -601,15 +650,30 @@ GPU-side matrix-scale rendering for the Video display object
 rendered at the SWF-declared bounds (160×120) per Flash's documented Video
 render rule; the on-stage size matches expected.
 
-The remaining diff had two terms, and the mechanism note at the top of this
-category corrects which one dominated. The **colour-conversion** term
-(`sws_scale`'s chroma interpolation) is removed by the session-13 port of
-Ruffle's exact BT.601 integer conversion. What is left is the same Spark
-**IDCT precision** difference documented in the `h263` entry above, plus the
-resampling boundary where the GPU sample-stretch (320×234 → 160×120) magnifies
-it. Both are valid H.263/Spark decoders; the residual is arithmetic precision,
-not a correctness gap. (This test was not re-measured post-patch — expect the
-band to move sharply down; only the flip is not expected.)
+The remaining diff had **three** terms, and this entry's figures have been
+restated twice as they were peeled off:
+
+| measurement | outliers | max diff |
+|---|---:|---:|
+| pre-2026-08-06 (as first written: `sws_scale` colour + IDCT + stretch) | ~52 000 | 64 |
+| session-13 baseline `fb36ba110` (exact BT.601 port landed) | 1 654 | 8 |
+| session-14 `w2-gfx-deblock` (deblocking filter landed) | **44** | **3** |
+
+The **colour-conversion** term (`sws_scale`'s chroma interpolation) was removed
+by the session-13 port of Ruffle's exact BT.601 integer conversion. The
+**missing deblocking filter** was the second term and was hiding inside the
+"IDCT precision" label until session 14: FLV carries no per-stream deblocking
+field, so Ruffle's hardcoded `UseVideoPacketValue` plus this stream's set packet
+bit and `PQUANT 3` give strength 2, and porting the filter drops the excess
+97.3 % (see `w2-gfx-deblock-report.md` §3b). What is left — 93 channels at 1,
+42 at 2, 2 at 3, inside a 58×57-pixel region — really is the GPU
+**sample-stretch** (320×234 → 160×120) magnifying the Spark **IDCT precision**
+difference documented in the `h263` entry above. Both are valid H.263/Spark
+decoders; the residual is arithmetic precision, not a correctness gap.
+
+(The 44/3 figures are a local Dawn measurement made with the session-14 deblock
+patch applied; re-baseline them from the first `images=true` CI run that carries
+it.)
 
 **Decision:** Accept; content decodes correctly and renders at the correct
 on-stage size. Trace test continues to pass.
@@ -746,10 +810,19 @@ coverage rasterizer + thin-stroke pixel-hinting produces crisp edges/seams that 
 > count it when tallying dispositioned pixel work; `scripts/image_triage.py`
 > reports it under "DISPOSITIONED BUT NOT FAILING" rather than silently dropping it.
 >
-> **Re-confirmed 2026-08-06 (session 13 hygiene)** against the current baseline
-> `1f8396f57` / CI run `31090651530`: `avm1/display_object_properties [output]`
-> is `status = pass`, `excess_outliers = 0`. Still stale, still kept for the
-> mechanism only.
+> **Re-confirmed 2026-08-06 (session 13 hygiene)** against the then-current
+> baseline `1f8396f57` / CI run `31090651530`: `avm1/display_object_properties
+> [output]` is `status = pass`, `excess_outliers = 0`. Still stale, still kept
+> for the mechanism only.
+>
+> **Re-confirmed again 2026-08-12 (session 14 hygiene)** at baseline
+> `fb36ba110` / CI run `31130292354`: `status = pass`, `outliers = 0`
+> (`max_diff = 79`, `diff_channels = 724` — all inside tolerance). Session 14's
+> wave-1 board audit §5 listed this entry and `from_gnash …/simple_loop_test`
+> as "stale and still unapplied"; that half is **refuted** — both were applied
+> by session 13's hygiene pass and only needed the baseline citation moved
+> forward. `image_triage.py` will keep listing them under "DISPOSITIONED BUT
+> NOT FAILING"; that is the tool working as designed, not an outstanding edit.
 
 `us-vs-Flash = 192`, `us-vs-Ruffle = 0`, `Ruffle-vs-Flash = 192`. Thin 1px diff
 lines along shape edges where our (and Ruffle's) MSAA antialiasing differs from
@@ -1003,7 +1076,8 @@ Identical mechanism and identical ceiling.
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 (trace lines; **no image comparison exists**) | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
-| `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | ~52k image outliers, max diff 64 | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected 2026-08-06: the colour half was `sws_scale`, now ported exactly; the residual is Spark IDCT precision × the GPU sample-stretch |
+| `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | **44** image outliers, max diff **3** (was ~52k/64, then 1654/8) | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected twice: the colour half was `sws_scale` (ported exactly, 2026-08-06) and the second half was the missing deblocking filter (ported 2026-08-12); the residual is Spark IDCT precision × the GPU sample-stretch |
+| `visual/video/deblocking` | Spark IDCT precision on the least-quantised stream (Category 9) — deblocking filter + flags byte + `MAX_EMBEDDED_VIDEO_STREAMS` 8→16 all landed 2026-08-12 | **104** image outlier channels, max **4**, mean 0.0 (was 2 906 999 / 255) | Accept (image axis only; trace passes). 11 of 12 streams byte-exact; all 104 channels are one Cb level on chroma row 232 of stream 9, whose planes have no remainder lane — decoder precision, not the filter |
 | `visual/video/colorconversion/h263` | Spark IDCT precision after the exact BT.601 port (Category 9) | 10 808 image outlier channels, max 2 | Accept (image axis only; trace passes). Every `idct_algo` arm still fails `max_outliers = 0`, and the closest one is a float IDCT = CI determinism hazard |
 | `visual/simple_shapes/masks` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels (776 px), ink IoU 1.00 | Accept, capped with the AA family. **Not mask work** — no `DoABC`, no `setMask`, no `scrollRect`; defects B/C cannot reach it |
 | `visual/simple_shapes/masks_equal_clipdepth` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels, identical to the row above | Accept; same mechanism, same decision |

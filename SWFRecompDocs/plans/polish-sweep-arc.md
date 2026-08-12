@@ -48,6 +48,35 @@ the sweep was re-shaped into **28 eight-test batches at `-P 5`** and the
 whole 172-test corpus triaged in ~12 minutes. Always pin `--tests-dir`
 per suite and never run a suite without `--test` filters.
 
+### 0.1 Ignore-listed tests still count — hard vs soft on the trace axis ★★
+
+**Added 2026-08-12 (session 14 wave-1 board audit §2.2).** Every wave-1 audit
+from s12 on — including s14's own first regeneration — reported the near-pass
+window as "N rows, of which M are ignore-listed", implying the flagged rows were
+out of play. **They are not.** `verify_output.py:3514` computes
+`effective_pass = pass + ruffle_matched` with **no ignore filtering anywhere**,
+and both ignore files say so in their own headers: *"the headline corpus figure
+is the UNFILTERED effective_pass, and ignored tests are run and counted there
+either way. It only fixes the filtered report."* An ignore-listed near-pass is
+worth exactly the same **+1 effective** as any other row if it is winnable; at
+s14 that was 16 of the 35 rows at gap ≤ 5.
+
+So the trace axis now uses **the pixel axis's hard/soft split** (the same rule
+`scripts/image_triage.py` applies to image dispositions):
+
+- **HARD** = backed by an entry in a disposition doc (`ACCEPTED_DIFFS.md`,
+  `RUFFLE_VS_FLASH_DIFFERENCES.md`) that explains why the diff is permanent.
+  Unwinnable; drop it from the board.
+- **SOFT** = a suite-local `ignored_tests.txt` entry with no doc backing. Still
+  a **candidate** — it only affects the *filtered* report. The suite-local lists
+  were seeded mechanically from directory-name prefixes before any AVM2
+  implementation existed (see the `avm2/ignored_tests.txt` header), which is
+  precisely the provenance that made the pixel axis introduce the split.
+
+When a board is regenerated, resolve each flag against the disposition docs
+before writing it off, and state which of the two it is. A soft flag is a
+bookkeeping fact about the filtered report, not a ruling about the test.
+
 ## 1. Triage table (bucketed by CAUSE)
 
 Ranked by yield-per-effort. "Lines" = expected−matching summed over

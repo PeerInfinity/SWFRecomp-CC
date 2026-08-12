@@ -15,7 +15,10 @@
 # avmplus's hashtable layout rather than a behavioural requirement. Every
 # line on BOTH sides is `PASSED!` — only the sequence differs — and avmplus,
 # Ruffle and we each produce a different order, so `ruffle_matched` is
-# unreachable too. Ours is insertion order (the ES2015+ rule).
+# unreachable too. Ours is the ES2015+ rule: integer-like keys ascending first
+# (visible in eforin_001), then string keys in insertion order (eforin_002 is
+# pure insertion order). NOTE (2026-08-12): avmplus IS the Flash VM here, and
+# its order is NOT insertion order — do not describe ours as "Flash-matching".
 # See avm1/_investigation/ACCEPTED_DIFFS.md Category 12.
 ecma3/Statements/eforin_001
 ecma3/Statements/eforin_002

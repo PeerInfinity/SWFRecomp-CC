@@ -1,14 +1,22 @@
 # Sprite Execution Order: LIFO Instantiation Plan
 
-<!-- TESTS: action_order/action_execution_order_test5, action_order/action_execution_order_test11 -->
+<!-- TESTS: action_order/action_execution_order_test11 -->
 <!-- PROMOTED (removed from TESTS):
   - action_execution_order_test2 → PASS 2026-05-08 (Phases 1-3 sort by place_seq DESC fixed it)
+  - action_execution_order_test5 → PASS 35/35 (confirmed at baseline fb36ba110 / CI run
+    31130292354; the doc previously claimed 26/35 long after it had flipped)
 -->
-<!-- Residual: test5 (26/35) and test11 (27/32) remain `output_mismatch`. Phases 1-3
-plus the 2026-05-08 flat clip-event dispatch landed; remaining diffs are NOT
-LIFO-ordering related — test5 cleanup-phase, test11 mc2/mc1 enterFrame interleave.
-See "Status as of 2026-05-08" below for what's left and why Phase 4 dispatcher-
-proper is not the right next step. -->
+<!-- Residual (refreshed 2026-08-12, session 14 hygiene, against baseline fb36ba110 /
+CI run 31130292354): test5 is **PASS 35/35**; test11 is **26/32** `output_mismatch`
+(6 differing lines). The pre-2026-08 header claimed "test5 (26/35) and test11 (27/32)"
+— both figures were stale; the 27/32 was a local 2026-05-08 measurement that was never
+reconciled with CI. Phases 1-3 plus the 2026-05-08 flat clip-event dispatch landed;
+the remaining test11 diff is NOT LIFO-ordering.
+CURRENT DIAGNOSIS OF RECORD: SWFRecompDocs/plans/session14-fanout-reports/wave1-avm1-tick.md
+— it splits test11's two failing assertions into (D1) per-clip enterFrame+advance
+adjacency and (D2) flat-global vs per-subtree LIFO in `advance_nested_sprite_frames`,
+prices the whole arc at +1 test, and recommends DEFER. Read it before reopening this
+plan; the sections below are the 2026-05 state and are kept as history. -->
 
 <!-- PLAN_META
 id: SPRITE_EXEC_LIST_LIFO
@@ -65,7 +73,11 @@ pub fn add_to_exec_list(&mut self, ..., clip: MovieClip<'gc>) {
 ```
 and `core/src/avm1/runtime.rs:489-505` (forward traversal in `Avm1::run_frame`).
 
-## Affected tests (CI 91a39c2c)
+## Affected tests (CI 91a39c2c — historical snapshot)
+
+> Current status (baseline `fb36ba110`): test2 **PASS**, test5 **PASS 35/35**,
+> test11 **26/32** `output_mismatch`. The table below is the 2026-05 starting
+> point, kept for the diff snippets.
 
 | Test | Suite | Match | Lines | Diff snippet |
 |------|-------|-------|-------|---|
