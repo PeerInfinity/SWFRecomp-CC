@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-07-29T03:45:41.133558+00:00",
-    "old_git_sha": "72fdc5e933a6c32ecea4be6e398c9a3aac819699",
-    "new_timestamp": "2026-08-02T09:26:35.697784+00:00",
-    "new_git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "old_timestamp": "2026-08-02T09:26:35.697784+00:00",
+    "old_git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "new_timestamp": "2026-08-09T08:51:22.970408+00:00",
+    "new_git_sha": "0a99be1a92dee5a4f000bdf1a0809c47b9e27fc5",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 3,
     "old_total": 6,
     "old_pass_rate": 50.0,
-    "new_pass": 3,
+    "new_pass": 6,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 3,
+    "new_effective_pass": 6,
     "new_total": 6,
-    "new_pass_rate": 50.0,
+    "new_pass_rate": 100.0,
     "old_mismatched_lines": 69,
-    "new_mismatched_lines": 69,
+    "new_mismatched_lines": 0,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 69,
+    "newly_passing": 3,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 6,
+    "status_changed": 3,
+    "unchanged": 3,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "device_font_glyph_fallback",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 29
+      },
+      "new_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      }
+    },
+    {
+      "test": "device_font_kerning",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "device_font_list",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 64,
+        "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      }
+    }
+  ]
 }

@@ -1,43 +1,44 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-02 09:26 UTC
+**Date**: 2026-08-09 08:51 UTC
 
-**Git SHA**: `b4c983ea4c`
+**Git SHA**: `0a99be1a92`
 
-**Run Duration**: 3m 20s
+**Run Duration**: 3m 22s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 11 |
-| Passing | **9** (81.8%) |
-| Failing | 2 |
+| Passing | **10** (90.9%) |
+| Failing | 1 |
 | Total expected lines | 973 |
-| Matching lines | 858 (88.2%) |
-| Mismatched lines | 115 |
+| Matching lines | 972 (99.9%) |
+| Mismatched lines | 1 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 2 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**9 tests passing**
+**10 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `auto_size/height` | 1 | 25.1s |  |
-| 2 | `auto_size/return` | 12 | 25.2s |  |
-| 3 | `auto_size/width` | 6 | 25.2s |  |
+| 1 | `auto_size/height` | 1 | 25.9s |  |
+| 2 | `auto_size/return` | 12 | 26.4s |  |
+| 3 | `auto_size/width` | 6 | 25.5s |  |
 | 4 | `br_at_start` | 0 | 1.4s |  |
-| 5 | `style_changes_in_html` | 0 | 20.8s |  |
-| 6 | `text_caret_placement_align` | 248 | 20.0s |  |
-| 7 | `text_caret_placement_leading` | 244 | 27.5s |  |
-| 8 | `text_caret_placement_scroll` | 108 | 26.5s |  |
-| 9 | `text_caret_placement_translated_bounds` | 140 | 20.2s |  |
+| 5 | `html_entity_parsing` | 213 | 6.3s |  |
+| 6 | `style_changes_in_html` | 0 | 15.9s |  |
+| 7 | `text_caret_placement_align` | 248 | 28.6s |  |
+| 8 | `text_caret_placement_leading` | 244 | 27.6s |  |
+| 9 | `text_caret_placement_scroll` | 108 | 21.6s |  |
+| 10 | `text_caret_placement_translated_bounds` | 140 | 20.2s |  |
 
 ## Near-Passing Tests
 
@@ -61,9 +62,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**2 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `html_entity_parsing` | 45.6% | 99/217 | 217 | 213 |  |
-| 2 | `links_in_scrolled_text` | 0.0% | 0/1 | 0 | 1 |  |
+| 1 | `links_in_scrolled_text` | 0.0% | 0/1 | 0 | 1 |  |

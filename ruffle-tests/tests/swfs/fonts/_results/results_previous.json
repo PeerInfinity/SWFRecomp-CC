@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-07-29T03:45:41.133558+00:00",
-    "git_sha": "72fdc5e933a6c32ecea4be6e398c9a3aac819699",
-    "duration_seconds": 106.58,
+    "timestamp": "2026-08-02T09:26:35.697784+00:00",
+    "git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
+    "duration_seconds": 114.18,
     "total_available": 6,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "device_font_glyph_fallback",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.41,
+        "compile": 24.735,
         "run": 0.004
       },
       "num_frames": 1,
@@ -31,7 +31,7 @@
         "expected_lines": 36,
         "matching_lines": 29
       },
-      "duration": 24.42,
+      "duration": 24.75,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=36, expected=36)",
       "actual_output": "Text: a\n  Text runs:\n    Text runs (1):\n    from 0 to 1: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0: x=2, y=2, width=6, height=13.6\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width=6\nText: ab\n  Text runs:\n    Text runs (1):\n    from 0 to 2: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0: x=2, y=2, width=6, height=13.6\n    1:\n      x=8, y=2\n      width is zero? false\n      height is zero? false\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width is zero? false\n    width is 10? false\nText: b\n  Text runs:\n    Text runs (1):\n    from 0 to 1: size=10, blockIndent=0, font=TestFontA, align=left, leading=0, display=block, kerning=false, leftMargin=0, rightMargin=0, color=0, bold=false, italic=false, bullet=false, underline=false\n  Character bounds:\n    0:\n      x=2, y=2\n      width is zero? false\n      height is zero? false\n  Line metrics:\n    ascent=10.7, descent=2.9, height=13.6, leading=0\n    width is zero? false\n    width is 10? false",
@@ -41,7 +41,7 @@
       "test": "device_font_kerning",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.301,
+        "compile": 25.03,
         "run": 0.004
       },
       "num_frames": 1,
@@ -50,7 +50,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 25.31,
+      "duration": 25.04,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=4, expected=4)",
       "actual_output": "LM width: 23\nwidth: 23\nLM width: 23\nwidth: 23",
@@ -60,7 +60,7 @@
       "test": "device_font_list",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.745,
+        "compile": 25.281,
         "run": 0.004
       },
       "num_frames": 1,
@@ -69,7 +69,7 @@
         "expected_lines": 64,
         "matching_lines": 6
       },
-      "duration": 24.76,
+      "duration": 25.29,
       "status": "output_mismatch",
       "detail": "58 line(s) differ (actual=48, expected=64)",
       "actual_output": "Testing CSS font list fallback:\n  Embedded? = false\n  Font list? = Totally Unknown, TestFontA , TestFontB\nTesting TextFormat font list fallback:\n  Embedded? = false\n  Font list? = Totally Unknown, TestFontA , TestFontB\nTesting CSS font list fallback:\n  Embedded? = false\n  Font list? =  testFOntB  , TestFontA , TestFontB\nTesting TextFormat font list fallback:\n  Embedded? = false\n  Font list? =  testFOntB  , TestFontA , TestFontB\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = Totally Unknown, EmbeddedTestFontA, EmbeddedTestFontB\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = Totally Unknown, EmbeddedTestFontA, EmbeddedTestFontB\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA\nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA  \nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? = EmbeddedTestFontA  \nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA  \nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   EmbeddedTestFontA  \nTesting CSS font list fallback:\n  Embedded? = true\n  Font list? =   embeddedTESTFonta\nTesting TextFormat font list fallback:\n  Embedded? = true\n  Font list? =   embeddedTESTFonta",
@@ -78,8 +78,8 @@
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.15,
-        "compile": 20.272,
+        "recomp": 0.194,
+        "compile": 26.076,
         "run": 0.004
       },
       "num_frames": 1,
@@ -88,14 +88,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.43,
+      "duration": 26.28,
       "status": "pass"
     },
     {
       "test": "embed_matching/match_style",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.845,
+        "compile": 6.475,
         "run": 0.004
       },
       "num_frames": 1,
@@ -104,14 +104,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.86,
+      "duration": 6.49,
       "status": "pass"
     },
     {
       "test": "embed_matching/no_font_found",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.439,
+        "compile": 5.98,
         "run": 0.004
       },
       "num_frames": 1,
@@ -120,7 +120,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.45,
+      "duration": 5.99,
       "status": "pass"
     }
   ]

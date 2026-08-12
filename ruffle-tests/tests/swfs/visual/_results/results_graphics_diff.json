@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-06T10:26:29.739290+00:00",
-    "old_git_sha": "1f8396f5799facba702fc3a1a72bda6974146a73",
-    "new_timestamp": "2026-08-06T23:55:08.713030+00:00",
-    "new_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
+    "old_timestamp": "2026-08-06T23:55:08.713030+00:00",
+    "old_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
+    "new_timestamp": "2026-08-12T23:11:20.726020+00:00",
+    "new_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 142,
     "old_total": 143,
     "old_pass_rate": 97.9,
-    "new_pass": 140,
+    "new_pass": 141,
     "new_ruffle_matched": 2,
-    "new_effective_pass": 142,
-    "new_total": 143,
+    "new_effective_pass": 143,
+    "new_total": 144,
     "new_pass_rate": 97.9,
     "old_mismatched_lines": 49,
     "new_mismatched_lines": 49,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 143,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "define_bits_lossless2_rgb15",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }
