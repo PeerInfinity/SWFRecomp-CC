@@ -388,6 +388,8 @@ static void gc_mark_roots_file(void);
 static void gc_mark_roots_nc_queue(void);
 // LocalConnection channel-map + message-queue roots (defined below).
 static void gc_mark_roots_lc(void);
+// NetStream queued-onMetaData roots (defined below).
+static void gc_mark_roots_netstream(void);
 
 void avm2_gc_mark_roots_net(Avm2Context* ctx)
 {
@@ -406,6 +408,7 @@ void avm2_gc_mark_roots_net(Avm2Context* ctx)
 	gc_mark_roots_file();
 	gc_mark_roots_nc_queue();
 	gc_mark_roots_lc();
+	gc_mark_roots_netstream();
 }
 
 static void register_socket(Avm2Context* ctx)
@@ -1843,15 +1846,26 @@ static void register_local_connection(Avm2Context* ctx)
 // flash.net.NetStream
 // ---------------------------------------------------------------------------
 //
-// No media pipeline: the corpus tests that need one are dispositioned out of
-// this arc (net-socket-arc.md bucket M). What IS graded is the `client`
-// property, whose setter rejects every non-object with TypeError #2004 —
-// including null and undefined, which is why it cannot be a plain slot.
+// No media pipeline (no demuxer, no A/V decoder): the corpus tests that need
+// one are dispositioned out of this arc (net-socket-arc.md bucket M). What IS
+// graded is the `client` property, whose setter rejects every non-object with
+// TypeError #2004 — including null and undefined, which is why it cannot be a
+// plain slot — plus the SCRIPT-DATA half of playback, below.
+//
+// FLV script data is not media: an FLV's onMetaData tag is a plain AMF0 value
+// sitting in a container we can walk with a length-prefixed tag loop, and
+// Flash delivers it to `client.onMetaData` before a single sample is decoded.
+// So `play()` on a bundled .flv parses the metadata tag and queues that one
+// callback; everything downstream of it (frames, audio, `time`) stays absent.
+// That is the whole of `avm2/netstream_flv_date` and the "cheapest re-entry
+// point" bucket M named.
 
 typedef struct Avm2NetStreamExt
 {
 	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
 	Avm2Value client;                   // defaults to the stream itself
+	Avm2Value pending_meta;             // queued onMetaData argument
+	uint8_t has_pending_meta;
 } Avm2NetStreamExt;
 
 static Avm2NetStreamExt* ns_ext(Avm2Activation* act)
@@ -1886,6 +1900,126 @@ static Avm2Value ns_set_client(Avm2Activation* act)
 
 static Avm2Value ns_get_zero(Avm2Activation* act)
 { (void) act; return avm2_number(0); }
+
+// --- FLV script data ------------------------------------------------------
+//
+// Streams with a queued onMetaData. Small and fixed: a test movie plays one
+// or two clips, and a stream whose callback has fired drops out immediately.
+#define NS_MAX_PENDING_META 8
+static Avm2Object* g_ns_pending_meta[NS_MAX_PENDING_META];
+static int g_ns_pending_meta_count;
+
+static void gc_mark_roots_netstream(void)
+{
+	for (int i = 0; i < g_ns_pending_meta_count; i++)
+		avm2_gc_mark_object(g_ns_pending_meta[i]);
+}
+
+// Locate the AMF0 body of the first SCRIPTDATA tag (type 18) whose name is
+// "onMetaData", and return a pointer to the VALUE that follows the name.
+// FLV body layout: 9-byte header, then repeating [PreviousTagSize u32][tag
+// header 11 bytes][tag data]. Returns NULL when the file is not an FLV, has no
+// such tag, or is truncated — every one of which leaves play() silent, which
+// is what Flash does with a stream that carries no metadata.
+static const unsigned char* flv_find_metadata(const unsigned char* data,
+                                              size_t len, size_t* out_len)
+{
+	if (data == NULL || len < 13) return NULL;
+	if (data[0] != 'F' || data[1] != 'L' || data[2] != 'V') return NULL;
+	size_t off = ((size_t) data[5] << 24) | ((size_t) data[6] << 16)
+	           | ((size_t) data[7] << 8) | (size_t) data[8];   // DataOffset
+	if (off < 9 || off > len) off = 9;
+	off += 4;   // first PreviousTagSize
+	while (off + 11 <= len)
+	{
+		unsigned int tag_type = data[off] & 0x1F;
+		size_t tag_size = ((size_t) data[off + 1] << 16)
+		                | ((size_t) data[off + 2] << 8) | (size_t) data[off + 3];
+		size_t body = off + 11;
+		if (body + tag_size > len) break;
+		if (tag_type == 18 && tag_size > 3 && data[body] == 0x02)
+		{
+			size_t nlen = ((size_t) data[body + 1] << 8) | (size_t) data[body + 2];
+			size_t name_end = body + 3 + nlen;
+			if (name_end <= body + tag_size && nlen == 10
+			    && memcmp(data + body + 3, "onMetaData", 10) == 0)
+			{
+				*out_len = body + tag_size - name_end;
+				return data + name_end;
+			}
+		}
+		off = body + tag_size + 4;   // skip the trailing PreviousTagSize
+	}
+	return NULL;
+}
+
+// play(name) — the script-data half only. A name that resolves to a bundled
+// .flv with an onMetaData tag queues the callback for the end of the frame
+// (Flash never delivers it inside the calling frame: netstream_flv_date traces
+// "init finished" from the same constructor first). Anything else is a no-op.
+static Avm2Value ns_play(Avm2Activation* act)
+{
+	Avm2Object* self = net2_this(act);
+	Avm2NetStreamExt* e = ns_ext(act);
+	if (self == NULL || e == NULL || act->argc == 0) return avm2_undefined();
+	if (act->args[0].kind == AVM2_VALUE_NULL
+	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
+		return avm2_undefined();
+	const Avm2String* url = avm2_coerce_to_string(act->ctx, act->args[0]);
+	if (url == NULL || url->len == 0) return avm2_undefined();
+
+	// findDataFile is keyed by the bare filename as well as the relative path.
+	char name[256];
+	size_t n = (size_t) url->len < sizeof(name) - 1
+		? (size_t) url->len : sizeof(name) - 1;
+	memcpy(name, url->utf8, n);
+	name[n] = '\0';
+	const char* base = name;
+	for (const char* p = name; *p != '\0'; p++)
+		if (*p == '/' || *p == '\\') base = p + 1;
+	DataFileEntry* d = findDataFile(base);
+	if (d == NULL) d = findDataFile(name);
+	if (d == NULL || d->content == NULL) return avm2_undefined();
+
+	size_t mlen = 0;
+	const unsigned char* meta = flv_find_metadata(
+		(const unsigned char*) d->content, (size_t) d->content_length, &mlen);
+	if (meta == NULL) return avm2_undefined();
+
+	e->pending_meta = avm2_amf0_read_value(act->ctx, meta, mlen);
+	if (e->has_pending_meta) return avm2_undefined();   // already queued
+	e->has_pending_meta = 1;
+	if (g_ns_pending_meta_count < NS_MAX_PENDING_META)
+		g_ns_pending_meta[g_ns_pending_meta_count++] = self;
+	return avm2_undefined();
+}
+
+// Per-tick drain, called from avm2_display_run_tick's executor-drain point
+// (beside the NetConnection flush). The client is whatever `client` holds at
+// delivery time, and a client without an onMetaData property is silent —
+// Flash raises no error for a missing script-data handler.
+void avm2_net_deliver_netstream_meta(Avm2Context* ctx)
+{
+	if (g_ns_pending_meta_count == 0) return;
+	Avm2Object* batch[NS_MAX_PENDING_META];
+	int count = g_ns_pending_meta_count;
+	memcpy(batch, g_ns_pending_meta, (size_t) count * sizeof(Avm2Object*));
+	g_ns_pending_meta_count = 0;
+	for (int i = 0; i < count; i++)
+	{
+		Avm2Object* ns = batch[i];
+		if (ns == NULL || ns->native_ext == NULL) continue;
+		Avm2NetStreamExt* e = (Avm2NetStreamExt*) ns->native_ext;
+		if (!e->has_pending_meta) continue;
+		e->has_pending_meta = 0;
+		Avm2Value arg = e->pending_meta;
+		e->pending_meta = avm2_undefined();
+		Avm2Value client = e->client;
+		if (client.kind != AVM2_VALUE_OBJECT) continue;
+		if (!avm2_has_public_property(ctx, client, "onMetaData", 10)) continue;
+		avm2_call_public_property(ctx, client, "onMetaData", 10, &arg, 1);
+	}
+}
 
 // --- flash.net.NetStreamPlayOptions ---------------------------------------
 //
@@ -1971,7 +2105,7 @@ static void register_net_stream(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, cls, "bytesTotal", ns_get_zero);
 	avm2_builtin_add_getter(ctx, cls, "currentFPS", ns_get_zero);
 	avm2_builtin_add_getter(ctx, cls, "bufferLength", ns_get_zero);
-	avm2_builtin_add_method(ctx, cls, "play", net2_noop);
+	avm2_builtin_add_method(ctx, cls, "play", ns_play);
 	avm2_builtin_add_method(ctx, cls, "pause", net2_noop);
 	avm2_builtin_add_method(ctx, cls, "resume", net2_noop);
 	avm2_builtin_add_method(ctx, cls, "togglePause", net2_noop);

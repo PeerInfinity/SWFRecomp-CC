@@ -777,6 +777,10 @@ void avm2_net_flush_connections(Avm2Context* ctx);
 // the callee's method, then an AsyncErrorEvent on the receiver if it threw).
 // Called from avm2_display_run_tick right after the frame's AVM2 phases.
 void avm2_net_deliver_local_connections(Avm2Context* ctx);
+// Deliver the onMetaData callback queued by NetStream.play() on a bundled FLV
+// (the script-data half of playback — see avm2_net.c's NetStream section).
+// Called from the same per-tick drain point as the NetConnection flush.
+void avm2_net_deliver_netstream_meta(Avm2Context* ctx);
 // The movie's LocalConnection domain (avm2_globals.c owns the URL parsing).
 const char* avm2_local_connection_domain(void);
 

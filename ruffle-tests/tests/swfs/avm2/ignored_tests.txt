@@ -27,15 +27,30 @@
 # if a genuinely GPU-dependent avm2 test lands.)
 
 # Host I/O: network / audio / video / camera (out of scope for a headless trace runner; re-triage if sync shims land)
+#
+# PARTIALLY RE-COSTED 2026-08-12 (s14 wave-2 `host-io`, board row T5). Three
+# entries removed by the 2026-08-01 prune criterion — they are `pass` now, and
+# an entry that hides a win is exactly what that criterion deletes:
+#   netstream_flv_date        an FLV's onMetaData tag is AMF0 SCRIPT DATA in a
+#                             length-prefixed container, not media: no demuxer
+#                             and no decoder are involved. It was bucketed with
+#                             the three real playback rows on its name alone.
+#   sound_rootless            } URL-loaded sounds now load and complete: their
+#   sound_constructor_with_args } duration is estimated from the mp3 frame
+#                             header and counted down per tick (the AVM1
+#                             trace-mode model, ported). Embedded sounds keep
+#                             the mixer path untouched in both build modes.
+# The nine below are NOT re-costed. `netstream_play_flv`/`_seek_flv`/
+# `_play_stop_replay` do need real playback state and a decoder (bucket M is
+# right about those three); `soundchannel_soundcomplete` (6/16) and
+# `soundchannel_position` (66/140) now sit directly on the mechanism above and
+# are the obvious next probe.
 audio_computespectrum
 localconnection
-netstream_flv_date
 netstream_play_flv
 netstream_play_stop_replay
 netstream_seek_flv
-sound_constructor_with_args
 sound_load_multiple
-sound_rootless
 soundchannel_position
 soundchannel_soundcomplete
 soundmixer_soundtransform

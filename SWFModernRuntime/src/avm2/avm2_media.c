@@ -26,9 +26,10 @@
 #include <string.h>
 
 #include <audio/audio.h>
-#ifndef NO_GRAPHICS
-#include <libswf/swf.h>   // full SWFAppContext (app->audio_ctx)
-#endif
+// Unconditional: DataFileEntry / findDataFile (the bundled sibling mp3 a
+// Sound.load() resolves) are needed in both builds. Graphics builds also take
+// the full SWFAppContext (app->audio_ctx) from here.
+#include <libswf/swf.h>
 
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
@@ -201,6 +202,12 @@ typedef struct Avm2SoundChannelExt
 	int32_t mixer_ch;
 	uint32_t mixer_gen;
 	uint8_t mixer_live;
+	// Simulated playback clock for a URL-loaded Sound. Such a sound has no
+	// DefineSound char id, so it never reaches the mixer in ANY build — the
+	// clock is the only thing that can end its playback, and it runs
+	// identically in no-graphics and graphics (mode parity).
+	double sim_elapsed_ms, sim_duration_ms;
+	uint8_t sim_live;
 } Avm2SoundChannelExt;
 
 static void sound_channel_native_init(Avm2Context* ctx, Avm2Object* obj)
@@ -227,6 +234,26 @@ static void sc_mixer_gains(const Avm2SoundChannelExt* sc, float gains[5])
 	gains[4] = (float) sc->st_volume / 100.0f;
 }
 #endif
+
+// --- simulated playback registry -------------------------------------------
+//
+// Channels playing a URL-loaded Sound. The mixer registry above cannot hold
+// them: audio_start_sound_ex is keyed by DefineSound char id and an external
+// mp3 has none, so in every build (browser included) such a channel would play
+// forever and never dispatch Event.SOUND_COMPLETE. This is the AVM2 port of
+// the AVM1 trace-mode model in action.c ("Sound playback simulation"): a
+// duration estimated from the mp3's own frame header, advanced one frame
+// budget per tick, dispatching soundComplete when it drains. Embedded sounds
+// are untouched — they keep the mixer path in both directions.
+#define AVM2_MAX_SIM_CHANNELS 16
+static Avm2Object* g_sim_channels[AVM2_MAX_SIM_CHANNELS];
+
+static void sim_channel_stop(Avm2Object* obj, Avm2SoundChannelExt* sc)
+{
+	sc->sim_live = 0;
+	for (int i = 0; i < AVM2_MAX_SIM_CHANNELS; i++)
+		if (g_sim_channels[i] == obj) g_sim_channels[i] = NULL;
+}
 
 static Avm2SoundChannelExt* this_sc(Avm2Activation* act)
 {
@@ -277,6 +304,7 @@ static Avm2Value sc_get_position(Avm2Activation* act)
 {
 	Avm2SoundChannelExt* sc = this_sc(act);
 	if (sc == NULL) return avm2_number(0.0);
+	if (sc->sim_live) return avm2_number(sc->sim_elapsed_ms);
 #ifndef NO_GRAPHICS
 	// Live mixer playback clock (browser builds; in the native test harness
 	// nothing pulls audio_mix, so an active channel reports 0 — trace-inert).
@@ -298,6 +326,11 @@ static Avm2Value sc_get_peak(Avm2Activation* act)
 
 static Avm2Value sc_stop(Avm2Activation* act)
 {
+	// Manual stop: no soundComplete, in either playback model.
+	{
+		Avm2SoundChannelExt* sim = this_sc(act);
+		if (sim != NULL && sim->sim_live) sim_channel_stop(this_obj(act), sim);
+	}
 #ifndef NO_GRAPHICS
 	Avm2SoundChannelExt* sc = this_sc(act);
 	if (sc != NULL && sc->mixer_live)
@@ -397,6 +430,12 @@ typedef struct Avm2SoundObjExt
 	uint32_t sample_count;
 	double sample_rate;
 	uint32_t data_size;  // bytesTotal (compressed, excl. MP3 seek prefix)
+	// URL-loaded sound (load()/new Sound(request)) — a bundled sibling file,
+	// resolved synchronously, with its open/progress/complete events queued
+	// for the end of the frame the way every other fetch in the runtime is.
+	double ext_duration_ms;
+	uint8_t ext_loaded;      // bytes resolved: length/bytesTotal are live
+	uint8_t ext_load_queued; // events not delivered yet
 } Avm2SoundObjExt;
 
 static Avm2SoundObjExt* sound_ext_of(Avm2Context* ctx, Avm2Object* o)
@@ -420,6 +459,9 @@ static const Avm2SoundData* sound_data_for_char(uint16_t char_id)
 	return NULL;
 }
 
+static void sound_start_url_load(Avm2Context* ctx, Avm2Object* self,
+                                 Avm2SoundObjExt* s, Avm2Value request);
+
 // Sound(stream:URLRequest = null, context:SoundLoaderContext = null).
 static Avm2Value sound_ctor(Avm2Activation* act)
 {
@@ -439,13 +481,18 @@ static Avm2Value sound_ctor(Avm2Activation* act)
 		s->sample_rate = rate_code_hz(sd->rate);
 		s->data_size = sd->data_size;
 	}
-	// External URL loading (new Sound(urlReq)) is deferred; leave has_sound 0.
+	// `new Sound(request)` starts the load immediately (Sound.as), exactly as
+	// `new URLLoader(request)` does.
+	else if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		sound_start_url_load(ctx, self, s, act->args[0]);
 	return avm2_undefined();
 }
 
 static double sound_length_ms(Avm2SoundObjExt* s)
 {
-	if (s == NULL || !s->has_sound || s->sample_rate <= 0) return 0.0;
+	if (s == NULL) return 0.0;
+	if (s->ext_loaded) return s->ext_duration_ms;
+	if (!s->has_sound || s->sample_rate <= 0) return 0.0;
 	return (double) s->sample_count * 1000.0 / s->sample_rate;
 }
 
@@ -488,6 +535,83 @@ static Avm2Value sound_get_id3(Avm2Activation* act)
 {
 	(void) act;
 	return avm2_null();
+}
+
+// --- URL-loaded sounds ------------------------------------------------------
+//
+// Sounds with a pending load(), drained once per tick by avm2_media_poll.
+// Flash never delivers open/progress/complete inside the calling frame, and
+// sound_constructor_with_args grades exactly that: both of the constructor's
+// own traces precede every callback.
+#define AVM2_MAX_PENDING_SOUND_LOADS 8
+static Avm2Object* g_pending_sound_loads[AVM2_MAX_PENDING_SOUND_LOADS];
+static int g_pending_sound_load_count;
+
+// Duration of a CBR MP3 from its first frame header — the same estimate the
+// AVM1 side uses (action.c builtin_sound_loadSound). Enough for playback
+// bookkeeping; nothing here decodes samples.
+static double mp3_duration_ms(const unsigned char* p, size_t len)
+{
+	if (p == NULL || len < 4) return 0.0;
+	// Skip an ID3v2 tag (syncsafe 28-bit size after the 10-byte header).
+	if (len >= 10 && p[0] == 'I' && p[1] == 'D' && p[2] == '3')
+	{
+		size_t skip = (size_t) (((p[6] & 0x7F) << 21) | ((p[7] & 0x7F) << 14)
+		                        | ((p[8] & 0x7F) << 7) | (p[9] & 0x7F)) + 10;
+		if (skip >= len) return 0.0;
+		p += skip;
+		len -= skip;
+	}
+	if (len < 4 || p[0] != 0xFF || (p[1] & 0xE0) != 0xE0) return 0.0;
+	int version = (p[1] >> 3) & 3;   // 3 = MPEG1
+	int layer = (p[1] >> 1) & 3;     // 1 = Layer III, 2 = Layer II
+	int br_idx = (p[2] >> 4) & 0xF;
+	static const int br_v1_l3[] =
+		{ 0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0 };
+	static const int br_v1_l2[] =
+		{ 0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0 };
+	int kbps = 0;
+	if (version == 3 && layer == 1) kbps = br_v1_l3[br_idx];
+	else if (version == 3 && layer == 2) kbps = br_v1_l2[br_idx];
+	if (kbps <= 0) return 0.0;
+	return (double) len * 8.0 / (double) (kbps * 1000) * 1000.0;
+}
+
+// Resolve a URLRequest to a bundled sibling file and seed the Sound with its
+// size and duration. The bytes are available synchronously (they are linked
+// into the binary) — only the EVENTS are deferred, which is the same split the
+// URLLoader pipeline uses.
+static void sound_start_url_load(Avm2Context* ctx, Avm2Object* self,
+                                 Avm2SoundObjExt* s, Avm2Value request)
+{
+	if (self == NULL || s == NULL || request.kind != AVM2_VALUE_OBJECT) return;
+	const Avm2String* url = NULL;
+	{
+		Avm2Value u = avm2_get_public_property(ctx, request, "url", 3, NULL);
+		if (u.kind == AVM2_VALUE_STRING) url = u.u.str;
+	}
+	if (url == NULL || url->len == 0) return;
+
+	char name[256];
+	size_t n = (size_t) url->len < sizeof(name) - 1
+		? (size_t) url->len : sizeof(name) - 1;
+	memcpy(name, url->utf8, n);
+	name[n] = '\0';
+	const char* base = name;
+	for (const char* p = name; *p != '\0'; p++)
+		if (*p == '/' || *p == '\\') base = p + 1;
+	DataFileEntry* d = findDataFile(base);
+	if (d == NULL) d = findDataFile(name);
+	if (d == NULL || d->content == NULL) return;
+
+	s->ext_loaded = 1;
+	s->data_size = (uint32_t) d->content_length;
+	s->ext_duration_ms = mp3_duration_ms((const unsigned char*) d->content,
+	                                     (size_t) d->content_length);
+	if (s->ext_load_queued) return;
+	s->ext_load_queued = 1;
+	if (g_pending_sound_load_count < AVM2_MAX_PENDING_SOUND_LOADS)
+		g_pending_sound_loads[g_pending_sound_load_count++] = self;
 }
 
 // play(startTime:Number = 0, loops:int = 0, sndTransform:SoundTransform = null)
@@ -537,6 +661,24 @@ static Avm2Value sound_play(Avm2Activation* act)
 		}
 	}
 #endif
+	// A URL-loaded sound has no mixer asset in ANY build, so its playback is
+	// simulated: the estimated duration is counted down one frame budget per
+	// tick and Event.SOUND_COMPLETE is dispatched when it drains. Identical in
+	// no-graphics and graphics (mode parity) — nothing here reads a mixer.
+	if (ch != NULL && !s->has_sound && s->ext_loaded && s->ext_duration_ms > 0.0
+	    && position < s->ext_duration_ms)
+	{
+		Avm2SoundChannelExt* sc = (Avm2SoundChannelExt*) ch->native_ext;
+		for (int i = 0; i < AVM2_MAX_SIM_CHANNELS; i++)
+		{
+			if (g_sim_channels[i] != NULL) continue;
+			sc->sim_elapsed_ms = position > 0.0 ? position : 0.0;
+			sc->sim_duration_ms = s->ext_duration_ms;
+			sc->sim_live = 1;
+			g_sim_channels[i] = ch;
+			break;
+		}
+	}
 	return avm2_object_value(ch);
 }
 
@@ -546,10 +688,14 @@ static Avm2Value sound_close(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// load(stream:URLRequest, context:SoundLoaderContext = null)
 static Avm2Value sound_load(Avm2Activation* act)
 {
-	// External loading deferred; a no-op keeps SymbolClass-bound sounds usable.
-	(void) act;
+	Avm2SoundObjExt* s = this_sound(act);
+	// A SymbolClass-bound (embedded) sound keeps its own data: Flash ignores
+	// the load on one, and so did the previous no-op.
+	if (s == NULL || s->has_sound || act->argc == 0) return avm2_undefined();
+	sound_start_url_load(act->ctx, this_obj(act), s, act->args[0]);
 	return avm2_undefined();
 }
 
@@ -577,11 +723,65 @@ void avm2_media_register_sounds(Avm2Context* ctx)
 #endif
 }
 
+// Deliver the queued open/progress/complete for URL-loaded sounds, then
+// advance every simulated playback clock by one frame budget and dispatch
+// Event.SOUND_COMPLETE for the ones that drained. Both halves are
+// build-independent (no mixer state is read) and run before the mixer sweep.
+static void media_poll_simulated(Avm2Context* ctx)
+{
+	if (g_pending_sound_load_count > 0)
+	{
+		Avm2Object* batch[AVM2_MAX_PENDING_SOUND_LOADS];
+		int count = g_pending_sound_load_count;
+		memcpy(batch, g_pending_sound_loads, (size_t) count * sizeof(Avm2Object*));
+		g_pending_sound_load_count = 0;
+		for (int i = 0; i < count; i++)
+		{
+			Avm2Object* obj = batch[i];
+			if (obj == NULL || obj->native_ext == NULL) continue;
+			Avm2SoundObjExt* s = (Avm2SoundObjExt*) obj->native_ext;
+			if (!s->ext_load_queued) continue;
+			s->ext_load_queued = 0;
+			Avm2Object* ev = avm2_event_new(
+				ctx, avm2_string_from_literal(ctx, "open"), 0, 0);
+			if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+			ev = avm2_progress_event_new(
+				ctx, avm2_string_from_literal(ctx, "progress"),
+				(double) s->data_size, (double) s->data_size);
+			if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+			ev = avm2_event_new(
+				ctx, avm2_string_from_literal(ctx, "complete"), 0, 0);
+			if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+		}
+	}
+
+	double fps = (double) (int16_t) avm2_generated_frame_rate / 256.0;
+	if (fps <= 0.0) fps = 24.0;
+	double budget_ms = 1000.0 / fps;
+	for (int i = 0; i < AVM2_MAX_SIM_CHANNELS; i++)
+	{
+		Avm2Object* obj = g_sim_channels[i];
+		if (obj == NULL || obj->native_ext == NULL) continue;
+		Avm2SoundChannelExt* sc = (Avm2SoundChannelExt*) obj->native_ext;
+		if (!sc->sim_live) { g_sim_channels[i] = NULL; continue; }
+		sc->sim_elapsed_ms += budget_ms;
+		if (sc->sim_elapsed_ms < sc->sim_duration_ms) continue;
+		// Unregister BEFORE dispatch: the handler may start a new playback.
+		sc->sim_elapsed_ms = sc->sim_duration_ms;
+		sc->sim_live = 0;
+		g_sim_channels[i] = NULL;
+		Avm2Object* ev = avm2_event_new(
+			ctx, avm2_string_from_literal(ctx, "soundComplete"), 0, 0);
+		if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+	}
+}
+
 // Dispatch Event.SOUND_COMPLETE for channels whose mixer playback drained.
 // Called once per tick after frame scripts (may run user handlers — the
 // caller wraps it in the tick's catch-all try frame).
 void avm2_media_poll(Avm2Context* ctx)
 {
+	media_poll_simulated(ctx);
 #ifndef NO_GRAPHICS
 	for (int i = 0; i < MAX_SOUND_CHANNELS; i++)
 	{
@@ -608,6 +808,13 @@ void avm2_media_poll(Avm2Context* ctx)
 void avm2_gc_mark_roots_media(Avm2Context* ctx)
 {
 	(void) ctx;
+	// Same argument for a simulated channel and for a Sound whose load events
+	// are still queued: the registry is the only reference C holds.
+	for (int i = 0; i < AVM2_MAX_SIM_CHANNELS; i++)
+		if (g_sim_channels[i] != NULL) avm2_gc_mark_object(g_sim_channels[i]);
+	for (int i = 0; i < g_pending_sound_load_count; i++)
+		if (g_pending_sound_loads[i] != NULL)
+			avm2_gc_mark_object(g_pending_sound_loads[i]);
 #ifndef NO_GRAPHICS
 	for (int i = 0; i < MAX_SOUND_CHANNELS; i++)
 	{

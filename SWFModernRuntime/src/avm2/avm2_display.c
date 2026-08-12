@@ -3528,6 +3528,11 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// the fetch log and the Responder callbacks follow the calling frame's traces
 	// (netconnection_send_remote pins that interleaving).
 	avm2_net_flush_connections(ctx);
+	// NetStream.play() on a bundled FLV: the onMetaData callback is script
+	// data, not media, and Flash delivers it off the calling frame — same
+	// drain point as the fetch above (netstream_flv_date traces the whole
+	// constructor first).
+	avm2_net_deliver_netstream_meta(ctx);
 	orphan_cleanup(ctx);
 
 	// Sockets: Ruffle's player.tick runs update_sockets right after the frame
