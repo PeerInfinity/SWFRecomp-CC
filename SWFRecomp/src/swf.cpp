@@ -6210,6 +6210,19 @@ namespace SWFRecomp
 					sprite_definitions << "}" << endl << endl;
 				}
 
+				// A DefineSprite body that is not terminated by an End record is
+				// malformed, and Flash does not loop such a clip — it stops on
+				// its last frame. Mirrors Ruffle's `preload_progress.has_end_tag`
+				// feeding `determine_next_frame` -> `NextFrame::Same` -> `stop()`
+				// ("Clips without an End tag should not loop, even if they have
+				// multiple frames"). Emitted only for the malformed case, so
+				// generated output for well-formed SWFs is unchanged.
+				if (sub_tag.code != SWF_TAG_END_TAG)
+				{
+					tag_init << endl << "\t" << "tagSetSpriteNoEndTag(app_context, "
+									 << to_string(sprite_id) << ");";
+				}
+
 				// Ensure cur_pos is past the DefineSprite content for the main loop
 				cur_pos = sprite_content_end;
 

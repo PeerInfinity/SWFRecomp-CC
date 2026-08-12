@@ -1116,6 +1116,26 @@ static void advance_sprite_children_only(SWFAppContext* app_context, DisplayObje
 	display_list_capacity = saved_cap;
 }
 
+// A DefineSprite whose body is not terminated by an End record does NOT loop.
+// Flash (and Ruffle) park such a clip on its last frame and stop it instead of
+// wrapping to frame 0. Ruffle: `determine_next_frame` returns `NextFrame::Same`
+// when `!preload_progress.has_end_tag`, and `run_frame_internal` answers that
+// with `self.stop(context)` (core/src/display_object/movie_clip.rs) — the field
+// doc there reads "Clips without an End tag should not loop, even if they have
+// multiple frames."
+//
+// The clip is only stopped, not removed: it keeps its place in the display list
+// and still receives per-tick ENTER_FRAME, and its children keep advancing (the
+// !sprite_is_playing branch in the advance loops recurses via
+// advance_sprite_children_only). Every well-formed authoring tool emits the End
+// record, so this path is unreachable for real-world content — it exists for
+// deliberately malformed SWFs (the from_shumway/fuzz corpus, where 143/143
+// sprites omit it).
+static void ng_sprite_park_no_end_tag(DisplayObject* obj)
+{
+	obj->sprite_is_playing = 0;
+}
+
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
@@ -1130,19 +1150,30 @@ void advance_sprite_frames(SWFAppContext* app_context)
 	// head, traverse forward). For SWFs that place sprites in non-monotonic depth
 	// order this differs from depth-descending, and Flash dispatches by
 	// instantiation order. Insertion sort over a small stack array; fall back to
-	// depth-descending if max_depth exceeds the stack cap.
+	// depth-descending only if the number of OCCUPIED depths exceeds the cap.
+	//
+	// The cap bounds how many entries we write, so it must be tested against the
+	// occupied count — not against max_depth, which is the highest depth INDEX.
+	// A SWF may legitimately place a handful of clips at sparse high depths
+	// (PlaceObject2 depth is a u16, so 0..65535 is in range); gating on
+	// max_depth silently abandoned the correct ordering for such movies and
+	// fell back to depth-descending. That mis-ordered every from_shumway/fuzz
+	// test whose deepest placement sits above the cap.
 	#define ASF_SORT_CAP 512
 	size_t sorted_depths[ASF_SORT_CAP];
 	size_t sorted_seq[ASF_SORT_CAP];
 	size_t n_sorted = 0;
-	int use_sorted = (max_depth < ASF_SORT_CAP);
-	if (use_sorted) {
+	int use_sorted = 1;
+	{
 		for (size_t d = 1; d <= max_depth; d++) {
 			if (display_list[d].char_id == 0) continue;
+			if (n_sorted >= ASF_SORT_CAP) { use_sorted = 0; n_sorted = 0; break; }
 			sorted_depths[n_sorted] = d;
 			sorted_seq[n_sorted] = display_list[d].place_seq;
 			n_sorted++;
 		}
+	}
+	if (use_sorted) {
 		for (size_t k = 1; k < n_sorted; k++) {
 			size_t key_d = sorted_depths[k];
 			size_t key_s = sorted_seq[k];
@@ -1621,7 +1652,12 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// at the top of the loop), NOT a direct scf write, so this guard is inert
 		// for the normal advance + self-loop cases.
 		if (ch->sprite_frame_count > 0 && obj->sprite_current_frame == frame)
-			obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
+		{
+			if (frame + 1 >= ch->sprite_frame_count && !ch->sprite_has_end_tag)
+				ng_sprite_park_no_end_tag(obj);
+			else
+				obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
+		}
 	}
 }
 
@@ -1730,19 +1766,24 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 #endif
 
 	// Reverse-instantiation order (place_seq DESC) — same Ruffle clip_exec_list
-	// LIFO semantics as advance_sprite_frames.
+	// LIFO semantics as advance_sprite_frames. The cap is tested against the
+	// occupied-depth COUNT, not max_depth (the highest depth index) — see the
+	// matching comment in advance_sprite_frames.
 	#define ANSF_SORT_CAP 512
 	size_t sorted_depths[ANSF_SORT_CAP];
 	size_t sorted_seq[ANSF_SORT_CAP];
 	size_t n_sorted = 0;
-	int use_sorted = (max_depth < ANSF_SORT_CAP);
-	if (use_sorted) {
+	int use_sorted = 1;
+	{
 		for (size_t d = 1; d <= max_depth; d++) {
 			if (display_list[d].char_id == 0) continue;
+			if (n_sorted >= ANSF_SORT_CAP) { use_sorted = 0; n_sorted = 0; break; }
 			sorted_depths[n_sorted] = d;
 			sorted_seq[n_sorted] = display_list[d].place_seq;
 			n_sorted++;
 		}
+	}
+	if (use_sorted) {
 		for (size_t k = 1; k < n_sorted; k++) {
 			size_t key_d = sorted_depths[k];
 			size_t key_s = sorted_seq[k];
@@ -4592,18 +4633,23 @@ static int gather_clip_ef_entries(SWFAppContext* app_context,
 static void dispatch_enterframe_clip_actions_recursive(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
+	// Cap is tested against the occupied-depth COUNT, not dl_max (the highest
+	// depth index) — see the matching comment in advance_sprite_frames.
 	#define DEC_SORT_CAP 512
 	size_t dec_depths[DEC_SORT_CAP];
 	size_t dec_seq[DEC_SORT_CAP];
 	size_t dec_n = 0;
-	int dec_use_sorted = (dl_max < DEC_SORT_CAP);
-	if (dec_use_sorted) {
+	int dec_use_sorted = 1;
+	{
 		for (size_t d = 0; d <= dl_max; d++) {
 			if (dl[d].char_id == 0) continue;
+			if (dec_n >= DEC_SORT_CAP) { dec_use_sorted = 0; dec_n = 0; break; }
 			dec_depths[dec_n] = d;
 			dec_seq[dec_n] = dl[d].place_seq;
 			dec_n++;
 		}
+	}
+	if (dec_use_sorted) {
 		for (size_t k = 1; k < dec_n; k++) {
 			size_t key_d = dec_depths[k];
 			size_t key_s = dec_seq[k];
@@ -11022,6 +11068,14 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 #endif
 }
 
+void tagSetSpriteNoEndTag(SWFAppContext* app_context, size_t char_id)
+{
+	(void)app_context;
+	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+	if (dictionary[char_id].type == CHAR_TYPE_SPRITE)
+		dictionary[char_id].sprite_has_end_tag = 0;
+}
+
 void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count, size_t byte_size)
 {
 	(void)app_context;
@@ -11031,6 +11085,11 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 	dictionary[char_id].sprite_frame_funcs = funcs;
 	dictionary[char_id].sprite_frame_count = frame_count;
 	dictionary[char_id].sprite_byte_size = byte_size;
+	// Must be written unconditionally: Character is a union, so this byte may
+	// hold a stale value from a different character type. Default 1 (loops);
+	// the recompiler emits tagSetSpriteNoEndTag afterwards for malformed
+	// sprites whose body lacks the terminating End record.
+	dictionary[char_id].sprite_has_end_tag = 1;
 
 	// Track which movie defined this character (for child movie transform data lookup)
 	extern u8 g_current_movie_id;

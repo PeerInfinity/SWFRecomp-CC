@@ -175,6 +175,11 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 #define tagDefineSprite_4(ctx, cid, fn, fc)     tagDefineSpriteEx(ctx, cid, fn, fc, 0)
 #define tagDefineSprite_GET(_1, _2, _3, _4, _5, NAME, ...) NAME
 #define tagDefineSprite(...) tagDefineSprite_GET(__VA_ARGS__, tagDefineSprite_5, tagDefineSprite_4)(__VA_ARGS__)
+// Emitted by the recompiler ONLY for a malformed DefineSprite whose body is not
+// terminated by an End record. Such a clip does not loop (see the comment on
+// Character.sprite_has_end_tag). Well-formed SWFs never emit this call, so
+// their generated output is unchanged.
+void tagSetSpriteNoEndTag(SWFAppContext* app_context, size_t char_id);
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count);
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id);
 void finalizeBitmaps();

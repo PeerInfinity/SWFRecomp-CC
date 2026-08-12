@@ -109,6 +109,15 @@ typedef struct Character
 			frame_func* sprite_frame_funcs;
 			size_t sprite_frame_count;
 			size_t sprite_byte_size;
+			// 0 only for a malformed DefineSprite whose body is not
+			// terminated by an End record. Such a clip does NOT loop —
+			// it stops on its last frame. Mirrors Ruffle's
+			// `preload_progress.has_end_tag` / `determine_next_frame`
+			// (core/src/display_object/movie_clip.rs): "Clips without an
+			// End tag should not loop, even if they have multiple
+			// frames." Well-formed authoring tools always emit the End
+			// record, so this is 1 for every real-world sprite.
+			u8 sprite_has_end_tag;
 		};
 		// DefineButton
 		struct
