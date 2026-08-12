@@ -1,0 +1,783 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 87b75153b..575cf3027 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -7715,6 +7715,262 @@ namespace SWFRecomp
+ 		return line_styles;
+ 	}
+ 
++	// -----------------------------------------------------------------------
++	// Morph shape edge pairing (see interpretShape's morph pre-pass)
++	// -----------------------------------------------------------------------
++	// A DefineMorphShape carries two edge streams (StartEdges, EndEdges) whose
++	// EDGE records correspond one-to-one, and our runtime lerps the start
++	// shape's flattened vertices against the end shape's positions BY INDEX
++	// (Vertex::morph_index -> morph_end_positions[i]). That only holds if the
++	// two streams emit the same number of vertices in the same order, which the
++	// historical rule ("one vertex per straight edge, six per curved edge") does
++	// NOT guarantee:
++	//
++	//   * SWF lets a StraightEdgeRecord in one stream pair with a
++	//     CurvedEdgeRecord in the other. Flash promotes the straight edge to a
++	//     degenerate quadratic whose control point is the segment midpoint
++	//     (~/CC/ruffle core/src/display_object/morph_shape.rs `lerp_edges`);
++	//     since that degenerate quadratic evaluates to plain linear
++	//     interpolation, subdividing the straight edge into the same N chords
++	//     as its curved partner reproduces Flash exactly. One vertex against
++	//     six does not — it desynchronises every vertex after it.
++	//   * StyleChangeRecords need not appear in matching pairs. Ruffle walks
++	//     whichever side has one and leaves the other side's pen where it is.
++	//
++	// So both streams are pre-scanned before either is parsed, the records are
++	// paired the way Ruffle pairs them, and each parser is handed a per-record
++	// vertex count. A shared count is also what makes adaptive subdivision
++	// possible here: a curve pair takes max(N(dev_start), N(dev_end)) chords, so
++	// the two sides subdivide identically and stay index-paired. (Session 13
++	// shipped adaptive subdivision for plain shapes and gated morphs out for
++	// exactly this reason — `w2-curve-subdiv-report.md` §2.)
++	//
++	// Anything unexpected in either stream (StateNewStyles, truncation) discards
++	// the plan and restores the historical fixed-6 behaviour.
++
++	struct MorphEdgeRec
++	{
++		u8 kind;             // 0 = StyleChange, 1 = StraightEdge, 2 = CurvedEdge
++		bool emits_vertex;   // StyleChange: this record pushes a vertex
++		bool implicit_start; // edge: the parser auto-creates a Path (+1 vertex) first
++		float dev;           // CurvedEdge: chord deviation from its chord, twips
++	};
++
++	// Walk one morph edge stream, recording its record sequence. `end_stream`
++	// selects the EndEdges grammar (its own NumFillBits/NumLineBits header, and
++	// StyleChangeRecords whose only meaningful bit is StateMoveTo) instead of the
++	// StartEdges one. Returns false if the stream is not a plain morph SHAPE.
++	static bool scanMorphEdgeStream(SWFTag& t, char* pos, char* limit,
++	                                bool end_stream, u8 fill_bits, u8 line_bits,
++	                                std::vector<MorphEdgeRec>& out)
++	{
++		u32 bits_left = 8;
++
++		if (end_stream)
++		{
++			if (pos == nullptr || pos + 1 > limit)
++			{
++				return false;
++			}
++
++			t.clearFields();
++			t.setFieldCount(2);
++			t.configureNextField(SWF_FIELD_UB, 4);
++			t.configureNextField(SWF_FIELD_UB, 4);
++			t.parseFields(pos);
++
++			fill_bits = (u8) t.fields[0].value;
++			line_bits = (u8) t.fields[1].value;
++		}
++
++		u32 last_fill_0 = 0, last_fill_1 = 0, last_line = 0;
++		bool has_path = false;
++		size_t guard = 0;
++
++		while (true)
++		{
++			if (++guard > 1000000 || pos >= limit)
++			{
++				return false;
++			}
++
++			t.clearFields();
++			t.setFieldCount(2);
++			t.configureNextField(SWF_FIELD_UB, 1);
++			t.configureNextField(SWF_FIELD_UB, 5);
++			t.parseFieldsContinue(pos, bits_left);
++
++			bool is_edge = ((u8) t.fields[0].value) != 0;
++			u8 state_flags = (u8) t.fields[1].value;
++
++			if (is_edge)
++			{
++				MorphEdgeRec r;
++				r.emits_vertex = false;
++				r.implicit_start = !has_path;
++				r.dev = 0.0f;
++				has_path = true;
++
++				bool is_straight = (state_flags & 0b10000) != 0;
++				u8 num_bits = state_flags & 0xF;
++
++				if (is_straight)
++				{
++					t.clearFields();
++					t.setFieldCount(1);
++					t.configureNextField(SWF_FIELD_UB, 1);
++					t.parseFieldsContinue(pos, bits_left);
++
++					bool is_general_line = (t.fields[0].value & 1) != 0;
++
++					t.clearFields();
++					t.setFieldCount(2);
++					if (is_general_line)
++					{
++						t.configureNextField(SWF_FIELD_SB, num_bits + 2);
++						t.configureNextField(SWF_FIELD_SB, num_bits + 2);
++					}
++					else
++					{
++						t.configureNextField(SWF_FIELD_UB, 1);
++						t.configureNextField(SWF_FIELD_SB, num_bits + 2);
++					}
++					t.parseFieldsContinue(pos, bits_left);
++
++					r.kind = 1;
++				}
++
++				else
++				{
++					t.clearFields();
++					t.setFieldCount(4);
++					t.configureNextField(SWF_FIELD_SB, num_bits + 2);
++					t.configureNextField(SWF_FIELD_SB, num_bits + 2);
++					t.configureNextField(SWF_FIELD_SB, num_bits + 2);
++					t.configureNextField(SWF_FIELD_SB, num_bits + 2);
++					t.parseFieldsContinue(pos, bits_left);
++
++					// dev = |control - (current + anchor)/2| / 2, which in terms of
++					// the record's deltas is |control_delta - anchor_delta| / 4. The
++					// parser's y negation does not change the magnitude.
++					float ddx = (float) ((s16) t.fields[0].value) - (float) ((s16) t.fields[2].value);
++					float ddy = (float) ((s16) t.fields[1].value) - (float) ((s16) t.fields[3].value);
++					r.dev = 0.25f * sqrtf(ddx*ddx + ddy*ddy);
++
++					r.kind = 2;
++				}
++
++				out.push_back(r);
++
++				continue;
++			}
++
++			if (state_flags == 0)
++			{
++				// EndShapeRecord
++				break;
++			}
++
++			if ((state_flags & 0b10000) != 0)
++			{
++				// StateNewStyles cannot appear in a morph SHAPE; the stream is not
++				// what we think it is.
++				return false;
++			}
++
++			bool state_line_style = (state_flags & 0b01000) != 0;
++			bool state_fill_style_1 = (state_flags & 0b00100) != 0;
++			bool state_fill_style_0 = (state_flags & 0b00010) != 0;
++			bool state_move_to = (state_flags & 0b00001) != 0;
++
++			MorphEdgeRec r;
++			r.kind = 0;
++			r.implicit_start = false;
++			r.dev = 0.0f;
++
++			if (end_stream)
++			{
++				// The EndEdges parser reads a StyleChangeRecord's MoveTo and nothing
++				// else (NumFillBits/NumLineBits are 0 there); mirror it exactly so
++				// the scan stays bit-aligned with the real parse.
++				if (state_move_to)
++				{
++					t.clearFields();
++					t.setFieldCount(3);
++					t.configureNextField(SWF_FIELD_UB, 5, true);
++					t.configureNextField(SWF_FIELD_SB, 0);
++					t.configureNextField(SWF_FIELD_SB, 0);
++					t.parseFieldsContinue(pos, bits_left);
++				}
++
++				r.emits_vertex = state_move_to;
++			}
++
++			else
++			{
++				t.clearFields();
++				t.setFieldCount(3*state_move_to + state_fill_style_0 + state_fill_style_1 + state_line_style);
++
++				if (state_move_to)
++				{
++					t.configureNextField(SWF_FIELD_UB, 5, true);
++					t.configureNextField(SWF_FIELD_SB, 0);
++					t.configureNextField(SWF_FIELD_SB, 0);
++				}
++				if (state_fill_style_0) t.configureNextField(SWF_FIELD_UB, fill_bits);
++				if (state_fill_style_1) t.configureNextField(SWF_FIELD_UB, fill_bits);
++				if (state_line_style)   t.configureNextField(SWF_FIELD_UB, line_bits);
++
++				t.parseFieldsContinue(pos, bits_left);
++
++				size_t f = state_move_to ? 3 : 0;
++				u32 fill_0 = last_fill_0, fill_1 = last_fill_1, line = last_line;
++				if (state_fill_style_0) fill_0 = (u32) t.fields[f++].value;
++				if (state_fill_style_1) fill_1 = (u32) t.fields[f++].value;
++				if (state_line_style)   line   = (u32) t.fields[f++].value;
++
++				// Mirrors the start parser's new-Path condition exactly.
++				r.emits_vertex = state_move_to || (fill_0 != last_fill_0)
++				              || (fill_1 != last_fill_1) || (line != last_line);
++
++				last_fill_0 = fill_0;
++				last_fill_1 = fill_1;
++				last_line = line;
++			}
++
++			if (r.emits_vertex)
++			{
++				has_path = true;
++			}
++
++			out.push_back(r);
++		}
++
++		return true;
++	}
++
++	// Chord count for a quadratic of chord deviation `dev`, tolerance 1 twip,
++	// clamped to [6, 64] — the same rule the plain-shape arm uses.
++	static u32 morphChordCount(float dev)
++	{
++		if (dev <= 1.0f)
++		{
++			return 6;
++		}
++
++		float n = ceilf(sqrtf(dev));
++		if (n > 64.0f)
++		{
++			n = 64.0f;
++		}
++		if (n < 6.0f)
++		{
++			n = 6.0f;
++		}
++
++		return (u32) n;
++	}
++
+ 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
+ 	{
+ 		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2 || shape_tag.code == SWF_TAG_DEFINE_FONT_3);
+@@ -7752,6 +8008,7 @@ namespace SWFRecomp
+ 				
+ 				// Save position at start of tag body for morph EndEdges skip
+ 				char* morph_tag_start = cur_pos;
++				char* morph_end_edges_ptr = nullptr;
+ 
+ 				if (!is_font)
+ 				{
+@@ -7872,7 +8129,18 @@ namespace SWFRecomp
+ 
+ 						shape_tag.parseFields(cur_pos);
+ 
+-						// Offset parsed and ignored (we skip EndEdges using tag length)
++						// Offset is the byte distance from the end of this field to
++						// EndEdges. The tag walk still skips EndEdges using the tag
++						// length; this pointer is what lets the edge-pairing pre-pass
++						// read the END stream before the START stream is parsed.
++						{
++							u32 end_edges_offset = (u32) shape_tag.fields[0].value;
++
++							if (end_edges_offset != 0)
++							{
++								morph_end_edges_ptr = cur_pos + end_edges_offset;
++							}
++						}
+ 					}
+ 
+ 					// FILLSTYLEARRAY
+@@ -8027,7 +8295,185 @@ namespace SWFRecomp
+ 					}
+ 				};
+ 
++				// ------------------------------------------------------------------
++				// Morph edge-pairing pre-pass
++				// ------------------------------------------------------------------
++				// Scan both edge streams and pair their records the way Ruffle does
++				// (see scanMorphEdgeStream above). Produces:
++				//   morph_start_edge_verts[i]  vertices the START parser emits for its
++				//                              i-th EDGE record
++				//   morph_end_rec_verts[j]     vertices the END parser emits for its
++				//                              j-th record
++				//   morph_end_rec_presynth[j]  vertices the END parser must first
++				//                              synthesise at its current pen, standing
++				//                              in for a start-only StyleChangeRecord
++				//   morph_end_tail_synth       the same, after the end stream is done
++				// Every entry is 1 (the historical count) unless the pairing needs
++				// otherwise, so a well-behaved morph is bit-identical to before.
++				std::vector<u32> morph_start_edge_verts;
++				std::vector<u32> morph_end_rec_verts;
++				std::vector<u32> morph_end_rec_presynth;
++				u32 morph_end_tail_synth = 0;
++				bool morph_plan_ok = false;
++
++				if (is_morph && morph_end_edges_ptr != nullptr)
++				{
++					char* tag_limit = morph_tag_start + shape_tag.length;
++					std::vector<MorphEdgeRec> start_recs;
++					std::vector<MorphEdgeRec> end_recs;
++
++					if (morph_end_edges_ptr < tag_limit
++					    && scanMorphEdgeStream(shape_tag, cur_pos, tag_limit, false, fill_bits, line_bits, start_recs)
++					    && scanMorphEdgeStream(shape_tag, morph_end_edges_ptr, tag_limit, true, 0, 0, end_recs))
++					{
++						morph_end_rec_verts.assign(end_recs.size(), 0);
++						morph_end_rec_presynth.assign(end_recs.size(), 0);
++
++						size_t i = 0, j = 0;
++						u32 pending_synth = 0;
++
++						while (i < start_recs.size() && j < end_recs.size())
++						{
++							const MorphEdgeRec& s = start_recs[i];
++							const MorphEdgeRec& e = end_recs[j];
++
++							if (s.kind == 0 && e.kind == 0)
++							{
++								// Paired StyleChangeRecords. The end side emits a vertex
++								// only when the start side starts a Path; its MoveTo still
++								// moves the end pen either way.
++								morph_end_rec_presynth[j] = pending_synth;
++								pending_synth = 0;
++								morph_end_rec_verts[j] = s.emits_vertex ? 1 : 0;
++								i += 1;
++								j += 1;
++							}
++
++							else if (s.kind == 0)
++							{
++								// Start-only StyleChangeRecord: Ruffle advances the start
++								// side alone and leaves the end pen where it is, so the end
++								// side stands in with a copy of its pen position.
++								if (s.emits_vertex)
++								{
++									pending_synth += 1;
++								}
++								i += 1;
++							}
++
++							else if (e.kind == 0)
++							{
++								// End-only StyleChangeRecord: pen update, no vertex.
++								morph_end_rec_presynth[j] = pending_synth;
++								pending_synth = 0;
++								morph_end_rec_verts[j] = 0;
++								j += 1;
++							}
++
++							else
++							{
++								if (s.implicit_start)
++								{
++									// The start parser auto-creates a Path (one extra
++									// vertex) before its first edge record.
++									pending_synth += 1;
++								}
++
++								u32 n = 1;
++								if (s.kind == 2 || e.kind == 2)
++								{
++									u32 ns = (s.kind == 2) ? morphChordCount(s.dev) : 6;
++									u32 ne = (e.kind == 2) ? morphChordCount(e.dev) : 6;
++									n = (ns > ne) ? ns : ne;
++								}
++
++								morph_start_edge_verts.push_back(n);
++								morph_end_rec_presynth[j] = pending_synth;
++								pending_synth = 0;
++								morph_end_rec_verts[j] = n;
++								i += 1;
++								j += 1;
++							}
++						}
++
++						// Start records with no end counterpart keep their historical
++						// single vertex; the end side pads with pen copies so the shape
++						// simply holds still there instead of desynchronising.
++						while (i < start_recs.size())
++						{
++							const MorphEdgeRec& s = start_recs[i];
++
++							if (s.kind == 0)
++							{
++								if (s.emits_vertex) pending_synth += 1;
++							}
++							else
++							{
++								if (s.implicit_start) pending_synth += 1;
++								morph_start_edge_verts.push_back(1);
++								pending_synth += 1;
++							}
++
++							i += 1;
++						}
++
++						morph_end_tail_synth = pending_synth;
++						morph_plan_ok = true;
++					}
++				}
++
++				size_t morph_start_edge_ord = 0;
++
+ 				s32 morph_vertex_counter = 0;
++
++				// Emit a straight edge's vertices. One, normally — but a straight edge
++				// paired with a curved edge in a morph's other stream is subdivided
++				// into the same number of chords as its partner. A straight edge is a
++				// degenerate quadratic (control = midpoint), so equal-parameter
++				// subdivision of it is plain linear interpolation and reproduces
++				// Flash's straight->curve promotion exactly.
++				auto pushStraightEdge = [&](s32 target_x, s32 target_y)
++				{
++					u32 n = 1;
++
++					if (morph_plan_ok && morph_start_edge_ord < morph_start_edge_verts.size())
++					{
++						n = morph_start_edge_verts[morph_start_edge_ord];
++					}
++
++					s32 from_x = last_x;
++					s32 from_y = last_y;
++
++					for (u32 p = 1; p <= n; ++p)
++					{
++						Vertex v;
++
++						if (p == n)
++						{
++							v.x = target_x;
++							v.y = target_y;
++						}
++
++						else
++						{
++							float ft = (float) p / (float) n;
++							v.x = (s32) ((float) from_x + ft * (float) (target_x - from_x));
++							v.y = (s32) ((float) from_y + ft * (float) (target_y - from_y));
++						}
++
++						if (is_morph) v.morph_index = morph_vertex_counter++;
++
++						current_path->verts.push_back(v);
++					}
++
++					// The raw path stream (vector hit testing) still sees one LineTo:
++					// subdivision is a rendering-geometry concern only.
++					emitPath(2.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y));
++
++					last_x = target_x;
++					last_y = target_y;
++				};
++
+ 				size_t edge_iterations = 0;
+ 				const size_t max_edge_iterations = 1000000;
+ 
+@@ -8101,18 +8547,8 @@ namespace SWFRecomp
+ 								s16 delta_x = (s16) shape_tag.fields[0].value;
+ 								s16 delta_y = (s16) shape_tag.fields[1].value;
+ 
+-								Vertex v;
+-								v.x = last_x + (s32) delta_x;
+-								v.y = last_y - (s32) delta_y;
+-								if (is_morph) v.morph_index = morph_vertex_counter++;
+-
+-								current_path->verts.push_back(v);
+-
+-								// Emit LineTo path command
+-								emitPath(2.0f, (float)v.x, (float)(FRAME_HEIGHT - v.y));
+-
+-								last_x = v.x;
+-								last_y = v.y;
++								pushStraightEdge(last_x + (s32) delta_x, last_y - (s32) delta_y);
++								morph_start_edge_ord += 1;
+ 
+ 								continue;
+ 							}
+@@ -8128,30 +8564,21 @@ namespace SWFRecomp
+ 							bool is_vertical_line = (shape_tag.fields[0].value & 1) != 0;
+ 							s16 delta = (s16) shape_tag.fields[1].value;
+ 
+-							Vertex v;
+-
+-							v.x = last_x;
+-							v.y = last_y;
++							s32 edge_x = last_x;
++							s32 edge_y = last_y;
+ 
+ 							if (is_vertical_line)
+ 							{
+-								v.y -= (s32) delta;
++								edge_y -= (s32) delta;
+ 							}
+ 
+ 							else
+ 							{
+-								v.x += (s32) delta;
++								edge_x += (s32) delta;
+ 							}
+ 
+-							if (is_morph) v.morph_index = morph_vertex_counter++;
+-
+-							current_path->verts.push_back(v);
+-
+-							// Emit LineTo path command
+-							emitPath(2.0f, (float)v.x, (float)(FRAME_HEIGHT - v.y));
+-
+-							last_x = v.x;
+-							last_y = v.y;
++							pushStraightEdge(edge_x, edge_y);
++							morph_start_edge_ord += 1;
+ 
+ 							continue;
+ 						}
+@@ -8193,13 +8620,26 @@ namespace SWFRecomp
+ 						// historical fixed count, so this only ever REFINES a curve, never
+ 						// coarsens one; 64 bounds shape_data growth.
+ 						//
+-						// Morph shapes keep the fixed 6: their end-shape edges are
+-						// flattened by a separate loop below and paired with these start
+-						// vertices BY INDEX (morph_index), so the two counts must agree,
+-						// and an adaptive count computed independently from two different
+-						// curves would not.
++						// Morph shapes take their count from the edge-pairing pre-pass
++						// instead: their end-shape edges are flattened by a separate loop
++						// below and paired with these start vertices BY INDEX
++						// (morph_index), so the two counts must agree. The pre-pass gives
++						// both sides max(N(dev_start), N(dev_end)), which keeps the
++						// pairing exact while still refining. Without a plan (an
++						// unrecognised stream) morphs fall back to the historical 6.
+ 						u32 num_passes = 6;
+-						if (!is_morph)
++						if (is_morph)
++						{
++							if (morph_plan_ok && morph_start_edge_ord < morph_start_edge_verts.size())
++							{
++								u32 planned = morph_start_edge_verts[morph_start_edge_ord];
++								if (planned > num_passes)
++								{
++									num_passes = planned;
++								}
++							}
++						}
++						else
+ 						{
+ 							const float curve_flatten_tol_twips = 1.0f;   // 0.05 px at 1:1
+ 
+@@ -8226,6 +8666,7 @@ namespace SWFRecomp
+ 						emitPath(4.0f, (float)anchor.x, (float)(FRAME_HEIGHT - anchor.y));
+ 
+ 						addCurvedEdge(current_path, current, control, anchor, num_passes, is_morph ? &morph_vertex_counter : nullptr);
++						morph_start_edge_ord += 1;
+ 
+ 						last_x = anchor.x;
+ 						last_y = anchor.y;
+@@ -8486,6 +8927,48 @@ namespace SWFRecomp
+ 					s32 end_last_y = FRAME_HEIGHT;
+ 					u32 end_bits_left = 8;
+ 					size_t end_edge_iterations = 0;
++					size_t end_rec_ord = 0;
++
++					// Counterpart of the start shape's pushStraightEdge: the pre-pass
++					// decides how many vertices this record contributes so the two
++					// streams stay index-paired.
++					auto pushEndStraight = [&](s32 target_x, s32 target_y)
++					{
++						u32 n = 1;
++
++						if (morph_plan_ok && end_rec_ord < morph_end_rec_verts.size())
++						{
++							n = morph_end_rec_verts[end_rec_ord];
++						}
++
++						s32 from_x = end_last_x;
++						s32 from_y = end_last_y;
++
++						for (u32 p = 1; p <= n; ++p)
++						{
++							Vertex ev;
++
++							if (p == n)
++							{
++								ev.x = target_x;
++								ev.y = target_y;
++							}
++
++							else
++							{
++								float ft = (float) p / (float) n;
++								ev.x = (s32) ((float) from_x + ft * (float) (target_x - from_x));
++								ev.y = (s32) ((float) from_y + ft * (float) (target_y - from_y));
++							}
++
++							morph_end_positions.push_back(ev);
++						}
++
++						if (path_recording) morph_end_geo_buf.push_back({2.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y)});
++
++						end_last_x = target_x;
++						end_last_y = target_y;
++					};
+ 
+ 					while (true)
+ 					{
+@@ -8495,6 +8978,19 @@ namespace SWFRecomp
+ 							break;
+ 						}
+ 
++						// Stand-ins for start-only StyleChangeRecords: the end pen has
++						// not moved, so the paired end vertex is a copy of it.
++						if (morph_plan_ok && end_rec_ord < morph_end_rec_presynth.size())
++						{
++							for (u32 k = 0; k < morph_end_rec_presynth[end_rec_ord]; ++k)
++							{
++								Vertex ev;
++								ev.x = end_last_x;
++								ev.y = end_last_y;
++								morph_end_positions.push_back(ev);
++							}
++						}
++
+ 						shape_tag.clearFields();
+ 						shape_tag.setFieldCount(2);
+ 						shape_tag.configureNextField(SWF_FIELD_UB, 1);
+@@ -8529,14 +9025,7 @@ namespace SWFRecomp
+ 									s16 dx = (s16) shape_tag.fields[0].value;
+ 									s16 dy = (s16) shape_tag.fields[1].value;
+ 
+-									Vertex ev;
+-									ev.x = end_last_x + (s32) dx;
+-									ev.y = end_last_y - (s32) dy;
+-									morph_end_positions.push_back(ev);
+-									if (path_recording) morph_end_geo_buf.push_back({2.0f, (float)ev.x, (float)(FRAME_HEIGHT - ev.y)});
+-
+-									end_last_x = ev.x;
+-									end_last_y = ev.y;
++									pushEndStraight(end_last_x + (s32) dx, end_last_y - (s32) dy);
+ 								}
+ 								else
+ 								{
+@@ -8549,18 +9038,15 @@ namespace SWFRecomp
+ 									bool end_vert = (shape_tag.fields[0].value & 1) != 0;
+ 									s16 delta = (s16) shape_tag.fields[1].value;
+ 
+-									Vertex ev;
+-									ev.x = end_last_x;
+-									ev.y = end_last_y;
++									s32 end_target_x = end_last_x;
++									s32 end_target_y = end_last_y;
++
+ 									if (end_vert)
+-										ev.y -= (s32) delta;
++										end_target_y -= (s32) delta;
+ 									else
+-										ev.x += (s32) delta;
+-									morph_end_positions.push_back(ev);
+-									if (path_recording) morph_end_geo_buf.push_back({2.0f, (float)ev.x, (float)(FRAME_HEIGHT - ev.y)});
++										end_target_x += (s32) delta;
+ 
+-									end_last_x = ev.x;
+-									end_last_y = ev.y;
++									pushEndStraight(end_target_x, end_target_y);
+ 								}
+ 							}
+ 							else
+@@ -8597,10 +9083,21 @@ namespace SWFRecomp
+ 									morph_end_geo_buf.push_back({4.0f, (float)anch.x, (float)(FRAME_HEIGHT - anch.y)});
+ 								}
+ 
+-								// Fixed 6, matching the start-shape morph arm above: these
+-								// vertices are paired with the start shape's BY INDEX, so
+-								// the two counts must agree.
++								// Chord count comes from the edge-pairing pre-pass, which
++								// gives this record and its start-shape partner the same
++								// number: these vertices are paired with the start shape's
++								// BY INDEX, so the two counts must agree. Falls back to the
++								// historical fixed 6 when there is no plan.
+ 								u32 passes = 6;
++
++								if (morph_plan_ok && end_rec_ord < morph_end_rec_verts.size())
++								{
++									if (morph_end_rec_verts[end_rec_ord] > passes)
++									{
++										passes = morph_end_rec_verts[end_rec_ord];
++									}
++								}
++
+ 								for (u32 p = 1; p <= passes; ++p)
+ 								{
+ 									float ft = (float) p / passes;
+@@ -8615,6 +9112,8 @@ namespace SWFRecomp
+ 								end_last_y = anch.y;
+ 							}
+ 
++							end_rec_ord += 1;
++
+ 							continue;
+ 						}
+ 
+@@ -8638,18 +9137,54 @@ namespace SWFRecomp
+ 							end_last_x = (s32) shape_tag.fields[1].value;
+ 							end_last_y = FRAME_HEIGHT - (s32) shape_tag.fields[2].value;
+ 
+-							Vertex ev;
+-							ev.x = end_last_x;
+-							ev.y = end_last_y;
+-							morph_end_positions.push_back(ev);
++							// The pen always moves; the vertex is emitted only when the
++							// paired start record starts a Path (an end-only MoveTo has no
++							// start vertex to pair with).
++							bool emit_end_vertex = true;
++
++							if (morph_plan_ok && end_rec_ord < morph_end_rec_verts.size())
++							{
++								emit_end_vertex = (morph_end_rec_verts[end_rec_ord] != 0);
++							}
++
++							if (emit_end_vertex)
++							{
++								Vertex ev;
++								ev.x = end_last_x;
++								ev.y = end_last_y;
++								morph_end_positions.push_back(ev);
++							}
++
+ 							if (path_recording) morph_end_geo_buf.push_back({5.0f, (float)end_last_x, (float)(FRAME_HEIGHT - end_last_y)});
+ 						}
++
++						end_rec_ord += 1;
++					}
++
++					// Start records the end stream ran out of counterparts for.
++					for (u32 k = 0; k < morph_end_tail_synth; ++k)
++					{
++						Vertex ev;
++						ev.x = end_last_x;
++						ev.y = end_last_y;
++						morph_end_positions.push_back(ev);
+ 					}
+ 
+ 					if (end_bits_left != 8)
+ 					{
+ 						cur_pos += 1;
+ 					}
++
++					// Diagnostic: the plan predicts one end position per start vertex.
++					// A mismatch means the pre-pass and the real parse disagree, which
++					// would silently desynchronise the morph.
++					if (morph_plan_ok && morph_end_positions.size() != (size_t) morph_vertex_counter)
++					{
++						fprintf(stderr,
++							"Warning: morph shape %u vertex pairing mismatch "
++							"(start %d, end %zu); morph interpolation may be wrong.\n",
++							(unsigned) shape_id, morph_vertex_counter, morph_end_positions.size());
++					}
+ 				}
+ 
+ 				if (current_path == nullptr)
