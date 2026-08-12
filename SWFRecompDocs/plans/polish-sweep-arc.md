@@ -1789,3 +1789,69 @@ composition work); deblocking (MAX_EMBEDDED_VIDEO_STREAMS 8→16 + flags
 byte + 559-line deblock port); hairline_edge_drift is ≥2 mechanisms —
 splitter is "large-deviation DefineShape quadratic present", worth a
 re-triage after curve-subdiv.
+
+## 15. Session 14 (2026-08-12) — dual-axis fan-out #6: trace +28, pixels +9, zero code regressions
+
+Commits `f552cf8af..bf585e448` (9 code patches + hygiene, 10 commits), CI run
+`31647430265` at `bf585e448` (graphics/full/images=true), results merge
+`b15b9cbdf`. Trace effective **4237 → 4269 / 4443** = intersection **+28**
+(29 gains, histogram clean, runtime_error flat) + **+4 drift** on 16 new
+upstream tests (denominator 4427→4443). Pixels **301/567 → 310/569 (54.5%)**:
++8 intersection flips + the new `regression/mask_nested_intersect` passing;
+bands improved 7 / worsened 0. 7 wave-1 + 10 wave-2 agents; reports in
+`session14-fanout-reports/`.
+
+### 15.1 Ledger
+
+Trace (+28 intersection, exactly the four patches' predictions):
+describeType T7 P0 gate + P3 metadata + P4 pilot (+9); fuzz block AVM1
+timeline-order — ASF_SORT_CAP depth-index-vs-count + unterminated
+DefineSprite (+15, fuzz suite 14/30→29/30, both prior ruffle_matched rows
+upgraded to exact pass); host-I/O bucket re-cost (+3); watch re-entry
+unified counter (+2, ACCEPTED_DIFFS Cat 10 RESOLVED). Pixels (+9):
+stencil Equal/IncrementClamp nesting model (6× cache_as_bitmap/masks +
+regression/mask_nested_intersect); AVM1 scrollRect end-to-end
+(scroll_rect_scaled); bitmap-fill content-size tiling (acid-bitmap-fill).
+Band moves: deblocking 2 906 999→104 (−99.996%, filter ported, 11/12
+streams byte-exact); displayobject_scrollrect 12382→10;
+scroll_rect_mask 11310→42; netstream_play_flv 1654→44;
+scroll_rect 18378→2056; simple_shapes/masks pair 2624→1738 (wrong→right,
+disposition partially refuted, flagged for re-baseline).
+
+### 15.2 Accounting corrections (vs the wave-1 audit)
+
+- The "regression" `avm2/textblock_line_changes` (ruffle_matched→
+  output_mismatch) is an upstream TEST REWRITE: 282-line fixture at
+  baseline, 481 lines in this run — the s12 trap on the same test family.
+  Zero code regressions both axes.
+- The audit's "+9 free drift on 11 on-disk ungraded tests" was WRONG in
+  detail: upstream de-duplicated those dirs (they never reached CI); actual
+  drift was a new matrix3d/textblock batch, +4 effective of 16 new tests.
+  The watch_special pair flips booked to nothing.
+- Wave-1 refutation rate stayed the defining feature: fuzz "error-recovery"
+  premise (actually timeline order), morph P1 "+7" (zero quadratics in the
+  named tests), U-pinning label (padded-layer tiling), test11 "one defect"
+  (three), stencil rider set, scrollRect rounding rule, board §5 stale
+  dispositions (already applied). Board pricing survived contact at ~50%;
+  mechanism GO/NO-GO verdicts survived at 100%.
+
+### 15.3 Left on the board
+
+Trace: T10-playerglobal-descriptor arc (13 all_classes rows, ~16.5k lines,
+needs typed member registration); fuzz 16th row (`e152812e2cfc`, depth-1015
+placement warning, +1 self-contained, canary set named in the fuzz report);
+watch_virtual_property dispatch-ordering (+1, watch must precede the
+virtual-setter walk); textblock_line_changes re-triage vs the new 481-line
+fixture (arrived with textblock_releaselines + textline_raw_text_length —
+likely one FTE mechanism); matrix3d batch (9 failing rows, one class —
+biggest new cluster); action_order arc DEFERRED with full plan
+(wave1-avm1-tick.md = diagnosis of record, pair with extend_test for +2
+ceiling). Pixels: displayobject_scrollrect at 10 channels (1-sample edge
+tie, budget 0 — lavapipe AA class); morph ratio plumbing (end positions
+never reach the rasteriser); morph path-command pairing half (~40 lines →
+avm1/movieclip_hittest_shapeflag); scale-aware tolerance leg B HELD
+(re-measure at 2 twips; archived patch beside the morph report);
+acid-bitmap-draw_quality = dynamic_bitmap_max size-gate decision (VRAM
+17→67 MB per AVM2 movie); blend-layer alpha defect (acid-blend-2 output.26,
+renderer, one-dump bisect); blur_fractional/blur_quality structural extra
+ink (774k/821k, un-struck by hygiene); displacement-map trio.

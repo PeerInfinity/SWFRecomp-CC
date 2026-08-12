@@ -405,3 +405,40 @@ regressions, bands improved 15 / worsened 5 (all fail→fail).** Ledger:
   vertex-placement at curve joints (acid-blend-2 output.26); AVM1
   scrollRect translate; deblocking; Stage3D (30) + remaining video (16)
   backends arc-sized.
+
+## 13. Session-14 state of the board (2026-08-12)
+
+**Closeout run `31647430265` at `bf585e448`: 310/569 (54.5%), +9, zero
+regressions, bands improved 7 / worsened 0.** Ledger:
+`polish-sweep-arc.md` §15; reports `session14-fanout-reports/`.
+
+- **Nested-mask stencil model landed** (Ruffle Equal/IncrementClamp +
+  DecrementClamp full-screen-quad pop; `mask_ref` = nesting level). The
+  cache_as_bitmap/masks family .01–.06 flipped; `regression/
+  mask_nested_intersect` finally exists as a built test (tolerance 0).
+  `end_clip` now pops ONE level and pairings must be LIFO — any new caller
+  of the clip API must push/pop exactly once per path.
+- **AVM1 scrollRect implemented end-to-end** (was a fully inert stub);
+  nested maskers are DISCARDED per Ruffle commands.rs. scroll_rect_scaled
+  flipped; the scroll_rect residual is a separate PixelSnapping::Always
+  defect; a latent AVM2 divergence is recorded at avm2_display.c:15547
+  (translate gated on mask capture; Ruffle gates only the crop).
+- **Bitmap fills tile on content size** (padded-layer tiling refuted the
+  U-pinning label). acid-bitmap-fill flipped with 3% headroom on the
+  tightest rung; linear-sampler lever documented unused.
+- **Deblocking filter ported** (+0 flips as re-priced; visual/video/
+  deblocking now b_tiny at 104 excess = dispositioned IDCT residual, entry
+  added). Video board hygiene: Video-EmbedSquareTest is NOT a video defect;
+  acid-video has no DefineVideoStream — the "remaining video (16)" bucket
+  is mis-scoped and should be rebuilt from SWF-level scan.
+- **Morph streams are now index-paired** (structural; 9/20 morph tests were
+  desynchronised) — unlocks morph adaptive subdivision, but P1's "+7 morph
+  family" was refuted (zero quadratics; diffs are text-colour band / AA
+  tie). Scale-aware tolerance leg HELD: our 0.05 px screen tolerance is
+  half lyon's 0.1 px and crosses over the reference (acid-scale 302→342);
+  re-measure at 2 twips.
+- **Top remaining leads**: simple_shapes/masks pair re-baseline (now 1738,
+  entry amended); displacement-map trio (content_displaced, one mechanism,
+  3 rows); blur_fractional/blur_quality structural extra ink (774k/821k);
+  blend-layer alpha (output.26, one-dump bisect); Stage3D (25) + h264 (12)
+  arcs parked; define_bits_lossless2_rgb15 arrived passing (new upstream).
