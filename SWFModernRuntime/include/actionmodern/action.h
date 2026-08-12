@@ -101,6 +101,15 @@ struct MovieClip {
 	// entries are relocatable and reclaimable. See
 	// SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
 	void* maskee_mc;
+	// MovieClip.scrollRect (AVM1). Ruffle core/src/avm1/globals/movie_clip.rs
+	// set_scroll_rect: ANY object value sets has_scroll_rect, and the rect is
+	// only overwritten when all four of x/y/width/height are readable. Stored
+	// in TWIPS, each edge already collapsed to a whole pixel by ES ToInt32
+	// (object_to_rectangle coerces every field with coerce_to_i32 BEFORE the
+	// x+width / y+height additions — truncation toward zero, NOT rounding).
+	// Read by tag.c's compose/render walks; see the scrollRect registry below.
+	u8 has_scroll_rect;
+	s32 sr_xmin, sr_ymin, sr_xmax, sr_ymax;
 	// AS2 event dispatch state
 	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
@@ -670,6 +679,21 @@ int actionAvm1GetMaskPairs(void** out_maskees, void** out_maskers, int max);
 int actionAvm1IsLiveMasker(const void* mc_ptr);
 // The masker MovieClip* of the live pair whose maskee is `mc_ptr`, else NULL.
 void* actionAvm1MaskerForMC(const void* mc_ptr);
+
+// --- AVM1 MovieClip.scrollRect ----------------------------------------------
+// Same shape as the setMask registry above, and for the same reason: the
+// renderer works in display-list entries, but a DisplayObject* stored across
+// frames is a use-after-free (ng_spriteDLRealloc / ng_freeSpriteDL / depth
+// reuse). Only immortal MovieClip*s are registered; tag.c re-reads
+// `mc->display_obj` at the point of use.
+typedef struct Avm1ScrollRect {
+	s32 xmin, ymin, xmax, ymax;   // twips
+} Avm1ScrollRect;
+// Number of live clips carrying a scrollRect. 0 for every movie that never
+// assigns one — the zero-cost early-out for compose_children's hot loop.
+int actionAvm1ScrollRectCount(void);
+// Copy up to `max` live (clip, rect) pairs out. Returns the number written.
+int actionAvm1GetScrollRects(void** out_mcs, Avm1ScrollRect* out_rects, int max);
 
 // Attached bitmap iteration: callback for rendering BitmapData attached to MCs
 typedef struct AttachedBitmapInfo {

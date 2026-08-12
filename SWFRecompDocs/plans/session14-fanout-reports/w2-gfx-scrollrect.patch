@@ -1,0 +1,409 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index c0a5d800c..329e8ee5d 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -101,6 +101,15 @@ struct MovieClip {
+ 	// entries are relocatable and reclaimable. See
+ 	// SWFRecompDocs/plans/session13-fanout-reports/wave1-gfx-maskB.md §2/§3.
+ 	void* maskee_mc;
++	// MovieClip.scrollRect (AVM1). Ruffle core/src/avm1/globals/movie_clip.rs
++	// set_scroll_rect: ANY object value sets has_scroll_rect, and the rect is
++	// only overwritten when all four of x/y/width/height are readable. Stored
++	// in TWIPS, each edge already collapsed to a whole pixel by ES ToInt32
++	// (object_to_rectangle coerces every field with coerce_to_i32 BEFORE the
++	// x+width / y+height additions — truncation toward zero, NOT rounding).
++	// Read by tag.c's compose/render walks; see the scrollRect registry below.
++	u8 has_scroll_rect;
++	s32 sr_xmin, sr_ymin, sr_xmax, sr_ymax;
+ 	// AS2 event dispatch state
+ 	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
+ 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
+@@ -671,6 +680,21 @@ int actionAvm1IsLiveMasker(const void* mc_ptr);
+ // The masker MovieClip* of the live pair whose maskee is `mc_ptr`, else NULL.
+ void* actionAvm1MaskerForMC(const void* mc_ptr);
+ 
++// --- AVM1 MovieClip.scrollRect ----------------------------------------------
++// Same shape as the setMask registry above, and for the same reason: the
++// renderer works in display-list entries, but a DisplayObject* stored across
++// frames is a use-after-free (ng_spriteDLRealloc / ng_freeSpriteDL / depth
++// reuse). Only immortal MovieClip*s are registered; tag.c re-reads
++// `mc->display_obj` at the point of use.
++typedef struct Avm1ScrollRect {
++	s32 xmin, ymin, xmax, ymax;   // twips
++} Avm1ScrollRect;
++// Number of live clips carrying a scrollRect. 0 for every movie that never
++// assigns one — the zero-cost early-out for compose_children's hot loop.
++int actionAvm1ScrollRectCount(void);
++// Copy up to `max` live (clip, rect) pairs out. Returns the number written.
++int actionAvm1GetScrollRects(void** out_mcs, Avm1ScrollRect* out_rects, int max);
++
+ // Attached bitmap iteration: callback for rendering BitmapData attached to MCs
+ typedef struct AttachedBitmapInfo {
+ 	const uint32_t* pixels;   // ARGB premultiplied pixel data
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index a804b0a5c..3ee0451bf 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -28695,6 +28695,122 @@ static void avm1_mask_pair(MovieClip* maskee, MovieClip* masker)
+ 		g_avm1_mask_pairs[g_avm1_mask_pair_count++] = (Avm1MaskPair){ maskee, masker };
+ }
+ 
++// ---------------------------------------------------------------------------
++// AVM1 MovieClip.scrollRect registry
++// ---------------------------------------------------------------------------
++// Same ownership model as the setMask registry directly above: only immortal
++// MovieClip*s are stored, liveness is a read-time predicate (depth == INT_MIN
++// is the tombstone), and no DisplayObject* is ever kept across a frame.
++// tag.c's compose/render walks resolve entry -> MovieClip by re-reading
++// mc->display_obj (with the instance-name fallback for the wrapper clips that
++// have none).
++#define AVM1_SCROLL_RECT_MAX 64
++static MovieClip* g_avm1_scroll_rect_mcs[AVM1_SCROLL_RECT_MAX];
++static int g_avm1_scroll_rect_count = 0;
++
++static void avm1_scroll_rect_register(MovieClip* mc)
++{
++	if (mc == NULL) return;
++	for (int i = 0; i < g_avm1_scroll_rect_count; i++)
++		if (g_avm1_scroll_rect_mcs[i] == mc) return;
++	if (g_avm1_scroll_rect_count < AVM1_SCROLL_RECT_MAX)
++		g_avm1_scroll_rect_mcs[g_avm1_scroll_rect_count++] = mc;
++}
++
++static void avm1_scroll_rect_unregister(MovieClip* mc)
++{
++	if (mc == NULL) return;
++	for (int i = 0; i < g_avm1_scroll_rect_count; i++) {
++		if (g_avm1_scroll_rect_mcs[i] != mc) continue;
++		g_avm1_scroll_rect_mcs[i] = g_avm1_scroll_rect_mcs[--g_avm1_scroll_rect_count];
++		return;
++	}
++}
++
++int actionAvm1ScrollRectCount(void)
++{
++	return g_avm1_scroll_rect_count;
++}
++
++int actionAvm1GetScrollRects(void** out_mcs, Avm1ScrollRect* out_rects, int max)
++{
++	int n = 0;
++	for (int i = 0; i < g_avm1_scroll_rect_count && n < max; i++) {
++		MovieClip* mc = g_avm1_scroll_rect_mcs[i];
++		if (!avm1_mask_mc_live(mc) || !mc->has_scroll_rect) continue;
++		out_mcs[n] = mc;
++		out_rects[n].xmin = mc->sr_xmin;
++		out_rects[n].ymin = mc->sr_ymin;
++		out_rects[n].xmax = mc->sr_xmax;
++		out_rects[n].ymax = mc->sr_ymax;
++		n++;
++	}
++	return n;
++}
++
++// Ruffle AVM1 `object_to_rectangle` (core/src/avm1/globals/movie_clip.rs:148):
++// every field is read with `get_local_stored` and coerced with
++// `coerce_to_i32` — ES ToInt32, i.e. truncation toward zero — and only THEN
++// are `x + width` / `y + height` formed, in i32 space. So a Rectangle whose
++// height is 143.95 yields y_max - y_min == 143, not 144. If any of the four
++// fields is missing, Ruffle returns None: `has_scroll_rect` is still set, but
++// the stored rect keeps its previous value.
++//
++// NOTE this is deliberately NOT the AVM2 rule. avm2_display.c's
++// `do_scrollrect_set` rounds half-to-even, because AVM2's
++// `object_to_rectangle` (display_object.rs:907) does. The two VMs really do
++// disagree; do not "unify" them.
++static s32 avm1_rect_field_to_i32(ActionVar* v)
++{
++	double d = varToDoubleSimple(v);
++	if (!isfinite(d)) return 0;
++	double t = trunc(d);
++	// ES ToInt32 wrap. Anything this far out is nonsense for a scroll rect,
++	// but wrapping keeps the twips multiply below in range.
++	double m = fmod(t, 4294967296.0);
++	if (m < 0.0) m += 4294967296.0;
++	if (m >= 2147483648.0) m -= 4294967296.0;
++	return (s32) m;
++}
++
++// `mc.scrollRect = value`. Returns nothing; the caller must NOT fall through
++// to the generic dynamic-property store (the prototype keeps its own
++// undefined-valued `scrollRect` stub so hasOwnProperty probes still pass).
++static void actionAvm1SetScrollRect(MovieClip* mc, ActionVar* value)
++{
++	if (mc == NULL) return;
++	// Ruffle tests `Value::Object`. Only a plain OBJECT can carry readable
++	// x/y/width/height here, and mis-classifying an array as "has a scroll
++	// rect" would crop the subtree to a stale/zero window — strictly worse
++	// than ignoring it, and no corpus test exercises it.
++	if (value == NULL || value->type != ACTION_STACK_VALUE_OBJECT
++	    || value->data.numeric_value == 0)
++	{
++		if (mc->has_scroll_rect) {
++			mc->has_scroll_rect = 0;
++			avm1_scroll_rect_unregister(mc);
++		}
++		return;
++	}
++	ASObject* obj = (ASObject*)(uintptr_t) value->data.numeric_value;
++	ActionVar* xv = getPropertyWithPrototype(obj, "x", 1);
++	ActionVar* yv = getPropertyWithPrototype(obj, "y", 1);
++	ActionVar* wv = getPropertyWithPrototype(obj, "width", 5);
++	ActionVar* hv = getPropertyWithPrototype(obj, "height", 6);
++	if (xv != NULL && yv != NULL && wv != NULL && hv != NULL) {
++		s32 x = avm1_rect_field_to_i32(xv);
++		s32 y = avm1_rect_field_to_i32(yv);
++		s32 w = avm1_rect_field_to_i32(wv);
++		s32 h = avm1_rect_field_to_i32(hv);
++		mc->sr_xmin = x * 20;
++		mc->sr_ymin = y * 20;
++		mc->sr_xmax = (x + w) * 20;
++		mc->sr_ymax = (y + h) * 20;
++	}
++	mc->has_scroll_rect = 1;
++	avm1_scroll_rect_register(mc);
++}
++
+ int actionAvm1MaskPairCount(void)
+ {
+ 	return g_avm1_mask_pair_count;
+@@ -49911,6 +50027,17 @@ void actionSetMember(SWFAppContext* app_context)
+ 					((DisplayObject*) mc->display_obj)->blend_mode = mc->blend_mode;
+ 				return;
+ 			}
++			// scrollRect setter (Ruffle avm1/globals/movie_clip.rs set_scroll_rect).
++			// Stores on the MovieClip and registers it with the scrollRect
++			// registry that tag.c's compose/render walks read; NEVER falls
++			// through to the dynamic-property store, so the prototype's
++			// undefined-valued `scrollRect` stub stays the only own property
++			// the enumeration tests see.
++			if (prop_name_len == 10 && strncmp(prop_name, "scrollRect", 10) == 0)
++			{
++				actionAvm1SetScrollRect(mc, &value_var);
++				return;
++			}
+ 			// filters setter: store array on dynamic_props (getter does the cloning)
+ 			if (prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0) {
+ 				if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
+@@ -53763,6 +53890,21 @@ void actionGetMember(SWFAppContext* app_context)
+ 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+ 			return;
+ 		}
++		// scrollRect: a FRESH Rectangle per read (Ruffle `new_rectangle`), or
++		// fall through when unset so the MovieClip.prototype stub answers
++		// `undefined` — which is what movieclip_default_state and the
++		// MovieClip-v5..v8 hasOwnProperty probes assert.
++		if (mc != NULL && prop_name_len == 10 && strncmp(prop_name, "scrollRect", 10) == 0
++		    && mc->has_scroll_rect)
++		{
++			ActionVar rx = makeF64(mc->sr_xmin / 20.0);
++			ActionVar ry = makeF64(mc->sr_ymin / 20.0);
++			ActionVar rw = makeF64((mc->sr_xmax - mc->sr_xmin) / 20.0);
++			ActionVar rh = makeF64((mc->sr_ymax - mc->sr_ymin) / 20.0);
++			ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
++			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) rect);
++			return;
++		}
+ 		if (mc != NULL && prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0)
+ 		{
+ 			// Return stored filters (cloned) or SWF-authored filters or empty array
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 80fc8b13a..6850295e9 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -2505,9 +2505,90 @@ typedef struct { DisplayObject* obj; u32 original_id; } XformOverride;
+ static XformOverride g_xform_overrides[MAX_XFORM_OVERRIDES];
+ static int g_xform_override_count;
+ 
++// ---------------------------------------------------------------------------
++// AVM1 MovieClip.scrollRect — per-frame crop-slot side table
++// ---------------------------------------------------------------------------
++// compose_children resolves an entry's scrollRect once, writes the PRE-translate
++// world matrix into a dynamic transform slot (the crop quad's matrix), and
++// records it here; render_display_list looks it up to push the crop stencil.
++// A side table rather than a DisplayObject field: zero header churn, and the
++// lifetime is naturally one frame, so a display-list slot recycled by depth
++// reuse cannot inherit a stale crop from the previous frame.
++#define MAX_SCROLL_CROPS 64
++typedef struct {
++	DisplayObject* obj;
++	u32 slot;        // transform slot holding the pre-translate world matrix
++	float w, h;      // crop size in twips
++} ScrollCropEntry;
++static ScrollCropEntry g_scroll_crops[MAX_SCROLL_CROPS];
++static int g_scroll_crop_count;
++
++static void scroll_crops_reset(void)
++{
++	g_scroll_crop_count = 0;
++}
++
++static void scroll_crops_push(DisplayObject* obj, u32 slot, float w, float h)
++{
++	// An entry can be composed more than once inside one frame (the root loop
++	// plus render_attached_child / render_single_object re-entry). The LAST
++	// compose is the one the render pass will draw from, so overwrite rather
++	// than accumulate — a stale slot id would crop with the previous matrix.
++	for (int i = 0; i < g_scroll_crop_count; i++) {
++		if (g_scroll_crops[i].obj != obj) continue;
++		g_scroll_crops[i].slot = slot;
++		g_scroll_crops[i].w = w;
++		g_scroll_crops[i].h = h;
++		return;
++	}
++	if (g_scroll_crop_count < MAX_SCROLL_CROPS) {
++		g_scroll_crops[g_scroll_crop_count].obj = obj;
++		g_scroll_crops[g_scroll_crop_count].slot = slot;
++		g_scroll_crops[g_scroll_crop_count].w = w;
++		g_scroll_crops[g_scroll_crop_count].h = h;
++		g_scroll_crop_count++;
++	}
++}
++
++static const ScrollCropEntry* scroll_crop_for_entry(const DisplayObject* obj)
++{
++	if (g_scroll_crop_count == 0 || obj == NULL) return NULL;
++	for (int i = 0; i < g_scroll_crop_count; i++)
++		if (g_scroll_crops[i].obj == obj) return &g_scroll_crops[i];
++	return NULL;
++}
++
++// Defined further down with the setMask paint hooks; the scrollRect resolver
++// below needs the same entry -> MovieClip identity test (display_obj first,
++// instance name as the fallback for wrapper clips that have no entry pointer).
++static int avm1_mc_owns_entry(const MovieClip* mc, const DisplayObject* obj);
++
++#define AVM1_SCROLL_RECT_PAINT_MAX 64
++
++// The scrollRect of the MovieClip that owns `obj`, or 0 when there is none.
++// `actionAvm1ScrollRectCount() == 0` in every movie that never assigns a
++// scrollRect, which is the single-branch fast-out for compose_children's hot
++// per-entry loop.
++static int avm1_scroll_rect_for_entry(const DisplayObject* obj, Avm1ScrollRect* out)
++{
++	if (obj == NULL || actionAvm1ScrollRectCount() == 0) return 0;
++	void* mcs[AVM1_SCROLL_RECT_PAINT_MAX];
++	Avm1ScrollRect rects[AVM1_SCROLL_RECT_PAINT_MAX];
++	int n = actionAvm1GetScrollRects(mcs, rects, AVM1_SCROLL_RECT_PAINT_MAX);
++	for (int i = 0; i < n; i++) {
++		if (!avm1_mc_owns_entry((const MovieClip*)mcs[i], obj)) continue;
++		*out = rects[i];
++		return 1;
++	}
++	return 0;
++}
++
+ static void xform_overrides_reset(void)
+ {
+ 	g_xform_override_count = 0;
++	// Same reset points as the dynamic xform pool (tagShowFrame /
++	// tagRerenderFrame): the recorded slots are indices INTO that pool.
++	scroll_crops_reset();
+ }
+ 
+ static void xform_overrides_push(DisplayObject* obj, u32 original_id)
+@@ -2870,6 +2951,54 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 		float composed[16];
+ 		hit_test_mat4_multiply(composed, parent_composed, local_xform);
+ 
++		// MovieClip.scrollRect, the TRANSLATE half (Ruffle
++		// display_object.rs:1189 `transform_stack.push(translate(-x_min,
++		// -y_min))`). It is pushed UNCONDITIONALLY — including while this
++		// subtree is being rasterised into a stencil, where Ruffle discards
++		// the crop's draw command but keeps the transform-stack push
++		// (render/commands.rs:47 `maskers_in_progress`). Applying it to
++		// `composed` here, BEFORE the slot allocation below, gives the entry's
++		// own slot and the `parent_composed` handed to the SPRITE/BUTTON
++		// recursions the same shift — Ruffle's push scope exactly.
++		//
++		// The crop quad's matrix is the PRE-translate world ("Note that we do
++		// *not* apply the translation yet", display_object.rs:1176), so it is
++		// captured first, into its own slot, and handed to render_display_list
++		// through the per-frame side table.
++		{
++			Avm1ScrollRect sr;
++			if (avm1_scroll_rect_for_entry(obj, &sr)) {
++				// If the dynamic pool is exhausted, record NO crop rather than
++				// falling back to slot 0: slot 0 is identity, so the crop quad
++				// would land as a (0,0)-(w,h)-TWIPS box at the stage origin —
++				// a ~5x5 px window that blanks the entry. A missing crop is a
++				// far smaller error than a crop in the wrong place. (s13's
++				// AVM2 avm2_push_scroll_rect_mask takes the identity fallback;
++				// this is a deliberate divergence.)
++				int have_crop_slot = 0;
++				u32 crop_slot = 0;
++				if (g_next_dynamic_xform_slot < g_xform_slot_capacity) {
++					crop_slot = g_next_dynamic_xform_slot++;
++					renderer_write_transform(context, crop_slot, composed);
++					have_crop_slot = 1;
++				}
++				// transform_data translations are twips (apply_as_transform:
++				// slot[12] = rintf(mc->x * 20.0f)), and sr is already twips.
++				float scroll_tr[16] = {
++					1.0f, 0.0f, 0.0f, 0.0f,
++					0.0f, 1.0f, 0.0f, 0.0f,
++					0.0f, 0.0f, 1.0f, 0.0f,
++					-(float) sr.xmin, -(float) sr.ymin, 0.0f, 1.0f
++				};
++				float scrolled[16];
++				hit_test_mat4_multiply(scrolled, composed, scroll_tr);
++				memcpy(composed, scrolled, sizeof(scrolled));
++				if (have_crop_slot)
++					scroll_crops_push(obj, crop_slot,
++						(float)(sr.xmax - sr.xmin), (float)(sr.ymax - sr.ymin));
++			}
++		}
++
+ 		// Allocate a dynamic transform slot to avoid overwriting shared slots
+ 		u32 new_slot = g_next_dynamic_xform_slot;
+ 		if (new_slot < g_xform_slot_capacity) {
+@@ -3586,6 +3715,36 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 		if (avm1_masker != NULL)
+ 			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
+ 
++		// MovieClip.scrollRect, the CROP half. Ruffle pushes it AFTER the
++		// DisplayObject.mask stencil and "in addition to" it
++		// (display_object.rs:1214-1223); compose_children already applied the
++		// translate to this entry's matrix and to its subtree's.
++		//
++		// Gated on `!g_clip_mask_capture` because Ruffle DISCARDS the crop
++		// while a masker subtree is being rasterised — push_mask emits nothing
++		// at nesting depth > 0 and the draw_rect command is dropped
++		// (render/commands.rs:47, "used to discard drawing commands of nested
++		// maskers, which Flash does not support"). The translate is NOT gated:
++		// it is a transform-stack push, not a command, so a scrolled clip
++		// inside a mask contributes its full, shifted silhouette. Same
++		// precedent as the EditText field-bounds clip below.
++		//
++		// A degenerate rect (w or h == 0) writes no stencil texels and so
++		// hides the subtree — Ruffle's and Flash's behaviour for a zero-sized
++		// scrollRect, not an accident.
++		u32 scroll_crop_saved_clip = 0;
++		int pushed_scroll_crop = 0;
++		const ScrollCropEntry* scroll_crop = scroll_crop_for_entry(obj);
++		if (scroll_crop != NULL && !g_clip_mask_capture)
++		{
++			scroll_crop_saved_clip = renderer_clip_ref(context);
++			renderer_begin_clip_mask(context);
++			renderer_draw_rect(context, 0.0f, 0.0f, scroll_crop->w, scroll_crop->h,
++				1.0f, 1.0f, 1.0f, 1.0f, scroll_crop->slot, 0);
++			renderer_end_clip_mask(context);
++			pushed_scroll_crop = 1;
++		}
++
+ 		Character* ch = &dictionary[obj->char_id];
+ 		switch (ch->type)
+ 		{
+@@ -3663,6 +3822,12 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 				break;
+ 		}
+ 
++		// restore_clip, never end_clip — end_clip zeroes mask_ref and would
++		// drop an enclosing clipDepth range (see the comment at the top of
++		// this function). Innermost push restored first.
++		if (pushed_scroll_crop)
++			renderer_restore_clip(context, scroll_crop_saved_clip);
++
+ 		if (avm1_masker != NULL)
+ 			renderer_restore_clip(context, avm1_mask_saved_clip);
+ 	}

@@ -28781,6 +28781,122 @@ static void avm1_mask_pair(MovieClip* maskee, MovieClip* masker)
 		g_avm1_mask_pairs[g_avm1_mask_pair_count++] = (Avm1MaskPair){ maskee, masker };
 }
 
+// ---------------------------------------------------------------------------
+// AVM1 MovieClip.scrollRect registry
+// ---------------------------------------------------------------------------
+// Same ownership model as the setMask registry directly above: only immortal
+// MovieClip*s are stored, liveness is a read-time predicate (depth == INT_MIN
+// is the tombstone), and no DisplayObject* is ever kept across a frame.
+// tag.c's compose/render walks resolve entry -> MovieClip by re-reading
+// mc->display_obj (with the instance-name fallback for the wrapper clips that
+// have none).
+#define AVM1_SCROLL_RECT_MAX 64
+static MovieClip* g_avm1_scroll_rect_mcs[AVM1_SCROLL_RECT_MAX];
+static int g_avm1_scroll_rect_count = 0;
+
+static void avm1_scroll_rect_register(MovieClip* mc)
+{
+	if (mc == NULL) return;
+	for (int i = 0; i < g_avm1_scroll_rect_count; i++)
+		if (g_avm1_scroll_rect_mcs[i] == mc) return;
+	if (g_avm1_scroll_rect_count < AVM1_SCROLL_RECT_MAX)
+		g_avm1_scroll_rect_mcs[g_avm1_scroll_rect_count++] = mc;
+}
+
+static void avm1_scroll_rect_unregister(MovieClip* mc)
+{
+	if (mc == NULL) return;
+	for (int i = 0; i < g_avm1_scroll_rect_count; i++) {
+		if (g_avm1_scroll_rect_mcs[i] != mc) continue;
+		g_avm1_scroll_rect_mcs[i] = g_avm1_scroll_rect_mcs[--g_avm1_scroll_rect_count];
+		return;
+	}
+}
+
+int actionAvm1ScrollRectCount(void)
+{
+	return g_avm1_scroll_rect_count;
+}
+
+int actionAvm1GetScrollRects(void** out_mcs, Avm1ScrollRect* out_rects, int max)
+{
+	int n = 0;
+	for (int i = 0; i < g_avm1_scroll_rect_count && n < max; i++) {
+		MovieClip* mc = g_avm1_scroll_rect_mcs[i];
+		if (!avm1_mask_mc_live(mc) || !mc->has_scroll_rect) continue;
+		out_mcs[n] = mc;
+		out_rects[n].xmin = mc->sr_xmin;
+		out_rects[n].ymin = mc->sr_ymin;
+		out_rects[n].xmax = mc->sr_xmax;
+		out_rects[n].ymax = mc->sr_ymax;
+		n++;
+	}
+	return n;
+}
+
+// Ruffle AVM1 `object_to_rectangle` (core/src/avm1/globals/movie_clip.rs:148):
+// every field is read with `get_local_stored` and coerced with
+// `coerce_to_i32` — ES ToInt32, i.e. truncation toward zero — and only THEN
+// are `x + width` / `y + height` formed, in i32 space. So a Rectangle whose
+// height is 143.95 yields y_max - y_min == 143, not 144. If any of the four
+// fields is missing, Ruffle returns None: `has_scroll_rect` is still set, but
+// the stored rect keeps its previous value.
+//
+// NOTE this is deliberately NOT the AVM2 rule. avm2_display.c's
+// `do_scrollrect_set` rounds half-to-even, because AVM2's
+// `object_to_rectangle` (display_object.rs:907) does. The two VMs really do
+// disagree; do not "unify" them.
+static s32 avm1_rect_field_to_i32(ActionVar* v)
+{
+	double d = varToDoubleSimple(v);
+	if (!isfinite(d)) return 0;
+	double t = trunc(d);
+	// ES ToInt32 wrap. Anything this far out is nonsense for a scroll rect,
+	// but wrapping keeps the twips multiply below in range.
+	double m = fmod(t, 4294967296.0);
+	if (m < 0.0) m += 4294967296.0;
+	if (m >= 2147483648.0) m -= 4294967296.0;
+	return (s32) m;
+}
+
+// `mc.scrollRect = value`. Returns nothing; the caller must NOT fall through
+// to the generic dynamic-property store (the prototype keeps its own
+// undefined-valued `scrollRect` stub so hasOwnProperty probes still pass).
+static void actionAvm1SetScrollRect(MovieClip* mc, ActionVar* value)
+{
+	if (mc == NULL) return;
+	// Ruffle tests `Value::Object`. Only a plain OBJECT can carry readable
+	// x/y/width/height here, and mis-classifying an array as "has a scroll
+	// rect" would crop the subtree to a stale/zero window — strictly worse
+	// than ignoring it, and no corpus test exercises it.
+	if (value == NULL || value->type != ACTION_STACK_VALUE_OBJECT
+	    || value->data.numeric_value == 0)
+	{
+		if (mc->has_scroll_rect) {
+			mc->has_scroll_rect = 0;
+			avm1_scroll_rect_unregister(mc);
+		}
+		return;
+	}
+	ASObject* obj = (ASObject*)(uintptr_t) value->data.numeric_value;
+	ActionVar* xv = getPropertyWithPrototype(obj, "x", 1);
+	ActionVar* yv = getPropertyWithPrototype(obj, "y", 1);
+	ActionVar* wv = getPropertyWithPrototype(obj, "width", 5);
+	ActionVar* hv = getPropertyWithPrototype(obj, "height", 6);
+	if (xv != NULL && yv != NULL && wv != NULL && hv != NULL) {
+		s32 x = avm1_rect_field_to_i32(xv);
+		s32 y = avm1_rect_field_to_i32(yv);
+		s32 w = avm1_rect_field_to_i32(wv);
+		s32 h = avm1_rect_field_to_i32(hv);
+		mc->sr_xmin = x * 20;
+		mc->sr_ymin = y * 20;
+		mc->sr_xmax = (x + w) * 20;
+		mc->sr_ymax = (y + h) * 20;
+	}
+	mc->has_scroll_rect = 1;
+	avm1_scroll_rect_register(mc);
+}
+
 int actionAvm1MaskPairCount(void)
 {
 	return g_avm1_mask_pair_count;
@@ -49997,6 +50113,17 @@ void actionSetMember(SWFAppContext* app_context)
 					((DisplayObject*) mc->display_obj)->blend_mode = mc->blend_mode;
 				return;
 			}
+			// scrollRect setter (Ruffle avm1/globals/movie_clip.rs set_scroll_rect).
+			// Stores on the MovieClip and registers it with the scrollRect
+			// registry that tag.c's compose/render walks read; NEVER falls
+			// through to the dynamic-property store, so the prototype's
+			// undefined-valued `scrollRect` stub stays the only own property
+			// the enumeration tests see.
+			if (prop_name_len == 10 && strncmp(prop_name, "scrollRect", 10) == 0)
+			{
+				actionAvm1SetScrollRect(mc, &value_var);
+				return;
+			}
 			// filters setter: store array on dynamic_props (getter does the cloning)
 			if (prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0) {
 				if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
@@ -53846,6 +53973,21 @@ void actionGetMember(SWFAppContext* app_context)
 		if (mc != NULL && prop_name_len == 13 && strncmp(prop_name, "cacheAsBitmap", 13) == 0)
 		{
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+			return;
+		}
+		// scrollRect: a FRESH Rectangle per read (Ruffle `new_rectangle`), or
+		// fall through when unset so the MovieClip.prototype stub answers
+		// `undefined` — which is what movieclip_default_state and the
+		// MovieClip-v5..v8 hasOwnProperty probes assert.
+		if (mc != NULL && prop_name_len == 10 && strncmp(prop_name, "scrollRect", 10) == 0
+		    && mc->has_scroll_rect)
+		{
+			ActionVar rx = makeF64(mc->sr_xmin / 20.0);
+			ActionVar ry = makeF64(mc->sr_ymin / 20.0);
+			ActionVar rw = makeF64((mc->sr_xmax - mc->sr_xmin) / 20.0);
+			ActionVar rh = makeF64((mc->sr_ymax - mc->sr_ymin) / 20.0);
+			ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) rect);
 			return;
 		}
 		if (mc != NULL && prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0)
