@@ -77,19 +77,12 @@ static int yuv420_frame_is_supported(int pix_fmt)
 	return pix_fmt == AV_PIX_FMT_YUV420P || pix_fmt == AV_PIX_FMT_YUVA420P;
 }
 
-static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
-                                       unsigned char* rgba)
+static void yuv420_planes_to_rgba_bt601(const uint8_t* yp,  int yls,
+                                        const uint8_t* cbp, int cbls,
+                                        const uint8_t* crp, int crls,
+                                        const uint8_t* ap,  int als,
+                                        int w, int h, unsigned char* rgba)
 {
-	const uint8_t* yp  = frame->data[0];
-	const uint8_t* cbp = frame->data[1];
-	const uint8_t* crp = frame->data[2];
-	const uint8_t* ap  = (frame->format == AV_PIX_FMT_YUVA420P) ? frame->data[3] : NULL;
-
-	const int yls  = frame->linesize[0];
-	const int cbls = frame->linesize[1];
-	const int crls = frame->linesize[2];
-	const int als  = ap ? frame->linesize[3] : 0;
-
 	for (int y = 0; y < h; y++) {
 		const uint8_t* yrow  = yp  + (size_t)y * (size_t)yls;
 		const uint8_t* cbrow = cbp + (size_t)(y >> 1) * (size_t)cbls;
@@ -134,6 +127,261 @@ static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
 	}
 }
 
+static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
+                                       unsigned char* rgba)
+{
+	const uint8_t* ap = (frame->format == AV_PIX_FMT_YUVA420P) ? frame->data[3] : NULL;
+	yuv420_planes_to_rgba_bt601(frame->data[0], frame->linesize[0],
+	                            frame->data[1], frame->linesize[1],
+	                            frame->data[2], frame->linesize[2],
+	                            ap, ap ? frame->linesize[3] : 0,
+	                            w, h, rgba);
+}
+
+// ---------------------------------------------------------------------------
+// H.263 Annex J post-decode deblocking filter.
+//
+// Line-for-line port of Ruffle's `h263-rs-deblock`
+// (deblock/src/deblock.rs), which `video/software/src/decoder/h263.rs`
+// runs over the decoded Y/Cb/Cr planes BEFORE the BT.601 conversion whenever
+// the stream asks for it. libavcodec's FLV1 decoder has no equivalent, so
+// without this every deblocked Spark stream renders with visible 8x8 blocking
+// against a Ruffle-exported golden that has none.
+//
+// Two properties of the Rust original that a "clean" C rewrite would get
+// wrong, and that decide byte-exactness:
+//
+//  1. **The scalar and SIMD lanes are NOT the same function.** Rust's
+//     `scalar_impl::process` divides (`/8`, `/4`, `/2`, truncating toward
+//     zero); `simd_impl::process_simd` shifts (`.shr(3)`, `.shr(2)`,
+//     `.shr(1)`, flooring). They disagree on every negative intermediate
+//     (-3/2 == -1 but -3>>1 == -2). Ruffle's chunking decides which pixel
+//     gets which: horizontally, columns [0, 8*floor(w/8)) shift and the
+//     <=7-column remainder divides; vertically, rows [0, 8*floor(h/8))
+//     shift and the <=7-row remainder divides. Reproduced exactly.
+//  2. **A and D wrap, B and C clamp.** `(a16 - d2) as u8` is a truncating
+//     cast in Rust; only B and C get `.clamp(0, 255)`.
+//
+// The port is validated against all three `test_deblock` vectors (11x17,
+// strengths 4/8/12 — an image sized to exercise both lanes in both
+// directions) and the 37-row `test_process` table from deblock.rs.
+//
+// Deblocking is display-only: Ruffle filters a COPY and leaves the decoder's
+// reference picture untouched, so inter-frame prediction is unaffected. We do
+// the same by filtering scratch planes, never `frame->data` (which libavcodec
+// may still hold as a reference frame).
+// ---------------------------------------------------------------------------
+
+// Table J.2/H.263 — QUANT → filter STRENGTH. Index 0 is never used.
+static const unsigned char VIDEO_QUANT_TO_STRENGTH[32] = {
+	0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 7,
+	7, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12, 12
+};
+
+// Arithmetic (flooring) right shift, spelled without relying on C's
+// implementation-defined `>>` for negative operands.
+static int deblock_floor_shr(int x, int n)
+{
+	return (x < 0) ? -(((-x) + ((1 << n) - 1)) >> n) : (x >> n);
+}
+
+// Figure J.2/H.263 — parameter d1 as a function of d.
+static int deblock_up_down_ramp(int x, int strength)
+{
+	int ax  = (x < 0) ? -x : x;
+	int sgn = (x > 0) - (x < 0);
+	int t   = 2 * (ax - strength);
+	if (t < 0) t = 0;
+	int v = ax - t;
+	if (v < 0) v = 0;
+	return sgn * v;
+}
+
+// Clips x to +/- abs(lim).
+static int deblock_clipd1(int x, int lim)
+{
+	int l = (lim < 0) ? -lim : lim;
+	if (x < -l) return -l;
+	if (x >  l) return  l;
+	return x;
+}
+
+// Rust `scalar_impl::process` — truncating division.
+static void deblock_process_div(unsigned char* A, unsigned char* B,
+                                unsigned char* C, unsigned char* D, int strength)
+{
+	int a = *A, b = *B, c = *C, d = *D;
+	int dv = (a - 4 * b + 4 * c - d) / 8;
+	int d1 = deblock_up_down_ramp(dv, strength);
+	int d2 = deblock_clipd1((a - d) / 4, d1 / 2);
+	int rb = b + d1; if (rb < 0) rb = 0; else if (rb > 255) rb = 255;
+	int rc = c - d1; if (rc < 0) rc = 0; else if (rc > 255) rc = 255;
+	*A = (unsigned char)(a - d2);
+	*B = (unsigned char)rb;
+	*C = (unsigned char)rc;
+	*D = (unsigned char)(d + d2);
+}
+
+// Rust `simd_impl::process_simd` — flooring shift. See note 1 above.
+static void deblock_process_shr(unsigned char* A, unsigned char* B,
+                                unsigned char* C, unsigned char* D, int strength)
+{
+	int a = *A, b = *B, c = *C, d = *D;
+	int dv = deblock_floor_shr(a - 4 * b + 4 * c - d, 3);
+	int d1 = deblock_up_down_ramp(dv, strength);
+	int d2 = deblock_clipd1(deblock_floor_shr(a - d, 2), deblock_floor_shr(d1, 1));
+	int rb = b + d1; if (rb < 0) rb = 0; else if (rb > 255) rb = 255;
+	int rc = c - d1; if (rc < 0) rc = 0; else if (rc > 255) rc = 255;
+	*A = (unsigned char)(a - d2);
+	*B = (unsigned char)rb;
+	*C = (unsigned char)rc;
+	*D = (unsigned char)(d + d2);
+}
+
+// Horizontal block edges: rows edge_y-2 .. edge_y+1 for every edge_y = 8, 16,
+// ... while edge_y+2 <= height (Rust: `while edge_y <= height - 2`).
+static void deblock_horiz(unsigned char* p, int width, int height, int stride, int strength)
+{
+	int simd_cols = (width / 8) * 8;
+	for (int edge_y = 8; edge_y + 2 <= height; edge_y += 8) {
+		unsigned char* ra = p + (size_t)(edge_y - 2) * (size_t)stride;
+		unsigned char* rb = ra + stride;
+		unsigned char* rc = rb + stride;
+		unsigned char* rd = rc + stride;
+		for (int x = 0; x < simd_cols; x++)
+			deblock_process_shr(&ra[x], &rb[x], &rc[x], &rd[x], strength);
+		for (int x = simd_cols; x < width; x++)
+			deblock_process_div(&ra[x], &rb[x], &rc[x], &rd[x], strength);
+	}
+}
+
+// Vertical block edges. Rust iterates `row[2..].chunks_exact_mut(8)` and
+// touches indices 4..7 of each chunk, i.e. columns 8k+6 .. 8k+9 — the edge
+// itself sits at column 8k+8. `width >= 10` is Rust's own guard for the
+// `[2..]` slice.
+static void deblock_vert(unsigned char* p, int width, int height, int stride, int strength)
+{
+	if (width < 10) return;
+	int nchunks   = (width - 2) / 8;
+	int simd_rows = (height / 8) * 8;
+	for (int y = 0; y < height; y++) {
+		unsigned char* row = p + (size_t)y * (size_t)stride;
+		int use_shr = (y < simd_rows);
+		for (int k = 0; k < nchunks; k++) {
+			unsigned char* q = row + 2 + 8 * k;
+			if (use_shr) deblock_process_shr(&q[4], &q[5], &q[6], &q[7], strength);
+			else         deblock_process_div(&q[4], &q[5], &q[6], &q[7], strength);
+		}
+	}
+}
+
+// Rust `deblock()` — horizontal edges first, per the spec, then vertical.
+static void deblock_plane(unsigned char* p, int width, int height, int stride, int strength)
+{
+	if (!p || width <= 0 || height <= 0 || strength <= 0) return;
+	deblock_horiz(p, width, height, stride, strength);
+	deblock_vert(p, width, height, stride, strength);
+}
+
+// ---------------------------------------------------------------------------
+// Sorenson Spark picture header — just enough of it to recover the deblocker
+// bit and PQUANT, which libavcodec does not expose on the AVFrame.
+//
+// Layout (h263-rs parser/picture.rs `decode_picture` +
+// `decode_sorenson_ptype`, MSB-first): PSC[17] == 1, version[5],
+// temporal_reference[8], source_format[3] (+ 8+8 or 16+16 custom dims when
+// the code is 0 or 1), picture_type[2], USE_DEBLOCKER[1], PQUANT[5].
+// ---------------------------------------------------------------------------
+typedef struct { const unsigned char* d; int nbits; int pos; } SparkBits;
+
+static int spark_read_bits(SparkBits* r, int n, unsigned* out)
+{
+	unsigned v = 0;
+	if (r->pos + n > r->nbits) return 0;
+	for (int i = 0; i < n; i++) {
+		unsigned bit = (r->d[r->pos >> 3] >> (7 - (r->pos & 7))) & 1u;
+		v = (v << 1) | bit;
+		r->pos++;
+	}
+	*out = v;
+	return 1;
+}
+
+static int spark_parse_header(const unsigned char* payload, int len,
+                              int* out_use_deblocker, int* out_quantizer)
+{
+	SparkBits r = { payload, len * 8, 0 };
+	unsigned v;
+	if (!spark_read_bits(&r, 17, &v) || v != 1) return 0;   // picture start code
+	if (!spark_read_bits(&r, 5, &v)) return 0;              // version
+	if (!spark_read_bits(&r, 8, &v)) return 0;              // temporal reference
+	if (!spark_read_bits(&r, 3, &v)) return 0;              // source format
+	if (v == 0) {
+		if (!spark_read_bits(&r, 8, &v)) return 0;
+		if (!spark_read_bits(&r, 8, &v)) return 0;
+	} else if (v == 1) {
+		if (!spark_read_bits(&r, 16, &v)) return 0;
+		if (!spark_read_bits(&r, 16, &v)) return 0;
+	}
+	if (!spark_read_bits(&r, 2, &v)) return 0;              // picture type
+	if (!spark_read_bits(&r, 1, &v)) return 0;              // USE_DEBLOCKER
+	*out_use_deblocker = (int)v;
+	if (!spark_read_bits(&r, 5, &v)) return 0;              // PQUANT
+	*out_quantizer = (int)v;
+	return 1;
+}
+
+// Ruffle's gate, verbatim (h263.rs:80-90): filter for LEVEL1 unconditionally,
+// or for USE_PACKET_VALUE when the picture header says so. Returns the
+// Table J.2 strength, or 0 for "don't filter".
+static int video_deblock_strength(int codec_id, int deblocking,
+                                  const unsigned char* payload, int payload_len)
+{
+	if (codec_id != 2) return 0;
+	if (deblocking != VIDEO_DEBLOCK_USE_PACKET_VALUE &&
+	    deblocking != VIDEO_DEBLOCK_LEVEL1) return 0;
+
+	int use_deblocker = 0, quantizer = 0;
+	if (!spark_parse_header(payload, payload_len, &use_deblocker, &quantizer)) return 0;
+	if (deblocking == VIDEO_DEBLOCK_USE_PACKET_VALUE && !use_deblocker) return 0;
+	if (quantizer < 0 || quantizer > 31) return 0;
+	return (int)VIDEO_QUANT_TO_STRENGTH[quantizer];
+}
+
+// Deblock a decoded 4:2:0 frame into scratch planes and convert those.
+// Returns 1 if the deblocked path ran, 0 if the caller should fall back to
+// converting `frame` directly (OOM only).
+//
+// The scratch planes are tightly packed at the picture's own width, which is
+// exactly h263-rs's `DecodedPicture` layout (luma w*h, chroma
+// ceil(w/2)*ceil(h/2)) — the geometry `deblock()` assumes.
+static int yuv420_deblock_and_convert(const AVFrame* frame, int w, int h,
+                                      int strength, unsigned char* rgba)
+{
+	int cw = (w + 1) / 2, ch = (h + 1) / 2;
+	unsigned char* yb  = (unsigned char*)malloc((size_t)w * (size_t)h);
+	unsigned char* cbb = (unsigned char*)malloc((size_t)cw * (size_t)ch);
+	unsigned char* crb = (unsigned char*)malloc((size_t)cw * (size_t)ch);
+	if (!yb || !cbb || !crb) { free(yb); free(cbb); free(crb); return 0; }
+
+	for (int y = 0; y < h; y++)
+		memcpy(yb + (size_t)y * w, frame->data[0] + (size_t)y * frame->linesize[0], (size_t)w);
+	for (int y = 0; y < ch; y++) {
+		memcpy(cbb + (size_t)y * cw, frame->data[1] + (size_t)y * frame->linesize[1], (size_t)cw);
+		memcpy(crb + (size_t)y * cw, frame->data[2] + (size_t)y * frame->linesize[2], (size_t)cw);
+	}
+
+	deblock_plane(yb,  w,  h,  w,  strength);
+	deblock_plane(cbb, cw, ch, cw, strength);
+	deblock_plane(crb, cw, ch, cw, strength);
+
+	// Codec 2 is never YUVA420P, so there is no alpha plane on this path.
+	yuv420_planes_to_rgba_bt601(yb, w, cbb, cw, crb, cw, NULL, 0, w, h, rgba);
+
+	free(yb); free(cbb); free(crb);
+	return 1;
+}
+
 static enum AVCodecID map_flv_codec_id(int codec_id)
 {
 	switch (codec_id) {
@@ -147,6 +395,7 @@ static enum AVCodecID map_flv_codec_id(int codec_id)
 
 static int decode_via_libavcodec(int codec_id,
                                  const unsigned char* payload, int payload_len,
+                                 int deblocking,
                                  int* out_w, int* out_h,
                                  unsigned char** out_rgba)
 {
@@ -180,8 +429,11 @@ static int decode_via_libavcodec(int codec_id,
 	if (!rgba) goto done;
 
 	if (yuv420_frame_is_supported(frame->format)) {
-		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601.
-		yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
+		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601, with the
+		// H.263 Annex J post-filter in front of it when the stream asks.
+		int strength = video_deblock_strength(codec_id, deblocking, payload, payload_len);
+		if (strength <= 0 || !yuv420_deblock_and_convert(frame, w, h, strength, rgba))
+			yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
 	} else {
 		// Any other decoded pixel format (e.g. an H.264 profile that isn't
 		// 8-bit 4:2:0) still goes through libswscale.
@@ -266,6 +518,7 @@ int video_resample_rgba(const unsigned char* src_rgba, int src_w, int src_h,
 
 int video_decode_one_frame(int codec_id, int frame_type,
                            const unsigned char* payload, int payload_len,
+                           int deblocking,
                            int* out_w, int* out_h,
                            unsigned char** out_rgba)
 {
@@ -279,7 +532,7 @@ int video_decode_one_frame(int codec_id, int frame_type,
 		case 5: // VP6 alpha
 		case 7: // H.264
 			return decode_via_libavcodec(codec_id, payload, payload_len,
-			                              out_w, out_h, out_rgba);
+			                              deblocking, out_w, out_h, out_rgba);
 		default:
 			break;
 	}
@@ -287,7 +540,7 @@ int video_decode_one_frame(int codec_id, int frame_type,
 
 	// Codec 3 (ScreenVideo) is handled by the legacy decoder in action.c;
 	// callers route it there directly.
-	(void)codec_id;
+	(void)codec_id; (void)deblocking;
 	return 0;
 }
 
@@ -296,6 +549,7 @@ int video_decode_one_frame(int codec_id, int frame_type,
 // ---------------------------------------------------------------------------
 struct VideoDecoderCtx {
 	int codec_id;
+	int deblocking;   // VIDEO_DEBLOCK_* from the stream's DefineVideoStream
 #ifdef SWF_HAVE_LIBAVCODEC
 	AVCodecContext* cctx;
 	struct SwsContext* sws;
@@ -306,13 +560,14 @@ struct VideoDecoderCtx {
 #endif
 };
 
-VideoDecoderCtx* video_decoder_create(int codec_id)
+VideoDecoderCtx* video_decoder_create(int codec_id, int deblocking)
 {
 	if (!video_codec_supported(codec_id)) return NULL;
 
 	VideoDecoderCtx* ctx = (VideoDecoderCtx*)calloc(1, sizeof(VideoDecoderCtx));
 	if (!ctx) return NULL;
 	ctx->codec_id = codec_id;
+	ctx->deblocking = deblocking;
 
 #ifdef SWF_HAVE_LIBAVCODEC
 	enum AVCodecID avid = map_flv_codec_id(codec_id);
@@ -378,8 +633,12 @@ int video_decoder_decode(VideoDecoderCtx* ctx, int frame_type,
 	if (yuv420_frame_is_supported(frame->format)) {
 		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601. This is
 		// the path every embedded DefineVideoStream (Spark / VP6 / VP6A) and
-		// every FLV NetStream frame takes.
-		yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
+		// every FLV NetStream frame takes. Spark streams may additionally ask
+		// for the Annex J deblocking post-filter.
+		int strength = video_deblock_strength(ctx->codec_id, ctx->deblocking,
+		                                      payload, payload_len);
+		if (strength <= 0 || !yuv420_deblock_and_convert(frame, w, h, strength, rgba))
+			yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
 	} else {
 		// (Re)build sws context if dimensions or pixel format changed.
 		if (!ctx->sws || ctx->sws_w != w || ctx->sws_h != h ||

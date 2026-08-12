@@ -276,6 +276,7 @@ static size_t ng_video_ids[MAX_VIDEOS_NG];
 static u16    ng_video_widths[MAX_VIDEOS_NG];
 static u16    ng_video_heights[MAX_VIDEOS_NG];
 static u8     ng_video_codecs[MAX_VIDEOS_NG];
+static u8     ng_video_deblocking[MAX_VIDEOS_NG];
 static size_t ng_video_count = 0;
 
 int ng_find_video(size_t char_id)
@@ -285,7 +286,8 @@ int ng_find_video(size_t char_id)
 	return 0;
 }
 
-void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
+void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
+                     u8 codec_id, u8 deblocking)
 {
 	(void)app_context;
 	// Idempotent per char_id (see ng_record_char_bounds).
@@ -293,6 +295,7 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 hei
 		if (ng_video_ids[i] == (size_t)char_id) {
 			ng_video_widths[i] = width; ng_video_heights[i] = height;
 			ng_video_codecs[i] = codec_id;
+			ng_video_deblocking[i] = deblocking;
 			return;
 		}
 	}
@@ -301,6 +304,7 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 hei
 		ng_video_widths[ng_video_count] = width;
 		ng_video_heights[ng_video_count] = height;
 		ng_video_codecs[ng_video_count] = codec_id;
+		ng_video_deblocking[ng_video_count] = deblocking;
 		ng_video_count++;
 	}
 }
@@ -332,6 +336,16 @@ u8 ng_getVideoCodec(size_t char_id)
 {
 	for (size_t i = 0; i < ng_video_count; i++)
 		if (ng_video_ids[i] == char_id) return ng_video_codecs[i];
+	return 0;
+}
+
+// DefineVideoStream `VideoFlagsDeblocking` (UB[3]) for the given video
+// char_id — a VIDEO_DEBLOCK_* value. Returns 0 (UseVideoPacketValue, the SWF
+// default and what Ruffle uses for FLV) for an unknown char_id.
+u8 ng_getVideoDeblocking(size_t char_id)
+{
+	for (size_t i = 0; i < ng_video_count; i++)
+		if (ng_video_ids[i] == char_id) return ng_video_deblocking[i];
 	return 0;
 }
 

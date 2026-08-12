@@ -5025,7 +5025,16 @@ namespace SWFRecomp
 				u16 video_char_id = (u16) tag.fields[0].value;
 				u16 video_width   = (u16) tag.fields[2].value;
 				u16 video_height  = (u16) tag.fields[3].value;
+				u8 video_flags    = (u8) cur_pos[8]; // reserved UB[4] | deblocking UB[3] | smoothing UB[1]
 				u8 video_codec_id = (u8) cur_pos[9]; // byte after the 4 UI16s + flags byte
+
+				// VideoFlagsDeblocking decides whether the runtime runs the
+				// H.263 Annex J post-filter (swf crate `VideoDeblocking`;
+				// 0 = use the picture header's own bit, 1 = off, 2 = Level1).
+				// Dropping it silently deblocks streams that asked not to be
+				// (visual/video/colorconversion/h263 sets 1 = off while its
+				// picture header sets the bit).
+				u8 video_deblocking = (u8) ((video_flags >> 1) & 0x07);
 
 				// Character id 0 collides with the runtime's "empty depth"
 				// display-list sentinel — alias it to a synthetic non-zero id
@@ -5052,6 +5061,7 @@ namespace SWFRecomp
 				         << to_string(video_char_id) << ", "
 				         << to_string(video_width) << ", "
 				         << to_string(video_height) << ", "
+				         << to_string((u32)video_deblocking) << ", "
 				         << to_string((u32)video_codec_id) << ");";
 
 				cur_pos += tag.length;

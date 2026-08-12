@@ -195,7 +195,10 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s32* advance_table, size_t glyph_count);
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base);
-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id);
+// `deblocking` is the tag's VideoFlagsDeblocking field (UB[3]) — a
+// VIDEO_DEBLOCK_* value from actionmodern/video_codec.h.
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
+    u8 deblocking, u8 codec_id);
 void tagVideoFrame(SWFAppContext* app_context, u16 char_id, u16 frame_num,
     const unsigned char* payload, size_t payload_size);
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
@@ -538,10 +541,12 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
     int* out_maxscroll, int* out_bottomscroll, int* out_text_height_twips);
 // ng_findFontIdByName, ng_getTextExtent, ng_lookupExport, ng_getSoundDuration
 // are declared above (outside #ifdef NO_GRAPHICS) since action.c needs them in all modes.
-void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id);
+void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
+                     u8 codec_id, u8 deblocking);
 int ng_isVideoChar(size_t char_id);
 int ng_getVideoDimensions(size_t char_id, u16* out_w, u16* out_h);
 u8 ng_getVideoCodec(size_t char_id);
+u8 ng_getVideoDeblocking(size_t char_id);
 // Attach a library symbol by char_id. Returns created MC, or NULL if not sprite.
 MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent);
 // Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)

@@ -1,0 +1,618 @@
+diff --git a/SWFModernRuntime/include/actionmodern/video_codec.h b/SWFModernRuntime/include/actionmodern/video_codec.h
+index 8fff0ebed..ea6ed7735 100644
+--- a/SWFModernRuntime/include/actionmodern/video_codec.h
++++ b/SWFModernRuntime/include/actionmodern/video_codec.h
+@@ -16,6 +16,21 @@ extern "C" {
+ // Returns 1 if this build has a working decoder for the given codec id.
+ int video_codec_supported(int codec_id);
+ 
++// DefineVideoStream `VideoFlagsDeblocking` (SWF spec UB[3], and the swf
++// crate's `VideoDeblocking`). Only codec 2 (Sorenson Spark) has a deblocking
++// filter; every other codec ignores the setting.
++//
++// Ruffle applies its H.263 Annex J post-filter for LEVEL1, or for
++// USE_PACKET_VALUE when the picture header's own deblocker bit is set
++// (video/software/src/decoder/h263.rs:80-90). LEVEL2..4 are parsed but never
++// act — that asymmetry is Ruffle's, and we reproduce it.
++#define VIDEO_DEBLOCK_USE_PACKET_VALUE 0
++#define VIDEO_DEBLOCK_NONE             1
++#define VIDEO_DEBLOCK_LEVEL1           2
++#define VIDEO_DEBLOCK_LEVEL2           3
++#define VIDEO_DEBLOCK_LEVEL3           4
++#define VIDEO_DEBLOCK_LEVEL4           5
++
+ // Decode a single FLV/DefineVideoStream video payload.
+ //
+ // `payload` is the codec payload *after* the FLV tag's leading
+@@ -29,9 +44,15 @@ int video_codec_supported(int codec_id);
+ // *out_rgba and must release it via free(). Layout is packed RGBA8
+ // (R=byte0, G=byte1, B=byte2, A=byte3), top-to-bottom.
+ //
++// `deblocking`: one of the VIDEO_DEBLOCK_* values above. NetStream/FLV
++// callers pass VIDEO_DEBLOCK_USE_PACKET_VALUE (Ruffle core/src/streams.rs
++// hardcodes that for every FLV stream); embedded DefineVideoStream callers
++// pass the tag's own flags field.
++//
+ // Returns 0 on any failure (unsupported codec, decode error, OOM).
+ int video_decode_one_frame(int codec_id, int frame_type,
+                            const unsigned char* payload, int payload_len,
++                           int deblocking,
+                            int* out_w, int* out_h,
+                            unsigned char** out_rgba);
+ 
+@@ -43,8 +64,8 @@ int video_decode_one_frame(int codec_id, int frame_type,
+ typedef struct VideoDecoderCtx VideoDecoderCtx;
+ 
+ // Create a persistent decoder for the given codec id, or NULL if the codec
+-// is unsupported in this build.
+-VideoDecoderCtx* video_decoder_create(int codec_id);
++// is unsupported in this build. `deblocking` is one of VIDEO_DEBLOCK_*.
++VideoDecoderCtx* video_decoder_create(int codec_id, int deblocking);
+ 
+ // Decode one VideoFrame payload through the persistent context. Same arg
+ // semantics as `video_decode_one_frame`. Returns 1 on success, 0 otherwise.
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index 7e13eed38..bb4ce723a 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -195,7 +195,10 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
+     s16 ascent, s16 descent, s16 leading, int em_square,
+     const u16* code_table, const s32* advance_table, size_t glyph_count);
+ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base);
+-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id);
++// `deblocking` is the tag's VideoFlagsDeblocking field (UB[3]) — a
++// VIDEO_DEBLOCK_* value from actionmodern/video_codec.h.
++void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
++    u8 deblocking, u8 codec_id);
+ void tagVideoFrame(SWFAppContext* app_context, u16 char_id, u16 frame_num,
+     const unsigned char* payload, size_t payload_size);
+ void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
+@@ -538,10 +541,12 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
+     int* out_maxscroll, int* out_bottomscroll, int* out_text_height_twips);
+ // ng_findFontIdByName, ng_getTextExtent, ng_lookupExport, ng_getSoundDuration
+ // are declared above (outside #ifdef NO_GRAPHICS) since action.c needs them in all modes.
+-void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id);
++void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
++                     u8 codec_id, u8 deblocking);
+ int ng_isVideoChar(size_t char_id);
+ int ng_getVideoDimensions(size_t char_id, u16* out_w, u16* out_h);
+ u8 ng_getVideoCodec(size_t char_id);
++u8 ng_getVideoDeblocking(size_t char_id);
+ // Attach a library symbol by char_id. Returns created MC, or NULL if not sprite.
+ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent);
+ // Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index a804b0a5c..de4293941 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -3319,9 +3319,14 @@ static unsigned char* flv_decode_first_frame(const unsigned char* data, int len,
+ 				// Spark / VP6 / H.264 via libavcodec — keyframe only in Phase A.
+ 				// Multi-frame decoding is Phase D of the video codec plan.
+ 				unsigned char* pixels = NULL;
++				// FLV has no per-stream deblocking field; Ruffle hardcodes
++				// UseVideoPacketValue for every NetStream video decoder
++				// (core/src/streams.rs:961,1167), so the picture header's own
++				// deblocker bit decides.
+ 				if (video_decode_one_frame(codec_id, frame_type,
+ 				                            data + tag_data_start + 1,
+ 				                            tag_size - 1,
++				                            VIDEO_DEBLOCK_USE_PACKET_VALUE,
+ 				                            out_width, out_height,
+ 				                            &pixels))
+ 					return pixels;
+@@ -3413,7 +3418,11 @@ int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
+ // ---------------------------------------------------------------------------
+ #include "actionmodern/video_codec.h"
+ 
+-#define MAX_EMBEDDED_VIDEO_STREAMS 8
++// 16, not 8: visual/video/deblocking carries TWELVE DefineVideoStream
++// characters (four quantizers x {deblocked, not} at two sizes), and at 8 the
++// last four were silently dropped — the whole bottom half of that stage
++// rendered empty. MAX_VIDEOS_NG (ng_shared.c) is already 32.
++#define MAX_EMBEDDED_VIDEO_STREAMS 16
+ #define MAX_EMBEDDED_VIDEO_FRAMES_PER_STREAM 256
+ 
+ typedef struct {
+@@ -3441,7 +3450,11 @@ static EmbeddedVideoStream* find_or_create_embedded_stream(size_t char_id)
+ 	for (int i = 0; i < MAX_EMBEDDED_VIDEO_STREAMS; i++) {
+ 		if (!g_embedded_video_streams[i].active) {
+ 			u8 codec_id = ng_getVideoCodec(char_id);
+-			VideoDecoderCtx* dec = video_decoder_create((int)codec_id);
++			// The DefineVideoStream flags byte decides whether the H.263
++			// deblocking post-filter runs (Ruffle passes the same field into
++			// H263Decoder::new).
++			u8 deblocking = ng_getVideoDeblocking(char_id);
++			VideoDecoderCtx* dec = video_decoder_create((int)codec_id, (int)deblocking);
+ 			if (!dec) return NULL;
+ 			g_embedded_video_streams[i].active = 1;
+ 			g_embedded_video_streams[i].char_id = char_id;
+diff --git a/SWFModernRuntime/src/actionmodern/video_codec.c b/SWFModernRuntime/src/actionmodern/video_codec.c
+index e72ca3250..3313461a5 100644
+--- a/SWFModernRuntime/src/actionmodern/video_codec.c
++++ b/SWFModernRuntime/src/actionmodern/video_codec.c
+@@ -77,19 +77,12 @@ static int yuv420_frame_is_supported(int pix_fmt)
+ 	return pix_fmt == AV_PIX_FMT_YUV420P || pix_fmt == AV_PIX_FMT_YUVA420P;
+ }
+ 
+-static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
+-                                       unsigned char* rgba)
++static void yuv420_planes_to_rgba_bt601(const uint8_t* yp,  int yls,
++                                        const uint8_t* cbp, int cbls,
++                                        const uint8_t* crp, int crls,
++                                        const uint8_t* ap,  int als,
++                                        int w, int h, unsigned char* rgba)
+ {
+-	const uint8_t* yp  = frame->data[0];
+-	const uint8_t* cbp = frame->data[1];
+-	const uint8_t* crp = frame->data[2];
+-	const uint8_t* ap  = (frame->format == AV_PIX_FMT_YUVA420P) ? frame->data[3] : NULL;
+-
+-	const int yls  = frame->linesize[0];
+-	const int cbls = frame->linesize[1];
+-	const int crls = frame->linesize[2];
+-	const int als  = ap ? frame->linesize[3] : 0;
+-
+ 	for (int y = 0; y < h; y++) {
+ 		const uint8_t* yrow  = yp  + (size_t)y * (size_t)yls;
+ 		const uint8_t* cbrow = cbp + (size_t)(y >> 1) * (size_t)cbls;
+@@ -134,6 +127,261 @@ static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
+ 	}
+ }
+ 
++static void yuv420_frame_to_rgba_bt601(const AVFrame* frame, int w, int h,
++                                       unsigned char* rgba)
++{
++	const uint8_t* ap = (frame->format == AV_PIX_FMT_YUVA420P) ? frame->data[3] : NULL;
++	yuv420_planes_to_rgba_bt601(frame->data[0], frame->linesize[0],
++	                            frame->data[1], frame->linesize[1],
++	                            frame->data[2], frame->linesize[2],
++	                            ap, ap ? frame->linesize[3] : 0,
++	                            w, h, rgba);
++}
++
++// ---------------------------------------------------------------------------
++// H.263 Annex J post-decode deblocking filter.
++//
++// Line-for-line port of Ruffle's `h263-rs-deblock`
++// (deblock/src/deblock.rs), which `video/software/src/decoder/h263.rs`
++// runs over the decoded Y/Cb/Cr planes BEFORE the BT.601 conversion whenever
++// the stream asks for it. libavcodec's FLV1 decoder has no equivalent, so
++// without this every deblocked Spark stream renders with visible 8x8 blocking
++// against a Ruffle-exported golden that has none.
++//
++// Two properties of the Rust original that a "clean" C rewrite would get
++// wrong, and that decide byte-exactness:
++//
++//  1. **The scalar and SIMD lanes are NOT the same function.** Rust's
++//     `scalar_impl::process` divides (`/8`, `/4`, `/2`, truncating toward
++//     zero); `simd_impl::process_simd` shifts (`.shr(3)`, `.shr(2)`,
++//     `.shr(1)`, flooring). They disagree on every negative intermediate
++//     (-3/2 == -1 but -3>>1 == -2). Ruffle's chunking decides which pixel
++//     gets which: horizontally, columns [0, 8*floor(w/8)) shift and the
++//     <=7-column remainder divides; vertically, rows [0, 8*floor(h/8))
++//     shift and the <=7-row remainder divides. Reproduced exactly.
++//  2. **A and D wrap, B and C clamp.** `(a16 - d2) as u8` is a truncating
++//     cast in Rust; only B and C get `.clamp(0, 255)`.
++//
++// The port is validated against all three `test_deblock` vectors (11x17,
++// strengths 4/8/12 — an image sized to exercise both lanes in both
++// directions) and the 37-row `test_process` table from deblock.rs.
++//
++// Deblocking is display-only: Ruffle filters a COPY and leaves the decoder's
++// reference picture untouched, so inter-frame prediction is unaffected. We do
++// the same by filtering scratch planes, never `frame->data` (which libavcodec
++// may still hold as a reference frame).
++// ---------------------------------------------------------------------------
++
++// Table J.2/H.263 — QUANT → filter STRENGTH. Index 0 is never used.
++static const unsigned char VIDEO_QUANT_TO_STRENGTH[32] = {
++	0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 7,
++	7, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12, 12
++};
++
++// Arithmetic (flooring) right shift, spelled without relying on C's
++// implementation-defined `>>` for negative operands.
++static int deblock_floor_shr(int x, int n)
++{
++	return (x < 0) ? -(((-x) + ((1 << n) - 1)) >> n) : (x >> n);
++}
++
++// Figure J.2/H.263 — parameter d1 as a function of d.
++static int deblock_up_down_ramp(int x, int strength)
++{
++	int ax  = (x < 0) ? -x : x;
++	int sgn = (x > 0) - (x < 0);
++	int t   = 2 * (ax - strength);
++	if (t < 0) t = 0;
++	int v = ax - t;
++	if (v < 0) v = 0;
++	return sgn * v;
++}
++
++// Clips x to +/- abs(lim).
++static int deblock_clipd1(int x, int lim)
++{
++	int l = (lim < 0) ? -lim : lim;
++	if (x < -l) return -l;
++	if (x >  l) return  l;
++	return x;
++}
++
++// Rust `scalar_impl::process` — truncating division.
++static void deblock_process_div(unsigned char* A, unsigned char* B,
++                                unsigned char* C, unsigned char* D, int strength)
++{
++	int a = *A, b = *B, c = *C, d = *D;
++	int dv = (a - 4 * b + 4 * c - d) / 8;
++	int d1 = deblock_up_down_ramp(dv, strength);
++	int d2 = deblock_clipd1((a - d) / 4, d1 / 2);
++	int rb = b + d1; if (rb < 0) rb = 0; else if (rb > 255) rb = 255;
++	int rc = c - d1; if (rc < 0) rc = 0; else if (rc > 255) rc = 255;
++	*A = (unsigned char)(a - d2);
++	*B = (unsigned char)rb;
++	*C = (unsigned char)rc;
++	*D = (unsigned char)(d + d2);
++}
++
++// Rust `simd_impl::process_simd` — flooring shift. See note 1 above.
++static void deblock_process_shr(unsigned char* A, unsigned char* B,
++                                unsigned char* C, unsigned char* D, int strength)
++{
++	int a = *A, b = *B, c = *C, d = *D;
++	int dv = deblock_floor_shr(a - 4 * b + 4 * c - d, 3);
++	int d1 = deblock_up_down_ramp(dv, strength);
++	int d2 = deblock_clipd1(deblock_floor_shr(a - d, 2), deblock_floor_shr(d1, 1));
++	int rb = b + d1; if (rb < 0) rb = 0; else if (rb > 255) rb = 255;
++	int rc = c - d1; if (rc < 0) rc = 0; else if (rc > 255) rc = 255;
++	*A = (unsigned char)(a - d2);
++	*B = (unsigned char)rb;
++	*C = (unsigned char)rc;
++	*D = (unsigned char)(d + d2);
++}
++
++// Horizontal block edges: rows edge_y-2 .. edge_y+1 for every edge_y = 8, 16,
++// ... while edge_y+2 <= height (Rust: `while edge_y <= height - 2`).
++static void deblock_horiz(unsigned char* p, int width, int height, int stride, int strength)
++{
++	int simd_cols = (width / 8) * 8;
++	for (int edge_y = 8; edge_y + 2 <= height; edge_y += 8) {
++		unsigned char* ra = p + (size_t)(edge_y - 2) * (size_t)stride;
++		unsigned char* rb = ra + stride;
++		unsigned char* rc = rb + stride;
++		unsigned char* rd = rc + stride;
++		for (int x = 0; x < simd_cols; x++)
++			deblock_process_shr(&ra[x], &rb[x], &rc[x], &rd[x], strength);
++		for (int x = simd_cols; x < width; x++)
++			deblock_process_div(&ra[x], &rb[x], &rc[x], &rd[x], strength);
++	}
++}
++
++// Vertical block edges. Rust iterates `row[2..].chunks_exact_mut(8)` and
++// touches indices 4..7 of each chunk, i.e. columns 8k+6 .. 8k+9 — the edge
++// itself sits at column 8k+8. `width >= 10` is Rust's own guard for the
++// `[2..]` slice.
++static void deblock_vert(unsigned char* p, int width, int height, int stride, int strength)
++{
++	if (width < 10) return;
++	int nchunks   = (width - 2) / 8;
++	int simd_rows = (height / 8) * 8;
++	for (int y = 0; y < height; y++) {
++		unsigned char* row = p + (size_t)y * (size_t)stride;
++		int use_shr = (y < simd_rows);
++		for (int k = 0; k < nchunks; k++) {
++			unsigned char* q = row + 2 + 8 * k;
++			if (use_shr) deblock_process_shr(&q[4], &q[5], &q[6], &q[7], strength);
++			else         deblock_process_div(&q[4], &q[5], &q[6], &q[7], strength);
++		}
++	}
++}
++
++// Rust `deblock()` — horizontal edges first, per the spec, then vertical.
++static void deblock_plane(unsigned char* p, int width, int height, int stride, int strength)
++{
++	if (!p || width <= 0 || height <= 0 || strength <= 0) return;
++	deblock_horiz(p, width, height, stride, strength);
++	deblock_vert(p, width, height, stride, strength);
++}
++
++// ---------------------------------------------------------------------------
++// Sorenson Spark picture header — just enough of it to recover the deblocker
++// bit and PQUANT, which libavcodec does not expose on the AVFrame.
++//
++// Layout (h263-rs parser/picture.rs `decode_picture` +
++// `decode_sorenson_ptype`, MSB-first): PSC[17] == 1, version[5],
++// temporal_reference[8], source_format[3] (+ 8+8 or 16+16 custom dims when
++// the code is 0 or 1), picture_type[2], USE_DEBLOCKER[1], PQUANT[5].
++// ---------------------------------------------------------------------------
++typedef struct { const unsigned char* d; int nbits; int pos; } SparkBits;
++
++static int spark_read_bits(SparkBits* r, int n, unsigned* out)
++{
++	unsigned v = 0;
++	if (r->pos + n > r->nbits) return 0;
++	for (int i = 0; i < n; i++) {
++		unsigned bit = (r->d[r->pos >> 3] >> (7 - (r->pos & 7))) & 1u;
++		v = (v << 1) | bit;
++		r->pos++;
++	}
++	*out = v;
++	return 1;
++}
++
++static int spark_parse_header(const unsigned char* payload, int len,
++                              int* out_use_deblocker, int* out_quantizer)
++{
++	SparkBits r = { payload, len * 8, 0 };
++	unsigned v;
++	if (!spark_read_bits(&r, 17, &v) || v != 1) return 0;   // picture start code
++	if (!spark_read_bits(&r, 5, &v)) return 0;              // version
++	if (!spark_read_bits(&r, 8, &v)) return 0;              // temporal reference
++	if (!spark_read_bits(&r, 3, &v)) return 0;              // source format
++	if (v == 0) {
++		if (!spark_read_bits(&r, 8, &v)) return 0;
++		if (!spark_read_bits(&r, 8, &v)) return 0;
++	} else if (v == 1) {
++		if (!spark_read_bits(&r, 16, &v)) return 0;
++		if (!spark_read_bits(&r, 16, &v)) return 0;
++	}
++	if (!spark_read_bits(&r, 2, &v)) return 0;              // picture type
++	if (!spark_read_bits(&r, 1, &v)) return 0;              // USE_DEBLOCKER
++	*out_use_deblocker = (int)v;
++	if (!spark_read_bits(&r, 5, &v)) return 0;              // PQUANT
++	*out_quantizer = (int)v;
++	return 1;
++}
++
++// Ruffle's gate, verbatim (h263.rs:80-90): filter for LEVEL1 unconditionally,
++// or for USE_PACKET_VALUE when the picture header says so. Returns the
++// Table J.2 strength, or 0 for "don't filter".
++static int video_deblock_strength(int codec_id, int deblocking,
++                                  const unsigned char* payload, int payload_len)
++{
++	if (codec_id != 2) return 0;
++	if (deblocking != VIDEO_DEBLOCK_USE_PACKET_VALUE &&
++	    deblocking != VIDEO_DEBLOCK_LEVEL1) return 0;
++
++	int use_deblocker = 0, quantizer = 0;
++	if (!spark_parse_header(payload, payload_len, &use_deblocker, &quantizer)) return 0;
++	if (deblocking == VIDEO_DEBLOCK_USE_PACKET_VALUE && !use_deblocker) return 0;
++	if (quantizer < 0 || quantizer > 31) return 0;
++	return (int)VIDEO_QUANT_TO_STRENGTH[quantizer];
++}
++
++// Deblock a decoded 4:2:0 frame into scratch planes and convert those.
++// Returns 1 if the deblocked path ran, 0 if the caller should fall back to
++// converting `frame` directly (OOM only).
++//
++// The scratch planes are tightly packed at the picture's own width, which is
++// exactly h263-rs's `DecodedPicture` layout (luma w*h, chroma
++// ceil(w/2)*ceil(h/2)) — the geometry `deblock()` assumes.
++static int yuv420_deblock_and_convert(const AVFrame* frame, int w, int h,
++                                      int strength, unsigned char* rgba)
++{
++	int cw = (w + 1) / 2, ch = (h + 1) / 2;
++	unsigned char* yb  = (unsigned char*)malloc((size_t)w * (size_t)h);
++	unsigned char* cbb = (unsigned char*)malloc((size_t)cw * (size_t)ch);
++	unsigned char* crb = (unsigned char*)malloc((size_t)cw * (size_t)ch);
++	if (!yb || !cbb || !crb) { free(yb); free(cbb); free(crb); return 0; }
++
++	for (int y = 0; y < h; y++)
++		memcpy(yb + (size_t)y * w, frame->data[0] + (size_t)y * frame->linesize[0], (size_t)w);
++	for (int y = 0; y < ch; y++) {
++		memcpy(cbb + (size_t)y * cw, frame->data[1] + (size_t)y * frame->linesize[1], (size_t)cw);
++		memcpy(crb + (size_t)y * cw, frame->data[2] + (size_t)y * frame->linesize[2], (size_t)cw);
++	}
++
++	deblock_plane(yb,  w,  h,  w,  strength);
++	deblock_plane(cbb, cw, ch, cw, strength);
++	deblock_plane(crb, cw, ch, cw, strength);
++
++	// Codec 2 is never YUVA420P, so there is no alpha plane on this path.
++	yuv420_planes_to_rgba_bt601(yb, w, cbb, cw, crb, cw, NULL, 0, w, h, rgba);
++
++	free(yb); free(cbb); free(crb);
++	return 1;
++}
++
+ static enum AVCodecID map_flv_codec_id(int codec_id)
+ {
+ 	switch (codec_id) {
+@@ -147,6 +395,7 @@ static enum AVCodecID map_flv_codec_id(int codec_id)
+ 
+ static int decode_via_libavcodec(int codec_id,
+                                  const unsigned char* payload, int payload_len,
++                                 int deblocking,
+                                  int* out_w, int* out_h,
+                                  unsigned char** out_rgba)
+ {
+@@ -180,8 +429,11 @@ static int decode_via_libavcodec(int codec_id,
+ 	if (!rgba) goto done;
+ 
+ 	if (yuv420_frame_is_supported(frame->format)) {
+-		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601.
+-		yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
++		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601, with the
++		// H.263 Annex J post-filter in front of it when the stream asks.
++		int strength = video_deblock_strength(codec_id, deblocking, payload, payload_len);
++		if (strength <= 0 || !yuv420_deblock_and_convert(frame, w, h, strength, rgba))
++			yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
+ 	} else {
+ 		// Any other decoded pixel format (e.g. an H.264 profile that isn't
+ 		// 8-bit 4:2:0) still goes through libswscale.
+@@ -266,6 +518,7 @@ int video_resample_rgba(const unsigned char* src_rgba, int src_w, int src_h,
+ 
+ int video_decode_one_frame(int codec_id, int frame_type,
+                            const unsigned char* payload, int payload_len,
++                           int deblocking,
+                            int* out_w, int* out_h,
+                            unsigned char** out_rgba)
+ {
+@@ -279,7 +532,7 @@ int video_decode_one_frame(int codec_id, int frame_type,
+ 		case 5: // VP6 alpha
+ 		case 7: // H.264
+ 			return decode_via_libavcodec(codec_id, payload, payload_len,
+-			                              out_w, out_h, out_rgba);
++			                              deblocking, out_w, out_h, out_rgba);
+ 		default:
+ 			break;
+ 	}
+@@ -287,7 +540,7 @@ int video_decode_one_frame(int codec_id, int frame_type,
+ 
+ 	// Codec 3 (ScreenVideo) is handled by the legacy decoder in action.c;
+ 	// callers route it there directly.
+-	(void)codec_id;
++	(void)codec_id; (void)deblocking;
+ 	return 0;
+ }
+ 
+@@ -296,6 +549,7 @@ int video_decode_one_frame(int codec_id, int frame_type,
+ // ---------------------------------------------------------------------------
+ struct VideoDecoderCtx {
+ 	int codec_id;
++	int deblocking;   // VIDEO_DEBLOCK_* from the stream's DefineVideoStream
+ #ifdef SWF_HAVE_LIBAVCODEC
+ 	AVCodecContext* cctx;
+ 	struct SwsContext* sws;
+@@ -306,13 +560,14 @@ struct VideoDecoderCtx {
+ #endif
+ };
+ 
+-VideoDecoderCtx* video_decoder_create(int codec_id)
++VideoDecoderCtx* video_decoder_create(int codec_id, int deblocking)
+ {
+ 	if (!video_codec_supported(codec_id)) return NULL;
+ 
+ 	VideoDecoderCtx* ctx = (VideoDecoderCtx*)calloc(1, sizeof(VideoDecoderCtx));
+ 	if (!ctx) return NULL;
+ 	ctx->codec_id = codec_id;
++	ctx->deblocking = deblocking;
+ 
+ #ifdef SWF_HAVE_LIBAVCODEC
+ 	enum AVCodecID avid = map_flv_codec_id(codec_id);
+@@ -378,8 +633,12 @@ int video_decoder_decode(VideoDecoderCtx* ctx, int frame_type,
+ 	if (yuv420_frame_is_supported(frame->format)) {
+ 		// Exact Ruffle conversion — see yuv420_frame_to_rgba_bt601. This is
+ 		// the path every embedded DefineVideoStream (Spark / VP6 / VP6A) and
+-		// every FLV NetStream frame takes.
+-		yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
++		// every FLV NetStream frame takes. Spark streams may additionally ask
++		// for the Annex J deblocking post-filter.
++		int strength = video_deblock_strength(ctx->codec_id, ctx->deblocking,
++		                                      payload, payload_len);
++		if (strength <= 0 || !yuv420_deblock_and_convert(frame, w, h, strength, rgba))
++			yuv420_frame_to_rgba_bt601(frame, w, h, rgba);
+ 	} else {
+ 		// (Re)build sws context if dimensions or pixel format changed.
+ 		if (!ctx->sws || ctx->sws_w != w || ctx->sws_h != h ||
+diff --git a/SWFModernRuntime/src/libswf/ng_shared.c b/SWFModernRuntime/src/libswf/ng_shared.c
+index cf680fbd0..5b00dc2bb 100644
+--- a/SWFModernRuntime/src/libswf/ng_shared.c
++++ b/SWFModernRuntime/src/libswf/ng_shared.c
+@@ -276,6 +276,7 @@ static size_t ng_video_ids[MAX_VIDEOS_NG];
+ static u16    ng_video_widths[MAX_VIDEOS_NG];
+ static u16    ng_video_heights[MAX_VIDEOS_NG];
+ static u8     ng_video_codecs[MAX_VIDEOS_NG];
++static u8     ng_video_deblocking[MAX_VIDEOS_NG];
+ static size_t ng_video_count = 0;
+ 
+ int ng_find_video(size_t char_id)
+@@ -285,7 +286,8 @@ int ng_find_video(size_t char_id)
+ 	return 0;
+ }
+ 
+-void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
++void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
++                     u8 codec_id, u8 deblocking)
+ {
+ 	(void)app_context;
+ 	// Idempotent per char_id (see ng_record_char_bounds).
+@@ -293,6 +295,7 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 hei
+ 		if (ng_video_ids[i] == (size_t)char_id) {
+ 			ng_video_widths[i] = width; ng_video_heights[i] = height;
+ 			ng_video_codecs[i] = codec_id;
++			ng_video_deblocking[i] = deblocking;
+ 			return;
+ 		}
+ 	}
+@@ -301,6 +304,7 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 hei
+ 		ng_video_widths[ng_video_count] = width;
+ 		ng_video_heights[ng_video_count] = height;
+ 		ng_video_codecs[ng_video_count] = codec_id;
++		ng_video_deblocking[ng_video_count] = deblocking;
+ 		ng_video_count++;
+ 	}
+ }
+@@ -335,6 +339,16 @@ u8 ng_getVideoCodec(size_t char_id)
+ 	return 0;
+ }
+ 
++// DefineVideoStream `VideoFlagsDeblocking` (UB[3]) for the given video
++// char_id — a VIDEO_DEBLOCK_* value. Returns 0 (UseVideoPacketValue, the SWF
++// default and what Ruffle uses for FLV) for an unknown char_id.
++u8 ng_getVideoDeblocking(size_t char_id)
++{
++	for (size_t i = 0; i < ng_video_count; i++)
++		if (ng_video_ids[i] == char_id) return ng_video_deblocking[i];
++	return 0;
++}
++
+ // ---------------------------------------------------------------------------
+ // Scriptable character queries
+ // ---------------------------------------------------------------------------
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 80fc8b13a..46d1a87f4 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -11700,7 +11700,8 @@ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
+ 	ng_record_font_glyph_base(font_id, glyph_base);
+ }
+ 
+-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
++void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
++    u8 deblocking, u8 codec_id)
+ {
+ 	// The video's dictionary entry is never written (video is detected via
+ 	// ng_isVideoChar before the dictionary switch, and the zeroed entry's
+@@ -11712,9 +11713,10 @@ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u1
+ 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+ 
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+-	ng_record_video(app_context, char_id, width, height, codec_id);
++	ng_record_video(app_context, char_id, width, height, codec_id, deblocking);
+ #else
+-	(void)app_context; (void)char_id; (void)width; (void)height; (void)codec_id;
++	(void)app_context; (void)char_id; (void)width; (void)height;
++	(void)codec_id; (void)deblocking;
+ #endif
+ }
+ 
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 87b75153b..3fbeef14d 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -5025,8 +5025,17 @@ namespace SWFRecomp
+ 				u16 video_char_id = (u16) tag.fields[0].value;
+ 				u16 video_width   = (u16) tag.fields[2].value;
+ 				u16 video_height  = (u16) tag.fields[3].value;
++				u8 video_flags    = (u8) cur_pos[8]; // reserved UB[4] | deblocking UB[3] | smoothing UB[1]
+ 				u8 video_codec_id = (u8) cur_pos[9]; // byte after the 4 UI16s + flags byte
+ 
++				// VideoFlagsDeblocking decides whether the runtime runs the
++				// H.263 Annex J post-filter (swf crate `VideoDeblocking`;
++				// 0 = use the picture header's own bit, 1 = off, 2 = Level1).
++				// Dropping it silently deblocks streams that asked not to be
++				// (visual/video/colorconversion/h263 sets 1 = off while its
++				// picture header sets the bit).
++				u8 video_deblocking = (u8) ((video_flags >> 1) & 0x07);
++
+ 				// Character id 0 collides with the runtime's "empty depth"
+ 				// display-list sentinel — alias it to a synthetic non-zero id
+ 				// for the whole movie. See swf.hpp `video_zero_alias`.
+@@ -5052,6 +5061,7 @@ namespace SWFRecomp
+ 				         << to_string(video_char_id) << ", "
+ 				         << to_string(video_width) << ", "
+ 				         << to_string(video_height) << ", "
++				         << to_string((u32)video_deblocking) << ", "
+ 				         << to_string((u32)video_codec_id) << ");";
+ 
+ 				cur_pos += tag.length;

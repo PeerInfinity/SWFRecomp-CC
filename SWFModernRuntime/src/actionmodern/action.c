@@ -3319,9 +3319,14 @@ static unsigned char* flv_decode_first_frame(const unsigned char* data, int len,
 				// Spark / VP6 / H.264 via libavcodec — keyframe only in Phase A.
 				// Multi-frame decoding is Phase D of the video codec plan.
 				unsigned char* pixels = NULL;
+				// FLV has no per-stream deblocking field; Ruffle hardcodes
+				// UseVideoPacketValue for every NetStream video decoder
+				// (core/src/streams.rs:961,1167), so the picture header's own
+				// deblocker bit decides.
 				if (video_decode_one_frame(codec_id, frame_type,
 				                            data + tag_data_start + 1,
 				                            tag_size - 1,
+				                            VIDEO_DEBLOCK_USE_PACKET_VALUE,
 				                            out_width, out_height,
 				                            &pixels))
 					return pixels;
@@ -3413,7 +3418,11 @@ int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
 // ---------------------------------------------------------------------------
 #include "actionmodern/video_codec.h"
 
-#define MAX_EMBEDDED_VIDEO_STREAMS 8
+// 16, not 8: visual/video/deblocking carries TWELVE DefineVideoStream
+// characters (four quantizers x {deblocked, not} at two sizes), and at 8 the
+// last four were silently dropped — the whole bottom half of that stage
+// rendered empty. MAX_VIDEOS_NG (ng_shared.c) is already 32.
+#define MAX_EMBEDDED_VIDEO_STREAMS 16
 #define MAX_EMBEDDED_VIDEO_FRAMES_PER_STREAM 256
 
 typedef struct {
@@ -3441,7 +3450,11 @@ static EmbeddedVideoStream* find_or_create_embedded_stream(size_t char_id)
 	for (int i = 0; i < MAX_EMBEDDED_VIDEO_STREAMS; i++) {
 		if (!g_embedded_video_streams[i].active) {
 			u8 codec_id = ng_getVideoCodec(char_id);
-			VideoDecoderCtx* dec = video_decoder_create((int)codec_id);
+			// The DefineVideoStream flags byte decides whether the H.263
+			// deblocking post-filter runs (Ruffle passes the same field into
+			// H263Decoder::new).
+			u8 deblocking = ng_getVideoDeblocking(char_id);
+			VideoDecoderCtx* dec = video_decoder_create((int)codec_id, (int)deblocking);
 			if (!dec) return NULL;
 			g_embedded_video_streams[i].active = 1;
 			g_embedded_video_streams[i].char_id = char_id;

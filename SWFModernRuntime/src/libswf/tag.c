@@ -11700,7 +11700,8 @@ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 	ng_record_font_glyph_base(font_id, glyph_base);
 }
 
-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
+    u8 deblocking, u8 codec_id)
 {
 	// The video's dictionary entry is never written (video is detected via
 	// ng_isVideoChar before the dictionary switch, and the zeroed entry's
@@ -11712,9 +11713,10 @@ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u1
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	ng_record_video(app_context, char_id, width, height, codec_id);
+	ng_record_video(app_context, char_id, width, height, codec_id, deblocking);
 #else
-	(void)app_context; (void)char_id; (void)width; (void)height; (void)codec_id;
+	(void)app_context; (void)char_id; (void)width; (void)height;
+	(void)codec_id; (void)deblocking;
 #endif
 }
 

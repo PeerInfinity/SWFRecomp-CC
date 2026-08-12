@@ -16,6 +16,21 @@ extern "C" {
 // Returns 1 if this build has a working decoder for the given codec id.
 int video_codec_supported(int codec_id);
 
+// DefineVideoStream `VideoFlagsDeblocking` (SWF spec UB[3], and the swf
+// crate's `VideoDeblocking`). Only codec 2 (Sorenson Spark) has a deblocking
+// filter; every other codec ignores the setting.
+//
+// Ruffle applies its H.263 Annex J post-filter for LEVEL1, or for
+// USE_PACKET_VALUE when the picture header's own deblocker bit is set
+// (video/software/src/decoder/h263.rs:80-90). LEVEL2..4 are parsed but never
+// act — that asymmetry is Ruffle's, and we reproduce it.
+#define VIDEO_DEBLOCK_USE_PACKET_VALUE 0
+#define VIDEO_DEBLOCK_NONE             1
+#define VIDEO_DEBLOCK_LEVEL1           2
+#define VIDEO_DEBLOCK_LEVEL2           3
+#define VIDEO_DEBLOCK_LEVEL3           4
+#define VIDEO_DEBLOCK_LEVEL4           5
+
 // Decode a single FLV/DefineVideoStream video payload.
 //
 // `payload` is the codec payload *after* the FLV tag's leading
@@ -29,9 +44,15 @@ int video_codec_supported(int codec_id);
 // *out_rgba and must release it via free(). Layout is packed RGBA8
 // (R=byte0, G=byte1, B=byte2, A=byte3), top-to-bottom.
 //
+// `deblocking`: one of the VIDEO_DEBLOCK_* values above. NetStream/FLV
+// callers pass VIDEO_DEBLOCK_USE_PACKET_VALUE (Ruffle core/src/streams.rs
+// hardcodes that for every FLV stream); embedded DefineVideoStream callers
+// pass the tag's own flags field.
+//
 // Returns 0 on any failure (unsupported codec, decode error, OOM).
 int video_decode_one_frame(int codec_id, int frame_type,
                            const unsigned char* payload, int payload_len,
+                           int deblocking,
                            int* out_w, int* out_h,
                            unsigned char** out_rgba);
 
@@ -43,8 +64,8 @@ int video_decode_one_frame(int codec_id, int frame_type,
 typedef struct VideoDecoderCtx VideoDecoderCtx;
 
 // Create a persistent decoder for the given codec id, or NULL if the codec
-// is unsupported in this build.
-VideoDecoderCtx* video_decoder_create(int codec_id);
+// is unsupported in this build. `deblocking` is one of VIDEO_DEBLOCK_*.
+VideoDecoderCtx* video_decoder_create(int codec_id, int deblocking);
 
 // Decode one VideoFrame payload through the persistent context. Same arg
 // semantics as `video_decode_one_frame`. Returns 1 on success, 0 otherwise.
