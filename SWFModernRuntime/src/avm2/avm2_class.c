@@ -601,6 +601,22 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 		}
 		e.defining_class = defining_class;
 		e.method_scope = scope;
+		// Trait metadata rides along for describeType. The two accessor
+		// merge paths below re-route it onto the surviving entry's matching
+		// half; the override path copies the whole entry, so an override's
+		// metadata correctly REPLACES the parent's.
+		e.metadata = t->metadata;
+		e.metadata_count = t->metadata_count;
+		e.metadata_file = (t->metadata_count > 0) ? file : NULL;
+		if (t->kind == 3)  // Setter: its metadata is the setter half's
+		{
+			e.setter_metadata = t->metadata;
+			e.setter_metadata_count = t->metadata_count;
+			e.setter_metadata_file = e.metadata_file;
+			e.metadata = NULL;
+			e.metadata_count = 0;
+			e.metadata_file = NULL;
+		}
 
 		switch (t->kind)
 		{
@@ -749,6 +765,9 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 						existing->method = ref;
 						existing->defining_class = defining_class;
 						existing->method_scope = scope;
+						existing->metadata = e.metadata;
+						existing->metadata_count = e.metadata_count;
+						existing->metadata_file = e.metadata_file;
 						continue;
 					}
 					e.kind = AVM2_PROP_GETTER;
@@ -765,6 +784,9 @@ void avm2_vtable_add_traits(Avm2Context* ctx, Avm2VTable* vt, Avm2AbcFileRt* fil
 						// stays the inherited one.
 						existing->setter_defining_class = defining_class;
 						existing->setter_scope = scope;
+						existing->setter_metadata = e.setter_metadata;
+						existing->setter_metadata_count = e.setter_metadata_count;
+						existing->setter_metadata_file = e.setter_metadata_file;
 						continue;
 					}
 					e.kind = AVM2_PROP_SETTER;

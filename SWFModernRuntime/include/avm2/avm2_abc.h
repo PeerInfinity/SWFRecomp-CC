@@ -57,8 +57,28 @@ typedef struct Avm2AbcDefault
 	uint32_t index;
 } Avm2AbcDefault;
 
+// Trait METADATA — an ABC `[Name(key="value", ...)]` annotation. Both
+// indices are into the STRING pool; index 0 is the empty string, which is
+// what a bare `[Foo("bar")]` item uses as its key.
+typedef struct Avm2AbcMetadataItem
+{
+	uint32_t key;
+	uint32_t value;
+} Avm2AbcMetadataItem;
+
+typedef struct Avm2AbcMetadata
+{
+	uint32_t name;        // string index
+	uint32_t item_count;
+	const Avm2AbcMetadataItem* items;
+} Avm2AbcMetadata;
+
 // Trait kinds: raw ABC values (abc_types.hpp TraitKindType):
 // 0 Slot, 1 Method, 2 Getter, 3 Setter, 4 Class, 5 Function, 6 Const.
+//
+// metadata_count/metadata are APPENDED members: the generated tables use
+// positional initializers, and C zero-fills missing trailing members, so a
+// stale RecompiledABC still compiles (it just reports no metadata).
 typedef struct Avm2AbcTrait
 {
 	uint8_t kind;
@@ -67,6 +87,8 @@ typedef struct Avm2AbcTrait
 	uint32_t type_mn;         // multiname index (Slot/Const)
 	uint32_t method_or_class; // method index (Method/Getter/Setter/Function) or class index (Class)
 	Avm2AbcDefault value;     // Slot/Const initial value
+	uint32_t metadata_count;
+	const Avm2AbcMetadata* metadata;
 } Avm2AbcTrait;
 
 struct Avm2Activation;

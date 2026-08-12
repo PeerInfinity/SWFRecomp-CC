@@ -1628,8 +1628,14 @@ void avm2_register_error(Avm2Context* ctx)
 		Avm2Class* made[7];
 		for (int i = 0; i < 7; i++)
 		{
+			// EOFError is `public dynamic class EOFError extends IOError`
+			// in both playerglobal and Ruffle -- `eofError is IOError` is
+			// TRUE in Flash -- and all_classes/errors/* grades the extra
+			// <extendsClass type="flash.errors::IOError"/> line. IOError is
+			// made[0], created one iteration earlier.
+			Avm2Class* super = (i == 1) ? made[0] : b->error_class;
 			Avm2Class* cls = avm2_builtin_class(ctx, "flash.errors", names[i],
-			                                    b->error_class);
+			                                    super);
 			cls->native_call = error_call;
 			cls->instance_init.fn = error_init;
 			cls->instance_init.debug_name = names[i];
@@ -1647,8 +1653,11 @@ void avm2_register_error(Avm2Context* ctx)
 		// DRMManagerError.as note; error_prototype asserts undefined). It is
 		// also the only flash.errors class with a THIRD constructor parameter
 		// and its own toString, both of which error_tostring_more grades.
-		Avm2Class* cls = avm2_builtin_class(ctx, "flash.errors", "DRMManagerError",
-		                                    b->error_class);
+		// [API("667")] = ApiVersion::FP_10_1 — invisible below SWF 10
+		// (all_classes/errors/swf9 expects "DRMManagerError not accessible").
+		Avm2Class* cls = avm2_builtin_class_api(ctx, "flash.errors",
+		                                        "DRMManagerError",
+		                                        b->error_class, 10);
 		cls->native_call = error_call;
 		cls->instance_init.fn = drm_manager_error_init;
 		cls->instance_init.debug_name = "DRMManagerError";

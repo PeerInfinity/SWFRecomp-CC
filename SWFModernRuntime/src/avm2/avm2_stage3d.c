@@ -2132,6 +2132,55 @@ static void s3d_sconst(Avm2Context* ctx, Avm2Class* cls, const char* n,
 	                              avm2_string(avm2_string_from_literal(ctx, v)));
 }
 
+// API-version gate for flash.display3D (Ruffle playerglobal `[API("N")]`,
+// ordinal N-660 → api_version.rs). Flash simply does not expose a class to a
+// movie older than its introduction version, and avm2/all_classes/display3D
+// grades exactly that: swf12 sees only the three UNANNOTATED bags, swf13
+// adds the API("674") set, and swf30 sees everything.
+//
+//   [API("674")] = SWF_13  Context3D, Context3DProgramType,
+//                          Context3DRenderMode, Context3DStencilAction,
+//                          Context3DTextureFormat, Context3DTriangleFace,
+//                          Context3DVertexBufferFormat, IndexBuffer3D,
+//                          Program3D, VertexBuffer3D
+//   [API("682")] = SWF_17  Context3DProfile
+//   [API("686")] = SWF_19  Context3DMipFilter, Context3DTextureFilter,
+//                          Context3DWrapMode
+//   [API("692")] = SWF_22  Context3DBufferUsage
+//   (unannotated)          Context3DBlendFactor, Context3DClearMask,
+//                          Context3DCompareMode
+static uint8_t s3d_api_min_swf(const char* name)
+{
+	static const struct { const char* name; uint8_t min_swf; } gates[] = {
+		{ "Context3D",                   13 },
+		{ "Context3DProgramType",        13 },
+		{ "Context3DRenderMode",         13 },
+		{ "Context3DStencilAction",      13 },
+		{ "Context3DTextureFormat",      13 },
+		{ "Context3DTriangleFace",       13 },
+		{ "Context3DVertexBufferFormat", 13 },
+		{ "IndexBuffer3D",               13 },
+		{ "Program3D",                   13 },
+		{ "VertexBuffer3D",              13 },
+		{ "Context3DProfile",            17 },
+		{ "Context3DMipFilter",          19 },
+		{ "Context3DTextureFilter",      19 },
+		{ "Context3DWrapMode",           19 },
+		{ "Context3DBufferUsage",        22 },
+	};
+	for (size_t i = 0; i < sizeof(gates) / sizeof(gates[0]); i++)
+	{
+		if (strcmp(gates[i].name, name) == 0) return gates[i].min_swf;
+	}
+	return 0;
+}
+
+static Avm2Class* s3d_class(Avm2Context* ctx, const char* name, Avm2Class* super)
+{
+	return avm2_builtin_class_api(ctx, "flash.display3D", name, super,
+	                              s3d_api_min_swf(name));
+}
+
 // The flash.display3D constant bags (one static const per accepted spelling).
 static void register_constant_classes(Avm2Context* ctx)
 {
@@ -2215,14 +2264,13 @@ static void register_constant_classes(Avm2Context* ctx)
 		if (cur_name == NULL || strcmp(cur_name, consts[i].cls) != 0)
 		{
 			cur_name = consts[i].cls;
-			cur = avm2_builtin_class(ctx, "flash.display3D", cur_name, obj);
+			cur = s3d_class(ctx, cur_name, obj);
 		}
 		s3d_sconst(ctx, cur, consts[i].name, consts[i].val);
 	}
 
-	// Context3DClearMask is the one int-valued bag.
-	Avm2Class* cm = avm2_builtin_class(ctx, "flash.display3D",
-	                                   "Context3DClearMask", obj);
+	// Context3DClearMask is the one int-valued bag (and unannotated).
+	Avm2Class* cm = s3d_class(ctx, "Context3DClearMask", obj);
 	avm2_builtin_add_static_const(ctx, cm, "COLOR", avm2_integer(1));
 	avm2_builtin_add_static_const(ctx, cm, "DEPTH", avm2_integer(2));
 	avm2_builtin_add_static_const(ctx, cm, "STENCIL", avm2_integer(4));
@@ -2308,7 +2356,7 @@ void avm2_register_stage3d(Avm2Context* ctx)
 	register_matrix3d(ctx);
 
 	// flash.display3D.Context3D (final, extends EventDispatcher).
-	Avm2Class* c3d = avm2_builtin_class(ctx, "flash.display3D", "Context3D", ed);
+	Avm2Class* c3d = s3d_class(ctx, "Context3D", ed);
 	g_context3d_class = c3d;
 	c3d->native_ext_size = sizeof(Avm2Context3DExt);
 	avm2_builtin_add_getter(ctx, c3d, "profile", context3d_get_profile);
@@ -2370,23 +2418,20 @@ void avm2_register_stage3d(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, c3d, "dispose", context3d_dispose);
 
 	// flash.display3D.Program3D / VertexBuffer3D / IndexBuffer3D.
-	Avm2Class* p3d = avm2_builtin_class(ctx, "flash.display3D", "Program3D",
-	                                    b->object_class);
+	Avm2Class* p3d = s3d_class(ctx, "Program3D", b->object_class);
 	g_program3d_class = p3d;
 	p3d->native_ext_size = sizeof(Avm2Program3DExt);
 	avm2_builtin_add_method(ctx, p3d, "upload", program3d_upload);
 	avm2_builtin_add_method(ctx, p3d, "dispose", s3d_noop);
 
-	Avm2Class* vb = avm2_builtin_class(ctx, "flash.display3D", "VertexBuffer3D",
-	                                   b->object_class);
+	Avm2Class* vb = s3d_class(ctx, "VertexBuffer3D", b->object_class);
 	g_vertexbuffer_class = vb;
 	vb->native_ext_size = sizeof(Avm2Buffer3DExt);
 	avm2_builtin_add_method(ctx, vb, "uploadFromByteArray", s3d_noop);
 	avm2_builtin_add_method(ctx, vb, "uploadFromVector", s3d_noop);
 	avm2_builtin_add_method(ctx, vb, "dispose", s3d_noop);
 
-	Avm2Class* ib = avm2_builtin_class(ctx, "flash.display3D", "IndexBuffer3D",
-	                                   b->object_class);
+	Avm2Class* ib = s3d_class(ctx, "IndexBuffer3D", b->object_class);
 	g_indexbuffer_class = ib;
 	ib->native_ext_size = sizeof(Avm2Buffer3DExt);
 	avm2_builtin_add_method(ctx, ib, "uploadFromByteArray", s3d_noop);

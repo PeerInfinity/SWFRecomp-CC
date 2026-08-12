@@ -962,18 +962,75 @@ namespace abc
 		  << v.index << " }";
 	}
 
+	// Trait METADATA ([Foo(bar="baz")] annotations). The parser already
+	// fills AbcTrait::metadata with indices into AbcFile::metadata; this is
+	// the only place any of it reaches the runtime, where
+	// avmplus.describeType(..., INCLUDE_METADATA) reports it.
+	//
+	// Deliberately NOT folded into fold_traits(): that hash is the
+	// native-intrinsic fingerprint and must stay metadata-blind, or every
+	// match in the intrinsic gate breaks.
+	static void emitTraitMetadata(ofstream& out, const string& sym,
+	                              const AbcFile& abc,
+	                              const std::vector<AbcTrait>& traits)
+	{
+		for (size_t ti = 0; ti < traits.size(); ti++)
+		{
+			const AbcTrait& t = traits[ti];
+			if (t.metadata.empty()) continue;
+			const string base = sym + "_md" + to_string(ti);
+			for (size_t j = 0; j < t.metadata.size(); j++)
+			{
+				if (t.metadata[j] >= abc.metadata.size()) continue;
+				const AbcMetadata& md = abc.metadata[t.metadata[j]];
+				if (md.items.empty()) continue;
+				out << "static const Avm2AbcMetadataItem " << base << "_"
+				    << j << "_it[] = { ";
+				for (size_t k = 0; k < md.items.size(); k++)
+				{
+					if (k > 0) out << ", ";
+					out << "{ " << md.items[k].key << ", "
+					    << md.items[k].value << " }";
+				}
+				out << " };" << endl;
+			}
+			out << "static const Avm2AbcMetadata " << base << "[] =" << endl
+			    << "{" << endl;
+			for (size_t j = 0; j < t.metadata.size(); j++)
+			{
+				if (t.metadata[j] >= abc.metadata.size())
+				{
+					out << "\t{ 0, 0, NULL }," << endl;
+					continue;
+				}
+				const AbcMetadata& md = abc.metadata[t.metadata[j]];
+				out << "\t{ " << md.name << ", " << md.items.size() << ", ";
+				if (md.items.empty()) out << "NULL";
+				else out << base << "_" << j << "_it";
+				out << " }," << endl;
+			}
+			out << "};" << endl << endl;
+		}
+	}
+
 	static void emitTraitArray(ofstream& out, const string& sym,
+	                           const AbcFile& abc,
 	                           const std::vector<AbcTrait>& traits)
 	{
 		if (traits.empty()) return;
+		emitTraitMetadata(out, sym, abc, traits);
 		out << "static const Avm2AbcTrait " << sym << "[] =" << endl << "{" << endl;
-		for (const AbcTrait& t : traits)
+		for (size_t ti = 0; ti < traits.size(); ti++)
 		{
+			const AbcTrait& t = traits[ti];
 			std::ostringstream dv;
 			emitDefault(dv, t.value);
 			out << "\t{ " << (unsigned) t.kind << ", " << t.name << ", "
 			    << t.slot_or_disp_id << ", " << t.type_name << ", "
-			    << t.method_or_class << ", " << dv.str() << " }," << endl;
+			    << t.method_or_class << ", " << dv.str() << ", ";
+			if (t.metadata.empty()) out << "0, NULL";
+			else out << t.metadata.size() << ", " << sym << "_md" << ti;
+			out << " }," << endl;
 		}
 		out << "};" << endl << endl;
 	}
@@ -3599,8 +3656,8 @@ namespace abc
 
 			for (size_t i = 0; i < abc.instances.size(); i++)
 			{
-				emitTraitArray(out, p + "_c" + to_string(i) + "_it", abc.instances[i].traits);
-				emitTraitArray(out, p + "_c" + to_string(i) + "_ct", abc.classes[i].traits);
+				emitTraitArray(out, p + "_c" + to_string(i) + "_it", abc, abc.instances[i].traits);
+				emitTraitArray(out, p + "_c" + to_string(i) + "_ct", abc, abc.classes[i].traits);
 				if (!abc.instances[i].interfaces.empty())
 				{
 					out << "static const uint32_t " << p << "_c" << i << "_if[] = { ";
@@ -3687,7 +3744,7 @@ namespace abc
 
 			for (size_t i = 0; i < abc.scripts.size(); i++)
 			{
-				emitTraitArray(out, p + "_s" + to_string(i) + "_t", abc.scripts[i].traits);
+				emitTraitArray(out, p + "_s" + to_string(i) + "_t", abc, abc.scripts[i].traits);
 			}
 			out << "static const Avm2AbcScriptData " << p << "_scripts[] =" << endl
 			    << "{" << endl;
@@ -3778,7 +3835,7 @@ namespace abc
 				}
 
 				// Activation-object traits (NewActivation / NewCatch).
-				emitTraitArray(out, p + "_m" + to_string(mi) + "_bt",
+				emitTraitArray(out, p + "_m" + to_string(mi) + "_bt", abc,
 				               abc.method_bodies[bi].traits);
 
 				emitMethodBody(out, abc, body, p + "_m" + to_string(mi), mi, exc_sym,

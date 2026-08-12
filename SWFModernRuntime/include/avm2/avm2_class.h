@@ -73,6 +73,17 @@ typedef struct Avm2PropEntry
 	// and threw #1069). NULL = the setter shares `defining_class` above.
 	Avm2Class* setter_defining_class;
 	Avm2ScopeChain* setter_scope;
+	// ABC trait METADATA, for avmplus.describeType(INCLUDE_METADATA).
+	// Two halves for the same reason the two method refs are two halves:
+	// Ruffle reports an accessor's metadata as the UNION of the getter's and
+	// the setter's, and either half can be inherited. `*_file` names the ABC
+	// whose string pool the key/value indices belong to.
+	const Avm2AbcMetadata* metadata;         // slot / method / getter half
+	uint32_t metadata_count;
+	Avm2AbcFileRt* metadata_file;
+	const Avm2AbcMetadata* setter_metadata;  // setter half
+	uint32_t setter_metadata_count;
+	Avm2AbcFileRt* setter_metadata_file;
 } Avm2PropEntry;
 
 // Per-slot metadata (Ruffle's slot_table): survives name shadowing, so a

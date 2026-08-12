@@ -127,6 +127,17 @@ int avm2_has_own_public_property(Avm2Context* ctx, Avm2Value recv,
 // Builtin class registration helpers (also used by avm2_string.c etc.).
 Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name,
                               Avm2Class* super);
+// ...API-VERSION GATED. Ruffle annotates playerglobal classes `[API("N")]`
+// and maps N-660 onto an ApiVersion ordinal (api_version.rs): the class is
+// simply INVISIBLE to a movie older than that. This sibling builds the class
+// identically but skips the two EXPOSURE calls (builtin_global_define_ro +
+// avm2_domain_add) when ctx->swf_version < min_swf, so the name 1065s while
+// the class itself still exists for the runtime to mint internally
+// (Stage3D.requestContext3D hands back a Context3D at every SWF version).
+// min_swf 0 = always exposed, i.e. identical to avm2_builtin_class.
+Avm2Class* avm2_builtin_class_api(Avm2Context* ctx, const char* ns,
+                                  const char* name, Avm2Class* super,
+                                  uint8_t min_swf);
 void avm2_builtin_add_method(Avm2Context* ctx, Avm2Class* cls, const char* name,
                              Avm2MethodFn fn);
 // ...with a declared arity, which is what Function.length reports. Needed

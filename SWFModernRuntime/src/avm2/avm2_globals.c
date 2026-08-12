@@ -327,8 +327,9 @@ void avm2_builtin_define_alias(Avm2Context* ctx, Avm2PropKey key, Avm2Value valu
 	avm2_domain_add(ctx, &key, NULL, 0);
 }
 
-Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name,
-                              Avm2Class* super)
+static Avm2Class* builtin_class_impl(Avm2Context* ctx, const char* ns,
+                                     const char* name, Avm2Class* super,
+                                     uint8_t min_swf)
 {
 	Avm2Class* cls = avm2_alloc(ctx, sizeof(Avm2Class));
 	memset(cls, 0, sizeof(Avm2Class));
@@ -374,10 +375,29 @@ Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name
 	                                         avm2_object_value(cobj));
 	p->dont_enum = 1;
 
-	// Expose on the builtin globals object + in the domain.
-	builtin_global_define_ro(ctx, cls->name, avm2_object_value(cobj), 1);
-	avm2_domain_add(ctx, &cls->name, NULL, 0);
+	// Expose on the builtin globals object + in the domain. An API-gated
+	// class below its introduction version is built but NOT exposed: the
+	// name resolves to nothing (1065 / "not accessible") while the class
+	// object stays available to the runtime.
+	if (min_swf == 0 || ctx->swf_version >= min_swf)
+	{
+		builtin_global_define_ro(ctx, cls->name, avm2_object_value(cobj), 1);
+		avm2_domain_add(ctx, &cls->name, NULL, 0);
+	}
 	return cls;
+}
+
+Avm2Class* avm2_builtin_class(Avm2Context* ctx, const char* ns, const char* name,
+                              Avm2Class* super)
+{
+	return builtin_class_impl(ctx, ns, name, super, 0);
+}
+
+Avm2Class* avm2_builtin_class_api(Avm2Context* ctx, const char* ns,
+                                  const char* name, Avm2Class* super,
+                                  uint8_t min_swf)
+{
+	return builtin_class_impl(ctx, ns, name, super, min_swf);
 }
 
 void avm2_builtin_add_method_n(Avm2Context* ctx, Avm2Class* cls, const char* name,
@@ -1893,6 +1913,22 @@ typedef struct DtParam
 	uint8_t optional;
 } DtParam;
 
+// ABC trait metadata, resolved to strings. Ruffle metadata.rs:80-103: each
+// entry is `{ name: String, value: [ { key, value }, ... ] }` — note the item
+// list lives under the key `value`, not `items`.
+typedef struct DtMetaArg
+{
+	char* key;
+	char* value;
+} DtMetaArg;
+
+typedef struct DtMeta
+{
+	char* name;
+	DtMetaArg* args;
+	uint32_t arg_count;
+} DtMeta;
+
 typedef struct DtMember
 {
 	char* name;
@@ -1902,6 +1938,8 @@ typedef struct DtMember
 	char* uri;           // NULL = no @uri / `uri: null`
 	DtParam* params;     // methods only
 	uint32_t param_count;
+	DtMeta* metas;
+	uint32_t meta_count;
 } DtMember;
 
 typedef struct DtMembers
@@ -1982,6 +2020,21 @@ static void dt_params_free(DtParam* p, uint32_t n)
 	free(p);
 }
 
+static void dt_metas_free(DtMeta* m, uint32_t n)
+{
+	for (uint32_t i = 0; i < n; i++)
+	{
+		free(m[i].name);
+		for (uint32_t j = 0; j < m[i].arg_count; j++)
+		{
+			free(m[i].args[j].key);
+			free(m[i].args[j].value);
+		}
+		free(m[i].args);
+	}
+	free(m);
+}
+
 static void dt_members_free(DtMembers* v)
 {
 	for (uint32_t i = 0; i < v->n; i++)
@@ -1991,6 +2044,7 @@ static void dt_members_free(DtMembers* v)
 		free(v->v[i].declared_by);
 		free(v->v[i].uri);
 		dt_params_free(v->v[i].params, v->v[i].param_count);
+		dt_metas_free(v->v[i].metas, v->v[i].meta_count);
 	}
 	free(v->v);
 }
@@ -2117,11 +2171,27 @@ static int dt_is_object_as3_method(Avm2Context* ctx, const Avm2PropEntry* e)
 // int's five inherited Number methods that Flash suppresses. flash.* classes
 // keep their public spelling (playerglobal really does declare them public),
 // which is why the test is on the DEFINING class having no package.
-static int dt_native_as3_method(const Avm2PropEntry* e)
+// ...with ONE exception: the Error hierarchy. Ruffle's Error.as declares
+// `public native function getStackTrace():String` — public, not AS3 — and
+// avmplus agrees. Tagging it AS3 made HIDE_NSURI_METHODS (which fires for
+// every flash.errors subclass, because Error's inherited Object trio already
+// puts the AS3 uri in the skip set) delete it from all eight flash.errors
+// blocks of avm2/all_classes/errors/*.
+static int dt_class_extends_error(Avm2Context* ctx, const Avm2Class* c)
+{
+	for (; c != NULL; c = c->super_class)
+	{
+		if (c == ctx->builtins.error_class) return 1;
+	}
+	return 0;
+}
+
+static int dt_native_as3_method(Avm2Context* ctx, const Avm2PropEntry* e)
 {
 	return e->kind == AVM2_PROP_METHOD && e->key.ns_len == 0
 	       && e->method.file == NULL && e->defining_class != NULL
-	       && e->defining_class->name.ns_len == 0;
+	       && e->defining_class->name.ns_len == 0
+	       && !dt_class_extends_error(ctx, e->defining_class);
 }
 
 // A trait's namespace as describeType sees it, plus its ORIGIN. Ruffle
@@ -2152,7 +2222,7 @@ static void dt_entry_ns(Avm2Context* ctx, const Avm2PropEntry* e,
 		*len = e->key.ns_len;
 		return;
 	}
-	if (dt_is_object_as3_method(ctx, e) || dt_native_as3_method(e))
+	if (dt_is_object_as3_method(ctx, e) || dt_native_as3_method(ctx, e))
 	{
 		*uri = DT_AS3_URI;
 		*len = (uint32_t) (sizeof(DT_AS3_URI) - 1);
@@ -2225,6 +2295,55 @@ static void dt_fill_params(DtParam** out, uint32_t* out_n,
 	}
 	*out = p;
 	*out_n = m->param_count;
+}
+
+// Pool index 0 is the empty string (`[mda("abcd")]` is one item with key "").
+// The generated abc0_strings[0] is already { 0, "" }, so no special case.
+static char* dt_pool_string(const Avm2AbcFileRt* file, uint32_t idx)
+{
+	if (file == NULL || file->data == NULL || idx >= file->data->string_count)
+	{
+		return dt_sdup("");
+	}
+	const Avm2String* s = &file->data->strings[idx];
+	if (s->utf8 == NULL) return dt_sdup("");
+	return dt_sndup(s->utf8, s->len);
+}
+
+// Append one half's metadata to a member. Accessors take the UNION of the
+// getter's and the setter's (Ruffle avmplus.rs:365-386), getter first.
+static void dt_metas_append(DtMember* m, const Avm2AbcMetadata* md,
+                            uint32_t count, const Avm2AbcFileRt* file)
+{
+	if (md == NULL || count == 0) return;
+	DtMeta* grown = (DtMeta*) realloc(m->metas,
+	                                  (m->meta_count + count) * sizeof(DtMeta));
+	if (grown == NULL) return;
+	m->metas = grown;
+	for (uint32_t i = 0; i < count; i++)
+	{
+		DtMeta* e = &m->metas[m->meta_count + i];
+		memset(e, 0, sizeof(*e));
+		e->name = dt_pool_string(file, md[i].name);
+		if (md[i].item_count == 0 || md[i].items == NULL) continue;
+		e->args = (DtMetaArg*) calloc(md[i].item_count, sizeof(DtMetaArg));
+		if (e->args == NULL) continue;
+		e->arg_count = md[i].item_count;
+		for (uint32_t j = 0; j < md[i].item_count; j++)
+		{
+			e->args[j].key = dt_pool_string(file, md[i].items[j].key);
+			e->args[j].value = dt_pool_string(file, md[i].items[j].value);
+		}
+	}
+	m->meta_count += count;
+}
+
+// Both halves of a vtable entry, in Ruffle's order.
+static void dt_fill_metas(DtMember* m, const Avm2PropEntry* e)
+{
+	dt_metas_append(m, e->metadata, e->metadata_count, e->metadata_file);
+	dt_metas_append(m, e->setter_metadata, e->setter_metadata_count,
+	                e->setter_metadata_file);
 }
 
 static void dt_one_param(DtParam** out, uint32_t* out_n, const char* type,
@@ -2303,6 +2422,209 @@ static int dt_skip_ns_has(Avm2Context* ctx, const DtSkipNs* s,
 	return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Builtin type DESCRIPTOR (T7 P4)
+//
+// Our builtins are C registrations: a native method carries no return type,
+// no parameter types and no optionality, so describeType falls through to
+// `*` for every one of them and emits no <constructor>. Flash's
+// playerglobal declares all of it, and avm2/all_classes/* grades the
+// difference. This table is the hand-written stand-in for the eventual
+// generator over Ruffle's 470 playerglobal .as files; it covers exactly the
+// classes the currently-live rows describe.
+//
+// The lookup key is the DEFINING class + member name, so an inherited member
+// resolves against the class that declared it (Error::errorID must report
+// `declaredBy="Error"` on all eight flash.errors subclasses).
+// ---------------------------------------------------------------------------
+
+typedef struct DtDescParam
+{
+	const char* type;
+	uint8_t optional;
+} DtDescParam;
+
+enum
+{
+	DT_DESC_METHOD = 0,
+	DT_DESC_ACCESSOR = 1,
+	DT_DESC_SLOT = 2,
+};
+
+typedef struct DtDescMember
+{
+	const char* name;   // NULL terminates the array
+	uint8_t kind;       // DT_DESC_*
+	const char* type;   // returnType | accessor type | slot type
+	uint8_t param_count;
+	const DtDescParam* params;
+} DtDescMember;
+
+typedef struct DtDescClass
+{
+	const char* ns;     // NULL terminates the array
+	const char* name;
+	// describeType-only `isDynamic`. Deliberately NOT AVM2_CLASS_FLAG_SEALED:
+	// that flag is ENFORCED at avm2_ops.c:211, and flipping it would break
+	// dynamic property writes on classes Flash merely REPORTS as sealed.
+	uint8_t describe_dynamic;
+	uint8_t ctor_param_count;
+	const DtDescParam* ctor_params;
+	const DtDescMember* members;
+} DtDescClass;
+
+// --- flash.events::Event ---------------------------------------------------
+
+static const DtDescParam dt_p_event_ctor[] = {
+	{ "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 },
+};
+static const DtDescParam dt_p_string_req[] = { { "String", 0 } };
+
+static const DtDescMember dt_m_event[] = {
+	{ "bubbles",                  DT_DESC_ACCESSOR, "Boolean", 0, NULL },
+	{ "cancelable",               DT_DESC_ACCESSOR, "Boolean", 0, NULL },
+	{ "currentTarget",            DT_DESC_ACCESSOR, "Object",  0, NULL },
+	{ "eventPhase",               DT_DESC_ACCESSOR, "uint",    0, NULL },
+	{ "target",                   DT_DESC_ACCESSOR, "Object",  0, NULL },
+	{ "type",                     DT_DESC_ACCESSOR, "String",  0, NULL },
+	{ "clone",                    DT_DESC_METHOD, "flash.events::Event", 0, NULL },
+	{ "formatToString",           DT_DESC_METHOD, "String", 1, dt_p_string_req },
+	{ "isDefaultPrevented",       DT_DESC_METHOD, "Boolean", 0, NULL },
+	{ "preventDefault",           DT_DESC_METHOD, "void",    0, NULL },
+	{ "stopImmediatePropagation", DT_DESC_METHOD, "void",    0, NULL },
+	{ "stopPropagation",          DT_DESC_METHOD, "void",    0, NULL },
+	{ "toString",                 DT_DESC_METHOD, "String",  0, NULL },
+	{ NULL, 0, NULL, 0, NULL },
+};
+
+// --- Error and the flash.errors family -------------------------------------
+//
+// avmplus Error is `public dynamic class Error` with
+// `Error(message = "", id = 0)`, one readonly `errorID:int` accessor and
+// `public native function getStackTrace():String`. Every flash.errors
+// subclass repeats the two-parameter constructor; DRMManagerError is the odd
+// one out with three REQUIRED parameters and its own toString.
+
+static const DtDescParam dt_p_error_ctor[] = {
+	{ "String", 1 }, { "int", 1 },
+};
+static const DtDescParam dt_p_drm_ctor[] = {
+	{ "String", 0 }, { "int", 0 }, { "int", 0 },
+};
+
+static const DtDescMember dt_m_error[] = {
+	{ "errorID",       DT_DESC_ACCESSOR, "int",    0, NULL },
+	{ "getStackTrace", DT_DESC_METHOD,   "String", 0, NULL },
+	{ NULL, 0, NULL, 0, NULL },
+};
+static const DtDescMember dt_m_drm_error[] = {
+	{ "subErrorID", DT_DESC_ACCESSOR, "int",    0, NULL },
+	{ "toString",   DT_DESC_METHOD,   "String", 0, NULL },
+	{ NULL, 0, NULL, 0, NULL },
+};
+
+// --- flash.security (describeType-only stubs) ------------------------------
+
+static const DtDescMember dt_m_x500[] = {
+	{ "commonName",             DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "countryName",            DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "localityName",           DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "organizationName",       DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "organizationalUnitName", DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "stateOrProvinceName",    DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "toString",               DT_DESC_METHOD,   "String", 0, NULL },
+	{ NULL, 0, NULL, 0, NULL },
+};
+static const DtDescMember dt_m_x509[] = {
+	{ "encoded",   DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL },
+	{ "issuer",    DT_DESC_ACCESSOR,
+	  "flash.security::X500DistinguishedName", 0, NULL },
+	{ "issuerUniqueID",              DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "serialNumber",                DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "signatureAlgorithmOID",       DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "signatureAlgorithmParams",    DT_DESC_ACCESSOR,
+	  "flash.utils::ByteArray", 0, NULL },
+	{ "subject",   DT_DESC_ACCESSOR,
+	  "flash.security::X500DistinguishedName", 0, NULL },
+	{ "subjectPublicKey",             DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "subjectPublicKeyAlgorithmOID", DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "subjectUniqueID",              DT_DESC_ACCESSOR, "String", 0, NULL },
+	{ "validNotAfter",                DT_DESC_ACCESSOR, "Date",   0, NULL },
+	{ "validNotBefore",               DT_DESC_ACCESSOR, "Date",   0, NULL },
+	{ "version",                      DT_DESC_ACCESSOR, "uint",   0, NULL },
+	{ NULL, 0, NULL, 0, NULL },
+};
+
+static const DtDescClass dt_desc_classes[] = {
+	{ "flash.events", "Event", 0, 3, dt_p_event_ctor, dt_m_event },
+
+	{ "", "Error", 1, 2, dt_p_error_ctor, dt_m_error },
+	{ "flash.errors", "IOError",              1, 2, dt_p_error_ctor, NULL },
+	{ "flash.errors", "EOFError",             1, 2, dt_p_error_ctor, NULL },
+	{ "flash.errors", "MemoryError",          1, 2, dt_p_error_ctor, NULL },
+	{ "flash.errors", "IllegalOperationError", 1, 2, dt_p_error_ctor, NULL },
+	{ "flash.errors", "InvalidSWFError",      1, 2, dt_p_error_ctor, NULL },
+	{ "flash.errors", "ScriptTimeoutError",   1, 2, dt_p_error_ctor, NULL },
+	{ "flash.errors", "StackOverflowError",   1, 2, dt_p_error_ctor, NULL },
+	{ "flash.errors", "DRMManagerError", 1, 3, dt_p_drm_ctor, dt_m_drm_error },
+
+	{ "flash.security", "X500DistinguishedName", 1, 0, NULL, dt_m_x500 },
+	{ "flash.security", "X509Certificate",       1, 0, NULL, dt_m_x509 },
+
+	{ NULL, NULL, 0, 0, NULL, NULL },
+};
+
+static const DtDescClass* dt_desc_find(const Avm2Class* cls)
+{
+	if (cls == NULL) return NULL;
+	for (const DtDescClass* c = dt_desc_classes; c->ns != NULL; c++)
+	{
+		if (dt_class_named(cls, c->ns, c->name)) return c;
+	}
+	return NULL;
+}
+
+static const DtDescMember* dt_desc_member(const DtDescClass* dc, uint8_t kind,
+                                          const char* name, uint32_t name_len)
+{
+	if (dc == NULL || dc->members == NULL) return NULL;
+	for (const DtDescMember* m = dc->members; m->name != NULL; m++)
+	{
+		if (m->kind != kind) continue;
+		if (strlen(m->name) != name_len) continue;
+		if (memcmp(m->name, name, name_len) == 0) return m;
+	}
+	return NULL;
+}
+
+// Apply a descriptor member onto a collected DtMember, replacing the `*`
+// fallback. Returns 1 when it fired.
+static int dt_desc_apply(DtMember* out, const DtDescClass* dc, uint8_t kind,
+                         const Avm2PropEntry* e)
+{
+	const DtDescMember* dm = dt_desc_member(dc, kind, (const char*) e->key.name,
+	                                        e->key.name_len);
+	if (dm == NULL) return 0;
+	free(out->type);
+	out->type = dt_sdup(dm->type != NULL ? dm->type : "*");
+	if (dm->param_count > 0 && dm->params != NULL)
+	{
+		DtParam* p = (DtParam*) calloc(dm->param_count, sizeof(DtParam));
+		if (p != NULL)
+		{
+			for (uint32_t i = 0; i < dm->param_count; i++)
+			{
+				p[i].type = dt_sdup(dm->params[i].type);
+				p[i].optional = dm->params[i].optional;
+			}
+			dt_params_free(out->params, out->param_count);
+			out->params = p;
+			out->param_count = dm->param_count;
+		}
+	}
+	return 1;
+}
+
 static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
                               const DtSkipNs* skip, uint32_t flags)
 {
@@ -2325,7 +2647,13 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 			m->name = dt_sndup(e->key.name, e->key.name_len);
 			m->access = e->is_const ? "readonly" : "readwrite";
 			m->type = dt_type_name(e->type_file, e->type_mn);
+			if (e->type_file == NULL || e->type_mn == 0)
+			{
+				dt_desc_apply(m, dt_desc_find(e->defining_class),
+				              DT_DESC_SLOT, e);
+			}
 			m->uri = dt_entry_uri(ctx, e);
+			dt_fill_metas(m, e);
 		}
 		else if (e->kind == AVM2_PROP_METHOD)
 		{
@@ -2339,6 +2667,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 				: (e->defining_class != NULL
 					? dt_class_qname(e->defining_class) : dt_sdup("*"));
 			m->uri = dt_entry_uri(ctx, e);
+			dt_fill_metas(m, e);
 			const Avm2AbcMethodData* md = dt_method_data(&e->method);
 			if (md != NULL)
 			{
@@ -2353,6 +2682,8 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 			else
 			{
 				m->type = dt_sdup("*");
+				dt_desc_apply(m, dt_desc_find(e->defining_class),
+				              DT_DESC_METHOD, e);
 			}
 		}
 		else  // GETTER / SETTER / GETSET
@@ -2375,6 +2706,8 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 					? dt_type_name(e->setter.file,
 					               md->param_types != NULL ? md->param_types[0] : 0)
 					: dt_sdup("*");
+				if (md == NULL) dt_desc_apply(m, dt_desc_find(dc),
+				                              DT_DESC_ACCESSOR, e);
 			}
 			else
 			{
@@ -2384,8 +2717,11 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 				m->type = (md != NULL) ? dt_type_name(e->method.file,
 				                                      md->return_type_mn)
 				                       : dt_sdup("*");
+				if (md == NULL) dt_desc_apply(m, dt_desc_find(e->defining_class),
+				                              DT_DESC_ACCESSOR, e);
 			}
 			m->uri = dt_entry_uri(ctx, e);
+			dt_fill_metas(m, e);
 		}
 	}
 }
@@ -2401,6 +2737,19 @@ static void dt_collect_static_consts(Avm2Context* ctx, DtDesc* d, Avm2Class* cls
 	for (Avm2DynProp* p = cls->class_object->dyn_props; p != NULL; p = p->next)
 	{
 		if (p->dead || !p->read_only || p->key_obj != NULL) continue;
+		// `length` is a describeType-visible class trait only on the
+		// TOP-LEVEL classes (describe_type_basic shows it on Object/int/
+		// Class; avm2/static_length names none outside the default package).
+		// register_class_object_lengths also installs it on the four
+		// flash.errors siblings so `IOError.length` reads 1 at runtime, but
+		// Flash reports it on none of them — `grep -c 'name="length"'` over
+		// every all_classes/*/*/output.txt is 0. Suppress the report, not
+		// the property.
+		if (cls->name.ns_len > 0 && p->name.len == 6
+		    && memcmp(p->name.utf8, "length", 6) == 0)
+		{
+			continue;
+		}
 		DtMember* m = dt_members_push(&d->variables);
 		m->name = dt_sndup(p->name.utf8, p->name.len);
 		m->access = "readonly";
@@ -2427,18 +2776,35 @@ static void dt_collect_ctor(Avm2Context* ctx, DtDesc* d, Avm2Class* cls)
 		d->has_ctor = d->ctor_param_count > 0;
 		return;
 	}
-	// Native builtins: no signature is recorded at registration, so the
-	// avmplus shell's 1-optional-`*` form is the fallback. Object takes none;
-	// Dictionary's `(weakKeys:Boolean = false)` is spelled out.
-	if (cls == ctx->builtins.object_class || cls == ctx->builtins.class_class)
+	// Native builtins record no signature at registration. Flash emits NO
+	// <constructor> element for a zero-parameter constructor, and almost the
+	// whole playerglobal surface is zero-parameter — every <factory> in
+	// all_classes/{display3D,security,accessibility}/* is constructor-less —
+	// so "none" is the right default. Giving every native the avmplus
+	// 1-optional-`*` shell instead injected three spurious lines into each
+	// of them. The few natives that really do take parameters are named:
+	// `int` (`(* = )`) and flash.utils::Dictionary (`(Boolean = )`), both
+	// graded by describe_type_basic, plus whatever the descriptor table
+	// below spells out.
+	const DtDescClass* dc = dt_desc_find(cls);
+	if (dc != NULL)
 	{
-		return;
+		for (uint32_t i = 0; i < dc->ctor_param_count; i++)
+		{
+			DtParam* p = (DtParam*) realloc(d->ctor_params,
+			                                (i + 1) * sizeof(DtParam));
+			if (p == NULL) break;
+			d->ctor_params = p;
+			p[i].type = dt_sdup(dc->ctor_params[i].type);
+			p[i].optional = dc->ctor_params[i].optional;
+			d->ctor_param_count = i + 1;
+		}
 	}
-	if (dt_class_named(cls, "flash.utils", "Dictionary"))
+	else if (dt_class_named(cls, "flash.utils", "Dictionary"))
 	{
 		dt_one_param(&d->ctor_params, &d->ctor_param_count, "Boolean", 1);
 	}
-	else
+	else if (cls == ctx->builtins.int_class)
 	{
 		dt_one_param(&d->ctor_params, &d->ctor_param_count, "*", 1);
 	}
@@ -2505,6 +2871,12 @@ static void dt_describe(Avm2Context* ctx, Avm2Value v, uint32_t flags, DtDesc* d
 	{
 		d->is_dynamic = (cls->flags & AVM2_CLASS_FLAG_SEALED) == 0;
 		d->is_final = (cls->flags & AVM2_CLASS_FLAG_FINAL) != 0;
+		// A builtin the descriptor knows reports ITS declared dynamism.
+		// Native classes carry no SEALED flag unless the runtime needs one
+		// enforced, so `describeType(new Event(...))` said isDynamic="true"
+		// where playerglobal declares a plain (sealed) class.
+		const DtDescClass* dc = dt_desc_find(cls);
+		if (dc != NULL) d->is_dynamic = dc->describe_dynamic != 0;
 	}
 
 	const Avm2VTable* super_vt = class_side
@@ -2587,6 +2959,28 @@ static Avm2Value dt_json_params(Avm2Context* ctx, const DtParam* p, uint32_t n)
 	return avm2_object_value(arr);
 }
 
+// Ruffle metadata.rs: `{ name: <String>, value: [ { key, value }, ... ] }`.
+static Avm2Value dt_json_metas(Avm2Context* ctx, const DtMeta* mv, uint32_t n)
+{
+	Avm2Object* arr = avm2_array_new(ctx, 0);
+	for (uint32_t i = 0; i < n; i++)
+	{
+		Avm2Object* o = dt_json_object(ctx);
+		dt_json_set(ctx, o, "name", dt_json_str(ctx, mv[i].name));
+		Avm2Object* items = avm2_array_new(ctx, 0);
+		for (uint32_t j = 0; j < mv[i].arg_count; j++)
+		{
+			Avm2Object* a = dt_json_object(ctx);
+			dt_json_set(ctx, a, "key", dt_json_str(ctx, mv[i].args[j].key));
+			dt_json_set(ctx, a, "value", dt_json_str(ctx, mv[i].args[j].value));
+			avm2_array_push(ctx, items, avm2_object_value(a));
+		}
+		dt_json_set(ctx, o, "value", avm2_object_value(items));
+		avm2_array_push(ctx, arr, avm2_object_value(o));
+	}
+	return avm2_object_value(arr);
+}
+
 typedef enum
 {
 	DT_JSON_VARIABLE = 0,
@@ -2625,12 +3019,13 @@ static Avm2Value dt_json_members(Avm2Context* ctx, const DtMembers* mv,
 			dt_json_set(ctx, o, "parameters",
 			            dt_json_params(ctx, m->params, m->param_count));
 		}
-		// Trait metadata is not modelled yet (P3): the array is always empty,
-		// and Ruffle reports `null` for an accessor with no metadata.
+		// Variables/methods always carry the array (possibly empty) when
+		// INCLUDE_METADATA; an ACCESSOR's key is `null` unless the union of
+		// its two halves is non-empty (Ruffle avmplus.rs:365-386).
 		int want_md = (flags & DT_INCLUDE_METADATA) != 0
-		              && kind != DT_JSON_ACCESSOR;
+		              && (kind != DT_JSON_ACCESSOR || m->meta_count > 0);
 		dt_json_set(ctx, o, "metadata",
-		            want_md ? avm2_object_value(avm2_array_new(ctx, 0))
+		            want_md ? dt_json_metas(ctx, m->metas, m->meta_count)
 		                    : avm2_null());
 		avm2_array_push(ctx, arr, avm2_object_value(o));
 	}
@@ -2697,6 +3092,27 @@ static void dt_copy_params(Avm2Context* ctx, E4XNode* xml, const DtParam* p,
 	}
 }
 
+// avmplus.as:42-62 copyMetadata: `<metadata name="…"><arg key="…"
+// value="…"/>…</metadata>`, appended AFTER copyParams and after the @uri
+// attribute (copyUriAndMetadata). Our emitter already sets @uri last and
+// appends <parameter> first, so appending here is the right order.
+static void dt_copy_metas(Avm2Context* ctx, E4XNode* xml, const DtMember* m,
+                          uint32_t flags)
+{
+	if (!(flags & DT_INCLUDE_METADATA)) return;
+	for (uint32_t i = 0; i < m->meta_count; i++)
+	{
+		E4XNode* e = dt_child(ctx, xml, "metadata");
+		dt_set_attr(ctx, e, "name", m->metas[i].name);
+		for (uint32_t j = 0; j < m->metas[i].arg_count; j++)
+		{
+			E4XNode* a = dt_child(ctx, e, "arg");
+			dt_set_attr(ctx, a, "key", m->metas[i].args[j].key);
+			dt_set_attr(ctx, a, "value", m->metas[i].args[j].value);
+		}
+	}
+}
+
 static void dt_copy_traits(Avm2Context* ctx, E4XNode* xml, const DtDesc* d)
 {
 	uint32_t flags = d->flags;
@@ -2723,6 +3139,7 @@ static void dt_copy_traits(Avm2Context* ctx, E4XNode* xml, const DtDesc* d)
 		dt_set_attr(ctx, e, "name", m->name);
 		dt_set_attr(ctx, e, "type", m->type != NULL ? m->type : "*");
 		if (m->uri != NULL) dt_set_attr(ctx, e, "uri", m->uri);
+		dt_copy_metas(ctx, e, m, flags);
 	}
 	for (uint32_t i = 0; i < d->accessors.n; i++)
 	{
@@ -2734,6 +3151,7 @@ static void dt_copy_traits(Avm2Context* ctx, E4XNode* xml, const DtDesc* d)
 		dt_set_attr(ctx, e, "declaredBy",
 		            m->declared_by != NULL ? m->declared_by : "*");
 		if (m->uri != NULL) dt_set_attr(ctx, e, "uri", m->uri);
+		dt_copy_metas(ctx, e, m, flags);
 	}
 	for (uint32_t i = 0; i < d->methods.n; i++)
 	{
@@ -2745,6 +3163,7 @@ static void dt_copy_traits(Avm2Context* ctx, E4XNode* xml, const DtDesc* d)
 		dt_set_attr(ctx, e, "returnType", m->type != NULL ? m->type : "*");
 		dt_copy_params(ctx, e, m->params, m->param_count);
 		if (m->uri != NULL) dt_set_attr(ctx, e, "uri", m->uri);
+		dt_copy_metas(ctx, e, m, flags);
 	}
 }
 
@@ -4652,6 +5071,80 @@ void avm2_register_toplevel(Avm2Context* ctx)
 // (avm2_nsqname.c, avm2_xml.c). dont-enum + read-only comes free from
 // add_static_const, which `for (p in Array)` and `delete Array.length`
 // both require.
+// ---------------------------------------------------------------------------
+// flash.security — three API-gated, describeType-only classes
+//
+// CertificateStatus is a constant bag; X500DistinguishedName and
+// X509Certificate are read-only views over a certificate the player never
+// hands a SWF outside AIR's SecureSocket / DRM surface, which we do not
+// implement. Nothing can construct one, so the accessors are inert; they
+// exist because all_classes/security/{swf12,swf13,swf30} enumerates and
+// describes them, and because the CLASS existing is what makes
+// `flash.security.X509Certificate` resolve at SWF 13+ instead of 1065ing.
+// ---------------------------------------------------------------------------
+
+static Avm2Value security_stub_null(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();
+}
+
+static Avm2Value security_stub_string(Avm2Activation* act)
+{
+	return avm2_string(avm2_string_from_literal(act->ctx, ""));
+}
+
+static void register_security_certs(Avm2Context* ctx)
+{
+	Avm2Class* obj = ctx->builtins.object_class;
+
+	// [API("672")] = ApiVersion::SWF_12
+	Avm2Class* cs = avm2_builtin_class_api(ctx, "flash.security",
+	                                       "CertificateStatus", obj, 12);
+	static const struct { const char* name; const char* value; } cs_consts[] = {
+		{ "EXPIRED",            "expired" },
+		{ "INVALID",            "invalid" },
+		{ "INVALID_CHAIN",      "invalidChain" },
+		{ "NOT_YET_VALID",      "notYetValid" },
+		{ "PRINCIPAL_MISMATCH", "principalMismatch" },
+		{ "REVOKED",            "revoked" },
+		{ "TRUSTED",            "trusted" },
+		{ "UNKNOWN",            "unknown" },
+		{ "UNTRUSTED_SIGNERS",  "untrustedSigners" },
+	};
+	for (size_t i = 0; i < sizeof(cs_consts) / sizeof(cs_consts[0]); i++)
+	{
+		avm2_builtin_add_static_const(ctx, cs, cs_consts[i].name,
+			avm2_string(avm2_string_from_literal(ctx, cs_consts[i].value)));
+	}
+
+	// [API("674")] = ApiVersion::SWF_13
+	Avm2Class* x500 = avm2_builtin_class_api(ctx, "flash.security",
+	                                         "X500DistinguishedName", obj, 13);
+	static const char* const x500_props[6] = {
+		"commonName", "countryName", "localityName", "organizationName",
+		"organizationalUnitName", "stateOrProvinceName",
+	};
+	for (int i = 0; i < 6; i++)
+	{
+		avm2_builtin_add_getter(ctx, x500, x500_props[i], security_stub_string);
+	}
+	avm2_builtin_add_method(ctx, x500, "toString", security_stub_string);
+
+	Avm2Class* x509 = avm2_builtin_class_api(ctx, "flash.security",
+	                                         "X509Certificate", obj, 13);
+	static const char* const x509_props[13] = {
+		"encoded", "issuer", "issuerUniqueID", "serialNumber",
+		"signatureAlgorithmOID", "signatureAlgorithmParams", "subject",
+		"subjectPublicKey", "subjectPublicKeyAlgorithmOID", "subjectUniqueID",
+		"validNotAfter", "validNotBefore", "version",
+	};
+	for (int i = 0; i < 13; i++)
+	{
+		avm2_builtin_add_getter(ctx, x509, x509_props[i], security_stub_null);
+	}
+}
+
 static void register_class_object_lengths(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -4891,6 +5384,8 @@ void avm2_globals_init(Avm2Context* ctx)
 	// and display (Sound.play returns a SoundChannel display-independent obj).
 	avm2_register_timer_class(ctx);
 	avm2_register_media(ctx);
+
+	register_security_certs(ctx);
 
 	// LAST: gates the abstract playerglobal classes the modules above made.
 	register_abstract_gates(ctx);
