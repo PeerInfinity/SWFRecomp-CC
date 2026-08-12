@@ -37,6 +37,10 @@ regression/avm2_timeline_stroke_gradient    # stroke + gradient  (tol 255)    1 
 regression/avm2_timeline_gradients          # gradient fill, AVM2 timeline    1 cmp
 regression/mask_sibling_union               # 2 sibling clipDepth masks       1 cmp
                                             #   repo golden, exact at tol 0
+regression/mask_nested_intersect            # NESTED clipDepth masks          1 cmp
+                                            #   repo golden, exact at tol 0;
+                                            #   pins Equal/IncrementClamp
+                                            #   intersection (s14 gfx-stencil)
 
 # tier=2  (CI-failing / skipped; A/B signal only)
 visual/simple_shapes/masks                  # mask compositing (largest gap)

@@ -15537,10 +15537,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 
 	// scrollRect — the crop, then the scroll. Ruffle pushes this stencil AFTER
 	// the DisplayObject.mask one ("this mask is applied *in addition to* a mask
-	// defined with DisplayObject.mask"), and our flat Replace stencil cannot
-	// intersect two masks (§6.2 of the s12 mask report), so the inner one wins
-	// — putting it in Ruffle's order makes scrollRect the winner, which is what
-	// Ruffle's own render order produces for the degenerate case.
+	// defined with DisplayObject.mask", core/src/display_object.rs:1216-1229),
+	// and this order is now literally that: since s14 the stencil is a nesting
+	// counter (Equal/IncrementClamp), so the crop INTERSECTS the mask instead
+	// of replacing it. The order is unchanged from s12 — only its rationale
+	// is: it used to be "the inner one wins, and Ruffle's order makes that
+	// scrollRect", it is now "both apply, which is what Ruffle renders".
 	//
 	// The crop rect is built from the PRE-translate world matrix; only the
 	// content and the subtree below get the (-x_min, -y_min) shift. Deliberate
@@ -15605,12 +15607,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// end_clip zeroes mask_ref unconditionally, which is right for tag.c (its
 	// ranges are siblings) but wrong here, where a clip range can open INSIDE
 	// an already-masked subtree — a DisplayObject.mask above us, or a clip
-	// range in an ancestor container. Restoring costs no geometry replay (the
-	// stencil is cleared once per pass, so the enclosing mask's texels still
-	// hold its reference) and closes the "nested range loses the outer stencil
-	// test" limitation. What it still cannot recover is the region where the
-	// inner mask OVERWROTE the outer reference (Replace, not Increment):
-	// nesting does not intersect, the same flat-mask limitation tag.c has.
+	// range in an ancestor container. Restoring closes the "nested range loses
+	// the outer stencil test" limitation. Since s14 restore_clip also POPS the
+	// inner mask's stencil (Equal/DecrementClamp), and the inner mask could
+	// only ever raise texels the outer one owned (Equal/IncrementClamp), so
+	// nesting now INTERSECTS — the "does not intersect" caveat this comment
+	// used to carry is gone.
 	{
 		int32_t active_clip_depth = 0;
 		uint32_t pre_clip_ref = 0;

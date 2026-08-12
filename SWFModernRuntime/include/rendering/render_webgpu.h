@@ -97,8 +97,9 @@ typedef struct WebGPURenderContext
 
 	// --- Pipelines ---
 	WGPURenderPipeline render_pipeline;         // normal: no stencil test
-	WGPURenderPipeline stencil_write_pipeline;  // writes stencil, no color output
+	WGPURenderPipeline stencil_write_pipeline;  // raises the clip level, no color output
 	WGPURenderPipeline stencil_test_pipeline;   // tests stencil, normal color output
+	WGPURenderPipeline stencil_clear_pipeline;  // lowers the clip level, no color output
 	WGPURenderPipeline blend_add_pipeline;      // blend mode 8: additive
 	WGPURenderPipeline blend_lighten_pipeline;  // blend mode 5: lighten (max)
 	WGPURenderPipeline blend_darken_pipeline;   // blend mode 6: darken (min)
@@ -176,14 +177,19 @@ typedef struct WebGPURenderContext
 	WGPUBindGroupLayout blend_shader_bgl;
 	WGPUPipelineLayout blend_shader_pl;
 
-	// --- Clip-mask stencil isolation ---
-	// The stencil attachment is cleared exactly ONCE per render pass (= once per
-	// frame), so every clip mask writing the same hard-coded reference value (1)
-	// made mask N test the UNION of masks 1..N: the first mask in a frame worked,
-	// every later one was a no-op that retroactively widened the earlier ones.
-	// Each mask now takes its own reference out of `mask_ref_next`.
-	u32 mask_ref;             // stencil reference of the ACTIVE clip (0 = none)
-	u32 mask_ref_next;        // per-pass monotonic allocator, 1..255
+	// --- Clip-mask stencil nesting (ruffle's num_masks model) ---
+	// `mask_ref` is the NESTING LEVEL of the active clip, not a per-mask id:
+	// 0 = unclipped, N = N masks are open and content may paint only where all
+	// N of them overlap. A mask draw is Equal(N-1)/IncrementClamp, so it can
+	// raise only texels the enclosing mask already owns — that IS the
+	// intersection, with no geometry algebra; content is Equal(N)/Keep; a pop
+	// is a full-screen Equal(N)/DecrementClamp quad, which selects exactly the
+	// texels the innermost mask raised and puts them back to N-1 (so a mask
+	// leaves NO residue behind for the next one, which the old Replace model
+	// relied on a fresh reference to survive). Ports ruffle
+	// render/wgpu/src/pipelines.rs:376-414 + surface/commands.rs:399-433.
+	// Pops must be LIFO — every caller restores monotonically downward.
+	u32 mask_ref;             // nesting level of the ACTIVE clip (0 = none)
 	u32 mask_capture_depth;   // >0 while writing mask geometry (nested sprite masks)
 	int mask_save_sp;         // depth of the offscreen-pass save stack
 	u32 mask_save_ref[8];     // {mask_ref, mask_capture_depth} parked across an

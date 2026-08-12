@@ -819,6 +819,21 @@ invariant:** the marker is scoped to the `output` comparison of these two tests
 only — if a *new* comparison or a materially larger excess appears here, it is
 not covered and must be re-triaged.
 
+**Amendment, session 14 (`gfx-stencil`, Equal/IncrementClamp stencil nesting):**
+part of the residual was NOT a rasteriser tie. The stencil model change drops
+both twins from 2624 to 1738 outlier channels (1095 → 652 mismatching pixels,
+local Dawn, md5-verified against the CI actual for the s13 baseline), and every
+one of the 443 changed pixels went from WRONG to matching the golden — 413 of
+the "422 px actual (255,0,0) expected (255,255,255)" class and 30 of the blue
+one. Those were mask content escaping the clip (over-paint just outside the mask
+silhouette), which the flat Always/Replace stencil could not contain; the model
+that pops a mask's stencil instead of abandoning it removes them. **What remains
+(482 px black-vs-white plus the saturated-colour swaps) IS the 1-sample
+rasteriser tie and the decision above stands unchanged** — both comparisons
+still fail at `tolerance = 0`. Re-baseline the counts in this entry and in the
+summary table from the first `images=true` CI run that carries the s14 stencil
+patch.
+
 ---
 
 ## Category 12: Implementation-Defined `for...in` Enumeration Order

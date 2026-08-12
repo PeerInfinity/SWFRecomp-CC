@@ -1,0 +1,690 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index 0a16df8ff..eabcc5adb 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -92,8 +92,9 @@ typedef struct WebGPURenderContext
+ 
+ 	// --- Pipelines ---
+ 	WGPURenderPipeline render_pipeline;         // normal: no stencil test
+-	WGPURenderPipeline stencil_write_pipeline;  // writes stencil, no color output
++	WGPURenderPipeline stencil_write_pipeline;  // raises the clip level, no color output
+ 	WGPURenderPipeline stencil_test_pipeline;   // tests stencil, normal color output
++	WGPURenderPipeline stencil_clear_pipeline;  // lowers the clip level, no color output
+ 	WGPURenderPipeline blend_add_pipeline;      // blend mode 8: additive
+ 	WGPURenderPipeline blend_lighten_pipeline;  // blend mode 5: lighten (max)
+ 	WGPURenderPipeline blend_darken_pipeline;   // blend mode 6: darken (min)
+@@ -171,14 +172,19 @@ typedef struct WebGPURenderContext
+ 	WGPUBindGroupLayout blend_shader_bgl;
+ 	WGPUPipelineLayout blend_shader_pl;
+ 
+-	// --- Clip-mask stencil isolation ---
+-	// The stencil attachment is cleared exactly ONCE per render pass (= once per
+-	// frame), so every clip mask writing the same hard-coded reference value (1)
+-	// made mask N test the UNION of masks 1..N: the first mask in a frame worked,
+-	// every later one was a no-op that retroactively widened the earlier ones.
+-	// Each mask now takes its own reference out of `mask_ref_next`.
+-	u32 mask_ref;             // stencil reference of the ACTIVE clip (0 = none)
+-	u32 mask_ref_next;        // per-pass monotonic allocator, 1..255
++	// --- Clip-mask stencil nesting (ruffle's num_masks model) ---
++	// `mask_ref` is the NESTING LEVEL of the active clip, not a per-mask id:
++	// 0 = unclipped, N = N masks are open and content may paint only where all
++	// N of them overlap. A mask draw is Equal(N-1)/IncrementClamp, so it can
++	// raise only texels the enclosing mask already owns — that IS the
++	// intersection, with no geometry algebra; content is Equal(N)/Keep; a pop
++	// is a full-screen Equal(N)/DecrementClamp quad, which selects exactly the
++	// texels the innermost mask raised and puts them back to N-1 (so a mask
++	// leaves NO residue behind for the next one, which the old Replace model
++	// relied on a fresh reference to survive). Ports ruffle
++	// render/wgpu/src/pipelines.rs:376-414 + surface/commands.rs:399-433.
++	// Pops must be LIFO — every caller restores monotonically downward.
++	u32 mask_ref;             // nesting level of the ACTIVE clip (0 = none)
+ 	u32 mask_capture_depth;   // >0 while writing mask geometry (nested sprite masks)
+ 	int mask_save_sp;         // depth of the offscreen-pass save stack
+ 	u32 mask_save_ref[8];     // {mask_ref, mask_capture_depth} parked across an
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 807216d6a..dce21189b 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -15532,10 +15532,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 
+ 	// scrollRect — the crop, then the scroll. Ruffle pushes this stencil AFTER
+ 	// the DisplayObject.mask one ("this mask is applied *in addition to* a mask
+-	// defined with DisplayObject.mask"), and our flat Replace stencil cannot
+-	// intersect two masks (§6.2 of the s12 mask report), so the inner one wins
+-	// — putting it in Ruffle's order makes scrollRect the winner, which is what
+-	// Ruffle's own render order produces for the degenerate case.
++	// defined with DisplayObject.mask", core/src/display_object.rs:1216-1229),
++	// and this order is now literally that: since s14 the stencil is a nesting
++	// counter (Equal/IncrementClamp), so the crop INTERSECTS the mask instead
++	// of replacing it. The order is unchanged from s12 — only its rationale
++	// is: it used to be "the inner one wins, and Ruffle's order makes that
++	// scrollRect", it is now "both apply, which is what Ruffle renders".
+ 	//
+ 	// The crop rect is built from the PRE-translate world matrix; only the
+ 	// content and the subtree below get the (-x_min, -y_min) shift. Deliberate
+@@ -15600,12 +15602,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 	// end_clip zeroes mask_ref unconditionally, which is right for tag.c (its
+ 	// ranges are siblings) but wrong here, where a clip range can open INSIDE
+ 	// an already-masked subtree — a DisplayObject.mask above us, or a clip
+-	// range in an ancestor container. Restoring costs no geometry replay (the
+-	// stencil is cleared once per pass, so the enclosing mask's texels still
+-	// hold its reference) and closes the "nested range loses the outer stencil
+-	// test" limitation. What it still cannot recover is the region where the
+-	// inner mask OVERWROTE the outer reference (Replace, not Increment):
+-	// nesting does not intersect, the same flat-mask limitation tag.c has.
++	// range in an ancestor container. Restoring closes the "nested range loses
++	// the outer stencil test" limitation. Since s14 restore_clip also POPS the
++	// inner mask's stencil (Equal/DecrementClamp), and the inner mask could
++	// only ever raise texels the outer one owned (Equal/IncrementClamp), so
++	// nesting now INTERSECTS — the "does not intersect" caveat this comment
++	// used to carry is gone.
+ 	{
+ 		int32_t active_clip_depth = 0;
+ 		uint32_t pre_clip_ref = 0;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 80fc8b13a..2e87207dc 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3527,6 +3527,22 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 		// color target) and clip subsequent depths up to clip_depth to it.
+ 		if (obj->clip_depth > 0)
+ 		{
++			// Pop before pushing. A clipDepth entry can appear while an
++			// earlier range is STILL open (its own depth is inside that
++			// range), and this loop tracks a single scalar active_clip_depth,
++			// so the second push would overwrite the first with no matching
++			// pop. Under the old Always/Replace stencil that was harmless —
++			// the new push just reassigned the reference. Under the
++			// Equal/IncrementClamp NESTING model (render_webgpu.c) an
++			// unpopped push LEAKS a level for the rest of the frame. Same
++			// shape avm2_render_node already uses (avm2_display.c:15630).
++			// No draw call happens between the pop and the push, so this is
++			// byte-identical under the old model.
++			if (active_clip_depth > 0)
++			{
++				renderer_restore_clip(context, pre_clip_ref);
++				active_clip_depth = 0;
++			}
+ 			Character* mch = &dictionary[obj->char_id];
+ 			if (mch->type == CHAR_TYPE_SHAPE)
+ 			{
+@@ -5828,6 +5844,15 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			avm1_masker = avm1_masker_for_entry(obj);
+ 		}
+ 		if (obj->clip_depth > 0) {
++			// Pop before pushing — see render_display_list for why (a second
++			// clip range opened inside a live one leaks a stencil LEVEL under
++			// the Equal/IncrementClamp model). No draw happens between the
++			// pop and the push, so this is byte-identical under the old
++			// Always/Replace model.
++			if (active_clip_depth > 0) {
++				renderer_end_clip(context);
++				active_clip_depth = 0;
++			}
+ 			Character* ch = &dictionary[obj->char_id];
+ 			if (ch->type == CHAR_TYPE_SHAPE) {
+ 				renderer_begin_clip_mask(context);
+@@ -6788,6 +6813,16 @@ void tagShowFrame(SWFAppContext* app_context)
+ 		// Check if this object is a clip mask
+ 		if (obj->clip_depth > 0)
+ 		{
++			// Pop before pushing — see render_display_list for why (a second
++			// clip range opened inside a live one leaks a stencil LEVEL under
++			// the Equal/IncrementClamp model). No draw happens between the
++			// pop and the push, so this is byte-identical under the old
++			// Always/Replace model.
++			if (active_clip_depth > 0)
++			{
++				renderer_end_clip(context);
++				active_clip_depth = 0;
++			}
+ 			Character* ch = &dictionary[obj->char_id];
+ 			if (ch->type == CHAR_TYPE_SHAPE)
+ 			{
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 1205e51ac..d410b1ada 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -1292,6 +1292,30 @@ static void create_textures(WebGPURenderContext* ctx)
+ 	}
+ }
+ 
++// Full-screen NDC quad, colour writes off — the geometry of a clip-mask POP.
++//
++// Ruffle re-draws the masker itself for its ClearMaskStencil pass
++// (core/src/display_object.rs:1256-1269); we would have to keep "re-draw this
++// masker" alive across five different push sites, so we cover the screen
++// instead. Equivalent, because Equal(level) selects precisely the texels the
++// innermost mask raised. NOT render_webgpu_draw_rect: that goes through the
++// dynamic vertex/colour staging and silently no-ops when it is full, which
++// would turn a stencil pop into a capacity bug, and it depends on whatever
++// stage transform is installed. An NDC quad has neither problem and needs no
++// vertex buffer, no bind group data and no transform slot.
++static const char* stencil_clear_wgsl =
++"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {\n"
++"  var positions = array<vec2f, 6>(\n"
++"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
++"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
++"  );\n"
++"  return vec4f(positions[vi], 0.0, 1.0);\n"
++"}\n"
++"\n"
++"@fragment fn fs_main() -> @location(0) vec4f {\n"
++"  return vec4f(0.0, 0.0, 0.0, 0.0);\n"
++"}\n";
++
+ // ---------------------------------------------------------------------------
+ // create_pipelines: render pipeline + compute pipeline
+ // ---------------------------------------------------------------------------
+@@ -1444,11 +1468,19 @@ static void create_pipelines(WebGPURenderContext* ctx)
+ 	ctx->render_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+ 	assert(ctx->render_pipeline != NULL);
+ 
+-	// --- Stencil write pipeline: writes to stencil, no color output ---
+-	// Used for clip mask shapes. The mask's geometry defines the clipping region.
++	// --- Stencil write pipeline: raises the clip level, no color output ---
++	// Used for clip mask shapes. The mask's geometry defines the clipping
++	// region, and Equal(level-1)/IncrementClamp raises ONLY the texels the
++	// enclosing mask already owns — a nested mask therefore clips to the
++	// INTERSECTION for free (ruffle render/wgpu/src/pipelines.rs:387-395,
++	// MaskState::DrawMaskStencil). failOp = Keep makes the write idempotent
++	// under self-overlapping mask geometry: a second triangle of the SAME
++	// mask finds level != level-1, fails the compare and is left alone, so a
++	// masker whose subtree draws overlapping shapes cannot increment itself
++	// into a hole. Same argument covers the matching decrement.
+ 	WGPUDepthStencilState ds_write = ds_normal;
+-	ds_write.stencilFront.compare = WGPUCompareFunction_Always;
+-	ds_write.stencilFront.passOp = WGPUStencilOperation_Replace;
++	ds_write.stencilFront.compare = WGPUCompareFunction_Equal;
++	ds_write.stencilFront.passOp = WGPUStencilOperation_IncrementClamp;
+ 	ds_write.stencilWriteMask = 0xFF;
+ 	ds_write.stencilBack = ds_write.stencilFront;
+ 
+@@ -1477,6 +1509,44 @@ static void create_pipelines(WebGPURenderContext* ctx)
+ 	ctx->stencil_test_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+ 	assert(ctx->stencil_test_pipeline != NULL);
+ 
++	// --- Stencil clear pipeline: lowers the clip level, no color output ---
++	// ruffle MaskState::ClearMaskStencil (pipelines.rs:406-414). Drawn as the
++	// full-screen NDC quad above, so it needs no vertex buffer — but it keeps
++	// the render pipeline LAYOUT, so the three bind groups the pass set at
++	// open time stay bound (a pipeline with an incompatible layout would unset
++	// them and every later draw would fail validation).
++	{
++		WGPUDepthStencilState ds_clear = ds_normal;
++		ds_clear.stencilFront.compare = WGPUCompareFunction_Equal;
++		ds_clear.stencilFront.passOp = WGPUStencilOperation_DecrementClamp;
++		ds_clear.stencilWriteMask = 0xFF;
++		ds_clear.stencilBack = ds_clear.stencilFront;
++
++		WGPUShaderModule clear_sm = create_shader(ctx->device, stencil_clear_wgsl,
++		                                          "stencil_clear_shader");
++		WGPUFragmentState frag_state_clear = frag_state_masked;   // colour writes OFF
++		frag_state_clear.module = clear_sm;
++
++		rp_desc.label = WGPU_LABEL("stencil_clear_pipeline");
++		rp_desc.depthStencil = &ds_clear;
++		rp_desc.fragment = &frag_state_clear;
++		rp_desc.vertex.module = clear_sm;
++		rp_desc.vertex.bufferCount = 0;
++		rp_desc.vertex.buffers = NULL;
++		// rp_desc.multisample.count is still MSAA_SAMPLES — never a literal 4;
++		// quality="low" goldens compile the whole renderer at 1 sample and a
++		// mismatch here fails pipeline creation loudly.
++
++		ctx->stencil_clear_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
++		assert(ctx->stencil_clear_pipeline != NULL);
++		wgpuShaderModuleRelease(clear_sm);
++
++		// Put the shared descriptor back for the pipelines created below.
++		rp_desc.vertex.module = vs_module;
++		rp_desc.vertex.bufferCount = 1;
++		rp_desc.vertex.buffers = &vb_layout;
++	}
++
+ 	// --- Blend mode pipelines ---
+ 	// Legacy per-draw blend pipelines. The layer-composite path in
+ 	// render_webgpu_composite_blend() supersedes these for stage/sprite display
+@@ -1971,11 +2041,9 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
+ 	ds_att.stencilStoreOp = WGPUStoreOp_Store; // Store for filter suspend/resume
+ 	ds_att.stencilClearValue = 0;
+ 
+-	// This Clear is the ONLY stencil reset in the pass, so per-mask references
+-	// have to be unique WITHIN it. Restart the allocator here (and drop any
+-	// clip state a previous pass left behind).
++	// The stencil starts at 0 everywhere, which IS nesting level 0. Drop any
++	// clip state a previous pass left behind so the level and the texels agree.
+ 	ctx->mask_ref = 0;
+-	ctx->mask_ref_next = 0;
+ 	ctx->mask_capture_depth = 0;
+ 	ctx->mask_save_sp = 0;
+ 
+@@ -2144,31 +2212,25 @@ static void restore_draw_pipeline(WebGPURenderContext* ctx)
+ 	}
+ }
+ 
+-// Allocate the next per-mask stencil reference.
++// Pop ONE clip-mask nesting level: draw the full-screen NDC quad through the
++// Equal(level)/DecrementClamp pipeline, which touches exactly the texels the
++// innermost mask raised and puts them back to level-1.
+ //
+-// The stencil is 8-bit and the pass clears it exactly once, so after 255 masks
+-// in ONE pass the references would alias earlier ones and the union bug would
+-// come back. Fall back to a mid-pass clear: a screen-covering rect through the
+-// stencil-WRITE pipeline (Always/Replace, colour writes off) with reference 0
+-// rewrites every texel to 0, after which the allocator can restart. No corpus
+-// test reaches this (the busiest frame in the graded corpus has 6 masks;
+-// from_shumway/invalidClipDepth's 257 masks are one PER FRAME), but a real
+-// movie can. The rect is deliberately enormous because the stage transform is
+-// arbitrary at this point — it is clipped to the viewport in NDC.
+-static u32 alloc_mask_ref(WebGPURenderContext* ctx)
++// The 8-bit stencil saturates at 255 by construction (IncrementClamp), so the
++// old 255-reference allocator and its mid-pass full-screen rewrite are gone;
++// masks 256-deep degrade to "the 255th mask wins" instead of aliasing. The
++// busiest graded frame has 6 masks (from_shumway/invalidClipDepth's 257 clip
++// ranges are one PER FRAME and are sibling ranges, so they never nest).
++static void pop_mask_level(WebGPURenderContext* ctx)
+ {
+-	if (ctx->mask_ref_next >= 255u)
++	if (ctx->mask_ref == 0) return;
++	if (ctx->render_pass != NULL)
+ 	{
+-		if (ctx->render_pass != NULL)
+-		{
+-			wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
+-			wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 0);
+-			render_webgpu_draw_rect(ctx, -4.0e6f, -4.0e6f, 8.0e6f, 8.0e6f,
+-				0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
+-		}
+-		ctx->mask_ref_next = 0;
++		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_clear_pipeline);
++		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
++		wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
+ 	}
+-	return ++ctx->mask_ref_next;
++	ctx->mask_ref--;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -2628,10 +2690,13 @@ void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)
+ 	// of a mask capture. Everything drawn inside the capture belongs to the
+ 	// same mask, so the inner pair is a no-op and the outer reference stands.
+ 	if (ctx->mask_capture_depth++ > 0) return;
+-	ctx->mask_ref = alloc_mask_ref(ctx);
++	// Ruffle's push_mask(): num_masks += 1, DrawMaskStencil at num_masks - 1
++	// (render/wgpu/src/surface/commands.rs:399-433). The geometry drawn next
++	// can therefore only raise texels the ENCLOSING mask owns.
++	if (ctx->mask_ref < 255u) ctx->mask_ref++;
+ 	// Switch to stencil-write pipeline: draws to stencil buffer only (no color)
+ 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
+-	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
++	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref - 1);
+ }
+ 
+ void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
+@@ -2639,9 +2704,9 @@ void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
+ 	if (!ctx->renderer_ok) return;
+ 	if (ctx->mask_capture_depth > 0) ctx->mask_capture_depth--;
+ 	if (ctx->mask_capture_depth > 0) return;   // still capturing the outer mask
+-	// Switch to stencil-test pipeline: only draws where stencil == THIS mask's
+-	// reference. Each mask owns its own value, so mask N no longer tests the
+-	// union of masks 1..N.
++	// Ruffle's activate_mask(): DrawMaskedContent at num_masks. Content passes
++	// only where the stencil reached THIS level, i.e. inside every mask that
++	// is currently open.
+ 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
+ 	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+ }
+@@ -2652,24 +2717,27 @@ void render_webgpu_end_clip(WebGPURenderContext* ctx)
+ 	// A nested display-list walk under a sprite mask runs its own clip loop and
+ 	// can call end_clip while the outer capture is still open; ignore it.
+ 	if (ctx->mask_capture_depth > 0) return;
+-	// Switch back to normal pipeline (no stencil testing)
+-	ctx->mask_ref = 0;
+-	restore_draw_pipeline(ctx);
++	// Pop exactly ONE level (ruffle's deactivate_mask + pop_mask), which is
++	// what the callers that own a single range mean by "end". It used to zero
++	// mask_ref outright and so DROPPED any enclosing clip; popping one level
++	// restores it instead — the EditText field-bounds clip (tag.c:5005) and
++	// masked_drawing_render_cb are nested pushes that now come back correctly.
++	render_webgpu_restore_clip(ctx, ctx->mask_ref > 0 ? ctx->mask_ref - 1 : 0);
+ }
+ 
+-// Save / restore the active clip reference around a NESTED mask (AVM2 walk).
++// Save / restore the active clip level around a NESTED mask.
+ //
+-// end_clip zeroes mask_ref, which is right for the tag.c loops (their clip
+-// ranges are siblings), but the AVM2 render walk can open a mask inside an
+-// already-masked subtree: `a.mask = m` on a child of a clipDepth range, or a
+-// clipDepth range inside a masked container. Without a restore the inner
+-// end_clip drops the OUTER clip for every later sibling.
++// A mask can be opened inside an already-masked subtree — `a.mask = m` on a
++// child of a clipDepth range, a clipDepth range inside a masked container, a
++// scrollRect crop on top of a DisplayObject.mask — and every such pair saves
++// the level with clip_ref() and gives it back with restore_clip().
+ //
+-// Restoring costs no geometry replay: the stencil is cleared once per pass, so
+-// the texels the enclosing mask wrote still hold its reference. The one thing
+-// this cannot recover is the region where the inner mask overwrote the outer
+-// reference (Replace, not Increment) — nesting still does not intersect, which
+-// is the same flat-mask limitation the tag.c loops have had since s11.
++// restore_clip is where the mask geometry is UNDONE: it pops one level per
++// step, each pop a full-screen Equal(level)/DecrementClamp quad, so the
++// stencil is left exactly as the enclosing mask had it. That is what makes
++// the model composable — under the old Replace stencil a nested mask
++// overwrote its parent's reference and restore_clip could put the reference
++// back but not the texels, which is the hole the s13 maskC report described.
+ u32 render_webgpu_clip_ref(WebGPURenderContext* ctx)
+ {
+ 	if (!ctx->renderer_ok) return 0;
+@@ -2680,7 +2748,12 @@ void render_webgpu_restore_clip(WebGPURenderContext* ctx, u32 ref)
+ {
+ 	if (!ctx->renderer_ok) return;
+ 	if (ctx->mask_capture_depth > 0) return;
+-	ctx->mask_ref = ref;
++	// Every caller restores monotonically downward (tag.c:3469/3543/3683/3686/
++	// 5920/6173/6905, avm2_display.c:15624/15635/15648/15654/15656); a raise is
++	// a bug, not a case — clamp rather than pretend the texels came back.
++	if (ref > ctx->mask_ref) ref = ctx->mask_ref;
++	while (ctx->mask_ref > ref)
++		pop_mask_level(ctx);
+ 	restore_draw_pipeline(ctx);
+ }
+ 
+@@ -4105,9 +4178,11 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
+ 	// The offscreen pass has its OWN depth-stencil, which it CLEARS below — the
+ 	// main pass's clip mask does not exist in it, and any mask opened inside it
+ 	// belongs to that cleared stencil. Park the clip state so (a) draws inside
+-	// the offscreen pass are not stencil-tested against a reference that is 0
+-	// everywhere there, and (b) an inner mask cannot zero the outer clip that
+-	// the resumed main pass still needs.
++	// the offscreen pass are not stencil-tested against a level that no texel
++	// there has reached, and (b) an inner mask cannot pop the outer clip that
++	// the resumed main pass still needs. The parked value is a NESTING LEVEL,
++	// and the offscreen pass's own stencilClearValue = 0 is exactly the level
++	// it is parked to, so the two agree without any geometry replay.
+ 	if (ctx->mask_save_sp >= 0
+ 	    && ctx->mask_save_sp < (int)(sizeof(ctx->mask_save_ref) / sizeof(ctx->mask_save_ref[0])))
+ 	{
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index faba73014..b53fc3030 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -37,6 +37,10 @@ regression/avm2_timeline_stroke_gradient    # stroke + gradient  (tol 255)    1
+ regression/avm2_timeline_gradients          # gradient fill, AVM2 timeline    1 cmp
+ regression/mask_sibling_union               # 2 sibling clipDepth masks       1 cmp
+                                             #   repo golden, exact at tol 0
++regression/mask_nested_intersect            # NESTED clipDepth masks          1 cmp
++                                            #   repo golden, exact at tol 0;
++                                            #   pins Equal/IncrementClamp
++                                            #   intersection (s14 gfx-stencil)
+ 
+ # tier=2  (CI-failing / skipped; A/B signal only)
+ visual/simple_shapes/masks                  # mask compositing (largest gap)
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+index 4e1b3c8e3..c6d2b8f39 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+@@ -765,6 +765,21 @@ invariant:** the marker is scoped to the `output` comparison of these two tests
+ only — if a *new* comparison or a materially larger excess appears here, it is
+ not covered and must be re-triaged.
+ 
++**Amendment, session 14 (`gfx-stencil`, Equal/IncrementClamp stencil nesting):**
++part of the residual was NOT a rasteriser tie. The stencil model change drops
++both twins from 2624 to 1738 outlier channels (1095 → 652 mismatching pixels,
++local Dawn, md5-verified against the CI actual for the s13 baseline), and every
++one of the 443 changed pixels went from WRONG to matching the golden — 413 of
++the "422 px actual (255,0,0) expected (255,255,255)" class and 30 of the blue
++one. Those were mask content escaping the clip (over-paint just outside the mask
++silhouette), which the flat Always/Replace stencil could not contain; the model
++that pops a mask's stencil instead of abandoning it removes them. **What remains
++(482 px black-vs-white plus the saturated-colour swaps) IS the 1-sample
++rasteriser tie and the decision above stands unchanged** — both comparisons
++still fail at `tolerance = 0`. Re-baseline the counts in this entry and in the
++summary table from the first `images=true` CI run that carries the s14 stencil
++patch.
++
+ ---
+ 
+ ## Category 12: Implementation-Defined `for...in` Enumeration Order
+diff --git a/ruffle-tests/tests/swfs/regression/mask_nested_intersect/create_test_swf.py b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/create_test_swf.py
+new file mode 100644
+index 000000000..89fec0dac
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/create_test_swf.py
+@@ -0,0 +1,191 @@
++#!/usr/bin/env python3
++"""Build test.swf for mask_nested_intersect.
++
++Authored by session 11 (`session11-fanout-reports/w2-masks-defectA`, section
++"Regression tests"), held back until the nesting work existed; dropped in by
++session 14's `gfx-stencil` patch, which is the change it pins.
++
++Pins **nested mask INTERSECTION semantics**: a root clip mask whose maskee is
++a sprite that itself contains a clip mask.
++
++    root   depth 1: shape M1 = rect   (0,0)-(120,120)  clipDepth = 2
++           depth 2: sprite S                            <- masked by M1
++    sprite depth 1: shape M2 = rect (60,60)-(180,180)  clipDepth = 2
++           depth 2: shape G  = rect   (0,0)-(200,200) GREEN   <- masked by M2
++
++Correct (Ruffle exporter, `output.expected.png`): green ONLY in M1 n M2 =
++(60,60)-(120,120) — exactly 3600 green / 36400 white pixels, TWO colours,
++no anti-aliasing anywhere.
++
++  * at HEAD (one stencil value for every mask): green over M1 u M2 = 25200 px
++  * with the defect-A per-mask-reference fix:   green over M2      = 14400 px
++  * only an increment/decrement mask STACK (mask-write pipeline
++    `compare = Equal @ depth-1, passOp = IncrementClamp`, mask-clear pipeline
++    `compare = Equal @ depth, passOp = DecrementClamp` + a screen-covering
++    decrement draw in end_clip) reaches the golden's 3600 px.
++
++So this test DISCRIMINATES between the three stencil models, which is why it
++is the pin for the increment/decrement work: a per-mask-reference fix alone
++still leaves 10800 outlier channels.
++
++`clipDepth` is a PlaceObject2 field with NO ActionScript equivalent, so MTASC
++and mxmlc cannot author this movie; the whole file is emitted as raw SWF tag
++bytes. Every shape is an axis-aligned rectangle on integer pixel boundaries,
++so neither Ruffle's exporter nor our MSAA produces partial coverage on any
++edge and the test is gradeable at `tolerance = 0` — same construction as
++`mask_sibling_union`.
++
++Regenerate:  python3 create_test_swf.py
++Golden:      ~/CC/ruffle/target/release/exporter test.swf output.expected.png -s
++             (the ONLY legal provenance for a regression-suite golden: an
++             oracle outside SWFRecomp — playbook §7)
++"""
++import struct
++
++
++# ---- bit writer (MSB-first, SWF convention) ------------------------------
++class Bits:
++    def __init__(self):
++        self.acc = 0
++        self.n = 0
++        self.out = bytearray()
++
++    def u(self, val, bits):
++        for i in range(bits - 1, -1, -1):
++            self.acc = (self.acc << 1) | ((val >> i) & 1)
++            self.n += 1
++            if self.n == 8:
++                self.out.append(self.acc)
++                self.acc = 0
++                self.n = 0
++
++    def s(self, val, bits):
++        if val < 0:
++            val = (1 << bits) + val
++        self.u(val, bits)
++
++    def bytes(self):
++        if self.n:
++            self.out.append(self.acc << (8 - self.n))
++            self.acc = 0
++            self.n = 0
++        return bytes(self.out)
++
++
++def sbits_needed(*vals):
++    m = 1
++    for v in vals:
++        m = max(m, v.bit_length() + 1 if v >= 0 else (~v).bit_length() + 1)
++    return m
++
++
++def rect(xmin, xmax, ymin, ymax):
++    nb = max(sbits_needed(v) for v in (xmin, xmax, ymin, ymax))
++    b = Bits()
++    b.u(nb, 5)
++    for v in (xmin, xmax, ymin, ymax):
++        b.s(v, nb)
++    return b.bytes()
++
++
++def tag(code, data):
++    n = len(data)
++    if n < 0x3F:
++        return struct.pack('<H', (code << 6) | n) + data
++    return struct.pack('<H', (code << 6) | 0x3F) + struct.pack('<I', n) + data
++
++
++MATRIX_IDENTITY = bytes([0x00])   # HasScale=0, HasRotate=0, NTranslateBits=0
++
++
++def define_shape(shape_id, x0, y0, x1, y1, rgb):
++    """DefineShape (tag 2): one solid-filled rectangle. Coordinates in TWIPS."""
++    body = bytearray()
++    body += struct.pack('<H', shape_id)
++    body += rect(x0, x1, y0, y1)
++    body.append(1)                  # FillStyleCount = 1
++    body.append(0x00)               # FILLSTYLE type 0x00 = solid
++    body += bytes(rgb)              # RGB
++    body.append(0)                  # LineStyleCount = 0
++
++    b = Bits()
++    b.u(1, 4)                       # NumFillBits = 1
++    b.u(0, 4)                       # NumLineBits = 0
++    # STYLECHANGERECORD: MoveTo(x0,y0) + FillStyle0 = 1
++    b.u(0, 1)                       # TypeFlag = 0 (non-edge)
++    b.u(0, 1)                       # StateNewStyles
++    b.u(0, 1)                       # StateLineStyle
++    b.u(0, 1)                       # StateFillStyle1
++    b.u(1, 1)                       # StateFillStyle0
++    b.u(1, 1)                       # StateMoveTo
++    nb = sbits_needed(x0, y0)
++    b.u(nb, 5)
++    b.s(x0, nb)
++    b.s(y0, nb)
++    b.u(1, 1)                       # FillStyle0 index = 1
++    w, h = x1 - x0, y1 - y0
++    for dx, dy in ((w, 0), (0, h), (-w, 0), (0, -h)):
++        n2 = max(sbits_needed(dx, dy), 2)
++        b.u(1, 1)                   # TypeFlag = 1 (edge)
++        b.u(1, 1)                   # StraightFlag = 1
++        b.u(n2 - 2, 4)              # NumBits
++        b.u(1, 1)                   # GeneralLineFlag = 1
++        b.s(dx, n2)
++        b.s(dy, n2)
++    b.u(0, 6)                       # EndShapeRecord
++    body += b.bytes()
++    return tag(2, bytes(body))
++
++
++def place_object2(depth, char_id, clip_depth=0):
++    """PlaceObject2 (tag 26), identity matrix, optional ClipDepth."""
++    flags = 0x02 | 0x04             # HasCharacter | HasMatrix
++    if clip_depth:
++        flags |= 0x40               # HasClipDepth
++    body = bytearray()
++    body.append(flags)
++    body += struct.pack('<H', depth)
++    body += struct.pack('<H', char_id)
++    body += MATRIX_IDENTITY
++    if clip_depth:
++        body += struct.pack('<H', clip_depth)
++    return tag(26, bytes(body))
++
++
++def do_action_trace(msg):
++    """DoAction (tag 12): trace(msg); END."""
++    item = b'\x00' + msg.encode('utf-8') + b'\x00'
++    acts = struct.pack('<BH', 0x96, len(item)) + item + b'\x26' + b'\x00'
++    return tag(12, acts)
++
++
++
++def define_sprite(sprite_id, inner_tags):
++    """DefineSprite (tag 39) with a single frame of control tags."""
++    body = struct.pack('<HH', sprite_id, 1) + inner_tags + tag(1, b'') + tag(0, b'')
++    return tag(39, body)
++
++
++T = 20   # twips per pixel
++
++inner = place_object2(1, 2, clip_depth=2) + place_object2(2, 3)
++
++tags = b''
++tags += tag(9, bytes((255, 255, 255)))                                       # white bg
++tags += define_shape(1,  0 * T,  0 * T, 120 * T, 120 * T, (0, 0, 0))         # M1
++tags += define_shape(2, 60 * T, 60 * T, 180 * T, 180 * T, (0, 0, 0))         # M2
++tags += define_shape(3,  0 * T,  0 * T, 200 * T, 200 * T, (0, 160, 0))       # G
++tags += define_sprite(4, inner)
++tags += place_object2(1, 1, clip_depth=2)
++tags += place_object2(2, 4)
++tags += do_action_trace('mask_nested_intersect')
++tags += tag(1, b'')                                                          # ShowFrame
++tags += tag(0, b'')                                                          # End
++
++stage = rect(0, 200 * T, 0, 200 * T)
++body = stage + struct.pack('<H', 24 << 8) + struct.pack('<H', 1) + tags
++data = b'FWS' + struct.pack('<BI', 6, 8 + len(body)) + body
++
++with open('test.swf', 'wb') as fh:
++    fh.write(data)
++print('Created test.swf (%d bytes)' % len(data))
+diff --git a/ruffle-tests/tests/swfs/regression/mask_nested_intersect/output.expected.png b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e2e8f20725aaffbd03eedf3ce817f264d5403f2
+GIT binary patch
+literal 1427
+zcmeAS@N?(olHy`uVBq!ia0vp^CqS5k4M?tyST~P>fi=q0#WAFU@$CWT1uBu#j(z-J
+z{;v1LndL>^$?I}&Z-b)Do_W)}*3UCCR(kidY<pJKvUcn2tLtx>g~yg&{p?(DH8gy$
+z0t<-4?KH}vcNm2Hn}6|p$AAAnanDxO8#k?9x9b(F;*M9VR>uj9a_Aifj@!<LhR1&W
+rBM?)1HB_JDAc)g6${B%S@SlS%jHl;~)iD!bVawp@>gTe~DWM4fMGJr=
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/mask_nested_intersect/output.txt b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/output.txt
+new file mode 100644
+index 000000000..40916ed36
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/output.txt
+@@ -0,0 +1 @@
++mask_nested_intersect
+diff --git a/ruffle-tests/tests/swfs/regression/mask_nested_intersect/test.swf b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d859c9d617a99d46f5ddba0e93b865a544b8ed58
+GIT binary patch
+literal 222
+zcmZ<@4`#c^z`&5fAn(Ayeu05Of|0?Q>Hq)#OBfh|f<gxvST+DzARxe_zAJ)(@eTuL
+z!uu=+hH?hh6%5N6m>4p3WE8yFIbf=II}@hKy-Z+WFJMq@-n#;%L2LoT5(Z|t9YEt2
+zfQ{Sz0wl}7;5{42I2H+pTbwLFV>;N}7=h*jQ5zc@6Hp_A1JHV~C{Qa@l!bvohIyJe
+f14C|Nadv!OYH>+wN_=KsNorAXYH|sK8dwhiObIPP
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/mask_nested_intersect/test.toml b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/test.toml
+new file mode 100644
+index 000000000..5e4c137a7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/mask_nested_intersect/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 1
++
++[image_comparisons.output]
++tolerance = 0
++max_outliers = 0

@@ -1307,6 +1307,30 @@ static void create_textures(WebGPURenderContext* ctx)
 	}
 }
 
+// Full-screen NDC quad, colour writes off — the geometry of a clip-mask POP.
+//
+// Ruffle re-draws the masker itself for its ClearMaskStencil pass
+// (core/src/display_object.rs:1256-1269); we would have to keep "re-draw this
+// masker" alive across five different push sites, so we cover the screen
+// instead. Equivalent, because Equal(level) selects precisely the texels the
+// innermost mask raised. NOT render_webgpu_draw_rect: that goes through the
+// dynamic vertex/colour staging and silently no-ops when it is full, which
+// would turn a stencil pop into a capacity bug, and it depends on whatever
+// stage transform is installed. An NDC quad has neither problem and needs no
+// vertex buffer, no bind group data and no transform slot.
+static const char* stencil_clear_wgsl =
+"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {\n"
+"  var positions = array<vec2f, 6>(\n"
+"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+"  );\n"
+"  return vec4f(positions[vi], 0.0, 1.0);\n"
+"}\n"
+"\n"
+"@fragment fn fs_main() -> @location(0) vec4f {\n"
+"  return vec4f(0.0, 0.0, 0.0, 0.0);\n"
+"}\n";
+
 // ---------------------------------------------------------------------------
 // create_pipelines: render pipeline + compute pipeline
 // ---------------------------------------------------------------------------
@@ -1459,11 +1483,19 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	ctx->render_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
 	assert(ctx->render_pipeline != NULL);
 
-	// --- Stencil write pipeline: writes to stencil, no color output ---
-	// Used for clip mask shapes. The mask's geometry defines the clipping region.
+	// --- Stencil write pipeline: raises the clip level, no color output ---
+	// Used for clip mask shapes. The mask's geometry defines the clipping
+	// region, and Equal(level-1)/IncrementClamp raises ONLY the texels the
+	// enclosing mask already owns — a nested mask therefore clips to the
+	// INTERSECTION for free (ruffle render/wgpu/src/pipelines.rs:387-395,
+	// MaskState::DrawMaskStencil). failOp = Keep makes the write idempotent
+	// under self-overlapping mask geometry: a second triangle of the SAME
+	// mask finds level != level-1, fails the compare and is left alone, so a
+	// masker whose subtree draws overlapping shapes cannot increment itself
+	// into a hole. Same argument covers the matching decrement.
 	WGPUDepthStencilState ds_write = ds_normal;
-	ds_write.stencilFront.compare = WGPUCompareFunction_Always;
-	ds_write.stencilFront.passOp = WGPUStencilOperation_Replace;
+	ds_write.stencilFront.compare = WGPUCompareFunction_Equal;
+	ds_write.stencilFront.passOp = WGPUStencilOperation_IncrementClamp;
 	ds_write.stencilWriteMask = 0xFF;
 	ds_write.stencilBack = ds_write.stencilFront;
 
@@ -1491,6 +1523,44 @@ static void create_pipelines(WebGPURenderContext* ctx)
 
 	ctx->stencil_test_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
 	assert(ctx->stencil_test_pipeline != NULL);
+
+	// --- Stencil clear pipeline: lowers the clip level, no color output ---
+	// ruffle MaskState::ClearMaskStencil (pipelines.rs:406-414). Drawn as the
+	// full-screen NDC quad above, so it needs no vertex buffer — but it keeps
+	// the render pipeline LAYOUT, so the three bind groups the pass set at
+	// open time stay bound (a pipeline with an incompatible layout would unset
+	// them and every later draw would fail validation).
+	{
+		WGPUDepthStencilState ds_clear = ds_normal;
+		ds_clear.stencilFront.compare = WGPUCompareFunction_Equal;
+		ds_clear.stencilFront.passOp = WGPUStencilOperation_DecrementClamp;
+		ds_clear.stencilWriteMask = 0xFF;
+		ds_clear.stencilBack = ds_clear.stencilFront;
+
+		WGPUShaderModule clear_sm = create_shader(ctx->device, stencil_clear_wgsl,
+		                                          "stencil_clear_shader");
+		WGPUFragmentState frag_state_clear = frag_state_masked;   // colour writes OFF
+		frag_state_clear.module = clear_sm;
+
+		rp_desc.label = WGPU_LABEL("stencil_clear_pipeline");
+		rp_desc.depthStencil = &ds_clear;
+		rp_desc.fragment = &frag_state_clear;
+		rp_desc.vertex.module = clear_sm;
+		rp_desc.vertex.bufferCount = 0;
+		rp_desc.vertex.buffers = NULL;
+		// rp_desc.multisample.count is still MSAA_SAMPLES — never a literal 4;
+		// quality="low" goldens compile the whole renderer at 1 sample and a
+		// mismatch here fails pipeline creation loudly.
+
+		ctx->stencil_clear_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->stencil_clear_pipeline != NULL);
+		wgpuShaderModuleRelease(clear_sm);
+
+		// Put the shared descriptor back for the pipelines created below.
+		rp_desc.vertex.module = vs_module;
+		rp_desc.vertex.bufferCount = 1;
+		rp_desc.vertex.buffers = &vb_layout;
+	}
 
 	// --- Blend mode pipelines ---
 	// Legacy per-draw blend pipelines. The layer-composite path in
@@ -1986,11 +2056,9 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	ds_att.stencilStoreOp = WGPUStoreOp_Store; // Store for filter suspend/resume
 	ds_att.stencilClearValue = 0;
 
-	// This Clear is the ONLY stencil reset in the pass, so per-mask references
-	// have to be unique WITHIN it. Restart the allocator here (and drop any
-	// clip state a previous pass left behind).
+	// The stencil starts at 0 everywhere, which IS nesting level 0. Drop any
+	// clip state a previous pass left behind so the level and the texels agree.
 	ctx->mask_ref = 0;
-	ctx->mask_ref_next = 0;
 	ctx->mask_capture_depth = 0;
 	ctx->mask_save_sp = 0;
 
@@ -2159,31 +2227,25 @@ static void restore_draw_pipeline(WebGPURenderContext* ctx)
 	}
 }
 
-// Allocate the next per-mask stencil reference.
+// Pop ONE clip-mask nesting level: draw the full-screen NDC quad through the
+// Equal(level)/DecrementClamp pipeline, which touches exactly the texels the
+// innermost mask raised and puts them back to level-1.
 //
-// The stencil is 8-bit and the pass clears it exactly once, so after 255 masks
-// in ONE pass the references would alias earlier ones and the union bug would
-// come back. Fall back to a mid-pass clear: a screen-covering rect through the
-// stencil-WRITE pipeline (Always/Replace, colour writes off) with reference 0
-// rewrites every texel to 0, after which the allocator can restart. No corpus
-// test reaches this (the busiest frame in the graded corpus has 6 masks;
-// from_shumway/invalidClipDepth's 257 masks are one PER FRAME), but a real
-// movie can. The rect is deliberately enormous because the stage transform is
-// arbitrary at this point — it is clipped to the viewport in NDC.
-static u32 alloc_mask_ref(WebGPURenderContext* ctx)
+// The 8-bit stencil saturates at 255 by construction (IncrementClamp), so the
+// old 255-reference allocator and its mid-pass full-screen rewrite are gone;
+// masks 256-deep degrade to "the 255th mask wins" instead of aliasing. The
+// busiest graded frame has 6 masks (from_shumway/invalidClipDepth's 257 clip
+// ranges are one PER FRAME and are sibling ranges, so they never nest).
+static void pop_mask_level(WebGPURenderContext* ctx)
 {
-	if (ctx->mask_ref_next >= 255u)
+	if (ctx->mask_ref == 0) return;
+	if (ctx->render_pass != NULL)
 	{
-		if (ctx->render_pass != NULL)
-		{
-			wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
-			wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, 0);
-			render_webgpu_draw_rect(ctx, -4.0e6f, -4.0e6f, 8.0e6f, 8.0e6f,
-				0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
-		}
-		ctx->mask_ref_next = 0;
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_clear_pipeline);
+		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+		wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
 	}
-	return ++ctx->mask_ref_next;
+	ctx->mask_ref--;
 }
 
 // ---------------------------------------------------------------------------
@@ -2652,10 +2714,13 @@ void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)
 	// of a mask capture. Everything drawn inside the capture belongs to the
 	// same mask, so the inner pair is a no-op and the outer reference stands.
 	if (ctx->mask_capture_depth++ > 0) return;
-	ctx->mask_ref = alloc_mask_ref(ctx);
+	// Ruffle's push_mask(): num_masks += 1, DrawMaskStencil at num_masks - 1
+	// (render/wgpu/src/surface/commands.rs:399-433). The geometry drawn next
+	// can therefore only raise texels the ENCLOSING mask owns.
+	if (ctx->mask_ref < 255u) ctx->mask_ref++;
 	// Switch to stencil-write pipeline: draws to stencil buffer only (no color)
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_write_pipeline);
-	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref - 1);
 }
 
 void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
@@ -2663,9 +2728,9 @@ void render_webgpu_end_clip_mask(WebGPURenderContext* ctx)
 	if (!ctx->renderer_ok) return;
 	if (ctx->mask_capture_depth > 0) ctx->mask_capture_depth--;
 	if (ctx->mask_capture_depth > 0) return;   // still capturing the outer mask
-	// Switch to stencil-test pipeline: only draws where stencil == THIS mask's
-	// reference. Each mask owns its own value, so mask N no longer tests the
-	// union of masks 1..N.
+	// Ruffle's activate_mask(): DrawMaskedContent at num_masks. Content passes
+	// only where the stencil reached THIS level, i.e. inside every mask that
+	// is currently open.
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
 	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
 }
@@ -2676,24 +2741,27 @@ void render_webgpu_end_clip(WebGPURenderContext* ctx)
 	// A nested display-list walk under a sprite mask runs its own clip loop and
 	// can call end_clip while the outer capture is still open; ignore it.
 	if (ctx->mask_capture_depth > 0) return;
-	// Switch back to normal pipeline (no stencil testing)
-	ctx->mask_ref = 0;
-	restore_draw_pipeline(ctx);
+	// Pop exactly ONE level (ruffle's deactivate_mask + pop_mask), which is
+	// what the callers that own a single range mean by "end". It used to zero
+	// mask_ref outright and so DROPPED any enclosing clip; popping one level
+	// restores it instead — the EditText field-bounds clip (tag.c:5005) and
+	// masked_drawing_render_cb are nested pushes that now come back correctly.
+	render_webgpu_restore_clip(ctx, ctx->mask_ref > 0 ? ctx->mask_ref - 1 : 0);
 }
 
-// Save / restore the active clip reference around a NESTED mask (AVM2 walk).
+// Save / restore the active clip level around a NESTED mask.
 //
-// end_clip zeroes mask_ref, which is right for the tag.c loops (their clip
-// ranges are siblings), but the AVM2 render walk can open a mask inside an
-// already-masked subtree: `a.mask = m` on a child of a clipDepth range, or a
-// clipDepth range inside a masked container. Without a restore the inner
-// end_clip drops the OUTER clip for every later sibling.
+// A mask can be opened inside an already-masked subtree — `a.mask = m` on a
+// child of a clipDepth range, a clipDepth range inside a masked container, a
+// scrollRect crop on top of a DisplayObject.mask — and every such pair saves
+// the level with clip_ref() and gives it back with restore_clip().
 //
-// Restoring costs no geometry replay: the stencil is cleared once per pass, so
-// the texels the enclosing mask wrote still hold its reference. The one thing
-// this cannot recover is the region where the inner mask overwrote the outer
-// reference (Replace, not Increment) — nesting still does not intersect, which
-// is the same flat-mask limitation the tag.c loops have had since s11.
+// restore_clip is where the mask geometry is UNDONE: it pops one level per
+// step, each pop a full-screen Equal(level)/DecrementClamp quad, so the
+// stencil is left exactly as the enclosing mask had it. That is what makes
+// the model composable — under the old Replace stencil a nested mask
+// overwrote its parent's reference and restore_clip could put the reference
+// back but not the texels, which is the hole the s13 maskC report described.
 u32 render_webgpu_clip_ref(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return 0;
@@ -2704,7 +2772,12 @@ void render_webgpu_restore_clip(WebGPURenderContext* ctx, u32 ref)
 {
 	if (!ctx->renderer_ok) return;
 	if (ctx->mask_capture_depth > 0) return;
-	ctx->mask_ref = ref;
+	// Every caller restores monotonically downward (tag.c:3469/3543/3683/3686/
+	// 5920/6173/6905, avm2_display.c:15624/15635/15648/15654/15656); a raise is
+	// a bug, not a case — clamp rather than pretend the texels came back.
+	if (ref > ctx->mask_ref) ref = ctx->mask_ref;
+	while (ctx->mask_ref > ref)
+		pop_mask_level(ctx);
 	restore_draw_pipeline(ctx);
 }
 
@@ -4134,9 +4207,11 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 	// The offscreen pass has its OWN depth-stencil, which it CLEARS below — the
 	// main pass's clip mask does not exist in it, and any mask opened inside it
 	// belongs to that cleared stencil. Park the clip state so (a) draws inside
-	// the offscreen pass are not stencil-tested against a reference that is 0
-	// everywhere there, and (b) an inner mask cannot zero the outer clip that
-	// the resumed main pass still needs.
+	// the offscreen pass are not stencil-tested against a level that no texel
+	// there has reached, and (b) an inner mask cannot pop the outer clip that
+	// the resumed main pass still needs. The parked value is a NESTING LEVEL,
+	// and the offscreen pass's own stencilClearValue = 0 is exactly the level
+	// it is parked to, so the two agree without any geometry replay.
 	if (ctx->mask_save_sp >= 0
 	    && ctx->mask_save_sp < (int)(sizeof(ctx->mask_save_ref) / sizeof(ctx->mask_save_ref[0])))
 	{

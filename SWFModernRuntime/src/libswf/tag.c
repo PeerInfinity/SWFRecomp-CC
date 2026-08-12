@@ -3656,6 +3656,22 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		// color target) and clip subsequent depths up to clip_depth to it.
 		if (obj->clip_depth > 0)
 		{
+			// Pop before pushing. A clipDepth entry can appear while an
+			// earlier range is STILL open (its own depth is inside that
+			// range), and this loop tracks a single scalar active_clip_depth,
+			// so the second push would overwrite the first with no matching
+			// pop. Under the old Always/Replace stencil that was harmless —
+			// the new push just reassigned the reference. Under the
+			// Equal/IncrementClamp NESTING model (render_webgpu.c) an
+			// unpopped push LEAKS a level for the rest of the frame. Same
+			// shape avm2_render_node already uses (avm2_display.c:15630).
+			// No draw call happens between the pop and the push, so this is
+			// byte-identical under the old model.
+			if (active_clip_depth > 0)
+			{
+				renderer_restore_clip(context, pre_clip_ref);
+				active_clip_depth = 0;
+			}
 			Character* mch = &dictionary[obj->char_id];
 			if (mch->type == CHAR_TYPE_SHAPE)
 			{
@@ -5993,6 +6009,15 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			avm1_masker = avm1_masker_for_entry(obj);
 		}
 		if (obj->clip_depth > 0) {
+			// Pop before pushing — see render_display_list for why (a second
+			// clip range opened inside a live one leaks a stencil LEVEL under
+			// the Equal/IncrementClamp model). No draw happens between the
+			// pop and the push, so this is byte-identical under the old
+			// Always/Replace model.
+			if (active_clip_depth > 0) {
+				renderer_end_clip(context);
+				active_clip_depth = 0;
+			}
 			Character* ch = &dictionary[obj->char_id];
 			if (ch->type == CHAR_TYPE_SHAPE) {
 				renderer_begin_clip_mask(context);
@@ -6953,6 +6978,16 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Check if this object is a clip mask
 		if (obj->clip_depth > 0)
 		{
+			// Pop before pushing — see render_display_list for why (a second
+			// clip range opened inside a live one leaks a stencil LEVEL under
+			// the Equal/IncrementClamp model). No draw happens between the
+			// pop and the push, so this is byte-identical under the old
+			// Always/Replace model.
+			if (active_clip_depth > 0)
+			{
+				renderer_end_clip(context);
+				active_clip_depth = 0;
+			}
 			Character* ch = &dictionary[obj->char_id];
 			if (ch->type == CHAR_TYPE_SHAPE)
 			{
