@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-06T10:26:29.731508+00:00",
-    "git_sha": "1f8396f5799facba702fc3a1a72bda6974146a73",
-    "duration_seconds": 82.96,
+    "timestamp": "2026-08-06T23:55:08.703087+00:00",
+    "git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
+    "duration_seconds": 79.97,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -22,8 +22,8 @@
       "test": "aac",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.841,
-        "run": 0.767
+        "compile": 7.932,
+        "run": 0.766
       },
       "num_frames": 400,
       "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
@@ -32,7 +32,7 @@
         "expected_lines": 18,
         "matching_lines": 3
       },
-      "duration": 8.62,
+      "duration": 8.71,
       "status": "output_mismatch",
       "detail": "21 line(s) differ (actual=24, expected=18)",
       "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()",
@@ -42,7 +42,7 @@
       "test": "g711",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.626,
+        "compile": 7.59,
         "run": 1.018
       },
       "num_frames": 600,
@@ -52,17 +52,17 @@
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 8.65,
+      "duration": 8.62,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=8, expected=6)",
-      "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()",
+      "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()",
       "expected_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nPASS\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nPASS"
     },
     {
       "test": "g711_event_alaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.252,
+        "compile": 20.232,
         "run": 0.215
       },
       "num_frames": 2,
@@ -71,14 +71,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.47,
+      "duration": 20.45,
       "status": "pass"
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.104,
+        "compile": 20.966,
         "run": 0.215
       },
       "num_frames": 2,
@@ -87,15 +87,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.34,
+      "duration": 21.19,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
-        "recomp": 0.01,
-        "compile": 22.139,
-        "run": 0.416
+        "recomp": 0.009,
+        "compile": 20.319,
+        "run": 0.366
       },
       "num_frames": 120,
       "lines": {
@@ -103,7 +103,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.57,
+      "duration": 20.7,
       "status": "pass"
     }
   ]

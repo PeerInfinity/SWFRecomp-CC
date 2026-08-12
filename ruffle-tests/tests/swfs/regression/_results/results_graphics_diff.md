@@ -1,15 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1f8396f5799f` (2026-08-06T10:26:29.755565+00:00)
-**Current:** `fb36ba11005c` (2026-08-06T23:55:08.733668+00:00)
+**Previous:** `fb36ba11005c` (2026-08-06T23:55:08.733668+00:00)
+**Current:** `bf585e4486b6` (2026-08-12T23:11:20.748225+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 71 | 71 | 0 |
-| Total | 71 | 71 | 0 |
+| Passing | 71 | 72 | +1 |
+| Total | 71 | 72 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-No changes detected.
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `mask_nested_intersect` | pass | 1/1 |

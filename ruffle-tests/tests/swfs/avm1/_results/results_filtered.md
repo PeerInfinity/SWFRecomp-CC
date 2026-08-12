@@ -6,26 +6,26 @@
 
 **Run Duration**: 81m 37s
 
-**Filtered**: 24 tests ignored out of 718 available
+**Filtered**: 22 tests ignored out of 718 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 694 |
-| Passing | **672** (96.8%) |
+| Total tests | 696 |
+| Passing | **672** (96.6%) |
 | Ruffle-matched | 13 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **685** (98.7%) |
-| Failing | 9 |
-| Total expected lines | 108744 |
-| Matching lines | 105273 (96.8%) |
-| Mismatched lines | 3471 |
+| Effective pass | **685** (98.4%) |
+| Failing | 11 |
+| Total expected lines | 112904 |
+| Matching lines | 106718 (94.5%) |
+| Mismatched lines | 6186 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 9 | 100.0% |
+| Output Mismatch | 11 | 100.0% |
 
 ## Passing Tests
 
@@ -730,14 +730,15 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**4 tests** within reach
+**5 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `set_property_values/swf5` | 92.9% | 1620 | 1743 | 123 |  |
-| 2 | `set_property_values/swf6` | 92.9% | 1620 | 1743 | 123 |  |
-| 3 | `set_property_values/swf7` | 92.9% | 1620 | 1743 | 123 |  |
-| 4 | `shared_stack` | 68.8% | 11 | 16 | 5 |  |
+| 1 | `watch_recursion_swf7` | 98.9% | 1036 | 1048 | 12 |  |
+| 2 | `set_property_values/swf5` | 92.9% | 1620 | 1743 | 123 |  |
+| 3 | `set_property_values/swf6` | 92.9% | 1620 | 1743 | 123 |  |
+| 4 | `set_property_values/swf7` | 92.9% | 1620 | 1743 | 123 |  |
+| 5 | `shared_stack` | 68.8% | 11 | 16 | 5 |  |
 
 ## Segfaults
 
@@ -753,19 +754,21 @@ No timeouts.
 
 ## All Output Mismatches
 
-**9 tests** with output mismatch, sorted by match rate (best first)
+**11 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `set_property_values/swf5` | 92.9% | 1620/1743 | 1743 | 1743 |  |
-| 2 | `set_property_values/swf6` | 92.9% | 1620/1743 | 1743 | 1743 |  |
-| 3 | `set_property_values/swf7` | 92.9% | 1620/1743 | 1743 | 1743 |  |
-| 4 | `shared_stack` | 68.8% | 11/16 | 12 | 16 |  |
-| 5 | `set_property_values/swf4` | 20.0% | 349/1743 | 1743 | 1571 |  |
-| 6 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
-| 7 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
-| 8 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
-| 9 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
+| 1 | `watch_recursion_swf7` | 98.9% | 1036/1048 | 1048 | 1042 |  |
+| 2 | `set_property_values/swf5` | 92.9% | 1620/1743 | 1743 | 1743 |  |
+| 3 | `set_property_values/swf6` | 92.9% | 1620/1743 | 1743 | 1743 |  |
+| 4 | `set_property_values/swf7` | 92.9% | 1620/1743 | 1743 | 1743 |  |
+| 5 | `shared_stack` | 68.8% | 11/16 | 12 | 16 |  |
+| 6 | `set_property_values/swf4` | 20.0% | 349/1743 | 1743 | 1571 |  |
+| 7 | `watch_recursion_double_swf7` | 13.1% | 409/3118 | 1596 | 3118 |  |
+| 8 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
+| 9 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
+| 10 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
+| 11 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
 
 ## Investigation Documents
 
@@ -878,4 +881,4 @@ No timeouts.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 5 | 0 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 32 | 32 | 0 |
-| | *(tests not in any document)* | 216 | 198 | 18 |
+| | *(tests not in any document)* | 218 | 198 | 20 |

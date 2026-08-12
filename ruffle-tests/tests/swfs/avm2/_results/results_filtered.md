@@ -6,26 +6,26 @@
 
 **Run Duration**: 196m 15s
 
-**Filtered**: 59 tests ignored out of 1227 available
+**Filtered**: 56 tests ignored out of 1227 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1168 |
-| Passing | **1107** (94.8%) |
+| Total tests | 1171 |
+| Passing | **1107** (94.5%) |
 | Ruffle-matched | 5 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1112** (95.2%) |
-| Failing | 56 |
-| Total expected lines | 133845 |
-| Matching lines | 114504 (85.5%) |
-| Mismatched lines | 19341 |
+| Effective pass | **1112** (95.0%) |
+| Failing | 59 |
+| Total expected lines | 133862 |
+| Matching lines | 114513 (85.5%) |
+| Mismatched lines | 19349 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 56 | 100.0% |
+| Output Mismatch | 59 | 100.0% |
 
 ## Passing Tests
 
@@ -1157,7 +1157,7 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**13 tests** within reach
+**15 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
@@ -1169,11 +1169,13 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 6 | `displayobject_transform` | 75.3% | 67 | 89 | 22 |  |
 | 7 | `scope_optimizations` | 75.0% | 3 | 4 | 1 |  |
 | 8 | `delayed_symbolclass` | 71.4% | 20 | 28 | 8 |  |
-| 9 | `button_nested_frame_simple` | 69.2% | 27 | 39 | 12 |  |
-| 10 | `large_preload_from_url` | 59.3% | 16 | 27 | 11 |  |
-| 11 | `orphan_removeobject` | 53.0% | 340 | 641 | 301 |  |
-| 12 | `mouse_pick_avm1_root` | 50.0% | 1 | 2 | 1 |  |
-| 13 | `sub_super_same_field` | 50.0% | 6 | 12 | 6 |  |
+| 9 | `sound_rootless` | 71.4% | 5 | 7 | 2 |  |
+| 10 | `button_nested_frame_simple` | 69.2% | 27 | 39 | 12 |  |
+| 11 | `large_preload_from_url` | 59.3% | 16 | 27 | 11 |  |
+| 12 | `orphan_removeobject` | 53.0% | 340 | 641 | 301 |  |
+| 13 | `mouse_pick_avm1_root` | 50.0% | 1 | 2 | 1 |  |
+| 14 | `netstream_flv_date` | 50.0% | 2 | 4 | 2 |  |
+| 15 | `sub_super_same_field` | 50.0% | 6 | 12 | 6 |  |
 
 ## Segfaults
 
@@ -1189,7 +1191,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**56 tests** with output mismatch, sorted by match rate (best first)
+**59 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -1201,51 +1203,54 @@ No timeouts.
 | 6 | `displayobject_transform` | 75.3% | 67/89 | 89 | 89 |  |
 | 7 | `scope_optimizations` | 75.0% | 3/4 | 4 | 4 |  |
 | 8 | `delayed_symbolclass` | 71.4% | 20/28 | 28 | 28 |  |
-| 9 | `button_nested_frame_simple` | 69.2% | 27/39 | 39 | 27 |  |
-| 10 | `large_preload_from_url` | 59.3% | 16/27 | 17 | 27 |  |
-| 11 | `orphan_removeobject` | 53.0% | 340/641 | 641 | 636 |  |
-| 12 | `mouse_pick_avm1_root` | 50.0% | 1/2 | 2 | 2 |  |
-| 13 | `sub_super_same_field` | 50.0% | 6/12 | 12 | 12 |  |
-| 14 | `loader_duplicate_class` | 46.9% | 23/49 | 49 | 48 |  |
-| 15 | `event_handler_exception` | 45.5% | 5/11 | 10 | 11 |  |
-| 16 | `textblock_recreateline` | 39.4% | 39/99 | 99 | 98 |  |
-| 17 | `textfield_input_events` | 36.0% | 9/25 | 24 | 25 |  |
-| 18 | `large_preload_from_bytes` | 35.3% | 18/51 | 25 | 51 |  |
-| 19 | `appdomain_lookup_edge_cases` | 21.9% | 7/32 | 11 | 32 |  |
-| 20 | `method_association` | 20.0% | 1/5 | 4 | 5 |  |
-| 21 | `displayobject_getrect` | 12.5% | 2/16 | 5 | 16 |  |
-| 22 | `supercalls_coerce` | 12.5% | 1/8 | 8 | 8 |  |
-| 23 | `mouse_pick_loader_avm1` | 11.9% | 5/42 | 40 | 42 |  |
-| 24 | `all_classes/xml/swf30` | 7.8% | 9/116 | 70 | 116 |  |
-| 25 | `all_classes/xml/swf9` | 7.8% | 9/116 | 70 | 116 |  |
-| 26 | `all_classes/accessibility/swf9` | 6.8% | 5/73 | 36 | 73 |  |
-| 27 | `all_classes/accessibility/swf10` | 5.7% | 5/88 | 36 | 88 |  |
-| 28 | `all_classes/accessibility/swf30` | 5.7% | 5/88 | 36 | 88 |  |
-| 29 | `number_convert_errors` | 4.6% | 40/871 | 685 | 871 |  |
-| 30 | `describe_type_native` | 4.3% | 1/23 | 19 | 23 |  |
-| 31 | `all_classes/errors/swf10` | 4.3% | 6/140 | 126 | 140 |  |
-| 32 | `all_classes/errors/swf30` | 4.3% | 6/140 | 126 | 140 |  |
-| 33 | `describe_type_metadata` | 4.0% | 5/125 | 36 | 125 |  |
-| 34 | `all_classes/display3D/swf30` | 2.9% | 12/412 | 321 | 412 |  |
-| 35 | `external_interface` | 2.9% | 3/105 | 8 | 105 |  |
-| 36 | `focus_events_mixed_avm_edittext` | 2.0% | 1/49 | 31 | 49 |  |
-| 37 | `displayobject_early_init` | 1.9% | 1/54 | 51 | 54 |  |
-| 38 | `all_classes/display3D/swf13` | 0.9% | 3/326 | 321 | 326 |  |
-| 39 | `automation_classes` | 0.8% | 1/122 | 4 | 122 |  |
-| 40 | `all_classes/errors/swf9` | 0.8% | 1/126 | 126 | 121 |  |
-| 41 | `all_classes/display/swf11` | 0.6% | 15/2593 | 1647 | 2593 |  |
-| 42 | `all_classes/display/swf12` | 0.6% | 15/2593 | 1647 | 2593 |  |
-| 43 | `all_classes/display/swf10` | 0.5% | 12/2569 | 1647 | 2569 |  |
-| 44 | `all_classes/display/swf13` | 0.4% | 12/2671 | 1647 | 2671 |  |
-| 45 | `all_classes/display/swf9` | 0.4% | 7/1959 | 1647 | 1959 |  |
-| 46 | `all_classes/display3D/swf12` | 0.3% | 1/321 | 321 | 61 |  |
-| 47 | `all_classes/display/swf30` | 0.2% | 7/2936 | 1647 | 2936 |  |
-| 48 | `accessibilityimplementation` | 0.0% | 0/18 | 4 | 18 |  |
-| 49 | `all_classes/security/swf12` | 0.0% | 0/19 | 3 | 19 |  |
-| 50 | `all_classes/security/swf13` | 0.0% | 0/53 | 3 | 53 |  |
-| 51 | `all_classes/security/swf30` | 0.0% | 0/53 | 3 | 53 |  |
-| 52 | `id3_info` | 0.0% | 0/8 | 0 | 8 |  |
-| 53 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
-| 54 | `native_menu_basic` | 0.0% | 0/19 | 3 | 19 |  |
-| 55 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
-| 56 | `stage_display_state` | 0.0% | 0/6 | 2 | 6 |  |
+| 9 | `sound_rootless` | 71.4% | 5/7 | 5 | 7 |  |
+| 10 | `button_nested_frame_simple` | 69.2% | 27/39 | 39 | 27 |  |
+| 11 | `large_preload_from_url` | 59.3% | 16/27 | 17 | 27 |  |
+| 12 | `orphan_removeobject` | 53.0% | 340/641 | 641 | 636 |  |
+| 13 | `mouse_pick_avm1_root` | 50.0% | 1/2 | 2 | 2 |  |
+| 14 | `netstream_flv_date` | 50.0% | 2/4 | 2 | 4 |  |
+| 15 | `sub_super_same_field` | 50.0% | 6/12 | 12 | 12 |  |
+| 16 | `loader_duplicate_class` | 46.9% | 23/49 | 49 | 48 |  |
+| 17 | `event_handler_exception` | 45.5% | 5/11 | 10 | 11 |  |
+| 18 | `textblock_recreateline` | 39.4% | 39/99 | 99 | 98 |  |
+| 19 | `textfield_input_events` | 36.0% | 9/25 | 24 | 25 |  |
+| 20 | `large_preload_from_bytes` | 35.3% | 18/51 | 25 | 51 |  |
+| 21 | `sound_constructor_with_args` | 33.3% | 2/6 | 2 | 6 |  |
+| 22 | `appdomain_lookup_edge_cases` | 21.9% | 7/32 | 11 | 32 |  |
+| 23 | `method_association` | 20.0% | 1/5 | 4 | 5 |  |
+| 24 | `displayobject_getrect` | 12.5% | 2/16 | 5 | 16 |  |
+| 25 | `supercalls_coerce` | 12.5% | 1/8 | 8 | 8 |  |
+| 26 | `mouse_pick_loader_avm1` | 11.9% | 5/42 | 40 | 42 |  |
+| 27 | `all_classes/xml/swf30` | 7.8% | 9/116 | 70 | 116 |  |
+| 28 | `all_classes/xml/swf9` | 7.8% | 9/116 | 70 | 116 |  |
+| 29 | `all_classes/accessibility/swf9` | 6.8% | 5/73 | 36 | 73 |  |
+| 30 | `all_classes/accessibility/swf10` | 5.7% | 5/88 | 36 | 88 |  |
+| 31 | `all_classes/accessibility/swf30` | 5.7% | 5/88 | 36 | 88 |  |
+| 32 | `number_convert_errors` | 4.6% | 40/871 | 685 | 871 |  |
+| 33 | `describe_type_native` | 4.3% | 1/23 | 19 | 23 |  |
+| 34 | `all_classes/errors/swf10` | 4.3% | 6/140 | 126 | 140 |  |
+| 35 | `all_classes/errors/swf30` | 4.3% | 6/140 | 126 | 140 |  |
+| 36 | `describe_type_metadata` | 4.0% | 5/125 | 36 | 125 |  |
+| 37 | `all_classes/display3D/swf30` | 2.9% | 12/412 | 321 | 412 |  |
+| 38 | `external_interface` | 2.9% | 3/105 | 8 | 105 |  |
+| 39 | `focus_events_mixed_avm_edittext` | 2.0% | 1/49 | 31 | 49 |  |
+| 40 | `displayobject_early_init` | 1.9% | 1/54 | 51 | 54 |  |
+| 41 | `all_classes/display3D/swf13` | 0.9% | 3/326 | 321 | 326 |  |
+| 42 | `automation_classes` | 0.8% | 1/122 | 4 | 122 |  |
+| 43 | `all_classes/errors/swf9` | 0.8% | 1/126 | 126 | 121 |  |
+| 44 | `all_classes/display/swf11` | 0.6% | 15/2593 | 1647 | 2593 |  |
+| 45 | `all_classes/display/swf12` | 0.6% | 15/2593 | 1647 | 2593 |  |
+| 46 | `all_classes/display/swf10` | 0.5% | 12/2569 | 1647 | 2569 |  |
+| 47 | `all_classes/display/swf13` | 0.4% | 12/2671 | 1647 | 2671 |  |
+| 48 | `all_classes/display/swf9` | 0.4% | 7/1959 | 1647 | 1959 |  |
+| 49 | `all_classes/display3D/swf12` | 0.3% | 1/321 | 321 | 61 |  |
+| 50 | `all_classes/display/swf30` | 0.2% | 7/2936 | 1647 | 2936 |  |
+| 51 | `accessibilityimplementation` | 0.0% | 0/18 | 4 | 18 |  |
+| 52 | `all_classes/security/swf12` | 0.0% | 0/19 | 3 | 19 |  |
+| 53 | `all_classes/security/swf13` | 0.0% | 0/53 | 3 | 53 |  |
+| 54 | `all_classes/security/swf30` | 0.0% | 0/53 | 3 | 53 |  |
+| 55 | `id3_info` | 0.0% | 0/8 | 0 | 8 |  |
+| 56 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
+| 57 | `native_menu_basic` | 0.0% | 0/19 | 3 | 19 |  |
+| 58 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
+| 59 | `stage_display_state` | 0.0% | 0/6 | 2 | 6 |  |
