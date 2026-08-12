@@ -93,7 +93,13 @@ static const char* vertex_wgsl =
 "@group(0) @binding(0) var<storage, read> transforms: array<mat4x4f>;\n"
 "@group(0) @binding(1) var<storage, read> colors: array<vec4f>;\n"
 "@group(0) @binding(2) var<storage, read> inv_mats: array<mat4x4f>;\n"
-"@group(0) @binding(3) var<storage, read> bitmap_sizes: array<vec2u>;\n"
+// bitmap_sizes: 4 u32 per texture-array layer — {content_w, content_h,
+// padded_w, padded_h}. `content` is the bitmap's OWN size (the repeat period,
+// per Ruffle's swf_bitmap_to_gl_matrix, render/src/tessellator.rs:356-383);
+// `padded` is the shared layer size, which is the max over every bitmap in the
+// movie and so is generally LARGER. Tiling on `padded` is what left transparent
+// gaps in from_shumway/acid/acid-bitmap-fill.
+"@group(0) @binding(3) var<storage, read> bitmap_sizes: array<vec4u>;\n"
 "\n"
 "struct StageTransform { matrix: mat4x4f };\n"
 "@group(1) @binding(0) var<uniform> stage_transform: StageTransform;\n"
@@ -138,9 +144,17 @@ static const char* vertex_wgsl =
 "  } else if ((out.v_style_type & 0xF0u) == 0x40u) {\n"
 "    let inv_pos = inv_mats[style_upper] * pos;\n"
 "    let sizes = bitmap_sizes[out.v_style_id];\n"
-"    let padded = vec2f(f32(sizes.x), f32(sizes.y));\n"
-"    let actual = padded - vec2f(1.0);\n"
-"    out.v_args = vec4f(inv_pos.x / padded.x, inv_pos.y / padded.y, actual.x / padded.x, actual.y / padded.y);\n"
+"    let content = vec2f(f32(sizes.x), f32(sizes.y));\n"
+"    let padded = vec2f(f32(sizes.z), f32(sizes.w));\n"
+// Repeating fills (0x40/0x42) tile on the bitmap's own size: v_args.xy is the
+// position in TILE units, v_args.zw scales one tile back into layer UV. The
+// clipped arm (0x41/0x43) keeps the old expression character-for-character so
+// the patch is provably a no-op for every non-repeating bitmap fill.
+"    if ((out.v_style_type & 0x1u) == 0u) {\n"
+"      out.v_args = vec4f(inv_pos.x / content.x, inv_pos.y / content.y, content.x / padded.x, content.y / padded.y);\n"
+"    } else {\n"
+"      out.v_args = vec4f(inv_pos.x / padded.x, inv_pos.y / padded.y, 1.0, 1.0);\n"
+"    }\n"
 "  } else {\n"
 "    out.v_args = vec4f(0.0);\n"
 "  }\n"
@@ -263,7 +277,7 @@ static const char* fragment_wgsl =
 "    color = sample_gradient(focal_radial_t(in.v_args), i32(in.v_style_id));\n"
 "  } else if (in.v_style_type == 0x40u || in.v_style_type == 0x42u) {\n"
 "    let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
-"    color = textureSampleLevel(bitmap_tex, bitmap_samp, fract(in.v_args.xy / bm_ratio) * bm_ratio, i32(in.v_style_id), 0.0);\n"
+"    color = textureSampleLevel(bitmap_tex, bitmap_samp, fract(in.v_args.xy) * bm_ratio, i32(in.v_style_id), 0.0);\n"
 "  } else if (in.v_style_type == 0x41u || in.v_style_type == 0x43u) {\n"
 "    color = textureSampleLevel(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id), 0.0);\n"
 "  } else {\n"
@@ -809,7 +823,8 @@ WebGPURenderContext* render_webgpu_new(void)
 void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 {
 	ctx->current_bitmap = 0;
-	ctx->bitmap_sizes = (u32*)HALLOC(2 * sizeof(u32) * ctx->bitmap_count);
+	// 4 u32 per layer: {content_w, content_h, padded_w, padded_h}.
+	ctx->bitmap_sizes = (u32*)HALLOC(4 * sizeof(u32) * ctx->bitmap_count);
 
 	// --- Create WebGPU instance ---
 	WGPUInstanceDescriptor inst_desc = {0};
@@ -1101,7 +1116,7 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		if (total_bmp_slots == 0) total_bmp_slots = 1;
 		ctx->bitmap_sizes_buffer = create_buffer(ctx->device, ctx->queue,
 			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-			NULL, 2 * sizeof(u32) * total_bmp_slots, "bitmap_sizes_buffer");
+			NULL, 4 * sizeof(u32) * total_bmp_slots, "bitmap_sizes_buffer");
 		ctx->dynamic_bitmap_base = (u32)ctx->bitmap_count;
 		ctx->dynamic_bitmap_capacity = MAX_DYNAMIC_BITMAPS;
 		ctx->dynamic_bitmap_used = 0;
@@ -2402,11 +2417,13 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 		WGPUExtent3D extent = {up_w, up_h, 1};
 		wgpuQueueWriteTexture(ctx->queue, &dest, temp, up_bytes, &layout, &extent);
 
-		// Upload bitmap_sizes for this layer — must match texture layer padded dimensions
-		// so the shader's UV mapping (inv_pos / padded) correctly addresses the data.
-		u32 sizes[2] = { bw, bh };
+		// Upload bitmap_sizes for this layer: {content, padded}. This quad is
+		// emitted as style 0x41 (clipped), so the shader reads only the padded
+		// half — `inv_pos / padded`, exactly as before. The content half is
+		// recorded truthfully for completeness.
+		u32 sizes[4] = { src_w, src_h, bw, bh };
 		wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer,
-			(uint64_t)bmp_layer * 2 * sizeof(u32), sizes, sizeof(sizes));
+			(uint64_t)bmp_layer * 4 * sizeof(u32), sizes, sizeof(sizes));
 
 		free(temp);
 	}
@@ -2541,10 +2558,17 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 		WGPUExtent3D extent = {bw, bh, 1};
 		wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
 
-		// Record the bitmap size for the layer (same convention as other paths).
-		u32 sizes[2] = { bw, bh };
+		// Record {content, padded} for the layer. This path PRE-TILES the
+		// source across the whole padded layer above, so its repeat period is
+		// the layer itself, not src_w/src_h: content = {bw-1, bh-1} reproduces
+		// the period the shader used before this commit exactly, keeping
+		// beginBitmapFill byte-identical. (Uploading only src_w x src_h and
+		// setting content = {src_w, src_h} is the better model and removes the
+		// wrap seam, but it needs the clipped arm to clamp to content too —
+		// a separate patch with its own A/B.)
+		u32 sizes[4] = { bw - 1, bh - 1, bw, bh };
 		wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer,
-			(uint64_t)bmp_layer * 2 * sizeof(u32), sizes, sizeof(sizes));
+			(uint64_t)bmp_layer * 4 * sizeof(u32), sizes, sizeof(sizes));
 
 		free(temp);
 	}
@@ -2929,11 +2953,16 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, size_t offset,
 	WGPUExtent3D extent = {bw, bh, 1};
 	wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
 
-	// Store padded texture dimensions (not raw bitmap size) so that the
-	// vertex shader UV computation (texel_pos / size) maps correctly to the
-	// actual texture layer, which includes a +1 edge-clamp padding column/row.
-	ctx->bitmap_sizes[2 * ctx->current_bitmap] = bw;
-	ctx->bitmap_sizes[2 * ctx->current_bitmap + 1] = bh;
+	// Store BOTH the bitmap's own size and the padded layer size.
+	// A repeating fill (0x40/0x42) must tile on the bitmap's own size; the
+	// layer is padded to the LARGEST bitmap in the shared texture array (plus
+	// one edge-clamp row/column), so tiling on it left transparent gaps of
+	// (padded - 1 - content) texels per axis for every under-sized bitmap.
+	// A clipped fill (0x41/0x43) still normalizes by the padded size.
+	ctx->bitmap_sizes[4 * ctx->current_bitmap]     = width;
+	ctx->bitmap_sizes[4 * ctx->current_bitmap + 1] = height;
+	ctx->bitmap_sizes[4 * ctx->current_bitmap + 2] = bw;
+	ctx->bitmap_sizes[4 * ctx->current_bitmap + 3] = bh;
 	ctx->current_bitmap++;
 
 	free(temp);
@@ -2945,7 +2974,7 @@ void render_webgpu_finalize_bitmaps(WebGPURenderContext* ctx)
 
 	// Upload bitmap_sizes to GPU
 	wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer, 0,
-	                     ctx->bitmap_sizes, 2 * sizeof(u32) * ctx->bitmap_count);
+	                     ctx->bitmap_sizes, 4 * sizeof(u32) * ctx->bitmap_count);
 }
 
 // ---------------------------------------------------------------------------

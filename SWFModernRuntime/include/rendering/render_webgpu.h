@@ -32,6 +32,11 @@ typedef struct WebGPURenderContext
 	size_t bitmap_highest_w;
 	size_t bitmap_highest_h;
 	size_t current_bitmap;
+	// 4 u32 per texture-array layer: {content_w, content_h, padded_w, padded_h}
+	// (WGSL side: array<vec4u>). `content` is the bitmap's own size and is the
+	// repeat period for 0x40/0x42 fills; `padded` is the shared layer size
+	// (max over all bitmaps, +1 edge-clamp row/col) and normalizes 0x41/0x43.
+	// NOTE: FlashbangContext's field of the same name is still 2 u32/layer.
 	u32* bitmap_sizes;
 
 	// CPU-side data pointers (populated by swf.c before init)
