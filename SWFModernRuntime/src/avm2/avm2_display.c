@@ -3449,9 +3449,18 @@ static void run_due_timers(Avm2Context* ctx)
 static void avm2_loaderinfo_run_exit_frame(Avm2Context* ctx);
 static void avm2_loader_drain(Avm2Context* ctx);
 
+// Dual-VM (session 15): advances any AVM1 child movie's timeline. Defined
+// down with the loader, next to the boot that registers them; a no-op —
+// literally a single global test — until an AVM1 child actually loads.
+static void avm1_child_tick(Avm2Context* ctx);
+
 void avm2_display_run_tick(Avm2Context* ctx)
 {
 	if (ctx->stage == NULL) return;
+
+	// Before the AVM2 phases, and therefore before this tick's loader drain:
+	// a child booted by tick N's drain must first advance on tick N+1.
+	avm1_child_tick(ctx);
 
 	ctx->frame_phase = PHASE_ENTER;
 	for (uint32_t i = 0; i < g_orphan_count; i++)
@@ -5079,6 +5088,10 @@ typedef struct Avm2PendingLoad
 	// Deliberately narrower than `content_type == LI_CT_SWF && tables == NULL`,
 	// which a bundled data-file SWF also satisfies.
 	uint8_t avm1_child;
+	// The registry entry behind an `avm1_child` load: its recompiled
+	// frame_funcs/tagInit are what the dual-VM boot below actually runs.
+	// NULL for everything else (session 15, dual-VM arc).
+	MovieEntry* avm1_entry;
 } Avm2PendingLoad;
 
 // The AVM1Movie wrapper an AVM2 movie sees around a loaded AVM1 child. The
@@ -5577,6 +5590,40 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 	cext->skip_next_enter_frame = 1;
 }
 
+// --- Dual-VM (session 15): the AVM1 half of a mixed movie -------------------
+//
+// The AVM1 side of this is action.c's `#ifdef SWF_AVM2` block; everything here
+// is the AVM2 seam. The child's timeline lives on a synthetic AVM1 `_levelN`
+// (levels 1..N — _level0 stays the AVM2 root's), and the AVM1Movie wrapper the
+// AVM2 script holds is the handle to it.
+typedef struct MovieClip MovieClip;
+extern MovieClip* actionBootAvm1ChildUnderAvm2(SWFAppContext* app_context,
+                                               MovieEntry* entry, int level);
+extern void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context);
+
+static int g_avm1_child_levels = 0;
+
+// Attach the AVM1 root the wrapper stands for, if the load really carried one.
+// Safe to call with a NULL wrapper or a NULL entry.
+static void avm1_child_boot(Avm2Context* ctx, Avm2Object* wrapper,
+                            MovieEntry* entry)
+{
+	if (entry == NULL || ctx == NULL || ctx->app == NULL) return;
+	if (g_avm1_child_levels >= 8) return;
+	(void) wrapper;
+	MovieClip* mc = actionBootAvm1ChildUnderAvm2(ctx->app, entry,
+	                                             ++g_avm1_child_levels);
+	if (mc == NULL) g_avm1_child_levels--;
+}
+
+// One AVM1 tick per AVM2 tick, at the top of the frame (before the loader
+// drain, so a child booted by THIS tick's drain does not also advance in it).
+static void avm1_child_tick(Avm2Context* ctx)
+{
+	if (g_avm1_child_levels == 0 || ctx == NULL || ctx->app == NULL) return;
+	actionTickAvm1ChildrenUnderAvm2(ctx->app);
+}
+
 // The tail of a load, shared by the deferred `load` path and the synchronous
 // `loadBytes` path (Ruffle movie_loader_data). `from_bytes` suppresses the URL
 // suffix on the #2124 message, exactly as Ruffle does.
@@ -5704,10 +5751,9 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 	{
 		// An AVM1 child has no AVM2 root to boot, but the AVM2 side still sees
 		// an AVM1Movie wrapper: it is `content` and, per movie_loader_complete,
-		// the Loader's child at index 0. We do not execute the child's AVM1
-		// timeline yet, so the wrapper is a live but empty DisplayObject —
-		// enough for `loader.content as AVM1Movie` and for the call/addCallback
-		// surface that avm1movie_addcallback_call grades.
+		// the Loader's child at index 0 — enough for `loader.content as
+		// AVM1Movie` and for the call/addCallback surface that
+		// avm1movie_addcallback_call grades.
 		Avm2Object* mov = avm1movie_mint(ctx);
 		if (mov != NULL)
 		{
@@ -5720,6 +5766,10 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 				insert_at_index(ctx, lx->loader, mov, 0);
 			}
 		}
+		// …and, since session 15, the wrapper is no longer EMPTY: the child's
+		// own recompiled AVM1 timeline boots behind it and ticks with the
+		// parent (avm1_child_boot / avm1_child_tick below).
+		avm1_child_boot(ctx, mov, pl->avm1_entry);
 	}
 	// Third `bytes` state: the real source bytes, now that content is loaded.
 	// Only bundled assets are kept — their storage is generated-static and
@@ -5882,6 +5932,7 @@ static int loader_resolve_url(const Avm2String* url, Avm2PendingLoad* out)
 		// shell, which is exactly the pre-tranche-6 behaviour.
 		out->tables = (const Avm2MovieTables*) m->avm2_tables;
 		out->avm1_child = (m->frame_funcs != NULL && m->avm2_tables == NULL);
+		out->avm1_entry = out->avm1_child ? m : NULL;
 		out->swf_bytes = m->swf_bytes;
 		out->swf_bytes_len = m->swf_bytes_len;
 		out->raw_bytes = m->raw_bytes;

@@ -6723,6 +6723,17 @@ void tagShowFrame(SWFAppContext* app_context)
 #endif
 
 #ifndef NO_GRAPHICS
+	// Same guard tagRerenderFrame has carried since it was written: with no
+	// renderer there is nothing to compose, and `context->xform_slot_count`
+	// below would be a NULL deref. In an AVM1 binary this is unreachable —
+	// swfStart assigns `context` before the first frame ever runs, whatever
+	// renderer_ok ends up as. It becomes reachable in an AVM2 binary, where
+	// runSWF_avm2 owns the renderer and an AVM1 CHILD movie's frame func
+	// reaches tagShowFrame with the AVM1 `context` still NULL (session 15,
+	// dual-VM arc). Deliberately NOT `!renderer_ok` — that state does occur
+	// in AVM1 graphics builds and must keep its existing path.
+	if (context == NULL) return;
+
 	// Compute focus rect BEFORE compose_children modifies transform_ids.
 	// ng_getDisplayEntryBounds reads from CPU-side transform_data which only
 	// has original (non-composed) slots; composed dynamic slots exist only in GPU.

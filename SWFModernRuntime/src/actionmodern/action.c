@@ -23805,6 +23805,278 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 	g_level_advance_count = write;
 }
 
+#ifdef SWF_AVM2
+// --- Dual-VM (session 15): an AVM1 child SWF under an AVM2 parent ---------
+//
+// runSWF_avm2 never calls swfStart, so NONE of the AVM1 substrate exists in an
+// AVM2 binary: no operand stack, no var_map, no dictionary/display_list, no
+// root display sentinel. Everything in this block is compiled ONLY under
+// -DSWF_AVM2 (verify_output.py defines it exactly when the test has an
+// RecompiledABC/), so no pure-AVM1 build can reach a line of it — the AVM1
+// corpus is structurally unaffected.
+//
+// The AVM1 child itself is already fully recompiled and linked: the harness
+// emits its frame_funcs/tagInit under a per-child symbol prefix and registers
+// a MovieEntry for it regardless of the parent's VM. What was missing is (a)
+// the lazy substrate boot and (b) a container MovieClip whose timeline the
+// AVM2 tick advances. Both live here; the AVM2 side calls in through the two
+// entry points at the bottom.
+void actionFirePendingDirectLoads(SWFAppContext* app_context);
+
+static int g_avm1_under_avm2_ready = 0;
+
+static void avm1UnderAvm2Substrate(SWFAppContext* app_context)
+{
+	if (g_avm1_under_avm2_ready) return;
+	g_avm1_under_avm2_ready = 1;
+
+	// swfStart's AVM1 half, minus heap_init (runSWF_avm2 already ran it) and
+	// minus tagInit/tagMain (the parent's timeline is AVM2's, not ours).
+	if (app_context->stack == NULL)
+	{
+		app_context->stack = (char*) malloc(INITIAL_STACK_SIZE);
+		app_context->sp = INITIAL_SP;
+		app_context->oldSP = 0;
+	}
+	extern int is_playing;
+	extern int quit_swf;
+	is_playing = 1;
+	quit_swf = 0;
+	initTime(app_context);
+	initMap();
+
+	extern DisplayObject* display_list;
+	if (dictionary == NULL)
+		dictionary = HCALLOC(INITIAL_DICTIONARY_CAPACITY, sizeof(Character));
+	if (display_list == NULL)
+		display_list = HCALLOC(INITIAL_DISPLAYLIST_CAPACITY, sizeof(DisplayObject));
+
+	extern void ng_sync_root_display_obj(void);
+	extern void* ng_get_root_display_obj(void);
+	ng_sync_root_display_obj();
+	root_movieclip.display_obj = ng_get_root_display_obj();
+	actionSetCurrentContext(&root_movieclip);
+}
+
+// Booted AVM1 children. A LOOPING playhead, unlike g_level_advance's one-shot
+// run: an AVM1 movie under a Loader keeps playing (mixed_avm/
+// avm2_loads_avm1_doabc grades frames 1,2,1 across its four ticks).
+#define MAX_AVM1_UNDER_AVM2 8
+typedef struct {
+	MovieClip* mc;
+	MovieEntry* entry;
+	size_t next_frame;   // 0-indexed frame to run on the NEXT tick
+	int done;            // single-frame child: its one frame already ran
+} Avm1UnderAvm2Child;
+static Avm1UnderAvm2Child g_avm1u2[MAX_AVM1_UNDER_AVM2];
+static int g_avm1u2_count = 0;
+
+// Run one frame of a booted child with the child's SWF version, globals,
+// movie id, display list and transform table swapped in. Structurally the same
+// context swap actionAdvancePlayingLevels does for a _levelN load — duplicated
+// rather than shared so that no AVM1-only path can be perturbed by this arc.
+static void avm1UnderAvm2RunFrame(SWFAppContext* app_context, MovieClip* mc,
+                                  MovieEntry* entry, size_t frame_idx)
+{
+	if (entry->frame_funcs == NULL || frame_idx >= entry->frame_count) return;
+	frame_func fn = entry->frame_funcs[frame_idx];
+	if (fn == NULL) return;
+
+	int _saved_ver = g_swf_version;
+	ASObject* _saved_global = global_object;
+	int _saved_child_init = g_child_swf_init;
+	u8 _saved_movie_id = g_current_movie_id;
+	MovieClip* _saved_ctx = g_current_context;
+	g_swf_version = entry->swf_version;
+	g_child_swf_init = 1;
+	g_current_movie_id = entry->movie_id;
+	ensureSecondaryGlobalInit(app_context, entry->swf_version);
+	if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+	else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+	actionSetCurrentContext(mc);
+
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern size_t display_list_capacity;
+	DisplayObject* _saved_dl = NULL;
+	size_t _saved_max = 0, _saved_cap = 0;
+	int _did_swap = 0;
+	DisplayObject* dobj = mc->display_obj ? (DisplayObject*) mc->display_obj : NULL;
+	if (dobj != NULL && dobj->sprite_display_list != NULL) {
+		_saved_dl = display_list;
+		_saved_max = max_depth;
+		_saved_cap = display_list_capacity;
+		display_list = dobj->sprite_display_list;
+		max_depth = dobj->sprite_max_depth;
+		display_list_capacity = dobj->sprite_dl_capacity;
+		_did_swap = 1;
+	}
+	float (*_saved_td)[16] = NULL;
+	{
+		extern float (*g_active_transform_data)[16];
+		if (entry->transform_data_ptr != NULL) {
+			_saved_td = g_active_transform_data;
+			g_active_transform_data = entry->transform_data_ptr;
+		}
+	}
+	extern int quit_swf;
+	extern int is_playing;
+	int _saved_quit = quit_swf;
+	int _saved_is_playing = is_playing;
+	quit_swf = 0;
+	is_playing = 1;
+	fn(app_context);
+	quit_swf = _saved_quit;
+	is_playing = _saved_is_playing;
+
+	if (_did_swap) {
+		if (dobj != NULL) {
+			dobj->sprite_display_list = display_list;
+			dobj->sprite_max_depth = max_depth;
+			dobj->sprite_dl_capacity = display_list_capacity;
+		}
+		display_list = _saved_dl;
+		max_depth = _saved_max;
+		display_list_capacity = _saved_cap;
+	}
+	if (_saved_td != NULL) {
+		extern float (*g_active_transform_data)[16];
+		g_active_transform_data = _saved_td;
+	}
+	actionSetCurrentContext(_saved_ctx);
+	g_swf_version = _saved_ver;
+	global_object = _saved_global;
+	g_child_swf_init = _saved_child_init;
+	g_current_movie_id = _saved_movie_id;
+}
+
+// Boot one AVM1 child. `level` is the synthetic _levelN slot the child's root
+// timeline occupies — an AVM2 Loader's AVM1 child is NOT _level0 (the AVM2
+// root owns that), so the first child lands on _level1 and so on, which is
+// also what makes `_root == _level0` false inside the child
+// (mixed_avm/avm2_loads_avm1's third graded line).
+//
+// Returns the container MovieClip, or NULL if the entry is not a real SWF.
+MovieClip* actionBootAvm1ChildUnderAvm2(SWFAppContext* app_context,
+                                        MovieEntry* entry, int level)
+{
+	if (entry == NULL || entry->frame_funcs == NULL || entry->swf_version == 0)
+		return NULL;
+	if (g_avm1u2_count >= MAX_AVM1_UNDER_AVM2) return NULL;
+	avm1UnderAvm2Substrate(app_context);
+
+	MovieClip* mc = getOrCreateLevel(app_context, level);
+	if (mc == NULL) return NULL;
+	constructChildURL(mc->url, sizeof(mc->url), entry->filename);
+	mc->swf_version = (u16) entry->swf_version;
+	mc->movie_id = entry->movie_id;
+	mc->load_failed = 0;
+	mc->totalframes = entry->frame_count;
+	mc->framesloaded = entry->frame_count;
+	mc->currentframe = 1;
+	mc->byte_size = entry->file_size;
+
+	// Give the level its own display list so the child's PlaceObject2 tags
+	// don't land on (empty) root depths the AVM2 side also indexes.
+	DisplayObject* dobj = mc->display_obj ? (DisplayObject*) mc->display_obj : NULL;
+	if (dobj == NULL) {
+		dobj = (DisplayObject*) HCALLOC(1, sizeof(DisplayObject));
+		mc->display_obj = dobj;
+	}
+	if (dobj->sprite_display_list == NULL) {
+		dobj->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
+		dobj->sprite_display_list =
+			(DisplayObject*) HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+		dobj->sprite_max_depth = 0;
+	}
+
+	// tagInit runs once (it owns initVarArray + the child's dictionary), then
+	// frame 1. Later frames ride the per-tick playhead below.
+	{
+		int _saved_ver = g_swf_version;
+		ASObject* _saved_global = global_object;
+		int _saved_child_init = g_child_swf_init;
+		u8 _saved_movie_id = g_current_movie_id;
+		MovieClip* _saved_ctx = g_current_context;
+		g_swf_version = entry->swf_version;
+		g_child_swf_init = 1;
+		g_current_movie_id = entry->movie_id;
+		ensureSecondaryGlobalInit(app_context, entry->swf_version);
+		if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+		else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+		actionSetCurrentContext(mc);
+		entry->init_func(app_context);
+		actionSetCurrentContext(_saved_ctx);
+		g_swf_version = _saved_ver;
+		global_object = _saved_global;
+		g_child_swf_init = _saved_child_init;
+		g_current_movie_id = _saved_movie_id;
+	}
+	// Frame 1 is NOT run here. Ruffle's movie_loader_data hands a loaded AVM1
+	// movie to the frame lifecycle rather than catching it up inline (unlike
+	// an AVM2 child root, which loader_boot_child_swf DOES catch up), so its
+	// first frame executes on the tick AFTER the load resolves.
+	// mixed_avm/avm2_loads_avm1_doabc pins it exactly: a 2-frame child over 4
+	// ticks traces frames 1,2,1 — catching up inline here yields 1,2,1,2.
+	Avm1UnderAvm2Child* c = &g_avm1u2[g_avm1u2_count++];
+	c->mc = mc;
+	c->entry = entry;
+	c->next_frame = 0;
+	c->done = 0;
+	return mc;
+}
+
+// Is `mc` a root that a dual-VM AVM1 child must not be allowed to REPLACE?
+// Two cases, both of which mixed_avm/avm2_loads_avm1_loads_into_root grades:
+// the AVM2 root's `_level0` slot (which no AVM1 movie under a Loader owns),
+// and a booted child's own level root. Flash drops both loads silently — the
+// inner SWF's DoAction never runs.
+int actionAvm1UnderAvm2IsRootTarget(MovieClip* mc)
+{
+	if (!g_avm1_under_avm2_ready || mc == NULL) return 0;
+	if (mc == &root_movieclip) return 1;
+	for (int i = 0; i < g_avm1u2_count; i++)
+		if (g_avm1u2[i].mc == mc) return 1;
+	return 0;
+}
+
+// One AVM1 tick, driven from the AVM2 frame loop. No-op until a child boots,
+// so an AVM2 movie with no AVM1 content pays a single global test per frame.
+void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context)
+{
+	if (!g_avm1_under_avm2_ready) return;
+	MovieClip* saved_ctx = g_current_context;
+	for (int i = 0; i < g_avm1u2_count; i++) {
+		Avm1UnderAvm2Child* c = &g_avm1u2[i];
+		if (c->mc == NULL || c->entry == NULL || c->done) continue;
+		if (c->mc->depth == INT_MIN || c->mc->unloaded) continue;
+		avm1UnderAvm2RunFrame(app_context, c->mc, c->entry, c->next_frame);
+		c->next_frame++;
+		if (c->next_frame >= c->entry->frame_count)
+		{
+			// A multi-frame movie loops (the child in avm2_loads_avm1_doabc
+			// re-traces frame 1); a single-frame movie's DoAction runs once.
+			if (c->entry->frame_count > 1) c->next_frame = 0;
+			else c->done = 1;
+		}
+		c->mc->currentframe = (int) c->next_frame + 1;
+	}
+	// A child's own loadMovie/loadMovieNum and its deferred unloads drain
+	// here — the AVM1 half of the tick the parent's loop otherwise never runs.
+	// (Timers deliberately stay out: nothing in the dual-VM cluster needs
+	// AVM1 setInterval, and processTimers wants a frame budget this loop has
+	// no honest value for.)
+	extern int quit_swf;
+	int saved_quit = quit_swf;
+	quit_swf = 0;
+	actionFirePendingDirectLoads(app_context);
+	actionAdvancePlayingLevels(app_context);
+	actionFirePendingUnloads(app_context);
+	quit_swf = saved_quit;
+	actionSetCurrentContext(saved_ctx);
+}
+#endif  // SWF_AVM2
+
 void actionFirePendingDirectLoads(SWFAppContext* app_context)
 {
 	int count = g_pending_direct_load_count;
@@ -23841,6 +24113,15 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		if (mc->avm1_removed || mc->pending_removal || mc->depth == INT_MIN) {
 			continue;
 		}
+#ifdef SWF_AVM2
+		// Dual-VM (session 15): an AVM1 movie sitting under an AVM2 Loader is
+		// NOT the root movie, so a load it aims at a root has nothing of its
+		// own to replace and Flash drops it silently. See
+		// actionAvm1UnderAvm2IsRootTarget. Whole statement is SWF_AVM2-only,
+		// so no AVM1 binary contains it — and the predicate is false until a
+		// dual-VM child actually boots, so a pure-AVM2 movie is unaffected.
+		if (actionAvm1UnderAvm2IsRootTarget(mc)) continue;
+#endif
 
 		// Set child SWF URL, version, movie_id, frame counts, byte_size on target MC
 		constructChildURL(mc->url, sizeof(mc->url), entry->filename);
@@ -48231,6 +48512,14 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				parseURLEncodedVars(app_context, _gu2_query, _gu2_mc);
 			}
 			// Root replacement: keep synchronous (complex state clearing)
+#ifdef SWF_AVM2
+			// …but a dual-VM AVM1 child has no root of its own to replace —
+			// see actionAvm1UnderAvm2IsRootTarget. Predicate is false in every
+			// pure-AVM2 movie and the whole arm is absent from AVM1 binaries.
+			if (actionAvm1UnderAvm2IsRootTarget(_gu2_mc)) {
+				/* dropped */
+			} else
+#endif
 			if (_gu2_mc == &root_movieclip) {
 				// Clear global variable table (parent's root-level variables)
 				freeMap();
