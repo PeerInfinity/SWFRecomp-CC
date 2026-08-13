@@ -89,6 +89,13 @@ int avm2_filter_is_filter(Avm2Context* ctx, Avm2Value v);
 // mode string. `out` is fully initialised on success.
 int avm2_filter_from_object(Avm2Context* ctx, Avm2Object* obj, Avm2FilterVal* out);
 
+// A DisplacementMapFilter's mapBitmap. Avm2FilterVal deliberately does NOT
+// carry it (it round-trips to null, exactly like ruffle), but the one consumer
+// that needs the real BitmapData -- BitmapData.applyFilter -- has the AS filter
+// object in hand, so it reads the map straight off that. Returns null for any
+// other filter kind.
+Avm2Value avm2_filter_map_bitmap(Avm2Context* ctx, Avm2Object* obj);
+
 // Quantized native value -> a BRAND NEW AS filter object (fresh every call:
 // `o.filters === o.filters` is false, and mutating what you assigned has no
 // effect on what you read back).

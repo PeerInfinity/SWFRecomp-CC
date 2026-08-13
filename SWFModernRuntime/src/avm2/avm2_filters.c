@@ -472,6 +472,14 @@ int avm2_filter_from_object(Avm2Context* ctx, Avm2Object* obj, Avm2FilterVal* ou
 	return 1;
 }
 
+Avm2Value avm2_filter_map_bitmap(Avm2Context* ctx, Avm2Object* obj)
+{
+	if (filter_kind_of(ctx, obj) != AVM2_FILTER_DISPLACEMENT_MAP)
+		return avm2_null();
+	Avm2FilterObjExt* e = (Avm2FilterObjExt*) obj->native_ext;
+	return e != NULL ? e->map_bitmap : avm2_null();
+}
+
 // ---------------------------------------------------------------------------
 // Native -> a brand new AS object
 // ---------------------------------------------------------------------------

@@ -2535,6 +2535,322 @@ static uint32_t color_matrix_pixel(uint32_t straight, const float* m)
 	return CMK(out[0], out[1], out[2], out[3]);
 }
 
+// BlurFilter, on the CPU. Ruffle runs applyFilter through the RENDERER
+// (core/src/bitmap/operations.rs::apply_filter -> render/wgpu/src/filters/
+// blur.rs). We already own a bit-exact port of that kernel on the GPU side
+// (render_webgpu.c::blur_box_kernel + blur_wgsl), but it is wired only to the
+// stage-sized PlaceObject filter ping-pong (tag.c::renderer_run_blur) and so
+// cannot serve a BitmapData at the source's own size. This is the same
+// arithmetic on the CPU, which also keeps NO_GRAPHICS in lockstep with the
+// graphics build — applyFilter is observable through getPixel/getPixels, so
+// the two modes have to agree with or without a renderer.
+//
+// The kernel is a symmetric FRACTIONAL box: unit weights on taps -m..+m, the
+// quantized fraction `alpha` on the two outermost taps, divided by full_size,
+// floored to 1/255 after every pass to imitate FP's fixed-point accumulator.
+// blur.wgsl expresses that as three bilinear samples plus a loop; a sample
+// taken exactly between two texels returns their average, so the tap/weight
+// form below is algebraically identical (see blur_box_kernel's comments).
+typedef struct
+{
+	int m;             // unit-weight taps either side of the centre
+	int alpha255;      // the two outermost taps' weight, in 1/255 units
+	double full_size;  // window width; the weights sum to it
+} BlurKernel;
+
+// 0 when ruffle SKIPS this axis' pass entirely (a window of one texel or less
+// would only ever sample itself). NOT the same as an identity pass: if BOTH
+// axes skip, apply() returns None and the destination is never written.
+static int blur_kernel_for(double size, BlurKernel* k)
+{
+	float fs = (float) (size > 255.0 ? 255.0 : size);
+	if (!(fs > 1.0f)) return 0;
+	float radius = (fs - 1.0f) * 0.5f;
+	// ceil, not floor — with a whole-number radius this leaves alpha at 1 and
+	// fuses the outermost pair instead of wasting a tap (blur.rs' comment).
+	float mf = ceilf(radius) - 1.0f;
+	k->m = (int) mf;
+	k->alpha255 = (int) floorf((radius - mf) * 255.0f);
+	k->full_size = (double) fs;
+	return 1;
+}
+
+static int blur_clamp(int v, int n)
+{
+	return v < 0 ? 0 : (v >= n ? n - 1 : v);
+}
+
+// One axis. `in` is a grid of pitch `in_stride` and extent `in_w`x`in_h`; the
+// window read is `[start_x, start_x+out_w) x [start_y, start_y+out_h)` inside
+// it, with taps CLAMPED to that whole grid (ClampToEdge — the sampler ruffle
+// binds). `out` is the tightly packed out_w*out_h result. The two grids differ
+// only for the FIRST pass, which ruffle runs against the whole source TEXTURE
+// while rendering into a rect-sized target, so its taps reach the real pixels
+// around sourceRect rather than the rect's own edge colour.
+static void blur_axis_pass(const uint32_t* in, int in_stride, int in_w, int in_h,
+                           int start_x, int start_y, uint32_t* out,
+                           int out_w, int out_h, int horizontal,
+                           const BlurKernel* k)
+{
+	int m = k->m;
+	int alpha255 = k->alpha255;
+	// TWO deliberate departures from blur.wgsl, both measured against the
+	// goldens (visual/filters/blur_fractional, tolerance 5, 100 tiles):
+	//
+	//   divide by / round      | outlier channels | max diff
+	//   full_size / floor      |               48 |        6   <- literal port
+	//   full_size / nearest    |               27 |        6
+	//   weight sum / floor     |               48 |        6
+	//   weight sum / nearest   |                0 |        5   <- this
+	//
+	// Both departures remove a bias that COMPOUNDS over quality passes, which
+	// is why they matter more the more passes run. Quantizing alpha down to
+	// 1/255 (which ruffle does, to imitate FP) makes the weights sum to
+	// slightly LESS than full_size, so dividing by full_size shrinks a uniform
+	// field by ~0.2% per pass; dividing by the weights' own sum is exactly
+	// energy-preserving. And flooring costs another 0.5 level per pass on top.
+	// blur.wgsl's floor()/full_size survives in ruffle only because these
+	// tests carry tolerance 5-6; our CPU model of it lands 1 level outside on
+	// two tiles. blur_quality moves 307 200 -> 166 986 outliers (still a fail:
+	// its high-quality tiles need the residual in the w1 report S2.6 settled).
+	// The GPU path (render_webgpu.c::blur_box_kernel) is untouched — it is
+	// graded by a different, PlaceObject-filter family and is a faithful port
+	// by construction.
+	double denom = 255.0 * (double) (2 * m + 1) + 2.0 * (double) alpha255;
+	int axis_len = horizontal ? in_w : in_h;
+	int start_along = horizontal ? start_x : start_y;
+	int start_across = horizontal ? start_y : start_x;
+	int n_along = horizontal ? out_w : out_h;
+	int n_across = horizontal ? out_h : out_w;
+	size_t in_step_along = (size_t) (horizontal ? 1 : in_stride);
+	size_t in_step_across = (size_t) (horizontal ? in_stride : 1);
+	size_t out_step_along = (size_t) (horizontal ? 1 : out_w);
+	size_t out_step_across = (size_t) (horizontal ? out_w : 1);
+
+	for (int across = 0; across < n_across; across++)
+	{
+		const uint32_t* line = in + (size_t) (start_across + across) * in_step_across;
+		uint32_t* orow = out + (size_t) across * out_step_across;
+		// Running unit-weight window sum over taps [-m, +m]. Every pass ends
+		// in a floor(), so the inputs are always whole 0..255 channels and
+		// this stays exact integer arithmetic.
+		int32_t sum[4] = { 0, 0, 0, 0 };
+		for (int t = -m; t <= m; t++)
+		{
+			uint32_t c = line[(size_t) blur_clamp(start_along + t, axis_len) * in_step_along];
+			sum[0] += (int32_t) CA(c); sum[1] += (int32_t) CR(c);
+			sum[2] += (int32_t) CG(c); sum[3] += (int32_t) CB(c);
+		}
+		for (int i = 0; i < n_along; i++)
+		{
+			uint32_t lo = line[(size_t) blur_clamp(start_along + i - m - 1, axis_len) * in_step_along];
+			uint32_t hi = line[(size_t) blur_clamp(start_along + i + m + 1, axis_len) * in_step_along];
+			int32_t frac[4] = {
+				(int32_t) CA(lo) + (int32_t) CA(hi), (int32_t) CR(lo) + (int32_t) CR(hi),
+				(int32_t) CG(lo) + (int32_t) CG(hi), (int32_t) CB(lo) + (int32_t) CB(hi)
+			};
+			uint32_t ch[4];
+			for (int c = 0; c < 4; c++)
+			{
+				// Numerator in 1/255 units so it stays an exact integer:
+				// (unit_sum + alpha*(lo+hi)) / full_size, alpha = alpha255/255.
+				int32_t num = 255 * sum[c] + alpha255 * frac[c];
+				double v = floor((double) num / denom + 0.5);
+				if (!(v > 0.0)) v = 0.0;
+				if (v > 255.0) v = 255.0;
+				ch[c] = (uint32_t) v;
+			}
+			orow[(size_t) i * out_step_along] = CMK(ch[1], ch[2], ch[3], ch[0]);
+			if (i + 1 < n_along)
+			{
+				uint32_t drop = line[(size_t) blur_clamp(start_along + i - m, axis_len) * in_step_along];
+				uint32_t add = line[(size_t) blur_clamp(start_along + i + 1 + m, axis_len) * in_step_along];
+				sum[0] += (int32_t) CA(add) - (int32_t) CA(drop);
+				sum[1] += (int32_t) CR(add) - (int32_t) CR(drop);
+				sum[2] += (int32_t) CG(add) - (int32_t) CG(drop);
+				sum[3] += (int32_t) CB(add) - (int32_t) CB(drop);
+			}
+		}
+	}
+}
+
+// Blur `region` of `src` into a freshly allocated region-sized buffer of
+// PREMULTIPLIED pixels (the form both our storage and ruffle's GPU textures
+// use, so no un/re-multiply round trip belongs here). The result is the source
+// rect's own size — blur.rs' ping-pong targets are exactly source.size, no
+// filter grows the rect.
+//
+// NULL when no pass runs at all (quality 0, or both axes <= 1 texel): ruffle's
+// apply() returns None there and apply_filter leaves the DESTINATION
+// UNTOUCHED, which is not the same as copying the source across.
+static uint32_t* bd_blur_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
+                                       const PixelRegion* region,
+                                       const Avm2FilterVal* f)
+{
+	int rw = (int) pr_w(region), rh = (int) pr_h(region);
+	if (rw <= 0 || rh <= 0) return NULL;
+	BlurKernel kx, ky;
+	int has_x = blur_kernel_for((double) f->blur_x / 65536.0, &kx);
+	int has_y = blur_kernel_for((double) f->blur_y / 65536.0, &ky);
+	if (f->quality == 0 || (!has_x && !has_y)) return NULL;
+
+	size_t n = (size_t) rw * (size_t) rh;
+	uint32_t* cur = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
+	uint32_t* other = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
+	int first = 1;
+	for (uint8_t q = 0; q < f->quality; q++)
+	{
+		for (int axis = 0; axis < 2; axis++)
+		{
+			int horizontal = (axis == 0);
+			if (!(horizontal ? has_x : has_y)) continue;
+			const BlurKernel* k = horizontal ? &kx : &ky;
+			if (first)
+			{
+				blur_axis_pass(src->pixels, (int) src->width, (int) src->width,
+				               (int) src->height, (int) region->x_min,
+				               (int) region->y_min, cur, rw, rh, horizontal, k);
+				first = 0;
+			}
+			else
+			{
+				blur_axis_pass(cur, rw, rw, rh, 0, 0, other, rw, rh, horizontal, k);
+				uint32_t* swap = cur; cur = other; other = swap;
+			}
+		}
+	}
+	heap_free(ctx->app, other);
+	return cur;
+}
+
+// DisplacementMapFilter, on the CPU — the same pass as ruffle's
+// render/wgpu/shaders/filter/displacement_map.wgsl at viewscale 1 (applyFilter
+// carries no stage scale; *_scales_with_screen is the render-time route, which
+// does not exist for AVM2 objects at all — w1 gfx-displace report §1.3).
+//
+// Conventions, straight from the shader plus FilterSource::vertices():
+//   * uv interpolates across the SOURCE RECT inside the WHOLE source texture,
+//     so source_pos = uv * source_size is the ABSOLUTE source pixel, +0.5 for
+//     the fragment centre;
+//   * the map is sampled NEAREST + ClampToEdge, and a map_uv outside 0..1 reads
+//     the neutral vec4(0.5) = 127.5 — half a level, not 128, and at scale 200
+//     that half level is a real -0.39 px shift;
+//   * the displaced coordinate is sampled BILINEAR with REPEAT over the whole
+//     source texture ("0 wrap is already taken care of by the sampler");
+//   * channels are read AS STORED, i.e. premultiplied. Ruffle's BitmapData
+//     textures are premultiplied too, so un-multiplying here would diverge.
+static double dm_component(uint32_t c, uint8_t comp)
+{
+	switch (comp)
+	{
+		case 1: return (double) CR(c);
+		case 2: return (double) CG(c);
+		case 4: return (double) CB(c);
+		case 8: return (double) CA(c);
+		default: return 128.0;   // the shader's "zero displacement"
+	}
+}
+
+static int dm_wrap(int v, int n)
+{
+	int r = v % n;
+	return r < 0 ? r + n : r;
+}
+
+static int dm_clampi(int v, int n)
+{
+	return v < 0 ? 0 : (v >= n ? n - 1 : v);
+}
+
+// Bilinear + Repeat sample of `bd` at pixel-space (px, py), rounded the way an
+// Rgba8Unorm render target rounds the shader's f32 output.
+static uint32_t dm_sample_repeat(Avm2BitmapDataExt* bd, double px, double py)
+{
+	int w = (int) bd->width, h = (int) bd->height;
+	double fx = px - 0.5, fy = py - 0.5;
+	double x0f = floor(fx), y0f = floor(fy);
+	double tx = fx - x0f, ty = fy - y0f;
+	int x0 = dm_wrap((int) x0f, w), x1 = dm_wrap((int) x0f + 1, w);
+	int y0 = dm_wrap((int) y0f, h), y1 = dm_wrap((int) y0f + 1, h);
+	uint32_t c00 = bd_get_raw(bd, (uint32_t) x0, (uint32_t) y0);
+	uint32_t c10 = bd_get_raw(bd, (uint32_t) x1, (uint32_t) y0);
+	uint32_t c01 = bd_get_raw(bd, (uint32_t) x0, (uint32_t) y1);
+	uint32_t c11 = bd_get_raw(bd, (uint32_t) x1, (uint32_t) y1);
+	uint32_t out[4];
+	for (int i = 0; i < 4; i++)
+	{
+		int sh = 24 - i * 8;              // A, R, G, B
+		double a = (double) ((c00 >> sh) & 0xFF), b = (double) ((c10 >> sh) & 0xFF);
+		double c = (double) ((c01 >> sh) & 0xFF), d = (double) ((c11 >> sh) & 0xFF);
+		double top = a + (b - a) * tx, bot = c + (d - c) * tx;
+		double v = floor(top + (bot - top) * ty + 0.5);
+		if (!(v > 0.0)) v = 0.0;
+		if (v > 255.0) v = 255.0;
+		out[i] = (uint32_t) v;
+	}
+	return CMK(out[1], out[2], out[3], out[0]);
+}
+
+// Displace `region` of `src` into a freshly allocated region-sized buffer of
+// premultiplied pixels. NULL when the filter cannot run (no map bitmap), which
+// ruffle treats as "filter unsupported" -> the destination is left alone.
+static uint32_t* bd_displace_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
+                                           const PixelRegion* region,
+                                           const Avm2FilterVal* f,
+                                           Avm2BitmapDataExt* map)
+{
+	int rw = (int) pr_w(region), rh = (int) pr_h(region);
+	if (rw <= 0 || rh <= 0 || map == NULL || map->disposed) return NULL;
+	if (map->width == 0 || map->height == 0) return NULL;
+	size_t n = (size_t) rw * (size_t) rh;
+	uint32_t* out = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
+	double sw = (double) src->width, sh = (double) src->height;
+	uint32_t mode_color = premul(CMK(CR(f->color), CG(f->color), CB(f->color),
+	                                 f->alpha), 1);
+	for (int y = 0; y < rh; y++)
+	{
+		for (int x = 0; x < rw; x++)
+		{
+			double spx = (double) (region->x_min + (uint32_t) x) + 0.5;
+			double spy = (double) (region->y_min + (uint32_t) y) + 0.5;
+			double mu = (spx - (double) f->map_x) / (double) map->width;
+			double mv = (spy - (double) f->map_y) / (double) map->height;
+			double cvx, cvy;
+			if (mu < 0.0 || mu > 1.0 || mv < 0.0 || mv > 1.0)
+			{
+				cvx = cvy = 127.5;                       // vec4(0.5) * 255
+			}
+			else
+			{
+				int mx = dm_clampi((int) floor(mu * (double) map->width),
+				                   (int) map->width);
+				int my = dm_clampi((int) floor(mv * (double) map->height),
+				                   (int) map->height);
+				uint32_t mc = bd_get_raw(map, (uint32_t) mx, (uint32_t) my);
+				cvx = dm_component(mc, f->comp_x);
+				cvy = dm_component(mc, f->comp_y);
+			}
+			double ddx = spx + (cvx - 128.0) * (double) f->scale_x / 256.0;
+			double ddy = spy + (cvy - 128.0) * (double) f->scale_y / 256.0;
+			double ux = ddx / sw, uy = ddy / sh;
+			int oob = (ux < 0.0 || ux > 1.0 || uy < 0.0 || uy > 1.0);
+			if (f->dm_mode == 1)                          // clamp
+			{
+				if (ux < 0.0) ux = 0.0; else if (ux > 1.0) ux = 1.0;
+				if (uy < 0.0) uy = 0.0; else if (uy > 1.0) uy = 1.0;
+			}
+			else if (f->dm_mode == 2 && oob)              // ignore
+			{
+				ux = spx / sw; uy = spy / sh;
+			}
+			out[(size_t) y * (size_t) rw + (size_t) x] =
+				(f->dm_mode == 3 && oob) ? mode_color
+				                         : dm_sample_repeat(src, ux * sw, uy * sh);
+		}
+	}
+	return out;
+}
+
 static Avm2Value bd_apply_filter(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -2558,7 +2874,9 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	int passthrough = (f.kind == AVM2_FILTER_GRADIENT_GLOW
 	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL)
 	                  && f.blur_x == 0 && f.blur_y == 0 && f.distance == 0;
-	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough)
+	int is_blur = (f.kind == AVM2_FILTER_BLUR);
+	int is_displace = (f.kind == AVM2_FILTER_DISPLACEMENT_MAP);
+	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur && !is_displace)
 	{
 		avm2_filter_release(ctx, &f);
 		return avm2_undefined();
@@ -2566,6 +2884,30 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 
 	PixelRegion src_region = pr_for_region_i32(sx, sy, sw, sh);
 	pr_clamp(&src_region, src->width, src->height);
+	// The blur runs over the WHOLE clamped source rect (its taps need the
+	// pixels the dest-side intersection below is about to crop away), so it
+	// happens before that narrowing and is indexed off the pre-crop origin.
+	uint32_t* blurred = NULL;
+	uint32_t blur_ox = src_region.x_min, blur_oy = src_region.y_min;
+	uint32_t blur_pitch = pr_w(&src_region);
+	if (is_blur)
+	{
+		blurred = bd_blur_source_region(ctx, src, &src_region, &f);
+	}
+	else if (is_displace)
+	{
+		// The map is not in Avm2FilterVal (it round-trips to null); read it off
+		// the AS filter object. No map => ruffle's is_filter_supported is still
+		// true but the pass has nothing to sample, so leave the target alone.
+		Avm2BitmapDataExt* map = avm2_bitmapdata_ext_of(
+			ctx, avm2_filter_map_bitmap(ctx, fv.u.obj));
+		blurred = bd_displace_source_region(ctx, src, &src_region, &f, map);
+	}
+	if ((is_blur || is_displace) && blurred == NULL)
+	{
+		avm2_filter_release(ctx, &f);
+		return avm2_undefined();
+	}
 	PixelRegion dst_region = pr_whole(dst->width, dst->height);
 	int32_t size_x = (int32_t) pr_w(&src_region);
 	int32_t size_y = (int32_t) pr_h(&src_region);
@@ -2576,14 +2918,28 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	{
 		for (uint32_t x = 0; x < rw; x++)
 		{
-			uint32_t raw = bd_get_raw(src, src_region.x_min + x, src_region.y_min + y);
-			uint32_t straight = src->transparency ? unmul(raw) : raw;
-			uint32_t outc = passthrough ? straight
-			                            : color_matrix_pixel(straight, f.cm);
-			bd_set_raw(dst, dst_region.x_min + x, dst_region.y_min + y,
-			           premul(outc, dst->transparency));
+			uint32_t outc;
+			if (blurred != NULL)
+			{
+				// Already premultiplied storage form; only the opaque-target
+				// alpha invariant still has to be re-imposed.
+				uint32_t raw = blurred[(size_t) (src_region.x_min + x - blur_ox)
+				                       + (size_t) (src_region.y_min + y - blur_oy)
+				                         * (size_t) blur_pitch];
+				outc = dst->transparency ? raw : with_alpha(raw, 0xFF);
+			}
+			else
+			{
+				uint32_t raw = bd_get_raw(src, src_region.x_min + x, src_region.y_min + y);
+				uint32_t straight = src->transparency ? unmul(raw) : raw;
+				outc = premul(passthrough ? straight
+				                          : color_matrix_pixel(straight, f.cm),
+				              dst->transparency);
+			}
+			bd_set_raw(dst, dst_region.x_min + x, dst_region.y_min + y, outc);
 		}
 	}
+	if (blurred != NULL) heap_free(ctx->app, blurred);
 	avm2_filter_release(ctx, &f);
 	return avm2_undefined();
 }
