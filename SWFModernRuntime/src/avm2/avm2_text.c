@@ -6863,10 +6863,19 @@ static Avm2Value tl_get_specified_width(Avm2Activation* act)
 	return avm2_number(tl != NULL ? tl->specified_width : 0.0);
 }
 
+// The SCRIPT-VISIBLE block link. `validity = "static"` hides it forever, but
+// the INTERNAL `text_block` back-edge survives — a static line is still in its
+// block's chain and is still releasable (textblock_releaselines sets line1 to
+// "static" and then expects releaseLines(line1, line2) to succeed).
+static Avm2Object* tl_script_block(const Avm2TextLineExt* tl)
+{
+	return tl->hide_block_from_script ? NULL : tl->text_block;
+}
+
 static Avm2Value tl_get_text_block(Avm2Activation* act)
 {
 	Avm2TextLineExt* tl = this_tl(act);
-	return tl != NULL ? fte_obj_or_null(tl->text_block) : avm2_null();
+	return tl != NULL ? fte_obj_or_null(tl_script_block(tl)) : avm2_null();
 }
 
 static Avm2Value tl_set_text_block(Avm2Activation* act)
@@ -6922,12 +6931,12 @@ static Avm2Value tl_set_validity(Avm2Activation* act)
 	if (!ok) throw_2008(ctx, "validity");
 	tl->validity = s;
 	// TextLineValidity.STATIC means "still valid, but the TextBlock no longer
-	// holds a reference to it" — so the transition INTO "static" releases the
-	// line from its block and `textBlock` reads back null. Only the exact
-	// string "static" does this; "invalid" (and any user string) leaves the
-	// back-edge alone. Graded by textblock_line_changes, whose oracle and
-	// output.ruffle.txt agree on all six lines.
-	if (str_is(s, "static")) tl->text_block = NULL;
+	// hands it out" — so the transition INTO "static" makes `textBlock` read
+	// back null WITHOUT unlinking the line (Ruffle's hide_block_from_script).
+	// Only the exact string "static" does this; "invalid" (and any user string)
+	// leaves the flag alone. Graded by textblock_line_changes /
+	// textblock_releaselines.
+	if (str_is(s, "static")) tl->hide_block_from_script = 1;
 	return avm2_undefined();
 }
 
@@ -6993,6 +7002,12 @@ typedef struct Avm2TextBlockExt
 static Avm2TextBlockExt* this_tb(Avm2Activation* act)
 {
 	return (Avm2TextBlockExt*) this_ext_of(act, g_textblock_class);
+}
+
+static Avm2TextBlockExt* textblock_ext_of(Avm2Object* o)
+{
+	return obj_is_class(o, g_textblock_class) ? (Avm2TextBlockExt*) o->native_ext
+	                                          : NULL;
 }
 
 static Avm2Value tb_get_apply_nlfs(Avm2Activation* act)
@@ -7194,6 +7209,25 @@ static Avm2Value tb_get_first_line(Avm2Activation* act)
 	return tb != NULL ? fte_obj_or_null(tb->first_line) : avm2_null();
 }
 
+// `lastLine` is the TAIL of the firstLine->nextLine chain, not the newest line
+// and not firstLine. (It used to alias firstLine, which only ever agreed with
+// the fixtures because Ruffle's own lastLine was equally wrong before
+// upstream 7af53788a rewrote textblock_line_changes' expectations.)
+static Avm2Value tb_get_last_line(Avm2Activation* act)
+{
+	Avm2TextBlockExt* tb = this_tb(act);
+	if (tb == NULL) return avm2_null();
+	Avm2Object* last = NULL;
+	for (Avm2Object* l = tb->first_line; l != NULL; )
+	{
+		last = l;
+		Avm2TextLineExt* le = textline_ext_of(l);
+		if (le == NULL) break;
+		l = le->next_line;
+	}
+	return fte_obj_or_null(last);
+}
+
 static Avm2Value tb_get_user_data(Avm2Activation* act)
 {
 	Avm2TextBlockExt* tb = this_tb(act);
@@ -7270,10 +7304,10 @@ static Avm2Value tb_ctor(Avm2Activation* act)
 }
 
 // --- the layout core -------------------------------------------------------
-// createTextLine splits on '\n' and NOTHING else: `width` is recorded as
-// specifiedWidth and never consulted for breaking, '\r' is not a break, the
-// break keeps its '\n', and a trailing empty segment yields no line. No graded
-// line reads textWidth/ascent/atomCount, so no glyph or font resolution is
+// createTextLine splits on line separators and NOTHING else: `width` is
+// recorded as specifiedWidth and never consulted for breaking, the break keeps
+// its separator, and a trailing empty segment yields no line. No graded line
+// reads textWidth/ascent/atomCount, so no glyph or font resolution is
 // involved — lines are created successfully against a font that cannot resolve.
 
 static _Noreturn void tb_throw_2004_via_throwerror(Avm2Context* ctx)
@@ -7283,14 +7317,40 @@ static _Noreturn void tb_throw_2004_via_throwerror(Avm2Context* ctx)
 	fte_throw_2004(ctx);
 }
 
-// Index just past the next '\n' at or after `start`, else the end.
+// Index (in UTF-16 code units) just past the next line separator at or after
+// `start`, else the end of the text. FTE breaks on LF, CR, CRLF (ONE break, two
+// units), U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR; the separator
+// stays in the line it terminates. `width` is never consulted for breaking, so
+// no glyph or font resolution is involved. Graded by textline_raw_text_length.
 static uint32_t next_line_break(const Avm2String* s, uint32_t start)
 {
-	for (uint32_t i = start; i < s->len; i++)
+	uint32_t i = u16_to_byte(s, start);
+	uint32_t u = start;
+	while (i < s->len)
 	{
-		if (s->utf8[i] == '\n') return i + 1;
+		unsigned char c = (unsigned char) s->utf8[i];
+		uint32_t nb, nu;
+		if (c < 0x80) { nb = 1; nu = 1; }
+		else if (c < 0xE0) { nb = 2; nu = 1; }
+		else if (c < 0xF0) { nb = 3; nu = 1; }
+		else { nb = 4; nu = 2; }
+		if (c == '\n') return u + 1;
+		if (c == '\r')
+		{
+			return (i + 1 < s->len && s->utf8[i + 1] == '\n') ? u + 2 : u + 1;
+		}
+		// U+2028 = E2 80 A8, U+2029 = E2 80 A9.
+		if (nb == 3 && c == 0xE2 && i + 2 < s->len
+		    && (unsigned char) s->utf8[i + 1] == 0x80
+		    && (((unsigned char) s->utf8[i + 2] == 0xA8)
+		        || ((unsigned char) s->utf8[i + 2] == 0xA9)))
+		{
+			return u + 1;
+		}
+		i += nb;
+		u += nu;
 	}
-	return s->len;
+	return u;
 }
 
 // FP reports the null-elementFormat case the way it reports an UNCAUGHT
@@ -7321,16 +7381,19 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
 	}
 	const Avm2String* text = ce_text_of(ctx, tb->content);
 	if (text == NULL) text = empty_string(ctx);
+	// Every index below is a UTF-16 code-unit offset (what textBlockBeginIndex
+	// and rawTextLength report), NOT a byte offset into the UTF-8 storage.
 	Avm2TextLineExt* pl = prev != NULL ? textline_ext_of(prev) : NULL;
+	uint32_t text_u16 = u16_length(text);
 	uint32_t pos = pl != NULL ? pl->end_index : 0;
-	if (pos > text->len)
+	if (pos > text_u16)
 	{
 		// The content shrank under a previously created line.
 		tb->creation_result = fte_lit(ctx, "complete");
 		return avm2_null();
 	}
 	uint32_t next = next_line_break(text, pos);
-	if (text->len == 0 || (next == text->len && pos == next))
+	if (text_u16 == 0 || (next == text_u16 && pos == next))
 	{
 		tb->creation_result = fte_lit(ctx, "complete");
 		return avm2_null();
@@ -7341,8 +7404,9 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
 	tl->user_data = avm2_undefined();
 	tl->validity = fte_lit(ctx, "valid");
 	tl->text_block = self;
+	tl->hide_block_from_script = 0;
 	tl->specified_width = width;
-	tl->raw_text_length = text->len;   // the WHOLE block text
+	tl->raw_text_length = next - pos;   // THIS line's substring
 	tl->begin_index = pos;
 	tl->end_index = next;
 	tl->line_index = pl != NULL ? pl->line_index + 1 : 0;
@@ -7376,9 +7440,11 @@ static Avm2Value tb_create_text_line(Avm2Activation* act)
 	Avm2Object* prev = pv.kind == AVM2_VALUE_OBJECT ? pv.u.obj : NULL;
 	if (prev != NULL)
 	{
+		// Ruffle writes this check in AS as `previousLine.textBlock !== this`,
+		// so it sees the SCRIPT-visible link: a "static" previousLine is #2004.
 		Avm2TextLineExt* pl = textline_ext_of(prev);
 		if (pl == NULL || !str_is(pl->validity, "valid")
-		    || pl->text_block != this_obj(act))
+		    || tl_script_block(pl) != this_obj(act))
 		{
 			tb_throw_2004_via_throwerror(ctx);
 		}
@@ -7412,7 +7478,7 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 	Avm2TextLineExt* pl = prev != NULL ? textline_ext_of(prev) : NULL;
 	if (prev != NULL
 	    && (pl == NULL || !str_is(pl->validity, "valid")
-	        || pl->text_block != this_obj(act)))
+	        || tl_script_block(pl) != this_obj(act)))
 	{
 		tb_throw_2004_via_throwerror(ctx);
 	}
@@ -7426,6 +7492,7 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 	// without this the chain fails its own #2004 argument check.
 	tl->validity = fte_lit(ctx, "valid");
 	tl->text_block = this_obj(act);
+	tl->hide_block_from_script = 0;
 	tl->specified_width = width;
 	tl->previous_line = prev;
 	if (pl != NULL) pl->next_line = tlv.u.obj;
@@ -7437,21 +7504,97 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 	return tlv;
 }
 
+// TextLine::release() (Ruffle core/src/display_object/text_line.rs): the whole
+// TAIL of the chain dies with the line — successors are invalidated BEFORE the
+// unlink — and the line itself is detached from its block. `validity` is
+// assigned directly, bypassing tl_set_validity's state machine (a "static" line
+// is releasable, and the machine forbids static -> invalid). The
+// hide_block_from_script flag is deliberately NOT cleared: a released static
+// line keeps reporting a null textBlock.
+static void tl_release(Avm2Context* ctx, Avm2Object* line)
+{
+	Avm2TextLineExt* tl = textline_ext_of(line);
+	if (tl == NULL) return;
+	Avm2TextBlockExt* tb = textblock_ext_of(tl->text_block);
+	Avm2Object* prev = tl->previous_line;
+	Avm2Object* next = tl->next_line;
+	const Avm2String* invalid = fte_lit(ctx, "invalid");
+	if (tb != NULL && tb->first_line == line) tb->first_line = next;
+	tl->validity = invalid;
+	for (Avm2Object* l = next; l != NULL; )
+	{
+		Avm2TextLineExt* le = textline_ext_of(l);
+		if (le == NULL) break;
+		le->validity = invalid;
+		l = le->next_line;
+	}
+	if (prev != NULL)
+	{
+		Avm2TextLineExt* pe = textline_ext_of(prev);
+		if (pe != NULL) pe->next_line = next;
+	}
+	if (next != NULL)
+	{
+		Avm2TextLineExt* ne = textline_ext_of(next);
+		if (ne != NULL) ne->previous_line = prev;
+	}
+	tl->text_block = NULL;
+	tl->previous_line = NULL;
+	tl->next_line = NULL;
+}
+
+// releaseLines(firstLine, lastLine) — Ruffle
+// avm2/globals/flash/text/engine/text_block.rs. Both arguments are looked up by
+// REACHABILITY from `firstLine`, in chain order, so the argument order is
+// irrelevant by construction and a line of another block (or one already
+// unlinked) is #2004. Being native, it throws with no `Error$/throwError()`
+// frame — unlike createTextLine; cf. textblock_releaselines' 20 graded traces.
 static Avm2Value tb_release_lines(Avm2Activation* act)
 {
+	Avm2Context* ctx = act->ctx;
+	Avm2Value av = arg_or_undef(act, 0);
+	Avm2Value bv = arg_or_undef(act, 1);
+	Avm2Object* a = av.kind == AVM2_VALUE_OBJECT ? av.u.obj : NULL;
+	Avm2Object* b = bv.kind == AVM2_VALUE_OBJECT ? bv.u.obj : NULL;
+	if (a == NULL) throw_2007(ctx, "firstLine");
+	if (b == NULL) throw_2007(ctx, "lastLine");
 	Avm2TextBlockExt* tb = this_tb(act);
-	Avm2Value start = arg_or_undef(act, 0);
-	Avm2Value end = arg_or_undef(act, 1);
-	if (tb == NULL || !avm2_strict_eq(start, end)
-	    || end.kind != AVM2_VALUE_OBJECT || end.u.obj != tb->first_line)
+	if (tb == NULL) fte_throw_2004(ctx);
+	Avm2Object* first = NULL;
+	for (Avm2Object* l = tb->first_line; l != NULL; )
 	{
-		return avm2_undefined();   // multi-line release is unimplemented
+		if (l == a || l == b) { first = l; break; }
+		Avm2TextLineExt* le = textline_ext_of(l);
+		if (le == NULL) break;
+		l = le->next_line;
 	}
-	Avm2TextLineExt* tl = textline_ext_of(tb->first_line);
-	if (tl != NULL)
+	if (first == NULL) fte_throw_2004(ctx);
+	// The single-line form is checked for reachability FIRST, then released.
+	if (a == b)
 	{
-		tl->validity = fte_lit(act->ctx, "invalid");
-		tl->text_block = NULL;
+		tl_release(ctx, a);
+		return avm2_undefined();
+	}
+	uint32_t count = 0;
+	{
+		Avm2TextLineExt* fe = textline_ext_of(first);
+		Avm2Object* l = fe != NULL ? fe->next_line : NULL;
+		for (uint32_t k = 2; l != NULL; k++)
+		{
+			if (l == a || l == b) { count = k; break; }
+			Avm2TextLineExt* le = textline_ext_of(l);
+			if (le == NULL) break;
+			l = le->next_line;
+		}
+	}
+	if (count == 0) fte_throw_2004(ctx);
+	// Each release rewrites the chain, so carry the successor forward.
+	for (Avm2Object* cur = first; cur != NULL && count > 0; count--)
+	{
+		Avm2TextLineExt* ce = textline_ext_of(cur);
+		Avm2Object* nxt = ce != NULL ? ce->next_line : NULL;
+		tl_release(ctx, cur);
+		cur = nxt;
 	}
 	return avm2_undefined();
 }
@@ -7731,7 +7874,7 @@ static void fte_register_value_objects(Avm2Context* ctx)
 	                        tb_get_creation_result);
 	avm2_builtin_add_getter(ctx, tb, "firstInvalidLine", tl_const_null);
 	avm2_builtin_add_getter(ctx, tb, "firstLine", tb_get_first_line);
-	avm2_builtin_add_getter(ctx, tb, "lastLine", tb_get_first_line);
+	avm2_builtin_add_getter(ctx, tb, "lastLine", tb_get_last_line);
 	avm2_builtin_add_method(ctx, tb, "createTextLine", tb_create_text_line);
 	avm2_builtin_add_method(ctx, tb, "recreateTextLine", tb_recreate_text_line);
 	avm2_builtin_add_method(ctx, tb, "releaseLines", tb_release_lines);

@@ -829,10 +829,13 @@ typedef struct Avm2TextLineExt
 	Avm2Value user_data;
 	const Avm2String* validity;
 	double specified_width;
-	uint32_t raw_text_length;       // the WHOLE block text, not this line's
-	uint32_t begin_index;
-	uint32_t end_index;
+	uint32_t raw_text_length;       // THIS line's substring, in UTF-16 units
+	uint32_t begin_index;           // UTF-16 code-unit offset into the block text
+	uint32_t end_index;             // UTF-16 code-unit offset into the block text
 	uint32_t line_index;
+	// validity = "static" hides the block from SCRIPT while the line stays in
+	// the block's chain (still walkable, still releasable) — see avm2_text.c.
+	uint8_t hide_block_from_script;
 } Avm2TextLineExt;
 // Wire the FTE surface onto the TextLine class shell (created by
 // avm2_register_display so it gets the concrete display alloc hook).
