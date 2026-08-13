@@ -141,7 +141,12 @@ mcl_replace_root_swf7_to_swf6
 movieclip_library_state_values
 native_objects_swf6
 tab_ordering_properties_tab_index_edge_case
-watch_virtual_property
+# It was listed here with no ACCEPTED_DIFFS.md entry to back it up, and the
+# diff was fixable: actionSetVariable's `_global` addProperty-setter branch
+# returned before ever consulting the timeline watch table, so the watcher
+# never fired on a watched name that also carried an addProperty accessor.
+# Now a byte-exact PASS against output.txt (the Flash oracle), 60/60 lines —
+# not merely ruffle_matched. Do not re-add.
 
 # --- Shape hit test accuracy limits ---
 # 329/338 lines pass. Remaining 9 diffs at exact geometric boundaries:

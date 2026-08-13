@@ -4411,6 +4411,26 @@ static ActionVar builtin_object_unwatch(SWFAppContext* app_context, ActionVar* a
 			}
 		}
 	}
+	// s15 w2-watch-order: same rule on the TIMELINE arm. A bare
+	// `addProperty(name, ...)` installs the accessor on `_global` (see
+	// actionCallFunction), so the timeline analogue of "this name is currently
+	// a getter-setter" is an own accessor property there. avm1/watch_virtual_property
+	// pins it: `unwatch("variable")` traces `false` and the watcher keeps
+	// firing on every later assignment.
+	else {
+		extern ASObject* global_object;
+		if (global_object != NULL) {
+			for (u32 i = 0; i < global_object->num_used; i++) {
+				if (global_object->properties[i].name_length == prop_name_len &&
+				    strncmp(global_object->properties[i].name, prop_name, prop_name_len) == 0) {
+					if (global_object->properties[i].getter != NULL ||
+					    global_object->properties[i].setter != NULL)
+						return ret; // false — can't unwatch a getter-setter
+					break;
+				}
+			}
+		}
+	}
 	for (int i = 0; i < g_watch_count; i++) {
 		if (g_watch_table[i].obj == obj &&
 		    g_watch_table[i].mc == mc &&
@@ -43542,6 +43562,116 @@ check_special_vars:
 	#undef _CMP_BUILTIN_NAME
 }
 
+// ---------------------------------------------------------------------------
+// s15 w2-watch-order: watch dispatch must PRECEDE the virtual-setter walk.
+//
+// Ruffle `Object::set_internal` (core/src/avm1/object.rs) calls `call_watcher()`
+// FIRST, folds the watcher's return value into the value being assigned, and
+// only then crawls for a virtual setter; `ScriptObject::set_local` afterwards
+// stores that value into the property's data slot *unconditionally*, even when
+// a setter ran (the setter's "ignoring" of the value is invisible to the raw
+// slot). Our `actionSetVariable` took the `_global` addProperty-setter branch
+// and returned before it ever reached the timeline watch table, so a watched
+// timeline name that also carried an addProperty getter/setter never fired its
+// watcher at all (avm1/watch_virtual_property: every `plusOne:` line missing).
+//
+// These three helpers are used ONLY from that branch (plus the bare
+// `addProperty()` / `unwatch()` builtins) and are deliberately self-contained
+// so the surrounding dispatch is untouched when no watcher is registered.
+//
+// Naming prefix `svwo_` (SetVariable Watch Order) keeps them out of the way of
+// concurrently-edited neighbours.
+
+// The timeline watch table row for (mc, name), or NULL. Timeline rows are the
+// ones with `obj == NULL` (object rows are keyed by ASObject*).
+static WatchEntry* svwo_timelineWatchEntry(MovieClip* mc, const char* name, u32 len)
+{
+	if (mc == NULL || name == NULL) return NULL;
+	for (int i = 0; i < g_watch_count; i++)
+	{
+		if (g_watch_table[i].obj == NULL && g_watch_table[i].mc == mc &&
+		    g_watch_table[i].prop_name_len == len &&
+		    strncmp(g_watch_table[i].prop_name, name, len) == 0)
+			return &g_watch_table[i];
+	}
+	return NULL;
+}
+
+// Mirror `value` into the property's raw data slot (Ruffle's `set_data`). The
+// slot is inert while a getter is installed — every read goes through the
+// getter — and exists only so the NEXT watcher call reports the right old
+// value. Strings are duplicated (the stack's UTF-16 buffer is not ours to
+// keep); objects/arrays go through setProperty so retain/release stays paired.
+static void svwo_rawSlotStore(SWFAppContext* app_context, ASProperty* gp,
+                              const char* name, u32 len, ActionVar* value)
+{
+	extern ASObject* global_object;
+	if (gp == NULL || global_object == NULL || value == NULL) return;
+	// Only mirror onto an OWN `_global` property: findPropertyStructWithPrototype
+	// can hand the caller a PROTOTYPE entry, and shadowing one of those onto
+	// `_global` itself would be a visible new property, not a slot update.
+	if (findPropertyRaw(global_object, name, len) != gp) return;
+	// NB: the own-property check above also guarantees setProperty takes its
+	// "property exists" path, which never reallocs obj->properties — callers
+	// keep using `gp` after this returns.
+	ActionVar nv = *value;
+	if (nv.type == ACTION_STACK_VALUE_STRING)
+	{
+		const uint16_t* src = varGetU16Ptr(value);
+		u32 n = value->str_size;
+		uint16_t* dup = (uint16_t*) malloc((size_t)(n + 1) * sizeof(uint16_t));
+		if (dup == NULL) return;
+		if (src != NULL && n > 0) memcpy(dup, src, (size_t)n * sizeof(uint16_t));
+		dup[n] = 0;
+		nv.data.string_data.heap_ptr = dup;
+		nv.data.string_data.owns_memory = true;
+		nv.str_size = n;
+		nv.string_id = 0;
+	}
+	setProperty(app_context, global_object, name, len, &nv);
+}
+
+// Fire the timeline watcher for a watched name whose value is about to go
+// through an addProperty setter, folding its return into *value. Mirrors the
+// existing Site-A ritual (type-2-only gate, INV_LOCAL_SCOPE | INV_VERSION_SWITCH,
+// non-owning prop-name arg, re-entry guard push/pop) — see the timeline watcher
+// block further down in actionSetVariable.
+static void svwo_fireTimelineWatch(SWFAppContext* app_context, MovieClip* mc,
+                                   WatchEntry* we, const char* name, u32 len,
+                                   ActionVar* old_val, ActionVar* value)
+{
+	ASFunction* wf = we->watcher_func;
+	if (wf == NULL || wf->function_type != 2 || wf->advanced_func == NULL) return;
+	if (watchReentryBlocked(NULL, mc, name, len)) return;
+	watch_firing_push(NULL, mc, name, len);
+	invokeWatchCallback(app_context, wf, &we->user_data, NULL,
+	                    name, len, old_val, value,
+	                    INV_LOCAL_SCOPE | INV_VERSION_SWITCH,
+	                    4, /*pname_owns*/0, /*free_pname*/0, /*clear_owns*/0);
+	watch_firing_pop();
+}
+
+// Read the raw slot as a watcher `oldVal` argument: non-owning, and an
+// uninitialised STRING slot (NULL heap ptr) reads back as undefined.
+static ActionVar svwo_rawSlotOldValue(ASProperty* gp)
+{
+	ActionVar ov = {0};
+	if (gp == NULL) { ov.type = ACTION_STACK_VALUE_UNDEFINED; return ov; }
+	ov = gp->value;
+	if (ov.type == ACTION_STACK_VALUE_STRING)
+	{
+		if (ov.data.string_data.heap_ptr == NULL)
+		{
+			ov.type = ACTION_STACK_VALUE_UNDEFINED;
+			ov.data.numeric_value = 0;
+			ov.str_size = 0;
+		}
+		else
+			ov.data.string_data.owns_memory = false;
+	}
+	return ov;
+}
+
 void actionSetVariable(SWFAppContext* app_context)
 {
 	if (g_execution_halted) { POP_2(); return; }
@@ -44062,6 +44192,29 @@ void actionSetVariable(SWFAppContext* app_context)
 			{
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
+				// s15 w2-watch-order: the watcher runs BEFORE the virtual-setter
+				// walk and its return value is what reaches the setter (Ruffle
+				// Object::set_internal). The raw slot is then updated with that
+				// value whether or not a watcher fired (Ruffle set_local's
+				// unconditional set_data) — it is the source of the NEXT
+				// watcher call's oldVal.
+				MovieClip* _wo_ctx = g_current_context ? g_current_context : &root_movieclip;
+				WatchEntry* _wo_we = (g_watch_count > 0 && !g_execution_halted)
+					? svwo_timelineWatchEntry(_wo_ctx, var_name, var_name_len) : NULL;
+				if (_wo_we != NULL)
+				{
+					ActionVar _wo_old = svwo_rawSlotOldValue(gp);
+					svwo_fireTimelineWatch(app_context, _wo_ctx, _wo_we,
+					                       var_name, var_name_len, &_wo_old, &value_var);
+					// Deliberately narrower than Ruffle, which mirrors the value
+					// into the data slot on EVERY set_local. The slot is only
+					// ever observable as a watcher's oldVal here, so mirroring
+					// it outside watch dispatch would be an unobservable write
+					// with a real downside: a setter-only `_global` accessor has
+					// no getter to shadow the slot, and reads fall through to
+					// the plain-property last resort. Gated on the watch row.
+					svwo_rawSlotStore(app_context, gp, var_name, var_name_len, &value_var);
+				}
 				POP_2();
 				invokeVirtualSetter(app_context, gp, (void*)global_object, &value_var);
 				return;
@@ -60385,6 +60538,27 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				prop->getter = (void*)getter;
 				prop->setter = (void*)setter;
 				result = 1; // boolean true
+
+				// s15 w2-watch-order: installing the accessor re-initialises the
+				// slot, and in Flash that store goes through the watch table —
+				// a watched timeline name fires its watcher with
+				// (oldVal = raw slot, newVal = undefined) at addProperty time,
+				// and the watcher's return lands in the raw slot so the NEXT
+				// assignment reports it as oldVal. avm1/watch_virtual_property
+				// pins both fires ("changed from undefined to undefined") and
+				// the resulting NaN oldVal on the following `variable = 10`.
+				MovieClip* _ap_ctx = g_current_context ? g_current_context : &root_movieclip;
+				WatchEntry* _ap_we = (g_watch_count > 0 && !g_execution_halted)
+					? svwo_timelineWatchEntry(_ap_ctx, prop_name, prop_name_len) : NULL;
+				if (_ap_we != NULL)
+				{
+					ActionVar _ap_old = svwo_rawSlotOldValue(prop);
+					ActionVar _ap_new = {0};
+					_ap_new.type = ACTION_STACK_VALUE_UNDEFINED;
+					svwo_fireTimelineWatch(app_context, _ap_ctx, _ap_we,
+					                       prop_name, prop_name_len, &_ap_old, &_ap_new);
+					svwo_rawSlotStore(app_context, prop, prop_name, prop_name_len, &_ap_new);
+				}
 			}
 		}
 
