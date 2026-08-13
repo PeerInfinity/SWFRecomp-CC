@@ -175,14 +175,61 @@ namespace abc
 			{
 				res.ok = false;  // name matches, namespace does not
 			}
+			// The ns-blind `hits` bail above is conservative, not the avmplus
+			// rule. A class's traits table binds each (name, ns) exactly once:
+			// the MOST-DERIVED declaration at or above the class. So when a
+			// name is redeclared along the chain (LevelOne/LevelTwo/LevelThree
+			// all declaring `pubSameName` — avm2/sub_super_same_field), the
+			// binding a method compiled in class C sees is C's, not the one a
+			// runtime by-name lookup on the instance finds (the most-derived
+			// declaration in the whole hierarchy). Resolve that binding here
+			// when the site carries a multiname to ns-match against; without
+			// one we stay with the conservative bail.
+			if (!res.ok && site_mn != 0)
+			{
+				res = findBindingSlot(inst, name, site_mn);
+			}
 			return res;
 		}
+		// avmplus binding resolution: the most-derived declaration at or above
+		// `inst` whose local name is `name` AND whose QName matches `site_mn`.
+		// Bails (ok=false) if that declaration is not a plain value slot, or if
+		// one class declares the name twice under matching namespaces.
+		Found findBindingSlot(int inst, const string& name, u32 site_mn) const
+		{
+			Found res; int cur = inst, guard = 0;
+			while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
+			{
+				const AbcInstance& in = abc.instances[cur];
+				int matches = 0; int at = -1;
+				for (size_t ti = 0; ti < in.traits.size(); ti++)
+				{
+					if (localName(in.traits[ti].name) != name) continue;
+					if (!mnMatchesQName(site_mn, in.traits[ti].name)) continue;
+					matches++; at = (int) ti;
+				}
+				if (matches > 1) return Found{};       // same class, same ns twice
+				if (matches == 1)
+				{
+					TraitKindType k = in.traits[at].kind;
+					if (k != TraitKindType::Slot && k != TraitKindType::Const)
+						return Found{};                // accessor/method shadow
+					res.ok = true; res.declInst = cur; res.traitIdx = at;
+					return res;
+				}
+				if (in.super_name == 0) break;
+				cur = typeMnToInst(in.super_name);
+			}
+			return Found{};
+		}
 		// Does any STRICT subclass of `cls` declare a trait with local name
-		// `name`? If so, a subclass receiver would resolve the multiname to that
-		// subclass's own (shadowing) slot — a different index than the ancestor
-		// slot the compile-time pass would bake — so the site is NOT safely
-		// specializable (`this` may be any subclass at runtime). Guards the
-		// sub/super same-field case (avm2 sub_super_same_field).
+		// `name`? CENSUS/DIAGNOSTIC ONLY as of the sub_super_same_field fix —
+		// it used to gate the two `this.field` slot levers, on the theory that
+		// a subclass receiver "would resolve the multiname to that subclass's
+		// own slot". That is what OUR by-name runtime lookup does, but it is
+		// not avmplus: a method compiled in `cls` early-binds to `cls`'s
+		// binding whatever the receiver's dynamic type is, so the shadowing
+		// subclass slot must NOT be reached from here. See findBindingSlot.
 		bool subclassRedeclares(int cls, const string& name) const
 		{
 			std::vector<int> stack;
@@ -392,13 +439,21 @@ namespace abc
 		// declared trait the way avm2_mn_match would).
 		struct InstSlot { bool ok = false; int K = -1; u32 type_mn = 0;
 		                  bool is_const = false; };
-		InstSlot instSlotForStore(int cls, u32 mn) const
+		// `recv_is_this` mirrors the read lever's gate: for a `this` receiver
+		// the subclassRedeclares bail is dropped (a method compiled in `cls`
+		// early-binds to cls's binding — see the GetPropertyStatic lever in
+		// abc_emit.cpp), so that `this.x = 1; trace(this.x)` in a class whose
+		// subclass redeclares `x` cannot write the runtime (most-derived) slot
+		// and read the compile-time one. For a merely statically-TYPED
+		// receiver the read lever does not fire at all, so the store side
+		// keeps the old conservative bail — no new read/write asymmetry.
+		InstSlot instSlotForStore(int cls, u32 mn, bool recv_is_this = false) const
 		{
 			InstSlot r;
 			if (!isSealed(cls)) return r;
 			if (!chainDefinesMn(cls, mn)) return r;
 			string nm = localName(mn);
-			if (subclassRedeclares(cls, nm)) return r;
+			if (!recv_is_this && subclassRedeclares(cls, nm)) return r;
 			Found f = findUniqueSlot(cls, nm, mn);
 			if (!f.ok) return r;
 			int K = computeSlotIndex(f.declInst, f.traitIdx);

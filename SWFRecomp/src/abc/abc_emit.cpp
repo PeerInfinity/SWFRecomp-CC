@@ -2298,8 +2298,14 @@ namespace abc
 				{
 					// Lever A: this.field.
 					string name = M.localName(op.arg1);
+					// NO subclassRedeclares bail here: a subclass that
+					// redeclares the name gets its OWN binding and its own
+					// slot index, so `this.field` compiled in thisCls must
+					// keep reading thisCls's slot even when `this` is that
+					// subclass at runtime (avmplus early-binds by the static
+					// type; avm2/sub_super_same_field pins all 12 lines).
 					AbcTypeModel::Found fnd = M.findUniqueSlot(thisCls, name, op.arg1);
-					int K = (fnd.ok && !M.subclassRedeclares(thisCls, name))
+					int K = fnd.ok
 						? M.computeSlotIndex(fnd.declInst, fnd.traitIdx) : -1;
 					if (K > 0) spec[i] = K;
 				}
@@ -2383,7 +2389,7 @@ namespace abc
 					if (C >= 0)
 					{
 						AbcTypeModel::InstSlot isl =
-							M.instSlotForStore(C, op.arg1);
+							M.instSlotForStore(C, op.arg1, recv.is_this);
 						if (isl.ok
 						    && !(isl.is_const
 						         && op.op == IrOpcode::SetPropertyStatic))
