@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 189/229 passing | Graphics: 206/229 passing
+Trace: 189/229 passing | Graphics: 207/229 passing
 
 ## Graphics Regressions (0 tests)
 
@@ -8,7 +8,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 
 No regressions.
 
-## Graphics Improvements (17 tests)
+## Graphics Improvements (18 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
@@ -28,6 +28,7 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 | 12 | `fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b` | Output Mismatch | 12/36 lines match |
 | 13 | `fuzz/c24e6e559fd66b092283a3bdcd925792e8dd7ca55ce1c7729d44d5b315ad8f75` | Output Mismatch | 17/41 lines match |
 | 14 | `fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b` | Output Mismatch | 17/63 lines match |
-| 15 | `fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897` | Output Mismatch | 16/32 lines match |
-| 16 | `fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052` | Output Mismatch | 14/19 lines match |
-| 17 | `fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b` | Output Mismatch | 10/26 lines match |
+| 15 | `fuzz/e152812e2cfc0971237321dfadc37e3484631c355cb2e4b86344ff90bb89c75e` | Output Mismatch | 19/63 lines match |
+| 16 | `fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897` | Output Mismatch | 16/32 lines match |
+| 17 | `fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052` | Output Mismatch | 14/19 lines match |
+| 18 | `fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b` | Output Mismatch | 10/26 lines match |

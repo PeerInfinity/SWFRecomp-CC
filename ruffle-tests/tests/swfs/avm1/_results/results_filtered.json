@@ -6,18 +6,18 @@
     "total_available": 718,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 22,
+    "ignored_count": 21,
     "filtered": true
   },
-  "total": 696,
+  "total": 697,
   "pass": 672,
   "ruffle_matched": 13,
-  "fail": 11,
-  "pass_rate": 96.6,
+  "fail": 12,
+  "pass_rate": 96.4,
   "effective_pass": 685,
-  "effective_pass_rate": 98.4,
+  "effective_pass_rate": 98.3,
   "breakdown": {
-    "output_mismatch": 11,
+    "output_mismatch": 12,
     "ruffle_matched": 13
   },
   "tests": [
@@ -10652,6 +10652,25 @@
       },
       "duration": 19.78,
       "status": "pass"
+    },
+    {
+      "test": "watch_virtual_property",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.289,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 52,
+        "expected_lines": 60,
+        "matching_lines": 9
+      },
+      "duration": 1.3,
+      "status": "output_mismatch",
+      "detail": "51 line(s) differ (actual=52, expected=60)",
+      "actual_output": "// watch(\"variable\", plusOne)\ntrue\n\n// addProperty(\"variable\", getter, setter)\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// unwatch(\"variable\")\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// watch(\"variable\", plusOne)\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// delete(variable)\n\n... (2 lines after) ...",
+      "expected_output": "// watch(\"variable\", plusOne)\ntrue\n\n// addProperty(\"variable\", getter, setter)\nplusOne: variable changed from undefined to undefined with userdata undefined\ntrue\n\n// variable = 10\nplusOne: variable changed from NaN to 10 with userdata undefined\nsetter: ignoring new value of 11\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nplusOne: variable changed from 11 to 4 with userdata undefined\nsetter: ignoring new value of 5\n// variable\ngetter: returning 5\n5\n\n// unwatch(\"variable\")\nfalse\n\n// variable = 10\nplusOne: variable changed from 5 to 10 with userdata undefined\nsetter: ignoring new value of 11\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nplusOne: variable changed from 11 to 4 with userdata undefined\nsetter: ignoring new value of 5\n// variable\ngetter: returning 5\n5\n\n// watch(\"variable\", plusOne)\ntrue\n\n// variable = 10\nplusOne: variable changed from 5 to 10 with userdata undefined\nsetter: ignoring new value of 11\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nplusOne: variable changed from 11 to 4 with userdata undefined\n... (10 lines after) ..."
     },
     {
       "test": "watch_virtual_property_proto",

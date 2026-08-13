@@ -1,33 +1,166 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-06T23:55:08.689981+00:00",
-    "old_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "new_timestamp": "2026-08-12T23:11:20.701461+00:00",
-    "new_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "old_timestamp": "2026-08-13T21:54:57.541967+00:00",
+    "old_git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
+    "new_timestamp": "2026-08-13T22:38:36.698440+00:00",
+    "new_git_sha": "3db858cbc157a97402c8e9a956b123871fc73405",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 10,
+    "old_pass": 0,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 10,
+    "old_effective_pass": 0,
     "old_total": 11,
-    "old_pass_rate": 90.9,
+    "old_pass_rate": 0.0,
     "new_pass": 10,
     "new_ruffle_matched": 0,
     "new_effective_pass": 10,
     "new_total": 11,
     "new_pass_rate": 90.9,
-    "old_mismatched_lines": 1,
+    "old_mismatched_lines": 0,
     "new_mismatched_lines": 1,
-    "increased_mismatches": 0,
+    "increased_mismatches": 1,
     "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "newly_passing": 10,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 11,
+    "status_changed": 11,
+    "unchanged": 0,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "auto_size/height",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "auto_size/return",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      }
+    },
+    {
+      "test": "auto_size/width",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "br_at_start",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "html_entity_parsing",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 213,
+        "expected_lines": 213,
+        "matching_lines": 213
+      }
+    },
+    {
+      "test": "links_in_scrolled_text",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "style_changes_in_html",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "text_caret_placement_align",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 248,
+        "expected_lines": 248,
+        "matching_lines": 248
+      }
+    },
+    {
+      "test": "text_caret_placement_leading",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 244,
+        "expected_lines": 244,
+        "matching_lines": 244
+      }
+    },
+    {
+      "test": "text_caret_placement_scroll",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 108,
+        "expected_lines": 108,
+        "matching_lines": 108
+      }
+    },
+    {
+      "test": "text_caret_placement_translated_bounds",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 140,
+        "expected_lines": 140,
+        "matching_lines": 140
+      }
+    }
+  ]
 }

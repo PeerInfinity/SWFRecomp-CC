@@ -1,309 +1,209 @@
 {
   "metadata": {
-    "timestamp": "2026-08-06T23:55:08.684915+00:00",
-    "git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "duration_seconds": 361.52,
+    "timestamp": "2026-08-13T21:54:57.536992+00:00",
+    "git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
+    "duration_seconds": 7.35,
     "total_available": 17,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 17,
-  "pass": 12,
-  "ruffle_matched": 3,
-  "fail": 2,
-  "pass_rate": 70.6,
-  "effective_pass": 15,
-  "effective_pass_rate": 88.2,
+  "pass": 0,
+  "ruffle_matched": 0,
+  "fail": 17,
+  "pass_rate": 0.0,
+  "effective_pass": 0,
+  "effective_pass_rate": 0.0,
   "breakdown": {
-    "output_mismatch": 2
+    "compile_fail": 17
   },
   "tests": [
     {
       "test": "clip_action_no_key_code",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.602,
-        "run": 0.215
+        "compile": 0.127
       },
       "num_frames": 16,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 21.82,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.13
     },
     {
       "test": "frame_label_count_oom",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.372,
-        "run": 0.215
+        "compile": 0.095
       },
       "num_frames": 16,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 20.6,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.1
     },
     {
       "test": "frame_script_button_order",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.324,
-        "run": 0.315
+        "compile": 0.384
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 14,
-        "matching_lines": 13
-      },
-      "duration": 7.65,
-      "ruffle_diff_count": 4,
-      "ours_diff_count": 2,
-      "status": "ruffle_matched",
-      "detail": "diffs 2 \u2286 ruffle 4"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.39
     },
     {
       "test": "frame_script_cleanup",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.407,
-        "run": 0.315
+        "compile": 0.526
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 27.73,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.53
     },
     {
       "test": "frame_script_cleanup2",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.911,
-        "run": 0.315
+        "compile": 0.568
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 32,
-        "expected_lines": 32,
-        "matching_lines": 32
-      },
-      "duration": 26.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.57
     },
     {
       "test": "frame_script_cleanup3",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.96,
-        "run": 0.315
+        "compile": 0.532
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 27.29,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.53
     },
     {
       "test": "frame_script_cleanup_goto",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.187,
-        "run": 0.315
+        "compile": 0.407
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 26.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.41
     },
     {
       "test": "frame_script_cleanup_goto2",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.282,
-        "run": 0.265
+        "compile": 0.542
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 29,
-        "expected_lines": 34,
-        "matching_lines": 12
-      },
-      "duration": 22.55,
-      "status": "output_mismatch",
-      "detail": "22 line(s) differ (actual=29, expected=34)",
-      "actual_output": "... (7 lines before) ...\nContainer addFrameScript\nLeafChild addFrameScript\nGrandChild addFrameScript\nChild addFrameScript\nContainer frame1\nMain frame2\nContainer frame2\nChild frame2\nGrandChild frame2\nLeafChild frame2\nContainer frame1\nChild frame1\nGrandChild addFrameScript\nGrandChild frame1\nLeafChild frame1\nGrandChild frame1\nMain frame1\nContainer frame2\nChild frame2\nGrandChild frame2\nLeafChild frame2\nMain frame2",
-      "expected_output": "... (7 lines before) ...\nContainer addFrameScript\nLeafChild addFrameScript\nGrandChild addFrameScript\nChild addFrameScript\nContainer frame1\nChild frame1\nGrandChild addFrameScript\nGrandChild frame1\nLeafChild frame1\nGrandChild frame1\nMain frame2\nContainer frame2\nChild frame2\nGrandChild frame2\nLeafChild frame2\nContainer frame1\nChild frame1\nGrandChild addFrameScript\nGrandChild frame1\nLeafChild frame1\nGrandChild frame1\nMain frame1\nContainer frame2\nChild frame2\nGrandChild frame2\nLeafChild frame2\nMain frame2"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.54
     },
     {
       "test": "frame_script_construct",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.009,
-        "run": 0.315
+        "compile": 0.452
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 25,
-        "expected_lines": 25,
-        "matching_lines": 25
-      },
-      "duration": 27.34,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.45
     },
     {
       "test": "missing_frame_scripts",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.21,
-        "run": 0.315
+        "compile": 0.337
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 27,
-        "expected_lines": 22,
-        "matching_lines": 12
-      },
-      "duration": 26.54,
-      "status": "output_mismatch",
-      "detail": "15 line(s) differ (actual=27, expected=22)",
-      "actual_output": "... (6 lines before) ...\nContainer Constructor\nContainer addFrameScript\nContainer frame1\nMain frame2\nSpawn frame2\nMain frame1\nSpawn frame1\nContainer frame2\nMain frame2\nSpawn frame2\nContainer frame1\nMain frame1\nSpawn frame1\nContainer frame2\nMain frame2\nMain stopped\nSpawn frame2\nSpawn stopped\nContainer frame1\nContainer frame2\nContainer stopped",
-      "expected_output": "... (6 lines before) ...\nContainer Constructor\nContainer addFrameScript\nContainer frame1\nMain frame2\nSpawn frame2\nContainer frame2\nMain frame1\nContainer frame1\nMain frame2\nContainer frame2\nMain frame1\nContainer frame1\nMain frame2\nMain stopped\nContainer frame2\nContainer stopped"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.34
     },
     {
       "test": "scene_count_oom",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.016,
-        "run": 0.215
+        "compile": 0.054
       },
       "num_frames": 16,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 2.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.05
     },
     {
       "test": "swf_9_event_goto_frame_script",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.934,
-        "run": 0.315
+        "compile": 0.313
       },
       "num_frames": 5,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 3
-      },
-      "duration": 27.26,
-      "ruffle_diff_count": 2,
-      "ours_diff_count": 2,
-      "status": "ruffle_matched",
-      "detail": "diffs 2 \u2286 ruffle 2"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.31
     },
     {
       "test": "swf_9_frame_script_button_order",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.003,
-        "run": 0.516
+        "compile": 0.35
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 27.53,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.35
     },
     {
       "test": "swf_9_frame_script_cleanup_goto",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.133,
-        "run": 0.315
+        "compile": 0.362
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 26.46,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.36
     },
     {
       "test": "swf_9_frame_script_cleanup_goto2",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.669,
-        "run": 0.315
+        "compile": 0.464
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 34,
-        "expected_lines": 34,
-        "matching_lines": 34
-      },
-      "duration": 27.0,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.46
     },
     {
       "test": "swf_9_frame_script_dynamic_goto",
       "phases": {
-        "recomp": 0.025,
-        "compile": 7.787,
-        "run": 0.315
+        "recomp": 0.0,
+        "compile": 0.433
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 34,
-        "expected_lines": 34,
-        "matching_lines": 31
-      },
-      "duration": 8.14,
-      "ruffle_diff_count": 3,
-      "ours_diff_count": 3,
-      "status": "ruffle_matched",
-      "detail": "diffs 3 \u2286 ruffle 3"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.43
     },
     {
       "test": "swf_9_frame_script_dynamic_goto_2",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.356,
-        "run": 0.265
+        "compile": 0.349
       },
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 33,
-        "expected_lines": 33,
-        "matching_lines": 33
-      },
-      "duration": 7.63,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.35
     }
   ]
 }

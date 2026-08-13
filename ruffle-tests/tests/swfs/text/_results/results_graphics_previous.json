@@ -1,325 +1,143 @@
 {
   "metadata": {
-    "timestamp": "2026-08-06T23:55:08.689981+00:00",
-    "git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "duration_seconds": 220.81,
+    "timestamp": "2026-08-13T21:54:57.541967+00:00",
+    "git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
+    "duration_seconds": 4.88,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 11,
-  "pass": 10,
+  "pass": 0,
   "ruffle_matched": 0,
-  "fail": 1,
-  "pass_rate": 90.9,
-  "effective_pass": 10,
-  "effective_pass_rate": 90.9,
+  "fail": 11,
+  "pass_rate": 0.0,
+  "effective_pass": 0,
+  "effective_pass_rate": 0.0,
   "breakdown": {
-    "output_mismatch": 1
+    "compile_fail": 11
   },
   "tests": [
     {
       "test": "auto_size/height",
       "phases": {
-        "recomp": 0.1,
-        "compile": 28.793,
-        "run": 0.666
+        "recomp": 0.101,
+        "compile": 0.319
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 29.66,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 15 outliers exceed limit of 3, max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false,
-          "stats": {
-            "width": 300,
-            "height": 250,
-            "total_channels": 300000,
-            "max_diff": 255,
-            "diff_channels": 15,
-            "mean_diff": 0.0127,
-            "outliers": 15,
-            "max_outliers": 3,
-            "tolerance": 0,
-            "excess_outliers": 12
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
-        }
-      },
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.42
     },
     {
       "test": "auto_size/return",
       "phases": {
-        "recomp": 0.108,
-        "compile": 28.064,
-        "run": 0.566
+        "recomp": 0.104,
+        "compile": 0.345
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 28.95,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 36 outliers exceed limit of 18, max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 375,
-            "total_channels": 825000,
-            "max_diff": 255,
-            "diff_channels": 36,
-            "mean_diff": 0.0111,
-            "outliers": 36,
-            "max_outliers": 18,
-            "tolerance": 0,
-            "excess_outliers": 18
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
-        }
-      },
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.45
     },
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.106,
-        "compile": 25.957,
-        "run": 0.315
+        "recomp": 0.105,
+        "compile": 0.377
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 26.56,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 18 outliers (limit 18), max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false,
-          "stats": {
-            "width": 500,
-            "height": 350,
-            "total_channels": 700000,
-            "max_diff": 255,
-            "diff_channels": 18,
-            "mean_diff": 0.0066,
-            "outliers": 18,
-            "max_outliers": 18,
-            "tolerance": 0,
-            "excess_outliers": 0
-          },
-          "expected_source": "repo"
-        }
-      },
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.48
     },
     {
       "test": "br_at_start",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.107,
-        "run": 0.315
+        "compile": 0.064
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 2.68,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 14419 outliers exceed limit of 8, max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 255,
-            "diff_channels": 17136,
-            "mean_diff": 4.337,
-            "outliers": 14419,
-            "max_outliers": 8,
-            "tolerance": 128,
-            "excess_outliers": 14411
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
-        }
-      },
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.06
     },
     {
       "test": "html_entity_parsing",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.039,
-        "run": 0.266
+        "compile": 0.276
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 213,
-        "expected_lines": 213,
-        "matching_lines": 213
-      },
-      "duration": 7.32,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.28
     },
     {
       "test": "links_in_scrolled_text",
       "phases": {
         "recomp": 0.079,
-        "compile": 2.13,
-        "run": 0.315
+        "compile": 0.066
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "duration": 2.53,
-      "status": "output_mismatch",
-      "detail": "1 line(s) differ (actual=0, expected=1)",
-      "actual_output": "",
-      "expected_output": "Success!"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.15
     },
     {
       "test": "style_changes_in_html",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.346,
-        "run": 0.215
+        "compile": 0.052
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 20.68,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 25100 outliers exceed limit of 0, max difference 103",
-          "max_diff": 103,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 175,
-            "total_channels": 385000,
-            "max_diff": 103,
-            "diff_channels": 25100,
-            "mean_diff": 3.7521,
-            "outliers": 25100,
-            "max_outliers": 0,
-            "tolerance": 0,
-            "excess_outliers": 25100
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
-        }
-      },
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.05
     },
     {
       "test": "text_caret_placement_align",
       "phases": {
-        "recomp": 0.057,
-        "compile": 23.013,
-        "run": 0.315
+        "recomp": 0.088,
+        "compile": 0.731
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 248,
-        "expected_lines": 248,
-        "matching_lines": 248
-      },
-      "duration": 23.39,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.82
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
-        "recomp": 0.089,
-        "compile": 27.808,
-        "run": 0.365
+        "recomp": 0.09,
+        "compile": 0.687
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 244,
-        "expected_lines": 244,
-        "matching_lines": 244
-      },
-      "duration": 28.28,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.78
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
-        "recomp": 0.09,
-        "compile": 27.248,
-        "run": 0.315
+        "recomp": 0.069,
+        "compile": 0.523
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 108,
-        "expected_lines": 108,
-        "matching_lines": 108
-      },
-      "duration": 27.66,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.59
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
-        "recomp": 0.0,
-        "compile": 22.247,
-        "run": 0.215
+        "recomp": 0.056,
+        "compile": 0.047
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 140,
-        "expected_lines": 140,
-        "matching_lines": 140
-      },
-      "duration": 22.47,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
+      "duration": 0.1
     }
   ]
 }
