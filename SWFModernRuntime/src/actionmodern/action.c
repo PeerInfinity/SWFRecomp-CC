@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <setjmp.h>
 #include "tesselator.h"
+#include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -27975,21 +27976,22 @@ static int drawingCmdWindingHitTest(const DrawingState* ds,
 			double sx = cx, sy = cy;
 			double mx = (sx + (double)c->x) * 0.5;
 			double my = (sy + (double)c->y) * 0.5;
-			double dx = (double)c->cx - mx, dy = (double)c->cy - my;
-			double flatness = dx*dx + dy*dy;
-			int segs;
-			if (flatness < 0.25) segs = 1;
-			else if (flatness < 4.0) segs = 4;
-			else if (flatness < 25.0) segs = 8;
-			else segs = 16;
+			// Levien/lyon flattening — MUST stay identical to
+			// drawingFinalizePath's, or hit tests disagree with the fill.
+			CurveFlatten cf_ = curve_flatten_init((float)sx, (float)sy,
+				c->cx, c->cy, c->x, c->y, CURVE_FLATTEN_TOLERANCE);
 			double prev_x = sx, prev_y = sy;
-			for (int s = 1; s <= segs; s++) {
-				double t = (double)s / (double)segs;
+			for (int s = 1; s <= cf_.count; s++) {
+				double t = (s < cf_.count) ? (double) curve_flatten_t(&cf_, s) : 1.0;
 				double u = 1.0 - t;
 				double px = u*u*sx + 2*u*t*(double)c->cx + t*t*(double)c->x;
 				double py = u*u*sy + 2*u*t*(double)c->cy + t*t*(double)c->y;
 				winding += drawingWindingLine(tx_px, ty_px, prev_x, prev_y, px, py);
 				prev_x = px; prev_y = py;
+			}
+			if (cf_.count < 1) {
+				winding += drawingWindingLine(tx_px, ty_px, prev_x, prev_y,
+					(double)c->x, (double)c->y);
 			}
 			cx = c->x; cy = c->y;
 		}
@@ -28642,17 +28644,14 @@ static void drawingFinalizePath(DrawingState* ds)
 			// Ensure a contour exists if the cmd stream began with a curve.
 			if (contour_count == 0) _DR_ADD_CONTOUR_START();
 			// Flatness test: max distance of control point from midpoint of start→end
-			float mx = (sx + c->x) * 0.5f, my = (sy + c->y) * 0.5f;
-			float dx = c->cx - mx, dy = c->cy - my;
-			float flatness = dx * dx + dy * dy;
-			// Choose segment count based on deviation (tolerance ~0.5 pixels)
-			int segs;
-			if (flatness < 0.25f) segs = 1;       // < 0.5px deviation
-			else if (flatness < 4.0f) segs = 4;    // < 2px
-			else if (flatness < 25.0f) segs = 8;   // < 5px
-			else segs = 16;                         // large curves
+			// Levien/lyon flattening at lyon's own tolerance — see
+			// include/curve_flatten.h. Kept in lockstep with
+			// drawingCmdWindingHitTest above.
+			CurveFlatten cf_ = curve_flatten_init(sx, sy, c->cx, c->cy,
+			                                      c->x, c->y, CURVE_FLATTEN_TOLERANCE);
+			int segs = curve_flatten_segs(&cf_);
 			for (int seg = 1; seg <= segs; seg++) {
-				float t = (float)seg / (float)segs;
+				float t = (seg < cf_.count) ? curve_flatten_t(&cf_, seg) : 1.0f;
 				float u = 1.0f - t;
 				float px = u*u*sx + 2*u*t*c->cx + t*t*c->x;
 				float py = u*u*sy + 2*u*t*c->cy + t*t*c->y;

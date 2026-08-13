@@ -30,6 +30,7 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_filters.h>
 #include <tesselator.h>  // T4 Part B: runtime Graphics tessellation (libtess2)
+#include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
 #include <memory/heap.h>
 
 #include <avm2/avm2_gc.h>
@@ -7740,15 +7741,21 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
 			float sx = (i > 0) ? g->cmds[i-1].x : 0.0f;
 			float sy = (i > 0) ? g->cmds[i-1].y : 0.0f;
 			if (ccount == 0) _GADDC();
-			float mx = (sx + c->x) * 0.5f, my = (sy + c->y) * 0.5f;
-			float dx = c->cx - mx, dy = c->cy - my, flat = dx*dx + dy*dy;
-			int segs = flat < 0.25f ? 1 : flat < 4.0f ? 4 : flat < 25.0f ? 8 : 16;
-			for (int s = 1; s <= segs; s++)
+			// Levien/lyon flattening at lyon's own tolerance — see
+			// include/curve_flatten.h. The old four-bucket flatness ladder
+			// (1/4/8/16) was much finer than Ruffle's on mid-size arcs, and
+			// since chords are inscribed in the *quadratic* (which for a
+			// drawCircle arc bulges outside the true circle) that made our
+			// filled polygon systematically WIDER than Ruffle's.
+			CurveFlatten cf_ = curve_flatten_init(sx, sy, c->cx, c->cy,
+			                                      c->x, c->y, CURVE_FLATTEN_TOLERANCE);
+			for (int s = 1; s < cf_.count; s++)
 			{
-				float t = (float) s / (float) segs, u = 1.0f - t;
+				float t = curve_flatten_t(&cf_, s), u = 1.0f - t;
 				_GADDP(u*u*sx + 2*u*t*c->cx + t*t*c->x,
 				       u*u*sy + 2*u*t*c->cy + t*t*c->y);
 			}
+			_GADDP(c->x, c->y);
 		}
 		else { if (ccount == 0) _GADDC(); _GADDP(c->x, c->y); }
 	}
