@@ -7666,6 +7666,21 @@ namespace SWFRecomp
 
 		for (u16 i = 0; i < line_style_count; ++i)
 		{
+			// Morph END stroke colour. Every colour_data append inside a morph
+			// shape must have a paired morph_end_color_data append: the runtime
+			// morph lerp walks colour_data[morph_color_start + c] against
+			// morph_end_color_data[c] (tag.c:6962-6971 / :3193-3202), so a line
+			// style that appended to colour_data ONLY froze the stroke at its
+			// start colour and shifted every later paired colour. This is the
+			// colour-table twin of the start/end VERTEX lockstep enforced in
+			// interpretShape. Defaults mirror the start colour, which is what a
+			// non-solid / unparseable end fill degrades to.
+			u8 end_r = 0;
+			u8 end_g = 0;
+			u8 end_b = 0;
+			u8 end_a = 255;
+			bool have_end_color = false;
+
 			// StartWidth (UI16)
 			line_data.clearFields();
 			line_data.setFieldCount(1);
@@ -7732,12 +7747,18 @@ namespace SWFRecomp
 						line_styles[i].b = (u8) RGBA.fields[2].value;
 						line_styles[i].a = (u8) RGBA.fields[3].value;
 
-						// EndFillType: same structure — skip EndColor (RGBA)
+						// EndFillType: same structure — read EndColor (RGBA)
 						line_data.clearFields();
 						line_data.setFieldCount(1);
 						line_data.configureNextField(SWF_FIELD_UI8, 8);
 						line_data.parseFields(cur_pos);
-						cur_pos += 4; // skip EndColor RGBA
+
+						RGBA.parseFields(cur_pos);
+						end_r = (u8) RGBA.fields[0].value;
+						end_g = (u8) RGBA.fields[1].value;
+						end_b = (u8) RGBA.fields[2].value;
+						end_a = (u8) RGBA.fields[3].value;
+						have_end_color = true;
 					}
 					else
 					{
@@ -7759,8 +7780,13 @@ namespace SWFRecomp
 					line_styles[i].b = (u8) RGBA.fields[2].value;
 					line_styles[i].a = (u8) RGBA.fields[3].value;
 
-					// EndColor (RGBA) — skip
-					cur_pos += 4;
+					// EndColor (RGBA)
+					RGBA.parseFields(cur_pos);
+					end_r = (u8) RGBA.fields[0].value;
+					end_g = (u8) RGBA.fields[1].value;
+					end_b = (u8) RGBA.fields[2].value;
+					end_a = (u8) RGBA.fields[3].value;
+					have_end_color = true;
 				}
 			}
 			else
@@ -7772,8 +7798,21 @@ namespace SWFRecomp
 				line_styles[i].b = (u8) RGBA.fields[2].value;
 				line_styles[i].a = (u8) RGBA.fields[3].value;
 
-				// Skip EndColor (RGBA = 4 bytes)
-				cur_pos += 4;
+				// EndColor (RGBA)
+				RGBA.parseFields(cur_pos);
+				end_r = (u8) RGBA.fields[0].value;
+				end_g = (u8) RGBA.fields[1].value;
+				end_b = (u8) RGBA.fields[2].value;
+				end_a = (u8) RGBA.fields[3].value;
+				have_end_color = true;
+			}
+
+			if (!have_end_color)
+			{
+				end_r = line_styles[i].r;
+				end_g = line_styles[i].g;
+				end_b = line_styles[i].b;
+				end_a = line_styles[i].a;
 			}
 
 			line_styles[i].index = current_color;
@@ -7785,6 +7824,14 @@ namespace SWFRecomp
 					   << to_string(line_styles[i].a) << "/255.0f }," << endl;
 
 			current_color += 1;
+
+			morph_end_color_data << "\t" << "{ "
+					   << to_string(end_r) << "/255.0f, "
+					   << to_string(end_g) << "/255.0f, "
+					   << to_string(end_b) << "/255.0f, "
+					   << to_string(end_a) << "/255.0f }," << endl;
+
+			current_morph_end_color += 1;
 		}
 
 		return line_styles;
@@ -10206,6 +10253,34 @@ namespace SWFRecomp
 					}
 				}
 
+				// Start positions indexed by morph_index, the inverse map of
+				// morph_end_positions. The fill arm below can write an end vertex
+				// absolutely (an earcut vertex IS a path vertex), but a stroke
+				// vertex is an offset corner invented by drawLines/drawLineJoin/
+				// drawLineCap, so its end position is
+				//     stroke_vertex + (end_position - start_position)
+				// of the source path vertex whose morph_index it inherited. An
+				// entry keeps morph_index == -1 until it is filled, which marks it
+				// as "no source vertex" (the fallback below then freezes it).
+				std::vector<Vertex> morph_start_positions;
+
+				if (is_morph && morph_vertex_counter > 0)
+				{
+					morph_start_positions.resize((size_t) morph_vertex_counter);
+
+					for (size_t i = 0; i < paths.size(); ++i)
+					{
+						for (const Vertex& pv : paths[i].verts)
+						{
+							if (pv.morph_index >= 0
+							    && (size_t) pv.morph_index < morph_start_positions.size())
+							{
+								morph_start_positions[pv.morph_index] = pv;
+							}
+						}
+					}
+				}
+
 				for (size_t i = 0; i < paths.size(); ++i)
 				{
 					u8 line_style_i = paths[i].line_style;
@@ -10238,9 +10313,78 @@ namespace SWFRecomp
 										   << "0x80000000, "
 										   << "0x" << (u32) line_style.index
 										   << " }," << endl;
+
+								// morph_end_shape_data is indexed BY the shape_data
+								// index (both the AVM2 walk's
+								// Avm2ShapeGeom.morph_end_offset + k and the AVM1
+								// renderer's end[v*2] read entry k of this
+								// character's start-vertex run), so the two arrays
+								// must be appended in lockstep. This stroke loop used
+								// to append to shape_data ONLY, so a morph character
+								// with a stroke run contributed N start vertices and
+								// 0 end vertices, which
+								//   (a) shifted every LATER morph character's
+								//       morph_end_offset down by N, and
+								//   (b) left the last one reading past the end of the
+								//       static array —
+								// a live out-of-bounds read (worst corpus case,
+								// from_gnash morph_test1: vert_count 90 against a
+								// morph_end_shape_data[6][2], 84 entries OOB on every
+								// rendered frame). Diagnosed in
+								// session15-fanout-reports/wave1-gfx-blur-morphratio.md
+								// §3.4 cause 2 and w2-morph-legb-report.md §5.
+								//
+								// The end position is the stroke corner translated by
+								// its source path vertex's morph delta, so the outline
+								// rides the morphing fill (exact for a uniform-width
+								// stroke; the residual is the start/end stroke *width*
+								// difference, which neither renderer interpolates
+								// today). Only a corner with no usable source vertex
+								// falls back to freezing at its start position.
+								if (is_morph)
+								{
+									float end_x_f = x_f;
+									float end_y_f = y_f;
+									s32 mi = t.verts[j].morph_index;
+
+									if (mi >= 0
+									    && (size_t) mi < morph_end_positions.size()
+									    && (size_t) mi < morph_start_positions.size()
+									    && morph_start_positions[mi].morph_index >= 0)
+									{
+										const Vertex& start_v = morph_start_positions[mi];
+										const Vertex& end_v = morph_end_positions[mi];
+
+										end_x_f = x_f + (float) (end_v.x - start_v.x);
+										// y_f is FRAME_HEIGHT - y, so the flipped
+										// delta is the negated raw delta.
+										end_y_f = y_f - (float) (end_v.y - start_v.y);
+									}
+
+									morph_end_shape_data << "\t" << "{ "
+														 << std::dec << std::fixed << std::setprecision(1)
+														 << end_x_f << "f, "
+														 << end_y_f << "f"
+														 << " }," << endl;
+
+									current_morph_end_vertex += 1;
+								}
 							}
 						}
 					}
+				}
+
+				// Lockstep assertion for the morph tables: this character's
+				// morph_end_shape_data run must be exactly as long as its
+				// shape_data run, or morph_end_offset + k walks off the end.
+				if (is_morph && !is_font
+				    && (current_morph_end_vertex - morph_end_start_vertex) != 3 * tris_size)
+				{
+					fprintf(stderr,
+						"Warning: morph shape %u start/end vertex table mismatch "
+						"(start %zu, end %zu); morph_end_offset would read out of bounds.\n",
+						(unsigned) shape_id, 3 * tris_size,
+						current_morph_end_vertex - morph_end_start_vertex);
 				}
 
 				if (!is_font)
@@ -10803,30 +10947,37 @@ namespace SWFRecomp
 		
 		double angle_delta = (end_angle - start_angle)/num_midpoints;
 		
+		// Every vertex this join synthesises is a fixed offset from the SOURCE
+		// path vertex `b`, so it inherits b's morph_index: a morph stroke then
+		// rides the morphing outline instead of freezing at the start shape
+		// (see the stroke arm of interpretShape's morph emission).
 		Vertex last_point;
 		last_point.x = (s32) std::round(b.x + halfwidth*cos(start_angle));
 		last_point.y = (s32) std::round(b.y + halfwidth*sin(start_angle));
-		
+		last_point.morph_index = b.morph_index;
+
 		Tri t;
 		t.verts[0] = b;
-		
+
 		for (double current_angle = start_angle + angle_delta; current_angle < end_angle; current_angle += angle_delta)
 		{
 			t.verts[1] = last_point;
-			
+
 			t.verts[2].x = (s32) std::round(b.x + halfwidth*cos(current_angle));
 			t.verts[2].y = (s32) std::round(b.y + halfwidth*sin(current_angle));
-			
+			t.verts[2].morph_index = b.morph_index;
+
 			tris.push_back(t);
-			
+
 			last_point = t.verts[2];
 		}
-		
+
 		t.verts[1] = last_point;
-		
+
 		t.verts[2].x = (s32) std::round(b.x + halfwidth*cos(end_angle));
 		t.verts[2].y = (s32) std::round(b.y + halfwidth*sin(end_angle));
-		
+		t.verts[2].morph_index = b.morph_index;
+
 		tris.push_back(t);
 	}
 	
@@ -10845,30 +10996,35 @@ namespace SWFRecomp
 		
 		double angle_delta = (end_angle - start_angle)/num_midpoints;
 		
+		// As in drawLineJoin: the cap fan is a fixed offset from the source path
+		// vertex `a`, so it inherits a's morph_index.
 		Vertex last_point;
 		last_point.x = (s32) std::round(a.x + halfwidth*cos(start_angle));
 		last_point.y = (s32) std::round(a.y + halfwidth*sin(start_angle));
-		
+		last_point.morph_index = a.morph_index;
+
 		Tri t;
 		t.verts[0] = a;
-		
+
 		for (double current_angle = start_angle + angle_delta; current_angle < end_angle; current_angle += angle_delta)
 		{
 			t.verts[1] = last_point;
-			
+
 			t.verts[2].x = (s32) std::round(a.x + halfwidth*cos(current_angle));
 			t.verts[2].y = (s32) std::round(a.y + halfwidth*sin(current_angle));
-			
+			t.verts[2].morph_index = a.morph_index;
+
 			tris.push_back(t);
-			
+
 			last_point = t.verts[2];
 		}
-		
+
 		t.verts[1] = last_point;
-		
+
 		t.verts[2].x = (s32) std::round(a.x + halfwidth*cos(end_angle));
 		t.verts[2].y = (s32) std::round(a.y + halfwidth*sin(end_angle));
-		
+		t.verts[2].morph_index = a.morph_index;
+
 		tris.push_back(t);
 	}
 	
@@ -10903,22 +11059,28 @@ namespace SWFRecomp
 				drawLineJoin(last_last_v, last_v, v, halfwidth, tris);
 			}
 			
+			// Each offset corner inherits the morph_index of the source path
+			// vertex it was offset from (see drawLineJoin).
 			t.verts[0].x = (s32) std::round(last_v.x + halfwidth*cos(angle));
 			t.verts[0].y = (s32) std::round(last_v.y + halfwidth*sin(angle));
-			
+			t.verts[0].morph_index = last_v.morph_index;
+
 			t.verts[2].x = (s32) std::round(v.x + halfwidth*cos(angle));
 			t.verts[2].y = (s32) std::round(v.y + halfwidth*sin(angle));
-			
+			t.verts[2].morph_index = v.morph_index;
+
 			angle += M_PI;
-			
+
 			t.verts[1].x = (s32) std::round(last_v.x + halfwidth*cos(angle));
 			t.verts[1].y = (s32) std::round(last_v.y + halfwidth*sin(angle));
-			
+			t.verts[1].morph_index = last_v.morph_index;
+
 			tris.push_back(t);
-			
+
 			t.verts[0].x = (s32) std::round(v.x + halfwidth*cos(angle));
 			t.verts[0].y = (s32) std::round(v.y + halfwidth*sin(angle));
-			
+			t.verts[0].morph_index = v.morph_index;
+
 			tris.push_back(t);
 			
 			last_v = v;
