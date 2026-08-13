@@ -1,322 +1,2782 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-06T23:55:08.745504+00:00",
-    "old_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "new_timestamp": "2026-08-12T23:11:20.760522+00:00",
-    "new_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "old_timestamp": "2026-08-12T23:11:20.760522+00:00",
+    "old_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "new_timestamp": "2026-08-13T21:54:57.588885+00:00",
+    "new_git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 189,
-    "old_ruffle_matched": 14,
-    "old_effective_pass": 203,
+    "old_pass": 206,
+    "old_ruffle_matched": 12,
+    "old_effective_pass": 218,
     "old_total": 229,
-    "old_pass_rate": 82.5,
-    "new_pass": 206,
-    "new_ruffle_matched": 12,
-    "new_effective_pass": 218,
+    "old_pass_rate": 90.0,
+    "new_pass": 0,
+    "new_ruffle_matched": 0,
+    "new_effective_pass": 0,
     "new_total": 229,
-    "new_pass_rate": 90.0,
-    "old_mismatched_lines": 695,
-    "new_mismatched_lines": 315,
+    "new_pass_rate": 0.0,
+    "old_mismatched_lines": 315,
+    "new_mismatched_lines": 0,
     "increased_mismatches": 0,
-    "decreased_mismatches": 380,
-    "newly_passing": 15,
-    "newly_failing": 0,
-    "status_changed": 17,
-    "unchanged": 211,
+    "decreased_mismatches": 315,
+    "newly_passing": 0,
+    "newly_failing": 218,
+    "status_changed": 229,
+    "unchanged": 0,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82",
+      "test": "3_joystick",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "MaskTest",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "MaskTest-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "MaskTest-3",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "ZeroClipboardTest",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-big",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-bitmap-draw_quality_high",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-bitmap-draw_quality_low",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-bitmap-fill",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-bitmap-fill-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-bitmapData-copyPixels",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-bitmapData-draw",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-bitmaps",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-blend",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-blend-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-chars",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-child",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-clip",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-clip-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-clip-3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-color",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-color-0",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-color-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-filter",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-filter-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-gc",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-gradient",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-gradient-0",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-gradient-1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-gradient-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-image",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-large",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-mask",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-morph",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 92,
-        "expected_lines": 48,
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-scale",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-shapes",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 120,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-shapes-testing",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 120,
+        "expected_lines": 120,
+        "matching_lines": 36
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-small",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-stroke-0",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text-2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text-3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text-4",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text-5",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text-6",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text-escape",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-text-x",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-textfield",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-textfield-scroll",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "acid/acid-video",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "add",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
         "matching_lines": 11
       },
-      "new_lines": {
+      "new_lines": null
+    },
+    {
+      "test": "as3-interfaces",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/LoaderLoadBytesTest",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 4,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/LoaderLoadBytesTest2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/LoaderTest",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/LoaderTest2",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/bug1093712/loader",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/bug1157243/empty",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/bug1157243/invalid",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/events/loader-events",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 37,
+        "expected_lines": 36,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/loaderinfo/Preloader",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/loaderinfo/loaded-content-properties",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 36
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/array",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/bitmapdata/getPixel",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/bitmapdata/loadBitmap",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/callee",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/depth",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/doactionorder/doactionorder",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/doactionorder/symbolclass",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/duplicateMovieClip/dontremove",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/duplicateMovieClip/duplicateMovieClip",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/duplicateMovieClip/name-coercion",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/duplicateMovieClip/samedepth",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/externalinterface",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/filters",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 149,
+        "expected_lines": 149,
+        "matching_lines": 149
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/haxe/flocons1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/haxe/flocons2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/hitarea",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 4,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/label",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/levels",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/loadevent",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/loadvariables/loadvariables",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/loadvariables/loadvars",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/lookup",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/mouse-transparency",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/moviecliploader",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/nativeinheritance",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/nested-button",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/operations",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/property-paths/property-paths-6",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/property-paths/property-paths-7",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/propertycase/propertycase",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/propertycase/propertycase-preserving-6",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/propertycase/propertycase-preserving-7",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/rollover",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/scope",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/setinterval",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/settimeout",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/super",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/target",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/text-bind",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/textfield/textfield-html",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/textfield/textfield-text-setters",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/undefined/undefined-swf6",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 39
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/undefined/undefined-swf7",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 39
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/watch",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/xml/xmlbuild",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/xml/xmlload",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/xml/xmlstring",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1movie",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 13,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1timeline1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1timeline2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2/event-dispatching",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2/flash/display/bitmapdata/bitmapdata-clone",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2/flash/geom/matrix3d/Matrix3DClass",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 56,
+        "expected_lines": 56,
+        "matching_lines": 56
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2/flash/geom/matrix3d/TransformBasics",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 11,
+        "expected_lines": 13,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2/flash/geom/perspectiveprojection/PerspectiveProjectionClass",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2/flash/geom/transform/pixelBounds",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "bitmapbuttons",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "bitmapdata/draw-and-read",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "bitmapdata/getpixel-from-embedded",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "blendmode/blendmode_1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "blendmode/blendmode_2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "blendmode/blendmode_3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "button1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "button2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "button3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "captions",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "clipping",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "doubleAndRegister",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "encoding1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "new_lines": null
+    },
+    {
+      "test": "esc",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 13,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_events_Event",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_geom_ColorTransform",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_net_SharedObject",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_net_URLLoader",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_net_URLRequest",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_net_classes",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_text_TextField",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_text_TextField2",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 18,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_utils_Timer",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fscommand1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
         "actual_lines": 48,
         "expected_lines": 48,
         "matching_lines": 48
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 96,
-        "expected_lines": 70,
-        "matching_lines": 29
-      },
-      "new_lines": {
         "actual_lines": 70,
         "expected_lines": 70,
         "matching_lines": 70
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 75,
-        "expected_lines": 57,
-        "matching_lines": 25
-      },
-      "new_lines": {
         "actual_lines": 57,
         "expected_lines": 57,
         "matching_lines": 57
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 173,
-        "expected_lines": 71,
-        "matching_lines": 15
-      },
-      "new_lines": {
         "actual_lines": 71,
         "expected_lines": 71,
         "matching_lines": 71
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/438789f3e93da74855898cceed80e21291c6ab14cf36314a856c6f2716606a49",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 18,
-        "expected_lines": 16,
-        "matching_lines": 10
-      },
-      "new_lines": {
         "actual_lines": 16,
         "expected_lines": 16,
         "matching_lines": 16
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 26,
-        "expected_lines": 23,
-        "matching_lines": 22
-      },
-      "new_lines": {
         "actual_lines": 23,
         "expected_lines": 23,
         "matching_lines": 23
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 75,
-        "expected_lines": 50,
-        "matching_lines": 21
-      },
-      "new_lines": {
         "actual_lines": 50,
         "expected_lines": 50,
         "matching_lines": 50
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 108,
-        "expected_lines": 67,
-        "matching_lines": 13
-      },
-      "new_lines": {
         "actual_lines": 67,
         "expected_lines": 67,
         "matching_lines": 67
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/7318344161196391b369e91217937687ebc437e42fdcc10c4c456bde55e0db61",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 32,
-        "expected_lines": 26,
-        "matching_lines": 18
-      },
-      "new_lines": {
         "actual_lines": 26,
         "expected_lines": 26,
         "matching_lines": 26
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 38,
-        "expected_lines": 31,
-        "matching_lines": 18
-      },
-      "new_lines": {
         "actual_lines": 31,
         "expected_lines": 31,
         "matching_lines": 31
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/a86fee6d68f77c63cd83f33d136be2c48f0ab7ab0414a93a0b711ec2a19c6883",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/ac649dcf28572cc8250759cc0f8571a4111361fb6923db34ff02901095cdc580",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 28,
-        "expected_lines": 25,
-        "matching_lines": 14
-      },
-      "new_lines": {
         "actual_lines": 25,
         "expected_lines": 25,
         "matching_lines": 25
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 36,
-        "expected_lines": 29,
-        "matching_lines": 12
-      },
-      "new_lines": {
         "actual_lines": 29,
         "expected_lines": 29,
         "matching_lines": 29
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/c24e6e559fd66b092283a3bdcd925792e8dd7ca55ce1c7729d44d5b315ad8f75",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 41,
-        "expected_lines": 35,
-        "matching_lines": 17
-      },
-      "new_lines": {
         "actual_lines": 35,
         "expected_lines": 35,
         "matching_lines": 35
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 63,
-        "expected_lines": 37,
-        "matching_lines": 17
-      },
-      "new_lines": {
         "actual_lines": 37,
         "expected_lines": 37,
         "matching_lines": 37
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/e152812e2cfc0971237321dfadc37e3484631c355cb2e4b86344ff90bb89c75e",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 63,
-        "expected_lines": 43,
-        "matching_lines": 19
-      },
-      "new_lines": {
         "actual_lines": 42,
         "expected_lines": 43,
         "matching_lines": 31
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 32,
-        "expected_lines": 22,
-        "matching_lines": 16
-      },
-      "new_lines": {
         "actual_lines": 22,
         "expected_lines": 22,
         "matching_lines": 22
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
         "actual_lines": 19,
         "expected_lines": 19,
-        "matching_lines": 14
-      },
-      "new_lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
         "matching_lines": 19
-      }
+      },
+      "new_lines": null
     },
     {
       "test": "fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
+      "old_status": "pass",
+      "new_status": "compile_fail",
       "old_lines": {
-        "actual_lines": 26,
-        "expected_lines": 24,
-        "matching_lines": 10
-      },
-      "new_lines": {
         "actual_lines": 24,
         "expected_lines": 24,
         "matching_lines": 24
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "getobjectsunderpoint",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 38,
+        "expected_lines": 34,
+        "matching_lines": 29
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gradient",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gradientTransform",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "hardwrap",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "hitTestStyleChange",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "hittesting/hittesting",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "new_lines": null
+    },
+    {
+      "test": "hittesting/mask-hit-test",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "image-loading",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "invalidClipDepth",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "local2global",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "localconnection",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lzma",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lzma_bytes",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse/mouse_coords",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse/start_drag",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mouse/start_drag_lock",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "movieclip",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "movieinfo1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "slider_component",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stream1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stroke1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stylesheet",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "targetPath1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/Timeline3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/Timeline4",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/Timeline8",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/Timeline9",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/events/timeline_events_fp10",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/events/timeline_events_fp9",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/blendMode",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/cacheAsBitmap",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/clipDepth",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 8,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/colorTransform",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/filters",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/matrix",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/morphShape",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/name",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/ratio",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/ratio2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/ratio3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/nav/shape",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/EncodedU32",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_1_MainTimeline",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 70,
+        "expected_lines": 70,
+        "matching_lines": 70
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_2_MovieClipTimeline",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 70,
+        "expected_lines": 70,
+        "matching_lines": 70
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_3_GotoAndStop_LabelScene",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_4_GotoAndStop_FrameScene",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_5_GotoAndPlay_LabelScene",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_6_GotoAndPlay_FrameScene",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 40
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/scene/Scene_7_NextPrevScene",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/timeline_as2_1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/timeline_as2_2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/timeline_as2_3",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/timeline_as2_4",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/timeline_as2_5",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/timeline_loop",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timeline/timeline_name_0",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "new_lines": null
     }
   ]
 }

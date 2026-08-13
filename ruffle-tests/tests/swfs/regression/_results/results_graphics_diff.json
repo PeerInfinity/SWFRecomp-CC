@@ -1,46 +1,898 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-06T23:55:08.733668+00:00",
-    "old_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "new_timestamp": "2026-08-12T23:11:20.748225+00:00",
-    "new_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "old_timestamp": "2026-08-12T23:11:20.748225+00:00",
+    "old_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "new_timestamp": "2026-08-13T21:54:57.578571+00:00",
+    "new_git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 71,
+    "old_pass": 72,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 71,
-    "old_total": 71,
+    "old_effective_pass": 72,
+    "old_total": 72,
     "old_pass_rate": 100.0,
-    "new_pass": 72,
+    "new_pass": 0,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 72,
+    "new_effective_pass": 0,
     "new_total": 72,
-    "new_pass_rate": 100.0,
+    "new_pass_rate": 0.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 71,
-    "added": 1,
+    "newly_failing": 72,
+    "status_changed": 72,
+    "unchanged": 0,
+    "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "mask_nested_intersect",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
+      "test": "array_element_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "array_method_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_agi_shell",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_bitmapdata_draw_textfield",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_contextmenu_stub",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_embed_bytearray",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_external_interface_unavailable",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_findprop_this_resolution",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_gc_dynprop_tombstone_purge",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_gc_string_concat_reclaim",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_gc_string_survives_collect",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_goto_catchup_scale",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_graphics_runtime",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_loader_stub",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_localconnection_domain",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_morph",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_sharedobject_flushstatus",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_simplebutton_click",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_slot_default_template",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_static_and_store_slots",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_static_text",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_timeline_gradients",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_timeline_solid",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_timeline_stroke_gradient",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_timeline_text",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_tolerant_verify_quarantine",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm2_typed_value_ops",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "new_lines": null
+    },
+    {
+      "test": "broadcast_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "broadcast_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "new_lines": null
+    },
+    {
+      "test": "coerce_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "coerce_recursion_guard",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      }
+      },
+      "new_lines": null
+    },
+    {
+      "test": "coerce_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "new_lines": null
+    },
+    {
+      "test": "convertfloat_type1_this",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "ei_closure_scope_order",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "ei_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "ei_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "enterframe_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fn_call_builtin_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fn_call_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "fn_empty_method_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lc_method_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lc_onstatus_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lv_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "lv_ondata_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mask_nested_intersect",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mask_sibling_union",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mc_event_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mc_event_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mc_method_v5_caller_gate",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "mc_resolve_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "method_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "new_lines": null
+    },
+    {
+      "test": "nc_onstatus_closure",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "nc_onstatus_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "onconstruct_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "onconstruct_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "onload_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "onunload_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "onunload_type1_local_frame",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "resolve_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "new_lines": null
+    },
+    {
+      "test": "root_enterframe_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sort_comparator_captured_scope",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sort_comparator_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_prim_method_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timer_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "timer_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "new_lines": null
+    },
+    {
+      "test": "watch_cross_swf_version",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "watch_mc_reentrant_setmember",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "watch_mc_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "watch_setmember_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "watch_timeline_named_params",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "watch_timeline_reentrant",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "xml_onload_type1_args",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
     }
   ]
 }

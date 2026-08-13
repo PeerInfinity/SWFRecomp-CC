@@ -6,26 +6,26 @@
 
 **Run Duration**: 81m 37s
 
-**Filtered**: 22 tests ignored out of 718 available
+**Filtered**: 21 tests ignored out of 718 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 696 |
-| Passing | **672** (96.6%) |
+| Total tests | 697 |
+| Passing | **672** (96.4%) |
 | Ruffle-matched | 13 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **685** (98.4%) |
-| Failing | 11 |
-| Total expected lines | 112904 |
-| Matching lines | 106718 (94.5%) |
-| Mismatched lines | 6186 |
+| Effective pass | **685** (98.3%) |
+| Failing | 12 |
+| Total expected lines | 112964 |
+| Matching lines | 106727 (94.5%) |
+| Mismatched lines | 6237 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 11 | 100.0% |
+| Output Mismatch | 12 | 100.0% |
 
 ## Passing Tests
 
@@ -754,7 +754,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**11 tests** with output mismatch, sorted by match rate (best first)
+**12 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -764,11 +764,12 @@ No timeouts.
 | 4 | `set_property_values/swf7` | 92.9% | 1620/1743 | 1743 | 1743 |  |
 | 5 | `shared_stack` | 68.8% | 11/16 | 12 | 16 |  |
 | 6 | `set_property_values/swf4` | 20.0% | 349/1743 | 1743 | 1571 |  |
-| 7 | `watch_recursion_double_swf7` | 13.1% | 409/3118 | 1596 | 3118 |  |
-| 8 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
-| 9 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
-| 10 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
-| 11 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
+| 7 | `watch_virtual_property` | 15.0% | 9/60 | 52 | 60 | [68](ruffle-tests/tests/swfs/avm1/_investigation/complete/OBJECT_WATCH_PLAN.md) |
+| 8 | `watch_recursion_double_swf7` | 13.1% | 409/3118 | 1596 | 3118 |  |
+| 9 | `looping_child_swf32` | 7.7% | 29/375 | 375 | 141 |  |
+| 10 | `looping_child_swf5` | 7.7% | 29/375 | 375 | 141 |  |
+| 11 | `looping_child_swf9` | 7.7% | 29/375 | 375 | 141 |  |
+| 12 | `textfield_asbroadcaster` | 0.0% | 0/14 | 10 | 14 |  |
 
 ## Investigation Documents
 
@@ -841,7 +842,7 @@ No timeouts.
 | 65 | [NATIVE_OBJECTS_UPDATED_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NATIVE_OBJECTS_UPDATED_PLAN.md) | 2 | 2 | 0 |
 | 66 | [NETCONNECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NETCONNECTION_PLAN.md) | 2 | 2 | 0 |
 | 67 | [object_string_coerce.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/object_string_coerce.md) | 2 | 2 | 0 |
-| 68 | [OBJECT_WATCH_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/OBJECT_WATCH_PLAN.md) | 3 | 3 | 0 |
+| 68 | [OBJECT_WATCH_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/OBJECT_WATCH_PLAN.md) | 4 | 3 | 1 |
 | 69 | [OOP_SUPER_EXTENDS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/OOP_SUPER_EXTENDS_PLAN.md) | 8 | 8 | 0 |
 | 70 | [PARSING_FUNCTIONS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/PARSING_FUNCTIONS_PLAN.md) | 3 | 3 | 0 |
 | 71 | [PIXEL_TEXT_LAYOUT_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/PIXEL_TEXT_LAYOUT_PLAN.md) | 3 | 3 | 0 |

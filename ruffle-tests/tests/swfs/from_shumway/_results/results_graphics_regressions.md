@@ -1,33 +1,205 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 189/229 passing | Graphics: 206/229 passing
+Trace: 189/229 passing | Graphics: 0/229 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (189 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `3_joystick` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 2 | `MaskTest` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 3 | `MaskTest-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 4 | `ZeroClipboardTest` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 5 | `acid/acid` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 6 | `acid/acid-big` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 7 | `acid/acid-bitmap-draw_quality_high` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 8 | `acid/acid-bitmap-draw_quality_low` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 9 | `acid/acid-bitmap-fill` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 10 | `acid/acid-bitmap-fill-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 11 | `acid/acid-bitmapData-copyPixels` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 12 | `acid/acid-bitmapData-draw` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 13 | `acid/acid-bitmaps` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 14 | `acid/acid-blend` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 15 | `acid/acid-blend-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 16 | `acid/acid-chars` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 17 | `acid/acid-child` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 18 | `acid/acid-clip` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 19 | `acid/acid-clip-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 20 | `acid/acid-clip-3` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 21 | `acid/acid-color` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 22 | `acid/acid-color-0` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 23 | `acid/acid-color-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 24 | `acid/acid-filter` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 25 | `acid/acid-filter-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 26 | `acid/acid-gc` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 27 | `acid/acid-gradient` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 28 | `acid/acid-gradient-0` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 29 | `acid/acid-gradient-1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 30 | `acid/acid-gradient-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 31 | `acid/acid-image` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 32 | `acid/acid-large` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 33 | `acid/acid-mask` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 34 | `acid/acid-scale` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 35 | `acid/acid-small` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 36 | `acid/acid-stroke-0` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 37 | `acid/acid-text` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 38 | `acid/acid-text-2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 39 | `acid/acid-text-3` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 40 | `acid/acid-text-4` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 41 | `acid/acid-text-5` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 42 | `acid/acid-text-6` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 43 | `acid/acid-text-escape` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 44 | `acid/acid-textfield-scroll` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 45 | `acid/acid-video` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 46 | `add` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 47 | `as3-interfaces` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 48 | `as3-loader/LoaderLoadBytesTest2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 49 | `as3-loader/bug1093712/loader` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 50 | `as3-loader/bug1157243/empty` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 51 | `as3-loader/bug1157243/invalid` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 52 | `as3-loader/loaderinfo/Preloader` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 53 | `avm1/array` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 54 | `avm1/bitmapdata/getPixel` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 55 | `avm1/bitmapdata/loadBitmap` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 56 | `avm1/callee` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 57 | `avm1/depth` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 58 | `avm1/doactionorder/doactionorder` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 59 | `avm1/doactionorder/symbolclass` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 60 | `avm1/duplicateMovieClip/dontremove` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 61 | `avm1/duplicateMovieClip/duplicateMovieClip` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 62 | `avm1/duplicateMovieClip/name-coercion` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 63 | `avm1/duplicateMovieClip/samedepth` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 64 | `avm1/externalinterface` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 65 | `avm1/filters` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 66 | `avm1/haxe/flocons1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 67 | `avm1/haxe/flocons2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 68 | `avm1/label` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 69 | `avm1/levels` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 70 | `avm1/loadevent` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 71 | `avm1/loadvariables/loadvariables` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 72 | `avm1/loadvariables/loadvars` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 73 | `avm1/lookup` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 74 | `avm1/mouse-transparency` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 75 | `avm1/moviecliploader` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 76 | `avm1/nativeinheritance` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 77 | `avm1/nested-button` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 78 | `avm1/operations` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 79 | `avm1/property-paths/property-paths-6` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 80 | `avm1/property-paths/property-paths-7` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 81 | `avm1/propertycase/propertycase` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 82 | `avm1/propertycase/propertycase-preserving-6` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 83 | `avm1/propertycase/propertycase-preserving-7` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 84 | `avm1/rollover` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 85 | `avm1/scope` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 86 | `avm1/setinterval` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 87 | `avm1/settimeout` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 88 | `avm1/super` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 89 | `avm1/target` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 90 | `avm1/text-bind` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 91 | `avm1/textfield/textfield-html` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 92 | `avm1/textfield/textfield-text-setters` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 93 | `avm1/undefined/undefined-swf6` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 94 | `avm1/undefined/undefined-swf7` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 95 | `avm1/watch` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 96 | `avm1/xml/xmlbuild` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 97 | `avm1/xml/xmlload` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 98 | `avm1/xml/xmlstring` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 99 | `avm1timeline1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 100 | `avm1timeline2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 101 | `avm2/event-dispatching` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 102 | `avm2/flash/display/bitmapdata/bitmapdata-clone` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 103 | `avm2/flash/geom/matrix3d/Matrix3DClass` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 104 | `avm2/flash/geom/perspectiveprojection/PerspectiveProjectionClass` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 105 | `bitmapbuttons` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 106 | `bitmapdata/draw-and-read` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 107 | `blendmode/blendmode_1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 108 | `blendmode/blendmode_2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 109 | `blendmode/blendmode_3` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 110 | `button1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 111 | `button2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 112 | `button3` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 113 | `captions` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 114 | `clipping` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 115 | `doubleAndRegister` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 116 | `encoding1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 117 | `flash_events_Event` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 118 | `flash_geom_ColorTransform` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 119 | `flash_net_URLLoader` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 120 | `flash_net_URLRequest` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 121 | `flash_net_classes` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 122 | `flash_utils_Timer` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 123 | `fscommand1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 124 | `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 125 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 126 | `fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 127 | `fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 128 | `fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 129 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 130 | `fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 131 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 132 | `fuzz/a86fee6d68f77c63cd83f33d136be2c48f0ab7ab0414a93a0b711ec2a19c6883` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 133 | `fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 134 | `fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 135 | `fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 136 | `gradient` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 137 | `gradientTransform` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 138 | `hardwrap` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 139 | `hitTestStyleChange` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 140 | `hittesting/hittesting` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 141 | `hittesting/mask-hit-test` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 142 | `image-loading` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 143 | `invalidClipDepth` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 144 | `local2global` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 145 | `localconnection` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 146 | `lzma` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 147 | `lzma_bytes` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 148 | `mouse/mouse_coords` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 149 | `mouse/start_drag` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 150 | `mouse/start_drag_lock` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 151 | `movieclip` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 152 | `movieinfo1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 153 | `slider_component` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 154 | `stream1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 155 | `stroke1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 156 | `stylesheet` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 157 | `targetPath1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 158 | `timeline/Timeline3` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 159 | `timeline/Timeline4` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 160 | `timeline/Timeline8` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 161 | `timeline/Timeline9` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 162 | `timeline/events/timeline_events_fp10` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 163 | `timeline/events/timeline_events_fp9` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 164 | `timeline/nav/blendMode` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 165 | `timeline/nav/cacheAsBitmap` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 166 | `timeline/nav/colorTransform` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 167 | `timeline/nav/filters` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 168 | `timeline/nav/matrix` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 169 | `timeline/nav/morphShape` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 170 | `timeline/nav/name` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 171 | `timeline/nav/ratio` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 172 | `timeline/nav/ratio2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 173 | `timeline/nav/ratio3` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 174 | `timeline/nav/shape` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 175 | `timeline/scene/EncodedU32` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 176 | `timeline/scene/Scene_1_MainTimeline` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 177 | `timeline/scene/Scene_2_MovieClipTimeline` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 178 | `timeline/scene/Scene_3_GotoAndStop_LabelScene` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 179 | `timeline/scene/Scene_4_GotoAndStop_FrameScene` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 180 | `timeline/scene/Scene_5_GotoAndPlay_LabelScene` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 181 | `timeline/scene/Scene_6_GotoAndPlay_FrameScene` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 182 | `timeline/scene/Scene_7_NextPrevScene` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 183 | `timeline/timeline_as2_1` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 184 | `timeline/timeline_as2_2` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 185 | `timeline/timeline_as2_3` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 186 | `timeline/timeline_as2_4` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 187 | `timeline/timeline_as2_5` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 188 | `timeline/timeline_loop` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+| 189 | `timeline/timeline_name_0` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
 
-## Graphics Improvements (17 tests)
+## Graphics Improvements (0 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
-| # | Test | Trace Status | Detail |
-|---|------|---------------|--------|
-| 1 | `fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82` | Output Mismatch | 11/92 lines match |
-| 2 | `fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096` | Output Mismatch | 29/96 lines match |
-| 3 | `fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77` | Output Mismatch | 25/75 lines match |
-| 4 | `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` | Output Mismatch | 15/173 lines match |
-| 5 | `fuzz/438789f3e93da74855898cceed80e21291c6ab14cf36314a856c6f2716606a49` | Output Mismatch | 10/18 lines match |
-| 6 | `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` | Ruffle Matched | 22/26 lines match |
-| 7 | `fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd` | Output Mismatch | 21/75 lines match |
-| 8 | `fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121` | Output Mismatch | 13/108 lines match |
-| 9 | `fuzz/7318344161196391b369e91217937687ebc437e42fdcc10c4c456bde55e0db61` | Output Mismatch | 18/32 lines match |
-| 10 | `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` | Ruffle Matched | 18/38 lines match |
-| 11 | `fuzz/ac649dcf28572cc8250759cc0f8571a4111361fb6923db34ff02901095cdc580` | Output Mismatch | 14/28 lines match |
-| 12 | `fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b` | Output Mismatch | 12/36 lines match |
-| 13 | `fuzz/c24e6e559fd66b092283a3bdcd925792e8dd7ca55ce1c7729d44d5b315ad8f75` | Output Mismatch | 17/41 lines match |
-| 14 | `fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b` | Output Mismatch | 17/63 lines match |
-| 15 | `fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897` | Output Mismatch | 16/32 lines match |
-| 16 | `fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052` | Output Mismatch | 14/19 lines match |
-| 17 | `fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b` | Output Mismatch | 10/26 lines match |
+No improvements.

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-08-12 23:11 UTC
+**Date**: 2026-08-13 21:54 UTC
 
-**Git SHA**: `bf585e4486`
+**Git SHA**: `16314e63fe`
 
-**Run Duration**: 2m 7s
+**Run Duration**: 0m 4s
 
 **Filtered**: 0 tests ignored out of 6 available
 
@@ -13,24 +13,23 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 6 |
-| Passing | **6** (100.0%) |
-| Failing | 0 |
-| Total expected lines | 104 |
-| Matching lines | 104 (100.0%) |
+| Passing | **0** (0.0%) |
+| Failing | 6 |
+| Total expected lines | 0 |
+| Matching lines | 0 (0.0%) |
 | Mismatched lines | 0 |
+
+### Failure Breakdown
+
+| Category | Count | % of Failures |
+|----------|-------|---------------|
+| Compile Fail | 6 | 100.0% |
 
 ## Passing Tests
 
-**6 tests passing**
+**0 tests passing**
 
-| # | Test | Lines | Duration | Notes |
-|---|------|-------|----------|-------|
-| 1 | `device_font_glyph_fallback` | 36 | 26.7s |  |
-| 2 | `device_font_kerning` | 4 | 27.6s |  |
-| 3 | `device_font_list` | 64 | 26.6s |  |
-| 4 | `embed_matching/fallback_preferences` | 0 | 29.0s |  |
-| 5 | `embed_matching/match_style` | 0 | 8.4s |  |
-| 6 | `embed_matching/no_font_found` | 0 | 8.2s |  |
+No passing tests.
 
 ## Near-Passing Tests
 

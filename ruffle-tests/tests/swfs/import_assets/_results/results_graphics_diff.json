@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-06T23:55:08.698811+00:00",
-    "old_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "new_timestamp": "2026-08-12T23:11:20.710462+00:00",
-    "new_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "old_timestamp": "2026-08-12T23:11:20.710462+00:00",
+    "old_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "new_timestamp": "2026-08-13T21:54:57.550704+00:00",
+    "new_git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,58 @@
     "old_effective_pass": 2,
     "old_total": 3,
     "old_pass_rate": 66.7,
-    "new_pass": 2,
+    "new_pass": 0,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 2,
+    "new_effective_pass": 0,
     "new_total": 3,
-    "new_pass_rate": 66.7,
+    "new_pass_rate": 0.0,
     "old_mismatched_lines": 6,
-    "new_mismatched_lines": 6,
+    "new_mismatched_lines": 0,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 6,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 3,
+    "newly_failing": 2,
+    "status_changed": 3,
+    "unchanged": 0,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_imports_avm1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1_non_swf_import",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "empty_url",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    }
+  ]
 }

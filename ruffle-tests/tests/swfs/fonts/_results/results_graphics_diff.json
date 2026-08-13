@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-06T23:55:08.707368+00:00",
-    "old_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "new_timestamp": "2026-08-12T23:11:20.719837+00:00",
-    "new_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "old_timestamp": "2026-08-12T23:11:20.719837+00:00",
+    "old_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "new_timestamp": "2026-08-13T21:54:57.559228+00:00",
+    "new_git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,94 @@
     "old_effective_pass": 6,
     "old_total": 6,
     "old_pass_rate": 100.0,
-    "new_pass": 6,
+    "new_pass": 0,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 6,
+    "new_effective_pass": 0,
     "new_total": 6,
-    "new_pass_rate": 100.0,
+    "new_pass_rate": 0.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 6,
+    "newly_failing": 6,
+    "status_changed": 6,
+    "unchanged": 0,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "device_font_glyph_fallback",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "new_lines": null
+    },
+    {
+      "test": "device_font_kerning",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "device_font_list",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      },
+      "new_lines": null
+    },
+    {
+      "test": "embed_matching/fallback_preferences",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "embed_matching/match_style",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "embed_matching/no_font_found",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    }
+  ]
 }

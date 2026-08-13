@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-06T23:55:08.770636+00:00",
-    "old_git_sha": "fb36ba11005c80bd6e77a1fe43a4d720e0c95ca9",
-    "new_timestamp": "2026-08-12T23:11:20.787761+00:00",
-    "new_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "old_timestamp": "2026-08-12T23:11:20.787761+00:00",
+    "old_git_sha": "bf585e4486b64a263abbd336a51f3baf3cd00a03",
+    "new_timestamp": "2026-08-13T21:54:57.607687+00:00",
+    "new_git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,130 @@
     "old_effective_pass": 9,
     "old_total": 9,
     "old_pass_rate": 77.8,
-    "new_pass": 7,
-    "new_ruffle_matched": 2,
-    "new_effective_pass": 9,
+    "new_pass": 0,
+    "new_ruffle_matched": 0,
+    "new_effective_pass": 0,
     "new_total": 9,
-    "new_pass_rate": 77.8,
+    "new_pass_rate": 0.0,
     "old_mismatched_lines": 20,
-    "new_mismatched_lines": 20,
+    "new_mismatched_lines": 0,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 20,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 9,
+    "newly_failing": 9,
+    "status_changed": 9,
+    "unchanged": 0,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "TextFieldTest",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "enum",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "new_lines": null
+    },
+    {
+      "test": "exception",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 35,
+        "expected_lines": 35,
+        "matching_lines": 35
+      },
+      "new_lines": null
+    },
+    {
+      "test": "function_test",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      },
+      "new_lines": null
+    },
+    {
+      "test": "hello",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "new_lines": null
+    },
+    {
+      "test": "implementsOpTest",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 28,
+        "expected_lines": 28,
+        "matching_lines": 28
+      },
+      "new_lines": null
+    },
+    {
+      "test": "inheritance",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      },
+      "new_lines": null
+    },
+    {
+      "test": "levels",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 68,
+        "expected_lines": 68,
+        "matching_lines": 49
+      },
+      "new_lines": null
+    },
+    {
+      "test": "super_test1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "new_lines": null
+    }
+  ]
 }
