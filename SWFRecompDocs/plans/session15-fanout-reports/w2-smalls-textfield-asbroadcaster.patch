@@ -1,0 +1,140 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 65edcbf57..b53f18a8a 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -15903,6 +15903,16 @@ static void initStyleSheetPrototype(SWFAppContext* app_context); // forward decl
+ static ASFunction g_stylesheet_constructor_global; // forward decl
+ static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj); // forward decl
+ 
++// Flash runs AsBroadcaster.initialize on every EditText's AVM1 object at
++// post-instantiation and then makes the field ITSELF listener 0, so that the
++// field's own on* handlers run before any user-added listener's
++// (Ruffle core/src/display_object/edit_text.rs::initialize_as_broadcaster).
++// Observable as `tf._listeners.length == 1 && tf._listeners[0] == tf` at
++// creation (avm1/textfield_asbroadcaster). Without this the only `_listeners`
++// in scope is the ZERO-length one on TextField.prototype, shared by every
++// field, so addListener/broadcastMessage operate on the wrong array.
++static void installTextFieldBroadcaster(SWFAppContext* app_context, MovieClip* mc); // forward decl
++
+ static void initTextFieldPrototype(SWFAppContext* app_context)
+ {
+ 	// Two-stage init: SWF5 run (e.g. via Dejagnu.swf child-SWF init) allocates the
+@@ -22143,6 +22153,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char*
+ 				}
+ 				ASObject* props = (ASObject*) mc->dynamic_props;
+ 				props->native_type = NATIVE_TEXTFIELD;
++				installTextFieldBroadcaster(app_context, mc);
+ 				// Set __proto__ to TextField.prototype (SWF6+ only — in SWF5,
+ 				// MC textfields are not instanceof TextField).
+ 				initTextFieldPrototype(app_context);
+@@ -22393,6 +22404,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char*
+ 				}
+ 				ASObject* props = (ASObject*) mc->dynamic_props;
+ 				props->native_type = NATIVE_TEXTFIELD;
++				installTextFieldBroadcaster(app_context, mc);
+ 
+ 				// Set __proto__ to TextField.prototype (SWF6+ only — in SWF5,
+ 				// MC textfields are not instanceof TextField).
+@@ -22823,6 +22835,7 @@ void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc) {
+ 	}
+ 	ASObject* props = (ASObject*) mc->dynamic_props;
+ 	props->native_type = NATIVE_TEXTFIELD;
++	installTextFieldBroadcaster(app_context, mc);
+ 
+ 	// In SWF5, MC textfields (including clones) are not instanceof TextField.
+ 	initTextFieldPrototype(app_context);
+@@ -34221,6 +34234,24 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
+ // handles null/undefined coercion and `obj.valueOf() == primitive` comparisons
+ // that the AsBroadcaster tests rely on (e.g. `removeListener('yes I am')`
+ // matching an object whose `valueOf` returns `'yes I am'`).
++// Resolve the broadcaster the three builtins below operate on. `this_obj` is
++// the receiver on the OBJECT dispatch arm; on the MOVIECLIP arm actionCallMethod
++// passes this_obj = NULL and communicates the receiver via g_event_this_mc
++// (same convention as builtin_object_valueOf), so a MovieClip-backed
++// broadcaster — a TextField instance, see installTextFieldBroadcaster — has to
++// be picked up from there or every call silently no-ops on a NULL receiver.
++static ASObject* broadcasterReceiver(void* this_obj)
++{
++    ASObject* receiver = (ASObject*) this_obj;
++    if (receiver == NULL) receiver = g_c_function_this_obj;
++    if (receiver == NULL && g_event_this_mc != NULL
++        && g_event_this_mc->depth != INT_MIN)
++    {
++        receiver = (ASObject*) g_event_this_mc->dynamic_props;
++    }
++    return receiver;
++}
++
+ static int listenerAbstractEq(SWFAppContext* app_context, ActionVar* a, ActionVar* b) {
+     pushVar(app_context, a);
+     pushVar(app_context, b);
+@@ -34233,8 +34264,7 @@ static int listenerAbstractEq(SWFAppContext* app_context, ActionVar* a, ActionVa
+ static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+     (void)registers;
+-    ASObject* receiver = (ASObject*) this_obj;
+-    if (!receiver) receiver = g_c_function_this_obj;
++    ASObject* receiver = broadcasterReceiver(this_obj);
+ 
+     ActionVar result = {0};
+     result.type = ACTION_STACK_VALUE_BOOLEAN;
+@@ -34299,8 +34329,7 @@ static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, Act
+ static ActionVar builtin_broadcaster_removeListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+     (void)registers;
+-    ASObject* receiver = (ASObject*) this_obj;
+-    if (!receiver) receiver = g_c_function_this_obj;
++    ASObject* receiver = broadcasterReceiver(this_obj);
+ 
+     ActionVar false_result = {0};
+     false_result.type = ACTION_STACK_VALUE_BOOLEAN;
+@@ -34341,8 +34370,7 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
+     ActionVar undef = {0};
+     undef.type = ACTION_STACK_VALUE_UNDEFINED;
+ 
+-    ASObject* receiver = (ASObject*) this_obj;
+-    if (!receiver) receiver = g_c_function_this_obj;
++    ASObject* receiver = broadcasterReceiver(this_obj);
+     if (!receiver || arg_count < 1) return undef;
+ 
+     // Convert method name to UTF-8 string. Push to stack and use convertString.
+@@ -36346,6 +36374,31 @@ static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
+     setPropertyWithFlags(app_context, obj, "broadcastMessage", 16, &fv, method_flags);
+ }
+ 
++// See the forward declaration above initTextFieldPrototype.
++static void installTextFieldBroadcaster(SWFAppContext* app_context, MovieClip* mc)
++{
++    // SWF5 MC textfields are not instanceof TextField and get no TextField
++    // surface at all (see the __proto__ gates at every call site), so the
++    // broadcaster is SWF6+ too.
++    if (mc == NULL || g_swf_version < 6) return;
++    ASObject* props = (ASObject*) mc->dynamic_props;
++    if (props == NULL) return;
++    // Idempotent: the clone/timeline paths can re-enter for the same field,
++    // and re-initializing would drop listeners the script already added.
++    if (getProperty(props, "_listeners", 10) != NULL) return;
++
++    installAsBroadcaster(app_context, props);
++
++    ActionVar* lp = getProperty(props, "_listeners", 10);
++    if (lp == NULL || lp->type != ACTION_STACK_VALUE_ARRAY) return;
++    ASArray* arr = (ASArray*) (uintptr_t) lp->data.numeric_value;
++    if (arr == NULL) return;
++    ActionVar self = {0};
++    self.type = ACTION_STACK_VALUE_MOVIECLIP;
++    VAL(u64, &self.data.numeric_value) = (u64) mc;
++    setArrayElement(app_context, arr, 0, &self);
++}
++
+ // Mark AsBroadcaster methods as SWF6+ (hidden in SWF5 via flash_flags).
+ // Called after installAsBroadcaster for objects like Key and Mouse where
+ // addListener/removeListener should not be visible in SWF5.
+@@ -60433,6 +60486,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 			}
+ 			ASObject* props = (ASObject*) child->dynamic_props;
+ 			props->native_type = NATIVE_TEXTFIELD;
++			installTextFieldBroadcaster(app_context, child);
+ 
+ 			// Store original createTextField position for clone recovery
+ 			// (autoSize may modify mc->x later, clones need the original)

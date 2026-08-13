@@ -1,0 +1,211 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2723,6 +2723,134 @@
+ 	return cur;
+ }
+ 
++// DisplacementMapFilter, on the CPU — the same pass as ruffle's
++// render/wgpu/shaders/filter/displacement_map.wgsl at viewscale 1 (applyFilter
++// carries no stage scale; *_scales_with_screen is the render-time route, which
++// does not exist for AVM2 objects at all — w1 gfx-displace report §1.3).
++//
++// Conventions, straight from the shader plus FilterSource::vertices():
++//   * uv interpolates across the SOURCE RECT inside the WHOLE source texture,
++//     so source_pos = uv * source_size is the ABSOLUTE source pixel, +0.5 for
++//     the fragment centre;
++//   * the map is sampled NEAREST + ClampToEdge, and a map_uv outside 0..1 reads
++//     the neutral vec4(0.5) = 127.5 — half a level, not 128, and at scale 200
++//     that half level is a real -0.39 px shift;
++//   * the displaced coordinate is sampled BILINEAR with REPEAT over the whole
++//     source texture ("0 wrap is already taken care of by the sampler");
++//   * channels are read AS STORED, i.e. premultiplied. Ruffle's BitmapData
++//     textures are premultiplied too, so un-multiplying here would diverge.
++static double dm_component(uint32_t c, uint8_t comp)
++{
++	switch (comp)
++	{
++		case 1: return (double) CR(c);
++		case 2: return (double) CG(c);
++		case 4: return (double) CB(c);
++		case 8: return (double) CA(c);
++		default: return 128.0;   // the shader's "zero displacement"
++	}
++}
++
++static int dm_wrap(int v, int n)
++{
++	int r = v % n;
++	return r < 0 ? r + n : r;
++}
++
++static int dm_clampi(int v, int n)
++{
++	return v < 0 ? 0 : (v >= n ? n - 1 : v);
++}
++
++// Bilinear + Repeat sample of `bd` at pixel-space (px, py), rounded the way an
++// Rgba8Unorm render target rounds the shader's f32 output.
++static uint32_t dm_sample_repeat(Avm2BitmapDataExt* bd, double px, double py)
++{
++	int w = (int) bd->width, h = (int) bd->height;
++	double fx = px - 0.5, fy = py - 0.5;
++	double x0f = floor(fx), y0f = floor(fy);
++	double tx = fx - x0f, ty = fy - y0f;
++	int x0 = dm_wrap((int) x0f, w), x1 = dm_wrap((int) x0f + 1, w);
++	int y0 = dm_wrap((int) y0f, h), y1 = dm_wrap((int) y0f + 1, h);
++	uint32_t c00 = bd_get_raw(bd, (uint32_t) x0, (uint32_t) y0);
++	uint32_t c10 = bd_get_raw(bd, (uint32_t) x1, (uint32_t) y0);
++	uint32_t c01 = bd_get_raw(bd, (uint32_t) x0, (uint32_t) y1);
++	uint32_t c11 = bd_get_raw(bd, (uint32_t) x1, (uint32_t) y1);
++	uint32_t out[4];
++	for (int i = 0; i < 4; i++)
++	{
++		int sh = 24 - i * 8;              // A, R, G, B
++		double a = (double) ((c00 >> sh) & 0xFF), b = (double) ((c10 >> sh) & 0xFF);
++		double c = (double) ((c01 >> sh) & 0xFF), d = (double) ((c11 >> sh) & 0xFF);
++		double top = a + (b - a) * tx, bot = c + (d - c) * tx;
++		double v = floor(top + (bot - top) * ty + 0.5);
++		if (!(v > 0.0)) v = 0.0;
++		if (v > 255.0) v = 255.0;
++		out[i] = (uint32_t) v;
++	}
++	return CMK(out[1], out[2], out[3], out[0]);
++}
++
++// Displace `region` of `src` into a freshly allocated region-sized buffer of
++// premultiplied pixels. NULL when the filter cannot run (no map bitmap), which
++// ruffle treats as "filter unsupported" -> the destination is left alone.
++static uint32_t* bd_displace_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
++                                           const PixelRegion* region,
++                                           const Avm2FilterVal* f,
++                                           Avm2BitmapDataExt* map)
++{
++	int rw = (int) pr_w(region), rh = (int) pr_h(region);
++	if (rw <= 0 || rh <= 0 || map == NULL || map->disposed) return NULL;
++	if (map->width == 0 || map->height == 0) return NULL;
++	size_t n = (size_t) rw * (size_t) rh;
++	uint32_t* out = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
++	double sw = (double) src->width, sh = (double) src->height;
++	uint32_t mode_color = premul(CMK(CR(f->color), CG(f->color), CB(f->color),
++	                                 f->alpha), 1);
++	for (int y = 0; y < rh; y++)
++	{
++		for (int x = 0; x < rw; x++)
++		{
++			double spx = (double) (region->x_min + (uint32_t) x) + 0.5;
++			double spy = (double) (region->y_min + (uint32_t) y) + 0.5;
++			double mu = (spx - (double) f->map_x) / (double) map->width;
++			double mv = (spy - (double) f->map_y) / (double) map->height;
++			double cvx, cvy;
++			if (mu < 0.0 || mu > 1.0 || mv < 0.0 || mv > 1.0)
++			{
++				cvx = cvy = 127.5;                       // vec4(0.5) * 255
++			}
++			else
++			{
++				int mx = dm_clampi((int) floor(mu * (double) map->width),
++				                   (int) map->width);
++				int my = dm_clampi((int) floor(mv * (double) map->height),
++				                   (int) map->height);
++				uint32_t mc = bd_get_raw(map, (uint32_t) mx, (uint32_t) my);
++				cvx = dm_component(mc, f->comp_x);
++				cvy = dm_component(mc, f->comp_y);
++			}
++			double ddx = spx + (cvx - 128.0) * (double) f->scale_x / 256.0;
++			double ddy = spy + (cvy - 128.0) * (double) f->scale_y / 256.0;
++			double ux = ddx / sw, uy = ddy / sh;
++			int oob = (ux < 0.0 || ux > 1.0 || uy < 0.0 || uy > 1.0);
++			if (f->dm_mode == 1)                          // clamp
++			{
++				if (ux < 0.0) ux = 0.0; else if (ux > 1.0) ux = 1.0;
++				if (uy < 0.0) uy = 0.0; else if (uy > 1.0) uy = 1.0;
++			}
++			else if (f->dm_mode == 2 && oob)              // ignore
++			{
++				ux = spx / sw; uy = spy / sh;
++			}
++			out[(size_t) y * (size_t) rw + (size_t) x] =
++				(f->dm_mode == 3 && oob) ? mode_color
++				                         : dm_sample_repeat(src, ux * sw, uy * sh);
++		}
++	}
++	return out;
++}
++
+ static Avm2Value bd_apply_filter(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -2747,7 +2875,8 @@
+ 	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL)
+ 	                  && f.blur_x == 0 && f.blur_y == 0 && f.distance == 0;
+ 	int is_blur = (f.kind == AVM2_FILTER_BLUR);
+-	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur)
++	int is_displace = (f.kind == AVM2_FILTER_DISPLACEMENT_MAP);
++	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur && !is_displace)
+ 	{
+ 		avm2_filter_release(ctx, &f);
+ 		return avm2_undefined();
+@@ -2764,11 +2893,20 @@
+ 	if (is_blur)
+ 	{
+ 		blurred = bd_blur_source_region(ctx, src, &src_region, &f);
+-		if (blurred == NULL)
+-		{
+-			avm2_filter_release(ctx, &f);
+-			return avm2_undefined();
+-		}
++	}
++	else if (is_displace)
++	{
++		// The map is not in Avm2FilterVal (it round-trips to null); read it off
++		// the AS filter object. No map => ruffle's is_filter_supported is still
++		// true but the pass has nothing to sample, so leave the target alone.
++		Avm2BitmapDataExt* map = avm2_bitmapdata_ext_of(
++			ctx, avm2_filter_map_bitmap(ctx, fv.u.obj));
++		blurred = bd_displace_source_region(ctx, src, &src_region, &f, map);
++	}
++	if ((is_blur || is_displace) && blurred == NULL)
++	{
++		avm2_filter_release(ctx, &f);
++		return avm2_undefined();
+ 	}
+ 	PixelRegion dst_region = pr_whole(dst->width, dst->height);
+ 	int32_t size_x = (int32_t) pr_w(&src_region);
+diff --git a/SWFModernRuntime/include/avm2/avm2_filters.h b/SWFModernRuntime/include/avm2/avm2_filters.h
+index d4a14e09f..dec07a0f7 100644
+--- a/SWFModernRuntime/include/avm2/avm2_filters.h
++++ b/SWFModernRuntime/include/avm2/avm2_filters.h
+@@ -89,6 +89,13 @@ int avm2_filter_is_filter(Avm2Context* ctx, Avm2Value v);
+ // mode string. `out` is fully initialised on success.
+ int avm2_filter_from_object(Avm2Context* ctx, Avm2Object* obj, Avm2FilterVal* out);
+ 
++// A DisplacementMapFilter's mapBitmap. Avm2FilterVal deliberately does NOT
++// carry it (it round-trips to null, exactly like ruffle), but the one consumer
++// that needs the real BitmapData -- BitmapData.applyFilter -- has the AS filter
++// object in hand, so it reads the map straight off that. Returns null for any
++// other filter kind.
++Avm2Value avm2_filter_map_bitmap(Avm2Context* ctx, Avm2Object* obj);
++
+ // Quantized native value -> a BRAND NEW AS filter object (fresh every call:
+ // `o.filters === o.filters` is false, and mutating what you assigned has no
+ // effect on what you read back).
+diff --git a/SWFModernRuntime/src/avm2/avm2_filters.c b/SWFModernRuntime/src/avm2/avm2_filters.c
+index 0141f6d9a..a5c56f74f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_filters.c
++++ b/SWFModernRuntime/src/avm2/avm2_filters.c
+@@ -472,6 +472,14 @@ int avm2_filter_from_object(Avm2Context* ctx, Avm2Object* obj, Avm2FilterVal* ou
+ 	return 1;
+ }
+ 
++Avm2Value avm2_filter_map_bitmap(Avm2Context* ctx, Avm2Object* obj)
++{
++	if (filter_kind_of(ctx, obj) != AVM2_FILTER_DISPLACEMENT_MAP)
++		return avm2_null();
++	Avm2FilterObjExt* e = (Avm2FilterObjExt*) obj->native_ext;
++	return e != NULL ? e->map_bitmap : avm2_null();
++}
++
+ // ---------------------------------------------------------------------------
+ // Native -> a brand new AS object
+ // ---------------------------------------------------------------------------

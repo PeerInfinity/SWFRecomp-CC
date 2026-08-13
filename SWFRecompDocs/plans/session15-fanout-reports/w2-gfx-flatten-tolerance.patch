@@ -1,0 +1,21 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 0a00cfe1c..64fb4b64c 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -8664,12 +8664,15 @@ namespace SWFRecomp
+ 						}
+ 						else
+ 						{
+-							const float curve_flatten_tol_twips = 1.0f;   // 0.05 px at 1:1
++							const float curve_flatten_tol_twips = 2.0f;   // 0.05 px at 1:1
++							const u32 curve_flatten_floor = 6;            // historical fixed count
+ 
+ 							float dev_x = (float) control.x - 0.5f * ((float) current.x + (float) anchor.x);
+ 							float dev_y = (float) control.y - 0.5f * ((float) current.y + (float) anchor.y);
+ 							float dev = 0.5f * sqrtf(dev_x*dev_x + dev_y*dev_y);
+ 
++							num_passes = curve_flatten_floor;
++
+ 							if (dev > curve_flatten_tol_twips)
+ 							{
+ 								float n = ceilf(sqrtf(dev / curve_flatten_tol_twips));

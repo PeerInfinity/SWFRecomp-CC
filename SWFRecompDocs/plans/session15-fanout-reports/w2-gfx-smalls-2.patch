@@ -1,0 +1,46 @@
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 7ccc4bdfc..ebffbef08 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -12010,20 +12010,36 @@ void tagVideoFrame(SWFAppContext* app_context, u16 char_id, u16 frame_num,
+ // swf.c's frame-loop keep-alive gate calls it in every build so a non-looping
+ // root that set quit_swf keeps ticking while a sprite still plays. Reads only
+ // display_list/max_depth/dictionary, all present in the graphics build.
+-int hasPlayingSprites(void)
++// RECURSIVE since 2026-08-13 (session 15 `w2-gfx-smalls`): the animation that
++// keeps a movie alive is not always a ROOT-level sprite. from_shumway/acid/
++// acid-video has a 1-frame root that places a 1-frame sprite which *contains*
++// the 39-frame sprite; with a root-only scan the keep-alive gate saw "nothing
++// playing", quit_swf stuck, and the movie exited after ONE tick. Mirrors the
++// recursion `hasClipEnterFrameHandlers_impl` (just below) already does.
++// Nested display lists are depth-indexed from 1, same as the root one
++// (cf. tag.c:4243, tag.c:4862).
++static int hasPlayingSprites_impl(DisplayObject* dl, size_t dl_max)
+ {
+-	for (size_t i = 1; i <= max_depth; i++)
++	for (size_t i = 1; i <= dl_max; i++)
+ 	{
+-		if (display_list[i].char_id == 0) continue;
+-		Character* ch = &dictionary[display_list[i].char_id];
++		if (dl[i].char_id == 0) continue;
++		Character* ch = &dictionary[dl[i].char_id];
+ 		if (ch->type == CHAR_TYPE_SPRITE &&
+ 		    ch->sprite_frame_count > 1 &&
+-		    (display_list[i].sprite_is_playing || display_list[i].sprite_manual_next_frame))
++		    (dl[i].sprite_is_playing || dl[i].sprite_manual_next_frame))
+ 			return 1;
++		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0)
++			if (hasPlayingSprites_impl(dl[i].sprite_display_list, dl[i].sprite_max_depth))
++				return 1;
+ 	}
+ 	return 0;
+ }
+ 
++int hasPlayingSprites(void)
++{
++	return hasPlayingSprites_impl(display_list, max_depth);
++}
++
+ // Check if any display_list entry (recursive) has CLIP_EVENT_ENTER_FRAME clip actions
+ // and is initialized (sprite_initialized >= 2). Used to keep the frame loop alive.
+ static int hasClipEnterFrameHandlers_impl(DisplayObject* dl, size_t dl_max)

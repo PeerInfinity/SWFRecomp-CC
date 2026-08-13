@@ -1,0 +1,186 @@
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index b417cb379..175dfeaff 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -997,6 +997,73 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
+ // ---------------------------------------------------------------------------
+ // create_buffers_and_upload: create GPU buffers and upload static data
+ // ---------------------------------------------------------------------------
++// Dynamic bitmap layers. 64 is the FLOOR every movie keeps, so a given draw
++// lands in the same slot it always did and any content issuing <= 64 dynamic
++// bitmap draws per frame renders bit-identically. The ceiling is only reached
++// when the layers are CHEAP, because every layer of the shared static+dynamic
++// bitmap array is a full max(bitmap_highest, dynamic_bitmap_max)+1 square:
++//
++//     VRAM = bw * bh * 4 * (bitmap_count + capacity)
++//
++// so a flat 64 -> 128 doubles the bitmap VRAM of EVERY graphics test, not just
++// the two that truncate. from_shumway/acid/acid-color is 1841^2*4*65 = 881 MB
++// today and PASSES; acid-large is already a 2.52 GB OOM (w1 gfx board P3, which
++// measured the practical lavapipe ceiling between those two). A flat raise would
++// put acid-color at 1.73 GB, inside that window. Growth is therefore gated on a
++// byte budget, and never shrinks below the floor.
++#define MAX_DYNAMIC_BITMAPS 64
++#define MAX_DYNAMIC_BITMAPS_GROWN 128
++#define DYNAMIC_BITMAP_VRAM_BUDGET ((size_t)384 * 1024 * 1024)
++// wgpu's guaranteed maxTextureArrayLayers floor, and what SwiftShader/WSL2
++// adapters report (webgpu-texture-array-layer-limit-blank-render).
++#define MAX_BITMAP_TEXTURE_LAYERS 256
++
++// Plan the bitmap texture array: one layer's padded dimensions and how many
++// dynamic layers to allocate. create_buffers_and_upload sizes its side-tables
++// from this and create_textures allocates the array itself, so it has to give
++// the same answer in both — it is idempotent, including across create_textures'
++// rewrite of bitmap_highest_{w,h} to the padded layer size.
++static void plan_dynamic_bitmaps(WebGPURenderContext* ctx, u32* out_cap,
++                                 u32* out_w, u32* out_h)
++{
++	// Callers (e.g. swf.c::swfStart, avm2_display.c) may pre-set these to fit a
++	// bundled image larger than 256x256 before renderer_init; only apply the
++	// default floor when unset.
++	if (ctx->dynamic_bitmap_max_w == 0) ctx->dynamic_bitmap_max_w = 256;
++	if (ctx->dynamic_bitmap_max_h == 0) ctx->dynamic_bitmap_max_h = 256;
++
++	u32 bw = (u32)(ctx->bitmap_highest_w > 0
++		? ctx->bitmap_highest_w + 1 : ctx->dynamic_bitmap_max_w + 1);
++	u32 bh = (u32)(ctx->bitmap_highest_h > 0
++		? ctx->bitmap_highest_h + 1 : ctx->dynamic_bitmap_max_h + 1);
++	// If static bitmaps exist, ensure dynamic max fits within the texture dims
++	if (ctx->bitmap_count > 0)
++	{
++		if (ctx->dynamic_bitmap_max_w + 1 > bw) bw = ctx->dynamic_bitmap_max_w + 1;
++		if (ctx->dynamic_bitmap_max_h + 1 > bh) bh = ctx->dynamic_bitmap_max_h + 1;
++	}
++
++	u32 cap = MAX_DYNAMIC_BITMAPS;
++	size_t layer_bytes = (size_t)bw * (size_t)bh * 4;
++	size_t affordable = layer_bytes > 0 ? DYNAMIC_BITMAP_VRAM_BUDGET / layer_bytes : 0;
++	if (affordable > (size_t)ctx->bitmap_count)
++	{
++		size_t grown = affordable - (size_t)ctx->bitmap_count;
++		if (grown > (size_t)MAX_DYNAMIC_BITMAPS_GROWN) grown = MAX_DYNAMIC_BITMAPS_GROWN;
++		if (grown > (size_t)cap) cap = (u32)grown;
++	}
++	// Only the GROWTH is clamped to the array-layer limit; a movie whose static
++	// bitmaps already overrun it keeps exactly the behaviour it has today.
++	u32 room = (u32)ctx->bitmap_count < MAX_BITMAP_TEXTURE_LAYERS
++		? MAX_BITMAP_TEXTURE_LAYERS - (u32)ctx->bitmap_count : 0;
++	if (cap > room) cap = room;
++	if (cap < MAX_DYNAMIC_BITMAPS) cap = MAX_DYNAMIC_BITMAPS;
++
++	*out_cap = cap;
++	*out_w = bw;
++	*out_h = bh;
++}
++
+ static void create_buffers_and_upload(WebGPURenderContext* ctx)
+ {
+ 	// Vertex buffer (shape geometry) — over-allocate for dynamic rendering.
+@@ -1088,11 +1155,13 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
+ 
+ 	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
+ 	#define MAX_DYNAMIC_GRADIENTS 64
+-	#define MAX_DYNAMIC_BITMAPS 64
++	u32 dynamic_bitmap_cap, bmp_layer_w, bmp_layer_h;
++	plan_dynamic_bitmaps(ctx, &dynamic_bitmap_cap, &bmp_layer_w, &bmp_layer_h);
++	(void) bmp_layer_w; (void) bmp_layer_h;
+ 	{
+ 		u32 static_mats = ctx->uninv_mat_data_size > 0
+ 			? (u32)(ctx->uninv_mat_data_size / (16 * sizeof(float))) : 0;
+-		size_t total_mat_size = (size_t)(static_mats + MAX_DYNAMIC_GRADIENTS + MAX_DYNAMIC_BITMAPS) * 16 * sizeof(float);
++		size_t total_mat_size = (size_t)(static_mats + MAX_DYNAMIC_GRADIENTS + dynamic_bitmap_cap) * 16 * sizeof(float);
+ 		if (total_mat_size == 0) total_mat_size = 16 * sizeof(float); // minimum 1 slot
+ 
+ 		ctx->uninv_mat_buffer = create_buffer(ctx->device, ctx->queue,
+@@ -1112,19 +1181,14 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
+ 
+ 	// Over-allocate bitmap_sizes_buffer for dynamic attached bitmaps
+ 	{
+-		u32 total_bmp_slots = (u32)ctx->bitmap_count + MAX_DYNAMIC_BITMAPS;
++		u32 total_bmp_slots = (u32)ctx->bitmap_count + dynamic_bitmap_cap;
+ 		if (total_bmp_slots == 0) total_bmp_slots = 1;
+ 		ctx->bitmap_sizes_buffer = create_buffer(ctx->device, ctx->queue,
+ 			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+ 			NULL, 4 * sizeof(u32) * total_bmp_slots, "bitmap_sizes_buffer");
+ 		ctx->dynamic_bitmap_base = (u32)ctx->bitmap_count;
+-		ctx->dynamic_bitmap_capacity = MAX_DYNAMIC_BITMAPS;
++		ctx->dynamic_bitmap_capacity = dynamic_bitmap_cap;
+ 		ctx->dynamic_bitmap_used = 0;
+-		// Callers (e.g. swf.c::swfStart) may pre-set these to fit a bundled
+-		// image larger than 256×256 before renderer_init; only apply the
+-		// default floor when unset.
+-		if (ctx->dynamic_bitmap_max_w == 0) ctx->dynamic_bitmap_max_w = 256;
+-		if (ctx->dynamic_bitmap_max_h == 0) ctx->dynamic_bitmap_max_h = 256;
+ 	}
+ 
+ 	// Over-allocate cxform buffer for dynamic runtime cxform slots
+@@ -1231,15 +1295,9 @@ static void create_textures(WebGPURenderContext* ctx)
+ 
+ 	// --- Bitmap texture array (always created, over-allocated for dynamic attachBitmap) ---
+ 	{
+-		u32 total_bitmap_layers = (u32)ctx->bitmap_count + MAX_DYNAMIC_BITMAPS;
+-		// Padded dimensions: max of static bitmaps and dynamic bitmap max size
+-		u32 bw = (u32)(ctx->bitmap_highest_w > 0 ? ctx->bitmap_highest_w + 1 : ctx->dynamic_bitmap_max_w + 1);
+-		u32 bh = (u32)(ctx->bitmap_highest_h > 0 ? ctx->bitmap_highest_h + 1 : ctx->dynamic_bitmap_max_h + 1);
+-		// If static bitmaps exist, ensure dynamic max fits within the texture dimensions
+-		if (ctx->bitmap_count > 0) {
+-			if (ctx->dynamic_bitmap_max_w + 1 > bw) bw = ctx->dynamic_bitmap_max_w + 1;
+-			if (ctx->dynamic_bitmap_max_h + 1 > bh) bh = ctx->dynamic_bitmap_max_h + 1;
+-		}
++		u32 dynamic_bitmap_cap, bw, bh;
++		plan_dynamic_bitmaps(ctx, &dynamic_bitmap_cap, &bw, &bh);
++		u32 total_bitmap_layers = (u32)ctx->bitmap_count + dynamic_bitmap_cap;
+ 		// Update highest dimensions for upload consistency
+ 		ctx->bitmap_highest_w = bw - 1;
+ 		ctx->bitmap_highest_h = bh - 1;
+@@ -2415,6 +2473,24 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
+ // stretches via UV mapping when src != dst (Flash's Video render rule).
+ // When src == dst, equivalent to the original unscaled function.
+ // ---------------------------------------------------------------------------
++// One-shot notice that a frame asked for more dynamic bitmap layers than the
++// array has. Both call sites drop the draw SILENTLY, which reads downstream as
++// missing ink rather than as a capacity failure — 36 of 100 tiles rendered
++// blank in visual/filters/blur_* for a whole session before anyone traced it
++// back here (w1 gfx-blur report S2.3). Enumerating who truncates is the only
++// way to price a capacity change, so leave a way to see it. Off unless
++// SWF_WARN_BITMAP_CAP is set, since tests capture these streams.
++static void dynamic_bitmap_capacity_hit(WebGPURenderContext* ctx)
++{
++	static int warned = 0;
++	if (warned || getenv("SWF_WARN_BITMAP_CAP") == NULL) return;
++	warned = 1;
++	fprintf(stderr, "[render] dynamic bitmap capacity %u exhausted "
++	        "(layer %ux%u); further bitmap draws this frame are dropped\n",
++	        ctx->dynamic_bitmap_capacity, (u32)(ctx->bitmap_highest_w + 1),
++	        (u32)(ctx->bitmap_highest_h + 1));
++}
++
+ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
+ 	const uint32_t* argb_pixels, u32 src_w, u32 src_h,
+ 	u32 dst_w, u32 dst_h,
+@@ -2423,7 +2499,11 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
+ {
+ 	if (!ctx->renderer_ok || argb_pixels == NULL) return;
+ 	if (src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0) return;
+-	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity) return;
++	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity)
++	{
++		dynamic_bitmap_capacity_hit(ctx);
++		return;
++	}
+ 	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
+ 	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
+ 
+@@ -2577,7 +2657,11 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
+ 	(void)smooth;  // smoothing flag — sampler is currently fixed at linear
+ 	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
+ 	if (argb_pixels == NULL || src_w == 0 || src_h == 0) return;
+-	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity) return;
++	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity)
++	{
++		dynamic_bitmap_capacity_hit(ctx);
++		return;
++	}
+ 	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
+ 		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
+ 	if (vertex_count == 0) return;

@@ -1,0 +1,433 @@
+diff --git a/SWFModernRuntime/include/curve_flatten.h b/SWFModernRuntime/include/curve_flatten.h
+new file mode 100644
+index 000000000..78e01d5ca
+--- /dev/null
++++ b/SWFModernRuntime/include/curve_flatten.h
+@@ -0,0 +1,125 @@
++#ifndef CURVE_FLATTEN_H
++#define CURVE_FLATTEN_H
++
++// Raph Levien parabola-integral flattening for quadratic Beziers, ported from
++// lyon_geom 1.0.6 `src/quadratic_bezier.rs` (`FlatteningParameters::new` and
++// `t_at_iteration`) — the flattener Ruffle's tessellator actually runs, via
++// `FillOptions::DEFAULT_TOLERANCE / scale` (`ruffle/render/src/tessellator.rs`).
++//
++// Coordinates are in PIXELS, exactly like Ruffle's lyon path (its `point()`
++// helper converts Twips -> pixels before handing the path to lyon).
++//
++// Why this exists: the runtime drawing-API tessellators used to pick a chord
++// count from a four-bucket flatness ladder (1 / 4 / 8 / 16 segments), which is
++// far finer than lyon's on mid-size arcs and far coarser on large ones. Since
++// our chords are inscribed, "finer" means the filled polygon is systematically
++// LARGER than Ruffle's, which shows up as one-directional edge pixels at
++// MSAA 1. See SWFRecompDocs/plans/session15-fanout-reports/w2-gfx-flatten-report.md.
++
++#include <math.h>
++
++#define CURVE_FLATTEN_TOLERANCE 0.1f   // lyon FillOptions::DEFAULT_TOLERANCE
++#define CURVE_FLATTEN_MAX_SEGS  256
++
++typedef struct
++{
++	int   count;                   // lyon's `count`; 0 => emit one straight chord
++	float integral_from;
++	float integral_step;
++	float inv_integral_from;
++	float div_inv_integral_diff;
++} CurveFlatten;
++
++// integral (1 + 4x^2) ^ -0.25 dx  (lyon `approx_parabola_integral`)
++static inline float curve_flatten_pint(float x)
++{
++	const float d = 0.67f;
++	return x / (1.0f - d + sqrtf(sqrtf(d*d*d*d + 0.25f*x*x)));
++}
++
++// inverse of the above (lyon `approx_parabola_inv_integral`)
++static inline float curve_flatten_pinv(float x)
++{
++	const float b = 0.39f;
++	return x * (1.0f - b + sqrtf(b*b + 0.25f*x*x));
++}
++
++static inline CurveFlatten curve_flatten_init(float x0, float y0,
++                                              float cx, float cy,
++                                              float x1, float y1,
++                                              float tolerance)
++{
++	CurveFlatten p;
++	p.count = 0;
++	p.integral_from = 0.0f;
++	p.integral_step = 0.0f;
++	p.inv_integral_from = 0.0f;
++	p.div_inv_integral_diff = 0.0f;
++
++	// lyon `is_linear`: degenerate, or control within 2*tolerance of the chord.
++	if (x0 == x1 && y0 == y1)
++	{
++		return p;
++	}
++	{
++		float bx = x1 - x0, by = y1 - y0;
++		float len2 = bx*bx + by*by;
++		float cross = (cx - x0) * by - (cy - y0) * bx;
++		if (len2 > 0.0f && (cross*cross) / len2 <= tolerance * tolerance * 4.0f)
++		{
++			return p;
++		}
++	}
++
++	float ddx = 2.0f*cx - x0 - x1;
++	float ddy = 2.0f*cy - y0 - y1;
++	float crs = (x1 - x0) * ddy - (y1 - y0) * ddx;
++	if (crs == 0.0f)
++	{
++		return p;
++	}
++	float inv_crs = 1.0f / crs;
++	float parabola_from = ((cx - x0) * ddx + (cy - y0) * ddy) * inv_crs;
++	float parabola_to   = ((x1 - cx) * ddx + (y1 - cy) * ddy) * inv_crs;
++	float scale = fabsf(crs) / (sqrtf(ddx*ddx + ddy*ddy) * fabsf(parabola_to - parabola_from));
++
++	float integral_from = curve_flatten_pint(parabola_from);
++	float integral_to   = curve_flatten_pint(parabola_to);
++	float integral_diff = integral_to - integral_from;
++
++	float inv_integral_from = curve_flatten_pinv(integral_from);
++	float inv_integral_to   = curve_flatten_pinv(integral_to);
++
++	float count = ceilf(0.5f * fabsf(integral_diff) * sqrtf(scale / tolerance));
++	if (!isfinite(count) || count < 1.0f)
++	{
++		return p;
++	}
++	if (count > (float) CURVE_FLATTEN_MAX_SEGS)
++	{
++		count = (float) CURVE_FLATTEN_MAX_SEGS;
++	}
++
++	p.count = (int) count;
++	p.integral_from = integral_from;
++	p.integral_step = integral_diff / count;
++	p.inv_integral_from = inv_integral_from;
++	p.div_inv_integral_diff = 1.0f / (inv_integral_to - inv_integral_from);
++	return p;
++}
++
++// lyon `t_at_iteration`. Valid for i in [1, count-1]; the final point is the
++// curve's own end point, never a sample.
++static inline float curve_flatten_t(const CurveFlatten* p, int i)
++{
++	float u = curve_flatten_pinv(p->integral_from + p->integral_step * (float) i);
++	return (u - p->inv_integral_from) * p->div_inv_integral_diff;
++}
++
++// Convenience: number of chords lyon would emit (always >= 1).
++static inline int curve_flatten_segs(const CurveFlatten* p)
++{
++	return (p->count < 1) ? 1 : p->count;
++}
++
++#endif // CURVE_FLATTEN_H
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 65edcbf57..b420d9ed8 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -8,6 +8,7 @@
+ #include <limits.h>
+ #include <setjmp.h>
+ #include "tesselator.h"
++#include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
+ 
+ #ifdef __EMSCRIPTEN__
+ #include <emscripten.h>
+@@ -27661,22 +27662,23 @@ static int drawingCmdWindingHitTest(const DrawingState* ds,
+ 			double sx = cx, sy = cy;
+ 			double mx = (sx + (double)c->x) * 0.5;
+ 			double my = (sy + (double)c->y) * 0.5;
+-			double dx = (double)c->cx - mx, dy = (double)c->cy - my;
+-			double flatness = dx*dx + dy*dy;
+-			int segs;
+-			if (flatness < 0.25) segs = 1;
+-			else if (flatness < 4.0) segs = 4;
+-			else if (flatness < 25.0) segs = 8;
+-			else segs = 16;
++			// Levien/lyon flattening — MUST stay identical to
++			// drawingFinalizePath's, or hit tests disagree with the fill.
++			CurveFlatten cf_ = curve_flatten_init((float)sx, (float)sy,
++				c->cx, c->cy, c->x, c->y, CURVE_FLATTEN_TOLERANCE);
+ 			double prev_x = sx, prev_y = sy;
+-			for (int s = 1; s <= segs; s++) {
+-				double t = (double)s / (double)segs;
++			for (int s = 1; s <= cf_.count; s++) {
++				double t = (s < cf_.count) ? (double) curve_flatten_t(&cf_, s) : 1.0;
+ 				double u = 1.0 - t;
+ 				double px = u*u*sx + 2*u*t*(double)c->cx + t*t*(double)c->x;
+ 				double py = u*u*sy + 2*u*t*(double)c->cy + t*t*(double)c->y;
+ 				winding += drawingWindingLine(tx_px, ty_px, prev_x, prev_y, px, py);
+ 				prev_x = px; prev_y = py;
+ 			}
++			if (cf_.count < 1) {
++				winding += drawingWindingLine(tx_px, ty_px, prev_x, prev_y,
++					(double)c->x, (double)c->y);
++			}
+ 			cx = c->x; cy = c->y;
+ 		}
+ 	}
+@@ -28328,17 +28330,14 @@ static void drawingFinalizePath(DrawingState* ds)
+ 			// Ensure a contour exists if the cmd stream began with a curve.
+ 			if (contour_count == 0) _DR_ADD_CONTOUR_START();
+ 			// Flatness test: max distance of control point from midpoint of start→end
+-			float mx = (sx + c->x) * 0.5f, my = (sy + c->y) * 0.5f;
+-			float dx = c->cx - mx, dy = c->cy - my;
+-			float flatness = dx * dx + dy * dy;
+-			// Choose segment count based on deviation (tolerance ~0.5 pixels)
+-			int segs;
+-			if (flatness < 0.25f) segs = 1;       // < 0.5px deviation
+-			else if (flatness < 4.0f) segs = 4;    // < 2px
+-			else if (flatness < 25.0f) segs = 8;   // < 5px
+-			else segs = 16;                         // large curves
++			// Levien/lyon flattening at lyon's own tolerance — see
++			// include/curve_flatten.h. Kept in lockstep with
++			// drawingCmdWindingHitTest above.
++			CurveFlatten cf_ = curve_flatten_init(sx, sy, c->cx, c->cy,
++			                                      c->x, c->y, CURVE_FLATTEN_TOLERANCE);
++			int segs = curve_flatten_segs(&cf_);
+ 			for (int seg = 1; seg <= segs; seg++) {
+-				float t = (float)seg / (float)segs;
++				float t = (seg < cf_.count) ? curve_flatten_t(&cf_, seg) : 1.0f;
+ 				float u = 1.0f - t;
+ 				float px = u*u*sx + 2*u*t*c->cx + t*t*c->x;
+ 				float py = u*u*sy + 2*u*t*c->cy + t*t*c->y;
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index a02225ac2..88a53892a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -30,6 +30,7 @@
+ #include <avm2/avm2_error.h>
+ #include <avm2/avm2_filters.h>
+ #include <tesselator.h>  // T4 Part B: runtime Graphics tessellation (libtess2)
++#include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
+ #include <memory/heap.h>
+ 
+ #include <avm2/avm2_gc.h>
+@@ -7689,15 +7690,21 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
+ 			float sx = (i > 0) ? g->cmds[i-1].x : 0.0f;
+ 			float sy = (i > 0) ? g->cmds[i-1].y : 0.0f;
+ 			if (ccount == 0) _GADDC();
+-			float mx = (sx + c->x) * 0.5f, my = (sy + c->y) * 0.5f;
+-			float dx = c->cx - mx, dy = c->cy - my, flat = dx*dx + dy*dy;
+-			int segs = flat < 0.25f ? 1 : flat < 4.0f ? 4 : flat < 25.0f ? 8 : 16;
+-			for (int s = 1; s <= segs; s++)
++			// Levien/lyon flattening at lyon's own tolerance — see
++			// include/curve_flatten.h. The old four-bucket flatness ladder
++			// (1/4/8/16) was much finer than Ruffle's on mid-size arcs, and
++			// since chords are inscribed in the *quadratic* (which for a
++			// drawCircle arc bulges outside the true circle) that made our
++			// filled polygon systematically WIDER than Ruffle's.
++			CurveFlatten cf_ = curve_flatten_init(sx, sy, c->cx, c->cy,
++			                                      c->x, c->y, CURVE_FLATTEN_TOLERANCE);
++			for (int s = 1; s < cf_.count; s++)
+ 			{
+-				float t = (float) s / (float) segs, u = 1.0f - t;
++				float t = curve_flatten_t(&cf_, s), u = 1.0f - t;
+ 				_GADDP(u*u*sx + 2*u*t*c->cx + t*t*c->x,
+ 				       u*u*sy + 2*u*t*c->cy + t*t*c->y);
+ 			}
++			_GADDP(c->x, c->y);
+ 		}
+ 		else { if (ccount == 0) _GADDC(); _GADDP(c->x, c->y); }
+ 	}
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 0a00cfe1c..153f33fdf 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -7994,6 +7994,128 @@ namespace SWFRecomp
+ 		return (u32) n;
+ 	}
+ 
++	// ---------------------------------------------------------------------
++	// Raph Levien parabola-integral quadratic flattening, ported from
++	// lyon_geom 1.0.6 `src/quadratic_bezier.rs` (`FlatteningParameters::new`
++	// and `t_at_iteration`) — the flattener Ruffle's tessellator runs, via
++	// `FillOptions::DEFAULT_TOLERANCE / scale` in
++	// `ruffle/render/src/tessellator.rs`. Ruffle's lyon path is in PIXELS;
++	// we flatten in twips, so DEFAULT_TOLERANCE (0.1 px) is 2.0 twips.
++	//
++	// Only the plain-shape arm uses this. Morph shapes keep equal-parameter
++	// stepping because their two streams are paired BY INDEX and a Levien
++	// schedule differs between the start and end curve.
++	// ---------------------------------------------------------------------
++
++	static const float LEVIEN_TOL_TWIPS = 2.0f;   // = lyon 0.1 px at 1:1
++
++	struct LevienParams
++	{
++		u32 count;               // 0 => a single straight chord
++		float integral_from;
++		float integral_step;
++		float inv_integral_from;
++		float div_inv_integral_diff;
++	};
++
++	static float levienParabolaIntegral(float x)
++	{
++		const float d = 0.67f;
++		return x / (1.0f - d + sqrtf(sqrtf(d*d*d*d + 0.25f*x*x)));
++	}
++
++	static float levienParabolaInvIntegral(float x)
++	{
++		const float b = 0.39f;
++		return x * (1.0f - b + sqrtf(b*b + 0.25f*x*x));
++	}
++
++	static LevienParams levienInit(float x0, float y0, float cx, float cy,
++	                               float x1, float y1, float tolerance)
++	{
++		LevienParams p = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
++
++		if (x0 == x1 && y0 == y1)
++		{
++			return p;
++		}
++
++		{
++			// lyon `is_linear`
++			float bx = x1 - x0, by = y1 - y0;
++			float len2 = bx*bx + by*by;
++			float cross = (cx - x0) * by - (cy - y0) * bx;
++			if (len2 > 0.0f && (cross*cross) / len2 <= tolerance * tolerance * 4.0f)
++			{
++				return p;
++			}
++		}
++
++		float ddx = 2.0f*cx - x0 - x1;
++		float ddy = 2.0f*cy - y0 - y1;
++		float crs = (x1 - x0) * ddy - (y1 - y0) * ddx;
++		if (crs == 0.0f)
++		{
++			return p;
++		}
++
++		float inv_crs = 1.0f / crs;
++		float parabola_from = ((cx - x0) * ddx + (cy - y0) * ddy) * inv_crs;
++		float parabola_to   = ((x1 - cx) * ddx + (y1 - cy) * ddy) * inv_crs;
++		float scale = fabsf(crs) / (sqrtf(ddx*ddx + ddy*ddy) * fabsf(parabola_to - parabola_from));
++
++		float integral_from = levienParabolaIntegral(parabola_from);
++		float integral_to   = levienParabolaIntegral(parabola_to);
++		float integral_diff = integral_to - integral_from;
++
++		float inv_integral_from = levienParabolaInvIntegral(integral_from);
++		float inv_integral_to   = levienParabolaInvIntegral(integral_to);
++
++		float count = ceilf(0.5f * fabsf(integral_diff) * sqrtf(scale / tolerance));
++		if (!std::isfinite(count) || count < 1.0f)
++		{
++			return p;
++		}
++		if (count > 64.0f)
++		{
++			count = 64.0f;   // same shape_data growth bound as before
++		}
++
++		p.count = (u32) count;
++		p.integral_from = integral_from;
++		p.integral_step = integral_diff / count;
++		p.inv_integral_from = inv_integral_from;
++		p.div_inv_integral_diff = 1.0f / (inv_integral_to - inv_integral_from);
++		return p;
++	}
++
++	static float levienT(const LevienParams& p, u32 i)
++	{
++		float u = levienParabolaInvIntegral(p.integral_from + p.integral_step * (float) i);
++		return (u - p.inv_integral_from) * p.div_inv_integral_diff;
++	}
++
++	// Levien-scheduled twin of SWF::addCurvedEdge. Non-morph only, so no
++	// morph_index bookkeeping. Truncation to integer twips is kept verbatim
++	// (see the note in addCurvedEdge).
++	static void addCurvedEdgeLevien(Path* path, Vertex current, Vertex control,
++	                                Vertex anchor, const LevienParams& lp)
++	{
++		u32 n = (lp.count < 1) ? 1 : lp.count;
++
++		for (u32 i = 1; i <= n; ++i)
++		{
++			float t = (i < lp.count) ? levienT(lp, i) : 1.0f;
++			float u = 1.0f - t;
++
++			Vertex v;
++			v.x = (s32) (u*u*current.x + 2*u*t*control.x + t*t*anchor.x);
++			v.y = (s32) (u*u*current.y + 2*u*t*control.y + t*t*anchor.y);
++
++			path->verts.push_back(v);
++		}
++	}
++
+ 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
+ 	{
+ 		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2 || shape_tag.code == SWF_TAG_DEFINE_FONT_3);
+@@ -8650,6 +8772,13 @@ namespace SWFRecomp
+ 						// both sides max(N(dev_start), N(dev_end)), which keeps the
+ 						// pairing exact while still refining. Without a plan (an
+ 						// unrecognised stream) morphs fall back to the historical 6.
++						// Leg-C knob: when set, the plain-shape arm uses the
++						// ported lyon/Levien schedule instead of the
++						// equal-parameter one, which is what Ruffle does.
++						const bool curve_flatten_levien = true;
++						LevienParams levien_params = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
++						bool levien_active = false;
++
+ 						u32 num_passes = 6;
+ 						if (is_morph)
+ 						{
+@@ -8662,14 +8791,27 @@ namespace SWFRecomp
+ 								}
+ 							}
+ 						}
++						else if (curve_flatten_levien)
++						{
++							levien_params = levienInit((float) current.x, (float) current.y,
++							                           (float) control.x, (float) control.y,
++							                           (float) anchor.x, (float) anchor.y,
++							                           LEVIEN_TOL_TWIPS);
++							levien_active = true;
++							num_passes = (levien_params.count < 1) ? 1 : levien_params.count;
++						}
++
+ 						else
+ 						{
+-							const float curve_flatten_tol_twips = 1.0f;   // 0.05 px at 1:1
++							const float curve_flatten_tol_twips = 2.0f;   // 0.05 px at 1:1
++							const u32 curve_flatten_floor = 6;            // historical fixed count
+ 
+ 							float dev_x = (float) control.x - 0.5f * ((float) current.x + (float) anchor.x);
+ 							float dev_y = (float) control.y - 0.5f * ((float) current.y + (float) anchor.y);
+ 							float dev = 0.5f * sqrtf(dev_x*dev_x + dev_y*dev_y);
+ 
++							num_passes = curve_flatten_floor;
++
+ 							if (dev > curve_flatten_tol_twips)
+ 							{
+ 								float n = ceilf(sqrtf(dev / curve_flatten_tol_twips));
+@@ -8688,7 +8830,15 @@ namespace SWFRecomp
+ 						emitPath(3.0f, (float)control.x, (float)(FRAME_HEIGHT - control.y));
+ 						emitPath(4.0f, (float)anchor.x, (float)(FRAME_HEIGHT - anchor.y));
+ 
+-						addCurvedEdge(current_path, current, control, anchor, num_passes, is_morph ? &morph_vertex_counter : nullptr);
++						if (levien_active)
++						{
++							addCurvedEdgeLevien(current_path, current, control, anchor, levien_params);
++						}
++
++						else
++						{
++							addCurvedEdge(current_path, current, control, anchor, num_passes, is_morph ? &morph_vertex_counter : nullptr);
++						}
+ 						morph_start_edge_ord += 1;
+ 
+ 						last_x = anchor.x;

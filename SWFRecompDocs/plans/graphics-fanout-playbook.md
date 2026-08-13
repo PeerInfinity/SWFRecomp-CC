@@ -442,3 +442,40 @@ regressions, bands improved 7 / worsened 0.** Ledger:
   3 rows); blur_fractional/blur_quality structural extra ink (774k/821k);
   blend-layer alpha (output.26, one-dump bisect); Stage3D (25) + h264 (12)
   arcs parked; define_bits_lossless2_rgb15 arrived passing (new upstream).
+
+## 14. Session-15 state of the board (2026-08-13)
+
+**Closeout run `31748059158` at `3db858cbc`: 324/569 (56.9%), +14, zero
+regressions, bands improved 13 / worsened 0, drift 0/0.** Ledger:
+`polish-sweep-arc.md` §16; reports `session15-fanout-reports/`.
+
+- **s16→s32 shape deltas landed** (17-bit SB fields; both acid-blend flips).
+  §13's "blend-layer alpha" row and §11's "B-channel halving" row are
+  SUPERSEDED. The four held acid-blend-2 comparisons passed CI.
+- **Blur is no longer a no-op for BitmapData**: bd_apply_filter routes to a
+  corrected box kernel (normalize by quantized weight sum + round-nearest —
+  the literal blur.wgsl port FAILS by 48 channels; keep the correction).
+  MAX_DYNAMIC_BITMAPS is now budgeted (64 floor → 128 under 384MB); a flat
+  raise is REFUTED (acid-color would hit 1.73GB). applyfilter_blur residual
+  is device-font text.
+- **Runtime drawing-API flattening is lyon/Levien** (leg R). The four-bucket
+  ladder (1/4/8/16) is gone. P2's recompiler framing was WRONG for 9/13
+  census rows (they have zero recompiler geometry) and the 0.6px magnitude
+  was 10× overstated. Leg C (recompiler port) is HELD for a solo dispatch —
+  never bundle (bounds shrink ~1 twip = trace effect corpus-wide).
+- **render_canary_tests.txt gained acid-blend-2** — the prior 11 canary
+  members contain ZERO quadratics (a canary caveat discovered s15; curve
+  changes were previously invisible to the canary).
+- **Morph OOB closed** (stroke vertices + end colors reach the end tables;
+  morph_test1 −76% ×5). Known-remaining: per-character end-color offset
+  (tag.c:6966 / avm2 :3197) needs a tagDefineMorphShape signature change.
+- **no_render bucket 5→1** (capture cap + sprite recursion + lossless2 fmt4).
+- **Top remaining leads**: AVM2 filters Route 2 offscreen/composite arc
+  (owns much of the 15-row filters family; five traps in
+  wave1-gfx-displace-blend.md + w2-gfx-blur-report.md §6); flattening leg C
+  solo run (masks 1738→1497 + 6 band moves, −25-38% vertices);
+  simple_shapes/masks = scale/transform defect (slope, not flattening);
+  acid-large VRAM budgeting; blur_quality residual per-pass rounding
+  (goldens disagree by 1 LSB — band ceiling); Stage3D (25) + h264 (12
+  → really 11 + FLV seek) parked; displacement Route 2 merged into the
+  filters arc.

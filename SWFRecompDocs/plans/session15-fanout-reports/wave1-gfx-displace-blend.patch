@@ -1,0 +1,74 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 0a00cfe1c..b0ea09ead 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -8567,8 +8567,8 @@ namespace SWFRecomp
+ 								
+ 								shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+ 								
+-								s16 delta_x = (s16) shape_tag.fields[0].value;
+-								s16 delta_y = (s16) shape_tag.fields[1].value;
++								s32 delta_x = (s32) shape_tag.fields[0].value;
++								s32 delta_y = (s32) shape_tag.fields[1].value;
+ 
+ 								pushStraightEdge(last_x + (s32) delta_x, last_y - (s32) delta_y);
+ 								morph_start_edge_ord += 1;
+@@ -8585,7 +8585,7 @@ namespace SWFRecomp
+ 							shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+ 							
+ 							bool is_vertical_line = (shape_tag.fields[0].value & 1) != 0;
+-							s16 delta = (s16) shape_tag.fields[1].value;
++							s32 delta = (s32) shape_tag.fields[1].value;
+ 
+ 							s32 edge_x = last_x;
+ 							s32 edge_y = last_y;
+@@ -8618,10 +8618,10 @@ namespace SWFRecomp
+ 						
+ 						shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+ 						
+-						s16 control_delta_x = (s16) shape_tag.fields[0].value;
+-						s16 control_delta_y = (s16) shape_tag.fields[1].value;
+-						s16 anchor_delta_x = (s16) shape_tag.fields[2].value;
+-						s16 anchor_delta_y = (s16) shape_tag.fields[3].value;
++						s32 control_delta_x = (s32) shape_tag.fields[0].value;
++						s32 control_delta_y = (s32) shape_tag.fields[1].value;
++						s32 anchor_delta_x = (s32) shape_tag.fields[2].value;
++						s32 anchor_delta_y = (s32) shape_tag.fields[3].value;
+ 						
+ 						Vertex current;
+ 						current.x = last_x;
+@@ -9045,8 +9045,8 @@ namespace SWFRecomp
+ 									shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+ 									shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+ 
+-									s16 dx = (s16) shape_tag.fields[0].value;
+-									s16 dy = (s16) shape_tag.fields[1].value;
++									s32 dx = (s32) shape_tag.fields[0].value;
++									s32 dy = (s32) shape_tag.fields[1].value;
+ 
+ 									pushEndStraight(end_last_x + (s32) dx, end_last_y - (s32) dy);
+ 								}
+@@ -9059,7 +9059,7 @@ namespace SWFRecomp
+ 									shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+ 
+ 									bool end_vert = (shape_tag.fields[0].value & 1) != 0;
+-									s16 delta = (s16) shape_tag.fields[1].value;
++									s32 delta = (s32) shape_tag.fields[1].value;
+ 
+ 									s32 end_target_x = end_last_x;
+ 									s32 end_target_y = end_last_y;
+@@ -9083,10 +9083,10 @@ namespace SWFRecomp
+ 								shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+ 								shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+ 
+-								s16 cdx = (s16) shape_tag.fields[0].value;
+-								s16 cdy = (s16) shape_tag.fields[1].value;
+-								s16 adx = (s16) shape_tag.fields[2].value;
+-								s16 ady = (s16) shape_tag.fields[3].value;
++								s32 cdx = (s32) shape_tag.fields[0].value;
++								s32 cdy = (s32) shape_tag.fields[1].value;
++								s32 adx = (s32) shape_tag.fields[2].value;
++								s32 ady = (s32) shape_tag.fields[3].value;
+ 
+ 								Vertex cur_v;
+ 								cur_v.x = end_last_x;

@@ -1,0 +1,19 @@
+# Reduced render canary for w2-gfx-flatten. Partitioned by whether the patch
+# is EXPECTED to move pixels.
+#
+# --- must-be-identical (no quadratics on any drawn edge) ---
+# tier=1
+regression/mask_sibling_union
+regression/mask_nested_intersect
+avm1/color
+visual/simple_shapes/winding_rule
+avm1/edittext_tag_indent
+avm2/blend_multiply_alpha
+# --- expected-changed (curved geometry and/or the drawing API) ---
+avm1/mask_with_drawing
+avm1/movieclip_setmask
+from_shumway/acid/acid-gradient-0
+visual/cache_as_bitmap/shape_changed
+# --- morph: MUST be identical, morph keeps equal-parameter stepping ---
+# tier=2
+regression/avm2_morph

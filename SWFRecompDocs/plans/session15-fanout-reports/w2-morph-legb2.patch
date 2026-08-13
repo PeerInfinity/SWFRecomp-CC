@@ -1,0 +1,344 @@
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -295,6 +295,11 @@
+ 		std::unordered_map<u16, s16> font_descent;        // font_id → descent (EM units)
+ 		std::unordered_map<u16, s16> font_leading;        // font_id → leading (EM units)
+ 
++		// Largest static placement scale each character is ever composed at,
++		// propagated through DefineSprite nesting (computeStaticPlacementScales).
++		// Absent => never statically placed; treated as 1.0.
++		std::unordered_map<u16, float> static_placement_scale;
++
+ 		// Frame label storage: label name -> frame number
+ 		std::unordered_map<std::string, size_t> frame_labels;
+ 
+@@ -374,6 +379,7 @@
+ 		void finalizeAbcEmit();
+ 		
+ 		void parseMatrix(MATRIX& matrix_out);
++		void computeStaticPlacementScales();
+ 		void parseAllTags(Context& context);
+ 		void interpretTag(Context& context, SWFTag& tag);
+ 		// Per-frame init prologue helpers. writeFrameInitMarker emits a
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -594,6 +594,268 @@
+ 		}
+ 	}
+ 	
++	// -----------------------------------------------------------------------
++	// Per-character static placement scale
++	// -----------------------------------------------------------------------
++	// The curve-flattening tolerance is expressed in shape-DEFINITION twips, so
++	// it is blind to placement scale: a small curve composed at 8x is flattened
++	// as coarsely as one composed at 1x and carries eight times the error onto
++	// the screen (`wave1-gfx-curvejoint.md` §3.3 measures the corpus-wide
++	// residual — 6 tests above 0.10 px, all of them scale-amplified). This
++	// pre-pass walks the tag stream once, before recompilation, and records for
++	// each character the largest static scale it is ever composed at —
++	// propagated through DefineSprite nesting, since a sprite's own placement
++	// scales everything inside it. interpretShape divides the tolerance by it.
++	//
++	// Scales are floored at 1.0, so a character that is never scaled up is
++	// flattened exactly as before and the corpus-wide diff is confined to the
++	// handful of tests that do scale one up. AS-driven _xscale/scaleX is
++	// invisible to a static pass; that degrades to today's behaviour, and the
++	// failure direction is a coarser curve, never a wrong one.
++	void SWF::computeStaticPlacementScales()
++	{
++		// container char id (0 = root) -> child char id -> largest scale
++		std::unordered_map<u16, std::unordered_map<u16, float>> placements;
++		// Matrix-only placements (PlaceObject2 "modify", no character id) apply
++		// to whatever already occupies that depth, so they are attributed to
++		// everything their container ever places.
++		std::unordered_map<u16, float> anon_scale;
++
++		char* saved_pos = cur_pos;
++		char* swf_end = swf_buffer + header.file_length;
++
++		std::vector<std::pair<u16, char*>> sprite_stack;   // (outer container, body end)
++		u16 container = 0;
++
++		while (cur_pos < swf_end)
++		{
++			while (!sprite_stack.empty() && cur_pos >= sprite_stack.back().second)
++			{
++				container = sprite_stack.back().first;
++				sprite_stack.pop_back();
++			}
++
++			SWFTag tag;
++			tag.parseHeader(cur_pos);
++			char* tag_end = cur_pos + tag.length;
++
++			if (tag_end > swf_end || tag_end < cur_pos)
++			{
++				break;
++			}
++
++			if (tag.code == 0 && sprite_stack.empty())
++			{
++				break;
++			}
++
++			try
++			{
++				if (tag.code == SWF_TAG_DEFINE_SPRITE)
++				{
++					tag.clearFields();
++					tag.setFieldCount(2);
++					tag.configureNextField(SWF_FIELD_UI16, 16);
++					tag.configureNextField(SWF_FIELD_UI16, 16);
++					tag.parseFields(cur_pos);
++
++					sprite_stack.push_back(std::make_pair(container, tag_end));
++					container = (u16) tag.fields[0].value;
++
++					// Descend into the sprite's own tags rather than skipping them.
++					continue;
++				}
++
++				if (tag.code == SWF_TAG_PLACE_OBJECT
++				 || tag.code == SWF_TAG_PLACE_OBJECT_2
++				 || tag.code == SWF_TAG_PLACE_OBJECT_3)
++				{
++					bool has_char = false;
++					bool has_matrix = false;
++					u16 char_id = 0;
++
++					if (tag.code == SWF_TAG_PLACE_OBJECT)
++					{
++						tag.clearFields();
++						tag.setFieldCount(2);
++						tag.configureNextField(SWF_FIELD_UI16, 16);
++						tag.configureNextField(SWF_FIELD_UI16, 16);
++						tag.parseFields(cur_pos);
++
++						char_id = (u16) tag.fields[0].value;
++						has_char = true;
++						has_matrix = true;   // PlaceObject always carries a MATRIX
++					}
++
++					else
++					{
++						tag.clearFields();
++						tag.setFieldCount(1);
++						tag.configureNextField(SWF_FIELD_UI8, 8);
++						tag.parseFields(cur_pos);
++
++						u8 flags = (u8) tag.fields[0].value;
++						u8 flags2 = 0;
++
++						if (tag.code == SWF_TAG_PLACE_OBJECT_3)
++						{
++							tag.clearFields();
++							tag.setFieldCount(1);
++							tag.configureNextField(SWF_FIELD_UI8, 8);
++							tag.parseFields(cur_pos);
++
++							flags2 = (u8) tag.fields[0].value;
++						}
++
++						// Depth
++						tag.clearFields();
++						tag.setFieldCount(1);
++						tag.configureNextField(SWF_FIELD_UI16, 16);
++						tag.parseFields(cur_pos);
++
++						if (tag.code == SWF_TAG_PLACE_OBJECT_3)
++						{
++							// ClassName: present with PlaceFlagHasClassName, or with
++							// PlaceFlagHasImage AND PlaceFlagHasCharacter.
++							bool has_class_name = ((flags2 & 0x08) != 0)
++							                   || (((flags2 & 0x10) != 0) && ((flags & 0x02) != 0));
++
++							if (has_class_name)
++							{
++								while (cur_pos < tag_end && *cur_pos != '\0')
++								{
++									cur_pos += 1;
++								}
++								if (cur_pos < tag_end)
++								{
++									cur_pos += 1;
++								}
++							}
++						}
++
++						if ((flags & 0x02) != 0)
++						{
++							tag.clearFields();
++							tag.setFieldCount(1);
++							tag.configureNextField(SWF_FIELD_UI16, 16);
++							tag.parseFields(cur_pos);
++
++							char_id = (u16) tag.fields[0].value;
++							has_char = true;
++						}
++
++						has_matrix = (flags & 0x04) != 0;
++					}
++
++					if (has_matrix && cur_pos < tag_end)
++					{
++						MATRIX m;
++						parseMatrix(m);
++
++						// Largest singular value of [[scale_x, rotateskew_0],
++						// [rotateskew_1, scale_y]] — the worst-case length gain this
++						// placement applies to a definition-space vector.
++						float a = m.scale_x, b = m.rotateskew_0;
++						float c = m.rotateskew_1, d = m.scale_y;
++						float tr = a*a + b*b + c*c + d*d;
++						float det = a*d - b*c;
++						float disc = tr*tr - 4.0f*det*det;
++
++						if (disc < 0.0f)
++						{
++							disc = 0.0f;
++						}
++
++						float s = sqrtf(0.5f * (tr + sqrtf(disc)));
++
++						if (!(s > 0.0f) || s > 4096.0f)
++						{
++							s = 1.0f;   // implausible matrix; ignore this sample
++						}
++
++						if (has_char)
++						{
++							float& slot = placements[container][char_id];
++							if (s > slot) slot = s;
++						}
++
++						else
++						{
++							float& slot = anon_scale[container];
++							if (s > slot) slot = s;
++						}
++					}
++				}
++			}
++
++			catch (const std::exception&)
++			{
++				// A malformed placement just costs one scale sample.
++			}
++
++			cur_pos = tag_end;
++		}
++
++		cur_pos = saved_pos;
++
++		// Fold each container's matrix-only placements into every character it
++		// places, then propagate from the root through sprite nesting.
++		for (auto& kv : placements)
++		{
++			auto anon_it = anon_scale.find(kv.first);
++
++			if (anon_it == anon_scale.end())
++			{
++				continue;
++			}
++
++			for (auto& child : kv.second)
++			{
++				if (anon_it->second > child.second)
++				{
++					child.second = anon_it->second;
++				}
++			}
++		}
++
++		static_placement_scale.clear();
++		static_placement_scale[0] = 1.0f;
++
++		// Sprite nesting is shallow in practice; eight relaxation passes is more
++		// depth than any real SWF and bounds the cost.
++		for (int pass = 0; pass < 8; ++pass)
++		{
++			bool moved = false;
++
++			for (auto& kv : placements)
++			{
++				auto parent = static_placement_scale.find(kv.first);
++
++				if (parent == static_placement_scale.end())
++				{
++					continue;
++				}
++
++				for (auto& child : kv.second)
++				{
++					float v = parent->second * child.second;
++					auto it = static_placement_scale.find(child.first);
++
++					if (it == static_placement_scale.end() || v > it->second)
++					{
++						static_placement_scale[child.first] = v;
++						moved = true;
++					}
++				}
++			}
++
++			if (!moved)
++			{
++				break;
++			}
++		}
++	}
++
+ 	void SWF::writeFrameInitMarker(Context& context)
+ 	{
+ 		// Emit a unique placeholder marker that flushFrameInitPrologue
+@@ -708,6 +970,11 @@
+ 
+ 		current_cxform += 1;
+ 
++		// Per-character static placement scale, read before any shape is
++		// flattened (the tolerance below depends on it, and a character's
++		// placements come after its definition in the tag stream).
++		computeStaticPlacementScales();
++
+ 		// prime the loop
+ 		tag.code = (TagType) 1;
+ 		
+@@ -8641,7 +8908,37 @@
+ 						}
+ 						else
+ 						{
+-							const float curve_flatten_tol_twips = 1.0f;   // 0.05 px at 1:1
++							// The tolerance is in shape-DEFINITION twips, so it is blind
++							// to placement scale: a curve blown up 8x carries eight
++							// times its definition-space error onto the screen. Divide
++							// it by the largest static scale this character is ever
++							// composed at.
++							//
++							// NUMERATOR = 2 twips = 0.1 px on screen, which is exactly
++							// Ruffle's lyon flattening tolerance. s14 shipped this leg
++							// at 1 twip/scale (0.05 px, HALF the reference's) and
++							// measured `acid-scale` moving the WRONG way, 302 -> 342
++							// outliers: being more accurate than the golden's own
++							// generator costs outliers against a reference-derived
++							// golden (w2-gfx-morph-report §5.3). 2 twips/scale lands
++							// just UNDER Ruffle's residual instead of crossing over it.
++							//
++							// Capped at the historical 1 twip, i.e. the effective
++							// tolerance is min(1, 2/scale): a bare 2 twips would
++							// COARSEN every unscaled curve in the corpus — a blast
++							// radius this leg has no measurement for — whereas the cap
++							// keeps every character that is never composed past 2x
++							// bit-identical to baseline by construction.
++							float curve_flatten_tol_twips = 1.0f;
++
++							{
++								auto scale_it = static_placement_scale.find(shape_id);
++
++								if (scale_it != static_placement_scale.end() && scale_it->second > 2.0f)
++								{
++									curve_flatten_tol_twips = 2.0f / scale_it->second;
++								}
++							}
+ 
+ 							float dev_x = (float) control.x - 0.5f * ((float) current.x + (float) anchor.x);
+ 							float dev_y = (float) control.y - 0.5f * ((float) current.y + (float) anchor.y);

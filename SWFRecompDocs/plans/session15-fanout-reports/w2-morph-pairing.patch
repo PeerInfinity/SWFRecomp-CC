@@ -1,0 +1,350 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 0a00cfe1c..2a412860c 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -7775,6 +7775,7 @@ namespace SWFRecomp
+ 	{
+ 		u8 kind;             // 0 = StyleChange, 1 = StraightEdge, 2 = CurvedEdge
+ 		bool emits_vertex;   // StyleChange: this record pushes a vertex
++		bool emits_path;     // StyleChange: this record pushes a {5} path MoveTo
+ 		bool implicit_start; // edge: the parser auto-creates a Path (+1 vertex) first
+ 		float dev;           // CurvedEdge: chord deviation from its chord, twips
+ 	};
+@@ -7830,6 +7831,7 @@ namespace SWFRecomp
+ 			{
+ 				MorphEdgeRec r;
+ 				r.emits_vertex = false;
++				r.emits_path = false;
+ 				r.implicit_start = !has_path;
+ 				r.dev = 0.0f;
+ 				has_path = true;
+@@ -7910,6 +7912,7 @@ namespace SWFRecomp
+ 			r.kind = 0;
+ 			r.implicit_start = false;
+ 			r.dev = 0.0f;
++			r.emits_path = false;
+ 
+ 			if (end_stream)
+ 			{
+@@ -7927,6 +7930,10 @@ namespace SWFRecomp
+ 				}
+ 
+ 				r.emits_vertex = state_move_to;
++
++				// The end stream's raw path buffer gets a {5} MoveTo for exactly
++				// the records that move its pen.
++				r.emits_path = state_move_to;
+ 			}
+ 
+ 			else
+@@ -7956,6 +7963,13 @@ namespace SWFRecomp
+ 				r.emits_vertex = state_move_to || (fill_0 != last_fill_0)
+ 				              || (fill_1 != last_fill_1) || (line != last_line);
+ 
++				// The raw path stream is emitted under a STRICTER condition than
++				// the vertex (`swf.cpp` start parser: a pure line-style change
++				// starts a Path but writes no path command), so the two pairings
++				// need separate predicates. StateNewStyles cannot reach here.
++				r.emits_path = r.emits_vertex
++				            && (state_move_to || (fill_0 != last_fill_0) || (fill_1 != last_fill_1));
++
+ 				last_fill_0 = fill_0;
+ 				last_fill_1 = fill_1;
+ 				last_line = line;
+@@ -8339,6 +8353,40 @@ namespace SWFRecomp
+ 				u32 morph_end_tail_synth = 0;
+ 				bool morph_plan_ok = false;
+ 
++				// ------------------------------------------------------------------
++				// Morph PATH-COMMAND pairing (the second index-paired stream)
++				// ------------------------------------------------------------------
++				// A morph carries a second stream besides the flattened vertices: the
++				// raw path-command list used by vector hit testing. `emitPath` buffers
++				// the start shape's commands and the end shape's go into
++				// `morph_end_geo_buf`; the emitter below walks the start buffer and
++				// attaches ONE end entry (`cmd 9`) to each geometric command
++				// ({5} MoveTo, {2} LineTo, {3} control, {4} anchor).
++				//
++				// That pairing desynchronises for exactly the same two reasons the
++				// vertex stream did: a start LineTo is 1 entry while its paired end
++				// CurveTo is 2, and StyleChangeRecords need not pair. The plan below
++				// records, alongside the vertex plan:
++				//   morph_start_edge_as_curve[i]   start straight edge i must be
++				//                                  written as {3,midpoint}+{4,anchor}
++				//                                  because its end partner is a curve
++				//   morph_end_rec_as_curve[j]      the mirror: end straight edge j is
++				//                                  written as a degenerate curve pair
++				//   morph_end_rec_path_presynth[j] end-buffer entries to synthesise at
++				//                                  the end pen before record j, standing
++				//                                  in for unpaired start commands
++				//   morph_end_rec_path_emit[j]     end MoveTo j writes its own {5}
++				//   morph_end_path_tail_synth      the same, after the end stream ends
++				// A degenerate quadratic (control = midpoint) is exactly the straight
++				// segment, and it is also how Ruffle promotes a straight edge paired
++				// with a curved one (`morph_shape.rs` lerp_edges), so the promotion is
++				// geometry-preserving at both ratio 0 and ratio 1.
++				std::vector<u8> morph_start_edge_as_curve;
++				std::vector<u8> morph_end_rec_as_curve;
++				std::vector<u32> morph_end_rec_path_presynth;
++				std::vector<u8> morph_end_rec_path_emit;
++				u32 morph_end_path_tail_synth = 0;
++
+ 				if (is_morph && morph_end_edges_ptr != nullptr)
+ 				{
+ 					char* tag_limit = morph_tag_start + shape_tag.length;
+@@ -8351,9 +8399,13 @@ namespace SWFRecomp
+ 					{
+ 						morph_end_rec_verts.assign(end_recs.size(), 0);
+ 						morph_end_rec_presynth.assign(end_recs.size(), 0);
++						morph_end_rec_as_curve.assign(end_recs.size(), 0);
++						morph_end_rec_path_presynth.assign(end_recs.size(), 0);
++						morph_end_rec_path_emit.assign(end_recs.size(), 1);
+ 
+ 						size_t i = 0, j = 0;
+ 						u32 pending_synth = 0;
++						u32 pending_path_synth = 0;
+ 
+ 						while (i < start_recs.size() && j < end_recs.size())
+ 						{
+@@ -8368,6 +8420,21 @@ namespace SWFRecomp
+ 								morph_end_rec_presynth[j] = pending_synth;
+ 								pending_synth = 0;
+ 								morph_end_rec_verts[j] = s.emits_vertex ? 1 : 0;
++
++								// Path stream: the start side writes a {5} under a
++								// stricter condition than the vertex, and the end side
++								// writes one only when it moves its pen. Reconcile the
++								// two so the emitter's sequential pairing stays aligned.
++								morph_end_rec_path_presynth[j] = pending_path_synth;
++								pending_path_synth = 0;
++
++								if (s.emits_path && !e.emits_path)
++								{
++									morph_end_rec_path_presynth[j] += 1;
++								}
++
++								morph_end_rec_path_emit[j] = (s.emits_path && e.emits_path) ? 1 : 0;
++
+ 								i += 1;
+ 								j += 1;
+ 							}
+@@ -8381,6 +8448,12 @@ namespace SWFRecomp
+ 								{
+ 									pending_synth += 1;
+ 								}
++
++								if (s.emits_path)
++								{
++									pending_path_synth += 1;
++								}
++
+ 								i += 1;
+ 							}
+ 
+@@ -8390,6 +8463,13 @@ namespace SWFRecomp
+ 								morph_end_rec_presynth[j] = pending_synth;
+ 								pending_synth = 0;
+ 								morph_end_rec_verts[j] = 0;
++
++								// ...and no path entry either: there is no start
++								// command for it to pair with.
++								morph_end_rec_path_presynth[j] = pending_path_synth;
++								pending_path_synth = 0;
++								morph_end_rec_path_emit[j] = 0;
++
+ 								j += 1;
+ 							}
+ 
+@@ -8414,6 +8494,18 @@ namespace SWFRecomp
+ 								morph_end_rec_presynth[j] = pending_synth;
+ 								pending_synth = 0;
+ 								morph_end_rec_verts[j] = n;
++
++								// Path stream: an edge pair must contribute the same
++								// NUMBER of geometric entries on both sides. A straight
++								// edge writes 1 ({2}); a curve writes 2 ({3},{4}). When
++								// the two kinds disagree, promote the straight one to a
++								// degenerate curve pair.
++								morph_end_rec_path_presynth[j] = pending_path_synth;
++								pending_path_synth = 0;
++
++								morph_start_edge_as_curve.push_back((s.kind == 1 && e.kind == 2) ? 1 : 0);
++								morph_end_rec_as_curve[j] = (e.kind == 1 && s.kind == 2) ? 1 : 0;
++
+ 								i += 1;
+ 								j += 1;
+ 							}
+@@ -8429,18 +8521,26 @@ namespace SWFRecomp
+ 							if (s.kind == 0)
+ 							{
+ 								if (s.emits_vertex) pending_synth += 1;
++								if (s.emits_path) pending_path_synth += 1;
+ 							}
+ 							else
+ 							{
+ 								if (s.implicit_start) pending_synth += 1;
+ 								morph_start_edge_verts.push_back(1);
+ 								pending_synth += 1;
++
++								// The start command keeps its own kind here (there is
++								// no partner to promote against), so the end buffer
++								// needs one stand-in per geometric entry it writes.
++								morph_start_edge_as_curve.push_back(0);
++								pending_path_synth += (s.kind == 2) ? 2 : 1;
+ 							}
+ 
+ 							i += 1;
+ 						}
+ 
+ 						morph_end_tail_synth = pending_synth;
++						morph_end_path_tail_synth = pending_path_synth;
+ 						morph_plan_ok = true;
+ 					}
+ 				}
+@@ -8489,9 +8589,32 @@ namespace SWFRecomp
+ 						current_path->verts.push_back(v);
+ 					}
+ 
+-					// The raw path stream (vector hit testing) still sees one LineTo:
+-					// subdivision is a rendering-geometry concern only.
+-					emitPath(2.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y));
++					// The raw path stream (vector hit testing) is record-level, so
++					// subdivision never reaches it — but a straight edge whose morph
++					// partner is a CURVE must still be written as a two-entry curve
++					// pair, or the emitter's sequential {cmd 9} attachment slides by
++					// one entry for the rest of the shape. A quadratic whose control
++					// point is the segment midpoint IS the segment, so this is exact.
++					bool as_curve = false;
++
++					if (morph_plan_ok && morph_start_edge_ord < morph_start_edge_as_curve.size())
++					{
++						as_curve = morph_start_edge_as_curve[morph_start_edge_ord] != 0;
++					}
++
++					if (as_curve)
++					{
++						float mid_x = 0.5f * ((float) from_x + (float) target_x);
++						float mid_y = 0.5f * ((float) from_y + (float) target_y);
++
++						emitPath(3.0f, mid_x, (float) FRAME_HEIGHT - mid_y);
++						emitPath(4.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y));
++					}
++
++					else
++					{
++						emitPath(2.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y));
++					}
+ 
+ 					last_x = target_x;
+ 					last_y = target_y;
+@@ -8987,7 +9110,32 @@ namespace SWFRecomp
+ 							morph_end_positions.push_back(ev);
+ 						}
+ 
+-						if (path_recording) morph_end_geo_buf.push_back({2.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y)});
++						// Mirror of the start side's promotion: an end straight edge
++						// paired with a start CURVE writes a degenerate curve pair so
++						// the two raw path streams keep the same entry count.
++						if (path_recording)
++						{
++							bool as_curve = false;
++
++							if (morph_plan_ok && end_rec_ord < morph_end_rec_as_curve.size())
++							{
++								as_curve = morph_end_rec_as_curve[end_rec_ord] != 0;
++							}
++
++							if (as_curve)
++							{
++								float mid_x = 0.5f * ((float) from_x + (float) target_x);
++								float mid_y = 0.5f * ((float) from_y + (float) target_y);
++
++								morph_end_geo_buf.push_back({3.0f, mid_x, (float) FRAME_HEIGHT - mid_y});
++								morph_end_geo_buf.push_back({4.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y)});
++							}
++
++							else
++							{
++								morph_end_geo_buf.push_back({2.0f, (float) target_x, (float) (FRAME_HEIGHT - target_y)});
++							}
++						}
+ 
+ 						end_last_x = target_x;
+ 						end_last_y = target_y;
+@@ -9014,6 +9162,18 @@ namespace SWFRecomp
+ 							}
+ 						}
+ 
++						// Same idea for the raw path stream: an unpaired START command
++						// gets an end entry that simply holds the end pen still.
++						if (path_recording && morph_plan_ok
++						    && end_rec_ord < morph_end_rec_path_presynth.size())
++						{
++							for (u32 k = 0; k < morph_end_rec_path_presynth[end_rec_ord]; ++k)
++							{
++								morph_end_geo_buf.push_back({5.0f, (float) end_last_x,
++								                             (float) (FRAME_HEIGHT - end_last_y)});
++							}
++						}
++
+ 						shape_tag.clearFields();
+ 						shape_tag.setFieldCount(2);
+ 						shape_tag.configureNextField(SWF_FIELD_UB, 1);
+@@ -9178,7 +9338,16 @@ namespace SWFRecomp
+ 								morph_end_positions.push_back(ev);
+ 							}
+ 
+-							if (path_recording) morph_end_geo_buf.push_back({5.0f, (float)end_last_x, (float)(FRAME_HEIGHT - end_last_y)});
++							// The raw path stream writes this MoveTo only when a start
++							// MoveTo exists to pair it with (an end-only one has none).
++							bool emit_end_path = true;
++
++							if (morph_plan_ok && end_rec_ord < morph_end_rec_path_emit.size())
++							{
++								emit_end_path = morph_end_rec_path_emit[end_rec_ord] != 0;
++							}
++
++							if (path_recording && emit_end_path) morph_end_geo_buf.push_back({5.0f, (float)end_last_x, (float)(FRAME_HEIGHT - end_last_y)});
+ 						}
+ 
+ 						end_rec_ord += 1;
+@@ -9193,6 +9362,15 @@ namespace SWFRecomp
+ 						morph_end_positions.push_back(ev);
+ 					}
+ 
++					if (path_recording)
++					{
++						for (u32 k = 0; k < morph_end_path_tail_synth; ++k)
++						{
++							morph_end_geo_buf.push_back({5.0f, (float) end_last_x,
++							                             (float) (FRAME_HEIGHT - end_last_y)});
++						}
++					}
++
+ 					if (end_bits_left != 8)
+ 					{
+ 						cur_pos += 1;
+@@ -10074,6 +10252,23 @@ namespace SWFRecomp
+ 					if (is_morph && path_recording && !morph_start_buf.empty()) {
+ 						size_t end_geo_idx = 0;
+ 						size_t end_width_idx = 0;
++
++						// Diagnostic mirror of the vertex-pairing assertion: the plan
++						// predicts one end path entry per START geometric command.
++						if (morph_plan_ok) {
++							size_t start_geo = 0;
++							for (auto& entry : morph_start_buf) {
++								float c = entry[0];
++								if (c == 5.0f || c == 2.0f || c == 3.0f || c == 4.0f) start_geo++;
++							}
++							if (start_geo != morph_end_geo_buf.size()) {
++								fprintf(stderr,
++									"Warning: morph shape %u path pairing mismatch "
++									"(start %zu, end %zu); morph hit testing may be wrong.\n",
++									(unsigned) shape_id, start_geo, morph_end_geo_buf.size());
++							}
++						}
++
+ 						for (auto& entry : morph_start_buf) {
+ 							float cmd = entry[0];
+ 							path_data << "\t{" << std::fixed << std::setprecision(1)

@@ -1,0 +1,22 @@
+# P2 curve-flattening probe set (w2-gfx-flatten, session 15)
+# The 13-comparison direction census from wave1-gfx-board.md P2, plus the
+# simple_shapes/masks instrument pair and the acid-blend-2 P9 rider.
+
+# tier=1
+avm2/displayobject_mask
+visual/avm2_button_scroll_rect
+text/auto_size/height
+avm2/loader_events
+avm2/loader_loadbytes_events
+from_shumway/MaskTest
+avm2/mouse_pick_dobj_mask
+avm2/mouse_pick_non_interactive_dobj_mask
+from_shumway/doubleAndRegister
+visual/simple_shapes/scroll_rect_mask
+avm2/displayobject_hittestpoint_boundary
+visual/drawing_api/fills_and_lines
+avm2/graphics_simple_shapes
+visual/simple_shapes/masks
+visual/simple_shapes/masks_equal_clipdepth
+from_shumway/acid/acid-blend-2
+visual/fonts/glyph

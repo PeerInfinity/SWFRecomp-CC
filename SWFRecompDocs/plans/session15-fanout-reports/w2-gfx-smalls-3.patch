@@ -1,0 +1,113 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 0a00cfe1c..c962f0271 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -1826,12 +1826,17 @@ namespace SWFRecomp
+ 				}
+ 
+ 				// Decode per-format. All paths emit 4-byte RGBA per pixel.
+-				// Format 4 is invalid in DefineBitsLossless2 per spec — we warn and
+-				// emit a fully-transparent bitmap rather than throw.
++				// Format 4 (Rgb15) is nominally invalid in DefineBitsLossless2 per
++				// SWF19, but Flash Player displays it anyway — and so does Ruffle
++				// (swf/src/read.rs `4 => BitmapFormat::Rgb15` with the "Despite the
++				// SWF19 specs stating otherwise" comment, ruffle-rs/ruffle#24431).
++				// Decode it exactly like Lossless1 Rgb15, with opaque alpha.
+ 				size_t expected_size = 0;
+ 				const u8* zlib_src = (const u8*) cur_pos;
+ 				size_t zlib_src_size = tag_start_remaining;
+ 				u16 num_colors = 0;
++				// No format sets this any more (format 4 decodes for real now); the
++				// placeholder path below is kept as a defensive fallback.
+ 				bool emit_transparent_placeholder = false;
+ 
+ 				switch (bitmap_format)
+@@ -1851,10 +1856,8 @@ namespace SWFRecomp
+ 						break;
+ 
+ 					case 4:
+-						// Invalid for DefineBitsLossless2. Emit transparent placeholder.
+-						fprintf(stderr, "DefineBitsLossless2 format 4 is invalid per spec; emitting transparent bitmap (char_id=%u).\n", char_id);
+-						emit_transparent_placeholder = true;
+-						expected_size = 0;
++						// Rgb15: big-endian u16 per pixel, rows padded to 4 bytes.
++						expected_size = (size_t)(((size_t) w * 2 + 3) & ~(size_t) 3) * h;
+ 						break;
+ 
+ 					case 5:
+@@ -1868,13 +1871,30 @@ namespace SWFRecomp
+ 				u8* uncompressed = NULL;
+ 				if (!emit_transparent_placeholder)
+ 				{
+-					uLongf uncompressed_size = (uLongf) expected_size;
+-					uncompressed = new u8[uncompressed_size];
+-
+-					int zresult = uncompress(uncompressed, &uncompressed_size,
+-					                         (const Bytef*) zlib_src, (uLong) zlib_src_size);
++					uLongf cap = (uLongf) expected_size;
++					uLongf uncompressed_size = 0;
++					int zresult = Z_BUF_ERROR;
++
++					// Real format-4 tags are RETAGGED, not re-encoded: the upstream
++					// fixture visual/define_bits_lossless2_rgb15 was made in JPEXS by
++					// flipping a format-5 tag's type byte, so its stream inflates to
++					// w*h*4 = 10000 bytes while the Rgb15 pixel array only needs 5000.
++					// Ruffle inflates the whole stream and then slices, so grow the
++					// buffer on Z_BUF_ERROR and ignore the trailing bytes. Formats 3
++					// and 5 keep the strict exact-size behavior.
++					for (int attempt = 0; attempt < 8; ++attempt)
++					{
++						uncompressed = new u8[cap];
++						uncompressed_size = cap;
++						zresult = uncompress(uncompressed, &uncompressed_size,
++						                     (const Bytef*) zlib_src, (uLong) zlib_src_size);
++						if (zresult != Z_BUF_ERROR || bitmap_format != 4) break;
++						delete[] uncompressed;
++						uncompressed = NULL;
++						cap *= 2;
++					}
+ 
+-					if (zresult != Z_OK)
++					if (zresult != Z_OK || uncompressed_size < (uLongf) expected_size)
+ 					{
+ 						delete[] uncompressed;
+ 						EXC_ARG("DefineBitsLossless2: ZLIB decompression failed (code %d).\n", zresult);
+@@ -1935,6 +1955,38 @@ namespace SWFRecomp
+ 							break;
+ 						}
+ 
++						case 4:
++						{
++							// Rgb15 inside DefineBitsLossless2: identical layout to
++							// the Lossless1 Rgb15 branch above (big-endian u16,
++							// 1pad/5R/5G/5B, 5->8 = (c*255+15)/31), alpha forced
++							// opaque — Ruffle's decode_define_bits_lossless takes
++							// the same Rgb15 arm for BOTH tag versions.
++							size_t row_stride = ((size_t) w * 2 + 3) & ~(size_t) 3;
++							for (size_t y = 0; y < (size_t) h; ++y)
++							{
++								for (size_t x = 0; x < (size_t) w; ++x)
++								{
++									u8 hi = uncompressed[y * row_stride + x * 2 + 0];
++									u8 lo = uncompressed[y * row_stride + x * 2 + 1];
++									u16 px = ((u16) hi << 8) | (u16) lo;
++									u8 r5 = (px >> 10) & 0x1F;
++									u8 g5 = (px >> 5) & 0x1F;
++									u8 b5 = px & 0x1F;
++									u8 r = (u8)(((u32) r5 * 255 + 15) / 31);
++									u8 g = (u8)(((u32) g5 * 255 + 15) / 31);
++									u8 b = (u8)(((u32) b5 * 255 + 15) / 31);
++									bitmap_data << std::hex << std::uppercase << std::setw(2)
++												<< "\t0x" << (u32) r << "," << endl
++												<< "\t0x" << (u32) g << "," << endl
++												<< "\t0x" << (u32) b << "," << endl
++												<< "\t0xFF," << endl;
++									current_bitmap_pixel += 1;
++								}
++							}
++							break;
++						}
++
+ 						case 5:
+ 						default:
+ 						{

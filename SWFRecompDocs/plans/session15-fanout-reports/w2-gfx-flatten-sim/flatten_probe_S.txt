@@ -1,0 +1,11 @@
+# Family S — comparisons whose curves come from recompile-time DefineShape /
+# font-glyph flattening (SWFRecomp/src/swf.cpp:8653). Verified by non-empty
+# `u32 shape_data[N][4]` in RecompiledTags/draws.c.
+visual/avm2_button_scroll_rect
+text/auto_size/height
+from_shumway/doubleAndRegister
+visual/simple_shapes/scroll_rect_mask
+visual/simple_shapes/masks
+visual/simple_shapes/masks_equal_clipdepth
+from_shumway/acid/acid-blend-2
+visual/fonts/glyph

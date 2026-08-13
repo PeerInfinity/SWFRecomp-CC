@@ -1855,3 +1855,77 @@ acid-bitmap-draw_quality = dynamic_bitmap_max size-gate decision (VRAM
 17→67 MB per AVM2 movie); blend-layer alpha defect (acid-blend-2 output.26,
 renderer, one-dump bisect); blur_fractional/blur_quality structural extra
 ink (774k/821k, un-struck by hygiene); displacement-map trio.
+
+## 16. Session 15 (2026-08-13) — dual-axis fan-out #7: trace +29, pixels +14, zero regressions
+
+Commits `98c6f99bd..82ec2a359` (15 code/doc patches + header fix + results
+merge), CI run `31748059158` at `3db858cbc` (graphics/full/images=true).
+Trace effective **4269 → 4298 / 4443** (+29 intersection, 29 gains, 0
+regressions, histogram clean; +3 bonus ruffle_matched→pass upgrades:
+int/uint_toprecision, e15_7_4_7_1). Pixels **310 → 324 / 569 (56.9%)**:
++14 flips, 0 regressions, bands improved 13 / worsened 0, drift 0/0.
+7 wave-1 + 12 wave-2 agents; reports in `session15-fanout-reports/`.
+
+### 16.1 Ledger (trace +29)
+
+watch-on-addProperty (+1, full pass vs Flash oracle; watcher never fired at
+all on addProperty props — un-ignored from ignored_tests.txt, entry had no
+backing disposition); Matrix3D member semantics (+9, one file, missing-class
+premise refuted); smalls (+3: asbroadcaster MOVIECLIP receiver,
+sub_super_same_field static early-bind, number_convert_edge_cases);
+AVM1-child-under-AVM2 timelines (+3 of a 14-row cluster that proved to be
+3 unrelated problems); textblock FTE (+4 incl. visual/definefont4 TLF free
+rider); T10 playerglobal descriptors slices 1-5 (+8 exactly as priced);
+fuzz 16th row (+1, fuzz 30/30, block closed).
+
+### 16.2 Ledger (pixels +14)
+
+s16→s32 shape-delta sign fix (acid-blend, acid-blend-2.26 — 17-bit SB
+fields, mis-signed |Δ|≥32768); capture cap 16→32 (acid .17/.18);
+hasPlayingSprites recursion (acid-video .10/.20); lossless2 format 4
+(+ grow-on-Z_BUF_ERROR); blur plumbing + budgeted bitmap capacity
+(blur_fractional, bitmapdata_filter_sourcerect) + displacement CPU rider;
+runtime lyon/Levien flattening leg R (displayobject_mask, loader_events ×2);
+free rider avm2_button_state. Band moves: applyfilter_blur −94%,
+blur_quality −80%, morph_test1 −76% ×5 (OOB fix + stroke end-colors).
+
+### 16.3 Incident of record
+
+First closeout run `31746548765` was POISONED: `git add -u` silently
+skipped the new `curve_flatten.h` created by `git apply`, so every CI test
+compile_failed (0 passes all suites). The WASM link-smoke job caught it;
+results never merged; header committed at `3db858cbc`, re-dispatched clean.
+RULE: after `git apply`, stage by name including NEW files from
+`git apply --stat`; never bare `git add -u`.
+
+### 16.4 Left on the board (session 16)
+
+Trace: all_classes/display 6-row surface (+6 all-or-nothing; slices 1-5
+built every mechanism except the declaredBy/defining_class re-point shape,
+which the s15 XMLDocument fix now demonstrates); AVM1-child remainder
+(depth constant −77824 for Loader-loaded AVM1 roots — derive from Ruffle's
+depth model, 2 of 4 remaining lines on avm2_loads_avm1; mouse/focus
+bridging rows are a separate cluster); number_convert_errors (int/uint
+primitive dispatch, structural); bug_483783 NO-GO stands (arena genuinely
+99.998% full; third-arc option: avmplus dependent strings, needs GC
+single-block-free change); gnash array/MovieClip v6-8 and eforin NO-GO
+evidence recorded in wave1-trace-board.md; action_order re-priced to +1
+with a named −1 (test12 onLoad gate tag.c:772-788) — DEFER stands;
+ignored_tests.txt "Permanently accepted diffs" heading: 6 remaining names
+have no backing disposition entries (w2-watch-order-report.md §6) — audit.
+
+Pixels: flattening leg C HELD for a SOLO dispatch (recompiler lyon port:
+masks 1738→1497, −25-38% vertices, bounds shrink ~1 twip trace effect —
+never bundle; patch archived in session15-fanout-reports/); AVM2 filters
+Route 2 = offscreen/composite arc (~250-350 lines, five traps incl.
+object-sized FilterSource vs our stage-sized textures); morph
+end-color per-character offset (tag.c:6966 + avm2 twin :3197 index from c
+not morph_end_color_start+c — needs tagDefineMorphShape signature change);
+simple_shapes/masks 0.62px offset is a scale/transform defect (slope
+differs — NOT flattening, NOT the old disposition); acid-large OOM (2.52GB
+VK_ERROR_OUT_OF_DEVICE_MEMORY — dynamic-layer budgeting arc);
+bitmapdata_applyfilter_blur residual is device-font text; morph pixel
+ceiling +1 gated on gradient morph fill (tranche); cache_as_bitmap/morph
+(2832, max diff 1) → disposition. Method note: on max_outliers=0 rows band
+count is not monotone in correctness — compare changed-region bbox +
+colour histogram vs golden before ruling NO-GO.

@@ -49,3 +49,4 @@ visual/filters/drop_shadow                  # filters proper
 visual/filters/color_matrix                 # filters proper
 visual/blend_modes/multiply                 # blend proper
 regression/avm2_morph                       # morph shapes (no expected PNG)
+from_shumway/acid/acid-blend-2

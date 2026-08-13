@@ -1,0 +1,81 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 0a00cfe1c..0ccbe5dce 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -10008,11 +10008,76 @@ namespace SWFRecomp
+ 										   << "0x80000000, "
+ 										   << "0x" << (u32) line_style.index
+ 										   << " }," << endl;
++
++								// morph_end_shape_data is indexed BY the shape_data
++								// index (Avm2ShapeGeom.morph_end_offset + k reads
++								// entry k of this character's start-vertex run), so the
++								// two arrays must be appended in lockstep. This stroke
++								// loop used to append to shape_data ONLY: a morph
++								// character with a stroke run therefore contributed N
++								// start vertices and 0 end vertices, which
++								//   (a) shifted every LATER morph character's
++								//       morph_end_offset down by N, and
++								//   (b) left the last one reading past the end of the
++								//       static array (acid-morph: char 4 reads
++								//       [276, 312) out of morph_end_shape_data[294][2],
++								//       and chars 4 and 5 share offset 276) —
++								// a live out-of-bounds read, diagnosed in
++								// session15-fanout-reports/wave1-gfx-blur-morphratio.md
++								// §3.4 cause 2.
++								//
++								// drawLines/drawLineJoin/drawLineCap synthesise their
++								// own vertices and cannot carry a morph_index (they
++								// invent corner points), so a stroke vertex takes the
++								// start position as its end position — the same
++								// fallback the fill arm above already uses for an
++								// unpaired vertex. Strokes therefore do not morph,
++								// which is exactly today's behaviour; what changes is
++								// that they no longer corrupt everyone else's offsets.
++								if (is_morph)
++								{
++									if (t.verts[j].morph_index >= 0
++									    && (size_t) t.verts[j].morph_index < morph_end_positions.size())
++									{
++										Vertex& end_v = morph_end_positions[t.verts[j].morph_index];
++										float end_x_f = (float) end_v.x;
++										float end_y_f = (float) (FRAME_HEIGHT - end_v.y);
++										morph_end_shape_data << "\t" << "{ "
++															 << std::dec << std::fixed << std::setprecision(1)
++															 << end_x_f << "f, "
++															 << end_y_f << "f"
++															 << " }," << endl;
++									}
++
++									else
++									{
++										morph_end_shape_data << "\t" << "{ "
++															 << std::dec << std::fixed << std::setprecision(1)
++															 << x_f << "f, "
++															 << y_f << "f"
++															 << " }," << endl;
++									}
++
++									current_morph_end_vertex += 1;
++								}
+ 							}
+ 						}
+ 					}
+ 				}
+ 
++				// Lockstep assertion for the AVM2 morph tables: this character's
++				// morph_end_shape_data run must be exactly as long as its shape_data
++				// run, or Avm2ShapeGeom.morph_end_offset + k walks off the end.
++				if (is_morph && !is_font
++				    && (current_morph_end_vertex - morph_end_start_vertex) != 3 * tris_size)
++				{
++					fprintf(stderr,
++						"Warning: morph shape %u start/end vertex table mismatch "
++						"(start %zu, end %zu); AVM2 morph_end_offset would read out of bounds.\n",
++						(unsigned) shape_id, 3 * tris_size,
++						current_morph_end_vertex - morph_end_start_vertex);
++				}
++
+ 				if (!is_font)
+ 				{
+ 					if (is_morph)
