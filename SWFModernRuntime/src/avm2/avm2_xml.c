@@ -3627,6 +3627,24 @@ void avm2_register_xml_legacy(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, doc, "parseXML", n_xdoc_parse_xml);
 	avm2_builtin_add_method(ctx, doc, "createElement", n_xdoc_create_element);
 	avm2_builtin_add_method(ctx, doc, "createTextNode", n_xdoc_create_text_node);
+	// playerglobal declares `override public function toString()` ON
+	// XMLDocument, so all_classes/xml/* grades
+	// declaredBy="flash.xml::XMLDocument" on the factory's toString. The
+	// implementation is the same one XMLNode carries, so re-point the COPIED
+	// entry rather than appending a second one (avm2_vtable_append does not
+	// de-duplicate, and a duplicate would emit two <method> elements).
+	{
+		Avm2VTable* vt = &doc->ivtable;
+		for (uint32_t i = 0; i < vt->count; i++)
+		{
+			if (vt->entries[i].kind == AVM2_PROP_METHOD
+			    && vt->entries[i].key.name_len == 8
+			    && memcmp(vt->entries[i].key.name, "toString", 8) == 0)
+			{
+				vt->entries[i].defining_class = doc;
+			}
+		}
+	}
 
 	Avm2Class* nt = avm2_builtin_class(ctx, "flash.xml", "XMLNodeType",
 	                                   b->object_class);

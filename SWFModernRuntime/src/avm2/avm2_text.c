@@ -9192,6 +9192,69 @@ static Avm2Class* make_slot_class(Avm2Context* ctx, const char* ns,
 	return cls;
 }
 
+// ---------------------------------------------------------------------------
+// flash.accessibility::AccessibilityImplementation (session 15 T10)
+//
+// A faithful port of Ruffle's AccessibilityImplementation.as. `errno`/`stub`
+// are set as instance properties by the constructor rather than as real
+// vtable slots (the class has no slot surface and every graded read goes
+// through the public-property path); describeType reports them from the
+// descriptor table's synthetic rows.
+// ---------------------------------------------------------------------------
+
+static Avm2Value acc_impl_ctor(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self != NULL)
+	{
+		avm2_object_set_dynamic(act->ctx, self, "errno", 5, avm2_uint_value(0));
+		avm2_object_set_dynamic(act->ctx, self, "stub", 4, avm2_bool(false));
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value acc_impl_void(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+static Avm2Value acc_impl_null(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_null();
+}
+
+static Avm2Value acc_impl_zero(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_uint_value(0);
+}
+
+static Avm2Value acc_impl_false(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(false);
+}
+
+// Both raisers go through Error.throwError in playerglobal, so the synthetic
+// "Error$/throwError()" frame is pushed per-site (avm2_error.h's rule).
+static Avm2Value acc_impl_accrole(Avm2Activation* act)
+{
+	avm2_callstack_push_throwerror(act->ctx);
+	avm2_throw_error(act->ctx, act->ctx->builtins.error_class,
+	                 "Error #2143: AccessibilityImplementation.get_accRole() "
+	                 "must be overridden from its default.");
+}
+
+static Avm2Value acc_impl_accstate(Avm2Activation* act)
+{
+	avm2_callstack_push_throwerror(act->ctx);
+	avm2_throw_error(act->ctx, act->ctx->builtins.error_class,
+	                 "Error #2144: AccessibilityImplementation.get_accState() "
+	                 "must be overridden from its default.");
+}
+
 void avm2_register_text(Avm2Context* ctx)
 {
 	// flash.text.TextSnapshot — [Ruffle(Abstract)]; only a Sprite's
@@ -9280,15 +9343,51 @@ void avm2_register_text(Avm2Context* ctx)
 	}
 
 	// flash.accessibility stubs (constructible value holders).
+	//
+	// AccessibilityImplementation is NOT a bare shell: Ruffle's
+	// globals/flash/accessibility/AccessibilityImplementation.as is a complete
+	// tiny reference implementation (two public vars, ten methods returning
+	// null/0/false, and get_accRole/get_accState raising 2143/2144 through
+	// Error.throwError), and avm2/accessibilityimplementation grades every one
+	// of them. AccessibilityProperties stays a value holder — its six public
+	// vars are describe-only (dt_desc_classes), since making them real slots
+	// would change dynamic-property behaviour for no graded gain.
 	{
 		Avm2Class* ai = avm2_builtin_class(ctx, "flash.accessibility",
 		                                   "AccessibilityImplementation",
 		                                   ctx->builtins.object_class);
-		(void) ai;
+		ai->instance_init.fn = acc_impl_ctor;
+		avm2_builtin_add_method_n(ctx, ai, "accDoDefaultAction",
+		                          acc_impl_void, 1);
+		avm2_builtin_add_method_n(ctx, ai, "accLocation", acc_impl_null, 1);
+		avm2_builtin_add_method_n(ctx, ai, "accSelect", acc_impl_void, 2);
+		avm2_builtin_add_method_n(ctx, ai, "get_accDefaultAction",
+		                          acc_impl_null, 1);
+		avm2_builtin_add_method_n(ctx, ai, "get_accFocus", acc_impl_zero, 0);
+		avm2_builtin_add_method_n(ctx, ai, "get_accName", acc_impl_null, 1);
+		avm2_builtin_add_method_n(ctx, ai, "get_accRole", acc_impl_accrole, 1);
+		avm2_builtin_add_method_n(ctx, ai, "get_accSelection", acc_impl_null, 0);
+		avm2_builtin_add_method_n(ctx, ai, "get_accState", acc_impl_accstate, 1);
+		avm2_builtin_add_method_n(ctx, ai, "get_accValue", acc_impl_null, 1);
+		avm2_builtin_add_method_n(ctx, ai, "getChildIDArray", acc_impl_null, 0);
+		avm2_builtin_add_method_n(ctx, ai, "isLabeledBy", acc_impl_false, 1);
 		Avm2Class* ap = avm2_builtin_class(ctx, "flash.accessibility",
 		                                   "AccessibilityProperties",
 		                                   ctx->builtins.object_class);
 		(void) ap;
+
+		// The two [API("667")] interfaces (= FP 10.1 → SWF >= 10). Nothing
+		// implements them; they exist only so getDefinitionByName resolves
+		// them at SWF 10+ and describeType reports their accessors, which are
+		// describe-only rows in dt_desc_classes (with the interface @uri).
+		// all_classes/accessibility/swf9 pins the gate FROM BELOW: both names
+		// must still be "not accessibile" there.
+		Avm2Class* ist = avm2_builtin_class_api(ctx, "flash.accessibility",
+		                                        "ISearchableText", NULL, 10);
+		ist->flags |= AVM2_CLASS_FLAG_INTERFACE;
+		Avm2Class* isel = avm2_builtin_class_api(ctx, "flash.accessibility",
+		                                         "ISimpleTextSelection", NULL, 10);
+		isel->flags |= AVM2_CLASS_FLAG_INTERFACE;
 	}
 
 	// (flash.filters lives in avm2_filters.c — the BitmapFilter shell and the
