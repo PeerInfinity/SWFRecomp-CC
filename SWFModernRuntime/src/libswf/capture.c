@@ -16,9 +16,12 @@
 // We borrow it via extern.
 extern RenderContext* context;
 
-// Default capacity for the capture-trigger table. Override at runtime with the
-// CAPTURE_MAX env var (e.g. CAPTURE_MAX=64) to capture more than 16 frames; the
-// default is unchanged so existing behavior is identical when it's unset.
+// Minimum capacity for the capture-trigger table. The table is ALWAYS sized to
+// fit every token actually present in CAPTURE_TRIGGERS (see
+// parse_capture_triggers) — the old fixed 16 silently dropped trigger 17 and
+// beyond, which is why from_shumway/acid (18 comparisons) never produced
+// output.17/output.18 and graded as no_render. CAPTURE_MAX still raises the
+// floor further if set.
 #define DEFAULT_MAX_CAPTURES 16
 
 typedef enum {
@@ -59,13 +62,17 @@ void parse_capture_triggers(void)
 	const char* env = getenv("CAPTURE_TRIGGERS");
 	if (!env || !*env) return;
 
-	// Capacity: CAPTURE_MAX env override, else DEFAULT_MAX_CAPTURES.
+	// Capacity: CAPTURE_MAX env override, else DEFAULT_MAX_CAPTURES, then grown
+	// to fit the actual trigger list so no trigger is ever silently dropped.
 	int cap = DEFAULT_MAX_CAPTURES;
 	const char* cap_env = getenv("CAPTURE_MAX");
 	if (cap_env && *cap_env) {
 		int v = atoi(cap_env);
 		if (v > 0) cap = v;
 	}
+	int token_count = 1;
+	for (const char* p = env; *p; p++) if (*p == ',') token_count++;
+	if (token_count > cap) cap = token_count;
 	if (g_captures) { free(g_captures); g_captures = NULL; g_capture_count = 0; }
 	g_captures = (CaptureEntry*) calloc((size_t)cap, sizeof(CaptureEntry));
 	if (!g_captures) { g_capture_cap = 0; return; }

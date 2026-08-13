@@ -640,7 +640,17 @@ band — a missing/extra element, not a decode artifact; it is misfiled in the
 video bucket) and `visual/video/h264{,_multinalu}` (codec 7, never reaches the
 Spark path; a decoder arc).
 
-### `netstream_play_flv` — Sorenson Spark pixel parity (44 outliers, max diff 3)
+### `avm1/netstream_play_flv` — Sorenson Spark pixel parity (44 outliers, max diff 3)
+
+<!-- image-axis: avm1/netstream_play_flv output -->
+
+**Scope (2026-08-13, session 15 `w2-gfx-smalls`):** the subject is written
+suite-qualified on purpose. Written bare, `scripts/image_triage.py` matched it
+by **basename** against `avm2/netstream_play_flv` — a different test with a
+different mechanism (blank render, 229 724 outlier channels, max diff 255) —
+and silently deleted that row from the pixel board. The qualified name resolves
+`exact` for avm1 and does not resolve at all for avm2; the avm2 row is
+re-documented as live work in the entry immediately below.
 
 The trace test (22/22) passes — `onStatus` events, NetStream lifecycle, and FLV
 metadata parsing all match Ruffle. After the 2026-05-13 Phase 1 landing of
@@ -677,6 +687,28 @@ it.)
 
 **Decision:** Accept; content decodes correctly and renders at the correct
 on-stage size. Trace test continues to pass.
+
+### `avm2/netstream_play_flv` — NOT dispositioned (blank render, live work)
+
+<!-- image-axis: none -->
+
+This entry exists so `scripts/image_triage.py` resolves the avm2 test
+**explicitly** instead of falling through to a basename match on the avm1 entry
+above (or to the bare `netstream_play_flv` line in the global
+`ruffle-tests/ignored_tests.txt`, which the tool also reads as an image-axis
+disposition). It is **not** an accepted diff on either axis.
+
+| | avm1 entry above | this test |
+|---|---|---|
+| status | renders, Spark decode parity | `blank_render` — nothing drawn |
+| excess | 44 outliers, max diff 3 | **229 724** outlier channels, max diff **255**, `e_large` |
+| mechanism | H.263 IDCT precision × GPU stretch | AVM2 `NetStream` playback never reaches a decoded frame |
+
+The trace axis is separately triaged in `ruffle-tests/tests/swfs/avm2/ignored_tests.txt`
+("do need real playback state and a decoder"); that is a suite-local, trace-axis
+statement and says nothing about the pixels. Measured at run `31647430265`
+(`bf585e448`). Re-triage with the video/decoder arc — it is a live pixel row, not
+a capped one.
 
 ---
 
@@ -1076,7 +1108,7 @@ Identical mechanism and identical ceiling.
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 (trace lines; **no image comparison exists**) | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
-| `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | **44** image outliers, max diff **3** (was ~52k/64, then 1654/8) | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected twice: the colour half was `sws_scale` (ported exactly, 2026-08-06) and the second half was the missing deblocking filter (ported 2026-08-12); the residual is Spark IDCT precision × the GPU sample-stretch |
+| `avm1/netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | **44** image outliers, max diff **3** (was ~52k/64, then 1654/8) | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected twice: the colour half was `sws_scale` (ported exactly, 2026-08-06) and the second half was the missing deblocking filter (ported 2026-08-12); the residual is Spark IDCT precision × the GPU sample-stretch |
 | `visual/video/deblocking` | Spark IDCT precision on the least-quantised stream (Category 9) — deblocking filter + flags byte + `MAX_EMBEDDED_VIDEO_STREAMS` 8→16 all landed 2026-08-12 | **104** image outlier channels, max **4**, mean 0.0 (was 2 906 999 / 255) | Accept (image axis only; trace passes). 11 of 12 streams byte-exact; all 104 channels are one Cb level on chroma row 232 of stream 9, whose planes have no remainder lane — decoder precision, not the filter |
 | `visual/video/colorconversion/h263` | Spark IDCT precision after the exact BT.601 port (Category 9) | 10 808 image outlier channels, max 2 | Accept (image axis only; trace passes). Every `idct_algo` arm still fails `max_outliers = 0`, and the closest one is a float IDCT = CI determinism hazard |
 | `visual/simple_shapes/masks` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels (776 px), ink IoU 1.00 | Accept, capped with the AA family. **Not mask work** — no `DoABC`, no `setMask`, no `scrollRect`; defects B/C cannot reach it |
