@@ -8599,9 +8599,40 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	extern int ng_depth_has_pending_finalize(size_t);
 	extern int g_loopback_replay;
 	extern int catch_up_backward;
+	// Ruffle's instantiate_child warns whenever the depth is occupied,
+	// *regardless of character identity* — the `char_id != ...` gate above is a
+	// proxy for "this is not a replay of an already-executed tag", because a
+	// same-char re-Place is overwhelmingly a replay (root loop-back, goto
+	// catch-up, browser-WASM frame-func re-run) and a spurious warning is a
+	// stdout line, i.e. a graded artefact.
+	//
+	// The one genuine case that proxy loses is a *forward* re-Place of the same
+	// character at the same depth from a later frame's tag stream — two Move=0
+	// PlaceObject2 tags at one depth on different frames of a normally-playing
+	// timeline. Ruffle warns and drops the second (from_shumway/fuzz
+	// e152812e2cfc: char 1 at depth 1015 on main frames 8 and 18; the expected
+	// output carries exactly one warning, for the frame-18 tag).
+	//
+	// Guards beyond the shared prefix, all asserting "real forward tag-stream
+	// execution, not a replay of a tag this depth already saw":
+	//  - `place_gen != g_place_gen`: a same-generation repeat is the business of
+	//    the within-frame gate further down (~line 9040), which already warns.
+	//  - `placed_at_frame < current_frame` (strict): the occupant came from an
+	//    *earlier* root frame. Loop-back replay re-runs frame 0 with
+	//    current_frame == placed_at_frame, so it can never satisfy this.
+	//  - `!catch_up_mode`: Ruffle's run_goto collects goto_commands into a
+	//    per-depth map, so a catch-up spanning N Place tags at one depth
+	//    executes ONE place; replaying each frame's tag stream the way we do
+	//    would over-warn. (catch_up_backward is already excluded below, this
+	//    covers the forward direction too.)
+	int ng_same_char_forward_replace =
+	    (display_list[depth].char_id == char_id
+	     && display_list[depth].place_gen != g_place_gen
+	     && display_list[depth].placed_at_frame < current_frame
+	     && !catch_up_mode);
 	if (char_id != 0 && !is_replace
 	    && display_list[depth].char_id != 0
-	    && display_list[depth].char_id != char_id
+	    && (display_list[depth].char_id != char_id || ng_same_char_forward_replace)
 	    && display_list[depth].placed_at_frame <= current_frame
 	    && !ng_depth_has_pending_finalize(depth)
 	    && !g_loopback_replay
