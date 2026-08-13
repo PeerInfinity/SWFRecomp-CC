@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-13T21:54:57.578571+00:00",
-    "git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
-    "duration_seconds": 24.42,
+    "timestamp": "2026-08-13T22:38:36.733528+00:00",
+    "git_sha": "3db858cbc157a97402c8e9a956b123871fc73405",
+    "duration_seconds": 1239.31,
     "total_available": 72,
     "shards": 30,
     "expected_shards": 30,
@@ -10,807 +10,1282 @@
     "filtered": true
   },
   "total": 72,
-  "pass": 0,
+  "pass": 72,
   "ruffle_matched": 0,
-  "fail": 72,
-  "pass_rate": 0.0,
-  "effective_pass": 0,
-  "effective_pass_rate": 0.0,
-  "breakdown": {
-    "compile_fail": 72
-  },
+  "fail": 0,
+  "pass_rate": 100.0,
+  "effective_pass": 72,
+  "effective_pass_rate": 100.0,
+  "breakdown": {},
   "tests": [
     {
       "test": "array_element_type1_args",
       "phases": {
-        "recomp": 0.056,
-        "compile": 0.088
+        "recomp": 0.003,
+        "compile": 14.705,
+        "run": 0.115
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.14
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 14.83,
+      "status": "pass"
     },
     {
       "test": "array_method_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.08
+        "recomp": 0.003,
+        "compile": 1.341,
+        "run": 0.114
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.09
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.46,
+      "status": "pass"
     },
     {
       "test": "avm2_agi_shell",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.866
+        "recomp": 0.003,
+        "compile": 33.518,
+        "run": 0.265
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.87
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 33.79,
+      "status": "pass"
     },
     {
       "test": "avm2_bitmapdata_draw_textfield",
       "phases": {
-        "recomp": 0.089,
-        "compile": 1.386
+        "recomp": 0.083,
+        "compile": 43.346,
+        "run": 0.365
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 1.48
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 43.81,
+      "status": "pass"
     },
     {
       "test": "avm2_contextmenu_stub",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.252
+        "recomp": 0.006,
+        "compile": 7.12,
+        "run": 0.315
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.26
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 7.45,
+      "status": "pass"
     },
     {
       "test": "avm2_embed_bytearray",
       "phases": {
         "recomp": 0.006,
-        "compile": 0.299
+        "compile": 25.66,
+        "run": 0.315
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.31
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 25.99,
+      "status": "pass"
     },
     {
       "test": "avm2_external_interface_unavailable",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.001
+        "recomp": 0.007,
+        "compile": 43.723,
+        "run": 0.365
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 1.01
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 44.11,
+      "status": "pass"
     },
     {
       "test": "avm2_findprop_this_resolution",
       "phases": {
         "recomp": 0.008,
-        "compile": 0.382
+        "compile": 7.336,
+        "run": 0.365
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.39
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 7.72,
+      "status": "pass"
     },
     {
       "test": "avm2_gc_dynprop_tombstone_purge",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.325
+        "compile": 7.522,
+        "run": 0.365
       },
       "num_frames": 4,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.33
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 7.9,
+      "status": "pass"
     },
     {
       "test": "avm2_gc_string_concat_reclaim",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.918
+        "compile": 46.941,
+        "run": 0.365
       },
       "num_frames": 6,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.93
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 47.33,
+      "status": "pass"
     },
     {
       "test": "avm2_gc_string_survives_collect",
       "phases": {
         "recomp": 0.008,
-        "compile": 0.596
+        "compile": 8.097,
+        "run": 0.365
       },
       "num_frames": 4,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.6
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 8.48,
+      "status": "pass"
     },
     {
       "test": "avm2_goto_catchup_scale",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.694
+        "compile": 8.12,
+        "run": 0.415
       },
       "num_frames": 3,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.7
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 8.55,
+      "status": "pass"
     },
     {
       "test": "avm2_graphics_runtime",
       "phases": {
-        "recomp": 0.009,
-        "compile": 1.196
+        "recomp": 0.007,
+        "compile": 42.8,
+        "run": 0.265
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 1.2
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 43.08,
+      "image_comparisons": {
+        "output": {
+          "status": "skip",
+          "message": "No expected image: output.expected.png",
+          "reason": "no_expected_image"
+        }
+      },
+      "status": "pass"
     },
     {
       "test": "avm2_loader_stub",
       "phases": {
         "recomp": 0.006,
-        "compile": 0.275
+        "compile": 25.631,
+        "run": 0.365
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.28
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 26.01,
+      "status": "pass"
     },
     {
       "test": "avm2_localconnection_domain",
       "phases": {
         "recomp": 0.006,
-        "compile": 0.246
+        "compile": 7.032,
+        "run": 0.315
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.25
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 7.36,
+      "status": "pass"
     },
     {
       "test": "avm2_morph",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.283
+        "recomp": 0.004,
+        "compile": 22.799,
+        "run": 0.215
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.29
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 23.02,
+      "image_comparisons": {
+        "output": {
+          "status": "skip",
+          "message": "No expected image: output.expected.png",
+          "reason": "no_expected_image"
+        }
+      },
+      "status": "pass"
     },
     {
       "test": "avm2_sharedobject_flushstatus",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.278
+        "recomp": 0.004,
+        "compile": 22.114,
+        "run": 0.265
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.28
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 22.39,
+      "status": "pass"
     },
     {
       "test": "avm2_simplebutton_click",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.25
+        "recomp": 0.004,
+        "compile": 6.655,
+        "run": 0.265
       },
       "num_frames": 3,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.26
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 6.93,
+      "status": "pass"
     },
     {
       "test": "avm2_slot_default_template",
       "phases": {
-        "recomp": 0.007,
-        "compile": 0.38
+        "recomp": 0.008,
+        "compile": 36.737,
+        "run": 0.315
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.39
+      "lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      },
+      "duration": 37.07,
+      "status": "pass"
     },
     {
       "test": "avm2_static_and_store_slots",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.355
+        "compile": 6.158,
+        "run": 0.315
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.36
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 6.49,
+      "status": "pass"
     },
     {
       "test": "avm2_static_text",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.213
+        "compile": 21.563,
+        "run": 0.215
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.22
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 21.79,
+      "status": "pass"
     },
     {
       "test": "avm2_timeline_gradients",
       "phases": {
-        "recomp": 0.022,
-        "compile": 1.199
+        "recomp": 0.012,
+        "compile": 39.505,
+        "run": 0.215
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 1.22
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 39.86,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 128",
+          "max_diff": 128,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 400,
+            "height": 400,
+            "total_channels": 640000,
+            "max_diff": 128,
+            "diff_channels": 214,
+            "mean_diff": 0.022,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 255,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
     },
     {
       "test": "avm2_timeline_solid",
       "phases": {
-        "recomp": 0.021,
-        "compile": 1.143
+        "recomp": 0.011,
+        "compile": 6.652,
+        "run": 0.215
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 1.16
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 6.88,
+      "image_comparisons": {
+        "output": {
+          "status": "skip",
+          "message": "No expected image: output.expected.png",
+          "reason": "no_expected_image"
+        }
+      },
+      "status": "pass"
     },
     {
       "test": "avm2_timeline_stroke_gradient",
       "phases": {
-        "recomp": 0.022,
-        "compile": 1.154
+        "recomp": 0.012,
+        "compile": 6.757,
+        "run": 0.215
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 1.18
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 7.1,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 400,
+            "height": 400,
+            "total_channels": 640000,
+            "max_diff": 255,
+            "diff_channels": 320,
+            "mean_diff": 0.0249,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 255,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
     },
     {
       "test": "avm2_timeline_text",
       "phases": {
-        "recomp": 0.08,
-        "compile": 0.487
+        "recomp": 0.088,
+        "compile": 45.725,
+        "run": 0.365
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.57
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 46.19,
+      "status": "pass"
     },
     {
       "test": "avm2_tolerant_verify_quarantine",
       "phases": {
         "recomp": 0.006,
-        "compile": 0.261
+        "compile": 7.662,
+        "run": 0.365
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.27
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 8.04,
+      "status": "pass"
     },
     {
       "test": "avm2_typed_value_ops",
       "phases": {
         "recomp": 0.009,
-        "compile": 0.523
+        "compile": 7.973,
+        "run": 0.415
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.53
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 8.41,
+      "status": "pass"
     },
     {
       "test": "broadcast_cross_swf_version",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.175
+        "recomp": 0.005,
+        "compile": 20.757,
+        "run": 0.165
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.18
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 20.93,
+      "status": "pass"
     },
     {
       "test": "broadcast_type1_args",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.056
+        "recomp": 0.005,
+        "compile": 20.604,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.06
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 20.78,
+      "status": "pass"
     },
     {
       "test": "coerce_cross_swf_version",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.065
+        "recomp": 0.005,
+        "compile": 1.919,
+        "run": 0.165
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.1,
+      "status": "pass"
     },
     {
       "test": "coerce_recursion_guard",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.044
+        "recomp": 0.005,
+        "compile": 21.453,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 21.63,
+      "status": "pass"
     },
     {
       "test": "coerce_type1_args",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.042
+        "recomp": 0.005,
+        "compile": 1.813,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 1.99,
+      "status": "pass"
     },
     {
       "test": "convertfloat_type1_this",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.044
+        "recomp": 0.005,
+        "compile": 1.805,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 1.98,
+      "status": "pass"
     },
     {
       "test": "ei_closure_scope_order",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.061
+        "recomp": 0.003,
+        "compile": 18.009,
+        "run": 0.165
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 18.18,
+      "status": "pass"
     },
     {
       "test": "ei_cross_swf_version",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.06
+        "recomp": 0.003,
+        "compile": 1.409,
+        "run": 0.165
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 1.58,
+      "status": "pass"
     },
     {
       "test": "ei_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.06
+        "recomp": 0.003,
+        "compile": 1.5,
+        "run": 0.164
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.67,
+      "status": "pass"
     },
     {
       "test": "enterframe_type1_args",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.071
+        "compile": 21.74,
+        "run": 0.165
       },
       "num_frames": 4,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 21.92,
+      "status": "pass"
     },
     {
       "test": "fn_call_builtin_type1_args",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.065
+        "compile": 21.228,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 21.4,
+      "status": "pass"
     },
     {
       "test": "fn_call_type1_args",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.227
+        "recomp": 0.004,
+        "compile": 21.027,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.23
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 21.2,
+      "status": "pass"
     },
     {
       "test": "fn_empty_method_type1_args",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.282
+        "recomp": 0.004,
+        "compile": 1.545,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.28
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 1.72,
+      "status": "pass"
     },
     {
       "test": "lc_method_type1_args",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.05
+        "recomp": 0.005,
+        "compile": 20.895,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.06
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 21.07,
+      "status": "pass"
     },
     {
       "test": "lc_onstatus_type1_args",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.049
+        "recomp": 0.005,
+        "compile": 1.793,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 1.97,
+      "status": "pass"
     },
     {
       "test": "lv_cross_swf_version",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.079
+        "recomp": 0.003,
+        "compile": 15.699,
+        "run": 0.114
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 15.82,
+      "status": "pass"
     },
     {
       "test": "lv_ondata_type1_args",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.08
+        "recomp": 0.003,
+        "compile": 14.985,
+        "run": 0.114
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 15.11,
+      "status": "pass"
     },
     {
       "test": "mask_nested_intersect",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.048
+        "recomp": 0.005,
+        "compile": 1.847,
+        "run": 0.215
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 2.11,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 200,
+            "height": 200,
+            "total_channels": 160000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
     },
     {
       "test": "mask_sibling_union",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.048
+        "recomp": 0.005,
+        "compile": 1.781,
+        "run": 0.215
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 2.04,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 200,
+            "height": 200,
+            "total_channels": 160000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
     },
     {
       "test": "mc_event_cross_swf_version",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.075
+        "recomp": 0.004,
+        "compile": 16.337,
+        "run": 0.165
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 16.51,
+      "status": "pass"
     },
     {
       "test": "mc_event_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.061
+        "recomp": 0.004,
+        "compile": 16.19,
+        "run": 0.164
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 16.36,
+      "status": "pass"
     },
     {
       "test": "mc_method_v5_caller_gate",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.075
+        "recomp": 0.004,
+        "compile": 20.043,
+        "run": 0.165
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 20.22,
+      "status": "pass"
     },
     {
       "test": "mc_resolve_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.062
+        "recomp": 0.004,
+        "compile": 19.908,
+        "run": 0.164
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 20.08,
+      "status": "pass"
     },
     {
       "test": "method_type1_args",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.09
+        "recomp": 0.004,
+        "compile": 16.505,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.1
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 16.68,
+      "status": "pass"
     },
     {
       "test": "nc_onstatus_closure",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.083
+        "recomp": 0.004,
+        "compile": 16.604,
+        "run": 0.164
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.09
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 16.78,
+      "status": "pass"
     },
     {
       "test": "nc_onstatus_type1_args",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.063
+        "compile": 21.345,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 21.52,
+      "status": "pass"
     },
     {
       "test": "onconstruct_cross_swf_version",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.075
+        "compile": 21.788,
+        "run": 0.165
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 21.97,
+      "status": "pass"
     },
     {
       "test": "onconstruct_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.062
+        "recomp": 0.004,
+        "compile": 21.631,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 21.8,
+      "status": "pass"
     },
     {
       "test": "onload_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.061
+        "recomp": 0.004,
+        "compile": 21.396,
+        "run": 0.165
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 21.57,
+      "status": "pass"
     },
     {
       "test": "onunload_type1_args",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.089
+        "recomp": 0.005,
+        "compile": 21.053,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.1
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 21.23,
+      "status": "pass"
     },
     {
       "test": "onunload_type1_local_frame",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.132
+        "recomp": 0.005,
+        "compile": 1.873,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.14
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 2.05,
+      "status": "pass"
     },
     {
       "test": "resolve_type1_args",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.065
+        "compile": 20.94,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 21.12,
+      "status": "pass"
     },
     {
       "test": "root_enterframe_cross_swf_version",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.077
+        "compile": 21.08,
+        "run": 0.165
       },
       "num_frames": 6,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 21.26,
+      "status": "pass"
     },
     {
       "test": "sort_comparator_captured_scope",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.047
+        "recomp": 0.005,
+        "compile": 20.686,
+        "run": 0.215
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 20.91,
+      "status": "pass"
     },
     {
       "test": "sort_comparator_type1_args",
       "phases": {
-        "recomp": 0.003,
-        "compile": 0.047
+        "recomp": 0.004,
+        "compile": 20.176,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.05
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 20.35,
+      "status": "pass"
     },
     {
       "test": "string_prim_method_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.066
+        "recomp": 0.004,
+        "compile": 17.276,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "duration": 17.45,
+      "status": "pass"
     },
     {
       "test": "timer_cross_swf_version",
       "phases": {
         "recomp": 0.004,
-        "compile": 0.114
+        "compile": 17.329,
+        "run": 0.165
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.12
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 17.5,
+      "status": "pass"
     },
     {
       "test": "timer_type1_args",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.066
+        "compile": 19.35,
+        "run": 0.165
       },
       "num_frames": 4,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 19.53,
+      "status": "pass"
     },
     {
       "test": "watch_cross_swf_version",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.122
+        "compile": 19.443,
+        "run": 0.165
       },
       "num_frames": 5,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.13
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 19.62,
+      "status": "pass"
     },
     {
       "test": "watch_mc_reentrant_setmember",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.07
+        "recomp": 0.004,
+        "compile": 19.901,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.08
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 20.08,
+      "status": "pass"
     },
     {
       "test": "watch_mc_type1_args",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.065
+        "recomp": 0.004,
+        "compile": 1.52,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.07
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.69,
+      "status": "pass"
     },
     {
       "test": "watch_setmember_type1_args",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.156
+        "recomp": 0.003,
+        "compile": 14.641,
+        "run": 0.115
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.16
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 14.76,
+      "status": "pass"
     },
     {
       "test": "watch_timeline_named_params",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.117
+        "recomp": 0.003,
+        "compile": 1.034,
+        "run": 0.114
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.12
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 1.15,
+      "status": "pass"
     },
     {
       "test": "watch_timeline_reentrant",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.294
+        "compile": 22.002,
+        "run": 0.165
       },
       "num_frames": 1,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.3
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 22.18,
+      "status": "pass"
     },
     {
       "test": "xml_onload_type1_args",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.234
+        "recomp": 0.005,
+        "compile": 23.465,
+        "run": 0.165
       },
       "num_frames": 2,
-      "status": "compile_fail",
-      "detail": "action.c:11:10: fatal error: curve_flatten.h: No such file or directory",
-      "duration": 0.24
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 23.64,
+      "status": "pass"
     }
   ]
 }

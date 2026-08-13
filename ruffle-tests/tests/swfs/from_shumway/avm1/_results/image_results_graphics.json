@@ -1,20 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-08-13T21:54:59.472109+00:00",
+    "timestamp": "2026-08-13T22:38:40.176185+00:00",
     "suite": "from_shumway/avm1",
     "stem": "results_graphics",
-    "git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
+    "git_sha": "3db858cbc157a97402c8e9a956b123871fc73405",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "31746548765",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/31746548765",
+    "run_id": "31748059158",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/31748059158",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 1,
   "comparisons": 1,
   "pass": 0,
-  "fail": 0,
-  "skip": 1,
+  "fail": 1,
+  "skip": 0,
   "no_render": 0,
   "fail_known_failure": 0,
   "pass_rate": 0.0,
@@ -23,11 +23,22 @@
       "suite": "from_shumway/avm1",
       "test": "text-bind",
       "comparison": "output",
-      "trace_status": "compile_fail",
+      "trace_status": "pass",
       "known_failure": false,
-      "status": "skip",
-      "reason": "test_compile_fail",
-      "message": "no image comparison recorded for this run"
+      "status": "fail",
+      "message": "Image comparison failed: 1934 outliers exceed limit of 100, max difference 158",
+      "reason": "pixel_mismatch",
+      "max_diff": 158,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 10316,
+      "mean_diff": 0.7064,
+      "outliers": 1934,
+      "max_outliers": 100,
+      "tolerance": 128,
+      "excess_outliers": 1834
     }
   ]
 }

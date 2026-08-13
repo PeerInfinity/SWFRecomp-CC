@@ -1,33 +1,58 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-13 21:54 UTC
+**Date**: 2026-08-13 22:38 UTC
 
-**Git SHA**: `16314e63fe`
+**Git SHA**: `3db858cbc1`
 
-**Run Duration**: 0m 7s
+**Run Duration**: 6m 41s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 17 |
-| Passing | **0** (0.0%) |
-| Failing | 17 |
-| Total expected lines | 0 |
-| Matching lines | 0 (0.0%) |
-| Mismatched lines | 0 |
+| Passing | **12** (70.6%) |
+| Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **15** (88.2%) |
+| Failing | 2 |
+| Total expected lines | 371 |
+| Matching lines | 333 (89.8%) |
+| Mismatched lines | 38 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 17 | 100.0% |
+| Output Mismatch | 2 | 100.0% |
 
 ## Passing Tests
 
-**0 tests passing**
+**12 tests passing**
 
-No passing tests.
+| # | Test | Lines | Duration | Notes |
+|---|------|-------|----------|-------|
+| 1 | `clip_action_no_key_code` | 1 | 15.9s |  |
+| 2 | `frame_label_count_oom` | 1 | 20.6s |  |
+| 3 | `frame_script_cleanup` | 30 | 28.0s |  |
+| 4 | `frame_script_cleanup2` | 32 | 26.7s |  |
+| 5 | `frame_script_cleanup3` | 30 | 23.4s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 22.8s |  |
+| 7 | `frame_script_construct` | 25 | 28.6s |  |
+| 8 | `scene_count_oom` | 1 | 2.2s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 27.9s |  |
+| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 27.6s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 27.1s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 27.8s |  |
+
+## Ruffle-Matched Tests
+
+**3 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+
+| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
+|---|------|-----------|--------------|----------|-------|
+| 1 | `frame_script_button_order` | 2 | 4 | 26.8s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 23.7s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 20.2s |  |
 
 ## Near-Passing Tests
 
@@ -51,6 +76,9 @@ No timeouts.
 
 ## All Output Mismatches
 
-**0 tests** with output mismatch, sorted by match rate (best first)
+**2 tests** with output mismatch, sorted by match rate (best first)
 
-No output mismatches.
+| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
+|---|------|------------|----------------|--------|----------|-------|
+| 1 | `missing_frame_scripts` | 44.4% | 12/27 | 27 | 22 |  |
+| 2 | `frame_script_cleanup_goto2` | 35.3% | 12/34 | 29 | 34 |  |

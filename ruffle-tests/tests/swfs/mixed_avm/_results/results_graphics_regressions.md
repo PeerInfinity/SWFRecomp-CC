@@ -1,20 +1,19 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 4/11 passing | Graphics: 0/11 passing
+Trace: 4/11 passing | Graphics: 7/11 passing
 
-## Graphics Regressions (4 tests)
+## Graphics Regressions (0 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-| # | Test | Graphics Status | Detail |
-|---|------|-----------------|--------|
-| 1 | `avm1_doabc` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
-| 2 | `avm1_loads_avm2_doaction` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
-| 3 | `avm1_sprite_sc_ignored` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
-| 4 | `avm2_doaction` | Compile Fail | action.c:11:10: fatal error: curve_flatten.h: No such file or directory |
+No regressions.
 
-## Graphics Improvements (0 tests)
+## Graphics Improvements (3 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
-No improvements.
+| # | Test | Trace Status | Detail |
+|---|------|---------------|--------|
+| 1 | `avm2_loads_avm1_doabc` | Output Mismatch | 1/4 lines match |
+| 2 | `avm2_loads_avm1_loads_avm2_doabc` | Output Mismatch | 1/3 lines match |
+| 3 | `avm2_loads_avm1_loads_into_root` | Output Mismatch | 1/2 lines match |

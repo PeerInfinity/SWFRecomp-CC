@@ -1,33 +1,33 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-13 21:54 UTC
+**Date**: 2026-08-13 22:38 UTC
 
-**Git SHA**: `16314e63fe`
+**Git SHA**: `3db858cbc1`
 
-**Run Duration**: 0m 9s
+**Run Duration**: 0m 45s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 5 |
-| Passing | **0** (0.0%) |
-| Failing | 5 |
-| Total expected lines | 0 |
-| Matching lines | 0 (0.0%) |
+| Passing | **5** (100.0%) |
+| Failing | 0 |
+| Total expected lines | 208 |
+| Matching lines | 208 (100.0%) |
 | Mismatched lines | 0 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Compile Fail | 5 | 100.0% |
 
 ## Passing Tests
 
-**0 tests passing**
+**5 tests passing**
 
-No passing tests.
+| # | Test | Lines | Duration | Notes |
+|---|------|-------|----------|-------|
+| 1 | `request_matching_profiles` | 190 | 5.5s |  |
+| 2 | `request_profiles` | 16 | 7.6s |  |
+| 3 | `sampler_odd_size` | 1 | 10.4s |  |
+| 4 | `scissor_rectangle` | 0 | 10.8s |  |
+| 5 | `scissor_rectangle_invalid` | 1 | 10.1s |  |
 
 ## Near-Passing Tests
 

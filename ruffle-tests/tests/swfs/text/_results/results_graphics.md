@@ -1,33 +1,44 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-13 21:54 UTC
+**Date**: 2026-08-13 22:38 UTC
 
-**Git SHA**: `16314e63fe`
+**Git SHA**: `3db858cbc1`
 
-**Run Duration**: 0m 5s
+**Run Duration**: 3m 33s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 11 |
-| Passing | **0** (0.0%) |
-| Failing | 11 |
-| Total expected lines | 0 |
-| Matching lines | 0 (0.0%) |
-| Mismatched lines | 0 |
+| Passing | **10** (90.9%) |
+| Failing | 1 |
+| Total expected lines | 973 |
+| Matching lines | 972 (99.9%) |
+| Mismatched lines | 1 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 11 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**0 tests passing**
+**10 tests passing**
 
-No passing tests.
+| # | Test | Lines | Duration | Notes |
+|---|------|-------|----------|-------|
+| 1 | `auto_size/height` | 1 | 21.8s |  |
+| 2 | `auto_size/return` | 12 | 30.0s |  |
+| 3 | `auto_size/width` | 6 | 27.3s |  |
+| 4 | `br_at_start` | 0 | 2.7s |  |
+| 5 | `html_entity_parsing` | 213 | 7.4s |  |
+| 6 | `style_changes_in_html` | 0 | 17.9s |  |
+| 7 | `text_caret_placement_align` | 248 | 23.9s |  |
+| 8 | `text_caret_placement_leading` | 244 | 29.7s |  |
+| 9 | `text_caret_placement_scroll` | 108 | 28.2s |  |
+| 10 | `text_caret_placement_translated_bounds` | 140 | 21.5s |  |
 
 ## Near-Passing Tests
 
@@ -51,6 +62,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**0 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
-No output mismatches.
+| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
+|---|------|------------|----------------|--------|----------|-------|
+| 1 | `links_in_scrolled_text` | 0.0% | 0/1 | 0 | 1 |  |
