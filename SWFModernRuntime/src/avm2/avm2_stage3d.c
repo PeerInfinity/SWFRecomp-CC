@@ -82,9 +82,12 @@ static _Noreturn void s3d_throw_2008(Avm2Context* ctx, const char* param)
 	                 param);
 }
 
+// #2007 is a TypeError everywhere in the corpus (Ruffle's
+// make_null_or_undefined_error), never an ArgumentError — see
+// avm2/matrix3d_append, tabstop_properties, localconnection, ...
 static _Noreturn void s3d_throw_2007(Avm2Context* ctx, const char* param)
 {
-	avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
 	                 "Error #2007: Parameter %s must be non-null.", param);
 }
 
@@ -165,6 +168,16 @@ static Avm2Object* s3d_arg_object(Avm2Activation* act, uint32_t i)
 {
 	Avm2Value v = s3d_arg(act, i);
 	return (v.kind == AVM2_VALUE_OBJECT) ? v.u.obj : NULL;
+}
+
+// A declared class-typed parameter reaches the native body already coerced, so
+// anything that is not an object is the `null` Flash rejects with #2007.
+static Avm2Object* s3d_arg_object_non_null(Avm2Activation* act, uint32_t i,
+                                           const char* param)
+{
+	Avm2Object* o = s3d_arg_object(act, i);
+	if (o == NULL) s3d_throw_2007(act->ctx, param);
+	return o;
 }
 
 // The accepted-spelling tables (render/src/backend.rs FromWStr impls).
@@ -1428,11 +1441,20 @@ static Avm2Value matrix3d_copy_from(Avm2Activation* act)
 static Avm2Value matrix3d_copy_raw_data_from(Avm2Activation* act)
 {
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
-	Avm2Object* v = s3d_arg_object(act, 0);
+	Avm2Object* v = s3d_arg_object_non_null(act, 0, "source");
 	Avm2VectorExt* src = v != NULL ? avm2_vector_ext(v) : NULL;
 	uint32_t index = s3d_arg_u32(act, 1, 0);
 	int transpose = s3d_arg_bool(act, 2, 0);
 	if (e == NULL || src == NULL) return avm2_undefined();
+	// A source that cannot supply all 16 entries from `index` on is #2004, and
+	// the matrix is left untouched — Flash does not pad from identity. (The
+	// Matrix3D(Vector) constructor and the rawData setter DO silently
+	// identity-fill; see avm2/matrix3d "Too short:".)
+	if ((uint64_t) index + 16 > (uint64_t) src->length)
+	{
+		avm2_throw_error(act->ctx, act->ctx->builtins.argument_error_class,
+		                 "Error #2004: One of the parameters is invalid.");
+	}
 	double tmp[16];
 	m3d_identity(tmp);
 	for (uint32_t i = 0; i < 16; i++)
@@ -1456,11 +1478,20 @@ static Avm2Value matrix3d_copy_raw_data_to(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
-	Avm2Object* v = s3d_arg_object(act, 0);
+	Avm2Object* v = s3d_arg_object_non_null(act, 0, "dest");
 	Avm2VectorExt* dst = v != NULL ? avm2_vector_ext(v) : NULL;
 	uint32_t index = s3d_arg_u32(act, 1, 0);
 	int transpose = s3d_arg_bool(act, 2, 0);
 	if (e == NULL || dst == NULL || v == NULL) return avm2_undefined();
+	// A fixed destination that cannot hold all 16 entries is #1126, raised
+	// BEFORE any element is written (Flash leaves the vector untouched); the
+	// per-element write path would otherwise report #1125 halfway through.
+	if (dst->fixed && (uint64_t) index + 16 > (uint64_t) dst->length)
+	{
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #1126: Cannot change the length of a fixed "
+		                 "Vector.");
+	}
 	for (uint32_t i = 0; i < 16; i++)
 	{
 		double val;
@@ -1492,7 +1523,7 @@ static Avm2Value matrix3d_transpose(Avm2Activation* act)
 static Avm2Value matrix3d_append(Avm2Activation* act)
 {
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
-	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object(act, 0));
+	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object_non_null(act, 0, "lhs"));
 	if (e != NULL && o != NULL) m3d_mul(e->m, e->m, o->m);
 	return avm2_undefined();
 }
@@ -1500,7 +1531,7 @@ static Avm2Value matrix3d_append(Avm2Activation* act)
 static Avm2Value matrix3d_prepend(Avm2Activation* act)
 {
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
-	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object(act, 0));
+	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object_non_null(act, 0, "rhs"));
 	if (e != NULL && o != NULL) m3d_mul(e->m, o->m, e->m);
 	return avm2_undefined();
 }
@@ -1523,8 +1554,10 @@ static void m3d_build_rotation(double* m, double deg, double ax, double ay,
 {
 	double len = sqrt(ax * ax + ay * ay + az * az);
 	m3d_identity(m);
-	if (len == 0.0) return;
-	ax /= len; ay /= len; az /= len;
+	// A zero-length axis skips only the normalization: Flash still runs the
+	// Rodrigues formula with ax=ay=az=0, so a 180-degree rotation about the
+	// zero axis is diag(c, c, c, 1) = diag(-1, -1, -1, 1), not identity.
+	if (len != 0.0) { ax /= len; ay /= len; az /= len; }
 	double r = deg * 3.14159265358979323846 / 180.0;
 	double c = cos(r), s = sin(r), t = 1.0 - c;
 	m[0] = t * ax * ax + c;
@@ -1547,7 +1580,8 @@ static Avm2Value matrix3d_xform(Avm2Activation* act, int kind, int prepend)
 	{
 		double deg = s3d_arg_number(act, 0, 0.0);
 		double ax = 0.0, ay = 0.0, az = 0.0;
-		Avm2Object* axis = s3d_arg_object(act, 1);
+		// `axis` is required non-null; the optional `pivotPoint` below is not.
+		Avm2Object* axis = s3d_arg_object_non_null(act, 1, "axis");
 		if (axis != NULL)
 		{
 			ax = m3d_component(act->ctx, axis, "x");
@@ -1670,7 +1704,7 @@ static Avm2Value matrix3d_transform_vector_common(Avm2Activation* act, int delta
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
-	Avm2Object* v = s3d_arg_object(act, 0);
+	Avm2Object* v = s3d_arg_object_non_null(act, 0, "vector");
 	if (e == NULL || v == NULL) return avm2_null();
 	double x = m3d_component(ctx, v, "x");
 	double y = m3d_component(ctx, v, "y");
@@ -1679,8 +1713,12 @@ static Avm2Value matrix3d_transform_vector_common(Avm2Activation* act, int delta
 	double ox = m[0] * x + m[4] * y + m[8] * z + (delta ? 0.0 : m[12]);
 	double oy = m[1] * x + m[5] * y + m[9] * z + (delta ? 0.0 : m[13]);
 	double oz = m[2] * x + m[6] * y + m[10] * z + (delta ? 0.0 : m[14]);
-	Avm2Value args[3] = { avm2_number(ox), avm2_number(oy), avm2_number(oz) };
-	return avm2_class_construct(ctx, v->cls, args, 3);
+	// The fourth row of the product is returned as the result's `w`; the input
+	// vector's own `w` is ignored (verified by the "w set" cases).
+	double ow = m[3] * x + m[7] * y + m[11] * z + (delta ? 0.0 : m[15]);
+	Avm2Value args[4] = { avm2_number(ox), avm2_number(oy), avm2_number(oz),
+	                      avm2_number(ow) };
+	return avm2_class_construct(ctx, v->cls, args, 4);
 }
 
 static Avm2Value matrix3d_transform_vector(Avm2Activation* act)
@@ -1741,8 +1779,14 @@ static void m3d_check_orientation(Avm2Context* ctx, const Avm2String* s)
 	avm2_throw_error(ctx, ctx->builtins.error_class, buf);
 }
 
+// An omitted (or `undefined`) style defaults to eulerAngles, but an explicit
+// `null` is #2007 — the declared `orientationStyle:String` parameter coerces
+// `undefined` to `null` before the builtin sees it, so the two are distinct
+// here even though they are the same "missing" at the AS3 call site.
 static const Avm2String* m3d_orientation_arg(Avm2Activation* act, uint32_t i)
 {
+	if (act->argc > i && act->args[i].kind == AVM2_VALUE_NULL)
+		s3d_throw_2007(act->ctx, "orientationStyle");
 	if (act->argc > i && act->args[i].kind != AVM2_VALUE_UNDEFINED)
 		return avm2_coerce_to_string(act->ctx, act->args[i]);
 	return avm2_string_from_literal(act->ctx, "eulerAngles");
@@ -1757,19 +1801,27 @@ static Avm2Value matrix3d_recompose(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	// Validation order is measured (matrix3d_recompose_edge_cases): a null
+	// `components` first, then a null `orientationStyle` (both #2007), then
+	// #2187 on the style spelling, and only then the component count.
+	Avm2Object* cv = s3d_arg_object_non_null(act, 0, "components");
 	const Avm2String* os = m3d_orientation_arg(act, 1);
 	m3d_check_orientation(ctx, os);
 	if (e == NULL) return avm2_bool(0);
-	Avm2Object* cv = s3d_arg_object(act, 0);
 	Avm2VectorExt* comps = cv != NULL ? avm2_vector_ext(cv) : NULL;
 	if (comps == NULL || comps->length < 3) return avm2_bool(0);
 
-	Avm2Object* t = comps->elems[0].kind == AVM2_VALUE_OBJECT
-		? comps->elems[0].u.obj : NULL;
-	Avm2Object* r = comps->elems[1].kind == AVM2_VALUE_OBJECT
-		? comps->elems[1].u.obj : NULL;
-	Avm2Object* sc = comps->elems[2].kind == AVM2_VALUE_OBJECT
-		? comps->elems[2].u.obj : NULL;
+	// A null element inside `components` reports false and leaves the matrix
+	// untouched, so this has to precede the m3d_identity() below.
+	if (comps->elems[0].kind != AVM2_VALUE_OBJECT
+	    || comps->elems[1].kind != AVM2_VALUE_OBJECT
+	    || comps->elems[2].kind != AVM2_VALUE_OBJECT)
+	{
+		return avm2_bool(0);
+	}
+	Avm2Object* t = comps->elems[0].u.obj;
+	Avm2Object* r = comps->elems[1].u.obj;
+	Avm2Object* sc = comps->elems[2].u.obj;
 	double sx3 = m3d_component(ctx, sc, "x");
 	double sy3 = m3d_component(ctx, sc, "y");
 	double sz3 = m3d_component(ctx, sc, "z");
@@ -1826,11 +1878,12 @@ static Avm2Value matrix3d_recompose(Avm2Activation* act)
 	m[14] = m3d_component(ctx, t, "z");
 	m[15] = 1;
 
-	if (sx3 == 0) m[0] = 1e-15;
-	if (sy3 == 0) m[5] = 1e-15;
-	if (sz3 == 0) m[10] = 1e-15;
-	// The .as tests components[2].y twice; that is upstream's typo, not ours.
-	return avm2_bool(!(sx3 == 0 || sy3 == 0 || sy3 == 0));
+	// A zero scale component is written as a literal 0 (no 1e-15 substitution)
+	// and still reports true — measured on every zero-scale permutation in
+	// matrix3d_recompose_edge_cases, and matches matrix3d_compose's
+	// "Recomposed zero scale: 0,0,...". Only a null component (above) or a
+	// short `components` reports false.
+	return avm2_bool(1);
 }
 
 static Avm2Value matrix3d_decompose(Avm2Activation* act)
@@ -1988,12 +2041,14 @@ static Avm2Value matrix3d_copy_vec_to(Avm2Activation* act, int column)
 	Avm2Context* ctx = act->ctx;
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
 	uint32_t idx = act->argc > 0 ? avm2_coerce_to_u32(ctx, act->args[0]) : 0;
+	// The null check precedes the range check: copyColumnTo(4, null) is #2007,
+	// not #2004.
+	Avm2Object* v = s3d_arg_object_non_null(act, 1, "vector3D");
 	if (idx > 3)
 	{
 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
 		                 "Error #2004: One of the parameters is invalid.");
 	}
-	Avm2Object* v = s3d_arg_object(act, 1);
 	if (e == NULL || v == NULL) return avm2_undefined();
 	static const char* const n[4] = { "x", "y", "z", "w" };
 	for (int k = 0; k < 4; k++)
@@ -2016,12 +2071,13 @@ static Avm2Value matrix3d_copy_vec_from(Avm2Activation* act, int column)
 	Avm2Context* ctx = act->ctx;
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
 	uint32_t idx = act->argc > 0 ? avm2_coerce_to_u32(ctx, act->args[0]) : 0;
+	// Same order as copyColumnTo: null before range.
+	Avm2Object* v = s3d_arg_object_non_null(act, 1, "vector3D");
 	if (idx > 3)
 	{
 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
 		                 "Error #2004: One of the parameters is invalid.");
 	}
-	Avm2Object* v = s3d_arg_object(act, 1);
 	if (e == NULL || v == NULL) return avm2_undefined();
 	static const char* const n[4] = { "x", "y", "z", "w" };
 	for (int k = 0; k < 4; k++)
