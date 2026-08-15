@@ -169,6 +169,14 @@ static const char* fragment_wgsl =
 "@group(2) @binding(1) var gradient_samp: sampler;\n"
 "@group(2) @binding(2) var bitmap_tex: texture_2d_array<f32>;\n"
 "@group(2) @binding(3) var bitmap_samp: sampler;\n"
+// Smoothed bitmap fills (SWF fill types 0x40 / 0x41) sample through a LINEAR
+// sampler; non-smoothed ones (0x42 / 0x43) keep the Nearest sampler above. The
+// bit lives in the fill-type byte itself and the recompiler emits that byte
+// verbatim as the vertex style type, so the split costs one extra sampler
+// binding and no plumbing. A GLOBAL linear sampler is REFUTED: it takes
+// from_shumway/acid/acid-blend (a 0x43 non-smoothed fill) from 101 outliers to
+// 1961 against a 348 budget (w1 gfx-vram section 4.2).
+"@group(2) @binding(4) var bitmap_samp_linear: sampler;\n"
 "\n"
 "struct FragmentInput {\n"
 "  @location(0) @interpolate(flat) v_style_type: u32,\n"
@@ -277,9 +285,18 @@ static const char* fragment_wgsl =
 "    color = sample_gradient(focal_radial_t(in.v_args), i32(in.v_style_id));\n"
 "  } else if (in.v_style_type == 0x40u || in.v_style_type == 0x42u) {\n"
 "    let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
-"    color = textureSampleLevel(bitmap_tex, bitmap_samp, fract(in.v_args.xy) * bm_ratio, i32(in.v_style_id), 0.0);\n"
+"    let uv = fract(in.v_args.xy) * bm_ratio;\n"
+"    if (in.v_style_type == 0x40u) {\n"
+"      color = textureSampleLevel(bitmap_tex, bitmap_samp_linear, uv, i32(in.v_style_id), 0.0);\n"
+"    } else {\n"
+"      color = textureSampleLevel(bitmap_tex, bitmap_samp, uv, i32(in.v_style_id), 0.0);\n"
+"    }\n"
 "  } else if (in.v_style_type == 0x41u || in.v_style_type == 0x43u) {\n"
-"    color = textureSampleLevel(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id), 0.0);\n"
+"    if (in.v_style_type == 0x41u) {\n"
+"      color = textureSampleLevel(bitmap_tex, bitmap_samp_linear, in.v_args.xy, i32(in.v_style_id), 0.0);\n"
+"    } else {\n"
+"      color = textureSampleLevel(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id), 0.0);\n"
+"    }\n"
 "  } else {\n"
 "    color = vec4f(0.0);\n"
 "  }\n"
@@ -1017,6 +1034,25 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 // wgpu's guaranteed maxTextureArrayLayers floor, and what SwiftShader/WSL2
 // adapters report (webgpu-texture-array-layer-limit-blank-render).
 #define MAX_BITMAP_TEXTURE_LAYERS 256
+// A single texture allocation must also fit the DRIVER's maxMemoryAllocationSize,
+// which the layer-count cap above says nothing about: Mesa lavapipe (what CI and
+// every local --mode=graphics run use, forced by verify_output.py's
+// VK_ICD_FILENAMES) reports exactly 2 GiB. Measured on from_shumway/acid/acid-large
+// (a 3613x2681 layer, 36.95 MB each): capacity 54 -> 2 131 019 660 B allocates,
+// capacity 55 -> 2 169 765 472 B returns VK_ERROR_OUT_OF_DEVICE_MEMORY, after which
+// Dawn drops every command buffer that binds the texture and the whole run reads
+// back empty (image status `no_render`, the corpus's only one).
+//
+// 1.5 GiB keeps 25% headroom under that wall and is deliberately generous: across
+// all 383 corpus tests with image comparisons, exactly ONE (acid-large, 2.40 GB)
+// exceeds it — the runner-up is acid-color at 840 MB — so every other movie's
+// capacity, and therefore every other movie's allocation, is byte-identical.
+// It also leaves s15's blur growth alone: those grids have 2.45 MB layers, so
+// 1.5 GiB / 2.45 MB = 626 layers of room and their grown cap of 128 survives.
+// This is the ONE clamp allowed to go below the MAX_DYNAMIC_BITMAPS floor —
+// under-allocating layers costs dropped dynamic bitmap draws, while breaching the
+// allocator costs the entire frame.
+#define BITMAP_ARRAY_HARD_LIMIT ((size_t)1536 * 1024 * 1024)
 
 // Plan the bitmap texture array: one layer's padded dimensions and how many
 // dynamic layers to allocate. create_buffers_and_upload sizes its side-tables
@@ -1058,6 +1094,26 @@ static void plan_dynamic_bitmaps(WebGPURenderContext* ctx, u32* out_cap,
 		? MAX_BITMAP_TEXTURE_LAYERS - (u32)ctx->bitmap_count : 0;
 	if (cap > room) cap = room;
 	if (cap < MAX_DYNAMIC_BITMAPS) cap = MAX_DYNAMIC_BITMAPS;
+
+	// Driver allocation ceiling. Applied LAST, after the floor, because it is the
+	// only clamp that may lower capacity below MAX_DYNAMIC_BITMAPS (see
+	// BITMAP_ARRAY_HARD_LIMIT). Zero effect unless the array would breach 1.5 GiB.
+	if (layer_bytes > 0)
+	{
+		size_t affordable_layers = BITMAP_ARRAY_HARD_LIMIT / layer_bytes;
+		if (affordable_layers > (size_t)ctx->bitmap_count)
+		{
+			size_t hard_room = affordable_layers - (size_t)ctx->bitmap_count;
+			if ((size_t)cap > hard_room) cap = (u32)hard_room;
+		}
+		else
+		{
+			// Pathological: the static bitmaps alone breach the limit. Nothing here
+			// can fix that, but keep the dynamic tail to a single layer so the array
+			// is as close to allocatable as this function can make it.
+			cap = 1;
+		}
+	}
 
 	*out_cap = cap;
 	*out_w = bw;
@@ -1326,6 +1382,13 @@ static void create_textures(WebGPURenderContext* ctx)
 		samp_desc.minFilter = WGPUFilterMode_Nearest;
 		samp_desc.maxAnisotropy = 1;
 		ctx->bitmap_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
+
+		// Same addressing, Linear filtering — bound at group(2) binding(4) and
+		// used only by the smoothed fill types (0x40 / 0x41).
+		samp_desc.label = WGPU_LABEL("bitmap_sampler_linear");
+		samp_desc.magFilter = WGPUFilterMode_Linear;
+		samp_desc.minFilter = WGPUFilterMode_Linear;
+		ctx->bitmap_sampler_linear = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
 
 	// --- MSAA texture (MSAA_SAMPLES x) ---
@@ -1430,9 +1493,9 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	bg1_desc.entries = bg1_entries;
 	ctx->vertex_uniform_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg1_desc);
 
-	// Group 2: fragment texture + sampler (4 entries: gradient tex, gradient samp,
-	// bitmap tex, bitmap samp)
-	WGPUBindGroupLayoutEntry bg2_entries[4] = {0};
+	// Group 2: fragment texture + sampler (5 entries: gradient tex, gradient samp,
+	// bitmap tex, bitmap samp, bitmap samp linear)
+	WGPUBindGroupLayoutEntry bg2_entries[5] = {0};
 	bg2_entries[0].binding = 0;
 	bg2_entries[0].visibility = WGPUShaderStage_Fragment;
 	bg2_entries[0].texture.sampleType = WGPUTextureSampleType_Float;
@@ -1447,10 +1510,13 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	bg2_entries[3].binding = 3;
 	bg2_entries[3].visibility = WGPUShaderStage_Fragment;
 	bg2_entries[3].sampler.type = WGPUSamplerBindingType_Filtering;
+	bg2_entries[4].binding = 4;
+	bg2_entries[4].visibility = WGPUShaderStage_Fragment;
+	bg2_entries[4].sampler.type = WGPUSamplerBindingType_Filtering;
 
 	WGPUBindGroupLayoutDescriptor bg2_desc = {0};
 	bg2_desc.label = WGPU_LABEL("fragment_sampler_bgl");
-	bg2_desc.entryCount = 4;
+	bg2_desc.entryCount = 5;
 	bg2_desc.entries = bg2_entries;
 	ctx->fragment_sampler_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg2_desc);
 
@@ -1842,8 +1908,9 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 	WGPUSampler grad_samp = ctx->gradient_sampler ? ctx->gradient_sampler : ctx->dummy_sampler;
 	WGPUTextureView bmp_view = ctx->bitmap_tex_view ? ctx->bitmap_tex_view : ctx->dummy_tex_view;
 	WGPUSampler bmp_samp = ctx->bitmap_sampler ? ctx->bitmap_sampler : ctx->dummy_sampler;
+	WGPUSampler bmp_samp_lin = ctx->bitmap_sampler_linear ? ctx->bitmap_sampler_linear : bmp_samp;
 
-	WGPUBindGroupEntry bg2_entries[4] = {0};
+	WGPUBindGroupEntry bg2_entries[5] = {0};
 	bg2_entries[0].binding = 0;
 	bg2_entries[0].textureView = grad_view;
 	bg2_entries[1].binding = 1;
@@ -1852,11 +1919,13 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 	bg2_entries[2].textureView = bmp_view;
 	bg2_entries[3].binding = 3;
 	bg2_entries[3].sampler = bmp_samp;
+	bg2_entries[4].binding = 4;
+	bg2_entries[4].sampler = bmp_samp_lin;
 
 	WGPUBindGroupDescriptor bg2_desc = {0};
 	bg2_desc.label = WGPU_LABEL("fragment_sampler_bg");
 	bg2_desc.layout = ctx->fragment_sampler_bgl;
-	bg2_desc.entryCount = 4;
+	bg2_desc.entryCount = 5;
 	bg2_desc.entries = bg2_entries;
 	ctx->fragment_sampler_bg = wgpuDeviceCreateBindGroup(ctx->device, &bg2_desc);
 
@@ -2593,7 +2662,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 		wgpuQueueWriteTexture(ctx->queue, &dest, temp, up_bytes, &layout, &extent);
 
 		// Upload bitmap_sizes for this layer: {content, padded}. This quad is
-		// emitted as style 0x41 (clipped), so the shader reads only the padded
+		// emitted as style 0x43 (clipped, non-smoothed), so the shader reads only the padded
 		// half — `inv_pos / padded`, exactly as before. The content half is
 		// recorded truthfully for completeness.
 		u32 sizes[4] = { src_w, src_h, bw, bh };
@@ -2627,8 +2696,16 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 
 	// Generate 6 vertices (2 triangles) for the quad
 	// Vertex format: { float x, float y, u32 style_type, u32 style_id }
-	// style_type = 0x41 (clipped bitmap fill, no repeat)
+	// style_type = 0x43 (clipped bitmap fill, no repeat, NOT smoothed)
 	// style_id = bitmap_layer_id (lower 16) | inv_mat_id (upper 16)
+	//
+	// This path (attachBitmap / Bitmap display objects / the video fallback)
+	// carries no smoothing information, and Flash's default for both
+	// Bitmap.smoothing and attachBitmap is false — so it asks for the Nearest
+	// sampler explicitly. Before per-fill smoothing existed it emitted 0x41 and
+	// got Nearest anyway from the single fixed sampler, so this keeps every such
+	// draw byte-identical. Wire a real flag through here (not a literal) if
+	// Bitmap.smoothing is ever honoured.
 	float w_twips = (float)dst_w * 20.0f;
 	float h_twips = (float)dst_h * 20.0f;
 
@@ -2636,7 +2713,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 	x0.f = x_twips;            y0.f = y_twips;
 	x1.f = x_twips + w_twips;  y1.f = y_twips + h_twips;
 
-	u32 sx = 0x41;  // clipped bitmap fill
+	u32 sx = render_webgpu_bitmap_fill_style_word(0, 0);  // clipped, non-smoothed
 	u32 sy = (bmp_layer & 0xFFFF) | ((inv_mat_id & 0xFFFF) << 16);
 
 	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
@@ -2687,7 +2764,6 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 	const float* user_matrix6, int repeat, int smooth,
 	u32 transform_id, u32 cxform_id)
 {
-	(void)smooth;  // smoothing flag — sampler is currently fixed at linear
 	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
 	if (argb_pixels == NULL || src_w == 0 || src_h == 0) return;
 	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity)
@@ -2790,9 +2866,11 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 			inv_mat, 16 * sizeof(float));
 	}
 
-	// Generate triangle vertices.
-	// style_type 0x40 = repeating bitmap fill, 0x41 = clipped (no repeat).
-	u32 sx_word = repeat ? 0x40u : 0x41u;
+	// Generate triangle vertices. The fill-type byte carries BOTH the repeat and
+	// the smoothing bit (0x40/0x41 smoothed, 0x42/0x43 not), which is how
+	// beginBitmapFill's `smooth` argument reaches the fragment shader's sampler
+	// choice — see render_webgpu_bitmap_fill_style_word.
+	u32 sx_word = render_webgpu_bitmap_fill_style_word(repeat, smooth);
 	u32 sy_word = (bmp_layer & 0xFFFFu) | ((inv_mat_id & 0xFFFFu) << 16);
 
 	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
@@ -4741,6 +4819,7 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->bitmap_tex_view) wgpuTextureViewRelease(ctx->bitmap_tex_view);
 	if (ctx->bitmap_tex) wgpuTextureRelease(ctx->bitmap_tex);
 	if (ctx->bitmap_sampler) wgpuSamplerRelease(ctx->bitmap_sampler);
+	if (ctx->bitmap_sampler_linear) wgpuSamplerRelease(ctx->bitmap_sampler_linear);
 	if (ctx->dummy_tex_view) wgpuTextureViewRelease(ctx->dummy_tex_view);
 	if (ctx->dummy_tex_2d_view) wgpuTextureViewRelease(ctx->dummy_tex_2d_view);
 	if (ctx->dummy_tex) wgpuTextureRelease(ctx->dummy_tex);

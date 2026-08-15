@@ -83,6 +83,7 @@ typedef struct WebGPURenderContext
 	WGPUTexture bitmap_tex;
 	WGPUTextureView bitmap_tex_view;
 	WGPUSampler bitmap_sampler;
+	WGPUSampler bitmap_sampler_linear;  // smoothed bitmap fills (0x40/0x41)
 
 	WGPUTexture dummy_tex;            // 1x1 fallback for empty gradient/bitmap
 	WGPUTextureView dummy_tex_view;  // 2D-array view (bitmap fallback)
@@ -284,6 +285,26 @@ typedef struct WebGPURenderContext
 	// Renderer initialization status (0 = not ready, 1 = fully initialized)
 	int renderer_ok;
 } WebGPURenderContext;
+
+// SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
+// decide which bitmap sampler a draw gets. The SWF format spells the smoothing
+// flag into the fill type itself (swf.hpp:115-118):
+//
+//     0x40 repeating, smoothed      0x42 repeating, NOT smoothed
+//     0x41 clipped,   smoothed      0x43 clipped,   NOT smoothed
+//
+// and the recompiler already emits that raw byte as the vertex style type, so
+// the fragment shader picks a Linear sampler for 0x40/0x41 and Nearest for
+// 0x42/0x43 with no further plumbing. Dynamic (drawing-API / attachBitmap)
+// draws build their style word here so they land on the same rule:
+// beginBitmapFill(bmp, matrix, repeat, smooth) passes its own flag, and a path
+// with NO smoothing information must pass smooth = 0 (Flash's default for
+// Bitmap.smoothing and attachBitmap), which is also what keeps those draws
+// byte-identical to the pre-2026-08 fixed-Nearest sampler.
+static inline u32 render_webgpu_bitmap_fill_style_word(int repeat, int smooth)
+{
+	return (repeat ? 0x40u : 0x41u) | (smooth ? 0x0u : 0x2u);
+}
 
 // --- Public API (matches flashbang.h signatures) ---
 
