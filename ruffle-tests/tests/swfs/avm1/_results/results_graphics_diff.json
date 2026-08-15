@@ -1,134 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-13T22:38:36.623140+00:00",
-    "old_git_sha": "3db858cbc157a97402c8e9a956b123871fc73405",
-    "new_timestamp": "2026-08-15T09:18:14.383997+00:00",
-    "new_git_sha": "86434112a75946b377d5d329b234e47fa83a957c",
+    "old_timestamp": "2026-08-15T09:18:14.383997+00:00",
+    "old_git_sha": "86434112a75946b377d5d329b234e47fa83a957c",
+    "new_timestamp": "2026-08-15T10:09:49.204284+00:00",
+    "new_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 678,
+    "old_pass": 681,
     "old_ruffle_matched": 18,
-    "old_effective_pass": 696,
-    "old_total": 718,
-    "old_pass_rate": 94.4,
+    "old_effective_pass": 699,
+    "old_total": 725,
+    "old_pass_rate": 93.9,
     "new_pass": 681,
     "new_ruffle_matched": 18,
     "new_effective_pass": 699,
     "new_total": 725,
     "new_pass_rate": 93.9,
-    "old_mismatched_lines": 11710,
+    "old_mismatched_lines": 11731,
     "new_mismatched_lines": 11731,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 717,
-    "added": 7,
+    "unchanged": 725,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "sound_load_multiple_instances",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      }
-    },
-    {
-      "test": "sound_load_multiple_remote",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 6,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "sound_load_props",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 111,
-        "expected_lines": 111,
-        "matching_lines": 96
-      }
-    },
-    {
-      "test": "sound_load_start",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "sound_load_start_remote",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 1,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "sound_load_stops_when_dereferenced",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "sound_load_streaming_stop_remote",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 3,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "sound_mixed_attach_load",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      }
-    }
-  ]
+  "changes": []
 }

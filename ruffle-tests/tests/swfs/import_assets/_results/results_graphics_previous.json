@@ -1,41 +1,39 @@
 {
   "metadata": {
-    "timestamp": "2026-08-13T22:38:36.705359+00:00",
-    "git_sha": "3db858cbc157a97402c8e9a956b123871fc73405",
-    "duration_seconds": 45.02,
+    "timestamp": "2026-08-15T09:18:14.491072+00:00",
+    "git_sha": "86434112a75946b377d5d329b234e47fa83a957c",
+    "duration_seconds": 48.82,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 3,
-  "pass": 2,
+  "pass": 3,
   "ruffle_matched": 0,
-  "fail": 1,
-  "pass_rate": 66.7,
-  "effective_pass": 2,
-  "effective_pass_rate": 66.7,
-  "breakdown": {
-    "output_mismatch": 1
-  },
+  "fail": 0,
+  "pass_rate": 100.0,
+  "effective_pass": 3,
+  "effective_pass_rate": 100.0,
+  "breakdown": {},
   "tests": [
     {
       "test": "avm1_imports_avm1",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.855,
-        "run": 0.366
+        "compile": 2.271,
+        "run": 0.516
       },
       "num_frames": 1,
       "lines": {
-        "actual_lines": 7,
+        "actual_lines": 6,
         "expected_lines": 6,
-        "matching_lines": 0
+        "matching_lines": 6
       },
-      "duration": 2.42,
+      "duration": 3.04,
       "image_comparisons": {
         "output": {
           "status": "fail",
-          "message": "Image comparison failed: 17922 outliers exceed limit of 500, max difference 255",
+          "message": "Image comparison failed: 17755 outliers exceed limit of 500, max difference 255",
           "max_diff": 255,
           "trigger": [
             "last_frame"
@@ -46,27 +44,24 @@
             "height": 400,
             "total_channels": 880000,
             "max_diff": 255,
-            "diff_channels": 27659,
-            "mean_diff": 4.6033,
-            "outliers": 17922,
+            "diff_channels": 27563,
+            "mean_diff": 4.5676,
+            "outliers": 17755,
             "max_outliers": 500,
             "tolerance": 100,
-            "excess_outliers": 17422
+            "excess_outliers": 17255
           },
           "expected_source": "repo",
           "reason": "pixel_mismatch"
         }
       },
-      "status": "output_mismatch",
-      "detail": "7 line(s) differ (actual=7, expected=6)",
-      "actual_output": "Hello from right_eye.swf\nHello from test.swf\nGuy_with_hat loaded!\nCircle loaded!\nSquare loaded!\nLeft eye loaded!\nRight eye loaded!",
-      "expected_output": "Hello from test.swf\nGuy_with_hat loaded!\nCircle loaded!\nSquare loaded!\nLeft eye loaded!\nRight eye loaded!"
+      "status": "pass"
     },
     {
       "test": "avm1_non_swf_import",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.024,
+        "compile": 23.122,
         "run": 0.215
       },
       "num_frames": 4,
@@ -75,15 +70,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 21.25,
+      "duration": 23.35,
       "status": "pass"
     },
     {
       "test": "empty_url",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.966,
-        "run": 0.215
+        "compile": 21.98,
+        "run": 0.265
       },
       "num_frames": 2,
       "lines": {
@@ -91,7 +86,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 21.19,
+      "duration": 22.25,
       "status": "pass"
     }
   ]
