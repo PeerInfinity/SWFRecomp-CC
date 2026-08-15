@@ -10732,8 +10732,21 @@ static Avm2Value do_cab_set(Avm2Activation* act)
 // `opaqueBackground` is declared `Object`, so assigning UNDEFINED stores the
 // AS3 coercion of undefined to Object — null — and reads back as `null`, not
 // `undefined` (displayobject_opaque_background's third read).
+//
+// s16 P2: the value is no longer only a dyn-prop echo. Ruffle
+// (avm2/globals/flash/display/display_object.rs set_opaque_background) does
+// `Null => None, value => Color::from_rgb(coerce_to_u32(value), 255)` and the
+// getter answers `color.to_rgb()` — the round trip is LOSSY: whatever is
+// assigned reads back as a 24-bit RGB uint. The dyn prop stays as the storage
+// for objects with no display ext; the ext fields are authoritative when they
+// exist, and are what the render walk paints from.
 static Avm2Value do_opaquebg_get(Avm2Activation* act)
 {
+	Avm2DisplayObjectExt* ext = this_display(act);
+	if (ext != NULL)
+		return ext->opaque_bg_set
+			? avm2_integer((int32_t) (ext->opaque_bg_rgb & 0xFFFFFFu))
+			: avm2_null();
 	return dyn_prop_get(act, "__opaqueBackground", avm2_null());
 }
 static Avm2Value do_opaquebg_set(Avm2Activation* act)
@@ -10743,6 +10756,29 @@ static Avm2Value do_opaquebg_set(Avm2Activation* act)
 	{
 		Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
 		if (v.kind == AVM2_VALUE_UNDEFINED) v = avm2_null();
+		Avm2DisplayObjectExt* ext = this_display(act);
+		if (ext != NULL)
+		{
+			if (v.kind == AVM2_VALUE_NULL)
+			{
+				ext->opaque_bg_set = 0;
+				ext->opaque_bg_rgb = 0;
+			}
+			else
+			{
+				double d = avm2_to_number_fast(act->ctx, v);
+				uint32_t u = 0;
+				if (isfinite(d))
+				{
+					double t = trunc(d);
+					t = fmod(t, 4294967296.0);
+					if (t < 0.0) t += 4294967296.0;
+					u = (uint32_t) t;
+				}
+				ext->opaque_bg_set = 1;
+				ext->opaque_bg_rgb = u & 0xFFFFFFu;
+			}
+		}
 		avm2_object_set_dynamic(act->ctx, self, "__opaqueBackground",
 		                        (uint32_t) strlen("__opaqueBackground"),
 		                        v)->dont_enum = 1;
@@ -16297,6 +16333,45 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	g_avm2_filter_active = saved_active;
 }
 
+// DisplayObject.opaqueBackground (s16 P2). Ruffle display_object.rs
+// render_base, non-cacheAsBitmap arm:
+//
+//     if let Some(background) = this.opaque_background() {
+//         let bounds = this.render_bounds_with_transform(
+//             &context.transform_stack.transform().matrix, true, view_matrix);
+//         context.commands.draw_rect(background,
+//             Matrix::create_box_from_rectangle(&bounds));
+//     }
+//
+// Three properties of that snippet drive this implementation:
+//   * the rect is the WORLD-space axis-aligned box of the object's bounds
+//     (self + children), not the object's local box pushed through its matrix;
+//   * it is emitted BEFORE apply_standard_mask_and_scroll, so the background
+//     is NOT clipped by the object's own `mask` or `scrollRect` (it IS clipped
+//     by any enclosing container clip, which is already the live stencil here);
+//   * `draw_rect` takes a Color, never a ColorTransform — cxform slot 0.
+// Alpha is 255 by construction (set_opaque_background forces it).
+static void avm2_draw_opaque_background(Avm2Context* ctx, Avm2Object* obj,
+                                        const Avm2DisplayObjectExt* ext,
+                                        const Mat* world)
+{
+	if (!ext->opaque_bg_set) return;
+	Rect acc = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, obj, world, &acc);
+	if (!acc.valid) return;
+	float w = (float) (acc.xmax - acc.xmin);
+	float h = (float) (acc.ymax - acc.ymin);
+	if (w <= 0.0f || h <= 0.0f) return;
+	uint32_t rgb = ext->opaque_bg_rgb;
+	// Transform slot 0 is identity, so these world-twips rects go straight
+	// through stage_to_ndc (same convention as avm2_render_highlight).
+	renderer_draw_rect(context, (float) acc.xmin, (float) acc.ymin, w, h,
+	                   (float) ((rgb >> 16) & 0xFF) / 255.0f,
+	                   (float) ((rgb >> 8) & 0xFF) / 255.0f,
+	                   (float) (rgb & 0xFF) / 255.0f,
+	                   1.0f, 0, 0);
+}
+
 // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
@@ -16336,6 +16411,11 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	avm2_cx_of_ext(&own_cx, ext);
 	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
 	g_avm2_cur_cx = node_cx;
+
+	// opaqueBackground — painted UNDER this node and outside its own mask /
+	// scrollRect, exactly where Ruffle's render_base emits it.
+	if (g_avm2_mask_capture == 0)
+		avm2_draw_opaque_background(ctx, obj, ext, &world);
 
 	// DisplayObject.mask — clip this node AND its whole subtree to the masker's
 	// silhouette. The masker lives elsewhere in the tree, so its stencil pass

@@ -3394,6 +3394,89 @@ static u32 avm1_mask_push(SWFAppContext* app_context, MovieClip* masker)
 	return saved;
 }
 
+// ---------------------------------------------------------------------------
+// DisplayObject.opaqueBackground (s16 P2)
+// ---------------------------------------------------------------------------
+// Ruffle display_object.rs::render_base, non-cacheAsBitmap arm: when a display
+// object carries an opaque background, a filled rectangle of its render bounds
+// is emitted BEFORE apply_standard_mask_and_scroll — i.e. under the object, and
+// NOT clipped by the object's own mask or scrollRect (an enclosing container
+// clip still applies, because that stencil is already live).
+//
+// Ruffle's rect is the WORLD-space axis-aligned box; ours is the object's LOCAL
+// box pushed through the object's own (already world-composed) transform slot,
+// which is the same rectangle for every unrotated object and a rotated box
+// rather than its AABB otherwise. Documented divergence: no test in the corpus
+// puts an opaque background on a rotated object, and going through the object's
+// own slot is what makes this correct inside nested sprites for free.
+//
+// `transform_data` is the CPU-side table, so child matrices must be read
+// through ng_get_original_transform_id (compose_children has already
+// repointed transform_id at a GPU-only slot by the time we render).
+static int opaque_bg_local_bounds(DisplayObject* obj, float* b)
+{
+	if (obj == NULL || obj->char_id == 0) return 0;
+	Character* ch = &dictionary[obj->char_id];
+	float xmin = 1e30f, xmax = -1e30f, ymin = 1e30f, ymax = -1e30f;
+	int found = 0;
+	if (ch->type == CHAR_TYPE_SPRITE && obj->sprite_display_list != NULL)
+	{
+		for (size_t i = 1; i <= obj->sprite_max_depth; i++)
+		{
+			DisplayObject* c = &obj->sprite_display_list[i];
+			if (c->char_id == 0 || c->clip_depth > 0) continue;
+			float cb[4];
+			if (!opaque_bg_local_bounds(c, cb)) continue;
+			const float* m = transform_data[ng_get_original_transform_id(c)];
+			const float xs[4] = { cb[0], cb[1], cb[0], cb[1] };
+			const float ys[4] = { cb[2], cb[2], cb[3], cb[3] };
+			for (int k = 0; k < 4; k++)
+			{
+				float X = m[0] * xs[k] + m[4] * ys[k] + m[12];
+				float Y = m[1] * xs[k] + m[5] * ys[k] + m[13];
+				if (X < xmin) xmin = X;
+				if (X > xmax) xmax = X;
+				if (Y < ymin) ymin = Y;
+				if (Y > ymax) ymax = Y;
+			}
+			found = 1;
+		}
+	}
+	else
+	{
+		s32 cxmin, cxmax, cymin, cymax;
+		if (ng_getCharBounds(obj->char_id, &cxmin, &cxmax, &cymin, &cymax))
+		{
+			xmin = (float) cxmin; xmax = (float) cxmax;
+			ymin = (float) cymin; ymax = (float) cymax;
+			found = 1;
+		}
+	}
+	if (!found) return 0;
+	b[0] = xmin; b[1] = xmax; b[2] = ymin; b[3] = ymax;
+	return 1;
+}
+
+static void draw_entry_opaque_background(SWFAppContext* app_context,
+                                         DisplayObject* obj)
+{
+	(void) app_context;
+	if (obj == NULL || !obj->opaque_bg_set) return;
+	if (g_clip_mask_capture) return;
+	float b[4];
+	if (!opaque_bg_local_bounds(obj, b)) return;
+	float w = b[1] - b[0], h = b[3] - b[2];
+	if (w <= 0.0f || h <= 0.0f) return;
+	u32 rgb = obj->opaque_bg_rgb;
+	// cxform slot 0 (identity): Ruffle's draw_rect takes a Color, never a
+	// ColorTransform, so the background ignores the placement cxform.
+	renderer_draw_rect(context, b[0], b[2], w, h,
+		(float) ((rgb >> 16) & 0xFF) / 255.0f,
+		(float) ((rgb >> 8) & 0xFF) / 255.0f,
+		(float) (rgb & 0xFF) / 255.0f,
+		1.0f, obj->transform_id, 0);
+}
+
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
 	if (cxform_forces_invisible(app_context, obj->cxform_id)) return;
@@ -3794,6 +3877,9 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 #endif
 
 		// setMask maskee: push the masker's stencil around this entry's paint.
+		// opaqueBackground: painted under this entry and OUTSIDE its own
+		// mask / scrollRect, exactly where Ruffle's render_base emits it.
+		draw_entry_opaque_background(app_context, obj);
 		u32 avm1_mask_saved_clip = 0;
 		if (avm1_masker != NULL)
 			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
@@ -6149,6 +6235,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
 		// setMask maskee: the masker's geometry becomes the stencil for this
 		// entry's paint, restored (not ended) afterwards.
+		// opaqueBackground: painted under this entry and OUTSIDE its own
+		// mask / scrollRect, exactly where Ruffle's render_base emits it.
+		draw_entry_opaque_background(app_context, obj);
 		u32 avm1_mask_saved_clip = 0;
 		if (avm1_masker != NULL)
 			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
@@ -7129,6 +7218,9 @@ void tagShowFrame(SWFAppContext* app_context)
 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
 
 		// setMask maskee: push the masker's geometry as this entry's stencil.
+		// opaqueBackground: painted under this entry and OUTSIDE its own
+		// mask / scrollRect, exactly where Ruffle's render_base emits it.
+		draw_entry_opaque_background(app_context, obj);
 		u32 avm1_mask_saved_clip = 0;
 		if (avm1_masker != NULL)
 			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
@@ -11574,6 +11666,20 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
 		display_list[depth].filter_strength = strength;
 		display_list[depth].filter_angle = angle;
 		display_list[depth].filter_distance = distance;
+	}
+}
+
+// PlaceObject3 BackgroundColor. Ruffle display_object.rs:2543 gates this on
+// swf_version >= 11 and drops a colour whose alpha is 0; the recompiler applies
+// both rules, so this only ever records what survived them.
+void tagSetOpaqueBackground(SWFAppContext* app_context, size_t depth,
+    u8 set, u32 rgb)
+{
+	(void)app_context;
+	if (depth <= max_depth)
+	{
+		display_list[depth].opaque_bg_set = set;
+		display_list[depth].opaque_bg_rgb = rgb & 0xFFFFFFu;
 	}
 }
 

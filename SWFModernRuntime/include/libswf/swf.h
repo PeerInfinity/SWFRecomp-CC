@@ -268,6 +268,13 @@ typedef struct DisplayObject
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
 	// Child movie transform data override (set during placement when g_active_transform_data != NULL)
 	float (*child_transform_data)[16];
+	// DisplayObject.opaqueBackground (s16 P2). Sources: PlaceObject3's
+	// BackgroundColor field (via tagSetOpaqueBackground) and AVM1
+	// `mc.opaqueBackground = 0xRRGGBB`. Ruffle forces alpha to 255 and drops
+	// a PlaceObject3 colour whose alpha is 0, so only the RGB is stored.
+	// The renderer paints a filled box of the entry's bounds UNDER it.
+	u8 opaque_bg_set;
+	u32 opaque_bg_rgb;
 } DisplayObject;
 
 typedef struct KeyState {

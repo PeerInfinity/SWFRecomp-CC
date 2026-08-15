@@ -91,6 +91,10 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
     u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
     double r, double g, double b, double a, double strength,
     double angle, double distance);
+// PlaceObject3 BackgroundColor -> DisplayObject.opaqueBackground.
+// `rgb` is 0xRRGGBB; `set` 0 clears (Ruffle drops an alpha==0 colour).
+void tagSetOpaqueBackground(SWFAppContext* app_context, size_t depth,
+    u8 set, u32 rgb);
 void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
     double r, double g, double b, double a);
 void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20);

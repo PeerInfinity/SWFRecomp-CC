@@ -136,6 +136,13 @@ struct MovieClip {
 	Avm1TextFieldBinding* avm1_text_field_bindings;
 	u16 avm1_text_field_binding_count;
 	u16 avm1_text_field_binding_capacity;
+	// MovieClip.opaqueBackground (s16 P2). Ruffle avm1/globals/movie_clip.rs:
+	// the getter answers `color.to_rgb()` or UNDEFINED (not null — that is the
+	// AVM2 spelling), and the setter treats undefined/null as "clear" and
+	// everything else as coerce_to_u32 with the alpha forced to 255.
+	// Mirrored onto the display-list entry, which is what the renderer reads.
+	u8 opaque_bg_set;
+	u32 opaque_bg_rgb;
 };
 
 // Global root MovieClip

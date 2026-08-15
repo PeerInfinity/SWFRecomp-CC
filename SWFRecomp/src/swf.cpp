@@ -4320,9 +4320,24 @@ namespace SWFRecomp
 					cur_pos += 1; // skip Visible UI8
 				}
 
+				u8 opaque_bg_set = 0;
+				u32 opaque_bg_rgb = 0;
 				if (is_po3 && has_opaque_background)
 				{
-					cur_pos += 4; // skip BackgroundColor RGBA
+					// BackgroundColor is RGBA. Ruffle display_object.rs:2543
+					// applies the field only for SWF version >= 11, and treats
+					// alpha == 0 as "clear the background" — the alpha is then
+					// forced to 255 for everything that survives.
+					u8 bg_r = ((u8*) cur_pos)[0];
+					u8 bg_g = ((u8*) cur_pos)[1];
+					u8 bg_b = ((u8*) cur_pos)[2];
+					u8 bg_a = ((u8*) cur_pos)[3];
+					cur_pos += 4;
+					if (header.version >= 11)
+					{
+						opaque_bg_set = (bg_a > 0) ? 1u : 0u;
+						opaque_bg_rgb = ((u32) bg_r << 16) | ((u32) bg_g << 8) | (u32) bg_b;
+					}
 				}
 
 				// If ColorMatrixFilter provided a cxform, use it (compose with existing if any)
@@ -4584,6 +4599,16 @@ namespace SWFRecomp
 				}
 
 				// Instance name already emitted before the placement call above.
+
+				// PlaceObject3 BackgroundColor -> DisplayObject.opaqueBackground.
+				// Emitted as its own call (like tagSetFilter) so none of the
+				// eight tagPlaceObject* signatures has to grow a parameter.
+				if (is_po3 && has_opaque_background)
+				{
+					context.tag_main << "\t" << "tagSetOpaqueBackground(app_context, "
+						<< to_string(depth) << ", " << to_string((unsigned) opaque_bg_set)
+						<< ", " << to_string(opaque_bg_rgb) << "u);" << endl;
+				}
 
 				// Emit filter if parsed
 				if (parsed_filter_type != 0)

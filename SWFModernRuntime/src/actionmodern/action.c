@@ -50785,6 +50785,49 @@ void actionSetMember(SWFAppContext* app_context)
 					((DisplayObject*) mc->display_obj)->blend_mode = mc->blend_mode;
 				return;
 			}
+			// opaqueBackground setter (Ruffle avm1/globals/movie_clip.rs
+			// set_opaque_background): undefined/null clears it, anything else
+			// is coerce_to_u32 with the alpha forced to 255. Never falls
+			// through to the dynamic-property store, so the prototype's
+			// undefined-valued stub stays the only own property the
+			// enumeration tests see (same discipline as scrollRect below).
+			if (prop_name_len == 16 && strncmp(prop_name, "opaqueBackground", 16) == 0)
+			{
+				if (value_var.type == ACTION_STACK_VALUE_NULL
+				    || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+				{
+					mc->opaque_bg_set = 0;
+					mc->opaque_bg_rgb = 0;
+				}
+				else
+				{
+					double _obd = varToDouble(&value_var);
+					u32 _obu = 0;
+					if (!isnan(_obd) && !isinf(_obd))
+					{
+						double _obt = trunc(_obd);
+						_obt = fmod(_obt, 4294967296.0);
+						if (_obt < 0.0) _obt += 4294967296.0;
+						_obu = (u32) _obt;
+					}
+					mc->opaque_bg_set = 1;
+					mc->opaque_bg_rgb = _obu & 0xFFFFFFu;
+				}
+				// Mirror onto the display-list entry — the only copy the
+				// renderer reads (tagSetOpaqueBackground writes the same
+				// fields). display_obj is set for attached/dynamic clips;
+				// a plain timeline sprite is found by the name walk instead.
+				{
+					DisplayObject* _obe = (DisplayObject*) mc->display_obj;
+					if (_obe == NULL) _obe = resolveMCDisplayEntry(mc);
+					if (_obe != NULL)
+					{
+						_obe->opaque_bg_set = mc->opaque_bg_set;
+						_obe->opaque_bg_rgb = mc->opaque_bg_rgb;
+					}
+				}
+				return;
+			}
 			// scrollRect setter (Ruffle avm1/globals/movie_clip.rs set_scroll_rect).
 			// Stores on the MovieClip and registers it with the scrollRect
 			// registry that tag.c's compose/render walks read; NEVER falls
@@ -54645,6 +54688,17 @@ void actionGetMember(SWFAppContext* app_context)
 		if (mc != NULL && prop_name_len == 13 && strncmp(prop_name, "cacheAsBitmap", 13) == 0)
 		{
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+			return;
+		}
+		// opaqueBackground: 0xRRGGBB once set, otherwise fall through to the
+		// MovieClip.prototype stub, which answers `undefined` — which is what
+		// movieclip_default_state / movieclip_library_state_values assert.
+		if (mc != NULL && prop_name_len == 16
+		    && strncmp(prop_name, "opaqueBackground", 16) == 0
+		    && mc->opaque_bg_set)
+		{
+			ActionVar _obg = makeF64((double) (mc->opaque_bg_rgb & 0xFFFFFFu));
+			pushVar(app_context, &_obg);
 			return;
 		}
 		// scrollRect: a FRESH Rectangle per read (Ruffle `new_rectangle`), or

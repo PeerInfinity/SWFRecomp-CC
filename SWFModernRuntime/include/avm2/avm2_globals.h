@@ -638,6 +638,14 @@ typedef struct Avm2DisplayObjectExt
 	// brand-new objects. A non-empty list also forces cacheAsBitmap on.
 	struct Avm2FilterVal* filters;
 	uint32_t filter_count;
+
+	// DisplayObject.opaqueBackground (s16 P2). Ruffle display_object.rs
+	// set_opaque_background: alpha is FORCED to 255 ("Only solid backgrounds
+	// are supported"), and render_base paints a rect of the object's WORLD
+	// render bounds beneath the object — outside its own mask/scrollRect.
+	// `opaque_bg_set == 0` reads back as `null`, never `undefined`.
+	uint8_t opaque_bg_set;
+	uint32_t opaque_bg_rgb;      // 0xRRGGBB, alpha implicit 255
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
