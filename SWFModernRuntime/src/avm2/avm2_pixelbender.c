@@ -2240,8 +2240,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 	Avm2Builtins* b = &ctx->builtins;
 
 	// flash.display.Shader (sealed).
-	Avm2Class* sh = avm2_builtin_class(ctx, "flash.display", "Shader",
-	                                   b->object_class);
+	Avm2Class* sh = avm2_builtin_class_api(ctx, "flash.display", "Shader",
+	                                       b->object_class, 10);
 	g_shader_class = sh;
 	sh->flags |= AVM2_CLASS_FLAG_SEALED;
 	sh->native_ext_size = sizeof(Avm2ShaderExt);
@@ -2253,8 +2253,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 	                        shader_set_precision);
 
 	// flash.display.ShaderData (final dynamic).
-	Avm2Class* sd = avm2_builtin_class(ctx, "flash.display", "ShaderData",
-	                                   b->object_class);
+	Avm2Class* sd = avm2_builtin_class_api(ctx, "flash.display", "ShaderData",
+	                                       b->object_class, 10);
 	g_shaderdata_class = sd;
 	sd->flags |= AVM2_CLASS_FLAG_FINAL;
 	sd->native_ext_size = sizeof(Avm2ShaderDataExt);
@@ -2262,8 +2262,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 	sd->instance_init.debug_name = "ShaderData";
 
 	// flash.display.ShaderParameter (final dynamic).
-	Avm2Class* sp = avm2_builtin_class(ctx, "flash.display", "ShaderParameter",
-	                                   b->object_class);
+	Avm2Class* sp = avm2_builtin_class_api(ctx, "flash.display",
+	                                       "ShaderParameter", b->object_class, 10);
 	g_shaderparameter_class = sp;
 	sp->flags |= AVM2_CLASS_FLAG_FINAL;
 	sp->native_ext_size = sizeof(Avm2ShaderParamExt);
@@ -2274,8 +2274,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, sp, "value", sp_get_value, sp_set_value);
 
 	// flash.display.ShaderInput (final dynamic).
-	Avm2Class* si = avm2_builtin_class(ctx, "flash.display", "ShaderInput",
-	                                   b->object_class);
+	Avm2Class* si = avm2_builtin_class_api(ctx, "flash.display", "ShaderInput",
+	                                       b->object_class, 10);
 	g_shaderinput_class = si;
 	si->flags |= AVM2_CLASS_FLAG_FINAL;
 	si->native_ext_size = sizeof(Avm2ShaderInputExt);
@@ -2288,8 +2288,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 	avm2_builtin_add_getset(ctx, si, "input", si_get_input, si_set_input);
 
 	// flash.display.ShaderJob (extends EventDispatcher, sealed).
-	Avm2Class* sj = avm2_builtin_class(ctx, "flash.display", "ShaderJob",
-	                                   b->event_dispatcher_class);
+	Avm2Class* sj = avm2_builtin_class_api(ctx, "flash.display", "ShaderJob",
+	                                       b->event_dispatcher_class, 10);
 	g_shaderjob_class = sj;
 	sj->flags |= AVM2_CLASS_FLAG_SEALED;
 	sj->native_ext_size = sizeof(Avm2ShaderJobExt);
@@ -2305,14 +2305,15 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 
 	// flash.display.ShaderPrecision / ShaderParameterType constant bags.
 	{
-		Avm2Class* c = avm2_builtin_class(ctx, "flash.display",
-		                                  "ShaderPrecision", b->object_class);
+		Avm2Class* c = avm2_builtin_class_api(ctx, "flash.display",
+		                                      "ShaderPrecision", b->object_class,
+		                                      10);
 		avm2_builtin_add_static_const(ctx, c, "FULL",
 			avm2_string(avm2_string_from_literal(ctx, "full")));
 		avm2_builtin_add_static_const(ctx, c, "FAST",
 			avm2_string(avm2_string_from_literal(ctx, "fast")));
-		c = avm2_builtin_class(ctx, "flash.display", "ShaderParameterType",
-		                       b->object_class);
+		c = avm2_builtin_class_api(ctx, "flash.display", "ShaderParameterType",
+		                           b->object_class, 10);
 		static const char* const kTypeConsts[][2] =
 		{
 			{ "FLOAT", "float" }, { "FLOAT2", "float2" },

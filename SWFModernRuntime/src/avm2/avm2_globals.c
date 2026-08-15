@@ -2464,7 +2464,18 @@ typedef struct DtDescMember
 	// below this SWF version. DESCRIBE-ONLY by design — Flash also hides the
 	// property from lookup, but no graded test calls a gated member on an
 	// under-versioned SWF and a real hide would need a per-entry availability
-	// check on the hot property path. SWF = 12 + (N - 672) / 2 (api_version.rs).
+	// check on the hot property path.
+	//
+	// `api_version.rs` numbers the annotations `ordinal = N - 660`. The stride
+	// is uniform only from ordinal 12 up (`SWF = 12 + (ordinal - 12) / 2`,
+	// even ordinals); ODD ordinals >= 12 and every ordinal below 12 that is
+	// not in {0, 2, 5, 7, 10} are AIR_* versions, which `TRANSFER_TABLE` maps
+	// to VM_INTERNAL under a Flash Player runtime — i.e. HIDDEN AT EVERY
+	// VERSION (255 here), never rounded up to the next SWF version. The five
+	// Flash-Player ordinals below 12 are 0 (always), 2/5/7 (FP 10.0/10.0.32/
+	// 10.1 => SWF 10) and 10 (FP 10.2 => SWF 11). Verified against all six
+	// all_classes/display expected files; tools/descriptor/as_model.py is the
+	// single implementation of the rule.
 	uint8_t min_swf;
 	// 1 = the member does not exist in our vtable at all and is reported
 	// purely from this table (dt_collect_synthetic).
@@ -2490,6 +2501,35 @@ typedef struct DtDescConst
 	uint8_t min_swf;    // 0 = always visible
 } DtDescConst;
 
+// A DESCRIBE-ONLY correction that belongs to the class being described rather
+// than to the class that declares the member, so it cannot live on a
+// DtDescMember row. Two shapes, distinguished by `declared_by`:
+//
+//   declared_by != NULL — report this inherited/overridden member as declared
+//     by that class. Both directions occur: playerglobal overrides `addChild`
+//     on Stage where we inherit DisplayObjectContainer's, and it overrides
+//     only the SETTER half of `alpha` on Stage (so `declaredBy` stays
+//     DisplayObject) where we re-register both halves.
+//   declared_by == NULL — hide the member on this class entirely.
+//     `soundTransform` is the case: playerglobal declares it twice, on Sprite
+//     and on SimpleButton, and NOT on InteractiveObject /
+//     DisplayObjectContainer / Loader / Stage, while we register it once on
+//     InteractiveObject so every subclass inherits it.
+//
+// This is deliberately NOT the session-15 XMLDocument shape (rewriting a live
+// vtable entry's `defining_class`): `defining_class` also drives
+// avm2_function_new scope binding, class_derive_depth override arbitration
+// and callstack frame naming, so re-pointing Stage's 30 accessors that way
+// would rename every `flash.display::Stage/set x()` frame — and
+// stage_properties2 grades those 2071 throws.
+typedef struct DtDescRedecl
+{
+	const char* name;         // NULL terminates the array
+	uint8_t kind;             // DT_DESC_*
+	uint8_t is_static;        // 1 = the class ("static") side
+	const char* declared_by;  // NULL = hide the member on this class
+} DtDescRedecl;
+
 typedef struct DtDescClass
 {
 	const char* ns;     // NULL terminates the array
@@ -2502,6 +2542,17 @@ typedef struct DtDescClass
 	const DtDescParam* ctor_params;
 	const DtDescMember* members;
 	const DtDescConst* consts;   // appended (session 15 T10)
+	// --- appended (session 16, all_classes/display); zero-fill keeps every
+	// row above meaning exactly what it did. ---
+	// 1 = a member lookup that starts at a SUBCLASS of this class may fall
+	// through to this row. Off by default: the hand-written rows above are
+	// keyed strictly on the declaring class, and letting them answer for
+	// subclasses would change what they report today. The generated
+	// flash.display rows set it, because our native registration and
+	// playerglobal disagree about which class carries a native override
+	// (dt_desc_lookup).
+	uint8_t chain_lookup;
+	const DtDescRedecl* redeclares;
 } DtDescClass;
 
 // --- flash.events::Event ---------------------------------------------------
@@ -2932,6 +2983,1124 @@ static const DtDescConst dt_c_xmlnodetype[] = {
 	{ NULL, NULL, 0 },
 };
 
+// >>> BEGIN GENERATED flash.display descriptors -- DO NOT EDIT.
+// Regenerate with:
+//   python3 tools/descriptor/gen_display_descriptors.py \
+//       --actual <our all_classes/display/swf30 output>
+// Derived from Ruffle's playerglobal ActionScript stubs
+// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and validated
+// element-for-element against the six
+// avm2/all_classes/display/swf*/output.txt oracles by
+// tools/descriptor/check_model.py.
+//
+// Derived from Ruffle's playerglobal ActionScript stubs
+// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and
+// validated element-for-element against the six
+// avm2/all_classes/display/swf*/output.txt oracles by
+// tools/descriptor/check_model.py.  Included from
+// avm2_globals.c inside the dt_* descriptor region, so it
+// sees DtDescParam/DtDescMember/DtDescConst/DtDescRedecl.
+//
+// 497 members / 82 distinct parameter lists / 18 constructors / 115 constants
+// 54 declaredBy re-points / 7 per-class hides.
+
+static const DtDescParam dtd_p0[] = { { "flash.net::URLRequest", 0 }, { "flash.system::LoaderContext", 1 } };
+static const DtDescParam dtd_p1[] = { { "String", 0 }, { "Function", 0 } };
+static const DtDescParam dtd_p10[] = { { "flash.display::IBitmapDrawable", 0 }, { "flash.geom::Matrix", 1 }, { "flash.geom::ColorTransform", 1 }, { "String", 1 }, { "flash.geom::Rectangle", 1 }, { "Boolean", 1 }, { "String", 1 } };
+static const DtDescParam dtd_p11[] = { { "flash.geom::Rectangle", 0 }, { "Object", 0 }, { "flash.utils::ByteArray", 1 } };
+static const DtDescParam dtd_p12[] = { { "flash.geom::Rectangle", 0 }, { "uint", 0 } };
+static const DtDescParam dtd_p13[] = { { "int", 0 }, { "int", 0 }, { "uint", 0 } };
+static const DtDescParam dtd_p14[] = { { "flash.geom::Rectangle", 0 }, { "flash.filters::BitmapFilter", 0 } };
+static const DtDescParam dtd_p15[] = { { "uint", 0 }, { "uint", 0 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p16[] = { { "int", 0 }, { "int", 0 } };
+static const DtDescParam dtd_p17[] = { { "flash.geom::Rectangle", 0 } };
+static const DtDescParam dtd_p18[] = { { "flash.geom::Rectangle", 1 } };
+static const DtDescParam dtd_p19[] = { { "flash.geom::Point", 0 }, { "uint", 0 }, { "Object", 0 }, { "flash.geom::Point", 1 }, { "uint", 1 } };
+static const DtDescParam dtd_p2[] = { { "String", 0 } };
+static const DtDescParam dtd_p20[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "uint", 0 }, { "uint", 0 }, { "uint", 0 }, { "uint", 0 } };
+static const DtDescParam dtd_p21[] = { { "int", 0 }, { "uint", 1 }, { "uint", 1 }, { "uint", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p22[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "Array", 1 }, { "Array", 1 }, { "Array", 1 }, { "Array", 1 } };
+static const DtDescParam dtd_p23[] = { { "Number", 0 }, { "Number", 0 }, { "uint", 0 }, { "int", 0 }, { "Boolean", 0 }, { "Boolean", 0 }, { "uint", 1 }, { "Boolean", 1 }, { "Array", 1 } };
+static const DtDescParam dtd_p24[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "int", 1 }, { "int", 1 }, { "uint", 1 } };
+static const DtDescParam dtd_p25[] = { { "flash.geom::Rectangle", 0 }, { "__AS3__.vec::Vector.<uint>", 0 } };
+static const DtDescParam dtd_p26[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "String", 0 }, { "uint", 0 }, { "uint", 1 }, { "uint", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p27[] = { { "flash.display::DisplayObject", 0 } };
+static const DtDescParam dtd_p28[] = { { "flash.geom::Point", 0 } };
+static const DtDescParam dtd_p29[] = { { "Number", 0 }, { "Number", 0 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p3[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "flash.filters::BitmapFilter", 0 } };
+static const DtDescParam dtd_p30[] = { { "flash.geom::Vector3D", 0 } };
+static const DtDescParam dtd_p31[] = { { "flash.display::DisplayObject", 0 }, { "int", 0 } };
+static const DtDescParam dtd_p32[] = { { "int", 0 } };
+static const DtDescParam dtd_p33[] = { { "int", 1 }, { "int", 1 } };
+static const DtDescParam dtd_p34[] = { { "flash.display::DisplayObject", 0 }, { "flash.display::DisplayObject", 0 } };
+static const DtDescParam dtd_p35[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Matrix", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p36[] = { { "uint", 0 }, { "Number", 1 } };
+static const DtDescParam dtd_p37[] = { { "String", 0 }, { "Array", 0 }, { "Array", 0 }, { "Array", 0 }, { "flash.geom::Matrix", 1 }, { "String", 1 }, { "String", 1 }, { "Number", 1 } };
+static const DtDescParam dtd_p38[] = { { "flash.display::Shader", 0 }, { "flash.geom::Matrix", 1 } };
+static const DtDescParam dtd_p39[] = { { "flash.display::Graphics", 0 } };
+static const DtDescParam dtd_p4[] = { { "flash.geom::Rectangle", 0 }, { "flash.geom::ColorTransform", 0 } };
+static const DtDescParam dtd_p40[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
+static const DtDescParam dtd_p41[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
+static const DtDescParam dtd_p42[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
+static const DtDescParam dtd_p43[] = { { "__AS3__.vec::Vector.<flash.display::IGraphicsData>", 0 } };
+static const DtDescParam dtd_p44[] = { { "__AS3__.vec::Vector.<int>", 0 }, { "__AS3__.vec::Vector.<Number>", 0 }, { "String", 1 } };
+static const DtDescParam dtd_p45[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 1 } };
+static const DtDescParam dtd_p46[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
+static const DtDescParam dtd_p47[] = { { "__AS3__.vec::Vector.<Number>", 0 }, { "__AS3__.vec::Vector.<int>", 1 }, { "__AS3__.vec::Vector.<Number>", 1 }, { "String", 1 } };
+static const DtDescParam dtd_p48[] = { { "Number", 1 }, { "uint", 1 }, { "Number", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "Number", 1 } };
+static const DtDescParam dtd_p49[] = { { "Number", 0 }, { "Number", 0 } };
+static const DtDescParam dtd_p5[] = { { "flash.display::BitmapData", 0 } };
+static const DtDescParam dtd_p50[] = { { "Boolean", 1 } };
+static const DtDescParam dtd_p51[] = { { "flash.utils::ByteArray", 0 }, { "flash.system::LoaderContext", 1 } };
+static const DtDescParam dtd_p52[] = { { "flash.events::Event", 0 } };
+static const DtDescParam dtd_p53[] = { { "Object", 0 } };
+static const DtDescParam dtd_p54[] = { { "Object", 0 }, { "String", 1 } };
+static const DtDescParam dtd_p55[] = { { "flash.display::NativeMenuItem", 0 } };
+static const DtDescParam dtd_p56[] = { { "flash.display::NativeMenuItem", 0 }, { "int", 0 } };
+static const DtDescParam dtd_p57[] = { { "flash.display::NativeMenu", 0 }, { "String", 0 } };
+static const DtDescParam dtd_p58[] = { { "flash.display::NativeMenu", 0 }, { "int", 0 }, { "String", 0 } };
+static const DtDescParam dtd_p59[] = { { "flash.display::Stage", 0 }, { "Number", 0 }, { "Number", 0 } };
+static const DtDescParam dtd_p6[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "uint", 0 }, { "uint", 0 } };
+static const DtDescParam dtd_p60[] = { { "Boolean", 1 }, { "flash.geom::Rectangle", 1 } };
+static const DtDescParam dtd_p61[] = { { "int", 0 }, { "Boolean", 1 }, { "flash.geom::Rectangle", 1 } };
+static const DtDescParam dtd_p62[] = { { "String", 0 }, { "Function", 0 }, { "Boolean", 1 }, { "int", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p63[] = { { "String", 1 }, { "String", 1 } };
+static const DtDescParam dtd_p64[] = { { "__AS3__.vec::Vector.<String>", 0 } };
+static const DtDescParam dtd_p65[] = { { "flash.display::BitmapData", 1 }, { "String", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p66[] = { { "int", 0 }, { "int", 0 }, { "Boolean", 1 }, { "uint", 1 } };
+static const DtDescParam dtd_p67[] = { { "String", 0 }, { "int", 0 } };
+static const DtDescParam dtd_p68[] = { { "flash.display::BitmapData", 1 }, { "flash.geom::Matrix", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p69[] = { { "String", 1 }, { "Array", 1 }, { "Array", 1 }, { "Array", 1 }, { "*", 1 }, { "*", 1 }, { "String", 1 }, { "Number", 1 } };
+static const DtDescParam dtd_p7[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "flash.display::BitmapData", 1 }, { "flash.geom::Point", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtd_p70[] = { { "__AS3__.vec::Vector.<int>", 1 }, { "__AS3__.vec::Vector.<Number>", 1 }, { "String", 1 } };
+static const DtDescParam dtd_p71[] = { { "flash.display::Shader", 1 }, { "flash.geom::Matrix", 1 } };
+static const DtDescParam dtd_p72[] = { { "uint", 1 }, { "Number", 1 } };
+static const DtDescParam dtd_p73[] = { { "Number", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "Number", 1 }, { "flash.display::IGraphicsFill", 1 } };
+static const DtDescParam dtd_p74[] = { { "__AS3__.vec::Vector.<Number>", 1 }, { "__AS3__.vec::Vector.<int>", 1 }, { "__AS3__.vec::Vector.<Number>", 1 }, { "String", 1 } };
+static const DtDescParam dtd_p75[] = { { "uint", 1 } };
+static const DtDescParam dtd_p76[] = { { "uint", 1 }, { "String", 1 }, { "uint", 1 } };
+static const DtDescParam dtd_p77[] = { { "String", 0 }, { "Array", 0 }, { "int", 0 } };
+static const DtDescParam dtd_p78[] = { { "flash.utils::ByteArray", 1 } };
+static const DtDescParam dtd_p79[] = { { "flash.utils::ByteArray", 0 } };
+static const DtDescParam dtd_p8[] = { { "flash.geom::Rectangle", 0 }, { "flash.utils::ByteArray", 0 } };
+static const DtDescParam dtd_p80[] = { { "flash.display::Shader", 1 }, { "Object", 1 }, { "int", 1 }, { "int", 1 } };
+static const DtDescParam dtd_p81[] = { { "flash.display::DisplayObject", 1 }, { "flash.display::DisplayObject", 1 }, { "flash.display::DisplayObject", 1 }, { "flash.display::DisplayObject", 1 } };
+static const DtDescParam dtd_p9[] = { { "flash.display::IBitmapDrawable", 0 }, { "flash.geom::Matrix", 1 }, { "flash.geom::ColorTransform", 1 }, { "String", 1 }, { "flash.geom::Rectangle", 1 }, { "Boolean", 1 } };
+
+static const DtDescMember dtd_m_AVLoader[] = {
+	{ "load", DT_DESC_METHOD, "void", 2, dtd_p0, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_AVLoader[] = {
+	{ "addChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "addChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "load", DT_DESC_METHOD, 0, "flash.display::AVLoader" },
+	{ "removeChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "removeChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "setChildIndex", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_AVM1Movie[] = {
+	{ "addCallback", DT_DESC_METHOD, "void", 2, dtd_p1, 0, 1, 0, NULL, NULL },
+	{ "call", DT_DESC_METHOD, "*", 1, dtd_p2, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_ActionScriptVersion[] = {
+	{ "ACTIONSCRIPT2", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ACTIONSCRIPT3", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_ActionScriptVersion[] = {
+	{ "ACTIONSCRIPT2", "uint", 0 },
+	{ "ACTIONSCRIPT3", "uint", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_Bitmap[] = {
+	{ "bitmapData", DT_DESC_ACCESSOR, "flash.display::BitmapData", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "pixelSnapping", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "smoothing", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_BitmapData[] = {
+	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "rect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "transparent", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "applyFilter", DT_DESC_METHOD, "void", 4, dtd_p3, 0, 1, 0, NULL, NULL },
+	{ "clone", DT_DESC_METHOD, "flash.display::BitmapData", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "colorTransform", DT_DESC_METHOD, "void", 2, dtd_p4, 0, 1, 0, NULL, NULL },
+	{ "compare", DT_DESC_METHOD, "Object", 1, dtd_p5, 0, 1, 0, NULL, NULL },
+	{ "copyChannel", DT_DESC_METHOD, "void", 5, dtd_p6, 0, 1, 0, NULL, NULL },
+	{ "copyPixels", DT_DESC_METHOD, "void", 6, dtd_p7, 0, 1, 0, NULL, NULL },
+	{ "copyPixelsToByteArray", DT_DESC_METHOD, "void", 2, dtd_p8, 17, 1, 0, NULL, NULL },
+	{ "dispose", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "draw", DT_DESC_METHOD, "void", 6, dtd_p9, 0, 1, 0, NULL, NULL },
+	{ "drawWithQuality", DT_DESC_METHOD, "void", 7, dtd_p10, 16, 1, 0, NULL, NULL },
+	{ "encode", DT_DESC_METHOD, "flash.utils::ByteArray", 3, dtd_p11, 16, 1, 0, NULL, NULL },
+	{ "fillRect", DT_DESC_METHOD, "void", 2, dtd_p12, 0, 1, 0, NULL, NULL },
+	{ "floodFill", DT_DESC_METHOD, "void", 3, dtd_p13, 0, 1, 0, NULL, NULL },
+	{ "generateFilterRect", DT_DESC_METHOD, "flash.geom::Rectangle", 2, dtd_p14, 0, 1, 0, NULL, NULL },
+	{ "getColorBoundsRect", DT_DESC_METHOD, "flash.geom::Rectangle", 3, dtd_p15, 0, 1, 0, NULL, NULL },
+	{ "getPixel", DT_DESC_METHOD, "uint", 2, dtd_p16, 0, 1, 0, NULL, NULL },
+	{ "getPixel32", DT_DESC_METHOD, "uint", 2, dtd_p16, 0, 1, 0, NULL, NULL },
+	{ "getPixels", DT_DESC_METHOD, "flash.utils::ByteArray", 1, dtd_p17, 0, 1, 0, NULL, NULL },
+	{ "getVector", DT_DESC_METHOD, "__AS3__.vec::Vector.<uint>", 1, dtd_p17, 10, 1, 0, NULL, NULL },
+	{ "histogram", DT_DESC_METHOD, "__AS3__.vec::Vector.<__AS3__.vec::Vector.<Number>>", 1, dtd_p18, 10, 1, 0, NULL, NULL },
+	{ "hitTest", DT_DESC_METHOD, "Boolean", 5, dtd_p19, 0, 1, 0, NULL, NULL },
+	{ "lock", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "merge", DT_DESC_METHOD, "void", 7, dtd_p20, 0, 1, 0, NULL, NULL },
+	{ "noise", DT_DESC_METHOD, "void", 5, dtd_p21, 0, 1, 0, NULL, NULL },
+	{ "paletteMap", DT_DESC_METHOD, "void", 7, dtd_p22, 0, 1, 0, NULL, NULL },
+	{ "perlinNoise", DT_DESC_METHOD, "void", 9, dtd_p23, 0, 1, 0, NULL, NULL },
+	{ "pixelDissolve", DT_DESC_METHOD, "int", 6, dtd_p24, 0, 1, 0, NULL, NULL },
+	{ "scroll", DT_DESC_METHOD, "void", 2, dtd_p16, 0, 1, 0, NULL, NULL },
+	{ "setPixel", DT_DESC_METHOD, "void", 3, dtd_p13, 0, 1, 0, NULL, NULL },
+	{ "setPixel32", DT_DESC_METHOD, "void", 3, dtd_p13, 0, 1, 0, NULL, NULL },
+	{ "setPixels", DT_DESC_METHOD, "void", 2, dtd_p8, 0, 1, 0, NULL, NULL },
+	{ "setVector", DT_DESC_METHOD, "void", 2, dtd_p25, 10, 1, 0, NULL, NULL },
+	{ "threshold", DT_DESC_METHOD, "uint", 8, dtd_p26, 0, 1, 0, NULL, NULL },
+	{ "unlock", DT_DESC_METHOD, "void", 1, dtd_p18, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_BitmapDataChannel[] = {
+	{ "ALPHA", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BLUE", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "GREEN", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RED", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_BitmapDataChannel[] = {
+	{ "ALPHA", "uint", 0 },
+	{ "BLUE", "uint", 0 },
+	{ "GREEN", "uint", 0 },
+	{ "RED", "uint", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_BitmapEncodingColorSpace[] = {
+	{ "COLORSPACE_4_2_0", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "COLORSPACE_4_2_2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "COLORSPACE_4_4_4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "COLORSPACE_AUTO", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_BitmapEncodingColorSpace[] = {
+	{ "COLORSPACE_4_2_0", "String", 0 },
+	{ "COLORSPACE_4_2_2", "String", 0 },
+	{ "COLORSPACE_4_4_4", "String", 0 },
+	{ "COLORSPACE_AUTO", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_BlendMode[] = {
+	{ "ADD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ALPHA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DARKEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DIFFERENCE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ERASE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "HARDLIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "INVERT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "LAYER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "LIGHTEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MULTIPLY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NORMAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "OVERLAY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SCREEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SHADER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SUBTRACT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_BlendMode[] = {
+	{ "ADD", "String", 0 },
+	{ "ALPHA", "String", 0 },
+	{ "DARKEN", "String", 0 },
+	{ "DIFFERENCE", "String", 0 },
+	{ "ERASE", "String", 0 },
+	{ "HARDLIGHT", "String", 0 },
+	{ "INVERT", "String", 0 },
+	{ "LAYER", "String", 0 },
+	{ "LIGHTEN", "String", 0 },
+	{ "MULTIPLY", "String", 0 },
+	{ "NORMAL", "String", 0 },
+	{ "OVERLAY", "String", 0 },
+	{ "SCREEN", "String", 0 },
+	{ "SHADER", "String", 0 },
+	{ "SUBTRACT", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_CapsStyle[] = {
+	{ "NONE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ROUND", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SQUARE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_CapsStyle[] = {
+	{ "NONE", "String", 0 },
+	{ "ROUND", "String", 0 },
+	{ "SQUARE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_ColorCorrection[] = {
+	{ "DEFAULT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "OFF", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ON", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_ColorCorrection[] = {
+	{ "DEFAULT", "String", 0 },
+	{ "OFF", "String", 0 },
+	{ "ON", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_ColorCorrectionSupport[] = {
+	{ "DEFAULT_OFF", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DEFAULT_ON", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "UNSUPPORTED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_ColorCorrectionSupport[] = {
+	{ "DEFAULT_OFF", "String", 0 },
+	{ "DEFAULT_ON", "String", 0 },
+	{ "UNSUPPORTED", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_DisplayObject[] = {
+	{ "accessibilityProperties", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityProperties", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "alpha", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "blendMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "blendShader", DT_DESC_ACCESSOR, "flash.display::Shader", 0, NULL, 10, 1, 0, "writeonly", NULL },
+	{ "cacheAsBitmap", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "filters", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "height", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "loaderInfo", DT_DESC_ACCESSOR, "flash.display::LoaderInfo", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "mask", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "metaData", DT_DESC_ACCESSOR, "Object", 0, NULL, 19, 1, 0, "readwrite", NULL },
+	{ "mouseX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "mouseY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "opaqueBackground", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "parent", DT_DESC_ACCESSOR, "flash.display::DisplayObjectContainer", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "root", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "rotation", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "rotationX", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "rotationY", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "rotationZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "scale9Grid", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "scaleX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "scaleY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "scaleZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "scrollRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "stage", DT_DESC_ACCESSOR, "flash.display::Stage", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "transform", DT_DESC_ACCESSOR, "flash.geom::Transform", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "visible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "width", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "x", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "y", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "z", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "getBounds", DT_DESC_METHOD, "flash.geom::Rectangle", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "getRect", DT_DESC_METHOD, "flash.geom::Rectangle", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "globalToLocal", DT_DESC_METHOD, "flash.geom::Point", 1, dtd_p28, 0, 1, 0, NULL, NULL },
+	{ "globalToLocal3D", DT_DESC_METHOD, "flash.geom::Vector3D", 1, dtd_p28, 10, 1, 0, NULL, NULL },
+	{ "hitTestObject", DT_DESC_METHOD, "Boolean", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "hitTestPoint", DT_DESC_METHOD, "Boolean", 3, dtd_p29, 0, 1, 0, NULL, NULL },
+	{ "local3DToGlobal", DT_DESC_METHOD, "flash.geom::Point", 1, dtd_p30, 10, 1, 0, NULL, NULL },
+	{ "localToGlobal", DT_DESC_METHOD, "flash.geom::Point", 1, dtd_p28, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_DisplayObjectContainer[] = {
+	{ "mouseChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "numChildren", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "tabChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "textSnapshot", DT_DESC_ACCESSOR, "flash.text::TextSnapshot", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "addChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "addChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 2, dtd_p31, 0, 1, 0, NULL, NULL },
+	{ "areInaccessibleObjectsUnderPoint", DT_DESC_METHOD, "Boolean", 1, dtd_p28, 0, 1, 0, NULL, NULL },
+	{ "contains", DT_DESC_METHOD, "Boolean", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "getChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
+	{ "getChildByName", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p2, 0, 1, 0, NULL, NULL },
+	{ "getChildIndex", DT_DESC_METHOD, "int", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "getObjectsUnderPoint", DT_DESC_METHOD, "Array", 1, dtd_p28, 0, 1, 0, NULL, NULL },
+	{ "removeChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "removeChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
+	{ "removeChildren", DT_DESC_METHOD, "void", 2, dtd_p33, 13, 1, 0, NULL, NULL },
+	{ "setChildIndex", DT_DESC_METHOD, "void", 2, dtd_p31, 0, 1, 0, NULL, NULL },
+	{ "stopAllMovieClips", DT_DESC_METHOD, "void", 0, NULL, 21, 1, 0, NULL, NULL },
+	{ "swapChildren", DT_DESC_METHOD, "void", 2, dtd_p34, 0, 1, 0, NULL, NULL },
+	{ "swapChildrenAt", DT_DESC_METHOD, "void", 2, dtd_p16, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_DisplayObjectContainer[] = {
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_FrameLabel[] = {
+	{ "frame", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GradientType[] = {
+	{ "LINEAR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RADIAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_GradientType[] = {
+	{ "LINEAR", "String", 0 },
+	{ "RADIAL", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_Graphics[] = {
+	{ "beginBitmapFill", DT_DESC_METHOD, "void", 4, dtd_p35, 0, 1, 0, NULL, NULL },
+	{ "beginFill", DT_DESC_METHOD, "void", 2, dtd_p36, 0, 1, 0, NULL, NULL },
+	{ "beginGradientFill", DT_DESC_METHOD, "void", 8, dtd_p37, 0, 1, 0, NULL, NULL },
+	{ "beginShaderFill", DT_DESC_METHOD, "void", 2, dtd_p38, 10, 1, 0, NULL, NULL },
+	{ "clear", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "copyFrom", DT_DESC_METHOD, "void", 1, dtd_p39, 10, 1, 0, NULL, NULL },
+	{ "cubicCurveTo", DT_DESC_METHOD, "void", 6, dtd_p40, 13, 1, 0, NULL, NULL },
+	{ "curveTo", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
+	{ "drawCircle", DT_DESC_METHOD, "void", 3, dtd_p42, 0, 1, 0, NULL, NULL },
+	{ "drawEllipse", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
+	{ "drawGraphicsData", DT_DESC_METHOD, "void", 1, dtd_p43, 10, 1, 0, NULL, NULL },
+	{ "drawPath", DT_DESC_METHOD, "void", 3, dtd_p44, 10, 1, 0, NULL, NULL },
+	{ "drawRect", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
+	{ "drawRoundRect", DT_DESC_METHOD, "void", 6, dtd_p45, 0, 1, 0, NULL, NULL },
+	{ "drawRoundRectComplex", DT_DESC_METHOD, "void", 8, dtd_p46, 0, 1, 0, NULL, NULL },
+	{ "drawTriangles", DT_DESC_METHOD, "void", 4, dtd_p47, 10, 1, 0, NULL, NULL },
+	{ "endFill", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "lineBitmapStyle", DT_DESC_METHOD, "void", 4, dtd_p35, 10, 1, 0, NULL, NULL },
+	{ "lineGradientStyle", DT_DESC_METHOD, "void", 8, dtd_p37, 0, 1, 0, NULL, NULL },
+	{ "lineShaderStyle", DT_DESC_METHOD, "void", 2, dtd_p38, 10, 1, 0, NULL, NULL },
+	{ "lineStyle", DT_DESC_METHOD, "void", 8, dtd_p48, 0, 1, 0, NULL, NULL },
+	{ "lineTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
+	{ "moveTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
+	{ "readGraphicsData", DT_DESC_METHOD, "__AS3__.vec::Vector.<flash.display::IGraphicsData>", 1, dtd_p50, 19, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GraphicsBitmapFill[] = {
+	{ "bitmapData", DT_DESC_SLOT, "flash.display::BitmapData", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "matrix", DT_DESC_SLOT, "flash.geom::Matrix", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "repeat", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "smooth", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GraphicsGradientFill[] = {
+	{ "interpolationMethod", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "spreadMethod", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "type", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "alphas", DT_DESC_SLOT, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "colors", DT_DESC_SLOT, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "focalPointRatio", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "matrix", DT_DESC_SLOT, "flash.geom::Matrix", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "ratios", DT_DESC_SLOT, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GraphicsPath[] = {
+	{ "winding", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "cubicCurveTo", DT_DESC_METHOD, "void", 6, dtd_p40, 13, 1, 0, NULL, NULL },
+	{ "curveTo", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
+	{ "lineTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
+	{ "moveTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
+	{ "wideLineTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
+	{ "wideMoveTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
+	{ "commands", DT_DESC_SLOT, "__AS3__.vec::Vector.<int>", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "data", DT_DESC_SLOT, "__AS3__.vec::Vector.<Number>", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GraphicsPathCommand[] = {
+	{ "CUBIC_CURVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CURVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "LINE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NO_OP", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "WIDE_LINE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "WIDE_MOVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_GraphicsPathCommand[] = {
+	{ "CUBIC_CURVE_TO", "int", 0 },
+	{ "CURVE_TO", "int", 0 },
+	{ "LINE_TO", "int", 0 },
+	{ "MOVE_TO", "int", 0 },
+	{ "NO_OP", "int", 0 },
+	{ "WIDE_LINE_TO", "int", 0 },
+	{ "WIDE_MOVE_TO", "int", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_GraphicsPathWinding[] = {
+	{ "EVEN_ODD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NON_ZERO", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_GraphicsPathWinding[] = {
+	{ "EVEN_ODD", "String", 0 },
+	{ "NON_ZERO", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_GraphicsShaderFill[] = {
+	{ "matrix", DT_DESC_SLOT, "flash.geom::Matrix", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "shader", DT_DESC_SLOT, "flash.display::Shader", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GraphicsSolidFill[] = {
+	{ "alpha", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "color", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GraphicsStroke[] = {
+	{ "caps", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "joints", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "scaleMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "fill", DT_DESC_SLOT, "flash.display::IGraphicsFill", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "miterLimit", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "pixelHinting", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "thickness", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_GraphicsTrianglePath[] = {
+	{ "culling", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "indices", DT_DESC_SLOT, "__AS3__.vec::Vector.<int>", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "uvtData", DT_DESC_SLOT, "__AS3__.vec::Vector.<Number>", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "vertices", DT_DESC_SLOT, "__AS3__.vec::Vector.<Number>", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_InteractiveObject[] = {
+	{ "accessibilityImplementation", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityImplementation", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "contextMenu", DT_DESC_ACCESSOR, "flash.ui::ContextMenu", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "doubleClickEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "focusRect", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "mouseEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "needsSoftKeyboard", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 11, 1, 0, "readwrite", NULL },
+	{ "softKeyboardInputAreaOfInterest", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 11, 1, 0, "readwrite", NULL },
+	{ "soundTransform", DT_DESC_ACCESSOR, "flash.media::SoundTransform", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "tabEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "tabIndex", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "requestSoftKeyboard", DT_DESC_METHOD, "Boolean", 0, NULL, 11, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_InteractiveObject[] = {
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_InterpolationMethod[] = {
+	{ "LINEAR_RGB", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RGB", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_InterpolationMethod[] = {
+	{ "LINEAR_RGB", "String", 0 },
+	{ "RGB", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_JPEGEncoderOptions[] = {
+	{ "quality", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_JPEGXREncoderOptions[] = {
+	{ "colorSpace", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "quantization", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "trimFlexBits", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_JointStyle[] = {
+	{ "BEVEL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MITER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ROUND", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_JointStyle[] = {
+	{ "BEVEL", "String", 0 },
+	{ "MITER", "String", 0 },
+	{ "ROUND", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_LineScaleMode[] = {
+	{ "HORIZONTAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NONE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NORMAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "VERTICAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_LineScaleMode[] = {
+	{ "HORIZONTAL", "String", 0 },
+	{ "NONE", "String", 0 },
+	{ "NORMAL", "String", 0 },
+	{ "VERTICAL", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_Loader[] = {
+	{ "content", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "contentLoaderInfo", DT_DESC_ACCESSOR, "flash.display::LoaderInfo", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "uncaughtErrorEvents", DT_DESC_ACCESSOR, "flash.events::UncaughtErrorEvents", 0, NULL, 10, 1, 0, "readonly", NULL },
+	{ "addChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "addChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 2, dtd_p31, 0, 1, 0, NULL, NULL },
+	{ "close", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "load", DT_DESC_METHOD, "void", 2, dtd_p0, 0, 1, 0, NULL, NULL },
+	{ "loadBytes", DT_DESC_METHOD, "void", 2, dtd_p51, 0, 1, 0, NULL, NULL },
+	{ "removeChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "removeChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
+	{ "setChildIndex", DT_DESC_METHOD, "void", 2, dtd_p31, 0, 1, 0, NULL, NULL },
+	{ "unload", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "unloadAndStop", DT_DESC_METHOD, "void", 1, dtd_p50, 10, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_Loader[] = {
+	{ "addChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "addChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "removeChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "removeChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "setChildIndex", DT_DESC_METHOD, 0, "flash.display::Loader" },
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_LoaderInfo[] = {
+	{ "actionScriptVersion", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "applicationDomain", DT_DESC_ACCESSOR, "flash.system::ApplicationDomain", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "bytes", DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "bytesLoaded", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "bytesTotal", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "childAllowsParent", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "childSandboxBridge", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "content", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "contentType", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "frameRate", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "isURLInaccessible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "loader", DT_DESC_ACCESSOR, "flash.display::Loader", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "loaderURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "parameters", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "parentAllowsChild", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "parentSandboxBridge", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "sameDomain", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "sharedEvents", DT_DESC_ACCESSOR, "flash.events::EventDispatcher", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "swfVersion", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "uncaughtErrorEvents", DT_DESC_ACCESSOR, "flash.events::UncaughtErrorEvents", 0, NULL, 10, 1, 0, "readonly", NULL },
+	{ "url", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "dispatchEvent", DT_DESC_METHOD, "Boolean", 1, dtd_p52, 0, 1, 0, NULL, NULL },
+	{ "getLoaderInfoByDefinition", DT_DESC_METHOD, "flash.display::LoaderInfo", 1, dtd_p53, 0, 1, 1, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_LoaderInfo[] = {
+	{ "dispatchEvent", DT_DESC_METHOD, 0, "flash.display::LoaderInfo" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_MovieClip[] = {
+	{ "currentFrame", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "currentFrameLabel", DT_DESC_ACCESSOR, "String", 0, NULL, 10, 1, 0, "readonly", NULL },
+	{ "currentLabel", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "currentLabels", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "currentScene", DT_DESC_ACCESSOR, "flash.display::Scene", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "enabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "framesLoaded", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "isPlaying", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 13, 1, 0, "readonly", NULL },
+	{ "scenes", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "totalFrames", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "trackAsMenu", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "addFrameScript", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "gotoAndPlay", DT_DESC_METHOD, "void", 2, dtd_p54, 0, 1, 0, NULL, NULL },
+	{ "gotoAndStop", DT_DESC_METHOD, "void", 2, dtd_p54, 0, 1, 0, NULL, NULL },
+	{ "nextFrame", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "nextScene", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "play", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "prevFrame", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "prevScene", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "stop", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_MovieClip[] = {
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, "flash.display::Sprite" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_NativeMenu[] = {
+	{ "isSupported", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readonly", NULL },
+	{ "items", DT_DESC_ACCESSOR, "Array", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "numItems", DT_DESC_ACCESSOR, "int", 0, NULL, 255, 1, 0, "readonly", NULL },
+	{ "parent", DT_DESC_ACCESSOR, "flash.display::NativeMenu", 0, NULL, 255, 1, 0, "readonly", NULL },
+	{ "addItem", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p55, 255, 1, 0, NULL, NULL },
+	{ "addItemAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 2, dtd_p56, 255, 1, 0, NULL, NULL },
+	{ "addSubmenu", DT_DESC_METHOD, "flash.display::NativeMenuItem", 2, dtd_p57, 255, 1, 0, NULL, NULL },
+	{ "addSubmenuAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 3, dtd_p58, 255, 1, 0, NULL, NULL },
+	{ "clone", DT_DESC_METHOD, "flash.display::NativeMenu", 0, NULL, 255, 1, 0, NULL, NULL },
+	{ "containsItem", DT_DESC_METHOD, "Boolean", 1, dtd_p55, 255, 1, 0, NULL, NULL },
+	{ "display", DT_DESC_METHOD, "void", 3, dtd_p59, 255, 1, 0, NULL, NULL },
+	{ "getItemAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p32, 255, 1, 0, NULL, NULL },
+	{ "getItemByName", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p2, 255, 1, 0, NULL, NULL },
+	{ "getItemIndex", DT_DESC_METHOD, "int", 1, dtd_p55, 255, 1, 0, NULL, NULL },
+	{ "removeAllItems", DT_DESC_METHOD, "void", 0, NULL, 255, 1, 0, NULL, NULL },
+	{ "removeItem", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p55, 255, 1, 0, NULL, NULL },
+	{ "removeItemAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p32, 255, 1, 0, NULL, NULL },
+	{ "setItemIndex", DT_DESC_METHOD, "void", 2, dtd_p56, 255, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_PNGEncoderOptions[] = {
+	{ "fastCompression", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_PixelSnapping[] = {
+	{ "ALWAYS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "AUTO", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NEVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_PixelSnapping[] = {
+	{ "ALWAYS", "String", 0 },
+	{ "AUTO", "String", 0 },
+	{ "NEVER", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_SWFVersion[] = {
+	{ "FLASH1", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH10", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH11", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH12", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH2", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH3", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH4", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH5", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH6", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH7", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH8", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLASH9", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_SWFVersion[] = {
+	{ "FLASH1", "uint", 0 },
+	{ "FLASH10", "uint", 0 },
+	{ "FLASH11", "uint", 0 },
+	{ "FLASH12", "uint", 0 },
+	{ "FLASH2", "uint", 0 },
+	{ "FLASH3", "uint", 0 },
+	{ "FLASH4", "uint", 0 },
+	{ "FLASH5", "uint", 0 },
+	{ "FLASH6", "uint", 0 },
+	{ "FLASH7", "uint", 0 },
+	{ "FLASH8", "uint", 0 },
+	{ "FLASH9", "uint", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_Scene[] = {
+	{ "labels", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "numFrames", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_Shader[] = {
+	{ "byteCode", DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "writeonly", NULL },
+	{ "data", DT_DESC_ACCESSOR, "flash.display::ShaderData", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "precisionHint", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_ShaderInput[] = {
+	{ "channels", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "index", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "input", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_ShaderJob[] = {
+	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "progress", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "shader", DT_DESC_ACCESSOR, "flash.display::Shader", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "target", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "cancel", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "start", DT_DESC_METHOD, "void", 1, dtd_p50, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_ShaderParameter[] = {
+	{ "index", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "type", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "value", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_ShaderParameterType[] = {
+	{ "BOOL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BOOL2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BOOL3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BOOL4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLOAT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLOAT2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLOAT3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FLOAT4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "INT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "INT2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "INT3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "INT4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MATRIX2X2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MATRIX3X3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MATRIX4X4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_ShaderParameterType[] = {
+	{ "BOOL", "String", 0 },
+	{ "BOOL2", "String", 0 },
+	{ "BOOL3", "String", 0 },
+	{ "BOOL4", "String", 0 },
+	{ "FLOAT", "String", 0 },
+	{ "FLOAT2", "String", 0 },
+	{ "FLOAT3", "String", 0 },
+	{ "FLOAT4", "String", 0 },
+	{ "INT", "String", 0 },
+	{ "INT2", "String", 0 },
+	{ "INT3", "String", 0 },
+	{ "INT4", "String", 0 },
+	{ "MATRIX2X2", "String", 0 },
+	{ "MATRIX3X3", "String", 0 },
+	{ "MATRIX4X4", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_ShaderPrecision[] = {
+	{ "FAST", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FULL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_ShaderPrecision[] = {
+	{ "FAST", "String", 0 },
+	{ "FULL", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_Shape[] = {
+	{ "graphics", DT_DESC_ACCESSOR, "flash.display::Graphics", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_SimpleButton[] = {
+	{ "downState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "enabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "hitTestState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "overState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "soundTransform", DT_DESC_ACCESSOR, "flash.media::SoundTransform", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "trackAsMenu", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "upState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "useHandCursor", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_SimpleButton[] = {
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, "flash.display::SimpleButton" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_SpreadMethod[] = {
+	{ "PAD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "REFLECT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "REPEAT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_SpreadMethod[] = {
+	{ "PAD", "String", 0 },
+	{ "REFLECT", "String", 0 },
+	{ "REPEAT", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_Sprite[] = {
+	{ "buttonMode", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "dropTarget", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "graphics", DT_DESC_ACCESSOR, "flash.display::Graphics", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "hitArea", DT_DESC_ACCESSOR, "flash.display::Sprite", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "soundTransform", DT_DESC_ACCESSOR, "flash.media::SoundTransform", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "useHandCursor", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "startDrag", DT_DESC_METHOD, "void", 2, dtd_p60, 0, 1, 0, NULL, NULL },
+	{ "startTouchDrag", DT_DESC_METHOD, "void", 3, dtd_p61, 10, 1, 0, NULL, NULL },
+	{ "stopDrag", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "stopTouchDrag", DT_DESC_METHOD, "void", 1, dtd_p32, 10, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_Sprite[] = {
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, "flash.display::Sprite" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_Stage[] = {
+	{ "accessibilityImplementation", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityImplementation", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "accessibilityProperties", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityProperties", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "align", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "allowsFullScreen", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 11, 1, 0, "readonly", NULL },
+	{ "allowsFullScreenInteractive", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 16, 1, 0, "readonly", NULL },
+	{ "alpha", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "autoOrients", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "blendMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "browserZoomFactor", DT_DESC_ACCESSOR, "Number", 0, NULL, 26, 1, 0, "readonly", NULL },
+	{ "cacheAsBitmap", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "color", DT_DESC_ACCESSOR, "uint", 0, NULL, 11, 1, 0, "readwrite", NULL },
+	{ "colorCorrection", DT_DESC_ACCESSOR, "String", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "colorCorrectionSupport", DT_DESC_ACCESSOR, "String", 0, NULL, 10, 1, 0, "readonly", NULL },
+	{ "constructor", DT_DESC_ACCESSOR, "*", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "contentsScaleFactor", DT_DESC_ACCESSOR, "Number", 0, NULL, 17, 1, 0, "readonly", NULL },
+	{ "contextMenu", DT_DESC_ACCESSOR, "flash.ui::ContextMenu", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "deviceOrientation", DT_DESC_ACCESSOR, "String", 0, NULL, 255, 1, 0, "readonly", NULL },
+	{ "displayContextInfo", DT_DESC_ACCESSOR, "String", 0, NULL, 13, 1, 0, "readonly", NULL },
+	{ "displayState", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "filters", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "focus", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "focusRect", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "frameRate", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "fullScreenHeight", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "fullScreenSourceRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "fullScreenWidth", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "height", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "mask", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "mouseChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "mouseEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "mouseLock", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 15, 1, 0, "readwrite", NULL },
+	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "nativeWindow", DT_DESC_ACCESSOR, "flash.display::NativeWindow", 0, NULL, 255, 1, 0, "readonly", NULL },
+	{ "numChildren", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "opaqueBackground", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "orientation", DT_DESC_ACCESSOR, "String", 0, NULL, 255, 1, 0, "readonly", NULL },
+	{ "quality", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "rotation", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "rotationX", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
+	{ "rotationY", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
+	{ "rotationZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
+	{ "scale9Grid", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "scaleMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "scaleX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "scaleY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "scaleZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
+	{ "scrollRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "showDefaultContextMenu", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "softKeyboardRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 11, 1, 0, "readonly", NULL },
+	{ "stage3Ds", DT_DESC_ACCESSOR, "__AS3__.vec::Vector.<flash.display::Stage3D>", 0, NULL, 13, 1, 0, "readonly", NULL },
+	{ "stageFocusRect", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "stageHeight", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "stageVideos", DT_DESC_ACCESSOR, "__AS3__.vec::Vector.<flash.media::StageVideo>", 0, NULL, 10, 1, 0, "readonly", NULL },
+	{ "stageWidth", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "supportedOrientations", DT_DESC_ACCESSOR, "__AS3__.vec::Vector.<String>", 0, NULL, 255, 1, 0, "readonly", NULL },
+	{ "supportsOrientationChange", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "tabChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "tabEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "tabIndex", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "textSnapshot", DT_DESC_ACCESSOR, "flash.text::TextSnapshot", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "transform", DT_DESC_ACCESSOR, "flash.geom::Transform", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "visible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "width", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "wmodeGPU", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 10, 1, 0, "readonly", NULL },
+	{ "x", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "y", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
+	{ "z", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
+	{ "addChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
+	{ "addChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 2, dtd_p31, 0, 1, 0, NULL, NULL },
+	{ "addEventListener", DT_DESC_METHOD, "void", 5, dtd_p62, 0, 1, 0, NULL, NULL },
+	{ "dispatchEvent", DT_DESC_METHOD, "Boolean", 1, dtd_p52, 0, 1, 0, NULL, NULL },
+	{ "hasEventListener", DT_DESC_METHOD, "Boolean", 1, dtd_p2, 0, 1, 0, NULL, NULL },
+	{ "invalidate", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "isFocusInaccessible", DT_DESC_METHOD, "Boolean", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "removeChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
+	{ "setAspectRatio", DT_DESC_METHOD, "void", 1, dtd_p2, 255, 1, 0, NULL, NULL },
+	{ "setChildIndex", DT_DESC_METHOD, "void", 2, dtd_p31, 0, 1, 0, NULL, NULL },
+	{ "setOrientation", DT_DESC_METHOD, "void", 1, dtd_p2, 255, 1, 0, NULL, NULL },
+	{ "swapChildrenAt", DT_DESC_METHOD, "void", 2, dtd_p16, 0, 1, 0, NULL, NULL },
+	{ "willTrigger", DT_DESC_METHOD, "Boolean", 1, dtd_p2, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtd_r_Stage[] = {
+	{ "accessibilityImplementation", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
+	{ "accessibilityProperties", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "addChild", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "addChildAt", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "addEventListener", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "alpha", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "blendMode", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "cacheAsBitmap", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "contextMenu", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
+	{ "dispatchEvent", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "filters", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "focusRect", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
+	{ "hasEventListener", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "mask", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "mouseChildren", DT_DESC_ACCESSOR, 0, "flash.display::Stage" },
+	{ "mouseEnabled", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
+	{ "name", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "numChildren", DT_DESC_ACCESSOR, 0, "flash.display::Stage" },
+	{ "opaqueBackground", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "removeChildAt", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "rotation", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "rotationX", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "rotationY", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "rotationZ", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "scale9Grid", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "scaleX", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "scaleY", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "scaleZ", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "scrollRect", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "setChildIndex", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
+	{ "swapChildrenAt", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "tabEnabled", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
+	{ "tabIndex", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
+	{ "transform", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "visible", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "willTrigger", DT_DESC_METHOD, 0, "flash.display::Stage" },
+	{ "x", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "y", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ "z", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_Stage3D[] = {
+	{ "context3D", DT_DESC_ACCESSOR, "flash.display3D::Context3D", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "visible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "x", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "y", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "requestContext3D", DT_DESC_METHOD, "void", 2, dtd_p63, 0, 1, 0, NULL, NULL },
+	{ "requestContext3DMatchingProfiles", DT_DESC_METHOD, "void", 1, dtd_p64, 22, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtd_m_StageAlign[] = {
+	{ "BOTTOM", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BOTTOM_LEFT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BOTTOM_RIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "LEFT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOP", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOP_LEFT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOP_RIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_StageAlign[] = {
+	{ "BOTTOM", "String", 0 },
+	{ "BOTTOM_LEFT", "String", 0 },
+	{ "BOTTOM_RIGHT", "String", 0 },
+	{ "LEFT", "String", 0 },
+	{ "RIGHT", "String", 0 },
+	{ "TOP", "String", 0 },
+	{ "TOP_LEFT", "String", 0 },
+	{ "TOP_RIGHT", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_StageDisplayState[] = {
+	{ "FULL_SCREEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FULL_SCREEN_INTERACTIVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NORMAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_StageDisplayState[] = {
+	{ "FULL_SCREEN", "String", 0 },
+	{ "FULL_SCREEN_INTERACTIVE", "String", 0 },
+	{ "NORMAL", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_StageQuality[] = {
+	{ "BEST", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "HIGH", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "HIGH_16X16", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "HIGH_16X16_LINEAR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "HIGH_8X8", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "HIGH_8X8_LINEAR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "LOW", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MEDIUM", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_StageQuality[] = {
+	{ "BEST", "String", 0 },
+	{ "HIGH", "String", 0 },
+	{ "HIGH_16X16", "String", 0 },
+	{ "HIGH_16X16_LINEAR", "String", 0 },
+	{ "HIGH_8X8", "String", 0 },
+	{ "HIGH_8X8_LINEAR", "String", 0 },
+	{ "LOW", "String", 0 },
+	{ "MEDIUM", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtd_r_StageQuality[] = {
+	{ "EIGHT_X_LINEAR", DT_DESC_SLOT, 1, NULL },
+	{ "SIXTEEN_X_LINEAR", DT_DESC_SLOT, 1, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtd_m_StageScaleMode[] = {
+	{ "EXACT_FIT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NO_BORDER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NO_SCALE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SHOW_ALL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_StageScaleMode[] = {
+	{ "EXACT_FIT", "String", 0 },
+	{ "NO_BORDER", "String", 0 },
+	{ "NO_SCALE", "String", 0 },
+	{ "SHOW_ALL", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtd_m_TriangleCulling[] = {
+	{ "NEGATIVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NONE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "POSITIVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtd_c_TriangleCulling[] = {
+	{ "NEGATIVE", "String", 0 },
+	{ "NONE", "String", 0 },
+	{ "POSITIVE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+
+#define DT_DESC_DISPLAY_ROWS \
+	{ "flash.display", "AVLoader", 0, 0, NULL, dtd_m_AVLoader, NULL, 1, dtd_r_AVLoader }, \
+	{ "flash.display", "AVM1Movie", 0, 0, NULL, dtd_m_AVM1Movie, NULL, 1, NULL }, \
+	{ "flash.display", "ActionScriptVersion", 0, 0, NULL, dtd_m_ActionScriptVersion, dtd_c_ActionScriptVersion, 1, NULL }, \
+	{ "flash.display", "Bitmap", 0, 3, dtd_p65, dtd_m_Bitmap, NULL, 1, NULL }, \
+	{ "flash.display", "BitmapData", 0, 4, dtd_p66, dtd_m_BitmapData, NULL, 1, NULL }, \
+	{ "flash.display", "BitmapDataChannel", 0, 0, NULL, dtd_m_BitmapDataChannel, dtd_c_BitmapDataChannel, 1, NULL }, \
+	{ "flash.display", "BitmapEncodingColorSpace", 0, 0, NULL, dtd_m_BitmapEncodingColorSpace, dtd_c_BitmapEncodingColorSpace, 1, NULL }, \
+	{ "flash.display", "BlendMode", 0, 0, NULL, dtd_m_BlendMode, dtd_c_BlendMode, 1, NULL }, \
+	{ "flash.display", "CapsStyle", 0, 0, NULL, dtd_m_CapsStyle, dtd_c_CapsStyle, 1, NULL }, \
+	{ "flash.display", "ColorCorrection", 0, 0, NULL, dtd_m_ColorCorrection, dtd_c_ColorCorrection, 1, NULL }, \
+	{ "flash.display", "ColorCorrectionSupport", 0, 0, NULL, dtd_m_ColorCorrectionSupport, dtd_c_ColorCorrectionSupport, 1, NULL }, \
+	{ "flash.display", "DisplayObject", 0, 0, NULL, dtd_m_DisplayObject, NULL, 1, NULL }, \
+	{ "flash.display", "DisplayObjectContainer", 0, 0, NULL, dtd_m_DisplayObjectContainer, NULL, 1, dtd_r_DisplayObjectContainer }, \
+	{ "flash.display", "FrameLabel", 0, 2, dtd_p67, dtd_m_FrameLabel, NULL, 1, NULL }, \
+	{ "flash.display", "GradientType", 0, 0, NULL, dtd_m_GradientType, dtd_c_GradientType, 1, NULL }, \
+	{ "flash.display", "Graphics", 0, 0, NULL, dtd_m_Graphics, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsBitmapFill", 0, 4, dtd_p68, dtd_m_GraphicsBitmapFill, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsEndFill", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsGradientFill", 0, 8, dtd_p69, dtd_m_GraphicsGradientFill, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsPath", 0, 3, dtd_p70, dtd_m_GraphicsPath, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsPathCommand", 0, 0, NULL, dtd_m_GraphicsPathCommand, dtd_c_GraphicsPathCommand, 1, NULL }, \
+	{ "flash.display", "GraphicsPathWinding", 0, 0, NULL, dtd_m_GraphicsPathWinding, dtd_c_GraphicsPathWinding, 1, NULL }, \
+	{ "flash.display", "GraphicsShaderFill", 0, 2, dtd_p71, dtd_m_GraphicsShaderFill, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsSolidFill", 0, 2, dtd_p72, dtd_m_GraphicsSolidFill, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsStroke", 0, 7, dtd_p73, dtd_m_GraphicsStroke, NULL, 1, NULL }, \
+	{ "flash.display", "GraphicsTrianglePath", 0, 4, dtd_p74, dtd_m_GraphicsTrianglePath, NULL, 1, NULL }, \
+	{ "flash.display", "IBitmapDrawable", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "IDrawCommand", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "IGraphicsData", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "IGraphicsFill", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "IGraphicsPath", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "IGraphicsStroke", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "InteractiveObject", 0, 0, NULL, dtd_m_InteractiveObject, NULL, 1, dtd_r_InteractiveObject }, \
+	{ "flash.display", "InterpolationMethod", 0, 0, NULL, dtd_m_InterpolationMethod, dtd_c_InterpolationMethod, 1, NULL }, \
+	{ "flash.display", "JPEGEncoderOptions", 0, 1, dtd_p75, dtd_m_JPEGEncoderOptions, NULL, 1, NULL }, \
+	{ "flash.display", "JPEGXREncoderOptions", 0, 3, dtd_p76, dtd_m_JPEGXREncoderOptions, NULL, 1, NULL }, \
+	{ "flash.display", "JointStyle", 0, 0, NULL, dtd_m_JointStyle, dtd_c_JointStyle, 1, NULL }, \
+	{ "flash.display", "LineScaleMode", 0, 0, NULL, dtd_m_LineScaleMode, dtd_c_LineScaleMode, 1, NULL }, \
+	{ "flash.display", "Loader", 0, 0, NULL, dtd_m_Loader, NULL, 1, dtd_r_Loader }, \
+	{ "flash.display", "LoaderInfo", 0, 0, NULL, dtd_m_LoaderInfo, NULL, 1, dtd_r_LoaderInfo }, \
+	{ "flash.display", "MorphShape", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "MovieClip", 0, 0, NULL, dtd_m_MovieClip, NULL, 1, dtd_r_MovieClip }, \
+	{ "flash.display", "NativeMenu", 0, 0, NULL, dtd_m_NativeMenu, NULL, 1, NULL }, \
+	{ "flash.display", "PNGEncoderOptions", 0, 1, dtd_p50, dtd_m_PNGEncoderOptions, NULL, 1, NULL }, \
+	{ "flash.display", "PixelSnapping", 0, 0, NULL, dtd_m_PixelSnapping, dtd_c_PixelSnapping, 1, NULL }, \
+	{ "flash.display", "SWFVersion", 0, 0, NULL, dtd_m_SWFVersion, dtd_c_SWFVersion, 1, NULL }, \
+	{ "flash.display", "Scene", 0, 3, dtd_p77, dtd_m_Scene, NULL, 1, NULL }, \
+	{ "flash.display", "Shader", 0, 1, dtd_p78, dtd_m_Shader, NULL, 1, NULL }, \
+	{ "flash.display", "ShaderData", 0, 1, dtd_p79, NULL, NULL, 1, NULL }, \
+	{ "flash.display", "ShaderInput", 0, 0, NULL, dtd_m_ShaderInput, NULL, 1, NULL }, \
+	{ "flash.display", "ShaderJob", 0, 4, dtd_p80, dtd_m_ShaderJob, NULL, 1, NULL }, \
+	{ "flash.display", "ShaderParameter", 0, 0, NULL, dtd_m_ShaderParameter, NULL, 1, NULL }, \
+	{ "flash.display", "ShaderParameterType", 0, 0, NULL, dtd_m_ShaderParameterType, dtd_c_ShaderParameterType, 1, NULL }, \
+	{ "flash.display", "ShaderPrecision", 0, 0, NULL, dtd_m_ShaderPrecision, dtd_c_ShaderPrecision, 1, NULL }, \
+	{ "flash.display", "Shape", 0, 0, NULL, dtd_m_Shape, NULL, 1, NULL }, \
+	{ "flash.display", "SimpleButton", 0, 4, dtd_p81, dtd_m_SimpleButton, NULL, 1, dtd_r_SimpleButton }, \
+	{ "flash.display", "SpreadMethod", 0, 0, NULL, dtd_m_SpreadMethod, dtd_c_SpreadMethod, 1, NULL }, \
+	{ "flash.display", "Sprite", 0, 0, NULL, dtd_m_Sprite, NULL, 1, dtd_r_Sprite }, \
+	{ "flash.display", "Stage", 0, 0, NULL, dtd_m_Stage, NULL, 1, dtd_r_Stage }, \
+	{ "flash.display", "Stage3D", 0, 0, NULL, dtd_m_Stage3D, NULL, 1, NULL }, \
+	{ "flash.display", "StageAlign", 0, 0, NULL, dtd_m_StageAlign, dtd_c_StageAlign, 1, NULL }, \
+	{ "flash.display", "StageDisplayState", 0, 0, NULL, dtd_m_StageDisplayState, dtd_c_StageDisplayState, 1, NULL }, \
+	{ "flash.display", "StageQuality", 0, 0, NULL, dtd_m_StageQuality, dtd_c_StageQuality, 1, dtd_r_StageQuality }, \
+	{ "flash.display", "StageScaleMode", 0, 0, NULL, dtd_m_StageScaleMode, dtd_c_StageScaleMode, 1, NULL }, \
+	{ "flash.display", "TriangleCulling", 0, 0, NULL, dtd_m_TriangleCulling, dtd_c_TriangleCulling, 1, NULL }, \
+	/* end of DT_DESC_DISPLAY_ROWS */
+// <<< END GENERATED flash.display descriptors
+
+
+
+
 static const DtDescClass dt_desc_classes[] = {
 	{ "flash.events", "Event", 0, 3, dt_p_event_ctor, dt_m_event },
 
@@ -2972,6 +4141,12 @@ static const DtDescClass dt_desc_classes[] = {
 	  dt_m_xmldocument, NULL },
 	{ "flash.xml", "XMLNodeType", 0, 0, NULL, NULL, dt_c_xmlnodetype },
 
+	// The 65-class flash.display surface, DERIVED from Ruffle's playerglobal
+	// .as stubs by tools/descriptor/gen_display_descriptors.py and validated
+	// element-for-element against the six all_classes/display expected files
+	// by tools/descriptor/check_model.py. Regenerate rather than hand-edit.
+	DT_DESC_DISPLAY_ROWS
+
 	{ NULL, NULL, 0, 0, NULL, NULL },
 };
 
@@ -3010,6 +4185,33 @@ static const DtDescConst* dt_desc_const(const DtDescClass* dc,
 	return NULL;
 }
 
+// Find the descriptor row for a member, starting at the class our vtable says
+// declares it. If that class's own row does not name the member, walk up the
+// superclass chain and accept the first ancestor row that both names it and
+// opts into `chain_lookup`. That fall-through exists because OUR native
+// registration and playerglobal disagree about which class carries a native
+// override: `flash.display::Sprite` re-registers `graphics` where playerglobal
+// declares it once on Sprite, `Loader` re-registers container methods, and so
+// on. Descriptor DATA (type / parameters) is identical either way, so
+// answering from the base row is always right; only `declaredBy` differs, and
+// that is what DtDescRedecl is for.
+static const DtDescMember* dt_desc_lookup(const Avm2Class* def, uint8_t kind,
+                                          const char* name, uint32_t name_len)
+{
+	int depth = 0;
+	for (const Avm2Class* c = def; c != NULL && depth < 32;
+	     c = c->super_class, depth++)
+	{
+		const DtDescClass* dc = dt_desc_find(c);
+		if (dc == NULL) continue;
+		const DtDescMember* dm = dt_desc_member(dc, kind, name, name_len);
+		if (dm == NULL) continue;
+		if (c != def && !dc->chain_lookup) continue;
+		return dm;
+	}
+	return NULL;
+}
+
 // Describe-side [API("N")] gate for a single vtable entry. Returns 1 when the
 // member exists in our runtime but Flash's playerglobal does not expose it at
 // this SWF version, so describeType must not report it.
@@ -3022,9 +4224,8 @@ static int dt_desc_member_hidden(const Avm2Context* ctx,
 	{
 		def = e->setter_defining_class;
 	}
-	const DtDescClass* dc = dt_desc_find(def);
-	if (dc == NULL) return 0;
-	const DtDescMember* dm = dt_desc_member(dc, kind, (const char*) e->key.name,
+	const DtDescMember* dm = dt_desc_lookup(def, kind,
+	                                        (const char*) e->key.name,
 	                                        e->key.name_len);
 	if (dm == NULL || dm->min_swf == 0) return 0;
 	return ctx->swf_version < dm->min_swf;
@@ -3032,14 +4233,20 @@ static int dt_desc_member_hidden(const Avm2Context* ctx,
 
 // Apply a descriptor member onto a collected DtMember, replacing the `*`
 // fallback. Returns 1 when it fired.
-static int dt_desc_apply(DtMember* out, const DtDescClass* dc, uint8_t kind,
+static int dt_desc_apply(DtMember* out, const Avm2Class* def, uint8_t kind,
                          const Avm2PropEntry* e)
 {
-	const DtDescMember* dm = dt_desc_member(dc, kind, (const char*) e->key.name,
+	const DtDescMember* dm = dt_desc_lookup(def, kind,
+	                                        (const char*) e->key.name,
 	                                        e->key.name_len);
 	if (dm == NULL) return 0;
 	free(out->type);
 	out->type = dt_sdup(dm->type != NULL ? dm->type : "*");
+	// Setter-only halves: playerglobal declares `DisplayObject.blendShader`
+	// and `Shader.byteCode` with no getter, so Flash reports `writeonly`,
+	// while our runtime registers both halves and would say `readwrite`.
+	// (Also flips a slot between <variable> and <constant>.)
+	if (dm->access != NULL) out->access = dm->access;
 	if (dm->param_count > 0 && dm->params != NULL)
 	{
 		DtParam* p = (DtParam*) calloc(dm->param_count, sizeof(DtParam));
@@ -3089,8 +4296,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 			m->type = dt_type_name(e->type_file, e->type_mn);
 			if (e->type_file == NULL || e->type_mn == 0)
 			{
-				dt_desc_apply(m, dt_desc_find(e->defining_class),
-				              DT_DESC_SLOT, e);
+				dt_desc_apply(m, e->defining_class, DT_DESC_SLOT, e);
 			}
 			m->uri = dt_entry_uri(ctx, e);
 			dt_fill_metas(m, e);
@@ -3122,8 +4328,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 			else
 			{
 				m->type = dt_sdup("*");
-				dt_desc_apply(m, dt_desc_find(e->defining_class),
-				              DT_DESC_METHOD, e);
+				dt_desc_apply(m, e->defining_class, DT_DESC_METHOD, e);
 			}
 		}
 		else  // GETTER / SETTER / GETSET
@@ -3146,8 +4351,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 					? dt_type_name(e->setter.file,
 					               md->param_types != NULL ? md->param_types[0] : 0)
 					: dt_sdup("*");
-				if (md == NULL) dt_desc_apply(m, dt_desc_find(dc),
-				                              DT_DESC_ACCESSOR, e);
+				if (md == NULL) dt_desc_apply(m, dc, DT_DESC_ACCESSOR, e);
 			}
 			else
 			{
@@ -3157,7 +4361,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
 				m->type = (md != NULL) ? dt_type_name(e->method.file,
 				                                      md->return_type_mn)
 				                       : dt_sdup("*");
-				if (md == NULL) dt_desc_apply(m, dt_desc_find(e->defining_class),
+				if (md == NULL) dt_desc_apply(m, e->defining_class,
 				                              DT_DESC_ACCESSOR, e);
 			}
 			m->uri = dt_entry_uri(ctx, e);
@@ -3295,6 +4499,48 @@ static void dt_collect_synthetic(Avm2Context* ctx, DtDesc* d, Avm2Class* cls,
 			}
 		}
 		if (class_side) break;
+	}
+}
+
+// Per-DESCRIBED-class corrections, applied after the vtable and synthetic
+// passes have produced the member lists. See DtDescRedecl for why this cannot
+// be a property of the declaring class's row.
+static void dt_apply_redeclares(DtDesc* d, Avm2Class* cls, int class_side)
+{
+	const DtDescClass* dc = dt_desc_find(cls);
+	if (dc == NULL || dc->redeclares == NULL) return;
+	for (const DtDescRedecl* r = dc->redeclares; r->name != NULL; r++)
+	{
+		if ((r->is_static != 0) != (class_side != 0)) continue;
+		DtMembers* b = r->kind == DT_DESC_SLOT     ? &d->variables
+		             : r->kind == DT_DESC_METHOD   ? &d->methods
+		                                           : &d->accessors;
+		for (uint32_t i = 0; i < b->n; i++)
+		{
+			if (b->v[i].name == NULL
+			    || strcmp(b->v[i].name, r->name) != 0)
+			{
+				continue;
+			}
+			if (r->declared_by != NULL)
+			{
+				free(b->v[i].declared_by);
+				b->v[i].declared_by = dt_sdup(r->declared_by);
+			}
+			else
+			{
+				free(b->v[i].name);
+				free(b->v[i].type);
+				free(b->v[i].declared_by);
+				free(b->v[i].uri);
+				dt_params_free(b->v[i].params, b->v[i].param_count);
+				dt_metas_free(b->v[i].metas, b->v[i].meta_count);
+				memmove(&b->v[i], &b->v[i + 1],
+				        (b->n - i - 1) * sizeof(DtMember));
+				b->n--;
+			}
+			break;
+		}
 	}
 }
 
@@ -3451,11 +4697,13 @@ static void dt_describe(Avm2Context* ctx, Avm2Value v, uint32_t flags, DtDesc* d
 		// installs it as a read-only static const.
 		if (flags & DT_INCLUDE_VARIABLES) dt_collect_static_consts(ctx, d, cls);
 		dt_collect_synthetic(ctx, d, cls, 1, flags);
+		dt_apply_redeclares(d, cls, 1);
 	}
 	else
 	{
 		dt_collect_vtable(ctx, d, &cls->ivtable, &skip, flags);
 		dt_collect_synthetic(ctx, d, cls, 0, flags);
+		dt_apply_redeclares(d, cls, 0);
 		if (flags & DT_INCLUDE_CONSTRUCTOR) dt_collect_ctor(ctx, d, cls);
 	}
 }

@@ -894,6 +894,10 @@ void avm2_register_display(Avm2Context* ctx);
 // with the rest of flash.net in avm2_globals.c, but its load pipeline shares
 // Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
 void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
+// flash.display.IBitmapDrawable, created with DisplayObject (its first
+// implementor). avm2_register_bitmap runs later and declares it on BitmapData,
+// the only other implementor. NULL before avm2_register_display has run.
+Avm2Class* avm2_display_ibitmapdrawable(void);
 void avm2_display_wire_url_stream(Avm2Context* ctx, Avm2Class* us);
 // flash.net.URLVariables, or NULL before register_net has run. The URLLoader
 // "variables" data format constructs one off the response body.

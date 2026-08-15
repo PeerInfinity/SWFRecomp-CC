@@ -3519,6 +3519,16 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	bd->instance_init.debug_name = "BitmapData";
 	g_bitmapdata_class = bd;
 	ctx->builtins.bitmapdata_class = bd;
+	// `BitmapData implements IBitmapDrawable` (the other implementor is
+	// DisplayObject). The interface class is created with the display module,
+	// which registers first.
+	Avm2Class* ibd = avm2_display_ibitmapdrawable();
+	if (ibd != NULL)
+	{
+		bd->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*));
+		bd->interfaces[0] = ibd;
+		bd->interface_count = 1;
+	}
 	g_bitmap_class = ctx->builtins.bitmap_class;
 
 	avm2_builtin_add_getter(ctx, bd, "width", bd_get_width);
@@ -3581,13 +3591,16 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	// BitmapData.encode. bitmapdata_colortransform imports PNGEncoderOptions
 	// for a commented-out encode call and still getlexes the class.
 	{
-		Avm2Class* png = avm2_builtin_class(ctx, "flash.display",
-		                                    "PNGEncoderOptions",
-		                                    ctx->builtins.object_class);
+		// Both are [API("680")] in playerglobal, i.e. SWF 16 and up
+		// (JPEGXREncoderOptions is registered with the flash.display constant
+		// bags in avm2_display.c).
+		Avm2Class* png = avm2_builtin_class_api(ctx, "flash.display",
+		                                        "PNGEncoderOptions",
+		                                        ctx->builtins.object_class, 16);
 		(void) png;
-		Avm2Class* jpg = avm2_builtin_class(ctx, "flash.display",
-		                                    "JPEGEncoderOptions",
-		                                    ctx->builtins.object_class);
+		Avm2Class* jpg = avm2_builtin_class_api(ctx, "flash.display",
+		                                        "JPEGEncoderOptions",
+		                                        ctx->builtins.object_class, 16);
 		(void) jpg;
 	}
 }

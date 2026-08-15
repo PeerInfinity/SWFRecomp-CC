@@ -1,0 +1,2940 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 746964a8e..59dd825fc 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -894,6 +894,10 @@ void avm2_register_display(Avm2Context* ctx);
+ // with the rest of flash.net in avm2_globals.c, but its load pipeline shares
+ // Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
+ void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
++// flash.display.IBitmapDrawable, created with DisplayObject (its first
++// implementor). avm2_register_bitmap runs later and declares it on BitmapData,
++// the only other implementor. NULL before avm2_register_display has run.
++Avm2Class* avm2_display_ibitmapdrawable(void);
+ void avm2_display_wire_url_stream(Avm2Context* ctx, Avm2Class* us);
+ // flash.net.URLVariables, or NULL before register_net has run. The URLLoader
+ // "variables" data format constructs one off the response body.
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 9c1637528..bb3d10a9d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -3445,6 +3445,16 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 	bd->instance_init.debug_name = "BitmapData";
+ 	g_bitmapdata_class = bd;
+ 	ctx->builtins.bitmapdata_class = bd;
++	// `BitmapData implements IBitmapDrawable` (the other implementor is
++	// DisplayObject). The interface class is created with the display module,
++	// which registers first.
++	Avm2Class* ibd = avm2_display_ibitmapdrawable();
++	if (ibd != NULL)
++	{
++		bd->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*));
++		bd->interfaces[0] = ibd;
++		bd->interface_count = 1;
++	}
+ 	g_bitmap_class = ctx->builtins.bitmap_class;
+ 
+ 	avm2_builtin_add_getter(ctx, bd, "width", bd_get_width);
+@@ -3507,13 +3517,16 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 	// BitmapData.encode. bitmapdata_colortransform imports PNGEncoderOptions
+ 	// for a commented-out encode call and still getlexes the class.
+ 	{
+-		Avm2Class* png = avm2_builtin_class(ctx, "flash.display",
+-		                                    "PNGEncoderOptions",
+-		                                    ctx->builtins.object_class);
++		// Both are [API("680")] in playerglobal, i.e. SWF 16 and up
++		// (JPEGXREncoderOptions is registered with the flash.display constant
++		// bags in avm2_display.c).
++		Avm2Class* png = avm2_builtin_class_api(ctx, "flash.display",
++		                                        "PNGEncoderOptions",
++		                                        ctx->builtins.object_class, 16);
+ 		(void) png;
+-		Avm2Class* jpg = avm2_builtin_class(ctx, "flash.display",
+-		                                    "JPEGEncoderOptions",
+-		                                    ctx->builtins.object_class);
++		Avm2Class* jpg = avm2_builtin_class_api(ctx, "flash.display",
++		                                        "JPEGEncoderOptions",
++		                                        ctx->builtins.object_class, 16);
+ 		(void) jpg;
+ 	}
+ }
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..3cb46d4aa 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -8889,6 +8889,44 @@ static Avm2Value graphicstrianglepath_init(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// --- flash.display marker interfaces --------------------------------------
++//
++// playerglobal declares six empty interfaces under flash.display, and
++// describeType reports each implementor's <implementsInterface> transitively
++// (avm2/all_classes/display/*). Native classes never run the ABC
++// mn-resolution path, so an implementor writes its `interfaces` array
++// directly and avm2_class_has_interface reads that resolved cache.
++
++static Avm2Class* g_ibitmapdrawable_class;
++
++static Avm2Class* disp_marker_iface(Avm2Context* ctx, const char* name,
++                                    uint8_t min_swf)
++{
++	Avm2Class* c = avm2_builtin_class_api(ctx, "flash.display", name, NULL,
++	                                      min_swf);
++	c->flags |= AVM2_CLASS_FLAG_INTERFACE;
++	return c;
++}
++
++// Declare up to two interfaces on a native class. Overwrites rather than
++// appends: every caller is the class's own registration site.
++static void disp_implements(Avm2Context* ctx, Avm2Class* cls, Avm2Class* a,
++                            Avm2Class* b)
++{
++	uint32_t n = (a != NULL) + (b != NULL);
++	if (n == 0) return;
++	cls->interfaces = avm2_alloc(ctx, n * sizeof(Avm2Class*));
++	cls->interface_count = n;
++	uint32_t i = 0;
++	if (a != NULL) cls->interfaces[i++] = a;
++	if (b != NULL) cls->interfaces[i++] = b;
++}
++
++Avm2Class* avm2_display_ibitmapdrawable(void)
++{
++	return g_ibitmapdrawable_class;
++}
++
+ // Register the T4 Graphics-drawing methods + data classes. `graphics` is the
+ // flash.display.Graphics class; `object_class` its base.
+ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
+@@ -8899,21 +8937,22 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
+ 	avm2_builtin_add_method(ctx, graphics, "drawGraphicsData", gfx_draw_graphics_data);
+ 
+ 	// IGraphicsData marker interface (Vector.<IGraphicsData> element coercion +
+-	// `is IGraphicsData`).
+-	Avm2Class* igd = avm2_builtin_class(ctx, "flash.display", "IGraphicsData", NULL);
+-	igd->flags |= AVM2_CLASS_FLAG_INTERFACE;
++	// `is IGraphicsData`). All five flash.display markers are [API("662")] in
++	// playerglobal, i.e. SWF 10 and up (IBitmapDrawable, registered with
++	// DisplayObject, is the one that is not gated).
++	Avm2Class* igd = disp_marker_iface(ctx, "IGraphicsData", 10);
+ 	g_igraphicsdata_class = igd;
++	Avm2Class* igfill = disp_marker_iface(ctx, "IGraphicsFill", 10);
++	Avm2Class* igpath = disp_marker_iface(ctx, "IGraphicsPath", 10);
++	Avm2Class* igstroke = disp_marker_iface(ctx, "IGraphicsStroke", 10);
++	disp_marker_iface(ctx, "IDrawCommand", 10);
+ 
+-	// Implementors declare the interface directly (native classes skip the ABC
+-	// mn-resolution path; avm2_class_has_interface reads the resolved cache).
+-	#define GFX_IMPLEMENTS_IGRAPHICSDATA(cls) do { \
+-		(cls)->interface_count = 1; \
+-		(cls)->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*)); \
+-		(cls)->interfaces[0] = igd; \
+-	} while (0)
++	// Implementors declare their interfaces through disp_implements (native
++	// classes skip the ABC mn-resolution path; avm2_class_has_interface reads
++	// the resolved cache).
+ 
+-	Avm2Class* gp = avm2_builtin_class(ctx, "flash.display", "GraphicsPath",
+-	                                   object_class);
++	Avm2Class* gp = avm2_builtin_class_api(ctx, "flash.display", "GraphicsPath",
++	                                       object_class, 10);
+ 	gp->instance_init.fn = graphicspath_init;
+ 	gp->instance_init.debug_name = "GraphicsPath";
+ 	avm2_builtin_add_getset(ctx, gp, "winding", graphicspath_get_winding,
+@@ -8924,14 +8963,15 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
+ 	avm2_builtin_add_method(ctx, gp, "cubicCurveTo", graphicspath_cubic_curve_to);
+ 	avm2_builtin_add_method(ctx, gp, "wideMoveTo", graphicspath_wide_move_to);
+ 	avm2_builtin_add_method(ctx, gp, "wideLineTo", graphicspath_wide_line_to);
+-	GFX_IMPLEMENTS_IGRAPHICSDATA(gp);
++	disp_implements(ctx, gp, igd, igpath);
+ 	g_graphicspath_class = gp;
+ 
+-	Avm2Class* gtp = avm2_builtin_class(ctx, "flash.display",
+-	                                    "GraphicsTrianglePath", object_class);
++	Avm2Class* gtp = avm2_builtin_class_api(ctx, "flash.display",
++	                                        "GraphicsTrianglePath",
++	                                        object_class, 10);
+ 	gtp->instance_init.fn = graphicstrianglepath_init;
+ 	gtp->instance_init.debug_name = "GraphicsTrianglePath";
+-	GFX_IMPLEMENTS_IGRAPHICSDATA(gtp);
++	disp_implements(ctx, gtp, igd, igpath);
+ 	g_graphicstrianglepath_class = gtp;
+ 
+ 	// Fill / stroke IGraphicsData carriers — non-sealed so AS3 can set their
+@@ -8940,15 +8980,22 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
+ 	                         "GraphicsStroke" };
+ 	for (int i = 0; i < 3; i++)
+ 	{
+-		Avm2Class* fc = avm2_builtin_class(ctx, "flash.display", fills[i],
+-		                                   object_class);
+-		GFX_IMPLEMENTS_IGRAPHICSDATA(fc);
++		Avm2Class* fc = avm2_builtin_class_api(ctx, "flash.display", fills[i],
++		                                       object_class, 10);
++		disp_implements(ctx, fc, igd, i == 2 ? igstroke : igfill);
+ 	}
+-	#undef GFX_IMPLEMENTS_IGRAPHICSDATA
++
++	// GraphicsShaderFill: a drawGraphicsData carrier like the five above, and
++	// the sixth IGraphicsFill. Its `shader`/`matrix` are plain public vars.
++	Avm2Class* gsf = avm2_builtin_class_api(ctx, "flash.display",
++	                                        "GraphicsShaderFill", object_class,
++	                                        10);
++	disp_implements(ctx, gsf, igd, igfill);
+ 
+ 	// GraphicsPathCommand (int) + GraphicsPathWinding (string) constant holders.
+-	Avm2Class* gpc = avm2_builtin_class(ctx, "flash.display",
+-	                                    "GraphicsPathCommand", object_class);
++	Avm2Class* gpc = avm2_builtin_class_api(ctx, "flash.display",
++	                                        "GraphicsPathCommand",
++	                                        object_class, 10);
+ 	avm2_builtin_add_static_const(ctx, gpc, "NO_OP", avm2_integer(0));
+ 	avm2_builtin_add_static_const(ctx, gpc, "MOVE_TO", avm2_integer(1));
+ 	avm2_builtin_add_static_const(ctx, gpc, "LINE_TO", avm2_integer(2));
+@@ -8957,14 +9004,15 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
+ 	avm2_builtin_add_static_const(ctx, gpc, "WIDE_LINE_TO", avm2_integer(5));
+ 	avm2_builtin_add_static_const(ctx, gpc, "CUBIC_CURVE_TO", avm2_integer(6));
+ 
+-	Avm2Class* gpw = avm2_builtin_class(ctx, "flash.display",
+-	                                    "GraphicsPathWinding", object_class);
++	Avm2Class* gpw = avm2_builtin_class_api(ctx, "flash.display",
++	                                        "GraphicsPathWinding",
++	                                        object_class, 10);
+ 	disp_sconst(ctx, gpw, "EVEN_ODD", "evenOdd");
+ 	disp_sconst(ctx, gpw, "NON_ZERO", "nonZero");
+ 
+ 	// TriangleCulling constants (imported by some tests; string values).
+-	Avm2Class* tc = avm2_builtin_class(ctx, "flash.display", "TriangleCulling",
+-	                                   object_class);
++	Avm2Class* tc = avm2_builtin_class_api(ctx, "flash.display",
++	                                       "TriangleCulling", object_class, 10);
+ 	disp_sconst(ctx, tc, "NONE", "none");
+ 	disp_sconst(ctx, tc, "POSITIVE", "positive");
+ 	disp_sconst(ctx, tc, "NEGATIVE", "negative");
+@@ -8989,11 +9037,9 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
+ 	const char* more_fills[2] = { "GraphicsBitmapFill", "GraphicsEndFill" };
+ 	for (int i = 0; i < 2; i++)
+ 	{
+-		Avm2Class* fc = avm2_builtin_class(ctx, "flash.display", more_fills[i],
+-		                                   object_class);
+-		fc->interface_count = 1;
+-		fc->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*));
+-		fc->interfaces[0] = igd;
++		Avm2Class* fc = avm2_builtin_class_api(ctx, "flash.display",
++		                                       more_fills[i], object_class, 10);
++		disp_implements(ctx, fc, igd, igfill);
+ 	}
+ }
+ 
+@@ -13701,6 +13747,13 @@ void avm2_register_display(Avm2Context* ctx)
+ 	dobj->native_ext_size = sizeof(Avm2DisplayObjectExt);
+ 	dobj->native_init = display_native_init_abstract;
+ 	b->display_object_class = dobj;
++	// `DisplayObject implements IBitmapDrawable` — the only ungated
++	// flash.display marker interface, and the one every display subclass
++	// inherits. BitmapData is its other implementor (avm2_bitmap.c, which
++	// registers after this and picks the class up through
++	// avm2_display_ibitmapdrawable).
++	g_ibitmapdrawable_class = disp_marker_iface(ctx, "IBitmapDrawable", 0);
++	disp_implements(ctx, dobj, g_ibitmapdrawable_class, NULL);
+ 	avm2_builtin_add_method(ctx, dobj, "hitTestObject", do_hit_test_object);
+ 	avm2_builtin_add_method(ctx, dobj, "getBounds", do_get_bounds);
+ 	avm2_builtin_add_method(ctx, dobj, "getRect", do_get_bounds);
+@@ -13854,6 +13907,15 @@ void avm2_register_display(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, loader, "unload", loader_unload);
+ 	avm2_builtin_add_method(ctx, loader, "unloadAndStop", loader_unload);
+ 
++	// flash.display.AVLoader (SWF 20+) is a Loader subclass whose only own
++	// member is an `load` override. Everything else is inherited, so the
++	// shell plus the descriptor table's declaredBy re-point is the whole
++	// class (avm2/all_classes/display/swf30).
++	Avm2Class* avloader = avm2_builtin_class_api(ctx, "flash.display",
++	                                             "AVLoader", loader, 20);
++	avloader->native_init = display_native_init;
++	avloader->native_ext_size = sizeof(Avm2LoaderExt);
++
+ 	Avm2Class* sprite = avm2_builtin_class(ctx, "flash.display", "Sprite", doc);
+ 	sprite->instance_init.fn = sprite_ctor_init;
+ 	sprite->instance_init.debug_name = "Sprite";
+@@ -14290,8 +14352,17 @@ void avm2_register_display(Avm2Context* ctx)
+ 		disp_sconst(ctx, sq, "MEDIUM", "medium");
+ 		disp_sconst(ctx, sq, "HIGH", "high");
+ 		disp_sconst(ctx, sq, "BEST", "best");
+-		disp_sconst(ctx, sq, "EIGHT_X_LINEAR", "8x8linear");
+-		disp_sconst(ctx, sq, "SIXTEEN_X_LINEAR", "16x16linear");
++		// playerglobal names the four high-quality settings HIGH_8X8 /
++		// HIGH_8X8_LINEAR / HIGH_16X16 / HIGH_16X16_LINEAR
++		// (<ruffle>/core/src/avm2/globals/flash/display/StageQuality.as).
++		// EIGHT_X_LINEAR / SIXTEEN_X_LINEAR were invented here and were the
++		// only two members of our whole flash.display surface that Flash has
++		// at no version; no test names either identifier (only the VALUES,
++		// in displayobject_transform).
++		disp_sconst(ctx, sq, "HIGH_8X8", "8x8");
++		disp_sconst(ctx, sq, "HIGH_8X8_LINEAR", "8x8linear");
++		disp_sconst(ctx, sq, "HIGH_16X16", "16x16");
++		disp_sconst(ctx, sq, "HIGH_16X16_LINEAR", "16x16linear");
+ 
+ 		// FlashPunk's Engine sets stage.displayState = StageDisplayState.NORMAL
+ 		// at startup (Engine.as:113).
+@@ -14327,6 +14398,64 @@ void avm2_register_display(Avm2Context* ctx)
+ 		disp_sconst(ctx, lsm, "HORIZONTAL", "horizontal");
+ 		disp_sconst(ctx, lsm, "VERTICAL", "vertical");
+ 		disp_sconst(ctx, lsm, "NONE", "none");
++
++		// The remaining playerglobal flash.display constant bags. Nothing in
++		// the runtime consumes these yet; they exist because
++		// getDefinitionByName has to find them at the right SWF version and
++		// describeType has to report their constants
++		// (avm2/all_classes/display/*). ActionScriptVersion and SWFVersion
++		// hold `uint`s, which our value model cannot express as a reported
++		// TYPE — that comes from the descriptor table's DtDescConst rows.
++		Avm2Class* asv = avm2_builtin_class(ctx, "flash.display",
++		                                    "ActionScriptVersion",
++		                                    b->object_class);
++		avm2_builtin_add_static_const(ctx, asv, "ACTIONSCRIPT2",
++		                              avm2_uint_value(2));
++		avm2_builtin_add_static_const(ctx, asv, "ACTIONSCRIPT3",
++		                              avm2_uint_value(3));
++
++		Avm2Class* swfv = avm2_builtin_class(ctx, "flash.display", "SWFVersion",
++		                                     b->object_class);
++		for (uint32_t i = 1; i <= 12; i++)
++		{
++			char n[12];
++			snprintf(n, sizeof(n), "FLASH%u", i);
++			avm2_builtin_add_static_const(ctx, swfv, n, avm2_uint_value(i));
++		}
++
++		Avm2Class* cc = avm2_builtin_class_api(ctx, "flash.display",
++		                                       "ColorCorrection",
++		                                       b->object_class, 10);
++		disp_sconst(ctx, cc, "DEFAULT", "default");
++		disp_sconst(ctx, cc, "ON", "on");
++		disp_sconst(ctx, cc, "OFF", "off");
++
++		Avm2Class* ccs = avm2_builtin_class_api(ctx, "flash.display",
++		                                        "ColorCorrectionSupport",
++		                                        b->object_class, 10);
++		disp_sconst(ctx, ccs, "UNSUPPORTED", "unsupported");
++		disp_sconst(ctx, ccs, "DEFAULT_ON", "defaultOn");
++		disp_sconst(ctx, ccs, "DEFAULT_OFF", "defaultOff");
++
++		Avm2Class* becs = avm2_builtin_class_api(ctx, "flash.display",
++		                                         "BitmapEncodingColorSpace",
++		                                         b->object_class, 16);
++		disp_sconst(ctx, becs, "COLORSPACE_AUTO", "auto");
++		disp_sconst(ctx, becs, "COLORSPACE_4_4_4", "4:4:4");
++		disp_sconst(ctx, becs, "COLORSPACE_4_2_2", "4:2:2");
++		disp_sconst(ctx, becs, "COLORSPACE_4_2_0", "4:2:0");
++
++		// JPEGXREncoderOptions is a plain public-var bag like its JPEG/PNG
++		// siblings in avm2_bitmap.c; the three vars are described from the
++		// table, not registered as slots.
++		avm2_builtin_class_api(ctx, "flash.display", "JPEGXREncoderOptions",
++		                       b->object_class, 16);
++
++		// NativeMenu exists from SWF 10, but every one of its members is
++		// AIR-gated, so under a Flash Player runtime it is an empty
++		// EventDispatcher subclass.
++		avm2_builtin_class_api(ctx, "flash.display", "NativeMenu",
++		                       b->event_dispatcher_class, 10);
+ 	}
+ 
+ 	// flash.ui.Mouse / MouseCursor — FlashPunk's Splash sets Mouse.cursor to a
+diff --git a/SWFModernRuntime/src/avm2/avm2_globals.c b/SWFModernRuntime/src/avm2/avm2_globals.c
+index 0d3b239ea..b3baaab83 100644
+--- a/SWFModernRuntime/src/avm2/avm2_globals.c
++++ b/SWFModernRuntime/src/avm2/avm2_globals.c
+@@ -2464,7 +2464,18 @@ typedef struct DtDescMember
+ 	// below this SWF version. DESCRIBE-ONLY by design — Flash also hides the
+ 	// property from lookup, but no graded test calls a gated member on an
+ 	// under-versioned SWF and a real hide would need a per-entry availability
+-	// check on the hot property path. SWF = 12 + (N - 672) / 2 (api_version.rs).
++	// check on the hot property path.
++	//
++	// `api_version.rs` numbers the annotations `ordinal = N - 660`. The stride
++	// is uniform only from ordinal 12 up (`SWF = 12 + (ordinal - 12) / 2`,
++	// even ordinals); ODD ordinals >= 12 and every ordinal below 12 that is
++	// not in {0, 2, 5, 7, 10} are AIR_* versions, which `TRANSFER_TABLE` maps
++	// to VM_INTERNAL under a Flash Player runtime — i.e. HIDDEN AT EVERY
++	// VERSION (255 here), never rounded up to the next SWF version. The five
++	// Flash-Player ordinals below 12 are 0 (always), 2/5/7 (FP 10.0/10.0.32/
++	// 10.1 => SWF 10) and 10 (FP 10.2 => SWF 11). Verified against all six
++	// all_classes/display expected files; tools/descriptor/as_model.py is the
++	// single implementation of the rule.
+ 	uint8_t min_swf;
+ 	// 1 = the member does not exist in our vtable at all and is reported
+ 	// purely from this table (dt_collect_synthetic).
+@@ -2490,6 +2501,35 @@ typedef struct DtDescConst
+ 	uint8_t min_swf;    // 0 = always visible
+ } DtDescConst;
+ 
++// A DESCRIBE-ONLY correction that belongs to the class being described rather
++// than to the class that declares the member, so it cannot live on a
++// DtDescMember row. Two shapes, distinguished by `declared_by`:
++//
++//   declared_by != NULL — report this inherited/overridden member as declared
++//     by that class. Both directions occur: playerglobal overrides `addChild`
++//     on Stage where we inherit DisplayObjectContainer's, and it overrides
++//     only the SETTER half of `alpha` on Stage (so `declaredBy` stays
++//     DisplayObject) where we re-register both halves.
++//   declared_by == NULL — hide the member on this class entirely.
++//     `soundTransform` is the case: playerglobal declares it twice, on Sprite
++//     and on SimpleButton, and NOT on InteractiveObject /
++//     DisplayObjectContainer / Loader / Stage, while we register it once on
++//     InteractiveObject so every subclass inherits it.
++//
++// This is deliberately NOT the session-15 XMLDocument shape (rewriting a live
++// vtable entry's `defining_class`): `defining_class` also drives
++// avm2_function_new scope binding, class_derive_depth override arbitration
++// and callstack frame naming, so re-pointing Stage's 30 accessors that way
++// would rename every `flash.display::Stage/set x()` frame — and
++// stage_properties2 grades those 2071 throws.
++typedef struct DtDescRedecl
++{
++	const char* name;         // NULL terminates the array
++	uint8_t kind;             // DT_DESC_*
++	uint8_t is_static;        // 1 = the class ("static") side
++	const char* declared_by;  // NULL = hide the member on this class
++} DtDescRedecl;
++
+ typedef struct DtDescClass
+ {
+ 	const char* ns;     // NULL terminates the array
+@@ -2502,6 +2542,17 @@ typedef struct DtDescClass
+ 	const DtDescParam* ctor_params;
+ 	const DtDescMember* members;
+ 	const DtDescConst* consts;   // appended (session 15 T10)
++	// --- appended (session 16, all_classes/display); zero-fill keeps every
++	// row above meaning exactly what it did. ---
++	// 1 = a member lookup that starts at a SUBCLASS of this class may fall
++	// through to this row. Off by default: the hand-written rows above are
++	// keyed strictly on the declaring class, and letting them answer for
++	// subclasses would change what they report today. The generated
++	// flash.display rows set it, because our native registration and
++	// playerglobal disagree about which class carries a native override
++	// (dt_desc_lookup).
++	uint8_t chain_lookup;
++	const DtDescRedecl* redeclares;
+ } DtDescClass;
+ 
+ // --- flash.events::Event ---------------------------------------------------
+@@ -2932,6 +2983,1124 @@ static const DtDescConst dt_c_xmlnodetype[] = {
+ 	{ NULL, NULL, 0 },
+ };
+ 
++// >>> BEGIN GENERATED flash.display descriptors -- DO NOT EDIT.
++// Regenerate with:
++//   python3 tools/descriptor/gen_display_descriptors.py \
++//       --actual <our all_classes/display/swf30 output>
++// Derived from Ruffle's playerglobal ActionScript stubs
++// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and validated
++// element-for-element against the six
++// avm2/all_classes/display/swf*/output.txt oracles by
++// tools/descriptor/check_model.py.
++//
++// Derived from Ruffle's playerglobal ActionScript stubs
++// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and
++// validated element-for-element against the six
++// avm2/all_classes/display/swf*/output.txt oracles by
++// tools/descriptor/check_model.py.  Included from
++// avm2_globals.c inside the dt_* descriptor region, so it
++// sees DtDescParam/DtDescMember/DtDescConst/DtDescRedecl.
++//
++// 497 members / 82 distinct parameter lists / 18 constructors / 115 constants
++// 54 declaredBy re-points / 7 per-class hides.
++
++static const DtDescParam dtd_p0[] = { { "flash.net::URLRequest", 0 }, { "flash.system::LoaderContext", 1 } };
++static const DtDescParam dtd_p1[] = { { "String", 0 }, { "Function", 0 } };
++static const DtDescParam dtd_p10[] = { { "flash.display::IBitmapDrawable", 0 }, { "flash.geom::Matrix", 1 }, { "flash.geom::ColorTransform", 1 }, { "String", 1 }, { "flash.geom::Rectangle", 1 }, { "Boolean", 1 }, { "String", 1 } };
++static const DtDescParam dtd_p11[] = { { "flash.geom::Rectangle", 0 }, { "Object", 0 }, { "flash.utils::ByteArray", 1 } };
++static const DtDescParam dtd_p12[] = { { "flash.geom::Rectangle", 0 }, { "uint", 0 } };
++static const DtDescParam dtd_p13[] = { { "int", 0 }, { "int", 0 }, { "uint", 0 } };
++static const DtDescParam dtd_p14[] = { { "flash.geom::Rectangle", 0 }, { "flash.filters::BitmapFilter", 0 } };
++static const DtDescParam dtd_p15[] = { { "uint", 0 }, { "uint", 0 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p16[] = { { "int", 0 }, { "int", 0 } };
++static const DtDescParam dtd_p17[] = { { "flash.geom::Rectangle", 0 } };
++static const DtDescParam dtd_p18[] = { { "flash.geom::Rectangle", 1 } };
++static const DtDescParam dtd_p19[] = { { "flash.geom::Point", 0 }, { "uint", 0 }, { "Object", 0 }, { "flash.geom::Point", 1 }, { "uint", 1 } };
++static const DtDescParam dtd_p2[] = { { "String", 0 } };
++static const DtDescParam dtd_p20[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "uint", 0 }, { "uint", 0 }, { "uint", 0 }, { "uint", 0 } };
++static const DtDescParam dtd_p21[] = { { "int", 0 }, { "uint", 1 }, { "uint", 1 }, { "uint", 1 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p22[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "Array", 1 }, { "Array", 1 }, { "Array", 1 }, { "Array", 1 } };
++static const DtDescParam dtd_p23[] = { { "Number", 0 }, { "Number", 0 }, { "uint", 0 }, { "int", 0 }, { "Boolean", 0 }, { "Boolean", 0 }, { "uint", 1 }, { "Boolean", 1 }, { "Array", 1 } };
++static const DtDescParam dtd_p24[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "int", 1 }, { "int", 1 }, { "uint", 1 } };
++static const DtDescParam dtd_p25[] = { { "flash.geom::Rectangle", 0 }, { "__AS3__.vec::Vector.<uint>", 0 } };
++static const DtDescParam dtd_p26[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "String", 0 }, { "uint", 0 }, { "uint", 1 }, { "uint", 1 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p27[] = { { "flash.display::DisplayObject", 0 } };
++static const DtDescParam dtd_p28[] = { { "flash.geom::Point", 0 } };
++static const DtDescParam dtd_p29[] = { { "Number", 0 }, { "Number", 0 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p3[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "flash.filters::BitmapFilter", 0 } };
++static const DtDescParam dtd_p30[] = { { "flash.geom::Vector3D", 0 } };
++static const DtDescParam dtd_p31[] = { { "flash.display::DisplayObject", 0 }, { "int", 0 } };
++static const DtDescParam dtd_p32[] = { { "int", 0 } };
++static const DtDescParam dtd_p33[] = { { "int", 1 }, { "int", 1 } };
++static const DtDescParam dtd_p34[] = { { "flash.display::DisplayObject", 0 }, { "flash.display::DisplayObject", 0 } };
++static const DtDescParam dtd_p35[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Matrix", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p36[] = { { "uint", 0 }, { "Number", 1 } };
++static const DtDescParam dtd_p37[] = { { "String", 0 }, { "Array", 0 }, { "Array", 0 }, { "Array", 0 }, { "flash.geom::Matrix", 1 }, { "String", 1 }, { "String", 1 }, { "Number", 1 } };
++static const DtDescParam dtd_p38[] = { { "flash.display::Shader", 0 }, { "flash.geom::Matrix", 1 } };
++static const DtDescParam dtd_p39[] = { { "flash.display::Graphics", 0 } };
++static const DtDescParam dtd_p4[] = { { "flash.geom::Rectangle", 0 }, { "flash.geom::ColorTransform", 0 } };
++static const DtDescParam dtd_p40[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
++static const DtDescParam dtd_p41[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
++static const DtDescParam dtd_p42[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
++static const DtDescParam dtd_p43[] = { { "__AS3__.vec::Vector.<flash.display::IGraphicsData>", 0 } };
++static const DtDescParam dtd_p44[] = { { "__AS3__.vec::Vector.<int>", 0 }, { "__AS3__.vec::Vector.<Number>", 0 }, { "String", 1 } };
++static const DtDescParam dtd_p45[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 1 } };
++static const DtDescParam dtd_p46[] = { { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 }, { "Number", 0 } };
++static const DtDescParam dtd_p47[] = { { "__AS3__.vec::Vector.<Number>", 0 }, { "__AS3__.vec::Vector.<int>", 1 }, { "__AS3__.vec::Vector.<Number>", 1 }, { "String", 1 } };
++static const DtDescParam dtd_p48[] = { { "Number", 1 }, { "uint", 1 }, { "Number", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "Number", 1 } };
++static const DtDescParam dtd_p49[] = { { "Number", 0 }, { "Number", 0 } };
++static const DtDescParam dtd_p5[] = { { "flash.display::BitmapData", 0 } };
++static const DtDescParam dtd_p50[] = { { "Boolean", 1 } };
++static const DtDescParam dtd_p51[] = { { "flash.utils::ByteArray", 0 }, { "flash.system::LoaderContext", 1 } };
++static const DtDescParam dtd_p52[] = { { "flash.events::Event", 0 } };
++static const DtDescParam dtd_p53[] = { { "Object", 0 } };
++static const DtDescParam dtd_p54[] = { { "Object", 0 }, { "String", 1 } };
++static const DtDescParam dtd_p55[] = { { "flash.display::NativeMenuItem", 0 } };
++static const DtDescParam dtd_p56[] = { { "flash.display::NativeMenuItem", 0 }, { "int", 0 } };
++static const DtDescParam dtd_p57[] = { { "flash.display::NativeMenu", 0 }, { "String", 0 } };
++static const DtDescParam dtd_p58[] = { { "flash.display::NativeMenu", 0 }, { "int", 0 }, { "String", 0 } };
++static const DtDescParam dtd_p59[] = { { "flash.display::Stage", 0 }, { "Number", 0 }, { "Number", 0 } };
++static const DtDescParam dtd_p6[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "uint", 0 }, { "uint", 0 } };
++static const DtDescParam dtd_p60[] = { { "Boolean", 1 }, { "flash.geom::Rectangle", 1 } };
++static const DtDescParam dtd_p61[] = { { "int", 0 }, { "Boolean", 1 }, { "flash.geom::Rectangle", 1 } };
++static const DtDescParam dtd_p62[] = { { "String", 0 }, { "Function", 0 }, { "Boolean", 1 }, { "int", 1 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p63[] = { { "String", 1 }, { "String", 1 } };
++static const DtDescParam dtd_p64[] = { { "__AS3__.vec::Vector.<String>", 0 } };
++static const DtDescParam dtd_p65[] = { { "flash.display::BitmapData", 1 }, { "String", 1 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p66[] = { { "int", 0 }, { "int", 0 }, { "Boolean", 1 }, { "uint", 1 } };
++static const DtDescParam dtd_p67[] = { { "String", 0 }, { "int", 0 } };
++static const DtDescParam dtd_p68[] = { { "flash.display::BitmapData", 1 }, { "flash.geom::Matrix", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p69[] = { { "String", 1 }, { "Array", 1 }, { "Array", 1 }, { "Array", 1 }, { "*", 1 }, { "*", 1 }, { "String", 1 }, { "Number", 1 } };
++static const DtDescParam dtd_p7[] = { { "flash.display::BitmapData", 0 }, { "flash.geom::Rectangle", 0 }, { "flash.geom::Point", 0 }, { "flash.display::BitmapData", 1 }, { "flash.geom::Point", 1 }, { "Boolean", 1 } };
++static const DtDescParam dtd_p70[] = { { "__AS3__.vec::Vector.<int>", 1 }, { "__AS3__.vec::Vector.<Number>", 1 }, { "String", 1 } };
++static const DtDescParam dtd_p71[] = { { "flash.display::Shader", 1 }, { "flash.geom::Matrix", 1 } };
++static const DtDescParam dtd_p72[] = { { "uint", 1 }, { "Number", 1 } };
++static const DtDescParam dtd_p73[] = { { "Number", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "Number", 1 }, { "flash.display::IGraphicsFill", 1 } };
++static const DtDescParam dtd_p74[] = { { "__AS3__.vec::Vector.<Number>", 1 }, { "__AS3__.vec::Vector.<int>", 1 }, { "__AS3__.vec::Vector.<Number>", 1 }, { "String", 1 } };
++static const DtDescParam dtd_p75[] = { { "uint", 1 } };
++static const DtDescParam dtd_p76[] = { { "uint", 1 }, { "String", 1 }, { "uint", 1 } };
++static const DtDescParam dtd_p77[] = { { "String", 0 }, { "Array", 0 }, { "int", 0 } };
++static const DtDescParam dtd_p78[] = { { "flash.utils::ByteArray", 1 } };
++static const DtDescParam dtd_p79[] = { { "flash.utils::ByteArray", 0 } };
++static const DtDescParam dtd_p8[] = { { "flash.geom::Rectangle", 0 }, { "flash.utils::ByteArray", 0 } };
++static const DtDescParam dtd_p80[] = { { "flash.display::Shader", 1 }, { "Object", 1 }, { "int", 1 }, { "int", 1 } };
++static const DtDescParam dtd_p81[] = { { "flash.display::DisplayObject", 1 }, { "flash.display::DisplayObject", 1 }, { "flash.display::DisplayObject", 1 }, { "flash.display::DisplayObject", 1 } };
++static const DtDescParam dtd_p9[] = { { "flash.display::IBitmapDrawable", 0 }, { "flash.geom::Matrix", 1 }, { "flash.geom::ColorTransform", 1 }, { "String", 1 }, { "flash.geom::Rectangle", 1 }, { "Boolean", 1 } };
++
++static const DtDescMember dtd_m_AVLoader[] = {
++	{ "load", DT_DESC_METHOD, "void", 2, dtd_p0, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_AVLoader[] = {
++	{ "addChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "addChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "load", DT_DESC_METHOD, 0, "flash.display::AVLoader" },
++	{ "removeChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "removeChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "setChildIndex", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_AVM1Movie[] = {
++	{ "addCallback", DT_DESC_METHOD, "void", 2, dtd_p1, 0, 1, 0, NULL, NULL },
++	{ "call", DT_DESC_METHOD, "*", 1, dtd_p2, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_ActionScriptVersion[] = {
++	{ "ACTIONSCRIPT2", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "ACTIONSCRIPT3", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_ActionScriptVersion[] = {
++	{ "ACTIONSCRIPT2", "uint", 0 },
++	{ "ACTIONSCRIPT3", "uint", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_Bitmap[] = {
++	{ "bitmapData", DT_DESC_ACCESSOR, "flash.display::BitmapData", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "pixelSnapping", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "smoothing", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_BitmapData[] = {
++	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "rect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "transparent", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "applyFilter", DT_DESC_METHOD, "void", 4, dtd_p3, 0, 1, 0, NULL, NULL },
++	{ "clone", DT_DESC_METHOD, "flash.display::BitmapData", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "colorTransform", DT_DESC_METHOD, "void", 2, dtd_p4, 0, 1, 0, NULL, NULL },
++	{ "compare", DT_DESC_METHOD, "Object", 1, dtd_p5, 0, 1, 0, NULL, NULL },
++	{ "copyChannel", DT_DESC_METHOD, "void", 5, dtd_p6, 0, 1, 0, NULL, NULL },
++	{ "copyPixels", DT_DESC_METHOD, "void", 6, dtd_p7, 0, 1, 0, NULL, NULL },
++	{ "copyPixelsToByteArray", DT_DESC_METHOD, "void", 2, dtd_p8, 17, 1, 0, NULL, NULL },
++	{ "dispose", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "draw", DT_DESC_METHOD, "void", 6, dtd_p9, 0, 1, 0, NULL, NULL },
++	{ "drawWithQuality", DT_DESC_METHOD, "void", 7, dtd_p10, 16, 1, 0, NULL, NULL },
++	{ "encode", DT_DESC_METHOD, "flash.utils::ByteArray", 3, dtd_p11, 16, 1, 0, NULL, NULL },
++	{ "fillRect", DT_DESC_METHOD, "void", 2, dtd_p12, 0, 1, 0, NULL, NULL },
++	{ "floodFill", DT_DESC_METHOD, "void", 3, dtd_p13, 0, 1, 0, NULL, NULL },
++	{ "generateFilterRect", DT_DESC_METHOD, "flash.geom::Rectangle", 2, dtd_p14, 0, 1, 0, NULL, NULL },
++	{ "getColorBoundsRect", DT_DESC_METHOD, "flash.geom::Rectangle", 3, dtd_p15, 0, 1, 0, NULL, NULL },
++	{ "getPixel", DT_DESC_METHOD, "uint", 2, dtd_p16, 0, 1, 0, NULL, NULL },
++	{ "getPixel32", DT_DESC_METHOD, "uint", 2, dtd_p16, 0, 1, 0, NULL, NULL },
++	{ "getPixels", DT_DESC_METHOD, "flash.utils::ByteArray", 1, dtd_p17, 0, 1, 0, NULL, NULL },
++	{ "getVector", DT_DESC_METHOD, "__AS3__.vec::Vector.<uint>", 1, dtd_p17, 10, 1, 0, NULL, NULL },
++	{ "histogram", DT_DESC_METHOD, "__AS3__.vec::Vector.<__AS3__.vec::Vector.<Number>>", 1, dtd_p18, 10, 1, 0, NULL, NULL },
++	{ "hitTest", DT_DESC_METHOD, "Boolean", 5, dtd_p19, 0, 1, 0, NULL, NULL },
++	{ "lock", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "merge", DT_DESC_METHOD, "void", 7, dtd_p20, 0, 1, 0, NULL, NULL },
++	{ "noise", DT_DESC_METHOD, "void", 5, dtd_p21, 0, 1, 0, NULL, NULL },
++	{ "paletteMap", DT_DESC_METHOD, "void", 7, dtd_p22, 0, 1, 0, NULL, NULL },
++	{ "perlinNoise", DT_DESC_METHOD, "void", 9, dtd_p23, 0, 1, 0, NULL, NULL },
++	{ "pixelDissolve", DT_DESC_METHOD, "int", 6, dtd_p24, 0, 1, 0, NULL, NULL },
++	{ "scroll", DT_DESC_METHOD, "void", 2, dtd_p16, 0, 1, 0, NULL, NULL },
++	{ "setPixel", DT_DESC_METHOD, "void", 3, dtd_p13, 0, 1, 0, NULL, NULL },
++	{ "setPixel32", DT_DESC_METHOD, "void", 3, dtd_p13, 0, 1, 0, NULL, NULL },
++	{ "setPixels", DT_DESC_METHOD, "void", 2, dtd_p8, 0, 1, 0, NULL, NULL },
++	{ "setVector", DT_DESC_METHOD, "void", 2, dtd_p25, 10, 1, 0, NULL, NULL },
++	{ "threshold", DT_DESC_METHOD, "uint", 8, dtd_p26, 0, 1, 0, NULL, NULL },
++	{ "unlock", DT_DESC_METHOD, "void", 1, dtd_p18, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_BitmapDataChannel[] = {
++	{ "ALPHA", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "BLUE", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "GREEN", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "RED", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_BitmapDataChannel[] = {
++	{ "ALPHA", "uint", 0 },
++	{ "BLUE", "uint", 0 },
++	{ "GREEN", "uint", 0 },
++	{ "RED", "uint", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_BitmapEncodingColorSpace[] = {
++	{ "COLORSPACE_4_2_0", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "COLORSPACE_4_2_2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "COLORSPACE_4_4_4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "COLORSPACE_AUTO", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_BitmapEncodingColorSpace[] = {
++	{ "COLORSPACE_4_2_0", "String", 0 },
++	{ "COLORSPACE_4_2_2", "String", 0 },
++	{ "COLORSPACE_4_4_4", "String", 0 },
++	{ "COLORSPACE_AUTO", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_BlendMode[] = {
++	{ "ADD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "ALPHA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "DARKEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "DIFFERENCE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "ERASE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "HARDLIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "INVERT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "LAYER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "LIGHTEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "MULTIPLY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NORMAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "OVERLAY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "SCREEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "SHADER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "SUBTRACT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_BlendMode[] = {
++	{ "ADD", "String", 0 },
++	{ "ALPHA", "String", 0 },
++	{ "DARKEN", "String", 0 },
++	{ "DIFFERENCE", "String", 0 },
++	{ "ERASE", "String", 0 },
++	{ "HARDLIGHT", "String", 0 },
++	{ "INVERT", "String", 0 },
++	{ "LAYER", "String", 0 },
++	{ "LIGHTEN", "String", 0 },
++	{ "MULTIPLY", "String", 0 },
++	{ "NORMAL", "String", 0 },
++	{ "OVERLAY", "String", 0 },
++	{ "SCREEN", "String", 0 },
++	{ "SHADER", "String", 0 },
++	{ "SUBTRACT", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_CapsStyle[] = {
++	{ "NONE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "ROUND", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "SQUARE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_CapsStyle[] = {
++	{ "NONE", "String", 0 },
++	{ "ROUND", "String", 0 },
++	{ "SQUARE", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_ColorCorrection[] = {
++	{ "DEFAULT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "OFF", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "ON", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_ColorCorrection[] = {
++	{ "DEFAULT", "String", 0 },
++	{ "OFF", "String", 0 },
++	{ "ON", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_ColorCorrectionSupport[] = {
++	{ "DEFAULT_OFF", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "DEFAULT_ON", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "UNSUPPORTED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_ColorCorrectionSupport[] = {
++	{ "DEFAULT_OFF", "String", 0 },
++	{ "DEFAULT_ON", "String", 0 },
++	{ "UNSUPPORTED", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_DisplayObject[] = {
++	{ "accessibilityProperties", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityProperties", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "alpha", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "blendMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "blendShader", DT_DESC_ACCESSOR, "flash.display::Shader", 0, NULL, 10, 1, 0, "writeonly", NULL },
++	{ "cacheAsBitmap", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "filters", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "height", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "loaderInfo", DT_DESC_ACCESSOR, "flash.display::LoaderInfo", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "mask", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "metaData", DT_DESC_ACCESSOR, "Object", 0, NULL, 19, 1, 0, "readwrite", NULL },
++	{ "mouseX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "mouseY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "opaqueBackground", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "parent", DT_DESC_ACCESSOR, "flash.display::DisplayObjectContainer", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "root", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "rotation", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "rotationX", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
++	{ "rotationY", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
++	{ "rotationZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
++	{ "scale9Grid", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "scaleX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "scaleY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "scaleZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
++	{ "scrollRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "stage", DT_DESC_ACCESSOR, "flash.display::Stage", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "transform", DT_DESC_ACCESSOR, "flash.geom::Transform", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "visible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "width", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "x", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "y", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "z", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 1, 0, "readwrite", NULL },
++	{ "getBounds", DT_DESC_METHOD, "flash.geom::Rectangle", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "getRect", DT_DESC_METHOD, "flash.geom::Rectangle", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "globalToLocal", DT_DESC_METHOD, "flash.geom::Point", 1, dtd_p28, 0, 1, 0, NULL, NULL },
++	{ "globalToLocal3D", DT_DESC_METHOD, "flash.geom::Vector3D", 1, dtd_p28, 10, 1, 0, NULL, NULL },
++	{ "hitTestObject", DT_DESC_METHOD, "Boolean", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "hitTestPoint", DT_DESC_METHOD, "Boolean", 3, dtd_p29, 0, 1, 0, NULL, NULL },
++	{ "local3DToGlobal", DT_DESC_METHOD, "flash.geom::Point", 1, dtd_p30, 10, 1, 0, NULL, NULL },
++	{ "localToGlobal", DT_DESC_METHOD, "flash.geom::Point", 1, dtd_p28, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_DisplayObjectContainer[] = {
++	{ "mouseChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "numChildren", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "tabChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "textSnapshot", DT_DESC_ACCESSOR, "flash.text::TextSnapshot", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "addChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "addChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 2, dtd_p31, 0, 1, 0, NULL, NULL },
++	{ "areInaccessibleObjectsUnderPoint", DT_DESC_METHOD, "Boolean", 1, dtd_p28, 0, 1, 0, NULL, NULL },
++	{ "contains", DT_DESC_METHOD, "Boolean", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "getChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
++	{ "getChildByName", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p2, 0, 1, 0, NULL, NULL },
++	{ "getChildIndex", DT_DESC_METHOD, "int", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "getObjectsUnderPoint", DT_DESC_METHOD, "Array", 1, dtd_p28, 0, 1, 0, NULL, NULL },
++	{ "removeChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "removeChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
++	{ "removeChildren", DT_DESC_METHOD, "void", 2, dtd_p33, 13, 1, 0, NULL, NULL },
++	{ "setChildIndex", DT_DESC_METHOD, "void", 2, dtd_p31, 0, 1, 0, NULL, NULL },
++	{ "stopAllMovieClips", DT_DESC_METHOD, "void", 0, NULL, 21, 1, 0, NULL, NULL },
++	{ "swapChildren", DT_DESC_METHOD, "void", 2, dtd_p34, 0, 1, 0, NULL, NULL },
++	{ "swapChildrenAt", DT_DESC_METHOD, "void", 2, dtd_p16, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_DisplayObjectContainer[] = {
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_FrameLabel[] = {
++	{ "frame", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GradientType[] = {
++	{ "LINEAR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "RADIAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_GradientType[] = {
++	{ "LINEAR", "String", 0 },
++	{ "RADIAL", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_Graphics[] = {
++	{ "beginBitmapFill", DT_DESC_METHOD, "void", 4, dtd_p35, 0, 1, 0, NULL, NULL },
++	{ "beginFill", DT_DESC_METHOD, "void", 2, dtd_p36, 0, 1, 0, NULL, NULL },
++	{ "beginGradientFill", DT_DESC_METHOD, "void", 8, dtd_p37, 0, 1, 0, NULL, NULL },
++	{ "beginShaderFill", DT_DESC_METHOD, "void", 2, dtd_p38, 10, 1, 0, NULL, NULL },
++	{ "clear", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "copyFrom", DT_DESC_METHOD, "void", 1, dtd_p39, 10, 1, 0, NULL, NULL },
++	{ "cubicCurveTo", DT_DESC_METHOD, "void", 6, dtd_p40, 13, 1, 0, NULL, NULL },
++	{ "curveTo", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
++	{ "drawCircle", DT_DESC_METHOD, "void", 3, dtd_p42, 0, 1, 0, NULL, NULL },
++	{ "drawEllipse", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
++	{ "drawGraphicsData", DT_DESC_METHOD, "void", 1, dtd_p43, 10, 1, 0, NULL, NULL },
++	{ "drawPath", DT_DESC_METHOD, "void", 3, dtd_p44, 10, 1, 0, NULL, NULL },
++	{ "drawRect", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
++	{ "drawRoundRect", DT_DESC_METHOD, "void", 6, dtd_p45, 0, 1, 0, NULL, NULL },
++	{ "drawRoundRectComplex", DT_DESC_METHOD, "void", 8, dtd_p46, 0, 1, 0, NULL, NULL },
++	{ "drawTriangles", DT_DESC_METHOD, "void", 4, dtd_p47, 10, 1, 0, NULL, NULL },
++	{ "endFill", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "lineBitmapStyle", DT_DESC_METHOD, "void", 4, dtd_p35, 10, 1, 0, NULL, NULL },
++	{ "lineGradientStyle", DT_DESC_METHOD, "void", 8, dtd_p37, 0, 1, 0, NULL, NULL },
++	{ "lineShaderStyle", DT_DESC_METHOD, "void", 2, dtd_p38, 10, 1, 0, NULL, NULL },
++	{ "lineStyle", DT_DESC_METHOD, "void", 8, dtd_p48, 0, 1, 0, NULL, NULL },
++	{ "lineTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
++	{ "moveTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
++	{ "readGraphicsData", DT_DESC_METHOD, "__AS3__.vec::Vector.<flash.display::IGraphicsData>", 1, dtd_p50, 19, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GraphicsBitmapFill[] = {
++	{ "bitmapData", DT_DESC_SLOT, "flash.display::BitmapData", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "matrix", DT_DESC_SLOT, "flash.geom::Matrix", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "repeat", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "smooth", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GraphicsGradientFill[] = {
++	{ "interpolationMethod", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "spreadMethod", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "type", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "alphas", DT_DESC_SLOT, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "colors", DT_DESC_SLOT, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "focalPointRatio", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "matrix", DT_DESC_SLOT, "flash.geom::Matrix", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "ratios", DT_DESC_SLOT, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GraphicsPath[] = {
++	{ "winding", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "cubicCurveTo", DT_DESC_METHOD, "void", 6, dtd_p40, 13, 1, 0, NULL, NULL },
++	{ "curveTo", DT_DESC_METHOD, "void", 4, dtd_p41, 0, 1, 0, NULL, NULL },
++	{ "lineTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
++	{ "moveTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
++	{ "wideLineTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
++	{ "wideMoveTo", DT_DESC_METHOD, "void", 2, dtd_p49, 0, 1, 0, NULL, NULL },
++	{ "commands", DT_DESC_SLOT, "__AS3__.vec::Vector.<int>", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "data", DT_DESC_SLOT, "__AS3__.vec::Vector.<Number>", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GraphicsPathCommand[] = {
++	{ "CUBIC_CURVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "CURVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "LINE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "MOVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NO_OP", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "WIDE_LINE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "WIDE_MOVE_TO", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_GraphicsPathCommand[] = {
++	{ "CUBIC_CURVE_TO", "int", 0 },
++	{ "CURVE_TO", "int", 0 },
++	{ "LINE_TO", "int", 0 },
++	{ "MOVE_TO", "int", 0 },
++	{ "NO_OP", "int", 0 },
++	{ "WIDE_LINE_TO", "int", 0 },
++	{ "WIDE_MOVE_TO", "int", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_GraphicsPathWinding[] = {
++	{ "EVEN_ODD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NON_ZERO", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_GraphicsPathWinding[] = {
++	{ "EVEN_ODD", "String", 0 },
++	{ "NON_ZERO", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_GraphicsShaderFill[] = {
++	{ "matrix", DT_DESC_SLOT, "flash.geom::Matrix", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "shader", DT_DESC_SLOT, "flash.display::Shader", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GraphicsSolidFill[] = {
++	{ "alpha", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "color", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GraphicsStroke[] = {
++	{ "caps", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "joints", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "scaleMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "fill", DT_DESC_SLOT, "flash.display::IGraphicsFill", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "miterLimit", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "pixelHinting", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "thickness", DT_DESC_SLOT, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_GraphicsTrianglePath[] = {
++	{ "culling", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "indices", DT_DESC_SLOT, "__AS3__.vec::Vector.<int>", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "uvtData", DT_DESC_SLOT, "__AS3__.vec::Vector.<Number>", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "vertices", DT_DESC_SLOT, "__AS3__.vec::Vector.<Number>", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_InteractiveObject[] = {
++	{ "accessibilityImplementation", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityImplementation", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "contextMenu", DT_DESC_ACCESSOR, "flash.ui::ContextMenu", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "doubleClickEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "focusRect", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "mouseEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "needsSoftKeyboard", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 11, 1, 0, "readwrite", NULL },
++	{ "softKeyboardInputAreaOfInterest", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 11, 1, 0, "readwrite", NULL },
++	{ "soundTransform", DT_DESC_ACCESSOR, "flash.media::SoundTransform", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "tabEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "tabIndex", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "requestSoftKeyboard", DT_DESC_METHOD, "Boolean", 0, NULL, 11, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_InteractiveObject[] = {
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_InterpolationMethod[] = {
++	{ "LINEAR_RGB", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "RGB", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_InterpolationMethod[] = {
++	{ "LINEAR_RGB", "String", 0 },
++	{ "RGB", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_JPEGEncoderOptions[] = {
++	{ "quality", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_JPEGXREncoderOptions[] = {
++	{ "colorSpace", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "quantization", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "trimFlexBits", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_JointStyle[] = {
++	{ "BEVEL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "MITER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "ROUND", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_JointStyle[] = {
++	{ "BEVEL", "String", 0 },
++	{ "MITER", "String", 0 },
++	{ "ROUND", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_LineScaleMode[] = {
++	{ "HORIZONTAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NONE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NORMAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "VERTICAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_LineScaleMode[] = {
++	{ "HORIZONTAL", "String", 0 },
++	{ "NONE", "String", 0 },
++	{ "NORMAL", "String", 0 },
++	{ "VERTICAL", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_Loader[] = {
++	{ "content", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "contentLoaderInfo", DT_DESC_ACCESSOR, "flash.display::LoaderInfo", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "uncaughtErrorEvents", DT_DESC_ACCESSOR, "flash.events::UncaughtErrorEvents", 0, NULL, 10, 1, 0, "readonly", NULL },
++	{ "addChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "addChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 2, dtd_p31, 0, 1, 0, NULL, NULL },
++	{ "close", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "load", DT_DESC_METHOD, "void", 2, dtd_p0, 0, 1, 0, NULL, NULL },
++	{ "loadBytes", DT_DESC_METHOD, "void", 2, dtd_p51, 0, 1, 0, NULL, NULL },
++	{ "removeChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "removeChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
++	{ "setChildIndex", DT_DESC_METHOD, "void", 2, dtd_p31, 0, 1, 0, NULL, NULL },
++	{ "unload", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "unloadAndStop", DT_DESC_METHOD, "void", 1, dtd_p50, 10, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_Loader[] = {
++	{ "addChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "addChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "removeChild", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "removeChildAt", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "setChildIndex", DT_DESC_METHOD, 0, "flash.display::Loader" },
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_LoaderInfo[] = {
++	{ "actionScriptVersion", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "applicationDomain", DT_DESC_ACCESSOR, "flash.system::ApplicationDomain", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "bytes", DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "bytesLoaded", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "bytesTotal", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "childAllowsParent", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "childSandboxBridge", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "content", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "contentType", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "frameRate", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "isURLInaccessible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "loader", DT_DESC_ACCESSOR, "flash.display::Loader", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "loaderURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "parameters", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "parentAllowsChild", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "parentSandboxBridge", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "sameDomain", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "sharedEvents", DT_DESC_ACCESSOR, "flash.events::EventDispatcher", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "swfVersion", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "uncaughtErrorEvents", DT_DESC_ACCESSOR, "flash.events::UncaughtErrorEvents", 0, NULL, 10, 1, 0, "readonly", NULL },
++	{ "url", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "dispatchEvent", DT_DESC_METHOD, "Boolean", 1, dtd_p52, 0, 1, 0, NULL, NULL },
++	{ "getLoaderInfoByDefinition", DT_DESC_METHOD, "flash.display::LoaderInfo", 1, dtd_p53, 0, 1, 1, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_LoaderInfo[] = {
++	{ "dispatchEvent", DT_DESC_METHOD, 0, "flash.display::LoaderInfo" },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_MovieClip[] = {
++	{ "currentFrame", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "currentFrameLabel", DT_DESC_ACCESSOR, "String", 0, NULL, 10, 1, 0, "readonly", NULL },
++	{ "currentLabel", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "currentLabels", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "currentScene", DT_DESC_ACCESSOR, "flash.display::Scene", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "enabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "framesLoaded", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "isPlaying", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 13, 1, 0, "readonly", NULL },
++	{ "scenes", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "totalFrames", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "trackAsMenu", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "addFrameScript", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "gotoAndPlay", DT_DESC_METHOD, "void", 2, dtd_p54, 0, 1, 0, NULL, NULL },
++	{ "gotoAndStop", DT_DESC_METHOD, "void", 2, dtd_p54, 0, 1, 0, NULL, NULL },
++	{ "nextFrame", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "nextScene", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "play", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "prevFrame", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "prevScene", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "stop", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_MovieClip[] = {
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, "flash.display::Sprite" },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_NativeMenu[] = {
++	{ "isSupported", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readonly", NULL },
++	{ "items", DT_DESC_ACCESSOR, "Array", 0, NULL, 255, 1, 0, "readwrite", NULL },
++	{ "numItems", DT_DESC_ACCESSOR, "int", 0, NULL, 255, 1, 0, "readonly", NULL },
++	{ "parent", DT_DESC_ACCESSOR, "flash.display::NativeMenu", 0, NULL, 255, 1, 0, "readonly", NULL },
++	{ "addItem", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p55, 255, 1, 0, NULL, NULL },
++	{ "addItemAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 2, dtd_p56, 255, 1, 0, NULL, NULL },
++	{ "addSubmenu", DT_DESC_METHOD, "flash.display::NativeMenuItem", 2, dtd_p57, 255, 1, 0, NULL, NULL },
++	{ "addSubmenuAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 3, dtd_p58, 255, 1, 0, NULL, NULL },
++	{ "clone", DT_DESC_METHOD, "flash.display::NativeMenu", 0, NULL, 255, 1, 0, NULL, NULL },
++	{ "containsItem", DT_DESC_METHOD, "Boolean", 1, dtd_p55, 255, 1, 0, NULL, NULL },
++	{ "display", DT_DESC_METHOD, "void", 3, dtd_p59, 255, 1, 0, NULL, NULL },
++	{ "getItemAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p32, 255, 1, 0, NULL, NULL },
++	{ "getItemByName", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p2, 255, 1, 0, NULL, NULL },
++	{ "getItemIndex", DT_DESC_METHOD, "int", 1, dtd_p55, 255, 1, 0, NULL, NULL },
++	{ "removeAllItems", DT_DESC_METHOD, "void", 0, NULL, 255, 1, 0, NULL, NULL },
++	{ "removeItem", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p55, 255, 1, 0, NULL, NULL },
++	{ "removeItemAt", DT_DESC_METHOD, "flash.display::NativeMenuItem", 1, dtd_p32, 255, 1, 0, NULL, NULL },
++	{ "setItemIndex", DT_DESC_METHOD, "void", 2, dtd_p56, 255, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_PNGEncoderOptions[] = {
++	{ "fastCompression", DT_DESC_SLOT, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_PixelSnapping[] = {
++	{ "ALWAYS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "AUTO", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NEVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_PixelSnapping[] = {
++	{ "ALWAYS", "String", 0 },
++	{ "AUTO", "String", 0 },
++	{ "NEVER", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_SWFVersion[] = {
++	{ "FLASH1", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH10", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH11", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH12", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH2", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH3", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH4", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH5", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH6", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH7", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH8", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLASH9", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_SWFVersion[] = {
++	{ "FLASH1", "uint", 0 },
++	{ "FLASH10", "uint", 0 },
++	{ "FLASH11", "uint", 0 },
++	{ "FLASH12", "uint", 0 },
++	{ "FLASH2", "uint", 0 },
++	{ "FLASH3", "uint", 0 },
++	{ "FLASH4", "uint", 0 },
++	{ "FLASH5", "uint", 0 },
++	{ "FLASH6", "uint", 0 },
++	{ "FLASH7", "uint", 0 },
++	{ "FLASH8", "uint", 0 },
++	{ "FLASH9", "uint", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_Scene[] = {
++	{ "labels", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "numFrames", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_Shader[] = {
++	{ "byteCode", DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "writeonly", NULL },
++	{ "data", DT_DESC_ACCESSOR, "flash.display::ShaderData", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "precisionHint", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_ShaderInput[] = {
++	{ "channels", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "index", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "input", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_ShaderJob[] = {
++	{ "height", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "progress", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "shader", DT_DESC_ACCESSOR, "flash.display::Shader", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "target", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "width", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "cancel", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "start", DT_DESC_METHOD, "void", 1, dtd_p50, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_ShaderParameter[] = {
++	{ "index", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "type", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "value", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_ShaderParameterType[] = {
++	{ "BOOL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "BOOL2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "BOOL3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "BOOL4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLOAT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLOAT2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLOAT3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FLOAT4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "INT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "INT2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "INT3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "INT4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "MATRIX2X2", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "MATRIX3X3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "MATRIX4X4", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_ShaderParameterType[] = {
++	{ "BOOL", "String", 0 },
++	{ "BOOL2", "String", 0 },
++	{ "BOOL3", "String", 0 },
++	{ "BOOL4", "String", 0 },
++	{ "FLOAT", "String", 0 },
++	{ "FLOAT2", "String", 0 },
++	{ "FLOAT3", "String", 0 },
++	{ "FLOAT4", "String", 0 },
++	{ "INT", "String", 0 },
++	{ "INT2", "String", 0 },
++	{ "INT3", "String", 0 },
++	{ "INT4", "String", 0 },
++	{ "MATRIX2X2", "String", 0 },
++	{ "MATRIX3X3", "String", 0 },
++	{ "MATRIX4X4", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_ShaderPrecision[] = {
++	{ "FAST", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FULL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_ShaderPrecision[] = {
++	{ "FAST", "String", 0 },
++	{ "FULL", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_Shape[] = {
++	{ "graphics", DT_DESC_ACCESSOR, "flash.display::Graphics", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_SimpleButton[] = {
++	{ "downState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "enabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "hitTestState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "overState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "soundTransform", DT_DESC_ACCESSOR, "flash.media::SoundTransform", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "trackAsMenu", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "upState", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "useHandCursor", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_SimpleButton[] = {
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, "flash.display::SimpleButton" },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_SpreadMethod[] = {
++	{ "PAD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "REFLECT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "REPEAT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_SpreadMethod[] = {
++	{ "PAD", "String", 0 },
++	{ "REFLECT", "String", 0 },
++	{ "REPEAT", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_Sprite[] = {
++	{ "buttonMode", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "dropTarget", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "graphics", DT_DESC_ACCESSOR, "flash.display::Graphics", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "hitArea", DT_DESC_ACCESSOR, "flash.display::Sprite", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "soundTransform", DT_DESC_ACCESSOR, "flash.media::SoundTransform", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "useHandCursor", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "startDrag", DT_DESC_METHOD, "void", 2, dtd_p60, 0, 1, 0, NULL, NULL },
++	{ "startTouchDrag", DT_DESC_METHOD, "void", 3, dtd_p61, 10, 1, 0, NULL, NULL },
++	{ "stopDrag", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "stopTouchDrag", DT_DESC_METHOD, "void", 1, dtd_p32, 10, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_Sprite[] = {
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, "flash.display::Sprite" },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_Stage[] = {
++	{ "accessibilityImplementation", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityImplementation", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "accessibilityProperties", DT_DESC_ACCESSOR, "flash.accessibility::AccessibilityProperties", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "align", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "allowsFullScreen", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 11, 1, 0, "readonly", NULL },
++	{ "allowsFullScreenInteractive", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 16, 1, 0, "readonly", NULL },
++	{ "alpha", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "autoOrients", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readwrite", NULL },
++	{ "blendMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "browserZoomFactor", DT_DESC_ACCESSOR, "Number", 0, NULL, 26, 1, 0, "readonly", NULL },
++	{ "cacheAsBitmap", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "color", DT_DESC_ACCESSOR, "uint", 0, NULL, 11, 1, 0, "readwrite", NULL },
++	{ "colorCorrection", DT_DESC_ACCESSOR, "String", 0, NULL, 10, 1, 0, "readwrite", NULL },
++	{ "colorCorrectionSupport", DT_DESC_ACCESSOR, "String", 0, NULL, 10, 1, 0, "readonly", NULL },
++	{ "constructor", DT_DESC_ACCESSOR, "*", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "contentsScaleFactor", DT_DESC_ACCESSOR, "Number", 0, NULL, 17, 1, 0, "readonly", NULL },
++	{ "contextMenu", DT_DESC_ACCESSOR, "flash.ui::ContextMenu", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "deviceOrientation", DT_DESC_ACCESSOR, "String", 0, NULL, 255, 1, 0, "readonly", NULL },
++	{ "displayContextInfo", DT_DESC_ACCESSOR, "String", 0, NULL, 13, 1, 0, "readonly", NULL },
++	{ "displayState", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "filters", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "focus", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "focusRect", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "frameRate", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "fullScreenHeight", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "fullScreenSourceRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "fullScreenWidth", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "height", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "mask", DT_DESC_ACCESSOR, "flash.display::DisplayObject", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "mouseChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "mouseEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "mouseLock", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 15, 1, 0, "readwrite", NULL },
++	{ "name", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "nativeWindow", DT_DESC_ACCESSOR, "flash.display::NativeWindow", 0, NULL, 255, 1, 0, "readonly", NULL },
++	{ "numChildren", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "opaqueBackground", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "orientation", DT_DESC_ACCESSOR, "String", 0, NULL, 255, 1, 0, "readonly", NULL },
++	{ "quality", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "rotation", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "rotationX", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
++	{ "rotationY", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
++	{ "rotationZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
++	{ "scale9Grid", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "scaleMode", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "scaleX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "scaleY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "scaleZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
++	{ "scrollRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "showDefaultContextMenu", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "softKeyboardRect", DT_DESC_ACCESSOR, "flash.geom::Rectangle", 0, NULL, 11, 1, 0, "readonly", NULL },
++	{ "stage3Ds", DT_DESC_ACCESSOR, "__AS3__.vec::Vector.<flash.display::Stage3D>", 0, NULL, 13, 1, 0, "readonly", NULL },
++	{ "stageFocusRect", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "stageHeight", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "stageVideos", DT_DESC_ACCESSOR, "__AS3__.vec::Vector.<flash.media::StageVideo>", 0, NULL, 10, 1, 0, "readonly", NULL },
++	{ "stageWidth", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "supportedOrientations", DT_DESC_ACCESSOR, "__AS3__.vec::Vector.<String>", 0, NULL, 255, 1, 0, "readonly", NULL },
++	{ "supportsOrientationChange", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 1, "readonly", NULL },
++	{ "tabChildren", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "tabEnabled", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "tabIndex", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "textSnapshot", DT_DESC_ACCESSOR, "flash.text::TextSnapshot", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "transform", DT_DESC_ACCESSOR, "flash.geom::Transform", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "visible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "width", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "wmodeGPU", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 10, 1, 0, "readonly", NULL },
++	{ "x", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "y", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 0, 0, "readwrite", NULL },
++	{ "z", DT_DESC_ACCESSOR, "Number", 0, NULL, 10, 0, 0, "readwrite", NULL },
++	{ "addChild", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p27, 0, 1, 0, NULL, NULL },
++	{ "addChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 2, dtd_p31, 0, 1, 0, NULL, NULL },
++	{ "addEventListener", DT_DESC_METHOD, "void", 5, dtd_p62, 0, 1, 0, NULL, NULL },
++	{ "dispatchEvent", DT_DESC_METHOD, "Boolean", 1, dtd_p52, 0, 1, 0, NULL, NULL },
++	{ "hasEventListener", DT_DESC_METHOD, "Boolean", 1, dtd_p2, 0, 1, 0, NULL, NULL },
++	{ "invalidate", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "isFocusInaccessible", DT_DESC_METHOD, "Boolean", 0, NULL, 0, 1, 0, NULL, NULL },
++	{ "removeChildAt", DT_DESC_METHOD, "flash.display::DisplayObject", 1, dtd_p32, 0, 1, 0, NULL, NULL },
++	{ "setAspectRatio", DT_DESC_METHOD, "void", 1, dtd_p2, 255, 1, 0, NULL, NULL },
++	{ "setChildIndex", DT_DESC_METHOD, "void", 2, dtd_p31, 0, 1, 0, NULL, NULL },
++	{ "setOrientation", DT_DESC_METHOD, "void", 1, dtd_p2, 255, 1, 0, NULL, NULL },
++	{ "swapChildrenAt", DT_DESC_METHOD, "void", 2, dtd_p16, 0, 1, 0, NULL, NULL },
++	{ "willTrigger", DT_DESC_METHOD, "Boolean", 1, dtd_p2, 0, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescRedecl dtd_r_Stage[] = {
++	{ "accessibilityImplementation", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
++	{ "accessibilityProperties", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "addChild", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "addChildAt", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "addEventListener", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "alpha", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "blendMode", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "cacheAsBitmap", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "contextMenu", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
++	{ "dispatchEvent", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "filters", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "focusRect", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
++	{ "hasEventListener", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "mask", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "mouseChildren", DT_DESC_ACCESSOR, 0, "flash.display::Stage" },
++	{ "mouseEnabled", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
++	{ "name", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "numChildren", DT_DESC_ACCESSOR, 0, "flash.display::Stage" },
++	{ "opaqueBackground", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "removeChildAt", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "rotation", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "rotationX", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "rotationY", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "rotationZ", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "scale9Grid", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "scaleX", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "scaleY", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "scaleZ", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "scrollRect", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "setChildIndex", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "soundTransform", DT_DESC_ACCESSOR, 0, NULL },
++	{ "swapChildrenAt", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "tabEnabled", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
++	{ "tabIndex", DT_DESC_ACCESSOR, 0, "flash.display::InteractiveObject" },
++	{ "transform", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "visible", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "willTrigger", DT_DESC_METHOD, 0, "flash.display::Stage" },
++	{ "x", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "y", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ "z", DT_DESC_ACCESSOR, 0, "flash.display::DisplayObject" },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_Stage3D[] = {
++	{ "context3D", DT_DESC_ACCESSOR, "flash.display3D::Context3D", 0, NULL, 0, 1, 0, "readonly", NULL },
++	{ "visible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "x", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "y", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
++	{ "requestContext3D", DT_DESC_METHOD, "void", 2, dtd_p63, 0, 1, 0, NULL, NULL },
++	{ "requestContext3DMatchingProfiles", DT_DESC_METHOD, "void", 1, dtd_p64, 22, 1, 0, NULL, NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescMember dtd_m_StageAlign[] = {
++	{ "BOTTOM", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "BOTTOM_LEFT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "BOTTOM_RIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "LEFT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "RIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "TOP", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "TOP_LEFT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "TOP_RIGHT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_StageAlign[] = {
++	{ "BOTTOM", "String", 0 },
++	{ "BOTTOM_LEFT", "String", 0 },
++	{ "BOTTOM_RIGHT", "String", 0 },
++	{ "LEFT", "String", 0 },
++	{ "RIGHT", "String", 0 },
++	{ "TOP", "String", 0 },
++	{ "TOP_LEFT", "String", 0 },
++	{ "TOP_RIGHT", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_StageDisplayState[] = {
++	{ "FULL_SCREEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "FULL_SCREEN_INTERACTIVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NORMAL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_StageDisplayState[] = {
++	{ "FULL_SCREEN", "String", 0 },
++	{ "FULL_SCREEN_INTERACTIVE", "String", 0 },
++	{ "NORMAL", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_StageQuality[] = {
++	{ "BEST", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "HIGH", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "HIGH_16X16", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "HIGH_16X16_LINEAR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "HIGH_8X8", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "HIGH_8X8_LINEAR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "LOW", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "MEDIUM", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_StageQuality[] = {
++	{ "BEST", "String", 0 },
++	{ "HIGH", "String", 0 },
++	{ "HIGH_16X16", "String", 0 },
++	{ "HIGH_16X16_LINEAR", "String", 0 },
++	{ "HIGH_8X8", "String", 0 },
++	{ "HIGH_8X8_LINEAR", "String", 0 },
++	{ "LOW", "String", 0 },
++	{ "MEDIUM", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescRedecl dtd_r_StageQuality[] = {
++	{ "EIGHT_X_LINEAR", DT_DESC_SLOT, 1, NULL },
++	{ "SIXTEEN_X_LINEAR", DT_DESC_SLOT, 1, NULL },
++	{ NULL, 0, 0, NULL },
++};
++static const DtDescMember dtd_m_StageScaleMode[] = {
++	{ "EXACT_FIT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NO_BORDER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NO_SCALE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "SHOW_ALL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_StageScaleMode[] = {
++	{ "EXACT_FIT", "String", 0 },
++	{ "NO_BORDER", "String", 0 },
++	{ "NO_SCALE", "String", 0 },
++	{ "SHOW_ALL", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++static const DtDescMember dtd_m_TriangleCulling[] = {
++	{ "NEGATIVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "NONE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ "POSITIVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
++	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
++};
++static const DtDescConst dtd_c_TriangleCulling[] = {
++	{ "NEGATIVE", "String", 0 },
++	{ "NONE", "String", 0 },
++	{ "POSITIVE", "String", 0 },
++	{ NULL, NULL, 0 },
++};
++
++#define DT_DESC_DISPLAY_ROWS \
++	{ "flash.display", "AVLoader", 0, 0, NULL, dtd_m_AVLoader, NULL, 1, dtd_r_AVLoader }, \
++	{ "flash.display", "AVM1Movie", 0, 0, NULL, dtd_m_AVM1Movie, NULL, 1, NULL }, \
++	{ "flash.display", "ActionScriptVersion", 0, 0, NULL, dtd_m_ActionScriptVersion, dtd_c_ActionScriptVersion, 1, NULL }, \
++	{ "flash.display", "Bitmap", 0, 3, dtd_p65, dtd_m_Bitmap, NULL, 1, NULL }, \
++	{ "flash.display", "BitmapData", 0, 4, dtd_p66, dtd_m_BitmapData, NULL, 1, NULL }, \
++	{ "flash.display", "BitmapDataChannel", 0, 0, NULL, dtd_m_BitmapDataChannel, dtd_c_BitmapDataChannel, 1, NULL }, \
++	{ "flash.display", "BitmapEncodingColorSpace", 0, 0, NULL, dtd_m_BitmapEncodingColorSpace, dtd_c_BitmapEncodingColorSpace, 1, NULL }, \
++	{ "flash.display", "BlendMode", 0, 0, NULL, dtd_m_BlendMode, dtd_c_BlendMode, 1, NULL }, \
++	{ "flash.display", "CapsStyle", 0, 0, NULL, dtd_m_CapsStyle, dtd_c_CapsStyle, 1, NULL }, \
++	{ "flash.display", "ColorCorrection", 0, 0, NULL, dtd_m_ColorCorrection, dtd_c_ColorCorrection, 1, NULL }, \
++	{ "flash.display", "ColorCorrectionSupport", 0, 0, NULL, dtd_m_ColorCorrectionSupport, dtd_c_ColorCorrectionSupport, 1, NULL }, \
++	{ "flash.display", "DisplayObject", 0, 0, NULL, dtd_m_DisplayObject, NULL, 1, NULL }, \
++	{ "flash.display", "DisplayObjectContainer", 0, 0, NULL, dtd_m_DisplayObjectContainer, NULL, 1, dtd_r_DisplayObjectContainer }, \
++	{ "flash.display", "FrameLabel", 0, 2, dtd_p67, dtd_m_FrameLabel, NULL, 1, NULL }, \
++	{ "flash.display", "GradientType", 0, 0, NULL, dtd_m_GradientType, dtd_c_GradientType, 1, NULL }, \
++	{ "flash.display", "Graphics", 0, 0, NULL, dtd_m_Graphics, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsBitmapFill", 0, 4, dtd_p68, dtd_m_GraphicsBitmapFill, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsEndFill", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsGradientFill", 0, 8, dtd_p69, dtd_m_GraphicsGradientFill, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsPath", 0, 3, dtd_p70, dtd_m_GraphicsPath, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsPathCommand", 0, 0, NULL, dtd_m_GraphicsPathCommand, dtd_c_GraphicsPathCommand, 1, NULL }, \
++	{ "flash.display", "GraphicsPathWinding", 0, 0, NULL, dtd_m_GraphicsPathWinding, dtd_c_GraphicsPathWinding, 1, NULL }, \
++	{ "flash.display", "GraphicsShaderFill", 0, 2, dtd_p71, dtd_m_GraphicsShaderFill, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsSolidFill", 0, 2, dtd_p72, dtd_m_GraphicsSolidFill, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsStroke", 0, 7, dtd_p73, dtd_m_GraphicsStroke, NULL, 1, NULL }, \
++	{ "flash.display", "GraphicsTrianglePath", 0, 4, dtd_p74, dtd_m_GraphicsTrianglePath, NULL, 1, NULL }, \
++	{ "flash.display", "IBitmapDrawable", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "IDrawCommand", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "IGraphicsData", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "IGraphicsFill", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "IGraphicsPath", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "IGraphicsStroke", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "InteractiveObject", 0, 0, NULL, dtd_m_InteractiveObject, NULL, 1, dtd_r_InteractiveObject }, \
++	{ "flash.display", "InterpolationMethod", 0, 0, NULL, dtd_m_InterpolationMethod, dtd_c_InterpolationMethod, 1, NULL }, \
++	{ "flash.display", "JPEGEncoderOptions", 0, 1, dtd_p75, dtd_m_JPEGEncoderOptions, NULL, 1, NULL }, \
++	{ "flash.display", "JPEGXREncoderOptions", 0, 3, dtd_p76, dtd_m_JPEGXREncoderOptions, NULL, 1, NULL }, \
++	{ "flash.display", "JointStyle", 0, 0, NULL, dtd_m_JointStyle, dtd_c_JointStyle, 1, NULL }, \
++	{ "flash.display", "LineScaleMode", 0, 0, NULL, dtd_m_LineScaleMode, dtd_c_LineScaleMode, 1, NULL }, \
++	{ "flash.display", "Loader", 0, 0, NULL, dtd_m_Loader, NULL, 1, dtd_r_Loader }, \
++	{ "flash.display", "LoaderInfo", 0, 0, NULL, dtd_m_LoaderInfo, NULL, 1, dtd_r_LoaderInfo }, \
++	{ "flash.display", "MorphShape", 0, 0, NULL, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "MovieClip", 0, 0, NULL, dtd_m_MovieClip, NULL, 1, dtd_r_MovieClip }, \
++	{ "flash.display", "NativeMenu", 0, 0, NULL, dtd_m_NativeMenu, NULL, 1, NULL }, \
++	{ "flash.display", "PNGEncoderOptions", 0, 1, dtd_p50, dtd_m_PNGEncoderOptions, NULL, 1, NULL }, \
++	{ "flash.display", "PixelSnapping", 0, 0, NULL, dtd_m_PixelSnapping, dtd_c_PixelSnapping, 1, NULL }, \
++	{ "flash.display", "SWFVersion", 0, 0, NULL, dtd_m_SWFVersion, dtd_c_SWFVersion, 1, NULL }, \
++	{ "flash.display", "Scene", 0, 3, dtd_p77, dtd_m_Scene, NULL, 1, NULL }, \
++	{ "flash.display", "Shader", 0, 1, dtd_p78, dtd_m_Shader, NULL, 1, NULL }, \
++	{ "flash.display", "ShaderData", 0, 1, dtd_p79, NULL, NULL, 1, NULL }, \
++	{ "flash.display", "ShaderInput", 0, 0, NULL, dtd_m_ShaderInput, NULL, 1, NULL }, \
++	{ "flash.display", "ShaderJob", 0, 4, dtd_p80, dtd_m_ShaderJob, NULL, 1, NULL }, \
++	{ "flash.display", "ShaderParameter", 0, 0, NULL, dtd_m_ShaderParameter, NULL, 1, NULL }, \
++	{ "flash.display", "ShaderParameterType", 0, 0, NULL, dtd_m_ShaderParameterType, dtd_c_ShaderParameterType, 1, NULL }, \
++	{ "flash.display", "ShaderPrecision", 0, 0, NULL, dtd_m_ShaderPrecision, dtd_c_ShaderPrecision, 1, NULL }, \
++	{ "flash.display", "Shape", 0, 0, NULL, dtd_m_Shape, NULL, 1, NULL }, \
++	{ "flash.display", "SimpleButton", 0, 4, dtd_p81, dtd_m_SimpleButton, NULL, 1, dtd_r_SimpleButton }, \
++	{ "flash.display", "SpreadMethod", 0, 0, NULL, dtd_m_SpreadMethod, dtd_c_SpreadMethod, 1, NULL }, \
++	{ "flash.display", "Sprite", 0, 0, NULL, dtd_m_Sprite, NULL, 1, dtd_r_Sprite }, \
++	{ "flash.display", "Stage", 0, 0, NULL, dtd_m_Stage, NULL, 1, dtd_r_Stage }, \
++	{ "flash.display", "Stage3D", 0, 0, NULL, dtd_m_Stage3D, NULL, 1, NULL }, \
++	{ "flash.display", "StageAlign", 0, 0, NULL, dtd_m_StageAlign, dtd_c_StageAlign, 1, NULL }, \
++	{ "flash.display", "StageDisplayState", 0, 0, NULL, dtd_m_StageDisplayState, dtd_c_StageDisplayState, 1, NULL }, \
++	{ "flash.display", "StageQuality", 0, 0, NULL, dtd_m_StageQuality, dtd_c_StageQuality, 1, dtd_r_StageQuality }, \
++	{ "flash.display", "StageScaleMode", 0, 0, NULL, dtd_m_StageScaleMode, dtd_c_StageScaleMode, 1, NULL }, \
++	{ "flash.display", "TriangleCulling", 0, 0, NULL, dtd_m_TriangleCulling, dtd_c_TriangleCulling, 1, NULL }, \
++	/* end of DT_DESC_DISPLAY_ROWS */
++// <<< END GENERATED flash.display descriptors
++
++
++
++
+ static const DtDescClass dt_desc_classes[] = {
+ 	{ "flash.events", "Event", 0, 3, dt_p_event_ctor, dt_m_event },
+ 
+@@ -2972,6 +4141,12 @@ static const DtDescClass dt_desc_classes[] = {
+ 	  dt_m_xmldocument, NULL },
+ 	{ "flash.xml", "XMLNodeType", 0, 0, NULL, NULL, dt_c_xmlnodetype },
+ 
++	// The 65-class flash.display surface, DERIVED from Ruffle's playerglobal
++	// .as stubs by tools/descriptor/gen_display_descriptors.py and validated
++	// element-for-element against the six all_classes/display expected files
++	// by tools/descriptor/check_model.py. Regenerate rather than hand-edit.
++	DT_DESC_DISPLAY_ROWS
++
+ 	{ NULL, NULL, 0, 0, NULL, NULL },
+ };
+ 
+@@ -3010,6 +4185,33 @@ static const DtDescConst* dt_desc_const(const DtDescClass* dc,
+ 	return NULL;
+ }
+ 
++// Find the descriptor row for a member, starting at the class our vtable says
++// declares it. If that class's own row does not name the member, walk up the
++// superclass chain and accept the first ancestor row that both names it and
++// opts into `chain_lookup`. That fall-through exists because OUR native
++// registration and playerglobal disagree about which class carries a native
++// override: `flash.display::Sprite` re-registers `graphics` where playerglobal
++// declares it once on Sprite, `Loader` re-registers container methods, and so
++// on. Descriptor DATA (type / parameters) is identical either way, so
++// answering from the base row is always right; only `declaredBy` differs, and
++// that is what DtDescRedecl is for.
++static const DtDescMember* dt_desc_lookup(const Avm2Class* def, uint8_t kind,
++                                          const char* name, uint32_t name_len)
++{
++	int depth = 0;
++	for (const Avm2Class* c = def; c != NULL && depth < 32;
++	     c = c->super_class, depth++)
++	{
++		const DtDescClass* dc = dt_desc_find(c);
++		if (dc == NULL) continue;
++		const DtDescMember* dm = dt_desc_member(dc, kind, name, name_len);
++		if (dm == NULL) continue;
++		if (c != def && !dc->chain_lookup) continue;
++		return dm;
++	}
++	return NULL;
++}
++
+ // Describe-side [API("N")] gate for a single vtable entry. Returns 1 when the
+ // member exists in our runtime but Flash's playerglobal does not expose it at
+ // this SWF version, so describeType must not report it.
+@@ -3022,9 +4224,8 @@ static int dt_desc_member_hidden(const Avm2Context* ctx,
+ 	{
+ 		def = e->setter_defining_class;
+ 	}
+-	const DtDescClass* dc = dt_desc_find(def);
+-	if (dc == NULL) return 0;
+-	const DtDescMember* dm = dt_desc_member(dc, kind, (const char*) e->key.name,
++	const DtDescMember* dm = dt_desc_lookup(def, kind,
++	                                        (const char*) e->key.name,
+ 	                                        e->key.name_len);
+ 	if (dm == NULL || dm->min_swf == 0) return 0;
+ 	return ctx->swf_version < dm->min_swf;
+@@ -3032,14 +4233,20 @@ static int dt_desc_member_hidden(const Avm2Context* ctx,
+ 
+ // Apply a descriptor member onto a collected DtMember, replacing the `*`
+ // fallback. Returns 1 when it fired.
+-static int dt_desc_apply(DtMember* out, const DtDescClass* dc, uint8_t kind,
++static int dt_desc_apply(DtMember* out, const Avm2Class* def, uint8_t kind,
+                          const Avm2PropEntry* e)
+ {
+-	const DtDescMember* dm = dt_desc_member(dc, kind, (const char*) e->key.name,
++	const DtDescMember* dm = dt_desc_lookup(def, kind,
++	                                        (const char*) e->key.name,
+ 	                                        e->key.name_len);
+ 	if (dm == NULL) return 0;
+ 	free(out->type);
+ 	out->type = dt_sdup(dm->type != NULL ? dm->type : "*");
++	// Setter-only halves: playerglobal declares `DisplayObject.blendShader`
++	// and `Shader.byteCode` with no getter, so Flash reports `writeonly`,
++	// while our runtime registers both halves and would say `readwrite`.
++	// (Also flips a slot between <variable> and <constant>.)
++	if (dm->access != NULL) out->access = dm->access;
+ 	if (dm->param_count > 0 && dm->params != NULL)
+ 	{
+ 		DtParam* p = (DtParam*) calloc(dm->param_count, sizeof(DtParam));
+@@ -3089,8 +4296,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
+ 			m->type = dt_type_name(e->type_file, e->type_mn);
+ 			if (e->type_file == NULL || e->type_mn == 0)
+ 			{
+-				dt_desc_apply(m, dt_desc_find(e->defining_class),
+-				              DT_DESC_SLOT, e);
++				dt_desc_apply(m, e->defining_class, DT_DESC_SLOT, e);
+ 			}
+ 			m->uri = dt_entry_uri(ctx, e);
+ 			dt_fill_metas(m, e);
+@@ -3122,8 +4328,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
+ 			else
+ 			{
+ 				m->type = dt_sdup("*");
+-				dt_desc_apply(m, dt_desc_find(e->defining_class),
+-				              DT_DESC_METHOD, e);
++				dt_desc_apply(m, e->defining_class, DT_DESC_METHOD, e);
+ 			}
+ 		}
+ 		else  // GETTER / SETTER / GETSET
+@@ -3146,8 +4351,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
+ 					? dt_type_name(e->setter.file,
+ 					               md->param_types != NULL ? md->param_types[0] : 0)
+ 					: dt_sdup("*");
+-				if (md == NULL) dt_desc_apply(m, dt_desc_find(dc),
+-				                              DT_DESC_ACCESSOR, e);
++				if (md == NULL) dt_desc_apply(m, dc, DT_DESC_ACCESSOR, e);
+ 			}
+ 			else
+ 			{
+@@ -3157,7 +4361,7 @@ static void dt_collect_vtable(Avm2Context* ctx, DtDesc* d, const Avm2VTable* vt,
+ 				m->type = (md != NULL) ? dt_type_name(e->method.file,
+ 				                                      md->return_type_mn)
+ 				                       : dt_sdup("*");
+-				if (md == NULL) dt_desc_apply(m, dt_desc_find(e->defining_class),
++				if (md == NULL) dt_desc_apply(m, e->defining_class,
+ 				                              DT_DESC_ACCESSOR, e);
+ 			}
+ 			m->uri = dt_entry_uri(ctx, e);
+@@ -3298,6 +4502,48 @@ static void dt_collect_synthetic(Avm2Context* ctx, DtDesc* d, Avm2Class* cls,
+ 	}
+ }
+ 
++// Per-DESCRIBED-class corrections, applied after the vtable and synthetic
++// passes have produced the member lists. See DtDescRedecl for why this cannot
++// be a property of the declaring class's row.
++static void dt_apply_redeclares(DtDesc* d, Avm2Class* cls, int class_side)
++{
++	const DtDescClass* dc = dt_desc_find(cls);
++	if (dc == NULL || dc->redeclares == NULL) return;
++	for (const DtDescRedecl* r = dc->redeclares; r->name != NULL; r++)
++	{
++		if ((r->is_static != 0) != (class_side != 0)) continue;
++		DtMembers* b = r->kind == DT_DESC_SLOT     ? &d->variables
++		             : r->kind == DT_DESC_METHOD   ? &d->methods
++		                                           : &d->accessors;
++		for (uint32_t i = 0; i < b->n; i++)
++		{
++			if (b->v[i].name == NULL
++			    || strcmp(b->v[i].name, r->name) != 0)
++			{
++				continue;
++			}
++			if (r->declared_by != NULL)
++			{
++				free(b->v[i].declared_by);
++				b->v[i].declared_by = dt_sdup(r->declared_by);
++			}
++			else
++			{
++				free(b->v[i].name);
++				free(b->v[i].type);
++				free(b->v[i].declared_by);
++				free(b->v[i].uri);
++				dt_params_free(b->v[i].params, b->v[i].param_count);
++				dt_metas_free(b->v[i].metas, b->v[i].meta_count);
++				memmove(&b->v[i], &b->v[i + 1],
++				        (b->n - i - 1) * sizeof(DtMember));
++				b->n--;
++			}
++			break;
++		}
++	}
++}
++
+ static void dt_collect_ctor(Avm2Context* ctx, DtDesc* d, Avm2Class* cls)
+ {
+ 	if (cls->flags & AVM2_CLASS_FLAG_INTERFACE) return;
+@@ -3451,11 +4697,13 @@ static void dt_describe(Avm2Context* ctx, Avm2Value v, uint32_t flags, DtDesc* d
+ 		// installs it as a read-only static const.
+ 		if (flags & DT_INCLUDE_VARIABLES) dt_collect_static_consts(ctx, d, cls);
+ 		dt_collect_synthetic(ctx, d, cls, 1, flags);
++		dt_apply_redeclares(d, cls, 1);
+ 	}
+ 	else
+ 	{
+ 		dt_collect_vtable(ctx, d, &cls->ivtable, &skip, flags);
+ 		dt_collect_synthetic(ctx, d, cls, 0, flags);
++		dt_apply_redeclares(d, cls, 0);
+ 		if (flags & DT_INCLUDE_CONSTRUCTOR) dt_collect_ctor(ctx, d, cls);
+ 	}
+ }
+diff --git a/SWFModernRuntime/src/avm2/avm2_pixelbender.c b/SWFModernRuntime/src/avm2/avm2_pixelbender.c
+index b90f7b034..1c8247588 100644
+--- a/SWFModernRuntime/src/avm2/avm2_pixelbender.c
++++ b/SWFModernRuntime/src/avm2/avm2_pixelbender.c
+@@ -2240,8 +2240,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
+ 	Avm2Builtins* b = &ctx->builtins;
+ 
+ 	// flash.display.Shader (sealed).
+-	Avm2Class* sh = avm2_builtin_class(ctx, "flash.display", "Shader",
+-	                                   b->object_class);
++	Avm2Class* sh = avm2_builtin_class_api(ctx, "flash.display", "Shader",
++	                                       b->object_class, 10);
+ 	g_shader_class = sh;
+ 	sh->flags |= AVM2_CLASS_FLAG_SEALED;
+ 	sh->native_ext_size = sizeof(Avm2ShaderExt);
+@@ -2253,8 +2253,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
+ 	                        shader_set_precision);
+ 
+ 	// flash.display.ShaderData (final dynamic).
+-	Avm2Class* sd = avm2_builtin_class(ctx, "flash.display", "ShaderData",
+-	                                   b->object_class);
++	Avm2Class* sd = avm2_builtin_class_api(ctx, "flash.display", "ShaderData",
++	                                       b->object_class, 10);
+ 	g_shaderdata_class = sd;
+ 	sd->flags |= AVM2_CLASS_FLAG_FINAL;
+ 	sd->native_ext_size = sizeof(Avm2ShaderDataExt);
+@@ -2262,8 +2262,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
+ 	sd->instance_init.debug_name = "ShaderData";
+ 
+ 	// flash.display.ShaderParameter (final dynamic).
+-	Avm2Class* sp = avm2_builtin_class(ctx, "flash.display", "ShaderParameter",
+-	                                   b->object_class);
++	Avm2Class* sp = avm2_builtin_class_api(ctx, "flash.display",
++	                                       "ShaderParameter", b->object_class, 10);
+ 	g_shaderparameter_class = sp;
+ 	sp->flags |= AVM2_CLASS_FLAG_FINAL;
+ 	sp->native_ext_size = sizeof(Avm2ShaderParamExt);
+@@ -2274,8 +2274,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
+ 	avm2_builtin_add_getset(ctx, sp, "value", sp_get_value, sp_set_value);
+ 
+ 	// flash.display.ShaderInput (final dynamic).
+-	Avm2Class* si = avm2_builtin_class(ctx, "flash.display", "ShaderInput",
+-	                                   b->object_class);
++	Avm2Class* si = avm2_builtin_class_api(ctx, "flash.display", "ShaderInput",
++	                                       b->object_class, 10);
+ 	g_shaderinput_class = si;
+ 	si->flags |= AVM2_CLASS_FLAG_FINAL;
+ 	si->native_ext_size = sizeof(Avm2ShaderInputExt);
+@@ -2288,8 +2288,8 @@ void avm2_register_pixelbender(Avm2Context* ctx)
+ 	avm2_builtin_add_getset(ctx, si, "input", si_get_input, si_set_input);
+ 
+ 	// flash.display.ShaderJob (extends EventDispatcher, sealed).
+-	Avm2Class* sj = avm2_builtin_class(ctx, "flash.display", "ShaderJob",
+-	                                   b->event_dispatcher_class);
++	Avm2Class* sj = avm2_builtin_class_api(ctx, "flash.display", "ShaderJob",
++	                                       b->event_dispatcher_class, 10);
+ 	g_shaderjob_class = sj;
+ 	sj->flags |= AVM2_CLASS_FLAG_SEALED;
+ 	sj->native_ext_size = sizeof(Avm2ShaderJobExt);
+@@ -2305,14 +2305,15 @@ void avm2_register_pixelbender(Avm2Context* ctx)
+ 
+ 	// flash.display.ShaderPrecision / ShaderParameterType constant bags.
+ 	{
+-		Avm2Class* c = avm2_builtin_class(ctx, "flash.display",
+-		                                  "ShaderPrecision", b->object_class);
++		Avm2Class* c = avm2_builtin_class_api(ctx, "flash.display",
++		                                      "ShaderPrecision", b->object_class,
++		                                      10);
+ 		avm2_builtin_add_static_const(ctx, c, "FULL",
+ 			avm2_string(avm2_string_from_literal(ctx, "full")));
+ 		avm2_builtin_add_static_const(ctx, c, "FAST",
+ 			avm2_string(avm2_string_from_literal(ctx, "fast")));
+-		c = avm2_builtin_class(ctx, "flash.display", "ShaderParameterType",
+-		                       b->object_class);
++		c = avm2_builtin_class_api(ctx, "flash.display", "ShaderParameterType",
++		                           b->object_class, 10);
+ 		static const char* const kTypeConsts[][2] =
+ 		{
+ 			{ "FLOAT", "float" }, { "FLOAT2", "float2" },
+diff --git a/SWFModernRuntime/src/avm2/avm2_stage3d.c b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+index f776f4e94..6ed413386 100644
+--- a/SWFModernRuntime/src/avm2/avm2_stage3d.c
++++ b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+@@ -2530,7 +2530,10 @@ void avm2_register_stage3d(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, vt, "attachNetStream", s3d_noop);
+ 
+ 	// flash.display.Stage3D (extends EventDispatcher).
+-	Avm2Class* s3d = avm2_builtin_class(ctx, "flash.display", "Stage3D", ed);
++	// flash.display.Stage3D is [API("674")] in playerglobal: SWF 13 and up
++	// (avm2/all_classes/display/swf12 does not list it).
++	Avm2Class* s3d = avm2_builtin_class_api(ctx, "flash.display", "Stage3D",
++	                                        ed, 13);
+ 	g_stage3d_class = s3d;
+ 	s3d->native_ext_size = sizeof(Avm2Stage3DExt);
+ 	s3d->instance_init.fn = stage3d_init;
+diff --git a/tools/descriptor/as_model.py b/tools/descriptor/as_model.py
+new file mode 100644
+index 000000000..e6c12d644
+--- /dev/null
++++ b/tools/descriptor/as_model.py
+@@ -0,0 +1,332 @@
++#!/usr/bin/env python3
++"""Parse Ruffle's playerglobal ActionScript stubs into a describeType model.
++
++The .as files under `<ruffle>/core/src/avm2/globals/` are Ruffle's transcription
++of Adobe's playerglobal.swc: they carry the full public signature of every
++builtin class (parameter types, defaults, return types) plus the `[API("N")]`
++annotations that gate a member/class to a minimum player version.  That makes
++them the natural source for the `describeType` descriptor tables the runtime
++needs (`SWFModernRuntime/src/avm2/avm2_globals.c`, the `dt_*` region), and it
++means those tables can be DERIVED rather than hand-transcribed from the
++expected outputs of the `avm2/all_classes/*` tests.
++
++This module is the parser + model half; `gen_display_descriptors.py` is the C
++emitter and `check_model.py` grades the model against the expected files.
++"""
++
++import os
++import re
++import sys
++
++# --------------------------------------------------------------------------
++# [API("N")] -> minimum SWF file version.
++#
++# Ruffle's `core/src/avm2/api_version.rs` numbers the versions with
++# `ordinal = N - 660`.  The table is NOT uniformly strided below ordinal 12,
++# and every AIR_* version maps to `VM_INTERNAL` under a Flash Player runtime,
++# i.e. the member is hidden at EVERY SWF version rather than rounded up to the
++# next one.  Verified empirically against the six all_classes/display expected
++# files (see session16-fanout-reports/wave1-all-classes-display.md 2.4).
++HIDE = 255  # AIR-only: never visible to a Flash Player runtime
++
++_ORD_BELOW_12 = {
++    0: 0,     # ALL_VERSIONS
++    2: 10,    # FP_10_0
++    5: 10,    # FP_10_0_32
++    7: 10,    # FP_10_1
++    10: 11,   # FP_10_2  (SWF file version stepped 10 -> 11 at FP 10.2)
++}
++
++
++def api_min_swf(n):
++    """Map an [API("N")] annotation to the first SWF version that shows it."""
++    ordinal = int(n) - 660
++    if ordinal < 12:
++        return _ORD_BELOW_12.get(ordinal, HIDE)
++    if ordinal % 2 == 1:
++        return HIDE                      # AIR_*
++    return 12 + (ordinal - 12) // 2
++
++
++# --------------------------------------------------------------------------
++
++# Names that describeType prints unqualified (the top-level package).
++TOP_LEVEL = {
++    "void", "*", "Object", "Class", "Function", "Boolean", "Number", "int",
++    "uint", "String", "Array", "Error", "Date", "RegExp", "XML", "XMLList",
++    "Namespace", "QName", "Math", "JSON", "ArgumentError", "DefinitionError",
++    "EvalError", "RangeError", "ReferenceError", "SecurityError",
++    "SyntaxError", "TypeError", "URIError", "VerifyError",
++    "UninitializedError",
++}
++
++
++class Member(object):
++    __slots__ = ("kind", "name", "type", "params", "min_swf", "is_static",
++                 "has_get", "has_set", "override", "uri", "value",
++                 "get_min_swf", "set_min_swf")
++
++    def __init__(self, kind, name):
++        self.kind = kind          # "method" | "accessor" | "variable"
++        self.name = name
++        self.type = "*"
++        self.params = []          # list of (type, optional)
++        self.min_swf = 0
++        self.is_static = False
++        self.has_get = False
++        self.has_set = False
++        self.override = False
++        self.uri = None
++        self.value = None
++        self.get_min_swf = None
++        self.set_min_swf = None
++
++
++class Klass(object):
++    __slots__ = ("ns", "name", "base", "interfaces", "is_interface", "final",
++                 "dynamic", "min_swf", "members", "ctor_params", "has_ctor",
++                 "imports")
++
++    def __init__(self, ns, name):
++        self.ns = ns
++        self.name = name
++        self.base = None
++        self.interfaces = []
++        self.is_interface = False
++        self.final = False
++        self.dynamic = False
++        self.min_swf = 0
++        self.members = {}         # (kind, name, is_static) -> Member
++        self.ctor_params = []
++        self.has_ctor = False
++        self.imports = {}
++
++    @property
++    def qname(self):
++        return "%s::%s" % (self.ns, self.name) if self.ns else self.name
++
++
++_COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.S)
++_COMMENT_LINE = re.compile(r"//[^\n]*")
++_API = re.compile(r'\[\s*API\s*\(\s*"(\d+)"\s*\)\s*\]')
++_CLASS = re.compile(
++    r"\b(class|interface)\s+([A-Za-z0-9_$]+)"
++    r"(?:\s+extends\s+([A-Za-z0-9_$.,\s]+?))?"
++    r"(?:\s+implements\s+([^{]+?))?\s*\{")
++
++
++def _strip_comments(src):
++    src = _COMMENT_BLOCK.sub("", src)
++    src = _COMMENT_LINE.sub("", src)
++    return src
++
++
++def _split_commas(text):
++    """Split on top-level commas."""
++    out, depth, cur = [], 0, ""
++    for ch in text:
++        if ch in "(<[":
++            depth += 1
++        elif ch in ")>]":
++            depth -= 1
++        if ch == "," and depth == 0:
++            out.append(cur)
++            cur = ""
++        else:
++            cur += ch
++    if cur.strip():
++        out.append(cur)
++    return [p.strip() for p in out if p.strip()]
++
++
++def _match_paren(src, i):
++    """`src[i]` is '('; return the index just past the matching ')'."""
++    depth = 0
++    while i < len(src):
++        if src[i] == "(":
++            depth += 1
++        elif src[i] == ")":
++            depth -= 1
++            if depth == 0:
++                return i + 1
++        i += 1
++    return i
++
++
++def parse_file(path):
++    """Return the list of Klass declared in one .as file (usually one)."""
++    src = _strip_comments(open(path, encoding="utf-8").read())
++    m = re.search(r"\bpackage\s+([A-Za-z0-9_.]*)\s*\{", src)
++    ns = m.group(1) if m else ""
++    imports = {}
++    for imp in re.findall(r"\bimport\s+([A-Za-z0-9_.$]+)\s*;", src):
++        imports[imp.rsplit(".", 1)[-1]] = imp
++    out = []
++    for cm in _CLASS.finditer(src):
++        head = src[max(0, cm.start() - 400):cm.start()]
++        brace = max(head.rfind("}"), head.rfind(";"))
++        head = head[brace + 1:]
++        api = _API.findall(head)
++        k = Klass(ns, cm.group(2))
++        k.is_interface = cm.group(1) == "interface"
++        k.dynamic = re.search(r"\bdynamic\b", head) is not None
++        k.final = re.search(r"\bfinal\b", head) is not None
++        k.min_swf = api_min_swf(api[-1]) if api else 0
++        ext = (cm.group(3) or "").strip()
++        if k.is_interface:
++            k.interfaces = [x.strip().rsplit(".", 1)[-1]
++                            for x in _split_commas(ext)] if ext else []
++        elif ext:
++            k.base = ext.rsplit(".", 1)[-1]
++        if cm.group(4):
++            k.interfaces = [x.strip().rsplit(".", 1)[-1]
++                            for x in _split_commas(cm.group(4))]
++        k.imports = imports
++        _parse_body(src, cm.end(), k)
++        out.append(k)
++    return out
++
++
++def _body_end(src, start):
++    depth = 1
++    i = start
++    while i < len(src) and depth:
++        if src[i] == "{":
++            depth += 1
++        elif src[i] == "}":
++            depth -= 1
++        i += 1
++    return i
++
++
++_FUNC = re.compile(
++    r"(?P<mods>(?:\b(?:public|private|protected|internal|static|native|"
++    r"override|final|AS3)\b[ \t\r\n]+)*)"
++    r"function\s+(?:(?P<acc>get|set)\s+)?(?P<name>[A-Za-z0-9_$]+)\s*\(")
++_VAR = re.compile(
++    r"(?P<mods>(?:\b(?:public|private|protected|internal|static)\b\s+)*)"
++    r"\b(?P<vk>var|const)\s+(?P<name>[A-Za-z0-9_$]+)\s*:"
++    r"\s*(?P<type>[A-Za-z0-9_$.<>*]+)\s*(?:=\s*(?P<val>[^;]+))?;")
++
++
++def _parse_body(src, start, k):
++    end = _body_end(src, start)
++    body = src[start:end - 1]
++    for m in _FUNC.finditer(body):
++        mods = m.group("mods")
++        if re.search(r"\b(private|protected|internal)\b", mods):
++            continue
++        if "public" not in mods and not k.is_interface:
++            continue
++        name = m.group("name")
++        popen = m.end() - 1
++        pclose = _match_paren(body, popen)
++        params_txt = body[popen + 1:pclose - 1]
++        rest = body[pclose:pclose + 200]
++        rt = re.match(r"\s*:\s*([A-Za-z0-9_$.<>*]+)", rest)
++        ret = rt.group(1) if rt else "*"
++        api = _api_before(body, m.start())
++        is_static = "static" in mods
++        acc = m.group("acc")
++        if name == k.name and not acc:
++            k.has_ctor = True
++            k.ctor_params = _params(params_txt)
++            continue
++        if acc:
++            key = ("accessor", name, is_static)
++            mem = k.members.get(key)
++            if mem is None:
++                mem = Member("accessor", name)
++                mem.is_static = is_static
++                k.members[key] = mem
++            if acc == "get":
++                mem.has_get = True
++                mem.type = ret
++                mem.get_min_swf = api
++            else:
++                mem.has_set = True
++                ps = _params(params_txt)
++                if not mem.has_get and ps:
++                    mem.type = ps[0][0]
++                mem.set_min_swf = api
++            if "override" in mods:
++                mem.override = True
++        else:
++            mem = Member("method", name)
++            mem.is_static = is_static
++            mem.type = ret
++            mem.params = _params(params_txt)
++            mem.min_swf = api
++            mem.override = "override" in mods
++            k.members[("method", name, is_static)] = mem
++    for m in _VAR.finditer(body):
++        mods = m.group("mods")
++        if re.search(r"\b(private|protected|internal)\b", mods):
++            continue
++        if "public" not in mods:
++            continue
++        is_static = "static" in mods
++        mem = Member("variable", m.group("name"))
++        mem.is_static = is_static
++        mem.type = m.group("type")
++        mem.min_swf = _api_before(body, m.start())
++        mem.value = (m.group("val") or "").strip()
++        mem.has_get = m.group("vk") == "const"   # has_get doubles as is_const
++        k.members[("variable", m.group("name"), is_static)] = mem
++    # An accessor's visibility gate follows the half that exists; when both
++    # halves carry one, the lower wins (the member appears as soon as either
++    # half does, reported with the getter's type).
++    for mem in k.members.values():
++        if mem.kind != "accessor":
++            continue
++        gates = [g for g in (mem.get_min_swf, mem.set_min_swf) if g is not None]
++        mem.min_swf = min(gates) if gates else 0
++
++
++def _api_before(body, pos):
++    """The [API("N")] annotation attached to the declaration starting at pos."""
++    head = body[max(0, pos - 300):pos]
++    cut = max(head.rfind(";"), head.rfind("}"), head.rfind("{"))
++    head = head[cut + 1:]
++    found = _API.findall(head)
++    return api_min_swf(found[-1]) if found else 0
++
++
++def _params(text):
++    out = []
++    for p in _split_commas(text):
++        if p.startswith("..."):
++            continue
++        mm = re.match(r"([A-Za-z0-9_$]+)\s*:\s*([A-Za-z0-9_$.<>*]+)"
++                      r"(?:\s*=\s*(.+))?$", p.strip(), re.S)
++        if mm is None:
++            out.append(("*", False))
++            continue
++        out.append((mm.group(2), mm.group(3) is not None))
++    return out
++
++
++def load_globals(root):
++    """Parse every .as under `root`; return {qname: Klass}."""
++    classes = {}
++    for dirpath, _dirs, files in os.walk(root):
++        for f in sorted(files):
++            if not f.endswith(".as"):
++                continue
++            for k in parse_file(os.path.join(dirpath, f)):
++                classes.setdefault(k.qname, k)
++    return classes
++
++
++if __name__ == "__main__":
++    root = sys.argv[1] if len(sys.argv) > 1 else \
++        os.path.expanduser("~/CC/ruffle/core/src/avm2/globals")
++    cs = load_globals(root)
++    sys.stderr.write("parsed %d classes\n" % len(cs))
++    for q in sorted(cs):
++        if q.startswith("flash.display::"):
++            k = cs[q]
++            print("%-46s base=%-22s api=%-3s iface=%-24s members=%3d ctor=%d%s"
++                  % (q, k.base, k.min_swf, ",".join(k.interfaces),
++                     len(k.members), len(k.ctor_params),
++                     " FINAL" if k.final else ""))
+diff --git a/tools/descriptor/check_model.py b/tools/descriptor/check_model.py
+new file mode 100644
+index 000000000..c7a8ebd0f
+--- /dev/null
++++ b/tools/descriptor/check_model.py
+@@ -0,0 +1,152 @@
++#!/usr/bin/env python3
++"""Grade the parsed playerglobal model against the all_classes expected files.
++
++This is the arc's free acceptance test: it needs no runtime build, and any
++mismatch it reports is a bug in the model (and therefore in the C tables the
++generator would emit).
++
++    python3 tools/descriptor/check_model.py [suite-dir] [package]
++    python3 tools/descriptor/check_model.py --actual OURS.txt EXPECTED.txt
++
++`suite-dir` defaults to `ruffle-tests/tests/swfs/avm2/all_classes/display`.
++
++The `--actual` form is the second half of the loop: a STRUCTURAL diff of one of
++our own `--save-actual` captures against the expected file, keyed on
++`(kind, name)` inside each class block. Use it instead of the runner's
++positional `matching_lines`, which reads as "structurally broken" (14/2936)
++even when every `<type>` attribute and every `<extendsClass>` already match.
++"""
++
++import os
++import re
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++
++import as_model
++import xml_model
++
++RUFFLE = os.path.expanduser("~/CC/ruffle")
++
++
++def fixture_classes(test_as):
++    src = open(test_as, encoding="utf-8").read()
++    m = re.search(r"CLASSES:Array\s*=\s*\[(.*?)\]", src, re.S)
++    return [x.strip().strip('"') for x in m.group(1).split(",")]
++
++
++def main_actual(ours, expected):
++    act = xml_model.parse_expected(ours)
++    exp = xml_model.parse_expected(expected)
++    bad = 0
++    for nm in sorted(exp):
++        e, a = exp[nm], act.get(nm, "ABSENT")
++        if e is None and a is None:
++            continue
++        if a == "ABSENT":
++            print("%-28s CLASS ABSENT from ours" % nm)
++            bad += 1
++            continue
++        if e is None:
++            print("%-28s ours describes it, Flash says not accessible" % nm)
++            bad += 1
++            continue
++        if a is None:
++            print("%-28s ours says not accessible, Flash describes it" % nm)
++            bad += 1
++            continue
++        for side in ("type", "factory"):
++            want = set(_norm(x) for x in e[side])
++            have = set(_norm(x) for x in a[side])
++            for x in sorted(want - have):
++                print("%-28s %-7s MISSING %s" % (nm, side, _fmt(x)))
++                bad += 1
++            for x in sorted(have - want):
++                print("%-28s %-7s EXTRA   %s" % (nm, side, _fmt(x)))
++                bad += 1
++    print("TOTAL element diffs: %d" % bad)
++    return 1 if bad else 0
++
++
++def main():
++    if len(sys.argv) > 1 and sys.argv[1] == "--actual":
++        return main_actual(sys.argv[2], sys.argv[3])
++    suite = sys.argv[1] if len(sys.argv) > 1 else \
++        "ruffle-tests/tests/swfs/avm2/all_classes/display"
++    pkg = sys.argv[2] if len(sys.argv) > 2 else "flash.display"
++    classes = as_model.load_globals(
++        os.path.join(RUFFLE, "core/src/avm2/globals"))
++    res = xml_model.Resolver(classes)
++    names = fixture_classes(os.path.join(
++        RUFFLE, "tests/tests/swfs/avm2/all_classes",
++        os.path.basename(suite.rstrip("/")), "Test.as"))
++
++    total_bad = 0
++    for ver_dir in sorted(os.listdir(suite)):
++        if not ver_dir.startswith("swf"):
++            continue
++        ver = int(ver_dir[3:])
++        exp = xml_model.parse_expected(os.path.join(suite, ver_dir,
++                                                    "output.txt"))
++        bad = 0
++        for nm in names:
++            k = classes.get("%s::%s" % (pkg, nm))
++            want_present = (k is not None and k.min_swf != as_model.HIDE
++                            and (k.min_swf == 0 or ver >= k.min_swf))
++            got = exp.get(nm, "MISSING")
++            if got == "MISSING":
++                print("[%s] %s: absent from expected file entirely" %
++                      (ver_dir, nm))
++                bad += 1
++                continue
++            if got is None:                       # "not accessible"
++                if want_present:
++                    print("[%s] %s: model says visible, Flash says not "
++                          "accessible (class api=%s)" % (ver_dir, nm,
++                                                         k.min_swf))
++                    bad += 1
++                continue
++            if not want_present:
++                print("[%s] %s: model hides it (api=%s) but Flash describes it"
++                      % (ver_dir, nm, None if k is None else k.min_swf))
++                bad += 1
++                continue
++            model = xml_model.describe(res, k, ver)
++            for side in ("type", "factory"):
++                want = sorted(_norm(e) for e in model[side])
++                have = sorted(_norm(e) for e in got[side])
++                if want != have:
++                    for line in _diff(nm, ver_dir, side, have, want):
++                        print(line)
++                        bad += 1
++        print("== %s: %d element mismatches" % (ver_dir, bad))
++        total_bad += bad
++    print("TOTAL mismatches: %d" % total_bad)
++    return 1 if total_bad else 0
++
++
++def _norm(e):
++    # normalizeXML() sorts children lexically, so <parameter index="10"/>
++    # prints before index="2"; compare parameter sets order-independently.
++    tag, attrs, params = e
++    return (tag, tuple(attrs), tuple(sorted(params)))
++
++
++def _diff(nm, ver_dir, side, have, want):
++    hs, ws = set(have), set(want)
++    for e in sorted(ws - hs):
++        yield "[%s] %s/%s MODEL-ONLY  %s" % (ver_dir, nm, side, _fmt(e))
++    for e in sorted(hs - ws):
++        yield "[%s] %s/%s FLASH-ONLY  %s" % (ver_dir, nm, side, _fmt(e))
++
++
++def _fmt(e):
++    tag, attrs, params = e
++    s = "<%s%s>" % (tag, "".join(' %s="%s"' % a for a in attrs))
++    if params:
++        s += " " + " ".join(params)
++    return s
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tools/descriptor/gen_display_descriptors.py b/tools/descriptor/gen_display_descriptors.py
+new file mode 100644
+index 000000000..370421cb5
+--- /dev/null
++++ b/tools/descriptor/gen_display_descriptors.py
+@@ -0,0 +1,357 @@
++#!/usr/bin/env python3
++"""Emit the `flash.display` describeType descriptor tables for the runtime.
++
++    python3 tools/descriptor/gen_display_descriptors.py \
++        [--actual <our-output.txt>] [-o <header>]
++
++Reads Ruffle's playerglobal .as stubs (via `as_model`), derives the full
++member/parameter/constructor/API-gate model (validated by `check_model.py`
++against the six `avm2/all_classes/display/swf*` expected files), and writes
++`SWFModernRuntime/src/avm2/avm2_desc_display.h`, which `avm2_globals.c`
++includes inside its `dt_*` region.
++
++`--actual` is one of OUR describeType outputs for the same fixture, captured
++from a BASELINE build -- one whose generated block is empty (delete everything
++between the two markers in avm2_globals.c and rebuild) or that predates this
++arc.  It must be a baseline because the tables below already correct what it
++records; feeding back a corrected output would erase the corrections.  A class
++the capture predates falls back to its superclass's entry, which is exact for
++the classes this arc adds (they inherit their whole instance surface).
++
++It is used only to derive the per-described-class exception tables that cannot
++come from playerglobal alone, because they describe where OUR class
++registration disagrees with playerglobal about which class owns a member:
++
++  * a `declaredBy` re-point (we register an override playerglobal does not, or
++    playerglobal declares an override we inherit), and
++  * a member hide (we register a member on a class playerglobal does not put
++    it on at all -- `soundTransform` on InteractiveObject).
++
++Re-run with a fresh `--actual` after changing the display class registration.
++"""
++
++import argparse
++import os
++import re
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++
++import as_model
++import xml_model
++
++RUFFLE = os.path.expanduser("~/CC/ruffle")
++PKG = "flash.display"
++KIND_C = {"method": "DT_DESC_METHOD", "accessor": "DT_DESC_ACCESSOR",
++          "variable": "DT_DESC_SLOT"}
++
++# The generated tables are spliced straight into avm2_globals.c between these
++# markers rather than living in their own header: verify_output.py builds by
++# copying an explicit list of source files into a flat directory, so a new
++# header would have to be added to that list, to CMakeLists and to the
++# Emscripten build script, and a missed one is a link-time surprise (the
++# session-15 incident of record). Everything here is `static`, so nothing
++# leaks past this translation unit.
++BEGIN = ("// >>> BEGIN GENERATED flash.display descriptors -- DO NOT EDIT.\n"
++         "// Regenerate with:\n"
++         "//   python3 tools/descriptor/gen_display_descriptors.py \\\n"
++         "//       --actual <our all_classes/display/swf30 output>\n"
++         "// Derived from Ruffle's playerglobal ActionScript stubs\n"
++         "// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and validated\n"
++         "// element-for-element against the six\n"
++         "// avm2/all_classes/display/swf*/output.txt oracles by\n"
++         "// tools/descriptor/check_model.py.")
++END = "// <<< END GENERATED flash.display descriptors"
++
++
++def splice(path, block):
++    src = open(path, encoding="utf-8").read()
++    i = src.find(BEGIN.split("\n")[0])
++    j = src.find(END)
++    if i < 0 or j < 0:
++        raise SystemExit("markers not found in %s -- add\n%s\n%s"
++                         % (path, BEGIN, END))
++    open(path, "w", encoding="utf-8").write(
++        src[:i] + block + src[j + len(END):])
++
++
++def fixture_classes(path):
++    src = open(path, encoding="utf-8").read()
++    m = re.search(r"CLASSES:Array\s*=\s*\[(.*?)\]", src, re.S)
++    return [x.strip().strip('"') for x in m.group(1).split(",")]
++
++
++class Emitter(object):
++    def __init__(self):
++        self.params = {}      # tuple -> symbol
++        self.lines = []
++
++    def param_sym(self, res, k, params):
++        if not params:
++            return "NULL", 0
++        key = tuple((res.qname(k, t), bool(o)) for t, o in params)
++        sym = self.params.get(key)
++        if sym is None:
++            sym = "dtd_p%d" % len(self.params)
++            self.params[key] = sym
++        return sym, len(key)
++
++    def emit_params(self):
++        out = []
++        for key, sym in sorted(self.params.items(), key=lambda kv: kv[1]):
++            body = ", ".join('{ "%s", %d }' % (t, 1 if o else 0)
++                             for t, o in key)
++            out.append("static const DtDescParam %s[] = { %s };" % (sym, body))
++        return out
++
++
++def owner_of(res, k, kind, name):
++    """The class the model reports in `declaredBy` when describing `k`."""
++    ch = xml_model.chain(res, k)
++    if kind == "accessor":
++        for c in ch:
++            mem = c.members.get(("accessor", name, False))
++            if mem is not None and mem.has_get:
++                return c
++        for c in ch:
++            mem = c.members.get(("accessor", name, False))
++            if mem is not None:
++                return c
++        return None
++    for c in ch:
++        if (kind, name, False) in c.members:
++            return c
++    return None
++
++
++def resolved_access(res, k, kind, name, mem):
++    """The access string describeType prints for `k`.`name`.
++
++    An accessor's halves can be split across the chain: playerglobal declares
++    `Stage.alpha` as a SETTER-only override of DisplayObject's readwrite pair,
++    and Flash still reports `readwrite` (with declaredBy=DisplayObject). So the
++    access has to be resolved over the whole chain, not read off the row's own
++    class -- that is also what keeps the genuinely setter-only members
++    (DisplayObject.blendShader, Shader.byteCode) reported as `writeonly`.
++    """
++    if kind == "variable":
++        return "readonly" if mem.has_get else "readwrite"
++    if kind != "accessor":
++        return None
++    g = st = False
++    for c in xml_model.chain(res, k):
++        m = c.members.get(("accessor", name, mem.is_static))
++        if m is None:
++            continue
++        g = g or m.has_get
++        st = st or m.has_set
++    return "readwrite" if g and st else "readonly" if g else "writeonly"
++
++
++def build(actual_path, out_path):
++    classes = as_model.load_globals(
++        os.path.join(RUFFLE, "core/src/avm2/globals"))
++    res = xml_model.Resolver(classes)
++    names = fixture_classes(os.path.join(
++        RUFFLE, "tests/tests/swfs/avm2/all_classes/display/Test.as"))
++    em = Emitter()
++    body = []
++    rows = []
++    stats = dict(members=0, params=0, ctors=0, consts=0, redecl=0, hide=0,
++                 shadow=0)
++
++    actual = xml_model.parse_expected(actual_path) if actual_path else {}
++
++    # --- pass 1: one member row per member each class DECLARES --------------
++    mem_rows = {}      # class name -> {(kind, name, static): row tuple}
++    const_rows = {}
++    for nm in names:
++        k = classes.get("%s::%s" % (PKG, nm))
++        if k is None:
++            print("WARN: no .as for %s" % nm, file=sys.stderr)
++            continue
++        mem_rows[nm] = {}
++        const_rows[nm] = []
++        for (kind, name, is_static), mem in sorted(k.members.items()):
++            typ = res.qname(k, mem.type)
++            if kind == "variable" and is_static and mem.has_get:
++                # `public static const` -- our runtime carries these as
++                # read-only dynamic props on the class object when it knows
++                # them; the DtDescConst row supplies the reported TYPE (uint
++                # is not one of our value kinds) and the API gate.
++                const_rows[nm].append('\t{ "%s", "%s", %d },'
++                                      % (name, typ, mem.min_swf))
++                stats["consts"] += 1
++            psym, pn = em.param_sym(res, k, mem.params)
++            access = resolved_access(res, k, kind, name, mem)
++            own = owner_of(res, k, kind, name) if not is_static else k
++            mem_rows[nm][(kind, name, is_static)] = (
++                name, KIND_C[kind], typ, pn, psym, mem.min_swf,
++                1 if own is k else 0, 1 if is_static else 0, access)
++            stats["members"] += 1
++
++    # --- pass 2: exceptions + shadow rows, from OUR output ------------------
++    redecl = {}
++    for nm in names:
++        k = classes.get("%s::%s" % (PKG, nm))
++        if k is None:
++            continue
++        # A class the baseline capture predates (one this patch creates)
++        # inherits its whole instance surface, so its SUPERCLASS's entry is a
++        # faithful stand-in for what our vtable pass would have produced. The
++        # class side is not inherited, so it is dropped in that case.
++        got = actual.get(nm)
++        inherited = False
++        for anc in xml_model.chain(res, k)[1:]:
++            if got:
++                break
++            got = actual.get(anc.name)
++            inherited = True
++        if not got:
++            continue
++        model = xml_model.describe(res, k, 99)
++        rl = []
++        for side, static in ((("factory", 0),) if inherited
++                             else (("factory", 0), ("type", 1))):
++            want = {}
++            for tag, attrs, _p in model[side]:
++                a = dict(attrs)
++                if tag in ("accessor", "method"):
++                    want[(tag, a["name"])] = a["declaredBy"]
++                elif tag in ("variable", "constant"):
++                    want[("variable", a["name"])] = None
++            for tag, attrs, _p in got[side]:
++                a = dict(attrs)
++                if tag not in ("accessor", "method", "variable", "constant"):
++                    continue
++                kind = tag if tag in ("accessor", "method") else "variable"
++                key = (kind, a["name"])
++                if static and key == ("accessor", "prototype"):
++                    continue
++                if key not in want:
++                    rl.append('\t{ "%s", %s, %d, NULL },'
++                              % (a["name"], KIND_C[kind], static))
++                    stats["hide"] += 1
++                    continue
++                if want[key] is not None and a.get("declaredBy") != want[key]:
++                    rl.append('\t{ "%s", %s, %d, "%s" },'
++                              % (a["name"], KIND_C[kind], static, want[key]))
++                    stats["redecl"] += 1
++                # A SHADOW row: our vtable declares the member on a class
++                # playerglobal does not, so the descriptor lookup (which keys
++                # on OUR declaring class and then walks UP) finds nothing and
++                # the member keeps its `*` fallback type. `soundTransform` is
++                # the standing case -- we register it once on InteractiveObject
++                # where playerglobal declares it twice, on Sprite and on
++                # SimpleButton. Park a non-synthetic row on our declaring class
++                # so the DATA resolves; declaredBy is still corrected per
++                # described class above, and the classes playerglobal does not
++                # give it to carry a hide.
++                if (a.get("type") or a.get("returnType")) != "*":
++                    continue
++                dcl = (a.get("declaredBy") or "").split("::")[-1]
++                mk = (kind, a["name"], bool(static))
++                if dcl not in mem_rows or mk in mem_rows[dcl]:
++                    continue
++                own = owner_of(res, k, kind, a["name"])
++                if own is None or mk not in own.members:
++                    continue
++                mem = own.members[mk]
++                psym, pn = em.param_sym(res, own, mem.params)
++                mem_rows[dcl][mk] = (
++                    a["name"], KIND_C[kind], res.qname(own, mem.type), pn,
++                    psym, mem.min_swf, 0, 1 if static else 0,
++                    resolved_access(res, k, kind, a["name"], mem))
++                stats["shadow"] += 1
++        if rl:
++            redecl[nm] = sorted(set(rl))
++
++    # --- emit ---------------------------------------------------------------
++    for nm in names:
++        if nm not in mem_rows:
++            continue
++        k = classes["%s::%s" % (PKG, nm)]
++        msym = csym = rsym = "NULL"
++        if mem_rows[nm]:
++            msym = "dtd_m_%s" % nm
++            body.append("static const DtDescMember %s[] = {" % msym)
++            for key in sorted(mem_rows[nm]):
++                r = mem_rows[nm][key]
++                body.append(
++                    '\t{ "%s", %s, "%s", %d, %s, %d, %d, %d, %s, NULL },'
++                    % (r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7],
++                       ('"%s"' % r[8]) if r[8] else "NULL"))
++            body.append("\t{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },")
++            body.append("};")
++        if const_rows[nm]:
++            csym = "dtd_c_%s" % nm
++            body.append("static const DtDescConst %s[] = {" % csym)
++            body.extend(const_rows[nm])
++            body.append("\t{ NULL, NULL, 0 },")
++            body.append("};")
++        if nm in redecl:
++            rsym = "dtd_r_%s" % nm
++            body.append("static const DtDescRedecl %s[] = {" % rsym)
++            body.extend(redecl[nm])
++            body.append("\t{ NULL, 0, 0, NULL },")
++            body.append("};")
++        ctor_sym, ctor_n = em.param_sym(res, k, k.ctor_params)
++        if ctor_n:
++            stats["ctors"] += 1
++        rows.append('\t{ "%s", "%s", 0, %d, %s, %s, %s, 1, %s }, \\'
++                    % (PKG, nm, ctor_n, ctor_sym, msym, csym, rsym))
++
++    stats["params"] = len(em.params)
++    out = []
++    out.append(BEGIN)
++    out.append("//")
++    out.append("// Derived from Ruffle's playerglobal ActionScript stubs")
++    out.append("// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and")
++    out.append("// validated element-for-element against the six")
++    out.append("// avm2/all_classes/display/swf*/output.txt oracles by")
++    out.append("// tools/descriptor/check_model.py.  Included from")
++    out.append("// avm2_globals.c inside the dt_* descriptor region, so it")
++    out.append("// sees DtDescParam/DtDescMember/DtDescConst/DtDescRedecl.")
++    out.append("//")
++    out.append("// %d members / %d distinct parameter lists / %d constructors"
++               " / %d constants" % (stats["members"], stats["params"],
++                                    stats["ctors"], stats["consts"]))
++    out.append("// %d declaredBy re-points / %d per-class hides."
++               % (stats["redecl"], stats["hide"]))
++    out.append("")
++    out.extend(em.emit_params())
++    out.append("")
++    out.extend(body)
++    out.append("")
++    out.append("#define DT_DESC_DISPLAY_ROWS \\")
++    out.extend(rows)
++    out.append("\t/* end of DT_DESC_DISPLAY_ROWS */")
++    out.append(END)
++    block = "\n".join(out) + "\n"
++    if out_path.endswith(".c") or out_path.endswith(".h"):
++        splice(out_path, block)
++    else:
++        open(out_path, "w", encoding="utf-8").write(block)
++    print("wrote %s: %s" % (out_path, stats), file=sys.stderr)
++
++    # A checklist for the hand-written half (avm2_display.c).
++    print("\n== class API gates (avm2_builtin_class_api min_swf) ==")
++    for nm in names:
++        k = classes.get("%s::%s" % (PKG, nm))
++        if k is not None and k.min_swf:
++            print("  %-28s %d" % (nm, k.min_swf))
++    print("\n== interfaces each class must declare ==")
++    for nm in names:
++        k = classes.get("%s::%s" % (PKG, nm))
++        if k is not None and k.interfaces:
++            print("  %-28s %s" % (nm, ", ".join(
++                res.qname(k, i) for i in k.interfaces)))
++
++
++if __name__ == "__main__":
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--actual", default=None)
++    ap.add_argument("-o", "--out",
++                    default="SWFModernRuntime/src/avm2/avm2_globals.c")
++    a = ap.parse_args()
++    build(a.actual, a.out)
+diff --git a/tools/descriptor/xml_model.py b/tools/descriptor/xml_model.py
+new file mode 100644
+index 000000000..0ff9c19d7
+--- /dev/null
++++ b/tools/descriptor/xml_model.py
+@@ -0,0 +1,251 @@
++#!/usr/bin/env python3
++"""Render the parsed playerglobal model as the `describeType` element tree the
++`avm2/all_classes/*` fixtures print, and parse those fixtures back.
++
++Both halves produce the same structure, so `check_model.py` can diff them:
++
++    {class-name: {"type": [elem, ...], "factory": [elem, ...]}}
++
++where `elem` is `(tag, ((attr, value), ...), (param, ...))`.
++"""
++
++import os
++import re
++
++import as_model
++
++VEC_NS = "__AS3__.vec"
++
++
++# ---------------------------------------------------------------- resolution
++
++class Resolver(object):
++    def __init__(self, classes):
++        self.classes = classes
++        self.by_simple = {}
++        for q, k in classes.items():
++            self.by_simple.setdefault(k.name, []).append(q)
++
++    def qname(self, k, simple):
++        """Fully-qualify a type name as it appears inside class `k`."""
++        if simple in ("*", "void", ""):
++            return simple or "*"
++        m = re.match(r"^Vector\.<(.+)>$", simple)
++        if m:
++            return "%s::Vector.<%s>" % (VEC_NS, self.qname(k, m.group(1)))
++        if "." in simple and "::" not in simple:
++            simple = simple.rsplit(".", 1)[-1]
++        if simple in as_model.TOP_LEVEL:
++            return simple
++        imp = k.imports.get(simple) if k is not None else None
++        if imp and "." in imp:
++            return "%s::%s" % (imp.rsplit(".", 1)[0], simple)
++        if k is not None and "%s::%s" % (k.ns, simple) in self.classes:
++            return "%s::%s" % (k.ns, simple)
++        cands = self.by_simple.get(simple)
++        if cands and len(cands) == 1:
++            return cands[0]
++        if cands:
++            # prefer the one in the same package
++            for c in cands:
++                if k is not None and c.startswith(k.ns + "::"):
++                    return c
++            return sorted(cands)[0]
++        return simple
++
++    def lookup(self, k, simple):
++        q = self.qname(k, simple)
++        return self.classes.get(q)
++
++
++# --------------------------------------------------------------- model side
++
++def chain(res, k):
++    """[k, base, ..., Object] as Klass objects (Object is synthetic/None)."""
++    out = []
++    cur = k
++    seen = set()
++    while cur is not None and cur.qname not in seen:
++        seen.add(cur.qname)
++        out.append(cur)
++        cur = res.lookup(cur, cur.base) if cur.base else None
++    return out
++
++
++def all_interfaces(res, k, min_swf_ok):
++    out = []
++    seen = set()
++
++    def add(iface):
++        if iface is None or iface.qname in seen:
++            return
++        seen.add(iface.qname)
++        out.append(iface.qname)
++        for nm in iface.interfaces:
++            add(res.lookup(iface, nm))
++
++    for c in chain(res, k):
++        for nm in c.interfaces:
++            add(res.lookup(c, nm))
++    return out
++
++
++def _param_elems(res, k, params):
++    return tuple("<parameter index=\"%d\" type=\"%s\" optional=\"%s\"/>"
++                 % (i + 1, res.qname(k, t), "true" if opt else "false")
++                 for i, (t, opt) in enumerate(params))
++
++
++def visible(mem, ver):
++    return mem.min_swf == 0 or (mem.min_swf != as_model.HIDE
++                                and ver >= mem.min_swf)
++
++
++def describe(res, k, ver):
++    """Element lists for `describeType(<class object>)` at SWF version `ver`."""
++    tp = [("accessor", (("name", "prototype"), ("access", "readonly"),
++                        ("type", "*"), ("declaredBy", "Class")), ()),
++          ("extendsClass", (("type", "Class"),), ()),
++          ("extendsClass", (("type", "Object"),), ())]
++    for (kind, name, is_static), mem in sorted(k.members.items()):
++        if not is_static or not visible(mem, ver):
++            continue
++        if kind == "variable":
++            tag = "constant" if mem.has_get else "variable"
++            tp.append((tag, (("name", name),
++                             ("type", res.qname(k, mem.type))), ()))
++        elif kind == "method":
++            tp.append(("method", (("name", name), ("declaredBy", k.qname),
++                                  ("returnType", res.qname(k, mem.type))),
++                       _param_elems(res, k, mem.params)))
++        else:
++            acc = ("readwrite" if mem.has_get and mem.has_set
++                   else "readonly" if mem.has_get else "writeonly")
++            tp.append(("accessor", (("name", name), ("access", acc),
++                                    ("type", res.qname(k, mem.type)),
++                                    ("declaredBy", k.qname)), ()))
++
++    fac = []
++    ch = chain(res, k)
++    for c in ch[1:]:
++        fac.append(("extendsClass", (("type", c.qname),), ()))
++    if not k.is_interface:
++        fac.append(("extendsClass", (("type", "Object"),), ()))
++    for q in all_interfaces(res, k, ver):
++        fac.append(("implementsInterface", (("type", q),), ()))
++    if k.is_interface:
++        for nm in k.interfaces:
++            pass  # already covered by all_interfaces
++
++    # instance members: most-derived declaration wins, declaredBy follows the
++    # getter half for accessors and the overriding class for methods.
++    seen = {}
++    for c in ch:
++        for (kind, name, is_static), mem in c.members.items():
++            if is_static:
++                continue
++            key = (kind, name)
++            prev = seen.get(key)
++            if prev is None:
++                seen[key] = [c, mem, dict(get=None, set=None)]
++                prev = seen[key]
++                if kind == "accessor":
++                    if mem.has_get:
++                        prev[2]["get"] = (c, mem)
++                    if mem.has_set:
++                        prev[2]["set"] = (c, mem)
++            else:
++                if kind == "accessor":
++                    if prev[2]["get"] is None and mem.has_get:
++                        prev[2]["get"] = (c, mem)
++                    if prev[2]["set"] is None and mem.has_set:
++                        prev[2]["set"] = (c, mem)
++    for (kind, name), (c, mem, halves) in sorted(seen.items()):
++        if kind == "accessor":
++            gc, gm = halves["get"] if halves["get"] else (None, None)
++            sc, sm = halves["set"] if halves["set"] else (None, None)
++            gates = [m.min_swf for m in (gm, sm) if m is not None]
++            gate = min(gates) if gates else 0
++            if gate == as_model.HIDE or (gate and ver < gate):
++                continue
++            acc = ("readwrite" if gm is not None and sm is not None
++                   else "readonly" if gm is not None else "writeonly")
++            owner = gc if gc is not None else sc
++            src = gm if gm is not None else sm
++            fac.append(("accessor", (("name", name), ("access", acc),
++                                     ("type", res.qname(owner, src.type)),
++                                     ("declaredBy", owner.qname)), ()))
++        elif kind == "method":
++            if not visible(mem, ver):
++                continue
++            fac.append(("method", (("name", name), ("declaredBy", c.qname),
++                                   ("returnType", res.qname(c, mem.type))),
++                        _param_elems(res, c, mem.params)))
++        else:
++            if not visible(mem, ver):
++                continue
++            tag = "constant" if mem.has_get else "variable"
++            fac.append((tag, (("name", name),
++                              ("type", res.qname(c, mem.type))), ()))
++    if k.ctor_params:
++        fac.append(("constructor", (), _param_elems(res, k, k.ctor_params)))
++    return {"type": tp, "factory": fac}
++
++
++# ------------------------------------------------------------ fixture side
++
++_SELF = re.compile(r"^<(\w+)((?:\s+\w+=\"[^\"]*\")*)\s*/>$")
++_OPEN = re.compile(r"^<(\w+)((?:\s+\w+=\"[^\"]*\")*)\s*>$")
++_ATTR = re.compile(r"(\w+)=\"([^\"]*)\"")
++
++
++def parse_expected(path):
++    """{class-name: {"type": [...], "factory": [...]}} from an output.txt."""
++    out = {}
++    cur = None
++    stack = []
++    pending = None      # (tag, attrs, [params]) awaiting its closer
++    for raw in open(path, encoding="utf-8"):
++        line = raw.strip()
++        if not line:
++            continue
++        if line.endswith("not accessible"):
++            out.setdefault(line.rsplit(" not accessible", 1)[0].split("::")[-1],
++                           None)
++            continue
++        if line.startswith("</"):
++            tag = line[2:-1]
++            if pending is not None and pending[0] == tag:
++                cur[stack[-1]].append((pending[0], pending[1],
++                                       tuple(pending[2])))
++                pending = None
++            elif tag == "factory":
++                stack.pop()
++            elif tag == "type":
++                stack.pop()
++                cur = None
++            continue
++        m = _SELF.match(line)
++        if m:
++            tag, attrs = m.group(1), tuple(_ATTR.findall(m.group(2)))
++            if tag == "parameter" and pending is not None:
++                pending[2].append(line)
++            elif tag == "factory":
++                pass          # empty factory: `<factory type="..."/>`
++            elif cur is not None:
++                cur[stack[-1]].append((tag, attrs, ()))
++            continue
++        m = _OPEN.match(line)
++        if m:
++            tag, attrs = m.group(1), tuple(_ATTR.findall(m.group(2)))
++            if tag == "type":
++                name = dict(attrs)["name"]
++                cur = {"type": [], "factory": [], "_attrs": attrs}
++                out[name.split("::")[-1]] = cur
++                stack = ["type"]
++            elif tag == "factory":
++                stack.append("factory")
++            else:
++                pending = (tag, attrs, [])
++            continue
++    return out

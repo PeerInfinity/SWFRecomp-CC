@@ -8889,6 +8889,44 @@ static Avm2Value graphicstrianglepath_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// --- flash.display marker interfaces --------------------------------------
+//
+// playerglobal declares six empty interfaces under flash.display, and
+// describeType reports each implementor's <implementsInterface> transitively
+// (avm2/all_classes/display/*). Native classes never run the ABC
+// mn-resolution path, so an implementor writes its `interfaces` array
+// directly and avm2_class_has_interface reads that resolved cache.
+
+static Avm2Class* g_ibitmapdrawable_class;
+
+static Avm2Class* disp_marker_iface(Avm2Context* ctx, const char* name,
+                                    uint8_t min_swf)
+{
+	Avm2Class* c = avm2_builtin_class_api(ctx, "flash.display", name, NULL,
+	                                      min_swf);
+	c->flags |= AVM2_CLASS_FLAG_INTERFACE;
+	return c;
+}
+
+// Declare up to two interfaces on a native class. Overwrites rather than
+// appends: every caller is the class's own registration site.
+static void disp_implements(Avm2Context* ctx, Avm2Class* cls, Avm2Class* a,
+                            Avm2Class* b)
+{
+	uint32_t n = (a != NULL) + (b != NULL);
+	if (n == 0) return;
+	cls->interfaces = avm2_alloc(ctx, n * sizeof(Avm2Class*));
+	cls->interface_count = n;
+	uint32_t i = 0;
+	if (a != NULL) cls->interfaces[i++] = a;
+	if (b != NULL) cls->interfaces[i++] = b;
+}
+
+Avm2Class* avm2_display_ibitmapdrawable(void)
+{
+	return g_ibitmapdrawable_class;
+}
+
 // Register the T4 Graphics-drawing methods + data classes. `graphics` is the
 // flash.display.Graphics class; `object_class` its base.
 static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
@@ -8899,21 +8937,22 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	avm2_builtin_add_method(ctx, graphics, "drawGraphicsData", gfx_draw_graphics_data);
 
 	// IGraphicsData marker interface (Vector.<IGraphicsData> element coercion +
-	// `is IGraphicsData`).
-	Avm2Class* igd = avm2_builtin_class(ctx, "flash.display", "IGraphicsData", NULL);
-	igd->flags |= AVM2_CLASS_FLAG_INTERFACE;
+	// `is IGraphicsData`). All five flash.display markers are [API("662")] in
+	// playerglobal, i.e. SWF 10 and up (IBitmapDrawable, registered with
+	// DisplayObject, is the one that is not gated).
+	Avm2Class* igd = disp_marker_iface(ctx, "IGraphicsData", 10);
 	g_igraphicsdata_class = igd;
+	Avm2Class* igfill = disp_marker_iface(ctx, "IGraphicsFill", 10);
+	Avm2Class* igpath = disp_marker_iface(ctx, "IGraphicsPath", 10);
+	Avm2Class* igstroke = disp_marker_iface(ctx, "IGraphicsStroke", 10);
+	disp_marker_iface(ctx, "IDrawCommand", 10);
 
-	// Implementors declare the interface directly (native classes skip the ABC
-	// mn-resolution path; avm2_class_has_interface reads the resolved cache).
-	#define GFX_IMPLEMENTS_IGRAPHICSDATA(cls) do { \
-		(cls)->interface_count = 1; \
-		(cls)->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*)); \
-		(cls)->interfaces[0] = igd; \
-	} while (0)
+	// Implementors declare their interfaces through disp_implements (native
+	// classes skip the ABC mn-resolution path; avm2_class_has_interface reads
+	// the resolved cache).
 
-	Avm2Class* gp = avm2_builtin_class(ctx, "flash.display", "GraphicsPath",
-	                                   object_class);
+	Avm2Class* gp = avm2_builtin_class_api(ctx, "flash.display", "GraphicsPath",
+	                                       object_class, 10);
 	gp->instance_init.fn = graphicspath_init;
 	gp->instance_init.debug_name = "GraphicsPath";
 	avm2_builtin_add_getset(ctx, gp, "winding", graphicspath_get_winding,
@@ -8924,14 +8963,15 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	avm2_builtin_add_method(ctx, gp, "cubicCurveTo", graphicspath_cubic_curve_to);
 	avm2_builtin_add_method(ctx, gp, "wideMoveTo", graphicspath_wide_move_to);
 	avm2_builtin_add_method(ctx, gp, "wideLineTo", graphicspath_wide_line_to);
-	GFX_IMPLEMENTS_IGRAPHICSDATA(gp);
+	disp_implements(ctx, gp, igd, igpath);
 	g_graphicspath_class = gp;
 
-	Avm2Class* gtp = avm2_builtin_class(ctx, "flash.display",
-	                                    "GraphicsTrianglePath", object_class);
+	Avm2Class* gtp = avm2_builtin_class_api(ctx, "flash.display",
+	                                        "GraphicsTrianglePath",
+	                                        object_class, 10);
 	gtp->instance_init.fn = graphicstrianglepath_init;
 	gtp->instance_init.debug_name = "GraphicsTrianglePath";
-	GFX_IMPLEMENTS_IGRAPHICSDATA(gtp);
+	disp_implements(ctx, gtp, igd, igpath);
 	g_graphicstrianglepath_class = gtp;
 
 	// Fill / stroke IGraphicsData carriers — non-sealed so AS3 can set their
@@ -8940,15 +8980,22 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	                         "GraphicsStroke" };
 	for (int i = 0; i < 3; i++)
 	{
-		Avm2Class* fc = avm2_builtin_class(ctx, "flash.display", fills[i],
-		                                   object_class);
-		GFX_IMPLEMENTS_IGRAPHICSDATA(fc);
+		Avm2Class* fc = avm2_builtin_class_api(ctx, "flash.display", fills[i],
+		                                       object_class, 10);
+		disp_implements(ctx, fc, igd, i == 2 ? igstroke : igfill);
 	}
-	#undef GFX_IMPLEMENTS_IGRAPHICSDATA
+
+	// GraphicsShaderFill: a drawGraphicsData carrier like the five above, and
+	// the sixth IGraphicsFill. Its `shader`/`matrix` are plain public vars.
+	Avm2Class* gsf = avm2_builtin_class_api(ctx, "flash.display",
+	                                        "GraphicsShaderFill", object_class,
+	                                        10);
+	disp_implements(ctx, gsf, igd, igfill);
 
 	// GraphicsPathCommand (int) + GraphicsPathWinding (string) constant holders.
-	Avm2Class* gpc = avm2_builtin_class(ctx, "flash.display",
-	                                    "GraphicsPathCommand", object_class);
+	Avm2Class* gpc = avm2_builtin_class_api(ctx, "flash.display",
+	                                        "GraphicsPathCommand",
+	                                        object_class, 10);
 	avm2_builtin_add_static_const(ctx, gpc, "NO_OP", avm2_integer(0));
 	avm2_builtin_add_static_const(ctx, gpc, "MOVE_TO", avm2_integer(1));
 	avm2_builtin_add_static_const(ctx, gpc, "LINE_TO", avm2_integer(2));
@@ -8957,14 +9004,15 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	avm2_builtin_add_static_const(ctx, gpc, "WIDE_LINE_TO", avm2_integer(5));
 	avm2_builtin_add_static_const(ctx, gpc, "CUBIC_CURVE_TO", avm2_integer(6));
 
-	Avm2Class* gpw = avm2_builtin_class(ctx, "flash.display",
-	                                    "GraphicsPathWinding", object_class);
+	Avm2Class* gpw = avm2_builtin_class_api(ctx, "flash.display",
+	                                        "GraphicsPathWinding",
+	                                        object_class, 10);
 	disp_sconst(ctx, gpw, "EVEN_ODD", "evenOdd");
 	disp_sconst(ctx, gpw, "NON_ZERO", "nonZero");
 
 	// TriangleCulling constants (imported by some tests; string values).
-	Avm2Class* tc = avm2_builtin_class(ctx, "flash.display", "TriangleCulling",
-	                                   object_class);
+	Avm2Class* tc = avm2_builtin_class_api(ctx, "flash.display",
+	                                       "TriangleCulling", object_class, 10);
 	disp_sconst(ctx, tc, "NONE", "none");
 	disp_sconst(ctx, tc, "POSITIVE", "positive");
 	disp_sconst(ctx, tc, "NEGATIVE", "negative");
@@ -8989,11 +9037,9 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	const char* more_fills[2] = { "GraphicsBitmapFill", "GraphicsEndFill" };
 	for (int i = 0; i < 2; i++)
 	{
-		Avm2Class* fc = avm2_builtin_class(ctx, "flash.display", more_fills[i],
-		                                   object_class);
-		fc->interface_count = 1;
-		fc->interfaces = avm2_alloc(ctx, sizeof(Avm2Class*));
-		fc->interfaces[0] = igd;
+		Avm2Class* fc = avm2_builtin_class_api(ctx, "flash.display",
+		                                       more_fills[i], object_class, 10);
+		disp_implements(ctx, fc, igd, igfill);
 	}
 }
 
@@ -13701,6 +13747,13 @@ void avm2_register_display(Avm2Context* ctx)
 	dobj->native_ext_size = sizeof(Avm2DisplayObjectExt);
 	dobj->native_init = display_native_init_abstract;
 	b->display_object_class = dobj;
+	// `DisplayObject implements IBitmapDrawable` — the only ungated
+	// flash.display marker interface, and the one every display subclass
+	// inherits. BitmapData is its other implementor (avm2_bitmap.c, which
+	// registers after this and picks the class up through
+	// avm2_display_ibitmapdrawable).
+	g_ibitmapdrawable_class = disp_marker_iface(ctx, "IBitmapDrawable", 0);
+	disp_implements(ctx, dobj, g_ibitmapdrawable_class, NULL);
 	avm2_builtin_add_method(ctx, dobj, "hitTestObject", do_hit_test_object);
 	avm2_builtin_add_method(ctx, dobj, "getBounds", do_get_bounds);
 	avm2_builtin_add_method(ctx, dobj, "getRect", do_get_bounds);
@@ -13853,6 +13906,15 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, loader, "close", loader_noop);
 	avm2_builtin_add_method(ctx, loader, "unload", loader_unload);
 	avm2_builtin_add_method(ctx, loader, "unloadAndStop", loader_unload);
+
+	// flash.display.AVLoader (SWF 20+) is a Loader subclass whose only own
+	// member is an `load` override. Everything else is inherited, so the
+	// shell plus the descriptor table's declaredBy re-point is the whole
+	// class (avm2/all_classes/display/swf30).
+	Avm2Class* avloader = avm2_builtin_class_api(ctx, "flash.display",
+	                                             "AVLoader", loader, 20);
+	avloader->native_init = display_native_init;
+	avloader->native_ext_size = sizeof(Avm2LoaderExt);
 
 	Avm2Class* sprite = avm2_builtin_class(ctx, "flash.display", "Sprite", doc);
 	sprite->instance_init.fn = sprite_ctor_init;
@@ -14290,8 +14352,17 @@ void avm2_register_display(Avm2Context* ctx)
 		disp_sconst(ctx, sq, "MEDIUM", "medium");
 		disp_sconst(ctx, sq, "HIGH", "high");
 		disp_sconst(ctx, sq, "BEST", "best");
-		disp_sconst(ctx, sq, "EIGHT_X_LINEAR", "8x8linear");
-		disp_sconst(ctx, sq, "SIXTEEN_X_LINEAR", "16x16linear");
+		// playerglobal names the four high-quality settings HIGH_8X8 /
+		// HIGH_8X8_LINEAR / HIGH_16X16 / HIGH_16X16_LINEAR
+		// (<ruffle>/core/src/avm2/globals/flash/display/StageQuality.as).
+		// EIGHT_X_LINEAR / SIXTEEN_X_LINEAR were invented here and were the
+		// only two members of our whole flash.display surface that Flash has
+		// at no version; no test names either identifier (only the VALUES,
+		// in displayobject_transform).
+		disp_sconst(ctx, sq, "HIGH_8X8", "8x8");
+		disp_sconst(ctx, sq, "HIGH_8X8_LINEAR", "8x8linear");
+		disp_sconst(ctx, sq, "HIGH_16X16", "16x16");
+		disp_sconst(ctx, sq, "HIGH_16X16_LINEAR", "16x16linear");
 
 		// FlashPunk's Engine sets stage.displayState = StageDisplayState.NORMAL
 		// at startup (Engine.as:113).
@@ -14327,6 +14398,64 @@ void avm2_register_display(Avm2Context* ctx)
 		disp_sconst(ctx, lsm, "HORIZONTAL", "horizontal");
 		disp_sconst(ctx, lsm, "VERTICAL", "vertical");
 		disp_sconst(ctx, lsm, "NONE", "none");
+
+		// The remaining playerglobal flash.display constant bags. Nothing in
+		// the runtime consumes these yet; they exist because
+		// getDefinitionByName has to find them at the right SWF version and
+		// describeType has to report their constants
+		// (avm2/all_classes/display/*). ActionScriptVersion and SWFVersion
+		// hold `uint`s, which our value model cannot express as a reported
+		// TYPE — that comes from the descriptor table's DtDescConst rows.
+		Avm2Class* asv = avm2_builtin_class(ctx, "flash.display",
+		                                    "ActionScriptVersion",
+		                                    b->object_class);
+		avm2_builtin_add_static_const(ctx, asv, "ACTIONSCRIPT2",
+		                              avm2_uint_value(2));
+		avm2_builtin_add_static_const(ctx, asv, "ACTIONSCRIPT3",
+		                              avm2_uint_value(3));
+
+		Avm2Class* swfv = avm2_builtin_class(ctx, "flash.display", "SWFVersion",
+		                                     b->object_class);
+		for (uint32_t i = 1; i <= 12; i++)
+		{
+			char n[12];
+			snprintf(n, sizeof(n), "FLASH%u", i);
+			avm2_builtin_add_static_const(ctx, swfv, n, avm2_uint_value(i));
+		}
+
+		Avm2Class* cc = avm2_builtin_class_api(ctx, "flash.display",
+		                                       "ColorCorrection",
+		                                       b->object_class, 10);
+		disp_sconst(ctx, cc, "DEFAULT", "default");
+		disp_sconst(ctx, cc, "ON", "on");
+		disp_sconst(ctx, cc, "OFF", "off");
+
+		Avm2Class* ccs = avm2_builtin_class_api(ctx, "flash.display",
+		                                        "ColorCorrectionSupport",
+		                                        b->object_class, 10);
+		disp_sconst(ctx, ccs, "UNSUPPORTED", "unsupported");
+		disp_sconst(ctx, ccs, "DEFAULT_ON", "defaultOn");
+		disp_sconst(ctx, ccs, "DEFAULT_OFF", "defaultOff");
+
+		Avm2Class* becs = avm2_builtin_class_api(ctx, "flash.display",
+		                                         "BitmapEncodingColorSpace",
+		                                         b->object_class, 16);
+		disp_sconst(ctx, becs, "COLORSPACE_AUTO", "auto");
+		disp_sconst(ctx, becs, "COLORSPACE_4_4_4", "4:4:4");
+		disp_sconst(ctx, becs, "COLORSPACE_4_2_2", "4:2:2");
+		disp_sconst(ctx, becs, "COLORSPACE_4_2_0", "4:2:0");
+
+		// JPEGXREncoderOptions is a plain public-var bag like its JPEG/PNG
+		// siblings in avm2_bitmap.c; the three vars are described from the
+		// table, not registered as slots.
+		avm2_builtin_class_api(ctx, "flash.display", "JPEGXREncoderOptions",
+		                       b->object_class, 16);
+
+		// NativeMenu exists from SWF 10, but every one of its members is
+		// AIR-gated, so under a Flash Player runtime it is an empty
+		// EventDispatcher subclass.
+		avm2_builtin_class_api(ctx, "flash.display", "NativeMenu",
+		                       b->event_dispatcher_class, 10);
 	}
 
 	// flash.ui.Mouse / MouseCursor — FlashPunk's Splash sets Mouse.cursor to a

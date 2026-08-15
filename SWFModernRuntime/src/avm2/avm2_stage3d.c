@@ -2530,7 +2530,10 @@ void avm2_register_stage3d(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, vt, "attachNetStream", s3d_noop);
 
 	// flash.display.Stage3D (extends EventDispatcher).
-	Avm2Class* s3d = avm2_builtin_class(ctx, "flash.display", "Stage3D", ed);
+	// flash.display.Stage3D is [API("674")] in playerglobal: SWF 13 and up
+	// (avm2/all_classes/display/swf12 does not list it).
+	Avm2Class* s3d = avm2_builtin_class_api(ctx, "flash.display", "Stage3D",
+	                                        ed, 13);
 	g_stage3d_class = s3d;
 	s3d->native_ext_size = sizeof(Avm2Stage3DExt);
 	s3d->instance_init.fn = stage3d_init;

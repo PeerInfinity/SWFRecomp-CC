@@ -6,7 +6,10 @@
 
 ---
 
-## 0. VERDICT — **GO, +6 / +6. All six `all_classes/display` rows PASS.**
+## 0. VERDICT — **GO, +6 / +6, ZERO REGRESSIONS.**
+
+**All six `all_classes/display` rows PASS; all 70 canary rows landed on exactly
+their baseline status.**
 
 The wave-1 pricing held exactly: six flips, one agent, one patch.
 The three wave-1 conditions were all met — a generator (not hand
@@ -31,7 +34,7 @@ swf9 flipped in the same build, and swf10-13 followed with no further change.
 
 ## 1. NEW FILES IN THIS PATCH (BRIEFS_COMMON s15 lesson)
 
-Three, all under `tools/descriptor/`, none compiled or linked:
+Four, all under `tools/descriptor/`, none compiled or linked:
 
 ```
 tools/descriptor/as_model.py                 (parser + [API] -> min_swf rule)
@@ -62,7 +65,7 @@ as new; stage those four by name along with the five modified C/H files.
 
 | file | what |
 |---|---|
-| `SWFModernRuntime/src/avm2/avm2_globals.c` | +4 mechanism pieces (~110 LOC) and the **1,097-line generated table block**. Corrected the shipped `min_swf` comment (it stated the wrong API-version rule). |
+| `SWFModernRuntime/src/avm2/avm2_globals.c` | +4 mechanism pieces (~110 LOC) and the **1,114-line generated table block**. Corrected the shipped `min_swf` comment (it stated the wrong API-version rule). |
 | `SWFModernRuntime/src/avm2/avm2_display.c` | 6 marker interfaces + `disp_implements`, 9 new classes, 11 class API gates, the StageQuality constant fix, AVLoader. ~190 lines. |
 | `SWFModernRuntime/src/avm2/avm2_pixelbender.c` | 7 `avm2_builtin_class` → `avm2_builtin_class_api(..., 10)` (the Shader family). |
 | `SWFModernRuntime/src/avm2/avm2_bitmap.c` | `BitmapData implements IBitmapDrawable`; PNG/JPEGEncoderOptions gated to 16. |
@@ -198,7 +201,7 @@ generalises F, so there are three new pieces plus one lookup change:
 
 497 member rows · 82 distinct parameter lists · 18 constructors · 115 constants
 · 54 re-points · 7 hides · 1 shadow row, over 65 `DtDescClass` rows —
-**1,097 generated lines**. (Wave-1 priced "360 rows / 296 params"; that counted
+**1,114 generated lines**. (Wave-1 priced "360 rows / 296 params"; that counted
 only rows that *needed work*. Emitting every declared member is what lets the
 same row serve both the vtable-fill path and the synthetic path.)
 
@@ -247,7 +250,53 @@ is called only from `dt_collect_vtable`) and cannot affect lookup at all.
 
 ## 7. Canary results
 
-CANARY_RESULTS_PLACEHOLDER
+**70 canary rows graded** (`--mode=graphics`, `-P 2`, baseline = merged CI run
+`31748059158` at `3db858cbc`, read out of
+`ruffle-tests/tests/swfs/{avm2,from_avmplus}/_results/results_graphics.md`).
+
+### **ZERO REGRESSIONS. Every canary landed on exactly its baseline status.**
+
+| tier | rows | baseline | after |
+|---|---|---|---|
+| 1 — describeType consumers | `describe_type_basic`, `describe_type_json`, `describe_type_metadata`, `describe_type_native`, `number_autoconv`, `function_proto_created`, `static_length`, `displayobject_name_from_timeline`, `font_enumeratefonts` | 9 × pass | **9 × pass** |
+| 1 — the interface-describeType pin | `from_avmplus/regress/bug_539328` | ruffle_matched | **ruffle_matched** (no drift — checked explicitly per `ruffle-matched-hides-regression`) |
+| 2 — `all_classes` rows the table already served | `errors/{swf9,swf10,swf30}`, `security/{swf11,swf12,swf13,swf30}`, `display3D/{swf12,swf13,swf30}`, `xml/{swf9,swf30}`, `accessibility/{swf9,swf10,swf30}` | 15 × pass | **15 × pass** |
+| 3 — `avm2_display.c` blast radius | `stage_properties`, `stage_properties2`, `stage_overriden_setters`, `stage_displayobject_properties`, `stage_access`, `stage_mousechildren`, `stage_mouseenabled`, `stage_invalidate`, `stage_loaderinfo_properties`, `stage_stage3Ds_vector`, `stage_domain_getQualifiedDefinitionNames`, `displayobject_metaData`, `displayobject_subclass`, `simplebutton_childprops`, `sound_rootless`, `soundchannel_soundtransform_exists`, `graphics_draw_triangles`, `graphics_path`, `bitmapdata_draw`, `bitmapdata_draw_stage`, `bitmapdata_drawwithquality`, `loader_events`, `abstract_classes` | 23 × pass | **23 × pass** |
+| 3 — already failing at baseline | `stage_display_state`, `displayobject_transform`, `simplebutton_soundtransform`, `loader_load` | 4 × output_mismatch | **4 × output_mismatch** (unchanged) |
+| 3 — `graphics_draw_path` | | ruffle_matched | **ruffle_matched** |
+| 4 — API-gate axis | `stage3d_bitmap`, `stage3d_x_y`, `stage3d_errors`, `stage3d_errors_swf_29`, `context3d_creation`, `json_version_gated`, `cross_api_version_call_older`, `cross_api_version_call_newer`, `air_hidden_lookup` | 9 × pass | **9 × pass** |
+| 4 — SWF-9 gate risk (added by me) | `loader_jpegxr`, `loader_jpegxr_alpha`, `loader_bitmap_transparency`, `avm1movie_addcallback_call` | 4 × pass | **4 × pass** |
+| 5 — must NOT drift | `all_classes/events/{swf9,swf10,swf11,swf12,swf30}` | 5 × output_mismatch | **5 × output_mismatch** (no drift) |
+
+The Tier-3 pins that would have caught the wrong mechanism choice are all green:
+`stage_properties2` and `stage_overriden_setters` grade Stage's 2071 throws by
+**callstack frame**, which is exactly what the s15 `defining_class` mutation
+would have renamed for all 30 re-pointed accessors.
+`displayobject_transform` (which reads the StageQuality string *values*) is
+unchanged at its baseline status, confirming the constant rename is
+value-transparent.
+
+**Load caveat, resolved.** The first pass ran while the box was at load ~25
+(≈10 concurrent fan-out agents on 8 cores) and produced 3 `compile_fail`s plus
+several killed-without-summary rows. All were the FALSE failures
+`BRIEFS_COMMON` §3 warns about: two causes, (a) copied test dirs need
+`--recompile` on first use, and (b) the default 300 s per-file gcc cap is hit
+under that load (`Error: compilation timed out` at `c=300.70s`). Every one of
+them was re-run sequentially on an idle box with `--recompile` and
+`SWFRECOMP_COMPILE_TIMEOUT=2400`, and every one landed on its baseline status
+(`stage_loaderinfo_properties` → pass, `soundchannel_soundtransform_exists` →
+pass, `simplebutton_soundtransform` → output_mismatch as at baseline). No
+result in the table above rests on a run that hit a timeout.
+
+**Canary blind spot (BRIEFS_COMMON s15 lesson).** The standing *render* canary
+does not exercise any of this: the patch is trace-only, touches no renderer
+path, and has zero pixel-axis effect. Tier 3 above is the covering grade. The
+one file I touched that a render sibling might also touch is `avm2_bitmap.c`,
+and only at `avm2_register_bitmap`'s two registration statements.
+
+**All six headline rows were re-verified on the FINAL tree** (after a
+late whitespace-only cleanup that removed a then-unused macro), sequentially on
+an idle box: 6/6 PASS.
 
 ---
 
