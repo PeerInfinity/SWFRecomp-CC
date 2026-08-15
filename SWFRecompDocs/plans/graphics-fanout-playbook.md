@@ -524,3 +524,145 @@ regressions, bands improved 13 / worsened 0, drift 0/0.** Ledger:
   max diff 9 vs tolerance 6 and Ruffle clears the test upstream — see §3); Stage3D (25) + h264 (12
   → really 11 + FLV seek) parked; displacement Route 2 merged into the
   filters arc.
+
+## 15. Session-15→16 state of the board (2026-08-14/15)
+
+**Closeout run `31874872388` at `86434112a`: 324 → 337/569 (59.2%; +13 = 14 gains − 1 regression fixed post-run), 2 real regressions both fixed in the follow-up commit (avm2/verify_method_info_oob: load-rejected ABC must ignore DoABC2 LAZY_INITIALIZE; visual/define_bits_lossless2_rgb15: bitmap smoothing only exists from SWF 8 — Ruffle read.rs) and re-graded by run {{RERUN}},
+bands 32 improved / 2 worsened (acid-scale 302→320, strokes/scale 66243→70119, both <7%), drift 0 new / 0 gone in the graded intersection; upstream master has since added avm1/sound_load_* ×7 + avm2/matrix3d_* ×3 and rewritten from_gnash Sound-v6/7/8 output.ruffle.txt (loadSound/onSoundComplete — new AVM1 Sound lead).** Baseline into the session was 324/569
+(56.9 %) at `3db858cbc`; **predicted +12**. Ledger:
+`polish-sweep-arc.md` §17; reports `session16-fanout-reports/`.
+
+- **Gradient ramps are now Ruffle's texel walk** (`gradient_ramp.h`, shared by
+  the recompiler and both VMs): one cursor step per texel, `alpha = 0` pinned on
+  equal ratios, never sorts, **always exactly 256 rows**. The old segment walk
+  emitted 336 rows into a 256-row slot on non-monotonic ratios — a live
+  over-run of the gradient's own texture allocation. +4
+  (`gradient_nonsequential_ratios`, `gradient_same_ratios`,
+  `gradient_radial_same_ratios`, `gradient_issue_9892`; the last needs the
+  linearRGB leg, which stores the ramp in linear space and ORs
+  `interpolation_mode << 10` into the style word). LINESTYLE2 `HasFillFlag`
+  gradient **strokes** and AVM2 `beginGradientFill` null alphas/ratios are both
+  fixed as mechanisms but **refuted as flips** — `acid-gradient-2` 12 555 → 79
+  and `graphics_gradients_nulls` 117 600 → 600, both blocked by
+  `max_outliers = 0`.
+- **AVM2 `DisplayObject.filters` renders** (cut 1, ~140 substantive lines,
+  `avm2_display.c` only, no new pipeline, no `render_stub.c` twin). §14's
+  "Route 2 owns much of the 15-row filters family" is **SUPERSEDED**: the family
+  is **27** live comparisons and Route 2 owns **7** of them; 17 are AVM1-tag-path
+  rows that already had a renderer and 3 are CPU `applyFilter`. §14's "five
+  traps incl. object-sized FilterSource" is **SUPERSEDED for
+  blur/glow/dropShadow/bevel** — Ruffle scales filters by the *stage view
+  matrix only*, so our stage-sized machinery is the same computation, proven by
+  `glow_pass_scaling` landing byte-identical to its golden. Trap 1 binds only
+  for **displacement** (cut 2). Non-obvious rules that cost real measurement:
+  BlurFilter `strength` must be forced to 1 or the object vanishes;
+  `Filter::impotent()` is **blur-only** (widening it costs `acid-filter` 34×);
+  and our `quality == 0` skip is **ours, not Ruffle's** (Ruffle composites the
+  unblurred source) — exact only when `composite_source` is set and distance
+  is 0.
+- **§14's `blur_quality` "band ceiling / goldens disagree by 1 LSB" row is
+  SUPERSEDED — it was a 2-line rounding port.** Ruffle divides by `full_size`
+  while its quantized weight sum is up to 2/255 smaller, so a uniform field
+  decays per pass, and the per-pass `floor` costs another half level. s15's
+  energy-preserving correction was the divergence. `blur_quality` and
+  `blur_pass_scaling` both flip; the feared `blur_fractional` regression does
+  not occur. The s15 comment table in `blur_axis_pass` is replaced by the
+  derivation.
+- **Flattening leg C landed, bundled — §14's "never bundle" is SUPERSEDED.**
+  AS-visible bounds come from the SWF tag's declared `ShapeBounds` RECT in our
+  recompiler *and* in Ruffle; `processShape()`'s vertex extremes never leave the
+  recompiler. Corpus-wide proof, not a sample: 4492 SWFs recompiled on both
+  binaries, 418 differ, **0 bounds-argument changes, 0 structural changes**, and
+  138/138 trace probes byte-unchanged. Free win: **−39.2 % emitted shape
+  vertices**. Pixel value is 7 band moves (`masks` −241, `drop_shadow` −436,
+  `scroll_rect_mask` 42→20, `blend_modes/multiply` 37→19, `doubleAndRegister`,
+  `avm2_button_scroll_rect`) and it costs `acid-blend-2` a little slack.
+- **Mask stencils omit strokes for timeline-character maskers** (Ruffle's
+  tessellator rule, one `static` helper in `render_webgpu.c`): `masks` and
+  `masks_equal_clipdepth` 1738 → 359 each, **181 stacked with leg C**. §14's
+  "`simple_shapes/masks` = scale/transform defect (slope, not flattening)" is
+  **SUPERSEDED and refuted** — centres agree to 0.02 px, the deltas are a
+  uniform +0.52 px *dilation*, and the "slope" came from fitting straight lines
+  to an elliptical arc. The ACCEPTED_DIFFS entry is narrowed to the measured
+  residual. Standing lesson: **a masker census over root `tagPlaceObject` rows
+  is a lower bound** — sprite maskers need the subtree walked (two unpredicted
+  band moves came from there), and `tagPlaceObject2`'s **first** numeric
+  argument is `depth`, not `char_id`.
+- **AVM1 morph colour lerp truncates** like `lerp_color` (our AVM2 twin already
+  did): `cache_as_bitmap/morph` 2832 → **0**, +1. §14's "cache_as_bitmap/morph
+  (2832, max diff 1) → disposition" is **SUPERSEDED** — it was one flat fill,
+  one channel, 84 vs 85, and the docs now carry a standing "never disposition
+  this" note. The per-character morph end-colour offset (§14's open item) is
+  **closed as hygiene**: the emitter now writes the correct base, and it moves
+  **zero** comparisons and zero trace lines (the only multi-morph pixel test is
+  AVM2, which already used the absolute index; the only multi-morph AVM1 test
+  has no image comparison). Note it changes `tagDefineMorphShape`'s arity, so
+  the deployed `docs/recompiler/runtime_headers/include_libswf_tag.h` was synced
+  in the same patch — **the WASM demo still needs a full `deploy_wasm_demo.sh`
+  redeploy** before its in-browser recompiler emits 16-argument calls.
+- **`no_render` is empty.** §14's "acid-large VRAM budgeting" is **DONE**:
+  `BITMAP_ARRAY_HARD_LIMIT` = 1.5 GiB in `plan_dynamic_bitmaps` (lavapipe's
+  2 GiB `maxMemoryAllocationSize`) **plus** per-fill bitmap smoothing. The clamp
+  **alone is a ledger trap** — it converts the `no_render` into a
+  139 500-outlier visible failure and flips nothing; ship both or neither. The
+  brief's "plumb the smoothing bit from the recompiler" is refuted: the raw SWF
+  fill-type byte (`0x40/0x41` smoothed, `0x42/0x43` not) was already in the
+  vertex buffer, so it is a pure runtime change —
+  `render_webgpu_bitmap_fill_style_word(repeat, smooth)` is now the single
+  sampler-selection point.
+- **`opaqueBackground` is implemented on all three paths** (PlaceObject3
+  BackgroundColor kept by the recompiler under Ruffle's `version >= 11` +
+  `alpha > 0` rules, AVM1 property, AVM2 accessors; world-bounds rect painted
+  **before** the mask/scrollRect push, cxform slot 0 — Ruffle's
+  `render_base` order). Priced +2, **delivered 0**: −99.2 % excess and both
+  residuals are other, named defects. AVM2 `beginBitmapFill` routes to the
+  existing `renderer_draw_bitmap_tris` (136 030 → 76 870, 185 430 → 43 013, no
+  flip) — pixels are **snapshotted, not referenced**, because
+  `Avm2GraphicsExt.paths` is outside the region `avm2_gc.c` scans.
+- **Two pixel flips arrived from the trace axis** (`bitmapdata_draw_alpha_erase`,
+  `edittext_tag_indent`): the image comparison failed *for the same reason* the
+  trace did. Standing follow-up: sweep the remaining soft `[trace-ign]` rows
+  whose trace also fails — the image diff may come free once the trace is right.
+
+**Canary changes.** `render_canary_tests.txt` gains **`visual/filters/glow_pass_scaling`**
+(tier 1 — the set's first AVM2 `.filters` member, byte-exact against its golden)
+and **`visual/cache_as_bitmap/masks`** (7 comparisons, the nearest passing AVM2
+neighbour of the new filter arm). The header note is corrected: "filters proper"
+is no longer a family with no CI-passing representative on the AVM2 route (the
+AVM1 *tag* route still is).
+
+**Canary blind spots, stated (s15 rule).** Outside `visual/simple_shapes/masks`
+itself, **no member carries a stroke-bearing masker**; **no member is an AVM1
+morph with colours**; and **no member has a smoothed (`0x40`/`0x41`) bitmap
+fill** — `acid-blend-2`'s fill is `0x43`, so the standing set could never have
+seen a smoothed-fill regression. Recommended addition:
+**`from_shumway/acid/acid-bitmap-fill`**, the only CI-passing test with a `0x40`
+repeating smoothed fill. Also uncovered: `BitmapData.draw` blend modes and
+DefineEditText layout fields (both graded by hand-picked sibling sets this
+session).
+
+**Top remaining leads.** cacheAsBitmap **`PixelSnapping::Always`** (+1 to +4;
+named mechanism, closed arithmetic, owns the `offset_translation` cluster,
+`visual/opaque_background`'s residual and part of `extra_element`);
+**`drawGraphicsData` is validation-only** — a blank-render owner for *every*
+fill kind, plus its sibling `lineBitmapStyle` (bitmap strokes); filters **cut 2**
+(the displacement trio, the only place trap 1 binds); the **EditText
+background/border family** (31 live comparisons, **at least two mechanisms** —
+missing background/border elements vs device-font glyph placement under a matrix
+— do not brief as one); `acid-filter`'s 482 and `simple_shapes/masks`'s 181, both
+now in `hairline_edge_drift`/tessellation-tie territory; and the **`blank_render`
+bucket (41 live) is the board's new multi-mechanism trap** — five unrelated
+causes, exactly the mis-scoping shape s15's `no_render` brief had. Stage3D (29
+family-wide) + h264 (11 + FLV seek) remain parked.
+
+**Two method notes worth standing rules.** (1) A **full-corpus recompiler A/B**
+— run both binaries over all 4492 `test.swf` in temp dirs and diff the generated
+C, ~25 min at `-P 2` — turns "which tests might this touch?" into an exact
+affected-test list, and it found two pixel rows (`filters/drop_shadow`,
+`blend_modes/multiply`) that a hand census had missed entirely; the gradient
+agent's variant over the 411 image-bearing tests corrected a board blast radius
+from 4 to 9. Promote the script into `ruffle-tests/`. (2) Under fan-out load the
+300 s per-file gcc cap manufactures `compile_fail`s **and** plausible-looking
+`output_mismatch`es (stale `Recompiled*` caches in `cp -r`'d dirs) — export
+`SWFRECOMP_COMPILE_TIMEOUT=2400` and pass `--recompile` on first use of every
+copied directory, canaries included.

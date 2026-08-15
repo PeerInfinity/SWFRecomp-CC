@@ -6472,6 +6472,11 @@ namespace SWFRecomp
 							"RecompiledABC", abc_symbol_prefix, abc_char_id_base);
 					}
 					abc_emitter->emitAbcLoadError(abc_load_error.message);
+					// FP rejects the ABC AT LOAD: the #1027 must surface even
+					// under DoABC2 LAZY_INITIALIZE (the runtime otherwise
+					// holds the stub's only script back and nothing prints —
+					// avm2/verify_method_info_oob).
+					abc_lazy = 0;
 				}
 				else
 				{
@@ -6487,6 +6492,7 @@ namespace SWFRecomp
 								abc_char_id_base);
 						}
 						abc_emitter->emitAbcLoadError(verr.message);
+						abc_lazy = 0;  // load-time rejection: never lazy
 					}
 					else
 					{
@@ -7045,6 +7051,17 @@ namespace SWFRecomp
 			fill_data.parseFields(cur_pos);
 			
 			fill_styles[i].type = (u8) fill_data.fields[0].value;
+			// Bitmap smoothing only exists from SWF 8 (Ruffle swf/src/read.rs
+			// read_fill_style: `is_smoothed: self.version >= 8 && ...`). Older
+			// movies wrote 0x40/0x41 for every bitmap fill and the player
+			// sampled them nearest; the s16 per-fill sampler made that visible
+			// (visual/define_bits_lossless2_rgb15, SWF 6, went 0 -> 5850).
+			if (header.version < 8
+			    && (fill_styles[i].type == FILL_BITMAP_REPEAT
+			        || fill_styles[i].type == FILL_BITMAP_CLIPPED))
+			{
+				fill_styles[i].type |= 0x02;
+			}
 			
 			switch (fill_styles[i].type)
 			{
@@ -7394,6 +7411,17 @@ namespace SWFRecomp
 			fill_data.parseFields(cur_pos);
 
 			fill_styles[i].type = (u8) fill_data.fields[0].value;
+			// Bitmap smoothing only exists from SWF 8 (Ruffle swf/src/read.rs
+			// read_fill_style: `is_smoothed: self.version >= 8 && ...`). Older
+			// movies wrote 0x40/0x41 for every bitmap fill and the player
+			// sampled them nearest; the s16 per-fill sampler made that visible
+			// (visual/define_bits_lossless2_rgb15, SWF 6, went 0 -> 5850).
+			if (header.version < 8
+			    && (fill_styles[i].type == FILL_BITMAP_REPEAT
+			        || fill_styles[i].type == FILL_BITMAP_CLIPPED))
+			{
+				fill_styles[i].type |= 0x02;
+			}
 
 			switch (fill_styles[i].type)
 			{

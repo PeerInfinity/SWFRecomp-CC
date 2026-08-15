@@ -1929,3 +1929,490 @@ ceiling +1 gated on gradient morph fill (tranche); cache_as_bitmap/morph
 (2832, max diff 1) → disposition. Method note: on max_outliers=0 rows band
 count is not monotone in correctness — compare changed-region bbox +
 colour histogram vs golden before ruling NO-GO.
+
+---
+
+## 17. Session 16 (2026-08-14/15) — dual-axis fan-out #8: trace +15 (4313/4443 eff; +19 gains, 3 drift), pixels +13 (337/569, 59.2%), 2 regressions fixed post-run
+
+Commits `cd04f80b9..86434112a` (13 session commits, 11 wave-2 merges + the
+wave-1 archive), closeout CI run `31874872388` at `86434112a`
+(graphics / full / images=true). Baseline was trace **4298 / 4443 effective**
+and pixels **324 / 569 (56.9 %)** from run `31748059158` at `3db858cbc`.
+**Predicted: trace +19, pixels +12.** Measured: trace **4298 → 4313/4443 eff (+15 intersection = 19 gains − 4 effective→fail, of which 3 are upstream drift on gnash Sound-v6/7/8 and 1 is a real regression fixed post-run)**,
+pixels **324 → 337/569 (59.2%; +13 = 14 gains − 1 regression fixed post-run)**, 2 real regressions both fixed in the follow-up commit (avm2/verify_method_info_oob: load-rejected ABC must ignore DoABC2 LAZY_INITIALIZE; visual/define_bits_lossless2_rgb15: bitmap smoothing only exists from SWF 8 — Ruffle read.rs) and re-graded by run {{RERUN}}, bands 32 improved / 2 worsened (acid-scale 302→320, strokes/scale 66243→70119, both <7%), drift 0 new / 0 gone in the graded intersection; upstream master has since added avm1/sound_load_* ×7 + avm2/matrix3d_* ×3 and rewritten from_gnash Sound-v6/7/8 output.ruffle.txt (loadSound/onSoundComplete — new AVM1 Sound lead).
+7 wave-1 + 11 wave-2 agents; reports and patches in
+`session16-fanout-reports/`.
+
+Merge order (each merged as its own commit with a per-patch ledger in the
+message): w2-ignore-bucket · w2-all-classes-display · w2-gfx-filters · w2-geom ·
+w2-trace-smalls · w2-gfx-shapes-morph · w2-avm1-child · w2-gfx-vram ·
+w2-gfx-gradient (+ w2-gfx-opaque's bitmapfill leg) · w2-gfx-opaque ·
+w2-gfx-flatten-legC.
+
+### 17.1 Ledger (trace +19 predicted)
+
+- **ignore-bucket +2** — `avm2/bitmapdata_draw_alpha_erase` (BlendMode
+  ALPHA/ERASE on the CPU `BitmapData.draw` path; exact-integer premul round trip
+  through `FLASH_PREMUL_FACTOR` — the naive float unmultiply is off by one) and
+  `avm2/edittext_tag_indent` (DefineEditText `Indent` is **SI16**, not UI16;
+  SWF19 is wrong and Ruffle carries the same note — our AVM1 reader was already
+  right, only `abc_timeline.cpp` was unsigned; exactly 2 SWFs corpus-wide carry
+  a negative indent, and they are the same fixture).
+- **all_classes/display +6** (swf9/10/11/12/13/30, all-or-nothing, all six pass).
+  Derived — not transcribed — from Ruffle's playerglobal `.as` stubs by a new
+  checked-in generator (`tools/descriptor/`, 4 Python files, none compiled);
+  `check_model.py` grades the model against the six expected files at **0 / ~2900
+  element mismatches** with no build, which is why the arc landed in one build
+  cycle. 497 member rows / 82 parameter lists / 18 ctors / 115 constants /
+  54 declaredBy re-points / 7 hides / 1 shadow row = 1,114 generated lines
+  spliced into `avm2_globals.c` between markers. 14 new classes, 32 class API
+  gates, 6 marker interfaces, and the
+  `StageQuality.{EIGHT,SIXTEEN}_X_LINEAR → HIGH_8X8[_LINEAR]/HIGH_16X16[_LINEAR]`
+  correctness fix. New describe-only mechanisms: `DtDescRedecl` (re-point OR
+  hide, applied as a post-pass — deliberately **not** the s15 `defining_class`
+  mutation), `DtDescClass.chain_lookup`, `access` on the non-synthetic path.
+- **geom +3** — `avm2/matrix`, `avm2/geom_transform`,
+  `from_shumway/avm2/flash/geom/matrix3d/TransformBasics`. Five gaps:
+  `Matrix.copyRowTo`/`copyColumnTo` never registered; `copyColumnFrom` **is
+  literally `copyRowFrom`** in Flash (an FP bug Ruffle replicates and the oracle
+  proves); `createBox`'s rotation argument is optional; `Transform.matrix` /
+  `.matrix3D` duality via Ruffle's `has_matrix3d_stub` bit (carried as a
+  `dont_enum` dynamic prop, **no new struct field**); `getRelativeMatrix3D` +
+  Error #2189 (an FP rule Ruffle does **not** have — its own
+  `output.ruffle.txt` is doubly stale, so `ruffle_matched` was never reachable
+  and full Flash parity was).
+- **trace-smalls +4** — `avm2/delayed_symbolclass` (`runSWF_avm2` step 3 eagerly
+  init'd every ABC's last script regardless of `LAZY_INITIALIZE`; the deferred
+  SymbolClass machinery was already correct, 17 lines, gated on `root_class`);
+  `from_shumway/acid/acid-morph` (MorphShape excluded from `has_pick_geometry`,
+  so hit tests fell back to the START shape's bounds — new ratio-lerped
+  triangle arm in `shape_contains_local`, same math the CPU rasteriser draws
+  with); `from_shumway/as3-loader/LoaderTest2` (`loader_boot_child_swf` called
+  `run_frame_internal` but never `flush_queued_places`, so the loaded root had
+  no named children when `complete` fired); `import_assets/avm1_imports_avm1`
+  (`actionImportAssets` sets `catch_up_mode` **and** `g_tag_skip_mode`, and the
+  emitted guard `if (!catch_up_mode || g_tag_skip_mode)` is then true — the
+  imported movie's own frame-1 DoAction ran).
+- **avm1-child +4** — `mixed_avm/avm2_loads_avm1{,_v9,_v10}` and
+  `avm2/localconnection` (890 expected lines, **unpriced by wave 1**). Four
+  legs: Loader-loaded AVM1 root depth `-77824` (Ruffle
+  `LOADER_INSERTED_AVM1_DEPTH + AVM_DEPTH_BIAS`); `addChild(AVM1Movie)` → #2180
+  for a root SWF > 9; an AVM1 mouse **broadcast** bridge under AVM2; a cross-VM
+  LocalConnection bridge in both directions (two `has_channel`/`deliver` pairs,
+  never a merged registry) plus an `AVM1Movie` x/y mirror into the AVM1 root.
+  `mixed_avm` now has exactly one row left (`avm1_loads_avm2`, the build arc).
+- Doc riders: `avm2/avm1_root` written up as a RUFFLE_VS_FLASH row (`_level-61440`
+  vs `_root`); `avm2/ignored_tests.txt`'s stale "needs graphics renderer"
+  heading re-triaged by name and owner; `geom_transform` pruned from that list.
+
+### 17.2 Ledger (pixels +12 predicted)
+
+- **filters +4** — `visual/filters/glow_pass_scaling` (**byte-identical to the
+  golden**, max diff 0), `visual/cache_as_bitmap/contains_grown_filter`,
+  `visual/filters/blur_quality`, `visual/filters/blur_pass_scaling` (needs both
+  legs). Three routes: AVM2 `DisplayObject.filters` cut 1 (stage-space offscreen
+  capture through the existing `filter_tex_a/b` ping-pong — no new pipeline, no
+  `render_stub.c` twin, ~240 lines in `avm2_display.c`); a nested-sprite filter
+  arm in `tag.c::render_display_list` gated on `!g_clip_mask_capture` and a new
+  `g_filter_capture_depth`; and CPU `applyFilter` blur rounding
+  (`denom = 255 * full_size`, `floor` not `floor(x+0.5)` — two substantive
+  lines).
+- **shapes-morph +1** — `visual/cache_as_bitmap/morph` 2832 → **0**. AVM1 morph
+  colour lerp must **truncate** on the u8 scale like Ruffle's `lerp_color`
+  (ratio 43691 on RED→BLUE gives `84.9975`; we rounded to 85). Our AVM2 twin
+  already truncated. Also landed, no pixels: mask stencil omits strokes for
+  timeline-character maskers (`simple_shapes/masks` and `masks_equal_clipdepth`
+  1738 → 359 each), and the per-character morph end-colour base fix (hygiene).
+- **vram +1** — `from_shumway/acid/acid-large` `no_render` → **pass** (0
+  outliers, max 3 vs tol 11). `BITMAP_ARRAY_HARD_LIMIT` = 1.5 GiB in
+  `plan_dynamic_bitmaps` (lavapipe's 2 GiB `maxMemoryAllocationSize`) **plus**
+  per-fill bitmap smoothing (SWF fill bytes `0x40/0x41` → a second Linear
+  sampler; `0x42/0x43` keep Nearest through the unchanged expression).
+- **gradient +4** — `visual/gradient_nonsequential_ratios`,
+  `gradient_same_ratios`, `gradient_radial_same_ratios`, `gradient_issue_9892`
+  (the last needs the linearRGB leg). One shared texel-indexed ramp walk
+  (`SWFModernRuntime/include/gradient_ramp.h`, **new file**) ported from
+  `CommonGradient::new`: one cursor step per texel, `alpha = 0` pin on equal
+  ratios, never sorts, always exactly 256 rows. The old segment walk emitted
+  **336** rows into a 256-row slot for `gradient_nonsequential_ratios`.
+- **ignore-bucket +2** — both trace fixes above also flip their image
+  comparison (15 000 → 0 and 7 884 → 0). Neither was on the pixel board's flip
+  list; the gfx board carried them only as soft `[trace-ign]` rows.
+- **Band moves, no flips**: `visual/opaque_background` 231 232 → 3 856 and
+  `avm2/displayobject_opaque_background` 17 004 → 20 (opaqueBackground now
+  implemented on all three paths — PlaceObject3 BackgroundColor kept by the
+  recompiler under Ruffle's `version >= 11` + `alpha > 0` rules, AVM1 property,
+  AVM2 accessors, painted before the mask/scrollRect push at cxform slot 0);
+  `avm2/graphics_bitmap_fill` 136 030 → 76 870 and `avm2/graphics_bitmaps`
+  185 430 → 43 013 (AVM2 `beginBitmapFill` routed to the existing
+  `renderer_draw_bitmap_tris`); `from_shumway/acid/acid-filter`
+  152 866 → **482** (watch, tol 4 / max_outliers 0);
+  `blur_scales_with_screen` 69 254 → 30 810; `acid-gradient-2` 12 555 → **79**;
+  `graphics_gradients_nulls` 117 600 → **600**; `acid-bitmap-fill`
+  67 908 → 63 432 (97.0 % → 90.6 % of budget); `acid-color-0` 34 323 → 32 532.
+  Leg C adds `simple_shapes/masks` 1738 → 1497 alone (**181** stacked with the
+  mask-stroke fix), `filters/drop_shadow` −436, `scroll_rect_mask` 42 → 20,
+  `blend_modes/multiply` 37 → 19, `doubleAndRegister` 32 → 26,
+  `avm2_button_scroll_rect` 9 → 6.
+- **On-budget / watch rows to check first in the closeout run**:
+  `acid-blend-2 [output.15]` (leg C costs +50, leaving **74** of a 6000 budget —
+  the intended fix if it flips is raising that row's `max_outliers` to 6500, it
+  is a blend instrument not a curve instrument); `blur_quality` at max 6 vs
+  tol 6 and `blur_fractional` at max 5 vs tol 5; `acid-filter`'s 482 residual
+  (all antialiased edge — the `hairline_edge_drift` class, exactly where local
+  Dawn and CI lavapipe disagree).
+
+### 17.3 Incidents and method notes
+
+1. **The weekly usage limit killed the entire wave-2 fleet mid-flight.** All ten
+   wave-2 Opus agents in flight at ~22:30 PT were terminated by the weekly cap
+   and resumed via `SendMessage` after the midnight reset. **Every worktree
+   preserved its partial work; zero loss.** The fan-out worktree model is what
+   made this survivable — record it as a property of the method, not luck.
+2. **`verify_output.py`'s per-file gcc timeout is 300 s, and under fan-out load
+   it manufactures false `compile_fail`s.** Four separate agents lost 40+ min
+   each to it (measured `c=301.08s`, `c=302.68s`, `c=304s`; load average 25–43
+   on 8 cores with ~10 agents). Re-running at the same ceiling just reproduces
+   it — **the ceiling has to move**: `SWFRECOMP_COMPILE_TIMEOUT=2400`. This is
+   now mandatory in `BRIEFS_COMMON.md`. Its cousin: zero-byte logs are the same
+   event with the process killed before printing, and OOM-killed gcc reads as
+   `compile_fail` too.
+3. **Unscoped `pkill -f` is a cross-agent kill.** Two agents ran
+   `pkill -f "render_canary.py capture"` / `pkill -f verify_output.py` to stop
+   their own runs and took down siblings' `before` captures (orphaned children
+   kept running, so the damage was "capture aborted", not corruption; one
+   orphan later `rmtree`d a build directory out from under a restarted run).
+   The standing `pkill-f-self-match` note covers self-matching only — **widen
+   it: select by worktree hash or PID**
+   (`pgrep -af <worktree-hash> | grep verify_output | awk '{print $1}' | xargs kill`).
+4. **The session scratchpad is shared across agents**, keyed by session and not
+   by agent. Two agents had `base.py` / `copy_canaries.sh` / `ledger.py`
+   overwritten mid-run by siblings using the same generic basenames. Namespace
+   every scratch file (`w2gfxgrad/`, `w2shapes/`, `w2acd/`).
+5. **One textual merge conflict, in `avm2_display.c`**: w2-gfx-opaque and
+   w2-gfx-filters both inserted a new static function immediately above
+   `avm2_render_node`. Resolved by keeping both. Every other pair of the 11
+   merges applied clean — the sibling-overlap audits in the briefs worked.
+6. **`--recompile` applies to canary directories too, not just headline rows.**
+   Six canaries came back `COMPILE_FAIL` (`undefined reference to
+   avm2_generated_symbol_class_frames`) or, worse, a *plausible-looking*
+   `output_mismatch` (every caret at column 0) purely because `cp -r`'d test
+   dirs carried stale/partial `Recompiled*` caches. The mismatch flavour is the
+   dangerous one — it does not announce itself as a build artefact.
+7. **A long-running foreground Bash command can process-group-kill every
+   background task in the same worktree** (exit 144), destroying partial
+   captures. `setsid nohup` survives it.
+8. **The corpus-wide recompiler A/B is cheap and should be standard for any
+   `SWFRecomp/` change**: run both binaries over all 4492 `test.swf` in temp
+   dirs and diff the generated C (~25 min at `-P 2`). Leg C used it to convert
+   "which tests might this touch?" into an exact **418-test** list, and it found
+   the two pixel rows (`filters/drop_shadow`, `blend_modes/multiply`) the s15
+   census had missed entirely. w2-gfx-gradient ran the same audit over the 411
+   image-bearing tests and corrected the board's blast radius from 4 to 9.
+   Promote `scratchpad/legC/sweep.sh` into `ruffle-tests/`.
+9. **Trace-axis A/B against the stored `results_graphics.json` fingerprint**
+   (`status` + `lines.{actual,expected,matching}` + `detail`) halves the work:
+   a probe test that returns the baseline fingerprint needs no base-leg run.
+   Only mismatches need attribution — leg C had 3 of 138, all of which turned
+   out to be **stale baseline rows**, not effects.
+
+**Wave-1 refutation yield: 19 named refutations across the 7 boards** (trace
+board §7 ×5, shapes-morph §4 ×5, all-classes ×4, filters §9 ×3, vram ×2), plus a
+full re-verification of every §16.4 / playbook-§14 lead. Wave 2 then refuted
+several of wave 1's own prices. The ones worth carrying:
+
+- **"The six unbacked `ignored_tests.txt` entries" (s15 §16.4) — REFUTED: all
+  six are backed.** The genuinely unbacked bucket is one file over
+  (`avm2/ignored_tests.txt`), and re-checking all 52 of its entries found three
+  that are **`pass`** (`int_toprecision`, `uint_toprecision` — both s15 fixes
+  hiding in the filtered report — plus `bytearray_oom`, deliberately kept
+  because it records an upstream `ignore = true`). Related and permanent:
+  **editing an ignore list moves the graded number by exactly zero** —
+  `verify_output.py` never opens it, `corpus_status_diff.py` reads the
+  unfiltered stem, and `filter_results.py` is a separate post-pass. Removing a
+  *failing* row makes the filtered number go **down**.
+- **s15's "our double→string is not shortest-round-trip" — REFUTED.**
+  `avm2_value.c::shortest_digits()` already does the Rust/Ruffle-identical
+  shortest round trip plus the exact-decimal-tie away-from-zero re-round glibc
+  gets wrong. The cited pairs are **different doubles**, both already shortest;
+  the gap was arithmetic (L1's missing twip quantization). Do not brief a
+  formatting probe.
+- **The s15 API-version formula in `avm2_globals.c` was WRONG below ordinal 12**
+  and mis-stated the AIR rule (AIR ordinals are hidden at every version — mapped
+  to `VM_INTERNAL` — not rounded up). It would have put ~30 of 51 member gates
+  and ~25 of 32 class gates on the wrong version, and all five lower
+  `all_classes/display` rows depend on getting it right. Fixed once, in
+  `as_model.api_min_swf`, and the shipped comment corrected with it.
+- **AVM2 filters Route 2 was priced at "~250–350 lines across `avm2_display.c` +
+  `render_webgpu.c` + a `render_stub.c` twin, risk high". Actual: ~140 lines
+  (240 as shipped with comments), ONE file, no renderer change, no stub twin,
+  risk low.** The 250–350 estimate belongs to the *displacement* pipeline
+  (cut 2), which is the only place trap 1 (object-sized `FilterSource`) binds.
+  Route 2 also owns **7** of the filters family's **27** live rows, not "much of
+  15" — 17 are AVM1-tag-path rows that already have a renderer.
+- **L1 (twip-quantize `localToGlobal`/`globalToLocal`) priced +1/+2/+4 and
+  delivered 0 flips.** The arithmetic is confirmed digit-for-digit against the
+  Flash oracle and `displayobject_scrollrect` went 14 diff lines → 6, but every
+  row the board priced for it is limited by a *different* mechanism
+  (`hittestpoint_boundary` never calls localToGlobal; `bounds_mode` is
+  pixelBounds + width-setter ULPs; `stage_scale_factor` needs a simulated 2×
+  display; `matrix` was pure L2). **A diff-line lead is not a flip lead** —
+  price the *limiting* mechanism per row, not the shared signature.
+- **P2 `opaqueBackground` priced +2, delivered 0** (−99.2 % excess). Both
+  residuals are a different, precisely-named defect: cacheAsBitmap
+  `PixelSnapping::Always` (the whole left block is 1 px right and 1 px down;
+  arithmetic closes exactly at 35.5 → 36) and 10 circle-edge pixels.
+- **VRAM clamp A alone is a ledger trap**: it converts the corpus's only
+  `no_render` into a **139 500-outlier visible failure** and flips nothing. Ship
+  A+B or neither. Also refuted: the brief's "plumb the smoothing bit from the
+  recompiler through bit 15 of `style_id`" — the raw fill-type byte was already
+  in the vertex buffer (`0x41` in `acid-large`'s emitted shape data), so B is
+  100 % runtime.
+- **The s15/shapes-morph `blur_quality` NO-GO ("max diff 9 vs tol 6, needs a
+  Ruffle intermediate-pass dump") is REFUTED — 2 lines, +2 comparisons, no
+  regression.** The rule is in `blur.wgsl` line 68 and `blur.rs:245`: Ruffle
+  divides by `full_size` while its weight sum is up to 2/255 smaller (the
+  `alpha` weight is quantized down), so a uniform field *decays* on every pass,
+  and the per-pass `floor` costs another half level. An exact numeric model
+  reproduces the observed max diff **9** to the level and predicts (correctly)
+  that it appears only on EVEN blur sizes. The feared `blur_fractional`
+  regression does not happen at all — s15's "48 outlier channels" prediction was
+  measuring something else.
+- **Leg C's "solo CI dispatch" premise is REFUTED.** s15 held it because
+  `processShape()` derives `shape.min/max` from flattened vertices and that was
+  believed to feed `getBounds`/`_width`/`_height`. It does not: AS-visible
+  bounds come from the SWF tag's declared `ShapeBounds` **RECT** in our
+  recompiler *and* in Ruffle (`Graphic::self_bounds` → `shape_bounds` →
+  `read_rectangle()`); `processShape()`'s extremes never leave the recompiler.
+  Verified corpus-wide, not sampled: 4492 SWFs recompiled on both binaries,
+  418 differ, **0 bounds-argument changes, 0 structural changes, 0
+  `ng_record_char_path` changes**, and 138/138 trace probes byte-unchanged.
+  Free win: **−39.2 % emitted shape vertices** (10.36 M → 6.30 M rows). It was
+  bundled.
+- **Gradient P3/P4 confirmed as mechanisms, refuted as flips** —
+  `graphics_gradients_nulls` 117 600 → 600 and `acid-gradient-2` 12 555 → 79,
+  both blocked by `max_outliers = 0`. The board's gradient blast radius was
+  **9 graded tests, not 4** (its scanner could not see the LINESTYLE2
+  gradient-stroke path); all 9 were already failing, so no passing test's
+  recompiler output changed. The linearRGB leg, by contrast, *does* reach five
+  passing tests — 4 byte-identical, `focal_radial` moved strictly toward the
+  golden — which is why it shipped as a separately-revertable patch.
+- **`all_classes/events` is NOT a free rider on the display generator.** Same
+  grader gives **113 element mismatches** across 5 versions (vs 0 for display);
+  6 are real Ruffle-vs-playerglobal `.as` divergences (AIR-era constructor
+  params on KeyboardEvent/MouseEvent/TouchEvent/…), plus an interface-`uri`
+  mechanism display's empty markers never exercise — for **0 flips** (all five
+  rows are upstream `known_failure`).
+
+### 17.4 Left on the board (session 17)
+
+**Trace.**
+
+- `text/links_in_scrolled_text` — patch delivered but **HELD** (0 flips). Half
+  the row is closed: AVM1 `TextField.scroll`/`.hscroll` are author-set view
+  offsets the hit test never added back (`scroll_lines` threaded through
+  `ng_getCharIndexAtPoint`, strict no-op for every unscrolled field). The
+  residual is the **vertical line model**: the click lands one line low on the
+  phantom empty 15th line our HTML→text conversion produces for a trailing
+  `</p>`, which also inflates `maxscroll` to 8. **Completion mechanism:** grade
+  `maxscroll`/`bottomScroll` for this field against Flash first — if Flash says
+  7, exclude the phantom line from the scroll window and the held patch carries
+  the rest; if 8, the line-height estimate is short by one line. Owner is
+  whoever holds `ng_shared.c`'s line model, paired canary
+  `text/text_caret_placement_scroll`.
+- `avm2/method_association` — **+1, two commits, recompiler + runtime.** The
+  five expected lines are `1107 / 1107 / 1034 / Passed / Passed`; the third and
+  fifth are both `test3`. (1) `abc_emit.cpp`: build the set of method_infos
+  bound to any trait / `iinit` / `cinit` / script init, then per body emit
+  `avm2_throw_verify_error(act, 1107)` as the **first statement, ahead of
+  `avm2_try_push_frame`** for `NewFunction <bound>` or `CallStatic <unbound>` —
+  avmplus raises it at verify time, before the method's own `try` frame exists,
+  which is why a runtime-only throw lands in the wrong `catch`. (2)
+  `avm2_op_callstatic` coerces the receiver to
+  `method_env_class[method_index]` and throws #1034. Neither alone flips it.
+  Grade `avm2/verify_method_info_duplicate` in the same slot; `categories=full`.
+- `avm2/scope_optimizations` — **+1, recompiler-only, ~1 slot.** Opcode window
+  identified exactly (`abc0_methods.c`, `Test/Test` method 10, ops 17–23): a
+  `Coerce Superclass` before `PushScope` gives the scope entry a *static* type
+  that lacks the trait, so avmplus's verifier skips that entry and the lookup
+  falls through to the global class. Fix: track a per-stack-slot static class
+  from `Coerce`, remember it at `PushScope`, and at `FindProperty[Strict]`
+  **reduce the emitted `scope_n`** past trailing entries whose static class is
+  sealed, fully known in this ABC, and provably lacks the name. The
+  sealed-class restriction is what keeps it sound (`with` scopes are
+  `is_with = 1` and must never be skipped).
+- `avm2/supercalls_coerce` (**L6, +1, untaken**) — every `super` property
+  get/set/call whose argument or return fails coercion must raise **#1034**; we
+  raise five different codes and on the first two do not raise at all. One rule,
+  seven lines.
+- `all_classes/events` ×5 — **0 flips**, but ~1 mechanism + ~6 adjudications
+  with `tools/descriptor/` reusable verbatim (`check_model.py <suite-dir>
+  flash.events` already grades it). Correctness/foundation item only.
+- `avm2/number_convert_errors` — DEFER stands, structural
+  (`Number$/_convert` + `builtin::` frames + int/uint primitive forwarders).
+- **Cross-VM hit test (leg E)** — `avm2/mouse_pick_avm1_root` (1 line),
+  `avm2/mouse_pick_loader_avm1` (37). Three requirements: the AVM2 pick walk
+  must descend into an AVM1 child's display list and attribute the hit to the
+  wrapping `Loader`; a hit on AVM1 content must NOT also produce an AVM2 `click`
+  on the Stage; and **AVM1 timers must run under AVM2** —
+  `actionTickAvm1ChildrenUnderAvm2` deliberately excludes `processTimers` for
+  want of an honest frame budget. **Flip condition:** hand the AVM2 frame loop's
+  real frame duration to `processTimers`, plus the pick-walk descent. s16's
+  LocalConnection drain is the precedent for adding a second AVM1 phase to that
+  tick, so the timer arm is now a small gated edit, not plumbing.
+- **Cross-VM focus / Tab / `Selection` (leg F)** —
+  `avm2/selection_onsetfocus_mixed_avm` (5 lines, we emit **zero**),
+  `avm2/focus_events_mixed_avm_edittext` (48). No cheap slice: needs AVM2 focus
+  changes broadcasting into AVM1's `Selection` listener list with `null` for
+  AVM2 objects, AVM1 TextFields in the AVM2 tab order, and AVM1
+  `onSetFocus`/`onKillFocus` dispatch — **all three together**.
+- **Timeline-order arc (12 rows, worth its own solo session)** — action_order ×7
+  (`ActionOrderTest3/4/5`, `PlaceAndRemove`, `extend_test`, `test6`, `test11`),
+  `timeline/missing_frame_scripts`, `avm1/looping_child_swf{5,9,32}`, and
+  `avm2/button_nested_frame_simple` (miss 0, 12 EXTRA lines: two spare tick
+  cycles past `num_ticks = 3` **and** child framescripts firing twice — two
+  distinct timeline-core defects). Note leg C's finding that the stored
+  `results_graphics.json` rows for `ActionOrderTest3/4` and
+  `RegisterClassTest4` are **stale relative to `cd04f80b9`** — re-baseline them
+  before pricing.
+- **Committed scroll rect** — Ruffle's `next_scroll_rect → scroll_rect` latched
+  per frame plus `Matrix::translate(-x_min,-y_min)` folded into
+  `display_world_matrix()` for self and each ancestor. Worth the remaining 6
+  diff lines of `displayobject_scrollrect` and the correct `hitTestPoint` crop.
+  **Must be driven by the frame loop, not the renderer**, for mode parity.
+- `avm2/displayobject_hittestpoint_boundary` is **much closer than the board
+  thinks and is NOT a geometry-quantisation row**: its 18 "missing" lines are
+  one leading blank line (the fixture opens with `trace("")`; check whether the
+  harness or the runtime eats it) plus a shape-hit-test **edge-exclusivity**
+  rule — a point exactly on an octagon vertex/edge must read `false`. Two small
+  independent fixes and it flips.
+- Unowned single-mechanism clusters found while pricing L1/L2:
+  `transform.pixelBounds` (10 rows in `bounds_mode`; a 0.75 px origin offset),
+  the quality-scaled `concatenatedMatrix` family (22 rows in
+  `displayobject_transform`, 5 more in `bounds_mode`'s neighbours), and
+  `width=`/`height=` setter ULPs (`3.076923076923077` vs `3.0769230769230775`
+  for `200/65`, 6 rows, no `[approximations]` cover). Also
+  `Stage.localToGlobal` ignores the Stage's own matrix in Flash — a one-line
+  rule that only pays if a test other than `stage_scale_factor` exercises it
+  (that one needs a simulated 2× display and can never pass here).
+- Standing NO-GOs re-verified at `cd04f80b9`, do not re-cost: `bug_483783`
+  (arena genuinely 99.998 % full; third-arc option is avmplus dependent strings
+  + a GC single-block-free change), gnash `array-v5..v8` /
+  `MovieClip-v6/7/8` / `argstest-v6/7/8`, `eforin_001/002` (avmplus
+  `InlineHashtable` probe order — every passing for-in test depends on our
+  insertion order), `avm1/set_property_values/swf4-7` (documented float
+  blocker), `avm2/{loader_load,bom}` (hashbrown order),
+  `avm2/{swz,loader_applicationDomain}` (ACCEPTED_DIFFS Cat 13),
+  `verify_method_info_duplicate` (fixing it demotes the passing `_oob`),
+  `from_avmplus/recursion/pcre_find_fixedlength` (+1 for a regex
+  capture-semantics rewrite), `from_gnash/misc-swfc.all/sound` (**unpassable by
+  construction** — its `output.txt` is a truncated capture of an abandoned
+  Ruffle run; write it up).
+- Ignore-list hygiene left undone (0 flips, but it keeps costing sessions):
+  16 `from_shumway/fuzz/*` entries and `avm2/{int,uint}_toprecision` are `pass`
+  and meet the files' own prune criterion; **34 entries have no rationale in any
+  of the four disposition docs**; and the four surviving rows in the re-triaged
+  `avm2` image-comparison block should be deleted on merit as their leads land
+  (deleting them drops the *filtered* count by 4 and the graded count by 0).
+
+**Pixels.**
+
+- **cacheAsBitmap `PixelSnapping::Always` — the top new lead, +1 to +4.**
+  Mechanism named and arithmetic closed: for a `BitmapCache` object the blit
+  goes back at `bounds.x_min` in world twips and Ruffle rounds 35.5 → 36 /
+  59.5 → 60 (`display_object.rs:1109`). **Completion mechanism:** capture
+  PlaceObject3's `BitmapCache` byte (currently `swf.cpp:4313`, `cur_pos += 1`)
+  onto the display entry, and for such an entry translate its world matrix by
+  `(round(x_min_px) − x_min_px, round(y_min_px) − y_min_px)` before drawing — a
+  dynamic transform slot + an `xform_override` push, machinery
+  `compose_children` already owns. It almost certainly owns the existing
+  `offset_translation` cluster (`cache_as_bitmap/text`,
+  `cache_as_bitmap/edittext_hscroll`, `text/br_at_start`; cluster yield 1.00),
+  part of `extra_element` (`cab_mask_alpha`, `cab_mask_transform`), and
+  `visual/opaque_background`'s 3 856 residual.
+- **`drawGraphicsData` is validation-only** — `gfx_draw_graphics_data`
+  (`avm2_display.c:8819`) walks the vector to raise #2004/#2008 and draws
+  **nothing**. It is a blank-render owner for *every* fill kind, not just
+  bitmaps, and blocks half of `avm2/graphics_bitmap_fill` (2 of its 4 quadrants)
+  today. Its sibling `lineBitmapStyle` (bitmap **strokes**) blocks the other
+  half of both P5 rows and needs the stroke tessellator to carry a bitmap style.
+  Recommend `drawGraphicsData` as its own s17 lead — it is the bigger prize.
+- **`avm2/displayobject_opaque_background`'s 10 circle-edge pixels** — anchor
+  and control points are already identical to Ruffle's `UNIT_CIRCLE_POINTS` and
+  the flattener is already lyon's, so the residual is sub-chord rasterisation
+  phase. **Refuted:** quantizing `gfx_add_cmd` coordinates to integer twips made
+  it *worse* (20 → 28), so the standing "quantize first" lesson is not the
+  answer here. Completion mechanism: a sub-pixel A/B of the AVM2 fill rasteriser
+  against lyon+wgpu at `quality = "low"` (1 sample).
+- **`acid-filter`'s 482 residual** is a coin flip at tol 4 / `max_outliers` 0 —
+  all antialiased edge on two rotated diamonds, i.e. `hairline_edge_drift`,
+  precisely where local Dawn and CI lavapipe disagree. Read it off the closeout
+  run before spending a slot.
+- **`simple_shapes/masks` 181** (mask-stroke fix stacked with leg C, from 1738).
+  The remaining transitions are *balanced* saturated-palette swaps in both
+  directions, ≤4 px per row — the 1-sample tessellation-tie signature. The
+  ACCEPTED_DIFFS entry is now narrowed to that; the old "scale/transform defect
+  (slope differs)" framing is refuted (the slope came from fitting straight
+  lines to an elliptical arc).
+- **`blank_render` (41 live) is now the board's multi-mechanism trap** — 25
+  Stage3D + 2 jpegxr + 2 `graphics_bitmap*` + 2 oversize masks + `acid-gradient-2`
+  + `acid-shapes` + `definefont4` + device-font + 2 netstream + `h264_multinalu`
+  + `acid-bitmap-draw_quality_high` + `graphics_gradients_nulls`. Anyone briefed
+  on it as one item will mis-scope it the way s15's `no_render` brief would
+  have. (`no_render` is now **empty**.)
+- **`acid-blend-2` slack**: `[output.15]` sits at **74 / 6000** after leg C
+  (1.2 %). It is the canary's only curve-bearing image-passing member, so it is
+  both the instrument and the exposure. If CI flips it, raise its
+  `max_outliers` to 6500 rather than unwinding leg C.
+- **`blur_scales_with_screen`** 30 810 residual (the filter now renders, the
+  blurred result still misses) and the **displacement trio**
+  (`displacement_map` 123 279, `_scales_with_screen` 99 353, `_through_filters`
+  27 565) — the latter is filters cut 2 and **the only place trap 1 binds**:
+  wrap/clamp are defined on the source rect, so a stage-sized port wraps the
+  *stage*. Cut 2 must pass the object's screen rect as uniforms. Also
+  `cab_mask_filters` (4 968, filters on a masker) and the fourteen AVM1-route
+  accuracy rows (blur profile / AA) that no structural fix reaches.
+- **EditText `background` / `border` (P6, 31 live comparisons, largest unowned
+  family) — at least TWO mechanisms; do not brief as one.** (A) certain
+  background/border configurations are never emitted at all
+  (`edittext_{background,border}_basic{,_scale2}`, `missing_ink` 0.564–0.689 —
+  Ruffle draws a wide black bar and two magenta squares we never draw); (B)
+  device-font glyph placement under a matrix (`edittext_device_transform_*`,
+  `fonts/leading_device_font`, `fonts/device_font_kerning`, and the
+  `bitmapdata_applyfilter_blur` residual). Scope one agent to (A) only.
+- `graphics_gradients_nulls`'s 600 and `acid-gradient-2`'s 79: the first is a
+  band-boundary disagreement against an **FP-generated** golden (a disposition
+  question before a code question); the second is stroke-outline edge — regrade
+  it off the closeout run now that leg C has landed.
+- Runtime gradient per-channel arithmetic still diverges from Ruffle by ≤1
+  channel (both VM builders round where Ruffle truncates, and quantise linearRGB
+  endpoints to u8 before lerping). Both are now single-constant changes
+  (`GRADIENT_RAMP_ROUND → _TRUNC`, `GRADIENT_RAMP_LINEAR_U8 → _LINEAR`) at two
+  call sites — but they move every dynamic gradient in the corpus by ±1, i.e. a
+  full-corpus A/B. `parseMorphFillStyles` still carries a fourth copy of the old
+  segment walk (10 lines, needs a morph A/B owner).
+- Recompiler-output movers nobody rendered: `avm2/away3d_advanced_shallow_water_demo`,
+  `from_shumway/3_joystick`, `from_shumway/bitmapbuttons`,
+  `from_shumway/gradientTransform` — all already failing, all changed by the
+  gradient patch, none graded locally. **Read their movement off the closeout
+  run rather than spending a slot.**
+- `Bitmap.smoothing` / `attachBitmap(..., smoothing)` — the sampler machinery
+  now exists; `draw_bitmap_quad_scaled` asks for Nearest explicitly via
+  `render_webgpu_bitmap_fill_style_word(0, 0)` and that call site is the one
+  line to change when someone wires the AS3/AS2 flag through.
+- Parked arcs, unchanged: Stage3D/AGAL 29 family-wide, h264 11 + FLV seek,
+  `avm2/netstream_play_flv` (live and untriaged since s15's hygiene landed),
+  `visual/definefont4`, `acid-shapes`, jpegxr ×2, `bitmapbuttons`, the 9 capped
+  `blend_modes` `a_epsilon` rows, the fonts near-pass family (re-check `glyph` /
+  `duplicate_font` / `match_style` / `fallback_preferences` now that leg C has
+  landed — they showed the flattening direction signature), and
+  `cache_as_bitmap/oversize/swf_{9,10}_masks` (NO-GO without a mask owner; 2
+  comparisons at `max_outliers = 0`).
+- **Canary additions suggested:** `from_shumway/acid/acid-bitmap-fill` — the
+  only CI-passing test with a `0x40` repeating smoothed fill, i.e. the standing
+  set's blind spot for any bitmap-sampler change. (`acid-blend-2`'s fill is
+  `0x43` and cannot see one.)
+- **Tooling to promote:** the full-corpus recompiler A/B sweep
+  (`scratchpad/legC/sweep.sh` + `boundscheck.sh`) into `ruffle-tests/` — it
+  turns any `SWFRecomp/` change from a guess into an exact affected-test list,
+  and it is the only audit that catches rows no census predicts.
