@@ -3811,8 +3811,20 @@ static Avm2Value point_transform_native(Avm2Activation* act, int to_local)
 	}
 	Mat m = display_world_matrix(ctx, self);
 	if (to_local) m = mat_invert(&m);
-	double tx = m.a * (x * 20.0) + m.c * (y * 20.0) + m.tx;
-	double ty = m.b * (x * 20.0) + m.d * (y * 20.0) + m.ty;
+	// Ruffle render/src/matrix.rs `impl Mul<Point<Twips>>`: the point is
+	// quantised to whole twips first (Twips::from_pixels truncates), the f32
+	// rotate/scale product is then rounded half-to-even into an i32 twip, and
+	// only THEN is the (already integral) translation added. Carrying the
+	// product in doubles instead leaks a fraction of a twip into the returned
+	// pixels -- 54.999999552965164 where Flash and Ruffle both say 55. Same
+	// idiom as rect_union_xform() above; see the ruffle-geometry-is-integer-
+	// twips note.
+	float xt = (float) twips_from_pixels(x);
+	float yt = (float) twips_from_pixels(y);
+	double tx = round_twips_f32((float) ((float) m.a * xt + (float) m.c * yt))
+	            + m.tx;
+	double ty = round_twips_f32((float) ((float) m.b * xt + (float) m.d * yt))
+	            + m.ty;
 	// flash.geom.Point lives in the builtin domain.
 	Avm2PropKey key = avm2_public_key("Point", 5);
 	key.ns_kind = 0x16;
@@ -5578,7 +5590,17 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 	// (check_has_pending_script runs only in PHASE_CONSTRUCT), and restored
 	// afterwards so the caller's phase is unchanged.
 	uint8_t saved_phase = ctx->frame_phase;
-	if (cext->timeline != NULL && cext->playing) run_frame_internal(ctx, child, 1);
+	if (cext->timeline != NULL)
+	{
+		if (cext->playing) run_frame_internal(ctx, child, 1);
+		// The same pairing enter_frame_obj uses: run_frame_internal only
+		// QUEUES this frame's places (Ruffle's per-depth QueuedTagList) —
+		// flush_queued_places is what actually creates the children. Without
+		// it the loaded root has no frame-1 children while the load's own
+		// `complete` handler runs, so a named child reads null
+		// (from_shumway/as3-loader/LoaderTest2 asks for `testSymbol` there).
+		flush_queued_places(ctx, child);
+	}
 	ctx->frame_phase = PHASE_CONSTRUCT;
 	construct_frame_obj(ctx, child);
 	ctx->frame_phase = PHASE_FRAME_SCRIPTS;
@@ -9237,7 +9259,10 @@ static Avm2Value geom_matrix_create_box(Avm2Activation* act)
 {
 	Avm2Object* s = this_obj(act);
 	if (s == NULL) return avm2_undefined();
-	double sx = matf_arg(act, 0), sy = matf_arg(act, 1), rot = matf_arg(act, 2);
+	double sx = matf_arg(act, 0), sy = matf_arg(act, 1);
+	// `rotation:Number = 0` -- omitting it must NOT poison the matrix with NaN
+	// (avm2/matrix "// matrix.createBox(2, 3)" expects (a=2,b=0,c=0,d=3)).
+	double rot = matf_arg_def(act, 2, 0.0);
 	double tx = matf_arg_def(act, 3, 0.0), ty = matf_arg_def(act, 4, 0.0);
 	MatF r = { cos(rot) * sx, sin(rot) * sy, -sin(rot) * sx, cos(rot) * sy, tx, ty };
 	matf_write(act->ctx, s, r);
@@ -9321,21 +9346,53 @@ static Avm2Value geom_matrix_copy_row_from(Avm2Activation* act)
 	return avm2_undefined();
 }
 
-// copyColumnFrom(index, Vector3D): col0 -> (a,b), col1 -> (c,d), col2 -> (tx,ty).
+// copyColumnFrom(index, Vector3D). FP BUG, replicated by Ruffle
+// (geom/Matrix.as:51-55) and graded by avm2/matrix: this is NOT the column
+// counterpart, it is literally copyRowFrom -- copyColumnFrom(1, <17,19,23>) on
+// (2,3,5,7,11,13) yields (a=17,b=17,c=19,d=19,tx=23,ty=23), i.e. the b/d/ty
+// row, not the c/d column.
 static Avm2Value geom_matrix_copy_column_from(Avm2Activation* act)
+{
+	return geom_matrix_copy_row_from(act);
+}
+
+// copyRowTo / copyColumnTo (Ruffle geom/Matrix.as:57-71, 97-111). These two do
+// NOT share the bug above: row2 reads (0,0,1) and column2 reads (tx,ty,1).
+// Out-of-range indices leave the vector untouched.
+static void matf_v3_put(Avm2Context* ctx, Avm2Object* v, double x, double y,
+                        double z)
+{
+	if (v == NULL) return;
+	avm2_object_set_dynamic(ctx, v, "x", 1, avm2_number(x));
+	avm2_object_set_dynamic(ctx, v, "y", 1, avm2_number(y));
+	avm2_object_set_dynamic(ctx, v, "z", 1, avm2_number(z));
+}
+
+static Avm2Value geom_matrix_copy_row_to(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* s = this_obj(act);
 	if (s == NULL) return avm2_undefined();
 	int idx = (int) matf_arg(act, 0);
 	Avm2Object* v = matf_obj_arg(act, 1);
-	double vx = matf_read_num_prop(ctx, v, "x");
-	double vy = matf_read_num_prop(ctx, v, "y");
 	MatF m = matf_read(ctx, s);
-	if (idx == 0) { m.a = vx; m.b = vy; }
-	else if (idx == 1) { m.c = vx; m.d = vy; }
-	else if (idx == 2) { m.tx = vx; m.ty = vy; }
-	matf_write(ctx, s, m);
+	if (idx == 0) matf_v3_put(ctx, v, m.a, m.c, m.tx);
+	else if (idx == 1) matf_v3_put(ctx, v, m.b, m.d, m.ty);
+	else if (idx == 2) matf_v3_put(ctx, v, 0.0, 0.0, 1.0);
+	return avm2_undefined();
+}
+
+static Avm2Value geom_matrix_copy_column_to(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* s = this_obj(act);
+	if (s == NULL) return avm2_undefined();
+	int idx = (int) matf_arg(act, 0);
+	Avm2Object* v = matf_obj_arg(act, 1);
+	MatF m = matf_read(ctx, s);
+	if (idx == 0) matf_v3_put(ctx, v, m.a, m.b, 0.0);
+	else if (idx == 1) matf_v3_put(ctx, v, m.c, m.d, 0.0);
+	else if (idx == 2) matf_v3_put(ctx, v, m.tx, m.ty, 1.0);
 	return avm2_undefined();
 }
 
@@ -9659,6 +9716,70 @@ static Avm2Object* make_geom_matrix(Avm2Context* ctx, double a, double b, double
 	return v.u.obj;
 }
 
+// --- Transform.matrix / Transform.matrix3D duality --------------------------
+// Ruffle carries a `has_matrix3d_stub` bit on DisplayObjectBase
+// (avm2/globals/flash/geom/transform.rs):
+//   .matrix   = null      -> SET the bit, leave the 2D matrix alone
+//   .matrix   = <Matrix>  -> clear the bit, write the 2D matrix
+//   .matrix3D = <M3D>     -> SET the bit, collapse the 4x4 to its 2D block
+//   .matrix3D = null      -> clear the bit, reset the matrix to identity
+// and the two getters each return null when the bit disagrees with them, so a
+// display object is "2D" or "3D" but never both. The bit lives in a dont_enum
+// dyn prop on the DISPLAY object -- the same trick perspectiveProjection's
+// Option uses -- so no shared struct field is needed for it.
+#define M3D_STUB_KEY "__m3dstub"
+#define M3D_OWNER_KEY "__m3downer"
+
+static int m3d_stub_get(Avm2Object* target)
+{
+	if (target == NULL) return 0;
+	Avm2Value* v = avm2_object_find_dynamic(target, M3D_STUB_KEY, 9);
+	return v != NULL && avm2_coerce_to_boolean(*v);
+}
+
+static void m3d_stub_set(Avm2Context* ctx, Avm2Object* target, int on)
+{
+	if (target == NULL) return;
+	avm2_object_set_dynamic(ctx, target, M3D_STUB_KEY, 9, avm2_bool(on != 0))
+		->dont_enum = 1;
+}
+
+// flash.geom.Matrix3D is minted in avm2_stage3d.c (Stage3D needs it first).
+extern Avm2Object* avm2_geom_matrix3d_new(Avm2Context* ctx, const double* raw);
+extern int avm2_geom_matrix3d_read(Avm2Object* o, double* out);
+
+// Ruffle render/src/matrix3d.rs Matrix3D::from_matrix -- column-major, with the
+// 2D matrix in columns 0/1 and its (already twip-quantised) translation in
+// column 3.
+static Avm2Value m3d_from_ext(Avm2Context* ctx, Avm2DisplayObjectExt* ext)
+{
+	double raw[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+	if (ext != NULL)
+	{
+		raw[0] = ext->mtx_a;
+		raw[1] = ext->mtx_b;
+		raw[4] = ext->mtx_c;
+		raw[5] = ext->mtx_d;
+		raw[12] = twips_to_pixels(ext->mtx_tx);
+		raw[13] = twips_to_pixels(ext->mtx_ty);
+	}
+	Avm2Object* o = avm2_geom_matrix3d_new(ctx, raw);
+	return o != NULL ? avm2_object_value(o) : avm2_null();
+}
+
+// Matrix3D::to_matrix -- only the 2D block survives.
+static void m3d_to_ext(Avm2DisplayObjectExt* ext, const double* raw)
+{
+	if (ext == NULL) return;
+	ext->mtx_a = (float) raw[0];
+	ext->mtx_b = (float) raw[1];
+	ext->mtx_c = (float) raw[4];
+	ext->mtx_d = (float) raw[5];
+	ext->mtx_tx = twips_from_pixels(raw[12]);
+	ext->mtx_ty = twips_from_pixels(raw[13]);
+	ext->scale_rot_cached = 0;
+}
+
 static Avm2Value transform_get_matrix(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -9667,6 +9788,7 @@ static Avm2Value transform_get_matrix(Avm2Activation* act)
 	Avm2TransformExt* text = self->native_ext;
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
 	if (ext == NULL) return avm2_null();
+	if (m3d_stub_get(text->target)) return avm2_null();
 	return avm2_object_value(make_geom_matrix(
 		ctx, ext->mtx_a, ext->mtx_b, ext->mtx_c, ext->mtx_d,
 		twips_to_pixels(ext->mtx_tx), twips_to_pixels(ext->mtx_ty)));
@@ -9676,14 +9798,18 @@ static Avm2Value transform_set_matrix(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* self = this_obj(act);
-	if (self == NULL || self->native_ext == NULL || act->argc < 1
-	    || act->args[0].kind != AVM2_VALUE_OBJECT)
-	{
-		return avm2_undefined();
-	}
+	if (self == NULL || self->native_ext == NULL) return avm2_undefined();
 	Avm2TransformExt* text = self->native_ext;
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
 	if (ext == NULL) return avm2_undefined();
+	if (act->argc < 1 || act->args[0].kind != AVM2_VALUE_OBJECT
+	    || act->args[0].u.obj == NULL)
+	{
+		// transform.rs:79-83: a non-object (null) promotes the object to "3D"
+		// WITHOUT touching the matrix and without marking transformed-by-script.
+		m3d_stub_set(ctx, text->target, 1);
+		return avm2_undefined();
+	}
 	// Ruffle avm2/globals/flash/geom/transform.rs:87. NOTE: only the Transform
 	// object's own matrix= setter marks; DisplayObject.transform = ... writes
 	// the matrix directly and does NOT mark (see do_set_transform).
@@ -9696,6 +9822,7 @@ static Avm2Value transform_set_matrix(Avm2Activation* act)
 	ext->mtx_tx = twips_from_pixels(matrix_get_prop(ctx, m, "tx"));
 	ext->mtx_ty = twips_from_pixels(matrix_get_prop(ctx, m, "ty"));
 	ext->scale_rot_cached = 0;
+	m3d_stub_set(ctx, text->target, 0);
 	return avm2_undefined();
 }
 
@@ -9926,8 +10053,79 @@ static Avm2Value transform_get_concatenated_matrix(Avm2Activation* act)
 
 static Avm2Value transform_get_matrix3d(Avm2Activation* act)
 {
-	(void) act;
-	return avm2_null();
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return avm2_null();
+	Avm2TransformExt* text = self->native_ext;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
+	if (ext == NULL || !m3d_stub_get(text->target)) return avm2_null();
+	return m3d_from_ext(ctx, ext);
+}
+
+static Avm2Value transform_set_matrix3d(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL || self->native_ext == NULL) return avm2_undefined();
+	Avm2TransformExt* text = self->native_ext;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
+	if (ext == NULL) return avm2_undefined();
+	double raw[16];
+	if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT
+	    && avm2_geom_matrix3d_read(act->args[0].u.obj, raw))
+	{
+		// FP-only rule (Ruffle does NOT have it, but the Flash oracle for
+		// from_shumway/.../matrix3d/TransformBasics does): a Matrix3D instance
+		// belongs to at most ONE DisplayObject; handing the same instance to a
+		// second one raises #2189. Re-assigning it to its own owner is fine.
+		Avm2Object* mo = act->args[0].u.obj;
+		Avm2Value* own = avm2_object_find_dynamic(mo, M3D_OWNER_KEY, 10);
+		if (own != NULL && own->kind == AVM2_VALUE_OBJECT
+		    && own->u.obj != NULL && own->u.obj != text->target)
+		{
+			avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+			                 "Error #2189: A Matrix3D can not be assigned to "
+			                 "more than one DisplayObject.");
+		}
+		avm2_object_set_dynamic(ctx, mo, M3D_OWNER_KEY, 10,
+		                        avm2_object_value(text->target))->dont_enum = 1;
+		m3d_to_ext(ext, raw);
+		m3d_stub_set(ctx, text->target, 1);
+		return avm2_undefined();
+	}
+	// transform.rs:353-370: null collapses to Matrix::IDENTITY, not to the
+	// matrix the object had before it went 3D.
+	ext->mtx_a = 1.0f;
+	ext->mtx_b = 0.0f;
+	ext->mtx_c = 0.0f;
+	ext->mtx_d = 1.0f;
+	ext->mtx_tx = 0;
+	ext->mtx_ty = 0;
+	ext->scale_rot_cached = 0;
+	m3d_stub_set(ctx, text->target, 0);
+	return avm2_undefined();
+}
+
+// getRelativeMatrix3D(relativeTo): Ruffle transform.rs:426-443 is a stub that
+// still grades -- it throws #2007 on a null argument, returns null for a 2D
+// object, and an IDENTITY Matrix3D for a 3D one.
+static Avm2Value transform_get_relative_matrix3d(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (act->argc < 1 || act->args[0].kind != AVM2_VALUE_OBJECT
+	    || act->args[0].u.obj == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter relativeTo must be non-null.");
+	}
+	if (self == NULL || self->native_ext == NULL) return avm2_null();
+	Avm2TransformExt* text = self->native_ext;
+	if (!m3d_stub_get(text->target)) return avm2_null();
+	static const double id[16] = { 1, 0, 0, 0, 0, 1, 0, 0,
+	                               0, 0, 1, 0, 0, 0, 0, 1 };
+	Avm2Object* o = avm2_geom_matrix3d_new(ctx, id);
+	return o != NULL ? avm2_object_value(o) : avm2_null();
 }
 
 static Avm2Value transform_set_stub(Avm2Activation* act)
@@ -10322,9 +10520,9 @@ static Avm2Value do_set_transform(Avm2Activation* act)
 	// Pull the matrix off the assigned Transform (a Transform bound to
 	// another object, per the AS3 pattern `a.transform = b.transform`).
 	Avm2Value mval = avm2_get_public_property(ctx, act->args[0], "matrix", 6, NULL);
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (mval.kind == AVM2_VALUE_OBJECT)
 	{
-		Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 		if (ext != NULL)
 		{
 			Avm2Object* m = mval.u.obj;
@@ -10335,6 +10533,23 @@ static Avm2Value do_set_transform(Avm2Activation* act)
 			ext->mtx_tx = twips_from_pixels(matrix_get_prop(ctx, m, "tx"));
 			ext->mtx_ty = twips_from_pixels(matrix_get_prop(ctx, m, "ty"));
 			ext->scale_rot_cached = 0;
+		}
+		m3d_stub_set(ctx, obj, 0);
+	}
+	else
+	{
+		// The source Transform is "3D", so its .matrix getter reads null;
+		// Ruffle's set_transform copies the BASE matrix plus the bit
+		// (display_object.rs set_transform:820-827), which is what reading its
+		// .matrix3D and collapsing it back reproduces.
+		Avm2Value m3v = avm2_get_public_property(ctx, act->args[0], "matrix3D",
+		                                         8, NULL);
+		double raw[16];
+		if (m3v.kind == AVM2_VALUE_OBJECT
+		    && avm2_geom_matrix3d_read(m3v.u.obj, raw))
+		{
+			m3d_to_ext(ext, raw);
+			m3d_stub_set(ctx, obj, 1);
 		}
 	}
 	return avm2_undefined();
@@ -12038,6 +12253,10 @@ static Rect self_bounds_full(Avm2Context* ctx, Avm2Object* obj,
 // hit testing: each row is one vertex {x_bits(float), y_bits(float), ...} in
 // shape-LOCAL twips, three consecutive rows per triangle.
 extern uint32_t shape_data[][4];
+// The END half of a DefineMorphShape's geometry: {x, y} in shape-LOCAL twips,
+// already floats (the START half is float BITS in shape_data). Same array the
+// render/CPU-raster morph paths read; re-declared here for the picker.
+extern float morph_end_shape_data[][2];
 
 static inline float pick_bits_to_f(uint32_t u)
 {
@@ -12077,7 +12296,11 @@ static int pick_tris_contain(const float* v, uint32_t n, double lx, double ly)
 // "default to using bounding box".
 static int has_pick_geometry(Avm2DisplayObjectExt* ext)
 {
-	if (ext->shape_vert_count > 0 && !ext->is_morph_shape) return 1;
+	// A morph shape carries real geometry too — its triangles just have to be
+	// ratio-lerped between the START (shape_data) and END (morph_end_shape_data)
+	// ranges first, exactly as avm2_cpu_raster_morph draws them
+	// (from_shumway/acid/acid-morph hit-tests a morph mid-tween).
+	if (ext->shape_vert_count > 0) return 1;
 	if (ext->graphics_obj != NULL)
 	{
 		Avm2GraphicsExt* g = (Avm2GraphicsExt*) ext->graphics_obj->native_ext;
@@ -12090,6 +12313,33 @@ static int has_pick_geometry(Avm2DisplayObjectExt* ext)
 // triangles, then the drawing API's tessellated fills and strokes.
 static int shape_contains_local(Avm2DisplayObjectExt* ext, double lx, double ly)
 {
+	if (ext->shape_vert_count > 0 && ext->is_morph_shape)
+	{
+		// Ruffle morph_shape.rs: b weights END, a weights START (a + b = 1),
+		// and lerp_twips rounds the interpolated coordinate to whole twips.
+		double b_w = (double) ext->ratio / 65535.0;
+		if (b_w < 0.0) b_w = 0.0; else if (b_w > 1.0) b_w = 1.0;
+		double a_w = 1.0 - b_w;
+		uint32_t off = ext->shape_vert_offset, n = ext->shape_vert_count;
+		for (uint32_t t = 0; t + 3 <= n; t += 3)
+		{
+			double vx[3], vy[3];
+			for (int k = 0; k < 3; k++)
+			{
+				uint32_t sj = off + t + (uint32_t) k;
+				uint32_t ej = ext->morph_end_offset + t + (uint32_t) k;
+				double sxs = (double) pick_bits_to_f(shape_data[sj][0]);
+				double sys = (double) pick_bits_to_f(shape_data[sj][1]);
+				double sxe = (double) morph_end_shape_data[ej][0];
+				double sye = (double) morph_end_shape_data[ej][1];
+				vx[k] = floor(sxs * a_w + sxe * b_w + 0.5);
+				vy[k] = floor(sys * a_w + sye * b_w + 0.5);
+			}
+			if (pick_tri_contains(lx, ly, vx[0], vy[0], vx[1], vy[1],
+			                      vx[2], vy[2]))
+				return 1;
+		}
+	}
 	if (ext->shape_vert_count > 0 && !ext->is_morph_shape)
 	{
 		uint32_t off = ext->shape_vert_offset, n = ext->shape_vert_count;
@@ -12137,12 +12387,19 @@ static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return 0;
 	Rect self = self_bounds_full(ctx, obj, ext);
-	if (!self.valid) return 0;
+	// A morph shape's static char bounds describe the START shape only (the
+	// recompiler emits one bounds rect per character), so they are not a valid
+	// AABB reject once the ratio has moved: the exact lerped-triangle test
+	// below is both necessary and sufficient. Everything else keeps the
+	// `world_bounds().contains(point)` guard Ruffle applies first.
+	int morph_pick = ext->is_morph_shape && ext->shape_vert_count > 0;
+	if (!self.valid && !morph_pick) return 0;
 	Mat m = display_world_matrix(ctx, obj);
 	Mat inv = mat_invert(&m);
 	double lx = inv.a * px + inv.c * py + inv.tx;
 	double ly = inv.b * px + inv.d * py + inv.ty;
-	if (lx < self.xmin || lx > self.xmax || ly < self.ymin || ly > self.ymax)
+	if (!morph_pick
+	    && (lx < self.xmin || lx > self.xmax || ly < self.ymin || ly > self.ymax))
 		return 0;
 	if (!has_pick_geometry(ext)) return 1;
 	return shape_contains_local(ext, lx, ly);
@@ -14106,6 +14363,10 @@ void avm2_register_display(Avm2Context* ctx)
 	                        geom_matrix_copy_row_from);
 	avm2_builtin_add_method(ctx, geom_matrix, "copyColumnFrom",
 	                        geom_matrix_copy_column_from);
+	avm2_builtin_add_method(ctx, geom_matrix, "copyRowTo",
+	                        geom_matrix_copy_row_to);
+	avm2_builtin_add_method(ctx, geom_matrix, "copyColumnTo",
+	                        geom_matrix_copy_column_to);
 	g_matrix_class = geom_matrix;
 	Avm2Class* geom_transform = avm2_builtin_class(ctx, "flash.geom", "Transform",
 	                                               b->object_class);
@@ -14119,7 +14380,9 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, geom_transform, "concatenatedMatrix",
 	           transform_get_concatenated_matrix, NULL);
 	add_getset(ctx, geom_transform, "matrix3D", transform_get_matrix3d,
-	           transform_set_stub);
+	           transform_set_matrix3d);
+	avm2_builtin_add_method(ctx, geom_transform, "getRelativeMatrix3D",
+	                        transform_get_relative_matrix3d);
 	add_getset(ctx, geom_transform, "perspectiveProjection",
 	           transform_get_perspective_projection,
 	           transform_set_perspective_projection);

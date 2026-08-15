@@ -83,20 +83,16 @@ soundmixer_soundtransform
 #                                criterion.
 #
 # Open trace bugs, owner lead named (avm2 suite, all graded in graphics mode):
-#   displayobject_scrollrect              localToGlobal/globalToLocal must
-#                                         quantize to integer twips before
-#                                         adding the translation (board L1)
+#   displayobject_scrollrect              L1 twip quantization landed (s16,
+#                                         14->6 diff lines); residual is the
+#                                         unmodelled render-committed scrollRect
 #   displayobject_hittestpoint_boundary   L1 + a hit-test edge-exclusivity rule
 #                                         + a missing leading blank line
-#   geom_transform                        Transform.matrix / .matrix3D duality;
-#                                         dies on #1009 (rawData) at line 24
-#                                         and cascades (board L2)
-#   stage_scale_factor                    contentsScaleFactor must be 2, and
-#                                         Stage localToGlobal must ignore the
-#                                         Stage's own matrix (L1 rider)
+#   (geom_transform: PASSES as of s16 w2-geom — pruned)
+#   stage_scale_factor                    contentsScaleFactor must be 2 (needs a
+#                                         simulated 2x display) - cannot pass
 displayobject_hittestpoint_boundary
 displayobject_scrollrect
-geom_transform
 stage_scale_factor
 
 # Upstream known_failure = true (Ruffle itself fails these)

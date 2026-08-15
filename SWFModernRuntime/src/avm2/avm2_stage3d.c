@@ -1413,6 +1413,27 @@ static Avm2Value matrix3d_set_raw_data(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// flash.geom.Transform's matrix3D surface lives in avm2_display.c, but the
+// Matrix3D class is minted HERE (Stage3D needs it first), so minting/reading
+// one from there goes through this pair. `raw` is the column-major rawData.
+Avm2Object* avm2_geom_matrix3d_new(Avm2Context* ctx, const double* raw)
+{
+	if (g_matrix3d_class == NULL) return NULL;
+	Avm2Value v = avm2_class_construct(ctx, g_matrix3d_class, NULL, 0);
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return NULL;
+	Avm2Matrix3DExt* e = matrix3d_ext_of(v.u.obj);
+	if (e != NULL && raw != NULL) memcpy(e->m, raw, sizeof(double) * 16);
+	return v.u.obj;
+}
+
+int avm2_geom_matrix3d_read(Avm2Object* o, double* out)
+{
+	Avm2Matrix3DExt* e = matrix3d_ext_of(o);
+	if (e == NULL || out == NULL) return 0;
+	memcpy(out, e->m, sizeof(double) * 16);
+	return 1;
+}
+
 static Avm2Value matrix3d_identity(Avm2Activation* act)
 {
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
