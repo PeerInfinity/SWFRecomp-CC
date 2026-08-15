@@ -939,6 +939,91 @@ still fail at `tolerance = 0`. Re-baseline the counts in this entry and in the
 summary table from the first `images=true` CI run that carries the s14 stencil
 patch.
 
+**Amendment, session 16 (`w1-gfx-shapes-morph` diagnosis, `w2-gfx-shapes-morph`
+fix) — the majority of this entry is REFUTED and the disposition is NARROWED.**
+The s14 amendment above attributed the remaining "482 px black-vs-white plus the
+saturated-colour swaps" to the 1-sample rasteriser tie. Measured at `cd04f80b9`
+(local Dawn, which reproduces CI's 1738 exactly): the 652 mismatching pixels
+split into **496 px / 1474 channels on the mask boundary and 156 px / 264
+channels in the interior**. The boundary half is **not** a tie — a least-squares
+ellipse fit of both renders gives centres equal to 0.02 px and `ΔA = +0.512`,
+`ΔB = +0.533` px, i.e. a *uniform outward dilation* of half a pixel (a scale
+would give unequal deltas), and char 1 — the masker — carries a 20-twip stroke
+whose geometry extends exactly 10 twips = 0.5 px outside its fill. We rasterised
+the masker's stroke into the stencil; **Ruffle omits strokes from a mask
+stencil** (`render/src/tessellator.rs:149-160`,
+`render/wgpu/src/surface/commands.rs:281-288`), and we already implemented that
+rule for drawing-API maskers only (`tag.c render_drawing_mc_paths_fill_only`).
+*That half IS mask work*, and session 16 fixed it in
+`render_webgpu.c::mask_stencil_vert_count`. The "do not book it in a mask
+session" line above therefore no longer applies to the boundary half; it still
+applies to the interior residual, which is the curve-flattening / AA family
+(flattening leg C moved this pair by −241 channels).
+**Measured after the fix** (`w2-gfx-shapes-morph`, local Dawn, both twins still
+byte-identical to each other): **1738 → 359 outlier channels, 652 → 188
+mismatching pixels, mean diff 0.4927 → 0.0940**. The residual is scattered
+(never more than 4 pixels in any row), and the colour transitions are now
+*balanced* saturated-palette swaps in both directions (44 px blue→black vs
+28 px black→blue; 27 px red→black vs 26 px black→red) — the 1-sample
+rasteriser-tie signature this entry describes. The one-sided
+"expected WHITE → ours BLACK" class, which was the dilation, collapsed from
+482 px to 24 px.
+**Scope of this disposition is hereby reduced to those 359 interior channels.**
+Re-baseline the counts here and in the summary table from the first
+`images=true` run that carries the mask-stroke fix; if the residual is
+materially above ~359 channels, this entry does not cover it.
+
+### `avm2/bitmapdata_applyfilter_blur` — residual is the default-font text, not the blur (30 844 outlier channels, mean 1.21)
+
+<!-- image-axis: avm2/bitmapdata_applyfilter_blur output -->
+
+`Test.as`'s `createSource()` draws a `TextField` into the source bitmap with
+`with_default_font = true`, and the fixture itself carries the upstream note
+*"TODO Fix this test. It shouldn't depend on the default font."*:
+
+```toml
+[image_comparisons.output]
+tolerance = 12
+[player_options]
+with_renderer = { quality = "low" }
+# TODO Fix this test. It shouldn't depend on the default font.
+with_default_font = true
+```
+
+The graded image is six copies of that source (one unfiltered + five
+`BlurFilter` variants), so the device-font glyph raster appears six times.
+After session 15 rewrote `bd_apply_filter`'s box kernel (821 415 → 30 844
+outliers, mean 30.3 → 1.21, run `31748059158`), the whole residual is the glyph
+band: in the **unfiltered** cell — which no filter touches — all 534 residual
+outliers lie in `y ∈ [96, 104]`, the text band, and nowhere else
+(`session15-fanout-reports/w2-gfx-blur-report.md` §1.5). Re-measured
+independently in session 16 (`w1-gfx-shapes-morph`, local `--mode=graphics
+--images`, reproducing CI's 30 844 / max 246 exactly): the 10 853 mismatching
+pixels of the 550×700 image occupy **four narrow horizontal bands and nothing
+else** —
+
+```
+rows  89-104   2438 px   x[3, 424]
+rows 309-327   4396 px   x[5, 424]
+rows 415-424     78 px   x[225, 236]
+rows 526-543   3941 px   x[5, 424]
+```
+
+three full-width 16-19-row bands ~217 rows apart (one per row of cells, each
+spanning every cell's x-range) plus one 12×10 glyph patch, and **zero outliers
+anywhere in the large blurred areas**. Matching it would mean reproducing
+Ruffle's bundled default font's rasterisation — the same architectural gap as
+the other device-font entries (`from_shumway/avm1/text-bind` above).
+
+**Decision:** Accept the text-owned residual. Scope: the `output` comparison
+only. **Standing invariant:** the blur half is *not* dispositioned — if the
+outlier count rises materially above ~31 k, or the excess moves outside the six
+glyph bands, this entry does not cover it and the blur path must be re-triaged.
+Not added to any ignore list: the trace side of the test passes and the
+`image-axis` marker above is what `image_triage.py` reads.
+
+---
+
 ---
 
 ## Category 12: Implementation-Defined `for...in` Enumeration Order

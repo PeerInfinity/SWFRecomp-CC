@@ -1,0 +1,59 @@
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 65f2035f8..21faf476d 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3196,3 +3196,3 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 					float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
+-					float* ec = (float*)(app_context->morph_end_color_data) + c * 4;
++					float* ec = (float*)(app_context->morph_end_color_data) + (ch->morph_end_color_start + c) * 4;
+ 					float interp[4];
+@@ -6965,3 +6965,3 @@ void tagShowFrame(SWFAppContext* app_context)
+ 				float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
+-				float* ec = (float*)(app_context->morph_end_color_data) + c * 4;
++				float* ec = (float*)(app_context->morph_end_color_data) + (ch->morph_end_color_start + c) * 4;
+ 				float interp[4];
+@@ -7922,2 +7922,3 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
+     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
++    size_t morph_end_color_start,
+     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax,
+@@ -7934,2 +7935,3 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
+ 	dictionary[char_id].morph_color_count = morph_color_count;
++	dictionary[char_id].morph_end_color_start = morph_end_color_start;
+ 
+diff --git a/SWFModernRuntime/include/libswf/swf.h b/SWFModernRuntime/include/libswf/swf.h
+index 52e7de080..f78b4ac2c 100644
+--- a/SWFModernRuntime/include/libswf/swf.h
++++ b/SWFModernRuntime/include/libswf/swf.h
+@@ -96,2 +96,8 @@ typedef struct Character
+ 			size_t morph_color_count;
++			// Base of this character's run in morph_end_color_data. The START
++			// colours are indexed by morph_color_start, but the END colours are
++			// a SEPARATE table with its own per-character base, so they need
++			// their own offset — without it every morph character reads the
++			// FIRST morph character's end colours.
++			size_t morph_end_color_start;
+ 		};
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index 6fe482a10..585074608 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -59,2 +59,3 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
+     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
++    size_t morph_end_color_start,
+     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax,
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f0c96f35d..8e0b3d047 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -10402,2 +10402,3 @@ namespace SWFRecomp
+ 										 << to_string(morph_color_count) << ", "
++										 << to_string(morph_end_color_before) << ", "
+ 										 << to_string(shape_bounds_xmin) << ", "
+diff --git a/docs/recompiler/runtime_headers/include_libswf_tag.h b/docs/recompiler/runtime_headers/include_libswf_tag.h
+index 4a385933f..10db1f497 100644
+--- a/docs/recompiler/runtime_headers/include_libswf_tag.h
++++ b/docs/recompiler/runtime_headers/include_libswf_tag.h
+@@ -48,2 +48,3 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
+     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
++    size_t morph_end_color_start,
+     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax,

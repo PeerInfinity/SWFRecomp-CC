@@ -94,6 +94,12 @@ typedef struct Character
 			size_t morph_end_offset;
 			size_t morph_color_start;
 			size_t morph_color_count;
+			// Base of this character's run in morph_end_color_data. The START
+			// colours are indexed by morph_color_start, but the END colours are
+			// a SEPARATE table with its own per-character base, so they need
+			// their own offset — without it every morph character reads the
+			// FIRST morph character's end colours.
+			size_t morph_end_color_start;
 		};
 		// DefineText
 		struct

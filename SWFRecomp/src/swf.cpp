@@ -10400,6 +10400,7 @@ namespace SWFRecomp
 										 << to_string(morph_end_start_vertex) << ", "
 										 << to_string(morph_color_start_saved) << ", "
 										 << to_string(morph_color_count) << ", "
+										 << to_string(morph_end_color_before) << ", "
 										 << to_string(shape_bounds_xmin) << ", "
 										 << to_string(shape_bounds_xmax) << ", "
 										 << to_string(shape_bounds_ymin) << ", "

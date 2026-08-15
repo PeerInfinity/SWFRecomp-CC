@@ -1,0 +1,51 @@
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 175dfeaff..6345c0b09 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -2162,6 +2162,37 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
+ 	wgpuQueueWriteBuffer(ctx->queue, ctx->cxform_uniform_buf, 0, identity_cxform, 80);
+ }
+ 
++// ---------------------------------------------------------------------------
++// mask_stencil_vert_count — ruffle omits STROKE geometry when a shape is
++// rasterised into a mask stencil (render/src/tessellator.rs:149-160 "strokes
++// need to be omitted when using this shape as a mask", and
++// render/wgpu/src/surface/commands.rs:281-288, which swaps in num_mask_indices
++// for the DrawMaskStencil / ClearMaskStencil states).
++//
++// SWFRecomp emits every fill group of a character first and every stroke run
++// after (SWFRecomp/src/swf.cpp; stroke vertices are the only ones whose style
++// word sets bit 31, 0x80000000), so the LEADING run of non-stroke vertices in a
++// character's static vertex range is exactly ruffle's num_mask_indices. A
++// stroke-ONLY masker keeps all of its vertices, matching ruffle's
++// `unwrap_or(len)` fallback — otherwise it would mask away everything.
++//
++// Only STATIC geometry is trimmed: dynamic (drawing-API) vertices live past
++// shape_data_size and already have their own fill-only helper
++// (tag.c render_drawing_mc_paths_fill_only).
++// ---------------------------------------------------------------------------
++static size_t mask_stencil_vert_count(const WebGPURenderContext* ctx,
++                                      size_t offset, size_t num_verts)
++{
++	if (ctx->mask_capture_depth == 0) return num_verts;
++	if (ctx->shape_data == NULL || num_verts == 0) return num_verts;
++	if (offset + num_verts > ctx->shape_data_size / (4 * sizeof(u32)))
++		return num_verts;                      // dynamic range — not ours to trim
++	const u32* sd = (const u32*) ctx->shape_data;
++	size_t n = 0;
++	while (n < num_verts && !(sd[(offset + n) * 4 + 2] & 0x80000000u)) n++;
++	return (n > 0 && n < num_verts) ? n : num_verts;
++}
++
+ // ---------------------------------------------------------------------------
+ // render_webgpu_draw_shape
+ // ---------------------------------------------------------------------------
+@@ -2169,6 +2200,8 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
+                               size_t num_verts, u32 transform_id, u32 cxform_id)
+ {
+ 	if (!ctx->renderer_ok) return;
++	// Ruffle rasterises only a masker's fill geometry into the stencil.
++	num_verts = mask_stencil_vert_count(ctx, offset, num_verts);
+ 	// Set vertex buffer with byte offset
+ 	uint64_t byte_offset = offset * 4 * sizeof(u32);
+ 	uint64_t byte_size = num_verts * 4 * sizeof(u32);

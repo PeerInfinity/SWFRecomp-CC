@@ -121,6 +121,50 @@ When a session dispositions a pixel failure permanently, write the doc entry
 with an explicit `<!-- image-axis: ... -->` scope marker so the board can
 enforce it per comparison and per frame.
 
+### Image-axis dispositions of record
+
+Every entry below lives in
+`ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md` and carries the
+`<!-- image-axis: ... -->` marker `image_triage.py` reads. Keep this list in
+sync when a session adds or narrows one — the board's "hard" exclusion set is
+exactly these markers plus the global `ignored_tests.txt`.
+
+| comparison(s) | mechanism | scope / standing invariant |
+|---|---|---|
+| `visual/video/colorconversion/h263 output` | Spark IDCT precision | 10 808 channels, max 2 |
+| `visual/video/deblocking output` | Spark IDCT precision, one Cb level | 104 channels, max 4 |
+| `avm1/netstream_play_flv output` | Sorenson Spark pixel parity | 44 channels, max 3 |
+| `visual/simple_shapes/masks output` + `…/masks_equal_clipdepth output` | **NARROWED s16** — was "1-sample rasteriser tie" for all 1738 channels; 1474 of them were our mask stencil rasterising the masker's STROKE (fixed s16). | now scoped to the **359 interior** channels measured after the fix (1738 → 359, mean 0.4927 → 0.0940; curve flattening / AA). A residual materially above ~359 is NOT covered. |
+| `avm2/bitmapdata_applyfilter_blur output` | **NEW s16** — the residual is the `with_default_font = true` TextField the fixture draws into the source bitmap, replicated across six cells; the blur itself contributes none of it. | 30 844 channels, mean 1.21, confined to four glyph bands. Above ~31 k, or excess outside the bands ⇒ re-triage the blur path. |
+
+**Explicitly NOT dispositioned (do not add):**
+
+- `visual/filters/blur_quality` — **NO-GO on a disposition (s16).** The premise
+  "goldens disagree by 1 LSB → band ceiling" does not survive: the baseline is
+  166 986 outliers at **max diff 9 against tolerance 6**, a 3-level overshoot
+  compounded over 9 passes, not a tie. The 1-LSB fact
+  (`session15-fanout-reports/wave1-gfx-blur-morphratio.md` §2.6) is about
+  `blur_quality` and `blur_fractional`'s goldens disagreeing *with each other*;
+  it bounds the achievable precision, it does not explain a 9-unit gap. And
+  **neither test is `known_failure` upstream**, so current Ruffle clears both at
+  these tolerances — an achievable answer exists, and dispositioning it would
+  freeze a solvable bug (the inverse of the `avm2-net-tranche2` trap).
+  **Completion mechanism to flip this to GO-for-a-fix:** build the Ruffle
+  exporter at `~/CC/ruffle`, dump an intermediate blur pass for one
+  `quality ≥ 7` tile, and fit our per-pass rounding to it (the
+  `triage_image_tests.py` oracle route) — measured, our per-pass response is
+  `0.9951·v + 1.02` against the golden's `0.9980·v − 0.5`; or move
+  `bd_apply_filter` onto the GPU shader that produced the golden's sampling
+  path. Until then it is a large band move already banked (821 415 → 166 986 in
+  s15), not a ceiling.
+- `visual/cache_as_bitmap/morph` — **NO-GO on a disposition (s16), twice
+  recommended for one in s14/s15 and refuted both times.** All 2832 outliers are
+  the red channel of one flat interior fill, expected 84 vs ours 85: Ruffle's
+  `lerp_color` truncates on the u8 scale and we rounded. Fixed in s16
+  (`tag.c::morph_lerp_color_u8`). Any future disposition request here must first
+  explain why 84-vs-85 is not the truncation rule our own AVM2 path already
+  implements.
+
 ## 4. Regression accounting
 
 After merging a new `images=true` run:
@@ -476,6 +520,7 @@ regressions, bands improved 13 / worsened 0, drift 0/0.** Ledger:
   solo run (masks 1738→1497 + 6 band moves, −25-38% vertices);
   simple_shapes/masks = scale/transform defect (slope, not flattening);
   acid-large VRAM budgeting; blur_quality residual per-pass rounding
-  (goldens disagree by 1 LSB — band ceiling); Stage3D (25) + h264 (12
+  (the "goldens disagree by 1 LSB — band ceiling" framing is REFUTED in s16;
+  max diff 9 vs tolerance 6 and Ruffle clears the test upstream — see §3); Stage3D (25) + h264 (12
   → really 11 + FLV seek) parked; displacement Route 2 merged into the
   filters arc.

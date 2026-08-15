@@ -2910,6 +2910,22 @@ static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
 	return 0;
 }
 
+// Ruffle lerp_color: (a*start + b*end) as u8 — TRUNCATION on the u8 scale, per
+// channel. color_data / morph_end_color_data hold the SWF u8 channel divided by
+// 255; recover the u8, lerp in double, truncate, re-normalise. Lerping in
+// normalised float and letting the unorm8 write round to nearest is one unit
+// HIGH whenever the exact product lands just above an integer: ratio 43691
+// morphing RED->BLUE gives a*255 = 84.998, ruffle 84, round-to-nearest 85
+// (visual/cache_as_bitmap/morph, all 2832 outliers). The AVM2 twins already do
+// it this way — avm2_display.c avm2_render_morph, avm2_cpu_raster.c.
+static inline float morph_lerp_color_u8(float start, float end, float t)
+{
+	double a_w = 1.0 - (double) t, b_w = (double) t;
+	u32 su = (u32) (start * 255.0f + 0.5f);
+	u32 eu = (u32) (end   * 255.0f + 0.5f);
+	return (float) (u32) (a_w * su + b_w * eu) / 255.0f;
+}
+
 // `parent_cx` carries the parent's concatenated colour transform as VALUES
 // (NULL = identity). Passing values rather than the parent's GPU slot id is
 // what lets this compose instead of inherit — the slot itself can't be read
@@ -3194,10 +3210,10 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				for (size_t c = 0; c < ch->morph_color_count; c++)
 				{
 					float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
-					float* ec = (float*)(app_context->morph_end_color_data) + c * 4;
+					float* ec = (float*)(app_context->morph_end_color_data) + (ch->morph_end_color_start + c) * 4;
 					float interp[4];
 					for (int k = 0; k < 4; k++)
-						interp[k] = sc[k] + t * (ec[k] - sc[k]);
+						interp[k] = morph_lerp_color_u8(sc[k], ec[k], t);
 					renderer_update_colors(context,
 						(ch->morph_color_start + c) * 4 * sizeof(float),
 						interp, 4 * sizeof(float));
@@ -6994,10 +7010,10 @@ void tagShowFrame(SWFAppContext* app_context)
 			for (size_t c = 0; c < ch->morph_color_count; c++)
 			{
 				float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
-				float* ec = (float*)(app_context->morph_end_color_data) + c * 4;
+				float* ec = (float*)(app_context->morph_end_color_data) + (ch->morph_end_color_start + c) * 4;
 				float interp[4];
 				for (int k = 0; k < 4; k++)
-					interp[k] = sc[k] + t * (ec[k] - sc[k]);
+					interp[k] = morph_lerp_color_u8(sc[k], ec[k], t);
 				renderer_update_colors(context,
 					(ch->morph_color_start + c) * 4 * sizeof(float),
 					interp, 4 * sizeof(float));
@@ -7951,6 +7967,7 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
     size_t shape_offset, size_t shape_size,
     size_t morph_end_offset, size_t morph_color_start, size_t morph_color_count,
+    size_t morph_end_color_start,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax,
     s32 end_bounds_xmin, s32 end_bounds_xmax, s32 end_bounds_ymin, s32 end_bounds_ymax)
 {
@@ -7963,6 +7980,7 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 	dictionary[char_id].morph_end_offset = morph_end_offset;
 	dictionary[char_id].morph_color_start = morph_color_start;
 	dictionary[char_id].morph_color_count = morph_color_count;
+	dictionary[char_id].morph_end_color_start = morph_end_color_start;
 
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
 	ng_record_morph_end_bounds(char_id, end_bounds_xmin, end_bounds_xmax, end_bounds_ymin, end_bounds_ymax);
