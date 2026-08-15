@@ -1,0 +1,192 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f0c96f35d..f3e69b6e0 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -8107,6 +8107,128 @@ namespace SWFRecomp
+ 		return (u32) n;
+ 	}
+ 
++	// ---------------------------------------------------------------------
++	// Raph Levien parabola-integral quadratic flattening, ported from
++	// lyon_geom 1.0.6 `src/quadratic_bezier.rs` (`FlatteningParameters::new`
++	// and `t_at_iteration`) — the flattener Ruffle's tessellator runs, via
++	// `FillOptions::DEFAULT_TOLERANCE / scale` in
++	// `ruffle/render/src/tessellator.rs`. Ruffle's lyon path is in PIXELS;
++	// we flatten in twips, so DEFAULT_TOLERANCE (0.1 px) is 2.0 twips.
++	//
++	// Only the plain-shape arm uses this. Morph shapes keep equal-parameter
++	// stepping because their two streams are paired BY INDEX and a Levien
++	// schedule differs between the start and end curve.
++	// ---------------------------------------------------------------------
++
++	static const float LEVIEN_TOL_TWIPS = 2.0f;   // = lyon 0.1 px at 1:1
++
++	struct LevienParams
++	{
++		u32 count;               // 0 => a single straight chord
++		float integral_from;
++		float integral_step;
++		float inv_integral_from;
++		float div_inv_integral_diff;
++	};
++
++	static float levienParabolaIntegral(float x)
++	{
++		const float d = 0.67f;
++		return x / (1.0f - d + sqrtf(sqrtf(d*d*d*d + 0.25f*x*x)));
++	}
++
++	static float levienParabolaInvIntegral(float x)
++	{
++		const float b = 0.39f;
++		return x * (1.0f - b + sqrtf(b*b + 0.25f*x*x));
++	}
++
++	static LevienParams levienInit(float x0, float y0, float cx, float cy,
++	                               float x1, float y1, float tolerance)
++	{
++		LevienParams p = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
++
++		if (x0 == x1 && y0 == y1)
++		{
++			return p;
++		}
++
++		{
++			// lyon `is_linear`
++			float bx = x1 - x0, by = y1 - y0;
++			float len2 = bx*bx + by*by;
++			float cross = (cx - x0) * by - (cy - y0) * bx;
++			if (len2 > 0.0f && (cross*cross) / len2 <= tolerance * tolerance * 4.0f)
++			{
++				return p;
++			}
++		}
++
++		float ddx = 2.0f*cx - x0 - x1;
++		float ddy = 2.0f*cy - y0 - y1;
++		float crs = (x1 - x0) * ddy - (y1 - y0) * ddx;
++		if (crs == 0.0f)
++		{
++			return p;
++		}
++
++		float inv_crs = 1.0f / crs;
++		float parabola_from = ((cx - x0) * ddx + (cy - y0) * ddy) * inv_crs;
++		float parabola_to   = ((x1 - cx) * ddx + (y1 - cy) * ddy) * inv_crs;
++		float scale = fabsf(crs) / (sqrtf(ddx*ddx + ddy*ddy) * fabsf(parabola_to - parabola_from));
++
++		float integral_from = levienParabolaIntegral(parabola_from);
++		float integral_to   = levienParabolaIntegral(parabola_to);
++		float integral_diff = integral_to - integral_from;
++
++		float inv_integral_from = levienParabolaInvIntegral(integral_from);
++		float inv_integral_to   = levienParabolaInvIntegral(integral_to);
++
++		float count = ceilf(0.5f * fabsf(integral_diff) * sqrtf(scale / tolerance));
++		if (!std::isfinite(count) || count < 1.0f)
++		{
++			return p;
++		}
++		if (count > 64.0f)
++		{
++			count = 64.0f;   // same shape_data growth bound as before
++		}
++
++		p.count = (u32) count;
++		p.integral_from = integral_from;
++		p.integral_step = integral_diff / count;
++		p.inv_integral_from = inv_integral_from;
++		p.div_inv_integral_diff = 1.0f / (inv_integral_to - inv_integral_from);
++		return p;
++	}
++
++	static float levienT(const LevienParams& p, u32 i)
++	{
++		float u = levienParabolaInvIntegral(p.integral_from + p.integral_step * (float) i);
++		return (u - p.inv_integral_from) * p.div_inv_integral_diff;
++	}
++
++	// Levien-scheduled twin of SWF::addCurvedEdge. Non-morph only, so no
++	// morph_index bookkeeping. Truncation to integer twips is kept verbatim
++	// (see the note in addCurvedEdge).
++	static void addCurvedEdgeLevien(Path* path, Vertex current, Vertex control,
++	                                Vertex anchor, const LevienParams& lp)
++	{
++		u32 n = (lp.count < 1) ? 1 : lp.count;
++
++		for (u32 i = 1; i <= n; ++i)
++		{
++			float t = (i < lp.count) ? levienT(lp, i) : 1.0f;
++			float u = 1.0f - t;
++
++			Vertex v;
++			v.x = (s32) (u*u*current.x + 2*u*t*control.x + t*t*anchor.x);
++			v.y = (s32) (u*u*current.y + 2*u*t*control.y + t*t*anchor.y);
++
++			path->verts.push_back(v);
++		}
++	}
++
+ 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
+ 	{
+ 		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2 || shape_tag.code == SWF_TAG_DEFINE_FONT_3);
+@@ -8872,6 +8994,13 @@ namespace SWFRecomp
+ 						// both sides max(N(dev_start), N(dev_end)), which keeps the
+ 						// pairing exact while still refining. Without a plan (an
+ 						// unrecognised stream) morphs fall back to the historical 6.
++						// Leg-C knob: when set, the plain-shape arm uses the
++						// ported lyon/Levien schedule instead of the
++						// equal-parameter one, which is what Ruffle does.
++						const bool curve_flatten_levien = true;
++						LevienParams levien_params = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
++						bool levien_active = false;
++
+ 						u32 num_passes = 6;
+ 						if (is_morph)
+ 						{
+@@ -8884,14 +9013,27 @@ namespace SWFRecomp
+ 								}
+ 							}
+ 						}
++						else if (curve_flatten_levien)
++						{
++							levien_params = levienInit((float) current.x, (float) current.y,
++							                           (float) control.x, (float) control.y,
++							                           (float) anchor.x, (float) anchor.y,
++							                           LEVIEN_TOL_TWIPS);
++							levien_active = true;
++							num_passes = (levien_params.count < 1) ? 1 : levien_params.count;
++						}
++
+ 						else
+ 						{
+ 							const float curve_flatten_tol_twips = 1.0f;   // 0.05 px at 1:1
++							const u32 curve_flatten_floor = 6;            // historical fixed count
+ 
+ 							float dev_x = (float) control.x - 0.5f * ((float) current.x + (float) anchor.x);
+ 							float dev_y = (float) control.y - 0.5f * ((float) current.y + (float) anchor.y);
+ 							float dev = 0.5f * sqrtf(dev_x*dev_x + dev_y*dev_y);
+ 
++							num_passes = curve_flatten_floor;
++
+ 							if (dev > curve_flatten_tol_twips)
+ 							{
+ 								float n = ceilf(sqrtf(dev / curve_flatten_tol_twips));
+@@ -8910,7 +9052,15 @@ namespace SWFRecomp
+ 						emitPath(3.0f, (float)control.x, (float)(FRAME_HEIGHT - control.y));
+ 						emitPath(4.0f, (float)anchor.x, (float)(FRAME_HEIGHT - anchor.y));
+ 
+-						addCurvedEdge(current_path, current, control, anchor, num_passes, is_morph ? &morph_vertex_counter : nullptr);
++						if (levien_active)
++						{
++							addCurvedEdgeLevien(current_path, current, control, anchor, levien_params);
++						}
++
++						else
++						{
++							addCurvedEdge(current_path, current, control, anchor, num_passes, is_morph ? &morph_vertex_counter : nullptr);
++						}
+ 						morph_start_edge_ord += 1;
+ 
+ 						last_x = anchor.x;
