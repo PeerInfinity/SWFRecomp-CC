@@ -1450,10 +1450,20 @@ void avm2_net_flush_connections(Avm2Context* ctx)
 //     so the callee gets a deep copy with Flash's type translations. That is the
 //     same wire the NetConnection packet above uses.
 //
-// Not modelled: the AVM1 half of the registry. Our AVM1 LocalConnection
-// (action.c) keeps its own channel map, so an AVM1<->AVM2 send finds no
-// listener. Only avm2/localconnection needs it, and that test needs more
-// besides.
+// The AVM1 half of the registry lives in action.c, with its own channel map and
+// its own AMF0 codec, and is BRIDGED here rather than merged: Flash's registry
+// belongs to the player, not to a VM, so a send that finds no AVM2 listener
+// consults the AVM1 map before it fails. Both key builders emit the same
+// `superdomain:name` lowercased string and both halves put a bare AMF0 value in
+// each argument buffer, so a message crosses untouched. mixed_avm/
+// avm2_loads_avm1_v9 and _v10 grade the AVM2->AVM1 direction; the reverse enters
+// through avm2_net_local_connection_deliver_from_avm1, at the end of this
+// section.
+extern int actionAvm1LocalConnectionHasChannel(const char* key);
+extern int actionAvm1LocalConnectionDeliver(SWFAppContext* app_context,
+                                            const char* key, const char* method,
+                                            unsigned char* const* args,
+                                            const size_t* arg_len, int argc);
 
 #define LC_MAX_CHANNELS 32
 #define LC_MAX_QUEUE 64
@@ -1698,7 +1708,8 @@ static Avm2Value lc_send(Avm2Activation* act)
 		m->arg_len[i] = len;
 	}
 	m->argc = (int) n;
-	m->failure = (lc_find_listener(m->key) == NULL) ? 1 : 0;
+	m->failure = (lc_find_listener(m->key) == NULL
+	              && !actionAvm1LocalConnectionHasChannel(m->key)) ? 1 : 0;
 	g_lc_queue_count++;
 	return avm2_undefined();
 }
@@ -1799,14 +1810,23 @@ void avm2_net_deliver_local_connections(Avm2Context* ctx)
 	{
 		LcMessage* m = &batch[i];
 		Avm2Object* receiver = m->failure ? NULL : lc_find_listener(m->key);
-		if (receiver == NULL)
-		{
-			lc_send_status(ctx, m->sender, "error");
-		}
-		else
+		if (receiver != NULL)
 		{
 			lc_send_status(ctx, m->sender, "status");
 			lc_run_method(ctx, receiver, m);
+		}
+		else if (!m->failure && actionAvm1LocalConnectionHasChannel(m->key))
+		{
+			// Cross-VM: an AVM1 child holds the channel. Status first, exactly
+			// as on the AVM2 path; the AVM1 half owns the callee dispatch and
+			// reads these very AMF0 buffers with its own reader.
+			lc_send_status(ctx, m->sender, "status");
+			actionAvm1LocalConnectionDeliver(ctx->app, m->key, m->method,
+			                                 m->args, m->arg_len, m->argc);
+		}
+		else
+		{
+			lc_send_status(ctx, m->sender, "error");
 		}
 		for (int a = 0; a < m->argc; a++)
 		{
@@ -1814,6 +1834,41 @@ void avm2_net_deliver_local_connections(Avm2Context* ctx)
 			m->args[a] = NULL;
 		}
 	}
+}
+
+// The AVM2 half of the bridge, called from action.c's AVM1 queue drain when an
+// AVM1 send() finds no AVM1 listener for the channel.
+int avm2_net_local_connection_has_channel(const char* key)
+{
+	return (key != NULL && lc_find_listener(key) != NULL) ? 1 : 0;
+}
+
+// Deliver a message an AVM1 LocalConnection sent. `args` holds `argc` AMF0
+// buffers owned by the AVM1 queue — lc_run_method reads them and never frees.
+// The AVM1 side has already dispatched its sender's onStatus. Returns 1 if an
+// AVM2 listener held the channel.
+int avm2_net_local_connection_deliver_from_avm1(const char* key, const char* method,
+                                                unsigned char* const* args,
+                                                const size_t* arg_len, int argc)
+{
+	Avm2Context* ctx = avm2_get_context();
+	Avm2Object* receiver = (ctx != NULL && key != NULL) ? lc_find_listener(key) : NULL;
+	if (receiver == NULL || method == NULL) return 0;
+	if (argc < 0) argc = 0;
+	if (argc > LC_MAX_ARGS) argc = LC_MAX_ARGS;
+
+	LcMessage m;
+	memset(&m, 0, sizeof(m));
+	snprintf(m.key, sizeof(m.key), "%s", key);
+	snprintf(m.method, sizeof(m.method), "%s", method);
+	for (int i = 0; i < argc; i++)
+	{
+		m.args[i] = args[i];
+		m.arg_len[i] = arg_len[i];
+	}
+	m.argc = argc;
+	lc_run_method(ctx, receiver, &m);
+	return 1;
 }
 
 static void register_local_connection(Avm2Context* ctx)

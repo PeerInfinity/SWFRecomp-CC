@@ -2807,6 +2807,22 @@ static int g_lc_channel_count = 0;
 static LCMessage g_lc_messages[MAX_LC_MESSAGES];
 static int g_lc_message_count = 0;
 
+#ifdef SWF_AVM2
+// The AVM2 half of the registry (avm2_net.c). Flash's LocalConnection registry
+// belongs to the PLAYER, not to a VM: a channel an AVM2 LocalConnection holds is
+// visible to an AVM1 send() in the same player and vice versa. The two halves
+// keep separate maps and separate AMF0 codecs, so they are BRIDGED rather than
+// merged — lc_build_key here and lc_connect_key/lc_send_key there already emit
+// the same `superdomain:name` lowercased string, and both put a bare AMF0 value
+// in each argument buffer, so a message crosses without re-encoding.
+extern int avm2_net_local_connection_has_channel(const char* key);
+extern int avm2_net_local_connection_deliver_from_avm1(const char* key,
+                                                       const char* method,
+                                                       unsigned char* const* args,
+                                                       const size_t* arg_len,
+                                                       int argc);
+#endif
+
 // Build channel key from connection name.
 // For connect(): name has no ':', domain is always "localhost"
 // For send(): name may contain "domain:channelname"
@@ -2970,8 +2986,11 @@ static ActionVar builtin_lc_send(SWFAppContext* app_context, ActionVar* args, u3
 	char key[256] = {0};
 	lc_build_key(ch_buf, 1, key, sizeof(key));
 
-	// Check if channel has a receiver at send time
+	// Check if channel has a receiver at send time — in either VM.
 	int had_receiver = (lc_find_receiver(key) != NULL) ? 1 : 0;
+#ifdef SWF_AVM2
+	if (!had_receiver) had_receiver = avm2_net_local_connection_has_channel(key);
+#endif
 
 	// Queue message
 	if (g_lc_message_count >= MAX_LC_MESSAGES) { ret.data.numeric_value = 1; return ret; }
@@ -3126,11 +3145,29 @@ void processLocalConnectionMessages(SWFAppContext* app_context)
 		LCMessage* msg = &msgs[i];
 		ASObject* receiver = msg->had_receiver
 			? lc_find_receiver(msg->channel_key) : NULL;
-		if (receiver == NULL)
+		int avm2_receiver = 0;
+#ifdef SWF_AVM2
+		if (receiver == NULL && msg->had_receiver)
+			avm2_receiver = avm2_net_local_connection_has_channel(msg->channel_key);
+#endif
+		if (receiver == NULL && !avm2_receiver)
 		{
 			// No receiver at send time, or it went away before delivery → error
 			lc_dispatch_onStatus(app_context, msg->sender, "error");
 		}
+#ifdef SWF_AVM2
+		else if (receiver == NULL)
+		{
+			// Cross-VM: an AVM2 LocalConnection holds the channel. It owns the
+			// callee dispatch (and its own AMF0 reader, reading the very bytes
+			// this send serialized); the sender's status fires first, exactly as
+			// in the AVM1-to-AVM1 path below.
+			lc_dispatch_onStatus(app_context, msg->sender, "status");
+			avm2_net_local_connection_deliver_from_avm1(
+				msg->channel_key, msg->method, msg->arg_data, msg->arg_len,
+				msg->num_args);
+		}
+#endif
 		else
 		{
 			// Deserialize on delivery, so the receiver sees a deep copy.
@@ -23968,6 +24005,11 @@ MovieClip* actionBootAvm1ChildUnderAvm2(SWFAppContext* app_context,
 
 	MovieClip* mc = getOrCreateLevel(app_context, level);
 	if (mc == NULL) return NULL;
+	// Ruffle loader.rs:61 LOADER_INSERTED_AVM1_DEPTH = -0xF000 (-61440): an AVM1
+	// movie inserted by an AVM2 Loader is stamped at that *internal* depth, and
+	// AVM1's getDepth subtracts AVM_DEPTH_BIAS (16384, avm1/globals.rs:864), so
+	// scripts observe -77824. mc->depth already stores the AVM1-biased value.
+	mc->depth = -0xF000 - 16384;
 	constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 	mc->swf_version = (u16) entry->swf_version;
 	mc->movie_id = entry->movie_id;
@@ -24041,6 +24083,57 @@ int actionAvm1UnderAvm2IsRootTarget(MovieClip* mc)
 	return 0;
 }
 
+// The execution context an AVM1 child runs under: the same version / globals /
+// movie-id / current-clip swap avm1UnderAvm2RunFrame performs around a frame,
+// factored out for the event bridges below (mouse, LocalConnection), which must
+// run AVM1 code from an AVM2 call site. The display-list and transform-table
+// halves of RunFrame's swap stay there — an event handler executes against
+// whatever list its own clip already owns.
+//
+// The swap is done ONCE, for the first booted child: the AVM1 registries these
+// bridges walk (child_mc_cache, the single Mouse broadcaster, the LocalConnection
+// channel map) are process-global, so re-entering them per child would fire every
+// handler N times. With one AVM1 child — every dual-VM test in the corpus, and
+// the only shape an AVM2 Loader produces in practice — that is exact.
+typedef struct {
+	MovieClip* clip;
+	int version;
+	ASObject* global;
+	u8 movie_id;
+	int quit;
+} Avm1ChildSwap;
+
+static void avm1UnderAvm2EnterChild(SWFAppContext* app_context, Avm1ChildSwap* saved)
+{
+	extern int quit_swf;
+	saved->clip = g_current_context;
+	saved->version = g_swf_version;
+	saved->global = global_object;
+	saved->movie_id = g_current_movie_id;
+	saved->quit = quit_swf;
+	quit_swf = 0;
+	if (g_avm1u2_count == 0) return;
+	Avm1UnderAvm2Child* child = &g_avm1u2[0];
+	if (child->entry != NULL) {
+		g_swf_version = child->entry->swf_version;
+		g_current_movie_id = child->entry->movie_id;
+		ensureSecondaryGlobalInit(app_context, child->entry->swf_version);
+		if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+		else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+	}
+	if (child->mc != NULL) actionSetCurrentContext(child->mc);
+}
+
+static void avm1UnderAvm2LeaveChild(Avm1ChildSwap* saved)
+{
+	extern int quit_swf;
+	quit_swf = saved->quit;
+	actionSetCurrentContext(saved->clip);
+	g_swf_version = saved->version;
+	global_object = saved->global;
+	g_current_movie_id = saved->movie_id;
+}
+
 // One AVM1 tick, driven from the AVM2 frame loop. No-op until a child boots,
 // so an AVM2 movie with no AVM1 content pays a single global test per frame.
 void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context)
@@ -24075,6 +24168,146 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context)
 	actionFirePendingUnloads(app_context);
 	quit_swf = saved_quit;
 	actionSetCurrentContext(saved_ctx);
+	// The AVM1 LocalConnection queue drains here too — an AVM1 child under an
+	// AVM2 Loader has no other end-of-frame hook, so a send() it issued (to
+	// another AVM1 movie or, through the bridge below, to an AVM2 listener)
+	// would otherwise sit in the queue forever. The callee runs in the child's
+	// context, hence the swap.
+	{
+		Avm1ChildSwap swap;
+		avm1UnderAvm2EnterChild(app_context, &swap);
+		processLocalConnectionMessages(app_context);
+		avm1UnderAvm2LeaveChild(&swap);
+	}
+}
+
+// Mouse event kinds the AVM2 input pump forwards into AVM1 (mirrored, with the
+// same values, next to avm2_display.c's extern declaration of the function
+// below — this seam is deliberately header-free, like the tick/boot hooks).
+#define AVM1_CHILD_MOUSE_MOVE 0
+#define AVM1_CHILD_MOUSE_DOWN 1
+#define AVM1_CHILD_MOUSE_UP   2
+
+// Forward a stage mouse event from the AVM2 input pump into the AVM1
+// substrate. `kind` is AVM1_CHILD_MOUSE_{MOVE,DOWN,UP}; `x`/`y` are stage
+// pixels (the AVM2 stage owns the origin here, so unlike input_events.c there
+// is no FRAME_{X,Y}_MIN_TWIPS bias to add).
+//
+// This is a BROADCAST, not a hit test: `Mouse.onMouseX` and `mc.onMouseX` fire
+// in AVM1 regardless of pointer position, which is exactly what the dual-VM
+// fixtures grade (mixed_avm/avm2_loads_avm1's `onmousedown at 10, 10!`). The
+// onPress/onRelease dispatchers below DO hit-test, but against the AVM1
+// child's own coordinate space — a Loader transform between the AVM2 stage and
+// the AVM1 root is not modelled, so cross-VM picking stays out of scope.
+//
+// The child-context swap around the dispatch is avm1UnderAvm2EnterChild's,
+// above.
+void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext* app_context, int kind,
+                                      float x, float y)
+{
+	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0) return;
+	extern void actionDispatchMCMouseDown(SWFAppContext*);
+	extern void actionDispatchMCMouseUp(SWFAppContext*);
+	extern void actionDispatchMCMouseMove(SWFAppContext*);
+	extern void actionDispatchMCMouseMoveGlobal(SWFAppContext*);
+	extern void actionDispatchMCPress(SWFAppContext*);
+	extern void actionDispatchMCRelease(SWFAppContext*);
+
+	// Mirror the bookkeeping input_events.c does on the AVM1-only path, so the
+	// AVM1 mouse state machine stays self-consistent. stage_x/y is the load
+	// bearing pair (mc_get_local_mouse reads it for _xmouse/_ymouse); the rest
+	// has no reader in an AVM2 build today.
+	MouseState* ms = &app_context->mouse;
+	ms->stage_x = x * 20.0f;
+	ms->stage_y = y * 20.0f;
+	root_movieclip.xmouse = x;
+	root_movieclip.ymouse = y;
+	if (kind == AVM1_CHILD_MOUSE_DOWN)    { ms->button_down = 1; ms->clicked = 1; }
+	else if (kind == AVM1_CHILD_MOUSE_UP) { ms->button_down = 0; ms->released = 1; }
+	else                                  { ms->moved = 1; }
+
+	Avm1ChildSwap swap;
+	avm1UnderAvm2EnterChild(app_context, &swap);
+	if (kind == AVM1_CHILD_MOUSE_MOVE) {
+		actionDispatchMouseMove(app_context);
+		actionDispatchMCMouseMove(app_context);
+		actionDispatchMCMouseMoveGlobal(app_context);
+	} else if (kind == AVM1_CHILD_MOUSE_DOWN) {
+		actionDispatchMouseDown(app_context);
+		actionDispatchMCMouseDown(app_context);
+		actionDispatchMCPress(app_context);
+	} else {
+		actionDispatchMouseUp(app_context);
+		actionDispatchMCMouseUp(app_context);
+		actionDispatchMCRelease(app_context);
+	}
+	avm1UnderAvm2LeaveChild(&swap);
+}
+
+// Mirror an AVM1Movie's position onto the AVM1 root it wraps. In Ruffle the two
+// are the SAME display object — loader.rs marks the loaded MovieClip itself as
+// an AVM1 movie and hands that object to AS3 as `Loader.content` — so a script
+// write to `content.x` IS a write to the AVM1 root's `_x`. Our model keeps an
+// AVM2 wrapper beside the AVM1 MovieClip, so the write has to be pushed across.
+// mixed_avm/avm2_loads_avm1_v9 and _v10 grade it: the parent sets
+// `content.x = 99`, pings the child over LocalConnection, and the child's
+// callback traces `_root._x`.
+//
+// Position only. Scale/rotation/alpha would need the same mirror, but nothing in
+// the corpus writes them on an AVM1Movie, and each is a separate AVM2 setter.
+void actionAvm1ChildSetRootPosition(float x, float y)
+{
+	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0) return;
+	MovieClip* mc = g_avm1u2[0].mc;
+	if (mc == NULL) return;
+	mc->x = x;
+	mc->y = y;
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Same bookkeeping the AVM1 `_x`/`_y` setters do, so a later timeline tween
+	// on the child cannot silently overwrite a script-set position.
+	mc->as_set_flags |= 3;
+	markTransformedByScript(mc);
+#endif
+}
+
+// --- cross-VM LocalConnection: the AVM1 half of the registry ---
+//
+// avm2_net.c calls these two hooks when its own channel map has no listener for
+// a send. See the extern block up at the AVM1 LocalConnection implementation for
+// why the halves are bridged (same key shape, same AMF0 wire) rather than merged.
+// mixed_avm/avm2_loads_avm1_v9 and _v10 grade this direction: the AVM2 parent
+// send()s `setX` to the channel the loaded AVM1 movie connect()ed to.
+
+int actionAvm1LocalConnectionHasChannel(const char* key)
+{
+	return (key != NULL && lc_find_receiver(key) != NULL) ? 1 : 0;
+}
+
+// Deliver a message an AVM2 LocalConnection sent. `args` holds `argc` AMF0
+// buffers still owned by the AVM2 send queue. The AVM2 side has already
+// dispatched the sender's "status" event, as Ruffle does, so only the callee is
+// left. Returns 1 if an AVM1 listener held the channel.
+int actionAvm1LocalConnectionDeliver(SWFAppContext* app_context, const char* key,
+                                     const char* method,
+                                     unsigned char* const* args,
+                                     const size_t* arg_len, int argc)
+{
+	ASObject* receiver = (key != NULL) ? lc_find_receiver(key) : NULL;
+	if (receiver == NULL || method == NULL) return 0;
+	if (argc < 0) argc = 0;
+	if (argc > MAX_LC_MSG_ARGS) argc = MAX_LC_MSG_ARGS;
+
+	Avm1ChildSwap swap;
+	avm1UnderAvm2EnterChild(app_context, &swap);
+	// Deserialized on delivery, like the AVM1-to-AVM1 path: the callee gets a
+	// deep copy carrying Flash's own type translations.
+	ActionVar delivered[MAX_LC_MSG_ARGS];
+	for (int i = 0; i < argc; i++)
+		delivered[i] = avm1AmfDeserializeArg(app_context, args[i], arg_len[i]);
+	lc_dispatch_method(app_context, receiver, method,
+	                   argc > 0 ? delivered : NULL, argc);
+	avm1UnderAvm2LeaveChild(&swap);
+	return 1;
 }
 #endif  // SWF_AVM2
 
