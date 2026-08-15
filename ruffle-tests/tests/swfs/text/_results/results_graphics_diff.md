@@ -1,35 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `16314e63feaa` (2026-08-13T21:54:57.541967+00:00)
-**Current:** `3db858cbc157` (2026-08-13T22:38:36.698440+00:00)
+**Previous:** `3db858cbc157` (2026-08-13T22:38:36.698440+00:00)
+**Current:** `86434112a759` (2026-08-15T09:18:14.481840+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 0 | 10 | +10 |
+| Passing | 10 | 10 | 0 |
 | Total | 11 | 11 | 0 |
-| Pass rate | 0.0% | 90.9% | +90.9% |
-| Mismatched lines | 0 | 1 | +1 |
-|   Increased | | | +1 |
+| Pass rate | 90.9% | 90.9% | 0% |
+| Mismatched lines | 1 | 1 | 0 |
 
-## Newly Passing (10)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `auto_size/height` | compile_fail | - | 1/1 |
-| `auto_size/return` | compile_fail | - | 12/12 |
-| `auto_size/width` | compile_fail | - | 6/6 |
-| `br_at_start` | compile_fail | - | 0/0 |
-| `html_entity_parsing` | compile_fail | - | 213/213 |
-| `style_changes_in_html` | compile_fail | - | 0/0 |
-| `text_caret_placement_align` | compile_fail | - | 248/248 |
-| `text_caret_placement_leading` | compile_fail | - | 244/244 |
-| `text_caret_placement_scroll` | compile_fail | - | 108/108 |
-| `text_caret_placement_translated_bounds` | compile_fail | - | 140/140 |
-
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `links_in_scrolled_text` | compile_fail | output_mismatch | - | 0/1 |
+No changes detected.

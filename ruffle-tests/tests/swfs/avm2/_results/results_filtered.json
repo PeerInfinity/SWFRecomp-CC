@@ -6,18 +6,18 @@
     "total_available": 1227,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 56,
+    "ignored_count": 53,
     "filtered": true
   },
-  "total": 1171,
+  "total": 1174,
   "pass": 1107,
   "ruffle_matched": 5,
-  "fail": 59,
-  "pass_rate": 94.5,
+  "fail": 62,
+  "pass_rate": 94.3,
   "effective_pass": 1112,
-  "effective_pass_rate": 95.0,
+  "effective_pass_rate": 94.7,
   "breakdown": {
-    "output_mismatch": 59,
+    "output_mismatch": 62,
     "ruffle_matched": 5
   },
   "tests": [
@@ -2028,6 +2028,25 @@
       },
       "duration": 25.66,
       "status": "pass"
+    },
+    {
+      "test": "bitmapdata_draw_alpha_erase",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 6.493,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 6
+      },
+      "duration": 6.5,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=8, expected=8)",
+      "actual_output": "alphaData before alpha: ff224466\nalphaData after alpha: ff224466\neraseData before erase: ff202060\neraseData after erase: ff202060\ndummyAlphaData before alpha: ff224466\ndummyAlphaData after alpha: ff224466\ndummyEraseData before erase: ff202060\ndummyEraseData after erase: ff202060",
+      "expected_output": "alphaData before alpha: ff224466\nalphaData after alpha: 44224365\neraseData before erase: ff202060\neraseData after erase: bb1f1f5f\ndummyAlphaData before alpha: ff224466\ndummyAlphaData after alpha: ff224466\ndummyEraseData before erase: ff202060\ndummyEraseData after erase: ff202060"
     },
     {
       "test": "bitmapdata_draw_colortransform",
@@ -6281,6 +6300,25 @@
       "status": "pass"
     },
     {
+      "test": "edittext_tag_indent",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.122,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 50,
+        "expected_lines": 49,
+        "matching_lines": 38
+      },
+      "duration": 21.13,
+      "status": "output_mismatch",
+      "detail": "12 line(s) differ (actual=50, expected=49)",
+      "actual_output": "Indent for text1:\n1638\n1638\nIndent for text2:\n1638\n1638\nIndent for text3:\n3267\n3267\nIndent for text4:\n2\n2\nIndent for text5:\n3273\n3273\nSetting 0 -> 0\nSetting 0.1 -> 0\nSetting 0.4 -> 0\nSetting 0.5 -> 0\nSetting 0.6 -> 1\nSetting 0.8 -> 1\nSetting 1 -> 1\nSetting 1.1 -> 1\nSetting 1.4 -> 1\nSetting 1.5 -> 2\nSetting 1.6 -> 2\nSetting 1.8 -> 2\nSetting 2 -> 2\nSetting -10 -> -10\nSetting 100 -> 100\nSetting 64010 -> 64010\nlines for text1:\na\nbcdabcd\n\nlines for text2:\na\nbcdabcd\n\nlines for text3:\na\nbcdabcd\n\nlines for text4:\nabcdabcd\n\n\nlines for text5:\na\nbcdabcd",
+      "expected_output": "Indent for text1:\n1638\n1638\nIndent for text2:\n-1638\n-1638\nIndent for text3:\n-10\n-10\nIndent for text4:\n2\n2\nIndent for text5:\n-4\n-4\nSetting 0 -> 0\nSetting 0.1 -> 0\nSetting 0.4 -> 0\nSetting 0.5 -> 0\nSetting 0.6 -> 1\nSetting 0.8 -> 1\nSetting 1 -> 1\nSetting 1.1 -> 1\nSetting 1.4 -> 1\nSetting 1.5 -> 2\nSetting 1.6 -> 2\nSetting 1.8 -> 2\nSetting 2 -> 2\nSetting -10 -> -10\nSetting 100 -> 100\nSetting 64010 -> 64010\nlines for text1:\na\nbcdabcd\n\nlines for text2:\nabcdabcd\n\n\nlines for text3:\nabcdabcd\n\n\nlines for text4:\nabcdabcd\n\n\nlines for text5:\nabcdabcd"
+    },
+    {
       "test": "edittext_underline",
       "phases": {
         "recomp": 0.096,
@@ -8229,6 +8267,26 @@
       },
       "duration": 5.94,
       "status": "pass"
+    },
+    {
+      "test": "geom_transform",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.073,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "error_signature": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: rawData)",
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 74,
+        "matching_lines": 21
+      },
+      "duration": 23.08,
+      "status": "output_mismatch",
+      "detail": "53 line(s) differ (actual=26, expected=74)",
+      "actual_output": "... (16 lines before) ...\n// sprite2D: .matrix = mat2D\nsprite2D.transform.matrix (a=2, b=3, c=4, d=5, tx=6, ty=7)\nsprite2D.transform.matrix3D null\nmat2D (a=2, b=3, c=4, d=5, tx=6, ty=7)\n// sprite2D: .matrix = null\nsprite2D.transform.matrix (a=2, b=3, c=4, d=5, tx=6, ty=7)\nsprite2D.transform.matrix3D null\nTypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: rawData)\n\tat Test/test2D()\n\tat Test()",
+      "expected_output": "... (16 lines before) ...\n// sprite2D: .matrix = mat2D\nsprite2D.transform.matrix (a=2, b=3, c=4, d=5, tx=6, ty=7)\nsprite2D.transform.matrix3D null\nmat2D (a=2, b=3, c=4, d=5, tx=6, ty=7)\n// sprite2D: .matrix = null\nsprite2D.transform.matrix null\nsprite2D.transform.matrix3D [object Matrix3D]\nsprite2D.transform.matrix3D.rawData 2,3,0,0,4,5,0,0,0,0,1,0,6,7,0,1\nmat2D (a=2, b=3, c=4, d=5, tx=6, ty=7)\n// sprite2D: .matrix3D = null\nsprite2D.transform.matrix (a=1, b=0, c=0, d=1, tx=0, ty=0)\nsprite2D.transform.matrix3D null\nmat2D (a=2, b=3, c=4, d=5, tx=6, ty=7)\n// sprite2D: set x = 30, y = 50\nsprite2D.transform.matrix (a=1, b=0, c=0, d=1, tx=30, ty=50)\nsprite2D.transform.matrix3D null\nmat2D (a=2, b=3, c=4, d=5, tx=6, ty=7)\n\n// sprite3D: set identity matrix3D\nsprite3D.transform.matrix null\nsprite3D.transform.matrix3D [object Matrix3D]\nsprite3D.transform.matrix3D.rawData 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1\nmat3D.rawData 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1\n// sprite3D: update mat3D\nsprite3D.transform.matrix null\nsprite3D.transform.matrix3D [object Matrix3D]\nmat3D.rawData 2,3,0,0,4,5,0,0,0,0,1,0,6,7,0,1\n// sprite3D: .matrix3D = mat3D\nsprite3D.transform.matrix null\nsprite3D.transform.matrix3D [object Matrix3D]\nsprite3D.transform.matrix3D.rawData 2,3,0,0,4,5,0,0,0,0,1,0,6,7,0,1\nmat3D.rawData 2,3,0,0,4,5,0,0,0,0,1,0,6,7,0,1\n// sprite3D: .matrix = null\nsprite3D.transform.matrix null\nsprite3D.transform.matrix3D [object Matrix3D]\nsprite3D.transform.matrix3D.rawData 2,3,0,0,4,5,0,0,0,0,1,0,6,7,0,1\nmat3D.rawData 2,3,0,0,4,5,0,0,0,0,1,0,6,7,0,1\n// sprite3D: set x = 30, y = 50\nsprite3D.transform.matrix null\nsprite3D.transform.matrix3D [object Matrix3D]\nsprite3D.transform.matrix3D.rawData 2,3,0,0,4,5,0,0,0,0,1,0,30,50,0,1\n// sprite3D: .matrix3D = null\nsprite3D.transform.matrix (a=1, b=0, c=0, d=1, tx=0, ty=0)\nsprite3D.transform.matrix3D null\n\n// Copy2D\nsprite1.transform.matrix (a=1, b=2, c=3, d=4, tx=5, ty=6)\nsprite1.transform.matrix3D null\nsprite2.transform.matrix (a=1, b=2, c=3, d=4, tx=5, ty=6)\nsprite2.transform.matrix3D null\n... (8 lines after) ..."
     },
     {
       "test": "get_definition_by_name",

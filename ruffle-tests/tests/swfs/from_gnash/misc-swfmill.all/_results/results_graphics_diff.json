@@ -1,274 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-13T21:54:57.595609+00:00",
-    "old_git_sha": "16314e63feaa3e9f094362a60c2b4c60b15218f6",
-    "new_timestamp": "2026-08-13T22:38:36.751645+00:00",
-    "new_git_sha": "3db858cbc157a97402c8e9a956b123871fc73405",
+    "old_timestamp": "2026-08-13T22:38:36.751645+00:00",
+    "old_git_sha": "3db858cbc157a97402c8e9a956b123871fc73405",
+    "new_timestamp": "2026-08-15T09:18:14.553324+00:00",
+    "new_git_sha": "86434112a75946b377d5d329b234e47fa83a957c",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 0,
-    "old_ruffle_matched": 0,
-    "old_effective_pass": 0,
+    "old_pass": 19,
+    "old_ruffle_matched": 1,
+    "old_effective_pass": 20,
     "old_total": 20,
-    "old_pass_rate": 0.0,
+    "old_pass_rate": 95.0,
     "new_pass": 19,
     "new_ruffle_matched": 1,
     "new_effective_pass": 20,
     "new_total": 20,
     "new_pass_rate": 95.0,
-    "old_mismatched_lines": 0,
+    "old_mismatched_lines": 2,
     "new_mismatched_lines": 2,
-    "increased_mismatches": 2,
+    "increased_mismatches": 0,
     "decreased_mismatches": 0,
-    "newly_passing": 20,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 20,
-    "unchanged": 0,
+    "status_changed": 0,
+    "unchanged": 20,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "afunc_dict",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "background",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "dict_callframe",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "dict_cross",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "dict_event",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "dict_override",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "func_dict",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "initaction_in_definesprite",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "jump_after_end",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "jump_to_prev_block",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "missing_bitmap",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "mixed-bytecode-as2",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "registers",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 36,
-        "expected_lines": 36,
-        "matching_lines": 36
-      }
-    },
-    {
-      "test": "tags_after_last_showframe",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "trace-as2/arguments",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "trace-as2/root_onload",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "trace-as2/shortstack",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "trace-as2/super",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "trace-as2/this",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "zeroframe_definesprite",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 1
-      }
-    }
-  ]
+  "changes": []
 }

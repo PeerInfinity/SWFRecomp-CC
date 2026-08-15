@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-08-13 22:38 UTC
+**Date**: 2026-08-15 09:18 UTC
 
-**Git SHA**: `3db858cbc1`
+**Git SHA**: `86434112a7`
 
-**Run Duration**: 1m 19s
+**Run Duration**: 1m 24s
 
 **Filtered**: 0 tests ignored out of 11 available
 
@@ -13,43 +13,42 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 11 |
-| Passing | **7** (63.6%) |
-| Failing | 4 |
+| Passing | **10** (90.9%) |
+| Failing | 1 |
 | Total expected lines | 53 |
-| Matching lines | 40 (75.5%) |
-| Mismatched lines | 13 |
+| Matching lines | 49 (92.5%) |
+| Mismatched lines | 4 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 4 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**7 tests passing**
+**10 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm1_doabc` | 1 | 1.6s |  |
-| 2 | `avm1_loads_avm2_doaction` | 2 | 2.1s |  |
-| 3 | `avm1_sprite_sc_ignored` | 3 | 21.4s |  |
-| 4 | `avm2_doaction` | 1 | 7.4s |  |
-| 5 | `avm2_loads_avm1_doabc` | 4 | 6.5s |  |
-| 6 | `avm2_loads_avm1_loads_avm2_doabc` | 3 | 6.4s |  |
-| 7 | `avm2_loads_avm1_loads_into_root` | 2 | 8.4s |  |
+| 1 | `avm1_doabc` | 1 | 2.2s |  |
+| 2 | `avm1_loads_avm2_doaction` | 2 | 2.2s |  |
+| 3 | `avm1_sprite_sc_ignored` | 3 | 23.3s |  |
+| 4 | `avm2_doaction` | 1 | 7.7s |  |
+| 5 | `avm2_loads_avm1` | 14 | 8.1s |  |
+| 6 | `avm2_loads_avm1_doabc` | 4 | 7.8s |  |
+| 7 | `avm2_loads_avm1_loads_avm2_doabc` | 3 | 5.4s |  |
+| 8 | `avm2_loads_avm1_loads_into_root` | 2 | 8.0s |  |
+| 9 | `avm2_loads_avm1_v10` | 8 | 7.9s |  |
+| 10 | `avm2_loads_avm1_v9` | 8 | 8.4s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**3 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `avm2_loads_avm1_v9` | 87.5% | 7 | 8 | 1 |  |
-| 2 | `avm2_loads_avm1` | 64.3% | 9 | 14 | 5 |  |
-| 3 | `avm2_loads_avm1_v10` | 62.5% | 5 | 8 | 3 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -65,11 +64,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**4 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `avm2_loads_avm1_v9` | 87.5% | 7/8 | 7 | 8 |  |
-| 2 | `avm2_loads_avm1` | 64.3% | 9/14 | 11 | 14 |  |
-| 3 | `avm2_loads_avm1_v10` | 62.5% | 5/8 | 7 | 8 |  |
-| 4 | `avm1_loads_avm2` | 42.9% | 3/7 | 3 | 7 |  |
+| 1 | `avm1_loads_avm2` | 42.9% | 3/7 | 3 | 7 |  |
