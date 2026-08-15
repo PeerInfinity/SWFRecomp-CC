@@ -1,0 +1,23 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..86021b135 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -5578,7 +5578,17 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
+ 	// (check_has_pending_script runs only in PHASE_CONSTRUCT), and restored
+ 	// afterwards so the caller's phase is unchanged.
+ 	uint8_t saved_phase = ctx->frame_phase;
+-	if (cext->timeline != NULL && cext->playing) run_frame_internal(ctx, child, 1);
++	if (cext->timeline != NULL)
++	{
++		if (cext->playing) run_frame_internal(ctx, child, 1);
++		// The same pairing enter_frame_obj uses: run_frame_internal only
++		// QUEUES this frame's places (Ruffle's per-depth QueuedTagList) —
++		// flush_queued_places is what actually creates the children. Without
++		// it the loaded root has no frame-1 children while the load's own
++		// `complete` handler runs, so a named child reads null
++		// (from_shumway/as3-loader/LoaderTest2 asks for `testSymbol` there).
++		flush_queued_places(ctx, child);
++	}
+ 	ctx->frame_phase = PHASE_CONSTRUCT;
+ 	construct_frame_obj(ctx, child);
+ 	ctx->frame_phase = PHASE_FRAME_SCRIPTS;

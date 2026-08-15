@@ -557,10 +557,20 @@ static void aq_dispatch_script(SWFAppContext* app_context, void* user)
 	free(p);
 }
 
+// Non-zero while actionImportAssets replays an IMPORTED movie's frame 0 to
+// register its character definitions. Flash's ImportAssets imports SYMBOLS
+// only — the imported movie's own timeline never plays — so the root DoAction
+// the recompiler queues out of that frame must be dropped
+// (import_assets/avm1_imports_avm1 otherwise traces the loadee's own
+// "Hello from right_eye.swf"). The imported movie's DoInitAction scripts are
+// unaffected: those run from `entry->init_func`, not from this replay.
+int g_import_assets_frame0 = 0;
+
 void actionQueueScript(SWFAppContext* app_context,
                        void (*fn)(SWFAppContext*))
 {
 	if (!fn) return;
+	if (g_import_assets_frame0) return;
 	// Browser-WASM: skip re-queueing the root DoAction while the playhead is
 	// parked on a stopped frame (set by swf.c). See g_suppress_root_doaction.
 	if (g_suppress_root_doaction) return;

@@ -35387,6 +35387,8 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 		int _saved_catch = catch_up_mode;
 		int _saved_tag_skip = g_tag_skip_mode;
 		int _saved_quit = quit_swf;
+		extern int g_import_assets_frame0;
+		int _saved_import_f0 = g_import_assets_frame0;
 		size_t scratch_cap = 64;
 		DisplayObject* scratch_dl = (DisplayObject*) calloc(scratch_cap, sizeof(DisplayObject));
 		if (scratch_dl != NULL) {
@@ -35395,8 +35397,12 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 			display_list_capacity = scratch_cap;
 			catch_up_mode = 1;
 			g_tag_skip_mode = 1;  // skip placements + show_frame
+			// …and skip the frame's own DoAction: an ImportAssets import
+			// runs no timeline script of the imported movie.
+			g_import_assets_frame0 = 1;
 			quit_swf = 0;
 			entry->frame_funcs[0](app_context);
+			g_import_assets_frame0 = _saved_import_f0;
 			g_tag_skip_mode = _saved_tag_skip;
 			catch_up_mode = _saved_catch;
 			quit_swf = _saved_quit;

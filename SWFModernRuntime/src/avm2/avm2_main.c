@@ -578,6 +578,23 @@ void runSWF_avm2(SWFAppContext* app_context)
 	// uncaught error aborts that script only.
 	for (uint32_t i = 0; i < ctx->file_count; i++)
 	{
+		// …unless the DoABC2 tag carries LAZY_INITIALIZE, in which case
+		// Ruffle holds back NO eager script at all: every script of that
+		// ABC waits for a definition lookup (a SymbolClass row, or a
+		// getDefinitionByName). avm2/delayed_symbolclass grades exactly
+		// this — a class whose only SymbolClass row lives on frame 2 must
+		// not run its class+script initializers at load.
+		//
+		// Gated on the movie having a char-0 root binding: that binding is
+		// what guarantees at least one domain lookup happens at boot (step
+		// 4 resolves it), so skipping the eager script cannot leave a
+		// lazy-flagged movie with no script running at all.
+		if (root_class != NULL && i < avm2_generated_abc_file_count
+		    && avm2_generated_abc_frames[i] == 0
+		    && avm2_generated_abc_lazy[i])
+		{
+			continue;
+		}
 		if (ctx->files[i] != NULL && ctx->files[i]->data->script_count > 0)
 		{
 			Avm2TryFrame top;

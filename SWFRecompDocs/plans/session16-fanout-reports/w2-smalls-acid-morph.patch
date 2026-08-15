@@ -1,0 +1,84 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..86021b135 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -11992,6 +12002,10 @@ static Rect self_bounds_full(Avm2Context* ctx, Avm2Object* obj,
+ // hit testing: each row is one vertex {x_bits(float), y_bits(float), ...} in
+ // shape-LOCAL twips, three consecutive rows per triangle.
+ extern uint32_t shape_data[][4];
++// The END half of a DefineMorphShape's geometry: {x, y} in shape-LOCAL twips,
++// already floats (the START half is float BITS in shape_data). Same array the
++// render/CPU-raster morph paths read; re-declared here for the picker.
++extern float morph_end_shape_data[][2];
+ 
+ static inline float pick_bits_to_f(uint32_t u)
+ {
+@@ -12031,7 +12045,11 @@ static int pick_tris_contain(const float* v, uint32_t n, double lx, double ly)
+ // "default to using bounding box".
+ static int has_pick_geometry(Avm2DisplayObjectExt* ext)
+ {
+-	if (ext->shape_vert_count > 0 && !ext->is_morph_shape) return 1;
++	// A morph shape carries real geometry too — its triangles just have to be
++	// ratio-lerped between the START (shape_data) and END (morph_end_shape_data)
++	// ranges first, exactly as avm2_cpu_raster_morph draws them
++	// (from_shumway/acid/acid-morph hit-tests a morph mid-tween).
++	if (ext->shape_vert_count > 0) return 1;
+ 	if (ext->graphics_obj != NULL)
+ 	{
+ 		Avm2GraphicsExt* g = (Avm2GraphicsExt*) ext->graphics_obj->native_ext;
+@@ -12044,6 +12062,33 @@ static int has_pick_geometry(Avm2DisplayObjectExt* ext)
+ // triangles, then the drawing API's tessellated fills and strokes.
+ static int shape_contains_local(Avm2DisplayObjectExt* ext, double lx, double ly)
+ {
++	if (ext->shape_vert_count > 0 && ext->is_morph_shape)
++	{
++		// Ruffle morph_shape.rs: b weights END, a weights START (a + b = 1),
++		// and lerp_twips rounds the interpolated coordinate to whole twips.
++		double b_w = (double) ext->ratio / 65535.0;
++		if (b_w < 0.0) b_w = 0.0; else if (b_w > 1.0) b_w = 1.0;
++		double a_w = 1.0 - b_w;
++		uint32_t off = ext->shape_vert_offset, n = ext->shape_vert_count;
++		for (uint32_t t = 0; t + 3 <= n; t += 3)
++		{
++			double vx[3], vy[3];
++			for (int k = 0; k < 3; k++)
++			{
++				uint32_t sj = off + t + (uint32_t) k;
++				uint32_t ej = ext->morph_end_offset + t + (uint32_t) k;
++				double sxs = (double) pick_bits_to_f(shape_data[sj][0]);
++				double sys = (double) pick_bits_to_f(shape_data[sj][1]);
++				double sxe = (double) morph_end_shape_data[ej][0];
++				double sye = (double) morph_end_shape_data[ej][1];
++				vx[k] = floor(sxs * a_w + sxe * b_w + 0.5);
++				vy[k] = floor(sys * a_w + sye * b_w + 0.5);
++			}
++			if (pick_tri_contains(lx, ly, vx[0], vy[0], vx[1], vy[1],
++			                      vx[2], vy[2]))
++				return 1;
++		}
++	}
+ 	if (ext->shape_vert_count > 0 && !ext->is_morph_shape)
+ 	{
+ 		uint32_t off = ext->shape_vert_offset, n = ext->shape_vert_count;
+@@ -12091,12 +12136,19 @@ static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py
+ 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+ 	if (ext == NULL) return 0;
+ 	Rect self = self_bounds_full(ctx, obj, ext);
+-	if (!self.valid) return 0;
++	// A morph shape's static char bounds describe the START shape only (the
++	// recompiler emits one bounds rect per character), so they are not a valid
++	// AABB reject once the ratio has moved: the exact lerped-triangle test
++	// below is both necessary and sufficient. Everything else keeps the
++	// `world_bounds().contains(point)` guard Ruffle applies first.
++	int morph_pick = ext->is_morph_shape && ext->shape_vert_count > 0;
++	if (!self.valid && !morph_pick) return 0;
+ 	Mat m = display_world_matrix(ctx, obj);
+ 	Mat inv = mat_invert(&m);
+ 	double lx = inv.a * px + inv.c * py + inv.tx;
+ 	double ly = inv.b * px + inv.d * py + inv.ty;
+-	if (lx < self.xmin || lx > self.xmax || ly < self.ymin || ly > self.ymax)
++	if (!morph_pick
++	    && (lx < self.xmin || lx > self.xmax || ly < self.ymin || ly > self.ymax))
+ 		return 0;
+ 	if (!has_pick_geometry(ext)) return 1;
+ 	return shape_contains_local(ext, lx, ly);
