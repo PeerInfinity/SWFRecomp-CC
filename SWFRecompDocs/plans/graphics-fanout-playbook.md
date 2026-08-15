@@ -527,7 +527,7 @@ regressions, bands improved 13 / worsened 0, drift 0/0.** Ledger:
 
 ## 15. Session-15→16 state of the board (2026-08-14/15)
 
-**Closeout run `31874872388` at `86434112a`: 324 → 337/569 (59.2%; +13 = 14 gains − 1 regression fixed post-run), 2 real regressions both fixed in the follow-up commit (avm2/verify_method_info_oob: load-rejected ABC must ignore DoABC2 LAZY_INITIALIZE; visual/define_bits_lossless2_rgb15: bitmap smoothing only exists from SWF 8 — Ruffle read.rs) and re-graded by run {{RERUN}},
+**Closeout run `31874872388` at `86434112a`: 324 → 337/569 (59.2%; +13 = 14 gains − 1 regression fixed post-run), 2 real regressions both fixed in the follow-up commit (avm2/verify_method_info_oob: load-rejected ABC must ignore DoABC2 LAZY_INITIALIZE; visual/define_bits_lossless2_rgb15: bitmap smoothing only exists from SWF 8 — Ruffle read.rs) and re-graded by run 31877239992 at `aeebf9ede` (results merge `c7b284034`): both rows back to pass, 0 regressions either axis → final trace **4317/4453 eff** (denominator +10 upstream arrivals: avm1/sound_load_* ×7, avm2/matrix3d_* ×3) and pixels **338/569 (59.4%)**,
 bands 32 improved / 2 worsened (acid-scale 302→320, strokes/scale 66243→70119, both <7%), drift 0 new / 0 gone in the graded intersection; upstream master has since added avm1/sound_load_* ×7 + avm2/matrix3d_* ×3 and rewritten from_gnash Sound-v6/7/8 output.ruffle.txt (loadSound/onSoundComplete — new AVM1 Sound lead).** Baseline into the session was 324/569
 (56.9 %) at `3db858cbc`; **predicted +12**. Ledger:
 `polish-sweep-arc.md` §17; reports `session16-fanout-reports/`.
