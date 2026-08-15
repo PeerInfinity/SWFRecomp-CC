@@ -15,10 +15,11 @@
 #            and a DIFFERS there may be the fix working (false-positive mode 9)
 #
 # The `regression/` suite is represented three times, per standing policy.
-# Families with NO CI-passing representative anywhere in the corpus (filters
-# proper, morph, visual-suite masks, TLF/rich text) are Tier-2-only — that is
-# a statement about the render gap, not about the canary (false-negative
-# mode 10).
+# Families with NO CI-passing representative anywhere in the corpus (morph,
+# visual-suite masks, TLF/rich text) are Tier-2-only — that is a statement
+# about the render gap, not about the canary (false-negative mode 10).
+# AVM1-route filters proper are still Tier-2-only; the AVM2 `.filters` route
+# gained a Tier-1 member (glow_pass_scaling) in session 16.
 
 # tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
 avm1/color                                  # solid fill + colour transform   1 cmp
@@ -29,6 +30,13 @@ avm1/edittext_tag_indent                    # text / EditText layout          1 
 avm1/focusrect_swf5                         # multi-frame + input events     12 cmps
 avm1/bitmapdata_applyfilter_colormatrix     # filters (only passing one)      1 cmp
 avm2/blend_multiply_alpha                   # blend modes                     1 cmp
+visual/filters/glow_pass_scaling            # AVM2 DisplayObject.filters      1 cmp
+                                            #   byte-exact vs golden as of
+                                            #   s16 cut 1; the set's first
+                                            #   AVM2 `.filters` member
+visual/cache_as_bitmap/masks                # cacheAsBitmap x mask, AVM2      7 cmps
+                                            #   nearest passing neighbour of
+                                            #   the filters render arm
 visual/simple_shapes/winding_rule           # shape tessellation / winding    1 cmp
 visual/cache_as_bitmap/shape_changed        # cacheAsBitmap                   1 cmp
 from_shumway/timeline/timeline_as2_5        # timeline / frames               7 cmps

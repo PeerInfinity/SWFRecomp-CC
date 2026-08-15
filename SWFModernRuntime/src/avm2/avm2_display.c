@@ -15671,6 +15671,222 @@ static void avm2_push_scroll_rect_mask(const Mat* world,
 	renderer_end_clip_mask(context);
 }
 
+// --- flash.display.DisplayObject.filters, render arm -----------------------
+//
+// Ruffle's filter path IS its cacheAsBitmap path (core/src/display_object.rs
+// render_base): a non-empty `filters` forces is_bitmap_cached(), the object is
+// drawn into a cache texture sized to its filter-grown bounds UNDER THE FULL
+// WORLD MATRIX, descriptors.filters.apply() runs each filter over
+// FilterSource::for_entire_texture, and the result is composited back with a
+// translation-only matrix. Two consequences shape this implementation:
+//
+//   1. Filters are scaled by the STAGE view matrix only
+//      (filter.scale(stage_matrix.a, stage_matrix.d)) - never by the object's
+//      own scale. render_webgpu_run_blur already does exactly that via
+//      ctx->stage_scale, a literal port of blur_filter.rs::scale_blur.
+//   2. The filter therefore runs in stage-pixel space, so a STAGE-SIZED
+//      transparent layer blurred with texel = 1/width is the same computation
+//      as Ruffle's object-sized cache texture. The only difference is where the
+//      ClampToEdge boundary sits, which matters solely for a filter whose
+//      kernel is defined relative to the source rect (displacement's
+//      wrap/clamp modes - not implemented here). Blur/glow/dropShadow/bevel
+//      clamp to transparent black either way; visual/filters/glow_pass_scaling
+//      comes out byte-identical to Ruffle's golden through this path.
+//
+// So this is structurally tag.c::render_filtered_object (the AVM1 timeline
+// route) generalised from DisplayObject's single scalar filter to a list, and
+// it reuses the same filter_tex_a/filter_tex_b ping-pong: no new texture, no
+// new pipeline, no new uniform block, VRAM unchanged.
+//
+// Not yet covered: displacement/colorMatrix/convolution/gradient kinds, filters
+// on a masker, exact composition for a non-final glow/dropShadow/bevel in a
+// chain, and Filter::calculate_dest_rect bounds growth (only observable once
+// something READS filtered bounds - rendering needs no growth on a stage-sized
+// layer).
+
+// Set for the whole duration of a filtered subtree's capture: the offscreen
+// ping-pong is a single pair of stage-sized textures and does not nest, so a
+// filtered descendant of a filtered object renders unfiltered rather than
+// corrupting its ancestor's layer.
+static int g_avm2_filter_active = 0;
+
+// Longest filter list this arm will apply in one capture. Flash imposes no
+// limit; beyond this the trailing filters are dropped (the visible result stays
+// the composition of the first N, never a blank object).
+#define AVM2_RENDER_MAX_FILTERS 32
+
+// Avm2FilterVal keeps swf::Filter's own fixed-point BITS (see avm2_filters.h).
+static float avm2_filter_fixed16(int32_t v) { return (float) v / 65536.0f; }
+static float avm2_filter_fixed8(int16_t v)  { return (float) v / 256.0f; }
+
+// Which filters this arm can render, and which are no-ops.
+//
+// The impotence rule is deliberately NOT applied to every kind:
+// render/src/filters.rs::Filter::impotent() matches only BlurFilter and
+// ColorMatrixFilter, so a DropShadow with blurX = blurY = 0 and distance > 0 is
+// a hard-edged offset copy, not a no-op. Widening the rule to all kinds drops
+// four of acid-filter's shadows and costs 34x its residual.
+//
+// quality == 0 skips for every kind: Flash runs zero blur passes, and
+// glow_pass_scaling's quality-0 tile is unfiltered in the golden.
+static int avm2_filter_renderable(const Avm2FilterVal* f)
+{
+	if (f->kind != AVM2_FILTER_BLUR && f->kind != AVM2_FILTER_DROP_SHADOW
+	    && f->kind != AVM2_FILTER_GLOW && f->kind != AVM2_FILTER_BEVEL)
+		return 0;
+	if (f->quality == 0) return 0;
+	if (f->kind == AVM2_FILTER_BLUR
+	    && f->blur_x <= 65536 && f->blur_y <= 65536)
+		return 0;                       // Filter::impotent(): blur <= 1 px
+	return 1;
+}
+
+// Capture obj's subtree into the offscreen layer, run its filter list over it,
+// and composite the result back into the suspended main pass. Mirrors
+// tag.c::render_filtered_object; the flag derivations below are that function's,
+// kept in the same order so the two stay diffable.
+static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+                                 Avm2DisplayObjectExt* ext,
+                                 const Mat* parent_world, double parent_alpha,
+                                 const Avm2Cx* parent_cx)
+{
+	const Avm2FilterVal* list[AVM2_RENDER_MAX_FILTERS];
+	uint32_t n = 0;
+	for (uint32_t i = 0;
+	     i < ext->filter_count && n < AVM2_RENDER_MAX_FILTERS; i++)
+		if (avm2_filter_renderable(&ext->filters[i]))
+			list[n++] = &ext->filters[i];
+
+	int saved_active = g_avm2_filter_active;
+	g_avm2_filter_active = 1;
+
+	if (n == 0)
+	{
+		// Every filter is impotent or unsupported: render normally.
+		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+		g_avm2_filter_active = saved_active;
+		return;
+	}
+
+	// Only the LAST filter's composition flags reach the framebuffer; the
+	// earlier ones fold into the ping-pong (see the chaining note below).
+	const Avm2FilterVal* last = list[n - 1];
+	int is_shadow = (last->kind == AVM2_FILTER_DROP_SHADOW);
+	int is_glow   = (last->kind == AVM2_FILTER_GLOW);
+	int is_bevel  = (last->kind == AVM2_FILTER_BEVEL);
+	int f_inner = last->inner, f_knockout = last->knockout;
+	int f_composite = last->hide_object ? 0 : 1;
+	int bevel_type = 0;
+	if (is_bevel)
+	{
+		// ruffle bevel.rs: onTop wins over inner ("full"), else inner, else
+		// outer; and composite_source is hard-coded to 1.
+		bevel_type = last->on_top ? 2 : (f_inner ? 1 : 0);
+		f_composite = 1;
+	}
+
+	// The composition shader needs the unblurred source only when its formula
+	// references dest.a; otherwise we draw the crisp source ourselves.
+	int needs_source_tex = is_bevel ? (f_knockout || bevel_type != 0)
+	                                : (f_inner || f_knockout);
+	int draw_source_after  = is_bevel ? (!f_knockout && bevel_type == 0)
+	                                  : (!f_inner && !f_knockout && f_composite);
+	int draw_source_before = is_bevel && !f_knockout && bevel_type == 2;
+	int shader_composite = (draw_source_after || draw_source_before)
+	                       ? 0 : f_composite;
+	// Plain blur has no composition flags and keeps the legacy blit-back.
+	int legacy = !(is_shadow || is_glow || is_bevel);
+
+	renderer_suspend_pass(context);
+	renderer_begin_offscreen_pass(context);
+	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+	renderer_end_offscreen_pass(context);
+	if (needs_source_tex)
+		renderer_snapshot_filter_source(context);
+
+	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
+	// of plain blurs chains for free and is bit-equal to one blur of quality N,
+	// exactly as Flash requires. A non-final glow/dropShadow/bevel is
+	// approximated by colorizing inside the blur - exact when the stacked
+	// filters are identical, an approximation otherwise; the exact form needs a
+	// compose-into-offscreen pipeline.
+	for (uint32_t i = 0; i < n; i++)
+	{
+		const Avm2FilterVal* f = list[i];
+		int f_last = (i == n - 1);
+		int f_is_blur = (f->kind == AVM2_FILTER_BLUR);
+		// AS3 BlurFilter has no `strength` property, so Avm2FilterVal.strength
+		// stays 0 for it - passing that through would multiply the layer by
+		// zero and the object would VANISH. Plain blur is always strength 1.
+		// For the final composed filter, strength is applied by the
+		// composition shader instead (inner needs the RAW blurred alpha).
+		float st = f_is_blur ? 1.0f : avm2_filter_fixed8(f->strength);
+		if (f_last && !f_is_blur) st = 1.0f;
+		int colorize = (!f_last && !f_is_blur) ? 1 : 0;
+		renderer_run_blur(context,
+			avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
+			f->quality, st,
+			(float) ((f->color >> 16) & 0xFF) / 255.0f,
+			(float) ((f->color >> 8) & 0xFF) / 255.0f,
+			(float) (f->color & 0xFF) / 255.0f,
+			(float) f->alpha / 255.0f, colorize);
+	}
+
+	renderer_resume_pass(context);
+
+	if (legacy)
+	{
+		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+		g_avm2_filter_active = saved_active;
+		return;
+	}
+
+	// Stage-pixel offset -> UV offset on the blurred texture. stage_fit_{x,y}
+	// account for fitted content covering only part of the target; both are 1.0
+	// unless the viewport aspect differs from the movie's. The SWF angle is
+	// FIXED RADIANS (spec: DROPSHADOWFILTER "Radian angle of the drop shadow").
+	SWFAppContext* app = ctx->app;
+	float fit_x = app->stage_fit_x > 0.0f ? app->stage_fit_x : 1.0f;
+	float fit_y = app->stage_fit_y > 0.0f ? app->stage_fit_y : 1.0f;
+	float angle_rad = avm2_filter_fixed16(last->angle);
+	float dist_px = (is_shadow || is_bevel)
+	                ? avm2_filter_fixed16(last->distance) : 0.0f;
+	float du = cosf(angle_rad) * dist_px / (float) context->width * fit_x;
+	float dv = sinf(angle_rad) * dist_px / (float) context->height * fit_y;
+	float strength = avm2_filter_fixed8(last->strength);
+	float hi_r = (float) ((last->color2 >> 16) & 0xFF) / 255.0f;
+	float hi_g = (float) ((last->color2 >> 8) & 0xFF) / 255.0f;
+	float hi_b = (float) (last->color2 & 0xFF) / 255.0f;
+	float hi_a = (float) last->alpha2 / 255.0f;
+	float sh_r = (float) ((last->color >> 16) & 0xFF) / 255.0f;
+	float sh_g = (float) ((last->color >> 8) & 0xFF) / 255.0f;
+	float sh_b = (float) (last->color & 0xFF) / 255.0f;
+	float sh_a = (float) last->alpha / 255.0f;
+
+	// "full" bevel is glow OVER source, so the source must already be in the
+	// framebuffer when the filter output lands.
+	if (draw_source_before)
+		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+
+	if (is_bevel)
+		// ruffle filters.rs: the HIGHLIGHT samples at +offset, the shadow at
+		// -offset, and the bevel is their difference.
+		renderer_compose_filter(context, 1, du, dv,
+			hi_r, hi_g, hi_b, hi_a, sh_r, sh_g, sh_b, sh_a,
+			strength, bevel_type, f_knockout, shader_composite);
+	else
+		// ruffle drop_shadow.rs passes (-x, -y): sampling the blur "back" by
+		// the offset displaces the shadow forward along the light direction.
+		renderer_compose_filter(context, 0, -du, -dv,
+			sh_r, sh_g, sh_b, sh_a, 0.0f, 0.0f, 0.0f, 0.0f,
+			strength, f_inner, f_knockout, shader_composite);
+
+	if (draw_source_after)
+		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+
+	g_avm2_filter_active = saved_active;
+}
+
 // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
@@ -15681,6 +15897,18 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
 	if (!ext->is_stage && !ext->visible && g_avm2_mask_capture == 0) return;
+	// flash.display.DisplayObject.filters. Sits above the mask / scrollRect
+	// pushes so the filter wraps the node's whole subtree, exactly as
+	// tag.c::render_filtered_object wraps render_single_object. Suppressed
+	// during a mask capture on purpose: a filtered MASKER contributes its raw
+	// silhouette to the stencil.
+	if (ext->filter_count > 0 && g_avm2_filter_active == 0
+	    && g_avm2_mask_capture == 0)
+	{
+		avm2_render_filtered(ctx, obj, ext, parent_world, parent_alpha,
+			parent_cx);
+		return;
+	}
 	// Ruffle render_base (display_object.rs:952, `options.skip_masks &&
 	// this.maskee().is_some()`, and skip_masks defaults to true): an object
 	// that masks something else is never painted as content on its own account.

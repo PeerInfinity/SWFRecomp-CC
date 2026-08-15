@@ -1,0 +1,75 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 9c1637528..ad712befd 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2594,29 +2594,40 @@ static void blur_axis_pass(const uint32_t* in, int in_stride, int in_w, int in_h
+ {
+ 	int m = k->m;
+ 	int alpha255 = k->alpha255;
+-	// TWO deliberate departures from blur.wgsl, both measured against the
+-	// goldens (visual/filters/blur_fractional, tolerance 5, 100 tiles):
++	// A LITERAL port of blur.wgsl's last line -- `floor(result * 255.0) / 255.0`
++	// with `result = total / filter_args.full_size` -- and of blur.rs:236-249's
++	// `alpha = ((radius - m) * 255.0).floor() / 255.0`.
+ 	//
+-	//   divide by / round      | outlier channels | max diff
+-	//   full_size / floor      |               48 |        6   <- literal port
+-	//   full_size / nearest    |               27 |        6
+-	//   weight sum / floor     |               48 |        6
+-	//   weight sum / nearest   |                0 |        5   <- this
++	// s15 deliberately departed on two counts (divide by the WEIGHT SUM, round
++	// to nearest) because those are energy-preserving: quantizing alpha down to
++	// 1/255 makes the weights sum to up to 2/255 LESS than full_size, so
++	// Ruffle's divide-by-full_size shrinks a uniform field every pass, and its
++	// floor costs another half level on top. That is a real bias -- but it is
++	// FLASH's bias, ruffle imitates it on purpose ("This rounding imitates the
++	// fixed-point computations of FP"), and it compounds over `quality` passes
++	// exactly as the goldens do. Modelling it over blur_quality's grid
++	// (BlurFilter(row, 1, col), so a horizontal-only blur) predicts a decay of
++	// 255 - 255*(wsum/full_size)^q that peaks at 9 levels on the EVEN blur
++	// sizes -- where radius is fractional and alpha255 == 127 -- and at 0 on the
++	// odd ones, where alpha255 == 255 and the weights sum to full_size exactly.
++	// blur_quality's board row was `excess 166 986, max_diff 9`: the model
++	// reproduces the maximum to the level.
+ 	//
+-	// Both departures remove a bias that COMPOUNDS over quality passes, which
+-	// is why they matter more the more passes run. Quantizing alpha down to
+-	// 1/255 (which ruffle does, to imitate FP) makes the weights sum to
+-	// slightly LESS than full_size, so dividing by full_size shrinks a uniform
+-	// field by ~0.2% per pass; dividing by the weights' own sum is exactly
+-	// energy-preserving. And flooring costs another 0.5 level per pass on top.
+-	// blur.wgsl's floor()/full_size survives in ruffle only because these
+-	// tests carry tolerance 5-6; our CPU model of it lands 1 level outside on
+-	// two tiles. blur_quality moves 307 200 -> 166 986 outliers (still a fail:
+-	// its high-quality tiles need the residual in the w1 report S2.6 settled).
+-	// The GPU path (render_webgpu.c::blur_box_kernel) is untouched — it is
+-	// graded by a different, PlaceObject-filter family and is a faithful port
+-	// by construction.
+-	double denom = 255.0 * (double) (2 * m + 1) + 2.0 * (double) alpha255;
++	// Measured on this tree (session 16, w2-gfx-filters), literal vs s15's form:
++	//
++	//   comparison                    s15 form            literal (this)   tol
++	//   visual/filters/blur_quality   fail 166 986 max 9  PASS 0 max 6      6
++	//   visual/filters/blur_pass_scaling  fail 18 582 max 6  PASS 0 max 3   3
++	//   visual/filters/blur_fractional    pass 0 max 5    pass 0 max 5      5
++	//
++	// i.e. +2 comparisons and no regression -- including on blur_fractional,
++	// which s15's own table predicted would break at 48 outliers / max 6. It
++	// does not move at all. Both of the surviving numbers sit exactly ON their
++	// budget (6 vs 6, 5 vs 5), so treat them as on-budget in any CI ledger.
++	//
++	// The GPU path (render_webgpu.c::blur_box_kernel) was always a faithful
++	// port and is untouched; the two are now the same arithmetic.
++	double denom = 255.0 * (double) k->full_size;
+ 	int axis_len = horizontal ? in_w : in_h;
+ 	int start_along = horizontal ? start_x : start_y;
+ 	int start_across = horizontal ? start_y : start_x;
+@@ -2655,7 +2666,7 @@ static void blur_axis_pass(const uint32_t* in, int in_stride, int in_w, int in_h
+ 				// Numerator in 1/255 units so it stays an exact integer:
+ 				// (unit_sum + alpha*(lo+hi)) / full_size, alpha = alpha255/255.
+ 				int32_t num = 255 * sum[c] + alpha255 * frac[c];
+-				double v = floor((double) num / denom + 0.5);
++				double v = floor((double) num / denom);
+ 				if (!(v > 0.0)) v = 0.0;
+ 				if (v > 255.0) v = 255.0;
+ 				ch[c] = (uint32_t) v;

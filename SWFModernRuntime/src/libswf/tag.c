@@ -3462,6 +3462,12 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 	}
 }
 
+// Non-zero while a filtered object's subtree is being captured. The offscreen
+// ping-pong is a single pair of stage-sized textures and does not nest, so a
+// filtered descendant of a filtered object renders flat rather than corrupting
+// its ancestor's layer. Same model as avm2_display.c's g_avm2_filter_active.
+static int g_filter_capture_depth = 0;
+
 // ---------------------------------------------------------------------------
 // Filtered-object rendering: blur + Flash's composition rules
 // ---------------------------------------------------------------------------
@@ -3523,6 +3529,7 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	// What the shader is told: 0 whenever we supply the source ourselves.
 	int shader_composite = (draw_source_after || draw_source_before) ? 0 : f_composite;
 
+	g_filter_capture_depth++;
 	renderer_suspend_pass(context);
 	renderer_begin_offscreen_pass(context);
 	render_single_object(app_context, obj);
@@ -3547,6 +3554,7 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	if (legacy)
 	{
 		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+		g_filter_capture_depth--;
 		return;
 	}
 
@@ -3592,6 +3600,8 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 
 	if (draw_source_after)
 		render_single_object(app_context, obj);
+
+	g_filter_capture_depth--;
 }
 
 // Compose two 20-float cxforms (5 vec4: column-major mat4 `mult` + vec4 `add`,
@@ -3803,6 +3813,27 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		}
 
 		Character* ch = &dictionary[obj->char_id];
+
+		// Filters on a NESTED entry — the same defect shape as the blend-mode
+		// arm above. render_filtered_object was reached only from the two ROOT
+		// display loops (tagShowFrame / tagRerenderFrame), so a filter authored
+		// INSIDE a DefineSprite rendered completely unfiltered
+		// (visual/cache_as_bitmap/contains_grown_filter: a plain blue square
+		// where the golden has a red glow; visual/filters/blur_scales_with_screen:
+		// a sharp red box against a heavily blurred golden). The entry's filter
+		// state is correct — sprite frame execution rebinds the global
+		// display_list/max_depth to the sprite's own list before running its
+		// frame functions, so the tagSetFilter emitted inside sprite_N_frame_M
+		// lands on the right entry — only the renderer arm was missing.
+		//
+		// Gated on !g_clip_mask_capture like the blend arm above: a filtered
+		// masker contributes its raw silhouette to the stencil.
+		if (obj->filter_type != 0 && !g_clip_mask_capture
+		    && g_filter_capture_depth == 0)
+		{
+			render_filtered_object(app_context, obj);
+		}
+		else
 		switch (ch->type)
 		{
 			case CHAR_TYPE_SHAPE:
