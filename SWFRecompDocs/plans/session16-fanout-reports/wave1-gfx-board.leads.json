@@ -1,0 +1,148 @@
+[
+  {
+    "id": "P1",
+    "tests": [
+      "visual/gradient_nonsequential_ratios [output]",
+      "visual/gradient_same_ratios [output]",
+      "visual/gradient_radial_same_ratios [output]",
+      "visual/gradient_issue_9892 [output]"
+    ],
+    "flips": 3,
+    "verdict": "GO (PROVEN)",
+    "files": [
+      "SWFRecomp/src/swf.cpp:7110-7208 (parseFillStyles ramp emitter)",
+      "SWFRecomp/src/swf.cpp:~7515 (parseMorphFillStyles ramp emitter)",
+      "SWFModernRuntime/src/actionmodern/action.c:28047-28110 (drawingGenerateGradientRamp)",
+      "SWFModernRuntime/src/avm2/avm2_display.c:7854-7889 (gfx_gen_ramp)"
+    ],
+    "summary": "All three gradient ramp builders walk stop ratios wrongly. Ruffle (render/wgpu/src/mesh.rs CommonGradient::new) advances its record cursor at most ONE step per texel and pins alpha to 0 when last.ratio == next.ratio, so a run of k duplicate-ratio stops renders as k consecutive 1-pixel bands and the following segment starts k-1 texels later; ratios are never sorted, so a decreasing ratio pins alpha to 1.0. Ours emits ZERO rows for a duplicate and ZERO for a decreasing ratio, and the recompiler copy additionally emits 336 rows into a 256-row slot for gradient_nonsequential_ratios, breaking the 'exactly 256 rows per gradient' texture-row invariant. Proven by porting both algorithms to Python: the model reproduces CI's outlier counts EXACTLY (61440 and 6912) and predicts 1280 and 5120 after the fix, both under budget; the radial row is 95.8% ring pixels that the fix removes. Corpus audit over 2848 SWFs found duplicate/non-monotonic static gradient ratios in exactly 4 tests, all already failing - zero regression risk. Separate leg (do NOT bundle): at interpolation=linearRGB our static ramp differs from Ruffle's by up to 13 channels on every row because Ruffle quantises in LINEAR space and converts per-pixel in gradient.wgsl while swf.cpp::linearRgbLerp converts back to sRGB first; 13 is under every affected tolerance so it is not what is failing. Independent slot: YES (edits swf.cpp ~7110/7515, ~1500 lines from flattening leg C at 8653). Recommended pairing: P1+P4.",
+    "independent_slot": true,
+    "cost": "one shared 25-line helper + 3 call sites; recompiler change => worktree cmake + --recompile"
+  },
+  {
+    "id": "P2",
+    "tests": [
+      "visual/opaque_background [output]",
+      "avm2/displayobject_opaque_background [output]"
+    ],
+    "flips": 2,
+    "verdict": "GO",
+    "files": [
+      "SWFModernRuntime/src/libswf/tag.c (AVM1 render walk)",
+      "SWFModernRuntime/src/actionmodern/action.c (AVM1 opaqueBackground property)",
+      "SWFModernRuntime/src/avm2/avm2_display.c (avm2_render_node)"
+    ],
+    "summary": "DisplayObject.opaqueBackground is unimplemented on both VMs. Ruffle paints a solid rectangle over the object's bounds before drawing it: two green blocks in visual/opaque_background (231232 excess, 99% of expected ink missing), a blue square behind the red circle in avm2/displayobject_opaque_background (17004 excess, ink IoU 1.00 / ncolors 2:2 / 21.3% repainted). Both reproduced locally at CI's exact numbers. Both are tolerance 1 / max_outliers 0 but the content is flat-colour axis-aligned rectangles, so exactness is achievable (same class as the s9 focus-rect rider). Risk: the fill must be ordered and clipped exactly like Ruffle - painted in the object's own space, under its children, interacting with scrollRect.",
+    "independent_slot": true,
+    "cost": "small runtime feature, two VMs"
+  },
+  {
+    "id": "P3",
+    "tests": ["avm2/graphics_gradients_nulls [output]"],
+    "flips": 1,
+    "verdict": "GO (moderate confidence)",
+    "files": ["SWFModernRuntime/src/avm2/avm2_display.c:~8038-8078 (gfx_begin_gradient_fill)"],
+    "summary": "AVM2 Graphics.beginGradientFill ignores null alphas/ratios and draws nothing (blank_render, 117600 excess, tolerance 5 / max_outliers 0, ncolors 1 vs 114). Test.as passes null for both arrays. Ruffle's build_gradient_records (core/src/avm2/globals/flash/display/graphics.rs) reduces length only by the arrays that are present, defaults alpha to 1.0 and generates evenly spaced ratios (i*255)/(length-1) = 0,63,127,191,255. ~10 lines. Confidence capped because the golden's toml comments it as generated from Flash Player, not Ruffle, and max_outliers is 0. Same file as P5 but a different function - self-localise.",
+    "independent_slot": true,
+    "cost": "~10 lines, runtime-only"
+  },
+  {
+    "id": "P4",
+    "tests": ["from_shumway/acid/acid-gradient-2 [output]"],
+    "flips": 1,
+    "verdict": "GO",
+    "files": [
+      "SWFRecomp/src/swf.cpp:7332-7344 (parseLineStyles, LINESTYLE2 HasFillFlag branch)",
+      "SWFModernRuntime/src/avm2/avm2_display.c:8355 (gfx_line_fill_style, AVM2 analogue stub)"
+    ],
+    "summary": "LINESTYLE2 with HasFillFlag calls parseFillStyles(1) and keeps only fill[0].r/g/b/a, which for a gradient fill style are never populated - so a gradient-filled stroke becomes transparent black. Proven from the generated C of acid-gradient-2: draws.h declares gradient_data[256][4] (the gradient IS registered) while color_data[0] = {0,0,0,0}. Ruffle renders a gradient-filled ring; we render an empty stage (12555 excess, tolerance 1 / max_outliers 0, reproduced locally). The renderer already has line-gradient plumbing (action.c:28719 line_interpolation, used by AVM1 lineGradientStyle), so this is recompiler wiring, not new GPU work. Shares SWFRecomp/src/swf.cpp with P1 - combining P1+P4 into one recompiler slot is the recommended pairing.",
+    "independent_slot": true,
+    "cost": "medium; recompiler + static line-gradient style path"
+  },
+  {
+    "id": "P5",
+    "tests": [
+      "avm2/graphics_bitmap_fill [output]",
+      "avm2/graphics_bitmaps [output]"
+    ],
+    "flips": 1,
+    "verdict": "DIAGNOSE-then-GO (0-2 flips)",
+    "files": ["SWFModernRuntime/src/avm2/avm2_display.c:8346 (gfx_begin_bitmap_fill), :13994/:13998 bindings"],
+    "summary": "gfx_begin_bitmap_fill is an explicit no-op stub (finalise subpath, cur_fill = 0, return) and beginShaderFill is bound to the same stub. Both tests are blank_render with ink_iou 0.0 and missing_ink 1.0 (136030 and 185430 excess, reproduced locally). The AVM1 bitmap-fill path already works (s14: acid-bitmap-fill flipped on content-size tiling), so the job is extending the AVM2 command stream with a bitmap-fill style. graphics_bitmaps has a 3-rung tolerance ladder (8/4000, 16/800, 32/600) and is the likelier flip; graphics_bitmap_fill is tol 5 / max_out 60 on a resampled bitmap, the class s12 deferred for bitmapbuttons - price that one as a band move.",
+    "independent_slot": true,
+    "cost": "medium-large"
+  },
+  {
+    "id": "P6",
+    "tests": [
+      "visual/edittext/edittext_background_basic [output]",
+      "visual/edittext/edittext_background_basic_scale2 [output]",
+      "visual/edittext/edittext_border_basic [output]",
+      "visual/edittext/edittext_border_basic_scale2 [output]"
+    ],
+    "flips": 0,
+    "verdict": "DIAGNOSE FIRST (largest unowned family: 31 live cmps)",
+    "files": ["SWFModernRuntime/src/libswf/tag.c (EditText background/border emission)", "SWFModernRuntime/src/libswf/ng_shared.c (device-font layout)"],
+    "summary": "halo_penumbra is the top-scoring cluster on the board (rows 1,3,4,5,6) and is entirely EditText, but the classifier's name is misleading: the background/border rows are MISSING ELEMENTS. Ruffle draws a wide black background bar and two magenta squares that we never draw (ink actual/expected 0.0696/0.1597, missing_ink 0.564); the fields we do draw match. The device_transform rows (basic 2386, negative 2619, small_shear 38) are a SECOND mechanism - device-font glyph placement under a matrix, shared with visual/fonts/leading_device_font (12978), fonts/device_font_kerning (1680) and the applyfilter_blur residual s15 already named. Do not brief as one item; scope a wave-2 agent to the four background/border rows only.",
+    "independent_slot": true,
+    "cost": "unpriced - diagnosis slot"
+  },
+  {
+    "id": "P7",
+    "tests": [
+      "visual/cache_as_bitmap/oversize/swf_9_masks [output]",
+      "visual/cache_as_bitmap/oversize/swf_10_masks [output]"
+    ],
+    "flips": 0,
+    "verdict": "NO-GO for wave 2 (no mask owner this session)",
+    "files": ["SWFModernRuntime/src/avm2/avm2_display.c (AVM2 DisplayObject.mask walk)"],
+    "summary": "Two comparisons, byte-identical numbers (119943 each, tolerance 64/max_out 200 then 128/0). Their siblings swf_9_too_big / swf_10_too_big PASS. Test.as differs by one number: test.width = 2879 (under the SWF9 2880 mask-surface limit, mask APPLIED, we fail) vs 2880 (over the limit, mask dropped, we pass for the wrong reason). We render the unmasked red background in both cases, so the mechanism is AVM2 DisplayObject.mask on a scaled masker - mask work. Completion mechanism to flip this to GO: an agent that already holds the AVM2 mask walk.",
+    "independent_slot": false,
+    "cost": "n/a"
+  },
+  {
+    "id": "HANDOFF-filters",
+    "tests": ["visual/filters/* (22 rows)", "avm2/bitmapdata_applyfilter_* (2)", "from_shumway/acid/acid-filter, acid-filter-2", "visual/cache_as_bitmap/{contains_grown_filter,cab_mask_filters}", "visual/edittext/edittext_border_filters"],
+    "flips": 0,
+    "verdict": "OWNED by w1-gfx-filters - sizing handoff only",
+    "files": [],
+    "summary": "REFUTATION of playbook section 14: the filters family is 27 live comparisons, not 15. Ranked: blur_quality 166986 (tolerance 6, max diff 9 - every offending channel is 7-9, so the whole test hangs on a per-pass rounding port; the 'band ceiling' claim is exactly right), acid-filter 152866, displacement_map 123279, blur_pass_scaling 105534, displacement_map_scales_with_screen 99353, blur_size_grows 87808, bevel_outer 80996, bevel 71451, blur_scales_with_screen 69254, bevel_full 69161, drop_shadow_angles 57994, bevel_inner 48427, drop_shadow 46468, glow_with_alpha_strength 43329, bitmapdata_applyfilter_blur 30844 (was 520441, -94%), displacement_map_through_filters 27565, glow 25505, glow_without_composite_source 25445, glow_pass_scaling 17680, acid-filter-2 16759, contains_grown_filter 10784, bitmapdata_applyfilter_colormatrix 7419, cab_mask_filters 4968, any_blur_scales_with_screen 4884, edittext_border_filters 810, drop_shadow_scales_with_screen 400, color_matrix 237. The five bevel* rows remain struck from flip leads per s12/s13. displacement is now a TRIO not a quartet - displacement_map_through_applyFilter flipped in s15.",
+    "independent_slot": false,
+    "cost": "n/a"
+  },
+  {
+    "id": "HANDOFF-owned",
+    "tests": [
+      "visual/simple_shapes/masks [output]",
+      "visual/simple_shapes/masks_equal_clipdepth [output]",
+      "from_shumway/acid/acid-large [output]",
+      "from_gnash/misc-ming.all/morph_test1 [frame1..6]",
+      "visual/cache_as_bitmap/morph [output]"
+    ],
+    "flips": 0,
+    "verdict": "OWNED by siblings - re-verified numbers only",
+    "files": [],
+    "summary": "simple_shapes/masks pair: both still 1738 excess, max diff 255, tolerance 0, still hard-dispositioned; the ACCEPTED_DIFFS heading at avm1/_investigation/ACCEPTED_DIFFS.md:879 still says '1-sample rasteriser tie' - s15 Hygiene-1's rewrite was never applied, so w1-gfx-shapes-morph owns that doc edit too. acid-large: now the ONLY no_render comparison on the board (bucket went 5->1 after s15's capture-cap and hasPlayingSprites fixes) - w1-gfx-vram. morph_test1: all six frames 189 excess (were 589-789), b_tiny, -76%; per-character end-colour offset still open. cache_as_bitmap/morph: 2832 outliers at tolerance 0 with max difference 1 - a pure +/-1 LSB residual.",
+    "independent_slot": false,
+    "cost": "n/a"
+  },
+  {
+    "id": "PARKED",
+    "tests": [
+      "avm2/stage3d_* + stage3d/* (25 blank_render, 29 family-wide)",
+      "visual/video/h264 [frame2..11] + h264_multinalu (11) + avm2/netstream_seek_flv (12th)",
+      "avm2/netstream_play_flv [output]",
+      "avm2/loader_jpegxr [output]",
+      "avm2/loader_jpegxr_alpha [output]",
+      "visual/definefont4 [output]",
+      "from_shumway/acid/acid-shapes [output]",
+      "from_shumway/bitmapbuttons [output]"
+    ],
+    "flips": 0,
+    "verdict": "PARKED (arc-sized) / untriaged",
+    "files": [],
+    "summary": "Stage3D 25 blank_render rows confirmed EXACT (29 family-wide incl. pixelbender_effect_glassDisplace 783192, _shaderfilter 879084, pixelbender_dithering, blend_shader_luma_lighten, stage3d_texture). h264 confirmed as 11 pure + netstream_seek_flv as the 12th, unchanged from s15 Hygiene-2. avm2/netstream_play_flv is now LIVE on the board (229724, blank_render) - s15's P8 basename-disposition fix landed and left it untriaged. New parked items surfaced this session: loader_jpegxr / _alpha (no JPEG XR decoder, 136033 + 10074), definefont4 (16086, DefineFont4/CFF TLF glyphs), acid-shapes (78982, black stage where Ruffle draws thousands of tiny shapes). BOARD HYGIENE: no_render is now one row, but blank_render (41 live) has become the multi-mechanism trap - Stage3D backend 25, missing decoders 3, unimplemented AVM2 fill paths 3, a discarded stroke fill 1, a font/text arc 3. Do not brief 'blank_render' as one item.",
+    "independent_slot": false,
+    "cost": "n/a"
+  }
+]

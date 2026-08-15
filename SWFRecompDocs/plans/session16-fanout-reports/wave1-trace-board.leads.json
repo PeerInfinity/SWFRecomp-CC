@@ -1,0 +1,123 @@
+[
+  {
+    "id": "L1-twip-quantize-point-transform",
+    "tests": ["avm2/displayobject_scrollrect", "avm2/displayobject_hittestpoint_boundary", "avm2/bounds_mode", "avm2/stage_scale_factor", "avm2/matrix"],
+    "flips": {"floor": 1, "real": 2, "ceiling": 4},
+    "verdict": "GO",
+    "independent": true,
+    "size": "XS",
+    "evidence": "STRONG",
+    "files": ["SWFModernRuntime/src/avm2/avm2_display.c"],
+    "summary": "point_transform_native (avm2_display.c:3794-3825) computes localToGlobal/globalToLocal in unrounded doubles. Ruffle's Matrix*Point<Twips> rounds the f32 rotate/scale product half-to-even into an i32 twip BEFORE adding the integral translation; helper round_to_i32 already exists at :601. Fifth instance of ruffle-geometry-is-integer-twips; the 2026-07-30 fix reached mat_mul and rect_union_xform but not this function. Verified by hand: 200*a+400*c = 299.99999106 -> round 300 -> +800 twips = 55.0px == expected, vs our 54.999999552965164. Oracle-directional (Flash is integer twips too), so the precedent is zero regressions across 176 canaries. Canaries: tab_ordering_arrows, getbounds family, from_shumway/stroke1, localconnection."
+  },
+  {
+    "id": "L2-flash-geom-completion",
+    "tests": ["avm2/geom_transform", "avm2/matrix", "from_shumway/avm2/flash/geom/matrix3d/TransformBasics", "avm2/displayobject_transform"],
+    "flips": {"floor": 1, "real": 2, "ceiling": 4},
+    "verdict": "GO",
+    "independent": true,
+    "size": "M",
+    "evidence": "STRONG",
+    "files": ["SWFModernRuntime/src/avm2/avm2_display.c", "SWFModernRuntime/src/avm2/avm2_stage3d.c"],
+    "summary": "Three gaps in the flash.geom builtin surface. (a) Transform.matrix/matrix3D duality: assigning .matrix must make .matrix3D return a promoted Matrix3D (rawData 2,3,0,0,4,5,0,0,0,0,1,0,6,7,0,1) and assigning .matrix3D must make .matrix null; we do the opposite and geom_transform dies on #1009 (accessing field: rawData) at expected line 24, cascading ~50 of its 53 missing lines. (b) flash.geom.Matrix.copyRowTo/copyColumnTo are never registered (avm2_display.c:14043 registers only the ...From halves) -> avm2/matrix #1006. (c) Transform.getRelativeMatrix3D missing -> TransformBasics #1006. NOTE: avm2/matrix will not flip on (b) alone; price it jointly with L1."
+  },
+  {
+    "id": "L3-trace-smalls-2",
+    "tests": ["avm2/delayed_symbolclass", "from_shumway/as3-loader/LoaderTest2", "text/links_in_scrolled_text", "from_shumway/acid/acid-morph", "avm2/method_association", "avm2/scope_optimizations"],
+    "flips": {"floor": 2, "real": 3, "ceiling": 6},
+    "verdict": "GO",
+    "independent": true,
+    "size": "S each",
+    "evidence": "STRONG for 4, MED for 2",
+    "files": ["SWFModernRuntime/src/avm2/*", "SWFRecomp/src/abc/abc_parser.cpp"],
+    "summary": "Six unrelated one-liners, none dispositioned. delayed_symbolclass (8/28, pure 2-line ORDER shift: a frame-2-only class's class+script initializers must run when that frame is reached, not at load — same family as avmplus-driver-eager-init). LoaderTest2 (1/7, child SWF's exported symbol invisible in the loader applicationDomain; s15 priced +1, never taken). links_in_scrolled_text (1/1, expects 'Success!', we emit a BLANK line). acid-morph (2/6, boolean pair 3/4 transposed). method_association (4/5, missing VerifyError #1107 x2 + #1034 for an illegal method association; owner abc_parser.cpp). scope_optimizations (1/4, findpropstrict after `coerce Superclass` must resolve against the scope entry's STATIC verifier type, falling through to the global class `field`; needs a recompiler scope-type annotation — MED for +1)."
+  },
+  {
+    "id": "L4-stale-image-comparison-ignore-bucket",
+    "tests": ["avm2/bitmapdata_draw_alpha_erase", "avm2/edittext_tag_indent", "avm2/stage_scale_factor", "avm2/displayobject_scrollrect", "avm2/displayobject_hittestpoint_boundary", "avm2/geom_transform", "avm2/blend_transform", "avm2/graphics_draw_path"],
+    "flips": {"floor": 1, "real": 2, "ceiling": 3},
+    "verdict": "GO",
+    "independent": true,
+    "size": "S-M",
+    "evidence": "STRONG",
+    "files": ["ruffle-tests/tests/swfs/avm2/ignored_tests.txt", "SWFModernRuntime/src/avm2/avm2_bitmap.c", "SWFModernRuntime/src/avm2/avm2_text.c"],
+    "summary": "avm2/ignored_tests.txt:58 heads eight entries with 'Image-comparison tests (need the graphics renderer; revisit with a future avm2 graphics mode)'. That rationale is DEAD — graphics mode landed 2026-07-23 and the corpus is graded in --mode=graphics. All eight are ordinary trace failures and none has a written disposition; this is the s16 analogue of s15's watch_virtual_property. Net-new flips beyond L1/L2: bitmapdata_draw_alpha_erase (2/8 — BitmapData.draw ignores alphaBitmapData and the ERASE blend entirely), edittext_tag_indent (11/49 — HTML indent must be NEGATIVE: -1638 vs our 1638, -10 vs 3267), stage_scale_factor (6/12 — contentsScaleFactor hard-coded 1 must be 2, plus Stage localToGlobal must ignore the Stage's own matrix). Rewrite the heading in the same patch."
+  },
+  {
+    "id": "L5-all-classes-events",
+    "tests": ["avm2/all_classes/events/swf9", "avm2/all_classes/events/swf10", "avm2/all_classes/events/swf11", "avm2/all_classes/events/swf12", "avm2/all_classes/events/swf30"],
+    "flips": {"floor": 0, "real": 0, "ceiling": 5},
+    "verdict": "DEFER",
+    "independent": false,
+    "size": "XL",
+    "evidence": "STRONG",
+    "files": ["describeType emitters"],
+    "summary": "NOT on the s16 board. Five rows with the identical failure shape to all_classes/display: actual line count is PINNED (731/731/731/731/735) across five SWF versions while expected grows 1030->2353, i.e. the emitter stops at a fixed class rather than under-describing each one. Whatever w1-all-classes-display finds about the declaredBy/defining-class re-point should apply. s15's refutation stands and must not be re-litigated: output.ruffle.txt is within 3-8 lines of the Flash expectation, so there is NO cheap ruffle_matched path. Relay to w1-all-classes-display for one joint ruling (+6 or +11)."
+  },
+  {
+    "id": "L6-supercalls-coerce-1034",
+    "tests": ["avm2/supercalls_coerce"],
+    "flips": {"floor": 0, "real": 1, "ceiling": 1},
+    "verdict": "GO",
+    "independent": true,
+    "size": "S-M",
+    "evidence": "STRONG",
+    "files": ["SWFModernRuntime/src/avm2/avm2_ops.c", "SWFModernRuntime/src/avm2/avm2_class.c"],
+    "summary": "Every super property get/set/call whose argument or return fails coercion must raise #1034 Type Coercion failed. Expected '#1..#6: 1034, #7: 1009'; we emit 'super getter called', 'super setter called', then #1063/#1077/#1037/#1070/#1010. One rule, seven lines, 7 of 8 fixture lines."
+  },
+  {
+    "id": "L7-ignore-list-hygiene",
+    "tests": [],
+    "flips": {"floor": 0, "real": 0, "ceiling": 0},
+    "verdict": "GO",
+    "independent": true,
+    "size": "S",
+    "evidence": "STRONG",
+    "files": ["ruffle-tests/tests/swfs/from_shumway/ignored_tests.txt", "ruffle-tests/tests/swfs/avm2/ignored_tests.txt", "ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md"],
+    "summary": "Doc-only, zero flips, but it has now cost three boards. (1) 16 from_shumway/fuzz/* entries are `pass` — including fuzz/e152812e2cfc... which s15 itself fixed — and so are avm2 int_toprecision and uint_toprecision; the file's own 2026-08-01 prune criterion says a `pass` entry must be removed because it hides a win (bytearray_oom is `pass` but records an UPSTREAM ignore=true — leave it). (2) Rewrite the dead 'image-comparison' heading (L4). (3) 34 ignore entries have no rationale in any of the four disposition docs and no inline comment: from_gnash/misc-swfc.all/{sound,matrix_accuracy_test1}, actionscript.all/{argstest-v6,-v7,-v8,array-v5}, misc-ming.all/register_class/RegisterClassTest4, from_shumway/{MaskTest-3,avm1movie,flash_net_SharedObject,flash_text_TextField2,getobjectsunderpoint}, from_shumway/avm1/hitarea, and the whole avm2 'upstream known_failure' bucket. from_gnash/misc-swfc.all/sound is the clearest write-up: its output.txt is a TRUNCATED capture of an abandoned Ruffle run (7 lines) while the SWF's own harness runs to __END_OF_TEST__ in 12 and self-reports FAILED — unpassable by construction. from_shumway/avm1/hitarea and the global shared_object/shared_object_self_ref are inert (no results row)."
+  },
+  {
+    "id": "L8-timeline-order-arc",
+    "tests": ["from_gnash/misc-ming.all/action_order/ActionOrderTest3", "from_gnash/misc-ming.all/action_order/ActionOrderTest4", "from_gnash/misc-ming.all/action_order/ActionOrderTest5", "from_gnash/misc-ming.all/action_order/PlaceAndRemove", "from_gnash/misc-ming.all/action_order/action_execution_order_extend_test", "from_gnash/misc-ming.all/action_order/action_execution_order_test6", "from_gnash/misc-ming.all/action_order/action_execution_order_test11", "timeline/missing_frame_scripts", "avm1/looping_child_swf5", "avm1/looping_child_swf9", "avm1/looping_child_swf32", "avm2/button_nested_frame_simple"],
+    "flips": {"floor": 0, "real": 0, "ceiling": 12},
+    "verdict": "DEFER",
+    "independent": false,
+    "size": "XL",
+    "evidence": "STRONG",
+    "files": ["timeline core"],
+    "summary": "The largest single-mechanism family left on the trace board: 12 rows, all 'we advance/run frames Flash does not'. avm1/looping_child_swf{5,9,32} have BYTE-IDENTICAL expected and actual outputs (207 actual vs 141 expected) = one mechanism, +3. timeline/missing_frame_scripts keeps advancing a Spawn clip after Flash stops. avm2/button_nested_frame_simple runs 2 spare tick cycles past num_ticks=3 AND double-fires the child's framescripts (miss=0, extra output only). Right shape for a SOLO session; never bundle into a fan-out slot, and never let a wave-2 brief bundle any two of them (s15's ruling on ActionOrderTest3/4/5 vs test11 stands)."
+  },
+  {
+    "id": "AUDIT-ignored-six",
+    "tests": ["avm1/date", "avm1/native_objects_swf6", "avm1/mcl_replace_root_swf7_to_swf5", "avm1/mcl_replace_root_swf7_to_swf6", "avm1/movieclip_library_state_values", "avm1/tab_ordering_properties_tab_index_edge_case"],
+    "flips": {"floor": 0, "real": 0, "ceiling": 0},
+    "verdict": "NO-GO",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": ["ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md", "ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md", "ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md"],
+    "summary": "The s15 claim (w2-watch-order-report.md §6) that these six have no backing disposition is REFUTED — all six are backed. date: ACCEPTED_DIFFS.md x4 entries (:19 NaN/Infinity year, :34 TimezoneOffset precision, :67 UTCHours at -8.64e15, :236 Infinity getters), 46 diffs of 6335, all-or-nothing. native_objects_swf6: ACCEPTED_DIFFS.md:82 + RUFFLE_VS_FLASH_DIFFERENCES.md:31; re-ran at HEAD, exactly 1 diff (line 56 'new TextField(): non-object: undefined' vs our 'native') and we are the Flash-correct side. mcl_replace_root_swf7_to_swf5/6: RUFFLE_VS_FLASH_DIFFERENCES.md:58 + RUFFLE_COMPAT_TWEAKS.md:46. movieclip_library_state_values: ACCEPTED_DIFFS.md:280,:297 + summary rows :1097-1098. tab_ordering_properties_tab_index_edge_case: ACCEPTED_DIFFS.md:353 + summary row :1105. FOUR of the six are already ruffle_matched, i.e. already inside effective_pass, so even a perfect fix is a bonus upgrade and not a flip. Net audit yield: 0."
+  },
+  {
+    "id": "REFUTATION-double-to-string",
+    "tests": ["avm2/matrix", "avm2/bounds_mode"],
+    "flips": {"floor": 0, "real": 0, "ceiling": 0},
+    "verdict": "NO-GO",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": ["SWFModernRuntime/src/avm2/avm2_value.c"],
+    "summary": "s15 board cluster 12 ('our double->string is not shortest-round-trip') is REFUTED. avm2_value.c:593 shortest_digits() already does Rust/Ruffle-identical shortest round-trip (%.*e + strtod probe, prec 0..17) plus the exact-decimal-tie away-from-zero re-round at :504 that glibc gets wrong. The cited pairs are DIFFERENT doubles, both already shortest: float('1.836970198721029e-16') != float('1.8369701987210297e-16'), float('3.076923076923077') != float('3.0769230769230775') (the former is exactly 40/13). The gap is arithmetic — and for these two rows the arithmetic is L1's missing twip quantization. Do not brief a formatting probe."
+  },
+  {
+    "id": "DRIFT-upstream",
+    "tests": ["from_gnash/actionscript.all/Sound-v6", "from_gnash/actionscript.all/Sound-v7", "from_gnash/actionscript.all/Sound-v8", "avm2/matrix3d_determinant", "avm2/matrix3d_precision", "avm2/matrix3d_raw_data"],
+    "flips": {"floor": 0, "real": 0, "ceiling": 0},
+    "verdict": "WATCH",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": [],
+    "summary": "At run 31748059158 the name-set matched upstream ruffle 99f4d491b (2026-08-12) exactly: avm2 1240/1244, avm1 718/721, visual/timeline/text/mixed_avm/from_shumway exact; every upstream-only name is a non-test (shared_object* have no output.txt, __framework__, nested resource dirs). Upstream has moved since: remote master is 5ee0627aa. `gh api compare` over tests/tests/swfs shows 7 NEW avm1 sound_load_* tests (several *_remote with localhost fixtures) and 3 NEW avm2/matrix3d_{determinant,precision,raw_data}, plus MODIFIED from_gnash/actionscript.all/Sound-v6/v7/v8 which are currently ruffle_matched — a changed expected file can move them either way and that is DRIFT, not regression. Expect the denominator ~4443 -> ~4453. The three new matrix3d_* land straight on s15's Matrix3D work and are the cheapest free-rider check of the session. SEPARATELY: the LOCAL tests tree is stale in both directions and is NOT a drift oracle — it is missing avm2/automation_classes, visual/define_bits_lossless2_rgb15, avm2/textblock_recreateline and every matrix3d_*, and still carries 8 dead avm1/*_special_recursion_* dirs plus avm2/av_networking_params and av_tag_data (deleted upstream). Consequence: avm2/automation_classes (121/122) and avm2/textblock_recreateline (139/180) cannot be reproduced locally at all."
+  }
+]

@@ -1,0 +1,129 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 9c1637528..fcc3adebc 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -118,8 +118,10 @@ static uint32_t blend_over(uint32_t dest, uint32_t src)
+ 
+ // BitmapData.draw() blend modes beyond normal/layer. Values >0 route the CPU
+ // raster through blend_mode_apply() per pixel; 0 keeps the blend_over/copy fast
+-// paths. All of Flash's non-shader modes are covered except alpha/erase (which
+-// have their own BitmapData quirk, handled at the call site) and layer/normal.
++// paths. All of Flash's non-shader modes are covered except layer/normal and
++// alpha/erase -- the latter two are destination-only scales that never read the
++// source colour, so they run through blend_alpha_erase() at the call site
++// (and are a documented no-op when the draw source is a bare BitmapData).
+ enum {
+ 	BM_NORMAL = 0, BM_MULTIPLY, BM_HARDLIGHT, BM_ADD,
+ 	BM_SUBTRACT, BM_SCREEN, BM_LIGHTEN, BM_DARKEN,
+@@ -231,6 +233,29 @@ static uint32_t blend_complex(int mode, uint32_t dst, uint32_t src)
+ 	return CMK(ri, gi, bi, ai);
+ }
+ 
++// BlendMode.ALPHA / BlendMode.ERASE, exactly as the wgpu complex-blend shaders
++// compute them (render/wgpu/shaders/blend/{alpha,erase}.wgsl). Both work on
++// PREMULTIPLIED values, both scale the *destination* by a factor read off the
++// SOURCE ALPHA ONLY (the source colour never contributes), and both `discard`
++// -- i.e. leave the destination untouched -- where the source is fully
++// transparent:
++//     alpha:  out = (dst.rgb * src.a,       dst.a * src.a)
++//     erase:  out = (dst.rgb * (1 - src.a), dst.a * (1 - src.a))
++// The (v * f + 127) / 255 rounding is the same 8-bit scale premul() uses, and
++// it is what makes the round trip through unmul()'s FLASH_PREMUL_FACTOR table
++// reproduce Flash byte-for-byte (0xFF224466 -alpha(0x44)-> 0x44224365).
++static uint32_t blend_alpha_erase(uint32_t dst, uint32_t src, int erase)
++{
++	uint32_t sa = CA(src);
++	if (sa == 0) return dst;              // shader `discard`
++	uint32_t f = erase ? 255 - sa : sa;
++	uint32_t r = (CR(dst) * f + 127) / 255;
++	uint32_t g = (CG(dst) * f + 127) / 255;
++	uint32_t b = (CB(dst) * f + 127) / 255;
++	uint32_t a = (CA(dst) * f + 127) / 255;
++	return CMK(r, g, b, a);
++}
++
+ // Blend the already-colorTransform'd premultiplied source over the premultiplied
+ // dest per a non-normal Flash blend mode.
+ static uint32_t blend_mode_apply(int mode, uint32_t dst, uint32_t src)
+@@ -2217,6 +2242,37 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+ 	}
+ }
+ 
++// BitmapData.draw(<Bitmap display object>, ..., BlendMode.ALPHA / .ERASE).
++// Ruffle routes this through the offscreen renderer (the blend needs a "layer",
++// so it cannot be a trivial hardware blend); the CPU equivalent below is exact
++// for the translation-only case, which is the same restriction the normal-mode
++// Bitmap-source blit already carries. Nothing here reads the source colour --
++// only its alpha -- so no colorTransform handling is needed on this path.
++// Known gap, shared with the normal-mode Bitmap-source blit above: the source
++// display object's own `alpha` property is not folded into src.a.
++static void bd_blit_alpha_erase(Avm2BitmapDataExt* dst, Avm2BitmapDataExt* src,
++                                int32_t tx, int32_t ty, int erase)
++{
++	PixelRegion src_region = pr_whole(src->width, src->height);
++	PixelRegion dst_region = pr_whole(dst->width, dst->height);
++	pr_clamp_intersection(&dst_region, tx, ty, 0, 0,
++	                      (int32_t) src->width, (int32_t) src->height, &src_region);
++	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
++	int opaque = !dst->transparency;
++	for (uint32_t j = 0; j < rh; j++)
++	{
++		for (uint32_t i = 0; i < rw; i++)
++		{
++			uint32_t sxx = src_region.x_min + i, syy = src_region.y_min + j;
++			uint32_t dxx = dst_region.x_min + i, dyy = dst_region.y_min + j;
++			uint32_t out = blend_alpha_erase(bd_get_raw(dst, dxx, dyy),
++			                                 bd_get_raw(src, sxx, syy), erase);
++			if (opaque) out = with_alpha(out, 0xFF);
++			bd_set_raw(dst, dxx, dyy, out);
++		}
++	}
++}
++
+ static Avm2Value bd_draw(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -2263,6 +2319,7 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 	// no-op-for-BitmapData quirk; every other named mode routes the raster through
+ 	// blend_mode_apply(). "normal", "layer" and "shader" stay on blend_over.
+ 	int blend_alpha_or_erase = 0;
++	int blend_is_erase = 0;
+ 	int blend_mode = BM_NORMAL;
+ 	if (arg_present(act, 3))
+ 	{
+@@ -2270,7 +2327,10 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 		if (bm != NULL && bm->utf8 != NULL)
+ 		{
+ 			if (strcmp(bm->utf8, "alpha") == 0 || strcmp(bm->utf8, "erase") == 0)
++			{
+ 				blend_alpha_or_erase = 1;
++				blend_is_erase = (strcmp(bm->utf8, "erase") == 0);
++			}
+ 			else if (strcmp(bm->utf8, "multiply") == 0)   blend_mode = BM_MULTIPLY;
+ 			else if (strcmp(bm->utf8, "hardlight") == 0)  blend_mode = BM_HARDLIGHT;
+ 			else if (strcmp(bm->utf8, "add") == 0)        blend_mode = BM_ADD;
+@@ -2308,9 +2368,23 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 	// scope: only pure translation (identity 2x2) blits on the CPU; a
+ 	// rotated/scaled Bitmap source still needs the offscreen GPU path.
+ 	int can_affine = source_is_bitmapdata || text_src != NULL || shape_src != NULL;
+-	if ((!identity_2x2 && !can_affine) || !extra_matrix_ok || blend_alpha_or_erase)
++	if ((!identity_2x2 && !can_affine) || !extra_matrix_ok)
+ 		return avm2_undefined();  // needs the offscreen GPU render path
+ 
++	// alpha/erase with a Bitmap display-object source (the BitmapData-source
++	// form already returned above as the Flash no-op quirk). Translation-only,
++	// and no other source kind: everything else keeps the old no-op.
++	if (blend_alpha_or_erase)
++	{
++		if (src == NULL || src->disposed || src->pixels == NULL || !identity_2x2)
++			return avm2_undefined();  // needs the offscreen GPU render path
++		bd_blit_alpha_erase(dst, src,
++		                    (int32_t) floor(mtx + extra_tx),
++		                    (int32_t) floor(mty + extra_ty),
++		                    blend_is_erase);
++		return avm2_undefined();
++	}
++
+ 	// colorTransform (arg 2): optional. Default = identity. A NULL argument
+ 	// (AS3 `draw(bmp, matrix, null, ...)` — FlashPunk Image.render passes null
+ 	// here for every untinted, transformed blit) means "no colorTransform", NOT

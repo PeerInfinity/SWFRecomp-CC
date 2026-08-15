@@ -1,0 +1,27 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..895af4a38 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -3811,8 +3811,20 @@ static Avm2Value point_transform_native(Avm2Activation* act, int to_local)
+ 	}
+ 	Mat m = display_world_matrix(ctx, self);
+ 	if (to_local) m = mat_invert(&m);
+-	double tx = m.a * (x * 20.0) + m.c * (y * 20.0) + m.tx;
+-	double ty = m.b * (x * 20.0) + m.d * (y * 20.0) + m.ty;
++	// Ruffle render/src/matrix.rs `impl Mul<Point<Twips>>`: the point is
++	// quantised to whole twips first (Twips::from_pixels truncates), the f32
++	// rotate/scale product is then rounded half-to-even into an i32 twip, and
++	// only THEN is the (already integral) translation added. Carrying the
++	// product in doubles instead leaks a fraction of a twip into the returned
++	// pixels -- 54.999999552965164 where Flash and Ruffle both say 55. Same
++	// idiom as rect_union_xform() above; see the ruffle-geometry-is-integer-
++	// twips note.
++	float xt = (float) twips_from_pixels(x);
++	float yt = (float) twips_from_pixels(y);
++	double tx = round_twips_f32((float) ((float) m.a * xt + (float) m.c * yt))
++	            + m.tx;
++	double ty = round_twips_f32((float) ((float) m.b * xt + (float) m.d * yt))
++	            + m.ty;
+ 	// flash.geom.Point lives in the builtin domain.
+ 	Avm2PropKey key = avm2_public_key("Point", 5);
+ 	key.ns_kind = 0x16;

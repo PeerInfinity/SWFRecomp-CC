@@ -411,7 +411,7 @@ typedef struct Avm2EditTextData
 	uint8_t align;           // 0 left, 1 right, 2 center, 3 justify (HAS_LAYOUT)
 	uint16_t left_margin;    // twips (HAS_LAYOUT)
 	uint16_t right_margin;   // twips (HAS_LAYOUT)
-	uint16_t indent;         // twips (HAS_LAYOUT)
+	int16_t indent;          // twips (HAS_LAYOUT) -- SIGNED (see abc_timeline.cpp)
 	int16_t leading;         // twips (HAS_LAYOUT)
 	const char* variable_name;  // NULL when empty
 	const char* raw_text;    // NULL unless HAS_TEXT

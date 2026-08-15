@@ -1,0 +1,191 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d562cb449..0d8d6f600 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -23968,6 +23968,11 @@ MovieClip* actionBootAvm1ChildUnderAvm2(SWFAppContext* app_context,
+ 
+ 	MovieClip* mc = getOrCreateLevel(app_context, level);
+ 	if (mc == NULL) return NULL;
++	// Ruffle loader.rs:61 LOADER_INSERTED_AVM1_DEPTH = -0xF000 (-61440): an AVM1
++	// movie inserted by an AVM2 Loader is stamped at that *internal* depth, and
++	// AVM1's getDepth subtracts AVM_DEPTH_BIAS (16384, avm1/globals.rs:864), so
++	// scripts observe -77824. mc->depth already stores the AVM1-biased value.
++	mc->depth = -0xF000 - 16384;
+ 	constructChildURL(mc->url, sizeof(mc->url), entry->filename);
+ 	mc->swf_version = (u16) entry->swf_version;
+ 	mc->movie_id = entry->movie_id;
+@@ -24076,6 +24081,94 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context)
+ 	quit_swf = saved_quit;
+ 	actionSetCurrentContext(saved_ctx);
+ }
++
++// Mouse event kinds the AVM2 input pump forwards into AVM1 (mirrored, with the
++// same values, next to avm2_display.c's extern declaration of the function
++// below — this seam is deliberately header-free, like the tick/boot hooks).
++#define AVM1_CHILD_MOUSE_MOVE 0
++#define AVM1_CHILD_MOUSE_DOWN 1
++#define AVM1_CHILD_MOUSE_UP   2
++
++// Forward a stage mouse event from the AVM2 input pump into the AVM1
++// substrate. `kind` is AVM1_CHILD_MOUSE_{MOVE,DOWN,UP}; `x`/`y` are stage
++// pixels (the AVM2 stage owns the origin here, so unlike input_events.c there
++// is no FRAME_{X,Y}_MIN_TWIPS bias to add).
++//
++// This is a BROADCAST, not a hit test: `Mouse.onMouseX` and `mc.onMouseX` fire
++// in AVM1 regardless of pointer position, which is exactly what the dual-VM
++// fixtures grade (mixed_avm/avm2_loads_avm1's `onmousedown at 10, 10!`). The
++// onPress/onRelease dispatchers below DO hit-test, but against the AVM1
++// child's own coordinate space — a Loader transform between the AVM2 stage and
++// the AVM1 root is not modelled, so cross-VM picking stays out of scope.
++//
++// The version/globals/movie-id swap is the same one avm1UnderAvm2RunFrame
++// performs for a frame; it is done ONCE, for the first booted child, because
++// the AVM1 dispatchers walk process-global registries (child_mc_cache plus the
++// single g_mouse_obj broadcaster) and re-entering them per child would fire
++// every handler N times. With one AVM1 child — every dual-VM test in the
++// corpus, and the only shape an AVM2 Loader produces in practice — that is
++// exact.
++void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext* app_context, int kind,
++                                      float x, float y)
++{
++	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0) return;
++	extern void actionDispatchMCMouseDown(SWFAppContext*);
++	extern void actionDispatchMCMouseUp(SWFAppContext*);
++	extern void actionDispatchMCMouseMove(SWFAppContext*);
++	extern void actionDispatchMCMouseMoveGlobal(SWFAppContext*);
++	extern void actionDispatchMCPress(SWFAppContext*);
++	extern void actionDispatchMCRelease(SWFAppContext*);
++
++	// Mirror the bookkeeping input_events.c does on the AVM1-only path, so the
++	// AVM1 mouse state machine stays self-consistent. stage_x/y is the load
++	// bearing pair (mc_get_local_mouse reads it for _xmouse/_ymouse); the rest
++	// has no reader in an AVM2 build today.
++	MouseState* ms = &app_context->mouse;
++	ms->stage_x = x * 20.0f;
++	ms->stage_y = y * 20.0f;
++	root_movieclip.xmouse = x;
++	root_movieclip.ymouse = y;
++	if (kind == AVM1_CHILD_MOUSE_DOWN)    { ms->button_down = 1; ms->clicked = 1; }
++	else if (kind == AVM1_CHILD_MOUSE_UP) { ms->button_down = 0; ms->released = 1; }
++	else                                  { ms->moved = 1; }
++
++	MovieClip* saved_ctx = g_current_context;
++	int saved_ver = g_swf_version;
++	ASObject* saved_global = global_object;
++	u8 saved_movie_id = g_current_movie_id;
++	Avm1UnderAvm2Child* child = &g_avm1u2[0];
++	if (child->entry != NULL) {
++		g_swf_version = child->entry->swf_version;
++		g_current_movie_id = child->entry->movie_id;
++		ensureSecondaryGlobalInit(app_context, child->entry->swf_version);
++		if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
++		else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
++	}
++	if (child->mc != NULL) actionSetCurrentContext(child->mc);
++
++	extern int quit_swf;
++	int saved_quit = quit_swf;
++	quit_swf = 0;
++	if (kind == AVM1_CHILD_MOUSE_MOVE) {
++		actionDispatchMouseMove(app_context);
++		actionDispatchMCMouseMove(app_context);
++		actionDispatchMCMouseMoveGlobal(app_context);
++	} else if (kind == AVM1_CHILD_MOUSE_DOWN) {
++		actionDispatchMouseDown(app_context);
++		actionDispatchMCMouseDown(app_context);
++		actionDispatchMCPress(app_context);
++	} else {
++		actionDispatchMouseUp(app_context);
++		actionDispatchMCMouseUp(app_context);
++		actionDispatchMCRelease(app_context);
++	}
++	quit_swf = saved_quit;
++
++	actionSetCurrentContext(saved_ctx);
++	g_swf_version = saved_ver;
++	global_object = saved_global;
++	g_current_movie_id = saved_movie_id;
++}
+ #endif  // SWF_AVM2
+ 
+ void actionFirePendingDirectLoads(SWFAppContext* app_context)
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..d5a754f59 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -5099,6 +5099,10 @@ typedef struct Avm2PendingLoad
+ // class is [Ruffle(Abstract)] to script, so only this internal mint may build
+ // one; defined next to the class down in the display registry.
+ static Avm2Object* avm1movie_mint(Avm2Context* ctx);
++// Tentative definition (C11 6.9.2): the same object the AVM1Movie class block
++// down in the display registry fills in. validate_add, which sits above that
++// block, needs to see it to raise #2180.
++static Avm2Class* g_avm1movie_class;
+ 
+ // Loads issued in one frame all resolve at the next frame's start; a handful
+ // is all any test (or game) has in flight at once.
+@@ -5625,6 +5629,21 @@ static void avm1_child_tick(Avm2Context* ctx)
+ 	actionTickAvm1ChildrenUnderAvm2(ctx->app);
+ }
+ 
++// Forward a stage mouse event into the AVM1 substrate, so that an AVM1 child
++// loaded by an AVM2 Loader still sees Mouse.onMouseX / mc.onMouseX. Values must
++// match the AVM1_CHILD_MOUSE_* macros in action.c (this seam is header-free,
++// like the boot/tick hooks above). No-op until a child boots, so a pure-AVM2
++// movie pays one integer compare per mouse event.
++#define AVM1_CHILD_MOUSE_MOVE 0
++#define AVM1_CHILD_MOUSE_DOWN 1
++#define AVM1_CHILD_MOUSE_UP   2
++static void avm1_child_mouse(Avm2Context* ctx, int kind, float x, float y)
++{
++	if (g_avm1_child_levels == 0 || ctx == NULL || ctx->app == NULL) return;
++	extern void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext*, int, float, float);
++	actionMouseAvm1ChildrenUnderAvm2(ctx->app, kind, x, y);
++}
++
+ // The tail of a load, shared by the deferred `load` path and the synchronous
+ // `loadBytes` path (Ruffle movie_loader_data). `from_bytes` suppresses the URL
+ // suffix on the #2124 message, exactly as Ruffle does.
+@@ -6658,6 +6677,18 @@ static void validate_add(Avm2Context* ctx, Avm2Object* parent, Avm2Object* child
+ 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+ 			"Error #3783: A Stage object cannot be added as the child of another object.");
+ 	}
++	// Ruffle display_object_container.rs validate_add_operation:
++	//   !proposed_child.movie().is_action_script_3() && root_swf.version() > 9
++	// Our only AVM2-visible AVM1 DisplayObject is the AVM1Movie wrapper.
++	if (child != NULL && child->cls != NULL && g_avm1movie_class != NULL
++	    && class_is_a(child->cls, g_avm1movie_class)
++	    && (int) avm2_generated_swf_version > 9)
++	{
++		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
++			"Error #2180: It is illegal to move AVM1 content (AS1 or AS2) to a "
++			"different part of the displayList when it has been loaded into AVM2 "
++			"(AS3) content.");
++	}
+ 	if (child == parent)
+ 	{
+ 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+@@ -12932,6 +12963,7 @@ static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
+ 		int moved = (g_mouse_x != ev->x) || (g_mouse_y != ev->y);
+ 		g_mouse_x = ev->x; g_mouse_y = ev->y;
+ 		update_mouse_state(ctx, -1, moved);
++		avm1_child_mouse(ctx, AVM1_CHILD_MOUSE_MOVE, ev->x, ev->y);
+ 		break;
+ 	}
+ 	case IN_MOUSE_DOWN:
+@@ -12941,6 +12973,7 @@ static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
+ 		g_mouse_btn_down[ev->button] = 1;
+ 		if (ev->button == 0) g_left_click_index = (uint32_t) ev->code;
+ 		update_mouse_state(ctx, ev->button, moved);
++		if (ev->button == 0) avm1_child_mouse(ctx, AVM1_CHILD_MOUSE_DOWN, ev->x, ev->y);
+ 		break;
+ 	}
+ 	case IN_MOUSE_UP:
+@@ -12949,6 +12982,7 @@ static void input_deliver(Avm2Context* ctx, Avm2InputEvent* ev)
+ 		g_mouse_x = ev->x; g_mouse_y = ev->y;
+ 		g_mouse_btn_down[ev->button] = 0;
+ 		update_mouse_state(ctx, ev->button, moved);
++		if (ev->button == 0) avm1_child_mouse(ctx, AVM1_CHILD_MOUSE_UP, ev->x, ev->y);
+ 		break;
+ 	}
+ 	case IN_MOUSE_WHEEL:

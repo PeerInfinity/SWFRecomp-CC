@@ -1,0 +1,74 @@
+diff --git a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+index cbf48cf75..610ce9915 100644
+--- a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+@@ -55,14 +55,48 @@ soundchannel_position
+ soundchannel_soundcomplete
+ soundmixer_soundtransform
+ 
+-# Image-comparison tests (need the graphics renderer; revisit with a future avm2 graphics mode)
+-bitmapdata_draw_alpha_erase
+-blend_transform
++# RE-TRIAGED 2026-08-14 (s16 wave-2 `ignore-bucket`, board lead L4). The heading
++# this bucket used to carry -- "Image-comparison tests (need the graphics
++# renderer; revisit with a future avm2 graphics mode)" -- had been factually
++# dead since 2026-07-23: graphics mode landed, mode parity is complete, and the
++# whole corpus is graded IN `--mode=graphics`. Every entry was an ordinary
++# graphics-mode TRACE failure, and not one of the eight had a disposition in
++# ACCEPTED_DIFFS.md / RUFFLE_VS_FLASH_DIFFERENCES.md / RUFFLE_COMPAT_TWEAKS.md /
++# FLASH_BUGS_REPLICATED.md. Disposition of all eight:
++#   bitmapdata_draw_alpha_erase  FIXED (s16) -- entry removed. BitmapData.draw
++#                                with BlendMode.ALPHA/.ERASE and a Bitmap
++#                                display-object source now runs the CPU
++#                                equivalent of the wgpu complex-blend shaders.
++#                                Trace AND image comparison both pass.
++#   edittext_tag_indent          FIXED (s16) -- entry removed. DefineEditText
++#                                Indent is SI16, not UI16. Trace AND image
++#                                comparison both pass.
++#   blend_transform              moved to the upstream-known_failure bucket
++#   graphics_draw_path           below (both are `known_failure = true` in their
++#                                own test.toml, and both are `ruffle_matched`
++#                                here, i.e. already inside effective_pass).
++#   the four kept below          ordinary open bugs with named owners -- NOT
++#                                accepted diffs. They are listed only so the
++#                                filtered report stays comparable across the
++#                                s16 boundary; prune each one the moment it
++#                                reaches `pass`, per this file's 2026-08-01
++#                                criterion.
++#
++# Open trace bugs, owner lead named (avm2 suite, all graded in graphics mode):
++#   displayobject_scrollrect              localToGlobal/globalToLocal must
++#                                         quantize to integer twips before
++#                                         adding the translation (board L1)
++#   displayobject_hittestpoint_boundary   L1 + a hit-test edge-exclusivity rule
++#                                         + a missing leading blank line
++#   geom_transform                        Transform.matrix / .matrix3D duality;
++#                                         dies on #1009 (rawData) at line 24
++#                                         and cascades (board L2)
++#   stage_scale_factor                    contentsScaleFactor must be 2, and
++#                                         Stage localToGlobal must ignore the
++#                                         Stage's own matrix (L1 rider)
+ displayobject_hittestpoint_boundary
+ displayobject_scrollrect
+-edittext_tag_indent
+ geom_transform
+-graphics_draw_path
+ stage_scale_factor
+ 
+ # Upstream known_failure = true (Ruffle itself fails these)
+@@ -74,6 +108,7 @@ all_classes/events/swf9
+ array_access_oob_interpreter
+ array_sort_swf10_64bit
+ avm1_root
++blend_transform
+ bounds_mode
+ coerce_to_primitive_side_effects_with_nulls
+ dictionary_weak_keys
+@@ -84,6 +119,7 @@ edittext_tab_stops
+ encode_uri_surrogate_pair_swf10
+ freestanding_superclass
+ goto_framescript_queued
++graphics_draw_path
+ int_toexponential
+ int_toprecision
+ simplebutton_childevents_multichild

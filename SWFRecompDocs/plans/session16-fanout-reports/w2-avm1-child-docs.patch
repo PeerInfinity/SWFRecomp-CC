@@ -1,0 +1,68 @@
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
+index 6810f43bb..576899070 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
+@@ -456,3 +456,63 @@ model *and* its allocation thresholds, purely to report them back. Added to
+ **not** added to the global `ruffle-tests/ignored_tests.txt` — the test has no
+ `[[image_comparisons]]` block, so a global entry would wrongly disposition a
+ pixel-axis row (same reasoning as `loader_load` / `bom` above).
++
++## The name of an AVM1 root loaded by an AVM2 `Loader`: `_root` vs `_level-61440`
++
++**Test:** `avm2/avm1_root` (58 expected / 46 differing lines at HEAD;
++`known_failure = true` in its own `test.toml`)
++
++<!-- image-axis: none -->
++
++This test's directory ships **two** oracles: `output.txt` (Flash) and
++`output.ruffle.txt` (Ruffle's own trace, recorded because upstream marks the row
++a known failure). They disagree on roughly thirty of the fifty-eight lines, and
++the disagreement has a single root cause.
++
++Ruffle inserts an AVM1 movie loaded by an AVM2 `Loader` at a synthetic depth,
++`LOADER_INSERTED_AVM1_DEPTH = -0xF000` (`core/src/loader.rs:61`), and then
++*names* the resulting root after that depth. Flash does not: it calls the loaded
++root `_root`, gives it an empty target path, and resolves AVM1 target paths
++**through** the AVM2 containers above it.
++
++```diff
++  === avm1_child
++- this: _root                                (Flash)
+++ this: _level-61440                         (Ruffle)
++- _root: _root
+++ _root: _level-61440
++- _level-61440: undefined
+++ _level-61440: _level-61440
++- child_via_mcl._target: /child_via_mcl
+++ child_via_mcl._target: _level-61440/child_via_mcl
++```
++
++and, nine lines later, the same divergence in the other direction — Flash
++resolves `_level0.as3Loader.defined_avm1_name._x: 10` *through* the AVM2 Loader,
++while Ruffle answers `undefined` for every one of those lookups because its AVM1
++child sits on a level of its own with no path back to `_level0`.
++
++Note that the depth constant itself is not in dispute, and we **do** adopt it:
++`actionBootAvm1ChildUnderAvm2` stamps the child `-0xF000 - 16384 = -77824`,
++which is what AVM1's `getDepth` (`AVM_DEPTH_BIAS = 16384`,
++`core/src/avm1/globals.rs:864`) reports, and `mixed_avm/avm2_loads_avm1` grades
++exactly that number in its `Root depth: -77824` line. What we decline is
++Ruffle's *naming* of the root after the internal depth.
++
++Two consequences worth recording:
++
++* **The ceiling on this row is `ruffle_matched`, never `pass`** — `output.txt`
++  requires Flash's full cross-VM target-path resolution (an AVM1 path walking
++  down through an AVM2 `Loader` into a nested AVM1 clip), which is the same
++  session-sized machinery `avm2/mouse_pick_loader_avm1` and
++  `avm2/focus_events_mixed_avm_edittext` need.
++* **Moving toward `ruffle_matched` would move us away from Flash.** Adopting
++  `_level{internal_depth}` naming is a two-line change, but it would break
++  `mixed_avm/avm2_loads_avm1`'s `_root == _level0: false` line and put us on
++  record following Ruffle's implementation against a Flash oracle that sits in
++  the same directory.
++
++**Decision:** leave the row alone; keep the depth constant, decline the naming.
++Not added to `ignored_tests.txt` — this is a `RUFFLE_VS_FLASH` entry, not an
++`ACCEPTED_DIFFS` one, and the row's remaining diff is genuinely fixable work
++(cross-VM target-path resolution) rather than a permanent divergence.

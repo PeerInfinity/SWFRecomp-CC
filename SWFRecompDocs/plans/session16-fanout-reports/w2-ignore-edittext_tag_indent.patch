@@ -1,0 +1,41 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_abc.h b/SWFModernRuntime/include/avm2/avm2_abc.h
+index cd79f606c..44a17b857 100644
+--- a/SWFModernRuntime/include/avm2/avm2_abc.h
++++ b/SWFModernRuntime/include/avm2/avm2_abc.h
+@@ -411,7 +411,7 @@ typedef struct Avm2EditTextData
+ 	uint8_t align;           // 0 left, 1 right, 2 center, 3 justify (HAS_LAYOUT)
+ 	uint16_t left_margin;    // twips (HAS_LAYOUT)
+ 	uint16_t right_margin;   // twips (HAS_LAYOUT)
+-	uint16_t indent;         // twips (HAS_LAYOUT)
++	int16_t indent;          // twips (HAS_LAYOUT) -- SIGNED (see abc_timeline.cpp)
+ 	int16_t leading;         // twips (HAS_LAYOUT)
+ 	const char* variable_name;  // NULL when empty
+ 	const char* raw_text;    // NULL unless HAS_TEXT
+diff --git a/SWFRecomp/src/abc/abc_timeline.cpp b/SWFRecomp/src/abc/abc_timeline.cpp
+index 253ca3afa..77d5f5124 100644
+--- a/SWFRecomp/src/abc/abc_timeline.cpp
++++ b/SWFRecomp/src/abc/abc_timeline.cpp
+@@ -738,7 +738,13 @@ struct EditTextDef
+ 	uint32_t color_rgba = 0;
+ 	uint16_t max_length = 0;
+ 	uint8_t align = 0;
+-	uint16_t left_margin = 0, right_margin = 0, indent = 0;
++	uint16_t left_margin = 0, right_margin = 0;
++	// Indent is documented UI16 but is really SI16 (Ruffle swf/src/read.rs:2413
++	// carries the same note): DefineEditText tags in the wild carry negative
++	// indents, and reading them unsigned turns -1638px into +1638px and
++	// -10px into +3267px -- which then also breaks line wrapping, because a
++	// 3267px first-line indent leaves room for one glyph.
++	int16_t indent = 0;
+ 	int16_t leading = 0;
+ 	std::string variable_name;
+ 	bool has_text = false;
+@@ -1293,7 +1299,7 @@ struct Scanner
+ 					et.align = body.u8();
+ 					et.left_margin = body.u16();
+ 					et.right_margin = body.u16();
+-					et.indent = body.u16();
++					et.indent = (int16_t) body.u16();
+ 					et.leading = (int16_t) body.u16();
+ 				}
+ 				et.variable_name = body.cstr();

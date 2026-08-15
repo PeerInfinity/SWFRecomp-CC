@@ -738,7 +738,13 @@ struct EditTextDef
 	uint32_t color_rgba = 0;
 	uint16_t max_length = 0;
 	uint8_t align = 0;
-	uint16_t left_margin = 0, right_margin = 0, indent = 0;
+	uint16_t left_margin = 0, right_margin = 0;
+	// Indent is documented UI16 but is really SI16 (Ruffle swf/src/read.rs:2413
+	// carries the same note): DefineEditText tags in the wild carry negative
+	// indents, and reading them unsigned turns -1638px into +1638px and
+	// -10px into +3267px -- which then also breaks line wrapping, because a
+	// 3267px first-line indent leaves room for one glyph.
+	int16_t indent = 0;
 	int16_t leading = 0;
 	std::string variable_name;
 	bool has_text = false;
@@ -1293,7 +1299,7 @@ struct Scanner
 					et.align = body.u8();
 					et.left_margin = body.u16();
 					et.right_margin = body.u16();
-					et.indent = body.u16();
+					et.indent = (int16_t) body.u16();
 					et.leading = (int16_t) body.u16();
 				}
 				et.variable_name = body.cstr();
