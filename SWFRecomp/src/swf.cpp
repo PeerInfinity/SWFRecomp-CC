@@ -21,6 +21,8 @@
 
 #include <swf.hpp>
 
+#include "../../SWFModernRuntime/include/gradient_ramp.h"
+
 #include <abc/abc_emit.hpp>
 #include <abc/abc_timeline.hpp>
 #include <abc/abc_parser.hpp>
@@ -7108,102 +7110,43 @@ namespace SWFRecomp
 							fill_styles[i].gradient.records[j].a = 255;
 						}
 
-						if (j == 0)
-						{
-							continue;
-						}
-
-						GradientRecord& last_grad = fill_styles[i].gradient.records[j - 1];
-						GradientRecord& grad = fill_styles[i].gradient.records[j];
-
-						// Pad the ramp head [0, first stop ratio) with the first stop
-						// color. SWF gradient ramps are pad-extended below the first
-						// stop; without this the head rows are never written AND every
-						// later gradient's 256-row texture boundary shifts, so a stop
-						// list whose first ratio > 0 (e.g. Pacman's title pac, first
-						// stop at ratio 45) sampled stale data and rendered white.
-						if (j == 1)
-						{
-							GradientRecord& first_grad = fill_styles[i].gradient.records[0];
-							for (int head = 0; head < (int) first_grad.ratio; ++head)
-							{
-								gradient_data << "\t" << "{ "
-											  << to_string(first_grad.r) << ", "
-											  << to_string(first_grad.g) << ", "
-											  << to_string(first_grad.b) << ", "
-											  << to_string(first_grad.a) << " },"
-											  << endl;
-							}
-						}
-
-						for (u8 ratio = last_grad.ratio; ratio < grad.ratio; ++ratio)
-						{
-							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
-							float t = (ratio - last_grad.ratio)/ratio_diff;
-
-							u8 r = use_linear_rgb ? linearRgbLerp(last_grad.r, grad.r, t) : rgbLerp(last_grad.r, grad.r, t);
-							u8 g = use_linear_rgb ? linearRgbLerp(last_grad.g, grad.g, t) : rgbLerp(last_grad.g, grad.g, t);
-							u8 b = use_linear_rgb ? linearRgbLerp(last_grad.b, grad.b, t) : rgbLerp(last_grad.b, grad.b, t);
-							u8 a = rgbLerp(last_grad.a, grad.a, t);
-
-							gradient_data << "\t" << "{ "
-										  << to_string(r) << ", "
-										  << to_string(g) << ", "
-										  << to_string(b) << ", "
-										  << to_string(a) << " },"
-										  << endl;
-						}
-
-						if (grad.ratio == 255)
-						{
-							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
-							float t = (255 - last_grad.ratio)/ratio_diff;
-
-							u8 r = use_linear_rgb ? linearRgbLerp(last_grad.r, grad.r, t) : rgbLerp(last_grad.r, grad.r, t);
-							u8 g = use_linear_rgb ? linearRgbLerp(last_grad.g, grad.g, t) : rgbLerp(last_grad.g, grad.g, t);
-							u8 b = use_linear_rgb ? linearRgbLerp(last_grad.b, grad.b, t) : rgbLerp(last_grad.b, grad.b, t);
-							u8 a = rgbLerp(last_grad.a, grad.a, t);
-
-							gradient_data << "\t" << "{ "
-										  << to_string(r) << ", "
-										  << to_string(g) << ", "
-										  << to_string(b) << ", "
-										  << to_string(a) << " },"
-										  << endl;
-						}
-
-						// Pad the ramp tail (last stop ratio, 255] with the last stop
-						// color when the final stop is below 255 (the ratio==255 branch
-						// above already emits row 255 when the gradient ends exactly at
-						// 255). Together with the head pad this keeps every gradient
-						// exactly 256 rows so gradient N lands on texture row N.
-						if (j == fill_styles[i].gradient.num_grads - 1 && grad.ratio < 255)
-						{
-							for (int tail = (int) grad.ratio; tail < 256; ++tail)
-							{
-								gradient_data << "\t" << "{ "
-											  << to_string(grad.r) << ", "
-											  << to_string(grad.g) << ", "
-											  << to_string(grad.b) << ", "
-											  << to_string(grad.a) << " },"
-											  << endl;
-							}
-						}
 					}
 
-					// Degenerate single-stop gradient: the loop above never runs a
-					// segment, so fill the whole 256-row ramp with that one color.
-					if (fill_styles[i].gradient.num_grads == 1)
+					// Bake the 256-row ramp with Ruffle's CommonGradient::new walk
+					// (gradient_ramp.h). The old code appended rows per SEGMENT, which
+					// only sums to 256 for a strictly-increasing ratio list: a duplicate
+					// ratio emitted 0 rows and a decreasing one emitted 0 rows, so
+					// e.g. visual/gradient_nonsequential_ratios wrote 336 rows into its
+					// own 256-row texture slot and shifted every later gradient.
 					{
-						GradientRecord& only_grad = fill_styles[i].gradient.records[0];
-						for (int u = 0; u < 256; ++u)
+						GradientRampStop ramp_stops[15];
+						int ramp_n = (int) fill_styles[i].gradient.num_grads;
+						if (ramp_n > 15) ramp_n = 15;
+
+						for (int j = 0; j < ramp_n; ++j)
+						{
+							GradientRecord& gr = fill_styles[i].gradient.records[j];
+							ramp_stops[j].ratio = gr.ratio;
+							ramp_stops[j].r = gr.r;
+							ramp_stops[j].g = gr.g;
+							ramp_stops[j].b = gr.b;
+							ramp_stops[j].a = gr.a;
+						}
+
+						u8 ramp[256 * 4];
+						gradient_ramp_build(ramp_stops, ramp_n,
+						                    use_linear_rgb ? GRADIENT_RAMP_LINEAR
+						                                   : GRADIENT_RAMP_SRGB,
+						                    GRADIENT_RAMP_TRUNC, ramp);
+
+						for (int t = 0; t < 256; ++t)
 						{
 							gradient_data << "\t" << "{ "
-										  << to_string(only_grad.r) << ", "
-										  << to_string(only_grad.g) << ", "
-										  << to_string(only_grad.b) << ", "
-										  << to_string(only_grad.a) << " },"
-										  << endl;
+							              << to_string(ramp[t * 4 + 0]) << ", "
+							              << to_string(ramp[t * 4 + 1]) << ", "
+							              << to_string(ramp[t * 4 + 2]) << ", "
+							              << to_string(ramp[t * 4 + 3]) << " },"
+							              << endl;
 						}
 					}
 
@@ -7331,14 +7274,29 @@ namespace SWFRecomp
 				}
 				else
 				{
-					// FillType: FILLSTYLE - parse and extract color for basic rendering
-					// For now, skip the fill style and use a default color
+					// FillType: FILLSTYLE. parseFillStyles already registers the
+					// gradient ramp + its inverse matrix and hands back the
+					// style index, so a gradient stroke only has to CARRY that
+					// index — the old code kept fill[0].r/g/b/a, which a
+					// gradient fill never populates, so every LINESTYLE2
+					// gradient stroke became transparent black
+					// (from_shumway/acid/acid-gradient-2 rendered blank).
 					FillStyle* fill = parseFillStyles(1);
 
 					line_styles[i].r = fill[0].r;
 					line_styles[i].g = fill[0].g;
 					line_styles[i].b = fill[0].b;
 					line_styles[i].a = fill[0].a;
+
+					if (fill[0].type == FILL_GRAD_LINEAR
+					    || fill[0].type == FILL_GRAD_RADIAL
+					    || fill[0].type == FILL_GRAD_FOCAL)
+					{
+						line_styles[i].fill_type = fill[0].type;
+						line_styles[i].fill_spread_mode = fill[0].gradient.spread_mode;
+						line_styles[i].fill_interp = fill[0].gradient.interpolation_mode;
+						line_styles[i].fill_index = fill[0].index;
+					}
 
 					delete[] fill;
 				}
@@ -10012,6 +9970,7 @@ namespace SWFRecomp
 									if (fs.type == FILL_GRAD_LINEAR || fs.type == FILL_GRAD_RADIAL || fs.type == FILL_GRAD_FOCAL)
 									{
 										style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
+						style_type_packed |= (((u32) fs.gradient.interpolation_mode & 1u) << 10);
 									}
 
 									// Morph solid fills carry the END colour index in the
@@ -10224,6 +10183,7 @@ namespace SWFRecomp
 						if (fs.type == FILL_GRAD_LINEAR || fs.type == FILL_GRAD_RADIAL || fs.type == FILL_GRAD_FOCAL)
 						{
 							style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
+						style_type_packed |= (((u32) fs.gradient.interpolation_mode & 1u) << 10);
 						}
 						// Only a BITMAP fill (0x40-0x43) makes the shape
 						// unrenderable this tranche — solid (T1) and gradient
@@ -10295,6 +10255,24 @@ namespace SWFRecomp
 
 						tris_size += tris.size();
 
+						// A LINESTYLE2 stroke whose FILLSTYLE is a gradient
+						// carries the gradient's style type (+ spread mode) and
+						// its gradient/inv-matrix index instead of a colour
+						// index. The 0x80000000 stroke marker stays in the top
+						// bit — the shader only reads `style.x & 0xFF` (and
+						// bits 8-9 for the spread), while the CPU hit test reads
+						// the marker bit, so both keep working.
+						u32 stroke_style_packed = 0x80000000u;
+						u32 stroke_style_index = (u32) line_style.index;
+
+						if (line_style.fill_type != 0)
+						{
+							stroke_style_packed |= (u32) line_style.fill_type
+							                     | ((u32) line_style.fill_spread_mode << 8);
+							stroke_style_packed |= (((u32) line_style.fill_interp & 1u) << 10);
+							stroke_style_index = (u32) line_style.fill_index;
+						}
+
 						// T2: strokes are shader-handled (0x80000000 style, shaded
 						// as solids via the color index), so a stroke run no longer
 						// makes the shape unrenderable — it does not clear the flag.
@@ -10310,8 +10288,8 @@ namespace SWFRecomp
 										   << std::hex << std::uppercase
 										   << "0x" << VAL(u32, &x_f) << ", "
 										   << "0x" << VAL(u32, &y_f) << ", "
-										   << "0x80000000, "
-										   << "0x" << (u32) line_style.index
+										   << "0x" << stroke_style_packed << ", "
+										   << "0x" << stroke_style_index
 										   << " }," << endl;
 
 								// morph_end_shape_data is indexed BY the shape_data

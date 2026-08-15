@@ -142,6 +142,15 @@ namespace SWFRecomp
 		u8 g;
 		u8 b;
 		u8 a;
+		// LINESTYLE2 HasFillFlag: the stroke is painted with a full FILLSTYLE,
+		// not an RGBA. For a gradient FILLSTYLE the r/g/b/a above are never
+		// populated (they stay {0,0,0,0} = transparent black), so the stroke
+		// has to carry the gradient's own style type + texture/matrix index.
+		// fill_type == 0 means "plain colour stroke" (the pre-existing path).
+		u8 fill_type = 0;
+		u8 fill_spread_mode = 0;
+		u8 fill_interp = 0;      // gradient interpolation_mode (1 = linearRGB)
+		size_t fill_index = 0;
 	};
 	
 	class SWFHeader

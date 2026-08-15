@@ -1,0 +1,684 @@
+diff --git a/SWFModernRuntime/include/gradient_ramp.h b/SWFModernRuntime/include/gradient_ramp.h
+new file mode 100644
+index 000000000..19f0a5f76
+--- /dev/null
++++ b/SWFModernRuntime/include/gradient_ramp.h
+@@ -0,0 +1,171 @@
++#ifndef GRADIENT_RAMP_H
++#define GRADIENT_RAMP_H
++
++// Single source of truth for the 256-row RGBA8 gradient ramp WALK, ported from
++// Ruffle's `render/wgpu/src/mesh.rs::CommonGradient::new` (GRADIENT_SIZE = 256).
++//
++// Why this exists: we used to have three near-identical *segment-walking*
++// builders (recompiler `SWFRecomp/src/swf.cpp::parseFillStyles`, AVM1
++// `action.c::drawingGenerateGradientRamp`, AVM2 `avm2_display.c::gfx_gen_ramp`),
++// each of which iterated `for ratio in [stop[s-1].ratio, stop[s].ratio]`. That
++// is only equivalent to Ruffle for a STRICTLY INCREASING ratio list. SWF does
++// not require that, and Ruffle never sorts the records, so:
++//
++//   * Duplicate ratios: Ruffle's cursor advances at most ONE record per texel
++//     and pins the interpolation factor to 0 when `last.ratio == next.ratio`,
++//     so k stops sharing a ratio render as k consecutive 1-pixel bands and
++//     every later segment starts k-1 texels further along. The segment walkers
++//     emitted zero rows (recompiler) or one wrong-coloured row (runtime).
++//   * Decreasing ratios: Ruffle's cursor still advances one step and the
++//     factor pins to 1.0, producing a plateau of the NEXT record's colour. The
++//     segment walkers emitted nothing at all — and the recompiler's row count
++//     then no longer summed to 256, which silently shifted every later
++//     gradient off its own texture row (`gradient_nonsequential_ratios` emitted
++//     336 rows into a 256-row slot).
++//
++// Building the whole ramp with a single texel-indexed loop makes the "exactly
++// 256 rows per gradient" invariant structural instead of a property that has to
++// be re-argued at every call site.
++//
++// SCOPE NOTE: this header deliberately reproduces each call site's EXISTING
++// per-channel arithmetic (see the space/rounding modes below) so that for a
++// strictly-increasing ratio list every builder is byte-for-byte unchanged. The
++// two known per-channel divergences from Ruffle (the recompiler quantising
++// linearRGB back to sRGB, and the runtime's +0.5 rounding / u8-quantised linear
++// endpoints) are separate legs with their own blast radius.
++//
++// See SWFRecompDocs/plans/session16-fanout-reports/w2-gfx-gradient-report.md.
++
++#include <math.h>
++#include <string.h>
++
++typedef struct
++{
++	unsigned char ratio;
++	unsigned char r, g, b, a;
++} GradientRampStop;
++
++// Interpolation-space handling for the three COLOUR channels.
++#define GRADIENT_RAMP_SRGB           0 // no conversion (both VMs + recompiler, mode 0)
++#define GRADIENT_RAMP_LINEAR         1 // Ruffle exact: float linear endpoints, truncate
++#define GRADIENT_RAMP_LINEAR_TO_SRGB 2 // recompiler legacy: lerp linear, back to sRGB, round
++#define GRADIENT_RAMP_LINEAR_U8      3 // runtime legacy: u8-quantised linear endpoints, truncate
++
++// Rounding for the SRGB colour path and for the alpha channel (alpha is never
++// colour-space converted — Ruffle lerps `color.a` raw).
++#define GRADIENT_RAMP_TRUNC 0
++#define GRADIENT_RAMP_ROUND 1
++
++static float gradient_ramp_srgb_to_linear(float c)
++{
++	if (c <= 0.04045f) return c / 12.92f;
++	return powf((c + 0.055f) / 1.055f, 2.4f);
++}
++
++static float gradient_ramp_linear_to_srgb(float c)
++{
++	if (c <= 0.0031308f) return c * 12.92f;
++	return 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
++}
++
++static unsigned char gradient_ramp_clamp_u8(float v)
++{
++	if (v <= 0.0f) return 0;
++	if (v >= 255.0f) return 255;
++	return (unsigned char) v;
++}
++
++static unsigned char gradient_ramp_chan(unsigned char start, unsigned char end,
++                                        float t, int space, int rounding)
++{
++	float s, e, v;
++
++	switch (space)
++	{
++		case GRADIENT_RAMP_LINEAR:
++			// Ruffle: convert = |c| srgb_to_linear(c / 255.0) * 255.0, lerp in
++			// that space, `as u8`. The texture stays linear; the shader (or the
++			// CPU rasteriser) converts back per pixel.
++			s = gradient_ramp_srgb_to_linear(start / 255.0f) * 255.0f;
++			e = gradient_ramp_srgb_to_linear(end / 255.0f) * 255.0f;
++			return gradient_ramp_clamp_u8(s + t * (e - s));
++
++		case GRADIENT_RAMP_LINEAR_TO_SRGB:
++			// swf.cpp::linearRgbLerp — lerp in normalised linear, convert back
++			// to sRGB, round. (Always rounds; that is the legacy behaviour.)
++			s = gradient_ramp_srgb_to_linear(start / 255.0f);
++			e = gradient_ramp_srgb_to_linear(end / 255.0f);
++			v = gradient_ramp_linear_to_srgb(s + t * (e - s)) * 255.0f + 0.5f;
++			return gradient_ramp_clamp_u8(v);
++
++		case GRADIENT_RAMP_LINEAR_U8:
++			// action.c::drawingSrgbToLinearU8 + drawingLinearRgbLerp — endpoints
++			// are quantised to u8 linear first, then lerped and truncated.
++			s = (float) gradient_ramp_clamp_u8(
++				gradient_ramp_srgb_to_linear(start / 255.0f) * 255.0f);
++			e = (float) gradient_ramp_clamp_u8(
++				gradient_ramp_srgb_to_linear(end / 255.0f) * 255.0f);
++			return gradient_ramp_clamp_u8(s + t * (e - s));
++
++		default:
++			v = (float) start + t * ((float) end - (float) start);
++			if (rounding == GRADIENT_RAMP_ROUND) v += 0.5f;
++			return gradient_ramp_clamp_u8(v);
++	}
++}
++
++// Build the 256-row RGBA8 ramp for `stops[0..n)` into `out` (256 * 4 bytes).
++// `stops` is used in FILE ORDER — never sort it, Ruffle does not.
++static void gradient_ramp_build(const GradientRampStop* stops, int n,
++                                int space, int rounding, unsigned char* out)
++{
++	int t;
++	int last = 0;
++
++	if (n <= 0)
++	{
++		memset(out, 0, 256 * 4);
++		return;
++	}
++
++	for (t = 0; t < 256; ++t)
++	{
++		const GradientRampStop* ls;
++		const GradientRampStop* ns;
++		int next;
++		float a;
++
++		// Ruffle advances the cursor by at most one record per texel.
++		if (last + 1 < n && t > (int) stops[last + 1].ratio) last += 1;
++		next = last + 1;
++		if (next > n - 1) next = n - 1;
++
++		ls = &stops[last];
++		ns = &stops[next];
++
++		if (t <= (int) ls->ratio || ls->ratio == ns->ratio)
++		{
++			// Before the first record, or a duplicate ratio: a full stop of
++			// this record's colour for exactly one texel.
++			a = 0.0f;
++		}
++		else if (t > (int) ns->ratio)
++		{
++			// Past the last record (or a decreasing ratio).
++			a = 1.0f;
++		}
++		else
++		{
++			a = ((float) t - (float) ls->ratio)
++			    / ((float) ns->ratio - (float) ls->ratio);
++		}
++
++		out[t * 4 + 0] = gradient_ramp_chan(ls->r, ns->r, a, space, rounding);
++		out[t * 4 + 1] = gradient_ramp_chan(ls->g, ns->g, a, space, rounding);
++		out[t * 4 + 2] = gradient_ramp_chan(ls->b, ns->b, a, space, rounding);
++		out[t * 4 + 3] = gradient_ramp_chan(ls->a, ns->a, a,
++		                                    GRADIENT_RAMP_SRGB, rounding);
++	}
++}
++
++#endif // GRADIENT_RAMP_H
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d562cb449..40b5d9ad3 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -9,6 +9,7 @@
+ #include <setjmp.h>
+ #include "tesselator.h"
+ #include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
++#include <gradient_ramp.h>  // w2-gfx-gradient: Ruffle CommonGradient::new ramp walk
+ 
+ #ifdef __EMSCRIPTEN__
+ #include <emscripten.h>
+@@ -28016,31 +28017,9 @@ static void drawingUpdateBounds(MovieClip* mc, float x, float y)
+ 	}
+ }
+ 
+-// sRGB <-> linear conversion for linearRGB gradient interpolation
+-static float drawingSrgbToLinear(float c)
+-{
+-	if (c <= 0.04045f) return c / 12.92f;
+-	return powf((c + 0.055f) / 1.055f, 2.4f);
+-}
+-static float drawingLinearToSrgb(float c)
+-{
+-	if (c <= 0.0031308f) return c * 12.92f;
+-	return 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
+-}
+-// Convert sRGB u8 to linear u8 (matching Ruffle: truncate, not round)
+-static u8 drawingSrgbToLinearU8(u8 c)
+-{
+-	return (u8)(drawingSrgbToLinear(c / 255.0f) * 255.0f);
+-}
+-// Lerp in linear u8 space, truncate result (matching Ruffle)
+-static u8 drawingLinearRgbLerp(u8 start_linear, u8 end_linear, float t)
+-{
+-	return (u8)(start_linear + t * (float)(end_linear - start_linear));
+-}
+-static u8 drawingRgbLerp(u8 a, u8 b, float t)
+-{
+-	return (u8)(a + t * (b - a) + 0.5f);
+-}
++// (The sRGB<->linear helpers and the per-channel lerps that used to live here
++//  moved into the shared SWFModernRuntime/include/gradient_ramp.h, which the
++//  recompiler's static-gradient emitter now shares with both VMs.)
+ 
+ // Generate a 256-entry RGBA8 gradient ramp from color stops.
+ // ratios: 0-255, colors: 0xRRGGBB, alphas: 0-100 (percent)
+@@ -28048,66 +28027,26 @@ static void drawingGenerateGradientRamp(
+ 	u32* colors, float* alphas, u8* ratios, int stop_count,
+ 	int use_linear_rgb, u8* out_ramp)
+ {
+-	if (stop_count <= 0) {
+-		memset(out_ramp, 0, 256 * 4);
+-		return;
+-	}
+-	// Fill entire ramp with first color before first ratio
+-	u8 r0 = (colors[0] >> 16) & 0xFF;
+-	u8 g0 = (colors[0] >> 8) & 0xFF;
+-	u8 b0 = colors[0] & 0xFF;
+-	u8 a0 = (u8)(alphas[0] / 100.0f * 255.0f + 0.5f);
+-	// For linearRGB, store ramp in linear color space (matching Ruffle)
+-	if (use_linear_rgb) { r0 = drawingSrgbToLinearU8(r0); g0 = drawingSrgbToLinearU8(g0); b0 = drawingSrgbToLinearU8(b0); }
+-	for (int i = 0; i < 256; i++) {
+-		out_ramp[i*4+0] = r0;
+-		out_ramp[i*4+1] = g0;
+-		out_ramp[i*4+2] = b0;
+-		out_ramp[i*4+3] = a0;
+-	}
+-	if (stop_count == 1) return;
+-
+-	for (int s = 1; s < stop_count; s++) {
+-		u8 ratio_start = ratios[s-1];
+-		u8 ratio_end = ratios[s];
+-		u8 sr = (colors[s-1] >> 16) & 0xFF, sg = (colors[s-1] >> 8) & 0xFF, sb = colors[s-1] & 0xFF;
+-		u8 sa = (u8)(alphas[s-1] / 100.0f * 255.0f + 0.5f);
+-		u8 er = (colors[s] >> 16) & 0xFF, eg = (colors[s] >> 8) & 0xFF, eb = colors[s] & 0xFF;
+-		u8 ea = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
+-		// For linearRGB, convert endpoints to linear u8 space
+-		if (use_linear_rgb) {
+-			sr = drawingSrgbToLinearU8(sr); sg = drawingSrgbToLinearU8(sg); sb = drawingSrgbToLinearU8(sb);
+-			er = drawingSrgbToLinearU8(er); eg = drawingSrgbToLinearU8(eg); eb = drawingSrgbToLinearU8(eb);
+-		}
+-
+-		float range = (float)(ratio_end - ratio_start);
+-		if (range <= 0) range = 1;
+-
+-		for (u8 i = ratio_start; i <= ratio_end; i++) {
+-			float t = (float)(i - ratio_start) / range;
+-			if (use_linear_rgb) {
+-				// Lerp in linear u8 space (matching Ruffle: truncate)
+-				out_ramp[i*4+0] = drawingLinearRgbLerp(sr, er, t);
+-				out_ramp[i*4+1] = drawingLinearRgbLerp(sg, eg, t);
+-				out_ramp[i*4+2] = drawingLinearRgbLerp(sb, eb, t);
+-			} else {
+-				out_ramp[i*4+0] = drawingRgbLerp(sr, er, t);
+-				out_ramp[i*4+1] = drawingRgbLerp(sg, eg, t);
+-				out_ramp[i*4+2] = drawingRgbLerp(sb, eb, t);
+-			}
+-			out_ramp[i*4+3] = drawingRgbLerp(sa, ea, t);
+-			if (i == 255) break;  // prevent u8 overflow
+-		}
+-		// Fill remaining after last stop
+-		if (s == stop_count - 1 && ratio_end < 255) {
+-			for (int i = ratio_end + 1; i < 256; i++) {
+-				out_ramp[i*4+0] = er;
+-				out_ramp[i*4+1] = eg;
+-				out_ramp[i*4+2] = eb;
+-				out_ramp[i*4+3] = ea;
+-			}
+-		}
+-	}
++	// Ruffle (`render/wgpu/src/mesh.rs::CommonGradient::new`) walks the 256
++	// TEXELS, advancing the stop cursor at most once per texel and pinning the
++	// factor to 0 on equal ratios / 1 past the next stop. The old per-segment
++	// walk here was only equivalent for a strictly-increasing ratio list: a
++	// duplicate ratio wrote ONE texel of the wrong colour instead of a 1-px
++	// band, and a decreasing ratio wrote nothing at all. See gradient_ramp.h.
++	GradientRampStop stops[64];
++	int n = stop_count;
++	if (n < 0) n = 0;
++	if (n > 64) n = 64;
++	for (int s = 0; s < n; s++) {
++		stops[s].ratio = ratios[s];
++		stops[s].r = (colors[s] >> 16) & 0xFF;
++		stops[s].g = (colors[s] >> 8) & 0xFF;
++		stops[s].b = colors[s] & 0xFF;
++		stops[s].a = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
++	}
++	gradient_ramp_build(stops, n,
++	                    use_linear_rgb ? GRADIENT_RAMP_LINEAR_U8 : GRADIENT_RAMP_SRGB,
++	                    GRADIENT_RAMP_ROUND, out_ramp);
+ }
+ 
+ // Build a 4x4 column-major gradient matrix from "box" parameters.
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..05404c87d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -31,6 +31,7 @@
+ #include <avm2/avm2_filters.h>
+ #include <tesselator.h>  // T4 Part B: runtime Graphics tessellation (libtess2)
+ #include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
++#include <gradient_ramp.h>  // w2-gfx-gradient: Ruffle CommonGradient::new ramp walk
+ #include <memory/heap.h>
+ 
+ #include <avm2/avm2_gc.h>
+@@ -7831,61 +7832,31 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
+ 	g->cmd_count = 0;
+ }
+ 
+-// sRGB<->linear for linearRGB ramp interpolation (mirror action.c, Ruffle parity).
+-static float gfx_srgb_to_linear(float c)
+-{
+-	return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+-}
+-static uint8_t gfx_srgb_to_linear_u8(uint8_t c)
+-{
+-	return (uint8_t) (gfx_srgb_to_linear(c / 255.0f) * 255.0f);
+-}
+-static uint8_t gfx_lin_lerp(uint8_t a, uint8_t b, float t)
+-{
+-	return (uint8_t) (a + t * (float) (b - a));
+-}
+-static uint8_t gfx_rgb_lerp(uint8_t a, uint8_t b, float t)
+-{
+-	return (uint8_t) (a + t * (b - a) + 0.5f);
+-}
++// (sRGB<->linear + the per-channel lerps now live in the shared
++//  SWFModernRuntime/include/gradient_ramp.h.)
+ 
+ // 256-row RGBA8 ramp from stops (colors 0xRRGGBB, alphas 0..1, ratios 0..255).
+ // linearRGB stores linear (shader/raster converts back). Mirrors action.c.
+ static void gfx_gen_ramp(const uint32_t* colors, const float* alphas,
+                          const uint8_t* ratios, int n, int linear, uint8_t* out)
+ {
+-	if (n <= 0) { memset(out, 0, 256 * 4); return; }
+-	uint8_t r0 = (colors[0] >> 16) & 0xFF, g0 = (colors[0] >> 8) & 0xFF;
+-	uint8_t b0 = colors[0] & 0xFF, a0 = (uint8_t) (alphas[0] * 255.0f + 0.5f);
+-	if (linear) { r0 = gfx_srgb_to_linear_u8(r0); g0 = gfx_srgb_to_linear_u8(g0);
+-	              b0 = gfx_srgb_to_linear_u8(b0); }
+-	for (int i = 0; i < 256; i++)
+-	{ out[i*4]=r0; out[i*4+1]=g0; out[i*4+2]=b0; out[i*4+3]=a0; }
+-	for (int s = 1; s < n; s++)
+-	{
+-		uint8_t r_s = ratios[s-1], r_e = ratios[s];
+-		uint8_t sr=(colors[s-1]>>16)&0xFF, sg=(colors[s-1]>>8)&0xFF, sb=colors[s-1]&0xFF;
+-		uint8_t sa=(uint8_t)(alphas[s-1]*255.0f+0.5f);
+-		uint8_t er=(colors[s]>>16)&0xFF, eg=(colors[s]>>8)&0xFF, eb=colors[s]&0xFF;
+-		uint8_t ea=(uint8_t)(alphas[s]*255.0f+0.5f);
+-		if (linear) { sr=gfx_srgb_to_linear_u8(sr); sg=gfx_srgb_to_linear_u8(sg);
+-		              sb=gfx_srgb_to_linear_u8(sb); er=gfx_srgb_to_linear_u8(er);
+-		              eg=gfx_srgb_to_linear_u8(eg); eb=gfx_srgb_to_linear_u8(eb); }
+-		float range = (float) (r_e - r_s); if (range <= 0) range = 1;
+-		for (int i = r_s; i <= r_e; i++)
+-		{
+-			float t = (float) (i - r_s) / range;
+-			if (linear) { out[i*4]=gfx_lin_lerp(sr,er,t); out[i*4+1]=gfx_lin_lerp(sg,eg,t);
+-			              out[i*4+2]=gfx_lin_lerp(sb,eb,t); }
+-			else { out[i*4]=gfx_rgb_lerp(sr,er,t); out[i*4+1]=gfx_rgb_lerp(sg,eg,t);
+-			       out[i*4+2]=gfx_rgb_lerp(sb,eb,t); }
+-			out[i*4+3] = gfx_rgb_lerp(sa, ea, t);
+-			if (i == 255) break;
+-		}
+-		if (s == n - 1 && r_e < 255)
+-			for (int i = r_e + 1; i < 256; i++)
+-			{ out[i*4]=er; out[i*4+1]=eg; out[i*4+2]=eb; out[i*4+3]=ea; }
++	// Texel-indexed walk shared with AVM1 and the recompiler's static-gradient
++	// emitter (see gradient_ramp.h): the old per-segment loop here was only
++	// equivalent to Ruffle for a strictly-increasing ratio list.
++	GradientRampStop stops[64];
++	if (n < 0) n = 0;
++	if (n > 64) n = 64;
++	for (int s = 0; s < n; s++)
++	{
++		stops[s].ratio = ratios[s];
++		stops[s].r = (colors[s] >> 16) & 0xFF;
++		stops[s].g = (colors[s] >> 8) & 0xFF;
++		stops[s].b = colors[s] & 0xFF;
++		stops[s].a = (uint8_t) (alphas[s] * 255.0f + 0.5f);
+ 	}
++	gradient_ramp_build(stops, n,
++	                    linear ? GRADIENT_RAMP_LINEAR_U8 : GRADIENT_RAMP_SRGB,
++	                    GRADIENT_RAMP_ROUND, out);
+ }
+ 
+ // From a Flash 2x3 affine (a,b,c,d dimensionless; tx,ty twips) mapping gradient
+@@ -8042,22 +8013,43 @@ static Avm2Value gfx_begin_gradient_fill(Avm2Activation* act)
+ 	Avm2GraphicsExt* g = gfx_self_ext(act);
+ 	if (g == NULL) return avm2_undefined();
+ 	gfx_finalize_path(g);
+-	if (act->argc < 4) { g->cur_fill = 0; return avm2_undefined(); }
++	if (act->argc < 2) { g->cur_fill = 0; return avm2_undefined(); }
+ 
+ 	const Avm2String* ts = avm2_coerce_to_string(ctx, act->args[0]);
+ 	uint8_t gt = gfx_str_is(ts, "radial") ? 0x12 : 0x10;
+ 	double colv[64], alpv[64], ratv[64];
++	// Ruffle's build_gradient_records (core/src/avm2/globals/flash/display/
++	// graphics.rs) takes the run length from `colors` and shortens it ONLY for
++	// the optional arrays that are actually present: a null/absent `alphas`
++	// means alpha 1.0 for every stop, and a null/absent `ratios` means evenly
++	// spaced stops `(i * 255) / (length - 1)`. We used to min() against a
++	// length of 0 for a null arg, which produced no gradient at all and left
++	// the stage blank (avm2/graphics_gradients_nulls).
++	int has_alphas = act->argc > 2 && act->args[2].kind == AVM2_VALUE_OBJECT
++	                 && act->args[2].u.obj != NULL;
++	int has_ratios = act->argc > 3 && act->args[3].kind == AVM2_VALUE_OBJECT
++	                 && act->args[3].u.obj != NULL;
+ 	uint32_t nc = gfx_read_num_array(ctx, act->args[1], colv, 64);
+-	uint32_t na = gfx_read_num_array(ctx, act->args[2], alpv, 64);
+-	uint32_t nr = gfx_read_num_array(ctx, act->args[3], ratv, 64);
+-	uint32_t n = nc < na ? nc : na; if (nr < n) n = nr;
++	uint32_t na = has_alphas ? gfx_read_num_array(ctx, act->args[2], alpv, 64) : 0;
++	uint32_t nr = has_ratios ? gfx_read_num_array(ctx, act->args[3], ratv, 64) : 0;
++	uint32_t n = nc;
++	if (has_alphas && na < n) n = na;
++	if (has_ratios && nr < n) n = nr;
+ 	if (n == 0) { g->cur_fill = 0; return avm2_undefined(); }
+ 	uint32_t cols[64]; float alps[64]; uint8_t rats[64];
+ 	for (uint32_t i = 0; i < n; i++)
+ 	{
+ 		cols[i] = (uint32_t) colv[i] & 0xFFFFFF;
+-		float a = (float) alpv[i]; alps[i] = a < 0 ? 0 : a > 1 ? 1 : a;
+-		int rr = (int) ratv[i]; rats[i] = rr < 0 ? 0 : rr > 255 ? 255 : (uint8_t) rr;
++		if (has_alphas)
++		{
++			float a = (float) alpv[i]; alps[i] = a < 0 ? 0 : a > 1 ? 1 : a;
++		}
++		else alps[i] = 1.0f;
++		if (has_ratios)
++		{
++			int rr = (int) ratv[i]; rats[i] = rr < 0 ? 0 : rr > 255 ? 255 : (uint8_t) rr;
++		}
++		else rats[i] = n > 1 ? (uint8_t) ((i * 255) / (n - 1)) : 0;
+ 	}
+ 	uint8_t spread = 0, interp = 0;
+ 	if (act->argc > 5)
+diff --git a/SWFRecomp/include/swf.hpp b/SWFRecomp/include/swf.hpp
+index 0d93b0a44..6628f7173 100644
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -142,6 +142,14 @@ namespace SWFRecomp
+ 		u8 g;
+ 		u8 b;
+ 		u8 a;
++		// LINESTYLE2 HasFillFlag: the stroke is painted with a full FILLSTYLE,
++		// not an RGBA. For a gradient FILLSTYLE the r/g/b/a above are never
++		// populated (they stay {0,0,0,0} = transparent black), so the stroke
++		// has to carry the gradient's own style type + texture/matrix index.
++		// fill_type == 0 means "plain colour stroke" (the pre-existing path).
++		u8 fill_type = 0;
++		u8 fill_spread_mode = 0;
++		size_t fill_index = 0;
+ 	};
+ 	
+ 	class SWFHeader
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f0c96f35d..379aaab14 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -21,6 +21,8 @@
+ 
+ #include <swf.hpp>
+ 
++#include "../../SWFModernRuntime/include/gradient_ramp.h"
++
+ #include <abc/abc_emit.hpp>
+ #include <abc/abc_timeline.hpp>
+ #include <abc/abc_parser.hpp>
+@@ -7108,102 +7110,43 @@ namespace SWFRecomp
+ 							fill_styles[i].gradient.records[j].a = 255;
+ 						}
+ 
+-						if (j == 0)
+-						{
+-							continue;
+-						}
++					}
+ 
+-						GradientRecord& last_grad = fill_styles[i].gradient.records[j - 1];
+-						GradientRecord& grad = fill_styles[i].gradient.records[j];
++					// Bake the 256-row ramp with Ruffle's CommonGradient::new walk
++					// (gradient_ramp.h). The old code appended rows per SEGMENT, which
++					// only sums to 256 for a strictly-increasing ratio list: a duplicate
++					// ratio emitted 0 rows and a decreasing one emitted 0 rows, so
++					// e.g. visual/gradient_nonsequential_ratios wrote 336 rows into its
++					// own 256-row texture slot and shifted every later gradient.
++					{
++						GradientRampStop ramp_stops[15];
++						int ramp_n = (int) fill_styles[i].gradient.num_grads;
++						if (ramp_n > 15) ramp_n = 15;
+ 
+-						// Pad the ramp head [0, first stop ratio) with the first stop
+-						// color. SWF gradient ramps are pad-extended below the first
+-						// stop; without this the head rows are never written AND every
+-						// later gradient's 256-row texture boundary shifts, so a stop
+-						// list whose first ratio > 0 (e.g. Pacman's title pac, first
+-						// stop at ratio 45) sampled stale data and rendered white.
+-						if (j == 1)
++						for (int j = 0; j < ramp_n; ++j)
+ 						{
+-							GradientRecord& first_grad = fill_styles[i].gradient.records[0];
+-							for (int head = 0; head < (int) first_grad.ratio; ++head)
+-							{
+-								gradient_data << "\t" << "{ "
+-											  << to_string(first_grad.r) << ", "
+-											  << to_string(first_grad.g) << ", "
+-											  << to_string(first_grad.b) << ", "
+-											  << to_string(first_grad.a) << " },"
+-											  << endl;
+-							}
++							GradientRecord& gr = fill_styles[i].gradient.records[j];
++							ramp_stops[j].ratio = gr.ratio;
++							ramp_stops[j].r = gr.r;
++							ramp_stops[j].g = gr.g;
++							ramp_stops[j].b = gr.b;
++							ramp_stops[j].a = gr.a;
+ 						}
+ 
+-						for (u8 ratio = last_grad.ratio; ratio < grad.ratio; ++ratio)
+-						{
+-							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
+-							float t = (ratio - last_grad.ratio)/ratio_diff;
+-
+-							u8 r = use_linear_rgb ? linearRgbLerp(last_grad.r, grad.r, t) : rgbLerp(last_grad.r, grad.r, t);
+-							u8 g = use_linear_rgb ? linearRgbLerp(last_grad.g, grad.g, t) : rgbLerp(last_grad.g, grad.g, t);
+-							u8 b = use_linear_rgb ? linearRgbLerp(last_grad.b, grad.b, t) : rgbLerp(last_grad.b, grad.b, t);
+-							u8 a = rgbLerp(last_grad.a, grad.a, t);
+-
+-							gradient_data << "\t" << "{ "
+-										  << to_string(r) << ", "
+-										  << to_string(g) << ", "
+-										  << to_string(b) << ", "
+-										  << to_string(a) << " },"
+-										  << endl;
+-						}
++						u8 ramp[256 * 4];
++						gradient_ramp_build(ramp_stops, ramp_n,
++						                    use_linear_rgb ? GRADIENT_RAMP_LINEAR_TO_SRGB
++						                                   : GRADIENT_RAMP_SRGB,
++						                    GRADIENT_RAMP_TRUNC, ramp);
+ 
+-						if (grad.ratio == 255)
++						for (int t = 0; t < 256; ++t)
+ 						{
+-							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
+-							float t = (255 - last_grad.ratio)/ratio_diff;
+-
+-							u8 r = use_linear_rgb ? linearRgbLerp(last_grad.r, grad.r, t) : rgbLerp(last_grad.r, grad.r, t);
+-							u8 g = use_linear_rgb ? linearRgbLerp(last_grad.g, grad.g, t) : rgbLerp(last_grad.g, grad.g, t);
+-							u8 b = use_linear_rgb ? linearRgbLerp(last_grad.b, grad.b, t) : rgbLerp(last_grad.b, grad.b, t);
+-							u8 a = rgbLerp(last_grad.a, grad.a, t);
+-
+ 							gradient_data << "\t" << "{ "
+-										  << to_string(r) << ", "
+-										  << to_string(g) << ", "
+-										  << to_string(b) << ", "
+-										  << to_string(a) << " },"
+-										  << endl;
+-						}
+-
+-						// Pad the ramp tail (last stop ratio, 255] with the last stop
+-						// color when the final stop is below 255 (the ratio==255 branch
+-						// above already emits row 255 when the gradient ends exactly at
+-						// 255). Together with the head pad this keeps every gradient
+-						// exactly 256 rows so gradient N lands on texture row N.
+-						if (j == fill_styles[i].gradient.num_grads - 1 && grad.ratio < 255)
+-						{
+-							for (int tail = (int) grad.ratio; tail < 256; ++tail)
+-							{
+-								gradient_data << "\t" << "{ "
+-											  << to_string(grad.r) << ", "
+-											  << to_string(grad.g) << ", "
+-											  << to_string(grad.b) << ", "
+-											  << to_string(grad.a) << " },"
+-											  << endl;
+-							}
+-						}
+-					}
+-
+-					// Degenerate single-stop gradient: the loop above never runs a
+-					// segment, so fill the whole 256-row ramp with that one color.
+-					if (fill_styles[i].gradient.num_grads == 1)
+-					{
+-						GradientRecord& only_grad = fill_styles[i].gradient.records[0];
+-						for (int u = 0; u < 256; ++u)
+-						{
+-							gradient_data << "\t" << "{ "
+-										  << to_string(only_grad.r) << ", "
+-										  << to_string(only_grad.g) << ", "
+-										  << to_string(only_grad.b) << ", "
+-										  << to_string(only_grad.a) << " },"
+-										  << endl;
++							              << to_string(ramp[t * 4 + 0]) << ", "
++							              << to_string(ramp[t * 4 + 1]) << ", "
++							              << to_string(ramp[t * 4 + 2]) << ", "
++							              << to_string(ramp[t * 4 + 3]) << " },"
++							              << endl;
+ 						}
+ 					}
+ 
+@@ -7331,8 +7274,13 @@ namespace SWFRecomp
+ 				}
+ 				else
+ 				{
+-					// FillType: FILLSTYLE - parse and extract color for basic rendering
+-					// For now, skip the fill style and use a default color
++					// FillType: FILLSTYLE. parseFillStyles already registers the
++					// gradient ramp + its inverse matrix and hands back the
++					// style index, so a gradient stroke only has to CARRY that
++					// index — the old code kept fill[0].r/g/b/a, which a
++					// gradient fill never populates, so every LINESTYLE2
++					// gradient stroke became transparent black
++					// (from_shumway/acid/acid-gradient-2 rendered blank).
+ 					FillStyle* fill = parseFillStyles(1);
+ 
+ 					line_styles[i].r = fill[0].r;
+@@ -7340,6 +7288,15 @@ namespace SWFRecomp
+ 					line_styles[i].b = fill[0].b;
+ 					line_styles[i].a = fill[0].a;
+ 
++					if (fill[0].type == FILL_GRAD_LINEAR
++					    || fill[0].type == FILL_GRAD_RADIAL
++					    || fill[0].type == FILL_GRAD_FOCAL)
++					{
++						line_styles[i].fill_type = fill[0].type;
++						line_styles[i].fill_spread_mode = fill[0].gradient.spread_mode;
++						line_styles[i].fill_index = fill[0].index;
++					}
++
+ 					delete[] fill;
+ 				}
+ 			}
+@@ -10295,6 +10252,23 @@ namespace SWFRecomp
+ 
+ 						tris_size += tris.size();
+ 
++						// A LINESTYLE2 stroke whose FILLSTYLE is a gradient
++						// carries the gradient's style type (+ spread mode) and
++						// its gradient/inv-matrix index instead of a colour
++						// index. The 0x80000000 stroke marker stays in the top
++						// bit — the shader only reads `style.x & 0xFF` (and
++						// bits 8-9 for the spread), while the CPU hit test reads
++						// the marker bit, so both keep working.
++						u32 stroke_style_packed = 0x80000000u;
++						u32 stroke_style_index = (u32) line_style.index;
++
++						if (line_style.fill_type != 0)
++						{
++							stroke_style_packed |= (u32) line_style.fill_type
++							                     | ((u32) line_style.fill_spread_mode << 8);
++							stroke_style_index = (u32) line_style.fill_index;
++						}
++
+ 						// T2: strokes are shader-handled (0x80000000 style, shaded
+ 						// as solids via the color index), so a stroke run no longer
+ 						// makes the shape unrenderable — it does not clear the flag.
+@@ -10310,8 +10284,8 @@ namespace SWFRecomp
+ 										   << std::hex << std::uppercase
+ 										   << "0x" << VAL(u32, &x_f) << ", "
+ 										   << "0x" << VAL(u32, &y_f) << ", "
+-										   << "0x80000000, "
+-										   << "0x" << (u32) line_style.index
++										   << "0x" << stroke_style_packed << ", "
++										   << "0x" << stroke_style_index
+ 										   << " }," << endl;
+ 
+ 								// morph_end_shape_data is indexed BY the shape_data

@@ -1,0 +1,448 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index 329e8ee5d..0ea9756fe 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -136,6 +136,13 @@ struct MovieClip {
+ 	Avm1TextFieldBinding* avm1_text_field_bindings;
+ 	u16 avm1_text_field_binding_count;
+ 	u16 avm1_text_field_binding_capacity;
++	// MovieClip.opaqueBackground (s16 P2). Ruffle avm1/globals/movie_clip.rs:
++	// the getter answers `color.to_rgb()` or UNDEFINED (not null — that is the
++	// AVM2 spelling), and the setter treats undefined/null as "clear" and
++	// everything else as coerce_to_u32 with the alpha forced to 255.
++	// Mirrored onto the display-list entry, which is what the renderer reads.
++	u8 opaque_bg_set;
++	u32 opaque_bg_rgb;
+ };
+ 
+ // Global root MovieClip
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 746964a8e..8872466a9 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -638,6 +638,14 @@ typedef struct Avm2DisplayObjectExt
+ 	// brand-new objects. A non-empty list also forces cacheAsBitmap on.
+ 	struct Avm2FilterVal* filters;
+ 	uint32_t filter_count;
++
++	// DisplayObject.opaqueBackground (s16 P2). Ruffle display_object.rs
++	// set_opaque_background: alpha is FORCED to 255 ("Only solid backgrounds
++	// are supported"), and render_base paints a rect of the object's WORLD
++	// render bounds beneath the object — outside its own mask/scrollRect.
++	// `opaque_bg_set == 0` reads back as `null`, never `undefined`.
++	uint8_t opaque_bg_set;
++	uint32_t opaque_bg_rgb;      // 0xRRGGBB, alpha implicit 255
+ } Avm2DisplayObjectExt;
+ 
+ // Compatibility alias: MovieClip state is the shared display ext.
+diff --git a/SWFModernRuntime/include/libswf/swf.h b/SWFModernRuntime/include/libswf/swf.h
+index 52e7de080..20b311ef8 100644
+--- a/SWFModernRuntime/include/libswf/swf.h
++++ b/SWFModernRuntime/include/libswf/swf.h
+@@ -262,6 +262,13 @@ typedef struct DisplayObject
+ 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
+ 	// Child movie transform data override (set during placement when g_active_transform_data != NULL)
+ 	float (*child_transform_data)[16];
++	// DisplayObject.opaqueBackground (s16 P2). Sources: PlaceObject3's
++	// BackgroundColor field (via tagSetOpaqueBackground) and AVM1
++	// `mc.opaqueBackground = 0xRRGGBB`. Ruffle forces alpha to 255 and drops
++	// a PlaceObject3 colour whose alpha is 0, so only the RGB is stored.
++	// The renderer paints a filled box of the entry's bounds UNDER it.
++	u8 opaque_bg_set;
++	u32 opaque_bg_rgb;
+ } DisplayObject;
+ 
+ typedef struct KeyState {
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index 6fe482a10..66d4c2be5 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -90,6 +90,10 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
+     u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
+     double r, double g, double b, double a, double strength,
+     double angle, double distance);
++// PlaceObject3 BackgroundColor -> DisplayObject.opaqueBackground.
++// `rgb` is 0xRRGGBB; `set` 0 clears (Ruffle drops an alpha==0 colour).
++void tagSetOpaqueBackground(SWFAppContext* app_context, size_t depth,
++    u8 set, u32 rgb);
+ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+     double r, double g, double b, double a);
+ void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20);
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d562cb449..9a43678b0 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -50607,6 +50607,49 @@ void actionSetMember(SWFAppContext* app_context)
+ 					((DisplayObject*) mc->display_obj)->blend_mode = mc->blend_mode;
+ 				return;
+ 			}
++			// opaqueBackground setter (Ruffle avm1/globals/movie_clip.rs
++			// set_opaque_background): undefined/null clears it, anything else
++			// is coerce_to_u32 with the alpha forced to 255. Never falls
++			// through to the dynamic-property store, so the prototype's
++			// undefined-valued stub stays the only own property the
++			// enumeration tests see (same discipline as scrollRect below).
++			if (prop_name_len == 16 && strncmp(prop_name, "opaqueBackground", 16) == 0)
++			{
++				if (value_var.type == ACTION_STACK_VALUE_NULL
++				    || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
++				{
++					mc->opaque_bg_set = 0;
++					mc->opaque_bg_rgb = 0;
++				}
++				else
++				{
++					double _obd = varToDouble(&value_var);
++					u32 _obu = 0;
++					if (!isnan(_obd) && !isinf(_obd))
++					{
++						double _obt = trunc(_obd);
++						_obt = fmod(_obt, 4294967296.0);
++						if (_obt < 0.0) _obt += 4294967296.0;
++						_obu = (u32) _obt;
++					}
++					mc->opaque_bg_set = 1;
++					mc->opaque_bg_rgb = _obu & 0xFFFFFFu;
++				}
++				// Mirror onto the display-list entry — the only copy the
++				// renderer reads (tagSetOpaqueBackground writes the same
++				// fields). display_obj is set for attached/dynamic clips;
++				// a plain timeline sprite is found by the name walk instead.
++				{
++					DisplayObject* _obe = (DisplayObject*) mc->display_obj;
++					if (_obe == NULL) _obe = resolveMCDisplayEntry(mc);
++					if (_obe != NULL)
++					{
++						_obe->opaque_bg_set = mc->opaque_bg_set;
++						_obe->opaque_bg_rgb = mc->opaque_bg_rgb;
++					}
++				}
++				return;
++			}
+ 			// scrollRect setter (Ruffle avm1/globals/movie_clip.rs set_scroll_rect).
+ 			// Stores on the MovieClip and registers it with the scrollRect
+ 			// registry that tag.c's compose/render walks read; NEVER falls
+@@ -54469,6 +54512,17 @@ void actionGetMember(SWFAppContext* app_context)
+ 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+ 			return;
+ 		}
++		// opaqueBackground: 0xRRGGBB once set, otherwise fall through to the
++		// MovieClip.prototype stub, which answers `undefined` — which is what
++		// movieclip_default_state / movieclip_library_state_values assert.
++		if (mc != NULL && prop_name_len == 16
++		    && strncmp(prop_name, "opaqueBackground", 16) == 0
++		    && mc->opaque_bg_set)
++		{
++			ActionVar _obg = makeF64((double) (mc->opaque_bg_rgb & 0xFFFFFFu));
++			pushVar(app_context, &_obg);
++			return;
++		}
+ 		// scrollRect: a FRESH Rectangle per read (Ruffle `new_rectangle`), or
+ 		// fall through when unset so the MovieClip.prototype stub answers
+ 		// `undefined` — which is what movieclip_default_state and the
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..bea794d17 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -10337,8 +10429,21 @@ static Avm2Value do_cab_set(Avm2Activation* act)
+ // `opaqueBackground` is declared `Object`, so assigning UNDEFINED stores the
+ // AS3 coercion of undefined to Object — null — and reads back as `null`, not
+ // `undefined` (displayobject_opaque_background's third read).
++//
++// s16 P2: the value is no longer only a dyn-prop echo. Ruffle
++// (avm2/globals/flash/display/display_object.rs set_opaque_background) does
++// `Null => None, value => Color::from_rgb(coerce_to_u32(value), 255)` and the
++// getter answers `color.to_rgb()` — the round trip is LOSSY: whatever is
++// assigned reads back as a 24-bit RGB uint. The dyn prop stays as the storage
++// for objects with no display ext; the ext fields are authoritative when they
++// exist, and are what the render walk paints from.
+ static Avm2Value do_opaquebg_get(Avm2Activation* act)
+ {
++	Avm2DisplayObjectExt* ext = this_display(act);
++	if (ext != NULL)
++		return ext->opaque_bg_set
++			? avm2_integer((int32_t) (ext->opaque_bg_rgb & 0xFFFFFFu))
++			: avm2_null();
+ 	return dyn_prop_get(act, "__opaqueBackground", avm2_null());
+ }
+ static Avm2Value do_opaquebg_set(Avm2Activation* act)
+@@ -10348,6 +10453,29 @@ static Avm2Value do_opaquebg_set(Avm2Activation* act)
+ 	{
+ 		Avm2Value v = (act->argc > 0) ? act->args[0] : avm2_undefined();
+ 		if (v.kind == AVM2_VALUE_UNDEFINED) v = avm2_null();
++		Avm2DisplayObjectExt* ext = this_display(act);
++		if (ext != NULL)
++		{
++			if (v.kind == AVM2_VALUE_NULL)
++			{
++				ext->opaque_bg_set = 0;
++				ext->opaque_bg_rgb = 0;
++			}
++			else
++			{
++				double d = avm2_to_number_fast(act->ctx, v);
++				uint32_t u = 0;
++				if (isfinite(d))
++				{
++					double t = trunc(d);
++					t = fmod(t, 4294967296.0);
++					if (t < 0.0) t += 4294967296.0;
++					u = (uint32_t) t;
++				}
++				ext->opaque_bg_set = 1;
++				ext->opaque_bg_rgb = u & 0xFFFFFFu;
++			}
++		}
+ 		avm2_object_set_dynamic(act->ctx, self, "__opaqueBackground",
+ 		                        (uint32_t) strlen("__opaqueBackground"),
+ 		                        v)->dont_enum = 1;
+@@ -15542,6 +15680,45 @@ static void avm2_push_scroll_rect_mask(const Mat* world,
+ 	renderer_end_clip_mask(context);
+ }
+ 
++// DisplayObject.opaqueBackground (s16 P2). Ruffle display_object.rs
++// render_base, non-cacheAsBitmap arm:
++//
++//     if let Some(background) = this.opaque_background() {
++//         let bounds = this.render_bounds_with_transform(
++//             &context.transform_stack.transform().matrix, true, view_matrix);
++//         context.commands.draw_rect(background,
++//             Matrix::create_box_from_rectangle(&bounds));
++//     }
++//
++// Three properties of that snippet drive this implementation:
++//   * the rect is the WORLD-space axis-aligned box of the object's bounds
++//     (self + children), not the object's local box pushed through its matrix;
++//   * it is emitted BEFORE apply_standard_mask_and_scroll, so the background
++//     is NOT clipped by the object's own `mask` or `scrollRect` (it IS clipped
++//     by any enclosing container clip, which is already the live stencil here);
++//   * `draw_rect` takes a Color, never a ColorTransform — cxform slot 0.
++// Alpha is 255 by construction (set_opaque_background forces it).
++static void avm2_draw_opaque_background(Avm2Context* ctx, Avm2Object* obj,
++                                        const Avm2DisplayObjectExt* ext,
++                                        const Mat* world)
++{
++	if (!ext->opaque_bg_set) return;
++	Rect acc = { 0, 0, 0, 0, 0 };
++	bounds_with_transform(ctx, obj, world, &acc);
++	if (!acc.valid) return;
++	float w = (float) (acc.xmax - acc.xmin);
++	float h = (float) (acc.ymax - acc.ymin);
++	if (w <= 0.0f || h <= 0.0f) return;
++	uint32_t rgb = ext->opaque_bg_rgb;
++	// Transform slot 0 is identity, so these world-twips rects go straight
++	// through stage_to_ndc (same convention as avm2_render_highlight).
++	renderer_draw_rect(context, (float) acc.xmin, (float) acc.ymin, w, h,
++	                   (float) ((rgb >> 16) & 0xFF) / 255.0f,
++	                   (float) ((rgb >> 8) & 0xFF) / 255.0f,
++	                   (float) (rgb & 0xFF) / 255.0f,
++	                   1.0f, 0, 0);
++}
++
+ // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
+ // world matrix + concatenated alpha down the tree. Invisible subtrees are
+ // culled, matching render_apply_text_bounds.
+@@ -15570,6 +15747,11 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 	avm2_cx_compose(&node_cx, parent_cx, &own_cx);
+ 	g_avm2_cur_cx = node_cx;
+ 
++	// opaqueBackground — painted UNDER this node and outside its own mask /
++	// scrollRect, exactly where Ruffle's render_base emits it.
++	if (g_avm2_mask_capture == 0)
++		avm2_draw_opaque_background(ctx, obj, ext, &world);
++
+ 	// DisplayObject.mask — clip this node AND its whole subtree to the masker's
+ 	// silhouette. The masker lives elsewhere in the tree, so its stencil pass
+ 	// runs under its own parent's world matrix, not ours (Ruffle composes
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 65f2035f8..feaf8ad56 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3378,6 +3378,89 @@ static u32 avm1_mask_push(SWFAppContext* app_context, MovieClip* masker)
+ 	return saved;
+ }
+ 
++// ---------------------------------------------------------------------------
++// DisplayObject.opaqueBackground (s16 P2)
++// ---------------------------------------------------------------------------
++// Ruffle display_object.rs::render_base, non-cacheAsBitmap arm: when a display
++// object carries an opaque background, a filled rectangle of its render bounds
++// is emitted BEFORE apply_standard_mask_and_scroll — i.e. under the object, and
++// NOT clipped by the object's own mask or scrollRect (an enclosing container
++// clip still applies, because that stencil is already live).
++//
++// Ruffle's rect is the WORLD-space axis-aligned box; ours is the object's LOCAL
++// box pushed through the object's own (already world-composed) transform slot,
++// which is the same rectangle for every unrotated object and a rotated box
++// rather than its AABB otherwise. Documented divergence: no test in the corpus
++// puts an opaque background on a rotated object, and going through the object's
++// own slot is what makes this correct inside nested sprites for free.
++//
++// `transform_data` is the CPU-side table, so child matrices must be read
++// through ng_get_original_transform_id (compose_children has already
++// repointed transform_id at a GPU-only slot by the time we render).
++static int opaque_bg_local_bounds(DisplayObject* obj, float* b)
++{
++	if (obj == NULL || obj->char_id == 0) return 0;
++	Character* ch = &dictionary[obj->char_id];
++	float xmin = 1e30f, xmax = -1e30f, ymin = 1e30f, ymax = -1e30f;
++	int found = 0;
++	if (ch->type == CHAR_TYPE_SPRITE && obj->sprite_display_list != NULL)
++	{
++		for (size_t i = 1; i <= obj->sprite_max_depth; i++)
++		{
++			DisplayObject* c = &obj->sprite_display_list[i];
++			if (c->char_id == 0 || c->clip_depth > 0) continue;
++			float cb[4];
++			if (!opaque_bg_local_bounds(c, cb)) continue;
++			const float* m = transform_data[ng_get_original_transform_id(c)];
++			const float xs[4] = { cb[0], cb[1], cb[0], cb[1] };
++			const float ys[4] = { cb[2], cb[2], cb[3], cb[3] };
++			for (int k = 0; k < 4; k++)
++			{
++				float X = m[0] * xs[k] + m[4] * ys[k] + m[12];
++				float Y = m[1] * xs[k] + m[5] * ys[k] + m[13];
++				if (X < xmin) xmin = X;
++				if (X > xmax) xmax = X;
++				if (Y < ymin) ymin = Y;
++				if (Y > ymax) ymax = Y;
++			}
++			found = 1;
++		}
++	}
++	else
++	{
++		s32 cxmin, cxmax, cymin, cymax;
++		if (ng_getCharBounds(obj->char_id, &cxmin, &cxmax, &cymin, &cymax))
++		{
++			xmin = (float) cxmin; xmax = (float) cxmax;
++			ymin = (float) cymin; ymax = (float) cymax;
++			found = 1;
++		}
++	}
++	if (!found) return 0;
++	b[0] = xmin; b[1] = xmax; b[2] = ymin; b[3] = ymax;
++	return 1;
++}
++
++static void draw_entry_opaque_background(SWFAppContext* app_context,
++                                         DisplayObject* obj)
++{
++	(void) app_context;
++	if (obj == NULL || !obj->opaque_bg_set) return;
++	if (g_clip_mask_capture) return;
++	float b[4];
++	if (!opaque_bg_local_bounds(obj, b)) return;
++	float w = b[1] - b[0], h = b[3] - b[2];
++	if (w <= 0.0f || h <= 0.0f) return;
++	u32 rgb = obj->opaque_bg_rgb;
++	// cxform slot 0 (identity): Ruffle's draw_rect takes a Color, never a
++	// ColorTransform, so the background ignores the placement cxform.
++	renderer_draw_rect(context, b[0], b[2], w, h,
++		(float) ((rgb >> 16) & 0xFF) / 255.0f,
++		(float) ((rgb >> 8) & 0xFF) / 255.0f,
++		(float) (rgb & 0xFF) / 255.0f,
++		1.0f, obj->transform_id, 0);
++}
++
+ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
+ {
+ 	if (cxform_forces_invisible(app_context, obj->cxform_id)) return;
+@@ -3768,6 +3851,9 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ #endif
+ 
+ 		// setMask maskee: push the masker's stencil around this entry's paint.
++		// opaqueBackground: painted under this entry and OUTSIDE its own
++		// mask / scrollRect, exactly where Ruffle's render_base emits it.
++		draw_entry_opaque_background(app_context, obj);
+ 		u32 avm1_mask_saved_clip = 0;
+ 		if (avm1_masker != NULL)
+ 			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
+@@ -6102,6 +6188,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
+ 		// setMask maskee: the masker's geometry becomes the stencil for this
+ 		// entry's paint, restored (not ended) afterwards.
++		// opaqueBackground: painted under this entry and OUTSIDE its own
++		// mask / scrollRect, exactly where Ruffle's render_base emits it.
++		draw_entry_opaque_background(app_context, obj);
+ 		u32 avm1_mask_saved_clip = 0;
+ 		if (avm1_masker != NULL)
+ 			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
+@@ -7082,6 +7171,9 @@ void tagShowFrame(SWFAppContext* app_context)
+ 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
+ 
+ 		// setMask maskee: push the masker's geometry as this entry's stencil.
++		// opaqueBackground: painted under this entry and OUTSIDE its own
++		// mask / scrollRect, exactly where Ruffle's render_base emits it.
++		draw_entry_opaque_background(app_context, obj);
+ 		u32 avm1_mask_saved_clip = 0;
+ 		if (avm1_masker != NULL)
+ 			avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
+@@ -11528,6 +11620,20 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
+ 	}
+ }
+ 
++// PlaceObject3 BackgroundColor. Ruffle display_object.rs:2543 gates this on
++// swf_version >= 11 and drops a colour whose alpha is 0; the recompiler applies
++// both rules, so this only ever records what survived them.
++void tagSetOpaqueBackground(SWFAppContext* app_context, size_t depth,
++    u8 set, u32 rgb)
++{
++	(void)app_context;
++	if (depth <= max_depth)
++	{
++		display_list[depth].opaque_bg_set = set;
++		display_list[depth].opaque_bg_rgb = rgb & 0xFFFFFFu;
++	}
++}
++
+ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+     double r, double g, double b, double a)
+ {
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f0c96f35d..bcbfaf090 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -4318,9 +4318,24 @@ namespace SWFRecomp
+ 					cur_pos += 1; // skip Visible UI8
+ 				}
+ 
++				u8 opaque_bg_set = 0;
++				u32 opaque_bg_rgb = 0;
+ 				if (is_po3 && has_opaque_background)
+ 				{
+-					cur_pos += 4; // skip BackgroundColor RGBA
++					// BackgroundColor is RGBA. Ruffle display_object.rs:2543
++					// applies the field only for SWF version >= 11, and treats
++					// alpha == 0 as "clear the background" — the alpha is then
++					// forced to 255 for everything that survives.
++					u8 bg_r = ((u8*) cur_pos)[0];
++					u8 bg_g = ((u8*) cur_pos)[1];
++					u8 bg_b = ((u8*) cur_pos)[2];
++					u8 bg_a = ((u8*) cur_pos)[3];
++					cur_pos += 4;
++					if (header.version >= 11)
++					{
++						opaque_bg_set = (bg_a > 0) ? 1u : 0u;
++						opaque_bg_rgb = ((u32) bg_r << 16) | ((u32) bg_g << 8) | (u32) bg_b;
++					}
+ 				}
+ 
+ 				// If ColorMatrixFilter provided a cxform, use it (compose with existing if any)
+@@ -4583,6 +4598,16 @@ namespace SWFRecomp
+ 
+ 				// Instance name already emitted before the placement call above.
+ 
++				// PlaceObject3 BackgroundColor -> DisplayObject.opaqueBackground.
++				// Emitted as its own call (like tagSetFilter) so none of the
++				// eight tagPlaceObject* signatures has to grow a parameter.
++				if (is_po3 && has_opaque_background)
++				{
++					context.tag_main << "\t" << "tagSetOpaqueBackground(app_context, "
++						<< to_string(depth) << ", " << to_string((unsigned) opaque_bg_set)
++						<< ", " << to_string(opaque_bg_rgb) << "u);" << endl;
++				}
++
+ 				// Emit filter if parsed
+ 				if (parsed_filter_type != 0)
+ 				{

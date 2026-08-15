@@ -9,6 +9,7 @@
 #include <setjmp.h>
 #include "tesselator.h"
 #include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
+#include <gradient_ramp.h>  // w2-gfx-gradient: Ruffle CommonGradient::new ramp walk
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -28249,31 +28250,9 @@ static void drawingUpdateBounds(MovieClip* mc, float x, float y)
 	}
 }
 
-// sRGB <-> linear conversion for linearRGB gradient interpolation
-static float drawingSrgbToLinear(float c)
-{
-	if (c <= 0.04045f) return c / 12.92f;
-	return powf((c + 0.055f) / 1.055f, 2.4f);
-}
-static float drawingLinearToSrgb(float c)
-{
-	if (c <= 0.0031308f) return c * 12.92f;
-	return 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
-}
-// Convert sRGB u8 to linear u8 (matching Ruffle: truncate, not round)
-static u8 drawingSrgbToLinearU8(u8 c)
-{
-	return (u8)(drawingSrgbToLinear(c / 255.0f) * 255.0f);
-}
-// Lerp in linear u8 space, truncate result (matching Ruffle)
-static u8 drawingLinearRgbLerp(u8 start_linear, u8 end_linear, float t)
-{
-	return (u8)(start_linear + t * (float)(end_linear - start_linear));
-}
-static u8 drawingRgbLerp(u8 a, u8 b, float t)
-{
-	return (u8)(a + t * (b - a) + 0.5f);
-}
+// (The sRGB<->linear helpers and the per-channel lerps that used to live here
+//  moved into the shared SWFModernRuntime/include/gradient_ramp.h, which the
+//  recompiler's static-gradient emitter now shares with both VMs.)
 
 // Generate a 256-entry RGBA8 gradient ramp from color stops.
 // ratios: 0-255, colors: 0xRRGGBB, alphas: 0-100 (percent)
@@ -28281,66 +28260,26 @@ static void drawingGenerateGradientRamp(
 	u32* colors, float* alphas, u8* ratios, int stop_count,
 	int use_linear_rgb, u8* out_ramp)
 {
-	if (stop_count <= 0) {
-		memset(out_ramp, 0, 256 * 4);
-		return;
+	// Ruffle (`render/wgpu/src/mesh.rs::CommonGradient::new`) walks the 256
+	// TEXELS, advancing the stop cursor at most once per texel and pinning the
+	// factor to 0 on equal ratios / 1 past the next stop. The old per-segment
+	// walk here was only equivalent for a strictly-increasing ratio list: a
+	// duplicate ratio wrote ONE texel of the wrong colour instead of a 1-px
+	// band, and a decreasing ratio wrote nothing at all. See gradient_ramp.h.
+	GradientRampStop stops[64];
+	int n = stop_count;
+	if (n < 0) n = 0;
+	if (n > 64) n = 64;
+	for (int s = 0; s < n; s++) {
+		stops[s].ratio = ratios[s];
+		stops[s].r = (colors[s] >> 16) & 0xFF;
+		stops[s].g = (colors[s] >> 8) & 0xFF;
+		stops[s].b = colors[s] & 0xFF;
+		stops[s].a = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
 	}
-	// Fill entire ramp with first color before first ratio
-	u8 r0 = (colors[0] >> 16) & 0xFF;
-	u8 g0 = (colors[0] >> 8) & 0xFF;
-	u8 b0 = colors[0] & 0xFF;
-	u8 a0 = (u8)(alphas[0] / 100.0f * 255.0f + 0.5f);
-	// For linearRGB, store ramp in linear color space (matching Ruffle)
-	if (use_linear_rgb) { r0 = drawingSrgbToLinearU8(r0); g0 = drawingSrgbToLinearU8(g0); b0 = drawingSrgbToLinearU8(b0); }
-	for (int i = 0; i < 256; i++) {
-		out_ramp[i*4+0] = r0;
-		out_ramp[i*4+1] = g0;
-		out_ramp[i*4+2] = b0;
-		out_ramp[i*4+3] = a0;
-	}
-	if (stop_count == 1) return;
-
-	for (int s = 1; s < stop_count; s++) {
-		u8 ratio_start = ratios[s-1];
-		u8 ratio_end = ratios[s];
-		u8 sr = (colors[s-1] >> 16) & 0xFF, sg = (colors[s-1] >> 8) & 0xFF, sb = colors[s-1] & 0xFF;
-		u8 sa = (u8)(alphas[s-1] / 100.0f * 255.0f + 0.5f);
-		u8 er = (colors[s] >> 16) & 0xFF, eg = (colors[s] >> 8) & 0xFF, eb = colors[s] & 0xFF;
-		u8 ea = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
-		// For linearRGB, convert endpoints to linear u8 space
-		if (use_linear_rgb) {
-			sr = drawingSrgbToLinearU8(sr); sg = drawingSrgbToLinearU8(sg); sb = drawingSrgbToLinearU8(sb);
-			er = drawingSrgbToLinearU8(er); eg = drawingSrgbToLinearU8(eg); eb = drawingSrgbToLinearU8(eb);
-		}
-
-		float range = (float)(ratio_end - ratio_start);
-		if (range <= 0) range = 1;
-
-		for (u8 i = ratio_start; i <= ratio_end; i++) {
-			float t = (float)(i - ratio_start) / range;
-			if (use_linear_rgb) {
-				// Lerp in linear u8 space (matching Ruffle: truncate)
-				out_ramp[i*4+0] = drawingLinearRgbLerp(sr, er, t);
-				out_ramp[i*4+1] = drawingLinearRgbLerp(sg, eg, t);
-				out_ramp[i*4+2] = drawingLinearRgbLerp(sb, eb, t);
-			} else {
-				out_ramp[i*4+0] = drawingRgbLerp(sr, er, t);
-				out_ramp[i*4+1] = drawingRgbLerp(sg, eg, t);
-				out_ramp[i*4+2] = drawingRgbLerp(sb, eb, t);
-			}
-			out_ramp[i*4+3] = drawingRgbLerp(sa, ea, t);
-			if (i == 255) break;  // prevent u8 overflow
-		}
-		// Fill remaining after last stop
-		if (s == stop_count - 1 && ratio_end < 255) {
-			for (int i = ratio_end + 1; i < 256; i++) {
-				out_ramp[i*4+0] = er;
-				out_ramp[i*4+1] = eg;
-				out_ramp[i*4+2] = eb;
-				out_ramp[i*4+3] = ea;
-			}
-		}
-	}
+	gradient_ramp_build(stops, n,
+	                    use_linear_rgb ? GRADIENT_RAMP_LINEAR_U8 : GRADIENT_RAMP_SRGB,
+	                    GRADIENT_RAMP_ROUND, out_ramp);
 }
 
 // Build a 4x4 column-major gradient matrix from "box" parameters.

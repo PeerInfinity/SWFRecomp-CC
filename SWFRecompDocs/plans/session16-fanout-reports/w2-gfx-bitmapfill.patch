@@ -1,0 +1,161 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..bea794d17 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -7520,6 +7520,23 @@ typedef struct
+ 	uint8_t  grad_ramp[256 * 4];    // RGBA8 (sRGB for rgb interp, linear for linearRGB)
+ 	float    grad_fwd16[16];        // GPU: col-major, gradient[-16384,16384] -> local twips
+ 	float    grad_inv2d[6];         // CPU: local twips -> UV[0,1] (normalized inverse)
++	// bitmap (fill_kind==3) — s16 P5. Ruffle graphics.rs begin_bitmap_fill
++	// stores FillStyle::Bitmap { matrix: user_matrix * scale(20,20) }, i.e. the
++	// SWF fill matrix maps a 20-twips-per-texel bitmap space to shape twips —
++	// which is exactly "bitmap pixel -> shape pixel" for the user matrix, the
++	// contract render_webgpu_draw_bitmap_tris already takes (and AVM1's
++	// beginBitmapFill already feeds it).
++	//
++	// The pixels are SNAPSHOT, not referenced: `paths` is a plain realloc()
++	// array, outside the region avm2_gc.c conservative_scan walks (it scans
++	// the native_ext blob only), so an Avm2Object* parked in a path would be
++	// an unrooted, collectable edge. Divergence from Ruffle, deliberate: a
++	// setPixel on the source BitmapData after the fill is recorded is not
++	// reflected. No corpus test mutates a bitmap after filling with it.
++	uint32_t* bmp_px;               // owned copy, premultiplied 0xAARRGGBB
++	uint32_t bmp_w, bmp_h;
++	float    bmp_matrix[6];         // a,b,c,d,tx,ty : bitmap px -> local px
++	uint8_t  bmp_repeat, bmp_smooth;
+ 	float*   fill_verts;            // local twips, xy pairs, count%3==0
+ 	uint32_t fill_vert_count;
+ 	// stroke
+@@ -7540,6 +7557,11 @@ typedef struct Avm2GraphicsExt
+ 	uint8_t  cramp[256 * 4];
+ 	float    cfwd16[16];
+ 	float    cinv2d[6];
++	// current bitmap fill (cur_fill==3), owned snapshot; see Avm2GfxPath
++	uint32_t* cbmp_px;
++	uint32_t cbmp_w, cbmp_h;
++	float    cbm[6];
++	uint8_t  cbrep, cbsmo;
+ 	int      cur_line;
+ 	float    clr, clg, clb, cla;
+ 	float    clw;                   // line width (pixels)
+@@ -7608,6 +7630,7 @@ static void gfx_free_path(Avm2GfxPath* p)
+ {
+ 	free(p->fill_verts); p->fill_verts = NULL; p->fill_vert_count = 0;
+ 	free(p->line_verts); p->line_verts = NULL; p->line_vert_count = 0;
++	free(p->bmp_px); p->bmp_px = NULL; p->bmp_w = p->bmp_h = 0;
+ }
+ 
+ static void gfx_reset(Avm2GraphicsExt* g)
+@@ -7615,6 +7638,7 @@ static void gfx_reset(Avm2GraphicsExt* g)
+ 	for (uint32_t i = 0; i < g->path_count; i++) gfx_free_path(&g->paths[i]);
+ 	free(g->paths); g->paths = NULL; g->path_count = g->path_cap = 0;
+ 	free(g->cmds); g->cmds = NULL; g->cmd_count = g->cmd_cap = 0;
++	free(g->cbmp_px); g->cbmp_px = NULL; g->cbmp_w = g->cbmp_h = 0;
+ 	g->cur_fill = g->cur_line = 0; g->pen_set = 0;
+ }
+ 
+@@ -7771,6 +7795,24 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
+ 	memset(path, 0, sizeof(Avm2GfxPath));
+ 	path->fill_kind = g->cur_fill;
+ 	path->fr = g->cfr; path->fg = g->cfg; path->fb = g->cfb; path->fa = g->cfa;
++	if (g->cur_fill == 3 && g->cbmp_px != NULL)
++	{
++		size_t nb = (size_t) g->cbmp_w * g->cbmp_h * sizeof(uint32_t);
++		path->bmp_px = (uint32_t*) malloc(nb);
++		if (path->bmp_px != NULL)
++		{
++			memcpy(path->bmp_px, g->cbmp_px, nb);
++			path->bmp_w = g->cbmp_w;
++			path->bmp_h = g->cbmp_h;
++			memcpy(path->bmp_matrix, g->cbm, sizeof(path->bmp_matrix));
++			path->bmp_repeat = g->cbrep;
++			path->bmp_smooth = g->cbsmo;
++		}
++		else
++		{
++			path->fill_kind = 0;
++		}
++	}
+ 	if (g->cur_fill == 2)
+ 	{
+ 		path->grad_type = g->cgt; path->grad_spread = g->cgs;
+@@ -8343,12 +8385,62 @@ static Avm2Value gfx_draw_ellipse(Avm2Activation* act)
+ // previous colour onto the next shape — each of these flushes the pending
+ // subpath and clears the style it governs. gfx_line_style already documents
+ // that convention for a fill-typed stroke.
++// AS3 default arg values: matrix = null, repeat = true, smooth = false.
++static int gfx_arg_bool(Avm2Activation* act, uint32_t i, int dflt)
++{
++	if (act->argc <= i) return dflt;
++	Avm2Value v = act->args[i];
++	switch (v.kind)
++	{
++		case AVM2_VALUE_UNDEFINED:
++		case AVM2_VALUE_NULL:      return 0;
++		case AVM2_VALUE_BOOL:      return v.u.b ? 1 : 0;
++		case AVM2_VALUE_INTEGER:   return v.u.i != 0;
++		case AVM2_VALUE_NUMBER:    return (v.u.d != 0.0 && !isnan(v.u.d));
++		default:                   return 1;
++	}
++}
++
+ static Avm2Value gfx_begin_bitmap_fill(Avm2Activation* act)
+ {
+ 	Avm2GraphicsExt* g = gfx_self_ext(act);
+ 	if (g == NULL) return avm2_undefined();
+ 	gfx_finalize_path(g);
+ 	g->cur_fill = 0;
++
++	Avm2BitmapDataExt* bd = act->argc > 0
++		? avm2_bitmapdata_ext_of(act->ctx, act->args[0]) : NULL;
++	if (bd == NULL || bd->disposed || bd->pixels == NULL
++	    || bd->width == 0 || bd->height == 0)
++		return avm2_undefined();
++	float m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
++	if (act->argc > 1 && act->args[1].kind == AVM2_VALUE_OBJECT
++	    && act->args[1].u.obj != NULL)
++	{
++		Avm2Object* mo = act->args[1].u.obj;
++		m[0] = (float) matrix_get_prop(act->ctx, mo, "a");
++		m[1] = (float) matrix_get_prop(act->ctx, mo, "b");
++		m[2] = (float) matrix_get_prop(act->ctx, mo, "c");
++		m[3] = (float) matrix_get_prop(act->ctx, mo, "d");
++		m[4] = (float) matrix_get_prop(act->ctx, mo, "tx");
++		m[5] = (float) matrix_get_prop(act->ctx, mo, "ty");
++	}
++
++	size_t nb = (size_t) bd->width * bd->height * sizeof(uint32_t);
++	uint32_t* snap = (uint32_t*) malloc(nb);
++	if (snap == NULL) return avm2_undefined();
++	memcpy(snap, bd->pixels, nb);
++	free(g->cbmp_px);
++	g->cbmp_px = snap;
++	g->cbmp_w = bd->width;
++	g->cbmp_h = bd->height;
++	memcpy(g->cbm, m, sizeof(g->cbm));
++	// `smooth` is carried on the fill record only. Sampler selection lives in
++	// the renderer and is owned by the per-fill smoothing patch (s16 w2-gfx-vram);
++	// render_webgpu_draw_bitmap_tris currently ignores the flag.
++	g->cbrep = (uint8_t) gfx_arg_bool(act, 2, 1);
++	g->cbsmo = (uint8_t) gfx_arg_bool(act, 3, 0);
++	g->cur_fill = 3;
+ 	return avm2_undefined();
+ }
+ 
+@@ -14979,6 +15107,16 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
+ 			                            p->grad_type, p->grad_spread, p->grad_interp,
+ 			                            p->grad_focal, p->grad_ramp, p->grad_fwd16,
+ 			                            xid, cxid);
++		// Honest failure: a source larger than the dynamic bitmap layer would
++		// corrupt the texture, so it is skipped (blank) — the same guard
++		// avm2_render_bitmap applies to a Bitmap node.
++		else if (p->fill_kind == 3 && p->fill_vert_count >= 3 && p->bmp_px != NULL
++		         && p->bmp_w <= context->dynamic_bitmap_max_w
++		         && p->bmp_h <= context->dynamic_bitmap_max_h)
++			renderer_draw_bitmap_tris(context, p->fill_verts, p->fill_vert_count,
++			                          p->bmp_px, p->bmp_w, p->bmp_h,
++			                          p->bmp_matrix, p->bmp_repeat, p->bmp_smooth,
++			                          xid, cxid);
+ 		if (p->has_line && p->line_vert_count >= 3)
+ 			renderer_draw_tris(context, p->line_verts, p->line_vert_count,
+ 			                   p->lr, p->lg, p->lb, p->la, xid, cxid);
