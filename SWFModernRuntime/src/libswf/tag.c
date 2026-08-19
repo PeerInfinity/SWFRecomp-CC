@@ -2926,6 +2926,142 @@ static inline float morph_lerp_color_u8(float start, float end, float t)
 	return (float) (u32) (a_w * su + b_w * eu) / 255.0f;
 }
 
+// ---------------------------------------------------------------------------
+// cacheAsBitmap PixelSnapping::Always (s17)
+// ---------------------------------------------------------------------------
+// Ruffle renders a bitmap-cached object into an offscreen texture whose origin
+// is the object's WORLD render bounds (display_object.rs render_base:
+// `offset_x = bounds.x_min - base_transform.matrix.tx`, offscreen drawn at
+// `tx = -offset_x`), then blits it back at
+// `transform_stack.tx + offset_x == bounds.x_min` with an IDENTITY 2x2 (scale
+// and rotation are already baked into the texture) and `PixelSnapping::Always`,
+// which rounds the blit translation to whole pixels
+// (render/src/bitmap.rs:89, `Twips::from_pixels(tx.to_pixels().round())`).
+//
+// Composition of those two steps is exactly a translation of the object's own
+// world matrix by the sub-pixel remainder of its world bounds' top-left corner:
+// content sits at `world - bounds.min` inside the texture and the texture lands
+// at `round(bounds.min)`. So we do not need an offscreen pass to reproduce the
+// one thing this is observable for — we translate the world matrix by
+// `(round(x_min_px) - x_min_px, round(y_min_px) - y_min_px)` and every child
+// inherits the same shift, which is Ruffle's scope (the blit carries the whole
+// subtree). f64 `round()` is half-away-from-zero, which is what C `round()`
+// does too, so 35.5 -> 36 and -35.5 -> -36.
+//
+// Divergences, stated: we do not clip to the cache texture's bounds, we do not
+// re-rasterise (so an AA edge is translated rather than resampled), and root
+// static-text entries are skipped (their glyph slots are composed from the
+// CPU-side transform table, which a dynamic slot has no entry in).
+static int opaque_bg_local_bounds(DisplayObject* obj, float* b);
+
+// World-space AABB minimum of `obj`'s local bounds under `world`, in twips.
+static int cab_world_bounds_min(DisplayObject* obj, const float world[16],
+                                float* out_x, float* out_y)
+{
+	float b[4];
+	if (!opaque_bg_local_bounds(obj, b)) return 0;
+	const float xs[4] = { b[0], b[1], b[0], b[1] };
+	const float ys[4] = { b[2], b[2], b[3], b[3] };
+	float xmin = 1e30f, ymin = 1e30f;
+	for (int k = 0; k < 4; k++)
+	{
+		float X = world[0] * xs[k] + world[4] * ys[k] + world[12];
+		float Y = world[1] * xs[k] + world[5] * ys[k] + world[13];
+		if (X < xmin) xmin = X;
+		if (Y < ymin) ymin = Y;
+	}
+	*out_x = xmin; *out_y = ymin;
+	return 1;
+}
+
+// Snap translation (twips) for a bitmap-cached entry; 0 when nothing moves.
+static int cab_snap_delta(DisplayObject* obj, const float world[16],
+                          float* dx, float* dy)
+{
+	*dx = 0.0f; *dy = 0.0f;
+	if (obj == NULL || !obj->cache_as_bitmap) return 0;
+	// SCOPED DIVERGENCE: skip filtered entries. Ruffle snaps them too, but its
+	// blit position is `bounds.x_min + draw_offset` where draw_offset is the
+	// filter's dest-rect growth and the *blurred* pixels live in the cache
+	// texture. Our AVM1 filter path is stage-sized (s16 cut 1), so it has no
+	// cache texture to snap; translating the source alone is a third thing, not
+	// an approximation of Ruffle, and it measurably hurts:
+	// visual/filters/blur_scales_with_screen 30810 -> 69375 and
+	// visual/filters/blur_size_grows 87854 -> 88623 (both already failing at
+	// max_outliers 0, so no status flip either way). Completion mechanism: a
+	// real offscreen cache pass (or filters cut 2's object-sized FilterSource),
+	// after which this gate comes out.
+	if (obj->filter_type != 0) return 0;
+	float xmin, ymin;
+	if (!cab_world_bounds_min(obj, world, &xmin, &ymin)) return 0;
+	double xpx = (double) xmin / 20.0;
+	double ypx = (double) ymin / 20.0;
+	*dx = (float) ((round(xpx) - xpx) * 20.0);
+	*dy = (float) ((round(ypx) - ypx) * 20.0);
+	return (*dx != 0.0f) || (*dy != 0.0f);
+}
+
+// In-place snap of a fully composed world matrix.
+static void cab_snap_in_place(DisplayObject* obj, float world[16])
+{
+	float dx, dy;
+	if (!cab_snap_delta(obj, world, &dx, &dy)) return;
+	world[12] += dx;
+	world[13] += dy;
+}
+
+// Snap a ROOT sprite/button's placement matrix before it is handed to
+// compose_children. Returns the matrix to use (`in` unchanged when no snap).
+//
+// The container's OWN slot has to move as well, not just the matrix handed to
+// the children: render_display_list draws the entry's opaqueBackground rect
+// (and the focus rect) straight from `obj->transform_id`, and in Ruffle the
+// background is the cache texture's CLEAR colour — it rides the snapped blit
+// with everything else. Leaving the slot alone renders the shape at the snapped
+// position with its background one pixel back (measured: visual/opaque_background
+// 3856 -> 1504 with the children-only snap, 3856 -> 4 with both).
+static const float* cab_snap_world(DisplayObject* obj, const float* in,
+                                   float out[16])
+{
+	float dx, dy;
+	if (!cab_snap_delta(obj, in, &dx, &dy)) return in;
+	memcpy(out, in, 16 * sizeof(float));
+	out[12] += dx;
+	out[13] += dy;
+	if (g_next_dynamic_xform_slot < g_xform_slot_capacity)
+	{
+		u32 slot = g_next_dynamic_xform_slot++;
+		xform_overrides_push(obj, obj->transform_id);
+		obj->transform_id = slot;
+		renderer_write_transform(context, slot, out);
+	}
+	return out;
+}
+
+// Snap a ROOT leaf entry (shape / bitmap / edittext / morph): the render pass
+// draws it straight from obj->transform_id, so the snapped matrix goes into a
+// freshly minted dynamic slot and the entry is repointed at it for the frame
+// (xform_overrides_restore puts the baked id back). No-op when nothing moves,
+// which keeps the slot pool untouched for the overwhelming majority of frames.
+static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
+{
+	if (obj == NULL || !obj->cache_as_bitmap) return;
+	u32 baked = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
+	if (obj->transform_id >= baked) return;   // already a dynamic slot
+	const float* src = (const float*)app_context->transform_data + obj->transform_id * 16;
+	float dx, dy;
+	if (!cab_snap_delta(obj, src, &dx, &dy)) return;
+	if (g_next_dynamic_xform_slot >= g_xform_slot_capacity) return;
+	float snapped[16];
+	memcpy(snapped, src, sizeof(snapped));
+	snapped[12] += dx;
+	snapped[13] += dy;
+	u32 slot = g_next_dynamic_xform_slot++;
+	xform_overrides_push(obj, obj->transform_id);
+	obj->transform_id = slot;
+	renderer_write_transform(context, slot, snapped);
+}
+
 // `parent_cx` carries the parent's concatenated colour transform as VALUES
 // (NULL = identity). Passing values rather than the parent's GPU slot id is
 // what lets this compose instead of inherit — the slot itself can't be read
@@ -3055,6 +3191,12 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 						(float)(sr.xmax - sr.xmin), (float)(sr.ymax - sr.ymin));
 			}
 		}
+
+		// cacheAsBitmap PixelSnapping::Always — applied AFTER the scrollRect
+		// translate and BEFORE the slot allocation, so the entry's own slot and
+		// the `composed` handed to the SPRITE/BUTTON recursions carry the same
+		// shift (Ruffle blits the whole cached subtree at one snapped origin).
+		if (obj->cache_as_bitmap) cab_snap_in_place(obj, composed);
 
 		// Allocate a dynamic transform slot to avoid overwriting shared slots
 		u32 new_slot = g_next_dynamic_xform_slot;
@@ -6069,6 +6211,15 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
+		// cacheAsBitmap PixelSnapping::Always for a ROOT LEAF entry. Sprites
+		// and buttons snap through cab_snap_world in their own arms below
+		// (compose_children needs the snapped matrix as the parent); static
+		// text is deliberately skipped — renderer_compose_text_transforms
+		// reads the CPU-side transform table, which has no entry at a dynamic
+		// slot.
+		if (obj->cache_as_bitmap && ch->type != CHAR_TYPE_SPRITE
+		    && ch->type != CHAR_TYPE_BUTTON && ch->type != CHAR_TYPE_TEXT)
+			cab_snap_root_leaf(app_context, obj);
 		if (ch->type == CHAR_TYPE_SPRITE)
 		{
 			if (obj->sprite_display_list != NULL)
@@ -6086,6 +6237,10 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				} else {
 					sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				// cacheAsBitmap PixelSnapping::Always (root sprite): the snapped
+				// matrix has to be the one compose_children sees as the parent.
+				float cab_sprite_buf[16];
+				sprite_xform = cab_snap_world(obj, sprite_xform, cab_sprite_buf);
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
@@ -6119,6 +6274,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				} else {
 					btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				float cab_btn_buf[16];
+				btn_xform = cab_snap_world(obj, btn_xform, cab_btn_buf);
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
@@ -6975,6 +7132,15 @@ void tagShowFrame(SWFAppContext* app_context)
 		if (obj->char_id == 0) continue;
 
 		Character* ch = &dictionary[obj->char_id];
+		// cacheAsBitmap PixelSnapping::Always for a ROOT LEAF entry. Sprites
+		// and buttons snap through cab_snap_world in their own arms below
+		// (compose_children needs the snapped matrix as the parent); static
+		// text is deliberately skipped — renderer_compose_text_transforms
+		// reads the CPU-side transform table, which has no entry at a dynamic
+		// slot.
+		if (obj->cache_as_bitmap && ch->type != CHAR_TYPE_SPRITE
+		    && ch->type != CHAR_TYPE_BUTTON && ch->type != CHAR_TYPE_TEXT)
+			cab_snap_root_leaf(app_context, obj);
 		if (ch->type == CHAR_TYPE_SPRITE)
 		{
 			if (obj->sprite_display_list != NULL)
@@ -6996,6 +7162,10 @@ void tagShowFrame(SWFAppContext* app_context)
 				} else {
 					sprite_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				// cacheAsBitmap PixelSnapping::Always (root sprite): the snapped
+				// matrix has to be the one compose_children sees as the parent.
+				float cab_sprite_buf[16];
+				sprite_xform = cab_snap_world(obj, sprite_xform, cab_sprite_buf);
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
@@ -7052,6 +7222,8 @@ void tagShowFrame(SWFAppContext* app_context)
 				} else {
 					btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
 				}
+				float cab_btn_buf[16];
+				btn_xform = cab_snap_world(obj, btn_xform, cab_btn_buf);
 				float seed_cx[20];
 				const float* seed = root_seed_cxform(app_context, obj, seed_cx)
 					? seed_cx : NULL;
@@ -11681,6 +11853,16 @@ void tagSetOpaqueBackground(SWFAppContext* app_context, size_t depth,
 		display_list[depth].opaque_bg_set = set;
 		display_list[depth].opaque_bg_rgb = rgb & 0xFFFFFFu;
 	}
+}
+
+// PlaceObject3 BitmapCache. Ruffle display_object.rs:2534 only applies the
+// field when the flag is PRESENT (an absent flag leaves the preference alone),
+// which the recompiler already enforces by emitting this call only then.
+void tagSetCacheAsBitmap(SWFAppContext* app_context, size_t depth, u8 on)
+{
+	(void)app_context;
+	if (depth <= max_depth)
+		display_list[depth].cache_as_bitmap = on ? 1u : 0u;
 }
 
 void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,

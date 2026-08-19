@@ -4310,9 +4310,16 @@ namespace SWFRecomp
 					blend_mode_val = *(u8*) cur_pos; cur_pos += 1;
 				}
 
+				u8 cab_set = 0;
 				if (is_po3 && has_cache_as_bitmap)
 				{
-					cur_pos += 1; // skip BitmapCache UI8
+					// PlaceObject3 BitmapCache UI8. Ruffle
+					// (display_object.rs:2534) treats any non-zero value as
+					// "cacheAsBitmap = true"; the flag being ABSENT leaves the
+					// preference untouched, which is why this is emitted as its
+					// own call rather than a tagPlaceObject* parameter.
+					cab_set = (*(u8*) cur_pos != 0) ? 1u : 0u;
+					cur_pos += 1;
 				}
 
 				if (is_po3 && has_visible)
@@ -4608,6 +4615,15 @@ namespace SWFRecomp
 					context.tag_main << "\t" << "tagSetOpaqueBackground(app_context, "
 						<< to_string(depth) << ", " << to_string((unsigned) opaque_bg_set)
 						<< ", " << to_string(opaque_bg_rgb) << "u);" << endl;
+				}
+
+				// PlaceObject3 BitmapCache -> DisplayObject.cacheAsBitmap.
+				// Same "own call" shape as tagSetOpaqueBackground above.
+				if (is_po3 && has_cache_as_bitmap)
+				{
+					context.tag_main << "\t" << "tagSetCacheAsBitmap(app_context, "
+						<< to_string(depth) << ", " << to_string((unsigned) cab_set)
+						<< ");" << endl;
 				}
 
 				// Emit filter if parsed
@@ -5770,7 +5786,12 @@ namespace SWFRecomp
 								sp_blend_mode_val = *(u8*) cur_pos; cur_pos += 1;
 							}
 
-							if (is_sprite_po3 && sp_has_cache_as_bitmap) cur_pos += 1;
+							u8 sp_cab_set = 0;
+							if (is_sprite_po3 && sp_has_cache_as_bitmap)
+							{
+								sp_cab_set = (*(u8*) cur_pos != 0) ? 1u : 0u;
+								cur_pos += 1;
+							}
 							if (is_sprite_po3 && sp_has_visible) cur_pos += 1;
 							if (is_sprite_po3 && sp_has_opaque_background) cur_pos += 4;
 
@@ -5998,6 +6019,14 @@ namespace SWFRecomp
 							}
 
 							// Instance name already emitted before the placement call above.
+
+							// PlaceObject3 BitmapCache -> DisplayObject.cacheAsBitmap.
+							if (is_sprite_po3 && sp_has_cache_as_bitmap)
+							{
+								sprite_definitions << "\t" << "tagSetCacheAsBitmap(app_context, "
+									<< to_string(depth) << ", " << to_string((unsigned) sp_cab_set)
+									<< ");" << endl;
+							}
 
 							// Emit filter if parsed
 							if (sp_filter_type != 0)

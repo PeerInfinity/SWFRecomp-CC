@@ -275,6 +275,14 @@ typedef struct DisplayObject
 	// The renderer paints a filled box of the entry's bounds UNDER it.
 	u8 opaque_bg_set;
 	u32 opaque_bg_rgb;
+	// DisplayObject.cacheAsBitmap (s17). Sources: PlaceObject3's BitmapCache
+	// field (via tagSetCacheAsBitmap) and AVM1 `mc.cacheAsBitmap = true`.
+	// The renderer does not actually rasterise into an offscreen texture; the
+	// one OBSERVABLE consequence it reproduces is Ruffle's
+	// `PixelSnapping::Always` on the cache blit (render/src/bitmap.rs:89) —
+	// the object's world matrix is translated so its render bounds' top-left
+	// lands on a whole pixel. See tag.c cab_pixel_snap.
+	u8 cache_as_bitmap;
 } DisplayObject;
 
 typedef struct KeyState {
