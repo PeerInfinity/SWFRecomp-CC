@@ -1426,11 +1426,19 @@ namespace abc
 	static const AbcFile* g_lat_model_abc = nullptr;
 	static AbcTypeModel* g_lat_model = nullptr;
 
+	// Class-bound method_info set for the #1107 method-association pass; same
+	// pointer-identity caching discipline (and the same reset) as g_lat_model.
+	static const AbcFile* g_bound_methods_abc = nullptr;
+	static std::unordered_set<u32>* g_bound_methods = nullptr;
+
 	void resetVerifierTypeModel()
 	{
 		delete g_lat_model;
 		g_lat_model = nullptr;
 		g_lat_model_abc = nullptr;
+		delete g_bound_methods;
+		g_bound_methods = nullptr;
+		g_bound_methods_abc = nullptr;
 	}
 
 	static const AbcTypeModel& latModelFor(const AbcFile& abc)
@@ -1442,6 +1450,117 @@ namespace abc
 			g_lat_model_abc = &abc;
 		}
 		return *g_lat_model;
+	}
+
+	// =====================================================================
+	// METHOD ASSOCIATION (#1107)
+	//
+	// avmplus gives every method_info exactly ONE MethodEnv, created by its
+	// FIRST binding, and the verifier rejects any later use that contradicts
+	// it. Ruffle models this as `Method::associate` / `check_classbound`
+	// (core/src/avm2/method.rs:405-441), driven from
+	// optimizer/type_aware.rs:
+	//
+	//     Op::NewFunction { method } =>
+	//         method.associate(activation, MethodAssociation::freestanding())?
+	//     Op::CallStatic { method, .. } =>
+	//         method.check_classbound(activation)?
+	//
+	// Both raise VerifyError #1107 on failure. The class-bound associations
+	// are all installed before any body is verified:
+	//
+	//   * class_object.rs:306-319 — every Method/Getter/Setter trait of the
+	//     i_class and the c_class, plus both initializers (iinit / cinit);
+	//   * script.rs:631-636 — the script's own init method, plus every
+	//     Method/Getter/Setter trait of the synthetic `global` class.
+	//
+	// So the set is computable statically from the AbcFile, which is what
+	// `classBoundMethodsFor` builds. `TraitKindType::Function` is deliberately
+	// NOT in it: Ruffle's `Trait::as_method()` returns None for it
+	// (traits.rs:228), so a function trait's method stays freestanding and may
+	// legally be the operand of NewFunction.
+	//
+	// THE CONSERVATIVE DIRECTION, as everywhere else in this file: a false
+	// positive DELETES a method (abc_emit.cpp lowers an unverified body to
+	// avm2_verify_error_body). Both predicates are therefore stated on
+	// affirmative membership of a set built only from bindings we can see in
+	// this ABC — never on "we could not prove it is bound".
+	// =====================================================================
+	static void collectTraitMethods(const std::vector<AbcTrait>& traits,
+	                                std::unordered_set<u32>& out)
+	{
+		for (const AbcTrait& t : traits)
+		{
+			if (t.kind == TraitKindType::Method || t.kind == TraitKindType::Getter
+			    || t.kind == TraitKindType::Setter)
+			{
+				out.insert(t.method_or_class);
+			}
+		}
+	}
+
+	static const std::unordered_set<u32>& classBoundMethodsFor(const AbcFile& abc)
+	{
+		if (g_bound_methods == nullptr || g_bound_methods_abc != &abc)
+		{
+			delete g_bound_methods;
+			g_bound_methods = new std::unordered_set<u32>();
+			g_bound_methods_abc = &abc;
+			std::unordered_set<u32>& S = *g_bound_methods;
+			for (const AbcInstance& inst : abc.instances)
+			{
+				S.insert(inst.init_method);          // iinit
+				collectTraitMethods(inst.traits, S); // i_class traits
+			}
+			for (const AbcClass& c : abc.classes)
+			{
+				S.insert(c.init_method);             // cinit
+				collectTraitMethods(c.traits, S);    // c_class traits
+			}
+			for (const AbcScript& s : abc.scripts)
+			{
+				S.insert(s.init_method);             // script init -> global_class
+				collectTraitMethods(s.traits, S);    // global_class traits
+			}
+		}
+		return *g_bound_methods;
+	}
+
+	// SWF_ASSOC_AUDIT=<csv> makes this pass REPORT-ONLY, exactly like
+	// SWF_VERIFY_TYPES does for the type lattice: every hit is appended to the
+	// CSV and verification still SUCCEEDS. That is the corpus sweep harness —
+	// it turns "which tests might this predicate touch" into an exact list
+	// without needing a second recompiler binary to diff generated C against.
+	static void assocWriteCsv(const char* path, const AbcFile& abc,
+	                          const IrMethod& out, u32 op_index, u32 method_info,
+	                          const char* what);
+
+	// Returns false (and fills `err`) on the first offending op.
+	static bool checkMethodAssociation(const AbcFile& abc, const IrMethod& out,
+	                                   VerifyError& err)
+	{
+		const char* audit = getenv("SWF_ASSOC_AUDIT");
+		const std::unordered_set<u32>* S = nullptr;
+		for (size_t i = 0; i < out.ops.size(); ++i)
+		{
+			const IrOp& op = out.ops[i];
+			bool is_new_fn = op.op == IrOpcode::NewFunction;
+			bool is_static = op.op == IrOpcode::CallStatic;
+			if (!is_new_fn && !is_static) continue;
+			if (op.arg1 >= abc.methods.size()) continue;  // #1032 territory
+			if (S == nullptr) S = &classBoundMethodsFor(abc);
+			bool bound = S->count(op.arg1) != 0;
+			if (!(is_new_fn && bound) && !(is_static && !bound)) continue;
+			const char* what = is_new_fn ? "newfunction-bound" : "callstatic-unbound";
+			if (audit != nullptr)
+			{
+				assocWriteCsv(audit, abc, out, (u32) i, op.arg1, what);
+				continue;
+			}
+			return fail(err, 1107,
+			            string(what) + " method_info " + to_string(op.arg1));
+		}
+		return true;
 	}
 
 	// Does this body contain any op a predicate could fire on? Building the
@@ -1827,6 +1946,26 @@ namespace abc
 			        h.code, h.inferred.c_str(), h.detail.c_str());
 		}
 		(void) body;
+		fclose(f);
+	}
+
+	// Report-only row for the #1107 method-association pass (SWF_ASSOC_AUDIT).
+	// Columns: swf, method name, body index, op index, method_info, predicate.
+	static void assocWriteCsv(const char* path, const AbcFile& abc,
+	                          const IrMethod& out, u32 op_index, u32 method_info,
+	                          const char* what)
+	{
+		FILE* f = fopen(path, "a");
+		if (f == nullptr) return;
+		string mname = "?";
+		u32 mi = out.method_index;
+		if (mi < abc.methods.size() && abc.methods[mi].name != 0
+		    && abc.methods[mi].name < abc.pool.strings.size())
+		{
+			mname = abc.pool.strings[abc.methods[mi].name];
+		}
+		fprintf(f, "%s,%s,%u,%u,%u,%s\n", g_lat_source_label.c_str(),
+		        mname.c_str(), out.body_index, op_index, method_info, what);
 		fclose(f);
 	}
 
@@ -2455,6 +2594,13 @@ namespace abc
 					return false;
 				}
 			}
+		}
+
+		// Method-association pass (#1107). Last, like the type pass, so a body
+		// with any other verify problem still reports that one first.
+		if (!checkMethodAssociation(abc, out, err))
+		{
+			return false;
 		}
 
 		return true;

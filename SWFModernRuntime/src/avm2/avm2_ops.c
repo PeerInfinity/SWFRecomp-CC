@@ -3228,6 +3228,17 @@ Avm2Value avm2_op_callstatic(Avm2Activation* act, uint32_t method_index, Avm2Val
 		env_scope = act->file->method_env_scope[method_index];
 		env_class = act->file->method_env_class[method_index];
 	}
+	// Ruffle activation.rs op_call_static: "Ensure receiver is of the correct
+	// type" — the receiver is coerced to the callee's OWN bound class before
+	// the call, so `CallStatic` with a foreign receiver raises TypeError #1034
+	// rather than silently running the method on it
+	// (avm2/method_association test3: `CallStatic Test/test1` on a bare
+	// `{}` object). method_env_class is exactly Ruffle's `method.bound_class()`
+	// — the declaring class of the method_info's first vtable binding.
+	if (env_class != NULL)
+	{
+		recv = avm2_coerce_to_class(act->ctx, env_class, recv);
+	}
 	if (env_scope != NULL)
 	{
 		return avm2_call_method_ref(act->ctx, &ref, env_class, env_scope,
@@ -3289,6 +3300,33 @@ static Avm2Class* super_class_of(Avm2Activation* act)
 	return act->bound_class->super_class;
 }
 
+// Ruffle activation.rs op_get_super / op_set_super / op_call_super all open
+// with the SAME two steps, in this order:
+//
+//     let receiver = self.pop_stack()
+//         .coerce_to_type(self, bound_superclass_object.inner_class_definition())?;
+//     let receiver = receiver.null_check(self, Some(&multiname))?;
+//
+// i.e. the receiver is coerced to the BOUND SUPERCLASS first, so a receiver
+// that is not an instance of it raises TypeError #1034 *before* any name
+// lookup, arg-count check or read-only check can produce a different code
+// (avm2/supercalls_coerce cases #1..#6, which otherwise surface as
+// 1063/1077/1037/1070 or as no throw at all). The coercion also maps
+// `undefined` to `null`, which is why case #7 (`super.func()` on an
+// explicitly pushed `undefined`) must report #1009 and not #1010.
+static Avm2Value super_coerce_receiver(Avm2Activation* act, Avm2Value recv,
+                                       Avm2Class* super,
+                                       const char* name, uint32_t name_len)
+{
+	Avm2Context* ctx = act->ctx;
+	recv = avm2_coerce_to_class(ctx, super, recv);
+	if (value_is_null_like(recv))
+	{
+		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
+	}
+	return recv;
+}
+
 Avm2Value avm2_op_callsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
                             const Avm2Value* args, uint32_t argc)
 {
@@ -3297,10 +3335,7 @@ Avm2Value avm2_op_callsuper(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx
 	const char* name;
 	uint32_t name_len;
 	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
-	if (value_is_null_like(recv))
-	{
-		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
-	}
+	recv = super_coerce_receiver(act, recv, super, name, name_len);
 	const Avm2PropEntry* e = avm2_vtable_find_mn(&super->ivtable, act->file->data, mn_idx);
 	if (e == NULL)
 	{
@@ -3339,10 +3374,7 @@ static Avm2Value getsuper_common(Avm2Activation* act, Avm2Value recv, Avm2Class*
                                  const char* name, uint32_t name_len)
 {
 	Avm2Context* ctx = act->ctx;
-	if (value_is_null_like(recv))
-	{
-		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
-	}
+	recv = super_coerce_receiver(act, recv, super, name, name_len);
 	if (e == NULL)
 	{
 		avm2_throw_1069(ctx, name, name_len, super);
@@ -3358,10 +3390,7 @@ static void setsuper_common(Avm2Activation* act, Avm2Value recv, Avm2Class* supe
                             const char* name, uint32_t name_len, Avm2Value value)
 {
 	Avm2Context* ctx = act->ctx;
-	if (value_is_null_like(recv))
-	{
-		avm2_throw_null_or_undefined(ctx, recv, name, name_len);
-	}
+	recv = super_coerce_receiver(act, recv, super, name, name_len);
 	if (e == NULL)
 	{
 		avm2_throw_1069(ctx, name, name_len, super);

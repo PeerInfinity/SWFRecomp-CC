@@ -12435,17 +12435,43 @@ static inline float pick_bits_to_f(uint32_t u)
 	return f;
 }
 
-// Barycentric sign test, boundary inclusive (copy of libswf hit_test.c's
-// point_in_triangle, which the AVM1 side has used since the beginning).
+// Ruffle render/src/shape_utils.rs::winding_number_line — the +x ray cast that
+// backs `shape_hit_test`. A downward (+y) segment contributes +1, an upward
+// (-y) segment -1, and the y interval is HALF-OPEN so a shared vertex is
+// counted exactly once. The perp-dot comparisons are `>=` / `<=`, so a point
+// lying exactly ON the segment counts as being on its inside; combined with the
+// half-open interval that makes the boundary rule "top/right edges are in,
+// bottom/left edges are out" — which is why an octagon's left half reads
+// `false` and its right half `true` (avm2/displayobject_hittestpoint_boundary).
+static int pick_winding_line(double px, double py, double x0, double y0,
+                             double x1, double y1)
+{
+	double d0x = px - x0, d0y = py - y0;
+	double d1x = x1 - x0, d1y = y1 - y0;
+	if (y0 <= py && py < y1 && d1x * d0y >= d1y * d0x) return 1;
+	if (y1 <= py && py < y0 && d1x * d0y <= d1y * d0x) return -1;
+	return 0;
+}
+
+// Point-in-triangle under Ruffle's winding rule rather than the old
+// boundary-inclusive barycentric test.
+//
+// The fills we hit-test are triangulations of the real contour, and this rule
+// TILES: for a point on a seam shared by two triangles the seam is a
+// "top/right" edge of exactly one of them, so the OR over triangles still
+// answers `true`; for a point on the outer contour only the owning triangle
+// votes, and it reproduces `shape_hit_test`'s answer exactly. Verified over a
+// fine grid against the polygon-level rule for fan, reversed-fan and strip
+// triangulations of the test's octagon (all three agree everywhere), so the
+// result does not depend on how libtess2/earcut happened to cut the shape or
+// on triangle orientation.
 static int pick_tri_contains(double px, double py, double ax, double ay,
                              double bx, double by, double cx, double cy)
 {
-	double d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
-	double d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
-	double d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
-	int has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-	int has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-	return !(has_neg && has_pos);
+	int w = pick_winding_line(px, py, ax, ay, bx, by)
+	        + pick_winding_line(px, py, bx, by, cx, cy)
+	        + pick_winding_line(px, py, cx, cy, ax, ay);
+	return w != 0;
 }
 
 static int pick_tris_contain(const float* v, uint32_t n, double lx, double ly)

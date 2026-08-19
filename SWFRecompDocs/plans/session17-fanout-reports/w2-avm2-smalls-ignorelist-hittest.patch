@@ -1,0 +1,23 @@
+diff --git a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+index 0a2ab6581..23773356d 100644
+--- a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+@@ -86,12 +86,15 @@ soundmixer_soundtransform
+ #   displayobject_scrollrect              L1 twip quantization landed (s16,
+ #                                         14->6 diff lines); residual is the
+ #                                         unmodelled render-committed scrollRect
+-#   displayobject_hittestpoint_boundary   L1 + a hit-test edge-exclusivity rule
+-#                                         + a missing leading blank line
++#   (displayobject_hittestpoint_boundary: PASSES as of s17 w2-avm2-smalls —
++#    pruned. The shape hit test now uses Ruffle's winding_number_line rule
++#    (shape_utils.rs:991) per tessellated triangle instead of a
++#    boundary-inclusive barycentric test. The "missing leading blank line"
++#    half of the old note was REFUTED: the harness normalises blank lines out
++#    of both sides, so the fixture's opening trace("") was never graded.)
+ #   (geom_transform: PASSES as of s16 w2-geom — pruned)
+ #   stage_scale_factor                    contentsScaleFactor must be 2 (needs a
+ #                                         simulated 2x display) - cannot pass
+-displayobject_hittestpoint_boundary
+ displayobject_scrollrect
+ stage_scale_factor
+ 
