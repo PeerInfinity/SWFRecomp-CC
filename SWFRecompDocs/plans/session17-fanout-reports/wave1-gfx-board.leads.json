@@ -1,0 +1,240 @@
+[
+ {
+  "id": "P1",
+  "verdict": "GO (PROVEN mechanism, +1 flip)",
+  "flips": 1,
+  "tests": [
+   "avm1/bitmap_data_copypixels [output]"
+  ],
+  "files": [
+   "SWFModernRuntime/src/actionmodern/action.c:12288-12420 (bitmapDataCopyPixels, the transparent-alpha-bitmap arm)",
+   "SWFModernRuntime/src/actionmodern/action.c:4749 premultiplyAlpha / :4789 unpremultiplyAlpha (READ ONLY \u2014 18 other call sites, do not change)"
+  ],
+  "oracle": [
+   "~/CC/ruffle/core/src/bitmap/operations.rs:1200-1210 copy_pixels_with_alpha_source (float / a, .round())",
+   "~/CC/ruffle/core/src/bitmap/bitmap_data.rs:98-109 to_premultiplied_alpha, :112-152 to_un_multiplied_alpha, :164-172 blend_over"
+  ],
+  "summary": "The residual is 280 pixels, every one exactly -1 on R,G,B with alpha identical (two 10x7 blocks in a 900x900 frame). Ruffle's copy_pixels_with_alpha_source deliberately does NOT use its FLASH_PREMUL_FACTOR table here: it un-premultiplies with f64 division and .round(), then re-premultiplies with (c*a+127)/255. We call unpremultiplyAlpha(), which IS the table. Every other step in the arm already matches Ruffle exactly ((ab_alpha*sa)>>8, premultiplyAlpha, blend_over's truncating /255). Fix must be local to this function; the shared helpers are correct for getPixel/setPixel and are graded by passing tests. tolerance 0 / max_outliers 0 means all-or-nothing: the wave-2 agent must A/B and confirm the sign.",
+  "risk": "low if localised; HIGH if the shared premultiply helpers are touched",
+  "independent_slot": true,
+  "do_not_bundle": [
+   "from_shumway/acid/acid-bitmapData-copyPixels [output] \u2014 53760 excess with -40/-27/+191 signed deltas, a structurally different defect"
+  ]
+ },
+ {
+  "id": "P2",
+  "verdict": "GO (+1 flip, one argument)",
+  "flips": 1,
+  "tests": [
+   "avm2/graphics_gradients_nulls [output]"
+  ],
+  "files": [
+   "SWFModernRuntime/src/avm2/avm2_display.c:7973 (gfx_gen_ramp call \u2014 GRADIENT_RAMP_ROUND -> GRADIENT_RAMP_TRUNC)",
+   "SWFModernRuntime/include/gradient_ramp.h:110-114 (the rounding branch)",
+   "SWFModernRuntime/src/actionmodern/action.c:28282 (AVM1 twin \u2014 optional, mixed-sign residuals)"
+  ],
+  "oracle": [
+   "~/CC/ruffle/render/wgpu/src/mesh.rs CommonGradient::new (`as u8` = truncate)"
+  ],
+  "summary": "Golden-based fingerprint: rebuilding the test's ramp (stops 0/63/127/191/255 from Ruffle's null-ratios rule (i*255)/(n-1)) shows EVERY distinct grey in the expected PNG's gradient band is a member of the TRUNC ramp, and 27 of them exist nowhere in the ROUND ramp. All 600 failing channels are one column (x=125, rows 100-299) at diff 6 against tolerance 5; the TRUNC ramp sits exactly one level below ROUND there (t=32: 129 vs 130), landing the column at diff 5. Blast radius: exactly 7 of the 384 image-bearing tests use runtime gradients and NONE of them passes today -> zero pixel-regression risk. REFUTED half: GRADIENT_RAMP_LINEAR_U8 -> _LINEAR is unpriceable \u2014 no image-bearing test passes linearRGB to a runtime gradient (graphics_gradients's 'linear' string is the TYPE, not the interpolation), so that leg is worth 0 flips and 0 band moves and must not be bundled into the A/B.",
+  "risk": "very low (no passing image test contains a runtime gradient)",
+  "independent_slot": true
+ },
+ {
+  "id": "P3",
+  "verdict": "DIAGNOSE-then-GO (4 comparisons, one mechanism; +2 adjacent)",
+  "flips": "0-4",
+  "tests": [
+   "visual/cache_as_bitmap/cab_mask_triangle [output]",
+   "visual/cache_as_bitmap/cab_mask_filters [output]",
+   "visual/cache_as_bitmap/cab_mask_alpha [output]",
+   "visual/cache_as_bitmap/cab_mask_transform [output]",
+   "visual/cache_as_bitmap/oversize/swf_9_masks [output]",
+   "visual/cache_as_bitmap/oversize/swf_10_masks [output]"
+  ],
+  "files": [
+   "SWFModernRuntime/src/avm2/avm2_display.c:16074-16101 (avm2_push_clip_mask) and the render walk at 16040+",
+   "SWFModernRuntime/src/rendering/render_webgpu.c (renderer_begin_clip_mask / stencil ops)"
+  ],
+  "summary": "The brief lists cab_mask_filters as one item; four rows share one measured signature: ink_frac_actual = 0.9000 on ALL FOUR (identical), extra_ink 0.78-0.90, i.e. we paint the whole maskee and Ruffle paints only the mask window. cab_mask_alpha's diff map shows the difference filling all EIGHT sub-cases ({bitmap masker, graphics masker} x {maskee cab, mask cab}^2) except the mask rectangle interior. The AVM2 mask walk exists and visual/cache_as_bitmap/masks passes 7/7, so the defect is 'these maskers never rasterise into the stencil', not 'masks unimplemented'. First measurement: which of Bitmap-as-masker / cacheAsBitmap-as-masker / runtime-graphics-as-masker yields an empty stencil. The oversize/swf_{9,10}_masks pair (119943 each, blank_render) is s16's P7 and plausibly the same family (a scaled masker).",
+  "risk": "medium \u2014 three of four rows are max_outliers = 0; and the tier-1 canary visual/cache_as_bitmap/masks passes with only 3-20% outlier slack (2520-3103 of 3200)",
+  "independent_slot": true
+ },
+ {
+  "id": "P5",
+  "verdict": "DIAGNOSE (0-1 flips, 5 band moves) \u2014 \u00a715 mechanism (B) REFUTED and restated",
+  "flips": "0-1",
+  "tests": [
+   "visual/fonts/leading_device_font [output]",
+   "visual/fonts/device-font [output]",
+   "visual/edittext/edittext_device_transform_negative [output]",
+   "visual/edittext/edittext_device_transform_basic [output]",
+   "fonts/device_font_kerning [output]"
+  ],
+  "files": [
+   "SWFRecomp/src/abc/abc_devicefont.cpp (398 lines \u2014 emits metrics only; already links stb_truetype)",
+   "SWFModernRuntime/src/libswf/ng_shared.c:399-620 (builtin Noto is metrics-only; ng_find_device_fallback_font)",
+   "SWFModernRuntime/src/actionmodern/action.c actionIterateTextFieldGlyphs (device-font re-point)"
+  ],
+  "oracle": [
+   "~/CC/ruffle/core/src/font.rs:284-320 get_glyph (face.outline_glyph into a Drawing)",
+   "~/CC/ruffle/core/src/font.rs:163-196 GlyphToDrawing (font units used directly as twips, Y negated, FillRule::NonZero)"
+  ],
+  "summary": "'Device-font glyph placement under a matrix' is wrong: extra_ink ~= 0 and shift_gain = 0.00 on all five rows, missing_ink 0.156-1.000 \u2014 our ink is a strict SUBSET of Ruffle's, i.e. absent glyphs, not displaced ones. In edittext_device_transform_basic the embedded-font column is pixel-identical and every differing pixel is in the device-font column (same TTF). Root cause: the recompiler's device-font importer emits metrics only (codes/advances/kern/ascent/descent), the runtime Noto fallback is metrics-only by construction, and ng_find_device_fallback_font only works when the SWF itself declares a synthesized _sans. So device text has correct metrics (its trace rows pass) and no outlines. Ruffle builds device glyphs exactly like embedded ones, so exact pixel agreement is achievable \u2014 the embedded column proves our rasteriser matches when the outlines match. Traps: NonZero fill rule for TTF contours; cubics only for CFF/embedAsCFF; the emitted glyph rows must be visible to both the AVM1 and AVM2 text paths.",
+  "risk": "medium-high \u2014 four of five rows are tolerance 0 with tiny outlier budgets; leading_device_font (tolerance 128) is the one row coverage alone can flip",
+  "independent_slot": true
+ },
+ {
+  "id": "P6",
+  "verdict": "GO (band move, 0-1 flips)",
+  "flips": "0-1",
+  "tests": [
+   "avm2/graphics_bitmaps [output]"
+  ],
+  "files": [
+   "SWFModernRuntime/src/avm2/avm2_display.c:8468-8508 (gfx_begin_bitmap_fill \u2014 g->cbsmo is stored and ignored)",
+   "SWFModernRuntime/src/rendering/render_webgpu.c:2702-2708 (draw_bitmap_quad_scaled hard-codes bitmap_fill_style_word(0,0) = Nearest) and render_webgpu_draw_bitmap_tris"
+  ],
+  "summary": "beginBitmapFill's `smooth` argument is parsed into g->cbsmo under a comment saying the renderer ignores it; the attachBitmap/Bitmap/video-fallback quad path hard-codes the Nearest sampler with a comment inviting exactly this patch. graphics_bitmaps calls beginBitmapFill(bmd, matrix, true, true) and (bmd, matrix, false, false) side by side and shows the nearest-vs-linear signature: ink IoU 0.93, 6.9% of pixels repainted, 558 vs 759 distinct colours, on a generous 8/4000 + 16/800 + 32/600 ladder. REFUTATION: the AVM1 half of this lead is worth zero pixels \u2014 no failing image row depends on attachBitmap(..., smoothing); the two Bitmap.smoothing rows that exist (displacement_map_scales_with_screen, _through_filters) belong to w2-gfx-filters-cut2.",
+  "risk": "medium \u2014 canaries from_shumway/acid/acid-bitmap-fill (9.4% slack) and acid-bitmap-fill-2 (3.5% slack) must both be re-graded",
+  "independent_slot": true
+ },
+ {
+  "id": "P7",
+  "verdict": "HOLD (not a standalone slot)",
+  "flips": 0,
+  "tests": [
+   "visual/filters/blur_scales_with_screen [output]",
+   "visual/filters/any_blur_scales_with_screen [output]"
+  ],
+  "files": [
+   "SWFModernRuntime/src/avm2/avm2_display.c filter pass (blur_axis_pass)"
+  ],
+  "summary": "blur_scales_with_screen: 30810 excess at tolerance 2 / max_outliers 0, max diff 40, ink IoU 0.995, only 0.29% of pixels significant \u2014 geometry right, blur kernel scale slightly off. any_blur_scales_with_screen is a different shape (halo_penumbra, 30% extra ink). Completion mechanism: hand to the filters owner after cut 2 lands, with glow_pass_scaling's byte-exactness as the reference.",
+  "risk": "n/a",
+  "independent_slot": false
+ },
+ {
+  "id": "P8",
+  "verdict": "FREE-PIXEL CANDIDATES (dual-axis rows; hand to the trace owners, not to a slot)",
+  "flips": "0-2",
+  "tests": [
+   "avm2/displayobject_scrollrect [output] (4 channels)",
+   "avm2/displayobject_hittestpoint_boundary [output] (76 channels)",
+   "avm2/stage_scale_factor [output] (1912924)",
+   "avm2/netstream_play_flv [output]",
+   "avm2/netstream_seek_flv [output]",
+   "avm2/graphics_draw_path [output]",
+   "from_shumway/acid/acid-shapes [output]",
+   "from_shumway/acid/acid-text-x [output]"
+  ],
+  "summary": "s16 got two pixel flips free this way. All six remaining soft [trace-ign] rows have a failing trace, plus three non-flagged rows. Cheapest: displayobject_scrollrect (4 channels) and displayobject_hittestpoint_boundary (976 outliers against a 900 budget = 76 over). Highest value: stage_scale_factor, 1.9M channels, content_displaced, whose trace mismatch is about stage scale mode. netstream_* is a band move only (its AVM1 twin's own residual is ACCEPTED_DIFFS Sorenson parity).",
+  "independent_slot": false
+ },
+ {
+  "id": "P9",
+  "verdict": "REFUTATION/INVENTORY \u2014 hairline_edge_drift near-passes that are NOT antialiasing",
+  "flips": "(2 already priced as P1/P2)",
+  "tests": [
+   "avm1/bitmap_data_copypixels [output] -> P1",
+   "avm2/graphics_gradients_nulls [output] -> P2",
+   "avm2/bitmapdata_colortransform [output] (726, uniform +1 field, unpriced)",
+   "visual/drawing_api/gradient_focal_point [output] (60 over tolerance 13, focal parameterisation)",
+   "from_shumway/acid/acid-gradient [output] (6639, unread)"
+  ],
+  "summary": "58 live hairline rows; exactly five are arithmetic rather than AA, and two of them are P1/P2. The 12 rows the classifier marks uniform_shift at max_diff 255 are single-pixel on/off ties (duplicate_font = 1 pixel, edittext_stylesheet = 2 pixels at exactly 95, fonts/glyph = 2 pixels, mouse_pick_dobj_mask = 2 pixels). The fonts near-pass family (glyph 6, duplicate_font 3, match_style 12, fallback_preferences 156) is entirely of that kind after leg C \u2014 ink_iou >= 0.999, missing_ink <= 0.001, shift_gain 0.00 \u2014 keep capped.",
+  "independent_slot": false
+ },
+ {
+  "id": "BLANK-RENDER",
+  "verdict": "DECOMPOSITION (36 live, 8 mechanisms) \u2014 never brief as one item",
+  "flips": "0-4 addressable",
+  "mechanisms": [
+   {
+    "id": "M1",
+    "name": "Stage3D / Context3D has no GPU backend",
+    "cmps": 24,
+    "owner": "SWFModernRuntime/src/avm2/avm2_stage3d.c (API + argument validator only) + a new 3D pipeline in render_webgpu.c",
+    "flips": 0,
+    "note": "PARKED ARC; 21 avm2/stage3d_* + stage3d/{scissor_rectangle,scissor_rectangle_invalid,sampler_odd_size}; 85740-1920000 excess"
+   },
+   {
+    "id": "M2",
+    "name": "Pixel Bender / Shader byte-code not executed",
+    "cmps": 1,
+    "owner": "avm2_display.c shader stubs (beginShaderFill bound to gfx_begin_bitmap_fill, :14490)",
+    "flips": 0,
+    "note": "avm2/pixelbender_dithering 2744871; family also owns glassDisplace/_shaderfilter/blend_shader_luma_lighten/shader_as_mask in other clusters"
+   },
+   {
+    "id": "M3a",
+    "name": "AVM2 NetStream never feeds the existing Sorenson decoder",
+    "cmps": 2,
+    "owner": "SWFModernRuntime/src/avm2/avm2_media.c + actionmodern/video_codec.c",
+    "flips": 0,
+    "note": "229724 + 40672; expect ~44 residual outliers (the AVM1 twin's ACCEPTED_DIFFS number) at tolerance 1 / max_outliers 0 -> band move + a new disposition, not a pass"
+   },
+   {
+    "id": "M3b",
+    "name": "No H.264 decoder",
+    "cmps": 1,
+    "owner": "-",
+    "flips": 0,
+    "note": "h264_multinalu here + 10 h264 [frame*] rows in unrelated_content = 11 family-wide; PARKED"
+   },
+   {
+    "id": "M4",
+    "name": "No JPEG XR decoder",
+    "cmps": 2,
+    "owner": "avm2_display.c loader sniffer (:4987, :5740 'stb cannot read it')",
+    "flips": 0,
+    "note": "loader_jpegxr 136033 + loader_jpegxr_alpha 10074; a library import, not a fix"
+   },
+   {
+    "id": "M5",
+    "name": "AVM2 mask on a scaled masker",
+    "cmps": 2,
+    "owner": "avm2_display.c mask walk + render_webgpu.c stencil",
+    "flips": "0-2",
+    "note": "oversize/swf_9_masks + swf_10_masks, 119943 each; folds into P3"
+   },
+   {
+    "id": "M6",
+    "name": "Font arcs with no glyph source",
+    "cmps": 2,
+    "owner": "SWFRecomp/src/swf.cpp (DefineFont4) and SWFRecomp/src/abc/abc_devicefont.cpp + ng_shared.c (device font)",
+    "flips": "0-1",
+    "note": "visual/definefont4 16086 (embedded CFF/TLF; golden has 2 colours) + visual/fonts/device-font 8202 (missing_ink 1.000, rides P5)"
+   },
+   {
+    "id": "M7",
+    "name": "BitmapData.draw at quality=high renders a flat stage",
+    "cmps": 1,
+    "owner": "action.c BitmapData.draw / offscreen capture path",
+    "flips": "0-1",
+    "note": "acid-bitmap-draw_quality_high 194784, tol 5/35000 + 32/700 + 64/0; its _low twin is a Ruffle known_failure"
+   },
+   {
+    "id": "M8",
+    "name": "acid-shapes \u2014 dual-axis (trace output_mismatch too)",
+    "cmps": 1,
+    "owner": "trace-side owner first",
+    "flips": 0,
+    "note": "78982; ours renders 4 colours, Ruffle 6802"
+   }
+  ],
+  "summary": "38 comparisons, 36 live (2 excluded: avm1/netstream_play_flv_screen dispositioned, acid-bitmap-draw_quality_low known_failure). \u00a715's '41 live, five unrelated causes' is stale on both numbers. 25 of 36 (69%) are the two parked backends (Stage3D + Pixel Bender); the addressable remainder is 11 comparisons across six mechanisms, and only M5/M6/M7 are worth wave-2 attention (M5 inside P3, M6 inside P5)."
+ },
+ {
+  "id": "CANARY",
+  "verdict": "AUDIT \u2014 the standing set misses 3 of this session's 4 handed-off change classes",
+  "flips": 0,
+  "summary": "render_canary_tests.txt = 18 tier-1 + 7 tier-2. Covered: cacheAsBitmap offsets partly (cache_as_bitmap/masks + shape_changed, but NO member puts text inside a cached surface, which is what all three pixelsnap targets do \u2014 and masks passes with only 3-20% outlier slack). NOT covered: (a) AVM2 Graphics bitmap styles \u2014 zero members; add from_shumway/acid/acid-bitmap-fill (passing, 9.4% slack, 0x40 smoothed repeating fill) and acid-bitmap-fill-2 (passing, 3.5% slack); (b) displacement filters \u2014 add visual/filters/displacement_map_through_applyFilter, which PASSES at max diff 2 vs tolerance 4 and is the corpus's only passing displacement row (tier 1); (c) EditText background/border \u2014 add visual/edittext/edittext_border_transform, 4 of whose 6 comparisons pass at tolerance 0. Blind spot to STATE rather than fix: the runtime gradient ramp (P2) has no passing representative anywhere \u2014 all 7 runtime-gradient image tests fail; the three gradient canaries are static-gradient rows.",
+  "additions": [
+   "from_shumway/acid/acid-bitmap-fill (tier 1)",
+   "from_shumway/acid/acid-bitmap-fill-2 (tier 1)",
+   "visual/filters/displacement_map_through_applyFilter (tier 1)",
+   "visual/edittext/edittext_border_transform (tier 1)"
+  ]
+ }
+]

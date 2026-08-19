@@ -1091,6 +1091,9 @@ namespace abc
 		int cmp_branch = 0;
 		u32 cmp_target = 0;
 		bool op_skip = false;
+		// Find[PropStrict]: trailing local scope entries the walk must skip
+		// (emitted as `scope_n - N`; 0 = unchanged). SlotSpecResult::find_scope_cut.
+		int scope_cut = 0;
 	};
 
 	// The `*_test` inline for a comparison opcode (returns a plain int rather
@@ -1284,6 +1287,24 @@ namespace abc
 					return true;
 				}
 				const char* strict = (op.op == IrOpcode::FindPropStrict) ? "1" : "0";
+				// Scope-skip lever (avmplus verifier parity): hand the walk a
+				// SHORTER local scope depth so it never examines trailing
+				// entries whose STATIC class provably lacks the name. The
+				// trailing `/* scope-cut N */` makes every reduction auditable
+				// in the generated C (grep the emitted sources for it).
+				// The reduction is proven (the analysis models `scope_n`
+				// exactly), but the guard keeps a modelling bug from
+				// underflowing an unsigned depth into a wild walk: an
+				// unexpected depth degrades to the full walk (today's
+				// behaviour), never to garbage. It folds away wherever the
+				// depth is a compile-time constant.
+				const string scopeArg = os.scope_cut > 0
+					? ("(scope_n > " + to_string(os.scope_cut) + "u ? scope_n - "
+					   + to_string(os.scope_cut) + "u : scope_n)")
+					: string("scope_n");
+				const string cutNote = os.scope_cut > 0
+					? (" /* scope-cut " + to_string(os.scope_cut) + " */")
+					: string("");
 				if (mnLazyNs(abc, op.arg1))
 				{
 					// RTQName pops [ns]; RTQNameL pops [ns, name].
@@ -1315,13 +1336,14 @@ namespace abc
 					// `scope_stable` lets a cached domain hit skip the scope walk.
 					out << "\t{ static Avm2FindCache __fc; stk[sp++] = "
 					       "avm2_object_value(avm2_op_findpropstrict_ic(act, lscope, "
-					       "scope_n, " << op.arg1 << ", " << strict << ", "
-					    << (bc.scope_stable ? 1 : 0) << ", &__fc)); }" << endl;
+					    << scopeArg << ", " << op.arg1 << ", " << strict << ", "
+					    << (bc.scope_stable ? 1 : 0) << ", &__fc)); }" << cutNote << endl;
 				}
 				else
 				{
 					out << "\tstk[sp++] = avm2_object_value(avm2_op_findproperty(act, "
-					    << "lscope, scope_n, " << op.arg1 << ", " << strict << "));" << endl;
+					    << "lscope, " << scopeArg << ", " << op.arg1 << ", " << strict
+					    << "));" << cutNote << endl;
 				}
 				return true;
 			}
@@ -1940,6 +1962,11 @@ namespace abc
 		// the coerce is proven a value no-op (or the slot is untyped).
 		std::vector<int> store_slot;
 		std::vector<u32> store_coerce_mn;
+		// Scope-skip lever (avmplus verifier parity): at a FindProperty/
+		// FindPropStrict index, the number of TRAILING local scope entries the
+		// emitted walk must not look at (emitted as `scope_n - N`). See
+		// classProvablyLacksName / the scope-skip block in analyzeSlotSpec.
+		std::vector<int> find_scope_cut;
 	};
 	// --- Step-0 census for the typed-value levers (temp tool, env-gated:
 	// SWF_CENSUS_TYPEDOPS=<csv path>). Read-only: it reports the static operand
@@ -2005,6 +2032,104 @@ namespace abc
 		return out;
 	}
 
+	// =====================================================================
+	// Scope-skip lever (avmplus verifier parity — avm2/scope_optimizations)
+	// =====================================================================
+	// avmplus early-binds FindProperty[Strict] against the STATIC type of each
+	// scope entry, never the runtime object. A `coerce Superclass` in front of
+	// `pushscope` therefore makes the verifier search Superclass's traits only:
+	// a trait that exists on the runtime Subclass is SKIPPED and the walk falls
+	// through to the outer chain / domain. Ruffle mirrors this in
+	// core/src/avm2/optimizer/type_aware.rs (Op::FindPropStrict — the "subtle
+	// issue with this logic ... however, this matches avmplus's behavior"
+	// comment names this very test). Our runtime walks the REAL object's
+	// vtable, so the only place to reproduce it is here: hand the walk a
+	// shorter `scope_n`.
+	//
+	// We implement the strictly-narrower half of Ruffle's rule: a trailing
+	// entry is skipped only when its static class is KNOWN and PROVEN to lack
+	// the name. (Ruffle additionally descends past entries whose class it does
+	// not know; we never do.) So this lever can only turn a wrong hit into the
+	// avmplus fall-through — it can never skip an entry avmplus would bind.
+	static bool scopeSkipDeniedName(const string& n)
+	{
+		// Names a plain scope entry can resolve through a NATIVE base that is
+		// invisible in the ABC: avm2_globals.c registers hasOwnProperty /
+		// isPrototypeOf / propertyIsEnumerable on object_class's INSTANCE
+		// vtable, which every ABC class inherits. The ES3 prototype names are
+		// held back as insurance (they are not ivtable traits today).
+		return n == "hasOwnProperty" || n == "isPrototypeOf"
+		    || n == "propertyIsEnumerable" || n == "setPropertyIsEnumerable"
+		    || n == "toString" || n == "toLocaleString" || n == "valueOf"
+		    || n == "constructor" || n == "prototype";
+	}
+	// Does the instance-trait surface of ABC class `inst` provably NOT contain
+	// `name`? Requirements (all necessary for soundness):
+	//   * sealed, non-interface (AbcTypeModel::isSealed);
+	//   * every ancestor ABC-defined down to Object — a native ancestor's
+	//     traits are invisible here, so "absent from the ABC" would not mean
+	//     "absent from the runtime vtable";
+	//   * every declared interface (transitively) ABC-defined too;
+	//   * the name is not one the native Object base supplies.
+	// The trait test is ns-BLIND, which is the conservative direction: a
+	// same-named trait in ANY namespace blocks the skip.
+	static bool classProvablyLacksName(const AbcTypeModel& M, const AbcFile& abc,
+	                                   int inst, const string& name)
+	{
+		if (name.empty() || scopeSkipDeniedName(name)) return false;
+		if (!M.isSealed(inst)) return false;
+		// AbcTypeModel::typeMnToInst resolves a TYPE multiname by LOCAL name
+		// only, so a class whose local name is shared inside this ABC may be
+		// the wrong instance. Require uniqueness before trusting its traits.
+		if (M.uniqueClassByName(M.localName(abc.instances[inst].name)) != inst)
+			return false;
+		auto traitsHaveName = [&] (int ii) {
+			for (const AbcTrait& t : abc.instances[ii].traits)
+				if (M.localName(t.name) == name) return true;
+			return false;
+		};
+		// Transitive interface closure: any unresolvable interface bails.
+		std::vector<int> ifq;
+		std::set<int> seen_if;
+		int cur = inst, guard = 0;
+		while (cur >= 0 && cur < (int) abc.instances.size() && guard++ < 64)
+		{
+			const AbcInstance& in = abc.instances[cur];
+			if (traitsHaveName(cur)) return false;
+			for (u32 imn : in.interfaces)
+			{
+				int ii = M.typeMnToInst(imn);
+				if (ii < 0) return false;     // native/unknown interface
+				if (seen_if.insert(ii).second) ifq.push_back(ii);
+			}
+			if (in.super_name == 0) break;    // implicit Object base
+			int sup = M.typeMnToInst(in.super_name);
+			if (sup < 0)
+			{
+				// A native superclass we cannot see: only the literal Object
+				// root is safe (it has no slot/method traits beyond the trio
+				// scopeSkipDeniedName already rejects).
+				if (M.localName(in.super_name) != "Object") return false;
+				break;
+			}
+			cur = sup;
+		}
+		if (guard >= 64) return false;        // malformed/cyclic chain
+		int iguard = 0;
+		while (!ifq.empty() && iguard++ < 4096)
+		{
+			int ii = ifq.back(); ifq.pop_back();
+			if (traitsHaveName(ii)) return false;
+			for (u32 jmn : abc.instances[ii].interfaces)
+			{
+				int ji = M.typeMnToInst(jmn);
+				if (ji < 0) return false;
+				if (seen_if.insert(ji).second) ifq.push_back(ji);
+			}
+		}
+		return ifq.empty();
+	}
+
 	static SlotSpecResult analyzeSlotSpec(const AbcTypeModel& M, const AbcFile& abc,
 	                                      const EmitBody& body)
 	{
@@ -2018,6 +2143,7 @@ namespace abc
 		R.findstatic_cls.assign(body.ir.ops.size(), -1);
 		R.store_slot.assign(body.ir.ops.size(), -1);
 		R.store_coerce_mn.assign(body.ir.ops.size(), 0);
+		R.find_scope_cut.assign(body.ir.ops.size(), 0);
 		std::vector<int>& spec = R.slot;
 		if (!body.verified) return R;
 		// A/B baseline toggles (interleaved before/after measurement):
@@ -2033,6 +2159,10 @@ namespace abc
 		static const bool findthis_disabled = getenv("SWF_NO_FIND_THIS") != nullptr;
 		static const bool findstatic_disabled = getenv("SWF_NO_FIND_STATIC") != nullptr;
 		static const bool setslot_disabled = getenv("SWF_NO_SET_SLOT") != nullptr;
+		//   SWF_NO_SCOPE_CUT     disables the scope-skip lever only.
+		//   SWF_TRACE_SCOPE_CUT  prints every emitted reduction to stderr.
+		static const bool scopecut_disabled = getenv("SWF_NO_SCOPE_CUT") != nullptr;
+		static const bool scopecut_trace = getenv("SWF_TRACE_SCOPE_CUT") != nullptr;
 		const bool coerce_enabled = !coerce_disabled;
 
 		// Defining class + this-kind (needed for BOTH slot lever A and the
@@ -2093,7 +2223,7 @@ namespace abc
 		bool setslot_lever = !setslot_disabled;
 
 		if (!this_lever && !staticB_lever && !coerce_enabled && !findthis_gate
-		    && !findstatic_gate && !setslot_lever)
+		    && !findstatic_gate && !setslot_lever && scopecut_disabled)
 			return R;
 
 		// Per-stack-slot value: compile-time provenance (is_this/fp_mn/cls, all
@@ -2147,6 +2277,23 @@ namespace abc
 		for (const IrException& e : body.ir.exceptions)
 			if (e.active) targets.insert(e.target_op);
 
+		// --- Scope-skip lever state ------------------------------------
+		// A model of the LOCAL scope stack (one entry per live PushScope/
+		// PushWith) carrying each entry's static type, so `sstk.size()` is
+		// exactly the emitted `scope_n` at this point.
+		//
+		// The model is trusted ONLY on the straight-line prefix that ends at
+		// the body's first join point. A linear pass cannot merge scope DEPTH
+		// across a branch, and a wrong depth would make `scope_n - k` skip the
+		// wrong entries — so the lever closes at the first branch/switch/
+		// exception target, and never opens in a body with an active handler
+		// (handler entry re-enters at the initial scope depth).
+		struct SE { TV type; bool is_with = false; };
+		std::vector<SE> sstk;
+		bool scope_model_ok = !scopecut_disabled;
+		for (const IrException& e : body.ir.exceptions)
+			if (e.active) scope_model_ok = false;
+
 		// A branch back into the preamble would re-run GetLocal0+PushScope and
 		// grow the scope stack — the [this]-only scope shape is no longer
 		// proven, so the find→this and find→own-class-static gates close.
@@ -2195,6 +2342,7 @@ namespace abc
 				for (SV& s : st) s.type = TV{};
 				for (u32 l = 0; l < localTy.size(); l++)
 					if (localWritten[l]) localTy[l] = TV{};
+				scope_model_ok = false;   // scope depth no longer provable
 			}
 			// Step-0 census: record operand static types BEFORE the op pops
 			// them (the branch-target reset above has already been applied, so
@@ -2225,6 +2373,24 @@ namespace abc
 				continue;
 			}
 			if (op.op == IrOpcode::Dup) { push(st.empty() ? SV{} : st.back()); continue; }
+			// Scope stack model (mirrors the emitted lscope[]/scope_n exactly:
+			// PushScope/PushWith pop one value and grow it by one, PopScope
+			// shrinks it, and nothing else touches it).
+			if (op.op == IrOpcode::PushScope || op.op == IrOpcode::PushWith)
+			{
+				SV v = pop();
+				SE e;
+				e.is_with = op.op == IrOpcode::PushWith;
+				if (!e.is_with) e.type = v.type;
+				sstk.push_back(e);
+				continue;
+			}
+			if (op.op == IrOpcode::PopScope)
+			{
+				if (sstk.empty()) scope_model_ok = false;
+				else sstk.pop_back();
+				continue;
+			}
 			// FindPropStrict/FindProperty of a static (non-lazy) multiname:
 			// when the find→this gate holds and the multiname matches a
 			// declared instance trait of the enclosing class, the walk
@@ -2274,6 +2440,42 @@ namespace abc
 							R.findstatic_cls[i] = thisCls;
 						}
 						SV v; v.fp_mn = (int) op.arg1; push(v); continue;
+					}
+				}
+				// Scope-skip lever: reduce the emitted local scope depth past
+				// every TRAILING entry whose static class provably lacks the
+				// name (see classProvablyLacksName). Stops at the first entry
+				// that is a `with`, has an unknown static class, or may hold
+				// the name — and never removes entry 0, which is avmplus's
+				// "global scope works differently" case.
+				if (scope_model_ok && sstk.size() > 1)
+				{
+					const string nm = M.localName(op.arg1);
+					int cut = 0;
+					for (size_t k = sstk.size(); k > 1; k--)
+					{
+						const SE& e = sstk[k - 1];
+						if (e.is_with) break;
+						if (e.type.k != TK_INST) break;
+						if (!classProvablyLacksName(M, abc, e.type.inst, nm)) break;
+						cut++;
+					}
+					if (cut > 0)
+					{
+						R.find_scope_cut[i] = cut;
+						if (scopecut_trace)
+						{
+							fprintf(stderr, "[scope-cut] method=%u op=%zu mn=%u "
+							        "name=%s depth=%zu cut=%d skipped=",
+							        body.ir.method_index, i, op.arg1, nm.c_str(),
+							        sstk.size(), cut);
+							for (int k = 0; k < cut; k++)
+								fprintf(stderr, "%s%s", k ? "," : "",
+								        M.localName(abc.instances[
+								            sstk[sstk.size() - 1 - k].type.inst]
+								            .name).c_str());
+							fprintf(stderr, "\n");
+						}
 					}
 				}
 				SV v; v.fp_mn = (int) op.arg1; push(v); continue;
@@ -2757,6 +2959,7 @@ namespace abc
 			os.cmp_branch = cmp_branch[i];
 			os.cmp_target = cmp_target[i];
 			os.op_skip = op_skip[i] != 0;
+			os.scope_cut = spec.find_scope_cut[i];
 			if (!emitOp(out, bc, op, os))
 			{
 				out << "\tavm2_unimplemented_op(act, \"" << escapeCString(desc)

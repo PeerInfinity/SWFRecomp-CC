@@ -1,0 +1,474 @@
+[
+  {
+    "id": "T1-concatenatedmatrix-stage-quality-scale",
+    "tests": [
+      "avm2/displayobject_transform"
+    ],
+    "flips": {
+      "floor": 1,
+      "real": 1,
+      "ceiling": 2
+    },
+    "verdict": "GO",
+    "independent": true,
+    "size": "XS",
+    "evidence": "STRONG",
+    "files": [
+      "SWFModernRuntime/src/avm2/avm2_display.c"
+    ],
+    "summary": "transform_get_concatenated_matrix (avm2_display.c:10180) hard-codes `double scale = 5.0; // StageQuality::High` for the Stage itself and for off-stage objects. Ruffle reads the live Stage.quality: Low 20.0, Medium 10.0, High|Best 5.0, High8x8|High8x8Linear 2.5, High16x16|High16x16Linear 1.25 (core/src/avm2/globals/flash/geom/transform.rs:121-127, quoted verbatim). All 22 diff lines of avm2/displayobject_transform re-run at HEAD are this one rule (the fixture walks all seven quality values twice, off-stage and on-stage). Fix = one 6-arm switch. RIDER found in the same read: the on-stage branch must use Ruffle's local_to_global_matrix_without_own_scroll_rect(), not display_world_matrix \u2014 the same API T3 needs, so T1 and T3 belong in one slot. REFUTES polish-sweep-arc 17.4's '22 rows + 5 more in bounds_mode's neighbours': bounds_mode has ZERO concatenatedMatrix rows, so this is a +1, not a +2. Canaries: displayobject_getbounds, geom_transform, stage_quality, bounds_mode, from_shumway/local2global."
+  },
+  {
+    "id": "T2-matrix3d-f32-storage-length16-det3x3",
+    "tests": [
+      "avm2/matrix3d_raw_data",
+      "avm2/matrix3d_determinant",
+      "avm2/matrix3d_precision"
+    ],
+    "flips": {
+      "floor": 1,
+      "real": 2,
+      "ceiling": 3
+    },
+    "verdict": "GO",
+    "independent": true,
+    "size": "S-M",
+    "evidence": "STRONG",
+    "files": [
+      "SWFModernRuntime/src/avm2/avm2_stage3d.c"
+    ],
+    "summary": "Three NEW upstream rows (2026-08-15 sync), unowned, one family. (a) Matrix3D rawData is stored as f32, not f64: every expected value is the f32 round-trip of ours \u2014 1.0000001 -> 1.0000001192092896, 1.00000001 -> 1, 1e+50 -> Infinity, 9.6e+38 -> Infinity, -2e+41 -> -Infinity. Avm2Matrix3DExt is `{ double m[16]; }` at avm2_stage3d.c:1335. (b) rawData/copyRawDataFrom must accept length EXACTLY 16: matrix3d_set_raw_data:1409 tests `src->length >= 16`, but the fixture proves Length 17 and Length 32 leave the matrix unchanged (one character, `>=` -> `==`). (c) determinant is the 3x3 UPPER-LEFT MINOR only: all 9 visible diffs of matrix3d_determinant are `zero index 12/13/14 = NaN|Infinity: 0` vs our NaN \u2014 the translation row must never participate. Our m3d_determinant (avm2_stage3d.c:1657) does a full 4x4 cofactor expansion and its own comment admits the choice; the new fixture settles it against us. PRICING ATTACK: matrix3d_precision is the least likely to flip \u2014 beyond f32 storage it wants transformVectors to accumulate in f64 while transformVector clamps to f32, and its expected `3.00000000000000e+50` carries a 15-significant-digit format we produce nowhere. Price raw_data + determinant as the floor. BLOCKER: all three test dirs are NOT on local disk; download before starting."
+  },
+  {
+    "id": "T3-committed-scrollrect",
+    "tests": [
+      "avm2/displayobject_scrollrect"
+    ],
+    "flips": {
+      "floor": 1,
+      "real": 1,
+      "ceiling": 1
+    },
+    "verdict": "GO",
+    "independent": true,
+    "size": "S-M",
+    "evidence": "STRONG",
+    "files": [
+      "SWFModernRuntime/src/avm2/avm2_display.c"
+    ],
+    "summary": "Re-run at HEAD the whole diff is 6 lines and one mechanism: after `circle.scrollRect = (x=50,y=60,...)`, localToGlobal/globalToLocal (4 lines), scrollChild.transform.concatenatedMatrix (tx 125->54, ty 146->64, i.e. exactly the scaled -x_min/-y_min) and hitTestPoint(400,400,true) (true->false, the shape-flag crop). Ruffle latches next_scroll_rect -> scroll_rect per frame and folds Matrix::translate(-x_min,-y_min) into display_world_matrix() for self AND each ancestor; concatenatedMatrix uses local_to_global_matrix_without_own_scroll_rect (own rect excluded, ancestors' included \u2014 line 31 is scrollChild, whose PARENT carries the rect). Second rider: expected a=1.709999918937683 (the f32 of 1.71) vs our f64-accumulated 1.7099998766183875, so the extra translate must re-quantize through f32. MUST be driven by the frame loop, not the renderer (mode parity). PIXEL RIDER (grade, do not price): this test's image comparison fails at 4 outliers over a limit of 0 \u2014 the smallest excess on the whole image board."
+  },
+  {
+    "id": "T4-all-classes-events",
+    "tests": [
+      "avm2/all_classes/events/swf9",
+      "avm2/all_classes/events/swf10",
+      "avm2/all_classes/events/swf11",
+      "avm2/all_classes/events/swf12",
+      "avm2/all_classes/events/swf30"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 3,
+      "ceiling": 5
+    },
+    "verdict": "GO",
+    "independent": true,
+    "size": "M-L",
+    "evidence": "STRONG",
+    "files": [
+      "tools/descriptor/gen_display_descriptors.py",
+      "tools/descriptor/as_model.py",
+      "SWFModernRuntime/src/avm2/avm2_globals.c"
+    ],
+    "summary": "REFUTES polish-sweep-arc 17.4's ruling of '0 flips, correctness/foundation item only'. Three measurements: (1) events is the LAST failing all_classes package \u2014 accessibility(3), display(6), display3D(3), errors(3), security(4), xml(2) are ALL pass at the baseline. (2) `python3 tools/descriptor/check_model.py <suite-dir> flash.events` grades the model at 95 element mismatches (14/20/20/20/21 across swf9..swf30) against 0 for the landed flash.display \u2014 a build-free oracle that took 4 s to run. (3) The 95 collapse into TWO defects: IEventDispatcher's five interface methods need uri=\"flash.events:IEventDispatcher\" on the <method> element (10 mismatches per version, each a MODEL-ONLY/FLASH-ONLY pair of the same method with and without uri), and constructor arity gating by API version (FocusEvent carries one extra trailing String; KeyboardEvent, GestureEvent, PressAndTapGestureEvent, TransformGestureEvent each carry 1-2 extra trailing optionals). The generator hard-codes PKG = \"flash.display\" (gen_display_descriptors.py:44) and splices into avm2_globals.c between markers at :2986/:4099 (1113 generated lines). FLOOR IS 0 because the runtime is pinned at 731/731/731/731/735 actual lines \u2014 the emitter does not describe the events classes at all yet, so the classes must also be registered and gated, exactly the shape w2-all-classes-display solved in s16 for +6. s15's refutation stands: all five are known_failure upstream but output.ruffle.txt is within 3-8 lines of Flash, so there is NO cheap ruffle_matched path."
+  },
+  {
+    "id": "T5-bounds-mode-pixelbounds-and-percent-scale",
+    "tests": [
+      "avm2/bounds_mode"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 1,
+      "ceiling": 1
+    },
+    "verdict": "GO",
+    "independent": true,
+    "size": "XS+XS",
+    "evidence": "STRONG",
+    "files": [
+      "SWFModernRuntime/src/avm2/avm2_display.c"
+    ],
+    "summary": "avm2/bounds_mode re-run at HEAD is 16 diff lines and TWO mechanisms, not three. (a) transform.pixelBounds is WORLD space (6 rows): expected (x=0,y=0,w=65,h=65) vs our (x=-0.75,y=-0.75,w=65,h=65) \u2014 Ruffle's pixel_bounds(mode) = world_bounds(mode) = bounds_with_transform(&local_to_global_matrix()) (display_object.rs:1366); we return the caller's/document-class space, the same numbers getBounds(this) gives. REFUTES 17.4's '10 rows; a 0.75 px origin offset' \u2014 it is 6 rows and 0.75 is the document class's own stage offset, not a constant. (b) scaleX/scaleY round-trip through a PERCENTAGE (9 rows + 1): Ruffle stores scale as Percent(f64) with from_unit(u)=u*100.0 and unit()=self.0/100.0 (core/src/types.rs:5-20), and set_width/set_height go through set_scale_x(Percent::from_unit(..)) (display_object.rs:1715). All three observed constants are reproduced bit-exactly by x*100/100 and by nothing else: 200/65 -> 3.0769230769230775, 100/65 -> 1.5384615384615388, 5/3 -> 1.666666666666667. REFUTES 17.4's '6 rows'. PRICING ATTACK: (b) changes EVERY scaleX/scaleY read in the corpus (exactly-representable scales are unaffected, so the blast radius is non-dyadic ratios) \u2014 that is a full-corpus A/B, not a canary. Take (a) first. bounds_mode is known_failure upstream and suite-local-ignored but is still COUNTED, so the flip is worth +1."
+  },
+  {
+    "id": "T6-avm2-nearpass-smalls-3",
+    "tests": [
+      "avm2/displayobject_early_init",
+      "avm2/textfield_input_events",
+      "avm2/large_preload_image_from_bytes",
+      "from_shumway/as3-loader/loaderinfo/loaded-content-properties",
+      "from_shumway/as3-loader/LoaderLoadBytesTest",
+      "avm2/appdomain_lookup_edge_cases",
+      "avm2/large_preload_from_url",
+      "avm2/large_preload_from_bytes",
+      "from_shumway/as3-loader/events/loader-events"
+    ],
+    "flips": {
+      "floor": 3,
+      "real": 4,
+      "ceiling": 9
+    },
+    "verdict": "GO",
+    "independent": true,
+    "size": "S each",
+    "evidence": "STRONG for 5, MED for 1",
+    "files": [
+      "SWFModernRuntime/src/avm2/avm2_display.c",
+      "SWFModernRuntime/src/avm2/avm2_text.c",
+      "SWFModernRuntime/src/avm2/avm2_loader.c",
+      "SWFModernRuntime/src/avm2/avm2_domain.c"
+    ],
+    "summary": "Six unowned rows, none dispositioned, all re-graded locally at HEAD. displayobject_early_init (well says 53, REAL DEFECT IS 3): expected emits `Caught error: ArgumentError: Error #2015: Invalid BitmapData.` at expected lines 2, 10 and 14 and we emit it ZERO times; every other line matches, shifted by one \u2014 constructing a Bitmap subclass whose linked BitmapData is invalid/unlinked must throw #2015 so the fixture's try can catch it. textfield_input_events (16): pure ordering \u2014 the textInput handler must observe the OLD text (expected pairs are `New text: <empty>` / `R`; ours are `New text: R` / `<empty>`) for all six keypresses plus backspace and `!`; dispatch textInput BEFORE mutating the field, change after. large_preload_image_from_bytes (6): pure ordering \u2014 `exitFrame in Test` must precede the loader init event (we emit it after complete) and one ProgressEvent line reports loader.numChildren = 1 where Flash says 0; same avm2-loader-timing-is-executor-drain family as siblings large_preload_from_url (11) and large_preload_from_bytes (33). loaded-content-properties (12): four property fixes repeated three times \u2014 childSandboxBridge and parentSandboxBridge must be `null` not `undefined`, isURLInaccessible must be `true`, uncaughtErrorEvents must be an [object UncaughtErrorEvents]. LoaderLoadBytesTest (3): the loaded child's own trace `from loadee: loaded` never appears and everything shifts. appdomain_lookup_edge_cases (25, MED, cascade): we die at expected line 8 with an UNCAUGHT #1065 from ApplicationDomain.getDefinition(\"<integerValue>\"); Flash raises VerifyError #1107 there (the fixture prints `error: 1107` twice), the test catches it and 24 further lines follow; line 7's hasDefinition(\"<integerValue>\") -> true vs our false is the same name-validation rule. RIDERS to grade in the same slot once the exitFrame/init ordering lands: avm2/large_preload_from_url (11), avm2/large_preload_from_bytes (33) and from_shumway/as3-loader/events/loader-events (27, which improved 31 -> 27 in s16 with nobody touching it) are all the same loader event-ordering axis; ceiling rises to +9 if they follow. GRADED LATE (459 s compile): from_shumway/as3-loader/events/loader-events confirms the rider classification AND splits off a second, cheaper defect. All 27 lines are a PERMUTATION (never a missing line) of loader progress/complete and init/httpStatus/complete against enterFrame / exitFrame / run frame N \u2014 that is the T6 ordering axis. Separately, a Loader-loaded child's display objects must receive auto-assigned instanceN names from the SHARED global instance counter: we emit `construct null, parent: null`, `added null`, `run frame 1 in null` and a bare `null` where Flash emits instance4/instance2/instance4, and our counter is one behind on line 4 (`added instance2` vs `added instance3`) because the loaded child never advances it. The naming half alone is worth 6 of the 27 lines and is independent of event order."
+  },
+  {
+    "id": "T7-missing-builtin-class-1065",
+    "tests": [
+      "avm2/native_menu_basic",
+      "avm2/automation_classes",
+      "avm2/stage_display_state"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 1,
+      "ceiling": 3
+    },
+    "verdict": "GO (medium)",
+    "independent": true,
+    "size": "M each",
+    "evidence": "STRONG",
+    "files": [
+      "SWFModernRuntime/src/avm2/avm2_globals.c"
+    ],
+    "summary": "Three rows, three absent classes, each killing its test on line 1 with ReferenceError #1065. native_menu_basic (19 lines) needs flash.display.NativeMenuItem/NativeMenu with full add/remove index semantics (#1034, #2007, #2006) \u2014 M. automation_classes (121 lines) needs AutomationAction and is NOT on local disk. stage_display_state (6 lines, error_signature `#1065: Variable FullScreenEvent is not defined`) is a DISCREPANCY: it PASSES locally at the graded SHA in graphics mode, verified twice including with --recompile, with an output.txt and test.swf byte-identical to upstream ruffle 437be1498 \u2014 yet the graded CI row is output_mismatch. Its RecompiledABC dates from Aug 6 and --recompile did NOT refresh it (mtimes unchanged), so the likeliest reading is a stale local ABC making the local PASS the false one; the alternative is a stale CI row (the ActionOrderTest3/4 / RegisterClassTest4 precedent in 17.4). RE-BASELINE IT IN CI BEFORE SPENDING A SLOT; do not count it in the floor either way."
+  },
+  {
+    "id": "T8-stack-trace-file-line",
+    "tests": [
+      "avm2/event_handler_exception"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 1,
+      "ceiling": 1
+    },
+    "verdict": "DEFER",
+    "independent": true,
+    "size": "M",
+    "evidence": "STRONG",
+    "files": [
+      "SWFRecomp/src/abc/abc_parser.cpp",
+      "SWFModernRuntime/src/avm2/avm2_error.c"
+    ],
+    "summary": "6 diff lines: stack-trace frames must carry the source suffix `[Z:\\tests\\tests\\swfs\\avm2\\event_handler_exception\\Test.as:10]`, which comes from the ABC's debugfile/debugline opcodes (we record neither), plus one missing frame `flash.events::EventDispatcher/dispatchEventFunction()` above dispatchEvent(). FAMILY OF ONE: only two corpus fixtures contain a `[Z:\\tests` stack suffix and the other (avm2/coerce_property) already passes. Defer unless a slot has room."
+  },
+  {
+    "id": "T9-ignore-list-hygiene",
+    "tests": [],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 0
+    },
+    "verdict": "GO (doc-only)",
+    "independent": true,
+    "size": "S",
+    "evidence": "STRONG",
+    "files": [
+      "ruffle-tests/tests/swfs/avm2/ignored_tests.txt",
+      "ruffle-tests/tests/swfs/from_shumway/ignored_tests.txt",
+      "ruffle-tests/ignored_tests.txt",
+      "ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md"
+    ],
+    "summary": "106 entries across 8 tracked ignore files, all classified mechanically at c7b284034. PRUNE 19 that are `pass` in every suite where they appear and meet the files' own 2026-08-01 criterion: the 16 from_shumway/fuzz/* (from_shumway:24-39 \u2014 and the bucket header's claim 'All 16 re-confirmed still failing on 2026-08-01' is now false), avm2:120 int_toprecision, avm2:128 uint_toprecision, and NEW THIS SESSION avm2:49 localconnection (s16's cross-VM bridge made it pass; the bucket comment above it still says 'not re-costed'). DO NOT PRUNE two traps: ruffle-tests/ignored_tests.txt:72 netstream_play_flv_screen (pass on trace, but a GLOBAL entry is an IMAGE-axis disposition and its image comparison still fails) and avm2:135 bytearray_oom (records an upstream ignore=true, verified). 3 inert entries have no results row (shared_object, shared_object_self_ref, from_shumway/avm1 hitarea) \u2014 all already commented. 9 entries have NO rationale of any kind and need one or deletion: global load_vars:45, loadvariables_method:46, stylesheet_load:47, sandbox_type_remote:105; avm2 audio_computespectrum:48, netstream_play_stop_replay:51, netstream_seek_flv:52, sound_load_multiple:53, soundmixer_soundtransform:56 (888/900 \u2014 re-triage, don't document); plus the five from_shumway rows at :51,:52,:54,:55,:56 which are flag-backed but reason-free. REFUTES the s16 board's '34 entries have no rationale': six of its named examples (misc-swfc.all sound and matrix_accuracy_test1, argstest-v6/-v7/-v8, array-v5, RegisterClassTest4) carry 7-12 line inline rationales in their own files, and all 33 test.tomls behind the avm2 upstream-known_failure bucket were opened and verified to carry the flag. Defensible number: 15 with no rationale of any kind, 9 actionable plus 5 flag-backed-but-reason-free."
+  },
+  {
+    "id": "T10-2007-targetcoordinatespace-cascade",
+    "tests": [
+      "avm2/displayobject_getrect",
+      "from_shumway/acid/acid-shapes"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 1,
+      "ceiling": 2
+    },
+    "verdict": "GO (small)",
+    "independent": true,
+    "size": "S",
+    "evidence": "STRONG",
+    "files": [
+      "SWFModernRuntime/src/avm2/avm2_display.c"
+    ],
+    "summary": "s15 filed these as riders on the Matrix3D #2007 helper; that helper landed and neither row moved, because these are getBounds/getRect sites. Re-graded locally: displayobject_getrect prints its two display objects ([object Shape], [object MorphShape]) and then dies on expected line 3 with `TypeError: Error #2007: Parameter targetCoordinateSpace must be non-null. at flash.display::DisplayObject/getBounds()`. All 14 lines behind the throw are plain rect strings, so this is a CASCADE UNLOCK, not a rewrite \u2014 our getBounds argument coercion is producing null for a targetCoordinateSpace Flash accepts (the MorphShape is the obvious suspect). from_shumway/acid/acid-shapes carries the identical signature and dies at ACTUAL line 7 of 120, same shape. One coercion fix, grade both in the same slot."
+  },
+  {
+    "id": "HANDOFF-s17-wave1",
+    "tests": [
+      "avm2/method_association",
+      "avm2/supercalls_coerce",
+      "avm2/displayobject_hittestpoint_boundary",
+      "avm2/scope_optimizations",
+      "avm2/mouse_pick_avm1_root",
+      "avm2/mouse_pick_loader_avm1",
+      "avm1/sound_load_props",
+      "avm1/sound_load_multiple_remote",
+      "avm1/sound_load_start_remote",
+      "avm1/sound_load_streaming_stop_remote",
+      "from_gnash/actionscript.all/Sound-v6",
+      "from_gnash/actionscript.all/Sound-v7",
+      "from_gnash/actionscript.all/Sound-v8",
+      "from_gnash/misc-ming.all/action_order/ActionOrderTest3",
+      "from_gnash/misc-ming.all/action_order/ActionOrderTest4",
+      "from_gnash/misc-ming.all/action_order/ActionOrderTest5",
+      "from_gnash/misc-ming.all/action_order/PlaceAndRemove",
+      "from_gnash/misc-ming.all/action_order/action_execution_order_extend_test",
+      "from_gnash/misc-ming.all/action_order/action_execution_order_test6",
+      "from_gnash/misc-ming.all/action_order/action_execution_order_test11",
+      "timeline/missing_frame_scripts",
+      "avm1/looping_child_swf5",
+      "avm1/looping_child_swf9",
+      "avm1/looping_child_swf32",
+      "avm2/button_nested_frame_simple",
+      "timeline/frame_script_cleanup_goto2"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 0
+    },
+    "verdict": "HANDED OFF - do not re-price",
+    "independent": false,
+    "size": "-",
+    "evidence": "-",
+    "files": [],
+    "summary": "Owned by w2-avm2-smalls (method_association, supercalls_coerce, displayobject_hittestpoint_boundary), w2-scope-opt (scope_optimizations), w2-crossvm-legE (mouse_pick_avm1_root, mouse_pick_loader_avm1), w1-sound-load (the 4 failing new avm1/sound_load_* plus gnash Sound-v6/7/8; 3 of the 7 new sound tests already pass), w1-timeline-order (the 12-row arc). THREE THINGS THIS BOARD ADDS. (1) For w1-sound-load: the ONLY diff in all three gnash Sound rows is `typeof(s.checkPolicyFile) == 'boolean'` returning undefined; grep shows checkPolicyFile on NetStream's prototype (action.c:37674, deliberately UNDEFINED) and on AVM2 LoaderContext, but NOWHERE on AVM1 Sound. `Sound.prototype.checkPolicyFile = false` as a real Boolean is a one-property add worth +3. (2) For w2-avm2-smalls: the 'missing leading blank line' in displayobject_hittestpoint_boundary is NOT a harness bug \u2014 16 corpus fixtures have an output.txt whose first line is blank and 13 of them PASS; grade the fixture's own first trace() instead of verify_output.py. (3) For w1-timeline-order: add timeline/frame_script_cleanup_goto2 (22 lines) as a 13th arc row \u2014 its diff is whole blocks of Container/Child/GrandChild/LeafChild framescripts emitted in the wrong order after a goto, the same nested-sprite advance-order mechanism."
+  },
+  {
+    "id": "DEFER-loader-duplicate-class",
+    "tests": [
+      "avm2/loader_duplicate_class"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 1
+    },
+    "verdict": "DEFER",
+    "independent": false,
+    "size": "M",
+    "evidence": "MED",
+    "files": [],
+    "summary": "19 miss, improved 25 -> 19 in s16. Real cause: `getChildAt()` throws RangeError #2006 inside the child SWF's DuplicateClass constructor, so this.childFromDomainChild is null and a #1034 coercion follows \u2014 the child SWF's timeline children are not placed before its symbol-class constructor runs. Also one missing leading blank line (see R5). Child-movie construction order, not a domain bug."
+  },
+  {
+    "id": "DEFER-misc-unowned",
+    "tests": [
+      "avm1/shared_stack",
+      "avm2/id3_info",
+      "from_shumway/bitmapdata/getpixel-from-embedded",
+      "from_gnash/misc-swfc.all/movieclip_destruction_test3"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 3
+    },
+    "verdict": "DEFER",
+    "independent": false,
+    "size": "varies",
+    "evidence": "MED",
+    "files": [],
+    "summary": "Graded but not worth a s17 slot. avm1/shared_stack (5): a child SWF's frame-2 execution truncates \u2014 expected `in child frame 2/1:` where we print `in frame 2/1:` and then stop after 12 of 16 lines; AVM1 multi-SWF. avm2/id3_info (8): we emit exactly one blank line \u2014 Sound.id3 / ID3Info needs real ID3v2 tag parsing out of the mp3, all-or-nothing. from_shumway/bitmapdata/getpixel-from-embedded (1): 200d04 vs our 220a06 \u2014 a single embedded-image pixel, per-channel decode delta of (+2,-3,+2); decoder-tolerance territory. from_gnash/misc-swfc.all/movieclip_destruction_test3 (13): a nested clip is NOT removed at frame 10 \u2014 the `nestedMovieClip removed` / `actions here should not be executed` lines never fire and three assertions invert (getDepth 10 vs -32779, typeof movieclip vs undefined, as_order `0+` vs `0+1+2+`). Timeline RemoveObject on a nested clip. The two #2007 rows formerly listed here were promoted to T10."
+  },
+  {
+    "id": "NOGO-standing",
+    "tests": [
+      "from_avmplus/regress/bug_483783",
+      "from_gnash/actionscript.all/array-v5",
+      "from_gnash/actionscript.all/array-v6",
+      "from_gnash/actionscript.all/array-v7",
+      "from_gnash/actionscript.all/array-v8",
+      "from_gnash/actionscript.all/MovieClip-v6",
+      "from_gnash/actionscript.all/MovieClip-v7",
+      "from_gnash/actionscript.all/MovieClip-v8",
+      "from_gnash/actionscript.all/argstest-v6",
+      "from_gnash/actionscript.all/argstest-v7",
+      "from_gnash/actionscript.all/argstest-v8",
+      "from_avmplus/ecma3/Statements/eforin_001",
+      "from_avmplus/ecma3/Statements/eforin_002",
+      "avm1/set_property_values/swf4",
+      "avm1/set_property_values/swf5",
+      "avm1/set_property_values/swf6",
+      "avm1/set_property_values/swf7",
+      "avm2/loader_load",
+      "avm2/bom",
+      "avm2/swz",
+      "avm2/loader_applicationDomain",
+      "avm2/verify_method_info_duplicate",
+      "from_avmplus/recursion/pcre_find_fixedlength",
+      "from_gnash/misc-swfc.all/sound",
+      "avm2/stage_scale_factor",
+      "avm2/audio_computespectrum",
+      "audio/aac",
+      "audio/g711",
+      "avm2/netstream_play_flv",
+      "avm2/netstream_seek_flv",
+      "avm2/netstream_play_stop_replay",
+      "avm1/date",
+      "avm1/native_objects_swf6",
+      "avm2/external_interface",
+      "from_shumway/esc"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 0
+    },
+    "verdict": "NO-GO",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": [],
+    "summary": "All re-verified unchanged at the baseline; polish-sweep-arc 17.4's standing NO-GO list stands verbatim and must not be re-costed. Additions worth restating: Stage.localToGlobal ignoring the Stage's own matrix is only exercised by stage_scale_factor, which needs a simulated 2x display and can never pass here; from_shumway/esc's expected output is a TIMING line (`388 bytes in 78 ms`) so it is unpassable as written; verify_method_info_duplicate's fix would demote the passing _oob, re-confirmed by s16's own post-run fix."
+  },
+  {
+    "id": "DRIFT-upstream-s16-to-s17",
+    "tests": [
+      "avm1/sound_load_multiple_instances",
+      "avm1/sound_load_stops_when_dereferenced",
+      "avm1/sound_mixed_attach_load",
+      "avm1/sound_load_props",
+      "avm1/sound_load_multiple_remote",
+      "avm1/sound_load_start_remote",
+      "avm1/sound_load_streaming_stop_remote",
+      "avm2/matrix3d_determinant",
+      "avm2/matrix3d_precision",
+      "avm2/matrix3d_raw_data",
+      "from_gnash/actionscript.all/Sound-v6",
+      "from_gnash/actionscript.all/Sound-v7",
+      "from_gnash/actionscript.all/Sound-v8"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 0
+    },
+    "verdict": "WATCH",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": [],
+    "summary": "Denominator 4443 -> 4453. Ten new names arrived exactly as s16 predicted: 3 pass (sound_load_multiple_instances 19/19, sound_load_stops_when_dereferenced 0/0, sound_mixed_attach_load 13/13), 7 output_mismatch (sound_load_props 96/111, sound_load_multiple_remote 2/6, sound_load_start_remote 0/1, sound_load_streaming_stop_remote 2/3, matrix3d_determinant 149/182, matrix3d_precision 5/25, matrix3d_raw_data 28/33) -> +3 effective from drift. Three REGRESSIONS, all fixture drift and not code: from_gnash Sound-v6/-v7/-v8 moved ruffle_matched -> output_mismatch when upstream rewrote their output.ruffle.txt so Ruffle now passes the checkPolicyFile assertions, breaking our subset match. Only 3 failing rows improved between the two baselines: displayobject_scrollrect 14 -> 6, loader_duplicate_class 25 -> 19, as3-loader/events/loader-events 31 -> 27. The LOCAL tests tree remains stale in both directions and is NOT a drift oracle: matrix3d_determinant/precision/raw_data, avm2/automation_classes and avm2/textblock_recreateline are all ungradable locally."
+  },
+  {
+    "id": "REFUTATION-links-in-scrolled-text-phantom-line",
+    "tests": [
+      "text/links_in_scrolled_text"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 1
+    },
+    "verdict": "HOLD (completion mechanism REWRITTEN)",
+    "independent": false,
+    "size": "S",
+    "evidence": "STRONG",
+    "files": [
+      "SWFModernRuntime/src/libswf/ng_shared.c"
+    ],
+    "summary": "polish-sweep-arc 17.4 asks: 'grade maxscroll/bottomScroll for this field against Flash first \u2014 if Flash says 7, exclude the phantom line from the scroll window; if 8, the line-height estimate is short by one line.' GRADED, and the first branch is REFUTED: the phantom empty final line is Ruffle-CANONICAL, not our artefact. Ruffle's core/src/html/text_format.rs:1072 pushes HTML_NEWLINE on EVERY </p> including the last (the field's HTML, extracted from test.swf, is 14 <p> elements and no <br>), and core/src/html/layout.rs:156 splits the span text on [\\n,\\r,\\t] so the trailing \\n materialises a final EMPTY line in Ruffle's layout too. Excluding it would move us AWAY from the oracle. Our maxscroll = 8 is therefore very likely correct. REWRITTEN completion mechanism: grade the CLICK's target line against the layout's per-line offset_y directly \u2014 Ruffle's EditText::maxscroll (edit_text.rs:1006) and bottom_scroll (:1035) both measure against bounds.height() - GUTTER*2 and never against a line count, so the remaining suspect is our line-height/leading, not the line inventory. Re-run at HEAD confirms the row is still exactly 1 line: expected `Success!`, we emit a BLANK line. Held patch: session16-fanout-reports/w2-smalls-links_in_scrolled_text.patch. Paired canary: text/text_caret_placement_scroll."
+  },
+  {
+    "id": "REFUTATION-s16-baseline-provenance",
+    "tests": [],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 0
+    },
+    "verdict": "REFUTED",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": [
+      "SWFRecompDocs/plans/session16-fanout-reports/wave1-trace-board.md"
+    ],
+    "summary": "The s16 board records its baseline as '4298 / 4443 effective at 3db858cbc'. Recomputed from the tracked blobs, 3db858cbc reads 4269 / 4443 (avm2 1152 eff, not 1174) \u2014 that commit PREDATES the results merge for run 31748059158. The s16-start baseline lives at the merge 82ec2a359 (and at cd04f80b9), both of which read exactly 4298 / 4443. This is the ci-baseline-commit-must-postdate-its-run trap; the s16 -> s17 delta in this board is computed from 82ec2a359."
+  },
+  {
+    "id": "REFUTATION-leading-blank-line-is-not-a-harness-bug",
+    "tests": [
+      "avm2/displayobject_hittestpoint_boundary",
+      "avm2/loader_duplicate_class",
+      "avm2/audio_computespectrum"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 0
+    },
+    "verdict": "REFUTED",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": [
+      "ruffle-tests/verify_output.py"
+    ],
+    "summary": "polish-sweep-arc 17.4 says displayobject_hittestpoint_boundary's 18 missing lines are 'one leading blank line (the fixture opens with trace(\"\"); check whether the harness or the runtime eats it) plus a shape-hit-test edge-exclusivity rule'. The harness does NOT eat it: 16 corpus fixtures have an output.txt whose first line is blank and 13 of them PASS. Only hittestpoint_boundary, loader_duplicate_class and audio_computespectrum fail that way, each for its own reason. Grade the fixture's own first trace(), not verify_output.py."
+  },
+  {
+    "id": "SOFT-TRACE-IGN-ROWS-WITH-FAILING-IMAGES",
+    "tests": [
+      "avm2/displayobject_scrollrect",
+      "avm2/displayobject_hittestpoint_boundary",
+      "avm2/graphics_draw_path",
+      "avm2/netstream_seek_flv",
+      "avm2/netstream_play_flv",
+      "avm2/stage_scale_factor"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 0
+    },
+    "verdict": "INFO (free pixel riders)",
+    "independent": false,
+    "size": "-",
+    "evidence": "STRONG",
+    "files": [],
+    "summary": "A suite-local ignored_tests.txt entry says nothing about the pixels (image_triage.py returns image_axis=False for suite-local lists \u2014 'kept on the board'). Six such soft [trace-ign] rows fail their image comparison at the baseline: displayobject_scrollrect 4 outliers over a limit of 0 (excess 4 \u2014 the SMALLEST excess on the whole image board, and it rides T3), displayobject_hittestpoint_boundary 976/900 (excess 76, 8% over, rides the handed-off edge rule), graphics_draw_path 764/0 (trace is already ruffle_matched, so this is a PIXEL-ONLY unowned lead), netstream_seek_flv 40672 excess and netstream_play_flv 229724 excess and stage_scale_factor 1912924 excess (all three NO-GO). Three further soft rows have PASSING image comparisons and must be left alone: avm2/blend_transform, from_shumway/MaskTest-3, from_shumway/flash_text_TextField2."
+  },
+  {
+    "id": "UNOWNED-WELL-REMAINDER",
+    "tests": [
+      "from_avmplus/e4x/Expressions/e11_1_4",
+      "from_gnash/misc-ming.all/PrototypeEventListeners",
+      "from_gnash/misc-swfc.all/movieclip_destruction_test4",
+      "avm2/simplebutton_soundtransform"
+    ],
+    "flips": {
+      "floor": 0,
+      "real": 0,
+      "ceiling": 4
+    },
+    "verdict": "OPEN (unpriced)",
+    "independent": true,
+    "size": "unknown",
+    "evidence": "WEAK (counts only)",
+    "files": [],
+    "summary": "After this board, exactly FOUR rows in the whole miss<=60 near-pass well are unowned by any lead, handoff or standing NO-GO \u2014 the well is otherwise a closed inventory. e4x/Expressions/e11_1_4 (20/34, we emit 37 lines for 34 expected, so over-emitting not truncating; unprobed). (as3-loader/events/loader-events was the fifth until a late local grade moved it under T6.) misc-ming.all/PrototypeEventListeners (31/32 but only 12 ACTUAL lines \u2014 an early abort, i.e. a cascade, and the cheapest of the five to probe). misc-swfc.all/movieclip_destruction_test4 (32/40, sibling of test3, same nested-clip removal mechanism \u2014 one lead of 2 rows). avm2/simplebutton_soundtransform (58/887, sibling of the ignore-listed soundmixer_soundtransform which is 12/900 \u2014 a SoundTransform property-surface sweep, not a mixer job)."
+  }
+]

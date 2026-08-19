@@ -1,0 +1,18 @@
+# Session 17 — wave-2 sibling file map (self-localize: new static helpers, wrapper functions, trailing struct fields; avoid textual overlap)
+
+- w2-avm2-smalls: `SWFRecomp/src/abc/abc_emit.cpp` (per-body verify-error #1107 preamble ahead of avm2_try_push_frame), `SWFModernRuntime/src/avm2/avm2_ops.c` (callstatic receiver coercion #1034), `avm2_class.c`/`avm2_main.c` (super get/set/call coercion #1034), `avm2_display.c` (shape hit-test edge exclusivity + hittestpoint_boundary leading blank line)
+- w2-scope-opt: `SWFRecomp/src/abc/abc_emit.cpp` (FindProperty[Strict] scope_n reduction from Coerce static class tracking) — shares the file with w2-avm2-smalls; keep edits in distinct functions
+- w2-crossvm-legE: `SWFModernRuntime/src/actionmodern/action.c` (`actionTickAvm1ChildrenUnderAvm2` + `processTimers` frame budget), `avm2_display.c` (AVM2 mouse-pick walk descending into AVM1 children / Loader attribution / no double Stage click)
+- w2-gfx-cab-pixelsnap: `SWFRecomp/src/swf.cpp` (~:4313 PlaceObject3 BitmapCache byte → emitted arg), `SWFModernRuntime/src/libswf/tag.c` + display entry structs, `compose_children` (`render_webgpu.c` / `action.c` / `avm2_display.c`) xform_override snap
+- w2-gfx-drawgraphicsdata: `avm2_display.c` `gfx_draw_graphics_data` (~:8819) + AVM2 Graphics stroke tessellation for `lineBitmapStyle`
+- w2-gfx-filters-cut2: `avm2_display.c` AVM2 `.filters` render path (s16 cut 1), `avm2_filters.c`, `render_webgpu.c` displacement filter shader/uniforms (object screen rect)
+- (pending) w2-gfx-edittext-bg: EditText background/border emission (`tag.c` / `ng_shared.c` / edittext render path)
+- (pending) w2-tooling-hygiene: `ruffle-tests/` new sweep script, `render_canary_tests.txt`, `ignored_tests.txt` files, disposition docs — no runtime code
+- (pending) w2-scrollrect: `avm2_display.c` `display_world_matrix` / scroll_rect latch, `action.c` frame loop
+- w2-sound-load: `SWFModernRuntime/src/actionmodern/action.c` (AVM1 Sound object: `resolveSoundTransformTarget` external arm, ExternalSound record, getBytesLoaded/Total, loadSound URL→data-file lookup via `avm1_amf.c` `nc_resolve_response`, deferred onLoad via `AQ_KIND_SCRIPT`) — shares action.c with w2-crossvm-legE (which edits `actionTickAvm1ChildrenUnderAvm2`/processTimers); keep to the Sound region
+- w2-timeline-s1s2: `SWFModernRuntime/src/avm2/avm2_main.c` (tick loop `fscommand("quit")` break), AVM1 sprite frame count split declared-vs-ShowFrame (`SWFRecomp/src/swf.cpp` DefineSprite emission — shares swf.cpp with w2-gfx-cab-pixelsnap's PlaceObject3 edit; `SWFModernRuntime/src/libswf/tag.c` / `action.c` sprite frame fields)
+- w2-avm2-display: `SWFModernRuntime/src/avm2/avm2_display.c` transform/bounds region ONLY — `concatenatedMatrix` quality scale (~:10180), committed scrollRect fold into `display_world_matrix`, `pixelBounds` world space + Percent scale, `#2007 targetCoordinateSpace` in getBounds/getRect. (Other avm2_display.c owners: gfx region = w2-gfx-drawgraphicsdata; filters region = w2-gfx-filters-cut2; compose_children = w2-gfx-cab-pixelsnap; hit-test = w2-avm2-smalls / w2-crossvm-legE.)
+- w2-trace-smalls: mixed (per wave1-trace-board T6 rows) — must list files in report
+- w2-matrix3d-classes: `SWFModernRuntime/src/avm2/avm2_stage3d.c` (Matrix3D f32 rawData / length rule / determinant), class registration for NativeMenuItem/Menu, AutomationAction, FullScreenEvent (`avm2_globals.c`)
+- w2-all-classes-events: `tools/descriptor/*` generator + `avm2_globals.c` generated block (flash.events)
+- w2-tooling-hygiene: 4 `ignored_tests.txt` + disposition docs, `render_canary_tests.txt`, new `ruffle-tests/recompiler_ab_sweep.sh` — no runtime code
