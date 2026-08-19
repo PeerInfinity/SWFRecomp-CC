@@ -540,6 +540,14 @@ typedef struct Avm2DisplayObjectExt
 	Avm2Object* graphics_obj;
 	uint8_t draw_valid;
 	int32_t draw_xmin, draw_xmax, draw_ymin, draw_ymax;
+	// Ruffle Drawing keeps TWO boxes (core/src/drawing.rs): `shape_bounds`
+	// grows by the active stroke's half-width, `edge_bounds` takes the raw
+	// path point. draw_* above is the shape (stroke-inclusive) box that
+	// getBounds / width / height / hitTestObject / pixelBounds read
+	// (BoundsMode::Script); the edge_* box below is what AVM2
+	// DisplayObject.getRect reads (BoundsMode::ScriptWithoutStrokes).
+	uint8_t draw_edge_valid;
+	int32_t draw_exmin, draw_exmax, draw_eymin, draw_eymax;
 
 	// --- DisplayObjectContainer ---
 	Avm2Object** render_list;

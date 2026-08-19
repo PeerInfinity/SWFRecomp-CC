@@ -1,0 +1,320 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 438f2d3e6..66e7e3236 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -540,6 +540,14 @@ typedef struct Avm2DisplayObjectExt
+ 	Avm2Object* graphics_obj;
+ 	uint8_t draw_valid;
+ 	int32_t draw_xmin, draw_xmax, draw_ymin, draw_ymax;
++	// Ruffle Drawing keeps TWO boxes (core/src/drawing.rs): `shape_bounds`
++	// grows by the active stroke's half-width, `edge_bounds` takes the raw
++	// path point. draw_* above is the shape (stroke-inclusive) box that
++	// getBounds / width / height / hitTestObject / pixelBounds read
++	// (BoundsMode::Script); the edge_* box below is what AVM2
++	// DisplayObject.getRect reads (BoundsMode::ScriptWithoutStrokes).
++	uint8_t draw_edge_valid;
++	int32_t draw_exmin, draw_exmax, draw_eymin, draw_eymax;
+ 
+ 	// --- DisplayObjectContainer ---
+ 	Avm2Object** render_list;
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 15286dad6..2c5d491ff 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -702,6 +702,15 @@ static Rect char_self_bounds(uint16_t char_id)
+ 
+ int avm2_text_self_bounds(struct Avm2EditTextExt* et, int32_t* out_xywh);
+ 
++// Ruffle's `BoundsMode` (display_object.rs:914) threaded through the bounds
++// walk. Every script-visible box except AVM2 `DisplayObject.getRect` is
++// `BoundsMode::Script` (strokes included); `getRect` alone is
++// `ScriptWithoutStrokes`. Ruffle passes the mode down as a parameter; carrying
++// it as a file-static here keeps `bounds_with_transform`'s 17 call sites
++// untouched. It is set immediately before the walk and cleared immediately
++// after (do_get_bounds_mode), and the walk itself cannot throw.
++static int g_bounds_no_strokes = 0;
++
+ static Rect display_self_bounds(const Avm2DisplayObjectExt* ext)
+ {
+ 	if (ext->edittext != NULL)
+@@ -715,10 +724,18 @@ static Rect display_self_bounds(const Avm2DisplayObjectExt* ext)
+ 		}
+ 	}
+ 	Rect r = char_self_bounds(ext->char_id);
+-	if (ext->draw_valid)
+-	{
+-		Rect d = { 1, (double) ext->draw_xmin, (double) ext->draw_xmax,
+-		           (double) ext->draw_ymin, (double) ext->draw_ymax };
++	// `Drawing::self_bounds(include_strokes)`: shape box or edge box. A
++	// DefineShape character only carries ShapeBounds in Avm2CharInfo, so
++	// char_self_bounds stays stroke-inclusive in both modes (Ruffle would use
++	// the tag's EdgeBounds; emitting it is a recompiler-side change).
++	int no_strokes = g_bounds_no_strokes;
++	if (no_strokes ? ext->draw_edge_valid : ext->draw_valid)
++	{
++		Rect d = no_strokes
++			? (Rect) { 1, (double) ext->draw_exmin, (double) ext->draw_exmax,
++			           (double) ext->draw_eymin, (double) ext->draw_eymax }
++			: (Rect) { 1, (double) ext->draw_xmin, (double) ext->draw_xmax,
++			           (double) ext->draw_ymin, (double) ext->draw_ymax };
+ 		if (!r.valid)
+ 		{
+ 			r = d;
+@@ -3877,7 +3894,10 @@ static Mat mat_invert(const Mat* m)
+ static Mat display_world_matrix(Avm2Context* ctx, Avm2Object* obj);
+ #define display_world_matrix_fwd display_world_matrix
+ 
+-static Avm2Value do_get_bounds(Avm2Activation* act)
++// getBounds / getRect share a body; `no_strokes` is Ruffle's BoundsMode split
++// (Script vs ScriptWithoutStrokes, display_object.rs:914) and only ever
++// changes what a runtime-drawn Graphics AABB contributes.
++static Avm2Value do_get_bounds_mode(Avm2Activation* act, int no_strokes)
+ {
+ 	Avm2Context* ctx = act->ctx;
+ 	Avm2Object* self = this_obj(act);
+@@ -3912,7 +3932,9 @@ static Avm2Value do_get_bounds(Avm2Activation* act)
+ 		m = mat_mul(&ti, &mw);
+ 	}
+ 	Rect r = { 0, 0, 0, 0, 0 };
++	g_bounds_no_strokes = no_strokes;
+ 	bounds_with_transform(ctx, self, &m, &r);
++	g_bounds_no_strokes = 0;
+ 	extern Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,
+ 	                                         double w, double h);
+ 	if (!r.valid)
+@@ -3924,6 +3946,18 @@ static Avm2Value do_get_bounds(Avm2Activation* act)
+ 	                               (r.ymax - r.ymin) / 20.0);
+ }
+ 
++static Avm2Value do_get_bounds(Avm2Activation* act)
++{
++	return do_get_bounds_mode(act, 0);
++}
++
++// DisplayObject.getRect is the ONE script-visible box Ruffle computes without
++// strokes (display_object.rs:1060 passes BoundsMode::ScriptWithoutStrokes).
++static Avm2Value do_get_rect(Avm2Activation* act)
++{
++	return do_get_bounds_mode(act, 1);
++}
++
+ // globalToLocal / localToGlobal: Point through the (inverse) world matrix.
+ static Avm2Value point_transform_native(Avm2Activation* act, int to_local)
+ {
+@@ -7910,7 +7944,13 @@ typedef struct Avm2GraphicsExt
+ 	uint8_t  cbrep, cbsmo;
+ 	int      cur_line;
+ 	float    clr, clg, clb, cla;
+-	float    clw;                   // line width (pixels)
++	float    clw;                   // line width (pixels), render-side
++	// The BOUNDS width: `clw` is clamped up to a nominal 1 px so a hairline
++	// still rasterises, but Ruffle's stretch_bounds uses the raw clamped
++	// thickness (`Twips::from_pixels(thickness.clamp(0.0, 255.0))`), for which
++	// a hairline is exactly zero. Keeping them apart is what stops a
++	// `lineStyle(0)` from inflating getBounds by half a pixel per side.
++	float    clw_bnd;               // line width (pixels) for bounds only
+ 	Avm2GfxStyle clsty;             // current non-solid stroke style
+ 	uint8_t  cur_winding;           // 0 evenOdd (Ruffle's Drawing default)
+ 	// Active pen-command buffer (flushed on begin*/endFill/clear/draw*).
+@@ -7931,10 +7971,11 @@ static Avm2DisplayObjectExt* graphics_owner_ext(Avm2Activation* act)
+ 	return avm2_display_ext_of(act->ctx, g->owner);
+ }
+ 
+-static void draw_union_point(Avm2DisplayObjectExt* ext, double x_px, double y_px)
++// The stroke-inclusive (`shape_bounds`) box. Ruffle grows it by the active
++// line style's half-width on every side (drawing.rs stretch_bounds) — that is
++// what getBounds / width / height / hitTestObject / pixelBounds read.
++static void draw_union_shape_tw(Avm2DisplayObjectExt* ext, int32_t x, int32_t y)
+ {
+-	int32_t x = twips_from_pixels(x_px);
+-	int32_t y = twips_from_pixels(y_px);
+ 	if (!ext->draw_valid)
+ 	{
+ 		ext->draw_valid = 1;
+@@ -7948,6 +7989,59 @@ static void draw_union_point(Avm2DisplayObjectExt* ext, double x_px, double y_px
+ 	if (y > ext->draw_ymax) ext->draw_ymax = y;
+ }
+ 
++// The stroke-EXCLUSIVE (`edge_bounds`) box: raw path points only, which is
++// what AVM2 DisplayObject.getRect reads.
++static void draw_union_edge_tw(Avm2DisplayObjectExt* ext, int32_t x, int32_t y)
++{
++	if (!ext->draw_edge_valid)
++	{
++		ext->draw_edge_valid = 1;
++		ext->draw_exmin = ext->draw_exmax = x;
++		ext->draw_eymin = ext->draw_eymax = y;
++		return;
++	}
++	if (x < ext->draw_exmin) ext->draw_exmin = x;
++	if (x > ext->draw_exmax) ext->draw_exmax = x;
++	if (y < ext->draw_eymin) ext->draw_eymin = y;
++	if (y > ext->draw_eymax) ext->draw_eymax = y;
++}
++
++// A point with no stroke attached (Video's intrinsic box, drawGraphicsData
++// carriers that never set a line): both boxes take it verbatim.
++static void draw_union_point(Avm2DisplayObjectExt* ext, double x_px, double y_px)
++{
++	int32_t x = twips_from_pixels(x_px);
++	int32_t y = twips_from_pixels(y_px);
++	draw_union_shape_tw(ext, x, y);
++	draw_union_edge_tw(ext, x, y);
++}
++
++// Ruffle `stretch_bounds`: `let radius = stroke_width / 2;` — Twips integer
++// division, so a hairline (thickness 0, and thickness < 0.1 px generally) has
++// radius 0 and contributes nothing. `Twips::from_pixels` truncates, matching
++// twips_from_pixels above.
++static int32_t gfx_stroke_radius_tw(const Avm2GraphicsExt* g)
++{
++	if (g == NULL || !g->cur_line) return 0;
++	int32_t w = twips_from_pixels((double) g->clw_bnd);
++	if (w < 0) w = 0;
++	return w / 2;
++}
++
++// A path point recorded while a line style may be active: the shape box grows
++// by the half-width on all four sides, the edge box takes the raw point.
++static void draw_union_stroke(Avm2DisplayObjectExt* ext,
++                              const Avm2GraphicsExt* g,
++                              double x_px, double y_px)
++{
++	int32_t x = twips_from_pixels(x_px);
++	int32_t y = twips_from_pixels(y_px);
++	int32_t r = gfx_stroke_radius_tw(g);
++	draw_union_shape_tw(ext, x - r, y - r);
++	draw_union_shape_tw(ext, x + r, y + r);
++	draw_union_edge_tw(ext, x, y);
++}
++
+ // ---- T4 Part B: geometry recording, tessellation, strokes, gradient ramps ----
+ 
+ static double matrix_get_prop(Avm2Context* ctx, Avm2Object* m, const char* name);
+@@ -7993,6 +8087,7 @@ static void gfx_reset(Avm2GraphicsExt* g)
+ 	memset(&g->clsty, 0, sizeof(g->clsty));
+ 	g->cur_winding = 0;
+ 	g->cur_fill = g->cur_line = 0; g->pen_set = 0;
++	g->clw_bnd = 0.0f;
+ }
+ 
+ // Miter/bevel join (miter-limit 4), mirrors action.c drawing_emit_stroke_join.
+@@ -8383,7 +8478,7 @@ static Avm2Value gfx_noop(Avm2Activation* act)
+ static Avm2Value gfx_clear(Avm2Activation* act)
+ {
+ 	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+-	if (ext != NULL) ext->draw_valid = 0;
++	if (ext != NULL) { ext->draw_valid = 0; ext->draw_edge_valid = 0; }
+ 	Avm2GraphicsExt* g = gfx_self_ext(act);
+ 	if (g != NULL) gfx_reset(g);
+ 	return avm2_undefined();
+@@ -8593,11 +8688,22 @@ static Avm2Value gfx_line_style(Avm2Activation* act)
+ 		return avm2_undefined();
+ 	}
+ 	double w = avm2_coerce_to_number(ctx, act->args[0]);
++	// Ruffle globals/flash/display/graphics.rs line_style(): a NaN thickness
++	// is `set_line_style(None)` (no stroke at all — NOT a hairline), and every
++	// other value is clamped to 0..255 before Twips::from_pixels. This is the
++	// same rule gfx_apply_stroke_carrier already applies to a GraphicsStroke.
++	if (isnan(w))
++	{
++		g->cur_line = 0;
++		return avm2_undefined();
++	}
++	if (w < 0) w = 0; else if (w > 255) w = 255;
+ 	uint32_t rgb = act->argc > 1 ? avm2_coerce_to_u32(ctx, act->args[1]) : 0;
+ 	double a = act->argc > 2 ? avm2_coerce_to_number(ctx, act->args[2]) : 1.0;
+ 	if (a < 0) a = 0; else if (a > 1) a = 1;
+ 	g->cur_line = 1;
+-	g->clw = (float) (w > 0 ? w : 1.0);  // hairline (0/NaN) -> nominal 1px
++	g->clw_bnd = (float) w;
++	g->clw = (float) (w > 0 ? w : 1.0);  // hairline (0) -> nominal 1px to draw
+ 	g->clr = ((rgb >> 16) & 0xFF) / 255.0f;
+ 	g->clg = ((rgb >>  8) & 0xFF) / 255.0f;
+ 	g->clb = ( rgb        & 0xFF) / 255.0f;
+@@ -8614,7 +8720,7 @@ static Avm2Value gfx_move_to(Avm2Activation* act)
+ 	{
+ 		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+ 		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+-		if (ext != NULL) draw_union_point(ext, x, y);
++		if (ext != NULL) draw_union_stroke(ext, g, x, y);
+ 		if (g != NULL) gfx_add_cmd(g, 0, (float) x, (float) y, 0, 0);
+ 	}
+ 	return avm2_undefined();
+@@ -8629,7 +8735,7 @@ static Avm2Value gfx_line_to(Avm2Activation* act)
+ 	{
+ 		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+ 		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+-		if (ext != NULL) draw_union_point(ext, x, y);
++		if (ext != NULL) draw_union_stroke(ext, g, x, y);
+ 		if (g != NULL)
+ 		{
+ 			if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
+@@ -8650,7 +8756,7 @@ static Avm2Value gfx_curve_to(Avm2Activation* act)
+ 		double cy = avm2_coerce_to_number(act->ctx, act->args[1]);
+ 		double ax = avm2_coerce_to_number(act->ctx, act->args[2]);
+ 		double ay = avm2_coerce_to_number(act->ctx, act->args[3]);
+-		if (ext != NULL) { draw_union_point(ext, cx, cy); draw_union_point(ext, ax, ay); }
++		if (ext != NULL) { draw_union_stroke(ext, g, cx, cy); draw_union_stroke(ext, g, ax, ay); }
+ 		if (g != NULL)
+ 		{
+ 			if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
+@@ -8683,7 +8789,7 @@ static Avm2Value gfx_draw_rect(Avm2Activation* act)
+ 		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+ 		double w = avm2_coerce_to_number(act->ctx, act->args[2]);
+ 		double h = avm2_coerce_to_number(act->ctx, act->args[3]);
+-		if (ext != NULL) { draw_union_point(ext, x, y); draw_union_point(ext, x + w, y + h); }
++		if (ext != NULL) { draw_union_stroke(ext, g, x, y); draw_union_stroke(ext, g, x + w, y + h); }
+ 		if (g != NULL) gfx_emit_rect(g, x, y, w, h);
+ 	}
+ 	return avm2_undefined();
+@@ -8715,9 +8821,9 @@ static Avm2Value gfx_cubic_curve_to(Avm2Activation* act)
+ 	double ay  = avm2_coerce_to_number(ctx, act->args[5]);
+ 	if (ext != NULL)
+ 	{
+-		draw_union_point(ext, c1x, c1y);
+-		draw_union_point(ext, c2x, c2y);
+-		draw_union_point(ext, ax, ay);
++		draw_union_stroke(ext, g, c1x, c1y);
++		draw_union_stroke(ext, g, c2x, c2y);
++		draw_union_stroke(ext, g, ax, ay);
+ 	}
+ 	if (g == NULL) return avm2_undefined();
+ 	if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
+@@ -8758,7 +8864,7 @@ static Avm2Value gfx_draw_circle(Avm2Activation* act)
+ 		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
+ 		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
+ 		double r = avm2_coerce_to_number(act->ctx, act->args[2]);
+-		if (ext != NULL) { draw_union_point(ext, x - r, y - r); draw_union_point(ext, x + r, y + r); }
++		if (ext != NULL) { draw_union_stroke(ext, g, x - r, y - r); draw_union_stroke(ext, g, x + r, y + r); }
+ 		if (g != NULL)
+ 		{
+ 			// 8 quadratic segments approximating the circle (control point at
+@@ -8792,8 +8898,8 @@ static Avm2Value gfx_draw_ellipse(Avm2Activation* act)
+ 	double h = avm2_coerce_to_number(act->ctx, act->args[3]);
+ 	if (ext != NULL)
+ 	{
+-		draw_union_point(ext, x, y);
+-		draw_union_point(ext, x + w, y + h);
++		draw_union_stroke(ext, g, x, y);
++		draw_union_stroke(ext, g, x + w, y + h);
+ 	}
+ 	if (g == NULL) return avm2_undefined();
+ 	double rx = w * 0.5, ry = h * 0.5, cx = x + rx, cy = y + ry;
+@@ -9467,6 +9573,7 @@ static void gfx_apply_stroke_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
+ 	}
+ 	if (th < 0) th = 0; else if (th > 255) th = 255;
+ 	g->cur_line = 1;
++	g->clw_bnd = (float) th;
+ 	g->clw = (float) (th > 0 ? th : 1.0);   // hairline -> nominal 1px
+ 	g->clr = g->clg = g->clb = 0.0f;
+ 	g->cla = 1.0f;
+@@ -15594,7 +15701,7 @@ void avm2_register_display(Avm2Context* ctx)
+ 	disp_implements(ctx, dobj, g_ibitmapdrawable_class, NULL);
+ 	avm2_builtin_add_method(ctx, dobj, "hitTestObject", do_hit_test_object);
+ 	avm2_builtin_add_method(ctx, dobj, "getBounds", do_get_bounds);
+-	avm2_builtin_add_method(ctx, dobj, "getRect", do_get_bounds);
++	avm2_builtin_add_method(ctx, dobj, "getRect", do_get_rect);
+ 	avm2_builtin_add_method(ctx, dobj, "globalToLocal", do_global_to_local);
+ 	avm2_builtin_add_method(ctx, dobj, "localToGlobal", do_local_to_global);
+ 	avm2_builtin_add_method(ctx, dobj, "hitTestPoint", do_hit_test_point);
