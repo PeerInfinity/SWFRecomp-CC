@@ -18049,6 +18049,25 @@ static int avm2_is_bitmap_cached(Avm2Object* obj,
 	return v != NULL && avm2_to_boolean_fast(*v);
 }
 
+// Ruffle BitmapCache::update (display_object.rs:163-168): the cache texture is
+// only created when the RENDERED size is acceptable — SWF <= 9: both sides
+// < 2880 px; SWF >= 10: both < 8191 px and area < 16777215 — otherwise
+// `is_bitmap_cached()` stays false and get_render_mask() falls back to the
+// STENCIL mask (visual/cache_as_bitmap/oversize/swf_{9,10}_too_big).
+static int avm2_bitmap_cache_size_ok(Avm2Context* ctx, Avm2Object* obj)
+{
+	Mat world = display_world_matrix(ctx, obj);
+	Rect r = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, obj, &world, &r);
+	if (!r.valid) return 1;
+	double w = (r.xmax - r.xmin) / 20.0, h = (r.ymax - r.ymin) / 20.0;
+	uint32_t aw = (uint32_t) (w > 0 ? w + 0.999999 : 0);
+	uint32_t ah = (uint32_t) (h > 0 ? h + 0.999999 : 0);
+	if (ctx->swf_version > 9)
+		return aw < 8191 && ah < 8191 && (double) aw * (double) ah < 16777215.0;
+	return aw < 2880 && ah < 2880;
+}
+
 // The object whose mask arms are being executed right now (its own mask must
 // not be re-applied by the recursive render), and the masker being rasterised
 // as an alpha layer (which must NOT be suppressed by the maskee rule).
@@ -18150,10 +18169,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// three because the offscreen ping-pong does not nest.
 	if (ext->mask != NULL && g_avm2_mask_capture == 0
 	    && obj != g_avm2_alpha_maskee && g_avm2_filter_active == 0
-	    && avm2_is_bitmap_cached(obj, ext))
+	    && avm2_is_bitmap_cached(obj, ext)
+	    && avm2_bitmap_cache_size_ok(ctx, obj))
 	{
 		Avm2DisplayObjectExt* amext = avm2_display_ext_of(ctx, ext->mask);
-		if (amext != NULL && avm2_is_bitmap_cached(ext->mask, amext))
+		if (amext != NULL && avm2_is_bitmap_cached(ext->mask, amext)
+		    && avm2_bitmap_cache_size_ok(ctx, ext->mask))
 		{
 			avm2_render_alpha_masked(ctx, obj, ext, amext, parent_world,
 			                         parent_alpha, parent_cx);
