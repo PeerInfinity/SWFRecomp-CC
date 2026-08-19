@@ -1,20 +1,18 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:51.753776+00:00",
+    "timestamp": "2026-08-19T14:26:17.376856+00:00",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "duration_seconds": 12694.57,
+    "duration_seconds": 13144.86,
     "total_available": 1574,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 1522,
-  "pass": 1485,
-  "ruffle_matched": 31,
+  "total": 1574,
+  "pass": 1527,
+  "ruffle_matched": 41,
   "fail": 6,
-  "pass_rate": 97.6,
-  "effective_pass": 1516,
+  "pass_rate": 97.0,
+  "effective_pass": 1568,
   "effective_pass_rate": 99.6,
   "breakdown": {
     "output_mismatch": 5,
@@ -12776,6 +12774,868 @@
         "matching_lines": 1
       },
       "duration": 10.16,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_1",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.27,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 9.62,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.395,
+        "run": 0.716
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 120,
+        "expected_lines": 121,
+        "matching_lines": 118
+      },
+      "duration": 10.12,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_1",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.402,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 33,
+        "matching_lines": 0
+      },
+      "duration": 9.76,
+      "ruffle_diff_count": 33,
+      "ours_diff_count": 33,
+      "status": "ruffle_matched",
+      "detail": "diffs 33 \u2286 ruffle 33"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_10",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 9.322,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 2
+      },
+      "duration": 9.67,
+      "ruffle_diff_count": 31,
+      "ours_diff_count": 31,
+      "status": "ruffle_matched",
+      "detail": "diffs 31 \u2286 ruffle 31"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_11",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.296,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 95,
+        "expected_lines": 95,
+        "matching_lines": 2
+      },
+      "duration": 9.62,
+      "ruffle_diff_count": 93,
+      "ours_diff_count": 93,
+      "status": "ruffle_matched",
+      "detail": "diffs 93 \u2286 ruffle 93"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_12",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.314,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      },
+      "duration": 9.64,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_13",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.295,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
+      },
+      "duration": 9.64,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_3",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 4.262,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 4.61,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_4",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 2.392,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 2.74,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_5",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 2.406,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 2.75,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_6",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.331,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 32,
+        "matching_lines": 32
+      },
+      "duration": 9.66,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_7",
+      "phases": {
+        "recomp": 0.026,
+        "compile": 4.38,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 4.73,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_8",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 9.279,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
+      },
+      "duration": 9.63,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_10_9",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.301,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
+      },
+      "duration": 9.65,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_11",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.213,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 33,
+        "matching_lines": 30
+      },
+      "duration": 9.56,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_11_1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.253,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 9.58,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_11_3",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 9.223,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 9.57,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_11_4",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 9.107,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 9.45,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_11_5",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 2.323,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 2.67,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_11_6",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.251,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 9.58,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_11_7",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.268,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 9.62,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.315,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 33,
+        "matching_lines": 30
+      },
+      "duration": 9.64,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12_1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.296,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 0
+      },
+      "duration": 9.62,
+      "ruffle_diff_count": 67,
+      "ours_diff_count": 67,
+      "status": "ruffle_matched",
+      "detail": "diffs 67 \u2286 ruffle 67"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12_3",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.328,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "duration": 9.68,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12_4",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.16,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "duration": 9.56,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12_5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.144,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "duration": 9.47,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12_6",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.306,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 55,
+        "expected_lines": 55,
+        "matching_lines": 55
+      },
+      "duration": 9.66,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12_7",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 4.34,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "duration": 4.69,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_12_8",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.328,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 9.65,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.314,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 33,
+        "matching_lines": 30
+      },
+      "duration": 9.66,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_1",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.264,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "duration": 9.61,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_2",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.282,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "duration": 9.63,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_3",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.259,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "duration": 9.61,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_4",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.104,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "duration": 9.45,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_5",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 2.311,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "duration": 2.66,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_6",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.252,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 60
+      },
+      "duration": 9.6,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_7",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.264,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 60
+      },
+      "duration": 9.61,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_13_8",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.314,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 9.66,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_14",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 9.319,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 44,
+        "expected_lines": 44,
+        "matching_lines": 44
+      },
+      "duration": 9.77,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_15",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 9.317,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 58,
+        "expected_lines": 58,
+        "matching_lines": 58
+      },
+      "duration": 9.67,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_15_1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.242,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 33,
+        "matching_lines": 30
+      },
+      "duration": 9.57,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_16",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.328,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 51
+      },
+      "duration": 9.75,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_17",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 9.362,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 51
+      },
+      "duration": 9.71,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_17_1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.259,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 33,
+        "matching_lines": 30
+      },
+      "duration": 9.58,
+      "ruffle_diff_count": 3,
+      "ours_diff_count": 3,
+      "status": "ruffle_matched",
+      "detail": "diffs 3 \u2286 ruffle 3"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_18",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.342,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 51
+      },
+      "duration": 9.77,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_19",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 4.384,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 51
+      },
+      "duration": 4.73,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_2",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 9.405,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "duration": 9.75,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_20",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.33,
+        "run": 0.465
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 79,
+        "expected_lines": 79,
+        "matching_lines": 79
+      },
+      "duration": 9.81,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_21_1",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.299,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 9.65,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_21_2",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.246,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 9.57,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_21_3",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.225,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 9.55,
+      "status": "pass"
+    },
+    {
+      "test": "ecma3/Date/e15_9_5_21_4",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 2.344,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 2.69,
       "status": "pass"
     },
     {

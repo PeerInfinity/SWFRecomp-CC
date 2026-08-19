@@ -1,23 +1,21 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:51.845280+00:00",
+    "timestamp": "2026-08-19T14:26:17.471769+00:00",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "duration_seconds": 3073.76,
+    "duration_seconds": 3155.66,
     "total_available": 229,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 221,
-  "pass": 205,
+  "total": 229,
+  "pass": 212,
   "ruffle_matched": 12,
-  "fail": 4,
-  "pass_rate": 92.8,
-  "effective_pass": 217,
-  "effective_pass_rate": 98.2,
+  "fail": 5,
+  "pass_rate": 92.6,
+  "effective_pass": 224,
+  "effective_pass_rate": 97.8,
   "breakdown": {
-    "output_mismatch": 4
+    "output_mismatch": 5
   },
   "tests": [
     {
@@ -3987,6 +3985,419 @@
           },
           "expected_source": "repo",
           "reason": "pixel_mismatch"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata/draw-and-read",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.837,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 8.16,
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata/getpixel-from-embedded",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 7.97,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "duration": 8.37,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=2, expected=2)",
+      "actual_output": "908a8c\n220a06",
+      "expected_output": "908a8c\n200d04"
+    },
+    {
+      "test": "blendmode/blendmode_1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 26.538,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 26.86,
+      "status": "pass"
+    },
+    {
+      "test": "blendmode/blendmode_2",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.859,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 8.18,
+      "status": "pass"
+    },
+    {
+      "test": "blendmode/blendmode_3",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 7.767,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 8.15,
+      "status": "pass"
+    },
+    {
+      "test": "button1",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 8.283,
+        "run": 0.415
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 9.34,
+      "image_comparisons": {
+        "output.1": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.2": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.3": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.4": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "button2",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 8.008,
+        "run": 0.465
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 9.1,
+      "image_comparisons": {
+        "output.1": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.2": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.3": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.4": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "button3",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.977,
+        "run": 0.365
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 3.27,
+      "image_comparisons": {
+        "output.1": {
+          "status": "pass",
+          "message": "Image check passed: 3480 outliers (limit 3500), max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            1
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 3480,
+            "mean_diff": 1.0084,
+            "outliers": 3480,
+            "max_outliers": 3500,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.2": {
+          "status": "pass",
+          "message": "Image check passed: 3480 outliers (limit 3500), max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            2
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 3480,
+            "mean_diff": 1.0084,
+            "outliers": 3480,
+            "max_outliers": 3500,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.3": {
+          "status": "pass",
+          "message": "Image check passed: 3480 outliers (limit 3500), max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            3
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 3480,
+            "mean_diff": 1.0084,
+            "outliers": 3480,
+            "max_outliers": 3500,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "output.4": {
+          "status": "pass",
+          "message": "Image check passed: 3480 outliers (limit 3500), max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "specific_iteration",
+            4
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 3480,
+            "mean_diff": 1.0084,
+            "outliers": 3480,
+            "max_outliers": 3500,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"

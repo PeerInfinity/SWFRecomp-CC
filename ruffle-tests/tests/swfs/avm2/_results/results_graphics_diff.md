@@ -1,14 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9d038c750eaf` (2026-08-19T13:54:51.719596+00:00)
-**Current:** `9d038c750eaf` (2026-08-19T14:26:17.342905+00:00)
-*Re-run on same commit — no comparison available.*
+**Previous:** `9d038c750eaf` (2026-08-19T14:26:17.342905+00:00)
+**Current:** `a946ee183838` (2026-08-19T16:36:38.727874+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1141 | 1179 | +38 |
-| Total | 1209 | 1251 | +42 |
-| Pass rate | 94.4% | 94.2% | -0.2% |
-| Mismatched lines | 3449 | 3490 | +41 |
+| Passing | 1179 | 1180 | +1 |
+| Total | 1251 | 1251 | 0 |
+| Pass rate | 94.2% | 94.3% | +0.1% |
+| Mismatched lines | 3490 | 3486 | -4 |
+|   Decreased | | | -4 |
+
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `getouterscope_two_classobjects` | ruffle_matched | 9/13 | 13/13 |

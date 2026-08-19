@@ -1,23 +1,21 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:51.719596+00:00",
+    "timestamp": "2026-08-19T14:26:17.342905+00:00",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "duration_seconds": 15224.05,
+    "duration_seconds": 15744.81,
     "total_available": 1251,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 1209,
-  "pass": 1141,
+  "total": 1251,
+  "pass": 1179,
   "ruffle_matched": 33,
-  "fail": 35,
-  "pass_rate": 94.4,
-  "effective_pass": 1174,
-  "effective_pass_rate": 97.1,
+  "fail": 39,
+  "pass_rate": 94.2,
+  "effective_pass": 1212,
+  "effective_pass_rate": 96.9,
   "breakdown": {
-    "output_mismatch": 35
+    "output_mismatch": 39
   },
   "tests": [
     {
@@ -12087,6 +12085,839 @@
       "detail": "16 line(s) differ (actual=46, expected=51)",
       "actual_output": "... (25 lines before) ...\nLargeSWF loader.contentLoaderInfo.bytesLoaded = 0\nLargeSWF loader.contentLoaderInfo.bytesTotal = 0\nLargeSWF loader.contentLoaderInfo.bytes?.length = null\nLargeSWF loader.contentLoaderInfo.url = null\nLargeSWF loader.contentLoaderInfo.parameters = [object Object]\nLargeSWF Event [ProgressEvent type=\"progress\" bubbles=false cancelable=false eventPhase=2 bytesLoaded=0 bytesTotal=0]: loader.numChildren = 0, loader.content = null, loader.contentLoaderInfo.bytesLoaded = 0, loader.contentLoaderInfo.bytesTotal = 0, loader.contentLoaderInfo.bytes.length = 0, loader.contentLoaderInfo.url = null\nLargeSWF Event [ProgressEvent type=\"progress\" bubbles=false cancelable=false eventPhase=2 bytesLoaded=0 bytesTotal=0]: loader.numChildren = 0, loader.content = null, loader.contentLoaderInfo.bytesLoaded = 0, loader.contentLoaderInfo.bytesTotal = 0, loader.contentLoaderInfo.bytes.length = 0, loader.contentLoaderInfo.url = null\nLargeSWF: Directly after load:\nLargeSWF loader.content = null\nLargeSWF loader.contentLoaderInfo.content = null\nLargeSWF loader.contentLoaderInfo.bytesLoaded = 0\nLargeSWF loader.contentLoaderInfo.bytesTotal = 0\nLargeSWF loader.contentLoaderInfo.bytes?.length = 0\nLargeSWF loader.contentLoaderInfo.url = null\nLargeSWF loader.contentLoaderInfo.parameters = [object Object]\nloader.contentLoaderInfo === loader.content.loaderInfo : true\nloader.contentLoaderInfo.content === loader.content : true\nEvent [Event type=\"init\" bubbles=false cancelable=false eventPhase=2]: loader.numChildren = 1, loader.content = [object LargeSWF], loader.contentLoaderInfo.bytesLoaded = 503316, loader.contentLoaderInfo.bytesTotal = 503316, loader.contentLoaderInfo.bytes.length = 505316, loader.contentLoaderInfo.url = file:///\nEvent [Event type=\"complete\" bubbles=false cancelable=false eventPhase=2]: loader.numChildren = 1, loader.content = [object LargeSWF], loader.contentLoaderInfo.bytesLoaded = 503316, loader.contentLoaderInfo.bytesTotal = 503316, loader.contentLoaderInfo.bytes.length = 505316, loader.contentLoaderInfo.url = file:///\nexitFrame in Test\nexitFrame in Test",
       "expected_output": "... (25 lines before) ...\nLargeSWF loader.contentLoaderInfo.bytesLoaded = 0\nLargeSWF loader.contentLoaderInfo.bytesTotal = 0\nLargeSWF loader.contentLoaderInfo.bytes?.length = null\nLargeSWF loader.contentLoaderInfo.url = null\nLargeSWF loader.contentLoaderInfo.parameters = [object Object]\nLargeSWF Event [ProgressEvent type=\"progress\" bubbles=false cancelable=false eventPhase=2 bytesLoaded=0 bytesTotal=424]: loader.numChildren = 0, loader.content = null, loader.contentLoaderInfo.bytesLoaded = 0, loader.contentLoaderInfo.bytesTotal = 424, loader.contentLoaderInfo.bytes.length = 0, loader.contentLoaderInfo.url = null\nLargeSWF Event [ProgressEvent type=\"progress\" bubbles=false cancelable=false eventPhase=2 bytesLoaded=424 bytesTotal=424]: loader.numChildren = 0, loader.content = null, loader.contentLoaderInfo.bytesLoaded = 424, loader.contentLoaderInfo.bytesTotal = 424, loader.contentLoaderInfo.bytes.length = 541, loader.contentLoaderInfo.url = null\nLargeSWF: Directly after load:\nLargeSWF loader.content = null\nLargeSWF loader.contentLoaderInfo.content = null\nLargeSWF loader.contentLoaderInfo.bytesLoaded = 424\nLargeSWF loader.contentLoaderInfo.bytesTotal = 424\nLargeSWF loader.contentLoaderInfo.bytes?.length = 541\nLargeSWF loader.contentLoaderInfo.url = null\nLargeSWF loader.contentLoaderInfo.parameters = [object Object]\nexitFrame in Test\nloader.contentLoaderInfo === loader.content.loaderInfo : true\nloader.contentLoaderInfo.content === loader.content : true\nEvent [Event type=\"init\" bubbles=false cancelable=false eventPhase=2]: loader.numChildren = 1, loader.content = [object LargeSWF], loader.contentLoaderInfo.bytesLoaded = 503316, loader.contentLoaderInfo.bytesTotal = 503316, loader.contentLoaderInfo.bytes.length = 505316, loader.contentLoaderInfo.url = file:///\nEvent [Event type=\"complete\" bubbles=false cancelable=false eventPhase=2]: loader.numChildren = 1, loader.content = [object LargeSWF], loader.contentLoaderInfo.bytesLoaded = 503316, loader.contentLoaderInfo.bytesTotal = 503316, loader.contentLoaderInfo.bytes.length = 505316, loader.contentLoaderInfo.url = file:///\nConstucted nested_load/test.swf\nexitFrame in Test\nLargeSWF loader.contentLoaderInfo === loader.content.loaderInfo : true\nLargeSWF loader.contentLoaderInfo.content === loader.content : true\nLargeSWF Event [Event type=\"init\" bubbles=false cancelable=false eventPhase=2]: loader.numChildren = 1, loader.content = [object Test], loader.contentLoaderInfo.bytesLoaded = 424, loader.contentLoaderInfo.bytesTotal = 424, loader.contentLoaderInfo.bytes.length = 541, loader.contentLoaderInfo.url = file:///\nLargeSWF Event [Event type=\"complete\" bubbles=false cancelable=false eventPhase=2]: loader.numChildren = 1, loader.content = [object Test], loader.contentLoaderInfo.bytesLoaded = 424, loader.contentLoaderInfo.bytesTotal = 424, loader.contentLoaderInfo.bytes.length = 541, loader.contentLoaderInfo.url = file:///"
+    },
+    {
+      "test": "large_preload_from_url",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 9.99,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 27
+      },
+      "duration": 10.37,
+      "status": "pass"
+    },
+    {
+      "test": "large_preload_image_from_bytes",
+      "phases": {
+        "recomp": 0.011,
+        "compile": 8.389,
+        "run": 0.465
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 25,
+        "matching_lines": 25
+      },
+      "duration": 8.87,
+      "status": "pass"
+    },
+    {
+      "test": "lazyinit",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.792,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "duration": 8.17,
+      "status": "pass"
+    },
+    {
+      "test": "lessequals",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 11.871,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 512,
+        "expected_lines": 512,
+        "matching_lines": 512
+      },
+      "duration": 12.25,
+      "status": "pass"
+    },
+    {
+      "test": "lessthan",
+      "phases": {
+        "recomp": 0.019,
+        "compile": 11.792,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 512,
+        "expected_lines": 512,
+        "matching_lines": 512
+      },
+      "duration": 12.19,
+      "status": "pass"
+    },
+    {
+      "test": "loader_applicationDomain",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 8.257,
+        "run": 0.365
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 4,
+        "matching_lines": 0
+      },
+      "duration": 8.64,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=0, expected=4)",
+      "actual_output": "",
+      "expected_output": "[class PropertyChangeEvent]\n[class ByteArrayAsset]\n[class Test]\n[class Test]"
+    },
+    {
+      "test": "loader_bitmap_transparency",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.938,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 8.31,
+      "status": "pass"
+    },
+    {
+      "test": "loader_bytes_unknown_content",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.949,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 8.32,
+      "status": "pass"
+    },
+    {
+      "test": "loader_child_getdefinition",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 8.162,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 8.54,
+      "status": "pass"
+    },
+    {
+      "test": "loader_duplicate_class",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 9.698,
+        "run": 0.365
+      },
+      "num_frames": 10,
+      "error_signature": "TypeError: Error #1034: Type Coercion failed: cannot convert flash.display::MovieClip@00000000000 to DuplicateClass.",
+      "lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 29
+      },
+      "duration": 10.08,
+      "status": "output_mismatch",
+      "detail": "19 line(s) differ (actual=48, expected=48)",
+      "actual_output": "Starting child domain load\ngetDefinitionByName(\"DuplicateClass\") not found initially: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\nloader_domain_child script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_child\nTypeError: Error #1034: Type Coercion failed: cannot convert flash.display::MovieClip@00000000000 to DuplicateClass.\nFramescript loader_domain_child with DuplicateClass: DuplicateClass from loader_domain_child\nnew loader_domain_child callMe script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_child\nnew loader_domain_child callMe: SwfPrivateClass = SwfPrivateClass from loader_domain_child\nFramescript loader_domain_child: instantiating DuplicateClass\nthis.childFromDomainChild = null\nRangeError: Error #2006: The supplied index is out of bounds.\n\tat flash.display::DisplayObjectContainer/getChildAt()\n\tat DuplicateClass()\n\tat loader_domain_child_fla::MainTimeline/frame1()\nInit event: DuplicateClass=DuplicateClass from loader_domain_child\ngetDefinitionByName(\"DuplicateClass\") not found afterwards: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\n\nStarting other child domain load\ngetDefinitionByName(\"DuplicateClass\") not found initially: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\nloader_domain_other_child script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_other_child\nFramescript loader_domain_other_child with DuplicateClass: DuplicateClass from loader_domain_other_child\nnew loader_domain_other_child callMe script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_other_child\nnew loader_domain_other_child callMe: SwfPrivateClass = SwfPrivateClass from loader_domain_other_child\nInit event: DuplicateClass=DuplicateClass from loader_domain_other_child\ngetDefinitionByName(\"DuplicateClass\") not found afterwards: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\n\nStarting same domain load\nsame domain: DuplicateClass not found initially: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\nloader_same_domain DuplicateClass script initializer: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nloader_same_domain DuplicateClass: this.childFromSameDomain = [object MovieClip] this.childFromOtherDomain = null this.childFromDomainChild = null\nFramescript loader_same_domain with DuplicateClass: DuplicateClass from loader_same_domain\nloader_same_domain callMe script initializer: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nloader_same_domain callMe: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nInit event: DuplicateClass from domain gives: DuplicateClass from loader_same_domain\ngetDefinitionByName(\"DuplicateClass\") gives: DuplicateClass from loader_same_domain\nAlready loaded class: DuplicateClass from loader_domain_other_child\nthis.childFromOtherDomain = null\nInstantiate clip: [object DuplicateClass]\n\nStarting repeated child domain load\nloader_same_domain DuplicateClass: this.childFromSameDomain = null this.childFromOtherDomain = null this.childFromDomainChild = [object MovieClip]\nFramescript loader_domain_child with DuplicateClass: DuplicateClass from loader_same_domain\nloader_same_domain callMe: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nFramescript loader_domain_child: instantiating DuplicateClass\nloader_same_domain DuplicateClass: this.childFromSameDomain = null this.childFromOtherDomain = null this.childFromDomainChild = null\nFramescript loader_domain_child: clip = [object DuplicateClass]\nInit event: DuplicateClass=DuplicateClass from loader_same_domain\nloader_same_domain DuplicateClass: this.childFromSameDomain = null this.childFromOtherDomain = null this.childFromDomainChild = null\nInstantiate clip in doChildDomainLoadAgain: [object DuplicateClass]",
+      "expected_output": "\nStarting child domain load\ngetDefinitionByName(\"DuplicateClass\") not found initially: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\nloader_domain_child script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_child\nthis.childFromDomainChild = [object MovieClip]\nChild name: [object MovieClip]\nFramescript loader_domain_child with DuplicateClass: DuplicateClass from loader_domain_child\nnew loader_domain_child callMe script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_child\nnew loader_domain_child callMe: SwfPrivateClass = SwfPrivateClass from loader_domain_child\nFramescript loader_domain_child: instantiating DuplicateClass\nthis.childFromDomainChild = [object MovieClip]\nChild name: [object MovieClip]\nFramescript loader_domain_child: clip = [object DuplicateClass]\nInit event: DuplicateClass=DuplicateClass from loader_domain_child\ngetDefinitionByName(\"DuplicateClass\") not found afterwards: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\n\nStarting other child domain load\ngetDefinitionByName(\"DuplicateClass\") not found initially: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\nloader_domain_other_child script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_other_child\nthis.childFromOtherDomain = [object MovieClip]\nFramescript loader_domain_other_child with DuplicateClass: DuplicateClass from loader_domain_other_child\nnew loader_domain_other_child callMe script initializer: SwfPrivateClass = SwfPrivateClass from loader_domain_other_child\nnew loader_domain_other_child callMe: SwfPrivateClass = SwfPrivateClass from loader_domain_other_child\nInit event: DuplicateClass=DuplicateClass from loader_domain_other_child\ngetDefinitionByName(\"DuplicateClass\") not found afterwards: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\n\nStarting same domain load\nsame domain: DuplicateClass not found initially: ReferenceError: Error #1065: Variable DuplicateClass is not defined.\nloader_same_domain DuplicateClass script initializer: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nloader_same_domain DuplicateClass: this.childFromSameDomain = [object MovieClip] this.childFromOtherDomain = null this.childFromDomainChild = null\nFramescript loader_same_domain with DuplicateClass: DuplicateClass from loader_same_domain\nloader_same_domain callMe script initializer: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nloader_same_domain callMe: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nInit event: DuplicateClass from domain gives: DuplicateClass from loader_same_domain\ngetDefinitionByName(\"DuplicateClass\") gives: DuplicateClass from loader_same_domain\nAlready loaded class: DuplicateClass from loader_domain_other_child\nthis.childFromOtherDomain = [object MovieClip]\nInstantiate clip: [object DuplicateClass]\n\nStarting repeated child domain load\nloader_same_domain DuplicateClass: this.childFromSameDomain = null this.childFromOtherDomain = null this.childFromDomainChild = [object MovieClip]\nFramescript loader_domain_child with DuplicateClass: DuplicateClass from loader_same_domain\nloader_same_domain callMe: SwfPrivateClass = SwfPrivateClass from loader_same_domain\nFramescript loader_domain_child: instantiating DuplicateClass\nloader_same_domain DuplicateClass: this.childFromSameDomain = [object MovieClip] this.childFromOtherDomain = null this.childFromDomainChild = null\nFramescript loader_domain_child: clip = [object DuplicateClass]\nInit event: DuplicateClass=DuplicateClass from loader_same_domain\nloader_same_domain DuplicateClass: this.childFromSameDomain = [object MovieClip] this.childFromOtherDomain = null this.childFromDomainChild = null\nInstantiate clip in doChildDomainLoadAgain: [object DuplicateClass]"
+    },
+    {
+      "test": "loader_duplicate_coerce",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 8.079,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 8.45,
+      "status": "pass"
+    },
+    {
+      "test": "loader_duplicate_coerce_new_domain",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 7.907,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 8.29,
+      "status": "pass"
+    },
+    {
+      "test": "loader_error_in_root_ctor",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 8.068,
+        "run": 0.365
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 8.45,
+      "status": "pass"
+    },
+    {
+      "test": "loader_events",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 8.297,
+        "run": 0.465
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 92,
+        "expected_lines": 92,
+        "matching_lines": 92
+      },
+      "duration": 8.95,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "loader_image",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.953,
+        "run": 0.465
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 8.58,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "loader_jpegxr",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 27.203,
+        "run": 0.315
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 27.6,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 136033 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 450,
+            "height": 125,
+            "total_channels": 225000,
+            "max_diff": 204,
+            "diff_channels": 136151,
+            "mean_diff": 45.8563,
+            "outliers": 136033,
+            "max_outliers": 0,
+            "tolerance": 1,
+            "excess_outliers": 136033
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "loader_jpegxr_alpha",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 26.767,
+        "run": 0.215
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 27.01,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 11574 outliers exceed limit of 1500, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 100,
+            "height": 100,
+            "total_channels": 40000,
+            "max_diff": 204,
+            "diff_channels": 22252,
+            "mean_diff": 40.5255,
+            "outliers": 11574,
+            "max_outliers": 1500,
+            "tolerance": 48,
+            "excess_outliers": 10074
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "loader_load",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 29.089,
+        "run": 0.365
+      },
+      "num_frames": 10,
+      "error_signature": "TypeError: Error #1034: Type Coercion failed: cannot convert Object@00000000000 to flash.net.URLRequest.",
+      "lines": {
+        "actual_lines": 128,
+        "expected_lines": 128,
+        "matching_lines": 126
+      },
+      "duration": 29.47,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=128, expected=128)",
+      "actual_output": "... (75 lines before) ...\nTest 3\n// request.url\nhttp://localhost:8000\n\n// request.data\naaa=bbb&cccc=true\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: aaa=bbb&cccc=true\n\nTest 4\n// request.url\nhttp://localhost:8000\n\n// request.data\na=b\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: a=b\n\n... (3 lines after) ...",
+      "expected_output": "... (75 lines before) ...\nTest 3\n// request.url\nhttp://localhost:8000\n\n// request.data\ncccc=true&aaa=bbb\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: cccc=true&aaa=bbb\n\nTest 4\n// request.url\nhttp://localhost:8000\n\n// request.data\na=b\n\n// request.method\nPOST\n\n// loader.load(request)\nundefined\nNavigator::fetch:\n  URL: http://localhost:8000\n  Method: POST\n  Headers:\nMyHeader1: MyDuplicateVal\nMyHeader2: MyVal2\nMyHeader3: MyVal3\nMyHeader4: MyVal4\nANewHeader: MyVal4\nSomeHeader: MyVal4\n  Mime-Type: application/x-www-form-urlencoded\n  Body: a=b\n\n... (3 lines after) ..."
+    },
+    {
+      "test": "loader_loadbytes_events",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 8.28,
+        "run": 0.365
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 8.81,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "loader_loadbytes_invalid_png",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 26.712,
+        "run": 0.315
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 27.04,
+      "status": "pass"
+    },
+    {
+      "test": "loader_loadbytes_url",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 8.116,
+        "run": 0.365
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 8.5,
+      "status": "pass"
+    },
+    {
+      "test": "loader_loaderurl",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 8.298,
+        "run": 0.365
+      },
+      "num_frames": 10,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 8.68,
+      "status": "pass"
+    },
+    {
+      "test": "loader_method",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.915,
+        "run": 0.365
+      },
+      "num_frames": 10,
+      "error_signature": "TypeError: Error #1034: Type Coercion failed: cannot convert Object@00000000000 to flash.net.URLRequest.",
+      "lines": {
+        "actual_lines": 85,
+        "expected_lines": 85,
+        "matching_lines": 85
+      },
+      "duration": 8.29,
+      "status": "pass"
+    },
+    {
+      "test": "loader_noninteractive_try_click_root",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 27.218,
+        "run": 0.666
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 27.89,
+      "status": "pass"
+    },
+    {
+      "test": "loader_reuse",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 8.026,
+        "run": 0.365
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 38,
+        "expected_lines": 38,
+        "matching_lines": 38
+      },
+      "duration": 8.41,
+      "status": "pass"
+    },
+    {
+      "test": "loader_try_click_root",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 8.048,
+        "run": 0.515
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 16,
+        "matching_lines": 0
+      },
+      "duration": 8.58,
+      "status": "output_mismatch",
+      "detail": "26 line(s) differ (actual=26, expected=16)",
+      "actual_output": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: mouseEnabled)\n\tat Loadable()\nTypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: mouseEnabled)\n\tat Loadable()\nTypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: mouseEnabled)\n\tat Loadable()\nTypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: mouseEnabled)\n\tat Loadable()\nTypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: mouseEnabled)\n\tat Loadable()\nClicked at: 45 47 on: [object Stage] (null)\nClicked at: 140 218 on: [object Stage] (null)\nClicked at: 248.25 217.25 on: [object Stage] (null)\nClicked at: 358 217 on: [object Stage] (null)\nClicked at: 131 370 on: [object Stage] (null)\nClicked at: 255.25 367.25 on: [object Stage] (null)\nClicked at: 361 370 on: [object Stage] (null)\nClicked at: 148 516 on: [object Stage] (null)\nClicked at: 246 516 on: [object Stage] (null)\nClicked at: 351 518 on: [object Stage] (null)\nClicked at: 136 660 on: [object Stage] (null)\nClicked at: 267 663 on: [object Stage] (null)\nClicked at: 352 673 on: [object Stage] (null)\nClicked at: 101 782 on: [object Stage] (null)\nClicked at: 224.25 787.25 on: [object Stage] (null)\nClicked at: 332 781 on: [object Stage] (null)",
+      "expected_output": "Clicked at: 45 47 on: [object Stage] (null)\nClicked at: 140 218 on: [object Loader] (firstLoader)\nClicked at: 248.25 217.25 on: [object MovieClip] (mouseChild)\nClicked at: 358 217 on: [object Loader] (firstLoader)\nClicked at: 131 370 on: [object Sprite] (LoaderWrapper)\nClicked at: 255.25 367.25 on: [object MovieClip] (mouseChild)\nClicked at: 361 370 on: [object Sprite] (LoaderWrapper)\nClicked at: 148 516 on: [object Loader] (thirdLoader)\nClicked at: 246 516 on: [object Loader] (thirdLoader)\nClicked at: 351 518 on: [object Loader] (thirdLoader)\nClicked at: 136 660 on: [object Sprite] (LoaderWrapper)\nClicked at: 267 663 on: [object Sprite] (LoaderWrapper)\nClicked at: 352 673 on: [object Sprite] (LoaderWrapper)\nClicked at: 101 782 on: [object Sprite] (LoaderWrapper)\nClicked at: 224.25 787.25 on: [object MovieClip] (mouseChild)\nClicked at: 332 781 on: [object Sprite] (LoaderWrapper)"
+    },
+    {
+      "test": "loader_unknown_content",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.918,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 24,
+        "expected_lines": 24,
+        "matching_lines": 24
+      },
+      "duration": 8.29,
+      "status": "pass"
+    },
+    {
+      "test": "loader_visibility_interactive",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.839,
+        "run": 0.515
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 8.36,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_events",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 7.807,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 8.19,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_loadurl",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 7.795,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 8.13,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_more",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 3.059,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 3.43,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_properties",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 26.752,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 27.13,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_properties_not_loaded",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.959,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 23
+      },
+      "duration": 8.33,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_quine",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.778,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 1005,
+        "expected_lines": 1005,
+        "matching_lines": 1005
+      },
+      "duration": 8.16,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_root",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.822,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 8.2,
+      "status": "pass"
+    },
+    {
+      "test": "loaderinfo_root_allows",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.736,
+        "run": 0.365
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 8.11,
+      "status": "pass"
+    },
+    {
+      "test": "localconnection",
+      "phases": {
+        "recomp": 0.018,
+        "compile": 9.576,
+        "run": 0.767
+      },
+      "num_frames": 300,
+      "lines": {
+        "actual_lines": 890,
+        "expected_lines": 890,
+        "matching_lines": 890
+      },
+      "duration": 10.37,
+      "status": "pass"
+    },
+    {
+      "test": "localconnection_send",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 7.797,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 8.18,
+      "status": "pass"
+    },
+    {
+      "test": "lshift",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 19.557,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1058,
+        "expected_lines": 1058,
+        "matching_lines": 1058
+      },
+      "duration": 19.94,
+      "status": "pass"
+    },
+    {
+      "test": "mask_reapply",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 26.684,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 26.94,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 1",
+          "max_diff": 1,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 150,
+            "height": 150,
+            "total_channels": 90000,
+            "max_diff": 1,
+            "diff_channels": 152,
+            "mean_diff": 0.0017,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 1,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "math",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 8.021,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 497,
+        "expected_lines": 497,
+        "matching_lines": 497
+      },
+      "duration": 8.4,
+      "status": "pass"
+    },
+    {
+      "test": "matrix",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 18.739,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 338,
+        "expected_lines": 338,
+        "matching_lines": 338
+      },
+      "duration": 19.11,
+      "status": "pass"
     },
     {
       "test": "matrix3d",

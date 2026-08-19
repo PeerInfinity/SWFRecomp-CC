@@ -1,20 +1,18 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:51.833661+00:00",
+    "timestamp": "2026-08-19T14:26:17.459639+00:00",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "duration_seconds": 1322.12,
+    "duration_seconds": 1364.25,
     "total_available": 72,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 70,
-  "pass": 70,
+  "total": 72,
+  "pass": 72,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 70,
+  "effective_pass": 72,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -757,6 +755,38 @@
         "matching_lines": 3
       },
       "duration": 2.16,
+      "status": "pass"
+    },
+    {
+      "test": "lv_cross_swf_version",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.985,
+        "run": 0.165
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 21.16,
+      "status": "pass"
+    },
+    {
+      "test": "lv_ondata_type1_args",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.679,
+        "run": 0.165
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 20.85,
       "status": "pass"
     },
     {
