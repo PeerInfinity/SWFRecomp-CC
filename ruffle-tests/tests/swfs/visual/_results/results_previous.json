@@ -1,28 +1,26 @@
 {
   "metadata": {
-    "timestamp": "2026-08-02T09:26:35.702647+00:00",
-    "git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
-    "duration_seconds": 1754.41,
-    "total_available": 143,
+    "timestamp": "2026-08-16T08:44:05.506088+00:00",
+    "git_sha": "88ebde66534f240bc01dd14fc57f16d4075452d7",
+    "duration_seconds": 1821.95,
+    "total_available": 144,
     "shards": 30,
     "expected_shards": 30
   },
-  "total": 143,
-  "pass": 138,
-  "ruffle_matched": 0,
-  "fail": 5,
-  "pass_rate": 96.5,
-  "effective_pass": 138,
-  "effective_pass_rate": 96.5,
-  "breakdown": {
-    "output_mismatch": 5
-  },
+  "total": 144,
+  "pass": 142,
+  "ruffle_matched": 2,
+  "fail": 0,
+  "pass_rate": 98.6,
+  "effective_pass": 144,
+  "effective_pass_rate": 100.0,
+  "breakdown": {},
   "tests": [
     {
       "test": "avm2_button_scroll_rect",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.951,
+        "compile": 26.113,
         "run": 0.004
       },
       "num_frames": 3,
@@ -31,14 +29,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 24.96,
+      "duration": 26.13,
       "status": "pass"
     },
     {
       "test": "bitmapdata_copypixels_with_alpha_oob",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.747,
+        "compile": 7.339,
         "run": 0.004
       },
       "num_frames": 5,
@@ -47,14 +45,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.76,
+      "duration": 7.35,
       "status": "pass"
     },
     {
       "test": "blend_modes/add",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.287,
+        "compile": 1.354,
         "run": 0.002
       },
       "num_frames": 1,
@@ -63,14 +61,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.29,
+      "duration": 1.36,
       "status": "pass"
     },
     {
       "test": "blend_modes/alpha_no_layer",
       "phases": {
-        "recomp": 0.27,
-        "compile": 1.286,
+        "recomp": 0.304,
+        "compile": 1.373,
         "run": 0.002
       },
       "num_frames": 1,
@@ -79,14 +77,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.56,
+      "duration": 1.68,
       "status": "pass"
     },
     {
       "test": "blend_modes/darken",
       "phases": {
-        "recomp": 0.271,
-        "compile": 1.282,
+        "recomp": 0.0,
+        "compile": 1.356,
         "run": 0.002
       },
       "num_frames": 1,
@@ -95,14 +93,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.56,
+      "duration": 1.36,
       "status": "pass"
     },
     {
       "test": "blend_modes/difference",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.281,
+        "compile": 1.289,
         "run": 0.002
       },
       "num_frames": 1,
@@ -111,91 +109,11 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.29,
+      "duration": 1.3,
       "status": "pass"
     },
     {
       "test": "blend_modes/erase_no_layer",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.286,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.29,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/hardlight",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.015,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.02,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/invert",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.012,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.02,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/layer_alpha",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.214,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.22,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/layer_erase",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.312,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.32,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/lighten",
       "phases": {
         "recomp": 0.0,
         "compile": 1.299,
@@ -211,10 +129,10 @@
       "status": "pass"
     },
     {
-      "test": "blend_modes/multiply",
+      "test": "blend_modes/hardlight",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.289,
+        "compile": 1.014,
         "run": 0.002
       },
       "num_frames": 1,
@@ -223,14 +141,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.29,
+      "duration": 1.02,
       "status": "pass"
     },
     {
-      "test": "blend_modes/overlay",
+      "test": "blend_modes/invert",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.026,
+        "compile": 1.022,
         "run": 0.002
       },
       "num_frames": 1,
@@ -243,10 +161,10 @@
       "status": "pass"
     },
     {
-      "test": "blend_modes/overlay_onto_stage",
+      "test": "blend_modes/layer_alpha",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.261,
+        "compile": 1.223,
         "run": 0.002
       },
       "num_frames": 1,
@@ -255,497 +173,17 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.27,
+      "duration": 1.23,
       "status": "pass"
     },
     {
-      "test": "blend_modes/screen",
+      "test": "blend_modes/layer_erase",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.305,
+        "compile": 1.338,
         "run": 0.002
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.31,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/shader_as_mask",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 26.918,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 26.93,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/shader_without_shader",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 25.038,
-        "run": 0.004
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 25.05,
-      "status": "pass"
-    },
-    {
-      "test": "blend_modes/subtract",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.298,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.3,
-      "status": "pass"
-    },
-    {
-      "test": "bmd_draw_with_msaa_issue_10579",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 20.096,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 20.1,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/avm1_color",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 19.647,
-        "run": 0.004
-      },
-      "num_frames": 2,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 19.66,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/avm2_button",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 19.567,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 19.58,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/avm2_button_state",
-      "phases": {
-        "recomp": 0.009,
-        "compile": 19.554,
-        "run": 0.002
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 19.57,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/bitmap_changed",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 24.55,
-        "run": 0.004
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 24.57,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/cab_bitmapdata_invalidate",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 24.708,
-        "run": 0.004
-      },
-      "num_frames": 12,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 24.73,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/cab_mask_alpha",
-      "phases": {
-        "recomp": 0.019,
-        "compile": 25.712,
-        "run": 0.008
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 25.75,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/cab_mask_filters",
-      "phases": {
-        "recomp": 0.017,
-        "compile": 6.152,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 6.18,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/cab_mask_transform",
-      "phases": {
-        "recomp": 0.017,
-        "compile": 24.545,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 24.57,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/cab_mask_triangle",
-      "phases": {
-        "recomp": 0.017,
-        "compile": 7.316,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 7.34,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/children_changed",
-      "phases": {
-        "recomp": 0.004,
-        "compile": 1.163,
-        "run": 0.002
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.17,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/color_transform",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.383,
-        "run": 0.002
-      },
-      "num_frames": 2,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.39,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/contains_grown_filter",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.298,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.31,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/drawing_api",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.534,
-        "run": 0.002
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.55,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/edittext_hscroll",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 21.174,
-        "run": 0.004
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 21.19,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/edittext_scroll",
-      "phases": {
-        "recomp": 0.021,
-        "compile": 21.089,
-        "run": 0.002
-      },
-      "num_frames": 4,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 21.12,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/edittext_selection",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 15.089,
-        "run": 0.004
-      },
-      "num_frames": 5,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 15.1,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/masks",
-      "phases": {
-        "recomp": 0.004,
-        "compile": 4.772,
-        "run": 0.004
-      },
-      "num_frames": 7,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 4.78,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/morph",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 0.931,
-        "run": 0.002
-      },
-      "num_frames": 4,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 0.94,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/nested_color_transform",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 0.783,
-        "run": 0.002
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 0.79,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/nested_matrix",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 0.781,
-        "run": 0.002
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 0.79,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/nested_rotation",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.445,
-        "run": 0.002
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.46,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_10_masks",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 26.081,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 26.09,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_10_too_big",
-      "phases": {
-        "recomp": 0.008,
-        "compile": 6.467,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 6.49,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_9_masks",
-      "phases": {
-        "recomp": 0.007,
-        "compile": 2.523,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 2.54,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_9_too_big",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 6.405,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 6.42,
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/scroll_rect",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 1.329,
-        "run": 0.004
-      },
-      "num_frames": 3,
       "lines": {
         "actual_lines": 0,
         "expected_lines": 0,
@@ -755,10 +193,90 @@
       "status": "pass"
     },
     {
-      "test": "cache_as_bitmap/scroll_rect_scaled",
+      "test": "blend_modes/lighten",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.418,
+        "compile": 1.333,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.34,
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/multiply",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.34,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.35,
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/overlay",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.084,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.09,
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/overlay_onto_stage",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.318,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.32,
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/screen",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.925,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 0.93,
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/shader_as_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 18.104,
         "run": 0.004
       },
       "num_frames": 1,
@@ -767,14 +285,94 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.43,
+      "duration": 18.11,
       "status": "pass"
     },
     {
-      "test": "cache_as_bitmap/shape_changed",
+      "test": "blend_modes/shader_without_shader",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.352,
+        "compile": 16.406,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 16.42,
+      "status": "pass"
+    },
+    {
+      "test": "blend_modes/subtract",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.848,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 0.85,
+      "status": "pass"
+    },
+    {
+      "test": "bmd_draw_with_msaa_issue_10579",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 13.206,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 13.21,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/avm1_color",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 15.871,
+        "run": 0.004
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 15.88,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/avm2_button",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 15.918,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 15.93,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/avm2_button_state",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 16.076,
         "run": 0.002
       },
       "num_frames": 3,
@@ -783,14 +381,414 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.36,
+      "duration": 16.09,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/bitmap_changed",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 19.827,
+        "run": 0.008
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.84,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_bitmapdata_invalidate",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 19.815,
+        "run": 0.004
+      },
+      "num_frames": 12,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 19.83,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_alpha",
+      "phases": {
+        "recomp": 0.029,
+        "compile": 28.337,
+        "run": 0.008
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 28.38,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_filters",
+      "phases": {
+        "recomp": 0.029,
+        "compile": 7.236,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 7.28,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_transform",
+      "phases": {
+        "recomp": 0.028,
+        "compile": 26.802,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 26.84,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/cab_mask_triangle",
+      "phases": {
+        "recomp": 0.028,
+        "compile": 8.606,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.65,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/children_changed",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.418,
+        "run": 0.002
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.43,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/color_transform",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.333,
+        "run": 0.002
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.34,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/contains_grown_filter",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.101,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.11,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/drawing_api",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.547,
+        "run": 0.002
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.56,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/edittext_hscroll",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.648,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 21.66,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/edittext_scroll",
+      "phases": {
+        "recomp": 0.022,
+        "compile": 21.562,
+        "run": 0.002
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.59,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/edittext_selection",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.158,
+        "run": 0.004
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.17,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/masks",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 7.02,
+        "run": 0.004
+      },
+      "num_frames": 7,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 7.04,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/morph",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.37,
+        "run": 0.002
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.38,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/nested_color_transform",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.315,
+        "run": 0.002
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.33,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/nested_matrix",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.304,
+        "run": 0.002
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.31,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/nested_rotation",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.39,
+        "run": 0.002
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.4,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_10_masks",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.907,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.92,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_10_too_big",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 6.47,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.48,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_9_masks",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.477,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.49,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_9_too_big",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 6.422,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 6.43,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/scroll_rect",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.386,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.39,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/scroll_rect_scaled",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.853,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.86,
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/shape_changed",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.402,
+        "run": 0.002
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.41,
       "status": "pass"
     },
     {
       "test": "cache_as_bitmap/text",
       "phases": {
-        "recomp": 0.0,
-        "compile": 1.572,
+        "recomp": 0.023,
+        "compile": 21.14,
         "run": 0.004
       },
       "num_frames": 4,
@@ -799,14 +797,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.58,
+      "duration": 21.17,
       "status": "pass"
     },
     {
       "test": "color_transform_issue_9698",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.038,
+        "compile": 20.803,
         "run": 0.002
       },
       "num_frames": 1,
@@ -815,53 +813,30 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.04,
+      "duration": 20.81,
       "status": "pass"
     },
     {
       "test": "define_bits_jpeg2_huge",
       "phases": {
-        "recomp": 1.184,
-        "compile": 20.476,
-        "run": 0.008
+        "recomp": 1.218,
+        "compile": 21.063,
+        "run": 0.016
       },
       "num_frames": 1,
       "lines": {
         "actual_lines": 19,
         "expected_lines": 19,
-        "matching_lines": 13
+        "matching_lines": 19
       },
-      "duration": 21.68,
-      "status": "output_mismatch",
-      "detail": "6 line(s) differ (actual=19, expected=19)",
-      "actual_output": "Loaded\nImage 1\n0\n2\n0\n0\nImage 2\n2\n0\n0\n0\nImage 3\n65000\n2\nImage 4\n2\n65000\n4284177243\n4278190080",
-      "expected_output": "Loaded\nImage 1\n524288\n2\n4286085240\n4285690482\nImage 2\n2\n524288\n4284243036\n4287401100\nImage 3\n65000\n2\nImage 4\n2\n65000\n4284177243\n4278190080"
+      "duration": 22.31,
+      "status": "pass"
     },
     {
-      "test": "definefont4",
-      "phases": {
-        "recomp": 1.034,
-        "compile": 85.733,
-        "run": 0.016
-      },
-      "num_frames": 5,
-      "error_signature": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: getEffectiveLineHeight)",
-      "lines": {
-        "actual_lines": 24,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 86.79,
-      "status": "output_mismatch",
-      "detail": "24 line(s) differ (actual=24, expected=0)",
-      "actual_output": "TypeError: Error #1009: Cannot access a property or method of a null object reference. (accessing field: getEffectiveLineHeight)\n\tat flashx.textLayout.compose::TextFlowLine/getLineLeading()\n\tat flashx.textLayout.compose::BaseCompose/calculateLeadingParameters()\n\tat flashx.textLayout.compose::BaseCompose/finishComposeLine()\n\tat flashx.textLayout.compose::BaseCompose/fitLineToParcel()\n\tat flashx.textLayout.compose::SimpleCompose/composeNextLine()\n\tat flashx.textLayout.compose::BaseCompose/composeParagraphElementIntoLines()\n\tat flashx.textLayout.compose::BaseCompose/composeParagraphElement()\n\tat flashx.textLayout.compose::BaseCompose/composeBlockElement()\n\tat flashx.textLayout.compose::BaseCompose/composeInternal()\n\tat flashx.textLayout.compose::BaseCompose/composeTextFlow()\n\tat flashx.textLayout.compose::SimpleCompose/composeTextFlow()\n\tat flashx.textLayout.factory::FactoryDisplayComposer/callTheComposer()\n\tat flashx.textLayout.compose::StandardFlowComposer/internalCompose()\n\tat flashx.textLayout.compose::StandardFlowComposer/compose()\n\tat flashx.textLayout.factory::StringTextLineFactory/createTextLinesInternal()\n\tat flashx.textLayout.factory::StringTextLineFactory/createTextLines()\n\tat flashx.textLayout.container::TextContainerManager/compose()\n\tat flashx.textLayout.container::TextContainerManager/updateContainer()\n\tat fl.text::TCMText/repaint()\n\tat fl.text::TCMRuntimeManager/configureInstance()\n\tat fl.text::TCMRuntimeManager/getInstanceForInfo()\n\tat fl.timeline::TimelineManager/addInstance()\n\tat definefont4_fla::MainTimeline()",
-      "expected_output": ""
-    },
-    {
-      "test": "drawing_api/cursor",
+      "test": "define_bits_lossless2_rgb15",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.25,
+        "compile": 1.249,
         "run": 0.002
       },
       "num_frames": 1,
@@ -870,14 +845,46 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.26,
+      "duration": 1.25,
+      "status": "pass"
+    },
+    {
+      "test": "definefont4",
+      "phases": {
+        "recomp": 1.044,
+        "compile": 87.664,
+        "run": 0.016
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 88.74,
+      "status": "pass"
+    },
+    {
+      "test": "drawing_api/cursor",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.318,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.32,
       "status": "pass"
     },
     {
       "test": "drawing_api/drawing_order",
       "phases": {
         "recomp": 0.005,
-        "compile": 19.646,
+        "compile": 20.268,
         "run": 0.004
       },
       "num_frames": 1,
@@ -886,14 +893,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.66,
+      "duration": 20.28,
       "status": "pass"
     },
     {
       "test": "drawing_api/fills_and_lines",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.571,
+        "recomp": 0.006,
+        "compile": 1.666,
         "run": 0.004
       },
       "num_frames": 1,
@@ -902,15 +909,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.58,
+      "duration": 1.68,
       "status": "pass"
     },
     {
       "test": "drawing_api/gradient_focal_point",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.112,
-        "run": 0.004
+        "compile": 21.109,
+        "run": 0.008
       },
       "num_frames": 1,
       "lines": {
@@ -925,8 +932,8 @@
       "test": "edittext/edittext_background_basic",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.464,
-        "run": 0.004
+        "compile": 20.657,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -934,30 +941,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.47,
+      "duration": 20.66,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_background_basic_scale2",
       "phases": {
         "recomp": 0.005,
-        "compile": 20.572,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 20.58,
-      "status": "pass"
-    },
-    {
-      "test": "edittext/edittext_border_basic",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 1.351,
+        "compile": 20.398,
         "run": 0.004
       },
       "num_frames": 1,
@@ -966,30 +957,30 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.36,
+      "duration": 20.41,
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_border_basic",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.399,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.41,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_border_basic_scale2",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.013,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.03,
-      "status": "pass"
-    },
-    {
-      "test": "edittext/edittext_border_filters",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 19.656,
+        "compile": 20.387,
         "run": 0.002
       },
       "num_frames": 1,
@@ -998,14 +989,30 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.67,
+      "duration": 20.4,
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_border_filters",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 20.3,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.31,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_border_transform",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.791,
+        "recomp": 0.006,
+        "compile": 1.875,
         "run": 0.004
       },
       "num_frames": 8,
@@ -1014,14 +1021,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.8,
+      "duration": 1.89,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_bounds_vs_position",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.216,
+        "recomp": 0.005,
+        "compile": 20.188,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1030,14 +1037,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.23,
+      "duration": 20.2,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_caret_empty",
       "phases": {
-        "recomp": 0.024,
-        "compile": 20.827,
+        "recomp": 0.0,
+        "compile": 20.864,
         "run": 0.004
       },
       "num_frames": 14,
@@ -1046,71 +1053,68 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.86,
+      "duration": 20.87,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_device_transform_basic",
       "phases": {
-        "recomp": 0.009,
-        "compile": 6.786,
+        "recomp": 0.011,
+        "compile": 25.88,
         "run": 0.004
       },
       "num_frames": 1,
       "lines": {
         "actual_lines": 24,
         "expected_lines": 24,
-        "matching_lines": 12
+        "matching_lines": 24
       },
-      "duration": 6.81,
-      "status": "output_mismatch",
-      "detail": "12 line(s) differ (actual=24, expected=24)",
-      "actual_output": "... (7 lines before) ...\nfalse = width=16\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = width=16\nfalse = 16\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = width=12\ntrue = 12",
-      "expected_output": "... (7 lines before) ...\nfalse = width=16\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = width=16\nfalse = 16\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = width=16\ntrue = 16\ntrue = (x=2, y=2, w=4, h=10),(x=6, y=2, w=4, h=10)\ntrue = width=8\ntrue = 8\ntrue = (x=2, y=2, w=16, h=10),(x=18, y=2, w=16, h=10)\ntrue = width=32\ntrue = 32\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = width=16\ntrue = 16"
+      "duration": 25.9,
+      "status": "pass"
     },
     {
       "test": "edittext/edittext_device_transform_metrics",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.981,
+        "compile": 6.678,
         "run": 0.004
       },
       "num_frames": 1,
       "lines": {
         "actual_lines": 40,
         "expected_lines": 40,
-        "matching_lines": 20
+        "matching_lines": 32
       },
-      "duration": 24.99,
-      "status": "output_mismatch",
-      "detail": "20 line(s) differ (actual=40, expected=40)",
-      "actual_output": "... (15 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12",
-      "expected_output": "... (15 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=102,ascent=8,descent=2\ntrue = 120\ntrue = 16\ntrue = (x=2, y=2, w=4, h=10),(x=6, y=2, w=4, h=10)\ntrue = 0,0,0,1,-1,-1,-1,-1,-1,-1,-1,\ntrue = height=5,width=8,x=52,ascent=4,descent=1\ntrue = 60\ntrue = 8\ntrue = (x=2, y=2, w=16, h=10),(x=18, y=2, w=16, h=10)\ntrue = 0,0,0,0,0,0,0,-1,-1,-1,-1,\ntrue = height=20,width=32,x=102,ascent=16,descent=4\ntrue = 240\ntrue = 32\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=52,ascent=8,descent=2\ntrue = 120\ntrue = 16"
+      "duration": 6.69,
+      "ruffle_diff_count": 8,
+      "ours_diff_count": 8,
+      "status": "ruffle_matched",
+      "detail": "diffs 8 \u2286 ruffle 8"
     },
     {
       "test": "edittext/edittext_device_transform_negative",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.528,
+        "compile": 6.842,
         "run": 0.004
       },
       "num_frames": 1,
       "lines": {
         "actual_lines": 120,
         "expected_lines": 120,
-        "matching_lines": 60
+        "matching_lines": 79
       },
-      "duration": 6.54,
-      "status": "output_mismatch",
-      "detail": "60 line(s) differ (actual=120, expected=120)",
-      "actual_output": "... (25 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\ntrue = (x=2, y=2, w=6, h=13.6),(x=8, y=2, w=6, h=13.6)\ntrue = 0,0,0,1,1,1,-1,-1,-1,1,1,\ntrue = height=14,width=12,x=2,ascent=11,descent=3\ntrue = 163.2\ntrue = 12\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\n... (45 lines after) ...",
-      "expected_output": "... (25 lines before) ...\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=102,ascent=8,descent=2\ntrue = 120\ntrue = 16\ntrue = (x=2, y=2, w=4, h=10),(x=6, y=2, w=4, h=10)\ntrue = 0,0,0,1,-1,-1,-1,-1,-1,-1,-1,\ntrue = height=5,width=8,x=52,ascent=4,descent=1\ntrue = 60\ntrue = 8\ntrue = (x=2, y=2, w=16, h=10),(x=18, y=2, w=16, h=10)\ntrue = 0,0,0,0,0,0,0,-1,-1,-1,-1,\ntrue = height=20,width=32,x=102,ascent=16,descent=4\ntrue = 240\ntrue = 32\ntrue = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\ntrue = 0,0,0,0,1,1,1,-1,-1,-1,-1,\ntrue = height=10,width=16,x=52,ascent=8,descent=2\ntrue = 120\ntrue = 16\ntrue = (x=2, y=18, w=2, h=-2),(x=2, y=16, w=2, h=-2)\ntrue = 0,0,0,0,0,0,0,0,0,0,0,\ntrue = height=2,width=4,x=132,ascent=2,descent=0\ntrue = 24\ntrue = 4\ntrue = (x=2, y=18, w=2, h=-1),(x=2, y=17, w=2, h=-1)\ntrue = 0,0,0,0,0,0,0,0,0,0,0,\ntrue = height=1,width=2,x=57,ascent=1,descent=0\ntrue = 12\ntrue = 2\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\nfalse = (x=2, y=2, w=8, h=10),(x=10, y=2, w=8, h=10)\nfalse = 0,0,0,0,1,1,1,-1,-1,-1,-1,\nfalse = height=10,width=16,x=2,ascent=8,descent=2\nfalse = 120\nfalse = 16\n... (45 lines after) ..."
+      "duration": 6.85,
+      "ruffle_diff_count": 41,
+      "ours_diff_count": 41,
+      "status": "ruffle_matched",
+      "detail": "diffs 41 \u2286 ruffle 41"
     },
     {
       "test": "edittext/edittext_device_transform_small_rotation",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.752,
+        "compile": 20.125,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1119,14 +1123,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.76,
+      "duration": 20.13,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_device_transform_small_shear",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.567,
+        "compile": 20.287,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1135,14 +1139,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.57,
+      "duration": 20.29,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_gutter",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.86,
+        "compile": 25.877,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1151,14 +1155,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.87,
+      "duration": 25.89,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_justify",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.718,
+        "compile": 25.984,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1167,14 +1171,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 25.73,
+      "duration": 26.0,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_negative_bounds",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.32,
+        "compile": 1.334,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1183,14 +1187,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.33,
+      "duration": 1.34,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_selection_font_size",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.414,
+        "compile": 21.55,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1199,14 +1203,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.43,
+      "duration": 21.56,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_selection_leading",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.956,
+        "compile": 26.445,
         "run": 0.004
       },
       "num_frames": 14,
@@ -1215,14 +1219,14 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 25.97,
+      "duration": 26.46,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_underline",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.079,
+        "compile": 26.276,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1231,14 +1235,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 26.09,
+      "duration": 26.29,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_underline_scale2",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.625,
+        "compile": 22.384,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1247,14 +1251,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.64,
+      "duration": 22.4,
       "status": "pass"
     },
     {
       "test": "filters/any_blur_scales_with_screen",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.454,
+        "compile": 19.918,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1263,14 +1267,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.46,
+      "duration": 19.92,
       "status": "pass"
     },
     {
       "test": "filters/avm1_convolution_initialization",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.397,
+        "compile": 1.372,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1279,14 +1283,14 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 1.41,
+      "duration": 1.38,
       "status": "pass"
     },
     {
       "test": "filters/bevel",
       "phases": {
-        "recomp": 0.052,
-        "compile": 21.086,
+        "recomp": 0.047,
+        "compile": 20.554,
         "run": 0.016
       },
       "num_frames": 1,
@@ -1295,14 +1299,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.16,
+      "duration": 20.62,
       "status": "pass"
     },
     {
       "test": "filters/bevel_full",
       "phases": {
-        "recomp": 0.057,
-        "compile": 21.502,
+        "recomp": 0.04,
+        "compile": 17.937,
         "run": 0.032
       },
       "num_frames": 1,
@@ -1311,14 +1315,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.6,
+      "duration": 18.01,
       "status": "pass"
     },
     {
       "test": "filters/bevel_inner",
       "phases": {
-        "recomp": 0.056,
-        "compile": 20.135,
+        "recomp": 0.04,
+        "compile": 1.088,
         "run": 0.032
       },
       "num_frames": 1,
@@ -1327,14 +1331,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.23,
+      "duration": 1.16,
       "status": "pass"
     },
     {
       "test": "filters/bevel_outer",
       "phases": {
-        "recomp": 0.056,
-        "compile": 1.568,
+        "recomp": 0.039,
+        "compile": 1.244,
         "run": 0.032
       },
       "num_frames": 1,
@@ -1343,15 +1347,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.66,
+      "duration": 1.32,
       "status": "pass"
     },
     {
       "test": "filters/blur_fractional",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.669,
-        "run": 0.008
+        "compile": 22.231,
+        "run": 0.032
       },
       "num_frames": 1,
       "lines": {
@@ -1359,15 +1363,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.68,
+      "duration": 22.27,
       "status": "pass"
     },
     {
       "test": "filters/blur_pass_scaling",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.65,
-        "run": 0.008
+        "compile": 22.357,
+        "run": 0.016
       },
       "num_frames": 1,
       "lines": {
@@ -1375,15 +1379,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.66,
+      "duration": 22.38,
       "status": "pass"
     },
     {
       "test": "filters/blur_quality",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.367,
-        "run": 0.008
+        "compile": 25.744,
+        "run": 0.065
       },
       "num_frames": 1,
       "lines": {
@@ -1391,14 +1395,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.38,
+      "duration": 25.82,
       "status": "pass"
     },
     {
       "test": "filters/blur_scales_with_screen",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.891,
+        "compile": 20.16,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1407,14 +1411,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.9,
+      "duration": 20.17,
       "status": "pass"
     },
     {
       "test": "filters/blur_size_grows",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.439,
+        "compile": 1.339,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1423,14 +1427,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.45,
+      "duration": 1.35,
       "status": "pass"
     },
     {
       "test": "filters/color_matrix",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.351,
+        "compile": 1.246,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1439,14 +1443,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.36,
+      "duration": 1.25,
       "status": "pass"
     },
     {
       "test": "filters/displacement_map",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.705,
+        "compile": 26.251,
         "run": 0.008
       },
       "num_frames": 1,
@@ -1455,14 +1459,46 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.72,
+      "duration": 26.27,
       "status": "pass"
     },
     {
       "test": "filters/displacement_map_scales_with_screen",
       "phases": {
         "recomp": 0.0,
-        "compile": 28.593,
+        "compile": 27.101,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.11,
+      "status": "pass"
+    },
+    {
+      "test": "filters/displacement_map_through_applyFilter",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 25.292,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.32,
+      "status": "pass"
+    },
+    {
+      "test": "filters/displacement_map_through_filters",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 6.396,
         "run": 0.008
       },
       "num_frames": 1,
@@ -1471,46 +1507,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 28.61,
-      "status": "pass"
-    },
-    {
-      "test": "filters/displacement_map_through_applyFilter",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 25.654,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 25.67,
-      "status": "pass"
-    },
-    {
-      "test": "filters/displacement_map_through_filters",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 6.507,
-        "run": 0.004
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 6.52,
+      "duration": 6.41,
       "status": "pass"
     },
     {
       "test": "filters/drop_shadow",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.467,
+        "compile": 1.457,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1519,14 +1523,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.47,
+      "duration": 1.46,
       "status": "pass"
     },
     {
       "test": "filters/drop_shadow_angles",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.374,
+        "compile": 1.371,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1542,7 +1546,7 @@
       "test": "filters/drop_shadow_scales_with_screen",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.874,
+        "compile": 20.622,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1551,14 +1555,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.88,
+      "duration": 20.63,
       "status": "pass"
     },
     {
       "test": "filters/glow",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.588,
+        "compile": 1.526,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1567,14 +1571,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.59,
+      "duration": 1.53,
       "status": "pass"
     },
     {
       "test": "filters/glow_pass_scaling",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.855,
+        "compile": 26.2,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1583,14 +1587,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 26.87,
+      "duration": 26.21,
       "status": "pass"
     },
     {
       "test": "filters/glow_with_alpha_strength",
       "phases": {
-        "recomp": 0.061,
-        "compile": 21.963,
+        "recomp": 0.06,
+        "compile": 21.129,
         "run": 0.032
       },
       "num_frames": 1,
@@ -1599,14 +1603,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.06,
+      "duration": 21.23,
       "status": "pass"
     },
     {
       "test": "filters/glow_without_composite_source",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.58,
+        "compile": 1.566,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1615,14 +1619,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.59,
+      "duration": 1.57,
       "status": "pass"
     },
     {
       "test": "focus_highlight/focus_highlight_avm1_button",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.278,
+        "compile": 20.771,
         "run": 0.004
       },
       "num_frames": 8,
@@ -1631,15 +1635,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 21.29,
+      "duration": 20.78,
       "status": "pass"
     },
     {
       "test": "focus_highlight/focus_highlight_avm2_button_bounds",
       "phases": {
-        "recomp": 0.006,
-        "compile": 24.746,
-        "run": 0.004
+        "recomp": 0.005,
+        "compile": 25.768,
+        "run": 0.008
       },
       "num_frames": 3,
       "lines": {
@@ -1647,14 +1651,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 24.76,
+      "duration": 25.79,
       "status": "pass"
     },
     {
       "test": "focus_highlight/focus_highlight_basic",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.706,
+        "recomp": 0.004,
+        "compile": 1.572,
         "run": 0.004
       },
       "num_frames": 11,
@@ -1663,14 +1667,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.72,
+      "duration": 1.58,
       "status": "pass"
     },
     {
       "test": "focus_highlight/focus_highlight_empty_clip",
       "phases": {
-        "recomp": 0.006,
-        "compile": 6.297,
+        "recomp": 0.005,
+        "compile": 6.346,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1679,14 +1683,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.31,
+      "duration": 6.36,
       "status": "pass"
     },
     {
       "test": "focus_highlight/focus_highlight_move",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.547,
+        "recomp": 0.004,
+        "compile": 20.636,
         "run": 0.004
       },
       "num_frames": 7,
@@ -1695,15 +1699,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.56,
+      "duration": 20.65,
       "status": "pass"
     },
     {
       "test": "focus_highlight/focus_highlight_render",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.579,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 1.657,
+        "run": 0.002
       },
       "num_frames": 8,
       "lines": {
@@ -1711,14 +1715,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.59,
+      "duration": 1.67,
       "status": "pass"
     },
     {
       "test": "fonts/advance_u16",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.844,
+        "compile": 21.248,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1727,14 +1731,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.85,
+      "duration": 21.26,
       "status": "pass"
     },
     {
       "test": "fonts/device-font",
       "phases": {
-        "recomp": 0.006,
-        "compile": 6.44,
+        "recomp": 0.013,
+        "compile": 6.785,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1743,14 +1747,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.46,
+      "duration": 6.81,
       "status": "pass"
     },
     {
       "test": "fonts/duplicate_font",
       "phases": {
-        "recomp": 0.045,
-        "compile": 6.56,
+        "recomp": 0.058,
+        "compile": 6.852,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1759,14 +1763,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.62,
+      "duration": 6.92,
       "status": "pass"
     },
     {
       "test": "fonts/font_lookup_as3",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.534,
+        "compile": 6.812,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1775,14 +1779,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.54,
+      "duration": 6.82,
       "status": "pass"
     },
     {
       "test": "fonts/glyph",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.544,
+        "compile": 7.058,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1791,14 +1795,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.55,
+      "duration": 7.07,
       "status": "pass"
     },
     {
       "test": "fonts/leading_define_font",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.564,
+        "compile": 20.622,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1807,14 +1811,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.57,
+      "duration": 20.63,
       "status": "pass"
     },
     {
       "test": "fonts/leading_device_font",
       "phases": {
         "recomp": 0.0,
-        "compile": 24.348,
+        "compile": 25.996,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1823,14 +1827,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.36,
+      "duration": 26.01,
       "status": "pass"
     },
     {
       "test": "fonts/leading_embedded_font",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.696,
+        "compile": 7.301,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1839,14 +1843,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.71,
+      "duration": 7.31,
       "status": "pass"
     },
     {
       "test": "gradient_issue_9892",
       "phases": {
-        "recomp": 0.005,
-        "compile": 19.747,
+        "recomp": 0.0,
+        "compile": 20.557,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1855,14 +1859,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.76,
+      "duration": 20.56,
       "status": "pass"
     },
     {
       "test": "gradient_nonsequential_ratios",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.468,
+        "compile": 19.798,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1871,14 +1875,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.47,
+      "duration": 19.8,
       "status": "pass"
     },
     {
       "test": "gradient_radial_same_ratios",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.851,
+        "compile": 19.856,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1894,7 +1898,7 @@
       "test": "gradient_same_ratios",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.788,
+        "compile": 1.161,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1903,14 +1907,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.79,
+      "duration": 1.17,
       "status": "pass"
     },
     {
       "test": "layout/line_vertical_align",
       "phases": {
         "recomp": 0.0,
-        "compile": 25.432,
+        "compile": 25.603,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1919,14 +1923,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 25.44,
+      "duration": 25.61,
       "status": "pass"
     },
     {
       "test": "opaque_background",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.309,
+        "compile": 1.3,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1942,7 +1946,7 @@
       "test": "scale_rotation_cache",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.427,
+        "compile": 20.327,
         "run": 0.004
       },
       "num_frames": 50,
@@ -1951,14 +1955,14 @@
         "expected_lines": 106,
         "matching_lines": 106
       },
-      "duration": 21.44,
+      "duration": 20.34,
       "status": "pass"
     },
     {
       "test": "simple_shapes/gradients/focal_radial",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.461,
+        "recomp": 0.004,
+        "compile": 1.231,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1967,14 +1971,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.47,
+      "duration": 1.24,
       "status": "pass"
     },
     {
       "test": "simple_shapes/gradients/gradients",
       "phases": {
-        "recomp": 0.028,
-        "compile": 1.482,
+        "recomp": 0.023,
+        "compile": 1.256,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1983,15 +1987,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.52,
+      "duration": 1.28,
       "status": "pass"
     },
     {
       "test": "simple_shapes/gradients/radial",
       "phases": {
-        "recomp": 0.027,
-        "compile": 1.6,
-        "run": 0.002
+        "recomp": 0.024,
+        "compile": 1.399,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -1999,14 +2003,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.63,
+      "duration": 1.43,
       "status": "pass"
     },
     {
       "test": "simple_shapes/gradients/reflect",
       "phases": {
-        "recomp": 0.028,
-        "compile": 1.553,
+        "recomp": 0.0,
+        "compile": 0.936,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2015,94 +2019,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.59,
+      "duration": 0.94,
       "status": "pass"
     },
     {
       "test": "simple_shapes/gradients/repeat",
       "phases": {
-        "recomp": 0.027,
-        "compile": 1.543,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.58,
-      "status": "pass"
-    },
-    {
-      "test": "simple_shapes/heavy_tesselation",
-      "phases": {
-        "recomp": 48.966,
-        "compile": 27.264,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 76.24,
-      "status": "pass"
-    },
-    {
-      "test": "simple_shapes/layers",
-      "phases": {
         "recomp": 0.0,
-        "compile": 1.308,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.31,
-      "status": "pass"
-    },
-    {
-      "test": "simple_shapes/masks",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.972,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 0.98,
-      "status": "pass"
-    },
-    {
-      "test": "simple_shapes/masks_equal_clipdepth",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.674,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 0.68,
-      "status": "pass"
-    },
-    {
-      "test": "simple_shapes/overlaps",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.928,
+        "compile": 0.926,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2115,11 +2039,11 @@
       "status": "pass"
     },
     {
-      "test": "simple_shapes/scroll_rect_mask",
+      "test": "simple_shapes/heavy_tesselation",
       "phases": {
-        "recomp": 0.0,
-        "compile": 0.98,
-        "run": 0.004
+        "recomp": 22.586,
+        "compile": 14.295,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -2127,14 +2051,30 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 0.99,
+      "duration": 36.89,
       "status": "pass"
     },
     {
-      "test": "simple_shapes/strokes/scale",
+      "test": "simple_shapes/layers",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.185,
+        "compile": 0.78,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 0.78,
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/masks",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.18,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2147,10 +2087,10 @@
       "status": "pass"
     },
     {
-      "test": "simple_shapes/text_field_mask",
+      "test": "simple_shapes/masks_equal_clipdepth",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.197,
+        "compile": 0.802,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2159,14 +2099,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.2,
+      "duration": 0.81,
       "status": "pass"
     },
     {
-      "test": "simple_shapes/winding_rule",
+      "test": "simple_shapes/overlaps",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.657,
+        "compile": 1.089,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2175,14 +2115,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.66,
+      "duration": 1.09,
       "status": "pass"
     },
     {
-      "test": "text/String_path_variable_button",
+      "test": "simple_shapes/scroll_rect_mask",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.305,
+        "compile": 1.165,
         "run": 0.004
       },
       "num_frames": 1,
@@ -2191,14 +2131,78 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.31,
+      "duration": 1.17,
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/strokes/scale",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.247,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.25,
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/text_field_mask",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.263,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.27,
+      "status": "pass"
+    },
+    {
+      "test": "simple_shapes/winding_rule",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.769,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.77,
+      "status": "pass"
+    },
+    {
+      "test": "text/String_path_variable_button",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.348,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 1.36,
       "status": "pass"
     },
     {
       "test": "video/colorconversion/h263",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.069,
+        "compile": 19.819,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2207,14 +2211,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.08,
+      "duration": 19.83,
       "status": "pass"
     },
     {
       "test": "video/colorconversion/vp6",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.383,
+        "recomp": 0.0,
+        "compile": 1.365,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2223,15 +2227,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.4,
+      "duration": 1.37,
       "status": "pass"
     },
     {
       "test": "video/colorconversion/vp6a",
       "phases": {
         "recomp": 0.008,
-        "compile": 1.57,
-        "run": 0.002
+        "compile": 1.562,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -2246,6 +2250,70 @@
       "test": "video/deblocking",
       "phases": {
         "recomp": 0.013,
+        "compile": 20.663,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.68,
+      "status": "pass"
+    },
+    {
+      "test": "video/h264",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 27.548,
+        "run": 0.004
+      },
+      "num_frames": 120,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.56,
+      "status": "pass"
+    },
+    {
+      "test": "video/h264_multinalu",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 26.453,
+        "run": 0.004
+      },
+      "num_frames": 8,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 26.47,
+      "status": "pass"
+    },
+    {
+      "test": "video/vp6_alphaoffset",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 20.631,
+        "run": 0.002
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 20.65,
+      "status": "pass"
+    },
+    {
+      "test": "video/vp6_dispsize",
+      "phases": {
+        "recomp": 0.008,
         "compile": 20.624,
         "run": 0.002
       },
@@ -2256,70 +2324,6 @@
         "matching_lines": 0
       },
       "duration": 20.64,
-      "status": "pass"
-    },
-    {
-      "test": "video/h264",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 26.924,
-        "run": 0.004
-      },
-      "num_frames": 120,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 26.94,
-      "status": "pass"
-    },
-    {
-      "test": "video/h264_multinalu",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 25.634,
-        "run": 0.004
-      },
-      "num_frames": 8,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 25.65,
-      "status": "pass"
-    },
-    {
-      "test": "video/vp6_alphaoffset",
-      "phases": {
-        "recomp": 0.008,
-        "compile": 20.244,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 20.26,
-      "status": "pass"
-    },
-    {
-      "test": "video/vp6_dispsize",
-      "phases": {
-        "recomp": 0.008,
-        "compile": 20.279,
-        "run": 0.002
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 20.29,
       "status": "pass"
     }
   ]

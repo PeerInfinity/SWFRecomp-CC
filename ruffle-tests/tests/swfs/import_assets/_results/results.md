@@ -1,36 +1,31 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-09 08:51 UTC
+**Date**: 2026-08-19 13:28 UTC
 
-**Git SHA**: `0a99be1a92`
+**Git SHA**: `9d038c750e`
 
-**Run Duration**: 0m 44s
+**Run Duration**: 0m 46s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 3 |
-| Passing | **2** (66.7%) |
-| Failing | 1 |
+| Passing | **3** (100.0%) |
+| Failing | 0 |
 | Total expected lines | 14 |
-| Matching lines | 8 (57.1%) |
-| Mismatched lines | 6 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Matching lines | 14 (100.0%) |
+| Mismatched lines | 0 |
 
 ## Passing Tests
 
-**2 tests passing**
+**3 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm1_non_swf_import` | 6 | 21.4s |  |
-| 2 | `empty_url` | 2 | 20.5s |  |
+| 1 | `avm1_imports_avm1` | 6 | 1.3s |  |
+| 2 | `avm1_non_swf_import` | 6 | 22.6s |  |
+| 3 | `empty_url` | 2 | 22.1s |  |
 
 ## Near-Passing Tests
 
@@ -54,8 +49,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `avm1_imports_avm1` | 0.0% | 0/7 | 7 | 6 |  |
+No output mismatches.

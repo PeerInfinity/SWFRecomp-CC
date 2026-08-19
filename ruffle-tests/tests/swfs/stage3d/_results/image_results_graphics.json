@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "timestamp": "2026-08-15T10:09:53.192834+00:00",
+    "timestamp": "2026-08-19T14:26:20.210329+00:00",
     "suite": "stage3d",
     "stem": "results_graphics",
-    "git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
+    "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "31877239992",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/31877239992",
-    "run_attempt": "1"
+    "run_id": "32254809391",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/32254809391",
+    "run_attempt": "2"
   },
   "tests_with_comparisons": 3,
   "comparisons": 3,

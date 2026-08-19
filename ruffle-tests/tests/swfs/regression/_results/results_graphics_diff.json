@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-15T09:18:14.528319+00:00",
-    "old_git_sha": "86434112a75946b377d5d329b234e47fa83a957c",
-    "new_timestamp": "2026-08-15T10:09:49.349934+00:00",
-    "new_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
+    "old_timestamp": "2026-08-19T13:54:51.833661+00:00",
+    "old_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
+    "new_timestamp": "2026-08-19T14:26:17.459639+00:00",
+    "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 72,
+    "old_pass": 70,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 72,
-    "old_total": 72,
+    "old_effective_pass": 70,
+    "old_total": 70,
     "old_pass_rate": 100.0,
     "new_pass": 72,
     "new_ruffle_matched": 0,
@@ -25,9 +25,34 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 72,
-    "added": 0,
+    "unchanged": 70,
+    "added": 2,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "lv_cross_swf_version",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "lv_ondata_type1_args",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    }
+  ]
 }

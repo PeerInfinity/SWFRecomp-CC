@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b4c983ea4c3d` (2026-08-02T09:26:35.718372+00:00)
-**Current:** `0a99be1a92de` (2026-08-09T08:51:22.990460+00:00)
+**Previous:** `88ebde66534f` (2026-08-16T08:44:05.521604+00:00)
+**Current:** `9d038c750eaf` (2026-08-19T13:28:59.098328+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 70 | 71 | +1 |
-| Total | 70 | 71 | +1 |
+| Passing | 72 | 72 | 0 |
+| Total | 72 | 72 | 0 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `mask_sibling_union` | pass | 1/1 |
+No changes detected.

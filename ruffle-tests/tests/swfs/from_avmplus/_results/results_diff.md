@@ -1,35 +1,31 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b4c983ea4c3d` (2026-08-02T09:26:35.644742+00:00)
-**Current:** `0a99be1a92de` (2026-08-09T08:51:22.919632+00:00)
+**Previous:** `88ebde66534f` (2026-08-16T08:44:05.448986+00:00)
+**Current:** `9d038c750eaf` (2026-08-19T13:28:59.022017+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1510 | 1514 | +4 |
+| Passing | 1515 | 1527 | +12 |
 | Total | 1574 | 1574 | 0 |
-| Pass rate | 95.9% | 96.2% | +0.3% |
-| Mismatched lines | 605 | 581 | -24 |
-|   Decreased | | | -24 |
+| Pass rate | 96.3% | 97.0% | +0.7% |
+| Mismatched lines | 578 | 562 | -16 |
+|   Decreased | | | -16 |
 
-## Newly Passing (4)
+## Newly Passing (12)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `as3/String/localeCompare_585791/v9` | output_mismatch | 2/8 | 8/8 |
-| `ecma3/Expressions/e11_6_1_3` | output_mismatch | 3/9 | 9/9 |
-| `ecma3/String/e15_5_4_8_2` | output_mismatch | 54/60 | 60/60 |
-| `regress/bug_550958` | output_mismatch | 2/3 | 3/3 |
-
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `regress/bug_539328` | output_mismatch | ruffle_matched | 7/15 | 12/15 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `e4x/XML/bug_564468` | ruffle_matched | 3/10 | 3/10 | 0 |
+| `as3/Expressions/asOperator/asOper` | output_mismatch | 332/334 | 334/334 |
+| `ecma3/Array/e15_4_4_5` | output_mismatch | 14/15 | 15/15 |
+| `ecma3/Array/toLocaleString` | output_mismatch | 13/14 | 14/14 |
+| `ecma3/Number/e15_7_1` | output_mismatch | 45/46 | 46/46 |
+| `ecma3/Number/e15_7_2` | output_mismatch | 86/87 | 87/87 |
+| `ecma3/Number/e15_7_4_2_4` | output_mismatch | 50/51 | 51/51 |
+| `ecma3/Number/toLocaleString_rt` | output_mismatch | 47/48 | 48/48 |
+| `ecma3/Number/tostring_001` | output_mismatch | 1/3 | 3/3 |
+| `ecma3/String/e15_5_1` | output_mismatch | 48/49 | 49/49 |
+| `ecma3/String/e15_5_2` | output_mismatch | 74/75 | 75/75 |
+| `ecma3/TypeConversion/e9_8_1` | output_mismatch | 38/39 | 39/39 |
+| `ecma3/Types/e8_5` | output_mismatch | 19/22 | 22/22 |

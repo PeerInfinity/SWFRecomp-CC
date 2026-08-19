@@ -1,82 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-02T09:26:35.709311+00:00",
-    "old_git_sha": "b4c983ea4c3dfc00b53a178966fc3778c3ac4be5",
-    "new_timestamp": "2026-08-09T08:51:22.981608+00:00",
-    "new_git_sha": "0a99be1a92dee5a4f000bdf1a0809c47b9e27fc5",
+    "old_timestamp": "2026-08-16T08:44:05.512654+00:00",
+    "old_git_sha": "88ebde66534f240bc01dd14fc57f16d4075452d7",
+    "new_timestamp": "2026-08-19T13:28:59.089349+00:00",
+    "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 4,
+    "old_pass": 10,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 4,
+    "old_effective_pass": 10,
     "old_total": 11,
-    "old_pass_rate": 36.4,
-    "new_pass": 4,
+    "old_pass_rate": 90.9,
+    "new_pass": 10,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 4,
+    "new_effective_pass": 10,
     "new_total": 11,
-    "new_pass_rate": 36.4,
-    "old_mismatched_lines": 34,
-    "new_mismatched_lines": 27,
+    "new_pass_rate": 90.9,
+    "old_mismatched_lines": 4,
+    "new_mismatched_lines": 4,
     "increased_mismatches": 0,
-    "decreased_mismatches": 7,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 8,
+    "unchanged": 11,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm2_loads_avm1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 14,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 14,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm2_loads_avm1_v10",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 3
-      },
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 8,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "avm2_loads_avm1_v9",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 8,
-        "matching_lines": 7
-      }
-    }
-  ]
+  "changes": []
 }
