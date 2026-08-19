@@ -298,6 +298,18 @@ typedef struct WebGPURenderContext
 	WGPUTextureView displace_map_view;
 	u32 displace_map_w;
 	u32 displace_map_h;
+
+	// Premultiplied-alpha bitmap blend behind the Equal-compare stencil test
+	// (s17 P3). Bound instead of blend_premul_pipeline whenever a clip mask is
+	// open, so a Bitmap / attachBitmap / beginBitmapFill draw is clipped by the
+	// mask the way shape draws already were. See bind_premul_pipeline().
+	WGPURenderPipeline blend_premul_stencil_pipeline;
+
+	// Alpha-mask composite (s17 P3). Created alongside compose_pipeline in
+	// render_webgpu_ensure_filter_resources and using the SAME compose_bgl /
+	// compose_pipeline_layout: binding 0 = maskee layer, binding 3 = mask layer,
+	// binding 2 = an unused uniform block the shared layout still demands.
+	WGPURenderPipeline alpha_mask_pipeline;
 } WebGPURenderContext;
 
 // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
@@ -382,6 +394,10 @@ void render_webgpu_compose_filter(WebGPURenderContext* context, int kind,
 	float c2r, float c2g, float c2b, float c2a,
 	float strength, int variant, int knockout, int composite_source);
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
+// Composite an alpha mask (s17 P3): filter_tex_a = maskee layer, filter_src_tex
+// = mask layer; draws maskee * mask.a over the RESUMED main pass. Ruffle's
+// CommandList::render_alpha_mask (display_object.rs RenderMask::Alpha arm).
+void render_webgpu_composite_alpha_mask(WebGPURenderContext* context);
 // One DisplacementMapFilter pass over the offscreen layer (filters cut 2).
 // Call with the main pass SUSPENDED, in the same slot as render_webgpu_run_blur
 // — it consumes filter_tex_a and leaves the result there.

@@ -304,6 +304,14 @@ static const char* fragment_wgsl =
 "  if (is_gradient && (u32(in.v_args.w + 0.5) & 4u) != 0u) {\n"
 "    color = apply_linear_to_srgb(color);\n"
 "  }\n"
+"  // Ruffle's bitmap shader (render/wgpu/shaders/bitmap.wgsl) guards the whole\n"
+"  // colour-transform step with `if (color.a > 0.0)`: a FULLY TRANSPARENT texel\n"
+"  // is left exactly as it is, so an additive alpha term cannot conjure ink out\n"
+"  // of nothing. color.wgsl (solid fills, gradients) has no such guard, hence\n"
+"  // the bitmap-only test here. s17 P3: cab_mask_transform's masker is a bitmap\n"
+"  // whose last column is alpha 0 under a ColorTransform with alphaOffset 64 —\n"
+"  // without the guard that column masked at 25 percent instead of 0.\n"
+"  if ((in.v_style_type & 0xF0u) == 0x40u && color.a <= 0.0) { return color; }\n"
 "  return apply_cxform(color, in.v_cxform_id);\n"
 "}\n";
 
@@ -1802,6 +1810,24 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		rp_desc.fragment = &fs_premul;
 		ctx->blend_premul_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
 		assert(ctx->blend_premul_pipeline != NULL);
+
+		// ...and the SAME blend state behind the Equal-compare stencil test.
+		//
+		// The plain premul pipeline carries ds_normal (stencil compare Always),
+		// so EVERY bitmap draw silently dropped the enclosing clip: a Bitmap
+		// display object, an attachBitmap, or a beginBitmapFill inside a mask
+		// painted its whole quad. Ruffle has no such hole — its bitmap pipeline
+		// is `pipelines.bitmap.pipeline_for(mask_state)`
+		// (render/wgpu/src/pipelines.rs), i.e. the mask state picks the stencil
+		// variant of the *same* blend for bitmaps exactly as it does for shapes.
+		// This is that variant; bind_premul_pipeline() below chooses between
+		// the two the way restore_draw_pipeline() already does for shapes.
+		rp_desc.label = WGPU_LABEL("blend_premul_stencil_pipeline");
+		rp_desc.depthStencil = &ds_test;
+		ctx->blend_premul_stencil_pipeline =
+			wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_premul_stencil_pipeline != NULL);
+		rp_desc.depthStencil = &ds_normal;
 	}
 
 	wgpuShaderModuleRelease(vs_module);
@@ -2376,6 +2402,22 @@ void render_webgpu_draw_rect(WebGPURenderContext* ctx,
 static void restore_draw_pipeline(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok || ctx->render_pass == NULL) return;
+	// Inside a mask CAPTURE the "normal" pipeline is the stencil-WRITE one:
+	// everything drawn between begin_clip_mask and end_clip_mask is masker
+	// geometry, not content. Coming back to stencil_test here (mask_ref is
+	// already the level being written) left the rest of the masker's subtree
+	// testing a level nothing had raised yet — it vanished, and the mask ended
+	// up with only the geometry drawn before the first pipeline clobber.
+	// s17 P3: a Bitmap masker clobbers on its very first draw, so its stencil
+	// was empty and the maskee was never clipped at all.
+	if (ctx->mask_capture_depth > 0)
+	{
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass,
+			ctx->stencil_write_pipeline);
+		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass,
+			ctx->mask_ref > 0 ? ctx->mask_ref - 1 : 0);
+		return;
+	}
 	if (ctx->mask_ref != 0)
 	{
 		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->stencil_test_pipeline);
@@ -2385,6 +2427,41 @@ static void restore_draw_pipeline(WebGPURenderContext* ctx)
 	{
 		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
 	}
+}
+
+// Bind the premultiplied-alpha blend a BITMAP draw needs right now, honouring
+// whatever stencil state is live (s17 P3). Three cases, and only the third was
+// implemented before:
+//
+//   * mask CAPTURE open — the bitmap IS masker geometry. Leave the
+//     stencil-write pipeline bound so the quad raises the stencil with colour
+//     writes off. Ruffle does the same thing: `render_bitmap` under
+//     MaskState::DrawMaskStencil picks the bitmap pipeline's mask variant, so a
+//     Bitmap masker's whole quad becomes the mask window (its ALPHA is not
+//     consulted — that is what separates the stencil arm from the alpha arm of
+//     display_object.rs::get_render_mask).
+//   * a mask is open and we are drawing CONTENT — test the stencil at the
+//     active level.
+//   * no mask — the plain premul pipeline, byte-for-byte the old behaviour.
+static void bind_premul_pipeline(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok || ctx->render_pass == NULL) return;
+	if (ctx->mask_capture_depth > 0)
+	{
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass,
+			ctx->stencil_write_pipeline);
+		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass,
+			ctx->mask_ref > 0 ? ctx->mask_ref - 1 : 0);
+		return;
+	}
+	if (ctx->mask_ref != 0 && ctx->blend_premul_stencil_pipeline != NULL)
+	{
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass,
+			ctx->blend_premul_stencil_pipeline);
+		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+		return;
+	}
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
 }
 
 // Pop ONE clip-mask nesting level: draw the full-screen NDC quad through the
@@ -2730,8 +2807,9 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 
 	stage_dyn_verts(ctx, vert_base, verts, 6);
 
-	// Switch to premultiplied alpha blending for bitmap rendering
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
+	// Switch to premultiplied alpha blending for bitmap rendering — through
+	// bind_premul_pipeline so an open clip mask survives the switch.
+	bind_premul_pipeline(ctx);
 	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
 	// Restore normal blend pipeline — and the ACTIVE CLIP with it.
 	restore_draw_pipeline(ctx);
@@ -2889,8 +2967,9 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 	stage_dyn_verts(ctx, vert_base, verts, vertex_count);
 	free(verts);
 
-	// Premultiplied blend (bitmap data is pre-multiplied via fillRect).
-	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
+	// Premultiplied blend (bitmap data is pre-multiplied via fillRect), through
+	// bind_premul_pipeline so an open clip mask survives the switch.
+	bind_premul_pipeline(ctx);
 	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
 	restore_draw_pipeline(ctx);
 }
@@ -3948,6 +4027,57 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		rpd.depthStencil = &ds;
 		ctx->compose_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
 		wgpuShaderModuleRelease(sm);
+
+		// --- Alpha-mask composite (s17 P3) -------------------------------
+		// Ruffle's SECOND masking mechanism. display_object.rs::get_render_mask
+		// picks RenderMask::Alpha over RenderMask::Stencil when the maskee AND
+		// the masker are BOTH bitmap-cached, and apply_standard_mask_and_scroll
+		// then renders the two into separate command lists and calls
+		// commands.render_alpha_mask(maskee, mask) instead of pushing a stencil.
+		// The wgpu backend draws each into its own texture and multiplies the
+		// maskee by the mask's ALPHA — so a semi-transparent masker produces a
+		// semi-transparent result, which a binary stencil can never express.
+		//
+		// Same pipeline layout, blend and stencil state as compose_pipeline;
+		// binding 0 is the maskee layer, binding 3 the mask layer, and the
+		// uniform at binding 2 is unused (the layout still requires it to be
+		// bound). Both layers are premultiplied, so scaling all four channels
+		// by the mask's alpha keeps the result premultiplied and the ordinary
+		// One / OneMinusSrcAlpha over-blend below is correct.
+		static const char* alpha_mask_wgsl =
+			"@group(0) @binding(0) var maskee_tex: texture_2d<f32>;\n"
+			"@group(0) @binding(1) var in_samp: sampler;\n"
+			"@group(0) @binding(3) var mask_tex: texture_2d<f32>;\n"
+			"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+			"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+			"  var positions = array<vec2f, 6>(\n"
+			"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+			"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+			"  );\n"
+			"  var uvs = array<vec2f, 6>(\n"
+			"    vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),\n"
+			"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
+			"  );\n"
+			"  var out: VSOut;\n"
+			"  out.pos = vec4f(positions[vi], 0.0, 1.0);\n"
+			"  out.uv = uvs[vi];\n"
+			"  return out;\n"
+			"}\n"
+			"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+			"  let c = textureSample(maskee_tex, in_samp, uv);\n"
+			"  let m = textureSample(mask_tex, in_samp, uv);\n"
+			"  return c * m.a;\n"
+			"}\n";
+
+		WGPUShaderModule am_sm = create_shader(ctx->device, alpha_mask_wgsl,
+		                                       "alpha_mask_shader");
+		WGPUFragmentState am_fs = fs;
+		am_fs.module = am_sm;
+		rpd.label = WGPU_LABEL("alpha_mask_pipeline");
+		rpd.vertex.module = am_sm;
+		rpd.fragment = &am_fs;
+		ctx->alpha_mask_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		wgpuShaderModuleRelease(am_sm);
 	}
 }
 
@@ -4748,6 +4878,56 @@ void render_webgpu_compose_filter(WebGPURenderContext* ctx, int kind,
 	wgpuBindGroupRelease(bg);
 }
 
+// Composite an ALPHA MASK (s17 P3): filter_tex_a holds the maskee layer and
+// filter_src_tex the mask layer (put there by snapshot_filter_source before the
+// second offscreen pass overwrote filter_tex_a). Draws maskee * mask.a over the
+// resumed main pass, honouring any enclosing clip.
+//
+// This is ruffle's CommandList::render_alpha_mask — the arm
+// apply_standard_mask_and_scroll takes when both maskee and masker are
+// bitmap-cached (display_object.rs::get_render_mask). The uniform at binding 2
+// is unused by alpha_mask_wgsl but the shared compose_bgl still requires a
+// buffer there, so a zeroed 80-byte block is pushed for it.
+void render_webgpu_composite_alpha_mask(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok || ctx->render_pass == NULL) return;
+	if (ctx->alpha_mask_pipeline == NULL) return;
+
+	float params[20] = {0};
+	u32 params_offset = filter_uniform_push(ctx, params, 80);
+
+	WGPUBindGroupEntry bg_entries[4] = {0};
+	bg_entries[0].binding = 0;
+	bg_entries[0].textureView = ctx->filter_view_a;   // maskee layer
+	bg_entries[1].binding = 1;
+	bg_entries[1].sampler = ctx->filter_sampler;
+	bg_entries[2].binding = 2;
+	bg_entries[2].buffer = ctx->filter_uniform_ring;
+	bg_entries[2].offset = params_offset;
+	bg_entries[2].size = 80;
+	bg_entries[3].binding = 3;
+	bg_entries[3].textureView = ctx->filter_src_view; // mask layer
+
+	WGPUBindGroupDescriptor bg_desc = {0};
+	bg_desc.layout = ctx->compose_bgl;
+	bg_desc.entryCount = 4;
+	bg_desc.entries = bg_entries;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+	if (bg == NULL) return;
+
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->alpha_mask_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
+	wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+	wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
+
+	restore_draw_pipeline(ctx);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+
+	wgpuBindGroupRelease(bg);
+}
+
 // ---------------------------------------------------------------------------
 // DisplacementMapFilter (filters cut 2).
 //
@@ -5200,6 +5380,7 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->composite_pipeline_layout) wgpuPipelineLayoutRelease(ctx->composite_pipeline_layout);
 	if (ctx->filter_src_view) wgpuTextureViewRelease(ctx->filter_src_view);
 	if (ctx->filter_src_tex) wgpuTextureRelease(ctx->filter_src_tex);
+	if (ctx->alpha_mask_pipeline) wgpuRenderPipelineRelease(ctx->alpha_mask_pipeline);
 	if (ctx->compose_pipeline) wgpuRenderPipelineRelease(ctx->compose_pipeline);
 	if (ctx->compose_bgl) wgpuBindGroupLayoutRelease(ctx->compose_bgl);
 	if (ctx->compose_pipeline_layout) wgpuPipelineLayoutRelease(ctx->compose_pipeline_layout);

@@ -18012,6 +18012,106 @@ static void avm2_draw_opaque_background(Avm2Context* ctx, Avm2Object* obj,
 	                   1.0f, 0, 0);
 }
 
+// --- DisplayObject.mask, ALPHA arm (s17 P3) --------------------------------
+//
+// Ruffle has TWO masking mechanisms, not one. `display_object.rs
+// ::get_render_mask` picks between them:
+//
+//     None                                  => RenderMask::None
+//     Some(m) if self.is_bitmap_cached()
+//               && m.is_bitmap_cached()      => RenderMask::Alpha(m)
+//     Some(m)                                => RenderMask::Stencil(m)
+//
+// The stencil arm is the one avm2_push_clip_mask implements: binary coverage,
+// the masker's geometry rasterised with colour writes off. The ALPHA arm
+// (apply_standard_mask_and_scroll's `if let RenderMask::Alpha(m)` branch) is
+// completely different — maskee and masker are each rendered into their own
+// layer and `commands.render_alpha_mask(maskee, mask)` multiplies the maskee by
+// the mask's ALPHA. A semi-transparent or antialiased masker therefore produces
+// a semi-transparent result, which no stencil can express; that is exactly what
+// visual/cache_as_bitmap/cab_mask_{alpha,transform,triangle,filters} test, one
+// 20x20 cell per {maskeeCab, maskCab} combination.
+//
+// `is_bitmap_cached()` is the *effective* value, not the stored preference: a
+// non-empty filter list forces it true (display_object.rs
+// recheck_cache_as_bitmap), which is why cab_mask_filters takes the alpha arm
+// in its maskeeCab cells even though the mask's own cacheAsBitmap is false.
+static int avm2_is_bitmap_cached(Avm2Object* obj,
+                                 const Avm2DisplayObjectExt* ext)
+{
+	if (ext != NULL && ext->filter_count > 0) return 1;
+	if (obj == NULL) return 0;
+	// The preference lives where do_cab_set / set_cache_as_bitmap put it: a
+	// dont_enum dynamic prop, written by BOTH the AS3 setter and PlaceObject3's
+	// BitmapCache byte. Reading it here is the only place the render walk has
+	// ever consumed it.
+	Avm2Value* v = avm2_object_find_dynamic(obj, "__cacheAsBitmap", 15);
+	return v != NULL && avm2_to_boolean_fast(*v);
+}
+
+// The object whose mask arms are being executed right now (its own mask must
+// not be re-applied by the recursive render), and the masker being rasterised
+// as an alpha layer (which must NOT be suppressed by the maskee rule).
+static Avm2Object* g_avm2_alpha_maskee = NULL;
+static Avm2Object* g_avm2_alpha_masker = NULL;
+
+static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
+                                     Avm2DisplayObjectExt* ext,
+                                     Avm2DisplayObjectExt* mext,
+                                     const Mat* parent_world,
+                                     double parent_alpha,
+                                     const Avm2Cx* parent_cx)
+{
+	Mat mpw = mext->parent != NULL
+		? display_world_matrix(ctx, mext->parent) : mat_identity();
+
+	Avm2Object* saved_maskee = g_avm2_alpha_maskee;
+	Avm2Object* saved_masker = g_avm2_alpha_masker;
+	int saved_filter = g_avm2_filter_active;
+	Avm2Cx saved_cx = g_avm2_cur_cx;
+
+	renderer_suspend_pass(context);
+
+	// (1) the MASK layer, into filter_tex_a, then snapshotted aside.
+	//
+	// Filters on the masker are suppressed for the same structural reason cut 1
+	// suppresses them on a stencil masker: avm2_render_filtered drives the SAME
+	// suspend / offscreen / resume ping-pong this function is already holding,
+	// and re-entering it would end the layer pass mid-flight. Ruffle's alpha arm
+	// does apply them (`m.render_with_options`), so a FILTERED masker's alpha
+	// layer is its raw silhouette here — the one place this port knowingly
+	// diverges, and the reason cab_mask_filters' two maskeeCab cells still
+	// differ. Completion mechanism: a compose-into-offscreen pipeline (the same
+	// one the filter chain wants for a non-final glow), after which the masker
+	// layer can run its own filter chain inside this pass.
+	renderer_begin_offscreen_pass(context);
+	g_avm2_filter_active = 1;
+	g_avm2_alpha_masker = ext->mask;
+	g_avm2_alpha_maskee = NULL;
+	avm2_render_node(ctx, ext->mask, &mpw, 1.0, &AVM2_CX_IDENTITY);
+	renderer_end_offscreen_pass(context);
+	renderer_snapshot_filter_source(context);
+
+	// (2) the MASKEE layer, into filter_tex_a (the offscreen pass clears it).
+	// g_avm2_alpha_maskee suppresses this node's own mask arms on re-entry so
+	// the recursion draws the plain content, exactly like Ruffle's `draw`
+	// closure inside apply_standard_mask_and_scroll.
+	renderer_begin_offscreen_pass(context);
+	g_avm2_alpha_masker = saved_masker;
+	g_avm2_alpha_maskee = obj;
+	g_avm2_filter_active = saved_filter;
+	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+	renderer_end_offscreen_pass(context);
+
+	renderer_resume_pass(context);
+	renderer_composite_alpha_mask(context);
+
+	g_avm2_alpha_maskee = saved_maskee;
+	g_avm2_alpha_masker = saved_masker;
+	g_avm2_filter_active = saved_filter;
+	g_avm2_cur_cx = saved_cx;
+}
+
 // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
 // world matrix + concatenated alpha down the tree. Invisible subtrees are
 // culled, matching render_apply_text_bounds.
@@ -18037,7 +18137,29 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// Ruffle render_base (display_object.rs:952, `options.skip_masks &&
 	// this.maskee().is_some()`, and skip_masks defaults to true): an object
 	// that masks something else is never painted as content on its own account.
-	if (ext->maskee != NULL && g_avm2_mask_capture == 0) return;
+	// The exception is the alpha arm, which renders the masker as ITS OWN layer
+	// (`m.render_with_options(.., skip_masks: false)`): while that layer is
+	// being drawn this object IS the content.
+	if (ext->maskee != NULL && g_avm2_mask_capture == 0
+	    && obj != g_avm2_alpha_masker) return;
+
+	// DisplayObject.mask, alpha arm — taken instead of the stencil push below
+	// when maskee and masker are BOTH bitmap-cached (see
+	// avm2_render_alpha_masked). Suppressed inside a mask capture, inside a
+	// filter capture and on re-entry for the node we are already masking, all
+	// three because the offscreen ping-pong does not nest.
+	if (ext->mask != NULL && g_avm2_mask_capture == 0
+	    && obj != g_avm2_alpha_maskee && g_avm2_filter_active == 0
+	    && avm2_is_bitmap_cached(obj, ext))
+	{
+		Avm2DisplayObjectExt* amext = avm2_display_ext_of(ctx, ext->mask);
+		if (amext != NULL && avm2_is_bitmap_cached(ext->mask, amext))
+		{
+			avm2_render_alpha_masked(ctx, obj, ext, amext, parent_world,
+			                         parent_alpha, parent_cx);
+			return;
+		}
+	}
 
 	Mat local = ext_matrix(ext);
 	Mat world = mat_mul(parent_world, &local);
@@ -18066,7 +18188,8 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// mask is ignored, matching Ruffle's `render_self` (not `render`).
 	uint32_t saved_clip_ref = 0;
 	int pushed_mask = 0;
-	if (ext->mask != NULL && g_avm2_mask_capture == 0)
+	if (ext->mask != NULL && g_avm2_mask_capture == 0
+	    && obj != g_avm2_alpha_maskee)
 	{
 		Avm2DisplayObjectExt* mext = avm2_display_ext_of(ctx, ext->mask);
 		if (mext != NULL)
