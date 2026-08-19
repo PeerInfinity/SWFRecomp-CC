@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-09T08:51:22.919632+00:00",
-    "old_git_sha": "0a99be1a92dee5a4f000bdf1a0809c47b9e27fc5",
-    "new_timestamp": "2026-08-16T08:44:05.448986+00:00",
-    "new_git_sha": "88ebde66534f240bc01dd14fc57f16d4075452d7",
+    "old_timestamp": "2026-08-16T08:44:05.448986+00:00",
+    "old_git_sha": "88ebde66534f240bc01dd14fc57f16d4075452d7",
+    "new_timestamp": "2026-08-19T13:28:59.022017+00:00",
+    "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1514,
-    "old_ruffle_matched": 54,
-    "old_effective_pass": 1568,
+    "old_pass": 1515,
+    "old_ruffle_matched": 41,
+    "old_effective_pass": 1556,
     "old_total": 1574,
-    "old_pass_rate": 96.2,
-    "new_pass": 1515,
+    "old_pass_rate": 96.3,
+    "new_pass": 1527,
     "new_ruffle_matched": 41,
-    "new_effective_pass": 1556,
+    "new_effective_pass": 1568,
     "new_total": 1574,
-    "new_pass_rate": 96.3,
-    "old_mismatched_lines": 581,
-    "new_mismatched_lines": 578,
+    "new_pass_rate": 97.0,
+    "old_mismatched_lines": 578,
+    "new_mismatched_lines": 562,
     "increased_mismatches": 0,
-    "decreased_mismatches": 3,
-    "newly_passing": 0,
-    "newly_failing": 12,
-    "status_changed": 13,
-    "unchanged": 1561,
+    "decreased_mismatches": 16,
+    "newly_passing": 12,
+    "newly_failing": 0,
+    "status_changed": 12,
+    "unchanged": 1562,
     "added": 0,
     "removed": 0
   },
@@ -33,8 +33,8 @@
     {
       "test": "as3/Expressions/asOperator/asOper",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 334,
         "expected_lines": 334,
@@ -43,14 +43,14 @@
       "new_lines": {
         "actual_lines": 334,
         "expected_lines": 334,
-        "matching_lines": 332
+        "matching_lines": 334
       }
     },
     {
       "test": "ecma3/Array/e15_4_4_5",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 15,
         "expected_lines": 15,
@@ -59,14 +59,14 @@
       "new_lines": {
         "actual_lines": 15,
         "expected_lines": 15,
-        "matching_lines": 14
+        "matching_lines": 15
       }
     },
     {
       "test": "ecma3/Array/toLocaleString",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 14,
         "expected_lines": 14,
@@ -75,14 +75,14 @@
       "new_lines": {
         "actual_lines": 14,
         "expected_lines": 14,
-        "matching_lines": 13
+        "matching_lines": 14
       }
     },
     {
       "test": "ecma3/Number/e15_7_1",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 46,
         "expected_lines": 46,
@@ -91,14 +91,14 @@
       "new_lines": {
         "actual_lines": 46,
         "expected_lines": 46,
-        "matching_lines": 45
+        "matching_lines": 46
       }
     },
     {
       "test": "ecma3/Number/e15_7_2",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 87,
         "expected_lines": 87,
@@ -107,46 +107,30 @@
       "new_lines": {
         "actual_lines": 87,
         "expected_lines": 87,
-        "matching_lines": 86
+        "matching_lines": 87
       }
     },
     {
       "test": "ecma3/Number/e15_7_4_2_4",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 50
-      },
-      "new_lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 50
-      }
-    },
-    {
-      "test": "ecma3/Number/e15_7_4_7_1",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
+      "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 8
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 50
       },
       "new_lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
+        "actual_lines": 51,
+        "expected_lines": 51,
+        "matching_lines": 51
       }
     },
     {
       "test": "ecma3/Number/toLocaleString_rt",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 48,
         "expected_lines": 48,
@@ -155,14 +139,14 @@
       "new_lines": {
         "actual_lines": 48,
         "expected_lines": 48,
-        "matching_lines": 47
+        "matching_lines": 48
       }
     },
     {
       "test": "ecma3/Number/tostring_001",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 3,
         "expected_lines": 3,
@@ -171,14 +155,14 @@
       "new_lines": {
         "actual_lines": 3,
         "expected_lines": 3,
-        "matching_lines": 1
+        "matching_lines": 3
       }
     },
     {
       "test": "ecma3/String/e15_5_1",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 49,
         "expected_lines": 49,
@@ -187,14 +171,14 @@
       "new_lines": {
         "actual_lines": 49,
         "expected_lines": 49,
-        "matching_lines": 48
+        "matching_lines": 49
       }
     },
     {
       "test": "ecma3/String/e15_5_2",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 75,
         "expected_lines": 75,
@@ -203,14 +187,14 @@
       "new_lines": {
         "actual_lines": 75,
         "expected_lines": 75,
-        "matching_lines": 74
+        "matching_lines": 75
       }
     },
     {
       "test": "ecma3/TypeConversion/e9_8_1",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 39,
         "expected_lines": 39,
@@ -219,14 +203,14 @@
       "new_lines": {
         "actual_lines": 39,
         "expected_lines": 39,
-        "matching_lines": 38
+        "matching_lines": 39
       }
     },
     {
       "test": "ecma3/Types/e8_5",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 22,
         "expected_lines": 22,
@@ -235,7 +219,7 @@
       "new_lines": {
         "actual_lines": 22,
         "expected_lines": 22,
-        "matching_lines": 19
+        "matching_lines": 22
       }
     }
   ]

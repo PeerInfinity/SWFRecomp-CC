@@ -6,16 +6,16 @@
     "total_available": 229,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 22,
+    "ignored_count": 6,
     "filtered": true
   },
-  "total": 207,
-  "pass": 194,
+  "total": 223,
+  "pass": 210,
   "ruffle_matched": 7,
   "fail": 6,
-  "pass_rate": 93.7,
-  "effective_pass": 201,
-  "effective_pass_rate": 97.1,
+  "pass_rate": 94.2,
+  "effective_pass": 217,
+  "effective_pass_rate": 97.3,
   "breakdown": {
     "output_mismatch": 6,
     "ruffle_matched": 7
@@ -4685,6 +4685,22 @@
       "status": "pass"
     },
     {
+      "test": "fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 22.979,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      },
+      "duration": 23.21,
+      "status": "pass"
+    },
+    {
       "test": "fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2",
       "phases": {
         "recomp": 0.005,
@@ -4733,6 +4749,70 @@
       "status": "pass"
     },
     {
+      "test": "fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 21.649,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 70,
+        "expected_lines": 70,
+        "matching_lines": 70
+      },
+      "duration": 21.88,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 21.76,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 57,
+        "expected_lines": 57,
+        "matching_lines": 57
+      },
+      "duration": 21.99,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3",
+      "phases": {
+        "recomp": 0.01,
+        "compile": 22.41,
+        "run": 0.265
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 71,
+        "expected_lines": 71,
+        "matching_lines": 71
+      },
+      "duration": 22.7,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/438789f3e93da74855898cceed80e21291c6ab14cf36314a856c6f2716606a49",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.439,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 16
+      },
+      "duration": 21.66,
+      "status": "pass"
+    },
+    {
       "test": "fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26",
       "phases": {
         "recomp": 0.0,
@@ -4765,6 +4845,38 @@
       "status": "pass"
     },
     {
+      "test": "fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 22.132,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 50,
+        "expected_lines": 50,
+        "matching_lines": 50
+      },
+      "duration": 22.35,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.828,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 67,
+        "expected_lines": 67,
+        "matching_lines": 67
+      },
+      "duration": 21.05,
+      "status": "pass"
+    },
+    {
       "test": "fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48",
       "phases": {
         "recomp": 0.0,
@@ -4778,6 +4890,22 @@
         "matching_lines": 0
       },
       "duration": 20.45,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/7318344161196391b369e91217937687ebc437e42fdcc10c4c456bde55e0db61",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.603,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      },
+      "duration": 20.82,
       "status": "pass"
     },
     {
@@ -4845,6 +4973,22 @@
       "status": "pass"
     },
     {
+      "test": "fuzz/ac649dcf28572cc8250759cc0f8571a4111361fb6923db34ff02901095cdc580",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.562,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 25,
+        "matching_lines": 25
+      },
+      "duration": 20.79,
+      "status": "pass"
+    },
+    {
       "test": "fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732",
       "phases": {
         "recomp": 0.0,
@@ -4858,6 +5002,22 @@
         "matching_lines": 8
       },
       "duration": 20.65,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.209,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 29,
+        "expected_lines": 29,
+        "matching_lines": 29
+      },
+      "duration": 21.43,
       "status": "pass"
     },
     {
@@ -4877,6 +5037,22 @@
       "status": "pass"
     },
     {
+      "test": "fuzz/c24e6e559fd66b092283a3bdcd925792e8dd7ca55ce1c7729d44d5b315ad8f75",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.054,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 35,
+        "expected_lines": 35,
+        "matching_lines": 35
+      },
+      "duration": 21.28,
+      "status": "pass"
+    },
+    {
       "test": "fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69",
       "phases": {
         "recomp": 0.0,
@@ -4890,6 +5066,86 @@
         "matching_lines": 6
       },
       "duration": 20.79,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.975,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      },
+      "duration": 22.2,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/e152812e2cfc0971237321dfadc37e3484631c355cb2e4b86344ff90bb89c75e",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 21.005,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 43,
+        "expected_lines": 43,
+        "matching_lines": 43
+      },
+      "duration": 21.23,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.432,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 22
+      },
+      "duration": 2.65,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.727,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "duration": 20.95,
+      "status": "pass"
+    },
+    {
+      "test": "fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.987,
+        "run": 0.215
+      },
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 24,
+        "expected_lines": 24,
+        "matching_lines": 24
+      },
+      "duration": 21.21,
       "status": "pass"
     },
     {

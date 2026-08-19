@@ -6,18 +6,18 @@
     "total_available": 1243,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 53,
+    "ignored_count": 49,
     "filtered": true
   },
-  "total": 1190,
-  "pass": 1150,
+  "total": 1194,
+  "pass": 1153,
   "ruffle_matched": 8,
-  "fail": 32,
+  "fail": 33,
   "pass_rate": 96.6,
-  "effective_pass": 1158,
-  "effective_pass_rate": 97.3,
+  "effective_pass": 1161,
+  "effective_pass_rate": 97.2,
   "breakdown": {
-    "output_mismatch": 32,
+    "output_mismatch": 33,
     "ruffle_matched": 8
   },
   "tests": [
@@ -5129,6 +5129,50 @@
       },
       "duration": 28.19,
       "status": "pass"
+    },
+    {
+      "test": "displayobject_hittestpoint_boundary",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 28.221,
+        "run": 0.465
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 65,
+        "expected_lines": 65,
+        "matching_lines": 47
+      },
+      "duration": 28.83,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 976 outliers exceed limit of 900, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 500,
+            "height": 250,
+            "total_channels": 500000,
+            "max_diff": 255,
+            "diff_channels": 976,
+            "mean_diff": 0.4978,
+            "outliers": 976,
+            "max_outliers": 900,
+            "tolerance": 0,
+            "excess_outliers": 76
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
+        }
+      },
+      "status": "output_mismatch",
+      "detail": "18 line(s) differ (actual=65, expected=65)",
+      "actual_output": "s.hitTestPoint(10+10, 10+0, true): true\ns.hitTestPoint(10+5, 10+5, true): true\ns.hitTestPoint(10+0, 10+10, true): true\ns.hitTestPoint(10+0, 10+15, true): true\ns.hitTestPoint(10+0, 10+20, true): true\ns.hitTestPoint(10+5, 10+25, true): true\ns.hitTestPoint(10+10, 10+30, true): true\ns.hitTestPoint(10+15, 10+30, true): true\ns.hitTestPoint(10+20, 10+30, true): true\ns.hitTestPoint(10+25, 10+25, true): true\ns.hitTestPoint(10+30, 10+20, true): true\ns.hitTestPoint(10+30, 10+15, true): true\ns.hitTestPoint(10+30, 10+10, true): true\ns.hitTestPoint(10+25, 10+5, true): true\ns.hitTestPoint(10+20, 10+0, true): true\ns.hitTestPoint(10+15, 10+0, true): true\ns.hitTestPoint(10+10, 10+0, false): true\ns.hitTestPoint(10+5, 10+5, false): true\ns.hitTestPoint(10+0, 10+10, false): true\ns.hitTestPoint(10+0, 10+15, false): true\ns.hitTestPoint(10+0, 10+20, false): true\ns.hitTestPoint(10+5, 10+25, false): true\ns.hitTestPoint(10+10, 10+30, false): true\ns.hitTestPoint(10+15, 10+30, false): true\ns.hitTestPoint(10+20, 10+30, false): true\ns.hitTestPoint(10+25, 10+25, false): true\ns.hitTestPoint(10+30, 10+20, false): true\ns.hitTestPoint(10+30, 10+15, false): true\ns.hitTestPoint(10+30, 10+10, false): true\ns.hitTestPoint(10+25, 10+5, false): true\ns.hitTestPoint(10+20, 10+0, false): true\ns.hitTestPoint(10+15, 10+0, false): true\n\ns.hitTestPoint(50+10, 10+0, true): true\ns.hitTestPoint(50+5, 10+5, true): true\ns.hitTestPoint(50+0, 10+10, true): true\ns.hitTestPoint(50+0, 10+15, true): true\ns.hitTestPoint(50+0, 10+20, true): true\ns.hitTestPoint(50+5, 10+25, true): true\ns.hitTestPoint(50+10, 10+30, true): true\ns.hitTestPoint(50+15, 10+30, true): true\ns.hitTestPoint(50+20, 10+30, true): true\ns.hitTestPoint(50+25, 10+25, true): true\ns.hitTestPoint(50+30, 10+20, true): true\ns.hitTestPoint(50+30, 10+15, true): true\ns.hitTestPoint(50+30, 10+10, true): true\ns.hitTestPoint(50+25, 10+5, true): true\ns.hitTestPoint(50+20, 10+0, true): true\ns.hitTestPoint(50+15, 10+0, true): true\ns.hitTestPoint(50+10, 10+0, false): true\n... (15 lines after) ...",
+      "expected_output": "\ns.hitTestPoint(10+10, 10+0, true): false\ns.hitTestPoint(10+5, 10+5, true): false\ns.hitTestPoint(10+0, 10+10, true): false\ns.hitTestPoint(10+0, 10+15, true): false\ns.hitTestPoint(10+0, 10+20, true): false\ns.hitTestPoint(10+5, 10+25, true): false\ns.hitTestPoint(10+10, 10+30, true): false\ns.hitTestPoint(10+15, 10+30, true): false\ns.hitTestPoint(10+20, 10+30, true): false\ns.hitTestPoint(10+25, 10+25, true): true\ns.hitTestPoint(10+30, 10+20, true): true\ns.hitTestPoint(10+30, 10+15, true): true\ns.hitTestPoint(10+30, 10+10, true): true\ns.hitTestPoint(10+25, 10+5, true): true\ns.hitTestPoint(10+20, 10+0, true): true\ns.hitTestPoint(10+15, 10+0, true): true\ns.hitTestPoint(10+10, 10+0, false): true\ns.hitTestPoint(10+5, 10+5, false): true\ns.hitTestPoint(10+0, 10+10, false): true\ns.hitTestPoint(10+0, 10+15, false): true\ns.hitTestPoint(10+0, 10+20, false): true\ns.hitTestPoint(10+5, 10+25, false): true\ns.hitTestPoint(10+10, 10+30, false): true\ns.hitTestPoint(10+15, 10+30, false): true\ns.hitTestPoint(10+20, 10+30, false): true\ns.hitTestPoint(10+25, 10+25, false): true\ns.hitTestPoint(10+30, 10+20, false): true\ns.hitTestPoint(10+30, 10+15, false): true\ns.hitTestPoint(10+30, 10+10, false): true\ns.hitTestPoint(10+25, 10+5, false): true\ns.hitTestPoint(10+20, 10+0, false): true\ns.hitTestPoint(10+15, 10+0, false): true\n\ns.hitTestPoint(50+10, 10+0, true): false\ns.hitTestPoint(50+5, 10+5, true): false\ns.hitTestPoint(50+0, 10+10, true): false\ns.hitTestPoint(50+0, 10+15, true): false\ns.hitTestPoint(50+0, 10+20, true): false\ns.hitTestPoint(50+5, 10+25, true): false\ns.hitTestPoint(50+10, 10+30, true): false\ns.hitTestPoint(50+15, 10+30, true): false\ns.hitTestPoint(50+20, 10+30, true): false\ns.hitTestPoint(50+25, 10+25, true): true\ns.hitTestPoint(50+30, 10+20, true): true\ns.hitTestPoint(50+30, 10+15, true): true\ns.hitTestPoint(50+30, 10+10, true): true\ns.hitTestPoint(50+25, 10+5, true): true\ns.hitTestPoint(50+20, 10+0, true): true\ns.hitTestPoint(50+15, 10+0, true): true\n... (16 lines after) ..."
     },
     {
       "test": "displayobject_hittestpoint_root",
@@ -11000,6 +11044,22 @@
       "status": "pass"
     },
     {
+      "test": "int_toprecision",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 7.331,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1125,
+        "expected_lines": 1125,
+        "matching_lines": 1125
+      },
+      "duration": 7.71,
+      "status": "pass"
+    },
+    {
       "test": "int_tostring",
       "phases": {
         "recomp": 0.0,
@@ -12161,6 +12221,22 @@
         "matching_lines": 2
       },
       "duration": 8.0,
+      "status": "pass"
+    },
+    {
+      "test": "localconnection",
+      "phases": {
+        "recomp": 0.019,
+        "compile": 9.482,
+        "run": 0.817
+      },
+      "num_frames": 300,
+      "lines": {
+        "actual_lines": 890,
+        "expected_lines": 890,
+        "matching_lines": 890
+      },
+      "duration": 10.33,
       "status": "pass"
     },
     {
@@ -20247,6 +20323,22 @@
         "matching_lines": 1215
       },
       "duration": 1.13,
+      "status": "pass"
+    },
+    {
+      "test": "uint_toprecision",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.745,
+        "run": 0.365
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1125,
+        "expected_lines": 1125,
+        "matching_lines": 1125
+      },
+      "duration": 1.12,
       "status": "pass"
     },
     {

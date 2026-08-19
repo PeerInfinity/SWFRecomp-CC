@@ -1,12 +1,16 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 135/243 passing | Graphics: 135/243 passing
+Trace: 138/243 passing | Graphics: 135/243 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (3 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `Sound-v6` | Output Mismatch | 113/121 lines match |
+| 2 | `Sound-v7` | Output Mismatch | 113/121 lines match |
+| 3 | `Sound-v8` | Output Mismatch | 113/121 lines match |
 
 ## Graphics Improvements (0 tests)
 
