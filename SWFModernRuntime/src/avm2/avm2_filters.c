@@ -290,6 +290,11 @@ void avm2_filter_gc_mark(const Avm2FilterVal* v, uint32_t count)
 	for (uint32_t i = 0; i < count; i++)
 	{
 		if (v[i].kind == AVM2_FILTER_SHADER) avm2_gc_mark_value(v[i].shader);
+		// The DisplacementMapFilter map the render arm samples is held by
+		// identity in the stored filter (avm2_filters.h), so it is a GC root
+		// for exactly as long as the DisplayObject keeps the filter.
+		else if (v[i].kind == AVM2_FILTER_DISPLACEMENT_MAP)
+			avm2_gc_mark_value(v[i].map_bitmap);
 	}
 }
 
@@ -343,6 +348,7 @@ int avm2_filter_from_object(Avm2Context* ctx, Avm2Object* obj, Avm2FilterVal* ou
 	memset(out, 0, sizeof(*out));
 	out->kind = kind;
 	out->shader = avm2_undefined();
+	out->map_bitmap = avm2_null();
 
 	if (kind == AVM2_FILTER_SHADER)
 	{
@@ -442,6 +448,9 @@ int avm2_filter_from_object(Avm2Context* ctx, Avm2Object* obj, Avm2FilterVal* ou
 			out->comp_y = (uint8_t) e->comp_y;
 			out->scale_x = (float) e->scale_x;
 			out->scale_y = (float) e->scale_y;
+			// Kept by identity for the RENDER arm only; avm2_filter_to_object
+			// still writes mapBitmap = null, so the AS round trip is unchanged.
+			out->map_bitmap = e->map_bitmap;
 			if (e->map_point.kind == AVM2_VALUE_OBJECT)
 			{
 				Avm2Object* p = e->map_point.u.obj;
@@ -628,6 +637,10 @@ void avm2_filter_from_tag(const Avm2TagFilter* tag, Avm2FilterVal* out)
 	memset(out, 0, sizeof(*out));
 	out->kind = tag->kind;
 	out->shader = avm2_undefined();
+	// SWF SurfaceFilterList has no displacement kind, so a tag filter never
+	// carries a map; keep the field a well-formed null rather than a zeroed
+	// Avm2Value so the GC mark above is always safe.
+	out->map_bitmap = avm2_null();
 	out->blur_x = tag->blur_x;
 	out->blur_y = tag->blur_y;
 	out->angle = tag->angle;

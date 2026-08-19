@@ -4749,6 +4749,360 @@ void render_webgpu_compose_filter(WebGPURenderContext* ctx, int kind,
 }
 
 // ---------------------------------------------------------------------------
+// DisplacementMapFilter (filters cut 2).
+//
+// Port of ruffle render/wgpu/shaders/filter/displacement_map.wgsl +
+// render/wgpu/src/filters/displacement_map.rs, with ONE structural adaptation
+// that the whole cut turns on.
+//
+// Ruffle draws a filtered DisplayObject into a cache texture sized to its
+// render bounds *under the stage view matrix* (display_object.rs render_base),
+// so its FilterSource is object-sized and every rect-relative rule in the
+// shader - the map offset, the /source_size normalisation, the out-of-bounds
+// test, and the REPEAT sampler that implements `wrap` - is defined on the
+// OBJECT. We have one stage-sized ping-pong layer instead (filters cut 1), and
+// for blur/glow/dropShadow/bevel that is provably the same computation
+// (glow_pass_scaling lands byte-identical). For displacement it is NOT: a
+// stage-sized port would wrap around the STAGE.
+//
+// So the object's screen rect is passed in as a uniform and the shader works in
+// rect-local pixels: `local = frag_pixel - rect_origin` is ruffle's
+// `source_pos`, `rect_size` replaces `source_size`, and the source fetch is a
+// MANUAL bilinear tap with explicit wrap/clamp inside the rect (textureLoad, no
+// sampler) instead of leaning on an address mode that can only wrap the whole
+// texture. Everything outside the rect returns transparent, exactly like
+// ruffle's fresh CommandTarget::FreshWithColor(TRANSPARENT).
+//
+// The tap arithmetic is deliberately the same as the CPU twin in
+// avm2_bitmap.c::bd_displace_source_region / dm_sample_repeat (s15), which is
+// already CI-graded against the same content through
+// visual/filters/displacement_map_through_applyFilter: nearest+ClampToEdge on
+// the map, the neutral vec4(0.5) = 127.5 (half a level, not 128) for a map_uv
+// outside 0..1, channels read AS STORED (premultiplied both sides), and
+// bilinear+repeat on the source.
+static const char* displace_wgsl =
+	"struct DParams {\n"
+	"  color: vec4f,\n"      // mode 3 colour, straight rgb + alpha
+	"  comp: vec4f,\n"       // x=componentX, y=componentY, z=mode, w=unused
+	"  rect: vec4f,\n"       // xy = rect origin (texture px), zw = rect size (px)
+	"  mapinfo: vec4f,\n"    // xy = map size (px), zw = mapPoint (stage px)
+	"  misc: vec4f,\n"       // xy = viewscale, zw = scaleX/scaleY
+	"  texsize: vec4f,\n"    // xy = source texture size (px)
+	"}\n"
+	"@group(0) @binding(0) var src_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(1) var map_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(2) var<uniform> p: DParams;\n"
+	"\n"
+	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+	"\n"
+	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+	"  var positions = array<vec2f, 6>(\n"
+	"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+	"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+	"  );\n"
+	"  var uvs = array<vec2f, 6>(\n"
+	"    vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),\n"
+	"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
+	"  );\n"
+	"  var out: VSOut;\n"
+	"  out.pos = vec4f(positions[vi], 0.0, 1.0);\n"
+	"  out.uv = uvs[vi];\n"
+	"  return out;\n"
+	"}\n"
+	"\n"
+	// ruffle get_component(): 1=R, 2=G, 4=B, 8=A, anything else = 128 (which
+	// here means "zero displacement on this axis"). componentX/Y of 0 is
+	// undocumented but real - visual/filters/displacement_map's last two tiles.
+	"fn get_component(m: vec4f, c: f32) -> f32 {\n"
+	"  if (c == 1.0) { return m.r; }\n"
+	"  if (c == 2.0) { return m.g; }\n"
+	"  if (c == 4.0) { return m.b; }\n"
+	"  if (c == 8.0) { return m.a; }\n"
+	"  return 128.0;\n"
+	"}\n"
+	"\n"
+	"fn wrapi(v: i32, n: i32) -> i32 {\n"
+	"  let r = v % n;\n"
+	"  if (r < 0) { return r + n; }\n"
+	"  return r;\n"
+	"}\n"
+	"\n"
+	// Bilinear + Repeat over the RECT (ruffle's source sampler is
+	// get_sampler(true, true) = repeat + filtering over its object-sized
+	// texture). pp is in rect-local pixels.
+	"fn sample_src(pp: vec2f) -> vec4f {\n"
+	"  let w = i32(p.rect.z);\n"
+	"  let h = i32(p.rect.w);\n"
+	"  let f = pp - vec2f(0.5, 0.5);\n"
+	"  let i0 = floor(f);\n"
+	"  let t = f - i0;\n"
+	"  let ox = i32(p.rect.x);\n"
+	"  let oy = i32(p.rect.y);\n"
+	"  let x0 = wrapi(i32(i0.x), w);\n"
+	"  let x1 = wrapi(i32(i0.x) + 1, w);\n"
+	"  let y0 = wrapi(i32(i0.y), h);\n"
+	"  let y1 = wrapi(i32(i0.y) + 1, h);\n"
+	"  let c00 = textureLoad(src_tex, vec2i(ox + x0, oy + y0), 0);\n"
+	"  let c10 = textureLoad(src_tex, vec2i(ox + x1, oy + y0), 0);\n"
+	"  let c01 = textureLoad(src_tex, vec2i(ox + x0, oy + y1), 0);\n"
+	"  let c11 = textureLoad(src_tex, vec2i(ox + x1, oy + y1), 0);\n"
+	"  return mix(mix(c00, c10, t.x), mix(c01, c11, t.x), t.y);\n"
+	"}\n"
+	"\n"
+	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"  let pix = uv * p.texsize.xy;\n"
+	"  let local = pix - p.rect.xy;\n"
+	// Outside the object's own rect there is no FilterSource at all.
+	"  if (local.x < 0.0 || local.x > p.rect.z\n"
+	"      || local.y < 0.0 || local.y > p.rect.w) {\n"
+	"    return vec4f(0.0, 0.0, 0.0, 0.0);\n"
+	"  }\n"
+	"  let vs = p.misc.xy;\n"
+	// ruffle: map_uv = (source_pos - offset) / viewscale / map_size.
+	"  let mu = (local.x - p.mapinfo.z) / vs.x / p.mapinfo.x;\n"
+	"  let mv = (local.y - p.mapinfo.w) / vs.y / p.mapinfo.y;\n"
+	"  var cv = vec2f(127.5, 127.5);\n"
+	"  if (mu >= 0.0 && mu <= 1.0 && mv >= 0.0 && mv <= 1.0) {\n"
+	"    let mw = i32(p.mapinfo.x);\n"
+	"    let mh = i32(p.mapinfo.y);\n"
+	"    let mx = clamp(i32(floor(mu * p.mapinfo.x)), 0, mw - 1);\n"
+	"    let my = clamp(i32(floor(mv * p.mapinfo.y)), 0, mh - 1);\n"
+	"    let mc = textureLoad(map_tex, vec2i(mx, my), 0) * 255.0;\n"
+	"    cv = vec2f(get_component(mc, p.comp.x), get_component(mc, p.comp.y));\n"
+	"  }\n"
+	// ruffle displace_coordinates(), with scale already multiplied by viewscale.
+	"  let sc = vec2f(p.misc.z, p.misc.w) * vs;\n"
+	"  let d = local + (cv - vec2f(128.0, 128.0)) * sc / 256.0;\n"
+	"  var duv = d / p.rect.zw;\n"
+	"  let oob = duv.x < 0.0 || duv.x > 1.0 || duv.y < 0.0 || duv.y > 1.0;\n"
+	"  let mode = p.comp.z;\n"
+	"  if (mode == 1.0) {\n"                       // clamp
+	"    duv = clamp(duv, vec2f(0.0, 0.0), vec2f(1.0, 1.0));\n"
+	"  } else if (mode == 2.0 && oob) {\n"         // ignore
+	"    duv = local / p.rect.zw;\n"
+	"  }\n"
+	"  var result = sample_src(duv * p.rect.zw);\n"
+	"  if (mode == 3.0 && oob) {\n"                // color
+	"    result = vec4f(p.color.rgb, 1.0) * p.color.a;\n"
+	"  }\n"
+	"  return result;\n"
+	"}\n";
+
+// Lazily built on the first displacement filter in the movie: an AVM2 movie
+// that never uses one pays nothing (no pipeline, no map texture).
+static void ensure_displace_resources(WebGPURenderContext* ctx)
+{
+	if (ctx->displace_resources_created) return;
+	ctx->displace_resources_created = 1;
+
+	WGPUBindGroupLayoutEntry entries[3] = {0};
+	entries[0].binding = 0;
+	entries[0].visibility = WGPUShaderStage_Fragment;
+	entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+	entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+	entries[1].binding = 1;
+	entries[1].visibility = WGPUShaderStage_Fragment;
+	entries[1].texture.sampleType = WGPUTextureSampleType_Float;
+	entries[1].texture.viewDimension = WGPUTextureViewDimension_2D;
+	entries[2].binding = 2;
+	entries[2].visibility = WGPUShaderStage_Fragment;
+	entries[2].buffer.type = WGPUBufferBindingType_Uniform;
+	entries[2].buffer.minBindingSize = 96;
+
+	WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+	bgl_desc.entryCount = 3;
+	bgl_desc.entries = entries;
+	ctx->displace_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
+
+	WGPUPipelineLayoutDescriptor pl_desc = {0};
+	pl_desc.bindGroupLayoutCount = 1;
+	pl_desc.bindGroupLayouts = &ctx->displace_bgl;
+	ctx->displace_pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &pl_desc);
+
+	WGPUShaderModule sm = create_shader(ctx->device, displace_wgsl, "displace_shader");
+
+	WGPUColorTargetState ct = {0};
+	ct.format = ctx->surface_format;
+	ct.writeMask = WGPUColorWriteMask_All;
+	WGPUBlendState blend = {0};
+	blend.color.srcFactor = WGPUBlendFactor_One;
+	blend.color.dstFactor = WGPUBlendFactor_Zero;
+	blend.color.operation = WGPUBlendOperation_Add;
+	blend.alpha.srcFactor = WGPUBlendFactor_One;
+	blend.alpha.dstFactor = WGPUBlendFactor_Zero;
+	blend.alpha.operation = WGPUBlendOperation_Add;
+	ct.blend = &blend;
+
+	WGPUFragmentState fs = {0};
+	fs.module = sm;
+	fs.entryPoint = WGPU_LABEL("fs_main");
+	fs.targetCount = 1;
+	fs.targets = &ct;
+
+	WGPURenderPipelineDescriptor rpd = {0};
+	rpd.label = WGPU_LABEL("displace_pipeline");
+	rpd.layout = ctx->displace_pipeline_layout;
+	rpd.vertex.module = sm;
+	rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+	rpd.fragment = &fs;
+	rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+	// The ping-pong targets (filter_tex_a/b) are single-sampled, exactly like
+	// the blur pipeline next door; MSAA_SAMPLES belongs to the OFFSCREEN pass
+	// that produced them, never to a filter pass.
+	rpd.multisample.count = 1;
+	rpd.multisample.mask = 0xFFFFFFFF;
+	ctx->displace_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+	wgpuShaderModuleRelease(sm);
+}
+
+// Upload the filter's map BitmapData into a dedicated RGBA8 texture. Format is
+// pinned to RGBA8Unorm (not ctx->surface_format) so the byte order below is the
+// channel order the shader reads, whatever the swapchain happens to be. Pixels
+// are premultiplied ARGB u32, exactly as Avm2BitmapDataExt stores them and as
+// bd_displace_source_region reads them.
+static void upload_displace_map(WebGPURenderContext* ctx,
+	const uint32_t* argb_pixels, u32 map_w, u32 map_h)
+{
+	if (ctx->displace_map_tex == NULL
+	    || ctx->displace_map_w != map_w || ctx->displace_map_h != map_h)
+	{
+		if (ctx->displace_map_view) wgpuTextureViewRelease(ctx->displace_map_view);
+		if (ctx->displace_map_tex) wgpuTextureRelease(ctx->displace_map_tex);
+		ctx->displace_map_view = NULL;
+		ctx->displace_map_tex = NULL;
+		WGPUTextureDescriptor td = {0};
+		td.label = WGPU_LABEL("displace_map");
+		td.dimension = WGPUTextureDimension_2D;
+		td.size = (WGPUExtent3D){map_w, map_h, 1};
+		td.format = WGPUTextureFormat_RGBA8Unorm;
+		td.mipLevelCount = 1;
+		td.sampleCount = 1;
+		td.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+		ctx->displace_map_tex = wgpuDeviceCreateTexture(ctx->device, &td);
+		WGPUTextureViewDescriptor vd = {0};
+		vd.mipLevelCount = 1;
+		vd.arrayLayerCount = 1;
+		ctx->displace_map_view = wgpuTextureCreateView(ctx->displace_map_tex, &vd);
+		ctx->displace_map_w = map_w;
+		ctx->displace_map_h = map_h;
+	}
+
+	size_t n = (size_t)map_w * (size_t)map_h;
+	u8* temp = (u8*)malloc(n * 4);
+	if (temp == NULL) return;
+	u32* dst = (u32*)temp;
+	for (size_t i = 0; i < n; i++)
+	{
+		u32 argb = argb_pixels[i];
+		u32 a = (argb >> 24) & 0xFF;
+		u32 r = (argb >> 16) & 0xFF;
+		u32 g = (argb >> 8) & 0xFF;
+		u32 b = argb & 0xFF;
+		dst[i] = r | (g << 8) | (b << 16) | (a << 24);
+	}
+	WGPUTexelCopyTextureInfo dest = {0};
+	dest.texture = ctx->displace_map_tex;
+	dest.origin = (WGPUOrigin3D){0, 0, 0};
+	WGPUTexelCopyBufferLayout layout = {0};
+	layout.bytesPerRow = map_w * 4;
+	layout.rowsPerImage = map_h;
+	WGPUExtent3D extent = {map_w, map_h, 1};
+	wgpuQueueWriteTexture(ctx->queue, &dest, temp, n * 4, &layout, &extent);
+	free(temp);
+}
+
+// One DisplacementMapFilter pass over the offscreen layer: filter_tex_a ->
+// filter_tex_b, then copied back so the ping-pong invariant ("the layer always
+// ends up in filter_tex_a") holds and the pass chains with run_blur.
+//
+// rect_* are the filtered object's screen rect in RENDER-TARGET pixels
+// (ruffle's cache-texture geometry); map_point is in STAGE pixels, as the AS
+// property is; viewscale is the stage view matrix's scale, the same factor
+// run_blur applies to blur sizes.
+void render_webgpu_run_displacement(WebGPURenderContext* ctx,
+	const uint32_t* map_pixels, u32 map_w, u32 map_h,
+	float rect_x, float rect_y, float rect_w, float rect_h,
+	float map_point_x, float map_point_y,
+	float scale_x, float scale_y, float viewscale,
+	int comp_x, int comp_y, int mode,
+	float cr, float cg, float cb, float ca)
+{
+	if (!ctx->renderer_ok) return;
+	if (map_pixels == NULL || map_w == 0 || map_h == 0) return;
+	if (rect_w < 1.0f || rect_h < 1.0f) return;
+	render_webgpu_ensure_filter_resources(ctx);
+	ensure_displace_resources(ctx);
+	if (ctx->displace_pipeline == NULL) return;
+	upload_displace_map(ctx, map_pixels, map_w, map_h);
+	if (ctx->displace_map_view == NULL) return;
+
+	// 96 bytes: color, comp, rect, mapinfo, misc, texsize - six vec4f.
+	float params[24] = {0};
+	params[0] = cr; params[1] = cg; params[2] = cb; params[3] = ca;
+	params[4] = (float)comp_x; params[5] = (float)comp_y; params[6] = (float)mode;
+	params[8] = rect_x; params[9] = rect_y; params[10] = rect_w; params[11] = rect_h;
+	params[12] = (float)map_w; params[13] = (float)map_h;
+	params[14] = map_point_x; params[15] = map_point_y;
+	params[16] = viewscale; params[17] = viewscale;
+	params[18] = scale_x; params[19] = scale_y;
+	params[20] = (float)ctx->width; params[21] = (float)ctx->height;
+	u32 params_offset = filter_uniform_push(ctx, params, 96);
+
+	WGPUBindGroupEntry bg_entries[3] = {0};
+	bg_entries[0].binding = 0;
+	bg_entries[0].textureView = ctx->filter_view_a;
+	bg_entries[1].binding = 1;
+	bg_entries[1].textureView = ctx->displace_map_view;
+	bg_entries[2].binding = 2;
+	bg_entries[2].buffer = ctx->filter_uniform_ring;
+	bg_entries[2].offset = params_offset;
+	bg_entries[2].size = 96;
+
+	WGPUBindGroupDescriptor bg_desc = {0};
+	bg_desc.layout = ctx->displace_bgl;
+	bg_desc.entryCount = 3;
+	bg_desc.entries = bg_entries;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+
+	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	color_att.view = ctx->filter_view_b;
+	color_att.loadOp = WGPULoadOp_Clear;
+	color_att.storeOp = WGPUStoreOp_Store;
+	color_att.clearValue = (WGPUColor){0, 0, 0, 0};
+
+	WGPURenderPassDescriptor rp_desc = {0};
+	rp_desc.label = WGPU_LABEL("displace");
+	rp_desc.colorAttachmentCount = 1;
+	rp_desc.colorAttachments = &color_att;
+
+	WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+	wgpuRenderPassEncoderSetPipeline(pass, ctx->displace_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(pass, 0, bg, 0, NULL);
+	wgpuRenderPassEncoderDraw(pass, 6, 1, 0, 0);
+	wgpuRenderPassEncoderEnd(pass);
+	wgpuRenderPassEncoderRelease(pass);
+	wgpuBindGroupRelease(bg);
+
+	// Back into filter_tex_a. Both ping-pong textures carry CopySrc|CopyDst
+	// (see render_webgpu_ensure_filter_resources), and this runs with the main
+	// pass suspended, so the copy is legal here for the same reason
+	// render_webgpu_snapshot_filter_source's is.
+	WGPUTexelCopyTextureInfo src = {0};
+	src.texture = ctx->filter_tex_b;
+	src.mipLevel = 0;
+	src.origin = (WGPUOrigin3D){0, 0, 0};
+	src.aspect = WGPUTextureAspect_All;
+	WGPUTexelCopyTextureInfo dst = {0};
+	dst.texture = ctx->filter_tex_a;
+	dst.mipLevel = 0;
+	dst.origin = (WGPUOrigin3D){0, 0, 0};
+	dst.aspect = WGPUTextureAspect_All;
+	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
+	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_free: release all GPU resources
 // ---------------------------------------------------------------------------
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
@@ -4849,6 +5203,12 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->compose_pipeline) wgpuRenderPipelineRelease(ctx->compose_pipeline);
 	if (ctx->compose_bgl) wgpuBindGroupLayoutRelease(ctx->compose_bgl);
 	if (ctx->compose_pipeline_layout) wgpuPipelineLayoutRelease(ctx->compose_pipeline_layout);
+	// DisplacementMapFilter (cut 2) — all NULL unless the movie used one.
+	if (ctx->displace_map_view) wgpuTextureViewRelease(ctx->displace_map_view);
+	if (ctx->displace_map_tex) wgpuTextureRelease(ctx->displace_map_tex);
+	if (ctx->displace_pipeline) wgpuRenderPipelineRelease(ctx->displace_pipeline);
+	if (ctx->displace_bgl) wgpuBindGroupLayoutRelease(ctx->displace_bgl);
+	if (ctx->displace_pipeline_layout) wgpuPipelineLayoutRelease(ctx->displace_pipeline_layout);
 
 	// Release surface
 	if (ctx->surface) wgpuSurfaceRelease(ctx->surface);

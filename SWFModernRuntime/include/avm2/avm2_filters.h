@@ -59,7 +59,16 @@ typedef struct Avm2FilterVal
 	float divisor, bias;
 	uint8_t preserve_alpha, clamp;
 	// DisplacementMapFilter (mapBitmap always round-trips to null, like Ruffle).
+	//
+	// `map_bitmap` is kept BY IDENTITY, exactly like ShaderFilter's `shader`,
+	// and is deliberately NOT part of the AS round trip: avm2_filter_to_object
+	// still writes `mapBitmap = null`, so nothing script-visible changes. The
+	// render-time DisplacementMapFilter arm (avm2_display.c) needs the real
+	// BitmapData to upload as the map texture, and unlike BitmapData.applyFilter
+	// it has no AS filter object in hand — only the stored Avm2FilterVal.
+	// GC: marked by avm2_filter_gc_mark for this kind.
 	int32_t map_x, map_y;
+	Avm2Value map_bitmap;
 	uint8_t comp_x, comp_y, dm_mode;    // dm_mode: 0 wrap, 1 clamp, 2 ignore, 3 color
 	float scale_x, scale_y;
 	// Gradient filters.

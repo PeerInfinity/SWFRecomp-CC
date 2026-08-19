@@ -84,4 +84,5 @@ void render_webgpu_end_offscreen_pass(WebGPURenderContext* c) { (void)c; }
 void render_webgpu_run_blur(WebGPURenderContext* c, float bx, float by, u8 q, float st, float r, float g, float b, float a, int col) { (void)c; (void)bx; (void)by; (void)q; (void)st; (void)r; (void)g; (void)b; (void)a; (void)col; }
 void render_webgpu_composite_filtered(WebGPURenderContext* c, float ox, float oy, float tr, float tg, float tb, float ta) { (void)c; (void)ox; (void)oy; (void)tr; (void)tg; (void)tb; (void)ta; }
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* c) { (void)c; }
+void render_webgpu_run_displacement(WebGPURenderContext* c, const uint32_t* mp, u32 mw, u32 mh, float rx, float ry, float rw, float rh, float px, float py, float sx, float sy, float vs, int cx, int cy, int md, float cr, float cg, float cb, float ca) { (void)c; (void)mp; (void)mw; (void)mh; (void)rx; (void)ry; (void)rw; (void)rh; (void)px; (void)py; (void)sx; (void)sy; (void)vs; (void)cx; (void)cy; (void)md; (void)cr; (void)cg; (void)cb; (void)ca; }
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* c) { (void)app_context; free(c); }

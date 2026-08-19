@@ -16289,6 +16289,14 @@ static float avm2_filter_fixed8(int16_t v)  { return (float) v / 256.0f; }
 // glow_pass_scaling's quality-0 tile is unfiltered in the golden.
 static int avm2_filter_renderable(const Avm2FilterVal* f)
 {
+	// DisplacementMapFilter (cut 2) is checked FIRST and does not go through
+	// the quality gate below: AS3 DisplacementMapFilter has no `quality`
+	// property at all, so Avm2FilterVal.quality is 0 for every one of them and
+	// the shared gate would drop the whole kind. Ruffle's own arm is
+	// `filter.map_bitmap.clone()?` in displacement_map.rs::apply — a filter
+	// with no map returns None, which leaves the source untouched.
+	if (f->kind == AVM2_FILTER_DISPLACEMENT_MAP)
+		return f->map_bitmap.kind == AVM2_VALUE_OBJECT;
 	if (f->kind != AVM2_FILTER_BLUR && f->kind != AVM2_FILTER_DROP_SHADOW
 	    && f->kind != AVM2_FILTER_GLOW && f->kind != AVM2_FILTER_BEVEL)
 		return 0;
@@ -16297,6 +16305,95 @@ static int avm2_filter_renderable(const Avm2FilterVal* f)
 	    && f->blur_x <= 65536 && f->blur_y <= 65536)
 		return 0;                       // Filter::impotent(): blur <= 1 px
 	return 1;
+}
+
+// The filtered object's screen rect, in RENDER-TARGET pixels — the geometry of
+// ruffle's per-object cache texture (display_object.rs render_base):
+//
+//     bounds = render_bounds_with_transform(&base_transform.matrix, false, view)
+//     width  = bounds.width().to_pixels().ceil()
+//     offset = bounds.x_min   (texture pixel 0 IS this stage position)
+//
+// `base_transform` is taken from the transform stack, and Stage::render_viewport
+// pushes the stage VIEW matrix first, so ruffle's bounds are already in device
+// pixels — the same space as our stage-sized offscreen layer. We therefore push
+// the world-twips AABB through app->stage_to_ndc (which bakes the ShowAll fit
+// and the centring offset, see wasm_wrappers/main.c) and read off the target
+// pixels, rather than multiplying by stage_scale and hoping the letterbox
+// margin is zero.
+//
+// The origin is rounded to the nearest texel because the shader addresses the
+// layer with textureLoad. Ruffle's cache texture starts exactly at a fractional
+// bounds.x_min; ours can only start at a texel boundary, so an object at a
+// fractional stage position is up to half a pixel off. Every displacement row
+// in the corpus places its objects at integer coordinates, where the two agree
+// exactly.
+static int avm2_filter_screen_rect(Avm2Context* ctx, Avm2Object* obj,
+                                   const Mat* world, float out[4])
+{
+	Rect acc = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, obj, world, &acc);
+	if (!acc.valid) return 0;
+	const float* m = ctx->app->stage_to_ndc;
+	if (m == NULL) return 0;
+	double tw = (double) context->width, th = (double) context->height;
+	double xs[2] = { acc.xmin, acc.xmax };
+	double ys[2] = { acc.ymin, acc.ymax };
+	double px_min = 0, px_max = 0, py_min = 0, py_max = 0;
+	for (int k = 0; k < 4; k++)
+	{
+		double x = xs[k & 1], y = ys[(k >> 1) & 1];
+		// Column-major mat4 applied to (x, y, 0, 1), exactly as the vertex
+		// shader does, then the NDC -> viewport-pixel mapping.
+		double ndc_x = (double) m[0] * x + (double) m[4] * y + (double) m[12];
+		double ndc_y = (double) m[1] * x + (double) m[5] * y + (double) m[13];
+		double px = (ndc_x * 0.5 + 0.5) * tw;
+		double py = (0.5 - ndc_y * 0.5) * th;
+		if (k == 0) { px_min = px_max = px; py_min = py_max = py; }
+		else
+		{
+			if (px < px_min) px_min = px;
+			if (px > px_max) px_max = px;
+			if (py < py_min) py_min = py;
+			if (py > py_max) py_max = py;
+		}
+	}
+	out[0] = floorf((float) px_min + 0.5f);
+	out[1] = floorf((float) py_min + 0.5f);
+	out[2] = ceilf((float) (px_max - px_min));
+	out[3] = ceilf((float) (py_max - py_min));
+	return (out[2] >= 1.0f && out[3] >= 1.0f);
+}
+
+// One DisplacementMapFilter over the captured layer. Everything rect-relative
+// lives in the shader (render_webgpu.c's displace_wgsl); this side only has to
+// hand it the object rect, the map's pixels and the SWF-unit conversions.
+static void avm2_run_displacement_filter(Avm2Context* ctx, Avm2Object* obj,
+                                         Avm2DisplayObjectExt* ext,
+                                         const Mat* parent_world,
+                                         const Avm2FilterVal* f)
+{
+	Avm2BitmapDataExt* map = avm2_bitmapdata_ext_of(ctx, f->map_bitmap);
+	if (map == NULL || map->disposed || map->pixels == NULL) return;
+	if (map->width == 0 || map->height == 0) return;
+	Mat local = ext_matrix(ext);
+	Mat world = mat_mul(parent_world, &local);
+	float rect[4];
+	if (!avm2_filter_screen_rect(ctx, obj, &world, rect)) return;
+	// ruffle scales a DisplacementMapFilter by the stage view matrix only
+	// (viewscale_x/y start at 1.0 and `Filter::scale` multiplies them), the
+	// same rule render_webgpu_run_blur applies to blur sizes.
+	float viewscale = ctx->app->stage_scale > 0.0f ? ctx->app->stage_scale : 1.0f;
+	renderer_run_displacement(context,
+		map->pixels, map->width, map->height,
+		rect[0], rect[1], rect[2], rect[3],
+		(float) f->map_x, (float) f->map_y,
+		f->scale_x, f->scale_y, viewscale,
+		(int) f->comp_x, (int) f->comp_y, (int) f->dm_mode,
+		(float) ((f->color >> 16) & 0xFF) / 255.0f,
+		(float) ((f->color >> 8) & 0xFF) / 255.0f,
+		(float) (f->color & 0xFF) / 255.0f,
+		(float) f->alpha / 255.0f);
 }
 
 // Capture obj's subtree into the offscreen layer, run its filter list over it,
@@ -16372,6 +16469,11 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	{
 		const Avm2FilterVal* f = list[i];
 		int f_last = (i == n - 1);
+		if (f->kind == AVM2_FILTER_DISPLACEMENT_MAP)
+		{
+			avm2_run_displacement_filter(ctx, obj, ext, parent_world, f);
+			continue;
+		}
 		int f_is_blur = (f->kind == AVM2_FILTER_BLUR);
 		// AS3 BlurFilter has no `strength` property, so Avm2FilterVal.strength
 		// stays 0 for it - passing that through would multiply the layer by

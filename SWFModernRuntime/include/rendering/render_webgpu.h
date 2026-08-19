@@ -284,6 +284,20 @@ typedef struct WebGPURenderContext
 
 	// Renderer initialization status (0 = not ready, 1 = fully initialized)
 	int renderer_ok;
+
+	// DisplacementMapFilter (filters cut 2). Built lazily on the first
+	// displacement pass in the movie, so an AVM2 movie without one pays
+	// nothing. The map texture is recreated only when the map's dimensions
+	// change; it is RGBA8Unorm regardless of surface_format so the shader's
+	// channel order is pinned.
+	int displace_resources_created;
+	WGPUBindGroupLayout displace_bgl;
+	WGPUPipelineLayout displace_pipeline_layout;
+	WGPURenderPipeline displace_pipeline;
+	WGPUTexture displace_map_tex;
+	WGPUTextureView displace_map_view;
+	u32 displace_map_w;
+	u32 displace_map_h;
 } WebGPURenderContext;
 
 // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
@@ -368,6 +382,25 @@ void render_webgpu_compose_filter(WebGPURenderContext* context, int kind,
 	float c2r, float c2g, float c2b, float c2a,
 	float strength, int variant, int knockout, int composite_source);
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
+// One DisplacementMapFilter pass over the offscreen layer (filters cut 2).
+// Call with the main pass SUSPENDED, in the same slot as render_webgpu_run_blur
+// — it consumes filter_tex_a and leaves the result there.
+//
+// Unlike every other filter pass this one is OBJECT-relative, because ruffle's
+// DisplacementMapFilter defines wrap/clamp/ignore, the map offset and the
+// out-of-bounds test on the SOURCE RECT. rect_* is the filtered object's screen
+// rect in render-target pixels; map_point is in STAGE pixels; viewscale is the
+// stage view matrix's scale (ctx->stage_scale), the same factor run_blur
+// applies to blur sizes. comp_x/comp_y are BitmapDataChannel bits (1 R, 2 G,
+// 4 B, 8 A; anything else = no displacement on that axis) and mode is
+// 0 wrap / 1 clamp / 2 ignore / 3 color.
+void render_webgpu_run_displacement(WebGPURenderContext* context,
+	const uint32_t* map_pixels, u32 map_w, u32 map_h,
+	float rect_x, float rect_y, float rect_w, float rect_h,
+	float map_point_x, float map_point_y,
+	float scale_x, float scale_y, float viewscale,
+	int comp_x, int comp_y, int mode,
+	float cr, float cg, float cb, float ca);
 // Blend-mode layer compositing: 1 when this mode must be rendered to its own
 // layer and composited once, 0 when the caller should keep the legacy per-draw
 // pipeline (nested layers, or a backdrop we cannot sample).
