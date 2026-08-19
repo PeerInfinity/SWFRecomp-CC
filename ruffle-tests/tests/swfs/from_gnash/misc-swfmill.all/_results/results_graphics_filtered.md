@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 6m 46s
+**Run Duration**: 7m 7s
 
 **Filtered**: 0 tests ignored out of 20 available
 
@@ -12,18 +12,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 19 |
-| Passing | **18** (94.7%) |
+| Total tests | 20 |
+| Passing | **19** (95.0%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **19** (100.0%) |
+| Effective pass | **20** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 91 |
-| Matching lines | 89 (97.8%) |
+| Total expected lines | 95 |
+| Matching lines | 93 (97.9%) |
 | Mismatched lines | 2 |
 
 ## Passing Tests
 
-**18 tests passing**
+**19 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -42,9 +42,10 @@
 | 13 | `registers` | 36 | 22.0s |  |
 | 14 | `tags_after_last_showframe` | 1 | 22.5s |  |
 | 15 | `trace-as2/arguments` | 8 | 22.5s |  |
-| 16 | `trace-as2/shortstack` | 2 | 17.6s |  |
-| 17 | `trace-as2/super` | 8 | 23.2s |  |
-| 18 | `trace-as2/this` | 8 | 21.6s |  |
+| 16 | `trace-as2/root_onload` | 4 | 20.8s |  |
+| 17 | `trace-as2/shortstack` | 2 | 17.6s |  |
+| 18 | `trace-as2/super` | 8 | 23.2s |  |
+| 19 | `trace-as2/this` | 8 | 21.6s |  |
 
 ## Ruffle-Matched Tests
 

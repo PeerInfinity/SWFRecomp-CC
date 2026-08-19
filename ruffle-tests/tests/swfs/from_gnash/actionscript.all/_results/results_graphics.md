@@ -1,23 +1,23 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 39m 33s
+**Run Duration**: 39m 57s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 235 |
-| Passing | **131** (55.7%) |
-| Ruffle-matched | 91 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **222** (94.5%) |
+| Total tests | 243 |
+| Passing | **138** (56.8%) |
+| Ruffle-matched | 92 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **230** (94.7%) |
 | Failing | 13 |
-| Total expected lines | 38484 |
-| Matching lines | 30100 (78.2%) |
-| Mismatched lines | 8384 |
+| Total expected lines | 38791 |
+| Matching lines | 30386 (78.3%) |
+| Mismatched lines | 8405 |
 
 ### Failure Breakdown
 
@@ -27,7 +27,7 @@
 
 ## Passing Tests
 
-**131 tests passing**
+**138 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -99,73 +99,80 @@
 | 66 | `Point-v6` | 7 | 1.4s |  |
 | 67 | `Point-v7` | 7 | 2.7s |  |
 | 68 | `Point-v8` | 193 | 9.8s |  |
-| 69 | `Selection-v5` | 21 | 19.0s |  |
-| 70 | `Sound-v6` | 121 | 5.7s |  |
-| 71 | `Sound-v7` | 121 | 5.3s |  |
-| 72 | `Sound-v8` | 121 | 2.4s |  |
-| 73 | `Stage-v5` | 38 | 22.9s |  |
-| 74 | `System-v5` | 67 | 23.8s |  |
-| 75 | `System-v6` | 100 | 4.8s |  |
-| 76 | `System-v7` | 101 | 4.8s |  |
-| 77 | `System-v8` | 101 | 2.2s |  |
-| 78 | `TextFieldHTML-v5` | 6 | 21.6s |  |
-| 79 | `TextFieldHTML-v6` | 37 | 3.4s |  |
-| 80 | `TextFieldHTML-v7` | 37 | 3.1s |  |
-| 81 | `TextFieldHTML-v8` | 37 | 2.3s |  |
-| 82 | `TextFormat-v5` | 128 | 5.8s |  |
-| 83 | `TextFormat-v6` | 128 | 1.3s |  |
-| 84 | `TextSnapshot-v5` | 7 | 22.8s |  |
-| 85 | `TextSnapshot-v6` | 173 | 9.7s |  |
-| 86 | `TextSnapshot-v7` | 173 | 9.1s |  |
-| 87 | `TextSnapshot-v8` | 173 | 2.6s |  |
-| 88 | `Transform-v5` | 7 | 3.0s |  |
-| 89 | `Transform-v6` | 7 | 2.5s |  |
-| 90 | `Transform-v7` | 7 | 2.6s |  |
-| 91 | `Try-v5` | 20 | 23.2s |  |
-| 92 | `Try-v6` | 20 | 1.4s |  |
-| 93 | `Try-v7` | 20 | 3.5s |  |
-| 94 | `Try-v8` | 20 | 2.5s |  |
-| 95 | `Video-v5` | 7 | 22.8s |  |
-| 96 | `Video-v6` | 85 | 4.8s |  |
-| 97 | `Video-v7` | 85 | 4.5s |  |
-| 98 | `Video-v8` | 85 | 2.5s |  |
-| 99 | `XMLSocket-v5` | 35 | 22.2s |  |
-| 100 | `XMLSocket-v6` | 35 | 3.5s |  |
-| 101 | `XMLSocket-v7` | 35 | 3.2s |  |
-| 102 | `XMLSocket-v8` | 35 | 2.4s |  |
-| 103 | `argstest-v5` | 4 | 3.0s |  |
-| 104 | `case-v5` | 39 | 3.5s |  |
-| 105 | `case-v6` | 73 | 4.4s |  |
-| 106 | `case-v7` | 67 | 4.3s |  |
-| 107 | `case-v8` | 67 | 2.4s |  |
-| 108 | `delete-v5` | 61 | 3.9s |  |
-| 109 | `delete-v6` | 61 | 3.3s |  |
-| 110 | `delete-v7` | 61 | 3.6s |  |
-| 111 | `delete-v8` | 61 | 2.4s |  |
-| 112 | `enumerate-v5` | 6 | 2.8s |  |
-| 113 | `enumerate-v6` | 49 | 3.9s |  |
-| 114 | `enumerate-v7` | 49 | 3.6s |  |
-| 115 | `enumerate-v8` | 49 | 2.3s |  |
-| 116 | `flash-v5` | 10 | 21.1s |  |
-| 117 | `flash-v6` | 10 | 2.7s |  |
-| 118 | `flash-v7` | 10 | 2.4s |  |
-| 119 | `flash-v8` | 41 | 22.1s |  |
-| 120 | `getvariable-v5` | 58 | 3.9s |  |
-| 121 | `getvariable-v6` | 64 | 4.0s |  |
-| 122 | `getvariable-v7` | 64 | 4.0s |  |
-| 123 | `getvariable-v8` | 64 | 2.3s |  |
-| 124 | `swap-v5` | 7 | 22.8s |  |
-| 125 | `swap-v6` | 7 | 1.3s |  |
-| 126 | `swap-v7` | 7 | 2.4s |  |
-| 127 | `swap-v8` | 7 | 2.2s |  |
-| 128 | `targetPath-v5` | 12 | 2.9s |  |
-| 129 | `targetPath-v6` | 23 | 3.1s |  |
-| 130 | `targetPath-v7` | 23 | 2.7s |  |
-| 131 | `targetPath-v8` | 23 | 2.2s |  |
+| 69 | `Random-v5` | 30 | 3.3s |  |
+| 70 | `Random-v6` | 30 | 1.3s |  |
+| 71 | `Random-v7` | 30 | 2.9s |  |
+| 72 | `Random-v8` | 30 | 2.2s |  |
+| 73 | `Rectangle-v5` | 7 | 2.8s |  |
+| 74 | `Rectangle-v6` | 7 | 1.3s |  |
+| 75 | `Rectangle-v7` | 7 | 2.4s |  |
+| 76 | `Selection-v5` | 21 | 19.0s |  |
+| 77 | `Sound-v6` | 121 | 5.7s |  |
+| 78 | `Sound-v7` | 121 | 5.3s |  |
+| 79 | `Sound-v8` | 121 | 2.4s |  |
+| 80 | `Stage-v5` | 38 | 22.9s |  |
+| 81 | `System-v5` | 67 | 23.8s |  |
+| 82 | `System-v6` | 100 | 4.8s |  |
+| 83 | `System-v7` | 101 | 4.8s |  |
+| 84 | `System-v8` | 101 | 2.2s |  |
+| 85 | `TextFieldHTML-v5` | 6 | 21.6s |  |
+| 86 | `TextFieldHTML-v6` | 37 | 3.4s |  |
+| 87 | `TextFieldHTML-v7` | 37 | 3.1s |  |
+| 88 | `TextFieldHTML-v8` | 37 | 2.3s |  |
+| 89 | `TextFormat-v5` | 128 | 5.8s |  |
+| 90 | `TextFormat-v6` | 128 | 1.3s |  |
+| 91 | `TextSnapshot-v5` | 7 | 22.8s |  |
+| 92 | `TextSnapshot-v6` | 173 | 9.7s |  |
+| 93 | `TextSnapshot-v7` | 173 | 9.1s |  |
+| 94 | `TextSnapshot-v8` | 173 | 2.6s |  |
+| 95 | `Transform-v5` | 7 | 3.0s |  |
+| 96 | `Transform-v6` | 7 | 2.5s |  |
+| 97 | `Transform-v7` | 7 | 2.6s |  |
+| 98 | `Try-v5` | 20 | 23.2s |  |
+| 99 | `Try-v6` | 20 | 1.4s |  |
+| 100 | `Try-v7` | 20 | 3.5s |  |
+| 101 | `Try-v8` | 20 | 2.5s |  |
+| 102 | `Video-v5` | 7 | 22.8s |  |
+| 103 | `Video-v6` | 85 | 4.8s |  |
+| 104 | `Video-v7` | 85 | 4.5s |  |
+| 105 | `Video-v8` | 85 | 2.5s |  |
+| 106 | `XMLSocket-v5` | 35 | 22.2s |  |
+| 107 | `XMLSocket-v6` | 35 | 3.5s |  |
+| 108 | `XMLSocket-v7` | 35 | 3.2s |  |
+| 109 | `XMLSocket-v8` | 35 | 2.4s |  |
+| 110 | `argstest-v5` | 4 | 3.0s |  |
+| 111 | `case-v5` | 39 | 3.5s |  |
+| 112 | `case-v6` | 73 | 4.4s |  |
+| 113 | `case-v7` | 67 | 4.3s |  |
+| 114 | `case-v8` | 67 | 2.4s |  |
+| 115 | `delete-v5` | 61 | 3.9s |  |
+| 116 | `delete-v6` | 61 | 3.3s |  |
+| 117 | `delete-v7` | 61 | 3.6s |  |
+| 118 | `delete-v8` | 61 | 2.4s |  |
+| 119 | `enumerate-v5` | 6 | 2.8s |  |
+| 120 | `enumerate-v6` | 49 | 3.9s |  |
+| 121 | `enumerate-v7` | 49 | 3.6s |  |
+| 122 | `enumerate-v8` | 49 | 2.3s |  |
+| 123 | `flash-v5` | 10 | 21.1s |  |
+| 124 | `flash-v6` | 10 | 2.7s |  |
+| 125 | `flash-v7` | 10 | 2.4s |  |
+| 126 | `flash-v8` | 41 | 22.1s |  |
+| 127 | `getvariable-v5` | 58 | 3.9s |  |
+| 128 | `getvariable-v6` | 64 | 4.0s |  |
+| 129 | `getvariable-v7` | 64 | 4.0s |  |
+| 130 | `getvariable-v8` | 64 | 2.3s |  |
+| 131 | `swap-v5` | 7 | 22.8s |  |
+| 132 | `swap-v6` | 7 | 1.3s |  |
+| 133 | `swap-v7` | 7 | 2.4s |  |
+| 134 | `swap-v8` | 7 | 2.2s |  |
+| 135 | `targetPath-v5` | 12 | 2.9s |  |
+| 136 | `targetPath-v6` | 23 | 3.1s |  |
+| 137 | `targetPath-v7` | 23 | 2.7s |  |
+| 138 | `targetPath-v8` | 23 | 2.2s |  |
 
 ## Ruffle-Matched Tests
 
-**91 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**92 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
@@ -221,45 +228,46 @@
 | 50 | `Object-v6` | 8 | 24 | 14.8s |  |
 | 51 | `Object-v7` | 8 | 15 | 14.9s |  |
 | 52 | `Object-v8` | 8 | 15 | 3.4s |  |
-| 53 | `Selection-v6` | 7 | 13 | 5.7s |  |
-| 54 | `Selection-v7` | 7 | 13 | 5.5s |  |
-| 55 | `Selection-v8` | 7 | 13 | 2.1s |  |
-| 56 | `Sound-v5` | 14 | 16 | 22.1s |  |
-| 57 | `Stage-v6` | 14 | 14 | 23.9s |  |
-| 58 | `Stage-v7` | 14 | 14 | 3.8s |  |
-| 59 | `Stage-v8` | 14 | 14 | 2.6s |  |
-| 60 | `String-v5` | 19 | 21 | 17.8s |  |
-| 61 | `String-v6` | 10 | 10 | 18.8s |  |
-| 62 | `String-v7` | 10 | 10 | 18.6s |  |
-| 63 | `String-v8` | 10 | 10 | 3.0s |  |
-| 64 | `TextField-v5` | 3 | 3 | 2.7s |  |
-| 65 | `TextFormat-v7` | 38 | 40 | 7.5s |  |
-| 66 | `TextFormat-v8` | 36 | 38 | 26.0s |  |
-| 67 | `Transform-v8` | 7 | 11 | 26.5s |  |
-| 68 | `XML-v5` | 10 | 79 | 36.6s |  |
-| 69 | `XML-v6` | 3 | 98 | 18.1s |  |
-| 70 | `XML-v7` | 3 | 98 | 18.1s |  |
-| 71 | `XML-v8` | 24 | 116 | 6.1s |  |
-| 72 | `XMLNode-v5` | 3 | 22 | 10.2s |  |
-| 73 | `XMLNode-v6` | 3 | 22 | 10.2s |  |
-| 74 | `XMLNode-v7` | 3 | 22 | 9.0s |  |
-| 75 | `XMLNode-v8` | 3 | 22 | 2.7s |  |
-| 76 | `ops-v5` | 7 | 9 | 30.2s |  |
-| 77 | `ops-v6` | 7 | 11 | 10.0s |  |
-| 78 | `ops-v7` | 7 | 11 | 10.6s |  |
-| 79 | `ops-v8` | 7 | 11 | 22.6s |  |
-| 80 | `setProperty-v5` | 49 | 49 | 4.0s |  |
-| 81 | `setProperty-v6` | 49 | 49 | 3.8s |  |
-| 82 | `setProperty-v7` | 49 | 49 | 3.5s |  |
-| 83 | `setProperty-v8` | 49 | 49 | 2.6s |  |
-| 84 | `toString_valueOf-v5` | 34 | 34 | 25.8s |  |
-| 85 | `toString_valueOf-v6` | 5 | 5 | 6.7s |  |
-| 86 | `toString_valueOf-v7` | 5 | 5 | 6.4s |  |
-| 87 | `toString_valueOf-v8` | 5 | 5 | 2.6s |  |
-| 88 | `with-v5` | 3 | 3 | 4.7s |  |
-| 89 | `with-v6` | 6 | 9 | 5.9s |  |
-| 90 | `with-v7` | 6 | 9 | 5.6s |  |
-| 91 | `with-v8` | 6 | 9 | 2.7s |  |
+| 53 | `Rectangle-v8` | 21 | 21 | 7.5s |  |
+| 54 | `Selection-v6` | 7 | 13 | 5.7s |  |
+| 55 | `Selection-v7` | 7 | 13 | 5.5s |  |
+| 56 | `Selection-v8` | 7 | 13 | 2.1s |  |
+| 57 | `Sound-v5` | 14 | 16 | 22.1s |  |
+| 58 | `Stage-v6` | 14 | 14 | 23.9s |  |
+| 59 | `Stage-v7` | 14 | 14 | 3.8s |  |
+| 60 | `Stage-v8` | 14 | 14 | 2.6s |  |
+| 61 | `String-v5` | 19 | 21 | 17.8s |  |
+| 62 | `String-v6` | 10 | 10 | 18.8s |  |
+| 63 | `String-v7` | 10 | 10 | 18.6s |  |
+| 64 | `String-v8` | 10 | 10 | 3.0s |  |
+| 65 | `TextField-v5` | 3 | 3 | 2.7s |  |
+| 66 | `TextFormat-v7` | 38 | 40 | 7.5s |  |
+| 67 | `TextFormat-v8` | 36 | 38 | 26.0s |  |
+| 68 | `Transform-v8` | 7 | 11 | 26.5s |  |
+| 69 | `XML-v5` | 10 | 79 | 36.6s |  |
+| 70 | `XML-v6` | 3 | 98 | 18.1s |  |
+| 71 | `XML-v7` | 3 | 98 | 18.1s |  |
+| 72 | `XML-v8` | 24 | 116 | 6.1s |  |
+| 73 | `XMLNode-v5` | 3 | 22 | 10.2s |  |
+| 74 | `XMLNode-v6` | 3 | 22 | 10.2s |  |
+| 75 | `XMLNode-v7` | 3 | 22 | 9.0s |  |
+| 76 | `XMLNode-v8` | 3 | 22 | 2.7s |  |
+| 77 | `ops-v5` | 7 | 9 | 30.2s |  |
+| 78 | `ops-v6` | 7 | 11 | 10.0s |  |
+| 79 | `ops-v7` | 7 | 11 | 10.6s |  |
+| 80 | `ops-v8` | 7 | 11 | 22.6s |  |
+| 81 | `setProperty-v5` | 49 | 49 | 4.0s |  |
+| 82 | `setProperty-v6` | 49 | 49 | 3.8s |  |
+| 83 | `setProperty-v7` | 49 | 49 | 3.5s |  |
+| 84 | `setProperty-v8` | 49 | 49 | 2.6s |  |
+| 85 | `toString_valueOf-v5` | 34 | 34 | 25.8s |  |
+| 86 | `toString_valueOf-v6` | 5 | 5 | 6.7s |  |
+| 87 | `toString_valueOf-v7` | 5 | 5 | 6.4s |  |
+| 88 | `toString_valueOf-v8` | 5 | 5 | 2.6s |  |
+| 89 | `with-v5` | 3 | 3 | 4.7s |  |
+| 90 | `with-v6` | 6 | 9 | 5.9s |  |
+| 91 | `with-v7` | 6 | 9 | 5.6s |  |
+| 92 | `with-v8` | 6 | 9 | 2.7s |  |
 
 ## Near-Passing Tests
 

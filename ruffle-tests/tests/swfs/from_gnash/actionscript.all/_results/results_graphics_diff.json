@@ -1,197 +1,129 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-15T10:09:49.381589+00:00",
-    "old_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
-    "new_timestamp": "2026-08-19T13:54:51.861422+00:00",
+    "old_timestamp": "2026-08-19T13:54:51.861422+00:00",
+    "old_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
+    "new_timestamp": "2026-08-19T14:26:17.488846+00:00",
     "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 135,
-    "old_ruffle_matched": 92,
-    "old_effective_pass": 227,
-    "old_total": 243,
-    "old_pass_rate": 55.6,
-    "new_pass": 131,
-    "new_ruffle_matched": 91,
-    "new_effective_pass": 222,
-    "new_total": 235,
-    "new_pass_rate": 55.7,
-    "old_mismatched_lines": 8431,
-    "new_mismatched_lines": 8384,
+    "old_pass": 131,
+    "old_ruffle_matched": 91,
+    "old_effective_pass": 222,
+    "old_total": 235,
+    "old_pass_rate": 55.7,
+    "new_pass": 138,
+    "new_ruffle_matched": 92,
+    "new_effective_pass": 230,
+    "new_total": 243,
+    "new_pass_rate": 56.8,
+    "old_mismatched_lines": 8384,
+    "new_mismatched_lines": 8405,
     "increased_mismatches": 0,
-    "decreased_mismatches": 26,
-    "newly_passing": 3,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 231,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 8
+    "status_changed": 0,
+    "unchanged": 235,
+    "added": 8,
+    "removed": 0
   },
   "changes": [
     {
       "test": "Random-v5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 30,
         "expected_lines": 30,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Random-v6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 30,
         "expected_lines": 30,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Random-v7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 30,
         "expected_lines": 30,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Random-v8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 30,
         "expected_lines": 30,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Rectangle-v5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Rectangle-v6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Rectangle-v7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Rectangle-v8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 166,
         "expected_lines": 166,
         "matching_lines": 145
-      },
-      "new_lines": null
-    },
-    {
-      "test": "Sound-v5",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 100,
-        "expected_lines": 100,
-        "matching_lines": 84
-      },
-      "new_lines": {
-        "actual_lines": 100,
-        "expected_lines": 100,
-        "matching_lines": 86
-      }
-    },
-    {
-      "test": "Sound-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 113
-      },
-      "new_lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 121
-      }
-    },
-    {
-      "test": "Sound-v7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 113
-      },
-      "new_lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 121
-      }
-    },
-    {
-      "test": "Sound-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 113
-      },
-      "new_lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 121
       }
     }
   ]

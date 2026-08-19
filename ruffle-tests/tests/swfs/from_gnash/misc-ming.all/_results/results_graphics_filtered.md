@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 36m 3s
+**Run Duration**: 36m 37s
 
 **Filtered**: 1 tests ignored out of 111 available
 
@@ -12,13 +12,13 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 106 |
-| Passing | **65** (61.3%) |
+| Total tests | 110 |
+| Passing | **69** (62.7%) |
 | Ruffle-matched | 29 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **94** (88.7%) |
+| Effective pass | **98** (89.1%) |
 | Failing | 12 |
-| Total expected lines | 5141 |
-| Matching lines | 3986 (77.5%) |
+| Total expected lines | 5206 |
+| Matching lines | 4051 (77.8%) |
 | Mismatched lines | 1155 |
 
 ### Failure Breakdown
@@ -29,7 +29,7 @@
 
 ## Passing Tests
 
-**65 tests passing**
+**69 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -67,37 +67,41 @@
 | 32 | `displaylist_depths/displaylist_depths_test9` | 23 | 24.3s |  |
 | 33 | `duplicate_movie_clip_test2` | 21 | 24.4s |  |
 | 34 | `event_handler_scope_test` | 16 | 3.5s |  |
-| 35 | `goto_frame_test` | 15 | 19.6s |  |
-| 36 | `instanceNameTest` | 5 | 2.3s |  |
-| 37 | `loading/LoadVarsTest` | 36 | 25.9s |  |
-| 38 | `loop/loop_test` | 21 | 22.3s |  |
-| 39 | `loop/loop_test2` | 15 | 21.9s |  |
-| 40 | `loop/loop_test3` | 16 | 2.5s |  |
-| 41 | `loop/loop_test4` | 22 | 22.6s |  |
-| 42 | `loop/loop_test5` | 24 | 3.8s |  |
-| 43 | `loop/loop_test8` | 38 | 25.0s |  |
-| 44 | `loop/loop_test9` | 15 | 23.0s |  |
-| 45 | `loop/simple_loop_test` | 0 | 25.6s |  |
-| 46 | `masks_test2` | 10 | 22.4s |  |
-| 47 | `morph_test1` | 0 | 25.8s |  |
-| 48 | `move_object_test` | 11 | 23.3s |  |
-| 49 | `multi_doactions_and_goto_frame_test` | 6 | 23.2s |  |
-| 50 | `new_child_in_unload_test` | 11 | 23.6s |  |
-| 51 | `opcode_guard_test` | 18 | 21.7s |  |
-| 52 | `place_and_remove_object_insane_test` | 22 | 21.8s |  |
-| 53 | `place_and_remove_object_test` | 13 | 21.8s |  |
-| 54 | `register_class/RegisterClassTest3` | 12 | 3.5s |  |
-| 55 | `register_class/registerClassTest` | 51 | 24.8s |  |
-| 56 | `replace_shapes1test` | 23 | 3.2s |  |
-| 57 | `replace_sprites1test` | 21 | 22.7s |  |
-| 58 | `reverse_execute_PlaceObject2_test1` | 8 | 21.9s |  |
-| 59 | `reverse_execute_PlaceObject2_test2` | 10 | 22.5s |  |
-| 60 | `runtime_vm_stack_test` | 9 | 23.3s |  |
-| 61 | `shape_test` | 21 | 25.2s |  |
-| 62 | `static_vs_dynamic1` | 17 | 22.6s |  |
-| 63 | `static_vs_dynamic2` | 18 | 24.1s |  |
-| 64 | `timeline_var_test` | 11 | 23.4s |  |
-| 65 | `unload_movieclip_test1` | 6 | 22.7s |  |
+| 35 | `frame_label_test` | 17 | 4.2s |  |
+| 36 | `getTimer_test` | 8 | 2.9s |  |
+| 37 | `get_frame_number_test` | 31 | 24.3s |  |
+| 38 | `gotoFrame2Test` | 9 | 2.8s |  |
+| 39 | `goto_frame_test` | 15 | 19.6s |  |
+| 40 | `instanceNameTest` | 5 | 2.3s |  |
+| 41 | `loading/LoadVarsTest` | 36 | 25.9s |  |
+| 42 | `loop/loop_test` | 21 | 22.3s |  |
+| 43 | `loop/loop_test2` | 15 | 21.9s |  |
+| 44 | `loop/loop_test3` | 16 | 2.5s |  |
+| 45 | `loop/loop_test4` | 22 | 22.6s |  |
+| 46 | `loop/loop_test5` | 24 | 3.8s |  |
+| 47 | `loop/loop_test8` | 38 | 25.0s |  |
+| 48 | `loop/loop_test9` | 15 | 23.0s |  |
+| 49 | `loop/simple_loop_test` | 0 | 25.6s |  |
+| 50 | `masks_test2` | 10 | 22.4s |  |
+| 51 | `morph_test1` | 0 | 25.8s |  |
+| 52 | `move_object_test` | 11 | 23.3s |  |
+| 53 | `multi_doactions_and_goto_frame_test` | 6 | 23.2s |  |
+| 54 | `new_child_in_unload_test` | 11 | 23.6s |  |
+| 55 | `opcode_guard_test` | 18 | 21.7s |  |
+| 56 | `place_and_remove_object_insane_test` | 22 | 21.8s |  |
+| 57 | `place_and_remove_object_test` | 13 | 21.8s |  |
+| 58 | `register_class/RegisterClassTest3` | 12 | 3.5s |  |
+| 59 | `register_class/registerClassTest` | 51 | 24.8s |  |
+| 60 | `replace_shapes1test` | 23 | 3.2s |  |
+| 61 | `replace_sprites1test` | 21 | 22.7s |  |
+| 62 | `reverse_execute_PlaceObject2_test1` | 8 | 21.9s |  |
+| 63 | `reverse_execute_PlaceObject2_test2` | 10 | 22.5s |  |
+| 64 | `runtime_vm_stack_test` | 9 | 23.3s |  |
+| 65 | `shape_test` | 21 | 25.2s |  |
+| 66 | `static_vs_dynamic1` | 17 | 22.6s |  |
+| 67 | `static_vs_dynamic2` | 18 | 24.1s |  |
+| 68 | `timeline_var_test` | 11 | 23.4s |  |
+| 69 | `unload_movieclip_test1` | 6 | 22.7s |  |
 
 ## Ruffle-Matched Tests
 

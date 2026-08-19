@@ -1,22 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:51.812915+00:00",
+    "timestamp": "2026-08-19T14:26:17.436928+00:00",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "duration_seconds": 2082.02,
+    "duration_seconds": 2181.99,
     "total_available": 144,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 0,
     "filtered": true
   },
-  "total": 139,
-  "pass": 137,
+  "total": 144,
+  "pass": 142,
   "ruffle_matched": 2,
   "fail": 0,
   "pass_rate": 98.6,
-  "effective_pass": 139,
+  "effective_pass": 144,
   "effective_pass_rate": 100.0,
   "breakdown": {
     "ruffle_matched": 2
@@ -3907,6 +3905,186 @@
             "excess_outliers": 0
           },
           "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_underline",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 27.545,
+        "run": 0.766
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 28.69,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 1974 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 900,
+            "height": 300,
+            "total_channels": 1080000,
+            "max_diff": 255,
+            "diff_channels": 1986,
+            "mean_diff": 0.4673,
+            "outliers": 1974,
+            "max_outliers": 0,
+            "tolerance": 144,
+            "excess_outliers": 1974
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext/edittext_underline_scale2",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 23.161,
+        "run": 0.666
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 25.31,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 27672 outliers exceed limit of 16, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 1800,
+            "height": 600,
+            "total_channels": 4320000,
+            "max_diff": 255,
+            "diff_channels": 27672,
+            "mean_diff": 1.6333,
+            "outliers": 27672,
+            "max_outliers": 16,
+            "tolerance": 0,
+            "excess_outliers": 27656
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/any_blur_scales_with_screen",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.673,
+        "run": 0.465
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.17,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 4884 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 160,
+            "height": 160,
+            "total_channels": 102400,
+            "max_diff": 255,
+            "diff_channels": 4895,
+            "mean_diff": 12.0185,
+            "outliers": 4884,
+            "max_outliers": 0,
+            "tolerance": 2,
+            "excess_outliers": 4884
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "filters/avm1_convolution_initialization",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.862,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "duration": 2.09,
+      "status": "pass"
+    },
+    {
+      "test": "filters/bevel",
+      "phases": {
+        "recomp": 0.046,
+        "compile": 21.115,
+        "run": 0.819
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 22.41,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 69229 outliers exceed limit of 6, max difference 254",
+          "max_diff": 254,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 650,
+            "total_channels": 1430000,
+            "max_diff": 254,
+            "diff_channels": 226481,
+            "mean_diff": 1.0424,
+            "outliers": 69229,
+            "max_outliers": 6,
+            "tolerance": 3,
+            "excess_outliers": 69223
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"

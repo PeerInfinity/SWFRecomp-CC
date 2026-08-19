@@ -1,853 +1,657 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-15T10:09:49.264760+00:00",
-    "old_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
-    "new_timestamp": "2026-08-19T13:54:51.753776+00:00",
+    "old_timestamp": "2026-08-19T13:54:51.753776+00:00",
+    "old_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
+    "new_timestamp": "2026-08-19T14:26:17.376856+00:00",
     "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 1515,
-    "old_ruffle_matched": 53,
-    "old_effective_pass": 1568,
-    "old_total": 1574,
-    "old_pass_rate": 96.3,
-    "new_pass": 1485,
-    "new_ruffle_matched": 31,
-    "new_effective_pass": 1516,
-    "new_total": 1522,
-    "new_pass_rate": 97.6,
-    "old_mismatched_lines": 578,
-    "new_mismatched_lines": 320,
+    "old_pass": 1485,
+    "old_ruffle_matched": 31,
+    "old_effective_pass": 1516,
+    "old_total": 1522,
+    "old_pass_rate": 97.6,
+    "new_pass": 1527,
+    "new_ruffle_matched": 41,
+    "new_effective_pass": 1568,
+    "new_total": 1574,
+    "new_pass_rate": 97.0,
+    "old_mismatched_lines": 320,
+    "new_mismatched_lines": 562,
     "increased_mismatches": 0,
-    "decreased_mismatches": 16,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 12,
-    "unchanged": 1510,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 52
+    "status_changed": 0,
+    "unchanged": 1522,
+    "added": 52,
+    "removed": 0
   },
   "changes": [
     {
-      "test": "as3/Expressions/asOperator/asOper",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 334,
-        "expected_lines": 334,
-        "matching_lines": 332
-      },
-      "new_lines": {
-        "actual_lines": 334,
-        "expected_lines": 334,
-        "matching_lines": 334
-      }
-    },
-    {
-      "test": "ecma3/Array/e15_4_4_5",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 14
-      },
-      "new_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      }
-    },
-    {
-      "test": "ecma3/Array/toLocaleString",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 13
-      },
-      "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      }
-    },
-    {
       "test": "ecma3/Date/e15_9_5_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 120,
         "expected_lines": 121,
         "matching_lines": 118
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_10",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 33,
         "expected_lines": 33,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_11",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 95,
         "expected_lines": 95,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_12",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 64,
         "expected_lines": 64,
         "matching_lines": 64
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_13",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 33,
         "expected_lines": 33,
         "matching_lines": 33
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_3",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 31,
         "expected_lines": 31,
         "matching_lines": 31
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_4",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 31,
         "expected_lines": 31,
         "matching_lines": 31
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 31,
         "expected_lines": 31,
         "matching_lines": 31
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 32,
         "expected_lines": 32,
         "matching_lines": 32
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 31,
         "expected_lines": 31,
         "matching_lines": 31
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 33,
         "expected_lines": 33,
         "matching_lines": 33
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_10_9",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 33,
         "expected_lines": 33,
         "matching_lines": 33
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_11",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_11_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 55,
         "expected_lines": 55,
         "matching_lines": 55
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_11_3",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 55,
         "expected_lines": 55,
         "matching_lines": 55
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_11_4",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 55,
         "expected_lines": 55,
         "matching_lines": 55
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_11_5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 55,
         "expected_lines": 55,
         "matching_lines": 55
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_11_6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 55,
         "expected_lines": 55,
         "matching_lines": 55
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_11_7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 55,
         "expected_lines": 55,
         "matching_lines": 55
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 67,
         "expected_lines": 67,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12_3",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 67,
         "expected_lines": 67,
         "matching_lines": 67
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12_4",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 67,
         "expected_lines": 67,
         "matching_lines": 67
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12_5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 67,
         "expected_lines": 67,
         "matching_lines": 67
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12_6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 55,
         "expected_lines": 55,
         "matching_lines": 55
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12_7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 67,
         "expected_lines": 67,
         "matching_lines": 67
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_12_8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 36,
         "expected_lines": 36,
         "matching_lines": 36
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_2",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 36,
         "expected_lines": 36,
         "matching_lines": 36
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_3",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 36,
         "expected_lines": 36,
         "matching_lines": 36
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_4",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 36,
         "expected_lines": 36,
         "matching_lines": 36
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_5",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 36,
         "expected_lines": 36,
         "matching_lines": 36
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 60,
         "expected_lines": 60,
         "matching_lines": 60
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 60,
         "expected_lines": 60,
         "matching_lines": 60
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_13_8",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_14",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 44,
         "expected_lines": 44,
         "matching_lines": 44
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_15",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 58,
         "expected_lines": 58,
         "matching_lines": 58
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_15_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_16",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 51,
         "expected_lines": 51,
         "matching_lines": 51
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_17",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 51,
         "expected_lines": 51,
         "matching_lines": 51
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_17_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "ruffle_matched",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 32,
         "expected_lines": 33,
         "matching_lines": 30
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_18",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 51,
         "expected_lines": 51,
         "matching_lines": 51
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_19",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 51,
         "expected_lines": 51,
         "matching_lines": 51
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_2",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 15,
         "expected_lines": 15,
         "matching_lines": 15
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_20",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 79,
         "expected_lines": 79,
         "matching_lines": 79
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_21_1",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 9,
         "expected_lines": 9,
         "matching_lines": 9
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_21_2",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_21_3",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "ecma3/Date/e15_9_5_21_4",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
-    },
-    {
-      "test": "ecma3/Number/e15_7_1",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 46,
-        "expected_lines": 46,
-        "matching_lines": 45
-      },
-      "new_lines": {
-        "actual_lines": 46,
-        "expected_lines": 46,
-        "matching_lines": 46
-      }
-    },
-    {
-      "test": "ecma3/Number/e15_7_2",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 87,
-        "expected_lines": 87,
-        "matching_lines": 86
-      },
-      "new_lines": {
-        "actual_lines": 87,
-        "expected_lines": 87,
-        "matching_lines": 87
-      }
-    },
-    {
-      "test": "ecma3/Number/e15_7_4_2_4",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 50
-      },
-      "new_lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 51
-      }
-    },
-    {
-      "test": "ecma3/Number/toLocaleString_rt",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 48,
-        "expected_lines": 48,
-        "matching_lines": 47
-      },
-      "new_lines": {
-        "actual_lines": 48,
-        "expected_lines": 48,
-        "matching_lines": 48
-      }
-    },
-    {
-      "test": "ecma3/Number/tostring_001",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "ecma3/String/e15_5_1",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 48
-      },
-      "new_lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 49
-      }
-    },
-    {
-      "test": "ecma3/String/e15_5_2",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 75,
-        "expected_lines": 75,
-        "matching_lines": 74
-      },
-      "new_lines": {
-        "actual_lines": 75,
-        "expected_lines": 75,
-        "matching_lines": 75
-      }
-    },
-    {
-      "test": "ecma3/TypeConversion/e9_8_1",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 38
-      },
-      "new_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      }
-    },
-    {
-      "test": "ecma3/Types/e8_5",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 22,
-        "expected_lines": 22,
-        "matching_lines": 19
-      },
-      "new_lines": {
-        "actual_lines": 22,
-        "expected_lines": 22,
-        "matching_lines": 22
       }
     }
   ]

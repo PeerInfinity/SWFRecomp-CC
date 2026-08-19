@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 2m 49s
+**Run Duration**: 2m 53s
 
 **Filtered**: 1 tests ignored out of 47 available
 
@@ -12,16 +12,16 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 44 |
-| Passing | **44** (100.0%) |
+| Total tests | 46 |
+| Passing | **46** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 480 |
-| Matching lines | 480 (100.0%) |
+| Total expected lines | 487 |
+| Matching lines | 487 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**44 tests passing**
+**46 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -54,21 +54,23 @@
 | 27 | `property-paths/property-paths-6` | 6 | 2.1s |  |
 | 28 | `property-paths/property-paths-7` | 7 | 2.2s |  |
 | 29 | `propertycase/propertycase` | 7 | 2.1s |  |
-| 30 | `rollover` | 4 | 18.9s |  |
-| 31 | `scope` | 14 | 1.8s |  |
-| 32 | `setinterval` | 20 | 2.2s |  |
-| 33 | `settimeout` | 17 | 1.8s |  |
-| 34 | `super` | 11 | 2.0s |  |
-| 35 | `target` | 18 | 2.2s |  |
-| 36 | `text-bind` | 0 | 21.9s |  |
-| 37 | `textfield/textfield-html` | 4 | 2.4s |  |
-| 38 | `textfield/textfield-text-setters` | 8 | 2.1s |  |
-| 39 | `undefined/undefined-swf6` | 39 | 2.1s |  |
-| 40 | `undefined/undefined-swf7` | 39 | 2.1s |  |
-| 41 | `watch` | 2 | 1.9s |  |
-| 42 | `xml/xmlbuild` | 1 | 1.8s |  |
-| 43 | `xml/xmlload` | 4 | 2.2s |  |
-| 44 | `xml/xmlstring` | 9 | 2.1s |  |
+| 30 | `propertycase/propertycase-preserving-6` | 2 | 2.0s |  |
+| 31 | `propertycase/propertycase-preserving-7` | 5 | 1.7s |  |
+| 32 | `rollover` | 4 | 18.9s |  |
+| 33 | `scope` | 14 | 1.8s |  |
+| 34 | `setinterval` | 20 | 2.2s |  |
+| 35 | `settimeout` | 17 | 1.8s |  |
+| 36 | `super` | 11 | 2.0s |  |
+| 37 | `target` | 18 | 2.2s |  |
+| 38 | `text-bind` | 0 | 21.9s |  |
+| 39 | `textfield/textfield-html` | 4 | 2.4s |  |
+| 40 | `textfield/textfield-text-setters` | 8 | 2.1s |  |
+| 41 | `undefined/undefined-swf6` | 39 | 2.1s |  |
+| 42 | `undefined/undefined-swf7` | 39 | 2.1s |  |
+| 43 | `watch` | 2 | 1.9s |  |
+| 44 | `xml/xmlbuild` | 1 | 1.8s |  |
+| 45 | `xml/xmlload` | 4 | 2.2s |  |
+| 46 | `xml/xmlstring` | 9 | 2.1s |  |
 
 ## Near-Passing Tests
 

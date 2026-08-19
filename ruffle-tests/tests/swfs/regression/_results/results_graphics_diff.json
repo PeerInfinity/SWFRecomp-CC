@@ -1,25 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-15T10:09:49.349934+00:00",
-    "old_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
-    "new_timestamp": "2026-08-19T13:54:51.833661+00:00",
+    "old_timestamp": "2026-08-19T13:54:51.833661+00:00",
+    "old_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
+    "new_timestamp": "2026-08-19T14:26:17.459639+00:00",
     "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 72,
+    "old_pass": 70,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 72,
-    "old_total": 72,
+    "old_effective_pass": 70,
+    "old_total": 70,
     "old_pass_rate": 100.0,
-    "new_pass": 70,
+    "new_pass": 72,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 70,
-    "new_total": 70,
+    "new_effective_pass": 72,
+    "new_total": 72,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -29,34 +26,33 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 70,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 2
+    "added": 2,
+    "removed": 0
   },
   "changes": [
     {
       "test": "lv_cross_swf_version",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 5,
         "expected_lines": 5,
         "matching_lines": 5
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "lv_ondata_type1_args",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 3
-      },
-      "new_lines": null
+      }
     }
   ]
 }

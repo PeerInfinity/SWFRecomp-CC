@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 34m 42s
+**Run Duration**: 36m 22s
 
 **Filtered**: 0 tests ignored out of 144 available
 
@@ -12,18 +12,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 139 |
-| Passing | **137** (98.6%) |
+| Total tests | 144 |
+| Passing | **142** (98.6%) |
 | Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **139** (100.0%) |
+| Effective pass | **144** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 332 |
-| Matching lines | 283 (85.2%) |
+| Total expected lines | 350 |
+| Matching lines | 301 (86.0%) |
 | Mismatched lines | 49 |
 
 ## Passing Tests
 
-**137 tests passing**
+**142 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -100,70 +100,75 @@
 | 71 | `edittext/edittext_negative_bounds` | 0 | 2.3s |  |
 | 72 | `edittext/edittext_selection_font_size` | 0 | 23.9s |  |
 | 73 | `edittext/edittext_selection_leading` | 12 | 30.0s |  |
-| 74 | `filters/bevel_full` | 0 | 20.3s |  |
-| 75 | `filters/bevel_inner` | 0 | 4.0s |  |
-| 76 | `filters/bevel_outer` | 0 | 4.1s |  |
-| 77 | `filters/blur_fractional` | 0 | 24.6s |  |
-| 78 | `filters/blur_pass_scaling` | 0 | 25.7s |  |
-| 79 | `filters/blur_quality` | 0 | 29.5s |  |
-| 80 | `filters/blur_scales_with_screen` | 0 | 21.7s |  |
-| 81 | `filters/blur_size_grows` | 0 | 2.7s |  |
-| 82 | `filters/color_matrix` | 0 | 2.4s |  |
-| 83 | `filters/displacement_map` | 0 | 30.2s |  |
-| 84 | `filters/displacement_map_scales_with_screen` | 0 | 29.6s |  |
-| 85 | `filters/displacement_map_through_applyFilter` | 0 | 27.6s |  |
-| 86 | `filters/displacement_map_through_filters` | 0 | 7.9s |  |
-| 87 | `filters/drop_shadow` | 0 | 2.5s |  |
-| 88 | `filters/drop_shadow_angles` | 0 | 2.4s |  |
-| 89 | `filters/drop_shadow_scales_with_screen` | 0 | 21.8s |  |
-| 90 | `filters/glow` | 0 | 2.8s |  |
-| 91 | `filters/glow_pass_scaling` | 0 | 28.5s |  |
-| 92 | `filters/glow_with_alpha_strength` | 0 | 23.9s |  |
-| 93 | `filters/glow_without_composite_source` | 0 | 2.7s |  |
-| 94 | `focus_highlight/focus_highlight_avm1_button` | 6 | 22.5s |  |
-| 95 | `focus_highlight/focus_highlight_avm2_button_bounds` | 1 | 29.3s |  |
-| 96 | `focus_highlight/focus_highlight_basic` | 0 | 4.5s |  |
-| 97 | `focus_highlight/focus_highlight_empty_clip` | 0 | 8.7s |  |
-| 98 | `focus_highlight/focus_highlight_move` | 0 | 22.9s |  |
-| 99 | `focus_highlight/focus_highlight_render` | 0 | 7.0s |  |
-| 100 | `fonts/advance_u16` | 0 | 21.4s |  |
-| 101 | `fonts/device-font` | 0 | 8.8s |  |
-| 102 | `fonts/duplicate_font` | 0 | 9.2s |  |
-| 103 | `fonts/font_lookup_as3` | 0 | 9.1s |  |
-| 104 | `fonts/glyph` | 0 | 12.7s |  |
-| 105 | `fonts/leading_define_font` | 0 | 24.1s |  |
-| 106 | `fonts/leading_device_font` | 0 | 31.2s |  |
-| 107 | `fonts/leading_embedded_font` | 0 | 9.6s |  |
-| 108 | `gradient_issue_9892` | 0 | 24.9s |  |
-| 109 | `gradient_nonsequential_ratios` | 0 | 21.2s |  |
-| 110 | `gradient_radial_same_ratios` | 0 | 20.9s |  |
-| 111 | `gradient_same_ratios` | 0 | 2.0s |  |
-| 112 | `layout/line_vertical_align` | 0 | 27.4s |  |
-| 113 | `opaque_background` | 0 | 2.3s |  |
-| 114 | `scale_rotation_cache` | 106 | 22.3s |  |
-| 115 | `simple_shapes/gradients/focal_radial` | 0 | 2.6s |  |
-| 116 | `simple_shapes/gradients/gradients` | 0 | 2.6s |  |
-| 117 | `simple_shapes/gradients/radial` | 0 | 2.7s |  |
-| 118 | `simple_shapes/gradients/reflect` | 0 | 2.7s |  |
-| 119 | `simple_shapes/gradients/repeat` | 0 | 2.7s |  |
-| 120 | `simple_shapes/heavy_tesselation` | 0 | 70.7s |  |
-| 121 | `simple_shapes/layers` | 0 | 2.4s |  |
-| 122 | `simple_shapes/masks` | 0 | 5.5s |  |
-| 123 | `simple_shapes/masks_equal_clipdepth` | 0 | 1.9s |  |
-| 124 | `simple_shapes/overlaps` | 0 | 2.3s |  |
-| 125 | `simple_shapes/scroll_rect_mask` | 0 | 2.2s |  |
-| 126 | `simple_shapes/strokes/scale` | 0 | 4.4s |  |
-| 127 | `simple_shapes/text_field_mask` | 0 | 3.6s |  |
-| 128 | `simple_shapes/winding_rule` | 0 | 21.8s |  |
-| 129 | `text/String_path_variable_button` | 0 | 2.4s |  |
-| 130 | `video/colorconversion/h263` | 0 | 26.2s |  |
-| 131 | `video/colorconversion/vp6` | 0 | 2.4s |  |
-| 132 | `video/colorconversion/vp6a` | 0 | 2.7s |  |
-| 133 | `video/deblocking` | 0 | 24.8s |  |
-| 134 | `video/h264` | 0 | 33.3s |  |
-| 135 | `video/h264_multinalu` | 0 | 28.9s |  |
-| 136 | `video/vp6_alphaoffset` | 0 | 22.3s |  |
-| 137 | `video/vp6_dispsize` | 0 | 22.4s |  |
+| 74 | `edittext/edittext_underline` | 0 | 28.7s |  |
+| 75 | `edittext/edittext_underline_scale2` | 0 | 25.3s |  |
+| 76 | `filters/any_blur_scales_with_screen` | 0 | 21.2s |  |
+| 77 | `filters/avm1_convolution_initialization` | 18 | 2.1s |  |
+| 78 | `filters/bevel` | 0 | 22.4s |  |
+| 79 | `filters/bevel_full` | 0 | 20.3s |  |
+| 80 | `filters/bevel_inner` | 0 | 4.0s |  |
+| 81 | `filters/bevel_outer` | 0 | 4.1s |  |
+| 82 | `filters/blur_fractional` | 0 | 24.6s |  |
+| 83 | `filters/blur_pass_scaling` | 0 | 25.7s |  |
+| 84 | `filters/blur_quality` | 0 | 29.5s |  |
+| 85 | `filters/blur_scales_with_screen` | 0 | 21.7s |  |
+| 86 | `filters/blur_size_grows` | 0 | 2.7s |  |
+| 87 | `filters/color_matrix` | 0 | 2.4s |  |
+| 88 | `filters/displacement_map` | 0 | 30.2s |  |
+| 89 | `filters/displacement_map_scales_with_screen` | 0 | 29.6s |  |
+| 90 | `filters/displacement_map_through_applyFilter` | 0 | 27.6s |  |
+| 91 | `filters/displacement_map_through_filters` | 0 | 7.9s |  |
+| 92 | `filters/drop_shadow` | 0 | 2.5s |  |
+| 93 | `filters/drop_shadow_angles` | 0 | 2.4s |  |
+| 94 | `filters/drop_shadow_scales_with_screen` | 0 | 21.8s |  |
+| 95 | `filters/glow` | 0 | 2.8s |  |
+| 96 | `filters/glow_pass_scaling` | 0 | 28.5s |  |
+| 97 | `filters/glow_with_alpha_strength` | 0 | 23.9s |  |
+| 98 | `filters/glow_without_composite_source` | 0 | 2.7s |  |
+| 99 | `focus_highlight/focus_highlight_avm1_button` | 6 | 22.5s |  |
+| 100 | `focus_highlight/focus_highlight_avm2_button_bounds` | 1 | 29.3s |  |
+| 101 | `focus_highlight/focus_highlight_basic` | 0 | 4.5s |  |
+| 102 | `focus_highlight/focus_highlight_empty_clip` | 0 | 8.7s |  |
+| 103 | `focus_highlight/focus_highlight_move` | 0 | 22.9s |  |
+| 104 | `focus_highlight/focus_highlight_render` | 0 | 7.0s |  |
+| 105 | `fonts/advance_u16` | 0 | 21.4s |  |
+| 106 | `fonts/device-font` | 0 | 8.8s |  |
+| 107 | `fonts/duplicate_font` | 0 | 9.2s |  |
+| 108 | `fonts/font_lookup_as3` | 0 | 9.1s |  |
+| 109 | `fonts/glyph` | 0 | 12.7s |  |
+| 110 | `fonts/leading_define_font` | 0 | 24.1s |  |
+| 111 | `fonts/leading_device_font` | 0 | 31.2s |  |
+| 112 | `fonts/leading_embedded_font` | 0 | 9.6s |  |
+| 113 | `gradient_issue_9892` | 0 | 24.9s |  |
+| 114 | `gradient_nonsequential_ratios` | 0 | 21.2s |  |
+| 115 | `gradient_radial_same_ratios` | 0 | 20.9s |  |
+| 116 | `gradient_same_ratios` | 0 | 2.0s |  |
+| 117 | `layout/line_vertical_align` | 0 | 27.4s |  |
+| 118 | `opaque_background` | 0 | 2.3s |  |
+| 119 | `scale_rotation_cache` | 106 | 22.3s |  |
+| 120 | `simple_shapes/gradients/focal_radial` | 0 | 2.6s |  |
+| 121 | `simple_shapes/gradients/gradients` | 0 | 2.6s |  |
+| 122 | `simple_shapes/gradients/radial` | 0 | 2.7s |  |
+| 123 | `simple_shapes/gradients/reflect` | 0 | 2.7s |  |
+| 124 | `simple_shapes/gradients/repeat` | 0 | 2.7s |  |
+| 125 | `simple_shapes/heavy_tesselation` | 0 | 70.7s |  |
+| 126 | `simple_shapes/layers` | 0 | 2.4s |  |
+| 127 | `simple_shapes/masks` | 0 | 5.5s |  |
+| 128 | `simple_shapes/masks_equal_clipdepth` | 0 | 1.9s |  |
+| 129 | `simple_shapes/overlaps` | 0 | 2.3s |  |
+| 130 | `simple_shapes/scroll_rect_mask` | 0 | 2.2s |  |
+| 131 | `simple_shapes/strokes/scale` | 0 | 4.4s |  |
+| 132 | `simple_shapes/text_field_mask` | 0 | 3.6s |  |
+| 133 | `simple_shapes/winding_rule` | 0 | 21.8s |  |
+| 134 | `text/String_path_variable_button` | 0 | 2.4s |  |
+| 135 | `video/colorconversion/h263` | 0 | 26.2s |  |
+| 136 | `video/colorconversion/vp6` | 0 | 2.4s |  |
+| 137 | `video/colorconversion/vp6a` | 0 | 2.7s |  |
+| 138 | `video/deblocking` | 0 | 24.8s |  |
+| 139 | `video/h264` | 0 | 33.3s |  |
+| 140 | `video/h264_multinalu` | 0 | 28.9s |  |
+| 141 | `video/vp6_alphaoffset` | 0 | 22.3s |  |
+| 142 | `video/vp6_dispsize` | 0 | 22.4s |  |
 
 ## Ruffle-Matched Tests
 

@@ -1,27 +1,27 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 2m 49s
+**Run Duration**: 2m 53s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 45 |
-| Passing | **44** (97.8%) |
+| Total tests | 47 |
+| Passing | **46** (97.9%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **45** (100.0%) |
+| Effective pass | **47** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 484 |
-| Matching lines | 482 (99.6%) |
+| Total expected lines | 491 |
+| Matching lines | 489 (99.6%) |
 | Mismatched lines | 2 |
 
 ## Passing Tests
 
-**44 tests passing**
+**46 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -54,21 +54,23 @@
 | 27 | `property-paths/property-paths-6` | 6 | 2.1s |  |
 | 28 | `property-paths/property-paths-7` | 7 | 2.2s |  |
 | 29 | `propertycase/propertycase` | 7 | 2.1s |  |
-| 30 | `rollover` | 4 | 18.9s |  |
-| 31 | `scope` | 14 | 1.8s |  |
-| 32 | `setinterval` | 20 | 2.2s |  |
-| 33 | `settimeout` | 17 | 1.8s |  |
-| 34 | `super` | 11 | 2.0s |  |
-| 35 | `target` | 18 | 2.2s |  |
-| 36 | `text-bind` | 0 | 21.9s |  |
-| 37 | `textfield/textfield-html` | 4 | 2.4s |  |
-| 38 | `textfield/textfield-text-setters` | 8 | 2.1s |  |
-| 39 | `undefined/undefined-swf6` | 39 | 2.1s |  |
-| 40 | `undefined/undefined-swf7` | 39 | 2.1s |  |
-| 41 | `watch` | 2 | 1.9s |  |
-| 42 | `xml/xmlbuild` | 1 | 1.8s |  |
-| 43 | `xml/xmlload` | 4 | 2.2s |  |
-| 44 | `xml/xmlstring` | 9 | 2.1s |  |
+| 30 | `propertycase/propertycase-preserving-6` | 2 | 2.0s |  |
+| 31 | `propertycase/propertycase-preserving-7` | 5 | 1.7s |  |
+| 32 | `rollover` | 4 | 18.9s |  |
+| 33 | `scope` | 14 | 1.8s |  |
+| 34 | `setinterval` | 20 | 2.2s |  |
+| 35 | `settimeout` | 17 | 1.8s |  |
+| 36 | `super` | 11 | 2.0s |  |
+| 37 | `target` | 18 | 2.2s |  |
+| 38 | `text-bind` | 0 | 21.9s |  |
+| 39 | `textfield/textfield-html` | 4 | 2.4s |  |
+| 40 | `textfield/textfield-text-setters` | 8 | 2.1s |  |
+| 41 | `undefined/undefined-swf6` | 39 | 2.1s |  |
+| 42 | `undefined/undefined-swf7` | 39 | 2.1s |  |
+| 43 | `watch` | 2 | 1.9s |  |
+| 44 | `xml/xmlbuild` | 1 | 1.8s |  |
+| 45 | `xml/xmlload` | 4 | 2.2s |  |
+| 46 | `xml/xmlstring` | 9 | 2.1s |  |
 
 ## Ruffle-Matched Tests
 

@@ -1,23 +1,23 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 6m 30s
+**Run Duration**: 6m 38s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 16 |
-| Passing | **12** (75.0%) |
-| Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **14** (87.5%) |
+| Total tests | 17 |
+| Passing | **12** (70.6%) |
+| Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **15** (88.2%) |
 | Failing | 2 |
-| Total expected lines | 337 |
-| Matching lines | 302 (89.6%) |
-| Mismatched lines | 35 |
+| Total expected lines | 371 |
+| Matching lines | 333 (89.8%) |
+| Mismatched lines | 38 |
 
 ### Failure Breakdown
 
@@ -46,12 +46,13 @@
 
 ## Ruffle-Matched Tests
 
-**2 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**3 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `frame_script_button_order` | 2 | 4 | 27.9s |  |
 | 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 28.1s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 8.5s |  |
 
 ## Near-Passing Tests
 

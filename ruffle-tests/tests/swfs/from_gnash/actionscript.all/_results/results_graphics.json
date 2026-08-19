@@ -1,21 +1,19 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:51.861422+00:00",
+    "timestamp": "2026-08-19T14:26:17.488846+00:00",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "duration_seconds": 2372.92,
+    "duration_seconds": 2397.07,
     "total_available": 243,
-    "shards": 29,
-    "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true
+    "shards": 30,
+    "expected_shards": 30
   },
-  "total": 235,
-  "pass": 131,
-  "ruffle_matched": 91,
+  "total": 243,
+  "pass": 138,
+  "ruffle_matched": 92,
   "fail": 13,
-  "pass_rate": 55.7,
-  "effective_pass": 222,
-  "effective_pass_rate": 94.5,
+  "pass_rate": 56.8,
+  "effective_pass": 230,
+  "effective_pass_rate": 94.7,
   "breakdown": {
     "output_mismatch": 13
   },
@@ -2152,6 +2150,137 @@
       },
       "duration": 9.77,
       "status": "pass"
+    },
+    {
+      "test": "Random-v5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.991,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 3.26,
+      "status": "pass"
+    },
+    {
+      "test": "Random-v6",
+      "phases": {
+        "recomp": 0.011,
+        "compile": 1.004,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 1.29,
+      "status": "pass"
+    },
+    {
+      "test": "Random-v7",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.641,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 2.91,
+      "status": "pass"
+    },
+    {
+      "test": "Random-v8",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.961,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 2.23,
+      "status": "pass"
+    },
+    {
+      "test": "Rectangle-v5",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.52,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.79,
+      "status": "pass"
+    },
+    {
+      "test": "Rectangle-v6",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 0.999,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 1.28,
+      "status": "pass"
+    },
+    {
+      "test": "Rectangle-v7",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 2.167,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 2.44,
+      "status": "pass"
+    },
+    {
+      "test": "Rectangle-v8",
+      "phases": {
+        "recomp": 0.063,
+        "compile": 7.121,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 166,
+        "expected_lines": 166,
+        "matching_lines": 145
+      },
+      "duration": 7.46,
+      "ruffle_diff_count": 21,
+      "ours_diff_count": 21,
+      "status": "ruffle_matched",
+      "detail": "diffs 21 \u2286 ruffle 21"
     },
     {
       "test": "Selection-v5",

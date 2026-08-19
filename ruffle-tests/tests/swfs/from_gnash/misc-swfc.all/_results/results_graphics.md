@@ -1,22 +1,22 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-19 13:54 UTC
+**Date**: 2026-08-19 14:26 UTC
 
 **Git SHA**: `9d038c750e`
 
-**Run Duration**: 6m 1s
+**Run Duration**: 6m 22s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 19 |
-| Passing | **10** (52.6%) |
+| Total tests | 20 |
+| Passing | **11** (55.0%) |
 | Ruffle-matched | 4 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **14** (73.7%) |
+| Effective pass | **15** (75.0%) |
 | Failing | 5 |
-| Total expected lines | 535 |
-| Matching lines | 393 (73.5%) |
+| Total expected lines | 580 |
+| Matching lines | 438 (75.5%) |
 | Mismatched lines | 142 |
 
 ### Failure Breakdown
@@ -27,7 +27,7 @@
 
 ## Passing Tests
 
-**10 tests passing**
+**11 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -38,9 +38,10 @@
 | 5 | `mouse_drag_test` | 12 | 17.3s |  |
 | 6 | `movieclip_destruction_test2` | 56 | 22.2s |  |
 | 7 | `opcode_guard_test2` | 24 | 22.9s |  |
-| 8 | `stackscope` | 11 | 22.2s |  |
-| 9 | `submoviegetvar` | 4 | 21.7s |  |
-| 10 | `swf4opcode` | 117 | 22.5s |  |
+| 8 | `soft_reference_test1` | 45 | 21.6s |  |
+| 9 | `stackscope` | 11 | 22.2s |  |
+| 10 | `submoviegetvar` | 4 | 21.7s |  |
+| 11 | `swf4opcode` | 117 | 22.5s |  |
 
 ## Ruffle-Matched Tests
 

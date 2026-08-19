@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:54.604616+00:00",
+    "timestamp": "2026-08-19T14:26:20.272565+00:00",
     "suite": "from_shumway/avm1",
     "stem": "results_graphics",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "source": "results_graphics.json",
-    "incomplete": true,
+    "incomplete": false,
     "run_id": "32254809391",
     "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/32254809391",
-    "run_attempt": "1"
+    "run_attempt": "2"
   },
   "tests_with_comparisons": 1,
   "comparisons": 1,

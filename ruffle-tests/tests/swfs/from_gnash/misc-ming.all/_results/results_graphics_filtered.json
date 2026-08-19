@@ -1,23 +1,21 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T13:54:51.874829+00:00",
+    "timestamp": "2026-08-19T14:26:17.502752+00:00",
     "git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "duration_seconds": 2162.68,
+    "duration_seconds": 2197.11,
     "total_available": 111,
-    "shards": 29,
+    "shards": 30,
     "expected_shards": 30,
-    "missing_shards": 1,
-    "incomplete": true,
     "ignored_count": 1,
     "filtered": true
   },
-  "total": 106,
-  "pass": 65,
+  "total": 110,
+  "pass": 69,
   "ruffle_matched": 29,
   "fail": 12,
-  "pass_rate": 61.3,
-  "effective_pass": 94,
-  "effective_pass_rate": 88.7,
+  "pass_rate": 62.7,
+  "effective_pass": 98,
+  "effective_pass_rate": 89.1,
   "breakdown": {
     "output_mismatch": 12,
     "ruffle_matched": 29
@@ -1134,6 +1132,70 @@
         "matching_lines": 16
       },
       "duration": 3.45,
+      "status": "pass"
+    },
+    {
+      "test": "frame_label_test",
+      "phases": {
+        "recomp": 0.022,
+        "compile": 3.933,
+        "run": 0.266
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "duration": 4.23,
+      "status": "pass"
+    },
+    {
+      "test": "getTimer_test",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.636,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 2.91,
+      "status": "pass"
+    },
+    {
+      "test": "get_frame_number_test",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 23.749,
+        "run": 0.516
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 24.3,
+      "status": "pass"
+    },
+    {
+      "test": "gotoFrame2Test",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 2.482,
+        "run": 0.265
+      },
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
+      },
+      "duration": 2.75,
       "status": "pass"
     },
     {
