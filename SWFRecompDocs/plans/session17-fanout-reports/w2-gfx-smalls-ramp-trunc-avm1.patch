@@ -1,0 +1,19 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 3eeecd085..2a9d807ef 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -28277,9 +28277,13 @@ static void drawingGenerateGradientRamp(
+ 		stops[s].b = colors[s] & 0xFF;
+ 		stops[s].a = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
+ 	}
++	// Ruffle truncates every ramp channel (`lerp(..) as u8`,
++	// render/wgpu/src/mesh.rs::CommonGradient::new); the recompiler's static
++	// gradient emitter already passes GRADIENT_RAMP_TRUNC (swf.cpp:7182), and
++	// the AVM2 twin (avm2_display.c::gfx_gen_ramp) moved with it.
+ 	gradient_ramp_build(stops, n,
+ 	                    use_linear_rgb ? GRADIENT_RAMP_LINEAR_U8 : GRADIENT_RAMP_SRGB,
+-	                    GRADIENT_RAMP_ROUND, out_ramp);
++	                    GRADIENT_RAMP_TRUNC, out_ramp);
+ }
+ 
+ // Build a 4x4 column-major gradient matrix from "box" parameters.

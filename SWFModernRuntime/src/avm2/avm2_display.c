@@ -7976,9 +7976,12 @@ static void gfx_gen_ramp(const uint32_t* colors, const float* alphas,
 		stops[s].b = colors[s] & 0xFF;
 		stops[s].a = (uint8_t) (alphas[s] * 255.0f + 0.5f);
 	}
+	// Ruffle truncates every ramp channel (`lerp(..) as u8`,
+	// render/wgpu/src/mesh.rs::CommonGradient::new); the recompiler's static
+	// gradient emitter already passes GRADIENT_RAMP_TRUNC (swf.cpp:7182).
 	gradient_ramp_build(stops, n,
 	                    linear ? GRADIENT_RAMP_LINEAR_U8 : GRADIENT_RAMP_SRGB,
-	                    GRADIENT_RAMP_ROUND, out);
+	                    GRADIENT_RAMP_TRUNC, out);
 }
 
 // From a Flash 2x3 affine (a,b,c,d dimensionless; tx,ty twips) mapping gradient

@@ -12639,6 +12639,28 @@ static ActionVar bitmapDataCompare(SWFAppContext* app_context, ActionVar* args, 
     return r;
 }
 
+// Ruffle's `copy_pixels_with_alpha_source` (core/src/bitmap/operations.rs:1200)
+// deliberately does NOT use the FLASH_PREMUL_FACTOR table when it un-premultiplies
+// the source: it divides by the alpha in f64 and `.round()`s, then re-premultiplies
+// (its own comment says so). The table is the correct oracle for
+// `to_un_multiplied_alpha` — getPixel32/setPixel/fillRect/noise/compare/applyFilter
+// — so `unpremultiplyAlpha()` is left alone and this one call site gets a local
+// helper. The AVM2 twin (avm2_bitmap.c::bd_copy_pixels) already does exactly this.
+static inline uint32_t copyPixelsUnpremultiplyRound(uint32_t color)
+{
+    uint32_t a = (color >> 24) & 0xFF;
+    // Rust: red/0.0 is NaN for a premultiplied 0-alpha pixel, and `NaN as u8` == 0.
+    if (a == 0) return 0;
+    double af = (double) a / 255.0;
+    double r = round((double) ((color >> 16) & 0xFF) / af);
+    double g = round((double) ((color >> 8) & 0xFF) / af);
+    double b = round((double) (color & 0xFF) / af);
+    if (r > 255.0) r = 255.0;
+    if (g > 255.0) g = 255.0;
+    if (b > 255.0) b = 255.0;
+    return (a << 24) | ((uint32_t) r << 16) | ((uint32_t) g << 8) | (uint32_t) b;
+}
+
 static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
@@ -12734,7 +12756,7 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
                 uint32_t ab_alpha = (ab_px >> 24) & 0xFF;
                 uint32_t src_px = src_pixels[src_y * src_bmp->width + src_x];
                 // Unpremultiply source, compute new alpha, re-premultiply
-                uint32_t straight = unpremultiplyAlpha(src_px);
+                uint32_t straight = copyPixelsUnpremultiplyRound(src_px);
                 uint32_t sa = (straight >> 24) & 0xFF;
                 uint32_t sr = (straight >> 16) & 0xFF;
                 uint32_t sg = (straight >> 8) & 0xFF;
@@ -28724,9 +28746,13 @@ static void drawingGenerateGradientRamp(
 		stops[s].b = colors[s] & 0xFF;
 		stops[s].a = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
 	}
+	// Ruffle truncates every ramp channel (`lerp(..) as u8`,
+	// render/wgpu/src/mesh.rs::CommonGradient::new); the recompiler's static
+	// gradient emitter already passes GRADIENT_RAMP_TRUNC (swf.cpp:7182), and
+	// the AVM2 twin (avm2_display.c::gfx_gen_ramp) moved with it.
 	gradient_ramp_build(stops, n,
 	                    use_linear_rgb ? GRADIENT_RAMP_LINEAR_U8 : GRADIENT_RAMP_SRGB,
-	                    GRADIENT_RAMP_ROUND, out_ramp);
+	                    GRADIENT_RAMP_TRUNC, out_ramp);
 }
 
 // Build a 4x4 column-major gradient matrix from "box" parameters.
