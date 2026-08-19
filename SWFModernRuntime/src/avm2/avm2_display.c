@@ -4590,6 +4590,7 @@ typedef struct Avm2LoaderInfoExt
 	                                    // and STAGE read ctx->root via `kind`)
 	Avm2Object* loader;                 // owning Loader (NULL for ROOT/STAGE)
 	Avm2Object* shared_events;          // sharedEvents (lazy EventDispatcher)
+	Avm2Object* uncaught_error_events;  // uncaughtErrorEvents (lazy)
 	Avm2Object* app_domain;             // LoaderContext's ApplicationDomain
 	// The domain the loaded movie's ABC registered into (tranche 8). Drives
 	// app_domain above, the movie's own name resolution, and its root binding.
@@ -4601,6 +4602,16 @@ typedef struct Avm2LoaderInfoExt
 	// inside the loadBytes() call (see loader_deliver). Static storage, so the
 	// conservative native_ext scan can only over-retain it.
 	const Avm2MovieTables* pending_boot;
+	// Decoded image content that is NOT the Loader's child yet. Ruffle builds
+	// the Bitmap during movie_loader_data but only calls
+	// `loader.insert_at_index(dobj, 0)` from movie_loader_complete
+	// (loader.rs:2119), so every progress event still reads
+	// `loader.numChildren == 0` (avm2/large_preload_image_from_bytes line 8).
+	Avm2Object* pending_child;
+	// Extra active-list flushes to sit out before init/complete. Ruffle delays
+	// a from_bytes IMAGE by TWO post_frame_callbacks -- "flash player seems to
+	// delay this for *two* frames for some reason" (loader.rs:1884) -- and our
+	// active list already spends one flush, so 1 here means two boundaries.
 	const uint8_t* bytes;               // loaded source bytes (static storage)
 	uint32_t bytes_len;
 	uint32_t bytes_loaded;
@@ -4618,6 +4629,7 @@ typedef struct Avm2LoaderInfoExt
 	// loadBytes never fetches, so this gates the event between init and
 	// complete (loader_events expects it; loader_loadbytes_events must not).
 	uint8_t from_fetch;
+	uint8_t defer_flushes;
 } Avm2LoaderInfoExt;
 
 // GC-rooted in avm2_gc_mark_roots_display.
@@ -4827,35 +4839,78 @@ static Avm2Value li_get_content_type(Avm2Activation* act)
 	return avm2_string(avm2_string_from_literal(act->ctx, s));
 }
 
+// The three SWF-only getters (actionScriptVersion, frameRate, swfVersion)
+// raise #2098 once a NON-swf stream has loaded: from_shumway
+// as3-loader/loaderinfo/loaded-content-properties loads alf.jpg and expects
+// "Error #2098: The loading object is not a .swf file, ..." from each of
+// them, where Ruffle answers with the root movie's numbers (that fixture is
+// `known_failure = true` upstream, so Ruffle is NOT the oracle here).
+static void li_require_swf(Avm2Activation* act, Avm2LoaderInfoExt* ext)
+{
+	li_require_loaded(act, ext);
+	if (ext != NULL && ext->kind == LI_KIND_LOADER
+	    && ext->content_type != LI_CT_SWF && ext->content_type != LI_CT_UNKNOWN)
+	{
+		avm2_throw_error(act->ctx, act->ctx->builtins.error_class,
+		                 "Error #2098: The loading object is not a .swf file, "
+		                 "you cannot request SWF properties from it.");
+	}
+}
+
+// width/height do NOT throw for an image stream — they report the decoded
+// bitmap's size (alf.jpg is 140x140), not the loading movie's stage. Only the
+// Loader kind can hold image content; ROOT/STAGE keep the stage rect.
+static int li_image_content_size(Avm2Context* ctx, Avm2LoaderInfoExt* ext,
+                                 uint32_t* w, uint32_t* h)
+{
+	if (ext == NULL || ext->kind != LI_KIND_LOADER) return 0;
+	if (ext->content_type == LI_CT_SWF || ext->content_type == LI_CT_UNKNOWN)
+		return 0;
+	Avm2DisplayObjectExt* cext = ext->content != NULL
+		? avm2_display_ext_of(ctx, ext->content) : NULL;
+	if (cext == NULL || !cext->is_bitmap) return 0;
+	*w = cext->bitmap_w;
+	*h = cext->bitmap_h;
+	return 1;
+}
+
 static Avm2Value li_get_as_version(Avm2Activation* act)
 {
-	li_require_loaded(act, this_li(act));
+	li_require_swf(act, this_li(act));
 	return avm2_integer(3);
 }
 
 static Avm2Value li_get_frame_rate(Avm2Activation* act)
 {
-	li_require_loaded(act, this_li(act));
+	li_require_swf(act, this_li(act));
 	return avm2_number(g_stage_frame_rate);
 }
 
 static Avm2Value li_get_width(Avm2Activation* act)
 {
-	li_require_loaded(act, this_li(act));
+	Avm2LoaderInfoExt* ext = this_li(act);
+	li_require_loaded(act, ext);
+	uint32_t w = 0, h = 0;
+	if (li_image_content_size(act->ctx, ext, &w, &h))
+		return avm2_integer((int32_t) w);
 	return avm2_integer((avm2_generated_stage_rect[1]
 	                     - avm2_generated_stage_rect[0]) / 20);
 }
 
 static Avm2Value li_get_height(Avm2Activation* act)
 {
-	li_require_loaded(act, this_li(act));
+	Avm2LoaderInfoExt* ext = this_li(act);
+	li_require_loaded(act, ext);
+	uint32_t w = 0, h = 0;
+	if (li_image_content_size(act->ctx, ext, &w, &h))
+		return avm2_integer((int32_t) h);
 	return avm2_integer((avm2_generated_stage_rect[3]
 	                     - avm2_generated_stage_rect[2]) / 20);
 }
 
 static Avm2Value li_get_swf_version(Avm2Activation* act)
 {
-	li_require_loaded(act, this_li(act));
+	li_require_swf(act, this_li(act));
 	return avm2_integer(avm2_generated_swf_version);
 }
 
@@ -4891,10 +4946,52 @@ static Avm2Value li_get_allows(Avm2Activation* act)
 	return avm2_bool(1);
 }
 
+// Flash reports TRUE for a LOADER's contentLoaderInfo while its stream is still
+// NotYetLoaded (the url is null, so the URL is trivially "inaccessible") and
+// FALSE once content arrived. Ruffle stubs the getter to a flat `false`
+// (loader_info.rs:221-229) and its own expectation file records that; the
+// Flash-authored output.txt for
+// from_shumway as3-loader/loaderinfo/loaded-content-properties expects
+// true then false. The ROOT and STAGE flavours are excluded: ours are
+// permanently NotYetLoaded by construction, but Flash reports false for them
+// (avm2/stage_loaderinfo_properties line 14).
 static Avm2Value li_get_is_url_inaccessible(Avm2Activation* act)
 {
+	Avm2LoaderInfoExt* ext = this_li(act);
+	return avm2_bool(ext != NULL && ext->kind == LI_KIND_LOADER && !ext->loaded);
+}
+
+// Ruffle LoaderInfo.as:55-69 — both bridges are plain stubs returning null
+// with a no-op setter (they are AIR-only in playerglobal, but Flash Player
+// still exposes them, and `null` is what both players report).
+static Avm2Value li_get_sandbox_bridge(Avm2Activation* act)
+{
 	(void) act;
-	return avm2_bool(0);
+	return avm2_null();
+}
+
+static Avm2Value li_set_sandbox_bridge(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
+// flash.events.UncaughtErrorEvents, minted once per LoaderInfo and cached
+// (Ruffle loader_info.rs:563-575 returns the LoaderInfo's own instance).
+static Avm2Value li_get_uncaught_error_events(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2LoaderInfoExt* ext = this_li(act);
+	if (ext == NULL) return avm2_undefined();
+	if (ext->uncaught_error_events == NULL)
+	{
+		Avm2Class* cls = avm2_uncaught_error_events_class();
+		if (cls == NULL) return avm2_undefined();
+		Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
+		ext->uncaught_error_events = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
+	}
+	return ext->uncaught_error_events != NULL
+		? avm2_object_value(ext->uncaught_error_events) : avm2_null();
 }
 
 static Avm2Value li_get_shared_events(Avm2Activation* act)
@@ -4983,6 +5080,15 @@ static void loaderinfo_fire_init_and_complete(Avm2Context* ctx, Avm2Object* li)
 	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(ctx, li);
 	if (ext == NULL) return;
 	ext->expose_content = 1;
+	// movie_loader_complete's insert_at_index, in Ruffle's order: the content
+	// becomes the Loader's child 0 immediately BEFORE init fires, not when it
+	// was decoded.
+	if (ext->pending_child != NULL)
+	{
+		Avm2Object* child = ext->pending_child;
+		ext->pending_child = NULL;
+		if (ext->loader != NULL) insert_at_index(ctx, ext->loader, child, 0);
+	}
 	if (!ext->init_fired)
 	{
 		ext->init_fired = 1;
@@ -5897,11 +6003,9 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 		{
 			lx->content = bmp;
 			Avm2LoaderExt* lext = loader_ext_of(ctx, lx->loader);
-			if (lext != NULL)
-			{
-				lext->content = bmp;
-				insert_at_index(ctx, lx->loader, bmp, 0);
-			}
+			if (lext != NULL) lext->content = bmp;
+			// Child 0 only at movie_loader_complete time -- see pending_child.
+			lx->pending_child = bmp;
 		}
 	}
 
@@ -5992,6 +6096,9 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 	// by two post-frame callbacks, so keeping it on the active list holds it at
 	// this tick's boundary instead of firing inside the loadBytes call.
 	if (is_image && !from_bytes) loaderinfo_fire_init_and_complete(ctx, li);
+	// ... and a from_bytes image waits out one EXTRA flush on top of that
+	// (loader.rs:1883-1902 nests two post_frame_callbacks).
+	if (is_image && from_bytes) lx->defer_flushes = 1;
 }
 
 // Deliver every queued fetch. A load() issued during frame N never resolves
@@ -6030,6 +6137,12 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
 	{
 		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, batch[i]);
 		if (lx == NULL || lx->errored) continue;
+		if (lx->defer_flushes > 0)
+		{
+			lx->defer_flushes--;
+			loader_track_active(batch[i]);
+			continue;
+		}
 		// A loadBytes SWF's root is constructed here, immediately before its
 		// init/complete (loader_deliver). A throw out of that constructor sets
 		// `errored`, which skips both and drops the entry.
@@ -12529,6 +12642,21 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 		set_default_instance_name(ctx, ext);
 		orphan_add(ctx, obj);
 		enter_frame_obj(ctx, obj);
+		// Ruffle avm2_button.rs::construct_frame creates the four states
+		// whenever `needs_frame_construction` is set -- including the
+		// construct_frame that initialize_for_allocator runs, i.e. BEFORE
+		// the script `new MyButton()` constructor body. Only the AS3 ctor
+		// call is skipped there (`needs_avm2_construction` is false once
+		// the allocator installed the object). We set `constructed`
+		// above, so construct_frame_obj's own button arm is a no-op --
+		// create the states here instead, or `Constructed <state>` traces
+		// land inside super() rather than ahead of the ctor
+		// (avm2/displayobject_early_init).
+		if (ctx->builtins.simple_button_class != NULL
+		    && class_is_a(obj->cls, ctx->builtins.simple_button_class))
+		{
+			button_construct_states(ctx, obj);
+		}
 		construct_frame_obj(ctx, obj);
 		ext->skip_next_enter_frame = 1;
 		// on_construction_complete's non-event half (the events are
@@ -15131,6 +15259,12 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, linfo, "isURLInaccessible",
 	                        li_get_is_url_inaccessible);
 	avm2_builtin_add_getter(ctx, linfo, "sharedEvents", li_get_shared_events);
+	add_getset(ctx, linfo, "childSandboxBridge", li_get_sandbox_bridge,
+	           li_set_sandbox_bridge);
+	add_getset(ctx, linfo, "parentSandboxBridge", li_get_sandbox_bridge,
+	           li_set_sandbox_bridge);
+	avm2_builtin_add_getter(ctx, linfo, "uncaughtErrorEvents",
+	                        li_get_uncaught_error_events);
 	avm2_builtin_add_getter(ctx, linfo, "childAllowsParent", li_get_allows);
 	avm2_builtin_add_getter(ctx, linfo, "parentAllowsChild", li_get_allows);
 	avm2_builtin_add_getter(ctx, linfo, "sameDomain", li_get_allows);

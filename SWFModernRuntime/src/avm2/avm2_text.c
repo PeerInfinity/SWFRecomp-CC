@@ -2452,6 +2452,19 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
 		spans_from_text(ctx, et, empty_string(ctx));
 	}
 
+	// Ruffle edit_text.rs:308-312 -- "Selections are mandatory in AS3": an AS3
+	// EditText is born with `TextSelection::for_position(text.len())`, i.e. the
+	// caret sitting AFTER the initial text, not at index 0. It matters as soon
+	// as anything types into a field whose tag text is non-empty:
+	// avm2/textfield_input_events' field lowers `<p align="left"></p>` to a
+	// single "\n", so Flash/Ruffle insert after it ("\nR") while a zero caret
+	// inserts before it ("R\n"). `sel_active` is deliberately left cleared --
+	// it is our render gate for a visible caret, and turning it on here would
+	// paint a caret in every focused editable field from birth (a pixel-axis
+	// change, not a trace one).
+	et->sel_begin = et->sel_end = et->sel_from = et->sel_to =
+		(int32_t) u16_length(et->text);
+
 	// Keep the legacy tf_text mirror for display code.
 	ext->tf_text = et->text;
 	et_relayout(ctx, et);

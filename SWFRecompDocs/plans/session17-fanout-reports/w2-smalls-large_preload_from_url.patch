@@ -1,0 +1,52 @@
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 1f5ad95a8..2bc3fa4af 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -1062,14 +1062,31 @@ _CHILD_SCAN_SKIP_DIRS = {
+ }
+ 
+ 
++def _dir_is_own_test(d):
++    """True when `d` is itself a discoverable test (test.swf + expected output).
++
++    `discover_tests` needs BOTH, so a subdirectory that carries only a
++    `test.swf` is not a test at all — it is a child SWF that its parent loads
++    by relative path (the three under `avm2/large_preload_from_*`).
++    """
++    if not (d / "test.swf").exists():
++        return False
++    resolved = resolve_expected_filename(d, None)
++    return resolved is not None and (d / resolved).exists()
++
++
+ def find_child_swfs(test_dir):
+     """Find child .swf/.png/.jpg files (non-test.swf) in a test directory.
+ 
+     Recurses into subdirectories (loader-arc tranche 8): four Loader tests keep
+     their children under `child/` or `loader_domain_child/` and load them by
+-    relative path. A subdirectory that holds its own `test.swf` is a SEPARATE
+-    test (`avm2/large_preload_from_url/large_bytearray`), not a child, and is
+-    pruned — as are our own generated output folders.
++    relative path. A subdirectory that holds its own `test.swf` AND an
++    expected-output file is a SEPARATE test, not a child, and is pruned — as
++    are our own generated output folders. A `test.swf` with no expected output
++    is NOT a test (`discover_tests` needs both), so it is a child like any
++    other: `avm2/large_preload_from_url/large_bytearray/test.swf` and the two
++    under `avm2/large_preload_from_bytes/` are the only three in the corpus,
++    and each is the very SWF its parent loads by relative path.
+ 
+     Ordering is by path relative to the test dir, so a flat test's list — and
+     therefore every movie_id, char_id_base and symbol prefix derived from it —
+@@ -1082,10 +1099,10 @@ def find_child_swfs(test_dir):
+         dirnames[:] = sorted(
+             d for d in dirnames
+             if d not in _CHILD_SCAN_SKIP_DIRS
+-            and not (here / d / "test.swf").exists())
++            and not _dir_is_own_test(here / d))
+         for name in sorted(filenames):
+             f = here / name
+-            if f.suffix == ".swf" and f.name != "test.swf":
++            if f.suffix == ".swf" and f != test_dir / "test.swf":
+                 children.append(f)
+             elif f.suffix.lower() in image_exts:
+                 children.append(f)

@@ -327,6 +327,38 @@ void avm2_builtin_define_alias(Avm2Context* ctx, Avm2PropKey key, Avm2Value valu
 	avm2_domain_add(ctx, &key, NULL, 0);
 }
 
+// --- API-gated builtins that this movie's SWF version hides ----------------
+//
+// Ruffle never removes an api-gated definition from the domain: only the
+// NAMESPACE carries the api version, so what a name resolves to depends on
+// which api version the LOOKUP uses. A compiled multiname and a
+// package-qualified runtime name both use the ROOT movie's api version (so
+// `JSON` in a SWF 12 movie and `"::JSON"` in a SWF 9 movie are both #1065 --
+// avm2/json_version_gated), but an UNQUALIFIED runtime name is built with
+// `ApiVersion::VM_INTERNAL` (qname.rs:105), the version that sees
+// everything, so `getDefinitionByName("JSON")` answers `[class JSON]` even in
+// a SWF 9 movie (avm2/appdomain_lookup_edge_cases lines 11-13).
+//
+// We express that with a side table instead of per-namespace api versions:
+// a class that builtin_class_impl declines to expose is recorded here, and
+// only the unqualified runtime-lookup path (definition_get_in /
+// definition_has_in) consults it. Only default-package (`ns_len == 0`)
+// entries can ever be reached by an unqualified name, so only those are kept.
+#define HIDDEN_BUILTIN_MAX 32
+static Avm2Class* g_hidden_builtins[HIDDEN_BUILTIN_MAX];
+static uint32_t g_hidden_builtin_count;
+
+static Avm2Class* hidden_builtin_find(const char* s, uint32_t len)
+{
+	for (uint32_t i = 0; i < g_hidden_builtin_count; i++)
+	{
+		Avm2Class* c = g_hidden_builtins[i];
+		if (c->name.name_len == len && memcmp(c->name.name, s, len) == 0)
+			return c;
+	}
+	return NULL;
+}
+
 static Avm2Class* builtin_class_impl(Avm2Context* ctx, const char* ns,
                                      const char* name, Avm2Class* super,
                                      uint8_t min_swf)
@@ -383,6 +415,11 @@ static Avm2Class* builtin_class_impl(Avm2Context* ctx, const char* ns,
 	{
 		builtin_global_define_ro(ctx, cls->name, avm2_object_value(cobj), 1);
 		avm2_domain_add(ctx, &cls->name, NULL, 0);
+	}
+	else if (cls->name.ns_len == 0
+	         && g_hidden_builtin_count < HIDDEN_BUILTIN_MAX)
+	{
+		g_hidden_builtins[g_hidden_builtin_count++] = cls;
 	}
 	return cls;
 }
@@ -1759,20 +1796,109 @@ _Noreturn static void throw_1065_for_definition(Avm2Context* ctx,
 	                 (int) key.name_len, key.name);
 }
 
+// --- `Vector.<X>` definition names -----------------------------------------
+//
+// Ruffle domain.rs:439 vector_parameter_from_name: a definition name that
+// starts with `Vector.<` (or `__AS3__.vec::Vector.<`) and ends with `>` is
+// split into the generic Vector plus the INNER name, and the inner name is
+// then resolved as a definition in its own right -- recursively. That is the
+// only way `ApplicationDomain.hasDefinition("Vector.<integerValue>")` can be
+// true (avm2/appdomain_lookup_edge_cases: `integerValue` is a package-level
+// var, so it IS a definition even though it is not a class), and the only way
+// `getDefinition` on the same name can raise VerifyError #1107 instead of a
+// #1065 -- ClassObject::apply (class_object.rs:817-825) rejects a non-class
+// type parameter with make_error_1107. avm2_vector_class_by_name resolves the
+// same shape but answers NULL for a non-class inner name, which collapses
+// both cases into "not defined".
+static const char* definition_vector_param(const char* s, uint32_t len,
+                                           uint32_t* out_len)
+{
+	static const char PFX_Q[] = "__AS3__.vec::Vector.<";
+	static const char PFX[] = "Vector.<";
+	uint32_t start;
+	if (len >= sizeof(PFX_Q) - 1 && memcmp(s, PFX_Q, sizeof(PFX_Q) - 1) == 0)
+		start = (uint32_t) (sizeof(PFX_Q) - 1);
+	else if (len >= sizeof(PFX) - 1 && memcmp(s, PFX, sizeof(PFX) - 1) == 0)
+		start = (uint32_t) (sizeof(PFX) - 1);
+	else
+		return NULL;
+	if (s[len - 1] != '>') return NULL;
+	*out_len = len - 1 - start;
+	return s + start;
+}
+
+// Ruffle QName::from_qualified_name splits on the LAST "::" (else the last
+// "."); a name with neither separator is the unqualified case that resolves
+// in the VM_INTERNAL public namespace (see the hidden-builtin table above).
+static int definition_name_is_unqualified(const char* s, uint32_t len)
+{
+	for (uint32_t i = 0; i < len; i++)
+		if (s[i] == '.' || s[i] == ':') return 0;
+	return 1;
+}
+
+static int definition_has_in(Avm2Context* ctx, const Avm2DomainScope* scope,
+                             const char* s, uint32_t len)
+{
+	uint32_t il = 0;
+	const char* inner = definition_vector_param(s, len, &il);
+	// avmplus only checks that the type parameter EXISTS -- it never checks
+	// that it is a class (Ruffle has_defined_value_handling_vector).
+	if (inner != NULL) return definition_has_in(ctx, scope, inner, il);
+	int found = 0;
+	avm2_find_definition_in(ctx, scope, s, len, &found);
+	if (found) return 1;
+	return definition_name_is_unqualified(s, len)
+	       && hidden_builtin_find(s, len) != NULL;
+}
+
+static Avm2Value definition_get_in(Avm2Context* ctx,
+                                   const Avm2DomainScope* scope,
+                                   const char* s, uint32_t len)
+{
+	uint32_t il = 0;
+	const char* inner = definition_vector_param(s, len, &il);
+	if (inner != NULL)
+	{
+		// `Vector.<*>` is the un-parameterised Vector object class; `*` is
+		// not a definition, so it must not go through the recursion.
+		if (il == 1 && inner[0] == '*')
+		{
+			return avm2_object_value(
+				ctx->builtins.vector_object_class->class_object);
+		}
+		Avm2Value p = definition_get_in(ctx, scope, inner, il);
+		if (p.kind != AVM2_VALUE_OBJECT || p.u.obj == NULL
+		    || p.u.obj->kind != AVM2_OBJ_CLASS)
+		{
+			avm2_throw_error(ctx, ctx->builtins.verify_error_class,
+			                 "Error #1107: The ABC data is corrupt, attempt "
+			                 "to read out of bounds.");
+		}
+		Avm2Class* applied = avm2_vector_apply(ctx, p.u.obj->class_ref);
+		return avm2_object_value(applied->class_object);
+	}
+	int found = 0;
+	Avm2Value v = avm2_find_definition_in(ctx, scope, s, len, &found);
+	if (found) return v;
+	if (definition_name_is_unqualified(s, len))
+	{
+		Avm2Class* hidden = hidden_builtin_find(s, len);
+		if (hidden != NULL) return avm2_object_value(hidden->class_object);
+	}
+	throw_1065_for_definition(ctx, s, len);
+}
+
 static Avm2Value global_get_definition_by_name(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	const Avm2String* s = (act->argc > 0)
 		? avm2_coerce_to_string(ctx, act->args[0])
 		: avm2_string_from_literal(ctx, "");
-	int found = 0;
 	// Flash resolves getDefinitionByName in the CALLER's ApplicationDomain
 	// (loader_child_getdefinition: the child SWF's Parent must round-trip to
 	// the child's Parent, and "Child" exists only in the child's domain).
-	Avm2Value v = avm2_find_definition_in(ctx, act_scope(act), s->utf8, s->len,
-	                                      &found);
-	if (found) return v;
-	throw_1065_for_definition(ctx, s->utf8, s->len);
+	return definition_get_in(ctx, act_scope(act), s->utf8, s->len);
 }
 
 // E4X construction primitives shared by the describeType emitter below.
@@ -6608,10 +6734,8 @@ static Avm2Value appdomain_has_definition(Avm2Activation* act)
 		return avm2_bool(false);
 	}
 	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
-	int found = 0;
-	avm2_find_definition_in(ctx, appdomain_self_scope(act), s->utf8, s->len,
-	                        &found);
-	return avm2_bool(found != 0);
+	return avm2_bool(definition_has_in(ctx, appdomain_self_scope(act),
+	                                   s->utf8, s->len));
 }
 
 static Avm2Value appdomain_get_definition(Avm2Activation* act)
@@ -6620,11 +6744,7 @@ static Avm2Value appdomain_get_definition(Avm2Activation* act)
 	const Avm2String* s = (act->argc > 0)
 		? avm2_coerce_to_string(ctx, act->args[0])
 		: avm2_string_from_literal(ctx, "");
-	int found = 0;
-	Avm2Value v = avm2_find_definition_in(ctx, appdomain_self_scope(act),
-	                                      s->utf8, s->len, &found);
-	if (found) return v;
-	throw_1065_for_definition(ctx, s->utf8, s->len);
+	return definition_get_in(ctx, appdomain_self_scope(act), s->utf8, s->len);
 }
 
 static Avm2Value system_noop(Avm2Activation* act)
@@ -7134,9 +7254,17 @@ static void register_platform_stubs(Avm2Context* ctx)
 		cls->instance_init.debug_name = "PrintJobOptions";
 	}
 
-	// flash.crypto.generateRandomBytes.
-	builtin_add_global_fn_ns(ctx, "flash.crypto", "generateRandomBytes",
-	                         crypto_generate_random_bytes);
+	// flash.crypto.generateRandomBytes -- [API("674")] in Ruffle
+	// (globals/flash/crypto.as:4), i.e. the same FP11/SWF13 threshold as JSON.
+	// A package-qualified name always resolves at the ROOT api version, so
+	// below SWF 13 both `flash.crypto::generateRandomBytes` and
+	// `flash.crypto.generateRandomBytes` are #1065
+	// (avm2/appdomain_lookup_edge_cases, a SWF 9 movie).
+	if (ctx->swf_version >= 13)
+	{
+		builtin_add_global_fn_ns(ctx, "flash.crypto", "generateRandomBytes",
+		                         crypto_generate_random_bytes);
+	}
 
 	// flash.trace.Trace — the package's only class, and a pure table.
 	{
@@ -8386,7 +8514,6 @@ static void register_events_shell_classes(Avm2Context* ctx)
 	{ "ThrottleType", NULL, 14 },
 	{ "TransformGestureEvent", "GestureEvent", 10 },
 	{ "UncaughtErrorEvent", "ErrorEvent", 10 },
-	{ "UncaughtErrorEvents", "EventDispatcher", 10 },
 	{ "VideoEvent", "Event", 11 },
 	{ "VideoTextureEvent", "Event", 0 },
 	};
@@ -8610,11 +8737,11 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_amf(ctx);
 	avm2_register_date(ctx);
 	// JSON is API-versioned (674 / FP11): invisible below SWF13
-	// (json_version_gated expects 1065 in a SWF12 movie).
-	if (ctx->swf_version >= 13)
-	{
-		avm2_register_json(ctx);
-	}
+	// (json_version_gated expects 1065 in a SWF12 movie). It is BUILT at every
+	// version so an unqualified runtime lookup can still reach it -- see the
+	// hidden-builtin table (avm2/appdomain_lookup_edge_cases is a SWF 9 movie
+	// whose getDefinitionByName("JSON") reads `[class JSON]`).
+	avm2_register_json(ctx);
 	avm2_register_toplevel(ctx);
 	register_application_domain(ctx);
 	register_loader_context(ctx);

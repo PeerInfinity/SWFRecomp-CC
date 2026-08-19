@@ -1,0 +1,59 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 65e9f3d36..7b34eea5e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -830,6 +830,20 @@ static void bd_seed_embedded(Avm2Context* ctx, Avm2BitmapDataExt* bd,
+ // Constructor
+ // ---------------------------------------------------------------------------
+ 
++// Ruffle's `bitmap_data_allocator` (avm2/object/bitmapdata_object.rs:15-31)
++// seeds every freshly allocated BitmapData with `BitmapData::dummy()`, whose
++// `disposed` flag is TRUE. A subclass constructor that touches `this.width`
++// (or any other checked accessor) BEFORE calling `super()` therefore sees an
++// invalid BitmapData and gets ArgumentError #2015 — which is exactly what
++// avm2/displayobject_early_init's `try` catches. `bd_alloc` /
++// `bd_seed_embedded` clear the flag when the real buffer is installed.
++static void bitmapdata_native_init(Avm2Context* ctx, Avm2Object* obj)
++{
++	(void) ctx;
++	if (obj == NULL || obj->native_ext == NULL) return;
++	((Avm2BitmapDataExt*) obj->native_ext)->disposed = 1;
++}
++
+ static Avm2Value bitmapdata_init(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -3528,6 +3542,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 	bd->native_ext_size = sizeof(Avm2BitmapDataExt);
+ 	bd->instance_init.fn = bitmapdata_init;
+ 	bd->instance_init.debug_name = "BitmapData";
++	bd->native_init = bitmapdata_native_init;
+ 	g_bitmapdata_class = bd;
+ 	ctx->builtins.bitmapdata_class = bd;
+ 	// `BitmapData implements IBitmapDrawable` (the other implementor is
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 4f041becf..8c2a5e97d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -11767,6 +11880,21 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
+ 		set_default_instance_name(ctx, ext);
+ 		orphan_add(ctx, obj);
+ 		enter_frame_obj(ctx, obj);
++		// Ruffle avm2_button.rs::construct_frame creates the four states
++		// whenever `needs_frame_construction` is set -- including the
++		// construct_frame that initialize_for_allocator runs, i.e. BEFORE
++		// the script `new MyButton()` constructor body. Only the AS3 ctor
++		// call is skipped there (`needs_avm2_construction` is false once
++		// the allocator installed the object). We set `constructed`
++		// above, so construct_frame_obj's own button arm is a no-op --
++		// create the states here instead, or `Constructed <state>` traces
++		// land inside super() rather than ahead of the ctor
++		// (avm2/displayobject_early_init).
++		if (ctx->builtins.simple_button_class != NULL
++		    && class_is_a(obj->cls, ctx->builtins.simple_button_class))
++		{
++			button_construct_states(ctx, obj);
++		}
+ 		construct_frame_obj(ctx, obj);
+ 		ext->skip_next_enter_frame = 1;
+ 		// on_construction_complete's non-event half (the events are

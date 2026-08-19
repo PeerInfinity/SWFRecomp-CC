@@ -1029,7 +1029,10 @@ static void json_native_init_abstract(Avm2Context* ctx, Avm2Object* obj)
 
 void avm2_register_json(Avm2Context* ctx)
 {
-	Avm2Class* cls = avm2_builtin_class(ctx, "", "JSON", ctx->builtins.object_class);
+	// [API("674")] -> SWF 13. Built unconditionally; builtin_class_impl only
+	// withholds the global/domain binding below that version.
+	Avm2Class* cls = avm2_builtin_class_api(ctx, "", "JSON",
+	                                        ctx->builtins.object_class, 13);
 	cls->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	cls->native_init = json_native_init_abstract;
 	// Arities are what Function.length reports (ecma3/JSON/e15_12_2, _3).

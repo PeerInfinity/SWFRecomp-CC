@@ -830,6 +830,20 @@ static void bd_seed_embedded(Avm2Context* ctx, Avm2BitmapDataExt* bd,
 // Constructor
 // ---------------------------------------------------------------------------
 
+// Ruffle's `bitmap_data_allocator` (avm2/object/bitmapdata_object.rs:15-31)
+// seeds every freshly allocated BitmapData with `BitmapData::dummy()`, whose
+// `disposed` flag is TRUE. A subclass constructor that touches `this.width`
+// (or any other checked accessor) BEFORE calling `super()` therefore sees an
+// invalid BitmapData and gets ArgumentError #2015 — which is exactly what
+// avm2/displayobject_early_init's `try` catches. `bd_alloc` /
+// `bd_seed_embedded` clear the flag when the real buffer is installed.
+static void bitmapdata_native_init(Avm2Context* ctx, Avm2Object* obj)
+{
+	(void) ctx;
+	if (obj == NULL || obj->native_ext == NULL) return;
+	((Avm2BitmapDataExt*) obj->native_ext)->disposed = 1;
+}
+
 static Avm2Value bitmapdata_init(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -3528,6 +3542,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	bd->native_ext_size = sizeof(Avm2BitmapDataExt);
 	bd->instance_init.fn = bitmapdata_init;
 	bd->instance_init.debug_name = "BitmapData";
+	bd->native_init = bitmapdata_native_init;
 	g_bitmapdata_class = bd;
 	ctx->builtins.bitmapdata_class = bd;
 	// `BitmapData implements IBitmapDrawable` (the other implementor is

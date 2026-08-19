@@ -915,6 +915,10 @@ void avm2_register_display(Avm2Context* ctx);
 // with the rest of flash.net in avm2_globals.c, but its load pipeline shares
 // Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
 void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
+// flash.events.UncaughtErrorEvents (avm2_events.c), or NULL below SWF 10 /
+// before avm2_register_events has run. LoaderInfo.uncaughtErrorEvents mints
+// one instance per LoaderInfo off it.
+Avm2Class* avm2_uncaught_error_events_class(void);
 // flash.display.IBitmapDrawable, created with DisplayObject (its first
 // implementor). avm2_register_bitmap runs later and declares it on BitmapData,
 // the only other implementor. NULL before avm2_register_display has run.

@@ -1,0 +1,83 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 4f041becf..8c2a5e97d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -4473,6 +4474,16 @@ typedef struct Avm2LoaderInfoExt
+ 	// inside the loadBytes() call (see loader_deliver). Static storage, so the
+ 	// conservative native_ext scan can only over-retain it.
+ 	const Avm2MovieTables* pending_boot;
++	// Decoded image content that is NOT the Loader's child yet. Ruffle builds
++	// the Bitmap during movie_loader_data but only calls
++	// `loader.insert_at_index(dobj, 0)` from movie_loader_complete
++	// (loader.rs:2119), so every progress event still reads
++	// `loader.numChildren == 0` (avm2/large_preload_image_from_bytes line 8).
++	Avm2Object* pending_child;
++	// Extra active-list flushes to sit out before init/complete. Ruffle delays
++	// a from_bytes IMAGE by TWO post_frame_callbacks -- "flash player seems to
++	// delay this for *two* frames for some reason" (loader.rs:1884) -- and our
++	// active list already spends one flush, so 1 here means two boundaries.
+ 	const uint8_t* bytes;               // loaded source bytes (static storage)
+ 	uint32_t bytes_len;
+ 	uint32_t bytes_loaded;
+@@ -4490,6 +4501,7 @@ typedef struct Avm2LoaderInfoExt
+ 	// loadBytes never fetches, so this gates the event between init and
+ 	// complete (loader_events expects it; loader_loadbytes_events must not).
+ 	uint8_t from_fetch;
++	uint8_t defer_flushes;
+ } Avm2LoaderInfoExt;
+ 
+ // GC-rooted in avm2_gc_mark_roots_display.
+@@ -4855,6 +4952,15 @@ static void loaderinfo_fire_init_and_complete(Avm2Context* ctx, Avm2Object* li)
+ 	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(ctx, li);
+ 	if (ext == NULL) return;
+ 	ext->expose_content = 1;
++	// movie_loader_complete's insert_at_index, in Ruffle's order: the content
++	// becomes the Loader's child 0 immediately BEFORE init fires, not when it
++	// was decoded.
++	if (ext->pending_child != NULL)
++	{
++		Avm2Object* child = ext->pending_child;
++		ext->pending_child = NULL;
++		if (ext->loader != NULL) insert_at_index(ctx, ext->loader, child, 0);
++	}
+ 	if (!ext->init_fired)
+ 	{
+ 		ext->init_fired = 1;
+@@ -5761,11 +5867,9 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
+ 		{
+ 			lx->content = bmp;
+ 			Avm2LoaderExt* lext = loader_ext_of(ctx, lx->loader);
+-			if (lext != NULL)
+-			{
+-				lext->content = bmp;
+-				insert_at_index(ctx, lx->loader, bmp, 0);
+-			}
++			if (lext != NULL) lext->content = bmp;
++			// Child 0 only at movie_loader_complete time -- see pending_child.
++			lx->pending_child = bmp;
+ 		}
+ 	}
+ 
+@@ -5856,6 +5960,9 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
+ 	// by two post-frame callbacks, so keeping it on the active list holds it at
+ 	// this tick's boundary instead of firing inside the loadBytes call.
+ 	if (is_image && !from_bytes) loaderinfo_fire_init_and_complete(ctx, li);
++	// ... and a from_bytes image waits out one EXTRA flush on top of that
++	// (loader.rs:1883-1902 nests two post_frame_callbacks).
++	if (is_image && from_bytes) lx->defer_flushes = 1;
+ }
+ 
+ // Deliver every queued fetch. A load() issued during frame N never resolves
+@@ -5894,6 +6001,12 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
+ 	{
+ 		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, batch[i]);
+ 		if (lx == NULL || lx->errored) continue;
++		if (lx->defer_flushes > 0)
++		{
++			lx->defer_flushes--;
++			loader_track_active(batch[i]);
++			continue;
++		}
+ 		// A loadBytes SWF's root is constructed here, immediately before its
+ 		// init/complete (loader_deliver). A throw out of that constructor sets
+ 		// `errored`, which skips both and drops the entry.

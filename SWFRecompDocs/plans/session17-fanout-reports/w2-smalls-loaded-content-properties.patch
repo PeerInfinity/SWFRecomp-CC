@@ -1,0 +1,214 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 7d4b4fbf3..f58bbd389 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -902,6 +902,10 @@ void avm2_register_display(Avm2Context* ctx);
+ // with the rest of flash.net in avm2_globals.c, but its load pipeline shares
+ // Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
+ void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
++// flash.events.UncaughtErrorEvents (avm2_events.c), or NULL below SWF 10 /
++// before avm2_register_events has run. LoaderInfo.uncaughtErrorEvents mints
++// one instance per LoaderInfo off it.
++Avm2Class* avm2_uncaught_error_events_class(void);
+ // flash.display.IBitmapDrawable, created with DisplayObject (its first
+ // implementor). avm2_register_bitmap runs later and declares it on BitmapData,
+ // the only other implementor. NULL before avm2_register_display has run.
+diff --git a/SWFModernRuntime/src/avm2/avm2_events.c b/SWFModernRuntime/src/avm2/avm2_events.c
+index 8ba19a02f..310e3c051 100644
+--- a/SWFModernRuntime/src/avm2/avm2_events.c
++++ b/SWFModernRuntime/src/avm2/avm2_events.c
+@@ -610,6 +610,8 @@ static Avm2EventDispatcherExt* this_dispatcher(Avm2Activation* act)
+ 	return avm2_dispatcher_ext_of(act->ctx, act->this_val.u.obj);
+ }
+ 
++static Avm2Class* g_uncaught_error_events_class;
++
+ static Avm2Value ed_init(Avm2Activation* act)
+ {
+ 	// EventDispatcher(target:IEventDispatcher = null).
+@@ -2152,6 +2154,22 @@ void avm2_register_events(Avm2Context* ctx)
+ 		avm2_string(avm2_string_from_literal(ctx, "timer")));
+ 	avm2_builtin_add_static_const(ctx, tev, "TIMER_COMPLETE",
+ 		avm2_string(avm2_string_from_literal(ctx, "timerComplete")));
++
++	// flash.events.UncaughtErrorEvents — [API("667")] in Ruffle
++	// (globals/flash/events/UncaughtErrorEvents.as), i.e. SWF 10+; an empty
++	// EventDispatcher subclass with a do-nothing constructor. LoaderInfo's
++	// `uncaughtErrorEvents` getter mints one per LoaderInfo.
++	g_uncaught_error_events_class =
++		avm2_builtin_class_api(ctx, "flash.events", "UncaughtErrorEvents",
++		                       b->event_dispatcher_class, 10);
++	g_uncaught_error_events_class->instance_init.fn = ed_init;
++	g_uncaught_error_events_class->instance_init.debug_name =
++		"UncaughtErrorEvents";
++}
++
++Avm2Class* avm2_uncaught_error_events_class(void)
++{
++	return g_uncaught_error_events_class;
+ }
+ 
+ Avm2Object* avm2_timer_event_new(Avm2Context* ctx, const Avm2String* type,
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 4f041becf..8c2a5e97d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -4462,6 +4462,7 @@ typedef struct Avm2LoaderInfoExt
+ 	                                    // and STAGE read ctx->root via `kind`)
+ 	Avm2Object* loader;                 // owning Loader (NULL for ROOT/STAGE)
+ 	Avm2Object* shared_events;          // sharedEvents (lazy EventDispatcher)
++	Avm2Object* uncaught_error_events;  // uncaughtErrorEvents (lazy)
+ 	Avm2Object* app_domain;             // LoaderContext's ApplicationDomain
+ 	// The domain the loaded movie's ABC registered into (tranche 8). Drives
+ 	// app_domain above, the movie's own name resolution, and its root binding.
+@@ -4699,35 +4711,78 @@ static Avm2Value li_get_content_type(Avm2Activation* act)
+ 	return avm2_string(avm2_string_from_literal(act->ctx, s));
+ }
+ 
++// The three SWF-only getters (actionScriptVersion, frameRate, swfVersion)
++// raise #2098 once a NON-swf stream has loaded: from_shumway
++// as3-loader/loaderinfo/loaded-content-properties loads alf.jpg and expects
++// "Error #2098: The loading object is not a .swf file, ..." from each of
++// them, where Ruffle answers with the root movie's numbers (that fixture is
++// `known_failure = true` upstream, so Ruffle is NOT the oracle here).
++static void li_require_swf(Avm2Activation* act, Avm2LoaderInfoExt* ext)
++{
++	li_require_loaded(act, ext);
++	if (ext != NULL && ext->kind == LI_KIND_LOADER
++	    && ext->content_type != LI_CT_SWF && ext->content_type != LI_CT_UNKNOWN)
++	{
++		avm2_throw_error(act->ctx, act->ctx->builtins.error_class,
++		                 "Error #2098: The loading object is not a .swf file, "
++		                 "you cannot request SWF properties from it.");
++	}
++}
++
++// width/height do NOT throw for an image stream — they report the decoded
++// bitmap's size (alf.jpg is 140x140), not the loading movie's stage. Only the
++// Loader kind can hold image content; ROOT/STAGE keep the stage rect.
++static int li_image_content_size(Avm2Context* ctx, Avm2LoaderInfoExt* ext,
++                                 uint32_t* w, uint32_t* h)
++{
++	if (ext == NULL || ext->kind != LI_KIND_LOADER) return 0;
++	if (ext->content_type == LI_CT_SWF || ext->content_type == LI_CT_UNKNOWN)
++		return 0;
++	Avm2DisplayObjectExt* cext = ext->content != NULL
++		? avm2_display_ext_of(ctx, ext->content) : NULL;
++	if (cext == NULL || !cext->is_bitmap) return 0;
++	*w = cext->bitmap_w;
++	*h = cext->bitmap_h;
++	return 1;
++}
++
+ static Avm2Value li_get_as_version(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	li_require_swf(act, this_li(act));
+ 	return avm2_integer(3);
+ }
+ 
+ static Avm2Value li_get_frame_rate(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	li_require_swf(act, this_li(act));
+ 	return avm2_number(g_stage_frame_rate);
+ }
+ 
+ static Avm2Value li_get_width(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	Avm2LoaderInfoExt* ext = this_li(act);
++	li_require_loaded(act, ext);
++	uint32_t w = 0, h = 0;
++	if (li_image_content_size(act->ctx, ext, &w, &h))
++		return avm2_integer((int32_t) w);
+ 	return avm2_integer((avm2_generated_stage_rect[1]
+ 	                     - avm2_generated_stage_rect[0]) / 20);
+ }
+ 
+ static Avm2Value li_get_height(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	Avm2LoaderInfoExt* ext = this_li(act);
++	li_require_loaded(act, ext);
++	uint32_t w = 0, h = 0;
++	if (li_image_content_size(act->ctx, ext, &w, &h))
++		return avm2_integer((int32_t) h);
+ 	return avm2_integer((avm2_generated_stage_rect[3]
+ 	                     - avm2_generated_stage_rect[2]) / 20);
+ }
+ 
+ static Avm2Value li_get_swf_version(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	li_require_swf(act, this_li(act));
+ 	return avm2_integer(avm2_generated_swf_version);
+ }
+ 
+@@ -4763,10 +4818,52 @@ static Avm2Value li_get_allows(Avm2Activation* act)
+ 	return avm2_bool(1);
+ }
+ 
++// Flash reports TRUE for a LOADER's contentLoaderInfo while its stream is still
++// NotYetLoaded (the url is null, so the URL is trivially "inaccessible") and
++// FALSE once content arrived. Ruffle stubs the getter to a flat `false`
++// (loader_info.rs:221-229) and its own expectation file records that; the
++// Flash-authored output.txt for
++// from_shumway as3-loader/loaderinfo/loaded-content-properties expects
++// true then false. The ROOT and STAGE flavours are excluded: ours are
++// permanently NotYetLoaded by construction, but Flash reports false for them
++// (avm2/stage_loaderinfo_properties line 14).
+ static Avm2Value li_get_is_url_inaccessible(Avm2Activation* act)
++{
++	Avm2LoaderInfoExt* ext = this_li(act);
++	return avm2_bool(ext != NULL && ext->kind == LI_KIND_LOADER && !ext->loaded);
++}
++
++// Ruffle LoaderInfo.as:55-69 — both bridges are plain stubs returning null
++// with a no-op setter (they are AIR-only in playerglobal, but Flash Player
++// still exposes them, and `null` is what both players report).
++static Avm2Value li_get_sandbox_bridge(Avm2Activation* act)
++{
++	(void) act;
++	return avm2_null();
++}
++
++static Avm2Value li_set_sandbox_bridge(Avm2Activation* act)
+ {
+ 	(void) act;
+-	return avm2_bool(0);
++	return avm2_undefined();
++}
++
++// flash.events.UncaughtErrorEvents, minted once per LoaderInfo and cached
++// (Ruffle loader_info.rs:563-575 returns the LoaderInfo's own instance).
++static Avm2Value li_get_uncaught_error_events(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2LoaderInfoExt* ext = this_li(act);
++	if (ext == NULL) return avm2_undefined();
++	if (ext->uncaught_error_events == NULL)
++	{
++		Avm2Class* cls = avm2_uncaught_error_events_class();
++		if (cls == NULL) return avm2_undefined();
++		Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
++		ext->uncaught_error_events = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
++	}
++	return ext->uncaught_error_events != NULL
++		? avm2_object_value(ext->uncaught_error_events) : avm2_null();
+ }
+ 
+ static Avm2Value li_get_shared_events(Avm2Activation* act)
+@@ -14253,6 +14381,12 @@ void avm2_register_display(Avm2Context* ctx)
+ 	avm2_builtin_add_getter(ctx, linfo, "isURLInaccessible",
+ 	                        li_get_is_url_inaccessible);
+ 	avm2_builtin_add_getter(ctx, linfo, "sharedEvents", li_get_shared_events);
++	add_getset(ctx, linfo, "childSandboxBridge", li_get_sandbox_bridge,
++	           li_set_sandbox_bridge);
++	add_getset(ctx, linfo, "parentSandboxBridge", li_get_sandbox_bridge,
++	           li_set_sandbox_bridge);
++	avm2_builtin_add_getter(ctx, linfo, "uncaughtErrorEvents",
++	                        li_get_uncaught_error_events);
+ 	avm2_builtin_add_getter(ctx, linfo, "childAllowsParent", li_get_allows);
+ 	avm2_builtin_add_getter(ctx, linfo, "parentAllowsChild", li_get_allows);
+ 	avm2_builtin_add_getter(ctx, linfo, "sameDomain", li_get_allows);

@@ -1,0 +1,674 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 7d4b4fbf3..f58bbd389 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -902,6 +902,10 @@ void avm2_register_display(Avm2Context* ctx);
+ // with the rest of flash.net in avm2_globals.c, but its load pipeline shares
+ // Loader's URL resolution, event dispatch and per-tick drain in avm2_display.c.
+ void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
++// flash.events.UncaughtErrorEvents (avm2_events.c), or NULL below SWF 10 /
++// before avm2_register_events has run. LoaderInfo.uncaughtErrorEvents mints
++// one instance per LoaderInfo off it.
++Avm2Class* avm2_uncaught_error_events_class(void);
+ // flash.display.IBitmapDrawable, created with DisplayObject (its first
+ // implementor). avm2_register_bitmap runs later and declares it on BitmapData,
+ // the only other implementor. NULL before avm2_register_display has run.
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 65e9f3d36..7b34eea5e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -830,6 +830,20 @@ static void bd_seed_embedded(Avm2Context* ctx, Avm2BitmapDataExt* bd,
+ // Constructor
+ // ---------------------------------------------------------------------------
+ 
++// Ruffle's `bitmap_data_allocator` (avm2/object/bitmapdata_object.rs:15-31)
++// seeds every freshly allocated BitmapData with `BitmapData::dummy()`, whose
++// `disposed` flag is TRUE. A subclass constructor that touches `this.width`
++// (or any other checked accessor) BEFORE calling `super()` therefore sees an
++// invalid BitmapData and gets ArgumentError #2015 — which is exactly what
++// avm2/displayobject_early_init's `try` catches. `bd_alloc` /
++// `bd_seed_embedded` clear the flag when the real buffer is installed.
++static void bitmapdata_native_init(Avm2Context* ctx, Avm2Object* obj)
++{
++	(void) ctx;
++	if (obj == NULL || obj->native_ext == NULL) return;
++	((Avm2BitmapDataExt*) obj->native_ext)->disposed = 1;
++}
++
+ static Avm2Value bitmapdata_init(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -3528,6 +3542,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 	bd->native_ext_size = sizeof(Avm2BitmapDataExt);
+ 	bd->instance_init.fn = bitmapdata_init;
+ 	bd->instance_init.debug_name = "BitmapData";
++	bd->native_init = bitmapdata_native_init;
+ 	g_bitmapdata_class = bd;
+ 	ctx->builtins.bitmapdata_class = bd;
+ 	// `BitmapData implements IBitmapDrawable` (the other implementor is
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 4f041becf..8c2a5e97d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -4462,6 +4462,7 @@ typedef struct Avm2LoaderInfoExt
+ 	                                    // and STAGE read ctx->root via `kind`)
+ 	Avm2Object* loader;                 // owning Loader (NULL for ROOT/STAGE)
+ 	Avm2Object* shared_events;          // sharedEvents (lazy EventDispatcher)
++	Avm2Object* uncaught_error_events;  // uncaughtErrorEvents (lazy)
+ 	Avm2Object* app_domain;             // LoaderContext's ApplicationDomain
+ 	// The domain the loaded movie's ABC registered into (tranche 8). Drives
+ 	// app_domain above, the movie's own name resolution, and its root binding.
+@@ -4473,6 +4474,16 @@ typedef struct Avm2LoaderInfoExt
+ 	// inside the loadBytes() call (see loader_deliver). Static storage, so the
+ 	// conservative native_ext scan can only over-retain it.
+ 	const Avm2MovieTables* pending_boot;
++	// Decoded image content that is NOT the Loader's child yet. Ruffle builds
++	// the Bitmap during movie_loader_data but only calls
++	// `loader.insert_at_index(dobj, 0)` from movie_loader_complete
++	// (loader.rs:2119), so every progress event still reads
++	// `loader.numChildren == 0` (avm2/large_preload_image_from_bytes line 8).
++	Avm2Object* pending_child;
++	// Extra active-list flushes to sit out before init/complete. Ruffle delays
++	// a from_bytes IMAGE by TWO post_frame_callbacks -- "flash player seems to
++	// delay this for *two* frames for some reason" (loader.rs:1884) -- and our
++	// active list already spends one flush, so 1 here means two boundaries.
+ 	const uint8_t* bytes;               // loaded source bytes (static storage)
+ 	uint32_t bytes_len;
+ 	uint32_t bytes_loaded;
+@@ -4490,6 +4501,7 @@ typedef struct Avm2LoaderInfoExt
+ 	// loadBytes never fetches, so this gates the event between init and
+ 	// complete (loader_events expects it; loader_loadbytes_events must not).
+ 	uint8_t from_fetch;
++	uint8_t defer_flushes;
+ } Avm2LoaderInfoExt;
+ 
+ // GC-rooted in avm2_gc_mark_roots_display.
+@@ -4699,35 +4711,78 @@ static Avm2Value li_get_content_type(Avm2Activation* act)
+ 	return avm2_string(avm2_string_from_literal(act->ctx, s));
+ }
+ 
++// The three SWF-only getters (actionScriptVersion, frameRate, swfVersion)
++// raise #2098 once a NON-swf stream has loaded: from_shumway
++// as3-loader/loaderinfo/loaded-content-properties loads alf.jpg and expects
++// "Error #2098: The loading object is not a .swf file, ..." from each of
++// them, where Ruffle answers with the root movie's numbers (that fixture is
++// `known_failure = true` upstream, so Ruffle is NOT the oracle here).
++static void li_require_swf(Avm2Activation* act, Avm2LoaderInfoExt* ext)
++{
++	li_require_loaded(act, ext);
++	if (ext != NULL && ext->kind == LI_KIND_LOADER
++	    && ext->content_type != LI_CT_SWF && ext->content_type != LI_CT_UNKNOWN)
++	{
++		avm2_throw_error(act->ctx, act->ctx->builtins.error_class,
++		                 "Error #2098: The loading object is not a .swf file, "
++		                 "you cannot request SWF properties from it.");
++	}
++}
++
++// width/height do NOT throw for an image stream — they report the decoded
++// bitmap's size (alf.jpg is 140x140), not the loading movie's stage. Only the
++// Loader kind can hold image content; ROOT/STAGE keep the stage rect.
++static int li_image_content_size(Avm2Context* ctx, Avm2LoaderInfoExt* ext,
++                                 uint32_t* w, uint32_t* h)
++{
++	if (ext == NULL || ext->kind != LI_KIND_LOADER) return 0;
++	if (ext->content_type == LI_CT_SWF || ext->content_type == LI_CT_UNKNOWN)
++		return 0;
++	Avm2DisplayObjectExt* cext = ext->content != NULL
++		? avm2_display_ext_of(ctx, ext->content) : NULL;
++	if (cext == NULL || !cext->is_bitmap) return 0;
++	*w = cext->bitmap_w;
++	*h = cext->bitmap_h;
++	return 1;
++}
++
+ static Avm2Value li_get_as_version(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	li_require_swf(act, this_li(act));
+ 	return avm2_integer(3);
+ }
+ 
+ static Avm2Value li_get_frame_rate(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	li_require_swf(act, this_li(act));
+ 	return avm2_number(g_stage_frame_rate);
+ }
+ 
+ static Avm2Value li_get_width(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	Avm2LoaderInfoExt* ext = this_li(act);
++	li_require_loaded(act, ext);
++	uint32_t w = 0, h = 0;
++	if (li_image_content_size(act->ctx, ext, &w, &h))
++		return avm2_integer((int32_t) w);
+ 	return avm2_integer((avm2_generated_stage_rect[1]
+ 	                     - avm2_generated_stage_rect[0]) / 20);
+ }
+ 
+ static Avm2Value li_get_height(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	Avm2LoaderInfoExt* ext = this_li(act);
++	li_require_loaded(act, ext);
++	uint32_t w = 0, h = 0;
++	if (li_image_content_size(act->ctx, ext, &w, &h))
++		return avm2_integer((int32_t) h);
+ 	return avm2_integer((avm2_generated_stage_rect[3]
+ 	                     - avm2_generated_stage_rect[2]) / 20);
+ }
+ 
+ static Avm2Value li_get_swf_version(Avm2Activation* act)
+ {
+-	li_require_loaded(act, this_li(act));
++	li_require_swf(act, this_li(act));
+ 	return avm2_integer(avm2_generated_swf_version);
+ }
+ 
+@@ -4763,10 +4818,52 @@ static Avm2Value li_get_allows(Avm2Activation* act)
+ 	return avm2_bool(1);
+ }
+ 
++// Flash reports TRUE for a LOADER's contentLoaderInfo while its stream is still
++// NotYetLoaded (the url is null, so the URL is trivially "inaccessible") and
++// FALSE once content arrived. Ruffle stubs the getter to a flat `false`
++// (loader_info.rs:221-229) and its own expectation file records that; the
++// Flash-authored output.txt for
++// from_shumway as3-loader/loaderinfo/loaded-content-properties expects
++// true then false. The ROOT and STAGE flavours are excluded: ours are
++// permanently NotYetLoaded by construction, but Flash reports false for them
++// (avm2/stage_loaderinfo_properties line 14).
+ static Avm2Value li_get_is_url_inaccessible(Avm2Activation* act)
++{
++	Avm2LoaderInfoExt* ext = this_li(act);
++	return avm2_bool(ext != NULL && ext->kind == LI_KIND_LOADER && !ext->loaded);
++}
++
++// Ruffle LoaderInfo.as:55-69 — both bridges are plain stubs returning null
++// with a no-op setter (they are AIR-only in playerglobal, but Flash Player
++// still exposes them, and `null` is what both players report).
++static Avm2Value li_get_sandbox_bridge(Avm2Activation* act)
++{
++	(void) act;
++	return avm2_null();
++}
++
++static Avm2Value li_set_sandbox_bridge(Avm2Activation* act)
+ {
+ 	(void) act;
+-	return avm2_bool(0);
++	return avm2_undefined();
++}
++
++// flash.events.UncaughtErrorEvents, minted once per LoaderInfo and cached
++// (Ruffle loader_info.rs:563-575 returns the LoaderInfo's own instance).
++static Avm2Value li_get_uncaught_error_events(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2LoaderInfoExt* ext = this_li(act);
++	if (ext == NULL) return avm2_undefined();
++	if (ext->uncaught_error_events == NULL)
++	{
++		Avm2Class* cls = avm2_uncaught_error_events_class();
++		if (cls == NULL) return avm2_undefined();
++		Avm2Value v = avm2_class_construct(ctx, cls, NULL, 0);
++		ext->uncaught_error_events = v.kind == AVM2_VALUE_OBJECT ? v.u.obj : NULL;
++	}
++	return ext->uncaught_error_events != NULL
++		? avm2_object_value(ext->uncaught_error_events) : avm2_null();
+ }
+ 
+ static Avm2Value li_get_shared_events(Avm2Activation* act)
+@@ -4855,6 +4952,15 @@ static void loaderinfo_fire_init_and_complete(Avm2Context* ctx, Avm2Object* li)
+ 	Avm2LoaderInfoExt* ext = loaderinfo_ext_of(ctx, li);
+ 	if (ext == NULL) return;
+ 	ext->expose_content = 1;
++	// movie_loader_complete's insert_at_index, in Ruffle's order: the content
++	// becomes the Loader's child 0 immediately BEFORE init fires, not when it
++	// was decoded.
++	if (ext->pending_child != NULL)
++	{
++		Avm2Object* child = ext->pending_child;
++		ext->pending_child = NULL;
++		if (ext->loader != NULL) insert_at_index(ctx, ext->loader, child, 0);
++	}
+ 	if (!ext->init_fired)
+ 	{
+ 		ext->init_fired = 1;
+@@ -5761,11 +5867,9 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
+ 		{
+ 			lx->content = bmp;
+ 			Avm2LoaderExt* lext = loader_ext_of(ctx, lx->loader);
+-			if (lext != NULL)
+-			{
+-				lext->content = bmp;
+-				insert_at_index(ctx, lx->loader, bmp, 0);
+-			}
++			if (lext != NULL) lext->content = bmp;
++			// Child 0 only at movie_loader_complete time -- see pending_child.
++			lx->pending_child = bmp;
+ 		}
+ 	}
+ 
+@@ -5856,6 +5960,9 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
+ 	// by two post-frame callbacks, so keeping it on the active list holds it at
+ 	// this tick's boundary instead of firing inside the loadBytes call.
+ 	if (is_image && !from_bytes) loaderinfo_fire_init_and_complete(ctx, li);
++	// ... and a from_bytes image waits out one EXTRA flush on top of that
++	// (loader.rs:1883-1902 nests two post_frame_callbacks).
++	if (is_image && from_bytes) lx->defer_flushes = 1;
+ }
+ 
+ // Deliver every queued fetch. A load() issued during frame N never resolves
+@@ -5894,6 +6001,12 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
+ 	{
+ 		Avm2LoaderInfoExt* lx = loaderinfo_ext_of(ctx, batch[i]);
+ 		if (lx == NULL || lx->errored) continue;
++		if (lx->defer_flushes > 0)
++		{
++			lx->defer_flushes--;
++			loader_track_active(batch[i]);
++			continue;
++		}
+ 		// A loadBytes SWF's root is constructed here, immediately before its
+ 		// init/complete (loader_deliver). A throw out of that constructor sets
+ 		// `errored`, which skips both and drops the entry.
+@@ -11767,6 +11880,21 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
+ 		set_default_instance_name(ctx, ext);
+ 		orphan_add(ctx, obj);
+ 		enter_frame_obj(ctx, obj);
++		// Ruffle avm2_button.rs::construct_frame creates the four states
++		// whenever `needs_frame_construction` is set -- including the
++		// construct_frame that initialize_for_allocator runs, i.e. BEFORE
++		// the script `new MyButton()` constructor body. Only the AS3 ctor
++		// call is skipped there (`needs_avm2_construction` is false once
++		// the allocator installed the object). We set `constructed`
++		// above, so construct_frame_obj's own button arm is a no-op --
++		// create the states here instead, or `Constructed <state>` traces
++		// land inside super() rather than ahead of the ctor
++		// (avm2/displayobject_early_init).
++		if (ctx->builtins.simple_button_class != NULL
++		    && class_is_a(obj->cls, ctx->builtins.simple_button_class))
++		{
++			button_construct_states(ctx, obj);
++		}
+ 		construct_frame_obj(ctx, obj);
+ 		ext->skip_next_enter_frame = 1;
+ 		// on_construction_complete's non-event half (the events are
+@@ -14253,6 +14381,12 @@ void avm2_register_display(Avm2Context* ctx)
+ 	avm2_builtin_add_getter(ctx, linfo, "isURLInaccessible",
+ 	                        li_get_is_url_inaccessible);
+ 	avm2_builtin_add_getter(ctx, linfo, "sharedEvents", li_get_shared_events);
++	add_getset(ctx, linfo, "childSandboxBridge", li_get_sandbox_bridge,
++	           li_set_sandbox_bridge);
++	add_getset(ctx, linfo, "parentSandboxBridge", li_get_sandbox_bridge,
++	           li_set_sandbox_bridge);
++	avm2_builtin_add_getter(ctx, linfo, "uncaughtErrorEvents",
++	                        li_get_uncaught_error_events);
+ 	avm2_builtin_add_getter(ctx, linfo, "childAllowsParent", li_get_allows);
+ 	avm2_builtin_add_getter(ctx, linfo, "parentAllowsChild", li_get_allows);
+ 	avm2_builtin_add_getter(ctx, linfo, "sameDomain", li_get_allows);
+diff --git a/SWFModernRuntime/src/avm2/avm2_events.c b/SWFModernRuntime/src/avm2/avm2_events.c
+index 8ba19a02f..310e3c051 100644
+--- a/SWFModernRuntime/src/avm2/avm2_events.c
++++ b/SWFModernRuntime/src/avm2/avm2_events.c
+@@ -610,6 +610,8 @@ static Avm2EventDispatcherExt* this_dispatcher(Avm2Activation* act)
+ 	return avm2_dispatcher_ext_of(act->ctx, act->this_val.u.obj);
+ }
+ 
++static Avm2Class* g_uncaught_error_events_class;
++
+ static Avm2Value ed_init(Avm2Activation* act)
+ {
+ 	// EventDispatcher(target:IEventDispatcher = null).
+@@ -2152,6 +2154,22 @@ void avm2_register_events(Avm2Context* ctx)
+ 		avm2_string(avm2_string_from_literal(ctx, "timer")));
+ 	avm2_builtin_add_static_const(ctx, tev, "TIMER_COMPLETE",
+ 		avm2_string(avm2_string_from_literal(ctx, "timerComplete")));
++
++	// flash.events.UncaughtErrorEvents — [API("667")] in Ruffle
++	// (globals/flash/events/UncaughtErrorEvents.as), i.e. SWF 10+; an empty
++	// EventDispatcher subclass with a do-nothing constructor. LoaderInfo's
++	// `uncaughtErrorEvents` getter mints one per LoaderInfo.
++	g_uncaught_error_events_class =
++		avm2_builtin_class_api(ctx, "flash.events", "UncaughtErrorEvents",
++		                       b->event_dispatcher_class, 10);
++	g_uncaught_error_events_class->instance_init.fn = ed_init;
++	g_uncaught_error_events_class->instance_init.debug_name =
++		"UncaughtErrorEvents";
++}
++
++Avm2Class* avm2_uncaught_error_events_class(void)
++{
++	return g_uncaught_error_events_class;
+ }
+ 
+ Avm2Object* avm2_timer_event_new(Avm2Context* ctx, const Avm2String* type,
+diff --git a/SWFModernRuntime/src/avm2/avm2_globals.c b/SWFModernRuntime/src/avm2/avm2_globals.c
+index b3baaab83..e57b85174 100644
+--- a/SWFModernRuntime/src/avm2/avm2_globals.c
++++ b/SWFModernRuntime/src/avm2/avm2_globals.c
+@@ -327,6 +327,38 @@ void avm2_builtin_define_alias(Avm2Context* ctx, Avm2PropKey key, Avm2Value valu
+ 	avm2_domain_add(ctx, &key, NULL, 0);
+ }
+ 
++// --- API-gated builtins that this movie's SWF version hides ----------------
++//
++// Ruffle never removes an api-gated definition from the domain: only the
++// NAMESPACE carries the api version, so what a name resolves to depends on
++// which api version the LOOKUP uses. A compiled multiname and a
++// package-qualified runtime name both use the ROOT movie's api version (so
++// `JSON` in a SWF 12 movie and `"::JSON"` in a SWF 9 movie are both #1065 --
++// avm2/json_version_gated), but an UNQUALIFIED runtime name is built with
++// `ApiVersion::VM_INTERNAL` (qname.rs:105), the version that sees
++// everything, so `getDefinitionByName("JSON")` answers `[class JSON]` even in
++// a SWF 9 movie (avm2/appdomain_lookup_edge_cases lines 11-13).
++//
++// We express that with a side table instead of per-namespace api versions:
++// a class that builtin_class_impl declines to expose is recorded here, and
++// only the unqualified runtime-lookup path (definition_get_in /
++// definition_has_in) consults it. Only default-package (`ns_len == 0`)
++// entries can ever be reached by an unqualified name, so only those are kept.
++#define HIDDEN_BUILTIN_MAX 32
++static Avm2Class* g_hidden_builtins[HIDDEN_BUILTIN_MAX];
++static uint32_t g_hidden_builtin_count;
++
++static Avm2Class* hidden_builtin_find(const char* s, uint32_t len)
++{
++	for (uint32_t i = 0; i < g_hidden_builtin_count; i++)
++	{
++		Avm2Class* c = g_hidden_builtins[i];
++		if (c->name.name_len == len && memcmp(c->name.name, s, len) == 0)
++			return c;
++	}
++	return NULL;
++}
++
+ static Avm2Class* builtin_class_impl(Avm2Context* ctx, const char* ns,
+                                      const char* name, Avm2Class* super,
+                                      uint8_t min_swf)
+@@ -384,6 +416,11 @@ static Avm2Class* builtin_class_impl(Avm2Context* ctx, const char* ns,
+ 		builtin_global_define_ro(ctx, cls->name, avm2_object_value(cobj), 1);
+ 		avm2_domain_add(ctx, &cls->name, NULL, 0);
+ 	}
++	else if (cls->name.ns_len == 0
++	         && g_hidden_builtin_count < HIDDEN_BUILTIN_MAX)
++	{
++		g_hidden_builtins[g_hidden_builtin_count++] = cls;
++	}
+ 	return cls;
+ }
+ 
+@@ -1759,20 +1796,109 @@ _Noreturn static void throw_1065_for_definition(Avm2Context* ctx,
+ 	                 (int) key.name_len, key.name);
+ }
+ 
++// --- `Vector.<X>` definition names -----------------------------------------
++//
++// Ruffle domain.rs:439 vector_parameter_from_name: a definition name that
++// starts with `Vector.<` (or `__AS3__.vec::Vector.<`) and ends with `>` is
++// split into the generic Vector plus the INNER name, and the inner name is
++// then resolved as a definition in its own right -- recursively. That is the
++// only way `ApplicationDomain.hasDefinition("Vector.<integerValue>")` can be
++// true (avm2/appdomain_lookup_edge_cases: `integerValue` is a package-level
++// var, so it IS a definition even though it is not a class), and the only way
++// `getDefinition` on the same name can raise VerifyError #1107 instead of a
++// #1065 -- ClassObject::apply (class_object.rs:817-825) rejects a non-class
++// type parameter with make_error_1107. avm2_vector_class_by_name resolves the
++// same shape but answers NULL for a non-class inner name, which collapses
++// both cases into "not defined".
++static const char* definition_vector_param(const char* s, uint32_t len,
++                                           uint32_t* out_len)
++{
++	static const char PFX_Q[] = "__AS3__.vec::Vector.<";
++	static const char PFX[] = "Vector.<";
++	uint32_t start;
++	if (len >= sizeof(PFX_Q) - 1 && memcmp(s, PFX_Q, sizeof(PFX_Q) - 1) == 0)
++		start = (uint32_t) (sizeof(PFX_Q) - 1);
++	else if (len >= sizeof(PFX) - 1 && memcmp(s, PFX, sizeof(PFX) - 1) == 0)
++		start = (uint32_t) (sizeof(PFX) - 1);
++	else
++		return NULL;
++	if (s[len - 1] != '>') return NULL;
++	*out_len = len - 1 - start;
++	return s + start;
++}
++
++// Ruffle QName::from_qualified_name splits on the LAST "::" (else the last
++// "."); a name with neither separator is the unqualified case that resolves
++// in the VM_INTERNAL public namespace (see the hidden-builtin table above).
++static int definition_name_is_unqualified(const char* s, uint32_t len)
++{
++	for (uint32_t i = 0; i < len; i++)
++		if (s[i] == '.' || s[i] == ':') return 0;
++	return 1;
++}
++
++static int definition_has_in(Avm2Context* ctx, const Avm2DomainScope* scope,
++                             const char* s, uint32_t len)
++{
++	uint32_t il = 0;
++	const char* inner = definition_vector_param(s, len, &il);
++	// avmplus only checks that the type parameter EXISTS -- it never checks
++	// that it is a class (Ruffle has_defined_value_handling_vector).
++	if (inner != NULL) return definition_has_in(ctx, scope, inner, il);
++	int found = 0;
++	avm2_find_definition_in(ctx, scope, s, len, &found);
++	if (found) return 1;
++	return definition_name_is_unqualified(s, len)
++	       && hidden_builtin_find(s, len) != NULL;
++}
++
++static Avm2Value definition_get_in(Avm2Context* ctx,
++                                   const Avm2DomainScope* scope,
++                                   const char* s, uint32_t len)
++{
++	uint32_t il = 0;
++	const char* inner = definition_vector_param(s, len, &il);
++	if (inner != NULL)
++	{
++		// `Vector.<*>` is the un-parameterised Vector object class; `*` is
++		// not a definition, so it must not go through the recursion.
++		if (il == 1 && inner[0] == '*')
++		{
++			return avm2_object_value(
++				ctx->builtins.vector_object_class->class_object);
++		}
++		Avm2Value p = definition_get_in(ctx, scope, inner, il);
++		if (p.kind != AVM2_VALUE_OBJECT || p.u.obj == NULL
++		    || p.u.obj->kind != AVM2_OBJ_CLASS)
++		{
++			avm2_throw_error(ctx, ctx->builtins.verify_error_class,
++			                 "Error #1107: The ABC data is corrupt, attempt "
++			                 "to read out of bounds.");
++		}
++		Avm2Class* applied = avm2_vector_apply(ctx, p.u.obj->class_ref);
++		return avm2_object_value(applied->class_object);
++	}
++	int found = 0;
++	Avm2Value v = avm2_find_definition_in(ctx, scope, s, len, &found);
++	if (found) return v;
++	if (definition_name_is_unqualified(s, len))
++	{
++		Avm2Class* hidden = hidden_builtin_find(s, len);
++		if (hidden != NULL) return avm2_object_value(hidden->class_object);
++	}
++	throw_1065_for_definition(ctx, s, len);
++}
++
+ static Avm2Value global_get_definition_by_name(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+ 	const Avm2String* s = (act->argc > 0)
+ 		? avm2_coerce_to_string(ctx, act->args[0])
+ 		: avm2_string_from_literal(ctx, "");
+-	int found = 0;
+ 	// Flash resolves getDefinitionByName in the CALLER's ApplicationDomain
+ 	// (loader_child_getdefinition: the child SWF's Parent must round-trip to
+ 	// the child's Parent, and "Child" exists only in the child's domain).
+-	Avm2Value v = avm2_find_definition_in(ctx, act_scope(act), s->utf8, s->len,
+-	                                      &found);
+-	if (found) return v;
+-	throw_1065_for_definition(ctx, s->utf8, s->len);
++	return definition_get_in(ctx, act_scope(act), s->utf8, s->len);
+ }
+ 
+ // E4X construction primitives shared by the describeType emitter below.
+@@ -5226,10 +5352,8 @@ static Avm2Value appdomain_has_definition(Avm2Activation* act)
+ 		return avm2_bool(false);
+ 	}
+ 	const Avm2String* s = avm2_coerce_to_string(ctx, act->args[0]);
+-	int found = 0;
+-	avm2_find_definition_in(ctx, appdomain_self_scope(act), s->utf8, s->len,
+-	                        &found);
+-	return avm2_bool(found != 0);
++	return avm2_bool(definition_has_in(ctx, appdomain_self_scope(act),
++	                                   s->utf8, s->len));
+ }
+ 
+ static Avm2Value appdomain_get_definition(Avm2Activation* act)
+@@ -5238,11 +5362,7 @@ static Avm2Value appdomain_get_definition(Avm2Activation* act)
+ 	const Avm2String* s = (act->argc > 0)
+ 		? avm2_coerce_to_string(ctx, act->args[0])
+ 		: avm2_string_from_literal(ctx, "");
+-	int found = 0;
+-	Avm2Value v = avm2_find_definition_in(ctx, appdomain_self_scope(act),
+-	                                      s->utf8, s->len, &found);
+-	if (found) return v;
+-	throw_1065_for_definition(ctx, s->utf8, s->len);
++	return definition_get_in(ctx, appdomain_self_scope(act), s->utf8, s->len);
+ }
+ 
+ static Avm2Value system_noop(Avm2Activation* act)
+@@ -5752,9 +5872,17 @@ static void register_platform_stubs(Avm2Context* ctx)
+ 		cls->instance_init.debug_name = "PrintJobOptions";
+ 	}
+ 
+-	// flash.crypto.generateRandomBytes.
+-	builtin_add_global_fn_ns(ctx, "flash.crypto", "generateRandomBytes",
+-	                         crypto_generate_random_bytes);
++	// flash.crypto.generateRandomBytes -- [API("674")] in Ruffle
++	// (globals/flash/crypto.as:4), i.e. the same FP11/SWF13 threshold as JSON.
++	// A package-qualified name always resolves at the ROOT api version, so
++	// below SWF 13 both `flash.crypto::generateRandomBytes` and
++	// `flash.crypto.generateRandomBytes` are #1065
++	// (avm2/appdomain_lookup_edge_cases, a SWF 9 movie).
++	if (ctx->swf_version >= 13)
++	{
++		builtin_add_global_fn_ns(ctx, "flash.crypto", "generateRandomBytes",
++		                         crypto_generate_random_bytes);
++	}
+ 
+ 	// flash.trace.Trace — the package's only class, and a pure table.
+ 	{
+@@ -7107,11 +7235,11 @@ void avm2_globals_init(Avm2Context* ctx)
+ 	avm2_register_amf(ctx);
+ 	avm2_register_date(ctx);
+ 	// JSON is API-versioned (674 / FP11): invisible below SWF13
+-	// (json_version_gated expects 1065 in a SWF12 movie).
+-	if (ctx->swf_version >= 13)
+-	{
+-		avm2_register_json(ctx);
+-	}
++	// (json_version_gated expects 1065 in a SWF12 movie). It is BUILT at every
++	// version so an unqualified runtime lookup can still reach it -- see the
++	// hidden-builtin table (avm2/appdomain_lookup_edge_cases is a SWF 9 movie
++	// whose getDefinitionByName("JSON") reads `[class JSON]`).
++	avm2_register_json(ctx);
+ 	avm2_register_toplevel(ctx);
+ 	register_application_domain(ctx);
+ 	register_loader_context(ctx);
+diff --git a/SWFModernRuntime/src/avm2/avm2_json.c b/SWFModernRuntime/src/avm2/avm2_json.c
+index 87bea12a3..dfb44c4ca 100644
+--- a/SWFModernRuntime/src/avm2/avm2_json.c
++++ b/SWFModernRuntime/src/avm2/avm2_json.c
+@@ -1029,7 +1029,10 @@ static void json_native_init_abstract(Avm2Context* ctx, Avm2Object* obj)
+ 
+ void avm2_register_json(Avm2Context* ctx)
+ {
+-	Avm2Class* cls = avm2_builtin_class(ctx, "", "JSON", ctx->builtins.object_class);
++	// [API("674")] -> SWF 13. Built unconditionally; builtin_class_impl only
++	// withholds the global/domain binding below that version.
++	Avm2Class* cls = avm2_builtin_class_api(ctx, "", "JSON",
++	                                        ctx->builtins.object_class, 13);
+ 	cls->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+ 	cls->native_init = json_native_init_abstract;
+ 	// Arities are what Function.length reports (ecma3/JSON/e15_12_2, _3).
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index e413acf0d..e0385c22a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -2452,6 +2452,19 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
+ 		spans_from_text(ctx, et, empty_string(ctx));
+ 	}
+ 
++	// Ruffle edit_text.rs:308-312 -- "Selections are mandatory in AS3": an AS3
++	// EditText is born with `TextSelection::for_position(text.len())`, i.e. the
++	// caret sitting AFTER the initial text, not at index 0. It matters as soon
++	// as anything types into a field whose tag text is non-empty:
++	// avm2/textfield_input_events' field lowers `<p align="left"></p>` to a
++	// single "\n", so Flash/Ruffle insert after it ("\nR") while a zero caret
++	// inserts before it ("R\n"). `sel_active` is deliberately left cleared --
++	// it is our render gate for a visible caret, and turning it on here would
++	// paint a caret in every focused editable field from birth (a pixel-axis
++	// change, not a trace one).
++	et->sel_begin = et->sel_end = et->sel_from = et->sel_to =
++		(int32_t) u16_length(et->text);
++
+ 	// Keep the legacy tf_text mirror for display code.
+ 	ext->tf_text = et->text;
+ 	et_relayout(ctx, et);
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 1f5ad95a8..2bc3fa4af 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -1062,14 +1062,31 @@ _CHILD_SCAN_SKIP_DIRS = {
+ }
+ 
+ 
++def _dir_is_own_test(d):
++    """True when `d` is itself a discoverable test (test.swf + expected output).
++
++    `discover_tests` needs BOTH, so a subdirectory that carries only a
++    `test.swf` is not a test at all — it is a child SWF that its parent loads
++    by relative path (the three under `avm2/large_preload_from_*`).
++    """
++    if not (d / "test.swf").exists():
++        return False
++    resolved = resolve_expected_filename(d, None)
++    return resolved is not None and (d / resolved).exists()
++
++
+ def find_child_swfs(test_dir):
+     """Find child .swf/.png/.jpg files (non-test.swf) in a test directory.
+ 
+     Recurses into subdirectories (loader-arc tranche 8): four Loader tests keep
+     their children under `child/` or `loader_domain_child/` and load them by
+-    relative path. A subdirectory that holds its own `test.swf` is a SEPARATE
+-    test (`avm2/large_preload_from_url/large_bytearray`), not a child, and is
+-    pruned — as are our own generated output folders.
++    relative path. A subdirectory that holds its own `test.swf` AND an
++    expected-output file is a SEPARATE test, not a child, and is pruned — as
++    are our own generated output folders. A `test.swf` with no expected output
++    is NOT a test (`discover_tests` needs both), so it is a child like any
++    other: `avm2/large_preload_from_url/large_bytearray/test.swf` and the two
++    under `avm2/large_preload_from_bytes/` are the only three in the corpus,
++    and each is the very SWF its parent loads by relative path.
+ 
+     Ordering is by path relative to the test dir, so a flat test's list — and
+     therefore every movie_id, char_id_base and symbol prefix derived from it —
+@@ -1082,10 +1099,10 @@ def find_child_swfs(test_dir):
+         dirnames[:] = sorted(
+             d for d in dirnames
+             if d not in _CHILD_SCAN_SKIP_DIRS
+-            and not (here / d / "test.swf").exists())
++            and not _dir_is_own_test(here / d))
+         for name in sorted(filenames):
+             f = here / name
+-            if f.suffix == ".swf" and f.name != "test.swf":
++            if f.suffix == ".swf" and f != test_dir / "test.swf":
+                 children.append(f)
+             elif f.suffix.lower() in image_exts:
+                 children.append(f)

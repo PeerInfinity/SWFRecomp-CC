@@ -610,6 +610,8 @@ static Avm2EventDispatcherExt* this_dispatcher(Avm2Activation* act)
 	return avm2_dispatcher_ext_of(act->ctx, act->this_val.u.obj);
 }
 
+static Avm2Class* g_uncaught_error_events_class;
+
 static Avm2Value ed_init(Avm2Activation* act)
 {
 	// EventDispatcher(target:IEventDispatcher = null).
@@ -2167,6 +2169,22 @@ void avm2_register_events(Avm2Context* ctx)
 		avm2_string(avm2_string_from_literal(ctx, "timer")));
 	avm2_builtin_add_static_const(ctx, tev, "TIMER_COMPLETE",
 		avm2_string(avm2_string_from_literal(ctx, "timerComplete")));
+
+	// flash.events.UncaughtErrorEvents — [API("667")] in Ruffle
+	// (globals/flash/events/UncaughtErrorEvents.as), i.e. SWF 10+; an empty
+	// EventDispatcher subclass with a do-nothing constructor. LoaderInfo's
+	// `uncaughtErrorEvents` getter mints one per LoaderInfo.
+	g_uncaught_error_events_class =
+		avm2_builtin_class_api(ctx, "flash.events", "UncaughtErrorEvents",
+		                       b->event_dispatcher_class, 10);
+	g_uncaught_error_events_class->instance_init.fn = ed_init;
+	g_uncaught_error_events_class->instance_init.debug_name =
+		"UncaughtErrorEvents";
+}
+
+Avm2Class* avm2_uncaught_error_events_class(void)
+{
+	return g_uncaught_error_events_class;
 }
 
 Avm2Object* avm2_timer_event_new(Avm2Context* ctx, const Avm2String* type,
