@@ -1,0 +1,298 @@
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -1587,6 +1587,94 @@
+ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element, int handle_this);
+ static MovieClip* resolveObjectPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element);
+ 
++// ---------------------------------------------------------------------------
++// ExternalSound record - Ruffle core/src/avm1/globals/sound.rs `ExternalSound`
++// (`Sound::external` is `Some` from the moment `loadSound(<any arg>)` is
++// called). The Sound is then permanently "separated" from its original owner:
++// it gets its OWN sound transform (checked BEFORE global and owner),
++// `owner()` returns None, and `has_valid_owner()` is unconditionally true.
++// Modelled as DONTENUM properties on the Sound instance:
++//   __ext__          boolean  record present            (Sound::is_external)
++//   __ext_xform__    object   private transform         (ExternalSound::transform)
++//   __ext_stream__   boolean  is_streaming
++//   __ext_auto__     boolean  will_autoplay (cleared by stop())
++//   __ext_loading__  boolean  is_loading
++//   __ext_loadid__   number   load generation (stale-completion guard)
++//   __bytes_total__  number   byte count of the loaded file (getBytes*)
++// ---------------------------------------------------------------------------
++static int soundIsExternal(ASObject* sound_obj)
++{
++	if (sound_obj == NULL) return 0;
++	ActionVar* v = getProperty(sound_obj, "__ext__", 7);
++	return (v != NULL && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value) ? 1 : 0;
++}
++
++static ASObject* soundExternalTransform(ASObject* sound_obj)
++{
++	if (sound_obj == NULL) return NULL;
++	ActionVar* v = getProperty(sound_obj, "__ext_xform__", 13);
++	if (v == NULL || v->type != ACTION_STACK_VALUE_OBJECT) return NULL;
++	return (ASObject*) (uintptr_t) v->data.numeric_value;
++}
++
++static int soundExtFlag(ASObject* sound_obj, const char* name, u32 len)
++{
++	if (sound_obj == NULL) return 0;
++	ActionVar* v = getProperty(sound_obj, name, len);
++	return (v != NULL && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value) ? 1 : 0;
++}
++
++static void soundSetExtFlag(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 len, int on)
++{
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_BOOLEAN;
++	v.data.numeric_value = on ? 1 : 0;
++	setPropertyWithFlags(app_context, sound_obj, name, len, &v, PROPERTY_FLAGS_DONTENUM);
++}
++
++static double soundExtNum(ASObject* sound_obj, const char* name, u32 len)
++{
++	if (sound_obj == NULL) return 0.0;
++	ActionVar* v = getProperty(sound_obj, name, len);
++	if (v == NULL) return 0.0;
++	if (v->type == ACTION_STACK_VALUE_F64) return VAL(double, &v->data.numeric_value);
++	if (v->type == ACTION_STACK_VALUE_F32) return (double) VAL(float, &v->data.numeric_value);
++	return 0.0;
++}
++
++static void soundSetExtNum(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 len, double d)
++{
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_F64;
++	VAL(double, &v.data.numeric_value) = d;
++	setPropertyWithFlags(app_context, sound_obj, name, len, &v, PROPERTY_FLAGS_DONTENUM);
++}
++
++// Create (or replace) the ExternalSound record - mirrors `ExternalSound::empty`:
++// a FRESH default transform (volume 100, identity matrix), will_autoplay =
++// is_streaming, is_loading = true. Called by every `loadSound(<arg>)` that
++// passes the has_valid_owner gate, including `loadSound("")`.
++static void soundCreateExternal(SWFAppContext* app_context, ASObject* sound_obj, int is_streaming, double load_id)
++{
++	ASObject* xf = allocObject(app_context, 8);
++	if (xf != NULL)
++	{
++		initSoundTransformDefaults(app_context, xf);
++		ActionVar xv = {0};
++		xv.type = ACTION_STACK_VALUE_OBJECT;
++		xv.data.numeric_value = (u64) (uintptr_t) xf;
++		// setPropertyWithFlags retains the new value and releases the old one,
++		// so replacing the record drops the previous transform object.
++		setPropertyWithFlags(app_context, sound_obj, "__ext_xform__", 13, &xv, PROPERTY_FLAGS_DONTENUM);
++		releaseObject(app_context, xf);   // drop allocObject's initial reference
++	}
++	soundSetExtFlag(app_context, sound_obj, "__ext__", 7, 1);
++	soundSetExtFlag(app_context, sound_obj, "__ext_stream__", 14, is_streaming);
++	soundSetExtFlag(app_context, sound_obj, "__ext_auto__", 12, is_streaming);
++	soundSetExtFlag(app_context, sound_obj, "__ext_loading__", 15, 1);
++	soundSetExtNum(app_context, sound_obj, "__ext_loadid__", 14, load_id);
++}
++
+ // Helper: resolve the owner MovieClip for a Sound instance by looking up
+ // the stored target path string. Returns NULL if (a) the Sound is set to
+ // use global sound (no target), or (b) the target path doesn't currently
+@@ -1598,6 +1686,10 @@
+ {
+ 	if (sound_obj == NULL || sound_obj->native_type != NATIVE_SOUND) return NULL;
+ 
++	// A Sound that has had loadSound() called on it is permanently separated
++	// from its owner - Ruffle `Sound::owner` gates on `&& !self.is_external()`.
++	if (soundIsExternal(sound_obj)) return NULL;
++
+ 	ActionVar* target = getProperty(sound_obj, "__sound_target__", 16);
+ 	if (target == NULL || target->type != ACTION_STACK_VALUE_STRING) return NULL;
+ 	if (target->str_size == 0) return NULL;
+@@ -1655,6 +1747,8 @@
+ static int soundHasValidOwner(SWFAppContext* app_context, ASObject* sound_obj)
+ {
+ 	if (soundUsesGlobal(sound_obj)) return 1;
++	// Ruffle `has_valid_owner`: use_global || is_external || owner.is_some().
++	if (soundIsExternal(sound_obj)) return 1;
+ 	return resolveSoundOwner(app_context, sound_obj) != NULL ? 1 : 0;
+ }
+ 
+@@ -1668,6 +1762,16 @@
+ 	if (sound_obj == NULL) return NULL;
+ 	if (sound_obj->native_type != NATIVE_SOUND) return NULL;
+ 
++	// Step 1 of Ruffle's `Sound::sound_transform`: the private ExternalSound
++	// transform takes precedence over BOTH the global transform and the
++	// owner clip's - a loaded Sound stops reading/writing its owner entirely
++	// (avm1/sound_load_props: two Sounds on the same clip stop aliasing once
++	// one of them has loaded).
++	if (soundIsExternal(sound_obj)) {
++		ASObject* ext_xf = soundExternalTransform(sound_obj);
++		if (ext_xf != NULL) return ext_xf;
++	}
++
+ 	if (soundUsesGlobal(sound_obj)) {
+ 		if (g_sound_global_transform == NULL) {
+ 			g_sound_global_transform = allocObject(app_context, 8);
+@@ -2202,16 +2306,43 @@
+ 	if (sound_obj == NULL || arg_count < 1) return ret;
+ 	if (!soundHasValidOwner(app_context, sound_obj)) return ret;
+ 
+-	// Get URL string
+-	if (args[0].type != ACTION_STACK_VALUE_STRING) return ret;
+-	const uint16_t* u16 = varGetU16Ptr(&args[0]);
+-	if (!u16) return ret;
+-	char url[256];
+-	u16_to_utf8(u16, args[0].str_size, url, sizeof(url));
++	// Get URL string. Ruffle coerces args[0] to a string, so `loadSound("")`
++	// is a real (empty) URL and still creates the ExternalSound record.
++	char url[512];
++	url[0] = '\0';
++	if (args[0].type == ACTION_STACK_VALUE_STRING) {
++		const uint16_t* u16 = varGetU16Ptr(&args[0]);
++		if (u16 != NULL && args[0].str_size > 0)
++			u16_to_utf8(u16, args[0].str_size, url, sizeof(url));
++	} else {
++		char sbuf[17];
++		ActionVar sv = {0};
++		PUSH_VAR(&args[0]);
++		convertString(app_context, sbuf);
++		popVar(app_context, &sv);
++		if (sv.type == ACTION_STACK_VALUE_STRING) {
++			const uint16_t* su16 = varGetU16Ptr(&sv);
++			if (su16 != NULL && sv.str_size > 0)
++				u16_to_utf8(su16, sv.str_size, url, sizeof(url));
++		}
++	}
++
++	int is_streaming = 0;
++	if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_BOOLEAN)
++		is_streaming = (int) args[1].data.numeric_value;
+ 
+ 	// Stop any currently playing instances of this sound
+ 	soundStopForObject(sound_obj);
+ 
++	// ExternalSound bookkeeping - deliberately OUTSIDE the HAS_DATA_FILES
++	// guard below: the separation from the owner happens whether or not the
++	// URL resolves to any bundled file (avm1/sound_load_props loads only the
++	// deliberately-missing "invalid.mp3" and still observes the reset).
++	double sound_load_id = 0.0;
++	if (soundIsExternal(sound_obj))
++		sound_load_id = soundExtNum(sound_obj, "__ext_loadid__", 14) + 1.0;
++	soundCreateExternal(app_context, sound_obj, is_streaming, sound_load_id);
++
+ 	// Snapshot pre-loadSound string own properties (Place 0 pattern)
+ 	ASProperty* pre_dur_p = findPropertyRaw(sound_obj, "duration", 8);
+ 	int pre_had_str_dur = (pre_dur_p != NULL && pre_dur_p->value.type == ACTION_STACK_VALUE_STRING);
+@@ -2241,7 +2372,13 @@
+ 		if (*p == '/' || *p == '\\') basename = p + 1;
+ 
+ 	DataFileEntry* entry = findDataFile(basename);
+-	if (entry == NULL) return ret;
++	if (entry == NULL) {
++		// Load failed. Ruffle's loader still clears is_loading (and fires
++		// onLoad(false)); we clear the flag so a later loadSound on the same
++		// Sound is not mistaken for a re-entrant load.
++		soundSetExtFlag(app_context, sound_obj, "__ext_loading__", 15, 0);
++		return ret;
++	}
+ 
+ 	// Estimate MP3 duration from file size
+ 	// Simple heuristic for CBR MP3: parse first frame header for bitrate
+@@ -2314,6 +2451,13 @@
+ 		setProperty(app_context, sound_obj, "__position__", 12, &pos);
+ 	}
+ 
++	// Byte counts for getBytesLoaded()/getBytesTotal() (Ruffle stubs both to 1;
++	// we report the real file size, which keeps the pre-load `== 'undefined'`
++	// checks passing - from_gnash Sound-v6/-v7/-v8 Sound.as:110/111/177/178/
++	// 336/337 - while satisfying the post-load `== "number"` checks at 345/346).
++	soundSetExtNum(app_context, sound_obj, "__bytes_total__", 15, (double) entry->content_length);
++	soundSetExtFlag(app_context, sound_obj, "__ext_loading__", 15, 0);
++
+ 	// Mark as loaded (activates native getters for duration/position)
+ 	// If pre-loadSound string overrides exist, set __dur_override__ / __pos_override__
+ 	{
+@@ -2377,17 +2521,38 @@
+ 		}
+ 	}
+ 
+-	// If streaming mode, auto-start playback
+-	int is_streaming = 0;
+-	if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_BOOLEAN)
+-		is_streaming = (int)args[1].data.numeric_value;
+-	if (is_streaming)
++	// If streaming mode, auto-start playback (will_autoplay; cleared by stop()).
++	if (soundExtFlag(sound_obj, "__ext_auto__", 12))
+ 		soundStartPlayback(sound_obj, duration_ms);
+ #endif
+ 
+ 	return ret;
+ }
+ 
++// Sound.getBytesLoaded() / Sound.getBytesTotal(). Ruffle stubs both to a
++// constant 1 (sound.rs:510-526), which makes it FAIL the six pre-load
++// `typeof(...) == 'undefined'` checks in from_gnash Sound.as (110/111,
++// 177/178, 336/337) that Flash passes. Gate on "externally loaded" instead:
++// undefined until a `loadSound()` has actually completed, the file's byte
++// count afterwards. attachSound()-ed sounds keep returning undefined (they
++// have no external byte stream), which is what those six checks pin.
++static ActionVar builtin_sound_getBytes(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)args; (void)arg_count; (void)registers;
++	ActionVar ret = {0};
++	ret.type = ACTION_STACK_VALUE_UNDEFINED;
++	ASObject* sound_obj = resolveSoundThis(this_obj);
++	if (sound_obj == NULL) return ret;
++	if (!soundIsExternal(sound_obj)) return ret;
++	ActionVar* bl_loaded = getProperty(sound_obj, "__loaded__", 10);
++	if (bl_loaded == NULL || bl_loaded->type != ACTION_STACK_VALUE_BOOLEAN ||
++	    !bl_loaded->data.numeric_value)
++		return ret;
++	ret.type = ACTION_STACK_VALUE_F64;
++	VAL(double, &ret.data.numeric_value) = soundExtNum(sound_obj, "__bytes_total__", 15);
++	return ret;
++}
++
+ static ActionVar builtin_sound_getPosition(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	(void)args; (void)arg_count; (void)registers;
+@@ -2432,6 +2597,10 @@
+ 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+ 	ASObject* sound_obj = resolveSoundThis(this_obj);
+ 	if (sound_obj == NULL) return ret;
++	// Ruffle `stop()` clears will_autoplay BEFORE the has_valid_owner work, so
++	// a streaming loadSound still in flight does not auto-play on completion.
++	if (soundIsExternal(sound_obj))
++		soundSetExtFlag(app_context, sound_obj, "__ext_auto__", 12, 0);
+ 	if (!soundHasValidOwner(app_context, sound_obj)) return ret;
+ 	soundStopForObject(sound_obj);
+ 	return ret;
+@@ -37336,8 +37505,27 @@
+ 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+ 			setPropertyWithFlags(app_context, ctor->prototype_obj, "loadSound", 9, &fv, mflags);
+ 		}
+-		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesLoaded", 14, mflags);
+-		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesTotal", 13, mflags);
++		// Sound.getBytesLoaded / Sound.getBytesTotal - real implementations
++		{
++			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
++			memset(fn, 0, sizeof(ASFunction));
++			strncpy(fn->name, "getBytesLoaded", 255);
++			fn->function_type = 2;
++			fn->advanced_func = (Function2Ptr) builtin_sound_getBytes;
++			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
++			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
++			setPropertyWithFlags(app_context, ctor->prototype_obj, "getBytesLoaded", 14, &fv, mflags);
++		}
++		{
++			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
++			memset(fn, 0, sizeof(ASFunction));
++			strncpy(fn->name, "getBytesTotal", 255);
++			fn->function_type = 2;
++			fn->advanced_func = (Function2Ptr) builtin_sound_getBytes;
++			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
++			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
++			setPropertyWithFlags(app_context, ctor->prototype_obj, "getBytesTotal", 13, &fv, mflags);
++		}
+ 
+ 		// Mark the 7 SWF6+ methods with flash_flags=0x0080 (hidden in SWF5).
+ 		const char* swf6_sound_methods[] = {

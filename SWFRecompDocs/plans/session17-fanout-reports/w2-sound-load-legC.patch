@@ -1,0 +1,26 @@
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -1804,6 +1804,12 @@
+ //     position is preserved by PUSH/popVar) and store as the target path.
+ static void initSoundTarget(SWFAppContext* app_context, ASObject* sound_obj, ActionVar* args, u32 num_args)
+ {
++	{
++		ActionVar cpf = {0};
++		cpf.type = ACTION_STACK_VALUE_BOOLEAN;
++		cpf.data.numeric_value = 0;
++		setPropertyWithFlags(app_context, sound_obj, "checkPolicyFile", 15, &cpf, PROPERTY_FLAGS_DONTENUM);
++	}
+ 	if (num_args < 1 || args[0].type == ACTION_STACK_VALUE_NULL ||
+ 	    args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
+ 		ActionVar use_global = {0};
+@@ -2340,6 +2346,10 @@
+ 			static const int bitrates_v1_l2[] = {0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0};
+ 			bitrate = bitrates_v1_l2[br_idx] * 1000;
+ 		}
++		else if ((version == 0 || version == 2) && layer == 1) { // MPEG2 / MPEG2.5 Layer III
++			static const int bitrates_v2_l3[] = {0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0};
++			bitrate = bitrates_v2_l3[br_idx] * 1000;
++		}
+ 
+ 		if (bitrate > 0)
+ 			return (double)mp3_len * 8.0 / (double)bitrate * 1000.0;

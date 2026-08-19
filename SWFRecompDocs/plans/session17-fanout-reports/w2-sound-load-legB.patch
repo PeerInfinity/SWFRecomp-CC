@@ -1,0 +1,347 @@
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -2298,6 +2298,187 @@
+ 	return id3;
+ }
+ 
++// Shared CBR-MP3 metadata pass. Parses the ID3v2 tag (returned through
++// *out_id3, NULL when absent or malformed), skips it, and returns the
++// duration estimate in milliseconds from the first MPEG frame header.
++// Extracted from builtin_sound_loadSound so the synchronous (local) load and
++// the deferred (remote) load share one implementation.
++static double soundParseMp3Meta(SWFAppContext* app_context, const unsigned char* data, int len, ASObject** out_id3)
++{
++	if (out_id3 != NULL) *out_id3 = NULL;
++	if (data == NULL || len <= 0) return 0.0;
++
++	const unsigned char* mp3 = data;
++	int mp3_len = len;
++
++	ASObject* id3_obj = parseID3v2Tags(app_context, mp3, mp3_len);
++	if (out_id3 != NULL) *out_id3 = id3_obj;
++
++	if (mp3_len >= 10 && mp3[0] == 'I' && mp3[1] == 'D' && mp3[2] == '3')
++	{
++		int id3_size = ((mp3[6] & 0x7F) << 21) | ((mp3[7] & 0x7F) << 14) |
++		               ((mp3[8] & 0x7F) << 7) | (mp3[9] & 0x7F);
++		int audio_offset = id3_size + 10;
++		mp3 += audio_offset;
++		mp3_len -= audio_offset;
++	}
++
++	if (mp3_len >= 4 && mp3[0] == 0xFF && (mp3[1] & 0xE0) == 0xE0)
++	{
++		// MPEG audio frame header
++		int version = (mp3[1] >> 3) & 3; // 0=2.5, 2=2, 3=1
++		int layer = (mp3[1] >> 1) & 3;   // 1=III, 2=II, 3=I
++		int br_idx = (mp3[2] >> 4) & 0xF;
++
++		// Bitrate table for MPEG1 Layer III
++		static const int bitrates_v1_l3[] = {0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0};
++
++		int bitrate = 0;
++		if (version == 3 && layer == 1) // MPEG1 Layer III
++			bitrate = bitrates_v1_l3[br_idx] * 1000;
++		else if (version == 3 && layer == 2) { // MPEG1 Layer II
++			static const int bitrates_v1_l2[] = {0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0};
++			bitrate = bitrates_v1_l2[br_idx] * 1000;
++		}
++
++		if (bitrate > 0)
++			return (double)mp3_len * 8.0 / (double)bitrate * 1000.0;
++		return 1000.0; // fallback
++	}
++	return 1000.0; // fallback for non-standard MP3
++}
++
++// Streaming MP3s can only have a single active instance (Ruffle `start`:
++// `if is_streaming { stop_sound(previous instance) }`). Non-streaming loaded
++// sounds keep stacking instances, which is what sound_load_multiple_instances
++// pins.
++static void soundStartExternalPlayback(ASObject* sound_obj, double duration_ms)
++{
++	if (soundExtFlag(sound_obj, "__ext_stream__", 14))
++		soundStopForObject(sound_obj);
++	soundStartPlayback(sound_obj, duration_ms);
++}
++
++#ifdef HAS_DATA_FILES
++// Resolve a scheme'd sound URL to a bundled data file. Ruffle's test navigator
++// maps `http://<host>/<path>` onto `<test_dir>/<host>/<path>`, and
++// verify_output.py's find_data_files registers the file under exactly that
++// relative key ("localhost/noise.mp3") — so the basename-only lookup the local
++// path uses misses it. Same resolution order as avm1_amf.c's
++// nc_resolve_response (kept as a private static rather than exported).
++static DataFileEntry* soundResolveUrlData(const char* url)
++{
++	const char* scheme = strstr(url, "://");
++	const char* rest = (scheme != NULL) ? scheme + 3 : url;
++	const char* slash = strchr(rest, '/');
++	if (slash == NULL || slash[1] == '\0') return NULL;
++
++	// "localhost:8000/noise.mp3" -> try "localhost/noise.mp3" then "noise.mp3".
++	char rel[512];
++	size_t hostlen = (size_t) (slash - rest);
++	const char* colon = (const char*) memchr(rest, ':', hostlen);
++	size_t hnlen = (colon != NULL) ? (size_t) (colon - rest) : hostlen;
++	if (hnlen + 1 + strlen(slash + 1) + 1 <= sizeof(rel))
++	{
++		memcpy(rel, rest, hnlen);
++		rel[hnlen] = '/';
++		snprintf(rel + hnlen + 1, sizeof(rel) - hnlen - 1, "%s", slash + 1);
++		DataFileEntry* d = findDataFile(rel);
++		if (d != NULL && d->content != NULL) return d;
++	}
++	const char* base = strrchr(url, '/');
++	base = (base != NULL) ? base + 1 : url;
++	if (base[0] == '\0') return NULL;
++	DataFileEntry* d = findDataFile(base);
++	if (d != NULL && d->content != NULL) return d;
++	return NULL;
++}
++#endif
++
++// Ruffle sound.rs:626-647 — only `file:` URLs load synchronously (the Flash
++// desktop projector blocks on local files). Anything else returns immediately
++// and completes asynchronously, so `loadSound` must NOT fire its callbacks
++// inside the calling script.
++static int soundUrlIsRemote(const char* url)
++{
++	const char* p = strstr(url, "://");
++	if (p == NULL) return 0;
++	if ((size_t)(p - url) == 4 && strncasecmp(url, "file", 4) == 0) return 0;
++	return 1;
++}
++
++// Deferred remote-load payload. `content` points at the static data-registry
++// buffer (no copy); NULL content means the URL resolved to nothing and the
++// load failed. Drained as an AQ_KIND_SCRIPT entry, i.e. right after the
++// in-progress frame script — exactly the deferral the three `_remote` tests
++// pin (sound_load_streaming_stop_remote's expected `before / after / onLoad
++// true` is impossible with a synchronous onLoad).
++typedef struct {
++	ASObject* sound;
++	const char* content;
++	u32 content_length;
++	double load_id;
++} SoundLoadDeferred;
++
++static void aq_dispatch_sound_load(SWFAppContext* app_context, void* user)
++{
++	SoundLoadDeferred* d = (SoundLoadDeferred*) user;
++	if (d == NULL) return;
++	ASObject* sound_obj = d->sound;
++	if (sound_obj != NULL)
++	{
++		// Stale-completion guard (Ruffle loader.rs:1425-1432): a second
++		// loadSound() bumped the generation, so this completion is dropped.
++		if (soundIsExternal(sound_obj) &&
++		    soundExtNum(sound_obj, "__ext_loadid__", 14) == d->load_id)
++		{
++			int success = 0;
++			double duration_ms = 0.0;
++			if (d->content != NULL && d->content_length > 0)
++			{
++				ASObject* id3_obj = NULL;
++				duration_ms = soundParseMp3Meta(app_context, (const unsigned char*) d->content,
++				                                (int) d->content_length, &id3_obj);
++
++				ActionVar dv = {0}; dv.type = ACTION_STACK_VALUE_F64;
++				VAL(double, &dv.data.numeric_value) = duration_ms;
++				setProperty(app_context, sound_obj, "__duration__", 12, &dv);
++				ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_F64;
++				setProperty(app_context, sound_obj, "__position__", 12, &pv);
++				ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_BOOLEAN; lv.data.numeric_value = 1;
++				setProperty(app_context, sound_obj, "__loaded__", 10, &lv);
++				soundSetExtNum(app_context, sound_obj, "__bytes_total__", 15, (double) d->content_length);
++
++				if (id3_obj != NULL)
++				{
++					ActionVar id3_var = {0}; id3_var.type = ACTION_STACK_VALUE_OBJECT;
++					id3_var.data.numeric_value = (u64) (uintptr_t) id3_obj;
++					setPropertyWithFlags(app_context, sound_obj, "__id3__", 7, &id3_var, PROPERTY_FLAGS_DONTENUM);
++					// getDuration() reads 0 during onID3 (mirrors the sync path).
++					ActionVar zero = {0}; zero.type = ACTION_STACK_VALUE_F64;
++					setProperty(app_context, sound_obj, "__duration__", 12, &zero);
++					ActionVar ok = {0}; ok.type = ACTION_STACK_VALUE_BOOLEAN; ok.data.numeric_value = 1;
++					soundFireCallback(app_context, sound_obj, "onID3", 5, &ok, 1);
++					setProperty(app_context, sound_obj, "__duration__", 12, &dv);
++				}
++				success = 1;
++			}
++
++			soundSetExtFlag(app_context, sound_obj, "__ext_loading__", 15, 0);
++
++			ActionVar cb = {0}; cb.type = ACTION_STACK_VALUE_BOOLEAN;
++			cb.data.numeric_value = success ? 1 : 0;
++			soundFireCallback(app_context, sound_obj, "onLoad", 6, &cb, 1);
++
++			// Streaming sounds auto-play unless stop() ran before completion.
++			if (success && soundExtFlag(sound_obj, "__ext_auto__", 12))
++				soundStartExternalPlayback(sound_obj, duration_ms);
++		}
++		releaseObject(app_context, sound_obj);
++	}
++	free(d);
++}
++
+ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	(void)registers;
+@@ -2339,8 +2520,19 @@
+ 	// URL resolves to any bundled file (avm1/sound_load_props loads only the
+ 	// deliberately-missing "invalid.mp3" and still observes the reset).
+ 	double sound_load_id = 0.0;
+-	if (soundIsExternal(sound_obj))
++	if (soundIsExternal(sound_obj)) {
++		// A second loadSound() while the first is still in flight reports
++		// failure for the first, SYNCHRONOUSLY inside this call (Ruffle
++		// sound.rs:596-617). avm1/sound_load_multiple_remote pins the
++		// resulting `loading again / onLoad false / after loading again`.
++		if (soundExtFlag(sound_obj, "__ext_loading__", 15)) {
++			ActionVar cb_fail = {0};
++			cb_fail.type = ACTION_STACK_VALUE_BOOLEAN;
++			cb_fail.data.numeric_value = 0;
++			soundFireCallback(app_context, sound_obj, "onLoad", 6, &cb_fail, 1);
++		}
+ 		sound_load_id = soundExtNum(sound_obj, "__ext_loadid__", 14) + 1.0;
++	}
+ 	soundCreateExternal(app_context, sound_obj, is_streaming, sound_load_id);
+ 
+ 	// Snapshot pre-loadSound string own properties (Place 0 pattern)
+@@ -2364,6 +2556,34 @@
+ 		setProperty(app_context, sound_obj, "__duration__", 12, &zero_dur);
+ 	}
+ 
++	// Remote (scheme'd) URLs complete asynchronously: return now and fire
++	// onID3/onLoad/autoplay from an AQ_KIND_SCRIPT entry that drains after
++	// the current script. Local/relative URLs keep the existing blocking
++	// path — sound_load_start and sound_duration_position_props require
++	// start() to see a loaded sound in the very same script.
++	if (soundUrlIsRemote(url)) {
++		const char* remote_content = NULL;
++		u32 remote_len = 0;
++#ifdef HAS_DATA_FILES
++		DataFileEntry* remote_entry = soundResolveUrlData(url);
++		if (remote_entry != NULL) {
++			remote_content = remote_entry->content;
++			remote_len = (u32) remote_entry->content_length;
++		}
++#endif
++		SoundLoadDeferred* sd = (SoundLoadDeferred*) malloc(sizeof(SoundLoadDeferred));
++		if (sd != NULL) {
++			sd->sound = sound_obj;
++			sd->content = remote_content;
++			sd->content_length = remote_len;
++			sd->load_id = sound_load_id;
++			retainObject(sound_obj);
++			actionQueueCallbackEx(app_context, aq_dispatch_sound_load, (void*)sd,
++			                      AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/0, AQ_KIND_SCRIPT);
++		}
++		return ret;
++	}
++
+ 	// Look up in data registry
+ #ifdef HAS_DATA_FILES
+ 	// Strip path, match basename
+@@ -2380,23 +2600,9 @@
+ 		return ret;
+ 	}
+ 
+-	// Estimate MP3 duration from file size
+-	// Simple heuristic for CBR MP3: parse first frame header for bitrate
+-	const unsigned char* mp3 = (const unsigned char*)entry->content;
+-	int mp3_len = entry->content_length;
+-	double duration_ms = 0;
+-
+-	// Parse ID3v2 tags and skip header
+-	ASObject* id3_obj = parseID3v2Tags(app_context, mp3, mp3_len);
+-	int audio_offset = 0;
+-	if (mp3_len >= 10 && mp3[0] == 'I' && mp3[1] == 'D' && mp3[2] == '3')
+-	{
+-		int id3_size = ((mp3[6] & 0x7F) << 21) | ((mp3[7] & 0x7F) << 14) |
+-		               ((mp3[8] & 0x7F) << 7) | (mp3[9] & 0x7F);
+-		audio_offset = id3_size + 10;
+-		mp3 += audio_offset;
+-		mp3_len -= audio_offset;
+-	}
++	ASObject* id3_obj = NULL;
++	double duration_ms = soundParseMp3Meta(app_context, (const unsigned char*) entry->content,
++	                                       (int) entry->content_length, &id3_obj);
+ 
+ 	// Store parsed ID3 object (or clear previous)
+ 	if (id3_obj != NULL) {
+@@ -2408,37 +2614,6 @@
+ 		}
+ 	}
+ 
+-	if (mp3_len >= 4 && mp3[0] == 0xFF && (mp3[1] & 0xE0) == 0xE0)
+-	{
+-		// MPEG audio frame header
+-		int version = (mp3[1] >> 3) & 3; // 0=2.5, 2=2, 3=1
+-		int layer = (mp3[1] >> 1) & 3;   // 1=III, 2=II, 3=I
+-		int br_idx = (mp3[2] >> 4) & 0xF;
+-		int sr_idx = (mp3[2] >> 2) & 3;
+-
+-		// Bitrate table for MPEG1 Layer III
+-		static const int bitrates_v1_l3[] = {0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0};
+-		// Sample rate table for MPEG1
+-		static const int samplerates_v1[] = {44100, 48000, 32000, 0};
+-
+-		int bitrate = 0;
+-		if (version == 3 && layer == 1) // MPEG1 Layer III
+-			bitrate = bitrates_v1_l3[br_idx] * 1000;
+-		else if (version == 3 && layer == 2) { // MPEG1 Layer II
+-			static const int bitrates_v1_l2[] = {0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0};
+-			bitrate = bitrates_v1_l2[br_idx] * 1000;
+-		}
+-
+-		if (bitrate > 0)
+-			duration_ms = (double)mp3_len * 8.0 / (double)bitrate * 1000.0;
+-		else
+-			duration_ms = 1000.0; // fallback
+-	}
+-	else
+-	{
+-		duration_ms = 1000.0; // fallback for non-standard MP3
+-	}
+-
+ 	// Store duration on the Sound instance
+ 	ActionVar dur_val = {0};
+ 	dur_val.type = ACTION_STACK_VALUE_F64;
+@@ -2523,7 +2698,7 @@
+ 
+ 	// If streaming mode, auto-start playback (will_autoplay; cleared by stop()).
+ 	if (soundExtFlag(sound_obj, "__ext_auto__", 12))
+-		soundStartPlayback(sound_obj, duration_ms);
++		soundStartExternalPlayback(sound_obj, duration_ms);
+ #endif
+ 
+ 	return ret;
+@@ -2621,7 +2796,7 @@
+ 	if (duration_ms <= 0) return ret;
+ 
+ 	// Start playback simulation
+-	soundStartPlayback(sound_obj, duration_ms);
++	soundStartExternalPlayback(sound_obj, duration_ms);
+ 
+ 	return ret;
+ }
+@@ -76630,11 +76805,16 @@
+ }
+ 
+ // actionQueueGcForEach callback: deferred XML loads carry a heap
+-// XmlLoadDeferred whose doc is a borrowed ASObject* — mark it.
++// XmlLoadDeferred whose doc is a borrowed ASObject* — mark it. Deferred
++// remote Sound.loadSound completions ride the same queue with a
++// SoundLoadDeferred payload; its `sound` is retained by the queue entry, but
++// retained-by-C is invisible to the trace, so mark it explicitly.
+ static void gcMarkXmlLoadPayload(void* fn, void* user)
+ {
+ 	if (fn == (void*)aq_dispatch_xml_load && user != NULL)
+ 		swfGcMarkObject(((XmlLoadDeferred*)user)->doc);
++	else if (fn == (void*)aq_dispatch_sound_load && user != NULL)
++		swfGcMarkObject(((SoundLoadDeferred*)user)->sound);
+ }
+ 
+ void actionGcMarkRoots(void)
