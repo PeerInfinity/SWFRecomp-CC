@@ -5209,6 +5209,12 @@ namespace SWFRecomp
 				// PlaceObject, which must show up as SCRIPT queued BEFORE
 				// nested sprite's LOAD.
 				size_t sprite_frame_i = 0;
+				// ShowFrame records in this DefineSprite body — Ruffle's
+				// frames_loaded once floored at 1 (preload() treats a
+				// ShowFrame-less clip as having one frame). Distinct from
+				// sprite_frame_i, which counts generated frame FUNCTIONS and
+				// is one larger when tags trail the last ShowFrame.
+				size_t sprite_show_frames = 0;
 				std::unordered_map<std::string, size_t> sprite_labels;
 				bool sprite_another_frame = false;
 
@@ -5259,6 +5265,7 @@ namespace SWFRecomp
 						{
 							sprite_definitions << "}" << endl << endl;
 							sprite_another_frame = true;
+							sprite_show_frames += 1;
 							break;
 						}
 
@@ -6329,6 +6336,30 @@ namespace SWFRecomp
 				{
 					tag_init << endl << "\t" << "tagSetSpriteNoEndTag(app_context, "
 									 << to_string(sprite_id) << ");";
+				}
+
+				// The DefineSprite HEADER frameCount is not the playback frame
+				// count. Ruffle drives the timeline off `frames_loaded`
+				// (movie_clip.rs:3314) = the body's ShowFrame count floored at
+				// 1, and only reports the header verbatim through
+				// _totalframes. The two disagree in real corpus SWFs both ways
+				// (declared 3 with one ShowFrame; declared 1 with two), and
+				// when declared > the number of frame functions we generated,
+				// advance_sprite_frames used to index sprite_<id>_frame_funcs
+				// past its end. Emit the two real numbers whenever the header
+				// does not already agree with the body, so well-formed SWFs
+				// keep byte-identical generated C.
+				{
+					size_t sprite_loaded_frames =
+							(sprite_show_frames > 0) ? sprite_show_frames : 1;
+					if (sprite_frame_i != (size_t) sprite_frame_count_declared
+					    || sprite_loaded_frames != sprite_frame_i)
+					{
+						tag_init << endl << "\t" << "tagSetSpriteFrameCounts(app_context, "
+										 << to_string(sprite_id) << ", "
+										 << to_string(sprite_frame_i) << ", "
+										 << to_string(sprite_loaded_frames) << ");";
+					}
 				}
 
 				// Ensure cur_pos is past the DefineSprite content for the main loop

@@ -187,6 +187,11 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 // Character.sprite_has_end_tag). Well-formed SWFs never emit this call, so
 // their generated output is unchanged.
 void tagSetSpriteNoEndTag(SWFAppContext* app_context, size_t char_id);
+// Split the DefineSprite header frameCount (kept for _totalframes) from the
+// body's real frame-function count and Ruffle's frames_loaded. Emitted only
+// for sprites where the three numbers are not all equal.
+void tagSetSpriteFrameCounts(SWFAppContext* app_context, size_t char_id,
+                             size_t func_count, size_t loaded_frames);
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count);
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id);
 void finalizeBitmaps();

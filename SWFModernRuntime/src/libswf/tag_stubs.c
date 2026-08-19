@@ -747,8 +747,10 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	}
 #endif // CI modes only; browser-WASM renders non-root attaches via child_mc_cache
 
-	new_mc->totalframes = (int)frame_count;
-	new_mc->framesloaded = (int)frame_count;
+	// AS-visible counters read the DECLARED DefineSprite header field, not
+	// the playback frame-function count (`frame_count` above).
+	new_mc->totalframes = (int)dictionary[char_id].sprite_declared_frames;
+	new_mc->framesloaded = (int)dictionary[char_id].sprite_declared_frames;
 	new_mc->currentframe = 1;
 
 	// PROGRESS #15: flag a multi-frame attached clip for playhead auto-advance.

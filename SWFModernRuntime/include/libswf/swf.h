@@ -124,6 +124,22 @@ typedef struct Character
 			// frames." Well-formed authoring tools always emit the End
 			// record, so this is 1 for every real-world sprite.
 			u8 sprite_has_end_tag;
+			// Ruffle's `frames_loaded` (movie_clip.rs:3314 —
+			// `cur_preload_frame - 1`): the number of ShowFrame records in
+			// the DefineSprite body, floored at 1 because `preload()`
+			// treats the end of a ShowFrame-less clip as one ShowFrame.
+			// This is what decides whether the clip loops; the DefineSprite
+			// HEADER count decides nothing about playback.
+			// `sprite_frame_count` above is the number of frame FUNCTIONS
+			// the recompiler generated, which is `sprite_loaded_frames + 1`
+			// when tags trail the last ShowFrame — Ruffle runs those exactly
+			// once through run_frame_internal's NextFrame::Same fall-through.
+			size_t sprite_loaded_frames;
+			// The DefineSprite header's frameCount field, verbatim. Only the
+			// AS-visible _totalframes / _framesloaded read this; it may
+			// disagree with both counts above (Flash reports it unchanged —
+			// see avm2_display.c total_frames() for the AVM2 twin).
+			size_t sprite_declared_frames;
 		};
 		// DefineButton
 		struct

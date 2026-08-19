@@ -600,9 +600,12 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			// Set totalframes/framesloaded from the sprite definition BEFORE
 			// clip actions fire (onLoad reads _totalframes/_framesloaded).
 			if (child_mc) {
-				child_mc->totalframes = (int)ch->sprite_frame_count;
-				child_mc->framesloaded = (int)ch->sprite_frame_count;
-				if (ch->sprite_frame_count == 0)
+				// AS-visible counters read the DECLARED header field, not
+				// the playback count — Flash reports the header verbatim
+				// (see avm2_display.c::total_frames for the AVM2 twin).
+				child_mc->totalframes = (int)ch->sprite_declared_frames;
+				child_mc->framesloaded = (int)ch->sprite_declared_frames;
+				if (ch->sprite_declared_frames == 0)
 					child_mc->currentframe = 0;
 			}
 
@@ -1653,10 +1656,43 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// for the normal advance + self-loop cases.
 		if (ch->sprite_frame_count > 0 && obj->sprite_current_frame == frame)
 		{
-			if (frame + 1 >= ch->sprite_frame_count && !ch->sprite_has_end_tag)
+			// Ruffle determine_next_frame (movie_clip.rs:1340) answered in
+			// our 0-based frame-function indices. `loaded` is frames_loaded
+			// (the ShowFrame count, floored at 1); `sprite_frame_count` is
+			// how many frame functions exist, which is loaded + 1 when tags
+			// trail the last ShowFrame.
+			//
+			//   current < frames_loaded          -> Next
+			//   frames_loaded <= 1 || !end_tag   -> Same: stop(), but
+			//        run_frame_internal still decodes the tags after the
+			//        last ShowFrame — exactly once. Those are our extra
+			//        frame function at index `loaded`.
+			//   otherwise                        -> First (loop to 0)
+			size_t loaded = ch->sprite_loaded_frames;
+			if (loaded == 0) loaded = ch->sprite_frame_count;
+			if (frame >= loaded)
+			{
+				// We just ran the trailing partial frame. Ruffle stopped the
+				// clip on the tick that reached it; it never runs again.
 				ng_sprite_park_no_end_tag(obj);
+			}
+			else if (frame + 1 < loaded)
+			{
+				obj->sprite_current_frame = frame + 1;
+			}
+			else if (loaded <= 1 || !ch->sprite_has_end_tag)
+			{
+				if (frame + 1 < ch->sprite_frame_count)
+					obj->sprite_current_frame = frame + 1;   // trailing partial
+				else if (!ch->sprite_has_end_tag)
+					ng_sprite_park_no_end_tag(obj);
+				else
+					obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
+			}
 			else
-				obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
+			{
+				obj->sprite_current_frame = 0;
+			}
 		}
 	}
 }
@@ -11431,6 +11467,24 @@ void tagSetSpriteNoEndTag(SWFAppContext* app_context, size_t char_id)
 		dictionary[char_id].sprite_has_end_tag = 0;
 }
 
+// Recompiler-emitted correction for a DefineSprite whose header frameCount
+// disagrees with its body. Emitted immediately after tagDefineSprite (which
+// carries the header field verbatim), so the header value survives in
+// sprite_declared_frames for _totalframes while playback switches to the two
+// numbers that actually describe the body:
+//   func_count    - how many frame functions the recompiler generated
+//                   (= loaded_frames, +1 when tags trail the last ShowFrame)
+//   loaded_frames - Ruffle's frames_loaded: ShowFrame count, floored at 1
+void tagSetSpriteFrameCounts(SWFAppContext* app_context, size_t char_id,
+                             size_t func_count, size_t loaded_frames)
+{
+	(void)app_context;
+	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+	if (dictionary[char_id].type != CHAR_TYPE_SPRITE) return;
+	dictionary[char_id].sprite_frame_count = func_count;
+	dictionary[char_id].sprite_loaded_frames = loaded_frames;
+}
+
 void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count, size_t byte_size)
 {
 	(void)app_context;
@@ -11439,6 +11493,12 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 	dictionary[char_id].type = CHAR_TYPE_SPRITE;
 	dictionary[char_id].sprite_frame_funcs = funcs;
 	dictionary[char_id].sprite_frame_count = frame_count;
+	// Defaults for the well-formed case (header count == ShowFrame count ==
+	// generated frame-function count). tagSetSpriteFrameCounts, emitted right
+	// after this call, overrides the first two whenever the DefineSprite body
+	// disagrees with its header.
+	dictionary[char_id].sprite_loaded_frames = frame_count;
+	dictionary[char_id].sprite_declared_frames = frame_count;
 	dictionary[char_id].sprite_byte_size = byte_size;
 	// Must be written unconditionally: Character is a union, so this byte may
 	// hold a stale value from a different character type. Default 1 (loops);

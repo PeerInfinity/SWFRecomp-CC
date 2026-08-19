@@ -1,0 +1,220 @@
+diff --git a/SWFModernRuntime/include/libswf/swf.h b/SWFModernRuntime/include/libswf/swf.h
+index 4351f85ea..274239fd8 100644
+--- a/SWFModernRuntime/include/libswf/swf.h
++++ b/SWFModernRuntime/include/libswf/swf.h
+@@ -124,6 +124,22 @@ typedef struct Character
+ 			// frames." Well-formed authoring tools always emit the End
+ 			// record, so this is 1 for every real-world sprite.
+ 			u8 sprite_has_end_tag;
++			// Ruffle's `frames_loaded` (movie_clip.rs:3314 —
++			// `cur_preload_frame - 1`): the number of ShowFrame records in
++			// the DefineSprite body, floored at 1 because `preload()`
++			// treats the end of a ShowFrame-less clip as one ShowFrame.
++			// This is what decides whether the clip loops; the DefineSprite
++			// HEADER count decides nothing about playback.
++			// `sprite_frame_count` above is the number of frame FUNCTIONS
++			// the recompiler generated, which is `sprite_loaded_frames + 1`
++			// when tags trail the last ShowFrame — Ruffle runs those exactly
++			// once through run_frame_internal's NextFrame::Same fall-through.
++			size_t sprite_loaded_frames;
++			// The DefineSprite header's frameCount field, verbatim. Only the
++			// AS-visible _totalframes / _framesloaded read this; it may
++			// disagree with both counts above (Flash reports it unchanged —
++			// see avm2_display.c total_frames() for the AVM2 twin).
++			size_t sprite_declared_frames;
+ 		};
+ 		// DefineButton
+ 		struct
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index db849a683..215452357 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -185,6 +185,11 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
+ // Character.sprite_has_end_tag). Well-formed SWFs never emit this call, so
+ // their generated output is unchanged.
+ void tagSetSpriteNoEndTag(SWFAppContext* app_context, size_t char_id);
++// Split the DefineSprite header frameCount (kept for _totalframes) from the
++// body's real frame-function count and Ruffle's frames_loaded. Emitted only
++// for sprites where the three numbers are not all equal.
++void tagSetSpriteFrameCounts(SWFAppContext* app_context, size_t char_id,
++                             size_t func_count, size_t loaded_frames);
+ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count);
+ void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id);
+ void finalizeBitmaps();
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index cf7763e6a..3b0ac608d 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -600,9 +600,12 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip*
+ 			// Set totalframes/framesloaded from the sprite definition BEFORE
+ 			// clip actions fire (onLoad reads _totalframes/_framesloaded).
+ 			if (child_mc) {
+-				child_mc->totalframes = (int)ch->sprite_frame_count;
+-				child_mc->framesloaded = (int)ch->sprite_frame_count;
+-				if (ch->sprite_frame_count == 0)
++				// AS-visible counters read the DECLARED header field, not
++				// the playback count — Flash reports the header verbatim
++				// (see avm2_display.c::total_frames for the AVM2 twin).
++				child_mc->totalframes = (int)ch->sprite_declared_frames;
++				child_mc->framesloaded = (int)ch->sprite_declared_frames;
++				if (ch->sprite_declared_frames == 0)
+ 					child_mc->currentframe = 0;
+ 			}
+ 
+@@ -1653,10 +1656,43 @@ void advance_sprite_frames(SWFAppContext* app_context)
+ 		// for the normal advance + self-loop cases.
+ 		if (ch->sprite_frame_count > 0 && obj->sprite_current_frame == frame)
+ 		{
+-			if (frame + 1 >= ch->sprite_frame_count && !ch->sprite_has_end_tag)
++			// Ruffle determine_next_frame (movie_clip.rs:1340) answered in
++			// our 0-based frame-function indices. `loaded` is frames_loaded
++			// (the ShowFrame count, floored at 1); `sprite_frame_count` is
++			// how many frame functions exist, which is loaded + 1 when tags
++			// trail the last ShowFrame.
++			//
++			//   current < frames_loaded          -> Next
++			//   frames_loaded <= 1 || !end_tag   -> Same: stop(), but
++			//        run_frame_internal still decodes the tags after the
++			//        last ShowFrame — exactly once. Those are our extra
++			//        frame function at index `loaded`.
++			//   otherwise                        -> First (loop to 0)
++			size_t loaded = ch->sprite_loaded_frames;
++			if (loaded == 0) loaded = ch->sprite_frame_count;
++			if (frame >= loaded)
++			{
++				// We just ran the trailing partial frame. Ruffle stopped the
++				// clip on the tick that reached it; it never runs again.
+ 				ng_sprite_park_no_end_tag(obj);
++			}
++			else if (frame + 1 < loaded)
++			{
++				obj->sprite_current_frame = frame + 1;
++			}
++			else if (loaded <= 1 || !ch->sprite_has_end_tag)
++			{
++				if (frame + 1 < ch->sprite_frame_count)
++					obj->sprite_current_frame = frame + 1;   // trailing partial
++				else if (!ch->sprite_has_end_tag)
++					ng_sprite_park_no_end_tag(obj);
++				else
++					obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
++			}
+ 			else
+-				obj->sprite_current_frame = (frame + 1) % ch->sprite_frame_count;
++			{
++				obj->sprite_current_frame = 0;
++			}
+ 		}
+ 	}
+ }
+@@ -11259,6 +11295,24 @@ void tagSetSpriteNoEndTag(SWFAppContext* app_context, size_t char_id)
+ 		dictionary[char_id].sprite_has_end_tag = 0;
+ }
+ 
++// Recompiler-emitted correction for a DefineSprite whose header frameCount
++// disagrees with its body. Emitted immediately after tagDefineSprite (which
++// carries the header field verbatim), so the header value survives in
++// sprite_declared_frames for _totalframes while playback switches to the two
++// numbers that actually describe the body:
++//   func_count    - how many frame functions the recompiler generated
++//                   (= loaded_frames, +1 when tags trail the last ShowFrame)
++//   loaded_frames - Ruffle's frames_loaded: ShowFrame count, floored at 1
++void tagSetSpriteFrameCounts(SWFAppContext* app_context, size_t char_id,
++                             size_t func_count, size_t loaded_frames)
++{
++	(void)app_context;
++	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
++	if (dictionary[char_id].type != CHAR_TYPE_SPRITE) return;
++	dictionary[char_id].sprite_frame_count = func_count;
++	dictionary[char_id].sprite_loaded_frames = loaded_frames;
++}
++
+ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* funcs, size_t frame_count, size_t byte_size)
+ {
+ 	(void)app_context;
+@@ -11267,6 +11321,12 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
+ 	dictionary[char_id].type = CHAR_TYPE_SPRITE;
+ 	dictionary[char_id].sprite_frame_funcs = funcs;
+ 	dictionary[char_id].sprite_frame_count = frame_count;
++	// Defaults for the well-formed case (header count == ShowFrame count ==
++	// generated frame-function count). tagSetSpriteFrameCounts, emitted right
++	// after this call, overrides the first two whenever the DefineSprite body
++	// disagrees with its header.
++	dictionary[char_id].sprite_loaded_frames = frame_count;
++	dictionary[char_id].sprite_declared_frames = frame_count;
+ 	dictionary[char_id].sprite_byte_size = byte_size;
+ 	// Must be written unconditionally: Character is a union, so this byte may
+ 	// hold a stale value from a different character type. Default 1 (loops);
+diff --git a/SWFModernRuntime/src/libswf/tag_stubs.c b/SWFModernRuntime/src/libswf/tag_stubs.c
+index fd0ee47fe..f8c767786 100644
+--- a/SWFModernRuntime/src/libswf/tag_stubs.c
++++ b/SWFModernRuntime/src/libswf/tag_stubs.c
+@@ -747,8 +747,10 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
+ 	}
+ #endif // CI modes only; browser-WASM renders non-root attaches via child_mc_cache
+ 
+-	new_mc->totalframes = (int)frame_count;
+-	new_mc->framesloaded = (int)frame_count;
++	// AS-visible counters read the DECLARED DefineSprite header field, not
++	// the playback frame-function count (`frame_count` above).
++	new_mc->totalframes = (int)dictionary[char_id].sprite_declared_frames;
++	new_mc->framesloaded = (int)dictionary[char_id].sprite_declared_frames;
+ 	new_mc->currentframe = 1;
+ 
+ 	// PROGRESS #15: flag a multi-frame attached clip for playhead auto-advance.
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 904c5171b..fa20d1a9b 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -5193,6 +5193,12 @@ namespace SWFRecomp
+ 				// PlaceObject, which must show up as SCRIPT queued BEFORE
+ 				// nested sprite's LOAD.
+ 				size_t sprite_frame_i = 0;
++				// ShowFrame records in this DefineSprite body — Ruffle's
++				// frames_loaded once floored at 1 (preload() treats a
++				// ShowFrame-less clip as having one frame). Distinct from
++				// sprite_frame_i, which counts generated frame FUNCTIONS and
++				// is one larger when tags trail the last ShowFrame.
++				size_t sprite_show_frames = 0;
+ 				std::unordered_map<std::string, size_t> sprite_labels;
+ 				bool sprite_another_frame = false;
+ 
+@@ -5243,6 +5249,7 @@ namespace SWFRecomp
+ 						{
+ 							sprite_definitions << "}" << endl << endl;
+ 							sprite_another_frame = true;
++							sprite_show_frames += 1;
+ 							break;
+ 						}
+ 
+@@ -6302,6 +6309,30 @@ namespace SWFRecomp
+ 									 << to_string(sprite_id) << ");";
+ 				}
+ 
++				// The DefineSprite HEADER frameCount is not the playback frame
++				// count. Ruffle drives the timeline off `frames_loaded`
++				// (movie_clip.rs:3314) = the body's ShowFrame count floored at
++				// 1, and only reports the header verbatim through
++				// _totalframes. The two disagree in real corpus SWFs both ways
++				// (declared 3 with one ShowFrame; declared 1 with two), and
++				// when declared > the number of frame functions we generated,
++				// advance_sprite_frames used to index sprite_<id>_frame_funcs
++				// past its end. Emit the two real numbers whenever the header
++				// does not already agree with the body, so well-formed SWFs
++				// keep byte-identical generated C.
++				{
++					size_t sprite_loaded_frames =
++							(sprite_show_frames > 0) ? sprite_show_frames : 1;
++					if (sprite_frame_i != (size_t) sprite_frame_count_declared
++					    || sprite_loaded_frames != sprite_frame_i)
++					{
++						tag_init << endl << "\t" << "tagSetSpriteFrameCounts(app_context, "
++										 << to_string(sprite_id) << ", "
++										 << to_string(sprite_frame_i) << ", "
++										 << to_string(sprite_loaded_frames) << ");";
++					}
++				}
++
+ 				// Ensure cur_pos is past the DefineSprite content for the main loop
+ 				cur_pos = sprite_content_end;
+ 

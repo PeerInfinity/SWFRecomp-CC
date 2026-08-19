@@ -1,0 +1,31 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_main.c b/SWFModernRuntime/src/avm2/avm2_main.c
+index 83866abb1..5f8b1fd12 100644
+--- a/SWFModernRuntime/src/avm2/avm2_main.c
++++ b/SWFModernRuntime/src/avm2/avm2_main.c
+@@ -879,6 +879,26 @@ void runSWF_avm2(SWFAppContext* app_context)
+ 			worst_play_gross = gross;
+ 			worst_play_tick  = tick;
+ 		}
++
++		// fscommand("quit") ends the movie — but only at a tick boundary.
++		// Ruffle's test runner drains the FsCommand channel AFTER running the
++		// tick and answers FsCommand::Quit with `remaining_iterations = 0`
++		// (tests/framework/src/runner.rs), i.e. "finish this tick, then stop",
++		// never "stop mid-tick": button_nested_frame_simple quits from
++		// MyContainer's constructor and its expected output still contains the
++		// frameConstructed + two exitFrame lines that follow in the same tick.
++		//
++		// `g_force_quit` is raised ONLY by the fscommand("quit") arm of
++		// avm2_globals.c::global_fscommand. The `quit_swf` it sets alongside is
++		// deliberately NOT read here: the recompiler also emits `quit_swf = 1`
++		// as an ordinary end-of-movie marker, which must not shorten the loop.
++		// Same split as the AVM1 loops (libswf/swf.c:524, swf_core.c:966).
++		// Defined by graphics_stubs.c in --mode=graphics and by swf_core.c in
++		// no-graphics, so this gate is identical in both build arms.
++		{
++			extern int g_force_quit;
++			if (g_force_quit) break;
++		}
+ 	}
+ 
+ #ifdef OFFSCREEN_RENDER
