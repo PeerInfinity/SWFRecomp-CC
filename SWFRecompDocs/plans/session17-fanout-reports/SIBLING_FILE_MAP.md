@@ -16,3 +16,4 @@
 - w2-matrix3d-classes: `SWFModernRuntime/src/avm2/avm2_stage3d.c` (Matrix3D f32 rawData / length rule / determinant), class registration for NativeMenuItem/Menu, AutomationAction, FullScreenEvent (`avm2_globals.c`)
 - w2-all-classes-events: `tools/descriptor/*` generator + `avm2_globals.c` generated block (flash.events)
 - w2-tooling-hygiene: 4 `ignored_tests.txt` + disposition docs, `render_canary_tests.txt`, new `ruffle-tests/recompiler_ab_sweep.sh` — no runtime code
+- (follow-up wave, base = master 6d2b64fa2) w2-gfx-cab-mask-stencil: `render_webgpu.c` stencil path for AVM2 `mask` maskers (board P3); w2-gfx-edittext-bg: EditText background/border emission (`tag.c`/`ng_shared.c`/edittext render); w2-gfx-acid-shapes-aabb: AVM2 runtime Graphics AABB includes stroke width (`avm2_display.c` gfx bounds helper)
