@@ -24491,7 +24491,14 @@ static void avm1UnderAvm2LeaveChild(Avm1ChildSwap* saved)
 
 // One AVM1 tick, driven from the AVM2 frame loop. No-op until a child boots,
 // so an AVM2 movie with no AVM1 content pays a single global test per frame.
-void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context)
+//
+// `frame_duration_ms` is the AVM2 frame loop's own frame budget
+// (1000 / stage frame rate — the same value avm2_display.c::run_due_timers
+// advances the AVM2 Timer clock by). Session 15 left AVM1 timers out of this
+// tick for want of "an honest value" for that budget; the AVM2 loop has had
+// one all along, so the two VMs' timer clocks now advance together.
+void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
+                                     double frame_duration_ms)
 {
 	if (!g_avm1_under_avm2_ready) return;
 	MovieClip* saved_ctx = g_current_context;
@@ -24512,9 +24519,6 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context)
 	}
 	// A child's own loadMovie/loadMovieNum and its deferred unloads drain
 	// here — the AVM1 half of the tick the parent's loop otherwise never runs.
-	// (Timers deliberately stay out: nothing in the dual-VM cluster needs
-	// AVM1 setInterval, and processTimers wants a frame budget this loop has
-	// no honest value for.)
 	extern int quit_swf;
 	int saved_quit = quit_swf;
 	quit_swf = 0;
@@ -24523,17 +24527,106 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context)
 	actionFirePendingUnloads(app_context);
 	quit_swf = saved_quit;
 	actionSetCurrentContext(saved_ctx);
-	// The AVM1 LocalConnection queue drains here too — an AVM1 child under an
-	// AVM2 Loader has no other end-of-frame hook, so a send() it issued (to
-	// another AVM1 movie or, through the bridge below, to an AVM2 listener)
-	// would otherwise sit in the queue forever. The callee runs in the child's
-	// context, hence the swap.
+	// The end-of-frame AVM1 phases an AVM1 child under an AVM2 Loader has no
+	// other hook for. All of them run AVM1 code, so they run in the child's
+	// context (hence the swap), and in swf_core.c's order: pending onLoads,
+	// timers, the LocalConnection queue, then the MovieClipLoader drain.
+	//
+	// * Timers — a child's setInterval/setTimeout callback (avm2/
+	//   mouse_pick_avm1_root arms `clip.onRelease` from a setInterval poll and
+	//   from nowhere else). See the frame-budget note on this function.
+	// * LocalConnection — a send() it issued (to another AVM1 movie or,
+	//   through the bridge below, to an AVM2 listener) would otherwise sit in
+	//   the queue forever.
+	// * MovieClipLoader — loadClip() queues into g_pending_mcl_loads_this_tick
+	//   and only actionFirePendingLoadInits fires onLoadStart/Progress/
+	//   Complete/Init and links the child movie in, so without this drain an
+	//   MCL load under an AVM2 parent never completes at all. Bounded like
+	//   swf_core.c's (a chain of loadClips can re-queue).
 	{
 		Avm1ChildSwap swap;
 		avm1UnderAvm2EnterChild(app_context, &swap);
+		actionFlushPendingOnLoads(app_context);
+		processTimers(app_context, frame_duration_ms);
 		processLocalConnectionMessages(app_context);
+		{
+			extern int g_pending_mcl_load_count_this_tick;
+			int mcl_guard = 0;
+			while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
+				actionFirePendingLoadInits(app_context);
+		}
+		actionFlushPendingOnLoads(app_context);
 		avm1UnderAvm2LeaveChild(&swap);
 	}
+}
+
+// Cross-VM pick outcomes, mirrored (same values) next to avm2_display.c's
+// extern declaration of the function below — this seam is header-free, like
+// the boot/tick/mouse hooks.
+#define AVM1_CHILD_PICK_MISS    0
+#define AVM1_CHILD_PICK_CONTENT 1
+#define AVM1_CHILD_PICK_BUTTON  2
+
+// Cross-VM hit test: does AVM1 content own the stage point (x, y)?
+//
+// Ruffle keeps ONE display tree, so its AVM2 pick walk descends into an AVM1
+// child by calling mouse_pick_avm1 on it (movie_clip.rs::mouse_pick_avm2 and
+// loader_display.rs::mouse_pick_avm2 both do). Our AVM1 child's display list
+// lives entirely on this side of the seam, so the AVM2 walk asks instead.
+//
+// Returns AVM1_CHILD_PICK_{MISS,CONTENT,BUTTON}:
+//   BUTTON  — a button-mode AVM1 clip (Ruffle's is_button_mode: any of the
+//             BUTTON_EVENT_METHODS) covers the point. The AVM1 object is the
+//             hit target, so the AVM2 side must dispatch NOTHING for the
+//             event, not even a Stage-targeted bubble.
+//   CONTENT — AVM1 content covers the point but nothing in it is interactive.
+//             Ruffle's LoaderDisplay absorbs that into the Loader itself.
+//   MISS    — the point is outside the AVM1 child entirely.
+//
+// Hit areas come from the same pixel AABBs actionDispatchMCPress/Release
+// test, so a click the AVM2 side attributes to AVM1 is exactly a click the
+// AVM1 dispatchers will act on.
+int actionAvm1ChildMousePick(float x, float y)
+{
+	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0)
+		return AVM1_CHILD_PICK_MISS;
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	extern int actionMCHasButtonHandlers(MovieClip*);
+	extern int actionMCMouseInsidePick(MovieClip*, float, float);
+
+	int found = AVM1_CHILD_PICK_MISS;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || !mc->visible) continue;
+		if (mc->unloaded || mc->avm1_removed || mc->pending_removal) continue;
+		if (mc->depth == INT_MIN) continue;
+		// Only clips that live under a booted AVM1 child count — the AVM2 root
+		// owns _level0, and nothing there is AVM1 content.
+		int owned = 0;
+		for (MovieClip* p = mc; p != NULL && !owned; p = p->parent)
+			for (int j = 0; j < g_avm1u2_count; j++)
+				if (g_avm1u2[j].mc == p) { owned = 1; break; }
+		if (!owned) continue;
+		if (!actionMCMouseInsidePick(mc, x, y)) continue;
+		found = AVM1_CHILD_PICK_CONTENT;
+		// Text fields take focus rather than onPress/onRelease, exactly as in
+		// actionDispatchMCPress.
+		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
+		if (actionMCHasButtonHandlers(mc)) return AVM1_CHILD_PICK_BUTTON;
+	}
+	// Timeline content (shapes/sprites placed by the child's own tags) never
+	// enters child_mc_cache, so ask the level roots for their display-list
+	// bounds as well before reporting a miss.
+	if (found == AVM1_CHILD_PICK_MISS) {
+		for (int j = 0; j < g_avm1u2_count; j++) {
+			MovieClip* r = g_avm1u2[j].mc;
+			if (r == NULL || r->depth == INT_MIN || r->unloaded) continue;
+			if (actionMCMouseInsidePick(r, x, y))
+				return AVM1_CHILD_PICK_CONTENT;
+		}
+	}
+	return found;
 }
 
 // Mouse event kinds the AVM2 input pump forwards into AVM1 (mirrored, with the
@@ -36037,6 +36130,14 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 } else {
                     loads[i].target->loaded_image_width = 0;
                     loads[i].target->loaded_image_height = 0;
+                    // A completed SWF load makes the target report the loaded
+                    // movie's size, exactly as the loadMovie drain does
+                    // (actionFirePendingDirectLoads). Without it getBytesTotal
+                    // stays 0 on an MCL target forever, and the standard
+                    // "poll until getBytesLoaded() == getBytesTotal() &&
+                    // getBytesTotal() > 4" idiom never completes
+                    // (avm2/mouse_pick_avm1_root's avm1.swf is exactly that).
+                    loads[i].target->byte_size = loads[i].entry->file_size;
                 }
                 // Clear _name on root replacement (Flash clears it before callbacks fire)
                 extern MovieClip root_movieclip;

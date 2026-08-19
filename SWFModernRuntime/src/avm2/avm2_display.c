@@ -5633,7 +5633,8 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 typedef struct MovieClip MovieClip;
 extern MovieClip* actionBootAvm1ChildUnderAvm2(SWFAppContext* app_context,
                                                MovieEntry* entry, int level);
-extern void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context);
+extern void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
+                                            double frame_duration_ms);
 
 static int g_avm1_child_levels = 0;
 
@@ -5655,7 +5656,14 @@ static void avm1_child_boot(Avm2Context* ctx, Avm2Object* wrapper,
 static void avm1_child_tick(Avm2Context* ctx)
 {
 	if (g_avm1_child_levels == 0 || ctx == NULL || ctx->app == NULL) return;
-	actionTickAvm1ChildrenUnderAvm2(ctx->app);
+	// The AVM1 half of the tick gets THIS loop's frame budget, so AVM1
+	// setInterval/setTimeout advances on the same clock as AVM2's Timer
+	// (run_due_timers derives dt_us from the very same expression). The value
+	// comes from the generated stage frame rate, so every build arm
+	// (NO_GRAPHICS, OFFSCREEN_RENDER, wasm) sees the same number.
+	double fps = (double) (int16_t) avm2_generated_frame_rate / 256.0;
+	if (fps <= 0) fps = 24.0;
+	actionTickAvm1ChildrenUnderAvm2(ctx->app, 1000.0 / fps);
 }
 
 // Forward a stage mouse event into the AVM1 substrate, so that an AVM1 child
@@ -12667,6 +12675,41 @@ static int pk_is_movie_root(Avm2Context* ctx, Avm2Object* o)
 	return e != NULL && e->is_root && !e->is_stage;
 }
 
+// --- Cross-VM pick: AVM1 content inside an AVM2 display list ---------------
+//
+// Ruffle keeps one display tree, so its AVM2 walk descends into an AVM1 child
+// directly (movie_clip.rs::mouse_pick_avm2 / loader_display.rs::mouse_pick_avm2
+// call mouse_pick_avm1 on it and wrap the result in Avm2MousePick::Hit). Our
+// AVM1 child's display list lives on the AVM1 side, so the walk asks across
+// the seam instead. Values mirror action.c's AVM1_CHILD_PICK_* (header-free
+// seam, like the boot/tick/mouse hooks).
+#define AVM1_CHILD_PICK_MISS    0
+#define AVM1_CHILD_PICK_CONTENT 1
+#define AVM1_CHILD_PICK_BUTTON  2
+extern int actionAvm1ChildMousePick(float x, float y);
+
+// The pick target that stands for "an AVM1 display object". It is deliberately
+// NOT a usable Avm2Object: an AVM1 hit means the AVM2 side dispatches nothing
+// at all (Ruffle's event_dispatch_to_avm2 needs an object2, which AVM1 content
+// never has — so not even the Stage sees a bubbled click), and carrying it as
+// a distinct target is what keeps combine_with_parent's mouseChildren /
+// mouseEnabled rules working above the AVM1 subtree. cls == NULL, so every
+// avm2_display_ext_of() on it answers NULL; the two dispatch seams that would
+// otherwise still act on it (dispatch_mouse, update_focus_on_press) test for
+// it explicitly.
+static Avm2Object g_avm1_pick_sentinel;
+#define PICK_IS_AVM1(o) ((o) == &g_avm1_pick_sentinel)
+
+// The AVM1Movie wrapper a Loader exposes for a loaded AVM1 movie — the seam
+// object the AVM1 display list hangs behind (loader_deliver mints it as the
+// Loader's child at index 0).
+static int pk_is_avm1movie(Avm2Object* child)
+{
+	return g_avm1_child_levels != 0 && child != NULL && child->cls != NULL
+	       && g_avm1movie_class != NULL
+	       && class_is_a(child->cls, g_avm1movie_class);
+}
+
 // Ruffle Avm2MousePick::combine_with_parent.
 static Pk pk_combine(Avm2Context* ctx, Pk p, Avm2Object* parent)
 {
@@ -12774,7 +12817,34 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 			if (cext == NULL || cext->clip_depth > 0 || cext->maskee != NULL)
 				continue;
 			Pk res;
-			if (ci)
+			if (pk_is_avm1movie(child))
+			{
+				// Ruffle loader_display.rs::mouse_pick_avm2: the AVM1 walk
+				// answers first, and only if it finds nothing interactive does
+				// the container absorb the hit as its own (`child
+				// .hit_test_shape() -> Hit(self)`).
+				int a = actionAvm1ChildMousePick((float) (px / 20.0),
+				                                 (float) (py / 20.0));
+				if (a == AVM1_CHILD_PICK_BUTTON)
+				{
+					res = pk_make(PK_HIT, &g_avm1_pick_sentinel);
+				}
+				else
+				{
+					// The wrapper's own bounds stay in the OR: they are the
+					// loaded movie's stage rect, which is what has been
+					// answering for AVM1 content so far, and the AVM1 walk
+					// only ADDS the clips (MCL-loaded content, drawing-API
+					// children) that rect can miss.
+					int in = a == AVM1_CHILD_PICK_CONTENT
+					         || (cext->visible
+					             && point_in_self(ctx, child, px, py));
+					res = in ? (ext->mouse_enabled ? pk_make(PK_HIT, obj)
+					                               : pk_make(PK_PROP, NULL))
+					         : pk_make(PK_MISS, NULL);
+				}
+			}
+			else if (ci)
 			{
 				res = mouse_pick(ctx, child, px, py);
 			}
@@ -13098,6 +13168,13 @@ static int dispatch_mouse(Avm2Context* ctx, Avm2Object* target,
                           int bubbles, int button)
 {
 	if (target == NULL) return 0;
+	// A hit on AVM1 content: Ruffle's event_dispatch_to_avm2 needs the target's
+	// object2 and an AVM1 display object has none, so NO AVM2 MouseEvent is
+	// constructed — the event does not fall back to an ancestor or to the
+	// Stage either (avm2/mouse_pick_avm1_root grades exactly that: clicking the
+	// AVM1 child traces the AVM1 onRelease and no `Clicked on: [object Stage]`).
+	// The AVM1 half of the event is delivered by the mouse bridge in action.c.
+	if (PICK_IS_AVM1(target)) return 0;
 	// Ruffle interactive.rs::event_dispatch_to_avm2: "Flash appears to not fire
 	// events *at all* for a targeted EditText that was originally created by the
 	// timeline" — not even the Stage sees them. mouse_pick still HITS such a
@@ -13716,6 +13793,12 @@ static void update_focus_on_press(Avm2Context* ctx, Avm2Object* pressed)
 {
 	// The stage is "no object" for focus purposes.
 	if (pressed == ctx->stage) pressed = NULL;
+	// So is AVM1 content: Ruffle's should_focus is
+	// `is_action_script_3() || is_focusable_by_mouse()`, and an AVM1 clip is
+	// neither an AS3 object nor focusable by mouse unless it is a text field —
+	// which is the cross-VM focus arc (leg F), not this one. Falling through
+	// with the sentinel would put it in a FocusEvent's relatedObject.
+	if (PICK_IS_AVM1(pressed)) pressed = NULL;
 	Avm2Object* old = g_stage_focus;
 	Avm2Object* target;
 	if (pressed != NULL)
