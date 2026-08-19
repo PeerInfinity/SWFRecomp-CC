@@ -7714,6 +7714,25 @@ static Avm2Class* g_graphics_class;
 // (pixels; cx/cy = quadratic control for CURVE). type: 0 move, 1 line, 2 curve.
 typedef struct { uint8_t type; float x, y, cx, cy; } Avm2GfxCmd;
 
+// A non-solid STROKE style. Ruffle models a stroke as a fill applied to the
+// stroke's own geometry (swf::LineStyle::fill_style, default Color::BLACK), so
+// lineGradientStyle / lineBitmapStyle / a GraphicsStroke carrying an
+// IGraphicsFill all land here. kind 0 keeps the legacy solid path (the path's
+// lr/lg/lb/la), so every pre-existing stroke is byte-unchanged.
+typedef struct
+{
+	int      kind;                  // 0 solid (lr..la), 2 gradient, 3 bitmap
+	uint8_t  grad_type, grad_spread, grad_interp;
+	float    grad_focal;
+	uint8_t  grad_ramp[256 * 4];
+	float    grad_fwd16[16];
+	float    grad_inv2d[6];
+	uint32_t* bmp_px;               // owned snapshot, premultiplied 0xAARRGGBB
+	uint32_t bmp_w, bmp_h;
+	float    bmp_matrix[6];
+	uint8_t  bmp_repeat, bmp_smooth;
+} Avm2GfxStyle;
+
 // A finalized subpath: fill kind + params + tessellated fill triangles, and the
 // stroke's triangle list, all in shape-LOCAL twips (the same convention T5's
 // static shape_data uses). Fill kind: 0 none, 1 solid, 2 gradient.
@@ -7748,9 +7767,14 @@ typedef struct
 	uint8_t  bmp_repeat, bmp_smooth;
 	float*   fill_verts;            // local twips, xy pairs, count%3==0
 	uint32_t fill_vert_count;
+	// Fill rule this subpath was tessellated with: 0 evenOdd, 1 nonZero.
+	// Ruffle's runtime Drawing defaults to EvenOdd (core/src/drawing.rs
+	// Drawing::new) and only drawPath / GraphicsPath.winding override it.
+	uint8_t  winding;
 	// stroke
 	int      has_line;
 	float    lr, lg, lb, la;        // straight 0..1
+	Avm2GfxStyle lsty;              // non-solid stroke style (kind 0 = lr..la)
 	float*   line_verts;            // local twips
 	uint32_t line_vert_count;
 } Avm2GfxPath;
@@ -7774,6 +7798,8 @@ typedef struct Avm2GraphicsExt
 	int      cur_line;
 	float    clr, clg, clb, cla;
 	float    clw;                   // line width (pixels)
+	Avm2GfxStyle clsty;             // current non-solid stroke style
+	uint8_t  cur_winding;           // 0 evenOdd (Ruffle's Drawing default)
 	// Active pen-command buffer (flushed on begin*/endFill/clear/draw*).
 	Avm2GfxCmd* cmds;
 	uint32_t cmd_count, cmd_cap;
@@ -7840,6 +7866,8 @@ static void gfx_free_path(Avm2GfxPath* p)
 	free(p->fill_verts); p->fill_verts = NULL; p->fill_vert_count = 0;
 	free(p->line_verts); p->line_verts = NULL; p->line_vert_count = 0;
 	free(p->bmp_px); p->bmp_px = NULL; p->bmp_w = p->bmp_h = 0;
+	free(p->lsty.bmp_px); p->lsty.bmp_px = NULL;
+	p->lsty.bmp_w = p->lsty.bmp_h = 0;
 }
 
 static void gfx_reset(Avm2GraphicsExt* g)
@@ -7848,6 +7876,9 @@ static void gfx_reset(Avm2GraphicsExt* g)
 	free(g->paths); g->paths = NULL; g->path_count = g->path_cap = 0;
 	free(g->cmds); g->cmds = NULL; g->cmd_count = g->cmd_cap = 0;
 	free(g->cbmp_px); g->cbmp_px = NULL; g->cbmp_w = g->cbmp_h = 0;
+	free(g->clsty.bmp_px);
+	memset(&g->clsty, 0, sizeof(g->clsty));
+	g->cur_winding = 0;
 	g->cur_fill = g->cur_line = 0; g->pen_set = 0;
 }
 
@@ -8032,6 +8063,22 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
 	}
 	path->has_line = g->cur_line;
 	path->lr = g->clr; path->lg = g->clg; path->lb = g->clb; path->la = g->cla;
+	path->winding = g->cur_winding;
+	if (g->cur_line)
+	{
+		path->lsty = g->clsty;      // by value; the ramp travels with it
+		path->lsty.bmp_px = NULL;
+		if (g->clsty.kind == 3 && g->clsty.bmp_px != NULL)
+		{
+			size_t lnb = (size_t) g->clsty.bmp_w * g->clsty.bmp_h
+			             * sizeof(uint32_t);
+			path->lsty.bmp_px = (uint32_t*) malloc(lnb);
+			if (path->lsty.bmp_px != NULL)
+				memcpy(path->lsty.bmp_px, g->clsty.bmp_px, lnb);
+			else
+				path->lsty.kind = 0;
+		}
+	}
 
 	if (want_fill && poly_count >= 3 && ccount > 0)
 	{
@@ -8054,7 +8101,9 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
 				tessAddContour(tess, 2, &tw[cs*2], sizeof(float) * 2, n);
 				contrib++;
 			}
-			if (contrib > 0 && tessTesselate(tess, TESS_WINDING_NONZERO,
+			if (contrib > 0 && tessTesselate(tess,
+			                                 path->winding ? TESS_WINDING_NONZERO
+			                                               : TESS_WINDING_ODD,
 			                                 TESS_POLYGONS, 3, 2, NULL))
 			{
 				const TESSreal* v = tessGetVertices(tess);
@@ -8116,12 +8165,12 @@ static void gfx_gen_ramp(const uint32_t* colors, const float* alphas,
 // [-16384,16384] -> local twips: fill grad_fwd16 (GPU) and grad_inv2d (CPU: the
 // normalized inverse local-twips -> UV[0,1], mirroring render_webgpu.c's dynamic
 // gradient norm_inv).
-static void gfx_set_gradient_matrix(Avm2GraphicsExt* g, float a, float b,
+static void gfx_set_gradient_matrix(float* fwd16, float* inv2d, float a, float b,
                                     float c, float d, float tx, float ty)
 {
-	memset(g->cfwd16, 0, sizeof(g->cfwd16));
-	g->cfwd16[0]=a; g->cfwd16[1]=b; g->cfwd16[4]=c; g->cfwd16[5]=d;
-	g->cfwd16[10]=1.0f; g->cfwd16[12]=tx; g->cfwd16[13]=ty; g->cfwd16[15]=1.0f;
+	memset(fwd16, 0, 16 * sizeof(float));
+	fwd16[0]=a; fwd16[1]=b; fwd16[4]=c; fwd16[5]=d;
+	fwd16[10]=1.0f; fwd16[12]=tx; fwd16[13]=ty; fwd16[15]=1.0f;
 	double det = (double) a * d - (double) b * c;
 	double ia, ib, ic, id, itx, ity;
 	if (det == 0.0) { ia=ib=ic=id=itx=ity=0.0; }
@@ -8133,9 +8182,9 @@ static void gfx_set_gradient_matrix(Avm2GraphicsExt* g, float a, float b,
 		ity = ((double) b * tx - (double) a * ty) * inv;
 	}
 	double s = 1.0 / 32768.0;
-	g->cinv2d[0] = (float) (ia * s); g->cinv2d[1] = (float) (ib * s);
-	g->cinv2d[2] = (float) (ic * s); g->cinv2d[3] = (float) (id * s);
-	g->cinv2d[4] = (float) (itx * s + 0.5); g->cinv2d[5] = (float) (ity * s + 0.5);
+	inv2d[0] = (float) (ia * s); inv2d[1] = (float) (ib * s);
+	inv2d[2] = (float) (ic * s); inv2d[3] = (float) (id * s);
+	inv2d[4] = (float) (itx * s + 0.5); inv2d[5] = (float) (ity * s + 0.5);
 }
 
 // Build a CPU-raster fill descriptor from a finalized path's fill style.
@@ -8189,7 +8238,21 @@ void avm2_graphics_cpu_composite(Avm2Context* ctx, Avm2Object* obj,
 		if (p->has_line && p->line_vert_count >= 3)
 		{
 			Avm2GfxFill sf; memset(&sf, 0, sizeof(sf));
-			sf.kind = 1; sf.r = p->lr; sf.g = p->lg; sf.b = p->lb; sf.a = p->la;
+			if (p->lsty.kind == 2)
+			{
+				sf.kind = 2;
+				sf.grad_type = p->lsty.grad_type;
+				sf.spread = p->lsty.grad_spread;
+				sf.interp = p->lsty.grad_interp;
+				sf.focal = p->lsty.grad_focal;
+				sf.ramp = p->lsty.grad_ramp;
+				memcpy(sf.inv2d, p->lsty.grad_inv2d, sizeof(sf.inv2d));
+			}
+			else
+			{
+				sf.kind = 1; sf.r = p->lr; sf.g = p->lg;
+				sf.b = p->lb; sf.a = p->la;
+			}
 			avm2_cpu_raster_tris(buf, W, H, transparent, p->line_verts,
 			                     p->line_vert_count, &sf, wa, wb, wc, wd,
 			                     wtx, wty, alpha);
@@ -8213,6 +8276,33 @@ static Avm2Value gfx_clear(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// AS3 Boolean coercion of one value (drawGraphicsData carriers read the same
+// flags off object slots, so the coercion is shared with gfx_arg_bool).
+static int gfx_val_bool(Avm2Value v)
+{
+	switch (v.kind)
+	{
+		case AVM2_VALUE_UNDEFINED:
+		case AVM2_VALUE_NULL:      return 0;
+		case AVM2_VALUE_BOOL:      return v.u.b ? 1 : 0;
+		case AVM2_VALUE_INTEGER:   return v.u.i != 0;
+		case AVM2_VALUE_NUMBER:    return (v.u.d != 0.0 && !isnan(v.u.d));
+		default:                   return 1;
+	}
+}
+
+// Current solid fill from an 0xRRGGBB + alpha pair. Shared by beginFill and
+// GraphicsSolidFill (Ruffle handle_solid_fill).
+static void gfx_set_solid_fill(Avm2GraphicsExt* g, uint32_t rgb, double a)
+{
+	if (a < 0) a = 0; else if (a > 1) a = 1;
+	g->cur_fill = 1;
+	g->cfr = ((rgb >> 16) & 0xFF) / 255.0f;
+	g->cfg = ((rgb >>  8) & 0xFF) / 255.0f;
+	g->cfb = ( rgb        & 0xFF) / 255.0f;
+	g->cfa = (float) a;
+}
+
 // beginFill(color:uint, alpha:Number=1): flush the pending subpath, then set a
 // solid current fill.
 static Avm2Value gfx_begin_fill(Avm2Activation* act)
@@ -8222,12 +8312,7 @@ static Avm2Value gfx_begin_fill(Avm2Activation* act)
 	gfx_finalize_path(g);
 	uint32_t rgb = act->argc > 0 ? avm2_coerce_to_u32(act->ctx, act->args[0]) : 0;
 	double a = act->argc > 1 ? avm2_coerce_to_number(act->ctx, act->args[1]) : 1.0;
-	if (a < 0) a = 0; else if (a > 1) a = 1;
-	g->cur_fill = 1;
-	g->cfr = ((rgb >> 16) & 0xFF) / 255.0f;
-	g->cfg = ((rgb >>  8) & 0xFF) / 255.0f;
-	g->cfb = ( rgb        & 0xFF) / 255.0f;
-	g->cfa = (float) a;
+	gfx_set_solid_fill(g, rgb, a);
 	return avm2_undefined();
 }
 
@@ -8258,17 +8343,17 @@ static uint32_t gfx_read_num_array(Avm2Context* ctx, Avm2Value v, double* out,
 	return n;
 }
 
-// beginGradientFill(type, colors, alphas, ratios, matrix, spread="pad",
-// interp="rgb", focal=0). Builds a 256-row ramp + gradient matrix now.
-static Avm2Value gfx_begin_gradient_fill(Avm2Activation* act)
+// Build a gradient style from the beginGradientFill argument tuple —
+//   a[0] type, a[1] colors, a[2] alphas, a[3] ratios, a[4] matrix,
+//   a[5] spreadMethod, a[6] interpolationMethod, a[7] focalPointRatio
+// — which is also, field for field, what a GraphicsGradientFill carries
+// (Ruffle handle_gradient_fill) and what lineGradientStyle takes. Returns 1
+// when `out` holds a usable gradient (>=1 stop), 0 otherwise.
+static int gfx_build_gradient_style(Avm2Context* ctx, const Avm2Value* a,
+                                    uint32_t n, Avm2GfxStyle* out)
 {
-	Avm2Context* ctx = act->ctx;
-	Avm2GraphicsExt* g = gfx_self_ext(act);
-	if (g == NULL) return avm2_undefined();
-	gfx_finalize_path(g);
-	if (act->argc < 2) { g->cur_fill = 0; return avm2_undefined(); }
-
-	const Avm2String* ts = avm2_coerce_to_string(ctx, act->args[0]);
+	if (n < 2) return 0;
+	const Avm2String* ts = avm2_coerce_to_string(ctx, a[0]);
 	uint8_t gt = gfx_str_is(ts, "radial") ? 0x12 : 0x10;
 	double colv[64], alpv[64], ratv[64];
 	// Ruffle's build_gradient_records (core/src/avm2/globals/flash/display/
@@ -8278,63 +8363,92 @@ static Avm2Value gfx_begin_gradient_fill(Avm2Activation* act)
 	// spaced stops `(i * 255) / (length - 1)`. We used to min() against a
 	// length of 0 for a null arg, which produced no gradient at all and left
 	// the stage blank (avm2/graphics_gradients_nulls).
-	int has_alphas = act->argc > 2 && act->args[2].kind == AVM2_VALUE_OBJECT
-	                 && act->args[2].u.obj != NULL;
-	int has_ratios = act->argc > 3 && act->args[3].kind == AVM2_VALUE_OBJECT
-	                 && act->args[3].u.obj != NULL;
-	uint32_t nc = gfx_read_num_array(ctx, act->args[1], colv, 64);
-	uint32_t na = has_alphas ? gfx_read_num_array(ctx, act->args[2], alpv, 64) : 0;
-	uint32_t nr = has_ratios ? gfx_read_num_array(ctx, act->args[3], ratv, 64) : 0;
-	uint32_t n = nc;
-	if (has_alphas && na < n) n = na;
-	if (has_ratios && nr < n) n = nr;
-	if (n == 0) { g->cur_fill = 0; return avm2_undefined(); }
+	int has_alphas = n > 2 && a[2].kind == AVM2_VALUE_OBJECT
+	                 && a[2].u.obj != NULL;
+	int has_ratios = n > 3 && a[3].kind == AVM2_VALUE_OBJECT
+	                 && a[3].u.obj != NULL;
+	uint32_t nc = gfx_read_num_array(ctx, a[1], colv, 64);
+	uint32_t na = has_alphas ? gfx_read_num_array(ctx, a[2], alpv, 64) : 0;
+	uint32_t nr = has_ratios ? gfx_read_num_array(ctx, a[3], ratv, 64) : 0;
+	uint32_t ns = nc;
+	if (has_alphas && na < ns) ns = na;
+	if (has_ratios && nr < ns) ns = nr;
+	if (ns == 0) return 0;
 	uint32_t cols[64]; float alps[64]; uint8_t rats[64];
-	for (uint32_t i = 0; i < n; i++)
+	for (uint32_t i = 0; i < ns; i++)
 	{
 		cols[i] = (uint32_t) colv[i] & 0xFFFFFF;
 		if (has_alphas)
 		{
-			float a = (float) alpv[i]; alps[i] = a < 0 ? 0 : a > 1 ? 1 : a;
+			float av = (float) alpv[i]; alps[i] = av < 0 ? 0 : av > 1 ? 1 : av;
 		}
 		else alps[i] = 1.0f;
 		if (has_ratios)
 		{
 			int rr = (int) ratv[i]; rats[i] = rr < 0 ? 0 : rr > 255 ? 255 : (uint8_t) rr;
 		}
-		else rats[i] = n > 1 ? (uint8_t) ((i * 255) / (n - 1)) : 0;
+		else rats[i] = ns > 1 ? (uint8_t) ((i * 255) / (ns - 1)) : 0;
 	}
 	uint8_t spread = 0, interp = 0;
-	if (act->argc > 5)
+	if (n > 5)
 	{
-		const Avm2String* ss = avm2_coerce_to_string(ctx, act->args[5]);
+		const Avm2String* ss = avm2_coerce_to_string(ctx, a[5]);
 		spread = gfx_str_is(ss, "reflect") ? 1 : gfx_str_is(ss, "repeat") ? 2 : 0;
 	}
-	if (act->argc > 6)
+	if (n > 6)
 	{
-		const Avm2String* is = avm2_coerce_to_string(ctx, act->args[6]);
+		const Avm2String* is = avm2_coerce_to_string(ctx, a[6]);
 		interp = gfx_str_is(is, "linearRGB") ? 1 : 0;
 	}
-	double focal = act->argc > 7 ? avm2_coerce_to_number(ctx, act->args[7]) : 0.0;
+	double focal = n > 7 ? avm2_coerce_to_number(ctx, a[7]) : 0.0;
 	if (focal != 0.0) gt = 0x13;
 
-	g->cur_fill = 2;
-	g->cgt = gt; g->cgs = spread; g->cgi = interp; g->cgf = (float) focal;
-	gfx_gen_ramp(cols, alps, rats, (int) n, interp, g->cramp);
+	out->grad_type = gt; out->grad_spread = spread; out->grad_interp = interp;
+	out->grad_focal = (float) focal;
+	gfx_gen_ramp(cols, alps, rats, (int) ns, interp, out->grad_ramp);
 
 	// Gradient matrix from the flash.geom.Matrix arg (a,b,c,d,tx,ty). Default
 	// identity box if absent.
 	double ma = 1, mb = 0, mc = 0, md = 1, mtx = 0, mty = 0;
-	if (act->argc > 4 && act->args[4].kind == AVM2_VALUE_OBJECT
-	    && act->args[4].u.obj != NULL)
+	if (n > 4 && a[4].kind == AVM2_VALUE_OBJECT && a[4].u.obj != NULL)
 	{
-		Avm2Object* m = act->args[4].u.obj;
+		Avm2Object* m = a[4].u.obj;
 		ma = matrix_get_prop(ctx, m, "a"); mb = matrix_get_prop(ctx, m, "b");
 		mc = matrix_get_prop(ctx, m, "c"); md = matrix_get_prop(ctx, m, "d");
 		mtx = matrix_get_prop(ctx, m, "tx"); mty = matrix_get_prop(ctx, m, "ty");
 	}
-	gfx_set_gradient_matrix(g, (float) ma, (float) mb, (float) mc, (float) md,
+	gfx_set_gradient_matrix(out->grad_fwd16, out->grad_inv2d,
+	                        (float) ma, (float) mb, (float) mc, (float) md,
 	                        (float) (mtx * 20.0), (float) (mty * 20.0));
+	return 1;
+}
+
+// Install a built gradient style as the CURRENT FILL.
+static void gfx_commit_gradient_fill(Avm2GraphicsExt* g, const Avm2GfxStyle* st)
+{
+	g->cur_fill = 2;
+	g->cgt = st->grad_type; g->cgs = st->grad_spread; g->cgi = st->grad_interp;
+	g->cgf = st->grad_focal;
+	memcpy(g->cramp, st->grad_ramp, sizeof(g->cramp));
+	memcpy(g->cfwd16, st->grad_fwd16, sizeof(g->cfwd16));
+	memcpy(g->cinv2d, st->grad_inv2d, sizeof(g->cinv2d));
+}
+
+// beginGradientFill(type, colors, alphas, ratios, matrix, spread="pad",
+// interp="rgb", focal=0). Builds a 256-row ramp + gradient matrix now.
+static Avm2Value gfx_begin_gradient_fill(Avm2Activation* act)
+{
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL) return avm2_undefined();
+	gfx_finalize_path(g);
+	Avm2GfxStyle st;
+	memset(&st, 0, sizeof(st));
+	if (!gfx_build_gradient_style(act->ctx, act->args, act->argc, &st))
+	{
+		g->cur_fill = 0;
+		return avm2_undefined();
+	}
+	gfx_commit_gradient_fill(g, &st);
 	return avm2_undefined();
 }
 
@@ -8356,6 +8470,10 @@ static Avm2Value gfx_line_style(Avm2Activation* act)
 	Avm2GraphicsExt* g = gfx_self_ext(act);
 	if (g == NULL) return avm2_undefined();
 	gfx_finalize_path(g);
+	// A fresh LineStyle: any lineBitmapStyle/lineGradientStyle fill attached to
+	// the previous one is gone (Ruffle set_line_style replaces the whole style).
+	free(g->clsty.bmp_px);
+	memset(&g->clsty, 0, sizeof(g->clsty));
 	if (act->argc == 0 || act->args[0].kind == AVM2_VALUE_UNDEFINED)
 	{
 		g->cur_line = 0;
@@ -8592,16 +8710,59 @@ static Avm2Value gfx_draw_ellipse(Avm2Activation* act)
 static int gfx_arg_bool(Avm2Activation* act, uint32_t i, int dflt)
 {
 	if (act->argc <= i) return dflt;
-	Avm2Value v = act->args[i];
-	switch (v.kind)
+	return gfx_val_bool(act->args[i]);
+}
+
+// Build a bitmap style from the beginBitmapFill argument tuple —
+//   a[0] bitmapData, a[1] matrix, a[2] repeat, a[3] smooth
+// — which is exactly what a GraphicsBitmapFill carries (Ruffle
+// handle_bitmap_fill) and what lineBitmapStyle takes. On success `out` owns a
+// freshly malloc'd pixel snapshot. Returns 1 on success, 0 on a bad/blank
+// source (in which case `out` is untouched).
+static int gfx_build_bitmap_style(Avm2Context* ctx, const Avm2Value* a,
+                                  uint32_t n, Avm2GfxStyle* out)
+{
+	Avm2BitmapDataExt* bd = n > 0 ? avm2_bitmapdata_ext_of(ctx, a[0]) : NULL;
+	if (bd == NULL || bd->disposed || bd->pixels == NULL
+	    || bd->width == 0 || bd->height == 0)
+		return 0;
+	float m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+	if (n > 1 && a[1].kind == AVM2_VALUE_OBJECT && a[1].u.obj != NULL)
 	{
-		case AVM2_VALUE_UNDEFINED:
-		case AVM2_VALUE_NULL:      return 0;
-		case AVM2_VALUE_BOOL:      return v.u.b ? 1 : 0;
-		case AVM2_VALUE_INTEGER:   return v.u.i != 0;
-		case AVM2_VALUE_NUMBER:    return (v.u.d != 0.0 && !isnan(v.u.d));
-		default:                   return 1;
+		Avm2Object* mo = a[1].u.obj;
+		m[0] = (float) matrix_get_prop(ctx, mo, "a");
+		m[1] = (float) matrix_get_prop(ctx, mo, "b");
+		m[2] = (float) matrix_get_prop(ctx, mo, "c");
+		m[3] = (float) matrix_get_prop(ctx, mo, "d");
+		m[4] = (float) matrix_get_prop(ctx, mo, "tx");
+		m[5] = (float) matrix_get_prop(ctx, mo, "ty");
 	}
+	size_t nb = (size_t) bd->width * bd->height * sizeof(uint32_t);
+	uint32_t* snap = (uint32_t*) malloc(nb);
+	if (snap == NULL) return 0;
+	memcpy(snap, bd->pixels, nb);
+	out->bmp_px = snap;
+	out->bmp_w = bd->width;
+	out->bmp_h = bd->height;
+	memcpy(out->bmp_matrix, m, sizeof(out->bmp_matrix));
+	out->bmp_repeat = (uint8_t) (n > 2 ? gfx_val_bool(a[2]) : 1);
+	out->bmp_smooth = (uint8_t) (n > 3 ? gfx_val_bool(a[3]) : 0);
+	return 1;
+}
+
+// Install a built bitmap style as the CURRENT FILL; takes ownership of
+// st->bmp_px.
+static void gfx_commit_bitmap_fill(Avm2GraphicsExt* g, Avm2GfxStyle* st)
+{
+	free(g->cbmp_px);
+	g->cbmp_px = st->bmp_px;
+	st->bmp_px = NULL;
+	g->cbmp_w = st->bmp_w;
+	g->cbmp_h = st->bmp_h;
+	memcpy(g->cbm, st->bmp_matrix, sizeof(g->cbm));
+	g->cbrep = st->bmp_repeat;
+	g->cbsmo = st->bmp_smooth;
+	g->cur_fill = 3;
 }
 
 static Avm2Value gfx_begin_bitmap_fill(Avm2Activation* act)
@@ -8610,43 +8771,58 @@ static Avm2Value gfx_begin_bitmap_fill(Avm2Activation* act)
 	if (g == NULL) return avm2_undefined();
 	gfx_finalize_path(g);
 	g->cur_fill = 0;
-
-	Avm2BitmapDataExt* bd = act->argc > 0
-		? avm2_bitmapdata_ext_of(act->ctx, act->args[0]) : NULL;
-	if (bd == NULL || bd->disposed || bd->pixels == NULL
-	    || bd->width == 0 || bd->height == 0)
+	Avm2GfxStyle st;
+	memset(&st, 0, sizeof(st));
+	if (!gfx_build_bitmap_style(act->ctx, act->args, act->argc, &st))
 		return avm2_undefined();
-	float m[6] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
-	if (act->argc > 1 && act->args[1].kind == AVM2_VALUE_OBJECT
-	    && act->args[1].u.obj != NULL)
-	{
-		Avm2Object* mo = act->args[1].u.obj;
-		m[0] = (float) matrix_get_prop(act->ctx, mo, "a");
-		m[1] = (float) matrix_get_prop(act->ctx, mo, "b");
-		m[2] = (float) matrix_get_prop(act->ctx, mo, "c");
-		m[3] = (float) matrix_get_prop(act->ctx, mo, "d");
-		m[4] = (float) matrix_get_prop(act->ctx, mo, "tx");
-		m[5] = (float) matrix_get_prop(act->ctx, mo, "ty");
-	}
-
-	size_t nb = (size_t) bd->width * bd->height * sizeof(uint32_t);
-	uint32_t* snap = (uint32_t*) malloc(nb);
-	if (snap == NULL) return avm2_undefined();
-	memcpy(snap, bd->pixels, nb);
-	free(g->cbmp_px);
-	g->cbmp_px = snap;
-	g->cbmp_w = bd->width;
-	g->cbmp_h = bd->height;
-	memcpy(g->cbm, m, sizeof(g->cbm));
-	// `smooth` is carried on the fill record only. Sampler selection lives in
-	// the renderer and is owned by the per-fill smoothing patch (s16 w2-gfx-vram);
-	// render_webgpu_draw_bitmap_tris currently ignores the flag.
-	g->cbrep = (uint8_t) gfx_arg_bool(act, 2, 1);
-	g->cbsmo = (uint8_t) gfx_arg_bool(act, 3, 0);
-	g->cur_fill = 3;
+	gfx_commit_bitmap_fill(g, &st);
 	return avm2_undefined();
 }
 
+// Install a built style as the current STROKE fill (kind 2 gradient / 3
+// bitmap); takes ownership of st->bmp_px.
+static void gfx_commit_line_style(Avm2GraphicsExt* g, Avm2GfxStyle* st, int kind)
+{
+	free(g->clsty.bmp_px);
+	g->clsty = *st;
+	g->clsty.kind = kind;
+	st->bmp_px = NULL;
+}
+
+// lineBitmapStyle(bitmap, matrix, repeat, smooth) /
+// lineGradientStyle(type, colors, alphas, ratios, matrix, spread, interp, focal).
+// Ruffle's Drawing::set_line_fill_style REPLACES the fill of the *current* line
+// style and is a NO-OP when no lineStyle is active — it never clears the
+// stroke, which is what the old shared gfx_line_fill_style stub did (and why
+// every bitmap/gradient stroke in the corpus rendered as nothing at all).
+static Avm2Value gfx_line_bitmap_style(Avm2Activation* act)
+{
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL || !g->cur_line) return avm2_undefined();
+	Avm2GfxStyle st;
+	memset(&st, 0, sizeof(st));
+	if (!gfx_build_bitmap_style(act->ctx, act->args, act->argc, &st))
+		return avm2_undefined();
+	gfx_finalize_path(g);
+	gfx_commit_line_style(g, &st, 3);
+	return avm2_undefined();
+}
+
+static Avm2Value gfx_line_gradient_style(Avm2Activation* act)
+{
+	Avm2GraphicsExt* g = gfx_self_ext(act);
+	if (g == NULL || !g->cur_line) return avm2_undefined();
+	Avm2GfxStyle st;
+	memset(&st, 0, sizeof(st));
+	if (!gfx_build_gradient_style(act->ctx, act->args, act->argc, &st))
+		return avm2_undefined();
+	gfx_finalize_path(g);
+	gfx_commit_line_style(g, &st, 2);
+	return avm2_undefined();
+}
+
+// lineShaderStyle: still a stub (Ruffle stub_method's it too); keep the old
+// clear-the-stroke convention rather than leaking the previous style.
 static Avm2Value gfx_line_fill_style(Avm2Activation* act)
 {
 	Avm2GraphicsExt* g = gfx_self_ext(act);
@@ -8790,6 +8966,14 @@ static Avm2Value do_get_graphics(Avm2Activation* act)
 static Avm2Class* g_graphicspath_class;
 static Avm2Class* g_graphicstrianglepath_class;
 static Avm2Class* g_igraphicsdata_class;
+// The IGraphicsData carriers drawGraphicsData dispatches on (Ruffle
+// handle_igraphics_data compares `obj.instance_class()` the same way).
+static Avm2Class* g_graphicssolidfill_class;
+static Avm2Class* g_graphicsgradientfill_class;
+static Avm2Class* g_graphicsstroke_class;
+static Avm2Class* g_graphicsbitmapfill_class;
+static Avm2Class* g_graphicsendfill_class;
+static Avm2Class* g_graphicsshaderfill_class;
 
 // Exact byte compare of an Avm2String to a C literal.
 static int gfx_str_is(const Avm2String* s, const char* lit)
@@ -8869,6 +9053,7 @@ static Avm2GfxPath* gfx_new_fill_path(Avm2GraphicsExt* g)
 	Avm2GfxPath* p = &g->paths[g->path_count++];
 	memset(p, 0, sizeof(Avm2GfxPath));
 	p->fill_kind = g->cur_fill;
+	p->winding = g->cur_winding;
 	p->fr = g->cfr; p->fg = g->cfg; p->fb = g->cfb; p->fa = g->cfa;
 	if (g->cur_fill == 2)
 	{
@@ -8877,6 +9062,24 @@ static Avm2GfxPath* gfx_new_fill_path(Avm2GraphicsExt* g)
 		memcpy(p->grad_ramp, g->cramp, sizeof(p->grad_ramp));
 		memcpy(p->grad_fwd16, g->cfwd16, sizeof(p->grad_fwd16));
 		memcpy(p->grad_inv2d, g->cinv2d, sizeof(p->grad_inv2d));
+	}
+	else if (g->cur_fill == 3 && g->cbmp_px != NULL)
+	{
+		// Was missing entirely: an explicit triangle list under a bitmap fill
+		// recorded fill_kind 3 with a NULL pixel pointer, so the renderer's
+		// `p->bmp_px != NULL` guard silently dropped it.
+		size_t nb = (size_t) g->cbmp_w * g->cbmp_h * sizeof(uint32_t);
+		p->bmp_px = (uint32_t*) malloc(nb);
+		if (p->bmp_px != NULL)
+		{
+			memcpy(p->bmp_px, g->cbmp_px, nb);
+			p->bmp_w = g->cbmp_w;
+			p->bmp_h = g->cbmp_h;
+			memcpy(p->bmp_matrix, g->cbm, sizeof(p->bmp_matrix));
+			p->bmp_repeat = g->cbrep;
+			p->bmp_smooth = g->cbsmo;
+		}
+		else p->fill_kind = 0;
 	}
 	return p;
 }
@@ -8986,9 +9189,20 @@ static Avm2Value gfx_draw_path(Avm2Activation* act)
 	uint32_t ndata = data != NULL ? data->length : 0;
 	if (ncmd == 0) return avm2_undefined();
 	if ((ndata & 1u) != 0) gfx_throw_2004(ctx);
-	// Part B: decode the command stream into pen commands (flushed on endFill).
+	// Part B: decode the command stream into pen commands. Ruffle brackets
+	// process_commands with set_fill_rule(Some(rule)) / set_fill_rule(None),
+	// and set_fill_rule goes through new_fill — so the commands land in a
+	// subpath of their OWN tessellated with `winding`, and the drawing's
+	// default rule (evenOdd) resumes afterwards.
 	Avm2GraphicsExt* g = gfx_self_ext(act);
-	if (g != NULL) gfx_decode_path(g, ctx, commands, data);
+	if (g != NULL)
+	{
+		gfx_finalize_path(g);
+		g->cur_winding = gfx_str_is(w, "nonZero") ? 1 : 0;
+		gfx_decode_path(g, ctx, commands, data);
+		gfx_finalize_path(g);
+		g->cur_winding = 0;
+	}
 	return avm2_undefined();
 }
 
@@ -9014,16 +9228,154 @@ static Avm2Value gfx_draw_triangles(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// Read a carrier's public property. The IGraphicsData classes are non-sealed
+// natives, so a ctor-assigned field and an AS3 write share one dynamic slot.
+static Avm2Value gfx_prop(Avm2Object* o, const char* name, uint32_t nlen)
+{
+	Avm2Value* v = avm2_object_find_dynamic(o, name, nlen);
+	return v != NULL ? *v : avm2_undefined();
+}
+
+// A GraphicsGradientFill / GraphicsBitmapFill read back as the argument tuple
+// its begin*Fill twin takes.
+static void gfx_grad_tuple(Avm2Object* o, Avm2Value* a)
+{
+	a[0] = gfx_prop(o, "type", 4);
+	a[1] = gfx_prop(o, "colors", 6);
+	a[2] = gfx_prop(o, "alphas", 6);
+	a[3] = gfx_prop(o, "ratios", 6);
+	a[4] = gfx_prop(o, "matrix", 6);
+	a[5] = gfx_prop(o, "spreadMethod", 12);
+	a[6] = gfx_prop(o, "interpolationMethod", 19);
+	a[7] = gfx_prop(o, "focalPointRatio", 15);
+}
+
+static void gfx_bmp_tuple(Avm2Object* o, Avm2Value* a)
+{
+	a[0] = gfx_prop(o, "bitmapData", 10);
+	a[1] = gfx_prop(o, "matrix", 6);
+	a[2] = gfx_prop(o, "repeat", 6);
+	a[3] = gfx_prop(o, "smooth", 6);
+}
+
+// Ruffle handle_igraphics_data's fill arms: apply an IGraphicsFill carrier as
+// the CURRENT FILL. GraphicsEndFill / GraphicsShaderFill / anything unknown
+// mean "no fill" (Ruffle sets the style to None for both).
+static void gfx_apply_fill_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
+                                   Avm2Object* o)
+{
+	if (o->cls == g_graphicssolidfill_class)
+	{
+		uint32_t rgb = avm2_coerce_to_u32(ctx, gfx_prop(o, "color", 5));
+		Avm2Value av = gfx_prop(o, "alpha", 5);
+		double al = (av.kind == AVM2_VALUE_UNDEFINED)
+			? 1.0 : avm2_coerce_to_number(ctx, av);
+		gfx_set_solid_fill(g, rgb, al);
+		return;
+	}
+	if (o->cls == g_graphicsgradientfill_class)
+	{
+		Avm2Value a[8];
+		gfx_grad_tuple(o, a);
+		Avm2GfxStyle st;
+		memset(&st, 0, sizeof(st));
+		if (gfx_build_gradient_style(ctx, a, 8, &st)) gfx_commit_gradient_fill(g, &st);
+		else g->cur_fill = 0;
+		return;
+	}
+	if (o->cls == g_graphicsbitmapfill_class)
+	{
+		Avm2Value a[4];
+		gfx_bmp_tuple(o, a);
+		Avm2GfxStyle st;
+		memset(&st, 0, sizeof(st));
+		if (gfx_build_bitmap_style(ctx, a, 4, &st)) gfx_commit_bitmap_fill(g, &st);
+		else g->cur_fill = 0;
+		return;
+	}
+	g->cur_fill = 0;
+}
+
+// Ruffle handle_igraphics_fill, applied to the LINE style: a GraphicsStroke's
+// `fill` becomes swf::LineStyle::fill_style. A solid fill stays on the legacy
+// clr/clg/clb/cla path (stroke style kind 0), so nothing changes for strokes
+// that were already solid.
+static void gfx_apply_stroke_fill_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
+                                          Avm2Object* o)
+{
+	if (o->cls == g_graphicssolidfill_class)
+	{
+		uint32_t rgb = avm2_coerce_to_u32(ctx, gfx_prop(o, "color", 5));
+		Avm2Value av = gfx_prop(o, "alpha", 5);
+		double al = (av.kind == AVM2_VALUE_UNDEFINED)
+			? 1.0 : avm2_coerce_to_number(ctx, av);
+		if (al < 0) al = 0; else if (al > 1) al = 1;
+		g->clr = ((rgb >> 16) & 0xFF) / 255.0f;
+		g->clg = ((rgb >>  8) & 0xFF) / 255.0f;
+		g->clb = ( rgb        & 0xFF) / 255.0f;
+		g->cla = (float) al;
+		return;
+	}
+	if (o->cls == g_graphicsgradientfill_class)
+	{
+		Avm2Value a[8];
+		gfx_grad_tuple(o, a);
+		Avm2GfxStyle st;
+		memset(&st, 0, sizeof(st));
+		if (gfx_build_gradient_style(ctx, a, 8, &st)) gfx_commit_line_style(g, &st, 2);
+		return;
+	}
+	if (o->cls == g_graphicsbitmapfill_class)
+	{
+		Avm2Value a[4];
+		gfx_bmp_tuple(o, a);
+		Avm2GfxStyle st;
+		memset(&st, 0, sizeof(st));
+		if (gfx_build_bitmap_style(ctx, a, 4, &st)) gfx_commit_line_style(g, &st, 3);
+		return;
+	}
+	// GraphicsEndFill / GraphicsShaderFill / unknown: keep the default black.
+}
+
+// A GraphicsStroke carrier -> the current line style (Ruffle's
+// graphicsstroke arm). thickness NaN is set_line_style(None); everything else
+// is a stroke whose default fill is swf::LineStyle::default()'s opaque black.
+static void gfx_apply_stroke_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
+                                     Avm2Object* o)
+{
+	double th = avm2_coerce_to_number(ctx, gfx_prop(o, "thickness", 9));
+	gfx_finalize_path(g);
+	free(g->clsty.bmp_px);
+	memset(&g->clsty, 0, sizeof(g->clsty));
+	if (isnan(th))
+	{
+		g->cur_line = 0;
+		return;
+	}
+	if (th < 0) th = 0; else if (th > 255) th = 255;
+	g->cur_line = 1;
+	g->clw = (float) (th > 0 ? th : 1.0);   // hairline -> nominal 1px
+	g->clr = g->clg = g->clb = 0.0f;
+	g->cla = 1.0f;
+	Avm2Value fv = gfx_prop(o, "fill", 4);
+	if (fv.kind == AVM2_VALUE_OBJECT && fv.u.obj != NULL)
+		gfx_apply_stroke_fill_carrier(ctx, g, fv.u.obj);
+}
+
 // Graphics.drawGraphicsData(graphicsData:Vector.<IGraphicsData>) — dispatch each
-// IGraphicsData item. A GraphicsPath re-runs process_commands validation (#2004);
-// its winding was validated at construction. Ruffle omits the inner drawPath /
-// drawPathObject frames here (output.ruffle.txt), so a single drawGraphicsData
-// frame is a subset of FP's trace => ruffle_matched.
+// IGraphicsData item onto the SAME style/pen machinery the begin*Fill /
+// lineStyle / drawPath / drawTriangles methods drive (Ruffle
+// handle_igraphics_data; the dispatch order and error cases mirror it). A
+// GraphicsPath re-runs process_commands validation (#2004); its winding was
+// validated at construction. Ruffle omits the inner drawPath / drawPathObject
+// frames here (output.ruffle.txt), so a single drawGraphicsData frame is a
+// subset of FP's trace => ruffle_matched.
 static Avm2Value gfx_draw_graphics_data(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2VectorExt* items = gfx_vec_arg(act, 0);
 	if (items == NULL) return avm2_undefined();
+	Avm2GraphicsExt* g = gfx_self_ext(act);
 	for (uint32_t i = 0; i < items->length; i++)
 	{
 		Avm2Value it = items->elems[i];
@@ -9036,14 +9388,39 @@ static Avm2Value gfx_draw_graphics_data(Avm2Activation* act)
 			uint32_t ncmd = cv != NULL ? cv->length : 0;
 			uint32_t ndata = dv != NULL ? dv->length : 0;
 			if (ncmd != 0 && (ndata & 1u) != 0) gfx_throw_2004(ctx);
+			if (g == NULL || cv == NULL || dv == NULL || ncmd == 0) continue;
+			gfx_finalize_path(g);
+			const Avm2String* ws =
+				avm2_coerce_to_string(ctx, gfx_prop(o, "_winding", 8));
+			g->cur_winding = gfx_str_is(ws, "nonZero") ? 1 : 0;
+			gfx_decode_path(g, ctx, cv, dv);
+			gfx_finalize_path(g);
+			g->cur_winding = 0;
 		}
 		else if (o->cls == g_graphicstrianglepath_class)
 		{
-			gfx_validate_triangles(ctx, gfx_vec_prop(o, "vertices", 8),
-			                       gfx_vec_prop(o, "indices", 7));
+			Avm2VectorExt* vv = gfx_vec_prop(o, "vertices", 8);
+			Avm2VectorExt* iv = gfx_vec_prop(o, "indices", 7);
+			gfx_validate_triangles(ctx, vv, iv);
+			if (g != NULL && g->cur_fill != 0 && vv != NULL)
+				gfx_append_triangles(g, ctx, vv, iv);
 		}
-		// GraphicsSolidFill / GraphicsGradientFill / GraphicsStroke / bitmap fills
-		// set fill/stroke state (Part B); no Part-A validation error.
+		else if (o->cls == g_graphicsstroke_class)
+		{
+			if (g != NULL) gfx_apply_stroke_carrier(ctx, g, o);
+		}
+		else if (o->cls == g_graphicssolidfill_class
+		         || o->cls == g_graphicsgradientfill_class
+		         || o->cls == g_graphicsbitmapfill_class
+		         || o->cls == g_graphicsendfill_class
+		         || o->cls == g_graphicsshaderfill_class)
+		{
+			if (g != NULL)
+			{
+				gfx_finalize_path(g);
+				gfx_apply_fill_carrier(ctx, g, o);
+			}
+		}
 	}
 	return avm2_undefined();
 }
@@ -9184,6 +9561,115 @@ static Avm2Value graphicstrianglepath_init(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// --- IGraphicsData carrier constructors ------------------------------------
+//
+// GraphicsSolidFill / GraphicsGradientFill / GraphicsBitmapFill /
+// GraphicsStroke / GraphicsShaderFill used to be argument-less shells, so
+// `new GraphicsBitmapFill(bmd, mtx)` stored NOTHING and drawGraphicsData saw
+// `undefined` for every style field. Each ctor now stores its arguments under
+// the property names playerglobal declares (Ruffle
+// core/src/avm2/globals/flash/display/Graphics*Fill.as / GraphicsStroke.as);
+// the classes are non-sealed, so AS3 writes hit the same dynamic slots.
+
+// Store arg `argi` (or `dflt` when it is missing/undefined) under `name`.
+static void gfx_carrier_store(Avm2Activation* act, Avm2Object* self,
+                              const char* name, uint32_t nlen, uint32_t argi,
+                              Avm2Value dflt)
+{
+	Avm2Value v = (argi < act->argc
+	               && act->args[argi].kind != AVM2_VALUE_UNDEFINED)
+		? act->args[argi] : dflt;
+	avm2_object_set_dynamic(act->ctx, self, name, nlen, v);
+}
+
+static Avm2Value gfx_carrier_str(Avm2Context* ctx, const char* lit)
+{
+	return avm2_string(avm2_string_from_literal(ctx, lit));
+}
+
+// GraphicsSolidFill(color:uint = 0, alpha:Number = 1.0)
+static Avm2Value graphicssolidfill_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	double color = act->argc > 0
+		? (double) avm2_coerce_to_u32(ctx, act->args[0]) : 0.0;
+	double alpha = act->argc > 1
+		? avm2_coerce_to_number(ctx, act->args[1]) : 1.0;
+	avm2_object_set_dynamic(ctx, self, "alpha", 5, avm2_number(alpha));
+	avm2_object_set_dynamic(ctx, self, "color", 5, avm2_number(color));
+	return avm2_undefined();
+}
+
+// GraphicsGradientFill(type, colors, alphas, ratios, matrix, spreadMethod,
+//                      interpolationMethod, focalPointRatio)
+static Avm2Value graphicsgradientfill_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	gfx_carrier_store(act, self, "alphas", 6, 2, avm2_null());
+	gfx_carrier_store(act, self, "colors", 6, 1, avm2_null());
+	avm2_object_set_dynamic(ctx, self, "focalPointRatio", 15, avm2_number(
+		act->argc > 7 ? avm2_coerce_to_number(ctx, act->args[7]) : 0.0));
+	gfx_carrier_store(act, self, "matrix", 6, 4, avm2_null());
+	gfx_carrier_store(act, self, "ratios", 6, 3, avm2_null());
+	gfx_carrier_store(act, self, "interpolationMethod", 19, 6,
+	                  gfx_carrier_str(ctx, "rgb"));
+	gfx_carrier_store(act, self, "spreadMethod", 12, 5,
+	                  gfx_carrier_str(ctx, "pad"));
+	gfx_carrier_store(act, self, "type", 4, 0, gfx_carrier_str(ctx, "linear"));
+	return avm2_undefined();
+}
+
+// GraphicsBitmapFill(bitmapData = null, matrix = null, repeat = true,
+//                    smooth = false)
+static Avm2Value graphicsbitmapfill_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	gfx_carrier_store(act, self, "bitmapData", 10, 0, avm2_null());
+	gfx_carrier_store(act, self, "matrix", 6, 1, avm2_null());
+	avm2_object_set_dynamic(ctx, self, "repeat", 6,
+		avm2_bool(act->argc > 2 ? gfx_val_bool(act->args[2]) : 1));
+	avm2_object_set_dynamic(ctx, self, "smooth", 6,
+		avm2_bool(act->argc > 3 ? gfx_val_bool(act->args[3]) : 0));
+	return avm2_undefined();
+}
+
+// GraphicsStroke(thickness = NaN, pixelHinting = false, scaleMode = "normal",
+//                caps = "none", joints = "round", miterLimit = 3, fill = null)
+static Avm2Value graphicsstroke_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	avm2_object_set_dynamic(ctx, self, "thickness", 9, avm2_number(
+		act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : NAN));
+	avm2_object_set_dynamic(ctx, self, "pixelHinting", 12,
+		avm2_bool(act->argc > 1 ? gfx_val_bool(act->args[1]) : 0));
+	gfx_carrier_store(act, self, "scaleMode", 9, 2,
+	                  gfx_carrier_str(ctx, "normal"));
+	gfx_carrier_store(act, self, "caps", 4, 3, gfx_carrier_str(ctx, "none"));
+	gfx_carrier_store(act, self, "joints", 6, 4, gfx_carrier_str(ctx, "round"));
+	avm2_object_set_dynamic(ctx, self, "miterLimit", 10, avm2_number(
+		act->argc > 5 ? avm2_coerce_to_number(ctx, act->args[5]) : 3.0));
+	gfx_carrier_store(act, self, "fill", 4, 6, avm2_null());
+	return avm2_undefined();
+}
+
+// GraphicsShaderFill(shader = null, matrix = null)
+static Avm2Value graphicsshaderfill_init(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	gfx_carrier_store(act, self, "shader", 6, 0, avm2_null());
+	gfx_carrier_store(act, self, "matrix", 6, 1, avm2_null());
+	return avm2_undefined();
+}
+
 // --- flash.display marker interfaces --------------------------------------
 //
 // playerglobal declares six empty interfaces under flash.display, and
@@ -9270,15 +9756,31 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	g_graphicstrianglepath_class = gtp;
 
 	// Fill / stroke IGraphicsData carriers — non-sealed so AS3 can set their
-	// properties (colors/matrix/fill/...); Part B reads them. No ctor needed.
-	const char* fills[3] = { "GraphicsSolidFill", "GraphicsGradientFill",
-	                         "GraphicsStroke" };
-	for (int i = 0; i < 3; i++)
-	{
-		Avm2Class* fc = avm2_builtin_class_api(ctx, "flash.display", fills[i],
-		                                       object_class, 10);
-		disp_implements(ctx, fc, igd, i == 2 ? igstroke : igfill);
-	}
+	// properties (colors/matrix/fill/...); Part B reads them, and each ctor
+	// stores its arguments under those same names.
+	Avm2Class* gsolid = avm2_builtin_class_api(ctx, "flash.display",
+	                                           "GraphicsSolidFill",
+	                                           object_class, 10);
+	disp_implements(ctx, gsolid, igd, igfill);
+	gsolid->instance_init.fn = graphicssolidfill_init;
+	gsolid->instance_init.debug_name = "GraphicsSolidFill";
+	g_graphicssolidfill_class = gsolid;
+
+	Avm2Class* ggrad = avm2_builtin_class_api(ctx, "flash.display",
+	                                          "GraphicsGradientFill",
+	                                          object_class, 10);
+	disp_implements(ctx, ggrad, igd, igfill);
+	ggrad->instance_init.fn = graphicsgradientfill_init;
+	ggrad->instance_init.debug_name = "GraphicsGradientFill";
+	g_graphicsgradientfill_class = ggrad;
+
+	Avm2Class* gstrk = avm2_builtin_class_api(ctx, "flash.display",
+	                                          "GraphicsStroke",
+	                                          object_class, 10);
+	disp_implements(ctx, gstrk, igd, igstroke);
+	gstrk->instance_init.fn = graphicsstroke_init;
+	gstrk->instance_init.debug_name = "GraphicsStroke";
+	g_graphicsstroke_class = gstrk;
 
 	// GraphicsShaderFill: a drawGraphicsData carrier like the five above, and
 	// the sixth IGraphicsFill. Its `shader`/`matrix` are plain public vars.
@@ -9286,6 +9788,9 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	                                        "GraphicsShaderFill", object_class,
 	                                        10);
 	disp_implements(ctx, gsf, igd, igfill);
+	gsf->instance_init.fn = graphicsshaderfill_init;
+	gsf->instance_init.debug_name = "GraphicsShaderFill";
+	g_graphicsshaderfill_class = gsf;
 
 	// GraphicsPathCommand (int) + GraphicsPathWinding (string) constant holders.
 	Avm2Class* gpc = avm2_builtin_class_api(ctx, "flash.display",
@@ -9329,13 +9834,19 @@ static void avm2_graphics_register(Avm2Context* ctx, Avm2Class* graphics,
 	// The two remaining IGraphicsData carriers. GraphicsBitmapFill/
 	// GraphicsEndFill sit in the same drawGraphicsData stream as the three
 	// registered above, so they get the same non-sealed shape + marker.
-	const char* more_fills[2] = { "GraphicsBitmapFill", "GraphicsEndFill" };
-	for (int i = 0; i < 2; i++)
-	{
-		Avm2Class* fc = avm2_builtin_class_api(ctx, "flash.display",
-		                                       more_fills[i], object_class, 10);
-		disp_implements(ctx, fc, igd, igfill);
-	}
+	Avm2Class* gbmp = avm2_builtin_class_api(ctx, "flash.display",
+	                                         "GraphicsBitmapFill",
+	                                         object_class, 10);
+	disp_implements(ctx, gbmp, igd, igfill);
+	gbmp->instance_init.fn = graphicsbitmapfill_init;
+	gbmp->instance_init.debug_name = "GraphicsBitmapFill";
+	g_graphicsbitmapfill_class = gbmp;
+
+	Avm2Class* gend = avm2_builtin_class_api(ctx, "flash.display",
+	                                         "GraphicsEndFill",
+	                                         object_class, 10);
+	disp_implements(ctx, gend, igd, igfill);
+	g_graphicsendfill_class = gend;
 }
 
 // ===========================================================================
@@ -14851,8 +15362,8 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, graphics, "beginFill", gfx_begin_fill);
 	avm2_builtin_add_method(ctx, graphics, "beginGradientFill", gfx_begin_gradient_fill);
 	avm2_builtin_add_method(ctx, graphics, "beginBitmapFill", gfx_begin_bitmap_fill);
-	avm2_builtin_add_method(ctx, graphics, "lineBitmapStyle", gfx_line_fill_style);
-	avm2_builtin_add_method(ctx, graphics, "lineGradientStyle", gfx_line_fill_style);
+	avm2_builtin_add_method(ctx, graphics, "lineBitmapStyle", gfx_line_bitmap_style);
+	avm2_builtin_add_method(ctx, graphics, "lineGradientStyle", gfx_line_gradient_style);
 	avm2_builtin_add_method(ctx, graphics, "lineShaderStyle", gfx_line_fill_style);
 	avm2_builtin_add_method(ctx, graphics, "beginShaderFill", gfx_begin_bitmap_fill);
 	avm2_builtin_add_method(ctx, graphics, "endFill", gfx_end_fill);
@@ -15922,8 +16433,29 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 			                          p->bmp_matrix, p->bmp_repeat, p->bmp_smooth,
 			                          xid, cxid);
 		if (p->has_line && p->line_vert_count >= 3)
-			renderer_draw_tris(context, p->line_verts, p->line_vert_count,
-			                   p->lr, p->lg, p->lb, p->la, xid, cxid);
+		{
+			// The stroke's own fill style (lineGradientStyle / lineBitmapStyle
+			// / a GraphicsStroke carrying an IGraphicsFill). kind 0 is the
+			// legacy solid path.
+			if (p->lsty.kind == 2)
+				renderer_draw_gradient_tris(context, p->line_verts,
+				                            p->line_vert_count,
+				                            p->lsty.grad_type, p->lsty.grad_spread,
+				                            p->lsty.grad_interp, p->lsty.grad_focal,
+				                            p->lsty.grad_ramp, p->lsty.grad_fwd16,
+				                            xid, cxid);
+			else if (p->lsty.kind == 3 && p->lsty.bmp_px != NULL
+			         && p->lsty.bmp_w <= context->dynamic_bitmap_max_w
+			         && p->lsty.bmp_h <= context->dynamic_bitmap_max_h)
+				renderer_draw_bitmap_tris(context, p->line_verts,
+				                          p->line_vert_count, p->lsty.bmp_px,
+				                          p->lsty.bmp_w, p->lsty.bmp_h,
+				                          p->lsty.bmp_matrix, p->lsty.bmp_repeat,
+				                          p->lsty.bmp_smooth, xid, cxid);
+			else
+				renderer_draw_tris(context, p->line_verts, p->line_vert_count,
+				                   p->lr, p->lg, p->lb, p->la, xid, cxid);
+		}
 	}
 }
 
