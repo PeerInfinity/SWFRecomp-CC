@@ -772,6 +772,18 @@ typedef struct TextFieldRenderInfo {
 typedef void (*TextFieldRenderCallback)(const TextFieldRenderInfo* info, void* user_data);
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data);
 
+// EditText z-order window (s17 w2-gfx-edittext-bg). Ruffle paints a field's
+// background/border/glyphs from render_self, i.e. at the field's own display
+// depth; our iterators are a post-pass in child_mc_cache order. The root render
+// loops drive them per depth with these modes; every other caller leaves the
+// window at TF_WINDOW_ALL and sees the historical single-pass behaviour.
+#define TF_WINDOW_ALL      0   // no filtering (default)
+#define TF_WINDOW_AT_DEPTH 1   // only root-timeline fields at exactly this depth
+#define TF_WINDOW_REST     2   // everything the root walk could not place
+void actionSetTextFieldDepthWindow(int mode, int swf_depth, int swf_max_depth);
+void actionBeginTextFieldDepthPass(int swf_max_depth);
+int actionHasTextFieldAtDepth(int swf_depth);
+
 // Per-run formatting info (color, font_height) keyed by UTF-8 byte offsets
 // into TextFieldGlyphInfo.text_utf8. Runs cover the text consecutively. Used
 // only when text was set via htmlText/text with a TFRunTable populated; for

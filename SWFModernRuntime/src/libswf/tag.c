@@ -5288,8 +5288,17 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	// supplies a world matrix, allocate a GPU transform slot for it and emit
 	// the box in FIELD-LOCAL twips through that slot instead.
 	u32 xform_slot = 0;
-	float bt = 20.0f;   // border thickness along y, in local twips
-	float bl = 20.0f;   // border thickness along x, in local twips
+	// Ruffle's transform_stack is seeded with the STAGE VIEW MATRIX, so both
+	// `round_to_pixel_ties_even` in draw_device_text_box and the standing
+	// "line width of the border is always 1px regardless of zoom and transform"
+	// rule are expressed in DEVICE pixels, not stage pixels. At viewport
+	// scale_factor 2 that is a half-stage-pixel snapping grid and a
+	// half-stage-pixel border — the whole residual of
+	// visual/edittext/edittext_{background,border}_basic_scale2.
+	float dscale = (context != NULL && context->stage_scale > 0.0f)
+	             ? context->stage_scale : 1.0f;
+	float bt = 20.0f / dscale;   // border thickness along y, in local twips
+	float bl = 20.0f / dscale;   // border thickness along x, in local twips
 	int line_rect = 0;  // draw the border as Ruffle's open line-rect polyline
 	int device_box = (info->has_matrix && info->device_font);
 	if (device_box) {
@@ -5320,11 +5329,13 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 			if (cys[k] < miny) miny = cys[k];
 			if (cys[k] > maxy) maxy = cys[k];
 		}
-		// round_to_pixel_ties_even on origin and extent, independently.
-		x = rintf(minx / 20.0f) * 20.0f;
-		y = rintf(miny / 20.0f) * 20.0f;
-		w = rintf((maxx - minx) / 20.0f) * 20.0f;
-		h = rintf((maxy - miny) / 20.0f) * 20.0f;
+		// round_to_pixel_ties_even on origin and extent, independently — on the
+		// DEVICE pixel grid (see `dscale` above), then back to stage twips.
+		const float dtw = 20.0f / dscale;   // one device pixel, in stage twips
+		x = rintf(minx / dtw) * dtw;
+		y = rintf(miny / dtw) * dtw;
+		w = rintf((maxx - minx) / dtw) * dtw;
+		h = rintf((maxy - miny) / dtw) * dtw;
 		xform_slot = 0;   // already in stage twips
 		line_rect = 1;
 		// The edge pixel is added AFTER the background draw (below) — the
@@ -5371,8 +5382,8 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 		// per-axis scale.
 		float sx = sqrtf(info->m_a * info->m_a + info->m_b * info->m_b);
 		float sy = sqrtf(info->m_c * info->m_c + info->m_d * info->m_d);
-		if (sx > 1e-4f) bl = 20.0f / sx;
-		if (sy > 1e-4f) bt = 20.0f / sy;
+		if (sx > 1e-4f) bl = 20.0f / (sx * dscale);
+		if (sy > 1e-4f) bt = 20.0f / (sy * dscale);
 	}
 
 	if (info->has_background) {
@@ -5401,9 +5412,10 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 		float det = info->m_a * info->m_d - info->m_b * info->m_c;
 		int plain = 1;
 		if (fabsf(det) > 1e-6f) {
-			// local delta (twips) for one screen pixel along +x and +y
-			float ux =  info->m_d * 20.0f / det, uy = -info->m_b * 20.0f / det;
-			float vx = -info->m_c * 20.0f / det, vy =  info->m_a * 20.0f / det;
+			// local delta (twips) for one DEVICE pixel along +x and +y
+			const float dpx = 20.0f / dscale;
+			float ux =  info->m_d * dpx / det, uy = -info->m_b * dpx / det;
+			float vx = -info->m_c * dpx / det, vy =  info->m_a * dpx / det;
 			struct { int on; float dx, dy; } edges[2] = {
 				{ info->edge_x, ux, uy },
 				{ info->edge_y, vx, vy },
@@ -6148,6 +6160,22 @@ static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user
 	renderer_draw_bitmap_quad(context, info->pixels, info->width, info->height,
 		info->x_twips, info->y_twips, 0, 0);
 }
+
+// Paint the EditText box + glyphs of the root-timeline fields sitting at
+// exactly this display depth — Ruffle's `EditText::render_self` position
+// (s17 w2-gfx-edittext-bg). Called from the two root render loops so a field's
+// (white, BORDER-implied) background can no longer erase everything placed
+// above it. `actionBeginTextFieldDepthPass` builds the presence table once per
+// frame so this is O(1) on the depths that carry no field.
+static void tf_draw_at_root_depth(SWFAppContext* app_context, int depth,
+                                  int max_depth)
+{
+	if (!actionHasTextFieldAtDepth(depth)) return;
+	actionSetTextFieldDepthWindow(TF_WINDOW_AT_DEPTH, depth, max_depth);
+	actionIterateTextFields(textfield_render_cb, NULL);
+	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
+	actionSetTextFieldDepthWindow(TF_WINDOW_ALL, 0, 0);
+}
 #endif
 
 // Re-render current display list state (for headless per-tick image capture).
@@ -6361,6 +6389,11 @@ void tagRerenderFrame(SWFAppContext* app_context)
 
 	// Render display list
 	u32 active_clip_depth = 0;
+	// EditText boxes/glyphs are painted at their own depth from here on
+	// (tf_draw_at_root_depth); depth 0 is a legal PlaceObject depth that the
+	// loop below never visits, so it is flushed first.
+	actionBeginTextFieldDepthPass((int) max_depth);
+	tf_draw_at_root_depth(app_context, 0, (int) max_depth);
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		// End an active clip BEFORE the empty-depth skip, matching
@@ -6372,6 +6405,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			renderer_end_clip(context);
 			active_clip_depth = 0;
 		}
+		tf_draw_at_root_depth(app_context, (int) i, (int) max_depth);
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
 		// AVM1 setMask pairing (mask defect B) — see render_display_list.
@@ -6498,9 +6532,14 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		}
 	}
 
-	// Text field backgrounds/borders and glyph rendering
+	// Text field backgrounds/borders and glyph rendering. The root-timeline
+	// fields were already painted at their own depth inside the loop above, so
+	// this pass covers only what the walk could not place: createTextField
+	// fields, fields inside sprites, and orphans.
+	actionSetTextFieldDepthWindow(TF_WINDOW_REST, 0, (int) max_depth);
 	actionIterateTextFields(textfield_render_cb, NULL);
 	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
+	actionSetTextFieldDepthWindow(TF_WINDOW_ALL, 0, 0);
 	actionIterateOrphanTextFields(app_context, textfield_render_cb,
 		textfield_glyph_render_cb, app_context);
 
@@ -7340,6 +7379,12 @@ void tagShowFrame(SWFAppContext* app_context)
 
 	u16 active_clip_depth = 0;
 
+	// EditText boxes/glyphs are painted at their own depth from here on
+	// (tf_draw_at_root_depth); depth 0 is a legal PlaceObject depth that the
+	// loop below never visits, so it is flushed first.
+	actionBeginTextFieldDepthPass((int) max_depth);
+	tf_draw_at_root_depth(app_context, 0, (int) max_depth);
+
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		// End active clip if we've passed its range
@@ -7348,6 +7393,8 @@ void tagShowFrame(SWFAppContext* app_context)
 			renderer_end_clip(context);
 			active_clip_depth = 0;
 		}
+
+		tf_draw_at_root_depth(app_context, (int) i, (int) max_depth);
 
 		DisplayObject* obj = &display_list[i];
 
@@ -7536,8 +7583,12 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Render text field backgrounds, borders, and glyphs ---
 	// Dynamic text fields (createTextField) are tracked in child_mc_cache but not
 	// on the tag display list. Render their background/border rectangles here.
+	// Root-timeline fields were already painted at their own depth inside the
+	// loop above (Ruffle's render_self position), so they are excluded here.
+	actionSetTextFieldDepthWindow(TF_WINDOW_REST, 0, (int) max_depth);
 	actionIterateTextFields(textfield_render_cb, NULL);
 	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
+	actionSetTextFieldDepthWindow(TF_WINDOW_ALL, 0, 0);
 	actionIterateOrphanTextFields(app_context, textfield_render_cb,
 		textfield_glyph_render_cb, app_context);
 

@@ -27505,6 +27505,92 @@ static int tf_transform_positive_scale_only(float a, float b, float c, float d)
 	    && a > 0.0f && d > 0.0f;
 }
 
+// --- EditText z-order window (s17 w2-gfx-edittext-bg) ----------------------
+// Ruffle draws an EditText's background/border AND its glyphs from
+// `EditText::render_self` (core/src/display_object/edit_text.rs:2698), i.e. at
+// the field's own position in the display list. Our two text-field iterators
+// below run as ONE post-pass after the whole root display list has been
+// painted, walking child_mc_cache in CREATION order — so a field's box painted
+// over every sibling with a higher depth. DefineEditText has no background
+// flag of its own: Ruffle mirrors HAS_BACKGROUND from the tag's BORDER bit and
+// fills it white (edit_text.rs:303-331), so an ordinary bordered field placed
+// early at a low depth erased everything above it
+// (visual/edittext/edittext_{background,border}_basic{,_scale2}).
+//
+// The root render loops now call the pair once per display depth with
+// TF_WINDOW_AT_DEPTH set, then once at the end with TF_WINDOW_REST for
+// everything the root walk cannot place (createTextField fields, fields inside
+// sprites, orphans). Inside a window the iterators keep their existing
+// child_mc_cache order, and TF_WINDOW_ALL restores the old single-pass
+// behaviour for every other caller (browser-WASM paths, mask capture, ...).
+#define TF_TIMELINE_DEPTH_BASE (-16384)
+static int g_tf_window_mode = TF_WINDOW_ALL;
+static int g_tf_window_depth = 0;
+static int g_tf_window_max_depth = 0;
+static unsigned char* g_tf_depth_present = NULL;
+static int g_tf_depth_present_cap = 0;
+static int g_tf_depth_present_max = -1;
+
+void actionSetTextFieldDepthWindow(int mode, int swf_depth, int swf_max_depth)
+{
+	g_tf_window_mode = mode;
+	g_tf_window_depth = swf_depth;
+	g_tf_window_max_depth = swf_max_depth;
+}
+
+// 1 = this field lies outside the active window and must be skipped.
+static int tf_window_skip(MovieClip* mc)
+{
+	if (g_tf_window_mode == TF_WINDOW_ALL) return 0;
+	// Only ROOT-timeline fields carry a root display-list depth
+	// (mc->depth = swf_depth - 16384). Dynamic fields keep AS-space depths
+	// (>= 0) and sprite children are relative to their own parent, so both
+	// fall through to the REST pass, exactly where they are drawn today.
+	int rooted = (mc->parent == &root_movieclip
+	              && mc->depth >= TF_TIMELINE_DEPTH_BASE
+	              && mc->depth <= TF_TIMELINE_DEPTH_BASE + g_tf_window_max_depth);
+	if (g_tf_window_mode == TF_WINDOW_AT_DEPTH)
+		return !(rooted
+		         && mc->depth == TF_TIMELINE_DEPTH_BASE + g_tf_window_depth);
+	return rooted;   // TF_WINDOW_REST
+}
+
+// Build the per-frame "is there a root-timeline text field at this depth?"
+// table so the render loop can skip the two iterator walks on the (vast)
+// majority of depths — without it the interleave would be
+// O(max_depth * child_mc_count) every frame.
+void actionBeginTextFieldDepthPass(int swf_max_depth)
+{
+	g_tf_depth_present_max = -1;
+	if (swf_max_depth < 0) return;
+	if (swf_max_depth + 1 > g_tf_depth_present_cap) {
+		int ncap = swf_max_depth + 1;
+		unsigned char* nb = (unsigned char*) realloc(g_tf_depth_present,
+			(size_t) ncap);
+		if (nb == NULL) return;
+		g_tf_depth_present = nb;
+		g_tf_depth_present_cap = ncap;
+	}
+	memset(g_tf_depth_present, 0, (size_t)(swf_max_depth + 1));
+	g_tf_depth_present_max = swf_max_depth;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!MC_IS_TEXTFIELD(mc)) continue;
+		if (mc->parent != &root_movieclip) continue;
+		int d = mc->depth - TF_TIMELINE_DEPTH_BASE;
+		if (d < 0 || d > swf_max_depth) continue;
+		g_tf_depth_present[d] = 1;
+	}
+}
+
+int actionHasTextFieldAtDepth(int swf_depth)
+{
+	if (g_tf_depth_present == NULL) return 0;
+	if (swf_depth < 0 || swf_depth > g_tf_depth_present_max) return 0;
+	return g_tf_depth_present[swf_depth];
+}
+
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 {
 	int count = 0;
@@ -27512,6 +27598,7 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->depth == INT_MIN) continue;
 		if (!MC_IS_TEXTFIELD(mc)) continue;
+		if (tf_window_skip(mc)) continue;
 		if (mc->dynamic_props == NULL) continue;
 		if (!mc->visible) continue;
 		// A live setMask masker is never painted as ordinary content — it only
@@ -27583,6 +27670,22 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 		info.border_color = bd_color;
 		info.x = vis_off_x;
 		info.y = vis_off_y;
+		// The box is the DefineEditText bounds RECT, so a tag-defined field
+		// whose RECT does not start at the origin draws that far from the
+		// placement matrix's translation (Ruffle passes `self.0.bounds` straight
+		// into draw_{device_,}text_box). The glyph pass already carries this as
+		// `bounds_{x,y}min_twips`; the box pass used to drop it, which put the
+		// two `bounds = [-40,160]` fields of visual/edittext/edittext_border_basic
+		// 2 px down and right. Dynamic/createTextField fields
+		// (ng_textfield_idx == -2) have no static RECT — their mc->x already
+		// encodes the visual origin, so they stay at vis_off.
+		if (mc->ng_textfield_idx >= 0) {
+			s32 _bxmin, _bxmax, _bymin, _bymax;
+			ng_getTextFieldBounds(mc->ng_textfield_idx,
+				&_bxmin, &_bxmax, &_bymin, &_bymax);
+			info.x += (float)_bxmin / 20.0f;
+			info.y += (float)_bymin / 20.0f;
+		}
 		// RAW local size — the renderer adds Flash's right/bottom edge pixel in
 		// DEVICE space (it comes from rasterising the border polyline, so it
 		// does not scale with the field). Negative-dimension fields don't get
@@ -27904,6 +28007,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->depth == INT_MIN) continue;
 		if (!MC_IS_TEXTFIELD(mc)) continue;
+		if (tf_window_skip(mc)) continue;
 		if (mc->dynamic_props == NULL) continue;
 		if (!mc->visible) continue;
 
