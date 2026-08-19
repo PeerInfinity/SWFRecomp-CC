@@ -3209,6 +3209,31 @@ Avm2Value avm2_op_call(Avm2Activation* act, Avm2Value func, Avm2Value recv,
 	return avm2_call_value(act->ctx, func, recv, args, argc);
 }
 
+// CallStatic class-side receiver test: `recv` is a class object whose class
+// definition is `env_class` (or a class object minted from the same ABC class:
+// same defining file and the same instance initializer), or a subclass's.
+static int callstatic_recv_is_class_side(const Avm2Class* env_class, Avm2Value recv)
+{
+	if (recv.kind != AVM2_VALUE_OBJECT || recv.u.obj == NULL)
+		return 0;
+	// Class object -> walk its class_ref chain (class-side call); instance ->
+	// walk its own class chain (an instance of a SECOND class object minted
+	// from the same ABC class is not `avm2_coerce_to_class`-compatible with
+	// the first one's Avm2Class, yet Flash accepts it — 4th line of the test).
+	const Avm2Class* start = (recv.u.obj->kind == AVM2_OBJ_CLASS)
+	                       ? recv.u.obj->class_ref : recv.u.obj->cls;
+	for (const Avm2Class* c = start; c != NULL; c = c->super_class)
+	{
+		if (c == env_class)
+			return 1;
+		if (c->instance_init.file != NULL
+		    && c->instance_init.file == env_class->instance_init.file
+		    && c->instance_init.method_index == env_class->instance_init.method_index)
+			return 1;
+	}
+	return 0;
+}
+
 Avm2Value avm2_op_callstatic(Avm2Activation* act, uint32_t method_index, Avm2Value recv,
                              const Avm2Value* args, uint32_t argc)
 {
@@ -3235,7 +3260,15 @@ Avm2Value avm2_op_callstatic(Avm2Activation* act, uint32_t method_index, Avm2Val
 	// (avm2/method_association test3: `CallStatic Test/test1` on a bare
 	// `{}` object). method_env_class is exactly Ruffle's `method.bound_class()`
 	// — the declaring class of the method_info's first vtable binding.
-	if (env_class != NULL)
+	// ...but a STATIC method's bound class is the c_class, and
+	// `coerce_to_type(c_class)` accepts the class OBJECT (any class object
+	// minted from the same class definition — avm2/getouterscope_two_classobjects
+	// runs `CallStatic Class1/staticFunc` on two distinct Class1 class objects
+	// and Flash prints 50 for both). Coercing a class-object receiver to the
+	// INSTANCE class would throw #1034 there, so detect the class-side case
+	// by identity of the class definition (same defining file + iinit) and
+	// leave the receiver alone.
+	if (env_class != NULL && !callstatic_recv_is_class_side(env_class, recv))
 	{
 		recv = avm2_coerce_to_class(act->ctx, env_class, recv);
 	}
