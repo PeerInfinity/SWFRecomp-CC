@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-15T09:18:14.505973+00:00",
-    "old_git_sha": "86434112a75946b377d5d329b234e47fa83a957c",
-    "new_timestamp": "2026-08-15T10:09:49.327422+00:00",
-    "new_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
+    "old_timestamp": "2026-08-15T10:09:49.327422+00:00",
+    "old_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
+    "new_timestamp": "2026-08-19T13:54:51.812915+00:00",
+    "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 142,
@@ -13,10 +16,10 @@
     "old_effective_pass": 144,
     "old_total": 144,
     "old_pass_rate": 98.6,
-    "new_pass": 142,
+    "new_pass": 137,
     "new_ruffle_matched": 2,
-    "new_effective_pass": 144,
-    "new_total": 144,
+    "new_effective_pass": 139,
+    "new_total": 139,
     "new_pass_rate": 98.6,
     "old_mismatched_lines": 49,
     "new_mismatched_lines": 49,
@@ -25,9 +28,71 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 144,
+    "unchanged": 139,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 5
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "edittext/edittext_underline",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "edittext/edittext_underline_scale2",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "filters/any_blur_scales_with_screen",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "filters/avm1_convolution_initialization",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      },
+      "new_lines": null
+    },
+    {
+      "test": "filters/bevel",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    }
+  ]
 }

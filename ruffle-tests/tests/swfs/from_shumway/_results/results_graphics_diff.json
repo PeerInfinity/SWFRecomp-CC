@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-15T09:18:14.541323+00:00",
-    "old_git_sha": "86434112a75946b377d5d329b234e47fa83a957c",
-    "new_timestamp": "2026-08-15T10:09:49.363298+00:00",
-    "new_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
+    "old_timestamp": "2026-08-15T10:09:49.363298+00:00",
+    "old_git_sha": "aeebf9ede383da45c61df6c9e10f29c8425fee8b",
+    "new_timestamp": "2026-08-19T13:54:51.845280+00:00",
+    "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 210,
@@ -13,21 +16,151 @@
     "old_effective_pass": 222,
     "old_total": 229,
     "old_pass_rate": 91.7,
-    "new_pass": 210,
+    "new_pass": 205,
     "new_ruffle_matched": 12,
-    "new_effective_pass": 222,
-    "new_total": 229,
-    "new_pass_rate": 91.7,
+    "new_effective_pass": 217,
+    "new_total": 221,
+    "new_pass_rate": 92.8,
     "old_mismatched_lines": 293,
-    "new_mismatched_lines": 293,
+    "new_mismatched_lines": 160,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 132,
+    "newly_passing": 2,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 229,
+    "status_changed": 2,
+    "unchanged": 219,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 8
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "acid/acid-shapes",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 120,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 120,
+        "expected_lines": 120,
+        "matching_lines": 120
+      }
+    },
+    {
+      "test": "as3-loader/loaderinfo/loaded-content-properties",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 36
+      },
+      "new_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      }
+    },
+    {
+      "test": "bitmapdata/draw-and-read",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "bitmapdata/getpixel-from-embedded",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "blendmode/blendmode_1",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "blendmode/blendmode_2",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "blendmode/blendmode_3",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "button1",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "button2",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "button3",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    }
+  ]
 }
