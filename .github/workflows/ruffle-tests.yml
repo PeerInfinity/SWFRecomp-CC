@@ -201,7 +201,14 @@ jobs:
         run: python3 -m pip install --upgrade pip Pillow
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake ccache
+        run: |
+          # Bare apt-get has no timeout: on 2026-08-19 two runs sat 5 h in this
+          # step on a wedged mirror. Bound each attempt and retry.
+          for i in 1 2 3; do
+            sudo timeout 600 apt-get update && sudo timeout 900 apt-get install -y build-essential cmake ccache && break
+            echo "apt-get attempt $i failed; retrying"; sleep 30
+            [ "$i" = 3 ] && { echo 'apt-get failed after 3 attempts'; exit 1; }
+          done
 
       # Graphics mode needs Vulkan + a prebuilt Dawn library. Dawn is built by
       # .github/workflows/build-dawn.yml and stored in the GitHub Actions
@@ -362,7 +369,14 @@ jobs:
           python-version: '3.x'
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+        run: |
+          # Bare apt-get has no timeout: on 2026-08-19 two runs sat 5 h in this
+          # step on a wedged mirror. Bound each attempt and retry.
+          for i in 1 2 3; do
+            sudo timeout 600 apt-get update && sudo timeout 900 apt-get install -y build-essential cmake && break
+            echo "apt-get attempt $i failed; retrying"; sleep 30
+            [ "$i" = 3 ] && { echo 'apt-get failed after 3 attempts'; exit 1; }
+          done
 
       # --- Dawn cache: restore-or-build, then save. Mirrors build-dawn.yml.
       # This populates the Dawn cache before any shards run, so shard-level
@@ -522,7 +536,14 @@ jobs:
           EOF
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential ccache
+        run: |
+          # Bare apt-get has no timeout: on 2026-08-19 two runs sat 5 h in this
+          # step on a wedged mirror. Bound each attempt and retry.
+          for i in 1 2 3; do
+            sudo timeout 600 apt-get update && sudo timeout 900 apt-get install -y build-essential ccache && break
+            echo "apt-get attempt $i failed; retrying"; sleep 30
+            [ "$i" = 3 ] && { echo 'apt-get failed after 3 attempts'; exit 1; }
+          done
 
       # Dawn comes from the cache that setup-parallel populated; see the
       # single-test job for how that cache is produced and keyed.
@@ -857,7 +878,14 @@ jobs:
         run: python3 -m pip install --upgrade pip Pillow
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential ccache
+        run: |
+          # Bare apt-get has no timeout: on 2026-08-19 two runs sat 5 h in this
+          # step on a wedged mirror. Bound each attempt and retry.
+          for i in 1 2 3; do
+            sudo timeout 600 apt-get update && sudo timeout 900 apt-get install -y build-essential ccache && break
+            echo "apt-get attempt $i failed; retrying"; sleep 30
+            [ "$i" = 3 ] && { echo 'apt-get failed after 3 attempts'; exit 1; }
+          done
 
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
