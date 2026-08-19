@@ -1,0 +1,44 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -3884,16 +3884,33 @@
+ 	Avm2Object* target = (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+ 		? act->args[0].u.obj : NULL;
+ 	if (self == NULL) return avm2_undefined();
++	// getBounds/getRect do NOT reject a null targetCoordinateSpace, despite
++	// the parameter being typed non-nullable: Ruffle reads it as
++	// `args.try_get_object(0).and_then(as_display_object).unwrap_or(dobj)`
++	// (display_object.rs:1038 / :1060), so null, undefined, a missing
++	// argument, and a non-DisplayObject all mean "my own coordinate space".
++	// avm2/displayobject_getrect calls `getBounds(null)` sixteen times and
++	// expects sixteen rects; nothing in the corpus expects #2007 here.
+ 	if (target == NULL || avm2_display_ext_of(ctx, target) == NULL)
+ 	{
+-		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+-		                 "Error #2007: Parameter targetCoordinateSpace must be "
+-		                 "non-null.");
++		target = self;
++	}
++	// "Getting the clip's bounds in its own coordinate space; no AABB
++	// transform needed" (get_dobj_bounds, display_object.rs:1011). Going
++	// through the matrix pair instead would round-trip every corner through
++	// mat_invert's whole-twip quantisation for nothing.
++	Mat m;
++	if (target == self)
++	{
++		m = mat_identity();
++	}
++	else
++	{
++		Mat mw = display_l2g_matrix(ctx, self);
++		Mat tw = display_l2g_matrix(ctx, target);
++		Mat ti = mat_invert(&tw);
++		m = mat_mul(&ti, &mw);
+ 	}
+-	Mat mw = display_l2g_matrix(ctx, self);
+-	Mat tw = display_l2g_matrix(ctx, target);
+-	Mat ti = mat_invert(&tw);
+-	Mat m = mat_mul(&ti, &mw);
+ 	Rect r = { 0, 0, 0, 0, 0 };
+ 	bounds_with_transform(ctx, self, &m, &r);
+ 	extern Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,

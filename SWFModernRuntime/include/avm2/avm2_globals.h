@@ -646,6 +646,19 @@ typedef struct Avm2DisplayObjectExt
 	// `opaque_bg_set == 0` reads back as `null`, never `undefined`.
 	uint8_t opaque_bg_set;
 	uint32_t opaque_bg_rgb;      // 0xRRGGBB, alpha implicit 255
+
+	// COMMITTED scrollRect. Ruffle keeps two rects per object: `next_scroll_
+	// rect`, which is what AS just wrote and what the `scrollRect` getter
+	// reports, and `scroll_rect`, which is what bounds, hit tests and the
+	// local<->global matrices actually read. `DisplayObject::pre_render`
+	// copies one to the other once per frame, just before the object is drawn
+	// (display_object.rs:2426-2430) — so a rect assigned mid-frame does not
+	// affect geometry until the next render. `has_scroll_rect` + `sr_*` above
+	// are the `next` half; these are the committed half. Latched from the
+	// frame loop (avm2_commit_scroll_rects), never from the renderer, so
+	// NO_GRAPHICS and graphics builds agree.
+	uint8_t sr_committed;
+	int32_t csr_xmin, csr_ymin, csr_xmax, csr_ymax;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.

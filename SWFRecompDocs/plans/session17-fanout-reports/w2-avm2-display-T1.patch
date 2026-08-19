@@ -1,0 +1,157 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -10150,6 +10150,99 @@
+ 
+ static Mat display_world_matrix(Avm2Context* ctx, Avm2Object* obj);
+ 
++// ---------------------------------------------------------------------------
++// Stage.quality (Ruffle render/src/quality.rs StageQuality)
++// ---------------------------------------------------------------------------
++// The live setting is a Stage field in Ruffle; here it is one file-static,
++// because the only two consumers are the AS-visible `Stage.quality` accessor
++// and `Transform.concatenatedMatrix`'s off-stage scale (transform.rs:121-127).
++// Rendering is NOT driven from it: the sample count is fixed at build time by
++// the harness's -DMSAA_SAMPLES (verify_output.py:2550), so a mid-run
++// `stage.quality = "low"` cannot change what the GPU already built — exactly
++// as in Ruffle, whose renderer also keeps its own pipeline sample count.
++//
++// The initial value is derived from that same -DMSAA_SAMPLES so the AS-visible
++// default agrees with the mode the harness asked for: the harness only ever
++// emits 1 (quality = "low") or leaves the default 4, so this is a two-way
++// mapping in practice; the 2/8/16 arms are written out for completeness.
++#ifndef MSAA_SAMPLES
++#define MSAA_SAMPLES 4
++#endif
++
++typedef enum
++{
++	AVM2_SQ_LOW = 0, AVM2_SQ_MEDIUM, AVM2_SQ_HIGH, AVM2_SQ_BEST,
++	AVM2_SQ_8X8, AVM2_SQ_8X8_LINEAR, AVM2_SQ_16X16, AVM2_SQ_16X16_LINEAR
++} Avm2StageQuality;
++
++static Avm2StageQuality g_avm2_stage_quality =
++#if MSAA_SAMPLES == 1
++	AVM2_SQ_LOW;
++#elif MSAA_SAMPLES == 2
++	AVM2_SQ_MEDIUM;
++#elif MSAA_SAMPLES == 8
++	AVM2_SQ_8X8;
++#elif MSAA_SAMPLES == 16
++	AVM2_SQ_16X16;
++#else
++	AVM2_SQ_HIGH;
++#endif
++
++// transform.rs:121-127, verbatim.
++static double avm2_stage_quality_scale(void)
++{
++	switch (g_avm2_stage_quality)
++	{
++		case AVM2_SQ_LOW:            return 20.0;
++		case AVM2_SQ_MEDIUM:         return 10.0;
++		case AVM2_SQ_8X8:
++		case AVM2_SQ_8X8_LINEAR:     return 2.5;
++		case AVM2_SQ_16X16:
++		case AVM2_SQ_16X16_LINEAR:   return 1.25;
++		default:                     return 5.0;   // High | Best
++	}
++}
++
++// StageQuality::from_str — AVM2's setter uses the case-SENSITIVE `parse()`
++// (stage.rs:413); an unrecognised name leaves the setting unchanged.
++static int avm2_stage_quality_parse(const Avm2String* s, Avm2StageQuality* out)
++{
++	static const struct { const char* name; Avm2StageQuality q; } tbl[] = {
++		{ "low", AVM2_SQ_LOW }, { "medium", AVM2_SQ_MEDIUM },
++		{ "high", AVM2_SQ_HIGH }, { "best", AVM2_SQ_BEST },
++		{ "8x8", AVM2_SQ_8X8 }, { "8x8linear", AVM2_SQ_8X8_LINEAR },
++		{ "16x16", AVM2_SQ_16X16 }, { "16x16linear", AVM2_SQ_16X16_LINEAR },
++	};
++	if (s == NULL) return 0;
++	for (size_t i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++)
++	{
++		size_t n = strlen(tbl[i].name);
++		if (s->len == n && memcmp(s->utf8, tbl[i].name, n) == 0)
++		{
++			*out = tbl[i].q;
++			return 1;
++		}
++	}
++	return 0;
++}
++
++// StageQuality::into_avm_str — Flash always reports uppercase, and the two
++// linear settings report as their non-linear twin (quality.rs:50-62).
++static const char* avm2_stage_quality_avm_str(void)
++{
++	switch (g_avm2_stage_quality)
++	{
++		case AVM2_SQ_LOW:            return "LOW";
++		case AVM2_SQ_MEDIUM:         return "MEDIUM";
++		case AVM2_SQ_BEST:           return "BEST";
++		case AVM2_SQ_8X8:
++		case AVM2_SQ_8X8_LINEAR:     return "8X8";
++		case AVM2_SQ_16X16:
++		case AVM2_SQ_16X16_LINEAR:   return "16X16";
++		default:                     return "HIGH";
++	}
++}
++
+ static Avm2Value transform_get_concatenated_matrix(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -10176,7 +10269,7 @@
+ 			ctx, m.a, m.b, m.c, m.d,
+ 			twips_to_pixels((int32_t) m.tx), twips_to_pixels((int32_t) m.ty)));
+ 	}
+-	double scale = 5.0;  // StageQuality::High
++	double scale = avm2_stage_quality_scale();
+ 	return avm2_object_value(make_geom_matrix(
+ 		ctx, (ext != NULL ? ext->mtx_a : 1) * scale,
+ 		ext != NULL ? ext->mtx_b : 0, ext != NULL ? ext->mtx_c : 0,
+@@ -11535,14 +11628,33 @@
+ 	return avm2_string(avm2_string_from_literal(act->ctx, "normal"));
+ }
+ 
++// Full-screen is not reachable from a headless player, so the setter is inert.
++// It used to be wired to stage_set_quality purely because that was a no-op;
++// now that `quality` really stores a value, displayState needs its own.
++static Avm2Value stage_set_display_state(Avm2Activation* act)
++{
++	(void) act;
++	return avm2_undefined();
++}
++
+ static Avm2Value stage_get_quality(Avm2Activation* act)
+ {
+-	return avm2_string(avm2_string_from_literal(act->ctx, "HIGH"));
++	return avm2_string(avm2_string_from_literal(act->ctx,
++	                                            avm2_stage_quality_avm_str()));
+ }
+ 
+ static Avm2Value stage_set_quality(Avm2Activation* act)
+ {
+-	(void) act;
++	// stage.rs:412 "Invalid values result in no change."
++	if (act->argc > 0)
++	{
++		const Avm2String* s = avm2_coerce_to_string(act->ctx, act->args[0]);
++		Avm2StageQuality q;
++		if (avm2_stage_quality_parse(s, &q))
++		{
++			g_avm2_stage_quality = q;
++		}
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -14695,7 +14807,7 @@
+ 	avm2_builtin_add_getter(ctx, stage, "contentsScaleFactor",
+ 	                        stage_get_contents_scale_factor);
+ 	add_getset(ctx, stage, "displayState", stage_get_display_state,
+-	           stage_set_quality);
++	           stage_set_display_state);
+ 	add_getset(ctx, stage, "quality", stage_get_quality, stage_set_quality);
+ 	add_getset(ctx, stage, "stageFocusRect", stage_get_stage_focus_rect,
+ 	           stage_set_stage_focus_rect);

@@ -1,0 +1,53 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -487,14 +487,31 @@
+ 	return (double) t / 20.0;
+ }
+ 
++// Ruffle stores a display object's scale as `Percent(f64)`, never as the unit
++// proportion ActionScript sees: `Percent::from_unit(u) = u * 100.0` on the way
++// in, `Percent::unit() = p / 100.0` on the way out (core/src/types.rs:5-20).
++// EVERY producer goes through from_unit — the matrix decomposition below
++// (display_object.rs:499-500) and `set_scale_x`/`set_width`/`set_height`
++// (:1715) alike — and every consumer, the `scaleX`/`scaleY` getters and the
++// matrix rebuild, goes through unit(). The round trip is exact for dyadic
++// values and one ULP off for everything else: `200/65` reads back as
++// 3.0769230769230775 rather than the naive 3.076923076923077, and no other
++// expression reproduces the three constants avm2/bounds_mode expects.
++// (The float cast into mtx_a/b/c/d swallows the difference, so this moves
++// script-visible scale reads only, never geometry.)
++static double scale_percent_roundtrip(double unit)
++{
++	return (unit * 100.0) / 100.0;
++}
++
+ static void cache_scale_rotation(Avm2DisplayObjectExt* ext)
+ {
+ 	if (ext->scale_rot_cached) return;
+ 	double a = ext->mtx_a, b = ext->mtx_b, c = ext->mtx_c, d = ext->mtx_d;
+ 	double rotation_x = atan2(b, a);
+ 	double rotation_y = atan2(-c, d);
+-	ext->scale_x = sqrt(a * a + b * b);
+-	ext->scale_y = sqrt(c * c + d * d);
++	ext->scale_x = scale_percent_roundtrip(sqrt(a * a + b * b));
++	ext->scale_y = scale_percent_roundtrip(sqrt(c * c + d * d));
+ 	ext->rotation_deg = rotation_x * (180.0 / M_PI);
+ 	ext->skew = rotation_y - rotation_x;
+ 	ext->scale_rot_cached = 1;
+@@ -550,6 +567,7 @@
+ {
+ 	mark_transformed_by_script(ext);
+ 	cache_scale_rotation(ext);
++	unit = scale_percent_roundtrip(unit);   // Percent::from_unit / .unit()
+ 	ext->scale_x = unit;  // NaN stored verbatim (getter reports it)
+ 	double calc = isnan(unit) ? 0.0 : unit;
+ 	double rot = ext->rotation_deg * (M_PI / 180.0);
+@@ -562,6 +580,7 @@
+ {
+ 	mark_transformed_by_script(ext);
+ 	cache_scale_rotation(ext);
++	unit = scale_percent_roundtrip(unit);   // Percent::from_unit / .unit()
+ 	ext->scale_y = unit;
+ 	double calc = isnan(unit) ? 0.0 : unit;
+ 	double rot = ext->rotation_deg * (M_PI / 180.0);

@@ -487,14 +487,31 @@ static double twips_to_pixels(int32_t t)
 	return (double) t / 20.0;
 }
 
+// Ruffle stores a display object's scale as `Percent(f64)`, never as the unit
+// proportion ActionScript sees: `Percent::from_unit(u) = u * 100.0` on the way
+// in, `Percent::unit() = p / 100.0` on the way out (core/src/types.rs:5-20).
+// EVERY producer goes through from_unit — the matrix decomposition below
+// (display_object.rs:499-500) and `set_scale_x`/`set_width`/`set_height`
+// (:1715) alike — and every consumer, the `scaleX`/`scaleY` getters and the
+// matrix rebuild, goes through unit(). The round trip is exact for dyadic
+// values and one ULP off for everything else: `200/65` reads back as
+// 3.0769230769230775 rather than the naive 3.076923076923077, and no other
+// expression reproduces the three constants avm2/bounds_mode expects.
+// (The float cast into mtx_a/b/c/d swallows the difference, so this moves
+// script-visible scale reads only, never geometry.)
+static double scale_percent_roundtrip(double unit)
+{
+	return (unit * 100.0) / 100.0;
+}
+
 static void cache_scale_rotation(Avm2DisplayObjectExt* ext)
 {
 	if (ext->scale_rot_cached) return;
 	double a = ext->mtx_a, b = ext->mtx_b, c = ext->mtx_c, d = ext->mtx_d;
 	double rotation_x = atan2(b, a);
 	double rotation_y = atan2(-c, d);
-	ext->scale_x = sqrt(a * a + b * b);
-	ext->scale_y = sqrt(c * c + d * d);
+	ext->scale_x = scale_percent_roundtrip(sqrt(a * a + b * b));
+	ext->scale_y = scale_percent_roundtrip(sqrt(c * c + d * d));
 	ext->rotation_deg = rotation_x * (180.0 / M_PI);
 	ext->skew = rotation_y - rotation_x;
 	ext->scale_rot_cached = 1;
@@ -550,6 +567,7 @@ static void set_scale_x_internal(Avm2DisplayObjectExt* ext, double unit)
 {
 	mark_transformed_by_script(ext);
 	cache_scale_rotation(ext);
+	unit = scale_percent_roundtrip(unit);   // Percent::from_unit / .unit()
 	ext->scale_x = unit;  // NaN stored verbatim (getter reports it)
 	double calc = isnan(unit) ? 0.0 : unit;
 	double rot = ext->rotation_deg * (M_PI / 180.0);
@@ -562,6 +580,7 @@ static void set_scale_y_internal(Avm2DisplayObjectExt* ext, double unit)
 {
 	mark_transformed_by_script(ext);
 	cache_scale_rotation(ext);
+	unit = scale_percent_roundtrip(unit);   // Percent::from_unit / .unit()
 	ext->scale_y = unit;
 	double calc = isnan(unit) ? 0.0 : unit;
 	double rot = ext->rotation_deg * (M_PI / 180.0);
@@ -723,15 +742,18 @@ static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
 	if (ext == NULL) return;
 	// A scrollRect completely overrides the object's bounds — children
 	// included — with a box of the rect's SIZE at the object's own origin
-	// (Ruffle display_object.rs bounds_with_transform).
-	if (ext->has_scroll_rect)
+	// (Ruffle display_object.rs bounds_with_transform). This reads the
+	// COMMITTED rect (`scroll_rect()`, not `next_scroll_rect()`): a rect
+	// assigned this frame does not reach the geometry until the frame loop
+	// latches it.
+	if (ext->sr_committed)
 	{
 		Rect sr;
 		sr.valid = 1;
 		sr.xmin = 0;
 		sr.ymin = 0;
-		sr.xmax = ext->sr_xmax - ext->sr_xmin;
-		sr.ymax = ext->sr_ymax - ext->sr_ymin;
+		sr.xmax = ext->csr_xmax - ext->csr_xmin;
+		sr.ymax = ext->csr_ymax - ext->csr_ymin;
 		rect_union_xform(acc, &sr, m);
 		return;
 	}
@@ -3456,6 +3478,10 @@ static void avm2_loader_drain(Avm2Context* ctx);
 // literally a single global test — until an AVM1 child actually loads.
 static void avm1_child_tick(Avm2Context* ctx);
 
+// Committed-scrollRect latch (Ruffle DisplayObject::pre_render); defined with
+// the local<->global matrix helpers further down.
+static void avm2_commit_scroll_rects(Avm2Context* ctx, Avm2Object* obj);
+
 void avm2_display_run_tick(Avm2Context* ctx)
 {
 	if (ctx->stage == NULL) return;
@@ -3564,6 +3590,10 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// on-stage TextField (Ruffle EditText::render_self ->
 	// apply_autosize_bounds; edittext_autosize_lazy_bounds_events).
 	render_apply_text_bounds(ctx, ctx->stage, 1);
+	// ...and latches every pending scrollRect (Ruffle pre_render). Same
+	// reason this lives here and not in the renderer: NO_GRAPHICS has no
+	// render walk, and scrollRect is script-visible geometry.
+	avm2_commit_scroll_rects(ctx, ctx->stage);
 
 	// Timers: Ruffle runs update_timers AFTER run_frame (player.rs::tick), so
 	// fire at the tail — the µs clock advances one frame here.
@@ -3747,6 +3777,87 @@ static Mat display_world_matrix(Avm2Context* ctx, Avm2Object* obj)
 	return m;
 }
 
+// Ruffle `local_to_global_matrix_without_own_scroll_rect` (display_object.rs
+// :1487) — "Should only be used to implement Transform.concatenatedMatrix".
+// Identical to display_world_matrix above except that every ANCESTOR carrying
+// a committed scrollRect folds a `Matrix::translate(-x_min, -y_min)` in ahead
+// of its own matrix. The object's OWN rect is deliberately excluded.
+static Mat display_l2g_matrix_no_own_sr(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Mat m = ext != NULL ? ext_matrix(ext) : mat_identity();
+	Avm2Object* p = ext != NULL ? ext->parent : NULL;
+	while (p != NULL)
+	{
+		Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, p);
+		if (pe == NULL) break;
+		if (pe->sr_committed)
+		{
+			Mat tr = { 1, 0, 0, 1,
+			           -(double) pe->csr_xmin, -(double) pe->csr_ymin };
+			m = mat_mul(&tr, &m);
+		}
+		Mat pm = ext_matrix(pe);
+		m = mat_mul(&pm, &m);
+		p = pe->parent;
+	}
+	return m;
+}
+
+// Ruffle `local_to_global_matrix` (display_object.rs:1505): the same walk with
+// the object's own committed scrollRect translate applied FIRST (i.e. on the
+// right). Everything script-visible that maps local <-> stage space goes
+// through this — localToGlobal/globalToLocal, getBounds/getRect, hitTest*,
+// pixelBounds — while `display_world_matrix` stays the raw ancestor concat the
+// renderer walks (the render path applies the scroll translate itself, next to
+// the stencil it pushes for the same rect).
+static Mat display_l2g_matrix(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	Mat m = display_l2g_matrix_no_own_sr(ctx, obj);
+	if (ext != NULL && ext->sr_committed)
+	{
+		Mat tr = { 1, 0, 0, 1,
+		           -(double) ext->csr_xmin, -(double) ext->csr_ymin };
+		m = mat_mul(&m, &tr);
+	}
+	return m;
+}
+
+// The per-frame latch behind those two. Ruffle runs it from
+// `DisplayObject::pre_render`, which `render_children` calls for every child on
+// a render list — including invisible ones — but only recurses through
+// children it actually renders (container.rs:559). Driving it from the frame
+// loop instead of the renderer is what keeps NO_GRAPHICS and graphics builds
+// in step; the call site is avm2_display_run_tick, immediately before the
+// render phase, so a rect assigned during this frame's scripts is only visible
+// to geometry from the NEXT frame on.
+static void avm2_commit_scroll_rects(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL) return;
+	ext->sr_committed = ext->has_scroll_rect;
+	if (ext->has_scroll_rect)
+	{
+		ext->csr_xmin = ext->sr_xmin;
+		ext->csr_ymin = ext->sr_ymin;
+		ext->csr_xmax = ext->sr_xmax;
+		ext->csr_ymax = ext->sr_ymax;
+	}
+	for (uint32_t i = 0; i < ext->render_len; i++)
+	{
+		Avm2Object* child = ext->render_list[i];
+		Avm2DisplayObjectExt* ce = avm2_display_ext_of(ctx, child);
+		if (ce == NULL) continue;
+		// pre_render runs on every child; the recursion is gated on the child
+		// actually being rendered (visible, or drawn as a clip mask).
+		if (ce->visible || ce->clip_depth > 0)
+			avm2_commit_scroll_rects(ctx, child);
+		else
+			ce->sr_committed = ce->has_scroll_rect;
+	}
+}
+
 // Invert an affine Mat (a b c d tx ty).
 static Mat mat_invert(const Mat* m)
 {
@@ -3773,16 +3884,33 @@ static Avm2Value do_get_bounds(Avm2Activation* act)
 	Avm2Object* target = (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
 		? act->args[0].u.obj : NULL;
 	if (self == NULL) return avm2_undefined();
+	// getBounds/getRect do NOT reject a null targetCoordinateSpace, despite
+	// the parameter being typed non-nullable: Ruffle reads it as
+	// `args.try_get_object(0).and_then(as_display_object).unwrap_or(dobj)`
+	// (display_object.rs:1038 / :1060), so null, undefined, a missing
+	// argument, and a non-DisplayObject all mean "my own coordinate space".
+	// avm2/displayobject_getrect calls `getBounds(null)` sixteen times and
+	// expects sixteen rects; nothing in the corpus expects #2007 here.
 	if (target == NULL || avm2_display_ext_of(ctx, target) == NULL)
 	{
-		avm2_throw_error(ctx, ctx->builtins.type_error_class,
-		                 "Error #2007: Parameter targetCoordinateSpace must be "
-		                 "non-null.");
+		target = self;
 	}
-	Mat mw = display_world_matrix_fwd(ctx, self);
-	Mat tw = display_world_matrix_fwd(ctx, target);
-	Mat ti = mat_invert(&tw);
-	Mat m = mat_mul(&ti, &mw);
+	// "Getting the clip's bounds in its own coordinate space; no AABB
+	// transform needed" (get_dobj_bounds, display_object.rs:1011). Going
+	// through the matrix pair instead would round-trip every corner through
+	// mat_invert's whole-twip quantisation for nothing.
+	Mat m;
+	if (target == self)
+	{
+		m = mat_identity();
+	}
+	else
+	{
+		Mat mw = display_l2g_matrix(ctx, self);
+		Mat tw = display_l2g_matrix(ctx, target);
+		Mat ti = mat_invert(&tw);
+		m = mat_mul(&ti, &mw);
+	}
 	Rect r = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, self, &m, &r);
 	extern Avm2Value avm2_text_new_rectangle(Avm2Context* ctx, double x, double y,
@@ -3816,7 +3944,7 @@ static Avm2Value point_transform_native(Avm2Activation* act, int to_local)
 			y = avm2_coerce_to_number(ctx, pt->slots[2]);
 		}
 	}
-	Mat m = display_world_matrix(ctx, self);
+	Mat m = display_l2g_matrix(ctx, self);
 	if (to_local) m = mat_invert(&m);
 	// Ruffle render/src/matrix.rs `impl Mul<Point<Twips>>`: the point is
 	// quantised to whole twips first (Twips::from_pixels truncates), the f32
@@ -3897,7 +4025,7 @@ static Avm2Value do_hit_test_point(Avm2Activation* act)
 		// root does not, and that is the one whose local space the point is in.
 		if (rext != NULL && rext->loader_info == NULL)
 		{
-			Mat rm = display_world_matrix(ctx, root);
+			Mat rm = display_l2g_matrix(ctx, root);
 			double gx = rm.a * tx + rm.c * ty + rm.tx;
 			double gy = rm.b * tx + rm.d * ty + rm.ty;
 			tx = gx;
@@ -3911,7 +4039,7 @@ static Avm2Value do_hit_test_point(Avm2Activation* act)
 		return avm2_bool(hit_test_shape_obj(ctx, self, tx, ty,
 		                                    HT_AVM_HIT_TEST) != 0);
 	}
-	Mat m = display_world_matrix(ctx, self);
+	Mat m = display_l2g_matrix(ctx, self);
 	Rect r = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, self, &m, &r);
 	int hit = r.valid && tx >= r.xmin && tx <= r.xmax && ty >= r.ymin
@@ -3950,8 +4078,8 @@ static Avm2Value do_hit_test_object(Avm2Activation* act)
 	// world_bounds applies pending autosize bounds on TextFields.
 	avm2_text_apply_pending_bounds(ctx, self);
 	avm2_text_apply_pending_bounds(ctx, other);
-	Mat ma = display_world_matrix(ctx, self);
-	Mat mb = display_world_matrix(ctx, other);
+	Mat ma = display_l2g_matrix(ctx, self);
+	Mat mb = display_l2g_matrix(ctx, other);
 	Rect ra = { 0, 0, 0, 0, 0 }, rb = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, self, &ma, &ra);
 	bounds_with_transform(ctx, other, &mb, &rb);
@@ -10161,6 +10289,99 @@ static Avm2Value transform_set_color_transform(Avm2Activation* act)
 
 static Mat display_world_matrix(Avm2Context* ctx, Avm2Object* obj);
 
+// ---------------------------------------------------------------------------
+// Stage.quality (Ruffle render/src/quality.rs StageQuality)
+// ---------------------------------------------------------------------------
+// The live setting is a Stage field in Ruffle; here it is one file-static,
+// because the only two consumers are the AS-visible `Stage.quality` accessor
+// and `Transform.concatenatedMatrix`'s off-stage scale (transform.rs:121-127).
+// Rendering is NOT driven from it: the sample count is fixed at build time by
+// the harness's -DMSAA_SAMPLES (verify_output.py:2550), so a mid-run
+// `stage.quality = "low"` cannot change what the GPU already built — exactly
+// as in Ruffle, whose renderer also keeps its own pipeline sample count.
+//
+// The initial value is derived from that same -DMSAA_SAMPLES so the AS-visible
+// default agrees with the mode the harness asked for: the harness only ever
+// emits 1 (quality = "low") or leaves the default 4, so this is a two-way
+// mapping in practice; the 2/8/16 arms are written out for completeness.
+#ifndef MSAA_SAMPLES
+#define MSAA_SAMPLES 4
+#endif
+
+typedef enum
+{
+	AVM2_SQ_LOW = 0, AVM2_SQ_MEDIUM, AVM2_SQ_HIGH, AVM2_SQ_BEST,
+	AVM2_SQ_8X8, AVM2_SQ_8X8_LINEAR, AVM2_SQ_16X16, AVM2_SQ_16X16_LINEAR
+} Avm2StageQuality;
+
+static Avm2StageQuality g_avm2_stage_quality =
+#if MSAA_SAMPLES == 1
+	AVM2_SQ_LOW;
+#elif MSAA_SAMPLES == 2
+	AVM2_SQ_MEDIUM;
+#elif MSAA_SAMPLES == 8
+	AVM2_SQ_8X8;
+#elif MSAA_SAMPLES == 16
+	AVM2_SQ_16X16;
+#else
+	AVM2_SQ_HIGH;
+#endif
+
+// transform.rs:121-127, verbatim.
+static double avm2_stage_quality_scale(void)
+{
+	switch (g_avm2_stage_quality)
+	{
+		case AVM2_SQ_LOW:            return 20.0;
+		case AVM2_SQ_MEDIUM:         return 10.0;
+		case AVM2_SQ_8X8:
+		case AVM2_SQ_8X8_LINEAR:     return 2.5;
+		case AVM2_SQ_16X16:
+		case AVM2_SQ_16X16_LINEAR:   return 1.25;
+		default:                     return 5.0;   // High | Best
+	}
+}
+
+// StageQuality::from_str — AVM2's setter uses the case-SENSITIVE `parse()`
+// (stage.rs:413); an unrecognised name leaves the setting unchanged.
+static int avm2_stage_quality_parse(const Avm2String* s, Avm2StageQuality* out)
+{
+	static const struct { const char* name; Avm2StageQuality q; } tbl[] = {
+		{ "low", AVM2_SQ_LOW }, { "medium", AVM2_SQ_MEDIUM },
+		{ "high", AVM2_SQ_HIGH }, { "best", AVM2_SQ_BEST },
+		{ "8x8", AVM2_SQ_8X8 }, { "8x8linear", AVM2_SQ_8X8_LINEAR },
+		{ "16x16", AVM2_SQ_16X16 }, { "16x16linear", AVM2_SQ_16X16_LINEAR },
+	};
+	if (s == NULL) return 0;
+	for (size_t i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++)
+	{
+		size_t n = strlen(tbl[i].name);
+		if (s->len == n && memcmp(s->utf8, tbl[i].name, n) == 0)
+		{
+			*out = tbl[i].q;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// StageQuality::into_avm_str — Flash always reports uppercase, and the two
+// linear settings report as their non-linear twin (quality.rs:50-62).
+static const char* avm2_stage_quality_avm_str(void)
+{
+	switch (g_avm2_stage_quality)
+	{
+		case AVM2_SQ_LOW:            return "LOW";
+		case AVM2_SQ_MEDIUM:         return "MEDIUM";
+		case AVM2_SQ_BEST:           return "BEST";
+		case AVM2_SQ_8X8:
+		case AVM2_SQ_8X8_LINEAR:     return "8X8";
+		case AVM2_SQ_16X16:
+		case AVM2_SQ_16X16_LINEAR:   return "16X16";
+		default:                     return "HIGH";
+	}
+}
+
 static Avm2Value transform_get_concatenated_matrix(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -10182,12 +10403,12 @@ static Avm2Value transform_get_concatenated_matrix(Avm2Activation* act)
 	}
 	if (on_stage && ext != NULL && !ext->is_stage)
 	{
-		Mat m = display_world_matrix(ctx, text->target);
+		Mat m = display_l2g_matrix_no_own_sr(ctx, text->target);
 		return avm2_object_value(make_geom_matrix(
 			ctx, m.a, m.b, m.c, m.d,
 			twips_to_pixels((int32_t) m.tx), twips_to_pixels((int32_t) m.ty)));
 	}
-	double scale = 5.0;  // StageQuality::High
+	double scale = avm2_stage_quality_scale();
 	return avm2_object_value(make_geom_matrix(
 		ctx, (ext != NULL ? ext->mtx_a : 1) * scale,
 		ext != NULL ? ext->mtx_b : 0, ext != NULL ? ext->mtx_c : 0,
@@ -10633,7 +10854,7 @@ static Avm2Value transform_get_pixel_bounds(Avm2Activation* act)
 	extern int avm2_text_lazy_suspend(Avm2Context* ctx, Avm2Object* obj);
 	extern void avm2_text_lazy_restore(Avm2Context* ctx, Avm2Object* obj, int saved);
 	int saved = avm2_text_lazy_suspend(ctx, text->target);
-	Mat m = display_world_matrix(ctx, text->target);
+	Mat m = display_l2g_matrix(ctx, text->target);
 	Rect r = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, text->target, &m, &r);
 	avm2_text_lazy_restore(ctx, text->target, saved);
@@ -11546,14 +11767,33 @@ static Avm2Value stage_get_display_state(Avm2Activation* act)
 	return avm2_string(avm2_string_from_literal(act->ctx, "normal"));
 }
 
+// Full-screen is not reachable from a headless player, so the setter is inert.
+// It used to be wired to stage_set_quality purely because that was a no-op;
+// now that `quality` really stores a value, displayState needs its own.
+static Avm2Value stage_set_display_state(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}
+
 static Avm2Value stage_get_quality(Avm2Activation* act)
 {
-	return avm2_string(avm2_string_from_literal(act->ctx, "HIGH"));
+	return avm2_string(avm2_string_from_literal(act->ctx,
+	                                            avm2_stage_quality_avm_str()));
 }
 
 static Avm2Value stage_set_quality(Avm2Activation* act)
 {
-	(void) act;
+	// stage.rs:412 "Invalid values result in no change."
+	if (act->argc > 0)
+	{
+		const Avm2String* s = avm2_coerce_to_string(act->ctx, act->args[0]);
+		Avm2StageQuality q;
+		if (avm2_stage_quality_parse(s, &q))
+		{
+			g_avm2_stage_quality = q;
+		}
+	}
 	return avm2_undefined();
 }
 
@@ -12601,7 +12841,7 @@ static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py
 	// `world_bounds().contains(point)` guard Ruffle applies first.
 	int morph_pick = ext->is_morph_shape && ext->shape_vert_count > 0;
 	if (!self.valid && !morph_pick) return 0;
-	Mat m = display_world_matrix(ctx, obj);
+	Mat m = display_l2g_matrix(ctx, obj);
 	Mat inv = mat_invert(&m);
 	double lx = inv.a * px + inv.c * py + inv.tx;
 	double ly = inv.b * px + inv.d * py + inv.ty;
@@ -12637,6 +12877,21 @@ static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
 	// mask is normally hidden, and the mask still has to answer hit tests.
 	if ((options & HT_SKIP_INVISIBLE) && !ext->visible && ext->maskee == NULL)
 		return 0;
+	// movie_clip.rs:2688 gates the whole container walk on
+	// `world_bounds(Engine).contains(point)`. For an ordinary container that
+	// box is the union of everything below it, so the gate can never change
+	// an answer and we skip the cost; a COMMITTED scrollRect, though, replaces
+	// the box outright with the rect, and that is exactly the crop that makes
+	// `hitTestPoint(..., true)` read false outside a scrolled clip.
+	if (ext->sr_committed)
+	{
+		Mat sw = display_l2g_matrix(ctx, obj);
+		Rect sb = { 0, 0, 0, 0, 0 };
+		bounds_with_transform(ctx, obj, &sw, &sb);
+		if (!sb.valid || px < sb.xmin || px > sb.xmax
+		    || py < sb.ymin || py > sb.ymax)
+			return 0;
+	}
 	if ((options & HT_SKIP_MASK) && ext->maskee != NULL) return 0;
 	if (ext->mask != NULL
 	    && !hit_test_shape_obj(ctx, ext->mask, px, py, HT_SKIP_INVISIBLE))
@@ -14807,7 +15062,7 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, stage, "contentsScaleFactor",
 	                        stage_get_contents_scale_factor);
 	add_getset(ctx, stage, "displayState", stage_get_display_state,
-	           stage_set_quality);
+	           stage_set_display_state);
 	add_getset(ctx, stage, "quality", stage_get_quality, stage_set_quality);
 	add_getset(ctx, stage, "stageFocusRect", stage_get_stage_focus_rect,
 	           stage_set_stage_focus_rect);
