@@ -25,6 +25,18 @@
 #     output2.txt and no output.txt, so discover_tests() skips them entirely.
 #     The entries are inert; they were kept as documentation, not pruned as
 #     "nonexistent".
+#
+# RE-RUN 2026-08-18 (s17 wave-2 `tooling-hygiene`, trace board T9 / §5).
+# The prune criterion was re-applied to this file against `aeebf9ede`
+# (run 31877239992, graphics / categories=full): **zero entries qualify**, so
+# nothing was removed here. `netstream_play_flv_screen` is `pass` on trace and
+# stays for trap 1 above (its image comparison still fails). What DID change is
+# that four entries which had no rationale of any kind — `load_vars`,
+# `loadvariables_method`, `stylesheet_load`, `sandbox_type_remote` — gained one,
+# inline, below. They are NOT in ACCEPTED_DIFFS.md and must not be added there:
+# that doc is for diffs that can never match, and every one of these four names
+# a specific unimplemented function or mapping. Two (`load_vars` 29/35 and
+# `sandbox_type_remote` 1/3) are near-pass re-triage leads.
 
 # --- Navigator/getURL (Ruffle-internal tracing) ---
 # These tests trace Ruffle's internal navigator dispatch output
@@ -41,6 +53,43 @@ geturl
 # These tests require network connections, HTTP POST, or browser-level form submission.
 # (form_loader_encoding_2, form_loader_encoding_3 removed 2026-08-01 — both now
 #  `pass`; the net/socket tranches supplied the infrastructure they needed.)
+#
+# BUCKET HEADER RE-TRIAGED 2026-08-18 (s17 wave-2 `tooling-hygiene`, trace board
+# T9 / §5d). "Require network connections" is no longer true of any of the three
+# below — the net/socket tranches landed and every one of them fetches its
+# fixture from the test directory. Each is an ordinary missing-implementation
+# row, so each now carries its own measured reason. Statuses at `aeebf9ede`
+# (run 31877239992). Prune on `pass`, per the header criterion.
+#   load_vars             29/35 (avm1). The first 29 lines — every `LoadVars`
+#                         API assertion, `decode`, `getBytesLoaded`, and the
+#                         `onData` payload on line 35 — all match. Missing is
+#                         exactly ONE of the two expected `Load: true /
+#                         this.myVar / this.also / this.loaded` blocks: the
+#                         fixture completes two loads of `testvars.txt` (one via
+#                         `sendAndLoad(..., loadVars2, 'POST')`, one via
+#                         `load()`), and only one of them dispatches `onLoad`.
+#                         4 lines + a blank. A near-pass re-triage lead, not a
+#                         capability gap.
+#   loadvariables_method  0/7 — we emit NOTHING. `MovieClip.loadVariables` is a
+#                         registered *name* (action.c ~:15731, so
+#                         `typeof mc.loadVariables == "function"`) with no
+#                         branch in the MovieClip method dispatch (~:72078,
+#                         where `loadMovie`/`unloadMovie` live), so calling it
+#                         is a silent no-op. The ActionGetURL2 *tag* form
+#                         (`load_variables_flag`, ~:48776) IS implemented — this
+#                         row is the method form only. The expected
+#                         `Navigator::fetch:` block is already emitted for other
+#                         tests via `log_fetch = true` + `utils.c
+#                         swf_log_navigate`, so nothing else is missing.
+#   stylesheet_load       1/49 (avm1). `TextField.StyleSheet.load(url)` is a
+#                         literal stub — `stylesheetLoad()` in action.c ~:17028
+#                         is commented "— stub" and returns `undefined`, which
+#                         is the single wrong line we emit (`undefined` where
+#                         Flash prints `true`). Every remaining line is
+#                         cascade: no `onLoad`, so no `parse()`, so all four
+#                         `getStyle()` blocks are absent. `StyleSheet.parse` and
+#                         `getStyle` themselves already work (the sibling
+#                         `stylesheet` tests pass), so this is one function.
 form_loader_encoding_4
 load_vars
 loadvariables_method
@@ -102,6 +151,21 @@ shared_object_self_ref
 # remaining half needs an AVM1<->AVM2 delivery bridge, which is a real gap rather
 # than absent infrastructure, so it is left visible in the filtered results.)
 # (edittext_ime_focus_lost removed — IME implemented, now passing)
+#
+# sandbox_type_remote — REASON ADDED 2026-08-18 (s17 `tooling-hygiene`, board
+# T9 / §5d). 1/3 in BOTH avm1 and avm2 at `aeebf9ede`. We print the fixture's
+# first line correctly (`Current sandbox type: localWithNetwork`); the two
+# missing lines come from two child SWFs the fixture loads over
+# `http://localhost:8000/` (`test.as`: `loader.loadClip("http://localhost:8000/
+# test-network.swf", ...)` then, from `onLoadInit`, `noNetworkMc.loadMovie(
+# "http://localhost:8000/test-no-network.swf")`), each of which must report
+# `Security.sandboxType == "remote"` because it was fetched from a network
+# origin. The two child SWFs ship in the test's own `localhost/` subdirectory.
+# So this is NOT "infrastructure not yet available": it needs (a) an
+# `http://localhost:8000/NAME` -> `<test>/localhost/NAME` mapping in the child
+# movie table, and (b) a per-movie sandbox type keyed on how the movie was
+# fetched, rather than one global value. Two lines, two mechanisms — grade it
+# before writing it off. Prune on `pass`.
 sandbox_type_remote
 
 # --- Ruffle behavior differs from Flash spec ---

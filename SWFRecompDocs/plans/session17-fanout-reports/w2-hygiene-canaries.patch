@@ -1,0 +1,64 @@
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 067171ab3..0f4fa0f78 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -20,6 +20,22 @@
+ # about the render gap, not about the canary (false-negative mode 10).
+ # AVM1-route filters proper are still Tier-2-only; the AVM2 `.filters` route
+ # gained a Tier-1 member (glow_pass_scaling) in session 16.
++#
++# SESSION 17 ADDITIONS (s17 wave-2 `tooling-hygiene`, per the s17 gfx board's
++# canary audit). The audit found the set had ZERO coverage of three of that
++# session's four handed-off change classes. Four members added, all Tier 1,
++# all verified image-PASSING in run 31877239992 at `aeebf9ede` and all
++# re-rendered locally before landing:
++#   bitmap fills   from_shumway/acid/acid-bitmap-fill{,-2}
++#   displacement   visual/filters/displacement_map_through_applyFilter
++#   EditText bg    visual/edittext/edittext_border_transform
++# STANDING BLIND SPOTS the audit could not close, recorded so nobody assumes
++# otherwise:
++#   * cacheAsBitmap x TEXT — the two cab members are shape-only; every
++#     cab+text row in the corpus fails CI, so no Tier-1 member exists.
++#   * RUNTIME gradient ramps — all three gradient members are STATIC gradients.
++#     All 7 runtime-gradient image rows fail CI; there is nothing to add.
++#   * morph, visual-suite masks, TLF/rich text — as noted above, Tier 2 only.
+ 
+ # tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
+ avm1/color                                  # solid fill + colour transform   1 cmp
+@@ -49,6 +65,36 @@ regression/mask_nested_intersect            # NESTED clipDepth masks          1
+                                             #   repo golden, exact at tol 0;
+                                             #   pins Equal/IncrementClamp
+                                             #   intersection (s14 gfx-stencil)
++from_shumway/acid/acid-bitmap-fill          # BITMAP FILL, smoothed           1 cmp
++                                            #   added s17. The set's first
++                                            #   bitmap-STYLE fill member (the
++                                            #   two existing bitmap members are
++                                            #   BitmapData APIs, not fills).
++                                            #   ~9.4 % outlier slack — a real
++                                            #   A/B margin.
++from_shumway/acid/acid-bitmap-fill-2        # BITMAP FILL, repeating          1 cmp
++                                            #   added s17. Tightest bitmap row
++                                            #   in the corpus, ~3.5 % slack:
++                                            #   treat a DIFFERS here as a
++                                            #   warning first, a win second.
++visual/filters/displacement_map_through_applyFilter
++                                            # DISPLACEMENT MAP filter         1 cmp
++                                            #   added s17. The ONLY CI-passing
++                                            #   displacement row in the corpus
++                                            #   (max diff 2 vs tolerance 4), so
++                                            #   it is the only absolute verdict
++                                            #   this family has anywhere.
++visual/edittext/edittext_border_transform   # EDITTEXT BACKGROUND / BORDER    6 cmps
++                                            #   added s17. 4 of 6 comparisons
++                                            #   pass at tolerance 0 (.01 .02
++                                            #   .03 .05) — those four carry an
++                                            #   absolute verdict. output.04 and
++                                            #   output.06 FAIL on CI (51 and 44
++                                            #   outliers, max 207) and are
++                                            #   A/B-only: tier-2 semantics
++                                            #   inside a tier-1 member. Read
++                                            #   the per-comparison rows, never
++                                            #   the test-level verdict.
+ 
+ # tier=2  (CI-failing / skipped; A/B signal only)
+ visual/simple_shapes/masks                  # mask compositing (largest gap)

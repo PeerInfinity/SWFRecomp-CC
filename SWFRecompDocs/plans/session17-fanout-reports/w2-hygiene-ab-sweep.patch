@@ -1,0 +1,360 @@
+diff --git a/ruffle-tests/recompiler_ab_sweep.sh b/ruffle-tests/recompiler_ab_sweep.sh
+new file mode 100755
+index 000000000..e818d69a4
+--- /dev/null
++++ b/ruffle-tests/recompiler_ab_sweep.sh
+@@ -0,0 +1,306 @@
++#!/bin/bash
++# =============================================================================
++# recompiler_ab_sweep.sh — corpus-wide recompiler A/B: which tests can this
++#                          `SWFRecomp/` change possibly move?
++# =============================================================================
++#
++# WHY THIS EXISTS
++# ---------------
++# A recompiler change is graded by CI over ~4500 tests, but the tests it can
++# affect are exactly the tests whose GENERATED C changes. Everything else is
++# byte-identical input to gcc and cannot move trace or pixels. This script
++# computes that set exactly instead of guessing it — and it is cheap
++# (~25 min for the whole corpus at `-P 2`).
++#
++# Three s16/s17 agents each re-wrote this ad hoc before it was promoted here:
++#   * session16-fanout-reports/w2-gfx-flatten-legC-report.md  (`sweep.sh`
++#     + `boundscheck.sh` — the full-corpus A/B and the shape-bounds projection
++#     that REFUTED the premise the leg had been held on: 418 tests' C changed,
++#     0 bounds arguments moved)
++#   * session16-fanout-reports/w2-gfx-gradient-report.md      (same pattern)
++#   * session17-fanout-reports/w2-scope-opt-report.md         (4493-SWF marker
++#     sweep + a 139-test byte A/B: exact answer "1 test affected")
++#   * session17-fanout-reports/w2-avm2-smalls-report.md       (single-binary
++#     audit sweep driven by an env var — the `--audit-env` mode below)
++#
++# WHAT IT DOES
++# ------------
++# For every `test.swf` under the given suite roots (default: the whole corpus):
++#   1. copy the SWF into a private temp dir (the tracked/gitignored test dirs
++#      are NEVER touched, so no sibling agent's `Recompiled*` cache is poisoned)
++#   2. run the OLD binary there, snapshot RecompiledTags/Scripts/ABC
++#   3. run the NEW binary there, snapshot again
++#   4. `diff -r` the two snapshots
++# and prints the exact affected-test list.
++#
++# USAGE
++# -----
++#   ruffle-tests/recompiler_ab_sweep.sh --old-bin OLD [--new-bin NEW] [SUITE...]
++#   ruffle-tests/recompiler_ab_sweep.sh --old <git-sha>              [SUITE...]
++#   ruffle-tests/recompiler_ab_sweep.sh --audit-env VAR=FILE         [SUITE...]
++#
++# SUITE arguments are directories (absolute, or relative to the repo root);
++# with none given, every suite under `ruffle-tests/tests/swfs/` is swept.
++#
++# OPTIONS
++#   --new-bin PATH    "after" recompiler   (default: SWFRecomp/build/SWFRecomp)
++#   --old-bin PATH    "before" recompiler
++#   --old SHA         build the "before" recompiler from a git SHA into a temp
++#                     dir (`git archive` + cmake; no git worktree is created,
++#                     so nothing in the shared checkout is mutated)
++#   -P, --jobs N      parallel recompiles (default 2 — the machine is shared)
++#   --timeout SEC     per-recompile timeout (default 300)
++#   --list FILE       explicit `suite/test` list instead of `find`
++#   --limit N         only the first N SWFs (smoke tests)
++#   --bounds-check    ALSO project the AS-visible shape/sprite BOUNDS arguments
++#                     of every `tagDefine*` call and the structural shape of
++#                     `tagMain.c`, and report BOUNDS_DIFF / STRUCT_DIFF
++#                     separately from "the generated C differs at all".
++#                     This is the projection that killed leg C's premise:
++#                     geometry changed for 418 tests, bounds for none.
++#   --audit-env V=F   single-binary REPORT-ONLY mode: run only the new binary
++#                     with `V=<tmp>/F` set and collect every non-empty F it
++#                     writes.  Use when the change is gated behind an audit
++#                     env var and you want the candidate rows, not a diff.
++#   --out DIR         results dir (default: a fresh mktemp -d)
++#   --keep            keep the temp dir of every DIFFERS test for inspection
++#   --config PATH     config.toml (default ruffle-tests/_shared/config.toml)
++#   -h, --help        this text
++#
++# OUTPUT (under --out)
++#   results.tsv   test <TAB> verdict <TAB> detail        (one row per SWF)
++#   affected.txt  the exact affected-test list           (also on stdout)
++#   bounds.tsv    only with --bounds-check
++#   audit.csv     only with --audit-env
++#
++# Verdicts: IDENTICAL · DIFFERS · OLD_FAIL · NEW_FAIL · BOTH_FAIL · NO_OUTPUT
++#
++# GOTCHAS (learned the hard way — see the reports above)
++#   * `-P 2` is the shared-machine cap. A recompile that trips `--timeout`
++#     under load is a FALSE failure; re-run those rows at `-P 1` before
++#     believing them. `ulimit -v 4194304` is applied per recompile so a runaway
++#     allocation fails that one test instead of the machine.
++#   * This script answers "can it move?", never "did it get better". Feed
++#     `affected.txt` to verify_output.py / render_canary.py for the grading.
++#   * An empty `affected.txt` with a non-empty corpus means the change is inert
++#     for the tests — which is also the smoke test for this script (run it with
++#     `--old-bin` == `--new-bin`).
++# =============================================================================
++set -u
++
++SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
++SWFS_DIR="$REPO_ROOT/ruffle-tests/tests/swfs"
++
++NEW_BIN="$REPO_ROOT/SWFRecomp/build/SWFRecomp"
++OLD_BIN=""
++OLD_SHA=""
++JOBS=2
++TIMEOUT=300
++LIST_FILE=""
++LIMIT=0
++BOUNDS=0
++AUDIT_ENV=""
++OUT_DIR=""
++KEEP=0
++CONFIG="$REPO_ROOT/ruffle-tests/_shared/config.toml"
++SUITES=()
++
++usage() { sed -n '2,90p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; }
++
++while [ $# -gt 0 ]; do
++  case "$1" in
++    --new-bin)     NEW_BIN="$2"; shift 2 ;;
++    --old-bin)     OLD_BIN="$2"; shift 2 ;;
++    --old)         OLD_SHA="$2"; shift 2 ;;
++    -P|--jobs)     JOBS="$2"; shift 2 ;;
++    --timeout)     TIMEOUT="$2"; shift 2 ;;
++    --list)        LIST_FILE="$2"; shift 2 ;;
++    --limit)       LIMIT="$2"; shift 2 ;;
++    --bounds-check) BOUNDS=1; shift ;;
++    --audit-env)   AUDIT_ENV="$2"; shift 2 ;;
++    --out)         OUT_DIR="$2"; shift 2 ;;
++    --keep)        KEEP=1; shift ;;
++    --config)      CONFIG="$2"; shift 2 ;;
++    -h|--help)     usage ;;
++    -*)            echo "unknown option: $1" >&2; exit 2 ;;
++    *)             SUITES+=("$1"); shift ;;
++  esac
++done
++
++[ -f "$CONFIG" ] || { echo "no config.toml at $CONFIG" >&2; exit 2; }
++[ -x "$NEW_BIN" ] || { echo "no recompiler binary at $NEW_BIN (build it: cmake -B SWFRecomp/build -DCMAKE_BUILD_TYPE=Release && cmake --build SWFRecomp/build -j)" >&2; exit 2; }
++
++if [ -z "$OUT_DIR" ]; then
++  OUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/recomp_ab.XXXXXX")"
++fi
++mkdir -p "$OUT_DIR"
++WORK="$OUT_DIR/work"; rm -rf "$WORK"; mkdir -p "$WORK"
++
++# ---------------------------------------------------------------- old binary
++if [ -n "$OLD_SHA" ]; then
++  [ -z "$OLD_BIN" ] || { echo "--old and --old-bin are mutually exclusive" >&2; exit 2; }
++  SRC="$OUT_DIR/old_src"
++  echo "[old] git archive $OLD_SHA -> $SRC" >&2
++  rm -rf "$SRC"; mkdir -p "$SRC"
++  git -C "$REPO_ROOT" archive "$OLD_SHA" SWFRecomp SWFModernRuntime/third_party/libtess2 \
++    | tar -x -C "$SRC" || { echo "git archive failed" >&2; exit 2; }
++  cmake -S "$SRC/SWFRecomp" -B "$SRC/build" -DCMAKE_BUILD_TYPE=Release >"$OUT_DIR/old_build.log" 2>&1 \
++    && cmake --build "$SRC/build" -j "$(nproc)" >>"$OUT_DIR/old_build.log" 2>&1 \
++    || { echo "old-binary build failed; see $OUT_DIR/old_build.log" >&2; exit 2; }
++  OLD_BIN="$SRC/build/SWFRecomp"
++fi
++
++if [ -z "$OLD_BIN" ] && [ -z "$AUDIT_ENV" ]; then
++  echo "need --old-bin, --old <sha>, or --audit-env VAR=FILE" >&2; exit 2
++fi
++[ -z "$OLD_BIN" ] || [ -x "$OLD_BIN" ] || { echo "not executable: $OLD_BIN" >&2; exit 2; }
++
++# ------------------------------------------------------------------ the list
++LIST="$OUT_DIR/tests.txt"
++if [ -n "$LIST_FILE" ]; then
++  sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$LIST_FILE" | grep -v '^$' \
++    | sed "s|^|$SWFS_DIR/|; s|$|/test.swf|" > "$LIST"
++else
++  if [ ${#SUITES[@]} -eq 0 ]; then SUITES=("$SWFS_DIR"); fi
++  : > "$LIST"
++  for s in "${SUITES[@]}"; do
++    case "$s" in /*) d="$s" ;; *) d="$REPO_ROOT/$s" ;; esac
++    [ -d "$d" ] || d="$SWFS_DIR/$s"
++    [ -d "$d" ] || { echo "no such suite dir: $s" >&2; exit 2; }
++    find "$d" -name test.swf -print >> "$LIST"
++  done
++  sort -o "$LIST" "$LIST"
++fi
++if [ "$LIMIT" -gt 0 ]; then head -n "$LIMIT" "$LIST" > "$LIST.lim"; mv "$LIST.lim" "$LIST"; fi
++TOTAL=$(wc -l < "$LIST")
++echo "[sweep] $TOTAL SWFs · -P $JOBS · new=$NEW_BIN · old=${OLD_BIN:-<audit-only>}" >&2
++echo "[sweep] out=$OUT_DIR" >&2
++
++# ------------------------------------------------------------------ the work
++# Snapshot every generated-C directory the recompiler can write.
++GEN_DIRS="RecompiledTags RecompiledScripts RecompiledABC"
++
++run_leg() {  # run_leg <bin> <dir> <legname>
++  local bin="$1" d="$2" leg="$3"
++  local rc=0
++  for g in $GEN_DIRS; do rm -rf "$d/$g"; done
++  ( cd "$d" && timeout "$TIMEOUT" bash -c "ulimit -v 4194304; exec \"\$0\" \"\$1\"" \
++      "$bin" "$d/config.toml" >"$d/$leg.log" 2>&1 ) || rc=$?
++  mkdir -p "$d/$leg"
++  for g in $GEN_DIRS; do [ -d "$d/$g" ] && cp -r "$d/$g" "$d/$leg/" 2>/dev/null; done
++  return $rc
++}
++
++# The AS-visible bounds projection (--bounds-check). `tagDefineShape(ctx, TYPE,
++# char_id, shape_offset, shape_size, XMIN, XMAX, YMIN, YMAX)`: args 4/5 are
++# offsets into the vertex table and MUST move whenever geometry changes; the
++# trailing four are the bounds the ActionScript surface can observe
++# (getBounds / _width / _height / hit tests).
++bounds_project() {  # bounds_project <dir> <leg>
++  local d="$1" leg="$2"
++  grep -h -oE 'tagDefineShape\(app_context, [A-Z_]+, [0-9]+, [0-9]+, [0-9]+, (-?[0-9]+, ){3}-?[0-9]+\)' \
++      "$d/$leg/RecompiledTags/"*.c 2>/dev/null \
++    | sed -E 's/tagDefineShape\(app_context, ([A-Z_]+), ([0-9]+), [0-9]+, [0-9]+, /\1 \2 /' \
++    > "$d/$leg.bounds"
++  grep -h -oE 'tagDefine(MorphShape|Sprite|Text|EditText|Button)\([^)]*\)' \
++      "$d/$leg/RecompiledTags/"*.c 2>/dev/null >> "$d/$leg.bounds"
++  # structural projection: tagMain.c with every integer replaced by N, so only
++  # non-numeric structure (call order, character kinds, names) survives.
++  sed -E 's/[0-9]+/N/g' "$d/$leg/RecompiledTags/tagMain.c" 2>/dev/null > "$d/$leg.struct"
++}
++
++one() {
++  local swf="$1"
++  local name; name=$(echo "$swf" | sed "s|^$SWFS_DIR/||; s|/test\.swf$||")
++  local key;  key=$(echo "$name" | tr '/' '_')
++  local d="$WORK/$key"
++  rm -rf "$d"; mkdir -p "$d" || return 0
++  cp "$swf" "$d/test.swf" 2>/dev/null || { rm -rf "$d"; return 0; }
++  cp "$CONFIG" "$d/config.toml"
++
++  # ---- audit-only mode -----------------------------------------------------
++  if [ -n "$AUDIT_ENV" ]; then
++    local var="${AUDIT_ENV%%=*}" file="${AUDIT_ENV#*=}"
++    ( cd "$d" && env "$var=$d/$file" timeout "$TIMEOUT" \
++        bash -c "ulimit -v 4194304; exec \"\$0\" \"\$1\"" "$NEW_BIN" "$d/config.toml" \
++        >/dev/null 2>&1 )
++    if [ -s "$d/$file" ]; then
++      sed "s|^|$name,|" "$d/$file" >> "$OUT_DIR/audit.csv.$$"
++      printf '%s\tAUDIT_HIT\t%s\n' "$name" "$(wc -l < "$d/$file")"
++    else
++      printf '%s\tIDENTICAL\t-\n' "$name"
++    fi
++    rm -rf "$d"; return 0
++  fi
++
++  # ---- A/B mode ------------------------------------------------------------
++  local orc=0 nrc=0
++  run_leg "$OLD_BIN" "$d" old || orc=$?
++  run_leg "$NEW_BIN" "$d" new || nrc=$?
++
++  local have_old=0 have_new=0
++  for g in $GEN_DIRS; do [ -d "$d/old/$g" ] && have_old=1; [ -d "$d/new/$g" ] && have_new=1; done
++
++  local verdict detail="-"
++  if [ $orc -ne 0 ] && [ $nrc -ne 0 ]; then verdict=BOTH_FAIL; detail="rc=$orc/$nrc"
++  elif [ $orc -ne 0 ];                 then verdict=OLD_FAIL;  detail="rc=$orc"
++  elif [ $nrc -ne 0 ];                 then verdict=NEW_FAIL;  detail="rc=$nrc"
++  elif [ $have_old -eq 0 ] && [ $have_new -eq 0 ]; then verdict=NO_OUTPUT
++  elif diff -rq "$d/old" "$d/new" >/dev/null 2>&1; then verdict=IDENTICAL
++  else
++    verdict=DIFFERS
++    detail=$(diff -rq "$d/old" "$d/new" 2>/dev/null | wc -l)
++    detail="files=$detail"
++  fi
++
++  if [ $BOUNDS -eq 1 ] && [ "$verdict" = DIFFERS ]; then
++    bounds_project "$d" old; bounds_project "$d" new
++    local b=SAME s=SAME
++    cmp -s "$d/old.bounds" "$d/new.bounds" || b=BOUNDS_DIFF
++    cmp -s "$d/old.struct" "$d/new.struct" || s=STRUCT_DIFF
++    printf '%s\t%s\t%s\t%s\n' "$name" "$b" "$s" "$(wc -l < "$d/old.bounds")" \
++      >> "$OUT_DIR/bounds.tsv.$$"
++  fi
++
++  printf '%s\t%s\t%s\n' "$name" "$verdict" "$detail"
++
++  if [ $KEEP -eq 1 ] && [ "$verdict" = DIFFERS ]; then
++    rm -rf "$d/test.swf"
++  else
++    rm -rf "$d"
++  fi
++}
++
++export -f one run_leg bounds_project
++export SWFS_DIR WORK CONFIG OLD_BIN NEW_BIN TIMEOUT GEN_DIRS BOUNDS AUDIT_ENV OUT_DIR KEEP
++
++xargs -a "$LIST" -d '\n' -I{} -P "$JOBS" bash -c 'one "$@"' _ {} > "$OUT_DIR/results.tsv"
++
++cat "$OUT_DIR"/bounds.tsv.* > "$OUT_DIR/bounds.tsv" 2>/dev/null; rm -f "$OUT_DIR"/bounds.tsv.*
++cat "$OUT_DIR"/audit.csv.*  > "$OUT_DIR/audit.csv"  2>/dev/null; rm -f "$OUT_DIR"/audit.csv.*
++[ -s "$OUT_DIR/bounds.tsv" ] || rm -f "$OUT_DIR/bounds.tsv"
++[ -s "$OUT_DIR/audit.csv" ]  || rm -f "$OUT_DIR/audit.csv"
++
++awk -F'\t' '$2=="DIFFERS" || $2=="AUDIT_HIT" {print $1}' "$OUT_DIR/results.tsv" \
++  | sort > "$OUT_DIR/affected.txt"
++
++echo
++echo "=== recompiler A/B sweep: $TOTAL SWFs ==="
++awk -F'\t' '{c[$2]++} END {for (v in c) printf "  %-11s %6d\n", v, c[v]}' \
++  "$OUT_DIR/results.tsv" | sort -k2 -nr
++if [ -f "$OUT_DIR/bounds.tsv" ]; then
++  echo "  --- bounds projection (DIFFERS rows only) ---"
++  echo "  BOUNDS_DIFF $(grep -c BOUNDS_DIFF "$OUT_DIR/bounds.tsv")"
++  echo "  STRUCT_DIFF $(grep -c STRUCT_DIFF "$OUT_DIR/bounds.tsv")"
++fi
++echo
++echo "=== affected tests ($(wc -l < "$OUT_DIR/affected.txt")) ==="
++cat "$OUT_DIR/affected.txt"
++echo
++echo "results: $OUT_DIR/results.tsv"
++echo "affected list: $OUT_DIR/affected.txt"
++
++FAILED=$(awk -F'\t' '$2=="NEW_FAIL"' "$OUT_DIR/results.tsv" | wc -l)
++[ "$FAILED" -eq 0 ] || echo "WARNING: $FAILED test(s) recompile only under the OLD binary — check $OUT_DIR/results.tsv (long-recompile timeouts under load are FALSE; re-run those rows at -P 1)" >&2
++exit 0
+diff --git a/ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md b/ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md
+index 1a3f29216..2eca811a6 100644
+--- a/ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md
++++ b/ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md
+@@ -145,6 +145,43 @@ alongside image comparisons. (The old `--headless` /
+ `--mode=graphics-headless-legacy` mode was deleted on 2026-07-23; `--headless`
+ now errors with a pointer to `--mode=graphics`.)
+ 
++### Which tests can a recompiler change possibly move? (`recompiler_ab_sweep.sh`)
++
++A change under `SWFRecomp/` can only affect tests whose **generated C changes** —
++everything else is byte-identical input to gcc. `ruffle-tests/recompiler_ab_sweep.sh`
++computes that set **exactly** instead of guessing it: it runs an old and a new
++recompiler binary over every `test.swf` under the given suite roots, each in a
++private temp dir (the tracked/gitignored test dirs are never touched, so no
++concurrent agent's `Recompiled*` cache is poisoned), diffs the generated C, and
++prints the affected-test list.
++
++```bash
++# whole corpus, old binary built from a git SHA (~25 min at -P 2)
++ruffle-tests/recompiler_ab_sweep.sh --old <sha> --bounds-check
++
++# two binaries you already have, one suite
++ruffle-tests/recompiler_ab_sweep.sh --old-bin /tmp/SWFRecomp.before \
++    ruffle-tests/tests/swfs/avm2
++
++# smoke test / sanity check: same binary both legs must print an EMPTY list
++ruffle-tests/recompiler_ab_sweep.sh --old-bin SWFRecomp/build/SWFRecomp --limit 30
++```
++
++Feed the resulting `affected.txt` to `verify_output.py` (trace) and
++`render_canary.py` (pixels) — the sweep answers "can it move?", never "did it get
++better". `--bounds-check` adds a second, independent projection: the AS-visible
++`tagDefine*` **bounds** arguments and the structural shape of `tagMain.c`, reported
++separately from "the generated C differs at all". That discrimination is what
++refuted the s16 curve-flattening premise — 418 tests' generated C changed and
++**zero** bounds arguments moved, so `getBounds`/`_width`/`_height` could not have
++regressed. `--audit-env VAR=FILE` is a single-binary report-only mode for changes
++gated behind an audit env var.
++
++`-P 2` is the shared-machine cap; a recompile that trips `--timeout` under load is
++a FALSE failure, so re-run those rows at `-P 1` before believing them. The script
++unifies four ad-hoc rewrites of the same sweep (s16 `w2-gfx-flatten-legC`,
++`w2-gfx-gradient`; s17 `w2-scope-opt`, `w2-avm2-smalls`).
++
+ ### Full test suites (use CI only)
+ 
+ **IMPORTANT: Do NOT run full test suites locally.** Use CI workflows instead.

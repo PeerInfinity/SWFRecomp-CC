@@ -145,6 +145,43 @@ alongside image comparisons. (The old `--headless` /
 `--mode=graphics-headless-legacy` mode was deleted on 2026-07-23; `--headless`
 now errors with a pointer to `--mode=graphics`.)
 
+### Which tests can a recompiler change possibly move? (`recompiler_ab_sweep.sh`)
+
+A change under `SWFRecomp/` can only affect tests whose **generated C changes** —
+everything else is byte-identical input to gcc. `ruffle-tests/recompiler_ab_sweep.sh`
+computes that set **exactly** instead of guessing it: it runs an old and a new
+recompiler binary over every `test.swf` under the given suite roots, each in a
+private temp dir (the tracked/gitignored test dirs are never touched, so no
+concurrent agent's `Recompiled*` cache is poisoned), diffs the generated C, and
+prints the affected-test list.
+
+```bash
+# whole corpus, old binary built from a git SHA (~25 min at -P 2)
+ruffle-tests/recompiler_ab_sweep.sh --old <sha> --bounds-check
+
+# two binaries you already have, one suite
+ruffle-tests/recompiler_ab_sweep.sh --old-bin /tmp/SWFRecomp.before \
+    ruffle-tests/tests/swfs/avm2
+
+# smoke test / sanity check: same binary both legs must print an EMPTY list
+ruffle-tests/recompiler_ab_sweep.sh --old-bin SWFRecomp/build/SWFRecomp --limit 30
+```
+
+Feed the resulting `affected.txt` to `verify_output.py` (trace) and
+`render_canary.py` (pixels) — the sweep answers "can it move?", never "did it get
+better". `--bounds-check` adds a second, independent projection: the AS-visible
+`tagDefine*` **bounds** arguments and the structural shape of `tagMain.c`, reported
+separately from "the generated C differs at all". That discrimination is what
+refuted the s16 curve-flattening premise — 418 tests' generated C changed and
+**zero** bounds arguments moved, so `getBounds`/`_width`/`_height` could not have
+regressed. `--audit-env VAR=FILE` is a single-binary report-only mode for changes
+gated behind an audit env var.
+
+`-P 2` is the shared-machine cap; a recompile that trips `--timeout` under load is
+a FALSE failure, so re-run those rows at `-P 1` before believing them. The script
+unifies four ad-hoc rewrites of the same sweep (s16 `w2-gfx-flatten-legC`,
+`w2-gfx-gradient`; s17 `w2-scope-opt`, `w2-avm2-smalls`).
+
 ### Full test suites (use CI only)
 
 **IMPORTANT: Do NOT run full test suites locally.** Use CI workflows instead.
