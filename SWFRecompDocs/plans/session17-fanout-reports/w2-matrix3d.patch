@@ -1,0 +1,414 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_stage3d.c b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+index 5fc7a803e..9913c907a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_stage3d.c
++++ b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+@@ -1333,7 +1333,19 @@ static Avm2Value texture_upload_compressed_cube(Avm2Activation* act)
+ // half-class is worse than none for the render-only 3D tests, so the usual
+ // append/prepend/invert set is here too.
+ 
+-typedef struct Avm2Matrix3DExt { double m[16]; } Avm2Matrix3DExt;
++// Flash stores a Matrix3D's components as 32-BIT floats and only widens them
++// back to Number on the way out (avm2/matrix3d_raw_data: 1.0000001 round-trips
++// as 1.0000001192092896, 1.00000001 as 1, 1e50 as Infinity). Every write
++// through this struct therefore quantizes and every read widens; the f64
++// formulas below are unchanged except where Flash is observably f32
++// (avm2/matrix3d_precision pins each of those sites).
++typedef struct Avm2Matrix3DExt { float m[16]; } Avm2Matrix3DExt;
++
++static void m3d_widen(const float* src, double* dst)
++{ for (int i = 0; i < 16; i++) dst[i] = (double) src[i]; }
++
++static void m3d_narrow(const double* src, float* dst)
++{ for (int i = 0; i < 16; i++) dst[i] = (float) src[i]; }
+ 
+ // Vector3D keeps x/y/z as dynamic props (avm2_display.c geom_vector3d_init).
+ static double m3d_component(Avm2Context* ctx, Avm2Object* v, const char* name)
+@@ -1356,6 +1368,12 @@ static void m3d_identity(double* m)
+ 	m[0] = m[5] = m[10] = m[15] = 1.0;
+ }
+ 
++static void m3d_identity_f(float* m)
++{
++	memset(m, 0, sizeof(float) * 16);
++	m[0] = m[5] = m[10] = m[15] = 1.0f;
++}
++
+ // out = a then b ("append b"): column-major, so out = b * a.
+ static void m3d_mul(double* out, const double* a, const double* b)
+ {
+@@ -1372,17 +1390,39 @@ static void m3d_mul(double* out, const double* a, const double* b)
+ 	memcpy(out, r, sizeof(r));
+ }
+ 
++// Same product, but every partial sum rounds to f32 — Flash multiplies
++// matrices in single precision (matrix3d_precision testPrependTranslation:
++// 3*1.0000001 + ... lands on 12.000001907348633, an f32).
++static void m3d_mul_f(float* out, const float* a, const float* b)
++{
++	float r[16];
++	for (int c = 0; c < 4; c++)
++	{
++		for (int row = 0; row < 4; row++)
++		{
++			float s = b[row] * a[c * 4];
++			s += b[4 + row] * a[c * 4 + 1];
++			s += b[8 + row] * a[c * 4 + 2];
++			s += b[12 + row] * a[c * 4 + 3];
++			r[c * 4 + row] = s;
++		}
++	}
++	memcpy(out, r, sizeof(r));
++}
++
+ static Avm2Value matrix3d_init(Avm2Activation* act)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	if (e == NULL) return avm2_undefined();
+-	m3d_identity(e->m);
++	m3d_identity_f(e->m);
+ 	Avm2Object* v = s3d_arg_object(act, 0);
+ 	Avm2VectorExt* src = v != NULL ? avm2_vector_ext(v) : NULL;
+-	if (src != NULL && src->length >= 16)
++	// `Matrix3D(v)` is literally `this.rawData = v`, so the same exactly-16
++	// rule applies: anything else leaves the (fresh, identity) matrix alone.
++	if (src != NULL && src->length == 16)
+ 	{
+ 		for (int i = 0; i < 16; i++)
+-			e->m[i] = avm2_coerce_to_number(act->ctx, src->elems[i]);
++			e->m[i] = (float) avm2_coerce_to_number(act->ctx, src->elems[i]);
+ 	}
+ 	return avm2_undefined();
+ }
+@@ -1405,10 +1445,12 @@ static Avm2Value matrix3d_set_raw_data(Avm2Activation* act)
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	Avm2Object* v = s3d_arg_object(act, 0);
+ 	Avm2VectorExt* src = v != NULL ? avm2_vector_ext(v) : NULL;
+-	if (e != NULL && src != NULL && src->length >= 16)
++	// The source Vector must be EXACTLY 16 long — 0, 1, 15, 17 and 32 all
++	// leave the matrix untouched (avm2/matrix3d_raw_data "Length N:").
++	if (e != NULL && src != NULL && src->length == 16)
+ 	{
+ 		for (int i = 0; i < 16; i++)
+-			e->m[i] = avm2_coerce_to_number(act->ctx, src->elems[i]);
++			e->m[i] = (float) avm2_coerce_to_number(act->ctx, src->elems[i]);
+ 	}
+ 	return avm2_undefined();
+ }
+@@ -1422,7 +1464,7 @@ Avm2Object* avm2_geom_matrix3d_new(Avm2Context* ctx, const double* raw)
+ 	Avm2Value v = avm2_class_construct(ctx, g_matrix3d_class, NULL, 0);
+ 	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return NULL;
+ 	Avm2Matrix3DExt* e = matrix3d_ext_of(v.u.obj);
+-	if (e != NULL && raw != NULL) memcpy(e->m, raw, sizeof(double) * 16);
++	if (e != NULL && raw != NULL) m3d_narrow(raw, e->m);
+ 	return v.u.obj;
+ }
+ 
+@@ -1430,14 +1472,14 @@ int avm2_geom_matrix3d_read(Avm2Object* o, double* out)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext_of(o);
+ 	if (e == NULL || out == NULL) return 0;
+-	memcpy(out, e->m, sizeof(double) * 16);
++	m3d_widen(e->m, out);
+ 	return 1;
+ }
+ 
+ static Avm2Value matrix3d_identity(Avm2Activation* act)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+-	if (e != NULL) m3d_identity(e->m);
++	if (e != NULL) m3d_identity_f(e->m);
+ 	return avm2_undefined();
+ }
+ 
+@@ -1486,11 +1528,12 @@ static Avm2Value matrix3d_copy_raw_data_from(Avm2Activation* act)
+ 	if (transpose)
+ 	{
+ 		for (int c = 0; c < 4; c++)
+-			for (int r = 0; r < 4; r++) e->m[c * 4 + r] = tmp[r * 4 + c];
++			for (int r = 0; r < 4; r++)
++				e->m[c * 4 + r] = (float) tmp[r * 4 + c];
+ 	}
+ 	else
+ 	{
+-		memcpy(e->m, tmp, sizeof(tmp));
++		m3d_narrow(tmp, e->m);
+ 	}
+ 	return avm2_undefined();
+ }
+@@ -1534,7 +1577,7 @@ static Avm2Value matrix3d_transpose(Avm2Activation* act)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	if (e == NULL) return avm2_undefined();
+-	double t[16];
++	float t[16];
+ 	for (int c = 0; c < 4; c++)
+ 		for (int r = 0; r < 4; r++) t[c * 4 + r] = e->m[r * 4 + c];
+ 	memcpy(e->m, t, sizeof(t));
+@@ -1545,7 +1588,7 @@ static Avm2Value matrix3d_append(Avm2Activation* act)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object_non_null(act, 0, "lhs"));
+-	if (e != NULL && o != NULL) m3d_mul(e->m, e->m, o->m);
++	if (e != NULL && o != NULL) m3d_mul_f(e->m, e->m, o->m);
+ 	return avm2_undefined();
+ }
+ 
+@@ -1553,7 +1596,7 @@ static Avm2Value matrix3d_prepend(Avm2Activation* act)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object_non_null(act, 0, "rhs"));
+-	if (e != NULL && o != NULL) m3d_mul(e->m, o->m, e->m);
++	if (e != NULL && o != NULL) m3d_mul_f(e->m, o->m, e->m);
+ 	return avm2_undefined();
+ }
+ 
+@@ -1630,19 +1673,38 @@ static Avm2Value matrix3d_xform(Avm2Activation* act, int kind, int prepend)
+ 	}
+ 	else
+ 	{
+-		double x = s3d_arg_number(act, 0, kind == 1 ? 1.0 : 0.0);
+-		double y = s3d_arg_number(act, 1, kind == 1 ? 1.0 : 0.0);
+-		double z = s3d_arg_number(act, 2, kind == 1 ? 1.0 : 0.0);
++		// The scale/translate matrix is built from f32-CAST arguments, so
++		// appendScale(1.0000000596046448) is exactly appendScale(1)
++		// (matrix3d_precision testAppendScale/testPrependScale: "3,3,3").
++		double x = (double) (float) s3d_arg_number(act, 0, kind == 1 ? 1.0 : 0.0);
++		double y = (double) (float) s3d_arg_number(act, 1, kind == 1 ? 1.0 : 0.0);
++		double z = (double) (float) s3d_arg_number(act, 2, kind == 1 ? 1.0 : 0.0);
+ 		if (kind == 1) m3d_build_scale(t, x, y, z);
+ 		else m3d_build_translation(t, x, y, z);
+ 	}
+-	if (prepend) m3d_mul(e->m, t, e->m);
+-	else m3d_mul(e->m, e->m, t);
++	float tf[16];
++	m3d_narrow(t, tf);
++	if (prepend) m3d_mul_f(e->m, tf, e->m);
++	else m3d_mul_f(e->m, e->m, tf);
+ 	return avm2_undefined();
+ }
+ 
++// appendTranslation does NOT run the general product: Flash adds the three
++// f32-cast arguments straight onto the translation column, which is observable
++// as soon as the bottom row is not (0,0,0,1) and pinned by matrix3d_precision
++// (`newMatrix(1.1920928955078125e-7)` + 1.0000000596046448 -> 1.0000001192092896).
+ static Avm2Value matrix3d_append_translation(Avm2Activation* act)
+-{ return matrix3d_xform(act, 0, 0); }
++{
++	Avm2Matrix3DExt* e = matrix3d_ext(act);
++	double x = s3d_arg_number(act, 0, 0.0);
++	double y = s3d_arg_number(act, 1, 0.0);
++	double z = s3d_arg_number(act, 2, 0.0);
++	if (e == NULL) return avm2_undefined();
++	e->m[12] += (float) x;
++	e->m[13] += (float) y;
++	e->m[14] += (float) z;
++	return avm2_undefined();
++}
+ static Avm2Value matrix3d_append_scale(Avm2Activation* act)
+ { return matrix3d_xform(act, 1, 0); }
+ static Avm2Value matrix3d_append_rotation(Avm2Activation* act)
+@@ -1654,37 +1716,62 @@ static Avm2Value matrix3d_prepend_scale(Avm2Activation* act)
+ static Avm2Value matrix3d_prepend_rotation(Avm2Activation* act)
+ { return matrix3d_xform(act, 2, 1); }
+ 
+-static double m3d_determinant(const double* m)
++// Determinant of a column-major 3x3 (Flash's inner block).
++static float m3d_det3(const float* m)
+ {
+-	// 3x3 upper-left cofactor expansion is what Flash's `determinant` is
+-	// documented to return for an affine matrix; use the full 4x4 form so the
+-	// value stays right for projection matrices too.
+-	double s0 = m[0] * m[5] - m[4] * m[1];
+-	double s1 = m[0] * m[9] - m[8] * m[1];
+-	double s2 = m[0] * m[13] - m[12] * m[1];
+-	double s3 = m[4] * m[9] - m[8] * m[5];
+-	double s4 = m[4] * m[13] - m[12] * m[5];
+-	double s5 = m[8] * m[13] - m[12] * m[9];
+-	double c5 = m[10] * m[15] - m[14] * m[11];
+-	double c4 = m[6] * m[15] - m[14] * m[7];
+-	double c3 = m[6] * m[11] - m[10] * m[7];
+-	double c2 = m[2] * m[15] - m[14] * m[3];
+-	double c1 = m[2] * m[11] - m[10] * m[3];
+-	double c0 = m[2] * m[7] - m[6] * m[3];
+-	return s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
++	return m[0] * (m[4] * m[8] - m[7] * m[5])
++	     - m[3] * (m[1] * m[8] - m[7] * m[2])
++	     + m[6] * (m[1] * m[5] - m[4] * m[2]);
++}
++
++// Flash's `determinant` is a CONDITIONAL Laplace expansion evaluated in f32,
++// not the plain 4x4 cofactor sum this used to compute. avm2/matrix3d_determinant
++// pins both branches:
++//
++//  * with a zero projection row (m[3]=m[7]=m[11]=0) the translation column
++//    m[12..14] never participates at all — "zero index 12 = NaN: 0" — and the
++//    m[15] factor is folded into the third ROW of the inner 3x3 rather than
++//    multiplied in afterwards (observable when m[15] is +-Infinity);
++//  * otherwise the expansion runs over the first ROW (m[0], m[4], m[8], m[12]),
++//    which is why a single Infinity in a dense matrix never meets a second one.
++//
++// f32 throughout: the 1e10-diagonal case in avm2/matrix3d_precision overflows
++// to Infinity, which an f64 accumulation would report as 1e+40.
++static float m3d_determinant(const float* m)
++{
++	if (m[3] == 0.0f && m[7] == 0.0f && m[11] == 0.0f)
++	{
++		const float inner[9] = {
++			m[0], m[1], m[2] * m[15],
++			m[4], m[5], m[6] * m[15],
++			m[8], m[9], m[10] * m[15],
++		};
++		return m3d_det3(inner);
++	}
++	const float d0[9] = { m[5], m[6], m[7], m[9], m[10], m[11], m[13], m[14], m[15] };
++	const float d4[9] = { m[1], m[2], m[3], m[9], m[10], m[11], m[13], m[14], m[15] };
++	const float d8[9] = { m[1], m[2], m[3], m[5], m[6], m[7], m[13], m[14], m[15] };
++	const float d12[9] = { m[1], m[2], m[3], m[5], m[6], m[7], m[9], m[10], m[11] };
++	float r = m[0] * m3d_det3(d0);
++	r -= m[4] * m3d_det3(d4);
++	r += m[8] * m3d_det3(d8);
++	r -= m[12] * m3d_det3(d12);
++	return r;
+ }
+ 
+ static Avm2Value matrix3d_get_determinant(Avm2Activation* act)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+-	return avm2_number(e != NULL ? m3d_determinant(e->m) : 0.0);
++	return avm2_number(e != NULL ? (double) m3d_determinant(e->m) : 0.0);
+ }
+ 
+ static Avm2Value matrix3d_invert(Avm2Activation* act)
+ {
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	if (e == NULL) return avm2_bool(0);
+-	const double* m = e->m;
++	double mw[16];
++	m3d_widen(e->m, mw);
++	const double* m = mw;
+ 	double s0 = m[0] * m[5] - m[4] * m[1];
+ 	double s1 = m[0] * m[9] - m[8] * m[1];
+ 	double s2 = m[0] * m[13] - m[12] * m[1];
+@@ -1717,7 +1804,7 @@ static Avm2Value matrix3d_invert(Avm2Activation* act)
+ 	r[13] = (m[2] * s5 - m[10] * s2 + m[14] * s1) * id;
+ 	r[14] = (-m[2] * s4 + m[6] * s2 - m[14] * s0) * id;
+ 	r[15] = (m[2] * s3 - m[6] * s1 + m[10] * s0) * id;
+-	memcpy(e->m, r, sizeof(r));
++	m3d_narrow(r, e->m);
+ 	return avm2_bool(1);
+ }
+ 
+@@ -1727,16 +1814,22 @@ static Avm2Value matrix3d_transform_vector_common(Avm2Activation* act, int delta
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	Avm2Object* v = s3d_arg_object_non_null(act, 0, "vector");
+ 	if (e == NULL || v == NULL) return avm2_null();
+-	double x = m3d_component(ctx, v, "x");
+-	double y = m3d_component(ctx, v, "y");
+-	double z = m3d_component(ctx, v, "z");
+-	const double* m = e->m;
+-	double ox = m[0] * x + m[4] * y + m[8] * z + (delta ? 0.0 : m[12]);
+-	double oy = m[1] * x + m[5] * y + m[9] * z + (delta ? 0.0 : m[13]);
+-	double oz = m[2] * x + m[6] * y + m[10] * z + (delta ? 0.0 : m[14]);
++	// transformVector()/deltaTransformVector() cast the input vector to f32
++	// first and accumulate in f32; transformVectors() (below) does NOT.
++	// matrix3d_precision separates the two on the same line.
++	float x = (float) m3d_component(ctx, v, "x");
++	float y = (float) m3d_component(ctx, v, "y");
++	float z = (float) m3d_component(ctx, v, "z");
++	const float* m = e->m;
++	float fox = m[0] * x; fox += m[4] * y; fox += m[8] * z;
++	float foy = m[1] * x; foy += m[5] * y; foy += m[9] * z;
++	float foz = m[2] * x; foz += m[6] * y; foz += m[10] * z;
+ 	// The fourth row of the product is returned as the result's `w`; the input
+ 	// vector's own `w` is ignored (verified by the "w set" cases).
+-	double ow = m[3] * x + m[7] * y + m[11] * z + (delta ? 0.0 : m[15]);
++	float fow = m[3] * x; fow += m[7] * y; fow += m[11] * z;
++	if (!delta) { fox += m[12]; foy += m[13]; foz += m[14]; fow += m[15]; }
++	double ox = (double) fox, oy = (double) foy;
++	double oz = (double) foz, ow = (double) fow;
+ 	Avm2Value args[4] = { avm2_number(ox), avm2_number(oy), avm2_number(oz),
+ 	                      avm2_number(ow) };
+ 	return avm2_class_construct(ctx, v->cls, args, 4);
+@@ -1763,9 +1856,9 @@ static Avm2Value matrix3d_set_position(Avm2Activation* act)
+ 	Avm2Matrix3DExt* e = matrix3d_ext(act);
+ 	Avm2Object* v = s3d_arg_object(act, 0);
+ 	if (e == NULL || v == NULL) return avm2_undefined();
+-	e->m[12] = m3d_component(ctx, v, "x");
+-	e->m[13] = m3d_component(ctx, v, "y");
+-	e->m[14] = m3d_component(ctx, v, "z");
++	e->m[12] = (float) m3d_component(ctx, v, "x");
++	e->m[13] = (float) m3d_component(ctx, v, "y");
++	e->m[14] = (float) m3d_component(ctx, v, "z");
+ 	return avm2_undefined();
+ }
+ 
+@@ -1847,8 +1940,9 @@ static Avm2Value matrix3d_recompose(Avm2Activation* act)
+ 	double sy3 = m3d_component(ctx, sc, "y");
+ 	double sz3 = m3d_component(ctx, sc, "z");
+ 
+-	m3d_identity(e->m);
+-	double* m = e->m;
++	double mm[16];
++	m3d_identity(mm);
++	double* m = mm;
+ 	if (s3d_str_is(os, "eulerAngles"))
+ 	{
+ 		double cx = cos(m3d_component(ctx, r, "x"));
+@@ -1898,6 +1992,7 @@ static Avm2Value matrix3d_recompose(Avm2Activation* act)
+ 	m[13] = m3d_component(ctx, t, "y");
+ 	m[14] = m3d_component(ctx, t, "z");
+ 	m[15] = 1;
++	m3d_narrow(mm, e->m);
+ 
+ 	// A zero scale component is written as a literal 0 (no 1e-15 substitution)
+ 	// and still reports true — measured on every zero-scale permutation in
+@@ -1916,7 +2011,7 @@ static Avm2Value matrix3d_decompose(Avm2Activation* act)
+ 	if (e == NULL || g_vector3d_class == NULL) return avm2_null();
+ 
+ 	double mr[16];
+-	memcpy(mr, e->m, sizeof(mr));
++	m3d_widen(e->m, mr);
+ 	double px = mr[12], py = mr[13], pz = mr[14];
+ 	mr[12] = mr[13] = mr[14] = 0;
+ 
+@@ -2038,7 +2133,10 @@ static Avm2Value matrix3d_transform_vectors(Avm2Activation* act)
+ 		                 "Error #1126: Cannot change the length of a fixed "
+ 		                 "Vector.");
+ 	}
+-	const double* m = e->m;
++	// Unlike transformVector(), this one widens the matrix and runs the whole
++	// product in f64 (matrix3d_precision grades the two on adjacent lines).
++	double m[16];
++	m3d_widen(e->m, m);
+ 	for (uint32_t i = 0; i < n; i += 3)
+ 	{
+ 		double x = avm2_coerce_to_number(ctx, vin->elems[i]);
+@@ -2104,7 +2202,7 @@ static Avm2Value matrix3d_copy_vec_from(Avm2Activation* act, int column)
+ 	for (int k = 0; k < 4; k++)
+ 	{
+ 		int off = column ? (int) idx * 4 + k : k * 4 + (int) idx;
+-		e->m[off] = m3d_component(ctx, v, n[k]);
++		e->m[off] = (float) m3d_component(ctx, v, n[k]);
+ 	}
+ 	return avm2_undefined();
+ }
+@@ -2137,7 +2235,8 @@ static Avm2Value utils3d_project_vector(Avm2Activation* act)
+ 	double x = m3d_component(ctx, v, "x");
+ 	double y = m3d_component(ctx, v, "y");
+ 	double z = m3d_component(ctx, v, "z");
+-	const double* m = e->m;
++	double m[16];
++	m3d_widen(e->m, m);
+ 	double ox = m[0] * x + m[4] * y + m[8] * z + m[12];
+ 	double oy = m[1] * x + m[5] * y + m[9] * z + m[13];
+ 	double oz = m[2] * x + m[6] * y + m[10] * z + m[14];
+@@ -2179,7 +2278,8 @@ static Avm2Value utils3d_project_vectors(Avm2Activation* act)
+ 		                         avm2_uint_value(need));
+ 	}
+ 
+-	const double* n = e->m;
++	double n[16];
++	m3d_widen(e->m, n);
+ 	uint32_t j = 0;
+ 	for (uint32_t i = 0; i + 2 < vlen; i += 3, j += 2)
+ 	{

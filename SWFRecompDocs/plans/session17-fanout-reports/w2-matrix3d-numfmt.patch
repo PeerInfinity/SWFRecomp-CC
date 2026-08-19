@@ -1,0 +1,70 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_value.c b/SWFModernRuntime/src/avm2/avm2_value.c
+index 583fc2654..e069b30fe 100644
+--- a/SWFModernRuntime/src/avm2/avm2_value.c
++++ b/SWFModernRuntime/src/avm2/avm2_value.c
+@@ -7,6 +7,7 @@
+ #include <math.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <stdint.h>
+ #include <string.h>
+ 
+ #include <avm2/avm2_value.h>
+@@ -701,21 +702,47 @@ int avm2_format_number(char* buf, int buf_size, double d)
+ 
+ 	const double MIN_DIGITS = -6.0;
+ 	const double MAX_DIGITS = 21.0;
+-	const double MAX_PRECISION = 15.0;
+ 
+ 	double digits = floor(log10(d));
+ 
+ 	if (digits < MIN_DIGITS || digits >= MAX_DIGITS)
+ 	{
+-		// Ruffle: precision-truncate to 15 significant digits, then format
+-		// "{mantissa}e{sign}{digits}" (mantissa via Display).
+-		double precision = floor(d * pow(10.0, MAX_PRECISION - digits))
+-		                   / pow(10.0, MAX_PRECISION - digits);
+-		double mantissa = precision / pow(10.0, digits);
+-		char mbuf[40];
+-		format_plain(mbuf, sizeof(mbuf), mantissa);
+-		return snprintf(buf, buf_size, "%se%c%.0f", mbuf,
+-		                digits < 0.0 ? '-' : '+', fabs(digits));
++		// Exponential form, Ruffle value.rs::f64_to_string_finite_nonzero:
++		// take the SHORTEST round-tripping decimal and, for a POSITIVE
++		// exponent only, cut the mantissa TEXT to 16 characters ("Flash shows
++		// large numbers with smaller precision for some reason"). A negative
++		// exponent keeps every digit.
++		//
++		// The arithmetic 15-significant-digit truncation this replaced was
++		// the OLD Ruffle rule and it does not survive a round trip: dividing
++		// the truncated value by 10^digits reintroduces error, so 1e40 came
++		// out as the malformed "0.9999999999999999e+40" and 3e50 as
++		// "2.9999999999999996e+50" (avm2/matrix3d_precision grades both).
++		char digs[24];
++		int e10 = 0;
++		int nd = shortest_digits(d, digs, &e10);
++		char mant[40];
++		int mp = 0;
++		mant[mp++] = digs[0];
++		if (nd > 1)
++		{
++			mant[mp++] = '.';
++			for (int i = 1; i < nd && mp < (int) sizeof(mant) - 1; i++)
++				mant[mp++] = digs[i];
++		}
++		mant[mp] = '\0';
++		if (e10 > 0)
++		{
++			// Two doubles print as "1e+308" in Flash while their immediate
++			// neighbours print normally (Ruffle carries the same pair).
++			uint64_t bits;
++			memcpy(&bits, &d, sizeof(bits));
++			if (bits == 0x7fe0000000000000ull || bits == 0x7fd0000000000000ull)
++				return snprintf(buf, buf_size, "1e+308");
++			if (mp > 16) { mant[16] = '\0'; mp = 16; }
++		}
++		return snprintf(buf, buf_size, "%se%c%d", mant,
++		                e10 < 0 ? '-' : '+', e10 < 0 ? -e10 : e10);
+ 	}
+ 
+ 	return format_plain(buf, buf_size, d);

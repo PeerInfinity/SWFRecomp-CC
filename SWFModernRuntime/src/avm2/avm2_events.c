@@ -1995,6 +1995,284 @@ static void register_input_events(Avm2Context* ctx)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// flash.automation  (AutomationAction / KeyboardAutomationAction /
+// MouseAutomationAction / StageCapture / StageCaptureEvent)
+// ---------------------------------------------------------------------------
+//
+// Ported from Ruffle's playerglobal stubs (core/src/avm2/globals/flash/
+// automation/*.as) and graded by avm2/automation_classes (a SWF 9 fixture).
+//
+// VERSION GATE: none of the five carries an `[API]` annotation, so all five
+// exist at every SWF version -- registered with plain avm2_builtin_class, not
+// the _api variant. No all_classes fixture covers flash.automation, so there
+// is no describeType surface to keep in step.
+
+typedef struct Avm2AutomationActionExt
+{
+	const Avm2String* type;    // AutomationAction._type (defaults to "")
+	double stage_x, stage_y;   // MouseAutomationAction
+	int32_t delta;             // MouseAutomationAction._delta is int
+	uint32_t key_code;         // KeyboardAutomationAction._keyCode is uint
+} Avm2AutomationActionExt;
+
+static Avm2Class* g_automation_action_class;
+static Avm2Class* g_stage_capture_event_class;
+
+static Avm2AutomationActionExt* auto_ext(Avm2Activation* act)
+{
+	Avm2Object* o = act->this_val.kind == AVM2_VALUE_OBJECT
+		? act->this_val.u.obj : NULL;
+	return o != NULL ? (Avm2AutomationActionExt*) o->native_ext : NULL;
+}
+
+// Builtin constructors in this package are arity-checked: the fixture opens
+// each class with a deliberately wrong call and prints the #1063 text. Our
+// native builtins do not enforce declared arity generally, so the check is
+// local (min = required params, max = total params).
+static void auto_check_argc(Avm2Activation* act, const char* qname,
+                            uint32_t min_args, uint32_t max_args)
+{
+	uint32_t expected;
+	if (act->argc < min_args) expected = min_args;
+	else if (act->argc > max_args) expected = max_args;
+	else return;
+	char buf[224];
+	snprintf(buf, sizeof(buf),
+	         "Error #1063: Argument count mismatch on %s(). Expected %u, "
+	         "got %u.", qname, expected, act->argc);
+	avm2_throw_error(act->ctx, act->ctx->builtins.argument_error_class, buf);
+}
+
+static const Avm2String* auto_arg_str(Avm2Activation* act, uint32_t i)
+{
+	if (act->argc > i)
+		return avm2_coerce_to_string(act->ctx, act->args[i]);
+	return avm2_string_from_literal(act->ctx, "");
+}
+
+static Avm2Value auto_action_init(Avm2Activation* act)
+{
+	auto_check_argc(act, "flash.automation::AutomationAction", 0, 0);
+	Avm2AutomationActionExt* e = auto_ext(act);
+	if (e != NULL) e->type = avm2_string_from_literal(act->ctx, "");
+	return avm2_undefined();
+}
+
+static Avm2Value auto_get_type(Avm2Activation* act)
+{
+	Avm2AutomationActionExt* e = auto_ext(act);
+	if (e == NULL || e->type == NULL) return avm2_null();
+	return avm2_string(e->type);
+}
+
+static Avm2Value auto_set_type(Avm2Activation* act)
+{
+	Avm2AutomationActionExt* e = auto_ext(act);
+	if (e != NULL) e->type = auto_arg_str(act, 0);
+	return avm2_undefined();
+}
+
+// KeyboardAutomationAction(type:String, keyCode:int = 0)
+static Avm2Value auto_keyboard_init(Avm2Activation* act)
+{
+	auto_check_argc(act, "flash.automation::KeyboardAutomationAction", 1, 2);
+	Avm2AutomationActionExt* e = auto_ext(act);
+	if (e == NULL) return avm2_undefined();
+	e->type = auto_arg_str(act, 0);
+	// `keyCode:int` coerces first, then lands in a uint field.
+	e->key_code = act->argc > 1
+		? (uint32_t) avm2_coerce_to_i32(act->ctx, act->args[1]) : 0;
+	return avm2_undefined();
+}
+
+static Avm2Value auto_get_key_code(Avm2Activation* act)
+{
+	Avm2AutomationActionExt* e = auto_ext(act);
+	return avm2_uint_value(e != NULL ? e->key_code : 0);
+}
+
+static Avm2Value auto_set_key_code(Avm2Activation* act)
+{
+	Avm2AutomationActionExt* e = auto_ext(act);
+	if (e != NULL && act->argc > 0)
+		e->key_code = avm2_coerce_to_u32(act->ctx, act->args[0]);
+	return avm2_undefined();
+}
+
+// MouseAutomationAction(type:String, stageX=0, stageY=0, delta=0)
+static Avm2Value auto_mouse_init(Avm2Activation* act)
+{
+	auto_check_argc(act, "flash.automation::MouseAutomationAction", 1, 4);
+	Avm2AutomationActionExt* e = auto_ext(act);
+	if (e == NULL) return avm2_undefined();
+	Avm2Context* ctx = act->ctx;
+	e->type = auto_arg_str(act, 0);
+	e->stage_x = act->argc > 1 ? avm2_coerce_to_number(ctx, act->args[1]) : 0.0;
+	e->stage_y = act->argc > 2 ? avm2_coerce_to_number(ctx, act->args[2]) : 0.0;
+	// The 4th parameter is declared Number but the backing field is int.
+	e->delta = act->argc > 3 ? avm2_coerce_to_i32(ctx, act->args[3]) : 0;
+	return avm2_undefined();
+}
+
+static Avm2Value auto_get_stage_x(Avm2Activation* act)
+{ Avm2AutomationActionExt* e = auto_ext(act);
+  return avm2_number(e != NULL ? e->stage_x : 0.0); }
+static Avm2Value auto_set_stage_x(Avm2Activation* act)
+{ Avm2AutomationActionExt* e = auto_ext(act);
+  if (e != NULL && act->argc > 0)
+      e->stage_x = avm2_coerce_to_number(act->ctx, act->args[0]);
+  return avm2_undefined(); }
+static Avm2Value auto_get_stage_y(Avm2Activation* act)
+{ Avm2AutomationActionExt* e = auto_ext(act);
+  return avm2_number(e != NULL ? e->stage_y : 0.0); }
+static Avm2Value auto_set_stage_y(Avm2Activation* act)
+{ Avm2AutomationActionExt* e = auto_ext(act);
+  if (e != NULL && act->argc > 0)
+      e->stage_y = avm2_coerce_to_number(act->ctx, act->args[0]);
+  return avm2_undefined(); }
+static Avm2Value auto_get_delta(Avm2Activation* act)
+{ Avm2AutomationActionExt* e = auto_ext(act);
+  return avm2_integer(e != NULL ? e->delta : 0); }
+static Avm2Value auto_set_delta(Avm2Activation* act)
+{ Avm2AutomationActionExt* e = auto_ext(act);
+  if (e != NULL && act->argc > 0)
+      e->delta = avm2_coerce_to_i32(act->ctx, act->args[0]);
+  return avm2_undefined(); }
+
+// --- StageCaptureEvent -----------------------------------------------------
+//
+// Its three own fields borrow slots already present in the shared Avm2EventExt
+// (the "one struct for the whole event ladder" pattern the header documents):
+// `response_url` (HTTPStatusEvent) carries `url`, `key_code` (KeyboardEvent)
+// carries the uint `checksum`, and `bytes_loaded` (ProgressEvent) carries
+// `pts`. StageCaptureEvent extends Event DIRECTLY, so none of those three
+// donors is reachable through its own vtable and no aliasing is observable.
+
+static Avm2Value sce_init(Avm2Activation* act)
+{
+	auto_check_argc(act, "flash.automation::StageCaptureEvent", 1, 6);
+	Avm2Context* ctx = act->ctx;
+	Avm2EventExt* e = this_event(act);
+	if (e == NULL) return avm2_undefined();
+	e->type = avm2_coerce_to_string(ctx, act->args[0]);
+	e->bubbles = (uint8_t) (act->argc > 1 && avm2_coerce_to_boolean(act->args[1]));
+	e->cancelable = (uint8_t) (act->argc > 2
+	                           && avm2_coerce_to_boolean(act->args[2]));
+	e->response_url = act->argc > 3
+		? avm2_coerce_to_string(ctx, act->args[3])
+		: avm2_string_from_literal(ctx, "");
+	e->key_code = act->argc > 4 ? avm2_coerce_to_u32(ctx, act->args[4]) : 0;
+	e->bytes_loaded = act->argc > 5
+		? avm2_coerce_to_number(ctx, act->args[5]) : 0.0;
+	return avm2_undefined();
+}
+
+static Avm2Value sce_get_url(Avm2Activation* act)
+{
+	Avm2EventExt* e = this_event(act);
+	if (e == NULL || e->response_url == NULL) return avm2_null();
+	return avm2_string(e->response_url);
+}
+static Avm2Value sce_get_checksum(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act);
+  return avm2_uint_value(e != NULL ? e->key_code : 0); }
+static Avm2Value sce_get_pts(Avm2Activation* act)
+{ Avm2EventExt* e = this_event(act);
+  return avm2_number(e != NULL ? e->bytes_loaded : 0.0); }
+
+// clone() forwards only FIVE arguments -- `pts` is dropped and comes back 0.
+// That is playerglobal's own behaviour and the fixture grades it.
+static Avm2Value sce_clone(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value args[5];
+	args[0] = avm2_get_public_property(ctx, act->this_val, "type", 4, NULL);
+	args[1] = avm2_get_public_property(ctx, act->this_val, "bubbles", 7, NULL);
+	args[2] = avm2_get_public_property(ctx, act->this_val, "cancelable", 10, NULL);
+	args[3] = avm2_get_public_property(ctx, act->this_val, "url", 3, NULL);
+	args[4] = avm2_get_public_property(ctx, act->this_val, "checksum", 8, NULL);
+	if (g_stage_capture_event_class == NULL) return avm2_null();
+	return avm2_class_construct(ctx, g_stage_capture_event_class, args, 5);
+}
+
+static Avm2Value sce_to_string(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	static const char* const fields[] = {
+		"StageCaptureEvent", "type", "bubbles", "cancelable", "eventPhase",
+		"url", "checksum"
+	};
+	Avm2Value args[7];
+	for (int i = 0; i < 7; i++)
+		args[i] = avm2_string(avm2_string_from_literal(ctx, fields[i]));
+	return avm2_call_public_property(ctx, act->this_val, "formatToString", 14,
+	                                 args, 7);
+}
+
+static void register_automation_classes(Avm2Context* ctx)
+{
+	Avm2Builtins* b = &ctx->builtins;
+
+	Avm2Class* aa = avm2_builtin_class(ctx, "flash.automation",
+	                                   "AutomationAction", b->object_class);
+	g_automation_action_class = aa;
+	aa->native_ext_size = sizeof(Avm2AutomationActionExt);
+	aa->instance_init.fn = auto_action_init;
+	aa->instance_init.debug_name = "AutomationAction";
+	avm2_builtin_add_getset(ctx, aa, "type", auto_get_type, auto_set_type);
+
+	Avm2Class* ka = avm2_builtin_class(ctx, "flash.automation",
+	                                   "KeyboardAutomationAction", aa);
+	ka->native_ext_size = sizeof(Avm2AutomationActionExt);
+	ka->instance_init.fn = auto_keyboard_init;
+	ka->instance_init.debug_name = "KeyboardAutomationAction";
+	avm2_builtin_add_getset(ctx, ka, "keyCode", auto_get_key_code,
+	                        auto_set_key_code);
+	sconst(ctx, ka, "KEY_DOWN", "keyDown");
+	sconst(ctx, ka, "KEY_UP", "keyUp");
+
+	Avm2Class* ma = avm2_builtin_class(ctx, "flash.automation",
+	                                   "MouseAutomationAction", aa);
+	ma->native_ext_size = sizeof(Avm2AutomationActionExt);
+	ma->instance_init.fn = auto_mouse_init;
+	ma->instance_init.debug_name = "MouseAutomationAction";
+	avm2_builtin_add_getset(ctx, ma, "stageX", auto_get_stage_x,
+	                        auto_set_stage_x);
+	avm2_builtin_add_getset(ctx, ma, "stageY", auto_get_stage_y,
+	                        auto_set_stage_y);
+	avm2_builtin_add_getset(ctx, ma, "delta", auto_get_delta, auto_set_delta);
+	sconst(ctx, ma, "MIDDLE_MOUSE_DOWN", "middleMouseDown");
+	sconst(ctx, ma, "MIDDLE_MOUSE_UP", "middleMouseUp");
+	sconst(ctx, ma, "MOUSE_DOWN", "mouseDown");
+	sconst(ctx, ma, "MOUSE_MOVE", "mouseMove");
+	sconst(ctx, ma, "MOUSE_UP", "mouseUp");
+	sconst(ctx, ma, "MOUSE_WHEEL", "mouseWheel");
+	sconst(ctx, ma, "RIGHT_MOUSE_DOWN", "rightMouseDown");
+	sconst(ctx, ma, "RIGHT_MOUSE_UP", "rightMouseUp");
+
+	Avm2Class* sc = avm2_builtin_class(ctx, "flash.automation", "StageCapture",
+	                                   b->event_dispatcher_class);
+	sconst(ctx, sc, "CURRENT", "current");
+	sconst(ctx, sc, "MULTIPLE", "multiple");
+	sconst(ctx, sc, "NEXT", "next");
+	sconst(ctx, sc, "RASTER", "raster");
+	sconst(ctx, sc, "SCREEN", "screen");
+	sconst(ctx, sc, "STAGE", "stage");
+
+	Avm2Class* sce = avm2_builtin_class(ctx, "flash.automation",
+	                                    "StageCaptureEvent", b->event_class);
+	g_stage_capture_event_class = sce;
+	sce->instance_init.fn = sce_init;
+	sce->instance_init.debug_name = "StageCaptureEvent";
+	avm2_builtin_add_getter(ctx, sce, "url", sce_get_url);
+	avm2_builtin_add_getter(ctx, sce, "checksum", sce_get_checksum);
+	avm2_builtin_add_getter(ctx, sce, "pts", sce_get_pts);
+	event_override_method(ctx, sce, "clone", sce_clone);
+	event_override_method(ctx, sce, "toString", sce_to_string);
+	sconst(ctx, sce, "CAPTURE", "capture");
+}
+
 void avm2_register_events(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -2180,6 +2458,10 @@ void avm2_register_events(Avm2Context* ctx)
 	g_uncaught_error_events_class->instance_init.fn = ed_init;
 	g_uncaught_error_events_class->instance_init.debug_name =
 		"UncaughtErrorEvents";
+
+	// flash.automation (avm2/automation_classes) -- after the Event ladder,
+	// StageCaptureEvent extends Event and StageCapture extends EventDispatcher.
+	register_automation_classes(ctx);
 }
 
 Avm2Class* avm2_uncaught_error_events_class(void)

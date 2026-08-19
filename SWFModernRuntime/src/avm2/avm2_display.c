@@ -15173,6 +15173,408 @@ static Avm2Value mouse_noop(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// ---------------------------------------------------------------------------
+// flash.display.NativeMenu / flash.display.NativeMenuItem
+// ---------------------------------------------------------------------------
+//
+// Ported from Ruffle's playerglobal stubs (core/src/avm2/globals/flash/display/
+// NativeMenu.as + NativeMenuItem.as) and graded by avm2/native_menu_basic,
+// which runs under `runtime = "AIR"`.
+//
+// VERSION GATE: both classes carry `[API("667")]` = ordinal 7 = SWF 10, so the
+// CLASS is visible from SWF 10 up. Every member except NativeMenuItem.enabled
+// is `[API("668")]` = an AIR-only ordinal = min_swf 255, i.e. hidden from
+// describeType at every Flash Player version. That hiding is already encoded
+// in `dtd_m_NativeMenu` (avm2_globals.c) and is describe-only
+// (`dt_desc_member_hidden` is reached only from `dt_collect_vtable`), so
+// registering the members as real natives here does NOT change what
+// all_classes/display prints -- every name/kind below has a matching
+// min_swf=255 row in that table. NativeMenuItem has no table because no
+// all_classes fixture lists it.
+
+typedef struct Avm2NativeMenuExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	Avm2Object* items;                  // Array of NativeMenuItem (lazily made)
+	Avm2Object* parent;                 // always NULL under Flash Player
+} Avm2NativeMenuExt;
+
+typedef struct Avm2NativeMenuItemExt
+{
+	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+	const Avm2String* label;
+	const Avm2String* name;
+	const Avm2String* key_equivalent;
+	Avm2Object* key_equivalent_modifiers;  // Array
+	Avm2Object* submenu;                   // NativeMenu
+	Avm2Value data;
+	int32_t mnemonic_index;
+	uint8_t enabled;
+	uint8_t checked;
+	uint8_t is_separator;
+} Avm2NativeMenuItemExt;
+
+static Avm2Class* g_native_menu_class;
+static Avm2Class* g_native_menu_item_class;
+
+static Avm2NativeMenuExt* nmenu_ext(Avm2Object* o)
+{
+	if (o == NULL || o->native_ext == NULL) return NULL;
+	for (Avm2Class* c = o->cls; c != NULL; c = c->super_class)
+		if (c == g_native_menu_class) return (Avm2NativeMenuExt*) o->native_ext;
+	return NULL;
+}
+
+static Avm2NativeMenuItemExt* nmitem_ext(Avm2Object* o)
+{
+	if (o == NULL || o->native_ext == NULL) return NULL;
+	for (Avm2Class* c = o->cls; c != NULL; c = c->super_class)
+		if (c == g_native_menu_item_class)
+			return (Avm2NativeMenuItemExt*) o->native_ext;
+	return NULL;
+}
+
+static int nmitem_is(Avm2Value v)
+{
+	return v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL
+	       && nmitem_ext(v.u.obj) != NULL;
+}
+
+// The declared `item:NativeMenuItem` parameter coerces before the body runs, so
+// a non-null value of the wrong type is #1034 and NOT the #2007 below
+// (native_menu_basic: `menu.items = [item, 4, item]` leaves the FIRST item in
+// place and throws TypeError 1034).
+static Avm2Object* nmitem_coerce(Avm2Activation* act, Avm2Value v)
+{
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED) return NULL;
+	if (nmitem_is(v)) return v.u.obj;
+	const Avm2String* s = avm2_coerce_to_string(act->ctx, v);
+	char buf[192];
+	snprintf(buf, sizeof(buf),
+	         "Error #1034: Type Coercion failed: cannot convert %.*s to "
+	         "flash.display.NativeMenuItem.",
+	         s != NULL ? (int) s->len : 4, s != NULL ? s->utf8 : "null");
+	avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class, buf);
+	return NULL;
+}
+
+static Avm2Object* nmenu_items_array(Avm2Context* ctx, Avm2NativeMenuExt* e)
+{
+	if (e->items == NULL) e->items = avm2_array_new(ctx, 0);
+	return e->items;
+}
+
+static uint32_t nmenu_count(Avm2Object* arr)
+{
+	Avm2ArrayExt* ax = arr != NULL ? avm2_array_ext(arr) : NULL;
+	return ax != NULL ? ax->length : 0;
+}
+
+// `items` hands out a COPY -- `menu.items == menu.items` is false and pushing
+// onto the result does not change the menu.
+static Avm2Value nmenu_get_items(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NativeMenuExt* e = nmenu_ext(act->this_val.u.obj);
+	if (e == NULL) return avm2_null();
+	Avm2Object* src = nmenu_items_array(ctx, e);
+	uint32_t n = nmenu_count(src);
+	Avm2Object* out = avm2_array_new(ctx, 0);
+	for (uint32_t i = 0; i < n; i++)
+		avm2_array_push(ctx, out, avm2_array_get(src, i));
+	return avm2_object_value(out);
+}
+
+static Avm2Value nmenu_insert(Avm2Activation* act, Avm2Value itemv,
+                              int32_t index);
+
+// The setter is `removeAllItems()` then `addItem()` per element, which is what
+// makes a mid-array coercion failure leave the earlier items behind.
+static Avm2Value nmenu_set_items(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NativeMenuExt* e = nmenu_ext(act->this_val.u.obj);
+	if (e == NULL) return avm2_undefined();
+	e->items = avm2_array_new(ctx, 0);
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL) return avm2_undefined();
+	Avm2ArrayExt* ax = avm2_array_ext(v.u.obj);
+	uint32_t n = ax != NULL ? ax->length : 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		uint32_t have = nmenu_count(nmenu_items_array(ctx, e));
+		nmenu_insert(act, avm2_array_get(v.u.obj, i), (int32_t) have);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value nmenu_get_num_items(Avm2Activation* act)
+{
+	Avm2NativeMenuExt* e = nmenu_ext(act->this_val.u.obj);
+	if (e == NULL) return avm2_integer(0);
+	return avm2_integer((int32_t) nmenu_count(nmenu_items_array(act->ctx, e)));
+}
+
+static Avm2Value nmenu_get_parent(Avm2Activation* act)
+{
+	Avm2NativeMenuExt* e = nmenu_ext(act->this_val.u.obj);
+	if (e == NULL || e->parent == NULL) return avm2_null();
+	return avm2_object_value(e->parent);
+}
+
+static Avm2Value nmenu_get_is_supported(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_bool(0);
+}
+
+// addItemAt(item, index): the parameter coercion fires first, then the RANGE
+// check, and only then the null check -- addItemAt(item, -1) is #2006 while
+// addItem(null) is #2007 (both graded).
+static Avm2Value nmenu_insert(Avm2Activation* act, Avm2Value itemv,
+                              int32_t index)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NativeMenuExt* e = nmenu_ext(act->this_val.u.obj);
+	Avm2Object* it = nmitem_coerce(act, itemv);
+	if (e == NULL) return avm2_null();
+	Avm2Object* arr = nmenu_items_array(ctx, e);
+	int32_t n = (int32_t) nmenu_count(arr);
+	if (index < 0 || index > n)
+	{
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #2006: The supplied index is out of bounds.");
+	}
+	if (it == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2007: Parameter item must be non-null.");
+	}
+	// splice(index, 0, item)
+	avm2_array_push(ctx, arr, avm2_null());
+	for (int32_t i = n; i > index; i--)
+		avm2_array_set(ctx, arr, (uint32_t) i, avm2_array_get(arr, (uint32_t) i - 1));
+	avm2_array_set(ctx, arr, (uint32_t) index, avm2_object_value(it));
+	return avm2_object_value(it);
+}
+
+static Avm2Value nmenu_add_item_at(Avm2Activation* act)
+{
+	Avm2Value item = act->argc > 0 ? act->args[0] : avm2_null();
+	int32_t index = act->argc > 1
+		? avm2_coerce_to_i32(act->ctx, act->args[1]) : 0;
+	return nmenu_insert(act, item, index);
+}
+
+// addItem(item) is `addItemAt(item, this.numItems)`.
+static Avm2Value nmenu_add_item(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NativeMenuExt* e = nmenu_ext(act->this_val.u.obj);
+	Avm2Value item = act->argc > 0 ? act->args[0] : avm2_null();
+	uint32_t n = e != NULL ? nmenu_count(nmenu_items_array(ctx, e)) : 0;
+	return nmenu_insert(act, item, (int32_t) n);
+}
+
+static Avm2Value nmenu_remove_all_items(Avm2Activation* act)
+{
+	Avm2NativeMenuExt* e = nmenu_ext(act->this_val.u.obj);
+	if (e != NULL) e->items = avm2_array_new(act->ctx, 0);
+	return avm2_undefined();
+}
+
+// The remaining AIR entry points are stubs in playerglobal too.
+static Avm2Value nmenu_null_stub(Avm2Activation* act)
+{ (void) act; return avm2_null(); }
+static Avm2Value nmenu_false_stub(Avm2Activation* act)
+{ (void) act; return avm2_bool(0); }
+static Avm2Value nmenu_void_stub(Avm2Activation* act)
+{ (void) act; return avm2_undefined(); }
+static Avm2Value nmenu_minus_one_stub(Avm2Activation* act)
+{ (void) act; return avm2_integer(-1); }
+
+// --- NativeMenuItem --------------------------------------------------------
+
+static Avm2Value nmitem_ctor(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	if (e == NULL) return avm2_undefined();
+	e->label = avm2_coerce_to_string(ctx, act->argc > 0 ? act->args[0]
+		: avm2_string(avm2_string_from_literal(ctx, "")));
+	e->is_separator = (uint8_t) (act->argc > 1
+		&& avm2_coerce_to_boolean(act->args[1]));
+	e->name = avm2_string_from_literal(ctx, "");
+	e->key_equivalent = avm2_string_from_literal(ctx, "k");
+	e->key_equivalent_modifiers = avm2_array_new(ctx, 0);
+	e->data = avm2_undefined();
+	e->mnemonic_index = 0;
+	e->enabled = 0;
+	e->checked = 0;
+	if (g_native_menu_class != NULL)
+	{
+		Avm2Value sm = avm2_class_construct(ctx, g_native_menu_class, NULL, 0);
+		if (sm.kind == AVM2_VALUE_OBJECT) e->submenu = sm.u.obj;
+	}
+	return avm2_undefined();
+}
+
+#define NMITEM_STR_ACCESSOR(fn, field)                                        \
+	static Avm2Value fn##_get(Avm2Activation* act)                            \
+	{                                                                         \
+		Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);            \
+		if (e == NULL || e->field == NULL) return avm2_null();                \
+		return avm2_string(e->field);                                         \
+	}                                                                         \
+	static Avm2Value fn##_set(Avm2Activation* act)                            \
+	{                                                                         \
+		Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);            \
+		if (e != NULL)                                                        \
+			e->field = avm2_coerce_to_string(act->ctx,                        \
+				act->argc > 0 ? act->args[0] : avm2_null());                  \
+		return avm2_undefined();                                              \
+	}
+
+NMITEM_STR_ACCESSOR(nmitem_label, label)
+NMITEM_STR_ACCESSOR(nmitem_name, name)
+NMITEM_STR_ACCESSOR(nmitem_key_equiv, key_equivalent)
+
+#define NMITEM_BOOL_ACCESSOR(fn, field)                                       \
+	static Avm2Value fn##_get(Avm2Activation* act)                            \
+	{                                                                         \
+		Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);            \
+		return avm2_bool(e != NULL && e->field != 0);                         \
+	}                                                                         \
+	static Avm2Value fn##_set(Avm2Activation* act)                            \
+	{                                                                         \
+		Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);            \
+		if (e != NULL)                                                        \
+			e->field = (uint8_t) (act->argc > 0                               \
+				&& avm2_coerce_to_boolean(act->args[0]));                     \
+		return avm2_undefined();                                              \
+	}
+
+NMITEM_BOOL_ACCESSOR(nmitem_enabled, enabled)
+NMITEM_BOOL_ACCESSOR(nmitem_checked, checked)
+NMITEM_BOOL_ACCESSOR(nmitem_separator, is_separator)
+
+static Avm2Value nmitem_data_get(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	return e != NULL ? e->data : avm2_undefined();
+}
+static Avm2Value nmitem_data_set(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	if (e != NULL) e->data = act->argc > 0 ? act->args[0] : avm2_null();
+	return avm2_undefined();
+}
+
+static Avm2Value nmitem_mnemonic_get(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	return avm2_integer(e != NULL ? e->mnemonic_index : 0);
+}
+static Avm2Value nmitem_mnemonic_set(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	if (e != NULL && act->argc > 0)
+		e->mnemonic_index = avm2_coerce_to_i32(act->ctx, act->args[0]);
+	return avm2_undefined();
+}
+
+static Avm2Value nmitem_key_mods_get(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	if (e == NULL) return avm2_null();
+	if (e->key_equivalent_modifiers == NULL)
+		e->key_equivalent_modifiers = avm2_array_new(act->ctx, 0);
+	return avm2_object_value(e->key_equivalent_modifiers);
+}
+static Avm2Value nmitem_key_mods_set(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	if (e != NULL && act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		e->key_equivalent_modifiers = act->args[0].u.obj;
+	return avm2_undefined();
+}
+
+static Avm2Value nmitem_submenu_get(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	if (e == NULL || e->submenu == NULL) return avm2_null();
+	return avm2_object_value(e->submenu);
+}
+static Avm2Value nmitem_submenu_set(Avm2Activation* act)
+{
+	Avm2NativeMenuItemExt* e = nmitem_ext(act->this_val.u.obj);
+	if (e != NULL && act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
+		e->submenu = act->args[0].u.obj;
+	return avm2_undefined();
+}
+
+static Avm2Value nmitem_menu_get(Avm2Activation* act)
+{
+	if (g_native_menu_class == NULL) return avm2_null();
+	return avm2_class_construct(act->ctx, g_native_menu_class, NULL, 0);
+}
+
+static void register_native_menu(Avm2Context* ctx, Avm2Builtins* b)
+{
+	// NativeMenu exists from SWF 10; every member is AIR-gated, so under a
+	// Flash Player runtime describeType reports an empty EventDispatcher
+	// subclass even though the members below are callable.
+	Avm2Class* nm = avm2_builtin_class_api(ctx, "flash.display", "NativeMenu",
+	                                       b->event_dispatcher_class, 10);
+	g_native_menu_class = nm;
+	nm->native_ext_size = sizeof(Avm2NativeMenuExt);
+	avm2_builtin_add_getset(ctx, nm, "isSupported", nmenu_get_is_supported, NULL);
+	avm2_builtin_add_getset(ctx, nm, "items", nmenu_get_items, nmenu_set_items);
+	avm2_builtin_add_getset(ctx, nm, "numItems", nmenu_get_num_items, NULL);
+	avm2_builtin_add_getset(ctx, nm, "parent", nmenu_get_parent, NULL);
+	avm2_builtin_add_method(ctx, nm, "addItem", nmenu_add_item);
+	avm2_builtin_add_method(ctx, nm, "addItemAt", nmenu_add_item_at);
+	avm2_builtin_add_method(ctx, nm, "addSubmenu", nmenu_null_stub);
+	avm2_builtin_add_method(ctx, nm, "addSubmenuAt", nmenu_null_stub);
+	avm2_builtin_add_method(ctx, nm, "clone", nmenu_null_stub);
+	avm2_builtin_add_method(ctx, nm, "containsItem", nmenu_false_stub);
+	avm2_builtin_add_method(ctx, nm, "display", nmenu_void_stub);
+	avm2_builtin_add_method(ctx, nm, "getItemAt", nmenu_null_stub);
+	avm2_builtin_add_method(ctx, nm, "getItemByName", nmenu_null_stub);
+	avm2_builtin_add_method(ctx, nm, "getItemIndex", nmenu_minus_one_stub);
+	avm2_builtin_add_method(ctx, nm, "removeAllItems", nmenu_remove_all_items);
+	avm2_builtin_add_method(ctx, nm, "removeItem", nmenu_null_stub);
+	avm2_builtin_add_method(ctx, nm, "removeItemAt", nmenu_null_stub);
+	avm2_builtin_add_method(ctx, nm, "setItemIndex", nmenu_void_stub);
+
+	Avm2Class* ni = avm2_builtin_class_api(ctx, "flash.display",
+	                                       "NativeMenuItem",
+	                                       b->event_dispatcher_class, 10);
+	g_native_menu_item_class = ni;
+	ni->native_ext_size = sizeof(Avm2NativeMenuItemExt);
+	ni->instance_init.fn = nmitem_ctor;
+	ni->instance_init.debug_name = "NativeMenuItem";
+	avm2_builtin_add_getset(ctx, ni, "enabled", nmitem_enabled_get,
+	                        nmitem_enabled_set);
+	avm2_builtin_add_getset(ctx, ni, "checked", nmitem_checked_get,
+	                        nmitem_checked_set);
+	avm2_builtin_add_getset(ctx, ni, "data", nmitem_data_get, nmitem_data_set);
+	avm2_builtin_add_getset(ctx, ni, "isSeparator", nmitem_separator_get,
+	                        nmitem_separator_set);
+	avm2_builtin_add_getset(ctx, ni, "keyEquivalent", nmitem_key_equiv_get,
+	                        nmitem_key_equiv_set);
+	avm2_builtin_add_getset(ctx, ni, "keyEquivalentModifiers",
+	                        nmitem_key_mods_get, nmitem_key_mods_set);
+	avm2_builtin_add_getset(ctx, ni, "label", nmitem_label_get,
+	                        nmitem_label_set);
+	avm2_builtin_add_getset(ctx, ni, "mnemonicIndex", nmitem_mnemonic_get,
+	                        nmitem_mnemonic_set);
+	avm2_builtin_add_getset(ctx, ni, "name", nmitem_name_get, nmitem_name_set);
+	avm2_builtin_add_getset(ctx, ni, "submenu", nmitem_submenu_get,
+	                        nmitem_submenu_set);
+	avm2_builtin_add_getset(ctx, ni, "menu", nmitem_menu_get, NULL);
+}
+
 void avm2_register_display(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -15899,11 +16301,7 @@ void avm2_register_display(Avm2Context* ctx)
 		avm2_builtin_class_api(ctx, "flash.display", "JPEGXREncoderOptions",
 		                       b->object_class, 16);
 
-		// NativeMenu exists from SWF 10, but every one of its members is
-		// AIR-gated, so under a Flash Player runtime it is an empty
-		// EventDispatcher subclass.
-		avm2_builtin_class_api(ctx, "flash.display", "NativeMenu",
-		                       b->event_dispatcher_class, 10);
+		register_native_menu(ctx, b);
 	}
 
 	// flash.ui.Mouse / MouseCursor — FlashPunk's Splash sets Mouse.cursor to a
