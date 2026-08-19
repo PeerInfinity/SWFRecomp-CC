@@ -41,7 +41,6 @@ import as_model
 import xml_model
 
 RUFFLE = os.path.expanduser("~/CC/ruffle")
-PKG = "flash.display"
 KIND_C = {"method": "DT_DESC_METHOD", "accessor": "DT_DESC_ACCESSOR",
           "variable": "DT_DESC_SLOT"}
 
@@ -52,27 +51,41 @@ KIND_C = {"method": "DT_DESC_METHOD", "accessor": "DT_DESC_ACCESSOR",
 # Emscripten build script, and a missed one is a link-time surprise (the
 # session-15 incident of record). Everything here is `static`, so nothing
 # leaks past this translation unit.
-BEGIN = ("// >>> BEGIN GENERATED flash.display descriptors -- DO NOT EDIT.\n"
-         "// Regenerate with:\n"
-         "//   python3 tools/descriptor/gen_display_descriptors.py \\\n"
-         "//       --actual <our all_classes/display/swf30 output>\n"
-         "// Derived from Ruffle's playerglobal ActionScript stubs\n"
-         "// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and validated\n"
-         "// element-for-element against the six\n"
-         "// avm2/all_classes/display/swf*/output.txt oracles by\n"
-         "// tools/descriptor/check_model.py.")
-END = "// <<< END GENERATED flash.display descriptors"
+# One package = one marker pair, one symbol prefix and one ROWS macro, so
+# several generated blocks coexist in the single translation unit.
+class Pkg(object):
+    def __init__(self, name):
+        self.name = name                       # "flash.display"
+        self.leaf = name.rsplit(".", 1)[-1]    # "display"
+        self.dir = name.replace(".", "/")      # "flash/display"
+        self.macro = "DT_DESC_%s_ROWS" % self.leaf.upper()
+        # `dtd_` is the shipped flash.display prefix; keep it so that block
+        # regenerates byte-identically, and derive a distinct one otherwise.
+        self.sym = "dtd" if name == "flash.display" else "dt%s" % self.leaf[:2]
+        self.begin = (
+            "// >>> BEGIN GENERATED %s descriptors -- DO NOT EDIT.\n"
+            "// Regenerate with:\n"
+            "//   python3 tools/descriptor/gen_display_descriptors.py"
+            " --pkg %s \\\n"
+            "//       --actual <our all_classes/%s/swf30 output>\n"
+            "// Derived from Ruffle's playerglobal ActionScript stubs\n"
+            "// (<ruffle>/core/src/avm2/globals/%s/*.as) and validated\n"
+            "// element-for-element against the\n"
+            "// avm2/all_classes/%s/swf*/output.txt oracles by\n"
+            "// tools/descriptor/check_model.py."
+            % (name, name, self.leaf, self.dir, self.leaf))
+        self.end = "// <<< END GENERATED %s descriptors" % name
 
 
-def splice(path, block):
+def splice(path, block, pkg):
     src = open(path, encoding="utf-8").read()
-    i = src.find(BEGIN.split("\n")[0])
-    j = src.find(END)
+    i = src.find(pkg.begin.split("\n")[0])
+    j = src.find(pkg.end)
     if i < 0 or j < 0:
         raise SystemExit("markers not found in %s -- add\n%s\n%s"
-                         % (path, BEGIN, END))
+                         % (path, pkg.begin, pkg.end))
     open(path, "w", encoding="utf-8").write(
-        src[:i] + block + src[j + len(END):])
+        src[:i] + block + src[j + len(pkg.end):])
 
 
 def fixture_classes(path):
@@ -82,7 +95,8 @@ def fixture_classes(path):
 
 
 class Emitter(object):
-    def __init__(self):
+    def __init__(self, sym="dtd"):
+        self.sym = sym
         self.params = {}      # tuple -> symbol
         self.lines = []
 
@@ -92,7 +106,7 @@ class Emitter(object):
         key = tuple((res.qname(k, t), bool(o)) for t, o in params)
         sym = self.params.get(key)
         if sym is None:
-            sym = "dtd_p%d" % len(self.params)
+            sym = "%s_p%d" % (self.sym, len(self.params))
             self.params[key] = sym
         return sym, len(key)
 
@@ -148,13 +162,14 @@ def resolved_access(res, k, kind, name, mem):
     return "readwrite" if g and st else "readonly" if g else "writeonly"
 
 
-def build(actual_path, out_path):
+def build(actual_path, out_path, pkg):
+    PKG = pkg.name
     classes = as_model.load_globals(
         os.path.join(RUFFLE, "core/src/avm2/globals"))
     res = xml_model.Resolver(classes)
     names = fixture_classes(os.path.join(
-        RUFFLE, "tests/tests/swfs/avm2/all_classes/display/Test.as"))
-    em = Emitter()
+        RUFFLE, "tests/tests/swfs/avm2/all_classes/%s/Test.as" % pkg.leaf))
+    em = Emitter(pkg.sym)
     body = []
     rows = []
     stats = dict(members=0, params=0, ctors=0, consts=0, redecl=0, hide=0,
@@ -273,7 +288,7 @@ def build(actual_path, out_path):
         k = classes["%s::%s" % (PKG, nm)]
         msym = csym = rsym = "NULL"
         if mem_rows[nm]:
-            msym = "dtd_m_%s" % nm
+            msym = "%s_m_%s" % (pkg.sym, nm)
             body.append("static const DtDescMember %s[] = {" % msym)
             for key in sorted(mem_rows[nm]):
                 r = mem_rows[nm][key]
@@ -284,13 +299,13 @@ def build(actual_path, out_path):
             body.append("\t{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },")
             body.append("};")
         if const_rows[nm]:
-            csym = "dtd_c_%s" % nm
+            csym = "%s_c_%s" % (pkg.sym, nm)
             body.append("static const DtDescConst %s[] = {" % csym)
             body.extend(const_rows[nm])
             body.append("\t{ NULL, NULL, 0 },")
             body.append("};")
         if nm in redecl:
-            rsym = "dtd_r_%s" % nm
+            rsym = "%s_r_%s" % (pkg.sym, nm)
             body.append("static const DtDescRedecl %s[] = {" % rsym)
             body.extend(redecl[nm])
             body.append("\t{ NULL, 0, 0, NULL },")
@@ -303,12 +318,12 @@ def build(actual_path, out_path):
 
     stats["params"] = len(em.params)
     out = []
-    out.append(BEGIN)
+    out.append(pkg.begin)
     out.append("//")
     out.append("// Derived from Ruffle's playerglobal ActionScript stubs")
-    out.append("// (<ruffle>/core/src/avm2/globals/flash/display/*.as) and")
-    out.append("// validated element-for-element against the six")
-    out.append("// avm2/all_classes/display/swf*/output.txt oracles by")
+    out.append("// (<ruffle>/core/src/avm2/globals/%s/*.as) and" % pkg.dir)
+    out.append("// validated element-for-element against the")
+    out.append("// avm2/all_classes/%s/swf*/output.txt oracles by" % pkg.leaf)
     out.append("// tools/descriptor/check_model.py.  Included from")
     out.append("// avm2_globals.c inside the dt_* descriptor region, so it")
     out.append("// sees DtDescParam/DtDescMember/DtDescConst/DtDescRedecl.")
@@ -323,13 +338,13 @@ def build(actual_path, out_path):
     out.append("")
     out.extend(body)
     out.append("")
-    out.append("#define DT_DESC_DISPLAY_ROWS \\")
+    out.append("#define %s \\" % pkg.macro)
     out.extend(rows)
-    out.append("\t/* end of DT_DESC_DISPLAY_ROWS */")
-    out.append(END)
+    out.append("\t/* end of %s */" % pkg.macro)
+    out.append(pkg.end)
     block = "\n".join(out) + "\n"
     if out_path.endswith(".c") or out_path.endswith(".h"):
-        splice(out_path, block)
+        splice(out_path, block, pkg)
     else:
         open(out_path, "w", encoding="utf-8").write(block)
     print("wrote %s: %s" % (out_path, stats), file=sys.stderr)
@@ -351,7 +366,9 @@ def build(actual_path, out_path):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--actual", default=None)
+    ap.add_argument("--pkg", default="flash.display",
+                    help="package to emit (flash.display | flash.events)")
     ap.add_argument("-o", "--out",
                     default="SWFModernRuntime/src/avm2/avm2_globals.c")
     a = ap.parse_args()
-    build(a.actual, a.out)
+    build(a.actual, a.out, Pkg(a.pkg))

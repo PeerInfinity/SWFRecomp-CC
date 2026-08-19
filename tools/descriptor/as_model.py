@@ -205,8 +205,14 @@ _FUNC = re.compile(
     r"function\s+(?:(?P<acc>get|set)\s+)?(?P<name>[A-Za-z0-9_$]+)\s*\(")
 _VAR = re.compile(
     r"(?P<mods>(?:\b(?:public|private|protected|internal|static)\b\s+)*)"
-    r"\b(?P<vk>var|const)\s+(?P<name>[A-Za-z0-9_$]+)\s*:"
-    r"\s*(?P<type>[A-Za-z0-9_$.<>*]+)\s*(?:=\s*(?P<val>[^;]+))?;")
+    r"\b(?P<vk>var|const)\s+(?P<name>[A-Za-z0-9_$]+)\s*"
+    # The type annotation is OPTIONAL in ActionScript, and playerglobal uses
+    # the untyped form in four places. `flash.events::AVLoadInfoEvent`'s
+    # `public static const AV_LOAD_INFO = "avLoadInfo"` is the one the
+    # all_classes fixtures grade, and Flash reports it as type="*" (the
+    # declaration, not the value, decides the reported type).
+    r"(?::\s*(?P<type>[A-Za-z0-9_$.<>*]+)\s*)?"
+    r"(?:=\s*(?P<val>[^;]+))?;")
 
 
 def _parse_body(src, start, k):
@@ -268,7 +274,7 @@ def _parse_body(src, start, k):
         is_static = "static" in mods
         mem = Member("variable", m.group("name"))
         mem.is_static = is_static
-        mem.type = m.group("type")
+        mem.type = m.group("type") or "*"
         mem.min_swf = _api_before(body, m.start())
         mem.value = (m.group("val") or "").strip()
         mem.has_get = m.group("vk") == "const"   # has_get doubles as is_const
@@ -306,6 +312,37 @@ def _params(text):
     return out
 
 
+# --------------------------------------------------------------------------
+# AIR-only TRAILING CONSTRUCTOR PARAMETERS.
+#
+# `[API("N")]` annotates declarations, not individual parameters, so a
+# constructor whose tail exists only in AIR's playerglobal cannot be gated by
+# the normal rule -- Ruffle's .as files write ONE signature, the AIR one, for
+# five flash.events classes.  A Flash Player runtime reports the shorter Adobe
+# playerglobal signature, and every one of these tails is a documented AIR
+# addition (`FocusEvent.direction` is AIR's FocusDirection; `controlKey` /
+# `commandKey` are AIR's macOS modifier split; `TransformGestureEvent.velocity`
+# is AIR-only).  The `all_classes/events/swf*` oracles pin all five, and they
+# agree with each other across 4-5 versions, so this is a per-class ADJUDICATION
+# of Ruffle-vs-playerglobal divergence, not a per-version gate.
+#
+# Anything NOT listed here is derived: MouseEvent and TouchEvent were once
+# believed to diverge the same way (session-16 report 8) and do not -- their
+# .as signatures match the oracles exactly.
+AIR_ONLY_CTOR_TAIL = {
+    # controlKeyValue, commandKeyValue
+    "flash.events::KeyboardEvent": 2,
+    # direction:String = "none"
+    "flash.events::FocusEvent": 1,
+    # commandKey, controlKey
+    "flash.events::GestureEvent": 2,
+    # controlKey
+    "flash.events::PressAndTapGestureEvent": 1,
+    # controlKey, velocity
+    "flash.events::TransformGestureEvent": 2,
+}
+
+
 def load_globals(root):
     """Parse every .as under `root`; return {qname: Klass}."""
     classes = {}
@@ -315,6 +352,10 @@ def load_globals(root):
                 continue
             for k in parse_file(os.path.join(dirpath, f)):
                 classes.setdefault(k.qname, k)
+    for q, n in AIR_ONLY_CTOR_TAIL.items():
+        k = classes.get(q)
+        if k is not None and len(k.ctor_params) > n:
+            k.ctor_params = k.ctor_params[:-n]
     return classes
 
 

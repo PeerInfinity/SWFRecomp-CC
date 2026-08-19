@@ -1625,6 +1625,7 @@ static void register_net_events(Avm2Context* ctx)
 	                                   b->text_event_class);
 	er->instance_init.fn = error_event_init;
 	er->instance_init.debug_name = "ErrorEvent";
+	b->error_event_class = er;
 	avm2_builtin_add_getter(ctx, er, "errorID", ee_get_error_id);
 	event_override_method(ctx, er, "toString", ee_to_string);
 	sconst(ctx, er, "ERROR", "error");
@@ -1885,8 +1886,13 @@ static void register_input_events(Avm2Context* ctx)
 	// demo does), so the constant bag has to exist. Its instance surface is
 	// MouseEvent's plus the touch ids, which is what the .as declares.
 	{
-		Avm2Class* te = avm2_builtin_class(ctx, "flash.events", "TouchEvent",
-		                                   b->event_class);
+		// [API("667")] = SWF 10 in Ruffle's TouchEvent.as: a SWF 9 movie
+		// cannot see the name at all (all_classes/events/swf9 lists it as
+		// "not accessible"), while the class object still exists for the
+		// runtime to mint internally.
+		Avm2Class* te = avm2_builtin_class_api(ctx, "flash.events",
+		                                       "TouchEvent", b->event_class,
+		                                       10);
 		te->instance_init.fn = mouse_event_init;
 		te->instance_init.debug_name = "TouchEvent";
 		avm2_builtin_add_getset(ctx, te, "localX", me_get_local_x, me_set_local_x);
@@ -2128,6 +2134,15 @@ void avm2_register_events(Avm2Context* ctx)
 		if (own == NULL) continue;
 		Avm2PropEntry alias = *own;
 		alias.key = ie->key;
+		// Dispatch machinery, not a trait avmplus has: describeType must not
+		// report EventDispatcher's five methods a SECOND time carrying
+		// uri="flash.events:IEventDispatcher" (avm2_class.c:1263 sets the
+		// same flag on the ABC-side aliases). Subclasses never showed the
+		// duplicate because HIDE_NSURI_METHODS suppresses a namespace their
+		// SUPERCLASS already declares — EventDispatcher, whose superclass is
+		// Object, is the one class the shadow rule cannot cover, and
+		// all_classes/events/swf* is the first fixture to describe it.
+		alias.is_iface_alias = 1;
 		avm2_vtable_append(ctx, &ed->ivtable, &alias);
 	}
 

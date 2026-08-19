@@ -1039,6 +1039,9 @@ typedef struct Avm2Builtins
 	Avm2Class* keyboard_event_class;
 	Avm2Class* focus_event_class;
 	Avm2Class* text_event_class;
+	// flash.events.ErrorEvent — the base of the four DRM/uncaught error
+	// event shells registered in avm2_globals.c.
+	Avm2Class* error_event_class;
 	Avm2Class* timer_event_class;
 	Avm2Class* timer_class;             // flash.utils.Timer
 	Avm2Class* sound_class;             // flash.media.Sound

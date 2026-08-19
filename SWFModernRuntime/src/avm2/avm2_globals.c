@@ -2555,29 +2555,8 @@ typedef struct DtDescClass
 	const DtDescRedecl* redeclares;
 } DtDescClass;
 
-// --- flash.events::Event ---------------------------------------------------
-
-static const DtDescParam dt_p_event_ctor[] = {
-	{ "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 },
-};
 static const DtDescParam dt_p_string_req[] = { { "String", 0 } };
 
-static const DtDescMember dt_m_event[] = {
-	{ "bubbles",                  DT_DESC_ACCESSOR, "Boolean", 0, NULL },
-	{ "cancelable",               DT_DESC_ACCESSOR, "Boolean", 0, NULL },
-	{ "currentTarget",            DT_DESC_ACCESSOR, "Object",  0, NULL },
-	{ "eventPhase",               DT_DESC_ACCESSOR, "uint",    0, NULL },
-	{ "target",                   DT_DESC_ACCESSOR, "Object",  0, NULL },
-	{ "type",                     DT_DESC_ACCESSOR, "String",  0, NULL },
-	{ "clone",                    DT_DESC_METHOD, "flash.events::Event", 0, NULL },
-	{ "formatToString",           DT_DESC_METHOD, "String", 1, dt_p_string_req },
-	{ "isDefaultPrevented",       DT_DESC_METHOD, "Boolean", 0, NULL },
-	{ "preventDefault",           DT_DESC_METHOD, "void",    0, NULL },
-	{ "stopImmediatePropagation", DT_DESC_METHOD, "void",    0, NULL },
-	{ "stopPropagation",          DT_DESC_METHOD, "void",    0, NULL },
-	{ "toString",                 DT_DESC_METHOD, "String",  0, NULL },
-	{ NULL, 0, NULL, 0, NULL },
-};
 
 // --- Error and the flash.errors family -------------------------------------
 //
@@ -2807,28 +2786,6 @@ static const DtDescMember dt_m_vertexbuffer3d[] = {
 	{ NULL, 0, NULL, 0, NULL },
 };
 
-// --- flash.events::EventDispatcher ---
-static const DtDescParam dt_p_eventdispatcher_addEventListener[] = {
-	{ "String", 0 }, { "Function", 0 }, { "Boolean", 1 }, { "int", 1 }, { "Boolean", 1 },
-};
-static const DtDescParam dt_p_eventdispatcher_dispatchEvent[] = {
-	{ "flash.events::Event", 0 },
-};
-static const DtDescParam dt_p_eventdispatcher_hasEventListener[] = {
-	{ "String", 0 },
-};
-static const DtDescParam dt_p_eventdispatcher_removeEventListener[] = {
-	{ "String", 0 }, { "Function", 0 }, { "Boolean", 1 },
-};
-static const DtDescMember dt_m_eventdispatcher[] = {
-	{ "addEventListener", DT_DESC_METHOD, "void", 5, dt_p_eventdispatcher_addEventListener },
-	{ "dispatchEvent", DT_DESC_METHOD, "Boolean", 1, dt_p_eventdispatcher_dispatchEvent },
-	{ "hasEventListener", DT_DESC_METHOD, "Boolean", 1, dt_p_eventdispatcher_hasEventListener },
-	{ "removeEventListener", DT_DESC_METHOD, "void", 3, dt_p_eventdispatcher_removeEventListener },
-	{ "toString", DT_DESC_METHOD, "String", 0, NULL },
-	{ "willTrigger", DT_DESC_METHOD, "Boolean", 1, dt_p_eventdispatcher_hasEventListener },
-	{ NULL, 0, NULL, 0, NULL },
-};
 
 
 // flash.display3D::Context3DTextureFormat's gated constants. No type
@@ -4098,12 +4055,1432 @@ static const DtDescConst dtd_c_TriangleCulling[] = {
 	/* end of DT_DESC_DISPLAY_ROWS */
 // <<< END GENERATED flash.display descriptors
 
+// >>> BEGIN GENERATED flash.events descriptors -- DO NOT EDIT.
+// Regenerate with:
+//   python3 tools/descriptor/gen_display_descriptors.py --pkg flash.events \
+//       --actual <our all_classes/events/swf30 output>
+// Derived from Ruffle's playerglobal ActionScript stubs
+// (<ruffle>/core/src/avm2/globals/flash/events/*.as) and validated
+// element-for-element against the
+// avm2/all_classes/events/swf*/output.txt oracles by
+// tools/descriptor/check_model.py.
+//
+// Derived from Ruffle's playerglobal ActionScript stubs
+// (<ruffle>/core/src/avm2/globals/flash/events/*.as) and
+// validated element-for-element against the
+// avm2/all_classes/events/swf*/output.txt oracles by
+// tools/descriptor/check_model.py.  Included from
+// avm2_globals.c inside the dt_* descriptor region, so it
+// sees DtDescParam/DtDescMember/DtDescConst/DtDescRedecl.
+//
+// 483 members / 54 distinct parameter lists / 60 constructors / 199 constants
+// 65 declaredBy re-points / 14 per-class hides.
+
+static const DtDescParam dtev_p0[] = { { "String", 0 } };
+static const DtDescParam dtev_p1[] = { { "String", 0 }, { "Function", 0 }, { "Boolean", 1 }, { "int", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p10[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "int", 1 } };
+static const DtDescParam dtev_p11[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "int", 1 }, { "String", 1 } };
+static const DtDescParam dtev_p12[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Number", 1 }, { "int", 1 }, { "int", 1 }, { "String", 1 }, { "int", 1 } };
+static const DtDescParam dtev_p13[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 } };
+static const DtDescParam dtev_p14[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p15[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "Error", 1 } };
+static const DtDescParam dtev_p16[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 } };
+static const DtDescParam dtev_p17[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.display::InteractiveObject", 1 }, { "flash.display::InteractiveObject", 1 } };
+static const DtDescParam dtev_p18[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "flash.net::NetStream", 1 } };
+static const DtDescParam dtev_p19[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 }, { "flash.utils::ByteArray", 1 } };
+static const DtDescParam dtev_p2[] = { { "flash.events::Event", 0 } };
+static const DtDescParam dtev_p20[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "int", 1 }, { "int", 1 }, { "String", 1 }, { "String", 1 } };
+static const DtDescParam dtev_p21[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "int", 1 }, { "int", 1 }, { "flash.net.drm::DRMDeviceGroup", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p22[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.net.drm::DRMDeviceGroup", 1 } };
+static const DtDescParam dtev_p23[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "int", 1 }, { "int", 1 }, { "flash.net.drm::DRMContentData", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p24[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.utils::ByteArray", 1 }, { "Number", 1 } };
+static const DtDescParam dtev_p25[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 }, { "int", 1 } };
+static const DtDescParam dtev_p26[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "int", 1 }, { "int", 1 }, { "String", 1 }, { "String", 1 }, { "String", 1 } };
+static const DtDescParam dtev_p27[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.net.drm::DRMContentData", 1 }, { "flash.net.drm::DRMVoucher", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p28[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "int", 1 } };
+static const DtDescParam dtev_p29[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p3[] = { { "String", 0 }, { "Function", 0 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p30[] = { { "flash.events::IEventDispatcher", 1 } };
+static const DtDescParam dtev_p31[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.display::InteractiveObject", 1 }, { "Boolean", 1 }, { "uint", 1 } };
+static const DtDescParam dtev_p32[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p33[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.ui::GameInputDevice", 1 } };
+static const DtDescParam dtev_p34[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "Number", 1 }, { "Number", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p35[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "int", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p36[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "flash.text.ime::IIMEClient", 1 } };
+static const DtDescParam dtev_p37[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "uint", 1 }, { "uint", 1 }, { "uint", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p38[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Number", 1 }, { "Number", 1 }, { "flash.display::InteractiveObject", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "int", 1 } };
+static const DtDescParam dtev_p39[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Number", 1 }, { "Object", 1 } };
+static const DtDescParam dtev_p4[] = { { "flash.utils::ByteArray", 0 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p40[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.utils::ByteArray", 1 }, { "flash.utils::ByteArray", 1 } };
+static const DtDescParam dtev_p41[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.net::NetStream", 1 } };
+static const DtDescParam dtev_p42[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Object", 1 } };
+static const DtDescParam dtev_p43[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Number", 1 }, { "Number", 1 } };
+static const DtDescParam dtev_p44[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p45[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Number", 1 }, { "flash.utils::ByteArray", 1 } };
+static const DtDescParam dtev_p46[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.display::BitmapData", 1 }, { "flash.utils::ByteArray", 1 }, { "__AS3__.vec::Vector.<Number>", 1 } };
+static const DtDescParam dtev_p47[] = { { "String", 0 }, { "Boolean", 0 }, { "Boolean", 0 }, { "flash.display::InteractiveObject", 0 }, { "String", 0 } };
+static const DtDescParam dtev_p48[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "String", 1 } };
+static const DtDescParam dtev_p49[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Array", 1 } };
+static const DtDescParam dtev_p5[] = { { "int", 0 } };
+static const DtDescParam dtev_p50[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "Number", 1 } };
+static const DtDescParam dtev_p51[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "int", 1 }, { "Boolean", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "flash.display::InteractiveObject", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p52[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "String", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Number", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "Boolean", 1 } };
+static const DtDescParam dtev_p53[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "*", 1 } };
+static const DtDescParam dtev_p6[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.utils::Dictionary", 1 }, { "Number", 1 } };
+static const DtDescParam dtev_p7[] = { { "String", 0 }, { "Boolean", 1 }, { "Boolean", 1 }, { "int", 1 }, { "String", 1 }, { "Array", 1 } };
+static const DtDescParam dtev_p8[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "flash.utils::Dictionary", 1 } };
+static const DtDescParam dtev_p9[] = { { "String", 1 }, { "Boolean", 1 }, { "Boolean", 1 }, { "int", 1 }, { "int", 1 }, { "int", 1 }, { "Number", 1 } };
+
+static const DtDescMember dtev_m_AVDictionaryDataEvent[] = {
+	{ "dictionary", DT_DESC_ACCESSOR, "flash.utils::Dictionary", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "time", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "AV_DICTIONARY_DATA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVDictionaryDataEvent[] = {
+	{ "AV_DICTIONARY_DATA", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_AVHTTPStatusEvent[] = {
+	{ "responseHeaders", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "responseURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "status", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "AV_HTTP_RESPONSE_STATUS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVHTTPStatusEvent[] = {
+	{ "AV_HTTP_RESPONSE_STATUS", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_AVHTTPStatusEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::AVHTTPStatusEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::AVHTTPStatusEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_AVLoadInfoEvent[] = {
+	{ "loadInfo", DT_DESC_ACCESSOR, "flash.utils::Dictionary", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "AV_LOAD_INFO", DT_DESC_SLOT, "*", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVLoadInfoEvent[] = {
+	{ "AV_LOAD_INFO", "*", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_AVManifestLoadEvent[] = {
+	{ "duration", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "handle", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "result", DT_DESC_ACCESSOR, "flash.media::AVResult", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "userData", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "AV_MANIFEST_LOAD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVManifestLoadEvent[] = {
+	{ "AV_MANIFEST_LOAD", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_AVPauseAtPeriodEndEvent[] = {
+	{ "userData", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "AV_PAUSE_AT_PERIOD_END", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVPauseAtPeriodEndEvent[] = {
+	{ "AV_PAUSE_AT_PERIOD_END", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_AVPlayStateEvent[] = {
+	{ "playState", DT_DESC_ACCESSOR, "flash.media::AVPlayState", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "AV_PLAY_STATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVPlayStateEvent[] = {
+	{ "AV_PLAY_STATE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_AVStatusEvent[] = {
+	{ "description", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "notificationType", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "result", DT_DESC_ACCESSOR, "flash.media::AVResult", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "AV_STATUS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BACKGROUND_MANIFEST_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BACKGROUND_MANIFEST_WARNING", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BUFFER_STATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DECODER_TYPE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DIMENSION_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "INSERTION_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "LOAD_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MANIFEST_UPDATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PLAY_STATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER_TYPE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SEEK_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "STEP_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "STREAM_SWITCH", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TRICKPLAY_ENDED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "WARNING", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVStatusEvent[] = {
+	{ "AV_STATUS", "String", 0 },
+	{ "BACKGROUND_MANIFEST_ERROR", "String", 0 },
+	{ "BACKGROUND_MANIFEST_WARNING", "String", 0 },
+	{ "BUFFER_STATE", "String", 0 },
+	{ "DECODER_TYPE", "String", 0 },
+	{ "DIMENSION_CHANGE", "String", 0 },
+	{ "ERROR", "String", 0 },
+	{ "INSERTION_COMPLETE", "String", 0 },
+	{ "LOAD_COMPLETE", "String", 0 },
+	{ "MANIFEST_UPDATE", "String", 0 },
+	{ "PLAY_STATE", "String", 0 },
+	{ "RENDER_TYPE", "String", 0 },
+	{ "SEEK_COMPLETE", "String", 0 },
+	{ "STEP_COMPLETE", "String", 0 },
+	{ "STREAM_SWITCH", "String", 0 },
+	{ "TRICKPLAY_ENDED", "String", 0 },
+	{ "WARNING", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_AVStreamSwitchEvent[] = {
+	{ "bitrate", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "description", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "switchType", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "time", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "userData", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "ABR_SWITCH", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "AV_STREAM_SWITCH", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PERIOD_SWITCH", DT_DESC_SLOT, "int", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AVStreamSwitchEvent[] = {
+	{ "ABR_SWITCH", "int", 0 },
+	{ "AV_STREAM_SWITCH", "String", 0 },
+	{ "PERIOD_SWITCH", "int", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_AccelerometerEvent[] = {
+	{ "accelerationX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "accelerationY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "accelerationZ", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "timestamp", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "UPDATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AccelerometerEvent[] = {
+	{ "UPDATE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_AccelerometerEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::AccelerometerEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::AccelerometerEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_ActivityEvent[] = {
+	{ "activating", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "ACTIVITY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_ActivityEvent[] = {
+	{ "ACTIVITY", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_ActivityEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::ActivityEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::ActivityEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_AsyncErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "ASYNC_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "error", DT_DESC_SLOT, "Error", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AsyncErrorEvent[] = {
+	{ "ASYNC_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_AsyncErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::AsyncErrorEvent" },
+	{ "error", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_AudioOutputChangeEvent[] = {
+	{ "reason", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "AUDIO_OUTPUT_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_AudioOutputChangeEvent[] = {
+	{ "AUDIO_OUTPUT_CHANGE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_ContextMenuEvent[] = {
+	{ "contextMenuOwner", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "isMouseTargetInaccessible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "mouseTarget", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "MENU_ITEM_SELECT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MENU_SELECT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_ContextMenuEvent[] = {
+	{ "MENU_ITEM_SELECT", "String", 0 },
+	{ "MENU_SELECT", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_DRMAuthenticateEvent[] = {
+	{ "authenticationType", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "header", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "netstream", DT_DESC_ACCESSOR, "flash.net::NetStream", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "passwordPrompt", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "urlPrompt", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "usernamePrompt", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "AUTHENTICATION_TYPE_DRM", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "AUTHENTICATION_TYPE_PROXY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DRM_AUTHENTICATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMAuthenticateEvent[] = {
+	{ "AUTHENTICATION_TYPE_DRM", "String", 0 },
+	{ "AUTHENTICATION_TYPE_PROXY", "String", 0 },
+	{ "DRM_AUTHENTICATE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMAuthenticateEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMAuthenticateEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::DRMAuthenticateEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMAuthenticationCompleteEvent[] = {
+	{ "domain", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "serverURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "token", DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "AUTHENTICATION_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMAuthenticationCompleteEvent[] = {
+	{ "AUTHENTICATION_COMPLETE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMAuthenticationCompleteEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMAuthenticationCompleteEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMAuthenticationErrorEvent[] = {
+	{ "domain", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "serverURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "subErrorID", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "AUTHENTICATION_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMAuthenticationErrorEvent[] = {
+	{ "AUTHENTICATION_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMAuthenticationErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMAuthenticationErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMDeviceGroupErrorEvent[] = {
+	{ "deviceGroup", DT_DESC_ACCESSOR, "flash.net.drm::DRMDeviceGroup", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "drmUpdateNeeded", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "subErrorID", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "systemUpdateNeeded", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "ADD_TO_DEVICE_GROUP_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "REMOVE_FROM_DEVICE_GROUP_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMDeviceGroupErrorEvent[] = {
+	{ "ADD_TO_DEVICE_GROUP_ERROR", "String", 0 },
+	{ "REMOVE_FROM_DEVICE_GROUP_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMDeviceGroupErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMDeviceGroupErrorEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::DRMDeviceGroupErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMDeviceGroupEvent[] = {
+	{ "deviceGroup", DT_DESC_ACCESSOR, "flash.net.drm::DRMDeviceGroup", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "ADD_TO_DEVICE_GROUP_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "REMOVE_FROM_DEVICE_GROUP_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMDeviceGroupEvent[] = {
+	{ "ADD_TO_DEVICE_GROUP_COMPLETE", "String", 0 },
+	{ "REMOVE_FROM_DEVICE_GROUP_COMPLETE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMDeviceGroupEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMDeviceGroupEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::DRMDeviceGroupEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMErrorEvent[] = {
+	{ "contentData", DT_DESC_ACCESSOR, "flash.net.drm::DRMContentData", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "drmUpdateNeeded", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "subErrorID", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "systemUpdateNeeded", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "DRM_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DRM_LOAD_DEVICEID_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMErrorEvent[] = {
+	{ "DRM_ERROR", "String", 0 },
+	{ "DRM_LOAD_DEVICEID_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMErrorEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::DRMErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMLicenseRequestEvent[] = {
+	{ "serverURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "LICENSE_REQUEST", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMLicenseRequestEvent[] = {
+	{ "LICENSE_REQUEST", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMLicenseRequestEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMLicenseRequestEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMMetadataEvent[] = {
+	{ "drmMetadata", DT_DESC_ACCESSOR, "flash.net.drm::DRMContentData", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "timestamp", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "DRM_METADATA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMMetadataEvent[] = {
+	{ "DRM_METADATA", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_DRMReturnVoucherCompleteEvent[] = {
+	{ "licenseID", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "numberOfVouchersReturned", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "policyID", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "serverURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "RETURN_VOUCHER_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMReturnVoucherCompleteEvent[] = {
+	{ "RETURN_VOUCHER_COMPLETE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMReturnVoucherCompleteEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMReturnVoucherCompleteEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMReturnVoucherErrorEvent[] = {
+	{ "licenseID", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "policyID", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "serverURL", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "subErrorID", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "RETURN_VOUCHER_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMReturnVoucherErrorEvent[] = {
+	{ "RETURN_VOUCHER_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMReturnVoucherErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMReturnVoucherErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DRMStatusEvent[] = {
+	{ "contentData", DT_DESC_ACCESSOR, "flash.net.drm::DRMContentData", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "isLocal", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "voucher", DT_DESC_ACCESSOR, "flash.net.drm::DRMVoucher", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "DRM_STATUS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DRMStatusEvent[] = {
+	{ "DRM_STATUS", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DRMStatusEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DRMStatusEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::DRMStatusEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_DataEvent[] = {
+	{ "data", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "DATA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "UPLOAD_COMPLETE_DATA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_DataEvent[] = {
+	{ "DATA", "String", 0 },
+	{ "UPLOAD_COMPLETE_DATA", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_DataEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::DataEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_ErrorEvent[] = {
+	{ "errorID", DT_DESC_ACCESSOR, "int", 0, NULL, 10, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_ErrorEvent[] = {
+	{ "ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_ErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::ErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_Event[] = {
+	{ "bubbles", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "cancelable", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "currentTarget", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "eventPhase", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "target", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "type", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "formatToString", DT_DESC_METHOD, "String", 1, dtev_p0, 0, 1, 0, NULL, NULL },
+	{ "isDefaultPrevented", DT_DESC_METHOD, "Boolean", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "preventDefault", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "stopImmediatePropagation", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "stopPropagation", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "ACTIVATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ADDED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ADDED_TO_STAGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BROWSER_ZOOM_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CANCEL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CHANNEL_MESSAGE", DT_DESC_SLOT, "String", 0, NULL, 17, 1, 1, "readonly", NULL },
+	{ "CHANNEL_STATE", DT_DESC_SLOT, "String", 0, NULL, 17, 1, 1, "readonly", NULL },
+	{ "CLEAR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CLOSE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CLOSING", DT_DESC_SLOT, "String", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CONNECT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CONTEXT3D_CREATE", DT_DESC_SLOT, "String", 0, NULL, 10, 1, 1, "readonly", NULL },
+	{ "COPY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DEACTIVATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ENTER_FRAME", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "EXITING", DT_DESC_SLOT, "String", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "EXIT_FRAME", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FRAME_CONSTRUCTED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FRAME_LABEL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FULLSCREEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ID3", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "INIT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOUSE_LEAVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "OPEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PASTE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "REMOVED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "REMOVED_FROM_STAGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RESIZE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SCROLL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SELECT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SELECT_ALL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SOUND_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SUSPEND", DT_DESC_SLOT, "String", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "TAB_CHILDREN_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TAB_ENABLED_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TAB_INDEX_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TEXTURE_READY", DT_DESC_SLOT, "String", 0, NULL, 10, 1, 1, "readonly", NULL },
+	{ "TEXT_INTERACTION_MODE_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "UNLOAD", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "VIDEO_FRAME", DT_DESC_SLOT, "String", 0, NULL, 17, 1, 1, "readonly", NULL },
+	{ "WORKER_STATE", DT_DESC_SLOT, "String", 0, NULL, 17, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_Event[] = {
+	{ "ACTIVATE", "String", 0 },
+	{ "ADDED", "String", 0 },
+	{ "ADDED_TO_STAGE", "String", 0 },
+	{ "BROWSER_ZOOM_CHANGE", "String", 0 },
+	{ "CANCEL", "String", 0 },
+	{ "CHANGE", "String", 0 },
+	{ "CHANNEL_MESSAGE", "String", 17 },
+	{ "CHANNEL_STATE", "String", 17 },
+	{ "CLEAR", "String", 0 },
+	{ "CLOSE", "String", 0 },
+	{ "CLOSING", "String", 255 },
+	{ "COMPLETE", "String", 0 },
+	{ "CONNECT", "String", 0 },
+	{ "CONTEXT3D_CREATE", "String", 10 },
+	{ "COPY", "String", 0 },
+	{ "CUT", "String", 0 },
+	{ "DEACTIVATE", "String", 0 },
+	{ "ENTER_FRAME", "String", 0 },
+	{ "EXITING", "String", 255 },
+	{ "EXIT_FRAME", "String", 0 },
+	{ "FRAME_CONSTRUCTED", "String", 0 },
+	{ "FRAME_LABEL", "String", 0 },
+	{ "FULLSCREEN", "String", 0 },
+	{ "ID3", "String", 0 },
+	{ "INIT", "String", 0 },
+	{ "MOUSE_LEAVE", "String", 0 },
+	{ "OPEN", "String", 0 },
+	{ "PASTE", "String", 0 },
+	{ "REMOVED", "String", 0 },
+	{ "REMOVED_FROM_STAGE", "String", 0 },
+	{ "RENDER", "String", 0 },
+	{ "RESIZE", "String", 0 },
+	{ "SCROLL", "String", 0 },
+	{ "SELECT", "String", 0 },
+	{ "SELECT_ALL", "String", 0 },
+	{ "SOUND_COMPLETE", "String", 0 },
+	{ "SUSPEND", "String", 255 },
+	{ "TAB_CHILDREN_CHANGE", "String", 0 },
+	{ "TAB_ENABLED_CHANGE", "String", 0 },
+	{ "TAB_INDEX_CHANGE", "String", 0 },
+	{ "TEXTURE_READY", "String", 10 },
+	{ "TEXT_INTERACTION_MODE_CHANGE", "String", 0 },
+	{ "UNLOAD", "String", 0 },
+	{ "VIDEO_FRAME", "String", 17 },
+	{ "WORKER_STATE", "String", 17 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_Event[] = {
+	{ "CLOSING", DT_DESC_SLOT, 1, NULL },
+	{ "EXITING", DT_DESC_SLOT, 1, NULL },
+	{ "SUSPEND", DT_DESC_SLOT, 1, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_EventDispatcher[] = {
+	{ "addEventListener", DT_DESC_METHOD, "void", 5, dtev_p1, 0, 1, 0, NULL, NULL },
+	{ "dispatchEvent", DT_DESC_METHOD, "Boolean", 1, dtev_p2, 0, 1, 0, NULL, NULL },
+	{ "hasEventListener", DT_DESC_METHOD, "Boolean", 1, dtev_p0, 0, 1, 0, NULL, NULL },
+	{ "removeEventListener", DT_DESC_METHOD, "void", 3, dtev_p3, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "willTrigger", DT_DESC_METHOD, "Boolean", 1, dtev_p0, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtev_m_EventPhase[] = {
+	{ "AT_TARGET", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BUBBLING_PHASE", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CAPTURING_PHASE", DT_DESC_SLOT, "uint", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_EventPhase[] = {
+	{ "AT_TARGET", "uint", 0 },
+	{ "BUBBLING_PHASE", "uint", 0 },
+	{ "CAPTURING_PHASE", "uint", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_FocusEvent[] = {
+	{ "direction", DT_DESC_ACCESSOR, "String", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "isRelatedObjectInaccessible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "keyCode", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "relatedObject", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "shiftKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "FOCUS_IN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FOCUS_OUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "KEY_FOCUS_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOUSE_FOCUS_CHANGE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_FocusEvent[] = {
+	{ "FOCUS_IN", "String", 0 },
+	{ "FOCUS_OUT", "String", 0 },
+	{ "KEY_FOCUS_CHANGE", "String", 0 },
+	{ "MOUSE_FOCUS_CHANGE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_FocusEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::FocusEvent" },
+	{ "direction", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_FullScreenEvent[] = {
+	{ "fullScreen", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "interactive", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 16, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "FULL_SCREEN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "FULL_SCREEN_INTERACTIVE_ACCEPTED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_FullScreenEvent[] = {
+	{ "FULL_SCREEN", "String", 0 },
+	{ "FULL_SCREEN_INTERACTIVE_ACCEPTED", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_FullScreenEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::FullScreenEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::FullScreenEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_GameInputEvent[] = {
+	{ "device", DT_DESC_ACCESSOR, "flash.ui::GameInputDevice", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "DEVICE_ADDED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DEVICE_REMOVED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "DEVICE_UNUSABLE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_GameInputEvent[] = {
+	{ "DEVICE_ADDED", "String", 0 },
+	{ "DEVICE_REMOVED", "String", 0 },
+	{ "DEVICE_UNUSABLE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_GestureEvent[] = {
+	{ "altKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "commandKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "controlKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "ctrlKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "localX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "localY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "phase", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "shiftKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "stageX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "stageY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "updateAfterEvent", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "GESTURE_TWO_FINGER_TAP", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_GestureEvent[] = {
+	{ "GESTURE_TWO_FINGER_TAP", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_GestureEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::GestureEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::GestureEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_GesturePhase[] = {
+	{ "ALL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "BEGIN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "END", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "UPDATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_GesturePhase[] = {
+	{ "ALL", "String", 0 },
+	{ "BEGIN", "String", 0 },
+	{ "END", "String", 0 },
+	{ "UPDATE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_HTTPStatusEvent[] = {
+	{ "redirected", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 21, 1, 0, "readwrite", NULL },
+	{ "responseHeaders", DT_DESC_ACCESSOR, "Array", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "responseURL", DT_DESC_ACCESSOR, "String", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "status", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "HTTP_RESPONSE_STATUS", DT_DESC_SLOT, "String", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "HTTP_STATUS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_HTTPStatusEvent[] = {
+	{ "HTTP_RESPONSE_STATUS", "String", 255 },
+	{ "HTTP_STATUS", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_HTTPStatusEvent[] = {
+	{ "HTTP_RESPONSE_STATUS", DT_DESC_SLOT, 1, NULL },
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::HTTPStatusEvent" },
+	{ "responseURL", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_IEventDispatcher[] = {
+	{ "addEventListener", DT_DESC_METHOD, "void", 5, dtev_p1, 0, 1, 0, NULL, NULL },
+	{ "dispatchEvent", DT_DESC_METHOD, "Boolean", 1, dtev_p2, 0, 1, 0, NULL, NULL },
+	{ "hasEventListener", DT_DESC_METHOD, "Boolean", 1, dtev_p0, 0, 1, 0, NULL, NULL },
+	{ "removeEventListener", DT_DESC_METHOD, "void", 3, dtev_p3, 0, 1, 0, NULL, NULL },
+	{ "willTrigger", DT_DESC_METHOD, "Boolean", 1, dtev_p0, 0, 1, 0, NULL, NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescMember dtev_m_IMEEvent[] = {
+	{ "imeClient", DT_DESC_ACCESSOR, "flash.text.ime::IIMEClient", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "IME_COMPOSITION", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "IME_START_COMPOSITION", DT_DESC_SLOT, "String", 0, NULL, 10, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_IMEEvent[] = {
+	{ "IME_COMPOSITION", "String", 0 },
+	{ "IME_START_COMPOSITION", "String", 10 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_IMEEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::IMEEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::IMEEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_IOErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "DISK_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "IO_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "NETWORK_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "STANDARD_ERROR_IO_ERROR", DT_DESC_SLOT, "String", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "STANDARD_INPUT_IO_ERROR", DT_DESC_SLOT, "String", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "STANDARD_OUTPUT_IO_ERROR", DT_DESC_SLOT, "String", 0, NULL, 255, 1, 1, "readonly", NULL },
+	{ "VERIFY_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_IOErrorEvent[] = {
+	{ "DISK_ERROR", "String", 0 },
+	{ "IO_ERROR", "String", 0 },
+	{ "NETWORK_ERROR", "String", 0 },
+	{ "STANDARD_ERROR_IO_ERROR", "String", 255 },
+	{ "STANDARD_INPUT_IO_ERROR", "String", 255 },
+	{ "STANDARD_OUTPUT_IO_ERROR", "String", 255 },
+	{ "VERIFY_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_IOErrorEvent[] = {
+	{ "STANDARD_ERROR_IO_ERROR", DT_DESC_SLOT, 1, NULL },
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::IOErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_KeyboardEvent[] = {
+	{ "altKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "charCode", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "commandKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "controlKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 255, 1, 0, "readwrite", NULL },
+	{ "ctrlKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "keyCode", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "keyLocation", DT_DESC_ACCESSOR, "uint", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "shiftKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "updateAfterEvent", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "KEY_DOWN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "KEY_UP", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_KeyboardEvent[] = {
+	{ "KEY_DOWN", "String", 0 },
+	{ "KEY_UP", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_KeyboardEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::KeyboardEvent" },
+	{ "commandKey", DT_DESC_ACCESSOR, 0, NULL },
+	{ "controlKey", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_MouseEvent[] = {
+	{ "altKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "buttonDown", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "ctrlKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "delta", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "isRelatedObjectInaccessible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 10, 1, 0, "readwrite", NULL },
+	{ "localX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "localY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "movementX", DT_DESC_ACCESSOR, "Number", 0, NULL, 15, 1, 0, "readwrite", NULL },
+	{ "movementY", DT_DESC_ACCESSOR, "Number", 0, NULL, 15, 1, 0, "readwrite", NULL },
+	{ "relatedObject", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "shiftKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "stageX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "stageY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "updateAfterEvent", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "CLICK", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "CONTEXT_MENU", DT_DESC_SLOT, "String", 0, NULL, 15, 1, 1, "readonly", NULL },
+	{ "DOUBLE_CLICK", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MIDDLE_CLICK", DT_DESC_SLOT, "String", 0, NULL, 15, 1, 1, "readonly", NULL },
+	{ "MIDDLE_MOUSE_DOWN", DT_DESC_SLOT, "String", 0, NULL, 15, 1, 1, "readonly", NULL },
+	{ "MIDDLE_MOUSE_UP", DT_DESC_SLOT, "String", 0, NULL, 15, 1, 1, "readonly", NULL },
+	{ "MOUSE_DOWN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOUSE_MOVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOUSE_OUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOUSE_OVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOUSE_UP", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "MOUSE_WHEEL", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RELEASE_OUTSIDE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RIGHT_CLICK", DT_DESC_SLOT, "String", 0, NULL, 15, 1, 1, "readonly", NULL },
+	{ "RIGHT_MOUSE_DOWN", DT_DESC_SLOT, "String", 0, NULL, 15, 1, 1, "readonly", NULL },
+	{ "RIGHT_MOUSE_UP", DT_DESC_SLOT, "String", 0, NULL, 15, 1, 1, "readonly", NULL },
+	{ "ROLL_OUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "ROLL_OVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_MouseEvent[] = {
+	{ "CLICK", "String", 0 },
+	{ "CONTEXT_MENU", "String", 15 },
+	{ "DOUBLE_CLICK", "String", 0 },
+	{ "MIDDLE_CLICK", "String", 15 },
+	{ "MIDDLE_MOUSE_DOWN", "String", 15 },
+	{ "MIDDLE_MOUSE_UP", "String", 15 },
+	{ "MOUSE_DOWN", "String", 0 },
+	{ "MOUSE_MOVE", "String", 0 },
+	{ "MOUSE_OUT", "String", 0 },
+	{ "MOUSE_OVER", "String", 0 },
+	{ "MOUSE_UP", "String", 0 },
+	{ "MOUSE_WHEEL", "String", 0 },
+	{ "RELEASE_OUTSIDE", "String", 0 },
+	{ "RIGHT_CLICK", "String", 15 },
+	{ "RIGHT_MOUSE_DOWN", "String", 15 },
+	{ "RIGHT_MOUSE_UP", "String", 15 },
+	{ "ROLL_OUT", "String", 0 },
+	{ "ROLL_OVER", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_MouseEvent[] = {
+	{ "MOUSE_LEAVE", DT_DESC_SLOT, 1, NULL },
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::MouseEvent" },
+	{ "commandKey", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_NetDataEvent[] = {
+	{ "info", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "timestamp", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "MEDIA_TYPE_DATA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_NetDataEvent[] = {
+	{ "MEDIA_TYPE_DATA", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_NetDataEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::NetDataEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::NetDataEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_NetFilterEvent[] = {
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "data", DT_DESC_SLOT, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "header", DT_DESC_SLOT, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescRedecl dtev_r_NetFilterEvent[] = {
+	{ "data", DT_DESC_ACCESSOR, 0, NULL },
+	{ "header", DT_DESC_ACCESSOR, 0, NULL },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_NetMonitorEvent[] = {
+	{ "netStream", DT_DESC_ACCESSOR, "flash.net::NetStream", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "NET_STREAM_CREATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_NetMonitorEvent[] = {
+	{ "NET_STREAM_CREATE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_NetMonitorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::NetMonitorEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::NetMonitorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_NetStatusEvent[] = {
+	{ "info", DT_DESC_ACCESSOR, "Object", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "NET_STATUS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_NetStatusEvent[] = {
+	{ "NET_STATUS", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_NetStatusEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::NetStatusEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_OutputProgressEvent[] = {
+	{ "bytesPending", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "bytesTotal", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "OUTPUT_PROGRESS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_OutputProgressEvent[] = {
+	{ "OUTPUT_PROGRESS", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_OutputProgressEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::OutputProgressEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::OutputProgressEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_PressAndTapGestureEvent[] = {
+	{ "tapLocalX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "tapLocalY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "tapStageX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "tapStageY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "GESTURE_PRESS_AND_TAP", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_PressAndTapGestureEvent[] = {
+	{ "GESTURE_PRESS_AND_TAP", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_PressAndTapGestureEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::PressAndTapGestureEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::PressAndTapGestureEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_ProgressEvent[] = {
+	{ "bytesLoaded", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "bytesTotal", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "PROGRESS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SOCKET_DATA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_ProgressEvent[] = {
+	{ "PROGRESS", "String", 0 },
+	{ "SOCKET_DATA", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_ProgressEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::ProgressEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_SampleDataEvent[] = {
+	{ "data", DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "position", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "SAMPLE_DATA", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_SampleDataEvent[] = {
+	{ "SAMPLE_DATA", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_SampleDataEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::SampleDataEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::SampleDataEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_SecurityErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "SECURITY_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_SecurityErrorEvent[] = {
+	{ "SECURITY_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_SecurityErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::SecurityErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_ShaderEvent[] = {
+	{ "bitmapData", DT_DESC_ACCESSOR, "flash.display::BitmapData", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "byteArray", DT_DESC_ACCESSOR, "flash.utils::ByteArray", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "vector", DT_DESC_ACCESSOR, "__AS3__.vec::Vector.<Number>", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_ShaderEvent[] = {
+	{ "COMPLETE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_ShaderEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::ShaderEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::ShaderEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_SoftKeyboardEvent[] = {
+	{ "relatedObject", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "triggerType", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "SOFT_KEYBOARD_ACTIVATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SOFT_KEYBOARD_ACTIVATING", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "SOFT_KEYBOARD_DEACTIVATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_SoftKeyboardEvent[] = {
+	{ "SOFT_KEYBOARD_ACTIVATE", "String", 0 },
+	{ "SOFT_KEYBOARD_ACTIVATING", "String", 0 },
+	{ "SOFT_KEYBOARD_DEACTIVATE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_SoftKeyboardEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::SoftKeyboardEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::SoftKeyboardEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_SoftKeyboardTrigger[] = {
+	{ "CONTENT_TRIGGERED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "USER_TRIGGERED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_SoftKeyboardTrigger[] = {
+	{ "CONTENT_TRIGGERED", "String", 0 },
+	{ "USER_TRIGGERED", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_StageVideoAvailabilityEvent[] = {
+	{ "availability", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "STAGE_VIDEO_AVAILABILITY", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "driver", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "reason", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_StageVideoAvailabilityEvent[] = {
+	{ "STAGE_VIDEO_AVAILABILITY", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_StageVideoEvent[] = {
+	{ "colorSpace", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "status", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "RENDER_STATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER_STATUS_ACCELERATED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER_STATUS_SOFTWARE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER_STATUS_UNAVAILABLE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "codecInfo", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_StageVideoEvent[] = {
+	{ "RENDER_STATE", "String", 0 },
+	{ "RENDER_STATUS_ACCELERATED", "String", 0 },
+	{ "RENDER_STATUS_SOFTWARE", "String", 0 },
+	{ "RENDER_STATUS_UNAVAILABLE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_StatusEvent[] = {
+	{ "code", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "level", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "STATUS", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_StatusEvent[] = {
+	{ "STATUS", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_StatusEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::StatusEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_SyncEvent[] = {
+	{ "changeList", DT_DESC_ACCESSOR, "Array", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "SYNC", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_SyncEvent[] = {
+	{ "SYNC", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_SyncEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::SyncEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::SyncEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_TextEvent[] = {
+	{ "text", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "LINK", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TEXT_INPUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_TextEvent[] = {
+	{ "LINK", "String", 0 },
+	{ "TEXT_INPUT", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_TextEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::TextEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_ThrottleEvent[] = {
+	{ "state", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "targetFrameRate", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "THROTTLE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_ThrottleEvent[] = {
+	{ "THROTTLE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_ThrottleEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::ThrottleEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::ThrottleEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_ThrottleType[] = {
+	{ "PAUSE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RESUME", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "THROTTLE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_ThrottleType[] = {
+	{ "PAUSE", "String", 0 },
+	{ "RESUME", "String", 0 },
+	{ "THROTTLE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_TimerEvent[] = {
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "updateAfterEvent", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "TIMER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TIMER_COMPLETE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_TimerEvent[] = {
+	{ "TIMER", "String", 0 },
+	{ "TIMER_COMPLETE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_TimerEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::TimerEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_TouchEvent[] = {
+	{ "altKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "ctrlKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "isPrimaryTouchPoint", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "isRelatedObjectInaccessible", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "localX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "localY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "pressure", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "relatedObject", DT_DESC_ACCESSOR, "flash.display::InteractiveObject", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "shiftKey", DT_DESC_ACCESSOR, "Boolean", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "sizeX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "sizeY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "stageX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "stageY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "touchPointID", DT_DESC_ACCESSOR, "int", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "getSamples", DT_DESC_METHOD, "uint", 2, dtev_p4, 255, 1, 0, NULL, NULL },
+	{ "isToolButtonDown", DT_DESC_METHOD, "Boolean", 1, dtev_p5, 255, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "updateAfterEvent", DT_DESC_METHOD, "void", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "PROXIMITY_BEGIN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PROXIMITY_END", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PROXIMITY_MOVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PROXIMITY_OUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PROXIMITY_OVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PROXIMITY_ROLL_OUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "PROXIMITY_ROLL_OVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_BEGIN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_END", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_MOVE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_OUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_OVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_ROLL_OUT", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_ROLL_OVER", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "TOUCH_TAP", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_TouchEvent[] = {
+	{ "PROXIMITY_BEGIN", "String", 0 },
+	{ "PROXIMITY_END", "String", 0 },
+	{ "PROXIMITY_MOVE", "String", 0 },
+	{ "PROXIMITY_OUT", "String", 0 },
+	{ "PROXIMITY_OVER", "String", 0 },
+	{ "PROXIMITY_ROLL_OUT", "String", 0 },
+	{ "PROXIMITY_ROLL_OVER", "String", 0 },
+	{ "TOUCH_BEGIN", "String", 0 },
+	{ "TOUCH_END", "String", 0 },
+	{ "TOUCH_MOVE", "String", 0 },
+	{ "TOUCH_OUT", "String", 0 },
+	{ "TOUCH_OVER", "String", 0 },
+	{ "TOUCH_ROLL_OUT", "String", 0 },
+	{ "TOUCH_ROLL_OVER", "String", 0 },
+	{ "TOUCH_TAP", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_TouchEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::TouchEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::TouchEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_TransformGestureEvent[] = {
+	{ "offsetX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "offsetY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "rotation", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "scaleX", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "scaleY", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "velocity", DT_DESC_ACCESSOR, "Number", 0, NULL, 0, 1, 0, "readwrite", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "GESTURE_PAN", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "GESTURE_ROTATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "GESTURE_SWIPE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "GESTURE_ZOOM", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_TransformGestureEvent[] = {
+	{ "GESTURE_PAN", "String", 0 },
+	{ "GESTURE_ROTATE", "String", 0 },
+	{ "GESTURE_SWIPE", "String", 0 },
+	{ "GESTURE_ZOOM", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_TransformGestureEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::TransformGestureEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::TransformGestureEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_UncaughtErrorEvent[] = {
+	{ "error", DT_DESC_ACCESSOR, "*", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "clone", DT_DESC_METHOD, "flash.events::Event", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "toString", DT_DESC_METHOD, "String", 0, NULL, 0, 1, 0, NULL, NULL },
+	{ "UNCAUGHT_ERROR", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_UncaughtErrorEvent[] = {
+	{ "UNCAUGHT_ERROR", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescRedecl dtev_r_UncaughtErrorEvent[] = {
+	{ "clone", DT_DESC_METHOD, 0, "flash.events::UncaughtErrorEvent" },
+	{ "toString", DT_DESC_METHOD, 0, "flash.events::UncaughtErrorEvent" },
+	{ NULL, 0, 0, NULL },
+};
+static const DtDescMember dtev_m_VideoEvent[] = {
+	{ "status", DT_DESC_ACCESSOR, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ "RENDER_STATE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER_STATUS_ACCELERATED", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER_STATUS_SOFTWARE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "RENDER_STATUS_UNAVAILABLE", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 1, "readonly", NULL },
+	{ "codecInfo", DT_DESC_SLOT, "String", 0, NULL, 0, 1, 0, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_VideoEvent[] = {
+	{ "RENDER_STATE", "String", 0 },
+	{ "RENDER_STATUS_ACCELERATED", "String", 0 },
+	{ "RENDER_STATUS_SOFTWARE", "String", 0 },
+	{ "RENDER_STATUS_UNAVAILABLE", "String", 0 },
+	{ NULL, NULL, 0 },
+};
+static const DtDescMember dtev_m_VideoTextureEvent[] = {
+	{ "colorSpace", DT_DESC_ACCESSOR, "String", 0, NULL, 29, 1, 0, "readonly", NULL },
+	{ "status", DT_DESC_ACCESSOR, "String", 0, NULL, 29, 1, 0, "readonly", NULL },
+	{ "RENDER_STATE", DT_DESC_SLOT, "String", 0, NULL, 29, 1, 1, "readonly", NULL },
+	{ "codecInfo", DT_DESC_SLOT, "String", 0, NULL, 29, 1, 0, "readonly", NULL },
+	{ NULL, 0, NULL, 0, NULL, 0, 0, 0, NULL, NULL },
+};
+static const DtDescConst dtev_c_VideoTextureEvent[] = {
+	{ "RENDER_STATE", "String", 29 },
+	{ NULL, NULL, 0 },
+};
+
+#define DT_DESC_EVENTS_ROWS \
+	{ "flash.events", "AVDictionaryDataEvent", 0, 5, dtev_p6, dtev_m_AVDictionaryDataEvent, dtev_c_AVDictionaryDataEvent, 1, NULL }, \
+	{ "flash.events", "AVHTTPStatusEvent", 0, 6, dtev_p7, dtev_m_AVHTTPStatusEvent, dtev_c_AVHTTPStatusEvent, 1, dtev_r_AVHTTPStatusEvent }, \
+	{ "flash.events", "AVLoadInfoEvent", 0, 4, dtev_p8, dtev_m_AVLoadInfoEvent, dtev_c_AVLoadInfoEvent, 1, NULL }, \
+	{ "flash.events", "AVManifestLoadEvent", 0, 7, dtev_p9, dtev_m_AVManifestLoadEvent, dtev_c_AVManifestLoadEvent, 1, NULL }, \
+	{ "flash.events", "AVPauseAtPeriodEndEvent", 0, 4, dtev_p10, dtev_m_AVPauseAtPeriodEndEvent, dtev_c_AVPauseAtPeriodEndEvent, 1, NULL }, \
+	{ "flash.events", "AVPlayStateEvent", 0, 4, dtev_p10, dtev_m_AVPlayStateEvent, dtev_c_AVPlayStateEvent, 1, NULL }, \
+	{ "flash.events", "AVStatusEvent", 0, 6, dtev_p11, dtev_m_AVStatusEvent, dtev_c_AVStatusEvent, 1, NULL }, \
+	{ "flash.events", "AVStreamSwitchEvent", 0, 8, dtev_p12, dtev_m_AVStreamSwitchEvent, dtev_c_AVStreamSwitchEvent, 1, NULL }, \
+	{ "flash.events", "AccelerometerEvent", 0, 7, dtev_p13, dtev_m_AccelerometerEvent, dtev_c_AccelerometerEvent, 1, dtev_r_AccelerometerEvent }, \
+	{ "flash.events", "ActivityEvent", 0, 4, dtev_p14, dtev_m_ActivityEvent, dtev_c_ActivityEvent, 1, dtev_r_ActivityEvent }, \
+	{ "flash.events", "AsyncErrorEvent", 0, 5, dtev_p15, dtev_m_AsyncErrorEvent, dtev_c_AsyncErrorEvent, 1, dtev_r_AsyncErrorEvent }, \
+	{ "flash.events", "AudioOutputChangeEvent", 0, 4, dtev_p16, dtev_m_AudioOutputChangeEvent, dtev_c_AudioOutputChangeEvent, 1, NULL }, \
+	{ "flash.events", "ContextMenuEvent", 0, 5, dtev_p17, dtev_m_ContextMenuEvent, dtev_c_ContextMenuEvent, 1, NULL }, \
+	{ "flash.events", "DRMAuthenticateEvent", 0, 9, dtev_p18, dtev_m_DRMAuthenticateEvent, dtev_c_DRMAuthenticateEvent, 1, dtev_r_DRMAuthenticateEvent }, \
+	{ "flash.events", "DRMAuthenticationCompleteEvent", 0, 6, dtev_p19, dtev_m_DRMAuthenticationCompleteEvent, dtev_c_DRMAuthenticationCompleteEvent, 1, dtev_r_DRMAuthenticationCompleteEvent }, \
+	{ "flash.events", "DRMAuthenticationErrorEvent", 0, 8, dtev_p20, dtev_m_DRMAuthenticationErrorEvent, dtev_c_DRMAuthenticationErrorEvent, 1, dtev_r_DRMAuthenticationErrorEvent }, \
+	{ "flash.events", "DRMDeviceGroupErrorEvent", 0, 9, dtev_p21, dtev_m_DRMDeviceGroupErrorEvent, dtev_c_DRMDeviceGroupErrorEvent, 1, dtev_r_DRMDeviceGroupErrorEvent }, \
+	{ "flash.events", "DRMDeviceGroupEvent", 0, 4, dtev_p22, dtev_m_DRMDeviceGroupEvent, dtev_c_DRMDeviceGroupEvent, 1, dtev_r_DRMDeviceGroupEvent }, \
+	{ "flash.events", "DRMErrorEvent", 0, 9, dtev_p23, dtev_m_DRMErrorEvent, dtev_c_DRMErrorEvent, 1, dtev_r_DRMErrorEvent }, \
+	{ "flash.events", "DRMLicenseRequestEvent", 0, 4, dtev_p16, dtev_m_DRMLicenseRequestEvent, dtev_c_DRMLicenseRequestEvent, 1, dtev_r_DRMLicenseRequestEvent }, \
+	{ "flash.events", "DRMMetadataEvent", 0, 5, dtev_p24, dtev_m_DRMMetadataEvent, dtev_c_DRMMetadataEvent, 1, NULL }, \
+	{ "flash.events", "DRMReturnVoucherCompleteEvent", 0, 7, dtev_p25, dtev_m_DRMReturnVoucherCompleteEvent, dtev_c_DRMReturnVoucherCompleteEvent, 1, dtev_r_DRMReturnVoucherCompleteEvent }, \
+	{ "flash.events", "DRMReturnVoucherErrorEvent", 0, 9, dtev_p26, dtev_m_DRMReturnVoucherErrorEvent, dtev_c_DRMReturnVoucherErrorEvent, 1, dtev_r_DRMReturnVoucherErrorEvent }, \
+	{ "flash.events", "DRMStatusEvent", 0, 6, dtev_p27, dtev_m_DRMStatusEvent, dtev_c_DRMStatusEvent, 1, dtev_r_DRMStatusEvent }, \
+	{ "flash.events", "DataEvent", 0, 4, dtev_p16, dtev_m_DataEvent, dtev_c_DataEvent, 1, dtev_r_DataEvent }, \
+	{ "flash.events", "ErrorEvent", 0, 5, dtev_p28, dtev_m_ErrorEvent, dtev_c_ErrorEvent, 1, dtev_r_ErrorEvent }, \
+	{ "flash.events", "Event", 0, 3, dtev_p29, dtev_m_Event, dtev_c_Event, 1, dtev_r_Event }, \
+	{ "flash.events", "EventDispatcher", 0, 1, dtev_p30, dtev_m_EventDispatcher, NULL, 1, NULL }, \
+	{ "flash.events", "EventPhase", 0, 0, NULL, dtev_m_EventPhase, dtev_c_EventPhase, 1, NULL }, \
+	{ "flash.events", "FocusEvent", 0, 6, dtev_p31, dtev_m_FocusEvent, dtev_c_FocusEvent, 1, dtev_r_FocusEvent }, \
+	{ "flash.events", "FullScreenEvent", 0, 5, dtev_p32, dtev_m_FullScreenEvent, dtev_c_FullScreenEvent, 1, dtev_r_FullScreenEvent }, \
+	{ "flash.events", "GameInputEvent", 0, 4, dtev_p33, dtev_m_GameInputEvent, dtev_c_GameInputEvent, 1, NULL }, \
+	{ "flash.events", "GestureEvent", 0, 9, dtev_p34, dtev_m_GestureEvent, dtev_c_GestureEvent, 1, dtev_r_GestureEvent }, \
+	{ "flash.events", "GesturePhase", 0, 0, NULL, dtev_m_GesturePhase, dtev_c_GesturePhase, 1, NULL }, \
+	{ "flash.events", "HTTPStatusEvent", 0, 5, dtev_p35, dtev_m_HTTPStatusEvent, dtev_c_HTTPStatusEvent, 1, dtev_r_HTTPStatusEvent }, \
+	{ "flash.events", "IEventDispatcher", 0, 0, NULL, dtev_m_IEventDispatcher, NULL, 1, NULL }, \
+	{ "flash.events", "IMEEvent", 0, 5, dtev_p36, dtev_m_IMEEvent, dtev_c_IMEEvent, 1, dtev_r_IMEEvent }, \
+	{ "flash.events", "IOErrorEvent", 0, 5, dtev_p28, dtev_m_IOErrorEvent, dtev_c_IOErrorEvent, 1, dtev_r_IOErrorEvent }, \
+	{ "flash.events", "KeyboardEvent", 0, 9, dtev_p37, dtev_m_KeyboardEvent, dtev_c_KeyboardEvent, 1, dtev_r_KeyboardEvent }, \
+	{ "flash.events", "MouseEvent", 0, 11, dtev_p38, dtev_m_MouseEvent, dtev_c_MouseEvent, 1, dtev_r_MouseEvent }, \
+	{ "flash.events", "NetDataEvent", 0, 5, dtev_p39, dtev_m_NetDataEvent, dtev_c_NetDataEvent, 1, dtev_r_NetDataEvent }, \
+	{ "flash.events", "NetFilterEvent", 0, 5, dtev_p40, dtev_m_NetFilterEvent, NULL, 1, dtev_r_NetFilterEvent }, \
+	{ "flash.events", "NetMonitorEvent", 0, 4, dtev_p41, dtev_m_NetMonitorEvent, dtev_c_NetMonitorEvent, 1, dtev_r_NetMonitorEvent }, \
+	{ "flash.events", "NetStatusEvent", 0, 4, dtev_p42, dtev_m_NetStatusEvent, dtev_c_NetStatusEvent, 1, dtev_r_NetStatusEvent }, \
+	{ "flash.events", "OutputProgressEvent", 0, 5, dtev_p43, dtev_m_OutputProgressEvent, dtev_c_OutputProgressEvent, 1, dtev_r_OutputProgressEvent }, \
+	{ "flash.events", "PressAndTapGestureEvent", 0, 11, dtev_p44, dtev_m_PressAndTapGestureEvent, dtev_c_PressAndTapGestureEvent, 1, dtev_r_PressAndTapGestureEvent }, \
+	{ "flash.events", "ProgressEvent", 0, 5, dtev_p43, dtev_m_ProgressEvent, dtev_c_ProgressEvent, 1, dtev_r_ProgressEvent }, \
+	{ "flash.events", "SampleDataEvent", 0, 5, dtev_p45, dtev_m_SampleDataEvent, dtev_c_SampleDataEvent, 1, dtev_r_SampleDataEvent }, \
+	{ "flash.events", "SecurityErrorEvent", 0, 5, dtev_p28, dtev_m_SecurityErrorEvent, dtev_c_SecurityErrorEvent, 1, dtev_r_SecurityErrorEvent }, \
+	{ "flash.events", "ShaderEvent", 0, 6, dtev_p46, dtev_m_ShaderEvent, dtev_c_ShaderEvent, 1, dtev_r_ShaderEvent }, \
+	{ "flash.events", "SoftKeyboardEvent", 0, 5, dtev_p47, dtev_m_SoftKeyboardEvent, dtev_c_SoftKeyboardEvent, 1, dtev_r_SoftKeyboardEvent }, \
+	{ "flash.events", "SoftKeyboardTrigger", 0, 0, NULL, dtev_m_SoftKeyboardTrigger, dtev_c_SoftKeyboardTrigger, 1, NULL }, \
+	{ "flash.events", "StageVideoAvailabilityEvent", 0, 4, dtev_p16, dtev_m_StageVideoAvailabilityEvent, dtev_c_StageVideoAvailabilityEvent, 1, NULL }, \
+	{ "flash.events", "StageVideoEvent", 0, 5, dtev_p48, dtev_m_StageVideoEvent, dtev_c_StageVideoEvent, 1, NULL }, \
+	{ "flash.events", "StatusEvent", 0, 5, dtev_p48, dtev_m_StatusEvent, dtev_c_StatusEvent, 1, dtev_r_StatusEvent }, \
+	{ "flash.events", "SyncEvent", 0, 4, dtev_p49, dtev_m_SyncEvent, dtev_c_SyncEvent, 1, dtev_r_SyncEvent }, \
+	{ "flash.events", "TextEvent", 0, 4, dtev_p16, dtev_m_TextEvent, dtev_c_TextEvent, 1, dtev_r_TextEvent }, \
+	{ "flash.events", "ThrottleEvent", 0, 5, dtev_p50, dtev_m_ThrottleEvent, dtev_c_ThrottleEvent, 1, dtev_r_ThrottleEvent }, \
+	{ "flash.events", "ThrottleType", 0, 0, NULL, dtev_m_ThrottleType, dtev_c_ThrottleType, 1, NULL }, \
+	{ "flash.events", "TimerEvent", 0, 3, dtev_p29, dtev_m_TimerEvent, dtev_c_TimerEvent, 1, dtev_r_TimerEvent }, \
+	{ "flash.events", "TouchEvent", 0, 14, dtev_p51, dtev_m_TouchEvent, dtev_c_TouchEvent, 1, dtev_r_TouchEvent }, \
+	{ "flash.events", "TransformGestureEvent", 0, 14, dtev_p52, dtev_m_TransformGestureEvent, dtev_c_TransformGestureEvent, 1, dtev_r_TransformGestureEvent }, \
+	{ "flash.events", "UncaughtErrorEvent", 0, 4, dtev_p53, dtev_m_UncaughtErrorEvent, dtev_c_UncaughtErrorEvent, 1, dtev_r_UncaughtErrorEvent }, \
+	{ "flash.events", "UncaughtErrorEvents", 0, 0, NULL, NULL, NULL, 1, NULL }, \
+	{ "flash.events", "VideoEvent", 0, 4, dtev_p16, dtev_m_VideoEvent, dtev_c_VideoEvent, 1, NULL }, \
+	{ "flash.events", "VideoTextureEvent", 0, 5, dtev_p48, dtev_m_VideoTextureEvent, dtev_c_VideoTextureEvent, 1, NULL }, \
+	/* end of DT_DESC_EVENTS_ROWS */
+// <<< END GENERATED flash.events descriptors
+
+
 
 
 
 static const DtDescClass dt_desc_classes[] = {
-	{ "flash.events", "Event", 0, 3, dt_p_event_ctor, dt_m_event },
-
 	{ "", "Error", 1, 2, dt_p_error_ctor, dt_m_error },
 	{ "flash.errors", "IOError",              1, 2, dt_p_error_ctor, NULL },
 	{ "flash.errors", "EOFError",             1, 2, dt_p_error_ctor, NULL },
@@ -4123,8 +5500,6 @@ static const DtDescClass dt_desc_classes[] = {
 	{ "flash.display3D", "VertexBuffer3D", 0, 0, NULL, dt_m_vertexbuffer3d, NULL },
 	{ "flash.display3D", "Context3DTextureFormat", 0, 0, NULL, NULL,
 	  dt_c_context3dtextureformat },
-	{ "flash.events", "EventDispatcher",   0, 0, NULL, dt_m_eventdispatcher, NULL },
-
 	{ "flash.accessibility", "Accessibility", 0, 0, NULL,
 	  dt_m_accessibility, NULL },
 	{ "flash.accessibility", "AccessibilityImplementation", 0, 0, NULL,
@@ -4146,6 +5521,13 @@ static const DtDescClass dt_desc_classes[] = {
 	// element-for-element against the six all_classes/display expected files
 	// by tools/descriptor/check_model.py. Regenerate rather than hand-edit.
 	DT_DESC_DISPLAY_ROWS
+
+	// ...and the 66-class flash.events surface, from the same generator
+	// (`--pkg flash.events`).  It SUPERSEDES the hand-written Event /
+	// EventDispatcher rows that used to head this table: dt_desc_find takes
+	// the FIRST match, so a hand row left above would shadow the generated
+	// one for exactly the two classes the generator models best.
+	DT_DESC_EVENTS_ROWS
 
 	{ NULL, NULL, 0, 0, NULL, NULL },
 };
@@ -6929,6 +8311,127 @@ static void register_security_certs(Avm2Context* ctx)
 	}
 }
 
+// --- the flash.events surface the runtime did not carry ------------------
+//
+// `avm2/all_classes/events/swf*` describes 28 flash.events classes at SWF 9
+// and 64 at SWF 30; avm2_events.c registers 21 of them.  These 45 are the
+// remainder: pure playerglobal SHELLS -- correct name, correct base, correct
+// [API("N")] gate -- whose entire describeType surface (members, parameter
+// lists, constructors and constants) comes from the generated
+// DT_DESC_EVENTS_ROWS descriptor rows above, exactly as the 14 flash.display
+// shells added in session 16 do.  Registering them makes
+// `getDefinitionByName("flash.events::SyncEvent")` resolve instead of 1065ing
+// at every version, which is what the fixtures grade.
+//
+// The base class is named, not passed: three of the rows extend another row
+// (FullScreenEvent -> ActivityEvent, the two gesture events -> GestureEvent),
+// and a builtin class snapshots its parent's vtable at creation time, so the
+// table must be walked in order.  A row's `base` is resolved against the four
+// pre-existing roots first, then against the rows already created.
+//
+// Deliberately NOT here: constants.  Flash exposes e.g.
+// `ActivityEvent.ACTIVITY` as a real class property; these shells report
+// theirs from the descriptor table and do not carry them at runtime.  That is
+// the same trade the flash.display shells make, and no graded test reads a
+// constant off a class this list creates.
+static void register_events_shell_classes(Avm2Context* ctx)
+{
+	struct EventShell
+	{
+		const char* name;
+		const char* base;    // NULL = Object
+		uint8_t min_swf;
+	};
+	Avm2Builtins* b = &ctx->builtins;
+	static const struct EventShell shells[] = {
+	{ "AVDictionaryDataEvent", "Event", 22 },
+	{ "AVHTTPStatusEvent", "Event", 0 },
+	{ "AVLoadInfoEvent", "Event", 20 },
+	{ "AVManifestLoadEvent", "Event", 20 },
+	{ "AVPauseAtPeriodEndEvent", "Event", 20 },
+	{ "AVPlayStateEvent", "Event", 20 },
+	{ "AVStatusEvent", "Event", 20 },
+	{ "AVStreamSwitchEvent", "Event", 20 },
+	{ "AccelerometerEvent", "Event", 10 },
+	{ "ActivityEvent", "Event", 0 },
+	{ "AudioOutputChangeEvent", "Event", 38 },
+	{ "DRMAuthenticateEvent", "Event", 255 },
+	{ "DRMAuthenticationCompleteEvent", "Event", 10 },
+	{ "DRMAuthenticationErrorEvent", "ErrorEvent", 10 },
+	{ "DRMDeviceGroupErrorEvent", "ErrorEvent", 22 },
+	{ "DRMDeviceGroupEvent", "Event", 22 },
+	{ "DRMErrorEvent", "ErrorEvent", 10 },
+	{ "DRMLicenseRequestEvent", "Event", 0 },
+	{ "DRMMetadataEvent", "Event", 0 },
+	{ "DRMReturnVoucherCompleteEvent", "Event", 21 },
+	{ "DRMReturnVoucherErrorEvent", "ErrorEvent", 21 },
+	{ "DRMStatusEvent", "Event", 10 },
+	{ "FullScreenEvent", "ActivityEvent", 0 },
+	{ "GameInputEvent", "Event", 20 },
+	{ "GestureEvent", "Event", 10 },
+	{ "GesturePhase", NULL, 10 },
+	{ "IMEEvent", "TextEvent", 0 },
+	{ "NetDataEvent", "Event", 12 },
+	{ "NetMonitorEvent", "Event", 12 },
+	{ "OutputProgressEvent", "Event", 13 },
+	{ "PressAndTapGestureEvent", "GestureEvent", 10 },
+	{ "SampleDataEvent", "Event", 10 },
+	{ "ShaderEvent", "Event", 10 },
+	{ "SoftKeyboardEvent", "Event", 11 },
+	{ "SoftKeyboardTrigger", NULL, 11 },
+	{ "StageVideoAvailabilityEvent", "Event", 11 },
+	{ "StageVideoEvent", "Event", 10 },
+	{ "SyncEvent", "Event", 0 },
+	{ "ThrottleEvent", "Event", 14 },
+	{ "ThrottleType", NULL, 14 },
+	{ "TransformGestureEvent", "GestureEvent", 10 },
+	{ "UncaughtErrorEvent", "ErrorEvent", 10 },
+	{ "UncaughtErrorEvents", "EventDispatcher", 10 },
+	{ "VideoEvent", "Event", 11 },
+	{ "VideoTextureEvent", "Event", 0 },
+	};
+	enum { SHELL_COUNT = sizeof(shells) / sizeof(shells[0]) };
+	Avm2Class* made[SHELL_COUNT];
+
+	for (uint32_t i = 0; i < SHELL_COUNT; i++)
+	{
+		Avm2Class* base = b->object_class;
+		if (shells[i].base != NULL)
+		{
+			if (strcmp(shells[i].base, "Event") == 0)
+				base = b->event_class;
+			else if (strcmp(shells[i].base, "TextEvent") == 0)
+				base = b->text_event_class;
+			else if (strcmp(shells[i].base, "ErrorEvent") == 0)
+				base = b->error_event_class;
+			else if (strcmp(shells[i].base, "EventDispatcher") == 0)
+				base = b->event_dispatcher_class;
+			else
+			{
+				for (uint32_t j = 0; j < i; j++)
+				{
+					if (strcmp(shells[j].name, shells[i].base) == 0)
+					{
+						base = made[j];
+						break;
+					}
+				}
+			}
+		}
+		Avm2Class* cls = avm2_builtin_class_api(ctx, "flash.events",
+		                                        shells[i].name, base,
+		                                        shells[i].min_swf);
+		// Builtin registration installs a no-op stub constructor rather than
+		// inheriting the base's, so `new SyncEvent("sync")` would leave
+		// `type`/`bubbles`/`cancelable` unset and `new UncaughtErrorEvents()`
+		// would leave the EventDispatcher extension uninitialised. Every one
+		// of these classes chains straight to its base's constructor.
+		cls->instance_init.fn = base->instance_init.fn;
+		cls->instance_init.debug_name = shells[i].name;
+		made[i] = cls;
+	}
+}
+
 static void register_class_object_lengths(Avm2Context* ctx)
 {
 	Avm2Builtins* b = &ctx->builtins;
@@ -7170,6 +8673,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_media(ctx);
 
 	register_security_certs(ctx);
+	register_events_shell_classes(ctx);
 
 	// LAST: gates the abstract playerglobal classes the modules above made.
 	register_abstract_gates(ctx);

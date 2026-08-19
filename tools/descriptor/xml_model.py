@@ -96,6 +96,23 @@ def _param_elems(res, k, params):
                  for i, (t, opt) in enumerate(params))
 
 
+def _uri_attr(owner):
+    """The trailing `uri=` attribute describeType prints for a member that an
+    INTERFACE declares.
+
+    An interface's members live in that interface's own namespace, so Flash
+    reports them with `uri="<package>:<Interface>"` (one colon, not the `::`
+    of a qualified class name) after `returnType`/`declaredBy`.  Members of a
+    CLASS that implements the interface are ordinary public members and carry
+    no uri, so this keys on the declaring class only.  Graded by
+    `all_classes/events` (flash.events::IEventDispatcher's five methods) and
+    matched by the hand-written flash.accessibility rows in avm2_globals.c.
+    """
+    if owner is None or not owner.is_interface:
+        return ()
+    return (("uri", "%s:%s" % (owner.ns, owner.name)),)
+
+
 def visible(mem, ver):
     return mem.min_swf == 0 or (mem.min_swf != as_model.HIDE
                                 and ver >= mem.min_swf)
@@ -174,12 +191,14 @@ def describe(res, k, ver):
             src = gm if gm is not None else sm
             fac.append(("accessor", (("name", name), ("access", acc),
                                      ("type", res.qname(owner, src.type)),
-                                     ("declaredBy", owner.qname)), ()))
+                                     ("declaredBy", owner.qname))
+                        + _uri_attr(owner), ()))
         elif kind == "method":
             if not visible(mem, ver):
                 continue
             fac.append(("method", (("name", name), ("declaredBy", c.qname),
-                                   ("returnType", res.qname(c, mem.type))),
+                                   ("returnType", res.qname(c, mem.type)))
+                        + _uri_attr(c),
                         _param_elems(res, c, mem.params)))
         else:
             if not visible(mem, ver):
