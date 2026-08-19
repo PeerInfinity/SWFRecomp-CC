@@ -2274,7 +2274,7 @@ several of wave 1's own prices. The ones worth carrying:
   distinct timeline-core defects). Note leg C's finding that the stored
   `results_graphics.json` rows for `ActionOrderTest3/4` and
   `RegisterClassTest4` are **stale relative to `cd04f80b9`** — re-baseline them
-  before pricing.
+  before pricing. *(s17: RegisterClassTest4 is dispositioned twice — struck; the stale-row warning applied to the no-graphics results.json only.)*
 - **Committed scroll rect** — Ruffle's `next_scroll_rect → scroll_rect` latched
   per frame plus `Matrix::translate(-x_min,-y_min)` folded into
   `display_world_matrix()` for self and each ancestor. Worth the remaining 6
@@ -2416,3 +2416,149 @@ several of wave 1's own prices. The ones worth carrying:
   (`scratchpad/legC/sweep.sh` + `boundscheck.sh`) into `ruffle-tests/` — it
   turns any `SWFRecomp/` change from a guess into an exact affected-test list,
   and it is the only audit that catches rows no census predicts.
+
+## 18. Session 17 (2026-08-18/19) — dual-axis fan-out #9: trace +37 (4354/4453 eff), pixels +21 (359/569, 63.1%), 3 regressions fixed post-run
+
+Commits `e4c7e4bfa..a946ee183` (21 session commits: 17 wave-2 merges, 3 post-run
+fixes, 1 CI hardening), grading CI run `32254809391` at `9d038c750`
+(graphics / full / images=true; the first pair `32228932599`/`32228942789` sat
+5 h in a wedged `apt-get` and was cancelled), verification run `32267473014` at
+`a946ee183`. Baseline was trace **4317 / 4453 effective** and pixels
+**338 / 569 (59.4 %)** from run `31877239992` at `aeebf9ede` (merge `c7b284034`).
+**Predicted: trace +37, pixels +14 (then +5 from the follow-up wave).** Measured at
+the grading run: trace **4317 → 4354/4453 eff (+37 = 37 gains, 0 regressions —
+the ledger exactly)**, pixels **338 → 352/569 (+14 = 16 gains − 2 regressions)**.
+Three defects were hidden by that run and fixed before verification:
+(1) `avm2/getouterscope_two_classobjects` `pass → ruffle_matched` — the new
+CallStatic receiver coercion threw #1034 on a class-side receiver / an instance
+of a second class object minted from the same ABC class (Flash prints 50; fix
+= identity by defining file + iinit, `8a77db488`); (2)+(3)
+`visual/cache_as_bitmap/oversize/swf_{9,10}_too_big` `pass → fail` (120 660) —
+the new alpha-mask path ignored Ruffle's BitmapCache size rule (SWF ≤ 9 both
+sides < 2880 px; SWF ≥ 10 < 8191 and area < 16 777 215; oversize objects are
+not cached so their masks stay stencil, `7f6d5daad`). Verification run:
+trace 4354/4453 intersection (4358/4463 with 10 new upstream names), 0 regressions, getouterscope back to pass; pixels 352 -> 359/569 (+7: the five edittext-bg rows + the two too_big rows), 0 regressions -> final trace **+37** and pixels **+21 = 338 -> 359/569 (63.1 %)**, 16 bands improved / 1 worsened (from_shumway/acid/acid-color-0 20 014 -> 44 817, an EditText-interleave side effect, new board item). 4 wave-1 + 17 wave-2 agents (14 early/board-derived + 3
+follow-up); reports and patches in `session17-fanout-reports/`.
+
+Merge order: w2-scope-opt · w2-avm2-smalls · w2-sound-load · w2-crossvm-legE ·
+w2-gfx-smalls · w2-gfx-filters-cut2 · w2-avm2-display · w2-gfx-drawgraphicsdata ·
+w2-gfx-cab-pixelsnap · w2-all-classes-events · w2-trace-smalls ·
+w2-matrix3d-classes · w2-timeline-s1s2 · w2-tooling-hygiene ·
+w2-gfx-acid-shapes-aabb · w2-gfx-cab-mask-stencil · w2-gfx-edittext-bg.
+
+### 18.1 Ledger (trace +37 predicted, +37 measured)
+
+| agent | rows | predicted | measured at `32254809391` |
+|---|---|---:|---:|
+| w2-sound-load | `avm1/sound_load_{props,start_remote,streaming_stop_remote,multiple_remote}`, gnash `Sound-v6/7/8` | +7 | +7 |
+| w2-trace-smalls (T6) | `displayobject_early_init`, `textfield_input_events`, `large_preload_image_from_bytes`, `appdomain_lookup_edge_cases`, `large_preload_from_url`, shumway `loaded-content-properties` | +6 | +6 |
+| w2-all-classes-events (T4) | `all_classes/events/swf{9,10,11,12,30}` | +5 (board: 0/+3/+5) | +5 |
+| w2-matrix3d-classes (T2+T7) | `matrix3d_{raw_data,determinant,precision}`, `native_menu_basic`, `automation_classes` | +5 | +5 |
+| w2-timeline-s1s2 | `button_nested_frame_simple`, `looping_child_swf{5,9,32}`, `shared_stack` | +5 | +5 |
+| w2-avm2-smalls | `method_association`, `supercalls_coerce`, `displayobject_hittestpoint_boundary` (+1 px) | +3 | +3 |
+| w2-avm2-display (T1/T3/T5b) | `displayobject_transform`, `displayobject_scrollrect`, `bounds_mode` (→ruffle_matched) | +3 | +3 |
+| w2-scope-opt | `scope_optimizations` | +1 | +1 |
+| w2-crossvm-legE | `mouse_pick_avm1_root` | +1 | +1 |
+| w2-gfx-acid-shapes-aabb | `from_shumway/acid/acid-shapes` | +1 | +1 |
+| 12 `ruffle_matched → pass` promotions (matrix3d number formatting) | `from_avmplus/ecma3/*` ×11, `asOper` | 0 | 0 (counted effective both sides) |
+
+### 18.2 Ledger (pixels +14 predicted at grading, +19 after follow-up)
+
+| agent | comparisons | predicted | measured |
+|---|---|---:|---:|
+| w2-gfx-cab-mask-stencil | `cab_mask_{alpha,transform,triangle}`, `oversize/swf_{9,10}_masks` | +5 | +5 (and −2 `too_big`, fixed) |
+| w2-gfx-edittext-bg (follow-up) | `edittext_{background,border}_basic{,_scale2}`, `edittext_negative_bounds` | +5 | +5 (verification run) |
+| w2-gfx-cab-pixelsnap | `cache_as_bitmap/avm1_color`, `opaque_background`, `cache_as_bitmap/text` | +3 | +3 |
+| w2-gfx-smalls | `avm1/bitmap_data_copypixels`, `avm2/graphics_gradients_nulls` | +2 | +2 |
+| w2-gfx-filters-cut2 | `displacement_map_{through_filters,scales_with_screen}` | +2 | +2 |
+| w2-gfx-drawgraphicsdata | `graphics_bad_direct_commands` | +1 | +1 |
+| w2-avm2-smalls | `displayobject_hittestpoint_boundary` | +1 | +1 |
+| unpredicted | `avm2/mouse_pick_non_interactive_bitmap_mask`, `from_shumway/timeline/timeline_loop [output.12]` | 0 | +2 |
+
+Bands: 14 improved / 0 worsened at the grading run (`graphics_bitmap_fill`
+76 810 → 134, `cab_mask_filters` −88 %, `displacement_map` −83 %,
+`shader_as_mask` −62 %, `acid-shapes` −47 %). Drift: `visual/edittext/
+edittext_device_transform_basic` GONE upstream (was fail).
+
+### 18.3 Incidents and method notes
+
+- **Coordinator process restart mid-session.** The harness process exited
+  while 3 follow-up agents + a `gh run watch` were live. Nothing was lost:
+  worktrees held every patch; two agents had finished (no completion record
+  arrives after a restart — read the delivered report), one was polling a
+  canary capture that the restart had killed (s10 trap (b) again) and needed a
+  SendMessage "your before-leg is dead, relaunch it". Probe = transcript
+  timestamps + `pgrep` on the worktree hash + new files in the worktree.
+- **`apt-get` with no timeout wedged two whole CI runs for 5 h** (Setup job,
+  `Install system dependencies`). Cancel, don't wait. `ruffle-tests.yml` now
+  bounds + retries those four steps; the composite `graphics-apt-deps` action
+  still failed once on shard 16 (`gh run rerun --failed` recovered it in 10 min
+  and the results branch was complete).
+- **Grading-run regressions were all second-order effects of correct patches**:
+  a stricter coercion (CallStatic) and a new render path (alpha mask) each
+  lacked one Ruffle gate (c_class receivers; cache size rule). Post-run
+  `corpus_status_diff` + `image_status_diff` caught all three in minutes;
+  the `pass → ruffle_matched` one would have been invisible without the
+  "ruffle_matched hides regression" rule — check OTHER STATUS MOVES every run.
+- **Wave-1 refutation rate stayed the defining feature** (≥10 material):
+  timeline-order "12 rows of one arc" = 8 mechanisms; `hittestpoint_boundary`
+  "missing blank line" = harness normalisation; T5 pixelBounds mechanism was
+  backwards (the +1 came from the half called risky); P6 bitmap-fill smooth
+  was already implemented; EditText "never emitted" = emitted then painted
+  over; the sound-load relay (`checkPolicyFile`) was refuted by the
+  implementer — and the coordinator relay is still worth sending.
+- **Serial merge cadence held at 17 patch sets with ONE textual conflict**
+  (two agents appending registrations at the same spot in `avm2_events.c` —
+  keep both) and one semantic dedupe (two agents registering
+  `UncaughtErrorEvents`; `builtin_class_impl` is not idempotent — grep for
+  duplicate class registrations when two agents touch class tables).
+- **Recompiler patches need the main tree rebuilt before the headline re-check**
+  (`cmake --build SWFRecomp/build`), and new upstream test dirs must be copied
+  into the main tree from the agent's worktree (`rsync --exclude Recompiled*`)
+  before the re-check can run.
+- Tooling promoted: `ruffle-tests/recompiler_ab_sweep.sh` (exact affected-test
+  list for any recompiler change; four agents had re-written it ad hoc),
+  render canary +4 tier-1 members, ignore lists 106 → 86.
+
+### 18.4 Left on the board (session 18)
+
+**Trace.**
+- `avm2/displayobject_getrect` (11/16) — needs `EdgeBounds` emitted into
+  `Avm2CharInfo` by the recompiler (~10 lines on top of the acid-shapes patch).
+- `avm2/stage_display_state` — `FullScreenEvent.FULL_SCREEN` real constant +
+  a dispatching `Stage.displayState` setter (the class now exists; #1065 was
+  never its blocker).
+- `avm2/mouse_pick_loader_avm1` (27 lines) + leg F `selection_onsetfocus_mixed_avm`
+  (+1, ~6-line pick extension + `Selection.onSetFocus` broadcast + AVM1
+  `onSetFocus`/`onKillFocus`; completion mechanism in `w2-crossvm-legE-report.md` §6).
+- `timeline/missing_frame_scripts` (S3+S4 HOLD; pin M4 — orphan clip loses a
+  tick); action_order M5/M6 NO-GO with named mechanisms (`wave1-timeline-order.md`).
+- `avm2/large_preload_from_bytes` (~16 lines) and `LoaderLoadBytesTest`: the
+  loadee is an embedded `DefineBinaryData` never compiled — needs a
+  bytes→SWF recompile path.
+- `loader-events` instance-name counter (6 of 27 lines; perturbs the shared
+  counter corpus-wide — A/B first).
+- AVM1 `drawingUpdateBounds` ignores stroke half-width (`action.c:28708`, the
+  AVM1 twin of acid-shapes; unpriced).
+- Leads now visible inside ignore lists: `avm2/soundmixer_soundtransform`
+  888/900, `avm1/load_vars` 29/35, `sandbox_type_remote` 1/3.
+- `text/links_in_scrolled_text` held patch (s16) still awaits the maxscroll grade.
+
+**Pixels.**
+- `from_shumway/acid/acid-color-0` worsened 20 014 -> 44 817 at verification — the only band the EditText per-depth interleave moved the wrong way; attribute and fix first (probably a field created later than a sibling shape it must now sit under).
+- `edittext_bounds_vs_position` 519: sprite-nested `DefineEditText` reaches
+  neither pass — parent-scoped window in `render_display_list`'s sprite walk (+1).
+- `graphics_bitmaps` 37 050 / `graphics_bitmap_fill` 134: the dynamic-bitmap
+  **layer-period tiling seam** in `render_webgpu_draw_bitmap_tris` (in-tree
+  comment names the fix) + round stroke joins (AS3 default `joints="round"`,
+  tessellator is miter/bevel only) — the real lead under old P6.
+- `cab_mask_filters` 612 (filters on a masker, cut 3(b)); `displacement_map`
+  20 589 = `TestImage` sub-pixel placement, not displacement.
+- `cache_as_bitmap/scroll_rect` 2 (one px short); `blur_scales_with_screen`
+  30 810 (AVM1 sprite-tag filter route, needs a real offscreen cache pass).
+- Device fonts have no outline source (`abc_devicefont.cpp` emits metrics only)
+  — the real owner of `definefont4`, `device-font`, fonts near-passes; an arc.
+- `blank_render` is 69 % Stage3D + codecs (parked); `acid-shapes` image needs
+  `drawRoundRect` corner radii.
+- Runtime gradient ramp has no passing canary representative — add
+  `avm2/graphics_gradients_nulls` + `avm1/bitmap_data_copypixels` (tier 1 now).

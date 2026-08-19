@@ -666,3 +666,78 @@ from 4 to 9. Promote the script into `ruffle-tests/`. (2) Under fan-out load the
 `output_mismatch`es (stale `Recompiled*` caches in `cp -r`'d dirs) — export
 `SWFRECOMP_COMPILE_TIMEOUT=2400` and pass `--recompile` on first use of every
 copied directory, canaries included.
+
+## 16. Session-16→17 state of the board (2026-08-18/19)
+
+**Grading run `32254809391` at `9d038c750`: 338 → 352/569 (+14 = 16 gains − 2
+regressions), bands 14 improved / 0 worsened; regressions
+(`cache_as_bitmap/oversize/swf_{9,10}_too_big`) fixed in `7f6d5daad` (alpha-mask
+path must honour Ruffle's BitmapCache size rule), then the follow-up
+`w2-gfx-edittext-bg` (+5) landed; verification run `32267473014` at
+`a946ee183`: 352 -> **359/569 (63.1 %)**, +7 (edittext-bg ×5 + too_big ×2), 0 regressions, 1 band worsened (acid-color-0).** Baseline into the session 338/569 (59.4 %) at
+`aeebf9ede`; **predicted +14 then +5.** Ledger: `polish-sweep-arc.md` §18.2;
+reports `session17-fanout-reports/`.
+
+- **cacheAsBitmap `PixelSnapping::Always` landed** (`BitmapCache` flag carried
+  to the display entry; cached entries AND their container slot snap world
+  x_min/y_min in a dynamic transform slot; filtered cached entries gated off).
+  §15's five named owners were **4/5 refuted** (`edittext_hscroll` and
+  `br_at_start` have no cacheAsBitmap; `cab_mask_*` are the alpha-mask path);
+  the three flips (`avm1_color`, `opaque_background`, `cache_as_bitmap/text`)
+  were mostly NOT on the list — `text` flipped by sub-pixel glyph re-phasing an
+  integer-shift probe cannot see. Standing lesson: the `offset_translation`
+  framing caps at +2 corpus-wide.
+- **AVM2 masks: TWO new paths** — cacheAsBitmap maskers now rasterise into the
+  stencil (premul stencil pipeline), and masker+maskee both cached use Ruffle's
+  ALPHA-MASK compositing (`renderer_composite_alpha_mask`), gated by the
+  BitmapCache size rule. +5 (`cab_mask_{alpha,transform,triangle}`,
+  `oversize/swf_{9,10}_masks`); `cab_mask_filters` 4 968 → 612 (filters on a
+  masker = cut 3(b)).
+- **Filters cut 2 (displacement) landed**: object screen rect + map params as
+  uniforms, manual bilinear tap with wrap/clamp inside the source rect. +2;
+  `displacement_map`'s 20 589 residual is `TestImage` sub-pixel placement (its
+  no-map control tile is 2 956 before and after). New trap: AS3
+  `DisplacementMapFilter` has no `quality`, so cut 1's `quality == 0` skip
+  deletes the kind unless the displacement clause precedes it.
+- **`drawGraphicsData` renders** (all 8 carriers; carrier constructors store
+  their fields; `lineBitmapStyle`/`lineGradientStyle` replace the line fill;
+  per-subpath winding with Ruffle's EvenOdd default). +1
+  (`graphics_bad_direct_commands`), `graphics_bitmap_fill` 76 810 → 134. §15's
+  "P6 `beginBitmapFill` smooth is ignored" is **REFUTED** — wired since s16;
+  the colour deficit was the missing `lineBitmapStyle` stroke groups. The real
+  lead under it: the dynamic-bitmap **layer-period tiling seam** in
+  `render_webgpu_draw_bitmap_tris` + round stroke joins.
+- **EditText box/glyph passes interleave per depth** at the field's own
+  display-list position (Ruffle `render_self` order) — §15's mechanism (A)
+  "never emitted" is **REFUTED**: every element was drawn, then painted over by
+  a later-created field's white background (which is correct: Ruffle mirrors
+  `HAS_BACKGROUND` from the tag's `BORDER` bit). +5
+  (`edittext_{background,border}_basic{,_scale2}`, `edittext_negative_bounds`);
+  `text/br_at_start` −74 %. Residual `edittext_bounds_vs_position` 519 =
+  sprite-nested DefineEditText (+1, parent-scoped window). Mechanism (B) is
+  **REFUTED** as "placement under a matrix" — device fonts have no outline
+  source at all (`abc_devicefont.cpp`), a separate arc.
+- **Two one-liners**: AVM1 `copyPixels` alpha-source un-premultiply uses
+  f64/round (`bitmap_data_copypixels` 840 → 0); AVM2 + AVM1 runtime gradient
+  ramps TRUNC (`graphics_gradients_nulls` 600 → 0; AVM1 twin 0 flips, one
+  passing row improved). `_LINEAR_U8 → _LINEAR` REFUTED (no image test passes
+  runtime linearRGB). Board blast-radius audits that grep `.as` sources miss
+  SWF-only tests — decompress the SWFs.
+- **AVM2 runtime Graphics keeps shape vs edge bounds** (stroke half-width,
+  NaN/clamp lineStyle rules, hairline = 0): `acid-shapes` trace +1, image
+  92 808 → 42 012 (rest = `drawRoundRect` radii, unimplemented).
+- `blank_render` re-decomposed: 36 live, EIGHT mechanisms, 69 % = Stage3D +
+  codecs; only 11 comparisons addressable. §15's "41" and M8 "acid-shapes
+  trace-first" are superseded.
+
+**Canary changes.** +4 tier-1: `from_shumway/acid/acid-bitmap-fill(-2)`,
+`visual/filters/displacement_map_through_applyFilter`,
+`visual/edittext/edittext_border_transform`. Blind spots stated: runtime
+gradient ramps (add `avm2/graphics_gradients_nulls` + `avm1/bitmap_data_copypixels`
+now that they pass), cab×text, morph/masks/TLF. `render_canary.py` has its own
+`TIMEOUT_DEFAULT = 900` — pass `--timeout 5400` under fan-out load.
+
+**Top remaining leads.** `graphics_bitmaps`/`graphics_bitmap_fill` tiling seam +
+round joins; `edittext_bounds_vs_position` sprite window (+1); `cab_mask_filters`
+(cut 3b); `cache_as_bitmap/scroll_rect` 2; device-font outlines arc; the
+runtime-gradient canary gap. Stage3D (24) + codecs (5) parked.
