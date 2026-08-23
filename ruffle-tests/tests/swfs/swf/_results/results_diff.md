@@ -1,20 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `88ebde66534f` (2026-08-16T08:44:05.488407+00:00)
-**Current:** `9d038c750eaf` (2026-08-19T13:28:59.064202+00:00)
+**Previous:** `9d038c750eaf` (2026-08-19T13:28:59.064202+00:00)
+**Current:** `06f3d87d295b` (2026-08-23T08:44:57.362176+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 4 | 5 | +1 |
-| Total | 5 | 7 | +2 |
-| Pass rate | 80.0% | 71.4% | -8.6% |
-| Mismatched lines | 6 | 16 | +10 |
+| Passing | 5 | 5 | 0 |
+| Total | 7 | 7 | 0 |
+| Pass rate | 71.4% | 71.4% | 0% |
+| Mismatched lines | 16 | 16 | 0 |
 
-## Added Tests (2)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `lzma_length_too_long` | ruffle_matched | 9/19 |
-| `lzma_length_too_short` | pass | 18/18 |
+No changes detected.
