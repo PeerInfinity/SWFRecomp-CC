@@ -1,6 +1,6 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-08-23 08:44 UTC
+**Date**: 2026-08-30 08:49 UTC
 
 **Git SHA**: `06f3d87d29`
 
@@ -23,11 +23,11 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `request_matching_profiles` | 190 | 7.5s |  |
-| 2 | `request_profiles` | 16 | 7.2s |  |
-| 3 | `sampler_odd_size` | 1 | 8.8s |  |
-| 4 | `scissor_rectangle` | 0 | 9.8s |  |
-| 5 | `scissor_rectangle_invalid` | 1 | 9.3s |  |
+| 1 | `request_matching_profiles` | 190 | 5.9s |  |
+| 2 | `request_profiles` | 16 | 7.4s |  |
+| 3 | `sampler_odd_size` | 1 | 9.6s |  |
+| 4 | `scissor_rectangle` | 0 | 9.4s |  |
+| 5 | `scissor_rectangle_invalid` | 1 | 10.0s |  |
 
 ## Near-Passing Tests
 

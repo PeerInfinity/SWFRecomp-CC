@@ -1,19 +1,14 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9d038c750eaf` (2026-08-19T13:28:58.964895+00:00)
-**Current:** `06f3d87d295b` (2026-08-23T08:44:57.271678+00:00)
+**Previous:** `06f3d87d295b` (2026-08-23T08:44:57.271678+00:00)
+**Current:** `06f3d87d295b` (2026-08-30T08:49:31.863410+00:00)
+*Re-run on same commit — no comparison available.*
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 689 | 689 | 0 |
-| Total | 725 | 726 | +1 |
-| Pass rate | 95.0% | 94.9% | -0.1% |
-| Mismatched lines | 11396 | 11458 | +62 |
-
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `globals_monkeypatch` | output_mismatch | 38/100 |
+| Total | 726 | 726 | 0 |
+| Pass rate | 94.9% | 94.9% | 0% |
+| Mismatched lines | 11458 | 11458 | 0 |
