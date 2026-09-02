@@ -26,6 +26,14 @@ export const GUEST_ARENA_END = 101 * 1024 * 1024;
 let hostInstance = null;   // one host per page: the runtime has global state
 let hostRawExports = null;
 let hostUsed = false;
+let hostVariant = null;    // "graphics_host" (AVM1) or "graphics_host_avm2"
+
+// The AVM2 host variant (build_graphics_host.sh AVM2=1) carries the AVM2
+// runtime and drives runSWF_avm2; a guest compiled from an AS3 SWF exports
+// get_avm2_movie_tables and must run on it.
+export function guestIsAvm2(mod) {
+    return WebAssembly.Module.exports(mod).some(e => e.name === "get_avm2_movie_tables");
+}
 
 export function hostAlreadyUsed() { return hostUsed; }
 
@@ -38,15 +46,20 @@ export function checkBrowserSupport() {
     }
 }
 
-export async function loadHost({ hostDir = "host/", canvas, log = () => {} }) {
-    if (hostInstance) return hostInstance;
+export async function loadHost({ hostDir = "host/", canvas, log = () => {}, avm2 = false }) {
+    const variant = avm2 ? "graphics_host_avm2" : "graphics_host";
+    if (hostInstance) {
+        if (hostVariant !== variant) throw new Error(`The ${hostVariant} host is already loaded in this page; reload to run an ${avm2 ? "AS3" : "AVM1"} SWF.`);
+        return hostInstance;
+    }
     checkBrowserSupport();
+    hostVariant = variant;
     if (typeof globalThis.createGraphicsHost !== "function") {
         await new Promise((resolve, reject) => {
             const s = document.createElement("script");
-            s.src = hostDir + "graphics_host.js";
+            s.src = hostDir + variant + ".js";
             s.onload = resolve;
-            s.onerror = () => reject(new Error(`Failed to load ${hostDir}graphics_host.js`));
+            s.onerror = () => reject(new Error(`Failed to load ${hostDir}${variant}.js`));
             document.head.appendChild(s);
         });
     }
@@ -56,7 +69,7 @@ export async function loadHost({ hostDir = "host/", canvas, log = () => {} }) {
         print: (t) => log(t),
         printErr: (t) => log(t),
         instantiateWasm: (imports, onSuccess) => {
-            WebAssembly.instantiateStreaming(fetch(hostDir + "graphics_host.wasm"), imports)
+            WebAssembly.instantiateStreaming(fetch(hostDir + variant + ".wasm"), imports)
                 .then(({ instance, module }) => { hostRawExports = instance.exports; onSuccess(instance, module); })
                 .catch((e) => log(`[host] instantiate failed: ${e}`));
             return {};
@@ -72,12 +85,13 @@ export async function loadHost({ hostDir = "host/", canvas, log = () => {} }) {
 
 export async function runGuest({ guestBytes, hostDir = "host/", canvas, log = () => {}, setStatus = () => {} }) {
     if (hostUsed) throw new Error("The graphics host can only run one SWF per page load — reload the page to run another.");
-    setStatus("Loading graphics host");
-    const host = await loadHost({ hostDir, canvas, log });
+    const mod = await WebAssembly.compile(guestBytes);
+    const avm2 = guestIsAvm2(mod);
+    setStatus(`Loading ${avm2 ? "AVM2 " : ""}graphics host`);
+    const host = await loadHost({ hostDir, canvas, log, avm2 });
     hostUsed = true;
     setStatus("Instantiating guest");
 
-    const mod = await WebAssembly.compile(guestBytes);
     const imports = WebAssembly.Module.imports(mod);
     const missing = [];
     const env = { memory: hostRawExports.memory };
@@ -88,11 +102,13 @@ export async function runGuest({ guestBytes, hostDir = "host/", canvas, log = ()
     for (const imp of imports) {
         if (imp.module !== "env" || env[imp.name]) continue;
         if (imp.kind === "function") {
-            if (imp.name === "setjmp") {
-                // AVM1 try/catch inlines setjmp into generated code and the
-                // in-browser clang cannot lower it; run the try body as if no
-                // exception can occur. A throw inside it surfaces as an error.
-                env.setjmp = () => 0;
+            if (imp.name === "setjmp" || imp.name === "__swf_guest_setjmp") {
+                // AVM1 try/catch and AVM2 exception-table method bodies inline
+                // setjmp into generated code and the in-browser clang cannot
+                // lower it (the guest's setjmp.h shim makes it an import); run
+                // the try body as if no exception can occur. A throw inside it
+                // surfaces as an error.
+                env[imp.name] = () => 0;
             } else if (imp.name === "longjmp") {
                 env.longjmp = () => { throw new Error("AVM1 try/catch (longjmp) is not supported in the in-browser build; use the downloadable build bundle"); };
             } else {
@@ -117,6 +133,13 @@ export async function runGuest({ guestBytes, hostDir = "host/", canvas, log = ()
     });
     const instance = await WebAssembly.instantiate(mod, { env, wasi_snapshot_preview1: wasiStubs, wasix_32v1: wasiStubs });
     const g = instance.exports;
+
+    // Layout check: runtime structs the guest allocates embed jmp_buf
+    // (Avm2TryFrame); the guest's setjmp.h shim must match the host's size.
+    if (g.get_guest_jmp_buf_size && host._get_jmp_buf_size) {
+        const gs = g.get_guest_jmp_buf_size(), hs = host._get_jmp_buf_size();
+        if (gs !== hs) throw new Error(`jmp_buf size mismatch: guest ${gs} vs host ${hs} bytes (update guest_setjmp_shim.h)`);
+    }
 
     // Arena check: guest data + its shadow stack must fit below the host's data.
     const heapBase = g.__heap_base ? g.__heap_base.value : 0;
@@ -161,6 +184,11 @@ export async function runGuest({ guestBytes, hostDir = "host/", canvas, log = ()
     host._setMorphData(g.get_morph_end_shape_data(), g.get_morph_end_shape_data_size(),
                        g.get_morph_end_color_data(), g.get_morph_end_color_data_size());
     host._setFrameLabels(g.get_frame_label_data(), g.get_frame_label_count());
+    if (avm2) {
+        host._setAvm2Tables(g.get_avm2_movie_tables(), g.get_avm2_abc_frames(), g.get_avm2_abc_lazy(),
+                            g.get_avm2_symbol_class_frames(), g.get_avm2_device_fonts(), g.get_avm2_device_font_count());
+        host._setAvm2DrawTables(g.get_color_data(), g.get_uninv_mat_data(), g.get_gradient_data(), g.get_morph_end_color_data());
+    }
 
     // The JSPI frame loop resumes from promise continuations, so a trap inside a
     // frame surfaces as an uncaught error/rejection, not as a rejection of runSWF.
@@ -171,5 +199,15 @@ export async function runGuest({ guestBytes, hostDir = "host/", canvas, log = ()
     setStatus(`Running ${width}x${height}, ${frameCount} frames @ ${fps} fps, SWF v${swfVersion}`);
     canvas.style.display = "block";
     canvas.focus();
-    await host.ccall("runSWF", null, [], [], { async: true });   // resolves when the movie quits
+    try {
+        await host.ccall("runSWF", null, [], [], { async: true });   // resolves when the movie quits
+    } catch (e) {
+        // A throw inside a try body reaches a jmp_buf no real setjmp filled
+        // (the guest's setjmp is stubbed, see guest_setjmp_shim.h): the host's
+        // longjmp is a Wasm exception that no frame owns, so it escapes runSWF.
+        if (typeof WebAssembly.Exception === "function" && e instanceof WebAssembly.Exception) {
+            throw new Error("The movie threw an exception inside a try/catch block, which the in-browser build cannot catch yet (setjmp is stubbed; see the AVM2 in-browser assessment, §4). Use the downloadable build bundle for this SWF.");
+        }
+        throw e;
+    }
 }

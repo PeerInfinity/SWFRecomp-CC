@@ -53,9 +53,11 @@ function patchGeneratedSource(text) {
 }
 
 export async function compileGuest(result, setStatus) {
-    if (Object.keys(result.files).some(p => p.startsWith("RecompiledABC/"))) {
-        throw new Error("This is an AS3 (AVM2) SWF. The in-browser run only supports AVM1 so far (the graphics host is built without the AVM2 runtime and AS3 output is too large for the in-browser compiler); download the build bundle instead — its build.sh handles AVM2.");
-    }
+    // AS3 (AVM2) SWFs compile against the AVM2 runtime headers and run on the
+    // AVM2 host variant (guest_loader.js picks it from the guest's exports).
+    // Their generated method bodies inline setjmp like AVM1 try/catch does;
+    // the setjmp.h shim below turns it into a stubbed import.
+    const isAvm2 = Object.keys(result.files).some(p => p.startsWith("RecompiledABC/"));
     const clang = await loadClang(setStatus);
     setStatus("Preparing sources");
     const project = new sdk.Directory();
@@ -83,6 +85,10 @@ export async function compileGuest(result, setStatus) {
     for (const f of ["guest_main_graphics.c", "bridge_globals.h", "bridge_globals.c"]) {
         await project.writeFile(f, await fetchBytes(HOST_DIR + f));
     }
+    // setjmp.h shim ahead of the sysroot: host-compatible jmp_buf layout and an
+    // importable (stubbed) setjmp — see guest_setjmp_shim.h for both reasons.
+    await project.createDir("shim");
+    await project.writeFile("shim/setjmp.h", await fetchBytes(HOST_DIR + "guest_setjmp_shim.h"));
 
     // Generated files, flattened (generated code includes them unqualified).
     const cFiles = ["guest_main_graphics.c", "bridge_globals.c"];
@@ -101,10 +107,11 @@ export async function compileGuest(result, setStatus) {
     const args = [
         ...cFiles.map(f => `/project/${f}`),
         "-DDYNAMIC_GUEST",
+        ...(isAvm2 ? ["-DSWF_AVM2", "-I/project/include/avm2"] : []),
         "-std=gnu2x",
         "-include", "string.h",
         "-include", "strings.h",
-        "-I/project", "-I/project/include", "-I/project/include/actionmodern",
+        "-I/project/shim", "-I/project", "-I/project/include", "-I/project/include/actionmodern",
         "-I/project/include/libswf", "-I/project/include/memory",
         "-O1", "-w",
         // The clang driver preset already adds --import-memory/--shared-memory.
@@ -133,5 +140,5 @@ export async function compileGuest(result, setStatus) {
         throw new Error(`In-browser compile failed (code ${r.code}):\n${err || r.stdout || "(no output)"}`);
     }
     const bytes = await project.readFile("guest.wasm");
-    return { bytes, ms, fileCount: cFiles.length };
+    return { bytes, ms, fileCount: cFiles.length, avm2: isAvm2 };
 }

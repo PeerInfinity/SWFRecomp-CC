@@ -25,6 +25,11 @@
 #define GEN_EXTERN_BITMAP_DATA          extern u8* bitmap_data
 #define GEN_EXTERN_MORPH_END_SHAPE_DATA extern float (*morph_end_shape_data)[2]
 #define GEN_EXTERN_FRAME_LABEL_DATA     extern FrameLabelEntry* frame_label_data
+// Read directly by the AVM2 runtime (avm2_cpu_raster.c / avm2_display.c).
+#define GEN_EXTERN_COLOR_DATA           extern float (*color_data)[4]
+#define GEN_EXTERN_UNINV_MAT_DATA       extern float* uninv_mat_data
+#define GEN_EXTERN_GRADIENT_DATA        extern u8 (*gradient_data)[4]
+#define GEN_EXTERN_MORPH_END_COLOR_DATA extern float (*morph_end_color_data)[4]
 #else
 #define GEN_EXTERN_TRANSFORM_DATA       extern float transform_data[][16]
 #define GEN_EXTERN_SHAPE_DATA           extern u32 shape_data[][4]
@@ -37,6 +42,10 @@
 #define GEN_EXTERN_BITMAP_DATA          extern u8 bitmap_data[]
 #define GEN_EXTERN_MORPH_END_SHAPE_DATA extern float morph_end_shape_data[][2]
 #define GEN_EXTERN_FRAME_LABEL_DATA     extern FrameLabelEntry frame_label_data[]
+#define GEN_EXTERN_COLOR_DATA           extern float color_data[][4]
+#define GEN_EXTERN_UNINV_MAT_DATA       extern float uninv_mat_data[]
+#define GEN_EXTERN_GRADIENT_DATA        extern u8 gradient_data[][4]
+#define GEN_EXTERN_MORPH_END_COLOR_DATA extern float morph_end_color_data[][4]
 #endif
 // frame_label_count is a scalar in both builds (the host copies the value).
 

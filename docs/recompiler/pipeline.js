@@ -300,12 +300,16 @@ $("dlWasmBtn").addEventListener("click", () => {
 // Runnable zip: the guest module + the graphics host + the standalone loader +
 // a player page + coi-serviceworker (cross-origin isolation for the host's
 // shared memory). Serve the folder over HTTP and open it in Chrome 137+.
-const RUNNABLE_FILES = [
-    ["host/graphics_host.js", "graphics_host.js"],
-    ["host/graphics_host.wasm", "graphics_host.wasm"],
-    ["guest_loader.js", "guest_loader.js"],
-    ["coi-serviceworker.js", "coi-serviceworker.js"],
-];
+// AS3 guests ship with the AVM2 host variant (guest_loader.js picks it by name).
+const runnableFiles = (avm2) => {
+    const h = avm2 ? "graphics_host_avm2" : "graphics_host";
+    return [
+        [`host/${h}.js`, `${h}.js`],
+        [`host/${h}.wasm`, `${h}.wasm`],
+        ["guest_loader.js", "guest_loader.js"],
+        ["coi-serviceworker.js", "coi-serviceworker.js"],
+    ];
+};
 $("dlRunnableBtn").addEventListener("click", async () => {
     if (!lastGuest) return;
     const btn = $("dlRunnableBtn");
@@ -315,7 +319,7 @@ $("dlRunnableBtn").addEventListener("click", async () => {
         const root = `${lastGuest.name}-runnable/`;
         const entries = {};
         $("runHint").textContent = "Fetching host files";
-        await Promise.all(RUNNABLE_FILES.map(async ([src, dst]) => {
+        await Promise.all(runnableFiles(lastGuest.avm2).map(async ([src, dst]) => {
             const r = await fetch(src);
             if (!r.ok) throw new Error(`Failed to fetch ${src} (${r.status})`);
             entries[root + dst] = new Uint8Array(await r.arrayBuffer());
@@ -331,7 +335,7 @@ $("dlRunnableBtn").addEventListener("click", async () => {
             "It must be served over HTTP (any static host works); file:// does not, because",
             "coi-serviceworker.js has to enable cross-origin isolation for the shared-memory host.", "",
             "Files: index.html (player page), guest_loader.js (instantiates the guest against the",
-            `host), ${lastGuest.name}-guest.wasm (this SWF's compiled code + data), graphics_host.js/.wasm`,
+            `host), ${lastGuest.name}-guest.wasm (this SWF's compiled code + data), ${lastGuest.avm2 ? "graphics_host_avm2" : "graphics_host"}.js/.wasm`,
             `(the SWFModernRuntime graphics runtime, snapshot ${buildInfo ? buildInfo.commit : "unknown"}), coi-serviceworker.js.`, "",
         ].join("\n"));
         $("runHint").textContent = "Zipping";
@@ -362,13 +366,13 @@ $("runBtn").addEventListener("click", async () => {
         setStep("step-guest", "active", "Compiling generated C in the browser ...");
         const guest = await gfx.compileGuest(currentResult, (t) => setStep("step-guest", "active", t + " ..."));
         setStep("step-guest", "done", `Compiled ${guest.fileCount} C files to a ${fmtSize(guest.bytes.length)} guest module in ${(guest.ms / 1000).toFixed(1)} s`);
-        lastGuest = { bytes: guest.bytes, name: currentResult.name };
+        lastGuest = { bytes: guest.bytes, name: currentResult.name, avm2: !!guest.avm2 };
         $("dlWasmBtn").style.display = "";
         $("dlRunnableBtn").style.display = "";
-        $("runHint").textContent = "The guest .wasm holds this SWF's compiled code and data; it runs only alongside the graphics host (host/graphics_host.wasm), the way this page loads it.";
-        setStep("step-host", "active", "Loading graphics host ...");
-        await gfx.loadHost({ hostDir: "host/", canvas, log });
-        setStep("step-host", "done", "Graphics host loaded");
+        $("runHint").textContent = `The guest .wasm holds this SWF's compiled code and data; it runs only alongside the graphics host (host/${guest.avm2 ? "graphics_host_avm2" : "graphics_host"}.wasm), the way this page loads it.`;
+        setStep("step-host", "active", `Loading ${guest.avm2 ? "AVM2 " : ""}graphics host ...`);
+        await gfx.loadHost({ hostDir: "host/", canvas, log, avm2: !!guest.avm2 });
+        setStep("step-host", "done", `${guest.avm2 ? "AVM2 " : ""}Graphics host loaded`);
         setStep("step-run", "active", "Instantiating guest ...");
         await gfx.runGuest({ guestBytes: guest.bytes, hostDir: "host/", canvas, log, setStatus: (t) => setStep("step-run", "active", t) });
         setStep("step-run", "done", "Finished");

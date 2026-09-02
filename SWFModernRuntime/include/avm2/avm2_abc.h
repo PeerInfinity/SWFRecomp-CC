@@ -210,20 +210,39 @@ typedef struct Avm2SymbolClassBinding
 	const char* class_name;  // dotted ("test_fla.MainTimeline")
 } Avm2SymbolClassBinding;
 
-// Provided by the generated RecompiledABC/abc_registry.c:
+// Provided by the generated RecompiledABC/abc_registry.c. The in-browser
+// recompiler's graphics HOST (-DDYNAMIC_HOST) links no generated code: it
+// declares every table as a POINTER (and every count as a plain scalar) that
+// the loader fills from the guest's tables (wasm_wrappers/host_main_graphics.c,
+// setAvm2Tables). Indexing syntax is identical, so no call site changes; the
+// runtime never takes sizeof() of these.
+#ifdef DYNAMIC_HOST
+extern const Avm2AbcFileData* const* avm2_generated_abc_files;
+extern uint32_t avm2_generated_abc_file_count;
+extern const Avm2SymbolClassBinding* avm2_generated_symbol_classes;
+extern uint32_t avm2_generated_symbol_class_count;
+extern uint8_t avm2_generated_swf_version;
+#else
 extern const Avm2AbcFileData* const avm2_generated_abc_files[];
 extern const uint32_t avm2_generated_abc_file_count;
 extern const Avm2SymbolClassBinding avm2_generated_symbol_classes[];
 extern const uint32_t avm2_generated_symbol_class_count;
 extern const uint8_t avm2_generated_swf_version;
+#endif
 // Frame scoping for the two tag classes Ruffle runs per-frame
 // (movie_clip.rs::run_abc_and_symbol_tags). Parallel to the arrays above:
 // 0-based frame index of the DoABC tag / SymbolClass row, plus the DoABC2
 // LAZY_INITIALIZE bit. All-zero for every movie whose AVM2 tags live in
 // frame 1, which is 4934 of the 4943 corpus SWFs.
+#ifdef DYNAMIC_HOST
+extern const uint32_t* avm2_generated_abc_frames;
+extern const uint8_t* avm2_generated_abc_lazy;
+extern const uint32_t* avm2_generated_symbol_class_frames;
+#else
 extern const uint32_t avm2_generated_abc_frames[];
 extern const uint8_t avm2_generated_abc_lazy[];
 extern const uint32_t avm2_generated_symbol_class_frames[];
+#endif
 
 // Runs frame `frame_idx`'s (0-based) held-back DoABC + SymbolClass tags once.
 // No-op for frame 0 (the boot path already ran it) and for movies with no
@@ -580,7 +599,24 @@ typedef struct Avm2SoundData
 	uint32_t data_len;
 } Avm2SoundData;
 
-// Provided by the generated RecompiledABC/abc_timeline.c:
+// Provided by the generated RecompiledABC/abc_timeline.c (pointer/scalar form
+// under DYNAMIC_HOST, see above):
+#ifdef DYNAMIC_HOST
+extern const Avm2TimelineData* avm2_generated_timelines;
+extern uint32_t avm2_generated_timeline_count;
+extern const Avm2CharInfo* avm2_generated_chars;
+extern uint32_t avm2_generated_char_count;
+extern const Avm2ShapeGeom* avm2_generated_shape_geom;
+extern uint32_t avm2_generated_shape_geom_count;
+extern const Avm2SceneData* avm2_generated_scenes;
+extern uint32_t avm2_generated_scene_count;
+extern const Avm2ButtonData* avm2_generated_buttons;
+extern uint32_t avm2_generated_button_count;
+extern const Avm2EditTextData* avm2_generated_edittexts;
+extern uint32_t avm2_generated_edittext_count;
+extern const Avm2FontData* avm2_generated_fonts;
+extern uint32_t avm2_generated_font_count;
+#else
 extern const Avm2TimelineData avm2_generated_timelines[];
 extern const uint32_t avm2_generated_timeline_count;
 extern const Avm2CharInfo avm2_generated_chars[];
@@ -595,8 +631,27 @@ extern const Avm2EditTextData avm2_generated_edittexts[];
 extern const uint32_t avm2_generated_edittext_count;
 extern const Avm2FontData avm2_generated_fonts[];
 extern const uint32_t avm2_generated_font_count;
+#endif
 // Device faces declared in the test harness's test.toml (B9). Player-level
 // state, so only the main movie's table exists (never symbol-prefixed).
+#ifdef DYNAMIC_HOST
+extern const Avm2FontData* avm2_generated_device_fonts;
+extern uint32_t avm2_generated_device_font_count;
+extern const Avm2StaticGlyph* avm2_generated_static_glyphs;
+extern uint32_t avm2_generated_static_glyph_count;
+extern const Avm2StaticTextData* avm2_generated_statictexts;
+extern uint32_t avm2_generated_statictext_count;
+extern const Avm2BitmapData* avm2_generated_bitmaps;
+extern uint32_t avm2_generated_bitmap_count;
+extern const Avm2BinaryData* avm2_generated_binaries;
+extern uint32_t avm2_generated_binary_count;
+extern const Avm2SoundData* avm2_generated_sounds;
+extern uint32_t avm2_generated_sound_count;
+extern const int32_t* avm2_generated_stage_rect;   // xmin xmax ymin ymax twips
+extern uint16_t avm2_generated_frame_rate;     // 8.8 fixed
+extern uint16_t avm2_generated_header_frames;  // header frame count
+extern uint32_t avm2_generated_bg_color;       // 0xRRGGBB (SetBackgroundColor)
+#else
 extern const Avm2FontData avm2_generated_device_fonts[];
 extern const uint32_t avm2_generated_device_font_count;
 extern const Avm2StaticGlyph avm2_generated_static_glyphs[];
@@ -613,6 +668,7 @@ extern const int32_t avm2_generated_stage_rect[4];   // xmin xmax ymin ymax twip
 extern const uint16_t avm2_generated_frame_rate;     // 8.8 fixed
 extern const uint16_t avm2_generated_header_frames;  // header frame count
 extern const uint32_t avm2_generated_bg_color;       // 0xRRGGBB (SetBackgroundColor)
+#endif
 
 // ---------------------------------------------------------------------------
 // Per-movie table aggregate (loader-arc tranche 6)

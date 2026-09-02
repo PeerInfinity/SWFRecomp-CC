@@ -113,9 +113,14 @@ mkdir -p "${HOST_DIR}"
 bash "${SCRIPT_DIR}/build_graphics_host.sh" "${BUILD_DIR}/graphics_host" > "${BUILD_DIR}/graphics_host.log" 2>&1 \
     || { tail -30 "${BUILD_DIR}/graphics_host.log"; echo "ERROR: graphics host build failed (log: ${BUILD_DIR}/graphics_host.log)" >&2; exit 1; }
 cp "${BUILD_DIR}/graphics_host/graphics_host.js" "${BUILD_DIR}/graphics_host/graphics_host.wasm" "${HOST_DIR}/"
+# AVM2 variant (AS3 SWFs): same host shape plus the AVM2 runtime source set.
+echo "  Building AVM2 graphics host..."
+AVM2=1 bash "${SCRIPT_DIR}/build_graphics_host.sh" "${BUILD_DIR}/graphics_host_avm2" > "${BUILD_DIR}/graphics_host_avm2.log" 2>&1 \
+    || { tail -30 "${BUILD_DIR}/graphics_host_avm2.log"; echo "ERROR: AVM2 graphics host build failed (log: ${BUILD_DIR}/graphics_host_avm2.log)" >&2; exit 1; }
+cp "${BUILD_DIR}/graphics_host_avm2/graphics_host_avm2.js" "${BUILD_DIR}/graphics_host_avm2/graphics_host_avm2.wasm" "${HOST_DIR}/"
 # Guest-side support compiled in the browser alongside the generated C.
-cp "${WRAPPERS}/guest_main_graphics.c" "${WRAPPERS}/bridge_globals.h" "${WRAPPERS}/bridge_globals.c" "${HOST_DIR}/"
-echo "    host: $(stat --printf='%s' "${HOST_DIR}/graphics_host.wasm") bytes wasm"
+cp "${WRAPPERS}/guest_main_graphics.c" "${WRAPPERS}/bridge_globals.h" "${WRAPPERS}/bridge_globals.c" "${WRAPPERS}/guest_setjmp_shim.h" "${HOST_DIR}/"
+echo "    host: $(stat --printf='%s' "${HOST_DIR}/graphics_host.wasm") bytes wasm, AVM2 host: $(stat --printf='%s' "${HOST_DIR}/graphics_host_avm2.wasm") bytes wasm"
 
 # --- 4. Build info (shown in the page footer, embedded in each bundle) ---
 COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD 2>/dev/null || echo unknown)"

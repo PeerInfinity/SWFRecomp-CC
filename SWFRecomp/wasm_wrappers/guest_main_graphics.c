@@ -8,6 +8,11 @@
 #include "draws.h"
 #include "bridge_globals.h"
 
+// Layout check for runtime structs that embed jmp_buf (see guest_setjmp_shim.h).
+#include <setjmp.h>
+__attribute__((export_name("get_guest_jmp_buf_size")))
+int get_guest_jmp_buf_size(void) { return (int)sizeof(jmp_buf); }
+
 // Export the frame function array info for JS to read
 __attribute__((export_name("get_frame_count")))
 int get_frame_count(void) { return FRAME_COUNT; }
@@ -140,3 +145,27 @@ void* get_text_char_codes(void) { return (void*)text_char_codes; }
 static void (*const tagInit_ptr)(SWFAppContext*) = tagInit;
 __attribute__((export_name("get_tagInit_ptr")))
 int get_tagInit_ptr(void) { return (int)tagInit_ptr; }
+
+#ifdef SWF_AVM2
+// --- AVM2 guests (RecompiledABC/ present; the page compiles with -DSWF_AVM2) ---
+// The AVM2 host variant (build_graphics_host.sh AVM2=1) reads the generated
+// tables through pointers filled by setAvm2Tables from the per-movie
+// aggregate avm2_movie_tables (RecompiledABC/avm2_movie_tables.c) plus the
+// few arrays the aggregate does not carry. The method function pointers in
+// the guest's Avm2AbcMethodData tables are valid host-side through the
+// mirrored function table, exactly like frame_funcs.
+#include <avm2/avm2_abc.h>
+extern const Avm2MovieTables avm2_movie_tables;
+__attribute__((export_name("get_avm2_movie_tables")))
+const void* get_avm2_movie_tables(void) { return &avm2_movie_tables; }
+__attribute__((export_name("get_avm2_abc_frames")))
+const void* get_avm2_abc_frames(void) { return avm2_generated_abc_frames; }
+__attribute__((export_name("get_avm2_abc_lazy")))
+const void* get_avm2_abc_lazy(void) { return avm2_generated_abc_lazy; }
+__attribute__((export_name("get_avm2_symbol_class_frames")))
+const void* get_avm2_symbol_class_frames(void) { return avm2_generated_symbol_class_frames; }
+__attribute__((export_name("get_avm2_device_fonts")))
+const void* get_avm2_device_fonts(void) { return avm2_generated_device_fonts; }
+__attribute__((export_name("get_avm2_device_font_count")))
+int get_avm2_device_font_count(void) { return (int)avm2_generated_device_font_count; }
+#endif

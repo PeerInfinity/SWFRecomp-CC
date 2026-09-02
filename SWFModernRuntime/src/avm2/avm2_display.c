@@ -13419,11 +13419,12 @@ static Rect self_bounds_full(Avm2Context* ctx, Avm2Object* obj,
 // see the matching extern near avm2_render_morph. Read here for shape-accurate
 // hit testing: each row is one vertex {x_bits(float), y_bits(float), ...} in
 // shape-LOCAL twips, three consecutive rows per triangle.
-extern uint32_t shape_data[][4];
+#include <libswf/generated_data.h>   // pointer form under DYNAMIC_HOST
+GEN_EXTERN_SHAPE_DATA;
 // The END half of a DefineMorphShape's geometry: {x, y} in shape-LOCAL twips,
 // already floats (the START half is float BITS in shape_data). Same array the
 // render/CPU-raster morph paths read; re-declared here for the picker.
-extern float morph_end_shape_data[][2];
+GEN_EXTERN_MORPH_END_SHAPE_DATA;
 
 static inline float pick_bits_to_f(uint32_t u)
 {
@@ -16931,10 +16932,10 @@ static void avm2_render_shape(Avm2Context* ctx, Avm2Object* obj,
 // mirrored into the render context, but the START/END lerp is cleanest against
 // the raw tables. morph_end_* are NOT copied into the context (T6 loads them
 // as externs, the T5 pattern).
-extern uint32_t shape_data[][4];
-extern float    color_data[][4];
-extern float    morph_end_shape_data[][2];
-extern float    morph_end_color_data[][4];
+GEN_EXTERN_SHAPE_DATA;
+GEN_EXTERN_COLOR_DATA;
+GEN_EXTERN_MORPH_END_SHAPE_DATA;
+GEN_EXTERN_MORPH_END_COLOR_DATA;
 
 static inline float avm2_bits_to_f(uint32_t u)
 {

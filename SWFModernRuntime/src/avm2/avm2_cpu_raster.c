@@ -32,14 +32,17 @@
 // linked into every build (both graphics and no-graphics — see verify_output.py
 // DRAWS_ARRAY_NAMES). Read directly: NO_GRAPHICS builds have no render
 // `context`, and the GPU dispatch reads the very same rows.
-extern uint32_t shape_data[][4];    // {x_bits(float), y_bits(float), style_packed, style_index}
-extern float    color_data[][4];    // {r,g,b,a} straight, 0..1
-extern float    uninv_mat_data[];   // 16 floats/gradient: forward UV[0,1]->twips (2D affine in 4x4)
-extern uint8_t  gradient_data[][4]; // 256 rows/gradient: {r,g,b,a} u8, sRGB-encoded
+// Declared through libswf/generated_data.h so the in-browser graphics HOST
+// (-DDYNAMIC_HOST, no generated code linked) sees them as pointers.
+#include <libswf/generated_data.h>
+GEN_EXTERN_SHAPE_DATA;            // {x_bits(float), y_bits(float), style_packed, style_index}
+GEN_EXTERN_COLOR_DATA;            // {r,g,b,a} straight, 0..1
+GEN_EXTERN_UNINV_MAT_DATA;        // 16 floats/gradient: forward UV[0,1]->twips (2D affine in 4x4)
+GEN_EXTERN_GRADIENT_DATA;         // 256 rows/gradient: {r,g,b,a} u8, sRGB-encoded
 // T6 (DefineMorphShape): END vertices paired 1:1 with the shape_data START
 // range, and END solid-fill colours indexed by the high 16 bits of style_index.
-extern float    morph_end_shape_data[][2];  // {x,y} twips, END positions
-extern float    morph_end_color_data[][4];  // {r,g,b,a} straight 0..1, END colours
+GEN_EXTERN_MORPH_END_SHAPE_DATA;  // {x,y} twips, END positions
+GEN_EXTERN_MORPH_END_COLOR_DATA;  // {r,g,b,a} straight 0..1, END colours
 
 // ---------------------------------------------------------------------------
 // Store helpers — must match avm2_bitmap.c premul()/blend_over() exactly.

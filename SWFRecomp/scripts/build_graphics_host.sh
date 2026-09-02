@@ -20,6 +20,10 @@
 #   EXPORTED_FUNCTIONS=<all>      every runtime symbol resolves guest imports
 #
 # Usage: build_graphics_host.sh [out_dir]   (default: SWFRecomp/build_graphics_host)
+#   AVM2=1  build the AVM2 host variant (graphics_host_avm2.{js,wasm}): the
+#           AVM2 runtime source set (src/avm2, quickjs-libregexp, lzma, zlib)
+#           with -DSWF_AVM2; runSWF drives runSWF_avm2. Assessment:
+#           SWFRecompDocs/plans/avm2-in-browser-assessment.md
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,6 +35,8 @@ SWFMODERN_INC="${SWFMODERN_ROOT}/include"
 BUILD_DIR="${1:-${SWFRECOMP_ROOT}/build_graphics_host}"
 HOST_TABLE_BASE="${HOST_TABLE_BASE:-262144}"
 GUEST_ARENA_END="${GUEST_ARENA_END:-105906176}"   # 101 MB; host data/stack/heap live above this
+AVM2="${AVM2:-0}"
+HOST_NAME="graphics_host"; [ "${AVM2}" = "1" ] && HOST_NAME="graphics_host_avm2"
 
 if ! command -v emcc >/dev/null 2>&1; then
     if [ -f "${PROJECT_ROOT}/emsdk/emsdk_env.sh" ]; then
@@ -70,6 +76,11 @@ cp -p "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${SWFMODERN_ROOT}/lib/o1heap/o1he
 cp -p "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${SRC}/"
 cp -p "${SWFMODERN_ROOT}/third_party/libtess2"/*.c "${SWFMODERN_ROOT}/third_party/libtess2"/*.h "${SRC}/"
 cp -p "${SWFRECOMP_ROOT}/wasm_wrappers/host_main_graphics.c" "${SRC}/"
+if [ "${AVM2}" = "1" ]; then
+    cp -p "${SWFMODERN_SRC}"/avm2/*.c "${SRC}/"
+    cp -p "${SWFMODERN_ROOT}/third_party/quickjs-libregexp"/*.c "${SWFMODERN_ROOT}/third_party/quickjs-libregexp"/*.h "${SRC}/"
+    cp -p "${SWFMODERN_ROOT}/third_party/lzma"/*.c "${SWFMODERN_ROOT}/third_party/lzma"/*.h "${SRC}/"
+fi
 
 EMCC_FLAGS=(
     -DUSE_WEBGPU -DDYNAMIC_HOST "-DHOST_TABLE_BASE=${HOST_TABLE_BASE}" "-DGUEST_ARENA_END=${GUEST_ARENA_END}u"
@@ -85,6 +96,13 @@ EMCC_FLAGS=(
     -I"${SWFMODERN_ROOT}/third_party/libtess2"
     -O2
 )
+LINK_EXTRA=()
+if [ "${AVM2}" = "1" ]; then
+    # Same defines as the downloadable bundle's AVM2 arm (SWF_URL/SWF_*_SIZE are
+    # compile-time there; a host variant would have to make them runtime-set).
+    EMCC_FLAGS+=(-DSWF_AVM2 -DMOCK_DATE_TIME=981152406000LL -msimd128 -I"${SWFMODERN_INC}/avm2" -sUSE_ZLIB=1)
+    LINK_EXTRA=(-sUSE_ZLIB=1 -msimd128)
+fi
 
 echo "=== Compiling host objects ==="
 OBJS=()
@@ -109,8 +127,8 @@ echo "[$(tr '\n' ',' < "${BUILD_DIR}/exports.txt" | sed 's/,$//')]" > "${BUILD_D
 echo "  $(wc -l < "${BUILD_DIR}/exports.txt") symbols exported"
 
 echo "=== Linking graphics_host.js / graphics_host.wasm ==="
-emcc "${OBJS[@]}" --use-port=emdawnwebgpu \
-    -o "${BUILD_DIR}/graphics_host.js" \
+emcc "${OBJS[@]}" --use-port=emdawnwebgpu "${LINK_EXTRA[@]}" \
+    -o "${BUILD_DIR}/${HOST_NAME}.js" \
     -s WASM=1 \
     -s EXPORTED_FUNCTIONS=@"${BUILD_DIR}/exports.json" \
     -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","wasmMemory","wasmTable","wasmExports","HEAPU8","HEAPU32"]' \
@@ -130,4 +148,4 @@ emcc "${OBJS[@]}" --use-port=emdawnwebgpu \
 
 echo
 echo "Built:"
-ls -lh "${BUILD_DIR}/graphics_host.js" "${BUILD_DIR}/graphics_host.wasm"
+ls -lh "${BUILD_DIR}/${HOST_NAME}.js" "${BUILD_DIR}/${HOST_NAME}.wasm"
