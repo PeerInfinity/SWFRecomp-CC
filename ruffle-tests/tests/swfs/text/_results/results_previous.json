@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-08-23T08:44:57.357741+00:00",
+    "timestamp": "2026-08-30T08:49:31.950281+00:00",
     "git_sha": "06f3d87d295b03b44b94221d38594612ecda4ff5",
-    "duration_seconds": 216.51,
+    "duration_seconds": 201.66,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "auto_size/height",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.96,
+        "compile": 21.473,
         "run": 0.004
       },
       "num_frames": 1,
@@ -31,14 +31,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 26.97,
+      "duration": 21.48,
       "status": "pass"
     },
     {
       "test": "auto_size/return",
       "phases": {
-        "recomp": 0.065,
-        "compile": 26.728,
+        "recomp": 0.066,
+        "compile": 27.502,
         "run": 0.004
       },
       "num_frames": 1,
@@ -47,15 +47,15 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 26.81,
+      "duration": 27.58,
       "status": "pass"
     },
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.054,
-        "compile": 26.019,
-        "run": 0.008
+        "recomp": 0.065,
+        "compile": 27.254,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -63,14 +63,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 26.09,
+      "duration": 27.33,
       "status": "pass"
     },
     {
       "test": "br_at_start",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.464,
+        "compile": 1.403,
         "run": 0.002
       },
       "num_frames": 1,
@@ -79,14 +79,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.47,
+      "duration": 1.41,
       "status": "pass"
     },
     {
       "test": "html_entity_parsing",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.87,
+        "compile": 7.339,
         "run": 0.004
       },
       "num_frames": 1,
@@ -95,14 +95,14 @@
         "expected_lines": 213,
         "matching_lines": 213
       },
-      "duration": 6.88,
+      "duration": 7.35,
       "status": "pass"
     },
     {
       "test": "links_in_scrolled_text",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.403,
+        "compile": 1.169,
         "run": 0.002
       },
       "num_frames": 2,
@@ -111,7 +111,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 1.41,
+      "duration": 1.17,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -121,8 +121,8 @@
       "test": "style_changes_in_html",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.986,
-        "run": 0.002
+        "compile": 20.295,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -130,14 +130,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.99,
+      "duration": 20.3,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_align",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.62,
+        "compile": 27.249,
         "run": 0.008
       },
       "num_frames": 2,
@@ -146,15 +146,15 @@
         "expected_lines": 248,
         "matching_lines": 248
       },
-      "duration": 27.64,
+      "duration": 27.27,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
         "recomp": 0.0,
-        "compile": 29.989,
-        "run": 0.008
+        "compile": 23.191,
+        "run": 0.004
       },
       "num_frames": 2,
       "lines": {
@@ -162,15 +162,15 @@
         "expected_lines": 244,
         "matching_lines": 244
       },
-      "duration": 30.01,
+      "duration": 23.2,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
         "recomp": 0.0,
-        "compile": 26.956,
-        "run": 0.008
+        "compile": 21.779,
+        "run": 0.004
       },
       "num_frames": 2,
       "lines": {
@@ -178,14 +178,14 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 26.97,
+      "duration": 21.79,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
         "recomp": 0.0,
-        "compile": 20.624,
+        "compile": 22.119,
         "run": 0.004
       },
       "num_frames": 2,
@@ -194,7 +194,7 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 20.63,
+      "duration": 22.13,
       "status": "pass"
     }
   ]

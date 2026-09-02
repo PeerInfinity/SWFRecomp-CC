@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-23T08:44:57.408209+00:00",
+    "old_timestamp": "2026-08-30T08:49:32.000325+00:00",
     "old_git_sha": "06f3d87d295b03b44b94221d38594612ecda4ff5",
-    "new_timestamp": "2026-08-30T08:49:32.000325+00:00",
-    "new_git_sha": "06f3d87d295b03b44b94221d38594612ecda4ff5",
+    "new_timestamp": "2026-09-02T18:30:12.860408+00:00",
+    "new_git_sha": "0a56091cfce2753e3bd157534b555334cf90ad0d",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
     "old_pass": 212,
@@ -14,8 +14,8 @@
     "old_total": 229,
     "old_pass_rate": 92.6,
     "new_pass": 212,
-    "new_ruffle_matched": 12,
-    "new_effective_pass": 224,
+    "new_ruffle_matched": 11,
+    "new_effective_pass": 223,
     "new_total": 229,
     "new_pass_rate": 92.6,
     "old_mismatched_lines": 161,
@@ -23,11 +23,28 @@
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 229,
+    "newly_failing": 1,
+    "status_changed": 1,
+    "unchanged": 228,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1/hitarea",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 4,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 4,
+        "matching_lines": 2
+      }
+    }
+  ]
 }
