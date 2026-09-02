@@ -1,7 +1,7 @@
 # In-Browser Recompiler: Refresh Assessment
 
 **Date:** 2026-09-02
-**Status:** Assessment (no code changed)
+**Status:** Assessment; stage 1 shipped 2026-09-02 (see §6)
 **Parent docs:** `IN_BROWSER_RECOMPILATION_FEASIBILITY.md`, `PHASE1_RECOMPILER_TO_WASM.md`,
 `PHASE2_IN_BROWSER_COMPILATION.md`
 
@@ -163,3 +163,27 @@ What the file is worth depends on the mode:
   `tools/divergence/perf/WINDOWS_PLAYWRIGHT_FROM_WSL.md`; the probe used here is
   `C:\playwright\recomp_probe.py <url> trace,graphics <tag>` (checks status steps,
   dumps trace output, screenshots the canvas).
+
+## 6. Stage 1 shipped (2026-09-02)
+
+Per the user's staging plan: trace mode is removed; the page now only recompiles to
+C and offers downloadable zips. Details:
+- `docs/recompiler/{index.html,pipeline.js}` rewritten: fresh `SWFRecompModule()`
+  instance per run (no cross-run static state), collects `RecompiledTags/`,
+  `RecompiledScripts/`, `RecompiledABC/`, shows file table + recompiler log.
+- Two downloads (fflate 0.8.2 from unpkg): "Generated C only" and the **build
+  bundle** = generated C + `docs/recompiler/bundle/` runtime snapshot (155 files,
+  9.4 MB; produced by `deploy_wasm_demo.sh`, listed in `manifest.json`) +
+  `build.sh`/`README.md` from `SWFRecomp/wasm_wrappers/bundle/`. `build.sh`
+  mirrors `build_test.sh wasm --graphics` (AVM1) and `build_wasm_avm2.sh` (AVM2)
+  and fills the stage size into the player page.
+- Verified: page → bundle zip (2.5 MB) → `./build.sh` with emsdk 5.0 → WebGPU page
+  renders `awful_shape_swf_4` correctly with the current runtime.
+- Deploy workflows no longer rebuild `action.o`/`object.o` or `build_info.json`;
+  `docs/recompiler/` is deployed as the consistent snapshot committed by
+  `deploy_wasm_demo.sh`. Trace artifacts (`libswfruntime.a`, `wasi_shim.js`,
+  `runtime_src/`) deleted. Graphics-stage files (`pipeline_graphics.js`,
+  `graphics_host.*`, `runtime_src_graphics/`, `clang_registry_response.json`,
+  `coi-serviceworker.js`) are kept, unreferenced, for stage 2.
+- Stage 2 = §3.3 (in-browser C→WASM for graphics), recommended via
+  `-sMAIN_MODULE=2` host + in-browser PIC side module.

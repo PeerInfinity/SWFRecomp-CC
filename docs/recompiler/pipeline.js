@@ -1,578 +1,369 @@
-// SWFRecomp In-Browser Pipeline
-// Phase 1: SWFRecomp.wasm (SWF → C files)
-// Phase 2: Clang via @wasmer/sdk (C → WASM)
-// Phase 3: WASI shim (run WASM, capture trace output)
+// SWFRecomp In-Browser Recompiler
+//   1. SWFRecomp.wasm (Emscripten build of the recompiler) turns the dropped
+//      SWF into C files inside MEMFS.
+//   2. The generated C is zipped together with the runtime snapshot served
+//      from ./bundle/ (see SWFRecomp/scripts/deploy_wasm_demo.sh) into a
+//      self-contained build bundle: ./build.sh + Emscripten -> WebGPU WASM page.
+//
+// The in-browser C -> WASM step (graphics host + in-browser clang) is a later
+// stage; see SWFRecompDocs/plans/in-browser-recompiler-refresh-assessment.md.
 
-import { createWASI } from "./wasi_shim.js";
-
+const FFLATE_URL = "https://unpkg.com/fflate@0.8.2/esm/browser.js";
+const GENERATED_DIRS = ["RecompiledTags", "RecompiledScripts", "RecompiledABC"];
 
 // --- UI helpers ---
 
-function setStep(stepId, state) {
-    const el = document.getElementById(stepId);
-    el.className = "status-step " + state;
-    if (state === "active") el.textContent = el.textContent.replace(/[^\w\s.]/g, "") + " ...";
-}
+const $ = (id) => document.getElementById(id);
 
-function showStatus() {
-    document.getElementById("status").classList.add("visible");
-}
-
-function showOutput(text) {
-    const container = document.getElementById("output-container");
-    container.classList.add("visible");
-    document.getElementById("output").textContent = text;
+function setStep(id, state, text) {
+    const el = $(id);
+    el.className = "status-line " + state;
+    if (text) el.textContent = text;
 }
 
 function showError(message) {
-    const container = document.getElementById("output-container");
-    container.classList.add("visible");
-    document.getElementById("output-label").textContent = "Error";
-    document.getElementById("output-label").style.color = "#ff6b6b";
-    document.getElementById("output").textContent = message;
+    const box = $("errorBox");
+    box.style.display = "block";
+    box.textContent = message;
 }
 
-// --- Phase 1: Recompile SWF → C files ---
-
-let recompilerModule = null;
-
-async function loadRecompiler() {
-    if (recompilerModule) return recompilerModule;
-
-    // SWFRecomp.js is an Emscripten UMD script (not an ES module).
-    // Load it via a script tag and access the global SWFRecompModule.
-    if (!globalThis.SWFRecompModule) {
-        await new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src = "SWFRecomp.js";
-            script.onload = resolve;
-            script.onerror = () => reject(new Error("Failed to load SWFRecomp.js"));
-            document.head.appendChild(script);
-        });
-    }
-
-    recompilerModule = await SWFRecompModule();
-    return recompilerModule;
+function clearError() {
+    $("errorBox").style.display = "none";
 }
 
-function recompileSWF(Module, swfBytes) {
-    // Clean up previous run
-    try { Module.FS.rmdir("RecompiledTags"); } catch {}
-    try { Module.FS.rmdir("RecompiledScripts"); } catch {}
-    for (const dir of ["RecompiledTags", "RecompiledScripts"]) {
-        try {
-            const files = Module.FS.readdir(dir).filter(f => f !== "." && f !== "..");
-            for (const f of files) Module.FS.unlink(`${dir}/${f}`);
-            Module.FS.rmdir(dir);
-        } catch {}
-    }
+function fmtSize(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
 
-    // Write SWF and config
+function safeName(fileName) {
+    const base = fileName.replace(/\.swf$/i, "").replace(/[^A-Za-z0-9_.-]+/g, "_");
+    return base || "swf";
+}
+
+// --- Build info ---
+
+let buildInfo = null;
+fetch("build_info.json").then(r => r.ok ? r.json() : null).then(info => {
+    if (!info) return;
+    buildInfo = info;
+    const d = new Date(info.built_at);
+    const date = d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    $("build-info").textContent = `Recompiler snapshot ${info.commit}, built ${date}`;
+}).catch(() => {});
+
+// --- Step 1: recompile SWF -> C (fresh module instance per run) ---
+
+let factoryLoaded = false;
+
+async function loadRecompilerFactory() {
+    if (factoryLoaded) return;
+    // SWFRecomp.js is an Emscripten MODULARIZE script exposing SWFRecompModule().
+    await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "SWFRecomp.js";
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Failed to load SWFRecomp.js"));
+        document.head.appendChild(script);
+    });
+    factoryLoaded = true;
+}
+
+function collectDir(FS, dir, prefix, out) {
+    let entries;
+    try {
+        entries = FS.readdir(dir).filter(f => f !== "." && f !== "..");
+    } catch {
+        return;
+    }
+    for (const name of entries) {
+        const full = `${dir}/${name}`;
+        const mode = FS.stat(full).mode;
+        if (FS.isDir(mode)) {
+            collectDir(FS, full, `${prefix}${name}/`, out);
+        } else {
+            out[`${prefix}${name}`] = FS.readFile(full);   // Uint8Array
+        }
+    }
+}
+
+async function recompileSWF(swfBytes) {
+    const logLines = [];
+    const Module = await SWFRecompModule({
+        print: (t) => logLines.push(t),
+        printErr: (t) => logLines.push(t),
+    });
+
     Module.FS.writeFile("input.swf", new Uint8Array(swfBytes));
-    Module.FS.writeFile("config.toml", [
+    const configToml = [
         "[input]",
         'path_to_swf = "input.swf"',
         'output_tags_folder = "RecompiledTags"',
         'output_scripts_folder = "RecompiledScripts"',
         "",
-    ].join("\n"));
+    ].join("\n");
+    Module.FS.writeFile("config.toml", configToml);
 
-    // Run recompiler
-    Module.callMain(["config.toml"]);
-
-    // Collect generated files
-    const files = {};
-    for (const dir of ["RecompiledTags", "RecompiledScripts"]) {
-        let entries;
-        try {
-            entries = Module.FS.readdir(dir).filter(f => f !== "." && f !== "..");
-        } catch {
-            continue;
-        }
-        for (const file of entries) {
-            const content = new TextDecoder().decode(Module.FS.readFile(`${dir}/${file}`));
-            files[file] = content;
-        }
-    }
-
-    return files;
-}
-
-// --- Phase 2: Compile C → WASM via @wasmer/sdk ---
-
-let wasmerInited = false;
-let clangPkg = null;
-
-// Intercept both fetch() and XHR to the Wasmer registry and return a
-// pre-computed response. Firefox includes User-Agent in CORS preflight
-// headers, and registry.wasmer.io doesn't allow it, so the request is
-// impossible. We bypass the registry entirely with a cached real response.
-let _cachedRegistryResponse = null;
-async function getRegistryResponse() {
-    if (!_cachedRegistryResponse) {
-        const resp = await _originalFetch("./clang_registry_response.json");
-        _cachedRegistryResponse = await resp.text();
-    }
-    return _cachedRegistryResponse;
-}
-
-// Patch fetch()
-const _originalFetch = globalThis.fetch;
-globalThis.fetch = function(input, init) {
-    const url = typeof input === "string" ? input : (input instanceof Request ? input.url : "");
-    if (url.includes("registry.wasmer.io")) {
-        return getRegistryResponse().then(body => {
-            return new Response(body, {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-            });
-        });
-    }
-    return _originalFetch.call(this, input, init);
-};
-
-// Patch XHR (fallback — SDK may retry with XHR if fetch path fails)
-const _xhrOpen = XMLHttpRequest.prototype.open;
-const _xhrSend = XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-    this._targetUrl = typeof url === "string" ? url : "";
-    return _xhrOpen.call(this, method, url, ...rest);
-};
-XMLHttpRequest.prototype.send = function(body) {
-    if (this._targetUrl.includes("registry.wasmer.io")) {
-        const xhr = this;
-        getRegistryResponse().then(responseText => {
-            setTimeout(() => {
-                Object.defineProperties(xhr, {
-                    readyState: { get: () => 4 },
-                    status: { get: () => 200 },
-                    statusText: { get: () => "OK" },
-                    responseText: { get: () => responseText },
-                    response: { get: () => responseText },
-                });
-                xhr.dispatchEvent(new Event("readystatechange"));
-                xhr.dispatchEvent(new Event("load"));
-                xhr.dispatchEvent(new Event("loadend"));
-            }, 0);
-        });
-        return;
-    }
-    return _xhrSend.call(this, body);
-};
-
-// Monkey-patch WebAssembly.Module to log the real error before the SDK
-// crashes trying to stringify it (module.rs:74 unwrap-on-None bug).
-const _OrigWasmModule = WebAssembly.Module;
-WebAssembly.Module = function(bytes) {
+    let exitCode = 0;
+    let failure = null;
     try {
-        return new _OrigWasmModule(bytes);
-    } catch(e) {
-        console.error("[WebAssembly.Module INTERCEPTED]", e);
-        console.error("  type:", e?.constructor?.name);
-        console.error("  message:", e?.message);
-        const input = bytes instanceof ArrayBuffer ? bytes : (bytes?.buffer || bytes);
-        console.error("  input size:", input?.byteLength, "bytes");
-        throw e;
-    }
-};
-WebAssembly.Module.prototype = _OrigWasmModule.prototype;
-Object.setPrototypeOf(WebAssembly.Module, _OrigWasmModule);
-
-async function initWasmer() {
-    if (wasmerInited) return;
-
-    const { init } = await import("https://unpkg.com/@wasmer/sdk@0.8.0-beta.1/dist/index.mjs");
-    await init({});
-    wasmerInited = true;
-}
-
-async function loadClang() {
-    if (clangPkg) return clangPkg;
-
-    const { Wasmer } = await import("https://unpkg.com/@wasmer/sdk@0.8.0-beta.1/dist/index.mjs");
-    clangPkg = await Wasmer.fromRegistry("clang/clang");
-    return clangPkg;
-}
-
-async function compileToWasm(generatedFiles, setStatus) {
-    if (!setStatus) setStatus = () => {};
-    const { Directory } = await import("https://unpkg.com/@wasmer/sdk@0.8.0-beta.1/dist/index.mjs");
-
-    const clang = await loadClang();
-    setStatus("Setting up project files");
-    const project = new Directory();
-
-    // All paths are relative to the Directory root.
-    // The Directory is mounted at /project, so "libswfruntime.a" -> /project/libswfruntime.a
-
-    // Write pre-compiled runtime library
-    const libResponse = await fetch("./libswfruntime.a");
-    const libBytes = new Uint8Array(await libResponse.arrayBuffer());
-    await project.writeFile("libswfruntime.a", libBytes);
-
-    // Write runtime headers/support files needed during compilation.
-    const runtimeHeaders = ["unicode_case_tables.h", "map.h", "o1heap.h"];
-    for (const f of runtimeHeaders) {
-        const resp = await fetch(`./runtime_src/${f}`);
-        const bytes = new Uint8Array(await resp.arrayBuffer());
-        await project.writeFile(f, bytes);
-    }
-
-    // Write pre-compiled .o files for large runtime sources.
-    // action.c (~10K lines) and object.c (~3K lines) are too large for
-    // in-WASI clang. They're pre-compiled offline with matching flags.
-    for (const f of ["action.o", "object.o"]) {
-        const resp = await fetch(`./runtime_src/${f}`);
-        const bytes = new Uint8Array(await resp.arrayBuffer());
-        await project.writeFile(f, bytes);
-    }
-
-    // Write runtime headers (paths like "include/common.h" -> /project/include/common.h)
-    // Create parent directories first (Directory doesn't auto-create them)
-    const headerDirs = new Set();
-    const headerList = await fetch("./runtime_headers/manifest.json").then(r => r.json());
-    for (const { path } of headerList) {
-        const dir = path.substring(0, path.lastIndexOf("/"));
-        if (dir) headerDirs.add(dir);
-    }
-    for (const dir of [...headerDirs].sort()) {
-        await project.createDir(dir);
-    }
-
-    for (const { path, file } of headerList) {
-        const resp = await fetch(`./runtime_headers/${file}`);
-        const bytes = new Uint8Array(await resp.arrayBuffer());
-        await project.writeFile(path, bytes);
-    }
-
-    // Write main.c wrapper
-    const mainResp = await fetch("./runtime_src/main.c");
-    await project.writeFile("main.c", new Uint8Array(await mainResp.arrayBuffer()));
-
-    // Write generated files
-    for (const [name, content] of Object.entries(generatedFiles)) {
-        await project.writeFile(name, new TextEncoder().encode(content));
-    }
-
-    // Collect .c files to compile in-browser.
-    // action.c (~10K lines) and object.c (~3K lines) are too large for
-    // in-WASI clang (cc1 crashes with exit 45, likely OOM). These are
-    // runtime files that don't change per-SWF — pre-compile them offline.
-    const cFiles = [
-        "main.c",
-        ...Object.keys(generatedFiles).filter(f => f.endsWith(".c")),
-    ];
-
-    // The clang entrypoint (slim driver) has preset main-args that include
-    // -pthread, --shared-memory, etc. The resulting WASM binary imports
-    // shared memory and wasix_32v1 threading functions. The WASI shim
-    // handles these with appropriate stubs.
-    const clangCmd = clang.entrypoint;
-
-    // Helper: run a command via cmd.run(), return wait() result
-    async function runCmd(cmd, args, opts) {
-        const instance = await cmd.run({ args, ...opts });
-        return await instance.wait();
-    }
-
-    const mounts = { "/project": project };
-
-    console.log("[DEBUG] crossOriginIsolated:", globalThis.crossOriginIsolated);
-    console.log("[DIAG] clang package commands:", Object.keys(clang.commands || {}));
-    console.log("[DIAG] .c files to compile:", cFiles);
-
-    // Compile all generated .c files + link in a single invocation.
-    setStatus(`Compiling ${cFiles.length} files and linking`);
-
-    const compileResult = await runCmd(clangCmd, [
-        ...cFiles.map(f => `/project/${f}`),
-        "-DNO_GRAPHICS",
-        "-include", "string.h",
-        "-include", "strings.h",
-        "-I/project",
-        "-I/project/include",
-        "-I/project/include/actionmodern",
-        "-I/project/include/libswf",
-        "-I/project/include/memory",
-        "-O0",
-        "-w",
-        "/project/action.o",
-        "/project/object.o",
-        "/project/libswfruntime.a",
-        "-o", "/project/output.wasm",
-    ], { mount: mounts });
-    console.log(`[COMPILE+LINK] ok=${compileResult.ok} code=${compileResult.code}`);
-    console.log(`[COMPILE+LINK] stdout=`, compileResult.stdout || "(empty)");
-    console.log(`[COMPILE+LINK] stderr=`, compileResult.stderr || "(empty)");
-    if (!compileResult.ok) {
-        throw new Error(`Compile+link failed (code ${compileResult.code}):\n${compileResult.stderr || compileResult.stdout || "(no output)"}`);
-    }
-
-    // readFile path is relative to the Directory root, not the mount point
-    return await project.readFile("output.wasm");
-}
-
-// --- Phase 3: Run WASM, capture trace output ---
-
-function extractTraceOutput(stdout) {
-    const lines = stdout.split("\n");
-    const trace = [];
-    for (const line of lines) {
-        if (line.startsWith("[") || line.startsWith("===") ||
-            line.startsWith("SWF Runtime") || line.startsWith("WASM SWF")) {
-            continue;
-        }
-        trace.push(line);
-    }
-    // Trim leading/trailing blank lines
-    while (trace.length && trace[trace.length - 1] === "") trace.pop();
-    while (trace.length && trace[0] === "") trace.shift();
-    return trace.join("\n");
-}
-
-// --- Graphics pipeline integration ---
-
-async function processSwfGraphics(swfBytes) {
-    const { initWasmer: gfxInitWasmer, loadClang: gfxLoadClang,
-            compileGuestModule, runGraphicsGuest } = await import("./pipeline_graphics.js");
-
-    showStatus();
-    const steps = ["step-recompile", "step-compile", "step-run"];
-    steps.forEach(s => setStep(s, ""));
-
-    try {
-        // Phase 1: Recompile SWF → C (same as trace)
-        setStep("step-recompile", "active");
-        const RecompModule = await loadRecompiler();
-        const generatedFiles = recompileSWF(RecompModule, swfBytes);
-        const fileCount = Object.keys(generatedFiles).length;
-        setStep("step-recompile", "done");
-        document.getElementById("step-recompile").textContent =
-            `Recompiled SWF to ${fileCount} C files`;
-
-        // Phase 2: Compile guest WASM
-        setStep("step-compile", "active");
-        const compileStatus = document.getElementById("step-compile");
-        const setCompileStatus = (msg) => { compileStatus.textContent = msg + " ..."; };
-        setCompileStatus("Initializing Wasmer SDK");
-        await gfxInitWasmer();
-        setCompileStatus("Loading Clang compiler (~100 MB)");
-        await gfxLoadClang();
-        const guestWasm = await compileGuestModule(generatedFiles, setCompileStatus);
-        setStep("step-compile", "done");
-        document.getElementById("step-compile").textContent =
-            `Compiled guest to WASM (${(guestWasm.length / 1024).toFixed(0)} KB)`;
-
-        // Phase 3: Load host + instantiate guest + run
-        document.getElementById("step-run").style.display = "";
-        setStep("step-run", "active");
-        document.getElementById("step-run").textContent = "Loading graphics host + running...";
-        await runGraphicsGuest(guestWasm);
-        setStep("step-run", "done");
-
+        exitCode = Module.callMain(["config.toml"]) || 0;
     } catch (e) {
-        console.error(e);
-        const currentStep = steps.find(s =>
-            document.getElementById(s).classList.contains("active"));
-        if (currentStep) setStep(currentStep, "error");
-        showError(e.message);
-    }
-}
-
-// --- Main pipeline ---
-
-function getSelectedMode() {
-    return document.querySelector('input[name="mode"]:checked')?.value || "trace";
-}
-
-// Detect if generated files indicate graphics content
-function detectGraphicsFromFiles(generatedFiles) {
-    const draws = generatedFiles["draws.c"] || "";
-    // shape_data[1] = empty placeholder (trace), shape_data[N>1] = real shapes (graphics)
-    const match = draws.match(/shape_data\[(\d+)\]/);
-    if (match && parseInt(match[1]) > 1) return true;
-    // Also check for tagDefineShape in tagMain.c
-    const tagMain = generatedFiles["tagMain.c"] || "";
-    if (tagMain.includes("tagDefineShape")) return true;
-    return false;
-}
-
-async function processSwf(swfBytes, modeOverride) {
-    let mode = modeOverride || getSelectedMode();
-
-    // Auto mode: use override from demo list if provided,
-    // otherwise default to graphics (any real SWF has visual content).
-    if (mode === "auto" && !modeOverride) {
-        mode = "graphics";
-    }
-
-    if (mode === "graphics") {
-        return processSwfGraphics(swfBytes);
-    }
-    showStatus();
-    const steps = ["step-recompile", "step-compile", "step-run"];
-    steps.forEach(s => setStep(s, ""));
-    document.getElementById("step-run").style.display = "none";
-
-    try {
-        // Phase 1: Recompile SWF → C
-        setStep("step-recompile", "active");
-        const Module = await loadRecompiler();
-        const generatedFiles = recompileSWF(Module, swfBytes);
-        const fileCount = Object.keys(generatedFiles).length;
-        setStep("step-recompile", "done");
-        document.getElementById("step-recompile").textContent =
-            `Recompiled SWF to ${fileCount} C files`;
-
-        // Phase 2: Compile C → WASM
-        setStep("step-compile", "active");
-        const compileStatus = document.getElementById("step-compile");
-        const setCompileStatus = (msg) => { compileStatus.textContent = msg + " ..."; };
-        setCompileStatus("Initializing Wasmer SDK");
-        await initWasmer();
-        setCompileStatus("Loading Clang compiler (~100 MB)");
-        const wasmBytes = await compileToWasm(generatedFiles, setCompileStatus);
-        setStep("step-compile", "done");
-        document.getElementById("step-compile").textContent =
-            `Compiled to WASM (${(wasmBytes.length / 1024).toFixed(0)} KB)`;
-
-        // Phase 3: Run WASM
-        document.getElementById("step-run").style.display = "";
-        setStep("step-run", "active");
-        console.log(`[PHASE 3] Running WASM (${wasmBytes.length} bytes)`);
-        const wasi = createWASI();
-        const result = await wasi.run(wasmBytes);
-        console.log(`[PHASE 3] exitCode=${result.exitCode}`);
-        console.log(`[PHASE 3] stdout=${JSON.stringify(result.stdout)}`);
-        console.log(`[PHASE 3] stderr=${JSON.stringify(result.stderr)}`);
-        setStep("step-run", "done");
-
-        const trace = extractTraceOutput(result.stdout);
-        if (trace) {
-            showOutput(trace);
+        if (e && e.name === "ExitStatus") {
+            exitCode = e.status;
         } else {
-            showOutput("(no trace output)");
+            failure = e;
         }
+    }
 
-        if (result.stderr) {
-            console.warn("stderr:", result.stderr);
+    const files = {};
+    for (const dir of GENERATED_DIRS) collectDir(Module.FS, dir, `${dir}/`, files);
+
+    const log = logLines.join("\n");
+    if (failure) {
+        throw new Error(`Recompiler crashed: ${failure.message || failure}\n\n${log}`);
+    }
+    if (exitCode !== 0 || Object.keys(files).length === 0) {
+        throw new Error(`Recompiler exited with code ${exitCode} and produced ${Object.keys(files).length} files.\n\n${log}`);
+    }
+    return { files, log, configToml };
+}
+
+// --- Step 2: zip bundles ---
+
+let fflate = null;
+async function loadFflate() {
+    if (!fflate) fflate = await import(FFLATE_URL);
+    return fflate;
+}
+
+let bundleManifest = null;
+async function loadBundleManifest() {
+    if (bundleManifest) return bundleManifest;
+    const r = await fetch("bundle/manifest.json");
+    if (!r.ok) throw new Error("bundle/manifest.json not found — the page was deployed without the runtime snapshot");
+    bundleManifest = await r.json();
+    return bundleManifest;
+}
+
+// Fetch every runtime snapshot file (with limited concurrency); returns
+// {relativePath: Uint8Array}.
+async function fetchBundleFiles(onProgress) {
+    const manifest = await loadBundleManifest();
+    const out = {};
+    let done = 0;
+    const queue = manifest.slice();
+    const worker = async () => {
+        while (queue.length) {
+            const { path } = queue.shift();
+            const r = await fetch(`bundle/${path}`);
+            if (!r.ok) throw new Error(`Failed to fetch bundle/${path} (${r.status})`);
+            out[path] = new Uint8Array(await r.arrayBuffer());
+            done++;
+            if (onProgress) onProgress(done, manifest.length);
         }
+    };
+    await Promise.all(Array.from({ length: 8 }, worker));
+    return out;
+}
 
+function triggerDownload(bytes, fileName) {
+    const blob = new Blob([bytes], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function zipEntries(entries) {
+    // entries: {path: Uint8Array}; build.sh gets the executable bit.
+    const tree = {};
+    for (const [path, bytes] of Object.entries(entries)) {
+        // os: 3 (Unix) makes unzip honour the mode in the external attrs, so
+        // every entry needs one: 0644 for files, 0755 for the build script.
+        const mode = path.endsWith("/build.sh") ? 0o755 : 0o644;
+        tree[path] = [bytes, { level: 6, attrs: (0o100000 | mode) << 16 }];
+    }
+    return fflate.zipSync(tree, { os: 3 });
+}
+
+async function downloadSources(result) {
+    await loadFflate();
+    const root = `${result.name}/`;
+    const entries = {};
+    for (const [p, b] of Object.entries(result.files)) entries[root + p] = b;
+    entries[root + `${result.name}.swf`] = new Uint8Array(result.swfBytes);
+    entries[root + "config.toml"] = new TextEncoder().encode(result.configToml);
+    entries[root + "recompiler.log"] = new TextEncoder().encode(result.log);
+    triggerDownload(zipEntries(entries), `${result.name}-recompiled-c.zip`);
+}
+
+async function downloadBundle(result, setHint) {
+    await loadFflate();
+    const runtime = await fetchBundleFiles((d, n) => setHint(`Fetching runtime snapshot ${d}/${n}`));
+    setHint("Zipping");
+    const root = `${result.name}/`;
+    const entries = {};
+    for (const [p, b] of Object.entries(runtime)) {
+        if (p === "manifest.json") continue;
+        entries[root + p] = b;
+    }
+    for (const [p, b] of Object.entries(result.files)) entries[root + p] = b;
+    entries[root + `${result.name}.swf`] = new Uint8Array(result.swfBytes);
+    entries[root + "config.toml"] = new TextEncoder().encode(result.configToml);
+    entries[root + "recompiler.log"] = new TextEncoder().encode(result.log);
+    entries[root + "NAME"] = new TextEncoder().encode(result.name + "\n");
+    entries[root + "BUNDLE_INFO.json"] = new TextEncoder().encode(JSON.stringify({
+        name: result.name,
+        source_swf: result.sourceLabel,
+        avm2: Object.keys(result.files).some(p => p.startsWith("RecompiledABC/")),
+        recompiler_snapshot: buildInfo,
+        created_at: new Date().toISOString(),
+    }, null, 2) + "\n");
+    const zipped = zipEntries(entries);
+    triggerDownload(zipped, `${result.name}-swfrecomp-bundle.zip`);
+    setHint(`Bundle: ${fmtSize(zipped.length)} zipped`);
+}
+
+// --- Main flow ---
+
+let currentResult = null;
+
+function renderResult(result) {
+    const rows = Object.entries(result.files).sort(([a], [b]) => a.localeCompare(b));
+    let total = 0;
+    $("fileRows").innerHTML = rows.map(([p, b]) => {
+        total += b.length;
+        return `<tr><td>${p}</td><td class="size">${fmtSize(b.length)}</td></tr>`;
+    }).join("") + `<tr><td><b>${rows.length} files</b></td><td class="size"><b>${fmtSize(total)}</b></td></tr>`;
+    $("log").textContent = result.log || "(no output)";
+    $("dlHint").textContent = "";
+    $("result").classList.add("visible");
+}
+
+async function processSwf(swfBytes, name, sourceLabel) {
+    clearError();
+    currentResult = null;
+    $("result").classList.remove("visible");
+    $("status").classList.add("visible");
+    setStep("step-load", "active", "Loading recompiler ...");
+    setStep("step-recompile", "", "Recompiling SWF to C");
+    try {
+        await loadRecompilerFactory();
+        setStep("step-load", "done", "Recompiler loaded");
+        setStep("step-recompile", "active", "Recompiling SWF to C ...");
+        const t0 = performance.now();
+        const { files, log, configToml } = await recompileSWF(swfBytes);
+        const ms = Math.round(performance.now() - t0);
+        const isAvm2 = Object.keys(files).some(p => p.startsWith("RecompiledABC/"));
+        setStep("step-recompile", "done",
+            `Recompiled ${sourceLabel} to ${Object.keys(files).length} C files in ${ms} ms (${isAvm2 ? "AVM2 / AS3" : "AVM1"})`);
+        currentResult = { files, log, configToml, swfBytes, name, sourceLabel };
+        renderResult(currentResult);
     } catch (e) {
         console.error(e);
-        const currentStep = steps.find(s =>
-            document.getElementById(s).classList.contains("active"));
-        if (currentStep) setStep(currentStep, "error");
+        const active = ["step-load", "step-recompile"].find(id => $(id).classList.contains("active"));
+        if (active) setStep(active, "error");
         showError(e.message);
     }
 }
+
+$("dlBundleBtn").addEventListener("click", async () => {
+    if (!currentResult) return;
+    const btn = $("dlBundleBtn");
+    btn.disabled = true;
+    try {
+        await downloadBundle(currentResult, (t) => { $("dlHint").textContent = t; });
+    } catch (e) {
+        console.error(e);
+        showError(e.message);
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+$("dlSourcesBtn").addEventListener("click", async () => {
+    if (!currentResult) return;
+    try {
+        await downloadSources(currentResult);
+    } catch (e) {
+        console.error(e);
+        showError(e.message);
+    }
+});
 
 // --- File drop / click handlers ---
 
-const dropZone = document.getElementById("dropZone");
-const fileInput = document.getElementById("fileInput");
+const dropZone = $("dropZone");
+const fileInput = $("fileInput");
 
 dropZone.addEventListener("click", () => fileInput.click());
-
-dropZone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    dropZone.classList.add("dragover");
-});
-
-dropZone.addEventListener("dragleave", () => {
-    dropZone.classList.remove("dragover");
-});
-
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
 dropZone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropZone.classList.remove("dragover");
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
 });
-
 fileInput.addEventListener("change", () => {
     const file = fileInput.files[0];
     if (file) handleFile(file);
 });
 
 function handleFile(file) {
-    if (!file.name.endsWith(".swf")) {
+    if (!file.name.toLowerCase().endsWith(".swf")) {
         showError("Please select a .swf file");
         return;
     }
     setListOpen(false);
     dropZone.querySelector("p").textContent = file.name;
-
     const reader = new FileReader();
-    reader.onload = () => processSwf(reader.result);
+    reader.onload = () => processSwf(reader.result, safeName(file.name), file.name);
     reader.readAsArrayBuffer(file);
 }
 
-// --- Demo search + run ---
+// --- Example SWF search (shared catalog with the demo pages) ---
 
-let demoList = { trace: [], graphics: [] };
+let demoList = [];     // [{name, kind, url}]
 let selectedDemo = null;
 
-// Load demo list from shared catalog
 fetch("../catalog.json").then(r => r.json()).then(data => {
-    var tests = data.tests || [];
-    demoList = {
-        trace: tests.filter(t => t.type === "trace").map(t => t.name),
-        graphics: tests.filter(t => t.type === "graphics").map(t => t.name),
-    };
+    demoList = (data.tests || []).map(t => ({
+        name: t.name,
+        kind: t.type,
+        url: t.type === "graphics" ? `../examples/graphics/${t.name}/test.swf` : `../examples/${t.name}/test.swf`,
+    }));
+    demoList.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "graphics" ? -1 : 1));
     updateDemoSearch();
 }).catch(() => {
-    demoList = { trace: ["add_swf_4"], graphics: ["keyboard_input"] };
+    demoList = [{ name: "keyboard_input", kind: "graphics", url: "../examples/graphics/keyboard_input/test.swf" }];
     updateDemoSearch();
 });
 
-const demoSearch = document.getElementById("demoSearch");
-const demoResults = document.getElementById("demoResults");
-
-function getEffectiveMode() {
-    const mode = getSelectedMode();
-    return mode === "auto" ? "trace" : mode;  // for demo list, auto shows trace
-}
-
-function getDemosForMode() {
-    const mode = getSelectedMode();
-    if (mode === "auto") {
-        // Show both lists combined, with graphics prefixed
-        return [
-            ...demoList.trace,
-            ...demoList.graphics.map(d => `graphics/${d}`),
-        ];
-    }
-    return mode === "graphics" ? demoList.graphics : demoList.trace;
-}
+const demoSearch = $("demoSearch");
+const demoResults = $("demoResults");
+const browseBtn = $("demoBrowseBtn");
 
 function updateDemoSearch() {
-    const demos = getDemosForMode();
-    const mode = getSelectedMode();
-    demoSearch.placeholder = `Search demos... (${demos.length} ${mode} tests)`;
-    if (selectedDemo && !demos.includes(selectedDemo)) {
-        selectedDemo = null;
-        demoSearch.value = "";
-    }
-    filterDemos();
+    demoSearch.placeholder = `Search example SWFs... (${demoList.length} available)`;
 }
 
 function highlightMatch(text, query) {
     if (!query) return text;
     const idx = text.toLowerCase().indexOf(query.toLowerCase());
     if (idx < 0) return text;
-    return text.slice(0, idx) +
-        `<span class="match">${text.slice(idx, idx + query.length)}</span>` +
-        text.slice(idx + query.length);
+    return text.slice(0, idx) + `<span class="match">${text.slice(idx, idx + query.length)}</span>` + text.slice(idx + query.length);
 }
-
-const browseBtn = document.getElementById("demoBrowseBtn");
 
 function setListOpen(open) {
     if (open) {
         filterDemos();
-        browseBtn.style.borderColor = "#4ecca3";
-        browseBtn.style.color = "#4ecca3";
     } else {
         demoResults.style.display = "none";
         browseBtn.style.borderColor = "#555";
@@ -580,111 +371,71 @@ function setListOpen(open) {
     }
 }
 
+function matches(query) {
+    const q = query.toLowerCase();
+    return q ? demoList.filter(d => d.name.toLowerCase().includes(q)) : demoList;
+}
+
 function filterDemos() {
     const query = demoSearch.value.trim();
-    const demos = getDemosForMode();
-    const filtered = query
-        ? demos.filter(d => d.toLowerCase().includes(query.toLowerCase()))
-        : demos;
-
-    if (filtered.length === 0) {
-        demoResults.innerHTML = `<div style="padding: 0.4rem 0.8rem; color: #666; font-size: 0.85em;">No matches</div>`;
-    } else {
-        demoResults.innerHTML = filtered.map(d =>
-            `<div class="demo-item${d === selectedDemo ? ' selected' : ''}" data-demo="${d}">${highlightMatch(d, query)}</div>`
+    const filtered = matches(query);
+    demoResults.innerHTML = filtered.length === 0
+        ? `<div style="padding: 0.4rem 0.8rem; color: #666; font-size: 0.85em;">No matches</div>`
+        : filtered.map(d =>
+            `<div class="demo-item${selectedDemo && d.name === selectedDemo.name && d.kind === selectedDemo.kind ? ' selected' : ''}" data-name="${d.name}" data-kind="${d.kind}">${highlightMatch(d.name, query)}<span class="kind">${d.kind}</span></div>`
         ).join("");
-    }
     demoResults.style.display = "block";
     browseBtn.style.borderColor = "#4ecca3";
     browseBtn.style.color = "#4ecca3";
 }
 
-function isListOpen() {
-    return demoResults.style.display !== "none";
-}
+function isListOpen() { return demoResults.style.display !== "none"; }
 
-demoSearch.addEventListener("input", () => { setListOpen(true); });
-demoSearch.addEventListener("focus", () => { setListOpen(true); });
-demoSearch.addEventListener("blur", () => {
-    setTimeout(() => { setListOpen(false); }, 200);
-});
-
+demoSearch.addEventListener("input", () => setListOpen(true));
+demoSearch.addEventListener("focus", () => setListOpen(true));
+demoSearch.addEventListener("blur", () => setTimeout(() => setListOpen(false), 200));
 browseBtn.addEventListener("click", () => {
-    if (isListOpen()) {
-        setListOpen(false);
-    } else {
-        setListOpen(true);
-        demoSearch.focus();
-    }
+    if (isListOpen()) setListOpen(false);
+    else { setListOpen(true); demoSearch.focus(); }
 });
 demoSearch.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
-        const demos = getDemosForMode();
-        const query = demoSearch.value.trim();
-        const match = query
-            ? demos.find(d => d.toLowerCase().includes(query.toLowerCase()))
-            : null;
+        const match = matches(demoSearch.value.trim())[0];
         if (match) {
             selectedDemo = match;
-            demoSearch.value = match;
+            demoSearch.value = match.name;
             demoResults.style.display = "none";
             runSelectedDemo();
         }
     }
 });
-
 demoResults.addEventListener("click", (e) => {
     const item = e.target.closest(".demo-item");
-    if (item) {
-        selectedDemo = item.dataset.demo;
-        demoSearch.value = selectedDemo;
-        setListOpen(false);
-    }
+    if (!item) return;
+    selectedDemo = demoList.find(d => d.name === item.dataset.name && d.kind === item.dataset.kind) || null;
+    if (selectedDemo) demoSearch.value = selectedDemo.name;
+    setListOpen(false);
 });
-
-document.querySelectorAll('input[name="mode"]').forEach(r =>
-    r.addEventListener("change", updateDemoSearch)
-);
 
 async function runSelectedDemo() {
     if (!selectedDemo) return;
-    const mode = getSelectedMode();
-
-    // Determine if this is a graphics demo
-    let isGraphics;
-    if (mode === "auto") {
-        isGraphics = selectedDemo.startsWith("graphics/");
-    } else {
-        isGraphics = mode === "graphics";
-    }
-
-    // Build the URL — strip "graphics/" prefix for the path
-    const demoName = selectedDemo.replace(/^graphics\//, "");
-    const swfUrl = isGraphics
-        ? `../examples/graphics/${demoName}/test.swf`
-        : `../examples/${demoName}/test.swf`;
-
-    dropZone.querySelector("p").textContent = `${selectedDemo}/test.swf`;
-    const resp = await fetch(swfUrl);
+    const label = `${selectedDemo.kind}/${selectedDemo.name}/test.swf`;
+    dropZone.querySelector("p").textContent = label;
+    const resp = await fetch(selectedDemo.url);
     if (!resp.ok) {
-        showError(`Could not load ${swfUrl}`);
+        showError(`Could not load ${selectedDemo.url}`);
         return;
     }
-    const bytes = await resp.arrayBuffer();
-    processSwf(bytes, isGraphics ? "graphics" : "trace");
+    processSwf(await resp.arrayBuffer(), safeName(selectedDemo.name), label);
 }
 
-document.getElementById("demoBtn").addEventListener("click", () => {
+$("demoBtn").addEventListener("click", () => {
     setListOpen(false);
-    if (selectedDemo) {
-        runSelectedDemo();
-    } else {
-        // Fallback: pick first demo
-        const demos = getDemosForMode();
-        if (demos.length > 0) {
-            selectedDemo = demos[0];
-            demoSearch.value = selectedDemo;
-            runSelectedDemo();
-        }
+    if (!selectedDemo) {
+        const match = matches(demoSearch.value.trim())[0];
+        if (!match) return;
+        selectedDemo = match;
+        demoSearch.value = match.name;
     }
+    runSelectedDemo();
 });

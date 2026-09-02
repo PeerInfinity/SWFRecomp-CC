@@ -1,7 +1,17 @@
 #!/bin/bash
-# Deploy the in-browser SWF recompiler demo
-# Packages SWFRecomp.wasm, libswfruntime.a, runtime sources, and headers
-set -e
+# Deploy the in-browser SWF recompiler page to docs/recompiler/.
+#
+# The page recompiles a dropped SWF to C entirely in the browser
+# (SWFRecomp.wasm) and offers a zip "build bundle": the generated C plus a
+# snapshot of the runtime sources and a build.sh that produces a WebGPU WASM
+# page locally with Emscripten. This script refreshes both halves from the
+# current tree so they always match:
+#   1. SWFRecomp.js/.wasm  (from build_wasm_recompiler.sh; pass --build to rebuild)
+#   2. docs/recompiler/bundle/  (runtime snapshot + build.sh + manifest.json)
+# and writes build_info.json (commit + timestamp shown on the page).
+#
+# Usage: deploy_wasm_demo.sh [--build]
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -9,192 +19,101 @@ PROJECT_ROOT="$(cd "${SWFRECOMP_ROOT}/.." && pwd)"
 SWFMODERN_ROOT="${PROJECT_ROOT}/SWFModernRuntime"
 SWFMODERN_SRC="${SWFMODERN_ROOT}/src"
 SWFMODERN_INC="${SWFMODERN_ROOT}/include"
+WRAPPERS="${SWFRECOMP_ROOT}/wasm_wrappers"
 
 DEMO_DIR="${PROJECT_ROOT}/docs/recompiler"
 BUILD_DIR="${SWFRECOMP_ROOT}/build_wasm"
+BUNDLE_DIR="${DEMO_DIR}/bundle"
 
-# Find WASI-SDK (needed for pre-compiling action.o/object.o)
-WASI_SDK="${PROJECT_ROOT}/wasi-sdk"
-if [ ! -d "${WASI_SDK}" ]; then
-    echo "ERROR: WASI-SDK not found at ${WASI_SDK}"
-    exit 1
-fi
-WASI_CC="${WASI_SDK}/bin/clang"
-WASI_SYSROOT="${WASI_SDK}/share/wasi-sysroot"
-
-# Check prerequisites
-if [ ! -f "${BUILD_DIR}/SWFRecomp.js" ] || [ ! -f "${BUILD_DIR}/SWFRecomp.wasm" ]; then
-    echo "ERROR: SWFRecomp.wasm not found. Run build_wasm_recompiler.sh first."
-    exit 1
+if [ "${1:-}" = "--build" ] || [ ! -f "${BUILD_DIR}/SWFRecomp.wasm" ]; then
+    echo "Building SWFRecomp.wasm..."
+    bash "${SCRIPT_DIR}/build_wasm_recompiler.sh"
 fi
 
-if [ ! -f "${BUILD_DIR}/libswfruntime.a" ]; then
-    echo "ERROR: libswfruntime.a not found. Run build_wasm_runtime_lib.sh first."
-    exit 1
-fi
-
-DEMO_SRC="${SWFRECOMP_ROOT}/wasm_recompiler_demo"
-
-echo "Deploying in-browser demo to ${DEMO_DIR}..."
+echo "Deploying in-browser recompiler to ${DEMO_DIR}..."
 mkdir -p "${DEMO_DIR}"
 
-# Copy demo page source files (if they exist in wasm_recompiler_demo/)
-DEMO_PAGE_FILES=(index.html pipeline.js wasi_shim.js coi-serviceworker.js serve.py)
-for f in "${DEMO_PAGE_FILES[@]}"; do
-    if [ -f "${DEMO_SRC}/${f}" ]; then
-        echo "  Copying ${f}..."
-        cp "${DEMO_SRC}/${f}" "${DEMO_DIR}/"
-    fi
-done
-
-# Copy demo SWF if present
-if [ -f "${DEMO_SRC}/add.swf" ]; then
-    cp "${DEMO_SRC}/add.swf" "${DEMO_DIR}/"
-fi
-
-# Copy Phase 1 output (SWFRecomp.wasm)
-echo "  Copying SWFRecomp.wasm..."
+# --- 1. Recompiler wasm ---
+echo "  Copying SWFRecomp.js / SWFRecomp.wasm..."
 cp "${BUILD_DIR}/SWFRecomp.js" "${DEMO_DIR}/SWFRecomp.js"
 cp "${BUILD_DIR}/SWFRecomp.wasm" "${DEMO_DIR}/SWFRecomp.wasm"
 
-# Copy pre-compiled runtime library
-echo "  Copying libswfruntime.a..."
-cp "${BUILD_DIR}/libswfruntime.a" "${DEMO_DIR}/libswfruntime.a"
+# Trace mode (in-browser clang + WASI) was removed 2026-09; drop its artifacts
+# if a previous deploy left them behind.
+rm -f "${DEMO_DIR}/libswfruntime.a" "${DEMO_DIR}/wasi_shim.js"
+rm -rf "${DEMO_DIR}/runtime_src"
 
-# Copy runtime source files (action.c/object.c too large for in-browser Clang)
-echo "  Copying runtime sources..."
-mkdir -p "${DEMO_DIR}/runtime_src"
-cp "${SWFMODERN_SRC}/actionmodern/action.c" "${DEMO_DIR}/runtime_src/"
-cp "${SWFMODERN_SRC}/actionmodern/object.c" "${DEMO_DIR}/runtime_src/"
-cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${DEMO_DIR}/runtime_src/"
-cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${DEMO_DIR}/runtime_src/"
-cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.h" "${DEMO_DIR}/runtime_src/"
-cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${DEMO_DIR}/runtime_src/"
+# --- 2. Build bundle: runtime snapshot + build script ---
+echo "  Assembling build bundle snapshot..."
+rm -rf "${BUNDLE_DIR}"
+RT="${BUNDLE_DIR}/runtime"
+mkdir -p "${RT}/src" "${RT}/lib/c-hashmap" "${RT}/lib/o1heap" "${RT}/lib/stb" "${RT}/third_party"
 
-# Pre-compile action.o and object.o (too large for in-browser Clang)
-echo "  Pre-compiling action.o and object.o..."
-WASI_CFLAGS=(
-    --target=wasm32-wasi
-    --sysroot="${WASI_SYSROOT}"
-    -DNO_GRAPHICS
-    -I"${SWFMODERN_INC}"
-    -I"${SWFMODERN_INC}/actionmodern"
-    -I"${SWFMODERN_INC}/libswf"
-    -I"${SWFMODERN_INC}/memory"
-    -I"${SWFMODERN_ROOT}/lib/c-hashmap"
-    -I"${SWFMODERN_ROOT}/lib/o1heap"
-    -I"${SWFMODERN_SRC}/actionmodern"
-    -mllvm -wasm-enable-sjlj
-    -matomics -mbulk-memory
-    -std=gnu17
-    -O2
-    -w
+cp "${WRAPPERS}/bundle/build.sh" "${WRAPPERS}/bundle/README.md" "${BUNDLE_DIR}/"
+chmod +x "${BUNDLE_DIR}/build.sh"
+cp "${WRAPPERS}/main.c" "${WRAPPERS}/display_bridge.c" "${WRAPPERS}/swf_bridge.js" \
+   "${WRAPPERS}/index_template_graphics.html" "${RT}/"
+
+# Runtime sources: the union of build_test.sh (wasm --graphics) and
+# build_wasm_avm2.sh source lists. build.sh picks the subset per SWF.
+RUNTIME_C=(
+    actionmodern/action.c actionmodern/math.c actionmodern/date.c
+    actionmodern/registered_class.c actionmodern/timer.c actionmodern/variables.c
+    actionmodern/avm1_amf.c actionmodern/object.c actionmodern/action_queue.c
+    actionmodern/sprite_frame_scripts.c actionmodern/image_decode.c
+    actionmodern/video_codec.c actionmodern/unicode_case_tables.h
+    utils.c amf_packet.c
+    libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
+    libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c
+    libswf/stb_image_impl.c
+    audio/audio.c audio/audio_output_web.c
+    rendering/render_webgpu.c
+    memory/heap.c
 )
-"${WASI_CC}" "${WASI_CFLAGS[@]}" -c "${SWFMODERN_SRC}/actionmodern/action.c" -o "${DEMO_DIR}/runtime_src/action.o"
-"${WASI_CC}" "${WASI_CFLAGS[@]}" -c "${SWFMODERN_SRC}/actionmodern/object.c" -o "${DEMO_DIR}/runtime_src/object.o"
+for f in "${RUNTIME_C[@]}"; do
+    mkdir -p "${RT}/src/$(dirname "${f}")"
+    cp "${SWFMODERN_SRC}/${f}" "${RT}/src/${f}"
+done
+mkdir -p "${RT}/src/avm2"
+cp "${SWFMODERN_SRC}/avm2"/*.c "${RT}/src/avm2/"
+cp -r "${SWFMODERN_INC}" "${RT}/include"
+cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${SWFMODERN_ROOT}/lib/c-hashmap/map.h" "${RT}/lib/c-hashmap/"
+cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${RT}/lib/o1heap/"
+cp "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${RT}/lib/stb/"
+for tp in libtess2 quickjs-libregexp lzma; do
+    mkdir -p "${RT}/third_party/${tp}"
+    cp "${SWFMODERN_ROOT}/third_party/${tp}"/*.c "${SWFMODERN_ROOT}/third_party/${tp}"/*.h "${RT}/third_party/${tp}/" 2>/dev/null || true
+done
 
-# Copy runtime headers for the include paths
-echo "  Copying runtime headers..."
-mkdir -p "${DEMO_DIR}/runtime_headers"
+# manifest.json: every bundle file with its size (the page fetches these and
+# zips them together with the generated C).
+python3 - "${BUNDLE_DIR}" <<'EOF'
+import json, os, sys
+root = sys.argv[1]
+entries = []
+for dp, _, fns in os.walk(root):
+    for fn in sorted(fns):
+        p = os.path.join(dp, fn)
+        rel = os.path.relpath(p, root).replace(os.sep, "/")
+        entries.append({"path": rel, "size": os.path.getsize(p)})
+entries.sort(key=lambda e: e["path"])
+with open(os.path.join(root, "manifest.json"), "w") as f:
+    json.dump(entries, f, indent=0)
+total = sum(e["size"] for e in entries)
+print(f"    {len(entries)} files, {total/1024/1024:.1f} MB")
+EOF
 
-# Build header manifest (maps virtual FS path → local filename)
-MANIFEST="["
-
-copy_header() {
-    local src="$1"
-    local vpath="$2"
-    local fname=$(basename "$src")
-    # Handle duplicate filenames by prefixing with directory
-    local unique_name="${vpath//\//_}"
-    unique_name="${unique_name#_}"  # Remove leading underscore
-    cp "$src" "${DEMO_DIR}/runtime_headers/${unique_name}"
-    MANIFEST="${MANIFEST}{\"path\":\"${vpath}\",\"file\":\"${unique_name}\"},"
-}
-
-# Headers are written to include/... inside the Wasmer Directory (mounted at /project)
-# so Clang can find them via -I/project/include, -I/project/include/actionmodern, etc.
-
-# Main include directory
-copy_header "${SWFMODERN_INC}/common.h" "include/common.h"
-copy_header "${SWFMODERN_INC}/utils.h" "include/utils.h"
-
-# actionmodern headers
-copy_header "${SWFMODERN_INC}/actionmodern/action.h" "include/actionmodern/action.h"
-copy_header "${SWFMODERN_INC}/actionmodern/object.h" "include/actionmodern/object.h"
-copy_header "${SWFMODERN_INC}/actionmodern/stackvalue.h" "include/actionmodern/stackvalue.h"
-copy_header "${SWFMODERN_INC}/actionmodern/variables.h" "include/actionmodern/variables.h"
-
-# libswf headers
-copy_header "${SWFMODERN_INC}/libswf/recomp.h" "include/libswf/recomp.h"
-copy_header "${SWFMODERN_INC}/libswf/swf.h" "include/libswf/swf.h"
-copy_header "${SWFMODERN_INC}/libswf/tag.h" "include/libswf/tag.h"
-copy_header "${SWFMODERN_INC}/libswf/hit_test.h" "include/libswf/hit_test.h"
-
-# memory headers
-copy_header "${SWFMODERN_INC}/memory/heap.h" "include/memory/heap.h"
-
-# Close manifest JSON
-MANIFEST="${MANIFEST%,}]"
-echo "${MANIFEST}" > "${DEMO_DIR}/runtime_headers/manifest.json"
-
-# --- Demo manifest ---
-echo "  Generating demos.json..."
-python3 -c "
-import os, json
-examples = '${PROJECT_ROOT}/docs/examples'
-trace = sorted([d for d in os.listdir(examples)
-    if d != 'graphics' and os.path.isdir(os.path.join(examples, d))
-    and os.path.exists(os.path.join(examples, d, 'test.swf'))])
-graphics_dir = os.path.join(examples, 'graphics')
-graphics = sorted([d for d in os.listdir(graphics_dir)
-    if os.path.isdir(os.path.join(graphics_dir, d))
-    and os.path.exists(os.path.join(graphics_dir, d, 'test.swf'))]) if os.path.isdir(graphics_dir) else []
-with open('${DEMO_DIR}/demos.json', 'w') as f:
-    json.dump({'trace': trace, 'graphics': graphics}, f)
-print(f'    {len(trace)} trace, {len(graphics)} graphics demos')
-"
-
-# --- Graphics host module ---
-GRAPHICS_HOST_DIR="${SWFRECOMP_ROOT}/build_graphics_host"
-if [ -f "${GRAPHICS_HOST_DIR}/graphics_host.js" ] && [ -f "${GRAPHICS_HOST_DIR}/graphics_host.wasm" ]; then
-    echo "  Copying graphics host module..."
-    cp "${GRAPHICS_HOST_DIR}/graphics_host.js" "${DEMO_DIR}/"
-    cp "${GRAPHICS_HOST_DIR}/graphics_host.wasm" "${DEMO_DIR}/"
-
-    # Graphics guest support files
-    echo "  Copying graphics guest support files..."
-    mkdir -p "${DEMO_DIR}/runtime_src_graphics"
-    cp "${SWFRECOMP_ROOT}/wasm_wrappers/guest_main_graphics.c" "${DEMO_DIR}/runtime_src_graphics/"
-    cp "${SWFRECOMP_ROOT}/wasm_wrappers/bridge_globals.h" "${DEMO_DIR}/runtime_src_graphics/"
-
-    # Pre-compiled bridge_globals.o
-    if [ -f "${BUILD_DIR}/bridge_globals.o" ]; then
-        cp "${BUILD_DIR}/bridge_globals.o" "${DEMO_DIR}/runtime_src_graphics/"
-    fi
-else
-    echo "  (Skipping graphics host — not built yet)"
-fi
-
-# Write build info for the deploy timestamp display
-echo "  Writing build_info.json..."
-cat > "${DEMO_DIR}/build_info.json" << ENDJSON
+# --- 3. Build info (shown in the page footer, embedded in each bundle) ---
+COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+cat > "${DEMO_DIR}/build_info.json" <<ENDJSON
 {
-  "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "commit": "$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "unknown")",
-  "source": "local"
+  "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "commit": "${COMMIT}",
+  "recompiler_wasm_bytes": $(stat --printf='%s' "${DEMO_DIR}/SWFRecomp.wasm")
 }
 ENDJSON
 
 echo ""
-echo "Demo deployed. Files:"
-find "${DEMO_DIR}" -type f | sort | while read f; do
-    size=$(stat --printf="%s" "$f" 2>/dev/null || stat -f "%z" "$f" 2>/dev/null)
-    printf "  %-50s %s\n" "${f#${DEMO_DIR}/}" "$(numfmt --to=iec-i --suffix=B $size 2>/dev/null || echo "${size}B")"
-done
-
-echo ""
-echo "To serve locally (with COOP/COEP headers for SharedArrayBuffer):"
-echo "  python3 ${DEMO_SRC}/serve.py 8080"
-echo "  (then open http://localhost:8080/recompiler/)"
-echo ""
-echo "The demo is deployed to docs/recompiler/ for GitHub Pages hosting."
+echo "Deployed. Test locally with:"
+echo "  (cd ${PROJECT_ROOT}/docs && python3 -m http.server 8010)   # http://localhost:8010/recompiler/"
+echo "Then commit docs/recompiler/ and dispatch the 'Deploy GitHub Pages' workflow."
