@@ -274,3 +274,28 @@ at a host-chosen address (`--global-base` = a static 96 MB arena in the host).
   error pointing at the downloadable bundle.
 - Chrome 137+ only (JSPI, SharedArrayBuffer via coi-serviceworker, WebGPU); the page
   checks for `WebAssembly.Suspending` and says so.
+
+## 8. Real games through the page (2026-09-02)
+
+Both originals, dropped on the page (file input), in-browser recompile → bundle
+zip → local `build.sh` → Chrome; Doodle Jump additionally through the in-browser
+build:
+
+| SWF | In-browser recompile | Bundle | Local build.sh | In-browser run |
+|---|---|---|---|---|
+| Doodle Jump (flasharchive, 650 KB, AVM1) | 3 s, 48 files, 19 MB C | 4.3 MB | OK, title screen renders | OK: 46 files compile in 61 s, title screen renders |
+| Seedling (Newgrounds 598977, 7.8 MB, AS3) | 65 s, 16 files, 182 MB C | 33 MB | see below | refused with the AS3 message (host is AVM1-only) |
+
+Two recompiler-wasm bugs surfaced by Seedling, both fixed in `SWFRecomp/CMakeLists.txt`:
+- **C++ exceptions were disabled in the Emscripten build**, so an exception the
+  recompiler throws *and catches internally* escaped `main()` as an opaque JS number
+  (`Recompiler crashed: 123257736`). Now built with `-fexceptions`; `main()` also
+  catches `std::exception` and prints `what()` (exit 2) in every build.
+- **Device-font fallback read `assets/NotoSans.ttf` from disk.** The in-browser
+  filesystem has no such file, so zero-glyph `_sans`-style fonts and the DefineText
+  tags using them were silently dropped (Seedling lost 38 K glyph vertices and 3
+  text tags). The font is now `--embed-file`d at the path `loadDeviceFont()` probes.
+
+Residual wasm-vs-native output difference: a few tessellation vertices per complex
+shape (Doodle Jump 22872 vs 22878 rows, Seedling 57066 vs 57069) — float-precision
+noise in libtess2 under wasm32, not a functional difference.

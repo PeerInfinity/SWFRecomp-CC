@@ -79,12 +79,22 @@ if(EMSCRIPTEN)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         SUFFIX ".js"
     )
+    # C++ exceptions stay enabled in the wasm build: without them a throw
+    # escapes as an opaque JS number and main()'s catch cannot report what().
+    target_compile_options(${PROJECT_NAME} PRIVATE -fexceptions)
     target_link_options(${PROJECT_NAME} PRIVATE
+        -fexceptions
         -sMODULARIZE=1
         -sEXPORT_NAME=SWFRecompModule
         -sEXPORTED_RUNTIME_METHODS=callMain,FS
         -sALLOW_MEMORY_GROWTH=1
         -sINITIAL_MEMORY=33554432
+        -sMAXIMUM_MEMORY=4294967296
+        -sEXPORT_EXCEPTION_HANDLING_HELPERS=1
+        # Device-font fallback (zero-glyph DefineFont2/3 such as `_sans`) reads
+        # assets/NotoSans.ttf from disk; the in-browser build has no disk, so
+        # embed it at the path loadDeviceFont() probes first.
+        --embed-file ${CMAKE_SOURCE_DIR}/assets/NotoSans.ttf@assets/NotoSans.ttf
         -sENVIRONMENT=node,web
         -sEXIT_RUNTIME=0
         -sINVOKE_RUN=0

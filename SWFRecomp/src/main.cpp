@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <exception>
 
 #include <common.h>
 #include <config.hpp>
@@ -38,7 +39,18 @@ int main(int argc, char** argv)
 	context.avm2_symbol_prefix = config.symbol_prefix;
 	context.avm2_char_id_base = config.char_id_base;
 	
-	SWFRecomp::recompile(context);
+	try
+	{
+		SWFRecomp::recompile(context);
+	}
+	catch (const std::exception& e)
+	{
+		// An escaping exception would otherwise surface as a bare abort (native)
+		// or an opaque thrown pointer (Emscripten/in-browser recompiler).
+		fflush(stdout);
+		fprintf(stderr, "SWFRecomp: fatal: %s\n", e.what());
+		return 2;
+	}
 	
 	fflush(stdout);
 	

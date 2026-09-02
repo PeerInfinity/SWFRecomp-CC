@@ -105,6 +105,9 @@ function patchGeneratedSource(text) {
 }
 
 export async function compileGuest(result, setStatus) {
+    if (Object.keys(result.files).some(p => p.startsWith("RecompiledABC/"))) {
+        throw new Error("This is an AS3 (AVM2) SWF. The in-browser run only supports AVM1 so far (the graphics host is built without the AVM2 runtime and AS3 output is too large for the in-browser compiler); download the build bundle instead — its build.sh handles AVM2.");
+    }
     const clang = await loadClang(setStatus);
     setStatus("Preparing sources");
     const project = new sdk.Directory();
