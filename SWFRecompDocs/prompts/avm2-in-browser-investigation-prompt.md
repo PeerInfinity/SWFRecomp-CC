@@ -70,6 +70,27 @@ served locally with `(cd docs && python3 -m http.server 8010)` after
   emission) committed with its own verification, CI per CLAUDE.md, no regressions.
 - Memory updated; commit pushed; Pages deploy only if `docs/` changed.
 
+## Notes from the preceding slice (bitmap texture pools, 2026-09-02)
+
+- Bitmap data still lives in the recompiler's static `bitmap_data[]` arrays;
+  only the GPU-side layout changed (12 size-class texture pools in
+  `render_webgpu.c`, status doc `SWFRecompDocs/status/2026-09-02-bitmap-texture-pools.md`).
+  The data-path question in this brief stands as written.
+- In AVM2 builds `tagInit` (the `defineBitmap` calls) never runs — only
+  `swfStart`/`swf_core` call it — so AVM2 movies reach the GPU through the
+  BitmapData/dynamic path. Relevant if you count what an AS3 bundle needs.
+- The downloadable bundle's `build.sh` is now header-aware (a runtime header
+  change rebuilds every TU); a bundle downloaded before `c6681e744` needs
+  `FRESH=1` once after a runtime update.
+- `~/CC/seedling_teleport_build/recompiled` no longer links against the
+  current runtime, and a tree regenerated with today's recompiler builds but
+  never reaches "WASM SWF Runtime Loaded" in the docs2 demo page. The
+  ORIGINAL Seedling (`~/CC/newgrounds/598977_Seedling.swf`) recompiled and built
+  the same way renders, so if you rebuild AS3 titles, start from originals.
+- Windows-Chrome runs: before trusting a "still broken" result, check who owns
+  the served port (`readlink /proc/<pid>/cwd`) — a stale `http.server` from an
+  earlier session served an old wasm for an hour here.
+
 REPORT BACK (after the durable records — never instead of them): once the
 closeout doc is written, memory updated, and the commit pushed, reply to the
 handshake message from the session that launched you (copy its `from`
