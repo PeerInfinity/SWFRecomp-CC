@@ -2,6 +2,11 @@ name: Deploy GitHub Pages
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build everything but skip the Pages upload/deploy (validates the workflow)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -15,6 +20,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # Pin emsdk to the version used locally (same as ruffle-tests.yml).
+      EMSDK_VERSION: '5.0.0'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -72,14 +80,43 @@ jobs:
             --images-dir="$RUNNER_TEMP/imgbranch" \
             --expected-dir="$RUNNER_TEMP/ruffle-expected"
 
+      # Cache + set up emsdk exactly like ruffle-tests.yml's wasm smoke job
+      # (same cache key, so the two workflows share one warm emsdk tree).
+      - name: Restore emsdk cache
+        id: emsdk_cache
+        uses: actions/cache@v4
+        with:
+          path: emsdk
+          key: emsdk-wasm-smoke-${{ runner.os }}-${{ env.EMSDK_VERSION }}
+
+      - name: Set up emsdk (cache miss)
+        if: steps.emsdk_cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git emsdk
+          cd emsdk
+          ./emsdk install "${EMSDK_VERSION}"
+          ./emsdk activate "${EMSDK_VERSION}"
+
+      # Generates docs/recompiler/{SWFRecomp.js,SWFRecomp.wasm,build_info.json,bundle/}
+      # (all gitignored): the Emscripten build of the recompiler plus the
+      # runtime-snapshot build bundle the page zips for download.
+      - name: Build in-browser recompiler + build bundle
+        run: |
+          bash SWFRecomp/scripts/deploy_wasm_demo.sh --build
+          echo "bundle: $(find docs/recompiler/bundle -type f | wc -l) files, $(du -sh docs/recompiler/bundle | cut -f1)"
+          ls -la docs/recompiler/SWFRecomp.wasm docs/recompiler/build_info.json
+
       - name: Setup Pages
+        if: ${{ !inputs.dry_run }}
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: ${{ !inputs.dry_run }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
       - name: Deploy to GitHub Pages
+        if: ${{ !inputs.dry_run }}
         id: deployment
         uses: actions/deploy-pages@v4

@@ -8,8 +8,13 @@ SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${SWFRECOMP_ROOT}/.." && pwd)"
 BUILD_DIR="${SWFRECOMP_ROOT}/build_wasm"
 
-# Source Emscripten
-source "${PROJECT_ROOT}/emsdk/emsdk_env.sh"
+# Source Emscripten (repo-local checkout, or EMSDK, or emcc already on PATH)
+if [ -f "${PROJECT_ROOT}/emsdk/emsdk_env.sh" ]; then
+    source "${PROJECT_ROOT}/emsdk/emsdk_env.sh"
+elif [ -n "${EMSDK:-}" ] && [ -f "${EMSDK}/emsdk_env.sh" ]; then
+    source "${EMSDK}/emsdk_env.sh"
+fi
+command -v emcc >/dev/null 2>&1 || { echo "ERROR: emcc not found (install emsdk at ${PROJECT_ROOT}/emsdk or set EMSDK)"; exit 1; }
 
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
