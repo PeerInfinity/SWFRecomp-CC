@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `88ebde66534f` (2026-08-16T08:44:05.560511+00:00)
-**Current:** `9d038c750eaf` (2026-08-19T13:28:59.136572+00:00)
+**Previous:** `06f3d87d295b` (2026-08-30T08:49:32.028334+00:00)
+**Current:** `0a56091cfce2` (2026-09-02T18:30:12.885327+00:00)
 
 ## Summary
 
@@ -10,11 +10,6 @@
 | Passing | 69 | 69 | 0 |
 | Total | 111 | 111 | 0 |
 | Pass rate | 62.2% | 62.2% | 0% |
-| Mismatched lines | 1194 | 1190 | -4 |
-|   Decreased | | | -4 |
+| Mismatched lines | 1190 | 1190 | 0 |
 
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `GradientFillTest` | output_mismatch | 119/278 | 123/278 | -4 |
+No changes detected.

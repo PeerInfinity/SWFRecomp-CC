@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `88ebde66534f` (2026-08-16T08:44:05.527207+00:00)
-**Current:** `9d038c750eaf` (2026-08-19T13:28:59.103844+00:00)
+**Previous:** `06f3d87d295b` (2026-08-30T08:49:31.994466+00:00)
+**Current:** `0a56091cfce2` (2026-09-02T18:30:12.855317+00:00)
 
 ## Summary
 
@@ -12,4 +12,8 @@
 | Pass rate | 97.9% | 97.9% | 0% |
 | Mismatched lines | 2 | 2 | 0 |
 
-No changes detected.
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `hitarea` | ruffle_matched | output_mismatch | 2/4 | 2/4 |
