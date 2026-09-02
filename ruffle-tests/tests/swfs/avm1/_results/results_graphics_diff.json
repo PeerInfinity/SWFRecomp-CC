@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-19T14:26:17.318934+00:00",
-    "old_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
-    "new_timestamp": "2026-08-19T16:36:38.708937+00:00",
-    "new_git_sha": "a946ee183838f3ee96b55a4fbf3937c4e5c341c6",
+    "old_timestamp": "2026-08-19T16:36:38.708937+00:00",
+    "old_git_sha": "a946ee183838f3ee96b55a4fbf3937c4e5c341c6",
+    "new_timestamp": "2026-09-02T18:22:57.311797+00:00",
+    "new_git_sha": "0a56091cfce2753e3bd157534b555334cf90ad0d",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,79 @@
     "new_pass": 689,
     "new_ruffle_matched": 18,
     "new_effective_pass": 707,
-    "new_total": 725,
-    "new_pass_rate": 95.0,
+    "new_total": 730,
+    "new_pass_rate": 94.4,
     "old_mismatched_lines": 11396,
-    "new_mismatched_lines": 11396,
+    "new_mismatched_lines": 11504,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 725,
-    "added": 0,
+    "added": 5,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "globals_monkeypatch",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 96,
+        "expected_lines": 100,
+        "matching_lines": 38
+      }
+    },
+    {
+      "test": "hitarea_lazy_getter",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 6,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "hitarea_remove_owner_drag",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "hitarea_remove_sibling",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "hitarea_sweep",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 20,
+        "expected_lines": 33,
+        "matching_lines": 1
+      }
+    }
+  ]
 }
