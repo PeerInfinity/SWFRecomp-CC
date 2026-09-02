@@ -22,7 +22,10 @@ cd "${BUILD_DIR}"
 emcmake cmake "${SWFRECOMP_ROOT}" \
     -DCMAKE_BUILD_TYPE=Release
 
-emmake make -j$(nproc)
+# Build only the recompiler target: the bundled zlib CMake also defines
+# example/minigzip test programs whose libz.a dependency races the static lib
+# under -j (seen in CI: "No rule to make target lib/zlib/libz.a").
+emmake make -j$(nproc) SWFRecomp
 
 echo ""
 echo "Built successfully:"
