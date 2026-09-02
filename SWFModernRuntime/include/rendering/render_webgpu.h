@@ -14,6 +14,25 @@
 // Forward declaration
 typedef struct SWFAppContext SWFAppContext;
 
+// Bitmap texture pool: one texture_2d_array whose layers all share (w, h).
+// Static bitmaps are grouped into BITMAP_STATIC_POOLS size classes, each pool
+// sized to its members' bounding box; dynamic (attachBitmap / BitmapData /
+// beginBitmapFill) uploads go to BITMAP_DYNAMIC_POOLS nominal-square pools
+// created on first use and grown by reallocation. See "Bitmap texture pools"
+// in render_webgpu.c.
+typedef struct BitmapPool
+{
+	WGPUTexture tex;
+	WGPUTextureView view;
+	u32 w, h;        // layer size in texels (0 = pool not created)
+	u32 layers;      // allocated array layers
+	u32 used;        // static: members uploaded; dynamic: layers used this frame
+	u32 cap;         // dynamic: growth ceiling in layers
+} BitmapPool;
+#define BITMAP_STATIC_POOLS 8
+#define BITMAP_DYNAMIC_POOLS 4
+#define BITMAP_POOL_COUNT (BITMAP_STATIC_POOLS + BITMAP_DYNAMIC_POOLS)
+
 typedef struct WebGPURenderContext
 {
 	// Render-target size in device pixels (SWFAppContext::render_{width,height},
@@ -32,12 +51,19 @@ typedef struct WebGPURenderContext
 	size_t bitmap_highest_w;
 	size_t bitmap_highest_h;
 	size_t current_bitmap;
-	// 4 u32 per texture-array layer: {content_w, content_h, padded_w, padded_h}
-	// (WGSL side: array<vec4u>). `content` is the bitmap's own size and is the
-	// repeat period for 0x40/0x42 fills; `padded` is the shared layer size
-	// (max over all bitmaps, +1 edge-clamp row/col) and normalizes 0x41/0x43.
+	// 8 u32 per bitmap SLOT: {content_w, content_h, padded_w, padded_h},
+	// {pool, layer, 0, 0} (WGSL side: array<vec4u>, two entries per slot).
+	// `content` is the bitmap's own size and is the repeat period for
+	// 0x40/0x42 fills; `padded` is the layer size of the pool holding it
+	// (members' bounding box, +1 edge-clamp row/col) and normalizes 0x41/0x43.
+	// Slots [0, bitmap_count) are the recompiler's static bitmaps, followed by
+	// MAX_DYNAMIC_BITMAP_SLOTS per-frame dynamic slots. The CPU copy covers the
+	// static slots only.
 	// NOTE: FlashbangContext's field of the same name is still 2 u32/layer.
 	u32* bitmap_sizes;
+	size_t* bitmap_offsets;   // per static bitmap: byte offset into bitmap_data
+	int bitmap_static_built;  // static pools created + uploaded (finalize)
+	BitmapPool bitmap_pools[BITMAP_POOL_COUNT];
 
 	// CPU-side data pointers (populated by swf.c before init)
 	char* shape_data;       size_t shape_data_size;
@@ -80,8 +106,6 @@ typedef struct WebGPURenderContext
 	WGPUTextureView gradient_tex_view;
 	WGPUSampler gradient_sampler;
 
-	WGPUTexture bitmap_tex;
-	WGPUTextureView bitmap_tex_view;
 	WGPUSampler bitmap_sampler;
 	WGPUSampler bitmap_sampler_linear;  // smoothed bitmap fills (0x40/0x41)
 
@@ -276,11 +300,11 @@ typedef struct WebGPURenderContext
 	u32 static_mat_count;        // number of static gradient matrices
 
 	// Dynamic bitmap rendering (attachBitmap)
-	u32 dynamic_bitmap_base;       // first dynamic bitmap layer index (= original bitmap_count)
-	u32 dynamic_bitmap_used;       // layers used this frame
-	u32 dynamic_bitmap_capacity;   // max dynamic layers
-	u32 dynamic_bitmap_max_w;      // max width for dynamic bitmap texture layers (pixels)
-	u32 dynamic_bitmap_max_h;      // max height for dynamic bitmap texture layers (pixels)
+	u32 dynamic_bitmap_base;       // first dynamic bitmap SLOT (= original bitmap_count)
+	u32 dynamic_bitmap_used;       // dynamic slots used this frame (all pools)
+	u32 dynamic_bitmap_capacity;   // per-frame dynamic slots (MAX_DYNAMIC_BITMAP_SLOTS)
+	u32 dynamic_bitmap_max_w;      // largest dynamic source accepted (pixels)
+	u32 dynamic_bitmap_max_h;      // largest dynamic source accepted (pixels)
 
 	// Renderer initialization status (0 = not ready, 1 = fully initialized)
 	int renderer_ok;

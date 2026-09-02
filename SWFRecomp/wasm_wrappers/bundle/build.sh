@@ -105,12 +105,18 @@ opt_for() {
 }
 
 echo "=== Compiling (incremental: a .c is rebuilt only if newer than its .o) ==="
+# A changed HEADER also invalidates every .o: the runtime's context structs
+# (e.g. render_webgpu.h's WebGPURenderContext) are shared by many TUs, and a
+# TU compiled against the old layout silently corrupts the new one. Rebuild
+# everything older than the newest header under runtime/include.
+NEWEST_HDR="$(find "${RT}/include" -type f -name '*.h' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)"
 OBJS=(); N=0
 for src in "${SRC}"/*.c; do
     base="$(basename "${src}" .c)"
     obj="${OBJ}/${base}.o"
     OBJS+=("${obj}")
-    if [ -f "${obj}" ] && [ "${obj}" -nt "${src}" ]; then continue; fi
+    if [ -f "${obj}" ] && [ "${obj}" -nt "${src}" ] \
+       && { [ -z "${NEWEST_HDR}" ] || [ "${obj}" -nt "${NEWEST_HDR}" ]; }; then continue; fi
     o="$(opt_for "$(basename "${src}")")"
     printf '  %-28s %s\n' "$(basename "${src}")" "${o}"
     emcc -DUSE_WEBGPU "${EXTRA_DEFINES[@]}" "${SIMD[@]}" --use-port=emdawnwebgpu \

@@ -3,6 +3,7 @@
 // webgpu.h C API. Works for both native (Dawn/wgpu-native) and WASM (emdawnwebgpu).
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -30,6 +31,18 @@
 
 // Helper: convert C string to WGPUStringView for descriptor labels.
 #define WGPU_LABEL(s) ((WGPUStringView){.data = (s), .length = WGPU_STRLEN})
+
+// Console/stderr diagnostic line (see the definition next to the bitmap pools:
+// browser console via emscripten_log, native stderr under SWF_WARN_BITMAP_CAP).
+static void bitmap_pool_log(const char* fmt, ...);
+// Browser-only init/allocation trace: one line per GPU buffer and init step,
+// so a device loss on a real GPU can be placed (Dawn's own message only names
+// the allocation that failed AFTER the device was already gone).
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+#define RENDER_INIT_LOG(...) bitmap_pool_log(__VA_ARGS__)
+#else
+#define RENDER_INIT_LOG(...) do { } while (0)
+#endif
 
 // ---------------------------------------------------------------------------
 // Antialiasing sample count. Flash's Stage.quality selects the AA level; Ruffle
@@ -143,15 +156,28 @@ static const char* vertex_wgsl =
 "    out.v_args = vec4f(inv_pos.xy, focal_z, f32(spread_mode) + f32(is_linear_rgb) * 4.0);\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x40u) {\n"
 "    let inv_pos = inv_mats[style_upper] * pos;\n"
-"    let sizes = bitmap_sizes[out.v_style_id];\n"
+"    let sizes = bitmap_sizes[out.v_style_id * 2u];\n"
+"    let slot = bitmap_sizes[out.v_style_id * 2u + 1u];\n"
 "    let content = vec2f(f32(sizes.x), f32(sizes.y));\n"
 "    let padded = vec2f(f32(sizes.z), f32(sizes.w));\n"
+// The vertex carries a bitmap SLOT (static bitmap index, or a per-frame
+// dynamic slot); the second vec4u of its table entry says which texture POOL
+// holds it and at which layer (see "Bitmap texture pools" in the C code).
+// Re-pack that as pool<<16 | layer for the fragment stage.
+"    out.v_style_id = (slot.y & 0xFFFFu) | ((slot.x & 0xFFu) << 16u);\n"
+// Style-word bit 11 (dynamic beginBitmapFill, clipped): clamp the fill to the
+// bitmap's own content instead of reading the rest of the pool layer, which a
+// previous frame may have written. Forwarded as bit 8 of v_style_type; the
+// fragment stage compares the fill type on the low byte only.
+"    out.v_style_type = out.v_style_type | ((in.style.x >> 3u) & 0x100u);\n"
 // Repeating fills (0x40/0x42) tile on the bitmap's own size: v_args.xy is the
 // position in TILE units, v_args.zw scales one tile back into layer UV. The
 // clipped arm (0x41/0x43) keeps the old expression character-for-character so
 // the patch is provably a no-op for every non-repeating bitmap fill.
 "    if ((out.v_style_type & 0x1u) == 0u) {\n"
 "      out.v_args = vec4f(inv_pos.x / content.x, inv_pos.y / content.y, content.x / padded.x, content.y / padded.y);\n"
+"    } else if ((out.v_style_type & 0x100u) != 0u) {\n"
+"      out.v_args = vec4f(inv_pos.x / padded.x, inv_pos.y / padded.y, content.x / padded.x, content.y / padded.y);\n"
 "    } else {\n"
 "      out.v_args = vec4f(inv_pos.x / padded.x, inv_pos.y / padded.y, 1.0, 1.0);\n"
 "    }\n"
@@ -167,8 +193,7 @@ static const char* fragment_wgsl =
 "\n"
 "@group(2) @binding(0) var gradient_tex: texture_2d<f32>;\n"
 "@group(2) @binding(1) var gradient_samp: sampler;\n"
-"@group(2) @binding(2) var bitmap_tex: texture_2d_array<f32>;\n"
-"@group(2) @binding(3) var bitmap_samp: sampler;\n"
+"@group(2) @binding(2) var bitmap_samp: sampler;\n"
 // Smoothed bitmap fills (SWF fill types 0x40 / 0x41) sample through a LINEAR
 // sampler; non-smoothed ones (0x42 / 0x43) keep the Nearest sampler above. The
 // bit lives in the fill-type byte itself and the recompiler emits that byte
@@ -176,7 +201,24 @@ static const char* fragment_wgsl =
 // binding and no plumbing. A GLOBAL linear sampler is REFUTED: it takes
 // from_shumway/acid/acid-blend (a 0x43 non-smoothed fill) from 101 outliers to
 // 1961 against a 348 budget (w1 gfx-vram section 4.2).
-"@group(2) @binding(4) var bitmap_samp_linear: sampler;\n"
+"@group(2) @binding(3) var bitmap_samp_linear: sampler;\n"
+// Bitmap texture POOLS (BITMAP_POOL_COUNT of them, bindings 4..15): each is a
+// texture_2d_array whose layers are all the same size, but the size differs
+// per pool, so a movie's bitmaps no longer share one (widest x tallest)
+// envelope. Empty pools are bound to the 1x1 dummy array. The pool index
+// travels in the upper 16 bits of v_style_id, the layer in the lower 16.
+"@group(2) @binding(4) var bitmap_pool0: texture_2d_array<f32>;\n"
+"@group(2) @binding(5) var bitmap_pool1: texture_2d_array<f32>;\n"
+"@group(2) @binding(6) var bitmap_pool2: texture_2d_array<f32>;\n"
+"@group(2) @binding(7) var bitmap_pool3: texture_2d_array<f32>;\n"
+"@group(2) @binding(8) var bitmap_pool4: texture_2d_array<f32>;\n"
+"@group(2) @binding(9) var bitmap_pool5: texture_2d_array<f32>;\n"
+"@group(2) @binding(10) var bitmap_pool6: texture_2d_array<f32>;\n"
+"@group(2) @binding(11) var bitmap_pool7: texture_2d_array<f32>;\n"
+"@group(2) @binding(12) var bitmap_pool8: texture_2d_array<f32>;\n"
+"@group(2) @binding(13) var bitmap_pool9: texture_2d_array<f32>;\n"
+"@group(2) @binding(14) var bitmap_pool10: texture_2d_array<f32>;\n"
+"@group(2) @binding(15) var bitmap_pool11: texture_2d_array<f32>;\n"
 "\n"
 "struct FragmentInput {\n"
 "  @location(0) @interpolate(flat) v_style_type: u32,\n"
@@ -258,6 +300,47 @@ static const char* fragment_wgsl =
 "  return mix(c0, c1, f);\n"
 "}\n"
 "\n"
+// Sample one bitmap pool at (uv, layer). WGSL cannot index a binding by a
+// runtime value, so this is a switch; textureSampleLevel with an explicit LOD
+// has no uniformity requirement, so being inside a non-uniform branch is fine.
+"fn sample_bitmap(pool: u32, uv: vec2f, layer: i32, smoothed: bool) -> vec4f {\n"
+"  var c = vec4f(0.0);\n"
+"  if (smoothed) {\n"
+"    switch (pool) {\n"
+"      case 0u: { c = textureSampleLevel(bitmap_pool0, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 1u: { c = textureSampleLevel(bitmap_pool1, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 2u: { c = textureSampleLevel(bitmap_pool2, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 3u: { c = textureSampleLevel(bitmap_pool3, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 4u: { c = textureSampleLevel(bitmap_pool4, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 5u: { c = textureSampleLevel(bitmap_pool5, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 6u: { c = textureSampleLevel(bitmap_pool6, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 7u: { c = textureSampleLevel(bitmap_pool7, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 8u: { c = textureSampleLevel(bitmap_pool8, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 9u: { c = textureSampleLevel(bitmap_pool9, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 10u: { c = textureSampleLevel(bitmap_pool10, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      case 11u: { c = textureSampleLevel(bitmap_pool11, bitmap_samp_linear, uv, layer, 0.0); }\n"
+"      default: {}\n"
+"    }\n"
+"  } else {\n"
+"    switch (pool) {\n"
+"      case 0u: { c = textureSampleLevel(bitmap_pool0, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 1u: { c = textureSampleLevel(bitmap_pool1, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 2u: { c = textureSampleLevel(bitmap_pool2, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 3u: { c = textureSampleLevel(bitmap_pool3, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 4u: { c = textureSampleLevel(bitmap_pool4, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 5u: { c = textureSampleLevel(bitmap_pool5, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 6u: { c = textureSampleLevel(bitmap_pool6, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 7u: { c = textureSampleLevel(bitmap_pool7, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 8u: { c = textureSampleLevel(bitmap_pool8, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 9u: { c = textureSampleLevel(bitmap_pool9, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 10u: { c = textureSampleLevel(bitmap_pool10, bitmap_samp, uv, layer, 0.0); }\n"
+"      case 11u: { c = textureSampleLevel(bitmap_pool11, bitmap_samp, uv, layer, 0.0); }\n"
+"      default: {}\n"
+"    }\n"
+"  }\n"
+"  return c;\n"
+"}\n"
+"\n"
 "@fragment\n"
 "fn fs_main(in: FragmentInput) -> @location(0) vec4f {\n"
 "  // Compute ONLY the texture sample the fill type actually needs, so a solid-colour\n"
@@ -274,29 +357,25 @@ static const char* fragment_wgsl =
 "  // avoids the 256 maxTextureArrayLayers cap on some adapters); the row is selected\n"
 "  // with textureLoad (exact, no V-filter bleed); see sample_gradient.\n"
 "  let is_gradient = (in.v_style_type & 0xF0u) == 0x10u;\n"
+// Low byte = SWF fill type; bit 8 = clamp-to-content flag (bitmap fills only).
+"  let ftype = in.v_style_type & 0xFFu;\n"
 "  var color: vec4f;\n"
-"  if (in.v_style_type == 0x00u) {\n"
+"  if (ftype == 0x00u) {\n"
 "    color = in.v_args;\n"
-"  } else if (in.v_style_type == 0x10u) {\n"
+"  } else if (ftype == 0x10u) {\n"
 "    color = sample_gradient(linear_t(in.v_args), i32(in.v_style_id));\n"
-"  } else if (in.v_style_type == 0x12u) {\n"
+"  } else if (ftype == 0x12u) {\n"
 "    color = sample_gradient(radial_t(in.v_args), i32(in.v_style_id));\n"
-"  } else if (in.v_style_type == 0x13u) {\n"
+"  } else if (ftype == 0x13u) {\n"
 "    color = sample_gradient(focal_radial_t(in.v_args), i32(in.v_style_id));\n"
-"  } else if (in.v_style_type == 0x40u || in.v_style_type == 0x42u) {\n"
+"  } else if (ftype == 0x40u || ftype == 0x42u) {\n"
 "    let bm_ratio = max(in.v_args.zw, vec2f(0.001));\n"
 "    let uv = fract(in.v_args.xy) * bm_ratio;\n"
-"    if (in.v_style_type == 0x40u) {\n"
-"      color = textureSampleLevel(bitmap_tex, bitmap_samp_linear, uv, i32(in.v_style_id), 0.0);\n"
-"    } else {\n"
-"      color = textureSampleLevel(bitmap_tex, bitmap_samp, uv, i32(in.v_style_id), 0.0);\n"
-"    }\n"
-"  } else if (in.v_style_type == 0x41u || in.v_style_type == 0x43u) {\n"
-"    if (in.v_style_type == 0x41u) {\n"
-"      color = textureSampleLevel(bitmap_tex, bitmap_samp_linear, in.v_args.xy, i32(in.v_style_id), 0.0);\n"
-"    } else {\n"
-"      color = textureSampleLevel(bitmap_tex, bitmap_samp, in.v_args.xy, i32(in.v_style_id), 0.0);\n"
-"    }\n"
+"    color = sample_bitmap(in.v_style_id >> 16u, uv, i32(in.v_style_id & 0xFFFFu), ftype == 0x40u);\n"
+"  } else if (ftype == 0x41u || ftype == 0x43u) {\n"
+"    var uv = in.v_args.xy;\n"
+"    if ((in.v_style_type & 0x100u) != 0u) { uv = clamp(uv, vec2f(0.0), in.v_args.zw); }\n"
+"    color = sample_bitmap(in.v_style_id >> 16u, uv, i32(in.v_style_id & 0xFFFFu), ftype == 0x41u);\n"
 "  } else {\n"
 "    color = vec4f(0.0);\n"
 "  }\n"
@@ -363,6 +442,7 @@ static WGPUBuffer create_buffer(WGPUDevice device, WGPUQueue queue,
 	// when no data is present.
 	size_t data_size = size;  // actual data to upload
 	if (size < 64) size = 64;
+	RENDER_INIT_LOG("[render] buffer %s: %.2f MiB", label, (double)size / (1024.0 * 1024.0));
 
 	WGPUBufferDescriptor desc = {0};
 	desc.label = WGPU_LABEL(label);
@@ -847,9 +927,17 @@ WebGPURenderContext* render_webgpu_new(void)
 // ---------------------------------------------------------------------------
 void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 {
+	RENDER_INIT_LOG("[render] init: start (%dx%d, %u static bitmaps)", ctx->width, ctx->height,
+	                (unsigned)ctx->bitmap_count);
 	ctx->current_bitmap = 0;
-	// 4 u32 per layer: {content_w, content_h, padded_w, padded_h}.
-	ctx->bitmap_sizes = (u32*)HALLOC(4 * sizeof(u32) * ctx->bitmap_count);
+	ctx->bitmap_static_built = 0;
+	// 8 u32 per static slot: {content_w, content_h, padded_w, padded_h}, {pool, layer, 0, 0}.
+	ctx->bitmap_sizes = (u32*)HALLOC(8 * sizeof(u32) * ctx->bitmap_count);
+	ctx->bitmap_offsets = (size_t*)HALLOC(sizeof(size_t) * ctx->bitmap_count);
+	// Callers (swf.c::swfStart, avm2_display.c) may pre-set the dynamic source
+	// limit before renderer_init; only apply the default floor when unset.
+	if (ctx->dynamic_bitmap_max_w == 0) ctx->dynamic_bitmap_max_w = 256;
+	if (ctx->dynamic_bitmap_max_h == 0) ctx->dynamic_bitmap_max_h = 256;
 
 	// --- Create WebGPU instance ---
 	WGPUInstanceDescriptor inst_desc = {0};
@@ -897,6 +985,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 
 		request_adapter_sync(ctx, &opts);
 		assert(ctx->adapter != NULL);
+		RENDER_INIT_LOG("[render] init: adapter %s", ctx->adapter ? "ok" : "NULL");
 	}
 
 	// --- Request device ---
@@ -926,6 +1015,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 
 		request_device_sync(ctx, &dev_desc);
 		assert(ctx->device != NULL);
+		RENDER_INIT_LOG("[render] init: device %s", ctx->device ? "ok" : "NULL");
 	}
 
 	// --- Configure surface (or create offscreen texture for headless) ---
@@ -970,20 +1060,27 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	surf_config.height = ctx->height;
 	surf_config.presentMode = WGPUPresentMode_Fifo;
 	wgpuSurfaceConfigure(ctx->surface, &surf_config);
+	RENDER_INIT_LOG("[render] init: surface configured %dx%d", ctx->width, ctx->height);
 #endif
 
 	// --- Create all GPU resources ---
 	create_dummy_texture(ctx);
+	RENDER_INIT_LOG("[render] init: %s done", "create_dummy_texture");
 	create_buffers_and_upload(ctx);
+	RENDER_INIT_LOG("[render] init: %s done", "create_buffers_and_upload");
 	create_textures(ctx);
+	RENDER_INIT_LOG("[render] init: %s done", "create_textures");
 	create_pipelines(ctx);
+	RENDER_INIT_LOG("[render] init: %s done", "create_pipelines");
 	create_bind_groups(ctx);
+	RENDER_INIT_LOG("[render] init: %s done", "create_bind_groups");
 
 	// --- Run compute pass to invert gradient matrices ---
 	size_t num_gradients = ctx->uninv_mat_data_size / (16 * sizeof(float));
 	if (num_gradients > 0)
 	{
 		run_compute_pass(ctx);
+		RENDER_INIT_LOG("[render] init: compute pass done");
 		// Recreate bind groups after compute (inv_mat_buffer now has data)
 		// Actually the buffer is the same, just the contents changed, so
 		// the bind group remains valid.
@@ -1022,110 +1119,318 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 // create_buffers_and_upload: create GPU buffers and upload static data
 // ---------------------------------------------------------------------------
-// Dynamic bitmap layers. 64 is the FLOOR every movie keeps, so a given draw
-// lands in the same slot it always did and any content issuing <= 64 dynamic
-// bitmap draws per frame renders bit-identically. The ceiling is only reached
-// when the layers are CHEAP, because every layer of the shared static+dynamic
-// bitmap array is a full max(bitmap_highest, dynamic_bitmap_max)+1 square:
+// ---------------------------------------------------------------------------
+// Bitmap texture pools
+// ---------------------------------------------------------------------------
+// Until 2026-09-02 every bitmap of the movie (plus a dynamic reserve) lived in
+// ONE texture_2d_array whose layer was (widest+1) x (tallest+1) over ALL of
+// them — two unrelated bitmaps set the envelope. The original Seedling has a
+// 4480x82 strip and a 486x1106 image among 284 bitmaps holding 13 MiB of
+// pixels; the array came to 4481x1107x284x4 B = 5.25 GiB, D3D12 refused it and
+// the canvas stayed black (in-browser-recompiler-refresh-assessment.md §8).
 //
-//     VRAM = bw * bh * 4 * (bitmap_count + capacity)
+// Now there are BITMAP_POOL_COUNT arrays, bound separately (fragment bindings
+// 4..15) and selected per fragment by the WGSL sample_bitmap():
+//   * static pools 0..7 — size classes by max(w+1, h+1) <= 64, 128, 256, 512,
+//     1024, 2048, 4096, and everything larger. Each pool's layer is the
+//     bounding box of ITS members, so Seedling's two outliers cost two
+//     4481x1107 layers (40 MB) instead of 284 of them. Built in
+//     render_webgpu_finalize_bitmaps, once every static size is known (the
+//     recompiler emits all defineBitmap calls, then finalizeBitmaps, in
+//     tag_init — before the first frame).
+//   * dynamic pools 8..11 — nominal squares of 256, 512, 1024 (each clipped to
+//     dynamic_bitmap_max) and the full dynamic_bitmap_max box. A dynamic draw
+//     takes the first pool its source fits. A pool is created on first use
+//     and DOUBLES its layer count when a frame exhausts it (up to
+//     dynamic_pool_cap), so nothing is allocated for sizes a movie never
+//     draws — an AVM2 movie raises dynamic_bitmap_max to its largest embedded
+//     bitmap (avm2_display.c), which used to size every dynamic layer.
+// Layer contents are unchanged: a bitmap sits at the layer origin with the
+// same +1 edge-clamp row/column, and the rest of the layer is transparent
+// (never written; WebGPU zero-initialises), so a clipped static fill reading
+// past its bitmap still reads transparent. Dynamic layers ARE rewritten every
+// frame, so the one dynamic path with arbitrary geometry (beginBitmapFill,
+// clipped) clamps its UVs to the content in the shader (style bit 11).
 //
-// so a flat 64 -> 128 doubles the bitmap VRAM of EVERY graphics test, not just
-// the two that truncate. from_shumway/acid/acid-color is 1841^2*4*65 = 881 MB
-// today and PASSES; acid-large is already a 2.52 GB OOM (w1 gfx board P3, which
-// measured the practical lavapipe ceiling between those two). A flat raise would
-// put acid-color at 1.73 GB, inside that window. Growth is therefore gated on a
-// byte budget, and never shrinks below the floor.
+// Slots: vertex data still names a bitmap SLOT — the recompiler's static
+// bitmap index, or dynamic_bitmap_base + a per-frame counter — and the
+// bitmap_sizes table maps a slot to {content, padded} and {pool, layer}.
+
+// Per-frame dynamic slots (table + inverse-matrix entries), shared by the
+// four dynamic pools (each capped at MAX_DYNAMIC_BITMAPS_GROWN layers).
+#define MAX_DYNAMIC_BITMAP_SLOTS 512
+// Dynamic pool growth. 64 is the floor every layer size keeps (a frame
+// issuing <= 64 dynamic draws of one class never truncates, as before); the
+// ceiling is reached when layers are cheap against DYNAMIC_BITMAP_VRAM_BUDGET.
 #define MAX_DYNAMIC_BITMAPS 64
 #define MAX_DYNAMIC_BITMAPS_GROWN 128
+#define DYNAMIC_POOL_INITIAL_LAYERS 16
 #define DYNAMIC_BITMAP_VRAM_BUDGET ((size_t)384 * 1024 * 1024)
-// wgpu's guaranteed maxTextureArrayLayers floor, and what SwiftShader/WSL2
-// adapters report (webgpu-texture-array-layer-limit-blank-render).
-#define MAX_BITMAP_TEXTURE_LAYERS 256
-// A single texture allocation must also fit the DRIVER's maxMemoryAllocationSize,
-// which the layer-count cap above says nothing about: Mesa lavapipe (what CI and
-// every local --mode=graphics run use, forced by verify_output.py's
-// VK_ICD_FILENAMES) reports exactly 2 GiB. Measured on from_shumway/acid/acid-large
-// (a 3613x2681 layer, 36.95 MB each): capacity 54 -> 2 131 019 660 B allocates,
-// capacity 55 -> 2 169 765 472 B returns VK_ERROR_OUT_OF_DEVICE_MEMORY, after which
-// Dawn drops every command buffer that binds the texture and the whole run reads
-// back empty (image status `no_render`, the corpus's only one).
-//
-// 1.5 GiB keeps 25% headroom under that wall and is deliberately generous: across
-// all 383 corpus tests with image comparisons, exactly ONE (acid-large, 2.40 GB)
-// exceeds it — the runner-up is acid-color at 840 MB — so every other movie's
-// capacity, and therefore every other movie's allocation, is byte-identical.
-// It also leaves s15's blur growth alone: those grids have 2.45 MB layers, so
-// 1.5 GiB / 2.45 MB = 626 layers of room and their grown cap of 128 survives.
-// This is the ONE clamp allowed to go below the MAX_DYNAMIC_BITMAPS floor —
-// under-allocating layers costs dropped dynamic bitmap draws, while breaching the
-// allocator costs the entire frame.
+// A single texture allocation must also fit the DRIVER's
+// maxMemoryAllocationSize: Mesa lavapipe (CI and every local --mode=graphics
+// run, forced by verify_output.py's VK_ICD_FILENAMES) reports exactly 2 GiB.
+// Measured on from_shumway/acid/acid-large (3613x2681 layers, 36.95 MB each):
+// 54 layers allocate, 55 return VK_ERROR_OUT_OF_DEVICE_MEMORY, after which Dawn
+// drops every command buffer that binds the texture and the run reads back
+// empty. 1.5 GiB keeps 25% headroom. It is the one clamp that may take a
+// dynamic pool below the 64-layer floor: under-allocating costs dropped
+// dynamic draws, breaching the allocator costs the entire frame.
 #define BITMAP_ARRAY_HARD_LIMIT ((size_t)1536 * 1024 * 1024)
 
-// Plan the bitmap texture array: one layer's padded dimensions and how many
-// dynamic layers to allocate. create_buffers_and_upload sizes its side-tables
-// from this and create_textures allocates the array itself, so it has to give
-// the same answer in both — it is idempotent, including across create_textures'
-// rewrite of bitmap_highest_{w,h} to the padded layer size.
-static void plan_dynamic_bitmaps(WebGPURenderContext* ctx, u32* out_cap,
-                                 u32* out_w, u32* out_h)
+#define BITMAP_POOL_BINDING_BASE 4
+
+static void rebuild_fragment_sampler_bg(WebGPURenderContext* ctx);
+
+// Pool allocations are the VRAM number that matters for a movie: log them to
+// the browser console (emscripten_log goes straight to console.log, never
+// through Module.print, so browser-side trace capture is untouched) and,
+// natively, to stderr when SWF_WARN_BITMAP_CAP is set (the same gate as the
+// capacity notice below).
+static void bitmap_pool_log(const char* fmt, ...)
 {
-	// Callers (e.g. swf.c::swfStart, avm2_display.c) may pre-set these to fit a
-	// bundled image larger than 256x256 before renderer_init; only apply the
-	// default floor when unset.
-	if (ctx->dynamic_bitmap_max_w == 0) ctx->dynamic_bitmap_max_w = 256;
-	if (ctx->dynamic_bitmap_max_h == 0) ctx->dynamic_bitmap_max_h = 256;
+	char buf[256];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	emscripten_log(EM_LOG_CONSOLE, "%s", buf);
+#else
+	if (getenv("SWF_WARN_BITMAP_CAP") != NULL) fprintf(stderr, "%s\n", buf);
+#endif
+}
 
-	u32 bw = (u32)(ctx->bitmap_highest_w > 0
-		? ctx->bitmap_highest_w + 1 : ctx->dynamic_bitmap_max_w + 1);
-	u32 bh = (u32)(ctx->bitmap_highest_h > 0
-		? ctx->bitmap_highest_h + 1 : ctx->dynamic_bitmap_max_h + 1);
-	// If static bitmaps exist, ensure dynamic max fits within the texture dims
-	if (ctx->bitmap_count > 0)
-	{
-		if (ctx->dynamic_bitmap_max_w + 1 > bw) bw = ctx->dynamic_bitmap_max_w + 1;
-		if (ctx->dynamic_bitmap_max_h + 1 > bh) bh = ctx->dynamic_bitmap_max_h + 1;
-	}
+// Static size class of a (w x h) bitmap: smallest k with max(w,h)+1 <= 64<<k.
+static u32 bitmap_static_class(u32 w, u32 h)
+{
+	u32 m = (w > h ? w : h) + 1;
+	u32 t = 64;
+	for (u32 k = 0; k + 1 < BITMAP_STATIC_POOLS; k++, t <<= 1)
+		if (m <= t) return k;
+	return BITMAP_STATIC_POOLS - 1;
+}
 
-	u32 cap = MAX_DYNAMIC_BITMAPS;
-	size_t layer_bytes = (size_t)bw * (size_t)bh * 4;
-	size_t affordable = layer_bytes > 0 ? DYNAMIC_BITMAP_VRAM_BUDGET / layer_bytes : 0;
-	if (affordable > (size_t)ctx->bitmap_count)
+// Layer size of dynamic pool d (0-based among the dynamic pools).
+static void dynamic_pool_dims(WebGPURenderContext* ctx, u32 d, u32* pw, u32* ph)
+{
+	static const u32 nominal[BITMAP_DYNAMIC_POOLS - 1] = { 256, 512, 1024 };
+	u32 mw = ctx->dynamic_bitmap_max_w, mh = ctx->dynamic_bitmap_max_h;
+	if (d + 1 < BITMAP_DYNAMIC_POOLS)
 	{
-		size_t grown = affordable - (size_t)ctx->bitmap_count;
-		if (grown > (size_t)MAX_DYNAMIC_BITMAPS_GROWN) grown = MAX_DYNAMIC_BITMAPS_GROWN;
-		if (grown > (size_t)cap) cap = (u32)grown;
+		if (mw > nominal[d]) mw = nominal[d];
+		if (mh > nominal[d]) mh = nominal[d];
 	}
-	// Only the GROWTH is clamped to the array-layer limit; a movie whose static
-	// bitmaps already overrun it keeps exactly the behaviour it has today.
-	u32 room = (u32)ctx->bitmap_count < MAX_BITMAP_TEXTURE_LAYERS
-		? MAX_BITMAP_TEXTURE_LAYERS - (u32)ctx->bitmap_count : 0;
-	if (cap > room) cap = room;
+	*pw = mw + 1;
+	*ph = mh + 1;
+}
+
+static u32 dynamic_pool_cap(u32 pw, u32 ph)
+{
+	size_t layer_bytes = (size_t)pw * (size_t)ph * 4;
+	size_t cap = DYNAMIC_BITMAP_VRAM_BUDGET / layer_bytes;
+	if (cap > MAX_DYNAMIC_BITMAPS_GROWN) cap = MAX_DYNAMIC_BITMAPS_GROWN;
 	if (cap < MAX_DYNAMIC_BITMAPS) cap = MAX_DYNAMIC_BITMAPS;
+	size_t hard = BITMAP_ARRAY_HARD_LIMIT / layer_bytes;
+	if (cap > hard) cap = hard;
+	if (cap < 1) cap = 1;
+	return (u32)cap;
+}
 
-	// Driver allocation ceiling. Applied LAST, after the floor, because it is the
-	// only clamp that may lower capacity below MAX_DYNAMIC_BITMAPS (see
-	// BITMAP_ARRAY_HARD_LIMIT). Zero effect unless the array would breach 1.5 GiB.
-	if (layer_bytes > 0)
+// (Re)allocate pool `pi` as a (w x h x layers) RGBA8 array. A previous texture
+// is only released: draws already recorded against it this frame hold it
+// through their bind group until the queue has executed them.
+static void bitmap_pool_alloc(WebGPURenderContext* ctx, u32 pi, u32 w, u32 h,
+                              u32 layers, const char* label)
+{
+	BitmapPool* p = &ctx->bitmap_pools[pi];
+	if (p->view) wgpuTextureViewRelease(p->view);
+	if (p->tex) wgpuTextureRelease(p->tex);
+
+	WGPUTextureDescriptor tex_desc = {0};
+	tex_desc.label = WGPU_LABEL(label);
+	tex_desc.dimension = WGPUTextureDimension_2D;
+	tex_desc.size = (WGPUExtent3D){w, h, layers};
+	tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
+	tex_desc.mipLevelCount = 1;
+	tex_desc.sampleCount = 1;
+	tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+	p->tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
+
+	WGPUTextureViewDescriptor view_desc = {0};
+	view_desc.dimension = WGPUTextureViewDimension_2DArray;
+	view_desc.arrayLayerCount = layers;
+	view_desc.mipLevelCount = 1;
+	p->view = wgpuTextureCreateView(p->tex, &view_desc);
+
+	p->w = w;
+	p->h = h;
+	p->layers = layers;
+	bitmap_pool_log("[render] bitmap pool %u (%s): %ux%u x %u layers = %.1f MiB",
+	                pi, label, w, h, layers,
+	                (double)w * (double)h * 4.0 * (double)layers / (1024.0 * 1024.0));
+}
+
+// GPU slot-table entry for `slot`: {content, padded}, {pool, layer}.
+static void write_bitmap_slot(WebGPURenderContext* ctx, u32 slot, u32 cw, u32 ch,
+                              u32 pi, u32 layer)
+{
+	BitmapPool* p = &ctx->bitmap_pools[pi];
+	u32 e[8] = { cw, ch, p->w, p->h, pi, layer, 0, 0 };
+	wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer,
+		(uint64_t)slot * sizeof(e), e, sizeof(e));
+}
+
+// One-shot notice that a frame asked for more dynamic bitmap layers than a
+// pool may grow to (or more slots than the table has). Both dynamic call
+// sites drop the draw SILENTLY, which reads downstream as missing ink rather
+// than as a capacity failure — 36 of 100 tiles rendered blank in
+// visual/filters/blur_* for a whole session before anyone traced it back here
+// (w1 gfx-blur report S2.3). Off unless SWF_WARN_BITMAP_CAP is set, since
+// tests capture these streams.
+static void dynamic_bitmap_capacity_hit(WebGPURenderContext* ctx, u32 pi)
+{
+	static int warned = 0;
+	if (warned || getenv("SWF_WARN_BITMAP_CAP") == NULL) return;
+	warned = 1;
+	if (pi < BITMAP_POOL_COUNT)
 	{
-		size_t affordable_layers = BITMAP_ARRAY_HARD_LIMIT / layer_bytes;
-		if (affordable_layers > (size_t)ctx->bitmap_count)
+		BitmapPool* p = &ctx->bitmap_pools[pi];
+		fprintf(stderr, "[render] dynamic bitmap pool %u exhausted at its ceiling "
+		        "(%u layers of %ux%u); further bitmap draws this frame are dropped\n",
+		        pi, p->layers, p->w, p->h);
+	}
+	else
+		fprintf(stderr, "[render] dynamic bitmap slots exhausted (%u); further "
+		        "bitmap draws this frame are dropped\n", ctx->dynamic_bitmap_capacity);
+}
+
+// Take a per-frame dynamic slot plus a layer in the first dynamic pool that
+// fits (src_w x src_h), creating or growing that pool when it is full. Returns
+// 0 — the draw must be dropped — when the slot table or the pool's ceiling is
+// exhausted. Callers guard src <= dynamic_bitmap_max, so a pool always fits.
+static int dynamic_bitmap_acquire(WebGPURenderContext* ctx, u32 src_w, u32 src_h,
+                                  u32* out_slot, u32* out_pool, u32* out_layer)
+{
+	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity)
+	{
+		dynamic_bitmap_capacity_hit(ctx, BITMAP_POOL_COUNT);
+		return 0;
+	}
+	u32 d, pw = 0, ph = 0;
+	for (d = 0; d < BITMAP_DYNAMIC_POOLS; d++)
+	{
+		dynamic_pool_dims(ctx, d, &pw, &ph);
+		if (src_w + 1 <= pw && src_h + 1 <= ph) break;
+	}
+	if (d == BITMAP_DYNAMIC_POOLS) return 0;
+	u32 pi = BITMAP_STATIC_POOLS + d;
+	BitmapPool* p = &ctx->bitmap_pools[pi];
+	if (p->used >= p->layers)
+	{
+		if (p->w == 0) p->cap = dynamic_pool_cap(pw, ph);
+		if (p->layers >= p->cap)
 		{
-			size_t hard_room = affordable_layers - (size_t)ctx->bitmap_count;
-			if ((size_t)cap > hard_room) cap = (u32)hard_room;
+			dynamic_bitmap_capacity_hit(ctx, pi);
+			return 0;
 		}
-		else
-		{
-			// Pathological: the static bitmaps alone breach the limit. Nothing here
-			// can fix that, but keep the dynamic tail to a single layer so the array
-			// is as close to allocatable as this function can make it.
-			cap = 1;
-		}
+		u32 want = p->layers ? p->layers * 2 : DYNAMIC_POOL_INITIAL_LAYERS;
+		if (want > p->cap) want = p->cap;
+		// Layers used earlier this frame stay in the old texture (their draws
+		// were recorded against the old bind group); `used` keeps counting so
+		// no layer index repeats within the frame.
+		bitmap_pool_alloc(ctx, pi, pw, ph, want, "bitmap_dynamic_pool");
+		rebuild_fragment_sampler_bg(ctx);
+	}
+	*out_layer = p->used++;
+	*out_pool = pi;
+	*out_slot = ctx->dynamic_bitmap_base + ctx->dynamic_bitmap_used++;
+	return 1;
+}
+
+// Group static bitmaps into size-class pools, allocate them, upload every
+// bitmap to its layer and publish the slot table. Called from
+// render_webgpu_finalize_bitmaps (and defensively from open_pass).
+static void build_static_bitmap_pools(WebGPURenderContext* ctx)
+{
+	if (ctx->bitmap_static_built) return;
+	ctx->bitmap_static_built = 1;
+	u32 n = (u32)ctx->current_bitmap;
+	if (n == 0 || ctx->bitmap_data == NULL) return;
+
+	u32 maxw[BITMAP_STATIC_POOLS] = {0}, maxh[BITMAP_STATIC_POOLS] = {0};
+	u32 cnt[BITMAP_STATIC_POOLS] = {0};
+	for (u32 i = 0; i < n; i++)
+	{
+		u32 w = ctx->bitmap_sizes[8 * i], h = ctx->bitmap_sizes[8 * i + 1];
+		u32 k = bitmap_static_class(w, h);
+		if (w > maxw[k]) maxw[k] = w;
+		if (h > maxh[k]) maxh[k] = h;
+		cnt[k]++;
+	}
+	double total_mib = 0.0;
+	for (u32 k = 0; k < BITMAP_STATIC_POOLS; k++)
+	{
+		if (cnt[k] == 0) continue;
+		bitmap_pool_alloc(ctx, k, maxw[k] + 1, maxh[k] + 1, cnt[k], "bitmap_static_pool");
+		total_mib += (double)(maxw[k] + 1) * (double)(maxh[k] + 1) * 4.0 * cnt[k]
+		             / (1024.0 * 1024.0);
 	}
 
-	*out_cap = cap;
-	*out_w = bw;
-	*out_h = bh;
+	for (u32 i = 0; i < n; i++)
+	{
+		u32 width = ctx->bitmap_sizes[8 * i], height = ctx->bitmap_sizes[8 * i + 1];
+		u32 k = bitmap_static_class(width, height);
+		BitmapPool* p = &ctx->bitmap_pools[k];
+		u32 layer = p->used++;
+		if (width == 0 || height == 0)
+		{
+			// Degenerate bitmap: keep the slot (pointing at an all-transparent
+			// layer), upload nothing.
+			ctx->bitmap_sizes[8 * i + 2] = p->w;
+			ctx->bitmap_sizes[8 * i + 3] = p->h;
+			ctx->bitmap_sizes[8 * i + 4] = k;
+			ctx->bitmap_sizes[8 * i + 5] = layer;
+			continue;
+		}
+
+		// (width+1) x (height+1) region at the layer origin, edge-clamped by one
+		// row/column (matching flashbang_upload_bitmap); the rest of the layer is
+		// never written and stays transparent.
+		u32 up_w = width + 1, up_h = height + 1;
+		size_t up_bytes = (size_t)up_w * up_h * 4;
+		u32* temp = (u32*)malloc(up_bytes);
+		const u32* src = (const u32*)(ctx->bitmap_data + ctx->bitmap_offsets[i]);
+		for (u32 y = 0; y < up_h; y++)
+		{
+			u32 sy = (y < height) ? y : height - 1;
+			for (u32 x = 0; x < up_w; x++)
+			{
+				u32 sx = (x < width) ? x : width - 1;
+				temp[y * up_w + x] = src[sy * width + sx];
+			}
+		}
+		WGPUTexelCopyTextureInfo dest = {0};
+		dest.texture = p->tex;
+		dest.origin = (WGPUOrigin3D){0, 0, layer};
+		WGPUTexelCopyBufferLayout layout = {0};
+		layout.bytesPerRow = up_w * 4;
+		layout.rowsPerImage = up_h;
+		WGPUExtent3D extent = {up_w, up_h, 1};
+		wgpuQueueWriteTexture(ctx->queue, &dest, temp, up_bytes, &layout, &extent);
+		free(temp);
+
+		ctx->bitmap_sizes[8 * i + 2] = p->w;
+		ctx->bitmap_sizes[8 * i + 3] = p->h;
+		ctx->bitmap_sizes[8 * i + 4] = k;
+		ctx->bitmap_sizes[8 * i + 5] = layer;
+		ctx->bitmap_sizes[8 * i + 6] = 0;
+		ctx->bitmap_sizes[8 * i + 7] = 0;
+	}
+	wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer, 0,
+	                     ctx->bitmap_sizes, 8 * sizeof(u32) * n);
+	rebuild_fragment_sampler_bg(ctx);
+	bitmap_pool_log("[render] %u static bitmaps in size-class pools: %.1f MiB total",
+	                n, total_mib);
 }
 
 static void create_buffers_and_upload(WebGPURenderContext* ctx)
@@ -1219,9 +1524,7 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 
 	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
 	#define MAX_DYNAMIC_GRADIENTS 64
-	u32 dynamic_bitmap_cap, bmp_layer_w, bmp_layer_h;
-	plan_dynamic_bitmaps(ctx, &dynamic_bitmap_cap, &bmp_layer_w, &bmp_layer_h);
-	(void) bmp_layer_w; (void) bmp_layer_h;
+	u32 dynamic_bitmap_cap = MAX_DYNAMIC_BITMAP_SLOTS;
 	{
 		u32 static_mats = ctx->uninv_mat_data_size > 0
 			? (u32)(ctx->uninv_mat_data_size / (16 * sizeof(float))) : 0;
@@ -1243,13 +1546,12 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->dynamic_gradient_capacity = MAX_DYNAMIC_GRADIENTS;
 	}
 
-	// Over-allocate bitmap_sizes_buffer for dynamic attached bitmaps
+	// Slot table: static bitmaps + per-frame dynamic slots, 8 u32 each.
 	{
 		u32 total_bmp_slots = (u32)ctx->bitmap_count + dynamic_bitmap_cap;
-		if (total_bmp_slots == 0) total_bmp_slots = 1;
 		ctx->bitmap_sizes_buffer = create_buffer(ctx->device, ctx->queue,
 			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-			NULL, 4 * sizeof(u32) * total_bmp_slots, "bitmap_sizes_buffer");
+			NULL, 8 * sizeof(u32) * total_bmp_slots, "bitmap_sizes_buffer");
 		ctx->dynamic_bitmap_base = (u32)ctx->bitmap_count;
 		ctx->dynamic_bitmap_capacity = dynamic_bitmap_cap;
 		ctx->dynamic_bitmap_used = 0;
@@ -1357,31 +1659,9 @@ static void create_textures(WebGPURenderContext* ctx)
 		ctx->gradient_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
 
-	// --- Bitmap texture array (always created, over-allocated for dynamic attachBitmap) ---
+	// --- Bitmap samplers. The pool textures are created later: static pools
+	// in render_webgpu_finalize_bitmaps, dynamic pools on first use. ---
 	{
-		u32 dynamic_bitmap_cap, bw, bh;
-		plan_dynamic_bitmaps(ctx, &dynamic_bitmap_cap, &bw, &bh);
-		u32 total_bitmap_layers = (u32)ctx->bitmap_count + dynamic_bitmap_cap;
-		// Update highest dimensions for upload consistency
-		ctx->bitmap_highest_w = bw - 1;
-		ctx->bitmap_highest_h = bh - 1;
-
-		WGPUTextureDescriptor tex_desc = {0};
-		tex_desc.label = WGPU_LABEL("bitmap_tex");
-		tex_desc.dimension = WGPUTextureDimension_2D;
-		tex_desc.size = (WGPUExtent3D){bw, bh, total_bitmap_layers};
-		tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
-		tex_desc.mipLevelCount = 1;
-		tex_desc.sampleCount = 1;
-		tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
-		ctx->bitmap_tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
-
-		WGPUTextureViewDescriptor view_desc = {0};
-		view_desc.dimension = WGPUTextureViewDimension_2DArray;
-		view_desc.arrayLayerCount = total_bitmap_layers;
-		view_desc.mipLevelCount = 1;
-		ctx->bitmap_tex_view = wgpuTextureCreateView(ctx->bitmap_tex, &view_desc);
-
 		WGPUSamplerDescriptor samp_desc = {0};
 		samp_desc.label = WGPU_LABEL("bitmap_sampler");
 		samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
@@ -1501,9 +1781,11 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	bg1_desc.entries = bg1_entries;
 	ctx->vertex_uniform_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg1_desc);
 
-	// Group 2: fragment texture + sampler (5 entries: gradient tex, gradient samp,
-	// bitmap tex, bitmap samp, bitmap samp linear)
-	WGPUBindGroupLayoutEntry bg2_entries[5] = {0};
+	// Group 2: fragment textures + samplers: gradient tex (0), gradient samp (1),
+	// bitmap samp nearest (2), bitmap samp linear (3), then one texture_2d_array
+	// per bitmap pool (BITMAP_POOL_BINDING_BASE + i). 13 sampled textures per
+	// stage, under WebGPU's guaranteed 16.
+	WGPUBindGroupLayoutEntry bg2_entries[BITMAP_POOL_BINDING_BASE + BITMAP_POOL_COUNT] = {0};
 	bg2_entries[0].binding = 0;
 	bg2_entries[0].visibility = WGPUShaderStage_Fragment;
 	bg2_entries[0].texture.sampleType = WGPUTextureSampleType_Float;
@@ -1513,18 +1795,22 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	bg2_entries[1].sampler.type = WGPUSamplerBindingType_Filtering;
 	bg2_entries[2].binding = 2;
 	bg2_entries[2].visibility = WGPUShaderStage_Fragment;
-	bg2_entries[2].texture.sampleType = WGPUTextureSampleType_Float;
-	bg2_entries[2].texture.viewDimension = WGPUTextureViewDimension_2DArray;
+	bg2_entries[2].sampler.type = WGPUSamplerBindingType_Filtering;
 	bg2_entries[3].binding = 3;
 	bg2_entries[3].visibility = WGPUShaderStage_Fragment;
 	bg2_entries[3].sampler.type = WGPUSamplerBindingType_Filtering;
-	bg2_entries[4].binding = 4;
-	bg2_entries[4].visibility = WGPUShaderStage_Fragment;
-	bg2_entries[4].sampler.type = WGPUSamplerBindingType_Filtering;
+	for (u32 i = 0; i < BITMAP_POOL_COUNT; i++)
+	{
+		WGPUBindGroupLayoutEntry* e = &bg2_entries[BITMAP_POOL_BINDING_BASE + i];
+		e->binding = BITMAP_POOL_BINDING_BASE + i;
+		e->visibility = WGPUShaderStage_Fragment;
+		e->texture.sampleType = WGPUTextureSampleType_Float;
+		e->texture.viewDimension = WGPUTextureViewDimension_2DArray;
+	}
 
 	WGPUBindGroupLayoutDescriptor bg2_desc = {0};
 	bg2_desc.label = WGPU_LABEL("fragment_sampler_bgl");
-	bg2_desc.entryCount = 5;
+	bg2_desc.entryCount = BITMAP_POOL_BINDING_BASE + BITMAP_POOL_COUNT;
 	bg2_desc.entries = bg2_entries;
 	ctx->fragment_sampler_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bg2_desc);
 
@@ -1885,6 +2171,47 @@ static void create_pipelines(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 // create_bind_groups
 // ---------------------------------------------------------------------------
+// Group 2 bind group: gradient texture + sampler, the two bitmap samplers, and
+// one texture view per bitmap pool (the 1x1 dummy array for pools that do not
+// exist yet). Called at init, when the static pools are built, and whenever a
+// dynamic pool is created or grown; if a render pass is open the new group is
+// bound immediately, so the draws recorded from here on see the new pool while
+// earlier draws keep the old group (and through it the old texture) alive.
+static void rebuild_fragment_sampler_bg(WebGPURenderContext* ctx)
+{
+	WGPUTextureView grad_view = ctx->gradient_tex_view ? ctx->gradient_tex_view : ctx->dummy_tex_2d_view;
+	WGPUSampler grad_samp = ctx->gradient_sampler ? ctx->gradient_sampler : ctx->dummy_sampler;
+	WGPUSampler bmp_samp = ctx->bitmap_sampler ? ctx->bitmap_sampler : ctx->dummy_sampler;
+	WGPUSampler bmp_samp_lin = ctx->bitmap_sampler_linear ? ctx->bitmap_sampler_linear : bmp_samp;
+
+	WGPUBindGroupEntry entries[BITMAP_POOL_BINDING_BASE + BITMAP_POOL_COUNT] = {0};
+	entries[0].binding = 0;
+	entries[0].textureView = grad_view;
+	entries[1].binding = 1;
+	entries[1].sampler = grad_samp;
+	entries[2].binding = 2;
+	entries[2].sampler = bmp_samp;
+	entries[3].binding = 3;
+	entries[3].sampler = bmp_samp_lin;
+	for (u32 i = 0; i < BITMAP_POOL_COUNT; i++)
+	{
+		entries[BITMAP_POOL_BINDING_BASE + i].binding = BITMAP_POOL_BINDING_BASE + i;
+		entries[BITMAP_POOL_BINDING_BASE + i].textureView =
+			ctx->bitmap_pools[i].view ? ctx->bitmap_pools[i].view : ctx->dummy_tex_view;
+	}
+
+	WGPUBindGroupDescriptor desc = {0};
+	desc.label = WGPU_LABEL("fragment_sampler_bg");
+	desc.layout = ctx->fragment_sampler_bgl;
+	desc.entryCount = BITMAP_POOL_BINDING_BASE + BITMAP_POOL_COUNT;
+	desc.entries = entries;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &desc);
+	if (ctx->fragment_sampler_bg) wgpuBindGroupRelease(ctx->fragment_sampler_bg);
+	ctx->fragment_sampler_bg = bg;
+	if (ctx->render_pass)
+		wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+}
+
 static void create_bind_groups(WebGPURenderContext* ctx)
 {
 	// --- Group 0: storage buffers ---
@@ -1928,32 +2255,9 @@ static void create_bind_groups(WebGPURenderContext* ctx)
 	bg1_desc.entries = bg1_entries;
 	ctx->vertex_uniform_bg = wgpuDeviceCreateBindGroup(ctx->device, &bg1_desc);
 
-	// --- Group 2: fragment textures + samplers ---
-	// Use dummy textures as fallback when gradients/bitmaps are absent
-	WGPUTextureView grad_view = ctx->gradient_tex_view ? ctx->gradient_tex_view : ctx->dummy_tex_2d_view;
-	WGPUSampler grad_samp = ctx->gradient_sampler ? ctx->gradient_sampler : ctx->dummy_sampler;
-	WGPUTextureView bmp_view = ctx->bitmap_tex_view ? ctx->bitmap_tex_view : ctx->dummy_tex_view;
-	WGPUSampler bmp_samp = ctx->bitmap_sampler ? ctx->bitmap_sampler : ctx->dummy_sampler;
-	WGPUSampler bmp_samp_lin = ctx->bitmap_sampler_linear ? ctx->bitmap_sampler_linear : bmp_samp;
-
-	WGPUBindGroupEntry bg2_entries[5] = {0};
-	bg2_entries[0].binding = 0;
-	bg2_entries[0].textureView = grad_view;
-	bg2_entries[1].binding = 1;
-	bg2_entries[1].sampler = grad_samp;
-	bg2_entries[2].binding = 2;
-	bg2_entries[2].textureView = bmp_view;
-	bg2_entries[3].binding = 3;
-	bg2_entries[3].sampler = bmp_samp;
-	bg2_entries[4].binding = 4;
-	bg2_entries[4].sampler = bmp_samp_lin;
-
-	WGPUBindGroupDescriptor bg2_desc = {0};
-	bg2_desc.label = WGPU_LABEL("fragment_sampler_bg");
-	bg2_desc.layout = ctx->fragment_sampler_bgl;
-	bg2_desc.entryCount = 5;
-	bg2_desc.entries = bg2_entries;
-	ctx->fragment_sampler_bg = wgpuDeviceCreateBindGroup(ctx->device, &bg2_desc);
+	// --- Group 2: fragment textures + samplers (rebuilt whenever a bitmap pool
+	// is created or grown; empty pools bind the dummy array) ---
+	rebuild_fragment_sampler_bg(ctx);
 
 	// --- Compute bind groups ---
 	size_t num_gradients = ctx->uninv_mat_data_size / (16 * sizeof(float));
@@ -2132,10 +2436,16 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 		}
 	}
 #endif
+	// Static pools are normally built by finalizeBitmaps in tag_init; build
+	// them here if a movie defined bitmaps but never finalized.
+	if (!ctx->bitmap_static_built && ctx->current_bitmap > 0)
+		build_static_bitmap_pools(ctx);
 	ctx->dynamic_rect_count = 0;
 	ctx->dynamic_vertex_used = 0;
 	ctx->dynamic_gradient_used = 0;
 	ctx->dynamic_bitmap_used = 0;
+	for (u32 i = BITMAP_STATIC_POOLS; i < BITMAP_POOL_COUNT; i++)
+		ctx->bitmap_pools[i].used = 0;
 	// Filter uniform slots only have to stay distinct WITHIN a frame (the frame's
 	// commands have all run by the time the next frame's writes land), so the
 	// ring restarts here rather than growing without bound.
@@ -2652,24 +2962,6 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 // stretches via UV mapping when src != dst (Flash's Video render rule).
 // When src == dst, equivalent to the original unscaled function.
 // ---------------------------------------------------------------------------
-// One-shot notice that a frame asked for more dynamic bitmap layers than the
-// array has. Both call sites drop the draw SILENTLY, which reads downstream as
-// missing ink rather than as a capacity failure — 36 of 100 tiles rendered
-// blank in visual/filters/blur_* for a whole session before anyone traced it
-// back here (w1 gfx-blur report S2.3). Enumerating who truncates is the only
-// way to price a capacity change, so leave a way to see it. Off unless
-// SWF_WARN_BITMAP_CAP is set, since tests capture these streams.
-static void dynamic_bitmap_capacity_hit(WebGPURenderContext* ctx)
-{
-	static int warned = 0;
-	if (warned || getenv("SWF_WARN_BITMAP_CAP") == NULL) return;
-	warned = 1;
-	fprintf(stderr, "[render] dynamic bitmap capacity %u exhausted "
-	        "(layer %ux%u); further bitmap draws this frame are dropped\n",
-	        ctx->dynamic_bitmap_capacity, (u32)(ctx->bitmap_highest_w + 1),
-	        (u32)(ctx->bitmap_highest_h + 1));
-}
-
 void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 	const uint32_t* argb_pixels, u32 src_w, u32 src_h,
 	u32 dst_w, u32 dst_h,
@@ -2678,34 +2970,27 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 {
 	if (!ctx->renderer_ok || argb_pixels == NULL) return;
 	if (src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0) return;
-	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity)
-	{
-		dynamic_bitmap_capacity_hit(ctx);
-		return;
-	}
 	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
 	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
 
-	// Allocate a dynamic bitmap layer
-	u32 bmp_layer = ctx->dynamic_bitmap_base + ctx->dynamic_bitmap_used;
-	ctx->dynamic_bitmap_used++;
+	// Allocate a dynamic slot + a pool layer that fits the source.
+	u32 bmp_slot, bmp_pool, bmp_layer;
+	if (!dynamic_bitmap_acquire(ctx, src_w, src_h, &bmp_slot, &bmp_pool, &bmp_layer))
+		return;
+	BitmapPool* pool = &ctx->bitmap_pools[bmp_pool];
 
-	// Upload ARGB pixels as RGBA to the bitmap texture layer.
+	// Upload ARGB pixels as RGBA to the pool layer.
 	//
-	// The padded layer is (bw, bh) — sized for the LARGEST bitmap in the shared
-	// static+dynamic texture array, which for embedded-asset SWFs (e.g. Seedling's
-	// 4480x640 atlas) dwarfs this dynamic source. But this quad's inverse matrix
-	// maps the on-stage quad EXACTLY onto bitmap coords [0, src] (see sx/sy below),
-	// and the sampler is Nearest + ClampToEdge, so the shader only ever addresses
-	// texels [0, src] of the layer. So upload just the (src+1)x(src+1) sub-region
-	// at the layer origin — the +1 edge-clamp row/col covers the boundary texel —
-	// and leave the rest of the padded layer untouched (never sampled).
-	// bitmap_sizes stays the PADDED {bw, bh} so the shader's UV normalization is
-	// unchanged → byte-identical output, but the per-frame upload shrinks from
-	// bw*bh to (src+1)^2 (Seedling: 11.5 MB -> ~104 KB per frame).
+	// This quad's inverse matrix maps the on-stage quad EXACTLY onto bitmap
+	// coords [0, src] (see sx/sy below), and the sampler is Nearest +
+	// ClampToEdge, so the shader only ever addresses texels [0, src] of the
+	// layer. So upload just the (src+1)x(src+1) sub-region at the layer origin
+	// — the +1 edge-clamp row/col covers the boundary texel — and leave the
+	// rest of the layer untouched (never sampled, even though a previous frame
+	// may have written it).
 	{
-		u32 bw = (u32)(ctx->bitmap_highest_w + 1);
-		u32 bh = (u32)(ctx->bitmap_highest_h + 1);
+		u32 bw = pool->w;
+		u32 bh = pool->h;
 		u32 up_w = (src_w + 1 <= bw) ? src_w + 1 : bw;
 		u32 up_h = (src_h + 1 <= bh) ? src_h + 1 : bh;
 		size_t up_bytes = (size_t)up_w * up_h * 4;
@@ -2730,7 +3015,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 		}
 
 		WGPUTexelCopyTextureInfo dest = {0};
-		dest.texture = ctx->bitmap_tex;
+		dest.texture = pool->tex;
 		dest.origin = (WGPUOrigin3D){0, 0, bmp_layer};
 		WGPUTexelCopyBufferLayout layout = {0};
 		layout.bytesPerRow = up_w * 4;
@@ -2738,13 +3023,11 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 		WGPUExtent3D extent = {up_w, up_h, 1};
 		wgpuQueueWriteTexture(ctx->queue, &dest, temp, up_bytes, &layout, &extent);
 
-		// Upload bitmap_sizes for this layer: {content, padded}. This quad is
-		// emitted as style 0x43 (clipped, non-smoothed), so the shader reads only the padded
-		// half — `inv_pos / padded`, exactly as before. The content half is
-		// recorded truthfully for completeness.
-		u32 sizes[4] = { src_w, src_h, bw, bh };
-		wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer,
-			(uint64_t)bmp_layer * 4 * sizeof(u32), sizes, sizeof(sizes));
+		// Slot entry: {content, padded}, {pool, layer}. This quad is emitted as
+		// style 0x43 (clipped, non-smoothed), so the shader normalizes by the
+		// padded half — `inv_pos / padded`; the content half is recorded
+		// truthfully for completeness.
+		write_bitmap_slot(ctx, bmp_slot, src_w, src_h, bmp_pool, bmp_layer);
 
 		free(temp);
 	}
@@ -2754,7 +3037,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 	// (x_twips + dst_w*20, y_twips + dst_h*20) → (src_w, src_h) in bitmap space.
 	// Sample-stretch happens for free when src != dst.
 	// Column-major 4x4: [sx, 0, 0, 0,  0, sy, 0, 0,  0, 0, 1, 0,  tx, ty, 0, 1]
-	u32 inv_mat_id = ctx->static_mat_count + MAX_DYNAMIC_GRADIENTS + (ctx->dynamic_bitmap_used - 1);
+	u32 inv_mat_id = ctx->static_mat_count + MAX_DYNAMIC_GRADIENTS + (bmp_slot - ctx->dynamic_bitmap_base);
 	{
 		float sx = (float)src_w / ((float)dst_w * 20.0f);
 		float sy = (float)src_h / ((float)dst_h * 20.0f);
@@ -2774,7 +3057,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 	// Generate 6 vertices (2 triangles) for the quad
 	// Vertex format: { float x, float y, u32 style_type, u32 style_id }
 	// style_type = 0x43 (clipped bitmap fill, no repeat, NOT smoothed)
-	// style_id = bitmap_layer_id (lower 16) | inv_mat_id (upper 16)
+	// style_id = bitmap slot (lower 16) | inv_mat_id (upper 16)
 	//
 	// This path (attachBitmap / Bitmap display objects / the video fallback)
 	// carries no smoothing information, and Flash's default for both
@@ -2791,7 +3074,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 	x1.f = x_twips + w_twips;  y1.f = y_twips + h_twips;
 
 	u32 sx = render_webgpu_bitmap_fill_style_word(0, 0);  // clipped, non-smoothed
-	u32 sy = (bmp_layer & 0xFFFF) | ((inv_mat_id & 0xFFFF) << 16);
+	u32 sy = (bmp_slot & 0xFFFF) | ((inv_mat_id & 0xFFFF) << 16);
 
 	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
 	ctx->dynamic_vertex_used += 6;
@@ -2829,10 +3112,14 @@ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
 
 // ---------------------------------------------------------------------------
 // render_webgpu_draw_bitmap_tris — bitmap-filled triangles for the Drawing
-// API's beginBitmapFill. Source `argb_pixels` is uploaded with row-stride
-// padding to fill the whole bitmap-array layer: tiled (for repeat=true) or
-// edge-clamped (for repeat=false), so that UVs outside the data region map
-// to the desired values without a custom sampler.
+// API's beginBitmapFill. Source `argb_pixels` is uploaded as a
+// (src_w+1) x (src_h+1) region at the pool layer's origin, with the +1
+// row/column a WRAP copy (repeat=true — so a smoothed tile edge blends into
+// the tile's own first texel) or an EDGE copy (repeat=false). The repeating
+// arm of the shader tiles on the content size (fract), so it never leaves the
+// region; the clipped arm sets style bit 11 so the shader clamps its UVs to
+// the content (Flash extends the edge pixels of a clipped bitmap fill) instead
+// of reading whatever a previous frame left in the rest of the layer.
 // user_matrix6: a, b, c, d, tx_pixels, ty_pixels — maps bitmap pixel coords →
 // MC local pixel coords (Flash semantics).
 // ---------------------------------------------------------------------------
@@ -2844,32 +3131,26 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 {
 	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
 	if (argb_pixels == NULL || src_w == 0 || src_h == 0) return;
-	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity)
-	{
-		dynamic_bitmap_capacity_hit(ctx);
-		return;
-	}
+	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
 	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
 		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
 	if (vertex_count == 0) return;
 
-	// Allocate dynamic bitmap layer
-	u32 bmp_layer = ctx->dynamic_bitmap_base + ctx->dynamic_bitmap_used;
-	ctx->dynamic_bitmap_used++;
+	u32 bmp_slot, bmp_pool, bmp_layer;
+	if (!dynamic_bitmap_acquire(ctx, src_w, src_h, &bmp_slot, &bmp_pool, &bmp_layer))
+		return;
+	BitmapPool* pool = &ctx->bitmap_pools[bmp_pool];
 
-	u32 bw = (u32)(ctx->bitmap_highest_w + 1);
-	u32 bh = (u32)(ctx->bitmap_highest_h + 1);
-
-	// Build the padded layer: tile for repeat=true, edge-clamp for repeat=false.
+	// (src+1)^2 region: wrap copy for repeat, edge copy for clipped.
 	{
-		size_t slice_bytes = (size_t)bw * bh * 4;
-		u8* temp = (u8*)calloc(1, slice_bytes);
-		u32* dst = (u32*)temp;
-		for (u32 y = 0; y < bh; y++) {
+		u32 up_w = src_w + 1, up_h = src_h + 1;
+		size_t up_bytes = (size_t)up_w * up_h * 4;
+		u32* dst = (u32*)malloc(up_bytes);
+		for (u32 y = 0; y < up_h; y++) {
 			u32 sy;
 			if (repeat) sy = y % src_h;
 			else        sy = (y < src_h) ? y : src_h - 1;
-			for (u32 x = 0; x < bw; x++) {
+			for (u32 x = 0; x < up_w; x++) {
 				u32 sx;
 				if (repeat) sx = x % src_w;
 				else        sx = (x < src_w) ? x : src_w - 1;
@@ -2878,39 +3159,31 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 				u32 r = (argb >> 16) & 0xFF;
 				u32 g = (argb >> 8)  & 0xFF;
 				u32 b =  argb        & 0xFF;
-				dst[y * bw + x] = r | (g << 8) | (b << 16) | (a << 24);
+				dst[y * up_w + x] = r | (g << 8) | (b << 16) | (a << 24);
 			}
 		}
 
 		WGPUTexelCopyTextureInfo dest = {0};
-		dest.texture = ctx->bitmap_tex;
+		dest.texture = pool->tex;
 		dest.origin = (WGPUOrigin3D){0, 0, bmp_layer};
 		WGPUTexelCopyBufferLayout layout = {0};
-		layout.bytesPerRow = bw * 4;
-		layout.rowsPerImage = bh;
-		WGPUExtent3D extent = {bw, bh, 1};
-		wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
+		layout.bytesPerRow = up_w * 4;
+		layout.rowsPerImage = up_h;
+		WGPUExtent3D extent = {up_w, up_h, 1};
+		wgpuQueueWriteTexture(ctx->queue, &dest, dst, up_bytes, &layout, &extent);
 
-		// Record {content, padded} for the layer. This path PRE-TILES the
-		// source across the whole padded layer above, so its repeat period is
-		// the layer itself, not src_w/src_h: content = {bw-1, bh-1} reproduces
-		// the period the shader used before this commit exactly, keeping
-		// beginBitmapFill byte-identical. (Uploading only src_w x src_h and
-		// setting content = {src_w, src_h} is the better model and removes the
-		// wrap seam, but it needs the clipped arm to clamp to content too —
-		// a separate patch with its own A/B.)
-		u32 sizes[4] = { bw - 1, bh - 1, bw, bh };
-		wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer,
-			(uint64_t)bmp_layer * 4 * sizeof(u32), sizes, sizeof(sizes));
+		// content = the source size: the repeat period for repeat=true, the
+		// clamp box for repeat=false (style bit 11 below).
+		write_bitmap_slot(ctx, bmp_slot, src_w, src_h, bmp_pool, bmp_layer);
 
-		free(temp);
+		free(dst);
 	}
 
 	// Compose inv_mat: pos_twips → bitmap_pixel_coord in layer space.
 	// Flash matrix M = [a, c, tx; b, d, ty] maps bitmap_pixel → mc_local_pixel.
 	// M^-1 maps mc_local_pixel → bitmap_pixel. We also fold a (1/20) factor so
 	// the matrix consumes pos_twips directly.
-	u32 inv_mat_id = ctx->static_mat_count + MAX_DYNAMIC_GRADIENTS + (ctx->dynamic_bitmap_used - 1);
+	u32 inv_mat_id = ctx->static_mat_count + MAX_DYNAMIC_GRADIENTS + (bmp_slot - ctx->dynamic_bitmap_base);
 	{
 		float a = user_matrix6[0], b = user_matrix6[1];
 		float c = user_matrix6[2], d = user_matrix6[3];
@@ -2948,8 +3221,12 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 	// the smoothing bit (0x40/0x41 smoothed, 0x42/0x43 not), which is how
 	// beginBitmapFill's `smooth` argument reaches the fragment shader's sampler
 	// choice — see render_webgpu_bitmap_fill_style_word.
-	u32 sx_word = render_webgpu_bitmap_fill_style_word(repeat, smooth);
-	u32 sy_word = (bmp_layer & 0xFFFFu) | ((inv_mat_id & 0xFFFFu) << 16);
+	// Bit 11 (outside the SWF fill byte): clamp UVs to the content — dynamic
+	// layers are reused across frames, so the clipped arm must not read past
+	// the (src+1)^2 region uploaded above. Static fills never set it.
+	u32 sx_word = render_webgpu_bitmap_fill_style_word(repeat, smooth)
+	            | (repeat ? 0u : 0x800u);
+	u32 sy_word = (bmp_slot & 0xFFFFu) | ((inv_mat_id & 0xFFFFu) << 16);
 
 	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
 	ctx->dynamic_vertex_used += vertex_count;
@@ -3264,64 +3541,36 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 // Bitmap upload (called during init, before rendering starts)
 // ---------------------------------------------------------------------------
+// Records the bitmap's size and data offset; the GPU work happens in
+// render_webgpu_finalize_bitmaps, once every static bitmap's size is known
+// and the size-class pools can be dimensioned (see "Bitmap texture pools").
 void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, size_t offset,
                                  size_t size, u32 width, u32 height)
 {
-	if (!ctx->bitmap_tex) return;
+	(void) size;
+	if (!ctx->renderer_ok || ctx->bitmap_static_built) return;
+	if (ctx->current_bitmap >= ctx->bitmap_count) return;
 
-	u32 bw = (u32)(ctx->bitmap_highest_w + 1);
-	u32 bh = (u32)(ctx->bitmap_highest_h + 1);
-
-	// Allocate temporary RGBA buffer for this bitmap layer (padded to array slice size)
-	size_t slice_bytes = bw * bh * 4;
-	u8* temp = calloc(1, slice_bytes);
-
-	// Copy bitmap data row-by-row into padded buffer (with edge clamping for
-	// the extra padding column/row, matching flashbang_upload_bitmap behavior)
-	u32* src = (u32*)(ctx->bitmap_data + offset);
-	u32* dst = (u32*)temp;
-	for (u32 y = 0; y <= height; y++)
-	{
-		u32 sy = (y < height) ? y : height - 1;
-		for (u32 x = 0; x <= width; x++)
-		{
-			u32 sx = (x < width) ? x : width - 1;
-			dst[y * bw + x] = src[sy * width + sx];
-		}
-	}
-
-	// Upload to the correct array layer
-	WGPUTexelCopyTextureInfo dest = {0};
-	dest.texture = ctx->bitmap_tex;
-	dest.origin = (WGPUOrigin3D){0, 0, (u32)ctx->current_bitmap};
-	WGPUTexelCopyBufferLayout layout = {0};
-	layout.bytesPerRow = bw * 4;
-	layout.rowsPerImage = bh;
-	WGPUExtent3D extent = {bw, bh, 1};
-	wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
-
-	// Store BOTH the bitmap's own size and the padded layer size.
-	// A repeating fill (0x40/0x42) must tile on the bitmap's own size; the
-	// layer is padded to the LARGEST bitmap in the shared texture array (plus
-	// one edge-clamp row/column), so tiling on it left transparent gaps of
-	// (padded - 1 - content) texels per axis for every under-sized bitmap.
-	// A clipped fill (0x41/0x43) still normalizes by the padded size.
-	ctx->bitmap_sizes[4 * ctx->current_bitmap]     = width;
-	ctx->bitmap_sizes[4 * ctx->current_bitmap + 1] = height;
-	ctx->bitmap_sizes[4 * ctx->current_bitmap + 2] = bw;
-	ctx->bitmap_sizes[4 * ctx->current_bitmap + 3] = bh;
+	// Every defineBitmap call owns the next slot (the recompiler numbers bitmap
+	// ids in emission order), so a degenerate 0x0 bitmap still consumes its
+	// index; build_static_bitmap_pools skips its upload.
+	size_t i = ctx->current_bitmap;
+	ctx->bitmap_offsets[i] = offset;
+	ctx->bitmap_sizes[8 * i]     = width;
+	ctx->bitmap_sizes[8 * i + 1] = height;
+	ctx->bitmap_sizes[8 * i + 2] = 0;
+	ctx->bitmap_sizes[8 * i + 3] = 0;
+	ctx->bitmap_sizes[8 * i + 4] = 0;
+	ctx->bitmap_sizes[8 * i + 5] = 0;
+	ctx->bitmap_sizes[8 * i + 6] = 0;
+	ctx->bitmap_sizes[8 * i + 7] = 0;
 	ctx->current_bitmap++;
-
-	free(temp);
 }
 
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* ctx)
 {
-	if (ctx->bitmap_count == 0) return;
-
-	// Upload bitmap_sizes to GPU
-	wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer, 0,
-	                     ctx->bitmap_sizes, 4 * sizeof(u32) * ctx->bitmap_count);
+	if (!ctx->renderer_ok || ctx->bitmap_count == 0) return;
+	build_static_bitmap_pools(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -5350,8 +5599,11 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->gradient_tex_view) wgpuTextureViewRelease(ctx->gradient_tex_view);
 	if (ctx->gradient_tex) wgpuTextureRelease(ctx->gradient_tex);
 	if (ctx->gradient_sampler) wgpuSamplerRelease(ctx->gradient_sampler);
-	if (ctx->bitmap_tex_view) wgpuTextureViewRelease(ctx->bitmap_tex_view);
-	if (ctx->bitmap_tex) wgpuTextureRelease(ctx->bitmap_tex);
+	for (u32 i = 0; i < BITMAP_POOL_COUNT; i++)
+	{
+		if (ctx->bitmap_pools[i].view) wgpuTextureViewRelease(ctx->bitmap_pools[i].view);
+		if (ctx->bitmap_pools[i].tex) wgpuTextureRelease(ctx->bitmap_pools[i].tex);
+	}
 	if (ctx->bitmap_sampler) wgpuSamplerRelease(ctx->bitmap_sampler);
 	if (ctx->bitmap_sampler_linear) wgpuSamplerRelease(ctx->bitmap_sampler_linear);
 	if (ctx->dummy_tex_view) wgpuTextureViewRelease(ctx->dummy_tex_view);
