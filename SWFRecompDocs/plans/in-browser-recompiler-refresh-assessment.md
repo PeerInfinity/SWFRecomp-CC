@@ -303,7 +303,8 @@ noise in libtess2 under wasm32, not a functional difference.
 **Original Seedling renders black (GPU device removed).** Not a pipeline problem: the
 bundle builds and runs, but `render_webgpu.c` allocates ONE bitmap texture array of
 `(highest_w+1) x (highest_h+1) x (bitmap_count + dynamic cap)` layers. The original has
-284 bitmaps with the tallest 4480x1106, i.e. 4481x1107x284x4 B = **5.25 GiB** of static
+284 bitmaps whose widest is 4480 px and whose tallest is 1106 px (different bitmaps:
+the 1106-tall one is only 486 wide), so the envelope is 4480x1106, i.e. 4481x1107x284x4 B = **5.25 GiB** of static
 layers (+64 dynamic), which D3D12 refuses and the device is lost. The teleport build
 that powers the docs2 demos has 281 bitmaps but its tallest is 4480x640 (3.0 GiB), which
 this GPU tolerates. `BITMAP_ARRAY_HARD_LIMIT` (1.5 GiB) only clamps dynamic growth, by
