@@ -284,7 +284,7 @@ build:
 | SWF | In-browser recompile | Bundle | Local build.sh | In-browser run |
 |---|---|---|---|---|
 | Doodle Jump (flasharchive, 650 KB, AVM1) | 3 s, 48 files, 19 MB C | 4.3 MB | OK, title screen renders | OK: 46 files compile in 61 s, title screen renders |
-| Seedling (Newgrounds 598977, 7.8 MB, AS3) | 65 s, 16 files, 182 MB C | 33 MB | see below | refused with the AS3 message (host is AVM1-only) |
+| Seedling (Newgrounds 598977, 7.8 MB, AS3) | 65 s, 16 files, 182 MB C | 33 MB | builds in 5:38 (1.8 GB RAM, 33 MB wasm); runs, but the canvas stays black: Dawn `DXGI_ERROR_DEVICE_REMOVED` (see below) | refused with the AS3 message (host is AVM1-only) |
 
 Two recompiler-wasm bugs surfaced by Seedling, both fixed in `SWFRecomp/CMakeLists.txt`:
 - **C++ exceptions were disabled in the Emscripten build**, so an exception the
@@ -299,3 +299,13 @@ Two recompiler-wasm bugs surfaced by Seedling, both fixed in `SWFRecomp/CMakeLis
 Residual wasm-vs-native output difference: a few tessellation vertices per complex
 shape (Doodle Jump 22872 vs 22878 rows, Seedling 57066 vs 57069) — float-precision
 noise in libtess2 under wasm32, not a functional difference.
+
+**Original Seedling renders black (GPU device removed).** Not a pipeline problem: the
+bundle builds and runs, but `render_webgpu.c` allocates ONE bitmap texture array of
+`(highest_w+1) x (highest_h+1) x (bitmap_count + dynamic cap)` layers. The original has
+284 bitmaps with the tallest 4480x1106, i.e. 4481x1107x284x4 B = **5.25 GiB** of static
+layers (+64 dynamic), which D3D12 refuses and the device is lost. The teleport build
+that powers the docs2 demos has 281 bitmaps but its tallest is 4480x640 (3.0 GiB), which
+this GPU tolerates. `BITMAP_ARRAY_HARD_LIMIT` (1.5 GiB) only clamps dynamic growth, by
+design. Fixing the original needs a runtime change (per-bitmap textures or an atlas
+instead of a uniform array); tracked as a follow-up, outside the in-browser work.
