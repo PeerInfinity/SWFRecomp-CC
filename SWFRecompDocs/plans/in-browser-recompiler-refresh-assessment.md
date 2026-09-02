@@ -179,9 +179,12 @@ C and offers downloadable zips. Details:
   and fills the stage size into the player page.
 - Verified: page → bundle zip (2.5 MB) → `./build.sh` with emsdk 5.0 → WebGPU page
   renders `awful_shape_swf_4` correctly with the current runtime.
-- Deploy workflows no longer rebuild `action.o`/`object.o` or `build_info.json`;
-  `docs/recompiler/` is deployed as the consistent snapshot committed by
-  `deploy_wasm_demo.sh`. Trace artifacts (`libswfruntime.a`, `wasi_shim.js`,
+- Nothing generated is tracked (`SWFRecomp.{js,wasm}`, `build_info.json`, `bundle/`
+  are gitignored): both deploy-pages workflows run `deploy_wasm_demo.sh --build`
+  with a pinned, cached emsdk and deploy the result, so `docs/recompiler/` is
+  always consistent with the deployed commit. `deploy-pages.yml` has a `dry_run`
+  input that builds everything but skips the Pages upload. A submodule for the
+  bundle was considered and rejected: the bundle is a pure function of the commit. Trace artifacts (`libswfruntime.a`, `wasi_shim.js`,
   `runtime_src/`) deleted. Graphics-stage files (`pipeline_graphics.js`,
   `graphics_host.*`, `runtime_src_graphics/`, `clang_registry_response.json`,
   `coi-serviceworker.js`) are kept, unreferenced, for stage 2.
