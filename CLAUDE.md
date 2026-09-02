@@ -34,6 +34,16 @@ to make the pipeline resumable across sessions.
   and force-pushes failing PNGs to the `ruffle-image-results` branch).
   Image comparisons never gate trace pass/fail. Baseline:
   `SWFRecompDocs/plans/graphics-image-baseline.md`.
+- **GitHub Pages deploy is authorized** (standing approval, added 2026-09-02):
+  after changing `docs/` or the in-browser recompiler
+  (`docs/recompiler/`, `SWFRecomp/scripts/deploy_wasm_demo.sh`,
+  `SWFRecomp/wasm_wrappers/bundle/`), dispatch
+  `gh workflow run deploy-pages.yml --ref master` and watch it. The workflow
+  builds `SWFRecomp.wasm` and the runtime-snapshot build bundle at deploy time
+  (never commit those — they are gitignored). `-f dry_run=true` runs every build
+  step but skips the upload; use it to validate workflow changes first.
+- Never rewrite published git history (no force-push / filter-repo), even to
+  purge large files that were committed by mistake; untrack them going forward.
 - Still ask before anything genuinely irreversible or out of scope (force-pushing
   over others' work, rewriting published history, deleting branches, etc.).
 - A failing-but-completed CI run is a result to report, not a blocker — surface
