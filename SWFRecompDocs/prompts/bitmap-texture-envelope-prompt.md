@@ -58,6 +58,13 @@ Seedling (generated C + runtime snapshot + `build.sh`, already built: `out/`).
   Windows python is `"/mnt/c/Program Files/Python312/python.exe"`.
 - The teleport control: `docs2/demo.html?test=avm2/seedling` served from `docs2/`.
 
+## After this slice
+
+The next slice is already briefed: `SWFRecompDocs/prompts/avm2-in-browser-investigation-prompt.md`
+(can AS3 SWFs run through the in-browser recompiler). Your report's "next slice's line"
+should say whether anything you learned changes that brief (e.g. if bitmap data moves
+out of static arrays, say so — it affects that investigation's data-path question).
+
 ## Done means
 
 - Original Seedling shows its title screen in Chrome via the repro above.
