@@ -252,6 +252,7 @@ async function processSwf(swfBytes, name, sourceLabel) {
     $("result").classList.remove("visible");
     $("runStatus").style.display = "none";
     $("dlWasmBtn").style.display = "none";
+    $("dlRunnableBtn").style.display = "none";
     lastGuest = null;
     $("status").classList.add("visible");
     setStep("step-load", "active", "Loading recompiler ...");
@@ -296,6 +297,55 @@ $("dlWasmBtn").addEventListener("click", () => {
     triggerDownload(lastGuest.bytes, `${lastGuest.name}-guest.wasm`, "application/wasm");
 });
 
+// Runnable zip: the guest module + the graphics host + the standalone loader +
+// a player page + coi-serviceworker (cross-origin isolation for the host's
+// shared memory). Serve the folder over HTTP and open it in Chrome 137+.
+const RUNNABLE_FILES = [
+    ["host/graphics_host.js", "graphics_host.js"],
+    ["host/graphics_host.wasm", "graphics_host.wasm"],
+    ["guest_loader.js", "guest_loader.js"],
+    ["coi-serviceworker.js", "coi-serviceworker.js"],
+];
+$("dlRunnableBtn").addEventListener("click", async () => {
+    if (!lastGuest) return;
+    const btn = $("dlRunnableBtn");
+    btn.disabled = true;
+    try {
+        await loadFflate();
+        const root = `${lastGuest.name}-runnable/`;
+        const entries = {};
+        $("runHint").textContent = "Fetching host files";
+        await Promise.all(RUNNABLE_FILES.map(async ([src, dst]) => {
+            const r = await fetch(src);
+            if (!r.ok) throw new Error(`Failed to fetch ${src} (${r.status})`);
+            entries[root + dst] = new Uint8Array(await r.arrayBuffer());
+        }));
+        const tpl = await (await fetch("runner_template.html")).text();
+        entries[root + "index.html"] = new TextEncoder().encode(tpl.replace(/{{NAME}}/g, lastGuest.name));
+        entries[root + `${lastGuest.name}-guest.wasm`] = lastGuest.bytes;
+        entries[root + "README.md"] = new TextEncoder().encode([
+            `# ${lastGuest.name} — runnable build`, "",
+            "Compiled by the SWFRecomp in-browser recompiler. No build step needed.", "",
+            "    python3 -m http.server 8080      # in this folder", "",
+            "then open http://localhost:8080/ in Chrome 137 or newer (WebGPU + JSPI required).",
+            "It must be served over HTTP (any static host works); file:// does not, because",
+            "coi-serviceworker.js has to enable cross-origin isolation for the shared-memory host.", "",
+            "Files: index.html (player page), guest_loader.js (instantiates the guest against the",
+            `host), ${lastGuest.name}-guest.wasm (this SWF's compiled code + data), graphics_host.js/.wasm`,
+            `(the SWFModernRuntime graphics runtime, snapshot ${buildInfo ? buildInfo.commit : "unknown"}), coi-serviceworker.js.`, "",
+        ].join("\n"));
+        $("runHint").textContent = "Zipping";
+        const zipped = zipEntries(entries);
+        triggerDownload(zipped, `${lastGuest.name}-runnable.zip`);
+        $("runHint").textContent = `Runnable: ${fmtSize(zipped.length)} zipped — unzip, serve the folder over HTTP, open in Chrome 137+.`;
+    } catch (e) {
+        console.error(e);
+        showError(e.message);
+    } finally {
+        btn.disabled = false;
+    }
+});
+
 $("runBtn").addEventListener("click", async () => {
     if (!currentResult) return;
     const gfx = await import("./pipeline_graphics.js");
@@ -314,12 +364,13 @@ $("runBtn").addEventListener("click", async () => {
         setStep("step-guest", "done", `Compiled ${guest.fileCount} C files to a ${fmtSize(guest.bytes.length)} guest module in ${(guest.ms / 1000).toFixed(1)} s`);
         lastGuest = { bytes: guest.bytes, name: currentResult.name };
         $("dlWasmBtn").style.display = "";
+        $("dlRunnableBtn").style.display = "";
         $("runHint").textContent = "The guest .wasm holds this SWF's compiled code and data; it runs only alongside the graphics host (host/graphics_host.wasm), the way this page loads it.";
         setStep("step-host", "active", "Loading graphics host ...");
-        const host = await gfx.loadHost(canvas, log);
+        await gfx.loadHost({ hostDir: "host/", canvas, log });
         setStep("step-host", "done", "Graphics host loaded");
         setStep("step-run", "active", "Instantiating guest ...");
-        await gfx.runGuest(guest.bytes, host, canvas, (t) => setStep("step-run", "active", t), log);
+        await gfx.runGuest({ guestBytes: guest.bytes, hostDir: "host/", canvas, log, setStatus: (t) => setStep("step-run", "active", t) });
         setStep("step-run", "done", "Finished");
     } catch (e) {
         console.error(e);

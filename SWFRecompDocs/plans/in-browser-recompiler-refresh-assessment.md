@@ -310,3 +310,18 @@ that powers the docs2 demos has 281 bitmaps but its tallest is 4480x640 (3.0 GiB
 this GPU tolerates. `BITMAP_ARRAY_HARD_LIMIT` (1.5 GiB) only clamps dynamic growth, by
 design. Fixing the original needs a runtime change (per-bitmap textures or an atlas
 instead of a uniform array); tracked as a follow-up, outside the in-browser work.
+
+## 9. Downloads after the in-browser build (2026-09-02)
+
+Once the in-browser compile succeeds the page offers, besides the two source zips:
+- **Download guest .wasm** — the module the in-browser clang produced (code + data of
+  this SWF; ~145 imports satisfied by the graphics host, so not standalone).
+- **Download runnable (.zip)** — `<name>-runnable/` = `index.html` (player page from
+  `runner_template.html`), `guest_loader.js` (the SAME loader the page uses:
+  host load with raw-export capture, guest instantiate, table mirroring, `runSWF`),
+  `<name>-guest.wasm`, `graphics_host.{js,wasm}`, `coi-serviceworker.js`, README.
+  Serve the folder over HTTP (`python3 -m http.server`; any static host) and open it
+  in Chrome 137+; `file://` cannot work because the host's shared memory needs
+  cross-origin isolation, which the service worker provides after one reload.
+  ~620 KB zipped for a small SWF. Verified: extracted folder runs from a plain
+  `http.server` (awful_shape, keyboard_input).
