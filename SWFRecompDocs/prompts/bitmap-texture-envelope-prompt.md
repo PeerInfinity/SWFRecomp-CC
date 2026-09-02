@@ -65,6 +65,21 @@ The next slice is already briefed: `SWFRecompDocs/prompts/avm2-in-browser-invest
 should say whether anything you learned changes that brief (e.g. if bitmap data moves
 out of static arrays, say so — it affects that investigation's data-path question).
 
+**You launch that successor yourself** (the session that launched you may be closed by
+then — standing rule, see the memory note `session-launch-protocol`): after your
+closeout is committed and pushed, first edit the AVM2 brief if your findings changed
+anything in it (commit that too), then run
+
+```
+~/bin/wsl-launch-claude.sh -m fable -C /home/robert/CC/SWFRecomp-CC -d : -t avm2-in-browser-investigation -f SWFRecompDocs/prompts/avm2-in-browser-investigation-prompt.md
+```
+
+verify the newest `~/.cache/wsl-launch-claude/run.*` and the new session's
+`/proc/<pid>/cwd`, then ListAgents and SendMessage the new session a handshake
+("Handshake from the launching session: reply to this sender for REPORT BACK; no action
+needed now"). Do this even if the Seedling fix is only partial — the investigation does
+not depend on it. Skip the launch only if the user has told you otherwise in the meantime.
+
 ## Done means
 
 - Original Seedling shows its title screen in Chrome via the repro above.
