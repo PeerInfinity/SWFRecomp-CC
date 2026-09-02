@@ -106,6 +106,16 @@ jobs:
           echo "bundle: $(find docs/recompiler/bundle -type f | wc -l) files, $(du -sh docs/recompiler/bundle | cut -f1)"
           ls -la docs/recompiler/SWFRecomp.wasm docs/recompiler/build_info.json
 
+      # End-to-end smoke of what the page hands out: recompile a tracked example
+      # SWF with SWFRecomp.wasm under Node, assemble the bundle the way
+      # pipeline.js zips it, run its build.sh with emcc. A broken recompiler
+      # build or a runtime change that breaks build.sh fails the deploy here
+      # instead of on a user's machine.
+      - name: Bundle smoke (recompile with SWFRecomp.wasm + build.sh)
+        run: |
+          source emsdk/emsdk_env.sh
+          bash SWFRecomp/scripts/bundle_smoke.sh
+
       - name: Setup Pages
         if: ${{ !inputs.dry_run }}
         uses: actions/configure-pages@v5
