@@ -24,6 +24,7 @@
 // ---------------------------------------------------------------------------
 // Global display state — defined here in NO_GRAPHICS (swf.c provides in GRAPHICS)
 // ---------------------------------------------------------------------------
+#include <libswf/generated_data.h>
 #ifdef NO_GRAPHICS
 Character* dictionary = NULL;
 DisplayObject* display_list = NULL;
@@ -33,8 +34,8 @@ size_t max_depth = 0;
 // ---------------------------------------------------------------------------
 // Access generated data arrays (from draws.c / tagMain.c, linked per-test)
 // ---------------------------------------------------------------------------
-extern float transform_data[][16];
-extern float cxform_data[];
+GEN_EXTERN_TRANSFORM_DATA;
+GEN_EXTERN_CXFORM_DATA;
 extern int catch_up_mode;
 extern size_t display_list_capacity;
 

@@ -250,6 +250,7 @@ async function processSwf(swfBytes, name, sourceLabel) {
     clearError();
     currentResult = null;
     $("result").classList.remove("visible");
+    $("runStatus").style.display = "none";
     $("status").classList.add("visible");
     setStep("step-load", "active", "Loading recompiler ...");
     setStep("step-recompile", "", "Recompiling SWF to C");
@@ -283,6 +284,37 @@ $("dlBundleBtn").addEventListener("click", async () => {
         console.error(e);
         showError(e.message);
     } finally {
+        btn.disabled = false;
+    }
+});
+
+$("runBtn").addEventListener("click", async () => {
+    if (!currentResult) return;
+    const gfx = await import("./pipeline_graphics.js");
+    if (gfx.hostAlreadyUsed()) { showError("Reload the page to run another SWF in the browser."); return; }
+    const btn = $("runBtn");
+    btn.disabled = true;
+    clearError();
+    $("runStatus").style.display = "block";
+    for (const id of ["step-host", "step-guest", "step-run"]) setStep(id, "");
+    const canvas = $("canvas");
+    const runLog = [];
+    const log = (t) => { runLog.push(t); console.log("[host] " + t); };
+    try {
+        setStep("step-guest", "active", "Compiling generated C in the browser ...");
+        const guest = await gfx.compileGuest(currentResult, (t) => setStep("step-guest", "active", t + " ..."));
+        setStep("step-guest", "done", `Compiled ${guest.fileCount} C files to a ${fmtSize(guest.bytes.length)} guest module in ${(guest.ms / 1000).toFixed(1)} s`);
+        setStep("step-host", "active", "Loading graphics host ...");
+        const host = await gfx.loadHost(canvas, log);
+        setStep("step-host", "done", "Graphics host loaded");
+        setStep("step-run", "active", "Instantiating guest ...");
+        await gfx.runGuest(guest.bytes, host, canvas, (t) => setStep("step-run", "active", t), log);
+        setStep("step-run", "done", "Finished");
+    } catch (e) {
+        console.error(e);
+        const active = ["step-host", "step-guest", "step-run"].find(id => $(id).classList.contains("active"));
+        if (active) setStep(active, "error");
+        showError((e.stack && e.stack.includes(e.message) ? e.stack : e.message) + (runLog.length ? "\n\nHost log:\n" + runLog.slice(-20).join("\n") : ""));
         btn.disabled = false;
     }
 });

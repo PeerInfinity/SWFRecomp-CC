@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SWFRecomp - In-Browser SWF Recompiler</title>
+    <script>
+        // coi-serviceworker in credentialless mode: SharedArrayBuffer (needed by the
+        // in-browser clang and the shared-memory graphics host) while still allowing
+        // the cross-origin SDK/fflate scripts from unpkg.
+        window.coi = { coepCredentialless: () => true, coepDegrade: () => false };
+    </script>
+    <script src="coi-serviceworker.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x26A1;</text></svg>">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -126,6 +133,16 @@
                 <button class="btn" id="dlSourcesBtn">Generated C only (.zip)</button>
                 <span class="hint" id="dlHint"></span>
             </div>
+            <div class="actions">
+                <button class="btn" id="runBtn">Build &amp; run in browser (WebGPU)</button>
+                <span class="hint">Chrome required. Compiles the generated C with clang running in the browser (~100 MB download the first time).</span>
+            </div>
+            <div id="runStatus" style="display:none; margin-bottom: 0.75rem; padding: 0.6rem 1rem; border-radius: 8px; background: #16213e;">
+                <div class="status-line" id="step-guest">Compiling generated C in the browser</div>
+                <div class="status-line" id="step-host">Loading graphics host</div>
+                <div class="status-line" id="step-run">Running</div>
+            </div>
+            <canvas id="canvas" width="550" height="400" tabindex="0" style="display: none; max-width: 100%; border: 1px solid #333; border-radius: 8px; margin-bottom: 1rem; outline: none; background: #000;"></canvas>
             <table class="files"><thead><tr><th>Generated file</th><th style="text-align:right">Size</th></tr></thead><tbody id="fileRows"></tbody></table>
             <details>
                 <summary>Recompiler output</summary>

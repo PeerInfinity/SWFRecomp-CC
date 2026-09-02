@@ -11,6 +11,7 @@
 #include <sprite_frame_scripts.h>
 #include <hit_test.h>
 
+#include <libswf/generated_data.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -159,11 +160,11 @@ float (*ng_getMovieTransformData(u8 movie_id))[16] {
 	return g_movie_transform_data[movie_id];
 }
 
-extern float transform_data[][16];
+GEN_EXTERN_TRANSFORM_DATA;
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // NO_GRAPHICS / graphics-native: cxform_data is graphics-side only here.
-extern float cxform_data[];
+GEN_EXTERN_CXFORM_DATA;
 
 // Active transform data pointer — defaults to main SWF's transform_data.
 // Swapped to child SWF's array during child movie init so that tagPlaceObject2
@@ -2936,7 +2937,7 @@ static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
 		build_cxform_from_obj(out, obj);
 		return !cx_is_identity(out);
 	}
-	extern float cxform_data[];
+	GEN_EXTERN_CXFORM_DATA;
 	u32 baked = (app_context->cxform_data_size > 0)
 		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
 	if (obj->cxform_id != 0 && obj->cxform_id < baked) {
@@ -3276,7 +3277,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		} else {
 			// Static PlaceObject cxform on this entry — previously only ever
 			// consulted at the ROOT call sites, and silently dropped here.
-			extern float cxform_data[];
+			GEN_EXTERN_CXFORM_DATA;
 			u32 baked_cx = (app_context->cxform_data_size > 0)
 				? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
 			if (obj->cxform_id != 0 && obj->cxform_id < baked_cx) {
@@ -3480,7 +3481,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
 {
 	if (cxform_id == 0) return 0;
-	extern float cxform_data[];
+	GEN_EXTERN_CXFORM_DATA;
 	u32 baked = (app_context->cxform_data_size > 0)
 		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
 	if (cxform_id >= baked) return 0;
@@ -4144,7 +4145,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				// back here) and a dynamic slot is free; otherwise fall back to the
 				// baked cxform (unchanged behavior).
 				u32 text_cx = ch->cxform_id;
-				extern float cxform_data[];
+				GEN_EXTERN_CXFORM_DATA;
 				u32 baked_cx = (app_context->cxform_data_size > 0)
 					? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
 				if (obj->cxform_id != 0 && obj->cxform_id != ch->cxform_id &&
@@ -5483,8 +5484,8 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 // vertically. Without this, long text overflows into neighboring fields.
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
 {
-	extern u32 shape_data[][4];
-	extern u32 glyph_data[][1];
+	GEN_EXTERN_SHAPE_DATA;
+	GEN_EXTERN_GLYPH_DATA;
 
 	// Number of u32 entries in the generated glyph_data global (4 per glyph:
 	// offset, size, +2 reserved). Passed via user_data so the draw pass can

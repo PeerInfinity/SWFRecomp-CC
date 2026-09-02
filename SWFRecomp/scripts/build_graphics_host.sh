@@ -1,9 +1,26 @@
 #!/bin/bash
-# Build the graphics host module with Emscripten.
-# This is the pre-built runtime for the in-browser recompiler's graphics mode.
-# Contains: WebGPU renderer, frame loop, action VM, tag system, audio.
-# Per-SWF generated code is compiled separately in-browser and linked via JS bridge.
-set -e
+# Build the graphics HOST module for the in-browser recompiler (stage 2).
+#
+# Emscripten build of the full SWFModernRuntime graphics runtime (WebGPU via
+# emdawnwebgpu, ASYNCIFY frame loop) with NO per-SWF generated code, compiled
+# with -DDYNAMIC_HOST (see SWFModernRuntime/include/libswf/generated_data.h and
+# SWFRecomp/wasm_wrappers/host_main_graphics.c). The per-SWF guest is compiled
+# in the browser and instantiated into this host's memory by pipeline.js.
+#
+# Key link choices (why they are what they are is in host_main_graphics.c):
+#   JSPI (not ASYNCIFY)           the frame loop and the renderer wait mid-frame
+#                                 (emscripten_sleep / wgpuInstanceWaitAny); with
+#                                 ASYNCIFY an unwind through a non-instrumented
+#                                 GUEST frame corrupts the stack. JSPI suspends the
+#                                 whole wasm stack in the engine, guest frames included.
+#   --table-base=HOST_TABLE_BASE  reserve low table slots for the guest's table
+#   GLOBAL_BASE=GUEST_ARENA_END   host data/stack/heap above 101 MB; the guest is
+#                                 linked at a fixed --global-base=64 KB below it
+#   SHARED_MEMORY=1               the in-browser clang emits --shared-memory guests
+#   EXPORTED_FUNCTIONS=<all>      every runtime symbol resolves guest imports
+#
+# Usage: build_graphics_host.sh [out_dir]   (default: SWFRecomp/build_graphics_host)
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -11,102 +28,106 @@ PROJECT_ROOT="$(cd "${SWFRECOMP_ROOT}/.." && pwd)"
 SWFMODERN_ROOT="${PROJECT_ROOT}/SWFModernRuntime"
 SWFMODERN_SRC="${SWFMODERN_ROOT}/src"
 SWFMODERN_INC="${SWFMODERN_ROOT}/include"
+BUILD_DIR="${1:-${SWFRECOMP_ROOT}/build_graphics_host}"
+HOST_TABLE_BASE="${HOST_TABLE_BASE:-262144}"
+GUEST_ARENA_END="${GUEST_ARENA_END:-105906176}"   # 101 MB; host data/stack/heap live above this
 
-BUILD_DIR="${SWFRECOMP_ROOT}/build_graphics_host"
+if ! command -v emcc >/dev/null 2>&1; then
+    if [ -f "${PROJECT_ROOT}/emsdk/emsdk_env.sh" ]; then
+        # shellcheck disable=SC1091
+        source "${PROJECT_ROOT}/emsdk/emsdk_env.sh" >/dev/null 2>&1
+    elif [ -n "${EMSDK:-}" ] && [ -f "${EMSDK}/emsdk_env.sh" ]; then
+        # shellcheck disable=SC1091
+        source "${EMSDK}/emsdk_env.sh" >/dev/null 2>&1
+    fi
+fi
+command -v emcc >/dev/null 2>&1 || { echo "ERROR: emcc not found" >&2; exit 1; }
 
-# Source Emscripten
-source "${PROJECT_ROOT}/emsdk/emsdk_env.sh"
+rm -rf "${BUILD_DIR}"
+mkdir -p "${BUILD_DIR}/src"
+SRC="${BUILD_DIR}/src"
 
-mkdir -p "${BUILD_DIR}"
+# Same runtime source set as the downloadable bundle's build.sh (AVM1 graphics
+# branch of build_test.sh), minus generated code, plus the host main.
+RUNTIME_C=(
+    actionmodern/action.c actionmodern/math.c actionmodern/date.c
+    actionmodern/registered_class.c actionmodern/timer.c actionmodern/variables.c
+    actionmodern/avm1_amf.c actionmodern/object.c actionmodern/action_queue.c
+    actionmodern/sprite_frame_scripts.c actionmodern/image_decode.c
+    actionmodern/video_codec.c
+    utils.c amf_packet.c
+    libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
+    libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c
+    libswf/stb_image_impl.c
+    audio/audio.c audio/audio_output_web.c
+    rendering/render_webgpu.c
+    memory/heap.c
+)
+for f in "${RUNTIME_C[@]}"; do cp -p "${SWFMODERN_SRC}/${f}" "${SRC}/"; done
+cp -p "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${SRC}/"
+cp -p "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${SWFMODERN_ROOT}/lib/c-hashmap/map.h" "${SRC}/"
+cp -p "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${SRC}/"
+cp -p "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${SRC}/"
+cp -p "${SWFMODERN_ROOT}/third_party/libtess2"/*.c "${SWFMODERN_ROOT}/third_party/libtess2"/*.h "${SRC}/"
+cp -p "${SWFRECOMP_ROOT}/wasm_wrappers/host_main_graphics.c" "${SRC}/"
 
-# Copy runtime sources to build dir
-echo "Copying runtime sources..."
-cp "${SWFMODERN_SRC}/actionmodern/action.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/actionmodern/object.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/actionmodern/variables.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/utils.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/libswf/swf.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/audio/audio.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/audio/audio_output_web.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_SRC}/memory/heap.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${BUILD_DIR}/"
-cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${BUILD_DIR}/"
-
-# Copy host main
-cp "${SWFRECOMP_ROOT}/wasm_wrappers/host_main_graphics.c" "${BUILD_DIR}/"
-
-echo "Building graphics host module..."
-cd "${BUILD_DIR}"
-
-
-# First compile all .c to .o so we can extract defined symbols
-echo "  Compiling sources to extract symbols..."
 EMCC_FLAGS=(
-    -DUSE_WEBGPU
+    -DUSE_WEBGPU -DDYNAMIC_HOST "-DHOST_TABLE_BASE=${HOST_TABLE_BASE}" "-DGUEST_ARENA_END=${GUEST_ARENA_END}u"
+    -sSHARED_MEMORY=1   # objects must carry atomics/bulk-memory for the shared-memory link
+    -sSUPPORT_LONGJMP=wasm   # no JS invoke_* trampolines: JSPI cannot suspend across JS frames
     --use-port=emdawnwebgpu
-    -I.
-    -I"${SWFMODERN_INC}"
-    -I"${SWFMODERN_INC}/actionmodern"
-    -I"${SWFMODERN_INC}/libswf"
-    -I"${SWFMODERN_INC}/memory"
-    -I"${SWFMODERN_INC}/rendering"
-    -I"${SWFMODERN_INC}/audio"
-    -I"${SWFMODERN_ROOT}/lib/c-hashmap"
+    -Wno-error=implicit-function-declaration -Wno-implicit-function-declaration
+    -Wno-unused-variable -Wno-unused-but-set-variable -Wno-incompatible-pointer-types
+    -I"${SRC}"
+    -I"${SWFMODERN_INC}" -I"${SWFMODERN_INC}/actionmodern" -I"${SWFMODERN_INC}/libswf"
+    -I"${SWFMODERN_INC}/memory" -I"${SWFMODERN_INC}/rendering" -I"${SWFMODERN_INC}/audio"
+    -I"${SWFMODERN_ROOT}/lib/c-hashmap" -I"${SWFMODERN_ROOT}/lib/o1heap" -I"${SWFMODERN_ROOT}/lib/stb"
+    -I"${SWFMODERN_ROOT}/third_party/libtess2"
     -O2
 )
-ALL_C_FILES=(host_main_graphics.c swf.c tag.c hit_test.c render_webgpu.c
-    audio.c audio_output_web.c action.c object.c variables.c utils.c
-    heap.c map.c o1heap.c)
-ALL_O_FILES=()
-for src in "${ALL_C_FILES[@]}"; do
-    obj="${src%.c}.o"
-    emcc -c "${src}" "${EMCC_FLAGS[@]}" -o "${obj}"
-    ALL_O_FILES+=("${obj}")
+
+echo "=== Compiling host objects ==="
+OBJS=()
+for src in "${SRC}"/*.c; do
+    obj="${BUILD_DIR}/$(basename "${src}" .c).o"
+    emcc "${EMCC_FLAGS[@]}" -c "${src}" -o "${obj}"
+    OBJS+=("${obj}")
 done
 
-# Extract defined global function symbols from all .o files
-echo "  Building export list from defined symbols..."
+# Export every defined function/data symbol so guest imports resolve by name.
+echo "=== Building export list ==="
+NM="$(dirname "$(command -v emcc)")/../bin/llvm-nm"
+[ -x "${NM}" ] || NM="$(command -v llvm-nm)"
 {
-    for obj in "${ALL_O_FILES[@]}"; do
-        "${PROJECT_ROOT}/emsdk/upstream/bin/llvm-nm" "${obj}" 2>/dev/null | grep " T " | awk '{print "\"_" $3 "\""}'
-        "${PROJECT_ROOT}/emsdk/upstream/bin/llvm-nm" "${obj}" 2>/dev/null | grep " D " | awk '{print "\"_" $3 "\""}'
+    for obj in "${OBJS[@]}"; do
+        # Skip internal/EM_JS bookkeeping symbols (__em_js__*, __wasm_*...).
+        "${NM}" "${obj}" 2>/dev/null | awk '($2 == "T" || $2 == "D" || $2 == "B") && $3 !~ /^__/ { print "\"_" $3 "\"" }'
     done
-} | sort -u > "${BUILD_DIR}/exports_raw.txt"
+    printf '"_main"\n"_malloc"\n"_free"\n'
+} | sort -u > "${BUILD_DIR}/exports.txt"
+echo "[$(tr '\n' ',' < "${BUILD_DIR}/exports.txt" | sed 's/,$//')]" > "${BUILD_DIR}/exports.json"
+echo "  $(wc -l < "${BUILD_DIR}/exports.txt") symbols exported"
 
-# Always include essential exports
-cat >> "${BUILD_DIR}/exports_raw.txt" << 'EXTRA'
-"_main"
-"_malloc"
-"_free"
-EXTRA
-
-# Format as JSON array
-echo "[$(sort -u "${BUILD_DIR}/exports_raw.txt" | tr '\n' ',' | sed 's/,$//' )]" > "${BUILD_DIR}/exports_final.json"
-EXPORT_COUNT=$(sort -u "${BUILD_DIR}/exports_raw.txt" | wc -l)
-echo "  ${EXPORT_COUNT} symbols in export list"
-
-emcc \
-    "${ALL_C_FILES[@]}" \
-    "${EMCC_FLAGS[@]}" \
-    -o graphics_host.js \
+echo "=== Linking graphics_host.js / graphics_host.wasm ==="
+emcc "${OBJS[@]}" --use-port=emdawnwebgpu \
+    -o "${BUILD_DIR}/graphics_host.js" \
     -s WASM=1 \
-    -s EXPORTED_FUNCTIONS=@"${BUILD_DIR}/exports_final.json" \
+    -s EXPORTED_FUNCTIONS=@"${BUILD_DIR}/exports.json" \
+    -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","wasmMemory","wasmTable","wasmExports","HEAPU8","HEAPU32"]' \
     -s ALLOW_TABLE_GROWTH=1 \
-    -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","addFunction","removeFunction","HEAPF32","wasmMemory","wasmTable"]' \
     -s SHARED_MEMORY=1 \
     -s ALLOW_MEMORY_GROWTH=1 \
+    -s INITIAL_MEMORY=335544320 \
     -s MAXIMUM_MEMORY=2147483648 \
-    -s INITIAL_MEMORY=209715200 \
     -s STACK_SIZE=8MB \
-    -sASYNCIFY \
-    -sASYNCIFY_STACK_SIZE=65536 \
+    -s MODULARIZE=1 -s EXPORT_NAME=createGraphicsHost \
+    -s ENVIRONMENT=web \
+    -sJSPI -sJSPI_EXPORTS='["runSWF"]' -sSUPPORT_LONGJMP=wasm \
+    "-Wl,--table-base=${HOST_TABLE_BASE}" \
+    "-sGLOBAL_BASE=${GUEST_ARENA_END}" \
+    --profiling-funcs \
     -O2
 
-echo ""
-echo "Built successfully:"
+echo
+echo "Built:"
 ls -lh "${BUILD_DIR}/graphics_host.js" "${BUILD_DIR}/graphics_host.wasm"

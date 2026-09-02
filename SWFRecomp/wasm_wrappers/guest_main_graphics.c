@@ -116,3 +116,27 @@ int get_max_string_id(void) { return MAX_STRING_ID; }
 __attribute__((export_name("get_max_string_id")))
 int get_max_string_id(void) { return 0; }
 #endif
+
+// --- Tables the host reads via pointer (DYNAMIC_HOST, see generated_data.h) ---
+// With the guest's function table mirrored into the host's reserved low table
+// slots (build_graphics_host.sh --table-base), the function pointers stored in
+// these guest arrays are valid in the host as-is: no translation needed.
+__attribute__((export_name("get_frame_funcs")))
+void* get_frame_funcs(void) { return (void*)frame_funcs; }
+
+extern FrameLabelEntry frame_label_data[];
+extern size_t frame_label_count;
+__attribute__((export_name("get_frame_label_data")))
+void* get_frame_label_data(void) { return (void*)frame_label_data; }
+__attribute__((export_name("get_frame_label_count")))
+int get_frame_label_count(void) { return (int)frame_label_count; }
+
+extern u16 __attribute__((weak)) text_char_codes[];
+__attribute__((export_name("get_text_char_codes")))
+void* get_text_char_codes(void) { return (void*)text_char_codes; }
+
+// tagInit as a function pointer: taking its address puts it in the guest's
+// function table, so the mirrored index is a valid host-side pointer.
+static void (*const tagInit_ptr)(SWFAppContext*) = tagInit;
+__attribute__((export_name("get_tagInit_ptr")))
+int get_tagInit_ptr(void) { return (int)tagInit_ptr; }

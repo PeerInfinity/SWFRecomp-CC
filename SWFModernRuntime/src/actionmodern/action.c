@@ -11,6 +11,7 @@
 #include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
 #include <gradient_ramp.h>  // w2-gfx-gradient: Ruffle CommonGradient::new ramp walk
 
+#include <libswf/generated_data.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -1249,10 +1250,10 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 	extern DisplayObject* display_list;
 	extern size_t max_depth;
 	extern Character* dictionary;
-	extern u32 text_data[];
+	GEN_EXTERN_TEXT_DATA;
 	// text_char_codes is emitted by newer recompiler builds (Unicode code points).
 	// Weak symbol: falls back to NULL if test was compiled with older recompiler.
-	extern u16 __attribute__((weak)) text_char_codes[];
+	GEN_EXTERN_TEXT_CHAR_CODES;
 
 	DisplayObject* dl = NULL;
 	size_t dl_max = 0;
@@ -14465,7 +14466,7 @@ static ActionVar bitmapDataLoadBitmap(SWFAppContext* app_context, ActionVar* arg
     if (!ng_getBitmapMetadata((u16)char_id, &offset, &size, &width, &height)) return r;
 
     // Access raw bitmap pixel data from generated code
-    extern u8 bitmap_data[];
+    GEN_EXTERN_BITMAP_DATA;
     u32* src_pixels = (u32*)(bitmap_data + offset);
     u32 num_pixels = width * height;
     if (size < num_pixels * 4) return r;
@@ -22631,7 +22632,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					extern MovieClip root_movieclip;
 					extern DisplayObject* display_list;
 					extern size_t max_depth;
-					extern float transform_data[][16];
+					GEN_EXTERN_TRANSFORM_DATA;
 					if (parent != NULL && parent != &root_movieclip && parent->name != NULL) {
 						size_t _pdepth = ng_findDisplayEntryByName(parent->name);
 						if (_pdepth != SIZE_MAX && _pdepth <= max_depth) {
@@ -28237,7 +28238,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			if (p->display_obj != NULL) {
 				extern DisplayObject* display_list;
 				extern size_t max_depth;
-				extern float transform_data[][16];
+				GEN_EXTERN_TRANSFORM_DATA;
 				ptrdiff_t _pidx = (DisplayObject*)p->display_obj - display_list;
 				if (_pidx >= 0 && (size_t)_pidx <= max_depth &&
 				    &display_list[_pidx] == (DisplayObject*)p->display_obj) {
@@ -28637,7 +28638,7 @@ static void otf_walk_dl(SWFAppContext* app_context,
 	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
 	void* user_data, int* count)
 {
-	extern float transform_data[][16];
+	GEN_EXTERN_TRANSFORM_DATA;
 	// ng_get_original_transform_id declared in tag.h (already included).
 
 	for (size_t d = 1; d <= dl_max; d++) {
@@ -29724,7 +29725,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		// makes hairline lineStyle(0) lines render as 1px instead of vanishing,
 		// and keeps strokes on scaled-down clips from thinning away.
 		if (path->has_line && path->stroke_poly != NULL) {
-			extern float transform_data[][16];
+			GEN_EXTERN_TRANSFORM_DATA;
 			float a = transform_data[info->transform_id][0];
 			float b = transform_data[info->transform_id][1];
 			float c = transform_data[info->transform_id][4];
@@ -30116,7 +30117,7 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 				s32 cxmin, cxmax, cymin, cymax;
 				if (!ng_getCharBounds(ch->char_id, &cxmin, &cxmax, &cymin, &cymax)) continue;
 				// Apply the placement matrix (twips * matrix → twips).
-				extern float transform_data[][16];
+				GEN_EXTERN_TRANSFORM_DATA;
 				float a = transform_data[ch->transform_id][0];
 				float b = transform_data[ch->transform_id][1];
 				float c = transform_data[ch->transform_id][4];
@@ -34194,7 +34195,7 @@ int findFrameByLabel(const char* label)
 	}
 
 	// Extern declarations for generated frame label data
-	extern FrameLabelEntry frame_label_data[];
+	GEN_EXTERN_FRAME_LABEL_DATA;
 	extern size_t frame_label_count;
 
 	// Search through frame labels (case-sensitive first, then case-insensitive fallback)
@@ -54609,7 +54610,7 @@ void actionGetMember(SWFAppContext* app_context)
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				if (mc->pending_removal) {
 					// Pending_removal MC: compute x from last known transform for full double precision
-					extern float transform_data[][16];
+					GEN_EXTERN_TRANSFORM_DATA;
 					double _dx = (double)transform_data[mc->last_transform_id][12] / 20.0;
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
 					return;
@@ -54628,7 +54629,7 @@ void actionGetMember(SWFAppContext* app_context)
 							if (mc->ng_textfield_idx >= 0) {
 								s32 bxmin, bxmax, bymin, bymax;
 								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
-								extern float transform_data[][16];
+								GEN_EXTERN_TRANSFORM_DATA;
 								u32 _tid;
 								if (ng_getTransformId(_dep, &_tid)) {
 									double _m00 = (double)transform_data[_tid][0];
@@ -54680,7 +54681,7 @@ void actionGetMember(SWFAppContext* app_context)
 							if (mc->ng_textfield_idx >= 0) {
 								s32 bxmin, bxmax, bymin, bymax;
 								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
-								extern float transform_data[][16];
+								GEN_EXTERN_TRANSFORM_DATA;
 								u32 _tid;
 								if (ng_getTransformId(_dep, &_tid)) {
 									double _m10 = (double)transform_data[_tid][1];
@@ -71530,7 +71531,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								double _la, _lb, _lc, _ld, _ltx, _lty; \
 								if (_wd != SIZE_MAX) { \
 									u32 _tid = _wdl[_wd].transform_id; \
-									extern float transform_data[][16]; \
+									GEN_EXTERN_TRANSFORM_DATA; \
 									_la = (double)transform_data[_tid][0]; _lb = (double)transform_data[_tid][1]; \
 									_lc = (double)transform_data[_tid][4]; _ld = (double)transform_data[_tid][5]; \
 									_ltx = (double)transform_data[_tid][12]; _lty = (double)transform_data[_tid][13]; \
@@ -71681,7 +71682,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				extern int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
 					double ma, double mb, double mc, double md, double mtx, double mty,
 					int* has, double* gxmin, double* gymin, double* gxmax, double* gymax);
-				extern float transform_data[][16];
+				GEN_EXTERN_TRANSFORM_DATA;
 
 				// Helper: compute global AABB for a MovieClip (in _root twips space)
 				// This finds the MC's sprite_display_list, computes local bounds,
@@ -74791,7 +74792,7 @@ static void compute_highlight_bounds(
 	float parent_sx, float parent_sy,
 	float* min_x, float* min_y)
 {
-	extern float transform_data[][16];
+	GEN_EXTERN_TRANSFORM_DATA;
 	for (size_t d = 1; d <= dl_max; d++) {
 		if (dl[d].char_id == 0) continue;
 		size_t cid = dl[d].char_id;
@@ -74840,7 +74841,7 @@ static void tab_collect_recursive(
 	float parent_scale_x, float parent_scale_y,
 	MovieClip** out, int* count, int max)
 {
-	extern float transform_data[][16];
+	GEN_EXTERN_TRANSFORM_DATA;
 
 	// Iterate in natural ascending depth order (d=1..dl_max)
 	for (size_t d = 1; d <= dl_max; d++) {

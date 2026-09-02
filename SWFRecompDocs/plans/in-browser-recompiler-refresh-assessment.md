@@ -190,3 +190,87 @@ C and offers downloadable zips. Details:
   `coi-serviceworker.js`) are kept, unreferenced, for stage 2.
 - Stage 2 = §3.3 (in-browser C→WASM for graphics), recommended via
   `-sMAIN_MODULE=2` host + in-browser PIC side module.
+
+## 7. Stage 2 design (2026-09-02): in-browser C → WASM for graphics mode
+
+### 7.1 Spike results (what the in-browser compiler can and cannot do)
+The only in-browser C compiler available is the wasmer registry package
+`clang/clang` 0.160000.1 (no newer version exists). Measured in Chrome via the SDK:
+- Its `clang` entrypoint is a **slim driver** (`clang-16-slim` atom) with hard-coded
+  presets (`--sysroot`, `--target=wasm32-wasi`, `-Wl,--shared-memory`, `--import-memory`,
+  `--export-dynamic`, `--export=__heap_base` ...). It compiles+links in one shot only:
+  `-c` fails with "unknown integrated tool '-cc1'", and `-fPIC` (or `-Xclang
+  -mrelocation-model pic`) is silently ignored — the objects it feeds to wasm-ld are
+  non-PIC (`R_WASM_MEMORY_ADDR_LEB ... recompile with -fPIC`).
+- The full `clang-16` atom dies immediately (exit 45, the OOM signature) even on a
+  10-line file.
+- wasm-ld is LLVM 16: no `--table-base`.
+- ⇒ **No PIC side module, so the Emscripten `MAIN_MODULE` route is out.**
+
+What does work (spike in `scratchpad/spike`, verified end to end in Node against an
+Emscripten host): a non-PIC guest linked with
+`--import-memory --export-table --global-base=<host address> --allow-undefined
+--export-all --no-entry`, instantiated against the host's shared memory, with the
+guest's own function table **mirrored** into the host's table. The host is built with
+`-Wl,--table-base=262144` (Emscripten's LLVM 21 supports it), so host slots
+`[1, 262144)` are free and a guest index `i` is placed at host index `i`: guest
+function pointers are valid in both modules with **no translation**. Guest data lives
+at a host-chosen address (`--global-base` = a static 96 MB arena in the host).
+
+### 7.2 Implementation (shipped 2026-09-02)
+- **Runtime:** `include/libswf/generated_data.h` declares the generated tables the
+  runtime reads directly (`transform_data`, `shape_data`, `glyph_data`, `text_data`,
+  `text_char_codes`, `cxform_data`, `bitmap_data`, `morph_end_shape_data`,
+  `frame_label_data`) as arrays normally and as **pointers under `-DDYNAMIC_HOST`**;
+  the 34 scattered `extern` declarations in action.c/tag.c/tag_stubs.c/shape_hit_test.c
+  became `GEN_EXTERN_*;` macros. Native/CI builds are textually unchanged.
+- **Host:** `wasm_wrappers/host_main_graphics.c` (DYNAMIC_HOST): pointer definitions +
+  `set*` setters that fill both `app_context` and the pointers, `configureAppContext`
+  with the viewport-fit fields, `get_*_addr` for the five bridged globals, weak stubs
+  for six NO_GRAPHICS-only symbols that `swf.c`'s dead goto-catch-up path references
+  (exporting every symbol keeps that function alive).
+  `scripts/build_graphics_host.sh`: current runtime source set + libtess2, export list
+  from `llvm-nm` minus `__*`, MODULARIZE (`createGraphicsHost`), and three link
+  choices that each fixed a real failure:
+  - `-sSHARED_MEMORY=1` at compile time too (the guest's memory import is shared
+    because the slim driver forces `--shared-memory`; objects need atomics/bulk-memory).
+  - **`-sJSPI` instead of `-sASYNCIFY`.** The renderer waits mid-frame
+    (`render_webgpu_open_pass` → `emscripten_sleep`, `wgpuInstanceWaitAny`), reached
+    from tag functions that are called from guest frames. ASYNCIFY cannot unwind
+    through a non-instrumented guest frame: symptoms were random `unreachable`
+    traps, a failing `operator new`, and `puts` re-executed inside `runSWF`. JSPI
+    suspends the whole wasm stack in the engine, guest frames included.
+  - **`-sSUPPORT_LONGJMP=wasm`** (default is `emscripten`, which routes calls inside
+    setjmp-scoped functions through JS `invoke_*` trampolines) and **raw exports for
+    the guest's imports**: JSPI refuses to suspend across JS frames, and Emscripten
+    wraps every export in a JS `wrapper` under JSPI. `pipeline_graphics.js` captures
+    `instance.exports` in the `instantiateWasm` hook before Emscripten wraps them.
+  - `-sGLOBAL_BASE=101 MB` + `--table-base=262144`: host data/stack/heap live above
+    101 MB and host functions above table slot 262144. The guest is linked at a
+    **fixed** `--global-base=64 KB`, so it can be compiled before the host is loaded,
+    and its table is mirrored into host slots `[1, n)`.
+- **Guest:** `guest_main_graphics.c` exports the table addresses/sizes plus
+  `get_frame_funcs`, `get_frame_label_data/count`, `get_text_char_codes` and
+  `get_tagInit_ptr` (a function pointer, so `tagInit` is in the guest table).
+  `bridge_globals.{h,c}` unchanged (compiled in-browser with the generated C).
+  Generated sources get two textual patches before compiling: the bridged-global
+  `extern`s are removed, and bare `label_N:` lines get a `;` (clang 16 rejects a
+  declaration after a label).
+- **Page:** `docs/recompiler/pipeline_graphics.js` — compile guest (headers fetched
+  from `bundle/runtime/include`; retries the SDK's intermittent "oneshot canceled"),
+  load host, instantiate, mirror table, `bridge_init`, `set*`, `runSWF` (promising
+  export). `deploy_wasm_demo.sh` builds the host into `docs/recompiler/host/`
+  (gitignored, CI-generated like the bundle).
+- Verified in Chrome via Playwright: `awful_shape_swf_4`, `keyboard_input`,
+  `define_button2` compile in ~8 s and run with no traps.
+
+### 7.3 Known limitations
+- **AVM1 try/catch:** `ACTION_TRY_SETJMP` inlines `setjmp` into generated scripts; the
+  slim driver cannot lower it, so the guest imports `setjmp`/`longjmp`. The page maps
+  `setjmp` → 0 (try body runs as if nothing can throw) and `longjmp` → JS error. A
+  real fix is a recompiler emission mode that runs try bodies through a runtime helper.
+- One SWF per page load (the runtime has global state); reload to run another.
+- Guest data + 8 MB shadow stack must fit the 96 MB arena; bigger SWFs get a clear
+  error pointing at the downloadable bundle.
+- Chrome 137+ only (JSPI, SharedArrayBuffer via coi-serviceworker, WebGPU); the page
+  checks for `WebAssembly.Suspending` and says so.
