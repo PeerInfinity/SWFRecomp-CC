@@ -99,7 +99,7 @@ SIMD=(); [ "${IS_AVM2}" = true ] && SIMD=(-msimd128)
 
 opt_for() {
     case "$1" in
-        abc0_methods.c|abc_timeline.c|abc0_tables.c) echo "${ABC_OPT}" ;;
+        abc*_methods.c|abc*_tables.c|abc_timeline.c) echo "${ABC_OPT}" ;;   # one per DoABC tag
         *) echo "${RT_OPT}" ;;
     esac
 }
