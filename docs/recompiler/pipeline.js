@@ -168,8 +168,8 @@ async function fetchBundleFiles(onProgress) {
     return out;
 }
 
-function triggerDownload(bytes, fileName) {
-    const blob = new Blob([bytes], { type: "application/zip" });
+function triggerDownload(bytes, fileName, mime = "application/zip") {
+    const blob = new Blob([bytes], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -251,6 +251,8 @@ async function processSwf(swfBytes, name, sourceLabel) {
     currentResult = null;
     $("result").classList.remove("visible");
     $("runStatus").style.display = "none";
+    $("dlWasmBtn").style.display = "none";
+    lastGuest = null;
     $("status").classList.add("visible");
     setStep("step-load", "active", "Loading recompiler ...");
     setStep("step-recompile", "", "Recompiling SWF to C");
@@ -288,6 +290,12 @@ $("dlBundleBtn").addEventListener("click", async () => {
     }
 });
 
+let lastGuest = null;
+$("dlWasmBtn").addEventListener("click", () => {
+    if (!lastGuest) return;
+    triggerDownload(lastGuest.bytes, `${lastGuest.name}-guest.wasm`, "application/wasm");
+});
+
 $("runBtn").addEventListener("click", async () => {
     if (!currentResult) return;
     const gfx = await import("./pipeline_graphics.js");
@@ -304,6 +312,9 @@ $("runBtn").addEventListener("click", async () => {
         setStep("step-guest", "active", "Compiling generated C in the browser ...");
         const guest = await gfx.compileGuest(currentResult, (t) => setStep("step-guest", "active", t + " ..."));
         setStep("step-guest", "done", `Compiled ${guest.fileCount} C files to a ${fmtSize(guest.bytes.length)} guest module in ${(guest.ms / 1000).toFixed(1)} s`);
+        lastGuest = { bytes: guest.bytes, name: currentResult.name };
+        $("dlWasmBtn").style.display = "";
+        $("runHint").textContent = "The guest .wasm holds this SWF's compiled code and data; it runs only alongside the graphics host (host/graphics_host.wasm), the way this page loads it.";
         setStep("step-host", "active", "Loading graphics host ...");
         const host = await gfx.loadHost(canvas, log);
         setStep("step-host", "done", "Graphics host loaded");
