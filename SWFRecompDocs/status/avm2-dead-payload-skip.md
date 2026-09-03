@@ -269,7 +269,7 @@ a row to have to add it. `verify_output.py`'s `.recomp_mode` stamp became
 `try_helper=<0|1> tu_split=<n> skip_avm1_payload=<0|1>` so a cached tree from a
 different mode regenerates.
 
-**Pages deploy.** `deploy-pages.yml` run `PAGESRUN` at `968e34acb`. (Only
+**Pages deploy.** `deploy-pages.yml` run `33721194488` at `fc3ffa3db`. (Only
 `pipeline.js` is tracked under `docs/recompiler/`; `SWFRecomp.wasm`, `bundle/`
 and `host/` are gitignored and rebuilt by the workflow.)
 
