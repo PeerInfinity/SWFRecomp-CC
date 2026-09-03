@@ -143,6 +143,12 @@ memory (2.5 GB → ~0), the 33 MB bundle zip and 175 MB of source round-tripping
 through the wasmer virtual FS, and the bundle's own `draws.c` compile.
 
 ### 2.2 Design: payload blob (optional optimization)
+> **Superseded 2026-09-02 — do not start from this section.** Its cheap-win bullet
+> shipped (§6.4) and took most of what the blob was for with it. The blob ITSELF is
+> ruled out on the post-slice numbers; the verdict, with the then/now table, is
+> `SWFRecompDocs/status/avm2-dead-payload-skip.md` §"Is the payload blob still worth
+> it?". Re-measure before reopening. The design below is kept as the record of what
+> was considered.
 Emit the byte payloads as a binary file the page hands to the host directly; keep the
 C form for native builds.
 - Recompiler (`swf.cpp` draws emission ~line 942; `abc_timeline.cpp`): a config
@@ -345,7 +351,7 @@ recommendation and (c') the fallback.
 | try-helper emission mode (§4.1) | done | AVM1 try/catch in the page (§7.3 of the stage-2 doc) — also done |
 | TU-splitting flag (§1.3) | done | 1.6× faster in-browser compile; Snailiad-class titles compile at all; bundle path parallel builds; gcc-ICE guard for giant TUs |
 | Skip the AVM1 bitmap/sound payload for AS3 SWFs (§2.2) | done | bundle path (−68.7 s, −2.23 GiB gcc RAM for Seedling), −138.7 MB C, −20.7 MB static; in-page compile 414.1 → 277.4 s |
-| Payload blob (§2.2) | ~1 day | in-browser peak memory, zip size; optional |
+| Payload blob (§2.2) | **ruled out** | the three things it bought are now 3–10× smaller and none is near a ceiling — verdict + then/now table in `SWFRecompDocs/status/avm2-dead-payload-skip.md` |
 | Runtime-set `SWF_URL`/sizes for the host (§3) | ~0.5 day | origin-gated titles (RWF/RWIC) |
 | Host variant + loader + pipeline (§3) | done | — |
 
