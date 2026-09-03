@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-03T09:30:15.457801+00:00",
-    "git_sha": "2eb6d24254318066f635c3efe51285f3a0c45f62",
-    "duration_seconds": 102.46,
+    "timestamp": "2026-09-03T17:48:49.429739+00:00",
+    "git_sha": "06856ff7c61bd78dd9ad5c745ee6a98df9c45d95",
+    "duration_seconds": 110.98,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
@@ -20,7 +20,7 @@
       "test": "TextFieldTest",
       "phases": {
         "recomp": 0.006,
-        "compile": 21.464,
+        "compile": 22.691,
         "run": 0.315
       },
       "num_frames": 30,
@@ -29,7 +29,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 21.79,
+      "duration": 23.02,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -38,8 +38,8 @@
     {
       "test": "enum",
       "phases": {
-        "recomp": 0.006,
-        "compile": 2.584,
+        "recomp": 0.007,
+        "compile": 2.801,
         "run": 0.315
       },
       "num_frames": 30,
@@ -48,15 +48,15 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 2.91,
+      "duration": 3.13,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
-        "recomp": 0.006,
-        "compile": 17.258,
-        "run": 0.265
+        "recomp": 0.007,
+        "compile": 23.807,
+        "run": 0.316
       },
       "num_frames": 30,
       "lines": {
@@ -64,14 +64,14 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 17.53,
+      "duration": 24.14,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.007,
-        "compile": 24.312,
+        "compile": 23.702,
         "run": 0.315
       },
       "num_frames": 30,
@@ -80,15 +80,15 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 24.64,
+      "duration": 24.03,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.006,
-        "compile": 2.432,
-        "run": 0.315
+        "compile": 2.364,
+        "run": 0.265
       },
       "num_frames": 30,
       "lines": {
@@ -96,15 +96,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 2.76,
+      "duration": 2.64,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.007,
-        "compile": 22.481,
-        "run": 0.315
+        "compile": 22.715,
+        "run": 0.316
       },
       "num_frames": 30,
       "lines": {
@@ -112,15 +112,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 22.81,
+      "duration": 23.05,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.007,
-        "compile": 2.568,
-        "run": 0.265
+        "compile": 2.68,
+        "run": 0.315
       },
       "num_frames": 30,
       "lines": {
@@ -128,15 +128,15 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 2.85,
+      "duration": 3.01,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.004,
-        "compile": 3.348,
-        "run": 0.265
+        "compile": 4.028,
+        "run": 0.316
       },
       "num_frames": 30,
       "lines": {
@@ -144,7 +144,7 @@
         "expected_lines": 68,
         "matching_lines": 49
       },
-      "duration": 3.62,
+      "duration": 4.35,
       "ruffle_diff_count": 21,
       "ours_diff_count": 19,
       "status": "ruffle_matched",
@@ -154,7 +154,7 @@
       "test": "super_test1",
       "phases": {
         "recomp": 0.007,
-        "compile": 2.67,
+        "compile": 2.696,
         "run": 0.315
       },
       "num_frames": 30,
@@ -163,7 +163,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 3.0,
+      "duration": 3.03,
       "status": "pass"
     }
   ]
