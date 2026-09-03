@@ -33,10 +33,11 @@ also fixes AVM1 try/catch in the page) → **TU-split flag** (Snailiad-class tit
 and 2× faster for everything) → **payload blob** (optional: cuts memory from 2.5 GB
 and the zip from 33 MB, and skipping the AVM2-dead AVM1 payload is a one-line win for
 the bundle too). ≈ 2.5 developer days total. See §5.
-The first two are **shipped** (§6.1, §6.3); what remains is the payload work (§2.2),
-whose cheap half — not emitting the AVM2-dead `bitmap_data`/`sound_data` for AS3
-SWFs — is now the biggest single lever left, since after the split the peak memory
-and a large share of the C text are Seedling's 142 MB `draws.c`.
+The first three are **shipped** (§6.1, §6.3, §6.4) — including the cheap half of
+the payload work, which turned out to be the single biggest lever of the arc:
+Seedling now recompiles to 52 MB of C instead of 190.7 MB and compiles in the
+page in 277.4 s instead of the 668.8 s this assessment measured. What remains is
+only the payload BLOB (§2.2 proper), whose case is now much weaker — see §6.4.
 
 ## 1. Compiler ceiling (Q1)
 
@@ -160,9 +161,16 @@ C form for native builds.
   `tagMain.c` addresses them by offset (`defineBitmap(0, 2600, …)`,
   `sound_data + 5982`), so under `DYNAMIC_GUEST` `draws.h` declares `extern u8*
   bitmap_data;` and nothing else changes.
-- Cheap extra win: for AS3 SWFs (`is_as3`, `swf.cpp:4865`) do not emit the AVM1
-  `bitmap_data`/`sound_data` payload at all (dead under AVM2): −120 MB of C, −20.7 MB
-  static, bundle `build.sh` time drops by the 83 s `draws.c` compile.
+- Cheap extra win — **SHIPPED 2026-09-02** as the `skip_avm1_payload` option
+  (§6.4): for AS3 SWFs (`is_as3`, `swf.cpp:4865`) do not emit the AVM1
+  `bitmap_data`/`sound_data`/`video_data` payload at all (dead under AVM2).
+  Measured on the original Seedling: `draws.c` **142.07 → 3.36 MB**, `draws.o`
+  **21.99 → 1.26 MB**, total generated C **190.7 → 52.0 MB**, native
+  `gcc -O1 -c draws.c` **69.9 s / 2.28 GiB → 1.2 s / 0.05 GiB**; in the page the
+  compile phase drops **414.1 → 277.4 s** and the guest **38.28 → 18.51 MB**.
+  (`video_data` was checked against this table and has no AVM2 consumer at all;
+  `morph_end_shape_data`, missing from the rows above, DOES have one and is
+  kept.)
 - What in the runtime assumes static arrays: nothing left. The AVM1 tables already
   went pointer-form for the host in the stage-2 work; this slice did the same for
   the 37 `avm2_generated_*` symbols and the four `draws.c` tables the AVM2 runtime
@@ -336,7 +344,7 @@ recommendation and (c') the fallback.
 |---|---|---|
 | try-helper emission mode (§4.1) | done | AVM1 try/catch in the page (§7.3 of the stage-2 doc) — also done |
 | TU-splitting flag (§1.3) | done | 1.6× faster in-browser compile; Snailiad-class titles compile at all; bundle path parallel builds; gcc-ICE guard for giant TUs |
-| Skip the AVM1 bitmap/sound payload for AS3 SWFs (§2.2) | ~0.2 day | bundle path (−83 s, −2.4 GB gcc RAM for Seedling), −120 MB C, −13 MB zip |
+| Skip the AVM1 bitmap/sound payload for AS3 SWFs (§2.2) | done | bundle path (−68.7 s, −2.23 GiB gcc RAM for Seedling), −138.7 MB C, −20.7 MB static; in-page compile 414.1 → 277.4 s |
 | Payload blob (§2.2) | ~1 day | in-browser peak memory, zip size; optional |
 | Runtime-set `SWF_URL`/sizes for the host (§3) | ~0.5 day | origin-gated titles (RWF/RWIC) |
 | Host variant + loader + pipeline (§3) | done | — |
@@ -353,6 +361,18 @@ The AS3 corpus tests (1155 avm2 + 1574 avmplus) all fit comfortably — the
 in-browser path is usable for them today (§3 end-to-end) modulo try/catch.
 
 ## 6. What shipped this slice
+
+### 6.4 Dead-payload skip (2026-09-02, follow-up slice) — SHIPPED
+Recompiler option `skip_avm1_payload` (§2.2's cheap-win bullet), off by default
+and additionally gated on `is_as3`: an AS3 SWF no longer emits `bitmap_data`,
+`sound_data` or `video_data` into `RecompiledTags/draws.c`, and the emission
+sites that reference them (`defineBitmap`, `tagDefineSound`,
+`tagSoundStreamBlock`, `tagVideoFrame`, `finalizeBitmaps`) are skipped in
+lockstep, so `tagInit` stays valid C rather than reachable-but-wrong. The arrays
+are still DEFINED, in the one-element empty form an SWF with no such content
+already produces, so `main.c`'s `sizeof(bitmap_data)` wiring and
+`guest_main_graphics.c`'s exports keep linking untouched. Numbers above and in
+the full write-up: `SWFRecompDocs/status/avm2-dead-payload-skip.md`.
 
 ### 6.3 TU-split emission mode (2026-09-02, follow-up slice) — SHIPPED
 Recompiler option `tu_split` (§1.3), off by default: each DoABC tag's method
