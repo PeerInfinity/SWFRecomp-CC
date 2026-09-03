@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-03 20:37 UTC
+**Date**: 2026-09-03 22:09 UTC
 
-**Git SHA**: `92ee912f3f`
+**Git SHA**: `df9560ff61`
 
-**Run Duration**: 5m 56s
+**Run Duration**: 2m 39s
 
 ## Summary
 
@@ -31,18 +31,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 20.9s |  |
+| 1 | `clip_action_no_key_code` | 1 | 1.2s |  |
 | 2 | `frame_label_count_oom` | 1 | 1.4s |  |
-| 3 | `frame_script_cleanup` | 30 | 19.5s |  |
-| 4 | `frame_script_cleanup2` | 32 | 26.7s |  |
-| 5 | `frame_script_cleanup3` | 30 | 24.4s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 6.1s |  |
-| 7 | `frame_script_construct` | 25 | 30.4s |  |
+| 3 | `frame_script_cleanup` | 30 | 7.1s |  |
+| 4 | `frame_script_cleanup2` | 32 | 5.7s |  |
+| 5 | `frame_script_cleanup3` | 30 | 8.3s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 7.6s |  |
+| 7 | `frame_script_construct` | 25 | 7.3s |  |
 | 8 | `scene_count_oom` | 1 | 1.4s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 26.8s |  |
-| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 27.4s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 28.3s |  |
-| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 26.1s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 21.2s |  |
+| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 7.4s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 4.8s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 7.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,9 +50,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 26.3s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 27.2s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 27.5s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 25.8s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 7.0s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 8.3s |  |
 
 ## Near-Passing Tests
 
