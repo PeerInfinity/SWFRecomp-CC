@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-03T09:46:14.598962+00:00",
-    "old_git_sha": "2eb6d24254318066f635c3efe51285f3a0c45f62",
-    "new_timestamp": "2026-09-03T19:23:14.855283+00:00",
-    "new_git_sha": "50fcc7f8bda9afd6cfb67539c5267657e1df62d4",
+    "old_timestamp": "2026-09-03T19:23:14.855283+00:00",
+    "old_git_sha": "50fcc7f8bda9afd6cfb67539c5267657e1df62d4",
+    "new_timestamp": "2026-09-03T20:37:21.995346+00:00",
+    "new_git_sha": "92ee912f3fac38f6b9bf0697a52d9b248e8f79fb",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 74,
+    "old_pass": 77,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 74,
-    "old_total": 74,
+    "old_effective_pass": 77,
+    "old_total": 77,
     "old_pass_rate": 100.0,
     "new_pass": 77,
     "new_ruffle_matched": 0,
@@ -25,45 +25,25 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 74,
-    "added": 3,
+    "unchanged": 76,
+    "added": 0,
     "removed": 0
   },
   "changes": [
     {
       "test": "avm1_parent_child_modify_place",
-      "change_type": "added",
-      "old_status": null,
+      "change_type": "changed",
+      "old_status": "pass",
       "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
+      "old_lines": {
         "actual_lines": 3,
         "expected_lines": 3,
         "matching_lines": 3
-      }
-    },
-    {
-      "test": "avm1_parent_child_sprite_meta",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
+      },
       "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "avm2_parent_child_symbol_stride",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
       }
     }
   ]
