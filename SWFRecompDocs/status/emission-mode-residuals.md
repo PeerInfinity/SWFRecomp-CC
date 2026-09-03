@@ -217,7 +217,56 @@ dispatched.
 
 ## CI
 
-_(filled in below once the runs land — see the commit for the numbers.)_
+Both runs at `24c1d07a7`, `mode=graphics`, `categories=full`, conclusion
+success.
+
+**Default (options off) — run `33724461481`**, results merged at `fc5d5f689`.
+`scripts/corpus_status_diff.py f162da7a6 WORKTREE --per-suite` (baseline = the
+tip before this slice, carrying the previous arc's merged results):
+
+```
+=== intersection: 4482 tests (f162da7a6 -> WORKTREE, results_graphics) ===
+  output_mismatch    124 ->   124 (+0)
+  pass              4122 ->  4122 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4357 ->  4357 (+0)
+GAINS 0 | REGRESSIONS 0 | OTHER STATUS MOVES 0
+```
+
+The new test is outside that intersection (it did not exist in the baseline);
+it is `pass` in the published results, and the `regression` suite is **73/73**.
+
+**Forced ON — run `33724501226`**, `skip_avm1_payload=1`. Compared against the
+default run at the same commit, from its `ruffle-test-results` ARTIFACT
+(intersection only, nested `_results` excluded):
+
+```
+=== intersection: 4530 tests (default -> forced-on, results_graphics) ===
+  output_mismatch    125 ->   125 (+0)
+  pass              4169 ->  4169 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+TRANSITIONS: 0
+```
+
+Zero transitions, identical histogram — the gate change costs nothing
+corpus-wide, and the seam it closes is now covered by a test that runs in both
+of these runs.
+
+**The publish gate, proved on the live workflow.** `origin/ruffle-test-results`
+moved exactly ONE commit (`f32b2218a` → `bbd93bb83`, "Workflow run: …/33724461481"):
+the default run published, the forced-on run did not. The two runs' `publish_gate`
+steps logged
+
+```
+33724461481:  publish=True  — all inputs at their declared defaults (or publish-safe)
+33724501226:  publish=False — non-default inputs: skip_avm1_payload='1' (default '')
+```
+
+and the forced-on run's `Commit results to ruffle-test-results branch` step is
+`skipped`. That is residual 2's verification: a default run publishes, a run with
+a non-default emission input does not, and the branch did not move for it.
 
 ## Residuals of the residuals
 
