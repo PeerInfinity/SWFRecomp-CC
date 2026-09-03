@@ -21,7 +21,7 @@ host variant is shipped (§3, §6). Measured against the real in-browser compile
 | 1. Host built from the AVM1 source set | AVM2 variant: 3.1 MB wasm, links first try, no generated globals to bridge | **shipped** this slice |
 | 2. AVM2 output too large for the in-browser clang | Every Seedling TU compiles at -O1: 142 MB `draws.c` 75 s, 33 MB `abc_timeline.c` 54 s, 12.9 MB `abc1_methods.c` 399 s (182 s as 9 chunks). Only Snailiad's 30 MB methods TU exceeds 25 min | **not a blocker for Seedling**; TU-split flag needed for the biggest titles |
 | 3. 101 MB guest arena | Seedling static data is 31 MB | **not a blocker** |
-| 4. `setjmp` in try-bearing methods | 0.2–0.9 % of methods, every title has some; runtime-helper mode validated mechanically (§4.1) | the one real piece of work (~1 day) |
+| 4. `setjmp` in try-bearing methods | 0.2–0.9 % of methods, every title has some; runtime-helper mode validated mechanically (§4.1) | **shipped** in the follow-up slice (§4.1, §6.1) |
 
 Versus the bundle path (5:38 local build for Seedling): the in-browser build is
 ~4.5× slower per TU than native emcc but the whole game still lands in 7 min in one
@@ -309,7 +309,7 @@ recommendation and (c') the fallback.
 
 | Component | Effort | Also benefits |
 |---|---|---|
-| try-helper emission mode (§4.1) | ~1 day | AVM1 try/catch in the page (§7.3 of the stage-2 doc) |
+| try-helper emission mode (§4.1) | done | AVM1 try/catch in the page (§7.3 of the stage-2 doc) — also done |
 | TU-splitting flag (§1.3) | ~0.5 day | 2× faster in-browser methods compile; bundle path parallel builds; gcc-ICE guard for giant TUs |
 | Skip the AVM1 bitmap/sound payload for AS3 SWFs (§2.2) | ~0.2 day | bundle path (−83 s, −2.4 GB gcc RAM for Seedling), −120 MB C, −13 MB zip |
 | Payload blob (§2.2) | ~1 day | in-browser peak memory, zip size; optional |
@@ -328,6 +328,22 @@ The AS3 corpus tests (1155 avm2 + 1574 avmplus) all fit comfortably — the
 in-browser path is usable for them today (§3 end-to-end) modulo try/catch.
 
 ## 6. What shipped this slice
+
+### 6.1 Try-helper emission mode (2026-09-02, follow-up slice) — SHIPPED
+Recompiler option `try_helper` (§4.1), off by default. AVM2 method bodies with
+an exception table and AVM1 try bodies are emitted as lifted functions the
+RUNTIME calls through its own setjmp (`avm2_try_run` / `avm1_try_run`), with
+the try frame's storage runtime-defined and opaque — generated code holds no
+libc type. `docs/recompiler/pipeline.js` turns it on for every in-browser
+recompile. Corpus forced-on: zero transitions across 4482 tests (run
+33704826524); default run at the same commit likewise (33704812955). In the
+page: `avm2/try_catch` and `avm1/try_catch_finally` now match their
+`output.txt` byte for byte, `avm2/graphics_draw_path` traces through every
+throw, Seedling still renders its title screen. Full write-up (including the
+two defects the first in-page AVM1 run surfaced):
+`SWFRecompDocs/status/avm2-try-helper-emission.md`.
+
+### 6.2 The AVM2 host variant slice
 
 - `SWFModernRuntime/include/avm2/avm2_abc.h`: `DYNAMIC_HOST` pointer/scalar forms
   of the 37 generated symbols (native builds textually unchanged).

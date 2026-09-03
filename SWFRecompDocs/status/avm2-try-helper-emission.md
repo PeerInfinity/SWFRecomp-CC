@@ -224,18 +224,73 @@ touching the AVM1 emitter: `verify_output.py` compiles with `-w`, so it is the
 only local thing that sees a malformed return.
 
 Corpus run: `ruffle-tests.yml`, `mode=graphics`, `categories=full`,
-`try_helper=1`:
-<!-- CI_FORCED -->
+`try_helper=1` — run **33704826524** at `ef20d2cbc`, conclusion success, all 30
+shards green. Compared to the published baseline (`ruffle-test-results`, run
+33696811049 at `53ee2bc5a`) over the 4482-key intersection, using the
+`corpus_status_diff` rules (full histogram, intersection only, nested
+`_results` excluded):
+
+```
+status histogram (intersection):
+  output_mismatch    124 ->   124  +0
+  pass              4122 ->  4122  +0
+  ruffle_matched     235 ->   235  +0
+  runtime_error        1 ->     1  +0
+transitions: 0
+```
+
+**Zero transitions and an identical histogram** — every try-bearing method and
+try body in the whole corpus was emitted through the runtime helper and not one
+test changed status. (This also settles the local `away3d` timeout: it is
+`pass` here in both runs.) A `try_helper` run deliberately publishes NOTHING to
+`ruffle-test-results` — see the workflow guard note below — so these numbers
+come from the run's `ruffle-test-results` ARTIFACT.
+
+The publish guard is itself a fix this slice had to make: `ruffle-tests.yml`
+picks its result-JSON stem from `mode` alone, so a forced-on run would have
+force-pushed its numbers over `results_graphics.json` and poisoned the
+`{STEM}_previous.json` baseline the next default run diffs against — the exact
+trap the `extra_defines` guard already existed for (memory
+`ci-verify-run-results-clobber`). `inputs.try_helper == ''` now guards both
+publish steps.
 
 Default (option off) run at the same commit, so the shipped default stays
-graded:
-<!-- CI_DEFAULT -->
+graded — run **33704812955**, conclusion success, results merged
+(`87efff571`). `scripts/corpus_status_diff.py ef20d2cbc WORKTREE --per-suite`:
 
-**3. In the page.**
-<!-- PAGE -->
+```
+=== intersection: 4482 tests (ef20d2cbc -> WORKTREE, results_graphics) ===
+  output_mismatch    124 ->   124 (+0)
+  pass              4122 ->  4122 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4357 ->  4357 (+0)
+GAINS 0 | REGRESSIONS 0 | OTHER STATUS MOVES 0
+```
 
-**4. Pages deploy.**
-<!-- DEPLOY -->
+So the two modes and the pre-slice baseline all agree, test for test.
+
+**3. In the page** (`docs/recompiler`, Windows Chrome via Playwright-from-WSL,
+served from a FRESH port — the long-lived 8010 server on this box is rooted at
+`docs2/` and does not serve `/docs/recompiler/`; check
+`readlink /proc/<pid>/cwd` of the listener before trusting a "still broken"
+result). Snapshot `ef20d2cbc`:
+
+| SWF | In-browser compile | Result |
+|---|---|---|
+| `avm2/try_catch` | 14 files, ~15 s | **traces all 11 lines, byte-identical to `output.txt`** (before: died at the first throw inside `try`) |
+| `avm2/graphics_draw_path` | 14 files | runs through every `try`, emitting the full `Error thrown: … / at …` trace for each case |
+| `avm1/try_catch_finally` | 9 files, ~15 s | **119/119 lines, byte-identical to `output.txt`** — catch, finally, rethrow-through-finally and `try_finally_return()`'s deferred return all correct. This removes §7.3's AVM1 limitation in `in-browser-recompiler-refresh-assessment.md` |
+| Seedling, original (7.8 MB) | 16 files (182 MB of C) recompiled in 65 s; 13 compiled to a **38.23 MB guest in 668.8 s** | boots on the AVM2 host and **renders its title screen** (480×480, 2 frames @ 30 fps, 3908 guest functions mirrored); Newgrounds API reports its expected offline `Error #2032` |
+
+The wasmer SDK's "oneshot canceled" worker race (assessment §7) fires on maybe
+half of the first attempts and is unrelated to this work — rerun in a fresh
+page.
+
+**4. Pages deploy.** `deploy-pages.yml` run `33706633114` at `ef20d2cbc`:
+success. (Nothing in `docs/recompiler/` needed committing — `SWFRecomp.wasm`
+and `host/` are gitignored and the workflow builds them at deploy time; the
+only tracked change there is `pipeline.js`.)
 
 ## Two defects this slice's own testing found
 

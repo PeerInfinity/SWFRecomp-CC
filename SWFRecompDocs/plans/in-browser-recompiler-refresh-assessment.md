@@ -265,10 +265,12 @@ at a host-chosen address (`--global-base` = a static 96 MB arena in the host).
   `define_button2` compile in ~8 s and run with no traps.
 
 ### 7.3 Known limitations
-- **AVM1 try/catch:** `ACTION_TRY_SETJMP` inlines `setjmp` into generated scripts; the
-  slim driver cannot lower it, so the guest imports `setjmp`/`longjmp`. The page maps
-  `setjmp` → 0 (try body runs as if nothing can throw) and `longjmp` → JS error. A
-  real fix is a recompiler emission mode that runs try bodies through a runtime helper.
+- ~~**AVM1 try/catch:**~~ **FIXED 2026-09-02** by the try-helper emission mode
+  (`avm2-in-browser-assessment.md` §4.1, status doc
+  `SWFRecompDocs/status/avm2-try-helper-emission.md`). The page recompiles with
+  `try_helper = true`, so each try body is a lifted function the runtime calls
+  through ITS setjmp and generated code performs none. `avm1/try_catch_finally`
+  now traces all 119 lines in the page, byte-identical to its `output.txt`.
 - One SWF per page load (the runtime has global state); reload to run another.
 - Guest data + 8 MB shadow stack must fit the 96 MB arena; bigger SWFs get a clear
   error pointing at the downloadable bundle.
