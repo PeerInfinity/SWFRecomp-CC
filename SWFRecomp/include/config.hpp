@@ -34,6 +34,11 @@ namespace SWFRecomp
 		// the in-browser guest toolchain, whose jmp_buf is not the host's).
 		// The SWF_TRY_HELPER env var forces it on regardless of the toml.
 		bool try_helper = false;
+		// TU-split emission (assessment §1.3), in bytes of C text per
+		// abc<tag>_methods_<k>.c body chunk. 0 (the default) = off, and the
+		// emitted C is then byte-for-bit what it was before this existed.
+		// The SWF_TU_SPLIT env var overrides the toml (0 also turns it off).
+		uint32_t tu_split = 0;
 
 		Config();
 		void parseFile(std::string path);

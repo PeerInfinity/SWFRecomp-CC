@@ -2008,12 +2008,13 @@ def recompile_swf(test_dir, force=False):
     Returns (success, stderr).
     """
     scripts_dir = test_dir / "RecompiledScripts"
-    # Emission-mode stamp. SWF_TRY_HELPER changes the generated C without
-    # touching the binary or the SWF, so the mtime check below cannot see it;
-    # a cached tree from the other mode must be regenerated.
+    # Emission-mode stamp. SWF_TRY_HELPER / SWF_TU_SPLIT change the generated
+    # C without touching the binary or the SWF, so the mtime check below cannot
+    # see them; a cached tree from a different mode must be regenerated.
     mode_stamp = scripts_dir / ".recomp_mode"
-    want_mode = "try_helper=%s\n" % (
-        "1" if os.environ.get("SWF_TRY_HELPER", "") not in ("", "0") else "0")
+    want_mode = "try_helper=%s tu_split=%s\n" % (
+        "1" if os.environ.get("SWF_TRY_HELPER", "") not in ("", "0") else "0",
+        os.environ.get("SWF_TU_SPLIT", "") or "0")
     if not force and scripts_dir.exists():
         # Stale-cache check: if the SWFRecomp binary is newer than the cached
         # output (or test.swf is newer), the cached code may use an older

@@ -28,6 +28,10 @@ namespace SWFRecomp
 		// C is byte-for-bit what it was before the option existed.
 		bool try_helper = false;
 
+		// TU-split emission (Config::tu_split), bytes per body chunk. 0 = off,
+		// and the emitted C is then byte-for-bit what it was before.
+		uint32_t tu_split = 0;
+
 		// tag_main is buffered in memory (stringstream) rather than written
 		// directly to disk so the per-frame init prologue placeholder can
 		// be replaced once each frame's DoInitAction / ImportAssets calls

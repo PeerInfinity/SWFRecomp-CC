@@ -108,6 +108,13 @@ async function recompileSWF(swfBytes) {
         'output_tags_folder = "RecompiledTags"',
         'output_scripts_folder = "RecompiledScripts"',
         "try_helper = true",
+        // tu_split: emit the per-DoABC-tag method bodies as ~1.5 MB chunk TUs
+        // instead of one giant one. In-browser clang time grows super-linearly
+        // with TU size — Seedling's 12.9 MB abc1_methods.c is 399 s as one TU
+        // and 182 s as nine chunks in the same clang call, at half the peak
+        // memory; Snailiad's 29.7 MB TU never finished at all. §1.1/§1.3 of
+        // SWFRecompDocs/plans/avm2-in-browser-assessment.md.
+        "tu_split = 1500000",
         "",
     ].join("\n");
     Module.FS.writeFile("config.toml", configToml);

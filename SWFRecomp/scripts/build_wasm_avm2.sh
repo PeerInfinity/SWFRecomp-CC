@@ -175,7 +175,8 @@ read -r -a EXTRA_CFLAGS_ARR <<< "${EXTRA_CFLAGS:-}"
 # Pick per-TU opt level: the two giant generated ABC TUs get ABC_OPT.
 opt_for() {
     case "$1" in
-        abc0_methods.c|abc_timeline.c|abc0_tables.c) echo "${ABC_OPT}" ;;
+        # abc*_methods_<k>.c are the recompiler tu_split body chunks
+        abc0_methods.c|abc*_methods_*.c|abc_timeline.c|abc0_tables.c) echo "${ABC_OPT}" ;;
         *) echo "${RT_OPT}" ;;
     esac
 }
@@ -184,7 +185,7 @@ echo "=== Compiling (incremental; giant ABC TUs at ${ABC_OPT}, rest ${RT_OPT}) =
 # Compile the small/runtime TUs FIRST and the giant generated ABC TUs LAST, so a
 # syntax/type error in an edited runtime file surfaces in seconds rather than
 # after the 13 MB abc0_methods.c compile.
-mapfile -t ALL_SRC < <(ls "${SRC_DIR}"/*.c | grep -Ev '/(abc0_methods|abc_timeline|abc0_tables)\.c$'; ls "${SRC_DIR}"/{abc0_tables,abc_timeline,abc0_methods}.c 2>/dev/null)
+mapfile -t ALL_SRC < <(ls "${SRC_DIR}"/*.c | grep -Ev '/(abc0_methods(_[0-9]+)?|abc_timeline|abc0_tables)\.c$'; ls "${SRC_DIR}"/{abc0_tables,abc_timeline,abc0_methods}.c "${SRC_DIR}"/abc0_methods_*.c 2>/dev/null)
 OBJS=()
 NCOMPILED=0
 for src in "${ALL_SRC[@]}"; do

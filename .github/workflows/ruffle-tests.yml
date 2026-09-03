@@ -74,6 +74,11 @@ on:
         required: false
         default: ''
         type: string
+      tu_split:
+        description: 'Force the recompiler TU-split emission mode on: bytes of C text per abcN_methods_K.c body chunk (e.g. 4096 to make even small corpus tests split; empty/0 = default single-TU emission)'
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       categories:
@@ -126,6 +131,11 @@ on:
         required: false
         default: ''
         type: string
+      tu_split:
+        description: 'Force the recompiler TU-split emission mode on (bytes per body chunk; empty/0 = off)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -157,6 +167,13 @@ env:
   # A forced-on corpus run is how the mode's SEMANTICS are validated without a
   # browser; the page always compiles with it on.
   SWF_TRY_HELPER: ${{ inputs.try_helper }}
+  # TU-split emission mode (assessment §1.3): the value is the target size in
+  # bytes of each abc<tag>_methods_<k>.c body chunk. Empty/0 = off (one
+  # methods TU per DoABC tag, byte-identical to before the option). A forced-on
+  # corpus run validates the split's SEMANTICS; pass a deliberately small
+  # target (4096) so even a small corpus test really splits — at the page's
+  # 1.5 MB nothing in the Ruffle corpus would.
+  SWF_TU_SPLIT: ${{ inputs.tu_split }}
   AVM1_DIR: ruffle-tests/tests/swfs/avm1
   # AVM2 (AS3) suite — plan Stage 2 baseline: 1/1202 (hello_world), everything
   # else failing honestly (runtime abort on the first unimplemented opcode).
@@ -1169,7 +1186,7 @@ jobs:
       # ruffle-test-results branch, which would take scripts/ and the results
       # JSONs this one reads out from under it.
       - name: Publish failing images to ruffle-image-results
-        if: always() && inputs.images == 'true' && inputs.extra_defines == '' && inputs.try_helper == ''
+        if: always() && inputs.images == 'true' && inputs.extra_defines == '' && inputs.try_helper == '' && inputs.tu_split == ''
         env:
           IMAGE_SRC: ${{ runner.temp }}/image-artifacts
           STEM: ${{ inputs.mode == 'graphics' && 'results_graphics' || 'results' }}
@@ -1290,11 +1307,11 @@ jobs:
         # the branch and erased an arc's published numbers (run 30186909756,
         # 2026-07-26). Its value is the per-test verdict in the log and the
         # uploaded artifact — never the branch.
-        # try_helper likewise: a forced-on emission run's value is its
-        # pass/fail signal, not its numbers — publishing them would poison the
-        # {STEM}_previous.json baseline the NEXT (default-emission) run diffs
-        # against, exactly as the extra_defines verify runs used to.
-        if: always() && inputs.extra_defines == '' && inputs.single_test == '' && inputs.try_helper == ''
+        # try_helper and tu_split likewise: a forced-on emission run's value
+        # is its pass/fail signal, not its numbers — publishing them would
+        # poison the {STEM}_previous.json baseline the NEXT (default-emission)
+        # run diffs against, exactly as the extra_defines verify runs used to.
+        if: always() && inputs.extra_defines == '' && inputs.single_test == '' && inputs.try_helper == '' && inputs.tu_split == ''
         env:
           MODE: ${{ inputs.mode }}
           LIMIT: ${{ inputs.limit }}

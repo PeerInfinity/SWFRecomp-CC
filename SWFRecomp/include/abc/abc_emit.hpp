@@ -32,6 +32,18 @@ namespace abc
 	// a different size from the host's (assessment §3.1/§4.1).
 	void setTryHelper(bool on);
 
+	// TU-split emission (Config::tu_split / SWF_TU_SPLIT env var), in bytes
+	// of C text per body chunk; 0 = off. Call once before emitting. At OFF
+	// every byte of the emitted C is what it was before the option existed.
+	// ON, abc<tag>_methods.c is emitted as N body chunks
+	// (abc<tag>_methods_<k>.c, split at method boundaries, ~target bytes
+	// each) plus the original file holding only the Avm2AbcMethodData table,
+	// the signature arrays and extern declarations for the chunked symbols.
+	// The in-browser clang's compile time grows super-linearly with TU size,
+	// so this is what makes the biggest titles compile at all (assessment
+	// §1.1/§1.3). A tag whose bodies fit in one chunk keeps today's file set.
+	void setTuSplit(size_t target_bytes);
+
 	// Per-body emit input: the verified IR, or the verify error if
 	// verification failed (the emitted function then aborts at call time).
 	struct EmitBody

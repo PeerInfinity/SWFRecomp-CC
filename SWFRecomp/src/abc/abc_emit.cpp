@@ -70,6 +70,16 @@ namespace abc
 		g_try_helper = on;
 	}
 
+	// TU-split emission (Config::tu_split / SWF_TU_SPLIT), in bytes of C text
+	// per body chunk. 0 = off, and at off every byte of emitted C is what it
+	// was before this existed. See the abc<tag>_methods.c block for the shape.
+	static size_t g_tu_split = 0;
+
+	void setTuSplit(size_t target_bytes)
+	{
+		g_tu_split = target_bytes;
+	}
+
 	// Escapes raw bytes for a C string literal. Octal escapes are always
 	// 3 digits so a following digit can't extend them.
 	static string escapeCString(const string& s)
@@ -990,7 +1000,7 @@ namespace abc
 	// Deliberately NOT folded into fold_traits(): that hash is the
 	// native-intrinsic fingerprint and must stay metadata-blind, or every
 	// match in the intrinsic gate breaks.
-	static void emitTraitMetadata(ofstream& out, const string& sym,
+	static void emitTraitMetadata(std::ostream& out, const string& sym,
 	                              const AbcFile& abc,
 	                              const std::vector<AbcTrait>& traits)
 	{
@@ -1033,13 +1043,18 @@ namespace abc
 		}
 	}
 
-	static void emitTraitArray(ofstream& out, const string& sym,
+	static void emitTraitArray(std::ostream& out, const string& sym,
 	                           const AbcFile& abc,
-	                           const std::vector<AbcTrait>& traits)
+	                           const std::vector<AbcTrait>& traits,
+	                           bool external = false)
 	{
 		if (traits.empty()) return;
 		emitTraitMetadata(out, sym, abc, traits);
-		out << "static const Avm2AbcTrait " << sym << "[] =" << endl << "{" << endl;
+		// `external` (tu_split) drops the `static` so the table chunk can
+		// name this array; the _md sub-arrays stay static, they are only
+		// ever read by the initializer right below them.
+		out << (external ? "" : "static ")
+		    << "const Avm2AbcTrait " << sym << "[] =" << endl << "{" << endl;
 		for (size_t ti = 0; ti < traits.size(); ti++)
 		{
 			const AbcTrait& t = traits[ti];
@@ -1136,7 +1151,7 @@ namespace abc
 	// Compile-time slot store (store-path lever): bare slot write when the
 	// declared-type coerce is proven a no-op, else the coercing variant with
 	// the declared type's multiname baked in.
-	static void emitStoreSlot(ofstream& out, u32 mn, const OpSpec& os, int is_init)
+	static void emitStoreSlot(std::ostream& out, u32 mn, const OpSpec& os, int is_init)
 	{
 		if (os.store_coerce_mn == 0)
 		{
@@ -1155,7 +1170,7 @@ namespace abc
 	// Emits one op's C. Returns false if the op is unsupported (caller
 	// emits an inline abort and continues with the next op). `os` carries the
 	// type-specialization results for this op (see OpSpec).
-	static bool emitOp(ofstream& out, const BodyCtx& bc, const IrOp& op,
+	static bool emitOp(std::ostream& out, const BodyCtx& bc, const IrOp& op,
 	                   const OpSpec& os = OpSpec())
 	{
 		const AbcFile& abc = *bc.abc;
@@ -2648,9 +2663,10 @@ namespace abc
 		return R;
 	}
 
-	static void emitMethodBody(ofstream& out, const AbcFile& abc, const EmitBody& body,
+	static void emitMethodBody(std::ostream& out, const AbcFile& abc, const EmitBody& body,
 	                           const string& fn_name, u32 method_index,
-	                           const string& exc_sym, const AbcTypeModel* typeModel)
+	                           const string& exc_sym, const AbcTypeModel* typeModel,
+	                           bool external = false)
 	{
 		const string& mname = abc.pool.strings[abc.methods[method_index].name];
 		out << "// method[" << method_index << "] \"" << sanitizeComment(mname)
@@ -2666,7 +2682,12 @@ namespace abc
 				break;
 			}
 		}
-		out << "static Avm2Value " << fn_name << "(Avm2Activation* act)" << endl
+		// `external` (tu_split): the method lives in a body chunk and the
+		// table chunk names it, so it loses `static`. The lifted <fn>_body
+		// stays static — it is emitted in this same unit, hence this same
+		// chunk, and nothing outside it refers to it.
+		out << (external ? "" : "static ")
+		    << "Avm2Value " << fn_name << "(Avm2Activation* act)" << endl
 		    << "{" << endl;
 
 		if (!body.verified)
@@ -4114,13 +4135,34 @@ namespace abc
 		}
 
 		// ------------------------------------------------------------------
-		// abc<tag>_methods.c
+		// abc<tag>_methods.c — the method bodies + the Avm2AbcMethodData table.
+		//
+		// Under tu_split (assessment §1.3) the bodies move out into
+		// abc<tag>_methods_<k>.c chunks of ~tu_split bytes each, split at
+		// method boundaries, and THIS file keeps only the table part (the
+		// _pt/_po signature arrays, Avm2AbcMethodData, Avm2AbcFileData) plus
+		// extern declarations for the symbols the chunks now define. Reason:
+		// in-browser clang time grows super-linearly with TU size — 12.9 MB in
+		// one TU is 399 s, the same methods as nine ~1.5 MB TUs in one clang
+		// call is 182 s at half the peak memory. At tu_split == 0 (the
+		// default) the emission below is exactly what it always was.
 		// ------------------------------------------------------------------
 		{
+			const size_t split_target = g_tu_split;
+			const bool split = split_target > 0;
 			ofstream out(folder_ + "/" + p + "_methods.c");
 			out << "// Generated by SWFRecomp (abc_emit.cpp) — method bodies for "
 			    << "DoABC tag " << tag << ". Do not edit." << endl
 			    << "#include \"" << prefix_ << "abc_gen.h\"" << endl << endl;
+
+			// Body chunks (tu_split only). Everything one method contributes
+			// at file scope — its _exc array, its _bt activation-trait array,
+			// its function and (try-helper mode) the lifted <fn>_body that
+			// follows it — is emitted into one `unit`, so a chunk boundary can
+			// only ever fall between methods.
+			std::vector<string> chunks;
+			std::ostringstream cur_chunk;
+			std::ostringstream ext_decls;
 
 			// Type model for the compile-time slot-specialization pass.
 			AbcTypeModel typeModel(abc);
@@ -4160,28 +4202,95 @@ namespace abc
 				const EmitBody& body = bodies[bi];
 				u32 mi = abc.method_bodies[bi].method;
 				string exc_sym = p + "_m" + to_string(mi) + "_exc";
+				string bt_sym = p + "_m" + to_string(mi) + "_bt";
+				std::ostringstream unit;
 
 				// Exception data precedes the body (its prologue refers to it).
 				if (body.verified && !body.ir.exceptions.empty())
 				{
-					out << "static const Avm2AbcException " << exc_sym
-					    << "[] =" << endl << "{" << endl;
+					unit << (split ? "" : "static ")
+					     << "const Avm2AbcException " << exc_sym
+					     << "[] =" << endl << "{" << endl;
 					for (const IrException& e : body.ir.exceptions)
 					{
-						out << "\t{ " << e.from_op << ", " << e.to_op << ", "
-						    << e.target_op << ", " << e.type_name << ", "
-						    << e.variable_name << ", " << (e.active ? 1 : 0)
-						    << " }," << endl;
+						unit << "\t{ " << e.from_op << ", " << e.to_op << ", "
+						     << e.target_op << ", " << e.type_name << ", "
+						     << e.variable_name << ", " << (e.active ? 1 : 0)
+						     << " }," << endl;
 					}
-					out << "};" << endl << endl;
+					unit << "};" << endl << endl;
+					if (split)
+					{
+						ext_decls << "extern const Avm2AbcException " << exc_sym
+						          << "[];" << endl;
+					}
 				}
 
 				// Activation-object traits (NewActivation / NewCatch).
-				emitTraitArray(out, p + "_m" + to_string(mi) + "_bt", abc,
-				               abc.method_bodies[bi].traits);
+				emitTraitArray(unit, bt_sym, abc,
+				               abc.method_bodies[bi].traits, split);
+				if (split && !abc.method_bodies[bi].traits.empty())
+				{
+					ext_decls << "extern const Avm2AbcTrait " << bt_sym
+					          << "[];" << endl;
+				}
 
-				emitMethodBody(out, abc, body, p + "_m" + to_string(mi), mi, exc_sym,
-				               &typeModel);
+				emitMethodBody(unit, abc, body, p + "_m" + to_string(mi), mi, exc_sym,
+				               &typeModel, split);
+				if (split)
+				{
+					ext_decls << "Avm2Value " << p << "_m" << mi
+					          << "(Avm2Activation* act);" << endl;
+				}
+
+				if (!split)
+				{
+					out << unit.str();
+					continue;
+				}
+				cur_chunk << unit.str();
+				if ((size_t) (std::streamoff) cur_chunk.tellp() >= split_target)
+				{
+					chunks.push_back(cur_chunk.str());
+					cur_chunk.str(string());
+					cur_chunk.clear();
+				}
+			}
+
+			if (split)
+			{
+				if ((std::streamoff) cur_chunk.tellp() > 0)
+				{
+					chunks.push_back(cur_chunk.str());
+				}
+				if (chunks.size() <= 1)
+				{
+					// A tag whose whole body text fits under the target keeps
+					// today's file set (one abc<tag>_methods.c); the only
+					// difference from the option-off emission is the linkage
+					// keywords, which cost nothing.
+					if (!chunks.empty()) out << chunks[0];
+				}
+				else
+				{
+					for (size_t k = 0; k < chunks.size(); k++)
+					{
+						ofstream cf(folder_ + "/" + p + "_methods_"
+						            + to_string(k) + ".c");
+						cf << "// Generated by SWFRecomp (abc_emit.cpp) — method "
+						   << "bodies " << (k + 1) << "/" << chunks.size()
+						   << " for DoABC tag " << tag << ". Do not edit." << endl
+						   << "#include \"" << prefix_ << "abc_gen.h\"" << endl
+						   << endl << chunks[k];
+					}
+					// The table below is the ONLY consumer of these symbols, so
+					// the declarations live here rather than in abc_gen.h —
+					// that header is included by every generated TU, and a
+					// Snailiad-sized tag would otherwise put ~21 K declarations
+					// in front of all twenty body chunks for nothing.
+					out << "// Defined in the abc" << tag << "_methods_*.c body "
+					    << "chunks." << endl << ext_decls.str() << endl;
+				}
 			}
 
 			// Per-method signature arrays (param types + optionals).

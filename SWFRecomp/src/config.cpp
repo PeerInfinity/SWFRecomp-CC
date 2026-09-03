@@ -38,6 +38,15 @@ namespace SWFRecomp
 		{
 			if (e[0] != '\0' && e[0] != '0') try_helper = true;
 		}
+
+		tu_split = (uint32_t) tbl["input"]["tu_split"].value_or(0);
+		// Same env override, but the value carries the chunk target: CI forces
+		// a deliberately tiny target so that even a small corpus test really
+		// splits (at 1.5 MB nothing in the Ruffle corpus would).
+		if (const char* e = getenv("SWF_TU_SPLIT"))
+		{
+			if (e[0] != '\0') tu_split = (uint32_t) strtoul(e, NULL, 10);
+		}
 	}
 	
 	string_view Config::parseStringView(string key)

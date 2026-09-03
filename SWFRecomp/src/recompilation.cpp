@@ -33,6 +33,8 @@ namespace SWFRecomp
 
 		// Try-helper emission mode (config `try_helper` / SWF_TRY_HELPER).
 		abc::setTryHelper(context.try_helper);
+		// TU-split emission (config `tu_split` / SWF_TU_SPLIT).
+		abc::setTuSplit(context.tu_split);
 
 		context.constants = ofstream(string("") + context.output_tags_folder + "constants.c", ios_base::out);
 		
