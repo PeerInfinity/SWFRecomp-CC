@@ -2,10 +2,10 @@
   "metadata": {
     "old_timestamp": "2026-08-19T16:36:38.804086+00:00",
     "old_git_sha": "a946ee183838f3ee96b55a4fbf3937c4e5c341c6",
-    "new_timestamp": "2026-08-19T16:36:38.804086+00:00",
-    "new_git_sha": "a946ee183838f3ee96b55a4fbf3937c4e5c341c6",
+    "new_timestamp": "2026-09-03T00:32:06.972061+00:00",
+    "new_git_sha": "53ee2bc5a1551cc290eed2e19242952f290f650d",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
     "old_pass": 10,
@@ -16,18 +16,31 @@
     "new_pass": 10,
     "new_ruffle_matched": 0,
     "new_effective_pass": 10,
-    "new_total": 11,
-    "new_pass_rate": 90.9,
+    "new_total": 12,
+    "new_pass_rate": 83.3,
     "old_mismatched_lines": 4,
-    "new_mismatched_lines": 4,
+    "new_mismatched_lines": 23,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 11,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm2_loads_avm1_events",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 25,
+        "expected_lines": 26,
+        "matching_lines": 7
+      }
+    }
+  ]
 }
