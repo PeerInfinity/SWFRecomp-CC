@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 
 #include <common.h>
+#include <abc/abc_emit.hpp>
 #include <swf.hpp>
 
 using std::string;
@@ -29,6 +30,9 @@ namespace SWFRecomp
 		// It is flushed to tagMain.c at the end of recompile().
 		context.tag_main.str("");
 		context.tag_main.clear();
+
+		// Try-helper emission mode (config `try_helper` / SWF_TRY_HELPER).
+		abc::setTryHelper(context.try_helper);
 
 		context.constants = ofstream(string("") + context.output_tags_folder + "constants.c", ios_base::out);
 		

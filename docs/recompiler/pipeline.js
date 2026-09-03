@@ -96,11 +96,18 @@ async function recompileSWF(swfBytes) {
     });
 
     Module.FS.writeFile("input.swf", new Uint8Array(swfBytes));
+    // try_helper: emit every try-bearing method (AVM2) and try body (AVM1) as
+    // a lifted function the RUNTIME calls through its own setjmp. The guest
+    // toolchain here cannot lower setjmp/longjmp at all — a plain setjmp in
+    // generated code silently links the WASIX libc's stack_checkpoint version,
+    // which the loader stubs — so without this a throw inside `try` kills the
+    // movie. See SWFRecompDocs/plans/avm2-in-browser-assessment.md §4.1.
     const configToml = [
         "[input]",
         'path_to_swf = "input.swf"',
         'output_tags_folder = "RecompiledTags"',
         'output_scripts_folder = "RecompiledScripts"',
+        "try_helper = true",
         "",
     ].join("\n");
     Module.FS.writeFile("config.toml", configToml);

@@ -2008,6 +2008,12 @@ def recompile_swf(test_dir, force=False):
     Returns (success, stderr).
     """
     scripts_dir = test_dir / "RecompiledScripts"
+    # Emission-mode stamp. SWF_TRY_HELPER changes the generated C without
+    # touching the binary or the SWF, so the mtime check below cannot see it;
+    # a cached tree from the other mode must be regenerated.
+    mode_stamp = scripts_dir / ".recomp_mode"
+    want_mode = "try_helper=%s\n" % (
+        "1" if os.environ.get("SWF_TRY_HELPER", "") not in ("", "0") else "0")
     if not force and scripts_dir.exists():
         # Stale-cache check: if the SWFRecomp binary is newer than the cached
         # output (or test.swf is newer), the cached code may use an older
@@ -2018,7 +2024,8 @@ def recompile_swf(test_dir, force=False):
             cache_mtime = scripts_dir.stat().st_mtime
             recomp_mtime = RECOMP_BIN.stat().st_mtime
             swf_mtime = (test_dir / "test.swf").stat().st_mtime
-            if cache_mtime >= recomp_mtime and cache_mtime >= swf_mtime:
+            stamp_ok = mode_stamp.exists() and mode_stamp.read_text() == want_mode
+            if cache_mtime >= recomp_mtime and cache_mtime >= swf_mtime and stamp_ok:
                 return True, ""
         except OSError:
             return True, ""
@@ -2071,6 +2078,11 @@ def recompile_swf(test_dir, force=False):
             stderr=subprocess.PIPE,
         )
         _, stderr = proc.communicate(timeout=recompile_timeout)
+        if proc.returncode == 0:
+            try:
+                mode_stamp.write_text(want_mode)
+            except OSError:
+                pass
         return proc.returncode == 0, stderr.decode("utf-8", errors="replace")
     except subprocess.TimeoutExpired:
         proc.kill()

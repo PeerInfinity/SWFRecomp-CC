@@ -26,6 +26,16 @@
 // and `scope_n` are declared volatile in such bodies (they are assigned
 // before use after the longjmp, but volatile also silences -Wclobbered);
 // the value arrays are address-taken and therefore memory-resident.
+//
+// Under setTryHelper(true) such a body is emitted differently: the ops move
+// into a lifted `<fn>_body(void*)` whose locals/stack/scope arrays live in
+// the OUTER frame (Avm2TryEnv), and the outer function loops
+// `while (avm2_try_run(ctx, &tf, body, &env) < 0)` — the runtime executes
+// the setjmp and owns the try frame's storage, so generated code holds no
+// libc type. Re-entry after a catch is a fresh call to the body, which
+// therefore starts sp/scope_n at 0 (the same reset the inline version does)
+// and needs no `volatile`. Semantics are otherwise identical, including
+// where the return coercion runs relative to the frame pop.
 
 #include <cinttypes>
 #include <cstdio>
@@ -50,6 +60,16 @@ namespace SWFRecomp
 {
 namespace abc
 {
+	// Try-helper emission mode (Config::try_helper / SWF_TRY_HELPER). OFF by
+	// default; at false every byte of emitted C is what it was before this
+	// existed. See emitMethodBody for the generated shape.
+	static bool g_try_helper = false;
+
+	void setTryHelper(bool on)
+	{
+		g_try_helper = on;
+	}
+
 	// Escapes raw bytes for a C string literal. Octal escapes are always
 	// 3 digits so a following digit can't extend them.
 	static string escapeCString(const string& s)
@@ -1050,6 +1070,7 @@ namespace abc
 		const AbcFile* abc;
 		u32 method_index;
 		bool has_exc;  // any active exception entry (try frame pushed)
+		bool try_helper;  // has_exc && the lifted-body mode is on
 		// Class/script initializer: avmplus runs these in "interpreter
 		// mode", whose index fast path ignores the ns set.
 		bool interp_mode;
@@ -2634,6 +2655,17 @@ namespace abc
 		const string& mname = abc.pool.strings[abc.methods[method_index].name];
 		out << "// method[" << method_index << "] \"" << sanitizeComment(mname)
 		    << "\" (body " << body.ir.body_index << ")" << endl;
+		// Try-helper mode needs the lifted body's prototype ahead of the
+		// method (it is referenced by the outer function's run loop).
+		if (g_try_helper && body.verified)
+		{
+			for (const IrException& e : body.ir.exceptions)
+			{
+				if (!e.active) continue;
+				out << "static int " << fn_name << "_body(void* _p);" << endl;
+				break;
+			}
+		}
 		out << "static Avm2Value " << fn_name << "(Avm2Activation* act)" << endl
 		    << "{" << endl;
 
@@ -2654,6 +2686,7 @@ namespace abc
 		bc.abc = &abc;
 		bc.method_index = method_index;
 		bc.has_exc = false;
+		bc.try_helper = false;
 		bc.interp_mode = false;
 		// A/B baseline toggle for lever A (getlex-global domain inline cache).
 		static const bool find_ic_disabled = getenv("SWF_NO_FIND_IC") != nullptr;
@@ -2677,6 +2710,7 @@ namespace abc
 		{
 			if (e.active) bc.has_exc = true;
 		}
+		bc.try_helper = bc.has_exc && g_try_helper;
 
 		// Branch/switch/exception targets need op labels.
 		std::set<u32> targets;
@@ -2702,34 +2736,75 @@ namespace abc
 			if (e.active) targets.insert(e.target_op);
 		}
 
-		// sp/scope_n are volatile in exception bodies (see file header).
-		const char* idx_qual = bc.has_exc ? "volatile uint32_t" : "uint32_t";
-		out << "\tAvm2Value loc[" << num_locals << "];" << endl
-		    << "\tAvm2Value stk[" << max_stack << "];" << endl
-		    << "\t" << idx_qual << " sp = 0;" << endl
-		    << "\tAvm2ScopeEntry lscope[" << max_scope << "];" << endl
-		    << "\t" << idx_qual << " scope_n = 0;" << endl
-		    << "\tavm2_setup_locals(loc, " << num_locals << ", act, "
-		    << method_index << ");" << endl
-		    << "\t(void) sp; (void) scope_n; (void) stk; (void) lscope; (void) loc;"
-		    << endl;
+		const string mi_str = to_string(method_index);
+		bool ret_coerce = abc.methods[method_index].return_type != 0;
 
-		if (bc.has_exc)
+		std::set<u32> handler_targets;
+		for (const IrException& e : body.ir.exceptions)
 		{
-			out << "\tAvm2TryFrame _tf;" << endl
-			    << "\tavm2_try_push_frame(act->ctx, &_tf, " << exc_sym << ", "
+			if (e.active) handler_targets.insert(e.target_op);
+		}
+
+		if (bc.try_helper)
+		{
+			// Lifted-body mode (assessment §4.1). The setjmp moves into the
+			// runtime (avm2_try_run), so no generated frame holds a jmp_buf;
+			// the value arrays stay in the OUTER frame (Avm2TryEnv) so they
+			// survive the re-entry a caught throw causes. `sp`/`scope_n` are
+			// plain locals of the body function: a re-entry is a fresh call,
+			// which starts them at 0 exactly like the inline version's reset.
+			out << "\tAvm2Value loc[" << num_locals << "];" << endl
+			    << "\tAvm2Value stk[" << max_stack << "];" << endl
+			    << "\tAvm2ScopeEntry lscope[" << max_scope << "];" << endl
+			    << "\tavm2_setup_locals(loc, " << num_locals << ", act, "
+			    << method_index << ");" << endl
+			    << "\tAvm2TryFrameStorage _tf;" << endl
+			    << "\tAvm2TryEnv _env;" << endl
+			    << "\t_env.act = act; _env.loc = loc; _env.stk = stk;" << endl
+			    << "\t_env.lscope = lscope; _env.tf = &_tf; _env.resume = -1;" << endl
+			    << "\t_env.exc = avm2_undefined(); _env.ret = avm2_undefined();" << endl
+			    << "\tavm2_try_push_frame_st(act->ctx, &_tf, " << exc_sym << ", "
 			    << body.ir.exceptions.size() << ", act->file);" << endl
-			    << "\tif (setjmp(_tf.jb))" << endl
+			    << "\tint _rc;" << endl
+			    << "\twhile ((_rc = avm2_try_run(act->ctx, &_tf, " << fn_name
+			    << "_body, &_env)) < 0)" << endl
+			    << "\t{" << endl
+			    << "\t\t_env.resume = (int32_t) avm2_try_handler_target(&_tf);" << endl
+			    << "\t\t_env.exc = avm2_try_exc(&_tf);" << endl
+			    << "\t}" << endl
+			    << "\tavm2_try_pop_frame_st(&_tf);" << endl;
+			if (ret_coerce)
+			{
+				// ReturnVoid coerces AFTER the frame is popped (so a throw from
+				// the coercion escapes to the caller) — the inline version pops
+				// first for exactly that reason; _rc carries the request.
+				out << "\tif (_rc) return avm2_op_coerce_return(act, " << mi_str
+				    << ", _env.ret);" << endl;
+			}
+			else
+			{
+				out << "\t(void) _rc;" << endl;
+			}
+			out << "\treturn _env.ret;" << endl
+			    << "}" << endl << endl
+			    << "static int " << fn_name << "_body(void* _p)" << endl
+			    << "{" << endl
+			    << "\tAvm2TryEnv* _env = (Avm2TryEnv*) _p;" << endl
+			    << "\tAvm2Activation* act = _env->act;" << endl
+			    << "\tAvm2Value* loc = _env->loc;" << endl
+			    << "\tAvm2Value* stk = _env->stk;" << endl
+			    << "\tAvm2ScopeEntry* lscope = _env->lscope;" << endl
+			    << "\tAvm2TryFrameStorage* _tfp = _env->tf;" << endl
+			    << "\tuint32_t sp = 0;" << endl
+			    << "\tuint32_t scope_n = 0;" << endl
+			    << "\t(void) act; (void) sp; (void) scope_n; (void) stk;"
+			    << " (void) lscope; (void) loc; (void) _tfp;" << endl
+			    << "\tif (_env->resume >= 0)" << endl
 			    << "\t{" << endl
 			    << "\t\tsp = 0; scope_n = 0;" << endl
-			    << "\t\tstk[sp++] = _tf.exc;" << endl
-			    << "\t\tswitch (_tf.handler_target)" << endl
+			    << "\t\tstk[sp++] = _env->exc;" << endl
+			    << "\t\tswitch (_env->resume)" << endl
 			    << "\t\t{" << endl;
-			std::set<u32> handler_targets;
-			for (const IrException& e : body.ir.exceptions)
-			{
-				if (e.active) handler_targets.insert(e.target_op);
-			}
 			for (u32 t : handler_targets)
 			{
 				out << "\t\t\tcase " << t << ": goto op_" << t << ";" << endl;
@@ -2738,10 +2813,41 @@ namespace abc
 			    << "\t\t}" << endl
 			    << "\t}" << endl;
 		}
-		out << endl;
+		else
+		{
+			// sp/scope_n are volatile in exception bodies (see file header).
+			const char* idx_qual = bc.has_exc ? "volatile uint32_t" : "uint32_t";
+			out << "\tAvm2Value loc[" << num_locals << "];" << endl
+			    << "\tAvm2Value stk[" << max_stack << "];" << endl
+			    << "\t" << idx_qual << " sp = 0;" << endl
+			    << "\tAvm2ScopeEntry lscope[" << max_scope << "];" << endl
+			    << "\t" << idx_qual << " scope_n = 0;" << endl
+			    << "\tavm2_setup_locals(loc, " << num_locals << ", act, "
+			    << method_index << ");" << endl
+			    << "\t(void) sp; (void) scope_n; (void) stk; (void) lscope; (void) loc;"
+			    << endl;
 
-		const string mi_str = to_string(method_index);
-		bool ret_coerce = abc.methods[method_index].return_type != 0;
+			if (bc.has_exc)
+			{
+				out << "\tAvm2TryFrame _tf;" << endl
+				    << "\tavm2_try_push_frame(act->ctx, &_tf, " << exc_sym << ", "
+				    << body.ir.exceptions.size() << ", act->file);" << endl
+				    << "\tif (setjmp(_tf.jb))" << endl
+				    << "\t{" << endl
+				    << "\t\tsp = 0; scope_n = 0;" << endl
+				    << "\t\tstk[sp++] = _tf.exc;" << endl
+				    << "\t\tswitch (_tf.handler_target)" << endl
+				    << "\t\t{" << endl;
+				for (u32 t : handler_targets)
+				{
+					out << "\t\t\tcase " << t << ": goto op_" << t << ";" << endl;
+				}
+				out << "\t\t\tdefault: avm2_fatal(\"bad exception handler target\");" << endl
+				    << "\t\t}" << endl
+				    << "\t}" << endl;
+			}
+		}
+		out << endl;
 
 		// Compile-time slot indices for specializable reads + coerce-elision
 		// flags for proven-redundant coerce_* / coerce_return sites.
@@ -2902,7 +3008,11 @@ namespace abc
 			}
 			string desc = sanitizeComment(formatIrOp(abc, op));
 			out << "\t// " << i << ": " << desc << endl;
-			if (bc.has_exc)
+			if (bc.try_helper)
+			{
+				out << "\t_tfp->op_index = " << i << ";" << endl;
+			}
+			else if (bc.has_exc)
 			{
 				out << "\t_tf.op_index = " << i << ";" << endl;
 			}
@@ -2919,6 +3029,13 @@ namespace abc
 						? "avm2_coerce_verify_return" : "avm2_op_coerce_return";
 					out << " _rv = " << rc << "(act, " << mi_str << ", _rv);";
 				}
+				if (bc.try_helper)
+				{
+					// The coercion above ran with the frame still installed
+					// (as in the inline version); the pop is the caller's.
+					out << " _env->ret = _rv; return 0; }" << endl;
+					continue;
+				}
 				if (bc.has_exc)
 				{
 					out << " avm2_try_pop_frame(&_tf);";
@@ -2928,6 +3045,15 @@ namespace abc
 			}
 			if (op.op == IrOpcode::ReturnVoid)
 			{
+				if (bc.try_helper)
+				{
+					// _rc = 1 asks the outer function to coerce AFTER popping
+					// the frame — the inline version pops first here, so a
+					// throw out of the coercion escapes to the caller.
+					out << "\t_env->ret = avm2_undefined(); return "
+					    << (ret_coerce ? 1 : 0) << ";" << endl;
+					continue;
+				}
 				if (bc.has_exc)
 				{
 					out << "\tavm2_try_pop_frame(&_tf);" << endl;
@@ -2972,7 +3098,14 @@ namespace abc
 		IrOpcode last = body.ir.ops.empty() ? IrOpcode::Nop : body.ir.ops.back().op;
 		if (last != IrOpcode::ReturnValue && last != IrOpcode::ReturnVoid)
 		{
-			out << "\treturn avm2_undefined();" << endl;
+			if (bc.try_helper)
+			{
+				out << "\t_env->ret = avm2_undefined(); return 0;" << endl;
+			}
+			else
+			{
+				out << "\treturn avm2_undefined();" << endl;
+			}
 		}
 		out << "}" << endl << endl;
 	}

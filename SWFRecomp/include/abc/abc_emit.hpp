@@ -22,6 +22,16 @@ namespace SWFRecomp
 {
 namespace abc
 {
+	// Try-helper emission mode (Config::try_helper / SWF_TRY_HELPER env var).
+	// Call once before emitting. OFF by default, and at OFF every byte of the
+	// emitted C is what it was before the option existed. ON, a method body
+	// with an active exception table is emitted as an outer frame + a lifted
+	// `<fn>_body` function driven by avm2_try_run (the runtime owns the
+	// setjmp and the try frame's storage), so generated code never holds a
+	// jmp_buf — required by the in-browser guest toolchain, whose jmp_buf is
+	// a different size from the host's (assessment §3.1/§4.1).
+	void setTryHelper(bool on);
+
 	// Per-body emit input: the verified IR, or the verify error if
 	// verification failed (the emitted function then aborts at call time).
 	struct EmitBody

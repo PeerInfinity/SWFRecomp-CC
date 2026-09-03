@@ -138,6 +138,27 @@ using Point = std::array<Coord, 2>;
 
 namespace SWFRecomp
 {
+
+	// Writes a buffered script file. `defs` (try-helper mode's lifted try
+	// bodies, empty otherwise) are static functions that must sit at file
+	// scope ahead of their caller but AFTER the leading #include block, since
+	// they use the runtime's types. Empty defs reproduce the plain write.
+	static void writeScriptFile(ofstream& f, const string& defs, const string& body)
+	{
+		if (defs.empty())
+		{
+			f << body;
+			return;
+		}
+		size_t p = body.rfind("#include");
+		size_t nl = (p == string::npos) ? string::npos : body.find('\n', p);
+		if (nl == string::npos)
+		{
+			f << defs << body;
+			return;
+		}
+		f << body.substr(0, nl + 1) << endl << defs << body.substr(nl + 1);
+	}
 	// Tessellate a set of contours with libtess2 under the given winding rule
 	// (TESS_WINDING_ODD = SWF even-odd, the default for DefineShape/2/3 and
 	// DefineShape4 without NON_ZERO_WINDING_RULE; TESS_WINDING_NONZERO otherwise).
@@ -3326,7 +3347,11 @@ namespace SWFRecomp
 				}
 				context.out_script_header << endl << "void script_" << to_string(next_script_i) << "(SWFAppContext* app_context);";
 
-				ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+				ofstream out_script_file(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+				// Try-helper mode lifts try bodies into STATIC functions that must
+				// sit at file scope ahead of their caller, so the function text is
+				// buffered and the lifted definitions are written out first.
+				std::ostringstream out_script;
 				out_script << "#include <recomp.h>" << endl
 						   << "#include <setjmp.h>" << endl
 						   << "#include \"script_decls.h\"" << endl << endl
@@ -3366,6 +3391,7 @@ namespace SWFRecomp
 				}
 
 				out_script << "}";
+				writeScriptFile(out_script_file, action.takeLiftedTryDefs(), out_script.str());
 
 				// Phase 6: queue the root DoAction inline at this tag's
 				// position. The drain at ShowFrame/EndTag pops in FIFO order,
@@ -3396,7 +3422,11 @@ namespace SWFRecomp
 
 				context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
 
-				ofstream out_script(context.output_scripts_folder + func_name + ".c", ios_base::out);
+				ofstream out_script_file(context.output_scripts_folder + func_name + ".c", ios_base::out);
+				// Try-helper mode lifts try bodies into STATIC functions that must
+				// sit at file scope ahead of their caller, so the function text is
+				// buffered and the lifted definitions are written out first.
+				std::ostringstream out_script;
 				out_script << "#include <recomp.h>" << endl
 						   << "#include <setjmp.h>" << endl
 						   << "#include \"script_decls.h\"" << endl << endl
@@ -3410,6 +3440,7 @@ namespace SWFRecomp
 				action.parseActions(context, cur_pos, out_script);
 
 				out_script << "}";
+				writeScriptFile(out_script_file, action.takeLiftedTryDefs(), out_script.str());
 
 				// Buffer the call into the current-frame prologue so it
 				// emits at the top of frame_N's body, before any same-frame
@@ -4447,7 +4478,11 @@ namespace SWFRecomp
 						std::string func_name = "clip_action_" + to_string(next_script_i);
 						context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
 
-						ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						ofstream out_script_file(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						// Try-helper mode lifts try bodies into STATIC functions that must
+						// sit at file scope ahead of their caller, so the function text is
+						// buffered and the lifted definitions are written out first.
+						std::ostringstream out_script;
 						out_script << "#include <recomp.h>" << endl
 								   << "#include <setjmp.h>" << endl
 								   << "#include \"script_decls.h\"" << endl << endl
@@ -4459,6 +4494,7 @@ namespace SWFRecomp
 
 						action.parseActions(context, cur_pos, out_script);
 						out_script << "}";
+						writeScriptFile(out_script_file, action.takeLiftedTryDefs(), out_script.str());
 
 						if (effective_flags != 0)
 							clip_entries.push_back({ effective_flags, func_name });
@@ -5885,7 +5921,11 @@ namespace SWFRecomp
 									std::string func_name = "clip_action_" + to_string(next_script_i);
 									context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
 
-									ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+									ofstream out_script_file(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+									// Try-helper mode lifts try bodies into STATIC functions that must
+									// sit at file scope ahead of their caller, so the function text is
+									// buffered and the lifted definitions are written out first.
+									std::ostringstream out_script;
 									out_script << "#include <recomp.h>" << endl
 											   << "#include <setjmp.h>" << endl
 											   << "#include \"script_decls.h\"" << endl << endl
@@ -5896,6 +5936,7 @@ namespace SWFRecomp
 
 									action.parseActions(context, cur_pos, out_script);
 									out_script << "}";
+									writeScriptFile(out_script_file, action.takeLiftedTryDefs(), out_script.str());
 
 									if (effective_flags != 0)
 										clip_entries.push_back({ effective_flags, func_name });
@@ -6167,7 +6208,11 @@ namespace SWFRecomp
 							std::string script_name = "script_" + to_string(next_script_i);
 							context.out_script_header << endl << "void " << script_name << "(SWFAppContext* app_context);";
 
-							ofstream sprite_out_script(context.output_scripts_folder + script_name + ".c", ios_base::out);
+							ofstream sprite_out_script_file(context.output_scripts_folder + script_name + ".c", ios_base::out);
+							// Try-helper mode lifts try bodies into STATIC functions that must
+							// sit at file scope ahead of their caller, so the function text is
+							// buffered and the lifted definitions are written out first.
+							std::ostringstream sprite_out_script;
 							sprite_out_script << "#include <recomp.h>" << endl
 											  << "#include <setjmp.h>" << endl
 											  << "#include \"script_decls.h\"" << endl << endl
@@ -6191,6 +6236,7 @@ namespace SWFRecomp
 							doaction_script_map[sprite_doaction_body_start] = script_name;
 
 							sprite_out_script << "}";
+							writeScriptFile(sprite_out_script_file, action.takeLiftedTryDefs(), sprite_out_script.str());
 
 							// Phase 7b: sprite DoAction dispatch has two paths:
 							//   (a) Queue: normal frame processing, target-frame
@@ -6287,7 +6333,11 @@ namespace SWFRecomp
 							std::string script_name = "script_" + to_string(next_script_i);
 							context.out_script_header << endl << "void " << script_name << "(SWFAppContext* app_context);";
 
-							ofstream sprite_init_script(context.output_scripts_folder + script_name + ".c", ios_base::out);
+							ofstream sprite_init_script_file(context.output_scripts_folder + script_name + ".c", ios_base::out);
+							// Try-helper mode lifts try bodies into STATIC functions that must
+							// sit at file scope ahead of their caller, so the function text is
+							// buffered and the lifted definitions are written out first.
+							std::ostringstream sprite_init_script;
 							sprite_init_script << "#include <recomp.h>" << endl
 											   << "#include <setjmp.h>" << endl
 											   << "#include \"script_decls.h\"" << endl << endl
@@ -6301,6 +6351,7 @@ namespace SWFRecomp
 							action.parseActions(context, cur_pos, sprite_init_script);
 
 							sprite_init_script << "}";
+							writeScriptFile(sprite_init_script_file, action.takeLiftedTryDefs(), sprite_init_script.str());
 
 							sprite_definitions << "\t" << "tagDoInitActionGuarded(app_context, " << init_sprite_id << ", " << script_name << ");" << endl;
 
@@ -6910,7 +6961,11 @@ namespace SWFRecomp
 						std::string func_name = bp + "_action_" + to_string(next_script_i);
 						context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
 
-						ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						ofstream out_script_file(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						// Try-helper mode lifts try bodies into STATIC functions that must
+						// sit at file scope ahead of their caller, so the function text is
+						// buffered and the lifted definitions are written out first.
+						std::ostringstream out_script;
 						out_script << "#include <recomp.h>" << endl
 								   << "#include <setjmp.h>" << endl
 								   << "#include \"script_decls.h\"" << endl << endl
@@ -6922,6 +6977,7 @@ namespace SWFRecomp
 
 						action.parseActions(context, cur_pos, out_script);
 						out_script << "}";
+						writeScriptFile(out_script_file, action.takeLiftedTryDefs(), out_script.str());
 
 						btn_actions.push_back({ 0x0008, func_name }); // OverDownToOverUp
 					}
@@ -6939,7 +6995,11 @@ namespace SWFRecomp
 						std::string func_name = bp + "_action_" + to_string(next_script_i);
 						context.out_script_header << endl << "void " << func_name << "(SWFAppContext* app_context);";
 
-						ofstream out_script(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						ofstream out_script_file(context.output_scripts_folder + "script_" + to_string(next_script_i) + ".c", ios_base::out);
+						// Try-helper mode lifts try bodies into STATIC functions that must
+						// sit at file scope ahead of their caller, so the function text is
+						// buffered and the lifted definitions are written out first.
+						std::ostringstream out_script;
 						out_script << "#include <recomp.h>" << endl
 								   << "#include <setjmp.h>" << endl
 								   << "#include \"script_decls.h\"" << endl << endl
@@ -6951,6 +7011,7 @@ namespace SWFRecomp
 
 						action.parseActions(context, action_ptr, out_script);
 						out_script << "}";
+						writeScriptFile(out_script_file, action.takeLiftedTryDefs(), out_script.str());
 
 						btn_actions.push_back({ condition, func_name });
 

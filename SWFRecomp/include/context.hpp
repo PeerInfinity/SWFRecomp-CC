@@ -24,6 +24,10 @@ namespace SWFRecomp
 		string avm2_symbol_prefix;
 		uint32_t avm2_char_id_base = 0;
 
+		// Try-helper emission mode (Config::try_helper). At false the emitted
+		// C is byte-for-bit what it was before the option existed.
+		bool try_helper = false;
+
 		// tag_main is buffered in memory (stringstream) rather than written
 		// directly to disk so the per-frame init prologue placeholder can
 		// be replaced once each frame's DoInitAction / ImportAssets calls

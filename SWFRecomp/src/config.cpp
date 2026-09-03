@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 
 #include <config.hpp>
@@ -30,6 +31,13 @@ namespace SWFRecomp
 		// keeps its pre-tranche-6 output exactly.
 		symbol_prefix = string(tbl["input"]["symbol_prefix"].value_or(""sv));
 		char_id_base = (uint32_t) tbl["input"]["char_id_base"].value_or(0);
+		try_helper = tbl["input"]["try_helper"].value_or(false);
+		// Env override so CI / verify_output.py can force the mode on for a
+		// whole corpus run without rewriting every test's config.toml.
+		if (const char* e = getenv("SWF_TRY_HELPER"))
+		{
+			if (e[0] != '\0' && e[0] != '0') try_helper = true;
+		}
 	}
 	
 	string_view Config::parseStringView(string key)

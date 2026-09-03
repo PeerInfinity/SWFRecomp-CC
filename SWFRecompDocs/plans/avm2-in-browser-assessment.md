@@ -229,7 +229,29 @@ already lives with (today the loader maps `setjmp → 0`, `longjmp → JS error`
 page now applies the same interim to AS3 guests through the `setjmp.h` shim (§3.1),
 which also keeps the WASIX libc's `stack_checkpoint`-based `setjmp` out of the link.
 
-### 4.1 Option (a): runtime helper — validated mechanically
+### 4.1 Option (a): runtime helper — **SHIPPED** 2026-09-02
+Landed as the recompiler option `try_helper` (toml key `[input] try_helper = true`,
+env override `SWF_TRY_HELPER=1`), OFF by default — with it off the emitted C is
+byte-identical to before the option existed (verified by recompiling a mixed
+AVM1/AVM2 set with the pre-change and post-change binaries and `diff -r`).
+What landed differs from the sketch below in three places; see
+`SWFRecompDocs/status/avm2-try-helper-emission.md` for the full design:
+- the try frame's storage is an **opaque runtime-defined blob**
+  (`Avm2TryFrameStorage`, `AVM2_TRY_FRAME_STORAGE` = 512 bytes, `op_index`
+  hoisted out of it so the body keeps updating it with a plain store), not an
+  `Avm2TryFrame` — generated code names no libc type at all, and the frame's
+  `op_index_ext` lets `avm2_throw` read the live index out of the blob;
+- `avm2_try_run` returns **-1** on a caught throw and otherwise the body's own
+  exit code, because `ReturnVoid` must have its return coercion run AFTER the
+  frame is popped (the inline emission pops first) — the exit code carries that
+  request to the outer function;
+- AVM1 lifts the **try body**, not the whole method, so a `return` or a jump out
+  of the body comes back as an exit code the enclosing function's dispatch
+  replays; a body that some jump enters from OUTSIDE is not lifted (it keeps the
+  inline `ACTION_TRY_SETJMP` form), which no test in the corpus hits.
+
+The original sketch, kept for the mechanical validation it records:
+
 Node experiment (`scratchpad/sjlj/`): an Emscripten host (`-sSUPPORT_LONGJMP=wasm
 -sSHARED_MEMORY=1`, table-base, same as the real host) exporting
 `host_try(fn, env, arg)` (does `setjmp`, calls the guest function pointer) and

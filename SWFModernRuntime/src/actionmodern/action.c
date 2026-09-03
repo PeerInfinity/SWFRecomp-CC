@@ -59635,6 +59635,17 @@ jmp_buf* actionGetExceptionJmpBuf(SWFAppContext* app_context)
 	return &g_exception_state.frames[idx].handler;
 }
 
+int avm1_try_run(SWFAppContext* app_context, Avm1TryBodyFn fn, void* env)
+{
+	// The handler frame was pushed by actionTryBegin; taking its jmp_buf is
+	// what arms it, so the ordering is identical to the inline emission.
+	if (setjmp(*actionGetExceptionJmpBuf(app_context)) != 0)
+	{
+		return AVM1_TRY_THROWN;
+	}
+	return fn(env);
+}
+
 void actionCatchEnter(SWFAppContext* app_context)
 {
 	// Disable current handler so a throw inside catch propagates to parent

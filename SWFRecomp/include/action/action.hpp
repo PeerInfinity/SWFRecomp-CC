@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <utility>
+#include <vector>
 
 #include <common.h>
 #include <stackvalue.hpp>
@@ -131,6 +133,40 @@ namespace SWFRecomp
 		int parse_depth;  // Track parseActions nesting depth
 		size_t with_counter;  // Counter for unique WITH block label prefixes
 		std::string label_prefix;  // Label prefix for current parseActions scope (e.g., "W3_")
+
+		// --- try-helper emission mode (Context::try_helper) -----------------
+		// A lifted try body becomes a file-scope `static int _swftryN(void*)`
+		// that the runtime helper (avm1_try_run) calls with the setjmp in ITS
+		// frame, so generated code never executes a setjmp of its own. The
+		// definitions accumulate here and the caller that owns the output file
+		// writes them at file scope, ahead of the function that uses them.
+		std::string lifted_try_defs;
+		size_t lift_counter = 0;
+		// 0 = top-level script, 1 = DefineFunction, 2 = DefineFunction2. Says
+		// which of regs/args/arg_count/this_obj exist in the enclosing frame
+		// (only a DefineFunction2 has them), so the lifted body's env carries
+		// exactly what the enclosing function can hand it.
+		int lift_fn_kind = 0;
+		// One entry per lifted try body currently being captured (nested trys
+		// stack). Public because parseActions recurses through WITH blocks.
+		struct LiftFrame
+		{
+			size_t id;
+			char* buf_start;    // action_buffer_start of the scope that owns it
+			char* body_start;
+			char* body_end;
+			// external jump targets, in order: (label name, target byte)
+			std::vector<std::pair<std::string, char*>> exits;
+		};
+		std::vector<LiftFrame> lift_stack;
+
+		// Drains lifted_try_defs (the caller writes it at file scope).
+		std::string takeLiftedTryDefs()
+		{
+			std::string s;
+			s.swap(lifted_try_defs);
+			return s;
+		}
 
 		// Cross-DoAction jump support. When a JUMP/IF in DoAction k targets the
 		// absolute SWF position of an earlier DoAction's body start (negative

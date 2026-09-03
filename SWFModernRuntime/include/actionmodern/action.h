@@ -457,6 +457,41 @@ ActionVar actionGetPendingReturn(SWFAppContext* app_context);
 // Macro for inline setjmp in generated code
 #define ACTION_TRY_SETJMP(app_context) setjmp(*actionGetExceptionJmpBuf(app_context))
 
+// --- try-helper emission mode (recompiler option `try_helper`) --------------
+//
+// The AVM1 jmp_buf already lives in the runtime (g_exception_state), but the
+// SETJMP still executes in generated code, which the in-browser guest
+// toolchain cannot lower (it links the WASIX libc's stack_checkpoint version,
+// which the page stubs out). In helper mode the try BODY is emitted as a
+// lifted function and avm1_try_run executes the setjmp in its own frame, so
+// generated code performs no setjmp at all. The body's locals/parameters stay
+// in the enclosing frame and reach it through Avm1TryEnv; control flow that
+// leaves the try body (a `return`, or a jump to a label outside it) comes back
+// as an exit code the enclosing function's dispatch replays.
+typedef struct Avm1TryEnv
+{
+	SWFAppContext* app_context;
+	ActionVar* args;       // DefineFunction2 only (NULL otherwise)
+	u32 arg_count;
+	ActionVar* regs;       // DefineFunction2 only (NULL otherwise)
+	void* this_obj;        // DefineFunction2 only (NULL otherwise)
+	char* str_buffer;
+	ActionVar ret;         // value for an AVM1_TRY_EXIT_RETURN_VALUE exit
+} Avm1TryEnv;
+
+#define AVM1_TRY_THROWN            (-1)  // avm1_try_run: a throw was caught
+#define AVM1_TRY_EXIT_FALLTHROUGH    0   // body ran off its end
+#define AVM1_TRY_EXIT_RETURN         1   // `return;` in the enclosing function
+#define AVM1_TRY_EXIT_RETURN_VALUE   2   // `return env->ret;`
+#define AVM1_TRY_EXIT_GOTO_BASE    100   // +k: goto the k'th external label
+
+typedef int (*Avm1TryBodyFn)(void* env);
+
+// setjmp + call. Returns AVM1_TRY_THROWN when a throw landed in this frame,
+// otherwise the body's exit code. actionTryBegin must already have pushed the
+// handler frame (this arms it, exactly as ACTION_TRY_SETJMP did).
+int avm1_try_run(SWFAppContext* app_context, Avm1TryBodyFn fn, void* env);
+
 // Control flow
 int evaluateCondition(SWFAppContext* app_context);
 bool actionWaitForFrame(SWFAppContext* app_context, u16 frame);

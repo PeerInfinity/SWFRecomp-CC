@@ -27,6 +27,13 @@ namespace SWFRecomp
 		u8 catch_register;
 		// State: 0=in try, 1=in catch, 2=in finally, 3=done
 		int state;
+		// Try-helper mode: this try's body is being captured into a lifted
+		// function (see SWFAction::lift_stack). Zero/false when the mode is
+		// off or the body could not be lifted safely.
+		bool lift = false;
+		size_t lift_id = 0;
+		ostream* lift_prev_out = nullptr;
+		std::ostringstream* lift_buf = nullptr;
 	};
 
 	// Escape a raw string for use inside C string literals
@@ -125,8 +132,23 @@ namespace SWFRecomp
 
 	}
 	
-	void SWFAction::parseActions(Context& context, char*& action_buffer, ostream& out_script)
+	// Redirectable emission target. In try-helper mode the try body is
+	// captured into a side buffer (it becomes a lifted function), so every
+	// `out_script << ...` in this function has to be able to change stream
+	// mid-parse; a reference cannot be rebound, so this thin proxy stands in
+	// for one. It converts to ostream& so the recursive parseActions calls
+	// (WITH blocks) keep writing wherever emission currently points.
+	struct OutProxy
 	{
+		ostream* p;
+		template <typename T> OutProxy& operator<<(const T& v) { (*p) << v; return *this; }
+		OutProxy& operator<<(ostream& (*f)(ostream&)) { (*p) << f; return *this; }
+		operator ostream&() { return *p; }
+	};
+
+	void SWFAction::parseActions(Context& context, char*& action_buffer, ostream& out_script_dest)
+	{
+		OutProxy out_script{ &out_script_dest };
 		parse_depth++;
 
 		// Save and clear constant pool at script boundary.
@@ -140,6 +162,10 @@ namespace SWFRecomp
 		char* action_buffer_start = action_buffer;
 
 		std::set<char*> labels;
+		// (source action, target) for every jump the second pass will emit.
+		// Try-helper mode needs them to prove no jump from OUTSIDE a try body
+		// lands INSIDE it before lifting that body into its own function.
+		std::vector<std::pair<char*, char*>> jump_edges;
 
 		// Parse action bytes once to mark labels
 		while (true)
@@ -174,7 +200,10 @@ namespace SWFRecomp
 					s16 offset = VAL(s16, action_buffer);
 					char* target = action_buffer + length + ((s64) offset);
 					if (target >= action_buffer_start)
+					{
 						labels.insert(target);
+						jump_edges.push_back(std::make_pair(action_buffer, target));
+					}
 					break;
 				}
 
@@ -201,6 +230,7 @@ namespace SWFRecomp
 
 					// Add skip target as a label
 					labels.insert(skip_ptr);
+					jump_edges.push_back(std::make_pair(action_buffer, skip_ptr));
 					break;
 				}
 
@@ -261,6 +291,7 @@ namespace SWFRecomp
 
 				// Mark the skip target as a label
 				labels.insert(skip_ptr);
+				jump_edges.push_back(std::make_pair(action_buffer, skip_ptr));
 				break;
 			}
 			}
@@ -273,8 +304,144 @@ namespace SWFRecomp
 
 		// Stack of active try/catch/finally block boundaries for inline parsing
 		std::vector<TryBlockBoundary> try_boundaries;
+
 		// Labels pre-emitted by boundary handler (skip in generic label code)
 		std::set<char*> emitted_labels;
+
+		// --- try-helper emission mode --------------------------------------
+		// Mirrors AVM1_TRY_EXIT_GOTO_BASE in actionmodern/action.h.
+		const int kTryExitGotoBase = 100;
+
+		// A `return` out of the enclosing generated function. Inside a lifted
+		// try body it becomes an exit code the enclosing frame's dispatch
+		// replays (the lifted body is a different C function).
+		auto retStmt = [&](const std::string& expr) -> std::string
+		{
+			if (lift_stack.empty())
+			{
+				return expr.empty() ? std::string("return;")
+				                    : ("return " + expr + ";");
+			}
+			if (expr.empty()) return std::string("return AVM1_TRY_EXIT_RETURN;");
+			return "_env->ret = " + expr + "; return AVM1_TRY_EXIT_RETURN_VALUE;";
+		};
+		// A jump. Targets inside the lifted body stay plain gotos; a target
+		// outside it becomes an exit, because the label only exists in the
+		// enclosing function. A jump emitted while parsing a NESTED buffer
+		// (a WITH body) is always internal to that buffer.
+		auto gotoStmt = [&](char* target, const std::string& label) -> std::string
+		{
+			if (!lift_stack.empty())
+			{
+				SWFAction::LiftFrame& lf = lift_stack.back();
+				bool internal = lf.buf_start != action_buffer_start
+					|| (target >= lf.body_start && target < lf.body_end);
+				if (!internal)
+				{
+					size_t k = lf.exits.size();
+					for (size_t j = 0; j < lf.exits.size(); j++)
+					{
+						if (lf.exits[j].first == label) { k = j; break; }
+					}
+					if (k == lf.exits.size())
+						lf.exits.push_back(std::make_pair(label, target));
+					return "return " + to_string(kTryExitGotoBase + (int) k) + ";";
+				}
+			}
+			return "goto " + label + ";";
+		};
+		// Closes a lifted try body: writes the lifted function out at file
+		// scope and emits, in its place, the runtime-helper call plus the
+		// dispatch that replays whatever control flow left the body. Runs
+		// with the lift frame already popped, so a nested lift sees its own
+		// enclosing frame when it emits returns/gotos here.
+		auto finishLift = [&](TryBlockBoundary& tb)
+		{
+			if (!tb.lift) return;
+			tb.lift = false;
+			// A label inside the body that the walk never reached (dead code)
+			// would otherwise be emitted at the END of the enclosing function
+			// by the leftover-label pass, out of reach of any goto that stayed
+			// in the lifted body. Emit those here instead.
+			for (char* ptr : labels)
+			{
+				if (ptr < lift_stack.back().body_start) continue;
+				if (ptr >= lift_stack.back().body_end) continue;
+				if (emitted_labels.count(ptr)) continue;
+				out_script << "label_" << label_prefix
+				           << to_string((s32) (ptr - action_buffer_start)) << ":;" << endl;
+				emitted_labels.insert(ptr);
+			}
+			std::string body = tb.lift_buf->str();
+			std::vector<std::pair<std::string, char*>> exits = lift_stack.back().exits;
+			lift_stack.pop_back();
+			out_script.p = tb.lift_prev_out;
+			delete tb.lift_buf;
+			tb.lift_buf = nullptr;
+
+			const string id = to_string(tb.lift_id);
+			const string fn = "_swftry_" + id;
+			const string te = "_te" + id;
+			const string rc = "_trc" + id;
+			bool has_regs = (lift_fn_kind == 2);
+
+			std::ostringstream d;
+			d << endl
+			  << "// Lifted try body #" << id << " (try-helper mode: the setjmp"
+			  << " runs in avm1_try_run, not here)" << endl
+			  << "static int " << fn << "(void* _p)" << endl
+			  << "{" << endl
+			  << "\tAvm1TryEnv* _env = (Avm1TryEnv*) _p;" << endl
+			  << "\tSWFAppContext* app_context = _env->app_context;" << endl
+			  << "\tchar* str_buffer = _env->str_buffer;" << endl
+			  << "\t(void) app_context; (void) str_buffer;" << endl;
+			if (has_regs)
+			{
+				d << "\tActionVar* args = _env->args;" << endl
+				  << "\tu32 arg_count = _env->arg_count;" << endl
+				  << "\tActionVar* regs = _env->regs;" << endl
+				  << "\tvoid* this_obj = _env->this_obj;" << endl
+				  << "\t(void) args; (void) arg_count; (void) regs; (void) this_obj;"
+				  << endl;
+			}
+			d << body
+			  << "\treturn AVM1_TRY_EXIT_FALLTHROUGH;" << endl
+			  << "}" << endl;
+			lifted_try_defs += d.str();
+
+			out_script << "\t" << "// Try-Catch-Finally (lifted body " << fn << ")" << endl
+			           << "\t" << "actionTryBegin(app_context);" << endl
+			           << "\t" << "Avm1TryEnv " << te << " = {0};" << endl
+			           << "\t" << te << ".app_context = app_context; "
+			           << te << ".str_buffer = str_buffer;" << endl;
+			if (has_regs)
+			{
+				out_script << "\t" << te << ".args = args; " << te
+				           << ".arg_count = arg_count; " << te << ".regs = regs; "
+				           << te << ".this_obj = this_obj;" << endl;
+			}
+			out_script << "\t" << "int " << rc << " = avm1_try_run(app_context, "
+			           << fn << ", &" << te << ");" << endl
+			           << "\t" << "if (" << rc << " != AVM1_TRY_THROWN) {" << endl
+			           << "\t\t" << "switch (" << rc << ") {" << endl;
+			if (context.in_function_body)
+			{
+				out_script << "\t\t" << "case AVM1_TRY_EXIT_RETURN_VALUE: "
+				           << retStmt(te + ".ret") << endl;
+			}
+			else
+			{
+				out_script << "\t\t" << "case AVM1_TRY_EXIT_RETURN: "
+				           << retStmt("") << endl;
+			}
+			for (size_t k = 0; k < exits.size(); k++)
+			{
+				out_script << "\t\t" << "case " << (kTryExitGotoBase + (int) k)
+				           << ": " << gotoStmt(exits[k].second, exits[k].first) << endl;
+			}
+			out_script << "\t\t" << "default: break;" << endl
+			           << "\t\t" << "}" << endl;
+		};
 		// Track dead code after unconditional jumps (for ConstantPool skip)
 		bool in_dead_code = false;
 		// Ming CloneSprite SWF-bias strip: when a `Push(int 16384) Add{,2} CloneSprite`
@@ -304,6 +471,7 @@ namespace SWFRecomp
 				if (tb.state == 0 && tb.has_catch && action_buffer >= tb.catch_start)
 				{
 					// Transition from try body to catch body
+					finishLift(tb);
 					out_script << "\t" << "} else {" << endl;
 					out_script << "\t\t" << "// Catch block" << endl;
 					out_script << "\t\t" << "actionCatchEnter(app_context);" << endl;
@@ -331,6 +499,7 @@ namespace SWFRecomp
 					if (tb.state == 0)
 					{
 						// try-only -> finally (no catch block)
+						finishLift(tb);
 						out_script << "\t" << "}" << endl;
 					}
 					else
@@ -347,6 +516,7 @@ namespace SWFRecomp
 					if (tb.state == 0 || tb.state == 1)
 					{
 						// Close the if or else block
+						if (tb.state == 0) finishLift(tb);
 						out_script << "\t" << "}" << endl;
 					}
 					// For try-catch without finally: emit the after_end label BEFORE
@@ -360,7 +530,8 @@ namespace SWFRecomp
 					if (tb.has_finally)
 					{
 						out_script << "\t" << "if (actionReturnPending(app_context)) {" << endl;
-						out_script << "\t\t" << "return actionGetPendingReturn(app_context);" << endl;
+						out_script << "\t\t"
+						           << retStmt("actionGetPendingReturn(app_context)") << endl;
 						out_script << "\t" << "}" << endl;
 					}
 					tb.state = 3;
@@ -401,9 +572,10 @@ namespace SWFRecomp
 					if (hasUnvisitedLabelsAhead())
 					{
 						if (context.in_function_body)
-							out_script << "\t" << "{ ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+							out_script << "\t" << "{ ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
+							           << retStmt("_hr") << " }" << endl;
 						else
-							out_script << "\t" << "return;" << endl;
+							out_script << "\t" << retStmt("") << endl;
 					}
 					break;
 				}
@@ -717,7 +889,10 @@ namespace SWFRecomp
 					if (in_catch_with_finally && throw_finally_ptr) {
 						out_script << "\t" << "// Throw (deferred to finally)" << endl
 								   << "\t" << "actionThrowPending(app_context);" << endl
-								   << "\t" << "goto label_" << label_prefix << to_string((s32)(throw_finally_ptr - action_buffer_start)) << ";" << endl;
+								   << "\t"
+								   << gotoStmt(throw_finally_ptr, "label_" + label_prefix
+								               + to_string((s32)(throw_finally_ptr - action_buffer_start)))
+								   << endl;
 					} else {
 						out_script << "\t" << "// Throw" << endl
 								   << "\t" << "actionThrow(app_context);" << endl;
@@ -878,7 +1053,10 @@ namespace SWFRecomp
 								   << "\t\t" << "ActionVar ret_val;" << endl
 								   << "\t\t" << "popVar(app_context, &ret_val);" << endl
 								   << "\t\t" << "actionSetReturnPending(app_context, &ret_val);" << endl
-								   << "\t\t" << "goto label_" << label_prefix << to_string((s32)(ret_finally_ptr - action_buffer_start)) << ";" << endl
+								   << "\t\t"
+								   << gotoStmt(ret_finally_ptr, "label_" + label_prefix
+								               + to_string((s32)(ret_finally_ptr - action_buffer_start)))
+								   << endl
 								   << "\t" << "}" << endl;
 					} else {
 						// Count active try boundaries that need cleanup before returning
@@ -910,10 +1088,10 @@ namespace SWFRecomp
 						// signature. The popped value is dropped — matches Flash's
 						// "RETURN at top level pops a value but has no return target."
 						if (context.in_function_body) {
-							out_script << "\t\t" << "return ret_val;" << endl;
+							out_script << "\t\t" << retStmt("ret_val") << endl;
 						} else {
 							out_script << "\t\t" << "(void)ret_val;" << endl
-									   << "\t\t" << "return;" << endl;
+									   << "\t\t" << retStmt("") << endl;
 						}
 						out_script << "\t" << "}" << endl;
 					}
@@ -934,7 +1112,8 @@ namespace SWFRecomp
 				out_script << "\t" << "// NewObject" << endl
 						   << "\t" << "actionNewObject(app_context);" << endl;
 				if (context.in_function_body)
-					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
+							   << retStmt("_hr") << " }" << endl;
 				else
 					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
@@ -946,7 +1125,8 @@ namespace SWFRecomp
 				out_script << "\t" << "// NewMethod" << endl
 						   << "\t" << "actionNewMethod(app_context);" << endl;
 				if (context.in_function_body)
-					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
+							   << retStmt("_hr") << " }" << endl;
 				else
 					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
@@ -1339,7 +1519,9 @@ namespace SWFRecomp
 							   << ", skip=" << (int)skip_count << " actions" << endl
 							   << "\t" << "if (!actionWaitForFrame(app_context, " << frame << "))" << endl
 							   << "\t" << "{" << endl
-							   << "\t" << "\t" << "goto label_" << label_prefix << skip_label << ";" << endl
+							   << "\t" << "\t"
+							   << gotoStmt(skip_ptr, "label_" + label_prefix + to_string(skip_label))
+							   << endl
 							   << "\t" << "}" << endl;
 
 					action_buffer += length;
@@ -1414,7 +1596,10 @@ namespace SWFRecomp
 				out_script << "\t" << "// WaitForFrame2: skip=" << (int)skip_count << endl
 						   << "\t" << "if (!actionWaitForFrame2(app_context)) {" << endl
 						   << "\t\t" << "// Frame not loaded, skip next " << (int)skip_count << " action(s)" << endl
-						   << "\t\t" << "goto label_" << label_prefix << to_string((s32) (skip_ptr - action_buffer_start)) << ";" << endl
+						   << "\t\t"
+						   << gotoStmt(skip_ptr, "label_" + label_prefix
+						               + to_string((s32) (skip_ptr - action_buffer_start)))
+						   << endl
 						   << "\t" << "}" << endl;
 
 				action_buffer += length;
@@ -1747,9 +1932,24 @@ namespace SWFRecomp
 				context.function2_register_count = (int)register_count;
 				context.in_function_body = true;
 
+				// A nested function body is its own C function: an enclosing
+				// lifted try body must not capture its returns/gotos.
+				std::vector<LiftFrame> prev_lift_stack;
+				prev_lift_stack.swap(lift_stack);
+				int prev_lift_fn_kind = lift_fn_kind;
+				lift_fn_kind = 2;
+				// Lifted bodies are static, so each must be flushed into the
+				// file that USES it. Park the enclosing scope's pending
+				// definitions so this function's flush cannot steal them.
+				std::string prev_lift_defs;
+				prev_lift_defs.swap(lifted_try_defs);
+
 				char* temp_ptr = temp_buffer;
 				parseActions(context, temp_ptr, func_def);
 				free(temp_buffer);
+
+				lift_stack.swap(prev_lift_stack);
+				lift_fn_kind = prev_lift_fn_kind;
 
 				// Restore previous state
 				context.inside_function2 = prev_inside_function2;
@@ -1768,7 +1968,10 @@ namespace SWFRecomp
 
 				// Flush the complete function definition to out_script_defs.
 				// Nested function defs have already been written there by recursive calls,
-				// so this function appears AFTER its dependencies.
+				// so this function appears AFTER its dependencies. Try-helper mode's
+				// lifted bodies go out first, at file scope, ahead of their user.
+				context.out_script_defs << takeLiftedTryDefs();
+				lifted_try_defs.swap(prev_lift_defs);
 				context.out_script_defs << func_def.str();
 
 				// Generate runtime call to register function
@@ -1829,6 +2032,44 @@ namespace SWFRecomp
 				boundary.catch_name = catch_name;
 				boundary.catch_register = catch_register;
 				boundary.state = 0; // Starting in try body
+
+				// Try-helper mode: capture the try body into a side buffer
+				// and lift it into its own function, so the setjmp can live in
+				// the runtime instead of here. Refused when a jump from
+				// OUTSIDE the body targets a label INSIDE it — such a label
+				// moves into the lifted function and would be unreachable.
+				bool do_lift = context.try_helper;
+				if (do_lift)
+				{
+					for (size_t ei = 0; ei < jump_edges.size(); ei++)
+					{
+						char* src = jump_edges[ei].first;
+						char* dst = jump_edges[ei].second;
+						bool src_in = src >= try_body && src < catch_body;
+						bool dst_in = dst >= try_body && dst < catch_body;
+						if (dst_in && !src_in) { do_lift = false; break; }
+					}
+				}
+
+				if (do_lift)
+				{
+					boundary.lift = true;
+					boundary.lift_id = ++lift_counter;
+					boundary.lift_prev_out = out_script.p;
+					boundary.lift_buf = new std::ostringstream();
+					try_boundaries.push_back(boundary);
+
+					SWFAction::LiftFrame lf;
+					lf.id = boundary.lift_id;
+					lf.buf_start = action_buffer_start;
+					lf.body_start = try_body;
+					lf.body_end = catch_body;
+					lift_stack.push_back(lf);
+					out_script.p = boundary.lift_buf;
+					out_script << "\t\t" << "// Try block" << endl;
+					break;
+				}
+
 				try_boundaries.push_back(boundary);
 
 				// Emit try block header
@@ -2223,10 +2464,13 @@ namespace SWFRecomp
 						}
 						if (!prev_script.empty())
 							out_script << "\t" << prev_script << "(app_context);" << endl;
-						out_script << "\t" << "return;" << endl;
+						out_script << "\t" << retStmt("") << endl;
 					}
 					else
-						out_script << "\t" << "goto label_" << label_prefix << to_string(target_offset) << ";" << endl;
+						out_script << "\t"
+						           << gotoStmt(action_buffer_start + target_offset,
+						                       "label_" + label_prefix + to_string(target_offset))
+						           << endl;
 					in_dead_code = true;  // Code after unconditional jump is dead until next label
 
 					action_buffer += length;
@@ -2254,10 +2498,13 @@ namespace SWFRecomp
 						}
 						if (!prev_script.empty())
 							out_script << "\t" << "\t" << prev_script << "(app_context);" << endl;
-						out_script << "\t" << "\t" << "return;" << endl;
+						out_script << "\t" << "\t" << retStmt("") << endl;
 					}
 					else
-						out_script << "\t" << "\t" << "goto label_" << label_prefix << to_string(target_offset) << ";" << endl;
+						out_script << "\t" << "\t"
+						           << gotoStmt(action_buffer_start + target_offset,
+						                       "label_" + label_prefix + to_string(target_offset))
+						           << endl;
 					out_script << "\t" << "}" << endl;
 
 					action_buffer += length;
@@ -2270,14 +2517,16 @@ namespace SWFRecomp
 					out_script << "\t" << "// Call" << endl;
 					if (parse_depth > 1) {
 						// Inside a DefineFunction body (returns ActionVar)
-						out_script << "\t" << "if (actionCall(app_context)) { ActionVar _cr = {0}; _cr.type = ACTION_STACK_VALUE_UNDEFINED; return _cr; }" << endl;
+						out_script << "\t" << "if (actionCall(app_context)) { ActionVar _cr = {0}; _cr.type = ACTION_STACK_VALUE_UNDEFINED; "
+							   << retStmt("_cr") << " }" << endl;
 					} else {
 						// Top-level frame script (void function)
 						out_script << "\t" << "if (actionCall(app_context)) return;" << endl;
 					}
 					// Also halt if base clip was removed during the call
 					if (context.in_function_body)
-						out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+						out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
+							   << retStmt("_hr") << " }" << endl;
 					else
 						out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
@@ -2406,9 +2655,17 @@ namespace SWFRecomp
 
 				bool prev_in_function_body = context.in_function_body;
 				context.in_function_body = true;
+				std::vector<LiftFrame> prev_lift_stack;
+				prev_lift_stack.swap(lift_stack);
+				int prev_lift_fn_kind = lift_fn_kind;
+				lift_fn_kind = 1;
+				std::string prev_lift_defs;
+				prev_lift_defs.swap(lifted_try_defs);
 				char* temp_ptr = temp_buffer;
 				parseActions(context, temp_ptr, func_def);
 				free(temp_buffer);
+				lift_stack.swap(prev_lift_stack);
+				lift_fn_kind = prev_lift_fn_kind;
 				context.in_function_body = prev_in_function_body;
 
 				action_buffer = func_body_end;
@@ -2421,6 +2678,8 @@ namespace SWFRecomp
 
 				// Flush the complete function definition to out_script_defs.
 				// Nested function defs have already been written there by recursive calls.
+				context.out_script_defs << takeLiftedTryDefs();
+				lifted_try_defs.swap(prev_lift_defs);
 				context.out_script_defs << func_def.str();
 
 				// Generate runtime call to register function
@@ -2436,7 +2695,8 @@ namespace SWFRecomp
 				out_script << "\t" << "// CallFunction" << endl
 						   << "\t" << "actionCallFunction(app_context, str_buffer);" << endl;
 				if (context.in_function_body)
-					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
+							   << retStmt("_hr") << " }" << endl;
 				else
 					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 
@@ -2448,7 +2708,8 @@ namespace SWFRecomp
 				out_script << "\t" << "// CallMethod" << endl
 						   << "\t" << "actionCallMethod(app_context, str_buffer);" << endl;
 				if (context.in_function_body)
-					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
+							   << retStmt("_hr") << " }" << endl;
 				else
 					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
 

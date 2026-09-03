@@ -26,6 +26,14 @@ namespace SWFRecomp
 		//     so keep base + max_child_char_id under 65536.
 		std::string symbol_prefix;
 		uint32_t char_id_base = 0;
+		// Try-helper emission mode (assessment §4.1). OFF by default: at false
+		// every emitter's output is byte-for-bit what it was before this
+		// existed. On, every method / script region with an exception table is
+		// emitted as a lifted body function driven by a runtime helper that
+		// owns the setjmp, so generated code never holds a jmp_buf (needed by
+		// the in-browser guest toolchain, whose jmp_buf is not the host's).
+		// The SWF_TRY_HELPER env var forces it on regardless of the toml.
+		bool try_helper = false;
 
 		Config();
 		void parseFile(std::string path);

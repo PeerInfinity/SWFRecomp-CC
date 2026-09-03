@@ -38,6 +38,7 @@ int main(int argc, char** argv)
 	context.output_scripts_folder = "RecompiledScripts";
 	context.avm2_symbol_prefix = config.symbol_prefix;
 	context.avm2_char_id_base = config.char_id_base;
+	context.try_helper = config.try_helper;
 	
 	try
 	{

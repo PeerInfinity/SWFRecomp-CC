@@ -39,10 +39,71 @@ typedef struct Avm2TryFrame
 	// loader_error_in_root_ctor's traced line appears twice.
 	uint8_t silent;
 	uint32_t saved_call_depth;  // debug call stack unwound to here on catch
+	// Try-helper emission mode (see Avm2TryFrameStorage below): the generated
+	// body writes its op index into runtime-owned storage the frame does not
+	// contain, so the dispatch reads it through here when non-NULL.
+	const uint32_t* op_index_ext;
 	// Set by dispatch before the longjmp:
 	Avm2Value exc;
 	uint32_t handler_target;  // op index to resume at
 } Avm2TryFrame;
+
+// ---------------------------------------------------------------------------
+// Try-helper emission mode (recompiler option `try_helper` / SWF_TRY_HELPER).
+//
+// Generated code must never hold a libc-typed object across the guest/host
+// boundary: the in-browser guest toolchain's `jmp_buf` is a handful of bytes
+// where the Emscripten host's is 156, so a guest-allocated Avm2TryFrame is
+// smashed the moment the host writes it (assessment §3.1). In helper mode the
+// generated method allocates only this opaque blob — sized by the RUNTIME, not
+// by any libc type — and the runtime places its own Avm2TryFrame inside it.
+// `op_index` sits outside the blob so the body can keep updating it with a
+// plain store (it is written before every op).
+#define AVM2_TRY_FRAME_STORAGE 512
+typedef struct Avm2TryFrameStorage
+{
+	uint32_t op_index;   // written directly by the generated body
+	uint32_t reserved;
+	union
+	{
+		unsigned char bytes[AVM2_TRY_FRAME_STORAGE];
+		// Widest alignment the frame's contents can need (jmp_buf saves
+		// registers and wants 16-byte alignment on x86-64).
+		long double align_ld;
+		void* align_p;
+		uint64_t align_u;
+	} opaque;
+} Avm2TryFrameStorage;
+
+typedef struct Avm2ScopeEntry Avm2ScopeEntry;
+
+// The generated method's frame, shared with its lifted body function: the
+// value arrays stay in the OUTER frame so they survive re-entry after a catch
+// (the body function's own frame is gone by then).
+typedef struct Avm2TryEnv
+{
+	Avm2Activation* act;
+	Avm2Value* loc;
+	Avm2Value* stk;
+	Avm2ScopeEntry* lscope;
+	Avm2TryFrameStorage* tf;
+	int32_t resume;     // -1 = first entry; else the handler's op index
+	Avm2Value exc;      // thrown value, pushed by the body on re-entry
+	Avm2Value ret;      // the body's return value
+} Avm2TryEnv;
+
+// Returns 0 (or the body's own non-negative exit code) when the body ran to
+// completion, -1 when a throw was caught by this frame.
+typedef int (*Avm2TryBodyFn)(void* env);
+
+void avm2_try_push_frame_st(Avm2Context* ctx, Avm2TryFrameStorage* st,
+                            const Avm2AbcException* excs, uint32_t exc_count,
+                            Avm2AbcFileRt* file);
+int avm2_try_run(Avm2Context* ctx, Avm2TryFrameStorage* st,
+                 Avm2TryBodyFn fn, void* env);
+void avm2_try_pop_frame_st(Avm2TryFrameStorage* st);
+uint32_t avm2_try_handler_target(const Avm2TryFrameStorage* st);
+Avm2Value avm2_try_exc(const Avm2TryFrameStorage* st);
 
 // Native C-stack guard. avmplus bounds AS3 recursion by the real machine
 // stack (AvmCore::stackLimit / interpreter.cpp's stackAvailable check), not by

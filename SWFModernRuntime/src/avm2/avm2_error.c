@@ -341,6 +341,59 @@ void avm2_try_pop_frame(Avm2TryFrame* tf)
 	avm2_get_context()->try_top = tf->prev;
 }
 
+// --- try-helper emission mode (avm2_error.h) --------------------------------
+//
+// The generated method owns only the opaque Avm2TryFrameStorage; the frame the
+// runtime longjmps into lives inside it, and the setjmp itself is executed HERE
+// (avm2_try_run), so no generated frame ever holds a jmp_buf.
+
+static Avm2TryFrame* try_frame_of(Avm2TryFrameStorage* st)
+{
+	return (Avm2TryFrame*) (void*) st->opaque.bytes;
+}
+
+void avm2_try_push_frame_st(Avm2Context* ctx, Avm2TryFrameStorage* st,
+                            const Avm2AbcException* excs, uint32_t exc_count,
+                            Avm2AbcFileRt* file)
+{
+	_Static_assert(sizeof(Avm2TryFrame) <= AVM2_TRY_FRAME_STORAGE,
+	               "AVM2_TRY_FRAME_STORAGE too small for Avm2TryFrame");
+	Avm2TryFrame* tf = try_frame_of(st);
+	st->op_index = 0;
+	st->reserved = 0;
+	avm2_try_push_frame(ctx, tf, excs, exc_count, file);
+	tf->op_index_ext = &st->op_index;
+}
+
+int avm2_try_run(Avm2Context* ctx, Avm2TryFrameStorage* st,
+                 Avm2TryBodyFn fn, void* env)
+{
+	Avm2TryFrame* tf = try_frame_of(st);
+	(void) ctx;
+	// The frame stays installed across a catch (avm2_throw leaves try_top at
+	// it for nested/rethrow), so re-arming is just another setjmp on it.
+	if (setjmp(tf->jb) != 0)
+	{
+		return -1;
+	}
+	return fn(env);
+}
+
+void avm2_try_pop_frame_st(Avm2TryFrameStorage* st)
+{
+	avm2_try_pop_frame(try_frame_of(st));
+}
+
+uint32_t avm2_try_handler_target(const Avm2TryFrameStorage* st)
+{
+	return ((const Avm2TryFrame*) (const void*) st->opaque.bytes)->handler_target;
+}
+
+Avm2Value avm2_try_exc(const Avm2TryFrameStorage* st)
+{
+	return ((const Avm2TryFrame*) (const void*) st->opaque.bytes)->exc;
+}
+
 static void print_uncaught(Avm2Context* ctx, Avm2Value v)
 {
 	// Ruffle Avm2::uncaught_error (avm2.rs): in Debug player mode — what the
@@ -397,7 +450,9 @@ _Noreturn void avm2_throw(Avm2Context* ctx, Avm2Value value)
 		{
 			const Avm2AbcException* e = &tf->excs[i];
 			if (!e->active) continue;
-			if (tf->op_index < e->from_op || tf->op_index >= e->to_op) continue;
+			uint32_t op_index = tf->op_index_ext != NULL
+				? *tf->op_index_ext : tf->op_index;
+			if (op_index < e->from_op || op_index >= e->to_op) continue;
 			if (e->type_mn != 0)
 			{
 				Avm2Class* cls = avm2_class_for_mn(ctx, tf->file, e->type_mn);
