@@ -1,0 +1,8 @@
+armed
+pU:n
+cU:n
+pA:2
+cA:2
+pB:y
+cB:y
+done

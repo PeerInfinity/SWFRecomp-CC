@@ -35,6 +35,20 @@
 
 #define CROSS(v1, v2) (v1.x*v2.y - v2.x*v1.y)
 
+// Emit a character id through the CHARID() wrapper (see the CHARACTER ID
+// WRAPPER comment in SWFModernRuntime/include/libswf/tag.h). EVERY character
+// id written into generated C goes through this — call arguments and
+// data-table fields (FramePlacement, SpriteFrameScriptEntry) alike — so a
+// consumer that must re-base a whole movie's dictionary can find them all by
+// value with one substitution instead of one regex per call name.
+// scripts/check_charid_wrapping.py derives the char-id argument positions and
+// struct field indices from tag.h and fails on a bare integer literal in one
+// of them; run it after adding an emission site.
+static inline std::string charId(size_t id)
+{
+	return "CHARID(" + std::to_string(id) + ")";
+}
+
 // ---------------------------------------------------------------------------
 // Device font (Noto Sans) for headless glyph rendering
 // ---------------------------------------------------------------------------
@@ -896,7 +910,7 @@ namespace SWFRecomp
 			context.tag_main << "SpriteFrameScriptEntry sprite_frame_scripts_data[] =" << endl
 							 << "{" << endl
 							 << sprite_frame_scripts_table.str()
-							 << "\t{ 0, 0, NULL }" << endl
+							 << "\t{ " << charId(0) << ", 0, NULL }" << endl
 							 << "};" << endl
 							 << "size_t sprite_frame_scripts_data_count = "
 							 << to_string(sprite_frame_scripts_count) << ";" << endl
@@ -904,7 +918,7 @@ namespace SWFRecomp
 		}
 		else
 		{
-			context.tag_main << "SpriteFrameScriptEntry sprite_frame_scripts_data[] = { { 0, 0, NULL } };" << endl
+			context.tag_main << "SpriteFrameScriptEntry sprite_frame_scripts_data[] = { { " << charId(0) << ", 0, NULL } };" << endl
 							 << "size_t sprite_frame_scripts_data_count = 0;" << endl
 							 << endl;
 		}
@@ -1315,7 +1329,7 @@ namespace SWFRecomp
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
 							 << to_string(h) << ", "
-							 << to_string(char_id)
+							 << charId(char_id)
 							 << ");";
 				}
 				
@@ -1422,7 +1436,7 @@ namespace SWFRecomp
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
 							 << to_string(h) << ", "
-							 << to_string(char_id)
+							 << charId(char_id)
 							 << ");";
 				}
 
@@ -1584,7 +1598,7 @@ namespace SWFRecomp
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
 							 << to_string(h) << ", "
-							 << to_string(char_id)
+							 << charId(char_id)
 							 << ");";
 				}
 
@@ -1845,7 +1859,7 @@ namespace SWFRecomp
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
 							 << to_string(h) << ", "
-							 << to_string(char_id)
+							 << charId(char_id)
 							 << ");";
 				}
 
@@ -2089,7 +2103,7 @@ namespace SWFRecomp
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
 							 << to_string(h) << ", "
-							 << to_string(char_id)
+							 << charId(char_id)
 							 << ");";
 				}
 
@@ -2138,7 +2152,7 @@ namespace SWFRecomp
 				if (emitPayloadRef())
 				{
 					tag_init << endl << "\ttagDefineSound(app_context, "
-							 << to_string(sound_id) << ", "
+							 << charId(sound_id) << ", "
 							 << to_string(format) << ", "
 							 << to_string(rate) << ", "
 							 << to_string(sample_size) << ", "
@@ -2208,7 +2222,7 @@ namespace SWFRecomp
 				}
 
 				context.tag_main << "\t" << "tagStartSound(app_context, "
-								 << to_string(sound_id) << ", "
+								 << charId(sound_id) << ", "
 								 << (sync_stop ? "1" : "0") << ", "
 								 << to_string(loop_count) << ", "
 								 << to_string(in_point) << ", "
@@ -2757,7 +2771,7 @@ namespace SWFRecomp
 					tag_init << endl
 							 << "\t" << "tagDefineFontInfo("
 							 << "app_context, "
-							 << to_string(font_id) << ", "
+							 << charId(font_id) << ", "
 							 << "\"" << escape_for_c(font_names[font_id]) << "\", "
 							 << (is_bold ? "1" : "0") << ", "
 							 << (is_italic ? "1" : "0")
@@ -2790,7 +2804,7 @@ namespace SWFRecomp
 						tag_init << "};" << endl
 								 << "\t\t" << "tagDefineFontMetrics("
 								 << "app_context, "
-								 << to_string(font_id) << ", "
+								 << charId(font_id) << ", "
 								 << to_string(ascent) << ", "
 								 << to_string(descent) << ", "
 								 << to_string(leading) << ", "
@@ -2804,7 +2818,7 @@ namespace SWFRecomp
 						auto gb_it = font_glyph_bases.find(font_id);
 						if (gb_it != font_glyph_bases.end()) {
 							context.tag_main << "\t" << "tagDefineFontGlyphBase("
-								 << to_string(font_id) << ", "
+								 << charId(font_id) << ", "
 								 << to_string(gb_it->second) << ");";
 						}
 					}
@@ -3095,7 +3109,7 @@ namespace SWFRecomp
 					tag_init << endl
 							 << "\t" << "tagDefineText("
 							 << "app_context, "
-							 << to_string(char_id) << ", "
+							 << charId(char_id) << ", "
 							 << to_string(text_start) << ", "
 							 << to_string(text_size) << ", "
 							 << to_string(transform_start) << ", "
@@ -3316,7 +3330,7 @@ namespace SWFRecomp
 					tag_init << endl
 							 << "\t" << "tagDefineText("
 							 << "app_context, "
-							 << to_string(char_id) << ", "
+							 << charId(char_id) << ", "
 							 << to_string(text_start) << ", "
 							 << to_string(text_size) << ", "
 							 << to_string(transform_start) << ", "
@@ -3366,11 +3380,11 @@ namespace SWFRecomp
 					tag_init << endl
 							 << "\t" << "tagDefineEditTextProps("
 							 << "app_context, "
-							 << to_string(char_id) << ", "
+							 << charId(char_id) << ", "
 							 << "\"" << escape_for_c(plain_text) << "\", "
 							 << "\"" << escape_for_c(initial_text) << "\", "
 							 << to_string(text_color) << ", "
-							 << to_string(font_id) << ", "
+							 << charId(font_id) << ", "
 							 << to_string(font_height) << ", "
 							 << to_string(max_length) << ", "
 							 << to_string(align) << ", "
@@ -3512,7 +3526,7 @@ namespace SWFRecomp
 				current_frame_init_actions
 					<< "\tif (!catch_up_mode || g_tag_skip_mode) "
 					<< "tagDoInitActionGuarded(app_context, "
-					<< to_string(init_sprite_id) << ", " << func_name << ");"
+					<< charId(init_sprite_id) << ", " << func_name << ");"
 					<< endl;
 
 
@@ -3647,7 +3661,7 @@ namespace SWFRecomp
 				}
 
 				// PlaceObject1 has no move flag — always Place (is_replace=0).
-				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", 0, 0);" << endl;
+				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << charId(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", 0, 0);" << endl;
 
 				break;
 			}
@@ -4626,7 +4640,7 @@ namespace SWFRecomp
 				// Emit the place call
 				if (blend_mode_val > 1)
 				{
-					context.tag_main << "\t" << "tagPlaceObject3(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(blend_mode_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject3(app_context, " << to_string(depth) << ", " << charId(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(blend_mode_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 				else if (is_replace && clip_action_count > 0)
 				{
@@ -4643,7 +4657,7 @@ namespace SWFRecomp
 						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
 					}
 					context.tag_main << "\t" << "tagReplaceObject2RatioWithClipActions(app_context, "
-						<< to_string(depth) << ", " << to_string(char_id) << ", "
+						<< to_string(depth) << ", " << charId(char_id) << ", "
 						<< to_string(transform_id) << ", " << to_string(cxform_id) << ", "
 						<< to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", "
 						<< old_ca_var << ", " << to_string(old_ca_count) << ", "
@@ -4661,11 +4675,11 @@ namespace SWFRecomp
 						}
 						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
 					}
-					context.tag_main << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, " << to_string(depth) << ", " << charId(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 				else if (has_ratio)
 				{
-					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << charId(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 					// Also attach clip actions if both ratio and clip actions are present
 					if (clip_action_count > 0)
 					{
@@ -4685,11 +4699,11 @@ namespace SWFRecomp
 						}
 						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
 					}
-					context.tag_main << "\t" << "tagPlaceObject2WithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2WithClipActions(app_context, " << to_string(depth) << ", " << charId(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 				else
 				{
-					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << charId(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 
 				// Track clip_actions per depth for future remove+replace detection
@@ -5033,7 +5047,7 @@ namespace SWFRecomp
 					std::string export_name(cur_pos);
 					cur_pos += export_name.length() + 1;  // +1 for null terminator
 					// Emit registration call in tagInit
-					tag_init << endl << "\ttagRegisterExport(app_context, \"" << export_name << "\", " << to_string(export_char_id) << ");";
+					tag_init << endl << "\ttagRegisterExport(app_context, \"" << export_name << "\", " << charId(export_char_id) << ");";
 				}
 				break;
 			}
@@ -5094,7 +5108,7 @@ namespace SWFRecomp
 					current_frame_init_actions
 						<< "\tif (!catch_up_mode || g_tag_skip_mode) "
 						<< "tagImportCharacter(app_context, "
-						<< imp.char_id << ", \"" << imp.name << "\");"
+						<< charId(imp.char_id) << ", \"" << imp.name << "\");"
 						<< endl;
 				}
 				break;
@@ -5127,7 +5141,7 @@ namespace SWFRecomp
 				else if (grid_fit == 2) gft = "subpixel";
 
 				// Emit runtime call
-				tag_init << "\ttagCSMTextSettings(" << csm_text_id << ", \"" << aat << "\", \"" << gft << "\", ";
+				tag_init << "\ttagCSMTextSettings(" << charId(csm_text_id) << ", \"" << aat << "\", \"" << gft << "\", ";
 				tag_init << std::fixed << thickness << "f, " << std::fixed << sharpness << "f);\n";
 				tag_init << std::defaultfloat;
 
@@ -5190,7 +5204,7 @@ namespace SWFRecomp
 				if (emitPayloadRef())
 				{
 					context.tag_main << "\t" << "tagVideoFrame(app_context, "
-					                 << to_string(vf_stream_id) << ", "
+					                 << charId(vf_stream_id) << ", "
 					                 << to_string(vf_frame_num) << ", "
 					                 << "video_data + " << to_string(payload_offset) << ", "
 					                 << to_string(payload_size) << ");" << endl;
@@ -5256,7 +5270,7 @@ namespace SWFRecomp
 				defined_chars.insert(video_char_id);
 
 				tag_init << endl << "\ttagDefineVideoStream(app_context, "
-				         << to_string(video_char_id) << ", "
+				         << charId(video_char_id) << ", "
 				         << to_string(video_width) << ", "
 				         << to_string(video_height) << ", "
 				         << to_string((u32)video_deblocking) << ", "
@@ -5298,7 +5312,7 @@ namespace SWFRecomp
 				// Emit tagDefineSprite call in tagInit (before any scripts)
 				// so that DoInitAction scripts can reference the sprite dictionary
 				tag_init << endl << "\t" << "tagDefineSprite(app_context, "
-								 << to_string(sprite_id) << ", "
+								 << charId(sprite_id) << ", "
 								 << sp << "_frame_funcs, "
 								 << to_string(sprite_frame_count_declared) << ", "
 								 << to_string(tag.length >= 4 ? tag.length - 4 : 0) << ");";
@@ -5487,7 +5501,7 @@ namespace SWFRecomp
 							// PlaceObject1 in sprite frame — no move flag, always Place.
 							sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
 											   << to_string(depth) << ", "
-											   << to_string(char_id) << ", "
+											   << charId(char_id) << ", "
 											   << to_string(transform_id) << ", "
 											   << to_string(cxform_id) << ", 0, 0);" << endl;
 
@@ -6051,7 +6065,7 @@ namespace SWFRecomp
 							{
 								sprite_definitions << "\t" << "tagPlaceObject3(app_context, "
 												   << to_string(depth) << ", "
-												   << to_string(char_id) << ", "
+												   << charId(char_id) << ", "
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
@@ -6072,7 +6086,7 @@ namespace SWFRecomp
 								}
 								sprite_definitions << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, "
 												   << to_string(depth) << ", "
-												   << to_string(char_id) << ", "
+												   << charId(char_id) << ", "
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
@@ -6085,7 +6099,7 @@ namespace SWFRecomp
 							{
 								sprite_definitions << "\t" << "tagPlaceObject2Ratio(app_context, "
 												   << to_string(depth) << ", "
-												   << to_string(char_id) << ", "
+												   << charId(char_id) << ", "
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
@@ -6114,7 +6128,7 @@ namespace SWFRecomp
 								}
 								sprite_definitions << "\t" << "tagPlaceObject2WithClipActions(app_context, "
 												   << to_string(depth) << ", "
-												   << to_string(char_id) << ", "
+												   << charId(char_id) << ", "
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
@@ -6126,7 +6140,7 @@ namespace SWFRecomp
 							{
 								sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
 												   << to_string(depth) << ", "
-												   << to_string(char_id) << ", "
+												   << charId(char_id) << ", "
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
@@ -6366,7 +6380,7 @@ namespace SWFRecomp
 							// at the open-frame-func site, so the current
 							// frame is sprite_frame_i - 1.
 							sprite_frame_scripts_table
-								<< "\t{ " << to_string(sprite_id) << ", "
+								<< "\t{ " << charId(sprite_id) << ", "
 								<< to_string(sprite_frame_i - 1) << ", "
 								<< script_name << " }," << endl;
 							sprite_frame_scripts_count += 1;
@@ -6420,7 +6434,7 @@ namespace SWFRecomp
 							sprite_init_script << "}";
 							writeScriptFile(sprite_init_script_file, action.takeLiftedTryDefs(), sprite_init_script.str());
 
-							sprite_definitions << "\t" << "tagDoInitActionGuarded(app_context, " << init_sprite_id << ", " << script_name << ");" << endl;
+							sprite_definitions << "\t" << "tagDoInitActionGuarded(app_context, " << charId(init_sprite_id) << ", " << script_name << ");" << endl;
 
 							break;
 						}
@@ -6453,7 +6467,7 @@ namespace SWFRecomp
 				if (sub_tag.code != SWF_TAG_END_TAG)
 				{
 					tag_init << endl << "\t" << "tagSetSpriteNoEndTag(app_context, "
-									 << to_string(sprite_id) << ");";
+									 << charId(sprite_id) << ");";
 				}
 
 				// The DefineSprite HEADER frameCount is not the playback frame
@@ -6474,7 +6488,7 @@ namespace SWFRecomp
 					    || sprite_loaded_frames != sprite_frame_i)
 					{
 						tag_init << endl << "\t" << "tagSetSpriteFrameCounts(app_context, "
-										 << to_string(sprite_id) << ", "
+										 << charId(sprite_id) << ", "
 										 << to_string(sprite_frame_i) << ", "
 										 << to_string(sprite_loaded_frames) << ");";
 					}
@@ -6520,7 +6534,7 @@ namespace SWFRecomp
 						{
 							sprite_definitions << "\t{ "
 								<< to_string(p.depth) << ", "
-								<< to_string(p.char_id) << ", "
+								<< charId(p.char_id) << ", "
 								<< to_string(p.ratio) << ", "
 								<< to_string((u32)p.is_remove) << ", "
 								<< to_string((u32)p.has_clip_actions) << " }, // frame "
@@ -6532,7 +6546,7 @@ namespace SWFRecomp
 				else
 				{
 					// Empty sentinel so the symbol always exists.
-					sprite_definitions << "static FramePlacement " << sp << "_placements[1] = { { 0, 0, 0, 0, 0 } };" << endl;
+					sprite_definitions << "static FramePlacement " << sp << "_placements[1] = { { 0, " << charId(0) << ", 0, 0, 0 } };" << endl;
 				}
 
 				sprite_definitions << "static u16 " << sp << "_frame_starts[] = {" << endl;
@@ -6546,7 +6560,7 @@ namespace SWFRecomp
 				sprite_definitions << "};" << endl << endl;
 
 				tag_init << endl << "\ttagSetSpritePlacements("
-						 << to_string(sprite_id) << ", "
+						 << charId(sprite_id) << ", "
 						 << sp << "_placements, "
 						 << sp << "_frame_starts, "
 						 << to_string(sprite_frame_i) << ");";
@@ -6565,7 +6579,7 @@ namespace SWFRecomp
 
 					// Register sprite labels in tagInit (after tagDefineSprite)
 					tag_init << endl << "\t" << "tagSetSpriteLabels("
-							 << to_string(sprite_id) << ", "
+							 << charId(sprite_id) << ", "
 							 << sp << "_frame_labels, "
 							 << to_string(sprite_labels.size()) << ");";
 				}
@@ -6987,7 +7001,7 @@ namespace SWFRecomp
 						// re-placement at occupied depths before the Phase 3 check.
 						sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
 										   << to_string(rec.depth) << ", "
-										   << to_string(rec.char_id) << ", "
+										   << charId(rec.char_id) << ", "
 										   << to_string(transform_id) << ", "
 										   << to_string(rec.cxform_id) << ", 0, 0);" << endl;
 					}
@@ -7103,9 +7117,9 @@ namespace SWFRecomp
 
 				// Emit tagDefineButton call
 				context.tag_main << "\t" << "tagDefineButton(app_context, "
-								 << to_string(button_id) << ", "
+								 << charId(button_id) << ", "
 								 << bp << "_state_funcs, "
-								 << to_string(hit_char_id >= 0 ? hit_char_id : 0) << ", "
+								 << charId(hit_char_id >= 0 ? hit_char_id : 0) << ", "
 								 << to_string(hit_transform_id) << ", "
 								 << (btn_actions.empty() ? "NULL" : bp + "_actions") << ", "
 								 << to_string(btn_actions.size()) << ");" << endl;
@@ -8523,7 +8537,7 @@ namespace SWFRecomp
 						if (uses_fill_winding_rule)
 						{
 							shape_uses_nonzero_winding = true;
-							context.tag_main << "\t" << "ng_record_char_winding(" << to_string(shape_id) << ");" << endl;
+							context.tag_main << "\t" << "ng_record_char_winding(" << charId(shape_id) << ");" << endl;
 						}
 					}
 
@@ -10763,7 +10777,7 @@ namespace SWFRecomp
 						size_t morph_color_count = current_morph_end_color - morph_end_color_before;
 						context.tag_main << "\t" << "tagDefineMorphShape(app_context, "
 										 << std::dec
-										 << to_string(shape_id) << ", "
+										 << charId(shape_id) << ", "
 										 << to_string(3*current_tri) << ", "
 										 << to_string(3*tris_size) << ", "
 										 << to_string(morph_end_start_vertex) << ", "
@@ -10796,7 +10810,7 @@ namespace SWFRecomp
 					}
 					else
 					{
-						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ", " << std::dec << to_string(shape_bounds_xmin) << ", " << to_string(shape_bounds_xmax) << ", " << to_string(shape_bounds_ymin) << ", " << to_string(shape_bounds_ymax) << ");" << endl;
+						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << charId(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ", " << std::dec << to_string(shape_bounds_xmin) << ", " << to_string(shape_bounds_xmax) << ", " << to_string(shape_bounds_ymin) << ", " << to_string(shape_bounds_ymax) << ");" << endl;
 
 						// Record the same (vert_offset, vert_count) for the AVM2
 						// render walk. tag_main above populates the AVM1 Character
@@ -10863,12 +10877,12 @@ namespace SWFRecomp
 					if (path_recording && current_path_entry > path_start) {
 						if (is_morph) {
 							context.tag_main << "\t" << "ng_record_morph_path("
-							                 << to_string(shape_id) << ", "
+							                 << charId(shape_id) << ", "
 							                 << to_string(path_start) << ", "
 							                 << to_string(current_path_entry - path_start) << ");" << endl;
 						} else {
 							context.tag_main << "\t" << "ng_record_char_path("
-							                 << to_string(shape_id) << ", "
+							                 << charId(shape_id) << ", "
 							                 << to_string(path_start) << ", "
 							                 << to_string(current_path_entry - path_start) << ");" << endl;
 						}

@@ -185,6 +185,34 @@ how the sound pair broke. The inventory is the deliverable; the next slice
 should take it a pair at a time, sprite metadata first (it is the one that is
 provably inconsistent rather than merely uniformly raw).
 
+> **Superseded 2026-09-03**, and this audit had two errors. See
+> `SWFRecompDocs/status/child-movie-charid-wrapper.md`.
+>
+> The list was not taken a pair at a time — the mechanism was replaced. Every
+> character id the recompiler emits now goes through `CHARID(...)` and the
+> harness does one value-keyed substitution.
+>
+> **Error 1 — the audit enumerated calls only, and char ids are not only call
+> arguments.** `swf.cpp` emits `FramePlacement` struct initialisers
+> (`{ depth, char_id, ratio, is_remove, has_clip_actions }`) as bare integers
+> into `sprite_definitions`, which is appended to `tag_main`. The harness had
+> that text and offset none of it, so a child sprite's loop-back placement
+> table described its objects by ids that could never match the offset ids
+> those objects were placed under. `SpriteFrameScriptEntry.char_id` is a
+> second such field. Any scheme keyed on call names or argument positions —
+> including deriving the table from `tag.h` — was incomplete by construction.
+>
+> **Error 2 — `tagSetSpriteLabels` was never half-applied.** It is emitted
+> *without* `app_context`, so no regex in the list (all anchored on
+> `\(app_context,`) could have matched it, and its raw registration was
+> simply the only entry with that key. It worked by accident; two movies with
+> sprites at the same raw id would have shadowed each other. The provably
+> inconsistent members of the quartet are `tagSetSpritePlacements`,
+> `tagSetSpriteFrameCounts` and `tagSetSpriteNoEndTag`.
+>
+> A third thing the audit did not look for: the old regexes **offset char id
+> 0**, and 0 is the "no character" sentinel in every one of these positions.
+
 ## Verification
 
 1. **The test flips.** `output_mismatch` at `06a039a1a`, `pass` after — shown

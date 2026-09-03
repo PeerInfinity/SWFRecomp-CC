@@ -676,6 +676,18 @@ MAIN_C = PROJECT_ROOT / "SWFRecomp" / "wasm_wrappers" / "main.c"
 DIFF_SCRIPT = PROJECT_ROOT / "scripts" / "diff_ruffle_results.py"
 DAWN_INSTALL = Path(os.environ.get("DAWN_INSTALL", PROJECT_ROOT.parent / "dawn-install"))
 STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
+
+# CHARID() completeness oracle. `generate_child_movie_file` re-bases a loaded
+# child's character ids with ONE substitution keyed on the CHARID() wrapper the
+# recompiler emits, so a char id emitted WITHOUT the wrapper would silently
+# keep its raw value and disagree with every id that moved. The oracle derives
+# the char-id argument positions and struct field indices from the runtime
+# headers and fails on any bare integer literal in one; see the module
+# docstring and the CHARACTER ID WRAPPER comment in libswf/tag.h.
+# append, not insert(0): stdlib must keep winning if a future scripts/
+# module is ever named after one.
+sys.path.append(str(PROJECT_ROOT / "scripts"))
+from check_charid_wrapping import check_text as check_charid_wrapping  # noqa: E402
 # Ruffle upstream test assets (expected PNGs live here)
 RUFFLE_UPSTREAM = Path.home() / "CC" / "ruffle" / "tests" / "tests" / "swfs" / "avm1"
 
@@ -1642,90 +1654,52 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         lines.append(modified)
         lines.append("")
 
-    # Apply char_id offsetting to avoid dictionary collisions with parent movie.
-    # Each child gets a fixed offset of movie_id * 1000 added to all char_ids.
+    # Re-base the child's character ids so they cannot collide with the
+    # parent's dictionary. Each child gets a fixed offset of movie_id * 1000.
+    #
+    # ONE substitution, keyed on the VALUE: the recompiler wraps every
+    # character id it emits in CHARID() (SWFModernRuntime/include/libswf/tag.h
+    # defines it as the identity macro), so this reaches call arguments and
+    # data-table fields alike. It replaced a hand-maintained list of one
+    # `re.sub` per emitted call name, which was both stale (four of its
+    # regexes named calls the recompiler no longer emits) and structurally
+    # incomplete: a regex keyed on a call name cannot see a struct-initialiser
+    # field, and `FramePlacement`'s char_id is one — so a child sprite's
+    # loop-back placement table described objects by ids that could never
+    # match the offset ids those objects were placed under.
+    #
+    # tagMain.c is the only generated file that carries character ids (the
+    # RecompiledScripts/ bytecode translation emits none, and draws.c is raw
+    # payload bytes), and `check_charid_wrapping` below asserts that no
+    # char-id position in it holds a bare integer literal.
     char_id_offset = movie_id * 1000
-    if tag_main_text and char_id_offset > 0:
-        def _offset_char_id(m):
-            """Add char_id_offset to the integer char_id argument in tag calls."""
-            prefix_part = m.group(1)
-            char_id_val = int(m.group(2))
-            suffix_part = m.group(3)
-            return f"{prefix_part}{char_id_val + char_id_offset}{suffix_part}"
-
-        # tagDefineSprite(app_context, CHAR_ID, ...) — 2nd arg
-        tag_main_text = re.sub(
-            r'(tagDefineSprite\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineShape(app_context, CHAR_TYPE_*, CHAR_ID, ...) — 3rd arg
-        tag_main_text = re.sub(
-            r'(tagDefineShape\(app_context,\s*\w+,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineMorphShape(app_context, CHAR_ID, ...) — 2nd arg
-        tag_main_text = re.sub(
-            r'(tagDefineMorphShape\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineEditText(app_context, CHAR_ID, ...) — 2nd arg
-        tag_main_text = re.sub(
-            r'(tagDefineEditText\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineButton(app_context, CHAR_ID, ...) — 2nd arg
-        tag_main_text = re.sub(
-            r'(tagDefineButton\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagRegisterExport(app_context, "name", CHAR_ID) — 3rd arg (last, before ')')
-        tag_main_text = re.sub(
-            r'(tagRegisterExport\(app_context,\s*"[^"]*",\s*)(\d+)(\s*\))',
-            _offset_char_id, tag_main_text)
-        # tagPlaceObject2 and variants — CHAR_ID is 3rd arg (after app_context, depth)
-        # Match: tagPlaceObject2*(app_context, DEPTH, CHAR_ID, ...)
-        tag_main_text = re.sub(
-            r'(tagPlaceObject2\w*\(app_context,\s*\d+,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineFont(app_context, CHAR_ID, ...) — 2nd arg
-        tag_main_text = re.sub(
-            r'(tagDefineFont\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineSoundMeta(app_context, CHAR_ID, ...) — 2nd arg
-        tag_main_text = re.sub(
-            r'(tagDefineSoundMeta\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineSound(app_context, CHAR_ID, ...) — 2nd arg. Without this the
-        # child's sound registers its duration/rate metadata under the RAW id
-        # while tagRegisterExport (offset just above) publishes the OFFSET id,
-        # so `new Sound().attachSound("<child export>")` resolved the export and
-        # then found no metadata: getDuration() === undefined. Found building
-        # regression/avm1_parent_as3_child_payload.
-        tag_main_text = re.sub(
-            r'(tagDefineSound\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagStartSound(app_context, CHAR_ID, ...) — 2nd arg. Offset in the
-        # same breath as tagDefineSound above: the two must agree, and before
-        # this pair BOTH were raw, so a child playing its own sound kept
-        # working by accident. Moving only the define would have broken it.
-        tag_main_text = re.sub(
-            r'(tagStartSound\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # tagDefineVideoMeta(app_context, CHAR_ID, ...) — 2nd arg
-        tag_main_text = re.sub(
-            r'(tagDefineVideoMeta\(app_context,\s*)(\d+)(\s*,)',
-            _offset_char_id, tag_main_text)
-        # defineBitmap(BASE, offset, size, w, h, CHAR_ID) — 6th arg, and the
-        # only emitted define whose char id is LAST. Without this a child's
-        # bitmap registered its metadata under the RAW id while
-        # tagRegisterExport (offset above) published the OFFSET id, so
-        # BitmapData.loadBitmap("<child export>") resolved the export and then
-        # found no metadata at all. BASE is the emitting movie's bitmap_data
-        # array, renamed to <prefix>_bitmap_data by apply_renames further down
-        # — this substitution runs before that, so it still reads `bitmap_data`.
-        # Found building regression/avm1_parent_child_bitmap.
-        tag_main_text = re.sub(
-            r'(defineBitmap\([A-Za-z_]\w*,\s*(?:\d+\s*,\s*){4})(\d+)(\s*\))',
-            _offset_char_id, tag_main_text)
-        # button_N_hit_char_id references (in tagDefineButton calls)
-        # These are embedded as a bare integer argument for hit char_id.
-        # Also offset char_id references in sprite_frame_funcs arrays via
-        # tagPlaceObject2 calls inside sprite frame functions (already handled above).
+    if tag_main_text:
+        ok, problems = check_charid_wrapping(tag_main_text)
+        if not ok:
+            raise RuntimeError(
+                "child movie %s: character ids in tagMain.c are not all "
+                "wrapped in CHARID(), so offsetting them by %d would leave "
+                "the movie internally inconsistent. Wrap the emission site in "
+                "SWFRecomp/src/swf.cpp with charId(). Offenders:\n  %s"
+                % (prefix, char_id_offset, "\n  ".join(problems)))
+        if char_id_offset > 0:
+            # 0 is NOT a character id — it is the "no character" sentinel in
+            # every one of these positions: a PlaceObject2/FramePlacement with
+            # char_id 0 is a Modify tag (`if (f0[k].char_id == 0) continue;` in
+            # ng_loopback_entry_survives, and tag.h's "Modify-only tags
+            # (char_id=0) ignore is_replace"), tagDefineButton's hit_char_id 0
+            # means no hit shape, and the empty FramePlacement /
+            # SpriteFrameScriptEntry arrays are 0-filled sentinels. Real SWF
+            # character ids start at 1. Offsetting 0 would turn every Modify
+            # place in a loaded child into a place of character `offset` — a
+            # bug the old per-call regex list had (its `tagPlaceObject2\w*`
+            # regex rewrote `..., 0,` to `..., 1000,`) and that only went
+            # unnoticed because it never reached a graded test.
+            tag_main_text = re.sub(
+                r'CHARID\((\d+)\)',
+                lambda m: 'CHARID(%d)' % (int(m.group(1)) + char_id_offset
+                                          if int(m.group(1)) else 0),
+                tag_main_text)
 
     # Frame functions from tagMain.c
     if tag_main_text:

@@ -93,31 +93,40 @@ first).
 
 ## Multi-SWF (loaded children)
 
-- **The child-movie char-id offset list is hand-maintained and known
-  incomplete.** `generate_child_movie_file` (`ruffle-tests/verify_output.py`)
-  adds `movie_id * 1000` to a child SWF's character ids with **one `re.sub`
-  per emitted call name**, so any call the list does not name keeps its RAW id
-  and silently disagrees with every call that was offset (memory
-  `child-movie-charid-offset-per-callsite`). Audited 2026-09-03 while fixing
-  `defineBitmap`: **four regexes are dead** — `tagDefineEditText`,
-  `tagDefineFont`, `tagDefineSoundMeta`, `tagDefineVideoMeta` name calls the
-  recompiler no longer emits — and these LIVE char/font/sprite-id calls are
-  unoffset while `tagDefineSprite` / `tagRegisterExport` / `tagPlaceObject2*`
-  are: `tagSetSpritePlacements`, `tagSetSpriteFrameCounts`,
-  `tagSetSpriteLabels`, `tagSetSpriteNoEndTag` (**half-applied today**, since
-  the sprite they describe IS offset), `tagDoInitActionGuarded`,
-  `tagPlaceObject3`, `tagReplaceObject2RatioWithClipActions` (the
-  `tagPlaceObject2\w*` regex matches neither name), `tagDefineEditTextProps`,
-  `tagDefineText`, `tagCSMTextSettings`, `tagDefineFontGlyphBase`/`Info`/
-  `Metrics`, `tagDefineVideoStream`, `tagVideoFrame`, `tagImportCharacter`,
-  and `tagDefineButton`'s 4th argument `hit_char_id`. No failing test covers
-  any of them. **Take them a PAIR at a time with a failing test each** —
-  moving a define without its consumers is exactly how the `tagDefineSound`
-  pair broke; sprite metadata first, as the one that is provably inconsistent
-  rather than merely uniformly raw. Full inventory and reasoning:
-  `SWFRecompDocs/status/child-movie-bitmap-registry.md` §"Audit". The real fix
-  is to stop it being a list of regexes at all — give the emitted calls a
-  wrapper the harness can key on. (2026-09-03)
+- ~~**The child-movie char-id offset list is hand-maintained and known
+  incomplete.**~~ **DONE 2026-09-03.** The list is gone. The recompiler now
+  wraps every character id it emits in `CHARID(...)` (identity macro in
+  `SWFModernRuntime/include/libswf/tag.h`, emitted by `charId()` in
+  `SWFRecomp/src/swf.cpp`), so `generate_child_movie_file` does **one**
+  value-keyed substitution — reaching struct-initialiser fields
+  (`FramePlacement.char_id`, `SpriteFrameScriptEntry.char_id`) that no
+  call-name-keyed scheme could see. Completeness is now detected rather than
+  hoped for: `scripts/check_charid_wrapping.py` derives the char-id argument
+  positions and struct field indices from the runtime headers and hard-fails
+  `generate_child_movie_file` on a bare integer literal in one. Anchored by
+  `regression/avm1_parent_child_sprite_meta`. Two corrections to the entry
+  this replaces: `tagSetSpriteLabels` was NOT broken (it takes no
+  `app_context`, so no regex ever matched it, and its raw registration happened
+  to be the only one with that key — it worked by accident, and two movies with
+  sprites at the same raw id would have shadowed each other); and the old
+  regexes **offset char id 0**, turning every Modify `PlaceObject2` in a loaded
+  child into a place of character 1000 — 0 is the "no character" sentinel and
+  is now excluded. Closeout:
+  `SWFRecompDocs/status/child-movie-charid-wrapper.md`. (2026-09-03)
+- **The AVM1 and AVM2 child-character-id strides disagree.** Every child SWF,
+  AVM1 or AVM2, is recompiled with `char_id_base = movie_id * 10000`
+  (`ruffle-tests/verify_output.py`), which the recompiler applies **only** to
+  the ABC/AVM2 emissions — the SymbolClass registry
+  (`SWFRecomp/src/abc/abc_emit.cpp`) and the AVM2 timeline tables
+  (`abc/abc_timeline.cpp`). The tag side of the same child is then shifted by
+  `movie_id * 1000` by the harness. So an AS3 child's SymbolClass binding names
+  character `10001` while its `tagDefineSprite` defines `1001`. Nothing
+  cross-references the two today (AVM2 does not read the AVM1 dictionary) and
+  `regression/avm1_parent_as3_child_payload` passes either way, so this is
+  latent, not broken. The end state is one mechanism: teach `charId()` about
+  `char_id_base` (three lines, now that every emission goes through it) and
+  delete the harness substitution entirely. Needs its own failing test first —
+  it moves every AVM2 child's ids. (2026-09-03)
 - **A loaded child's bitmaps never reach the renderer.** Two gates, both
   stated in the ROOT movie's terms: `finalizeBitmaps()` is emitted at the end
   of the root's `tagInit` so `render_webgpu_upload_bitmap` early-returns on

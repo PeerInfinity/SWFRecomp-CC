@@ -47,6 +47,31 @@ void dispatch_clip_event_flag(SWFAppContext* app_context, uint32_t flag);
 int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
     const char* skip_name, char* out_path, size_t out_size);
 #endif
+// ---------------------------------------------------------------------------
+// CHARACTER ID WRAPPER
+//
+// Every character id the recompiler writes into generated C goes through
+// CHARID() — call arguments (`tagDefineSprite(app_context, CHARID(1), ...)`)
+// AND data-table fields alike (`FramePlacement` / `SpriteFrameScriptEntry`
+// initialisers). It is the identity macro, so every ordinary build is
+// bit-identical in behaviour and CHARID(7) stays a constant expression usable
+// in a static initialiser.
+//
+// It exists so a consumer that must shift a whole movie's dictionary can find
+// every id BY VALUE with one substitution: verify_output.py's
+// `generate_child_movie_file` re-bases a loaded child SWF's ids by
+// `movie_id * 1000`, and used to do it with one regex per emitted call name —
+// a hand-maintained list that was both stale (four regexes named calls the
+// recompiler no longer emits) and structurally incomplete (a regex keyed on a
+// call name cannot see a struct-initialiser field).
+//
+// If you add an emission site that writes a character id, wrap it.
+// `scripts/check_charid_wrapping.py` derives the char-id argument positions
+// and struct field indices from THIS header and fails on any bare integer
+// literal in one of them.
+// ---------------------------------------------------------------------------
+#define CHARID(x) (x)
+
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue);
 void tagShowFrame(SWFAppContext* app_context);
 void tagFlushPendingEnterFrame(SWFAppContext* app_context);
