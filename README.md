@@ -12,8 +12,6 @@ Served from `docs/` at [peerinfinity.github.io/SWFRecomp-CC](https://peerinfinit
 |------|------------|
 | [Demo gallery](https://peerinfinity.github.io/SWFRecomp-CC/) | Recompiled SWFs running as WebAssembly, with a side-by-side Ruffle comparison view |
 | [In-browser recompiler](https://peerinfinity.github.io/SWFRecomp-CC/recompiler/) | Drop a `.swf` in and it is recompiled to C in the page. Download the generated code with a build script, or compile and run it right there — no toolchain installed |
-| [Injection demos](https://peerinfinity.github.io/SWFRecomp-CC/injector/) | Runtime SWF injection demos |
-| [Image dashboard](https://peerinfinity.github.io/SWFRecomp-CC/image-dashboard/) | Render-comparison dashboard for the graphics test suite (regenerated on each Pages deploy) |
 
 ## Contents
 
@@ -23,10 +21,10 @@ Served from `docs/` at [peerinfinity.github.io/SWFRecomp-CC](https://peerinfinit
 | `SWFModernRuntime/` | Runtime library — ActionScript runtime, rendering, and WebGPU backend | [SWFRecomp/SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) (fork: [PeerInfinity/SWFModernRuntime](https://github.com/PeerInfinity/SWFModernRuntime)) |
 | `SWFRecompDocs/` | Documentation — guides, specs, plans, and status tracking | [SWFRecomp/SWFRecompDocs](https://github.com/SWFRecomp/SWFRecompDocs) |
 | `docs/` | GitHub Pages site — the live pages above, served from this repo | |
-| `ruffle-tests/` | Test corpus (~4,500 tests) mirrored from Ruffle, Gnash, Shumway and the Tamarin acceptance suite, plus this project's own regression tests, with the shared runner | |
+| `ruffle-tests/` | Test harness, per-suite results, and this project's own hand-written regression tests. The ~4,500-test upstream corpus it runs against (Ruffle, Gnash, Shumway, Tamarin) is **not** stored here — `ruffle-tests/download_tests.sh` fetches it | |
 | `tools/` | Divergence harnesses, browser-test drivers, SWF analysis and performance measurement | |
 | `scripts/` | Build, CI and test-result processing scripts | |
-| `demos/` | ActionScript sources used by the demo and injector pages | |
+| `demos/` | ActionScript sources used by the demo pages | |
 | `docs2/` | Second demo site for SWFs that are not OSS-licensed. Local hosting only — deliberately never deployed to Pages, so publishing it would redistribute copyrighted games. Not a superseded copy of `docs/` | |
 
 ## Original Repositories
