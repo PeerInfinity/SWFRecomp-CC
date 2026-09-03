@@ -684,6 +684,24 @@ STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
 # the char-id argument positions and struct field indices from the runtime
 # headers and fails on any bare integer literal in one; see the module
 # docstring and the CHARACTER ID WRAPPER comment in libswf/tag.h.
+# Per-child character-id stride. A loaded child movie is recompiled with
+# `char_id_base = movie_id * CHILD_CHAR_ID_STRIDE`, which the recompiler adds
+# to EVERY character id it emits — the tag pipeline (swf.cpp's charId()) and
+# the ABC/AVM2 emissions (SymbolClass registry + timeline tables) alike — so a
+# child's dictionary cannot collide with its parent's.
+#
+# 1000, not 10000, and the ceiling that fixes it is the AVM1 dictionary:
+# INITIAL_DICTIONARY_CAPACITY is 8192 (SWFModernRuntime/include/libswf/swf.h,
+# whose comment already says "1000 per child SWF"), and while tag.c GROWS the
+# array past that, several bounds checks compare against the CONSTANT instead
+# of the growable `dictionary_capacity` — all of tag_stubs.c's
+# (:414/:883/:1511, the NO_GRAPHICS build, which never grows the array at all)
+# and action.c's button-MC probes (every build). A 10000 stride would put the
+# FIRST child's characters past 8192 and read back as "no such character".
+# The cost is a cap of 999 characters per child movie; raising it means fixing
+# those checks first. See SWFRecompDocs/status/child-charid-stride-unify.md.
+CHILD_CHAR_ID_STRIDE = 1000
+
 # append, not insert(0): stdlib must keep winning if a future scripts/
 # module is ever named after one.
 sys.path.append(str(PROJECT_ROOT / "scripts"))
@@ -1422,8 +1440,11 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     Returns the prefix used, or None on failure.
 
     movie_id: unique ID for this child movie (1, 2, 3, ...). Used for per-movie
-    export table isolation. Char IDs are offset by movie_id * 1000 to avoid
-    dictionary collisions with the parent movie.
+    export table isolation. Char ids are offset by movie_id * CHILD_CHAR_ID_STRIDE
+    to avoid dictionary collisions with the parent movie — but the RECOMPILER
+    does that (it was handed the base as `[input] char_id_base`), not this
+    function; all this function checks is that every emitted id went through
+    charId() and so actually moved.
     """
     prefix = _sanitize_prefix(child_swf_name)
 
@@ -1654,52 +1675,32 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         lines.append(modified)
         lines.append("")
 
-    # Re-base the child's character ids so they cannot collide with the
-    # parent's dictionary. Each child gets a fixed offset of movie_id * 1000.
+    # The child's character ids are ALREADY re-based when they get here: the
+    # recompiler was handed `char_id_base = movie_id * CHILD_CHAR_ID_STRIDE`
+    # and swf.cpp's charId() added it to every character id it emitted, on the
+    # tag side and the ABC/AVM2 side alike. The harness used to do the tag half
+    # itself — first with one `re.sub` per emitted call name, then with a
+    # single substitution keyed on the CHARID() token — and that is what left
+    # the two halves on DIFFERENT strides. Nothing is rewritten here now.
     #
-    # ONE substitution, keyed on the VALUE: the recompiler wraps every
-    # character id it emits in CHARID() (SWFModernRuntime/include/libswf/tag.h
-    # defines it as the identity macro), so this reaches call arguments and
-    # data-table fields alike. It replaced a hand-maintained list of one
-    # `re.sub` per emitted call name, which was both stale (four of its
-    # regexes named calls the recompiler no longer emits) and structurally
-    # incomplete: a regex keyed on a call name cannot see a struct-initialiser
-    # field, and `FramePlacement`'s char_id is one — so a child sprite's
-    # loop-back placement table described objects by ids that could never
-    # match the offset ids those objects were placed under.
-    #
-    # tagMain.c is the only generated file that carries character ids (the
+    # What survives is the completeness check. `CHARID()` is still emitted (it
+    # is the identity macro in SWFModernRuntime/include/libswf/tag.h) precisely
+    # so this oracle has something to key on: a character id emitted WITHOUT
+    # the wrapper is one charId() never saw, so it kept its raw value and
+    # silently disagrees with every id in the movie that moved. tagMain.c is
+    # the only generated file that carries character ids (the
     # RecompiledScripts/ bytecode translation emits none, and draws.c is raw
-    # payload bytes), and `check_charid_wrapping` below asserts that no
-    # char-id position in it holds a bare integer literal.
-    char_id_offset = movie_id * 1000
+    # payload bytes).
     if tag_main_text:
         ok, problems = check_charid_wrapping(tag_main_text)
         if not ok:
             raise RuntimeError(
                 "child movie %s: character ids in tagMain.c are not all "
-                "wrapped in CHARID(), so offsetting them by %d would leave "
-                "the movie internally inconsistent. Wrap the emission site in "
+                "wrapped in CHARID(), so they did not go through charId() and "
+                "were NOT re-based with the rest of the movie — which leaves "
+                "it internally inconsistent. Wrap the emission site in "
                 "SWFRecomp/src/swf.cpp with charId(). Offenders:\n  %s"
-                % (prefix, char_id_offset, "\n  ".join(problems)))
-        if char_id_offset > 0:
-            # 0 is NOT a character id — it is the "no character" sentinel in
-            # every one of these positions: a PlaceObject2/FramePlacement with
-            # char_id 0 is a Modify tag (`if (f0[k].char_id == 0) continue;` in
-            # ng_loopback_entry_survives, and tag.h's "Modify-only tags
-            # (char_id=0) ignore is_replace"), tagDefineButton's hit_char_id 0
-            # means no hit shape, and the empty FramePlacement /
-            # SpriteFrameScriptEntry arrays are 0-filled sentinels. Real SWF
-            # character ids start at 1. Offsetting 0 would turn every Modify
-            # place in a loaded child into a place of character `offset` — a
-            # bug the old per-call regex list had (its `tagPlaceObject2\w*`
-            # regex rewrote `..., 0,` to `..., 1000,`) and that only went
-            # unnoticed because it never reached a graded test.
-            tag_main_text = re.sub(
-                r'CHARID\((\d+)\)',
-                lambda m: 'CHARID(%d)' % (int(m.group(1)) + char_id_offset
-                                          if int(m.group(1)) else 0),
-                tag_main_text)
+                % (prefix, "\n  ".join(problems)))
 
     # Frame functions from tagMain.c
     if tag_main_text:
@@ -2357,11 +2358,9 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         child_recomp_dir.mkdir(exist_ok=True)
         # loader-arc tranche 6: an AVM2 child's tables link alongside the
         # parent's under a per-child symbol prefix, with its character ids
-        # lifted clear of the parent's range. Char ids are u16 in the runtime
-        # tables, so the stride caps children at ~6 before wrapping — the
-        # corpus has at most two.
+        # lifted clear of the parent's range by CHILD_CHAR_ID_STRIDE.
         child_sym_prefix = f"{_sanitize_prefix(child_name)}_"
-        child_char_base = child_movie_id * 10000
+        child_char_base = child_movie_id * CHILD_CHAR_ID_STRIDE
         if recompile_child_swf(child_swf, child_recomp_dir,
                                symbol_prefix=child_sym_prefix,
                                char_id_base=child_char_base):
@@ -2878,7 +2877,15 @@ def compile_wasm(test_dir, num_frames, build_dir):
             continue
         child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_name)}"
         child_recomp_dir.mkdir(exist_ok=True)
-        if recompile_child_swf(child_swf, child_recomp_dir):
+        # char_id_base must be passed here too. It used to be absent, and the
+        # child's ids came out raw from the recompiler and were re-based
+        # afterwards by generate_child_movie_file's CHARID() substitution; with
+        # the offset moved into the recompiler, NOT passing it would leave a
+        # WASM-built child's dictionary colliding with its parent's. No symbol
+        # prefix: compile_wasm does not link an AVM2 child's tables (compile_native
+        # does that, gated on an AVM2 parent), so there is nothing to deconflict.
+        if recompile_child_swf(child_swf, child_recomp_dir,
+                               char_id_base=child_movie_id * CHILD_CHAR_ID_STRIDE):
             child_is_prelude = child_swf.name.startswith("prelude_")
             prefix = generate_child_movie_file(
                 child_name, child_recomp_dir, build_dir,

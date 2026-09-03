@@ -1,0 +1,3 @@
+t:movieclip
+nm:mc
+done

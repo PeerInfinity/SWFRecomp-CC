@@ -22,7 +22,10 @@ namespace SWFRecomp
 		// and zero base = the main movie, and every emitter's output is then
 		// bit-for-bit what it was before these existed.
 		string avm2_symbol_prefix;
-		uint32_t avm2_char_id_base = 0;
+		// Named without the avm2_ prefix its sibling carries because it is no
+		// longer AVM2-only: since the stride-unification slice it also reaches
+		// the TAG pipeline, through swf.cpp's charId().
+		uint32_t char_id_base = 0;
 
 		// Try-helper emission mode (Config::try_helper). At false the emitted
 		// C is byte-for-bit what it was before the option existed.

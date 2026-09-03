@@ -35,18 +35,34 @@
 
 #define CROSS(v1, v2) (v1.x*v2.y - v2.x*v1.y)
 
+// Character-id base for THIS recompile (Config::char_id_base, set from
+// `[input] char_id_base`). 0 for the main movie; a loaded CHILD movie is
+// recompiled with a per-movie stride so its dictionary cannot collide with the
+// parent's. Process-wide because the recompiler handles exactly one SWF per
+// invocation (main.cpp); SWF's constructor sets it from the Config.
+static u32 g_char_id_base = 0;
+
 // Emit a character id through the CHARID() wrapper (see the CHARACTER ID
 // WRAPPER comment in SWFModernRuntime/include/libswf/tag.h). EVERY character
 // id written into generated C goes through this — call arguments and
-// data-table fields (FramePlacement, SpriteFrameScriptEntry) alike — so a
-// consumer that must re-base a whole movie's dictionary can find them all by
-// value with one substitution instead of one regex per call name.
+// data-table fields (FramePlacement, SpriteFrameScriptEntry) alike — which is
+// what makes ONE place (here) able to re-base a whole movie's dictionary.
 // scripts/check_charid_wrapping.py derives the char-id argument positions and
 // struct field indices from tag.h and fails on a bare integer literal in one
 // of them; run it after adding an emission site.
+//
+// 0 is NOT a character id and is never re-based: it is the "no character"
+// sentinel in every one of these positions — a PlaceObject2 / FramePlacement
+// with char_id 0 is a Modify tag (tag.h: "Modify-only tags (char_id=0) ignore
+// is_replace", and ng_loopback_entry_survives does `if (f0[k].char_id == 0)
+// continue;`), tagDefineButton's hit_char_id 0 means no hit shape, and the
+// empty FramePlacement / SpriteFrameScriptEntry arrays are 0-filled sentinel
+// rows. Real SWF character ids start at 1. Offsetting 0 would turn every
+// Modify place in a loaded child into a place of character `base` — the bug
+// the harness's old per-call regex list had.
 static inline std::string charId(size_t id)
 {
-	return "CHARID(" + std::to_string(id) + ")";
+	return "CHARID(" + std::to_string(id != 0 ? id + g_char_id_base : 0) + ")";
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +406,15 @@ namespace SWFRecomp
 		// Multi-SWF emission keys, carried from the config (loader-arc
 		// tranche 6). Defaults ("" / 0) reproduce the main-movie output.
 		abc_symbol_prefix = context.avm2_symbol_prefix;
-		abc_char_id_base = context.avm2_char_id_base;
+		abc_char_id_base = context.char_id_base;
+		// The tag pipeline's half of the same key: charId() adds this to every
+		// character id it emits, so a child's tag-side ids and its ABC-side
+		// ids are re-based by the SAME stride from the SAME config value.
+		// Before this the base reached only the ABC/AVM2 emissions and the tag
+		// side was re-based after the fact by the test harness, on a different
+		// stride (config.hpp's `char_id_base` comment described the end state,
+		// not the code).
+		g_char_id_base = context.char_id_base;
 		// Dead-payload skip (assessment §2.2). Only ever true together with
 		// is_as3, so an AVM1 SWF's emission is untouched at any setting.
 		skip_avm1_payload = context.skip_avm1_payload;

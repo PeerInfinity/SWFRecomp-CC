@@ -113,20 +113,56 @@ first).
   child into a place of character 1000 — 0 is the "no character" sentinel and
   is now excluded. Closeout:
   `SWFRecompDocs/status/child-movie-charid-wrapper.md`. (2026-09-03)
-- **The AVM1 and AVM2 child-character-id strides disagree.** Every child SWF,
-  AVM1 or AVM2, is recompiled with `char_id_base = movie_id * 10000`
-  (`ruffle-tests/verify_output.py`), which the recompiler applies **only** to
-  the ABC/AVM2 emissions — the SymbolClass registry
-  (`SWFRecomp/src/abc/abc_emit.cpp`) and the AVM2 timeline tables
-  (`abc/abc_timeline.cpp`). The tag side of the same child is then shifted by
-  `movie_id * 1000` by the harness. So an AS3 child's SymbolClass binding names
-  character `10001` while its `tagDefineSprite` defines `1001`. Nothing
-  cross-references the two today (AVM2 does not read the AVM1 dictionary) and
-  `regression/avm1_parent_as3_child_payload` passes either way, so this is
-  latent, not broken. The end state is one mechanism: teach `charId()` about
-  `char_id_base` (three lines, now that every emission goes through it) and
-  delete the harness substitution entirely. Needs its own failing test first —
-  it moves every AVM2 child's ids. (2026-09-03)
+- ~~**The AVM1 and AVM2 child-character-id strides disagree.**~~
+  **DONE 2026-09-03.** One stride, owned by the recompiler. `charId()`
+  (`SWFRecomp/src/swf.cpp`) adds `Config::char_id_base` to every character id
+  the TAG pipeline emits, alongside the ABC/AVM2 emissions that already had
+  it, and the harness's `CHARID()` substitution is gone (the wrapper is still
+  emitted — `scripts/check_charid_wrapping.py` keys on it). `char_id_base`
+  now means what `config.hpp` always said it meant.
+  **Stride ruling: 1000, unifying DOWNWARD**, because the AVM1 dictionary is
+  `INITIAL_DICTIONARY_CAPACITY` = 8192 and a 10000 stride puts the FIRST
+  child's characters past it. Anchored by
+  `regression/avm2_parent_child_symbol_stride` (a lock — no trace-visible
+  repro of the disagreement exists, since AVM2 never reads the AVM1
+  dictionary) and `regression/avm1_parent_child_modify_place`. Closeout:
+  `SWFRecompDocs/status/child-charid-stride-unify.md`. (2026-09-03)
+- **The dictionary bound is checked against a CONSTANT in places, and against
+  the growable variable in others.** `tag.c` grows `dictionary` with
+  `ENSURE_SIZE(..., dictionary_capacity, ...)` and mostly bounds-checks
+  against that variable — but `tag_stubs.c` (NO_GRAPHICS / HEADLESS, whose
+  `swf_core.c` never grows the array at all) checks
+  `char_id >= INITIAL_DICTIONARY_CAPACITY` at :414/:883/:1511 and indexes
+  `dictionary[cid]` UNGUARDED at :1509, and `action.c`'s three button-MC
+  probes (:54533, :55121, :55189 — every build mode, not just no-graphics)
+  compare against the constant too. tag.c's own browser-WASM-only arms
+  (:9628, :9647, :10190, :10204) do the same. So any character id at or above
+  8192 reads back as "no such character" in code that looks bounds-safe, and
+  in NO_GRAPHICS worse than that. Nothing trips it today — the stride is 1000
+  and the corpus has at most two children — but it is what caps a child at
+  999 characters, and it is the work item for whoever needs to raise the
+  stride. (2026-09-03)
+- **`embedded_bitmap_for_char` never consults child movies.**
+  `SWFModernRuntime/src/avm2/avm2_bitmap.c:757` scans only the main movie's
+  `avm2_generated_bitmaps`, unlike its neighbours `char_info` and
+  `timeline_for_char` in `avm2_display.c`, which both fall through to
+  `g_child_movies`. So a loaded AVM2 child's `[Embed]`ed image instantiates
+  as a `BitmapData` subclass with width/height **0**, where the same SWF run
+  as the main movie reports its real size. Independent of the char-id stride
+  (it reproduces at either one). Reproduced while writing
+  `regression/avm2_parent_child_symbol_stride`, which deliberately reads the
+  class name instead of the pixels; the fix is the same six-line
+  `g_child_movies` loop the display lookups carry. (2026-09-03)
+- **`_x` on a loaded child's TAG-PLACED clip reads uninitialized memory.**
+  `_root.holder.mc._x`, where `mc` is placed by the child's own
+  `PlaceObject2` (not `createEmptyMovieClip`), returned a different garbage
+  float on every run — 8197.8125, -1.92062288988382e-6,
+  -1.48600998484698e+20 — while `_name` and `typeof` on the same object read
+  correctly and `_x` on a parent-side `createEmptyMovieClip` clip reads 0.
+  Reproduces with no Modify tag anywhere in the child, so it is the placement
+  path, not the Modify path. Found while writing
+  `regression/avm1_parent_child_modify_place`, which reads `typeof`/`_name`
+  because of it. (2026-09-03)
 - **A loaded child's bitmaps never reach the renderer.** Two gates, both
   stated in the ROOT movie's terms: `finalizeBitmaps()` is emitted at the end
   of the root's `tagInit` so `render_webgpu_upload_bitmap` early-returns on

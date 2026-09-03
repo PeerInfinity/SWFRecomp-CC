@@ -21,9 +21,22 @@ namespace SWFRecomp
 		//     emitted file name in RecompiledABC/, so a child's tables can be
 		//     linked into the same binary as the parent's.
 		//   char_id_base:  added to every character id in the emitted tables,
-		//     making ids globally unique across movies (the AVM1 pipeline's
-		//     movie_id * 1000 trick). Char ids are u16 in the runtime tables,
-		//     so keep base + max_child_char_id under 65536.
+		//     making ids globally unique across movies. ONE stride does both
+		//     halves: the ABC/AVM2 emissions (SymbolClass registry + timeline
+		//     tables) and, through swf.cpp's charId(), every character id the
+		//     TAG pipeline writes. Character id 0 is never re-based — it is
+		//     the "no character" sentinel, see charId().
+		//     The caller picks the stride; the harness uses movie_id * 1000.
+		//     Two ceilings bound how high it may go:
+		//       - char ids are u16 in the runtime tables, so keep
+		//         base + max_child_char_id under 65536;
+		//       - the AVM1 dictionary is INITIAL_DICTIONARY_CAPACITY (8192)
+		//         entries, and several bounds checks compare against that
+		//         CONSTANT rather than the growable `dictionary_capacity`
+		//         (tag_stubs.c:414/883/1511, action.c's button-MC probes),
+		//         so a tag-side id at or above 8192 silently reads as "no
+		//         such character" — in NO_GRAPHICS it is worse than silent,
+		//         since swf_core.c never grows the array at all.
 		std::string symbol_prefix;
 		uint32_t char_id_base = 0;
 		// True when this recompile is a CHILD movie of another SWF (loaded at
