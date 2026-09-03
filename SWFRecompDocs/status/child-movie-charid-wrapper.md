@@ -341,7 +341,44 @@ The two earlier passes of that same sweep are what found the five missed sites
 (4 + the sentinel row) described above — this is the third, after all of them
 were wrapped.
 
-<!-- CI -->
+## CI
+
+**`mode=graphics`, `categories=full`, `images=false` — run `33782702750`** at
+`06856ff7c`, conclusion **success**, results merged.
+
+`scripts/corpus_status_diff.py 06856ff7c WORKTREE --per-suite` (baseline = this
+slice's own commit, carrying the previous slice's merged results):
+
+```
+=== intersection: 4484 tests (06856ff7c -> WORKTREE, results_graphics) ===
+  output_mismatch    124 ->   124 (+0)
+  pass              4124 ->  4124 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4359 ->  4359 (+0)
+GAINS 0 | REGRESSIONS 0 | OTHER STATUS MOVES 0
+```
+
+Zero regressions and an unmoved histogram — no test changed status in either
+direction, which is what an emission change touching every SWF's generated C
+should look like when `CHARID(x)` is `(x)`. The suites that actually exercise
+loaded children:
+
+- `regression` **75/75 pass**, with all three multi-SWF tests green:
+  `avm1_parent_child_sprite_meta` (new), `avm1_parent_child_bitmap`,
+  `avm1_parent_as3_child_payload`.
+- `mixed_avm` 10 pass / 2 `output_mismatch` — unchanged from the baseline
+  (`avm1_loads_avm2` is one of the two and was already mismatching).
+- `import_assets` 3/3 pass — the suite that exercises `tagImportCharacter`,
+  one of the calls the old list never offset.
+- `avm1` 689 pass / 23 `output_mismatch` / 18 `ruffle_matched`.
+
+`mode=no-graphics` was NOT dispatched: this change touches no
+no-graphics-only code (`swf_core.c`, `tag_stubs.c`, or a bare `NO_GRAPHICS`
+arm), only the recompiler and a shared header. The weekly canary covers it.
+
+The +1 test / +1 effective versus the previous slice's 4483 / 4358 is this
+slice's new regression test.
 
 ## Residuals
 
