@@ -230,3 +230,77 @@ these rows read happens in the child root's constructor, which
 
 ## 6. CI
 
+Both modes at `df9560ff6`, `categories=full`, `images=false`, both **success**.
+Graphics run `33808752126`, no-graphics run `33808779440`. Baseline
+`c68871311` (the pre-merge master, whose results are the previous publish;
+the intervening commit is docs-only and was not what CI graded).
+
+### `mode=graphics` — run `33808752126`
+
+```
+=== intersection: 4487 tests (c68871311 -> WORKTREE, results_graphics) ===
+
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4127 ->  4127 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4362 ->  4362 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+### `mode=no-graphics` — run `33808779440`
+
+Dispatched because the three changed lookups are shared runtime code with no
+graphics guard (CLAUDE.md: "when in doubt for shared runtime code, run both").
+
+```
+=== intersection: 4487 tests (c68871311 -> WORKTREE, results) ===
+
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4127 ->  4127 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4363 ->  4363 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved in both modes, and the same 4487-test intersection on both
+sides — no shard was lost. The one-test `output_mismatch`/`ruffle_matched`
+difference between the modes is the pre-existing mode difference the two
+predecessors recorded, present on both sides of each diff.
+
+The suites this change touches, identical in both modes:
+
+| suite | result |
+|---|---|
+| `regression` | **77/77**, with `avm2_parent_child_symbol_stride` now grading **6/6** lines (was 4) |
+| `import_assets` | **3/3** — the canary for the defining-vs-placing ruling |
+| `from_gnash/misc-ming.all` | `attachImported` **pass**, `attachExtImported` **pass** |
+| `mixed_avm` | 10 pass / 2 `output_mismatch` — unchanged |
+
+The three new rows are a **pure gain in graded lines, not in graded tests**: the
+fixture already passed, so a corpus headline number cannot show this slice's
+yield. That is expected — no corpus test loads a child SWF with embedded
+assets, which is why the defect survived three slices.
+
+## 7. What is left of the arc
+
+- **A loaded child's timeline never advances past frame 0** — the next slice,
+  and the largest. Unchanged.
+- **A loaded child movie does not render at all** — rewritten from "a child's
+  bitmaps never reach the renderer", which named one facet. See §3.
+- **`flashbang_upload_bitmap`'s fix is unverified** — entangled with the
+  standing "delete or fold flashbang into render_webgpu.c" question, which is
+  worth settling before investing in testing it.
+- **The constant-vs-`dictionary_capacity` divergence** — only worth doing when
+  something needs a stride above 1000.
