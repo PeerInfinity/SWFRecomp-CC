@@ -28,8 +28,11 @@ The recompiler option is `try_helper`:
   `SWF_TRY_HELPER` env var for the whole job.
 
 **Default is OFF, and at OFF the emitted C is byte-identical to before the
-option existed** — verified by recompiling a mixed AVM1/AVM2 set with the
-pre-change and post-change binaries and `diff -r` (see "Verification").
+option existed with exactly one deliberate exception** (a pre-existing
+constraint violation this slice had to fix to get an AVM1 try/finally script
+through the in-browser clang — see "Two defects this slice's own testing
+found") — verified by recompiling a mixed AVM1/AVM2 set with the pre-change and
+post-change binaries and `diff -r` (see "Verification").
 
 ## Design as landed
 
@@ -209,7 +212,16 @@ and `RecompiledABC`.
 **2. Native, option forced ON.** Every AVM1 test in the corpus whose generated
 C contains a try (22 of them) plus a 40-test sample of the 233 AVM2 tests with
 an exception table, run locally with `SWF_TRY_HELPER=1` in `--mode=graphics`:
-<!-- LOCAL_BATCH -->
+60/62 strict passes, and neither of the two non-passes is a regression —
+`avm2/coerce_to_primitive_side_effects_with_nulls` is `ruffle_matched` in the
+published baseline too, and `avm2/away3d_advanced_shallow_water_demo` times out
+on this box **with the option OFF as well** (a control run confirmed it; the
+machine was at load average ~25 from unrelated work, and the test passes in CI).
+
+Plus, in both modes, `gcc -fsyntax-only -Werror=return-type` over every
+generated script of the 22 AVM1 try tests — clean. Keep this check when
+touching the AVM1 emitter: `verify_output.py` compiles with `-w`, so it is the
+only local thing that sees a malformed return.
 
 Corpus run: `ruffle-tests.yml`, `mode=graphics`, `categories=full`,
 `try_helper=1`:
@@ -224,6 +236,33 @@ graded:
 
 **4. Pages deploy.**
 <!-- DEPLOY -->
+
+## Two defects this slice's own testing found
+
+**1. Bare `return;` inside a lifted body (introduced here, caught in the page).**
+Six emission sites — the script-context arms of `if (actionBaseClipRemoved())
+return;` and `if (actionCall(app_context)) return;` — were not routed through
+`retStmt`, so inside a lifted body they returned *no value* from a function
+declared `int`. `verify_output.py` compiles generated C with `-w`, so gcc said
+nothing and the tests passed on an indeterminate exit code; the in-browser
+clang rejected it outright (`non-void function '_swftry_8' should return a
+value`) on the first AVM1 page run. Fixed by routing them, and by dispatching
+BOTH return exits in both contexts so a void return inside a function body and
+a valued return inside a void script are replayed the way the emitter handles
+those shapes outside a try. The local check that would have caught it is now
+part of the verification below: `gcc -fsyntax-only -Werror=return-type` over
+every generated script of the 22 AVM1 try tests, in both modes.
+
+**2. A pre-existing bug the page surfaced.** A top-level (void) script with
+try/finally emitted `return actionGetPendingReturn(app_context);` — a value
+returned from a `void` function. gcc only warns (and `-w` hid it), so no native
+test ever failed, but clang rejects it, which would have blocked
+`avm1/try_finally_simple` in the page with the option OFF too. Fixed the way
+the emitter already handles a top-level `RETURN` action: the pending value is
+dropped (`(void) actionGetPendingReturn(app_context); return;`). This is the
+one intended change to the DEFAULT emission; `try_finally_simple`,
+`try_catch_finally`, `try_catch_stack` and `catch_references_registers` all
+pass in both modes after it.
 
 ## Residuals / notes
 
