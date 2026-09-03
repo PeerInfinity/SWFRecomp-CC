@@ -115,6 +115,16 @@ async function recompileSWF(swfBytes) {
         // memory; Snailiad's 29.7 MB TU never finished at all. §1.1/§1.3 of
         // SWFRecompDocs/plans/avm2-in-browser-assessment.md.
         "tu_split = 1500000",
+        // skip_avm1_payload: an AS3 SWF stops emitting bitmap_data /
+        // sound_data / video_data into draws.c. Those arrays are read only by
+        // tagInit's defineBitmap / tagDefineSound and by the AVM1 frame
+        // bodies' tagVideoFrame / tagSoundStreamBlock, and runSWF_avm2 reaches
+        // none of them — AVM2 carries its own copies of the same bytes in
+        // RecompiledABC/abc_timeline.c. For the original Seedling that is
+        // 142.1 MB of C down to 3.4 MB, and 22.0 MB of static data down to
+        // 1.3 MB. An AVM1 SWF is unaffected at any setting. §2.2 of
+        // SWFRecompDocs/plans/avm2-in-browser-assessment.md.
+        "skip_avm1_payload = true",
         "",
     ].join("\n");
     Module.FS.writeFile("config.toml", configToml);

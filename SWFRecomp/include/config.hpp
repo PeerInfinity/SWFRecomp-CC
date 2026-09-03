@@ -39,6 +39,16 @@ namespace SWFRecomp
 		// emitted C is then byte-for-bit what it was before this existed.
 		// The SWF_TU_SPLIT env var overrides the toml (0 also turns it off).
 		uint32_t tu_split = 0;
+		// Dead-payload skip (assessment §2.2, "cheap extra win"). OFF by
+		// default: at false the emitted C is byte-for-bit what it was before
+		// this existed, for AVM1 and AS3 SWFs alike. On, an AS3 (is_as3) SWF
+		// omits the AVM1-only byte payloads from RecompiledTags/draws.c —
+		// bitmap_data, sound_data and video_data — which only tagInit's
+		// defineBitmap / tagDefineSound and tagMain's tagVideoFrame read, and
+		// runSWF_avm2 calls neither. AVM2 carries its own copies of those
+		// bytes in RecompiledABC/abc_timeline.c. An AVM1 SWF is untouched at
+		// any setting. The SWF_SKIP_AVM1_PAYLOAD env var forces it on.
+		bool skip_avm1_payload = false;
 
 		Config();
 		void parseFile(std::string path);

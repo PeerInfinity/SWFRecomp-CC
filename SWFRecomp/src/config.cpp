@@ -47,6 +47,14 @@ namespace SWFRecomp
 		{
 			if (e[0] != '\0') tu_split = (uint32_t) strtoul(e, NULL, 10);
 		}
+
+		skip_avm1_payload = tbl["input"]["skip_avm1_payload"].value_or(false);
+		// Same env override as try_helper: CI / verify_output.py force the
+		// mode on for a whole corpus run without rewriting every config.toml.
+		if (const char* e = getenv("SWF_SKIP_AVM1_PAYLOAD"))
+		{
+			if (e[0] != '\0' && e[0] != '0') skip_avm1_payload = true;
+		}
 	}
 	
 	string_view Config::parseStringView(string key)

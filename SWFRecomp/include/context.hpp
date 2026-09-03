@@ -32,6 +32,11 @@ namespace SWFRecomp
 		// and the emitted C is then byte-for-bit what it was before.
 		uint32_t tu_split = 0;
 
+		// Dead-payload skip (Config::skip_avm1_payload). At false the emitted
+		// C is byte-for-bit what it was before the option existed; on, an AS3
+		// SWF drops the AVM2-dead bitmap/sound/video byte payloads.
+		bool skip_avm1_payload = false;
+
 		// tag_main is buffered in memory (stringstream) rather than written
 		// directly to disk so the per-frame init prologue placeholder can
 		// be replaced once each frame's DoInitAction / ImportAssets calls

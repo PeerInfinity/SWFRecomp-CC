@@ -40,6 +40,7 @@ int main(int argc, char** argv)
 	context.avm2_char_id_base = config.char_id_base;
 	context.try_helper = config.try_helper;
 	context.tu_split = config.tu_split;
+	context.skip_avm1_payload = config.skip_avm1_payload;
 	
 	try
 	{

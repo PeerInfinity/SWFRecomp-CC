@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <streambuf>
 #include <string>
 #include <set>
 #include <map>
@@ -19,6 +20,16 @@ namespace SWFRecomp
 	{
 		class AbcEmitter;
 	}
+
+	// Sink for byte payloads the chosen emission mode is going to drop
+	// (Config::skip_avm1_payload). Writes are discarded without allocating, so
+	// an AS3 SWF's 84 MB of bitmap hex never exists in the recompiler either.
+	class NullStreamBuf : public std::streambuf
+	{
+	public:
+		int overflow(int c) override { return c; }
+		std::streamsize xsputn(const char*, std::streamsize n) override { return n; }
+	};
 
 	struct RECT
 	{
@@ -351,6 +362,35 @@ namespace SWFRecomp
 		bool use_network;
 		// FileAttributes AS3 bit: the SWF's code is AVM2 (DoABC tags).
 		bool is_as3;
+		// Dead-payload skip (Context::skip_avm1_payload, assessment §2.2).
+		// `payloadSink` routes bitmap/sound/video bytes to the bit bucket for
+		// an AS3 SWF when the option is on, and the emission sites that would
+		// reference those arrays (defineBitmap / tagDefineSound /
+		// tagSoundStreamBlock / tagVideoFrame / finalizeBitmaps) are skipped
+		// with it. `avm1_payload_kept` latches the moment one of those sites
+		// DOES emit: a SWF whose FileAttributes tag arrived after its first
+		// payload tag (not legal for SWF 8+, but nothing enforces it here)
+		// then falls back to full emission rather than emitting calls whose
+		// backing bytes are gone.
+		NullStreamBuf null_payload_buf;
+		std::ostream null_payload_stream;
+		bool skip_avm1_payload = false;
+		bool avm1_payload_kept = false;
+		bool dropPayload() const { return skip_avm1_payload && is_as3; }
+		std::ostream& payloadSink(std::stringstream& real)
+		{
+			if (dropPayload()) return null_payload_stream;
+			avm1_payload_kept = true;
+			return real;
+		}
+		// True when this site should emit its reference into one of those
+		// arrays (and latch that the payload is being kept).
+		bool emitPayloadRef()
+		{
+			if (dropPayload()) return false;
+			avm1_payload_kept = true;
+			return true;
+		}
 		// SymbolClass (tag 76) bindings: (char_id, AS3 class name).
 		// Consumed by the AVM2 emitter's finalize (abc_registry.c).
 		std::vector<std::pair<u16, std::string>> symbol_class_bindings;

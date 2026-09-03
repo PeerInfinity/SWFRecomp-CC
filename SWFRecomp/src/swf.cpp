@@ -297,7 +297,7 @@ namespace SWFRecomp
 	
 	
 	
-	SWF::SWF()
+	SWF::SWF() : null_payload_stream(&null_payload_buf)
 	{
 		abc_emitter = nullptr;
 	}
@@ -370,12 +370,16 @@ namespace SWFRecomp
 							 shape_is_morph2(false),
 							 use_network(false),
 							 is_as3(false),
+							 null_payload_stream(&null_payload_buf),
 							 abc_emitter(nullptr)
 	{
 		// Multi-SWF emission keys, carried from the config (loader-arc
 		// tranche 6). Defaults ("" / 0) reproduce the main-movie output.
 		abc_symbol_prefix = context.avm2_symbol_prefix;
 		abc_char_id_base = context.avm2_char_id_base;
+		// Dead-payload skip (assessment §2.2). Only ever true together with
+		// is_as3, so an AVM1 SWF's emission is untouched at any setting.
+		skip_avm1_payload = context.skip_avm1_payload;
 
 		// Configure reusable struct records
 		//
@@ -830,7 +834,23 @@ namespace SWFRecomp
 			context.tag_main << "\t" << "frame_" << to_string(i) << "," << endl;
 		}
 		
-		if (current_bitmap_pixel)
+		// Dead-payload skip (assessment §2.2). For an AS3 SWF with the option
+		// on, the AVM1-only byte payloads are emitted as the same empty
+		// one-element arrays an SWF with none of that content produces: the
+		// only readers are tagInit's defineBitmap / tagDefineSound and the
+		// frame bodies' tagVideoFrame / tagSoundStreamBlock, none of which run
+		// under runSWF_avm2 (AVM2 carries its own copies of those bytes in
+		// RecompiledABC/abc_timeline.c), and those emission sites were skipped
+		// in lockstep above. `avm1_payload_kept` guards the one way the two
+		// halves could disagree — a FileAttributes tag arriving after a
+		// payload tag, so that a reference was emitted before is_as3 was
+		// known: fall back to emitting everything.
+		const bool drop_payload = dropPayload() && !avm1_payload_kept;
+		const size_t emit_bitmap_pixel = drop_payload ? 0 : current_bitmap_pixel;
+		const size_t emit_sound_byte = drop_payload ? 0 : current_sound_byte;
+		const size_t emit_video_byte = drop_payload ? 0 : current_video_byte;
+
+		if (emit_bitmap_pixel)
 		{
 			tag_init << endl << "\tfinalizeBitmaps();";
 		}
@@ -960,9 +980,9 @@ namespace SWFRecomp
 						  << (current_gradient ? gradient_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
-						  << "u8 bitmap_data[" << to_string(current_bitmap_pixel ? 4*current_bitmap_pixel : 1) << "] =" << endl
+						  << "u8 bitmap_data[" << to_string(emit_bitmap_pixel ? 4*emit_bitmap_pixel : 1) << "] =" << endl
 						  << "{" << endl
-						  << (current_bitmap_pixel ? bitmap_data.str() : "\t0\n")
+						  << (emit_bitmap_pixel ? bitmap_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
 						  << "u32 glyph_data[" << to_string(current_glyph ? 4*current_glyph : 1) << "][1] =" << endl
@@ -995,14 +1015,14 @@ namespace SWFRecomp
 						  << (current_morph_end_color ? morph_end_color_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
-						  << "u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "] =" << endl
+						  << "u8 sound_data[" << to_string(emit_sound_byte ? emit_sound_byte : 1) << "] =" << endl
 						  << "{" << endl
-						  << (current_sound_byte ? sound_data.str() : "\t0\n")
+						  << (emit_sound_byte ? sound_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
-						  << "u8 video_data[" << to_string(current_video_byte ? current_video_byte : 1) << "] =" << endl
+						  << "u8 video_data[" << to_string(emit_video_byte ? emit_video_byte : 1) << "] =" << endl
 						  << "{" << endl
-						  << (current_video_byte ? video_data.str() : "\t0\n")
+						  << (emit_video_byte ? video_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
 						  << "float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3] =" << endl
@@ -1016,15 +1036,15 @@ namespace SWFRecomp
 								 << "extern float color_data[" << to_string(current_color ? current_color : 1) << "][4];" << endl
 								 << "extern float uninv_mat_data[" << to_string(current_uninv ? 16*current_uninv : 1) << "];" << endl
 								 << "extern u8 gradient_data[" << to_string(current_gradient ? 256*current_gradient : 1) << "][4];" << endl
-								 << "extern u8 bitmap_data[" << to_string(current_bitmap_pixel ? 4*current_bitmap_pixel : 1) << "];" << endl
+								 << "extern u8 bitmap_data[" << to_string(emit_bitmap_pixel ? 4*emit_bitmap_pixel : 1) << "];" << endl
 								 << "extern u32 glyph_data[" << to_string(current_glyph ? 4*current_glyph : 1) << "][1];" << endl
 								 << "extern u32 text_data[" << to_string(current_text ? current_text : 1) << "];" << endl
 								 << "extern u16 text_char_codes[" << to_string(current_text ? current_text : 1) << "];" << endl
 								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl
 								 << "extern float morph_end_shape_data[" << to_string(current_morph_end_vertex ? current_morph_end_vertex : 1) << "][2];" << endl
 								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl
-								 << "extern u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "];" << endl
-								 << "extern u8 video_data[" << to_string(current_video_byte ? current_video_byte : 1) << "];" << endl
+								 << "extern u8 sound_data[" << to_string(emit_sound_byte ? emit_sound_byte : 1) << "];" << endl
+								 << "extern u8 video_data[" << to_string(emit_video_byte ? emit_video_byte : 1) << "];" << endl
 								 << "extern float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3];" << endl;
 
 		// Emit sprite forward declarations (frame_func arrays)
@@ -1272,7 +1292,7 @@ namespace SWFRecomp
 				
 				for (size_t i = 0; i < 3*w*h; i += 3)
 				{
-					bitmap_data << std::hex << std::uppercase << std::setw(2)
+					payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 								<< "\t0x" << (u32) decompressed[i] << "," << endl
 								<< "\t0x" << (u32) decompressed[i + 1] << "," << endl
 								<< "\t0x" << (u32) decompressed[i + 2] << "," << endl
@@ -1283,14 +1303,20 @@ namespace SWFRecomp
 				
 				char_id_to_bitmap_id[char_id] = current_bitmap;
 				
-				tag_init << endl
-						 << "\tdefineBitmap("
-						 << to_string(4*bitmap_start) << ", "
-						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
-						 << to_string(w) << ", "
-						 << to_string(h) << ", "
-						 << to_string(char_id)
-						 << ");";
+				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
+				// is not emitted then, and tagInit — the only caller of
+				// defineBitmap — is never reached on the AVM2 path.
+				if (emitPayloadRef())
+				{
+					tag_init << endl
+							 << "\tdefineBitmap("
+							 << to_string(4*bitmap_start) << ", "
+							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+							 << to_string(w) << ", "
+							 << to_string(h) << ", "
+							 << to_string(char_id)
+							 << ");";
+				}
 				
 				current_bitmap += 1;
 
@@ -1373,7 +1399,7 @@ namespace SWFRecomp
 				{
 					const u8* px = decompressed + (size_t) i * decoded_channels;
 					u8 a = (decoded_channels == 4) ? px[3] : 0xFF;
-					bitmap_data << std::hex << std::uppercase << std::setw(2)
+					payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 								<< "\t0x" << (u32) px[0] << "," << endl
 								<< "\t0x" << (u32) px[1] << "," << endl
 								<< "\t0x" << (u32) px[2] << "," << endl
@@ -1384,14 +1410,20 @@ namespace SWFRecomp
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
 
-				tag_init << endl
-						 << "\tdefineBitmap("
-						 << to_string(4*bitmap_start) << ", "
-						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
-						 << to_string(w) << ", "
-						 << to_string(h) << ", "
-						 << to_string(char_id)
-						 << ");";
+				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
+				// is not emitted then, and tagInit — the only caller of
+				// defineBitmap — is never reached on the AVM2 path.
+				if (emitPayloadRef())
+				{
+					tag_init << endl
+							 << "\tdefineBitmap("
+							 << to_string(4*bitmap_start) << ", "
+							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+							 << to_string(w) << ", "
+							 << to_string(h) << ", "
+							 << to_string(char_id)
+							 << ");";
+				}
 
 				current_bitmap += 1;
 
@@ -1529,7 +1561,7 @@ namespace SWFRecomp
 					else if (decoded_channels == 4) a = px[3];
 					else                       a = 0xFF;
 
-					bitmap_data << std::hex << std::uppercase << std::setw(2)
+					payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 								<< "\t0x" << (u32) px[0] << "," << endl
 								<< "\t0x" << (u32) px[1] << "," << endl
 								<< "\t0x" << (u32) px[2] << "," << endl
@@ -1540,14 +1572,20 @@ namespace SWFRecomp
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
 
-				tag_init << endl
-						 << "\tdefineBitmap("
-						 << to_string(4*bitmap_start) << ", "
-						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
-						 << to_string(w) << ", "
-						 << to_string(h) << ", "
-						 << to_string(char_id)
-						 << ");";
+				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
+				// is not emitted then, and tagInit — the only caller of
+				// defineBitmap — is never reached on the AVM2 path.
+				if (emitPayloadRef())
+				{
+					tag_init << endl
+							 << "\tdefineBitmap("
+							 << to_string(4*bitmap_start) << ", "
+							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+							 << to_string(w) << ", "
+							 << to_string(h) << ", "
+							 << to_string(char_id)
+							 << ");";
+				}
 
 				current_bitmap += 1;
 
@@ -1734,7 +1772,7 @@ namespace SWFRecomp
 									g = palette[(size_t) idx * 3 + 1];
 									b = palette[(size_t) idx * 3 + 2];
 								}
-								bitmap_data << std::hex << std::uppercase << std::setw(2)
+								payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 											<< "\t0x" << (u32) r << "," << endl
 											<< "\t0x" << (u32) g << "," << endl
 											<< "\t0x" << (u32) b << "," << endl
@@ -1762,7 +1800,7 @@ namespace SWFRecomp
 								u8 r = (u8)(((u32) r5 * 255 + 15) / 31);
 								u8 g = (u8)(((u32) g5 * 255 + 15) / 31);
 								u8 b = (u8)(((u32) b5 * 255 + 15) / 31);
-								bitmap_data << std::hex << std::uppercase << std::setw(2)
+								payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 											<< "\t0x" << (u32) r << "," << endl
 											<< "\t0x" << (u32) g << "," << endl
 											<< "\t0x" << (u32) b << "," << endl
@@ -1779,7 +1817,7 @@ namespace SWFRecomp
 						// PIX24 = [0x00_padding, R, G, B] per pixel
 						for (size_t i = 0; i < (size_t)(w * h * 4); i += 4)
 						{
-							bitmap_data << std::hex << std::uppercase << std::setw(2)
+							payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 										<< "\t0x" << (u32) uncompressed[i + 1] << "," << endl
 										<< "\t0x" << (u32) uncompressed[i + 2] << "," << endl
 										<< "\t0x" << (u32) uncompressed[i + 3] << "," << endl
@@ -1795,14 +1833,20 @@ namespace SWFRecomp
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
 
-				tag_init << endl
-						 << "\tdefineBitmap("
-						 << to_string(4*bitmap_start) << ", "
-						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
-						 << to_string(w) << ", "
-						 << to_string(h) << ", "
-						 << to_string(char_id)
-						 << ");";
+				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
+				// is not emitted then, and tagInit — the only caller of
+				// defineBitmap — is never reached on the AVM2 path.
+				if (emitPayloadRef())
+				{
+					tag_init << endl
+							 << "\tdefineBitmap("
+							 << to_string(4*bitmap_start) << ", "
+							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+							 << to_string(w) << ", "
+							 << to_string(h) << ", "
+							 << to_string(char_id)
+							 << ");";
+				}
 
 				current_bitmap += 1;
 
@@ -1936,7 +1980,7 @@ namespace SWFRecomp
 				{
 					for (size_t i = 0; i < (size_t) w * (size_t) h; ++i)
 					{
-						bitmap_data << "\t0x0," << endl
+						payloadSink(bitmap_data) << "\t0x0," << endl
 									<< "\t0x0," << endl
 									<< "\t0x0," << endl
 									<< "\t0x0," << endl;
@@ -1967,7 +2011,7 @@ namespace SWFRecomp
 										b = palette[(size_t) idx * 4 + 2];
 										a = palette[(size_t) idx * 4 + 3];
 									}
-									bitmap_data << std::hex << std::uppercase << std::setw(2)
+									payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 												<< "\t0x" << (u32) r << "," << endl
 												<< "\t0x" << (u32) g << "," << endl
 												<< "\t0x" << (u32) b << "," << endl
@@ -1999,7 +2043,7 @@ namespace SWFRecomp
 									u8 r = (u8)(((u32) r5 * 255 + 15) / 31);
 									u8 g = (u8)(((u32) g5 * 255 + 15) / 31);
 									u8 b = (u8)(((u32) b5 * 255 + 15) / 31);
-									bitmap_data << std::hex << std::uppercase << std::setw(2)
+									payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 												<< "\t0x" << (u32) r << "," << endl
 												<< "\t0x" << (u32) g << "," << endl
 												<< "\t0x" << (u32) b << "," << endl
@@ -2016,7 +2060,7 @@ namespace SWFRecomp
 							// ALPHACOLORMAPDATA/ALPHARGB = [A, R, G, B] per pixel
 							for (size_t i = 0; i < (size_t)(w * h * 4); i += 4)
 							{
-								bitmap_data << std::hex << std::uppercase << std::setw(2)
+								payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
 											<< "\t0x" << (u32) uncompressed[i + 1] << "," << endl
 											<< "\t0x" << (u32) uncompressed[i + 2] << "," << endl
 											<< "\t0x" << (u32) uncompressed[i + 3] << "," << endl
@@ -2033,14 +2077,20 @@ namespace SWFRecomp
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
 
-				tag_init << endl
-						 << "\tdefineBitmap("
-						 << to_string(4*bitmap_start) << ", "
-						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
-						 << to_string(w) << ", "
-						 << to_string(h) << ", "
-						 << to_string(char_id)
-						 << ");";
+				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
+				// is not emitted then, and tagInit — the only caller of
+				// defineBitmap — is never reached on the AVM2 path.
+				if (emitPayloadRef())
+				{
+					tag_init << endl
+							 << "\tdefineBitmap("
+							 << to_string(4*bitmap_start) << ", "
+							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
+							 << to_string(w) << ", "
+							 << to_string(h) << ", "
+							 << to_string(char_id)
+							 << ");";
+				}
 
 				current_bitmap += 1;
 
@@ -2076,21 +2126,26 @@ namespace SWFRecomp
 
 				for (size_t i = 0; i < data_size; ++i)
 				{
-					sound_data << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+					payloadSink(sound_data) << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
 							   << (u32)(u8)cur_pos[i] << "," << std::dec << endl;
 				}
 				current_sound_byte += data_size;
 				cur_pos += data_size;
 
-				tag_init << endl << "\ttagDefineSound(app_context, "
-						 << to_string(sound_id) << ", "
-						 << to_string(format) << ", "
-						 << to_string(rate) << ", "
-						 << to_string(sample_size) << ", "
-						 << to_string(stereo) << ", "
-						 << to_string(sample_count) << ", "
-						 << "sound_data + " << to_string(data_offset) << ", "
-						 << to_string(data_size) << ");";
+				// Dropped for an AS3 SWF under skip_avm1_payload (sound_data
+				// is not emitted; AVM2 reads snd_N_bytes in abc_timeline.c).
+				if (emitPayloadRef())
+				{
+					tag_init << endl << "\ttagDefineSound(app_context, "
+							 << to_string(sound_id) << ", "
+							 << to_string(format) << ", "
+							 << to_string(rate) << ", "
+							 << to_string(sample_size) << ", "
+							 << to_string(stereo) << ", "
+							 << to_string(sample_count) << ", "
+							 << "sound_data + " << to_string(data_offset) << ", "
+							 << to_string(data_size) << ");";
+				}
 
 				break;
 			}
@@ -2200,15 +2255,20 @@ namespace SWFRecomp
 
 				for (size_t i = 0; i < data_size; ++i)
 				{
-					sound_data << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+					payloadSink(sound_data) << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
 							   << (u32)(u8)cur_pos[i] << "," << std::dec << endl;
 				}
 				current_sound_byte += data_size;
 				cur_pos += data_size;
 
-				context.tag_main << "\t" << "tagSoundStreamBlock(app_context, "
-								 << "sound_data + " << to_string(data_offset) << ", "
-								 << to_string(data_size) << ");" << endl;
+				// Dropped for an AS3 SWF under skip_avm1_payload: the frame
+				// bodies this lands in are not run on the AVM2 path.
+				if (emitPayloadRef())
+				{
+					context.tag_main << "\t" << "tagSoundStreamBlock(app_context, "
+									 << "sound_data + " << to_string(data_offset) << ", "
+									 << to_string(data_size) << ");" << endl;
+				}
 
 				break;
 			}
@@ -5118,16 +5178,22 @@ namespace SWFRecomp
 				size_t payload_offset = current_video_byte;
 				const unsigned char* payload_bytes = (const unsigned char*)(cur_pos + 4);
 				for (size_t i = 0; i < payload_size; ++i) {
-					video_data << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+					payloadSink(video_data) << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
 					           << (u32)payload_bytes[i] << "," << std::dec << endl;
 				}
 				current_video_byte += payload_size;
 
-				context.tag_main << "\t" << "tagVideoFrame(app_context, "
-				                 << to_string(vf_stream_id) << ", "
-				                 << to_string(vf_frame_num) << ", "
-				                 << "video_data + " << to_string(payload_offset) << ", "
-				                 << to_string(payload_size) << ");" << endl;
+				// Dropped for an AS3 SWF under skip_avm1_payload: video_data
+				// has no AVM2 consumer at all and the frame bodies this lands
+				// in are not run on the AVM2 path.
+				if (emitPayloadRef())
+				{
+					context.tag_main << "\t" << "tagVideoFrame(app_context, "
+					                 << to_string(vf_stream_id) << ", "
+					                 << to_string(vf_frame_num) << ", "
+					                 << "video_data + " << to_string(payload_offset) << ", "
+					                 << to_string(payload_size) << ");" << endl;
+				}
 
 				cur_pos += tag.length;
 				break;
