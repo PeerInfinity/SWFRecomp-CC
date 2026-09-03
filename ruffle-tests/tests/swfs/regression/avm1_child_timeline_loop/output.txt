@@ -1,0 +1,21 @@
+L1
+t1 cf:1 ax:10
+L2
+t2 cf:2 ax:20
+L3
+t3 cf:3 ax:30
+L1
+t4 cf:1 ax:10
+L2
+t5 cf:2 ax:20
+L3
+t6 cf:3 ax:30
+L1
+t7 cf:1 ax:10
+L2
+t8 cf:2 ax:20
+stop
+t9 cf:2 ax:20
+t10 cf:2 ax:20
+t11 cf:2 ax:20
+done

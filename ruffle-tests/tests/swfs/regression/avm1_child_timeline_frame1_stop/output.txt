@@ -1,0 +1,7 @@
+S1
+t1 cf:1 ax:10 b:undefined
+t2 cf:1 ax:10 b:undefined
+t3 cf:1 ax:10 b:undefined
+t4 cf:1 ax:10 b:undefined
+t5 cf:1 ax:10 b:undefined
+done

@@ -45,8 +45,16 @@ The parent defines (and never places) a sprite at char id 1000 = the child's
 a real character in the shared dictionary, which is the sharpest form the bug
 can take.
 
-BOTH TAGS ARE IN ONE FRAME, ON PURPOSE
---------------------------------------
+BOTH TAGS ARE IN ONE FRAME -- ORIGINALLY OUT OF NECESSITY, NOW ON PURPOSE
+------------------------------------------------------------------------
+UPDATE 2026-09-03: the necessity below is GONE. A loaded child's timeline now
+advances (SWFRecompDocs/status/child-timeline-advance.md, anchored by
+regression/avm1_child_timeline_advance), so a cross-frame Modify would run.
+The test is deliberately left as it is: place-then-Modify in ONE frame is a
+real shape worth pinning, and re-pointing a test that guards the transform
+table and the char-id-0 sentinel at a different mechanism would weaken both.
+The paragraph below records why it was written this way.
+
 The Modify used to sit in the child's frame 2. It never executed: a loaded
 child movie's timeline does not advance past frame 0 in this configuration —
 `actionFirePendingDirectLoads` runs `child_frame_0` and nothing ever calls
@@ -170,8 +178,9 @@ def define_sprite(char_id, declared_frames, body):
 def build_child(path):
     tags = define_sprite(INNER_ID, 1, show_frame() + end_tag())
     tags += place_character(DEPTH, INNER_ID, CLIP_NAME, *PLACE_TWIPS)
-    # Same frame as the place: a loaded child never reaches its frame 2 (see
-    # the module docstring), so a cross-frame Modify would simply not run.
+    # Same frame as the place. Originally because a loaded child never reached
+    # its frame 2; now kept because place-then-Modify in one frame is the shape
+    # this test means to pin (see the module docstring).
     tags += modify_matrix(DEPTH, *MODIFY_TWIPS)
     tags += show_frame()
     tags += end_tag()
