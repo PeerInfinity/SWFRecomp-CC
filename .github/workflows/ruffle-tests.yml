@@ -1169,7 +1169,7 @@ jobs:
       # ruffle-test-results branch, which would take scripts/ and the results
       # JSONs this one reads out from under it.
       - name: Publish failing images to ruffle-image-results
-        if: always() && inputs.images == 'true' && inputs.extra_defines == ''
+        if: always() && inputs.images == 'true' && inputs.extra_defines == '' && inputs.try_helper == ''
         env:
           IMAGE_SRC: ${{ runner.temp }}/image-artifacts
           STEM: ${{ inputs.mode == 'graphics' && 'results_graphics' || 'results' }}
@@ -1290,7 +1290,11 @@ jobs:
         # the branch and erased an arc's published numbers (run 30186909756,
         # 2026-07-26). Its value is the per-test verdict in the log and the
         # uploaded artifact — never the branch.
-        if: always() && inputs.extra_defines == '' && inputs.single_test == ''
+        # try_helper likewise: a forced-on emission run's value is its
+        # pass/fail signal, not its numbers — publishing them would poison the
+        # {STEM}_previous.json baseline the NEXT (default-emission) run diffs
+        # against, exactly as the extra_defines verify runs used to.
+        if: always() && inputs.extra_defines == '' && inputs.single_test == '' && inputs.try_helper == ''
         env:
           MODE: ${{ inputs.mode }}
           LIMIT: ${{ inputs.limit }}
