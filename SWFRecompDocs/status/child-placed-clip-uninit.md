@@ -201,13 +201,81 @@ say why the wrapper survives its substitution (the oracle keys on it).
    every build mode including browser-WASM; only :8935 and :9954 are
    browser-WASM-only and :9173/:9371/:9417/:10068/:10117/:10423 are
    NO_GRAPHICS/OFFSCREEN-only.
-7. **Regression suite**, `--tests-dir=ruffle-tests/tests/swfs/regression`: see
-   below.
-8. **CI**, both modes: see below.
+7. **Regression suite 77/77**, run one test at a time under `xargs -P 5`
+   against the fixed runtime — including all five multi-SWF tests.
+8. **CHARID oracle, both modes**: `--emitter` clean; `--tree` clean over 42
+   generated files of the multi-SWF build dir. (`charId()` is untouched by this
+   slice; run because the sabotage experiment edited and rebuilt it.)
+9. **CI**, both modes: see below.
 
 ## CI
 
-<!-- CI_RESULTS -->
+Both modes at `92ee912f3`, `categories=full`, `images=false`, both
+**conclusion success** (the `Combine Results` job fails on any missing shard, so
+success means all 30 shards landed). Results merged at `c5835fecb`.
+
+Baseline `e52002d96` — this slice's own base commit, which postdates both of the
+predecessor's merged result publishes (`f1665ecae`, `4505e3eda`). It reads two
+tests and two passes higher than the figure quoted in the brief (4360): the
+brief's number is the predecessor's own `eeea09ca3` baseline, and an upstream
+test sync landed in between. The diff below is against what is actually at
+`e52002d96`, which is the comparison that means anything.
+
+### `mode=graphics` — run `33799811718`
+
+```
+=== intersection: 4487 tests (e52002d96 -> WORKTREE, results_graphics) ===
+
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4127 ->  4127 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4362 ->  4362 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+### `mode=no-graphics` — run `33799838533`
+
+Dispatched because `tag_stubs.c` — a no-graphics-only TU — carries five of the
+fifteen converted readers, and because the `DisplayObject` struct gained a
+field, which AVM2's display code shares.
+
+```
+=== intersection: 4487 tests (e52002d96 -> WORKTREE, results) ===
+
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4127 ->  4127 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4363 ->  4363 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved in both modes — not just the pass/fail line. The one-test
+difference between the two modes' histograms (`output_mismatch` vs
+`ruffle_matched`) is the pre-existing mode difference the predecessor recorded,
+present on both sides of each diff.
+
+The suites that actually exercise this change, identical in both modes:
+
+| suite | result |
+|---|---|
+| `regression` | **77/77**, all five multi-SWF tests pass, including this slice's rewritten `avm1_parent_child_modify_place` |
+| `import_assets` | **3/3** — the suite that would break if `child_transform_data` had been reused for the tid lookup |
+| `mixed_avm` | 10 pass / 2 `output_mismatch` — unchanged |
+| `avm1` | 689 pass / 23 `output_mismatch` / 18 `ruffle_matched` — unchanged |
+| `avm2` | 1180 pass / 48 `output_mismatch` / 33 `ruffle_matched` — unchanged |
+| `from_avmplus` | 1527 pass / 41 `ruffle_matched` / 5 `output_mismatch` / 1 `runtime_error` — unchanged |
 
 ## What is left of the arc
 
