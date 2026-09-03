@@ -14460,14 +14460,17 @@ static ActionVar bitmapDataLoadBitmap(SWFAppContext* app_context, ActionVar* arg
     size_t char_id = ng_lookupExport(name);
     if (char_id == (size_t)-1) return r;
 
-    // Look up char_id → bitmap metadata
-    size_t offset, size;
+    // Look up char_id → bitmap metadata. The registry hands back an absolute
+    // pointer into the DEFINING movie's bitmap_data: a child SWF loaded by this
+    // one owns a separate array (<prefix>_bitmap_data), so reading the ambient
+    // `bitmap_data` global here used to apply a child's offset to the root
+    // movie's pixels. See regression/avm1_parent_child_bitmap.
+    const u8* src_bytes = NULL;
+    size_t size;
     u32 width, height;
-    if (!ng_getBitmapMetadata((u16)char_id, &offset, &size, &width, &height)) return r;
-
-    // Access raw bitmap pixel data from generated code
-    GEN_EXTERN_BITMAP_DATA;
-    u32* src_pixels = (u32*)(bitmap_data + offset);
+    if (!ng_getBitmapMetadata((u16)char_id, &src_bytes, &size, &width, &height)) return r;
+    if (src_bytes == NULL) return r;
+    const u32* src_pixels = (const u32*)src_bytes;
     u32 num_pixels = width * height;
     if (size < num_pixels * 4) return r;
 

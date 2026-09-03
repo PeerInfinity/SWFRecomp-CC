@@ -270,14 +270,19 @@ a non-default emission input does not, and the branch did not move for it.
 
 ## Residuals of the residuals
 
-- **Bitmaps in an AVM1-loaded child are still broken**, independently of any of
-  this: `defineBitmap` records an offset into the emitted `bitmap_data`, and
-  `BitmapData.loadBitmap` reads the MAIN movie's `bitmap_data` global, while a
-  child's array is renamed `<prefix>_bitmap_data` by the wrapper. So a child's
-  bitmap offsets index the parent's array. Nothing in the corpus exercises it;
-  fixing it means giving the bitmap-metadata registry a per-movie data pointer.
-  Sound has no such problem — its metadata is rate + sample count, no pointer —
-  which is why the new regression test uses sound.
+- ~~**Bitmaps in an AVM1-loaded child are still broken**~~ — **FIXED
+  2026-09-03**, see `SWFRecompDocs/status/child-movie-bitmap-registry.md` and
+  `ruffle-tests/tests/swfs/regression/avm1_parent_child_bitmap/`. The diagnosis
+  here was right but incomplete: there were **two** stacked defects, and the
+  outer one hid the inner one. `defineBitmap` was also missing from the
+  wrapper's char-id offset list (exactly the `tagDefineSound` omission this
+  slice fixed), so the metadata lookup failed outright and the wrong-array read
+  was never even reached. Both are closed: `defineBitmap` now takes the
+  emitting TU's `bitmap_data` as its first argument (the wrapper's existing
+  symbol renaming makes that `<prefix>_bitmap_data` for free) and the registry
+  stores an absolute pixel pointer instead of a bare offset. Sound still has no
+  such problem — its metadata is rate + sample count, no pointer — which is why
+  that test uses sound and this one needed two movies each owning a bitmap.
 - `child_movie` is only ever set by `verify_output.py`. `docs/recompiler`'s
   `pipeline.js` recompiles exactly one SWF as the root movie, which is the
   correct default; a future in-page multi-SWF path must set it for children.

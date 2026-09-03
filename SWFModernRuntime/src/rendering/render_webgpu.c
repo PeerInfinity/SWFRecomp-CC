@@ -933,7 +933,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	ctx->bitmap_static_built = 0;
 	// 8 u32 per static slot: {content_w, content_h, padded_w, padded_h}, {pool, layer, 0, 0}.
 	ctx->bitmap_sizes = (u32*)HALLOC(8 * sizeof(u32) * ctx->bitmap_count);
-	ctx->bitmap_offsets = (size_t*)HALLOC(sizeof(size_t) * ctx->bitmap_count);
+	ctx->bitmap_ptrs = (const u8**)HALLOC(sizeof(const u8*) * ctx->bitmap_count);
 	// Callers (swf.c::swfStart, avm2_display.c) may pre-set the dynamic source
 	// limit before renderer_init; only apply the default floor when unset.
 	if (ctx->dynamic_bitmap_max_w == 0) ctx->dynamic_bitmap_max_w = 256;
@@ -1382,10 +1382,10 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
 		u32 k = bitmap_static_class(width, height);
 		BitmapPool* p = &ctx->bitmap_pools[k];
 		u32 layer = p->used++;
-		if (width == 0 || height == 0)
+		if (width == 0 || height == 0 || ctx->bitmap_ptrs[i] == NULL)
 		{
-			// Degenerate bitmap: keep the slot (pointing at an all-transparent
-			// layer), upload nothing.
+			// Degenerate bitmap (or one whose defining movie emitted no payload):
+			// keep the slot (pointing at an all-transparent layer), upload nothing.
 			ctx->bitmap_sizes[8 * i + 2] = p->w;
 			ctx->bitmap_sizes[8 * i + 3] = p->h;
 			ctx->bitmap_sizes[8 * i + 4] = k;
@@ -1399,7 +1399,7 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
 		u32 up_w = width + 1, up_h = height + 1;
 		size_t up_bytes = (size_t)up_w * up_h * 4;
 		u32* temp = (u32*)malloc(up_bytes);
-		const u32* src = (const u32*)(ctx->bitmap_data + ctx->bitmap_offsets[i]);
+		const u32* src = (const u32*)ctx->bitmap_ptrs[i];
 		for (u32 y = 0; y < up_h; y++)
 		{
 			u32 sy = (y < height) ? y : height - 1;
@@ -3544,18 +3544,23 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 // Records the bitmap's size and data offset; the GPU work happens in
 // render_webgpu_finalize_bitmaps, once every static bitmap's size is known
 // and the size-class pools can be dimensioned (see "Bitmap texture pools").
-void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, size_t offset,
+void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, const u8* pixels,
                                  size_t size, u32 width, u32 height)
 {
 	(void) size;
 	if (!ctx->renderer_ok || ctx->bitmap_static_built) return;
+	// A loaded child's bitmaps never get here: the static pools are finalized at
+	// the end of the ROOT movie's tagInit (bitmap_static_built above) and the
+	// slot table is sized by the root's BITMAP_COUNT (below). `pixels` still
+	// carries the defining movie's base so the slot table cannot inherit the
+	// ambiguity if that ever changes.
 	if (ctx->current_bitmap >= ctx->bitmap_count) return;
 
 	// Every defineBitmap call owns the next slot (the recompiler numbers bitmap
 	// ids in emission order), so a degenerate 0x0 bitmap still consumes its
 	// index; build_static_bitmap_pools skips its upload.
 	size_t i = ctx->current_bitmap;
-	ctx->bitmap_offsets[i] = offset;
+	ctx->bitmap_ptrs[i] = pixels;
 	ctx->bitmap_sizes[8 * i]     = width;
 	ctx->bitmap_sizes[8 * i + 1] = height;
 	ctx->bitmap_sizes[8 * i + 2] = 0;

@@ -61,7 +61,10 @@ typedef struct WebGPURenderContext
 	// static slots only.
 	// NOTE: FlashbangContext's field of the same name is still 2 u32/layer.
 	u32* bitmap_sizes;
-	size_t* bitmap_offsets;   // per static bitmap: byte offset into bitmap_data
+	// Per static bitmap: an absolute pointer to its pixels. Not an offset —
+	// a loaded child SWF defines its bitmaps out of its OWN bitmap_data array,
+	// so the base has to be carried per entry (see defineBitmap in tag.h).
+	const u8** bitmap_ptrs;
 	int bitmap_static_built;  // static pools created + uploaded (finalize)
 	BitmapPool bitmap_pools[BITMAP_POOL_COUNT];
 
@@ -362,7 +365,7 @@ WebGPURenderContext* render_webgpu_new(void);
 void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* context);
 int render_webgpu_poll(SWFAppContext* app_context);
 void render_webgpu_set_background(WebGPURenderContext* context, u8 r, u8 g, u8 b);
-void render_webgpu_upload_bitmap(WebGPURenderContext* context, size_t offset, size_t size, u32 width, u32 height);
+void render_webgpu_upload_bitmap(WebGPURenderContext* context, const u8* pixels, size_t size, u32 width, u32 height);
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* context);
 void render_webgpu_open_pass(WebGPURenderContext* context);
 // Overwrite the per-pass stage_to_ndc uniform with a caller-composed matrix

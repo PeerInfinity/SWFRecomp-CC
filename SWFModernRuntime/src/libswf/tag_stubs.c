@@ -2981,11 +2981,12 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // In graphics modes, tag.c provides real
 // implementations that call the renderer. These stubs are only needed in
 // pure NO_GRAPHICS (no renderer at all).
-void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
+void defineBitmap(const u8* data, size_t offset, size_t size, u32 width, u32 height, u16 char_id)
 {
-	// Register metadata so BitmapData.loadBitmap can resolve dimensions/offsets
+	// Register metadata so BitmapData.loadBitmap can resolve dimensions/pixels
 	// even when the renderer is absent (NO_GRAPHICS builds).
-	ng_registerBitmapMetadata(char_id, offset, size, width, height);
+	ng_registerBitmapMetadata(char_id, (data != NULL) ? data + offset : NULL,
+	                          size, width, height);
 }
 
 void finalizeBitmaps(void)

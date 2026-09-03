@@ -82,7 +82,7 @@ FlashbangContext* flashbang_new();
 void flashbang_init(SWFAppContext* app_context, FlashbangContext* context);
 int flashbang_poll(SWFAppContext* app_context);
 void flashbang_set_window_background(FlashbangContext* context, u8 r, u8 g, u8 b);
-void flashbang_upload_bitmap(FlashbangContext* context, size_t offset, size_t size, u32 width, u32 height);
+void flashbang_upload_bitmap(FlashbangContext* context, const u8* pixels, size_t size, u32 width, u32 height);
 void flashbang_finalize_bitmaps(FlashbangContext* context);
 void flashbang_open_pass(FlashbangContext* context);
 void flashbang_upload_extra_transform_id(FlashbangContext* context, u32 transform_id);

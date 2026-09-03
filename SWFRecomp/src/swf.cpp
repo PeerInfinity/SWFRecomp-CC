@@ -1310,7 +1310,7 @@ namespace SWFRecomp
 				if (emitPayloadRef())
 				{
 					tag_init << endl
-							 << "\tdefineBitmap("
+							 << "\tdefineBitmap(bitmap_data, "
 							 << to_string(4*bitmap_start) << ", "
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
@@ -1417,7 +1417,7 @@ namespace SWFRecomp
 				if (emitPayloadRef())
 				{
 					tag_init << endl
-							 << "\tdefineBitmap("
+							 << "\tdefineBitmap(bitmap_data, "
 							 << to_string(4*bitmap_start) << ", "
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
@@ -1579,7 +1579,7 @@ namespace SWFRecomp
 				if (emitPayloadRef())
 				{
 					tag_init << endl
-							 << "\tdefineBitmap("
+							 << "\tdefineBitmap(bitmap_data, "
 							 << to_string(4*bitmap_start) << ", "
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
@@ -1840,7 +1840,7 @@ namespace SWFRecomp
 				if (emitPayloadRef())
 				{
 					tag_init << endl
-							 << "\tdefineBitmap("
+							 << "\tdefineBitmap(bitmap_data, "
 							 << to_string(4*bitmap_start) << ", "
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "
@@ -2084,7 +2084,7 @@ namespace SWFRecomp
 				if (emitPayloadRef())
 				{
 					tag_init << endl
-							 << "\tdefineBitmap("
+							 << "\tdefineBitmap(bitmap_data, "
 							 << to_string(4*bitmap_start) << ", "
 							 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 							 << to_string(w) << ", "

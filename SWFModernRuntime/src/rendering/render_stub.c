@@ -51,7 +51,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 
 int render_webgpu_poll(SWFAppContext* app_context) { (void)app_context; return 0; }
 void render_webgpu_set_background(WebGPURenderContext* c, u8 r, u8 g, u8 b) { (void)c; (void)r; (void)g; (void)b; }
-void render_webgpu_upload_bitmap(WebGPURenderContext* c, size_t o, size_t s, u32 w, u32 h) { (void)c; (void)o; (void)s; (void)w; (void)h; }
+void render_webgpu_upload_bitmap(WebGPURenderContext* c, const u8* px, size_t s, u32 w, u32 h) { (void)c; (void)px; (void)s; (void)w; (void)h; }
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* c) { (void)c; }
 void render_webgpu_open_pass(WebGPURenderContext* c) { (void)c; }
 void render_webgpu_upload_stage_transform(WebGPURenderContext* c, const float m[16]) { (void)c; (void)m; }

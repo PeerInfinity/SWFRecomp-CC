@@ -1710,6 +1710,18 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         tag_main_text = re.sub(
             r'(tagDefineVideoMeta\(app_context,\s*)(\d+)(\s*,)',
             _offset_char_id, tag_main_text)
+        # defineBitmap(BASE, offset, size, w, h, CHAR_ID) — 6th arg, and the
+        # only emitted define whose char id is LAST. Without this a child's
+        # bitmap registered its metadata under the RAW id while
+        # tagRegisterExport (offset above) published the OFFSET id, so
+        # BitmapData.loadBitmap("<child export>") resolved the export and then
+        # found no metadata at all. BASE is the emitting movie's bitmap_data
+        # array, renamed to <prefix>_bitmap_data by apply_renames further down
+        # — this substitution runs before that, so it still reads `bitmap_data`.
+        # Found building regression/avm1_parent_child_bitmap.
+        tag_main_text = re.sub(
+            r'(defineBitmap\([A-Za-z_]\w*,\s*(?:\d+\s*,\s*){4})(\d+)(\s*\))',
+            _offset_char_id, tag_main_text)
         # button_N_hit_char_id references (in tagDefineButton calls)
         # These are embedded as a bare integer argument for hit char_id.
         # Also offset char_id references in sprite_frame_funcs arrays via

@@ -193,7 +193,11 @@ void tagSetSpriteNoEndTag(SWFAppContext* app_context, size_t char_id);
 void tagSetSpriteFrameCounts(SWFAppContext* app_context, size_t char_id,
                              size_t func_count, size_t loaded_frames);
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count);
-void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id);
+// `data` is the EMITTING movie's own bitmap_data array and `offset` a byte
+// offset into it. A loaded child SWF has its own array (renamed
+// <prefix>_bitmap_data by the child-movie wrapper), so the offset alone does
+// not identify the pixels — the base has to travel with it.
+void defineBitmap(const u8* data, size_t offset, size_t size, u32 width, u32 height, u16 char_id);
 void finalizeBitmaps();
 void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
     u8 format, u8 rate, u8 sample_size, u8 stereo,
@@ -282,8 +286,10 @@ size_t ng_lookupExportForMovie(const char* name, u8 movie_id);
 int ng_lookupExportVersion(const char* name);
 int ng_lookupExportVersionForMovie(const char* name, u8 movie_id);
 int32_t ng_getSoundDuration(u16 char_id);
-int ng_getBitmapMetadata(u16 char_id, size_t* out_offset, size_t* out_size, u32* out_width, u32* out_height);
-void ng_registerBitmapMetadata(u16 char_id, size_t offset, size_t size, u32 width, u32 height);
+// The registry records WHICH array the pixels are in, not just where in one:
+// `pixels` already has the emitting movie's base folded in.
+int ng_getBitmapMetadata(u16 char_id, const u8** out_pixels, size_t* out_size, u32* out_width, u32* out_height);
+void ng_registerBitmapMetadata(u16 char_id, const u8* pixels, size_t size, u32 width, u32 height);
 extern u8 g_current_movie_id;
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);

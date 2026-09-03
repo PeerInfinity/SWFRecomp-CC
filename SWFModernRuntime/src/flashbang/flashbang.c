@@ -680,8 +680,15 @@ void flashbang_set_window_background(FlashbangContext* context, u8 r, u8 g, u8 b
 	context->blue = b;
 }
 
-void flashbang_upload_bitmap(FlashbangContext* context, size_t offset, size_t size, u32 width, u32 height)
+void flashbang_upload_bitmap(FlashbangContext* context, const u8* pixels, size_t size, u32 width, u32 height)
 {
+	(void) size;
+	// `pixels` points at THIS bitmap inside its defining movie's bitmap_data.
+	// It used to read context->bitmap_data, i.e. the start of the root
+	// movie's array, so every bitmap after the first uploaded the first
+	// one's pixels; carrying the pointer fixes that as a side effect.
+	const u32* src = (const u32*) pixels;
+	if (src == NULL) return;
 	u32* buffer = (u32*) SDL_MapGPUTransferBuffer(context->device, context->bitmap_transfer, 0);
 	
 	size_t bitmap_global_size = (context->bitmap_highest_w + 1)*(context->bitmap_highest_h + 1);
@@ -701,17 +708,17 @@ void flashbang_upload_bitmap(FlashbangContext* context, size_t offset, size_t si
 					break;
 				}
 				
-				buffer[buffer_pixel] = ((u32*) context->bitmap_data)[bitmap_pixel - 1];
+				buffer[buffer_pixel] = src[bitmap_pixel - 1];
 				break;
 			}
 			
 			else if (y == height)
 			{
-				buffer[buffer_pixel - context->bitmap_highest_w - 1] = ((u32*) context->bitmap_data)[bitmap_pixel - width];
+				buffer[buffer_pixel - context->bitmap_highest_w - 1] = src[bitmap_pixel - width];
 				continue;
 			}
 			
-			buffer[buffer_pixel] = ((u32*) context->bitmap_data)[bitmap_pixel];
+			buffer[buffer_pixel] = src[bitmap_pixel];
 		}
 	}
 	
