@@ -215,6 +215,33 @@ first).
   fold into render_webgpu.c" above), so the fix is unverified beyond
   inspection. (2026-09-03)
 
+## Tooling — build scripts
+
+- **`verify_output_keep.py`'s native source list has drifted again.**
+  `ruffle-tests/verify_output_keep.py` omits `src/amf_packet.c` and
+  `src/actionmodern/avm1_amf.c`, so the KEEP_BUILD_DIR game-bring-up path does
+  not link: 15 undefined references from `action.o`
+  (`avm1AmfSerializeArg`, `avm1AmfGcMarkRoots`, ...) and `avm2_net.o`
+  (`amf_packet_build`, `amf_buf_init`, ...). Both sources exist in the runtime;
+  they are simply absent from the list. This is the SECOND instance of exactly
+  this drift — the script's own comment at :1718 records the first
+  (`avm2_net.c`), with the same root cause: the list is hand-maintained and
+  **CI never exercises it**, since KEEP_BUILD_DIR is a game-bring-up path only.
+  A fix that only adds the two files leaves the third instance to be found by
+  hand; deriving the list, or having CI link this path once, is what ends it.
+  Reported by the kittyengine arc from a throwaway worktree build at
+  `21e98fcfd`, verified here 2026-09-03. (2026-09-03)
+- **`SWFRecomp/build/run-SWFRecomp.sh` hardcodes the LIVE tree's binary.** The
+  wrapper is untracked (`build/` is gitignored) and its only line is
+  `exec /home/robert/CC/SWFRecomp-CC/SWFRecomp/build/SWFRecomp "$@"`, so any
+  worktree-based build that goes through the wrapper silently runs the live
+  tree's recompiler instead of its own. Harmless whenever the two binaries
+  agree — which is how it has gone unnoticed — and silently wrong the moment a
+  worktree carries a recompiler change, i.e. exactly when a worktree is being
+  used to isolate one. (2026-09-03)
+- **The recompiler treats `--help` as a config-file path** and aborts on a toml
+  parse error rather than printing usage. (2026-09-03)
+
 ## Deferred test failures
 
 - **`avm2/edittext_align` intermittent segfault after byte-correct output
