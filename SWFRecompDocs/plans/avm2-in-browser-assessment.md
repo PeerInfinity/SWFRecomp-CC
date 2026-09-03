@@ -19,7 +19,7 @@ host variant is shipped (§3, §6). Measured against the real in-browser compile
 | Brief's blocker | Measured | Status |
 |---|---|---|
 | 1. Host built from the AVM1 source set | AVM2 variant: 3.1 MB wasm, links first try, no generated globals to bridge | **shipped** this slice |
-| 2. AVM2 output too large for the in-browser clang | Every Seedling TU compiles at -O1: 142 MB `draws.c` 75 s, 33 MB `abc_timeline.c` 54 s, 12.9 MB `abc1_methods.c` 399 s (182 s as 9 chunks). Only Snailiad's 30 MB methods TU exceeds 25 min | **not a blocker for Seedling**; TU-split flag needed for the biggest titles |
+| 2. AVM2 output too large for the in-browser clang | Every Seedling TU compiles at -O1: 142 MB `draws.c` 75 s, 33 MB `abc_timeline.c` 54 s, 12.9 MB `abc1_methods.c` 399 s (182 s as 9 chunks). Only Snailiad's 30 MB methods TU exceeds 25 min | **not a blocker**; the `tu_split` flag (§1.3, shipped) chunks the methods TU and Snailiad now compiles too |
 | 3. 101 MB guest arena | Seedling static data is 31 MB | **not a blocker** |
 | 4. `setjmp` in try-bearing methods | 0.2–0.9 % of methods, every title has some; runtime-helper mode validated mechanically (§4.1) | **shipped** in the follow-up slice (§4.1, §6.1) |
 
@@ -33,6 +33,10 @@ also fixes AVM1 try/catch in the page) → **TU-split flag** (Snailiad-class tit
 and 2× faster for everything) → **payload blob** (optional: cuts memory from 2.5 GB
 and the zip from 33 MB, and skipping the AVM2-dead AVM1 payload is a one-line win for
 the bundle too). ≈ 2.5 developer days total. See §5.
+The first two are **shipped** (§6.1, §6.3); what remains is the payload work (§2.2),
+whose cheap half — not emitting the AVM2-dead `bitmap_data`/`sound_data` for AS3
+SWFs — is now the biggest single lever left, since after the split the peak memory
+and a large share of the C text are Seedling's 142 MB `draws.c`.
 
 ## 1. Compiler ceiling (Q1)
 
@@ -85,14 +89,35 @@ C text, which puts the wasm32 4 GB address space at ≈ 230 MB of data C.
   `abc_timeline.c` in 54 s (≈ 0.6–1.6 MB/s, ≤ 1.4 GB). The data-path question (§2) is
   therefore about the 142 MB `draws.c` alone, see the last table row.
 
-### 1.3 TU-splitting preview
-`scratchpad/probe/split_methods.py` splits `abcN_methods.c` at method boundaries into
-K body chunks + one table chunk (functions and their `_bt`/`_exc` tables lose
-`static`; the table chunk gets `extern` declarations). All nine chunks pass
-`gcc -fsyntax-only`, so the recompiler flag is a mechanical change in
-`abc_emit.cpp` (`abc<tag>_methods.c` emission, ~line 3987): emit N files of ~1.5 MB,
-drop `static` on `abcN_mK` / `abcN_mK_bt` / `abcN_mK_exc`, emit the prototypes into
-`abc_gen.h`. The bundle's `build.sh` already globs `RecompiledABC/*.c`.
+### 1.3 TU-splitting — **SHIPPED** 2026-09-02
+Landed as the recompiler option `tu_split` (toml key `[input] tu_split = <bytes per
+body chunk>`, env override `SWF_TU_SPLIT`, workflow input `tu_split`), OFF (0) by
+default — with it off the emitted C is byte-identical to before the option existed
+(verified by recompiling a mixed AVM1/AVM2/from_avmplus set, plus a `symbol_prefix`'d
+child, with the pre-change and post-change binaries and `diff -r`). `abc_emit.cpp`
+buffers everything one method contributes at file scope — its `_exc` array, its `_bt`
+array, its function and (try-helper mode) the lifted `<fn>_body` that follows it —
+into one unit, so a chunk boundary can only fall between methods; those three symbols
+lose `static` and the table file `abc<tag>_methods.c` keeps the `_pt`/`_po` arrays and
+`Avm2AbcMethodData` behind extern declarations for them. The declarations go in the
+table chunk, NOT `abc_gen.h`: the table is their only consumer and `abc_gen.h` is
+included by every generated TU. A tag whose bodies fit in one chunk keeps today's
+single-file layout. `avm2_symbol_prefix` covers the new file names and globals for
+free; the bundle's `build.sh` already globs `RecompiledABC/*.c` (its per-file opt-level
+`case` needed the `abc*_methods_*.c` pattern added).
+
+Measured in the page at a 1.5 MB target (`pipeline.js` turns it on for every
+in-browser recompile):
+
+| SWF | before | after |
+|---|---|---|
+| **Snailiad, original** (6.4 MB, 216 MB of C, 34 TUs) | its 29.7 MB methods TU alone **did not finish in 25 min** | **51.78 MB guest in 1717.5 s** (28.6 min), peak ~1.73 GB, **boots and renders** its title screen |
+| **Seedling, original** (7.8 MB, 182 MB of C) | 38.23 MB guest in 668.8 s | 38.28 MB guest in **414.1 s** (1.62×), title screen renders |
+
+Corpus forced-on (`tu_split=4096`, so even a small test really splits): zero
+transitions across 4482 tests, run 33710882328; default run at the same commit
+likewise (33710871686). Full write-up:
+`SWFRecompDocs/status/avm2-tu-split-emission.md`.
 
 ## 2. Data path (Q2)
 
@@ -310,7 +335,7 @@ recommendation and (c') the fallback.
 | Component | Effort | Also benefits |
 |---|---|---|
 | try-helper emission mode (§4.1) | done | AVM1 try/catch in the page (§7.3 of the stage-2 doc) — also done |
-| TU-splitting flag (§1.3) | ~0.5 day | 2× faster in-browser methods compile; bundle path parallel builds; gcc-ICE guard for giant TUs |
+| TU-splitting flag (§1.3) | done | 1.6× faster in-browser compile; Snailiad-class titles compile at all; bundle path parallel builds; gcc-ICE guard for giant TUs |
 | Skip the AVM1 bitmap/sound payload for AS3 SWFs (§2.2) | ~0.2 day | bundle path (−83 s, −2.4 GB gcc RAM for Seedling), −120 MB C, −13 MB zip |
 | Payload blob (§2.2) | ~1 day | in-browser peak memory, zip size; optional |
 | Runtime-set `SWF_URL`/sizes for the host (§3) | ~0.5 day | origin-gated titles (RWF/RWIC) |
@@ -328,6 +353,17 @@ The AS3 corpus tests (1155 avm2 + 1574 avmplus) all fit comfortably — the
 in-browser path is usable for them today (§3 end-to-end) modulo try/catch.
 
 ## 6. What shipped this slice
+
+### 6.3 TU-split emission mode (2026-09-02, follow-up slice) — SHIPPED
+Recompiler option `tu_split` (§1.3), off by default: each DoABC tag's method
+bodies are emitted as `abc<tag>_methods_<k>.c` chunks of ~`tu_split` bytes split
+at method boundaries, with `abc<tag>_methods.c` reduced to the signature arrays,
+`Avm2AbcMethodData` and extern declarations. Corpus forced-on at a 4096-byte
+target: zero transitions across 4482 tests (run 33710882328); default run at the
+same commit likewise (33710871686). In the page, Snailiad now compiles and
+renders (1717.5 s) where its methods TU previously never finished, and Seedling's
+compile drops 668.8 s → 414.1 s. Full write-up:
+`SWFRecompDocs/status/avm2-tu-split-emission.md`.
 
 ### 6.1 Try-helper emission mode (2026-09-02, follow-up slice) — SHIPPED
 Recompiler option `try_helper` (§4.1), off by default. AVM2 method bodies with
