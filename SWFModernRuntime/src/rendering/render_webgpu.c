@@ -3553,7 +3553,16 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, const u8* pixels,
 	// the end of the ROOT movie's tagInit (bitmap_static_built above) and the
 	// slot table is sized by the root's BITMAP_COUNT (below). `pixels` still
 	// carries the defining movie's base so the slot table cannot inherit the
-	// ambiguity if that ever changes.
+	// ambiguity if that ever changes. Measured on
+	// regression/avm1_parent_child_bitmap: the root uploads 4x4 then finalizes,
+	// then the child's 2x2 arrives with BOTH gates already closed
+	// (built=1, cur=1 cnt=1) and every movie's tagInit calls finalizeBitmaps.
+	// Lifting these two gates alone would render nothing: a child's SHAPE
+	// vertices are not in the vertex buffer either (it is uploaded once from
+	// the root's shape_data), and the bitmap index baked into a child's fill
+	// style is movie-local. The whole feature is per-movie render tables --
+	// SWFRecompDocs/status/child-embedded-asset-lookup.md, section
+	// "Half B: what it actually needs".
 	if (ctx->current_bitmap >= ctx->bitmap_count) return;
 
 	// Every defineBitmap call owns the next slot (the recompiler numbers bitmap

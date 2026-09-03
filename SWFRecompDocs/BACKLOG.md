@@ -142,17 +142,24 @@ first).
   and the corpus has at most two children — but it is what caps a child at
   999 characters, and it is the work item for whoever needs to raise the
   stride. (2026-09-03)
-- **`embedded_bitmap_for_char` never consults child movies.**
-  `SWFModernRuntime/src/avm2/avm2_bitmap.c:757` scans only the main movie's
-  `avm2_generated_bitmaps`, unlike its neighbours `char_info` and
-  `timeline_for_char` in `avm2_display.c`, which both fall through to
-  `g_child_movies`. So a loaded AVM2 child's `[Embed]`ed image instantiates
-  as a `BitmapData` subclass with width/height **0**, where the same SWF run
-  as the main movie reports its real size. Independent of the char-id stride
-  (it reproduces at either one). Reproduced while writing
-  `regression/avm2_parent_child_symbol_stride`, which deliberately reads the
-  class name instead of the pixels; the fix is the same six-line
-  `g_child_movies` loop the display lookups carry. (2026-09-03)
+- ~~**`embedded_bitmap_for_char` never consults child movies.**~~
+  **DONE 2026-09-03**, and it was three defects with two layers each, not one
+  six-line loop. The table fall-through the entry described is necessary and
+  **not sufficient**: every embedded-asset constructor keys on
+  `avm2_display_char_for_class`, whose `g_symbol_map` is built once at stage
+  build from the MAIN movie's SymbolClass rows, so a child-defined asset class
+  resolved to char **0** and never reached any payload table. Both layers are
+  load-bearing (reverting either alone puts `child:pix` back to `0x0`). The
+  same two-layer miss was then reproduced and fixed on the other two embedded
+  tables — `[Embed(mimeType="application/octet-stream")]` -> `ByteArray`
+  (`avm2_bytearray.c` `ba_native_init`, read `length 0`) and `[Embed]` MP3 ->
+  `Sound` (`avm2_media.c` `sound_ctor` / `sound_data_for_char`, read
+  `length 0`). Ruling: these key on the **defining** movie, the opposite of the
+  transform-table case, because the thing looked up is a payload and both ends
+  of the lookup are already the class's own movie. `import_assets` 3/3 and
+  gnash `attachImported`/`attachExtImported` confirmed unmoved. Anchored by
+  three new rows in `regression/avm2_parent_child_symbol_stride`. Closeout:
+  `SWFRecompDocs/status/child-embedded-asset-lookup.md`. (2026-09-03)
 - ~~**`_x` on a loaded child's TAG-PLACED clip reads uninitialized memory.**~~
   **DONE 2026-09-03.** It was an out-of-bounds read, not an unwritten field: a
   display entry's `transform_id` indexes the transform table of the movie whose
@@ -175,18 +182,31 @@ first).
   frame 2), and the current test places and modifies in ONE frame to sidestep
   it. No corpus test grades it — the multi-SWF children in the suite are all
   single-frame or read only metadata. (2026-09-03)
-- **A loaded child's bitmaps never reach the renderer.** Two gates, both
-  stated in the ROOT movie's terms: `finalizeBitmaps()` is emitted at the end
-  of the root's `tagInit` so `render_webgpu_upload_bitmap` early-returns on
-  `bitmap_static_built`, and the static slot table is sized by the root's
-  `BITMAP_COUNT` (`ctx->current_bitmap >= ctx->bitmap_count`). So a child's
-  `defineBitmap` calls are dropped and its bitmaps do not render — a missing
-  feature, not a corrupt read. `BitmapData.loadBitmap`, the AS-visible path,
-  was fixed 2026-09-03 and the renderer now stores per-bitmap pointers
-  (`ctx->bitmap_ptrs`) rather than root-relative offsets, so lifting these
-  gates cannot re-inherit the wrong-array bug; what is left is giving the
-  renderer a per-movie static-bitmap range. No corpus test exercises it.
-  (2026-09-03)
+- **A loaded child movie does not render at all — the renderer has no
+  per-movie tables.** Rewritten 2026-09-03 from "a loaded child's bitmaps never
+  reach the renderer", which named one facet of it. The bitmap gates are real
+  and measured (`avm1_parent_child_bitmap --mode=graphics`, instrumented: the
+  root uploads then finalizes, then the child's `defineBitmap` arrives with
+  **both** gates closed — `bitmap_static_built=1` **and**
+  `current_bitmap >= bitmap_count` — and every movie's `tagInit` calls
+  `finalizeBitmaps()`). But lifting them renders nothing, because a static
+  bitmap is only sampled by a shape and a child's shapes are not on the GPU
+  either: the vertex buffer is uploaded once from the ROOT's `shape_data`
+  (`swf.c:1581` -> `create_buffers_and_upload`), while
+  `renderer_draw_shape(ctx, ch->shape_offset, ..., obj->transform_id,
+  obj->cxform_id)` passes movie-LOCAL indices, and a bitmap fill style bakes a
+  movie-local bitmap index (`swf.cpp:7462`/`:7877`). `MovieEntry` carries
+  exactly one render array (`transform_data_ptr`) and it is CPU-only. So the
+  work item is: per-movie render tables on `MovieEntry` (shape/color/gradient/
+  uninv + the bitmap range), per-movie bases applied at draw time, and a
+  growable static slot table with a re-entrant finalize (the static pools are
+  size-classed — read memory `bitmap-texture-pools` before sizing anything).
+  There is also **no trace-visible assertion available**: every AS-visible read
+  of a child bitmap goes through the metadata/table paths, both now fixed, so
+  nothing in ActionScript can observe `ctx->bitmap_sizes`. Worth taking after
+  the frame-0 timeline entry above — a child that renders only frame 1 is a
+  thin prize. Detail: `SWFRecompDocs/status/child-embedded-asset-lookup.md`
+  section 3. (2026-09-03)
 - **`flashbang_upload_bitmap`'s offset bug is fixed but untested.** The SDL3
   backend read `((u32*)context->bitmap_data)[bitmap_pixel]` — the start of the
   array — for every bitmap, so every bitmap after the first uploaded the first

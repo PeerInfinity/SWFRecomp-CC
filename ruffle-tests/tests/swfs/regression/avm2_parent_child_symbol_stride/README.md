@@ -47,18 +47,41 @@ rows fail loudly:
 +  root:flash.display::MovieClip
 ```
 
-## Known gap this test does NOT read
+## The child's embedded ASSETS (added by the child-bitmap slice)
 
-`new Pix()` yields a `Child_Pix` whose `width`/`height` are **0**, where the
-same SWF run as the MAIN movie reports `4x3`. `embedded_bitmap_for_char`
-(`SWFModernRuntime/src/avm2/avm2_bitmap.c`) scans only the main movie's
-`avm2_generated_bitmaps` and never consults `g_child_movies`, unlike its
-neighbours `char_info` and `timeline_for_char`. Independent of the stride —
-it reproduces at either one — and left for the child-bitmap slice, so this
-test deliberately reads the class name and not the pixels.
+Three more rows, one per embedded-asset table, all reading a character the
+CHILD movie defines:
+
+| row | reads | pre-fix |
+|---|---|---|
+| `child:pix:4x3` | `[Embed]`ed PNG -> `BitmapData` subclass `width`/`height` | `0x0` |
+| `child:blob:9` | `[Embed(mimeType="application/octet-stream")]` -> `ByteArray.length` | `0` |
+| `child:snd:1044` | `[Embed]`ed MP3 -> `Sound.length` (ms) | `0` |
+
+Each was a **two-layer** miss, not one (see
+`SWFRecompDocs/status/child-embedded-asset-lookup.md`):
+
+1. `g_symbol_map` (class -> char id) is built once at stage build from the MAIN
+   movie's SymbolClass rows, so a child-defined asset class resolved to char
+   **0** and never reached a payload table at all. The three sites now call
+   `avm2_display_child_char_for_class`.
+2. The payload tables (`avm2_generated_bitmaps` / `_binaries` / `_sounds`) were
+   scanned in the main movie only, unlike `char_info` / `timeline_for_char`
+   which already consult `g_child_movies`. All three now fall through.
+
+Both layers are load-bearing: reverting either one alone puts `child:pix` back
+to `0x0`.
+
+**The control is the same SWF as the MAIN movie.** `child.swf` run directly as
+`test.swf` reports `4x3` / `9` / `1044` — before and after the fix — so these
+rows measure main-vs-child parity, not the absolute values. (`1044` in
+particular is our own `Sound.length` computation, not an oracle number.)
 
 ## Rebuild
 
 ```bash
 ./build_swf.sh
 ```
+
+`pixel.png` (4x3), `blob.bin` (9 bytes, ASCII) and `silence.mp3` are the
+embedded assets; `silence.mp3` is a copy of `avm2/sound_valueof/silence.mp3`.

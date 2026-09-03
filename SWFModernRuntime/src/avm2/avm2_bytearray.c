@@ -1351,20 +1351,32 @@ static void ba_native_init(Avm2Context* ctx, Avm2Object* obj)
 	// symbol association (data filled, position reset to 0). A plain
 	// `new ByteArray()` (or any class with no binary binding) has char_id 0
 	// and is left empty.
-	uint16_t char_id = avm2_display_char_for_class(obj->cls);
+	// Both halves are child-aware, for the reason avm2_bitmap.c's
+	// embedded_bitmap_for_char documents: g_symbol_map is built once from the
+	// MAIN movie's SymbolClass rows, and the payload table read below is the
+	// main movie's too, so a DefineBinaryData embedded by a Loader-loaded child
+	// resolved to char 0 and seeded an EMPTY ByteArray. Keyed on the DEFINING
+	// movie: the bytes live in the tables of the movie whose tag carried them.
+	uint16_t char_id = avm2_display_child_char_for_class(ctx, obj->cls);
 	if (char_id != 0)
 	{
-		for (uint32_t i = 0; i < avm2_generated_binary_count; i++)
+		const Avm2BinaryData* bin = NULL;
+		for (uint32_t i = 0; i < avm2_generated_binary_count && bin == NULL; i++)
+			if (avm2_generated_binaries[i].char_id == char_id)
+				bin = &avm2_generated_binaries[i];
+		uint32_t nm = avm2_display_child_movie_count();
+		for (uint32_t m = 0; m < nm && bin == NULL; m++)
 		{
-			if (avm2_generated_binaries[i].char_id != char_id) continue;
-			const Avm2BinaryData* bin = &avm2_generated_binaries[i];
-			if (bin->len > 0 && bin->bytes != NULL)
-			{
-				ba_set_length(ctx, ba, bin->len);
-				memcpy(ba->bytes, bin->bytes, bin->len);
-				ba->position = 0;
-			}
-			break;
+			const Avm2MovieTables* t = avm2_display_child_movie(m);
+			if (t == NULL) continue;
+			for (uint32_t i = 0; i < t->binary_count && bin == NULL; i++)
+				if (t->binaries[i].char_id == char_id) bin = &t->binaries[i];
+		}
+		if (bin != NULL && bin->len > 0 && bin->bytes != NULL)
+		{
+			ba_set_length(ctx, ba, bin->len);
+			memcpy(ba->bytes, bin->bytes, bin->len);
+			ba->position = 0;
 		}
 	}
 }

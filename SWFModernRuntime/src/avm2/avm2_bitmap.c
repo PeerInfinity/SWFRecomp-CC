@@ -754,6 +754,19 @@ static void bd_alloc(Avm2Context* ctx, Avm2BitmapDataExt* bd, uint32_t w, uint32
 	bd->pixels = avm2_alloc(ctx, w * h * (uint32_t) sizeof(uint32_t));
 }
 
+// The bitmap tables of the movie that DEFINED the character, main or child.
+// Keyed on the bare char id, exactly like avm2_display.c's char_info and
+// timeline_for_char: a loaded child's ids are re-based by its char_id_base at
+// emission, so an id can name a row in at most one movie and the scan order
+// only decides how fast the answer comes back.
+//
+// Defining, not placing: an embedded bitmap's PIXELS live in the tables of the
+// movie whose DefineBits tag carried them, and the only caller-supplied key is
+// a char id that came from that same movie's SymbolClass row (via
+// avm2_display_child_char_for_class, itself keyed on the class's own movie).
+// That is the opposite of the transform-table case (swf.h's note on
+// DisplayObject::place_transform_data / child_transform_data), where the id
+// indexes a table belonging to the movie whose TAG placed the object.
 static const Avm2BitmapData* embedded_bitmap_for_char(uint16_t char_id)
 {
 	for (uint32_t i = 0; i < avm2_generated_bitmap_count; i++)
@@ -764,6 +777,14 @@ static const Avm2BitmapData* embedded_bitmap_for_char(uint16_t char_id)
 		{
 			return &avm2_generated_bitmaps[i];
 		}
+	}
+	uint32_t nm = avm2_display_child_movie_count();
+	for (uint32_t m = 0; m < nm; m++)
+	{
+		const Avm2MovieTables* t = avm2_display_child_movie(m);
+		if (t == NULL) continue;
+		for (uint32_t i = 0; i < t->bitmap_count; i++)
+			if (t->bitmaps[i].char_id == char_id) return &t->bitmaps[i];
 	}
 	return NULL;
 }
@@ -852,7 +873,13 @@ static Avm2Value bitmapdata_init(Avm2Activation* act)
 	Avm2BitmapDataExt* bd = (Avm2BitmapDataExt*) self->native_ext;
 
 	// SymbolClass-bound subclass: fill from the embedded asset, ignore args.
-	uint16_t char_id = avm2_display_char_for_class(self->cls);
+	// child_char_for_class, not char_for_class: g_symbol_map is built once at
+	// stage build from the MAIN movie's rows, so a BitmapData subclass defined
+	// by a Loader-loaded child resolves to 0 there and never reaches the
+	// embedded asset at all (it came up 0x0). The child arm is a by-name scan
+	// of the DEFINING movie's SymbolClass rows and only runs on a main-movie
+	// miss, so the single-movie path is the same pointer scan it was.
+	uint16_t char_id = avm2_display_child_char_for_class(ctx, self->cls);
 	if (char_id != 0)
 	{
 		const Avm2BitmapData* emb = embedded_bitmap_for_char(char_id);
@@ -3369,7 +3396,8 @@ static Avm2Value bitmap_init(Avm2Activation* act)
 		if (ext->bitmap_data == NULL)
 		{
 			Avm2Object* self = this_obj(act);
-			uint16_t char_id = self != NULL ? avm2_display_char_for_class(self->cls) : 0;
+			uint16_t char_id = self != NULL
+				? avm2_display_child_char_for_class(ctx, self->cls) : 0;
 			const Avm2BitmapData* emb = char_id ? embedded_bitmap_for_char(char_id) : NULL;
 			if (emb != NULL)
 			{

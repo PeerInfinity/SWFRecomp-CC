@@ -1,3 +1,6 @@
 child:tf3:Child_Pix
+child:pix:4x3
+child:blob:9
+child:snd:1044
 root:Child
 done

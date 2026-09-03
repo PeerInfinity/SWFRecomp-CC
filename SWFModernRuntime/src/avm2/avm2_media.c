@@ -451,11 +451,22 @@ static Avm2SoundObjExt* this_sound(Avm2Activation* act)
 	return sound_ext_of(act->ctx, this_obj(act));
 }
 
+// Keyed on the DEFINING movie, main or child - see avm2_bitmap.c's
+// embedded_bitmap_for_char for the ruling and why an id can match at most one
+// movie's rows.
 static const Avm2SoundData* sound_data_for_char(uint16_t char_id)
 {
 	for (uint32_t i = 0; i < avm2_generated_sound_count; i++)
 		if (avm2_generated_sounds[i].char_id == char_id)
 			return &avm2_generated_sounds[i];
+	uint32_t nm = avm2_display_child_movie_count();
+	for (uint32_t m = 0; m < nm; m++)
+	{
+		const Avm2MovieTables* t = avm2_display_child_movie(m);
+		if (t == NULL) continue;
+		for (uint32_t i = 0; i < t->sound_count; i++)
+			if (t->sounds[i].char_id == char_id) return &t->sounds[i];
+	}
 	return NULL;
 }
 
@@ -471,7 +482,10 @@ static Avm2Value sound_ctor(Avm2Activation* act)
 	if (s == NULL) return avm2_undefined();
 	// SymbolClass-bound embedded sound: seed metadata from the DefineSound
 	// table (ignores any ctor args, like BitmapData subclasses do).
-	uint16_t char_id = avm2_display_char_for_class(self->cls);
+	// child_char_for_class: g_symbol_map holds the MAIN movie's rows only, so
+	// a sound embedded by a Loader-loaded child resolved to char 0 and came up
+	// silent (length 0).
+	uint16_t char_id = avm2_display_child_char_for_class(ctx, self->cls);
 	const Avm2SoundData* sd = char_id != 0 ? sound_data_for_char(char_id) : NULL;
 	if (sd != NULL)
 	{
