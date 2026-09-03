@@ -1,28 +1,30 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T16:36:38.791439+00:00",
-    "git_sha": "a946ee183838f3ee96b55a4fbf3937c4e5c341c6",
-    "duration_seconds": 128.55,
-    "total_available": 6,
+    "timestamp": "2026-09-03T00:32:06.958016+00:00",
+    "git_sha": "53ee2bc5a1551cc290eed2e19242952f290f650d",
+    "duration_seconds": 152.05,
+    "total_available": 7,
     "shards": 30,
     "expected_shards": 30,
     "ignored_count": 0,
     "filtered": true
   },
-  "total": 6,
+  "total": 7,
   "pass": 6,
   "ruffle_matched": 0,
-  "fail": 0,
-  "pass_rate": 100.0,
+  "fail": 1,
+  "pass_rate": 85.7,
   "effective_pass": 6,
-  "effective_pass_rate": 100.0,
-  "breakdown": {},
+  "effective_pass_rate": 85.7,
+  "breakdown": {
+    "output_mismatch": 1
+  },
   "tests": [
     {
       "test": "device_font_glyph_fallback",
       "phases": {
         "recomp": 0.0,
-        "compile": 27.822,
+        "compile": 27.612,
         "run": 0.265
       },
       "num_frames": 1,
@@ -31,15 +33,15 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 28.1,
+      "duration": 27.89,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
         "recomp": 0.0,
-        "compile": 28.505,
-        "run": 0.265
+        "compile": 24.61,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -47,7 +49,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 28.8,
+      "duration": 24.84,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -56,21 +58,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 100,
-            "height": 50,
-            "total_channels": 20000,
-            "max_diff": 255,
-            "diff_channels": 1680,
-            "mean_diff": 21.42,
-            "outliers": 1680,
-            "max_outliers": 0,
-            "tolerance": 0,
-            "excess_outliers": 1680
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
+          "known_failure": false
         }
       },
       "status": "pass"
@@ -79,8 +67,8 @@
       "test": "device_font_list",
       "phases": {
         "recomp": 0.0,
-        "compile": 23.651,
-        "run": 0.215
+        "compile": 28.391,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -88,15 +76,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 23.87,
+      "duration": 28.67,
       "status": "pass"
     },
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.216,
-        "compile": 29.823,
-        "run": 0.867
+        "recomp": 0.218,
+        "compile": 29.429,
+        "run": 0.668
       },
       "num_frames": 1,
       "lines": {
@@ -104,7 +92,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 31.48,
+      "duration": 30.91,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -113,21 +101,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 1000,
-            "total_channels": 2200000,
-            "max_diff": 255,
-            "diff_channels": 156,
-            "mean_diff": 0.0181,
-            "outliers": 156,
-            "max_outliers": 0,
-            "tolerance": 3,
-            "excess_outliers": 156
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
+          "known_failure": false
         }
       },
       "status": "pass"
@@ -136,8 +110,8 @@
       "test": "embed_matching/match_style",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.403,
-        "run": 0.365
+        "compile": 8.062,
+        "run": 0.616
       },
       "num_frames": 1,
       "lines": {
@@ -145,7 +119,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.95,
+      "duration": 8.94,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -154,21 +128,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 255,
-            "diff_channels": 12,
-            "mean_diff": 0.0035,
-            "outliers": 12,
-            "max_outliers": 0,
-            "tolerance": 3,
-            "excess_outliers": 12
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
+          "known_failure": false
         }
       },
       "status": "pass"
@@ -177,8 +137,8 @@
       "test": "embed_matching/no_font_found",
       "phases": {
         "recomp": 0.0,
-        "compile": 8.397,
-        "run": 0.415
+        "compile": 7.36,
+        "run": 0.365
       },
       "num_frames": 1,
       "lines": {
@@ -186,7 +146,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.99,
+      "duration": 7.86,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -195,23 +155,29 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": true,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 0,
-            "diff_channels": 0,
-            "mean_diff": 0.0,
-            "outliers": 0,
-            "max_outliers": 0,
-            "tolerance": 0,
-            "excess_outliers": 0
-          },
-          "expected_source": "repo"
+          "known_failure": true
         }
       },
       "status": "pass"
+    },
+    {
+      "test": "embed_name_lookup",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 22.05,
+        "run": 0.466
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 242,
+        "expected_lines": 242,
+        "matching_lines": 86
+      },
+      "duration": 22.52,
+      "status": "output_mismatch",
+      "detail": "156 line(s) differ (actual=242, expected=242)",
+      "actual_output": "... (3 lines before) ...\nExportAssets\nReverse order\nConflicting names\nExport non-font\nFont matching\nAA: 22\naa: 22\nAA (bold): 22\nAB: 40\nab: 40\nAB (bold): 40\nAC: 40\nac: 40\nAC (bold): 40\nAD: 22\nad: 22\nAD (bold): 22\nAE: 40\nae: 40\nAE (bold): 40\nAF: 40\naf: 40\nAF (bold): 40\nAG: 22\nag: 22\nAG (bold): 22\nAH: 22\nah: 22\nAH (bold): 22\nAI: 22\nai: 22\nAI (bold): 22\nAJ: 22\naj: 22\nAJ (bold): 22\nAK: 22\nak: 22\nAK (bold): 22\nAL: 22\nal: 22\nAL (bold): 22\nAM: 40\nam: 40\nAM (bold): 40\nAN: 22\nan: 22\nAN (bold): 22\nAO: 40\nao: 40\nAO (bold): 40\n... (189 lines after) ...",
+      "expected_output": "... (3 lines before) ...\nExportAssets\nReverse order\nConflicting names\nExport non-font\nFont matching\nAA: 0\naa: 0\nAA (bold): 0\nAB: 40\nab: 40\nAB (bold): 40\nAC: 40\nac: 40\nAC (bold): 40\nAD: 0\nad: 0\nAD (bold): 0\nAE: 40\nae: 40\nAE (bold): 40\nAF: 40\naf: 40\nAF (bold): 40\nAG: 0\nag: 0\nAG (bold): 0\nAH: 0\nah: 0\nAH (bold): 0\nAI: 0\nai: 0\nAI (bold): 0\nAJ: 0\naj: 0\nAJ (bold): 0\nAK: 0\nak: 0\nAK (bold): 0\nAL: 0\nal: 0\nAL (bold): 0\nAM: 40\nam: 40\nAM (bold): 40\nAN: 40\nan: 40\nAN (bold): 40\nAO: 40\nao: 40\nAO (bold): 40\n... (189 lines after) ..."
     }
   ]
 }
