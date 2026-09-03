@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-08-30T08:49:31.979594+00:00",
-    "old_git_sha": "06f3d87d295b03b44b94221d38594612ecda4ff5",
-    "new_timestamp": "2026-08-19T13:28:59.089349+00:00",
-    "new_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
+    "old_timestamp": "2026-08-19T13:28:59.089349+00:00",
+    "old_git_sha": "9d038c750eaf021d3f42487b5f97f190a378f3ce",
+    "new_timestamp": "2026-09-03T09:46:14.589945+00:00",
+    "new_git_sha": "2eb6d24254318066f635c3efe51285f3a0c45f62",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,31 @@
     "new_pass": 10,
     "new_ruffle_matched": 0,
     "new_effective_pass": 10,
-    "new_total": 11,
-    "new_pass_rate": 90.9,
+    "new_total": 12,
+    "new_pass_rate": 83.3,
     "old_mismatched_lines": 4,
-    "new_mismatched_lines": 4,
+    "new_mismatched_lines": 23,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 11,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm2_loads_avm1_events",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 25,
+        "expected_lines": 26,
+        "matching_lines": 7
+      }
+    }
+  ]
 }
