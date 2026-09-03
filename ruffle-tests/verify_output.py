@@ -677,13 +677,14 @@ DIFF_SCRIPT = PROJECT_ROOT / "scripts" / "diff_ruffle_results.py"
 DAWN_INSTALL = Path(os.environ.get("DAWN_INSTALL", PROJECT_ROOT.parent / "dawn-install"))
 STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
 
-# CHARID() completeness oracle. `generate_child_movie_file` re-bases a loaded
-# child's character ids with ONE substitution keyed on the CHARID() wrapper the
-# recompiler emits, so a char id emitted WITHOUT the wrapper would silently
-# keep its raw value and disagree with every id that moved. The oracle derives
-# the char-id argument positions and struct field indices from the runtime
-# headers and fails on any bare integer literal in one; see the module
-# docstring and the CHARACTER ID WRAPPER comment in libswf/tag.h.
+# CHARID() completeness oracle. The recompiler itself re-bases a loaded child's
+# character ids (see the stride comment immediately below); the harness performs
+# NO substitution. The wrapper stays because this oracle keys on it: a char id
+# emitted WITHOUT it is one the recompiler wrote by a path that never reached
+# charId(), so it would silently keep its raw value and disagree with every id
+# that moved. The oracle derives the char-id argument positions and struct field
+# indices from the runtime headers and fails on any bare integer literal in one;
+# see the module docstring and the CHARACTER ID WRAPPER comment in libswf/tag.h.
 # Per-child character-id stride. A loaded child movie is recompiled with
 # `char_id_base = movie_id * CHILD_CHAR_ID_STRIDE`, which the recompiler adds
 # to EVERY character id it emits — the tag pipeline (swf.cpp's charId()) and

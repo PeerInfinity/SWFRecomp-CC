@@ -160,6 +160,30 @@ float (*ng_getMovieTransformData(u8 movie_id))[16] {
 	return g_movie_transform_data[movie_id];
 }
 
+// The transform table a display entry's `transform_id` indexes, or NULL when
+// that is the main movie's `transform_data` (so callers holding a different
+// handle on the main table — e.g. the GPU-side app_context->transform_data,
+// which also carries dynamic slots — keep using theirs).
+//
+// Set by ng_cache_transform at placement time from g_active_transform_data,
+// i.e. keyed on the movie whose TAG placed the entry. See swf.h's
+// place_transform_data for why that is not the same as child_transform_data.
+float (*ng_entryChildTransformData(const DisplayObject* obj))[16] {
+	GEN_EXTERN_TRANSFORM_DATA;
+	if (obj == NULL) return NULL;
+	float (*td)[16] = obj->place_transform_data;
+	if (td == NULL || td == transform_data) return NULL;
+	return td;
+}
+
+// Same lookup, but resolved to a usable table: the main movie's
+// `transform_data` when the entry carries no override. Never NULL.
+float (*ng_entryTransformData(const DisplayObject* obj))[16] {
+	GEN_EXTERN_TRANSFORM_DATA;
+	float (*td)[16] = (obj != NULL) ? obj->place_transform_data : NULL;
+	return (td != NULL) ? td : transform_data;
+}
+
 GEN_EXTERN_TRANSFORM_DATA;
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -177,6 +201,12 @@ extern float (*g_active_transform_data)[16];
 
 static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 	float (*td)[16] = g_active_transform_data ? g_active_transform_data : transform_data;
+	// Record WHICH table the id indexes, not just the six values. Readers that
+	// re-index `transform_id` later (ng_getTransformXY / ScaleRotation*, the
+	// AVM1 _x/_y getters) otherwise index the main movie's `transform_data`
+	// with a loaded child's id — out of bounds whenever the child has more
+	// transform rows than the parent, which is the usual case.
+	obj->place_transform_data = td;
 	obj->place_a  = td[tid][0];
 	obj->place_b  = td[tid][1];
 	obj->place_c  = td[tid][4];

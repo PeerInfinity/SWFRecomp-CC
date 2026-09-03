@@ -153,16 +153,28 @@ first).
   `regression/avm2_parent_child_symbol_stride`, which deliberately reads the
   class name instead of the pixels; the fix is the same six-line
   `g_child_movies` loop the display lookups carry. (2026-09-03)
-- **`_x` on a loaded child's TAG-PLACED clip reads uninitialized memory.**
-  `_root.holder.mc._x`, where `mc` is placed by the child's own
-  `PlaceObject2` (not `createEmptyMovieClip`), returned a different garbage
-  float on every run — 8197.8125, -1.92062288988382e-6,
-  -1.48600998484698e+20 — while `_name` and `typeof` on the same object read
-  correctly and `_x` on a parent-side `createEmptyMovieClip` clip reads 0.
-  Reproduces with no Modify tag anywhere in the child, so it is the placement
-  path, not the Modify path. Found while writing
-  `regression/avm1_parent_child_modify_place`, which reads `typeof`/`_name`
-  because of it. (2026-09-03)
+- ~~**`_x` on a loaded child's TAG-PLACED clip reads uninitialized memory.**~~
+  **DONE 2026-09-03.** It was an out-of-bounds read, not an unwritten field: a
+  display entry's `transform_id` indexes the transform table of the movie whose
+  TAG placed it, and every AVM1 reader indexed the MAIN movie's
+  `transform_data` — `float transform_data[1][16]` for an MTASC parent with no
+  timeline content, so a child's tid 1 read past the end. `ng_cache_transform`
+  now records the placing movie's table on the entry
+  (`DisplayObject::place_transform_data`) and the readers go through
+  `ng_entryTransformData`. `regression/avm1_parent_child_modify_place` pins
+  `_x`/`_y` and now DISCRIMINATES on the char-id-0 sentinel as well. Closeout:
+  `SWFRecompDocs/status/child-placed-clip-uninit.md`. (2026-09-03)
+- **A loaded child movie's timeline never advances past frame 0.**
+  `actionFirePendingDirectLoads` runs the child's `child_frame_0` and nothing
+  ever calls `child_frame_1`: verified by breaking on `tagPlaceObject2` for a
+  2-frame child whose frame 2 carries a `PlaceObject2` — exactly one call, from
+  `child_frame_0`. So every tag past a loaded child's first frame is dead, and
+  a child SWF used as an animation plays only its first frame. Found while
+  fixing the `_x` read above; it is the real reason the earlier
+  `avm1_parent_child_modify_place` could not discriminate (its Modify sat in
+  frame 2), and the current test places and modifies in ONE frame to sidestep
+  it. No corpus test grades it — the multi-SWF children in the suite are all
+  single-frame or read only metadata. (2026-09-03)
 - **A loaded child's bitmaps never reach the renderer.** Two gates, both
   stated in the ROOT movie's terms: `finalizeBitmaps()` is emitted at the end
   of the root's `tagInit` so `render_webgpu_upload_bitmap` early-returns on

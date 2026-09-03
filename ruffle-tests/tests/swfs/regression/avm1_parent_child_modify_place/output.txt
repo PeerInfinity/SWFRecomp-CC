@@ -1,3 +1,5 @@
 t:movieclip
 nm:mc
+x:50
+y:30
 done

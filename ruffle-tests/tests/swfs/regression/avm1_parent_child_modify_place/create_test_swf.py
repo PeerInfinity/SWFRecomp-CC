@@ -3,66 +3,77 @@ r"""Build child.swf and test.swf for regression/avm1_parent_child_modify_place.
 
 WHAT THIS PINS DOWN
 -------------------
-A loaded child SWF's character ids are re-based by `movie_id * 1000` so they
-cannot collide with the parent's dictionary. Character id **0 must never be
-re-based**: it is the "no character" sentinel, and in a `PlaceObject2` it is
-what makes the tag a MODIFY of whatever already sits at that depth rather than
-a place of a new character. Offsetting it turns every Modify in a loaded child
-into a place of character `base` — and because parent and child share ONE
-dictionary, `base` is an id the parent may well define.
+Two things, both about a loaded child SWF's own `PlaceObject2` tags.
 
-That bug is not hypothetical. The harness's original per-call regex list had it
-(`tagPlaceObject2\w*` rewrote `..., 0,` to `..., 1000,`); the value-keyed
-substitution that replaced the list skipped 0 explicitly; and the offset now
-lives in the recompiler (`charId()` in SWFRecomp/src/swf.cpp), which skips 0
-for the same reason.
+1. **`_x` / `_y` on a child's tag-placed clip.** A display entry's
+   `transform_id` indexes the transform table of the movie whose TAG placed it.
+   The child's ids index `child_transform_data`; the AVM1 property getters
+   indexed the MAIN movie's `transform_data`, which for an MTASC parent with no
+   timeline content is `float transform_data[1][16]` — so `_x` read past the end
+   of a one-row array and returned a different garbage float on every run
+   (measured: 8197.8125, -1.92062288988382e-6, -1.48600998484698e+20). Fixed by
+   recording the placing movie's table on the display entry
+   (`DisplayObject::place_transform_data`, written by `ng_cache_transform`).
+
+2. **Character id 0 must never be re-based.** It is the "no character"
+   sentinel, and in a `PlaceObject2` it is what makes the tag a MODIFY of
+   whatever already sits at that depth rather than a place of a new character.
+   Offsetting it turns every Modify in a loaded child into a place of character
+   `base` — and because parent and child share ONE dictionary, `base` is an id
+   the parent may well define.
+
+   That bug is not hypothetical. The harness's original per-call regex list had
+   it (`tagPlaceObject2\w*` rewrote `..., 0,` to `..., 1000,`); the value-keyed
+   substitution that replaced the list skipped 0 explicitly; and the offset now
+   lives in the recompiler (`charId()` in SWFRecomp/src/swf.cpp), which skips 0
+   for the same reason.
 
 THE SHAPE
 ---------
     parent test.swf  (AVM1, SWF8, MTASC + a spliced decoy sprite at char 1000)
                      loadMovie("child.swf") into _root.holder
-    child.swf        (AVM1, SWF8, hand-built, 2 frames)
+    child.swf        (AVM1, SWF8, hand-built, 1 frame)
 
     frame 1: PlaceObject2 HasCharacter|HasMatrix|HasName  depth 1, char 1,
-             "mc", identity matrix
-    frame 2: PlaceObject2 Move|HasMatrix, char id ABSENT (= 0),
-             translate x = 1000 twips
+             "mc", translate (200, 100) twips = (10, 5) px
+             PlaceObject2 Move|HasMatrix, char id ABSENT (= 0),
+             translate (1000, 600) twips = (50, 30) px
+    -> _root.holder.mc._x == 50, _y == 30
 
 The parent defines (and never places) a sprite at char id 1000 = the child's
 `movie_id * stride`, so a re-based sentinel does not name "nothing" — it names
 a real character in the shared dictionary, which is the sharpest form the bug
 can take.
 
-THIS TEST IS A LOCK, NOT A REPRO — AND IT DOES NOT DISCRIMINATE TODAY
---------------------------------------------------------------------
-Measured, not assumed. Sabotaging `charId()` to offset 0 as well
-(`std::to_string(id + g_char_id_base)`) and rebuilding leaves every row of
-this test — and of `avm1_parent_child_sprite_meta`,
-`avm1_parent_child_bitmap` and `avm1_parent_as3_child_payload` — unchanged.
-Three separate reasons, each verified by hand:
+BOTH TAGS ARE IN ONE FRAME, ON PURPOSE
+--------------------------------------
+The Modify used to sit in the child's frame 2. It never executed: a loaded
+child movie's timeline does not advance past frame 0 in this configuration —
+`actionFirePendingDirectLoads` runs `child_frame_0` and nothing ever calls
+`child_frame_1` (verified by breaking on `tagPlaceObject2`: exactly one call,
+from `child_frame_0`). That is a separate defect, filed in BACKLOG §Multi-SWF;
+it is also the real reason the earlier version of this test could not
+discriminate, superseding "an is_replace == 0 place at an occupied depth is a
+no-op". Placing and modifying in the SAME frame sidesteps it entirely and makes
+the Modify observable.
 
-  1. A `tagPlaceObject2` of ANY character (defined decoy included) at a depth
-     that is already occupied, with `is_replace == 0` — which is what the
-     recompiler emits for a Move tag — is a no-op in the runtime. So the
-     re-based sentinel neither replaces "mc" nor removes it.
-  2. The Modify's own effect (the x translate) is not readable back:
-     `_root.holder.mc._x` on a child movie's TAG-PLACED clip returns
-     uninitialized memory (it varied run to run: 8197.8125,
-     -1.92062288988382e-6, -1.48600998484698e+20). That is a separate
-     pre-existing defect — it reproduces with the Modify tag removed
-     entirely — and it is why this test reads `typeof` and `_name` instead of
-     a coordinate.
-  3. `PlaceObject2 Move|HasName` (a rename Modify) is also a no-op here, so
-     the name cannot be used as the channel either.
+THIS TEST DISCRIMINATES
+-----------------------
+Three distinguishable states, all measured:
 
-What the test still buys: it is the only child in the suite whose generated C
-carries `CHARID(0)` in a LIVE `tagPlaceObject2` argument rather than in the
-0-filled sentinel ROW of an empty `FramePlacement` / `SpriteFrameScriptEntry`
-array, which is all the other multi-SWF children have. The moment reason 1
-above changes — the runtime learning to replace, or to warn on an unresolvable
-character — this test starts discriminating, with the decoy already in place.
+  * before the `place_transform_data` fix: `x:` and `y:` are garbage floats
+    that differ on every run (an out-of-bounds read);
+  * with `charId()` sabotaged to offset 0 as well
+    (`std::to_string(id + g_char_id_base)`): the second tag stops being a
+    Modify and becomes a place of the parent's decoy character 1000 at an
+    already-occupied depth, so the translate never lands and the rows read
+    `x:10` / `y:5` — the FIRST placement's matrix;
+  * correct: `x:50` / `y:30`.
 
-See SWFRecompDocs/status/child-charid-stride-unify.md for the full write-up.
+`typeof` and `_name` are kept as controls: they read correctly in all three
+states, so a failure that moves them is a different bug.
+
+See SWFRecompDocs/status/child-placed-clip-uninit.md for the full write-up.
 """
 import struct
 import subprocess
@@ -74,7 +85,8 @@ HERE = Path(__file__).resolve().parent
 INNER_ID = 1          # the sprite placed at depth 1
 DEPTH = 1
 CLIP_NAME = "mc"
-MODIFY_TWIPS = 1000   # 50 px
+PLACE_TWIPS = (200, 100)     # the first placement's matrix: (10, 5) px
+MODIFY_TWIPS = (1000, 600)   # the same-frame Modify's matrix: (50, 30) px
 
 # The parent defines a sprite at exactly the id the child's stride would
 # produce if character id 0 were re-based (movie_id 1 * stride 1000). That is
@@ -125,14 +137,14 @@ def matrix_translate(tx, ty):
     return Bits().u(0, 1).u(0, 1).u(nbits, 5).s(tx, nbits).s(ty, nbits).bytes()
 
 
-def place_character(depth, char_id, name):
+def place_character(depth, char_id, name, tx, ty):
     """PlaceObject2 HasCharacter | HasMatrix | HasName."""
     flags = 0x02 | 0x04 | 0x20
     return tag(26, struct.pack('<BHH', flags, depth, char_id)
-               + matrix_identity() + name.encode('ascii') + b'\x00')
+               + matrix_translate(tx, ty) + name.encode('ascii') + b'\x00')
 
 
-def modify_matrix(depth, tx):
+def modify_matrix(depth, tx, ty):
     """PlaceObject2 Move | HasMatrix — no HasCharacter, so the char id is 0.
 
     PlaceFlagMove (0x01) with HasCharacter (0x02) CLEAR is exactly what makes
@@ -140,7 +152,7 @@ def modify_matrix(depth, tx):
     id at all, and the recompiler emits 0 for it.
     """
     flags = 0x01 | 0x04
-    return tag(26, struct.pack('<BH', flags, depth) + matrix_translate(tx, 0))
+    return tag(26, struct.pack('<BH', flags, depth) + matrix_translate(tx, ty))
 
 
 def show_frame():
@@ -157,18 +169,19 @@ def define_sprite(char_id, declared_frames, body):
 
 def build_child(path):
     tags = define_sprite(INNER_ID, 1, show_frame() + end_tag())
-    tags += place_character(DEPTH, INNER_ID, CLIP_NAME)
-    tags += show_frame()
-    tags += modify_matrix(DEPTH, MODIFY_TWIPS)
+    tags += place_character(DEPTH, INNER_ID, CLIP_NAME, *PLACE_TWIPS)
+    # Same frame as the place: a loaded child never reaches its frame 2 (see
+    # the module docstring), so a cross-frame Modify would simply not run.
+    tags += modify_matrix(DEPTH, *MODIFY_TWIPS)
     tags += show_frame()
     tags += end_tag()
 
     # RECT nbits=15, 0..4000 twips square (200x200 px stage, never rendered).
     rect = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
-    body = rect + struct.pack('<H', 30 << 8) + struct.pack('<H', 2) + tags
+    body = rect + struct.pack('<H', 30 << 8) + struct.pack('<H', 1) + tags
     file_length = 8 + len(body)
     path.write_bytes(b'FWS' + struct.pack('<BI', 8, file_length) + body)
-    print(f'Created {path} (SWF8, 2 frames, {file_length} bytes)')
+    print(f'Created {path} (SWF8, 1 frame, {file_length} bytes)')
 
 
 def read_swf(path):

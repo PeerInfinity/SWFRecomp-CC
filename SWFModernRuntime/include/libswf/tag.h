@@ -517,6 +517,12 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // Defined in tag.c (NO_GRAPHICS builds only). NULL = use main SWF's transform_data.
 extern float (*g_active_transform_data)[16];
 
+// The transform table `obj->transform_id` indexes, or NULL when that is the
+// main movie's `transform_data`. Defined in tag.c (all build modes).
+float (*ng_entryChildTransformData(const DisplayObject* obj))[16];
+// Same, resolved to a usable table (main movie's when there is no override).
+float (*ng_entryTransformData(const DisplayObject* obj))[16];
+
 // (was: #endif — see comment above)
 
 // --- Shared ng_* declarations (from ng_shared.c, always compiled) ---

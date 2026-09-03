@@ -1626,6 +1626,17 @@ size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
 // Transform queries (root-level)
 // ---------------------------------------------------------------------------
 
+// A display entry's transform_id indexes the transform table of the movie whose
+// TAG placed it — the main movie's `transform_data` for everything the main SWF
+// placed, but a loaded child's own array for characters the child placed. Those
+// arrays are unrelated allocations of unrelated sizes (a parent with no timeline
+// content emits `float transform_data[1][16]`), so indexing the main one with a
+// child's id reads past the end and returns a different garbage float each run.
+static inline float (*ENTRY_TRANSFORM_DATA(const DisplayObject* obj))[16] {
+	float (*td)[16] = ng_entryChildTransformData(obj);
+	return td ? td : transform_data;
+}
+
 int ng_getTransformId(size_t depth, u32* out_id)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
@@ -1637,8 +1648,9 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	u32 tid = display_list[depth].transform_id;
-	*out_x = transform_data[tid][12] / 20.0f;
-	*out_y = transform_data[tid][13] / 20.0f;
+	float (*td)[16] = ENTRY_TRANSFORM_DATA(&display_list[depth]);
+	*out_x = td[tid][12] / 20.0f;
+	*out_y = td[tid][13] / 20.0f;
 	return 1;
 }
 
@@ -1648,16 +1660,18 @@ void ng_getDisplayObjTranslation(void* dobj_ptr, float* out_tx, float* out_ty)
 	if (dobj_ptr == NULL) { *out_tx = 0; *out_ty = 0; return; }
 	DisplayObject* dobj = (DisplayObject*)dobj_ptr;
 	u32 tid = dobj->transform_id;
-	*out_tx = transform_data[tid][12] / 20.0f;
-	*out_ty = transform_data[tid][13] / 20.0f;
+	float (*td)[16] = ENTRY_TRANSFORM_DATA(dobj);
+	*out_tx = td[tid][12] / 20.0f;
+	*out_ty = td[tid][13] / 20.0f;
 }
 
 int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	u32 tid = display_list[depth].transform_id;
-	if (out_x) *out_x = (double)transform_data[tid][12] / 20.0;
-	if (out_y) *out_y = (double)transform_data[tid][13] / 20.0;
+	float (*td)[16] = ENTRY_TRANSFORM_DATA(&display_list[depth]);
+	if (out_x) *out_x = (double)td[tid][12] / 20.0;
+	if (out_y) *out_y = (double)td[tid][13] / 20.0;
 	return 1;
 }
 
@@ -1665,10 +1679,11 @@ int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_ysc
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	u32 tid = display_list[depth].transform_id;
-	float m00 = transform_data[tid][0];
-	float m10 = transform_data[tid][1];
-	float m01 = transform_data[tid][4];
-	float m11 = transform_data[tid][5];
+	float (*td)[16] = ENTRY_TRANSFORM_DATA(&display_list[depth]);
+	float m00 = td[tid][0];
+	float m10 = td[tid][1];
+	float m01 = td[tid][4];
+	float m11 = td[tid][5];
 	if (out_xscale)  *out_xscale  = sqrtf(m00*m00 + m10*m10) * 100.0f;
 	if (out_yscale)  *out_yscale  = sqrtf(m01*m01 + m11*m11) * 100.0f;
 	if (out_rotation) *out_rotation = atan2f(m10, m00) * 180.0f / 3.14159265358979323846f;
@@ -1679,10 +1694,11 @@ int ng_getTransformScaleRotationSkew(size_t depth, float* out_xscale, float* out
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
 	u32 tid = display_list[depth].transform_id;
-	float m00 = transform_data[tid][0];
-	float m10 = transform_data[tid][1];
-	float m01 = transform_data[tid][4];
-	float m11 = transform_data[tid][5];
+	float (*td)[16] = ENTRY_TRANSFORM_DATA(&display_list[depth]);
+	float m00 = td[tid][0];
+	float m10 = td[tid][1];
+	float m01 = td[tid][4];
+	float m11 = td[tid][5];
 	float rot_x = atan2f(m10, m00);
 	float rot_y = atan2f(-m01, m11);
 	if (out_xscale)  *out_xscale  = sqrtf(m00*m00 + m10*m10) * 100.0f;

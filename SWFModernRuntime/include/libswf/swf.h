@@ -282,6 +282,21 @@ typedef struct DisplayObject
 	void* resolved_mc;
 	// Cached transform values (populated at placement time for correct bounds on child SWFs)
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
+	// The transform table `transform_id` indexes — i.e. the table belonging to
+	// the movie whose TAG performed this placement, recorded by
+	// ng_cache_transform from g_active_transform_data. NULL = never cached, use
+	// the main movie's `transform_data`.
+	//
+	// This is NOT `child_transform_data` below: that one is keyed on the movie
+	// that DEFINED the character (so a sprite's own frame funcs run against the
+	// right table), and the two disagree exactly when a parent's tag places a
+	// character imported from a child (tagImportCharacter / ng_shared.c copies
+	// the child's movie id onto the local char id, but the tid is the PARENT's).
+	// Indexing the wrong table is an out-of-bounds read, not a wrong number:
+	// a parent with no timeline content has `float transform_data[1][16]`, so a
+	// loaded child's tid 1 reads past the end and `_x` returns a different
+	// garbage float every run.
+	float (*place_transform_data)[16];
 	// Child movie transform data override (set during placement when g_active_transform_data != NULL)
 	float (*child_transform_data)[16];
 	// DisplayObject.opaqueBackground (s16 P2). Sources: PlaceObject3's

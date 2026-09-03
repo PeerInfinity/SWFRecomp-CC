@@ -22646,8 +22646,9 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 									if (_cobj->char_id == 0 || _cobj->instance_name == NULL) continue;
 									if (swf_name_match(_cobj->instance_name, instance_name)) {
 										u32 _tid = _cobj->transform_id;
-										if (!(mc->as_set_flags & 1)) mc->x = transform_data[_tid][12] / 20.0f;
-										if (!(mc->as_set_flags & 2)) mc->y = transform_data[_tid][13] / 20.0f;
+										float (*_ctd)[16] = ng_entryTransformData(_cobj);
+										if (!(mc->as_set_flags & 1)) mc->x = _ctd[_tid][12] / 20.0f;
+										if (!(mc->as_set_flags & 2)) mc->y = _ctd[_tid][13] / 20.0f;
 										break;
 									}
 								}
@@ -28246,8 +28247,9 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				if (_pidx >= 0 && (size_t)_pidx <= max_depth &&
 				    &display_list[_pidx] == (DisplayObject*)p->display_obj) {
 					u32 _ptid = ((DisplayObject*)p->display_obj)->transform_id;
-					if (!(p->as_set_flags & 1)) px = transform_data[_ptid][12] / 20.0f;
-					if (!(p->as_set_flags & 2)) py = transform_data[_ptid][13] / 20.0f;
+					float (*_ptd)[16] = ng_entryTransformData((DisplayObject*)p->display_obj);
+					if (!(p->as_set_flags & 1)) px = _ptd[_ptid][12] / 20.0f;
+					if (!(p->as_set_flags & 2)) py = _ptd[_ptid][13] / 20.0f;
 				}
 			}
 			world_x += px;
@@ -28659,8 +28661,9 @@ static void otf_walk_dl(SWFAppContext* app_context,
 		// deferred (most orphan TFs in test SWFs are identity-placed; the
 		// dejagnu trace TextField is the driver case and is identity).
 		u32 tid = ng_get_original_transform_id(obj);
-		float local_tx = transform_data[tid][12] / 20.0f;
-		float local_ty = transform_data[tid][13] / 20.0f;
+		float (*otd)[16] = ng_entryTransformData(obj);
+		float local_tx = otd[tid][12] / 20.0f;
+		float local_ty = otd[tid][13] / 20.0f;
 		float world_x = parent_tx_px + local_tx;
 		float world_y = parent_ty_px + local_ty;
 
@@ -30121,12 +30124,13 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 				if (!ng_getCharBounds(ch->char_id, &cxmin, &cxmax, &cymin, &cymax)) continue;
 				// Apply the placement matrix (twips * matrix → twips).
 				GEN_EXTERN_TRANSFORM_DATA;
-				float a = transform_data[ch->transform_id][0];
-				float b = transform_data[ch->transform_id][1];
-				float c = transform_data[ch->transform_id][4];
-				float d_ = transform_data[ch->transform_id][5];
-				float tx = transform_data[ch->transform_id][12];
-				float ty = transform_data[ch->transform_id][13];
+				float (*chtd)[16] = ng_entryTransformData(ch);
+				float a = chtd[ch->transform_id][0];
+				float b = chtd[ch->transform_id][1];
+				float c = chtd[ch->transform_id][4];
+				float d_ = chtd[ch->transform_id][5];
+				float tx = chtd[ch->transform_id][12];
+				float ty = chtd[ch->transform_id][13];
 				s32 corners_x[4] = {
 					(s32)(a * cxmin + c * cymin + tx),
 					(s32)(a * cxmax + c * cymin + tx),
@@ -54614,7 +54618,8 @@ void actionGetMember(SWFAppContext* app_context)
 				if (mc->pending_removal) {
 					// Pending_removal MC: compute x from last known transform for full double precision
 					GEN_EXTERN_TRANSFORM_DATA;
-					double _dx = (double)transform_data[mc->last_transform_id][12] / 20.0;
+					float (*_rtd)[16] = ng_entryTransformData((DisplayObject*)mc->display_obj);
+					double _dx = (double)_rtd[mc->last_transform_id][12] / 20.0;
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
 					return;
 				}
@@ -54633,10 +54638,12 @@ void actionGetMember(SWFAppContext* app_context)
 								s32 bxmin, bxmax, bymin, bymax;
 								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
 								GEN_EXTERN_TRANSFORM_DATA;
+								extern DisplayObject* display_list;
+								float (*_btd)[16] = ng_entryTransformData(&display_list[_dep]);
 								u32 _tid;
 								if (ng_getTransformId(_dep, &_tid)) {
-									double _m00 = (double)transform_data[_tid][0];
-									double _m01 = (double)transform_data[_tid][4];
+									double _m00 = (double)_btd[_tid][0];
+									double _m01 = (double)_btd[_tid][4];
 									_dx += (_m00 * (double)bxmin + _m01 * (double)bymin) / 20.0;
 								} else {
 									_dx += (double)bxmin / 20.0;
@@ -54654,7 +54661,12 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_dep != SIZE_MAX) {
 						extern DisplayObject* display_list;
 						u32 _tid = display_list[_dep].transform_id;
-						float* _xf = (float*)app_context->transform_data + _tid * 16;
+						// A loaded child's id indexes the CHILD's static table,
+						// not the GPU-side one (which only carries the main
+						// movie's rows plus dynamic slots).
+						float (*_ctd)[16] = ng_entryChildTransformData(&display_list[_dep]);
+						const float* _xf = _ctd ? _ctd[_tid]
+						                        : (const float*)app_context->transform_data + _tid * 16;
 						double _dx = (double)_xf[12] / 20.0;
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
 						return;
@@ -54685,10 +54697,12 @@ void actionGetMember(SWFAppContext* app_context)
 								s32 bxmin, bxmax, bymin, bymax;
 								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
 								GEN_EXTERN_TRANSFORM_DATA;
+								extern DisplayObject* display_list;
+								float (*_btd)[16] = ng_entryTransformData(&display_list[_dep]);
 								u32 _tid;
 								if (ng_getTransformId(_dep, &_tid)) {
-									double _m10 = (double)transform_data[_tid][1];
-									double _m11 = (double)transform_data[_tid][5];
+									double _m10 = (double)_btd[_tid][1];
+									double _m11 = (double)_btd[_tid][5];
 									_dy += (_m10 * (double)bxmin + _m11 * (double)bymin) / 20.0;
 								} else {
 									_dy += (double)bymin / 20.0;
@@ -54706,7 +54720,12 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_dep != SIZE_MAX) {
 						extern DisplayObject* display_list;
 						u32 _tid = display_list[_dep].transform_id;
-						float* _xf = (float*)app_context->transform_data + _tid * 16;
+						// A loaded child's id indexes the CHILD's static table,
+						// not the GPU-side one (which only carries the main
+						// movie's rows plus dynamic slots).
+						float (*_ctd)[16] = ng_entryChildTransformData(&display_list[_dep]);
+						const float* _xf = _ctd ? _ctd[_tid]
+						                        : (const float*)app_context->transform_data + _tid * 16;
 						double _dy = (double)_xf[13] / 20.0;
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
 						return;
@@ -71546,9 +71565,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								if (_wd != SIZE_MAX) { \
 									u32 _tid = _wdl[_wd].transform_id; \
 									GEN_EXTERN_TRANSFORM_DATA; \
-									_la = (double)transform_data[_tid][0]; _lb = (double)transform_data[_tid][1]; \
-									_lc = (double)transform_data[_tid][4]; _ld = (double)transform_data[_tid][5]; \
-									_ltx = (double)transform_data[_tid][12]; _lty = (double)transform_data[_tid][13]; \
+									float (*_wtd)[16] = ng_entryTransformData(&_wdl[_wd]); \
+									_la = (double)_wtd[_tid][0]; _lb = (double)_wtd[_tid][1]; \
+									_lc = (double)_wtd[_tid][4]; _ld = (double)_wtd[_tid][5]; \
+									_ltx = (double)_wtd[_tid][12]; _lty = (double)_wtd[_tid][13]; \
 									if (_step_mc != NULL && (_step_mc->as_set_flags & (4|8|16))) { \
 										double _xs = (double)_step_mc->xscale / 100.0; \
 										double _ys = (double)_step_mc->yscale / 100.0; \
@@ -74811,10 +74831,11 @@ static void compute_highlight_bounds(
 		if (dl[d].char_id == 0) continue;
 		size_t cid = dl[d].char_id;
 		u32 tid = dl[d].transform_id;
-		float sx = transform_data[tid][0] * parent_sx;
-		float sy = transform_data[tid][5] * parent_sy;
-		float lx = transform_data[tid][12] / 20.0f;
-		float ly = transform_data[tid][13] / 20.0f;
+		float (*htd)[16] = ng_entryTransformData(&dl[d]);
+		float sx = htd[tid][0] * parent_sx;
+		float sy = htd[tid][5] * parent_sy;
+		float lx = htd[tid][12] / 20.0f;
+		float ly = htd[tid][13] / 20.0f;
 		float gx = parent_gx + lx * parent_sx;
 		float gy = parent_gy + ly * parent_sy;
 		if (dictionary[cid].type == CHAR_TYPE_SPRITE) {
@@ -74873,10 +74894,11 @@ static void tab_collect_recursive(
 
 		// Compute GLOBAL position and scale
 		u32 tid = dl[d].transform_id;
-		float local_sx = transform_data[tid][0];
-		float local_sy = transform_data[tid][5];
-		float local_x = transform_data[tid][12] / 20.0f;
-		float local_y = transform_data[tid][13] / 20.0f;
+		float (*ttd)[16] = ng_entryTransformData(&dl[d]);
+		float local_sx = ttd[tid][0];
+		float local_sy = ttd[tid][5];
+		float local_x = ttd[tid][12] / 20.0f;
+		float local_y = ttd[tid][13] / 20.0f;
 		float global_x = parent_global_x + local_x * parent_scale_x;
 		float global_y = parent_global_y + local_y * parent_scale_y;
 		float global_sx = parent_scale_x * local_sx;
