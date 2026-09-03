@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a946ee183838` (2026-08-19T16:36:38.804086+00:00)
-**Current:** `53ee2bc5a155` (2026-09-03T00:32:06.972061+00:00)
+**Previous:** `53ee2bc5a155` (2026-09-03T00:32:06.972061+00:00)
+**Current:** `ef20d2cbc47d` (2026-09-03T02:44:18.930440+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 10 | 10 | 0 |
-| Total | 11 | 12 | +1 |
-| Pass rate | 90.9% | 83.3% | -7.6% |
-| Mismatched lines | 4 | 23 | +19 |
+| Total | 12 | 12 | 0 |
+| Pass rate | 83.3% | 83.3% | 0% |
+| Mismatched lines | 23 | 23 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `avm2_loads_avm1_events` | output_mismatch | 7/26 |
+No changes detected.
