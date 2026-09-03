@@ -201,12 +201,60 @@ provably inconsistent rather than merely uniformly raw).
    `from_shumway/acid/acid-bitmap-fill-2`,
    `visual/{define_bits_lossless2_rgb15, define_bits_jpeg2_huge,
    bitmapdata_copypixels_with_alpha_oob}`, `regression/*` (whole suite), and
-   `mixed_avm/avm1_loads_avm2`. Results below.
+   `mixed_avm/avm1_loads_avm2`. Everything at its published status:
+   `regression` **74/74**; `BitmapData-v8` and `LoadBitmapTest` are
+   `ruffle_matched` (effective pass) as they were; `avm1_loads_avm2` is
+   `output_mismatch`, which it also is at the published baseline. Two entries
+   in that list are not runnable locally and were dropped rather than counted:
+   `avm1/bitmap_data_thorough` is a container of sub-tests with no top-level
+   `test.swf`, and its sub-tests are not in this checkout.
 4. **CI**: below.
 
 ## CI
 
-(filled in after the run)
+Both runs at `2eb6d2425`, `categories=full`. `mode=no-graphics` was dispatched
+alongside `graphics` because this change touches `tag_stubs.c` — the
+`NO_GRAPHICS` arm of `defineBitmap` — which the graphics build never compiles
+(`.claude/pipeline-handoff.md` §"Build mode").
+
+**`mode=graphics` — run `33735478581`**, conclusion success, results merged.
+`scripts/corpus_status_diff.py 2eb6d2425 WORKTREE --per-suite` (baseline = this
+slice's own commit, carrying the previous arc's merged results):
+
+```
+=== intersection: 4483 tests (2eb6d2425 -> WORKTREE, results_graphics) ===
+  output_mismatch    124 ->   124 (+0)
+  pass              4123 ->  4123 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4358 ->  4358 (+0)
+GAINS 0 | REGRESSIONS 0 | OTHER STATUS MOVES 0
+```
+
+Zero regressions and an unmoved histogram — no test changed status in either
+direction, which is what an emission change touching every SWF's `tagInit`
+should look like when the pointer it now passes is byte-for-byte the address
+the reader used to compute. The `regression` suite is **74/74** and
+`avm1_parent_child_bitmap` is `pass` in the published results. (The previous
+arc's baseline was 4482 tests / 4357 effective; the +1/+1 is this slice's new
+test, which is outside the intersection because it did not exist at the
+baseline.)
+
+**`mode=no-graphics` — run `33735513357`**, conclusion success, results merged.
+`scripts/corpus_status_diff.py 2eb6d2425 WORKTREE --stem results --per-suite`:
+
+```
+=== intersection: 4478 tests (2eb6d2425 -> WORKTREE, results) ===
+  output_mismatch    121 ->   121 (+0)
+  pass              4120 ->  4120 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4356 ->  4356 (+0)
+GAINS 0 | REGRESSIONS 0 | OTHER STATUS MOVES 0
+```
+
+Same picture, and it is the arm that actually compiles the `tag_stubs.c` edit.
+`regression` is **74/74** here too, with `avm1_parent_child_bitmap` `pass`.
 
 ## Residuals
 
