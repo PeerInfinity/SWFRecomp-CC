@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-03 09:46 UTC
+**Date**: 2026-09-03 19:23 UTC
 
-**Git SHA**: `2eb6d24254`
+**Git SHA**: `50fcc7f8bd`
 
-**Run Duration**: 0m 48s
+**Run Duration**: 0m 9s
 
 ## Summary
 
@@ -25,10 +25,10 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `convolution_filter_big_matrix` | 2 | 20.6s |  |
+| 1 | `convolution_filter_big_matrix` | 2 | 1.4s |  |
 | 2 | `lzma_length_too_short` | 18 | 1.5s |  |
-| 3 | `swf_length_too_short_no_end` | 19 | 0.9s |  |
-| 4 | `swf_length_too_short_no_second_frame` | 18 | 1.4s |  |
+| 3 | `swf_length_too_short_no_end` | 19 | 0.8s |  |
+| 4 | `swf_length_too_short_no_second_frame` | 18 | 1.0s |  |
 | 5 | `swf_length_zero` | 0 | 1.4s |  |
 
 ## Ruffle-Matched Tests
@@ -37,8 +37,8 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `lzma_length_too_long` | 68 | 68 | 20.8s |  |
-| 2 | `swf_length_too_long` | 6 | 6 | 1.3s |  |
+| 1 | `lzma_length_too_long` | 68 | 68 | 1.1s |  |
+| 2 | `swf_length_too_long` | 6 | 6 | 1.6s |  |
 
 ## Near-Passing Tests
 
