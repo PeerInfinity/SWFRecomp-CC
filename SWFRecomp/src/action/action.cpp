@@ -424,14 +424,24 @@ namespace SWFRecomp
 			           << fn << ", &" << te << ");" << endl
 			           << "\t" << "if (" << rc << " != AVM1_TRY_THROWN) {" << endl
 			           << "\t\t" << "switch (" << rc << ") {" << endl;
+			// Both return exits are dispatched in both contexts: a void
+			// `return;` inside a function body returns undefined, and a
+			// valued return inside a void script drops the value — exactly
+			// what the emitter does for those shapes outside a try.
 			if (context.in_function_body)
 			{
 				out_script << "\t\t" << "case AVM1_TRY_EXIT_RETURN_VALUE: "
-				           << retStmt(te + ".ret") << endl;
+				           << retStmt(te + ".ret") << endl
+				           << "\t\t" << "case AVM1_TRY_EXIT_RETURN: { ActionVar _tr"
+				           << id << " = {0}; _tr" << id
+				           << ".type = ACTION_STACK_VALUE_UNDEFINED; "
+				           << retStmt("_tr" + id) << " }" << endl;
 			}
 			else
 			{
 				out_script << "\t\t" << "case AVM1_TRY_EXIT_RETURN: "
+				           << retStmt("") << endl
+				           << "\t\t" << "case AVM1_TRY_EXIT_RETURN_VALUE: "
 				           << retStmt("") << endl;
 			}
 			for (size_t k = 0; k < exits.size(); k++)
@@ -530,8 +540,24 @@ namespace SWFRecomp
 					if (tb.has_finally)
 					{
 						out_script << "\t" << "if (actionReturnPending(app_context)) {" << endl;
-						out_script << "\t\t"
-						           << retStmt("actionGetPendingReturn(app_context)") << endl;
+						// A top-level script is void: a RETURN deferred to
+						// finally has no return target, so the pending value is
+						// dropped (same rule SWF_ACTION_RETURN applies at top
+						// level). Emitting `return <value>;` there is a
+						// constraint violation gcc only warns about under -w,
+						// but the in-browser clang rejects outright.
+						if (context.in_function_body)
+						{
+							out_script << "\t\t"
+							           << retStmt("actionGetPendingReturn(app_context)")
+							           << endl;
+						}
+						else
+						{
+							out_script << "\t\t"
+							           << "(void) actionGetPendingReturn(app_context); "
+							           << retStmt("") << endl;
+						}
 						out_script << "\t" << "}" << endl;
 					}
 					tb.state = 3;
@@ -1115,7 +1141,7 @@ namespace SWFRecomp
 					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
 							   << retStmt("_hr") << " }" << endl;
 				else
-					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) " << retStmt("") << endl;
 
 				break;
 			}
@@ -1128,7 +1154,7 @@ namespace SWFRecomp
 					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
 							   << retStmt("_hr") << " }" << endl;
 				else
-					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) " << retStmt("") << endl;
 
 				break;
 			}
@@ -2521,14 +2547,14 @@ namespace SWFRecomp
 							   << retStmt("_cr") << " }" << endl;
 					} else {
 						// Top-level frame script (void function)
-						out_script << "\t" << "if (actionCall(app_context)) return;" << endl;
+						out_script << "\t" << "if (actionCall(app_context)) " << retStmt("") << endl;
 					}
 					// Also halt if base clip was removed during the call
 					if (context.in_function_body)
 						out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
 							   << retStmt("_hr") << " }" << endl;
 					else
-						out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
+						out_script << "\t" << "if (actionBaseClipRemoved()) " << retStmt("") << endl;
 
 					break;
 				}
@@ -2698,7 +2724,7 @@ namespace SWFRecomp
 					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
 							   << retStmt("_hr") << " }" << endl;
 				else
-					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) " << retStmt("") << endl;
 
 				break;
 			}
@@ -2711,7 +2737,7 @@ namespace SWFRecomp
 					out_script << "\t" << "if (actionBaseClipRemoved()) { ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; "
 							   << retStmt("_hr") << " }" << endl;
 				else
-					out_script << "\t" << "if (actionBaseClipRemoved()) return;" << endl;
+					out_script << "\t" << "if (actionBaseClipRemoved()) " << retStmt("") << endl;
 
 				break;
 			}
