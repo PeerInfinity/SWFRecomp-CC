@@ -13,6 +13,8 @@ Served from `docs/` at [peerinfinity.github.io/SWFRecomp-CC](https://peerinfinit
 | [Demo gallery](https://peerinfinity.github.io/SWFRecomp-CC/) | Recompiled SWFs running as WebAssembly, with a side-by-side Ruffle comparison view |
 | [In-browser recompiler](https://peerinfinity.github.io/SWFRecomp-CC/recompiler/) | Drop a `.swf` in and it is recompiled to C in the page. Download the generated code with a build script, or compile and run it right there — no toolchain installed |
 
+Beyond the small test SWFs in the gallery, **Seedling** — a full Flash game — has been put through SWFRecomp into WebAssembly. Those builds live in [seedling-wasm](https://github.com/PeerInfinity/seedling-wasm), whose README links the hosted, playable pages.
+
 ## Contents
 
 | Directory | Description | Original Repository |
