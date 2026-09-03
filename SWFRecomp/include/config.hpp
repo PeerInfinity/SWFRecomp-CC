@@ -26,6 +26,13 @@ namespace SWFRecomp
 		//     so keep base + max_child_char_id under 65536.
 		std::string symbol_prefix;
 		uint32_t char_id_base = 0;
+		// True when this recompile is a CHILD movie of another SWF (loaded at
+		// runtime by the parent), rather than the movie the binary starts in.
+		// Nothing about the emitted C changes with it directly; it is the one
+		// thing the recompiler cannot infer from the SWF itself, and the
+		// dead-payload skip needs it (see skip_avm1_payload below). The caller
+		// that recompiles a child sets `[input] child_movie = true`.
+		bool child_movie = false;
 		// Try-helper emission mode (assessment §4.1). OFF by default: at false
 		// every emitter's output is byte-for-bit what it was before this
 		// existed. On, every method / script region with an exception table is
@@ -48,6 +55,10 @@ namespace SWFRecomp
 		// runSWF_avm2 calls neither. AVM2 carries its own copies of those
 		// bytes in RecompiledABC/abc_timeline.c. An AVM1 SWF is untouched at
 		// any setting. The SWF_SKIP_AVM1_PAYLOAD env var forces it on.
+		// ALSO gated on this recompile not being a child movie: `is_as3` means
+		// "this SWF's code is AVM2", not "this SWF's tagInit never runs", and
+		// an AS3 SWF loaded as a child by an AVM1 parent has its tagInit
+		// called by the AVM1 loader (regression/avm1_parent_as3_child_payload).
 		bool skip_avm1_payload = false;
 
 		Config();

@@ -36,6 +36,9 @@ namespace SWFRecomp
 		// C is byte-for-bit what it was before the option existed; on, an AS3
 		// SWF drops the AVM2-dead bitmap/sound/video byte payloads.
 		bool skip_avm1_payload = false;
+		// Config::child_movie — this recompile is a child movie of another
+		// SWF. Only the dead-payload skip reads it (see SWF::dropPayload).
+		bool child_movie = false;
 
 		// tag_main is buffered in memory (stringstream) rather than written
 		// directly to disk so the per-frame init prologue placeholder can

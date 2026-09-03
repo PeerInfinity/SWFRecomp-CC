@@ -922,6 +922,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      # THE PUBLISH GATE. Both publish steps below are gated on its output,
+      # and nothing else. It is fail-CLOSED: an input whose value differs from
+      # the default declared in THIS file blocks publishing unless its name is
+      # in the script's PUBLISH_SAFE set.
+      #
+      # FUTURE OPTION AUTHORS: you do not have to do anything here. Declaring a
+      # new input already guards it — a run that sets it will not publish. Add
+      # the name to PUBLISH_SAFE in scripts/ci/publish_gate.py ONLY if the input
+      # cannot change what a test binary does or what a published number means
+      # (mode/categories/parallel/images are the whole list today), and say why
+      # in that comment block.
+      #
+      # This replaced a hand-maintained `&&` chain that three emission-option
+      # slices in a row each had to extend, each after being bitten
+      # (memory `ci-verify-run-results-clobber`). The chain was fail-OPEN.
+      - name: Decide whether this run may publish results
+        id: publish_gate
+        if: always()
+        env:
+          ALL_INPUTS: ${{ toJSON(inputs) }}
+        run: python3 scripts/ci/publish_gate.py
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -1205,7 +1227,7 @@ jobs:
       # ruffle-test-results branch, which would take scripts/ and the results
       # JSONs this one reads out from under it.
       - name: Publish failing images to ruffle-image-results
-        if: always() && inputs.images == 'true' && inputs.extra_defines == '' && inputs.try_helper == '' && inputs.tu_split == '' && inputs.skip_avm1_payload == ''
+        if: always() && inputs.images == 'true' && steps.publish_gate.outputs.publish == 'true'
         env:
           IMAGE_SRC: ${{ runner.temp }}/image-artifacts
           STEM: ${{ inputs.mode == 'graphics' && 'results_graphics' || 'results' }}
@@ -1326,12 +1348,17 @@ jobs:
         # the branch and erased an arc's published numbers (run 30186909756,
         # 2026-07-26). Its value is the per-test verdict in the log and the
         # uploaded artifact — never the branch.
-        # try_helper, tu_split and skip_avm1_payload likewise: a forced-on
-        # emission run's value is its pass/fail signal, not its numbers —
+        # try_helper, tu_split, skip_avm1_payload, swf_gc, avm2_gc likewise: a
+        # forced-on run's value is its pass/fail signal, not its numbers —
         # publishing them would poison the {STEM}_previous.json baseline the
-        # NEXT (default-emission) run diffs against, exactly as the
-        # extra_defines verify runs used to.
-        if: always() && inputs.extra_defines == '' && inputs.single_test == '' && inputs.try_helper == '' && inputs.tu_split == '' && inputs.skip_avm1_payload == ''
+        # NEXT (default) run diffs against, exactly as the extra_defines verify
+        # runs used to. `limit` too: it publishes a TRUNCATED tree.
+        #
+        # None of that is enumerated here any more. The list of what may
+        # publish lives in scripts/ci/publish_gate.py (step `publish_gate`
+        # above), which blocks any input that differs from its declared
+        # default — including an input added after this comment was written.
+        if: always() && steps.publish_gate.outputs.publish == 'true'
         env:
           MODE: ${{ inputs.mode }}
           LIMIT: ${{ inputs.limit }}

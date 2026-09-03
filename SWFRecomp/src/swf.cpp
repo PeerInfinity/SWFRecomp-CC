@@ -380,6 +380,7 @@ namespace SWFRecomp
 		// Dead-payload skip (assessment §2.2). Only ever true together with
 		// is_as3, so an AVM1 SWF's emission is untouched at any setting.
 		skip_avm1_payload = context.skip_avm1_payload;
+		child_movie = context.child_movie;
 
 		// Configure reusable struct records
 		//

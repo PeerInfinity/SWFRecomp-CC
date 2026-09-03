@@ -1139,12 +1139,19 @@ def recompile_child_swf(swf_path, output_dir, symbol_prefix="", char_id_base=0):
         # The child needs its OWN config (the shared one has no per-child
         # keys), so write it rather than passing RECOMP_CONFIG's path.
         cfg = RECOMP_CONFIG.read_text()
+        # `child_movie` on EVERY child, prefixed or not: it is what stops the
+        # dead-payload skip (skip_avm1_payload) from dropping an AS3 child's
+        # AVM1-side bitmap/sound payload, which the loader's init_func call
+        # still needs. An AVM1 parent's children get no symbol_prefix, so the
+        # prefix alone would not have covered exactly the seam it exists for
+        # (regression/avm1_parent_as3_child_payload).
+        extra = ['child_movie = true']
         if symbol_prefix or char_id_base:
-            cfg = cfg.replace(
-                'output_scripts_folder = "RecompiledScripts"',
-                'output_scripts_folder = "RecompiledScripts"\n'
-                f'symbol_prefix = "{symbol_prefix}"\n'
-                f'char_id_base = {char_id_base}')
+            extra.append(f'symbol_prefix = "{symbol_prefix}"')
+            extra.append(f'char_id_base = {char_id_base}')
+        cfg = cfg.replace(
+            'output_scripts_folder = "RecompiledScripts"',
+            'output_scripts_folder = "RecompiledScripts"\n' + '\n'.join(extra))
         child_cfg = tmp / "config.toml"
         child_cfg.write_text(cfg)
         try:
@@ -1682,6 +1689,22 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         # tagDefineSoundMeta(app_context, CHAR_ID, ...) — 2nd arg
         tag_main_text = re.sub(
             r'(tagDefineSoundMeta\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineSound(app_context, CHAR_ID, ...) — 2nd arg. Without this the
+        # child's sound registers its duration/rate metadata under the RAW id
+        # while tagRegisterExport (offset just above) publishes the OFFSET id,
+        # so `new Sound().attachSound("<child export>")` resolved the export and
+        # then found no metadata: getDuration() === undefined. Found building
+        # regression/avm1_parent_as3_child_payload.
+        tag_main_text = re.sub(
+            r'(tagDefineSound\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagStartSound(app_context, CHAR_ID, ...) — 2nd arg. Offset in the
+        # same breath as tagDefineSound above: the two must agree, and before
+        # this pair BOTH were raw, so a child playing its own sound kept
+        # working by accident. Moving only the define would have broken it.
+        tag_main_text = re.sub(
+            r'(tagStartSound\(app_context,\s*)(\d+)(\s*,)',
             _offset_char_id, tag_main_text)
         # tagDefineVideoMeta(app_context, CHAR_ID, ...) — 2nd arg
         tag_main_text = re.sub(

@@ -376,7 +376,30 @@ namespace SWFRecomp
 		std::ostream null_payload_stream;
 		bool skip_avm1_payload = false;
 		bool avm1_payload_kept = false;
-		bool dropPayload() const { return skip_avm1_payload && is_as3; }
+		// True when this recompile is a CHILD movie (Context::child_movie, or
+		// either multi-SWF emission key being non-default — a main movie sets
+		// neither). See isChildRecompile()'s use below.
+		bool child_movie = false;
+		// A child movie NEVER drops its payload, whatever the option says.
+		// `is_as3` is the SWF's own VM, not a statement about whether its
+		// tagInit runs: the AVM1 loader calls a loaded child's init_func
+		// (`entry->init_func`, five sites in actionmodern/action.c), so an AS3
+		// child of an AVM1 parent needs its AVM1-side bitmap/sound dictionary
+		// even though its own code is AVM2 — and in that configuration the
+		// AVM2 copies of those bytes are not even linked (an AVM1 parent's
+		// build compiles no RecompiledABC for its children). Locked by
+		// regression/avm1_parent_as3_child_payload, which fails without this.
+		// Cost: a child keeps its payload bytes. Children are rare and small
+		// (one AS3 child in the whole Ruffle corpus carries one), and the
+		// mode's win is a root-movie win — the page recompiles one SWF.
+		bool isChildRecompile() const
+		{
+			return child_movie || !abc_symbol_prefix.empty() || abc_char_id_base != 0;
+		}
+		bool dropPayload() const
+		{
+			return skip_avm1_payload && is_as3 && !isChildRecompile();
+		}
 		std::ostream& payloadSink(std::stringstream& real)
 		{
 			if (dropPayload()) return null_payload_stream;

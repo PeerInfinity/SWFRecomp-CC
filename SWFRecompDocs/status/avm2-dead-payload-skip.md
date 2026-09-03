@@ -297,14 +297,25 @@ and re-measure first — the numbers that motivated it no longer hold.
 
 ## Residuals / notes
 
-- **The option is gated on `is_as3`, not on "will be run under AVM2".** The one
-  configuration where those differ is an AS3 SWF loaded as a CHILD by an
-  **AVM1** parent: the AVM1 loader calls a child's `init_func` (= its
-  `tagInit`) from `action.c`, so with the option on such a child would no
-  longer define its bitmaps/sounds on the AVM1 side. No corpus test is in that
-  shape (the only AS3 child with a payload, `from_shumway/as3-loader`'s, has an
-  AS3 parent), the option is off by default, and the page only ever recompiles
-  one SWF at a time. Worth remembering if the mode is ever made a default.
+- **The option was gated on `is_as3`, not on "will be run under AVM2".**
+  ~~Worth remembering if the mode is ever made a default.~~ **CLOSED
+  2026-09-02** (`SWFRecompDocs/status/emission-mode-residuals.md`). The seam
+  was real and is now a corpus test: `regression/avm1_parent_as3_child_payload`
+  (an MTASC AVM1 parent `loadMovie`s an AS3-flagged child carrying
+  `DefineSound` + `ExportAssets`; `getDuration()` traced `undefined` with the
+  option on). The gate is now
+  `skip_avm1_payload && is_as3 && !isChildRecompile()`, where
+  `isChildRecompile()` = `child_movie || !abc_symbol_prefix.empty() ||
+  abc_char_id_base != 0` — a child movie NEVER drops its payload, whatever the
+  option says. `[input] child_movie = true` is written by whoever recompiles a
+  child (`recompile_child_swf` in `verify_output.py`, for every child); the two
+  multi-SWF emission keys are belt and braces, since an AVM1 parent's children
+  get neither. Note the brief's cheapest candidate — gate on
+  `avm2_symbol_prefix.empty()` alone — would NOT have closed this: an AVM1
+  parent's child is recompiled with no prefix, which is exactly the failing
+  configuration. Default emission is still byte-identical, and so is forced-on
+  emission for a ROOT movie: the only thing that changed is that a child keeps
+  its bytes.
 - `BITMAP_COUNT` / `BITMAP_HIGHEST_W|H` in `constants.h` are unchanged: the
   bitmaps are still parsed and counted, only their pixels are not written out.
   Under AVM2 those constants feed a `bitmap_count`-sized index table in

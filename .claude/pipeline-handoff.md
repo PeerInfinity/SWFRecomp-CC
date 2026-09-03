@@ -46,6 +46,26 @@ Every `ruffle-tests.yml` dispatch (any mode / any `parallel` / with or without `
 
 `-f single_test=NAME` now runs in its own lean **`Single test`** job that builds, runs the one test, and uploads the result JSON as an artifact — it does **not** touch `ruffle-test-results`. Previously it satisfied the publish guard and force-pushed a whole results tree rebuilt from the *master checkout*, so dispatching one before pushing a results merge reverted the branch to its pre-merge state (run `30186909756`). The old "push the merge before dispatching a single-test verify" ordering rule is therefore obsolete. Read the verdict from the `Verify single test` log step. Two behavior notes: it downloads **every** category (so a `from_avmplus` or misc test is runnable, which it wasn't before), and in `mode=graphics` it requires a warm Dawn cache — on a miss it fails fast telling you to run `build-dawn.yml`, rather than building Dawn inline for ~30 min.
 
+### The publish gate is computed, not enumerated (2026-09-02)
+
+Which runs may force-push their numbers to `ruffle-test-results` is decided by
+`scripts/ci/publish_gate.py` (step `publish_gate` in `combine-results`), and
+both publish steps — results and failing images — are gated on its single
+output. It is **fail-closed**: an input whose value differs from the default
+declared in `ruffle-tests.yml` blocks publishing unless its name is in that
+script's `PUBLISH_SAFE` set (`mode`, `categories`, `parallel`, `images` — the
+four that cannot change what a binary does or what a number means).
+
+So **a run that sets any other input publishes nothing**: `extra_defines`,
+`swf_gc`, `avm2_gc`, `try_helper`, `tu_split`, `skip_avm1_payload`,
+`single_test` — and now also `limit`, which used to publish a TRUNCATED tree
+over the baseline. Read such a run's verdict from its log and its uploaded
+artifact; never wait for it on the branch.
+
+Adding a new input needs no edit here and no edit to the guard: it is guarded
+the moment it is declared. `python3 scripts/ci/publish_gate.py --self-test`
+checks the parser and the decision table against the real workflow file.
+
 ## State file
 
 Path: `.pipeline-state` (gitignored). Compact JSON, one line:

@@ -41,6 +41,7 @@ int main(int argc, char** argv)
 	context.try_helper = config.try_helper;
 	context.tu_split = config.tu_split;
 	context.skip_avm1_payload = config.skip_avm1_payload;
+	context.child_movie = config.child_movie;
 	
 	try
 	{
