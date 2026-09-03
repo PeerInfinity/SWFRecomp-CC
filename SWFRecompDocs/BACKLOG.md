@@ -91,6 +91,53 @@ first).
   make both harmless today; revisit if headroom shrinks or session
   lengths grow. (2026-07-18)
 
+## Multi-SWF (loaded children)
+
+- **The child-movie char-id offset list is hand-maintained and known
+  incomplete.** `generate_child_movie_file` (`ruffle-tests/verify_output.py`)
+  adds `movie_id * 1000` to a child SWF's character ids with **one `re.sub`
+  per emitted call name**, so any call the list does not name keeps its RAW id
+  and silently disagrees with every call that was offset (memory
+  `child-movie-charid-offset-per-callsite`). Audited 2026-09-03 while fixing
+  `defineBitmap`: **four regexes are dead** — `tagDefineEditText`,
+  `tagDefineFont`, `tagDefineSoundMeta`, `tagDefineVideoMeta` name calls the
+  recompiler no longer emits — and these LIVE char/font/sprite-id calls are
+  unoffset while `tagDefineSprite` / `tagRegisterExport` / `tagPlaceObject2*`
+  are: `tagSetSpritePlacements`, `tagSetSpriteFrameCounts`,
+  `tagSetSpriteLabels`, `tagSetSpriteNoEndTag` (**half-applied today**, since
+  the sprite they describe IS offset), `tagDoInitActionGuarded`,
+  `tagPlaceObject3`, `tagReplaceObject2RatioWithClipActions` (the
+  `tagPlaceObject2\w*` regex matches neither name), `tagDefineEditTextProps`,
+  `tagDefineText`, `tagCSMTextSettings`, `tagDefineFontGlyphBase`/`Info`/
+  `Metrics`, `tagDefineVideoStream`, `tagVideoFrame`, `tagImportCharacter`,
+  and `tagDefineButton`'s 4th argument `hit_char_id`. No failing test covers
+  any of them. **Take them a PAIR at a time with a failing test each** —
+  moving a define without its consumers is exactly how the `tagDefineSound`
+  pair broke; sprite metadata first, as the one that is provably inconsistent
+  rather than merely uniformly raw. Full inventory and reasoning:
+  `SWFRecompDocs/status/child-movie-bitmap-registry.md` §"Audit". The real fix
+  is to stop it being a list of regexes at all — give the emitted calls a
+  wrapper the harness can key on. (2026-09-03)
+- **A loaded child's bitmaps never reach the renderer.** Two gates, both
+  stated in the ROOT movie's terms: `finalizeBitmaps()` is emitted at the end
+  of the root's `tagInit` so `render_webgpu_upload_bitmap` early-returns on
+  `bitmap_static_built`, and the static slot table is sized by the root's
+  `BITMAP_COUNT` (`ctx->current_bitmap >= ctx->bitmap_count`). So a child's
+  `defineBitmap` calls are dropped and its bitmaps do not render — a missing
+  feature, not a corrupt read. `BitmapData.loadBitmap`, the AS-visible path,
+  was fixed 2026-09-03 and the renderer now stores per-bitmap pointers
+  (`ctx->bitmap_ptrs`) rather than root-relative offsets, so lifting these
+  gates cannot re-inherit the wrong-array bug; what is left is giving the
+  renderer a per-movie static-bitmap range. No corpus test exercises it.
+  (2026-09-03)
+- **`flashbang_upload_bitmap`'s offset bug is fixed but untested.** The SDL3
+  backend read `((u32*)context->bitmap_data)[bitmap_pixel]` — the start of the
+  array — for every bitmap, so every bitmap after the first uploaded the first
+  one's pixels. Fixed 2026-09-03 in passing when the call started taking a
+  pointer. Nothing in CI grades flashbang (see "flashbang backend: delete or
+  fold into render_webgpu.c" above), so the fix is unverified beyond
+  inspection. (2026-09-03)
+
 ## Deferred test failures
 
 - **`avm2/edittext_align` intermittent segfault after byte-correct output
