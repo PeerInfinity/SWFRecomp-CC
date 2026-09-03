@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-03T04:10:50.791504+00:00",
-    "old_git_sha": "39ad765df8fd6e878f7bc33e87ff36ee1c5a5c31",
-    "new_timestamp": "2026-09-03T05:27:40.827761+00:00",
-    "new_git_sha": "968e34acb1ee732d0feb0c6423747bcc99056e2c",
+    "old_timestamp": "2026-09-03T05:27:40.827761+00:00",
+    "old_git_sha": "968e34acb1ee732d0feb0c6423747bcc99056e2c",
+    "new_timestamp": "2026-09-03T07:28:26.812769+00:00",
+    "new_git_sha": "24c1d07a7ee2efc79b0fc241c20491c139604ec7",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 72,
     "old_total": 72,
     "old_pass_rate": 100.0,
-    "new_pass": 72,
+    "new_pass": 73,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 72,
-    "new_total": 72,
+    "new_effective_pass": 73,
+    "new_total": 73,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 72,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_parent_as3_child_payload",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    }
+  ]
 }
