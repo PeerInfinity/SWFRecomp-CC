@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-03T19:03:26.044838+00:00",
-    "git_sha": "50fcc7f8bda9afd6cfb67539c5267657e1df62d4",
-    "duration_seconds": 86.96,
+    "timestamp": "2026-09-03T20:58:31.626489+00:00",
+    "git_sha": "92ee912f3fac38f6b9bf0697a52d9b248e8f79fb",
+    "duration_seconds": 90.63,
     "total_available": 12,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "avm1_doabc",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.96,
+        "compile": 1.768,
         "run": 0.265
       },
       "num_frames": 1,
@@ -31,15 +31,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.24,
+      "duration": 2.05,
       "status": "pass"
     },
     {
       "test": "avm1_loads_avm2",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.838,
-        "run": 0.265
+        "recomp": 0.004,
+        "compile": 1.585,
+        "run": 0.266
       },
       "num_frames": 2,
       "lines": {
@@ -47,7 +47,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 2.12,
+      "duration": 1.86,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "Created clip\nLoaded AVM2 movie into non-root\nLoaded AVM2 movie into root",
@@ -56,8 +56,8 @@
     {
       "test": "avm1_loads_avm2_doaction",
       "phases": {
-        "recomp": 0.003,
-        "compile": 1.46,
+        "recomp": 0.004,
+        "compile": 1.575,
         "run": 0.215
       },
       "num_frames": 3,
@@ -66,14 +66,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 1.68,
+      "duration": 1.88,
       "status": "pass"
     },
     {
       "test": "avm1_sprite_sc_ignored",
       "phases": {
-        "recomp": 0.004,
-        "compile": 20.239,
+        "recomp": 0.005,
+        "compile": 21.153,
         "run": 0.265
       },
       "num_frames": 3,
@@ -82,15 +82,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 20.51,
+      "duration": 21.43,
       "status": "pass"
     },
     {
       "test": "avm2_doaction",
       "phases": {
-        "recomp": 0.006,
-        "compile": 8.333,
-        "run": 0.265
+        "recomp": 0.005,
+        "compile": 6.282,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -98,15 +98,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 8.62,
+      "duration": 6.51,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1",
       "phases": {
-        "recomp": 0.005,
-        "compile": 6.572,
-        "run": 0.215
+        "recomp": 0.006,
+        "compile": 8.337,
+        "run": 0.265
       },
       "num_frames": 4,
       "lines": {
@@ -114,14 +114,14 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 6.8,
+      "duration": 8.62,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_doabc",
       "phases": {
-        "recomp": 0.006,
-        "compile": 7.886,
+        "recomp": 0.004,
+        "compile": 7.78,
         "run": 0.265
       },
       "num_frames": 4,
@@ -130,15 +130,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 8.17,
+      "duration": 8.06,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_events",
       "phases": {
-        "recomp": 0.007,
-        "compile": 8.511,
-        "run": 0.315
+        "recomp": 0.004,
+        "compile": 6.091,
+        "run": 0.215
       },
       "num_frames": 8,
       "lines": {
@@ -146,7 +146,7 @@
         "expected_lines": 26,
         "matching_lines": 7
       },
-      "duration": 8.84,
+      "duration": 6.32,
       "status": "output_mismatch",
       "detail": "19 line(s) differ (actual=25, expected=26)",
       "actual_output": "added: target=[object Loader], currentTarget=[object Loader], eventPhase=2, bubbles=true\naddedToStage: target=[object Loader], currentTarget=[object Loader], eventPhase=2, bubbles=false\nopen: target=[object LoaderInfo], currentTarget=[object LoaderInfo], eventPhase=2, bubbles=false\nprogress: bytesLoaded=0, bytesTotal=57\nprogress: bytesLoaded=57, bytesTotal=57\nadded: target=[object AVM1Movie], currentTarget=[object Loader], eventPhase=3, bubbles=true\nchild\nframe 1\ninit: target=[object LoaderInfo], currentTarget=[object LoaderInfo], eventPhase=2, bubbles=false\nhttpStatus: status=0\ncomplete: target=[object LoaderInfo], currentTarget=[object LoaderInfo], eventPhase=2, bubbles=false\nremoved: target=[object AVM1Movie], currentTarget=[object Loader], eventPhase=3, bubbles=true\nopen: target=[object LoaderInfo], currentTarget=[object LoaderInfo], eventPhase=2, bubbles=false\nprogress: bytesLoaded=0, bytesTotal=57\nprogress: bytesLoaded=57, bytesTotal=57\nadded: target=[object AVM1Movie], currentTarget=[object Loader], eventPhase=3, bubbles=true\nchild\nframe 2\ninit: target=[object LoaderInfo], currentTarget=[object LoaderInfo], eventPhase=2, bubbles=false\nhttpStatus: status=0\ncomplete: target=[object LoaderInfo], currentTarget=[object LoaderInfo], eventPhase=2, bubbles=false\nframe 3\nframe 4\nframe 5\nframe 6",
@@ -155,9 +155,9 @@
     {
       "test": "avm2_loads_avm1_loads_avm2_doabc",
       "phases": {
-        "recomp": 0.005,
-        "compile": 6.753,
-        "run": 0.215
+        "recomp": 0.006,
+        "compile": 8.81,
+        "run": 0.315
       },
       "num_frames": 4,
       "lines": {
@@ -165,14 +165,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 6.98,
+      "duration": 9.14,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_loads_into_root",
       "phases": {
         "recomp": 0.006,
-        "compile": 8.372,
+        "compile": 8.377,
         "run": 0.265
       },
       "num_frames": 3,
@@ -181,15 +181,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 8.65,
+      "duration": 8.66,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_v10",
       "phases": {
-        "recomp": 0.005,
-        "compile": 5.777,
-        "run": 0.215
+        "recomp": 0.007,
+        "compile": 7.276,
+        "run": 0.265
       },
       "num_frames": 3,
       "lines": {
@@ -197,15 +197,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 6.0,
+      "duration": 7.56,
       "status": "pass"
     },
     {
       "test": "avm2_loads_avm1_v9",
       "phases": {
-        "recomp": 0.004,
-        "compile": 5.449,
-        "run": 0.215
+        "recomp": 0.007,
+        "compile": 7.526,
+        "run": 0.315
       },
       "num_frames": 3,
       "lines": {
@@ -213,7 +213,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 5.67,
+      "duration": 7.86,
       "status": "pass"
     }
   ]
