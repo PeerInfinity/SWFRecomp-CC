@@ -4029,10 +4029,12 @@ uint32_t avm2_statictext_collect_glyphs(Avm2Context* ctx,
 	Avm2GlyphPlacement* gl =
 		avm2_alloc(ctx, (size_t) st->glyph_count * sizeof(Avm2GlyphPlacement));
 	uint32_t n = 0;
+	// A child movie's DefineText names a run in ITS OWN static-glyph table,
+	// not the root's (avm2_display.c avm2_display_static_glyphs_for).
+	const Avm2StaticGlyph* glyphs = avm2_display_static_glyphs_for(st);
 	for (uint32_t i = 0; i < st->glyph_count; i++)
 	{
-		const Avm2StaticGlyph* sg =
-			&avm2_generated_static_glyphs[st->glyph_start + i];
+		const Avm2StaticGlyph* sg = &glyphs[st->glyph_start + i];
 		const Avm2FontData* fd = font_by_id(sg->font_id);
 		if (fd == NULL || fd->glyph_pts == NULL) continue;
 		if (sg->glyph >= fd->glyph_count) continue;

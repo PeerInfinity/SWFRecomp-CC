@@ -346,23 +346,45 @@ first).
   being the two fixtures, `regression` 84/84 -> 86/86. Local sweep of the 348
   tests that bundle a second SWF: 0 regressions, 0 gains. Closeout:
   `SWFRecompDocs/status/child-static-text-and-morphs.md`. (2026-09-04)
-- **An AVM2 (Loader-loaded AS3) child's shapes still do not render**, and the
-  reason is bigger than a missing base: **`ng_buildMovieRenderTables` is never
-  called on the AVM2 path at all.** Its only two call sites are
-  `swf.c::swfStart` and `swf_core.c::runSWF`, both AVM1 entry points; an AS3
-  root boots through `avm2_main.c::runSWF_avm2`, so the combined tables are
-  never built, `ng_movieRenderTablesActive()` is 0 and every `MovieEntry` base
-  stays 0. (This corrects the 2026-09-04 framing that called it "a routing
-  problem, not a missing-data one".) The work is: call the builder from the
-  AVM2 boot before `avm2_render_init`; give `shape_geom_for` / `statictext_for`
-  / `avm2_display_char_is_defined` the `g_child_movies` fall-through
-  `char_info` already has; add the owning movie's base at `resolve_shape_geom`
-  (an `Avm2MovieTables*` -> `MovieEntry*` pointer compare); convert the
-  raw-symbol geometry readers in `avm2_display.c` / `avm2_cpu_raster.c`; and
-  note that AVM2 STATIC TEXT is a separate index space
-  (`Avm2StaticGlyph{font_id, glyph}`, not a `glyph_data` row) needing its own
-  base. Full site list: `SWFRecompDocs/status/child-static-text-and-morphs.md`
-  §6. (2026-09-04)
+- ~~**An AVM2 (Loader-loaded AS3) child's shapes still do not render.**~~
+  **DONE 2026-09-04** (multi-SWF slice 9). The reason was bigger than a missing
+  base: `ng_buildMovieRenderTables` had exactly two call sites,
+  `swf.c::swfStart` and `swf_core.c::runSWF`, both AVM1 entry points, so on the
+  AVM2 boot no combined table was ever built. It is now called from
+  `runSWF_avm2` at the earliest point that satisfies BOTH AVM1 orderings
+  ("before any define tag re-bases an offset" = `resolve_shape_geom` at place
+  time; "before the renderer reads app_context's tables" = `avm2_render_init`),
+  with `ng_predeclareChildBitmaps()` one line after `avm2_render_init` as
+  `swf.c:1719` does. `resolve_shape_geom` adds the defining movie's
+  `shape_vert_base` / `morph_end_vert_base`, found by pointer-comparing the
+  character's `Avm2MovieTables` against the generated registry; `shape_geom_for`,
+  `statictext_for` and `avm2_display_char_is_defined` gained the
+  `g_child_movies` fall-through; and the raw-symbol readers in
+  `avm2_display.c` / `avm2_cpu_raster.c` went to the combined tables with the
+  established NULL fallback. **Two corrections to the site list this entry
+  carried.** (a) A FOURTH MAIN-only lookup was load-bearing and unlisted: the
+  generic display allocator resolved a class to its character through
+  `char_for_class`, whose `g_symbol_map` holds the MAIN movie's SymbolClass
+  rows only — so a child's own `new Art()` of its embedded symbol produced an
+  EMPTY sprite, and every geometry fix was invisible until that line moved to
+  `avm2_display_child_char_for_class` (gated on `g_child_movie_count > 0`).
+  (b) AVM2 static text needed **no base**: a child's `Avm2StaticGlyph` rows
+  live in the CHILD's `static_glyphs` array and `glyph_start` is numbered from
+  0 there, so it is a REGISTRY lookup keyed on the `Avm2StaticTextData*`
+  pointer, not an index re-base. Also forced: `color_data`, `gradient_data`,
+  `uninv_mat_data` and both morph END tables move to ALL build modes, because
+  `avm2_cpu_raster.c` is reachable in NO_GRAPHICS via `BitmapData.draw` and
+  would otherwise read the ROOT's arrays at a child's index (`cxform_data` and
+  `bitmap_data` stay graphics-only — nothing outside the renderer indexes
+  them). Anchored by `regression/avm2_parent_child_render`: `chd:in`
+  false->true (`hitTestPoint`, the triangle walk) and `chd:px` ffffff->ff
+  (`BitmapData.draw` + `getPixel`, the only trace-visible read of a fill
+  COLOUR) in BOTH modes, plus a tolerance-0 image comparison that moves 22964
+  outlier channels -> 96. Closeout:
+  `SWFRecompDocs/status/avm2-child-render-arm.md`; §7 there is what it does NOT
+  cover (AVM2 static text is implemented but ungraded — its fixture needs the
+  `avm2_static_text/build_statictext.py` splice run against `child.swf`).
+  (2026-09-04)
 - **A loaded child whose stage HEIGHT differs from the root's renders shifted.**
   The recompiler bakes the y-flip into every vertex as `FRAME_HEIGHT - y`, per
   movie, so a 200-high child loaded into a 400-high parent is 200 px off. Both

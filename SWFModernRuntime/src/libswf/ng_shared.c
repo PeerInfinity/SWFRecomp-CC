@@ -2246,6 +2246,20 @@ static const float (*g_ng_combined_morph_end_color)[4] = NULL;
 const float (*ng_combinedMorphEndShapeData(void))[2] { return g_ng_combined_morph_end_shape; }
 const float (*ng_combinedMorphEndColorData(void))[4] { return g_ng_combined_morph_end_color; }
 
+// The combined fill-style tables (graphics builds only; NULL otherwise). The
+// AVM1 renderer reaches all three through `app_context`, which the combine
+// pass rewrites in place; the AVM2 CPU raster and morph walk read the
+// generated symbols DIRECTLY, so they need the same fall-back contract as
+// ng_combinedShapeData. gradient_data and uninv_mat_data share one index
+// space (a vertex's style word carries one id for both), so they are combined
+// to a shared row count and exposed as a pair.
+static const float (*g_ng_combined_color_data)[4] = NULL;
+static const u8    (*g_ng_combined_gradient_data)[4] = NULL;
+static const float*  g_ng_combined_uninv_mat_data = NULL;
+const float (*ng_combinedColorData(void))[4] { return g_ng_combined_color_data; }
+const u8 (*ng_combinedGradientData(void))[4] { return g_ng_combined_gradient_data; }
+const float* ng_combinedUninvMatData(void) { return g_ng_combined_uninv_mat_data; }
+
 // Base of `movie_id`'s rows in each combined table. Movie 0 is the main SWF and
 // is always 0.
 u32 ng_movieShapeVertBase(u8 movie_id)
@@ -2423,18 +2437,21 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 	// TextSnapshot read these tables in NO_GRAPHICS too.
 	size_t root_text = app_context->text_data_size / sizeof(u32);
 	size_t root_glyphs = app_context->glyph_data_size / (4 * sizeof(u32));
-#ifndef NO_GRAPHICS
-	size_t root_cxforms = app_context->cxform_data_size / (20 * sizeof(float));
+	// Fill styles and morph ENDs are combined in EVERY mode too: the AVM2 CPU
+	// raster (BitmapData.draw, the CPU frame dump) and the AVM2 exact hit test
+	// read them under NO_GRAPHICS, with indices that resolve_shape_geom has
+	// re-based onto the combined numbering.
 	size_t root_colors = app_context->color_data_size / (4 * sizeof(float));
 	size_t root_uninv = app_context->uninv_mat_data_size / (16 * sizeof(float));
 	size_t root_grads = app_context->gradient_data_size / (256 * 4);
 	size_t root_style = root_uninv > root_grads ? root_uninv : root_grads;
-	size_t root_bitmaps = app_context->bitmap_count;
 	size_t root_mverts = app_context->morph_end_shape_data_size / (2 * sizeof(float));
 	size_t root_mcolors = app_context->morph_end_color_data_size / (4 * sizeof(float));
+#ifndef NO_GRAPHICS
+	size_t root_cxforms = app_context->cxform_data_size / (20 * sizeof(float));
+	size_t root_bitmaps = app_context->bitmap_count;
 #else
-	size_t root_style = 0, root_colors = 0, root_bitmaps = 0, root_cxforms = 0;
-	size_t root_mverts = 0, root_mcolors = 0;
+	size_t root_bitmaps = 0, root_cxforms = 0;
 #endif
 
 	size_t tot_verts = root_verts;
@@ -2464,38 +2481,34 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 		tot_xforms  += e->transform_count;
 		tot_text    += e->text_count;
 		tot_glyphs  += e->glyph_count;
-#ifndef NO_GRAPHICS
 		b->color      = (u32) tot_colors;
 		b->style      = (u32) tot_style;
-		b->bitmap     = (u32) tot_bitmaps;
-		b->cxform     = (u32) tot_cxforms;
 		b->morph_vert  = (u32) tot_mverts;
 		b->morph_color = (u32) tot_mcolors;
 		e->color_base      = b->color;
 		e->gradient_base   = b->style;
 		e->uninv_mat_base  = b->style;
-		e->bitmap_base     = b->bitmap;
-		e->cxform_base     = b->cxform;
 		e->morph_end_vert_base  = b->morph_vert;
 		e->morph_end_color_base = b->morph_color;
 		tot_colors  += e->color_count;
 		tot_style   += style_n;
-		tot_bitmaps += e->bitmap_count;
-		tot_cxforms += e->cxform_count;
 		tot_mverts  += e->morph_end_vert_count;
 		tot_mcolors += e->morph_end_color_count;
+#ifndef NO_GRAPHICS
+		b->bitmap     = (u32) tot_bitmaps;
+		b->cxform     = (u32) tot_cxforms;
+		e->bitmap_base     = b->bitmap;
+		e->cxform_base     = b->cxform;
+		tot_bitmaps += e->bitmap_count;
+		tot_cxforms += e->cxform_count;
 #else
-		// NO_GRAPHICS has no colour/gradient/bitmap/cxform arrays on
-		// app_context at all, so none of them is combined and every base must
-		// stay 0 — a nonzero cxform base with an un-combined array is an
-		// out-of-bounds read, and it would only appear with a SECOND child
-		// movie (the first one's base is 0 either way).
-		(void) style_n;
-		b->color = b->style = b->bitmap = b->cxform = 0;
-		b->morph_vert = b->morph_color = 0;
-		e->color_base = e->gradient_base = e->uninv_mat_base = 0;
+		// NO_GRAPHICS has no bitmap/cxform arrays on app_context at all, so
+		// neither is combined and both bases must stay 0 — a nonzero cxform
+		// base with an un-combined array is an out-of-bounds read, and it
+		// would only appear with a SECOND child movie (the first one's base is
+		// 0 either way).
+		b->bitmap = b->cxform = 0;
 		e->bitmap_base = e->cxform_base = 0;
-		e->morph_end_vert_base = e->morph_end_color_base = 0;
 #endif
 	}
 
@@ -2638,6 +2651,8 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 		}
 	}
 
+#endif
+
 	// --- solid fill colours ------------------------------------------------
 	if (tot_colors > root_colors) {
 		float (*cd)[4] = (float (*)[4]) calloc(tot_colors, 4 * sizeof(float));
@@ -2650,6 +2665,7 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 				memcpy(cd + e->color_base, e->color_data_ptr,
 				       e->color_count * 4 * sizeof(float));
 			}
+			g_ng_combined_color_data = (const float (*)[4]) cd;
 			app_context->color_data = (char*) cd;
 			app_context->color_data_size = tot_colors * 4 * sizeof(float);
 		}
@@ -2668,6 +2684,7 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 				memcpy(um + (size_t) e->uninv_mat_base * 16, e->uninv_mat_data_ptr,
 				       e->uninv_mat_count * 16 * sizeof(float));
 			}
+			g_ng_combined_uninv_mat_data = um;
 			app_context->uninv_mat_data = (char*) um;
 			app_context->uninv_mat_data_size = tot_style * 16 * sizeof(float);
 		}
@@ -2682,14 +2699,16 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 				memcpy(gd + (size_t) e->gradient_base * 256, e->gradient_data_ptr,
 				       e->gradient_count * 256 * 4);
 			}
+			g_ng_combined_gradient_data = (const u8 (*)[4]) gd;
 			app_context->gradient_data = (char*) gd;
 			app_context->gradient_data_size = tot_style * 256 * 4;
 		}
 	}
 
 	// --- morph shape END vertices / END colours ------------------------------
-	// Graphics only: the only readers are tagShowFrame/tagRerenderFrame's
-	// ratio lerp and the AVM2 morph raster. The three character-side offsets
+	// All modes: tagShowFrame/tagRerenderFrame's ratio lerp is graphics-only,
+	// but the AVM2 morph raster and the AVM2 exact hit test read these under
+	// NO_GRAPHICS too. The three character-side offsets
 	// (morph_end_offset, morph_color_start, morph_end_color_start) are re-based
 	// at define time in tagDefineMorphShape, and the per-vertex morph END
 	// colour index in the solid style word is re-based by ng_rebase_style_word.
@@ -2731,6 +2750,7 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 		}
 	}
 
+#ifndef NO_GRAPHICS
 	// --- static bitmap slots ------------------------------------------------
 	// Only the COUNT moves here: the pixels stay in each movie's own array and
 	// are pre-declared into the renderer's slot table by

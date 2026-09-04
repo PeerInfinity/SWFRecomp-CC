@@ -34,6 +34,10 @@
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
+// Combined per-movie render tables (ng_shared.c) — an AS3 root has to build
+// them too; see runSWF_avm2.
+#include <libswf/tag.h>
+
 #if defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 #include <emscripten.h>
 #include <libswf/swf.h>   // full SWFAppContext (ctx->app->fps) for the browser loop
@@ -511,6 +515,25 @@ void runSWF_avm2(SWFAppContext* app_context)
 	// this point is measured against it (avm2_stack_check → Error #1023).
 	avm2_stack_guard_init(ctx);
 
+	// Multi-SWF render slice: fold every linked child movie's geometry and
+	// style arrays into the root's. swfStart/runSWF do this too, but an AS3
+	// root boots through here and never touches either, so before this call
+	// an AVM2 build had NO combined tables at all -- every base on every
+	// MovieEntry stayed 0 and a Loader-loaded child's shapes indexed the
+	// ROOT's vertices.
+	//
+	// The AVM1 boots place it "before any define tag re-bases an offset onto
+	// them" (swf_core.c) and before the renderer reads app_context's tables
+	// (swf.c). The AVM2 equivalents of those two moments are resolve_shape_geom
+	// at PLACE time -- reached from avm2_display_build_stage, below -- and
+	// avm2_render_init, which copies app_context's pointers into the render
+	// context and derives g_avm2_xform_base from transform_data_size. Both are
+	// downstream of here, so this is the earliest point that satisfies the same
+	// ordering; nothing between here and them reads a geometry table.
+	// ng_predeclareChildBitmaps() is the other half and needs a live renderer,
+	// so it sits next to avm2_render_init (as swf.c:1719 does).
+	ng_buildMovieRenderTables(app_context);
+
 	avm2_globals_init(ctx);
 
 #ifndef NO_GRAPHICS
@@ -717,6 +740,10 @@ void runSWF_avm2(SWFAppContext* app_context)
 		}
 		avm2_try_pop_frame(&top);
 	}
+	// Child movies' static bitmap slots, now that the renderer exists and
+	// before anything can finalize the size-class pools — the same moment
+	// swf.c:1719 uses, one line after its renderer_init.
+	ng_predeclareChildBitmaps();
 #endif
 #ifdef OFFSCREEN_RENDER
 	extern void avm2_render_frame(Avm2Context* ctx);

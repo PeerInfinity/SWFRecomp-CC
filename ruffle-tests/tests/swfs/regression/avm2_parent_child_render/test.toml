@@ -1,0 +1,9 @@
+num_frames = 6
+
+# The two circles are curve-flattened, so a handful of edge channels differ
+# from Ruffle's own tessellation + AA. 96 channels moved on the reference run;
+# 400 is ~4x that headroom, and two orders of magnitude below what a MISSING
+# child circle costs (~34000 channels), which is what this comparison is for.
+[image_comparisons.output]
+tolerance = 0
+max_outliers = 400

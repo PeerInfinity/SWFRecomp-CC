@@ -285,6 +285,27 @@ static uint8_t g_stage_invalidated_flag;
 static const Avm2MovieTables* g_child_movies[AVM2_MAX_CHILD_MOVIES];
 static uint32_t g_child_movie_count;
 
+// Defined with the Loader machinery below; used by the char lookups above it.
+static int movie_char_is_defined(const Avm2MovieTables* t, uint16_t char_id);
+
+// The generated movie-registry row a child's AVM2 tables belong to — the
+// carrier of its bases into the combined render tables
+// (ng_buildMovieRenderTables). NULL for the main movie, whose bases are 0.
+// The registry is static generated data, so this is a pointer compare over a
+// handful of rows; avm2_display.c:~6300 already does the same compare in the
+// other direction (MovieEntry -> tables).
+static const MovieEntry* avm2_movie_entry_for_tables(const Avm2MovieTables* t)
+{
+	if (t == NULL) return NULL;
+	for (int i = 0; ; i++)
+	{
+		MovieEntry* e = getMovieEntryAt(i);
+		if (e == NULL) break;
+		if ((const Avm2MovieTables*) e->avm2_tables == t) return e;
+	}
+	return NULL;
+}
+
 // char_for_class, but also across CHILD movies (Ruffle `class_symbol`, which
 // is keyed by the class's OWN movie). g_symbol_map is built ONCE, at stage
 // build, from the main movie's rows, so a class defined by a Loader-loaded SWF
@@ -410,17 +431,40 @@ int avm2_display_char_is_defined(uint16_t char_id)
 		if (avm2_generated_sounds[i].char_id == char_id) return 1;
 	for (uint32_t i = 0; i < avm2_generated_font_count; i++)
 		if (avm2_generated_fonts[i].font_id == char_id) return 1;
+	// …and every LOADED CHILD movie, the same fall-through char_info() and
+	// timeline_for_char() already have. Without it a child's own symbol
+	// binding reads as "names no character" and is promoted to that movie's
+	// root class. Inert for the main movie's boot-time root binding, which
+	// runs before any Loader can register a child.
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+		if (movie_char_is_defined(g_child_movies[m], char_id)) return 1;
 	return 0;
 }
 
-static const Avm2ShapeGeom* shape_geom_for(uint16_t char_id)
+// Which movie's tables does this character live in? NULL = the MAIN movie
+// (whose tables are the avm2_generated_* globals and whose combined-table
+// bases are 0 by construction). `owner` may be NULL when the caller does not
+// care.
+static const Avm2ShapeGeom* shape_geom_for_in(uint16_t char_id,
+                                              const Avm2MovieTables** owner)
 {
+	if (owner != NULL) *owner = NULL;
 	for (uint32_t i = 0; i < avm2_generated_shape_geom_count; i++)
 	{
 		if (avm2_generated_shape_geom[i].char_id == char_id)
 		{
 			return &avm2_generated_shape_geom[i];
 		}
+	}
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->shape_geom_count; i++)
+			if (t->shape_geom[i].char_id == char_id)
+			{
+				if (owner != NULL) *owner = t;
+				return &t->shape_geom[i];
+			}
 	}
 	return NULL;
 }
@@ -434,7 +478,34 @@ static const Avm2StaticTextData* statictext_for(uint16_t char_id)
 			return &avm2_generated_statictexts[i];
 		}
 	}
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->statictext_count; i++)
+			if (t->statictexts[i].char_id == char_id) return &t->statictexts[i];
+	}
 	return NULL;
+}
+
+// The flat static-glyph table `st->glyph_start` indexes. Avm2StaticTextData
+// names a run in the table of the movie that DEFINED it, and a child's runs
+// are numbered from 0 in its own array — so this is a REGISTRY lookup, not an
+// index re-base (the brief's §3 rule: when you re-base something, enumerate
+// the registries that remember a table on its behalf). The `st` pointer is
+// itself the key: it points into exactly one movie's `statictexts` array.
+const Avm2StaticGlyph* avm2_display_static_glyphs_for(
+	const Avm2StaticTextData* st)
+{
+	if (st != NULL)
+	{
+		for (uint32_t m = 0; m < g_child_movie_count; m++)
+		{
+			const Avm2MovieTables* t = g_child_movies[m];
+			if (st >= t->statictexts && st < t->statictexts + t->statictext_count)
+				return t->static_glyphs;
+		}
+	}
+	return avm2_generated_static_glyphs;
 }
 
 // Resolve a placed character's static-text (DefineText/2) glyph range onto its
@@ -452,13 +523,23 @@ static void resolve_static_text(Avm2DisplayObjectExt* ext, uint16_t char_id)
 // stroke (T2), and gradient (T3) fills; bitmap-fill shapes stay deferred.
 static void resolve_shape_geom(Avm2DisplayObjectExt* ext, uint16_t char_id)
 {
-	const Avm2ShapeGeom* sg = shape_geom_for(char_id);
+	const Avm2MovieTables* owner = NULL;
+	const Avm2ShapeGeom* sg = shape_geom_for_in(char_id, &owner);
 	if (sg != NULL && sg->renderable && sg->vert_count > 0)
 	{
-		ext->shape_vert_offset = sg->vert_offset;
+		// This is the AVM2 twin of tagDefineShape's re-base: the one moment
+		// the DEFINING movie is known. Both offsets are numbered from 0 in
+		// the movie that emitted them; the combined tables put the root's
+		// rows first, so a main-movie character adds 0 and this is a no-op
+		// for every single-movie build. Recomputed from `sg` on each
+		// placement, so it can never double-apply.
+		const MovieEntry* me = avm2_movie_entry_for_tables(owner);
+		ext->shape_vert_offset = sg->vert_offset
+			+ (me != NULL ? me->shape_vert_base : 0);
 		ext->shape_vert_count = sg->vert_count;
 		ext->is_morph_shape = sg->is_morph;
-		ext->morph_end_offset = sg->morph_end_offset;
+		ext->morph_end_offset = sg->morph_end_offset
+			+ (me != NULL ? me->morph_end_vert_base : 0);
 	}
 	else
 	{
@@ -12722,7 +12803,17 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 		// load-frame child-recursion gate), skip the first enterFrame.
 		ext->placed_by_avm2_script = 1;
 		ext->constructed = 1;
-		uint16_t char_id = char_for_class(obj->cls);
+		// child_char_for_class once a child movie is loaded: g_symbol_map is
+		// built ONCE, at stage build, from the MAIN movie's SymbolClass rows,
+		// so a class a Loader-loaded SWF defines is invisible to
+		// char_for_class — a child's own `new Art()` of its embedded symbol
+		// came up with no character, hence no timeline and no children. The
+		// bitmap / sound / ByteArray / TextField allocators already take this
+		// arm; the generic display allocator was the one that did not. Gated
+		// on there BEING a child so the single-movie hot path is untouched.
+		uint16_t char_id = g_child_movie_count > 0
+			? avm2_display_child_char_for_class(ctx, obj->cls)
+			: char_for_class(obj->cls);
 		// Ruffle consults class_symbol in exactly four display allocators
 		// (sprite, simple_button, bitmap, video). shape_allocator
 		// (display/shape.rs:11) builds a bare `Graphic::empty` and never
@@ -12948,6 +13039,14 @@ static const Avm2FontData* statictext_font_by_id(uint16_t font_id)
 		if (avm2_generated_fonts[i].font_id == font_id)
 			return &avm2_generated_fonts[i];
 	}
+	// A font embedded in a Loader-loaded SWF is a real Character::Font; the
+	// EditText twin (avm2_text.c font_by_id) already looks there.
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->font_count; i++)
+			if (t->fonts[i].font_id == font_id) return &t->fonts[i];
+	}
 	return NULL;
 }
 
@@ -12960,10 +13059,10 @@ static Avm2Value statictext_get_text(Avm2Activation* act)
 	if (st->glyph_count == 0) return avm2_null();
 	char* buf = avm2_alloc(ctx, (size_t) st->glyph_count * 4 + 1);
 	uint32_t n = 0;
+	const Avm2StaticGlyph* glyphs = avm2_display_static_glyphs_for(st);
 	for (uint32_t i = 0; i < st->glyph_count; i++)
 	{
-		const Avm2StaticGlyph* sg =
-			&avm2_generated_static_glyphs[st->glyph_start + i];
+		const Avm2StaticGlyph* sg = &glyphs[st->glyph_start + i];
 		const Avm2FontData* fd = statictext_font_by_id(sg->font_id);
 		if (fd == NULL || fd->codes == NULL) return avm2_null();
 		if (sg->glyph >= fd->glyph_count) continue;
@@ -13426,6 +13525,17 @@ GEN_EXTERN_SHAPE_DATA;
 // render/CPU-raster morph paths read; re-declared here for the picker.
 GEN_EXTERN_MORPH_END_SHAPE_DATA;
 
+// …and the COMBINED tables those two symbols become once a child movie
+// contributes geometry (ng_shared.c). The generated symbol then names only the
+// ROOT's PREFIX of the table, while ext->shape_vert_offset / morph_end_offset
+// are combined-table indices (resolve_shape_geom) — so reading the symbol
+// directly is an out-of-bounds read, not merely a wrong one. NULL when this
+// build combined nothing, in which case the symbol IS the whole table.
+extern const u32 (*ng_combinedShapeData(void))[4];
+extern const float (*ng_combinedMorphEndShapeData(void))[2];
+extern const float (*ng_combinedColorData(void))[4];
+extern const float (*ng_combinedMorphEndColorData(void))[4];
+
 static inline float pick_bits_to_f(uint32_t u)
 {
 	float f;
@@ -13507,6 +13617,10 @@ static int has_pick_geometry(Avm2DisplayObjectExt* ext)
 // triangles, then the drawing API's tessellated fills and strokes.
 static int shape_contains_local(Avm2DisplayObjectExt* ext, double lx, double ly)
 {
+	const u32 (*sd)[4] = ng_combinedShapeData();
+	if (sd == NULL) sd = (const u32 (*)[4]) shape_data;
+	const float (*med)[2] = ng_combinedMorphEndShapeData();
+	if (med == NULL) med = (const float (*)[2]) morph_end_shape_data;
 	if (ext->shape_vert_count > 0 && ext->is_morph_shape)
 	{
 		// Ruffle morph_shape.rs: b weights END, a weights START (a + b = 1),
@@ -13522,10 +13636,10 @@ static int shape_contains_local(Avm2DisplayObjectExt* ext, double lx, double ly)
 			{
 				uint32_t sj = off + t + (uint32_t) k;
 				uint32_t ej = ext->morph_end_offset + t + (uint32_t) k;
-				double sxs = (double) pick_bits_to_f(shape_data[sj][0]);
-				double sys = (double) pick_bits_to_f(shape_data[sj][1]);
-				double sxe = (double) morph_end_shape_data[ej][0];
-				double sye = (double) morph_end_shape_data[ej][1];
+				double sxs = (double) pick_bits_to_f(sd[sj][0]);
+				double sys = (double) pick_bits_to_f(sd[sj][1]);
+				double sxe = (double) med[ej][0];
+				double sye = (double) med[ej][1];
 				vx[k] = floor(sxs * a_w + sxe * b_w + 0.5);
 				vy[k] = floor(sys * a_w + sye * b_w + 0.5);
 			}
@@ -13539,9 +13653,9 @@ static int shape_contains_local(Avm2DisplayObjectExt* ext, double lx, double ly)
 		uint32_t off = ext->shape_vert_offset, n = ext->shape_vert_count;
 		for (uint32_t t = 0; t + 3 <= n; t += 3)
 		{
-			const uint32_t* a = shape_data[off + t];
-			const uint32_t* b = shape_data[off + t + 1];
-			const uint32_t* c = shape_data[off + t + 2];
+			const uint32_t* a = sd[off + t];
+			const uint32_t* b = sd[off + t + 1];
+			const uint32_t* c = sd[off + t + 2];
 			if (pick_tri_contains(lx, ly,
 			                      pick_bits_to_f(a[0]), pick_bits_to_f(a[1]),
 			                      pick_bits_to_f(b[0]), pick_bits_to_f(b[1]),
@@ -16963,14 +17077,24 @@ static void avm2_render_morph(Avm2Context* ctx, Avm2Object* obj,
 	uint32_t n = ext->shape_vert_count;
 	float* verts = (float*) malloc((size_t) n * 2 * sizeof(float));
 	if (verts == NULL) return;
+	// Combined tables when a child movie contributed geometry; the generated
+	// symbol is only the ROOT's prefix then (see shape_contains_local).
+	const u32 (*sd)[4] = ng_combinedShapeData();
+	if (sd == NULL) sd = (const u32 (*)[4]) shape_data;
+	const float (*med)[2] = ng_combinedMorphEndShapeData();
+	if (med == NULL) med = (const float (*)[2]) morph_end_shape_data;
+	const float (*cd)[4] = ng_combinedColorData();
+	if (cd == NULL) cd = (const float (*)[4]) color_data;
+	const float (*mecd)[4] = ng_combinedMorphEndColorData();
+	if (mecd == NULL) mecd = (const float (*)[4]) morph_end_color_data;
 	for (uint32_t i = 0; i < n; i++)
 	{
 		uint32_t si = ext->shape_vert_offset + i;
 		uint32_t ei = ext->morph_end_offset + i;
-		double sxs = (double) avm2_bits_to_f(shape_data[si][0]);
-		double sys = (double) avm2_bits_to_f(shape_data[si][1]);
-		double sxe = (double) morph_end_shape_data[ei][0];
-		double sye = (double) morph_end_shape_data[ei][1];
+		double sxs = (double) avm2_bits_to_f(sd[si][0]);
+		double sys = (double) avm2_bits_to_f(sd[si][1]);
+		double sxe = (double) med[ei][0];
+		double sye = (double) med[ei][1];
 		// Ruffle lerp_twips: round(start*a + end*b) to integer twips.
 		verts[i * 2]     = (float) floor(sxs * a_w + sxe * b_w + 0.5);
 		verts[i * 2 + 1] = (float) floor(sys * a_w + sye * b_w + 0.5);
@@ -16993,15 +17117,15 @@ static void avm2_render_morph(Avm2Context* ctx, Avm2Object* obj,
 	while (t + 3 <= n)
 	{
 		uint32_t i0 = ext->shape_vert_offset + t;
-		uint32_t style_packed = shape_data[i0][2];
-		uint32_t style_index  = shape_data[i0][3];
+		uint32_t style_packed = sd[i0][2];
+		uint32_t style_index  = sd[i0][3];
 		uint32_t style_type   = style_packed & 0xFFu;
 
 		// Extend the run over triangles sharing this exact style_index.
 		uint32_t run_end = t + 3;
 		while (run_end + 3 <= n
-		       && (shape_data[ext->shape_vert_offset + run_end][2] & 0xFFu) == style_type
-		       && shape_data[ext->shape_vert_offset + run_end][3] == style_index)
+		       && (sd[ext->shape_vert_offset + run_end][2] & 0xFFu) == style_type
+		       && sd[ext->shape_vert_offset + run_end][3] == style_index)
 			run_end += 3;
 
 		if (style_type == 0x00u)
@@ -17010,10 +17134,10 @@ static void avm2_render_morph(Avm2Context* ctx, Avm2Object* obj,
 			// channel. color_data holds u8/255; recover u8, lerp, re-normalise.
 			uint32_t sid = style_index & 0xFFFFu;
 			uint32_t eid = (style_index >> 16) & 0xFFFFu;
-			uint32_t sr = (uint32_t)(color_data[sid][0]*255.0f+0.5f), er = (uint32_t)(morph_end_color_data[eid][0]*255.0f+0.5f);
-			uint32_t sg = (uint32_t)(color_data[sid][1]*255.0f+0.5f), eg = (uint32_t)(morph_end_color_data[eid][1]*255.0f+0.5f);
-			uint32_t sb = (uint32_t)(color_data[sid][2]*255.0f+0.5f), eb = (uint32_t)(morph_end_color_data[eid][2]*255.0f+0.5f);
-			uint32_t sa = (uint32_t)(color_data[sid][3]*255.0f+0.5f), ea = (uint32_t)(morph_end_color_data[eid][3]*255.0f+0.5f);
+			uint32_t sr = (uint32_t)(cd[sid][0]*255.0f+0.5f), er = (uint32_t)(mecd[eid][0]*255.0f+0.5f);
+			uint32_t sg = (uint32_t)(cd[sid][1]*255.0f+0.5f), eg = (uint32_t)(mecd[eid][1]*255.0f+0.5f);
+			uint32_t sb = (uint32_t)(cd[sid][2]*255.0f+0.5f), eb = (uint32_t)(mecd[eid][2]*255.0f+0.5f);
+			uint32_t sa = (uint32_t)(cd[sid][3]*255.0f+0.5f), ea = (uint32_t)(mecd[eid][3]*255.0f+0.5f);
 			float r = (float)(uint32_t)(a_w * sr + b_w * er) / 255.0f;
 			float g = (float)(uint32_t)(a_w * sg + b_w * eg) / 255.0f;
 			float b = (float)(uint32_t)(a_w * sb + b_w * eb) / 255.0f;

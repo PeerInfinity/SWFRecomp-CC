@@ -44,6 +44,52 @@ GEN_EXTERN_GRADIENT_DATA;         // 256 rows/gradient: {r,g,b,a} u8, sRGB-encod
 GEN_EXTERN_MORPH_END_SHAPE_DATA;  // {x,y} twips, END positions
 GEN_EXTERN_MORPH_END_COLOR_DATA;  // {r,g,b,a} straight 0..1, END colours
 
+// …and the COMBINED tables those symbols become once a loaded child movie
+// contributes geometry (ng_shared.c ng_buildMovieRenderTables). The generated
+// symbol then names only the ROOT's PREFIX of the table, while the vertex
+// offsets and style ids reaching this file are COMBINED-table indices
+// (avm2_display.c resolve_shape_geom / ng_rebase_style_word) — so reading the
+// symbol directly would be an out-of-bounds read, not merely a wrong one.
+// Each accessor returns NULL when nothing was combined, in which case the
+// generated symbol IS the whole table and every read is exactly what it was.
+extern const uint32_t (*ng_combinedShapeData(void))[4];
+extern const float (*ng_combinedColorData(void))[4];
+extern const float (*ng_combinedMorphEndShapeData(void))[2];
+extern const float (*ng_combinedMorphEndColorData(void))[4];
+extern const uint8_t (*ng_combinedGradientData(void))[4];
+extern const float* ng_combinedUninvMatData(void);
+
+static inline const uint32_t (*cpu_shape_table(void))[4]
+{
+	const uint32_t (*t)[4] = ng_combinedShapeData();
+	return t != NULL ? t : (const uint32_t (*)[4]) shape_data;
+}
+static inline const float (*cpu_color_table(void))[4]
+{
+	const float (*t)[4] = ng_combinedColorData();
+	return t != NULL ? t : (const float (*)[4]) color_data;
+}
+static inline const float (*cpu_morph_end_shape_table(void))[2]
+{
+	const float (*t)[2] = ng_combinedMorphEndShapeData();
+	return t != NULL ? t : (const float (*)[2]) morph_end_shape_data;
+}
+static inline const float (*cpu_morph_end_color_table(void))[4]
+{
+	const float (*t)[4] = ng_combinedMorphEndColorData();
+	return t != NULL ? t : (const float (*)[4]) morph_end_color_data;
+}
+static inline const uint8_t (*cpu_gradient_table(void))[4]
+{
+	const uint8_t (*t)[4] = ng_combinedGradientData();
+	return t != NULL ? t : (const uint8_t (*)[4]) gradient_data;
+}
+static inline const float* cpu_uninv_mat_table(void)
+{
+	const float* t = ng_combinedUninvMatData();
+	return t != NULL ? t : (const float*) uninv_mat_data;
+}
+
 // ---------------------------------------------------------------------------
 // Store helpers — must match avm2_bitmap.c premul()/blend_over() exactly.
 // ---------------------------------------------------------------------------
@@ -117,8 +163,9 @@ static uint32_t grad_sample(uint32_t row, double t)
 	int u0 = (int) floor(u);
 	int u1 = u0 + 1; if (u1 > 255) u1 = 255;
 	double f = u - (double) u0;
-	const uint8_t* c0 = gradient_data[row * 256 + u0];
-	const uint8_t* c1 = gradient_data[row * 256 + u1];
+	const uint8_t (*grad)[4] = cpu_gradient_table();
+	const uint8_t* c0 = grad[row * 256 + u0];
+	const uint8_t* c1 = grad[row * 256 + u1];
 	uint32_t r = (uint32_t) ((c0[0] * (1.0 - f) + c1[0] * f) + 0.5);
 	uint32_t g = (uint32_t) ((c0[1] * (1.0 - f) + c1[1] * f) + 0.5);
 	uint32_t b = (uint32_t) ((c0[2] * (1.0 - f) + c1[2] * f) + 0.5);
@@ -288,11 +335,13 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 	if (buf == NULL || W <= 0 || H <= 0 || vert_count < 3) return;
 	if (node_alpha <= 0.0) return;
 
+	const uint32_t (*sd)[4] = cpu_shape_table();
+	const float (*cd)[4] = cpu_color_table();
 	for (uint32_t t = 0; t + 3 <= vert_count; t += 3)
 	{
 		uint32_t i0 = vert_offset + t;
-		uint32_t style_packed = shape_data[i0][2];
-		uint32_t style_index  = shape_data[i0][3];
+		uint32_t style_packed = sd[i0][2];
+		uint32_t style_index  = sd[i0][3];
 		uint32_t style_type   = style_packed & 0xFFu;
 
 		// Only solid (0x00, incl. strokes) and gradients (0x10/0x12/0x13) this
@@ -305,8 +354,8 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 		for (int k = 0; k < 3; k++)
 		{
 			uint32_t j = i0 + (uint32_t) k;
-			sx[k] = (double) bits_to_f(shape_data[j][0]);
-			sy[k] = (double) bits_to_f(shape_data[j][1]);
+			sx[k] = (double) bits_to_f(sd[j][0]);
+			sy[k] = (double) bits_to_f(sd[j][1]);
 			// world (local twips -> target twips), then /20 -> device pixels.
 			dX[k] = (wa * sx[k] + wc * sy[k] + wtx) / 20.0;
 			dY[k] = (wb * sx[k] + wd * sy[k] + wty) / 20.0;
@@ -320,8 +369,8 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 		if (!is_grad)
 		{
 			uint32_t id = style_index & 0xFFFFu;
-			double r = color_data[id][0], g = color_data[id][1];
-			double b = color_data[id][2], a = color_data[id][3] * node_alpha;
+			double r = cd[id][0], g = cd[id][1];
+			double b = cd[id][2], a = cd[id][3] * node_alpha;
 			R.is_gradient = 0;
 			R.solid_argb = (f2b(a) << 24) | (f2b(r) << 16) | (f2b(g) << 8) | f2b(b);
 			raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
@@ -342,7 +391,7 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 		R.sx2 = sx[2]; R.sy2 = sy[2];
 
 		// INVERT_2D_AFFINE(uninv_mat_data + id*16) — verbatim from action.c.
-		const float* m = uninv_mat_data + (size_t) id * 16;
+		const float* m = cpu_uninv_mat_table() + (size_t) id * 16;
 		double _ia = m[0],  _ib = m[1];
 		double _ic = m[4],  _id = m[5];
 		double _itx = m[12], _ity = m[13];
@@ -442,11 +491,15 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 	// Ruffle morph_shape.rs weights: b weights END, a weights START (a+b=1).
 	double b_w = ratio, a_w = 1.0 - ratio;
 
+	const uint32_t (*sd)[4] = cpu_shape_table();
+	const float (*cd)[4] = cpu_color_table();
+	const float (*med)[2] = cpu_morph_end_shape_table();
+	const float (*mecd)[4] = cpu_morph_end_color_table();
 	for (uint32_t t = 0; t + 3 <= vert_count; t += 3)
 	{
 		uint32_t i0 = vert_offset + t;
-		uint32_t style_packed = shape_data[i0][2];
-		uint32_t style_index  = shape_data[i0][3];
+		uint32_t style_packed = sd[i0][2];
+		uint32_t style_index  = sd[i0][3];
 		uint32_t style_type   = style_packed & 0xFFu;
 
 		// Solid morph only this tranche (gradient/stroke morph deferred).
@@ -457,10 +510,10 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 		{
 			uint32_t sj = i0 + (uint32_t) k;
 			uint32_t ej = morph_end_offset + t + (uint32_t) k;
-			double sxs = (double) bits_to_f(shape_data[sj][0]);
-			double sys = (double) bits_to_f(shape_data[sj][1]);
-			double sxe = (double) morph_end_shape_data[ej][0];
-			double sye = (double) morph_end_shape_data[ej][1];
+			double sxs = (double) bits_to_f(sd[sj][0]);
+			double sys = (double) bits_to_f(sd[sj][1]);
+			double sxe = (double) med[ej][0];
+			double sye = (double) med[ej][1];
 			// Ruffle lerp_twips: round(start*a + end*b) to integer twips.
 			double sx = floor(sxs * a_w + sxe * b_w + 0.5);
 			double sy = floor(sys * a_w + sye * b_w + 0.5);
@@ -472,10 +525,10 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 		// color_data / morph_end_color_data hold the u8 SWF colour / 255.
 		uint32_t sid = style_index & 0xFFFFu;
 		uint32_t eid = (style_index >> 16) & 0xFFFFu;
-		uint32_t sr = f2b(color_data[sid][0]), er = f2b(morph_end_color_data[eid][0]);
-		uint32_t sg = f2b(color_data[sid][1]), eg = f2b(morph_end_color_data[eid][1]);
-		uint32_t sb = f2b(color_data[sid][2]), eb = f2b(morph_end_color_data[eid][2]);
-		uint32_t sa = f2b(color_data[sid][3]), ea = f2b(morph_end_color_data[eid][3]);
+		uint32_t sr = f2b(cd[sid][0]), er = f2b(mecd[eid][0]);
+		uint32_t sg = f2b(cd[sid][1]), eg = f2b(mecd[eid][1]);
+		uint32_t sb = f2b(cd[sid][2]), eb = f2b(mecd[eid][2]);
+		uint32_t sa = f2b(cd[sid][3]), ea = f2b(mecd[eid][3]);
 		uint32_t cr = (uint32_t) (a_w * sr + b_w * er);
 		uint32_t cg = (uint32_t) (a_w * sg + b_w * eg);
 		uint32_t cb = (uint32_t) (a_w * sb + b_w * eb);

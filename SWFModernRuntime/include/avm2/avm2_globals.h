@@ -971,6 +971,12 @@ const Avm2MovieTables* avm2_display_movie_for_abc(const Avm2AbcFileData* f);
 // Does the movie DEFINE this character? (Ruffle library.character_by_id.)
 // A SymbolClass binding to an id that names nothing binds the ROOT class.
 int avm2_display_char_is_defined(uint16_t char_id);
+// The flat Avm2StaticGlyph table a DefineText character's glyph_start indexes:
+// the DEFINING movie's, or avm2_generated_static_glyphs for the main movie.
+struct Avm2StaticGlyph;
+struct Avm2StaticTextData;
+const struct Avm2StaticGlyph* avm2_display_static_glyphs_for(
+	const struct Avm2StaticTextData* st);
 // Load a CHILD movie's ABC files into the running context (loader-arc tranche
 // 6): grows ctx->files, publishes each script's traits into the domain and
 // eager-inits every file's last script. Idempotent per tables pointer — a

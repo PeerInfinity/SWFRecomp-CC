@@ -586,9 +586,17 @@ const u32 (*ng_combinedGlyphData(void))[1];
 size_t ng_combinedGlyphRows(void);
 const u32* ng_combinedTextData(void);
 const u16* ng_combinedTextCharCodes(void);
-// The combined morph END tables (graphics builds only), or NULL.
+// The combined morph END tables, or NULL when none was built. Built in every
+// mode: the AVM2 morph raster and the AVM2 exact hit test read them under
+// NO_GRAPHICS too.
 const float (*ng_combinedMorphEndShapeData(void))[2];
 const float (*ng_combinedMorphEndColorData(void))[4];
+// The combined fill-style tables, or NULL when none was built. Only the AVM2
+// raster/morph walk needs these accessors: every AVM1 reader holds
+// app_context's pointers, which the combine pass rewrites in place.
+const float (*ng_combinedColorData(void))[4];
+const u8 (*ng_combinedGradientData(void))[4];
+const float* ng_combinedUninvMatData(void);
 // 1 once the combine pass has actually run with child tables to fold in.
 int ng_movieRenderTablesActive(void);
 

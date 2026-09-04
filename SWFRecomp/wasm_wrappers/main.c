@@ -118,6 +118,21 @@ int main(int argc, char* argv[]) {
     app_context.text_char_codes = text_char_codes;
     app_context.text_char_codes_size = sizeof(text_char_codes);
 
+    // Fill-style + morph END tables: all modes too. The AVM2 CPU raster
+    // (BitmapData.draw, the CPU frame dump) and the AVM2 exact hit test read
+    // them in NO_GRAPHICS, and ng_buildMovieRenderTables needs the root's row
+    // counts there to combine a loaded child's rows onto them.
+    app_context.color_data = (char*)color_data;
+    app_context.color_data_size = sizeof(color_data);
+    app_context.uninv_mat_data = (char*)uninv_mat_data;
+    app_context.uninv_mat_data_size = sizeof(uninv_mat_data);
+    app_context.gradient_data = (char*)gradient_data;
+    app_context.gradient_data_size = sizeof(gradient_data);
+    app_context.morph_end_shape_data = (char*)morph_end_shape_data;
+    app_context.morph_end_shape_data_size = sizeof(morph_end_shape_data);
+    app_context.morph_end_color_data = (char*)morph_end_color_data;
+    app_context.morph_end_color_data_size = sizeof(morph_end_color_data);
+
 #ifndef NO_GRAPHICS
     app_context.width = FRAME_WIDTH;
     app_context.height = FRAME_HEIGHT;
@@ -174,20 +189,10 @@ int main(int argc, char* argv[]) {
     app_context.bitmap_count = BITMAP_COUNT;
     app_context.bitmap_highest_w = BITMAP_HIGHEST_W;
     app_context.bitmap_highest_h = BITMAP_HIGHEST_H;
-    app_context.color_data = (char*)color_data;
-    app_context.color_data_size = sizeof(color_data);
-    app_context.uninv_mat_data = (char*)uninv_mat_data;
-    app_context.uninv_mat_data_size = sizeof(uninv_mat_data);
-    app_context.gradient_data = (char*)gradient_data;
-    app_context.gradient_data_size = sizeof(gradient_data);
     app_context.bitmap_data = (char*)bitmap_data;
     app_context.bitmap_data_size = sizeof(bitmap_data);
     app_context.cxform_data = (char*)cxform_data;
     app_context.cxform_data_size = sizeof(cxform_data);
-    app_context.morph_end_shape_data = (char*)morph_end_shape_data;
-    app_context.morph_end_shape_data_size = sizeof(morph_end_shape_data);
-    app_context.morph_end_color_data = (char*)morph_end_color_data;
-    app_context.morph_end_color_data_size = sizeof(morph_end_color_data);
 #endif
 
 #ifdef HAS_TEST_HARNESS

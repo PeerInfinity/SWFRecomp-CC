@@ -385,6 +385,26 @@ typedef struct SWFAppContext
 	u16* text_char_codes;       // u16[text_count], parallel to text_data
 	size_t text_char_codes_size;
 
+	// Fill-style and morph END tables. Available in all modes for the same
+	// reason the static-text tables above are: the AVM2 CPU raster
+	// (avm2_cpu_raster.c, reached from BitmapData.draw and the CPU frame dump)
+	// and the AVM2 exact hit test read them in NO_GRAPHICS too, and
+	// ng_buildMovieRenderTables needs the ROOT's row counts in every mode to
+	// size the combined tables a loaded child's indices are re-based onto.
+	// (cxform_data and bitmap_data stay graphics-only: nothing outside the
+	// renderer indexes them, so combining them there would give a nonzero base
+	// with no combined array behind it.)
+	char* color_data;
+	size_t color_data_size;
+	char* uninv_mat_data;
+	size_t uninv_mat_data_size;
+	char* gradient_data;
+	size_t gradient_data_size;
+	char* morph_end_shape_data;
+	size_t morph_end_shape_data_size;
+	char* morph_end_color_data;
+	size_t morph_end_color_data_size;
+
 #ifndef NO_GRAPHICS
 	// Stage size, in *stage* pixels (the SWF header frame size). Anything that
 	// reasons in stage coordinates — tag.c's drop-shadow/bevel NDC offsets, the
@@ -412,21 +432,11 @@ typedef struct SWFAppContext
 	size_t bitmap_highest_w;
 	size_t bitmap_highest_h;
 
-	char* color_data;
-	size_t color_data_size;
-	char* uninv_mat_data;
-	size_t uninv_mat_data_size;
-	char* gradient_data;
-	size_t gradient_data_size;
 	char* bitmap_data;
 	size_t bitmap_data_size;
 
 	char* cxform_data;
 	size_t cxform_data_size;
-	char* morph_end_shape_data;
-	size_t morph_end_shape_data_size;
-	char* morph_end_color_data;
-	size_t morph_end_color_data_size;
 
 	void* audio_ctx;  // AudioContext* (opaque to avoid header dependency)
 #endif

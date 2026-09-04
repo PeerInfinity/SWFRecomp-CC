@@ -1,0 +1,11 @@
+chd:ctor
+root:kids=2 content=true
+ctl:in=true
+ctl:cor=false
+chd:in=true
+chd:cor=false
+ctl:px=ff0000
+ctl:px:cor=ffffff
+chd:px=ff
+chd:px:cor=ffffff
+done
