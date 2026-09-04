@@ -33,6 +33,36 @@ comparisons — the earlier 567 double-counted one nested `from_shumway/avm1`
 comparison. Tables below regenerated from this run; the narrative sections
 after them still describe the 2026-07-31 characterisation run.
 
+**Update 2026-09-04, Multi-SWF render slice (run
+[33857494837](https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/33857494837),
+at `659153865`): 364/572 pass (63.6%), up from 359/569 at run `32267473014`.
+0 regressions; +2 on the 568-comparison intersection, +1 band improvement, and
+4 comparisons that are new since that run.** A loaded child movie's shapes now reach the GPU with
+per-movie index bases (`SWFRecompDocs/status/per-movie-render-tables.md`).
+
+**Attribution matters more than usual on this one and was measured, not
+assumed.** The previous `images=true` run is `32267473014` from 2026-08-19, so
+the raw diff spans sixteen days and many slices. Reverting this slice as a patch
+and rebuilding the recompiler puts each mover on the record:
+
+| comparison | reverted | with slice | this slice? |
+|---|---|---|---|
+| `import_assets/avm1_imports_avm1` | 17755 outliers, fail | 459, pass | **yes** |
+| `avm2/graphics_bitmaps` | 1058, pass | 1058, pass | no |
+| `avm2/graphics_bitmap_fill` (band b_tiny→a_epsilon) | 64, fail | 64, fail | no |
+
+So the slice's own pixel yield is **+1 upstream comparison** plus its two new
+`regression` fixtures (`avm1_parent_child_render`,
+`avm1_parent_child_bitmap_fill`), which are the first entries in this baseline
+that grade a loaded child's render and are both tolerance-0 against Ruffle
+goldens. The two unattributed movers belong to the sixteen-day gap and are
+someone else's yield to claim.
+
+`import_assets/avm1_imports_avm1` is worth remembering as a **standing canary
+for per-movie geometry**: an `ImportAssets` character is DEFINED by the child
+SWF, so it takes the same re-base path a `loadMovie`'d one does, and it is the
+only upstream image comparison that exercises it.
+
 ## How to reproduce this
 
 ```bash

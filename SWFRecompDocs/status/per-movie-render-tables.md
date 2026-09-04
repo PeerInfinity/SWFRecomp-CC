@@ -346,6 +346,8 @@ for either new fixture. Baseline doc:
 Its trace half re-ran identically (4369 -> 4369, every bucket +0 against the
 graphics run above — two runs at the same SHA, byte-identical, as designed).
 
+Corpus-wide, `scripts/image_baseline_report.py --stem=graphics` now reports
+**364/572 comparisons passing (63.6%)**, up from 359/569 at run `32267473014`.
 `scripts/image_status_diff.py` over the 568-comparison intersection:
 
 ```
