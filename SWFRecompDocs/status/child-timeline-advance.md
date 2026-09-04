@@ -459,7 +459,66 @@ loaded movie must not keep running.
 
 ### The final runs
 
-To be filled in by the pipeline run at the final commit.
+Both modes at `1ccb87a95`, `categories=full`, `images=false`, both
+**conclusion success**, both complete (no `metadata.incomplete` on any suite).
+Graphics run `33826698339`, no-graphics run `33826714102`. Diffed against
+`128828002` — this slice's own pre-slice base, not the intermediate commits,
+so the numbers are the whole slice.
+
+Both modes were dispatched because the change is shared runtime code with no
+graphics guard, which is CLAUDE.md's "when in doubt, run both" case — and it
+earned its keep: the `unloadmovie_method` regression above appeared in graphics
+only.
+
+#### `mode=graphics` — run `33826698339`
+
+```
+=== intersection: 4487 tests (128828002 -> WORKTREE, results_graphics) ===
+
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4127 ->  4127 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4362 ->  4362 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+#### `mode=no-graphics` — run `33826714102`
+
+```
+=== intersection: 4487 tests (128828002 -> WORKTREE, results) ===
+
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4127 ->  4127 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4363 ->  4363 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved in both modes — not just the pass/fail line, so a test
+that was already failing and started segfaulting would show. The one-test
+`output_mismatch`/`ruffle_matched` difference between the modes is the
+pre-existing mode difference the two predecessors recorded, present on both
+sides of each diff. The `regression` suite reads **80/80 pass** in both modes,
+which is the 77 that existed plus this slice's three.
+
+**Read this as the regression check it is, not as the slice's yield.** No
+corpus test loads a multi-frame child SWF into an AVM1 clip target — 21 of the
+~440 child SWFs have more than one frame and only a handful reach that path —
+so a corpus headline cannot move for this work in either direction. The
+fixtures in §5 are the evidence; §8's sweep and this are what say nothing else
+broke.
 
 ## 10. What is left of the arc
 
