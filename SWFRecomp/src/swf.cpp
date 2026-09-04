@@ -11404,10 +11404,33 @@ namespace SWFRecomp
 		double angle_b_c = atan2(vec_b_c.y, vec_b_c.x) + offset;
 		
 		int num_midpoints = 5;
-		
-		double start_angle = (angle_a_b < angle_b_c) ? angle_a_b : angle_b_c;
-		double end_angle = (angle_a_b < angle_b_c) ? angle_b_c : angle_a_b;
-		
+
+		// `offset` already picks the OUTER side of the turn, so the join arc is
+		// always the one of magnitude <= pi. Sorting the two raw angles is only
+		// equivalent to that while they stay on the same branch of atan2: both
+		// live in (-3pi/2, 3pi/2], so a corner whose two outward normals
+		// straddle the branch cut yields |angle_b_c - angle_a_b| > pi and the
+		// min/max sweep traces the REFLEX arc instead. That paints a redundant
+		// disc on the inside of the corner and leaves the outer quadrant of the
+		// join uncovered — a sub-pixel notch at every affected corner. Unwrap
+		// the second angle onto the same branch first; when |diff| <= pi this
+		// is a bit-for-bit no-op, so only the wrapped corners move.
+		double angle_b_c_unwrapped = angle_b_c;
+		double angle_diff = angle_b_c - angle_a_b;
+
+		if (angle_diff > M_PI)
+		{
+			angle_b_c_unwrapped = angle_b_c - 2.0*M_PI;
+		}
+
+		else if (angle_diff < -M_PI)
+		{
+			angle_b_c_unwrapped = angle_b_c + 2.0*M_PI;
+		}
+
+		double start_angle = (angle_a_b < angle_b_c_unwrapped) ? angle_a_b : angle_b_c_unwrapped;
+		double end_angle = (angle_a_b < angle_b_c_unwrapped) ? angle_b_c_unwrapped : angle_a_b;
+
 		double angle_delta = (end_angle - start_angle)/num_midpoints;
 		
 		// Every vertex this join synthesises is a fixed offset from the SOURCE
