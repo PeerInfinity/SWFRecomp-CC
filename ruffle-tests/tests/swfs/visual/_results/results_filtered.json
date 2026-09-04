@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T00:54:58.431080+00:00",
+    "timestamp": "2026-09-04T01:40:04.023919+00:00",
     "git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
-    "duration_seconds": 1926.45,
+    "duration_seconds": 1925.87,
     "total_available": 146,
     "shards": 30,
     "expected_shards": 30,
@@ -1949,8 +1949,8 @@
     {
       "test": "layout/line_vertical_align",
       "phases": {
-        "recomp": 0.008,
-        "compile": 28.071,
+        "recomp": 0.009,
+        "compile": 27.742,
         "run": 0.004
       },
       "num_frames": 1,
@@ -1959,14 +1959,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 28.09,
+      "duration": 27.76,
       "status": "pass"
     },
     {
       "test": "opaque_background",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.353,
+        "compile": 1.405,
         "run": 0.002
       },
       "num_frames": 1,
@@ -1975,14 +1975,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.36,
+      "duration": 1.42,
       "status": "pass"
     },
     {
       "test": "scale_rotation_cache",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.625,
+        "compile": 21.267,
         "run": 0.004
       },
       "num_frames": 50,
@@ -1991,14 +1991,14 @@
         "expected_lines": 106,
         "matching_lines": 106
       },
-      "duration": 21.64,
+      "duration": 21.28,
       "status": "pass"
     },
     {
       "test": "simple_shapes/gradients/focal_radial",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.476,
+        "compile": 1.471,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2007,14 +2007,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.49,
+      "duration": 1.48,
       "status": "pass"
     },
     {
       "test": "simple_shapes/gradients/gradients",
       "phases": {
-        "recomp": 0.028,
-        "compile": 1.469,
+        "recomp": 0.031,
+        "compile": 1.507,
         "run": 0.002
       },
       "num_frames": 1,
@@ -2023,7 +2023,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.5,
+      "duration": 1.54,
       "status": "pass"
     },
     {

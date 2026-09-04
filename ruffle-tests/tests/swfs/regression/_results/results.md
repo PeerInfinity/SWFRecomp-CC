@@ -1,6 +1,6 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
@@ -91,8 +91,8 @@
 | 66 | `onunload_type1_local_frame` | 2 | 1.3s |  |
 | 67 | `resolve_type1_args` | 13 | 20.2s |  |
 | 68 | `root_enterframe_cross_swf_version` | 3 | 20.2s |  |
-| 69 | `sort_comparator_captured_scope` | 2 | 20.8s |  |
-| 70 | `sort_comparator_type1_args` | 5 | 20.7s |  |
+| 69 | `sort_comparator_captured_scope` | 2 | 21.0s |  |
+| 70 | `sort_comparator_type1_args` | 5 | 20.5s |  |
 | 71 | `string_prim_method_type1_args` | 19 | 19.9s |  |
 | 72 | `timer_cross_swf_version` | 3 | 20.0s |  |
 | 73 | `timer_type1_args` | 14 | 18.8s |  |

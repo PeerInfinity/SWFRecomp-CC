@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
-**Run Duration**: 43m 25s
+**Run Duration**: 43m 27s
 
 **Filtered**: 6 tests ignored out of 229 available
 
@@ -204,13 +204,13 @@
 | 169 | `lzma` | 5 | 6.9s |  |
 | 170 | `lzma_bytes` | 2 | 25.9s |  |
 | 171 | `mouse/mouse_coords` | 2 | 7.1s |  |
-| 172 | `mouse/start_drag` | 3 | 27.2s |  |
-| 173 | `mouse/start_drag_lock` | 3 | 7.1s |  |
-| 174 | `movieclip` | 9 | 7.1s |  |
-| 175 | `movieinfo1` | 3 | 1.3s |  |
-| 176 | `slider_component` | 4 | 13.0s |  |
-| 177 | `stream1` | 9 | 7.3s |  |
-| 178 | `stroke1` | 1 | 7.2s |  |
+| 172 | `mouse/start_drag` | 3 | 27.9s |  |
+| 173 | `mouse/start_drag_lock` | 3 | 7.3s |  |
+| 174 | `movieclip` | 9 | 7.3s |  |
+| 175 | `movieinfo1` | 3 | 1.4s |  |
+| 176 | `slider_component` | 4 | 13.3s |  |
+| 177 | `stream1` | 9 | 7.5s |  |
+| 178 | `stroke1` | 1 | 7.5s |  |
 | 179 | `stylesheet` | 3 | 7.1s |  |
 | 180 | `targetPath1` | 8 | 1.2s |  |
 | 181 | `timeline/Timeline3` | 5 | 25.8s |  |

@@ -3,15 +3,15 @@
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
 **Commit:** `86d4d6aac5b3`  
-**Date:** 2026-09-04 00:54 UTC  
-**Total duration:** 10h44m35s
+**Date:** 2026-09-04 01:40 UTC  
+**Total duration:** 10h44m14s
 
 ## Results by Suite
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 3 | 5 | 60.0% | [details](ruffle-tests/tests/swfs/audio/_results/results.md) |
-| avm1 | 666 | 706 | 94.3% ⚠️ | [details](ruffle-tests/tests/swfs/avm1/_results/results.md) |
+| avm1 | 689 | 730 | 94.4% | [details](ruffle-tests/tests/swfs/avm1/_results/results.md) |
 | avm2 | 1180 | 1261 | 93.6% | [details](ruffle-tests/tests/swfs/avm2/_results/results.md) |
 | fonts | 6 | 7 | 85.7% | [details](ruffle-tests/tests/swfs/fonts/_results/results.md) |
 | from_avmplus | 1527 | 1574 | 97.0% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results.md) |
@@ -30,18 +30,14 @@
 | text | 10 | 11 | 90.9% | [details](ruffle-tests/tests/swfs/text/_results/results.md) |
 | timeline | 12 | 17 | 70.6% | [details](ruffle-tests/tests/swfs/timeline/_results/results.md) |
 | visual | 144 | 146 | 98.6% | [details](ruffle-tests/tests/swfs/visual/_results/results.md) |
-| **Total** | **4153** | **4513** | **92.0%** | |
-
-### ⚠️ Incomplete Runs
-
-- **avm1**: 29/30 shards produced results (1 missing)
+| **Total** | **4176** | **4537** | **92.0%** | |
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | audio | 5 | 24 | 20.8% |
-| avm1 | 118,297 | 129,798 | 91.1% |
+| avm1 | 119,983 | 131,487 | 91.3% |
 | avm2 | 151,410 | 155,033 | 97.7% |
 | fonts | 190 | 346 | 54.9% |
 | from_avmplus | 85,434 | 85,996 | 99.3% |
@@ -60,7 +56,7 @@
 | text | 972 | 973 | 99.9% |
 | timeline | 333 | 371 | 89.8% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **395,854** | **421,761** | **93.9%** |
+| **Total** | **397,540** | **423,450** | **93.9%** |
 
 ## Failure Breakdown
 
@@ -132,8 +128,6 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 *No changes since last run.*
 
-*Comparing `df9560ff612e` → `86d4d6aac5b3`*
-
 ## Flash-Spec Results
 
 Tests verified against Flash's actual output (`output.flash.txt`).
@@ -153,15 +147,15 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm1
 
-- **Pass:** 666/706 (94.3%)
-- **Duration:** 1h08m17s across 29 shards
-- **Lines:** 118,297/129,798 matching (91.1%)
-- **Avg test duration:** 5.7s — slowest: `movieclip_invalid_get_bounds_6` (28.8s)
+- **Pass:** 689/730 (94.4%)
+- **Duration:** 1h08m52s across 30 shards
+- **Lines:** 119,983/131,487 matching (91.3%)
+- **Avg test duration:** 5.6s — slowest: `movieclip_invalid_get_bounds_6` (28.8s)
 
 ### avm2
 
 - **Pass:** 1180/1261 (93.6%)
-- **Duration:** 3h25m24s across 30 shards
+- **Duration:** 3h24m32s across 30 shards
 - **Lines:** 151,410/155,033 matching (97.7%)
 - **Avg test duration:** 9.7s — slowest: `away3d_advanced_shallow_water_demo` (61.0s)
 
@@ -175,21 +169,21 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### from_avmplus
 
 - **Pass:** 1527/1574 (97.0%)
-- **Duration:** 2h58m44s across 30 shards
+- **Duration:** 2h58m51s across 30 shards
 - **Lines:** 85,434/85,996 matching (99.3%)
-- **Avg test duration:** 6.7s — slowest: `ecma3/Statements/eregress_74474_002` (54.3s)
+- **Avg test duration:** 6.8s — slowest: `ecma3/Statements/eregress_74474_002` (54.3s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 138/243 (56.8%)
-- **Duration:** 30m32s across 30 shards
+- **Duration:** 30m19s across 30 shards
 - **Lines:** 30,386/38,791 matching (78.3%)
-- **Avg test duration:** 7.5s — slowest: `MovieClip-v8` (60.9s)
+- **Avg test duration:** 7.4s — slowest: `MovieClip-v8` (60.9s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 69/111 (62.2%)
-- **Duration:** 33m10s across 30 shards
+- **Duration:** 33m11s across 30 shards
 - **Lines:** 4,058/5,248 matching (77.3%)
 - **Avg test duration:** 17.9s — slowest: `matrix_test` (82.7s)
 
@@ -217,7 +211,7 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### from_shumway
 
 - **Pass:** 212/229 (92.6%)
-- **Duration:** 43m24s across 30 shards
+- **Duration:** 43m26s across 30 shards
 - **Lines:** 2,323/2,484 matching (93.5%)
 - **Avg test duration:** 11.3s — slowest: `acid/acid-large` (77.0s)
 
@@ -280,6 +274,6 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### visual
 
 - **Pass:** 144/146 (98.6%)
-- **Duration:** 32m06s across 30 shards
+- **Duration:** 32m05s across 30 shards
 - **Lines:** 301/350 matching (86.0%)
 - **Avg test duration:** 13.1s — slowest: `definefont4` (94.1s)
