@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 666/706 passing | Graphics: 689/730 passing
+Trace: 666/706 passing | Graphics: 688/730 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `unloadmovie_method` | Output Mismatch | 3/4 lines match |
 
 ## Graphics Improvements (0 tests)
 

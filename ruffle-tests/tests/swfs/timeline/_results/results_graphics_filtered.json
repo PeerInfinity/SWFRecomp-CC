@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-03T22:29:53.819936+00:00",
-    "git_sha": "df9560ff612e56a6056021f83ad1f6a1fb220ae0",
-    "duration_seconds": 171.17,
+    "timestamp": "2026-09-04T01:16:01.751873+00:00",
+    "git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
+    "duration_seconds": 268.9,
     "total_available": 17,
     "shards": 30,
     "expected_shards": 30,
@@ -25,7 +25,7 @@
       "test": "clip_action_no_key_code",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.941,
+        "compile": 1.976,
         "run": 0.265
       },
       "num_frames": 16,
@@ -34,15 +34,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.22,
+      "duration": 2.25,
       "status": "pass"
     },
     {
       "test": "frame_label_count_oom",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.58,
-        "run": 0.215
+        "recomp": 0.005,
+        "compile": 1.85,
+        "run": 0.265
       },
       "num_frames": 16,
       "lines": {
@@ -50,14 +50,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.81,
+      "duration": 2.13,
       "status": "pass"
     },
     {
       "test": "frame_script_button_order",
       "phases": {
-        "recomp": 0.013,
-        "compile": 27.354,
+        "recomp": 0.017,
+        "compile": 28.394,
         "run": 0.316
       },
       "num_frames": 20,
@@ -66,7 +66,7 @@
         "expected_lines": 14,
         "matching_lines": 13
       },
-      "duration": 27.69,
+      "duration": 28.74,
       "ruffle_diff_count": 4,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
@@ -75,8 +75,8 @@
     {
       "test": "frame_script_cleanup",
       "phases": {
-        "recomp": 0.015,
-        "compile": 7.006,
+        "recomp": 0.012,
+        "compile": 22.6,
         "run": 0.265
       },
       "num_frames": 20,
@@ -85,14 +85,14 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 7.3,
+      "duration": 22.88,
       "status": "pass"
     },
     {
       "test": "frame_script_cleanup2",
       "phases": {
         "recomp": 0.018,
-        "compile": 8.285,
+        "compile": 28.126,
         "run": 0.315
       },
       "num_frames": 20,
@@ -101,14 +101,30 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 8.63,
+      "duration": 28.47,
       "status": "pass"
     },
     {
       "test": "frame_script_cleanup3",
       "phases": {
+        "recomp": 0.015,
+        "compile": 21.696,
+        "run": 0.265
+      },
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 21.98,
+      "status": "pass"
+    },
+    {
+      "test": "frame_script_cleanup_goto",
+      "phases": {
         "recomp": 0.018,
-        "compile": 8.512,
+        "compile": 8.244,
         "run": 0.315
       },
       "num_frames": 20,
@@ -117,30 +133,14 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 8.86,
-      "status": "pass"
-    },
-    {
-      "test": "frame_script_cleanup_goto",
-      "phases": {
-        "recomp": 0.015,
-        "compile": 7.82,
-        "run": 0.316
-      },
-      "num_frames": 20,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 8.16,
+      "duration": 8.59,
       "status": "pass"
     },
     {
       "test": "frame_script_cleanup_goto2",
       "phases": {
         "recomp": 0.018,
-        "compile": 1.175,
+        "compile": 1.131,
         "run": 0.315
       },
       "num_frames": 20,
@@ -149,7 +149,7 @@
         "expected_lines": 34,
         "matching_lines": 12
       },
-      "duration": 1.52,
+      "duration": 1.48,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=29, expected=34)",
       "actual_output": "... (7 lines before) ...\nContainer addFrameScript\nLeafChild addFrameScript\nGrandChild addFrameScript\nChild addFrameScript\nContainer frame1\nMain frame2\nContainer frame2\nChild frame2\nGrandChild frame2\nLeafChild frame2\nContainer frame1\nChild frame1\nGrandChild addFrameScript\nGrandChild frame1\nLeafChild frame1\nGrandChild frame1\nMain frame1\nContainer frame2\nChild frame2\nGrandChild frame2\nLeafChild frame2\nMain frame2",
@@ -158,8 +158,8 @@
     {
       "test": "frame_script_construct",
       "phases": {
-        "recomp": 0.018,
-        "compile": 8.527,
+        "recomp": 0.017,
+        "compile": 8.573,
         "run": 0.315
       },
       "num_frames": 20,
@@ -168,15 +168,15 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 8.87,
+      "duration": 8.92,
       "status": "pass"
     },
     {
       "test": "missing_frame_scripts",
       "phases": {
-        "recomp": 0.017,
-        "compile": 29.084,
-        "run": 0.315
+        "recomp": 0.011,
+        "compile": 19.56,
+        "run": 0.215
       },
       "num_frames": 20,
       "lines": {
@@ -184,7 +184,7 @@
         "expected_lines": 22,
         "matching_lines": 12
       },
-      "duration": 29.43,
+      "duration": 19.79,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=27, expected=22)",
       "actual_output": "... (6 lines before) ...\nContainer Constructor\nContainer addFrameScript\nContainer frame1\nMain frame2\nSpawn frame2\nMain frame1\nSpawn frame1\nContainer frame2\nMain frame2\nSpawn frame2\nContainer frame1\nMain frame1\nSpawn frame1\nContainer frame2\nMain frame2\nMain stopped\nSpawn frame2\nSpawn stopped\nContainer frame1\nContainer frame2\nContainer stopped",
@@ -194,7 +194,7 @@
       "test": "scene_count_oom",
       "phases": {
         "recomp": 0.005,
-        "compile": 2.086,
+        "compile": 2.02,
         "run": 0.265
       },
       "num_frames": 16,
@@ -203,15 +203,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.36,
+      "duration": 2.3,
       "status": "pass"
     },
     {
       "test": "swf_9_event_goto_frame_script",
       "phases": {
-        "recomp": 0.016,
-        "compile": 8.824,
-        "run": 0.265
+        "recomp": 0.012,
+        "compile": 6.689,
+        "run": 0.215
       },
       "num_frames": 5,
       "lines": {
@@ -219,7 +219,7 @@
         "expected_lines": 5,
         "matching_lines": 3
       },
-      "duration": 9.12,
+      "duration": 6.92,
       "ruffle_diff_count": 2,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
@@ -228,9 +228,9 @@
     {
       "test": "swf_9_frame_script_button_order",
       "phases": {
-        "recomp": 0.013,
-        "compile": 26.83,
-        "run": 0.316
+        "recomp": 0.016,
+        "compile": 26.835,
+        "run": 0.315
       },
       "num_frames": 20,
       "lines": {
@@ -238,15 +238,15 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 27.17,
+      "duration": 27.18,
       "status": "pass"
     },
     {
       "test": "swf_9_frame_script_cleanup_goto",
       "phases": {
         "recomp": 0.018,
-        "compile": 8.407,
-        "run": 0.316
+        "compile": 27.521,
+        "run": 0.315
       },
       "num_frames": 20,
       "lines": {
@@ -254,15 +254,15 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 8.75,
+      "duration": 27.87,
       "status": "pass"
     },
     {
       "test": "swf_9_frame_script_cleanup_goto2",
       "phases": {
-        "recomp": 0.01,
-        "compile": 0.589,
-        "run": 0.215
+        "recomp": 0.018,
+        "compile": 20.195,
+        "run": 0.315
       },
       "num_frames": 20,
       "lines": {
@@ -270,14 +270,14 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 0.82,
+      "duration": 20.54,
       "status": "pass"
     },
     {
       "test": "swf_9_frame_script_dynamic_goto",
       "phases": {
-        "recomp": 0.017,
-        "compile": 8.067,
+        "recomp": 0.018,
+        "compile": 29.03,
         "run": 0.315
       },
       "num_frames": 20,
@@ -286,7 +286,7 @@
         "expected_lines": 34,
         "matching_lines": 31
       },
-      "duration": 8.41,
+      "duration": 29.37,
       "ruffle_diff_count": 3,
       "ours_diff_count": 3,
       "status": "ruffle_matched",
@@ -295,8 +295,8 @@
     {
       "test": "swf_9_frame_script_dynamic_goto_2",
       "phases": {
-        "recomp": 0.019,
-        "compile": 8.733,
+        "recomp": 0.017,
+        "compile": 8.174,
         "run": 0.315
       },
       "num_frames": 20,
@@ -305,7 +305,7 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 9.08,
+      "duration": 8.52,
       "status": "pass"
     }
   ]
