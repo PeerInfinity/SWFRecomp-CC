@@ -257,7 +257,7 @@ equivalent logging at the two sites named above.
   a collaborative loop: change → rebuild+deploy → user tests → reports.
 - **Run probes DIRECTLY**, e.g. `/tmp/probe-venv/bin/python3 -u <probe>.py`.
   Do NOT wrap in `timeout … | tail` — the SIGPIPE/SIGTERM kills the probe and
-  hides output. Kill stray Chrome between runs (`pkill -9 -f chrome`); many
+  hides output. Kill stray Chrome between runs — list them with `pgrep -af chrome`, then `kill <pid> <pid>` with the literal numbers. (`pkill -9 -f chrome` is denied by the `block-pattern-kill.sh` guard, as is piping a `pgrep` harvest into `kill`.); many
   zombie Chrome instances starve new probes.
 - **`build_test.sh` needs `--clean`** to pick up runtime (`.c`) changes — without
   it the wasm may not relink and you'll test stale code.
