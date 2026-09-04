@@ -246,4 +246,87 @@ Both modes, dispatched SERIALLY, `categories=full` (the change touches shared
 runtime code — `SWFAppContext`, `main.c` and `ng_shared.c` are on every test's
 path), `images=false`.
 
-<!-- CI RESULTS -->
+**no-graphics — run `33879642365`.** Corpus-clean:
+
+```
+=== intersection: 4496 tests (34dd5877d -> WORKTREE, results) ===
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4136 ->  4136 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4372 ->  4372 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved, including the crash buckets the histogram exists to
+catch. `regression` **87/87**, up from 86/86 — the new fixture.
+
+**graphics — run `33883489039`.** Corpus-clean:
+
+```
+=== intersection: 4496 tests (090c3c30f -> WORKTREE, results_graphics) ===
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4136 ->  4136 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4371 ->  4371 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved. `regression` **87/87**, and the new fixture's image
+comparison passes on CI's lavapipe too (96 outliers, limit 400).
+
+The intersection is against the 4496 the baseline graded; the new fixture is
+outside it, so new corpus totals are **4497 graded / 4372 effective (graphics),
+4373 (no-graphics)**. The one-test mode gap is the stable pre-existing
+divergence already on the BACKLOG under Tooling.
+
+**The trace numbers are the regression check, not the slice's yield.** The
+yield is §1-§6: an AS3 root's child geometry, with two AS-visible assertions and
+a tolerance-0 image comparison that all flip on revert.
+
+### The one intermittent, and how it was adjudicated
+
+The FIRST graphics run (`33875683111`) reported exactly one regression:
+`from_shumway/as3-loader/bug1157243/empty`, `pass -> output_mismatch`, with
+`actual_output: ""` — the binary produced no trace at all. That test's traced
+line lives in an `ioError` handler for a 0-byte `empty.swf`, so an empty output
+means the run ended before the handler fired.
+
+It is **not reproducible, and the evidence points away from this slice**:
+
+| probe | result |
+|---|---|
+| the built binary, 200 serial runs | 200 × `true` |
+| the same binary, 240 runs at `-P 16` (CI-like contention) | 0 failures |
+| `verify_output.py --mode=graphics`, 24 runs, slice applied | 24/24 pass |
+| same, 32 runs on the REVERTED tree (`git apply -R`) | 32/32 pass |
+| `verify_output.py`, an earlier 8-run batch, slice applied | 7/8 — the only local failure ever seen |
+| the no-graphics corpus run above | `pass` (and its sibling `…/invalid` too) |
+
+So the count stands at **two observations, both on the slice side (one CI, one
+local), against 472 local runs with the slice that show nothing**. A mechanism
+was looked for and none found: on this test the slice is provably inert at
+runtime — `ng_buildMovieRenderTables` returns at its `have_tables` check
+(the child is a byte-only shell with no tables), `ng_predeclareChildBitmaps`
+skips it (`bitmap_count == 0`), `g_child_movie_count` stays 0 so neither
+`char_for_class` nor `avm2_display_char_is_defined` takes its new arm, and no
+combined table is ever built for the readers to resolve differently.
+
+The `""` signature matches an early return before the first trace — the
+`heap_init` failure path (a 4 GB reserve) prints to stderr and returns, which
+verify_output records as zero lines — and that is load-sensitive on a 30-way
+sharded runner. It is recorded here rather than dismissed; if it recurs, that
+is the first thing to instrument.
+
+**One caution for whoever reads the CI single-test job on this test:** a
+`-f single_test=empty` dispatch FAILS for an unrelated reason — the job resolves
+a bare name against `avm1/` only, and this test lives in
+`from_shumway/as3-loader/bug1157243/`. That failure is a path lookup, not a
+verdict.

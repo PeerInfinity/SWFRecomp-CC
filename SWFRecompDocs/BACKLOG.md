@@ -380,7 +380,19 @@ first).
   false->true (`hitTestPoint`, the triangle walk) and `chd:px` ffffff->ff
   (`BitmapData.draw` + `getPixel`, the only trace-visible read of a fill
   COLOUR) in BOTH modes, plus a tolerance-0 image comparison that moves 22964
-  outlier channels -> 96. Closeout:
+  outlier channels -> 96. CI corpus-clean in BOTH modes, serial,
+  `categories=full`, `images=false`: graphics `33883489039` (4371->4371, every
+  bucket +0), no-graphics `33879642365` (4372->4372); totals 4496 -> **4497
+  graded**, `regression` 86/86 -> 87/87; local sweep 87/87 in both modes, zero
+  upstream drift. **One caveat worth carrying:** the FIRST graphics run
+  (`33875683111`) reported `from_shumway/as3-loader/bug1157243/empty` as
+  pass -> output_mismatch with EMPTY output. It is not reproducible (200 serial
+  + 240 parallel runs of the built binary, 24 `verify_output` runs with the
+  slice, 32 on the reverted tree — zero failures) and the slice is provably
+  inert on that test at runtime, so it is recorded as an intermittent in the
+  closeout's §8, not as a regression. Also: a `-f single_test=empty` dispatch
+  FAILS for an unrelated reason — that job resolves a bare name against `avm1/`
+  only, and this test lives in `from_shumway/as3-loader/bug1157243/`. Closeout:
   `SWFRecompDocs/status/avm2-child-render-arm.md`; §7 there is what it does NOT
   cover (AVM2 static text is implemented but ungraded — its fixture needs the
   `avm2_static_text/build_statictext.py` splice run against `child.swf`).
