@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T01:16:01.775444+00:00",
-    "git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
-    "duration_seconds": 149.36,
+    "timestamp": "2026-09-04T02:19:25.810657+00:00",
+    "git_sha": "1ccb87a956cdaaeaaa528d58f96b51741ef2f61d",
+    "duration_seconds": 139.83,
     "total_available": 7,
     "shards": 30,
     "expected_shards": 30
@@ -21,9 +21,9 @@
     {
       "test": "device_font_glyph_fallback",
       "phases": {
-        "recomp": 0.012,
-        "compile": 27.717,
-        "run": 0.265
+        "recomp": 0.009,
+        "compile": 21.756,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -31,14 +31,14 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 28.0,
+      "duration": 21.99,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
-        "recomp": 0.011,
-        "compile": 26.758,
+        "recomp": 0.01,
+        "compile": 27.764,
         "run": 0.265
       },
       "num_frames": 1,
@@ -47,7 +47,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 27.06,
+      "duration": 28.06,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -64,9 +64,9 @@
     {
       "test": "device_font_list",
       "phases": {
-        "recomp": 0.016,
-        "compile": 31.051,
-        "run": 0.316
+        "recomp": 0.015,
+        "compile": 27.663,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -74,15 +74,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 31.39,
+      "duration": 27.95,
       "status": "pass"
     },
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.155,
-        "compile": 23.228,
-        "run": 0.415
+        "recomp": 0.156,
+        "compile": 24.135,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -90,7 +90,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.2,
+      "duration": 25.16,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -107,9 +107,9 @@
     {
       "test": "embed_matching/match_style",
       "phases": {
-        "recomp": 0.025,
-        "compile": 8.53,
-        "run": 0.666
+        "recomp": 0.023,
+        "compile": 7.615,
+        "run": 0.515
       },
       "num_frames": 1,
       "lines": {
@@ -117,7 +117,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.47,
+      "duration": 8.35,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -135,7 +135,7 @@
       "test": "embed_matching/no_font_found",
       "phases": {
         "recomp": 0.005,
-        "compile": 6.389,
+        "compile": 6.54,
         "run": 0.315
       },
       "num_frames": 1,
@@ -144,7 +144,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.85,
+      "duration": 7.0,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -161,9 +161,9 @@
     {
       "test": "embed_name_lookup",
       "phases": {
-        "recomp": 0.019,
-        "compile": 21.541,
-        "run": 0.419
+        "recomp": 0.017,
+        "compile": 20.49,
+        "run": 0.418
       },
       "num_frames": 1,
       "lines": {
@@ -171,7 +171,7 @@
         "expected_lines": 242,
         "matching_lines": 86
       },
-      "duration": 21.99,
+      "duration": 20.93,
       "status": "output_mismatch",
       "detail": "156 line(s) differ (actual=242, expected=242)",
       "actual_output": "... (3 lines before) ...\nExportAssets\nReverse order\nConflicting names\nExport non-font\nFont matching\nAA: 22\naa: 22\nAA (bold): 22\nAB: 40\nab: 40\nAB (bold): 40\nAC: 40\nac: 40\nAC (bold): 40\nAD: 22\nad: 22\nAD (bold): 22\nAE: 40\nae: 40\nAE (bold): 40\nAF: 40\naf: 40\nAF (bold): 40\nAG: 22\nag: 22\nAG (bold): 22\nAH: 22\nah: 22\nAH (bold): 22\nAI: 22\nai: 22\nAI (bold): 22\nAJ: 22\naj: 22\nAJ (bold): 22\nAK: 22\nak: 22\nAK (bold): 22\nAL: 22\nal: 22\nAL (bold): 22\nAM: 40\nam: 40\nAM (bold): 40\nAN: 22\nan: 22\nAN (bold): 22\nAO: 40\nao: 40\nAO (bold): 40\n... (189 lines after) ...",
