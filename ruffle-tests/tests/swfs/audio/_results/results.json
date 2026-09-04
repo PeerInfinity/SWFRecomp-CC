@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T14:22:00.446672+00:00",
-    "git_sha": "027418adc476092bd0180535ac8b24773e639e9f",
-    "duration_seconds": 74.19,
+    "timestamp": "2026-09-04T16:45:31.428616+00:00",
+    "git_sha": "646796612ea68711860244cc7add550d81535b44",
+    "duration_seconds": 68.63,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -21,9 +21,9 @@
     {
       "test": "aac",
       "phases": {
-        "recomp": 0.007,
-        "compile": 6.36,
-        "run": 0.004
+        "recomp": 0.009,
+        "compile": 7.974,
+        "run": 0.008
       },
       "num_frames": 400,
       "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
@@ -32,7 +32,7 @@
         "expected_lines": 18,
         "matching_lines": 3
       },
-      "duration": 6.38,
+      "duration": 8.0,
       "status": "output_mismatch",
       "detail": "21 line(s) differ (actual=24, expected=18)",
       "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()",
@@ -42,7 +42,7 @@
       "test": "g711",
       "phases": {
         "recomp": 0.006,
-        "compile": 7.215,
+        "compile": 6.911,
         "run": 0.008
       },
       "num_frames": 600,
@@ -52,7 +52,7 @@
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 7.23,
+      "duration": 6.93,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=8, expected=6)",
       "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()",
@@ -61,8 +61,8 @@
     {
       "test": "g711_event_alaw",
       "phases": {
-        "recomp": 0.005,
-        "compile": 21.136,
+        "recomp": 0.003,
+        "compile": 15.027,
         "run": 0.002
       },
       "num_frames": 2,
@@ -71,14 +71,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.15,
+      "duration": 15.03,
       "status": "pass"
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
-        "recomp": 0.006,
-        "compile": 21.561,
+        "recomp": 0.005,
+        "compile": 21.234,
         "run": 0.002
       },
       "num_frames": 2,
@@ -87,14 +87,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.57,
+      "duration": 21.25,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
         "recomp": 0.006,
-        "compile": 17.564,
+        "compile": 17.151,
         "run": 0.002
       },
       "num_frames": 120,
@@ -103,7 +103,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.58,
+      "duration": 17.16,
       "status": "pass"
     }
   ]
