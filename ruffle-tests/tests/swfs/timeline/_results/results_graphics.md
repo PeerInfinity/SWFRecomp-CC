@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 05:42 UTC
+**Date**: 2026-09-04 08:14 UTC
 
-**Git SHA**: `14e8eae5c5`
+**Git SHA**: `91ce4e9a2e`
 
-**Run Duration**: 3m 1s
+**Run Duration**: 6m 13s
 
 ## Summary
 
@@ -31,18 +31,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 2.2s |  |
-| 2 | `frame_label_count_oom` | 1 | 1.9s |  |
-| 3 | `frame_script_cleanup` | 30 | 8.2s |  |
-| 4 | `frame_script_cleanup2` | 32 | 9.0s |  |
-| 5 | `frame_script_cleanup3` | 30 | 9.2s |  |
+| 1 | `clip_action_no_key_code` | 1 | 21.8s |  |
+| 2 | `frame_label_count_oom` | 1 | 1.6s |  |
+| 3 | `frame_script_cleanup` | 30 | 28.2s |  |
+| 4 | `frame_script_cleanup2` | 32 | 22.4s |  |
+| 5 | `frame_script_cleanup3` | 30 | 27.7s |  |
 | 6 | `frame_script_cleanup_goto` | 30 | 9.0s |  |
-| 7 | `frame_script_construct` | 25 | 9.0s |  |
+| 7 | `frame_script_construct` | 25 | 28.4s |  |
 | 8 | `scene_count_oom` | 1 | 2.2s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 31.0s |  |
-| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 9.1s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 7.2s |  |
-| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 8.8s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 28.3s |  |
+| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 28.2s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 26.9s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 29.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,9 +50,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 27.4s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 8.6s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 8.9s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 27.0s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 28.7s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 27.9s |  |
 
 ## Near-Passing Tests
 

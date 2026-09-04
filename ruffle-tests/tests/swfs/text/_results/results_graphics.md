@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 05:42 UTC
+**Date**: 2026-09-04 08:14 UTC
 
-**Git SHA**: `14e8eae5c5`
+**Git SHA**: `91ce4e9a2e`
 
-**Run Duration**: 3m 42s
+**Run Duration**: 3m 37s
 
 ## Summary
 
@@ -29,16 +29,16 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `auto_size/height` | 1 | 28.7s |  |
-| 2 | `auto_size/return` | 12 | 27.9s |  |
-| 3 | `auto_size/width` | 6 | 28.1s |  |
-| 4 | `br_at_start` | 0 | 2.4s |  |
-| 5 | `html_entity_parsing` | 213 | 8.4s |  |
-| 6 | `style_changes_in_html` | 0 | 22.0s |  |
-| 7 | `text_caret_placement_align` | 248 | 29.5s |  |
-| 8 | `text_caret_placement_leading` | 244 | 29.0s |  |
-| 9 | `text_caret_placement_scroll` | 108 | 20.7s |  |
-| 10 | `text_caret_placement_translated_bounds` | 140 | 22.0s |  |
+| 1 | `auto_size/height` | 1 | 32.7s |  |
+| 2 | `auto_size/return` | 12 | 22.3s |  |
+| 3 | `auto_size/width` | 6 | 27.8s |  |
+| 4 | `br_at_start` | 0 | 2.5s |  |
+| 5 | `html_entity_parsing` | 213 | 6.7s |  |
+| 6 | `style_changes_in_html` | 0 | 21.5s |  |
+| 7 | `text_caret_placement_align` | 248 | 24.3s |  |
+| 8 | `text_caret_placement_leading` | 244 | 29.5s |  |
+| 9 | `text_caret_placement_scroll` | 108 | 28.4s |  |
+| 10 | `text_caret_placement_translated_bounds` | 140 | 18.0s |  |
 
 ## Near-Passing Tests
 
