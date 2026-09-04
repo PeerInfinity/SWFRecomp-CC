@@ -1354,7 +1354,14 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
 {
 	if (ctx->bitmap_static_built) return;
 	ctx->bitmap_static_built = 1;
+	// The root's uploads occupy [0, current_bitmap); a loaded child's slots were
+	// pre-declared above that (see render_webgpu_predeclare_bitmap). Sizing off
+	// current_bitmap alone silently dropped every child bitmap. NOT
+	// ctx->bitmap_count: a movie can declare more slots than it uploads (an AS3
+	// SWF uploads none at all), and giving those a pool layer each is what the
+	// size-class pools exist to avoid.
 	u32 n = (u32)ctx->current_bitmap;
+	if (ctx->bitmap_predeclared_end > n) n = ctx->bitmap_predeclared_end;
 	if (n == 0 || ctx->bitmap_data == NULL) return;
 
 	u32 maxw[BITMAP_STATIC_POOLS] = {0}, maxh[BITMAP_STATIC_POOLS] = {0};
@@ -3579,6 +3586,33 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, const u8* pixels,
 	ctx->bitmap_sizes[8 * i + 6] = 0;
 	ctx->bitmap_sizes[8 * i + 7] = 0;
 	ctx->current_bitmap++;
+}
+
+// Fill one static bitmap slot directly, bypassing the sequential
+// `current_bitmap` cursor. This is how a LOADED CHILD movie's bitmaps get into
+// the size-class pools: the pools are dimensioned once, at the root's
+// finalizeBitmaps, and a child's own defineBitmap does not run until
+// loadMovie -- so the child's slots are pre-declared from static descriptors
+// (ng_predeclareChildBitmaps) before the root's tagInit ever runs.
+//
+// ctx->bitmap_count is the COMBINED count (ng_buildMovieRenderTables), so the
+// child's slots are inside the table and inside bitmap_sizes_buffer; the root's
+// own uploads keep the low slots and the cursor, untouched.
+void render_webgpu_predeclare_bitmap(WebGPURenderContext* ctx, u32 slot,
+                                     const u8* pixels, u32 width, u32 height)
+{
+	if (ctx == NULL || !ctx->renderer_ok || ctx->bitmap_static_built) return;
+	if (pixels == NULL || slot >= (u32) ctx->bitmap_count) return;
+	ctx->bitmap_ptrs[slot] = pixels;
+	ctx->bitmap_sizes[8 * slot]     = width;
+	ctx->bitmap_sizes[8 * slot + 1] = height;
+	ctx->bitmap_sizes[8 * slot + 2] = 0;
+	ctx->bitmap_sizes[8 * slot + 3] = 0;
+	ctx->bitmap_sizes[8 * slot + 4] = 0;
+	ctx->bitmap_sizes[8 * slot + 5] = 0;
+	ctx->bitmap_sizes[8 * slot + 6] = 0;
+	ctx->bitmap_sizes[8 * slot + 7] = 0;
+	if (slot + 1 > ctx->bitmap_predeclared_end) ctx->bitmap_predeclared_end = slot + 1;
 }
 
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* ctx)

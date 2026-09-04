@@ -1455,6 +1455,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     frame_width = 550
     frame_height = 400
     frame_count_val = 1
+    child_bitmap_count = 0
     if constants_h.exists():
         text = constants_h.read_text(errors="replace")
         m = re.search(r"#define\s+SWF_VERSION\s+(\d+)", text)
@@ -1466,6 +1467,9 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         m = re.search(r"#define\s+FRAME_HEIGHT\s+(\d+)", text)
         if m:
             frame_height = int(m.group(1))
+        m = re.search(r"#define\s+BITMAP_COUNT\s+(\d+)", text)
+        if m:
+            child_bitmap_count = int(m.group(1))
 
     # Read the child's out.h to extract FRAME_COUNT and script declarations
     out_h = child_recomp_dir / "RecompiledScripts" / "out.h"
@@ -1558,7 +1562,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         "shape_data", "transform_data", "color_data", "uninv_mat_data",
         "gradient_data", "bitmap_data", "glyph_data", "text_data",
         "text_char_codes", "cxform_data", "morph_end_shape_data",
-        "morph_end_color_data", "sound_data", "path_data",
+        "morph_end_color_data", "sound_data", "path_data", "bitmap_descs",
     )
     if tag_main_text:
         for arr_name in DRAWS_ARRAY_NAMES:
@@ -1574,7 +1578,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
             r'|shape_data|transform_data|color_data|uninv_mat_data'
             r'|gradient_data|bitmap_data|glyph_data|text_data'
             r'|text_char_codes|cxform_data|morph_end_shape_data'
-            r'|morph_end_color_data|sound_data|path_data)\b')
+            r'|morph_end_color_data|sound_data|path_data|bitmap_descs)\b')
         _renames = all_renames  # capture for closure
 
         def apply_renames(text):
@@ -1646,6 +1650,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         "glyph_data": "u32", "text_data": "u32", "text_char_codes": "u16",
         "cxform_data": "float", "morph_end_shape_data": "float",
         "morph_end_color_data": "float", "sound_data": "u8", "path_data": "float",
+        "bitmap_descs": "u32",
     }
     for arr_name in DRAWS_ARRAY_NAMES:
         if arr_name in all_renames:
@@ -1757,6 +1762,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     draws_c_path = child_recomp_dir / "RecompiledTags" / "draws.c"
     has_child_transforms = False
     extracted_array_names = set()
+    draws_array_counts = {}
     if draws_c_path.exists():
         draws_text = draws_c_path.read_text(encoding="latin-1")
         # All raw-data arrays emitted in draws.c (see SWFRecomp/src/swf.cpp).
@@ -1776,11 +1782,25 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
             (r'float\s+morph_end_color_data\s*\[\s*\d+\s*\]\s*\[\s*4\s*\]', 'morph_end_color_data'),
             (r'u8\s+sound_data\s*\[\s*\d+\s*\]', 'sound_data'),
             (r'float\s+path_data\s*\[\s*\d+\s*\]\s*\[\s*3\s*\]', 'path_data'),
+            (r'u32\s+bitmap_descs\s*\[\s*\d+\s*\]\s*\[\s*4\s*\]', 'bitmap_descs'),
         ]
         for sig_re, name in draws_arrays:
             m = re.search(rf'({sig_re}\s*=\s*\{{.*?\}};)', draws_text, re.DOTALL)
             if m:
                 arr_def = m.group(1)
+                # Declared element count, for the MovieEntry render-table
+                # fields below. `[N]` and `[N * K]` both appear (uninv_mat_data
+                # and cxform_data are emitted flat); the first bracket is the
+                # row count either way, so multiply the factors back out.
+                dims = re.match(rf'[a-z0-9_]+\s+{name}\s*\[([^\]]*)\]',
+                                arr_def)
+                if dims:
+                    prod = 1
+                    for factor in dims.group(1).split('*'):
+                        factor = factor.strip()
+                        if factor.isdigit():
+                            prod *= int(factor)
+                    draws_array_counts[name] = prod
                 # Rename only the first occurrence of `name` (the declaration);
                 # don't touch any inline references inside the initializer.
                 arr_def = re.sub(rf'\b{name}\b', f'{prefix}_{name}', arr_def, count=1)
@@ -1842,6 +1862,41 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"    .swf_bytes_len = {bytes_len},")
     lines.append(f"    .raw_bytes = {raw_ptr},")
     lines.append(f"    .raw_bytes_len = {raw_len},")
+
+    # ---- per-movie render tables (multi-SWF render slice) -------------------
+    # The recompiler numbers every geometry and style index from 0 in the movie
+    # that emitted it, so the runtime has to know where each movie's rows are.
+    # ng_buildMovieRenderTables concatenates these into one set at startup and
+    # hands back the bases; a NULL table simply contributes nothing.
+    #
+    # Counts come from the DECLARED array dimensions in the child's draws.c, so
+    # they cannot drift from the arrays actually emitted above. A movie with no
+    # shapes still emits a one-element placeholder array, which costs one unused
+    # row in the combined table and nothing else.
+    def _tbl(name, ctype_cast=""):
+        if name in extracted_array_names:
+            return f"{ctype_cast}{prefix}_{name}"
+        return "NULL"
+
+    def _count(name, divisor=1):
+        return draws_array_counts.get(name, 0) // divisor
+
+    lines.append(f"    .shape_data_ptr = (const u32*){_tbl('shape_data')},")
+    lines.append(f"    .shape_vert_count = {_count('shape_data')},")
+    lines.append(f"    .color_data_ptr = (const float*){_tbl('color_data')},")
+    lines.append(f"    .color_count = {_count('color_data')},")
+    lines.append(f"    .uninv_mat_data_ptr = (const float*){_tbl('uninv_mat_data')},")
+    lines.append(f"    .uninv_mat_count = {_count('uninv_mat_data', 16)},")
+    lines.append(f"    .gradient_data_ptr = (const u8*){_tbl('gradient_data')},")
+    lines.append(f"    .gradient_count = {_count('gradient_data', 256)},")
+    lines.append(f"    .path_data_ptr = (const float*){_tbl('path_data')},")
+    lines.append(f"    .path_count = {_count('path_data')},")
+    lines.append(f"    .transform_count = {_count('transform_data')},")
+    lines.append(f"    .cxform_data_ptr = (const float*){_tbl('cxform_data')},")
+    lines.append(f"    .cxform_count = {_count('cxform_data', 20)},")
+    lines.append(f"    .bitmap_data_ptr = (const u8*){_tbl('bitmap_data')},")
+    lines.append(f"    .bitmap_descs_ptr = (const u32*){_tbl('bitmap_descs')},")
+    lines.append(f"    .bitmap_count = {child_bitmap_count},")
     lines.append(f"}};")
     lines.append("")
 

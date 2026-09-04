@@ -855,7 +855,12 @@ void ng_fire_pending_loads(SWFAppContext* app_context)
 // ---------------------------------------------------------------------------
 void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id)
 {
-	float* cx = &cxform_data[cxform_id * 20];
+	// With child movies linked, cxform_id indexes the COMBINED table and the
+	// generated `cxform_data` symbol is only the root's prefix of it (multi-SWF
+	// render slice). This is the one reader with no app_context to hand.
+	const float* cxd = ng_combinedCxformData();
+	const float* cx = (cxd != NULL) ? cxd + (size_t)cxform_id * 20
+	                                : &cxform_data[cxform_id * 20];
 	obj->cx_ra = (double)(int16_t)roundf(cx[0]  * 256.0f) * 100.0 / 256.0;
 	obj->cx_ga = (double)(int16_t)roundf(cx[5]  * 256.0f) * 100.0 / 256.0;
 	obj->cx_ba = (double)(int16_t)roundf(cx[10] * 256.0f) * 100.0 / 256.0;
@@ -1632,9 +1637,14 @@ size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
 // arrays are unrelated allocations of unrelated sizes (a parent with no timeline
 // content emits `float transform_data[1][16]`), so indexing the main one with a
 // child's id reads past the end and returns a different garbage float each run.
+// Multi-SWF render slice: this must be ng_entryTransformData, not
+// ng_entryChildTransformData + a `transform_data` fallback. Once child movies
+// are linked, ng_cache_transform re-bases the entry's id onto the COMBINED
+// table and records that table here, and the generated `transform_data` symbol
+// is only the root's prefix of it -- so the "child?" question and the "which
+// table?" question stopped having the same answer.
 static inline float (*ENTRY_TRANSFORM_DATA(const DisplayObject* obj))[16] {
-	float (*td)[16] = ng_entryChildTransformData(obj);
-	return td ? td : transform_data;
+	return ng_entryTransformData((const DisplayObject*) obj);
 }
 
 int ng_getTransformId(size_t depth, u32* out_id)
@@ -1730,12 +1740,16 @@ int ng_getMatrixFromObj(DisplayObject* obj,
 {
 	if (!obj) return 0;
 	u32 tid = obj->transform_id;
-	if (out_a)  *out_a  = (double)transform_data[tid][0];
-	if (out_b)  *out_b  = (double)transform_data[tid][1];
-	if (out_c)  *out_c  = (double)transform_data[tid][4];
-	if (out_d)  *out_d  = (double)transform_data[tid][5];
-	if (out_tx) *out_tx = (double)transform_data[tid][12] / 20.0;
-	if (out_ty) *out_ty = (double)transform_data[tid][13] / 20.0;
+	// The entry's own table: `transform_id` is an index into the COMBINED
+	// placement table for anything a loaded movie placed (multi-SWF render
+	// slice) and into the main movie's for everything else.
+	float (*td)[16] = ng_entryTransformData(obj);
+	if (out_a)  *out_a  = (double)td[tid][0];
+	if (out_b)  *out_b  = (double)td[tid][1];
+	if (out_c)  *out_c  = (double)td[tid][4];
+	if (out_d)  *out_d  = (double)td[tid][5];
+	if (out_tx) *out_tx = (double)td[tid][12] / 20.0;
+	if (out_ty) *out_ty = (double)td[tid][13] / 20.0;
 	return 1;
 }
 
@@ -2003,9 +2017,12 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
 		if (child->char_id == 0) continue;
 
 		u32 tid = child->transform_id;
-		float oa = transform_data[tid][0], ob = transform_data[tid][1];
-		float oc = transform_data[tid][4], od = transform_data[tid][5];
-		float otx = transform_data[tid][12], oty = transform_data[tid][13];
+		// See ng_getMatrixFromObj: a loaded movie's placement ids index the
+		// combined table, and this walk descends INTO a loaded child's sprites.
+		float (*ctd)[16] = ng_entryTransformData(child);
+		float oa = ctd[tid][0], ob = ctd[tid][1];
+		float oc = ctd[tid][4], od = ctd[tid][5];
+		float otx = ctd[tid][12], oty = ctd[tid][13];
 		// Overlay any AS-set transform (nested AS-moved clips otherwise hit-test
 		// at their static placement — same gap as the bounds engine above).
 		ng_overlay_entry_as_transform(child, &oa, &ob, &oc, &od, &otx, &oty);

@@ -266,6 +266,29 @@ namespace SWFRecomp
 		std::unordered_map<u16, size_t> char_id_to_bitmap_id;
 		std::vector<Vertex> bitmap_sizes;
 
+		// Static descriptor per static-bitmap slot: {byte offset into
+		// bitmap_data, byte size, width, height}, flat, 4 entries per slot and
+		// indexed by the same `current_bitmap` the fill styles bake. Emitted as
+		// `bitmap_descs` in draws.c.
+		//
+		// Its reader is the multi-SWF render slice: a LOADED CHILD's bitmaps
+		// are pre-declared into the renderer's size-class pools before the
+		// root's tagInit finalizes them, because the child's own defineBitmap
+		// call does not run until loadMovie -- long after the pools are latched.
+		// A slot whose bitmap carried no payload stays {0,0,0,0} and is skipped.
+		std::vector<size_t> bitmap_descs;
+
+		void recordBitmapDesc(size_t slot, size_t offset, size_t size,
+		                      size_t width, size_t height)
+		{
+			if (bitmap_descs.size() < 4 * (slot + 1))
+				bitmap_descs.resize(4 * (slot + 1), 0);
+			bitmap_descs[4*slot + 0] = offset;
+			bitmap_descs[4*slot + 1] = size;
+			bitmap_descs[4*slot + 2] = width;
+			bitmap_descs[4*slot + 3] = height;
+		}
+
 		// --- Embedded video (DefineVideoStream / VideoFrame) ---------------
 		//
 		// SWF character id 0 is a legal id for a Define* tag, but the runtime

@@ -66,6 +66,13 @@ typedef struct WebGPURenderContext
 	// so the base has to be carried per entry (see defineBitmap in tag.h).
 	const u8** bitmap_ptrs;
 	int bitmap_static_built;  // static pools created + uploaded (finalize)
+	// One past the highest slot filled by render_webgpu_predeclare_bitmap, i.e.
+	// by a LOADED CHILD movie's static bitmaps (multi-SWF render slice). Those
+	// slots sit ABOVE the root's sequential `current_bitmap` cursor, so
+	// build_static_bitmap_pools has to size its walk off both. Stays 0 when no
+	// child contributed bitmaps, which keeps the AVM2 case (tagInit never runs,
+	// current_bitmap == 0, no pools at all) exactly as it was.
+	u32 bitmap_predeclared_end;
 	BitmapPool bitmap_pools[BITMAP_POOL_COUNT];
 
 	// CPU-side data pointers (populated by swf.c before init)
@@ -366,6 +373,8 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* context
 int render_webgpu_poll(SWFAppContext* app_context);
 void render_webgpu_set_background(WebGPURenderContext* context, u8 r, u8 g, u8 b);
 void render_webgpu_upload_bitmap(WebGPURenderContext* context, const u8* pixels, size_t size, u32 width, u32 height);
+void render_webgpu_predeclare_bitmap(WebGPURenderContext* ctx, u32 slot,
+                                     const u8* pixels, u32 width, u32 height);
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* context);
 void render_webgpu_open_pass(WebGPURenderContext* context);
 // Overwrite the per-pass stage_to_ndc uniform with a caller-composed matrix

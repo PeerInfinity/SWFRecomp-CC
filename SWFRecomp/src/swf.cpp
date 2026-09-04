@@ -1069,6 +1069,25 @@ namespace SWFRecomp
 						  << (current_path_entry ? path_data.str() : "\t{0}\n")
 						  << "};" << endl;
 
+		// Static bitmap descriptors ({offset, size, w, h} per slot) — see
+		// SWF::recordBitmapDesc. Always emitted, so a movie with no bitmaps
+		// still links; the runtime keys on BITMAP_COUNT, not on this length.
+		{
+			size_t desc_slots = bitmap_descs.size() / 4;
+			context.out_draws << endl
+							  << "u32 bitmap_descs[" << to_string(desc_slots ? desc_slots : 1) << "][4] =" << endl
+							  << "{" << endl;
+			for (size_t i = 0; i < desc_slots; i++)
+			{
+				context.out_draws << "\t{ " << to_string(bitmap_descs[4*i + 0]) << ", "
+								  << to_string(bitmap_descs[4*i + 1]) << ", "
+								  << to_string(bitmap_descs[4*i + 2]) << ", "
+								  << to_string(bitmap_descs[4*i + 3]) << " }," << endl;
+			}
+			if (desc_slots == 0) context.out_draws << "\t{ 0, 0, 0, 0 }," << endl;
+			context.out_draws << "};" << endl;
+		}
+
 		context.out_draws_header << endl
 								 << "extern u32 shape_data[" << to_string(current_tri ? 3*current_tri : 1) << "][4];" << endl
 								 << "extern float transform_data[" << to_string(current_transform ? current_transform : 1) << "][16];" << endl
@@ -1084,7 +1103,8 @@ namespace SWFRecomp
 								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl
 								 << "extern u8 sound_data[" << to_string(emit_sound_byte ? emit_sound_byte : 1) << "];" << endl
 								 << "extern u8 video_data[" << to_string(emit_video_byte ? emit_video_byte : 1) << "];" << endl
-								 << "extern float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3];" << endl;
+								 << "extern float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3];" << endl
+								 << "extern u32 bitmap_descs[" << to_string(bitmap_descs.size() / 4 ? bitmap_descs.size() / 4 : 1) << "][4];" << endl;
 
 		// Emit sprite forward declarations (frame_func arrays)
 		if (!sprite_forward_decls.str().empty())
@@ -1342,6 +1362,13 @@ namespace SWFRecomp
 				
 				char_id_to_bitmap_id[char_id] = current_bitmap;
 				
+				// Same four numbers as the defineBitmap call below, kept as
+				// static data so a LOADED CHILD's bitmaps can be declared to
+				// the renderer before its tagInit ever runs (see swf.hpp).
+				recordBitmapDesc(current_bitmap, 4*bitmap_start,
+				                 4*(current_bitmap_pixel - bitmap_start),
+				                 (size_t) w, (size_t) h);
+				
 				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
 				// is not emitted then, and tagInit — the only caller of
 				// defineBitmap — is never reached on the AVM2 path.
@@ -1448,6 +1475,13 @@ namespace SWFRecomp
 				}
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
+
+				// Same four numbers as the defineBitmap call below, kept as
+				// static data so a LOADED CHILD's bitmaps can be declared to
+				// the renderer before its tagInit ever runs (see swf.hpp).
+				recordBitmapDesc(current_bitmap, 4*bitmap_start,
+				                 4*(current_bitmap_pixel - bitmap_start),
+				                 (size_t) w, (size_t) h);
 
 				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
 				// is not emitted then, and tagInit — the only caller of
@@ -1610,6 +1644,13 @@ namespace SWFRecomp
 				}
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
+
+				// Same four numbers as the defineBitmap call below, kept as
+				// static data so a LOADED CHILD's bitmaps can be declared to
+				// the renderer before its tagInit ever runs (see swf.hpp).
+				recordBitmapDesc(current_bitmap, 4*bitmap_start,
+				                 4*(current_bitmap_pixel - bitmap_start),
+				                 (size_t) w, (size_t) h);
 
 				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
 				// is not emitted then, and tagInit — the only caller of
@@ -1872,6 +1913,13 @@ namespace SWFRecomp
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
 
+				// Same four numbers as the defineBitmap call below, kept as
+				// static data so a LOADED CHILD's bitmaps can be declared to
+				// the renderer before its tagInit ever runs (see swf.hpp).
+				recordBitmapDesc(current_bitmap, 4*bitmap_start,
+				                 4*(current_bitmap_pixel - bitmap_start),
+				                 (size_t) w, (size_t) h);
+
 				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
 				// is not emitted then, and tagInit — the only caller of
 				// defineBitmap — is never reached on the AVM2 path.
@@ -2115,6 +2163,13 @@ namespace SWFRecomp
 				delete[] uncompressed;
 
 				char_id_to_bitmap_id[char_id] = current_bitmap;
+
+				// Same four numbers as the defineBitmap call below, kept as
+				// static data so a LOADED CHILD's bitmaps can be declared to
+				// the renderer before its tagInit ever runs (see swf.hpp).
+				recordBitmapDesc(current_bitmap, 4*bitmap_start,
+				                 4*(current_bitmap_pixel - bitmap_start),
+				                 (size_t) w, (size_t) h);
 
 				// Dropped for an AS3 SWF under skip_avm1_payload: bitmap_data
 				// is not emitted then, and tagInit — the only caller of

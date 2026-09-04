@@ -157,6 +157,13 @@ static struct {
 	size_t char_id;
 	size_t path_offset;
 	size_t path_size;
+	// The path_data array the offset indexes: the DEFINING movie's, because
+	// ng_record_char_path runs from that movie's tagInit. NULL = the main
+	// movie's generated `path_data`. Same shape as
+	// DisplayObject::place_transform_data, and load-bearing for the same
+	// reason: a loaded child's offset against the root's array is either the
+	// wrong outline or an out-of-bounds read.
+	const float (*table)[3];
 } ng_char_paths[MAX_CHAR_PATHS_NG];
 static size_t ng_char_paths_count = 0;
 
@@ -172,14 +179,30 @@ static size_t ng_morph_paths_count = 0;
 static size_t ng_winding_ids[MAX_WINDING_NG];
 static size_t ng_winding_count = 0;
 
+// The path_data table of the movie whose tagInit is running (NULL = main).
+static const float (*ng_current_path_table(void))[3]
+{
+	extern u8 g_current_movie_id;
+	if (g_current_movie_id == 0) return NULL;
+	for (int i = 0; ; i++) {
+		MovieEntry* e = getMovieEntryAt(i);
+		if (e == NULL) break;
+		if (e->movie_id == g_current_movie_id)
+			return (const float (*)[3]) e->path_data_ptr;
+	}
+	return NULL;
+}
+
 void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size)
 {
+	const float (*table)[3] = ng_current_path_table();
 	// Idempotent per char_id (see ng_record_char_bounds): prevents re-running
 	// define tags from overflowing the table and dropping later chars' paths.
 	for (size_t i = 0; i < ng_char_paths_count; i++) {
 		if (ng_char_paths[i].char_id == char_id) {
 			ng_char_paths[i].path_offset = path_offset;
 			ng_char_paths[i].path_size = path_size;
+			ng_char_paths[i].table = table;
 			return;
 		}
 	}
@@ -187,7 +210,18 @@ void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size)
 	ng_char_paths[ng_char_paths_count].char_id = char_id;
 	ng_char_paths[ng_char_paths_count].path_offset = path_offset;
 	ng_char_paths[ng_char_paths_count].path_size = path_size;
+	ng_char_paths[ng_char_paths_count].table = table;
 	ng_char_paths_count++;
+}
+
+// The path_data table `ng_find_char_path`'s offset indexes for this character,
+// or NULL when that is the main movie's generated array.
+const float (*ng_findCharPathTable(size_t char_id))[3]
+{
+	for (size_t i = 0; i < ng_char_paths_count; i++)
+		if (ng_char_paths[i].char_id == char_id)
+			return ng_char_paths[i].table;
+	return NULL;
 }
 
 void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size)
@@ -2085,3 +2119,357 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
 	}
 	return end_idx;
 }
+
+// ===========================================================================
+// Combined per-movie render tables (multi-SWF render slice)
+// ===========================================================================
+// Every geometry and style index the recompiler emits is numbered from 0 in
+// the movie that emitted it. The renderer has ONE vertex buffer, ONE colour
+// buffer, ONE gradient texture and ONE static-bitmap slot table, all uploaded
+// from the ROOT movie's arrays, so a loaded child's shape drew the root's
+// triangles with the root's colours -- or, when the root had none, nothing.
+//
+// This pass concatenates every linked movie's arrays into one set. The root
+// goes first and keeps base 0, so a build with no child movies skips the pass
+// entirely and every other build leaves the root's indices untouched. A child
+// contributes its own rows at its own base, and the STYLE WORD of each of its
+// vertices is re-based as it is copied -- that word carries colour / gradient /
+// bitmap indices baked at recompile time, which no draw-time argument can
+// reach.
+//
+// What is NOT here, and why:
+//   * path_data -- read only by the CPU hit tester, so the movie's own table
+//     is recorded per character (ng_record_char_path below) rather than
+//     concatenated. That also avoids needing the root's path_data SIZE, which
+//     the generated main.c does not put in app_context.
+//   * text_data / glyph_data / morph_end_* -- static text and morph shapes in
+//     a loaded child are not covered by this slice.
+
+#define NG_MAX_RENDER_MOVIES 32
+
+typedef struct {
+	u32 shape_vert;
+	u32 color;
+	u32 transform;
+	u32 cxform;
+	// One index. The shader uses a vertex's style id as BOTH a gradient ramp
+	// row and an inverse-matrix slot (`inv_mats[style_id]` for a gradient fill,
+	// `inv_mats[style_upper]` for a bitmap one), and the recompiler advances
+	// current_uninv for bitmap fills but current_gradient only for gradients.
+	// So the two arrays share a per-movie stride of max(uninv, gradient) and
+	// one base; the padding rows are never read.
+	u32 style;
+	u32 bitmap;
+} NgRenderBases;
+
+static NgRenderBases g_ng_render_bases[NG_MAX_RENDER_MOVIES];
+static int g_ng_render_tables_built = 0;
+
+// The combined vertex table, or NULL when this build never built one (no child
+// movies, or none of them carries geometry). shape_hit_test.c reads it through
+// ng_combinedShapeData() and falls back to the generated `shape_data` symbol.
+static const u32 (*g_ng_combined_shape_data)[4] = NULL;
+
+const u32 (*ng_combinedShapeData(void))[4] { return g_ng_combined_shape_data; }
+
+// Base of `movie_id`'s rows in each combined table. Movie 0 is the main SWF and
+// is always 0.
+u32 ng_movieShapeVertBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].shape_vert;
+}
+
+u32 ng_movieBitmapBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].bitmap;
+}
+
+// Base for the movie whose ORIGINAL transform_data array is `td`. That pointer
+// is the one signal in the runtime that already tracks the PLACING movie
+// correctly through every path -- g_active_transform_data is swapped for a
+// loaded movie's tags AND for a child-defined sprite's frame funcs -- so
+// ng_cache_transform keys on it rather than on g_current_movie_id.
+u32 ng_movieTransformBaseForTable(const float (*td)[16])
+{
+	if (td == NULL) return 0;
+	for (int i = 0; ; i++) {
+		MovieEntry* e = getMovieEntryAt(i);
+		if (e == NULL) break;
+		if ((const float*) e->transform_data_ptr == (const float*) td)
+			return e->transform_base;
+	}
+	return 0;
+}
+
+u32 ng_movieCxformBaseForTable(const float (*td)[16])
+{
+	if (td == NULL) return 0;
+	for (int i = 0; ; i++) {
+		MovieEntry* e = getMovieEntryAt(i);
+		if (e == NULL) break;
+		if ((const float*) e->transform_data_ptr == (const float*) td)
+			return e->cxform_base;
+	}
+	return 0;
+}
+
+// The combined transform table, or NULL when this build never built one.
+static const float (*g_ng_combined_transform_data)[16] = NULL;
+static size_t g_ng_combined_transform_rows = 0;
+const float (*ng_combinedTransformData(void))[16] { return g_ng_combined_transform_data; }
+size_t ng_combinedTransformRows(void) { return g_ng_combined_transform_rows; }
+
+// The combined colour-transform table (flat, 20 floats per slot), or NULL when
+// none was built. Only ng_init_cxform_from_data needs this — every other reader
+// already holds app_context->cxform_data, which IS this array.
+static const float* g_ng_combined_cxform_data = NULL;
+const float* ng_combinedCxformData(void) { return g_ng_combined_cxform_data; }
+
+// 1 once ng_buildMovieRenderTables has actually combined something. The hot
+// placement paths (ng_cache_transform, ng_rebaseCxformId) test this first so a
+// single-movie build never walks the movie registry.
+static int g_ng_render_tables_active = 0;
+int ng_movieRenderTablesActive(void) { return g_ng_render_tables_active; }
+
+// Re-base one vertex's style word from movie-local indices to combined ones.
+// The layout is the recompiler's (SWFRecomp/src/swf.cpp parseFillStyles) and
+// the shader's (render_webgpu.c vertex_wgsl), which agree: style.x's low byte
+// is the SWF fill type, style.y's low 16 bits are the fill's own index and its
+// high 16 bits are the inverse-matrix slot for a bitmap fill.
+static u32 ng_rebase_style_word(u32 style_type, u32 style_index,
+                                const NgRenderBases* b)
+{
+	u32 ftype = style_type & 0xFFu;
+	u32 lo = style_index & 0xFFFFu;
+	u32 hi = (style_index >> 16) & 0xFFFFu;
+	if (ftype == 0x00u) {
+		// Solid. The high half is a morph END colour index (morph_end_color_data,
+		// not combined by this slice), so it is left alone.
+		lo = (lo + b->color) & 0xFFFFu;
+	} else if ((ftype & 0xF0u) == 0x10u) {
+		// Gradient: one index into both the ramp texture and inv_mats.
+		lo = (lo + b->style) & 0xFFFFu;
+	} else if ((ftype & 0xF0u) == 0x40u) {
+		// Bitmap: low = static bitmap slot, high = inv_mats slot.
+		lo = (lo + b->bitmap) & 0xFFFFu;
+		hi = (hi + b->style) & 0xFFFFu;
+	} else {
+		return style_index;
+	}
+	return (hi << 16) | lo;
+}
+
+void ng_buildMovieRenderTables(SWFAppContext* app_context)
+{
+	if (g_ng_render_tables_built) return;
+	g_ng_render_tables_built = 1;
+	if (app_context == NULL) return;
+
+	MovieEntry* movies[NG_MAX_RENDER_MOVIES];
+	int movie_count = 0;
+	int have_tables = 0;
+	for (int i = 0; i < NG_MAX_RENDER_MOVIES; i++) {
+		MovieEntry* e = getMovieEntryAt(i);
+		if (e == NULL) break;
+		if (e->movie_id == 0 || e->movie_id >= NG_MAX_RENDER_MOVIES) continue;
+		movies[movie_count++] = e;
+		if (e->shape_vert_count > 0 || e->color_count > 0 ||
+		    e->uninv_mat_count > 0 || e->gradient_count > 0 ||
+		    e->bitmap_count > 0 || e->transform_count > 0 ||
+		    e->cxform_count > 0)
+			have_tables = 1;
+	}
+	// No child movies, or a generator that predates these fields: leave every
+	// array exactly as the root emitted it. This is the path every
+	// single-movie build takes, so the pass cannot move a byte there.
+	if (!have_tables) return;
+	g_ng_render_tables_active = 1;
+
+	// --- root counts -------------------------------------------------------
+	size_t root_verts = app_context->shape_data_size / (4 * sizeof(u32));
+	size_t root_xforms = app_context->transform_data_size / (16 * sizeof(float));
+#ifndef NO_GRAPHICS
+	size_t root_cxforms = app_context->cxform_data_size / (20 * sizeof(float));
+	size_t root_colors = app_context->color_data_size / (4 * sizeof(float));
+	size_t root_uninv = app_context->uninv_mat_data_size / (16 * sizeof(float));
+	size_t root_grads = app_context->gradient_data_size / (256 * 4);
+	size_t root_style = root_uninv > root_grads ? root_uninv : root_grads;
+	size_t root_bitmaps = app_context->bitmap_count;
+#else
+	size_t root_style = 0, root_colors = 0, root_bitmaps = 0, root_cxforms = 0;
+#endif
+
+	size_t tot_verts = root_verts;
+	size_t tot_colors = root_colors;
+	size_t tot_style = root_style;
+	size_t tot_bitmaps = root_bitmaps;
+	size_t tot_xforms = root_xforms;
+	size_t tot_cxforms = root_cxforms;
+	for (int i = 0; i < movie_count; i++) {
+		MovieEntry* e = movies[i];
+		NgRenderBases* b = &g_ng_render_bases[e->movie_id];
+		size_t style_n = e->uninv_mat_count > e->gradient_count
+			? e->uninv_mat_count : e->gradient_count;
+		b->shape_vert = (u32) tot_verts;
+		b->transform  = (u32) tot_xforms;
+		e->shape_vert_base = b->shape_vert;
+		e->transform_base  = b->transform;
+		tot_verts   += e->shape_vert_count;
+		tot_xforms  += e->transform_count;
+#ifndef NO_GRAPHICS
+		b->color      = (u32) tot_colors;
+		b->style      = (u32) tot_style;
+		b->bitmap     = (u32) tot_bitmaps;
+		b->cxform     = (u32) tot_cxforms;
+		e->color_base      = b->color;
+		e->gradient_base   = b->style;
+		e->uninv_mat_base  = b->style;
+		e->bitmap_base     = b->bitmap;
+		e->cxform_base     = b->cxform;
+		tot_colors  += e->color_count;
+		tot_style   += style_n;
+		tot_bitmaps += e->bitmap_count;
+		tot_cxforms += e->cxform_count;
+#else
+		// NO_GRAPHICS has no colour/gradient/bitmap/cxform arrays on
+		// app_context at all, so none of them is combined and every base must
+		// stay 0 — a nonzero cxform base with an un-combined array is an
+		// out-of-bounds read, and it would only appear with a SECOND child
+		// movie (the first one's base is 0 either way).
+		(void) style_n;
+		b->color = b->style = b->bitmap = b->cxform = 0;
+		e->color_base = e->gradient_base = e->uninv_mat_base = 0;
+		e->bitmap_base = e->cxform_base = 0;
+#endif
+	}
+
+	// --- vertices ----------------------------------------------------------
+	// Always rebuilt when there is any child geometry, because the CPU hit
+	// tester and the GPU upload must agree on one numbering.
+	if (tot_verts > root_verts) {
+		u32 (*sd)[4] = (u32 (*)[4]) calloc(tot_verts, 4 * sizeof(u32));
+		if (sd != NULL) {
+			if (app_context->shape_data != NULL && root_verts > 0)
+				memcpy(sd, app_context->shape_data, root_verts * 4 * sizeof(u32));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->shape_data_ptr == NULL || e->shape_vert_count == 0) continue;
+				const NgRenderBases* b = &g_ng_render_bases[e->movie_id];
+				const u32* src = e->shape_data_ptr;
+				u32 (*dst)[4] = sd + e->shape_vert_base;
+				for (size_t v = 0; v < e->shape_vert_count; v++) {
+					dst[v][0] = src[v * 4 + 0];
+					dst[v][1] = src[v * 4 + 1];
+					dst[v][2] = src[v * 4 + 2];
+					dst[v][3] = ng_rebase_style_word(src[v * 4 + 2],
+					                                 src[v * 4 + 3], b);
+				}
+			}
+			g_ng_combined_shape_data = (const u32 (*)[4]) sd;
+			app_context->shape_data = (char*) sd;
+			app_context->shape_data_size = tot_verts * 4 * sizeof(u32);
+		}
+	}
+
+	// --- placement matrices -------------------------------------------------
+	// Combined in ALL build modes: ng_cache_transform re-bases every
+	// obj->transform_id onto this table, and the AVM1 _x/_y getters read it
+	// through ng_entryTransformData in NO_GRAPHICS too.
+	if (tot_xforms > root_xforms) {
+		float (*td)[16] = (float (*)[16]) calloc(tot_xforms, 16 * sizeof(float));
+		if (td != NULL) {
+			if (app_context->transform_data != NULL && root_xforms > 0)
+				memcpy(td, app_context->transform_data,
+				       root_xforms * 16 * sizeof(float));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->transform_data_ptr == NULL || e->transform_count == 0) continue;
+				memcpy(td + e->transform_base, e->transform_data_ptr,
+				       e->transform_count * 16 * sizeof(float));
+			}
+			g_ng_combined_transform_data = (const float (*)[16]) td;
+			g_ng_combined_transform_rows = tot_xforms;
+			app_context->transform_data = (char*) td;
+			app_context->transform_data_size = tot_xforms * 16 * sizeof(float);
+		}
+	}
+
+#ifndef NO_GRAPHICS
+	// --- placement colour transforms ---------------------------------------
+	if (tot_cxforms > root_cxforms) {
+		float* cx = (float*) calloc(tot_cxforms * 20, sizeof(float));
+		if (cx != NULL) {
+			if (app_context->cxform_data != NULL && root_cxforms > 0)
+				memcpy(cx, app_context->cxform_data,
+				       root_cxforms * 20 * sizeof(float));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->cxform_data_ptr == NULL || e->cxform_count == 0) continue;
+				memcpy(cx + (size_t) e->cxform_base * 20, e->cxform_data_ptr,
+				       e->cxform_count * 20 * sizeof(float));
+			}
+			g_ng_combined_cxform_data = cx;
+			app_context->cxform_data = (char*) cx;
+			app_context->cxform_data_size = tot_cxforms * 20 * sizeof(float);
+		}
+	}
+
+	// --- solid fill colours ------------------------------------------------
+	if (tot_colors > root_colors) {
+		float (*cd)[4] = (float (*)[4]) calloc(tot_colors, 4 * sizeof(float));
+		if (cd != NULL) {
+			if (app_context->color_data != NULL && root_colors > 0)
+				memcpy(cd, app_context->color_data, root_colors * 4 * sizeof(float));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->color_data_ptr == NULL || e->color_count == 0) continue;
+				memcpy(cd + e->color_base, e->color_data_ptr,
+				       e->color_count * 4 * sizeof(float));
+			}
+			app_context->color_data = (char*) cd;
+			app_context->color_data_size = tot_colors * 4 * sizeof(float);
+		}
+	}
+
+	// --- gradient ramps + inverse fill matrices (shared index space) --------
+	if (tot_style > root_style) {
+		float* um = (float*) calloc(tot_style * 16, sizeof(float));
+		if (um != NULL) {
+			if (app_context->uninv_mat_data != NULL && root_uninv > 0)
+				memcpy(um, app_context->uninv_mat_data,
+				       root_uninv * 16 * sizeof(float));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->uninv_mat_data_ptr == NULL || e->uninv_mat_count == 0) continue;
+				memcpy(um + (size_t) e->uninv_mat_base * 16, e->uninv_mat_data_ptr,
+				       e->uninv_mat_count * 16 * sizeof(float));
+			}
+			app_context->uninv_mat_data = (char*) um;
+			app_context->uninv_mat_data_size = tot_style * 16 * sizeof(float);
+		}
+
+		u8 (*gd)[4] = (u8 (*)[4]) calloc(tot_style * 256, 4);
+		if (gd != NULL) {
+			if (app_context->gradient_data != NULL && root_grads > 0)
+				memcpy(gd, app_context->gradient_data, root_grads * 256 * 4);
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->gradient_data_ptr == NULL || e->gradient_count == 0) continue;
+				memcpy(gd + (size_t) e->gradient_base * 256, e->gradient_data_ptr,
+				       e->gradient_count * 256 * 4);
+			}
+			app_context->gradient_data = (char*) gd;
+			app_context->gradient_data_size = tot_style * 256 * 4;
+		}
+	}
+
+	// --- static bitmap slots ------------------------------------------------
+	// Only the COUNT moves here: the pixels stay in each movie's own array and
+	// are pre-declared into the renderer's slot table by
+	// ng_predeclareChildBitmaps(), called once the renderer exists.
+	app_context->bitmap_count = tot_bitmaps;
+#endif
+}
+

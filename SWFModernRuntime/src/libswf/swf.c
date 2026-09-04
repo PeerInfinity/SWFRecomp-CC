@@ -1558,8 +1558,43 @@ frame_loop_exit:
 #endif
 }
 
+// Pre-declare every child movie's static bitmaps into the renderer's slot
+// table, so build_static_bitmap_pools can dimension the size-class pools for
+// all of them at the ROOT's finalizeBitmaps and never has to be re-entered.
+//
+// A child's own defineBitmap calls arrive at loadMovie time, long after the
+// pools are latched; making the pools growable and the finalize re-entrant was
+// the alternative, and it is a much riskier shape (destroying textures a
+// recorded draw still references). The descriptors are static data the
+// recompiler already knows -- see `bitmap_descs` in draws.c -- so the whole
+// question can be answered before the first frame.
+//
+// Cost: a bundled child's bitmaps are resident even if the child is never
+// loaded. That is the same trade the root's own bitmaps already make.
+void ng_predeclareChildBitmaps(void)
+{
+	for (int i = 0; ; i++) {
+		MovieEntry* e = getMovieEntryAt(i);
+		if (e == NULL) break;
+		if (e->movie_id == 0 || e->bitmap_count == 0) continue;
+		if (e->bitmap_descs_ptr == NULL || e->bitmap_data_ptr == NULL) continue;
+		for (size_t k = 0; k < e->bitmap_count; k++) {
+			const u32* d = e->bitmap_descs_ptr + k * 4;
+			if (d[2] == 0 || d[3] == 0) continue;   // degenerate: keeps its slot
+			renderer_predeclare_bitmap(context, e->bitmap_base + (u32) k,
+			                           e->bitmap_data_ptr + d[0],
+			                           d[2], d[3]);
+		}
+	}
+}
+
 void swfStart(SWFAppContext* app_context)
 {
+	// Multi-SWF render slice: fold every linked child movie's geometry and
+	// style arrays into the root's, so what the renderer uploads below covers
+	// all of them. No-op unless a child movie carries render tables.
+	ng_buildMovieRenderTables(app_context);
+
 	context = renderer_new();
 
 	// The renderer's width/height are the RENDER TARGET, which is the declared
@@ -1676,6 +1711,12 @@ void swfStart(SWFAppContext* app_context)
 #endif
 
 	renderer_init(app_context, context);
+
+	// Child movies' static bitmaps go into their combined slots now, while the
+	// size-class pools are still unbuilt: the root's tagInit finalizes them a
+	// few lines below and a child's own defineBitmap arrives at loadMovie time,
+	// far too late. See ng_predeclareChildBitmaps.
+	ng_predeclareChildBitmaps();
 
 #ifdef OFFSCREEN_RENDER
 	// Parse CAPTURE_TRIGGERS / CAPTURE_OUTPUT_DIR env vars so the tick-loop

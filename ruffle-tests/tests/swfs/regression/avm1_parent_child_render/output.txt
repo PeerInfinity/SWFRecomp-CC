@@ -1,0 +1,7 @@
+ctl:shape:50:true
+ctl:shape:150:false
+chd:shape:50:false
+chd:shape:150:true
+chd:bbox:150:true
+chd:sub:movieclip
+done

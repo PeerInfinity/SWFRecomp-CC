@@ -30043,11 +30043,32 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		// makes hairline lineStyle(0) lines render as 1px instead of vanishing,
 		// and keeps strokes on scaled-down clips from thinning away.
 		if (path->has_line && path->stroke_poly != NULL) {
+			// With child movies linked, last_transform_id can be a loaded
+			// movie's re-based id and the generated `transform_data` symbol is
+			// only the ROOT's prefix of the combined placement table (multi-SWF
+			// render slice) — so read the combined table when there is one, and
+			// bound it. When there is none this is the old expression verbatim,
+			// so a single-movie build is unchanged (including its long-standing
+			// exposure to dynamic_xform_slot, a GPU-only slot past the end of
+			// the CPU array — see the Drawing-API note in
+			// SWFRecompDocs/status/child-placed-clip-uninit.md).
 			GEN_EXTERN_TRANSFORM_DATA;
-			float a = transform_data[info->transform_id][0];
-			float b = transform_data[info->transform_id][1];
-			float c = transform_data[info->transform_id][4];
-			float d = transform_data[info->transform_id][5];
+			const float (*_comb)[16] = ng_combinedTransformData();
+			float a, b, c, d;
+			if (_comb != NULL) {
+				size_t _rows = ng_combinedTransformRows();
+				const float* _row = ((size_t)info->transform_id < _rows)
+					? _comb[info->transform_id] : NULL;
+				a = _row ? _row[0] : 1.0f;
+				b = _row ? _row[1] : 0.0f;
+				c = _row ? _row[4] : 0.0f;
+				d = _row ? _row[5] : 1.0f;
+			} else {
+				a = transform_data[info->transform_id][0];
+				b = transform_data[info->transform_id][1];
+				c = transform_data[info->transform_id][4];
+				d = transform_data[info->transform_id][5];
+			}
 			float sx = sqrtf(a*a + b*b);
 			float sy = sqrtf(c*c + d*d);
 			float s = (sx > sy) ? sx : sy;                  // max-axis on-screen scale

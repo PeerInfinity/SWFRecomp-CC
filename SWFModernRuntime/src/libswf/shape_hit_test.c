@@ -45,12 +45,14 @@ int ng_getMatrixFromObj_render(DisplayObject* obj,
 {
 	if (!obj) return 0;
 	u32 tid = obj->transform_id;
-	if (out_a)  *out_a  = transform_data[tid][0];
-	if (out_b)  *out_b  = transform_data[tid][1];
-	if (out_c)  *out_c  = transform_data[tid][4];
-	if (out_d)  *out_d  = transform_data[tid][5];
-	if (out_tx_twips) *out_tx_twips = (int32_t)rintf(transform_data[tid][12]);
-	if (out_ty_twips) *out_ty_twips = (int32_t)rintf(transform_data[tid][13]);
+	// The entry's own table — see ng_getMatrixFromObj (tag_stubs.c).
+	float (*td)[16] = ng_entryTransformData(obj);
+	if (out_a)  *out_a  = td[tid][0];
+	if (out_b)  *out_b  = td[tid][1];
+	if (out_c)  *out_c  = td[tid][4];
+	if (out_d)  *out_d  = td[tid][5];
+	if (out_tx_twips) *out_tx_twips = (int32_t)rintf(td[tid][12]);
+	if (out_ty_twips) *out_ty_twips = (int32_t)rintf(td[tid][13]);
 	return 1;
 }
 
@@ -66,6 +68,16 @@ GEN_EXTERN_TEXT_DATA;
 // Weak default: overridden by draws.c when shapes are present.
 // Older generated code may lack path_data; this prevents linker errors.
 __attribute__((weak)) float path_data[1][3] = {{0}};
+
+// --- multi-SWF: read geometry through the right movie's tables --------------
+// A loaded child's path offsets index ITS OWN path_data and its vertex offsets
+// index the COMBINED vertex table; both are the generated root arrays when the
+// build has no child movies, so PD/SD are the old expressions verbatim there.
+// ng_ht_path_tab is set once per ng_hitTestShapeChar call from the character's
+// DEFINING movie (ng_record_char_path recorded it); NULL = the main movie's.
+static const float (*ng_ht_path_tab)[3] = NULL;
+#define PD (ng_ht_path_tab != NULL ? ng_ht_path_tab : (const float (*)[3]) path_data)
+
 
 
 // Winding number contribution from a line segment (ray-cast along +x axis).
@@ -316,36 +328,36 @@ static int ng_hitTestPathStroke(size_t path_offset, size_t path_size,
 
 	size_t end = path_offset + path_size;
 	for (size_t i = path_offset; i < end; i++) {
-		float cmd = path_data[i][0];
+		float cmd = PD[i][0];
 		if (cmd == 1.0f) {
 			// StyleChange fills — skip
-			if (i + 1 < end && path_data[i+1][0] == 1.5f) {
+			if (i + 1 < end && PD[i+1][0] == 1.5f) {
 				i++;
-				int line_style = (int)path_data[i][1];
-				line_width = (double)path_data[i][2];
+				int line_style = (int)PD[i][1];
+				line_width = (double)PD[i][2];
 				has_line = (line_style > 0 && line_width > 0.0);
 				// Minimum stroke width: 1 pixel = 20 twips
 				if (has_line && line_width < 20.0) line_width = 20.0;
 			}
 		}
 		else if (cmd == 5.0f) {
-			cursor_x = (double)path_data[i][1];
-			cursor_y = (double)path_data[i][2];
+			cursor_x = (double)PD[i][1];
+			cursor_y = (double)PD[i][2];
 		}
 		else if (cmd == 2.0f && has_line) {
-			double nx = (double)path_data[i][1], ny = (double)path_data[i][2];
+			double nx = (double)PD[i][1], ny = (double)PD[i][2];
 			double half_w = line_width * 0.5;
 			if (dist_sq_point_to_segment(local_x, local_y, cursor_x, cursor_y, nx, ny) <= half_w * half_w)
 				return 1;
 			cursor_x = nx; cursor_y = ny;
 		}
 		else if (cmd == 2.0f) {
-			cursor_x = (double)path_data[i][1]; cursor_y = (double)path_data[i][2];
+			cursor_x = (double)PD[i][1]; cursor_y = (double)PD[i][2];
 		}
 		else if (cmd == 3.0f && i + 1 < end) {
-			double cx = (double)path_data[i][1], cy = (double)path_data[i][2];
+			double cx = (double)PD[i][1], cy = (double)PD[i][2];
 			i++;
-			double nx = (double)path_data[i][1], ny = (double)path_data[i][2];
+			double nx = (double)PD[i][1], ny = (double)PD[i][2];
 			if (has_line) {
 				double half_w = line_width * 0.5;
 				if (dist_sq_point_to_curve(local_x, local_y, cursor_x, cursor_y, cx, cy, nx, ny) <= half_w * half_w)
@@ -371,26 +383,26 @@ static int ng_hitTestPathFill(size_t char_id, size_t path_offset, size_t path_si
 
 	size_t end = path_offset + path_size;
 	for (size_t i = path_offset; i < end; i++) {
-		float cmd = path_data[i][0];
+		float cmd = PD[i][0];
 
 		if (cmd == 1.0f) {
 			// StyleChange: {1, fill0, fill1}
-			cur_fill0 = (int)path_data[i][1];
-			cur_fill1 = (int)path_data[i][2];
+			cur_fill0 = (int)PD[i][1];
+			cur_fill1 = (int)PD[i][2];
 			if (cur_fill0 > max_fill) max_fill = cur_fill0;
 			if (cur_fill1 > max_fill) max_fill = cur_fill1;
 			// Skip line style entry (1.5)
-			if (i + 1 < end && path_data[i+1][0] == 1.5f) i++;
+			if (i + 1 < end && PD[i+1][0] == 1.5f) i++;
 		}
 		else if (cmd == 5.0f) {
 			// MoveTo: {5, x, y}
-			cursor_x = (double)path_data[i][1];
-			cursor_y = (double)path_data[i][2];
+			cursor_x = (double)PD[i][1];
+			cursor_y = (double)PD[i][2];
 		}
 		else if (cmd == 2.0f) {
 			// LineTo: {2, x, y}
-			double nx = (double)path_data[i][1];
-			double ny = (double)path_data[i][2];
+			double nx = (double)PD[i][1];
+			double ny = (double)PD[i][2];
 
 			// fill1 (left fill): forward direction
 			if (cur_fill1 > 0 && cur_fill1 < 64) {
@@ -408,11 +420,11 @@ static int ng_hitTestPathFill(size_t char_id, size_t path_offset, size_t path_si
 		}
 		else if (cmd == 3.0f && i + 1 < end) {
 			// CurveTo: {3, ctrl_x, ctrl_y} + {4, anchor_x, anchor_y}
-			double cx = (double)path_data[i][1];
-			double cy = (double)path_data[i][2];
+			double cx = (double)PD[i][1];
+			double cy = (double)PD[i][2];
 			i++;
-			double nx = (double)path_data[i][1];
-			double ny = (double)path_data[i][2];
+			double nx = (double)PD[i][1];
+			double ny = (double)PD[i][2];
 
 			if (cur_fill1 > 0 && cur_fill1 < 64) {
 				fill_winding[cur_fill1] += winding_number_curve(local_x, local_y,
@@ -462,14 +474,14 @@ static int ng_hitTestMorphPath(size_t char_id, size_t path_offset, size_t path_s
 	size_t end = path_offset + path_size;
 
 	while (i < end) {
-		float cmd = path_data[i][0];
+		float cmd = PD[i][0];
 
 		if (cmd == 0.0f) break;
 
 		if (cmd == 1.0f) {
 			// StyleChange fills (no interpolation)
-			cur_fill0 = (int)path_data[i][1];
-			cur_fill1 = (int)path_data[i][2];
+			cur_fill0 = (int)PD[i][1];
+			cur_fill1 = (int)PD[i][2];
 			if (cur_fill0 > max_fill) max_fill = cur_fill0;
 			if (cur_fill1 > max_fill) max_fill = cur_fill1;
 			i++;
@@ -478,13 +490,13 @@ static int ng_hitTestMorphPath(size_t char_id, size_t path_offset, size_t path_s
 
 		if (cmd == 1.5f) {
 			// StyleChange line (start width)
-			int line_style = (int)path_data[i][1];
-			double start_w = (double)path_data[i][2];
+			int line_style = (int)PD[i][1];
+			double start_w = (double)PD[i][2];
 			i++;
 			// Read morph end width (cmd == 9.0)
 			double end_w = start_w;
-			if (i < end && path_data[i][0] == 9.0f) {
-				end_w = (double)path_data[i][2];
+			if (i < end && PD[i][0] == 9.0f) {
+				end_w = (double)PD[i][2];
 				i++;
 			}
 			line_width = ot * start_w + t * end_w;
@@ -495,11 +507,11 @@ static int ng_hitTestMorphPath(size_t char_id, size_t path_offset, size_t path_s
 
 		if (cmd == 5.0f) {
 			// MoveTo (start)
-			double sx = (double)path_data[i][1], sy = (double)path_data[i][2];
+			double sx = (double)PD[i][1], sy = (double)PD[i][2];
 			i++;
 			double ex = sx, ey = sy;
-			if (i < end && path_data[i][0] == 9.0f) {
-				ex = (double)path_data[i][1]; ey = (double)path_data[i][2];
+			if (i < end && PD[i][0] == 9.0f) {
+				ex = (double)PD[i][1]; ey = (double)PD[i][2];
 				i++;
 			}
 			cursor_x = ot * sx + t * ex;
@@ -509,11 +521,11 @@ static int ng_hitTestMorphPath(size_t char_id, size_t path_offset, size_t path_s
 
 		if (cmd == 2.0f) {
 			// LineTo (start)
-			double sx = (double)path_data[i][1], sy = (double)path_data[i][2];
+			double sx = (double)PD[i][1], sy = (double)PD[i][2];
 			i++;
 			double ex = sx, ey = sy;
-			if (i < end && path_data[i][0] == 9.0f) {
-				ex = (double)path_data[i][1]; ey = (double)path_data[i][2];
+			if (i < end && PD[i][0] == 9.0f) {
+				ex = (double)PD[i][1]; ey = (double)PD[i][2];
 				i++;
 			}
 			double nx = ot * sx + t * ex;
@@ -538,23 +550,23 @@ static int ng_hitTestMorphPath(size_t char_id, size_t path_offset, size_t path_s
 
 		if (cmd == 3.0f) {
 			// CurveTo control (start)
-			double scx = (double)path_data[i][1], scy = (double)path_data[i][2];
+			double scx = (double)PD[i][1], scy = (double)PD[i][2];
 			i++;
 			double ecx = scx, ecy = scy;
-			if (i < end && path_data[i][0] == 9.0f) {
-				ecx = (double)path_data[i][1]; ecy = (double)path_data[i][2];
+			if (i < end && PD[i][0] == 9.0f) {
+				ecx = (double)PD[i][1]; ecy = (double)PD[i][2];
 				i++;
 			}
 			double ctrl_x = ot * scx + t * ecx;
 			double ctrl_y = ot * scy + t * ecy;
 
 			// Expect anchor (cmd == 4.0)
-			if (i >= end || path_data[i][0] != 4.0f) { continue; }
-			double sax = (double)path_data[i][1], say = (double)path_data[i][2];
+			if (i >= end || PD[i][0] != 4.0f) { continue; }
+			double sax = (double)PD[i][1], say = (double)PD[i][2];
 			i++;
 			double eax = sax, eay = say;
-			if (i < end && path_data[i][0] == 9.0f) {
-				eax = (double)path_data[i][1]; eay = (double)path_data[i][2];
+			if (i < end && PD[i][0] == 9.0f) {
+				eax = (double)PD[i][1]; eay = (double)PD[i][2];
 				i++;
 			}
 			double anchor_x = ot * sax + t * eax;
@@ -634,6 +646,11 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
     double ma, double mb, double mc_m, double md, double mtx, double mty,
     double test_x, double test_y)
 {
+	// The path_data array this character's recorded offsets index — the movie
+	// that DEFINED it, which is not the main movie for a Loader-loaded child.
+	// Read through PD for the rest of this call.
+	ng_ht_path_tab = ng_findCharPathTable(char_id);
+
 	// EditText (text field): hit test against bounds rectangle
 	int tf_idx = ng_find_textfield(char_id);
 	if (tf_idx >= 0) {
@@ -695,18 +712,18 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 				double g_cursor_x = 0, g_cursor_y = 0;
 				int g_fill1 = 0;
 				for (size_t pi = glyph_path_offset; pi < glyph_path_offset + glyph_path_size; pi++) {
-					float pcmd = path_data[pi][0];
-					if (pcmd == 1.0f) { g_fill1 = (int)path_data[pi][2]; if (pi+1 < glyph_path_offset+glyph_path_size && path_data[pi+1][0]==1.5f) pi++; }
-					else if (pcmd == 5.0f) { g_cursor_x = (double)path_data[pi][1]; g_cursor_y = (double)path_data[pi][2]; }
+					float pcmd = PD[pi][0];
+					if (pcmd == 1.0f) { g_fill1 = (int)PD[pi][2]; if (pi+1 < glyph_path_offset+glyph_path_size && PD[pi+1][0]==1.5f) pi++; }
+					else if (pcmd == 5.0f) { g_cursor_x = (double)PD[pi][1]; g_cursor_y = (double)PD[pi][2]; }
 					else if (pcmd == 2.0f && g_fill1) {
-						double gnx = (double)path_data[pi][1], gny = (double)path_data[pi][2];
+						double gnx = (double)PD[pi][1], gny = (double)PD[pi][2];
 						glyph_winding += winding_number_line(local_x, local_y, g_cursor_x, g_cursor_y, gnx, gny);
 						g_cursor_x = gnx; g_cursor_y = gny;
 					}
 					else if (pcmd == 3.0f && pi+1 < glyph_path_offset+glyph_path_size && g_fill1) {
-						double gcx = (double)path_data[pi][1], gcy = (double)path_data[pi][2];
+						double gcx = (double)PD[pi][1], gcy = (double)PD[pi][2];
 						pi++;
-						double gnx = (double)path_data[pi][1], gny = (double)path_data[pi][2];
+						double gnx = (double)PD[pi][1], gny = (double)PD[pi][2];
 						glyph_winding += winding_number_curve(local_x, local_y, g_cursor_x, g_cursor_y, gcx, gcy, gnx, gny);
 						g_cursor_x = gnx; g_cursor_y = gny;
 					}
@@ -718,9 +735,11 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 			// Fallback: test against glyph triangles
 			size_t num_tris = glyph_size / 3;
 			for (size_t t = 0; t < num_tris; t++) {
-				const u32* v0 = shape_data[glyph_offset + t*3 + 0];
-				const u32* v1 = shape_data[glyph_offset + t*3 + 1];
-				const u32* v2 = shape_data[glyph_offset + t*3 + 2];
+				const u32 (*gsd)[4] = ng_combinedShapeData();
+				if (gsd == NULL) gsd = (const u32 (*)[4]) shape_data;
+				const u32* v0 = gsd[glyph_offset + t*3 + 0];
+				const u32* v1 = gsd[glyph_offset + t*3 + 1];
+				const u32* v2 = gsd[glyph_offset + t*3 + 2];
 				double ax = (double)*(const float*)&v0[0];
 				double ay = (double)*(const float*)&v0[1];
 				double bx = (double)*(const float*)&v1[0];
@@ -789,6 +808,11 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 	size_t offset = ch->shape_offset;
 	size_t count = ch->size;
 	if (count < 3) return 0;
+	// ch->shape_offset is already re-based onto the combined vertex table by
+	// tagDefineShape, so read that table (== the generated array when no child
+	// movie contributed geometry).
+	const u32 (*sd)[4] = ng_combinedShapeData();
+	if (sd == NULL) sd = (const u32 (*)[4]) shape_data;
 
 	// Inverse-transform test point into shape's local space
 	double det = ma * md - mb * mc_m;
@@ -807,9 +831,9 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 	int stroke_hits = 0;
 	size_t num_tris = count / 3;
 	for (size_t t = 0; t < num_tris; t++) {
-		const u32* v0 = shape_data[offset + t * 3 + 0];
-		const u32* v1 = shape_data[offset + t * 3 + 1];
-		const u32* v2 = shape_data[offset + t * 3 + 2];
+		const u32* v0 = sd[offset + t * 3 + 0];
+		const u32* v1 = sd[offset + t * 3 + 1];
+		const u32* v2 = sd[offset + t * 3 + 2];
 		double ax = (double)*(const float*)&v0[0];
 		double ay = (double)*(const float*)&v0[1];
 		double bx = (double)*(const float*)&v1[0];

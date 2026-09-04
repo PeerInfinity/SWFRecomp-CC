@@ -497,6 +497,57 @@ typedef struct MovieEntry {
 	// is `file_size`, not `swf_bytes_len`.
 	const u8* raw_bytes;
 	u32 raw_bytes_len;
+	// ---- Per-movie RENDER tables (multi-SWF render slice) -----------------
+	// Every geometry and style index the recompiler emits is numbered from 0
+	// in the movie that emitted it, so a loaded child's indices mean nothing
+	// against the root's arrays: its shapes drew the root's triangles and its
+	// fills sampled the root's colours. ng_buildMovieRenderTables()
+	// concatenates all movies' arrays into one set of combined tables -- the
+	// ROOT FIRST, so a build with no child movies skips the whole pass and a
+	// build with them keeps every root index unchanged -- and fills in the
+	// *_base fields below.
+	//
+	// transform_data and cxform_data are combined too, but their ids are
+	// re-based at PLACEMENT time rather than at define time -- a placement id
+	// comes from the placing movie's tag, not from a character. ng_cache_transform
+	// is the single funnel every one of the 14 tagPlaceObject* call sites goes
+	// through, so re-basing there makes obj->transform_id a COMBINED-table index
+	// everywhere and leaves all ~45 of its readers untouched.
+	//
+	// All zero-init safe: a NULL table contributes nothing and leaves its base
+	// at 0, which is what every entry the generator produced before this slice
+	// carries.
+	const u32*   shape_data_ptr;      // u32[shape_vert_count][4]
+	size_t       shape_vert_count;
+	const float* color_data_ptr;      // float[color_count][4]
+	size_t       color_count;
+	const float* uninv_mat_data_ptr;  // float[uninv_mat_count * 16]
+	size_t       uninv_mat_count;
+	const u8*    gradient_data_ptr;   // u8[gradient_count * 256][4]
+	size_t       gradient_count;      // ramps, 256 RGBA rows each
+	// path_data is NOT combined: it is read only by the CPU hit tester, so the
+	// movie's own table is recorded per CHARACTER at ng_record_char_path time
+	// (the same shape as place_transform_data) instead.
+	const float* path_data_ptr;       // float[path_count][3]
+	size_t       path_count;
+	size_t       transform_count;     // rows in transform_data_ptr
+	const float* cxform_data_ptr;     // float[cxform_count * 20]
+	size_t       cxform_count;
+	const u8*    bitmap_data_ptr;     // this movie's raw pixel array
+	const u32*   bitmap_descs_ptr;    // u32[bitmap_count][4] {offset,size,w,h}
+	size_t       bitmap_count;
+	// Bases into the combined tables, assigned by ng_buildMovieRenderTables.
+	// gradient_base and uninv_mat_base are always EQUAL: a vertex's style word
+	// carries ONE index that the shader uses as both a gradient ramp row and an
+	// inverse-matrix slot, so the two arrays are padded to a shared per-movie
+	// stride rather than packed independently.
+	u32 shape_vert_base;
+	u32 color_base;
+	u32 gradient_base;
+	u32 uninv_mat_base;
+	u32 bitmap_base;
+	u32 transform_base;
+	u32 cxform_base;
 } MovieEntry;
 
 // Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)

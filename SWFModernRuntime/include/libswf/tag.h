@@ -538,6 +538,36 @@ void ng_record_char_winding(size_t char_id);
 void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size);
 // Record interleaved morph path data (for interpolated hit testing)
 void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size);
+// The path_data table ng_find_char_path's offset indexes for this character:
+// the DEFINING movie's, or NULL when that is the main movie's generated array.
+const float (*ng_findCharPathTable(size_t char_id))[3];
+
+// ---------------------------------------------------------------------------
+// Combined per-movie render tables (multi-SWF render slice, ng_shared.c)
+// ---------------------------------------------------------------------------
+// Concatenate every linked movie's geometry/style arrays into one set, so a
+// loaded child's shapes reach the GPU and the CPU hit tester with indices that
+// mean something. No-op for a build with no child movies. Call before the
+// renderer reads app_context's tables.
+void ng_buildMovieRenderTables(SWFAppContext* app_context);
+// Pre-declare child movies' static bitmaps into the renderer's slot table.
+// Call after renderer_init and before the root's tagInit finalizes the pools.
+void ng_predeclareChildBitmaps(void);
+// The combined vertex table, or NULL when this build never built one.
+const u32 (*ng_combinedShapeData(void))[4];
+// Base of movie_id's rows in the combined tables (movie 0 = main = 0).
+u32 ng_movieShapeVertBase(u8 movie_id);
+u32 ng_movieBitmapBase(u8 movie_id);
+// Base for the movie whose OWN transform_data array is `td` (NULL/main = 0).
+u32 ng_movieTransformBaseForTable(const float (*td)[16]);
+u32 ng_movieCxformBaseForTable(const float (*td)[16]);
+// The combined placement-matrix table, or NULL when none was built.
+const float (*ng_combinedTransformData(void))[16];
+size_t ng_combinedTransformRows(void);
+// The combined colour-transform table (20 floats per slot), or NULL.
+const float* ng_combinedCxformData(void);
+// 1 once the combine pass has actually run with child tables to fold in.
+int ng_movieRenderTablesActive(void);
 
 // (was: #ifdef NO_GRAPHICS — un-gated; same reason as above)
 // Shape-accurate point-in-shape test for a display list.

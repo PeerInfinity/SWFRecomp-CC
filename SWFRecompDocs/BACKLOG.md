@@ -267,37 +267,65 @@ first).
   left undone deliberately in slice 6 (a behaviour change on the
   `mcl_replace_root_*` / `load_cancel_*` cluster with no fixture demanding it).
   (2026-09-03)
-- **A loaded child movie does not render at all — the renderer has no
-  per-movie tables.** Rewritten 2026-09-03 from "a loaded child's bitmaps never
-  reach the renderer", which named one facet of it. The bitmap gates are real
-  and measured (`avm1_parent_child_bitmap --mode=graphics`, instrumented: the
-  root uploads then finalizes, then the child's `defineBitmap` arrives with
-  **both** gates closed — `bitmap_static_built=1` **and**
-  `current_bitmap >= bitmap_count` — and every movie's `tagInit` calls
-  `finalizeBitmaps()`). But lifting them renders nothing, because a static
-  bitmap is only sampled by a shape and a child's shapes are not on the GPU
-  either: the vertex buffer is uploaded once from the ROOT's `shape_data`
-  (`swf.c:1581` -> `create_buffers_and_upload`), while
-  `renderer_draw_shape(ctx, ch->shape_offset, ..., obj->transform_id,
-  obj->cxform_id)` passes movie-LOCAL indices, and a bitmap fill style bakes a
-  movie-local bitmap index (`swf.cpp:7462`/`:7877`). `MovieEntry` carries
-  exactly one render array (`transform_data_ptr`) and it is CPU-only. So the
-  work item is: per-movie render tables on `MovieEntry` (shape/color/gradient/
-  uninv + the bitmap range), per-movie bases applied at draw time, and a
-  growable static slot table with a re-entrant finalize (the static pools are
-  size-classed — read memory `bitmap-texture-pools` before sizing anything).
-  There is also **no trace-visible assertion available**: every AS-visible read
-  of a child bitmap goes through the metadata/table paths, both now fixed, so
-  nothing in ActionScript can observe `ctx->bitmap_sizes`. Worth taking after
-  the frame-0 timeline entry above — a child that renders only frame 1 is a
-  thin prize; that gate is gone (children advance since slice 5 and LOOP since
-  slice 6). **This is NOT the same missing abstraction as display-list
-  ownership**, despite both being called "per-movie": that one is per-ENTRY
-  identity in a shared list, this one is per-movie INDEX BASES on
-  `MovieEntry` plus a growable re-entrant static pool, and it is just as
-  broken for a `_levelN` child that already HAS a private display list.
-  Slice 6 does not move it. See `per-movie-display-list-ownership.md` §7. Detail: `SWFRecompDocs/status/child-embedded-asset-lookup.md`
-  section 3. (2026-09-03)
+- ~~**A loaded child movie does not render at all — the renderer has no
+  per-movie tables.**~~ **DONE 2026-09-04.** A loaded child's shapes reach the
+  GPU with per-movie bases, and its solid, gradient and bitmap fills all sample
+  the right rows. Three re-basing strategies, because the three kinds of index
+  are known at three different moments: the vertex offset is baked into the
+  CHARACTER at `tagDefineShape` (one site instead of the ~10
+  `renderer_draw_shape` calls); the colour / gradient / bitmap indices are baked
+  into the VERTEX at combine time, because a fill style's style word is written
+  at recompile time and no draw-time argument can reach it; and `transform_id` /
+  `cxform_id` are re-based at PLACEMENT time inside `ng_cache_transform`, which
+  all 14 `tagPlaceObject*` sites already funnel through — that single write
+  makes the id a combined-table index for all ~45 of its readers without
+  touching one of them (keyed on `g_active_transform_data`, the only signal that
+  tracks the placing movie through both the loaders and `exec_sprite_frame`).
+  **The entry's own correction: the growable static slot table with a re-entrant
+  finalize is NOT needed and would have been the wrong answer.** The set of
+  movies a build can load is fixed at link time, so every child's bitmap count
+  and sizes are static data: the recompiler now emits `bitmap_descs[][4]` beside
+  the pixels and `ng_predeclareChildBitmaps()` fills the child slots between
+  `renderer_init` and the root's `tagInit`, leaving `build_static_bitmap_pools`
+  dimensioned exactly once with no growth and no texture freed under a recorded
+  draw. And there IS a trace-visible assertion for the shape half, which slice
+  4's ruling (correct for bitmaps) had been generalised too far: `path_data` is
+  a second per-movie geometry array read by `shape_hit_test.c`, so
+  `mc.hitTest(x, y, true)` on a child's shape tested the ROOT's outline. Anchored
+  by `regression/avm1_parent_child_render` (5 hitTest rows, 2 of which flip, plus
+  a 4-square tolerance-0 image comparison) and
+  `regression/avm1_parent_child_bitmap_fill` (pixels only). Closeout:
+  `SWFRecompDocs/status/per-movie-render-tables.md`; what it does NOT cover is
+  §5 there and the next four entries here. (2026-09-04)
+- **Static text and morph shapes in a loaded child still draw the root's
+  glyphs.** `text_data` / `glyph_data` / `morph_end_shape_data` /
+  `morph_end_color_data` are not in the combined tables, and `ch->text_start`,
+  `ch->transform_start`, `ch->morph_end_offset`, `ch->morph_color_start` and
+  `ch->morph_end_color_start` are not re-based. Same shape as the vertex-offset
+  fix in `tagDefineShape` — add the array to `ng_buildMovieRenderTables`, add
+  the count to `MovieEntry` (the harness already reads every draws.c array's
+  declared size), add the base at `tagDefineText` / `tagDefineMorphShape`.
+  `morph_start_offset` IS already re-based; the other morph offsets were left
+  alone deliberately so they stay consistent with each other. (2026-09-04)
+- **An AVM2 (Loader-loaded AS3) child's shapes still do not render.** The AVM2
+  render walk uses `Avm2ShapeGeomRec.vert_offset` out of the child's own
+  `Avm2MovieTables`, not `ch->shape_offset`, so it never passes through the
+  `tagDefineShape` re-base. The child's vertices ARE in the combined table and
+  its base is on its `MovieEntry`; what is missing is applying it on that path.
+  (2026-09-04)
+- **A loaded child whose stage HEIGHT differs from the root's renders shifted.**
+  The recompiler bakes the y-flip into every vertex as `FRAME_HEIGHT - y`, per
+  movie, so a 200-high child loaded into a 400-high parent is 200 px off. Both
+  render fixtures use equal stage sizes. Untested and unmeasured; the fix is
+  either a per-movie flip applied at combine time or a per-movie stage matrix.
+  (2026-09-04)
+- **Browser-WASM does not re-base a loaded movie's placement ids.** Several
+  `ng_cache_transform` call sites sit behind
+  `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, so the placement
+  re-base does not happen in the browser graphics build. Inert rather than wrong
+  (an un-re-based id keeps indexing the root rows it indexed before), and moot
+  until browser-WASM advances a loaded movie at all — see the MovieClipLoader
+  timing entry above. (2026-09-04)
 - **`flashbang_upload_bitmap`'s offset bug is fixed but untested.** The SDL3
   backend read `((u32*)context->bitmap_data)[bitmap_pixel]` — the start of the
   array — for every bitmap, so every bitmap after the first uploaded the first

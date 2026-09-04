@@ -51,6 +51,10 @@ float g_drag_virt_x = 0.0f;   // virtual stage X of dragged clip (twips)
 float g_drag_virt_y = 0.0f;   // virtual stage Y of dragged clip (twips)
 char g_drag_target_name[256] = "";  // name of most-recently dragged clip (persists after stopDrag)
 
+// NO_GRAPHICS has no renderer and no bitmap slot table; the combined bitmap
+// range built by ng_buildMovieRenderTables has nothing to fill here.
+void ng_predeclareChildBitmaps(void) {}
+
 // Default findMovieEntry/getPreludeEntry stubs when no child movies are linked
 #ifndef HAS_CHILD_MOVIES
 MovieEntry* findMovieEntry(const char* filename) {
@@ -878,6 +882,12 @@ void swfStart(SWFAppContext* app_context)
 #ifdef SWF_FILE_SIZE
 	root_movieclip.byte_size = SWF_FILE_SIZE;
 #endif
+
+	// Multi-SWF render slice: combine every child movie's geometry tables into
+	// the root's before any define tag re-bases an offset onto them. NO_GRAPHICS
+	// builds need this for shape/path hit testing and the AVM1 _x/_y getters,
+	// which read the same indices the renderer would.
+	ng_buildMovieRenderTables(app_context);
 
 	tagInit(app_context);
 

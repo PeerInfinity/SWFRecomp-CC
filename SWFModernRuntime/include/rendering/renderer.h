@@ -36,6 +36,10 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_free(app, ctx)                    render_webgpu_free(app, ctx)
 #define renderer_upload_bitmap(ctx, px, s, w, h)   render_webgpu_upload_bitmap(ctx, px, s, w, h)
 #define renderer_finalize_bitmaps(ctx)             render_webgpu_finalize_bitmaps(ctx)
+// Fill one static bitmap slot ahead of the pools being built. Used for a
+// loaded child movie's bitmaps, which the child's own defineBitmap would
+// otherwise report far too late (multi-SWF render slice).
+#define renderer_predeclare_bitmap(ctx, slot, px, w, h) render_webgpu_predeclare_bitmap(ctx, slot, px, w, h)
 #define renderer_upload_extra_transform_id(ctx, t) render_webgpu_upload_extra_transform_id(ctx, t)
 #define renderer_upload_extra_transform(ctx, xf)   render_webgpu_upload_extra_transform(ctx, xf)
 #define renderer_upload_cxform_id(ctx, id)         render_webgpu_upload_cxform_id(ctx, id)
@@ -97,6 +101,7 @@ typedef FlashbangContext RenderContext;
 #define renderer_free(app, ctx)                    flashbang_free(app, ctx)
 #define renderer_upload_bitmap(ctx, px, s, w, h)   flashbang_upload_bitmap(ctx, px, s, w, h)
 #define renderer_finalize_bitmaps(ctx)             flashbang_finalize_bitmaps(ctx)
+#define renderer_predeclare_bitmap(ctx, slot, px, w, h) ((void)0)
 #define renderer_upload_extra_transform_id(ctx, t) flashbang_upload_extra_transform_id(ctx, t)
 #define renderer_upload_extra_transform(ctx, xf)   flashbang_upload_extra_transform(ctx, xf)
 #define renderer_upload_cxform_id(ctx, id)         flashbang_upload_cxform_id(ctx, id)

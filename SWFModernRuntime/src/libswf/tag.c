@@ -173,6 +173,10 @@ float (*ng_entryChildTransformData(const DisplayObject* obj))[16] {
 	if (obj == NULL) return NULL;
 	float (*td)[16] = obj->place_transform_data;
 	if (td == NULL || td == transform_data) return NULL;
+	// The COMBINED table (multi-SWF render slice) is what
+	// app_context->transform_data points at, so it is "theirs" too: an entry on
+	// it carries an already-re-based id and needs no override.
+	if ((const float (*)[16]) td == ng_combinedTransformData()) return NULL;
 	return td;
 }
 
@@ -199,6 +203,9 @@ float (*g_active_transform_data)[16] = NULL;
 extern float (*g_active_transform_data)[16];
 #endif
 
+// Which movie's tagInit / frame funcs are running (defined in ng_shared.c).
+extern u8 g_current_movie_id;
+
 static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 	float (*td)[16] = g_active_transform_data ? g_active_transform_data : transform_data;
 	// Record WHICH table the id indexes, not just the six values. Readers that
@@ -206,13 +213,47 @@ static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 	// AVM1 _x/_y getters) otherwise index the main movie's `transform_data`
 	// with a loaded child's id — out of bounds whenever the child has more
 	// transform rows than the parent, which is the usual case.
-	obj->place_transform_data = td;
 	obj->place_a  = td[tid][0];
 	obj->place_b  = td[tid][1];
 	obj->place_c  = td[tid][4];
 	obj->place_d  = td[tid][5];
 	obj->place_tx = td[tid][12];
 	obj->place_ty = td[tid][13];
+	// Multi-SWF render slice: re-base a loaded movie's placement id onto the
+	// COMBINED transform table (ng_buildMovieRenderTables). This is the single
+	// funnel all 14 tagPlaceObject* sites pass through — each assigns
+	// obj->transform_id immediately before calling — so doing it here makes
+	// obj->transform_id a combined-table index for every one of its ~45
+	// readers, CPU and GPU alike, without touching any of them.
+	//
+	// `td` is the key rather than g_current_movie_id because it is the one
+	// signal that already tracks the PLACING movie through every path: the
+	// loaders swap it for a loaded movie's tags, and exec_sprite_frame swaps it
+	// again for a child-DEFINED sprite's frame funcs.
+	//
+	// Inert for the main movie and for any build with no child movies: the base
+	// is 0 and the combined table is NULL, so both branches are skipped.
+	if (ng_movieRenderTablesActive()) {
+		const float (*_comb)[16] = ng_combinedTransformData();
+		u32 _xbase = ng_movieTransformBaseForTable((const float (*)[16]) td);
+		if (_comb != NULL && _xbase != 0) {
+			obj->transform_id = tid + _xbase;
+			td = (float (*)[16]) _comb;
+		}
+	}
+	obj->place_transform_data = td;
+}
+
+// Re-base a placement's colour-transform id onto the combined cxform table
+// (multi-SWF render slice). Same argument as ng_cache_transform above and the
+// same key; 0 is the "no colour transform" sentinel and never moves. Applied at
+// the 14 `display_list[depth].cxform_id = ...` sites, which is every place a
+// tag's cxform id reaches a display entry.
+static inline u32 ng_rebaseCxformId(u32 cxform_id) {
+	if (cxform_id == 0) return 0;
+	float (*td)[16] = g_active_transform_data;
+	if (td == NULL || !ng_movieRenderTablesActive()) return cxform_id;
+	return cxform_id + ng_movieCxformBaseForTable((const float (*)[16]) td);
 }
 
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
@@ -2971,7 +3012,11 @@ static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
 	u32 baked = (app_context->cxform_data_size > 0)
 		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
 	if (obj->cxform_id != 0 && obj->cxform_id < baked) {
-		memcpy(out, &cxform_data[obj->cxform_id * 20], 20 * sizeof(float));
+		// app_context->cxform_data, not the `cxform_data` symbol: with child
+		// movies linked the id is an index into the COMBINED table and the
+		// symbol is only the root's prefix of it (multi-SWF render slice).
+		memcpy(out, (const float*)app_context->cxform_data + obj->cxform_id * 20,
+		       20 * sizeof(float));
 		return !cx_is_identity(out);
 	}
 	return 0;
@@ -3311,7 +3356,9 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			u32 baked_cx = (app_context->cxform_data_size > 0)
 				? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
 			if (obj->cxform_id != 0 && obj->cxform_id < baked_cx) {
-				memcpy(own_cx, &cxform_data[obj->cxform_id * 20], sizeof(own_cx));
+				memcpy(own_cx,
+				       (const float*)app_context->cxform_data + obj->cxform_id * 20,
+				       sizeof(own_cx));
 				have_own = 1;
 			}
 		}
@@ -3515,7 +3562,7 @@ static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
 	u32 baked = (app_context->cxform_data_size > 0)
 		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
 	if (cxform_id >= baked) return 0;
-	const float* cx = &cxform_data[cxform_id * 20];
+	const float* cx = (const float*)app_context->cxform_data + cxform_id * 20;
 	// 20-float layout: 4x4 column-major mult (alpha mult at [15]) + vec4 add
 	// (alpha add at [19]); see apply_cxform in render_webgpu.c.
 	return (cx[15] <= 0.0001f && cx[19] <= 0.0001f);
@@ -3636,7 +3683,8 @@ static int opaque_bg_local_bounds(DisplayObject* obj, float* b)
 			if (c->char_id == 0 || c->clip_depth > 0) continue;
 			float cb[4];
 			if (!opaque_bg_local_bounds(c, cb)) continue;
-			const float* m = transform_data[ng_get_original_transform_id(c)];
+			// The entry's own table (combined for a loaded movie's placements).
+			const float* m = ng_entryTransformData(c)[ng_get_original_transform_id(c)];
 			const float xs[4] = { cb[0], cb[1], cb[0], cb[1] };
 			const float ys[4] = { cb[2], cb[2], cb[3], cb[3] };
 			for (int k = 0; k < 4; k++)
@@ -4183,8 +4231,9 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				    g_next_dynamic_cxform_slot < g_cxform_slot_capacity)
 				{
 					float comp[20];
-					compose_cxform20(comp, &cxform_data[obj->cxform_id * 20],
-						&cxform_data[ch->cxform_id * 20]);
+					const float* _cxd = (const float*)app_context->cxform_data;
+					compose_cxform20(comp, _cxd + obj->cxform_id * 20,
+						_cxd + ch->cxform_id * 20);
 					u32 slot = g_next_dynamic_cxform_slot++;
 					renderer_write_cxform(context, slot, comp);
 					text_cx = slot;
@@ -6263,7 +6312,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			// Skip sprites and buttons — the compose loop below handles them.
 			Character* ch_ = &dictionary[obj->char_id];
 			if (ch_->type == CHAR_TYPE_SPRITE || ch_->type == CHAR_TYPE_BUTTON) continue;
-			float* slot = transform_data[obj->transform_id];
+			// app_context->transform_data, matching the tagShowFrame twin: with
+			// child movies linked transform_id indexes the COMBINED table.
+			float* slot = (float*)app_context->transform_data + obj->transform_id * 16;
 			apply_as_transform(slot, mc, mc->as_set_flags);
 			renderer_write_transform(context, obj->transform_id, slot);
 		}
@@ -7692,10 +7743,11 @@ int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
 		float sx = child->place_a;
 		float sy = child->place_d;
 #else
-		float tx = transform_data[child->transform_id][12];
-		float ty = transform_data[child->transform_id][13];
-		float sx = transform_data[child->transform_id][0];
-		float sy = transform_data[child->transform_id][5];
+		float (*_ctd)[16] = ng_entryTransformData(child);
+		float tx = _ctd[child->transform_id][12];
+		float ty = _ctd[child->transform_id][13];
+		float sx = _ctd[child->transform_id][0];
+		float sy = _ctd[child->transform_id][5];
 #endif
 
 		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE ||
@@ -7791,12 +7843,13 @@ static int find_drop_target_shape_hit_recursive(DisplayObject* dl, size_t dl_max
 		Character* cch = &dictionary[child->char_id];
 		// Compose parent matrix with this child's transform
 		u32 ctid = child->transform_id;
-		double ca = (double)transform_data[ctid][0];
-		double cb = (double)transform_data[ctid][1];
-		double cc = (double)transform_data[ctid][4];
-		double cd = (double)transform_data[ctid][5];
-		double ctx_v = (double)transform_data[ctid][12];
-		double cty_v = (double)transform_data[ctid][13];
+		float (*_ctd)[16] = ng_entryTransformData(child);
+		double ca = (double)_ctd[ctid][0];
+		double cb = (double)_ctd[ctid][1];
+		double cc = (double)_ctd[ctid][4];
+		double cd = (double)_ctd[ctid][5];
+		double ctx_v = (double)_ctd[ctid][12];
+		double cty_v = (double)_ctd[ctid][13];
 		double na = pa*ca + pc*cb, nb = pb*ca + pd*cb;
 		double nc = pa*cc + pc*cd, nd = pb*cc + pd*cd;
 		double nntx = pa*ctx_v + pc*cty_v + ptx;
@@ -7849,10 +7902,11 @@ static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
 
 		Character* ch = &dictionary[entry->char_id];
 
-		float entry_stage_x = parent_stage_x + transform_data[entry->transform_id][12];
-		float entry_stage_y = parent_stage_y + transform_data[entry->transform_id][13];
-		float sx = transform_data[entry->transform_id][0];
-		float sy = transform_data[entry->transform_id][5];
+		float (*_etd)[16] = ng_entryTransformData(entry);
+		float entry_stage_x = parent_stage_x + _etd[entry->transform_id][12];
+		float entry_stage_y = parent_stage_y + _etd[entry->transform_id][13];
+		float sx = _etd[entry->transform_id][0];
+		float sy = _etd[entry->transform_id][5];
 
 		// If this entry has an associated AS-level MC with as_set_flags
 		// (e.g. Dejagnu._y = 100), apply that delta to the entry's stage
@@ -8007,12 +8061,13 @@ static void dispatch_clip_event_press_dl(SWFAppContext* app_context,
 		// instead of the transform position (startDrag moves the clip visually
 		// without updating transform_data).
 		u32 tid = obj->transform_id;
-		double ca = (double)transform_data[tid][0];
-		double cb = (double)transform_data[tid][1];
-		double cc = (double)transform_data[tid][4];
-		double cd = (double)transform_data[tid][5];
-		double ctx_v = (double)transform_data[tid][12];
-		double cty_v = (double)transform_data[tid][13];
+		float (*_otd)[16] = ng_entryTransformData(obj);
+		double ca = (double)_otd[tid][0];
+		double cb = (double)_otd[tid][1];
+		double cc = (double)_otd[tid][4];
+		double cd = (double)_otd[tid][5];
+		double ctx_v = (double)_otd[tid][12];
+		double cty_v = (double)_otd[tid][13];
 		if (g_drag_target_name[0] != '\0' && obj->instance_name &&
 		    strcmp(obj->instance_name, g_drag_target_name) == 0)
 		{
@@ -8171,12 +8226,13 @@ static void dispatch_clip_event_roll_dl(SWFAppContext* app_context,
 		// Compose parent transform with this entry's transform (drag-aware,
 		// matches dispatch_clip_event_press_dl).
 		u32 tid = obj->transform_id;
-		double ca = (double)transform_data[tid][0];
-		double cb = (double)transform_data[tid][1];
-		double cc = (double)transform_data[tid][4];
-		double cd = (double)transform_data[tid][5];
-		double ctx_v = (double)transform_data[tid][12];
-		double cty_v = (double)transform_data[tid][13];
+		float (*_otd)[16] = ng_entryTransformData(obj);
+		double ca = (double)_otd[tid][0];
+		double cb = (double)_otd[tid][1];
+		double cc = (double)_otd[tid][4];
+		double cd = (double)_otd[tid][5];
+		double ctx_v = (double)_otd[tid][12];
+		double cty_v = (double)_otd[tid][13];
 		if (g_drag_target_name[0] != '\0' && obj->instance_name &&
 		    strcmp(obj->instance_name, g_drag_target_name) == 0)
 		{
@@ -8337,7 +8393,13 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = type;
-	dictionary[char_id].shape_offset = shape_offset;
+	// Re-base a loaded child's movie-LOCAL vertex offset onto the combined
+	// vertex table (ng_buildMovieRenderTables). Zero for the main movie and
+	// for any build without child geometry, so this is inert everywhere else.
+	// Done here rather than at the ~10 renderer_draw_shape sites because the
+	// defining movie is known exactly here and nowhere else.
+	dictionary[char_id].shape_offset =
+		shape_offset + ng_movieShapeVertBase(g_current_movie_id);
 	dictionary[char_id].size = shape_size;
 
 	// Bounds always recorded — AS-visible _width/_height/getBounds need them
@@ -8357,7 +8419,11 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = CHAR_TYPE_MORPH_SHAPE;
-	dictionary[char_id].morph_start_offset = shape_offset;
+	// See tagDefineShape. morph_end_offset / morph_color_start are NOT re-based:
+	// morph_end_shape_data and morph_end_color_data are not combined by this
+	// slice, so a MORPH shape in a loaded child is still unsupported.
+	dictionary[char_id].morph_start_offset =
+		shape_offset + ng_movieShapeVertBase(g_current_movie_id);
 	dictionary[char_id].morph_start_size = shape_size;
 	dictionary[char_id].morph_end_offset = morph_end_offset;
 	dictionary[char_id].morph_color_start = morph_color_start;
@@ -8900,7 +8966,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				ng_cache_transform(&display_list[depth], transform_id);
 			}
 			if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
-				display_list[depth].cxform_id = cxform_id;
+				display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 				init_cx_fields(&display_list[depth]);
 			}
@@ -8957,7 +9023,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		display_list[depth].char_id = char_id;
 		display_list[depth].transform_id = transform_id;
-		display_list[depth].cxform_id = cxform_id;
+		display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 		display_list[depth].placed_at_frame = current_frame;
@@ -9120,7 +9186,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		// white→yellow cxform, frames 1-4 move it with no cxform) loses the tint
 		// on the first move and renders white.
 		if (cxform_id != 0) {
-			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 			display_list[depth].has_cxform = 1;
 		}
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -9203,7 +9269,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 					ng_cache_transform(&display_list[depth], transform_id);
 				}
 				if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
-					display_list[depth].cxform_id = cxform_id;
+					display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 					display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 				}
 				if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -9399,7 +9465,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		display_list[depth].transform_id = transform_id;
 		ng_cache_transform(&display_list[depth], transform_id);
-		display_list[depth].cxform_id = cxform_id;
+		display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 		display_list[depth].placed_at_frame = current_frame;
@@ -9447,7 +9513,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			ng_cache_transform(&display_list[depth], transform_id);
 		}
 		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
-			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 			init_cx_fields(&display_list[depth]);
 		}
@@ -9507,7 +9573,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			g_pending_instance_name = NULL;
 			display_list[depth].transform_id = transform_id;
 			ng_cache_transform(&display_list[depth], transform_id);
-			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 			if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 			init_cx_fields(&display_list[depth]);
@@ -9562,7 +9628,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		display_list[depth].transform_id = transform_id;
 		ng_cache_transform(&display_list[depth], transform_id);
 	}
-	display_list[depth].cxform_id = cxform_id;
+	display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
 	display_list[depth].ratio = 0;
@@ -9947,7 +10013,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 			ng_cache_transform(&display_list[depth], transform_id);
 		}
 		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
-			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 			init_cx_fields(&display_list[depth]);
 		}
@@ -9989,7 +10055,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 				g_pending_instance_name = NULL;
 				display_list[depth].transform_id = transform_id;
 				ng_cache_transform(&display_list[depth], transform_id);
-				display_list[depth].cxform_id = cxform_id;
+				display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 				if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 				display_list[depth].ratio = ratio;
@@ -10106,7 +10172,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 #endif
 		}
 		if (cxform_id != 0) {
-			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 			display_list[depth].has_cxform = 1;
 		}
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -10132,7 +10198,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 			ng_cache_transform(&display_list[depth], transform_id);
 		}
 		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
-			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 			init_cx_fields(&display_list[depth]);
 		}
@@ -10152,7 +10218,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
 	ng_cache_transform(&display_list[depth], transform_id);
-	display_list[depth].cxform_id = cxform_id;
+	display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
 	display_list[depth].ratio = ratio;
@@ -10467,7 +10533,7 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 			ng_cache_transform(&display_list[depth], transform_id);
 		}
 		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
-			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].cxform_id = ng_rebaseCxformId(cxform_id);
 			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 			init_cx_fields(&display_list[depth]);
 		}
