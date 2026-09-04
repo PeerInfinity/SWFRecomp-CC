@@ -240,6 +240,32 @@ corpus could have moved. The run's `completed failure` conclusion is the
 `wasm-link-smoke` job above, not a test regression; the shards completed and the
 results published.
 
-**No-graphics**: dispatched after the `build_test.sh` fix, so the same run also
-re-verifies `wasm-link-smoke` (that job runs on every dispatch, any mode).
-Result below.
+**No-graphics**, run `33906033322` at `4a8e7476d`, `categories=full`,
+`images=false`, diffed against `d9cf90aff`:
+
+```
+=== intersection: 4498 tests (d9cf90aff -> WORKTREE, results) ===
+  output_mismatch    123 ->   123 (+0)
+  pass              4138 ->  4138 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4374 ->  4374 (+0)
+GAINS 0   REGRESSIONS 0   OTHER STATUS MOVES 0
+```
+
+`completed success` — every job green, **including `wasm-link-smoke`**, so that
+run is also the verification of the `build_test.sh` fix (the smoke job runs on
+every dispatch regardless of mode). `regression` 88/88 in both modes.
+
+Both modes therefore land clean and flat, with the one CI signal that could
+move having moved: red before the build-list fix, green after.
+
+## 8. Next
+
+* Probe `MovieClipLoader.loadClip` in a browser build (§4) — a fixture shaped
+  like `avm1_child_timeline_advance` but driven by `loadClip`/`onLoadInit`.
+* The two root-side browser gaps in §5, both filed in BACKLOG.
+* The loaded-child arc's own remaining items are unchanged by this slice:
+  `holder.gotoAndStop(n)` not targeting the loaded movie's frames, the
+  second-load-into-the-same-holder clear, the MCL load-timing tick, and the
+  differing-stage-height y-flip.
