@@ -209,6 +209,18 @@ source list became a hard link error. Every other browser-graphics build script
 out. Added there, and CI's exact command reproduced green locally
 (`build_test.sh graphics/three_boxes wasm --graphics`).
 
+**Scope of the `getbbox` trap: the probe harness only.** The alpha-only default
+that briefly made four fixtures look pixel-perfect never touched a graded
+result. The CI image path (`scripts/`, `.github/`, `verify_output.py`) contains
+no `getbbox` at all, so the published pixel baseline and every earlier slice's
+CI pixel grading are unaffected. The two other in-tree callers are both correct
+and both already knew: `tools/divergence/glyph_compare/compare_both.py:60`
+converts to RGB first, and `ruffle-tests/render_canary.py:448-454` — the
+standing pixel-session canary — passes `alpha_only=False` explicitly with a
+comment naming the exact hazard and a `TypeError` fallback for Pillow < 9.2.
+**The project had already learned this and it was not in memory**, which is why
+this slice paid for it again. It is in memory now.
+
 **My own probe build could not have caught this**: it takes its source list
 from `deploy_wasm_demo.sh`'s `RUNTIME_C` (the production path), which includes
 the decoders. So the harness that measured the behaviour was blind to the break
@@ -257,8 +269,18 @@ GAINS 0   REGRESSIONS 0   OTHER STATUS MOVES 0
 run is also the verification of the `build_test.sh` fix (the smoke job runs on
 every dispatch regardless of mode). `regression` 88/88 in both modes.
 
-Both modes therefore land clean and flat, with the one CI signal that could
-move having moved: red before the build-list fix, green after.
+**Precisely what these two runs do and do not show.** The corpus is flat in
+both modes, and the one CI signal that could move did: `wasm-link-smoke` red
+before the build-list fix, green after. But the two facts come from *different
+commits* — there is **no post-fix graphics run**. The graphics corpus was graded
+at `ec709e7c9` (pre-fix) and the link smoke verified at `4a8e7476d` (post-fix).
+That is complete evidence rather than a gap, for two reasons: `wasm-link-smoke`
+builds the browser configuration on **every** dispatch regardless of mode, so
+the no-graphics run verifies it; and `build_test.sh` is a demo build script that
+cannot affect corpus traces, so the graphics numbers cannot have been changed by
+the fix that followed them. "Clean in both modes" is true of the corpus; it is
+worth saying the sharper version rather than letting the shorthand imply one
+post-fix run proved both.
 
 ## 8. Next
 
