@@ -270,9 +270,8 @@ first).
   would let `armed` apply uniformly. Also open on the same paths:
   `holder.gotoAndStop(n)` does not target the loaded movie's frames (the
   `ng_goto*` entry points need a `CHAR_TYPE_SPRITE` dictionary character and a
-  loaded holder has none), browser-WASM never advances a loaded movie at all
-  (`swf.c`'s driver call is inside `#ifdef OFFSCREEN_RENDER`), and a second
-  load into the same holder does not clear the first movie's children -- now
+  loaded holder has none), and a second load into the same holder does not
+  clear the first movie's children -- now
   CHEAP to fix, since `actionRegisterChildMovieAdvance` replacing an entry is
   the exact moment and `actionClearChildMoviePlacements` is the exact call;
   left undone deliberately in slice 6 (a behaviour change on the
@@ -444,13 +443,56 @@ first).
   render fixtures use equal stage sizes. Untested and unmeasured; the fix is
   either a per-movie flip applied at combine time or a per-movie stage matrix.
   (2026-09-04)
-- **Browser-WASM does not re-base a loaded movie's placement ids.** Several
-  `ng_cache_transform` call sites sit behind
-  `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, so the placement
-  re-base does not happen in the browser graphics build. Inert rather than wrong
-  (an un-re-based id keeps indexing the root rows it indexed before), and moot
-  until browser-WASM advances a loaded movie at all — see the MovieClipLoader
-  timing entry above. (2026-09-04)
+- ~~**Browser-WASM does not re-base a loaded movie's placement ids.**~~
+  **DONE 2026-09-04**, and both halves of the entry's framing were wrong. The
+  "moot until browser-WASM advances a loaded movie at all" premise was
+  understated, not mistaken: browser-WASM did not **load** a child movie at
+  all. Every loaded-movie drain — `actionFirePendingDirectLoads`,
+  `actionProcessDeferredFailedLoads`, `actionAdvancePlayingLevels`,
+  `actionFirePendingLoadInits` — lives inside `swf.c`'s `#ifdef
+  OFFSCREEN_RENDER` block (`:1034`-`:1331`), and `tagShowFrame`'s two
+  `actionFirePendingLoadInits` calls are inside `NO_GRAPHICS ||
+  OFFSCREEN_RENDER` arms, so there was no fallback. Measured in a browser
+  before any fix: not one frame of the child ever ran. Fixed by giving the
+  browser-WASM arm the same drains in the same order. **And the re-base itself
+  was one site, not "several".** Of the seven `ng_cache_transform` calls behind
+  that gate, six sit inside blocks the browser never executes (button-state
+  preservation, backward-goto survives-rewind, cross-frame sprite REPLACE, two
+  ratio arms) — the browser takes its own parallel arms at `tag.c:9002` /
+  `:10049`, which already called it. The one real gap was `tagPlaceObject2`'s
+  `char_id == 0` timeline-Move arm, where the raw `transform_id` assignment ran
+  but the `ng_cache_transform` funnel that re-bases it did not, so a loaded
+  child's every Move indexed the ROOT's transform rows: `holder.a._x` read
+  10, 10, 0, 0 where native reads 10, 20, 30, 30. All seventeen graded
+  behaviours of the ten-slice arc now reach browser-WASM, four of them
+  pixel-identical to their Ruffle goldens. Both edits are preprocessor-identical
+  in both CI modes (proven with `cpp`). Closeout:
+  `SWFRecompDocs/status/browser-wasm-loaded-child-parity.md`. Harness:
+  `tools/browser-test/child_probe/`. (2026-09-04)
+- **`MovieClipLoader.loadClip` in browser-WASM is code-complete but unprobed.**
+  The `actionFirePendingLoadInits` drain is now called from the browser arm
+  alongside the direct-`loadMovie` one, but no fixture in the loaded-child arc
+  exercises MCL under an AVM1 parent, so nothing has observed an MCL load
+  completing in a browser. The direct-`loadMovie` path is measured end to end.
+  A fixture shaped like `avm1_child_timeline_advance` but using
+  `loadClip`/`onLoadInit` would close it. (2026-09-04)
+- **`_root._currentframe` reads `undefined` in browser-WASM.** Native reads `1`
+  (`regression/avm1_child_timeline_loop`, the `rf:` column). The root-playhead
+  sync `root_movieclip.currentframe = _disp_frame + 1` at `swf.c:585-608` is
+  `#ifdef OFFSCREEN_RENDER`, which is necessary but **not sufficient** as an
+  explanation — an unmaintained field would read `0`, not `undefined`, and the
+  three getters (`action.c:44956`, `:55124`, `:59616`) are ungated. Owner not
+  identified. Out of the loaded-child arc: the same fixture's two loaded
+  children read their `_currentframe` correctly in the same run, and the
+  parent-rewind guard's other half (`t` rising 1..9 exactly once) holds.
+  (2026-09-04)
+- **`typeof` a root-placed named bare `DefineShape` is `object` in
+  browser-WASM**, where native and Ruffle both say `movieclip`
+  (`regression/avm1_parent_child_bitmap_fill`: `ctl:object` vs
+  `ctl:movieclip`). The loaded child's identically-placed `sub` reads
+  `movieclip` in the same run, so this is a root-side non-scriptable-display-
+  object gap rather than a child one. The fixture's pixels are unaffected
+  (identical to its golden in the browser). (2026-09-04)
 - **`flashbang_upload_bitmap`'s offset bug is fixed but untested.** The SDL3
   backend read `((u32*)context->bitmap_data)[bitmap_pixel]` — the start of the
   array — for every bitmap, so every bitmap after the first uploaded the first

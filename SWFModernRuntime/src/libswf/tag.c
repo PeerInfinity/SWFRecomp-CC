@@ -9231,13 +9231,26 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		// incorrectly remove the object during backward goto catch-up.
 		init_cx_fields(&display_list[depth]);
 		if (depth > max_depth) max_depth = depth;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Skip caching the new transform when it was rejected above so the
 		// cached x/y/xscale/yscale on the DisplayObject continue to reflect the
 		// AS-set values (or the preserved matrix for a no-matrix modify).
+		//
+		// Ungated (was `NO_GRAPHICS || OFFSCREEN_RENDER`): this is the single
+		// funnel that re-bases a placement id onto the COMBINED transform table
+		// as well as the one that caches place_*. Skipping it in browser-WASM
+		// while the `transform_id = transform_id` assignment above still ran
+		// left a loaded child's timeline Move indexing the ROOT movie's rows —
+		// wrong values for both the AVM1 `_x`/`_y` getters (which re-index
+		// transform_id) and the renderer. Measured 2026-09-04 on a browser
+		// build of regression/avm1_child_timeline_advance: `holder.a._x` read
+		// 10, 10, 0, 0 across the child's frames 1-4 where native reads
+		// 10, 20, 30, 30. Inert for a single-SWF movie (base 0, combined table
+		// NULL) beyond keeping place_* in step with transform_id, which the
+		// browser arm below never did.
 		if (transform_id != 0 && !display_list[depth].transformed_by_script) {
 			ng_cache_transform(&display_list[depth], transform_id);
 		}
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Re-init cxform via ng_on_place_object2 (handles ng_init_cxform_from_data internally).
 		// Pass actual char_id so type detection works.
 		// Preserve sprite_needs_init if already set (sprite awaiting Phase 2 init from

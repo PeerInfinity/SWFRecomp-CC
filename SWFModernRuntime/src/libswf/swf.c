@@ -1343,6 +1343,32 @@ void tagMain(SWFAppContext* app_context)
 		// the timer-side pumps that have no browser-WASM equivalent. Bracketed
 		// by actionFlushPendingOnLoads like the OFFSCREEN cluster so onLoad
 		// chains queued by a timer callback drain the same tick.
+		//
+		// The LOAD drains referred to above are tagShowFrame's AQ_KIND_LOAD
+		// queue (clip-event onLoad) — NOT the loaded-MOVIE drains. Those live
+		// in the OFFSCREEN_RENDER block above and in tagShowFrame arms gated
+		// `NO_GRAPHICS || OFFSCREEN_RENDER`, so browser-WASM had none of them:
+		// a `holder.loadMovie("child.swf")` queued a pending direct load that
+		// nothing ever fired, and a loaded movie's playhead was never advanced.
+		// Measured 2026-09-04 on a browser build of
+		// regression/avm1_child_timeline_advance: no child frame ever ran
+		// (`_currentframe` 0, `_totalframes` 1) where native traces frames
+		// 1..5 and a wrap. The three drains below mirror the OFFSCREEN cluster
+		// (and swf_core.c ~1455/1463/1517) in the same order and with the same
+		// guards; they are strict no-ops when no load is pending.
+		{
+			extern void actionProcessDeferredFailedLoads(void);
+			extern void actionFirePendingDirectLoads(SWFAppContext*);
+			extern int g_pending_direct_load_count;
+			actionProcessDeferredFailedLoads();
+			int dl_guard = 0;
+			while (g_pending_direct_load_count > 0 && dl_guard++ < 32)
+				actionFirePendingDirectLoads(app_context);
+		}
+		{
+			extern void actionAdvancePlayingLevels(SWFAppContext*);
+			actionAdvancePlayingLevels(app_context);
+		}
 		{
 			extern void processTimers(SWFAppContext*, double);
 			extern void actionFlushPendingOnLoads(SWFAppContext*);
@@ -1350,6 +1376,17 @@ void tagMain(SWFAppContext* app_context)
 			actionFlushPendingOnLoads(app_context);
 			processTimers(app_context, timer_dur_ms);
 			actionFlushPendingOnLoads(app_context);
+		}
+		// MovieClipLoader.loadClip: loadClip() only queues;
+		// actionFirePendingLoadInits is what fires onLoadStart/Progress/
+		// Complete/Init and links the movie in. Bounded like the OFFSCREEN and
+		// swf_core.c drains — a chain of loadClips can re-queue.
+		{
+			extern void actionFirePendingLoadInits(SWFAppContext*);
+			extern int g_pending_mcl_load_count_this_tick;
+			int mcl_guard = 0;
+			while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
+				actionFirePendingLoadInits(app_context);
 		}
 #endif
 		if (manual_next_frame)
