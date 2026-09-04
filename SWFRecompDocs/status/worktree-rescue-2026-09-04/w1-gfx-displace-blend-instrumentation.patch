@@ -1,0 +1,141 @@
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index b417cb379..f6d615909 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -1253,6 +1253,11 @@ static void create_textures(WebGPURenderContext* ctx)
+ 		tex_desc.sampleCount = 1;
+ 		tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+ 		ctx->bitmap_tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
++		if (getenv("SWFR_DISPLACE_DUMP") != NULL)
++			fprintf(stderr, "[dump] bitmap_tex bw=%u bh=%u layers=%u bytes=%llu tex=%p\n",
++				bw, bh, total_bitmap_layers,
++				(unsigned long long)bw * bh * 4ull * total_bitmap_layers,
++				(void*)ctx->bitmap_tex);
+ 
+ 		WGPUTextureViewDescriptor view_desc = {0};
+ 		view_desc.dimension = WGPUTextureViewDimension_2DArray;
+@@ -2111,6 +2116,39 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
+                               size_t num_verts, u32 transform_id, u32 cxform_id)
+ {
+ 	if (!ctx->renderer_ok) return;
++	// --- w1-gfx-displace-blend instrumentation (env-gated, worktree only) ---
++	if (getenv("SWFR_DISPLACE_DUMP") != NULL && ctx->shape_data != NULL
++	    && offset + num_verts <= ctx->shape_data_size / (4 * sizeof(u32)))
++	{
++		const u32* v = ((const u32*)ctx->shape_data) + offset * 4;
++		u32 st = v[2] & 0xFFu;
++		if ((st & 0xF0u) == 0x40u)
++		{
++			u32 sid = v[3] & 0xFFFFu, upper = (v[3] >> 16) & 0xFFFFu;
++			const float* im = ctx->uninv_mat_data
++				? ((const float*)ctx->uninv_mat_data) + (size_t)upper * 16 : NULL;
++			float minx = 1e30f, maxx = -1e30f, miny = 1e30f, maxy = -1e30f;
++			for (size_t k = 0; k < num_verts; k++)
++			{
++				float px = ((const float*)v)[k * 4 + 0];
++				float py = ((const float*)v)[k * 4 + 1];
++				if (px < minx) minx = px; if (px > maxx) maxx = px;
++				if (py < miny) miny = py; if (py > maxy) maxy = py;
++			}
++			fprintf(stderr,
++				"[dump] bitmapfill st=0x%02x layer=%u invmat=%u verts=%zu "
++				"x[%.1f,%.1f] y[%.1f,%.1f] fwdmat=[%.4f %.4f %.4f %.4f tx=%.1f ty=%.1f] "
++				"sizes=[%u %u %u %u] xform=%u\n",
++				st, sid, upper, num_verts, minx, maxx, miny, maxy,
++				im ? im[0] : 0.f, im ? im[1] : 0.f, im ? im[4] : 0.f, im ? im[5] : 0.f,
++				im ? im[12] : 0.f, im ? im[13] : 0.f,
++				ctx->bitmap_sizes ? ctx->bitmap_sizes[4 * sid] : 0,
++				ctx->bitmap_sizes ? ctx->bitmap_sizes[4 * sid + 1] : 0,
++				ctx->bitmap_sizes ? ctx->bitmap_sizes[4 * sid + 2] : 0,
++				ctx->bitmap_sizes ? ctx->bitmap_sizes[4 * sid + 3] : 0,
++				transform_id);
++		}
++	}
+ 	// Set vertex buffer with byte offset
+ 	uint64_t byte_offset = offset * 4 * sizeof(u32);
+ 	uint64_t byte_size = num_verts * 4 * sizeof(u32);
+@@ -3026,6 +3064,10 @@ void render_webgpu_upload_bitmap(WebGPURenderContext* ctx, size_t offset,
+ 	WGPUExtent3D extent = {bw, bh, 1};
+ 	wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
+ 
++	if (getenv("SWFR_DISPLACE_DUMP") != NULL)
++		fprintf(stderr, "[dump] upload_bitmap layer=%d w=%u h=%u padded=%ux%u\n",
++			(int)ctx->current_bitmap, width, height, bw, bh);
++
+ 	// Store BOTH the bitmap's own size and the padded layer size.
+ 	// A repeating fill (0x40/0x42) must tile on the bitmap's own size; the
+ 	// layer is padded to the LARGEST bitmap in the shared texture array (plus
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 0a00cfe1c..b0ea09ead 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -8567,8 +8567,8 @@ namespace SWFRecomp
+ 								
+ 								shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+ 								
+-								s16 delta_x = (s16) shape_tag.fields[0].value;
+-								s16 delta_y = (s16) shape_tag.fields[1].value;
++								s32 delta_x = (s32) shape_tag.fields[0].value;
++								s32 delta_y = (s32) shape_tag.fields[1].value;
+ 
+ 								pushStraightEdge(last_x + (s32) delta_x, last_y - (s32) delta_y);
+ 								morph_start_edge_ord += 1;
+@@ -8585,7 +8585,7 @@ namespace SWFRecomp
+ 							shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+ 							
+ 							bool is_vertical_line = (shape_tag.fields[0].value & 1) != 0;
+-							s16 delta = (s16) shape_tag.fields[1].value;
++							s32 delta = (s32) shape_tag.fields[1].value;
+ 
+ 							s32 edge_x = last_x;
+ 							s32 edge_y = last_y;
+@@ -8618,10 +8618,10 @@ namespace SWFRecomp
+ 						
+ 						shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
+ 						
+-						s16 control_delta_x = (s16) shape_tag.fields[0].value;
+-						s16 control_delta_y = (s16) shape_tag.fields[1].value;
+-						s16 anchor_delta_x = (s16) shape_tag.fields[2].value;
+-						s16 anchor_delta_y = (s16) shape_tag.fields[3].value;
++						s32 control_delta_x = (s32) shape_tag.fields[0].value;
++						s32 control_delta_y = (s32) shape_tag.fields[1].value;
++						s32 anchor_delta_x = (s32) shape_tag.fields[2].value;
++						s32 anchor_delta_y = (s32) shape_tag.fields[3].value;
+ 						
+ 						Vertex current;
+ 						current.x = last_x;
+@@ -9045,8 +9045,8 @@ namespace SWFRecomp
+ 									shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+ 									shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+ 
+-									s16 dx = (s16) shape_tag.fields[0].value;
+-									s16 dy = (s16) shape_tag.fields[1].value;
++									s32 dx = (s32) shape_tag.fields[0].value;
++									s32 dy = (s32) shape_tag.fields[1].value;
+ 
+ 									pushEndStraight(end_last_x + (s32) dx, end_last_y - (s32) dy);
+ 								}
+@@ -9059,7 +9059,7 @@ namespace SWFRecomp
+ 									shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+ 
+ 									bool end_vert = (shape_tag.fields[0].value & 1) != 0;
+-									s16 delta = (s16) shape_tag.fields[1].value;
++									s32 delta = (s32) shape_tag.fields[1].value;
+ 
+ 									s32 end_target_x = end_last_x;
+ 									s32 end_target_y = end_last_y;
+@@ -9083,10 +9083,10 @@ namespace SWFRecomp
+ 								shape_tag.configureNextField(SWF_FIELD_SB, end_num_bits + 2);
+ 								shape_tag.parseFieldsContinue(cur_pos, end_bits_left);
+ 
+-								s16 cdx = (s16) shape_tag.fields[0].value;
+-								s16 cdy = (s16) shape_tag.fields[1].value;
+-								s16 adx = (s16) shape_tag.fields[2].value;
+-								s16 ady = (s16) shape_tag.fields[3].value;
++								s32 cdx = (s32) shape_tag.fields[0].value;
++								s32 cdy = (s32) shape_tag.fields[1].value;
++								s32 adx = (s32) shape_tag.fields[2].value;
++								s32 ady = (s32) shape_tag.fields[3].value;
+ 
+ 								Vertex cur_v;
+ 								cur_v.x = end_last_x;

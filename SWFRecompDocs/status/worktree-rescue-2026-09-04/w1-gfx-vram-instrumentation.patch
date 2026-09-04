@@ -1,0 +1,171 @@
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 175dfeaff..b1948d3e7 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -325,6 +325,38 @@ static const char* compute_wgsl =
+ "  inv_gradmats[mat_i] = mat4_inverse(gradmats[mat_i]);\n"
+ "}\n";
+ 
++
++// --- SCRATCH INSTRUMENTATION (w1-gfx-vram, NOT FOR MERGE) ---
++#include <stdlib.h>
++static size_t g_vram_total = 0;
++static void vram_log(const char* what, const char* label, size_t bytes, void* handle)
++{
++	if (getenv("SWF_VRAM_LOG") == NULL) return;
++	g_vram_total += bytes;
++	fprintf(stderr, "[vram] %-8s %-26s %12zu B  (%7.2f MB)  cum=%7.2f MB %s\n",
++	        what, label ? label : "?", bytes, bytes/1048576.0,
++	        g_vram_total/1048576.0, handle ? "" : "<<< NULL (ALLOC FAILED)");
++	fflush(stderr);
++}
++static void vram_tex(const char* label, WGPUTextureDescriptor* d, unsigned bpp, void* h)
++{
++	size_t b = (size_t)d->size.width * d->size.height * d->size.depthOrArrayLayers
++	           * bpp * (d->sampleCount ? d->sampleCount : 1);
++	if (getenv("SWF_VRAM_LOG"))
++		fprintf(stderr, "[vram]   dims %ux%ux%u  samples=%u bpp=%u\n",
++		        d->size.width, d->size.height, d->size.depthOrArrayLayers,
++		        d->sampleCount, bpp);
++	vram_log("TEXTURE", label, b, h);
++}
++unsigned g_dynbmp_max_used = 0, g_dynbmp_max_gradused = 0, g_dynbmp_frames = 0;
++__attribute__((destructor)) static void dynbmp_report(void)
++{
++	if (getenv("SWF_DYNBMP_REPORT"))
++		fprintf(stderr, "[dynbmp] frames=%u max_dynamic_bitmaps_per_frame=%u max_dynamic_gradients_per_frame=%u\n",
++		        g_dynbmp_frames, g_dynbmp_max_used, g_dynbmp_max_gradused);
++}
++// --- END SCRATCH INSTRUMENTATION ---
++
+ // ---------------------------------------------------------------------------
+ // Helper: create a WGPUBuffer and optionally upload data
+ // ---------------------------------------------------------------------------
+@@ -348,6 +380,7 @@ static WGPUBuffer create_buffer(WGPUDevice device, WGPUQueue queue,
+ 	desc.mappedAtCreation = false;
+ 
+ 	WGPUBuffer buffer = wgpuDeviceCreateBuffer(device, &desc);
++	vram_log("BUFFER", label, size, buffer);
+ 	if (data && data_size > 0)
+ 	{
+ 		wgpuQueueWriteBuffer(queue, buffer, 0, data, data_size);
+@@ -496,6 +529,7 @@ static void create_dummy_texture(WebGPURenderContext* ctx)
+ 	tex_desc.sampleCount = 1;
+ 	tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+ 	ctx->dummy_tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
++		vram_tex("dummy_tex", &tex_desc, 4, ctx->dummy_tex);
+ 
+ 	WGPUTextureViewDescriptor view_desc = {0};
+ 	view_desc.dimension = WGPUTextureViewDimension_2DArray;
+@@ -918,6 +952,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
+ 		offscreen_desc.mipLevelCount = 1;
+ 		offscreen_desc.sampleCount = 1;
+ 		ctx->offscreen_texture = wgpuDeviceCreateTexture(ctx->device, &offscreen_desc);
++		vram_tex("offscreen_target", &offscreen_desc, 4, ctx->offscreen_texture);
+ 		assert(ctx->offscreen_texture != NULL);
+ 		ctx->offscreen_view = wgpuTextureCreateView(ctx->offscreen_texture, NULL);
+ 
+@@ -932,6 +967,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
+ 		buf_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
+ 		buf_desc.mappedAtCreation = false;
+ 		ctx->readback_buffer = wgpuDeviceCreateBuffer(ctx->device, &buf_desc);
++		vram_log("BUFFER", "readback_buffer", buf_desc.size, ctx->readback_buffer);
+ 		assert(ctx->readback_buffer != NULL);
+ 	}
+ #else
+@@ -1059,6 +1095,8 @@ static void plan_dynamic_bitmaps(WebGPURenderContext* ctx, u32* out_cap,
+ 	if (cap > room) cap = room;
+ 	if (cap < MAX_DYNAMIC_BITMAPS) cap = MAX_DYNAMIC_BITMAPS;
+ 
++	{ const char* ov = getenv("SWF_DYNBMP_CAP");
++	  if (ov) { long v = strtol(ov, NULL, 10); if (v >= 0) cap = (u32)v; } }
+ 	*out_cap = cap;
+ 	*out_w = bw;
+ 	*out_h = bh;
+@@ -1262,6 +1300,7 @@ static void create_textures(WebGPURenderContext* ctx)
+ 		tex_desc.sampleCount = 1;
+ 		tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+ 		ctx->gradient_tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
++		vram_tex("gradient_tex", &tex_desc, 4, ctx->gradient_tex);
+ 
+ 		WGPUTextureViewDescriptor view_desc = {0};
+ 		view_desc.dimension = WGPUTextureViewDimension_2D;
+@@ -1311,6 +1350,7 @@ static void create_textures(WebGPURenderContext* ctx)
+ 		tex_desc.sampleCount = 1;
+ 		tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+ 		ctx->bitmap_tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
++		vram_tex("bitmap_tex", &tex_desc, 4, ctx->bitmap_tex);
+ 
+ 		WGPUTextureViewDescriptor view_desc = {0};
+ 		view_desc.dimension = WGPUTextureViewDimension_2DArray;
+@@ -1322,8 +1362,9 @@ static void create_textures(WebGPURenderContext* ctx)
+ 		samp_desc.label = WGPU_LABEL("bitmap_sampler");
+ 		samp_desc.addressModeU = WGPUAddressMode_ClampToEdge;
+ 		samp_desc.addressModeV = WGPUAddressMode_ClampToEdge;
+-		samp_desc.magFilter = WGPUFilterMode_Nearest;
+-		samp_desc.minFilter = WGPUFilterMode_Nearest;
++		int _lin = getenv("SWF_BITMAP_LINEAR") != NULL;
++		samp_desc.magFilter = _lin ? WGPUFilterMode_Linear : WGPUFilterMode_Nearest;
++		samp_desc.minFilter = _lin ? WGPUFilterMode_Linear : WGPUFilterMode_Nearest;
+ 		samp_desc.maxAnisotropy = 1;
+ 		ctx->bitmap_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
+ 	}
+@@ -1339,6 +1380,7 @@ static void create_textures(WebGPURenderContext* ctx)
+ 		tex_desc.sampleCount = MSAA_SAMPLES;
+ 		tex_desc.usage = WGPUTextureUsage_RenderAttachment;
+ 		ctx->msaa_texture = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
++		vram_tex("msaa_texture", &tex_desc, 4, ctx->msaa_texture);
+ 
+ 		WGPUTextureViewDescriptor view_desc = {0};
+ 		view_desc.mipLevelCount = 1;
+@@ -1357,6 +1399,7 @@ static void create_textures(WebGPURenderContext* ctx)
+ 		tex_desc.sampleCount = MSAA_SAMPLES;
+ 		tex_desc.usage = WGPUTextureUsage_RenderAttachment;
+ 		ctx->depth_stencil_texture = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
++		vram_tex("depth_stencil", &tex_desc, 5, ctx->depth_stencil_texture);
+ 
+ 		WGPUTextureViewDescriptor view_desc = {0};
+ 		view_desc.mipLevelCount = 1;
+@@ -2037,6 +2080,10 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
+ 		}
+ 	}
+ #endif
++	{ extern unsigned g_dynbmp_max_used, g_dynbmp_max_gradused, g_dynbmp_frames;
++	  if (ctx->dynamic_bitmap_used > g_dynbmp_max_used) g_dynbmp_max_used = ctx->dynamic_bitmap_used;
++	  if (ctx->dynamic_gradient_used > g_dynbmp_max_gradused) g_dynbmp_max_gradused = ctx->dynamic_gradient_used;
++	  g_dynbmp_frames++; }
+ 	ctx->dynamic_rect_count = 0;
+ 	ctx->dynamic_vertex_used = 0;
+ 	ctx->dynamic_gradient_used = 0;
+@@ -3582,12 +3629,15 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
+ 	ftex_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding
+ 	                | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc;
+ 	ctx->filter_tex_a = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
++		vram_tex("filter_tex_a", &ftex_desc, 4, ctx->filter_tex_a);
+ 	ftex_desc.label = WGPU_LABEL("filter_tex_b");
+ 	ctx->filter_tex_b = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
++		vram_tex("filter_tex_b", &ftex_desc, 4, ctx->filter_tex_b);
+ 	// The unblurred source the composition shader needs as `dest`.
+ 	ftex_desc.label = WGPU_LABEL("filter_src");
+ 	ftex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+ 	ctx->filter_src_tex = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
++		vram_tex("filter_src_tex", &ftex_desc, 4, ctx->filter_src_tex);
+ 
+ 	WGPUTextureViewDescriptor fview_desc = {0};
+ 	fview_desc.mipLevelCount = 1;
+@@ -3607,6 +3657,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
+ 		msaa_desc.sampleCount = MSAA_SAMPLES;
+ 		msaa_desc.usage = WGPUTextureUsage_RenderAttachment;
+ 		ctx->filter_msaa_texture = wgpuDeviceCreateTexture(ctx->device, &msaa_desc);
++		vram_tex("filter_msaa", &msaa_desc, 4, ctx->filter_msaa_texture);
+ 		ctx->filter_msaa_view = wgpuTextureCreateView(ctx->filter_msaa_texture, NULL);
+ 	}
+ 
+@@ -3971,6 +4022,7 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
+ 		td.sampleCount = MSAA_SAMPLES;
+ 		td.usage = WGPUTextureUsage_RenderAttachment;
+ 		ctx->filter_ds_texture = wgpuDeviceCreateTexture(ctx->device, &td);
++		vram_tex("filter_ds", &td, 5, ctx->filter_ds_texture);
+ 		WGPUTextureViewDescriptor vd = {0};
+ 		vd.mipLevelCount = 1;
+ 		vd.arrayLayerCount = 1;

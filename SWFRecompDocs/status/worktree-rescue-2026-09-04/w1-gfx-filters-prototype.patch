@@ -1,0 +1,173 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 007c82629..7a2924ada 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -14804,6 +14804,9 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
+ 	(void) alpha;
+ 	uint32_t cxid = avm2_alloc_cx_slot();
+ 
++	if (getenv("SWFR_FILT_DUMP"))
++		fprintf(stderr, "[filt] bitmap %ux%u xid=%u off=%d\n",
++			bd->width, bd->height, xid, context->offscreen_depth);
+ 	renderer_draw_bitmap_quad_scaled(context, bd->pixels,
+ 		bd->width, bd->height, bd->width, bd->height,
+ 		0.0f, 0.0f, xid, cxid);
+@@ -15542,6 +15545,145 @@ static void avm2_push_scroll_rect_mask(const Mat* world,
+ 	renderer_end_clip_mask(context);
+ }
+ 
++// --- PROTOTYPE (w1-gfx-filters, session 16): DisplayObject.filters render arm.
++// Reuses tag.c::render_filtered_object's STAGE-SIZED offscreen machinery.
++static int g_avm2_filter_active = 0;
++static Avm2Object* g_avm2_filter_skip = NULL;
++
++static float avm2_fx16(int32_t v) { return (float) v / 65536.0f; }
++
++static int avm2_filter_supported(const Avm2FilterVal* f)
++{
++	if (f->kind != AVM2_FILTER_BLUR && f->kind != AVM2_FILTER_DROP_SHADOW
++	    && f->kind != AVM2_FILTER_GLOW && f->kind != AVM2_FILTER_BEVEL)
++		return 0;
++	if (f->quality == 0) return 0;                                  /* impotent */
++	/* Ruffle Filter::impotent() matches ONLY BlurFilter/ColorMatrixFilter:
++	   a DropShadow with blurX=blurY=0 and distance>0 is a hard-edged offset
++	   copy, not a no-op (acid-filter has four of them). */
++	if (f->kind == AVM2_FILTER_BLUR
++	    && f->blur_x <= 65536 && f->blur_y <= 65536) return 0;
++	return 1;
++}
++
++static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
++                                 Avm2DisplayObjectExt* ext,
++                                 const Mat* parent_world, double parent_alpha,
++                                 const Avm2Cx* parent_cx)
++{
++	const Avm2FilterVal* list[32];
++	uint32_t n = 0;
++	for (uint32_t i = 0; i < ext->filter_count && n < 32; i++)
++		if (avm2_filter_supported(&ext->filters[i])) list[n++] = &ext->filters[i];
++
++	Avm2Object* saved_skip = g_avm2_filter_skip;
++	int saved_active = g_avm2_filter_active;
++	g_avm2_filter_skip = obj;
++	g_avm2_filter_active = 1;
++
++	if (n == 0)
++	{
++		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++		g_avm2_filter_skip = saved_skip;
++		g_avm2_filter_active = saved_active;
++		return;
++	}
++
++	const Avm2FilterVal* last = list[n - 1];
++	int is_shadow = (last->kind == AVM2_FILTER_DROP_SHADOW);
++	int is_glow   = (last->kind == AVM2_FILTER_GLOW);
++	int is_bevel  = (last->kind == AVM2_FILTER_BEVEL);
++	int f_inner = last->inner, f_knockout = last->knockout;
++	int f_composite = last->hide_object ? 0 : 1;
++	int bevel_type = 0;
++	if (is_bevel) { bevel_type = last->on_top ? 2 : (f_inner ? 1 : 0); f_composite = 1; }
++
++	int needs_source_tex = is_bevel ? (f_knockout || bevel_type != 0)
++	                                : (f_inner || f_knockout);
++	int draw_source_after  = is_bevel ? (!f_knockout && bevel_type == 0)
++	                                  : (!f_inner && !f_knockout && f_composite);
++	int draw_source_before = is_bevel && !f_knockout && bevel_type == 2;
++	int shader_composite = (draw_source_after || draw_source_before) ? 0 : f_composite;
++	int legacy = !(is_shadow || is_glow || is_bevel);
++
++	if (getenv("SWFR_FILT_DUMP"))
++		fprintf(stderr, "[filt] n=%u kind=%u blur=%.2f/%.2f q=%u legacy=%d\n",
++			n, last->kind, avm2_fx16(last->blur_x), avm2_fx16(last->blur_y),
++			last->quality, legacy);
++	renderer_suspend_pass(context);
++	renderer_begin_offscreen_pass(context);
++	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++	renderer_end_offscreen_pass(context);
++	if (needs_source_tex) renderer_snapshot_filter_source(context);
++
++	for (uint32_t i = 0; i < n; i++)
++	{
++		const Avm2FilterVal* f = list[i];
++		int f_last = (i == n - 1);
++		int f_is_plain = (f->kind == AVM2_FILTER_BLUR);
++		/* BlurFilter has no `strength` property, so Avm2FilterVal.strength is
++		   0 for it — feeding that to the blur shader multiplies the layer by
++		   zero and the object VANISHES. Plain blur is always strength 1. */
++		float st = (f->kind == AVM2_FILTER_BLUR)
++			? 1.0f : (float) f->strength / 256.0f;
++		float cr = (float) ((f->color >> 16) & 0xFF) / 255.0f;
++		float cg = (float) ((f->color >> 8) & 0xFF) / 255.0f;
++		float cb = (float) (f->color & 0xFF) / 255.0f;
++		float ca = (float) f->alpha / 255.0f;
++		/* Non-last non-blur filters have no compose-into-offscreen pipeline
++		   yet: approximate with colorize inside the blur (prototype only). */
++		int colorize = (!f_last && !f_is_plain) ? 1 : 0;
++		float use_st = (f_last && !f_is_plain) ? 1.0f : st;
++		renderer_run_blur(context, avm2_fx16(f->blur_x), avm2_fx16(f->blur_y),
++			f->quality, use_st, cr, cg, cb, ca, colorize);
++	}
++
++	renderer_resume_pass(context);
++
++	if (legacy)
++	{
++		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
++		g_avm2_filter_skip = saved_skip;
++		g_avm2_filter_active = saved_active;
++		return;
++	}
++
++	SWFAppContext* app = ctx->app;
++	float fit_x = app->stage_fit_x > 0.0f ? app->stage_fit_x : 1.0f;
++	float fit_y = app->stage_fit_y > 0.0f ? app->stage_fit_y : 1.0f;
++	float angle_rad = avm2_fx16(last->angle);
++	float dist_px = (is_shadow || is_bevel) ? avm2_fx16(last->distance) : 0.0f;
++	float du = cosf(angle_rad) * dist_px / (float) context->width * fit_x;
++	float dv = sinf(angle_rad) * dist_px / (float) context->height * fit_y;
++	float st  = (float) last->strength / 256.0f;
++	float c1r = (float) ((last->color2 >> 16) & 0xFF) / 255.0f;
++	float c1g = (float) ((last->color2 >> 8) & 0xFF) / 255.0f;
++	float c1b = (float) (last->color2 & 0xFF) / 255.0f;
++	float c1a = (float) last->alpha2 / 255.0f;
++	float c2r = (float) ((last->color >> 16) & 0xFF) / 255.0f;
++	float c2g = (float) ((last->color >> 8) & 0xFF) / 255.0f;
++	float c2b = (float) (last->color & 0xFF) / 255.0f;
++	float c2a = (float) last->alpha / 255.0f;
++
++	if (draw_source_before)
++		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++
++	if (is_bevel)
++		renderer_compose_filter(context, 1, du, dv,
++			c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a,
++			st, bevel_type, f_knockout, shader_composite);
++	else
++		renderer_compose_filter(context, 0, -du, -dv,
++			c2r, c2g, c2b, c2a, 0.0f, 0.0f, 0.0f, 0.0f,
++			st, f_inner, f_knockout, shader_composite);
++
++	if (draw_source_after)
++		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
++
++	g_avm2_filter_skip = saved_skip;
++	g_avm2_filter_active = saved_active;
++}
++
+ // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
+ // world matrix + concatenated alpha down the tree. Invisible subtrees are
+ // culled, matching render_apply_text_bounds.
+@@ -15552,6 +15694,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+ 	if (ext == NULL) return;
+ 	if (!ext->is_stage && !ext->visible && g_avm2_mask_capture == 0) return;
++	if (ext->filter_count > 0 && obj != g_avm2_filter_skip
++	    && g_avm2_filter_active == 0 && g_avm2_mask_capture == 0)
++	{
++		avm2_render_filtered(ctx, obj, ext, parent_world, parent_alpha, parent_cx);
++		return;
++	}
+ 	// Ruffle render_base (display_object.rs:952, `options.skip_masks &&
+ 	// this.maskee().is_some()`, and skip_masks defaults to true): an object
+ 	// that masks something else is never painted as content on its own account.
