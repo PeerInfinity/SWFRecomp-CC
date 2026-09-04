@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-04T09:54:59.322367+00:00",
-    "old_git_sha": "65915386558b4edff5a2f21932534de280d53114",
-    "new_timestamp": "2026-09-04T11:26:32.612958+00:00",
-    "new_git_sha": "943fb901223649b6340056eb77cbdf9f8734cc69",
+    "old_timestamp": "2026-09-04T11:26:32.612958+00:00",
+    "old_git_sha": "943fb901223649b6340056eb77cbdf9f8734cc69",
+    "new_timestamp": "2026-09-04T13:40:14.592096+00:00",
+    "new_git_sha": "a12dd3c2911e565b7516ea7e67c45ae52a167f9f",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 84,
+    "old_pass": 86,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 84,
-    "old_total": 84,
+    "old_effective_pass": 86,
+    "old_total": 86,
     "old_pass_rate": 100.0,
-    "new_pass": 86,
+    "new_pass": 87,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 86,
-    "new_total": 86,
+    "new_effective_pass": 87,
+    "new_total": 87,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,33 +25,21 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 84,
-    "added": 2,
+    "unchanged": 86,
+    "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_parent_child_morph",
+      "test": "avm2_parent_child_render",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "avm1_parent_child_text",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
       }
     }
   ]
