@@ -340,7 +340,11 @@ first).
   (`regression/avm1_parent_child_text`, `..._morph`); the morph one exposed a
   defect the array grep could not see — `ng_record_morph_path` never recorded
   the defining movie's `path_data` table, so a child's morph hit-tested the
-  ROOT's outline. Closeout:
+  ROOT's outline. CI corpus-clean in BOTH modes, `categories=full`,
+  `images=false`: graphics `33864764556` (4369->4369, every bucket +0),
+  no-graphics `33868110233` (4370->4370); totals 4494->4496 graded, the +2
+  being the two fixtures, `regression` 84/84 -> 86/86. Local sweep of the 348
+  tests that bundle a second SWF: 0 regressions, 0 gains. Closeout:
   `SWFRecompDocs/status/child-static-text-and-morphs.md`. (2026-09-04)
 - **An AVM2 (Loader-loaded AS3) child's shapes still do not render**, and the
   reason is bigger than a missing base: **`ng_buildMovieRenderTables` is never

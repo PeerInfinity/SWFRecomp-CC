@@ -203,10 +203,37 @@ geometry — still passes in both modes, as do slice 7's two fixtures.
 
 ## 5. Local sweep
 
-The 348 corpus tests that bundle a second SWF, run individually in
-`--mode=graphics` against the per-suite baseline in the merged `_results`:
-**see §7 for the result.** The tree had stopped moving before the sweep
-started; slice 7 paid a triage cycle for not waiting.
+The 348 corpus tests that bundle a second SWF — every test this change can
+reach — run individually in `--mode=graphics` against the per-test baseline in
+the merged `_results`: **0 regressions, 0 gains.** Every one matched its
+baseline status. (Slice 7 swept 108; the difference is a wider definition — any
+test dir holding a second `.swf`, with nested own-tests pruned the way
+`find_child_swfs` prunes them.)
+
+Two categories of noise, both already documented and both re-verified serially
+rather than believed:
+
+- **Four apparent moves under `-P 5` were parallel-load artifacts** — two
+  `compile_fail` and two `runtime_segfault` in `from_gnash/actionscript.all`,
+  all four matching their baseline exactly when re-run one at a time. Memory
+  `verify-output-parallel-batching` says this in advance; it is worth the
+  re-run every time, because `compile_fail` and `segfault` are also what a
+  genuine breakage looks like.
+- **37 `RecompiledTags` caches in the corpus predate `text_data`/`glyph_data`
+  entirely** and make `main.c` fail to compile — with the slice REVERTED as
+  well, because `main.c` already took `sizeof(glyph_data)` in the graphics arm.
+  Not one of the 37 belongs to a graded test; they are leftovers in parent and
+  `_results` directories from an older test layout, and several sit under a
+  test the current recompiler cannot rebuild at all
+  (`avm1/set_property_values`, memory `set-property-values-float-blocker`).
+  Deleted locally; CI recompiles from scratch and never saw them.
+
+The upstream tests were re-synced first (`download_tests.sh` over all 14
+categories, 4418 installed): **zero drift**, so nothing below is an upstream
+`output.txt` change wearing a regression's clothes.
+
+The tree had stopped moving before the sweep started — slice 7 paid a triage
+cycle for not waiting.
 
 ## 6. The AVM2 arm, and what the brief got wrong about it
 
@@ -262,3 +289,56 @@ correct on that path; and the AVM2 raster's `color_data` reads are the same
 "root prefix vs whole table" trap the audit found twice here.
 
 ## 7. CI
+
+Both modes, dispatched SERIALLY, `categories=full` (the change touches shared
+runtime code), `images=false` (the per-change default; this slice ran no
+deliberate render-baseline run, so the pixel baseline is unchanged at
+364/572 from `33857494837`).
+
+**graphics — run `33864764556`, merged as `090c3c30f`.** Corpus-clean:
+
+```
+=== intersection: 4494 tests (c30317101 -> WORKTREE, results_graphics) ===
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4134 ->  4134 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4369 ->  4369 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved, including the crash buckets the histogram exists to
+catch: `runtime_error` held at 1 and no `segfault` / `timeout` / `compile_fail`
+appeared. The intersection is against the 4494 the baseline graded; the two new
+fixtures are outside it, so new corpus totals are **4496 graded / 4371
+effective**. `regression` **86/86**, up from 84/84 — both new fixtures pass.
+
+**no-graphics — run `33868110233`, merged as `34dd5877d`.** Also clean:
+
+```
+=== intersection: 4494 tests (98b05748e -> WORKTREE, results) ===
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4134 ->  4134 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4370 ->  4370 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+New totals **4496 graded / 4372 effective**, `regression` 86/86. The one-test
+gap against graphics (4372 vs 4371) is the stable pre-existing mode divergence
+already on the BACKLOG under Tooling, not anything this slice moved. Re-running
+the graphics stem against the post-merge tree confirms the no-graphics publish
+did not disturb it (`090c3c30f -> WORKTREE, results_graphics`: 4496 tests,
+every bucket +0, effective 4371).
+
+**The trace numbers are the regression check, not the slice's yield.** The
+yield is in §1/§2/§4 — two arms of child rendering that did not work, with
+three AS-visible assertions and two pixel comparisons at tolerance 0 that all
+flip on revert.
