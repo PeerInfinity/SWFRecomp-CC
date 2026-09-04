@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T00:54:58.458393+00:00",
+    "timestamp": "2026-09-04T01:40:04.050961+00:00",
     "git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
-    "duration_seconds": 2604.73,
+    "duration_seconds": 2606.66,
     "total_available": 229,
     "shards": 30,
     "expected_shards": 30
@@ -3063,7 +3063,7 @@
       "test": "mouse/start_drag",
       "phases": {
         "recomp": 0.006,
-        "compile": 27.168,
+        "compile": 27.843,
         "run": 0.004
       },
       "num_frames": 6,
@@ -3072,14 +3072,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 27.19,
+      "duration": 27.86,
       "status": "pass"
     },
     {
       "test": "mouse/start_drag_lock",
       "phases": {
         "recomp": 0.006,
-        "compile": 7.115,
+        "compile": 7.276,
         "run": 0.004
       },
       "num_frames": 6,
@@ -3088,14 +3088,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 7.13,
+      "duration": 7.29,
       "status": "pass"
     },
     {
       "test": "movieclip",
       "phases": {
         "recomp": 0.006,
-        "compile": 7.097,
+        "compile": 7.33,
         "run": 0.004
       },
       "num_frames": 1,
@@ -3104,14 +3104,14 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 7.11,
+      "duration": 7.35,
       "status": "pass"
     },
     {
       "test": "movieinfo1",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.301,
+        "compile": 1.348,
         "run": 0.002
       },
       "num_frames": 1,
@@ -3120,14 +3120,14 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 1.31,
+      "duration": 1.36,
       "status": "pass"
     },
     {
       "test": "slider_component",
       "phases": {
-        "recomp": 0.199,
-        "compile": 12.747,
+        "recomp": 0.219,
+        "compile": 13.024,
         "run": 0.008
       },
       "num_frames": 11,
@@ -3136,14 +3136,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 12.96,
+      "duration": 13.26,
       "status": "pass"
     },
     {
       "test": "stream1",
       "phases": {
-        "recomp": 0.007,
-        "compile": 7.253,
+        "recomp": 0.008,
+        "compile": 7.499,
         "run": 0.004
       },
       "num_frames": 2,
@@ -3152,14 +3152,14 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 7.27,
+      "duration": 7.52,
       "status": "pass"
     },
     {
       "test": "stroke1",
       "phases": {
-        "recomp": 0.006,
-        "compile": 7.224,
+        "recomp": 0.007,
+        "compile": 7.471,
         "run": 0.004
       },
       "num_frames": 1,
@@ -3168,7 +3168,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.24,
+      "duration": 7.49,
       "status": "pass"
     },
     {
