@@ -20455,7 +20455,14 @@ MovieClip root_movieclip = {
 	.blend_mode = 0,
 	.is_button_mc = 0,
 	.depth = -16384,   // _root is at Flash "level 0" depth
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// NOT gated on NO_GRAPHICS || OFFSCREEN_RENDER. These fields exist in every
+	// build, and two of them have a non-zero "unset" value, so gating the
+	// initializer left browser-WASM (neither macro defined) with C's implicit
+	// zeros. `ng_textfield_idx = 0` means "static textfield #0", so
+	// MC_IS_TEXTFIELD(root) evaluated TRUE in the browser and _root reported
+	// typeof "object" with _currentframe/_totalframes/_framesloaded undefined —
+	// the same hazard the _levelN MC constructor already documents against
+	// HCALLOC (see findOrCreateLevelMC). The other six are zero either way.
 	.display_obj = NULL,
 	.last_transform_id = 0,
 	.as_set_flags = 0,
@@ -20464,7 +20471,6 @@ MovieClip root_movieclip = {
 	.mc_mouse_inside = 0,
 	.mc_as_pressed = 0,
 	.mc_enterframe_eligible = 1,  // Root is always eligible
-#endif
 	.cx_ra = 100.0f, .cx_ga = 100.0f, .cx_ba = 100.0f, .cx_aa = 100.0f,
 	.cx_rb = 0.0f,   .cx_gb = 0.0f,   .cx_bb = 0.0f,   .cx_ab = 0.0f,
 	.skew = 0.0f,

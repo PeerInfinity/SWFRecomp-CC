@@ -70,7 +70,11 @@ source "${ROOT}/emsdk/emsdk_env.sh" >/dev/null 2>&1
 cd "$OUT"
 SWF_SIZE=$(python3 -c "import struct,sys;print(struct.unpack('<I',open(sys.argv[1],'rb').read(8)[4:8])[0])" \
            "${ROOT}/${TESTS_DIR}/${TEST}/test.swf")
-EXTRA="-DHAS_CHILD_MOVIES -DHAS_DISPLAY_BRIDGE -DMOCK_DATE_TIME=981152406000LL"
+# HAS_CHILD_MOVIES only when the child walk actually emitted a registry: a
+# childless fixture (a plain root-side probe) generates no movie_registry.c, and
+# defining it anyway leaves findMovieEntry/getMovieEntryAt undefined at link.
+EXTRA="-DHAS_DISPLAY_BRIDGE -DMOCK_DATE_TIME=981152406000LL"
+[ -f "$OUT/movie_registry.c" ] && EXTRA="-DHAS_CHILD_MOVIES $EXTRA"
 EXTRA="$EXTRA -DSWF_FILE_SIZE=${SWF_SIZE} -DSWF_ONDISK_SIZE=${SWF_SIZE} -DSWF_URL=\"file:///test.swf\""
 [ -f "$OUT/data_registry.c" ] && EXTRA="$EXTRA -DHAS_DATA_FILES"
 emcc *.c -DUSE_WEBGPU ${EXTRA} --use-port=emdawnwebgpu \

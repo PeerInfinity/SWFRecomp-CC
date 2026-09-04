@@ -1,0 +1,3 @@
+r1 t:movieclip cf:1 tf:3 fl:3 s:movieclip
+r2 t:movieclip cf:2 tf:3 fl:3 s:movieclip
+r3 t:movieclip cf:3 tf:3 fl:3 s:movieclip

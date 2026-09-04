@@ -581,7 +581,22 @@ void tagMain(SWFAppContext* app_context)
 		// CAPTURE_TRIGGERS asks for the current tick or any last_frame.
 		// Mirrors swf_headless.c line ~904.
 		capture_tick_pre_frame();
+#endif  // OFFSCREEN_RENDER — the _currentframe sync below is deliberately outside it
 
+		// NOT gated on OFFSCREEN_RENDER. This block used to sit inside the
+		// tick's `#ifdef OFFSCREEN_RENDER`, so browser-WASM and the native
+		// windowed player — the two swf.c builds that define neither
+		// NO_GRAPHICS nor OFFSCREEN_RENDER — never ran it and parked
+		// `_root._currentframe` at 1 for the life of the movie however far the
+		// playhead advanced. There is no parallel arm: `cpp -P -DUSE_WEBGPU`
+		// counts ZERO `root_movieclip.currentframe =` writes in this file
+		// against OFFSCREEN's one. It is pure computation over `current_frame`
+		// and `g_frame_count`, so hoisting it leaves OFFSCREEN's statement
+		// order untouched. Graded by
+		// regression/avm1_root_identity_and_playhead's `cf:` column, which only
+		// a browser build can flip (see
+		// SWFRecompDocs/status/browser-root-side-gaps.md).
+		//
 		// Keep root _currentframe in sync with the natural advance. Mirrors
 		// swf_core.c lines ~1425/1431 (which update at the END of each tick).
 		// Without this, scripts running on frame N read a stale value left
@@ -607,6 +622,8 @@ void tagMain(SWFAppContext* app_context)
 			                   ? g_frame_count - 1 : current_frame;
 			root_movieclip.currentframe = (int)_disp_frame + 1;
 		}
+
+#ifdef OFFSCREEN_RENDER  // resumes the tick block opened above
 
 		// Clear g_defer_sprite_init at tick boundary. ng_executeGotoCatchUp
 		// intentionally leaves it set so the calling frame's tagShowFrame

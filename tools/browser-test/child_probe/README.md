@@ -17,6 +17,14 @@ python3 tools/browser-test/child_probe/pixcmp.py \
 page and the captures. Re-running the build script reuses `gen_<fixture>/`;
 delete it to force a recompile.
 
+Despite the name it also builds a **childless** fixture — any regression test,
+or a scratch directory passed as the second argument (repo-relative). That is
+how the root-side gaps in `SWFRecompDocs/status/browser-root-side-gaps.md` were
+measured: a plain single-movie SWF with no `loadMovie` at all. `HAS_CHILD_MOVIES`
+is defined only when the child walk actually emitted a `movie_registry.c`;
+defining it for a childless build leaves `findMovieEntry` / `getMovieEntryAt`
+undefined at link.
+
 ## Why it exists
 
 Neither existing path can do this on its own:

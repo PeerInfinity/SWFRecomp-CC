@@ -469,30 +469,67 @@ first).
   in both CI modes (proven with `cpp`). Closeout:
   `SWFRecompDocs/status/browser-wasm-loaded-child-parity.md`. Harness:
   `tools/browser-test/child_probe/`. (2026-09-04)
-- **`MovieClipLoader.loadClip` in browser-WASM is code-complete but unprobed.**
-  The `actionFirePendingLoadInits` drain is now called from the browser arm
-  alongside the direct-`loadMovie` one, but no fixture in the loaded-child arc
-  exercises MCL under an AVM1 parent, so nothing has observed an MCL load
-  completing in a browser. The direct-`loadMovie` path is measured end to end.
-  A fixture shaped like `avm1_child_timeline_advance` but using
-  `loadClip`/`onLoadInit` would close it. (2026-09-04)
-- **`_root._currentframe` reads `undefined` in browser-WASM.** Native reads `1`
-  (`regression/avm1_child_timeline_loop`, the `rf:` column). The root-playhead
-  sync `root_movieclip.currentframe = _disp_frame + 1` at `swf.c:585-608` is
-  `#ifdef OFFSCREEN_RENDER`, which is necessary but **not sufficient** as an
-  explanation — an unmaintained field would read `0`, not `undefined`, and the
-  three getters (`action.c:44956`, `:55124`, `:59616`) are ungated. Owner not
-  identified. Out of the loaded-child arc: the same fixture's two loaded
-  children read their `_currentframe` correctly in the same run, and the
-  parent-rewind guard's other half (`t` rising 1..9 exactly once) holds.
+- ~~**`MovieClipLoader.loadClip` in browser-WASM is code-complete but
+  unprobed**~~ — PROBED 2026-09-04, and it **works**. An MTASC parent
+  `loadClip`ping a hand-built 3-frame child into a `createEmptyMovieClip`
+  holder produced the same events in the same order as native
+  (`onLoadStart` → `c1` → `onLoadInit` → `c2` → `c3`), the same child display
+  children and the same end state. Two residues, neither in the MCL path
+  itself:
+  - **A one-tick phase offset on the ROOT's `onEnterFrame`**, not on the load:
+    the browser fires an extra enterFrame tick before the child's frame 2, so
+    `t1` reads `cf:0 b:undefined` where native's `t1` already reads `cf:2`, and
+    every later row is shifted by one. Rows converge from `t3`. Belongs to the
+    browser frame-loop phase family (`browser_wasm_frame_func_rerun`,
+    `mcl_load_timing`). Not promoted to a fixture because a stable expectation
+    needs that phase settled first.
+  - **An MCL-loaded holder reports `_totalframes` 1** while its `_currentframe`
+    walks 1→3 — in BOTH builds equally, so not a browser gap. The
+    direct-`loadMovie` fixtures read `tf:5` correctly, so MCL's registration is
+    not setting the holder's frame count. Own entry below.
+  Detail: `SWFRecompDocs/status/browser-root-side-gaps.md` §6.
+- **`MovieClipLoader.loadClip` leaves the holder's `_totalframes` at 1.** The
+  loaded movie's own frames run and `_currentframe` advances 1→3, but
+  `holder._totalframes` stays 1 in every build. Direct `loadMovie` sets it
+  correctly (`regression/avm1_child_timeline_advance` reads `tf:5`), so the
+  gap is in the MCL registration path, not the movie-entry machinery.
   (2026-09-04)
-- **`typeof` a root-placed named bare `DefineShape` is `object` in
-  browser-WASM**, where native and Ruffle both say `movieclip`
-  (`regression/avm1_parent_child_bitmap_fill`: `ctl:object` vs
-  `ctl:movieclip`). The loaded child's identically-placed `sub` reads
-  `movieclip` in the same run, so this is a root-side non-scriptable-display-
-  object gap rather than a child one. The fixture's pixels are unaffected
-  (identical to its golden in the browser). (2026-09-04)
+- ~~**`_root._currentframe` reads `undefined` in browser-WASM**~~ and
+  ~~**`typeof` a root-placed named bare `DefineShape` is `object`**~~ — DONE
+  2026-09-04. **One owner for both, and it was neither the playhead nor
+  display-object identity: `_root` was a TextField.** `root_movieclip`'s static
+  initializer set `.ng_textfield_idx = -1` inside a
+  `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`, while the field is
+  declared unconditionally — so every build defining neither macro got C's
+  implicit `0`, which means "static textfield #0", and `MC_IS_TEXTFIELD(root)`
+  evaluated TRUE. That single predicate gates exactly the four wrong rows:
+  `_currentframe` / `_totalframes` / `_framesloaded` are the only members in
+  `actionGetMember` carrying `&& !MC_IS_TEXTFIELD(mc)`, and `actionTypeof`
+  answers `"object"` for a MOVIECLIP when `MC_IS_TEXTFIELD(mc) &&
+  g_swf_version >= 6`. Scope was browser-WIDE — an ordinary single-movie SWF
+  with no child at all — and wider than the browser: `-DUSE_WEBGPU` with
+  neither macro is also what `build_test.sh` passes for the **native windowed**
+  player, so every live-render configuration was affected and only the two
+  headless CI harnesses were not. With identity fixed, the brief's original
+  lead turned out to be a REAL second defect it had been hiding: `swf.c`'s
+  natural-advance `root_movieclip.currentframe` sync sat inside the tick's
+  `#ifdef OFFSCREEN_RENDER` with no parallel arm (`cpp -P -DUSE_WEBGPU` counts
+  0 writes vs OFFSCREEN's 1), so `_currentframe` then read `1` forever;
+  hoisted out of the gate, OFFSCREEN byte-identical. The goto family needed
+  nothing — `action.c` compiles 5 of its 13 root-`currentframe` writes in the
+  browser, and a hand-built probe driving `gotoAndStop` / `nextFrame` /
+  `prevFrame` matched the native oracle exactly. Graded by
+  `regression/avm1_root_identity_and_playhead` (all five columns flip on
+  revert, in the BROWSER harness — the corpus cannot see either defect) and by
+  `avm1_parent_child_bitmap_fill`'s `ctl:` row. Closeout:
+  `SWFRecompDocs/status/browser-root-side-gaps.md`.
+- **The browser-WASM arms added to `swf.c` exclude the native windowed
+  player.** `#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` guards
+  the loaded-movie drains and the pending-removal finalize + dead-child
+  reclaim, but a native `build_test.sh --graphics` build defines neither
+  `__EMSCRIPTEN__` nor `OFFSCREEN_RENDER`, so it gets none of them. Same shape
+  of hole as the root-initializer bug above, one gate over. Unmeasured.
+  (2026-09-04)
 - **`flashbang_upload_bitmap`'s offset bug is fixed but untested.** The SDL3
   backend read `((u32*)context->bitmap_data)[bitmap_pixel]` — the start of the
   array — for every bitmap, so every bitmap after the first uploaded the first
