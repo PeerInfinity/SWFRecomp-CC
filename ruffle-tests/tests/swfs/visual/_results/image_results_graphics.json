@@ -1,23 +1,23 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T16:36:41.839925+00:00",
+    "timestamp": "2026-09-04T09:55:02.284804+00:00",
     "suite": "visual",
     "stem": "results_graphics",
-    "git_sha": "a946ee183838f3ee96b55a4fbf3937c4e5c341c6",
+    "git_sha": "65915386558b4edff5a2f21932534de280d53114",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "32267473014",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/32267473014",
-    "run_attempt": "2"
+    "run_id": "33857494837",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/33857494837",
+    "run_attempt": "1"
   },
-  "tests_with_comparisons": 140,
-  "comparisons": 213,
-  "pass": 130,
-  "fail": 83,
+  "tests_with_comparisons": 142,
+  "comparisons": 215,
+  "pass": 131,
+  "fail": 84,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 2,
-  "pass_rate": 61.0,
+  "pass_rate": 60.9,
   "results": [
     {
       "suite": "visual",
@@ -59,6 +59,27 @@
       "max_outliers": 0,
       "tolerance": 0,
       "excess_outliers": 0
+    },
+    {
+      "suite": "visual",
+      "test": "blend_across_masks_issue_24549",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "fail",
+      "message": "Image comparison failed: 6 outliers exceed limit of 0, max difference 255",
+      "reason": "pixel_mismatch",
+      "max_diff": 255,
+      "expected_source": "repo",
+      "width": 200,
+      "height": 150,
+      "total_channels": 120000,
+      "diff_channels": 6,
+      "mean_diff": 0.0127,
+      "outliers": 6,
+      "max_outliers": 0,
+      "tolerance": 0,
+      "excess_outliers": 6
     },
     {
       "suite": "visual",
@@ -269,6 +290,26 @@
       "max_outliers": 0,
       "tolerance": 2,
       "excess_outliers": 8
+    },
+    {
+      "suite": "visual",
+      "test": "blend_modes/masked_layer_cached_children",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 160,
+      "height": 80,
+      "total_channels": 51200,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 2,
+      "excess_outliers": 0
     },
     {
       "suite": "visual",

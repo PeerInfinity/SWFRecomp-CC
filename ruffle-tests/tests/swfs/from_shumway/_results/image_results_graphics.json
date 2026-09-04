@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "timestamp": "2026-08-19T16:36:41.925484+00:00",
+    "timestamp": "2026-09-04T09:55:02.325030+00:00",
     "suite": "from_shumway",
     "stem": "results_graphics",
-    "git_sha": "a946ee183838f3ee96b55a4fbf3937c4e5c341c6",
+    "git_sha": "65915386558b4edff5a2f21932534de280d53114",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "32267473014",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/32267473014",
-    "run_attempt": "2"
+    "run_id": "33857494837",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/33857494837",
+    "run_attempt": "1"
   },
   "tests_with_comparisons": 71,
   "comparisons": 123,
@@ -537,7 +537,7 @@
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 506176,
+      "diff_channels": 506173,
       "mean_diff": 1.7802,
       "outliers": 63432,
       "max_outliers": 70000,
@@ -952,19 +952,19 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 44820 outliers exceed limit of 3, max difference 255",
+      "message": "Image comparison failed: 44819 outliers exceed limit of 3, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 1024,
       "height": 1024,
       "total_channels": 4194304,
-      "diff_channels": 87725,
+      "diff_channels": 87728,
       "mean_diff": 2.0105,
-      "outliers": 44820,
+      "outliers": 44819,
       "max_outliers": 3,
       "tolerance": 3,
-      "excess_outliers": 44817
+      "excess_outliers": 44816
     },
     {
       "suite": "from_shumway",

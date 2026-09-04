@@ -1,20 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `14e8eae5c550` (2026-09-04T05:42:13.582847+00:00)
-**Current:** `91ce4e9a2ecb` (2026-09-04T08:14:22.193539+00:00)
+**Previous:** `91ce4e9a2ecb` (2026-09-04T08:14:22.193539+00:00)
+**Current:** `65915386558b` (2026-09-04T09:54:59.322367+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 82 | 84 | +2 |
-| Total | 82 | 84 | +2 |
+| Passing | 84 | 84 | 0 |
+| Total | 84 | 84 | 0 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (2)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `avm1_parent_child_bitmap_fill` | pass | 3/3 |
-| `avm1_parent_child_render` | pass | 7/7 |
+No changes detected.

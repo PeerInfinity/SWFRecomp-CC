@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T05:42:13.564725+00:00",
-    "git_sha": "14e8eae5c550e5a59fe8a245de8ad65c99521919",
-    "duration_seconds": 1899.12,
+    "timestamp": "2026-09-04T08:14:22.175046+00:00",
+    "git_sha": "91ce4e9a2ecb2c5fd31a180810dfd9bf76edf145",
+    "duration_seconds": 2116.18,
     "total_available": 146,
     "shards": 30,
     "expected_shards": 30
@@ -19,8 +19,8 @@
     {
       "test": "avm2_button_scroll_rect",
       "phases": {
-        "recomp": 0.006,
-        "compile": 27.383,
+        "recomp": 0.007,
+        "compile": 27.849,
         "run": 0.265
       },
       "num_frames": 3,
@@ -29,7 +29,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 27.71,
+      "duration": 28.18,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -46,8 +46,8 @@
     {
       "test": "bitmapdata_copypixels_with_alpha_oob",
       "phases": {
-        "recomp": 0.014,
-        "compile": 8.513,
+        "recomp": 0.015,
+        "compile": 8.584,
         "run": 0.566
       },
       "num_frames": 5,
@@ -56,7 +56,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.26,
+      "duration": 9.34,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -74,7 +74,7 @@
       "test": "blend_across_masks_issue_24549",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.795,
+        "compile": 21.895,
         "run": 0.315
       },
       "num_frames": 1,
@@ -83,7 +83,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.15,
+      "duration": 22.26,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -100,9 +100,9 @@
     {
       "test": "blend_modes/add",
       "phases": {
-        "recomp": 0.282,
-        "compile": 1.856,
-        "run": 0.316
+        "recomp": 0.302,
+        "compile": 1.982,
+        "run": 0.365
       },
       "num_frames": 1,
       "lines": {
@@ -110,7 +110,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.68,
+      "duration": 2.88,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -127,8 +127,8 @@
     {
       "test": "blend_modes/alpha_no_layer",
       "phases": {
-        "recomp": 0.281,
-        "compile": 1.858,
+        "recomp": 0.3,
+        "compile": 2.028,
         "run": 0.315
       },
       "num_frames": 1,
@@ -137,7 +137,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.68,
+      "duration": 2.88,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -154,9 +154,9 @@
     {
       "test": "blend_modes/darken",
       "phases": {
-        "recomp": 0.217,
-        "compile": 1.626,
-        "run": 0.365
+        "recomp": 0.169,
+        "compile": 1.428,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -164,7 +164,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.4,
+      "duration": 2.03,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -181,9 +181,9 @@
     {
       "test": "blend_modes/difference",
       "phases": {
-        "recomp": 0.215,
-        "compile": 1.463,
-        "run": 0.315
+        "recomp": 0.227,
+        "compile": 1.164,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -191,7 +191,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.18,
+      "duration": 1.77,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -208,9 +208,9 @@
     {
       "test": "blend_modes/erase_no_layer",
       "phases": {
-        "recomp": 0.215,
-        "compile": 1.639,
-        "run": 0.265
+        "recomp": 0.163,
+        "compile": 1.278,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -218,7 +218,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.3,
+      "duration": 1.77,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -235,9 +235,9 @@
     {
       "test": "blend_modes/hardlight",
       "phases": {
-        "recomp": 0.215,
-        "compile": 1.449,
-        "run": 0.316
+        "recomp": 0.169,
+        "compile": 1.209,
+        "run": 0.264
       },
       "num_frames": 1,
       "lines": {
@@ -245,7 +245,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.16,
+      "duration": 1.76,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -262,9 +262,9 @@
     {
       "test": "blend_modes/invert",
       "phases": {
-        "recomp": 0.215,
-        "compile": 1.456,
-        "run": 0.315
+        "recomp": 0.163,
+        "compile": 1.255,
+        "run": 0.264
       },
       "num_frames": 1,
       "lines": {
@@ -272,7 +272,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.17,
+      "duration": 1.8,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -289,9 +289,9 @@
     {
       "test": "blend_modes/layer_alpha",
       "phases": {
-        "recomp": 0.272,
-        "compile": 1.891,
-        "run": 0.316
+        "recomp": 0.22,
+        "compile": 1.677,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -299,7 +299,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.73,
+      "duration": 2.37,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -316,8 +316,8 @@
     {
       "test": "blend_modes/layer_erase",
       "phases": {
-        "recomp": 0.271,
-        "compile": 0.733,
+        "recomp": 0.216,
+        "compile": 0.646,
         "run": 0.265
       },
       "num_frames": 1,
@@ -326,7 +326,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.51,
+      "duration": 1.33,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -343,9 +343,9 @@
     {
       "test": "blend_modes/lighten",
       "phases": {
-        "recomp": 0.27,
-        "compile": 1.894,
-        "run": 0.365
+        "recomp": 0.216,
+        "compile": 1.646,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -353,7 +353,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.75,
+      "duration": 2.36,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -370,8 +370,8 @@
     {
       "test": "blend_modes/masked_layer_cached_children",
       "phases": {
-        "recomp": 0.006,
-        "compile": 27.16,
+        "recomp": 0.005,
+        "compile": 26.849,
         "run": 0.265
       },
       "num_frames": 1,
@@ -380,7 +380,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.45,
+      "duration": 27.13,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -397,8 +397,8 @@
     {
       "test": "blend_modes/multiply",
       "phases": {
-        "recomp": 0.271,
-        "compile": 1.847,
+        "recomp": 0.218,
+        "compile": 1.647,
         "run": 0.365
       },
       "num_frames": 1,
@@ -407,7 +407,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.71,
+      "duration": 2.42,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -424,9 +424,9 @@
     {
       "test": "blend_modes/overlay",
       "phases": {
-        "recomp": 0.275,
-        "compile": 1.773,
-        "run": 0.365
+        "recomp": 0.278,
+        "compile": 1.849,
+        "run": 0.366
       },
       "num_frames": 1,
       "lines": {
@@ -434,7 +434,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.63,
+      "duration": 2.72,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -451,9 +451,9 @@
     {
       "test": "blend_modes/overlay_onto_stage",
       "phases": {
-        "recomp": 0.009,
-        "compile": 1.736,
-        "run": 0.365
+        "recomp": 0.008,
+        "compile": 1.829,
+        "run": 0.367
       },
       "num_frames": 1,
       "lines": {
@@ -461,7 +461,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.33,
+      "duration": 2.45,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -478,8 +478,8 @@
     {
       "test": "blend_modes/screen",
       "phases": {
-        "recomp": 0.274,
-        "compile": 1.763,
+        "recomp": 0.277,
+        "compile": 1.837,
         "run": 0.365
       },
       "num_frames": 1,
@@ -488,7 +488,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.61,
+      "duration": 2.7,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -505,8 +505,8 @@
     {
       "test": "blend_modes/shader_as_mask",
       "phases": {
-        "recomp": 0.022,
-        "compile": 27.08,
+        "recomp": 0.023,
+        "compile": 29.032,
         "run": 0.365
       },
       "num_frames": 1,
@@ -515,7 +515,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.48,
+      "duration": 29.44,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -533,7 +533,7 @@
       "test": "blend_modes/shader_without_shader",
       "phases": {
         "recomp": 0.006,
-        "compile": 25.729,
+        "compile": 27.228,
         "run": 0.265
       },
       "num_frames": 3,
@@ -542,7 +542,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 26.01,
+      "duration": 27.51,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -559,9 +559,9 @@
     {
       "test": "blend_modes/subtract",
       "phases": {
-        "recomp": 0.274,
-        "compile": 1.897,
-        "run": 0.666
+        "recomp": 0.236,
+        "compile": 1.561,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -569,7 +569,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 3.06,
+      "duration": 2.45,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -586,9 +586,9 @@
     {
       "test": "bmd_draw_with_msaa_issue_10579",
       "phases": {
-        "recomp": 0.005,
-        "compile": 2.09,
-        "run": 0.265
+        "recomp": 0.004,
+        "compile": 16.786,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -596,7 +596,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.4,
+      "duration": 17.03,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -613,9 +613,9 @@
     {
       "test": "cache_as_bitmap/avm1_color",
       "phases": {
-        "recomp": 0.005,
-        "compile": 22.024,
-        "run": 0.215
+        "recomp": 0.004,
+        "compile": 16.599,
+        "run": 0.214
       },
       "num_frames": 2,
       "lines": {
@@ -623,7 +623,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.27,
+      "duration": 16.84,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -640,9 +640,9 @@
     {
       "test": "cache_as_bitmap/avm2_button",
       "phases": {
-        "recomp": 0.005,
-        "compile": 21.673,
-        "run": 0.265
+        "recomp": 0.004,
+        "compile": 16.591,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -650,7 +650,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.97,
+      "duration": 16.83,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -667,9 +667,9 @@
     {
       "test": "cache_as_bitmap/avm2_button_state",
       "phases": {
-        "recomp": 0.01,
-        "compile": 21.963,
-        "run": 0.315
+        "recomp": 0.009,
+        "compile": 16.398,
+        "run": 0.265
       },
       "num_frames": 3,
       "lines": {
@@ -677,7 +677,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.78,
+      "duration": 17.08,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -694,8 +694,8 @@
     {
       "test": "cache_as_bitmap/bitmap_changed",
       "phases": {
-        "recomp": 0.007,
-        "compile": 28.22,
+        "recomp": 0.006,
+        "compile": 26.706,
         "run": 0.516
       },
       "num_frames": 3,
@@ -704,7 +704,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 28.79,
+      "duration": 27.28,
       "image_comparisons": {
         "initial": {
           "status": "pass",
@@ -740,7 +740,7 @@
       "test": "cache_as_bitmap/cab_bitmapdata_invalidate",
       "phases": {
         "recomp": 0.006,
-        "compile": 22.815,
+        "compile": 21.877,
         "run": 0.515
       },
       "num_frames": 12,
@@ -749,7 +749,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 23.35,
+      "duration": 22.41,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -766,8 +766,8 @@
     {
       "test": "cache_as_bitmap/cab_mask_alpha",
       "phases": {
-        "recomp": 0.023,
-        "compile": 29.457,
+        "recomp": 0.021,
+        "compile": 28.728,
         "run": 0.666
       },
       "num_frames": 1,
@@ -776,7 +776,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 30.16,
+      "duration": 29.43,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -793,8 +793,8 @@
     {
       "test": "cache_as_bitmap/cab_mask_filters",
       "phases": {
-        "recomp": 0.022,
-        "compile": 8.578,
+        "recomp": 0.02,
+        "compile": 8.22,
         "run": 0.515
       },
       "num_frames": 1,
@@ -803,7 +803,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.13,
+      "duration": 8.77,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -820,8 +820,8 @@
     {
       "test": "cache_as_bitmap/cab_mask_transform",
       "phases": {
-        "recomp": 0.022,
-        "compile": 28.609,
+        "recomp": 0.021,
+        "compile": 27.15,
         "run": 0.315
       },
       "num_frames": 1,
@@ -830,7 +830,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 28.96,
+      "duration": 27.5,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -848,7 +848,7 @@
       "test": "cache_as_bitmap/cab_mask_triangle",
       "phases": {
         "recomp": 0.022,
-        "compile": 29.855,
+        "compile": 29.009,
         "run": 0.666
       },
       "num_frames": 1,
@@ -857,7 +857,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 30.56,
+      "duration": 29.72,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -874,8 +874,8 @@
     {
       "test": "cache_as_bitmap/children_changed",
       "phases": {
-        "recomp": 0.006,
-        "compile": 2.057,
+        "recomp": 0.005,
+        "compile": 1.99,
         "run": 0.265
       },
       "num_frames": 3,
@@ -884,7 +884,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.5,
+      "duration": 2.43,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -902,7 +902,7 @@
       "test": "cache_as_bitmap/color_transform",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.972,
+        "compile": 21.098,
         "run": 0.265
       },
       "num_frames": 2,
@@ -911,7 +911,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.41,
+      "duration": 21.52,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -929,7 +929,7 @@
       "test": "cache_as_bitmap/contains_grown_filter",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.921,
+        "compile": 20.987,
         "run": 0.415
       },
       "num_frames": 1,
@@ -938,7 +938,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.39,
+      "duration": 21.46,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -956,7 +956,7 @@
       "test": "cache_as_bitmap/drawing_api",
       "phases": {
         "recomp": 0.005,
-        "compile": 2.121,
+        "compile": 2.116,
         "run": 0.265
       },
       "num_frames": 3,
@@ -965,7 +965,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.65,
+      "duration": 2.63,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -982,9 +982,9 @@
     {
       "test": "cache_as_bitmap/edittext_hscroll",
       "phases": {
-        "recomp": 0.006,
-        "compile": 21.586,
-        "run": 0.465
+        "recomp": 0.005,
+        "compile": 17.872,
+        "run": 0.415
       },
       "num_frames": 3,
       "lines": {
@@ -992,7 +992,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 22.08,
+      "duration": 18.31,
       "image_comparisons": {
         "output.01": {
           "status": "fail",
@@ -1020,9 +1020,9 @@
     {
       "test": "cache_as_bitmap/edittext_scroll",
       "phases": {
-        "recomp": 0.022,
-        "compile": 21.476,
-        "run": 0.365
+        "recomp": 0.017,
+        "compile": 17.695,
+        "run": 0.265
       },
       "num_frames": 4,
       "lines": {
@@ -1030,7 +1030,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.88,
+      "duration": 17.99,
       "image_comparisons": {
         "output.01": {
           "status": "fail",
@@ -1058,9 +1058,9 @@
     {
       "test": "cache_as_bitmap/edittext_selection",
       "phases": {
-        "recomp": 0.005,
-        "compile": 21.488,
-        "run": 0.365
+        "recomp": 0.004,
+        "compile": 17.485,
+        "run": 0.265
       },
       "num_frames": 5,
       "lines": {
@@ -1068,7 +1068,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.89,
+      "duration": 17.78,
       "image_comparisons": {
         "output.01": {
           "status": "fail",
@@ -1106,9 +1106,9 @@
     {
       "test": "cache_as_bitmap/masks",
       "phases": {
-        "recomp": 0.008,
-        "compile": 8.719,
-        "run": 0.465
+        "recomp": 0.007,
+        "compile": 7.13,
+        "run": 0.368
       },
       "num_frames": 7,
       "lines": {
@@ -1116,7 +1116,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 10.89,
+      "duration": 8.83,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -1194,9 +1194,9 @@
     {
       "test": "cache_as_bitmap/morph",
       "phases": {
-        "recomp": 0.005,
-        "compile": 2.027,
-        "run": 0.515
+        "recomp": 0.004,
+        "compile": 1.993,
+        "run": 0.365
       },
       "num_frames": 4,
       "lines": {
@@ -1204,7 +1204,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.71,
+      "duration": 2.49,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1222,7 +1222,7 @@
       "test": "cache_as_bitmap/nested_color_transform",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.981,
+        "compile": 2.056,
         "run": 0.516
       },
       "num_frames": 3,
@@ -1231,7 +1231,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.68,
+      "duration": 2.75,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1249,10 +1249,377 @@
       "test": "cache_as_bitmap/nested_matrix",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.926,
+        "compile": 1.987,
         "run": 0.265
       },
       "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.43,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/nested_rotation",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 2.065,
+        "run": 0.265
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.59,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 25665 outliers exceed limit of 0, max difference 204",
+          "max_diff": 204,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_10_masks",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 28.602,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 29.1,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 132 outliers (limit 200), max difference 127",
+          "max_diff": 127,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_10_too_big",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 8.074,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.45,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_9_masks",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 27.079,
+        "run": 0.415
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 27.58,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 132 outliers (limit 200), max difference 127",
+          "max_diff": 127,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/oversize/swf_9_too_big",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 2.879,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 3.2,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": true
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/scroll_rect",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 3.016,
+        "run": 0.866
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 4.11,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 2 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/scroll_rect_scaled",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 21.02,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 21.38,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 2445 outliers (limit 2800), max difference 240",
+          "max_diff": 240,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/shape_changed",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.892,
+        "run": 0.265
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.32,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "cache_as_bitmap/text",
+      "phases": {
+        "recomp": 0.019,
+        "compile": 1.833,
+        "run": 0.265
+      },
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.32,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 10233 outliers (limit 12000), max difference 254",
+          "max_diff": 254,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "color_transform_issue_9698",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 2.035,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.28,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "define_bits_jpeg2_huge",
+      "phases": {
+        "recomp": 0.944,
+        "compile": 19.991,
+        "run": 0.215
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "duration": 21.16,
+      "status": "pass"
+    },
+    {
+      "test": "define_bits_lossless2_rgb15",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 2.31,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 2.59,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 2",
+          "max_diff": 2,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "definefont4",
+      "phases": {
+        "recomp": 0.595,
+        "compile": 76.447,
+        "run": 0.215
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 77.33,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 16086 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "drawing_api/cursor",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.92,
+        "run": 0.265
+      },
+      "num_frames": 1,
       "lines": {
         "actual_lines": 0,
         "expected_lines": 0,
@@ -1273,377 +1640,10 @@
       "status": "pass"
     },
     {
-      "test": "cache_as_bitmap/nested_rotation",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 2.014,
-        "run": 0.265
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 2.53,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 25665 outliers exceed limit of 0, max difference 204",
-          "max_diff": 204,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_10_masks",
-      "phases": {
-        "recomp": 0.008,
-        "compile": 27.59,
-        "run": 0.415
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 28.09,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 132 outliers (limit 200), max difference 127",
-          "max_diff": 127,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_10_too_big",
-      "phases": {
-        "recomp": 0.008,
-        "compile": 8.04,
-        "run": 0.315
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 8.42,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
-          "max_diff": 0,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": true
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_9_masks",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 19.827,
-        "run": 0.315
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 20.19,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 132 outliers (limit 200), max difference 127",
-          "max_diff": 127,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/oversize/swf_9_too_big",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.723,
-        "run": 0.214
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.97,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
-          "max_diff": 0,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": true
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/scroll_rect",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 1.34,
-        "run": 0.465
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.94,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 2 outliers exceed limit of 0, max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/scroll_rect_scaled",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 15.161,
-        "run": 0.214
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 15.43,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 2445 outliers (limit 2800), max difference 240",
-          "max_diff": 240,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/shape_changed",
-      "phases": {
-        "recomp": 0.003,
-        "compile": 1.141,
-        "run": 0.215
-      },
-      "num_frames": 3,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 1.45,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
-          "max_diff": 0,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "cache_as_bitmap/text",
-      "phases": {
-        "recomp": 0.024,
-        "compile": 2.109,
-        "run": 0.315
-      },
-      "num_frames": 4,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 2.7,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 10233 outliers (limit 12000), max difference 254",
-          "max_diff": 254,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "color_transform_issue_9698",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.807,
-        "run": 0.215
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 2.06,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
-          "max_diff": 0,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "define_bits_jpeg2_huge",
-      "phases": {
-        "recomp": 1.207,
-        "compile": 22.943,
-        "run": 0.265
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      },
-      "duration": 24.43,
-      "status": "pass"
-    },
-    {
-      "test": "define_bits_lossless2_rgb15",
-      "phases": {
-        "recomp": 0.006,
-        "compile": 1.802,
-        "run": 0.265
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 2.08,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 2",
-          "max_diff": 2,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "definefont4",
-      "phases": {
-        "recomp": 0.736,
-        "compile": 91.661,
-        "run": 0.265
-      },
-      "num_frames": 5,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 92.75,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 16086 outliers exceed limit of 0, max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "drawing_api/cursor",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 1.809,
-        "run": 0.265
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 2.25,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
-          "max_diff": 0,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
       "test": "drawing_api/drawing_order",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.497,
+        "compile": 22.214,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1652,7 +1652,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.05,
+      "duration": 22.75,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1670,8 +1670,8 @@
       "test": "drawing_api/fills_and_lines",
       "phases": {
         "recomp": 0.005,
-        "compile": 2.222,
-        "run": 0.265
+        "compile": 2.29,
+        "run": 0.266
       },
       "num_frames": 1,
       "lines": {
@@ -1679,7 +1679,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.74,
+      "duration": 2.8,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1697,7 +1697,7 @@
       "test": "drawing_api/gradient_focal_point",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.652,
+        "compile": 22.359,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1706,7 +1706,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.12,
+      "duration": 22.82,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1723,8 +1723,8 @@
     {
       "test": "edittext/edittext_background_basic",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.938,
+        "recomp": 0.006,
+        "compile": 22.187,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1733,7 +1733,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.22,
+      "duration": 22.47,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1751,8 +1751,8 @@
     {
       "test": "edittext/edittext_background_basic_scale2",
       "phases": {
-        "recomp": 0.006,
-        "compile": 23.706,
+        "recomp": 0.005,
+        "compile": 21.137,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1761,7 +1761,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.02,
+      "duration": 21.45,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1780,7 +1780,7 @@
       "test": "edittext/edittext_border_basic",
       "phases": {
         "recomp": 0.005,
-        "compile": 2.057,
+        "compile": 21.044,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1789,7 +1789,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.34,
+      "duration": 21.33,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1808,7 +1808,7 @@
       "test": "edittext/edittext_border_basic_scale2",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.824,
+        "compile": 1.63,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1817,7 +1817,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.13,
+      "duration": 1.94,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -1836,8 +1836,8 @@
       "test": "edittext/edittext_border_filters",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.992,
-        "run": 0.566
+        "compile": 1.797,
+        "run": 0.516
       },
       "num_frames": 1,
       "lines": {
@@ -1845,7 +1845,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.58,
+      "duration": 2.34,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -1863,8 +1863,8 @@
     {
       "test": "edittext/edittext_border_transform",
       "phases": {
-        "recomp": 0.006,
-        "compile": 2.556,
+        "recomp": 0.005,
+        "compile": 2.389,
         "run": 0.265
       },
       "num_frames": 8,
@@ -1873,7 +1873,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.89,
+      "duration": 2.72,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -1942,7 +1942,7 @@
       "test": "edittext/edittext_bounds_vs_position",
       "phases": {
         "recomp": 0.005,
-        "compile": 22.258,
+        "compile": 20.941,
         "run": 0.265
       },
       "num_frames": 1,
@@ -1951,11 +1951,11 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.55,
+      "duration": 21.23,
       "image_comparisons": {
         "output": {
           "status": "fail",
-          "message": "Image comparison failed: 522 outliers exceed limit of 0, max difference 255",
+          "message": "Image comparison failed: 519 outliers exceed limit of 0, max difference 255",
           "max_diff": 255,
           "trigger": [
             "last_frame"
@@ -1968,8 +1968,8 @@
     {
       "test": "edittext/edittext_caret_empty",
       "phases": {
-        "recomp": 0.032,
-        "compile": 22.389,
+        "recomp": 0.031,
+        "compile": 21.72,
         "run": 0.315
       },
       "num_frames": 14,
@@ -1978,7 +1978,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.94,
+      "duration": 22.27,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -2107,7 +2107,7 @@
       "test": "edittext/edittext_device_transform_basic",
       "phases": {
         "recomp": 0.011,
-        "compile": 28.198,
+        "compile": 27.544,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2116,14 +2116,14 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 28.49,
+      "duration": 27.83,
       "status": "pass"
     },
     {
       "test": "edittext/edittext_device_transform_metrics",
       "phases": {
         "recomp": 0.011,
-        "compile": 8.368,
+        "compile": 8.235,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2132,7 +2132,7 @@
         "expected_lines": 40,
         "matching_lines": 32
       },
-      "duration": 8.66,
+      "duration": 8.52,
       "ruffle_diff_count": 8,
       "ours_diff_count": 8,
       "status": "ruffle_matched",
@@ -2142,7 +2142,7 @@
       "test": "edittext/edittext_device_transform_negative",
       "phases": {
         "recomp": 0.012,
-        "compile": 8.533,
+        "compile": 8.425,
         "run": 0.316
       },
       "num_frames": 1,
@@ -2151,7 +2151,7 @@
         "expected_lines": 120,
         "matching_lines": 79
       },
-      "duration": 9.15,
+      "duration": 9.03,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2172,7 +2172,7 @@
       "test": "edittext/edittext_device_transform_small_rotation",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.566,
+        "compile": 22.519,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2181,7 +2181,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 0.86,
+      "duration": 22.81,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2200,7 +2200,7 @@
       "test": "edittext/edittext_device_transform_small_shear",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.579,
+        "compile": 20.659,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2209,7 +2209,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 0.9,
+      "duration": 20.98,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2227,9 +2227,9 @@
     {
       "test": "edittext/edittext_gutter",
       "phases": {
-        "recomp": 0.008,
-        "compile": 6.626,
-        "run": 0.566
+        "recomp": 0.007,
+        "compile": 26.679,
+        "run": 0.565
       },
       "num_frames": 1,
       "lines": {
@@ -2237,7 +2237,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.22,
+      "duration": 27.27,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2255,7 +2255,7 @@
       "test": "edittext/edittext_justify",
       "phases": {
         "recomp": 0.008,
-        "compile": 6.648,
+        "compile": 26.562,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2264,7 +2264,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.02,
+      "duration": 26.94,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2282,7 +2282,7 @@
       "test": "edittext/edittext_negative_bounds",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.573,
+        "compile": 1.665,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2291,7 +2291,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 0.88,
+      "duration": 1.97,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2309,7 +2309,7 @@
       "test": "edittext/edittext_selection_font_size",
       "phases": {
         "recomp": 0.008,
-        "compile": 28.294,
+        "compile": 27.486,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2318,7 +2318,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 28.6,
+      "duration": 27.79,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2336,7 +2336,7 @@
       "test": "edittext/edittext_selection_leading",
       "phases": {
         "recomp": 0.009,
-        "compile": 29.229,
+        "compile": 28.183,
         "run": 0.315
       },
       "num_frames": 14,
@@ -2345,7 +2345,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 29.83,
+      "duration": 28.78,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -2474,8 +2474,8 @@
       "test": "edittext/edittext_underline",
       "phases": {
         "recomp": 0.012,
-        "compile": 29.941,
-        "run": 0.666
+        "compile": 28.182,
+        "run": 0.616
       },
       "num_frames": 1,
       "lines": {
@@ -2483,7 +2483,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 31.02,
+      "duration": 29.21,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2501,7 +2501,7 @@
       "test": "edittext/edittext_underline_scale2",
       "phases": {
         "recomp": 0.012,
-        "compile": 24.772,
+        "compile": 23.707,
         "run": 0.415
       },
       "num_frames": 1,
@@ -2510,7 +2510,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 26.8,
+      "duration": 25.67,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2528,8 +2528,8 @@
       "test": "filters/any_blur_scales_with_screen",
       "phases": {
         "recomp": 0.005,
-        "compile": 22.047,
-        "run": 0.566
+        "compile": 20.948,
+        "run": 0.515
       },
       "num_frames": 1,
       "lines": {
@@ -2537,7 +2537,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.66,
+      "duration": 21.5,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2555,8 +2555,8 @@
       "test": "filters/avm1_convolution_initialization",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.853,
-        "run": 0.265
+        "compile": 2.025,
+        "run": 0.266
       },
       "num_frames": 1,
       "lines": {
@@ -2564,15 +2564,15 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 2.13,
+      "duration": 2.31,
       "status": "pass"
     },
     {
       "test": "filters/bevel",
       "phases": {
-        "recomp": 0.047,
-        "compile": 21.661,
-        "run": 0.768
+        "recomp": 0.048,
+        "compile": 22.654,
+        "run": 0.719
       },
       "num_frames": 1,
       "lines": {
@@ -2580,7 +2580,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.93,
+      "duration": 23.88,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2598,8 +2598,8 @@
       "test": "filters/bevel_full",
       "phases": {
         "recomp": 0.056,
-        "compile": 21.848,
-        "run": 1.576
+        "compile": 22.423,
+        "run": 1.582
       },
       "num_frames": 1,
       "lines": {
@@ -2607,7 +2607,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.33,
+      "duration": 24.91,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2624,9 +2624,9 @@
     {
       "test": "filters/bevel_inner",
       "phases": {
-        "recomp": 0.056,
-        "compile": 2.09,
-        "run": 1.525
+        "recomp": 0.057,
+        "compile": 2.183,
+        "run": 1.575
       },
       "num_frames": 1,
       "lines": {
@@ -2634,7 +2634,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 4.48,
+      "duration": 4.62,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2652,8 +2652,8 @@
       "test": "filters/bevel_outer",
       "phases": {
         "recomp": 0.057,
-        "compile": 2.238,
-        "run": 1.57
+        "compile": 2.306,
+        "run": 1.572
       },
       "num_frames": 1,
       "lines": {
@@ -2661,7 +2661,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 4.71,
+      "duration": 4.78,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2678,9 +2678,9 @@
     {
       "test": "filters/blur_fractional",
       "phases": {
-        "recomp": 0.009,
-        "compile": 28.059,
-        "run": 0.717
+        "recomp": 0.01,
+        "compile": 27.637,
+        "run": 0.666
       },
       "num_frames": 1,
       "lines": {
@@ -2688,7 +2688,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 29.54,
+      "duration": 29.06,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2706,8 +2706,8 @@
       "test": "filters/blur_pass_scaling",
       "phases": {
         "recomp": 0.01,
-        "compile": 28.077,
-        "run": 2.124
+        "compile": 27.447,
+        "run": 2.076
       },
       "num_frames": 1,
       "lines": {
@@ -2715,7 +2715,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 30.63,
+      "duration": 29.94,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2732,8 +2732,8 @@
     {
       "test": "filters/blur_quality",
       "phases": {
-        "recomp": 0.01,
-        "compile": 8.209,
+        "recomp": 0.009,
+        "compile": 8.112,
         "run": 0.465
       },
       "num_frames": 1,
@@ -2742,7 +2742,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.34,
+      "duration": 9.25,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2760,7 +2760,7 @@
       "test": "filters/blur_scales_with_screen",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.362,
+        "compile": 21.255,
         "run": 0.365
       },
       "num_frames": 1,
@@ -2769,7 +2769,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.91,
+      "duration": 21.8,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2787,8 +2787,8 @@
       "test": "filters/blur_size_grows",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.932,
-        "run": 0.368
+        "compile": 1.916,
+        "run": 0.369
       },
       "num_frames": 1,
       "lines": {
@@ -2813,8 +2813,8 @@
     {
       "test": "filters/color_matrix",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.888,
+        "recomp": 0.004,
+        "compile": 1.611,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2823,7 +2823,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.4,
+      "duration": 2.08,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2840,9 +2840,9 @@
     {
       "test": "filters/displacement_map",
       "phases": {
-        "recomp": 0.04,
-        "compile": 28.329,
-        "run": 0.666
+        "recomp": 0.031,
+        "compile": 27.533,
+        "run": 0.565
       },
       "num_frames": 1,
       "lines": {
@@ -2850,7 +2850,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 29.8,
+      "duration": 28.76,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2867,9 +2867,9 @@
     {
       "test": "filters/displacement_map_scales_with_screen",
       "phases": {
-        "recomp": 0.04,
-        "compile": 30.121,
-        "run": 0.466
+        "recomp": 0.035,
+        "compile": 29.371,
+        "run": 0.416
       },
       "num_frames": 1,
       "lines": {
@@ -2877,7 +2877,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 30.97,
+      "duration": 30.1,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2894,8 +2894,8 @@
     {
       "test": "filters/displacement_map_through_applyFilter",
       "phases": {
-        "recomp": 0.042,
-        "compile": 28.019,
+        "recomp": 0.035,
+        "compile": 27.212,
         "run": 0.265
       },
       "num_frames": 1,
@@ -2904,7 +2904,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 28.42,
+      "duration": 27.59,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2921,8 +2921,8 @@
     {
       "test": "filters/displacement_map_through_filters",
       "phases": {
-        "recomp": 0.042,
-        "compile": 8.128,
+        "recomp": 0.036,
+        "compile": 7.467,
         "run": 0.365
       },
       "num_frames": 1,
@@ -2931,7 +2931,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.63,
+      "duration": 7.94,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -2948,9 +2948,9 @@
     {
       "test": "filters/drop_shadow",
       "phases": {
-        "recomp": 0.045,
-        "compile": 2.134,
-        "run": 1.117
+        "recomp": 0.032,
+        "compile": 1.619,
+        "run": 0.767
       },
       "num_frames": 1,
       "lines": {
@@ -2958,7 +2958,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 3.55,
+      "duration": 2.6,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -2975,9 +2975,9 @@
     {
       "test": "filters/drop_shadow_angles",
       "phases": {
-        "recomp": 0.029,
-        "compile": 2.028,
-        "run": 0.417
+        "recomp": 0.02,
+        "compile": 1.429,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -2985,7 +2985,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.73,
+      "duration": 1.95,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3002,9 +3002,9 @@
     {
       "test": "filters/drop_shadow_scales_with_screen",
       "phases": {
-        "recomp": 0.005,
-        "compile": 21.852,
-        "run": 0.367
+        "recomp": 0.003,
+        "compile": 17.526,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -3012,7 +3012,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.55,
+      "duration": 18.09,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3029,9 +3029,9 @@
     {
       "test": "filters/glow",
       "phases": {
-        "recomp": 0.044,
-        "compile": 2.134,
-        "run": 0.366
+        "recomp": 0.031,
+        "compile": 1.491,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -3039,7 +3039,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.79,
+      "duration": 2.02,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3056,9 +3056,9 @@
     {
       "test": "filters/glow_pass_scaling",
       "phases": {
-        "recomp": 0.006,
-        "compile": 28.36,
-        "run": 1.172
+        "recomp": 0.004,
+        "compile": 22.706,
+        "run": 0.866
       },
       "num_frames": 1,
       "lines": {
@@ -3066,7 +3066,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 29.69,
+      "duration": 23.68,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3083,9 +3083,9 @@
     {
       "test": "filters/glow_with_alpha_strength",
       "phases": {
-        "recomp": 0.056,
-        "compile": 21.238,
-        "run": 2.221
+        "recomp": 0.037,
+        "compile": 17.258,
+        "run": 1.422
       },
       "num_frames": 1,
       "lines": {
@@ -3093,7 +3093,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.33,
+      "duration": 19.27,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3110,9 +3110,9 @@
     {
       "test": "filters/glow_without_composite_source",
       "phases": {
-        "recomp": 0.044,
-        "compile": 2.016,
-        "run": 0.366
+        "recomp": 0.03,
+        "compile": 1.428,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -3120,7 +3120,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.67,
+      "duration": 1.93,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3137,9 +3137,9 @@
     {
       "test": "focus_highlight/focus_highlight_avm1_button",
       "phases": {
-        "recomp": 0.005,
-        "compile": 2.141,
-        "run": 0.265
+        "recomp": 0.004,
+        "compile": 17.124,
+        "run": 0.215
       },
       "num_frames": 8,
       "lines": {
@@ -3147,7 +3147,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 2.46,
+      "duration": 17.37,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -3215,8 +3215,8 @@
     {
       "test": "focus_highlight/focus_highlight_avm2_button_bounds",
       "phases": {
-        "recomp": 0.006,
-        "compile": 26.819,
+        "recomp": 0.004,
+        "compile": 21.553,
         "run": 0.215
       },
       "num_frames": 3,
@@ -3225,7 +3225,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 27.05,
+      "duration": 21.78,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3243,9 +3243,9 @@
     {
       "test": "focus_highlight/focus_highlight_basic",
       "phases": {
-        "recomp": 0.005,
-        "compile": 2.264,
-        "run": 0.415
+        "recomp": 0.004,
+        "compile": 2.137,
+        "run": 0.315
       },
       "num_frames": 11,
       "lines": {
@@ -3253,7 +3253,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 4.07,
+      "duration": 3.3,
       "image_comparisons": {
         "output.01_highlight_under": {
           "status": "pass",
@@ -3351,9 +3351,9 @@
     {
       "test": "focus_highlight/focus_highlight_empty_clip",
       "phases": {
-        "recomp": 0.006,
-        "compile": 28.178,
-        "run": 0.516
+        "recomp": 0.005,
+        "compile": 24.02,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -3361,7 +3361,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 28.72,
+      "duration": 24.36,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3379,8 +3379,8 @@
     {
       "test": "focus_highlight/focus_highlight_move",
       "phases": {
-        "recomp": 0.005,
-        "compile": 21.612,
+        "recomp": 0.004,
+        "compile": 16.646,
         "run": 0.215
       },
       "num_frames": 7,
@@ -3389,7 +3389,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.85,
+      "duration": 16.88,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -3447,9 +3447,9 @@
     {
       "test": "focus_highlight/focus_highlight_render",
       "phases": {
-        "recomp": 0.005,
-        "compile": 2.2,
-        "run": 0.515
+        "recomp": 0.004,
+        "compile": 1.744,
+        "run": 0.415
       },
       "num_frames": 8,
       "lines": {
@@ -3457,7 +3457,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 3.76,
+      "duration": 2.99,
       "image_comparisons": {
         "output.01": {
           "status": "pass",
@@ -3526,8 +3526,8 @@
       "test": "fonts/advance_u16",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.506,
-        "run": 0.265
+        "compile": 16.569,
+        "run": 0.214
       },
       "num_frames": 1,
       "lines": {
@@ -3535,7 +3535,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.82,
+      "duration": 16.83,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3552,9 +3552,9 @@
     {
       "test": "fonts/device-font",
       "phases": {
-        "recomp": 0.013,
-        "compile": 8.114,
-        "run": 0.265
+        "recomp": 0.008,
+        "compile": 6.384,
+        "run": 0.214
       },
       "num_frames": 1,
       "lines": {
@@ -3562,7 +3562,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.6,
+      "duration": 6.77,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3579,9 +3579,9 @@
     {
       "test": "fonts/duplicate_font",
       "phases": {
-        "recomp": 0.047,
-        "compile": 7.594,
-        "run": 0.515
+        "recomp": 0.042,
+        "compile": 9.423,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -3589,7 +3589,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.35,
+      "duration": 10.1,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3606,9 +3606,9 @@
     {
       "test": "fonts/font_lookup_as3",
       "phases": {
-        "recomp": 0.009,
-        "compile": 7.56,
-        "run": 0.265
+        "recomp": 0.008,
+        "compile": 6.819,
+        "run": 0.214
       },
       "num_frames": 1,
       "lines": {
@@ -3616,7 +3616,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.04,
+      "duration": 7.22,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3633,9 +3633,9 @@
     {
       "test": "fonts/glyph",
       "phases": {
-        "recomp": 0.015,
-        "compile": 7.431,
-        "run": 0.265
+        "recomp": 0.013,
+        "compile": 6.807,
+        "run": 0.214
       },
       "num_frames": 1,
       "lines": {
@@ -3643,7 +3643,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.9,
+      "duration": 7.2,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3661,8 +3661,8 @@
       "test": "fonts/leading_define_font",
       "phases": {
         "recomp": 0.004,
-        "compile": 20.077,
-        "run": 0.265
+        "compile": 18.032,
+        "run": 0.214
       },
       "num_frames": 1,
       "lines": {
@@ -3670,7 +3670,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 20.42,
+      "duration": 18.31,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3687,9 +3687,9 @@
     {
       "test": "fonts/leading_device_font",
       "phases": {
-        "recomp": 0.008,
-        "compile": 25.989,
-        "run": 0.265
+        "recomp": 0.007,
+        "compile": 23.511,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -3697,7 +3697,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 26.31,
+      "duration": 23.77,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -3714,9 +3714,9 @@
     {
       "test": "fonts/leading_embedded_font",
       "phases": {
-        "recomp": 0.007,
-        "compile": 18.039,
-        "run": 0.365
+        "recomp": 0.009,
+        "compile": 28.456,
+        "run": 0.666
       },
       "num_frames": 1,
       "lines": {
@@ -3724,7 +3724,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 18.45,
+      "duration": 29.19,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3741,9 +3741,9 @@
     {
       "test": "gradient_issue_9892",
       "phases": {
-        "recomp": 0.004,
-        "compile": 13.73,
-        "run": 0.264
+        "recomp": 0.006,
+        "compile": 21.833,
+        "run": 0.415
       },
       "num_frames": 1,
       "lines": {
@@ -3751,7 +3751,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 14.25,
+      "duration": 22.75,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3768,9 +3768,9 @@
     {
       "test": "gradient_nonsequential_ratios",
       "phases": {
-        "recomp": 0.004,
-        "compile": 13.389,
-        "run": 0.214
+        "recomp": 0.005,
+        "compile": 22.124,
+        "run": 0.367
       },
       "num_frames": 1,
       "lines": {
@@ -3778,7 +3778,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 13.65,
+      "duration": 22.58,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3795,9 +3795,9 @@
     {
       "test": "gradient_radial_same_ratios",
       "phases": {
-        "recomp": 0.004,
-        "compile": 13.288,
-        "run": 0.214
+        "recomp": 0.006,
+        "compile": 21.976,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -3805,7 +3805,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 13.58,
+      "duration": 22.43,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3822,9 +3822,9 @@
     {
       "test": "gradient_same_ratios",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.149,
-        "run": 0.214
+        "recomp": 0.005,
+        "compile": 1.874,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -3832,7 +3832,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.41,
+      "duration": 2.28,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3850,8 +3850,8 @@
       "test": "layout/line_vertical_align",
       "phases": {
         "recomp": 0.008,
-        "compile": 27.12,
-        "run": 0.516
+        "compile": 28.757,
+        "run": 0.566
       },
       "num_frames": 1,
       "lines": {
@@ -3859,7 +3859,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.67,
+      "duration": 29.36,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3877,7 +3877,7 @@
       "test": "opaque_background",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.837,
+        "compile": 1.983,
         "run": 0.265
       },
       "num_frames": 1,
@@ -3886,7 +3886,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.27,
+      "duration": 2.42,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3904,8 +3904,8 @@
       "test": "scale_rotation_cache",
       "phases": {
         "recomp": 0.005,
-        "compile": 20.979,
-        "run": 0.515
+        "compile": 22.653,
+        "run": 0.566
       },
       "num_frames": 50,
       "lines": {
@@ -3913,7 +3913,7 @@
         "expected_lines": 106,
         "matching_lines": 106
       },
-      "duration": 21.79,
+      "duration": 23.52,
       "image_comparisons": {
         "output.5": {
           "status": "pass",
@@ -3962,7 +3962,7 @@
       "test": "simple_shapes/gradients/focal_radial",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.915,
+        "compile": 2.057,
         "run": 0.315
       },
       "num_frames": 1,
@@ -3971,7 +3971,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.48,
+      "duration": 2.62,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -3988,8 +3988,8 @@
     {
       "test": "simple_shapes/gradients/gradients",
       "phases": {
-        "recomp": 0.028,
-        "compile": 1.996,
+        "recomp": 0.029,
+        "compile": 2.087,
         "run": 0.315
       },
       "num_frames": 1,
@@ -3998,7 +3998,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.57,
+      "duration": 2.66,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4015,8 +4015,8 @@
     {
       "test": "simple_shapes/gradients/radial",
       "phases": {
-        "recomp": 0.029,
-        "compile": 2.174,
+        "recomp": 0.031,
+        "compile": 2.18,
         "run": 0.315
       },
       "num_frames": 1,
@@ -4025,7 +4025,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.77,
+      "duration": 2.78,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4042,8 +4042,8 @@
     {
       "test": "simple_shapes/gradients/reflect",
       "phases": {
-        "recomp": 0.027,
-        "compile": 2.048,
+        "recomp": 0.028,
+        "compile": 2.135,
         "run": 0.315
       },
       "num_frames": 1,
@@ -4052,7 +4052,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.63,
+      "duration": 2.73,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4069,8 +4069,8 @@
     {
       "test": "simple_shapes/gradients/repeat",
       "phases": {
-        "recomp": 0.028,
-        "compile": 2.114,
+        "recomp": 0.03,
+        "compile": 2.136,
         "run": 0.315
       },
       "num_frames": 1,
@@ -4079,7 +4079,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.7,
+      "duration": 2.73,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4096,9 +4096,9 @@
     {
       "test": "simple_shapes/heavy_tesselation",
       "phases": {
-        "recomp": 43.732,
-        "compile": 25.59,
-        "run": 0.416
+        "recomp": 49.494,
+        "compile": 25.131,
+        "run": 0.42
       },
       "num_frames": 1,
       "lines": {
@@ -4106,7 +4106,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 70.23,
+      "duration": 75.57,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4124,8 +4124,8 @@
       "test": "simple_shapes/layers",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.874,
-        "run": 0.265
+        "compile": 1.936,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -4133,7 +4133,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.37,
+      "duration": 2.49,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4150,9 +4150,9 @@
     {
       "test": "simple_shapes/masks",
       "phases": {
-        "recomp": 0.012,
-        "compile": 1.582,
-        "run": 0.465
+        "recomp": 0.015,
+        "compile": 4.981,
+        "run": 0.666
       },
       "num_frames": 1,
       "lines": {
@@ -4160,7 +4160,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.25,
+      "duration": 5.9,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4177,9 +4177,9 @@
     {
       "test": "simple_shapes/masks_equal_clipdepth",
       "phases": {
-        "recomp": 0.012,
-        "compile": 1.292,
-        "run": 0.217
+        "recomp": 0.015,
+        "compile": 1.451,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -4187,7 +4187,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.7,
+      "duration": 1.95,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4204,9 +4204,9 @@
     {
       "test": "simple_shapes/overlaps",
       "phases": {
-        "recomp": 0.022,
-        "compile": 1.465,
-        "run": 0.365
+        "recomp": 0.026,
+        "compile": 1.686,
+        "run": 0.515
       },
       "num_frames": 1,
       "lines": {
@@ -4214,7 +4214,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.03,
+      "duration": 2.45,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4231,9 +4231,9 @@
     {
       "test": "simple_shapes/scroll_rect_mask",
       "phases": {
-        "recomp": 0.004,
-        "compile": 1.529,
-        "run": 0.214
+        "recomp": 0.005,
+        "compile": 1.763,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -4241,7 +4241,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.93,
+      "duration": 2.26,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4259,7 +4259,7 @@
       "test": "simple_shapes/strokes/scale",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.915,
+        "compile": 3.92,
         "run": 0.315
       },
       "num_frames": 1,
@@ -4268,7 +4268,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.5,
+      "duration": 4.51,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4286,7 +4286,7 @@
       "test": "simple_shapes/text_field_mask",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.853,
+        "compile": 2.987,
         "run": 0.666
       },
       "num_frames": 1,
@@ -4295,7 +4295,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.76,
+      "duration": 3.88,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4313,7 +4313,7 @@
       "test": "simple_shapes/winding_rule",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.853,
+        "compile": 21.517,
         "run": 0.515
       },
       "num_frames": 1,
@@ -4322,7 +4322,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 22.56,
+      "duration": 22.21,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4339,9 +4339,9 @@
     {
       "test": "text/String_path_variable_button",
       "phases": {
-        "recomp": 0.023,
-        "compile": 1.976,
-        "run": 0.266
+        "recomp": 0.022,
+        "compile": 2.069,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -4349,7 +4349,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.51,
+      "duration": 2.6,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4366,9 +4366,9 @@
     {
       "test": "video/colorconversion/h263",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.408,
-        "run": 0.415
+        "recomp": 0.009,
+        "compile": 24.403,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -4376,7 +4376,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.08,
+      "duration": 25.17,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4393,9 +4393,9 @@
     {
       "test": "video/colorconversion/vp6",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.366,
-        "run": 0.264
+        "recomp": 0.006,
+        "compile": 1.753,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -4403,7 +4403,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.79,
+      "duration": 2.21,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4420,9 +4420,9 @@
     {
       "test": "video/colorconversion/vp6a",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.536,
-        "run": 0.265
+        "recomp": 0.008,
+        "compile": 1.947,
+        "run": 0.316
       },
       "num_frames": 1,
       "lines": {
@@ -4430,7 +4430,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.03,
+      "duration": 2.54,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4447,9 +4447,9 @@
     {
       "test": "video/deblocking",
       "phases": {
-        "recomp": 0.01,
-        "compile": 18.224,
-        "run": 0.418
+        "recomp": 0.012,
+        "compile": 21.711,
+        "run": 0.468
       },
       "num_frames": 1,
       "lines": {
@@ -4457,7 +4457,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.75,
+      "duration": 23.52,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4475,7 +4475,7 @@
       "test": "video/h264",
       "phases": {
         "recomp": 0.007,
-        "compile": 30.114,
+        "compile": 32.968,
         "run": 0.566
       },
       "num_frames": 120,
@@ -4484,7 +4484,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 31.39,
+      "duration": 34.18,
       "image_comparisons": {
         "frame2": {
           "status": "fail",
@@ -4593,7 +4593,7 @@
       "test": "video/h264_multinalu",
       "phases": {
         "recomp": 0.006,
-        "compile": 29.896,
+        "compile": 28.746,
         "run": 0.265
       },
       "num_frames": 8,
@@ -4602,7 +4602,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 30.39,
+      "duration": 29.23,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -4620,9 +4620,9 @@
     {
       "test": "video/vp6_alphaoffset",
       "phases": {
-        "recomp": 0.009,
-        "compile": 23.172,
-        "run": 0.616
+        "recomp": 0.008,
+        "compile": 21.861,
+        "run": 0.566
       },
       "num_frames": 1,
       "lines": {
@@ -4630,7 +4630,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.08,
+      "duration": 22.71,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -4647,8 +4647,8 @@
     {
       "test": "video/vp6_dispsize",
       "phases": {
-        "recomp": 0.009,
-        "compile": 2.116,
+        "recomp": 0.008,
+        "compile": 21.533,
         "run": 0.315
       },
       "num_frames": 1,
@@ -4657,7 +4657,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.67,
+      "duration": 22.08,
       "image_comparisons": {
         "output": {
           "status": "pass",
