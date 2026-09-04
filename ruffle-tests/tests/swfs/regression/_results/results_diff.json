@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-04T01:40:04.039572+00:00",
-    "old_git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
-    "new_timestamp": "2026-09-04T02:34:30.057764+00:00",
-    "new_git_sha": "1ccb87a956cdaaeaaa528d58f96b51741ef2f61d",
+    "old_timestamp": "2026-09-04T02:34:30.057764+00:00",
+    "old_git_sha": "1ccb87a956cdaaeaaa528d58f96b51741ef2f61d",
+    "new_timestamp": "2026-09-04T04:42:20.309755+00:00",
+    "new_git_sha": "82f27e5f907028b8d1a79e40da7030c0db810fbd",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 80,
     "old_total": 80,
     "old_pass_rate": 100.0,
-    "new_pass": 80,
+    "new_pass": 81,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 80,
-    "new_total": 80,
+    "new_effective_pass": 81,
+    "new_total": 81,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,9 +25,54 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 80,
-    "added": 0,
+    "unchanged": 78,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_child_timeline_advance",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      },
+      "new_lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 23
+      }
+    },
+    {
+      "test": "avm1_child_timeline_holder_stop",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      },
+      "new_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      }
+    },
+    {
+      "test": "avm1_child_timeline_loop",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      }
+    }
+  ]
 }
