@@ -1,6 +1,6 @@
-// Source for regression/avm1_child_timeline_loop (test.swf).
-// See create_test_swf.py for what this pins down: a loaded child SWF's
-// timeline wrapping back to frame 1, and the HOLDER's stop() stopping it.
+// Source for regression/avm1_child_timeline_holder_stop (test.swf).
+// See create_test_swf.py: holder.stop() / holder.play() from the PARENT drive
+// the loaded movie's timeline, and the movie parks on its last frame.
 //
 // Build (SWF8 AVM1 parent):
 //   ~/CC/mtasc/bin/mtasc -cp ~/CC/mtasc/ocaml/mtasc/std \
@@ -15,12 +15,16 @@ class Parent {
         _root.onEnterFrame = function(): Void {
             Parent.t++;
             Parent.sample();
-            // Stop from the PARENT once the child has been round the loop.
-            // The loaded movie is the holder's timeline, so this is a stop()
-            // on that timeline — the rows after it must be frozen.
-            if (Parent.t == 8) {
+            // The loaded movie is the holder's timeline and has three frames
+            // still to run, so a stop here has to be visible as cf FREEZING at
+            // 3 rather than climbing to 4, 5, 6.
+            if (Parent.t == 3) {
                 _root.holder.stop();
                 trace("stop");
+            }
+            if (Parent.t == 6) {
+                _root.holder.play();
+                trace("play");
             }
             if (Parent.t >= 11) {
                 _root.onEnterFrame = null;

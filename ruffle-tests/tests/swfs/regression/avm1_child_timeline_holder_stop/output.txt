@@ -1,0 +1,20 @@
+L1
+t1 cf:1 ax:10
+L2
+t2 cf:2 ax:20
+L3
+t3 cf:3 ax:30
+stop
+t4 cf:3 ax:30
+t5 cf:3 ax:30
+t6 cf:3 ax:30
+play
+L4
+t7 cf:4 ax:40
+L5
+t8 cf:5 ax:50
+L6
+t9 cf:6 ax:60
+t10 cf:6 ax:60
+t11 cf:6 ax:60
+done

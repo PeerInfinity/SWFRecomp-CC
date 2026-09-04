@@ -1,51 +1,53 @@
 #!/usr/bin/env python3
-r"""Build child.swf and test.swf for regression/avm1_child_timeline_loop.
+r"""Build child.swf and test.swf for regression/avm1_child_timeline_holder_stop.
 
 WHAT THIS PINS DOWN
 -------------------
-**A loaded child SWF's timeline LOOPS, and the holder clip's `stop()` stops
-it.** The sibling `avm1_child_timeline_advance` covers the forward sequence and
-the child's own `stop()`; this one covers the two things that test cannot see:
-the wrap back to frame 1, and a stop driven from the PARENT.
+**`holder.stop()` and `holder.play()` from the PARENT drive the loaded movie's
+timeline, and the movie parks on its last frame.**
 
-Ruffle: `MovieClip::replace_with_movie` (movie_clip.rs:371) makes the loaded
-movie the holder clip's timeline and sets the PLAYING flag;
-`determine_next_frame` (movie_clip.rs:1340) answers `NextFrame::First` — i.e.
-wrap to the first frame — for any clip with more than one loaded frame and an
-End tag, which every real SWF file has. So a loaded child plays and loops
-unless something stops it.
+A movie loaded into a clip becomes that clip's timeline (Ruffle
+`MovieClip::replace_with_movie`, movie_clip.rs:371), so `holder.stop()` is a
+stop on the loaded movie. Before the child-timeline slice it fell all the way
+through to `actionStop` and stopped the **ROOT** -- a dynamic holder is missed
+by `ng_findDisplayEntryByName` and has no `display_obj`, so both of that arm's
+clip-specific branches missed it. The sibling `avm1_child_timeline_advance`
+covers the movie stopping ITSELF; this one covers the parent doing it, which is
+a different code path (`actionCallMethod`'s `stop`/`play` arms, not
+`actionStop`).
 
 THE SHAPE
 ---------
     parent test.swf  (AVM1, SWF8, MTASC)
                      loadMovie("child.swf") into _root.holder
-    child.swf        (AVM1, SWF8, hand-built, 3 frames, NO stop())
+    child.swf        (AVM1, SWF8, hand-built, 6 frames, NO stop() of its own)
 
-    frame 1: PlaceObject2 char 1, depth 1, "a", at (10, 0) px   DoAction trace L1
-    frame 2: PlaceObject2 Move depth 1 -> (20, 0) px            DoAction trace L2
-    frame 3: PlaceObject2 Move depth 1 -> (30, 0) px            DoAction trace L3
+    frame N: PlaceObject2 Move depth 1 -> (10*N, 0) px   DoAction trace LN
 
-The parent samples `holder._currentframe` and `holder.a._x` every tick, and on
-tick 8 calls `holder.stop()`.
+The parent lets it run to frame 3, calls `holder.stop()`, holds for three
+ticks, then calls `holder.play()`.
 
 WHAT EACH ROW DISCRIMINATES
 ---------------------------
-  * `cf` cycling 1,2,3,1,2,3 is the wrap itself. A one-shot playhead — which
-    is what `_levelN` loads and MovieClipLoader targets still have — parks on
-    3 and never returns to 1.
-  * `ax` returning to 10 on the wrap tick proves the wrap RE-RAN frame 1's
-    tags, rather than only resetting a counter. This is the row that
-    distinguishes a real loop-back from a `_currentframe` that merely wraps.
-  * The `L1/L2/L3` trace lines from the child's own DoAction are the same
-    assertion from inside the child.
-  * After `holder.stop()` the rows must freeze — `stop()` on the holder is
-    `stop()` on the loaded movie's timeline, because the loaded movie IS that
-    clip's timeline.
+  * `cf` frozen at 3 for ticks 4-6 is the parent-driven stop. The movie has no
+    stop() of its own and three frames left, so without the fix those ticks
+    read 4, 5, 6.
+  * `ax` frozen with it proves the frames' TAGS stopped too, not just a
+    counter.
+  * `cf` resuming 4, 5, 6 after `play` is the parent-driven play.
+  * `cf:6` held to the end is the PARK. A loaded movie should WRAP here
+    (Ruffle `determine_next_frame` -> `NextFrame::First` for any clip with more
+    than one loaded frame and an End tag, which every SWF file has). It does
+    not, because a wrap has to clear the movie's own display children and a
+    clip target's children are interleaved with the parent's in the global
+    display_list -- see SWFRecompDocs/status/child-timeline-advance.md §2.2.
+    **Those rows are a lock on known-incomplete behaviour**: when the wrap
+    lands they must flip to `cf:1 ax:10`, deliberately.
 
 NEGATIVE CONTROL
 ----------------
-Reverting the runtime change puts the child back at frame 1 forever: `L1`
-alone, `cf:1` and `ax:10` on every tick.
+Reverting the child-timeline change puts the movie back at frame 1 forever:
+`L1` alone, `cf:1` and `ax:10` on every tick.
 
 See SWFRecompDocs/status/child-timeline-advance.md for the full write-up.
 """
@@ -136,28 +138,28 @@ def trace_str(s):
     return push_string(s) + ACTION_TRACE
 
 
+FRAMES = 6
+
+
 def build_child(path):
     tags = define_sprite(CHAR_A, 1, show_frame() + end_tag())
-    # frame 1
+    # frame 1 places, frames 2..N each Modify. The movie never stops itself:
+    # everything this test measures is driven from the parent.
     tags += place_character(1, CHAR_A, "a", 200, 0)      # (10, 0) px
     tags += do_action(trace_str("L1"))
     tags += show_frame()
-    # frame 2
-    tags += modify_matrix(1, 400, 0)                     # (20, 0) px
-    tags += do_action(trace_str("L2"))
-    tags += show_frame()
-    # frame 3 — no stop(): the movie wraps back to frame 1
-    tags += modify_matrix(1, 600, 0)                     # (30, 0) px
-    tags += do_action(trace_str("L3"))
-    tags += show_frame()
+    for n in range(2, FRAMES + 1):
+        tags += modify_matrix(1, 200 * n, 0)             # (10*n, 0) px
+        tags += do_action(trace_str("L%d" % n))
+        tags += show_frame()
     tags += end_tag()
 
     # RECT nbits=15, 0..4000 twips square (200x200 px stage, never rendered).
     rect = bytes([0x78, 0x00, 0x0F, 0xA0, 0x00, 0x00, 0x0F, 0xA0, 0x00])
-    body = rect + struct.pack('<H', 30 << 8) + struct.pack('<H', 3) + tags
+    body = rect + struct.pack('<H', 30 << 8) + struct.pack('<H', FRAMES) + tags
     file_length = 8 + len(body)
     path.write_bytes(b'FWS' + struct.pack('<BI', 8, file_length) + body)
-    print(f'Created {path} (SWF8, 3 frames, {file_length} bytes)')
+    print(f'Created {path} (SWF8, {FRAMES} frames, {file_length} bytes)')
 
 
 def build_parent(path):

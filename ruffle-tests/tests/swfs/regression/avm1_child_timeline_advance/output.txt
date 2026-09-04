@@ -12,12 +12,8 @@ t7 cf:4 tf:5 ax:30 b:undefined z:undefined
 play
 c5
 t8 cf:5 tf:5 ax:30 b:undefined z:movieclip
-c1
-t9 cf:1 tf:5 ax:10 b:undefined z:undefined
-c2
-t10 cf:2 tf:5 ax:20 b:movieclip z:undefined
-c3
-t11 cf:3 tf:5 ax:30 b:undefined z:undefined
-c4
-t12 cf:4 tf:5 ax:30 b:undefined z:undefined
+t9 cf:5 tf:5 ax:30 b:undefined z:movieclip
+t10 cf:5 tf:5 ax:30 b:undefined z:movieclip
+t11 cf:5 tf:5 ax:30 b:undefined z:movieclip
+t12 cf:5 tf:5 ax:30 b:undefined z:movieclip
 done

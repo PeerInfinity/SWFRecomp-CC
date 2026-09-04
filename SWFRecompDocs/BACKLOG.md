@@ -178,43 +178,65 @@ first).
   `MovieClipLoader.loadClip` already registered clip targets with it. What was
   frozen was the DIRECT `loadMovie` path alone: its registration carried an
   extra `loads[i].is_level &&`. Dropping that gate is the core of the fix.
-  Around it: every loaded movie now gets its holder's own
-  `sprite_display_list` (the block that already existed for `_levelN`,
-  generalised) so the movie's children are the clip's children and a wrap-back
-  can clear them; play/stop lives in the holder's `sprite_is_playing`, which is
-  the field `ng_stopCurrentSprite` and the `mc.stop()` attached-clip arm
-  already write, so a stop() inside the movie AND `holder.stop()` from the
-  parent both work with no new routing; the movie wraps past its last frame
-  (Ruffle `determine_next_frame` -> `NextFrame::First`); and a load no longer
-  runs two of the movie's frames on its load tick. Two further defects fell
-  out: the recompiler's end-of-movie wrap emission (`next_frame = 0;
+  Around it: the playhead's frame cursor AND play flag live on the advance-table
+  entry (the only per-LOAD thing there is), routed to explicitly at four sites
+  that all used to fall through to the ROOT's `is_playing` -- `actionStop` /
+  `actionPlay` reached from the movie's own frame script, and the `stop`/`play`
+  arms of `actionCallMethod` reached as `holder.stop()` from the parent (which
+  stopped the ROOT); a load no longer runs two of the movie's frames on its load
+  tick (direct clip loads only -- see the next entry); and two further defects
+  fell out. The recompiler's end-of-movie wrap emission (`next_frame = 0;
   manual_next_frame = 1;`) is the MAIN movie's globals and a child reaching its
-  last frame rewound the PARENT (guarded in the runtime at all three child
-  frame-call sites -- the harness strips the sibling `quit_swf = 1;` but never
-  saw this one); and marking the holder PLAYING at registration time, which
-  runs after the movie's frame 1, overwrote a `stop()` in that frame (hoisted
-  ahead of `frame_funcs[0]` in both loader paths). Anchored by three new
-  fixtures -- `regression/avm1_child_timeline_advance`,
-  `avm1_child_timeline_loop`, `avm1_child_timeline_frame1_stop` -- each
+  last frame rewound the PARENT (guarded in the runtime at all three
+  `MovieEntry` frame-call sites -- the harness strips the sibling
+  `quit_swf = 1;` but never saw this one); and registering the playhead AFTER
+  the movie's frame 1 overwrote a `stop()` in that frame (the preloader shape;
+  hoisted ahead of `frame_funcs[0]` in both loader paths). Anchored by three
+  new fixtures -- `regression/avm1_child_timeline_advance`,
+  `avm1_child_timeline_holder_stop`, `avm1_child_timeline_frame1_stop` -- each
   asserting a per-tick SEQUENCE with negative controls in both directions.
   AVM1 only; AVM2 `Loader.load` was never frozen (its AVM1 children run on
-  `g_avm1u2`, which already loops). Closeout:
+  `g_avm1u2`, which already loops). **Looping is NOT part of this** -- see the
+  next entry. Closeout:
   `SWFRecompDocs/status/child-timeline-advance.md`. (2026-09-03)
-- **`_levelN` and MovieClipLoader targets still do not loop.** A movie in a
-  level or an MCL target is a MovieClip like any other and should wrap past its
-  last frame; `actionRegisterChildMovieAdvance`'s `loops` argument is passed 1
-  only by the direct `loadMovie` clip path. Turning it on for the other two is
-  a one-line switch and a corpus-visible behaviour change on paths that already
-  work -- `hasPlayingLevels()` goes permanently true, holding the player to
-  `max_ticks` for `avm1/unloadmovienum`'s 10-frame level and `mcl_unloadclip`'s
-  10-frame MCL target and re-running frames the corpus has never seen re-run.
-  Worth its own slice with its own measurement. Same file also lists
-  `holder.gotoAndStop(n)` not targeting the loaded movie's frames (the
-  `ng_goto*` entry points need a `CHAR_TYPE_SPRITE` dictionary character; a
-  loaded holder's `char_id` is 0) and browser-WASM never advancing a loaded
-  movie at all (`swf.c`'s driver call is inside `#ifdef OFFSCREEN_RENDER`).
-  Detail: `SWFRecompDocs/status/child-timeline-advance.md` sections 2.2 and
-  2.3. (2026-09-03)
+- **A loaded movie does not LOOP, because it does not own its display
+  children.** A movie loaded into a clip is that clip's timeline and should
+  wrap past its last frame like any MovieClip (Ruffle `replace_with_movie` +
+  `determine_next_frame` -> `NextFrame::First`). It parks instead. A wrap has
+  to remove the movie's own display children before re-running its frame 1 --
+  otherwise frame 1's `PlaceObject2` hits an occupied depth and the runtime
+  prints `Warning: Failed to place object at depth N.` -- and a clip target's
+  children are interleaved with the parent's in the GLOBAL `display_list` with
+  nothing marking which are which. The obvious fix (give the holder its own
+  `DisplayObject` + private `sprite_display_list`, as `_levelN` already has)
+  was implemented and **measured to cost ten corpus tests**: merely ALLOCATING
+  a `DisplayObject` for a `createEmptyMovieClip` holder, with no display-list
+  change at all, breaks `avm1/movieclip_invalid_get_bounds_1..8`, and swapping
+  the list on top of that additionally breaks
+  `avm1/swf{5_to_6,6_to_5}_cross_call`. (`mc->display_obj != NULL` is read at
+  48 sites in `action.c` and means "this clip is a display object".) Two
+  routes: make per-movie display-list ownership actually work (find what those
+  ten tests read), or add `u8 placed_by_movie` to `DisplayObject`, written from
+  `g_current_movie_id` at placement, and clear exactly those on wrap -- the
+  same shape as slice 3's `place_transform_data` ruling. This is the same
+  missing per-movie abstraction as the render-tables entry below, seen from the
+  other side. Detail: `SWFRecompDocs/status/child-timeline-advance.md` §2.2.
+  (2026-09-03)
+- **Our MovieClipLoader load completes a tick later than Flash's.** A loaded
+  movie used to run TWO of its frames on its load tick (the loader calls
+  `frame_funcs[0]`; the per-tick driver runs in the same tick right after it).
+  Direct `loadMovie` clip targets now get one frame per tick; `_levelN` and MCL
+  targets deliberately keep the double step, because removing it breaks
+  `from_shumway/avm1/moviecliploader` -- `num_frames = 3`, and it only reaches
+  its loadee's `loadee frame 2` because of the double step. So the double step
+  is compensating for a load that lands a tick late. Fixing the load timing
+  would let `armed` apply uniformly. Also open on the same paths:
+  `holder.gotoAndStop(n)` does not target the loaded movie's frames (the
+  `ng_goto*` entry points need a `CHAR_TYPE_SPRITE` dictionary character and a
+  loaded holder has none), browser-WASM never advances a loaded movie at all
+  (`swf.c`'s driver call is inside `#ifdef OFFSCREEN_RENDER`), and a second
+  load into the same holder does not clear the first movie's children.
+  (2026-09-03)
 - **A loaded child movie does not render at all — the renderer has no
   per-movie tables.** Rewritten 2026-09-03 from "a loaded child's bitmaps never
   reach the renderer", which named one facet of it. The bitmap gates are real

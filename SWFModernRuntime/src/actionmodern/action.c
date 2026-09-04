@@ -24071,111 +24071,90 @@ int g_pending_direct_load_count = 0;
 // None of those targets is a DefineSprite instance sitting in a display list,
 // so advance_sprite_frames -- which walks display_list and dispatches on
 // dictionary[obj->char_id].type == CHAR_TYPE_SPRITE -- can never find them.
-// This table is their driver. What IS reused from the sprite playhead is the
-// STATE, not the driver:
+// This table is their driver.
 //
-//   * PLAY/STOP lives in the holder DisplayObject's `sprite_is_playing`. That
-//     is the field ng_stopCurrentSprite/ng_playCurrentSprite write, so a
-//     stop() inside the loaded movie lands there (the frame call below sets
-//     g_current_sprite_obj to the holder); and it is the field the
-//     mc.stop()/mc.play() arms write for a clip whose display_obj is a
-//     standalone struct, so holder.stop() from the parent lands in the same
-//     place. Neither needed new routing.
-//   * The DISPLAY LIST is the holder's own `sprite_display_list`, swapped in
-//     around every frame call. That is what lets the loop-back below clear the
-//     loaded movie's children without touching the parent's.
+// Both the frame CURSOR and the PLAY FLAG live here, on the entry, because the
+// entry is the only thing that exists per LOAD. They cannot live on
+// `MovieEntry` (one entry can be loaded into two holders, and it is the
+// immutable program), and they cannot live on the holder's `DisplayObject`
+// because a clip target usually HAS no DisplayObject: it is a
+// createEmptyMovieClip, and giving it one is a measured corpus regression
+// (avm1/movieclip_invalid_get_bounds_1..8 fail on the bare allocation, with no
+// display-list change at all).
 //
-// The frame CURSOR stays here rather than on the DisplayObject because an MCL
-// target need not have one (Phase 2 of actionFirePendingLoadInits allocates no
-// display_obj) and because the cursor belongs to the LOAD: one MovieEntry can
-// be loaded into two holders, and MovieEntry is the immutable program.
+// So the play flag is routed to explicitly, in the three places that can
+// change it:
+//   * `actionStop`/`actionPlay` reached from the loaded movie's OWN frame
+//     script, which the driver marks with g_child_movie_advance_mc. Without
+//     this the call falls through to the ROOT's `is_playing`, which the loader
+//     save/restores -- i.e. the movie's stop() was being discarded.
+//   * `mc.stop()` / `mc.play()` on the holder, which is `holder.stop()` from
+//     the parent. That used to fall through to actionStop and stop the ROOT.
+//
+// What this table does NOT do is own a display list, which is why a loaded
+// movie parks on its last frame instead of wrapping. See section 2.2 of
+// SWFRecompDocs/status/child-timeline-advance.md.
 typedef struct {
 	MovieClip* mc;
 	MovieEntry* entry;
 	size_t current_frame;  // 0-indexed; next frame to run
-	u8 loops;              // 1 = wrap to frame 0 past the last frame
-	u8 armed;              // 0 on the tick the load itself ran frame 0; the driver
-	                       //   sets it and only advances from the NEXT tick, so no
-	                       //   load ever runs two of the movie's frames in one tick
+	u8 playing;            // 0 after a stop() on this movie's own timeline
+	u8 armed;              // 0 = do not advance on the tick the load itself ran
+	                       //   frame 0. The loader calls frame_funcs[0] and this
+	                       //   driver runs in the SAME tick right after it, so an
+	                       //   armed-at-birth entry runs TWO of the movie's frames
+	                       //   on its load tick. Flash gives it one per tick.
+	                       //   Clip targets of a direct loadMovie start unarmed;
+	                       //   _levelN and MovieClipLoader targets start ARMED,
+	                       //   keeping the double step they have always had --
+	                       //   from_shumway/avm1/moviecliploader has num_frames=3
+	                       //   and only reaches its loadee's frame 2 because of
+	                       //   it, which says our MCL load itself completes a tick
+	                       //   later than Flash's. Fixing that is its own change.
 } LevelAdvanceEntry;
 #define MAX_LEVEL_ADVANCE 128
 static LevelAdvanceEntry g_level_advance[MAX_LEVEL_ADVANCE];
 static int g_level_advance_count = 0;
 
-// The holder's DisplayObject (standalone for a level / dynamic clip, or the
-// display-list entry for a timeline-placed one), or NULL when it has none.
-static DisplayObject* childMovieHolderObj(MovieClip* mc)
-{
-	return (mc != NULL && mc->display_obj != NULL) ? (DisplayObject*)mc->display_obj : NULL;
-}
+// The loaded movie whose frame script is executing right now, or NULL. Set by
+// the driver and by the two loaders around a frame_funcs[] call; read by
+// actionStop/actionPlay so a stop() on the movie's OWN root timeline lands on
+// its playhead instead of the parent's `is_playing`.
+static MovieClip* g_child_movie_advance_mc = NULL;
 
-// A holder with no DisplayObject has nowhere to record a stop, so it counts as
-// always playing -- which is what every target did before the flag was read.
-static int childMoviePlayheadRunning(MovieClip* mc)
+static LevelAdvanceEntry* childMovieEntryFor(MovieClip* mc)
 {
-	DisplayObject* d = childMovieHolderObj(mc);
-	return (d == NULL) ? 1 : (d->sprite_is_playing != 0);
-}
-
-// Mark a freshly-loaded movie as playing on its holder. replace_with_movie sets
-// MovieClipFlags::PLAYING unconditionally, so this overrides a holder sprite
-// that happened to be stopped before the load.
-//
-// It has to run BEFORE the movie's own frame 1, not at registration time
-// (which is after it): a loaded movie whose first frame calls stop() -- the
-// preloader shape, and the commonest real one -- would otherwise have that
-// stop overwritten and would play on.
-void actionChildMovieMarkPlaying(MovieClip* mc)
-{
-	DisplayObject* d = childMovieHolderObj(mc);
-	if (d != NULL) d->sprite_is_playing = 1;
-}
-
-// Wrap-back for a looping loaded movie. Only reachable when the holder owns a
-// PRIVATE display list: the loaded movie's children are the only things in it,
-// so a full clear is exactly "remove this movie's display list". A holder
-// without one has its children interleaved with the parent's in the global
-// display_list, and clearing that would take the parent's with it -- so such a
-// target does not wrap, it parks on its last frame.
-static int childMovieCanLoop(MovieClip* mc)
-{
-	DisplayObject* d = childMovieHolderObj(mc);
-	return d != NULL && d->sprite_display_list != NULL;
-}
-
-static void childMovieLoopBackClear(SWFAppContext* app_context, MovieClip* mc)
-{
-	DisplayObject* d = childMovieHolderObj(mc);
-	if (d == NULL || d->sprite_display_list == NULL) return;
-	extern void ng_freeSpriteDL(SWFAppContext*, DisplayObject*, size_t);
-	DisplayObject* dl = d->sprite_display_list;
-	size_t highest_kept = 0;
-	for (size_t j = 1; j <= d->sprite_max_depth && j < d->sprite_dl_capacity; ++j) {
-		// Dynamic-range entries (attachMovie / duplicateMovieClip /
-		// createEmptyMovieClip, swf depth >= AVM_DEPTH_BIAS) survive a rewind.
-		// Same rule the root's ng_display_clear_after and the sprite loop-back's
-		// ng_loopback_entry_survives both apply, and Ruffle's run_goto with them.
-		if (j >= 16384) {
-			if (dl[j].char_id != 0) highest_kept = j;
-			continue;
-		}
-		if (dl[j].sprite_display_list != NULL) {
-			ng_freeSpriteDL(app_context, dl[j].sprite_display_list, dl[j].sprite_dl_capacity);
-			dl[j].sprite_display_list = NULL;
-		}
-		dl[j].char_id = 0;
+	if (mc == NULL) return NULL;
+	for (int i = 0; i < g_level_advance_count; i++) {
+		if (g_level_advance[i].mc == mc && g_level_advance[i].entry != NULL)
+			return &g_level_advance[i];
 	}
-	d->sprite_max_depth = highest_kept;
+	return NULL;
 }
 
-// `loops`: 1 for a movie that should wrap past its last frame the way any
-// MovieClip does (Ruffle determine_next_frame -> NextFrame::First for a clip
-// with more than one loaded frame and an End tag, which every SWF file has).
-// The direct loadMovie path passes 1; _levelN and MovieClipLoader targets keep
-// the one-shot behaviour they have always had here -- see the closeout doc
-// (SWFRecompDocs/status/child-timeline-advance.md) for why that asymmetry is
-// deliberate rather than an oversight.
-void actionRegisterChildMovieAdvance(MovieClip* mc, MovieEntry* entry, int loops)
+// Route a stop()/play() to a loaded movie's own playhead. Returns 1 when it
+// landed, so the caller knows not to fall through to the root timeline.
+//
+// `mc == NULL` means "the movie whose frame script is running", which is how
+// actionStop/actionPlay reach it: a loaded movie's root timeline has no
+// DisplayObject and no sprite, so those functions would otherwise treat its
+// stop() as the ROOT's.
+int actionChildMovieSetPlaying(MovieClip* mc, int playing)
+{
+	if (mc == NULL) mc = g_child_movie_advance_mc;
+	LevelAdvanceEntry* e = childMovieEntryFor(mc);
+	if (e == NULL) return 0;
+	e->playing = (u8)(playing ? 1 : 0);
+	return 1;
+}
+
+// Non-NULL only while a loaded movie's own frame script is executing.
+MovieClip* actionCurrentChildMovieMC(void) { return g_child_movie_advance_mc; }
+void actionSetCurrentChildMovieMC(MovieClip* mc) { g_child_movie_advance_mc = mc; }
+
+// `start_armed`: 1 preserves the historical same-tick double step (see the
+// `armed` field comment); 0 gives the movie one frame per tick from the start.
+void actionRegisterChildMovieAdvance(MovieClip* mc, MovieEntry* entry, int start_armed)
 {
 	if (mc == NULL || entry == NULL) return;
 	// Replace any existing entry for this MC (a subsequent load into the same
@@ -24184,23 +24163,42 @@ void actionRegisterChildMovieAdvance(MovieClip* mc, MovieEntry* entry, int loops
 		if (g_level_advance[i].mc == mc) {
 			g_level_advance[i].entry = entry;
 			g_level_advance[i].current_frame = 1;
-			g_level_advance[i].loops = (u8)(loops ? 1 : 0);
-			g_level_advance[i].armed = 0;
+			g_level_advance[i].playing = 1;
+			g_level_advance[i].armed = (u8)(start_armed ? 1 : 0);
 			return;
 		}
 	}
-	if (g_level_advance_count >= MAX_LEVEL_ADVANCE) return;
+	if (g_level_advance_count >= MAX_LEVEL_ADVANCE) {
+		// A parked playhead is kept so a later holder.play() can find it, so the
+		// table no longer self-cleans the way it did when a finished entry was
+		// dropped. Evict the first parked one rather than silently refusing to
+		// register the new load.
+		int victim = -1;
+		for (int i = 0; i < g_level_advance_count; i++) {
+			LevelAdvanceEntry* c = &g_level_advance[i];
+			if (c->mc == NULL || c->entry == NULL
+			    || c->current_frame >= c->entry->frame_count) { victim = i; break; }
+		}
+		if (victim < 0) return;
+		g_level_advance[victim].mc = mc;
+		g_level_advance[victim].entry = entry;
+		g_level_advance[victim].current_frame = 1;
+		g_level_advance[victim].playing = 1;
+		g_level_advance[victim].armed = (u8)(start_armed ? 1 : 0);
+		return;
+	}
 	LevelAdvanceEntry* e = &g_level_advance[g_level_advance_count++];
 	e->mc = mc;
 	e->entry = entry;
 	e->current_frame = 1;
-	e->loops = (u8)(loops ? 1 : 0);
-	e->armed = 0;
+	e->playing = 1;
+	e->armed = (u8)(start_armed ? 1 : 0);
 }
 
+// MovieClipLoader targets. Kept armed at birth: see the `armed` field comment.
 void actionRegisterLevelAdvance(MovieClip* mc, MovieEntry* entry)
 {
-	actionRegisterChildMovieAdvance(mc, entry, /*loops=*/0);
+	actionRegisterChildMovieAdvance(mc, entry, /*start_armed=*/1);
 }
 
 // Stop per-tick frame advancement for a previously-registered level/MC.
@@ -24231,10 +24229,9 @@ int hasPlayingLevels(void)
 		if (e->mc == NULL || e->entry == NULL) continue;
 		if (e->mc->depth == INT_MIN) continue;
 		if (e->mc->unloaded) continue;
-		// A stopped playhead is not a reason to keep the player alive, and a
-		// looping one always is -- the same rule the root timeline follows.
-		if (!childMoviePlayheadRunning(e->mc)) continue;
-		if (e->loops) return 1;
+		// A stopped playhead is not a reason to keep the player alive -- the
+		// same rule the root timeline follows.
+		if (!e->playing) continue;
 		if (e->current_frame < e->entry->frame_count) return 1;
 	}
 	return 0;
@@ -24260,15 +24257,19 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 		}
 		// stop(), from inside the movie or from the parent via holder.stop(),
 		// freezes the playhead but KEEPS the entry, so a later play() resumes it.
-		if (!childMoviePlayheadRunning(e.mc)) {
+		if (!e.playing) {
 			g_level_advance[write++] = e;
 			continue;
 		}
+		// Past the last frame. A loaded movie should WRAP here (Ruffle
+		// determine_next_frame -> NextFrame::First); it parks instead, because a
+		// wrap has to clear the movie's own display children and a clip target's
+		// children are interleaved with the parent's in the global display_list.
+		// Keeping the entry (rather than dropping it) is what makes a later
+		// holder.play() able to find this playhead again.
 		if (e.current_frame >= e.entry->frame_count) {
-			// One-shot target (or one with nowhere to clear): done, drop it.
-			if (!e.loops || !childMovieCanLoop(e.mc)) continue;
-			childMovieLoopBackClear(app_context, e.mc);
-			e.current_frame = 0;
+			g_level_advance[write++] = e;
+			continue;
 		}
 
 		frame_func fn = e.entry->frame_funcs[e.current_frame];
@@ -24318,7 +24319,6 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 
 			extern int quit_swf;
 			extern int is_playing;
-			extern DisplayObject* g_current_sprite_obj;
 			extern size_t next_frame;
 			extern int manual_next_frame;
 			int _saved_quit = quit_swf;
@@ -24333,18 +24333,23 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 			// substitution never saw this one.)
 			size_t _saved_next_frame = next_frame;
 			int _saved_manual_next = manual_next_frame;
-			// Route an in-movie stop()/play() to the holder: actionStop then takes
-			// the ng_isInsideSprite() arm and writes sprite_is_playing there rather
-			// than falling through to the ROOT's is_playing flag.
-			DisplayObject* _saved_sprite_obj = g_current_sprite_obj;
-			{
-				DisplayObject* _holder_obj = childMovieHolderObj(e.mc);
-				if (_holder_obj != NULL) g_current_sprite_obj = _holder_obj;
-			}
+			// Mark whose timeline is running so an in-movie stop()/play() reaches
+			// this playhead instead of the ROOT's is_playing flag.
+			MovieClip* _saved_child_mc = g_child_movie_advance_mc;
+			g_child_movie_advance_mc = e.mc;
 			quit_swf = 0;
 			is_playing = 1;
 			fn(app_context);
-			g_current_sprite_obj = _saved_sprite_obj;
+			g_child_movie_advance_mc = _saved_child_mc;
+			// A stop() inside the frame just run wrote the LIVE table slot, but
+			// this loop works on a copy and writes it back below -- without this
+			// read-back the write-back resurrects the playhead the movie just
+			// stopped. (Re-found by fixture: the movie's frame-4 stop() was
+			// recorded and then immediately overwritten, so frame 5 ran anyway.)
+			{
+				LevelAdvanceEntry* _live = childMovieEntryFor(e.mc);
+				if (_live != NULL) e.playing = _live->playing;
+			}
 			quit_swf = _saved_quit;
 			is_playing = _saved_is_playing;
 			next_frame = _saved_next_frame;
@@ -24373,9 +24378,9 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 		e.current_frame++;
 		// Update _currentframe property for AS visibility.
 		e.mc->currentframe = (int)e.current_frame;
-		if (e.loops || e.current_frame < e.entry->frame_count) {
-			g_level_advance[write++] = e;
-		}
+		// Always keep the entry: a parked playhead is still a playhead, and
+		// holder.play() has to be able to find it.
+		g_level_advance[write++] = e;
 	}
 	g_level_advance_count = write;
 }
@@ -25039,13 +25044,18 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		size_t _saved_max = 0, _saved_cap = 0;
 		int _did_swap = 0;
 		float (*_saved_td)[16] = NULL;
-		// EVERY loaded movie gets its holder's own display list, not just a
-		// _levelN one. A movie loaded into a clip becomes that clip's timeline
-		// (Ruffle replace_with_movie), so its placements are the clip's children
-		// -- they were landing in the ROOT's display_list, where they collide
-		// with the parent's own depths and where a wrap-back could not clear them
-		// without clearing the parent's too.
-		{
+		// Only a _levelN target gets its holder's own display list. A clip
+		// target's placements stay in the parent's GLOBAL display_list, where
+		// they have always been. Generalising this is the obvious next move --
+		// it is what a movie loaded into a clip should have (Ruffle
+		// replace_with_movie makes the movie the clip's timeline) and it is what
+		// a wrap-back needs to be able to clear -- but it is NOT free: a clip
+		// target's holder is typically a createEmptyMovieClip with no
+		// DisplayObject, and merely ALLOCATING one for it (with no list swap at
+		// all) breaks avm1/movieclip_invalid_get_bounds_1..8; swapping the list
+		// on top of that additionally breaks avm1/swf{5_to_6,6_to_5}_cross_call.
+		// Both measured. See SWFRecompDocs/status/child-timeline-advance.md.
+		if (loads[i].is_level) {
 			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
 			// Lazily attach a display_obj + private sprite_display_list to a
 			// freshly-created level MC (getOrCreateLevel zeros display_obj). Without
@@ -25075,10 +25085,6 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 				_did_swap = 1;
 			}
 		}
-		// The loaded movie starts PLAYING, and this has to be said before its
-		// frame 1 runs so a stop() in that frame survives.
-		actionChildMovieMarkPlaying(mc);
-
 		// Swap transform_data to child's array (for correct ng_cache_transform)
 		{
 			extern float (*g_active_transform_data)[16];
@@ -25118,10 +25124,26 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		int _saved_is_playing = is_playing;
 
 		entry->init_func(app_context);
+		// Register the loaded movie's playhead BEFORE its frame 1 runs. This used
+		// to be gated on `is_level`, which is why a movie loadMovie'd into a
+		// HOLDER CLIP never advanced past its first frame: nothing called
+		// frame_funcs[1..N-1] for it, so every tag and every DoAction after the
+		// child's frame 1 was dead code. (MovieClipLoader.loadClip never had the
+		// gate -- it registers any target -- so the freeze was specific to direct
+		// loadMovie.) Registering first is what lets a stop() in the movie's OWN
+		// frame 1 -- the preloader shape -- find the playhead to stop.
+		if (entry->frame_count > 1 && entry->frame_funcs != NULL) {
+			// A _levelN target keeps the historical double step; a clip target,
+			// which never advanced at all before, starts at one frame per tick.
+			actionRegisterChildMovieAdvance(mc, entry,
+			                                /*start_armed=*/loads[i].is_level);
+		}
 		if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 			extern int quit_swf;
 			extern size_t next_frame;
 			extern int manual_next_frame;
+			MovieClip* _saved_child_mc = g_child_movie_advance_mc;
+			g_child_movie_advance_mc = mc;
 			int _saved_quit = quit_swf;
 			// See the same guard in actionAdvancePlayingLevels: a one-frame movie
 			// emits `quit_swf = 1;` (the harness strips that) but a multi-frame one
@@ -25135,19 +25157,7 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			quit_swf = _saved_quit;
 			next_frame = _saved_next_frame;
 			manual_next_frame = _saved_manual_next;
-		}
-		// Register the loaded movie's playhead. This used to be gated on
-		// `is_level`, which is why a movie loadMovie'd into a HOLDER CLIP never
-		// advanced past its first frame: nothing called frame_funcs[1..N-1] for
-		// it, so every tag and every DoAction after the child's frame 1 was dead
-		// code. (MovieClipLoader.loadClip never had the gate -- it registers any
-		// target -- so the freeze was specific to direct loadMovie.)
-		//
-		// loops=1: a movie loaded into a clip is that clip's timeline and plays
-		// and wraps like any MovieClip. _levelN keeps loops=0 for now; see
-		// SWFRecompDocs/status/child-timeline-advance.md.
-		if (entry->frame_count > 1 && entry->frame_funcs != NULL) {
-			actionRegisterChildMovieAdvance(mc, entry, /*loops=*/!loads[i].is_level);
+			g_child_movie_advance_mc = _saved_child_mc;
 		}
 
 		g_current_sprite_obj = _saved_sprite_obj;
@@ -33735,6 +33745,9 @@ void actionPlay(SWFAppContext* app_context)
 			return;
 		}
 	}
+	// A loaded movie's own root timeline: its play() is not the parent's.
+	// Returns 0 (and falls through unchanged) outside a loaded movie's frame.
+	if (actionChildMovieSetPlaying(NULL, 1)) return;
 	is_playing = 1;
 }
 
@@ -33765,6 +33778,11 @@ void actionStop(SWFAppContext* app_context)
 			return;
 		}
 	}
+	// A loaded movie's own root timeline: its stop() is not the parent's. The
+	// loaders used to save/restore `is_playing` around a child's frame call,
+	// which protected the parent by DISCARDING the child's stop entirely.
+	// Returns 0 (and falls through unchanged) outside a loaded movie's frame.
+	if (actionChildMovieSetPlaying(NULL, 0)) return;
 	is_playing = 0;
 }
 
@@ -36608,13 +36626,17 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 }
             }
 
-            // Same rule as the direct-load path: PLAYING is set before the
-            // movie's frame 1, so a stop() in that frame survives.
-            {
-                extern void actionChildMovieMarkPlaying(MovieClip*);
-                actionChildMovieMarkPlaying(loads[i].target);
-            }
             loads[i].entry->init_func(app_context);
+            // Register multi-frame MCL targets for per-tick frame advancement.
+            // Phase 2 only runs frame_funcs[0]; without this, frame_funcs[1..N-1]
+            // never run and the loadee's later frames are skipped (e.g. Shumway
+            // moviecliploader's "loadee frame 2" trace from frame_funcs[1]).
+            // Registered BEFORE frame 1 so a stop() in that frame can find the
+            // playhead; mirrors actionFirePendingDirectLoads.
+            if (loads[i].target != NULL && loads[i].entry->frame_count > 1
+                && loads[i].entry->frame_funcs != NULL) {
+                actionRegisterLevelAdvance(loads[i].target, loads[i].entry);
+            }
             if (loads[i].entry->frame_count > 0 && loads[i].entry->frame_funcs != NULL
                 && loads[i].entry->frame_funcs[0] != NULL) {
                 // Same guard as the direct-load path: a multi-frame movie's
@@ -36624,18 +36646,12 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 extern int manual_next_frame;
                 size_t _p2_saved_next_frame = next_frame;
                 int _p2_saved_manual_next = manual_next_frame;
+                MovieClip* _p2_saved_child_mc = actionCurrentChildMovieMC();
+                actionSetCurrentChildMovieMC(loads[i].target);
                 loads[i].entry->frame_funcs[0](app_context);
+                actionSetCurrentChildMovieMC(_p2_saved_child_mc);
                 next_frame = _p2_saved_next_frame;
                 manual_next_frame = _p2_saved_manual_next;
-            }
-            // Register multi-frame MCL targets for per-tick frame advancement.
-            // Phase 2 only ran frame_funcs[0]; without this, frame_funcs[1..N-1]
-            // never run and the loadee's later frames are skipped (e.g. Shumway
-            // moviecliploader's "loadee frame 2" trace from frame_funcs[1]).
-            // Mirrors the level-load registration in actionFirePendingDirectLoads.
-            if (loads[i].target != NULL && loads[i].entry->frame_count > 1
-                && loads[i].entry->frame_funcs != NULL) {
-                actionRegisterLevelAdvance(loads[i].target, loads[i].entry);
             }
 
             // Restore transform_data
@@ -69368,6 +69384,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					return;
 				}
 			}
+			// A holder with a loaded movie: play() is that movie's timeline.
+			// Checked BEFORE the by-name display-entry lookup, which for a
+			// timeline-placed holder would set a sprite flag nothing reads.
+			if (mc && actionChildMovieSetPlaying(mc, 1)) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
 			// Try clip-specific play first
 			if (mc) {
 				size_t depth = ng_findDisplayEntryByName(mc->name);
@@ -69403,6 +69427,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				extern int is_playing;
 				if (mc == &root_movieclip) {
 					is_playing = 1;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				if (mc != NULL && actionChildMovieSetPlaying(mc, 1)) {
 					if (args != NULL) FREE(args);
 					pushUndefined(app_context);
 					return;
@@ -69457,6 +69486,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					return;
 				}
 			}
+			// A holder with a loaded movie: stop() is that movie's timeline.
+			// Before this, holder.stop() on a dynamic holder fell all the way
+			// through to actionStop and stopped the ROOT.
+			if (mc && actionChildMovieSetPlaying(mc, 0)) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
 			// Try clip-specific stop first
 			if (mc) {
 				size_t depth = ng_findDisplayEntryByName(mc->name);
@@ -69487,6 +69524,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				extern int is_playing;
 				if (mc == &root_movieclip) {
 					is_playing = 0;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+				if (mc != NULL && actionChildMovieSetPlaying(mc, 0)) {
 					if (args != NULL) FREE(args);
 					pushUndefined(app_context);
 					return;
