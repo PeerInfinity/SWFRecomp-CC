@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-04T11:26:32.624541+00:00",
-    "old_git_sha": "943fb901223649b6340056eb77cbdf9f8734cc69",
-    "new_timestamp": "2026-09-04T13:40:14.601231+00:00",
-    "new_git_sha": "a12dd3c2911e565b7516ea7e67c45ae52a167f9f",
+    "old_timestamp": "2026-09-04T13:40:14.601231+00:00",
+    "old_git_sha": "a12dd3c2911e565b7516ea7e67c45ae52a167f9f",
+    "new_timestamp": "2026-09-04T15:03:09.374152+00:00",
+    "new_git_sha": "2ac253d4743ba9830a7f5806d8191b6b69820295",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 212,
+    "old_pass": 211,
     "old_ruffle_matched": 11,
-    "old_effective_pass": 223,
+    "old_effective_pass": 222,
     "old_total": 229,
-    "old_pass_rate": 92.6,
-    "new_pass": 211,
+    "old_pass_rate": 92.1,
+    "new_pass": 212,
     "new_ruffle_matched": 11,
-    "new_effective_pass": 222,
+    "new_effective_pass": 223,
     "new_total": 229,
-    "new_pass_rate": 92.1,
-    "old_mismatched_lines": 161,
-    "new_mismatched_lines": 162,
-    "increased_mismatches": 1,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 1,
+    "new_pass_rate": 92.6,
+    "old_mismatched_lines": 162,
+    "new_mismatched_lines": 161,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 1,
+    "newly_passing": 1,
+    "newly_failing": 0,
     "status_changed": 1,
     "unchanged": 228,
     "added": 0,
@@ -33,17 +33,17 @@
     {
       "test": "as3-loader/bug1157243/empty",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 1,
         "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
       }
     }
   ]
