@@ -220,7 +220,10 @@ first).
   Anchored by `regression/avm1_child_timeline_loop` (two out-of-phase loaded
   movies, so every wrap is a live over-clearing control) plus the deliberate
   flips of `avm1_child_timeline_advance` and `avm1_child_timeline_holder_stop`,
-  whose park rows the predecessor wrote as a lock to be broken. Closeout:
+  whose park rows the predecessor wrote as a lock to be broken. CI corpus-clean
+  in BOTH modes at `82f27e5f9`, `categories=full`, `images=false` -- graphics
+  run `33833019835` (4365 effective, +0, every bucket unmoved) and no-graphics
+  run `33835560435` (4366, +0); `regression` 81/81 in both. Closeout:
   `SWFRecompDocs/status/per-movie-display-list-ownership.md`. (2026-09-03)
 - **Per-movie display-list ownership (Route 1) is a SUB-ARC, and its shape is
   now measured.** The brief's decisive question -- what

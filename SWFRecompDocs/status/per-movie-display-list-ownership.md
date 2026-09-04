@@ -204,6 +204,15 @@ when it is gone, rather than writing the stale copy back. A *fresh load* into
 the same holder during the frame is carried through as the live registration
 instead, so the new playhead is not clobbered by the old one either.
 
+### 3.1 One inherited case, considered rather than stumbled on
+
+`ng_cloneSprite` copies a display entry wholesale
+(`display_list[target] = display_list[src]`), so an AVM1 clone of a loaded
+movie's child **inherits `placed_by_holder`** and the wrap removes it too.
+That is the Ruffle-consistent answer, not an accident: an AVM1 clone's
+`survives_rewind()` is false, and a wrap is a backward goto. Nothing in the
+corpus reaches it.
+
 ## 5. Evidence
 
 ### `regression/avm1_child_timeline_loop` (new)
@@ -327,6 +336,83 @@ unlocks several items at once.
 
 ## 8. CI
 
+Both modes at `82f27e5f9`, `categories=full`, `images=false`. Diffed against
+`cce32f82c` — the commit that carries the predecessor's merged results, so the
+numbers are this slice alone. Both modes were dispatched for the reason the
+brief gave: the predecessor's one real regression appeared in graphics only,
+and this change is shared runtime code with no graphics guard. Dispatched
+**serially**, not in parallel — each run's `combine-results` checks out
+`ruffle-test-results` and force-pushes, so an overlapping pair can drop the
+first one's stem (memory `ci-results-branch-checkout-clobbers-unbacked-stems`).
+
+### `mode=graphics` — run `33833019835`, conclusion success, 30/30 shards
+
+```
+=== intersection: 4490 tests (cce32f82c -> WORKTREE, results_graphics) ===
+
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4130 ->  4130 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4365 ->  4365 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+`regression` reads **81/81 pass** — the 80 that existed plus this slice's one.
+No suite carries `metadata.incomplete`.
+
+### `mode=no-graphics` — run `33835560435`, conclusion success
+
+```
+=== intersection: 4490 tests (cce32f82c -> WORKTREE, results) ===
+
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4130 ->  4130 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+
+  effective         4366 ->  4366 (+0)
+
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+`regression` 81/81 in this mode too; no suite incomplete. The one-test
+`output_mismatch`/`ruffle_matched` difference between the modes is the
+pre-existing mode difference the two predecessors recorded, present on both
+sides of each diff.
+
+**Read this as the regression check it is, not as the slice's yield.** Every
+bucket is unmoved in both modes — not just the pass/fail line, so a test that
+was already failing and started segfaulting would show. No corpus test loads a
+multi-frame child SWF into an AVM1 clip target and then lets it run past its
+last frame: 18 corpus tests have a multi-frame child at all, and each of those
+either stops, unloads, or never reaches the end. The fixtures in §5 are the
+evidence; this and §6's sweep are what say nothing else broke.
+
+**One behavioural note the corpus does not show but which is worth writing
+down:** `hasPlayingLevels()` never goes false for a looping movie, so a run
+whose only remaining activity was a parked loaded movie now uses its full
+`MAX_FRAMES` budget instead of quiescing early. That is Flash's behaviour (a
+loaded movie with no `stop()` keeps playing) and it is measured harmless here,
+but it is the mechanism to suspect first if a loader test's *tail* output ever
+moves.
+
+### Run notes
+
+The no-graphics run's `gh run watch` died on GitHub's **secondary** rate limit
+(HTTP 403 while `gh api rate_limit` still reported 4,783 core requests
+remaining) — the exact trap the brief named. Recovered with the API-free
+fallback: poll `git fetch origin ruffle-test-results` and read the run id out
+of the publish commit body. Worth knowing that the secondary limit kills a
+watcher rather than the run.
 
 ## 9. What is left of the arc
 
