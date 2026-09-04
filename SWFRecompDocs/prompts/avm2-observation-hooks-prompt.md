@@ -61,22 +61,37 @@ structures — `instance_traits` / `instance_trait_count` and `class_traits` /
 name-only walk over those is the likely shape of (A). Confirm it fits before
 building on it.
 
-## 3. The design hazard the request does not mention
+## 3. The signature is fixed, and it removes an ambiguity by construction
 
-**A namespace-blind lookup by name is ambiguous, and this codebase has already
-been bitten by the ambiguity it creates.** Two different traits can share a
-name: a `private var x` in a base class and a `protected var x` in a subclass
-are genuinely different slots, and memory `avm2-private-namespace-identity`
-records that private members are **not** virtual — `Base`'s method reads BASE's
-slot, and a shadowing subclass slot is a different one. So `getTrait(obj, "x")`
-has more than one defensible answer.
+A namespace-blind lookup by name alone is ambiguous: a base-class `private var x`
+and a subclass `protected var x` are genuinely different slots, and memory
+`avm2-private-namespace-identity` records that private members are **not**
+virtual — `Base`'s method reads BASE's slot. I raised this with the requester and
+they settled it. **The declaring class is REQUIRED, not optional:**
 
-**Decide the rule, document it, and make the fixture prove it.** Most-derived
-wins, an optional class-name argument, an error on ambiguity — any of these is
-defensible; silently returning whichever the walk hits first is not, and
-`setTrait` writing the wrong slot is worse than `getTrait` reading it. This is
-the arc-adjacent failure mode: five recent slices in this repo turned on a
-lookup being keyed on the wrong thing.
+```
+swfmodern.Reflect.getTrait(obj, "xplor.Player", "dashTime")
+swfmodern.Reflect.setTrait(obj, "xplor.Player", "dashTime", value)
+```
+
+The second argument is the qualified name of the trait's **OWNER** — the class
+that declares the slot — **not** the object's runtime class. Their recorder always
+knows it: it walks the display group with `getQualifiedClassName` and reads a
+per-class field list. This removes the shadowed-slot ambiguity by construction
+rather than by a disambiguation rule someone would later have to trust, which is
+a better answer than the one I had drafted. Keep it.
+
+Two requirements that come with it:
+
+- **A (class, name) pair that does not exist must REFUSE distinguishably** —
+  throw, or return a sentinel that cannot be a legal value. **Never null.** Null
+  is exactly what the broken path returns today, and the requester's probe could
+  not tell "no such trait" from "trait unreadable" from "object not built yet".
+  A hook that reproduces that confusion has not fixed anything.
+- **The fixture's shadowed case is specified:** a base-class `private var` and a
+  subclass `protected var` **of the same name**, read through **both** owners,
+  each returning its own value. That is the test that proves the owner argument
+  is load-bearing rather than decorative.
 
 ## 4. Constraints on the fixtures — read before writing any
 
