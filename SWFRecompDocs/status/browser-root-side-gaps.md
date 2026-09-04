@@ -203,7 +203,26 @@ the signal that actually matters for a change shaped like this one. `regression`
 89/89, the new fixture among them (it is outside the 4498-test intersection
 because it did not exist at the baseline).
 
-<!-- NO-GRAPHICS RESULTS -->
+**No-graphics**, run `33916672580` at `f0fd711c7`, `categories=full`,
+`images=false`, diffed against `195ea700a`:
+
+```
+=== intersection: 4498 tests (195ea700a -> WORKTREE, results) ===
+  output_mismatch    123 ->   123 (+0)
+  pass              4138 ->  4138 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4374 ->  4374 (+0)
+GAINS 0   REGRESSIONS 0   OTHER STATUS MOVES 0
+```
+
+`completed success`, `regression` 89/89. Both modes flat, exactly as the
+`cpp -P` invariance proof said they had to be — and dispatched anyway, because
+that proof covers the two CI *test* modes and says nothing about the browser
+configuration, which `wasm-link-smoke` builds on every dispatch. Here it stayed
+green in both runs; a green link smoke is not evidence the change WORKS (it
+compiles and links, it never executes), so §4's browser measurements remain the
+only evidence for that.
 
 ## 6. Folded in: the `MovieClipLoader.loadClip` browser probe
 
