@@ -393,10 +393,41 @@ first).
   closeout's §8, not as a regression. Also: a `-f single_test=empty` dispatch
   FAILS for an unrelated reason — that job resolves a bare name against `avm1/`
   only, and this test lives in `from_shumway/as3-loader/bug1157243/`. Closeout:
-  `SWFRecompDocs/status/avm2-child-render-arm.md`; §7 there is what it does NOT
-  cover (AVM2 static text is implemented but ungraded — its fixture needs the
-  `avm2_static_text/build_statictext.py` splice run against `child.swf`).
-  (2026-09-04)
+  `SWFRecompDocs/status/avm2-child-render-arm.md`; ~~§7 there is what it does
+  NOT cover (AVM2 static text is implemented but ungraded — its fixture needs
+  the `avm2_static_text/build_statictext.py` splice run against
+  `child.swf`)~~ — **graded 2026-09-04 by slice 10, see the next entry; §7
+  now closes at 6/6**. (2026-09-04)
+- ~~**The AVM2 child static-text lookup ships ungraded.**~~ **DONE 2026-09-04**
+  (multi-SWF slice 10). `avm2_display_static_glyphs_for()` — the registry keyed
+  on the `Avm2StaticTextData*` pointer, which answers which movie's
+  `static_glyphs` array a run's `glyph_start` indexes — had no test behind it
+  because mxmlc cannot emit a placed `DefineText`. `regression/avm2_parent_child_static_text`
+  is that grade, and slice 9's code **was correct as shipped**: no defect found,
+  no runtime or recompiler source changed. Built by the predecessor's recipe (a
+  parameterised copy of `avm2_static_text/build_statictext.py` splices a
+  DefineFont3 + DefineText + PlaceObject2 into BOTH mxmlc bases) plus one
+  addition it did not name — a differing glyph CODE grades `StaticText.text`,
+  but the second reader (`avm2_cpu_raster_statictext` via `BitmapData.draw` +
+  `getPixel`) needs a differing COLOUR and PEN X too. Parent: glyph 'A', red,
+  pen 200 twips; child: glyph 'B', blue, pen 4200. Both runs sit at
+  `glyph_start` 0 / `glyph_count` 2 of their own array, so a read against the
+  ROOT's array lands on real in-bounds data. Both graded rows run in BOTH build
+  modes (ordinary AS + the unconditionally-compiled CPU raster), so no image
+  comparison was needed. **Three child arms were reverted individually** rather
+  than wholesale, so each row is attributed: reverting
+  `avm2_display_static_glyphs_for` moves `chd:txt` BB->AA **and** `chd:px`
+  ff->ffffff; reverting `statictext_font_by_id`'s child fall-through moves
+  `chd:txt` BB->null **alone**; reverting `statictext_for`'s moves both. Two
+  additions to the predecessor's §5 reader table: (a) there are **two** font
+  lookups on this path — `avm2_display.c statictext_font_by_id` serves
+  `StaticText.text`, `avm2_text.c font_by_id` serves the raster — and they are
+  independent, neither masking the other; (b) unlike the shape path, **the
+  reachability half was already covered here** (`chd:kids` stays 1 under all
+  three reverts), because a timeline placement resolves through
+  `timeline_for_char` on the loaded root rather than through the MAIN-only
+  SymbolClass map — so all three probes land on the lookup layer. Closeout:
+  `SWFRecompDocs/status/avm2-child-static-text-grade.md`.
 - **A loaded child whose stage HEIGHT differs from the root's renders shifted.**
   The recompiler bakes the y-flip into every vertex as `FRAME_HEIGHT - y`, per
   movie, so a 200-high child loaded into a 400-high parent is 200 px off. Both

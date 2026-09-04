@@ -1,0 +1,12 @@
+chd:ctor
+root:kids=2 content=true
+chd:kids=1
+ctl:txt=AA
+chd:txt=BB
+ctl:px=ff0000
+ctl:px:gap=ffffff
+chd:px=ff
+chd:px:2=ff
+chd:px:gap=ffffff
+chd:px:below=ffffff
+done
