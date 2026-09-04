@@ -1,28 +1,28 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T18:23:42.529044+00:00",
-    "git_sha": "ec709e7c9340f9af368bdd6e8b3b35548b327a30",
-    "duration_seconds": 43.77,
-    "total_available": 5,
+    "timestamp": "2026-09-04T20:29:55.073878+00:00",
+    "git_sha": "ed39ce53d96bda2e0772d293112bf85b571b9c05",
+    "duration_seconds": 72.15,
+    "total_available": 7,
     "shards": 30,
     "expected_shards": 30,
     "ignored_count": 0,
     "filtered": true
   },
-  "total": 5,
-  "pass": 5,
+  "total": 7,
+  "pass": 7,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 5,
+  "effective_pass": 7,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
     {
       "test": "request_matching_profiles",
       "phases": {
-        "recomp": 0.007,
-        "compile": 8.082,
+        "recomp": 0.008,
+        "compile": 8.896,
         "run": 0.265
       },
       "num_frames": 126,
@@ -31,15 +31,15 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 8.37,
+      "duration": 9.18,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
-        "recomp": 0.004,
-        "compile": 6.898,
-        "run": 0.215
+        "recomp": 0.007,
+        "compile": 8.801,
+        "run": 0.265
       },
       "num_frames": 12,
       "lines": {
@@ -47,15 +47,15 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 7.12,
+      "duration": 9.08,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.014,
-        "compile": 8.001,
-        "run": 0.215
+        "recomp": 0.025,
+        "compile": 11.132,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -63,7 +63,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 8.4,
+      "duration": 11.76,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -80,9 +80,9 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.016,
-        "compile": 8.447,
-        "run": 0.265
+        "recomp": 0.023,
+        "compile": 10.396,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -90,7 +90,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.95,
+      "duration": 11.03,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -107,8 +107,8 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.021,
-        "compile": 10.161,
+        "recomp": 0.018,
+        "compile": 9.67,
         "run": 0.265
       },
       "num_frames": 1,
@@ -117,11 +117,65 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 10.69,
+      "duration": 10.2,
       "image_comparisons": {
         "output": {
           "status": "fail",
           "message": "Image comparison failed: 657072 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "unbound_texture",
+      "phases": {
+        "recomp": 0.02,
+        "compile": 8.218,
+        "run": 0.265
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 8.74,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 660000 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "unbound_texture_multiple",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 11.092,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 11.74,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 643500 outliers exceed limit of 0, max difference 255",
           "max_diff": 255,
           "trigger": [
             "last_frame"

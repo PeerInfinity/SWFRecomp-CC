@@ -1,17 +1,17 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 18:23 UTC
+**Date**: 2026-09-04 20:29 UTC
 
-**Git SHA**: `ec709e7c93`
+**Git SHA**: `ed39ce53d9`
 
-**Run Duration**: 0m 44s
+**Run Duration**: 1m 12s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 5 |
-| Passing | **5** (100.0%) |
+| Total tests | 7 |
+| Passing | **7** (100.0%) |
 | Failing | 0 |
 | Total expected lines | 208 |
 | Matching lines | 208 (100.0%) |
@@ -19,15 +19,17 @@
 
 ## Passing Tests
 
-**5 tests passing**
+**7 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `request_matching_profiles` | 190 | 8.4s |  |
-| 2 | `request_profiles` | 16 | 7.1s |  |
-| 3 | `sampler_odd_size` | 1 | 8.4s |  |
-| 4 | `scissor_rectangle` | 0 | 8.9s |  |
-| 5 | `scissor_rectangle_invalid` | 1 | 10.7s |  |
+| 1 | `request_matching_profiles` | 190 | 9.2s |  |
+| 2 | `request_profiles` | 16 | 9.1s |  |
+| 3 | `sampler_odd_size` | 1 | 11.8s |  |
+| 4 | `scissor_rectangle` | 0 | 11.0s |  |
+| 5 | `scissor_rectangle_invalid` | 1 | 10.2s |  |
+| 6 | `unbound_texture` | 0 | 8.7s |  |
+| 7 | `unbound_texture_multiple` | 0 | 11.7s |  |
 
 ## Near-Passing Tests
 

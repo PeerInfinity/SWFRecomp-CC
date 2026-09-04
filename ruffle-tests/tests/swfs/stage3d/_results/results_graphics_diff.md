@@ -1,15 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d045bec8a81b` (2026-09-04T16:10:50.551537+00:00)
-**Current:** `ec709e7c9340` (2026-09-04T18:23:42.529044+00:00)
+**Previous:** `ec709e7c9340` (2026-09-04T18:23:42.529044+00:00)
+**Current:** `ed39ce53d96b` (2026-09-04T20:29:55.073878+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 5 | 5 | 0 |
-| Total | 5 | 5 | 0 |
+| Passing | 5 | 7 | +2 |
+| Total | 5 | 7 | +2 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-No changes detected.
+## Added Tests (2)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `unbound_texture` | pass | 0/0 |
+| `unbound_texture_multiple` | pass | 0/0 |
