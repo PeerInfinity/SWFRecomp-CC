@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-03T20:37:21.990899+00:00",
-    "git_sha": "92ee912f3fac38f6b9bf0697a52d9b248e8f79fb",
-    "duration_seconds": 37.62,
+    "timestamp": "2026-09-03T22:09:10.409065+00:00",
+    "git_sha": "df9560ff612e56a6056021f83ad1f6a1fb220ae0",
+    "duration_seconds": 34.98,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -19,8 +19,8 @@
     {
       "test": "request_matching_profiles",
       "phases": {
-        "recomp": 0.007,
-        "compile": 7.568,
+        "recomp": 0.006,
+        "compile": 5.812,
         "run": 0.004
       },
       "num_frames": 126,
@@ -29,14 +29,14 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 7.59,
+      "duration": 5.83,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
-        "recomp": 0.007,
-        "compile": 7.305,
+        "recomp": 0.006,
+        "compile": 7.033,
         "run": 0.004
       },
       "num_frames": 12,
@@ -45,14 +45,14 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 7.32,
+      "duration": 7.05,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.025,
-        "compile": 9.466,
+        "recomp": 0.019,
+        "compile": 8.831,
         "run": 0.008
       },
       "num_frames": 1,
@@ -61,14 +61,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 9.51,
+      "duration": 8.86,
       "status": "pass"
     },
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.013,
-        "compile": 6.545,
+        "recomp": 0.015,
+        "compile": 7.473,
         "run": 0.008
       },
       "num_frames": 1,
@@ -77,15 +77,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.57,
+      "duration": 7.5,
       "status": "pass"
     },
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.025,
-        "compile": 6.277,
-        "run": 0.009
+        "recomp": 0.017,
+        "compile": 5.434,
+        "run": 0.008
       },
       "num_frames": 1,
       "lines": {
@@ -93,7 +93,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 6.32,
+      "duration": 5.46,
       "status": "pass"
     }
   ]
