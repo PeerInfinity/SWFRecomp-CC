@@ -420,32 +420,17 @@ first).
 
 ## Tooling — build scripts
 
-- **CLAUDE.md's "mode parity COMPLETE / per-test results identical" line is off
-  by one test.** `CLAUDE.md:68-69` states per-test results are identical between
-  graphics and no-graphics "across all suites, zero asterisks". They are not,
-  and have not been for at least two slices: one test classifies as
-  `ruffle_matched` under no-graphics and `output_mismatch` under graphics
-  (graphics 124/235, no-graphics 123/236 in every recent run's histogram). The
-  gap is stable and pre-existing — identical on both sides of four consecutive
-  slice diffs — so it is a real small divergence, not a flake. Nobody has named
-  which test. Worth an hour: identify it, then either fix the divergence or
-  amend the CLAUDE.md claim to match reality. A standing instruction that is
-  quietly false is worse than one that admits an exception. Found by the
-  observation-hooks slice, verified 2026-09-04. (2026-09-04)
-- **`.claude/pipeline-handoff.md` mandates `gh run watch` with no allowance for
-  it being killed.** The doc says at :113 "You MUST run `gh run watch` here...
-  Don't replace it with Monitor, a polling loop, `sleep`, or anything else."
-  Two independent slices have now had it die on them: once to GitHub's
-  SECONDARY rate limit (while `gh api rate_limit` still reported 4,783 core
-  requests remaining) and twice to the OOM killer under memory pressure from
-  another arc's browser measurements. Both recovered — one by polling
-  `git fetch origin ruffle-test-results` and reading the run id out of the
-  publish commit message, one by a 150-second `gh run view --json status` loop
-  (much smaller RSS, ~1/50th the API calls). The doc's reasoning for the
-  prohibition is sound (stacked watchers exhausted the quota once), but it has
-  no branch for "the watcher died through no fault of yours", so each session
-  rediscovers a fallback. Document the two fallbacks and when they apply.
-  (2026-09-04)
+- **Graphics and no-graphics disagree on exactly one test.**
+  `from_gnash/misc-swfc.all/gotoFrameFromInterval2` is `output_mismatch` under
+  graphics and `ruffle_matched` under no-graphics. Stable, not a flake:
+  identical on both sides of five consecutive slice diffs, and named by
+  differencing the two published result trees at `91c7c99f1` / `f735855ea`
+  (4497-test intersection, exactly one disagreement). CLAUDE.md's parity claim
+  was amended 2026-09-04 to say "1-test-short" rather than complete, so the
+  instruction file is no longer false; what remains is to diagnose the
+  divergence itself — a `gotoFrame`-from-`setInterval` test differing by render
+  mode suggests a frame-loop timing difference between `swf.c` and
+  `swf_core.c`, not a rendering one. (2026-09-04)
 - **`verify_output_keep.py`'s native source list has drifted again.**
   `ruffle-tests/verify_output_keep.py` omits `src/amf_packet.c` and
   `src/actionmodern/avm1_amf.c`, so the KEEP_BUILD_DIR game-bring-up path does

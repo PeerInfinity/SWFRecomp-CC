@@ -44,7 +44,9 @@ Every `ruffle-tests.yml` dispatch (any mode / any `parallel` / with or without `
 
 ### `single_test` runs no longer publish (2026-07-26)
 
-`-f single_test=NAME` now runs in its own lean **`Single test`** job that builds, runs the one test, and uploads the result JSON as an artifact — it does **not** touch `ruffle-test-results`. Previously it satisfied the publish guard and force-pushed a whole results tree rebuilt from the *master checkout*, so dispatching one before pushing a results merge reverted the branch to its pre-merge state (run `30186909756`). The old "push the merge before dispatching a single-test verify" ordering rule is therefore obsolete. Read the verdict from the `Verify single test` log step. Two behavior notes: it downloads **every** category (so a `from_avmplus` or misc test is runnable, which it wasn't before), and in `mode=graphics` it requires a warm Dawn cache — on a miss it fails fast telling you to run `build-dawn.yml`, rather than building Dawn inline for ~30 min.
+`-f single_test=NAME` now runs in its own lean **`Single test`** job that builds, runs the one test, and uploads the result JSON as an artifact — it does **not** touch `ruffle-test-results`. Previously it satisfied the publish guard and force-pushed a whole results tree rebuilt from the *master checkout*, so dispatching one before pushing a results merge reverted the branch to its pre-merge state (run `30186909756`). The old "push the merge before dispatching a single-test verify" ordering rule is therefore obsolete. Read the verdict from the `Verify single test` log step.
+
+**`single_test` resolves the bare name against `tests/swfs/avm1` ONLY.** The workflow's `Single test` step passes no `--tests-dir`, and `verify_output.py` defaults `TESTS_DIR` to `tests/swfs/avm1` (:671). Downloading every category makes a `from_gnash` / `from_avmplus` / misc test *present on disk*, but it does not make its bare name **resolve** — the run fails on path lookup and that is **not a verdict on the test**. A slice dispatched one for a `from_shumway` test and nearly read the failure as confirmation of a regression it was investigating (2026-09-04). Until the workflow grows a `tests_dir` input, verify a non-avm1 test locally with `--tests-dir`, or read it out of a full-corpus run. Two behavior notes: it downloads **every** category, and in `mode=graphics` it requires a warm Dawn cache — on a miss it fails fast telling you to run `build-dawn.yml`, rather than building Dawn inline for ~30 min.
 
 ### The publish gate is computed, not enumerated (2026-09-02)
 
@@ -111,6 +113,13 @@ Dispatch by current `stage`. After each stage completes, fall through to the nex
 ### running → wait for completion
 
 **You MUST run `gh run watch` here. Don't skip this step. Don't replace it with Monitor, a polling loop, `sleep`, or anything else.** The tool is specifically designed for this — it blocks until the workflow finishes, which is exactly what this stage needs.
+
+**Exception — the watcher DIED through no fault of yours.** The rule above is about not *choosing* a polling loop; it is not a demand that you resurrect a watcher that cannot survive. Three watcher deaths across three slices (2026-09-03/04): GitHub's **secondary** rate limit killed one while `gh api rate_limit` still reported ~4,800 core requests remaining, and the **OOM killer** took two more under memory pressure from another arc's browser measurements. When the watcher dies for one of those reasons, use one of these and say which:
+
+- **Preferred, costs zero API quota:** poll `git fetch origin ruffle-test-results` and read the run id out of the publish commit message. Note the no-graphics publish commit is titled plain `Update Ruffle test results` with **no** `(mode=...)` suffix.
+- A ~150-second `gh run view --json status` loop — much smaller RSS than the watcher and roughly 1/50th the API calls.
+
+Both are *fallbacks after a death*, never a first choice, and neither may run **alongside** a live watcher: one slice tripped the secondary limit doing exactly that, which is the case the prohibition above exists for.
 
 1. Run `gh run watch <run_id> --exit-status` via the Bash tool with `timeout: 600000` (10 minutes, the max). Foreground or background is fine; the command itself does the waiting.
 2. When it returns, re-check: `gh run view <run_id> --json status,conclusion -q '.status+" "+(.conclusion//"")'`.
