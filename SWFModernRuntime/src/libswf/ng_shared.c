@@ -172,6 +172,10 @@ static struct {
 	size_t char_id;
 	size_t path_offset;
 	size_t path_size;
+	// Same field, same reason as ng_char_paths above: a loaded child's morph
+	// path offsets are numbered in ITS path_data. Without this a child's
+	// hitTest(x, y, true) on a morph shape walked the root's outline.
+	const float (*table)[3];
 } ng_morph_paths[MAX_MORPH_PATHS_NG];
 static size_t ng_morph_paths_count = 0;
 
@@ -226,11 +230,13 @@ const float (*ng_findCharPathTable(size_t char_id))[3]
 
 void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size)
 {
+	const float (*table)[3] = ng_current_path_table();
 	// Idempotent per char_id (see ng_record_char_bounds).
 	for (size_t i = 0; i < ng_morph_paths_count; i++) {
 		if (ng_morph_paths[i].char_id == char_id) {
 			ng_morph_paths[i].path_offset = path_offset;
 			ng_morph_paths[i].path_size = path_size;
+			ng_morph_paths[i].table = table;
 			return;
 		}
 	}
@@ -238,7 +244,41 @@ void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size)
 	ng_morph_paths[ng_morph_paths_count].char_id = char_id;
 	ng_morph_paths[ng_morph_paths_count].path_offset = path_offset;
 	ng_morph_paths[ng_morph_paths_count].path_size = path_size;
+	ng_morph_paths[ng_morph_paths_count].table = table;
 	ng_morph_paths_count++;
+}
+
+// The path_data table a MORPH character's offsets index (NULL = the main
+// movie's generated array). Separate registry from ng_findCharPathTable
+// because a morph character is recorded in ng_morph_paths only.
+const float (*ng_findMorphPathTable(size_t char_id))[3]
+{
+	for (size_t i = 0; i < ng_morph_paths_count; i++)
+		if (ng_morph_paths[i].char_id == char_id)
+			return ng_morph_paths[i].table;
+	return NULL;
+}
+
+// A static-text character has no path run of its own, but its GLYPHS' path
+// offsets (glyph_data[4g+2]) are numbered in the DEFINING movie's path_data.
+// Record the table so the CPU glyph hit tester can resolve them; the entry
+// carries no run, so ng_find_char_path keeps answering "no" for it.
+void ng_record_text_path_table(size_t char_id)
+{
+	const float (*table)[3] = ng_current_path_table();
+	if (table == NULL) return;         // main movie: the default is already right
+	for (size_t i = 0; i < ng_char_paths_count; i++) {
+		if (ng_char_paths[i].char_id == char_id) {
+			ng_char_paths[i].table = table;
+			return;
+		}
+	}
+	if (ng_char_paths_count >= MAX_CHAR_PATHS_NG) return;
+	ng_char_paths[ng_char_paths_count].char_id = char_id;
+	ng_char_paths[ng_char_paths_count].path_offset = 0;
+	ng_char_paths[ng_char_paths_count].path_size = 0;   // no run: see above
+	ng_char_paths[ng_char_paths_count].table = table;
+	ng_char_paths_count++;
 }
 
 void ng_record_char_winding(size_t char_id)
@@ -255,6 +295,9 @@ int ng_find_char_path(size_t char_id, size_t* out_offset, size_t* out_size)
 {
 	for (size_t i = 0; i < ng_char_paths_count; i++) {
 		if (ng_char_paths[i].char_id == char_id) {
+			// path_size 0 = a table-only entry recorded by
+			// ng_record_text_path_table; it names no path run.
+			if (ng_char_paths[i].path_size == 0) return 0;
 			*out_offset = ng_char_paths[i].path_offset;
 			*out_size = ng_char_paths[i].path_size;
 			return 1;
@@ -2142,8 +2185,14 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
 //     is recorded per character (ng_record_char_path below) rather than
 //     concatenated. That also avoids needing the root's path_data SIZE, which
 //     the generated main.c does not put in app_context.
-//   * text_data / glyph_data / morph_end_* -- static text and morph shapes in
-//     a loaded child are not covered by this slice.
+//   * text_data / glyph_data / text_char_codes ARE here, and unlike the arrays
+//     above their CONTENTS are re-written too: a text_data row is a glyph
+//     index into glyph_data, and a glyph_data row is a vertex offset into
+//     shape_data. Same shape as the style word.
+//   * morph_end_shape_data / morph_end_color_data are here in GRAPHICS builds
+//     only, because they are read only by the renderer and by the AVM2 morph
+//     raster; NO_GRAPHICS never combines them (and keeps their bases 0), the
+//     same rule color_data / cxform_data already follow.
 
 #define NG_MAX_RENDER_MOVIES 32
 
@@ -2160,6 +2209,13 @@ typedef struct {
 	// one base; the padding rows are never read.
 	u32 style;
 	u32 bitmap;
+	// Static text: rows of text_data / text_char_codes, and GLYPHS (4
+	// glyph_data rows each) of glyph_data.
+	u32 text;
+	u32 glyph;
+	// Morph shapes: rows of morph_end_shape_data / morph_end_color_data.
+	u32 morph_vert;
+	u32 morph_color;
 } NgRenderBases;
 
 static NgRenderBases g_ng_render_bases[NG_MAX_RENDER_MOVIES];
@@ -2171,6 +2227,24 @@ static int g_ng_render_tables_built = 0;
 static const u32 (*g_ng_combined_shape_data)[4] = NULL;
 
 const u32 (*ng_combinedShapeData(void))[4] { return g_ng_combined_shape_data; }
+
+// The combined static-text tables, or NULL when none was built. Same
+// fall-back contract as ng_combinedShapeData: every reader keeps its old
+// expression for a build that has no child geometry.
+static const u32 (*g_ng_combined_glyph_data)[1] = NULL;
+static const u32*  g_ng_combined_text_data = NULL;
+static const u16*  g_ng_combined_text_char_codes = NULL;
+static size_t      g_ng_combined_glyph_rows = 0;
+const u32 (*ng_combinedGlyphData(void))[1] { return g_ng_combined_glyph_data; }
+const u32* ng_combinedTextData(void) { return g_ng_combined_text_data; }
+const u16* ng_combinedTextCharCodes(void) { return g_ng_combined_text_char_codes; }
+size_t ng_combinedGlyphRows(void) { return g_ng_combined_glyph_rows; }
+
+// The combined morph END tables (graphics builds only; NULL otherwise).
+static const float (*g_ng_combined_morph_end_shape)[2] = NULL;
+static const float (*g_ng_combined_morph_end_color)[4] = NULL;
+const float (*ng_combinedMorphEndShapeData(void))[2] { return g_ng_combined_morph_end_shape; }
+const float (*ng_combinedMorphEndColorData(void))[4] { return g_ng_combined_morph_end_color; }
 
 // Base of `movie_id`'s rows in each combined table. Movie 0 is the main SWF and
 // is always 0.
@@ -2184,6 +2258,54 @@ u32 ng_movieBitmapBase(u8 movie_id)
 {
 	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
 	return g_ng_render_bases[movie_id].bitmap;
+}
+
+// Define-time bases, keyed on the DEFINING movie (g_current_movie_id), for the
+// character fields tagDefineText / tagDefineMorphShape bake. Placement ids are
+// re-based elsewhere and on a different key -- see ng_cache_transform.
+u32 ng_movieTextBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].text;
+}
+
+u32 ng_movieGlyphBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].glyph;
+}
+
+u32 ng_movieMorphEndVertBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].morph_vert;
+}
+
+u32 ng_movieMorphEndColorBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].morph_color;
+}
+
+u32 ng_movieColorBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].color;
+}
+
+// A DefineText character's glyph transform slots and its colour transform are
+// DEFINE-time ids into the placing-independent transform / cxform tables, so
+// they take the defining movie's base rather than a placement's.
+u32 ng_movieTransformBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].transform;
+}
+
+u32 ng_movieCxformBase(u8 movie_id)
+{
+	if (movie_id >= NG_MAX_RENDER_MOVIES) return 0;
+	return g_ng_render_bases[movie_id].cxform;
 }
 
 // Base for the movie whose ORIGINAL transform_data array is `td`. That pointer
@@ -2245,9 +2367,14 @@ static u32 ng_rebase_style_word(u32 style_type, u32 style_index,
 	u32 lo = style_index & 0xFFFFu;
 	u32 hi = (style_index >> 16) & 0xFFFFu;
 	if (ftype == 0x00u) {
-		// Solid. The high half is a morph END colour index (morph_end_color_data,
-		// not combined by this slice), so it is left alone.
+		// Solid: low half is a color_data index, high half a morph END colour
+		// index into morph_end_color_data (SWFRecomp/src/swf.cpp, "Morph solid
+		// fills carry the END colour index in the high 16 bits"). The high half
+		// is written for EVERY solid fill and read only through the morph
+		// raster, so re-basing it unconditionally is correct where it is read
+		// and unobservable where it is not.
 		lo = (lo + b->color) & 0xFFFFu;
+		hi = (hi + b->morph_color) & 0xFFFFu;
 	} else if ((ftype & 0xF0u) == 0x10u) {
 		// Gradient: one index into both the ramp texture and inv_mats.
 		lo = (lo + b->style) & 0xFFFFu;
@@ -2278,7 +2405,9 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 		if (e->shape_vert_count > 0 || e->color_count > 0 ||
 		    e->uninv_mat_count > 0 || e->gradient_count > 0 ||
 		    e->bitmap_count > 0 || e->transform_count > 0 ||
-		    e->cxform_count > 0)
+		    e->cxform_count > 0 || e->text_count > 0 ||
+		    e->glyph_count > 0 || e->morph_end_vert_count > 0 ||
+		    e->morph_end_color_count > 0)
 			have_tables = 1;
 	}
 	// No child movies, or a generator that predates these fields: leave every
@@ -2290,6 +2419,10 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 	// --- root counts -------------------------------------------------------
 	size_t root_verts = app_context->shape_data_size / (4 * sizeof(u32));
 	size_t root_xforms = app_context->transform_data_size / (16 * sizeof(float));
+	// Static text is combined in EVERY mode: the CPU glyph hit tester and
+	// TextSnapshot read these tables in NO_GRAPHICS too.
+	size_t root_text = app_context->text_data_size / sizeof(u32);
+	size_t root_glyphs = app_context->glyph_data_size / (4 * sizeof(u32));
 #ifndef NO_GRAPHICS
 	size_t root_cxforms = app_context->cxform_data_size / (20 * sizeof(float));
 	size_t root_colors = app_context->color_data_size / (4 * sizeof(float));
@@ -2297,8 +2430,11 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 	size_t root_grads = app_context->gradient_data_size / (256 * 4);
 	size_t root_style = root_uninv > root_grads ? root_uninv : root_grads;
 	size_t root_bitmaps = app_context->bitmap_count;
+	size_t root_mverts = app_context->morph_end_shape_data_size / (2 * sizeof(float));
+	size_t root_mcolors = app_context->morph_end_color_data_size / (4 * sizeof(float));
 #else
 	size_t root_style = 0, root_colors = 0, root_bitmaps = 0, root_cxforms = 0;
+	size_t root_mverts = 0, root_mcolors = 0;
 #endif
 
 	size_t tot_verts = root_verts;
@@ -2307,6 +2443,10 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 	size_t tot_bitmaps = root_bitmaps;
 	size_t tot_xforms = root_xforms;
 	size_t tot_cxforms = root_cxforms;
+	size_t tot_text = root_text;
+	size_t tot_glyphs = root_glyphs;
+	size_t tot_mverts = root_mverts;
+	size_t tot_mcolors = root_mcolors;
 	for (int i = 0; i < movie_count; i++) {
 		MovieEntry* e = movies[i];
 		NgRenderBases* b = &g_ng_render_bases[e->movie_id];
@@ -2314,24 +2454,36 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 			? e->uninv_mat_count : e->gradient_count;
 		b->shape_vert = (u32) tot_verts;
 		b->transform  = (u32) tot_xforms;
+		b->text       = (u32) tot_text;
+		b->glyph      = (u32) tot_glyphs;
 		e->shape_vert_base = b->shape_vert;
 		e->transform_base  = b->transform;
+		e->text_base       = b->text;
+		e->glyph_base      = b->glyph;
 		tot_verts   += e->shape_vert_count;
 		tot_xforms  += e->transform_count;
+		tot_text    += e->text_count;
+		tot_glyphs  += e->glyph_count;
 #ifndef NO_GRAPHICS
 		b->color      = (u32) tot_colors;
 		b->style      = (u32) tot_style;
 		b->bitmap     = (u32) tot_bitmaps;
 		b->cxform     = (u32) tot_cxforms;
+		b->morph_vert  = (u32) tot_mverts;
+		b->morph_color = (u32) tot_mcolors;
 		e->color_base      = b->color;
 		e->gradient_base   = b->style;
 		e->uninv_mat_base  = b->style;
 		e->bitmap_base     = b->bitmap;
 		e->cxform_base     = b->cxform;
+		e->morph_end_vert_base  = b->morph_vert;
+		e->morph_end_color_base = b->morph_color;
 		tot_colors  += e->color_count;
 		tot_style   += style_n;
 		tot_bitmaps += e->bitmap_count;
 		tot_cxforms += e->cxform_count;
+		tot_mverts  += e->morph_end_vert_count;
+		tot_mcolors += e->morph_end_color_count;
 #else
 		// NO_GRAPHICS has no colour/gradient/bitmap/cxform arrays on
 		// app_context at all, so none of them is combined and every base must
@@ -2340,8 +2492,10 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 		// movie (the first one's base is 0 either way).
 		(void) style_n;
 		b->color = b->style = b->bitmap = b->cxform = 0;
+		b->morph_vert = b->morph_color = 0;
 		e->color_base = e->gradient_base = e->uninv_mat_base = 0;
 		e->bitmap_base = e->cxform_base = 0;
+		e->morph_end_vert_base = e->morph_end_color_base = 0;
 #endif
 	}
 
@@ -2393,6 +2547,74 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 			g_ng_combined_transform_rows = tot_xforms;
 			app_context->transform_data = (char*) td;
 			app_context->transform_data_size = tot_xforms * 16 * sizeof(float);
+		}
+	}
+
+	// --- static text: glyph outlines, then the per-character glyph runs ------
+	// Combined in ALL build modes (see root_text/root_glyphs above). Two of the
+	// three indices a DefineText uses live IN these arrays rather than on the
+	// character, so this pass re-writes contents as well as concatenating:
+	//   glyph_data[4g+0] is a VERTEX offset into shape_data,
+	//   text_data[i]     is a GLYPH index into glyph_data.
+	// glyph_data[4g+2] is a path_data offset and is deliberately NOT re-based:
+	// path_data is per-movie (see the header comment), and the reader resolves
+	// it through the defining movie's table, which tagDefineText records.
+	if (tot_glyphs > root_glyphs) {
+		u32 (*gd)[1] = (u32 (*)[1]) calloc(tot_glyphs * 4, sizeof(u32));
+		if (gd != NULL) {
+			if (app_context->glyph_data != NULL && root_glyphs > 0)
+				memcpy(gd, app_context->glyph_data, root_glyphs * 4 * sizeof(u32));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->glyph_data_ptr == NULL || e->glyph_count == 0) continue;
+				const u32* src = e->glyph_data_ptr;
+				u32 (*dst)[1] = gd + (size_t) e->glyph_base * 4;
+				u32 vbase = e->shape_vert_base;
+				for (size_t g = 0; g < e->glyph_count; g++) {
+					dst[g * 4 + 0][0] = src[g * 4 + 0] + vbase;  // vertex offset
+					dst[g * 4 + 1][0] = src[g * 4 + 1];          // vertex count
+					dst[g * 4 + 2][0] = src[g * 4 + 2];          // path offset
+					dst[g * 4 + 3][0] = src[g * 4 + 3];          // path count
+				}
+			}
+			g_ng_combined_glyph_data = (const u32 (*)[1]) gd;
+			g_ng_combined_glyph_rows = tot_glyphs * 4;
+			app_context->glyph_data = (u32*) gd;
+			app_context->glyph_data_size = tot_glyphs * 4 * sizeof(u32);
+		}
+	}
+
+	if (tot_text > root_text) {
+		u32* txt = (u32*) calloc(tot_text, sizeof(u32));
+		if (txt != NULL) {
+			if (app_context->text_data != NULL && root_text > 0)
+				memcpy(txt, app_context->text_data, root_text * sizeof(u32));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->text_data_ptr == NULL || e->text_count == 0) continue;
+				for (size_t k = 0; k < e->text_count; k++)
+					txt[e->text_base + k] = e->text_data_ptr[k] + e->glyph_base;
+			}
+			g_ng_combined_text_data = txt;
+			app_context->text_data = txt;
+			app_context->text_data_size = tot_text * sizeof(u32);
+		}
+		// text_char_codes is a parallel array of Unicode code points (no index
+		// re-basing) that older recompiler output may not emit at all, so a
+		// movie without one contributes zeroes rather than dropping the table.
+		u16* codes = (u16*) calloc(tot_text, sizeof(u16));
+		if (codes != NULL) {
+			if (app_context->text_char_codes != NULL && root_text > 0)
+				memcpy(codes, app_context->text_char_codes, root_text * sizeof(u16));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->text_char_codes_ptr == NULL || e->text_count == 0) continue;
+				memcpy(codes + e->text_base, e->text_char_codes_ptr,
+				       e->text_count * sizeof(u16));
+			}
+			g_ng_combined_text_char_codes = codes;
+			app_context->text_char_codes = codes;
+			app_context->text_char_codes_size = tot_text * sizeof(u16);
 		}
 	}
 
@@ -2462,6 +2684,50 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 			}
 			app_context->gradient_data = (char*) gd;
 			app_context->gradient_data_size = tot_style * 256 * 4;
+		}
+	}
+
+	// --- morph shape END vertices / END colours ------------------------------
+	// Graphics only: the only readers are tagShowFrame/tagRerenderFrame's
+	// ratio lerp and the AVM2 morph raster. The three character-side offsets
+	// (morph_end_offset, morph_color_start, morph_end_color_start) are re-based
+	// at define time in tagDefineMorphShape, and the per-vertex morph END
+	// colour index in the solid style word is re-based by ng_rebase_style_word.
+	if (tot_mverts > root_mverts) {
+		float (*me)[2] = (float (*)[2]) calloc(tot_mverts, 2 * sizeof(float));
+		if (me != NULL) {
+			if (app_context->morph_end_shape_data != NULL && root_mverts > 0)
+				memcpy(me, app_context->morph_end_shape_data,
+				       root_mverts * 2 * sizeof(float));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->morph_end_shape_data_ptr == NULL || e->morph_end_vert_count == 0)
+					continue;
+				memcpy(me + e->morph_end_vert_base, e->morph_end_shape_data_ptr,
+				       e->morph_end_vert_count * 2 * sizeof(float));
+			}
+			g_ng_combined_morph_end_shape = (const float (*)[2]) me;
+			app_context->morph_end_shape_data = (char*) me;
+			app_context->morph_end_shape_data_size = tot_mverts * 2 * sizeof(float);
+		}
+	}
+
+	if (tot_mcolors > root_mcolors) {
+		float (*mc)[4] = (float (*)[4]) calloc(tot_mcolors, 4 * sizeof(float));
+		if (mc != NULL) {
+			if (app_context->morph_end_color_data != NULL && root_mcolors > 0)
+				memcpy(mc, app_context->morph_end_color_data,
+				       root_mcolors * 4 * sizeof(float));
+			for (int i = 0; i < movie_count; i++) {
+				MovieEntry* e = movies[i];
+				if (e->morph_end_color_data_ptr == NULL || e->morph_end_color_count == 0)
+					continue;
+				memcpy(mc + e->morph_end_color_base, e->morph_end_color_data_ptr,
+				       e->morph_end_color_count * 4 * sizeof(float));
+			}
+			g_ng_combined_morph_end_color = (const float (*)[4]) mc;
+			app_context->morph_end_color_data = (char*) mc;
+			app_context->morph_end_color_data_size = tot_mcolors * 4 * sizeof(float);
 		}
 	}
 

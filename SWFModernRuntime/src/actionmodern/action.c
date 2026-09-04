@@ -1283,9 +1283,17 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 			size_t ts = dictionary[cid].text_start;
 			size_t tsz = dictionary[cid].text_size;
 
+			// dictionary[].text_start is a COMBINED-table index once a child
+			// movie is linked (tagDefineText re-bases it), and the generated
+			// symbols are only the ROOT's prefix of those tables. Both fall
+			// back to the generated array when nothing was combined.
+			const u16* _tcc = ng_combinedTextCharCodes();
+			if (_tcc == NULL) _tcc = text_char_codes;
+			const u32* _td = ng_combinedTextData();
+			if (_td == NULL) _td = text_data;
 			for (size_t j = 0; j < tsz && text_len < 4090; j++) {
 				// Use text_char_codes (Unicode) if available, else fall back to text_data (glyph indices)
-				u16 code = text_char_codes ? text_char_codes[ts + j] : (u16)text_data[ts + j];
+				u16 code = _tcc ? _tcc[ts + j] : (u16)_td[ts + j];
 				nl_buf[text_len] = (j == 0 && !first_entry) ? '1' : '0';
 				text_buf[text_len] = code;
 				text_len++;

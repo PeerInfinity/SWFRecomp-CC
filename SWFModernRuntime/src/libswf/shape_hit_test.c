@@ -650,6 +650,7 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 	// that DEFINED it, which is not the main movie for a Loader-loaded child.
 	// Read through PD for the rest of this call.
 	ng_ht_path_tab = ng_findCharPathTable(char_id);
+	if (ng_ht_path_tab == NULL) ng_ht_path_tab = ng_findMorphPathTable(char_id);
 
 	// EditText (text field): hit test against bounds rectangle
 	int tf_idx = ng_find_textfield(char_id);
@@ -677,22 +678,34 @@ int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 		size_t ts = ch->text_start;
 		size_t tc = ch->text_size;
 		u32 tf_base = ch->transform_start;
+		// ch->text_start / ch->transform_start are already COMBINED-table
+		// indices (tagDefineText re-bases both), and the generated `text_data`
+		// / `glyph_data` / `transform_data` symbols are only the ROOT's prefix
+		// of those tables once a child movie is linked. Each of these resolves
+		// to the generated array when no child contributed one, so a
+		// single-movie build reads exactly what it read before.
+		const u32* _td = ng_combinedTextData();
+		if (_td == NULL) _td = text_data;
+		const u32 (*_gd)[1] = ng_combinedGlyphData();
+		if (_gd == NULL) _gd = (const u32 (*)[1]) glyph_data;
+		const float (*_xf)[16] = ng_combinedTransformData();
+		if (_xf == NULL) _xf = (const float (*)[16]) transform_data;
 		for (size_t j = 0; j < tc; j++) {
 			// glyph_data: 4 values per glyph (tri_offset, tri_size, path_offset, path_size)
-			size_t gi = 4 * (size_t)text_data[ts + j];
-			size_t glyph_offset = (size_t)glyph_data[gi][0];
-			size_t glyph_size = (size_t)glyph_data[gi + 1][0];
-			size_t glyph_path_offset = (size_t)glyph_data[gi + 2][0];
-			size_t glyph_path_size = (size_t)glyph_data[gi + 3][0];
+			size_t gi = 4 * (size_t)_td[ts + j];
+			size_t glyph_offset = (size_t)_gd[gi][0];
+			size_t glyph_size = (size_t)_gd[gi + 1][0];
+			size_t glyph_path_offset = (size_t)_gd[gi + 2][0];
+			size_t glyph_path_size = (size_t)_gd[gi + 3][0];
 			if (glyph_size < 3 && glyph_path_size < 3) continue;  // no data
 			// Compose parent matrix with glyph positioning transform
 			u32 gtid = tf_base + (u32)j;
-			double ga = (double)transform_data[gtid][0];
-			double gb = (double)transform_data[gtid][1];
-			double gc = (double)transform_data[gtid][4];
-			double gd = (double)transform_data[gtid][5];
-			double gtx_v = (double)transform_data[gtid][12];
-			double gty_v = (double)transform_data[gtid][13];
+			double ga = (double)_xf[gtid][0];
+			double gb = (double)_xf[gtid][1];
+			double gc = (double)_xf[gtid][4];
+			double gd = (double)_xf[gtid][5];
+			double gtx_v = (double)_xf[gtid][12];
+			double gty_v = (double)_xf[gtid][13];
 			double na = ma*ga + mc_m*gb, nb = mb*ga + md*gb;
 			double nc = ma*gc + mc_m*gd, nd = mb*gc + md*gd;
 			double ntx = ma*gtx_v + mc_m*gty_v + mtx;

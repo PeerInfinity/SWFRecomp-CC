@@ -541,6 +541,11 @@ void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size);
 // The path_data table ng_find_char_path's offset indexes for this character:
 // the DEFINING movie's, or NULL when that is the main movie's generated array.
 const float (*ng_findCharPathTable(size_t char_id))[3];
+// Same, for a MORPH character (ng_find_morph_path's offsets).
+const float (*ng_findMorphPathTable(size_t char_id))[3];
+// Record which path_data table a static-text character's GLYPH path offsets
+// index. No path run of its own; a no-op for the main movie.
+void ng_record_text_path_table(size_t char_id);
 
 // ---------------------------------------------------------------------------
 // Combined per-movie render tables (multi-SWF render slice, ng_shared.c)
@@ -558,6 +563,15 @@ const u32 (*ng_combinedShapeData(void))[4];
 // Base of movie_id's rows in the combined tables (movie 0 = main = 0).
 u32 ng_movieShapeVertBase(u8 movie_id);
 u32 ng_movieBitmapBase(u8 movie_id);
+u32 ng_movieTextBase(u8 movie_id);
+u32 ng_movieGlyphBase(u8 movie_id);
+u32 ng_movieColorBase(u8 movie_id);
+u32 ng_movieMorphEndVertBase(u8 movie_id);
+u32 ng_movieMorphEndColorBase(u8 movie_id);
+// Define-time bases into the placement tables. tagDefineText's glyph transform
+// slots and colour transform are DEFINING-movie ids, unlike a placement's.
+u32 ng_movieTransformBase(u8 movie_id);
+u32 ng_movieCxformBase(u8 movie_id);
 // Base for the movie whose OWN transform_data array is `td` (NULL/main = 0).
 u32 ng_movieTransformBaseForTable(const float (*td)[16]);
 u32 ng_movieCxformBaseForTable(const float (*td)[16]);
@@ -566,6 +580,15 @@ const float (*ng_combinedTransformData(void))[16];
 size_t ng_combinedTransformRows(void);
 // The combined colour-transform table (20 floats per slot), or NULL.
 const float* ng_combinedCxformData(void);
+// The combined static-text tables, or NULL when none was built. Built in every
+// build mode -- the CPU glyph hit tester and TextSnapshot read them.
+const u32 (*ng_combinedGlyphData(void))[1];
+size_t ng_combinedGlyphRows(void);
+const u32* ng_combinedTextData(void);
+const u16* ng_combinedTextCharCodes(void);
+// The combined morph END tables (graphics builds only), or NULL.
+const float (*ng_combinedMorphEndShapeData(void))[2];
+const float (*ng_combinedMorphEndColorData(void))[4];
 // 1 once the combine pass has actually run with child tables to fold in.
 int ng_movieRenderTablesActive(void);
 

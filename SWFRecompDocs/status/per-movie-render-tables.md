@@ -184,6 +184,9 @@ complete audit. Thirteen sites, all converted:
 Left alone deliberately: `shape_hit_test.c`'s static-text glyph transforms
 (`ch->transform_start` is a DEFINING-movie id and static text in a child is out
 of scope, §5) — for the main movie it is the same rows it always read.
+**(Slice 8 converted this one: once `tagDefineText` re-bases `transform_start`,
+"out of scope" stopped being true and the raw-symbol read became out of
+bounds. Same trap, one slice later.)**
 
 The `action.c` site is the Drawing-API minimum-stroke-width scale read, which
 indexes on `mc->dynamic_xform_slot` — a GPU-only slot PAST the end of the CPU
@@ -208,7 +211,15 @@ because its two `action.c` callers use NULL to mean "use
 ## 5. What this does NOT cover
 
 Named precisely, because each is a separate missing base and none of them is
-hard now that the pattern exists:
+hard now that the pattern exists.
+
+**Update 2026-09-04 (slice 8, `SWFRecompDocs/status/child-static-text-and-morphs.md`):
+the first two are DONE and the third's diagnosis below is wrong.** Static text
+and morph shapes in a loaded child now work, with a fixture each. The AVM2 arm
+is not "the base is on its `MovieEntry`, what is missing is applying it": on
+the AVM2 path `ng_buildMovieRenderTables` is never called at all, so no
+combined table exists and no base is ever assigned. See that doc's §6 for the
+site list.
 
 - **Static text in a loaded child.** `text_data` and `glyph_data` are not
   combined and `ch->text_start` / `ch->transform_start` are not re-based, so a

@@ -1,0 +1,8 @@
+ctl:glyph:50:true
+ctl:glyph:150:false
+chd:glyph:50:false
+chd:glyph:150:true
+chd:bbox:150:true
+ctl:snap:P
+chd:snap:C
+done

@@ -1897,6 +1897,18 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"    .bitmap_data_ptr = (const u8*){_tbl('bitmap_data')},")
     lines.append(f"    .bitmap_descs_ptr = (const u32*){_tbl('bitmap_descs')},")
     lines.append(f"    .bitmap_count = {child_bitmap_count},")
+    # Static text: text_data / text_char_codes are parallel (one row per glyph
+    # DRAWN), glyph_data is 4 rows per glyph DEFINED.
+    lines.append(f"    .text_data_ptr = (const u32*){_tbl('text_data')},")
+    lines.append(f"    .text_char_codes_ptr = (const u16*){_tbl('text_char_codes')},")
+    lines.append(f"    .text_count = {_count('text_data')},")
+    lines.append(f"    .glyph_data_ptr = (const u32*){_tbl('glyph_data')},")
+    lines.append(f"    .glyph_count = {_count('glyph_data', 4)},")
+    # Morph shapes: the END halves (the START halves are shape_data/color_data).
+    lines.append(f"    .morph_end_shape_data_ptr = (const float*){_tbl('morph_end_shape_data')},")
+    lines.append(f"    .morph_end_vert_count = {_count('morph_end_shape_data')},")
+    lines.append(f"    .morph_end_color_data_ptr = (const float*){_tbl('morph_end_color_data')},")
+    lines.append(f"    .morph_end_color_count = {_count('morph_end_color_data')},")
     lines.append(f"}};")
     lines.append("")
 

@@ -57,6 +57,17 @@ first).
   USER-CONFIRMED current behavior is "good enough for N"; do the proper
   fix when a game needs faithful nested/attached morph animation.
   (2026-06-27)
+- **A morph shape's hitTest bounding box is its START bounds and does not
+  follow the ratio.** `ng_computeBoundsFromDL_matrix` (and every other bounds
+  walk) calls `ng_getCharBounds`, which returns what `tagDefineMorphShape`
+  recorded — the START rectangle. `ng_getCharBoundsForRatio` exists and IS used
+  by the shape-accurate morph hit test's own fallback, but the AABB fast reject
+  in FRONT of that walk is not ratio-aware, so a morph placed at a high ratio
+  can be rejected before its outline is ever compared. Surfaced while building
+  `regression/avm1_parent_child_morph`, which works around it by giving the
+  morph a START rectangle that contains its END one. Cheap fix: give the bounds
+  walks the entry's `ratio` and route them through `ng_getCharBoundsForRatio`.
+  (2026-09-04)
 
 ## Native windowed graphics (assessment: `reference/native-windowed-graphics-assessment.md`)
 
@@ -309,22 +320,45 @@ first).
   is a standing canary for this mechanism. Closeout:
   `SWFRecompDocs/status/per-movie-render-tables.md`; what it does NOT cover is
   §5 there and the next four entries here. (2026-09-04)
-- **Static text and morph shapes in a loaded child still draw the root's
-  glyphs.** `text_data` / `glyph_data` / `morph_end_shape_data` /
-  `morph_end_color_data` are not in the combined tables, and `ch->text_start`,
-  `ch->transform_start`, `ch->morph_end_offset`, `ch->morph_color_start` and
-  `ch->morph_end_color_start` are not re-based. Same shape as the vertex-offset
-  fix in `tagDefineShape` — add the array to `ng_buildMovieRenderTables`, add
-  the count to `MovieEntry` (the harness already reads every draws.c array's
-  declared size), add the base at `tagDefineText` / `tagDefineMorphShape`.
-  `morph_start_offset` IS already re-based; the other morph offsets were left
-  alone deliberately so they stay consistent with each other. (2026-09-04)
-- **An AVM2 (Loader-loaded AS3) child's shapes still do not render.** The AVM2
-  render walk uses `Avm2ShapeGeomRec.vert_offset` out of the child's own
-  `Avm2MovieTables`, not `ch->shape_offset`, so it never passes through the
-  `tagDefineShape` re-base. The child's vertices ARE in the combined table and
-  its base is on its `MovieEntry`; what is missing is applying it on that path.
-  (2026-09-04)
+- ~~**Static text and morph shapes in a loaded child still draw the root's
+  glyphs.**~~ DONE 2026-09-04 (multi-SWF slice 8). `text_data`,
+  `text_char_codes` and `glyph_data` are combined in EVERY build mode (the CPU
+  glyph hit tester and TextSnapshot read them in NO_GRAPHICS too);
+  `morph_end_shape_data` / `morph_end_color_data` in graphics builds only,
+  matching `color_data`. `tagDefineText` re-bases `text_start`,
+  `transform_start` and `cxform_id`; `tagDefineMorphShape` re-bases
+  `morph_end_offset`, `morph_color_start` and `morph_end_color_start`;
+  `tagDefineFontGlyphBase` re-bases the font's glyph base. Two arrays needed
+  their CONTENTS re-written at combine time as well (a `text_data` row is a
+  glyph index, a `glyph_data` row is a vertex offset), and the SOLID style
+  word's high half — the morph END colour index — joined the style-word
+  re-base. Three readers were the §2 trap again: `textfield_glyph_render_cb`
+  bounded a raw-symbol read with the COMBINED length,
+  `shape_hit_test.c`'s static-text branch read three raw symbols with
+  re-based ids, and `textSnapshotCapture` read two. Both arms have
+  trace-visible assertions and a fixture each
+  (`regression/avm1_parent_child_text`, `..._morph`); the morph one exposed a
+  defect the array grep could not see — `ng_record_morph_path` never recorded
+  the defining movie's `path_data` table, so a child's morph hit-tested the
+  ROOT's outline. Closeout:
+  `SWFRecompDocs/status/child-static-text-and-morphs.md`. (2026-09-04)
+- **An AVM2 (Loader-loaded AS3) child's shapes still do not render**, and the
+  reason is bigger than a missing base: **`ng_buildMovieRenderTables` is never
+  called on the AVM2 path at all.** Its only two call sites are
+  `swf.c::swfStart` and `swf_core.c::runSWF`, both AVM1 entry points; an AS3
+  root boots through `avm2_main.c::runSWF_avm2`, so the combined tables are
+  never built, `ng_movieRenderTablesActive()` is 0 and every `MovieEntry` base
+  stays 0. (This corrects the 2026-09-04 framing that called it "a routing
+  problem, not a missing-data one".) The work is: call the builder from the
+  AVM2 boot before `avm2_render_init`; give `shape_geom_for` / `statictext_for`
+  / `avm2_display_char_is_defined` the `g_child_movies` fall-through
+  `char_info` already has; add the owning movie's base at `resolve_shape_geom`
+  (an `Avm2MovieTables*` -> `MovieEntry*` pointer compare); convert the
+  raw-symbol geometry readers in `avm2_display.c` / `avm2_cpu_raster.c`; and
+  note that AVM2 STATIC TEXT is a separate index space
+  (`Avm2StaticGlyph{font_id, glyph}`, not a `glyph_data` row) needing its own
+  base. Full site list: `SWFRecompDocs/status/child-static-text-and-morphs.md`
+  §6. (2026-09-04)
 - **A loaded child whose stage HEIGHT differs from the root's renders shifted.**
   The recompiler bakes the y-flip into every vertex as `FRAME_HEIGHT - y`, per
   movie, so a 200-high child loaded into a 400-high parent is 200 px off. Both

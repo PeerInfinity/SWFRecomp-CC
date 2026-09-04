@@ -374,6 +374,17 @@ typedef struct SWFAppContext
 	char* transform_data;
 	size_t transform_data_size;
 
+	// Font/static-text data. Available in all modes, not just graphics: the
+	// CPU glyph hit tester (shape_hit_test.c) and TextSnapshot
+	// (actionmodern/action.c) both read them, and ng_buildMovieRenderTables
+	// needs the ROOT's row counts in every mode to size the combined tables.
+	u32* glyph_data;            // u32[glyph_count * 4][1]
+	size_t glyph_data_size;
+	u32* text_data;             // u32[text_count]
+	size_t text_data_size;
+	u16* text_char_codes;       // u16[text_count], parallel to text_data
+	size_t text_char_codes_size;
+
 #ifndef NO_GRAPHICS
 	// Stage size, in *stage* pixels (the SWF header frame size). Anything that
 	// reasons in stage coordinates — tag.c's drop-shadow/bevel NDC offsets, the
@@ -410,11 +421,6 @@ typedef struct SWFAppContext
 	char* bitmap_data;
 	size_t bitmap_data_size;
 
-	// Font/Text data (from upstream)
-	u32* glyph_data;
-	size_t glyph_data_size;
-	u32* text_data;
-	size_t text_data_size;
 	char* cxform_data;
 	size_t cxform_data_size;
 	char* morph_end_shape_data;
@@ -536,6 +542,22 @@ typedef struct MovieEntry {
 	const u8*    bitmap_data_ptr;     // this movie's raw pixel array
 	const u32*   bitmap_descs_ptr;    // u32[bitmap_count][4] {offset,size,w,h}
 	size_t       bitmap_count;
+	// Static text (DefineText/DefineText2). text_data holds GLOBAL glyph
+	// indices into glyph_data, and glyph_data's rows hold a vertex offset into
+	// shape_data and a path offset into path_data -- so combining these two
+	// re-writes their CONTENTS as well as concatenating them (the same shape as
+	// a vertex's style word). text_char_codes is parallel to text_data.
+	const u32*   text_data_ptr;       // u32[text_count]
+	const u16*   text_char_codes_ptr; // u16[text_count] (may be NULL)
+	size_t       text_count;
+	const u32*   glyph_data_ptr;      // u32[glyph_count * 4][1]
+	size_t       glyph_count;         // GLYPHS, 4 rows each
+	// Morph shapes (DefineMorphShape/2). The END vertex and END colour tables;
+	// the START halves live in shape_data / color_data and are already covered.
+	const float* morph_end_shape_data_ptr;  // float[morph_end_vert_count][2]
+	size_t       morph_end_vert_count;
+	const float* morph_end_color_data_ptr;  // float[morph_end_color_count][4]
+	size_t       morph_end_color_count;
 	// Bases into the combined tables, assigned by ng_buildMovieRenderTables.
 	// gradient_base and uninv_mat_base are always EQUAL: a vertex's style word
 	// carries ONE index that the shader uses as both a gradient ramp row and an
@@ -548,6 +570,10 @@ typedef struct MovieEntry {
 	u32 bitmap_base;
 	u32 transform_base;
 	u32 cxform_base;
+	u32 text_base;
+	u32 glyph_base;
+	u32 morph_end_vert_base;
+	u32 morph_end_color_base;
 } MovieEntry;
 
 // Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)

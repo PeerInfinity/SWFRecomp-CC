@@ -5999,15 +5999,25 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		// Bound-check against the actual glyph_data length (4 u32 per glyph).
 		// The pen still advances below for layout either way.
 		if (!ng_font_is_builtin(font_idx) && (4 * global_idx + 1) < glyph_data_entries) {
-		size_t g_offset = (size_t)glyph_data[4 * global_idx][0];
-		size_t g_size = (size_t)glyph_data[4 * global_idx + 1][0];
+		// glyph_base is already a COMBINED glyph index (tagDefineFontGlyphBase
+		// re-bases it), and the generated `glyph_data` / `shape_data` symbols
+		// are only the ROOT's prefix of the combined tables once a child movie
+		// is linked. Read the combined tables when there are any; both fall
+		// back to exactly the old expression otherwise. The bound above is
+		// already the combined length (app_context->glyph_data_size).
+		const u32 (*_gd)[1] = ng_combinedGlyphData();
+		if (_gd == NULL) _gd = (const u32 (*)[1]) glyph_data;
+		const u32 (*_sd)[4] = ng_combinedShapeData();
+		if (_sd == NULL) _sd = (const u32 (*)[4]) shape_data;
+		size_t g_offset = (size_t)_gd[4 * global_idx][0];
+		size_t g_size = (size_t)_gd[4 * global_idx + 1][0];
 
 		if (g_size > 0 && g_size <= TF_GLYPH_MAX_VERTS) {
 			// Transform glyph vertices: scale from EM space + translate to position
 			for (size_t v = 0; v < g_size; v++) {
 				union { u32 u; float f; } vx, vy;
-				vx.u = shape_data[g_offset + v][0];
-				vy.u = shape_data[g_offset + v][1];
+				vx.u = _sd[g_offset + v][0];
+				vy.u = _sd[g_offset + v][1];
 				xy_buf[2 * v]     = vx.f * scale + x_pos;
 				xy_buf[2 * v + 1] = vy.f * scale + y_pos;
 			}
@@ -8419,16 +8429,22 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
 
 	dictionary[char_id].type = CHAR_TYPE_MORPH_SHAPE;
-	// See tagDefineShape. morph_end_offset / morph_color_start are NOT re-based:
-	// morph_end_shape_data and morph_end_color_data are not combined by this
-	// slice, so a MORPH shape in a loaded child is still unsupported.
+	// See tagDefineShape. All four offsets are movie-LOCAL and each indexes a
+	// different combined table: the START verts are in shape_data, the END
+	// verts in morph_end_shape_data, the START colours in color_data and the
+	// END colours in morph_end_color_data. Every base is 0 for the main movie
+	// and 0 in NO_GRAPHICS for the three graphics-only tables, which is exactly
+	// what those readers still expect there.
 	dictionary[char_id].morph_start_offset =
 		shape_offset + ng_movieShapeVertBase(g_current_movie_id);
 	dictionary[char_id].morph_start_size = shape_size;
-	dictionary[char_id].morph_end_offset = morph_end_offset;
-	dictionary[char_id].morph_color_start = morph_color_start;
+	dictionary[char_id].morph_end_offset =
+		morph_end_offset + ng_movieMorphEndVertBase(g_current_movie_id);
+	dictionary[char_id].morph_color_start =
+		morph_color_start + ng_movieColorBase(g_current_movie_id);
 	dictionary[char_id].morph_color_count = morph_color_count;
-	dictionary[char_id].morph_end_color_start = morph_end_color_start;
+	dictionary[char_id].morph_end_color_start =
+		morph_end_color_start + ng_movieMorphEndColorBase(g_current_movie_id);
 
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
 	ng_record_morph_end_bounds(char_id, end_bounds_xmin, end_bounds_xmax, end_bounds_ymin, end_bounds_ymax);
@@ -8438,6 +8454,26 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 {
 	(void)app_context;
 	ENSURE_SIZE(dictionary, char_id, dictionary_capacity, sizeof(Character));
+
+	// Re-base the three movie-LOCAL indices this tag carries onto the combined
+	// tables (ng_buildMovieRenderTables), at the one place the defining movie
+	// is known -- the same argument as tagDefineShape:
+	//   text_start      -> combined text_data (whose ROWS are also re-based,
+	//                      because each is a glyph index)
+	//   transform_start -> combined transform_data. This is a DEFINE-time id
+	//                      (the recompiler bakes one glyph-positioning matrix
+	//                      per glyph), so it takes the DEFINING movie's base,
+	//                      not the placing movie's that ng_cache_transform adds.
+	//   cxform_id       -> combined cxform_data; 0 is the no-colour-transform
+	//                      sentinel and never moves (see ng_rebaseCxformId).
+	// All three bases are 0 for the main movie, and cxform's is 0 in
+	// NO_GRAPHICS where that table is not combined at all.
+	text_start += ng_movieTextBase(g_current_movie_id);
+	transform_start += ng_movieTransformBase(g_current_movie_id);
+	if (cxform_id != 0) cxform_id += ng_movieCxformBase(g_current_movie_id);
+	// The glyph outlines this character draws carry path_data offsets numbered
+	// in the DEFINING movie's table; record it for the CPU glyph hit tester.
+	ng_record_text_path_table(char_id);
 
 	if (dictionary[char_id].type == CHAR_TYPE_TEXT) {
 		// Accumulate: extend text range to cover this additional text record
@@ -12557,7 +12593,9 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
 
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 {
-	ng_record_font_glyph_base(font_id, glyph_base);
+	// Movie-local index into glyph_data, baked at define time exactly like
+	// tagDefineText's text_start (multi-SWF render slice).
+	ng_record_font_glyph_base(font_id, glyph_base + ng_movieGlyphBase(g_current_movie_id));
 }
 
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,

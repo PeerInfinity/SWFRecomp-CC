@@ -107,6 +107,17 @@ int main(int argc, char* argv[]) {
     app_context.transform_data = (char*)transform_data;
     app_context.transform_data_size = sizeof(transform_data);
 
+    // Static-text tables: all modes, not just graphics. The CPU glyph hit
+    // tester and TextSnapshot read them in NO_GRAPHICS too, and
+    // ng_buildMovieRenderTables needs the root's row counts to size the
+    // combined tables a loaded child's indices are re-based onto.
+    app_context.glyph_data = (u32*)glyph_data;
+    app_context.glyph_data_size = sizeof(glyph_data);
+    app_context.text_data = text_data;
+    app_context.text_data_size = sizeof(text_data);
+    app_context.text_char_codes = text_char_codes;
+    app_context.text_char_codes_size = sizeof(text_char_codes);
+
 #ifndef NO_GRAPHICS
     app_context.width = FRAME_WIDTH;
     app_context.height = FRAME_HEIGHT;
@@ -171,10 +182,6 @@ int main(int argc, char* argv[]) {
     app_context.gradient_data_size = sizeof(gradient_data);
     app_context.bitmap_data = (char*)bitmap_data;
     app_context.bitmap_data_size = sizeof(bitmap_data);
-    app_context.glyph_data = (u32*)glyph_data;
-    app_context.glyph_data_size = sizeof(glyph_data);
-    app_context.text_data = text_data;
-    app_context.text_data_size = sizeof(text_data);
     app_context.cxform_data = (char*)cxform_data;
     app_context.cxform_data_size = sizeof(cxform_data);
     app_context.morph_end_shape_data = (char*)morph_end_shape_data;
