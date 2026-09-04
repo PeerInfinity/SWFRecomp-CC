@@ -188,6 +188,20 @@ if [ "$GRAPHICS_FLAG" = true ]; then
     echo "Using GRAPHICS mode (WebGPU) for ${TARGET} build..."
     cp "${SWFMODERN_SRC}/actionmodern/action_queue.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/actionmodern/sprite_frame_scripts.c" "${BUILD_DIR}/"
+    # Image/video decoders. The graphics branch used to omit these while the
+    # NO_GRAPHICS branch copied them, and it linked only because nothing in the
+    # browser build REACHED them: wasm-ld drops an unreferenced function along
+    # with its callees, and `actionFirePendingDirectLoads` — the only caller of
+    # decodeAndAttachImageToMC on this path — was unreachable while swf.c's
+    # loaded-movie drains were OFFSCREEN_RENDER-only. Giving browser-WASM those
+    # drains (2026-09-04) made it reachable and the link failed on
+    # `undefined symbol: decodeAndAttachImageToMC`. Every other browser-graphics
+    # build script (bundle/build.sh, build_graphics_host.sh, build_wasm_avm2.sh)
+    # already carries all three; this list was the odd one out.
+    cp "${SWFMODERN_SRC}/actionmodern/image_decode.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/actionmodern/video_codec.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/stb_image_impl.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/swf.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"

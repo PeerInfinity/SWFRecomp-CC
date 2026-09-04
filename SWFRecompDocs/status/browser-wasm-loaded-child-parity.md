@@ -125,14 +125,27 @@ golden. "before" = the same page with fix (a) reverted.
 | Child placement: char id, name, `_x`/`_y` | `avm1_parent_child_modify_place` | no | exact |
 | Child shape geometry (hitTest outline + bbox) | `avm1_parent_child_render` | absent | exact |
 | Child shape **pixels** | `avm1_parent_child_render` | 7200/40000 px wrong | **identical to golden** |
-| Child embedded bitmap (`BitmapData.draw`+`getPixel`) | `avm1_parent_child_bitmap` | absent | exact |
-| Child bitmap-fill **pixels** | `avm1_parent_child_bitmap_fill` | — | **identical to golden** |
-| Child static text (glyph hitTest + `TextSnapshot`) | `avm1_parent_child_text` | absent | exact |
-| Child static text **pixels** | `avm1_parent_child_text` | — | **identical to golden** |
-| Child morph END shape | `avm1_parent_child_morph` | absent | exact |
-| Child morph **pixels** | `avm1_parent_child_morph` | — | **identical to golden** |
+| Child embedded bitmap (`BitmapData.draw`+`getPixel`) | `avm1_parent_child_bitmap` | absent² | exact |
+| Child bitmap-fill **pixels** | `avm1_parent_child_bitmap_fill` | absent² | **identical to golden** |
+| Child static text (glyph hitTest + `TextSnapshot`) | `avm1_parent_child_text` | absent² | exact |
+| Child static text **pixels** | `avm1_parent_child_text` | absent² | **identical to golden** |
+| Child morph END shape | `avm1_parent_child_morph` | absent² | exact |
+| Child morph **pixels** | `avm1_parent_child_morph` | absent² | **identical to golden** |
 
 ¹ except one line — see §5.
+² **Inferred, not measured.** The "before" column was measured directly for
+`avm1_child_timeline_advance` (trace) and `avm1_parent_child_render` (trace +
+pixels, 7200/40000 px wrong). For the other four fixtures the before state is
+inferred from the same mechanism — the child movie never linked in, so every
+child-side probe reads `undefined` and no child geometry reaches the renderer.
+The inference is one build away from being measured if it ever matters.
+
+The probe's runtime source set is the one the **production** browser path uses
+(`deploy_wasm_demo.sh`'s `RUNTIME_C` / `wasm_wrappers/bundle/build.sh`), which
+includes `image_decode.c`, `video_codec.c` and `stb_image_impl.c`.
+`build_test.sh --graphics` omits those three; it builds the repo's own demo
+pages, not an arbitrary SWF, so the narrower list is not the target this slice
+is about.
 
 `MovieClipLoader.loadClip` in the browser is **code-complete but unprobed**:
 the drain is now called, and no regression fixture in the arc exercises MCL
@@ -172,10 +185,61 @@ tag.c  -DOFFSCREEN_RENDER -DUSE_WEBGPU      IDENTICAL
 Fix (a) is inside a `!OFFSCREEN_RENDER && __EMSCRIPTEN__` arm neither CI mode
 compiles. Fix (b) moves a statement out of a `#if` whose condition both CI
 modes satisfy, leaving their token stream unchanged. CI was dispatched anyway
-per CLAUDE.md (shared runtime code), serial, `images=false`; results in §7.
-`wasm-link-smoke` compiles and links only — it is not evidence this slice
-worked, and the browser measurements above are.
+per CLAUDE.md (shared runtime code), serial, `images=false`.
+
+**And dispatching it anyway paid, in the way I had argued it could not.** The
+invariance proof covers the two CI *test* modes; I generalised it to "CI cannot
+see this change", and that was wrong. The **`wasm-link-smoke`** job compiles the
+**browser** configuration, and it went red:
+
+```
+wasm-ld: error: action.o: undefined symbol: decodeAndAttachImageToMC
+```
+
+`build_test.sh`'s `--graphics` source list omits `image_decode.c`,
+`video_codec.c` and `stb_image_impl.c` while its NO_GRAPHICS branch copies them.
+That linked only because **nothing in the browser build reached them**: wasm-ld
+drops an unreferenced function along with its callees, and
+`actionFirePendingDirectLoads` — the only caller of `decodeAndAttachImageToMC`
+on this path, for `loadMovie("foo.png")` — was unreachable precisely because the
+drains were OFFSCREEN-only. Fix (a) made it reachable and the latent gap in the
+source list became a hard link error. Every other browser-graphics build script
+(`wasm_wrappers/bundle/build.sh`, `build_graphics_host.sh`,
+`build_wasm_avm2.sh`) already carries all three; `build_test.sh` was the odd one
+out. Added there, and CI's exact command reproduced green locally
+(`build_test.sh graphics/three_boxes wasm --graphics`).
+
+**My own probe build could not have caught this**: it takes its source list
+from `deploy_wasm_demo.sh`'s `RUNTIME_C` (the production path), which includes
+the decoders. So the harness that measured the behaviour was blind to the break
+in the demo build, and only CI saw it. The general lesson is narrower and more
+useful than "run CI anyway": *preprocessor invariance in the CI test modes says
+nothing about the browser configuration, and `wasm-link-smoke` builds that.*
+
+The reverse still holds: a **green** `wasm-link-smoke` is not evidence this
+slice worked — it compiles and links, it never executes. The browser
+measurements in §4 are that evidence.
 
 ## 7. CI results
 
-(filled in below)
+**Graphics**, run `33902348100` at `ec709e7c9`, `categories=full`,
+`images=false`, diffed against `21a6270ce`:
+
+```
+=== intersection: 4498 tests (21a6270ce -> WORKTREE, results_graphics) ===
+  output_mismatch    124 ->   124 (+0)
+  pass              4138 ->  4138 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4373 ->  4373 (+0)
+GAINS 0   REGRESSIONS 0   OTHER STATUS MOVES 0
+```
+
+Every bucket flat, exactly as the invariance proof predicted — nothing in the
+corpus could have moved. The run's `completed failure` conclusion is the
+`wasm-link-smoke` job above, not a test regression; the shards completed and the
+results published.
+
+**No-graphics**: dispatched after the `build_test.sh` fix, so the same run also
+re-verifies `wasm-link-smoke` (that job runs on every dispatch, any mode).
+Result below.
