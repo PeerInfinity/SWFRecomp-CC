@@ -301,3 +301,41 @@ None required by this audit. The reclamation is a user action, not a slice.
 If `feature-priority-map`'s "T7 P4 descriptors" lead is picked up, start from
 `gen_display_descriptors.py` and the `DT_DESC_*_ROWS` generator on master —
 **not** from the branch, which is behind it.
+
+---
+
+## Addendum: the reclamation was executed (2026-09-04, orchestrator)
+
+This audit's recommendation was carried out by the multi-SWF orchestrator on the
+user's explicit instruction. Recorded here because the body above says
+"recommend, don't execute", and a later reader must not think the 19 GB is still
+on disk.
+
+**What was done:** all 64 worktrees removed with `git worktree remove --force`
+(proper deregistration, not `rm -rf`) — 64 removed, 0 failures. `git worktree
+list` now shows only the main tree.
+
+**Three safety checks ran first**, all passing:
+1. The three rescue patches in `SWFRecompDocs/status/worktree-rescue-2026-09-04/`
+   were confirmed present on **`origin/master`**, not merely locally — so they
+   survive independently of any local deletion.
+2. No live process had a cwd inside any worktree (checked every session socket
+   under `/run/user/1000/cc-socks/`). A concurrently running slice was working in
+   the MAIN tree and its in-flight edits were left untouched.
+3. Disk measured before and after.
+
+**Result:** repo directory 49 GB → **30 GB**; filesystem free 779 G → 798 G, i.e.
+**19 GB reclaimed**. Branch count **368 before, 368 after** — removing a worktree
+does not delete its branch, which is what the audit relied on and what the two
+pinned items below depend on.
+
+**Still true after reclamation**, and the reason branches were all kept:
+- `t5-iso-v1` — **never merge**. Its commit is 2 insertions / 39 deletions, a
+  subtractive A/B bisect variant stripping `URLRequestHeader`, which master has
+  in full. It reads like "+2 ahead of master", i.e. like work; landing it is a
+  regression. Branch verified present.
+- `worktree-agent-a2f63695b17bd7caf` — fully landed, kept only so the
+  adjudication above remains checkable. Branch verified present.
+- The held curve-flattening leg C (`computeStaticPlacementScales()`, genuinely
+  absent from master) survives in `session14/w2-gfx-morph-legb.patch` and
+  `session15/w2-morph-legb2.patch`, both committed — not in any worktree.
