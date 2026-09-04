@@ -426,8 +426,18 @@ first).
   reachability half was already covered here** (`chd:kids` stays 1 under all
   three reverts), because a timeline placement resolves through
   `timeline_for_char` on the loaded root rather than through the MAIN-only
-  SymbolClass map — so all three probes land on the lookup layer. Closeout:
-  `SWFRecompDocs/status/avm2-child-static-text-grade.md`.
+  SymbolClass map — so all three probes land on the lookup layer. CI
+  corpus-clean in BOTH modes, serial, `categories=full`, `images=false`:
+  graphics `33890031783` (4372->4372, every bucket +0), no-graphics
+  `33893826974` (4373->4373); both `completed success`, `regression` 87/87 ->
+  **88/88** in both, totals 4497 -> **4498 graded**. Nothing could have moved —
+  no runtime or recompiler source changed. **The brief's baselines were one run
+  stale**: read fresh, graphics at `91c7c99f1` is 4372 not 4371, and the +1 over
+  `9925cac7c` is exactly `from_shumway/as3-loader/bug1157243/empty` going
+  output_mismatch -> pass — the intermittent slice 9 adjudicated, moving as its
+  472 local runs predicted. **The graphics corpus total is intermittent-dependent
+  by ±1**; re-read the results branch rather than carrying a number forward.
+  Closeout: `SWFRecompDocs/status/avm2-child-static-text-grade.md`.
 - **A loaded child whose stage HEIGHT differs from the root's renders shifted.**
   The recompiler bakes the y-flip into every vertex as `FRAME_HEIGHT - y`, per
   movie, so a 200-high child loaded into a 400-high parent is 200 px off. Both

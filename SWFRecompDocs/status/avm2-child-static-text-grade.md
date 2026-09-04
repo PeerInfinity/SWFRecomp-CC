@@ -120,7 +120,68 @@ says so.
 
 ## 5. CI
 
-See §6 below.
+Both modes, dispatched SERIALLY, `categories=full`, `images=false`. Baselines
+re-read fresh rather than taken from the brief (see the note at the end of this
+section).
+
+**graphics — run `33890031783`.** Corpus-clean:
+
+```
+=== intersection: 4497 tests (91c7c99f1 -> WORKTREE, results_graphics) ===
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4137 ->  4137 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4372 ->  4372 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+**no-graphics — run `33893826974`.** Corpus-clean:
+
+```
+=== intersection: 4497 tests (f735855ea -> WORKTREE, results) ===
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4137 ->  4137 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4373 ->  4373 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved in both modes, including the crash buckets the histogram
+exists to catch. Both runs `completed success`. `regression` **87/87 -> 88/88**
+in BOTH modes — the new fixture. The intersection is the 4497 each baseline
+graded; the new fixture is outside it, so corpus totals are now **4498 graded /
+4373 effective (graphics), 4374 (no-graphics)**. The one-test mode gap is the
+stable pre-existing divergence already on the BACKLOG under Tooling.
+
+Nothing here could have moved: this slice changes no runtime or recompiler
+source. The runs are the regression check, not the yield — the yield is §1-§3.
+
+**A note on the baselines, because the brief's were one run stale.** The brief
+quoted "4371 effective graphics / 4372 no-graphics, 4497 graded". Read fresh,
+the graphics baseline at `91c7c99f1` is **4372**, and the +1 over the previous
+publish (`9925cac7c`, run `33875683111`) is exactly
+`from_shumway/as3-loader/bug1157243/empty` going `output_mismatch -> pass` —
+the load-sensitive intermittent the predecessor adjudicated in its §8, moving
+in the direction its 472 local runs predicted. So **the graphics corpus total
+is intermittent-dependent by ±1**, and the closeout numbers to compare against
+are the absolute ones (4372 / 4497 at `91c7c99f1`, 4373 / 4497 at `f735855ea`),
+not the intersection figures the predecessor quoted against a pre-fixture
+baseline. Anyone diffing this arc should re-read the branch rather than trust a
+number copied forward.
+
+**Watcher note.** `gh run watch` was OOM-killed on the graphics run (the second
+documented death mode in `.claude/pipeline-handoff.md`, alongside the secondary
+rate limit). The preferred zero-API-quota fallback was used for both runs:
+polling `git fetch origin ruffle-test-results` and reading the run id out of
+the publish commit message. No watcher and no poll ran concurrently.
 
 ## 6. What is left of the arc
 
