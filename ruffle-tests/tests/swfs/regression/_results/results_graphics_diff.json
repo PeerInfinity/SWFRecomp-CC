@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-04T16:10:50.556417+00:00",
-    "old_git_sha": "d045bec8a81b73887204bcef06a3ab9fee9cf8a8",
-    "new_timestamp": "2026-09-04T18:23:42.532279+00:00",
-    "new_git_sha": "ec709e7c9340f9af368bdd6e8b3b35548b327a30",
+    "old_timestamp": "2026-09-04T18:23:42.532279+00:00",
+    "old_git_sha": "ec709e7c9340f9af368bdd6e8b3b35548b327a30",
+    "new_timestamp": "2026-09-04T20:29:55.078640+00:00",
+    "new_git_sha": "ed39ce53d96bda2e0772d293112bf85b571b9c05",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 88,
     "old_total": 88,
     "old_pass_rate": 100.0,
-    "new_pass": 88,
+    "new_pass": 89,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 88,
-    "new_total": 88,
+    "new_effective_pass": 89,
+    "new_total": 89,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 88,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_root_identity_and_playhead",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    }
+  ]
 }
