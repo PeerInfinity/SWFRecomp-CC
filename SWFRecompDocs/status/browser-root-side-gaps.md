@@ -22,7 +22,7 @@ typeof(_root)                       object             movieclip
 _root._currentframe                 undefined          1
 typeof(_root._currentframe)         undefined          number
 _root._totalframes                  undefined          1
-this._currentframe                  undefined          1
+main(mc)'s root arg ._currentframe  undefined          1
 _root._name                         (empty)            (empty)     <- agreed
 _root._x                            0                  0           <- agreed
 eval("_root")._currentframe         undefined          1
@@ -185,7 +185,25 @@ the previous slice's own lesson that prediction is not a licence to skip the
 dispatch: `wasm-link-smoke` builds the BROWSER configuration on every dispatch
 in any mode, and it is the one CI signal that can move for a change like this.
 
-<!-- CI RESULTS -->
+**Graphics**, run `33913083605` at `ed39ce53d`, `categories=full`,
+`images=false`, diffed against `23c37af72`:
+
+```
+=== intersection: 4498 tests (23c37af72 -> WORKTREE, results_graphics) ===
+  output_mismatch    124 ->   124 (+0)
+  pass              4138 ->  4138 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4373 ->  4373 (+0)
+GAINS 0   REGRESSIONS 0   OTHER STATUS MOVES 0
+```
+
+`completed success` — every job green, **`wasm-link-smoke` included**, which is
+the signal that actually matters for a change shaped like this one. `regression`
+89/89, the new fixture among them (it is outside the 4498-test intersection
+because it did not exist at the baseline).
+
+<!-- NO-GRAPHICS RESULTS -->
 
 ## 6. Folded in: the `MovieClipLoader.loadClip` browser probe
 
