@@ -280,6 +280,19 @@ typedef struct DisplayObject
 	// through to the real resolver and is re-cached. void* to avoid pulling the
 	// MovieClip definition into this header.
 	void* resolved_mc;
+	// The loaded-movie HOLDER whose frame tag created this entry, or NULL when
+	// the main movie placed it. `MovieClip*`, kept as void* so this header does
+	// not pull in action.h; MovieClip structs are immortal (tombstoned at
+	// depth == INT_MIN, never freed) so the pointer can never dangle.
+	//
+	// This is the PLACING movie, not the DEFINING one — the same distinction
+	// `place_transform_data` below draws, and the opposite of
+	// `child_transform_data`. It answers exactly one question: "when this loaded
+	// movie's timeline wraps back to its frame 1, which display entries did it
+	// put there and must therefore take away?" A movie loaded twice into two
+	// different holders has two identities here and one `movie_id`, which is why
+	// this records the holder and not `g_current_movie_id`.
+	void* placed_by_holder;
 	// Cached transform values (populated at placement time for correct bounds on child SWFs)
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
 	// The transform table `transform_id` indexes — i.e. the table belonging to

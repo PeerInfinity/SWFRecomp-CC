@@ -199,29 +199,52 @@ first).
   `g_avm1u2`, which already loops). **Looping is NOT part of this** -- see the
   next entry. Closeout:
   `SWFRecompDocs/status/child-timeline-advance.md`. (2026-09-03)
-- **A loaded movie does not LOOP, because it does not own its display
-  children.** A movie loaded into a clip is that clip's timeline and should
-  wrap past its last frame like any MovieClip (Ruffle `replace_with_movie` +
-  `determine_next_frame` -> `NextFrame::First`). It parks instead. A wrap has
-  to remove the movie's own display children before re-running its frame 1 --
-  otherwise frame 1's `PlaceObject2` hits an occupied depth and the runtime
-  prints `Warning: Failed to place object at depth N.` -- and a clip target's
-  children are interleaved with the parent's in the GLOBAL `display_list` with
-  nothing marking which are which. The obvious fix (give the holder its own
-  `DisplayObject` + private `sprite_display_list`, as `_levelN` already has)
-  was implemented and **measured to cost ten corpus tests**: merely ALLOCATING
-  a `DisplayObject` for a `createEmptyMovieClip` holder, with no display-list
-  change at all, breaks `avm1/movieclip_invalid_get_bounds_1..8`, and swapping
-  the list on top of that additionally breaks
-  `avm1/swf{5_to_6,6_to_5}_cross_call`. (`mc->display_obj != NULL` is read at
-  48 sites in `action.c` and means "this clip is a display object".) Two
-  routes: make per-movie display-list ownership actually work (find what those
-  ten tests read), or add `u8 placed_by_movie` to `DisplayObject`, written from
-  `g_current_movie_id` at placement, and clear exactly those on wrap -- the
-  same shape as slice 3's `place_transform_data` ruling. This is the same
-  missing per-movie abstraction as the render-tables entry below, seen from the
-  other side. Detail: `SWFRecompDocs/status/child-timeline-advance.md` §2.2.
-  (2026-09-03)
+- ~~**A loaded movie does not LOOP, because it does not own its display
+  children.**~~ **DONE 2026-09-03** -- and it did NOT need per-movie display
+  lists. A loaded movie now wraps from its last frame to its frame 1 (Ruffle
+  `determine_next_frame` -> `NextFrame::First`), clearing its own display
+  children on the way. Ownership is one field on the display entry --
+  `DisplayObject::placed_by_holder`, the HOLDER whose frame tag placed it,
+  written at the two new-entry `PlaceObject2` sites from
+  `actionCurrentChildMovieMC()` -- not a private `sprite_display_list`.
+  **Deviation from the entry this replaces: the field records the holder, not
+  `g_current_movie_id`.** The two disagree for the same file loaded into two
+  different holders, which is one movie id but two independent playheads;
+  looping is a per-LOAD question. Two defects fell out of the audit: the clear
+  has to walk BOTH the active list and the global one, because the driver swaps
+  to a timeline-clip holder's private sprite list but neither loader does (so
+  such a movie's frame 1 is in one list and its frames 2..N in the other -- a
+  pre-existing asymmetry); and the driver's copy-out **resurrected a playhead
+  that `unloadMovie` had unregistered mid-frame**, the same class as the
+  predecessor's `stop()` write-back bug, now fixed by re-reading the live slot.
+  Anchored by `regression/avm1_child_timeline_loop` (two out-of-phase loaded
+  movies, so every wrap is a live over-clearing control) plus the deliberate
+  flips of `avm1_child_timeline_advance` and `avm1_child_timeline_holder_stop`,
+  whose park rows the predecessor wrote as a lock to be broken. Closeout:
+  `SWFRecompDocs/status/per-movie-display-list-ownership.md`. (2026-09-03)
+- **Per-movie display-list ownership (Route 1) is a SUB-ARC, and its shape is
+  now measured.** The brief's decisive question -- what
+  `avm1/movieclip_invalid_get_bounds_1..8` actually read from `display_obj` --
+  has one answer: **the onEnterFrame eligibility gate** (`action.c:37058`),
+  whose `enterframe_eligible` flag is armed by a display-list walk that a
+  loaded movie's root is not in. The runtime already had the escape hatch for
+  the identical `_levelN` case (`actionIsLoadedLevelRootMC`); widening that one
+  predicate is two lines and recovers six of the eight. So the 48
+  `display_obj != NULL` sites do NOT need a different predicate -- 47 were
+  never the problem. Three work items remain, in order: (1) widen the
+  predicate; (2) make the loaders swap for clip targets like the driver does,
+  and fix the fallout (`getBounds`'s loaded-child fallback becomes dead code,
+  `unloadMovie` must clear a list it now owns, the two-list clear collapses to
+  one); (3) the hard one -- **the swap is call-scoped, not movie-scoped**.
+  `avm1/swf{5_to_6,6_to_5}_cross_call` was bisected to the direct-`loadMovie`
+  swap alone and then instrumented: the child calls back into `_root.onLoaded()`
+  during its own frame 1, so the parent's whole test block runs INSIDE the swap
+  and resolves names against the child's list. A single global `display_list`
+  pointer cannot express ownership while two movies' code is on the stack, so
+  either name resolution takes its list from the clip being resolved against,
+  or the swap is pushed down to the placement/lookup sites. `_levelN` has
+  carried the same hazard all along, ungraded. Detail:
+  `SWFRecompDocs/status/per-movie-display-list-ownership.md` §1-2. (2026-09-03)
 - **Our MovieClipLoader load completes a tick later than Flash's.** A loaded
   movie used to run TWO of its frames on its load tick (the loader calls
   `frame_funcs[0]`; the per-tick driver runs in the same tick right after it).
@@ -235,7 +258,11 @@ first).
   `ng_goto*` entry points need a `CHAR_TYPE_SPRITE` dictionary character and a
   loaded holder has none), browser-WASM never advances a loaded movie at all
   (`swf.c`'s driver call is inside `#ifdef OFFSCREEN_RENDER`), and a second
-  load into the same holder does not clear the first movie's children.
+  load into the same holder does not clear the first movie's children -- now
+  CHEAP to fix, since `actionRegisterChildMovieAdvance` replacing an entry is
+  the exact moment and `actionClearChildMoviePlacements` is the exact call;
+  left undone deliberately in slice 6 (a behaviour change on the
+  `mcl_replace_root_*` / `load_cancel_*` cluster with no fixture demanding it).
   (2026-09-03)
 - **A loaded child movie does not render at all — the renderer has no
   per-movie tables.** Rewritten 2026-09-03 from "a loaded child's bitmaps never
@@ -260,7 +287,13 @@ first).
   of a child bitmap goes through the metadata/table paths, both now fixed, so
   nothing in ActionScript can observe `ctx->bitmap_sizes`. Worth taking after
   the frame-0 timeline entry above — a child that renders only frame 1 is a
-  thin prize. Detail: `SWFRecompDocs/status/child-embedded-asset-lookup.md`
+  thin prize; that gate is gone (children advance since slice 5 and LOOP since
+  slice 6). **This is NOT the same missing abstraction as display-list
+  ownership**, despite both being called "per-movie": that one is per-ENTRY
+  identity in a shared list, this one is per-movie INDEX BASES on
+  `MovieEntry` plus a growable re-entrant static pool, and it is just as
+  broken for a `_levelN` child that already HAS a private display list.
+  Slice 6 does not move it. See `per-movie-display-list-ownership.md` §7. Detail: `SWFRecompDocs/status/child-embedded-asset-lookup.md`
   section 3. (2026-09-03)
 - **`flashbang_upload_bitmap`'s offset bug is fixed but untested.** The SDL3
   backend read `((u32*)context->bitmap_data)[bitmap_pixel]` — the start of the

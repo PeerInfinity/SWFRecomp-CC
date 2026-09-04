@@ -9621,6 +9621,13 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	{ extern size_t g_tick_count; display_list[depth].placed_at_tick = g_tick_count; }
+	// Record the loaded-movie holder whose frame tag is running, so a wrap-back
+	// of that movie's timeline can take its own children off the list again.
+	// NULL for every ordinary main-movie placement. See DisplayObject.
+	{
+		extern MovieClip* actionCurrentChildMovieMC(void);
+		display_list[depth].placed_by_holder = (void*)actionCurrentChildMovieMC();
+	}
 	display_list[depth].place_gen = g_place_gen;
 	display_list[depth].place_seq = ++g_place_seq;
 	display_list[depth].constructor_invoked = 0;
@@ -10191,6 +10198,13 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	{ extern size_t g_tick_count; display_list[depth].placed_at_tick = g_tick_count; }
+	// Record the loaded-movie holder whose frame tag is running, so a wrap-back
+	// of that movie's timeline can take its own children off the list again.
+	// NULL for every ordinary main-movie placement. See DisplayObject.
+	{
+		extern MovieClip* actionCurrentChildMovieMC(void);
+		display_list[depth].placed_by_holder = (void*)actionCurrentChildMovieMC();
+	}
 	display_list[depth].place_gen = g_place_gen;
 	display_list[depth].place_seq = ++g_place_seq;
 	display_list[depth].constructor_invoked = 0;

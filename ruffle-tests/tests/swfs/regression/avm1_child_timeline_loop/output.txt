@@ -1,0 +1,34 @@
+c1
+d1
+t1 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:1 p:movieclip q:undefined | rf:1
+c2
+d2
+t2 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:2 p:movieclip q:movieclip | rf:1
+c3
+d1
+t3 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:1 p:movieclip q:undefined | rf:1
+c1
+d2
+t4 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:2 p:movieclip q:movieclip | rf:1
+c2
+d1
+t5 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:1 p:movieclip q:undefined | rf:1
+c3
+d2
+t6 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:2 p:movieclip q:movieclip | rf:1
+c1
+d1
+t7 f1:1 a:movieclip b:undefined c:undefined ax:10 | f2:1 p:movieclip q:undefined | rf:1
+c2
+d2
+t8 f1:2 a:movieclip b:movieclip c:undefined ax:20 | f2:2 p:movieclip q:movieclip | rf:1
+c3
+d1
+t9 f1:3 a:movieclip b:movieclip c:movieclip ax:20 | f2:1 p:movieclip q:undefined | rf:1
+done
+c1
+d2
+c2
+d1
+c3
+d2

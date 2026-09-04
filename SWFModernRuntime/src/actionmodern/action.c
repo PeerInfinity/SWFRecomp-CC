@@ -24237,6 +24237,42 @@ int hasPlayingLevels(void)
 	return 0;
 }
 
+// Take a loaded movie's own display children back off the list.
+//
+// Called for exactly one reason: the movie's timeline has reached its last
+// frame and is about to wrap to frame 1. Its frame 1 re-runs the same
+// PlaceObject2 tags, and the runtime REFUSES a place onto an occupied depth
+// with a graded `Warning: Failed to place object at depth N.` — so the wrap has
+// to clear first. Ruffle's equivalent is run_goto(frame 1) on the clip, which
+// removes the children the timeline placed and re-places them.
+//
+// Ownership is read off the entry (`placed_by_holder`), NOT off the list: a
+// clip target's children are interleaved with the parent's in the global
+// display_list and there is no other way to tell them apart. A _levelN target
+// does have a private list, and the same predicate works there unchanged --
+// its entries carry the same stamp.
+//
+// Top level only, and deliberately: a sprite the movie placed owns its own
+// children, and removing the sprite entry disposes them with it. What this does
+// NOT cover is a placement the movie aimed at a clip belonging to somebody else
+// (a SetTarget into the parent's tree); those are that clip's children by every
+// other rule in the runtime, and a wrap has no business removing them.
+static void actionClearChildMoviePlacements(SWFAppContext* app_context, MovieClip* holder)
+{
+	if (holder == NULL) return;
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	// Descending, so clearing an entry cannot disturb a depth still to visit.
+	for (size_t d = max_depth; d >= 1; d--) {
+		if (display_list[d].char_id == 0) continue;
+		if (display_list[d].placed_by_holder != (void*)holder) continue;
+		// The tag-stream removal, not a raw slot clear: it fires onUnload,
+		// invalidates the cached MovieClip and disposes the subtree, which is
+		// what Flash does to a timeline child that the playhead leaves behind.
+		tagRemoveObject2(app_context, d);
+	}
+}
+
 void actionAdvancePlayingLevels(SWFAppContext* app_context)
 {
 	if (g_level_advance_count == 0) return;
@@ -24263,15 +24299,22 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 			g_level_advance[write++] = e;
 			continue;
 		}
-		// Past the last frame. A loaded movie should WRAP here (Ruffle
-		// determine_next_frame -> NextFrame::First); it parks instead, because a
-		// wrap has to clear the movie's own display children and a clip target's
-		// children are interleaved with the parent's in the global display_list.
-		// Keeping the entry (rather than dropping it) is what makes a later
-		// holder.play() able to find this playhead again.
+		// Past the last frame: WRAP back to frame 1, which is what Ruffle's
+		// determine_next_frame answers (NextFrame::First) for any loaded movie
+		// with more than one frame. The movie's own display children have to come
+		// off the list first -- frame 1 re-places at the same depths and the
+		// runtime refuses (and prints) a place onto an occupied depth.
+		//
+		// The clear runs on whichever list the driver is about to swap in: a
+		// _levelN target's private sprite list, or the global list for a clip
+		// target. Both are addressed by the same per-entry stamp, so the swap
+		// below has to happen FIRST -- hence the clear is inside the frame call's
+		// swap, not here. `current_frame = 0` is what makes the code below run
+		// frame_funcs[0]; the increment at the bottom then lands it on 1.
+		int _wrapped = 0;
 		if (e.current_frame >= e.entry->frame_count) {
-			g_level_advance[write++] = e;
-			continue;
+			e.current_frame = 0;
+			_wrapped = 1;
 		}
 
 		frame_func fn = e.entry->frame_funcs[e.current_frame];
@@ -24319,6 +24362,40 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 				}
 			}
 
+			// Now that the movie's own list is the active one, drop the children
+			// it placed on its previous pass. Done under the same context swap as
+			// the frame call so onUnload handlers see the movie's SWF version,
+			// globals and transform table, exactly as its own RemoveObject2 would.
+			if (_wrapped) {
+				MovieClip* _clr_saved_child_mc = g_child_movie_advance_mc;
+				g_child_movie_advance_mc = e.mc;
+				actionClearChildMoviePlacements(app_context, e.mc);
+				// ...and the GLOBAL list too, when they differ. A holder that is
+				// itself a TIMELINE clip already has a sprite list, so THIS driver
+				// swaps to it -- but neither LOADER does, so that movie's frame 1
+				// placed into the global list and its frames 2..N into the private
+				// one. The asymmetry pre-dates this slice (it is the display-list
+				// half of Route 1, see the closeout); until it is resolved a wrap
+				// that looked in only one list would leave half the movie behind.
+				// For a _levelN target this pass is a no-op -- nothing of the
+				// level's is in the parent's list -- and for a dynamic
+				// createEmptyMovieClip holder there is no swap and the pass above
+				// already WAS the global list.
+				if (_did_swap) {
+					DisplayObject* _clr_dl = display_list;
+					size_t _clr_max = max_depth, _clr_cap = display_list_capacity;
+					display_list = _saved_dl;
+					max_depth = _saved_max;
+					display_list_capacity = _saved_cap;
+					actionClearChildMoviePlacements(app_context, e.mc);
+					_saved_max = max_depth;
+					display_list = _clr_dl;
+					max_depth = _clr_max;
+					display_list_capacity = _clr_cap;
+				}
+				g_child_movie_advance_mc = _clr_saved_child_mc;
+			}
+
 			extern int quit_swf;
 			extern int is_playing;
 			extern size_t next_frame;
@@ -24348,9 +24425,51 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 			// read-back the write-back resurrects the playhead the movie just
 			// stopped. (Re-found by fixture: the movie's frame-4 stop() was
 			// recorded and then immediately overwritten, so frame 5 ran anyway.)
+			//
+			// The same copy-out resurrects more than a stop(). `unloadMovie` from
+			// inside the frame calls actionUnregisterLevelAdvance, which NULLs the
+			// live slot -- and the write-back below would put the entry straight
+			// back. A fresh load into the same holder rewrites the slot with a new
+			// MovieEntry and a frame cursor of 1, which the stale copy would
+			// clobber. Both are ordinary shapes now that looping runs last frames
+			// often, so the read-back covers the whole slot, not just `playing`.
 			{
 				LevelAdvanceEntry* _live = childMovieEntryFor(e.mc);
-				if (_live != NULL) e.playing = _live->playing;
+				if (_live == NULL) {
+					// Unregistered mid-frame: drop it, do not write the copy back.
+					continue;
+				}
+				if (_live->entry != e.entry) {
+					// A fresh load took this holder over during the frame. Its
+					// registration is the live one; carry it through verbatim
+					// instead of advancing the movie it replaced.
+					g_level_advance[write++] = *_live;
+					quit_swf = _saved_quit;
+					is_playing = _saved_is_playing;
+					next_frame = _saved_next_frame;
+					manual_next_frame = _saved_manual_next;
+					if (_did_swap) {
+						if (dobj != NULL) {
+							dobj->sprite_display_list = display_list;
+							dobj->sprite_max_depth = max_depth;
+							dobj->sprite_dl_capacity = display_list_capacity;
+						}
+						display_list = _saved_dl;
+						max_depth = _saved_max;
+						display_list_capacity = _saved_cap;
+					}
+					if (_saved_td != NULL) {
+						extern float (*g_active_transform_data)[16];
+						g_active_transform_data = _saved_td;
+					}
+					actionSetCurrentContext(_saved_ctx);
+					g_swf_version = _saved_ver;
+					global_object = _saved_global;
+					g_child_swf_init = _saved_child_init;
+					g_current_movie_id = _saved_movie_id;
+					continue;
+				}
+				e.playing = _live->playing;
 			}
 			quit_swf = _saved_quit;
 			is_playing = _saved_is_playing;
