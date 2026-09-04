@@ -1,0 +1,30 @@
+A1 base.shadowed: base-private
+A2 sub.shadowed:  sub-protected
+A3 via base code: base-private
+A4 via sub code:  sub-protected
+A5 protected:     7
+A6 accessor:      3
+A7 static:        base-prot-static
+A8 public:        public-value
+A9 qname form:    probe::Sub
+B1 after set:     42
+B2 coerced:       13 typeof=number
+B3 accessor set:  10
+B4 sub written:   sub-written
+B5 base untouched:base-private
+C1 swfmodern.Reflect: class probe.Base declares no trait noSuchMember.
+C2 swfmodern.Reflect: no class probe.NoSuchClass in this object's hierarchy.
+C3 swfmodern.Reflect: receiver is null or undefined (the object does not exist yet).
+C4 swfmodern.Reflect: trait secretMethod is not readable (it is a method).
+C5 swfmodern.Reflect: trait FROZEN is a const.
+C6 swfmodern.Reflect: no class probe.Base in this object's hierarchy.
+D1 control: throws #1069
+D2 control: throws #1069
+D3 control: undefined
+D4 hook sees it:  dyn-private
+D5 public normal: public-value
+E1 three draws:   3
+E2 no draws:      0
+E3 cosmetic:      0
+E4 across reset:  1
+E5 monotonic:     true

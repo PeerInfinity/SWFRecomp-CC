@@ -8731,6 +8731,7 @@ void avm2_globals_init(Avm2Context* ctx)
 	avm2_register_vector(ctx);
 	avm2_register_regexp(ctx);
 	avm2_register_nsqname(ctx);
+	avm2_register_reflect(ctx);
 	avm2_register_dictionary(ctx);
 	avm2_register_proxy(ctx);
 	avm2_register_bytearray(ctx);

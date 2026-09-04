@@ -204,6 +204,10 @@ void avm2_register_vector(Avm2Context* ctx);   // __AS3__.vec::Vector + speciali
 void avm2_register_regexp(Avm2Context* ctx);   // RegExp + String regex paths
 void avm2_register_json(Avm2Context* ctx);     // SWF13+ (caller gates)
 void avm2_register_nsqname(Avm2Context* ctx);  // Namespace + QName
+// swfmodern.Reflect (avm2_class.c) — the trait-table observation hook for
+// injected code, sibling of swfmodern.Rng. Lives with the vtable machinery it
+// walks; registered here so the whole swfmodern family is minted in one place.
+void avm2_register_reflect(Avm2Context* ctx);
 void avm2_register_dictionary(Avm2Context* ctx);  // flash.utils.Dictionary
 // Is `obj` an instance of (a subclass of) flash.utils.Dictionary?
 int avm2_is_dictionary(Avm2Object* obj);

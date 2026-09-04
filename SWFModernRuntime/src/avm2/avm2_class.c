@@ -1962,3 +1962,257 @@ Avm2Value avm2_coerce_to_type_mn(Avm2Context* ctx, Avm2AbcFileRt* file,
 	}
 	return avm2_coerce_to_class(ctx, cls, v);
 }
+
+// ---------------------------------------------------------------------------
+// swfmodern.Reflect — namespace-blind trait access for injected code
+// ---------------------------------------------------------------------------
+//
+// Sibling of swfmodern.Rng (avm2_number.c): a runtime INSTRUMENT, not an ECMA
+// or playerglobal surface. It exists for code injected into a recompiled,
+// source-less SWF — a recorder that must read a game object's `protected var
+// dashTime` without being able to recompile the game.
+//
+// Why the ordinary route cannot work. `getproperty` with a runtime-built name
+// resolves in the PUBLIC namespace, and a script cannot construct a key in any
+// other one:
+//   - PRIVATE (ABC kind 0x05) is compared by POOL-ENTRY IDENTITY, never by URI
+//     (avm2_propkey_matches above; every ASC PrivateNamespace carries the same
+//     empty name). No `new Namespace(uri)` can ever equal one.
+//   - PROTECTED (0x18) IS compared by (kind, URI) — it is not identity-keyed,
+//     which is a real difference from private. It is still unreachable from
+//     script, for a different reason: `new Namespace(...)` always yields kind
+//     0x16 (avm2_nsqname.c namespace_construct), and 0x16 vs 0x18 fails the
+//     kind check before the URI is ever looked at. The only way to a 0x18 key
+//     is a namespace CONSTANT in an ABC that declares it.
+// So the hook resolves against the class's trait table directly, and takes the
+// declaring class as a REQUIRED argument.
+//
+// Why the OWNER argument is required rather than optional: a base-class
+// `private var x` and a subclass `protected var x` are genuinely different
+// slots (private members are not virtual — Base's method reads BASE's slot),
+// so a name-only lookup would have to pick one by a rule the caller could only
+// trust. Naming the owner removes the ambiguity by construction. Callers get
+// the owner from getQualifiedClassName, so BOTH spellings are accepted:
+// "pkg.Class" and "pkg::Class".
+//
+// Why the RUNTIME vtable and not the Avm2AbcTrait arrays: a trait's
+// `slot_or_disp_id` is frequently 0 ("auto-assign"), so the static table alone
+// does not say which slot a trait owns — you would have to replay the whole
+// vtable build to find out. The flattened ivtable already holds the answer,
+// already carries `defining_class` on every entry (stamped in
+// avm2_vtable_add_traits, and preserved when a subclass inherits the entry),
+// and already keeps a shadowed base slot alongside the subclass's own. Class
+// (static) traits live on the class object's own vtable with the same stamp,
+// so passing a class object reads statics through the same code.
+//
+// Every failure THROWS with a distinguishing message. A missing trait must
+// never come back as null: null is exactly what the broken path returns, and
+// an instrument that cannot tell "no such trait" from "trait unreadable" from
+// "object not built yet" has not fixed anything.
+
+static Avm2Object* reflect_receiver(Avm2Activation* act, uint32_t argc_min)
+{
+	Avm2Context* ctx = act->ctx;
+	if (act->argc < argc_min)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "swfmodern.Reflect: expected %u arguments, got %u.",
+		                 argc_min, act->argc);
+	}
+	Avm2Value v = act->args[0];
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+		                 "swfmodern.Reflect: receiver is null or undefined "
+		                 "(the object does not exist yet).");
+	}
+	if (v.kind != AVM2_VALUE_OBJECT || v.u.obj == NULL)
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "swfmodern.Reflect: receiver is a primitive, which "
+		                 "declares no traits.");
+	}
+	return v.u.obj;
+}
+
+// Does `cls` answer to the caller's spelling of its qualified name? Accepts
+// the dot form ("pkg.Class") and the getQualifiedClassName form
+// ("pkg::Class"), since callers get the string from the latter.
+static int reflect_owner_matches(const Avm2Class* cls,
+                                 const char* want, uint32_t want_len)
+{
+	char buf[256];
+	int n = avm2_class_qname_buf(cls, buf, sizeof(buf));
+	if (n > 0 && (size_t) n < sizeof(buf) && (uint32_t) n == want_len
+	    && memcmp(buf, want, want_len) == 0)
+	{
+		return 1;
+	}
+	n = avm2_class_qname_colons_buf(cls, buf, sizeof(buf));
+	if (n > 0 && (size_t) n < sizeof(buf) && (uint32_t) n == want_len
+	    && memcmp(buf, want, want_len) == 0)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+// Find the entry named `name` DECLARED BY the class the caller named. Interface
+// aliases are skipped: they are our dispatch machinery, not traits anyone
+// declared. `*owner_seen` reports whether the named class contributed anything
+// at all to this receiver, so a wrong class name and a wrong member name are
+// distinguishable failures.
+static const Avm2PropEntry* reflect_find(const Avm2VTable* vt,
+                                         const char* owner, uint32_t owner_len,
+                                         const char* name, uint32_t name_len,
+                                         int* owner_seen)
+{
+	*owner_seen = 0;
+	if (vt == NULL) return NULL;
+	const Avm2Class* last_owner = NULL;
+	int last_match = 0;
+	for (uint32_t i = 0; i < vt->count; i++)
+	{
+		const Avm2PropEntry* e = &vt->entries[i];
+		if (e->is_iface_alias || e->defining_class == NULL) continue;
+		// The owner test is an snprintf; the entry list is walked per call, so
+		// cache the last verdict (runs of entries share a defining class).
+		if (e->defining_class != last_owner)
+		{
+			last_owner = e->defining_class;
+			last_match = reflect_owner_matches(e->defining_class, owner, owner_len);
+		}
+		if (!last_match) continue;
+		*owner_seen = 1;
+		if (e->key.name_len == name_len
+		    && memcmp(e->key.name, name, name_len) == 0)
+		{
+			return e;
+		}
+	}
+	return NULL;
+}
+
+static _Noreturn void reflect_no_trait(Avm2Context* ctx, int owner_seen,
+                                       const char* owner, uint32_t owner_len,
+                                       const char* name, uint32_t name_len)
+{
+	if (!owner_seen)
+	{
+		avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+		                 "swfmodern.Reflect: no class %.*s in this object's "
+		                 "hierarchy.", (int) owner_len, owner);
+	}
+	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+	                 "swfmodern.Reflect: class %.*s declares no trait %.*s.",
+	                 (int) owner_len, owner, (int) name_len, name);
+}
+
+static Avm2Value reflect_get_trait(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* obj = reflect_receiver(act, 3);
+	const Avm2String* owner = avm2_coerce_to_string(ctx, act->args[1]);
+	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[2]);
+	int owner_seen = 0;
+	const Avm2PropEntry* e = reflect_find(obj->vtable, owner->utf8, owner->len,
+	                                      name->utf8, name->len, &owner_seen);
+	if (e == NULL)
+	{
+		reflect_no_trait(ctx, owner_seen, owner->utf8, owner->len,
+		                 name->utf8, name->len);
+	}
+	switch (e->kind)
+	{
+		case AVM2_PROP_SLOT:
+			if (e->slot_index == 0 || e->slot_index >= obj->slot_count)
+			{
+				avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+				                 "swfmodern.Reflect: trait %.*s has no slot on "
+				                 "this object (it is not fully constructed).",
+				                 (int) name->len, name->utf8);
+			}
+			return obj->slots[e->slot_index];
+		case AVM2_PROP_GETTER:
+		case AVM2_PROP_GETSET:
+			return avm2_call_method_ref(ctx, &e->method, e->defining_class,
+			                            e->method_scope, act->args[0], NULL, 0);
+		default:
+			break;
+	}
+	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+	                 "swfmodern.Reflect: trait %.*s is not readable (it is a %s).",
+	                 (int) name->len, name->utf8,
+	                 e->kind == AVM2_PROP_METHOD ? "method" : "write-only accessor");
+}
+
+static Avm2Value reflect_set_trait(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* obj = reflect_receiver(act, 4);
+	const Avm2String* owner = avm2_coerce_to_string(ctx, act->args[1]);
+	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[2]);
+	Avm2Value value = act->args[3];
+	int owner_seen = 0;
+	const Avm2PropEntry* e = reflect_find(obj->vtable, owner->utf8, owner->len,
+	                                      name->utf8, name->len, &owner_seen);
+	if (e == NULL)
+	{
+		reflect_no_trait(ctx, owner_seen, owner->utf8, owner->len,
+		                 name->utf8, name->len);
+	}
+	switch (e->kind)
+	{
+		case AVM2_PROP_SLOT:
+		{
+			if (e->is_const)
+			{
+				avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+				                 "swfmodern.Reflect: trait %.*s is a const.",
+				                 (int) name->len, name->utf8);
+			}
+			if (e->slot_index == 0 || e->slot_index >= obj->slot_count)
+			{
+				avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+				                 "swfmodern.Reflect: trait %.*s has no slot on "
+				                 "this object (it is not fully constructed).",
+				                 (int) name->len, name->utf8);
+			}
+			// Declared-type coercion, exactly as a slot write through the
+			// ordinary path does it (avm2_op_setslot): an instrument must not
+			// be able to park a String in an int slot.
+			if (e->type_mn != 0 && e->type_file != NULL)
+			{
+				value = avm2_coerce_to_type_mn(ctx, e->type_file, e->type_mn, value);
+			}
+			obj->slots[e->slot_index] = value;
+			return avm2_undefined();
+		}
+		case AVM2_PROP_SETTER:
+		case AVM2_PROP_GETSET:
+			// The setter half can be declared by a deeper class than the
+			// getter (see Avm2PropEntry::setter_defining_class).
+			avm2_call_method_ref(ctx, &e->setter,
+			                     e->setter_defining_class != NULL
+			                       ? e->setter_defining_class : e->defining_class,
+			                     e->setter_scope != NULL
+			                       ? e->setter_scope : e->method_scope,
+			                     act->args[0], &value, 1);
+			return avm2_undefined();
+		default:
+			break;
+	}
+	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+	                 "swfmodern.Reflect: trait %.*s is not writable (it is a %s).",
+	                 (int) name->len, name->utf8,
+	                 e->kind == AVM2_PROP_METHOD ? "method" : "read-only accessor");
+}
+
+void avm2_register_reflect(Avm2Context* ctx)
+{
+	Avm2Class* refl = avm2_builtin_class(ctx, "swfmodern", "Reflect",
+	                                     ctx->builtins.object_class);
+	refl->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+	avm2_builtin_add_static_method_n(ctx, refl, "getTrait", reflect_get_trait, 3);
+	avm2_builtin_add_static_method_n(ctx, refl, "setTrait", reflect_set_trait, 4);
+}

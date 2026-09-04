@@ -522,8 +522,18 @@ static int32_t avm2_random_next(Avm2RandomFast* r)
 	return aNum & 0x7FFFFFFF;
 }
 
+// Draws taken from the MAIN stream. `Math.random()` is the only way to move
+// that generator, so this counts exactly the numbers a replay would have to
+// step past. It is deliberately NOT reset by setState: the point of a
+// monotonic counter is that a per-tick sample can subtract two readings and
+// get a draw COUNT, and a reset would silently make a window read as zero.
+// `cosmetic()` runs a separate generator and is not counted -- counting it
+// would defeat the whole reason the second stream exists.
+static uint64_t g_avm2_rng_draws;
+
 static int32_t avm2_generate_random_number(void)
 {
+	g_avm2_rng_draws++;
 	return avm2_random_next(&g_avm2_rng);
 }
 
@@ -557,6 +567,12 @@ static Avm2Value math_random(Avm2Activation* act)
 // otherwise shift every gameplay draw that follows. Nothing routes itself —
 // only the content knows which of its own draws are which — so this is inert
 // until something calls it, and `Math.random()` is untouched either way.
+//
+// `draws()` closes the loop on the paragraph above: `state` says WHERE the
+// stream is, `draws()` says HOW FAR it has come. With one seeded generator the
+// values themselves are then recoverable offline (step the LFSR N times), so a
+// per-tick sample of the pair describes the stream completely instead of
+// merely proving it moved.
 //
 // Reachable from AS3 as flash.utils.getDefinitionByName("swfmodern.Rng"); a
 // build without it throws #1065 there, which is a loud absence rather than a
@@ -593,6 +609,14 @@ static Avm2Value rng_set_cosmetic_state(Avm2Activation* act)
 {
 	avm2_random_seed(&g_avm2_rng_cosmetic, rng_arg_u32(act, 0));
 	return avm2_undefined();
+}
+
+static Avm2Value rng_draws(Avm2Activation* act)
+{
+	(void) act;
+	// A double carries every count below 2^53; the LFSR would have to be
+	// stepped for millennia to reach that, so no precision note is needed.
+	return avm2_number((double) g_avm2_rng_draws);
 }
 
 static Avm2Value rng_cosmetic(Avm2Activation* act)
@@ -863,4 +887,9 @@ void avm2_register_number(Avm2Context* ctx)
 	avm2_builtin_add_static_method_n(ctx, rng, "setCosmeticState",
 	                                 rng_set_cosmetic_state, 1);
 	avm2_builtin_add_static_method_n(ctx, rng, "cosmetic", rng_cosmetic, 0);
+	// ⛓ `draws` is MONOTONIC for the life of the process — setState does not
+	// zero it. A stream that reports only its state says the state moved; one
+	// that also reports its draw count is self-describing (the values are
+	// recoverable offline by stepping the generator that many times).
+	avm2_builtin_add_static_method_n(ctx, rng, "draws", rng_draws, 0);
 }

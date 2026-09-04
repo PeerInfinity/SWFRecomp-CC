@@ -2185,6 +2185,60 @@ def get_self_load(test_dir):
     return False
 
 
+# AVM2 (AS3) runtime module tree. An AVM1 test never compiles any of it; a
+# test whose recompile produced RecompiledABC/ compiles all of it and defines
+# -DSWF_AVM2, which routes main.c to runSWF_avm2() instead of swf_core.c's
+# swfStart(). Shared by compile_native and compile_wasm so the two targets
+# cannot drift apart — the whole point of running a fixture on both.
+AVM2_CORE_SOURCES = [
+    "src/avm2/avm2_value.c",
+    "src/avm2/avm2_object.c",
+    "src/avm2/avm2_class.c",
+    "src/avm2/avm2_ops.c",
+    "src/avm2/avm2_globals.c",
+    "src/avm2/avm2_function.c",
+    "src/avm2/avm2_error.c",
+    "src/avm2/avm2_number.c",
+    "src/avm2/avm2_string.c",
+    "src/avm2/avm2_array.c",
+    "src/avm2/avm2_vector.c",
+    "src/avm2/avm2_regexp.c",
+    "src/avm2/avm2_json.c",
+    "src/avm2/avm2_nsqname.c",
+    "src/avm2/avm2_dictionary.c",
+    "src/avm2/avm2_proxy.c",
+    "src/avm2/avm2_bytearray.c",
+    "src/avm2/avm2_mops.c",
+    "src/avm2/avm2_amf.c",
+    "src/avm2/avm2_net.c",
+    "src/avm2/avm2_date.c",
+    "src/avm2/avm2_e4x.c",
+    "src/avm2/avm2_xml.c",
+    "src/avm2/avm2_events.c",
+    "src/avm2/avm2_text.c",
+    "src/avm2/avm2_display.c",
+    "src/avm2/avm2_stage3d.c",
+    "src/avm2/avm2_pixelbender.c",
+    "src/avm2/avm2_filters.c",
+    "src/avm2/avm2_bitmap.c",
+    "src/avm2/avm2_cpu_raster.c",
+    "src/avm2/avm2_media.c",
+    "src/avm2/avm2_external.c",
+    "src/avm2/avm2_flixel.c",
+    "src/avm2/avm2_gc.c",
+    "src/avm2/avm2_main.c",
+]
+
+
+def copy_avm2_third_party(build_dir):
+    """Vendored deps the AVM2 tree links: QuickJS libregexp (RegExp) and the
+    LZMA SDK (ByteArray.compress/uncompress("lzma"))."""
+    for sub in ("quickjs-libregexp", "lzma"):
+        for f in (SWFMODERN / "third_party" / sub).iterdir():
+            if f.suffix in (".c", ".h"):
+                shutil.copy2(f, build_dir)
+
+
 def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_image_comparisons=False, asan=False, use_ccache=True):
     """Compile generated C code with runtime into native binary.
 
@@ -2235,52 +2289,8 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     # instead of swf_core.c's swfStart(). AVM1 tests never compile src/avm2.
     is_avm2 = (test_dir / "RecompiledABC").exists()
     if is_avm2:
-        core_sources.extend([
-            "src/avm2/avm2_value.c",
-            "src/avm2/avm2_object.c",
-            "src/avm2/avm2_class.c",
-            "src/avm2/avm2_ops.c",
-            "src/avm2/avm2_globals.c",
-            "src/avm2/avm2_function.c",
-            "src/avm2/avm2_error.c",
-            "src/avm2/avm2_number.c",
-            "src/avm2/avm2_string.c",
-            "src/avm2/avm2_array.c",
-            "src/avm2/avm2_vector.c",
-            "src/avm2/avm2_regexp.c",
-            "src/avm2/avm2_json.c",
-            "src/avm2/avm2_nsqname.c",
-            "src/avm2/avm2_dictionary.c",
-            "src/avm2/avm2_proxy.c",
-            "src/avm2/avm2_bytearray.c",
-            "src/avm2/avm2_mops.c",
-            "src/avm2/avm2_amf.c",
-            "src/avm2/avm2_net.c",
-            "src/avm2/avm2_date.c",
-            "src/avm2/avm2_e4x.c",
-            "src/avm2/avm2_xml.c",
-            "src/avm2/avm2_events.c",
-            "src/avm2/avm2_text.c",
-            "src/avm2/avm2_display.c",
-            "src/avm2/avm2_stage3d.c",
-            "src/avm2/avm2_pixelbender.c",
-            "src/avm2/avm2_filters.c",
-            "src/avm2/avm2_bitmap.c",
-            "src/avm2/avm2_cpu_raster.c",
-            "src/avm2/avm2_media.c",
-            "src/avm2/avm2_external.c",
-            "src/avm2/avm2_flixel.c",
-            "src/avm2/avm2_gc.c",
-            "src/avm2/avm2_main.c",
-        ])
-        # QuickJS libregexp (vendored) backs the RegExp builtin.
-        for f in (SWFMODERN / "third_party" / "quickjs-libregexp").iterdir():
-            if f.suffix in (".c", ".h"):
-                shutil.copy2(f, build_dir)
-        # LZMA SDK (vendored) backs ByteArray.compress/uncompress("lzma").
-        for f in (SWFMODERN / "third_party" / "lzma").iterdir():
-            if f.suffix in (".c", ".h"):
-                shutil.copy2(f, build_dir)
+        core_sources.extend(AVM2_CORE_SOURCES)
+        copy_avm2_third_party(build_dir)
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 
@@ -2822,6 +2832,16 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "src/libswf/tag_stubs.c",
         "src/libswf/shape_hit_test.c",
     ]
+
+    # AVM2 (AS3) test — same trigger and same module tree as compile_native.
+    # The NO_GRAPHICS wasm build takes runSWF_avm2's plain bounded frame loop
+    # (its while(1)+emscripten_sleep browser loop is `__EMSCRIPTEN__ &&
+    # !NO_GRAPHICS`), so it needs no ASYNCIFY and runs to completion under node.
+    is_avm2 = (test_dir / "RecompiledABC").exists()
+    if is_avm2:
+        core_sources.extend(AVM2_CORE_SOURCES)
+        copy_avm2_third_party(build_dir)
+
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
 
@@ -2846,7 +2866,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
     shutil.copy2(MAIN_C, build_dir)
 
     # Copy generated files for main SWF
-    for folder in ["RecompiledScripts", "RecompiledTags"]:
+    for folder in ["RecompiledScripts", "RecompiledTags", "RecompiledABC"]:
         src_dir = test_dir / folder
         if src_dir.exists():
             for f in src_dir.iterdir():
@@ -2952,6 +2972,8 @@ def compile_wasm(test_dir, num_frames, build_dir):
     # Build defines
     inc = SWFMODERN / "include"
     extra_defines = ["-DNO_GRAPHICS", f"-DMAX_FRAMES={num_frames}"]
+    if is_avm2:
+        extra_defines.append("-DSWF_AVM2")
     if with_ap:
         extra_defines.append("-DWITH_AP")
     mock_time = get_mock_date_time(test_dir)
