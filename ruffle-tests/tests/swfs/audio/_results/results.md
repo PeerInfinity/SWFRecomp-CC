@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 01:40 UTC
+**Date**: 2026-09-04 02:34 UTC
 
-**Git SHA**: `86d4d6aac5`
+**Git SHA**: `1ccb87a956`
 
-**Run Duration**: 1m 13s
+**Run Duration**: 1m 17s
 
 ## Summary
 
@@ -29,9 +29,9 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `g711_event_alaw` | 0 | 16.0s |  |
-| 2 | `g711_event_mulaw` | 0 | 20.4s |  |
-| 3 | `stream_incomplete_loop` | 0 | 20.8s |  |
+| 1 | `g711_event_alaw` | 0 | 22.9s |  |
+| 2 | `g711_event_mulaw` | 0 | 19.9s |  |
+| 3 | `stream_incomplete_loop` | 0 | 20.0s |  |
 
 ## Near-Passing Tests
 
