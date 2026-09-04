@@ -120,5 +120,49 @@ will ask if they need more; a `try/catch` around `getTrait` already answers
 ## Corpus
 
 Additive: two new builtin classes in the `swfmodern` package (which already
-holds `Rng`) and one counter increment. CI run in both modes with
-`categories=full`, `images=false` — see the commit that carries this file.
+holds `Rng`) and one counter increment. Run in **both** modes at
+`categories=full`, `images=false`, from `14e8eae5c`:
+
+- **graphics**, run `33839212621` (`completed success`), baseline `14e8eae5c`:
+
+```
+=== intersection: 4491 tests (14e8eae5c -> WORKTREE, results_graphics) ===
+  output_mismatch    124 ->   124 (+0)
+  pass              4131 ->  4131 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4366 ->  4366 (+0)
+GAINS 0 · REGRESSIONS 0 · OTHER STATUS MOVES 0
+```
+
+- **no-graphics**, run `33841594984` (`completed success`), baseline
+  `b20dff160`:
+
+```
+=== intersection: 4491 tests (b20dff160 -> WORKTREE, results) ===
+  output_mismatch    123 ->   123 (+0)
+  pass              4131 ->  4131 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4367 ->  4367 (+0)
+GAINS 0 · REGRESSIONS 0 · OTHER STATUS MOVES 0
+```
+
+Byte-inert in both, as an additive change should be. The **only** membership
+change on either side is the new fixture — verified by differencing the test
+NAME sets, not just the totals: `only in new: ['regression/avm2_reflect_trait_hooks']`,
+`only in old: []`. It passes 30/30 lines in both modes, so the run totals are
+**4367 effective / 4492 graded (graphics)** and **4368 / 4492 (no-graphics)**,
+with `regression` at 82/82 in both. Neither run was shard-incomplete and no
+`segfault`/`timeout`/`compile_fail` bucket appeared.
+
+The 1-test graphics-vs-no-graphics gap in the histogram (one test is
+`ruffle_matched` under no-graphics and `output_mismatch` under graphics) is
+**pre-existing** — it is identical on both sides of both diffs — and is not
+something this change introduced.
+
+Process note: `gh run watch` was OOM-killed twice while waiting on the
+no-graphics run (this box was under memory pressure from the requesting arc's
+browser measurements). A 150-second `gh run view --json status` poll loop is
+the lighter substitute — far smaller RSS and ~1/50th the API calls — and is
+what actually carried the wait.
