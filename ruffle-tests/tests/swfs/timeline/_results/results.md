@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 14:22 UTC
+**Date**: 2026-09-04 16:45 UTC
 
-**Git SHA**: `027418adc4`
+**Git SHA**: `646796612e`
 
-**Run Duration**: 5m 37s
+**Run Duration**: 2m 40s
 
 ## Summary
 
@@ -31,18 +31,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `clip_action_no_key_code` | 1 | 16.6s |  |
-| 2 | `frame_label_count_oom` | 1 | 1.3s |  |
-| 3 | `frame_script_cleanup` | 30 | 28.4s |  |
-| 4 | `frame_script_cleanup2` | 32 | 22.1s |  |
-| 5 | `frame_script_cleanup3` | 30 | 21.1s |  |
-| 6 | `frame_script_cleanup_goto` | 30 | 7.8s |  |
-| 7 | `frame_script_construct` | 25 | 26.6s |  |
+| 1 | `clip_action_no_key_code` | 1 | 1.6s |  |
+| 2 | `frame_label_count_oom` | 1 | 1.2s |  |
+| 3 | `frame_script_cleanup` | 30 | 8.0s |  |
+| 4 | `frame_script_cleanup2` | 32 | 6.1s |  |
+| 5 | `frame_script_cleanup3` | 30 | 7.7s |  |
+| 6 | `frame_script_cleanup_goto` | 30 | 7.6s |  |
+| 7 | `frame_script_construct` | 25 | 7.6s |  |
 | 8 | `scene_count_oom` | 1 | 1.4s |  |
-| 9 | `swf_9_frame_script_button_order` | 15 | 16.9s |  |
-| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 26.1s |  |
-| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 27.7s |  |
-| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 19.7s |  |
+| 9 | `swf_9_frame_script_button_order` | 15 | 28.8s |  |
+| 10 | `swf_9_frame_script_cleanup_goto` | 30 | 7.6s |  |
+| 11 | `swf_9_frame_script_cleanup_goto2` | 34 | 7.6s |  |
+| 12 | `swf_9_frame_script_dynamic_goto_2` | 33 | 5.1s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,9 +50,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `frame_script_button_order` | 2 | 4 | 28.2s |  |
-| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 26.7s |  |
-| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 27.5s |  |
+| 1 | `frame_script_button_order` | 2 | 4 | 19.9s |  |
+| 2 | `swf_9_event_goto_frame_script` | 2 | 2 | 6.1s |  |
+| 3 | `swf_9_frame_script_dynamic_goto` | 3 | 3 | 7.5s |  |
 
 ## Near-Passing Tests
 
