@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
-**Run Duration**: 178m 45s
+**Run Duration**: 178m 52s
 
 **Filtered**: 2 tests ignored out of 1574 available
 
@@ -1258,57 +1258,57 @@
 | 1222 | `ecma3/Statements/etry_005` | 3 | 7.4s |  |
 | 1223 | `ecma3/Statements/etry_006` | 4 | 7.4s |  |
 | 1224 | `ecma3/Statements/etry_007` | 2 | 7.3s |  |
-| 1225 | `ecma3/Statements/etry_008` | 6 | 2.8s |  |
-| 1226 | `ecma3/Statements/etry_009` | 2 | 7.5s |  |
-| 1227 | `ecma3/Statements/etry_010` | 4 | 7.6s |  |
-| 1228 | `ecma3/Statements/etry_012` | 9 | 8.0s |  |
-| 1229 | `ecma3/Statements/ewhile_001` | 1 | 7.4s |  |
-| 1230 | `ecma3/Statements/ewhile_002` | 8 | 7.5s |  |
-| 1231 | `ecma3/Statements/ewhile_003` | 10 | 7.5s |  |
-| 1232 | `ecma3/Statements/ewhile_004` | 13 | 7.6s |  |
-| 1233 | `ecma3/Statements/expression` | 1 | 7.4s |  |
-| 1234 | `ecma3/Statements/throw` | 2 | 7.5s |  |
-| 1235 | `ecma3/String/Split` | 19 | 7.7s |  |
-| 1236 | `ecma3/String/concat` | 21 | 7.6s |  |
-| 1237 | `ecma3/String/e15_5_1` | 49 | 7.8s |  |
-| 1238 | `ecma3/String/e15_5_2` | 75 | 8.1s |  |
-| 1239 | `ecma3/String/e15_5_3` | 2 | 7.4s |  |
-| 1240 | `ecma3/String/e15_5_3_1_1` | 2 | 7.4s |  |
-| 1241 | `ecma3/String/e15_5_3_1_2` | 1 | 7.5s |  |
-| 1242 | `ecma3/String/e15_5_3_1_3` | 1 | 7.2s |  |
-| 1243 | `ecma3/String/e15_5_3_1_4` | 1 | 7.4s |  |
-| 1244 | `ecma3/String/e15_5_3_2_1` | 116 | 11.8s |  |
-| 1245 | `ecma3/String/e15_5_3_2_2` | 2 | 7.5s |  |
-| 1246 | `ecma3/String/e15_5_3_2_3` | 481 | 7.6s |  |
+| 1225 | `ecma3/Statements/etry_008` | 6 | 2.9s |  |
+| 1226 | `ecma3/Statements/etry_009` | 2 | 8.0s |  |
+| 1227 | `ecma3/Statements/etry_010` | 4 | 8.1s |  |
+| 1228 | `ecma3/Statements/etry_012` | 9 | 8.2s |  |
+| 1229 | `ecma3/Statements/ewhile_001` | 1 | 7.6s |  |
+| 1230 | `ecma3/Statements/ewhile_002` | 8 | 7.6s |  |
+| 1231 | `ecma3/Statements/ewhile_003` | 10 | 7.7s |  |
+| 1232 | `ecma3/Statements/ewhile_004` | 13 | 7.9s |  |
+| 1233 | `ecma3/Statements/expression` | 1 | 8.1s |  |
+| 1234 | `ecma3/Statements/throw` | 2 | 8.0s |  |
+| 1235 | `ecma3/String/Split` | 19 | 7.8s |  |
+| 1236 | `ecma3/String/concat` | 21 | 7.7s |  |
+| 1237 | `ecma3/String/e15_5_1` | 49 | 8.0s |  |
+| 1238 | `ecma3/String/e15_5_2` | 75 | 8.3s |  |
+| 1239 | `ecma3/String/e15_5_3` | 2 | 7.6s |  |
+| 1240 | `ecma3/String/e15_5_3_1_1` | 2 | 7.7s |  |
+| 1241 | `ecma3/String/e15_5_3_1_2` | 1 | 7.8s |  |
+| 1242 | `ecma3/String/e15_5_3_1_3` | 1 | 7.6s |  |
+| 1243 | `ecma3/String/e15_5_3_1_4` | 1 | 7.8s |  |
+| 1244 | `ecma3/String/e15_5_3_2_1` | 116 | 12.1s |  |
+| 1245 | `ecma3/String/e15_5_3_2_2` | 2 | 7.7s |  |
+| 1246 | `ecma3/String/e15_5_3_2_3` | 481 | 7.7s |  |
 | 1247 | `ecma3/String/e15_5_4` | 6 | 2.8s |  |
-| 1248 | `ecma3/String/e15_5_4_10_1_rt` | 24 | 8.6s |  |
+| 1248 | `ecma3/String/e15_5_4_10_1_rt` | 24 | 8.5s |  |
 | 1249 | `ecma3/String/e15_5_4_11_1` | 387 | 8.0s |  |
 | 1250 | `ecma3/String/e15_5_4_11_2` | 96 | 8.0s |  |
 | 1251 | `ecma3/String/e15_5_4_11_3` | 240 | 8.0s |  |
 | 1252 | `ecma3/String/e15_5_4_11_4` | 96 | 7.9s |  |
-| 1253 | `ecma3/String/e15_5_4_11_5` | 131 | 8.2s |  |
-| 1254 | `ecma3/String/e15_5_4_11_6` | 96 | 7.8s |  |
+| 1253 | `ecma3/String/e15_5_4_11_5` | 131 | 8.0s |  |
+| 1254 | `ecma3/String/e15_5_4_11_6` | 96 | 7.7s |  |
 | 1255 | `ecma3/String/e15_5_4_12_1` | 387 | 8.0s |  |
-| 1256 | `ecma3/String/e15_5_4_12_2` | 1 | 8.0s |  |
-| 1257 | `ecma3/String/e15_5_4_12_3` | 864 | 8.0s |  |
-| 1258 | `ecma3/String/e15_5_4_12_4` | 128 | 7.7s |  |
+| 1256 | `ecma3/String/e15_5_4_12_2` | 1 | 8.1s |  |
+| 1257 | `ecma3/String/e15_5_4_12_3` | 864 | 8.1s |  |
+| 1258 | `ecma3/String/e15_5_4_12_4` | 128 | 7.9s |  |
 | 1259 | `ecma3/String/e15_5_4_12_5` | 96 | 1.3s |  |
-| 1260 | `ecma3/String/e15_5_4_13` | 17 | 7.7s |  |
-| 1261 | `ecma3/String/e15_5_4_1_rt` | 2 | 7.6s |  |
-| 1262 | `ecma3/String/e15_5_4_2_1` | 6 | 7.5s |  |
-| 1263 | `ecma3/String/e15_5_4_2_3` | 4 | 7.5s |  |
-| 1264 | `ecma3/String/e15_5_4_2_rt` | 8 | 7.5s |  |
+| 1260 | `ecma3/String/e15_5_4_13` | 17 | 7.8s |  |
+| 1261 | `ecma3/String/e15_5_4_1_rt` | 2 | 7.7s |  |
+| 1262 | `ecma3/String/e15_5_4_2_1` | 6 | 7.7s |  |
+| 1263 | `ecma3/String/e15_5_4_2_3` | 4 | 7.6s |  |
+| 1264 | `ecma3/String/e15_5_4_2_rt` | 8 | 7.6s |  |
 | 1265 | `ecma3/String/e15_5_4_3_1` | 7 | 7.5s |  |
 | 1266 | `ecma3/String/e15_5_4_3_2` | 4 | 7.5s |  |
-| 1267 | `ecma3/String/e15_5_4_3_3_rt` | 1 | 7.7s |  |
-| 1268 | `ecma3/String/e15_5_4_4_1` | 189 | 7.5s |  |
+| 1267 | `ecma3/String/e15_5_4_3_3_rt` | 1 | 7.5s |  |
+| 1268 | `ecma3/String/e15_5_4_4_1` | 189 | 7.6s |  |
 | 1269 | `ecma3/String/e15_5_4_4_2` | 33 | 7.8s |  |
 | 1270 | `ecma3/String/e15_5_4_4_3` | 18 | 2.9s |  |
-| 1271 | `ecma3/String/e15_5_4_4_4_rt` | 52 | 11.8s |  |
-| 1272 | `ecma3/String/e15_5_4_5_1` | 95 | 7.5s |  |
-| 1273 | `ecma3/String/e15_5_4_5_2` | 31 | 8.0s |  |
-| 1274 | `ecma3/String/e15_5_4_5_3` | 28 | 7.7s |  |
-| 1275 | `ecma3/String/e15_5_4_5_4` | 323 | 2.8s |  |
+| 1271 | `ecma3/String/e15_5_4_4_4_rt` | 52 | 11.7s |  |
+| 1272 | `ecma3/String/e15_5_4_5_1` | 95 | 7.7s |  |
+| 1273 | `ecma3/String/e15_5_4_5_2` | 31 | 8.1s |  |
+| 1274 | `ecma3/String/e15_5_4_5_3` | 28 | 8.1s |  |
+| 1275 | `ecma3/String/e15_5_4_5_4` | 323 | 2.9s |  |
 | 1276 | `ecma3/String/e15_5_4_5_5` | 269 | 7.8s |  |
 | 1277 | `ecma3/String/e15_5_4_5_6_rt` | 11 | 7.9s |  |
 | 1278 | `ecma3/String/e15_5_4_6_1` | 578 | 7.6s |  |

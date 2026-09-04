@@ -1,6 +1,6 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
@@ -65,7 +65,7 @@
 | 38 | `text-bind` | 0 | 17.2s |  |
 | 39 | `textfield/textfield-html` | 4 | 1.5s |  |
 | 40 | `textfield/textfield-text-setters` | 8 | 1.4s |  |
-| 41 | `undefined/undefined-swf6` | 39 | 1.3s |  |
+| 41 | `undefined/undefined-swf6` | 39 | 1.4s |  |
 | 42 | `undefined/undefined-swf7` | 39 | 1.3s |  |
 | 43 | `watch` | 2 | 0.3s |  |
 | 44 | `xml/xmlbuild` | 1 | 1.3s |  |

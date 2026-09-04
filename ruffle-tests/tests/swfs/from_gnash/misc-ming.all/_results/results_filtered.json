@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T00:54:58.486188+00:00",
+    "timestamp": "2026-09-04T01:40:04.080375+00:00",
     "git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
-    "duration_seconds": 1990.39,
+    "duration_seconds": 1991.49,
     "total_available": 111,
     "shards": 30,
     "expected_shards": 30,
@@ -1624,7 +1624,7 @@
       "test": "place_and_remove_object_test",
       "phases": {
         "recomp": 0.019,
-        "compile": 21.706,
+        "compile": 22.653,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1633,14 +1633,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 21.73,
+      "duration": 22.68,
       "status": "pass"
     },
     {
       "test": "place_object_test",
       "phases": {
         "recomp": 0.019,
-        "compile": 2.495,
+        "compile": 2.488,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1658,8 +1658,8 @@
     {
       "test": "place_object_test2",
       "phases": {
-        "recomp": 0.02,
-        "compile": 22.098,
+        "recomp": 0.019,
+        "compile": 22.252,
         "run": 0.004
       },
       "num_frames": 30,
@@ -1668,7 +1668,7 @@
         "expected_lines": 19,
         "matching_lines": 0
       },
-      "duration": 22.13,
+      "duration": 22.28,
       "ruffle_diff_count": 23,
       "ours_diff_count": 22,
       "status": "ruffle_matched",

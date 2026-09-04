@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
-**Run Duration**: 205m 25s
+**Run Duration**: 204m 33s
 
 ## Summary
 
@@ -975,45 +975,45 @@
 | 942 | `stage3d_multistage_triangle` | 3 | 9.6s |  |
 | 943 | `stage3d_program_constants_bytearray_be` | 0 | 30.6s |  |
 | 944 | `stage3d_program_constants_bytearray_le` | 0 | 31.5s |  |
-| 945 | `stage3d_program_constants_invalid_input` | 21 | 27.9s |  |
-| 946 | `stage3d_raytrace` | 0 | 53.1s |  |
-| 947 | `stage3d_rotating_cube` | 0 | 10.4s |  |
+| 945 | `stage3d_program_constants_invalid_input` | 21 | 8.2s |  |
+| 946 | `stage3d_raytrace` | 0 | 33.6s |  |
+| 947 | `stage3d_rotating_cube` | 0 | 10.6s |  |
 | 948 | `stage3d_sampler` | 0 | 9.7s |  |
-| 949 | `stage3d_sampler_partial_upload` | 0 | 9.9s |  |
-| 950 | `stage3d_stencil` | 0 | 29.8s |  |
-| 951 | `stage3d_texture` | 0 | 15.1s |  |
+| 949 | `stage3d_sampler_partial_upload` | 0 | 9.6s |  |
+| 950 | `stage3d_stencil` | 0 | 10.0s |  |
+| 951 | `stage3d_texture` | 0 | 14.8s |  |
 | 952 | `stage3d_texture_bytearray` | 0 | 11.1s |  |
-| 953 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 10.4s |  |
-| 954 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 11.7s |  |
-| 955 | `stage3d_triangle` | 0 | 9.9s |  |
-| 956 | `stage3d_triangle_bytes4` | 0 | 10.0s |  |
-| 957 | `stage3d_triangle_float1` | 0 | 9.9s |  |
-| 958 | `stage3d_triangle_index_upload` | 0 | 10.0s |  |
-| 959 | `stage3d_x_y` | 22 | 7.3s |  |
-| 960 | `stage_access` | 10 | 7.3s |  |
-| 961 | `stage_displayobject_properties` | 24 | 7.2s |  |
-| 962 | `stage_domain_getQualifiedDefinitionNames` | 5 | 7.3s |  |
-| 963 | `stage_framerate_nan` | 7 | 7.3s |  |
+| 953 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 10.3s |  |
+| 954 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 11.5s |  |
+| 955 | `stage3d_triangle` | 0 | 9.8s |  |
+| 956 | `stage3d_triangle_bytes4` | 0 | 9.8s |  |
+| 957 | `stage3d_triangle_float1` | 0 | 9.7s |  |
+| 958 | `stage3d_triangle_index_upload` | 0 | 9.9s |  |
+| 959 | `stage3d_x_y` | 22 | 8.2s |  |
+| 960 | `stage_access` | 10 | 7.5s |  |
+| 961 | `stage_displayobject_properties` | 24 | 7.3s |  |
+| 962 | `stage_domain_getQualifiedDefinitionNames` | 5 | 7.5s |  |
+| 963 | `stage_framerate_nan` | 7 | 7.4s |  |
 | 964 | `stage_framerate_negative` | 6 | 7.3s |  |
 | 965 | `stage_framerate_zero` | 6 | 7.3s |  |
 | 966 | `stage_invalidate` | 38 | 7.5s |  |
-| 967 | `stage_loaderinfo_properties` | 24 | 27.7s |  |
-| 968 | `stage_mousechildren` | 2 | 7.2s |  |
-| 969 | `stage_mouseenabled` | 15 | 7.2s |  |
-| 970 | `stage_overriden_setters` | 31 | 7.5s |  |
-| 971 | `stage_properties` | 30 | 7.3s |  |
-| 972 | `stage_properties2` | 213 | 7.4s |  |
-| 973 | `stage_stage3Ds_vector` | 1 | 7.1s |  |
-| 974 | `static_length` | 24 | 7.3s |  |
-| 975 | `static_text` | 3 | 7.4s |  |
-| 976 | `static_var_with_this_in_ctor` | 2 | 7.2s |  |
-| 977 | `statictext_text` | 8 | 7.4s |  |
-| 978 | `stored_properties` | 11 | 7.3s |  |
-| 979 | `strict_equality` | 34 | 7.3s |  |
-| 980 | `string_call` | 13 | 7.2s |  |
-| 981 | `string_case` | 23 | 7.2s |  |
-| 982 | `string_char_at` | 27 | 7.2s |  |
-| 983 | `string_char_code_at` | 28 | 2.4s |  |
+| 967 | `stage_loaderinfo_properties` | 24 | 27.8s |  |
+| 968 | `stage_mousechildren` | 2 | 7.6s |  |
+| 969 | `stage_mouseenabled` | 15 | 7.7s |  |
+| 970 | `stage_overriden_setters` | 31 | 7.9s |  |
+| 971 | `stage_properties` | 30 | 7.5s |  |
+| 972 | `stage_properties2` | 213 | 7.8s |  |
+| 973 | `stage_stage3Ds_vector` | 1 | 7.5s |  |
+| 974 | `static_length` | 24 | 7.9s |  |
+| 975 | `static_text` | 3 | 7.7s |  |
+| 976 | `static_var_with_this_in_ctor` | 2 | 7.3s |  |
+| 977 | `statictext_text` | 8 | 7.5s |  |
+| 978 | `stored_properties` | 11 | 7.4s |  |
+| 979 | `strict_equality` | 34 | 7.5s |  |
+| 980 | `string_call` | 13 | 7.5s |  |
+| 981 | `string_case` | 23 | 7.8s |  |
+| 982 | `string_char_at` | 27 | 7.5s |  |
+| 983 | `string_char_code_at` | 28 | 2.5s |  |
 | 984 | `string_concat_fromcharcode` | 37 | 26.0s |  |
 | 985 | `string_constr` | 25 | 25.7s |  |
 | 986 | `string_indexof_lastindexof` | 87 | 7.1s |  |

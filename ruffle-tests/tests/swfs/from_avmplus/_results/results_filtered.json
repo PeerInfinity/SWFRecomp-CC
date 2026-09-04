@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T00:54:58.368882+00:00",
+    "timestamp": "2026-09-04T01:40:03.966742+00:00",
     "git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
-    "duration_seconds": 10724.97,
+    "duration_seconds": 10731.97,
     "total_available": 1574,
     "shards": 30,
     "expected_shards": 30,
@@ -20297,8 +20297,8 @@
     {
       "test": "ecma3/Statements/etry_008",
       "phases": {
-        "recomp": 0.009,
-        "compile": 2.815,
+        "recomp": 0.01,
+        "compile": 2.874,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20307,14 +20307,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 2.84,
+      "duration": 2.9,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/etry_009",
       "phases": {
-        "recomp": 0.009,
-        "compile": 7.504,
+        "recomp": 0.01,
+        "compile": 7.936,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20323,14 +20323,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.52,
+      "duration": 7.96,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/etry_010",
       "phases": {
-        "recomp": 0.009,
-        "compile": 7.573,
+        "recomp": 0.01,
+        "compile": 8.085,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20339,14 +20339,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 7.59,
+      "duration": 8.11,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/etry_012",
       "phases": {
         "recomp": 0.011,
-        "compile": 7.949,
+        "compile": 8.159,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20355,14 +20355,14 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 7.97,
+      "duration": 8.18,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/ewhile_001",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.425,
+        "compile": 7.608,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20371,14 +20371,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.44,
+      "duration": 7.63,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/ewhile_002",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.47,
+        "compile": 7.621,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20387,14 +20387,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 7.49,
+      "duration": 7.64,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/ewhile_003",
       "phases": {
-        "recomp": 0.009,
-        "compile": 7.486,
+        "recomp": 0.01,
+        "compile": 7.625,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20403,14 +20403,14 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 7.51,
+      "duration": 7.65,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/ewhile_004",
       "phases": {
         "recomp": 0.01,
-        "compile": 7.62,
+        "compile": 7.872,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20419,14 +20419,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 7.64,
+      "duration": 7.9,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/expression",
       "phases": {
-        "recomp": 0.008,
-        "compile": 7.39,
+        "recomp": 0.01,
+        "compile": 8.041,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20435,14 +20435,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.41,
+      "duration": 8.06,
       "status": "pass"
     },
     {
       "test": "ecma3/Statements/throw",
       "phases": {
-        "recomp": 0.009,
-        "compile": 7.511,
+        "recomp": 0.01,
+        "compile": 7.941,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20451,14 +20451,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.53,
+      "duration": 7.96,
       "status": "pass"
     },
     {
       "test": "ecma3/String/Split",
       "phases": {
-        "recomp": 0.01,
-        "compile": 7.68,
+        "recomp": 0.011,
+        "compile": 7.767,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20467,14 +20467,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 7.7,
+      "duration": 7.79,
       "status": "pass"
     },
     {
       "test": "ecma3/String/concat",
       "phases": {
         "recomp": 0.01,
-        "compile": 7.607,
+        "compile": 7.721,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20483,14 +20483,14 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 7.63,
+      "duration": 7.74,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_1",
       "phases": {
-        "recomp": 0.011,
-        "compile": 7.799,
+        "recomp": 0.012,
+        "compile": 7.987,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20499,14 +20499,14 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 7.82,
+      "duration": 8.01,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_2",
       "phases": {
-        "recomp": 0.013,
-        "compile": 8.114,
+        "recomp": 0.014,
+        "compile": 8.317,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20515,14 +20515,14 @@
         "expected_lines": 75,
         "matching_lines": 75
       },
-      "duration": 8.14,
+      "duration": 8.34,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.393,
+        "compile": 7.601,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20531,14 +20531,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.41,
+      "duration": 7.62,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3_1_1",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.425,
+        "compile": 7.692,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20547,14 +20547,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.44,
+      "duration": 7.71,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3_1_2",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.495,
+        "compile": 7.752,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20563,14 +20563,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.52,
+      "duration": 7.77,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3_1_3",
       "phases": {
-        "recomp": 0.008,
-        "compile": 7.22,
+        "recomp": 0.009,
+        "compile": 7.572,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20579,14 +20579,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.24,
+      "duration": 7.59,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3_1_4",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.366,
+        "compile": 7.729,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20595,14 +20595,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.39,
+      "duration": 7.75,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3_2_1",
       "phases": {
-        "recomp": 0.017,
-        "compile": 11.812,
+        "recomp": 0.018,
+        "compile": 12.08,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20611,14 +20611,14 @@
         "expected_lines": 116,
         "matching_lines": 116
       },
-      "duration": 11.84,
+      "duration": 12.11,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3_2_2",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.51,
+        "compile": 7.685,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20627,14 +20627,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.53,
+      "duration": 7.71,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_3_2_3",
       "phases": {
         "recomp": 0.01,
-        "compile": 7.604,
+        "compile": 7.684,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20643,14 +20643,14 @@
         "expected_lines": 481,
         "matching_lines": 481
       },
-      "duration": 7.63,
+      "duration": 7.71,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4",
       "phases": {
         "recomp": 0.009,
-        "compile": 2.753,
+        "compile": 2.779,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20659,14 +20659,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 2.77,
+      "duration": 2.8,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_10_1_rt",
       "phases": {
         "recomp": 0.012,
-        "compile": 8.528,
+        "compile": 8.461,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20675,14 +20675,14 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 8.55,
+      "duration": 8.48,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_11_1",
       "phases": {
         "recomp": 0.012,
-        "compile": 7.931,
+        "compile": 7.967,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20691,14 +20691,14 @@
         "expected_lines": 387,
         "matching_lines": 387
       },
-      "duration": 7.96,
+      "duration": 8.0,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_11_2",
       "phases": {
         "recomp": 0.012,
-        "compile": 7.953,
+        "compile": 7.932,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20707,14 +20707,14 @@
         "expected_lines": 96,
         "matching_lines": 96
       },
-      "duration": 7.98,
+      "duration": 7.96,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_11_3",
       "phases": {
         "recomp": 0.012,
-        "compile": 8.002,
+        "compile": 7.989,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20723,15 +20723,15 @@
         "expected_lines": 240,
         "matching_lines": 240
       },
-      "duration": 8.03,
+      "duration": 8.02,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_11_4",
       "phases": {
-        "recomp": 0.011,
-        "compile": 7.87,
-        "run": 0.008
+        "recomp": 0.012,
+        "compile": 7.876,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -20746,7 +20746,7 @@
       "test": "ecma3/String/e15_5_4_11_5",
       "phases": {
         "recomp": 0.012,
-        "compile": 8.171,
+        "compile": 7.996,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20755,14 +20755,14 @@
         "expected_lines": 131,
         "matching_lines": 131
       },
-      "duration": 8.2,
+      "duration": 8.02,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_11_6",
       "phases": {
         "recomp": 0.012,
-        "compile": 7.76,
+        "compile": 7.712,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20771,14 +20771,14 @@
         "expected_lines": 96,
         "matching_lines": 96
       },
-      "duration": 7.79,
+      "duration": 7.74,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_12_1",
       "phases": {
         "recomp": 0.012,
-        "compile": 8.001,
+        "compile": 7.959,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20787,15 +20787,15 @@
         "expected_lines": 387,
         "matching_lines": 387
       },
-      "duration": 8.03,
+      "duration": 7.99,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_12_2",
       "phases": {
         "recomp": 0.012,
-        "compile": 7.945,
-        "run": 0.004
+        "compile": 8.058,
+        "run": 0.008
       },
       "num_frames": 1,
       "lines": {
@@ -20803,14 +20803,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.97,
+      "duration": 8.09,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_12_3",
       "phases": {
-        "recomp": 0.012,
-        "compile": 7.986,
+        "recomp": 0.013,
+        "compile": 8.061,
         "run": 0.016
       },
       "num_frames": 1,
@@ -20819,14 +20819,14 @@
         "expected_lines": 864,
         "matching_lines": 864
       },
-      "duration": 8.02,
+      "duration": 8.1,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_12_4",
       "phases": {
         "recomp": 0.012,
-        "compile": 7.682,
+        "compile": 7.838,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20835,14 +20835,14 @@
         "expected_lines": 128,
         "matching_lines": 128
       },
-      "duration": 7.71,
+      "duration": 7.87,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_12_5",
       "phases": {
         "recomp": 0.012,
-        "compile": 1.298,
+        "compile": 1.301,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20857,8 +20857,8 @@
     {
       "test": "ecma3/String/e15_5_4_13",
       "phases": {
-        "recomp": 0.01,
-        "compile": 7.648,
+        "recomp": 0.011,
+        "compile": 7.756,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20867,14 +20867,14 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 7.67,
+      "duration": 7.78,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_1_rt",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.56,
+        "compile": 7.715,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20883,14 +20883,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 7.58,
+      "duration": 7.74,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_2_1",
       "phases": {
-        "recomp": 0.009,
-        "compile": 7.431,
+        "recomp": 0.01,
+        "compile": 7.652,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20899,14 +20899,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 7.45,
+      "duration": 7.67,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_2_3",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.43,
+        "compile": 7.614,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20915,14 +20915,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 7.45,
+      "duration": 7.63,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_2_rt",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.508,
+        "compile": 7.605,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20931,14 +20931,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 7.53,
+      "duration": 7.63,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_3_1",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.525,
+        "compile": 7.514,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20947,14 +20947,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 7.54,
+      "duration": 7.53,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_3_2",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.463,
+        "compile": 7.476,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20963,14 +20963,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 7.48,
+      "duration": 7.5,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_3_3_rt",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.678,
+        "compile": 7.524,
         "run": 0.004
       },
       "num_frames": 1,
@@ -20979,14 +20979,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 7.7,
+      "duration": 7.55,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_4_1",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.524,
+        "compile": 7.548,
         "run": 0.008
       },
       "num_frames": 1,
@@ -20995,14 +20995,14 @@
         "expected_lines": 189,
         "matching_lines": 189
       },
-      "duration": 7.55,
+      "duration": 7.57,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_4_2",
       "phases": {
         "recomp": 0.011,
-        "compile": 7.825,
+        "compile": 7.745,
         "run": 0.004
       },
       "num_frames": 1,
@@ -21011,14 +21011,14 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 7.85,
+      "duration": 7.77,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_4_3",
       "phases": {
         "recomp": 0.01,
-        "compile": 2.862,
+        "compile": 2.867,
         "run": 0.004
       },
       "num_frames": 1,
@@ -21027,14 +21027,14 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 2.88,
+      "duration": 2.89,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_4_4_rt",
       "phases": {
-        "recomp": 0.021,
-        "compile": 11.751,
+        "recomp": 0.022,
+        "compile": 11.626,
         "run": 0.004
       },
       "num_frames": 1,
@@ -21043,14 +21043,14 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 11.78,
+      "duration": 11.66,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_5_1",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.509,
+        "compile": 7.634,
         "run": 0.004
       },
       "num_frames": 1,
@@ -21059,14 +21059,14 @@
         "expected_lines": 95,
         "matching_lines": 95
       },
-      "duration": 7.53,
+      "duration": 7.65,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_5_2",
       "phases": {
-        "recomp": 0.012,
-        "compile": 7.978,
+        "recomp": 0.013,
+        "compile": 8.093,
         "run": 0.004
       },
       "num_frames": 1,
@@ -21075,14 +21075,14 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 8.0,
+      "duration": 8.12,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_5_3",
       "phases": {
-        "recomp": 0.01,
-        "compile": 7.722,
+        "recomp": 0.011,
+        "compile": 8.063,
         "run": 0.004
       },
       "num_frames": 1,
@@ -21091,14 +21091,14 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 7.74,
+      "duration": 8.09,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_5_4",
       "phases": {
-        "recomp": 0.009,
-        "compile": 2.79,
+        "recomp": 0.01,
+        "compile": 2.821,
         "run": 0.008
       },
       "num_frames": 1,
@@ -21107,15 +21107,15 @@
         "expected_lines": 323,
         "matching_lines": 323
       },
-      "duration": 2.81,
+      "duration": 2.85,
       "status": "pass"
     },
     {
       "test": "ecma3/String/e15_5_4_5_5",
       "phases": {
         "recomp": 0.01,
-        "compile": 7.73,
-        "run": 0.008
+        "compile": 7.793,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -21123,7 +21123,7 @@
         "expected_lines": 269,
         "matching_lines": 269
       },
-      "duration": 7.76,
+      "duration": 7.82,
       "status": "pass"
     },
     {

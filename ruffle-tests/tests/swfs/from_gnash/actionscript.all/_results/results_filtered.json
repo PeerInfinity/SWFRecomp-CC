@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T00:54:58.472300+00:00",
+    "timestamp": "2026-09-04T01:40:04.065205+00:00",
     "git_sha": "86d4d6aac5b35e8c490b320fd408f86ba3f90974",
-    "duration_seconds": 1832.28,
+    "duration_seconds": 1819.64,
     "total_available": 243,
     "shards": 30,
     "expected_shards": 30,
@@ -3342,9 +3342,9 @@
     {
       "test": "array-v6",
       "phases": {
-        "recomp": 0.593,
-        "compile": 33.023,
-        "run": 0.016
+        "recomp": 0.661,
+        "compile": 34.671,
+        "run": 0.032
       },
       "num_frames": 30,
       "lines": {
@@ -3352,7 +3352,7 @@
         "expected_lines": 644,
         "matching_lines": 623
       },
-      "duration": 33.64,
+      "duration": 35.37,
       "status": "output_mismatch",
       "detail": "21 line(s) differ (actual=644, expected=644)",
       "actual_output": "... (120 lines before) ...\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == '16' [./array.as:235]\nPASSED: gaparray[16] == '4' [./array.as:236]\nPASSED: gaparray.hasOwnProperty('15') [./array.as:244]\nPASSED: gaparray.hasOwnProperty('16') [./array.as:245]\nFAILED: gaparray.hasOwnProperty('4') [./array.as:246]\nPASSED: !gaparray.hasOwnProperty('0') [./array.as:247]\nFAILED: expected: '3' obtained: 2 [./array.as:260]\nPASSED: tmp[0] == '15' [./array.as:261]\nPASSED: tmp[1] == '16' [./array.as:262]\nFAILED: expected: '4' obtained:  [./array.as:263]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nPASSED: typeof(testCmpThis) == 'undefined' [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nFAILED: expected: 4 obtained: 0 [./array.as:324]\nFAILED: expected: \"2,3,4,1\" obtained:  [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\nPASSED: c[2] == undefined [./array.as:383]\nPASSED: c[3] == undefined [./array.as:384]\nPASSED: c.length == -2147483646 [./array.as:386]\nPASSED: str == \"2147483649: too high; -2147483649: too low; -2147483648: lowest int; -3: minus three; 1.1: one point one; \" [./array.as:394]\nPASSED: c[0] == \"zero\" [./array.as:400]\n... (474 lines after) ...",
@@ -3361,8 +3361,8 @@
     {
       "test": "array-v7",
       "phases": {
-        "recomp": 0.612,
-        "compile": 33.993,
+        "recomp": 0.68,
+        "compile": 36.302,
         "run": 0.032
       },
       "num_frames": 30,
@@ -3371,7 +3371,7 @@
         "expected_lines": 654,
         "matching_lines": 604
       },
-      "duration": 34.65,
+      "duration": 37.02,
       "status": "output_mismatch",
       "detail": "50 line(s) differ (actual=654, expected=654)",
       "actual_output": "... (118 lines before) ...\nPASSED: gaparray[12] == undefined [./array.as:231]\nPASSED: gaparray[13] == undefined [./array.as:232]\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == undefined [./array.as:238]\nPASSED: gaparray[16] == undefined [./array.as:239]\nFAILED: gaparray.hasOwnProperty('16') [./array.as:249]\nFAILED: gaparray.hasOwnProperty('4') [./array.as:250]\nPASSED: gaparray.hasOwnProperty('1') [./array.as:251]\nPASSED: gaparray.hasOwnProperty('0') [./array.as:252]\nFAILED: gaparray.hasOwnProperty('2') [./array.as:253]\nFAILED: expected: '5' obtained: 2 [./array.as:265]\nPASSED: tmp[0] == '0' [./array.as:266]\nPASSED: tmp[1] == '1' [./array.as:267]\nFAILED: expected: '16' obtained: undefined [./array.as:268]\nFAILED: expected: '2' obtained: undefined [./array.as:269]\nFAILED: expected: '4' obtained: undefined [./array.as:270]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nFAILED: expected: 'undefined' obtained: movieclip [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nFAILED: expected: 4 obtained: 0 [./array.as:324]\nFAILED: expected: \"2,3,4,1\" obtained:  [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\n... (486 lines after) ...",
@@ -3380,8 +3380,8 @@
     {
       "test": "array-v8",
       "phases": {
-        "recomp": 0.61,
-        "compile": 2.797,
+        "recomp": 0.68,
+        "compile": 2.916,
         "run": 0.032
       },
       "num_frames": 30,
@@ -3390,7 +3390,7 @@
         "expected_lines": 654,
         "matching_lines": 604
       },
-      "duration": 3.45,
+      "duration": 3.64,
       "status": "output_mismatch",
       "detail": "50 line(s) differ (actual=654, expected=654)",
       "actual_output": "... (118 lines before) ...\nPASSED: gaparray[12] == undefined [./array.as:231]\nPASSED: gaparray[13] == undefined [./array.as:232]\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == undefined [./array.as:238]\nPASSED: gaparray[16] == undefined [./array.as:239]\nFAILED: gaparray.hasOwnProperty('16') [./array.as:249]\nFAILED: gaparray.hasOwnProperty('4') [./array.as:250]\nPASSED: gaparray.hasOwnProperty('1') [./array.as:251]\nPASSED: gaparray.hasOwnProperty('0') [./array.as:252]\nFAILED: gaparray.hasOwnProperty('2') [./array.as:253]\nFAILED: expected: '5' obtained: 2 [./array.as:265]\nPASSED: tmp[0] == '0' [./array.as:266]\nPASSED: tmp[1] == '1' [./array.as:267]\nFAILED: expected: '16' obtained: undefined [./array.as:268]\nFAILED: expected: '2' obtained: undefined [./array.as:269]\nFAILED: expected: '4' obtained: undefined [./array.as:270]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nFAILED: expected: 'undefined' obtained: movieclip [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nFAILED: expected: 4 obtained: 0 [./array.as:324]\nFAILED: expected: \"2,3,4,1\" obtained:  [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\n... (486 lines after) ...",
@@ -3399,8 +3399,8 @@
     {
       "test": "case-v5",
       "phases": {
-        "recomp": 0.009,
-        "compile": 2.758,
+        "recomp": 0.01,
+        "compile": 3.002,
         "run": 0.004
       },
       "num_frames": 30,
@@ -3409,15 +3409,15 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 2.77,
+      "duration": 3.02,
       "status": "pass"
     },
     {
       "test": "case-v6",
       "phases": {
-        "recomp": 0.014,
-        "compile": 3.723,
-        "run": 0.004
+        "recomp": 0.016,
+        "compile": 4.106,
+        "run": 0.008
       },
       "num_frames": 30,
       "lines": {
@@ -3425,14 +3425,14 @@
         "expected_lines": 73,
         "matching_lines": 73
       },
-      "duration": 3.75,
+      "duration": 4.14,
       "status": "pass"
     },
     {
       "test": "case-v7",
       "phases": {
-        "recomp": 0.014,
-        "compile": 3.645,
+        "recomp": 0.015,
+        "compile": 3.983,
         "run": 0.008
       },
       "num_frames": 30,
@@ -3441,14 +3441,14 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 3.67,
+      "duration": 4.01,
       "status": "pass"
     },
     {
       "test": "case-v8",
       "phases": {
-        "recomp": 0.014,
-        "compile": 1.646,
+        "recomp": 0.015,
+        "compile": 1.734,
         "run": 0.008
       },
       "num_frames": 30,
@@ -3457,7 +3457,7 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 1.67,
+      "duration": 1.76,
       "status": "pass"
     },
     {

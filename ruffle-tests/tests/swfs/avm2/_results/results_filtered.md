@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
-**Run Duration**: 205m 25s
+**Run Duration**: 204m 33s
 
 **Filtered**: 49 tests ignored out of 1261 available
 
@@ -969,45 +969,45 @@
 | 934 | `stage3d_multistage_triangle` | 3 | 9.6s |  |
 | 935 | `stage3d_program_constants_bytearray_be` | 0 | 30.6s |  |
 | 936 | `stage3d_program_constants_bytearray_le` | 0 | 31.5s |  |
-| 937 | `stage3d_program_constants_invalid_input` | 21 | 27.9s |  |
-| 938 | `stage3d_raytrace` | 0 | 53.1s |  |
-| 939 | `stage3d_rotating_cube` | 0 | 10.4s |  |
+| 937 | `stage3d_program_constants_invalid_input` | 21 | 8.2s |  |
+| 938 | `stage3d_raytrace` | 0 | 33.6s |  |
+| 939 | `stage3d_rotating_cube` | 0 | 10.6s |  |
 | 940 | `stage3d_sampler` | 0 | 9.7s |  |
-| 941 | `stage3d_sampler_partial_upload` | 0 | 9.9s |  |
-| 942 | `stage3d_stencil` | 0 | 29.8s |  |
-| 943 | `stage3d_texture` | 0 | 15.1s |  |
+| 941 | `stage3d_sampler_partial_upload` | 0 | 9.6s |  |
+| 942 | `stage3d_stencil` | 0 | 10.0s |  |
+| 943 | `stage3d_texture` | 0 | 14.8s |  |
 | 944 | `stage3d_texture_bytearray` | 0 | 11.1s |  |
-| 945 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 10.4s |  |
-| 946 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 11.7s |  |
-| 947 | `stage3d_triangle` | 0 | 9.9s |  |
-| 948 | `stage3d_triangle_bytes4` | 0 | 10.0s |  |
-| 949 | `stage3d_triangle_float1` | 0 | 9.9s |  |
-| 950 | `stage3d_triangle_index_upload` | 0 | 10.0s |  |
-| 951 | `stage3d_x_y` | 22 | 7.3s |  |
-| 952 | `stage_access` | 10 | 7.3s |  |
-| 953 | `stage_displayobject_properties` | 24 | 7.2s |  |
-| 954 | `stage_domain_getQualifiedDefinitionNames` | 5 | 7.3s |  |
-| 955 | `stage_framerate_nan` | 7 | 7.3s |  |
+| 945 | `stage3d_texture_bytearray_compressed_alpha` | 0 | 10.3s |  |
+| 946 | `stage3d_texture_bytearray_compressed_raw_alpha` | 0 | 11.5s |  |
+| 947 | `stage3d_triangle` | 0 | 9.8s |  |
+| 948 | `stage3d_triangle_bytes4` | 0 | 9.8s |  |
+| 949 | `stage3d_triangle_float1` | 0 | 9.7s |  |
+| 950 | `stage3d_triangle_index_upload` | 0 | 9.9s |  |
+| 951 | `stage3d_x_y` | 22 | 8.2s |  |
+| 952 | `stage_access` | 10 | 7.5s |  |
+| 953 | `stage_displayobject_properties` | 24 | 7.3s |  |
+| 954 | `stage_domain_getQualifiedDefinitionNames` | 5 | 7.5s |  |
+| 955 | `stage_framerate_nan` | 7 | 7.4s |  |
 | 956 | `stage_framerate_negative` | 6 | 7.3s |  |
 | 957 | `stage_framerate_zero` | 6 | 7.3s |  |
 | 958 | `stage_invalidate` | 38 | 7.5s |  |
-| 959 | `stage_loaderinfo_properties` | 24 | 27.7s |  |
-| 960 | `stage_mousechildren` | 2 | 7.2s |  |
-| 961 | `stage_mouseenabled` | 15 | 7.2s |  |
-| 962 | `stage_overriden_setters` | 31 | 7.5s |  |
-| 963 | `stage_properties` | 30 | 7.3s |  |
-| 964 | `stage_properties2` | 213 | 7.4s |  |
-| 965 | `stage_stage3Ds_vector` | 1 | 7.1s |  |
-| 966 | `static_length` | 24 | 7.3s |  |
-| 967 | `static_text` | 3 | 7.4s |  |
-| 968 | `static_var_with_this_in_ctor` | 2 | 7.2s |  |
-| 969 | `statictext_text` | 8 | 7.4s |  |
-| 970 | `stored_properties` | 11 | 7.3s |  |
-| 971 | `strict_equality` | 34 | 7.3s |  |
-| 972 | `string_call` | 13 | 7.2s |  |
-| 973 | `string_case` | 23 | 7.2s |  |
-| 974 | `string_char_at` | 27 | 7.2s |  |
-| 975 | `string_char_code_at` | 28 | 2.4s |  |
+| 959 | `stage_loaderinfo_properties` | 24 | 27.8s |  |
+| 960 | `stage_mousechildren` | 2 | 7.6s |  |
+| 961 | `stage_mouseenabled` | 15 | 7.7s |  |
+| 962 | `stage_overriden_setters` | 31 | 7.9s |  |
+| 963 | `stage_properties` | 30 | 7.5s |  |
+| 964 | `stage_properties2` | 213 | 7.8s |  |
+| 965 | `stage_stage3Ds_vector` | 1 | 7.5s |  |
+| 966 | `static_length` | 24 | 7.9s |  |
+| 967 | `static_text` | 3 | 7.7s |  |
+| 968 | `static_var_with_this_in_ctor` | 2 | 7.3s |  |
+| 969 | `statictext_text` | 8 | 7.5s |  |
+| 970 | `stored_properties` | 11 | 7.4s |  |
+| 971 | `strict_equality` | 34 | 7.5s |  |
+| 972 | `string_call` | 13 | 7.5s |  |
+| 973 | `string_case` | 23 | 7.8s |  |
+| 974 | `string_char_at` | 27 | 7.5s |  |
+| 975 | `string_char_code_at` | 28 | 2.5s |  |
 | 976 | `string_concat_fromcharcode` | 37 | 26.0s |  |
 | 977 | `string_constr` | 25 | 25.7s |  |
 | 978 | `string_indexof_lastindexof` | 87 | 7.1s |  |

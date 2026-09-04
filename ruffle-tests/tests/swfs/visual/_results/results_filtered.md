@@ -1,6 +1,6 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
@@ -145,9 +145,9 @@
 | 116 | `gradient_nonsequential_ratios` | 0 | 20.2s |  |
 | 117 | `gradient_radial_same_ratios` | 0 | 20.1s |  |
 | 118 | `gradient_same_ratios` | 0 | 1.2s |  |
-| 119 | `layout/line_vertical_align` | 0 | 28.1s |  |
+| 119 | `layout/line_vertical_align` | 0 | 27.8s |  |
 | 120 | `opaque_background` | 0 | 1.4s |  |
-| 121 | `scale_rotation_cache` | 106 | 21.6s |  |
+| 121 | `scale_rotation_cache` | 106 | 21.3s |  |
 | 122 | `simple_shapes/gradients/focal_radial` | 0 | 1.5s |  |
 | 123 | `simple_shapes/gradients/gradients` | 0 | 1.5s |  |
 | 124 | `simple_shapes/gradients/radial` | 0 | 1.6s |  |

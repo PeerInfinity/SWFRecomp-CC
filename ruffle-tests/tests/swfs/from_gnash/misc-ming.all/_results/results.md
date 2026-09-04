@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
-**Run Duration**: 33m 10s
+**Run Duration**: 33m 11s
 
 ## Summary
 
@@ -87,7 +87,7 @@
 | 54 | `new_child_in_unload_test` | 11 | 22.9s |  |
 | 55 | `opcode_guard_test` | 18 | 21.3s |  |
 | 56 | `place_and_remove_object_insane_test` | 22 | 21.4s |  |
-| 57 | `place_and_remove_object_test` | 13 | 21.7s |  |
+| 57 | `place_and_remove_object_test` | 13 | 22.7s |  |
 | 58 | `register_class/RegisterClassTest3` | 12 | 21.4s |  |
 | 59 | `register_class/registerClassTest` | 51 | 23.6s |  |
 | 60 | `replace_shapes1test` | 23 | 0.3s |  |
@@ -133,7 +133,7 @@
 | 24 | `matrix_test` | 5 | 9 | 82.7s |  |
 | 25 | `path_format_test` | 28 | 28 | 23.3s |  |
 | 26 | `place_object_test` | 14 | 14 | 2.5s |  |
-| 27 | `place_object_test2` | 22 | 23 | 22.1s |  |
+| 27 | `place_object_test2` | 22 | 23 | 22.3s |  |
 | 28 | `register_class/registerClassTest2` | 8 | 28 | 19.4s |  |
 | 29 | `replace_buttons1test` | 3 | 3 | 19.2s |  |
 

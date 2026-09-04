@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-04 00:54 UTC
+**Date**: 2026-09-04 01:40 UTC
 
 **Git SHA**: `86d4d6aac5`
 
-**Run Duration**: 30m 32s
+**Run Duration**: 30m 20s
 
 ## Summary
 
@@ -141,10 +141,10 @@
 | 108 | `XMLSocket-v7` | 35 | 2.4s |  |
 | 109 | `XMLSocket-v8` | 35 | 1.7s |  |
 | 110 | `argstest-v5` | 4 | 2.2s |  |
-| 111 | `case-v5` | 39 | 2.8s |  |
-| 112 | `case-v6` | 73 | 3.8s |  |
-| 113 | `case-v7` | 67 | 3.7s |  |
-| 114 | `case-v8` | 67 | 1.7s |  |
+| 111 | `case-v5` | 39 | 3.0s |  |
+| 112 | `case-v6` | 73 | 4.1s |  |
+| 113 | `case-v7` | 67 | 4.0s |  |
+| 114 | `case-v8` | 67 | 1.8s |  |
 | 115 | `delete-v5` | 61 | 21.6s |  |
 | 116 | `delete-v6` | 61 | 2.5s |  |
 | 117 | `delete-v7` | 61 | 2.7s |  |
