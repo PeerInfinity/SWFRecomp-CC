@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-04T09:14:15.677586+00:00",
-    "old_git_sha": "2002bc3ece7c1d471723096d990a0eb55ab8a30c",
-    "new_timestamp": "2026-09-04T12:05:22.467589+00:00",
-    "new_git_sha": "ec6bffa09f5f2ec54c80977cd356d96dd79f8cc8",
+    "old_timestamp": "2026-09-04T12:05:22.467589+00:00",
+    "old_git_sha": "ec6bffa09f5f2ec54c80977cd356d96dd79f8cc8",
+    "new_timestamp": "2026-09-04T14:22:00.368634+00:00",
+    "new_git_sha": "027418adc476092bd0180535ac8b24773e639e9f",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,32 @@
     "new_total": 1261,
     "new_pass_rate": 93.6,
     "old_mismatched_lines": 3623,
-    "new_mismatched_lines": 3623,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 3649,
+    "increased_mismatches": 26,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 1261,
+    "unchanged": 1260,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "loader_duplicate_class",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 29
+      },
+      "new_lines": {
+        "actual_lines": 46,
+        "expected_lines": 48,
+        "matching_lines": 3
+      }
+    }
+  ]
 }
