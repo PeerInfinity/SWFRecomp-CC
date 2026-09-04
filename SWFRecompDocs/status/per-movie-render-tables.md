@@ -265,10 +265,16 @@ for the same reason.
 
 ## 7. Local sweep
 
-`regression` suite and the 108 upstream tests that bundle a second SWF, run
-individually in `--mode=graphics` against the per-test baseline in
-`avm1/_results/results_graphics.json` at `46ee4fe37` (the merged CI results this
-slice started from). Numbers in §8.
+The 108 upstream tests that bundle a second SWF — every test in the corpus this
+change can reach — run individually in `--mode=graphics` against the per-test
+baseline in the merged `_results/results_graphics.json` at `46ee4fe37`:
+
+**0 regressions, 0 newly-passing.** 17 failures, every one of them already
+failing at the baseline with the same status (12 `output_mismatch`, 5
+`ruffle_matched`). The zero on the TRACE yield side is expected: a loaded
+child's shapes appearing on the GPU is a pixel change, and these are trace
+tests that were already reaching the metadata paths earlier slices fixed. The
+pixel axis is a different story — see §9, where one of them moves.
 
 The first attempt at this sweep produced 27 `compile_fail`s and none of them was
 real: runtime sources were still being edited while it ran, so tests picked up
@@ -277,4 +283,106 @@ stopped moving — worth remembering, because `compile_fail` is exactly the
 signature a genuine breakage would have.
 
 ## 8. CI
+
+Both modes, dispatched SERIALLY, `categories=full` (the change touches shared
+runtime code and the recompiler's emission), `images=false`.
+
+**graphics — run `33849507561`, merged as `2002bc3ec`.** Corpus-clean:
+
+```
+=== intersection: 4492 tests (91ce4e9a2 -> WORKTREE, results_graphics) ===
+STATUS HISTOGRAM
+  output_mismatch    124 ->   124 (+0)
+  pass              4132 ->  4132 (+0)
+  ruffle_matched     235 ->   235 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4367 ->  4367 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+Every bucket unmoved, including the crash buckets the histogram exists to catch
+(`runtime_error` held at 1; no `segfault` / `timeout` / `compile_fail` appeared).
+New corpus totals **4494 graded / 4369 effective**, up from 4492/4367 — the +2 is
+exactly the two new fixtures. `regression` 84/84 in both modes.
+
+**no-graphics — run `33854435965`, merged as `659153865`.** Also clean:
+
+```
+=== intersection: 4492 tests (2002bc3ec -> WORKTREE, results) ===
+STATUS HISTOGRAM
+  output_mismatch    123 ->   123 (+0)
+  pass              4132 ->  4132 (+0)
+  ruffle_matched     236 ->   236 (+0)
+  runtime_error        1 ->     1 (+0)
+  effective         4368 ->  4368 (+0)
+GAINS (fail -> effective): 0
+REGRESSIONS (effective -> fail): 0
+OTHER STATUS MOVES (failing on both sides): 0
+```
+
+New totals **4494 graded / 4370 effective**. The one-test gap against graphics
+(4370 vs 4369; `output_mismatch` 123 vs 124, `ruffle_matched` 236 vs 235) is the
+stable pre-existing mode divergence already on the BACKLOG under Tooling, not
+anything this slice moved.
+
+The upstream tests were re-synced before reading this (`download_tests.sh` over
+all 14 categories, 4418 installed) and reported **zero** drift, so nothing here
+is an upstream `output.txt` change wearing a regression's clothes.
+
+**The trace numbers are the regression check, not the slice's yield** — the
+pixel run below is where the yield is.
+
+## 9. The image baseline (one deliberate `images=true` run)
+
+Run `33857494837`, `mode=graphics categories=full images=true`, merged as
+`c30317101`. This is a deliberate render-baseline refresh, not a per-change
+default: the per-change runs above are `images=false`, and an `images=false` run
+never publishes `image_results_graphics.json`, so the pixel baseline had no entry
+for either new fixture. Baseline doc:
+`SWFRecompDocs/plans/graphics-image-baseline.md`.
+
+Its trace half re-ran identically (4369 -> 4369, every bucket +0 against the
+graphics run above — two runs at the same SHA, byte-identical, as designed).
+
+`scripts/image_status_diff.py` over the 568-comparison intersection:
+
+```
+  fail    206 -> 204 (-2)      pass  359 -> 361 (+2)     skip 3 -> 3
+  GAINS (-> pass): 2           REGRESSIONS (pass -> not pass): 0
+  BAND MOVES: improved 1 / worsened 0
+  NEW (absent from baseline): 4
+```
+
+**Read the provenance banner before believing any of that is mine.** The
+previous `images=true` run is `32267473014` from **2026-08-19** — sixteen days
+and many slices old — so the diff spans everything since, not just this commit.
+Attribution was measured, not assumed, by reverting this slice as a patch,
+rebuilding the recompiler and re-running each mover:
+
+| comparison | reverted | with slice | attributable? |
+|---|---|---|---|
+| `import_assets/avm1_imports_avm1 [output]` | 17755 outliers, FAIL | 459, PASS | **yes — this slice** |
+| `avm2/graphics_bitmaps [output]` | 1058, PASS | 1058, PASS | no — identical both ways |
+| `avm2/graphics_bitmap_fill [output]` | 64, FAIL | 64, FAIL | no — identical both ways |
+| `regression/avm1_parent_child_render [output]` | (new) | PASS | this slice's own fixture |
+| `regression/avm1_parent_child_bitmap_fill [output]` | (new) | PASS | this slice's own fixture |
+
+(Local Dawn is not CI's lavapipe, so the absolute verdicts differ from CI's; the
+A/B is what is valid, and "identical on both sides" is decisive either way.)
+
+**So this slice DOES have a corpus-visible pixel yield: +1, plus its own two
+fixtures. And it overturns something I wrote two sections up.** I had said no
+upstream test grades a loaded child's pixels. One does:
+`import_assets/avm1_imports_avm1` bundles `right_eye.swf` and pulls a character
+out of it with `ImportAssets` — so the character is DEFINED by the child, its
+vertex offset went through `tagDefineShape` under a non-zero
+`g_current_movie_id`, and it was drawing the ROOT's triangles. The
+loadMovie-shaped tests genuinely have no image comparisons; the IMPORT-shaped
+one does, and it is the same defect wearing a different tag.
+
+That also means the `import_assets` suite is a standing canary for this
+mechanism, alongside the two fixtures.
+
 

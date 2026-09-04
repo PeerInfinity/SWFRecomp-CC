@@ -294,7 +294,19 @@ first).
   `mc.hitTest(x, y, true)` on a child's shape tested the ROOT's outline. Anchored
   by `regression/avm1_parent_child_render` (5 hitTest rows, 2 of which flip, plus
   a 4-square tolerance-0 image comparison) and
-  `regression/avm1_parent_child_bitmap_fill` (pixels only). Closeout:
+  `regression/avm1_parent_child_bitmap_fill` (pixels only). CI corpus-clean in
+  BOTH modes, `categories=full`, `images=false` — graphics `33849507561`
+  (4367 effective, every bucket +0) and no-graphics `33854435965` (4368, +0);
+  totals 4492 -> 4494 graded, the +2 being the two fixtures. One deliberate
+  `images=true` run (`33857494837`) moved the pixel baseline **+1 beyond those
+  fixtures, 0 regressions**: `import_assets/avm1_imports_avm1` flipped
+  fail -> pass, attribution confirmed by a local revert A/B (17755 outliers
+  reverted, 459 with the slice) while the run's two other movers measured
+  IDENTICAL both ways and belong to the 16-day gap since the previous images
+  run. That test is the correction to this entry's own framing: an
+  `ImportAssets` character is DEFINED by the child, so it hits the same
+  `tagDefineShape` re-base a `loadMovie`'d one does — the `import_assets` suite
+  is a standing canary for this mechanism. Closeout:
   `SWFRecompDocs/status/per-movie-render-tables.md`; what it does NOT cover is
   §5 there and the next four entries here. (2026-09-04)
 - **Static text and morph shapes in a loaded child still draw the root's
