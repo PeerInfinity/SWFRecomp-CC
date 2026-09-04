@@ -1,19 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `82f27e5f9070` (2026-09-04T04:42:20.309755+00:00)
-**Current:** `b20dff160be5` (2026-09-04T06:19:35.489055+00:00)
+**Previous:** `b20dff160be5` (2026-09-04T06:19:35.489055+00:00)
+**Current:** `2002bc3ece7c` (2026-09-04T09:14:15.782004+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 81 | 82 | +1 |
-| Total | 81 | 82 | +1 |
+| Passing | 82 | 84 | +2 |
+| Total | 82 | 84 | +2 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (1)
+## Added Tests (2)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm2_reflect_trait_hooks` | pass | 30/30 |
+| `avm1_parent_child_bitmap_fill` | pass | 3/3 |
+| `avm1_parent_child_render` | pass | 7/7 |
