@@ -24244,8 +24244,10 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 	for (int read = 0; read < g_level_advance_count; read++) {
 		LevelAdvanceEntry e = g_level_advance[read];
 		if (e.mc == NULL || e.entry == NULL) continue;
-		// Drop entries whose MC has been unloaded or destroyed.
-		if (e.mc->depth == INT_MIN || e.mc->unloaded) continue;
+		// Drop entries whose MC has been unloaded or destroyed. `avm1_removed`
+		// covers removeMovieClip on the holder: script execution halts for that
+		// clip, so its loaded movie's timeline must not keep running either.
+		if (e.mc->depth == INT_MIN || e.mc->unloaded || e.mc->avm1_removed) continue;
 		// The tick that ran the load also ran the movie's frame 1 (the loader
 		// calls frame_funcs[0] itself), and this driver runs in the SAME tick,
 		// immediately after it. Arming here rather than advancing keeps a loaded
@@ -73028,6 +73030,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// child) on the construct frame; our deferred queue would have lagged it
 			// a tick, leaving _cf=1 + a stale child.
 			if (mc != NULL && mc != &root_movieclip) {
+				// Stop the loaded movie's playhead immediately, the same way
+				// unloadMovieNum / MovieClipLoader.unloadClip / the getURL unload
+				// path already do. This arm never needed it before, because a clip
+				// target of a direct loadMovie was never registered for per-tick
+				// advancement at all; now that it is, the movie keeps running one
+				// more frame after the unload -- enough to reach a terminal
+				// "TEST FAILURE" trace in graphics mode, where the main loop does
+				// not exit early on root stop. Key test: avm1/unloadmovie_method.
+				actionUnregisterLevelAdvance(mc);
 				DisplayObject* _ul_dobj = (DisplayObject*) mc->display_obj;
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 				// Capture (before the clear below zeroes sprite_max_depth) whether

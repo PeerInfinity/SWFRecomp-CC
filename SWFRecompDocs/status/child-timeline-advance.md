@@ -398,10 +398,66 @@ slices.
 
 ## 8. Local sweep
 
-To be filled in with the final sweep's diff against the `128828002` baseline
-sweep of the same 168-test list.
+168 tests, run one at a time (never a whole suite locally), against a baseline
+sweep of the same list at `128828002`: every corpus test that has a child SWF
+sibling and loads it — the `loadmovie*` / `loadmovienum*` / `unloadmovie*` /
+`mcl_*` / `load_cancel_*` / `register_class*` / `*cross_call` /
+`movieclip_invalid_get_bounds_1..8` / `focusrect_property_swf[567]` /
+`global_swf*` clusters, `from_gnash/misc-{ming,mtasc}.all`'s loaders,
+`from_shumway/avm1/{levels,moviecliploader}` and `avm1movie`, all of
+`mixed_avm` and `import_assets` — plus the whole `regression` suite.
+
+```
+88 canary tests   : 88/88 identical status to baseline (12 fail on both sides)
+regression suite  : 80/80 pass (77 pre-existing + this slice's 3)
+new failures      : 0
+```
+
+The twelve that fail on both sides are the suite's standing non-passes
+(`globals_monkeypatch`, `load_cancel_via_unload{clip,movie}`,
+`mcl_replace_root_swf7_to_swf{5,6}`, `movieclip_library_state_values`,
+`from_gnash/misc-ming.all/{DragDropTest,loading/loadMovieTest}`,
+`from_gnash/misc-mtasc.all/levels`, `from_shumway/avm1movie`,
+`mixed_avm/{avm1_loads_avm2,avm2_loads_avm1_events}`).
+
+This sweep is what caught §2.2's eleven-test regression — the first design's
+CI run was cancelled and the design reworked before it finished.
 
 ## 9. CI
+
+### The run that found the eleventh test
+
+`mode=graphics`, `categories=full`, `images=false` at `86d4d6aac` — **success**,
+run `33821303934`, complete (30/30 shards). It found exactly one regression the
+local sweep could not, because the local sweep runs `no-graphics`:
+
+```
+=== intersection: 4487 tests (128828002 -> 86d4d6aac, results_graphics) ===
+  output_mismatch    124 ->   125 (+1)
+  pass              4127 ->  4126 (-1)
+  effective         4362 ->  4361 (-1)
+REGRESSIONS (effective -> fail): 1
+  avm1/unloadmovie_method: pass -> output_mismatch
+```
+
+`mc.unloadMovie()` never called `actionUnregisterLevelAdvance`. It never needed
+to: a clip target of a direct `loadMovie` was never registered for per-tick
+advancement, so there was nothing to unregister. The other three unload entry
+points (`unloadMovieNum`, `MovieClipLoader.unloadClip`, the `getURL` unload
+path) all carry that call already, each with the same comment — the deferred
+unload queue only flips `mc->unloaded` on the NEXT tick, so without an
+immediate unregister the movie runs one more frame and reaches its terminal
+`TEST FAILURE: I should be unloaded by now!` line. **Graphics-only** because in
+`no-graphics` the main loop exits early on root stop and never gets there;
+reproduced locally with `--mode=graphics` before the fix and verified after, in
+both modes, along with `unloadmovie`, `unloadmovienum`, `mcl_unloadclip`,
+`load_cancel_via_removemovieclip` and `loadmovienum_cross_version_prototype`.
+
+The driver's drop condition gained `avm1_removed` in the same change — same
+class: a `removeMovieClip`'d holder halts its own script execution, so its
+loaded movie must not keep running.
+
+### The final runs
 
 To be filled in by the pipeline run at the final commit.
 
