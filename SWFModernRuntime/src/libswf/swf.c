@@ -1406,6 +1406,26 @@ void tagMain(SWFAppContext* app_context)
 				actionFirePendingLoadInits(app_context);
 		}
 #endif
+		// A goto issued from a timer/event callback (setInterval, etc.) queues the
+		// target frame's DoAction via ng_executeGotoCatchUp's drain-suppressed
+		// funcs[target] call. Unlike a goto from a frame script — where the
+		// caller's SHOW_FRAME drain runs the target script this tick — a
+		// timer-callback goto leaves it orphaned in the queue. A gotoAndPlay's
+		// is_playing=1 then survives into the natural advance below before the
+		// target frame's own stop() runs, over-advancing one frame. Drain any
+		// orphaned ONLOAD/SCRIPT entries now so the target frame's actions
+		// (e.g. stop()) settle is_playing before the advance. g_aq_count is
+		// normally 0 here (frame funcs drain at SHOW_FRAME), so this is a no-op
+		// on the common path. Mirrors swf_core.c (~line 1533-1548) — this is
+		// the graphics/OFFSCREEN_RENDER + browser-WASM twin of that drain, and
+		// it is deliberately OUTSIDE the mode #ifdefs so both loops get it.
+		// Key test: from_gnash/misc-swfc.all/gotoFrameFromInterval2 (the last
+		// graphics/no-graphics parity gap in the corpus).
+		{
+			extern size_t actionActionQueuePending(void);
+			if (actionActionQueuePending() > 0)
+				actionDrainAllInPriorityOrder(app_context);
+		}
 		if (manual_next_frame)
 		{
 			// Natural backward wrap (recompiler-emitted at end of last frame
