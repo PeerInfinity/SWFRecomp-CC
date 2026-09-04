@@ -2448,18 +2448,20 @@ void ng_buildMovieRenderTables(SWFAppContext* app_context)
 	size_t root_mverts = app_context->morph_end_shape_data_size / (2 * sizeof(float));
 	size_t root_mcolors = app_context->morph_end_color_data_size / (4 * sizeof(float));
 #ifndef NO_GRAPHICS
+	// Graphics only: NO_GRAPHICS has no cxform_data / bitmap_data on
+	// app_context, so neither is combined and neither base ever moves.
 	size_t root_cxforms = app_context->cxform_data_size / (20 * sizeof(float));
 	size_t root_bitmaps = app_context->bitmap_count;
-#else
-	size_t root_bitmaps = 0, root_cxforms = 0;
 #endif
 
 	size_t tot_verts = root_verts;
 	size_t tot_colors = root_colors;
 	size_t tot_style = root_style;
-	size_t tot_bitmaps = root_bitmaps;
 	size_t tot_xforms = root_xforms;
+#ifndef NO_GRAPHICS
+	size_t tot_bitmaps = root_bitmaps;
 	size_t tot_cxforms = root_cxforms;
+#endif
 	size_t tot_text = root_text;
 	size_t tot_glyphs = root_glyphs;
 	size_t tot_mverts = root_mverts;
