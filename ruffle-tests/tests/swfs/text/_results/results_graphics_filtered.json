@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-05T03:18:53.231759+00:00",
-    "git_sha": "cdafe1be9c2210ec22ca2ab89da2b5e9ee2118f4",
-    "duration_seconds": 235.91,
+    "timestamp": "2026-09-05T05:20:58.606693+00:00",
+    "git_sha": "12d2ec06b7bf678d88fe98e260356d390c41b63d",
+    "duration_seconds": 226.33,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30,
@@ -23,9 +23,9 @@
     {
       "test": "auto_size/height",
       "phases": {
-        "recomp": 0.062,
-        "compile": 31.053,
-        "run": 1.067
+        "recomp": 0.061,
+        "compile": 30.753,
+        "run": 1.016
       },
       "num_frames": 1,
       "lines": {
@@ -33,11 +33,11 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 32.28,
+      "duration": 31.92,
       "image_comparisons": {
         "output": {
           "status": "fail",
-          "message": "Image comparison failed: 15 outliers exceed limit of 3, max difference 255",
+          "message": "Image comparison failed: 6 outliers exceed limit of 3, max difference 255",
           "max_diff": 255,
           "trigger": [
             "last_frame"
@@ -48,12 +48,12 @@
             "height": 250,
             "total_channels": 300000,
             "max_diff": 255,
-            "diff_channels": 15,
-            "mean_diff": 0.0127,
-            "outliers": 15,
+            "diff_channels": 6,
+            "mean_diff": 0.0051,
+            "outliers": 6,
             "max_outliers": 3,
             "tolerance": 0,
-            "excess_outliers": 12
+            "excess_outliers": 3
           },
           "expected_source": "repo",
           "reason": "pixel_mismatch"
@@ -65,8 +65,8 @@
       "test": "auto_size/return",
       "phases": {
         "recomp": 0.065,
-        "compile": 29.669,
-        "run": 0.916
+        "compile": 32.201,
+        "run": 0.917
       },
       "num_frames": 1,
       "lines": {
@@ -74,11 +74,11 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 30.88,
+      "duration": 33.42,
       "image_comparisons": {
         "output": {
           "status": "fail",
-          "message": "Image comparison failed: 36 outliers exceed limit of 18, max difference 255",
+          "message": "Image comparison failed: 21 outliers exceed limit of 18, max difference 255",
           "max_diff": 255,
           "trigger": [
             "last_frame"
@@ -89,12 +89,12 @@
             "height": 375,
             "total_channels": 825000,
             "max_diff": 255,
-            "diff_channels": 36,
-            "mean_diff": 0.0111,
-            "outliers": 36,
+            "diff_channels": 21,
+            "mean_diff": 0.0065,
+            "outliers": 21,
             "max_outliers": 18,
             "tolerance": 0,
-            "excess_outliers": 18
+            "excess_outliers": 3
           },
           "expected_source": "repo",
           "reason": "pixel_mismatch"
@@ -105,9 +105,9 @@
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.064,
-        "compile": 28.03,
-        "run": 0.315
+        "recomp": 0.041,
+        "compile": 21.213,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -115,12 +115,12 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 28.61,
+      "duration": 21.55,
       "image_comparisons": {
         "output": {
           "status": "pass",
-          "message": "Image check passed: 18 outliers (limit 18), max difference 255",
-          "max_diff": 255,
+          "message": "Image check passed: 0 outliers (limit 18), max difference 0",
+          "max_diff": 0,
           "trigger": [
             "last_frame"
           ],
@@ -129,10 +129,10 @@
             "width": 500,
             "height": 350,
             "total_channels": 700000,
-            "max_diff": 255,
-            "diff_channels": 18,
-            "mean_diff": 0.0066,
-            "outliers": 18,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
             "max_outliers": 18,
             "tolerance": 0,
             "excess_outliers": 0
@@ -145,8 +145,8 @@
     {
       "test": "br_at_start",
       "phases": {
-        "recomp": 0.038,
-        "compile": 2.041,
+        "recomp": 0.028,
+        "compile": 1.931,
         "run": 0.315
       },
       "num_frames": 1,
@@ -155,7 +155,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.64,
+      "duration": 2.52,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -186,8 +186,8 @@
     {
       "test": "html_entity_parsing",
       "phases": {
-        "recomp": 0.006,
-        "compile": 8.217,
+        "recomp": 0.004,
+        "compile": 7.416,
         "run": 0.265
       },
       "num_frames": 1,
@@ -196,14 +196,14 @@
         "expected_lines": 213,
         "matching_lines": 213
       },
-      "duration": 8.5,
+      "duration": 7.69,
       "status": "pass"
     },
     {
       "test": "links_in_scrolled_text",
       "phases": {
-        "recomp": 0.05,
-        "compile": 2.07,
+        "recomp": 0.051,
+        "compile": 2.129,
         "run": 0.365
       },
       "num_frames": 2,
@@ -212,7 +212,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 2.49,
+      "duration": 2.55,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -221,9 +221,9 @@
     {
       "test": "style_changes_in_html",
       "phases": {
-        "recomp": 0.019,
-        "compile": 20.734,
-        "run": 0.265
+        "recomp": 0.012,
+        "compile": 16.026,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -231,7 +231,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.14,
+      "duration": 16.33,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -262,8 +262,8 @@
     {
       "test": "text_caret_placement_align",
       "phases": {
-        "recomp": 0.055,
-        "compile": 28.329,
+        "recomp": 0.053,
+        "compile": 29.73,
         "run": 0.315
       },
       "num_frames": 2,
@@ -272,15 +272,15 @@
         "expected_lines": 248,
         "matching_lines": 248
       },
-      "duration": 28.71,
+      "duration": 30.11,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
-        "recomp": 0.056,
-        "compile": 28.453,
-        "run": 0.317
+        "recomp": 0.055,
+        "compile": 28.636,
+        "run": 0.315
       },
       "num_frames": 2,
       "lines": {
@@ -288,15 +288,15 @@
         "expected_lines": 244,
         "matching_lines": 244
       },
-      "duration": 28.84,
+      "duration": 29.02,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
-        "recomp": 0.056,
-        "compile": 28.91,
-        "run": 0.315
+        "recomp": 0.055,
+        "compile": 28.076,
+        "run": 0.316
       },
       "num_frames": 2,
       "lines": {
@@ -304,14 +304,14 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 29.29,
+      "duration": 28.46,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
-        "recomp": 0.05,
-        "compile": 21.221,
+        "recomp": 0.049,
+        "compile": 21.52,
         "run": 0.566
       },
       "num_frames": 2,
@@ -320,7 +320,7 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 21.85,
+      "duration": 22.14,
       "status": "pass"
     }
   ]
