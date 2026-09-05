@@ -1,0 +1,125 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 1063647c7..277a79f74 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -841,6 +841,10 @@ int avm2_sound_transform_read(Avm2Context* ctx, Avm2Value v, int32_t out[5]);
+ // and per-tick dispatch Event.SOUND_COMPLETE for drained playbacks.
+ void avm2_media_register_sounds(Avm2Context* ctx);
+ void avm2_media_poll(Avm2Context* ctx);
++// Registers the global SoundMixer `soundTransform` accessor pair as an
++// INSTANCE property of `cls` — SimpleButton's `soundTransform` is the mixer's
++// (see avm2_media.c). Called from avm2_display.c's SimpleButton class build.
++void avm2_media_register_mixer_transform(Avm2Context* ctx, Avm2Class* cls);
+ 
+ // flash.text module (avm2_text.c — Stage 6): TextFormat/TextField engine.
+ void avm2_register_text(Avm2Context* ctx);
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index ad91fca80..d8c0c8dff 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -15911,10 +15911,6 @@ void avm2_register_display(Avm2Context* ctx)
+ 	add_getset(ctx, iobj, "accessibilityImplementation", do_accessimpl_get,
+ 	           do_accessimpl_set);
+ 	add_getset(ctx, iobj, "contextMenu", do_contextmenu_get, do_contextmenu_set);
+-	// soundTransform lives on Sprite + SimpleButton; both derive from
+-	// InteractiveObject, so registering here covers MovieClip and SimpleButton.
+-	add_getset(ctx, iobj, "soundTransform", do_get_sound_transform,
+-	           do_set_sound_transform);
+ 
+ 	Avm2Class* doc =
+ 		avm2_builtin_class(ctx, "flash.display", "DisplayObjectContainer", iobj);
+@@ -15997,6 +15993,14 @@ void avm2_register_display(Avm2Context* ctx)
+ 	// on Sprite). The Graphics class itself (g_graphics_class) is created later
+ 	// but only referenced when the getter is first called at runtime.
+ 	avm2_builtin_add_getter(ctx, sprite, "graphics", do_get_graphics);
++	// soundTransform is declared on Sprite and on SimpleButton ONLY — NOT on
++	// InteractiveObject/DisplayObjectContainer, so TextField/Loader/Stage do
++	// not get one. Sprite's is the per-object transform (Ruffle:
++	// avm2/globals/flash/display/sprite.rs:119-147); SimpleButton's is the
++	// GLOBAL SoundMixer transform, registered in the SimpleButton block below
++	// via avm2_media_register_mixer_transform().
++	add_getset(ctx, sprite, "soundTransform", do_get_sound_transform,
++	           do_set_sound_transform);
+ 
+ 	// The AGI no-op shell (see loader_load): a concrete Sprite subclass seeded as
+ 	// a Loader's `content` for the ArmorGames AGI SWF. Every AG-API method the
+@@ -16309,6 +16313,9 @@ void avm2_register_display(Avm2Context* ctx)
+ 	add_getset(ctx, button, "enabled", btn_enabled_get, btn_enabled_set);
+ 	add_getset(ctx, button, "useHandCursor", btn_handcursor_get, btn_handcursor_set);
+ 	add_getset(ctx, button, "trackAsMenu", btn_trackasmenu_get, btn_trackasmenu_set);
++	// NOT the per-object pair: a SimpleButton's soundTransform reads and
++	// writes the global SoundMixer transform (see avm2_media.c).
++	avm2_media_register_mixer_transform(ctx, button);
+ 
+ 	// flash.display.Stage. [Ruffle(Abstract)] to script, but the player mints
+ 	// the one real stage itself — so the gate is script-only, like MorphShape's
+diff --git a/SWFModernRuntime/src/avm2/avm2_media.c b/SWFModernRuntime/src/avm2/avm2_media.c
+index fed07cdeb..eef25340a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_media.c
++++ b/SWFModernRuntime/src/avm2/avm2_media.c
+@@ -400,6 +400,20 @@ static Avm2Value sm_set_sound_transform(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// `SimpleButton.soundTransform` IS the global SoundMixer transform: Flash
++// declares the property on SimpleButton, but playerglobal's implementation is
++// the mixer's (Ruffle: core/src/avm2/globals/flash/display/simple_button.rs:13
++// re-exports `sound_mixer::{get_sound_transform, set_sound_transform}`, and
++// sound_mixer.rs:15-19 documents the double duty). Sprite keeps its OWN
++// per-object pair. Both accessors below ignore `this`, so the static
++// SoundMixer pair serves the instance registration unchanged; avm2_display.c
++// calls this where the SimpleButton class is built.
++void avm2_media_register_mixer_transform(Avm2Context* ctx, Avm2Class* cls)
++{
++	avm2_builtin_add_getset(ctx, cls, "soundTransform", sm_get_sound_transform,
++	                        sm_set_sound_transform);
++}
++
+ static Avm2Value sm_stop_all(Avm2Activation* act)
+ {
+ #ifndef NO_GRAPHICS
+diff --git a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+index 789d61368..16f9b4c64 100644
+--- a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+@@ -85,17 +85,21 @@
+ #                               for the last), so the row needs both the method
+ #                               and its state-machine guards; passing cases
+ #                               cannot be scored piecemeal.
+-#   soundmixer_soundtransform   888/900 — the NEAREST-PASS row in this file, and
+-#                               a re-triage lead rather than a documentation
+-#                               row. All 12 diff lines are the two report blocks
+-#                               that follow `SoundMixer.soundTransform = st`:
+-#                               expected reports each player's
+-#                               leftToLeft/rightToRight as `-0.12` and pan
+-#                               `0.9856`, we report the identity transform
+-#                               (1 / 0 / 0 / 1, pan 0). i.e. a WRITE to
+-#                               `SoundMixer.soundTransform` is not reflected in
+-#                               the per-`SoundChannel` `soundTransform`
+-#                               readback. 2 players x 3 fields x 2 blocks = 12.
++#   soundmixer_soundtransform   PRUNED 2026-09-04 (s18 `w2-soundtransform`) —
++#                               `pass` 900/900. The entry's own diagnosis was
++#                               wrong on the owner: it called the two report
++#                               blocks a "per-`SoundChannel` `soundTransform`
++#                               readback", but `silence_player`/`noise_player`
++#                               are DefineButton characters (SimpleButton), not
++#                               SoundChannels. A SimpleButton's `soundTransform`
++#                               IS the global SoundMixer transform (Ruffle
++#                               `display/simple_button.rs:13` re-exports
++#                               `sound_mixer::{get,set}_sound_transform`), so the
++#                               12 lines were the global write not showing up
++#                               through the button. Fixed by registering the
++#                               mixer pair on SimpleButton and the per-object
++#                               pair on Sprite (was: one registration on
++#                               InteractiveObject).
+ audio_computespectrum
+ netstream_play_flv
+ netstream_play_stop_replay
+@@ -103,7 +107,6 @@ netstream_seek_flv
+ sound_load_multiple
+ soundchannel_position
+ soundchannel_soundcomplete
+-soundmixer_soundtransform
+ 
+ # RE-TRIAGED 2026-08-14 (s16 wave-2 `ignore-bucket`, board lead L4). The heading
+ # this bucket used to carry -- "Image-comparison tests (need the graphics

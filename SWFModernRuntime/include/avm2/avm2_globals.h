@@ -841,6 +841,10 @@ int avm2_sound_transform_read(Avm2Context* ctx, Avm2Value v, int32_t out[5]);
 // and per-tick dispatch Event.SOUND_COMPLETE for drained playbacks.
 void avm2_media_register_sounds(Avm2Context* ctx);
 void avm2_media_poll(Avm2Context* ctx);
+// Registers the global SoundMixer `soundTransform` accessor pair as an
+// INSTANCE property of `cls` — SimpleButton's `soundTransform` is the mixer's
+// (see avm2_media.c). Called from avm2_display.c's SimpleButton class build.
+void avm2_media_register_mixer_transform(Avm2Context* ctx, Avm2Class* cls);
 
 // flash.text module (avm2_text.c — Stage 6): TextFormat/TextField engine.
 void avm2_register_text(Avm2Context* ctx);

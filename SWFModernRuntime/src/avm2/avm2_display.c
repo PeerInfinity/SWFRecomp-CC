@@ -16617,10 +16617,6 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, iobj, "accessibilityImplementation", do_accessimpl_get,
 	           do_accessimpl_set);
 	add_getset(ctx, iobj, "contextMenu", do_contextmenu_get, do_contextmenu_set);
-	// soundTransform lives on Sprite + SimpleButton; both derive from
-	// InteractiveObject, so registering here covers MovieClip and SimpleButton.
-	add_getset(ctx, iobj, "soundTransform", do_get_sound_transform,
-	           do_set_sound_transform);
 
 	Avm2Class* doc =
 		avm2_builtin_class(ctx, "flash.display", "DisplayObjectContainer", iobj);
@@ -16703,6 +16699,14 @@ void avm2_register_display(Avm2Context* ctx)
 	// on Sprite). The Graphics class itself (g_graphics_class) is created later
 	// but only referenced when the getter is first called at runtime.
 	avm2_builtin_add_getter(ctx, sprite, "graphics", do_get_graphics);
+	// soundTransform is declared on Sprite and on SimpleButton ONLY — NOT on
+	// InteractiveObject/DisplayObjectContainer, so TextField/Loader/Stage do
+	// not get one. Sprite's is the per-object transform (Ruffle:
+	// avm2/globals/flash/display/sprite.rs:119-147); SimpleButton's is the
+	// GLOBAL SoundMixer transform, registered in the SimpleButton block below
+	// via avm2_media_register_mixer_transform().
+	add_getset(ctx, sprite, "soundTransform", do_get_sound_transform,
+	           do_set_sound_transform);
 
 	// The AGI no-op shell (see loader_load): a concrete Sprite subclass seeded as
 	// a Loader's `content` for the ArmorGames AGI SWF. Every AG-API method the
@@ -17015,6 +17019,9 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, button, "enabled", btn_enabled_get, btn_enabled_set);
 	add_getset(ctx, button, "useHandCursor", btn_handcursor_get, btn_handcursor_set);
 	add_getset(ctx, button, "trackAsMenu", btn_trackasmenu_get, btn_trackasmenu_set);
+	// NOT the per-object pair: a SimpleButton's soundTransform reads and
+	// writes the global SoundMixer transform (see avm2_media.c).
+	avm2_media_register_mixer_transform(ctx, button);
 
 	// flash.display.Stage. [Ruffle(Abstract)] to script, but the player mints
 	// the one real stage itself — so the gate is script-only, like MorphShape's

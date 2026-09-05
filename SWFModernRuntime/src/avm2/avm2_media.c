@@ -400,6 +400,20 @@ static Avm2Value sm_set_sound_transform(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// `SimpleButton.soundTransform` IS the global SoundMixer transform: Flash
+// declares the property on SimpleButton, but playerglobal's implementation is
+// the mixer's (Ruffle: core/src/avm2/globals/flash/display/simple_button.rs:13
+// re-exports `sound_mixer::{get_sound_transform, set_sound_transform}`, and
+// sound_mixer.rs:15-19 documents the double duty). Sprite keeps its OWN
+// per-object pair. Both accessors below ignore `this`, so the static
+// SoundMixer pair serves the instance registration unchanged; avm2_display.c
+// calls this where the SimpleButton class is built.
+void avm2_media_register_mixer_transform(Avm2Context* ctx, Avm2Class* cls)
+{
+	avm2_builtin_add_getset(ctx, cls, "soundTransform", sm_get_sound_transform,
+	                        sm_set_sound_transform);
+}
+
 static Avm2Value sm_stop_all(Avm2Activation* act)
 {
 #ifndef NO_GRAPHICS

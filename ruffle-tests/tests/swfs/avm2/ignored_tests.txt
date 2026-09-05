@@ -85,17 +85,21 @@
 #                               for the last), so the row needs both the method
 #                               and its state-machine guards; passing cases
 #                               cannot be scored piecemeal.
-#   soundmixer_soundtransform   888/900 — the NEAREST-PASS row in this file, and
-#                               a re-triage lead rather than a documentation
-#                               row. All 12 diff lines are the two report blocks
-#                               that follow `SoundMixer.soundTransform = st`:
-#                               expected reports each player's
-#                               leftToLeft/rightToRight as `-0.12` and pan
-#                               `0.9856`, we report the identity transform
-#                               (1 / 0 / 0 / 1, pan 0). i.e. a WRITE to
-#                               `SoundMixer.soundTransform` is not reflected in
-#                               the per-`SoundChannel` `soundTransform`
-#                               readback. 2 players x 3 fields x 2 blocks = 12.
+#   soundmixer_soundtransform   PRUNED 2026-09-04 (s18 `w2-soundtransform`) —
+#                               `pass` 900/900. The entry's own diagnosis was
+#                               wrong on the owner: it called the two report
+#                               blocks a "per-`SoundChannel` `soundTransform`
+#                               readback", but `silence_player`/`noise_player`
+#                               are DefineButton characters (SimpleButton), not
+#                               SoundChannels. A SimpleButton's `soundTransform`
+#                               IS the global SoundMixer transform (Ruffle
+#                               `display/simple_button.rs:13` re-exports
+#                               `sound_mixer::{get,set}_sound_transform`), so the
+#                               12 lines were the global write not showing up
+#                               through the button. Fixed by registering the
+#                               mixer pair on SimpleButton and the per-object
+#                               pair on Sprite (was: one registration on
+#                               InteractiveObject).
 audio_computespectrum
 netstream_play_flv
 netstream_play_stop_replay
@@ -103,7 +107,6 @@ netstream_seek_flv
 sound_load_multiple
 soundchannel_position
 soundchannel_soundcomplete
-soundmixer_soundtransform
 
 # RE-TRIAGED 2026-08-14 (s16 wave-2 `ignore-bucket`, board lead L4). The heading
 # this bucket used to carry -- "Image-comparison tests (need the graphics
