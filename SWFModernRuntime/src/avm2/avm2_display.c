@@ -5953,6 +5953,32 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 	cext->depth = 0;
 	cext->loader_info = li;   // loader.content.loaderInfo === contentLoaderInfo
 
+	// Ruffle movie_loader_complete (loader.rs:2087-2096) runs `mc.enter_frame`
+	// and only THEN `mc.construct_frame`: the loaded root's first frame — its
+	// timeline advance and its PlaceObject tags — is executed BEFORE the root
+	// class constructor, so a ctor that touches a frame-1 instance sees it.
+	// (loader_try_click_root's `Loadable` is exactly that: its whole body is
+	// `this.mouseDisabled.mouseEnabled = false`.) The AVM2 objects for those
+	// children are still minted by super()'s constructChildren
+	// (sprite_ctor_init) inside the ctor, which is what binds each named child
+	// to its field via set_on_parent_field.
+	//
+	// The phase is captured here because the construct/framescript legs below
+	// borrow it; the enter leg keeps the caller's phase, exactly as it did
+	// when this block sat after insert_at_index.
+	uint8_t saved_phase = ctx->frame_phase;
+	if (cext->timeline != NULL)
+	{
+		if (cext->playing) run_frame_internal(ctx, child, 1);
+		// The same pairing enter_frame_obj uses: run_frame_internal only
+		// QUEUES this frame's places (Ruffle's per-depth QueuedTagList) —
+		// flush_queued_places is what actually creates the children. Without
+		// it the loaded root has no frame-1 children while the load's own
+		// `complete` handler runs, so a named child reads null
+		// (from_shumway/as3-loader/LoaderTest2 asks for `testSymbol` there).
+		flush_queued_places(ctx, child);
+	}
+
 	// Constructed here, not by the next tick's construct walk: the ctor must
 	// observe a null stage and a null parent.
 	//
@@ -5984,23 +6010,11 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 	// as part of the load (catchup_display_object_to_frame), so a child whose
 	// constructor called addFrameScript runs it HERE — before init, not on
 	// the next tick. loader_loadbytes_events pins the position: `Framescript
-	// frame 1` sits between addedToStage and the identity checks.
-	// Enter -> Construct -> FrameScripts for this subtree only. The phase is
-	// borrowed for the construct leg because that is what arms a frame script
-	// (check_has_pending_script runs only in PHASE_CONSTRUCT), and restored
-	// afterwards so the caller's phase is unchanged.
-	uint8_t saved_phase = ctx->frame_phase;
-	if (cext->timeline != NULL)
-	{
-		if (cext->playing) run_frame_internal(ctx, child, 1);
-		// The same pairing enter_frame_obj uses: run_frame_internal only
-		// QUEUES this frame's places (Ruffle's per-depth QueuedTagList) —
-		// flush_queued_places is what actually creates the children. Without
-		// it the loaded root has no frame-1 children while the load's own
-		// `complete` handler runs, so a named child reads null
-		// (from_shumway/as3-loader/LoaderTest2 asks for `testSymbol` there).
-		flush_queued_places(ctx, child);
-	}
+	// frame 1` sits between addedToStage and the identity checks. The enter
+	// leg of that catch-up now runs ABOVE, before the root ctor.
+	// The phase is borrowed for the construct leg because that is what arms a
+	// frame script (check_has_pending_script runs only in PHASE_CONSTRUCT),
+	// and restored afterwards so the caller's phase is unchanged.
 	ctx->frame_phase = PHASE_CONSTRUCT;
 	construct_frame_obj(ctx, child);
 	ctx->frame_phase = PHASE_FRAME_SCRIPTS;
@@ -6298,15 +6312,33 @@ static void avm2_loader_run_exit_frame(Avm2Context* ctx)
 			loader_track_active(batch[i]);
 			continue;
 		}
-		// A loadBytes SWF's root is constructed here, immediately before its
-		// init/complete (loader_deliver). A throw out of that constructor sets
-		// `errored`, which skips both and drops the entry.
+		// A loadBytes SWF's root is constructed here (loader_deliver handed it
+		// over), and that is ALL that happens this tick: Ruffle reaches
+		// movie_loader_complete from a post_frame_callback, and
+		// movie_loader_complete only boots the clip — the AVM2 arm explicitly
+		// does NOT call fire_init_and_complete_events for a MovieClip
+		// ("This is fired after we process the movie's first frame, in
+		// MovieClip.on_exit_frame", loader.rs:2194-2206). So init/complete
+		// land at the NEXT frame's exit, one `exitFrame` later.
+		// large_preload_from_bytes grades that gap directly: `exitFrame in
+		// Test` sits between the loaded root's constructor traces and the
+		// identity checks its `init` handler prints.
+		//
+		// The re-track happens BEFORE the boot so this loader keeps its place
+		// ahead of any load the child's own constructor starts — the nested
+		// loadBytes in that same fixture must report `Constucted
+		// nested_load/test.swf` AFTER the outer loader's complete.
+		//
+		// A throw out of the root constructor sets `errored`; the entry then
+		// drops on the next pass without firing either event
+		// (loader_error_in_root_ctor).
 		if (lx->pending_boot != NULL)
 		{
 			const Avm2MovieTables* t = lx->pending_boot;
 			lx->pending_boot = NULL;
+			loader_track_active(batch[i]);
 			loader_boot_child_swf(ctx, batch[i], lx, t);
-			if (lx->errored) continue;
+			continue;
 		}
 		if (lx->loaded) loaderinfo_fire_init_and_complete(ctx, batch[i]);
 		else loader_track_active(batch[i]);
