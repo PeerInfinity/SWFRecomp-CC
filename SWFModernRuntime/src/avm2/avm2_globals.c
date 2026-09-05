@@ -8457,11 +8457,22 @@ static void register_security_certs(Avm2Context* ctx)
 // table must be walked in order.  A row's `base` is resolved against the four
 // pre-existing roots first, then against the rows already created.
 //
-// Deliberately NOT here: constants.  Flash exposes e.g.
+// Deliberately NOT here: constants, with ONE exception.  Flash exposes e.g.
 // `ActivityEvent.ACTIVITY` as a real class property; these shells report
 // theirs from the descriptor table and do not carry them at runtime.  That is
-// the same trade the flash.display shells make, and no graded test reads a
-// constant off a class this list creates.
+// the same trade the flash.display shells make.  FullScreenEvent breaks the
+// trade because avm2/stage_display_state really does read
+// `FullScreenEvent.FULL_SCREEN` -- an undefined there registers the listener
+// for type "undefined" and the whole fixture goes silent -- so its two
+// constants (FullScreenEvent.as) are added below and the class is kept for
+// Stage.displayState to dispatch with.
+static Avm2Class* g_full_screen_event_class;
+
+Avm2Class* avm2_full_screen_event_class(void)
+{
+	return g_full_screen_event_class;
+}
+
 static void register_events_shell_classes(Avm2Context* ctx)
 {
 	struct EventShell
@@ -8556,6 +8567,17 @@ static void register_events_shell_classes(Avm2Context* ctx)
 		cls->instance_init.fn = base->instance_init.fn;
 		cls->instance_init.debug_name = shells[i].name;
 		made[i] = cls;
+		if (strcmp(shells[i].name, "FullScreenEvent") == 0)
+		{
+			g_full_screen_event_class = cls;
+			avm2_builtin_add_static_const(
+				ctx, cls, "FULL_SCREEN",
+				avm2_string(avm2_string_from_literal(ctx, "fullScreen")));
+			avm2_builtin_add_static_const(
+				ctx, cls, "FULL_SCREEN_INTERACTIVE_ACCEPTED",
+				avm2_string(avm2_string_from_literal(
+					ctx, "fullScreenInteractiveAccepted")));
+		}
 	}
 }
 

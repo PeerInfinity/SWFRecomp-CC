@@ -931,6 +931,9 @@ void avm2_display_wire_url_loader(Avm2Context* ctx, Avm2Class* ul);
 // before avm2_register_events has run. LoaderInfo.uncaughtErrorEvents mints
 // one instance per LoaderInfo off it.
 Avm2Class* avm2_uncaught_error_events_class(void);
+// flash.events.FullScreenEvent (a shell class registered with the other 44),
+// kept so Stage.displayState can dispatch a real instance of it.
+Avm2Class* avm2_full_screen_event_class(void);
 // flash.display.IBitmapDrawable, created with DisplayObject (its first
 // implementor). avm2_register_bitmap runs later and declares it on BitmapData,
 // the only other implementor. NULL before avm2_register_display has run.

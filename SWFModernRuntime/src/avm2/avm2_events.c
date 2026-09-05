@@ -724,7 +724,23 @@ static Avm2Value ed_dispatch_event(Avm2Activation* act)
 	{
 		return avm2_bool(false);
 	}
+	// FP's EventDispatcher.dispatchEvent is AS3 playerglobal code whose body
+	// is `return dispatchEventFunction(event)` (Flash) /
+	// `dispatchEventInternal(event)` (Ruffle's playerglobal,
+	// EventDispatcher.as), so a listener that throws reports TWO frames for
+	// the dispatch, not one: the inner native worker under the outer AS3
+	// method. Ours is a single native method, so push the worker's frame
+	// explicitly around the dispatch (avm2/event_handler_exception grades
+	// exactly this line). Only the AS3 entry point does it — the runtime's
+	// own broadcasts (enterFrame &c.) call avm2_dispatch_event directly and
+	// FP shows no dispatch frames for those, which the same fixture's first
+	// trace pins.
+	static const Avm2MethodRef dispatch_internal = {
+		NULL, NULL, "flash.events::EventDispatcher/dispatchEventInternal", 0, 0
+	};
+	avm2_callstack_push(ctx, &dispatch_internal, NULL);
 	avm2_dispatch_event(ctx, act->this_val.u.obj, event_val.u.obj);
+	avm2_callstack_pop(ctx);
 	return avm2_bool(evt->cancelled == 0);
 }
 

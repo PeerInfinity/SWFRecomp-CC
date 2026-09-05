@@ -3889,6 +3889,11 @@ static Mat display_l2g_matrix_no_own_sr(Avm2Context* ctx, Avm2Object* obj)
 	{
 		Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, p);
 		if (pe == NULL) break;
+		// "We want to transform to Stage-local coordinates, so do *not* apply
+		// the Stage's matrix" (Ruffle display_object.rs:1494-1497). Everything
+		// script-visible is in Stage space; only the RENDER concat
+		// (display_world_matrix) carries stage.transform.matrix.
+		if (pe->is_stage) break;
 		if (pe->sr_committed)
 		{
 			Mat tr = { 1, 0, 0, 1,
@@ -3912,12 +3917,43 @@ static Mat display_l2g_matrix_no_own_sr(Avm2Context* ctx, Avm2Object* obj)
 static Mat display_l2g_matrix(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	// Ruffle Stage::local_to_global_matrix (stage.rs:814) overrides the walk
+	// with Matrix::IDENTITY -- "The stage is in Stage coordinates by
+	// definition" -- so stage.localToGlobal(0,0) is (0,0) whatever
+	// stage.transform.matrix says.
+	if (ext != NULL && ext->is_stage) return mat_identity();
 	Mat m = display_l2g_matrix_no_own_sr(ctx, obj);
 	if (ext != NULL && ext->sr_committed)
 	{
 		Mat tr = { 1, 0, 0, 1,
 		           -(double) ext->csr_xmin, -(double) ext->csr_ymin };
 		m = mat_mul(&m, &tr);
+	}
+	return m;
+}
+
+// The mouse mapping's version of the same rule. Ruffle's MouseEvent
+// stageX/stageY (globals/flash/events/mouse_event.rs:41 `local_to_stage_x`)
+// and `local_mouse_position` both go through local_to_global /
+// global_to_local, so both see the Stage override and the Stage-ancestor
+// break; our two mouse helpers otherwise use the RENDER concat
+// (display_world_matrix), which must keep stage.transform.matrix. This is
+// bit-identical to display_world_matrix wherever the stage matrix is the
+// identity -- i.e. everywhere in the corpus except avm2/stage_scale_factor,
+// the one fixture that assigns stage.transform.matrix.
+static Mat display_stage_space_matrix(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext != NULL && ext->is_stage) return mat_identity();
+	Mat m = ext != NULL ? ext_matrix(ext) : mat_identity();
+	Avm2Object* p = ext != NULL ? ext->parent : NULL;
+	while (p != NULL)
+	{
+		Avm2DisplayObjectExt* pe = avm2_display_ext_of(ctx, p);
+		if (pe == NULL || pe->is_stage) break;
+		Mat pm = ext_matrix(pe);
+		m = mat_mul(&pm, &m);
+		p = pe->parent;
 	}
 	return m;
 }
@@ -12568,23 +12604,128 @@ static Avm2Value stage_get_browser_zoom_factor(Avm2Activation* act)
 	return avm2_number(1);
 }
 
+// Ruffle Stage::contents_scale_factor -> the player's HiDPI scale factor
+// (stage.rs, `viewport_scale_factor`). verify_output.py already simulates the
+// display: `-DVIEWPORT_SCALE_FACTOR=` comes from test.toml's
+// [player_options] viewport_dimensions.scale_factor (the same define
+// Capabilities.screenResolution* divides by). With no viewport override there
+// is no simulated display and the factor is 1.
 static Avm2Value stage_get_contents_scale_factor(Avm2Activation* act)
 {
 	(void) act;
+#ifdef VIEWPORT_SCALE_FACTOR
+	return avm2_number((double) (VIEWPORT_SCALE_FACTOR));
+#else
 	return avm2_number(1);
+#endif
+}
+
+// Ruffle StageDisplayState (stage.rs:1027) + Stage::set_display_state
+// (:381-405) + fire_fullscreen_event (:760-789). The player has no real
+// window to expand, but the STATE and the event it fires are pure script
+// bookkeeping, and avm2/stage_display_state grades both.
+enum
+{
+	STAGE_DS_NORMAL = 0,
+	STAGE_DS_FULL_SCREEN,
+	STAGE_DS_FULL_SCREEN_INTERACTIVE
+};
+static int g_stage_display_state = STAGE_DS_NORMAL;
+
+static const char* stage_display_state_str(int st)
+{
+	// StageDisplayState's Display impl — "Match string values returned by AS."
+	if (st == STAGE_DS_FULL_SCREEN) return "fullScreen";
+	if (st == STAGE_DS_FULL_SCREEN_INTERACTIVE) return "fullScreenInteractive";
+	return "normal";
+}
+
+// StageDisplayState::from_str — `s.to_ascii_lowercase()` against the three
+// names, anything else is a parse error (-> #2008 at the AS3 setter).
+static int stage_display_state_parse(const Avm2String* s, int* out)
+{
+	static const struct { const char* lower; int st; } names[] = {
+		{ "fullscreen",            STAGE_DS_FULL_SCREEN },
+		{ "fullscreeninteractive", STAGE_DS_FULL_SCREEN_INTERACTIVE },
+		{ "normal",                STAGE_DS_NORMAL },
+	};
+	if (s == NULL) return 0;
+	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+	{
+		const char* n = names[i].lower;
+		size_t len = strlen(n);
+		if (s->len != len) continue;
+		size_t j = 0;
+		for (; j < len; j++)
+		{
+			unsigned char c = (unsigned char) s->utf8[j];
+			if (c >= 'A' && c <= 'Z') c = (unsigned char) (c + 32);
+			if (c != (unsigned char) n[j]) break;
+		}
+		if (j == len) { *out = names[i].st; return 1; }
+	}
+	return 0;
+}
+
+static int stage_ds_is_fullscreen(int st)
+{
+	return st == STAGE_DS_FULL_SCREEN || st == STAGE_DS_FULL_SCREEN_INTERACTIVE;
 }
 
 static Avm2Value stage_get_display_state(Avm2Activation* act)
 {
-	return avm2_string(avm2_string_from_literal(act->ctx, "normal"));
+	return avm2_string(avm2_string_from_literal(
+		act->ctx, stage_display_state_str(g_stage_display_state)));
 }
 
-// Full-screen is not reachable from a headless player, so the setter is inert.
-// It used to be wired to stage_set_quality purely because that was a no-op;
-// now that `quality` really stores a value, displayState needs its own.
 static Avm2Value stage_set_display_state(Avm2Activation* act)
 {
-	(void) act;
+	Avm2Context* ctx = act->ctx;
+	const Avm2String* s = avm2_coerce_to_string(
+		ctx, act->argc > 0 ? act->args[0] : avm2_undefined());
+	int want = STAGE_DS_NORMAL;
+	if (!stage_display_state_parse(s, &want))
+	{
+		// make_error_2008(activation, "displayState").
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2008: Parameter displayState must be one of "
+		                 "the accepted values.");
+	}
+	// "It's not entirely clear why when setting to FullScreen, desktop flash
+	// player at least will set its value to FullScreenInteractive."
+	// (globals/flash/display/stage.rs:160-164) — this rewrite is the AS3
+	// setter's, NOT the core one's, which is why the AVM1 Stage.displayState
+	// path in action.c must keep reporting "fullScreen".
+	if (want == STAGE_DS_FULL_SCREEN) want = STAGE_DS_FULL_SCREEN_INTERACTIVE;
+	// Stage::set_display_state's three early-outs. allow_fullscreen is the
+	// player option behind stage_get_allows_fullscreen (true here).
+	if (want == g_stage_display_state
+	    || (stage_ds_is_fullscreen(want)
+	        && stage_ds_is_fullscreen(g_stage_display_state)))
+	{
+		return avm2_undefined();
+	}
+	g_stage_display_state = want;
+	// fire_fullscreen_event's AVM2 arm: a real FullScreenEvent constructed
+	// with ("fullScreen", false, false, is_fullscreen, true), dispatched on
+	// the Stage. The listener coerces its argument to
+	// flash.events::FullScreenEvent, so the instance's class must really be
+	// that shell class.
+	Avm2Class* fse = avm2_full_screen_event_class();
+	if (fse != NULL && ctx->stage != NULL)
+	{
+		Avm2Value args[5];
+		args[0] = avm2_string(avm2_string_from_literal(ctx, "fullScreen"));
+		args[1] = avm2_bool(false);
+		args[2] = avm2_bool(false);
+		args[3] = avm2_bool(stage_ds_is_fullscreen(g_stage_display_state));
+		args[4] = avm2_bool(true);
+		Avm2Value ev = avm2_class_construct(ctx, fse, args, 5);
+		if (ev.kind == AVM2_VALUE_OBJECT && ev.u.obj != NULL)
+		{
+			avm2_dispatch_event(ctx, ctx->stage, ev.u.obj);
+		}
+	}
 	return avm2_undefined();
 }
 
@@ -14253,7 +14394,7 @@ static Avm2Value do_set_use_hand(Avm2Activation* act)
 // came back one twip short (mouse_pick_masking's 282.75-for-282.8).
 static void local_mouse(Avm2Context* ctx, Avm2Object* obj, double* lx, double* ly)
 {
-	Mat m = display_world_matrix(ctx, obj);
+	Mat m = display_stage_space_matrix(ctx, obj);
 	Mat inv = mat_invert(&m);
 	double gx = g_mouse_x * 20.0, gy = g_mouse_y * 20.0;
 	*lx = round(inv.a * gx + inv.c * gy + inv.tx) / 20.0;
@@ -14274,7 +14415,7 @@ int avm2_display_event_stage_coords(Avm2Context* ctx, Avm2Object* target,
 		*sx = lx; *sy = ly;
 		return 0;
 	}
-	Mat m = display_world_matrix(ctx, target);
+	Mat m = display_stage_space_matrix(ctx, target);
 	double px = (double) (int32_t) (lx * 20.0), py = (double) (int32_t) (ly * 20.0);
 	*sx = (m.a * px + m.c * py + m.tx) / 20.0;
 	*sy = (m.b * px + m.d * py + m.ty) / 20.0;

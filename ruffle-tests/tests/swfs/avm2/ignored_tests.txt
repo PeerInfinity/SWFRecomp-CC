@@ -143,10 +143,12 @@ soundmixer_soundtransform
 #    half of the old note was REFUTED: the harness normalises blank lines out
 #    of both sides, so the fixture's opening trace("") was never graded.)
 #   (geom_transform: PASSES as of s16 w2-geom — pruned)
-#   stage_scale_factor                    contentsScaleFactor must be 2 (needs a
-#                                         simulated 2x display) - cannot pass
+#   (stage_scale_factor: PASSES as of s18 w2-avm2-stage — pruned. The old note
+#    "contentsScaleFactor must be 2 (needs a simulated 2x display) - cannot
+#    pass" was WRONG: verify_output.py already simulates it — test.toml's
+#    [player_options] viewport_dimensions.scale_factor is compiled in as
+#    -DVIEWPORT_SCALE_FACTOR; only the getter was stubbed to 1.)
 displayobject_scrollrect
-stage_scale_factor
 
 # Upstream known_failure = true (Ruffle itself fails these)
 #
