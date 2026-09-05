@@ -1167,6 +1167,77 @@ Identical mechanism and identical ceiling.
 
 ---
 
+## Category 14: Corrupt Upstream Oracle (Flash Player Capture Artifacts)
+
+An `output.txt` is a capture of what real Flash Player printed. Normally that is
+the strongest oracle we have — but a capture can be *wrong*, and upstream Ruffle
+records the fact by setting `ignore = true` in `test.toml` (which means Ruffle
+never runs the test at all, as distinct from `known_failure = true`, which means
+Ruffle runs it and fails). When the captured bytes are physically impossible for
+the program that produced them, the test can never reach `pass` and there is no
+Ruffle oracle to fall back to either, so `ruffle_matched` is unreachable as well.
+
+### `avm2/number_tostring` — 31 impossible digits in the captured base-N strings (168 diff lines of 1050)
+
+<!-- image-axis: none -->
+
+`test.toml` is two lines, and the second is upstream's own verdict:
+
+```toml
+num_frames = 1
+ignore = true # Ignored because Flash Player adds extra x, W, and/or ° symbols randomly
+```
+
+`Test.as` traces `val.toString(radix)` for every radix 2–36 over a list of
+doubles, each block introduced by a `///(radix = N)` marker. Every line in such
+a block must therefore consist only of the first N characters of
+`0123456789abcdefghijklmnopqrstuvwxyz` (plus `-` / `.`). **31 lines violate
+their own radix** — the marker says the digit cannot exist, and it is there
+anyway:
+
+```
+line  307  ///(radix = 3)   1000100102201110210101222112100222000<0x97>000
+line  313  ///(radix = 6)   2333214230550124231308000            <- digit 8 in base 6
+line  382  ///(radix = 3)   101010111100012201221001211022200200000W000
+line  412  ///(radix = 18)  104a2a847555h,000
+line  848  ///(radix = 11)  2240393243114a32 00                  <- an ASCII space
+line  925  ///(radix = 12)  47618bb90b85629(00W
+line  998  ///(radix = 11)  191571a527a231970°000
+line 1046  ///(radix = 35)  aeg6eqbbyy0×00
+```
+
+The injected bytes are exactly the ones upstream names — `x`/`×`, `W`, `°` —
+plus `(`, `,`, a space, `\x10` and `\x97`, and two decimal digits (`8`) in
+sub-octal radices. They are scattered with no pattern across radices 3–35 and
+always near the tail of the digit string, i.e. Flash's own base-N printer
+corrupting its output buffer, not a semantic difference we could implement. The
+scan is reproducible: parse the `///(radix = N)` markers and flag any line
+containing a character outside base N (37 hits, of which 6 are the legitimate
+radix-10 scientific-notation lines `1.2315e-8` &c.).
+
+**Ceiling: 1019 of 1050 lines.** The remaining 137 of the 168 diff lines are one
+real mechanism — avmplus's radix conversion loses precision from the top down and
+pads the tail with zeros, e.g. expected
+`1000100102201110210101222112100222000000` against our exact
+`10001001022011102101012221121002220002210` — but chasing it buys nothing,
+because the 31 corrupt lines pin the status at `output_mismatch` forever.
+
+**Decision: accept permanently.** Already listed in
+`ruffle-tests/tests/swfs/avm2/ignored_tests.txt` under
+"upstream `ignore = true` in test.toml" (added 2026-07-11, kept by the
+2026-08-01 prune) — this entry supplies the rationale that listing lacked.
+Deliberately NOT added to the global `ruffle-tests/ignored_tests.txt`: the test
+has no `[[image_comparisons]]`, and a global entry is also an image-axis
+disposition (see that file's header, traps 1–2), so a global entry would buy
+nothing and mislabel the pixel board.
+
+**Not the same bug as `avm2/number_to_string`.** That test is base-10
+`avm2_format_number`; this one is `print_with_radix`'s 2–36 loop. Disjoint code,
+disjoint defects — `number_to_string`'s residual (subnormal shortest-round-trip
+digits) is a live HOLD, not an accepted diff.
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
@@ -1205,3 +1276,4 @@ Identical mechanism and identical ceiling.
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
 | `avm2/loader_applicationDomain` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 4 of 4 | Accept; would require shipping an AVM2 interpreter |
 | `avm2/swz` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 2 of 2 | Accept; same mechanism as `loader_applicationDomain` |
+| `avm2/number_tostring` | Corrupt upstream oracle: 31 impossible base-N digits in the Flash capture; upstream `ignore = true` (Category 14) | 168 of 1050 | Accept; ceiling is 1019/1050 and there is no `output.ruffle.txt`, so neither `pass` nor `ruffle_matched` is reachable. Suite-local ignore only |

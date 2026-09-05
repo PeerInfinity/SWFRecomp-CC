@@ -30,8 +30,17 @@ static double arg_f64(Avm2Activation* act, uint32_t i)
 // Number methods
 // ---------------------------------------------------------------------------
 
+// FP's range check does not live in toFixed/toPrecision/toExponential: those
+// three are thin AS3 wrappers around one static helper, `Number$/_convert`,
+// and that helper is what raises #1002 -- so its frame sits INNERMOST in the
+// trace (avm2/number_convert_errors pins 250 such lines). It is deliberately
+// absent from the argument-coercion traces in the same test: the argument is
+// coerced in the caller's own frame, BEFORE _convert is entered, so the push
+// must stay here and not move up into the three entry points.
 _Noreturn static void throw_1002(Avm2Context* ctx)
 {
+	static const Avm2MethodRef convert = { NULL, NULL, "Number$/_convert", 0, 0 };
+	avm2_callstack_push(ctx, &convert, NULL);
 	avm2_throw_error(ctx, ctx->builtins.range_error_class,
 	                 "Error #1002: Number.toPrecision has a range of 1 to 21. "
 	                 "Number.toFixed and Number.toExponential have a range of 0 to "
@@ -750,6 +759,49 @@ static void add_number_statics(Avm2Context* ctx, Avm2Class* cls)
 }
 
 // ---------------------------------------------------------------------------
+// Stack-frame spelling for the three convert methods
+// ---------------------------------------------------------------------------
+//
+// toFixed / toExponential / toPrecision are declared in the AS3 builtin
+// namespace in playerglobal, and FP spells a non-public trait's frame with its
+// URI: "Number/http://adobe.com/AS3/2006/builtin::toFixed()". Same rule as
+// "Function/http://adobe.com/AS3/2006/builtin::call()" (avm2_function.c) --
+// only the frame name moves, dispatch keys stay public.
+//
+// The receiver class is always Number here even for an `int`/`uint` receiver:
+// avm2_value_class maps AVM2_VALUE_INTEGER and AVM2_VALUE_NUMBER alike to
+// Number, so a primitive never reaches int's or uint's own vtable. That is
+// also why FP's SECOND frame for an int receiver ("int/...::toFixed()" outside
+// "Number/...::toFixed()") is not reproduced -- it is a STATIC-type rule, not
+// a value-kind one, and int and uint are the same runtime value here. See the
+// session-18 w2-avmplus-numerics report.
+#define AS3_BUILTIN_NS "http://adobe.com/AS3/2006/builtin::"
+
+static Avm2Value convert_framed(Avm2Activation* act, Avm2MethodFn self,
+                                Avm2MethodFn impl, const char* frame)
+{
+	Avm2Context* ctx = act->ctx;
+	uint32_t depth0 = ctx->call_depth;
+	avm2_callstack_rename_frame(ctx, self, frame);
+	Avm2Value r = impl(act);
+	// Restore exactly what we found; the throwing path longjmps past this and
+	// the unwind resets call_depth for us.
+	ctx->call_depth = depth0;
+	return r;
+}
+
+#define DEFINE_CONVERT_WRAPPER(impl, meth)                                     \
+	static Avm2Value impl##_framed(Avm2Activation* act)                        \
+	{                                                                          \
+		return convert_framed(act, impl##_framed, impl,                        \
+		                      "Number/" AS3_BUILTIN_NS meth);                  \
+	}
+
+DEFINE_CONVERT_WRAPPER(number_to_fixed, "toFixed")
+DEFINE_CONVERT_WRAPPER(number_to_exponential, "toExponential")
+DEFINE_CONVERT_WRAPPER(number_to_precision, "toPrecision")
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -770,9 +822,13 @@ static void add_number_methods(Avm2Context* ctx, Avm2Class* cls,
 	// still resolve through the prototype entry added below, whose numeric
 	// arm is number_to_string.
 	avm2_builtin_add_method(ctx, cls, "valueOf", number_value_of);
-	avm2_builtin_add_method(ctx, cls, "toFixed", number_to_fixed);
-	avm2_builtin_add_method(ctx, cls, "toExponential", number_to_exponential);
-	avm2_builtin_add_method(ctx, cls, "toPrecision", number_to_precision);
+	// The three convert methods carry their AS3 namespace URI in a stack
+	// frame; the ES3 prototype copies below deliberately do NOT (a prototype
+	// call is a Function frame in FP, not a class-trait one).
+	avm2_builtin_add_method(ctx, cls, "toFixed", number_to_fixed_framed);
+	avm2_builtin_add_method(ctx, cls, "toExponential",
+	                        number_to_exponential_framed);
+	avm2_builtin_add_method(ctx, cls, "toPrecision", number_to_precision_framed);
 
 	// ES3-compat layer on the prototype (Ruffle globals/Number.as).
 	Avm2Object* proto = cls->prototype_obj;

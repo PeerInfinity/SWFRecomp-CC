@@ -1,0 +1,283 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_array.c b/SWFModernRuntime/src/avm2/avm2_array.c
+index 220ec575c..ad37d7fa5 100644
+--- a/SWFModernRuntime/src/avm2/avm2_array.c
++++ b/SWFModernRuntime/src/avm2/avm2_array.c
+@@ -554,6 +554,20 @@ static Avm2Value array_last_index_of(Avm2Activation* act)
+ 
+ 
+ // FP19+ mutation helpers.
++//
++// insertAt/removeAt shift the dense storage, which moves every hole in the
++// tail to a new index. A hole reads through to Array.prototype[index], so the
++// shift must not carry it along: bake each tail hole down to the value it has
++// NOW, before the memmove. array_splice has had this pass since it was
++// written; these two never did.
++static void resolve_tail_holes(Avm2Object* arr, Avm2ArrayExt* ext, uint32_t from)
++{
++	for (uint32_t i = from; i < ext->dense_len; i++)
++	{
++		ext->elems[i] = resolve_hole(arr, i, ext->elems[i]);
++	}
++}
++
+ static Avm2Value array_insert_at(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -563,6 +577,12 @@ static Avm2Value array_insert_at(Avm2Activation* act)
+ 	double idxf = avm2_coerce_to_number(ctx, act->args[0]);
+ 	uint32_t idx = wrap_index(idxf, ext->dense_len);
+ 	Avm2Value v = act->argc > 1 ? act->args[1] : avm2_undefined();
++	// Resolve holes across the shifted tail before mutating, exactly as
++	// array_splice does: after the memmove a hole would fall through to the
++	// prototype at its NEW index, so `insertAt` and `splice` would disagree
++	// on a sparse array (from_avmplus/as3/Array/insertremove compares the
++	// two element by element).
++	resolve_tail_holes(arr, ext, idx);
+ 	uint32_t need = ext->dense_len + 1;
+ 	if (need > ext->cap)
+ 	{
+@@ -594,6 +614,8 @@ static Avm2Value array_remove_at(Avm2Activation* act)
+ 	if (idxf >= (double) ext->dense_len) return avm2_undefined();
+ 	uint32_t idx = wrap_index(idxf, ext->dense_len);
+ 	if (idx >= ext->dense_len) return avm2_undefined();
++	// Same hole-resolution pass as insertAt/splice (see above).
++	resolve_tail_holes(arr, ext, idx);
+ 	Avm2Value v = ext->elems[idx];
+ 	memmove(ext->elems + idx, ext->elems + idx + 1,
+ 	        (ext->dense_len - idx - 1) * sizeof(Avm2Value));
+diff --git a/SWFModernRuntime/src/avm2/avm2_number.c b/SWFModernRuntime/src/avm2/avm2_number.c
+index 7861748ad..3aa99f353 100644
+--- a/SWFModernRuntime/src/avm2/avm2_number.c
++++ b/SWFModernRuntime/src/avm2/avm2_number.c
+@@ -30,8 +30,17 @@ static double arg_f64(Avm2Activation* act, uint32_t i)
+ // Number methods
+ // ---------------------------------------------------------------------------
+ 
++// FP's range check does not live in toFixed/toPrecision/toExponential: those
++// three are thin AS3 wrappers around one static helper, `Number$/_convert`,
++// and that helper is what raises #1002 -- so its frame sits INNERMOST in the
++// trace (avm2/number_convert_errors pins 250 such lines). It is deliberately
++// absent from the argument-coercion traces in the same test: the argument is
++// coerced in the caller's own frame, BEFORE _convert is entered, so the push
++// must stay here and not move up into the three entry points.
+ _Noreturn static void throw_1002(Avm2Context* ctx)
+ {
++	static const Avm2MethodRef convert = { NULL, NULL, "Number$/_convert", 0, 0 };
++	avm2_callstack_push(ctx, &convert, NULL);
+ 	avm2_throw_error(ctx, ctx->builtins.range_error_class,
+ 	                 "Error #1002: Number.toPrecision has a range of 1 to 21. "
+ 	                 "Number.toFixed and Number.toExponential have a range of 0 to "
+@@ -749,6 +758,49 @@ static void add_number_statics(Avm2Context* ctx, Avm2Class* cls)
+ 	}
+ }
+ 
++// ---------------------------------------------------------------------------
++// Stack-frame spelling for the three convert methods
++// ---------------------------------------------------------------------------
++//
++// toFixed / toExponential / toPrecision are declared in the AS3 builtin
++// namespace in playerglobal, and FP spells a non-public trait's frame with its
++// URI: "Number/http://adobe.com/AS3/2006/builtin::toFixed()". Same rule as
++// "Function/http://adobe.com/AS3/2006/builtin::call()" (avm2_function.c) --
++// only the frame name moves, dispatch keys stay public.
++//
++// The receiver class is always Number here even for an `int`/`uint` receiver:
++// avm2_value_class maps AVM2_VALUE_INTEGER and AVM2_VALUE_NUMBER alike to
++// Number, so a primitive never reaches int's or uint's own vtable. That is
++// also why FP's SECOND frame for an int receiver ("int/...::toFixed()" outside
++// "Number/...::toFixed()") is not reproduced -- it is a STATIC-type rule, not
++// a value-kind one, and int and uint are the same runtime value here. See the
++// session-18 w2-avmplus-numerics report.
++#define AS3_BUILTIN_NS "http://adobe.com/AS3/2006/builtin::"
++
++static Avm2Value convert_framed(Avm2Activation* act, Avm2MethodFn self,
++                                Avm2MethodFn impl, const char* frame)
++{
++	Avm2Context* ctx = act->ctx;
++	uint32_t depth0 = ctx->call_depth;
++	avm2_callstack_rename_frame(ctx, self, frame);
++	Avm2Value r = impl(act);
++	// Restore exactly what we found; the throwing path longjmps past this and
++	// the unwind resets call_depth for us.
++	ctx->call_depth = depth0;
++	return r;
++}
++
++#define DEFINE_CONVERT_WRAPPER(impl, meth)                                     \
++	static Avm2Value impl##_framed(Avm2Activation* act)                        \
++	{                                                                          \
++		return convert_framed(act, impl##_framed, impl,                        \
++		                      "Number/" AS3_BUILTIN_NS meth);                  \
++	}
++
++DEFINE_CONVERT_WRAPPER(number_to_fixed, "toFixed")
++DEFINE_CONVERT_WRAPPER(number_to_exponential, "toExponential")
++DEFINE_CONVERT_WRAPPER(number_to_precision, "toPrecision")
++
+ // ---------------------------------------------------------------------------
+ // Registration
+ // ---------------------------------------------------------------------------
+@@ -770,9 +822,13 @@ static void add_number_methods(Avm2Context* ctx, Avm2Class* cls,
+ 	// still resolve through the prototype entry added below, whose numeric
+ 	// arm is number_to_string.
+ 	avm2_builtin_add_method(ctx, cls, "valueOf", number_value_of);
+-	avm2_builtin_add_method(ctx, cls, "toFixed", number_to_fixed);
+-	avm2_builtin_add_method(ctx, cls, "toExponential", number_to_exponential);
+-	avm2_builtin_add_method(ctx, cls, "toPrecision", number_to_precision);
++	// The three convert methods carry their AS3 namespace URI in a stack
++	// frame; the ES3 prototype copies below deliberately do NOT (a prototype
++	// call is a Function frame in FP, not a class-trait one).
++	avm2_builtin_add_method(ctx, cls, "toFixed", number_to_fixed_framed);
++	avm2_builtin_add_method(ctx, cls, "toExponential",
++	                        number_to_exponential_framed);
++	avm2_builtin_add_method(ctx, cls, "toPrecision", number_to_precision_framed);
+ 
+ 	// ES3-compat layer on the prototype (Ruffle globals/Number.as).
+ 	Avm2Object* proto = cls->prototype_obj;
+diff --git a/SWFModernRuntime/src/avm2/avm2_ops.c b/SWFModernRuntime/src/avm2/avm2_ops.c
+index 365f9f96a..bb6a5fa6e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_ops.c
++++ b/SWFModernRuntime/src/avm2/avm2_ops.c
+@@ -4284,8 +4284,38 @@ Avm2Value avm2_op_esc_xattr(Avm2Activation* act, Avm2Value v)
+ 	return esc_xml(act, v, 1);
+ }
+ 
++// ECMA-357 10.2.1.1 EscapeElementValue: an XML / XMLList operand contributes
++// its MARKUP (ToXMLString), not its escaped string value. This is what makes
++// `<a>{someXml}</a>` splice nodes into the literal instead of stringifying
++// them -- an XML literal compiles to string concatenation of esc_xelem'd
++// pieces followed by `new XML(...)`, so the splice IS this opcode.
++// (Ruffle activation.rs op_esc_elem: XmlObject / XmlListObject -> as_xml_string,
++// everything else -> escape_element_value(ToString). Deliberately asymmetric
++// with esc_xattr, which always stringifies.)
+ Avm2Value avm2_op_esc_xelem(Avm2Activation* act, Avm2Value v)
+ {
++	Avm2Context* ctx = act->ctx;
++	Avm2XmlExt* xe = avm2_xml_ext_of(v);
++	if (xe != NULL)
++	{
++		return avm2_string(avm2_e4x_to_xml_string(ctx, xe->node));
++	}
++	Avm2XmlListExt* le = avm2_xmllist_ext_of(v);
++	if (le != NULL)
++	{
++		const Avm2String* s = avm2_string_from_literal(ctx, "");
++		for (uint32_t i = 0; i < le->count; i++)
++		{
++			if (i > 0)
++			{
++				s = avm2_string_concat(ctx, s,
++				                       avm2_string_from_literal(ctx, "\n"));
++			}
++			s = avm2_string_concat(ctx, s,
++			                       avm2_e4x_to_xml_string(ctx, le->items[i]));
++		}
++		return avm2_string(s);
++	}
+ 	return esc_xml(act, v, 0);
+ }
+ 
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+index 644a8988d..9be69fcdc 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+@@ -1167,6 +1167,77 @@ Identical mechanism and identical ceiling.
+ 
+ ---
+ 
++## Category 14: Corrupt Upstream Oracle (Flash Player Capture Artifacts)
++
++An `output.txt` is a capture of what real Flash Player printed. Normally that is
++the strongest oracle we have — but a capture can be *wrong*, and upstream Ruffle
++records the fact by setting `ignore = true` in `test.toml` (which means Ruffle
++never runs the test at all, as distinct from `known_failure = true`, which means
++Ruffle runs it and fails). When the captured bytes are physically impossible for
++the program that produced them, the test can never reach `pass` and there is no
++Ruffle oracle to fall back to either, so `ruffle_matched` is unreachable as well.
++
++### `avm2/number_tostring` — 31 impossible digits in the captured base-N strings (168 diff lines of 1050)
++
++<!-- image-axis: none -->
++
++`test.toml` is two lines, and the second is upstream's own verdict:
++
++```toml
++num_frames = 1
++ignore = true # Ignored because Flash Player adds extra x, W, and/or ° symbols randomly
++```
++
++`Test.as` traces `val.toString(radix)` for every radix 2–36 over a list of
++doubles, each block introduced by a `///(radix = N)` marker. Every line in such
++a block must therefore consist only of the first N characters of
++`0123456789abcdefghijklmnopqrstuvwxyz` (plus `-` / `.`). **31 lines violate
++their own radix** — the marker says the digit cannot exist, and it is there
++anyway:
++
++```
++line  307  ///(radix = 3)   1000100102201110210101222112100222000<0x97>000
++line  313  ///(radix = 6)   2333214230550124231308000            <- digit 8 in base 6
++line  382  ///(radix = 3)   101010111100012201221001211022200200000W000
++line  412  ///(radix = 18)  104a2a847555h,000
++line  848  ///(radix = 11)  2240393243114a32 00                  <- an ASCII space
++line  925  ///(radix = 12)  47618bb90b85629(00W
++line  998  ///(radix = 11)  191571a527a231970°000
++line 1046  ///(radix = 35)  aeg6eqbbyy0×00
++```
++
++The injected bytes are exactly the ones upstream names — `x`/`×`, `W`, `°` —
++plus `(`, `,`, a space, `\x10` and `\x97`, and two decimal digits (`8`) in
++sub-octal radices. They are scattered with no pattern across radices 3–35 and
++always near the tail of the digit string, i.e. Flash's own base-N printer
++corrupting its output buffer, not a semantic difference we could implement. The
++scan is reproducible: parse the `///(radix = N)` markers and flag any line
++containing a character outside base N (37 hits, of which 6 are the legitimate
++radix-10 scientific-notation lines `1.2315e-8` &c.).
++
++**Ceiling: 1019 of 1050 lines.** The remaining 137 of the 168 diff lines are one
++real mechanism — avmplus's radix conversion loses precision from the top down and
++pads the tail with zeros, e.g. expected
++`1000100102201110210101222112100222000000` against our exact
++`10001001022011102101012221121002220002210` — but chasing it buys nothing,
++because the 31 corrupt lines pin the status at `output_mismatch` forever.
++
++**Decision: accept permanently.** Already listed in
++`ruffle-tests/tests/swfs/avm2/ignored_tests.txt` under
++"upstream `ignore = true` in test.toml" (added 2026-07-11, kept by the
++2026-08-01 prune) — this entry supplies the rationale that listing lacked.
++Deliberately NOT added to the global `ruffle-tests/ignored_tests.txt`: the test
++has no `[[image_comparisons]]`, and a global entry is also an image-axis
++disposition (see that file's header, traps 1–2), so a global entry would buy
++nothing and mislabel the pixel board.
++
++**Not the same bug as `avm2/number_to_string`.** That test is base-10
++`avm2_format_number`; this one is `print_with_radix`'s 2–36 loop. Disjoint code,
++disjoint defects — `number_to_string`'s residual (subnormal shortest-round-trip
++digits) is a live HOLD, not an accepted diff.
++
++---
++
+ ## Summary Table
+ 
+ | Test | Category | Diff pairs | Decision |
+@@ -1205,3 +1276,4 @@ Identical mechanism and identical ceiling.
+ | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
+ | `avm2/loader_applicationDomain` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 4 of 4 | Accept; would require shipping an AVM2 interpreter |
+ | `avm2/swz` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 2 of 2 | Accept; same mechanism as `loader_applicationDomain` |
++| `avm2/number_tostring` | Corrupt upstream oracle: 31 impossible base-N digits in the Flash capture; upstream `ignore = true` (Category 14) | 168 of 1050 | Accept; ceiling is 1019/1050 and there is no `output.ruffle.txt`, so neither `pass` nor `ruffle_matched` is reachable. Suite-local ignore only |
+diff --git a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+index 9c690e37d..04d544de6 100644
+--- a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+@@ -194,6 +194,12 @@ weird_superinterface_properties
+ # bytearray_oom currently `pass`, but the entry records an UPSTREAM decision
+ # (the test is disabled in its own test.toml), not our own scope call, so the
+ # 2026-08-01 prune kept it.
++# number_tostring gained its rationale on 2026-09-04 (s18 w2-avmplus-numerics):
++# 31 lines of its output.txt carry a digit that cannot exist in the radix its
++# own `///(radix = N)` marker announces (Flash's base-N printer corrupting its
++# buffer — exactly the "extra x, W, and/or degrees symbols" the test.toml
++# comment names). Ceiling 1019/1050, no output.ruffle.txt, so neither `pass`
++# nor `ruffle_matched` is reachable. avm1 ACCEPTED_DIFFS.md Category 14.
+ bytearray_oom
+ number_tostring
+ 

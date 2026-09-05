@@ -197,6 +197,12 @@ weird_superinterface_properties
 # bytearray_oom currently `pass`, but the entry records an UPSTREAM decision
 # (the test is disabled in its own test.toml), not our own scope call, so the
 # 2026-08-01 prune kept it.
+# number_tostring gained its rationale on 2026-09-04 (s18 w2-avmplus-numerics):
+# 31 lines of its output.txt carry a digit that cannot exist in the radix its
+# own `///(radix = N)` marker announces (Flash's base-N printer corrupting its
+# buffer — exactly the "extra x, W, and/or degrees symbols" the test.toml
+# comment names). Ceiling 1019/1050, no output.ruffle.txt, so neither `pass`
+# nor `ruffle_matched` is reachable. avm1 ACCEPTED_DIFFS.md Category 14.
 bytearray_oom
 number_tostring
 

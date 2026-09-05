@@ -554,6 +554,20 @@ static Avm2Value array_last_index_of(Avm2Activation* act)
 
 
 // FP19+ mutation helpers.
+//
+// insertAt/removeAt shift the dense storage, which moves every hole in the
+// tail to a new index. A hole reads through to Array.prototype[index], so the
+// shift must not carry it along: bake each tail hole down to the value it has
+// NOW, before the memmove. array_splice has had this pass since it was
+// written; these two never did.
+static void resolve_tail_holes(Avm2Object* arr, Avm2ArrayExt* ext, uint32_t from)
+{
+	for (uint32_t i = from; i < ext->dense_len; i++)
+	{
+		ext->elems[i] = resolve_hole(arr, i, ext->elems[i]);
+	}
+}
+
 static Avm2Value array_insert_at(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -563,6 +577,12 @@ static Avm2Value array_insert_at(Avm2Activation* act)
 	double idxf = avm2_coerce_to_number(ctx, act->args[0]);
 	uint32_t idx = wrap_index(idxf, ext->dense_len);
 	Avm2Value v = act->argc > 1 ? act->args[1] : avm2_undefined();
+	// Resolve holes across the shifted tail before mutating, exactly as
+	// array_splice does: after the memmove a hole would fall through to the
+	// prototype at its NEW index, so `insertAt` and `splice` would disagree
+	// on a sparse array (from_avmplus/as3/Array/insertremove compares the
+	// two element by element).
+	resolve_tail_holes(arr, ext, idx);
 	uint32_t need = ext->dense_len + 1;
 	if (need > ext->cap)
 	{
@@ -594,6 +614,8 @@ static Avm2Value array_remove_at(Avm2Activation* act)
 	if (idxf >= (double) ext->dense_len) return avm2_undefined();
 	uint32_t idx = wrap_index(idxf, ext->dense_len);
 	if (idx >= ext->dense_len) return avm2_undefined();
+	// Same hole-resolution pass as insertAt/splice (see above).
+	resolve_tail_holes(arr, ext, idx);
 	Avm2Value v = ext->elems[idx];
 	memmove(ext->elems + idx, ext->elems + idx + 1,
 	        (ext->dense_len - idx - 1) * sizeof(Avm2Value));

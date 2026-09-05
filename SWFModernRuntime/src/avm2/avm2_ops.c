@@ -4284,8 +4284,38 @@ Avm2Value avm2_op_esc_xattr(Avm2Activation* act, Avm2Value v)
 	return esc_xml(act, v, 1);
 }
 
+// ECMA-357 10.2.1.1 EscapeElementValue: an XML / XMLList operand contributes
+// its MARKUP (ToXMLString), not its escaped string value. This is what makes
+// `<a>{someXml}</a>` splice nodes into the literal instead of stringifying
+// them -- an XML literal compiles to string concatenation of esc_xelem'd
+// pieces followed by `new XML(...)`, so the splice IS this opcode.
+// (Ruffle activation.rs op_esc_elem: XmlObject / XmlListObject -> as_xml_string,
+// everything else -> escape_element_value(ToString). Deliberately asymmetric
+// with esc_xattr, which always stringifies.)
 Avm2Value avm2_op_esc_xelem(Avm2Activation* act, Avm2Value v)
 {
+	Avm2Context* ctx = act->ctx;
+	Avm2XmlExt* xe = avm2_xml_ext_of(v);
+	if (xe != NULL)
+	{
+		return avm2_string(avm2_e4x_to_xml_string(ctx, xe->node));
+	}
+	Avm2XmlListExt* le = avm2_xmllist_ext_of(v);
+	if (le != NULL)
+	{
+		const Avm2String* s = avm2_string_from_literal(ctx, "");
+		for (uint32_t i = 0; i < le->count; i++)
+		{
+			if (i > 0)
+			{
+				s = avm2_string_concat(ctx, s,
+				                       avm2_string_from_literal(ctx, "\n"));
+			}
+			s = avm2_string_concat(ctx, s,
+			                       avm2_e4x_to_xml_string(ctx, le->items[i]));
+		}
+		return avm2_string(s);
+	}
 	return esc_xml(act, v, 0);
 }
 
