@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-05 04:40 UTC
+**Date**: 2026-09-05 06:00 UTC
 
-**Git SHA**: `7f7a6ba369`
+**Git SHA**: `1d87c1cfba`
 
-**Run Duration**: 2m 36s
+**Run Duration**: 2m 27s
 
 ## Summary
 
@@ -23,52 +23,52 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 1.3s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 1.2s |  |
-| 3 | `bitmapdata/loadBitmap` | 3 | 1.1s |  |
-| 4 | `callee` | 2 | 1.1s |  |
-| 5 | `depth` | 6 | 1.3s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 1.6s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 1.5s |  |
+| 1 | `array` | 7 | 1.4s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 1.3s |  |
+| 3 | `bitmapdata/loadBitmap` | 3 | 1.3s |  |
+| 4 | `callee` | 2 | 1.3s |  |
+| 5 | `depth` | 6 | 1.1s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 1.3s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 1.4s |  |
 | 8 | `duplicateMovieClip/dontremove` | 6 | 1.4s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 1.0s |  |
 | 10 | `duplicateMovieClip/name-coercion` | 3 | 0.9s |  |
 | 11 | `duplicateMovieClip/samedepth` | 6 | 1.4s |  |
 | 12 | `externalinterface` | 4 | 1.2s |  |
-| 13 | `filters` | 149 | 1.8s |  |
-| 14 | `haxe/flocons1` | 2 | 1.3s |  |
-| 15 | `haxe/flocons2` | 3 | 1.0s |  |
-| 16 | `hitarea` | 4 | 18.2s |  |
-| 17 | `label` | 4 | 20.5s |  |
-| 18 | `levels` | 9 | 1.4s |  |
+| 13 | `filters` | 149 | 1.2s |  |
+| 14 | `haxe/flocons1` | 2 | 0.8s |  |
+| 15 | `haxe/flocons2` | 3 | 1.1s |  |
+| 16 | `hitarea` | 4 | 20.4s |  |
+| 17 | `label` | 4 | 14.5s |  |
+| 18 | `levels` | 9 | 0.8s |  |
 | 19 | `loadevent` | 9 | 1.5s |  |
 | 20 | `loadvariables/loadvariables` | 7 | 1.3s |  |
-| 21 | `loadvariables/loadvars` | 2 | 1.1s |  |
-| 22 | `lookup` | 3 | 1.2s |  |
+| 21 | `loadvariables/loadvars` | 2 | 1.3s |  |
+| 22 | `lookup` | 3 | 1.5s |  |
 | 23 | `mouse-transparency` | 1 | 1.4s |  |
-| 24 | `moviecliploader` | 7 | 21.0s |  |
-| 25 | `nativeinheritance` | 6 | 1.4s |  |
-| 26 | `nested-button` | 1 | 1.3s |  |
+| 24 | `moviecliploader` | 7 | 20.4s |  |
+| 25 | `nativeinheritance` | 6 | 1.1s |  |
+| 26 | `nested-button` | 1 | 1.0s |  |
 | 27 | `operations` | 13 | 1.3s |  |
 | 28 | `property-paths/property-paths-6` | 6 | 1.2s |  |
-| 29 | `property-paths/property-paths-7` | 7 | 1.3s |  |
-| 30 | `propertycase/propertycase` | 7 | 1.2s |  |
-| 31 | `propertycase/propertycase-preserving-6` | 2 | 1.2s |  |
+| 29 | `property-paths/property-paths-7` | 7 | 1.0s |  |
+| 30 | `propertycase/propertycase` | 7 | 1.0s |  |
+| 31 | `propertycase/propertycase-preserving-6` | 2 | 1.3s |  |
 | 32 | `propertycase/propertycase-preserving-7` | 5 | 0.9s |  |
-| 33 | `rollover` | 4 | 20.9s |  |
-| 34 | `scope` | 14 | 1.3s |  |
-| 35 | `setinterval` | 20 | 1.0s |  |
+| 33 | `rollover` | 4 | 17.5s |  |
+| 34 | `scope` | 14 | 1.0s |  |
+| 35 | `setinterval` | 20 | 1.3s |  |
 | 36 | `settimeout` | 17 | 1.3s |  |
 | 37 | `super` | 11 | 1.1s |  |
-| 38 | `target` | 18 | 1.4s |  |
-| 39 | `text-bind` | 0 | 21.0s |  |
+| 38 | `target` | 18 | 1.0s |  |
+| 39 | `text-bind` | 0 | 21.2s |  |
 | 40 | `textfield/textfield-html` | 4 | 1.5s |  |
-| 41 | `textfield/textfield-text-setters` | 8 | 1.2s |  |
-| 42 | `undefined/undefined-swf6` | 39 | 0.9s |  |
-| 43 | `undefined/undefined-swf7` | 39 | 1.0s |  |
-| 44 | `watch` | 2 | 0.9s |  |
+| 41 | `textfield/textfield-text-setters` | 8 | 1.4s |  |
+| 42 | `undefined/undefined-swf6` | 39 | 1.0s |  |
+| 43 | `undefined/undefined-swf7` | 39 | 1.3s |  |
+| 44 | `watch` | 2 | 1.1s |  |
 | 45 | `xml/xmlbuild` | 1 | 1.2s |  |
-| 46 | `xml/xmlload` | 4 | 1.6s |  |
+| 46 | `xml/xmlload` | 4 | 0.9s |  |
 | 47 | `xml/xmlstring` | 9 | 1.2s |  |
 
 ## Near-Passing Tests
