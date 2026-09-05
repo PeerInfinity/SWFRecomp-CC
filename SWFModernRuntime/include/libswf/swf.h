@@ -327,6 +327,22 @@ typedef struct DisplayObject
 	// the object's world matrix is translated so its render bounds' top-left
 	// lands on a whole pixel. See tag.c cab_pixel_snap.
 	u8 cache_as_bitmap;
+	// PlaceObject3 SurfaceFilterList, the WHOLE chain (s18 w2-gfx-filter-chain).
+	// The scalar filter_* fields above carry only the FIRST filter of the list —
+	// that is all the recompiler ever emitted through tagSetFilter, and the
+	// renderer applied exactly one filter, silently dropping the rest
+	// (visual/filters/blur_size_grows is [Blur, Glow] and lost the blue glow;
+	// from_shumway/acid/acid-filter-2 is [Glow, Blur], acid-filter is
+	// [Blur, Blur]). tagBeginFilterList already recorded the full list for the
+	// `mc.filters` reflection; this links that record to the display entry so
+	// render_filtered_object can run the chain in order.
+	//
+	// `const FilterListData*`, kept as void* so this header does not pull in
+	// tag.h. It points into a file-static table in tag.c that is never freed, so
+	// it cannot dangle; it is cleared wherever filter_type is cleared (the two
+	// placement arms), and re-set by the tagBeginFilterList that follows the
+	// tagSetFilter of the same placement.
+	const void* filter_chain;
 } DisplayObject;
 
 typedef struct KeyState {

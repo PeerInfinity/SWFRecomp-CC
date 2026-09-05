@@ -5996,7 +5996,29 @@ namespace SWFRecomp
 								cur_pos += 1;
 							}
 							if (is_sprite_po3 && sp_has_visible) cur_pos += 1;
-							if (is_sprite_po3 && sp_has_opaque_background) cur_pos += 4;
+							// PlaceObject3 BackgroundColor inside a DefineSprite.
+							// The sprite arm grew the cacheAsBitmap and filter
+							// twins of the root arm but never this one, so the
+							// field was parsed only to be SKIPPED and
+							// `visual/cache_as_bitmap/avm2_button`'s green
+							// background never rendered. Same rules as the root
+							// arm at :4515 (Ruffle display_object.rs:2543).
+							u8 sp_opaque_bg_set = 0;
+							u32 sp_opaque_bg_rgb = 0;
+							if (is_sprite_po3 && sp_has_opaque_background)
+							{
+								u8 sp_bg_r = ((u8*) cur_pos)[0];
+								u8 sp_bg_g = ((u8*) cur_pos)[1];
+								u8 sp_bg_b = ((u8*) cur_pos)[2];
+								u8 sp_bg_a = ((u8*) cur_pos)[3];
+								cur_pos += 4;
+								if (header.version >= 11)
+								{
+									sp_opaque_bg_set = (sp_bg_a > 0) ? 1u : 0u;
+									sp_opaque_bg_rgb = ((u32) sp_bg_r << 16)
+										| ((u32) sp_bg_g << 8) | (u32) sp_bg_b;
+								}
+							}
 
 							// Parse clip actions if present
 							std::string clip_actions_var;
@@ -6227,6 +6249,15 @@ namespace SWFRecomp
 							}
 
 							// Instance name already emitted before the placement call above.
+
+							// PlaceObject3 BackgroundColor -> DisplayObject.opaqueBackground.
+							// Twin of the root arm's emission (~:4805).
+							if (is_sprite_po3 && sp_has_opaque_background)
+							{
+								sprite_definitions << "\t" << "tagSetOpaqueBackground(app_context, "
+									<< to_string(depth) << ", " << to_string((unsigned) sp_opaque_bg_set)
+									<< ", " << to_string(sp_opaque_bg_rgb) << "u);" << endl;
+							}
 
 							// PlaceObject3 BitmapCache -> DisplayObject.cacheAsBitmap.
 							if (is_sprite_po3 && sp_has_cache_as_bitmap)

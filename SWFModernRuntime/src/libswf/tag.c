@@ -3675,7 +3675,16 @@ static int opaque_bg_local_bounds(DisplayObject* obj, float* b)
 	Character* ch = &dictionary[obj->char_id];
 	float xmin = 1e30f, xmax = -1e30f, ymin = 1e30f, ymax = -1e30f;
 	int found = 0;
-	if (ch->type == CHAR_TYPE_SPRITE && obj->sprite_display_list != NULL)
+	// A BUTTON keeps its current state's contents in the same
+	// `sprite_display_list` a sprite does (render_single_object's two arms are
+	// identical), and `ng_getCharBounds` never records a bound for a button
+	// character — so without this arm an opaqueBackground on a button entry
+	// found no bounds and drew NOTHING. That is the second half of
+	// visual/cache_as_bitmap/avm2_button: the recompiler now emits the
+	// DefineSprite's tagSetOpaqueBackground, and the entry it lands on is a
+	// button placement.
+	if ((ch->type == CHAR_TYPE_SPRITE || ch->type == CHAR_TYPE_BUTTON)
+	    && obj->sprite_display_list != NULL)
 	{
 		for (size_t i = 1; i <= obj->sprite_max_depth; i++)
 		{
@@ -3843,13 +3852,181 @@ static int g_filter_capture_depth = 0;
 // `filter_output` then `source` over it reproduces the compositeSource formula
 // exactly and keeps the source MSAA-sharp. That is the common case, and it is
 // bit-identical to what this code did before composition existed.
+// Build the render chain for a PlaceObject3 SurfaceFilterList (s18).
+//
+// The recompiler records the list twice: the scalar `parsed_filter_*` set
+// (emitted as tagSetFilter, and the ONLY thing the renderer used to read) and
+// the full `all_filters[]` list (emitted as tagBeginFilterList/tagAdd*, until
+// now consumed only by the `mc.filters` reflection). The scalars come from the
+// FIRST list entry whose kind is not ColorMatrix — every other kind sets them
+// when `parsed_filter_type == 0`, and ColorMatrix is folded into the placement
+// cxform instead — and for the three kinds the renderer cannot express
+// natively (Convolution -> blur, GradientGlow -> glow, GradientBevel -> bevel)
+// the scalars carry the APPROXIMATION, which the list entry does not.
+//
+// So: that one entry is rendered from the scalars (byte-identical to the old
+// single-filter behaviour), every other blur / drop-shadow / glow / bevel entry
+// is rendered from the list, and the remaining kinds are dropped exactly as
+// before. A list with one renderable filter therefore reproduces the previous
+// output exactly; a chain now renders all of its members, in order.
+//
+// Returns the chain length; `scratch` receives the scalar-derived entry.
+static int build_filter_chain(const DisplayObject* obj,
+                              FilterListEntry* scratch,
+                              const FilterListEntry** chain, int cap)
+{
+	const FilterListData* fl = (const FilterListData*) obj->filter_chain;
+
+	memset(scratch, 0, sizeof(*scratch));
+	scratch->type = obj->filter_type;
+	scratch->blur_x = obj->filter_blur_x;
+	scratch->blur_y = obj->filter_blur_y;
+	scratch->quality = obj->filter_quality;
+	scratch->flags = obj->filter_flags;
+	scratch->color_r = obj->filter_color_r;
+	scratch->color_g = obj->filter_color_g;
+	scratch->color_b = obj->filter_color_b;
+	scratch->color_a = obj->filter_color_a;
+	scratch->strength = obj->filter_strength;
+	scratch->angle = obj->filter_angle;
+	scratch->distance = obj->filter_distance;
+	scratch->highlight_r = obj->filter_highlight_r;
+	scratch->highlight_g = obj->filter_highlight_g;
+	scratch->highlight_b = obj->filter_highlight_b;
+	scratch->highlight_a = obj->filter_highlight_a;
+
+	if (fl == NULL || fl->count == 0)
+	{
+		chain[0] = scratch;
+		return 1;
+	}
+
+	// Index of the entry the scalars describe: the first non-ColorMatrix one.
+	int scalar_idx = -1;
+	for (u8 i = 0; i < fl->count; i++)
+		if (fl->entries[i].type != 6) { scalar_idx = (int) i; break; }
+
+	int n = 0;
+	for (u8 i = 0; i < fl->count && n < cap; i++)
+	{
+		if ((int) i == scalar_idx)
+		{
+			if (scratch->type != 0) chain[n++] = scratch;
+			continue;
+		}
+		u8 t = fl->entries[i].type;
+		if (t >= 1 && t <= 4) chain[n++] = &fl->entries[i];
+	}
+	if (n == 0)
+	{
+		chain[0] = scratch;
+		return 1;
+	}
+
+	// EXPRESSIBILITY GATE. The ping-pong (filter_tex_a in, filter_tex_a out)
+	// can carry a non-final filter exactly only when that filter's output is
+	// "the blurred layer, optionally recoloured": a plain Blur, or a
+	// glow / drop-shadow with NO compositeSource, inner or knockout. Anything
+	// else has to blend its own source back INTO the layer, which needs a
+	// compose-into-offscreen pipeline we do not have; the `colorize` shortcut
+	// silently DROPS that source.
+	//
+	// Measured, on from_shumway/acid/acid-filter-2 ([Glow(compositeSource),
+	// Blur]): chaining it through colorize takes the row from 16 764 outliers
+	// to 64 921 — the ellipse under the glow disappears. So when the chain is
+	// not expressible we keep exactly the old single-filter behaviour (the
+	// scalar entry, i.e. the first filter) rather than trade one wrong render
+	// for a worse one. That is a HOLD on those lists, not a fix; the
+	// completion mechanism is the compose-into-offscreen pipeline that
+	// cab_mask_filters and the AVM2 `.filters` route also wait on.
+	for (int i = 0; i < n - 1; i++)
+	{
+		u8 t = chain[i]->type;
+		int ok = (t == 1)
+		      || ((t == 2 || t == 3) && chain[i]->flags == 0);
+		if (!ok)
+		{
+			chain[0] = scratch;
+			return 1;
+		}
+	}
+	return n;
+}
+
+// --- A3: the object's colour transform belongs on the FILTER OUTPUT --------
+//
+// Ruffle renders a filtered object into its cache texture with an IDENTITY
+// colour transform, runs the filter chain, then draws the RESULT with the
+// object's transform (display_object.rs render_base -> the BitmapCache blit).
+// We render the source WITH the transform, so the transform never reaches the
+// filter's own colour: from_shumway/acid/acid-filter-2 places a BLACK glow
+// under a PlaceObject3 cxform add=[+255,0,0,0]; Ruffle's halo is RED and ours
+// stayed neutral grey (16 764 outliers, all of them "expected (255,v,v), got
+// (v,v,v)" with the G/B falloff already byte-identical).
+//
+// The composition shader emits `filter_colour * f(blurred alpha)` - straight
+// colour in .rgb, coverage in .a - so applying the colour transform to the
+// FILTER COLOUR is exactly equivalent to applying it to the output, for
+// everything except an additive ALPHA term (which would have to be scaled by
+// the coverage; no corpus test uses one). That is far cheaper than plumbing a
+// cxform through three shaders. The composite SOURCE is drawn separately by
+// draw_source_{before,after} and already carries the object's own cxform, so
+// it must not be transformed twice.
+//
+// Only CPU-readable slots are honoured: the placement's baked slot and the
+// AS-set runtime override. A slot minted by compose_children for a nested
+// COMPOSED cxform lives on the GPU with no CPU mirror, so a filtered object
+// deep inside a tinted container behaves exactly as it did before.
+static int filtered_object_cxform(SWFAppContext* app_context,
+                                  const DisplayObject* obj, float out[20])
+{
+	if (obj->cx_overridden) { build_cxform_from_obj(out, obj); return 1; }
+	if (obj->cxform_id == 0) return 0;
+	GEN_EXTERN_CXFORM_DATA;
+	u32 baked = (app_context->cxform_data_size > 0)
+		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
+	if (obj->cxform_id >= baked) return 0;
+	memcpy(out, (const float*) app_context->cxform_data + obj->cxform_id * 20,
+	       20 * sizeof(float));
+	return 1;
+}
+
+// out = clamp(mult * in + add, 0, 1) on a STRAIGHT (not premultiplied) RGBA -
+// the same formula apply_cxform runs in the shader (render_webgpu.c:271).
+static void cxform_apply_rgba(const float cx[20], double* r, double* g,
+                              double* b, double* a)
+{
+	double in[4] = { *r, *g, *b, *a };
+	double o[4];
+	for (int i = 0; i < 4; i++)
+	{
+		double sum = 0.0;
+		for (int k = 0; k < 4; k++) sum += (double) cx[k * 4 + i] * in[k];
+		sum += (double) cx[16 + i];
+		o[i] = sum < 0.0 ? 0.0 : (sum > 1.0 ? 1.0 : sum);
+	}
+	*r = o[0]; *g = o[1]; *b = o[2]; *a = o[3];
+}
+
 static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
 {
-	int is_shadow = (obj->filter_type == 2);
-	int is_glow   = (obj->filter_type == 3);
-	int is_bevel  = (obj->filter_type == 4);
+	FilterListEntry chain_scratch;
+	const FilterListEntry* chain[MAX_FILTER_LIST_SIZE];
+	float obj_cx[20];
+	int have_obj_cx = filtered_object_cxform(app_context, obj, obj_cx);
+	int chain_n = build_filter_chain(obj, &chain_scratch, chain,
+	                                 MAX_FILTER_LIST_SIZE);
+	// Only the LAST filter's composition flags reach the framebuffer; the
+	// earlier ones fold into the blur ping-pong. Same rule (and the same
+	// caveats) as avm2_display.c::avm2_render_filtered, whose `.filters` array
+	// path has always chained.
+	const FilterListEntry* last = chain[chain_n - 1];
 
-	u8 flags = obj->filter_flags;
+	int is_shadow = (last->type == 2);
+	int is_glow   = (last->type == 3);
+	int is_bevel  = (last->type == 4);
+
+	u8 flags = last->flags;
 	int f_inner, f_knockout, f_composite, bevel_type = 0;
 	if (is_bevel)
 	{
@@ -3869,19 +4046,30 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	// ruffle bevel.rs hard-codes composite_source = 1 for bevels.
 	if (is_bevel) f_composite = 1;
 
+	// CHAINED (s18): a filter's "composite source" is the LAYER it received,
+	// which for filter k>0 is the output of filter k-1 — not the crisp object.
+	// The single-filter path exploits the two being the same thing: rather than
+	// snapshot the source it just re-draws the object into the framebuffer
+	// (draw_source_{before,after}) and tells the shader composite_source = 0.
+	// For a chain that shortcut paints a CRISP silhouette on top of a blurred
+	// one — measured on visual/filters/blur_size_grows ([Blur, Glow]): 86 708
+	// -> 74 142 with the shortcut, -> 6 383 once the source is snapshotted
+	// after the earlier filters have run. So a chain always snapshots and
+	// always lets the shader composite.
+	int chained = (chain_n > 1);
 	// The composition shader needs the unblurred source only when the formula
 	// references dest.a. Everything else is "filter output, then draw the
 	// source normally", which needs no snapshot.
-	int needs_source_tex = is_bevel
+	int needs_source_tex = chained || (is_bevel
 		? (f_knockout || bevel_type != 0)
-		: (f_inner || f_knockout);
+		: (f_inner || f_knockout));
 	// Whether we draw the crisp source ourselves rather than sampling it.
-	int draw_source_after  = is_bevel
+	int draw_source_after  = !chained && (is_bevel
 		? (!f_knockout && bevel_type == 0)
-		: (!f_inner && !f_knockout && f_composite);
+		: (!f_inner && !f_knockout && f_composite));
 	// "full" bevel is glow OVER source, so the source must already be in the
 	// framebuffer when the filter output lands.
-	int draw_source_before = is_bevel && !f_knockout && bevel_type == 2;
+	int draw_source_before = !chained && is_bevel && !f_knockout && bevel_type == 2;
 	// What the shader is told: 0 whenever we supply the source ourselves.
 	int shader_composite = (draw_source_after || draw_source_before) ? 0 : f_composite;
 
@@ -3890,7 +4078,10 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	renderer_begin_offscreen_pass(context);
 	render_single_object(app_context, obj);
 	renderer_end_offscreen_pass(context);
-	if (needs_source_tex)
+	// Unchained: the snapshot IS the source, so take it now. Chained: the
+	// snapshot must be the layer entering the LAST filter, so it is taken
+	// inside the loop below, after every earlier filter has run.
+	if (needs_source_tex && !chained)
 		renderer_snapshot_filter_source(context);
 
 	// Plain blur keeps the legacy path (BlurFilter has no composition flags);
@@ -3898,12 +4089,42 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	// composition shader instead of inside the blur, because inner needs the
 	// RAW blurred alpha ((1 - blur) * strength, not 1 - blur*strength).
 	int legacy = !(is_shadow || is_glow || is_bevel);
-	renderer_run_blur(context,
-		obj->filter_blur_x, obj->filter_blur_y,
-		obj->filter_quality,
-		legacy ? obj->filter_strength : 1.0f,
-		obj->filter_color_r, obj->filter_color_g,
-		obj->filter_color_b, obj->filter_color_a, 0);
+
+	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
+	// chains for free: N plain blurs are bit-equal to one blur of quality N,
+	// exactly as Flash requires. A NON-FINAL glow / drop-shadow / bevel is
+	// approximated by colorizing inside the blur (`colorize` = 1) — exact when
+	// the stacked filters are identical, an approximation otherwise; the exact
+	// form needs a compose-into-offscreen pipeline. This mirrors, line for
+	// line, the loop avm2_render_filtered already runs for `.filters` arrays.
+	for (int fi = 0; fi < chain_n; fi++)
+	{
+		const FilterListEntry* f = chain[fi];
+		int f_last = (fi == chain_n - 1);
+		// The layer the last filter receives is this chain's "source".
+		if (chained && f_last)
+			renderer_snapshot_filter_source(context);
+		int f_is_blur = (f->type == 1);
+		float st = (float) f->strength;
+		// A SWF BlurFilter has no `strength` field, so a LIST entry leaves it
+		// 0 — passing that through would multiply the layer by zero and the
+		// object would vanish. The scalar entry keeps the recompiler's 1.0
+		// default (and Convolution-as-blur's explicit 1.0), so it is left
+		// alone: that is what the single-filter path has always passed.
+		if (f_is_blur && f != &chain_scratch) st = 1.0f;
+		// The composed kinds apply strength in the composition shader when they
+		// are last (inner needs the RAW blurred alpha), inside the blur when not.
+		if (f_last && !f_is_blur) st = 1.0f;
+		int colorize = (!f_last && !f_is_blur) ? 1 : 0;
+		// A3: the filter's own colour carries the object's colour transform.
+		double fr = f->color_r, fg = f->color_g, fb = f->color_b, fa = f->color_a;
+		if (have_obj_cx) cxform_apply_rgba(obj_cx, &fr, &fg, &fb, &fa);
+		renderer_run_blur(context,
+			f->blur_x, f->blur_y,
+			f->quality,
+			st,
+			fr, fg, fb, fa, colorize);
+	}
 
 	renderer_resume_pass(context);
 
@@ -3924,34 +4145,45 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	// the mc.filters reflection in action.c converts it to degrees on the way
 	// out. The render path used to multiply by pi/180 as if it were degrees,
 	// which put every non-zero-angle shadow and bevel in the wrong direction.
-	float angle_rad = obj->filter_angle;
-	float dist_px = (is_shadow || is_bevel) ? obj->filter_distance : 0.0f;
+	float angle_rad = last->angle;
+	float dist_px = (is_shadow || is_bevel) ? last->distance : 0.0f;
 	float du = cosf(angle_rad) * dist_px / (float)app_context->width * fit_x;
 	float dv = sinf(angle_rad) * dist_px / (float)app_context->height * fit_y;
 
 	if (draw_source_before)
 		render_single_object(app_context, obj);
 
+	// A3 again, for the composition half: shadow/glow colour and the bevel
+	// highlight are the filter's OUTPUT colour, so they take the object's
+	// colour transform (the crisp source drawn either side of this already
+	// carries it through render_single_object's own cxform slot).
+	double c_r = last->color_r, c_g = last->color_g;
+	double c_b = last->color_b, c_a = last->color_a;
+	double h_r = last->highlight_r, h_g = last->highlight_g;
+	double h_b = last->highlight_b, h_a = last->highlight_a;
+	if (have_obj_cx)
+	{
+		cxform_apply_rgba(obj_cx, &c_r, &c_g, &c_b, &c_a);
+		cxform_apply_rgba(obj_cx, &h_r, &h_g, &h_b, &h_a);
+	}
+
 	if (is_bevel)
 	{
 		// ruffle filters.rs: the HIGHLIGHT samples at +offset, the shadow at
 		// -offset, and the bevel is their difference.
 		renderer_compose_filter(context, 1, du, dv,
-			obj->filter_highlight_r, obj->filter_highlight_g,
-			obj->filter_highlight_b, obj->filter_highlight_a,
-			obj->filter_color_r, obj->filter_color_g,
-			obj->filter_color_b, obj->filter_color_a,
-			obj->filter_strength, bevel_type, f_knockout, shader_composite);
+			h_r, h_g, h_b, h_a,
+			c_r, c_g, c_b, c_a,
+			last->strength, bevel_type, f_knockout, shader_composite);
 	}
 	else
 	{
 		// ruffle drop_shadow.rs passes (-x, -y): sampling the blur "back" by the
 		// offset displaces the shadow forward along the light direction.
 		renderer_compose_filter(context, 0, -du, -dv,
-			obj->filter_color_r, obj->filter_color_g,
-			obj->filter_color_b, obj->filter_color_a,
+			c_r, c_g, c_b, c_a,
 			0.0f, 0.0f, 0.0f, 0.0f,
-			obj->filter_strength, f_inner, f_knockout, shader_composite);
+			last->strength, f_inner, f_knockout, shader_composite);
 	}
 
 	if (draw_source_after)
@@ -9718,6 +9950,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		display_list[depth].clip_action_count = 0;
 	}
 	display_list[depth].filter_type = 0;
+	// The filter CHAIN is placement-scoped exactly like filter_type: the
+	// tagBeginFilterList of this placement (emitted right after its
+	// tagSetFilter) re-links it. Clearing here stops a re-placed depth from
+	// inheriting the previous occupant's list.
+	display_list[depth].filter_chain = NULL;
 	display_list[depth].depth_swapped = 0;
 	// Restore persistent button state if the same character is being re-placed
 	// (e.g. a looping movie that removes+replaces a button each frame cycle).
@@ -10295,6 +10532,11 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].clip_actions = NULL;
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
+	// The filter CHAIN is placement-scoped exactly like filter_type: the
+	// tagBeginFilterList of this placement (emitted right after its
+	// tagSetFilter) re-links it. Clearing here stops a re-placed depth from
+	// inheriting the previous occupant's list.
+	display_list[depth].filter_chain = NULL;
 	display_list[depth].depth_swapped = 0;
 	// Restore persistent button state if the same character is being re-placed
 	// (e.g. a looping movie that removes+replaces a button each frame cycle).
@@ -12261,6 +12503,12 @@ void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count)
 	FilterListData* fl = getOrCreateFilterList(depth);
 	if (!fl) return;
 	fl->count = 0; // reset
+	// Link the list to the display entry so the RENDER path can walk the whole
+	// chain (s18). The by-depth table below stays the reflection path's key;
+	// this pointer is the render path's, and it survives the entry moving
+	// (a depth swap copies the field with the rest of the struct).
+	if (depth <= max_depth)
+		display_list[depth].filter_chain = fl;
 	// Find index for subsequent tagAdd* calls
 	for (int i = 0; i < g_filter_list_count; i++) {
 		if (g_filter_lists[i].depth == depth) { g_current_filter_list_idx = i; return; }
