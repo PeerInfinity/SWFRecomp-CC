@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T20:29:55.054989+00:00",
-    "git_sha": "ed39ce53d96bda2e0772d293112bf85b571b9c05",
-    "duration_seconds": 160.15,
+    "timestamp": "2026-09-05T03:18:53.242379+00:00",
+    "git_sha": "cdafe1be9c2210ec22ca2ab89da2b5e9ee2118f4",
+    "duration_seconds": 158.16,
     "total_available": 7,
     "shards": 30,
     "expected_shards": 30,
@@ -23,9 +23,9 @@
     {
       "test": "device_font_glyph_fallback",
       "phases": {
-        "recomp": 0.013,
-        "compile": 29.858,
-        "run": 0.266
+        "recomp": 0.012,
+        "compile": 28.894,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -33,14 +33,14 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 30.15,
+      "duration": 29.18,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
-        "recomp": 0.011,
-        "compile": 30.252,
+        "recomp": 0.01,
+        "compile": 27.7,
         "run": 0.265
       },
       "num_frames": 1,
@@ -49,7 +49,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 30.55,
+      "duration": 28.0,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -58,7 +58,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 100,
+            "height": 50,
+            "total_channels": 20000,
+            "max_diff": 255,
+            "diff_channels": 1680,
+            "mean_diff": 21.42,
+            "outliers": 1680,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 1680
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -67,7 +81,7 @@
       "test": "device_font_list",
       "phases": {
         "recomp": 0.014,
-        "compile": 28.902,
+        "compile": 28.82,
         "run": 0.265
       },
       "num_frames": 1,
@@ -76,15 +90,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 29.19,
+      "duration": 29.11,
       "status": "pass"
     },
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.216,
-        "compile": 29.426,
-        "run": 0.667
+        "recomp": 0.229,
+        "compile": 29.645,
+        "run": 0.666
       },
       "num_frames": 1,
       "lines": {
@@ -92,7 +106,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 30.88,
+      "duration": 31.1,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -101,7 +115,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 1000,
+            "total_channels": 2200000,
+            "max_diff": 255,
+            "diff_channels": 156,
+            "mean_diff": 0.0181,
+            "outliers": 156,
+            "max_outliers": 0,
+            "tolerance": 3,
+            "excess_outliers": 156
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -109,9 +137,9 @@
     {
       "test": "embed_matching/match_style",
       "phases": {
-        "recomp": 0.02,
-        "compile": 7.698,
-        "run": 0.516
+        "recomp": 0.025,
+        "compile": 8.507,
+        "run": 0.666
       },
       "num_frames": 1,
       "lines": {
@@ -119,7 +147,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.43,
+      "duration": 9.44,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -128,7 +156,21 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 12,
+            "mean_diff": 0.0035,
+            "outliers": 12,
+            "max_outliers": 0,
+            "tolerance": 3,
+            "excess_outliers": 12
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -136,9 +178,9 @@
     {
       "test": "embed_matching/no_font_found",
       "phases": {
-        "recomp": 0.005,
-        "compile": 6.796,
-        "run": 0.315
+        "recomp": 0.006,
+        "compile": 8.452,
+        "run": 0.415
       },
       "num_frames": 1,
       "lines": {
@@ -146,7 +188,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.26,
+      "duration": 9.06,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -155,7 +197,20 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": true
+          "known_failure": true,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -164,8 +219,8 @@
       "test": "embed_name_lookup",
       "phases": {
         "recomp": 0.019,
-        "compile": 22.776,
-        "run": 0.467
+        "compile": 21.382,
+        "run": 0.416
       },
       "num_frames": 1,
       "lines": {
@@ -173,7 +228,7 @@
         "expected_lines": 242,
         "matching_lines": 86
       },
-      "duration": 23.27,
+      "duration": 21.83,
       "status": "output_mismatch",
       "detail": "156 line(s) differ (actual=242, expected=242)",
       "actual_output": "... (3 lines before) ...\nExportAssets\nReverse order\nConflicting names\nExport non-font\nFont matching\nAA: 22\naa: 22\nAA (bold): 22\nAB: 40\nab: 40\nAB (bold): 40\nAC: 40\nac: 40\nAC (bold): 40\nAD: 22\nad: 22\nAD (bold): 22\nAE: 40\nae: 40\nAE (bold): 40\nAF: 40\naf: 40\nAF (bold): 40\nAG: 22\nag: 22\nAG (bold): 22\nAH: 22\nah: 22\nAH (bold): 22\nAI: 22\nai: 22\nAI (bold): 22\nAJ: 22\naj: 22\nAJ (bold): 22\nAK: 22\nak: 22\nAK (bold): 22\nAL: 22\nal: 22\nAL (bold): 22\nAM: 40\nam: 40\nAM (bold): 40\nAN: 22\nan: 22\nAN (bold): 22\nAO: 40\nao: 40\nAO (bold): 40\n... (189 lines after) ...",

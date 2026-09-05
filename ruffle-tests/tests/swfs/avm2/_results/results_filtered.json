@@ -6,18 +6,18 @@
     "total_available": 1261,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 49,
+    "ignored_count": 47,
     "filtered": true
   },
-  "total": 1212,
+  "total": 1214,
   "pass": 1172,
   "ruffle_matched": 9,
-  "fail": 31,
-  "pass_rate": 96.7,
+  "fail": 33,
+  "pass_rate": 96.5,
   "effective_pass": 1181,
-  "effective_pass_rate": 97.4,
+  "effective_pass_rate": 97.3,
   "breakdown": {
-    "output_mismatch": 31,
+    "output_mismatch": 33,
     "ruffle_matched": 9
   },
   "tests": [
@@ -15307,6 +15307,25 @@
       "status": "pass"
     },
     {
+      "test": "soundmixer_soundtransform",
+      "phases": {
+        "recomp": 0.028,
+        "compile": 9.191,
+        "run": 0.008
+      },
+      "num_frames": 49,
+      "lines": {
+        "actual_lines": 900,
+        "expected_lines": 900,
+        "matching_lines": 888
+      },
+      "duration": 9.24,
+      "status": "output_mismatch",
+      "detail": "12 line(s) differ (actual=900, expected=900)",
+      "actual_output": "... (391 lines before) ...\n0.9856\n///volume\n1\n///(SilencePlayer's sound transform data...)\n///leftToLeft\n1\n///leftToRight\n0\n///rightToLeft\n0\n///rightToRight\n1\n///pan\n0\n///volume\n1\n///(NoisePlayer's sound transform data...)\n///leftToLeft\n1\n///leftToRight\n0\n///rightToLeft\n0\n///rightToRight\n1\n///pan\n0\n///volume\n1\n///st = SoundMixer.soundTransform\n///st.leftToLeft = st.leftToLeft - 1/24\n///st.rightToRight = st.rightToRight - 1/24\n///SoundMixer.soundTransform = st;\n///(SilencePlayer's sound transform data...)\n///leftToLeft\n1\n///leftToRight\n0\n///rightToLeft\n0\n///rightToRight\n1\n///pan\n0\n///volume\n1\n///(NoisePlayer's sound transform data...)\n///leftToLeft\n1\n///leftToRight\n... (459 lines after) ...",
+      "expected_output": "... (391 lines before) ...\n0.9856\n///volume\n1\n///(SilencePlayer's sound transform data...)\n///leftToLeft\n-0.12\n///leftToRight\n0\n///rightToLeft\n0\n///rightToRight\n-0.12\n///pan\n0.9856\n///volume\n1\n///(NoisePlayer's sound transform data...)\n///leftToLeft\n-0.12\n///leftToRight\n0\n///rightToLeft\n0\n///rightToRight\n-0.12\n///pan\n0.9856\n///volume\n1\n///st = SoundMixer.soundTransform\n///st.leftToLeft = st.leftToLeft - 1/24\n///st.rightToRight = st.rightToRight - 1/24\n///SoundMixer.soundTransform = st;\n///(SilencePlayer's sound transform data...)\n///leftToLeft\n-0.16\n///leftToRight\n0\n///rightToLeft\n0\n///rightToRight\n-0.16\n///pan\n0.9744\n///volume\n1\n///(NoisePlayer's sound transform data...)\n///leftToLeft\n-0.16\n///leftToRight\n... (459 lines after) ..."
+    },
+    {
       "test": "soundmixer_stopall",
       "phases": {
         "recomp": 0.009,
@@ -16060,6 +16079,25 @@
       },
       "duration": 7.03,
       "status": "pass"
+    },
+    {
+      "test": "stage_scale_factor",
+      "phases": {
+        "recomp": 0.017,
+        "compile": 30.152,
+        "run": 0.008
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 6
+      },
+      "duration": 30.18,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=12, expected=12)",
+      "actual_output": "NOTE: This test MUST be run under a (possibly simulated) display with a scale factor of 2\nstage.transform.matrix: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nstage.contentsScaleFactor: 1\nstage.transform.matrix: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nstage.contentsScaleFactor: 1\nstage.localToGlobal(new Point(0, 0)) = (x=0, y=0)\nSet stage matrix\nstage.transform.matrix: (a=1.5, b=0, c=0, d=1, tx=10, ty=100)\nstage.contentsScaleFactor: 1\nstage.localToGlobal(new Point(0, 0)) = (x=10, y=100)\nmouseDown: stageX= 2.5 stageY=2.5 localX=-5 localY = -97.5\nmouseDown: stageX= 545.05 stageY=394 localX=356.7 localY = 294",
+      "expected_output": "NOTE: This test MUST be run under a (possibly simulated) display with a scale factor of 2\nstage.transform.matrix: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nstage.contentsScaleFactor: 2\nstage.transform.matrix: (a=1, b=0, c=0, d=1, tx=0, ty=0)\nstage.contentsScaleFactor: 2\nstage.localToGlobal(new Point(0, 0)) = (x=0, y=0)\nSet stage matrix\nstage.transform.matrix: (a=1.5, b=0, c=0, d=1, tx=10, ty=100)\nstage.contentsScaleFactor: 2\nstage.localToGlobal(new Point(0, 0)) = (x=0, y=0)\nmouseDown: stageX= 2.5 stageY=2.5 localX=2.5 localY = 2.5\nmouseDown: stageX= 545 stageY=394 localX=545 localY = 394"
     },
     {
       "test": "stage_stage3Ds_vector",
