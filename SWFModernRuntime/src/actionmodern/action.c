@@ -7865,20 +7865,44 @@ static ActionVar builtin_assetnativeaccessor(SWFAppContext* app_context, ActionV
 
 // ============================================================================
 
+// The String.prototype objects (primary + secondary version group). Flash's
+// String.prototype.valueOf and .toString are ONE implementation that ends at
+// Object.prototype.toString's "[object Object]" for a receiver with no boxed
+// string, so `String.prototype != undefined` is TRUE — but Number.prototype and
+// Boolean.prototype have no such fallback and DO compare equal to `undefined`.
+// gnash pins both halves:
+//   Function.as:305 / String.as:1091  `stringInstance.__proto__ != undefined`
+//                                     PASSES at SWF5 *and* SWF6+;
+//   Number.as:332-336                 `Number.prototype == Object / Function /
+//                                     Object.__proto__ / null / undefined` all
+//                                     PASS at SWF5 — they only can if
+//                                     Number.prototype converts to `undefined`.
+// So the fallback is receiver-specific, NOT version-gated. Registered from the
+// two String.prototype "valueOf" installation sites.
+static ASObject* g_string_proto_valueof_self[2] = { NULL, NULL };
+static void registerStringProtoValueOfSelf(ASObject* proto)
+{
+	if (proto == NULL) return;
+	for (int i = 0; i < 2; i++)
+	{
+		if (g_string_proto_valueof_self[i] == proto) return;
+		if (g_string_proto_valueof_self[i] == NULL) { g_string_proto_valueof_self[i] = proto; return; }
+	}
+}
+
 // Built-in valueOf for primitive wrapper objects (new Object(5))
 //
-// Unboxed receiver (the classic case being String.prototype / Number.prototype /
-// Boolean.prototype themselves, which carry this method but no boxed value):
-// Flash falls back to the ordinary Object.prototype.valueOf answer, i.e. `this`.
-// Returning UNDEFINED here made `String.prototype == undefined` compare TRUE
-// (actionEquals2 converts the object side to a primitive first, and
-// undefined == undefined is true), which fails gnash
-// actionscript.all/Function.as:305 `stringInstance.__proto__ != undefined`.
-// Ruffle has the same bug and flags it: globals/string.rs `to_string_value_of`
-// carries a TODO saying this "normally falls back to `[object Object]`".
-// Returning the receiver reproduces that observable answer via the existing
-// non-primitive fallback (actionEquals2 -> false; string concat -> toString ->
-// "[object Object]") without inventing a string here.
+// Unboxed receiver: returns UNDEFINED (Number.prototype / Boolean.prototype and
+// plain wrappers), EXCEPT for String.prototype, where Flash falls back to the
+// ordinary Object.prototype.valueOf answer — `this`. Returning UNDEFINED there
+// made `String.prototype == undefined` compare TRUE (actionEquals2 converts the
+// object side to a primitive first, and undefined == undefined is true), which
+// failed gnash actionscript.all/Function.as:305. Ruffle has the same bug and
+// flags it: globals/string.rs `to_string_value_of` carries a TODO saying this
+// "normally falls back to `[object Object]`". Returning the receiver reproduces
+// that observable answer through machinery that already exists (actionEquals2 ->
+// false; string concat -> toString -> "[object Object]") without inventing a
+// string here.
 static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	ActionVar ret;
@@ -7892,11 +7916,12 @@ static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* 
 		ActionVar* prim = getProperty(obj, "valueOf_value", 13);
 		if (prim != NULL)
 			ret = *prim;
-		else
+		else if (obj == g_string_proto_valueof_self[0] ||
+		         obj == g_string_proto_valueof_self[1])
 		{
-			// No boxed value: behave like Object.prototype.valueOf and return
-			// `this` (preserving the receiver's own type tag when the CallMethod
-			// path recorded it).
+			// String.prototype with no boxed string: behave like
+			// Object.prototype.valueOf and return `this` (preserving the
+			// receiver's own type tag when the CallMethod path recorded it).
 			ret.type = ACTION_STACK_VALUE_OBJECT;
 			if (g_this_depth > 0 &&
 			    g_this_stack[g_this_depth - 1].data.numeric_value == (u64) this_obj)
@@ -42699,6 +42724,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setObjectProto(app_context, g_ctors[2].prototype_obj);
 		}
 		setPropertyWithFlags(app_context, g_ctors[2].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
+		registerStringProtoValueOfSelf(g_ctors[2].prototype_obj);
 		setPropertyWithFlags(app_context, g_ctors[2].prototype_obj, "toString", 8, &ts_val, PROPERTY_FLAG_WRITABLE);
 		// Core String methods — implemented as builtins in actionCallMethod(STRING),
 		// but need to be registered on String.prototype for typeof/hasOwnProperty checks.
@@ -44782,6 +44808,7 @@ check_special_vars:
 					ActionVar _vo = {0}; _vo.type = ACTION_STACK_VALUE_FUNCTION;
 					_vo.data.numeric_value = (u64)&g_wrapper_valueOf_func;
 					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "valueOf", 7, &_vo, PROPERTY_FLAG_WRITABLE);
+					registerStringProtoValueOfSelf(g_string_constructor.prototype_obj);
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
