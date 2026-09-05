@@ -104,9 +104,21 @@ int avm2_object_delete_dynamic_obj(Avm2Object* obj, Avm2Object* key)
 	return 0;
 }
 
-// Is this name the CANONICAL spelling of a u32 index? ("0" yes, "00" and "-1"
-// no — those round-trip as strings, so both players keep them string-keyed.)
-static int dyn_key_is_index(const char* name, uint32_t name_len)
+// Is this name the CANONICAL spelling of a dynamic INTEGER key? ("0" yes, "00"
+// and "-1" no — those round-trip as strings, so both players keep them
+// string-keyed.)
+//
+// The ceiling is 2^28 - 1, NOT u32::MAX: "Due to a quirk in avmplus, only
+// values that fit in 28 bits are considered to be integers. Other values remain
+// strings." (ruffle core/src/avm2/object/script_object.rs::maybe_int_property,
+// commit 45904c3ee; avmplus String::getIntAtom / String::parseIndex). avm2
+// primitive_keys pins the boundary exactly: 268435455 -> number,
+// 268435456 / 2147483646 / 4294967294 -> string. Array's OWN index parse is a
+// different predicate with a u32::MAX - 1 ceiling (ruffle
+// array_object.rs:111) — do not fold the two together.
+#define AVM2_DYN_KEY_MAX_INDEX 0x0FFFFFFFull
+
+static int dyn_key_index_value(const char* name, uint32_t name_len, uint32_t* out)
 {
 	if (name_len == 0 || name_len > 10) return 0;
 	if (name_len > 1 && name[0] == '0') return 0;
@@ -116,7 +128,14 @@ static int dyn_key_is_index(const char* name, uint32_t name_len)
 		if (name[i] < '0' || name[i] > '9') return 0;
 		v = v * 10 + (uint64_t) (name[i] - '0');
 	}
-	return v <= 4294967294ULL;
+	if (v > AVM2_DYN_KEY_MAX_INDEX) return 0;
+	if (out != NULL) *out = (uint32_t) v;
+	return 1;
+}
+
+static int dyn_key_is_index(const char* name, uint32_t name_len)
+{
+	return dyn_key_index_value(name, name_len, NULL);
 }
 
 Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const char* name,
@@ -552,23 +571,16 @@ Avm2Value avm2_object_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t
 	                     : nth_enumerable_dyn(obj, idx - arr_n);
 	if (p == NULL) return avm2_null();
 	if (p->key_obj != NULL) return avm2_object_value(p->key_obj);
-	// Names that are pure natural numbers (no sign, no leading zeros)
-	// enumerate as NUMBERS (Ruffle DynamicKey::Uint / avmplus int atoms) —
-	// dictionary_primitive_keys asserts typeof key == "number".
-	if (p->name.len > 0 && p->name.len <= 10
-	    && !(p->name.len > 1 && p->name.utf8[0] == '0'))
+	// Names that are pure natural numbers (no sign, no leading zeros) and fit
+	// in 28 bits enumerate as NUMBERS (Ruffle DynamicKey::Uint / avmplus int
+	// atoms). avm2/primitive_keys is the fixture: it asserts typeof key ==
+	// "number" below 2^28 and "string" from 2^28 up. Same predicate the
+	// integer-keys-first partition uses, as in Ruffle.
 	{
-		uint64_t v = 0;
-		int numeric = 1;
-		for (uint32_t i = 0; i < p->name.len; i++)
+		uint32_t iv;
+		if (dyn_key_index_value(p->name.utf8, p->name.len, &iv))
 		{
-			char c = p->name.utf8[i];
-			if (c < '0' || c > '9') { numeric = 0; break; }
-			v = v * 10 + (uint64_t) (c - '0');
-		}
-		if (numeric && v <= 0xFFFFFFFFull)
-		{
-			return avm2_uint_value((uint32_t) v);
+			return avm2_uint_value(iv);
 		}
 	}
 	return avm2_string(avm2_string_new(ctx, p->name.utf8, p->name.len));

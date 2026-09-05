@@ -3330,6 +3330,10 @@ static const Avm2String* g_str_timer;
 static const Avm2String* g_str_timer_complete;
 // Defined below (Mouse section); rooted in avm2_gc_mark_roots_display.
 static const Avm2String* g_mouse_cursor;
+static const Avm2String* g_mouse_custom_cursor;
+#define MOUSE_CUSTOM_CURSOR_MAX 64
+static const Avm2String* g_mouse_custom_cursors[MOUSE_CUSTOM_CURSOR_MAX];
+static uint32_t g_mouse_custom_cursor_count;
 
 // One Timer tick: currentCount++, dispatch TimerEvent.TIMER; on the final
 // repeat clear running (so a TIMER_COMPLETE handler reads running==false) and
@@ -7932,6 +7936,19 @@ static Avm2Value mc_add_frame_script(Avm2Activation* act)
 	if (ext == NULL)
 	{
 		avm2_fatal("addFrameScript on a non-MovieClip receiver");
+	}
+	// The argument list must be a NON-EMPTY sequence of (frame, closure) pairs;
+	// empty or odd is ArgumentError #2001 (ruffle
+	// core/src/avm2/globals/flash/display/movie_clip.rs: `if args.is_empty() ||
+	// !args.len().is_multiple_of(2)`, make_error_2001). "n + 1 expected" is
+	// literally n + 1, not the pair count -- avm2/movieclip_addframescript_error
+	// pins `got 11, 12 expected`.
+	if (act->argc == 0 || (act->argc % 2) != 0)
+	{
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2001: Too few arguments were specified; "
+		                 "got %u, %u expected.",
+		                 (unsigned) act->argc, (unsigned) act->argc + 1u);
 	}
 	for (uint32_t i = 0; i + 1 < act->argc; i += 2)
 	{
@@ -13459,6 +13476,11 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
 	avm2_gc_mark_string(g_str_timer);
 	avm2_gc_mark_string(g_str_timer_complete);
 	avm2_gc_mark_string(g_mouse_cursor);
+	avm2_gc_mark_string(g_mouse_custom_cursor);
+	for (uint32_t i = 0; i < g_mouse_custom_cursor_count; i++)
+	{
+		avm2_gc_mark_string(g_mouse_custom_cursors[i]);
+	}
 }
 
 // Post-mark, pre-sweep hook (avm2_gc.c gc_collect): drop orphan entries whose
@@ -15514,26 +15536,233 @@ static void input_handle_text_control(Avm2Context* ctx, const char* ctrl)
 	avm2_text_input_control(ctx, g_stage_focus, ctrl, g_clipboard_text);
 }
 
-// flash.ui.Mouse — static cursor property + hide/show. Headless has no real
-// cursor; store the last-set string and no-op hide/show (FlashPunk's Splash
-// sets Mouse.cursor every frame).
-static const Avm2String* g_mouse_cursor;
+// flash.ui.Mouse — static cursor property, hide/show, and the custom-cursor
+// registry. Headless has no real cursor, so the natives are pure state; what
+// they DO have to get right is the error surface, which avm2/flash_ui_mouse_cursor
+// grades line by line. Ported from ruffle
+// core/src/avm2/globals/flash/ui/mouse.rs (+ MouseCursorData.as).
+//
+// Two independent pieces of state, exactly as in ruffle's `mouse_data`:
+//   * forced_cursor        — one of the four MouseCursor enum spellings, or
+//                            "none" meaning "auto"
+//   * current_custom_cursor— a name previously handed to registerCursor
+// The getter prefers the custom cursor, then the forced one, then "auto".
+// (g_mouse_cursor / g_mouse_custom_cursor / g_mouse_custom_cursors are declared
+// near the Timer natives above, where avm2_gc_mark_roots_display can root them.)
+static const Avm2String* g_mouse_cursor;         // forced cursor (NULL = auto)
+
+// FP spells a class-side frame with a `$` on the class
+// ("flash.ui::Mouse$/registerCursor()", and for the accessor
+// "flash.ui::Mouse$/set cursor()" — with the space). A NATIVE static carries
+// bound_class but no ABC method, so avm2_callstack_frame_name's
+// frame_is_class_trait cannot see it is class-side; swap our own frame for a
+// synthetic native one, the same idiom as avm2_globals.c's system_exit.
+static void mouse_class_frame(Avm2Context* ctx, Avm2MethodFn self,
+                              const Avm2MethodRef* frame)
+{
+	if (ctx->call_depth > 0
+	    && ctx->call_frames[ctx->call_depth - 1].method.fn == self)
+	{
+		avm2_callstack_pop(ctx);
+	}
+	avm2_callstack_push(ctx, frame, NULL);
+}
+
+static int mouse_cursor_registered(const Avm2String* name)
+{
+	for (uint32_t i = 0; i < g_mouse_custom_cursor_count; i++)
+	{
+		if (avm2_string_equals(g_mouse_custom_cursors[i], name)) return 1;
+	}
+	return 0;
+}
+
+// The four MouseCursor enum values ruffle's MouseCursor::from_avm2_str accepts
+// (backend/ui.rs `avm2_variant` attributes). "auto" is handled before this, and
+// the match is CASE-SENSITIVE: "AUTO"/"HAND" are #2008.
+static int mouse_cursor_is_enum_value(const Avm2String* s)
+{
+	static const char* const names[] = { "arrow", "button", "ibeam", "hand" };
+	for (uint32_t i = 0; i < 4; i++)
+	{
+		uint32_t n = (uint32_t) strlen(names[i]);
+		if (s->len == n && memcmp(s->utf8, names[i], n) == 0) return 1;
+	}
+	return 0;
+}
+
 static Avm2Value mouse_get_cursor(Avm2Activation* act)
 {
+	if (g_mouse_custom_cursor != NULL) return avm2_string(g_mouse_custom_cursor);
 	const Avm2String* s = g_mouse_cursor != NULL
 		? g_mouse_cursor : avm2_string_from_literal(act->ctx, "auto");
 	return avm2_string(s);
 }
+
 static Avm2Value mouse_set_cursor(Avm2Activation* act)
 {
-	g_mouse_cursor = avm2_coerce_to_string(act->ctx,
-		act->argc > 0 ? act->args[0] : avm2_undefined());
+	static const Avm2MethodRef frame =
+		{ NULL, NULL, "flash.ui::Mouse$/set cursor", 0, 0 };
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		mouse_class_frame(ctx, mouse_set_cursor, &frame);
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter cursor must be non-null.");
+	}
+	const Avm2String* s = avm2_coerce_to_string(ctx, v);
+	if (s->len == 4 && memcmp(s->utf8, "auto", 4) == 0)
+	{
+		g_mouse_custom_cursor = NULL;
+		g_mouse_cursor = NULL;
+	}
+	else if (mouse_cursor_registered(s))
+	{
+		g_mouse_custom_cursor = s;
+		g_mouse_cursor = NULL;   // ruffle: forced stays None for a custom cursor
+	}
+	else if (mouse_cursor_is_enum_value(s))
+	{
+		// Cleared only once we KNOW the value is legal (ruffle's comment: do it
+		// here so a throwing call leaves the custom cursor alone).
+		g_mouse_custom_cursor = NULL;
+		g_mouse_cursor = s;
+	}
+	else
+	{
+		mouse_class_frame(ctx, mouse_set_cursor, &frame);
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2008: Parameter cursor must be one of the "
+		                 "accepted values.");
+	}
 	return avm2_undefined();
 }
+
+static Avm2Value mouse_register_cursor(Avm2Activation* act)
+{
+	static const Avm2MethodRef frame =
+		{ NULL, NULL, "flash.ui::Mouse$/registerCursor", 0, 0 };
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		mouse_class_frame(ctx, mouse_register_cursor, &frame);
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter name must be non-null.");
+	}
+	const Avm2String* name = avm2_coerce_to_string(ctx, v);
+	if (!mouse_cursor_registered(name)
+	    && g_mouse_custom_cursor_count < MOUSE_CUSTOM_CURSOR_MAX)
+	{
+		g_mouse_custom_cursors[g_mouse_custom_cursor_count++] = name;
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value mouse_unregister_cursor(Avm2Activation* act)
+{
+	static const Avm2MethodRef frame =
+		{ NULL, NULL, "flash.ui::Mouse$/unregisterCursor", 0, 0 };
+	Avm2Context* ctx = act->ctx;
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		mouse_class_frame(ctx, mouse_unregister_cursor, &frame);
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter name must be non-null.");
+	}
+	const Avm2String* name = avm2_coerce_to_string(ctx, v);
+	for (uint32_t i = 0; i < g_mouse_custom_cursor_count; i++)
+	{
+		if (avm2_string_equals(g_mouse_custom_cursors[i], name))
+		{
+			for (uint32_t j = i + 1; j < g_mouse_custom_cursor_count; j++)
+			{
+				g_mouse_custom_cursors[j - 1] = g_mouse_custom_cursors[j];
+			}
+			g_mouse_custom_cursor_count--;
+			break;
+		}
+	}
+	// Dropping the cursor that is CURRENTLY shown falls back to "auto"; dropping
+	// any other registered name leaves the shown cursor alone.
+	if (g_mouse_custom_cursor != NULL
+	    && avm2_string_equals(g_mouse_custom_cursor, name))
+	{
+		g_mouse_custom_cursor = NULL;
+	}
+	return avm2_undefined();
+}
+
 static Avm2Value mouse_noop(Avm2Activation* act)
 {
 	(void) act;
 	return avm2_undefined();
+}
+
+// flash.ui.MouseCursorData — a `final` value bag (ruffle stubs every accessor).
+// The three properties are ordinary accessor traits over hidden dynamic slots
+// on the instance, so they are GC-marked with the object and need no native ext.
+static Avm2Value mcd_get_slot(Avm2Activation* act, const char* key)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	Avm2Value* v = avm2_object_find_dynamic(self, key, (uint32_t) strlen(key));
+	return v != NULL ? *v : avm2_undefined();
+}
+
+static Avm2Value mcd_set_slot(Avm2Activation* act, const char* key)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
+	Avm2DynProp* p = avm2_object_set_dynamic(act->ctx, self, key,
+	                                         (uint32_t) strlen(key), v);
+	if (p != NULL) p->dont_enum = 1;
+	return avm2_undefined();
+}
+
+static Avm2Value mcd_get_data(Avm2Activation* act)
+{
+	return mcd_get_slot(act, "_data");
+}
+static Avm2Value mcd_set_data(Avm2Activation* act)
+{
+	return mcd_set_slot(act, "_data");
+}
+static Avm2Value mcd_get_frame_rate(Avm2Activation* act)
+{
+	Avm2Value v = mcd_get_slot(act, "_frameRate");
+	// `private var _frameRate:Number` — an unset Number reads as NaN, not undefined.
+	return v.kind == AVM2_VALUE_UNDEFINED ? avm2_number(NAN) : v;
+}
+static Avm2Value mcd_set_frame_rate(Avm2Activation* act)
+{
+	return mcd_set_slot(act, "_frameRate");
+}
+static Avm2Value mcd_get_hot_spot(Avm2Activation* act)
+{
+	Avm2Value v = mcd_get_slot(act, "_hotSpot");
+	if (v.kind != AVM2_VALUE_UNDEFINED) return v;
+	// `private var _hotSpot:Point = new Point(0, 0)` — materialize on first read
+	// so identity is stable across reads.
+	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
+	Avm2Value args[2] = { avm2_number(0.0), avm2_number(0.0) };
+	Avm2Value pt = avm2_class_construct(act->ctx,
+	                                    avm2_display_point_class(act->ctx),
+	                                    args, 2);
+	Avm2Object* self = this_obj(act);
+	if (self != NULL)
+	{
+		Avm2DynProp* p = avm2_object_set_dynamic(act->ctx, self, "_hotSpot", 8, pt);
+		if (p != NULL) p->dont_enum = 1;
+	}
+	return pt;
+}
+static Avm2Value mcd_set_hot_spot(Avm2Activation* act)
+{
+	return mcd_set_slot(act, "_hotSpot");
 }
 
 // ---------------------------------------------------------------------------
@@ -16685,6 +16914,17 @@ void avm2_register_display(Avm2Context* ctx)
 		                               mouse_get_cursor, mouse_set_cursor);
 		avm2_builtin_add_static_method(ctx, mouse, "hide", mouse_noop);
 		avm2_builtin_add_static_method(ctx, mouse, "show", mouse_noop);
+		avm2_builtin_add_static_method(ctx, mouse, "registerCursor",
+		                               mouse_register_cursor);
+		avm2_builtin_add_static_method(ctx, mouse, "unregisterCursor",
+		                               mouse_unregister_cursor);
+		Avm2Class* mcd = avm2_builtin_class(ctx, "flash.ui", "MouseCursorData",
+		                                    b->object_class);
+		avm2_builtin_add_getset(ctx, mcd, "data", mcd_get_data, mcd_set_data);
+		avm2_builtin_add_getset(ctx, mcd, "frameRate", mcd_get_frame_rate,
+		                        mcd_set_frame_rate);
+		avm2_builtin_add_getset(ctx, mcd, "hotSpot", mcd_get_hot_spot,
+		                        mcd_set_hot_spot);
 	}
 
 	// flash.ui.Keyboard — FlashPunk's Input.onKeyDown reads Keyboard.capsLock on

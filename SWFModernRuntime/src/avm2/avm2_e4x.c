@@ -1536,6 +1536,17 @@ static _Noreturn void parse_error(Parser* ps, const char* fmt, const Avm2String*
 	avm2_throw_error(ctx, ctx->builtins.type_error_class, "%s", fmt);
 }
 
+// #1104 needs TWO different names interpolated (the attribute and the
+// element), which parse_error's single-arg-substituted-twice shape cannot do.
+static _Noreturn void parse_error2(Parser* ps, const char* fmt,
+                                   const Avm2String* a, const Avm2String* b)
+{
+	Avm2Context* ctx = ps->ctx;
+	avm2_callstack_push_unnamed(ctx);  // same unnamed scanner frame as above
+	avm2_throw_error(ctx, ctx->builtins.type_error_class, fmt,
+	                 (int) a->len, a->utf8, (int) b->len, b->utf8);
+}
+
 static _Noreturn void err_1090(Parser* ps)
 {
 	parse_error(ps, "Error #1090: XML parser failure: element is malformed.", NULL);
@@ -1861,20 +1872,29 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
 		const Avm2String* value =
 			decode_entities_str(ps, ps->p + vstart, ps->pos - vstart);
 		ps->pos++;
-		// Duplicate raw attribute names → 1104.
-		for (uint32_t i = 0; i < attr_n; i++)
-		{
-			if (str_eq(attrs[i].raw_name, aname))
-			{
-				parse_error(ps, "Error #1104: Attribute was already specified "
-				            "for element.", NULL);
-			}
-		}
 		if (attr_n < 128)
 		{
 			attrs[attr_n].raw_name = aname;
 			attrs[attr_n].value = value;
 			attr_n++;
+		}
+	}
+
+	// Duplicate raw attribute names → #1104. This runs only AFTER the start tag
+	// has been terminated: quick_xml (and therefore ruffle e4x.rs
+	// from_start_event) only sees the attribute list once the scanner has
+	// produced a complete BytesStart, so an UNTERMINATED tag reports #1090 even
+	// when it also carries a duplicate (`<root a="" a=""` with no `>`).
+	for (uint32_t i = 1; i < attr_n; i++)
+	{
+		for (uint32_t j = 0; j < i; j++)
+		{
+			if (str_eq(attrs[j].raw_name, attrs[i].raw_name))
+			{
+				parse_error2(ps, "Error #1104: Attribute \"%.*s\" was already "
+				             "specified for element \"%.*s\".",
+				             attrs[i].raw_name, raw);
+			}
 		}
 	}
 

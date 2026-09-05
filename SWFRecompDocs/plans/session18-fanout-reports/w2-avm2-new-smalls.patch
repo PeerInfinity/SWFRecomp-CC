@@ -1,0 +1,522 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 96bec6a37..cab7e69ad 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -1359,8 +1359,15 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
+ 					a = CA(bd_get_raw(alpha, axx, ayy));
+ 				else
+ 					a = 0;
++				// Ruffle core/src/bitmap/operations.rs::copy_pixels_with_alpha_source:
++				// a fully opaque alpha pixel leaves the source alpha untouched
++				// (the `>> 8` scale would otherwise lose one step, 0xFF -> 0xFE).
++				// Ruffle also gates this whole block on the ALPHA bitmap's own
++				// transparency flag; a non-transparent BitmapData stores alpha 255
++				// everywhere, so with the a == 255 arm the two paths agree and we
++				// do not need a separate branch here.
+ 				if (src->transparency)
+-					final_alpha = (a * CA(sc)) >> 8;
++					final_alpha = (a == 255) ? CA(sc) : ((a * CA(sc)) >> 8);
+ 				else
+ 					final_alpha = a;
+ 				// Un-premultiply source, reapply final alpha, re-premultiply.
+@@ -3000,6 +3007,13 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
+ 	int passthrough = (f.kind == AVM2_FILTER_GRADIENT_GLOW
+ 	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL)
+ 	                  && f.blur_x == 0 && f.blur_y == 0 && f.distance == 0;
++	// ConvolutionFilter is in ruffle's unsupported set
++	// (render/wgpu/src/filters.rs), so applyFilter falls through to
++	// copy_on_cpu(merge_alpha = false) -- "until we support these filters,
++	// treat this like a copy". We match that. NOTE: this is RUFFLE parity, not
++	// Flash parity: a non-identity kernel should convolve. See
++	// ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md.
++	passthrough = passthrough || (f.kind == AVM2_FILTER_CONVOLUTION);
+ 	int is_blur = (f.kind == AVM2_FILTER_BLUR);
+ 	int is_displace = (f.kind == AVM2_FILTER_DISPLACEMENT_MAP);
+ 	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur && !is_displace)
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index ad91fca80..2b90bf0bd 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -3330,6 +3330,10 @@ static const Avm2String* g_str_timer;
+ static const Avm2String* g_str_timer_complete;
+ // Defined below (Mouse section); rooted in avm2_gc_mark_roots_display.
+ static const Avm2String* g_mouse_cursor;
++static const Avm2String* g_mouse_custom_cursor;
++#define MOUSE_CUSTOM_CURSOR_MAX 64
++static const Avm2String* g_mouse_custom_cursors[MOUSE_CUSTOM_CURSOR_MAX];
++static uint32_t g_mouse_custom_cursor_count;
+ 
+ // One Timer tick: currentCount++, dispatch TimerEvent.TIMER; on the final
+ // repeat clear running (so a TIMER_COMPLETE handler reads running==false) and
+@@ -7897,6 +7901,19 @@ static Avm2Value mc_add_frame_script(Avm2Activation* act)
+ 	{
+ 		avm2_fatal("addFrameScript on a non-MovieClip receiver");
+ 	}
++	// The argument list must be a NON-EMPTY sequence of (frame, closure) pairs;
++	// empty or odd is ArgumentError #2001 (ruffle
++	// core/src/avm2/globals/flash/display/movie_clip.rs: `if args.is_empty() ||
++	// !args.len().is_multiple_of(2)`, make_error_2001). "n + 1 expected" is
++	// literally n + 1, not the pair count -- avm2/movieclip_addframescript_error
++	// pins `got 11, 12 expected`.
++	if (act->argc == 0 || (act->argc % 2) != 0)
++	{
++		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
++		                 "Error #2001: Too few arguments were specified; "
++		                 "got %u, %u expected.",
++		                 (unsigned) act->argc, (unsigned) act->argc + 1u);
++	}
+ 	for (uint32_t i = 0; i + 1 < act->argc; i += 2)
+ 	{
+ 		int64_t frame_id = (int64_t) avm2_coerce_to_u32(ctx, act->args[i]) + 1;
+@@ -13318,6 +13335,11 @@ void avm2_gc_mark_roots_display(Avm2Context* ctx)
+ 	avm2_gc_mark_string(g_str_timer);
+ 	avm2_gc_mark_string(g_str_timer_complete);
+ 	avm2_gc_mark_string(g_mouse_cursor);
++	avm2_gc_mark_string(g_mouse_custom_cursor);
++	for (uint32_t i = 0; i < g_mouse_custom_cursor_count; i++)
++	{
++		avm2_gc_mark_string(g_mouse_custom_cursors[i]);
++	}
+ }
+ 
+ // Post-mark, pre-sweep hook (avm2_gc.c gc_collect): drop orphan entries whose
+@@ -15373,28 +15395,235 @@ static void input_handle_text_control(Avm2Context* ctx, const char* ctrl)
+ 	avm2_text_input_control(ctx, g_stage_focus, ctrl, g_clipboard_text);
+ }
+ 
+-// flash.ui.Mouse — static cursor property + hide/show. Headless has no real
+-// cursor; store the last-set string and no-op hide/show (FlashPunk's Splash
+-// sets Mouse.cursor every frame).
+-static const Avm2String* g_mouse_cursor;
++// flash.ui.Mouse — static cursor property, hide/show, and the custom-cursor
++// registry. Headless has no real cursor, so the natives are pure state; what
++// they DO have to get right is the error surface, which avm2/flash_ui_mouse_cursor
++// grades line by line. Ported from ruffle
++// core/src/avm2/globals/flash/ui/mouse.rs (+ MouseCursorData.as).
++//
++// Two independent pieces of state, exactly as in ruffle's `mouse_data`:
++//   * forced_cursor        — one of the four MouseCursor enum spellings, or
++//                            "none" meaning "auto"
++//   * current_custom_cursor— a name previously handed to registerCursor
++// The getter prefers the custom cursor, then the forced one, then "auto".
++// (g_mouse_cursor / g_mouse_custom_cursor / g_mouse_custom_cursors are declared
++// near the Timer natives above, where avm2_gc_mark_roots_display can root them.)
++static const Avm2String* g_mouse_cursor;         // forced cursor (NULL = auto)
++
++// FP spells a class-side frame with a `$` on the class
++// ("flash.ui::Mouse$/registerCursor()", and for the accessor
++// "flash.ui::Mouse$/set cursor()" — with the space). A NATIVE static carries
++// bound_class but no ABC method, so avm2_callstack_frame_name's
++// frame_is_class_trait cannot see it is class-side; swap our own frame for a
++// synthetic native one, the same idiom as avm2_globals.c's system_exit.
++static void mouse_class_frame(Avm2Context* ctx, Avm2MethodFn self,
++                              const Avm2MethodRef* frame)
++{
++	if (ctx->call_depth > 0
++	    && ctx->call_frames[ctx->call_depth - 1].method.fn == self)
++	{
++		avm2_callstack_pop(ctx);
++	}
++	avm2_callstack_push(ctx, frame, NULL);
++}
++
++static int mouse_cursor_registered(const Avm2String* name)
++{
++	for (uint32_t i = 0; i < g_mouse_custom_cursor_count; i++)
++	{
++		if (avm2_string_equals(g_mouse_custom_cursors[i], name)) return 1;
++	}
++	return 0;
++}
++
++// The four MouseCursor enum values ruffle's MouseCursor::from_avm2_str accepts
++// (backend/ui.rs `avm2_variant` attributes). "auto" is handled before this, and
++// the match is CASE-SENSITIVE: "AUTO"/"HAND" are #2008.
++static int mouse_cursor_is_enum_value(const Avm2String* s)
++{
++	static const char* const names[] = { "arrow", "button", "ibeam", "hand" };
++	for (uint32_t i = 0; i < 4; i++)
++	{
++		uint32_t n = (uint32_t) strlen(names[i]);
++		if (s->len == n && memcmp(s->utf8, names[i], n) == 0) return 1;
++	}
++	return 0;
++}
++
+ static Avm2Value mouse_get_cursor(Avm2Activation* act)
+ {
++	if (g_mouse_custom_cursor != NULL) return avm2_string(g_mouse_custom_cursor);
+ 	const Avm2String* s = g_mouse_cursor != NULL
+ 		? g_mouse_cursor : avm2_string_from_literal(act->ctx, "auto");
+ 	return avm2_string(s);
+ }
++
+ static Avm2Value mouse_set_cursor(Avm2Activation* act)
+ {
+-	g_mouse_cursor = avm2_coerce_to_string(act->ctx,
+-		act->argc > 0 ? act->args[0] : avm2_undefined());
++	static const Avm2MethodRef frame =
++		{ NULL, NULL, "flash.ui::Mouse$/set cursor", 0, 0 };
++	Avm2Context* ctx = act->ctx;
++	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
++	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
++	{
++		mouse_class_frame(ctx, mouse_set_cursor, &frame);
++		avm2_throw_error(ctx, ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter cursor must be non-null.");
++	}
++	const Avm2String* s = avm2_coerce_to_string(ctx, v);
++	if (s->len == 4 && memcmp(s->utf8, "auto", 4) == 0)
++	{
++		g_mouse_custom_cursor = NULL;
++		g_mouse_cursor = NULL;
++	}
++	else if (mouse_cursor_registered(s))
++	{
++		g_mouse_custom_cursor = s;
++		g_mouse_cursor = NULL;   // ruffle: forced stays None for a custom cursor
++	}
++	else if (mouse_cursor_is_enum_value(s))
++	{
++		// Cleared only once we KNOW the value is legal (ruffle's comment: do it
++		// here so a throwing call leaves the custom cursor alone).
++		g_mouse_custom_cursor = NULL;
++		g_mouse_cursor = s;
++	}
++	else
++	{
++		mouse_class_frame(ctx, mouse_set_cursor, &frame);
++		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
++		                 "Error #2008: Parameter cursor must be one of the "
++		                 "accepted values.");
++	}
+ 	return avm2_undefined();
+ }
++
++static Avm2Value mouse_register_cursor(Avm2Activation* act)
++{
++	static const Avm2MethodRef frame =
++		{ NULL, NULL, "flash.ui::Mouse$/registerCursor", 0, 0 };
++	Avm2Context* ctx = act->ctx;
++	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
++	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
++	{
++		mouse_class_frame(ctx, mouse_register_cursor, &frame);
++		avm2_throw_error(ctx, ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter name must be non-null.");
++	}
++	const Avm2String* name = avm2_coerce_to_string(ctx, v);
++	if (!mouse_cursor_registered(name)
++	    && g_mouse_custom_cursor_count < MOUSE_CUSTOM_CURSOR_MAX)
++	{
++		g_mouse_custom_cursors[g_mouse_custom_cursor_count++] = name;
++	}
++	return avm2_undefined();
++}
++
++static Avm2Value mouse_unregister_cursor(Avm2Activation* act)
++{
++	static const Avm2MethodRef frame =
++		{ NULL, NULL, "flash.ui::Mouse$/unregisterCursor", 0, 0 };
++	Avm2Context* ctx = act->ctx;
++	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
++	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
++	{
++		mouse_class_frame(ctx, mouse_unregister_cursor, &frame);
++		avm2_throw_error(ctx, ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter name must be non-null.");
++	}
++	const Avm2String* name = avm2_coerce_to_string(ctx, v);
++	for (uint32_t i = 0; i < g_mouse_custom_cursor_count; i++)
++	{
++		if (avm2_string_equals(g_mouse_custom_cursors[i], name))
++		{
++			for (uint32_t j = i + 1; j < g_mouse_custom_cursor_count; j++)
++			{
++				g_mouse_custom_cursors[j - 1] = g_mouse_custom_cursors[j];
++			}
++			g_mouse_custom_cursor_count--;
++			break;
++		}
++	}
++	// Dropping the cursor that is CURRENTLY shown falls back to "auto"; dropping
++	// any other registered name leaves the shown cursor alone.
++	if (g_mouse_custom_cursor != NULL
++	    && avm2_string_equals(g_mouse_custom_cursor, name))
++	{
++		g_mouse_custom_cursor = NULL;
++	}
++	return avm2_undefined();
++}
++
+ static Avm2Value mouse_noop(Avm2Activation* act)
+ {
+ 	(void) act;
+ 	return avm2_undefined();
+ }
+ 
++// flash.ui.MouseCursorData — a `final` value bag (ruffle stubs every accessor).
++// The three properties are ordinary accessor traits over hidden dynamic slots
++// on the instance, so they are GC-marked with the object and need no native ext.
++static Avm2Value mcd_get_slot(Avm2Activation* act, const char* key)
++{
++	Avm2Object* self = this_obj(act);
++	if (self == NULL) return avm2_undefined();
++	Avm2Value* v = avm2_object_find_dynamic(self, key, (uint32_t) strlen(key));
++	return v != NULL ? *v : avm2_undefined();
++}
++
++static Avm2Value mcd_set_slot(Avm2Activation* act, const char* key)
++{
++	Avm2Object* self = this_obj(act);
++	if (self == NULL) return avm2_undefined();
++	Avm2Value v = act->argc > 0 ? act->args[0] : avm2_undefined();
++	Avm2DynProp* p = avm2_object_set_dynamic(act->ctx, self, key,
++	                                         (uint32_t) strlen(key), v);
++	if (p != NULL) p->dont_enum = 1;
++	return avm2_undefined();
++}
++
++static Avm2Value mcd_get_data(Avm2Activation* act)
++{
++	return mcd_get_slot(act, "_data");
++}
++static Avm2Value mcd_set_data(Avm2Activation* act)
++{
++	return mcd_set_slot(act, "_data");
++}
++static Avm2Value mcd_get_frame_rate(Avm2Activation* act)
++{
++	Avm2Value v = mcd_get_slot(act, "_frameRate");
++	// `private var _frameRate:Number` — an unset Number reads as NaN, not undefined.
++	return v.kind == AVM2_VALUE_UNDEFINED ? avm2_number(NAN) : v;
++}
++static Avm2Value mcd_set_frame_rate(Avm2Activation* act)
++{
++	return mcd_set_slot(act, "_frameRate");
++}
++static Avm2Value mcd_get_hot_spot(Avm2Activation* act)
++{
++	Avm2Value v = mcd_get_slot(act, "_hotSpot");
++	if (v.kind != AVM2_VALUE_UNDEFINED) return v;
++	// `private var _hotSpot:Point = new Point(0, 0)` — materialize on first read
++	// so identity is stable across reads.
++	extern Avm2Class* avm2_display_point_class(Avm2Context* ctx);
++	Avm2Value args[2] = { avm2_number(0.0), avm2_number(0.0) };
++	Avm2Value pt = avm2_class_construct(act->ctx,
++	                                    avm2_display_point_class(act->ctx),
++	                                    args, 2);
++	Avm2Object* self = this_obj(act);
++	if (self != NULL)
++	{
++		Avm2DynProp* p = avm2_object_set_dynamic(act->ctx, self, "_hotSpot", 8, pt);
++		if (p != NULL) p->dont_enum = 1;
++	}
++	return pt;
++}
++static Avm2Value mcd_set_hot_spot(Avm2Activation* act)
++{
++	return mcd_set_slot(act, "_hotSpot");
++}
++
+ // ---------------------------------------------------------------------------
+ // flash.display.NativeMenu / flash.display.NativeMenuItem
+ // ---------------------------------------------------------------------------
+@@ -16544,6 +16773,17 @@ void avm2_register_display(Avm2Context* ctx)
+ 		                               mouse_get_cursor, mouse_set_cursor);
+ 		avm2_builtin_add_static_method(ctx, mouse, "hide", mouse_noop);
+ 		avm2_builtin_add_static_method(ctx, mouse, "show", mouse_noop);
++		avm2_builtin_add_static_method(ctx, mouse, "registerCursor",
++		                               mouse_register_cursor);
++		avm2_builtin_add_static_method(ctx, mouse, "unregisterCursor",
++		                               mouse_unregister_cursor);
++		Avm2Class* mcd = avm2_builtin_class(ctx, "flash.ui", "MouseCursorData",
++		                                    b->object_class);
++		avm2_builtin_add_getset(ctx, mcd, "data", mcd_get_data, mcd_set_data);
++		avm2_builtin_add_getset(ctx, mcd, "frameRate", mcd_get_frame_rate,
++		                        mcd_set_frame_rate);
++		avm2_builtin_add_getset(ctx, mcd, "hotSpot", mcd_get_hot_spot,
++		                        mcd_set_hot_spot);
+ 	}
+ 
+ 	// flash.ui.Keyboard — FlashPunk's Input.onKeyDown reads Keyboard.capsLock on
+diff --git a/SWFModernRuntime/src/avm2/avm2_e4x.c b/SWFModernRuntime/src/avm2/avm2_e4x.c
+index c989df5b7..5f53d54a7 100644
+--- a/SWFModernRuntime/src/avm2/avm2_e4x.c
++++ b/SWFModernRuntime/src/avm2/avm2_e4x.c
+@@ -1536,6 +1536,17 @@ static _Noreturn void parse_error(Parser* ps, const char* fmt, const Avm2String*
+ 	avm2_throw_error(ctx, ctx->builtins.type_error_class, "%s", fmt);
+ }
+ 
++// #1104 needs TWO different names interpolated (the attribute and the
++// element), which parse_error's single-arg-substituted-twice shape cannot do.
++static _Noreturn void parse_error2(Parser* ps, const char* fmt,
++                                   const Avm2String* a, const Avm2String* b)
++{
++	Avm2Context* ctx = ps->ctx;
++	avm2_callstack_push_unnamed(ctx);  // same unnamed scanner frame as above
++	avm2_throw_error(ctx, ctx->builtins.type_error_class, fmt,
++	                 (int) a->len, a->utf8, (int) b->len, b->utf8);
++}
++
+ static _Noreturn void err_1090(Parser* ps)
+ {
+ 	parse_error(ps, "Error #1090: XML parser failure: element is malformed.", NULL);
+@@ -1861,15 +1872,6 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
+ 		const Avm2String* value =
+ 			decode_entities_str(ps, ps->p + vstart, ps->pos - vstart);
+ 		ps->pos++;
+-		// Duplicate raw attribute names → 1104.
+-		for (uint32_t i = 0; i < attr_n; i++)
+-		{
+-			if (str_eq(attrs[i].raw_name, aname))
+-			{
+-				parse_error(ps, "Error #1104: Attribute was already specified "
+-				            "for element.", NULL);
+-			}
+-		}
+ 		if (attr_n < 128)
+ 		{
+ 			attrs[attr_n].raw_name = aname;
+@@ -1878,6 +1880,24 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
+ 		}
+ 	}
+ 
++	// Duplicate raw attribute names → #1104. This runs only AFTER the start tag
++	// has been terminated: quick_xml (and therefore ruffle e4x.rs
++	// from_start_event) only sees the attribute list once the scanner has
++	// produced a complete BytesStart, so an UNTERMINATED tag reports #1090 even
++	// when it also carries a duplicate (`<root a="" a=""` with no `>`).
++	for (uint32_t i = 1; i < attr_n; i++)
++	{
++		for (uint32_t j = 0; j < i; j++)
++		{
++			if (str_eq(attrs[j].raw_name, attrs[i].raw_name))
++			{
++				parse_error2(ps, "Error #1104: Attribute \"%.*s\" was already "
++				             "specified for element \"%.*s\".",
++				             attrs[i].raw_name, raw);
++			}
++		}
++	}
++
+ 	// Pass 1: xmlns declarations.
+ 	for (uint32_t i = 0; i < attr_n; i++)
+ 	{
+diff --git a/SWFModernRuntime/src/avm2/avm2_object.c b/SWFModernRuntime/src/avm2/avm2_object.c
+index 00bf82ec5..203637446 100644
+--- a/SWFModernRuntime/src/avm2/avm2_object.c
++++ b/SWFModernRuntime/src/avm2/avm2_object.c
+@@ -104,9 +104,21 @@ int avm2_object_delete_dynamic_obj(Avm2Object* obj, Avm2Object* key)
+ 	return 0;
+ }
+ 
+-// Is this name the CANONICAL spelling of a u32 index? ("0" yes, "00" and "-1"
+-// no — those round-trip as strings, so both players keep them string-keyed.)
+-static int dyn_key_is_index(const char* name, uint32_t name_len)
++// Is this name the CANONICAL spelling of a dynamic INTEGER key? ("0" yes, "00"
++// and "-1" no — those round-trip as strings, so both players keep them
++// string-keyed.)
++//
++// The ceiling is 2^28 - 1, NOT u32::MAX: "Due to a quirk in avmplus, only
++// values that fit in 28 bits are considered to be integers. Other values remain
++// strings." (ruffle core/src/avm2/object/script_object.rs::maybe_int_property,
++// commit 45904c3ee; avmplus String::getIntAtom / String::parseIndex). avm2
++// primitive_keys pins the boundary exactly: 268435455 -> number,
++// 268435456 / 2147483646 / 4294967294 -> string. Array's OWN index parse is a
++// different predicate with a u32::MAX - 1 ceiling (ruffle
++// array_object.rs:111) — do not fold the two together.
++#define AVM2_DYN_KEY_MAX_INDEX 0x0FFFFFFFull
++
++static int dyn_key_index_value(const char* name, uint32_t name_len, uint32_t* out)
+ {
+ 	if (name_len == 0 || name_len > 10) return 0;
+ 	if (name_len > 1 && name[0] == '0') return 0;
+@@ -116,7 +128,14 @@ static int dyn_key_is_index(const char* name, uint32_t name_len)
+ 		if (name[i] < '0' || name[i] > '9') return 0;
+ 		v = v * 10 + (uint64_t) (name[i] - '0');
+ 	}
+-	return v <= 4294967294ULL;
++	if (v > AVM2_DYN_KEY_MAX_INDEX) return 0;
++	if (out != NULL) *out = (uint32_t) v;
++	return 1;
++}
++
++static int dyn_key_is_index(const char* name, uint32_t name_len)
++{
++	return dyn_key_index_value(name, name_len, NULL);
+ }
+ 
+ Avm2DynProp* avm2_object_set_dynamic(Avm2Context* ctx, Avm2Object* obj, const char* name,
+@@ -552,23 +571,16 @@ Avm2Value avm2_object_enumerant_name(Avm2Context* ctx, Avm2Object* obj, uint32_t
+ 	                     : nth_enumerable_dyn(obj, idx - arr_n);
+ 	if (p == NULL) return avm2_null();
+ 	if (p->key_obj != NULL) return avm2_object_value(p->key_obj);
+-	// Names that are pure natural numbers (no sign, no leading zeros)
+-	// enumerate as NUMBERS (Ruffle DynamicKey::Uint / avmplus int atoms) —
+-	// dictionary_primitive_keys asserts typeof key == "number".
+-	if (p->name.len > 0 && p->name.len <= 10
+-	    && !(p->name.len > 1 && p->name.utf8[0] == '0'))
+-	{
+-		uint64_t v = 0;
+-		int numeric = 1;
+-		for (uint32_t i = 0; i < p->name.len; i++)
+-		{
+-			char c = p->name.utf8[i];
+-			if (c < '0' || c > '9') { numeric = 0; break; }
+-			v = v * 10 + (uint64_t) (c - '0');
+-		}
+-		if (numeric && v <= 0xFFFFFFFFull)
++	// Names that are pure natural numbers (no sign, no leading zeros) and fit
++	// in 28 bits enumerate as NUMBERS (Ruffle DynamicKey::Uint / avmplus int
++	// atoms). avm2/primitive_keys is the fixture: it asserts typeof key ==
++	// "number" below 2^28 and "string" from 2^28 up. Same predicate the
++	// integer-keys-first partition uses, as in Ruffle.
++	{
++		uint32_t iv;
++		if (dyn_key_index_value(p->name.utf8, p->name.len, &iv))
+ 		{
+-			return avm2_uint_value((uint32_t) v);
++			return avm2_uint_value(iv);
+ 		}
+ 	}
+ 	return avm2_string(avm2_string_new(ctx, p->name.utf8, p->name.len));
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md
+index 06c93f5b7..a13b0e7a6 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md
+@@ -67,3 +67,34 @@ only once per preload tick.
+ Ruffle commit 3891fb824 (Feb 2026) by Kamil Jarosz.
+ 
+ **File**: `SWFModernRuntime/src/actionmodern/action.c` — `actionFirePendingLoadInits()`
++
++
++---
++
++## AVM2 `BitmapData.applyFilter` treats `ConvolutionFilter` as a plain copy
++
++**Affected tests**: `avm2/bitmapdata_applyfilter_identity`
++
++**What we did**: `bd_apply_filter` adds `ConvolutionFilter` to the `passthrough` set, so
++`applyFilter` with a ConvolutionFilter copies the source region into the destination
++(un-premultiply -> re-premultiply, `merge_alpha = false`) instead of convolving:
++
++```c
++passthrough = passthrough || (f.kind == AVM2_FILTER_CONVOLUTION);
++```
++
++**Why**: Ruffle does not implement ConvolutionFilter either — it is in the unsupported arm
++of `render/wgpu/src/filters.rs:286`, so `is_filter_supported` is false and
++`core/src/bitmap/operations.rs:1252-1276` falls through to
++`copy_on_cpu(..., merge_alpha = false)` with the comment *"Until we support these filters,
++treat this like a copy."* The fixture uses a 1x1 identity kernel, for which a copy IS the
++correct Flash answer, so the graded lines are right for the right reason.
++
++**Risk / why this is a compat tweak, not Flash parity**: a NON-identity kernel would be
++wrong — Flash would convolve and we would copy. Nothing in the corpus grades that today
++(`avm2/convolution_filter` passes and only grades the filter object's own properties), and
++a real CPU convolution is a much larger slice with zero additional graded lines. If a
++future test grades a non-identity kernel, this entry is the thing to remove: implement the
++convolution and drop the `passthrough` arm.
++
++**File**: `SWFModernRuntime/src/avm2/avm2_bitmap.c` — `bd_apply_filter()`

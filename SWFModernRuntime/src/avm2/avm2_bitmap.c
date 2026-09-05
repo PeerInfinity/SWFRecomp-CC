@@ -1359,8 +1359,15 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 					a = CA(bd_get_raw(alpha, axx, ayy));
 				else
 					a = 0;
+				// Ruffle core/src/bitmap/operations.rs::copy_pixels_with_alpha_source:
+				// a fully opaque alpha pixel leaves the source alpha untouched
+				// (the `>> 8` scale would otherwise lose one step, 0xFF -> 0xFE).
+				// Ruffle also gates this whole block on the ALPHA bitmap's own
+				// transparency flag; a non-transparent BitmapData stores alpha 255
+				// everywhere, so with the a == 255 arm the two paths agree and we
+				// do not need a separate branch here.
 				if (src->transparency)
-					final_alpha = (a * CA(sc)) >> 8;
+					final_alpha = (a == 255) ? CA(sc) : ((a * CA(sc)) >> 8);
 				else
 					final_alpha = a;
 				// Un-premultiply source, reapply final alpha, re-premultiply.
@@ -3000,6 +3007,13 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	int passthrough = (f.kind == AVM2_FILTER_GRADIENT_GLOW
 	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL)
 	                  && f.blur_x == 0 && f.blur_y == 0 && f.distance == 0;
+	// ConvolutionFilter is in ruffle's unsupported set
+	// (render/wgpu/src/filters.rs), so applyFilter falls through to
+	// copy_on_cpu(merge_alpha = false) -- "until we support these filters,
+	// treat this like a copy". We match that. NOTE: this is RUFFLE parity, not
+	// Flash parity: a non-identity kernel should convolve. See
+	// ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md.
+	passthrough = passthrough || (f.kind == AVM2_FILTER_CONVOLUTION);
 	int is_blur = (f.kind == AVM2_FILTER_BLUR);
 	int is_displace = (f.kind == AVM2_FILTER_DISPLACEMENT_MAP);
 	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur && !is_displace)
