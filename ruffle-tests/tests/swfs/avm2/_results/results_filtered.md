@@ -6,26 +6,26 @@
 
 **Run Duration**: 203m 2s
 
-**Filtered**: 49 tests ignored out of 1261 available
+**Filtered**: 47 tests ignored out of 1261 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1212 |
-| Passing | **1172** (96.7%) |
+| Total tests | 1214 |
+| Passing | **1172** (96.5%) |
 | Ruffle-matched | 9 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1181** (97.4%) |
-| Failing | 31 |
-| Total expected lines | 139954 |
-| Matching lines | 137622 (98.3%) |
-| Mismatched lines | 2332 |
+| Effective pass | **1181** (97.3%) |
+| Failing | 33 |
+| Total expected lines | 140866 |
+| Matching lines | 138516 (98.3%) |
+| Mismatched lines | 2350 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 31 | 100.0% |
+| Output Mismatch | 33 | 100.0% |
 
 ## Passing Tests
 
@@ -1226,23 +1226,25 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**13 tests** within reach
+**15 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `simplebutton_soundtransform` | 93.5% | 829 | 887 | 58 |  |
-| 2 | `vector3d_near_equals` | 83.8% | 67 | 80 | 13 |  |
-| 3 | `large_preload_from_bytes` | 80.4% | 41 | 51 | 10 |  |
-| 4 | `matrix3d_copy_from` | 78.9% | 15 | 19 | 4 |  |
-| 5 | `matrix3d_copy_to_matrix3d` | 78.9% | 15 | 19 | 4 |  |
-| 6 | `tab_ordering_properties` | 76.6% | 561 | 732 | 171 |  |
-| 7 | `displayobject_getrect` | 68.8% | 11 | 16 | 5 |  |
-| 8 | `number_to_string` | 67.1% | 237 | 353 | 116 |  |
-| 9 | `primitive_keys` | 61.1% | 33 | 54 | 21 |  |
-| 10 | `orphan_removeobject` | 53.0% | 340 | 641 | 301 |  |
-| 11 | `textline_atom_index_at_char_index` | 52.5% | 21 | 40 | 19 |  |
-| 12 | `bitmapdata_applyfilter_identity` | 50.0% | 2 | 4 | 2 |  |
-| 13 | `xml_duplicate_attribute` | 50.0% | 7 | 14 | 7 |  |
+| 1 | `soundmixer_soundtransform` | 98.7% | 888 | 900 | 12 |  |
+| 2 | `simplebutton_soundtransform` | 93.5% | 829 | 887 | 58 |  |
+| 3 | `vector3d_near_equals` | 83.8% | 67 | 80 | 13 |  |
+| 4 | `large_preload_from_bytes` | 80.4% | 41 | 51 | 10 |  |
+| 5 | `matrix3d_copy_from` | 78.9% | 15 | 19 | 4 |  |
+| 6 | `matrix3d_copy_to_matrix3d` | 78.9% | 15 | 19 | 4 |  |
+| 7 | `tab_ordering_properties` | 76.6% | 561 | 732 | 171 |  |
+| 8 | `displayobject_getrect` | 68.8% | 11 | 16 | 5 |  |
+| 9 | `number_to_string` | 67.1% | 237 | 353 | 116 |  |
+| 10 | `primitive_keys` | 61.1% | 33 | 54 | 21 |  |
+| 11 | `orphan_removeobject` | 53.0% | 340 | 641 | 301 |  |
+| 12 | `textline_atom_index_at_char_index` | 52.5% | 21 | 40 | 19 |  |
+| 13 | `bitmapdata_applyfilter_identity` | 50.0% | 2 | 4 | 2 |  |
+| 14 | `stage_scale_factor` | 50.0% | 6 | 12 | 6 |  |
+| 15 | `xml_duplicate_attribute` | 50.0% | 7 | 14 | 7 |  |
 
 ## Segfaults
 
@@ -1258,38 +1260,40 @@ No timeouts.
 
 ## All Output Mismatches
 
-**31 tests** with output mismatch, sorted by match rate (best first)
+**33 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `simplebutton_soundtransform` | 93.5% | 829/887 | 887 | 887 |  |
-| 2 | `vector3d_near_equals` | 83.8% | 67/80 | 80 | 80 |  |
-| 3 | `large_preload_from_bytes` | 80.4% | 41/51 | 51 | 51 |  |
-| 4 | `matrix3d_copy_from` | 78.9% | 15/19 | 16 | 19 |  |
-| 5 | `matrix3d_copy_to_matrix3d` | 78.9% | 15/19 | 16 | 19 |  |
-| 6 | `tab_ordering_properties` | 76.6% | 561/732 | 732 | 732 |  |
-| 7 | `displayobject_getrect` | 68.8% | 11/16 | 16 | 16 |  |
-| 8 | `number_to_string` | 67.1% | 237/353 | 353 | 353 |  |
-| 9 | `primitive_keys` | 61.1% | 33/54 | 54 | 54 |  |
-| 10 | `orphan_removeobject` | 53.0% | 340/641 | 641 | 636 |  |
-| 11 | `textline_atom_index_at_char_index` | 52.5% | 21/40 | 37 | 40 |  |
-| 12 | `bitmapdata_applyfilter_identity` | 50.0% | 2/4 | 4 | 4 |  |
-| 13 | `xml_duplicate_attribute` | 50.0% | 7/14 | 14 | 14 |  |
-| 14 | `event_handler_exception` | 45.5% | 5/11 | 10 | 11 |  |
-| 15 | `mouse_pick_loader_avm1` | 38.1% | 16/42 | 40 | 42 |  |
-| 16 | `bitmapdata_copypixels_alpha_merge` | 33.3% | 3/9 | 9 | 9 |  |
-| 17 | `textblock_recreateline` | 22.7% | 41/181 | 181 | 180 |  |
-| 18 | `bitmapdata_copypixels_alpha_combine` | 15.4% | 2/13 | 13 | 13 |  |
-| 19 | `loader_duplicate_class` | 6.2% | 3/48 | 46 | 48 |  |
-| 20 | `loader_events_2` | 5.7% | 2/35 | 31 | 35 |  |
-| 21 | `number_convert_errors` | 4.6% | 40/871 | 685 | 871 |  |
-| 22 | `external_interface` | 2.9% | 3/105 | 7 | 105 |  |
-| 23 | `flash_ui_mouse_cursor` | 2.9% | 1/35 | 3 | 35 |  |
-| 24 | `focus_events_mixed_avm_edittext` | 0.0% | 0/49 | 23 | 49 |  |
-| 25 | `id3_info` | 0.0% | 0/8 | 0 | 8 |  |
-| 26 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
-| 27 | `matrix3d_append_prepend_scale` | 0.0% | 0/86 | 46 | 86 |  |
-| 28 | `matrix3d_interpolate` | 0.0% | 0/21 | 3 | 21 |  |
-| 29 | `movieclip_addframescript_error` | 0.0% | 0/9 | 0 | 9 |  |
-| 30 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
-| 31 | `stage_display_state` | 0.0% | 0/6 | 0 | 6 |  |
+| 1 | `soundmixer_soundtransform` | 98.7% | 888/900 | 900 | 900 |  |
+| 2 | `simplebutton_soundtransform` | 93.5% | 829/887 | 887 | 887 |  |
+| 3 | `vector3d_near_equals` | 83.8% | 67/80 | 80 | 80 |  |
+| 4 | `large_preload_from_bytes` | 80.4% | 41/51 | 51 | 51 |  |
+| 5 | `matrix3d_copy_from` | 78.9% | 15/19 | 16 | 19 |  |
+| 6 | `matrix3d_copy_to_matrix3d` | 78.9% | 15/19 | 16 | 19 |  |
+| 7 | `tab_ordering_properties` | 76.6% | 561/732 | 732 | 732 |  |
+| 8 | `displayobject_getrect` | 68.8% | 11/16 | 16 | 16 |  |
+| 9 | `number_to_string` | 67.1% | 237/353 | 353 | 353 |  |
+| 10 | `primitive_keys` | 61.1% | 33/54 | 54 | 54 |  |
+| 11 | `orphan_removeobject` | 53.0% | 340/641 | 641 | 636 |  |
+| 12 | `textline_atom_index_at_char_index` | 52.5% | 21/40 | 37 | 40 |  |
+| 13 | `bitmapdata_applyfilter_identity` | 50.0% | 2/4 | 4 | 4 |  |
+| 14 | `stage_scale_factor` | 50.0% | 6/12 | 12 | 12 |  |
+| 15 | `xml_duplicate_attribute` | 50.0% | 7/14 | 14 | 14 |  |
+| 16 | `event_handler_exception` | 45.5% | 5/11 | 10 | 11 |  |
+| 17 | `mouse_pick_loader_avm1` | 38.1% | 16/42 | 40 | 42 |  |
+| 18 | `bitmapdata_copypixels_alpha_merge` | 33.3% | 3/9 | 9 | 9 |  |
+| 19 | `textblock_recreateline` | 22.7% | 41/181 | 181 | 180 |  |
+| 20 | `bitmapdata_copypixels_alpha_combine` | 15.4% | 2/13 | 13 | 13 |  |
+| 21 | `loader_duplicate_class` | 6.2% | 3/48 | 46 | 48 |  |
+| 22 | `loader_events_2` | 5.7% | 2/35 | 31 | 35 |  |
+| 23 | `number_convert_errors` | 4.6% | 40/871 | 685 | 871 |  |
+| 24 | `external_interface` | 2.9% | 3/105 | 7 | 105 |  |
+| 25 | `flash_ui_mouse_cursor` | 2.9% | 1/35 | 3 | 35 |  |
+| 26 | `focus_events_mixed_avm_edittext` | 0.0% | 0/49 | 23 | 49 |  |
+| 27 | `id3_info` | 0.0% | 0/8 | 0 | 8 |  |
+| 28 | `loader_try_click_root` | 0.0% | 0/26 | 26 | 16 |  |
+| 29 | `matrix3d_append_prepend_scale` | 0.0% | 0/86 | 46 | 86 |  |
+| 30 | `matrix3d_interpolate` | 0.0% | 0/21 | 3 | 21 |  |
+| 31 | `movieclip_addframescript_error` | 0.0% | 0/9 | 0 | 9 |  |
+| 32 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
+| 33 | `stage_display_state` | 0.0% | 0/6 | 0 | 6 |  |
