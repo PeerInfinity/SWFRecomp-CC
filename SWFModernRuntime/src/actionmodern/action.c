@@ -52801,6 +52801,23 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				return;
 			}
+			// A clip that has no dynamic_props yet still inherits from
+			// MovieClip.prototype, so a user
+			// `MovieClip.prototype.addProperty(name, get, set)` setter must
+			// consume an assignment made before the clip has any own property
+			// at all (avm1/hitarea_lazy_getter: `btn.hitArea = decoy` is btn's
+			// first write). Materialize the props object only when such an
+			// ACCESSOR actually exists, so `this` binds to this clip.
+			if (mc->dynamic_props == NULL && g_movieclip_constructor_init &&
+			    g_movieclip_constructor.prototype_obj != NULL)
+			{
+				ASProperty* _mcp_probe = findPropertyStructWithPrototype(
+					g_movieclip_constructor.prototype_obj, prop_name, prop_name_len);
+				if (_mcp_probe != NULL &&
+				    (_mcp_probe->getter != NULL || _mcp_probe->setter != NULL) &&
+				    !isPropertyHiddenAtVersion(_mcp_probe->flash_flags))
+					mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
+			}
 			// User-defined property: check addProperty setters on prototype chain first
 			if (mc->dynamic_props != NULL)
 			{
@@ -52822,6 +52839,23 @@ void actionSetMember(SWFAppContext* app_context)
 					ASObject* _next = (ASObject*) _np->data.numeric_value;
 					if (_next == _dp) break;
 					_cur = _next;
+				}
+				// Same MovieClip.prototype fall-back as the GetMember MC arm: a
+				// clip whose dynamic_props has no __proto__ link still inherits
+				// from MovieClip.prototype, so a user
+				// `MovieClip.prototype.addProperty` setter must consume the
+				// assignment. Accessors only — a plain prototype value must not
+				// intercept a write.
+				if (_setter_prop == NULL && g_movieclip_constructor_init &&
+				    g_movieclip_constructor.prototype_obj != NULL &&
+				    _dp != g_movieclip_constructor.prototype_obj)
+				{
+					ASProperty* _mcp_set = findPropertyStructWithPrototype(
+						g_movieclip_constructor.prototype_obj, prop_name, prop_name_len);
+					if (_mcp_set != NULL &&
+					    (_mcp_set->getter != NULL || _mcp_set->setter != NULL) &&
+					    !isPropertyHiddenAtVersion(_mcp_set->flash_flags))
+						_setter_prop = _mcp_set;
 				}
 				if (_setter_prop != NULL && _setter_prop->setter != NULL)
 				{
@@ -54932,6 +54966,19 @@ void actionGetMember(SWFAppContext* app_context)
 		// is invoked under the accessor re-entry guard so a getter that
 		// reads its own property (e.g. `return this._target`) resolves to
 		// the (uninitialized) underlying value. Object.as:366.
+		// Same MovieClip.prototype materialization as the SetMember MC arm: a
+		// clip with no own properties yet still inherits MovieClip.prototype's
+		// addProperty accessors (avm1/hitarea_lazy_getter reads `btn.hitArea`
+		// before btn has any own property). Accessors only.
+		if (mc != NULL && mc->dynamic_props == NULL && g_movieclip_constructor_init &&
+		    g_movieclip_constructor.prototype_obj != NULL)
+		{
+			ASProperty* _mcg_probe = findPropertyStructWithPrototype(
+				g_movieclip_constructor.prototype_obj, prop_name, prop_name_len);
+			if (_mcg_probe != NULL && _mcg_probe->getter != NULL &&
+			    !isPropertyHiddenAtVersion(_mcg_probe->flash_flags))
+				mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
+		}
 		if (mc != NULL && mc->dynamic_props != NULL)
 		{
 			ASProperty* _mc_ap = findPropertyRaw((ASObject*)mc->dynamic_props, prop_name, prop_name_len);
@@ -54974,6 +55021,36 @@ void actionGetMember(SWFAppContext* app_context)
 					_proto_cur = (ASObject*)_pp_next->data.numeric_value;
 				else
 					_proto_cur = NULL;
+			}
+
+			// Fall-back: a MovieClip whose dynamic_props carries no __proto__
+			// link (createEmptyMovieClip / plain timeline clips) still inherits
+			// from MovieClip.prototype in Flash, so a user
+			// `MovieClip.prototype.addProperty(name, get, set)` accessor must
+			// dispatch from it. Mirrors the MovieClip.prototype fall-back the
+			// `instanceof` MC arm already has.
+			// ACCESSORS ONLY: a plain value on MovieClip.prototype must keep
+			// falling through to the builtin-property block below, or it would
+			// shadow _x/_name/... and child-clip name bindings.
+			// `_mc_ap == NULL` keeps an OWN property (plain value included)
+			// shadowing the prototype accessor, as Flash requires.
+			if (_mc_ap == NULL && g_movieclip_constructor_init &&
+			    g_movieclip_constructor.prototype_obj != NULL &&
+			    (ASObject*)mc->dynamic_props != g_movieclip_constructor.prototype_obj)
+			{
+				ASProperty* _mcp_prop = findPropertyStructWithPrototype(
+					g_movieclip_constructor.prototype_obj, prop_name, prop_name_len);
+				if (_mcp_prop != NULL && (_mcp_prop->getter != NULL || _mcp_prop->setter != NULL) &&
+				    !isPropertyHiddenAtVersion(_mcp_prop->flash_flags))
+				{
+					ActionVar _mcp_result;
+					if (_mcp_prop->getter == NULL)
+						_mcp_result = _mcp_prop->value;
+					else
+						_mcp_result = invokeVirtualGetter(app_context, _mcp_prop, (void*)mc->dynamic_props);
+					pushVar(app_context, &_mcp_result);
+					return;
+				}
 			}
 		}
 
@@ -74449,6 +74526,230 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 	g_inside_event_handler--;
 }
 
+// ===========================================================================
+// AVM1 MovieClip.hitArea  (Ruffle mouse_pick_avm1 parity — session 18 slice)
+// ===========================================================================
+// Ruffle (movie_clip.rs `hit_area` / player.rs `mouse_pick_avm1`) resolves the
+// owner's `hitArea` with an ORDINARY AVM1 property get — prototype chain and
+// user getters included — on EVERY button-mode pick, BEFORE any bounds check.
+// A display-object result REPLACES the owner's own shape as its hit region;
+// anything else (undefined, a non-DO, a throwing getter) leaves the owner
+// picking on its own shape. Because the get can run user code, order matters:
+// the walk is depth-DESCENDING (topmost first), and a clip removed by such a
+// getter is excluded from the remainder of that pick.
+//
+// Our AVM1 picking is AABB-based (mc_get_pixel_aabb_ng), so the substitution
+// is "use the hit-area clip's AABB instead of the owner's". The property is
+// resolved once per pick into a small side table (mc_hit_area_pick_begin) that
+// every consumer in the pick then reads — a getter must not run once per
+// consumer.
+//
+// Deliberate deviation from Ruffle, forced by the surrounding model: Ruffle
+// stops at the FIRST (topmost) hit, so a lower clip's getter never runs once a
+// higher one hits. Our rollover dispatch is not a topmost pick (every
+// AABB-containing button-mode clip fires), so the pre-pass resolves every
+// button-mode clip's hitArea. That is only observable when two clips both
+// install a side-effecting hitArea getter; the depth-descending ORDER, which is
+// what `hitarea_remove_sibling` grades, is exact.
+//
+// Tests: avm1/hitarea_lazy_getter, avm1/hitarea_remove_sibling,
+// from_shumway/avm1/hitarea.
+
+typedef struct { MovieClip* owner; MovieClip* area; } NgHitAreaEntry;
+static NgHitAreaEntry* s_hit_area_tbl = NULL;
+static int s_hit_area_tbl_count = 0;
+static int s_hit_area_tbl_cap = 0;
+// Alive-at-pick-start snapshot, taken lazily the first time this pick is about
+// to run a user getter. Only clips in it that are gone by the time the pick
+// consumes them were removed MID-pick, and only those are excluded. Taking it
+// lazily is what keeps the exclusion inert for content that installs no hitArea
+// accessor: no getter runs => no snapshot => nothing is ever excluded.
+static MovieClip** s_hit_alive_snap = NULL;
+static int s_hit_alive_snap_count = 0;
+static int s_hit_alive_snap_cap = 0;
+static int s_hit_alive_snap_taken = 0;
+static int* s_hit_order = NULL;
+static int s_hit_order_cap = 0;
+
+static int mc_is_avm1_gone_ng(MovieClip* mc)
+{
+	return mc == NULL || mc->avm1_removed || mc->pending_removal;
+}
+
+static void ng_hit_area_tbl_push(MovieClip* owner, MovieClip* area)
+{
+	if (s_hit_area_tbl_count >= s_hit_area_tbl_cap) {
+		int ncap = s_hit_area_tbl_cap ? s_hit_area_tbl_cap * 2 : 8;
+		NgHitAreaEntry* n = (NgHitAreaEntry*) realloc(s_hit_area_tbl, (size_t)ncap * sizeof(NgHitAreaEntry));
+		if (n == NULL) return;
+		s_hit_area_tbl = n;
+		s_hit_area_tbl_cap = ncap;
+	}
+	s_hit_area_tbl[s_hit_area_tbl_count].owner = owner;
+	s_hit_area_tbl[s_hit_area_tbl_count].area = area;
+	s_hit_area_tbl_count++;
+}
+
+// Snapshot the clips alive right now (called just before this pick's first
+// user getter runs).
+static void ng_hit_area_snapshot_alive(void)
+{
+	if (s_hit_alive_snap_taken) return;
+	s_hit_alive_snap_taken = 1;
+	s_hit_alive_snap_count = 0;
+	if (child_mc_count > s_hit_alive_snap_cap) {
+		MovieClip** n = (MovieClip**) realloc(s_hit_alive_snap, (size_t)child_mc_count * sizeof(MovieClip*));
+		if (n == NULL) return;
+		s_hit_alive_snap = n;
+		s_hit_alive_snap_cap = child_mc_count;
+	}
+	for (int i = 0; i < child_mc_count && i < s_hit_alive_snap_cap; i++) {
+		MovieClip* c = child_mc_cache[i];
+		if (c != NULL && !mc_is_avm1_gone_ng(c))
+			s_hit_alive_snap[s_hit_alive_snap_count++] = c;
+	}
+}
+
+// True when `mc` was alive at the start of this pick but a hitArea getter run
+// during it has since removed it (Ruffle: `if self.avm1_removed() { None }`).
+static int mc_removed_during_pick_ng(MovieClip* mc)
+{
+	if (!s_hit_alive_snap_taken || mc == NULL) return 0;
+	if (!mc_is_avm1_gone_ng(mc)) return 0;
+	for (int i = 0; i < s_hit_alive_snap_count; i++)
+		if (s_hit_alive_snap[i] == mc) return 1;
+	return 0;
+}
+
+// One ordinary AVM1 property get of "hitArea" on `mc`: own dynamic_props and
+// its __proto__ chain first, then the MovieClip.prototype fall-back for clips
+// whose dynamic_props carries no __proto__ link (createEmptyMovieClip clips) —
+// the same fall-back the `instanceof` MC arm already has. Returns the hit-area
+// clip, or NULL when the property is absent / not a MovieClip.
+static MovieClip* ng_resolve_hit_area(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL || g_execution_halted) return NULL;
+	ActionVar val;
+	val.type = ACTION_STACK_VALUE_UNDEFINED;
+	val.str_size = 0;
+	val.data.numeric_value = 0;
+
+	ASProperty* prop = findPropertyStructWithPrototype((ASObject*)mc->dynamic_props, "hitArea", 7);
+	if (prop == NULL && g_movieclip_constructor_init &&
+	    g_movieclip_constructor.prototype_obj != NULL) {
+		ASProperty* pp = findPropertyStructWithPrototype(
+			g_movieclip_constructor.prototype_obj, "hitArea", 7);
+		// Only ACCESSORS fall back here: a plain value on MovieClip.prototype
+		// would be a single shared hit area for every clip in the movie, which
+		// is not what Ruffle stores (hit_area is per display object).
+		if (pp != NULL && pp->getter != NULL) prop = pp;
+	}
+	if (prop == NULL) return NULL;
+
+	if (prop->getter != NULL) {
+		ng_hit_area_snapshot_alive();
+		// A THROWING hitArea getter must not unwind the pick — Ruffle discards
+		// the error (`.ok()`) and the owner falls back to its own shape. Without
+		// this bracket the longjmp escapes the mouse dispatcher entirely and
+		// aborts the movie with "Uncaught exception" (measured:
+		// avm1/hitarea_sweep's `throw via own` probe went 3/33 -> 1/33 and
+		// stopped the run). Same shape as filerefOwnField's getter bracket.
+		u32 _ha_sp = SP;
+		u32 _ha_scope = scope_depth;
+		u32 _ha_this = g_this_depth;
+		int _ha_ed = g_exception_state.depth;
+		if (_ha_ed >= MAX_EXCEPTION_DEPTH) return NULL;
+		g_exception_state.frames[_ha_ed].saved_scope_depth = scope_depth;
+		g_exception_state.frames[_ha_ed].saved_sp = SP;
+		g_exception_state.frames[_ha_ed].has_jmp_buf = 1;
+		g_exception_state.depth = _ha_ed + 1;
+		int _ha_ok = 0;
+		if (setjmp(g_exception_state.frames[_ha_ed].handler) != 0) {
+			g_exception_state.exception_thrown = false;
+			scope_depth = _ha_scope;
+			g_this_depth = _ha_this;
+			SP = _ha_sp;
+		} else {
+			val = invokeVirtualGetter(app_context, prop, (void*)mc->dynamic_props);
+			_ha_ok = 1;
+		}
+		g_exception_state.frames[_ha_ed].has_jmp_buf = 0;
+		g_exception_state.depth = _ha_ed;
+		if (!_ha_ok) return NULL;   // threw => owner picks on its own shape
+	} else {
+		val = prop->value;
+	}
+
+	if (val.type != ACTION_STACK_VALUE_MOVIECLIP) return NULL;
+	MovieClip* area = (MovieClip*)(uintptr_t)val.data.numeric_value;
+	if (area == NULL || area == mc) return NULL;
+	if (mc_is_avm1_gone_ng(area)) return NULL;
+	return area;
+}
+
+static int ng_hit_order_cmp(const void* a, const void* b)
+{
+	int ia = *(const int*)a, ib = *(const int*)b;
+	MovieClip* ma = child_mc_cache[ia];
+	MovieClip* mb = child_mc_cache[ib];
+	int da = (ma != NULL) ? ma->depth : INT_MIN;
+	int db = (mb != NULL) ? mb->depth : INT_MIN;
+	if (da != db) return (da < db) ? 1 : -1;   // depth-descending: topmost first
+	return (ia < ib) ? 1 : ((ia > ib) ? -1 : 0);
+}
+
+// Begin one mouse pick: resolve every button-mode clip's hitArea, topmost
+// first. Must run before any mc_hit_pixel_aabb_ng consumer in that pick.
+static void mc_hit_area_pick_begin(SWFAppContext* app_context)
+{
+	extern int actionMCHasButtonHandlers(MovieClip* mc);
+	s_hit_area_tbl_count = 0;
+	s_hit_alive_snap_taken = 0;
+	s_hit_alive_snap_count = 0;
+	if (child_mc_count <= 0) return;
+
+	if (child_mc_count > s_hit_order_cap) {
+		int* n = (int*) realloc(s_hit_order, (size_t)child_mc_count * sizeof(int));
+		if (n == NULL) return;
+		s_hit_order = n;
+		s_hit_order_cap = child_mc_count;
+	}
+	int n_cand = 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
+		if (mc_is_avm1_gone_ng(mc)) continue;
+		if (!actionMCHasButtonHandlers(mc)) continue;
+		s_hit_order[n_cand++] = i;
+	}
+	if (n_cand == 0) return;
+	if (n_cand > 1) qsort(s_hit_order, (size_t)n_cand, sizeof(int), ng_hit_order_cmp);
+
+	for (int k = 0; k < n_cand; k++) {
+		MovieClip* mc = child_mc_cache[s_hit_order[k]];
+		// A getter earlier in this pick may already have removed this clip.
+		if (mc == NULL || mc_is_avm1_gone_ng(mc)) continue;
+		MovieClip* area = ng_resolve_hit_area(app_context, mc);
+		if (area != NULL) ng_hit_area_tbl_push(mc, area);
+	}
+}
+
+// The AABB a clip picks on for this pick: its resolved hitArea clip's if it has
+// one, otherwise its own.
+static int mc_hit_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, float* y2)
+{
+	for (int i = 0; i < s_hit_area_tbl_count; i++) {
+		if (s_hit_area_tbl[i].owner == mc) {
+			MovieClip* area = s_hit_area_tbl[i].area;
+			if (area != NULL && !mc_is_avm1_gone_ng(area))
+				return mc_get_pixel_aabb_ng(area, x1, y1, x2, y2);
+			break;
+		}
+	}
+	return mc_get_pixel_aabb_ng(mc, x1, y1, x2, y2);
+}
+
 // Dispatch AS2 onPress to all dynamic MCs whose hit area contains the mouse.
 // Called from swf_core.c on EV_MOUSE_DOWN_LEFT (after dispatch_clip_event_press).
 void actionDispatchMCPress(SWFAppContext* app_context)
@@ -74456,14 +74757,17 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 	float mx = app_context->mouse.stage_x / 20.0f;  // stage_x is in twips; convert to pixels
 	float my = app_context->mouse.stage_y / 20.0f;
 
+	mc_hit_area_pick_begin(app_context);
+
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		// Text fields don't receive onPress/onRelease — clicking them acquires focus instead
 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
+		if (mc_removed_during_pick_ng(mc)) continue;
 
 		float x1, y1, x2, y2;
-		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+		if (!mc_hit_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
 
 		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
 
@@ -74480,6 +74784,8 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 	float mx = app_context->mouse.stage_x / 20.0f;
 	float my = app_context->mouse.stage_y / 20.0f;
 
+	mc_hit_area_pick_begin(app_context);
+
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || !mc->mc_as_pressed) continue;
@@ -74490,7 +74796,7 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 		}
 
 		float x1, y1, x2, y2;
-		int have_bounds = mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2);
+		int have_bounds = mc_hit_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2);
 		int inside = have_bounds && (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
 
 		mc->mc_as_pressed = 0;
@@ -74597,14 +74903,21 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 	float my = app_context->mouse.stage_y / 20.0f;
 	int btn_down = app_context->mouse.button_down;
 
+	// Resolve every button-mode clip's hitArea first, topmost-depth first: the
+	// property get can run a user getter, and Ruffle orders those by depth and
+	// excludes any clip such a getter removes from the rest of the pick.
+	mc_hit_area_pick_begin(app_context);
+
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		// Text fields don't receive roll events (onRollOver/onRollOut/onDragOver/onDragOut)
 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
+		// Removed mid-pick by another clip's hitArea getter — no events for it.
+		if (mc_removed_during_pick_ng(mc)) continue;
 
 		float x1, y1, x2, y2;
-		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) {
+		if (!mc_hit_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) {
 			continue;
 		}
 
