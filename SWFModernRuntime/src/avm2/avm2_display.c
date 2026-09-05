@@ -1860,13 +1860,29 @@ static const char* blend_mode_name(uint8_t id)
 	}
 }
 
+// The inverse of blend_mode_name. Derived from that table rather than a second
+// one so the two can never drift; "normal" and "shader" both fall through to 0
+// (we have no shader-blend backend, so a shader blend draws as normal, which is
+// exactly what the walk did before it had a blend arm at all).
+static uint8_t blend_mode_id_from_name(const char* name)
+{
+	if (name == NULL) return 0;
+	for (uint8_t id = 2; id <= 14; id++)
+		if (strcmp(name, blend_mode_name(id)) == 0) return id;
+	return 0;
+}
+
 // blendMode / cacheAsBitmap are stored as dont_enum dyn props (the same slots
 // the AS getters read), so the timeline can seed them without an activation.
+// The numeric id is ALSO cached on the display ext: the string is what AS reads
+// back, the id is what avm2_render_node's blend arm needs.
 static void set_blend_mode_name(Avm2Context* ctx, Avm2Object* obj, const char* name)
 {
 	if (obj == NULL) return;
 	avm2_object_set_dynamic(ctx, obj, "__blendMode", 11,
 		avm2_string(avm2_string_from_literal(ctx, name)))->dont_enum = 1;
+	Avm2DisplayObjectExt* bext = avm2_display_ext_of(ctx, obj);
+	if (bext != NULL) bext->blend_mode_id = blend_mode_id_from_name(name);
 }
 
 static void set_cache_as_bitmap(Avm2Context* ctx, Avm2Object* obj, int on)
@@ -8919,7 +8935,14 @@ static void gfx_set_solid_fill(Avm2GraphicsExt* g, uint32_t rgb, double a)
 	g->cfr = ((rgb >> 16) & 0xFF) / 255.0f;
 	g->cfg = ((rgb >>  8) & 0xFF) / 255.0f;
 	g->cfb = ( rgb        & 0xFF) / 255.0f;
-	g->cfa = (float) a;
+	// A swf::Color alpha is a BYTE, and Ruffle's graphics.rs::color_from_args
+	// makes it one by TRUNCATING (`(alpha * 255.0) as u8`), not rounding — so
+	// AS `0.5` is 127/255, not 128/255, and `0.1` is 25/255, not 26/255. We
+	// used to keep the float, which is off by up to half a step everywhere and
+	// showed up the moment a blend made the difference visible
+	// (avm2/displayobject_blendmode: the ADD of a 0.1-alpha fill landed +1 in
+	// R and B, and the 0.5-alpha backdrop +1 in all three).
+	g->cfa = (float) ((double) (uint8_t) (a * 255.0) / 255.0);
 }
 
 // beginFill(color:uint, alpha:Number=1): flush the pending subpath, then set a
@@ -12307,9 +12330,10 @@ static Avm2Value do_blendmode_set(Avm2Activation* act)
 		"overlay", "hardlight", "shader",
 	};
 	int ok = 0;
+	size_t matched = 0;
 	for (size_t i = 0; i < sizeof(known) / sizeof(known[0]); i++)
 	{
-		if (gfx_str_is(s, known[i])) { ok = 1; break; }
+		if (gfx_str_is(s, known[i])) { ok = 1; matched = i; break; }
 	}
 	if (!ok)
 	{
@@ -12322,6 +12346,12 @@ static Avm2Value do_blendmode_set(Avm2Activation* act)
 	{
 		avm2_object_set_dynamic(ctx, self, "__blendMode", 11,
 		                        avm2_string(s))->dont_enum = 1;
+		// Cache the numeric id for the render walk. The string the getter
+		// hands back stays the caller's own Avm2String; only the id is
+		// derived (from the matched table entry, so it cannot disagree).
+		Avm2DisplayObjectExt* bext = avm2_display_ext_of(ctx, self);
+		if (bext != NULL)
+			bext->blend_mode_id = blend_mode_id_from_name(known[matched]);
 	}
 	return avm2_undefined();
 }
@@ -12349,6 +12379,9 @@ static Avm2Value do_blendshader_set(Avm2Activation* act)
 	{
 		avm2_object_set_dynamic(ctx, self, "__blendMode", 11,
 			avm2_string(avm2_string_from_literal(ctx, "shader")))->dont_enum = 1;
+		// No shader-blend backend: the render walk treats "shader" as normal.
+		Avm2DisplayObjectExt* bext = avm2_display_ext_of(ctx, self);
+		if (bext != NULL) bext->blend_mode_id = 0;
 	}
 	return avm2_undefined();
 }
@@ -18923,6 +18956,12 @@ static int avm2_bitmap_cache_size_ok(Avm2Context* ctx, Avm2Object* obj)
 static Avm2Object* g_avm2_alpha_maskee = NULL;
 static Avm2Object* g_avm2_alpha_masker = NULL;
 
+// The node whose blend wrap is currently open. avm2_render_node's blend arm
+// re-enters itself for the SAME object to draw the wrapped content, so the arm
+// is skipped exactly once, for that object only — a descendant with its own
+// blendMode is untouched by it.
+static Avm2Object* g_avm2_blend_wrapped = NULL;
+
 static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
                                      Avm2DisplayObjectExt* ext,
                                      Avm2DisplayObjectExt* mext,
@@ -18990,6 +19029,65 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
 	if (!ext->is_stage && !ext->visible && g_avm2_mask_capture == 0) return;
+	// flash.display.DisplayObject.blendMode. The AVM2 twin of tag.c's
+	// display-list blend arm (:6547-6586) — kept in the same shape and order so
+	// the two stay diffable. Until s18 this walk had NO blend arm at all: the
+	// blendMode setter and PlaceObject3's blend byte both only wrote the
+	// `__blendMode` dyn prop the AS getter reads back, and every non-normal
+	// mode painted as NORMAL (avm2/displayobject_blendmode: five ADD rects,
+	// 62 400 outlier channels, the one NORMAL control rect already matching).
+	//
+	// The arm wraps the WHOLE node — its own content AND its subtree — which is
+	// what tag.c's render_single_object does for a sprite entry, and what Flash
+	// requires: the object is rendered into a layer and composited ONCE, never
+	// per draw call (see render_webgpu.c's "Blend-mode LAYER compositing").
+	// Re-entry for the same object is what makes that possible without a
+	// separate "render me without my blend" entry point; a nested child with
+	// its own blendMode still takes the arm on its own account, and
+	// render_webgpu_blend_mode_is_layered already refuses to nest layers
+	// (offscreen_depth > 0 -> the inner one falls back to the per-draw
+	// pipeline).
+	if (ext->blend_mode_id > 1 && obj != g_avm2_blend_wrapped
+	    && g_avm2_mask_capture == 0)
+	{
+		uint8_t bm = ext->blend_mode_id;
+		// Alpha (11) / Erase (12) with no Layer above them are IGNORED by
+		// Flash — the draw is dropped entirely (ruffle
+		// render/wgpu/src/surface.rs:239-244). We have no layer groups, so
+		// "no layer above" is unconditionally true, exactly as in tag.c.
+		int blend_skip = (bm == 11 || bm == 12);
+		// Filter and blend both want filter_tex_a, so a filtered node keeps
+		// the legacy per-draw blend pipeline (tag.c's `filter_type == 0`).
+		int blend_layered = !blend_skip && ext->filter_count == 0
+			&& renderer_blend_mode_is_layered(context, bm);
+		Avm2Object* saved_blend = g_avm2_blend_wrapped;
+		g_avm2_blend_wrapped = obj;
+		if (blend_skip)
+		{
+			// nothing drawn
+		}
+		else if (blend_layered)
+		{
+			renderer_suspend_pass(context);
+			renderer_capture_backdrop(context, bm);
+			renderer_begin_offscreen_pass(context);
+			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+			renderer_end_offscreen_pass(context);
+			renderer_resume_pass(context);
+			// The stencil reference is read from the context inside
+			// composite_blend; the argument is the legacy boolean.
+			renderer_composite_blend(context, bm,
+				renderer_clip_ref(context) > 0 ? 1 : 0);
+		}
+		else
+		{
+			renderer_set_blend_mode(context, bm);
+			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+			renderer_set_blend_mode(context, 0);
+		}
+		g_avm2_blend_wrapped = saved_blend;
+		return;
+	}
 	// flash.display.DisplayObject.filters. Sits above the mask / scrollRect
 	// pushes so the filter wraps the node's whole subtree, exactly as
 	// tag.c::render_filtered_object wraps render_single_object. Suppressed

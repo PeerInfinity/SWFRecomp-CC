@@ -671,6 +671,14 @@ typedef struct Avm2DisplayObjectExt
 	// NO_GRAPHICS and graphics builds agree.
 	uint8_t sr_committed;
 	int32_t csr_xmin, csr_ymin, csr_xmax, csr_ymax;
+
+	// DisplayObject.blendMode as the SWF NUMERIC id (swf/src/types.rs
+	// BlendMode; 0/1 = normal), cached at SET time so the render walk never
+	// re-parses the `__blendMode` string it reads back. Written by
+	// set_blend_mode_name() (PlaceObject3 + the goto rewind default) and by the
+	// AS blendMode / blendShader setters; read only by avm2_render_node's blend
+	// arm. "shader" has no SWF id and no backend, so it caches 0.
+	uint8_t blend_mode_id;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
