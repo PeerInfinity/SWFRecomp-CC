@@ -29057,7 +29057,24 @@ static DrawingState* getOrCreateDrawingState(MovieClip* mc)
 	return (DrawingState*)mc->drawing_state;
 }
 
-static void drawingAddCmd(DrawingState* ds, u8 type, float x, float y, float cx, float cy)
+// Ruffle's runtime `Drawing` stores every pen command as a `Point<Twips>`, and
+// `Twips::from_pixels` is `(px * 20.0) as i32` — TRUNCATION toward zero, not
+// rounding (swf/src/types/twips.rs). Its tessellator therefore never sees a
+// sub-twip coordinate. Quantizing here (rather than leaving raw pixels in the
+// command buffer) is what puts our flattened outline on Ruffle's polygon
+// instead of ~0.1 px outside it; the difference is invisible on straight edges
+// and decisive on curves, where the quadratic's mid-arc bulge sits right at
+// the pixel-centre boundary.
+static double drawingQuantizeTwips(double px)
+{
+	double t = px * 20.0;
+	if (isnan(t)) return 0.0;
+	if (t >= 2147483647.0) t = 2147483647.0;
+	else if (t <= -2147483648.0) t = -2147483648.0;
+	return (double)(s32)t / 20.0;   // C truncation toward zero
+}
+
+static void drawingAddCmd(DrawingState* ds, u8 type, double x, double y, double cx, double cy)
 {
 	if (ds->cmd_count >= ds->cmd_capacity) {
 		ds->cmd_capacity = ds->cmd_capacity ? ds->cmd_capacity * 2 : 64;
@@ -29065,8 +29082,10 @@ static void drawingAddCmd(DrawingState* ds, u8 type, float x, float y, float cx,
 	}
 	DrawCmd* c = &ds->cmds[ds->cmd_count++];
 	c->type = type;
-	c->x = x; c->y = y;
-	c->cx = cx; c->cy = cy;
+	c->x = (float) drawingQuantizeTwips(x);
+	c->y = (float) drawingQuantizeTwips(y);
+	c->cx = (float) drawingQuantizeTwips(cx);
+	c->cy = (float) drawingQuantizeTwips(cy);
 }
 
 // Winding-number contribution from a single line segment (begin → end) for
@@ -29512,12 +29531,153 @@ static void applyLineGradientStyleToMC(SWFAppContext* app_context, MovieClip* mc
 	ds->line_gradient_focal = focal;
 }
 
+// ---------------------------------------------------------------------------
+// Round join / round cap support (shared arithmetic, mirrored in
+// avm2_display.c's gfx_* stroke builder).
+//
+// Ruffle tessellates runtime strokes with lyon's StrokeTessellator, whose
+// round join and round cap fans are NOT adaptive per-vertex: lyon computes
+//
+//     step  = 2 * acos((r - tol) / r)            (circle_flattening_step)
+//     n_req = ceil(|sweep| / step)
+//     n     = 2 ^ round(log2(n_req))             (tessellate_arc bisects)
+//
+// and then bisects the sweep uniformly n times, so the fan vertices land on
+// the exact circle of radius r about the join vertex. `tol` is lyon's
+// StrokeOptions::DEFAULT_TOLERANCE (0.1 px) divided by the render scale;
+// our runtime strokes are tessellated in twips at scale 1, so 0.1 px = 2 twips.
+// Reproducing the SEGMENT COUNT (not just "a fine arc") is what makes our
+// polygon agree with Ruffle's to well under a pixel: a finer fan hugs the true
+// circle, which is strictly OUTSIDE lyon's inscribed chords.
+#define DRAWING_STROKE_TOL_TW 2.0f     // lyon's 0.1 px default, in twips
+// action.c is compiled without _DEFAULT_SOURCE, so <math.h> does not hand us
+// M_PI here (it appears in this file only inside a comment).
+#define DRAWING_STROKE_PI 3.14159265358979323846
+
+static u32 drawing_arc_segments(float radius_tw, float sweep_abs)
+{
+	if (!(radius_tw > 0.0f) || !(sweep_abs > 0.0f)) return 1;
+	float tol = DRAWING_STROKE_TOL_TW;
+	if (tol > radius_tw) tol = radius_tw;
+	float c = (radius_tw - tol) / radius_tw;
+	if (c < -1.0f) c = -1.0f; else if (c > 1.0f) c = 1.0f;
+	float step = 2.0f * acosf(c);
+	if (!(step > 1e-6f)) return 1;
+	float n_req = ceilf(sweep_abs / step);
+	if (!(n_req >= 1.0f)) n_req = 1.0f;
+	int subdiv = (int) lroundf(log2f(n_req));
+	if (subdiv < 0) subdiv = 0;
+	if (subdiv > 6) subdiv = 6;          // 64-segment ceiling
+	return 1u << subdiv;
+}
+
+// Upper bound on the vertices one join OR one cap can write at this
+// half-width, used to size the stroke vertex buffer.
+static u32 drawing_stroke_extra_verts(float half_w, u8 joints, u8 caps)
+{
+	u32 n = 6;                                       // miter = 2 triangles
+	if (joints == 0)
+	{
+		u32 j = 3u * drawing_arc_segments(half_w, (float) DRAWING_STROKE_PI);
+		if (j > n) n = j;
+	}
+	if (caps == 0)
+	{
+		u32 c = 6u * drawing_arc_segments(half_w, (float)(DRAWING_STROKE_PI * 0.5));
+		if (c > n) n = c;
+	}
+	return n;
+}
+
+// Round-join fan: triangles (V, arc_i, arc_{i+1}) sweeping the OUTER side from
+// the incoming outer corner p0 to the outgoing outer corner p1. `sweep` is the
+// signed short-way angle from o0 to o1, so this is inherently free of the +/-pi
+// wrap bug that the recompiler's min/max-angle drawLineJoin has.
+static u32 drawing_emit_round_join(float* out, float vx, float vy,
+                                   float o0x, float o0y, float o1x, float o1y,
+                                   float p0x, float p0y, float p1x, float p1y,
+                                   float half_w)
+{
+	float a0 = atan2f(o0y, o0x);
+	float sweep = atan2f(o0x * o1y - o0y * o1x, o0x * o1x + o0y * o1y);
+	u32 n = drawing_arc_segments(half_w, fabsf(sweep));
+	float px = p0x, py = p0y;
+	u32 w = 0;
+	for (u32 i = 1; i <= n; i++)
+	{
+		float qx, qy;
+		if (i == n) { qx = p1x; qy = p1y; }
+		else
+		{
+			float a = a0 + sweep * ((float) i / (float) n);
+			qx = vx + half_w * cosf(a);
+			qy = vy + half_w * sinf(a);
+		}
+		out[w*2+0] = vx; out[w*2+1] = vy;
+		out[w*2+2] = px; out[w*2+3] = py;
+		out[w*2+4] = qx; out[w*2+5] = qy;
+		w += 3; px = qx; py = qy;
+	}
+	return w;
+}
+
+// End cap on the open end E of the segment P->E. Coordinates in PIXELS (the
+// stroke-quad convention); output in twips. `caps`: 0 round, 1 none (butt,
+// writes nothing), 2 square.
+static u32 drawing_emit_stroke_cap(float* out, float px_, float py_,
+                                   float ex, float ey, float half_w, u8 caps)
+{
+	if (caps == 1) return 0;
+	float ax = px_ * 20.0f, ay = py_ * 20.0f;
+	float bx = ex * 20.0f,  by = ey * 20.0f;
+	float dx = bx - ax, dy = by - ay;
+	float l = sqrtf(dx*dx + dy*dy);
+	if (l < 0.001f) return 0;
+	dx /= l; dy /= l;
+	float nx = -dy, ny = dx;                          // +normal side
+	float q0x = bx + nx*half_w, q0y = by + ny*half_w;
+	float q1x = bx - nx*half_w, q1y = by - ny*half_w;
+	if (caps == 2)
+	{
+		float s0x = q0x + dx*half_w, s0y = q0y + dy*half_w;
+		float s1x = q1x + dx*half_w, s1y = q1y + dy*half_w;
+		out[0]=q0x; out[1]=q0y; out[2]=q1x; out[3]=q1y; out[4]=s1x;  out[5]=s1y;
+		out[6]=q0x; out[7]=q0y; out[8]=s1x; out[9]=s1y; out[10]=s0x; out[11]=s0y;
+		return 6;
+	}
+	// Round: half-disc from +n through +d to -n. Rotating (-dy,dx) by -pi/2
+	// gives (dx,dy), so the forward direction is always at -pi/2 from a0 and
+	// the sweep is -pi. lyon splits the cap into two quarter sweeps, each
+	// subdivided from |diff| = pi/2 -- so the segment count is 2*segs(pi/2),
+	// NOT segs(pi).
+	u32 n = 2u * drawing_arc_segments(half_w, (float)(DRAWING_STROKE_PI * 0.5));
+	float a0 = atan2f(ny, nx);
+	float sx = q0x, sy = q0y;
+	u32 w = 0;
+	for (u32 i = 1; i <= n; i++)
+	{
+		float qx, qy;
+		if (i == n) { qx = q1x; qy = q1y; }
+		else
+		{
+			float a = a0 - (float) DRAWING_STROKE_PI * ((float) i / (float) n);
+			qx = bx + half_w * cosf(a);
+			qy = by + half_w * sinf(a);
+		}
+		out[w*2+0] = bx; out[w*2+1] = by;
+		out[w*2+2] = sx; out[w*2+3] = sy;
+		out[w*2+4] = qx; out[w*2+5] = qy;
+		w += 3; sx = qx; sy = qy;
+	}
+	return w;
+}
+
 // Emit an outer-side stroke join wedge at vertex V, between the incoming
 // segment A->V and the outgoing segment V->B. Coordinates are passed in pixels
 // and converted to twips internally (matching the stroke-quad emission, which
 // also scales by 20). Writes triangle-list vertices (x,y float pairs) into
-// `out` and returns the number of vertices written: 0 (no join), 3 (bevel) or
-// 6 (miter, two triangles).
+// `out` and returns the number of vertices written: 0 (no join), 3 (bevel),
+// 6 (miter) or 3*n (round fan).
 //
 // The outer (convex) side of the turn is the side with a coverage gap between
 // the two independent segment quads; the inner side already overlaps. The
@@ -29530,7 +29690,8 @@ static u32 drawing_emit_stroke_join(float* out,
                                     float ax, float ay,
                                     float vx, float vy,
                                     float bx, float by,
-                                    float half_w)
+                                    float half_w,
+                                    u8 joints, float miter_limit)
 {
 	ax *= 20.0f; ay *= 20.0f;
 	vx *= 20.0f; vy *= 20.0f;
@@ -29552,15 +29713,23 @@ static u32 drawing_emit_stroke_join(float* out,
 	float o1x = sign * -d1y, o1y = sign * d1x;   // outer unit normal of outgoing
 	float p0x = vx + o0x*half_w, p0y = vy + o0y*half_w;  // incoming outer corner
 	float p1x = vx + o1x*half_w, p1y = vy + o1y*half_w;  // outgoing outer corner
+	// Round is the DEFAULT join for every runtime stroke API (AS3
+	// Graphics.lineStyle/GraphicsStroke and AVM1 lineStyle all default
+	// `joints` to JointStyle.ROUND — Ruffle joints_to_join_style), so this is
+	// the arm that nearly every corpus stroke takes.
+	if (joints == 0) {
+		return drawing_emit_round_join(out, vx, vy, o0x, o0y, o1x, o1y,
+		                               p0x, p0y, p1x, p1y, half_w);
+	}
 	float mx = o0x + o1x, my = o0y + o1y;
 	float mlen = sqrtf(mx*mx + my*my);
-	if (mlen > 1e-4f) {
+	// Miter ratio = 1/cos_half (miter length over stroke half-width); past the
+	// limit the spike is clipped to a bevel. A miter limit below lyon's
+	// MINIMUM_MITER_LIMIT (1.0) is a plain bevel in Ruffle's tessellator.
+	if (joints == 1 && mlen > 1e-4f && miter_limit >= 1.0f) {
 		float mhx = mx/mlen, mhy = my/mlen;
 		float cos_half = mhx*o0x + mhy*o0y;      // cos(half the corner angle)
-		// Miter ratio = 1/cos_half (miter length over stroke half-width).
-		// Limit 4 (cos_half >= 0.25) — beyond this the spike is clipped to a
-		// bevel, matching Flash's miter-limit behavior.
-		if (cos_half > 0.25f) {
+		if (cos_half * miter_limit > 1.0f) {
 			float miter_len = half_w / cos_half;
 			float Mx = vx + mhx*miter_len;
 			float My = vy + mhy*miter_len;
@@ -29581,6 +29750,9 @@ static u32 drawing_emit_stroke_join(float* out,
 // stroke width. Frees and reallocates path->line_verts.
 static void drawingBuildStroke(DrawPath* path, float half_w)
 {
+	const u8 joints = path->line_joints;
+	const u8 caps = path->line_caps;
+	const float miter_limit = (path->line_miter > 0.0f) ? path->line_miter : 3.0f;
 	float* poly = path->stroke_poly;
 	u32 poly_count = path->stroke_poly_count;
 	u32* contour_starts = path->stroke_contours;
@@ -29620,11 +29792,14 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 		if (_DR_CONTOUR_NEEDS_CLOSE(cstart, cend)) total_segs += 1;
 	}
 	if (total_segs > 0) {
-		// Allocate the stroke quads plus headroom for one join per vertex
-		// (a join is at most 2 triangles = 6 verts). poly_count is a safe
-		// upper bound on the number of joins, so this never overflows; the
-		// actual vertex count is tracked in `wv` and stored afterwards.
-		u32 alloc_verts = total_segs * 6 + poly_count * 6;
+		// Allocate the stroke quads plus headroom for one join OR one cap
+		// per polyline vertex. Every contour spends at most one such slot per
+		// vertex: a closed contour has (n-2) interior joins + 2 seam joins, an
+		// open one has (n-2) interior joins + 2 end caps. A round join/cap is
+		// a fan, so the per-slot bound depends on the style AND the radius —
+		// see drawing_stroke_extra_verts.
+		u32 extra_per_vert = drawing_stroke_extra_verts(half_w, joints, caps);
+		u32 alloc_verts = total_segs * 6 + poly_count * extra_per_vert;
 		path->line_verts = (float*)malloc(alloc_verts * 2 * sizeof(float));
 		u32 wv = 0;  // verts written so far (each vert = 2 floats)
 		#define _DR_EMIT_STROKE_SEG(_x0, _y0, _x1, _y1) do { \
@@ -29643,7 +29818,14 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 			wv += drawing_emit_stroke_join(&path->line_verts[wv * 2], \
 				poly[(_kp)*2], poly[(_kp)*2+1], \
 				poly[(_kv)*2], poly[(_kv)*2+1], \
-				poly[(_kn)*2], poly[(_kn)*2+1], half_w); \
+				poly[(_kn)*2], poly[(_kn)*2+1], half_w, \
+				joints, miter_limit); \
+		} while (0)
+		// End cap on the open end `_ke`, whose inbound segment starts at `_kp`.
+		#define _DR_EMIT_CAP(_kp, _ke) do { \
+			wv += drawing_emit_stroke_cap(&path->line_verts[wv * 2], \
+				poly[(_kp)*2], poly[(_kp)*2+1], \
+				poly[(_ke)*2], poly[(_ke)*2+1], half_w, caps); \
 		} while (0)
 		for (u32 ci = 0; ci < contour_count; ci++) {
 			u32 cstart = contour_starts[ci];
@@ -29674,8 +29856,18 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 				// Seam where last point coincides with first: last segment
 				// (cend-2 -> cend-1≈cstart) meets first (cstart -> cstart+1).
 				_DR_EMIT_JOIN(cend - 2, cstart, cstart + 1);
+			} else if (cend > cstart + 1) {
+				// Genuinely open polyline: cap both ends. Ruffle's default
+				// cap for a runtime stroke is CapStyle::Round (AVM1 lineStyle
+				// and AS3 lineStyle both default `caps` to null -> ROUND);
+				// GraphicsStroke's own default is "none" (butt), which is why
+				// the style has to travel with the path rather than being
+				// hard-coded here.
+				_DR_EMIT_CAP(cstart + 1, cstart);
+				_DR_EMIT_CAP(cend - 2, cend - 1);
 			}
 		}
+		#undef _DR_EMIT_CAP
 		#undef _DR_EMIT_JOIN
 		#undef _DR_EMIT_STROKE_SEG
 		path->line_vert_count = wv;
@@ -29771,6 +29963,9 @@ static void drawingFinalizePath(DrawingState* ds)
 	path->fill_b = ds->fill_b; path->fill_a = ds->fill_a;
 	path->has_line = ds->has_line;
 	path->line_width = ds->line_w;
+	path->line_joints = ds->line_joints;
+	path->line_caps = ds->line_caps;
+	path->line_miter = ds->line_miter;
 	path->line_r = ds->line_r; path->line_g = ds->line_g;
 	path->line_b = ds->line_b; path->line_a = ds->line_a;
 	// Copy gradient fill state
@@ -29914,6 +30109,34 @@ static void drawingEnsurePen(DrawingState* ds)
 	drawingAddCmd(ds, 0, 0.0f, 0.0f, 0, 0);  // MOVE_TO origin
 }
 
+// AVM1 `lineStyle(thickness, rgb, alpha, pixelHinting, noScale, capsStyle,
+// jointStyle, miterLimit)` — decode args 5..7. Ruffle
+// (avm1/globals/movie_clip.rs line_style) defaults BOTH styles to Round: any
+// string other than the recognised ones, and a missing/undefined argument,
+// is Round. A `miter` join with no limit uses 3.
+static void drawingParseLineJoinCaps(SWFAppContext* app_context,
+	ActionVar* args, u32 num_args, u8* out_joints, u8* out_caps, float* out_miter)
+{
+	char buf[16];
+	*out_joints = 0; *out_caps = 0; *out_miter = 3.0f;
+	if (num_args >= 6 && args[5].type != ACTION_STACK_VALUE_UNDEFINED
+	    && args[5].type != ACTION_STACK_VALUE_NULL) {
+		int n = varToStringBuf(app_context, &args[5], buf, sizeof(buf));
+		if (n == 4 && strncmp(buf, "none", 4) == 0) *out_caps = 1;
+		else if (n == 6 && strncmp(buf, "square", 6) == 0) *out_caps = 2;
+	}
+	if (num_args >= 7 && args[6].type != ACTION_STACK_VALUE_UNDEFINED
+	    && args[6].type != ACTION_STACK_VALUE_NULL) {
+		int n = varToStringBuf(app_context, &args[6], buf, sizeof(buf));
+		if (n == 5 && strncmp(buf, "miter", 5) == 0) *out_joints = 1;
+		else if (n == 5 && strncmp(buf, "bevel", 5) == 0) *out_joints = 2;
+	}
+	if (num_args >= 8 && *out_joints == 1) {
+		double m = varToDouble(&args[7]);
+		if (m > 0.0 && !isnan(m)) *out_miter = (float) m;
+	}
+}
+
 // lineStyle() ENDS the current stroke and starts a new one at the cursor, so a
 // style change mid-polyline yields two separately-styled paths (Ruffle
 // `Drawing::set_line_style`: it pushes `current_line` and re-opens a fresh
@@ -29934,13 +30157,15 @@ static void drawingEnsurePen(DrawingState* ds)
 // the 64-DrawPath-per-MC cap in actionIterateDrawings (fillDrawingInfos
 // truncates silently, so a needless split could DROP geometry).
 static void drawingBeginNewLineStyle(DrawingState* ds, int new_has_line,
-	float w, float r, float g, float b, float a)
+	float w, float r, float g, float b, float a, u8 joints, u8 caps, float miter)
 {
 	if (ds->has_fill || ds->has_gradient || ds->has_bitmap_fill) return;
 	if (ds->has_line == new_has_line
 	    && (!new_has_line || (ds->line_w == w && ds->line_r == r
 	                          && ds->line_g == g && ds->line_b == b
-	                          && ds->line_a == a && !ds->has_line_gradient)))
+	                          && ds->line_a == a && ds->line_joints == joints
+	                          && ds->line_caps == caps && ds->line_miter == miter
+	                          && !ds->has_line_gradient)))
 	{
 		return;  // no observable change — keep accumulating one path
 	}
@@ -61338,16 +61563,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				}
 			} else if (func_name_len == 6 && strncmp(func_name, "moveTo", 6) == 0) {
 				if (num_args >= 2) {
-					float x = (float)varToDouble(&args[0]);
-					float y = (float)varToDouble(&args[1]);
+					double x = varToDouble(&args[0]);
+					double y = varToDouble(&args[1]);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
 					drawingAddCmd(ds, 0, x, y, 0, 0);
 					ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
 				}
 			} else if (func_name_len == 6 && strncmp(func_name, "lineTo", 6) == 0) {
 				if (num_args >= 2) {
-					float x = (float)varToDouble(&args[0]);
-					float y = (float)varToDouble(&args[1]);
+					double x = varToDouble(&args[0]);
+					double y = varToDouble(&args[1]);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
 					drawingEnsurePen(ds);   // implicit start at the origin
 					// Always fold endpoints into bounds (covers fills); when a line
@@ -61366,10 +61591,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				}
 			} else if (func_name_len == 7 && strncmp(func_name, "curveTo", 7) == 0) {
 				if (num_args >= 4) {
-					float cx = (float)varToDouble(&args[0]);
-					float cy = (float)varToDouble(&args[1]);
-					float ax = (float)varToDouble(&args[2]);
-					float ay = (float)varToDouble(&args[3]);
+					double cx = varToDouble(&args[0]);
+					double cy = varToDouble(&args[1]);
+					double ax = varToDouble(&args[2]);
+					double ay = varToDouble(&args[3]);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
 					drawingEnsurePen(ds);   // implicit start at the origin
 					float h = ds->has_line ? ds->line_w : 0.0f;
@@ -61389,6 +61614,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Resolve the new style FIRST — see the CallMethod handler.
 				int new_has_line = 0;
 				float thickness = 0.0f, lr = 0.0f, lg = 0.0f, lb = 0.0f, alpha = 1.0f;
+				u8 ln_joints = 0, ln_caps = 0; float ln_miter = 3.0f;
 				if (num_args > 0) {
 					// Use varToDoubleSWF so an Object with `valueOf()` (e.g. `thick = {valueOf:()=>20}`)
 					// coerces to its numeric value rather than 0.
@@ -61402,8 +61628,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					lg = ((rgb >> 8) & 0xFF) / 255.0f;
 					lb = (rgb & 0xFF) / 255.0f;
 					new_has_line = 1;
+					drawingParseLineJoinCaps(app_context, args, num_args,
+					                         &ln_joints, &ln_caps, &ln_miter);
 				}
-				drawingBeginNewLineStyle(ds, new_has_line, thickness, lr, lg, lb, alpha);
+				drawingBeginNewLineStyle(ds, new_has_line, thickness, lr, lg, lb, alpha,
+				                         ln_joints, ln_caps, ln_miter);
 				if (!new_has_line) {
 					ds->has_line = 0; ds->line_w = 0;
 				} else {
@@ -61412,6 +61641,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					ds->line_g = lg;
 					ds->line_b = lb;
 					ds->line_a = alpha;
+					ds->line_joints = ln_joints;
+					ds->line_caps = ln_caps;
+					ds->line_miter = ln_miter;
 					ds->has_line = 1;
 				}
 			} else if (func_name_len == 5 && strncmp(func_name, "clear", 5) == 0) {
@@ -72560,8 +72792,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// moveTo(x, y) — set pen position, record command (no bounds update;
 			// Flash returns the empty-bounds sentinel for clips with only moveTo).
 			if (num_args >= 2 && mc != NULL) {
-				float x = (float)varToDouble(&args[0]);
-				float y = (float)varToDouble(&args[1]);
+				double x = varToDouble(&args[0]);
+				double y = varToDouble(&args[1]);
 				DrawingState* ds = getOrCreateDrawingState(mc);
 				drawingAddCmd(ds, 0, x, y, 0, 0); // MOVE_TO
 				ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
@@ -72576,8 +72808,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Always fold endpoints into bounds (covers fills); when a line style is active,
 			// expand by the FULL line thickness on each side (Flash semantics, not half).
 			if (num_args >= 2 && mc != NULL) {
-				float x = (float)varToDouble(&args[0]);
-				float y = (float)varToDouble(&args[1]);
+				double x = varToDouble(&args[0]);
+				double y = varToDouble(&args[1]);
 				DrawingState* ds = getOrCreateDrawingState(mc);
 				drawingEnsurePen(ds);   // implicit start at the origin
 				float h = ds->has_line ? ds->line_w : 0.0f;
@@ -72599,10 +72831,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// curveTo(cx, cy, ax, ay) — quadratic Bezier curve.
 			// Conservative bounds: expand at start, control, and anchor by full line thickness when stroked.
 			if (num_args >= 4 && mc != NULL) {
-				float cx = (float)varToDouble(&args[0]);
-				float cy = (float)varToDouble(&args[1]);
-				float ax = (float)varToDouble(&args[2]);
-				float ay = (float)varToDouble(&args[3]);
+				double cx = varToDouble(&args[0]);
+				double cy = varToDouble(&args[1]);
+				double ax = varToDouble(&args[2]);
+				double ay = varToDouble(&args[3]);
 				DrawingState* ds = getOrCreateDrawingState(mc);
 				drawingEnsurePen(ds);   // implicit start at the origin
 				float h = ds->has_line ? ds->line_w : 0.0f;
@@ -72758,6 +72990,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// be finalized while ds still holds the OLD style.
 				int new_has_line = 0;
 				float thickness = 0.0f, lr = 0.0f, lg = 0.0f, lb = 0.0f, alpha = 1.0f;
+				u8 ln_joints = 0, ln_caps = 0; float ln_miter = 3.0f;
 				if (num_args > 0) {
 					// Use varToDoubleSWF so an Object with `valueOf()` coerces to its
 					// numeric value rather than 0.
@@ -72772,8 +73005,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					lg = ((rgb >> 8) & 0xFF) / 255.0f;
 					lb = (rgb & 0xFF) / 255.0f;
 					new_has_line = 1;
+					drawingParseLineJoinCaps(app_context, args, num_args,
+					                         &ln_joints, &ln_caps, &ln_miter);
 				}
-				drawingBeginNewLineStyle(ds, new_has_line, thickness, lr, lg, lb, alpha);
+				drawingBeginNewLineStyle(ds, new_has_line, thickness, lr, lg, lb, alpha,
+				                         ln_joints, ln_caps, ln_miter);
 				if (!new_has_line) {
 					// No args: clear line style
 					ds->has_line = 0; ds->line_w = 0;
@@ -72783,6 +73019,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ds->line_g = lg;
 					ds->line_b = lb;
 					ds->line_a = alpha;
+					ds->line_joints = ln_joints;
+					ds->line_caps = ln_caps;
+					ds->line_miter = ln_miter;
 					ds->has_line = 1;
 				}
 			}

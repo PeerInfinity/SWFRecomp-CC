@@ -8058,6 +8058,12 @@ typedef struct
 	Avm2GfxStyle lsty;              // non-solid stroke style (kind 0 = lr..la)
 	float*   line_verts;            // local twips
 	uint32_t line_vert_count;
+	// Join/cap style snapshot. 0/0 is the API default in BOTH fields
+	// (JointStyle.ROUND / CapsStyle.ROUND), so a zeroed path is Ruffle's
+	// default stroke.
+	uint8_t  ljoints;               // 0 round, 1 miter, 2 bevel
+	uint8_t  lcaps;                 // 0 round, 1 none (butt), 2 square
+	float    lmiter;                // miter limit; <1 degrades to bevel
 } Avm2GfxPath;
 
 typedef struct Avm2GraphicsExt
@@ -8095,6 +8101,9 @@ typedef struct Avm2GraphicsExt
 	// Finalized paths.
 	Avm2GfxPath* paths;
 	uint32_t path_count, path_cap;
+	// Join/cap style of the CURRENT line style (see Avm2GfxPath above).
+	uint8_t  cljoints, clcaps;
+	float    clmiter;
 } Avm2GraphicsExt;
 
 static Avm2DisplayObjectExt* graphics_owner_ext(Avm2Activation* act)
@@ -8189,8 +8198,13 @@ static Avm2GraphicsExt* gfx_self_ext(Avm2Activation* act)
 	return (Avm2GraphicsExt*) self->native_ext;
 }
 
-static void gfx_add_cmd(Avm2GraphicsExt* g, uint8_t type, float x, float y,
-                        float cx, float cy)
+static double gfx_quantize_twips(double px)
+{
+	return (double) twips_from_pixels(px) / 20.0;
+}
+
+static void gfx_add_cmd(Avm2GraphicsExt* g, uint8_t type, double x, double y,
+                        double cx, double cy)
 {
 	if (g->cmd_count >= g->cmd_cap)
 	{
@@ -8198,8 +8212,19 @@ static void gfx_add_cmd(Avm2GraphicsExt* g, uint8_t type, float x, float y,
 		g->cmds = realloc(g->cmds, g->cmd_cap * sizeof(Avm2GfxCmd));
 	}
 	Avm2GfxCmd* c = &g->cmds[g->cmd_count++];
-	c->type = type; c->x = x; c->y = y; c->cx = cx; c->cy = cy;
-	g->pen_x = x; g->pen_y = y; g->pen_set = 1;
+	c->type = type;
+	// Ruffle's runtime `Drawing` stores every pen command as a Point<Twips>,
+	// and `Twips::from_pixels` is `(px * 20.0) as i32` — TRUNCATION toward
+	// zero (swf/src/types/twips.rs). drawCircle / drawEllipse / drawRoundRect
+	// all funnel through `draw_round_rect_internal`, which builds each anchor
+	// and control with `Point::from_pixels`, so Ruffle's circle is flattened
+	// from twip-truncated control points and sits ~0.1 px inside ours. Quantize
+	// at command-record time — the same place Ruffle does.
+	c->x = (float) gfx_quantize_twips(x);
+	c->y = (float) gfx_quantize_twips(y);
+	c->cx = (float) gfx_quantize_twips(cx);
+	c->cy = (float) gfx_quantize_twips(cy);
+	g->pen_x = c->x; g->pen_y = c->y; g->pen_set = 1;
 }
 
 static void gfx_free_path(Avm2GfxPath* p)
@@ -8222,12 +8247,126 @@ static void gfx_reset(Avm2GraphicsExt* g)
 	g->cur_winding = 0;
 	g->cur_fill = g->cur_line = 0; g->pen_set = 0;
 	g->clw_bnd = 0.0f;
+	g->cljoints = 0; g->clcaps = 0; g->clmiter = 3.0f;
 }
 
-// Miter/bevel join (miter-limit 4), mirrors action.c drawing_emit_stroke_join.
-// Inputs in pixels; outputs in twips. Returns verts written (0/3/6).
+// Round join / round cap arithmetic. Mirrors action.c's drawing_arc_segments /
+// drawing_emit_round_join / drawing_emit_stroke_cap — see the long comment
+// there for why the lyon SEGMENT COUNT (not just "a fine arc") is reproduced.
+#define GFX_STROKE_TOL_TW 2.0f          // lyon's 0.1 px default, in twips
+
+static uint32_t gfx_arc_segments(float radius_tw, float sweep_abs)
+{
+	if (!(radius_tw > 0.0f) || !(sweep_abs > 0.0f)) return 1;
+	float tol = GFX_STROKE_TOL_TW;
+	if (tol > radius_tw) tol = radius_tw;
+	float c = (radius_tw - tol) / radius_tw;
+	if (c < -1.0f) c = -1.0f; else if (c > 1.0f) c = 1.0f;
+	float step = 2.0f * acosf(c);
+	if (!(step > 1e-6f)) return 1;
+	float n_req = ceilf(sweep_abs / step);
+	if (!(n_req >= 1.0f)) n_req = 1.0f;
+	int subdiv = (int) lroundf(log2f(n_req));
+	if (subdiv < 0) subdiv = 0;
+	if (subdiv > 6) subdiv = 6;
+	return 1u << subdiv;
+}
+
+// Upper bound on vertices one join OR one cap can write at this half-width.
+static uint32_t gfx_stroke_extra_verts(float half_w, uint8_t joints, uint8_t caps)
+{
+	uint32_t n = 6;
+	if (joints == 0)
+	{
+		uint32_t j = 3u * gfx_arc_segments(half_w, (float) M_PI);
+		if (j > n) n = j;
+	}
+	if (caps == 0)
+	{
+		uint32_t c = 6u * gfx_arc_segments(half_w, (float)(M_PI * 0.5));
+		if (c > n) n = c;
+	}
+	return n;
+}
+
+static uint32_t gfx_emit_round_join(float* out, float vx, float vy,
+                                    float o0x, float o0y, float o1x, float o1y,
+                                    float p0x, float p0y, float p1x, float p1y,
+                                    float half_w)
+{
+	float a0 = atan2f(o0y, o0x);
+	float sweep = atan2f(o0x * o1y - o0y * o1x, o0x * o1x + o0y * o1y);
+	uint32_t n = gfx_arc_segments(half_w, fabsf(sweep));
+	float px = p0x, py = p0y;
+	uint32_t w = 0;
+	for (uint32_t i = 1; i <= n; i++)
+	{
+		float qx, qy;
+		if (i == n) { qx = p1x; qy = p1y; }
+		else
+		{
+			float a = a0 + sweep * ((float) i / (float) n);
+			qx = vx + half_w * cosf(a);
+			qy = vy + half_w * sinf(a);
+		}
+		out[w*2+0] = vx; out[w*2+1] = vy;
+		out[w*2+2] = px; out[w*2+3] = py;
+		out[w*2+4] = qx; out[w*2+5] = qy;
+		w += 3; px = qx; py = qy;
+	}
+	return w;
+}
+
+// End cap on the open end E of segment P->E. Pixels in, twips out.
+// caps: 0 round, 1 none (butt), 2 square.
+static uint32_t gfx_stroke_cap(float* out, float px_, float py_,
+                               float ex, float ey, float half_w, uint8_t caps)
+{
+	if (caps == 1) return 0;
+	float ax = px_ * 20.0f, ay = py_ * 20.0f;
+	float bx = ex * 20.0f,  by = ey * 20.0f;
+	float dx = bx - ax, dy = by - ay;
+	float l = sqrtf(dx*dx + dy*dy);
+	if (l < 0.001f) return 0;
+	dx /= l; dy /= l;
+	float nx = -dy, ny = dx;
+	float q0x = bx + nx*half_w, q0y = by + ny*half_w;
+	float q1x = bx - nx*half_w, q1y = by - ny*half_w;
+	if (caps == 2)
+	{
+		float s0x = q0x + dx*half_w, s0y = q0y + dy*half_w;
+		float s1x = q1x + dx*half_w, s1y = q1y + dy*half_w;
+		out[0]=q0x; out[1]=q0y; out[2]=q1x; out[3]=q1y; out[4]=s1x;  out[5]=s1y;
+		out[6]=q0x; out[7]=q0y; out[8]=s1x; out[9]=s1y; out[10]=s0x; out[11]=s0y;
+		return 6;
+	}
+	uint32_t n = 2u * gfx_arc_segments(half_w, (float)(M_PI * 0.5));
+	float a0 = atan2f(ny, nx);
+	float sx = q0x, sy = q0y;
+	uint32_t w = 0;
+	for (uint32_t i = 1; i <= n; i++)
+	{
+		float qx, qy;
+		if (i == n) { qx = q1x; qy = q1y; }
+		else
+		{
+			float a = a0 - (float) M_PI * ((float) i / (float) n);
+			qx = bx + half_w * cosf(a);
+			qy = by + half_w * sinf(a);
+		}
+		out[w*2+0] = bx; out[w*2+1] = by;
+		out[w*2+2] = sx; out[w*2+3] = sy;
+		out[w*2+4] = qx; out[w*2+5] = qy;
+		w += 3; sx = qx; sy = qy;
+	}
+	return w;
+}
+
+// Round/miter/bevel join, mirrors action.c drawing_emit_stroke_join.
+// Inputs in pixels; outputs in twips. Returns verts written.
 static uint32_t gfx_stroke_join(float* out, float ax, float ay, float vx,
-                                float vy, float bx, float by, float half_w)
+                                float vy, float bx, float by, float half_w,
+                                uint8_t joints, float miter_limit)
 {
 	ax *= 20.0f; ay *= 20.0f; vx *= 20.0f; vy *= 20.0f; bx *= 20.0f; by *= 20.0f;
 	float d0x = vx - ax, d0y = vy - ay, d1x = bx - vx, d1y = by - vy;
@@ -8240,11 +8379,17 @@ static uint32_t gfx_stroke_join(float* out, float ax, float ay, float vx,
 	float o0x = sign * -d0y, o0y = sign * d0x, o1x = sign * -d1y, o1y = sign * d1x;
 	float p0x = vx + o0x * half_w, p0y = vy + o0y * half_w;
 	float p1x = vx + o1x * half_w, p1y = vy + o1y * half_w;
+	// Round is the DEFAULT for AS3 Graphics.lineStyle and GraphicsStroke
+	// (Ruffle joints_to_join_style: anything not "miter"/"bevel", null
+	// included, is JointStyle::Round).
+	if (joints == 0)
+		return gfx_emit_round_join(out, vx, vy, o0x, o0y, o1x, o1y,
+		                           p0x, p0y, p1x, p1y, half_w);
 	float mx = o0x + o1x, my = o0y + o1y, mlen = sqrtf(mx * mx + my * my);
-	if (mlen > 1e-4f)
+	if (joints == 1 && mlen > 1e-4f && miter_limit >= 1.0f)
 	{
 		float mhx = mx / mlen, mhy = my / mlen, cos_half = mhx * o0x + mhy * o0y;
-		if (cos_half > 0.25f)
+		if (cos_half * miter_limit > 1.0f)
 		{
 			float ml = half_w / cos_half, Mx = vx + mhx * ml, My = vy + mhy * ml;
 			out[0]=vx; out[1]=vy; out[2]=p0x; out[3]=p0y; out[4]=Mx; out[5]=My;
@@ -8257,12 +8402,17 @@ static uint32_t gfx_stroke_join(float* out, float ax, float ay, float vx,
 }
 
 // Build stroke triangles from a contour polyline (pixels) at half_w (twips).
-// Mirrors action.c drawingBuildStroke (butt caps, miter/bevel joins). `filled`
-// auto-closes open contours (Flash closes fill+stroke of `moveTo;lineTo*;endFill`).
+// Mirrors action.c drawingBuildStroke. `filled` auto-closes open contours
+// (Flash closes fill+stroke of `moveTo;lineTo*;endFill`). The join/cap style
+// travels on the path (GraphicsStroke defaults to caps "none" while
+// lineStyle defaults to CapsStyle.ROUND, so it cannot be hard-coded).
 static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
                              uint32_t poly_count, const uint32_t* cstarts,
                              uint32_t ccount, int filled, float half_w)
 {
+	const uint8_t joints = path->ljoints;
+	const uint8_t caps = path->lcaps;
+	const float miter_limit = (path->lmiter > 0.0f) ? path->lmiter : 3.0f;
 	free(path->line_verts); path->line_verts = NULL; path->line_vert_count = 0;
 	if (poly == NULL || ccount == 0) return;
 	#define _GNEEDCLOSE(cs, ce) (filled && ((ce)-(cs)) >= 3 && ( \
@@ -8280,7 +8430,8 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 		if (_GNEEDCLOSE(cs, ce)) total_segs += 1;
 	}
 	if (total_segs == 0) return;
-	uint32_t alloc_verts = total_segs * 6 + poly_count * 6;
+	uint32_t alloc_verts = total_segs * 6
+	                     + poly_count * gfx_stroke_extra_verts(half_w, joints, caps);
 	path->line_verts = malloc(alloc_verts * 2 * sizeof(float));
 	uint32_t wv = 0;
 	#define _GSEG(_x0,_y0,_x1,_y1) do { \
@@ -8293,7 +8444,12 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 	#define _GJOIN(_kp,_kv,_kn) do { \
 		wv += gfx_stroke_join(&path->line_verts[wv*2], \
 			poly[(_kp)*2], poly[(_kp)*2+1], poly[(_kv)*2], poly[(_kv)*2+1], \
-			poly[(_kn)*2], poly[(_kn)*2+1], half_w); \
+			poly[(_kn)*2], poly[(_kn)*2+1], half_w, joints, miter_limit); \
+	} while (0)
+	#define _GCAP(_kp,_ke) do { \
+		wv += gfx_stroke_cap(&path->line_verts[wv*2], \
+			poly[(_kp)*2], poly[(_kp)*2+1], poly[(_ke)*2], poly[(_ke)*2+1], \
+			half_w, caps); \
 	} while (0)
 	for (uint32_t ci = 0; ci < ccount; ci++)
 	{
@@ -8311,7 +8467,9 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
 			_GJOIN(ce-2, ce-1, cs);
 		}
 		else if (expl) _GJOIN(ce-2, cs, cs+1);
+		else if (ce > cs + 1) { _GCAP(cs+1, cs); _GCAP(ce-2, ce-1); }
 	}
+	#undef _GCAP
 	#undef _GJOIN
 	#undef _GSEG
 	#undef _GEXPLCLOSED
@@ -8466,8 +8624,13 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
 		free(tw);
 	}
 	if (want_line)
+	{
+		path->ljoints = g->cljoints;
+		path->lcaps = g->clcaps;
+		path->lmiter = g->clmiter;
 		gfx_build_stroke(path, poly, poly_count, cstarts, ccount,
 		                 want_fill, g->clw * 0.5f * 20.0f);
+	}
 
 	free(poly); free(cstarts);
 	g->cmd_count = 0;
@@ -8804,6 +8967,27 @@ static Avm2Value gfx_end_fill(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// `caps` / `joints` string -> our style codes. Ruffle
+// (globals/flash/display/graphics.rs caps_to_cap_style / joints_to_join_style)
+// treats null/undefined AND any unrecognised string as ROUND for both.
+static uint8_t gfx_caps_code(Avm2Context* ctx, Avm2Value v)
+{
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED) return 0;
+	const Avm2String* s_ = avm2_coerce_to_string(ctx, v);
+	if (gfx_str_is(s_, "none")) return 1;
+	if (gfx_str_is(s_, "square")) return 2;
+	return 0;
+}
+
+static uint8_t gfx_joints_code(Avm2Context* ctx, Avm2Value v)
+{
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED) return 0;
+	const Avm2String* s_ = avm2_coerce_to_string(ctx, v);
+	if (gfx_str_is(s_, "miter")) return 1;
+	if (gfx_str_is(s_, "bevel")) return 2;
+	return 0;
+}
+
 // lineStyle(thickness, color=0, alpha=1, ...): flush, then set the current
 // stroke (solid only this tranche; a fill-typed stroke degrades to no stroke).
 static Avm2Value gfx_line_style(Avm2Activation* act)
@@ -8842,6 +9026,16 @@ static Avm2Value gfx_line_style(Avm2Activation* act)
 	g->clg = ((rgb >>  8) & 0xFF) / 255.0f;
 	g->clb = ( rgb        & 0xFF) / 255.0f;
 	g->cla = (float) a;
+	// lineStyle(thickness, color, alpha, pixelHinting, scaleMode, caps,
+	// joints, miterLimit) — args 5..7. Both style defaults are ROUND.
+	g->clcaps = act->argc > 5 ? gfx_caps_code(ctx, act->args[5]) : 0;
+	g->cljoints = act->argc > 6 ? gfx_joints_code(ctx, act->args[6]) : 0;
+	g->clmiter = 3.0f;
+	if (act->argc > 7)
+	{
+		double ml = avm2_coerce_to_number(ctx, act->args[7]);
+		if (!isnan(ml) && ml > 0.0) g->clmiter = (float) ml;
+	}
 	return avm2_undefined();
 }
 
@@ -8855,7 +9049,7 @@ static Avm2Value gfx_move_to(Avm2Activation* act)
 		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
 		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
 		if (ext != NULL) draw_union_stroke(ext, g, x, y);
-		if (g != NULL) gfx_add_cmd(g, 0, (float) x, (float) y, 0, 0);
+		if (g != NULL) gfx_add_cmd(g, 0, x, y, 0, 0);
 	}
 	return avm2_undefined();
 }
@@ -8873,7 +9067,7 @@ static Avm2Value gfx_line_to(Avm2Activation* act)
 		if (g != NULL)
 		{
 			if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
-			gfx_add_cmd(g, 1, (float) x, (float) y, 0, 0);
+			gfx_add_cmd(g, 1, x, y, 0, 0);
 		}
 	}
 	return avm2_undefined();
@@ -8894,7 +9088,7 @@ static Avm2Value gfx_curve_to(Avm2Activation* act)
 		if (g != NULL)
 		{
 			if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);
-			gfx_add_cmd(g, 2, (float) ax, (float) ay, (float) cx, (float) cy);
+			gfx_add_cmd(g, 2, ax, ay, cx, cy);
 		}
 	}
 	return avm2_undefined();
@@ -8904,11 +9098,11 @@ static Avm2Value gfx_curve_to(Avm2Activation* act)
 static void gfx_emit_rect(Avm2GraphicsExt* g, double x, double y,
                           double w, double h)
 {
-	gfx_add_cmd(g, 0, (float) x,       (float) y,       0, 0);
-	gfx_add_cmd(g, 1, (float)(x + w),  (float) y,       0, 0);
-	gfx_add_cmd(g, 1, (float)(x + w),  (float)(y + h),  0, 0);
-	gfx_add_cmd(g, 1, (float) x,       (float)(y + h),  0, 0);
-	gfx_add_cmd(g, 1, (float) x,       (float) y,       0, 0);
+	gfx_add_cmd(g, 0, x,       y,       0, 0);
+	gfx_add_cmd(g, 1, x + w,   y,       0, 0);
+	gfx_add_cmd(g, 1, x + w,   y + h,   0, 0);
+	gfx_add_cmd(g, 1, x,       y + h,   0, 0);
+	gfx_add_cmd(g, 1, x,       y,       0, 0);
 }
 
 // drawRect/drawRoundRect/drawEllipse(x, y, w, h) — round-rect corner radii are
@@ -8983,7 +9177,7 @@ static Avm2Value gfx_cubic_curve_to(Avm2Activation* act)
 		#undef DER
 		double qx = (3 * b1x - sx + 3 * b2x - ex) * 0.25;
 		double qy = (3 * b1y - sy + 3 * b2y - ey) * 0.25;
-		gfx_add_cmd(g, 2, (float) ex, (float) ey, (float) qx, (float) qy);
+		gfx_add_cmd(g, 2, ex, ey, qx, qy);
 	}
 	return avm2_undefined();
 }
@@ -9005,14 +9199,14 @@ static Avm2Value gfx_draw_circle(Avm2Activation* act)
 			// tan(pi/8) out along the bisector). Good to <0.1% radius.
 			const int N = 8;
 			double kct = 1.0 / cos(M_PI / N);   // control radius factor
-			gfx_add_cmd(g, 0, (float)(x + r), (float) y, 0, 0);
+			gfx_add_cmd(g, 0, x + r, y, 0, 0);
 			for (int i = 0; i < N; i++)
 			{
 				double a0 = 2.0 * M_PI * i / N, a1 = 2.0 * M_PI * (i + 1) / N;
 				double am = (a0 + a1) * 0.5;
 				double ex = x + r * cos(a1), ey = y + r * sin(a1);
 				double cxp = x + r * kct * cos(am), cyp = y + r * kct * sin(am);
-				gfx_add_cmd(g, 2, (float) ex, (float) ey, (float) cxp, (float) cyp);
+				gfx_add_cmd(g, 2, ex, ey, cxp, cyp);
 			}
 		}
 	}
@@ -9039,14 +9233,14 @@ static Avm2Value gfx_draw_ellipse(Avm2Activation* act)
 	double rx = w * 0.5, ry = h * 0.5, cx = x + rx, cy = y + ry;
 	const int N = 8;
 	double kct = 1.0 / cos(M_PI / N);
-	gfx_add_cmd(g, 0, (float)(cx + rx), (float) cy, 0, 0);
+	gfx_add_cmd(g, 0, cx + rx, cy, 0, 0);
 	for (int i = 0; i < N; i++)
 	{
 		double a0 = 2.0 * M_PI * i / N, a1 = 2.0 * M_PI * (i + 1) / N;
 		double am = (a0 + a1) * 0.5;
 		double ex = cx + rx * cos(a1), ey = cy + ry * sin(a1);
 		double ccx = cx + rx * kct * cos(am), ccy = cy + ry * kct * sin(am);
-		gfx_add_cmd(g, 2, (float) ex, (float) ey, (float) ccx, (float) ccy);
+		gfx_add_cmd(g, 2, ex, ey, ccx, ccy);
 	}
 	return avm2_undefined();
 }
@@ -9498,12 +9692,12 @@ static void gfx_decode_path(Avm2GraphicsExt* g, Avm2Context* ctx,
 		switch (cmd)
 		{
 			case 0: break;                                  // NO_OP
-			case 1: _GRDPT(x, y); gfx_add_cmd(g, 0, (float)x, (float)y, 0, 0); break;
-			case 2: _GRDPT(x, y); gfx_add_cmd(g, 1, (float)x, (float)y, 0, 0); break;
+			case 1: _GRDPT(x, y); gfx_add_cmd(g, 0, x, y, 0, 0); break;
+			case 2: _GRDPT(x, y); gfx_add_cmd(g, 1, x, y, 0, 0); break;
 			case 3: _GRDPT(cx, cy); _GRDPT(x, y);
-				gfx_add_cmd(g, 2, (float)x, (float)y, (float)cx, (float)cy); break;
-			case 4: di += 2; _GRDPT(x, y); gfx_add_cmd(g, 0, (float)x, (float)y, 0, 0); break;
-			case 5: di += 2; _GRDPT(x, y); gfx_add_cmd(g, 1, (float)x, (float)y, 0, 0); break;
+				gfx_add_cmd(g, 2, x, y, cx, cy); break;
+			case 4: di += 2; _GRDPT(x, y); gfx_add_cmd(g, 0, x, y, 0, 0); break;
+			case 5: di += 2; _GRDPT(x, y); gfx_add_cmd(g, 1, x, y, 0, 0); break;
 			case 6:                                         // CUBIC -> flatten
 			{
 				double sx = g->pen_set ? g->pen_x : 0, sy = g->pen_set ? g->pen_y : 0;
@@ -9514,7 +9708,7 @@ static void gfx_decode_path(Avm2GraphicsExt* g, Avm2Context* ctx,
 					double t = (double) s / N, u = 1 - t;
 					double bx = u*u*u*sx + 3*u*u*t*cx + 3*u*t*t*c2x + t*t*t*x;
 					double by = u*u*u*sy + 3*u*u*t*cy + 3*u*t*t*c2y + t*t*t*y;
-					gfx_add_cmd(g, 1, (float) bx, (float) by, 0, 0);
+					gfx_add_cmd(g, 1, bx, by, 0, 0);
 				}
 				break;
 			}
@@ -9711,6 +9905,15 @@ static void gfx_apply_stroke_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
 	g->clw = (float) (th > 0 ? th : 1.0);   // hairline -> nominal 1px
 	g->clr = g->clg = g->clb = 0.0f;
 	g->cla = 1.0f;
+	// GraphicsStroke's own defaults differ from lineStyle's: caps = "none"
+	// (butt), joints = "round", miterLimit = 3 (see gfx_graphicsstroke_ctor).
+	g->clcaps = gfx_caps_code(ctx, gfx_prop(o, "caps", 4));
+	g->cljoints = gfx_joints_code(ctx, gfx_prop(o, "joints", 6));
+	g->clmiter = 3.0f;
+	{
+		double ml = avm2_coerce_to_number(ctx, gfx_prop(o, "miterLimit", 10));
+		if (!isnan(ml) && ml > 0.0) g->clmiter = (float) ml;
+	}
 	Avm2Value fv = gfx_prop(o, "fill", 4);
 	if (fv.kind == AVM2_VALUE_OBJECT && fv.u.obj != NULL)
 		gfx_apply_stroke_fill_carrier(ctx, g, fv.u.obj);

@@ -612,6 +612,12 @@ typedef struct {
 	u32 stroke_contour_count;
 	int stroke_filled;         // path had a fill (controls stroke auto-close)
 	float stroke_built_half_w; // half-width (twips) line_verts were built at; <0 = unbuilt
+	// Stroke join/cap style snapshot (Flash LINESTYLE2 semantics, as the
+	// drawing API exposes them). 0 is the API default in BOTH fields, so a
+	// zero-initialized DrawPath is Ruffle's `round`/`round` default.
+	u8 line_joints;            // 0 round, 1 miter, 2 bevel
+	u8 line_caps;              // 0 round, 1 none (butt), 2 square
+	float line_miter;          // miter limit; <1 degrades to bevel (lyon rule)
 } DrawPath;
 
 typedef struct {
@@ -636,6 +642,11 @@ typedef struct {
 	float line_w;
 	float line_r, line_g, line_b, line_a;
 	int has_line;
+	// Join/cap style of the current line style (see DrawPath above; 0/0 =
+	// the AVM1 `lineStyle` defaults, which are round/round).
+	u8 line_joints;
+	u8 line_caps;
+	float line_miter;
 	// Line gradient state (set by lineGradientStyle)
 	int has_line_gradient;
 	u8 line_gradient_type;
