@@ -1,29 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `f0fd711c7126` (2026-09-04T21:08:44.182040+00:00)
-**Current:** `7f7a6ba36937` (2026-09-05T04:40:58.125313+00:00)
+**Previous:** `7f7a6ba36937` (2026-09-05T04:40:58.125313+00:00)
+**Current:** `1d87c1cfba93` (2026-09-05T06:00:14.991298+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 689 | 691 | +2 |
+| Passing | 691 | 691 | 0 |
 | Total | 730 | 730 | 0 |
-| Pass rate | 94.4% | 94.7% | +0.3% |
-| Mismatched lines | 11504 | 11492 | -12 |
-|   Decreased | | | -12 |
+| Pass rate | 94.7% | 94.7% | 0% |
+| Mismatched lines | 11492 | 11492 | 0 |
 
-## Newly Passing (2)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `hitarea_lazy_getter` | output_mismatch | 0/6 | 6/6 |
-| `hitarea_remove_sibling` | output_mismatch | 3/4 | 4/4 |
-
-## Line Count Changed (3)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `hitarea_remove_owner_drag` | output_mismatch | 3/10 | 5/10 | -2 |
-| `hitarea_sweep` | output_mismatch | 1/33 | 3/33 | -2 |
-| `globals_monkeypatch` | output_mismatch | 38/100 | 39/100 | -1 |
+No changes detected.
