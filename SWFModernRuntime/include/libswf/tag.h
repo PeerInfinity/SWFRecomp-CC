@@ -436,6 +436,10 @@ int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
 size_t ng_objRootDepth(DisplayObject* obj);
 int ng_getMatrixFromObj(DisplayObject* obj, double* out_a, double* out_b, double* out_c, double* out_d, double* out_tx, double* out_ty);
 int ng_getMatrixFromObj_render(DisplayObject* obj, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
+// Same read with a caller-supplied transform-table row — needed inside a render
+// frame, where compose_children has rewritten a child entry's transform_id to a
+// GPU-only slot (resolve with ng_get_original_transform_id first).
+int ng_getMatrixFromObj_render_tid(DisplayObject* obj, u32 tid, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
 int ng_getCTFromObj(DisplayObject* obj, double* ra, double* ga, double* ba, double* aa, double* rb, double* gb, double* bb, double* ab);
 // Populate a display entry's cx_* fields from the baked cxform_data slot.
 void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id);

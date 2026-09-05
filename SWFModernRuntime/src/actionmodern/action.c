@@ -9281,8 +9281,24 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
 	DisplayObject* entry = resolveMCDisplayEntry(mc);
 	float ba = 1.0f, bb = 0.0f, bc = 0.0f, bd = 1.0f;
 	int32_t btx = 0, bty = 0;
-	int has_base = (entry != NULL) &&
+	// s18 w2-gfx-text (G1): this accessor runs DURING the render pass (the
+	// EditText box/glyph iterators call it from tf_world_matrix), and by then
+	// compose_children has rewritten a NESTED entry's transform_id to a dynamic
+	// GPU slot with no CPU-side transform_data row — reading it yields garbage
+	// (d == 0 killed the device-font positive-scale cull, blanking every
+	// sprite-nested field). Resolve the pre-compose id the way otf_walk_dl
+	// already does. Localised here on purpose: the shared
+	// ng_getMatrixFromObj_render also serves NO_GRAPHICS hit testing, which
+	// never runs inside a render frame.
+	int has_base;
+#ifndef NO_GRAPHICS
+	has_base = (entry != NULL) &&
+		ng_getMatrixFromObj_render_tid(entry, ng_get_original_transform_id(entry),
+		                               &ba, &bb, &bc, &bd, &btx, &bty);
+#else
+	has_base = (entry != NULL) &&
 		ng_getMatrixFromObj_render(entry, &ba, &bb, &bc, &bd, &btx, &bty);
+#endif
 	if (!has_base) {
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;

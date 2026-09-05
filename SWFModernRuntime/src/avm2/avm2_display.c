@@ -17995,6 +17995,10 @@ int avm2_text_box_info(struct Avm2EditTextExt* et, int32_t* out_xywh,
 int avm2_text_is_device_font(struct Avm2EditTextExt* et);
 uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
                                          int32_t** out, uint32_t* out_color);
+// avm2_text.c: per-layout-box underline segments, {x, y, w, 0xRRGGBB} in
+// field-local twips (Ruffle render_layout_box / render_underline).
+uint32_t avm2_edittext_collect_underlines(Avm2Context* ctx, Avm2Object* tf_obj,
+                                          int32_t** out);
 
 // One world-transform + alpha-cxform slot pair for a text field (field-local
 // twips -> stage). The selection fill and the glyphs both draw under it,
@@ -18041,11 +18045,36 @@ static void avm2_text_slots(const Mat* world, double alpha,
 #define MSAA_SAMPLES 4
 #endif
 
-// Twips rounding helpers mirroring Ruffle's Twips methods.
-static double tw_trunc_to_pixel(double t) { return trunc(t / 20.0) * 20.0; }
-static double tw_round_to_pixel_ties_even(double t)
+// Twips rounding helpers mirroring Ruffle's Twips methods. The stage-pixel
+// forms (`trunc(t/20)*20`, `nearbyint(t/20)*20`) were correct only while the
+// viewport matched the stage; they are superseded by the DEVICE-pixel forms
+// below, which reduce to them exactly at dscale == 1.
+//
+// s18 w2-gfx-text (H1). Ruffle seeds its transform_stack with the STAGE VIEW
+// MATRIX, so every "1px" in the EditText painters — border and underline
+// thickness, the HALF_PX offsets, the pixel-snapping grid — is one DEVICE
+// pixel, not one stage pixel. At viewport scale_factor 2 those are half a
+// stage pixel; the AVM2 painter computed them all in stage twips and drew a
+// 2-device-pixel border. s17 ported this to the AVM1 painter (tag.c:5378);
+// this is its AVM2 twin. dscale == 1 (viewport == stage) restores every old
+// expression verbatim.
+static double avm2_text_dscale(void)
 {
-	return nearbyint(t / 20.0) * 20.0;
+	return (context != NULL && context->stage_scale > 0.0f)
+	       ? (double) context->stage_scale : 1.0;
+}
+// One device pixel, in stage twips.
+static double avm2_text_device_twip(void) { return 20.0 / avm2_text_dscale(); }
+// round_to_pixel_ties_even / trunc_to_pixel on the DEVICE pixel grid.
+static double tw_round_to_device_px(double t)
+{
+	double d = avm2_text_device_twip();
+	return nearbyint(t / d) * d;
+}
+static double tw_trunc_to_device_px(double t)
+{
+	double d = avm2_text_device_twip();
+	return trunc(t / d) * d;
 }
 
 // One solid quad in stage twips (p = 4 corners in order), as two triangles.
@@ -18087,9 +18116,13 @@ static void avm2_draw_border_line(double ax, double ay, double bx, double by,
 	double len = sqrt(dx * dx + dy * dy);
 	if (len <= 0.0) return;
 	double ux = dx / len, uy = dy / len;                   // cos/sin of the angle
-	double tx = ax + 10.0 + 10.0 * uy;                     // HALF_PX = 10 twips
-	double ty = ay + 10.0 - 10.0 * ux;
-	double la = ux * len, lb = uy * len, lc = -uy, ld = ux;
+	// HALF_PX and the 1px thickness are DEVICE pixels (s18 H1); half == 10 and
+	// th == 1 whenever the viewport matches the stage.
+	double half = avm2_text_device_twip() / 2.0;
+	double th = 1.0 / avm2_text_dscale();
+	double tx = ax + half + half * uy;
+	double ty = ay + half - half * ux;
+	double la = ux * len, lb = uy * len, lc = -uy * th, ld = ux * th;
 	double p[8] = {
 		tx,                     ty,
 		la * 20.0 + tx,         lb * 20.0 + ty,
@@ -18097,6 +18130,46 @@ static void avm2_draw_border_line(double ax, double ay, double bx, double by,
 		lc * 20.0 + tx,         ld * 20.0 + ty,
 	};
 	avm2_draw_quad(p, rgb, alpha);
+}
+
+// Draw the field's underline segments. `u` is {x, y, w, 0xRRGGBB} per segment in
+// FIELD-LOCAL twips (avm2_edittext_collect_underlines); the world matrix maps
+// them to stage twips, then EditTextPixelSnapping runs on the resulting
+// translation exactly as it does for the box.
+static void avm2_render_underlines(const int32_t* u, uint32_t n,
+                                   const Mat* world, double alpha)
+{
+	for (uint32_t i = 0; i < n; i++)
+	{
+		double lx = (double) u[i * 4 + 0], ly = (double) u[i * 4 + 1];
+		double lw = (double) u[i * 4 + 2];
+		uint32_t rgb = (uint32_t) u[i * 4 + 3];
+		// M = world * translate(lx, ly) * create_box(w_px, 1, 0, 0):
+		// M.tx/M.ty are the segment start, M.a/M.b scale the unit x axis by the
+		// segment width. Only tx/ty are snapped at low quality (the scale terms
+		// are left alone), which is exactly the arm both underline comparisons
+		// take (quality = "low" -> MSAA_SAMPLES == 1).
+		double ax = world->a * lx + world->c * ly + world->tx;
+		double ay = world->b * lx + world->d * ly + world->ty;
+		double sa = world->a * lw, sb = world->b * lw;
+#if MSAA_SAMPLES == 1
+		ax = tw_round_to_device_px(ax);
+		ay = tw_round_to_device_px(ay);
+#else
+		ax = tw_trunc_to_device_px(ax + 2.0);
+		ay = tw_trunc_to_device_px(ay + 2.0);
+		if (fabs(world->c) < 0.001 || fabs(world->d) < 0.001)
+		{
+			double d = avm2_text_device_twip();
+			sa = nearbyint(sa / d - 0.35) * d;
+			sb = nearbyint(sb / d - 0.35) * d;
+		}
+#endif
+		// Same emulate_line_as_rect the rotated border falls back to: a
+		// 1-DEVICE-pixel rect fitted between the two transformed endpoints,
+		// offset by HALF_PX along the line and its normal.
+		avm2_draw_border_line(ax, ay, ax + sa, ay + sb, rgb, alpha);
+	}
 }
 
 static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
@@ -18107,6 +18180,14 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 	if (!avm2_text_box_info(et, bb, &flags, &bg, &bc)) return;
 	int has_bg = (flags & 1u) != 0, has_border = (flags & 2u) != 0;
 	double wpx = (double) bb[2] / 20.0, hpx = (double) bb[3] / 20.0;
+	// s18 w2-gfx-text (H1): every "1px" below is one DEVICE pixel — Ruffle's
+	// transform_stack starts at the stage view matrix. `dtw` is that pixel in
+	// stage twips (= 20 when the viewport matches the stage, so this is an
+	// identity rewrite for every default-viewport test) and `dsc` converts the
+	// unitless scale terms into the device-pixel units the snapping expects.
+	// Twin of the AVM1 fix at tag.c:5378 (s17 A3).
+	const double dsc = avm2_text_dscale();
+	const double dtw = avm2_text_device_twip();
 
 	if ((flags & 4u) != 0)
 	{
@@ -18119,10 +18200,10 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 		            + world->tx;
 		double y1 = world->b * (bb[0] + bb[2]) + world->d * (bb[1] + bb[3])
 		            + world->ty;
-		double w = tw_round_to_pixel_ties_even(x1 - x0);
-		double h = tw_round_to_pixel_ties_even(y1 - y0);
-		x0 = tw_round_to_pixel_ties_even(x0);
-		y0 = tw_round_to_pixel_ties_even(y0);
+		double w = tw_round_to_device_px(x1 - x0);
+		double h = tw_round_to_device_px(y1 - y0);
+		x0 = tw_round_to_device_px(x0);
+		y0 = tw_round_to_device_px(y0);
 		if (has_bg)
 			renderer_draw_rect(context, (float) x0, (float) y0,
 			                   (float) w, (float) h,
@@ -18137,10 +18218,10 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 			// line runs (x_min, y_min+0.5px) -> (x_min+w, y_min+0.5px) and the left
 			// line is its transpose; unlike the closed line-strip of draw_line_rect
 			// every edge keeps both terminal pixels, so the outline is symmetric.
-			avm2_border_rect(x0, y0, w + 20.0, 20.0, bc, alpha);
-			avm2_border_rect(x0, y0 + h, w + 20.0, 20.0, bc, alpha);
-			avm2_border_rect(x0, y0, 20.0, h + 20.0, bc, alpha);
-			avm2_border_rect(x0 + w, y0, 20.0, h + 20.0, bc, alpha);
+			avm2_border_rect(x0, y0, w + dtw, dtw, bc, alpha);
+			avm2_border_rect(x0, y0 + h, w + dtw, dtw, bc, alpha);
+			avm2_border_rect(x0, y0, dtw, h + dtw, bc, alpha);
+			avm2_border_rect(x0 + w, y0, dtw, h + dtw, bc, alpha);
 		}
 		return;
 	}
@@ -18164,15 +18245,25 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 	double btx = trunc(world->a * bb[0] + world->c * bb[1] + world->tx);
 	double bty = trunc(world->b * bb[0] + world->d * bb[1] + world->ty);
 #if MSAA_SAMPLES == 1
-	btx = tw_round_to_pixel_ties_even(btx);
-	bty = tw_round_to_pixel_ties_even(bty);
+	btx = tw_round_to_device_px(btx);
+	bty = tw_round_to_device_px(bty);
 #else
 	int x_snap = fabs(bcm) < 0.001 || fabs(bd) < 0.001;
 	int y_snap = fabs(ba) < 0.001 || fabs(bbm) < 0.001;
-	btx = tw_trunc_to_pixel(btx + 2.0);
-	bty = tw_trunc_to_pixel(bty + 2.0);
-	if (x_snap) { ba = nearbyint(ba - 0.35); bbm = nearbyint(bbm - 0.35); }
-	if (y_snap) { bcm = nearbyint(bcm - 0.35); bd = nearbyint(bd - 0.35); }
+	// Ruffle snaps `matrix.tx + Twips::new(2)` in DEVICE twips and rounds the
+	// DEVICE-scaled scale terms; at dsc == 1 both lines are the old expressions.
+	btx = tw_trunc_to_device_px(btx + 2.0 / dsc);
+	bty = tw_trunc_to_device_px(bty + 2.0 / dsc);
+	if (x_snap)
+	{
+		ba  = nearbyint(ba  * dsc - 0.35) / dsc;
+		bbm = nearbyint(bbm * dsc - 0.35) / dsc;
+	}
+	if (y_snap)
+	{
+		bcm = nearbyint(bcm * dsc - 0.35) / dsc;
+		bd  = nearbyint(bd  * dsc - 0.35) / dsc;
+	}
 #endif
 	double p[8] = {
 		btx,                      bty,
@@ -18214,14 +18305,14 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 		// The fractional-WIDTH case is unmeasured; it is left drawing the full
 		// corner, i.e. unchanged from before.
 		double bx = btx, by = bty, bw = ba * 20.0, bh = bd * 20.0;
-		int frac_bottom = fabs((by + bh) / 20.0
-		                       - nearbyint((by + bh) / 20.0)) > 1e-6;
-		avm2_border_rect(bx, by, bw + 20.0, 20.0, bc, alpha);        // top
-		avm2_border_rect(bx, by + bh, frac_bottom ? bw : bw + 20.0,
-		                 20.0, bc, alpha);                           // bottom
-		avm2_border_rect(bx, by, 20.0, bh + 20.0, bc, alpha);        // left
-		avm2_border_rect(bx + bw, by, 20.0,
-		                 frac_bottom ? bh : bh + 20.0, bc, alpha);   // right
+		int frac_bottom = fabs((by + bh) / dtw
+		                       - nearbyint((by + bh) / dtw)) > 1e-6;
+		avm2_border_rect(bx, by, bw + dtw, dtw, bc, alpha);          // top
+		avm2_border_rect(bx, by + bh, frac_bottom ? bw : bw + dtw,
+		                 dtw, bc, alpha);                            // bottom
+		avm2_border_rect(bx, by, dtw, bh + dtw, bc, alpha);          // left
+		avm2_border_rect(bx + bw, by, dtw,
+		                 frac_bottom ? bh : bh + dtw, bc, alpha);    // right
 		return;
 	}
 	// Rotated / sheared: fall back to Ruffle's emulated 1px line rects, whose
@@ -18381,7 +18472,9 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 	Avm2GlyphPlacement* gl = NULL;
 	int32_t clip[4] = { 0, 0, 0, 0 };
 	uint32_t n = avm2_edittext_collect_glyphs(ctx, obj, &gl, clip);
-	if (sn > 0 || n > 0)
+	int32_t* ul = NULL;
+	uint32_t un = avm2_edittext_collect_underlines(ctx, obj, &ul);
+	if (sn > 0 || n > 0 || un > 0)
 	{
 		uint32_t xid = 0, cxid = 0;
 		avm2_text_slots(world, alpha, &xid, &cxid);
@@ -18428,10 +18521,17 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 			                   (float) (sel_color & 0xFF) / 255.0f,
 			                   1.0f, xid, cxid);
 		avm2_render_glyphs(ctx, gl, n, xid, cxid);
+		// Underlines last, still inside the field mask (Ruffle draws them at the
+		// end of render_layout_box, under the same transform stack as the
+		// glyphs). They go through the IDENTITY slot because the geometry is
+		// already stage twips — like the border, their thickness must not be
+		// transformed by the field matrix.
+		if (un > 0) avm2_render_underlines(ul, un, world, alpha);
 		if (has_clip) renderer_end_clip(context);
 	}
 	if (sel != NULL) heap_free(ctx->app, sel);
 	if (gl != NULL) heap_free(ctx->app, gl);
+	if (ul != NULL) heap_free(ctx->app, ul);
 }
 
 // Static text (DefineText/2 -> StaticText) GPU entry: same shared glyph draw,

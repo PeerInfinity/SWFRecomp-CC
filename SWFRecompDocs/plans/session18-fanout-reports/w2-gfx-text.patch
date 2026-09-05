@@ -1,0 +1,490 @@
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index b362d10d8..d0fbefc71 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -436,6 +436,10 @@ int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
+ size_t ng_objRootDepth(DisplayObject* obj);
+ int ng_getMatrixFromObj(DisplayObject* obj, double* out_a, double* out_b, double* out_c, double* out_d, double* out_tx, double* out_ty);
+ int ng_getMatrixFromObj_render(DisplayObject* obj, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
++// Same read with a caller-supplied transform-table row — needed inside a render
++// frame, where compose_children has rewritten a child entry's transform_id to a
++// GPU-only slot (resolve with ng_get_original_transform_id first).
++int ng_getMatrixFromObj_render_tid(DisplayObject* obj, u32 tid, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
+ int ng_getCTFromObj(DisplayObject* obj, double* ra, double* ga, double* ba, double* aa, double* rb, double* gb, double* bb, double* ab);
+ // Populate a display entry's cx_* fields from the baked cxform_data slot.
+ void ng_init_cxform_from_data(DisplayObject* obj, u32 cxform_id);
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 6223d7324..b5bb9fec8 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -9248,8 +9248,24 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
+ 	DisplayObject* entry = resolveMCDisplayEntry(mc);
+ 	float ba = 1.0f, bb = 0.0f, bc = 0.0f, bd = 1.0f;
+ 	int32_t btx = 0, bty = 0;
+-	int has_base = (entry != NULL) &&
++	// s18 w2-gfx-text (G1): this accessor runs DURING the render pass (the
++	// EditText box/glyph iterators call it from tf_world_matrix), and by then
++	// compose_children has rewritten a NESTED entry's transform_id to a dynamic
++	// GPU slot with no CPU-side transform_data row — reading it yields garbage
++	// (d == 0 killed the device-font positive-scale cull, blanking every
++	// sprite-nested field). Resolve the pre-compose id the way otf_walk_dl
++	// already does. Localised here on purpose: the shared
++	// ng_getMatrixFromObj_render also serves NO_GRAPHICS hit testing, which
++	// never runs inside a render frame.
++	int has_base;
++#ifndef NO_GRAPHICS
++	has_base = (entry != NULL) &&
++		ng_getMatrixFromObj_render_tid(entry, ng_get_original_transform_id(entry),
++		                               &ba, &bb, &bc, &bd, &btx, &bty);
++#else
++	has_base = (entry != NULL) &&
+ 		ng_getMatrixFromObj_render(entry, &ba, &bb, &bc, &bd, &btx, &bty);
++#endif
+ 	if (!has_base) {
+ 		double xs = (double)mc->xscale / 100.0;
+ 		double ys = (double)mc->yscale / 100.0;
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 36cee757d..b1eafa748 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -17832,6 +17832,10 @@ int avm2_text_box_info(struct Avm2EditTextExt* et, int32_t* out_xywh,
+ int avm2_text_is_device_font(struct Avm2EditTextExt* et);
+ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
+                                          int32_t** out, uint32_t* out_color);
++// avm2_text.c: per-layout-box underline segments, {x, y, w, 0xRRGGBB} in
++// field-local twips (Ruffle render_layout_box / render_underline).
++uint32_t avm2_edittext_collect_underlines(Avm2Context* ctx, Avm2Object* tf_obj,
++                                          int32_t** out);
+ 
+ // One world-transform + alpha-cxform slot pair for a text field (field-local
+ // twips -> stage). The selection fill and the glyphs both draw under it,
+@@ -17878,11 +17882,36 @@ static void avm2_text_slots(const Mat* world, double alpha,
+ #define MSAA_SAMPLES 4
+ #endif
+ 
+-// Twips rounding helpers mirroring Ruffle's Twips methods.
+-static double tw_trunc_to_pixel(double t) { return trunc(t / 20.0) * 20.0; }
+-static double tw_round_to_pixel_ties_even(double t)
++// Twips rounding helpers mirroring Ruffle's Twips methods. The stage-pixel
++// forms (`trunc(t/20)*20`, `nearbyint(t/20)*20`) were correct only while the
++// viewport matched the stage; they are superseded by the DEVICE-pixel forms
++// below, which reduce to them exactly at dscale == 1.
++//
++// s18 w2-gfx-text (H1). Ruffle seeds its transform_stack with the STAGE VIEW
++// MATRIX, so every "1px" in the EditText painters — border and underline
++// thickness, the HALF_PX offsets, the pixel-snapping grid — is one DEVICE
++// pixel, not one stage pixel. At viewport scale_factor 2 those are half a
++// stage pixel; the AVM2 painter computed them all in stage twips and drew a
++// 2-device-pixel border. s17 ported this to the AVM1 painter (tag.c:5378);
++// this is its AVM2 twin. dscale == 1 (viewport == stage) restores every old
++// expression verbatim.
++static double avm2_text_dscale(void)
++{
++	return (context != NULL && context->stage_scale > 0.0f)
++	       ? (double) context->stage_scale : 1.0;
++}
++// One device pixel, in stage twips.
++static double avm2_text_device_twip(void) { return 20.0 / avm2_text_dscale(); }
++// round_to_pixel_ties_even / trunc_to_pixel on the DEVICE pixel grid.
++static double tw_round_to_device_px(double t)
+ {
+-	return nearbyint(t / 20.0) * 20.0;
++	double d = avm2_text_device_twip();
++	return nearbyint(t / d) * d;
++}
++static double tw_trunc_to_device_px(double t)
++{
++	double d = avm2_text_device_twip();
++	return trunc(t / d) * d;
+ }
+ 
+ // One solid quad in stage twips (p = 4 corners in order), as two triangles.
+@@ -17924,9 +17953,13 @@ static void avm2_draw_border_line(double ax, double ay, double bx, double by,
+ 	double len = sqrt(dx * dx + dy * dy);
+ 	if (len <= 0.0) return;
+ 	double ux = dx / len, uy = dy / len;                   // cos/sin of the angle
+-	double tx = ax + 10.0 + 10.0 * uy;                     // HALF_PX = 10 twips
+-	double ty = ay + 10.0 - 10.0 * ux;
+-	double la = ux * len, lb = uy * len, lc = -uy, ld = ux;
++	// HALF_PX and the 1px thickness are DEVICE pixels (s18 H1); half == 10 and
++	// th == 1 whenever the viewport matches the stage.
++	double half = avm2_text_device_twip() / 2.0;
++	double th = 1.0 / avm2_text_dscale();
++	double tx = ax + half + half * uy;
++	double ty = ay + half - half * ux;
++	double la = ux * len, lb = uy * len, lc = -uy * th, ld = ux * th;
+ 	double p[8] = {
+ 		tx,                     ty,
+ 		la * 20.0 + tx,         lb * 20.0 + ty,
+@@ -17936,6 +17969,46 @@ static void avm2_draw_border_line(double ax, double ay, double bx, double by,
+ 	avm2_draw_quad(p, rgb, alpha);
+ }
+ 
++// Draw the field's underline segments. `u` is {x, y, w, 0xRRGGBB} per segment in
++// FIELD-LOCAL twips (avm2_edittext_collect_underlines); the world matrix maps
++// them to stage twips, then EditTextPixelSnapping runs on the resulting
++// translation exactly as it does for the box.
++static void avm2_render_underlines(const int32_t* u, uint32_t n,
++                                   const Mat* world, double alpha)
++{
++	for (uint32_t i = 0; i < n; i++)
++	{
++		double lx = (double) u[i * 4 + 0], ly = (double) u[i * 4 + 1];
++		double lw = (double) u[i * 4 + 2];
++		uint32_t rgb = (uint32_t) u[i * 4 + 3];
++		// M = world * translate(lx, ly) * create_box(w_px, 1, 0, 0):
++		// M.tx/M.ty are the segment start, M.a/M.b scale the unit x axis by the
++		// segment width. Only tx/ty are snapped at low quality (the scale terms
++		// are left alone), which is exactly the arm both underline comparisons
++		// take (quality = "low" -> MSAA_SAMPLES == 1).
++		double ax = world->a * lx + world->c * ly + world->tx;
++		double ay = world->b * lx + world->d * ly + world->ty;
++		double sa = world->a * lw, sb = world->b * lw;
++#if MSAA_SAMPLES == 1
++		ax = tw_round_to_device_px(ax);
++		ay = tw_round_to_device_px(ay);
++#else
++		ax = tw_trunc_to_device_px(ax + 2.0);
++		ay = tw_trunc_to_device_px(ay + 2.0);
++		if (fabs(world->c) < 0.001 || fabs(world->d) < 0.001)
++		{
++			double d = avm2_text_device_twip();
++			sa = nearbyint(sa / d - 0.35) * d;
++			sb = nearbyint(sb / d - 0.35) * d;
++		}
++#endif
++		// Same emulate_line_as_rect the rotated border falls back to: a
++		// 1-DEVICE-pixel rect fitted between the two transformed endpoints,
++		// offset by HALF_PX along the line and its normal.
++		avm2_draw_border_line(ax, ay, ax + sa, ay + sb, rgb, alpha);
++	}
++}
++
+ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+                                 double alpha)
+ {
+@@ -17944,6 +18017,14 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+ 	if (!avm2_text_box_info(et, bb, &flags, &bg, &bc)) return;
+ 	int has_bg = (flags & 1u) != 0, has_border = (flags & 2u) != 0;
+ 	double wpx = (double) bb[2] / 20.0, hpx = (double) bb[3] / 20.0;
++	// s18 w2-gfx-text (H1): every "1px" below is one DEVICE pixel — Ruffle's
++	// transform_stack starts at the stage view matrix. `dtw` is that pixel in
++	// stage twips (= 20 when the viewport matches the stage, so this is an
++	// identity rewrite for every default-viewport test) and `dsc` converts the
++	// unitless scale terms into the device-pixel units the snapping expects.
++	// Twin of the AVM1 fix at tag.c:5378 (s17 A3).
++	const double dsc = avm2_text_dscale();
++	const double dtw = avm2_text_device_twip();
+ 
+ 	if ((flags & 4u) != 0)
+ 	{
+@@ -17956,10 +18037,10 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+ 		            + world->tx;
+ 		double y1 = world->b * (bb[0] + bb[2]) + world->d * (bb[1] + bb[3])
+ 		            + world->ty;
+-		double w = tw_round_to_pixel_ties_even(x1 - x0);
+-		double h = tw_round_to_pixel_ties_even(y1 - y0);
+-		x0 = tw_round_to_pixel_ties_even(x0);
+-		y0 = tw_round_to_pixel_ties_even(y0);
++		double w = tw_round_to_device_px(x1 - x0);
++		double h = tw_round_to_device_px(y1 - y0);
++		x0 = tw_round_to_device_px(x0);
++		y0 = tw_round_to_device_px(y0);
+ 		if (has_bg)
+ 			renderer_draw_rect(context, (float) x0, (float) y0,
+ 			                   (float) w, (float) h,
+@@ -17974,10 +18055,10 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+ 			// line runs (x_min, y_min+0.5px) -> (x_min+w, y_min+0.5px) and the left
+ 			// line is its transpose; unlike the closed line-strip of draw_line_rect
+ 			// every edge keeps both terminal pixels, so the outline is symmetric.
+-			avm2_border_rect(x0, y0, w + 20.0, 20.0, bc, alpha);
+-			avm2_border_rect(x0, y0 + h, w + 20.0, 20.0, bc, alpha);
+-			avm2_border_rect(x0, y0, 20.0, h + 20.0, bc, alpha);
+-			avm2_border_rect(x0 + w, y0, 20.0, h + 20.0, bc, alpha);
++			avm2_border_rect(x0, y0, w + dtw, dtw, bc, alpha);
++			avm2_border_rect(x0, y0 + h, w + dtw, dtw, bc, alpha);
++			avm2_border_rect(x0, y0, dtw, h + dtw, bc, alpha);
++			avm2_border_rect(x0 + w, y0, dtw, h + dtw, bc, alpha);
+ 		}
+ 		return;
+ 	}
+@@ -18001,15 +18082,25 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+ 	double btx = trunc(world->a * bb[0] + world->c * bb[1] + world->tx);
+ 	double bty = trunc(world->b * bb[0] + world->d * bb[1] + world->ty);
+ #if MSAA_SAMPLES == 1
+-	btx = tw_round_to_pixel_ties_even(btx);
+-	bty = tw_round_to_pixel_ties_even(bty);
++	btx = tw_round_to_device_px(btx);
++	bty = tw_round_to_device_px(bty);
+ #else
+ 	int x_snap = fabs(bcm) < 0.001 || fabs(bd) < 0.001;
+ 	int y_snap = fabs(ba) < 0.001 || fabs(bbm) < 0.001;
+-	btx = tw_trunc_to_pixel(btx + 2.0);
+-	bty = tw_trunc_to_pixel(bty + 2.0);
+-	if (x_snap) { ba = nearbyint(ba - 0.35); bbm = nearbyint(bbm - 0.35); }
+-	if (y_snap) { bcm = nearbyint(bcm - 0.35); bd = nearbyint(bd - 0.35); }
++	// Ruffle snaps `matrix.tx + Twips::new(2)` in DEVICE twips and rounds the
++	// DEVICE-scaled scale terms; at dsc == 1 both lines are the old expressions.
++	btx = tw_trunc_to_device_px(btx + 2.0 / dsc);
++	bty = tw_trunc_to_device_px(bty + 2.0 / dsc);
++	if (x_snap)
++	{
++		ba  = nearbyint(ba  * dsc - 0.35) / dsc;
++		bbm = nearbyint(bbm * dsc - 0.35) / dsc;
++	}
++	if (y_snap)
++	{
++		bcm = nearbyint(bcm * dsc - 0.35) / dsc;
++		bd  = nearbyint(bd  * dsc - 0.35) / dsc;
++	}
+ #endif
+ 	double p[8] = {
+ 		btx,                      bty,
+@@ -18051,14 +18142,14 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+ 		// The fractional-WIDTH case is unmeasured; it is left drawing the full
+ 		// corner, i.e. unchanged from before.
+ 		double bx = btx, by = bty, bw = ba * 20.0, bh = bd * 20.0;
+-		int frac_bottom = fabs((by + bh) / 20.0
+-		                       - nearbyint((by + bh) / 20.0)) > 1e-6;
+-		avm2_border_rect(bx, by, bw + 20.0, 20.0, bc, alpha);        // top
+-		avm2_border_rect(bx, by + bh, frac_bottom ? bw : bw + 20.0,
+-		                 20.0, bc, alpha);                           // bottom
+-		avm2_border_rect(bx, by, 20.0, bh + 20.0, bc, alpha);        // left
+-		avm2_border_rect(bx + bw, by, 20.0,
+-		                 frac_bottom ? bh : bh + 20.0, bc, alpha);   // right
++		int frac_bottom = fabs((by + bh) / dtw
++		                       - nearbyint((by + bh) / dtw)) > 1e-6;
++		avm2_border_rect(bx, by, bw + dtw, dtw, bc, alpha);          // top
++		avm2_border_rect(bx, by + bh, frac_bottom ? bw : bw + dtw,
++		                 dtw, bc, alpha);                            // bottom
++		avm2_border_rect(bx, by, dtw, bh + dtw, bc, alpha);          // left
++		avm2_border_rect(bx + bw, by, dtw,
++		                 frac_bottom ? bh : bh + dtw, bc, alpha);    // right
+ 		return;
+ 	}
+ 	// Rotated / sheared: fall back to Ruffle's emulated 1px line rects, whose
+@@ -18218,7 +18309,9 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
+ 	Avm2GlyphPlacement* gl = NULL;
+ 	int32_t clip[4] = { 0, 0, 0, 0 };
+ 	uint32_t n = avm2_edittext_collect_glyphs(ctx, obj, &gl, clip);
+-	if (sn > 0 || n > 0)
++	int32_t* ul = NULL;
++	uint32_t un = avm2_edittext_collect_underlines(ctx, obj, &ul);
++	if (sn > 0 || n > 0 || un > 0)
+ 	{
+ 		uint32_t xid = 0, cxid = 0;
+ 		avm2_text_slots(world, alpha, &xid, &cxid);
+@@ -18265,10 +18358,17 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
+ 			                   (float) (sel_color & 0xFF) / 255.0f,
+ 			                   1.0f, xid, cxid);
+ 		avm2_render_glyphs(ctx, gl, n, xid, cxid);
++		// Underlines last, still inside the field mask (Ruffle draws them at the
++		// end of render_layout_box, under the same transform stack as the
++		// glyphs). They go through the IDENTITY slot because the geometry is
++		// already stage twips — like the border, their thickness must not be
++		// transformed by the field matrix.
++		if (un > 0) avm2_render_underlines(ul, un, world, alpha);
+ 		if (has_clip) renderer_end_clip(context);
+ 	}
+ 	if (sel != NULL) heap_free(ctx->app, sel);
+ 	if (gl != NULL) heap_free(ctx->app, gl);
++	if (ul != NULL) heap_free(ctx->app, ul);
+ }
+ 
+ // Static text (DefineText/2 -> StaticText) GPU entry: same shared glyph draw,
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 1bd601ea0..e61ec7e89 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -2535,6 +2535,14 @@ typedef struct LFont
+ {
+ 	const Avm2FontData* data;
+ 	uint8_t is_device;
++	// s18 w2-gfx-text (A1b). A `[fonts.*]` device face carries metrics,
++	// advances and the TTF `kern` table but NO glyph outlines —
++	// abc_devicefont.cpp emits none, so a device-font field renders BLANK.
++	// When the SWF also EMBEDS a face of the same name (fonts/device_font_
++	// kerning embeds the very TTF it then asks for as a device font), the
++	// outlines are already in the dictionary: keep every layout number from
++	// `data` and source the glyph SHAPES from here. NULL = draw from `data`.
++	const Avm2FontData* outline;
+ } LFont;
+ 
+ static int name_eq_ci(const Avm2String* a, const char* b)
+@@ -2652,6 +2660,7 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
+ 		{
+ 			f.data = fd;
+ 			f.is_device = 0;
++			f.outline = NULL;
+ 			return f;
+ 		}
+ 	}
+@@ -2670,11 +2679,25 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
+ 		{
+ 			f.data = fd;
+ 			f.is_device = 1;
++			// A1b: a metrics-only device face borrows outlines from a
++			// same-name embedded face when the SWF has one. Everything the
++			// layout reads still comes from `fd`, so advances, kerning and
++			// getLineMetrics are byte-identical to before; only the glyph
++			// SHAPES appear where there used to be nothing.
++			f.outline = NULL;
++			if (fd->glyph_pts == NULL)
++			{
++				const Avm2FontData* efd =
++					find_embedded_font(fmt->font, fmt->bold != 0,
++					                   fmt->italic != 0);
++				if (efd != NULL && efd->glyph_pts != NULL) f.outline = efd;
++			}
+ 			return f;
+ 		}
+ 	}
+ 	f.data = &noto_device_font;
+ 	f.is_device = 1;
++	f.outline = NULL;
+ 	return f;
+ }
+ 
+@@ -3904,6 +3927,68 @@ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
+ 	return n;
+ }
+ 
++// Underline segments in field-local twips — Ruffle render_layout_box
++// (edit_text.rs:1318-1329) + render_underline (:1365-1378). The underline is a
++// property of the LAYOUT BOX, not of a character run: it spans the box's full
++// width (not the ink width), sits at box-local `ascent + max_descent / 2` where
++// max_descent is the LINE's descent, and is a `draw_line`, i.e. exactly ONE
++// DEVICE pixel thick with a +0.5-device-pixel x offset — the thickness is not
++// transformed (render/src/lines.rs emulate_line_as_rect). The device-space part
++// is the painter's job; this returns {x, y, w, 0xRRGGBB} per segment, the same
++// field-local twips space the glyph placements use. *out is avm2_alloc'ed and
++// owned by the caller (heap_free it).
++uint32_t avm2_edittext_collect_underlines(Avm2Context* ctx, Avm2Object* tf_obj,
++                                          int32_t** out)
++{
++	*out = NULL;
++	Avm2EditTextExt* et = edittext_of(ctx, tf_obj);
++	if (et == NULL || et->text == NULL) return 0;
++	LLayout* l = et_layout(ctx, et);
++	et_apply_lazy_bounds(et);
++
++	int32_t vscroll = 0;
++	if (et->scroll > 1 && (uint32_t) et->scroll <= l->line_count)
++		vscroll = l->lines[et->scroll - 1].y;
++	int32_t off_x = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
++	int32_t off_y = et->bounds_y + GUTTER - vscroll;
++
++	int32_t* r = NULL;
++	uint32_t n = 0, cap = 0;
++	for (uint32_t li = 0; li < l->line_count; li++)
++	{
++		LLine* line = &l->lines[li];
++		for (uint32_t bi = 0; bi < line->box_count; bi++)
++		{
++			LBox* b = &line->boxes[bi];
++			// Ruffle draws the underline inside the `as_renderable_text` arm,
++			// so a bullet / empty / culled box never gets one.
++			if (b->is_bullet || b->char_count == 0 || b->char_end == NULL)
++				continue;
++			if (b->y + GUTTER - vscroll > et->bounds_h) continue;
++			if (b->w <= 0) continue;
++			const Avm2TextFormatFields* fmt = span_at_pos(et, b->start);
++			if (fmt == NULL || !fmt->underline) continue;
++			int32_t ascent = font_ascent(&b->font, twips_from_px(b->size_px));
++			if (n == cap)
++			{
++				uint32_t ncap = cap ? cap * 2 : 8;
++				int32_t* nr = avm2_alloc(ctx, ncap * 4 * sizeof(int32_t));
++				if (n > 0) memcpy(nr, r, n * 4 * sizeof(int32_t));
++				if (r != NULL) heap_free(ctx->app, r);
++				r = nr;
++				cap = ncap;
++			}
++			r[n * 4 + 0] = off_x + b->x;
++			r[n * 4 + 1] = off_y + b->y + ascent + line->descent / 2;
++			r[n * 4 + 2] = b->w;
++			r[n * 4 + 3] = (int32_t) ((fmt->color >> 8) & 0xFFFFFF);
++			n++;
++		}
++	}
++	*out = r;
++	return n;
++}
++
+ // Collect the rendered glyphs of a TextField in field-local twips, matching
+ // Ruffle EditText::render_text: layout_to_local (bounds origin + gutter -
+ // scroll offsets) composed with render_layout_box (box origin) and
+@@ -3962,7 +4047,12 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
+ 			int32_t baseline = off_y + b->y + ascent;
+ 			const Avm2TextFormatFields* fmt = span_at_pos(et, b->start);
+ 			uint32_t color = (fmt->color >> 8) & 0xFFFFFF;
+-			float scale = (float) p.height / (float) b->font.data->em_square;
++			// A1b: shapes come from the outline face when the layout face has
++			// none (a `[fonts.*]` device face). Same font when there is no
++			// borrow, so this is an identity rewrite for every other field.
++			const Avm2FontData* ofd =
++				b->font.outline ? b->font.outline : b->font.data;
++			float scale = (float) p.height / (float) ofd->em_square;
+ 			uint32_t cn = b->char_count;
+ 			for (uint32_t i = 0; i < cn; )
+ 			{
+@@ -3979,7 +4069,7 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
+ 					step = 2;
+ 				}
+ 				uint32_t gi;
+-				if (glyph_index_of(b->font.data, cp, &gi))
++				if (glyph_index_of(ofd, cp, &gi))
+ 				{
+ 					if (n == cap)
+ 					{
+@@ -3991,7 +4081,7 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
+ 						gl = ng;
+ 						cap = ncap;
+ 					}
+-					gl[n].font = b->font.data;
++					gl[n].font = ofd;
+ 					gl[n].glyph = gi;
+ 					gl[n].x_twips = off_x + b->x
+ 					                + (i > 0 ? b->char_end[i - 1] : 0);
+diff --git a/SWFModernRuntime/src/libswf/shape_hit_test.c b/SWFModernRuntime/src/libswf/shape_hit_test.c
+index 37cf4cc8a..d43aa49f8 100644
+--- a/SWFModernRuntime/src/libswf/shape_hit_test.c
++++ b/SWFModernRuntime/src/libswf/shape_hit_test.c
+@@ -39,12 +39,18 @@ extern int ng_getCharBoundsForRatio(size_t char_id, u16 ratio, s32* out_xmin, s3
+ // ---------------------------------------------------------------------------
+ // Render-format matrix accessor (f32 a/b/c/d, i32 twips tx/ty — matches Ruffle render Matrix)
+ // ---------------------------------------------------------------------------
+-int ng_getMatrixFromObj_render(DisplayObject* obj,
++// Same read, but with the transform-table ROW supplied by the caller. During a
++// render frame `compose_children` rewrites a CHILD entry's `transform_id` to a
++// dynamically-allocated GPU slot that has no corresponding CPU-side
++// `transform_data` row, so any caller that consults this table between compose
++// and xform_overrides_restore must resolve the ORIGINAL id first (tag.c's
++// `ng_get_original_transform_id`) and pass it here. Same rule as otf_walk_dl
++// (action.c:28988).
++int ng_getMatrixFromObj_render_tid(DisplayObject* obj, u32 tid,
+     float* out_a, float* out_b, float* out_c, float* out_d,
+     int32_t* out_tx_twips, int32_t* out_ty_twips)
+ {
+ 	if (!obj) return 0;
+-	u32 tid = obj->transform_id;
+ 	// The entry's own table — see ng_getMatrixFromObj (tag_stubs.c).
+ 	float (*td)[16] = ng_entryTransformData(obj);
+ 	if (out_a)  *out_a  = td[tid][0];
+@@ -56,6 +62,16 @@ int ng_getMatrixFromObj_render(DisplayObject* obj,
+ 	return 1;
+ }
+ 
++int ng_getMatrixFromObj_render(DisplayObject* obj,
++    float* out_a, float* out_b, float* out_c, float* out_d,
++    int32_t* out_tx_twips, int32_t* out_ty_twips)
++{
++	if (!obj) return 0;
++	return ng_getMatrixFromObj_render_tid(obj, obj->transform_id,
++	                                      out_a, out_b, out_c, out_d,
++	                                      out_tx_twips, out_ty_twips);
++}
++
+ GEN_EXTERN_SHAPE_DATA;
+ GEN_EXTERN_GLYPH_DATA;
+ GEN_EXTERN_TEXT_DATA;

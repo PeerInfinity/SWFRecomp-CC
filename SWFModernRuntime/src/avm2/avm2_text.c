@@ -2535,6 +2535,14 @@ typedef struct LFont
 {
 	const Avm2FontData* data;
 	uint8_t is_device;
+	// s18 w2-gfx-text (A1b). A `[fonts.*]` device face carries metrics,
+	// advances and the TTF `kern` table but NO glyph outlines —
+	// abc_devicefont.cpp emits none, so a device-font field renders BLANK.
+	// When the SWF also EMBEDS a face of the same name (fonts/device_font_
+	// kerning embeds the very TTF it then asks for as a device font), the
+	// outlines are already in the dictionary: keep every layout number from
+	// `data` and source the glyph SHAPES from here. NULL = draw from `data`.
+	const Avm2FontData* outline;
 } LFont;
 
 static int name_eq_ci(const Avm2String* a, const char* b)
@@ -2652,6 +2660,7 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
 		{
 			f.data = fd;
 			f.is_device = 0;
+			f.outline = NULL;
 			return f;
 		}
 	}
@@ -2670,11 +2679,25 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
 		{
 			f.data = fd;
 			f.is_device = 1;
+			// A1b: a metrics-only device face borrows outlines from a
+			// same-name embedded face when the SWF has one. Everything the
+			// layout reads still comes from `fd`, so advances, kerning and
+			// getLineMetrics are byte-identical to before; only the glyph
+			// SHAPES appear where there used to be nothing.
+			f.outline = NULL;
+			if (fd->glyph_pts == NULL)
+			{
+				const Avm2FontData* efd =
+					find_embedded_font(fmt->font, fmt->bold != 0,
+					                   fmt->italic != 0);
+				if (efd != NULL && efd->glyph_pts != NULL) f.outline = efd;
+			}
 			return f;
 		}
 	}
 	f.data = &noto_device_font;
 	f.is_device = 1;
+	f.outline = NULL;
 	return f;
 }
 
@@ -3907,6 +3930,68 @@ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
 	return n;
 }
 
+// Underline segments in field-local twips — Ruffle render_layout_box
+// (edit_text.rs:1318-1329) + render_underline (:1365-1378). The underline is a
+// property of the LAYOUT BOX, not of a character run: it spans the box's full
+// width (not the ink width), sits at box-local `ascent + max_descent / 2` where
+// max_descent is the LINE's descent, and is a `draw_line`, i.e. exactly ONE
+// DEVICE pixel thick with a +0.5-device-pixel x offset — the thickness is not
+// transformed (render/src/lines.rs emulate_line_as_rect). The device-space part
+// is the painter's job; this returns {x, y, w, 0xRRGGBB} per segment, the same
+// field-local twips space the glyph placements use. *out is avm2_alloc'ed and
+// owned by the caller (heap_free it).
+uint32_t avm2_edittext_collect_underlines(Avm2Context* ctx, Avm2Object* tf_obj,
+                                          int32_t** out)
+{
+	*out = NULL;
+	Avm2EditTextExt* et = edittext_of(ctx, tf_obj);
+	if (et == NULL || et->text == NULL) return 0;
+	LLayout* l = et_layout(ctx, et);
+	et_apply_lazy_bounds(et);
+
+	int32_t vscroll = 0;
+	if (et->scroll > 1 && (uint32_t) et->scroll <= l->line_count)
+		vscroll = l->lines[et->scroll - 1].y;
+	int32_t off_x = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
+	int32_t off_y = et->bounds_y + GUTTER - vscroll;
+
+	int32_t* r = NULL;
+	uint32_t n = 0, cap = 0;
+	for (uint32_t li = 0; li < l->line_count; li++)
+	{
+		LLine* line = &l->lines[li];
+		for (uint32_t bi = 0; bi < line->box_count; bi++)
+		{
+			LBox* b = &line->boxes[bi];
+			// Ruffle draws the underline inside the `as_renderable_text` arm,
+			// so a bullet / empty / culled box never gets one.
+			if (b->is_bullet || b->char_count == 0 || b->char_end == NULL)
+				continue;
+			if (b->y + GUTTER - vscroll > et->bounds_h) continue;
+			if (b->w <= 0) continue;
+			const Avm2TextFormatFields* fmt = span_at_pos(et, b->start);
+			if (fmt == NULL || !fmt->underline) continue;
+			int32_t ascent = font_ascent(&b->font, twips_from_px(b->size_px));
+			if (n == cap)
+			{
+				uint32_t ncap = cap ? cap * 2 : 8;
+				int32_t* nr = avm2_alloc(ctx, ncap * 4 * sizeof(int32_t));
+				if (n > 0) memcpy(nr, r, n * 4 * sizeof(int32_t));
+				if (r != NULL) heap_free(ctx->app, r);
+				r = nr;
+				cap = ncap;
+			}
+			r[n * 4 + 0] = off_x + b->x;
+			r[n * 4 + 1] = off_y + b->y + ascent + line->descent / 2;
+			r[n * 4 + 2] = b->w;
+			r[n * 4 + 3] = (int32_t) ((fmt->color >> 8) & 0xFFFFFF);
+			n++;
+		}
+	}
+	*out = r;
+	return n;
+}
+
 // Collect the rendered glyphs of a TextField in field-local twips, matching
 // Ruffle EditText::render_text: layout_to_local (bounds origin + gutter -
 // scroll offsets) composed with render_layout_box (box origin) and
@@ -3965,7 +4050,12 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 			int32_t baseline = off_y + b->y + ascent;
 			const Avm2TextFormatFields* fmt = span_at_pos(et, b->start);
 			uint32_t color = (fmt->color >> 8) & 0xFFFFFF;
-			float scale = (float) p.height / (float) b->font.data->em_square;
+			// A1b: shapes come from the outline face when the layout face has
+			// none (a `[fonts.*]` device face). Same font when there is no
+			// borrow, so this is an identity rewrite for every other field.
+			const Avm2FontData* ofd =
+				b->font.outline ? b->font.outline : b->font.data;
+			float scale = (float) p.height / (float) ofd->em_square;
 			uint32_t cn = b->char_count;
 			for (uint32_t i = 0; i < cn; )
 			{
@@ -3982,7 +4072,7 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 					step = 2;
 				}
 				uint32_t gi;
-				if (glyph_index_of(b->font.data, cp, &gi))
+				if (glyph_index_of(ofd, cp, &gi))
 				{
 					if (n == cap)
 					{
@@ -3994,7 +4084,7 @@ uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
 						gl = ng;
 						cap = ncap;
 					}
-					gl[n].font = b->font.data;
+					gl[n].font = ofd;
 					gl[n].glyph = gi;
 					gl[n].x_twips = off_x + b->x
 					                + (i > 0 ? b->char_end[i - 1] : 0);

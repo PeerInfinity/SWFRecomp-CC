@@ -39,12 +39,18 @@ extern int ng_getCharBoundsForRatio(size_t char_id, u16 ratio, s32* out_xmin, s3
 // ---------------------------------------------------------------------------
 // Render-format matrix accessor (f32 a/b/c/d, i32 twips tx/ty — matches Ruffle render Matrix)
 // ---------------------------------------------------------------------------
-int ng_getMatrixFromObj_render(DisplayObject* obj,
+// Same read, but with the transform-table ROW supplied by the caller. During a
+// render frame `compose_children` rewrites a CHILD entry's `transform_id` to a
+// dynamically-allocated GPU slot that has no corresponding CPU-side
+// `transform_data` row, so any caller that consults this table between compose
+// and xform_overrides_restore must resolve the ORIGINAL id first (tag.c's
+// `ng_get_original_transform_id`) and pass it here. Same rule as otf_walk_dl
+// (action.c:28988).
+int ng_getMatrixFromObj_render_tid(DisplayObject* obj, u32 tid,
     float* out_a, float* out_b, float* out_c, float* out_d,
     int32_t* out_tx_twips, int32_t* out_ty_twips)
 {
 	if (!obj) return 0;
-	u32 tid = obj->transform_id;
 	// The entry's own table — see ng_getMatrixFromObj (tag_stubs.c).
 	float (*td)[16] = ng_entryTransformData(obj);
 	if (out_a)  *out_a  = td[tid][0];
@@ -54,6 +60,16 @@ int ng_getMatrixFromObj_render(DisplayObject* obj,
 	if (out_tx_twips) *out_tx_twips = (int32_t)rintf(td[tid][12]);
 	if (out_ty_twips) *out_ty_twips = (int32_t)rintf(td[tid][13]);
 	return 1;
+}
+
+int ng_getMatrixFromObj_render(DisplayObject* obj,
+    float* out_a, float* out_b, float* out_c, float* out_d,
+    int32_t* out_tx_twips, int32_t* out_ty_twips)
+{
+	if (!obj) return 0;
+	return ng_getMatrixFromObj_render_tid(obj, obj->transform_id,
+	                                      out_a, out_b, out_c, out_d,
+	                                      out_tx_twips, out_ty_twips);
 }
 
 GEN_EXTERN_SHAPE_DATA;
