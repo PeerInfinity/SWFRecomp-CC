@@ -3856,7 +3856,10 @@ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
 	int focused = 0;
 	if (!et_visible_selection(tf_obj, et, &sel_s, &sel_e, &focused)) return 0;
 	if (sel_s >= sel_e) return 0;            // caret: no background to fill
-	*out_color = focused ? 0x000000u : 0x808080u;
+	// Color::GRAY is 0x555555 (swf/src/types/color.rs:34), NOT 0x808080 —
+	// the comment above already named the constant; the value was
+	// mis-transcribed (avm2/edittext_always_show_selection, 432 outliers).
+	*out_color = focused ? 0x000000u : 0x555555u;
 
 	LLayout* l = et_layout(ctx, et);
 	et_apply_lazy_bounds(et);

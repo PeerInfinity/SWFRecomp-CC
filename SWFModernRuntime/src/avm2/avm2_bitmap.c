@@ -2184,6 +2184,121 @@ void avm2_cpu_raster_statictext(uint32_t* buf, int W, int H, int transparent,
 	heap_free(ctx->app, gl);
 }
 
+// Scale a premultiplied pixel by a display alpha (the twin of
+// avm2_display.c::avm2_cpu_scale_premul, which the stage-framebuffer walk uses).
+static uint32_t bd_scale_premul(uint32_t c, double f)
+{
+	uint32_t a = (uint32_t) (CA(c) * f + 0.5), r = (uint32_t) (CR(c) * f + 0.5);
+	uint32_t g = (uint32_t) (CG(c) * f + 0.5), b = (uint32_t) (CB(c) * f + 0.5);
+	return CMK(r, g, b, a);
+}
+
+// Porter-Duff "over" for a source that Ruffle composites on the GPU rather than
+// through bitmap_data.rs. blend_over() above is the byte-exact twin of Ruffle's
+// CPU operate_ex path, which TRUNCATES `dest * (1 - srcA)`; a wgpu draw does the
+// same arithmetic in f32 and rounds on the way back to rgba8unorm. The two
+// differ by one LSB exactly when the product's fraction is >= .5 — which is what
+// avm2/bitmapdata_draw_self_via_graphic measures (dest alpha 160 * 95 / 255 =
+// 59.6: truncating gives 219 and a final 173, rounding gives 220 and Ruffle's
+// 172). Only BitmapData.draw's display-object walk uses this; every
+// copyPixels/merge/CPU path keeps blend_over.
+static uint32_t blend_over_round(uint32_t dest, uint32_t src)
+{
+	uint32_t inv = 255u - CA(src);
+	uint32_t r = CR(src) + (CR(dest) * inv + 127u) / 255u;
+	uint32_t g = CG(src) + (CG(dest) * inv + 127u) / 255u;
+	uint32_t b = CB(src) + (CB(dest) * inv + 127u) / 255u;
+	uint32_t a = CA(src) + (CA(dest) * inv + 127u) / 255u;
+	if (r > 255u) r = 255u;
+	if (g > 255u) g = 255u;
+	if (b > 255u) b = 255u;
+	if (a > 255u) a = 255u;
+	return CMK(r, g, b, a);
+}
+
+// A Bitmap display object inside the draw source's subtree. bd_draw_shape_walk
+// had no arm for one, so `bmd.draw(sprite_holding_a_Bitmap)` composited NOTHING
+// (avm2/bitmapdata_draw_self_via_graphic left the destination untouched, which
+// is why its pixels read as the un-drawn fill rather than as a mis-blended one).
+// Mirrors avm2_display.c::avm2_cpu_composite_bitmap — inverse (dest->src) affine
+// sampling at pixel centres, 1 px = 20 twips — but targets a BitmapData: it
+// honours dst->transparency and blends with blend_over_round.
+// `w*` maps bitmap-local twips -> dst-pixel*20, the same convention
+// avm2_cpu_raster_shape uses.
+static void bd_draw_bitmap_node(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                                Avm2DisplayObjectExt* ext,
+                                double wa, double wb, double wc, double wd,
+                                double wtx, double wty, double alpha)
+{
+	if (ext->bitmap_data == NULL || alpha <= 0.0) return;
+	Avm2BitmapDataExt* src =
+		avm2_bitmapdata_ext_of(ctx, avm2_object_value(ext->bitmap_data));
+	if (src == NULL || src->disposed || src->pixels == NULL
+	    || src->width == 0 || src->height == 0) return;
+	double det = wa * wd - wc * wb;
+	if (det == 0.0 || !isfinite(det) || !isfinite(wtx) || !isfinite(wty)) return;
+
+	int bw = (int) src->width, bh = (int) src->height;
+	// Self-draw (the walked subtree holds `dst` itself — exactly the shape of
+	// avm2/bitmapdata_draw_self_via_graphic): Ruffle renders the source into its
+	// own texture BEFORE compositing, so sample a snapshot instead of the pixels
+	// this loop is writing.
+	uint32_t* sp = src->pixels;
+	uint32_t* snapshot = NULL;
+	if (src == dst)
+	{
+		size_t nb = (size_t) bw * (size_t) bh * sizeof(uint32_t);
+		snapshot = (uint32_t*) malloc(nb);
+		if (snapshot == NULL) return;
+		memcpy(snapshot, src->pixels, nb);
+		sp = snapshot;
+	}
+
+	double cx[4] = { 0.0, bw * 20.0, 0.0, bw * 20.0 };
+	double cy[4] = { 0.0, 0.0, bh * 20.0, bh * 20.0 };
+	double minx = 1e30, miny = 1e30, maxx = -1e30, maxy = -1e30;
+	for (int k = 0; k < 4; k++)
+	{
+		double sx = wa * cx[k] + wc * cy[k] + wtx;
+		double sy = wb * cx[k] + wd * cy[k] + wty;
+		if (sx < minx) minx = sx;
+		if (sx > maxx) maxx = sx;
+		if (sy < miny) miny = sy;
+		if (sy > maxy) maxy = sy;
+	}
+	int px0 = (int) floor(minx / 20.0), px1 = (int) ceil(maxx / 20.0);
+	int py0 = (int) floor(miny / 20.0), py1 = (int) ceil(maxy / 20.0);
+	if (px0 < 0) px0 = 0;
+	if (py0 < 0) py0 = 0;
+	if (px1 > (int) dst->width) px1 = (int) dst->width;
+	if (py1 > (int) dst->height) py1 = (int) dst->height;
+
+	double ia = wd / det, ic = -wc / det;
+	double ib = -wb / det, id = wa / det;
+	int opaque = !dst->transparency;
+	for (int dy = py0; dy < py1; dy++)
+	{
+		for (int dx = px0; dx < px1; dx++)
+		{
+			double tx = (dx + 0.5) * 20.0 - wtx;
+			double ty = (dy + 0.5) * 20.0 - wty;
+			double lx = ia * tx + ic * ty;
+			double ly = ib * tx + id * ty;
+			int spx = (int) floor(lx / 20.0);
+			int spy = (int) floor(ly / 20.0);
+			if (spx < 0 || spy < 0 || spx >= bw || spy >= bh) continue;
+			uint32_t s = sp[(size_t) spy * (size_t) bw + (size_t) spx];
+			if (alpha < 0.999) s = bd_scale_premul(s, alpha);
+			if (CA(s) == 0) continue;                       // fully transparent
+			uint32_t out = blend_over_round(
+				bd_get_raw(dst, (uint32_t) dx, (uint32_t) dy), s);
+			if (opaque) out = with_alpha(out, 0xFF);
+			bd_set_raw(dst, (uint32_t) dx, (uint32_t) dy, out);
+		}
+	}
+	free(snapshot);
+}
+
 // ---------------------------------------------------------------------------
 // draw — the CPU fast path from Ruffle core/src/bitmap/operations.rs::draw.
 //
@@ -2215,7 +2330,12 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	if (ext == NULL) return;
 	if (!ext->is_stage && !ext->visible) return;
 
-	if (ext->is_morph_shape && ext->shape_vert_count > 0)
+	if (ext->is_bitmap)
+		// A Bitmap inside the drawn subtree. avm2_cpu_walk has had this arm all
+		// along; this walk had not, so drawing a container that holds a Bitmap
+		// wrote nothing at all.
+		bd_draw_bitmap_node(ctx, dst, ext, wa, wb, wc, wd, wtx, wty, alpha);
+	else if (ext->is_morph_shape && ext->shape_vert_count > 0)
 		// T6: ratio-lerped morph shape (the getPixel gate reads its interpolated
 		// edge + fill colour through this path).
 		avm2_cpu_raster_morph(dst->pixels, (int) dst->width, (int) dst->height,

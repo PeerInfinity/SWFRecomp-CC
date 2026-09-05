@@ -9795,10 +9795,18 @@ static void gfx_decode_path(Avm2GraphicsExt* g, Avm2Context* ctx,
                             Avm2VectorExt* commands, Avm2VectorExt* data)
 {
 	uint32_t di = 0, nd = data != NULL ? data->length : 0;
+	// Ruffle stores every path coordinate as Twips::from_pixels(v), whose
+	// `as i32` cast maps NaN to 0 (the same Rust rule clamp_fixed16 models).
+	// A NaN coordinate therefore makes ONE subpath degenerate — it does NOT
+	// discard the rest of the path, which is what dropping the whole command
+	// stream used to do (avm2/graphics_draw_path case 6 "Non-integer coord":
+	// its trailing 10x10 square never drew).
+	#define _GRDNUM(v) do { \
+		(v) = avm2_coerce_to_number(ctx, data->elems[di++]); \
+		if (isnan(v)) (v) = 0.0; } while (0)
 	#define _GRDPT(px, py) do { \
 		if (di + 2 > nd) return; \
-		(px) = avm2_coerce_to_number(ctx, data->elems[di]); \
-		(py) = avm2_coerce_to_number(ctx, data->elems[di + 1]); di += 2; } while (0)
+		_GRDNUM(px); _GRDNUM(py); } while (0)
 	for (uint32_t i = 0; i < commands->length; i++)
 	{
 		int32_t cmd = avm2_coerce_to_i32(ctx, commands->elems[i]);
@@ -9830,6 +9838,7 @@ static void gfx_decode_path(Avm2GraphicsExt* g, Avm2Context* ctx,
 		}
 	}
 	#undef _GRDPT
+	#undef _GRDNUM
 }
 
 // Graphics.drawPath(commands:Vector.<int>, data:Vector.<Number>, winding:String)
