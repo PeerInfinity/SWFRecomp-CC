@@ -1,0 +1,231 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index ad91fca80..a05255839 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -119,6 +119,22 @@ static uint32_t g_orphan_dirty_count, g_orphan_dirty_cap;
+ // that regained a parent) is a pure size optimization — the walk loops skip
+ // parented entries anyway — so it is amortized instead of run per goto.
+ static uint32_t g_orphan_reparented;
++// Orphans added since the last retain pass that were not placed by script:
++// while this is zero no entry on the orphan list can have died. See
++// orphan_cleanup.
++static uint32_t g_orphan_tag_pending;
++
++// Iteration bound for the per-phase orphan walks.
++//
++// Ruffle's each_orphan_obj CLONES the orphan list before iterating, so a clip
++// that becomes an orphan WHILE a phase runs (a removed clip's own RemoveObject
++// tag orphaning its children, say) is not visited until the next frame. We
++// re-read the live count, which handed those late arrivals an extra advance in
++// the very frame they were removed in (avm2/orphan_removeobject reported
++// `currentFrame = 3` where Flash freezes them at 2). Every orphan loop now
++// snapshots this bound once and also re-checks it, since a nested inner goto's
++// orphan_cleanup can SHRINK the list mid-walk.
++static uint32_t orphan_walk_bound(void);
+ 
+ static void orphan_dirty_push(Avm2Context* ctx, Avm2Object* obj)
+ {
+@@ -148,6 +164,9 @@ static void orphan_add(Avm2Context* ctx, Avm2Object* obj)
+ 		g_orphan_cap = nc;
+ 	}
+ 	e->in_orphan_list = 1;
++	// Not script-placed => this entry can die at the end of the frame
++	// (orphan_cleanup); arm the retain pass. See orphan_cleanup.
++	if (!e->placed_by_avm2_script) g_orphan_tag_pending++;
+ 	g_orphans[g_orphan_count++] = obj;
+ 	avm2_display_mark_frame_work(ctx, obj);
+ 	orphan_dirty_push(ctx, obj);
+@@ -178,19 +197,38 @@ static void orphan_dirty_compact(void)
+ 	g_orphan_dirty_count = w;
+ }
+ 
++// Ruffle cleanup_dead_orphans (core/src/orphan_manager.rs:65-92), run at the
++// end of every frame AND every inner goto: an orphan is RETAINED only if it is
++// still parentless *and* `placed_by_avm2_script`.
++//
++// Every clip that loses its parent joins the orphan list, but there are two
++// kinds. A clip removed by a RemoveObject TAG stays on the list only until the
++// end of that frame -- long enough to run one framescript with
++// `this.parent == null` -- and is then dropped for good; it never advances
++// again. A clip removed by ActionScript keeps ticking indefinitely.
++// `placed_by_avm2_script` is exactly that discriminator (it is set for
++// script-constructed objects and for anything a script moved in the display
++// list; a RemoveObject tag can only reach objects the timeline instantiated
++// and script never touched).
++//
++// The scan itself stays amortized. `placed_by_avm2_script` is monotonic
++// (0 -> 1, never cleared), so a retained entry can never turn dead on its own:
++// the retain pass is needed only after an orphan was added that was NOT
++// script-placed (g_orphan_tag_pending) or after re-parentings accumulated.
++// That keeps the per-inner-goto cost at O(1) in the steady state, which is
++// what the goto catch-up work depends on.
+ static void orphan_cleanup(Avm2Context* ctx)
+ {
+ 	(void) ctx;
+ 	orphan_dirty_compact();
+-	// Ruffle compacts the orphan list on every inner goto; for us that is a
+-	// pure optimization (the walks skip re-parented entries), so amortize it.
+-	if (g_orphan_reparented < 64) return;
++	if (g_orphan_tag_pending == 0 && g_orphan_reparented < 64) return;
++	g_orphan_tag_pending = 0;
+ 	g_orphan_reparented = 0;
+ 	uint32_t w = 0;
+ 	for (uint32_t i = 0; i < g_orphan_count; i++)
+ 	{
+ 		Avm2DisplayObjectExt* ext = display_ext_fast(g_orphans[i]);
+-		if (ext != NULL && ext->parent == NULL)
++		if (ext != NULL && ext->parent == NULL && ext->placed_by_avm2_script)
+ 		{
+ 			g_orphans[w++] = g_orphans[i];
+ 		}
+@@ -200,6 +238,9 @@ static void orphan_cleanup(Avm2Context* ctx)
+ 		}
+ 	}
+ 	g_orphan_count = w;
++	// Entries just dropped are gone from g_orphans, so the dirty list can
++	// still name them; re-compact so the walks do not visit a dead entry.
++	orphan_dirty_compact();
+ }
+ 
+ // Frame-script cleanup queue (Ruffle frame_script_cleanup_queue).
+@@ -1467,6 +1508,11 @@ static int walk_skip_on(void)
+ 	return g_walk_skip;
+ }
+ 
++static uint32_t orphan_walk_bound(void)
++{
++	return walk_skip_on() ? g_orphan_dirty_count : g_orphan_count;
++}
++
+ // Mark `obj` and every ancestor as needing a walk. Stops as soon as it finds
+ // a node already marked: by the invariant, that node's ancestors are marked
+ // too. Re-parenting is the one operation that can break the invariant, so
+@@ -1522,8 +1568,22 @@ static int node_quiescent(Avm2DisplayObjectExt* e)
+ 	if (e->executing_frame_script) return 0;
+ 	// A pending frame script only does something when it is FRESH for the
+ 	// frame it is queued on (run_local_frame_scripts' is_fresh).
++	//
++	// `has_pending_script` alone is NOT the whole arming condition. Ruffle
++	// arms it unconditionally when a clip advances a frame
++	// (run_frame_internal -> set_has_pending_script(true)); we arm it lazily,
++	// in construct_frame_obj's `check_has_pending_script`, and only if a
++	// script for the CURRENT frame already exists. So a clip whose script is
++	// registered LATER in the same frame (addFrameScript from another clip's
++	// frame script) sits here with has_pending_script == 0 while the very
++	// next PHASE_CONSTRUCT visit would arm it. Certifying that node clean is
++	// what made the catch-up walk of a `no_op_goto` skip it forever
++	// (timeline/frame_script_cleanup_goto2). Mirror the arming condition.
+ 	uint32_t f = e->queued_script_frame;
+-	if (e->has_pending_script && f < e->frame_script_cap
++	uint32_t cf = e->current_frame;
++	int would_arm = (cf < e->frame_script_cap
++	                 && e->frame_scripts[cf].kind == AVM2_VALUE_OBJECT);
++	if ((e->has_pending_script || would_arm) && f < e->frame_script_cap
+ 	    && e->frame_scripts[f].kind == AVM2_VALUE_OBJECT
+ 	    && e->last_queued_script_frame != (int32_t) f)
+ 	{
+@@ -2554,10 +2614,21 @@ static void broadcast_named(Avm2Context* ctx, const char* type)
+ 
+ static void run_frame_script_cleanup(Avm2Context* ctx)
+ {
+-	uint32_t i = 0;
+-	while (i < g_fs_cleanup_count)
++	// Ruffle's queue is a VecDeque drained with pop_front, and the drain is
++	// re-entrant: a queued script can run a no-op goto, and
++	// run_inner_goto_frame CLEARS the queue (g_fs_cleanup_count = 0) and then
++	// lets the inner walk push fresh entries onto it. A read index into the
++	// array loses those (it is already past the front), so pop from the front
++	// for real.
++	while (g_fs_cleanup_count > 0)
+ 	{
+-		Avm2Object* obj = g_fs_cleanup[i++];
++		Avm2Object* obj = g_fs_cleanup[0];
++		g_fs_cleanup_count--;
++		if (g_fs_cleanup_count > 0)
++		{
++			memmove(g_fs_cleanup, g_fs_cleanup + 1,
++			        g_fs_cleanup_count * sizeof(Avm2Object*));
++		}
+ 		Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+ 		if (ext == NULL) continue;
+ 		ext->has_pending_script = 1;
+@@ -2565,7 +2636,6 @@ static void run_frame_script_cleanup(Avm2Context* ctx)
+ 		avm2_display_mark_frame_work(ctx, obj);
+ 		run_local_frame_scripts(ctx, obj);
+ 	}
+-	g_fs_cleanup_count = 0;
+ }
+ 
+ // run_inner_goto_frame (Ruffle FL:124): Construct + FrameScripts + Exit
+@@ -2606,8 +2676,8 @@ void avm2_display_inner_goto_frame(Avm2Context* ctx)
+ 	}
+ 
+ 	ctx->frame_phase = PHASE_CONSTRUCT;
+-	for (uint32_t i = 0;
+-	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
++	for (uint32_t i = 0, snap = orphan_walk_bound();
++	     i < snap && i < orphan_walk_bound(); i++)
+ 	{
+ 		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+ 		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+@@ -2622,8 +2692,8 @@ void avm2_display_inner_goto_frame(Avm2Context* ctx)
+ 
+ 	ctx->frame_phase = PHASE_FRAME_SCRIPTS;
+ 	if (ctx->stage != NULL) run_frame_scripts_obj(ctx, ctx->stage);
+-	for (uint32_t i = 0;
+-	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
++	for (uint32_t i = 0, snap = orphan_walk_bound();
++	     i < snap && i < orphan_walk_bound(); i++)
+ 	{
+ 		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+ 		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+@@ -3589,7 +3659,8 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 	avm1_child_tick(ctx);
+ 
+ 	ctx->frame_phase = PHASE_ENTER;
+-	for (uint32_t i = 0; i < g_orphan_count; i++)
++	for (uint32_t i = 0, snap = g_orphan_count;
++	     i < snap && i < g_orphan_count; i++)   // snapshot: orphan_walk_bound
+ 	{
+ 		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, g_orphans[i]);
+ 		if (e != NULL && e->parent == NULL) enter_frame_obj(ctx, g_orphans[i]);
+@@ -3605,8 +3676,8 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 	}
+ 
+ 	ctx->frame_phase = PHASE_CONSTRUCT;
+-	for (uint32_t i = 0;
+-	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
++	for (uint32_t i = 0, snap = orphan_walk_bound();
++	     i < snap && i < orphan_walk_bound(); i++)
+ 	{
+ 		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+ 		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+@@ -3629,8 +3700,8 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 			run_frame_scripts_obj(ctx, sext->render_list[i]);
+ 		}
+ 	}
+-	for (uint32_t i = 0;
+-	     i < (walk_skip_on() ? g_orphan_dirty_count : g_orphan_count); i++)
++	for (uint32_t i = 0, snap = orphan_walk_bound();
++	     i < snap && i < orphan_walk_bound(); i++)
+ 	{
+ 		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
+ 		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+@@ -7919,6 +7990,17 @@ static Avm2Value mc_add_frame_script(Avm2Activation* act)
+ 			if (ctx->frame_phase == PHASE_FRAME_SCRIPTS)
+ 			{
+ 				fs_cleanup_push(ctx, this_obj(act));
++				// The clip now has frame-script work outstanding, so it
++				// must not stay `walk_clean`: a `no_op_goto` issued later
++				// in the same frame runs its catch-up walk through the
++				// gate, and a clean subtree is skipped outright. The
++				// `else` arm below already pairs the state change with
++				// this call; the cleanup-queue arm did not
++				// (timeline/frame_script_cleanup_goto2 lost the five
++				// lines its four registered descendants would emit).
++				// mark_frame_work only clears walk_clean / bumps
++				// dirty_kids, so this is inert for everything but the gate.
++				avm2_display_mark_frame_work(ctx, this_obj(act));
+ 			}
+ 			else
+ 			{
