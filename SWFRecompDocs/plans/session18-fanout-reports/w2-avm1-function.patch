@@ -1,0 +1,211 @@
+diff --git a/SWFModernRuntime/include/actionmodern/object.h b/SWFModernRuntime/include/actionmodern/object.h
+index bc28e28cf..d3558a7f1 100644
+--- a/SWFModernRuntime/include/actionmodern/object.h
++++ b/SWFModernRuntime/include/actionmodern/object.h
+@@ -31,6 +31,16 @@ typedef struct ASProperty ASProperty;
+ // ASSetPropFlags only touches bits 0x01-0x04, so this bit is never cleared by script.
+ #define PROPERTY_FLAG_PERM_READONLY 0x80
+ 
++// Permanently non-enumerable — survives ASSetPropFlags clearing DontEnum.
++// Used for the `arguments` object's callee/caller/__proto__ slots: Flash's
++// arguments object exposes NO enumerable properties, and
++// `ASSetPropFlags(arguments, null, 6, 1)` does not make them visible
++// (gnash actionscript.all/Function.as:487-500 — Flash traces 0 both before and
++// after the ASSetPropFlags call, while gnash itself expects 5).
++// ASSetPropFlags only touches bits 0x01-0x04, so this bit is never cleared by
++// script. Only the ARRAY for-in walkers honor it (arguments is an ASArray).
++#define PROPERTY_FLAG_PERM_DONTENUM 0x40
++
+ // Default flags for user-created properties (fully mutable and enumerable)
+ #define PROPERTY_FLAGS_DEFAULT (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE)
+ 
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index e32b935b6..b0aa172a2 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -7866,6 +7866,19 @@ static ActionVar builtin_assetnativeaccessor(SWFAppContext* app_context, ActionV
+ // ============================================================================
+ 
+ // Built-in valueOf for primitive wrapper objects (new Object(5))
++//
++// Unboxed receiver (the classic case being String.prototype / Number.prototype /
++// Boolean.prototype themselves, which carry this method but no boxed value):
++// Flash falls back to the ordinary Object.prototype.valueOf answer, i.e. `this`.
++// Returning UNDEFINED here made `String.prototype == undefined` compare TRUE
++// (actionEquals2 converts the object side to a primitive first, and
++// undefined == undefined is true), which fails gnash
++// actionscript.all/Function.as:305 `stringInstance.__proto__ != undefined`.
++// Ruffle has the same bug and flags it: globals/string.rs `to_string_value_of`
++// carries a TODO saying this "normally falls back to `[object Object]`".
++// Returning the receiver reproduces that observable answer via the existing
++// non-primitive fallback (actionEquals2 -> false; string concat -> toString ->
++// "[object Object]") without inventing a string here.
+ static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	ActionVar ret;
+@@ -7879,6 +7892,17 @@ static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar*
+ 		ActionVar* prim = getProperty(obj, "valueOf_value", 13);
+ 		if (prim != NULL)
+ 			ret = *prim;
++		else
++		{
++			// No boxed value: behave like Object.prototype.valueOf and return
++			// `this` (preserving the receiver's own type tag when the CallMethod
++			// path recorded it).
++			ret.type = ACTION_STACK_VALUE_OBJECT;
++			if (g_this_depth > 0 &&
++			    g_this_stack[g_this_depth - 1].data.numeric_value == (u64) this_obj)
++				ret.type = g_this_stack[g_this_depth - 1].type;
++			ret.data.numeric_value = (u64) this_obj;
++		}
+ 	}
+ 	return ret;
+ }
+@@ -8303,12 +8327,20 @@ static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
+ 		retainObject(arr->props);
+ 	}
+ 
++	// The arguments object's slots are PERMANENTLY non-enumerable: Flash traces
++	// zero properties from `for (p in arguments)` both before and after
++	// `ASSetPropFlags(arguments, null, 6, 1)` (gnash Function.as:487-500 — that
++	// test expects 5 after the call, which is gnash's behavior, not Flash's).
++	// PROPERTY_FLAG_PERM_DONTENUM is outside the 0x01-0x04 window ASSetPropFlags
++	// writes, so the clear-DontEnum request cannot resurrect these entries.
++	#define _ARGS_HIDDEN (PROPERTY_FLAGS_DONTENUM | PROPERTY_FLAG_PERM_DONTENUM)
++
+ 	// __proto__ = Array.prototype (non-enumerable)
+ 	{
+ 		ActionVar pv = {0};
+ 		pv.type = ACTION_STACK_VALUE_OBJECT;
+ 		pv.data.numeric_value = (u64)g_array_prototype;
+-		setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
++		setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, _ARGS_HIDDEN);
+ 	}
+ 
+ 	// callee = the function being called (non-enumerable)
+@@ -8316,7 +8348,7 @@ static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
+ 		ActionVar cv = {0};
+ 		cv.type = ACTION_STACK_VALUE_FUNCTION;
+ 		cv.data.numeric_value = (u64)callee_func;
+-		setPropertyWithFlags(app_context, arr->props, "callee", 6, &cv, PROPERTY_FLAGS_DONTENUM);
++		setPropertyWithFlags(app_context, arr->props, "callee", 6, &cv, _ARGS_HIDDEN);
+ 	}
+ 
+ 	// caller = the function that initiated this call, or null (non-enumerable)
+@@ -8331,8 +8363,9 @@ static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
+ 		{
+ 			cr.type = ACTION_STACK_VALUE_NULL;
+ 		}
+-		setPropertyWithFlags(app_context, arr->props, "caller", 6, &cr, PROPERTY_FLAGS_DONTENUM);
++		setPropertyWithFlags(app_context, arr->props, "caller", 6, &cr, _ARGS_HIDDEN);
+ 	}
++	#undef _ARGS_HIDDEN
+ }
+ 
+ // Public wrapper for setupArgumentsProps — called from recompiler-generated code
+@@ -15462,6 +15495,48 @@ static inline ASObject* getFunctionProto(int version) {
+ 	return (version <= 6) ? g_function_proto_legacy : g_function_proto_modern;
+ }
+ 
++// Flash wires a freshly created function object to `_global.Function` at
++// CREATION time: "__proto__ is _global.Function.prototype" (gnash
++// actionscript.all/Function.as:1069-1089). Our FUNCTION GetMember path already
++// synthesises a *virtual* __proto__ from the built-in per-version
++// Function.prototype singleton, which is right whenever `_global.Function` is
++// untouched — so this only materialises a real own `__proto__` slot in the one
++// case the virtual answer is wrong: the SWF replaced `_global.Function` (or its
++// `.prototype`) with something else before defining the function.
++//
++// Deliberately narrow, to keep the blast radius at zero for ordinary movies:
++//   - `_global.Function` must currently be a FUNCTION (Flash skips the wiring
++//     when it is a primitive — Function.as:1096-1113 checks exactly that via
++//     hasOwnProperty);
++//   - its `.prototype` must be an OBJECT (a non-object prototype would leave
++//     the function with no lookup chain at all; the ASnative(1,0) path stores
++//     it, but no test observes it for SWF-defined functions);
++//   - and it must NOT be one of the two built-in Function.prototype singletons,
++//     which is the normal case and needs no own slot.
++// When it fires, the existing own_props prototype walk in the FUNCTION arm of
++// GetMember delivers both `uf.__proto__` and inherited members (`uf.p`).
++static void applyGlobalFunctionProtoLink(SWFAppContext* app_context, ASFunction* fn)
++{
++	extern ASObject* global_object;
++	if (fn == NULL || global_object == NULL) return;
++	ActionVar* gfn_ptr = getProperty(global_object, "Function", 8);
++	if (gfn_ptr == NULL || gfn_ptr->type != ACTION_STACK_VALUE_FUNCTION) return;
++	ASFunction* gff = (ASFunction*)(uintptr_t)gfn_ptr->data.numeric_value;
++	if (gff == NULL || gff == fn) return;
++	ActionVar protov = funcPrototypeVar(gff);
++	if (protov.type != ACTION_STACK_VALUE_OBJECT) return;
++	ASObject* po = (ASObject*)(uintptr_t)protov.data.numeric_value;
++	if (po == NULL || po == g_function_proto_legacy || po == g_function_proto_modern)
++		return;
++	if (fn->own_props == NULL)
++	{
++		fn->own_props = allocObject(app_context, 4);
++		retainObject(fn->own_props);
++	}
++	setPropertyWithFlags(app_context, fn->own_props, "__proto__", 9, &protov,
++	                     PROPERTY_FLAGS_DONTENUM);
++}
++
+ // Lazily initialize and return the built-in Object constructor function.
+ // Shared between actionGetVariable("Object") and actionNewObject (which sets
+ // __constructor__ on freshly allocated objects).
+@@ -33350,6 +33425,10 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
+ 						continue;
+ 					if (!(arr->props->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+ 						continue;
++					// arguments-object slots stay hidden even after
++					// ASSetPropFlags clears DontEnum (see object.h).
++					if (arr->props->properties[i].flags & PROPERTY_FLAG_PERM_DONTENUM)
++						continue;
+ 					PUSH_STR(pn, pn_len);
+ 				}
+ 			}
+@@ -47984,8 +48063,10 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
+ 						ASProperty* ps = findPropertyRaw(arr->props, key, key_len);
+ 						if (ps != NULL)
+ 						{
+-							// Honor DontEnum (ENUMERABLE cleared via ASSetPropFlags).
+-							if (ps->flags & PROPERTY_FLAG_ENUMERABLE)
++							// Honor DontEnum (ENUMERABLE cleared via ASSetPropFlags),
++							// and the permanent arguments-slot hide (object.h).
++							if ((ps->flags & PROPERTY_FLAG_ENUMERABLE) &&
++							    !(ps->flags & PROPERTY_FLAG_PERM_DONTENUM))
+ 								PUSH_STR((char*)key, key_len);
+ 							found = 1;
+ 						}
+@@ -48031,6 +48112,10 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
+ 							continue;
+ 						if (!(arr->props->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+ 							continue;
++						// arguments-object slots stay hidden even after
++						// ASSetPropFlags clears DontEnum (see object.h).
++						if (arr->props->properties[i].flags & PROPERTY_FLAG_PERM_DONTENUM)
++							continue;
+ 						// Skip purely-numeric in-range index keys (handled above).
+ 						int is_index = (pn_len > 0 && pn_len <= 10);
+ 						u64 idx_val = 0;
+@@ -60179,6 +60264,10 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
+ 	// Per-movie global index: reserved for future per-movie _global isolation
+ 	as_func->movie_global_idx = 0;
+ 
++	// Flash-creation-time link to _global.Function.prototype (no-op unless the
++	// SWF replaced _global.Function — see applyGlobalFunctionProtoLink).
++	applyGlobalFunctionProtoLink(app_context, as_func);
++
+ 	// Capture scope chain entries at definition time.
+ 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
+ 	// SWF5 does NOT support closures — only SWF6+ captures the scope chain.
+@@ -60329,6 +60418,10 @@ void actionDefineFunction2(SWFAppContext* app_context, const char* name, Functio
+ 	// Per-movie global index: reserved for future per-movie _global isolation
+ 	as_func->movie_global_idx = 0;
+ 
++	// Flash-creation-time link to _global.Function.prototype (no-op unless the
++	// SWF replaced _global.Function — see applyGlobalFunctionProtoLink).
++	applyGlobalFunctionProtoLink(app_context, as_func);
++
+ 	// Capture scope chain entries at definition time.
+ 	// AVM1 closures capture both WITH scopes and enclosing function local scopes.
+ 	// SWF5 does NOT support closures — only SWF6+ captures the scope chain.

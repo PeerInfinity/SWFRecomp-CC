@@ -31,6 +31,16 @@ typedef struct ASProperty ASProperty;
 // ASSetPropFlags only touches bits 0x01-0x04, so this bit is never cleared by script.
 #define PROPERTY_FLAG_PERM_READONLY 0x80
 
+// Permanently non-enumerable — survives ASSetPropFlags clearing DontEnum.
+// Used for the `arguments` object's callee/caller/__proto__ slots: Flash's
+// arguments object exposes NO enumerable properties, and
+// `ASSetPropFlags(arguments, null, 6, 1)` does not make them visible
+// (gnash actionscript.all/Function.as:487-500 — Flash traces 0 both before and
+// after the ASSetPropFlags call, while gnash itself expects 5).
+// ASSetPropFlags only touches bits 0x01-0x04, so this bit is never cleared by
+// script. Only the ARRAY for-in walkers honor it (arguments is an ASArray).
+#define PROPERTY_FLAG_PERM_DONTENUM 0x40
+
 // Default flags for user-created properties (fully mutable and enumerable)
 #define PROPERTY_FLAGS_DEFAULT (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE)
 
