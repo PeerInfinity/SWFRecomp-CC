@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-04T19:03:28.646539+00:00",
-    "git_sha": "4a8e7476d97534866f1428f6edf1de6c4f0ef6f8",
-    "duration_seconds": 45.76,
+    "timestamp": "2026-09-04T21:08:44.281218+00:00",
+    "git_sha": "f0fd711c7126ecd6022109fc74fc37e87115aa5d",
+    "duration_seconds": 44.57,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30
@@ -19,8 +19,8 @@
     {
       "test": "avm1_imports_avm1",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.565,
+        "recomp": 0.007,
+        "compile": 1.704,
         "run": 0.004
       },
       "num_frames": 1,
@@ -29,14 +29,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.58,
+      "duration": 1.72,
       "status": "pass"
     },
     {
       "test": "avm1_non_swf_import",
       "phases": {
         "recomp": 0.005,
-        "compile": 22.85,
+        "compile": 20.879,
         "run": 0.004
       },
       "num_frames": 4,
@@ -45,14 +45,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 22.86,
+      "duration": 20.89,
       "status": "pass"
     },
     {
       "test": "empty_url",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.124,
+        "compile": 21.769,
         "run": 0.002
       },
       "num_frames": 2,
@@ -61,7 +61,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 21.14,
+      "duration": 21.78,
       "status": "pass"
     }
   ]

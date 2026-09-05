@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-04 21:08 UTC
+**Date**: 2026-09-05 04:40 UTC
 
-**Git SHA**: `f0fd711c71`
+**Git SHA**: `7f7a6ba369`
 
-**Run Duration**: 1m 17s
+**Run Duration**: 1m 22s
 
 **Filtered**: 0 tests ignored out of 12 available
 
@@ -31,16 +31,16 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm1_doabc` | 1 | 1.3s |  |
+| 1 | `avm1_doabc` | 1 | 1.2s |  |
 | 2 | `avm1_loads_avm2_doaction` | 2 | 1.4s |  |
-| 3 | `avm1_sprite_sc_ignored` | 3 | 20.0s |  |
-| 4 | `avm2_doaction` | 1 | 6.7s |  |
-| 5 | `avm2_loads_avm1` | 14 | 7.1s |  |
-| 6 | `avm2_loads_avm1_doabc` | 4 | 7.0s |  |
+| 3 | `avm1_sprite_sc_ignored` | 3 | 21.4s |  |
+| 4 | `avm2_doaction` | 1 | 5.8s |  |
+| 5 | `avm2_loads_avm1` | 14 | 7.5s |  |
+| 6 | `avm2_loads_avm1_doabc` | 4 | 7.8s |  |
 | 7 | `avm2_loads_avm1_loads_avm2_doabc` | 3 | 7.5s |  |
-| 8 | `avm2_loads_avm1_loads_into_root` | 2 | 5.5s |  |
-| 9 | `avm2_loads_avm1_v10` | 8 | 5.9s |  |
-| 10 | `avm2_loads_avm1_v9` | 8 | 5.2s |  |
+| 8 | `avm2_loads_avm1_loads_into_root` | 2 | 7.5s |  |
+| 9 | `avm2_loads_avm1_v10` | 8 | 6.0s |  |
+| 10 | `avm2_loads_avm1_v9` | 8 | 7.3s |  |
 
 ## Near-Passing Tests
 
