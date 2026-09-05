@@ -741,3 +741,80 @@ now that they pass), cab×text, morph/masks/TLF. `render_canary.py` has its own
 round joins; `edittext_bounds_vs_position` sprite window (+1); `cab_mask_filters`
 (cut 3b); `cache_as_bitmap/scroll_rect` 2; device-font outlines arc; the
 runtime-gradient canary gap. Stage3D (24) + codecs (5) parked.
+
+## 17. Session-18 state of the board (2026-09-04/05)
+
+**Grading run `33939123188` at `cdafe1be9` (14 of 18 patches): 364 → 372/572
+(+8, 0 regressions), bands 26 improved / 1 worsened (`avm2/graphics_gradients`
+299 → 469, a round-join side effect on gradient strokes — new board item).**
+Four more pixel patches landed after it (glyph-twips +2, gfx-text +4,
+filter-chain 0 flips / three −82..−99.9 % bands, priced from local Dawn A/Bs
+that matched CI on every row measured this session); the final
+graphics/full/images run `33945288707` at `8376eb700` graded them: **381/577
+(66.0 %)**, +6 flips / 0 regressions / 10 bands improved — session total **+17
+pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
+`session18-fanout-reports/`.
+
+- **Round-join branch cut (recompiler `drawLineJoin`)**: a corner whose normals
+  straddle ±π swept the 270° reflex arc (uncovered outer quadrant + redundant
+  inner disc). `cache_as_bitmap/scroll_rect` flipped; `color_matrix` 237 → 6.
+  The blend-tie "match Ruffle's world-matrix composition" premise is REFUTED
+  (matrices bit-identical; Ruffle's are coarser); the `blend_modes` ×12 residual
+  is integer-twip truncation of flattened curve vertices in
+  `addCurvedEdgeLevien` (`SWFRecomp::Vertex` is s32) — the completion mechanism
+  for the whole family, sign-dependent.
+- **Runtime strokes**: round joins/caps (lyon chord counts) + integer-twip
+  quantisation of drawing-API points in BOTH VMs' runtime builders. +3
+  (`graphics_bitmap_fill`, `mouse_pick_dobj_mask` ×2); `fills_and_lines` 104 → 4,
+  `graphics_draw_path` 204 → 4. LINESTYLE2 join/cap styles are still parsed and
+  discarded by the recompiler; join fans there are a fixed 5 midpoints.
+- **AVM2 blend arm** existed nowhere (`blendMode` wrote a dyn prop nothing read);
+  now mirrors `tag.c`. Solid-fill alpha is a truncated byte like `swf::Color`
+  (NO_GRAPHICS-visible via `avm2_cpu_raster`). `lineStyle` alpha has the same
+  bug (open). Layer groups (`layer_alpha`/`layer_erase`) remain an arc.
+- **Fill-smalls**: `BitmapData.draw` had no `is_bitmap` walk arm (the "alpha
+  accumulation" diagnosis was wrong — a whole Bitmap child drew nothing);
+  selection GRAY is 0x555555; `drawPath` NaN → 0.
+- **Text**: the render-pass local matrix read the post-compose GPU slot
+  (`getLocalMatrixForMC_render`) — s17's "parent-scoped sprite window" mechanism
+  refuted; AVM2 underlines were never drawn; the AVM2 border box was in stage
+  twips; device-font requests fall back to a name-matched embedded font. Device
+  fonts still have no outline source (`abc_devicefont.cpp`; stb_truetype is
+  already linked — the arc is "emit contours").
+- **AVM2 has a SECOND glyph pipeline** (`abc_timeline.cpp::parseGlyphShape` →
+  `glyph_pts` → runtime libtess2), undocumented until now; it flattened every
+  quadratic into 8 fixed chords. Now lyon's adaptive schedule at 0.1 px. The
+  "quantise glyphs to integer twips" premise is refuted (Ruffle doesn't; 4×
+  uncompensated outlines rendered byte-identical). `auto_size/{height,return}`
+  are 3 outliers from passing on a shared mechanism; `fonts/glyph`'s last pixel
+  is the libtess2-CDT-vs-lyon straight-edge tie.
+- **Filters**: the glow/drop-shadow/bevel maths is byte-exact; 100 % of that
+  family's residual is source-silhouette drift × kernel area (Ruffle's
+  filter-implied cacheAsBitmap snaps `frac(u − local_min)`, ours `frac(tx+u)`) —
+  arithmetically unflippable at `max_outliers` 0–18. The AVM1 tag route now
+  renders the whole filter LIST (a filter's composite source is the previous
+  layer — the AVM2 `.filters` loop gets this wrong AND drops a non-final
+  compositeSource, both live defects), cxform applies to the filter output,
+  DefineSprite placements keep `opaqueBackground`. `any_blur_scales_with_screen`
+  (4884/0) flips only by drawing NOTHING for GradientGlow/GradientBevel like
+  Ruffle — dispositioned rather than implemented (see below).
+  `edittext_border_filters`: an EditText is never drawn by
+  `render_single_object`, so PlaceObject3 filters on a DefineEditText are a
+  structural no-op (HOLD).
+- **Smalls board**: the a_epsilon 45° ties on masks/scrollRect rows are
+  1-sample (quality=low) run-edge ties, deterministic, NOT lavapipe AA;
+  `morph_test1` ×6 is the "- xtrace enabled" status-bar text, not morph
+  geometry; `bitmapbuttons` (618 042) is NOT parked — four `0x43` clipped-bitmap
+  fill characters render nothing; `Bitmap.pixelSnapping` is unimplemented (3 831).
+- **Canary gaps found and still open**: no AVM2 embedded-font text member, no
+  AVM1 PlaceObject3-tag filter route member, no multi-filter list, no nested
+  Bitmap `BitmapData.draw`, no EditText selection, no `drawPath`. Add
+  `visual/fonts/duplicate_font`, `avm2/displayobject_blendmode`,
+  `avm2/bitmapdata_draw_self_via_graphic`, `avm2/edittext_always_show_selection`,
+  `from_shumway/acid/acid-filter`, `visual/opaque_background` (all pass now).
+
+### Image-axis dispositions added this session
+- `visual/filters/any_blur_scales_with_screen` [output] — Ruffle renders nothing
+  for GradientGlow/GradientBevel; the other 9 cells are byte-exact. Matching
+  the golden means hiding content Flash draws; blast radius exactly this one
+  comparison. **Won't-fix (Ruffle divergence), not a bug of ours.**

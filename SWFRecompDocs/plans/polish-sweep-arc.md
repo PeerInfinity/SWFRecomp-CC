@@ -2562,3 +2562,128 @@ edittext_device_transform_basic` GONE upstream (was fail).
   `drawRoundRect` corner radii.
 - Runtime gradient ramp has no passing canary representative — add
   `avm2/graphics_gradients_nulls` + `avm1/bitmap_data_copypixels` (tier 1 now).
+
+## 19. Session 18 (2026-09-04/05) — dual-axis fan-out #10: trace +30 (4406/4501 eff), pixels +8 at the grading run (final run: see §19.2), 1 regression fixed post-run
+
+Commits `e3474d611..8376eb700` on master (18 wave-2 merges + 1 post-run fix,
+each carrying its agent's patch, report and brief under
+`session18-fanout-reports/`). Baseline was trace **4373 ±1 / 4498** (results
+`f00041501`, run `33902348100`) and pixels **364 / 572 (63.6 %)** (`659153865`,
+run `33857494837`). Grading runs: graphics/full/images `33939123188` at
+`cdafe1be9` (14 patches) — trace **4376 → 4406 / 4501 eff (+30 = 31 gains,
+1 regression)**, pixels **364 → 372 / 572 (+8, 0 regressions, 26 bands
+improved / 1 worsened)**; no-graphics/full `33943558051` at `7f7a6ba36`
+(17 patches, after the fix) — **4377 → 4407 (+30 = 30 gains, 0 regressions)**.
+The one regression, gnash `Number-v5` `ruffle_matched → output_mismatch`, was
+the Function patch's builtin `valueOf` fallback reaching `Number.prototype`
+at SWF5; fixed in `7f7a6ba36` (String.prototype receivers only — NOT a
+version gate, Flash pins both halves at SWF5). 8 wave-1 + 17 wave-2 agents
+(15 board-derived + 1 probe + 1 fix), all on Opus.
+
+Merge order: w2-gfx-blend-tie · w2-avm1-goto · w2-avm2-stage ·
+w2-avm2-new-smalls · w2-matrix3d · w2-avm1-hitarea · w2-gfx-strokes ·
+w2-avm2-loader · w2-avm2-timeline · w2-avm1-function · w2-gfx-fill-smalls ·
+w2-soundtransform · w2-gfx-avm2-blend · w2-avmplus-numerics · w2-gfx-glyph-twips ·
+w2-gfx-text · w2-avm1-function-fix · w2-gfx-filter-chain. Zero textual merge
+conflicts; every headline re-check on the stacked tree matched the agent's ledger.
+
+### 19.1 Ledger (trace +30 predicted from the eight wave-1 reports, +30 measured in both modes)
+
+| patch | flips | tests |
+|---|---:|---|
+| w2-avm2-new-smalls | +6 pass, +1 rm | copypixels_alpha_combine, applyfilter_identity, primitive_keys, xml_duplicate_attribute, movieclip_addframescript_error, flash_ui_mouse_cursor; alpha_merge → rm |
+| w2-matrix3d | +5 | matrix3d_append_prepend_scale, _copy_from, _copy_to_matrix3d, _interpolate, vector3d_near_equals |
+| w2-avm2-stage | +2 pass, +1 rm | stage_scale_factor (un-ignored), stage_display_state; event_handler_exception → rm |
+| w2-avm1-hitarea | +3 | shumway avm1/hitarea, hitarea_remove_sibling, hitarea_lazy_getter (priced +2) |
+| w2-avm1-function | +3 | gnash Function-v6/-v7/-v8 |
+| w2-avm2-loader | +2 | loader_try_click_root, large_preload_from_bytes (loader_duplicate_class 3→32/48, no flip) |
+| w2-avm2-timeline | +2 | timeline/frame_script_cleanup_goto2, orphan_removeobject |
+| w2-soundtransform | +2 (+1 eff) | simplebutton_soundtransform, soundmixer_soundtransform (un-ignored) |
+| w2-avmplus-numerics | +2 pass, +1 rm | as3/Array/insertremove, e4x/Expressions/e11_1_4; number_convert_errors → rm |
+| w2-avm1-goto | +1 rm (graphics only) | misc-swfc.all/gotoFrameFromInterval2 — the last mode-parity gap, closed |
+
+Pixels at the grading run (+8): displayobject_blendmode (blend arm),
+bitmapdata_draw_self_via_graphic + edittext_always_show_selection (fill-smalls),
+graphics_bitmap_fill + mouse_pick_dobj_mask ×2 (strokes), scroll_rect
+(drawLineJoin), displayobject_scrollrect (unpriced rider of drawLineJoin).
+Landed AFTER that run and priced from local Dawn A/Bs (CI-identical on every
+row measured this session): glyph-twips +2 (duplicate_font, acid-text-x),
+gfx-text +4 (edittext_bounds_vs_position, edittext_underline,
+edittext_underline_scale2, device_font_kerning), filter-chain 0 flips
+(blur_size_grows 86 708 → 6 383, acid-filter-2 16 764 → 2 986, avm2_button
+4 432 → 6).
+
+### 19.2 Final verification run
+
+Graphics/full/images `33945288707` at `8376eb700` (all 18 patches), results
+merge `12517e2f4`: trace **4407 / 4501 effective** (vs the grading run: +1 =
+`Number-v5` back to `ruffle_matched`, 0 regressions, histogram
+93 mismatch / 4168 pass / 239 rm / 1 runtime_error); pixels **381 / 577
+(66.0 %)** — +6 more flips (`device_font_kerning`, `acid-text-x`,
+`edittext_bounds_vs_position`, `edittext_underline`,
+`edittext_underline_scale2`, `duplicate_font`), 0 regressions, 10 bands
+improved / 0 worsened (incl. `acid-color-0` 44 800 → 17 383, the s17
+regression band, and `avm2_button` 4 432 → 6). Session totals against the
+baseline runs: **trace +30 in both modes (4376 → 4406/4407 on the 4501
+intersection), pixels +17 (364/572 → 381/577)**, zero net regressions.
+No-graphics/full at `8376eb700`: see the results branch (`Update Ruffle test
+results`, dispatched at closeout).
+
+### 19.3 Method notes (deltas vs s17)
+
+- **The usage limit killed all 7 live wave-2 agents at once (17:20, 5-hour
+  session cap at 62 % + 12 concurrent agents).** Zero loss: every worktree kept
+  its patch and draft report; after the 18:20 reset ONE agent was resumed as a
+  probe, then the other six, each with "your background jobs are dead, check
+  disk, rerun only what is missing". All seven delivered within ~40 min. The
+  user asked for throttling before the cap hit — cap concurrent wave-2 agents
+  at ~8 and never spawn the whole held queue at once.
+- **Wave-1 refutation yield stayed the headline.** Of the coordinator's own
+  drift list, 12 "new" dirs were stale local residue (non-`--clean` syncs
+  never delete) and `external_interface` was NOT removed (the drift script
+  assumed `test.toml`); 39 stale `output.ruffle.txt` oracles were pruned, one
+  of them a live `ruffle_matched` trap on `from_shumway/avm1/hitarea`.
+  Wave-2 refuted its own briefs' mechanisms on: L1 (walk-skip mark → it was
+  `node_quiescent` re-cleaning), A4 (alpha accumulation → missing `is_bitmap`
+  walk arm), F1/F3 (DontEnum → permanent-hide bit; `__proto__` → `valueOf`
+  on unboxed receivers), G6 (`avm2_e4x.c` → the EscXElem opcode), the
+  blend-tie "world-matrix" premise, the glyph "quantise to twips" premise
+  (Ruffle doesn't; the real owner was an undocumented SECOND glyph pipeline
+  flattening to 8 fixed chords), and the filters family (math byte-exact;
+  silhouette drift). Every one of those still delivered its flips.
+- **Two graded runs, not one:** an early graphics grading run over the first
+  14 patches while the last agents finished caught the Number-v5 regression
+  while its author still had context; the no-graphics run doubled as the
+  regression re-verification. CI runs cost no tokens — use them early.
+- **Serial merge under budget pressure:** `git apply --cached <patch>` lets two
+  patches that touch the same file (loader + timeline, both `avm2_display.c`)
+  become separate commits after ONE stacked headline re-check.
+- **Probe agents pay:** both "measured prototype" briefs (blend-tie,
+  glyph-twips) refuted their premise and shipped a different real fix
+  (+1 and +2 pixels) — brief every probe to attack its own premise first.
+- **Recompiler non-determinism:** the filter-chain agent's whole-corpus
+  recompiler A/B found 7 SWFs that recompile differently from the same
+  binary (uninitialised words in `draws.c`) and that `recompiler_ab_sweep.sh`
+  is broken three ways (`--old` archive misses `SWFModernRuntime/include`,
+  build-type mismatch, device font resolved via `/proc/self/exe`). Both are
+  open leads.
+- **Inventory tool flaw:** the wave-0 inventory flagged only the global
+  `ignored_tests.txt`; suite-local lists (`avm2/ignored_tests.txt`) were not
+  scanned, so `stage_scale_factor` / `displayobject_scrollrect` showed
+  unflagged. Two of those entries turned out to be WRONG and were pruned
+  (stage_scale_factor, soundmixer_soundtransform) — an ignore-list entry is a
+  claim to re-test, not a disposition.
+
+### 19.4 Left on the board (session 19)
+
+**Trace.**
+- `hitarea_sweep` / `hitarea_remove_owner_drag` — shape-based (not AABB) picking + a single topmost pick (every AABB-containing button-mode clip fires today, in creation order). Second arc, `w2-avm1-hitarea-report.md`.
+- `loader_duplicate_class` 32/48 — timeline-placed characters in a loaded child never get their SymbolClass class (`avm2_display_char_for_class` / `g_symbol_map` is main-movie-only); own slot.
+- `number_convert_errors` → pass needs the static-type int/uint outer frame = recompiler early binding (`abc_emit.cpp` has TK_INT/TK_UINT); 0 headline movement.
+- `matrix3d_append_rotation` rm → pass in ~10 LOC (Flash's NaN pivot path is a real 4×4 product); `matrix3d_recompose_edge_cases` #2004 predicate undiagnosed.
+- `missing_frame_scripts` S3/S4 = main-timeline advance/removal, NOT orphan-phase (relabelled); `links_in_scrolled_text` s16 patch still 0 flips; leg-F focus family; LoaderInfo `unload`; instance-name counter (A/B first).
+- `gotoFrameFromInterval` (workflow-excluded on purpose): 0.0001 ms setIntervals with no minimum-interval floor in `timer.c` — a 10 ms floor is plausibly `ruffle_matched`, but re-times every setInterval in the corpus (full-corpus both-modes A/B).
+- `embed_name_lookup` (fonts) NO-GO: four failure families, needs Flash's font-name registration precedence.
+- KF/NO-GO of record: `number_tostring` (31 corrupt lines, ACCEPTED), `bug_483783` (OOM, needs mid-method GC), `pcre_find_fixedlength` (255-capture ceiling), audio trio (real FFT), `avm1_loads_avm2` (harness), `globals_monkeypatch` (arc), gnash `array-v*`/`MovieClip-v*` (multi-phase plans).
+
+**Pixels.** See playbook §17.

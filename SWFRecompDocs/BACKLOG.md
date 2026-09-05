@@ -540,17 +540,16 @@ first).
 
 ## Tooling — build scripts
 
-- **Graphics and no-graphics disagree on exactly one test.**
-  `from_gnash/misc-swfc.all/gotoFrameFromInterval2` is `output_mismatch` under
-  graphics and `ruffle_matched` under no-graphics. Stable, not a flake:
-  identical on both sides of five consecutive slice diffs, and named by
-  differencing the two published result trees at `91c7c99f1` / `f735855ea`
-  (4497-test intersection, exactly one disagreement). CLAUDE.md's parity claim
-  was amended 2026-09-04 to say "1-test-short" rather than complete, so the
-  instruction file is no longer false; what remains is to diagnose the
-  divergence itself — a `gotoFrame`-from-`setInterval` test differing by render
-  mode suggests a frame-loop timing difference between `swf.c` and
-  `swf_core.c`, not a rendering one. (2026-09-04)
+- ~~**Graphics and no-graphics disagree on exactly one test.**~~ **CLOSED
+  2026-09-04 (session 18, `78ab05fda`).** `swf_core.c:1544-1548` drains the
+  orphaned-action queue before the frame advance; `swf.c` never did, so the
+  graphics loop ran one surplus root frame. Ported outside every mode `#ifdef`
+  (swf.c has the timer/MCL drains twice). `gotoFrameFromInterval2` is
+  `ruffle_matched` in both modes on CI (`33939123188` / `33943558051`); mode
+  parity is complete. Sibling `gotoFrameFromInterval` is workflow-excluded on
+  purpose (`ruffle-tests.yml --exclude`): two 0.0001 ms setIntervals with no
+  minimum-interval floor in `timer.c` — a 10 ms floor is the lead
+  (`session18-fanout-reports/w2-avm1-goto-report.md`).
 - **`verify_output_keep.py`'s native source list has drifted again.**
   `ruffle-tests/verify_output_keep.py` omits `src/amf_packet.c` and
   `src/actionmodern/avm1_amf.c`, so the KEEP_BUILD_DIR game-bring-up path does

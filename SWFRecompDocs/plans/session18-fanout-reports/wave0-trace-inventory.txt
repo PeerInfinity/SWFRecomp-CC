@@ -1,0 +1,139 @@
+total 4562 effective 4437 {'output_mismatch': 124, 'pass': 4202, 'ruffle_matched': 235, 'runtime_error': 1}
+
+== audio: 2 failing
+  output_mismatch  aac                                                          exp=18 match=3 act=24 miss=15 [] TypeError: Error #1006: computeSpectrum is not a function.
+  output_mismatch  g711                                                         exp=6 match=2 act=8 miss=4 [] TypeError: Error #1006: computeSpectrum is not a function.
+== avm1: 23 failing
+  output_mismatch  bitmap_data_thorough/pixelDissolve                           exp=1371 match=1335 act=1371 miss=36 [IGN ACCEPTED] 
+  output_mismatch  date                                                         exp=6335 match=6289 act=6335 miss=46 [IGN ACCEPTED RUFFLE_V FLASH_BU] 
+  output_mismatch  geturl                                                       exp=7 match=4 act=4 miss=3 [IGN] 
+  output_mismatch  global_instance_decls                                        exp=758 match=26 act=786 miss=732 [IGN KF] 
+  output_mismatch  global_proto_decls                                           exp=4497 match=803 act=3863 miss=3694 [IGN RUFFLE_V KF] 
+  output_mismatch  global_proto_decls_delete                                    exp=4158 match=461 act=2371 miss=3697 [IGN RUFFLE_V KF] 
+  output_mismatch  globals_monkeypatch                                          exp=100 match=38 act=96 miss=62 [KF] 
+  output_mismatch  globals_swf5                                                 exp=304 match=294 act=304 miss=10 [IGN RUFFLE_V KF] 
+  output_mismatch  hitarea_lazy_getter                                          exp=6 match=0 act=3 miss=6 [] 
+  output_mismatch  hitarea_remove_owner_drag                                    exp=10 match=3 act=10 miss=7 [] 
+  output_mismatch  hitarea_remove_sibling                                       exp=4 match=3 act=4 miss=1 [] 
+  output_mismatch  hitarea_sweep                                                exp=33 match=1 act=20 miss=32 [] 
+  output_mismatch  load_vars                                                    exp=35 match=29 act=30 miss=6 [IGN] 
+  output_mismatch  loadvariables_method                                         exp=7 match=0 act=0 miss=7 [IGN] 
+  output_mismatch  movieclip_hittest_shapeflag                                  exp=338 match=332 act=338 miss=6 [IGN ACCEPTED] 
+  output_mismatch  native_objects_swf6                                          exp=115 match=114 act=115 miss=1 [IGN ACCEPTED RUFFLE_V KF] 
+  output_mismatch  sandbox_type_remote                                          exp=3 match=1 act=1 miss=2 [IGN] 
+  output_mismatch  set_property_values/swf4                                     exp=1571 match=349 act=1743 miss=1222 [KF] 
+  output_mismatch  set_property_values/swf5                                     exp=1743 match=1620 act=1743 miss=123 [] 
+  output_mismatch  set_property_values/swf6                                     exp=1743 match=1620 act=1743 miss=123 [] 
+  output_mismatch  set_property_values/swf7                                     exp=1743 match=1620 act=1743 miss=123 [] 
+  output_mismatch  stylesheet_load                                              exp=49 match=1 act=2 miss=48 [IGN] 
+  output_mismatch  xml_getbytes                                                 exp=17 match=9 act=17 miss=8 [IGN] 
+== avm2: 48 failing
+  output_mismatch  audio_computespectrum                                        exp=118 match=0 act=478 miss=118 [] TypeError: Error #1006: computeSpectrum is not a function.
+  output_mismatch  avm1_root                                                    exp=58 match=12 act=34 miss=46 [RUFFLE_V KF] RangeError: Error #2006: The supplied index is out of bounds.
+  output_mismatch  bitmapdata_applyfilter_identity                              exp=4 match=2 act=4 miss=2 [] 
+  output_mismatch  bitmapdata_copypixels_alpha_combine                          exp=13 match=2 act=13 miss=11 [] 
+  output_mismatch  bitmapdata_copypixels_alpha_merge                            exp=9 match=3 act=9 miss=6 [KF] 
+  output_mismatch  bom                                                          exp=9 match=6 act=9 miss=3 [RUFFLE_V] 
+  output_mismatch  dependent_strings                                            exp=84 match=46 act=83 miss=38 [RUFFLE_V] 
+  output_mismatch  displayobject_getrect                                        exp=16 match=11 act=16 miss=5 [approx] 
+  output_mismatch  event_handler_exception                                      exp=11 match=5 act=10 miss=6 [KF] Error: Exception in first listener
+  output_mismatch  external_interface                                           exp=105 match=3 act=7 miss=102 [] Error: Error #2067: The ExternalInterface is not available in this container. Ex
+  output_mismatch  flash_ui_mouse_cursor                                        exp=35 match=1 act=3 miss=34 [] ReferenceError: Error #1065: Variable MouseCursorData is not defined.
+  output_mismatch  focus_events_mixed_avm_edittext                              exp=49 match=0 act=23 miss=49 [RUFFLE_V] 
+  output_mismatch  id3_info                                                     exp=8 match=0 act=0 miss=8 [] 
+  output_mismatch  large_preload_from_bytes                                     exp=51 match=41 act=51 miss=10 [] 
+  output_mismatch  loader_applicationDomain                                     exp=4 match=0 act=0 miss=4 [ACCEPTED RUFFLE_V] 
+  output_mismatch  loader_duplicate_class                                       exp=48 match=3 act=46 miss=45 [] TypeError: Error #1034: Type Coercion failed: cannot convert flash.display::Movi
+  output_mismatch  loader_events_2                                              exp=35 match=2 act=31 miss=33 [KF] 
+  output_mismatch  loader_load                                                  exp=128 match=126 act=128 miss=2 [RUFFLE_V] TypeError: Error #1034: Type Coercion failed: cannot convert Object@00000000000 
+  output_mismatch  loader_try_click_root                                        exp=16 match=0 act=26 miss=16 [] 
+  output_mismatch  matrix3d_append_prepend_scale                                exp=86 match=0 act=46 miss=86 [] 
+  output_mismatch  matrix3d_copy_from                                           exp=19 match=15 act=16 miss=4 [] 
+  output_mismatch  matrix3d_copy_to_matrix3d                                    exp=19 match=15 act=16 miss=4 [] 
+  output_mismatch  matrix3d_interpolate                                         exp=21 match=0 act=3 miss=21 [] TypeError: Error #1009: Cannot access a property or method of a null object refe
+  output_mismatch  mouse_pick_loader_avm1                                       exp=42 match=16 act=40 miss=26 [RUFFLE_V] 
+  output_mismatch  movieclip_addframescript_error                               exp=9 match=0 act=0 miss=9 [] 
+  output_mismatch  netstream_play_flv                                           exp=16 match=0 act=1 miss=16 [IGN ACCEPTED RUFFLE_V] 
+  output_mismatch  netstream_play_stop_replay                                   exp=11 match=1 act=1 miss=10 [] 
+  output_mismatch  netstream_seek_flv                                           exp=49 match=0 act=1 miss=49 [] 
+  output_mismatch  number_convert_errors                                        exp=871 match=40 act=685 miss=831 [KF] 
+  output_mismatch  number_to_string                                             exp=353 match=237 act=353 miss=116 [KF] 
+  output_mismatch  number_tostring                                              exp=1050 match=882 act=1050 miss=168 [] 
+  output_mismatch  orphan_removeobject                                          exp=636 match=340 act=641 miss=296 [] 
+  output_mismatch  primitive_keys                                               exp=54 match=33 act=54 miss=21 [] 
+  output_mismatch  sandbox_type_remote                                          exp=3 match=1 act=1 miss=2 [IGN] 
+  output_mismatch  selection_onsetfocus_mixed_avm                               exp=5 match=0 act=0 miss=5 [] 
+  output_mismatch  simplebutton_childevents_multichild                          exp=152 match=33 act=132 miss=119 [KF] 
+  output_mismatch  simplebutton_soundtransform                                  exp=887 match=829 act=887 miss=58 [] 
+  output_mismatch  sound_load_multiple                                          exp=19 match=3 act=7 miss=16 [] TypeError: Error #1006: loadCompressedDataFromByteArray is not a function.
+  output_mismatch  soundmixer_soundtransform                                    exp=900 match=888 act=900 miss=12 [] 
+  output_mismatch  stage_display_state                                          exp=6 match=0 act=0 miss=6 [] 
+  output_mismatch  stage_scale_factor                                           exp=12 match=6 act=12 miss=6 [] 
+  output_mismatch  swz                                                          exp=2 match=0 act=0 miss=2 [ACCEPTED RUFFLE_V] 
+  output_mismatch  tab_ordering_properties                                      exp=732 match=561 act=732 miss=171 [ACCEPTED] 
+  output_mismatch  textblock_recreateline                                       exp=180 match=41 act=181 miss=139 [KF] 
+  output_mismatch  textline_atom_index_at_char_index                            exp=40 match=21 act=37 miss=19 [KF] 
+  output_mismatch  vector3d_near_equals                                         exp=80 match=67 act=80 miss=13 [] 
+  output_mismatch  verify_method_info_duplicate                                 exp=2 match=1 act=1 miss=1 [ACCEPTED KF] VerifyError: Error #1121: Method Test/hello() has a duplicate method body.
+  output_mismatch  xml_duplicate_attribute                                      exp=14 match=7 act=14 miss=7 [] 
+== fonts: 1 failing
+  output_mismatch  embed_name_lookup                                            exp=242 match=86 act=242 miss=156 [] 
+== from_avmplus: 6 failing
+  output_mismatch  as3/Array/insertremove                                       exp=30870 match=30766 act=30870 miss=104 [KF] 
+  output_mismatch  e4x/Expressions/e11_1_4                                      exp=34 match=14 act=37 miss=20 [] 
+  output_mismatch  ecma3/Statements/eforin_001                                  exp=16 match=12 act=16 miss=4 [ACCEPTED KF] 
+  output_mismatch  ecma3/Statements/eforin_002                                  exp=10 match=0 act=10 miss=10 [ACCEPTED RUFFLE_V KF] 
+  output_mismatch  recursion/pcre_find_fixedlength                              exp=20 match=19 act=20 miss=1 [KF] 
+  runtime_error    regress/bug_483783                                           exp=1 match=0 act=0 miss=1 [] 
+== from_gnash/actionscript.all: 16 failing
+  output_mismatch  Function-v6                                                  exp=271 match=263 act=271 miss=8 [KF] 
+  output_mismatch  Function-v7                                                  exp=272 match=264 act=272 miss=8 [KF] 
+  output_mismatch  Function-v8                                                  exp=272 match=264 act=272 miss=8 [KF] 
+  output_mismatch  MovieClip-v6                                                 exp=936 match=901 act=921 miss=35 [KF] 
+  output_mismatch  MovieClip-v7                                                 exp=969 match=934 act=954 miss=35 [KF] 
+  output_mismatch  MovieClip-v8                                                 exp=1087 match=1020 act=1072 miss=67 [KF] 
+  output_mismatch  TextField-v6                                                 exp=545 match=467 act=545 miss=78 [ACCEPTED KF] 
+  output_mismatch  TextField-v7                                                 exp=570 match=476 act=570 miss=94 [ACCEPTED KF] 
+  output_mismatch  TextField-v8                                                 exp=571 match=478 act=571 miss=93 [ACCEPTED KF] 
+  output_mismatch  argstest-v6                                                  exp=2192 match=80 act=2661 miss=2112 [ACCEPTED KF] 
+  output_mismatch  argstest-v7                                                  exp=2061 match=110 act=2661 miss=1951 [ACCEPTED KF] 
+  output_mismatch  argstest-v8                                                  exp=2434 match=175 act=3023 miss=2259 [ACCEPTED KF] 
+  output_mismatch  array-v5                                                     exp=560 match=551 act=560 miss=9 [ACCEPTED KF] 
+  output_mismatch  array-v6                                                     exp=644 match=623 act=644 miss=21 [KF] 
+  output_mismatch  array-v7                                                     exp=654 match=604 act=654 miss=50 [KF] 
+  output_mismatch  array-v8                                                     exp=654 match=604 act=654 miss=50 [KF] 
+== from_gnash/misc-ming.all: 13 failing
+  output_mismatch  DrawingApiTest                                               exp=93 match=81 act=95 miss=12 [RUFFLE_V KF] 
+  output_mismatch  GradientFillTest                                             exp=278 match=123 act=278 miss=155 [approx] 
+  output_mismatch  NetStream-SquareTest                                         exp=216 match=91 act=201 miss=125 [KF] 
+  output_mismatch  PrototypeEventListeners                                      exp=32 match=1 act=12 miss=31 [KF] 
+  output_mismatch  action_order/ActionOrderTest3                                exp=62 match=4 act=73 miss=58 [KF] 
+  output_mismatch  action_order/ActionOrderTest4                                exp=64 match=10 act=105 miss=54 [KF] 
+  output_mismatch  action_order/ActionOrderTest5                                exp=51 match=6 act=58 miss=45 [KF] 
+  output_mismatch  action_order/PlaceAndRemove                                  exp=96 match=15 act=45 miss=81 [] 
+  output_mismatch  action_order/action_execution_order_extend_test              exp=32 match=7 act=28 miss=25 [KF] 
+  output_mismatch  action_order/action_execution_order_test11                   exp=32 match=26 act=32 miss=6 [] 
+  output_mismatch  action_order/action_execution_order_test6                    exp=24 match=0 act=20 miss=24 [KF] 
+  output_mismatch  masks_test                                                   exp=175 match=28 act=28 miss=147 [KF] 
+  output_mismatch  register_class/RegisterClassTest4                            exp=42 match=6 act=57 miss=36 [ACCEPTED KF] 
+== from_gnash/misc-swfc.all: 5 failing
+  output_mismatch  gotoFrameFromInterval2                                       exp=23 match=2 act=24 miss=21 [RUFFLE_V KF] 
+  output_mismatch  matrix_accuracy_test1                                        exp=18 match=10 act=18 miss=8 [ACCEPTED] 
+  output_mismatch  movieclip_destruction_test3                                  exp=18 match=5 act=16 miss=13 [KF] 
+  output_mismatch  movieclip_destruction_test4                                  exp=40 match=8 act=24 miss=32 [KF] 
+  output_mismatch  sound                                                        exp=7 match=7 act=12 miss=0 [ACCEPTED RUFFLE_V] 
+== from_shumway: 6 failing
+  output_mismatch  acid/acid-shapes-testing                                     exp=120 match=36 act=120 miss=84 [KF] 
+  output_mismatch  as3-loader/LoaderLoadBytesTest                               exp=4 match=1 act=3 miss=3 [] 
+  output_mismatch  as3-loader/events/loader-events                              exp=36 match=9 act=37 miss=27 [KF] 
+  output_mismatch  avm1/hitarea                                                 exp=4 match=2 act=3 miss=2 [] 
+  output_mismatch  bitmapdata/getpixel-from-embedded                            exp=2 match=1 act=2 miss=1 [approx] 
+  output_mismatch  esc                                                          exp=2 match=0 act=13 miss=2 [ACCEPTED RUFFLE_V FLASH_BU approx] TypeError: Error #1009: Cannot access a property or method of a null object refe
+== mixed_avm: 2 failing
+  output_mismatch  avm1_loads_avm2                                              exp=7 match=3 act=3 miss=4 [] 
+  output_mismatch  avm2_loads_avm1_events                                       exp=26 match=7 act=25 miss=19 [KF] 
+== text: 1 failing
+  output_mismatch  links_in_scrolled_text                                       exp=1 match=0 act=0 miss=1 [] 
+== timeline: 2 failing
+  output_mismatch  frame_script_cleanup_goto2                                   exp=34 match=12 act=29 miss=22 [] 
+  output_mismatch  missing_frame_scripts                                        exp=22 match=12 act=27 miss=10 [] 

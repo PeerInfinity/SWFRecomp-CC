@@ -65,13 +65,12 @@ We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 t
 python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 
 # Run against the --mode=graphics native build (swf.c + offscreen Dawn).
-# Mode parity as of 2026-09-04: per-test results are identical to no-graphics
-# across all suites EXCEPT ONE — `from_gnash/misc-swfc.all/gotoFrameFromInterval2`
-# is `output_mismatch` under graphics and `ruffle_matched` under no-graphics.
-# That gap is stable, not a flake: identical on both sides of five consecutive
-# slice diffs. It is filed in BACKLOG; treat "parity" as 1-test-short rather
-# than complete. (The old "case-v6 CI flake" was 3 real heap bugs, fixed
-# 2026-05-28 in d905efdb1 — that one IS closed.)
+# Mode parity as of 2026-09-04 (session 18, commit 78ab05fda): per-test
+# results are identical to no-graphics across ALL suites. The one standing
+# gap — `from_gnash/misc-swfc.all/gotoFrameFromInterval2`, output_mismatch
+# under graphics only — was swf.c lacking swf_core.c's pre-advance orphaned-
+# action drain; ported, CI-confirmed in both modes. (The old "case-v6 CI
+# flake" was 3 real heap bugs, fixed 2026-05-28 in d905efdb1 — also closed.)
 # Graphics is also the per-change CI mode (see Git Workflow above). See
 # SWFRecompDocs/plans/graphics-native-test-mode-*.md for the plan,
 # playbook, and full-suite baseline.

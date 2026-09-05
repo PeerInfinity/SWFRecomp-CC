@@ -1,0 +1,17 @@
+== avm1: on-disk 738 graded 730
+  NEW (ungraded): virtual_property_special_recursion_double_swf6
+  NEW (ungraded): virtual_property_special_recursion_double_swf7
+  NEW (ungraded): virtual_property_special_recursion_swf6
+  NEW (ungraded): virtual_property_special_recursion_swf7
+  NEW (ungraded): watch_special_recursion_double_swf6
+  NEW (ungraded): watch_special_recursion_double_swf7
+  NEW (ungraded): watch_special_recursion_swf6
+  NEW (ungraded): watch_special_recursion_swf7
+== avm2: on-disk 1264 graded 1261
+  NEW (ungraded): av_networking_params
+  NEW (ungraded): av_tag_data
+  NEW (ungraded): dictionary_primitive_keys
+  NEW (ungraded): property_priority_scope_cache_order
+  GONE (upstream removed): external_interface
+== from_gnash/misc-swfc.all: on-disk 21 graded 20
+  NEW (ungraded): gotoFrameFromInterval

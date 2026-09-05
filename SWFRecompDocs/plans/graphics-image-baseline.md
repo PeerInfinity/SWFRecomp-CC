@@ -63,6 +63,14 @@ for per-movie geometry**: an `ImportAssets` character is DEFINED by the child
 SWF, so it takes the same re-base path a `loadMovie`'d one does, and it is the
 only upstream image comparison that exercises it.
 
+**Update 2026-09-05, session 18 fan-out (run
+[33945288707](https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/33945288707)
+at `8376eb700`): 381/577 pass (66.0%), up from 364/572. +17 flips, 0
+regressions across three graded runs; 36 bands improved / 1 worsened
+(`avm2/graphics_gradients` 299 → 469, a round-join side effect on gradient
+strokes). Mechanisms and the session-19 board: `graphics-fanout-playbook.md`
+§17; per-patch ledgers in `session18-fanout-reports/`.**
+
 ## How to reproduce this
 
 ```bash
