@@ -1,0 +1,122 @@
+diff --git a/SWFRecomp/src/abc/abc_timeline.cpp b/SWFRecomp/src/abc/abc_timeline.cpp
+index 77d5f5124..8c0d00d07 100644
+--- a/SWFRecomp/src/abc/abc_timeline.cpp
++++ b/SWFRecomp/src/abc/abc_timeline.cpp
+@@ -830,9 +830,90 @@ struct GlyphBitReader
+ 	}
+ };
+ 
++// ---------------------------------------------------------------------
++// Raph Levien parabola-integral quadratic flattening for AVM2 GLYPH outlines,
++// ported from lyon_geom 1.0.6 `src/quadratic_bezier.rs` — the flattener
++// Ruffle's tessellator runs on glyph shapes (`register_shape` -> scale 1.0 ->
++// `FillOptions::DEFAULT_TOLERANCE` = 0.1 px, and a glyph coordinate is read as
++// one twip, so 0.1 px = 2.0 glyph units).  Local twin of the plain-shape
++// flattener in swf.cpp; kept separate so the two pipelines stay independent.
++// ---------------------------------------------------------------------
++static const float GLYPH_LEVIEN_TOL = 2.0f;
++
++struct GlyphLevienParams
++{
++	uint32_t count;
++	float integral_from;
++	float integral_step;
++	float inv_integral_from;
++	float div_inv_integral_diff;
++};
++
++static float glyphParabolaIntegral(float x)
++{
++	const float d = 0.67f;
++	return x / (1.0f - d + sqrtf(sqrtf(d*d*d*d + 0.25f*x*x)));
++}
++
++static float glyphParabolaInvIntegral(float x)
++{
++	const float b = 0.39f;
++	return x * (1.0f - b + sqrtf(b*b + 0.25f*x*x));
++}
++
++static GlyphLevienParams glyphLevienInit(float x0, float y0, float cx, float cy,
++                                         float x1, float y1, float tolerance)
++{
++	GlyphLevienParams p = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
++	if (x0 == x1 && y0 == y1) return p;
++	{
++		float bx = x1 - x0, by = y1 - y0;
++		float len2 = bx*bx + by*by;
++		float cross = (cx - x0) * by - (cy - y0) * bx;
++		if (len2 > 0.0f && (cross*cross) / len2 <= tolerance * tolerance * 4.0f) return p;
++	}
++	float ddx = 2.0f*cx - x0 - x1;
++	float ddy = 2.0f*cy - y0 - y1;
++	float crs = (x1 - x0) * ddy - (y1 - y0) * ddx;
++	if (crs == 0.0f) return p;
++
++	float inv_crs = 1.0f / crs;
++	float parabola_from = ((cx - x0) * ddx + (cy - y0) * ddy) * inv_crs;
++	float parabola_to   = ((x1 - cx) * ddx + (y1 - cy) * ddy) * inv_crs;
++	float scale = fabsf(crs) / (sqrtf(ddx*ddx + ddy*ddy) * fabsf(parabola_to - parabola_from));
++
++	float integral_from = glyphParabolaIntegral(parabola_from);
++	float integral_to   = glyphParabolaIntegral(parabola_to);
++	float integral_diff = integral_to - integral_from;
++
++	float inv_integral_from = glyphParabolaInvIntegral(integral_from);
++	float inv_integral_to   = glyphParabolaInvIntegral(integral_to);
++
++	float count = ceilf(0.5f * fabsf(integral_diff) * sqrtf(scale / tolerance));
++	if (!std::isfinite(count) || count < 1.0f) return p;
++	if (count > 64.0f) count = 64.0f;
++
++	p.count = (uint32_t) count;
++	p.integral_from = integral_from;
++	p.integral_step = integral_diff / count;
++	p.inv_integral_from = inv_integral_from;
++	p.div_inv_integral_diff = 1.0f / (inv_integral_to - inv_integral_from);
++	return p;
++}
++
++static float glyphLevienT(const GlyphLevienParams& p, uint32_t i)
++{
++	float u = glyphParabolaInvIntegral(p.integral_from + p.integral_step * (float) i);
++	return (u - p.inv_integral_from) * p.div_inv_integral_diff;
++}
++
+ // Parse one glyph SHAPE (no styles): flatten contours into fd. Quadratic
+-// curves are subdivided into 8 segments — glyphs render at text sizes, where
+-// that is well under half a pixel of error.
++// curves are subdivided on lyon's adaptive Levien schedule at Ruffle's own
++// glyph tolerance (see the helper block above). This used to be a fixed 8
++// equal-parameter chords on the reasoning that "glyphs render at text sizes,
++// where that is well under half a pixel of error" — at a 20480-em face and a
++// 96 px text height that left ~0.11 device px, which is what the AVM2 text
++// image comparisons were losing run-edge pixels to.
+ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
+ {
+ 	GlyphBitReader r{p, end};
+@@ -891,9 +972,22 @@ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
+ 			double cx = px + cdx, cy = py + cdy;
+ 			double ax = cx + adx, ay = cy + ady;
+ 			if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
+-			for (int k = 1; k <= 8; k++)
++			// Ruffle flattens a glyph outline with lyon's Levien schedule at
++			// FillOptions::DEFAULT_TOLERANCE (0.1 px = 2.0 glyph units, since
++			// register_shape tessellates glyphs at scale 1.0 and reads a glyph
++			// coordinate as one twip).  The old fixed 8 equal-parameter chords
++			// left up to dev/64 of error, ~30x the integer-unit quantisation on
++			// a 20480-em face, and that error is what the AVM2 text image tests
++			// were losing run-edge pixels to.
++			GlyphLevienParams lp = glyphLevienInit((float) x0, (float) y0,
++			                                       (float) cx, (float) cy,
++			                                       (float) ax, (float) ay,
++			                                       GLYPH_LEVIEN_TOL);
++			uint32_t nseg = (lp.count < 1) ? 1 : lp.count;
++			for (uint32_t k = 1; k <= nseg; k++)
+ 			{
+-				double t = k / 8.0, u = 1.0 - t;
++				double t = (k < lp.count) ? (double) glyphLevienT(lp, k) : 1.0;
++				double u = 1.0 - t;
+ 				double qx = u * u * x0 + 2.0 * u * t * cx + t * t * ax;
+ 				double qy = u * u * y0 + 2.0 * u * t * cy + t * t * ay;
+ 				cur.push_back((int32_t) lround(qx));
