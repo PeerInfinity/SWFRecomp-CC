@@ -10701,9 +10701,19 @@ static Avm2Value v3_near_equals(Avm2Activation* act)
 	int all_four = act->argc > 2 && avm2_coerce_to_boolean(act->args[2]);
 	int eq = fabs(v3_get(ctx, s, "x") - v3_get(ctx, a, "x")) < tol
 	      && fabs(v3_get(ctx, s, "y") - v3_get(ctx, a, "y")) < tol
-	      && fabs(v3_get(ctx, s, "z") - v3_get(ctx, a, "z")) < tol
-	      // FP BUG (replicated): the w arm forgets the subtraction.
-	      && (!all_four || fabs(v3_get(ctx, a, "w")) < tol);
+	      && fabs(v3_get(ctx, s, "z") - v3_get(ctx, a, "z")) < tol;
+	// FP BUG (replicated in full): the w arm is `Math.abs(this.w =
+	// toCompare.w) < tolerance` — an ASSIGNMENT, not a subtraction. So it
+	// both compares |toCompare.w| against the tolerance AND overwrites
+	// this.w, and only when allFour is true and the x/y/z arms all passed
+	// (the `&& (!allFour || ...)` short-circuit). avm2/vector3d_near_equals
+	// grades the side effect through its traceVectors lines.
+	if (eq && all_four)
+	{
+		double aw = v3_get(ctx, a, "w");
+		v3_set(ctx, s, "w", aw);
+		eq = fabs(aw) < tol;
+	}
 	return avm2_bool(eq);
 }
 

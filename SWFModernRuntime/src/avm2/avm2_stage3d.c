@@ -1496,7 +1496,11 @@ static Avm2Value matrix3d_clone(Avm2Activation* act)
 static Avm2Value matrix3d_copy_from(Avm2Activation* act)
 {
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
-	Avm2Matrix3DExt* src = matrix3d_ext_of(s3d_arg_object(act, 0));
+	// A null `source` is #2007 (matrix3d_copy_from testNull), thrown before
+	// anything is copied — the same get_object(...) contract copyRawDataFrom
+	// already uses.
+	Avm2Matrix3DExt* src = matrix3d_ext_of(s3d_arg_object_non_null(act, 0,
+	                                                               "source"));
 	if (e != NULL && src != NULL) memcpy(e->m, src->m, sizeof(e->m));
 	return avm2_undefined();
 }
@@ -1676,9 +1680,24 @@ static Avm2Value matrix3d_xform(Avm2Activation* act, int kind, int prepend)
 		// The scale/translate matrix is built from f32-CAST arguments, so
 		// appendScale(1.0000000596046448) is exactly appendScale(1)
 		// (matrix3d_precision testAppendScale/testPrependScale: "3,3,3").
-		double x = (double) (float) s3d_arg_number(act, 0, kind == 1 ? 1.0 : 0.0);
-		double y = (double) (float) s3d_arg_number(act, 1, kind == 1 ? 1.0 : 0.0);
-		double z = (double) (float) s3d_arg_number(act, 2, kind == 1 ? 1.0 : 0.0);
+		// The #2183 check below, however, is on the RAW f64 (Ruffle
+		// matrix_3d.rs:147/223 `x.is_zero()`), so a value that only
+		// underflows to zero in f32 still scales.
+		double rx = s3d_arg_number(act, 0, 0.0);
+		double ry = s3d_arg_number(act, 1, 0.0);
+		double rz = s3d_arg_number(act, 2, 0.0);
+		// appendScale/prependScale reject a zero factor of EITHER sign before
+		// touching the matrix (avm2/matrix3d_append_prepend_scale's eight
+		// exception blocks). A missing argument reads as 0 and therefore
+		// throws too, matching Ruffle's FunctionArgs::get_f64.
+		if (kind == 1 && (rx == 0.0 || ry == 0.0 || rz == 0.0))
+		{
+			avm2_throw_error(act->ctx, act->ctx->builtins.argument_error_class,
+			                 "Error #2183: Scale values must not be zero.");
+		}
+		double x = (double) (float) rx;
+		double y = (double) (float) ry;
+		double z = (double) (float) rz;
 		if (kind == 1) m3d_build_scale(t, x, y, z);
 		else m3d_build_translation(t, x, y, z);
 	}
@@ -2215,8 +2234,186 @@ static Avm2Value matrix3d_copy_row_from(Avm2Activation* act)
 static Avm2Value matrix3d_copy_to_matrix3d(Avm2Activation* act)
 {
 	Avm2Matrix3DExt* e = matrix3d_ext(act);
-	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object(act, 0));
+	// A null `dest` is #2007 (matrix3d_copy_to_matrix3d testNull).
+	Avm2Matrix3DExt* o = matrix3d_ext_of(s3d_arg_object_non_null(act, 0,
+	                                                             "dest"));
 	if (e != NULL && o != NULL) memcpy(o->m, e->m, sizeof(o->m));
+	return avm2_undefined();
+}
+
+// ---------------------------------------------------------------------------
+// Matrix3D.interpolate / interpolateTo (Ruffle geom/Matrix3D.as:69-175)
+// ---------------------------------------------------------------------------
+
+// Normalized rotation quaternion (x,y,z,w) of a raw column-major 4x4, read
+// from its upper-left 3x3 WITH THE SCALE LEFT IN. That is not a bug: it is
+// what makes avm2/matrix3d_interpolate's "rot+scale p=0.5" row land on
+// 0.529999/0.847998 instead of the naive 45-degree 0.707107.
+static void m3d_quaternion_of(const double* m, double* q)
+{
+	double m00 = m[0], m10 = m[1], m20 = m[2];
+	double m01 = m[4], m11 = m[5], m21 = m[6];
+	double m02 = m[8], m12 = m[9], m22 = m[10];
+	double x, y, z, w, sc;
+	double tr = m00 + m11 + m22;
+	if (tr > 0)
+	{
+		sc = sqrt(tr + 1) * 2;
+		w = 0.25 * sc;
+		x = (m21 - m12) / sc;
+		y = (m02 - m20) / sc;
+		z = (m10 - m01) / sc;
+	}
+	else if (m00 > m11 && m00 > m22)
+	{
+		sc = sqrt(1 + m00 - m11 - m22) * 2;
+		w = (m21 - m12) / sc;
+		x = 0.25 * sc;
+		y = (m01 + m10) / sc;
+		z = (m02 + m20) / sc;
+	}
+	else if (m11 > m22)
+	{
+		sc = sqrt(1 + m11 - m00 - m22) * 2;
+		w = (m02 - m20) / sc;
+		x = (m01 + m10) / sc;
+		y = 0.25 * sc;
+		z = (m12 + m21) / sc;
+	}
+	else
+	{
+		sc = sqrt(1 + m22 - m00 - m11) * 2;
+		w = (m10 - m01) / sc;
+		x = (m02 + m20) / sc;
+		y = (m12 + m21) / sc;
+		z = 0.25 * sc;
+	}
+	double len = sqrt(x * x + y * y + z * z + w * w);
+	if (len == 0)
+	{
+		q[0] = 0; q[1] = 0; q[2] = 0; q[3] = 1;
+		return;
+	}
+	q[0] = x / len; q[1] = y / len; q[2] = z / len; q[3] = w / len;
+}
+
+// The whole of `interpolate` on raw column-major doubles: the translation
+// column lerps, the two quaternions slerp, and the SCALE IS DISCARDED (the
+// .as recomposes with a unit scale vector, which is why interpolating two
+// pure-scale matrices yields the identity).
+static void m3d_interpolate_raw(const double* a, const double* b,
+                                double percent, double* out)
+{
+	double q0[4], q1[4];
+	m3d_quaternion_of(a, q0);
+	m3d_quaternion_of(b, q1);
+
+	double tx = a[12] + (b[12] - a[12]) * percent;
+	double ty = a[13] + (b[13] - a[13]) * percent;
+	double tz = a[14] + (b[14] - a[14]) * percent;
+
+	double dot = q0[0] * q1[0] + q0[1] * q1[1] + q0[2] * q1[2] + q0[3] * q1[3];
+	double x1 = q1[0], y1 = q1[1], z1 = q1[2], w1 = q1[3];
+	if (dot < 0)
+	{
+		dot = -dot;
+		x1 = -x1; y1 = -y1; z1 = -z1; w1 = -w1;
+	}
+	double k0, k1;
+	if (dot > 0.9995)
+	{
+		k0 = 1 - percent;
+		k1 = percent;
+	}
+	else
+	{
+		double theta = acos(dot);
+		double st = sin(theta);
+		k0 = sin((1 - percent) * theta) / st;
+		k1 = sin(percent * theta) / st;
+	}
+	double rx = q0[0] * k0 + x1 * k1;
+	double ry = q0[1] * k0 + y1 * k1;
+	double rz = q0[2] * k0 + z1 * k1;
+	double rw = q0[3] * k0 + w1 * k1;
+	double len = sqrt(rx * rx + ry * ry + rz * rz + rw * rw);
+	if (len == 0)
+	{
+		rx = 0; ry = 0; rz = 0; rw = 1; len = 1;
+	}
+	rx /= len; ry /= len; rz /= len; rw /= len;
+
+	// recompose([trans, rot, Vector3D(1,1,1)], "quaternion") — the unit-scale
+	// specialization of matrix3d_recompose's quaternion arm.
+	out[0] = 1 - 2 * ry * ry - 2 * rz * rz;
+	out[1] = 2 * rx * ry + 2 * rw * rz;
+	out[2] = 2 * rx * rz - 2 * rw * ry;
+	out[3] = 0;
+	out[4] = 2 * rx * ry - 2 * rw * rz;
+	out[5] = 1 - 2 * rx * rx - 2 * rz * rz;
+	out[6] = 2 * ry * rz + 2 * rw * rx;
+	out[7] = 0;
+	out[8] = 2 * rx * rz + 2 * rw * ry;
+	out[9] = 2 * ry * rz - 2 * rw * rx;
+	out[10] = 1 - 2 * rx * rx - 2 * ry * ry;
+	out[11] = 0;
+	out[12] = tx; out[13] = ty; out[14] = tz; out[15] = 1;
+}
+
+static Avm2Value matrix3d_interpolate(Avm2Activation* act);
+
+// FP spells the CLASS-side frame "flash.geom::Matrix3D$/interpolate()", and
+// avm2_callstack_frame_name cannot tell a static builtin frame from an
+// instance one, so swap this call's own frame for a synthetic native one —
+// the same idiom as avm2_globals.c's "flash.system::System$/exit". The
+// longjmp to the catch unwinds call_depth, so no pop is needed afterwards.
+static _Noreturn void m3d_interp_throw_2007(Avm2Activation* act,
+                                            const char* param)
+{
+	static const Avm2MethodRef interp_frame =
+		{ NULL, NULL, "flash.geom::Matrix3D$/interpolate", 0, 0 };
+	Avm2Context* c = act->ctx;
+	if (c->call_depth > 0
+	    && c->call_frames[c->call_depth - 1].method.fn == matrix3d_interpolate)
+	{
+		avm2_callstack_pop(c);
+	}
+	avm2_callstack_push(c, &interp_frame, NULL);
+	s3d_throw_2007(c, param);
+}
+
+static Avm2Value matrix3d_interpolate(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* fo = s3d_arg_object(act, 0);
+	Avm2Object* to = s3d_arg_object(act, 1);
+	Avm2Matrix3DExt* fe = matrix3d_ext_of(fo);
+	Avm2Matrix3DExt* te = matrix3d_ext_of(to);
+	if (fe == NULL) m3d_interp_throw_2007(act, "fromMat");
+	if (te == NULL) m3d_interp_throw_2007(act, "toMat");
+	double percent = s3d_arg_number(act, 2, 0.0);
+	double a[16], b[16], out[16];
+	m3d_widen(fe->m, a);
+	m3d_widen(te->m, b);
+	m3d_interpolate_raw(a, b, percent, out);
+	Avm2Object* r = avm2_geom_matrix3d_new(ctx, out);
+	return r != NULL ? avm2_object_value(r) : avm2_null();
+}
+
+// interpolateTo validates `toMat` ITSELF, so the trace carries no
+// interpolate() frame (avm2/matrix3d_interpolate "interpTo(null)").
+static Avm2Value matrix3d_interpolate_to(Avm2Activation* act)
+{
+	Avm2Matrix3DExt* e = matrix3d_ext(act);
+	Avm2Matrix3DExt* te = matrix3d_ext_of(s3d_arg_object_non_null(act, 0,
+	                                                              "toMat"));
+	if (e == NULL || te == NULL) return avm2_undefined();
+	double percent = s3d_arg_number(act, 1, 0.0);
+	double a[16], b[16], out[16];
+	m3d_widen(e->m, a);
+	m3d_widen(te->m, b);
+	m3d_interpolate_raw(a, b, percent, out);
+	m3d_narrow(out, e->m);
 	return avm2_undefined();
 }
 
@@ -2503,8 +2700,9 @@ static void register_matrix3d(Avm2Context* ctx)
 	// pointAt is a stub in Ruffle too (stub_method, no matrix change), so a
 	// caller sees an unchanged matrix rather than an error.
 	avm2_builtin_add_method(ctx, m, "pointAt", s3d_noop);
-	avm2_builtin_add_method(ctx, m, "interpolateTo", s3d_noop);
-	avm2_builtin_add_static_method(ctx, m, "interpolate", s3d_noop);
+	avm2_builtin_add_method(ctx, m, "interpolateTo", matrix3d_interpolate_to);
+	avm2_builtin_add_static_method(ctx, m, "interpolate",
+	                              matrix3d_interpolate);
 
 	// flash.geom.Orientation3D — the three strings recompose/decompose accept.
 	Avm2Class* o3 = avm2_builtin_class(ctx, "flash.geom", "Orientation3D",

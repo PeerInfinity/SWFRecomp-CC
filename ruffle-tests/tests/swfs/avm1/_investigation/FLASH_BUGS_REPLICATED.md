@@ -73,6 +73,52 @@ to the `String`/`Array` prototype methods above — but check, don't assume.
 
 ---
 
+## [AVM2] `Vector3D.nearEquals(v, tol, true)` ASSIGNS `this.w = toCompare.w`
+
+**Affected test**: `avm2/vector3d_near_equals`
+
+**The bug**: Flash's `Vector3D.nearEquals` fourth arm is
+
+```as3
+&& (!allFour || Math.abs(this.w = toCompare.w) < tolerance); // FP BUG
+```
+
+An **assignment** was written where a subtraction belongs. Two consequences,
+both observable:
+
+1. The `w` comparison is `|toCompare.w| < tolerance` — `this.w` is never part
+   of the comparison at all, so `nearEquals` can report `true` for two
+   vectors whose `w` differ by any amount as long as the *argument's* `w` is
+   small.
+2. It is a **side effect on the receiver**: whenever `allFour` is true and the
+   x/y/z arms all passed, `this.w` is silently overwritten with
+   `toCompare.w`. The `&& (!allFour || ...)` short-circuit means the write
+   does NOT happen when `allFour` is false, or when any of x/y/z already
+   failed.
+
+**Evidence**: `avm2/vector3d_near_equals` prints both vectors after every
+`nearEquals` call, and 13 of its `v1 = ...` lines carry a `w` that came from
+`v2`:
+
+```
+  19   v1 = 1,1,1,2       # after v1.nearEquals(v2, 2, true), v2.w == 2
+  49   v1 = 2,2,2,3       # after v1.nearEquals(v3, 2, true), v3.w == 3
+  79   v1 = -1,-1,-1,-2
+```
+
+Ruffle's `core/src/avm2/globals/flash/geom/Vector3D.as:96` carries the same
+line with the same `// FP BUG` comment, so the expected output is Flash's.
+
+**What we did**: `v3_near_equals` already replicated half the bug (comparing
+`|toCompare.w|` instead of a difference) but not the assignment, which is why
+those 13 lines diverged. Session 18 completed it: the x/y/z arms are
+evaluated first, and only if they all pass *and* `allFour` is set do we write
+`this.w` and then test `|w| < tolerance`.
+
+**File**: `SWFModernRuntime/src/avm2/avm2_display.c` — `v3_near_equals()`
+
+---
+
 ## colorTransform: aMult-Only > 1 Has No Effect
 
 **Affected test**: `bitmap_data_colortransform`
