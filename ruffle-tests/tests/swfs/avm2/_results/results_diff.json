@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-05T04:40:58.146765+00:00",
-    "old_git_sha": "7f7a6ba36937ef3094a51657f72e64a8359953fb",
-    "new_timestamp": "2026-09-05T06:00:15.012644+00:00",
-    "new_git_sha": "1d87c1cfba936209fc59d1e9eb79aa3141aebe56",
+    "old_timestamp": "2026-09-05T06:00:15.012644+00:00",
+    "old_git_sha": "1d87c1cfba936209fc59d1e9eb79aa3141aebe56",
+    "new_timestamp": "2026-09-06T08:47:24.353795+00:00",
+    "new_git_sha": "bf907d0023cc5a31bed497fe099e1cec63ddeef3",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 1234,
     "old_total": 1261,
     "old_pass_rate": 95.0,
-    "new_pass": 1198,
+    "new_pass": 1199,
     "new_ruffle_matched": 36,
-    "new_effective_pass": 1234,
-    "new_total": 1261,
+    "new_effective_pass": 1235,
+    "new_total": 1262,
     "new_pass_rate": 95.0,
     "old_mismatched_lines": 2875,
     "new_mismatched_lines": 2875,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 1261,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "bitmapdata_draw_cab_quality",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }
