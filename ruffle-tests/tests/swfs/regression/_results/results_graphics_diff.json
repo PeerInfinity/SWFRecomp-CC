@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-11T15:53:45.723044+00:00",
-    "old_git_sha": "c4a952960bcab8ccdf60caec9b5bda9e083506cb",
-    "new_timestamp": "2026-09-11T17:41:26.598181+00:00",
-    "new_git_sha": "b0a6a487b11cb91fa9610a0eddd910e5b1ea8018",
+    "old_timestamp": "2026-09-11T17:41:26.598181+00:00",
+    "old_git_sha": "b0a6a487b11cb91fa9610a0eddd910e5b1ea8018",
+    "new_timestamp": "2026-09-11T18:18:12.259555+00:00",
+    "new_git_sha": "60bb82a8a67fb6f8f92b6b03d16aa7d0633b6a0d",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 90,
     "old_total": 90,
     "old_pass_rate": 100.0,
-    "new_pass": 90,
+    "new_pass": 91,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 90,
-    "new_total": 90,
+    "new_effective_pass": 91,
+    "new_total": 91,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 90,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_mcl_holder_totalframes",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    }
+  ]
 }
