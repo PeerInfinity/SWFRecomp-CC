@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-06T08:47:24.443225+00:00",
-    "old_git_sha": "bf907d0023cc5a31bed497fe099e1cec63ddeef3",
+    "old_timestamp": "2026-09-11T16:55:04.472068+00:00",
+    "old_git_sha": "13dfc5b483e9808c4c4f4fd3cf47ab44eb714e64",
     "new_timestamp": "2026-09-11T16:55:04.472068+00:00",
     "new_git_sha": "13dfc5b483e9808c4c4f4fd3cf47ab44eb714e64",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 144,
+    "old_pass": 145,
     "old_ruffle_matched": 2,
-    "old_effective_pass": 146,
-    "old_total": 146,
+    "old_effective_pass": 147,
+    "old_total": 147,
     "old_pass_rate": 98.6,
     "new_pass": 145,
     "new_ruffle_matched": 2,
@@ -25,22 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 146,
-    "added": 1,
+    "unchanged": 147,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "edittext/edittext_caret_multiline",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    }
-  ]
+  "changes": []
 }
