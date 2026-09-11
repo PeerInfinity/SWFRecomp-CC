@@ -1,0 +1,10 @@
+load
+  Child ctor, numChildren=1
+root kids=1
+child0:flash.display::SimpleButton
+up: flash.display::Shape w=20 h=20
+over: flash.display::Sprite w=40 h=40 kids=2
+down: flash.display::Shape w=40 h=40
+hit: flash.display::Shape w=20 h=20
+button w=20 h=20
+done

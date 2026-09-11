@@ -12481,6 +12481,20 @@ static const Avm2ButtonData* button_data_for_char(uint16_t char_id)
 			return &avm2_generated_buttons[i];
 		}
 	}
+	// …and every LOADED CHILD movie, the same fall-through char_info(),
+	// timeline_for_char() and class_for_char() already have. class_for_char
+	// ALREADY answers SimpleButton for a child's DefineButton2 (its `chars`
+	// row falls through), so without this the object exists but every state
+	// comes back NULL and the button measures 0x0. A child's ButtonDef and
+	// every ButtonRec char id are already shifted by char_id_base
+	// (abc_timeline.cpp offsetCharIds), so the bare-id key is correct.
+	// Graded by regression/avm2_child_simplebutton.
+	for (uint32_t m = 0; m < g_child_movie_count; m++)
+	{
+		const Avm2MovieTables* t = g_child_movies[m];
+		for (uint32_t i = 0; i < t->button_count; i++)
+			if (t->buttons[i].char_id == char_id) return &t->buttons[i];
+	}
 	return NULL;
 }
 
