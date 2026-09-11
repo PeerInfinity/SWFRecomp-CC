@@ -5689,10 +5689,24 @@ static void loader_drop_content(Avm2Context* ctx, Avm2Object* self,
 {
 	if (ext == NULL) return;
 	Avm2DisplayObjectExt* pext = avm2_display_ext_of(ctx, self);
-	if (ext->content != NULL && pext != NULL
-	    && render_index_of(pext, ext->content) >= 0)
+	// Ruffle LoaderInfoObject::unload (loaderinfo_object.rs:265-279) reads the
+	// content child ONCE, dispatches a bare `unload` on the LoaderInfo only
+	// when it is Some, and removes that captured child afterwards — so a
+	// listener still sees the old stream, and the `removed`/`removedFromStage`
+	// trio follows the `unload`. Graded by avm2/loader_events_2 (its `unload`
+	// + `child unload` lines) and mixed_avm/avm2_loads_avm1_events.
+	Avm2Object* content = (ext->content != NULL && pext != NULL
+	                       && render_index_of(pext, ext->content) >= 0)
+		? ext->content : NULL;
+	if (content != NULL && ext->content_loader_info != NULL)
 	{
-		full_remove_child(ctx, pext, ext->content);
+		dispatch_simple_event(ctx, ext->content_loader_info, "unload", 0);
+	}
+	// Re-checked after the dispatch: a handler may have unloaded the Loader
+	// itself, which already took the child off the list.
+	if (content != NULL && render_index_of(pext, content) >= 0)
+	{
+		full_remove_child(ctx, pext, content);
 	}
 	ext->content = NULL;
 	loaderinfo_reset_stream(loaderinfo_ext_of(ctx, ext->content_loader_info));
@@ -6118,6 +6132,20 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 		return;
 	}
 
+	// Ruffle fire_added_events (display_object.rs:2404), run at the end of the
+	// loaded root's own construction: its gate is ONLY "my parent is not a
+	// SimpleButton", so a PARENTLESS object still fires a bare, bubbling
+	// `added` on itself — and no `addedToStage`, because it is not on the
+	// stage yet. Our on_construction_complete additionally requires a parent
+	// and is never called for a loaded root anyway (constructed is set above),
+	// so the dispatch is done here, at the same point in the sequence: after
+	// the ctor, before the Loader inserts the content (which fires the SECOND
+	// `added` — the one that bubbles to the Loader and brings addedToStage).
+	// Both copies are graded by avm2/loader_events_2.
+	if (!cext->placed_by_avm2_script)
+	{
+		dispatch_simple_event(ctx, child, "added", 1);
+	}
 	lx->content = child;
 	// content/url become readable at ATTACH, not at init: the child's own
 	// ctor reads them as null (`Loaded swf loaderInfo.url: null content:
