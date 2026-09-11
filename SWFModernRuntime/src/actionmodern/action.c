@@ -24234,13 +24234,15 @@ typedef struct {
 	                       //   driver runs in the SAME tick right after it, so an
 	                       //   armed-at-birth entry runs TWO of the movie's frames
 	                       //   on its load tick. Flash gives it one per tick.
-	                       //   Clip targets of a direct loadMovie start unarmed;
-	                       //   _levelN and MovieClipLoader targets start ARMED,
-	                       //   keeping the double step they have always had --
-	                       //   from_shumway/avm1/moviecliploader has num_frames=3
-	                       //   and only reaches its loadee's frame 2 because of
-	                       //   it, which says our MCL load itself completes a tick
-	                       //   later than Flash's. Fixing that is its own change.
+	                       //   Clip targets of a direct loadMovie start unarmed,
+	                       //   and so do MovieClipLoader targets since the
+	                       //   Phase-3 split (the double step was compensating
+	                       //   for onLoadInit firing inside the load's own
+	                       //   drain; see g_pending_load_inits and
+	                       //   regression/avm1_mcl_load_tick). Only a _levelN
+	                       //   target of a DIRECT loadMovieNum still starts
+	                       //   ARMED -- nothing grades it, and unarming it
+	                       //   widens the blast radius for no measured gain.
 } LevelAdvanceEntry;
 #define MAX_LEVEL_ADVANCE 128
 static LevelAdvanceEntry g_level_advance[MAX_LEVEL_ADVANCE];
@@ -24325,10 +24327,19 @@ void actionRegisterChildMovieAdvance(MovieClip* mc, MovieEntry* entry, int start
 	e->armed = (u8)(start_armed ? 1 : 0);
 }
 
-// MovieClipLoader targets. Kept armed at birth: see the `armed` field comment.
+// MovieClipLoader targets.
+//
+// UNARMED since the Phase-3 split (regression/avm1_mcl_load_tick): the loader
+// already ran the movie's frame 1 itself, so the same tick's
+// actionAdvancePlayingLevels must not run frame 2 as well. The double step was
+// compensating for Phase 3 firing inside the load's own drain — with
+// onLoadInit moved to the next tick's pre-advance slot, arming at birth would
+// put the movie a whole frame ahead of Ruffle from `c2` onwards.
+// `_levelN` targets (actionRegisterChildMovieAdvance's other caller) are
+// deliberately left armed: nothing grades them and it widens the blast radius.
 void actionRegisterLevelAdvance(MovieClip* mc, MovieEntry* entry)
 {
-	actionRegisterChildMovieAdvance(mc, entry, /*start_armed=*/1);
+	actionRegisterChildMovieAdvance(mc, entry, /*start_armed=*/0);
 }
 
 // Stop per-tick frame advancement for a previously-registered level/MC.
@@ -24961,6 +24972,10 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
 	int saved_quit = quit_swf;
 	quit_swf = 0;
 	actionFirePendingDirectLoads(app_context);
+	// The MCL Phase-3 slot, same as swf_core.c / swf.c: the previous AVM2
+	// tick's drain parked onLoadInit, and it fires here, just before the
+	// loaded movie's own advance.
+	actionDrainPendingLoadInits(app_context);
 	actionAdvancePlayingLevels(app_context);
 	actionFirePendingUnloads(app_context);
 	quit_swf = saved_quit;
@@ -36394,6 +36409,30 @@ static PendingMCLLoad g_pending_mcl_loads_next_tick[MAX_PENDING_MCL_LOADS];
 int g_pending_mcl_load_count_next_tick = 0;
 int g_pending_mcl_load_count = 0;  // sum of both buckets (for exit-condition checks)
 
+// Phase 3 (`onLoadInit` / `onLoadError`) is NOT fired by the drain that ran
+// phases 1 and 2 — it is parked here and fired by actionDrainPendingLoadInits
+// on the NEXT tick, immediately BEFORE actionAdvancePlayingLevels.
+//
+// Ruffle/Flash order for a one-frame loader (regression/avm1_mcl_load_tick,
+// oracled against the Ruffle exporter):
+//
+//     c1, t1 h.cf=1, onLoadInit cf=1, c2, t2 h.cf=2, c3, ...
+//               ^ the root's own onEnterFrame for the tick AFTER the load,
+//                 then onLoadInit, then the loaded movie's frame 2
+//
+// so the slot is: after the tick's enterFrame broadcast, before the loaded
+// movie's advance. Draining at the existing end-of-tick MCL site instead would
+// give `t1, c2, onLoadInit` — the position is the whole point of the queue.
+// Entries are pushed in Phase 3's LIFO order and drained in push order, so the
+// relative firing order between several loads is unchanged.
+// The stamp is what makes it "next tick" rather than "later in this tick": the
+// drain that queues an entry runs inside tagShowFrame, which is EARLIER in the
+// same tick than the pre-advance slot, so a position-only move would still fire
+// onLoadInit before the next enterFrame broadcast.
+static PendingMCLLoad g_pending_load_inits[MAX_PENDING_MCL_LOADS];
+static size_t g_pending_load_init_tick[MAX_PENDING_MCL_LOADS];
+static int g_pending_load_init_count = 0;
+
 // Helper: create an ActionVar string from an ASCII C string
 static ActionVar makeStringVar(SWFAppContext* app_context, const char* str)
 {
@@ -37190,10 +37229,59 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
         }
     }
 
-    // Phase 3: Fire onLoadInit (success) or onLoadError (failure) for each load (LIFO order)
+    // Phase 3: QUEUE onLoadInit / onLoadError (LIFO order, preserved by the
+    // FIFO drain). It fires on the next tick, in actionDrainPendingLoadInits —
+    // see the g_pending_load_inits comment for why the slot matters.
+    {
+        extern size_t g_tick_count;
+        for (int i = count - 1; i >= 0; i--) {
+            if (g_pending_load_init_count >= MAX_PENDING_MCL_LOADS) break;
+            g_pending_load_init_tick[g_pending_load_init_count] = g_tick_count;
+            g_pending_load_inits[g_pending_load_init_count++] = loads[i];
+        }
+    }
+}
+
+// Fire the onLoadInit / onLoadError handlers parked by the previous drain.
+// Called immediately BEFORE actionAdvancePlayingLevels in every tick loop
+// (swf_core.c, swf.c, and the AVM1-under-AVM2 tick in this file), and once
+// more after the loop so a load parked on the final tick is not dropped.
+int actionHasPendingLoadInits(void)
+{
+    return g_pending_load_init_count > 0;
+}
+
+static void drain_pending_load_inits(SWFAppContext* app_context, int force)
+{
+    extern size_t g_tick_count;
+    if (g_pending_load_init_count == 0) return;
+    // Take only the entries queued on an EARLIER tick (unless forced, which is
+    // the end-of-run case). Copy and reset first: a handler may chain another
+    // loadClip, whose own Phase 3 must land in a FRESH queue, not extend this
+    // pass.
+    PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
+    int count = 0, keep = 0;
+    for (int i = 0; i < g_pending_load_init_count; i++) {
+        if (force || g_pending_load_init_tick[i] != g_tick_count) {
+            loads[count++] = g_pending_load_inits[i];
+        } else {
+            g_pending_load_init_tick[keep] = g_pending_load_init_tick[i];
+            g_pending_load_inits[keep++] = g_pending_load_inits[i];
+        }
+    }
+    g_pending_load_init_count = keep;
+    if (count == 0) return;
+
     // For root replacement, onLoadInit fires in child's SWF version context
-    for (int i = count - 1; i >= 0; i--) {
+    for (int i = 0; i < count; i++) {
         if (g_execution_halted) break;
+        // Same dead-clip gate the queue side uses: a removeMovieClip between
+        // the load's own drain and this one cancels the remaining handler.
+        MovieClip* t = loads[i].target;
+        if (t != NULL && (t->avm1_removed || t->pending_removal
+                          || t->depth == INT_MIN)) {
+            continue;
+        }
         ActionVar mc_var = {0};
         mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
         mc_var.data.numeric_value = (u64)loads[i].target;
@@ -37226,6 +37314,19 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             fireMCLEvent(app_context, loads[i].mcl, "onLoadInit", &mc_var, 1);
         }
     }
+}
+
+// The per-tick slot: fires only what an EARLIER tick queued.
+void actionDrainPendingLoadInits(SWFAppContext* app_context)
+{
+    drain_pending_load_inits(app_context, 0);
+}
+
+// End of run (final tick / loop exit): there is no next tick to fire in, so
+// everything goes, same-tick entries included.
+void actionDrainPendingLoadInitsFinal(SWFAppContext* app_context)
+{
+    drain_pending_load_inits(app_context, 1);
 }
 
 // Query button MC visibility for button state machine (tag.c)

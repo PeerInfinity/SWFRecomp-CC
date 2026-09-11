@@ -513,6 +513,7 @@ void tagMain(SWFAppContext* app_context)
 			    && !hasPlayingLevels()
 			    && !hasClipEnterFrameHandlers()
 			    && g_pending_mcl_load_count == 0
+			    && !actionHasPendingLoadInits()
 			    && g_pending_direct_load_count == 0) break;
 
 			// FSCommand:quit was called in a prior tick — exit as soon as
@@ -1276,6 +1277,10 @@ void tagMain(SWFAppContext* app_context)
 		// not in display_list — advance_sprite_frames doesn't reach those).
 		// Mirrors swf_core.c line ~1299.
 		{
+			// The MCL Phase-3 slot, mirroring swf_core.c: after this tick's
+			// enterFrame broadcast, before the loaded movie's own advance.
+			// See actionDrainPendingLoadInits / regression/avm1_mcl_load_tick.
+			actionDrainPendingLoadInits(app_context);
 			extern void actionAdvancePlayingLevels(SWFAppContext*);
 			actionAdvancePlayingLevels(app_context);
 		}
@@ -1334,6 +1339,8 @@ void tagMain(SWFAppContext* app_context)
 				while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
 					actionFirePendingLoadInits(app_context);
 			}
+			// …and the deferred Phase 3, which has no next tick to fire in.
+			actionDrainPendingLoadInitsFinal(app_context);
 		}
 #endif
 
@@ -1383,6 +1390,10 @@ void tagMain(SWFAppContext* app_context)
 				actionFirePendingDirectLoads(app_context);
 		}
 		{
+			// The MCL Phase-3 slot, mirroring swf_core.c: after this tick's
+			// enterFrame broadcast, before the loaded movie's own advance.
+			// See actionDrainPendingLoadInits / regression/avm1_mcl_load_tick.
+			actionDrainPendingLoadInits(app_context);
 			extern void actionAdvancePlayingLevels(SWFAppContext*);
 			actionAdvancePlayingLevels(app_context);
 		}

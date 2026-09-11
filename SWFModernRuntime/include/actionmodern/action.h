@@ -233,6 +233,17 @@ void actionQueueClipActionUnloadDeferred(void (*fn)(SWFAppContext*), MovieClip* 
 void actionQueueDynamicChildUnloads(MovieClip* parent_mc);
 // Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame
 void actionFirePendingLoadInits(SWFAppContext* app_context);
+// Fire the onLoadInit/onLoadError handlers the drain above PARKED for the next
+// tick. Must run immediately before actionAdvancePlayingLevels (and once after
+// the tick loop), so the sequence is enterFrame -> onLoadInit -> the loaded
+// movie's next frame. See regression/avm1_mcl_load_tick.
+void actionDrainPendingLoadInits(SWFAppContext* app_context);
+// Same, but for the final tick / loop exit: no next tick exists, so entries
+// queued by THIS tick fire too instead of being dropped.
+void actionDrainPendingLoadInitsFinal(SWFAppContext* app_context);
+// Non-zero while at least one onLoadInit is parked — an exit-condition reason
+// to keep ticking, like a pending MCL load.
+int actionHasPendingLoadInits(void);
 // ImportAssets: load an imported SWF's init function in the current context
 void actionImportAssets(SWFAppContext* app_context, const char* url);
 // ImportAssets: issue the imported URL's GET at PRELOAD time (called from

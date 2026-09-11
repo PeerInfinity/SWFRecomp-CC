@@ -1186,6 +1186,10 @@ void swfStart(SWFAppContext* app_context)
 				    && !hasPlayingLevels()
 				    && !hasClipEnterFrameHandlers()
 				    && g_pending_mcl_load_count == 0
+				    // A parked onLoadInit keeps the player alive exactly like
+				    // a pending load: it fires at this tick's pre-advance slot,
+				    // which is below this check.
+				    && !actionHasPendingLoadInits()
 				    && g_pending_direct_load_count == 0) break;
 			}
 			{
@@ -1459,6 +1463,10 @@ void swfStart(SWFAppContext* app_context)
 		// not in display_list, so advance_sprite_frames doesn't reach them — but
 		// their timelines still need to play after the initial loadMovieNum.
 		{
+			// The MCL Phase-3 slot: after this tick's enterFrame broadcast,
+			// before the loaded movie's own advance. See
+			// actionDrainPendingLoadInits / regression/avm1_mcl_load_tick.
+			actionDrainPendingLoadInits(app_context);
 			extern void actionAdvancePlayingLevels(SWFAppContext*);
 			actionAdvancePlayingLevels(app_context);
 		}
@@ -1529,6 +1537,12 @@ void swfStart(SWFAppContext* app_context)
 			while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
 				actionFirePendingLoadInits(app_context);
 		}
+		// …and the same rule for the deferred Phase 3: onLoadInit normally
+		// fires at the NEXT tick's pre-advance slot, which does not exist on
+		// the final iteration. Fire it here rather than dropping it.
+		if (tick_count >= max_ticks) {
+			actionDrainPendingLoadInitsFinal(app_context);
+		}
 
 		// A goto issued from a timer/event callback (setInterval, etc.) queues the
 		// target frame's DoAction via ng_executeGotoCatchUp's drain-suppressed
@@ -1574,6 +1588,9 @@ void swfStart(SWFAppContext* app_context)
 			if (g_events && g_event_pos < g_event_count) continue;
 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
 			if (g_pending_mcl_load_count > 0) continue;
+			// A parked onLoadInit is a reason to keep ticking, exactly like a
+			// pending load: it fires at the NEXT tick's pre-advance slot.
+			if (actionHasPendingLoadInits()) continue;
 			if (g_pending_direct_load_count > 0) continue;
 			{ extern int hasPlayingLevels(void); if (hasPlayingLevels()) continue; }
 			{ extern int hasPlayingSounds(void); if (hasPlayingSounds()) continue; }
@@ -1664,6 +1681,9 @@ void swfStart(SWFAppContext* app_context)
 			// end of frame 0 but pending loadClip in _next_tick still needs
 			// promote+drain on tick 2).
 			if (g_pending_mcl_load_count > 0) continue;
+			// A parked onLoadInit is a reason to keep ticking, exactly like a
+			// pending load: it fires at the NEXT tick's pre-advance slot.
+			if (actionHasPendingLoadInits()) continue;
 			if (g_pending_direct_load_count > 0) continue;
 			break;
 		}

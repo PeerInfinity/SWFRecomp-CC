@@ -1,0 +1,14 @@
+loadClip
+onLoadStart
+onLoadProgress
+onLoadComplete
+c1
+t1 h.cf=1
+onLoadInit cf=1
+c2
+t2 h.cf=2
+c3
+t3 h.cf=3
+t4 h.cf=3
+t5 h.cf=3
+t6 h.cf=3
