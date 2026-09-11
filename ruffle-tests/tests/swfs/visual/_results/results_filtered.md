@@ -1,21 +1,21 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-06 08:47 UTC
+**Date**: 2026-09-11 16:55 UTC
 
-**Git SHA**: `bf907d0023`
+**Git SHA**: `13dfc5b483`
 
-**Run Duration**: 30m 32s
+**Run Duration**: 31m 15s
 
-**Filtered**: 0 tests ignored out of 146 available
+**Filtered**: 0 tests ignored out of 147 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 146 |
-| Passing | **144** (98.6%) |
+| Total tests | 147 |
+| Passing | **145** (98.6%) |
 | Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **146** (100.0%) |
+| Effective pass | **147** (100.0%) |
 | Failing | 0 |
 | Total expected lines | 350 |
 | Matching lines | 301 (86.0%) |
@@ -23,154 +23,155 @@
 
 ## Passing Tests
 
-**144 tests passing**
+**145 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm2_button_scroll_rect` | 2 | 22.8s |  |
-| 2 | `bitmapdata_copypixels_with_alpha_oob` | 0 | 6.6s |  |
+| 1 | `avm2_button_scroll_rect` | 2 | 20.5s |  |
+| 2 | `bitmapdata_copypixels_with_alpha_oob` | 0 | 6.0s |  |
 | 3 | `blend_across_masks_issue_24549` | 0 | 1.0s |  |
-| 4 | `blend_modes/add` | 0 | 1.6s |  |
-| 5 | `blend_modes/alpha_no_layer` | 0 | 1.3s |  |
-| 6 | `blend_modes/darken` | 0 | 1.1s |  |
-| 7 | `blend_modes/difference` | 0 | 1.0s |  |
-| 8 | `blend_modes/erase_no_layer` | 0 | 1.3s |  |
-| 9 | `blend_modes/hardlight` | 0 | 0.9s |  |
-| 10 | `blend_modes/invert` | 0 | 0.8s |  |
-| 11 | `blend_modes/layer_alpha` | 0 | 1.6s |  |
-| 12 | `blend_modes/layer_erase` | 0 | 0.6s |  |
+| 4 | `blend_modes/add` | 0 | 1.5s |  |
+| 5 | `blend_modes/alpha_no_layer` | 0 | 1.2s |  |
+| 6 | `blend_modes/darken` | 0 | 1.4s |  |
+| 7 | `blend_modes/difference` | 0 | 1.1s |  |
+| 8 | `blend_modes/erase_no_layer` | 0 | 1.4s |  |
+| 9 | `blend_modes/hardlight` | 0 | 1.4s |  |
+| 10 | `blend_modes/invert` | 0 | 1.1s |  |
+| 11 | `blend_modes/layer_alpha` | 0 | 1.7s |  |
+| 12 | `blend_modes/layer_erase` | 0 | 0.7s |  |
 | 13 | `blend_modes/lighten` | 0 | 1.7s |  |
-| 14 | `blend_modes/masked_layer_cached_children` | 0 | 27.5s |  |
+| 14 | `blend_modes/masked_layer_cached_children` | 0 | 28.6s |  |
 | 15 | `blend_modes/multiply` | 0 | 1.7s |  |
-| 16 | `blend_modes/overlay` | 0 | 1.6s |  |
-| 17 | `blend_modes/overlay_onto_stage` | 0 | 1.3s |  |
-| 18 | `blend_modes/screen` | 0 | 1.6s |  |
-| 19 | `blend_modes/shader_as_mask` | 0 | 27.8s |  |
-| 20 | `blend_modes/shader_without_shader` | 1 | 26.1s |  |
+| 16 | `blend_modes/overlay` | 0 | 1.9s |  |
+| 17 | `blend_modes/overlay_onto_stage` | 0 | 1.1s |  |
+| 18 | `blend_modes/screen` | 0 | 1.0s |  |
+| 19 | `blend_modes/shader_as_mask` | 0 | 22.0s |  |
+| 20 | `blend_modes/shader_without_shader` | 1 | 19.8s |  |
 | 21 | `blend_modes/subtract` | 0 | 1.6s |  |
 | 22 | `bmd_draw_with_msaa_issue_10579` | 0 | 1.5s |  |
-| 23 | `cache_as_bitmap/avm1_color` | 0 | 20.3s |  |
-| 24 | `cache_as_bitmap/avm2_button` | 0 | 20.2s |  |
-| 25 | `cache_as_bitmap/avm2_button_state` | 0 | 20.1s |  |
-| 26 | `cache_as_bitmap/bitmap_changed` | 0 | 27.0s |  |
-| 27 | `cache_as_bitmap/cab_bitmapdata_invalidate` | 0 | 22.0s |  |
-| 28 | `cache_as_bitmap/cab_mask_alpha` | 0 | 28.2s |  |
-| 29 | `cache_as_bitmap/cab_mask_filters` | 0 | 7.5s |  |
-| 30 | `cache_as_bitmap/cab_mask_transform` | 0 | 26.9s |  |
-| 31 | `cache_as_bitmap/cab_mask_triangle` | 0 | 19.2s |  |
-| 32 | `cache_as_bitmap/children_changed` | 0 | 1.0s |  |
-| 33 | `cache_as_bitmap/color_transform` | 0 | 13.3s |  |
-| 34 | `cache_as_bitmap/contains_grown_filter` | 0 | 13.6s |  |
-| 35 | `cache_as_bitmap/drawing_api` | 0 | 1.1s |  |
-| 36 | `cache_as_bitmap/edittext_hscroll` | 1 | 20.4s |  |
-| 37 | `cache_as_bitmap/edittext_scroll` | 0 | 20.4s |  |
-| 38 | `cache_as_bitmap/edittext_selection` | 0 | 20.4s |  |
-| 39 | `cache_as_bitmap/masks` | 0 | 7.6s |  |
+| 23 | `cache_as_bitmap/avm1_color` | 0 | 21.4s |  |
+| 24 | `cache_as_bitmap/avm2_button` | 0 | 21.3s |  |
+| 25 | `cache_as_bitmap/avm2_button_state` | 0 | 21.7s |  |
+| 26 | `cache_as_bitmap/bitmap_changed` | 0 | 27.4s |  |
+| 27 | `cache_as_bitmap/cab_bitmapdata_invalidate` | 0 | 22.4s |  |
+| 28 | `cache_as_bitmap/cab_mask_alpha` | 0 | 28.7s |  |
+| 29 | `cache_as_bitmap/cab_mask_filters` | 0 | 7.7s |  |
+| 30 | `cache_as_bitmap/cab_mask_transform` | 0 | 27.4s |  |
+| 31 | `cache_as_bitmap/cab_mask_triangle` | 0 | 20.8s |  |
+| 32 | `cache_as_bitmap/children_changed` | 0 | 0.9s |  |
+| 33 | `cache_as_bitmap/color_transform` | 0 | 15.1s |  |
+| 34 | `cache_as_bitmap/contains_grown_filter` | 0 | 14.8s |  |
+| 35 | `cache_as_bitmap/drawing_api` | 0 | 1.0s |  |
+| 36 | `cache_as_bitmap/edittext_hscroll` | 1 | 20.7s |  |
+| 37 | `cache_as_bitmap/edittext_scroll` | 0 | 20.7s |  |
+| 38 | `cache_as_bitmap/edittext_selection` | 0 | 20.7s |  |
+| 39 | `cache_as_bitmap/masks` | 0 | 7.9s |  |
 | 40 | `cache_as_bitmap/morph` | 0 | 1.4s |  |
 | 41 | `cache_as_bitmap/nested_color_transform` | 0 | 1.4s |  |
-| 42 | `cache_as_bitmap/nested_matrix` | 0 | 1.4s |  |
+| 42 | `cache_as_bitmap/nested_matrix` | 0 | 1.3s |  |
 | 43 | `cache_as_bitmap/nested_rotation` | 0 | 1.4s |  |
-| 44 | `cache_as_bitmap/oversize/swf_10_masks` | 0 | 28.2s |  |
-| 45 | `cache_as_bitmap/oversize/swf_10_too_big` | 0 | 7.2s |  |
-| 46 | `cache_as_bitmap/oversize/swf_9_masks` | 0 | 17.9s |  |
-| 47 | `cache_as_bitmap/oversize/swf_9_too_big` | 0 | 1.6s |  |
-| 48 | `cache_as_bitmap/scroll_rect` | 0 | 0.9s |  |
-| 49 | `cache_as_bitmap/scroll_rect_scaled` | 0 | 13.0s |  |
-| 50 | `cache_as_bitmap/shape_changed` | 0 | 1.0s |  |
-| 51 | `cache_as_bitmap/text` | 0 | 1.5s |  |
-| 52 | `color_transform_issue_9698` | 0 | 1.1s |  |
-| 53 | `define_bits_jpeg2_huge` | 19 | 22.0s |  |
-| 54 | `define_bits_lossless2_rgb15` | 0 | 1.2s |  |
-| 55 | `definefont4` | 0 | 80.8s |  |
-| 56 | `drawing_api/cursor` | 0 | 1.1s |  |
-| 57 | `drawing_api/drawing_order` | 0 | 19.6s |  |
-| 58 | `drawing_api/fills_and_lines` | 0 | 1.4s |  |
-| 59 | `drawing_api/gradient_focal_point` | 0 | 19.8s |  |
-| 60 | `edittext/edittext_background_basic` | 0 | 19.7s |  |
-| 61 | `edittext/edittext_background_basic_scale2` | 0 | 20.1s |  |
+| 44 | `cache_as_bitmap/oversize/swf_10_masks` | 0 | 26.1s |  |
+| 45 | `cache_as_bitmap/oversize/swf_10_too_big` | 0 | 6.9s |  |
+| 46 | `cache_as_bitmap/oversize/swf_9_masks` | 0 | 26.8s |  |
+| 47 | `cache_as_bitmap/oversize/swf_9_too_big` | 0 | 2.3s |  |
+| 48 | `cache_as_bitmap/scroll_rect` | 0 | 1.4s |  |
+| 49 | `cache_as_bitmap/scroll_rect_scaled` | 0 | 20.5s |  |
+| 50 | `cache_as_bitmap/shape_changed` | 0 | 1.4s |  |
+| 51 | `cache_as_bitmap/text` | 0 | 1.6s |  |
+| 52 | `color_transform_issue_9698` | 0 | 1.3s |  |
+| 53 | `define_bits_jpeg2_huge` | 19 | 22.9s |  |
+| 54 | `define_bits_lossless2_rgb15` | 0 | 1.3s |  |
+| 55 | `definefont4` | 0 | 89.8s |  |
+| 56 | `drawing_api/cursor` | 0 | 1.4s |  |
+| 57 | `drawing_api/drawing_order` | 0 | 20.9s |  |
+| 58 | `drawing_api/fills_and_lines` | 0 | 1.7s |  |
+| 59 | `drawing_api/gradient_focal_point` | 0 | 21.3s |  |
+| 60 | `edittext/edittext_background_basic` | 0 | 20.9s |  |
+| 61 | `edittext/edittext_background_basic_scale2` | 0 | 20.2s |  |
 | 62 | `edittext/edittext_border_basic` | 0 | 20.0s |  |
 | 63 | `edittext/edittext_border_basic_scale2` | 0 | 1.0s |  |
-| 64 | `edittext/edittext_border_filters` | 0 | 1.2s |  |
+| 64 | `edittext/edittext_border_filters` | 0 | 1.3s |  |
 | 65 | `edittext/edittext_border_transform` | 0 | 1.8s |  |
-| 66 | `edittext/edittext_bounds_vs_position` | 0 | 20.4s |  |
-| 67 | `edittext/edittext_caret_empty` | 0 | 22.5s |  |
-| 68 | `edittext/edittext_device_transform_basic` | 24 | 27.5s |  |
-| 69 | `edittext/edittext_device_transform_small_rotation` | 0 | 21.6s |  |
-| 70 | `edittext/edittext_device_transform_small_shear` | 0 | 21.8s |  |
-| 71 | `edittext/edittext_gutter` | 0 | 28.1s |  |
-| 72 | `edittext/edittext_justify` | 0 | 28.0s |  |
-| 73 | `edittext/edittext_negative_bounds` | 0 | 1.4s |  |
-| 74 | `edittext/edittext_selection_font_size` | 0 | 27.9s |  |
-| 75 | `edittext/edittext_selection_leading` | 12 | 28.1s |  |
-| 76 | `edittext/edittext_underline` | 0 | 28.1s |  |
-| 77 | `edittext/edittext_underline_scale2` | 0 | 28.5s |  |
-| 78 | `filters/any_blur_scales_with_screen` | 0 | 21.1s |  |
-| 79 | `filters/avm1_convolution_initialization` | 18 | 1.4s |  |
-| 80 | `filters/bevel` | 0 | 20.9s |  |
-| 81 | `filters/bevel_full` | 0 | 21.2s |  |
-| 82 | `filters/bevel_inner` | 0 | 1.5s |  |
-| 83 | `filters/bevel_outer` | 0 | 1.7s |  |
-| 84 | `filters/blur_fractional` | 0 | 26.7s |  |
-| 85 | `filters/blur_pass_scaling` | 0 | 26.7s |  |
-| 86 | `filters/blur_quality` | 0 | 7.5s |  |
-| 87 | `filters/blur_scales_with_screen` | 0 | 20.6s |  |
-| 88 | `filters/blur_size_grows` | 0 | 1.4s |  |
-| 89 | `filters/color_matrix` | 0 | 1.3s |  |
-| 90 | `filters/displacement_map` | 0 | 27.6s |  |
-| 91 | `filters/displacement_map_scales_with_screen` | 0 | 29.0s |  |
-| 92 | `filters/displacement_map_through_applyFilter` | 0 | 27.1s |  |
-| 93 | `filters/displacement_map_through_filters` | 0 | 7.3s |  |
-| 94 | `filters/drop_shadow` | 0 | 1.4s |  |
-| 95 | `filters/drop_shadow_angles` | 0 | 1.2s |  |
-| 96 | `filters/drop_shadow_scales_with_screen` | 0 | 19.8s |  |
-| 97 | `filters/glow` | 0 | 1.3s |  |
-| 98 | `filters/glow_pass_scaling` | 0 | 25.8s |  |
-| 99 | `filters/glow_with_alpha_strength` | 0 | 20.4s |  |
-| 100 | `filters/glow_without_composite_source` | 0 | 1.5s |  |
-| 101 | `focus_highlight/focus_highlight_avm1_button` | 6 | 19.9s |  |
-| 102 | `focus_highlight/focus_highlight_avm2_button_bounds` | 1 | 25.3s |  |
-| 103 | `focus_highlight/focus_highlight_basic` | 0 | 1.5s |  |
-| 104 | `focus_highlight/focus_highlight_empty_clip` | 0 | 26.6s |  |
-| 105 | `focus_highlight/focus_highlight_move` | 0 | 20.7s |  |
-| 106 | `focus_highlight/focus_highlight_render` | 0 | 1.7s |  |
-| 107 | `fonts/advance_u16` | 0 | 20.5s |  |
-| 108 | `fonts/device-font` | 0 | 7.5s |  |
-| 109 | `fonts/duplicate_font` | 0 | 6.0s |  |
-| 110 | `fonts/font_lookup_as3` | 0 | 6.0s |  |
-| 111 | `fonts/glyph` | 0 | 5.9s |  |
-| 112 | `fonts/leading_define_font` | 0 | 16.3s |  |
-| 113 | `fonts/leading_device_font` | 0 | 21.1s |  |
-| 114 | `fonts/leading_embedded_font` | 0 | 27.0s |  |
-| 115 | `gradient_issue_9892` | 0 | 20.3s |  |
-| 116 | `gradient_nonsequential_ratios` | 0 | 20.1s |  |
-| 117 | `gradient_radial_same_ratios` | 0 | 20.1s |  |
-| 118 | `gradient_same_ratios` | 0 | 1.2s |  |
-| 119 | `layout/line_vertical_align` | 0 | 28.2s |  |
-| 120 | `opaque_background` | 0 | 1.4s |  |
-| 121 | `scale_rotation_cache` | 106 | 22.2s |  |
-| 122 | `simple_shapes/gradients/focal_radial` | 0 | 1.5s |  |
-| 123 | `simple_shapes/gradients/gradients` | 0 | 1.6s |  |
-| 124 | `simple_shapes/gradients/radial` | 0 | 1.6s |  |
-| 125 | `simple_shapes/gradients/reflect` | 0 | 1.5s |  |
-| 126 | `simple_shapes/gradients/repeat` | 0 | 1.6s |  |
-| 127 | `simple_shapes/heavy_tesselation` | 0 | 66.5s |  |
-| 128 | `simple_shapes/layers` | 0 | 1.2s |  |
-| 129 | `simple_shapes/masks` | 0 | 0.8s |  |
-| 130 | `simple_shapes/masks_equal_clipdepth` | 0 | 0.5s |  |
-| 131 | `simple_shapes/overlaps` | 0 | 1.0s |  |
-| 132 | `simple_shapes/scroll_rect_mask` | 0 | 0.9s |  |
-| 133 | `simple_shapes/strokes/scale` | 0 | 1.4s |  |
-| 134 | `simple_shapes/text_field_mask` | 0 | 1.4s |  |
-| 135 | `simple_shapes/winding_rule` | 0 | 20.6s |  |
-| 136 | `text/String_path_variable_button` | 0 | 1.5s |  |
-| 137 | `video/colorconversion/h263` | 0 | 0.2s |  |
-| 138 | `video/colorconversion/vp6` | 0 | 0.2s |  |
-| 139 | `video/colorconversion/vp6a` | 0 | 0.3s |  |
-| 140 | `video/deblocking` | 0 | 0.3s |  |
-| 141 | `video/h264` | 0 | 28.1s |  |
-| 142 | `video/h264_multinalu` | 0 | 27.1s |  |
-| 143 | `video/vp6_alphaoffset` | 0 | 20.8s |  |
-| 144 | `video/vp6_dispsize` | 0 | 0.4s |  |
+| 66 | `edittext/edittext_bounds_vs_position` | 0 | 16.2s |  |
+| 67 | `edittext/edittext_caret_empty` | 0 | 17.1s |  |
+| 68 | `edittext/edittext_caret_multiline` | 0 | 6.5s |  |
+| 69 | `edittext/edittext_device_transform_basic` | 24 | 21.8s |  |
+| 70 | `edittext/edittext_device_transform_small_rotation` | 0 | 22.6s |  |
+| 71 | `edittext/edittext_device_transform_small_shear` | 0 | 23.3s |  |
+| 72 | `edittext/edittext_gutter` | 0 | 29.2s |  |
+| 73 | `edittext/edittext_justify` | 0 | 28.3s |  |
+| 74 | `edittext/edittext_negative_bounds` | 0 | 1.5s |  |
+| 75 | `edittext/edittext_selection_font_size` | 0 | 27.9s |  |
+| 76 | `edittext/edittext_selection_leading` | 12 | 28.5s |  |
+| 77 | `edittext/edittext_underline` | 0 | 28.5s |  |
+| 78 | `edittext/edittext_underline_scale2` | 0 | 29.3s |  |
+| 79 | `filters/any_blur_scales_with_screen` | 0 | 20.8s |  |
+| 80 | `filters/avm1_convolution_initialization` | 18 | 1.4s |  |
+| 81 | `filters/bevel` | 0 | 21.5s |  |
+| 82 | `filters/bevel_full` | 0 | 21.6s |  |
+| 83 | `filters/bevel_inner` | 0 | 1.5s |  |
+| 84 | `filters/bevel_outer` | 0 | 18.1s |  |
+| 85 | `filters/blur_fractional` | 0 | 22.5s |  |
+| 86 | `filters/blur_pass_scaling` | 0 | 22.8s |  |
+| 87 | `filters/blur_quality` | 0 | 6.0s |  |
+| 88 | `filters/blur_scales_with_screen` | 0 | 17.2s |  |
+| 89 | `filters/blur_size_grows` | 0 | 1.4s |  |
+| 90 | `filters/color_matrix` | 0 | 1.3s |  |
+| 91 | `filters/displacement_map` | 0 | 28.0s |  |
+| 92 | `filters/displacement_map_scales_with_screen` | 0 | 29.2s |  |
+| 93 | `filters/displacement_map_through_applyFilter` | 0 | 27.0s |  |
+| 94 | `filters/displacement_map_through_filters` | 0 | 26.9s |  |
+| 95 | `filters/drop_shadow` | 0 | 1.5s |  |
+| 96 | `filters/drop_shadow_angles` | 0 | 1.4s |  |
+| 97 | `filters/drop_shadow_scales_with_screen` | 0 | 20.3s |  |
+| 98 | `filters/glow` | 0 | 1.5s |  |
+| 99 | `filters/glow_pass_scaling` | 0 | 27.1s |  |
+| 100 | `filters/glow_with_alpha_strength` | 0 | 21.4s |  |
+| 101 | `filters/glow_without_composite_source` | 0 | 1.6s |  |
+| 102 | `focus_highlight/focus_highlight_avm1_button` | 6 | 21.1s |  |
+| 103 | `focus_highlight/focus_highlight_avm2_button_bounds` | 1 | 26.9s |  |
+| 104 | `focus_highlight/focus_highlight_basic` | 0 | 1.6s |  |
+| 105 | `focus_highlight/focus_highlight_empty_clip` | 0 | 21.1s |  |
+| 106 | `focus_highlight/focus_highlight_move` | 0 | 16.6s |  |
+| 107 | `focus_highlight/focus_highlight_render` | 0 | 1.3s |  |
+| 108 | `fonts/advance_u16` | 0 | 16.6s |  |
+| 109 | `fonts/device-font` | 0 | 2.6s |  |
+| 110 | `fonts/duplicate_font` | 0 | 7.9s |  |
+| 111 | `fonts/font_lookup_as3` | 0 | 7.8s |  |
+| 112 | `fonts/glyph` | 0 | 7.7s |  |
+| 113 | `fonts/leading_define_font` | 0 | 21.5s |  |
+| 114 | `fonts/leading_device_font` | 0 | 26.6s |  |
+| 115 | `fonts/leading_embedded_font` | 0 | 7.7s |  |
+| 116 | `gradient_issue_9892` | 0 | 20.6s |  |
+| 117 | `gradient_nonsequential_ratios` | 0 | 20.5s |  |
+| 118 | `gradient_radial_same_ratios` | 0 | 20.6s |  |
+| 119 | `gradient_same_ratios` | 0 | 21.4s |  |
+| 120 | `layout/line_vertical_align` | 0 | 27.4s |  |
+| 121 | `opaque_background` | 0 | 1.4s |  |
+| 122 | `scale_rotation_cache` | 106 | 21.1s |  |
+| 123 | `simple_shapes/gradients/focal_radial` | 0 | 1.4s |  |
+| 124 | `simple_shapes/gradients/gradients` | 0 | 1.5s |  |
+| 125 | `simple_shapes/gradients/radial` | 0 | 1.6s |  |
+| 126 | `simple_shapes/gradients/reflect` | 0 | 1.6s |  |
+| 127 | `simple_shapes/gradients/repeat` | 0 | 1.6s |  |
+| 128 | `simple_shapes/heavy_tesselation` | 0 | 66.8s |  |
+| 129 | `simple_shapes/layers` | 0 | 1.3s |  |
+| 130 | `simple_shapes/masks` | 0 | 1.2s |  |
+| 131 | `simple_shapes/masks_equal_clipdepth` | 0 | 0.9s |  |
+| 132 | `simple_shapes/overlaps` | 0 | 1.2s |  |
+| 133 | `simple_shapes/scroll_rect_mask` | 0 | 1.3s |  |
+| 134 | `simple_shapes/strokes/scale` | 0 | 1.0s |  |
+| 135 | `simple_shapes/text_field_mask` | 0 | 1.1s |  |
+| 136 | `simple_shapes/winding_rule` | 0 | 17.8s |  |
+| 137 | `text/String_path_variable_button` | 0 | 1.3s |  |
+| 138 | `video/colorconversion/h263` | 0 | 0.2s |  |
+| 139 | `video/colorconversion/vp6` | 0 | 0.2s |  |
+| 140 | `video/colorconversion/vp6a` | 0 | 0.3s |  |
+| 141 | `video/deblocking` | 0 | 0.3s |  |
+| 142 | `video/h264` | 0 | 27.3s |  |
+| 143 | `video/h264_multinalu` | 0 | 26.1s |  |
+| 144 | `video/vp6_alphaoffset` | 0 | 20.1s |  |
+| 145 | `video/vp6_dispsize` | 0 | 0.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -178,8 +179,8 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `edittext/edittext_device_transform_metrics` | 8 | 8 | 7.5s |  |
-| 2 | `edittext/edittext_device_transform_negative` | 41 | 41 | 7.5s |  |
+| 1 | `edittext/edittext_device_transform_metrics` | 8 | 8 | 5.9s |  |
+| 2 | `edittext/edittext_device_transform_negative` | 41 | 41 | 3.0s |  |
 
 ## Near-Passing Tests
 
