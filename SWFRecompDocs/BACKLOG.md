@@ -38,6 +38,21 @@ first).
 
 ## Browser-WASM — rendering
 
+- **Gradient capacity: one ramp per ROW caps a movie at `maxTextureDimension2D`
+  gradients** (8192 on SwiftShader and the WebGPU defaults, 16,384 on real GPUs).
+  Castle Hero has 47,509: before `a39a8ab0c` its gradient texture was invalid
+  on every device (black canvas); now the rows clamp and the gradients past
+  the last row draw as garbage (black or blue blobs in its preloader). Fix:
+  pack N ramps per row (`sample_gradient`'s textureLoad coordinate + the static
+  and dynamic uploads). `status/bitmap-pool-layer-cap.md` §8. (2026-09-11)
+- **Stage-sized render targets, the displacement-map texture and `flashbang.c`
+  are not planned against the device's texture limits.** Everything else is
+  (`status/bitmap-pool-layer-cap.md` §3). A canvas over
+  `maxTextureDimension2D` (8192 by default) would still make invalid targets.
+  After an unforeseen creation failure, the downstream invalid-object errors
+  still flood natively; they are capped at 8 lines in the browser. Swapping in
+  the dummy view on failure would keep the bind group valid, but the error
+  callback is asynchronous in the browser. (2026-09-11)
 - **Headless-Chromium WebGPU needs `--enable-features=Vulkan
   --use-vulkan=swiftshader` to present; unverified on a CI runner.** With the
   usual `--use-angle=swiftshader` headless flags, Chromium loses the device at

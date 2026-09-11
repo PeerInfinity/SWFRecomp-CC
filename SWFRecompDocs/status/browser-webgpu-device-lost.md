@@ -304,6 +304,12 @@ The check is not wired into this repo's CI. The CI browser path is
   creation failed" would surface that as one fact instead of thousands of
   validation errors. It isn't implemented. The current size-class pools could
   still hit the same limit if a single size class exceeded 256 bitmaps.
+  **Update (2026-09-11, `a39a8ab0c`, `status/bitmap-pool-layer-cap.md`): both
+  are done.** Pools are planned against the device's own limits, and an
+  over-full class spills into the next pool. Two docs2 titles were over the
+  wall: Castle Hero (412 in one class) and Bloxorz (478). The readout is
+  `window.__swfGpu.{texFail, texMsg, spilled, errors}` plus one
+  `console.error` line.
 - **Runtime (graceful degradation when the flags are missing, or on any real
   loss):** it needs a rebuild from the runtime at this slice's commit (§7). The
   pinned `PeerInfinity/seedling-wasm@071ac1c` wasms keep the old behaviour until
