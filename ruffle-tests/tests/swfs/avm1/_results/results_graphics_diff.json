@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-05T03:18:53.158599+00:00",
-    "old_git_sha": "cdafe1be9c2210ec22ca2ab89da2b5e9ee2118f4",
-    "new_timestamp": "2026-09-05T05:20:58.517586+00:00",
-    "new_git_sha": "12d2ec06b7bf678d88fe98e260356d390c41b63d",
+    "old_timestamp": "2026-09-05T05:20:58.517586+00:00",
+    "old_git_sha": "12d2ec06b7bf678d88fe98e260356d390c41b63d",
+    "new_timestamp": "2026-09-11T15:53:45.591179+00:00",
+    "new_git_sha": "c4a952960bcab8ccdf60caec9b5bda9e083506cb",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,71 @@
     "new_pass": 691,
     "new_ruffle_matched": 18,
     "new_effective_pass": 709,
-    "new_total": 730,
-    "new_pass_rate": 94.7,
+    "new_total": 733,
+    "new_pass_rate": 94.3,
     "old_mismatched_lines": 11492,
-    "new_mismatched_lines": 11492,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 11666,
+    "increased_mismatches": 128,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 730,
-    "added": 0,
+    "unchanged": 729,
+    "added": 3,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "bitmapdata_custom_rectangle",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 30,
+        "expected_lines": 42,
+        "matching_lines": 15
+      }
+    },
+    {
+      "test": "edittext_onscroller",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 14,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "globals_monkeypatch",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 96,
+        "expected_lines": 100,
+        "matching_lines": 39
+      },
+      "new_lines": {
+        "actual_lines": 144,
+        "expected_lines": 228,
+        "matching_lines": 39
+      }
+    },
+    {
+      "test": "new_class_prototype_getter",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 6,
+        "matching_lines": 1
+      }
+    }
+  ]
 }

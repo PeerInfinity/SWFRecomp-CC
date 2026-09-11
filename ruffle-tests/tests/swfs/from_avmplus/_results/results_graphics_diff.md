@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `cdafe1be9c22` (2026-09-05T03:18:53.206618+00:00)
-**Current:** `12d2ec06b7bf` (2026-09-05T05:20:58.572340+00:00)
+**Previous:** `12d2ec06b7bf` (2026-09-05T05:20:58.572340+00:00)
+**Current:** `c4a952960bca` (2026-09-11T15:53:45.645304+00:00)
 
 ## Summary
 
@@ -12,4 +12,8 @@
 | Pass rate | 97.1% | 97.1% | 0% |
 | Mismatched lines | 438 | 438 | 0 |
 
-No changes detected.
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `ecma3/JSON/adhoc` | ruffle_matched | output_mismatch | 33/40 | 33/40 |

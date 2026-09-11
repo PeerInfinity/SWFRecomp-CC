@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-05T03:18:53.206618+00:00",
-    "old_git_sha": "cdafe1be9c2210ec22ca2ab89da2b5e9ee2118f4",
-    "new_timestamp": "2026-09-05T05:20:58.572340+00:00",
-    "new_git_sha": "12d2ec06b7bf678d88fe98e260356d390c41b63d",
+    "old_timestamp": "2026-09-05T05:20:58.572340+00:00",
+    "old_git_sha": "12d2ec06b7bf678d88fe98e260356d390c41b63d",
+    "new_timestamp": "2026-09-11T15:53:45.645304+00:00",
+    "new_git_sha": "c4a952960bcab8ccdf60caec9b5bda9e083506cb",
     "partial": false,
     "same_commit": false
   },
@@ -14,8 +14,8 @@
     "old_total": 1574,
     "old_pass_rate": 97.1,
     "new_pass": 1529,
-    "new_ruffle_matched": 41,
-    "new_effective_pass": 1570,
+    "new_ruffle_matched": 40,
+    "new_effective_pass": 1569,
     "new_total": 1574,
     "new_pass_rate": 97.1,
     "old_mismatched_lines": 438,
@@ -23,11 +23,28 @@
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 1574,
+    "newly_failing": 1,
+    "status_changed": 1,
+    "unchanged": 1573,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "ecma3/JSON/adhoc",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 33
+      },
+      "new_lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 33
+      }
+    }
+  ]
 }
