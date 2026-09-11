@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-11 20:40 UTC
+**Date**: 2026-09-11 21:09 UTC
 
-**Git SHA**: `a39a8ab0ce`
+**Git SHA**: `0ccafbc4eb`
 
-**Run Duration**: 4m 52s
+**Run Duration**: 4m 48s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -33,17 +33,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.5s |  |
-| 2 | `edittext_test1` | 47 | 22.8s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 1.9s |  |
-| 4 | `hello` | 4 | 20.8s |  |
+| 1 | `button_test1` | 31 | 2.9s |  |
+| 2 | `edittext_test1` | 47 | 17.1s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 2.3s |  |
+| 4 | `hello` | 4 | 14.2s |  |
 | 5 | `mouse_drag_test` | 12 | 2.8s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 3.3s |  |
-| 7 | `opcode_guard_test2` | 24 | 24.5s |  |
-| 8 | `soft_reference_test1` | 45 | 24.2s |  |
-| 9 | `stackscope` | 11 | 14.1s |  |
-| 10 | `submoviegetvar` | 4 | 22.5s |  |
-| 11 | `swf4opcode` | 117 | 3.7s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 3.0s |  |
+| 7 | `opcode_guard_test2` | 24 | 23.9s |  |
+| 8 | `soft_reference_test1` | 45 | 21.1s |  |
+| 9 | `stackscope` | 11 | 18.6s |  |
+| 10 | `submoviegetvar` | 4 | 22.3s |  |
+| 11 | `swf4opcode` | 117 | 3.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 24.5s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 16.0s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.6s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 22.6s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 23.1s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 19.3s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 18.9s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.4s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 23.7s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 18.1s |  |
 
 ## Near-Passing Tests
 
