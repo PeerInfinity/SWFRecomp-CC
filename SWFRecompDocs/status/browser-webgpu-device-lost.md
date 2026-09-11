@@ -305,8 +305,13 @@ The check is not wired into this repo's CI. The CI browser path is
 
 ## 7. CI
 
-Graphics, `categories=all`, `images=false`. Run ID and corpus result: pending
-(filled in by the follow-up commit).
+Run **`34626607635`** (graphics, `categories=all`, `images=false`) on
+`b0a6a487b`: completed success, 30/30 shards. **`WASM link-smoke` is green**:
+it builds the browser config, so it is the job that compiles this change.
+`corpus_status_diff.py b0a6a487b WORKTREE --per-suite` is **flat**: 4516-test
+intersection, effective 4411 → 4411, 0 gains, 0 regressions, no status moves.
+The baseline is `34614830360`'s graphics results, merged in `13dfc5b48`. That
+is what the preprocessor proof in §2.4 predicts.
 
 ## 8. Left open
 
