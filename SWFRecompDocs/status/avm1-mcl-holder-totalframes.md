@@ -141,8 +141,8 @@ suite's top level; the loadMovie test is nested one directory down.
 Both dispatches `categories=all`, `images=false`, serial. Graphics ran at the fix
 commit `60bb82a8a`, no-graphics at the graphics results merge `ea6960eac` on top of it.
 **Flat in both modes apart from the new fixture**, as the brief expected.
-Neither upstream-drift test from the brief moved, because both baselines already
-contain it.
+None of the brief's three upstream-drift tests moved, because both baselines
+already include that drift.
 
 | mode | run | vs | intersection | effective | regressions | new fixture |
 |---|---|---|---|---|---|---|
