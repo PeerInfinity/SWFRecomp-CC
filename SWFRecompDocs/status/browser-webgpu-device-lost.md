@@ -16,7 +16,10 @@ Two results:
    WebGPU swapchain when its compositor runs on ANGLE-SwiftShader GL. Adding
    `--enable-features=Vulkan --use-vulkan=swiftshader` moves the compositor onto
    SwiftShader Vulkan. The device then survives and the canvas shows real pixels
-   headless: the unmodified Seedling build renders its splash at ~10–12 ticks/s.
+   headless: a Seedling build from the current tree (before this slice's
+   runtime change) renders its splash at ~10–12 ticks/s. **This does not hold
+   for Seedling builds made before `c6681e744` (2026-09-02, the size-class
+   bitmap pools)**, which includes Archipelago-CC's pinned wasms. See §6.
 2. **Degrading gracefully (part A).** The runtime now registers a device-lost
    callback. After a loss it stops parking and stops registering work-done
    callbacks, while the render walk keeps running. The frames-in-flight park no
@@ -287,7 +290,20 @@ The check is not wired into this repo's CI. The CI browser path is
   `--use-angle=swiftshader`: without it the device is still lost. Expect a live
   device, real canvas pixels (screenshots, not `drawImage`), and ~10–12
   ticks/s on this box's CPU. This was verified here on Chromium 1194 and 145,
-  not on a GitHub runner.
+  not on a GitHub runner, and **only on a build from the current tree**.
+  **Correction (2026-09-11, measured by Archipelago-CC on its pinned p4d):** under
+  the Vulkan flags the device lives and the game ticks at ~28 frames/s, but the
+  canvas is **black**. That build predates `c6681e744`, so it allocates one
+  bitmap texture array with a layer per bitmap: 283 layers, at 4481×641. That
+  exceeds SwiftShader's `maxTextureArrayLayers` of 256, which is the adapter
+  maximum this runtime already requests (real GPUs grant ≥ 2048). The result is
+  an invalid `bitmap_tex`, then an invalid bind group, then every frame's command
+  buffer dropped: 4,458 `uncapturederror`s in 30 s. So **any pre-2026-09-02
+  build with more than 256 bitmaps is black-but-ticking** under these flags, and
+  pixels need the rebuild below. A `__swfGpu`-style readout of "bitmap texture
+  creation failed" would surface that as one fact instead of thousands of
+  validation errors. It isn't implemented. The current size-class pools could
+  still hit the same limit if a single size class exceeded 256 bitmaps.
 - **Runtime (graceful degradation when the flags are missing, or on any real
   loss):** it needs a rebuild from the runtime at this slice's commit (§7). The
   pinned `PeerInfinity/seedling-wasm@071ac1c` wasms keep the old behaviour until
