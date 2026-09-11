@@ -147,7 +147,14 @@ void avm2_callstack_rename_frame(Avm2Context* ctx, Avm2MethodFn own_fn,
 // read "Test$/class_method()" instead of "Test/class_method()".
 static int frame_is_class_trait(const Avm2Class* cls, const Avm2MethodRef* m)
 {
-	if (cls == NULL || m->file == NULL || cls->class_object == NULL) return 0;
+	if (cls == NULL || cls->class_object == NULL) return 0;
+	// A NATIVE builtin (file == NULL) has no ABC identity, so its C function
+	// pointer IS its identity and the file/method_index halves of the compare
+	// below are trivially equal. Bailing on `file == NULL` used to strip the
+	// `$` off EVERY native class-side frame ("JSON/parse()" for FP's
+	// "JSON$/parse()"), which is why five call sites carry a hand-written
+	// "Cls$/m" literal today. A NULL fn identifies nothing — reject that.
+	if (m->file == NULL && m->fn == NULL) return 0;
 	const Avm2VTable* vt = cls->class_object->vtable;
 	if (vt == NULL) return 0;
 	for (uint32_t i = 0; i < vt->count; i++)

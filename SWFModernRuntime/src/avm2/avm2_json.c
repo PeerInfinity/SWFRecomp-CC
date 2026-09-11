@@ -1,7 +1,8 @@
 // JSON builtin — port of Ruffle core/src/avm2/globals/json.rs (which backs
 // it with serde_json): strict ECMA-404 parsing with insertion-order object
-// keys (Ruffle enables serde's preserve_order), integral numbers landing
-// as wrapping-i32 Integers, reviver/replacer (function or prop-list array)
+// keys (Ruffle enables serde's preserve_order), numbers normalized to
+// Integer only when they round-trip through the 29-bit atom range
+// (Value::normalize), reviver/replacer (function or prop-list array)
 // semantics, toJSON hooks, cyclic detection (TypeError 1129), and the
 // serde compact/pretty output formats (lowercase \u escapes, ryu-style
 // float text). Registration is SWF-version-gated by avm2_globals.c: the
@@ -23,6 +24,47 @@ _Noreturn static void throw_1132(Avm2Context* ctx)
 {
 	avm2_throw_error(ctx, ctx->builtins.syntax_error_class,
 	                 "Error #1132: Invalid JSON parse input.");
+}
+
+// FP's JSON.parse is a thin AS3 wrapper in playerglobal, so its #1132 comes
+// out through one of two extra frames (avm2/json_parse_errors pins both):
+// the null/undefined argument check routes through Error.throwError, while
+// EVERY syntax error is raised by the native JSON$/parseCore() helper. The
+// longjmp to the catch unwinds call_depth, so neither push needs a pop.
+_Noreturn static void throw_1132_argument(Avm2Context* ctx)
+{
+	avm2_callstack_push_throwerror(ctx);
+	throw_1132(ctx);
+}
+
+_Noreturn static void throw_1132_syntax(Avm2Context* ctx)
+{
+	static const Avm2MethodRef parse_core =
+		{ NULL, NULL, "JSON$/parseCore", 0, 0 };
+	avm2_callstack_push(ctx, &parse_core, NULL);
+	throw_1132(ctx);
+}
+
+// Ruffle Value::normalize (core/src/avm2/value.rs:574) — the single rule for
+// "does this JSON number land as an Integer or a Number". A double is
+// promoted only when it round-trips bit-exactly through i32 AND fits
+// avmplus's 29-bit atom range; everything else stays a Number. This used to
+// be "integral → wrapping i32 cast", which silently corrupted every integral
+// value outside i32: a ms timestamp `1782219299000` came back `-192128840`,
+// and `1e21` came back `-559939584`. That was a live content bug, not just a
+// test row. The explicit range guard also keeps the cast out of UB.
+static Avm2Value json_number_value(double d)
+{
+	if (d >= -2147483648.0 && d <= 2147483647.0)
+	{
+		int32_t i = (int32_t) d;
+		if ((double) i == d && !(d == 0.0 && signbit(d))
+		    && i < (1 << 28) && i >= -(1 << 28))
+		{
+			return avm2_integer(i);
+		}
+	}
+	return avm2_number(d);
 }
 
 _Noreturn static void throw_1131(Avm2Context* ctx)
@@ -267,15 +309,20 @@ static JVal* jp_value(JParser* p)
 	}
 	if (c == '-' || (c >= '0' && c <= '9'))
 	{
-		// Strict JSON number grammar.
+		// JSON number grammar, with avmplus's ONE documented relaxation:
+		// ECMA-404 forbids a leading zero, but FP's parseCore scans the
+		// integer part as a plain digit run, so `01`/`007`/`010` parse as
+		// decimal 1/7/10 (avm2/json_parse_numbers' Flash-captured
+		// output.txt pins all three). Ruffle inherits serde's strict
+		// rejection here and throws #1132 — we follow Flash, which is also
+		// what keeps the rest of that test's lines index-aligned.
+		// Everything else stays strict: `.5`, `5.`, `+5`, `0x1F`, `0b101`
+		// and `1_000_000` all still fail (the digit run stops at the
+		// non-digit and the enclosing value/object parser rejects it).
 		uint32_t start = p->i;
 		if (p->s[p->i] == '-') p->i++;
 		if (p->i >= p->len) return NULL;
-		if (p->s[p->i] == '0')
-		{
-			p->i++;
-		}
-		else if (p->s[p->i] >= '1' && p->s[p->i] <= '9')
+		if (p->s[p->i] >= '0' && p->s[p->i] <= '9')
 		{
 			while (p->i < p->len && p->s[p->i] >= '0' && p->s[p->i] <= '9') p->i++;
 		}
@@ -401,12 +448,8 @@ static Avm2Value j_deserialize(Avm2Context* ctx, const JVal* v, Avm2Value revive
 		case 0: return avm2_null();
 		case 1: return avm2_bool(v->b != 0);
 		case 2:
-			// Integral doubles land as wrapping-i32 Integers (Ruffle).
-			if (v->num == trunc(v->num) && !isinf(v->num))
-			{
-				return avm2_integer(avm2_f64_to_wrapping_i32(v->num));
-			}
-			return avm2_number(v->num);
+			// Ruffle deserialize_json_inner: f64 → Value, then normalize().
+			return json_number_value(v->num);
 		case 3: return avm2_string(avm2_string_new(ctx, v->str, v->str_len));
 		case 4:
 		{
@@ -463,7 +506,7 @@ static Avm2Value json_parse(Avm2Activation* act)
 	Avm2Value input = act->argc > 0 ? act->args[0] : avm2_undefined();
 	if (input.kind == AVM2_VALUE_UNDEFINED || input.kind == AVM2_VALUE_NULL)
 	{
-		throw_1132(ctx);
+		throw_1132_argument(ctx);
 	}
 	const Avm2String* text = avm2_coerce_to_string(ctx, input);
 
@@ -483,9 +526,9 @@ static Avm2Value json_parse(Avm2Activation* act)
 
 	JParser p = { ctx, text->utf8, text->len, 0, 0 };
 	JVal* v = jp_value(&p);
-	if (v == NULL) throw_1132(ctx);
+	if (v == NULL) throw_1132_syntax(ctx);
 	jp_ws(&p);
-	if (p.i != p.len) throw_1132(ctx);
+	if (p.i != p.len) throw_1132_syntax(ctx);
 
 	Avm2Value val = j_deserialize(ctx, v, reviver);
 	if (reviver.kind != AVM2_VALUE_UNDEFINED)
@@ -673,15 +716,7 @@ static Avm2Value js_map_value(JSer* js, const char* key, uint32_t key_len, Avm2V
 // become Integers before serialization.
 static Avm2Value js_normalize(Avm2Value v)
 {
-	if (v.kind == AVM2_VALUE_NUMBER)
-	{
-		int32_t i = (int32_t) v.u.d;
-		if (v.u.d == (double) i && !(v.u.d == 0.0 && signbit(v.u.d))
-		    && i < (1 << 28) && i >= -(1 << 28))
-		{
-			return avm2_integer(i);
-		}
-	}
+	if (v.kind == AVM2_VALUE_NUMBER) return json_number_value(v.u.d);
 	return v;
 }
 

@@ -516,3 +516,48 @@ Two consequences worth recording:
 Not added to `ignored_tests.txt` — this is a `RUFFLE_VS_FLASH` entry, not an
 `ACCEPTED_DIFFS` one, and the row's remaining diff is genuinely fixable work
 (cross-VM target-path resolution) rather than a permanent divergence.
+
+## AVM2 `JSON.parse` number grammar: Flash's leading zeros vs serde's strict ECMA-404
+
+**Tests:** `avm2/json_parse_numbers` (`known_failure = true`),
+`from_avmplus/ecma3/JSON/adhoc`.
+**Added:** 2026-09-11 (session 19, `w2-avm2-json`).
+
+ECMA-404 forbids a leading zero in a JSON number, and Ruffle inherits that
+rule verbatim from `serde_json`. Flash Player does not: `JSON$/parseCore()`
+scans the integer part as a plain digit run, so the three rows
+
+```
+{"t": 01}  -> 1
+{"t": 007} -> 7
+{"t": 010} -> 10        (decimal ten — FP does not read this as octal)
+```
+
+come back as numbers in Flash's own `output.txt`, while Ruffle throws
+`SyntaxError: Error #1132` on all three (`output.ruffle.txt`). Every other
+non-grammatical form in the same test — `+5`, `.5`, `5.`, `0x1F`, `0b101`,
+`1_000_000`, a full-width `５` — throws in Flash as well as in Ruffle, so the
+relaxation is precisely and only "a digit run may start with `0`".
+
+**Decision: follow Flash.** `jp_value`'s integer-part scan
+(`SWFModernRuntime/src/avm2/avm2_json.c`) accepts a leading zero; nothing else
+in the grammar moved. Two reasons beyond the oracle:
+
+* It is strictly more permissive, so no SWF that worked in Flash can start
+  failing on it — the opposite direction (adopting serde's reject) would make
+  real content throw where Flash returned a number.
+* It is also what keeps `json_parse_numbers` line-index aligned with
+  `output.txt`. Throwing on those three rows inserts nine trace lines and
+  shifts every later line, which is what kept the row out of `ruffle_matched`
+  even after the frame and integer-wrap fixes landed: Ruffle's own output is
+  shifted by a *different* amount (it additionally rejects the out-of-f64-range
+  literal `1.7976931348623159e308`, which Flash and we both return as
+  `Infinity`), so the two shifts do not cancel.
+
+The row is `ruffle_matched` with four residual diff lines, all of them in
+already-dispositioned families: Flash printing `Infinity` for `DBL_MAX`
+itself, and the 17-significant-digit subnormal/denormal spellings
+(`5e-324` → `4.9406564584124654e-324`, `1.1754944e-38` →
+`1.1754943999999998e-38`) that `number_to_string` already owns, plus Flash's
+lower-precision `strtod` on a 270-digit literal. Not added to
+`ignored_tests.txt`: the row counts as an effective pass.
