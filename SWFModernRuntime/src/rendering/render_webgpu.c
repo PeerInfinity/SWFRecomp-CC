@@ -561,6 +561,45 @@ static void on_device_ready(WGPURequestDeviceStatus status,
 	}
 }
 
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+// ---------------------------------------------------------------------------
+// Device loss (browser-WASM).
+// ---------------------------------------------------------------------------
+// The browser can take the device away at any time. Headless Chromium on
+// SwiftShader does it at the FIRST canvas present of every page (the GPU
+// process finds no shared-image backing for the WebGPU swapchain when the
+// compositor runs on ANGLE-SwiftShader GL; SWFRecompDocs/status/
+// browser-webgpu-device-lost.md). A lost device is not an error state for the
+// API: every call on it stays valid and does nothing, so the render walk keeps
+// running and keeps its side effects. What breaks is anything that WAITS on the
+// GPU. emdawnwebgpu's glue chains queue.onSubmittedWorkDone() with no rejection
+// handler ("assumed not to reject", library_webgpu.js), so on a lost device
+// each registration becomes an unhandled promise rejection and its C callback
+// never fires. The frames-in-flight park (render_webgpu_open_pass) then ran to
+// its guard on every other frame: ~4.4 s each, 0.4 fps. Once g_device_lost is
+// set, the park and the work-done registration both stand down.
+//
+// The device is NOT re-requested: in that environment a fresh device on a fresh
+// adapter is lost again at its own first present, and a rebuild would have to
+// recreate every buffer, texture pool, pipeline and bind group.
+static volatile int g_device_lost = 0;
+static void on_device_lost(const WGPUDevice* device, WGPUDeviceLostReason reason,
+                           struct WGPUStringView message, void* u1, void* u2)
+{
+	(void)device; (void)u1; (void)u2;
+	if (g_device_lost) return;
+	g_device_lost = 1;
+	fprintf(stderr, "WebGPU device lost (reason %d): %.*s -- rendering stops, "
+	        "the movie keeps running\n", (int)reason,
+	        (int)message.length, message.data ? message.data : "");
+	// For harnesses: window.__swfGpu.lost counts losses (see park note below).
+	EM_ASM({
+		var g = globalThis.__swfGpu || (globalThis.__swfGpu = { lost: 0, stalls: 0 });
+		g.lost++;
+	});
+}
+#endif
+
 static void request_device_sync(WebGPURenderContext* ctx,
                                 const WGPUDeviceDescriptor* desc)
 {
@@ -994,6 +1033,10 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		dev_desc.label = WGPU_LABEL("swf_device");
 		dev_desc.defaultQueue.label = WGPU_LABEL("swf_queue");
 		dev_desc.uncapturedErrorCallbackInfo.callback = on_uncaptured_error;
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+		dev_desc.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowSpontaneous;
+		dev_desc.deviceLostCallbackInfo.callback = on_device_lost;
+#endif
 
 		// Request the adapter's full limits rather than the WebGPU defaults.
 		// The default maxTextureArrayLayers is 256, but the gradient (and bitmap)
@@ -2414,13 +2457,43 @@ void render_webgpu_upload_stage_transform(WebGPURenderContext* ctx, const float 
 // AllowSpontaneous so the callback fires during the park's emscripten_sleep
 // event-loop turns (the browser never calls wgpuInstanceProcessEvents — matches
 // browser_capture_finish + the adapter/device requests).
+//
+// The park gives up after FRAME_PARK_QUIET_MS with NO callback at all: not
+// "this park is long", but "the GPU has reported nothing for that long". The
+// guard used to be 1000 emscripten_sleep(1) turns: ~4.4 s, because the browser
+// clamps nested timers to 4 ms (and ~17 min in a background tab, where they
+// clamp to 1 s). When callbacks stopped coming, every other frame paid it, then
+// zeroed the count. Now a park that goes quiet marks the channel stalled: no
+// more parks, so a channel that never answers costs one quiet period, once. The
+// next successful callback revives it. Registration continues while stalled
+// and the count is never reset, so it stays the true number of unfinished
+// frames and the first park after a revival drains whatever backlog built up.
+// A lost device (g_device_lost, above) stops the park and the registrations for
+// good. window.__swfGpu.stalls counts stalls.
+//
+// Why "quiet", not a per-park cap: a slow live GPU is not a dead one. A per-park
+// cap that zeroes the count and stops registering hides the backlog from the
+// count, so draining it looks like more silence. Measured on headless
+// SwiftShader with a live device (a frame completes in ~70 ms, early frames in
+// up to ~1.8 s while pipelines compile): 12-18 stalls in 30 s with a 250 ms or
+// 1 s cap, frames up to the cap. Even with the quiet rule, 1 s still tripped at
+// startup there, and the revived park then paid the backlog back as one long
+// frame. So the threshold sits well above any live GPU's slowest completion:
+// it only has to catch a channel that never answers, and device LOSS (the
+// case that actually happens) is handled at once by g_device_lost.
 #define MAX_FRAMES_IN_FLIGHT 2
+#define FRAME_PARK_QUIET_MS 3000.0
 static volatile int g_frames_in_flight = 0;
+static volatile int g_wd_stalled = 0;
+static volatile double g_last_work_done_ms = 0.0;
 static void on_frame_work_done(WGPUQueueWorkDoneStatus status, WGPUStringView message,
                                void* u1, void* u2)
 {
-	(void)status; (void)message; (void)u1; (void)u2;
+	(void)message; (void)u1; (void)u2;
 	if (g_frames_in_flight > 0) g_frames_in_flight--;
+	g_last_work_done_ms = emscripten_get_now();
+	if (status == WGPUQueueWorkDoneStatus_Success)
+		g_wd_stalled = 0;
 }
 #endif
 
@@ -2432,13 +2505,27 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	if (!ctx->renderer_ok) return;
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
 	// Wait for the GPU to drain to within MAX_FRAMES_IN_FLIGHT before building a
-	// new frame (see the backpressure note above). guard caps the wait so a
-	// stalled/lost callback degrades gracefully to the old no-backpressure
-	// behavior rather than hanging.
+	// new frame (see the backpressure note above). A GPU that goes quiet for
+	// FRAME_PARK_QUIET_MS stalls the channel instead of being waited on again.
+	if (!g_device_lost && !g_wd_stalled)
 	{
-		int guard = 0;
-		while (g_frames_in_flight >= MAX_FRAMES_IN_FLIGHT) {
-			if (guard++ >= 1000) { g_frames_in_flight = 0; break; }
+		double park_t0 = emscripten_get_now();
+		while (g_frames_in_flight >= MAX_FRAMES_IN_FLIGHT && !g_device_lost) {
+			double quiet_since = g_last_work_done_ms > park_t0 ? g_last_work_done_ms : park_t0;
+			if (emscripten_get_now() - quiet_since >= FRAME_PARK_QUIET_MS) {
+				g_wd_stalled = 1;
+				static int stall_logged = 0;
+				if (!stall_logged) {
+					stall_logged = 1;
+					fprintf(stderr, "WebGPU: no frame completed in %.0f ms; frames stop "
+					        "waiting on the GPU until one does\n", FRAME_PARK_QUIET_MS);
+				}
+				EM_ASM({
+					var g = globalThis.__swfGpu || (globalThis.__swfGpu = { lost: 0, stalls: 0 });
+					g.stalls++;
+				});
+				break;
+			}
 			emscripten_sleep(1);
 		}
 	}
@@ -3495,6 +3582,9 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	// finishes it, and render_webgpu_open_pass parks until we're within
 	// MAX_FRAMES_IN_FLIGHT (see the backpressure note above). Without this the
 	// timer-paced loop outruns the GPU and the present queue backs up unbounded.
+	// Not on a lost device: each registration there is one unhandled promise
+	// rejection in the page and a callback that never comes.
+	if (!g_device_lost)
 	{
 		WGPUQueueWorkDoneCallbackInfo wd_info = {0};
 		wd_info.mode = WGPUCallbackMode_AllowSpontaneous;
@@ -5894,7 +5984,7 @@ static void browser_capture_finish(WebGPURenderContext* ctx)
 	                   ctx->browser_capture_row_stride * (size_t)ctx->height, map_info);
 
 	int guard = 0;
-	while (!g_browser_map_done && guard++ < 2500)   // up to ~20s, then give up
+	while (!g_browser_map_done && !g_device_lost && guard++ < 2500)   // up to ~20s, then give up
 		emscripten_sleep(8);
 
 	if (!g_browser_map_done || g_browser_map_status != WGPUMapAsyncStatus_Success)
@@ -5933,7 +6023,7 @@ static void browser_capture_finish(WebGPURenderContext* ctx)
 
 void render_webgpu_request_browser_capture(WebGPURenderContext* ctx)
 {
-	if (!ctx || !ctx->renderer_ok) return;
+	if (!ctx || !ctx->renderer_ok || g_device_lost) return;
 	ctx->browser_capture_state = 1;   // requested — open_pass picks it up next frame
 }
 

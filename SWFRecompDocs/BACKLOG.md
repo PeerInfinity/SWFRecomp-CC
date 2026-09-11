@@ -38,6 +38,17 @@ first).
 
 ## Browser-WASM — rendering
 
+- **Headless-Chromium WebGPU needs `--enable-features=Vulkan
+  --use-vulkan=swiftshader` to present; unverified on a CI runner.** With the
+  usual `--use-angle=swiftshader` headless flags, Chromium loses the device at
+  the first canvas present (no shared-image backing for the WebGPU swapchain on
+  ANGLE-SwiftShader GL). The runtime now survives that, but draws nothing. The
+  Vulkan flags give a live device and real pixels on this box, on Chromium 1194
+  and 145. Not yet tried on GitHub's ubuntu image, and no headless page check
+  runs in CI (`tools/browser-test/webgpu_headless_smoke.py` is the check to
+  wire). Also still open: the 1–4 unhandled rejections at the moment of loss are
+  emdawnwebgpu's glue (upstream text in
+  `status/browser-webgpu-device-lost.md` §8). (2026-09-11)
 - **Attached-clip morph shapes can't ratio-interpolate per-instance.**
   Morph interpolation is a per-CHARACTER pre-pass into a SHARED vertex
   buffer run over the ROOT display_list only (`tag.c` ~5802);
