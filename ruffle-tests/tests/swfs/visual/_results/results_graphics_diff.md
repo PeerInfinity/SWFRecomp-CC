@@ -1,15 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `cdafe1be9c22` (2026-09-05T03:18:53.246044+00:00)
-**Current:** `12d2ec06b7bf` (2026-09-05T05:20:58.629935+00:00)
+**Previous:** `12d2ec06b7bf` (2026-09-05T05:20:58.629935+00:00)
+**Current:** `c4a952960bca` (2026-09-11T15:53:45.704607+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 144 | 144 | 0 |
-| Total | 146 | 146 | 0 |
+| Passing | 144 | 145 | +1 |
+| Total | 146 | 147 | +1 |
 | Pass rate | 98.6% | 98.6% | 0% |
 | Mismatched lines | 49 | 49 | 0 |
 
-No changes detected.
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `edittext/edittext_caret_multiline` | pass | 0/0 |

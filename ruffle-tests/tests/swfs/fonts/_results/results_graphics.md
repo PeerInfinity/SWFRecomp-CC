@@ -1,21 +1,23 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-05 05:20 UTC
+**Date**: 2026-09-11 15:53 UTC
 
-**Git SHA**: `12d2ec06b7`
+**Git SHA**: `c4a952960b`
 
-**Run Duration**: 2m 26s
+**Run Duration**: 3m 0s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 7 |
-| Passing | **6** (85.7%) |
+| Total tests | 8 |
+| Passing | **6** (75.0%) |
+| Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **7** (87.5%) |
 | Failing | 1 |
-| Total expected lines | 346 |
-| Matching lines | 190 (54.9%) |
-| Mismatched lines | 156 |
+| Total expected lines | 364 |
+| Matching lines | 194 (53.3%) |
+| Mismatched lines | 170 |
 
 ### Failure Breakdown
 
@@ -29,12 +31,20 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `device_font_glyph_fallback` | 36 | 27.4s |  |
-| 2 | `device_font_kerning` | 4 | 29.9s |  |
-| 3 | `device_font_list` | 64 | 22.2s |  |
-| 4 | `embed_matching/fallback_preferences` | 0 | 29.9s |  |
-| 5 | `embed_matching/match_style` | 0 | 9.7s |  |
-| 6 | `embed_matching/no_font_found` | 0 | 9.2s |  |
+| 1 | `device_font_glyph_fallback` | 36 | 29.0s |  |
+| 2 | `device_font_kerning` | 4 | 22.7s |  |
+| 3 | `device_font_list` | 64 | 29.2s |  |
+| 4 | `embed_matching/fallback_preferences` | 0 | 32.2s |  |
+| 5 | `embed_matching/match_style` | 0 | 7.3s |  |
+| 6 | `embed_matching/no_font_found` | 0 | 8.2s |  |
+
+## Ruffle-Matched Tests
+
+**1 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+
+| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
+|---|------|-----------|--------------|----------|-------|
+| 1 | `device_font_no_ink` | 14 | 14 | 27.2s |  |
 
 ## Near-Passing Tests
 
