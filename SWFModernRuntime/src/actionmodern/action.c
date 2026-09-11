@@ -691,6 +691,15 @@ u32 g_call_depth = 0;
 // before the next event in the same tick. Mirrors Ruffle's synchronous
 // MovieClip.nextFrame / gotoFrame semantics. Key test: ButtonEventsTest.
 int g_inside_event_handler = 0;
+// >0 while inside a Key/Mouse *broadcaster* callback (Key.addListener /
+// Mouse.addListener listeners, dispatched through
+// builtin_broadcaster_broadcastMessage from actionDispatchKeyDown/Up and
+// actionDispatchMouseDown/Up/Move). Those never go through
+// mc_call_as2_handler_ng, so g_inside_event_handler stays 0 for them — which
+// silently dropped a nextFrame() issued from such a callback on a STOPPED
+// root (w2-avm1-events G3). Read by actionNextFrame only.
+// Key test: from_gnash/misc-ming.all/masks_test.
+int g_inside_broadcaster_dispatch = 0;
 static int g_child_swf_init = 0;  // >0 during child SWF init (MCL/loadMovie); scopes funcs to MC
 extern u8 g_current_movie_id;    // Defined in tag_stubs.c — tracks which movie is currently initializing
 static int g_use_new_invalid_bounds = 0;  // Ruffle: one-way flag, flips to 1 when getBounds/getRect called from SWF>=8
@@ -34175,10 +34184,20 @@ void actionNextFrame(SWFAppContext* app_context)
 	// animation lag). Gated to the root (g_current_context == &root_movieclip)
 	// and to a stopped root (a playing root advances naturally). Key game:
 	// flasharchive/Tetris (preloader→menu transition).
+	//
+	// Same hole, second entrance (w2-avm1-events G3): a Key/Mouse *broadcaster*
+	// callback (`Key.addListener(l); l.onKeyUp = function(){ nextFrame(); }`)
+	// sets neither g_inside_event_handler (only mc_call_as2_handler_ng does)
+	// nor g_inside_enterframe_dispatch, so on a stopped root its nextFrame()
+	// was dropped exactly the same way — the playhead moved, the target
+	// frame's tags and DoAction never ran, and the movie went silent for the
+	// rest of the run. g_inside_broadcaster_dispatch closes it with the same
+	// deferred-goto form. Key test: from_gnash/misc-ming.all/masks_test
+	// ("- Press any key to continue -" at 28/175 lines).
 	{
 		extern int g_inside_enterframe_dispatch;
 		extern int is_playing;
-		if (g_inside_enterframe_dispatch && !is_playing
+		if ((g_inside_enterframe_dispatch || g_inside_broadcaster_dispatch) && !is_playing
 		    && g_current_context == &root_movieclip && !ng_isInsideSprite()) {
 			extern int goto_from_action;
 			extern size_t g_frame_count;
@@ -38192,7 +38211,11 @@ void actionDispatchKeyDown(SWFAppContext* app_context)
     method_name.type = ACTION_STACK_VALUE_STRING;
     method_name.data.numeric_value = (u64)(uintptr_t)onKeyDown_u16;
     method_name.str_size = 9;
+    // G3: mark the broadcaster callback so actionNextFrame's stopped-root
+    // arm sees it (see g_inside_broadcaster_dispatch).
+    g_inside_broadcaster_dispatch++;
     builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_key_obj);
+    g_inside_broadcaster_dispatch--;
 }
 
 void actionDispatchKeyUp(SWFAppContext* app_context)
@@ -38205,7 +38228,11 @@ void actionDispatchKeyUp(SWFAppContext* app_context)
     method_name.type = ACTION_STACK_VALUE_STRING;
     method_name.data.numeric_value = (u64)(uintptr_t)onKeyUp_u16;
     method_name.str_size = 7;
+    // G3: mark the broadcaster callback so actionNextFrame's stopped-root
+    // arm sees it (see g_inside_broadcaster_dispatch).
+    g_inside_broadcaster_dispatch++;
     builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_key_obj);
+    g_inside_broadcaster_dispatch--;
 }
 
 // Dispatch onMouseDown/onMouseUp/onMouseMove to all Mouse listeners.
@@ -38220,7 +38247,11 @@ void actionDispatchMouseDown(SWFAppContext* app_context)
     method_name.type = ACTION_STACK_VALUE_STRING;
     method_name.data.numeric_value = (u64)(uintptr_t)onMouseDown_u16;
     method_name.str_size = 11;
+    // G3: mark the broadcaster callback so actionNextFrame's stopped-root
+    // arm sees it (see g_inside_broadcaster_dispatch).
+    g_inside_broadcaster_dispatch++;
     builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+    g_inside_broadcaster_dispatch--;
 }
 
 void actionDispatchMouseUp(SWFAppContext* app_context)
@@ -38233,7 +38264,11 @@ void actionDispatchMouseUp(SWFAppContext* app_context)
     method_name.type = ACTION_STACK_VALUE_STRING;
     method_name.data.numeric_value = (u64)(uintptr_t)onMouseUp_u16;
     method_name.str_size = 9;
+    // G3: mark the broadcaster callback so actionNextFrame's stopped-root
+    // arm sees it (see g_inside_broadcaster_dispatch).
+    g_inside_broadcaster_dispatch++;
     builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+    g_inside_broadcaster_dispatch--;
 }
 
 void actionDispatchMouseMove(SWFAppContext* app_context)
@@ -38246,7 +38281,11 @@ void actionDispatchMouseMove(SWFAppContext* app_context)
     method_name.type = ACTION_STACK_VALUE_STRING;
     method_name.data.numeric_value = (u64)(uintptr_t)onMouseMove_u16;
     method_name.str_size = 11;
+    // G3: mark the broadcaster callback so actionNextFrame's stopped-root
+    // arm sees it (see g_inside_broadcaster_dispatch).
+    g_inside_broadcaster_dispatch++;
     builtin_broadcaster_broadcastMessage(app_context, &method_name, 1, NULL, (void*)g_mouse_obj);
+    g_inside_broadcaster_dispatch--;
 }
 
 static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
@@ -74946,11 +74985,36 @@ static int mc_get_track_as_menu_ng(MovieClip* mc)
 static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
                                     const char* name, u32 name_len, ActionVar* handler_args, int handler_arg_count)
 {
-	if (mc == NULL || mc->dynamic_props == NULL || g_execution_halted) return;
+	if (mc == NULL || g_execution_halted) return;
 	// Walk prototype chain so handlers defined on RegisterClass prototypes are found
-	ActionVar* handler_var = getPropertyWithPrototype((ASObject*)mc->dynamic_props, name, name_len);
-	if (handler_var == NULL || handler_var->type != ACTION_STACK_VALUE_FUNCTION) return;
-	ASFunction* func = (ASFunction*)(uintptr_t)handler_var->data.numeric_value;
+	ASFunction* func = NULL;
+	if (mc->dynamic_props != NULL)
+	{
+		ActionVar* handler_var = getPropertyWithPrototype((ASObject*)mc->dynamic_props, name, name_len);
+		if (handler_var != NULL && handler_var->type == ACTION_STACK_VALUE_FUNCTION)
+			func = (ASFunction*)(uintptr_t)handler_var->data.numeric_value;
+	}
+	// MovieClip.prototype fall-back (w2-avm1-events G1). A plain timeline /
+	// createEmptyMovieClip clip's dynamic_props has no __proto__ link to
+	// MovieClip.prototype (only registerClass'd clips do), so a handler
+	// installed as `MovieClip.prototype.onMouseDown = f` was found for NO
+	// clip at all. Ruffle looks the handler up through the clip's AVM1
+	// object, whose proto chain always reaches MovieClip.prototype
+	// (`MovieClip::call_as2_handler` -> `object.call_method`). Same shape as
+	// actionDispatchMCOnConstruct's fall-back just above; function values
+	// only, so a non-function prototype property never shadows.
+	// Key test: from_gnash/misc-ming.all/PrototypeEventListeners.
+	if (func == NULL)
+	{
+		int mc_ver = mc->swf_version ? mc->swf_version : g_swf_version;
+		ASObject* mc_proto = getMovieClipPrototype(mc_ver);
+		if (mc_proto != NULL)
+		{
+			ActionVar* pv = getPropertyWithPrototype(mc_proto, name, name_len);
+			if (pv != NULL && pv->type == ACTION_STACK_VALUE_FUNCTION)
+				func = (ASFunction*)(uintptr_t)pv->data.numeric_value;
+		}
+	}
 	if (func == NULL) return;
 
 	if (g_call_depth >= g_max_call_depth - 1) {
@@ -75457,7 +75521,8 @@ void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context)
 {
 	for (int i = child_mc_count - 1; i >= 0; i--) {
 		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		// No dynamic_props guard — see actionDispatchMCMouseDown (G1).
+		if (mc == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
 		mc_call_as2_handler_ng(app_context, mc, "onMouseMove", 11, NULL, 0);
 	}
@@ -75471,7 +75536,10 @@ void actionDispatchMCMouseDown(SWFAppContext* app_context)
 {
 	for (int i = child_mc_count - 1; i >= 0; i--) {
 		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		// NOTE: no dynamic_props guard — mc_call_as2_handler_ng falls back to
+		// MovieClip.prototype (w2-avm1-events G1), which is the whole point for
+		// a clip that has never had a dynamic property written to it.
+		if (mc == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
 		mc_call_as2_handler_ng(app_context, mc, "onMouseDown", 11, NULL, 0);
 	}
@@ -75487,7 +75555,8 @@ void actionDispatchMCMouseUp(SWFAppContext* app_context)
 {
 	for (int i = child_mc_count - 1; i >= 0; i--) {
 		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->dynamic_props == NULL) continue;
+		// No dynamic_props guard — see actionDispatchMCMouseDown (G1).
+		if (mc == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
 		mc_call_as2_handler_ng(app_context, mc, "onMouseUp", 9, NULL, 0);
 	}
@@ -75495,6 +75564,111 @@ void actionDispatchMCMouseUp(SWFAppContext* app_context)
 	extern MovieClip root_movieclip;
 	if (root_movieclip.dynamic_props != NULL)
 		mc_call_as2_handler_ng(app_context, &root_movieclip, "onMouseUp", 9, NULL, 0);
+}
+
+// Mouse-wheel delivery (w2-avm1-events G2). AVM1 parsed MOUSE_WHEEL into
+// EV_MOUSE_WHEEL and then dropped it on the floor — there was no case for it in
+// either event pump, so `Mouse.onMouseWheel` never broadcast and a hovered
+// TextField never scrolled. Mirrors Ruffle:
+//   * `Player::handle_event` (player.rs:1276) broadcasts
+//     `Mouse.onMouseWheel(delta.lines())`, and
+//   * `Player::handle_event` (player.rs:1423) routes a `ClipEvent::MouseWheel`
+//     to the hovered object, where `EditText::event_dispatch`
+//     (edit_text.rs:3009) does `set_scroll(scroll - delta.lines(), /*programmatic=*/false)`.
+//     `set_scroll` clamps to [1, maxscroll] and, when the value actually
+//     changed, calls `on_scroller(false)` — which broadcasts `onScroller` with
+//     the field as the single argument (edit_text.rs:2142).
+// Deliberately narrow: only a TextField under the pointer is scrolled (Ruffle's
+// generic hovered-object route reaches EditText for every other target anyway,
+// since no other AVM1 display object handles ClipEvent::MouseWheel), and
+// onScroller is fired ONLY from here — never from the script-side `scroll`
+// setter, which Ruffle treats as `programmatic = true`.
+void actionDispatchMouseWheel(SWFAppContext* app_context, int lines)
+{
+	// 1. Mouse.onMouseWheel(delta) broadcast to Mouse listeners.
+	if (g_mouse_obj)
+	{
+		static const uint16_t onMouseWheel_u16[] = {
+			'o','n','M','o','u','s','e','W','h','e','e','l'
+		};
+		ActionVar mw_args[2];
+		memset(mw_args, 0, sizeof(mw_args));
+		mw_args[0].type = ACTION_STACK_VALUE_STRING;
+		mw_args[0].data.numeric_value = (u64)(uintptr_t)onMouseWheel_u16;
+		mw_args[0].str_size = 12;
+		mw_args[1].type = ACTION_STACK_VALUE_F64;
+		VAL(double, &mw_args[1].data.numeric_value) = (double)lines;
+		g_inside_broadcaster_dispatch++;
+		builtin_broadcaster_broadcastMessage(app_context, mw_args, 2, NULL,
+		                                     (void*)g_mouse_obj);
+		g_inside_broadcaster_dispatch--;
+	}
+	if (g_execution_halted) return;
+
+	// 2. Scroll the topmost TextField under the pointer.
+	float mx = app_context->mouse.stage_x / 20.0f;
+	float my = app_context->mouse.stage_y / 20.0f;
+	MovieClip* tf_mc = NULL;
+	for (int i = child_mc_count - 1; i >= 0; i--)
+	{
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || !MC_IS_TEXTFIELD(mc)) continue;
+		if (mc->dynamic_props == NULL) continue;
+		if (mc_is_avm1_gone_ng(mc)) continue;
+		float x1, y1, x2, y2;
+		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+		tf_mc = mc;
+		break;
+	}
+	if (tf_mc == NULL) return;
+
+	ASObject* tf_props = (ASObject*) tf_mc->dynamic_props;
+	// mouseWheelEnabled gate (default true; the property is seeded true on
+	// every field we create, so only an explicit `false` suppresses).
+	ActionVar* mwe = getProperty(tf_props, "mouseWheelEnabled", 17);
+	if (mwe != NULL && mwe->type == ACTION_STACK_VALUE_BOOLEAN
+	    && mwe->data.numeric_value == 0)
+		return;
+
+	ActionVar* sc_var = getProperty(tf_props, "scroll", 6);
+	int cur = 1;
+	if (sc_var != NULL && (sc_var->type == ACTION_STACK_VALUE_F64
+	                       || sc_var->type == ACTION_STACK_VALUE_F32))
+		cur = (int) varToDoubleSimple(sc_var);
+	if (cur < 1) cur = 1;
+
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	int max_scroll = recomputeMaxScroll(app_context, tf_mc);
+#else
+	int max_scroll = 1;
+	{
+		ActionVar* ms_var = getProperty(tf_props, "maxscroll", 9);
+		if (ms_var != NULL && (ms_var->type == ACTION_STACK_VALUE_F64
+		                       || ms_var->type == ACTION_STACK_VALUE_F32))
+			max_scroll = (int) varToDoubleSimple(ms_var);
+	}
+#endif
+	if (max_scroll < 1) max_scroll = 1;
+
+	int target = cur - lines;
+	if (target < 1) target = 1;
+	if (target > max_scroll) target = max_scroll;
+	if (target == cur) return;
+
+	ActionVar new_scroll;
+	memset(&new_scroll, 0, sizeof(new_scroll));
+	new_scroll.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &new_scroll.data.numeric_value) = (double) target;
+	setProperty(app_context, tf_props, "scroll", 6, &new_scroll);
+
+	// on_scroller(programmatic = false): the field itself is listener 0, so the
+	// handler assigned as `tf.onScroller = function(x)` runs with x = the field.
+	ActionVar sc_arg;
+	memset(&sc_arg, 0, sizeof(sc_arg));
+	sc_arg.type = ACTION_STACK_VALUE_MOVIECLIP;
+	sc_arg.data.numeric_value = (u64)(uintptr_t) tf_mc;
+	mc_call_as2_handler_ng(app_context, tf_mc, "onScroller", 10, &sc_arg, 1);
 }
 
 // ====== Focus and Tab Navigation System ======

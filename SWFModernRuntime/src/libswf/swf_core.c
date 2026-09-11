@@ -633,6 +633,16 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMouseUp(app_context);
         actionDispatchMCMouseUp(app_context);
         break;
+    case EV_MOUSE_WHEEL:
+        // w2-avm1-events G2: AVM1 parsed MOUSE_WHEEL and then dropped it.
+        // Ruffle broadcasts Mouse.onMouseWheel(lines) and routes the wheel to
+        // the hovered object, where an EditText scrolls by -lines and fires
+        // onScroller. ev->code carries the signed line delta.
+        {
+            extern void actionDispatchMouseWheel(SWFAppContext* app_context, int lines);
+            actionDispatchMouseWheel(app_context, ev->code);
+        }
+        break;
     case EV_KEY_DOWN: {
         if (ev->code >= 0 && ev->code < 256) {
             app_context->keys.down[ev->code] = 1;
