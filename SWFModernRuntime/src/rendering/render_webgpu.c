@@ -1342,7 +1342,12 @@ static void on_texture_scope_popped(WGPUPopErrorScopeStatus status, WGPUErrorTyp
                                     struct WGPUStringView message, void* u1, void* u2)
 {
 	(void)u2;
-	if (status != WGPUPopErrorScopeStatus_Success || type == WGPUErrorType_NoError) return;
+	// Only the two types these scopes filter for. A pop that REJECTS (the
+	// device was lost while it was pending: "Instance dropped in
+	// popErrorScope") comes back from emdawnwebgpu as Success + Unknown, and is
+	// not a creation failure; the device-lost path reports that.
+	if (status != WGPUPopErrorScopeStatus_Success) return;
+	if (type != WGPUErrorType_Validation && type != WGPUErrorType_OutOfMemory) return;
 	render_texture_problem("[render] GPU texture \"%s\" could not be created, so nothing "
 	                       "that samples it will draw: %.*s", (const char*)u1,
 	                       (int)(message.length > 240 ? 240 : message.length),

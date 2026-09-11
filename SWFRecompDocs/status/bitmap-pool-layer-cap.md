@@ -184,6 +184,24 @@ All runs had 0 WebGPU errors and 0 page errors, and the title rendered.
   So does the existing pool log, which now opens with the device limits.
 - An over-limit texture could not have produced this readout before: nothing
   checked the limit, and nothing scoped the error.
+- **Fixed after the first push:** the first version counted every non-NoError
+  pop. When the device is lost while a pop is pending (headless without the
+  Vulkan pair, at the first present), emdawnwebgpu resolves the rejected
+  `popErrorScope` as `Success` with type `Unknown` ("Instance dropped in
+  popErrorScope"). `a39a8ab0c` then reported `texFail: 6` with a false
+  *"gradient_tex could not be created"*. The callback now counts only
+  `Validation` and `OutOfMemory`, the two types its scopes filter for.
+  Seedling at the fix, no Vulkan pair: `{lost:1, stalls:0}` at 29.8–30.3
+  ticks/s. With the pair: pixels, and `__swfGpu` is never created.
+- **Two headless modes, by flag** (asked by Archipelago-CC):
+  - The report flags alone lose the device at the first present. The runtime
+    survives: no pixels, ~30 ticks/s (Seedling's pacing cap).
+  - Adding `--enable-features=Vulkan --use-vulkan=swiftshader` keeps a live
+    device with real pixels, at 4–12 ticks/s because SwiftShader rasterises
+    on the CPU.
+
+  The AVM and the render walk run the same in both. After a loss, every
+  WebGPU call is a valid no-op.
 
 ## 7. CI
 
