@@ -1,15 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `7f7a6ba36937` (2026-09-05T04:40:58.125313+00:00)
-**Current:** `1d87c1cfba93` (2026-09-05T06:00:14.991298+00:00)
+**Previous:** `1d87c1cfba93` (2026-09-05T06:00:14.991298+00:00)
+**Current:** `bf907d0023cc` (2026-09-06T08:47:24.332061+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 691 | 691 | 0 |
-| Total | 730 | 730 | 0 |
-| Pass rate | 94.7% | 94.7% | 0% |
-| Mismatched lines | 11492 | 11492 | 0 |
+| Total | 730 | 731 | +1 |
+| Pass rate | 94.7% | 94.5% | -0.2% |
+| Mismatched lines | 11492 | 11515 | +23 |
 
-No changes detected.
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `bitmapdata_custom_rectangle` | ruffle_matched | 11/34 |
