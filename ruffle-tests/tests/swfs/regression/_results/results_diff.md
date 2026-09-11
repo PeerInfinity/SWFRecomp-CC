@@ -1,15 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1d87c1cfba93` (2026-09-05T06:00:15.116529+00:00)
-**Current:** `bf907d0023cc` (2026-09-06T08:47:24.459123+00:00)
+**Previous:** `bf907d0023cc` (2026-09-06T08:47:24.459123+00:00)
+**Current:** `13dfc5b483e9` (2026-09-11T16:55:04.484721+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 89 | 89 | 0 |
-| Total | 89 | 89 | 0 |
+| Passing | 89 | 90 | +1 |
+| Total | 89 | 90 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-No changes detected.
+## Added Tests (1)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `avm2_parent_child_symbolclass_domain` | pass | 12/12 |
