@@ -9,7 +9,13 @@ re-derive them.
 **Corpus baseline: take the newest graphics and no-graphics results commits on
 `origin/ruffle-test-results` that are already merged into `master`, and read the
 numbers off them yourself. Never quote a figure from a brief** (memory
-`ci-baseline-must-be-read-fresh`).
+`ci-baseline-must-be-read-fresh`). At launch those were `c7d24d557` (graphics)
+and `c1df12d64` (no-graphics), merged in `13dfc5b48` / `d1721c233`. Three tests
+moved there from **upstream drift**, verified against the Ruffle commits:
+`avm2/geom_transform` (`45be8d5365`, DisplayObject.z),
+`from_avmplus/ecma3/JSON/adhoc` (`af88e41a58`, a new `output.ruffle.txt`) and
+`avm1/bitmapdata_custom_rectangle` (`352718de29`, 34→42 expected lines). They
+will show up against any older baseline, and they are not yours.
 
 ## 1. The defect
 
