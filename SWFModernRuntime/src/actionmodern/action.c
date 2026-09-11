@@ -42109,6 +42109,11 @@ static void initFlashPackage(SWFAppContext* app_context)
 
 static void ensureGlobalInit(SWFAppContext* app_context)
 {
+	// Belt-and-braces for the actionNewObject hole above: every opcode that can
+	// run user code reaches this function, so latching here means no future
+	// entry point can hand setVariableOnLocalScope a NULL app_context. Runs
+	// before the early return so it also covers callers after the first init.
+	if (g_scope_app_context == NULL) g_scope_app_context = app_context;
 	if (g_global_init_done) return;
 
 #ifdef __EMSCRIPTEN__
@@ -56846,6 +56851,18 @@ void actionGetMember(SWFAppContext* app_context)
 
 void actionNewObject(SWFAppContext* app_context)
 {
+	// Mirror actionNewMethod/actionCallFunction/actionCallMethod: they latch
+	// g_scope_app_context, which setVariableOnLocalScope (via variables.c's
+	// setVariableByName -> setProperty) uses to HALLOC the property name.
+	// actionNewObject did not, so when the first user code in a movie is a
+	// `new`-invoked constructor the static was still NULL, heap_alloc(NULL, ..)
+	// failed, and object.c silently DROPPED the property (`num_used--`) — every
+	// named parameter and `var` in that constructor read back as undefined,
+	// with nothing but a stderr line to show for it. (The s18 lead filed this
+	// as "heap_alloc() called before heap_init()"; the heap is fine, the
+	// app_context argument is NULL.)
+	// Regression fixture: regression/ctor_before_first_call_locals.
+	g_scope_app_context = app_context;
 	// Ensure globals (Object, Array, stub ctors, etc.) are initialized before any new X() call
 	ensureGlobalInit(app_context);
 

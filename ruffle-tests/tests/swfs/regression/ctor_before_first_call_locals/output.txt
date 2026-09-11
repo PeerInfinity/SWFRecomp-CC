@@ -1,0 +1,5 @@
+p=A
+v=L
+q=B
+w=M
+done
