@@ -1,0 +1,10 @@
+num_frames = 2
+
+# SWFRecomp-only: clamp the renderer's texture-array layer limit to SwiftShader's
+# 256 (lavapipe grants 2048). See create_test_swf.py.
+[swfrecomp]
+gpu_max_texture_array_layers = 256
+
+[image_comparisons.output]
+tolerance = 0
+max_outliers = 0

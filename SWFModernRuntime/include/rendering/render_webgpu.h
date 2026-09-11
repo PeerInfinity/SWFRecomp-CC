@@ -74,6 +74,14 @@ typedef struct WebGPURenderContext
 	// current_bitmap == 0, no pools at all) exactly as it was.
 	u32 bitmap_predeclared_end;
 	BitmapPool bitmap_pools[BITMAP_POOL_COUNT];
+	// The DEVICE's texture limits, read back after device creation (the
+	// adapter's maxima are requested, so on a real GPU these are typically
+	// 2048 / 16384; SwiftShader and the WebGPU defaults give 256 / 8192).
+	// max_texture_array_layers is additionally clamped by the test knob
+	// SWF_GPU_MAX_TEXTURE_ARRAY_LAYERS. Every texture array the renderer
+	// creates stays within both ("Bitmap texture pools" in render_webgpu.c).
+	u32 max_texture_array_layers;
+	u32 max_texture_dimension_2d;
 
 	// CPU-side data pointers (populated by swf.c before init)
 	char* shape_data;       size_t shape_data_size;

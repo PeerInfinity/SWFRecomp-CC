@@ -538,6 +538,25 @@ static void on_uncaptured_error(const WGPUDevice* device, WGPUErrorType type,
                                 struct WGPUStringView message, void* u1, void* u2)
 {
 	(void)device;(void)u1;(void)u2;
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	// In the browser one invalid object costs an error PER FRAME, forever (a
+	// pre-pool Seedling under SwiftShader: 4,458 in 30 s), which buries the
+	// first one, the only one that says what went wrong. Print the first few,
+	// then count: window.__swfGpu.errors.
+	static unsigned errors = 0;
+	errors++;
+	EM_ASM({
+		var g = globalThis.__swfGpu || (globalThis.__swfGpu = { lost: 0, stalls: 0 });
+		g.errors = $0;
+	}, errors);
+	if (errors > 8)
+	{
+		if (errors == 9)
+			fprintf(stderr, "WebGPU: further errors are not printed "
+			        "(window.__swfGpu.errors counts them)\n");
+		return;
+	}
+#endif
 	fprintf(stderr, "WebGPU error (type %d): %.*s\n", (int)type,
 		(int)message.length, message.data ? message.data : "");
 }
@@ -961,6 +980,19 @@ WebGPURenderContext* render_webgpu_new(void)
 	return ctx;
 }
 
+// Test knob: clamp the texture-array layer limit (see the device request in
+// render_webgpu_init). The env var wins over a compiled-in -D default.
+static u32 gpu_layer_knob(void)
+{
+	const char* e = getenv("SWF_GPU_MAX_TEXTURE_ARRAY_LAYERS");
+	if (e != NULL && *e != '\0') return (u32)strtoul(e, NULL, 10);
+#ifdef SWF_GPU_MAX_TEXTURE_ARRAY_LAYERS
+	return (u32)(SWF_GPU_MAX_TEXTURE_ARRAY_LAYERS);
+#else
+	return 0;
+#endif
+}
+
 // ---------------------------------------------------------------------------
 // render_webgpu_init
 // ---------------------------------------------------------------------------
@@ -1048,17 +1080,44 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		// transparent black. Requesting the adapter maximum (often 2048 layers,
 		// larger buffer sizes) lets these games render. Limits queried from the
 		// adapter are by definition grantable.
+		//
+		// Test knob SWF_GPU_MAX_TEXTURE_ARRAY_LAYERS (env var, or a -D of the same
+		// name; off by default): request at most that many layers, and have the
+		// pool code plan for at most that many. lavapipe (every native graphics
+		// run) grants 2048, so without the knob a native run never sees the
+		// 256-layer wall SwiftShader and the WebGPU defaults impose; with it set
+		// to 256 the device really enforces 256 (WebGPU never grants a device
+		// less than the default, so smaller values only clamp the planner).
+		u32 layer_knob = gpu_layer_knob();
 		WGPULimits adapter_limits = WGPU_LIMITS_INIT;
 		WGPULimits required_limits = WGPU_LIMITS_INIT;
 		if (wgpuAdapterGetLimits(ctx->adapter, &adapter_limits) == WGPUStatus_Success) {
 			required_limits = adapter_limits;
 			required_limits.nextInChain = NULL;
+			if (layer_knob && required_limits.maxTextureArrayLayers > layer_knob)
+				required_limits.maxTextureArrayLayers = layer_knob < 256 ? 256 : layer_knob;
 			dev_desc.requiredLimits = &required_limits;
 		}
 
 		request_device_sync(ctx, &dev_desc);
 		assert(ctx->device != NULL);
 		RENDER_INIT_LOG("[render] init: device %s", ctx->device ? "ok" : "NULL");
+
+		// What the device actually grants is what every texture array must fit.
+		// Fall back to the WebGPU defaults, which every device guarantees.
+		ctx->max_texture_array_layers = 256;
+		ctx->max_texture_dimension_2d = 8192;
+		WGPULimits device_limits = WGPU_LIMITS_INIT;
+		if (wgpuDeviceGetLimits(ctx->device, &device_limits) == WGPUStatus_Success) {
+			ctx->max_texture_array_layers = device_limits.maxTextureArrayLayers;
+			ctx->max_texture_dimension_2d = device_limits.maxTextureDimension2D;
+		}
+		if (layer_knob && ctx->max_texture_array_layers > layer_knob)
+			ctx->max_texture_array_layers = layer_knob;
+		bitmap_pool_log("[render] device limits: maxTextureArrayLayers %u%s, "
+		                "maxTextureDimension2D %u", ctx->max_texture_array_layers,
+		                layer_knob ? " (SWF_GPU_MAX_TEXTURE_ARRAY_LAYERS)" : "",
+		                ctx->max_texture_dimension_2d);
 	}
 
 	// --- Configure surface (or create offscreen texture for headless) ---
@@ -1243,6 +1302,106 @@ static void bitmap_pool_log(const char* fmt, ...)
 #endif
 }
 
+// One legible report for a renderer texture that cannot be made within the
+// device's limits, or whose creation failed. An over-limit texture is not a
+// crash: it is an invalid handle, which invalidates the bind group holding it,
+// which drops every command buffer that binds that group. The movie keeps
+// ticking and the canvas stays black, and the only symptom used to be a
+// validation error per frame (4,458 in 30 s on a pre-pool Seedling under
+// SwiftShader). Printed ONCE (browser: console.error, always; native: stderr
+// under SWF_WARN_BITMAP_CAP); every later report only counts.
+// window.__swfGpu.texFail counts reports, .texMsg holds the first.
+static u32 g_texture_problems = 0;
+static void render_texture_problem(const char* fmt, ...)
+{
+	char buf[384];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	g_texture_problems++;
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+	if (g_texture_problems == 1) emscripten_log(EM_LOG_CONSOLE | EM_LOG_ERROR, "%s", buf);
+	EM_ASM({
+		var g = globalThis.__swfGpu || (globalThis.__swfGpu = { lost: 0, stalls: 0 });
+		g.texFail = (g.texFail | 0) + 1;
+		if (!g.texMsg) g.texMsg = UTF8ToString($0);
+	}, buf);
+#else
+	if (g_texture_problems == 1 && getenv("SWF_WARN_BITMAP_CAP") != NULL)
+		fprintf(stderr, "%s\n", buf);
+#endif
+}
+
+// Creation failures the planning above cannot foresee (out of memory, a limit
+// this file does not check) are caught by an error scope around each texture
+// array's creation and reported through render_texture_problem instead of the
+// uncaptured-error stream. The label is a string literal, so it outlives the
+// (possibly asynchronous) callback.
+static void on_texture_scope_popped(WGPUPopErrorScopeStatus status, WGPUErrorType type,
+                                    struct WGPUStringView message, void* u1, void* u2)
+{
+	(void)u2;
+	if (status != WGPUPopErrorScopeStatus_Success || type == WGPUErrorType_NoError) return;
+	render_texture_problem("[render] GPU texture \"%s\" could not be created, so nothing "
+	                       "that samples it will draw: %.*s", (const char*)u1,
+	                       (int)(message.length > 240 ? 240 : message.length),
+	                       message.data ? message.data : "");
+}
+
+static void texture_scope_push(WebGPURenderContext* ctx)
+{
+	wgpuDevicePushErrorScope(ctx->device, WGPUErrorFilter_OutOfMemory);
+	wgpuDevicePushErrorScope(ctx->device, WGPUErrorFilter_Validation);
+}
+
+static void texture_scope_pop(WebGPURenderContext* ctx, const char* label)
+{
+	WGPUPopErrorScopeCallbackInfo cb = {0};
+	cb.mode = WGPUCallbackMode_AllowSpontaneous;
+	cb.callback = on_texture_scope_popped;
+	cb.userdata1 = (void*)label;
+	wgpuDevicePopErrorScope(ctx->device, cb);  // Validation
+	wgpuDevicePopErrorScope(ctx->device, cb);  // OutOfMemory
+}
+
+// Static pool membership (2026-09-11, bitmap-pool-layer-cap slice). A static
+// pool used to take one layer per member of its size class with no cap, so a
+// movie with more than maxTextureArrayLayers bitmaps in one class (256 on
+// SwiftShader and under the WebGPU default limits; 2048+ on real GPUs and
+// lavapipe) created an invalid texture and rendered black. Membership is now
+// planned against the DEVICE's limits, read back after device creation:
+//   * a pool holds at most max_texture_array_layers members, and at most
+//     BITMAP_ARRAY_HARD_LIMIT bytes (lavapipe's 2 GiB allocation ceiling);
+//   * a class that would exceed either keeps its SMALLEST members and spills
+//     the rest into the next pool up, whose layer box grows to take them if it
+//     has to (the spilled bitmaps are the largest of their class, and the next
+//     class is larger anyway, so the box rarely moves);
+//   * a bitmap wider or taller than maxTextureDimension2D - 1 fits no layer,
+//     and neither does whatever the last pool cannot hold: those slots name
+//     BITMAP_POOL_NONE, which sample_bitmap() reads as transparent, and
+//     render_texture_problem reports them once.
+// Spilling needs no new binding and no shader change, and costs VRAM only
+// where a class actually overflows: the spilled layers take the larger
+// pool's box. Under the limits every class keeps exactly its own members, so
+// the layout (and every pixel) is the plain size-class one.
+#define BITMAP_POOL_NONE 0xFFu
+
+// qsort order for a class's candidates: smallest first (max side, then area,
+// then slot, so the plan is deterministic). qsort takes no context pointer.
+static const u32* g_bitmap_sort_sizes;
+static int bitmap_size_cmp(const void* a, const void* b)
+{
+	u32 i = *(const u32*)a, j = *(const u32*)b;
+	const u32* sz = g_bitmap_sort_sizes;
+	u32 wi = sz[8 * i], hi = sz[8 * i + 1], wj = sz[8 * j], hj = sz[8 * j + 1];
+	u32 mi = wi > hi ? wi : hi, mj = wj > hj ? wj : hj;
+	if (mi != mj) return mi < mj ? -1 : 1;
+	unsigned long long ai = (unsigned long long)wi * hi, aj = (unsigned long long)wj * hj;
+	if (ai != aj) return ai < aj ? -1 : 1;
+	return i < j ? -1 : (i > j ? 1 : 0);
+}
+
 // Static size class of a (w x h) bitmap: smallest k with max(w,h)+1 <= 64<<k.
 static u32 bitmap_static_class(u32 w, u32 h)
 {
@@ -1263,11 +1422,18 @@ static void dynamic_pool_dims(WebGPURenderContext* ctx, u32 d, u32* pw, u32* ph)
 		if (mw > nominal[d]) mw = nominal[d];
 		if (mh > nominal[d]) mh = nominal[d];
 	}
+	// The layer must fit maxTextureDimension2D. dynamic_bitmap_max is raised
+	// by callers to the movie's largest embedded bitmap (avm2_display.c) with
+	// no GPU cap; a larger source now fits no pool and its draw is dropped
+	// (dynamic_bitmap_acquire), instead of making the whole bind group invalid.
+	u32 dmax = ctx->max_texture_dimension_2d ? ctx->max_texture_dimension_2d - 1 : 8191;
+	if (mw > dmax) mw = dmax;
+	if (mh > dmax) mh = dmax;
 	*pw = mw + 1;
 	*ph = mh + 1;
 }
 
-static u32 dynamic_pool_cap(u32 pw, u32 ph)
+static u32 dynamic_pool_cap(WebGPURenderContext* ctx, u32 pw, u32 ph)
 {
 	size_t layer_bytes = (size_t)pw * (size_t)ph * 4;
 	size_t cap = DYNAMIC_BITMAP_VRAM_BUDGET / layer_bytes;
@@ -1275,6 +1441,9 @@ static u32 dynamic_pool_cap(u32 pw, u32 ph)
 	if (cap < MAX_DYNAMIC_BITMAPS) cap = MAX_DYNAMIC_BITMAPS;
 	size_t hard = BITMAP_ARRAY_HARD_LIMIT / layer_bytes;
 	if (cap > hard) cap = hard;
+	// The device's layer limit. MAX_DYNAMIC_BITMAPS_GROWN (128) is under the
+	// 256 every device guarantees, so this only bites under the test knob.
+	if (cap > ctx->max_texture_array_layers) cap = ctx->max_texture_array_layers;
 	if (cap < 1) cap = 1;
 	return (u32)cap;
 }
@@ -1297,7 +1466,9 @@ static void bitmap_pool_alloc(WebGPURenderContext* ctx, u32 pi, u32 w, u32 h,
 	tex_desc.mipLevelCount = 1;
 	tex_desc.sampleCount = 1;
 	tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+	texture_scope_push(ctx);
 	p->tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
+	texture_scope_pop(ctx, label);
 
 	WGPUTextureViewDescriptor view_desc = {0};
 	view_desc.dimension = WGPUTextureViewDimension_2DArray;
@@ -1365,12 +1536,24 @@ static int dynamic_bitmap_acquire(WebGPURenderContext* ctx, u32 src_w, u32 src_h
 		dynamic_pool_dims(ctx, d, &pw, &ph);
 		if (src_w + 1 <= pw && src_h + 1 <= ph) break;
 	}
-	if (d == BITMAP_DYNAMIC_POOLS) return 0;
+	if (d == BITMAP_DYNAMIC_POOLS)
+	{
+		// Only reachable when the source exceeds maxTextureDimension2D - 1.
+		static int reported = 0;
+		if (!reported)
+		{
+			reported = 1;
+			render_texture_problem("[render] a %ux%u dynamic bitmap is larger than the GPU's "
+			                       "%u px texture limit and will not draw", src_w, src_h,
+			                       ctx->max_texture_dimension_2d);
+		}
+		return 0;
+	}
 	u32 pi = BITMAP_STATIC_POOLS + d;
 	BitmapPool* p = &ctx->bitmap_pools[pi];
 	if (p->used >= p->layers)
 	{
-		if (p->w == 0) p->cap = dynamic_pool_cap(pw, ph);
+		if (p->w == 0) p->cap = dynamic_pool_cap(ctx, pw, ph);
 		if (p->layers >= p->cap)
 		{
 			dynamic_bitmap_capacity_hit(ctx, pi);
@@ -1407,29 +1590,79 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
 	if (ctx->bitmap_predeclared_end > n) n = ctx->bitmap_predeclared_end;
 	if (n == 0 || ctx->bitmap_data == NULL) return;
 
-	u32 maxw[BITMAP_STATIC_POOLS] = {0}, maxh[BITMAP_STATIC_POOLS] = {0};
+	// Membership, planned against the DEVICE's limits (see "Static pool
+	// membership" above): class k's candidates are its own members plus what
+	// class k-1 could not hold, smallest first; the pool keeps the longest
+	// prefix that fits, the rest carry up. Under the limits every class keeps
+	// exactly its own members, i.e. the layout is the plain size-class one.
+	u32 L = ctx->max_texture_array_layers, D = ctx->max_texture_dimension_2d;
+	u32* pool_of = (u32*)malloc(n * sizeof(u32));
+	u32* cand = (u32*)malloc(n * sizeof(u32));
+	u32 pw[BITMAP_STATIC_POOLS] = {0}, ph[BITMAP_STATIC_POOLS] = {0};
 	u32 cnt[BITMAP_STATIC_POOLS] = {0};
+	u32 ncand = 0, too_big = 0, dropped = 0, spilled = 0;
 	for (u32 i = 0; i < n; i++)
 	{
+		pool_of[i] = BITMAP_POOL_NONE;
 		u32 w = ctx->bitmap_sizes[8 * i], h = ctx->bitmap_sizes[8 * i + 1];
-		u32 k = bitmap_static_class(w, h);
-		if (w > maxw[k]) maxw[k] = w;
-		if (h > maxh[k]) maxh[k] = h;
-		cnt[k]++;
+		if (w + 1 > D || h + 1 > D) too_big++;
 	}
+	g_bitmap_sort_sizes = ctx->bitmap_sizes;
+	for (u32 k = 0; k < BITMAP_STATIC_POOLS; k++)
+	{
+		for (u32 i = 0; i < n; i++)
+		{
+			u32 w = ctx->bitmap_sizes[8 * i], h = ctx->bitmap_sizes[8 * i + 1];
+			if (w + 1 <= D && h + 1 <= D && bitmap_static_class(w, h) == k)
+				cand[ncand++] = i;
+		}
+		if (ncand == 0) continue;
+		qsort(cand, ncand, sizeof(u32), bitmap_size_cmp);
+		u32 bw = 0, bh = 0, m = 0;
+		for (; m < ncand; m++)
+		{
+			u32 i = cand[m];
+			u32 nw = ctx->bitmap_sizes[8 * i] + 1, nh = ctx->bitmap_sizes[8 * i + 1] + 1;
+			if (nw < bw) nw = bw;
+			if (nh < bh) nh = bh;
+			if (m + 1 > L || (size_t)nw * nh * 4 * (m + 1) > BITMAP_ARRAY_HARD_LIMIT) break;
+			bw = nw;
+			bh = nh;
+			pool_of[i] = k;
+			if (bitmap_static_class(ctx->bitmap_sizes[8 * i], ctx->bitmap_sizes[8 * i + 1]) != k)
+				spilled++;
+		}
+		pw[k] = bw;
+		ph[k] = bh;
+		cnt[k] = m;
+		memmove(cand, cand + m, (ncand - m) * sizeof(u32));
+		ncand -= m;
+	}
+	dropped = ncand + too_big;
+	free(cand);
+
 	double total_mib = 0.0;
 	for (u32 k = 0; k < BITMAP_STATIC_POOLS; k++)
 	{
 		if (cnt[k] == 0) continue;
-		bitmap_pool_alloc(ctx, k, maxw[k] + 1, maxh[k] + 1, cnt[k], "bitmap_static_pool");
-		total_mib += (double)(maxw[k] + 1) * (double)(maxh[k] + 1) * 4.0 * cnt[k]
-		             / (1024.0 * 1024.0);
+		bitmap_pool_alloc(ctx, k, pw[k], ph[k], cnt[k], "bitmap_static_pool");
+		total_mib += (double)pw[k] * (double)ph[k] * 4.0 * cnt[k] / (1024.0 * 1024.0);
 	}
 
 	for (u32 i = 0; i < n; i++)
 	{
 		u32 width = ctx->bitmap_sizes[8 * i], height = ctx->bitmap_sizes[8 * i + 1];
-		u32 k = bitmap_static_class(width, height);
+		u32 k = pool_of[i];
+		if (k == BITMAP_POOL_NONE)
+		{
+			// No pool can hold it: the slot names no pool, which the fragment
+			// stage reads as transparent (sample_bitmap's default arm).
+			ctx->bitmap_sizes[8 * i + 2] = width + 1;
+			ctx->bitmap_sizes[8 * i + 3] = height + 1;
+			ctx->bitmap_sizes[8 * i + 4] = BITMAP_POOL_NONE;
+			ctx->bitmap_sizes[8 * i + 5] = 0;
+			continue;
+		}
 		BitmapPool* p = &ctx->bitmap_pools[k];
 		u32 layer = p->used++;
 		if (width == 0 || height == 0 || ctx->bitmap_ptrs[i] == NULL)
@@ -1476,11 +1709,27 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
 		ctx->bitmap_sizes[8 * i + 6] = 0;
 		ctx->bitmap_sizes[8 * i + 7] = 0;
 	}
+	free(pool_of);
 	wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer, 0,
 	                     ctx->bitmap_sizes, 8 * sizeof(u32) * n);
 	rebuild_fragment_sampler_bg(ctx);
 	bitmap_pool_log("[render] %u static bitmaps in size-class pools: %.1f MiB total",
 	                n, total_mib);
+	if (spilled)
+	{
+		bitmap_pool_log("[render] %u static bitmaps spilled into a larger pool "
+		                "(maxTextureArrayLayers %u)", spilled, L);
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+		EM_ASM({
+			var g = globalThis.__swfGpu || (globalThis.__swfGpu = { lost: 0, stalls: 0 });
+			g.spilled = $0;
+		}, spilled);
+#endif
+	}
+	if (dropped)
+		render_texture_problem("[render] %u of %u static bitmaps do not fit the GPU's "
+		                       "texture limits (%u layers per array, %u px per side) and "
+		                       "will not draw", dropped, n, L, D);
 }
 
 static void create_buffers_and_upload(WebGPURenderContext* ctx)
@@ -1660,6 +1909,25 @@ static void create_textures(WebGPURenderContext* ctx)
 	u32 total_gradient_layers = (u32)num_gradients + MAX_DYNAMIC_GRADIENTS;
 	if (total_gradient_layers == 0) total_gradient_layers = 1; // minimum 1 layer
 	ctx->static_gradient_count = (u32)num_gradients;
+	// One row per gradient, so the texture's HEIGHT is the ramp count and must
+	// fit maxTextureDimension2D (8192 by default: 8128 static gradients plus
+	// the dynamic rows). Past that the texture would be invalid and take every
+	// draw with it; instead the rows stop at the limit, the dynamic rows go
+	// first, and the gradients that lost their row draw from whatever an
+	// out-of-range textureLoad returns.
+	u32 grad_rows_max = ctx->max_texture_dimension_2d ? ctx->max_texture_dimension_2d : 8192;
+	u32 static_grad_rows = (u32)num_gradients;
+	if (total_gradient_layers > grad_rows_max)
+	{
+		total_gradient_layers = grad_rows_max;
+		if (static_grad_rows > grad_rows_max) static_grad_rows = grad_rows_max;
+		if (ctx->dynamic_gradient_capacity > grad_rows_max - static_grad_rows)
+			ctx->dynamic_gradient_capacity = grad_rows_max - static_grad_rows;
+		render_texture_problem("[render] %u gradients exceed the GPU's %u-row texture limit; "
+		                       "%u static gradients and %u dynamic ones per frame get a row",
+		                       (unsigned)num_gradients, grad_rows_max, static_grad_rows,
+		                       grad_rows_max - static_grad_rows);
+	}
 
 	// --- Gradient texture (always created, over-allocated for dynamic gradients) ---
 	// Each gradient ramp is 256x1 RGBA8. We pack one ramp per ROW of a single
@@ -1677,7 +1945,9 @@ static void create_textures(WebGPURenderContext* ctx)
 		tex_desc.mipLevelCount = 1;
 		tex_desc.sampleCount = 1;
 		tex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+		texture_scope_push(ctx);
 		ctx->gradient_tex = wgpuDeviceCreateTexture(ctx->device, &tex_desc);
+		texture_scope_pop(ctx, "gradient_tex");
 
 		WGPUTextureViewDescriptor view_desc = {0};
 		view_desc.dimension = WGPUTextureViewDimension_2D;
@@ -1687,16 +1957,16 @@ static void create_textures(WebGPURenderContext* ctx)
 
 		// Upload static gradient data — consecutive 256-texel ramps map to
 		// consecutive rows (bytesPerRow = one ramp, rowsPerImage = ramp count).
-		if (num_gradients > 0)
+		if (static_grad_rows > 0)
 		{
 			WGPUTexelCopyTextureInfo dest = {0};
 			dest.texture = ctx->gradient_tex;
 			WGPUTexelCopyBufferLayout layout = {0};
 			layout.bytesPerRow = 256 * 4;
-			layout.rowsPerImage = (u32)num_gradients;
-			WGPUExtent3D extent = {256, (u32)num_gradients, 1};
+			layout.rowsPerImage = static_grad_rows;
+			WGPUExtent3D extent = {256, static_grad_rows, 1};
 			wgpuQueueWriteTexture(ctx->queue, &dest, ctx->gradient_data,
-			                      num_gradients * 256 * 4, &layout, &extent);
+			                      (size_t)static_grad_rows * 256 * 4, &layout, &extent);
 		}
 
 		WGPUSamplerDescriptor samp_desc = {0};

@@ -2225,6 +2225,25 @@ def get_log_fetch(test_dir):
     return False
 
 
+def get_gpu_max_texture_array_layers(test_dir):
+    """Parse `gpu_max_texture_array_layers = N` from test.toml (SWFRecomp-only).
+
+    Becomes -DSWF_GPU_MAX_TEXTURE_ARRAY_LAYERS=N: the renderer requests at most
+    N texture-array layers from the device and plans its bitmap pools for N.
+    lavapipe grants 2048, so this is how a native graphics run reaches the
+    256-layer wall SwiftShader and the WebGPU default limits impose
+    (render_webgpu.c, "Bitmap texture pools"; regression/bitmap_pool_layer_cap).
+    Only graphics mode compiles the renderer, so the define is inert elsewhere.
+    """
+    toml_path = test_dir / "test.toml"
+    if toml_path.exists():
+        m = re.search(r"^\s*gpu_max_texture_array_layers\s*=\s*(\d+)",
+                      toml_path.read_text(), re.MULTILINE)
+        if m:
+            return int(m.group(1))
+    return None
+
+
 def get_self_load(test_dir):
     """Detect if the test loads itself (test.swf loads test.swf into a child MC).
 
@@ -2612,6 +2631,9 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         extra_defines.append("-DSWF_RUNTIME_AIR=1")
     if get_player_mode_is_release(test_dir):
         extra_defines.append("-DSWF_PLAYER_MODE_RELEASE=1")
+    _gpu_layers = get_gpu_max_texture_array_layers(test_dir)
+    if _gpu_layers is not None:
+        extra_defines.append(f"-DSWF_GPU_MAX_TEXTURE_ARRAY_LAYERS={_gpu_layers}")
     if is_avm2:
         extra_defines.append("-DSWF_AVM2")
     viewport = get_viewport_dimensions(test_dir)
