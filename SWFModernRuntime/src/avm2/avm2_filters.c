@@ -1035,6 +1035,11 @@ static Avm2Class* new_filter_class(Avm2Context* ctx, const char* name, uint8_t k
 {
 	Avm2Class* c = avm2_builtin_class(ctx, "flash.filters", name,
 	                                  g_bitmapfilter_class);
+	// avm2_builtin_class copies native_init down from the super, and
+	// BitmapFilter's is the abstract #2012 gate (avm2_register_filters). The
+	// nine engine filters are concrete, so clear it back. Same reset in
+	// avm2_pixelbender.c for ShaderFilter, which extends BitmapFilter too.
+	c->native_init = NULL;
 	c->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
 	c->native_ext_size = sizeof(Avm2FilterObjExt);
 	c->instance_init.fn = ctor;
@@ -1050,6 +1055,17 @@ void avm2_register_filters(Avm2Context* ctx)
 	// ShaderFilter (avm2_pixelbender.c) extends it through the accessor.
 	g_bitmapfilter_class = avm2_builtin_class(ctx, "flash.filters", "BitmapFilter",
 	                                          ctx->builtins.object_class);
+	// …but it IS [Ruffle(Abstract)]: Ruffle's bitmap_filter allocator
+	// (globals/flash/filters/bitmap_filter.rs) throws #2012 unless the class
+	// being allocated has one of the ten engine filter classes in its chain,
+	// so both `new BitmapFilter()` and `new CustomFilter()` (a direct script
+	// subclass) throw, while a subclass of ConvolutionFilter constructs.
+	// Inheritance of native_init gives us exactly that shape for free: the
+	// engine classes clear the hook (new_filter_class / ShaderFilter) and a
+	// SWF subclass inherits whatever its super ended up with
+	// (avm2_class.c's link step). Nothing in the runtime mints the base
+	// class, so the unconditional gate needs no script-new guard.
+	avm2_builtin_set_abstract(ctx, g_bitmapfilter_class);
 	avm2_builtin_add_method(ctx, g_bitmapfilter_class, "clone", bitmapfilter_clone);
 
 	Avm2Class* c;

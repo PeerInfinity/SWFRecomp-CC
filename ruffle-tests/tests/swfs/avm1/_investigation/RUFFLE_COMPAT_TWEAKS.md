@@ -98,3 +98,29 @@ future test grades a non-identity kernel, this entry is the thing to remove: imp
 convolution and drop the `passthrough` arm.
 
 **File**: `SWFModernRuntime/src/avm2/avm2_bitmap.c` — `bd_apply_filter()`
+
+---
+
+## Matrix3D.recompose: the non-unit-quaternion tolerance is `1e-2`
+
+**Test**: `avm2/matrix3d_recompose_edge_cases`, `avm2/matrix3d_compose` (2026-09-11, session 19)
+
+**Tweak**: `recompose()` throws error #2004 when the quaternion is non-unit, leaving the
+matrix untouched. Flash's actual tolerance is unspecified, so we use:
+
+```c
+if (!(fabs(qn - 1.0) <= 1e-2))
+```
+
+**Why this is a judgement call, not parity**: the corpus brackets Flash Player's real
+epsilon only to the open interval `(2.7e-4, 0.75)` — every graded row falls outside it, so
+any constant in that range scores identically today. `1e-2` sits inside the bracket with
+roughly 37x headroom on each side, which is why it was chosen.
+
+**Risk / how to revisit**: a future test that grades a quaternion norm between `2.7e-4` and
+`1e-2`, or between `1e-2` and `0.75`, would pin the real value and could contradict this.
+This is the one constant to change, and it is commented as such in-code. An earlier
+spelling of the same rule (`norm != 1.0`, i.e. an exact comparison) regressed
+`avm2/matrix3d_compose` from pass to fail — exact equality is definitely wrong.
+
+**File**: `SWFModernRuntime/src/avm2/avm2_stage3d.c` — the `recompose` path.

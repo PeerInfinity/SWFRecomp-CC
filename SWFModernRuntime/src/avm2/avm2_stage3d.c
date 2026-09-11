@@ -1667,12 +1667,21 @@ static Avm2Value matrix3d_xform(Avm2Activation* act, int kind, int prepend)
 			double px = m3d_component(act->ctx, pivot, "x");
 			double py = m3d_component(act->ctx, pivot, "y");
 			double pz = m3d_component(act->ctx, pivot, "z");
-			double rx = px * t[0] + py * t[4] + pz * t[8];
-			double ry = px * t[1] + py * t[5] + pz * t[9];
-			double rz = px * t[2] + py * t[6] + pz * t[10];
-			t[12] = px - rx;
-			t[13] = py - ry;
-			t[14] = pz - rz;
+			// FP runs T(-p) * R * T(p) as three GENUINE 4x4 products rather
+			// than folding the pivot into the translation column, and the
+			// difference is observable: with p = (NaN,NaN,NaN) the zeros in
+			// R's projection column meet a NaN, 0*NaN = NaN, and ALL SIXTEEN
+			// cells go NaN (avm2/matrix3d_append_rotation's "zero axis, NaN
+			// pivot" row; Ruffle short-circuits like we used to and reports
+			// NaN,NaN,NaN,0,...,1). For a finite pivot the two forms are
+			// bit-identical -- the folded form's `px - p*Rcol` IS the c=3
+			// column of this product, and the 3x3 block picks up only
+			// `px * tmp[3]` with tmp[3] an exact 0 -- so no finite row moves.
+			double tn[16], tp[16], tmp[16];
+			m3d_build_translation(tn, -px, -py, -pz);
+			m3d_build_translation(tp, px, py, pz);
+			m3d_mul(tmp, tn, t);   // T(-p) then R
+			m3d_mul(t, tmp, tp);   // ... then T(p)
 		}
 	}
 	else
@@ -1993,6 +2002,44 @@ static Avm2Value matrix3d_recompose(Avm2Activation* act)
 		{
 			x *= sin(w / 2); y *= sin(w / 2); z *= sin(w / 2);
 			w = cos(w / 2);
+		}
+		else
+		{
+			// QUATERNION only: FP validates that the rotation Vector3D IS a
+			// unit quaternion and raises ArgumentError #2004 if it is not,
+			// leaving the matrix untouched. Measured over every arm of
+			// matrix3d_recompose_edge_cases's testQuaternion(): (0,0,0,±1),
+			// (1,0,0,0) and the four (±0.5,0.5,±0.5,0.5) permutations pass;
+			// (0,0,0,0), (0.5,0,0,0), (2,0,0,0), (1,1,1,1) and every
+			// NaN/Infinity spelling throw. No separate isfinite() arm is
+			// needed: a NaN norm makes the <= below false (so the negation
+			// throws) and an infinite one is trivially outside the window.
+			// Ruffle's Matrix3D.as skips the check entirely and
+			// recomposes anyway (its output.ruffle.txt traces `true` plus an
+			// all-NaN matrix). The axisAngle arm above is genuinely
+			// unvalidated in FP — NaN simply propagates there.
+			//
+			// The comparison MUST be tolerant, not exact, and the tolerance is
+			// the one number here the corpus cannot pin.
+			// avm2/matrix3d_compose round-trips `decompose("quaternion")`
+			// straight back into recompose; that matrix carries shear, so the
+			// extracted quaternion is genuinely NOT unit — its norm is
+			// 0.99973, off by 2.7e-4 — and FP accepts it (measured: an exact
+			// `!= 1.0`, and a 1e-4 window, both regress that test). So FP's
+			// window is wider than 2.7e-4, and narrower than 0.75 (the
+			// distance of the nearest REJECTED norm, 0.25). Nothing in the
+			// corpus narrows it further: every rejected norm is 0, 0.25, 4 or
+			// non-finite. 1e-2 is chosen inside that bracket with ~37x
+			// headroom over the observed legitimate round-trip and ~75x below
+			// the nearest real rejection. If a fixture ever pins FP's real
+			// epsilon, this is the one constant to change.
+			double qn = x * x + y * y + z * z + w * w;
+			if (!(fabs(qn - 1.0) <= 1e-2))
+			{
+				avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+				                 "Error #2004: One of the parameters is "
+				                 "invalid.");
+			}
 		}
 		m[0] = (1 - 2 * y * y - 2 * z * z) * sx3;
 		m[1] = (2 * x * y + 2 * w * z) * sx3;

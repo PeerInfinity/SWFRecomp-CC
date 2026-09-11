@@ -1339,6 +1339,31 @@ Avm2Value avm2_amf_write_object(Avm2Activation* act);
 // Registration
 // ---------------------------------------------------------------------------
 
+// Which movie's character tables does `cls` belong to? Same class walk
+// avm2_display_child_char_for_class takes (avm2_display.c), answering with the
+// DEFINING file's tables. NULL = the main movie, whose chars are the
+// avm2_generated_* globals. Needed because a SymbolClass char id is only
+// meaningful inside the movie that carried the tag: two movies can define the
+// same raw id as different character kinds.
+static const Avm2CharInfo* ba_char_info_for_class(Avm2Class* cls, uint16_t char_id)
+{
+	const Avm2CharInfo* chars = avm2_generated_chars;
+	uint32_t count = avm2_generated_char_count;
+	for (Avm2Class* c = cls; c != NULL; c = c->super_class)
+	{
+		if (c->instance_init.file == NULL) continue;  // builtin
+		const Avm2MovieTables* t =
+			avm2_display_movie_for_abc(c->instance_init.file->data);
+		if (t == NULL) continue;                      // the MAIN movie
+		chars = t->chars;
+		count = t->char_count;
+		break;
+	}
+	for (uint32_t i = 0; i < count; i++)
+		if (chars[i].char_id == char_id) return &chars[i];
+	return NULL;
+}
+
 static void ba_native_init(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2ByteArrayExt* ba = (Avm2ByteArrayExt*) obj->native_ext;
@@ -1377,6 +1402,36 @@ static void ba_native_init(Avm2Context* ctx, Avm2Object* obj)
 			ba_set_length(ctx, ba, bin->len);
 			memcpy(ba->bytes, bin->bytes, bin->len);
 			ba->position = 0;
+		}
+		else if (bin == NULL)
+		{
+			// The class IS SymbolClass-bound, but to something that is not a
+			// DefineBinaryData. Ruffle's ByteArray allocator
+			// (object/bytearray_object.rs) looks the bound character up and
+			// raises #2136 ("The SWF file <url> contains invalid data.") for
+			// any non-BinaryData kind — avm2/bytearray_bad_symbol_class binds
+			// `MyBytes` to a DefineVideoStream and Flash throws there too.
+			//
+			// The predicate is deliberately "a KNOWN character of a non-binary
+			// kind", not "no binary payload found": a DefineBinaryData whose
+			// payload the emitter dropped (or a child movie whose binaries[]
+			// table is empty) must keep seeding an empty ByteArray rather than
+			// start throwing. abc_timeline.cpp records a kind-8 (OTHER)
+			// CharInfo for every DefineBinaryData and for nothing else, so
+			// kind 8 is exactly "binary" here; an id that names no character
+			// at all (bin == NULL, ci == NULL) also stays silent.
+			const Avm2CharInfo* ci = ba_char_info_for_class(obj->cls, char_id);
+			if (ci != NULL && ci->kind != AVM2_CHAR_OTHER)
+			{
+#ifdef SWF_URL
+				const char* url = SWF_URL;
+#else
+				const char* url = "";
+#endif
+				avm2_throw_error(ctx, NULL,
+				                 "Error #2136: The SWF file %s contains "
+				                 "invalid data.", url);
+			}
 		}
 	}
 }

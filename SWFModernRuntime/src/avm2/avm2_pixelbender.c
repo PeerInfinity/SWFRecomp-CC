@@ -2340,6 +2340,11 @@ void avm2_register_pixelbender(Avm2Context* ctx)
 		Avm2Class* sf = avm2_builtin_class(ctx, "flash.filters", "ShaderFilter",
 			(super != NULL) ? super : b->object_class);
 		g_shaderfilter_class = sf;
+		// BitmapFilter is abstract (#2012 at allocation); avm2_builtin_class
+		// copies its native_init down. ShaderFilter is concrete, so clear it
+		// back — the same reset new_filter_class does for the nine engine
+		// filters in avm2_filters.c.
+		sf->native_init = NULL;
 		sf->flags |= AVM2_CLASS_FLAG_SEALED;
 		sf->native_ext_size = sizeof(Avm2ShaderFilterExt);
 		sf->instance_init.fn = sf_ctor;
