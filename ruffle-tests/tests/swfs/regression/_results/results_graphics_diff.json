@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-11T18:18:12.259555+00:00",
-    "old_git_sha": "60bb82a8a67fb6f8f92b6b03d16aa7d0633b6a0d",
-    "new_timestamp": "2026-09-11T20:40:51.627806+00:00",
-    "new_git_sha": "a39a8ab0cec83f8a1deecc34441d86595ba7720e",
+    "old_timestamp": "2026-09-11T20:40:51.627806+00:00",
+    "old_git_sha": "a39a8ab0cec83f8a1deecc34441d86595ba7720e",
+    "new_timestamp": "2026-09-11T21:09:53.291094+00:00",
+    "new_git_sha": "0ccafbc4eb896f2a1ee5fe7dd8a0bb31f0f7de3f",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 91,
+    "old_pass": 92,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 91,
-    "old_total": 91,
+    "old_effective_pass": 92,
+    "old_total": 92,
     "old_pass_rate": 100.0,
     "new_pass": 92,
     "new_ruffle_matched": 0,
@@ -25,22 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 91,
-    "added": 1,
+    "unchanged": 92,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "bitmap_pool_layer_cap",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    }
-  ]
+  "changes": []
 }

@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `60bb82a8a67f` (2026-09-11T18:18:12.259555+00:00)
-**Current:** `a39a8ab0cec8` (2026-09-11T20:40:51.627806+00:00)
+**Previous:** `a39a8ab0cec8` (2026-09-11T20:40:51.627806+00:00)
+**Current:** `0ccafbc4eb89` (2026-09-11T21:09:53.291094+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 91 | 92 | +1 |
-| Total | 91 | 92 | +1 |
+| Passing | 92 | 92 | 0 |
+| Total | 92 | 92 | 0 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `bitmap_pool_layer_cap` | pass | 1/1 |
+No changes detected.

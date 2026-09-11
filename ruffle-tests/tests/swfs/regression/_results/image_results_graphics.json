@@ -1,23 +1,23 @@
 {
   "metadata": {
-    "timestamp": "2026-09-05T05:21:01.335435+00:00",
+    "timestamp": "2026-09-11T21:09:55.232507+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "12d2ec06b7bf678d88fe98e260356d390c41b63d",
+    "git_sha": "0ccafbc4eb896f2a1ee5fe7dd8a0bb31f0f7de3f",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "33945288707",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/33945288707",
+    "run_id": "34645805030",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/34645805030",
     "run_attempt": "1"
   },
-  "tests_with_comparisons": 12,
-  "comparisons": 12,
-  "pass": 9,
+  "tests_with_comparisons": 13,
+  "comparisons": 13,
+  "pass": 10,
   "fail": 0,
   "skip": 3,
   "no_render": 0,
   "fail_known_failure": 0,
-  "pass_rate": 75.0,
+  "pass_rate": 76.9,
   "results": [
     {
       "suite": "regression",
@@ -187,6 +187,26 @@
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 255,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "bitmap_pool_layer_cap",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 400,
+      "height": 320,
+      "total_channels": 512000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 0,
       "excess_outliers": 0
     },
     {
