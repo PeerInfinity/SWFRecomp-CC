@@ -229,6 +229,19 @@ All runs had 0 WebGPU errors and 0 page errors, and the title rendered.
 
   Trace side of the same run: `corpus_status_diff.py 5209b821a WORKTREE` is
   flat on the 4518-test intersection (effective 4413 → 4413).
+- **Readout fix:** run **`34648878013`** (graphics, `categories=all`,
+  `images=false`) at `254145a5b`, merged in `cf1aaac5c`. Completed success,
+  `WASM link-smoke` green. `corpus_status_diff.py 254145a5b WORKTREE` shows
+  effective 4413 → 4412 with **one move, `avm2/bitmapdata_copypixels_alpha_merge`
+  (ruffle_matched → output_mismatch), which is upstream drift too.** Our output
+  is byte-identical across the two runs (9 lines, 5 matching, the same 4
+  differing); what changed is that the run no longer records a
+  `ruffle_diff_count`, because `ruffle_matched` is decided by the test's own
+  `output.ruffle.txt` + `known_failure`. Ruffle updated that test at
+  2026-09-11T20:57Z (`0c6a734da`, "core: Improve accuracy of blend_over() for
+  bitmaps"), between the 21:09 and 21:20 runs, so Ruffle's own diffs shrank and
+  ours are no longer a subset of them. It reproduces locally against the synced
+  tree, with or without this slice.
 
 ## 8. Left open
 
