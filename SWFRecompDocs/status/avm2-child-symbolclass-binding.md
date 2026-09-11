@@ -9,7 +9,8 @@ member of the "MAIN-only symbol map" family
 `ae28d1ae1`, no-graphics `c184410f4` — `avm2/loader_duplicate_class` is
 `output_mismatch` **32/48** in both.
 
-`avm2/loader_duplicate_class` now passes, 48/48, in both modes. A character a
+`avm2/loader_duplicate_class` now passes, 48/48, in both modes (CI `34614830360`
+graphics, `34621152628` no-graphics). A character a
 Loader-loaded child places now resolves its SymbolClass name in the
 ApplicationDomain of the movie **instance** that placed it.
 
@@ -163,7 +164,78 @@ Both target tests also pass locally in `--mode=graphics`.
 
 ## 7. CI
 
-CI_SECTION
+Serial, `categories=full`, `images=false`, code at `c4a952960` (plus the
+docs-only `bf6626aa5` another session committed on top).
+
+**Graphics: run `34614830360`, `completed success`, every job green including
+`wasm-link-smoke`.** Results `c7d24d557`, merged in `13dfc5b48`.
+`scripts/corpus_status_diff.py bf6626aa5 WORKTREE --per-suite` over the
+4501-test intersection (baseline = `ae28d1ae1`'s numbers, read fresh):
+
+| | before | after |
+|---|---|---|
+| pass | 4168 | 4168 |
+| ruffle_matched | 239 | 238 |
+| output_mismatch | 93 | 94 |
+| runtime_error | 1 | 1 |
+| **effective** | **4407** | **4406** |
+
+- **Gain:** `avm2/loader_duplicate_class` output_mismatch 32/48 -> **pass 48/48**.
+- New `regression/avm2_parent_child_symbolclass_domain`: **pass 12/12**
+  (outside the intersection; `regression` 90/90).
+- **Two "regressions", both UPSTREAM DRIFT**, both proven. CI re-downloads
+  every test from `ruffle-rs/ruffle` master, and both tests changed there after
+  the baseline run (2026-09-05):
+  - `avm2/geom_transform` pass -> output_mismatch (71/74). Upstream
+    `45be8d5365` (2026-09-09, "avm2: Implement DisplayObject z getter/setter")
+    replaced `test.swf` and `output.txt`. The three failing rows are the new
+    `z` translation in `matrix3D.rawData` (`…,6,7,8,1` expected, we print
+    `…,6,7,0,1`): we have no `DisplayObject.z`. Reproduced locally on the
+    synced tree; nothing in this change touches Matrix3D or `z`.
+  - `from_avmplus/ecma3/JSON/adhoc` ruffle_matched -> output_mismatch, **33/40
+    on both sides** (our output did not change). Upstream `af88e41a58`
+    (2026-09-07, "avm2: Improve number parsing in JSON") rewrote
+    `output.ruffle.txt` (+4/-4): Ruffle now passes `JSON.parse(-1.75e12)` and
+    `JSON.parse(-1e+12)`, so our seven diffs are no longer a subset of Ruffle's
+    five. Our two extra rows are a real int32 truncation
+    (`JSON.parse(-1e+12)` gives `727379968`).
+
+So the corpus effective count is -1 at the headline, but on the code it is +1:
+the gain is this slice, and the -2 is the test mirror moving under both
+baselines. Any later run will show the same two moves.
+
+**No-graphics: run `34621152628`, `completed success`, every job green.**
+Results `c1df12d64`, merged in `d1721c233`.
+`corpus_status_diff.py 13dfc5b48 WORKTREE --per-suite --stem results` over the
+4503-test intersection (baseline = the `c184410f4` weekly canary of
+2026-09-06, read fresh):
+
+| | before | after |
+|---|---|---|
+| pass | 4169 | 4169 |
+| ruffle_matched | 240 | 238 |
+| output_mismatch | 93 | 95 |
+| runtime_error | 1 | 1 |
+| **effective** | **4409** | **4407** |
+
+- **Gain:** `avm2/loader_duplicate_class` 32/48 -> **pass 48/48**.
+- `regression/avm2_parent_child_symbolclass_domain` **pass 12/12**
+  (`regression` 90/90).
+- **Three "regressions", all upstream drift:** the same two as graphics, plus
+  `avm1/bitmapdata_custom_rectangle` ruffle_matched -> output_mismatch. This
+  change is AVM2-only, and that test's **expected line count moved 34 -> 42**:
+  upstream `352718de29` (2026-09-09, "avm1: In
+  `BitmapData.getColorBoundsRect`, coerce arguments even if `this` is invalid")
+  changed it after the 2026-09-06 baseline. Today's graphics run grades it
+  identically (30/42). It did not show up in the graphics diff only because
+  upstream added the test (`5e9953c40c`, 2026-09-05 10:57) after the graphics
+  baseline ran (05:22), so it was outside that intersection.
+
+**Net, both modes: +1 effective on the code (the slice's target), zero
+regressions from this change, and -2 (graphics) / -3 (no-graphics) of
+upstream test drift that any later run at any code will reproduce.** The
+next slice should take `13dfc5b48` (graphics) and `d1721c233` (no-graphics) as
+its baselines. Those already include the drift.
 
 ## 8. Leads left on the board
 
@@ -177,3 +249,8 @@ CI_SECTION
 - `nondisplay_class_for_char`'s scope fix (§1) is ungraded. A child whose
   timeline places a bitmap bound to a `BitmapData` subclass, loaded into a
   fresh domain, would grade it.
+- **Three new targets the drift created** (§7): `DisplayObject.z` for
+  `avm2/geom_transform`; JSON number parsing/stringify of values past int32
+  for `ecma3/JSON/adhoc` (Ruffle fixed its own in `af88e41a58`); and the new
+  `BitmapData.getColorBoundsRect` argument-coercion rows in
+  `avm1/bitmapdata_custom_rectangle`.
