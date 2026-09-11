@@ -138,7 +138,20 @@ suite's top level; the loadMovie test is nested one directory down.
 
 ## 5. CI
 
-CI_RESULTS
+Both dispatches `categories=all`, `images=false`, serial. Graphics ran at the fix
+commit `60bb82a8a`, no-graphics at the graphics results merge `ea6960eac` on top of it.
+**Flat in both modes apart from the new fixture**, as the brief expected.
+Neither upstream-drift test from the brief moved, because both baselines already
+contain it.
+
+| mode | run | vs | intersection | effective | regressions | new fixture |
+|---|---|---|---|---|---|---|
+| graphics | `34629934795` (green, incl. `wasm-link-smoke`) | `19d9abd4c` (results of the concurrent device-lost slice's run, `fbe53d342`) | 4516 | 4411 → 4411 | 0, no status moves | `pass` (regression 90 → 91 graded) |
+| no-graphics | `34632640899` (green; watcher and two pollers OOM-killed on the host, read via the publish commit `67ba188ce`) | `ea6960eac` (no-graphics results `c1df12d64`, the brief's) | 4516 | 4411 → 4411 | 0, no status moves | `pass` (regression 90 → 91 graded) |
+
+The graphics baseline is newer than the brief's `c7d24d557`: the concurrent
+slice landed and published between launch and this dispatch, and its results were
+already merged when this run started.
 
 ## 6. Side effects worth knowing
 
