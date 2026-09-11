@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-11 15:53 UTC
+**Date**: 2026-09-11 17:41 UTC
 
-**Git SHA**: `c4a952960b`
+**Git SHA**: `b0a6a487b1`
 
-**Run Duration**: 6m 55s
+**Run Duration**: 6m 42s
 
 **Filtered**: 0 tests ignored out of 20 available
 
@@ -27,25 +27,25 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 22.1s |  |
-| 2 | `background` | 0 | 17.0s |  |
+| 1 | `afunc_dict` | 2 | 22.6s |  |
+| 2 | `background` | 0 | 21.4s |  |
 | 3 | `dict_callframe` | 3 | 22.1s |  |
-| 4 | `dict_cross` | 3 | 20.4s |  |
-| 5 | `dict_event` | 5 | 22.2s |  |
-| 6 | `dict_override` | 2 | 16.7s |  |
-| 7 | `func_dict` | 3 | 20.1s |  |
-| 8 | `initaction_in_definesprite` | 2 | 23.2s |  |
-| 9 | `jump_after_end` | 3 | 21.4s |  |
-| 10 | `jump_to_prev_block` | 1 | 22.3s |  |
-| 11 | `missing_bitmap` | 0 | 17.4s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 21.2s |  |
-| 13 | `registers` | 36 | 18.1s |  |
-| 14 | `tags_after_last_showframe` | 1 | 19.1s |  |
-| 15 | `trace-as2/arguments` | 8 | 21.7s |  |
-| 16 | `trace-as2/root_onload` | 4 | 21.9s |  |
-| 17 | `trace-as2/shortstack` | 2 | 21.4s |  |
-| 18 | `trace-as2/super` | 8 | 21.9s |  |
-| 19 | `trace-as2/this` | 8 | 21.9s |  |
+| 4 | `dict_cross` | 3 | 22.4s |  |
+| 5 | `dict_event` | 5 | 23.0s |  |
+| 6 | `dict_override` | 2 | 21.7s |  |
+| 7 | `func_dict` | 3 | 20.9s |  |
+| 8 | `initaction_in_definesprite` | 2 | 22.1s |  |
+| 9 | `jump_after_end` | 3 | 16.1s |  |
+| 10 | `jump_to_prev_block` | 1 | 23.5s |  |
+| 11 | `missing_bitmap` | 0 | 14.2s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 17.5s |  |
+| 13 | `registers` | 36 | 16.5s |  |
+| 14 | `tags_after_last_showframe` | 1 | 21.8s |  |
+| 15 | `trace-as2/arguments` | 8 | 20.9s |  |
+| 16 | `trace-as2/root_onload` | 4 | 21.4s |  |
+| 17 | `trace-as2/shortstack` | 2 | 16.1s |  |
+| 18 | `trace-as2/super` | 8 | 17.4s |  |
+| 19 | `trace-as2/this` | 8 | 16.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -53,7 +53,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 22.0s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 23.0s |  |
 
 ## Near-Passing Tests
 

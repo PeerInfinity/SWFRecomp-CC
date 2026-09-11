@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-05T05:20:58.650654+00:00",
-    "old_git_sha": "12d2ec06b7bf678d88fe98e260356d390c41b63d",
-    "new_timestamp": "2026-09-11T15:53:45.723044+00:00",
-    "new_git_sha": "c4a952960bcab8ccdf60caec9b5bda9e083506cb",
+    "old_timestamp": "2026-09-11T15:53:45.723044+00:00",
+    "old_git_sha": "c4a952960bcab8ccdf60caec9b5bda9e083506cb",
+    "new_timestamp": "2026-09-11T17:41:26.598181+00:00",
+    "new_git_sha": "b0a6a487b11cb91fa9610a0eddd910e5b1ea8018",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 89,
+    "old_pass": 90,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 89,
-    "old_total": 89,
+    "old_effective_pass": 90,
+    "old_total": 90,
     "old_pass_rate": 100.0,
     "new_pass": 90,
     "new_ruffle_matched": 0,
@@ -25,22 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 89,
-    "added": 1,
+    "unchanged": 90,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm2_parent_child_symbolclass_domain",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      }
-    }
-  ]
+  "changes": []
 }
