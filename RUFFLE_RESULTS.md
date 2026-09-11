@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `13dfc5b483e9`  
-**Date:** 2026-09-11 16:55 UTC  
-**Total duration:** 9h56m37s
+**Commit:** `ea6960eacaf6`  
+**Date:** 2026-09-11 18:44 UTC  
+**Total duration:** 10h51m52s
 
 ## Results by Suite
 
@@ -24,13 +24,13 @@
 | from_shumway/avm1 | 47 | 47 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results.md) |
 | import_assets | 3 | 3 | 100% | [details](ruffle-tests/tests/swfs/import_assets/_results/results.md) |
 | mixed_avm | 10 | 12 | 83.3% | [details](ruffle-tests/tests/swfs/mixed_avm/_results/results.md) |
-| regression | 90 | 90 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results.md) |
+| regression | 91 | 91 | 100% | [details](ruffle-tests/tests/swfs/regression/_results/results.md) |
 | stage3d | 7 | 7 | 100% | [details](ruffle-tests/tests/swfs/stage3d/_results/results.md) |
 | swf | 5 | 7 | 71.4% | [details](ruffle-tests/tests/swfs/swf/_results/results.md) |
 | text | 10 | 11 | 90.9% | [details](ruffle-tests/tests/swfs/text/_results/results.md) |
 | timeline | 13 | 17 | 76.5% | [details](ruffle-tests/tests/swfs/timeline/_results/results.md) |
 | visual | 145 | 147 | 98.6% | [details](ruffle-tests/tests/swfs/visual/_results/results.md) |
-| **Total** | **4219** | **4563** | **92.5%** | |
+| **Total** | **4220** | **4564** | **92.5%** | |
 
 ## Line-Level Accuracy
 
@@ -50,13 +50,13 @@
 | from_shumway/avm1 | 491 | 491 | 100% |
 | import_assets | 14 | 14 | 100% |
 | mixed_avm | 56 | 79 | 70.9% |
-| regression | 693 | 693 | 100% |
+| regression | 698 | 698 | 100% |
 | stage3d | 208 | 208 | 100% |
 | swf | 78 | 94 | 83.0% |
 | text | 972 | 973 | 99.9% |
 | timeline | 355 | 371 | 95.7% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **398,707** | **424,111** | **94.0%** |
+| **Total** | **398,712** | **424,116** | **94.0%** |
 
 ## Failure Breakdown
 
@@ -120,17 +120,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | - | 1 | - | 132 |
-| avm2 | 1 | 1 | 16 | 3 |
-| from_avmplus | - | 1 | - | - |
+*No changes since last run.*
 
-**avm2 — newly passing:** `loader_duplicate_class`
-
-**avm2 — newly failing:** `geom_transform`
-
-*Comparing `bf907d0023cc` → `13dfc5b483e9`*
+*Comparing `13dfc5b483e9` → `ea6960eacaf6`*
 
 ## Flash-Spec Results
 
@@ -152,16 +144,16 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 691/733 (94.3%)
-- **Duration:** 56m14s across 30 shards
+- **Duration:** 1h08m59s across 30 shards
 - **Lines:** 120,011/131,677 matching (91.1%)
-- **Avg test duration:** 4.5s — slowest: `define_font_glyph_table_order` (45.4s)
+- **Avg test duration:** 5.6s — slowest: `netstream_play_flv_screen` (29.4s)
 
 ### avm2
 
 - **Pass:** 1200/1270 (94.5%)
-- **Duration:** 3h22m11s across 30 shards
+- **Duration:** 3h30m12s across 30 shards
 - **Lines:** 152,229/155,348 matching (98.0%)
-- **Avg test duration:** 9.5s — slowest: `away3d_advanced_shallow_water_demo` (90.1s)
+- **Avg test duration:** 9.9s — slowest: `away3d_advanced_shallow_water_demo` (85.8s)
 
 ### fonts
 
@@ -180,51 +172,51 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### from_gnash/actionscript.all
 
 - **Pass:** 141/243 (58.0%)
-- **Duration:** 21m02s across 30 shards
+- **Duration:** 30m56s across 30 shards
 - **Lines:** 30,418/38,791 matching (78.4%)
-- **Avg test duration:** 5.1s — slowest: `MovieClip-v8` (64.1s)
+- **Avg test duration:** 7.6s — slowest: `MovieClip-v8` (69.1s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 69/111 (62.2%)
-- **Duration:** 20m34s across 30 shards
+- **Duration:** 32m52s across 30 shards
 - **Lines:** 4,058/5,248 matching (77.3%)
-- **Avg test duration:** 11.1s — slowest: `matrix_test` (86.5s)
+- **Avg test duration:** 17.7s — slowest: `matrix_test` (76.1s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m28s across 30 shards
+- **Duration:** 1m53s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 9.7s — slowest: `exception` (23.1s)
+- **Avg test duration:** 12.6s — slowest: `exception` (22.6s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 11/20 (55.0%)
-- **Duration:** 4m35s across 30 shards
+- **Duration:** 6m00s across 30 shards
 - **Lines:** 441/580 matching (76.0%)
-- **Avg test duration:** 13.7s — slowest: `movieclip_destruction_test1` (22.6s)
+- **Avg test duration:** 18.0s — slowest: `movieclip_destruction_test1` (23.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 2m29s across 30 shards
+- **Duration:** 6m39s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 7.4s — slowest: `dict_callframe` (22.5s)
+- **Avg test duration:** 19.9s — slowest: `jump_to_prev_block` (22.4s)
 
 ### from_shumway
 
 - **Pass:** 213/229 (93.0%)
-- **Duration:** 41m09s across 30 shards
+- **Duration:** 42m13s across 30 shards
 - **Lines:** 2,321/2,484 matching (93.4%)
-- **Avg test duration:** 10.7s — slowest: `acid/acid-large` (77.6s)
+- **Avg test duration:** 11.0s — slowest: `esc` (68.4s)
 
 ### from_shumway/avm1
 
 - **Pass:** 47/47 (100%)
-- **Duration:** 2m32s across 30 shards
+- **Duration:** 2m55s across 30 shards
 - **Lines:** 491/491 matching (100%)
-- **Avg test duration:** 3.2s — slowest: `moviecliploader` (21.0s)
+- **Avg test duration:** 3.7s — slowest: `moviecliploader` (21.7s)
 
 ### import_assets
 
@@ -242,10 +234,10 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### regression
 
-- **Pass:** 90/90 (100%)
-- **Duration:** 15m25s across 30 shards
-- **Lines:** 693/693 matching (100%)
-- **Avg test duration:** 10.2s — slowest: `avm2_parent_child_static_text` (44.8s)
+- **Pass:** 91/91 (100%)
+- **Duration:** 20m15s across 30 shards
+- **Lines:** 698/698 matching (100%)
+- **Avg test duration:** 13.3s — slowest: `avm2_localconnection_domain` (28.8s)
 
 ### stage3d
 
