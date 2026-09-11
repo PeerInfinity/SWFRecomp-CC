@@ -243,7 +243,10 @@ first).
   whose `enterframe_eligible` flag is armed by a display-list walk that a
   loaded movie's root is not in. The runtime already had the escape hatch for
   the identical `_levelN` case (`actionIsLoadedLevelRootMC`); widening that one
-  predicate is two lines and recovers six of the eight. So the 48
+  predicate is two lines and recovers six of the eight. (All eight PASS
+  today: they regress only once a loaded holder is given a `display_obj`,
+  i.e. under item (2), so item (1) is its prerequisite, not a fix owed to
+  the corpus now.) So the 48
   `display_obj != NULL` sites do NOT need a different predicate -- 47 were
   never the problem. Three work items remain, in order: (1) widen the
   predicate; (2) make the loaders swap for clip targets like the driver does,
@@ -550,20 +553,6 @@ first).
   purpose (`ruffle-tests.yml --exclude`): two 0.0001 ms setIntervals with no
   minimum-interval floor in `timer.c` — a 10 ms floor is the lead
   (`session18-fanout-reports/w2-avm1-goto-report.md`).
-- **`verify_output_keep.py`'s native source list has drifted again.**
-  `ruffle-tests/verify_output_keep.py` omits `src/amf_packet.c` and
-  `src/actionmodern/avm1_amf.c`, so the KEEP_BUILD_DIR game-bring-up path does
-  not link: 15 undefined references from `action.o`
-  (`avm1AmfSerializeArg`, `avm1AmfGcMarkRoots`, ...) and `avm2_net.o`
-  (`amf_packet_build`, `amf_buf_init`, ...). Both sources exist in the runtime;
-  they are simply absent from the list. This is the SECOND instance of exactly
-  this drift — the script's own comment at :1718 records the first
-  (`avm2_net.c`), with the same root cause: the list is hand-maintained and
-  **CI never exercises it**, since KEEP_BUILD_DIR is a game-bring-up path only.
-  A fix that only adds the two files leaves the third instance to be found by
-  hand; deriving the list, or having CI link this path once, is what ends it.
-  Reported by the kittyengine arc from a throwaway worktree build at
-  `21e98fcfd`, verified here 2026-09-03. (2026-09-03)
 - **`SWFRecomp/build/run-SWFRecomp.sh` hardcodes the LIVE tree's binary.** The
   wrapper is untracked (`build/` is gitignored) and its only line is
   `exec /home/robert/CC/SWFRecomp-CC/SWFRecomp/build/SWFRecomp "$@"`, so any
@@ -571,7 +560,8 @@ first).
   tree's recompiler instead of its own. Harmless whenever the two binaries
   agree — which is how it has gone unnoticed — and silently wrong the moment a
   worktree carries a recompiler change, i.e. exactly when a worktree is being
-  used to isolate one. (2026-09-03)
+  used to isolate one. No tracked script calls the wrapper (checked
+  2026-09-11), so only hand-typed commands can hit this. (2026-09-03)
 - **The recompiler treats `--help` as a config-file path** and aborts on a toml
   parse error rather than printing usage. (2026-09-03)
 
@@ -604,10 +594,3 @@ first).
   Guarded the free with `variableIsArrayOwned`. case-v5 + case-v6
   now 10/10 in graphics, both still pass NO_GRAPHICS, ASAN clean
   (only pre-existing `u16_concat` Dejagnu leaks). (2026-05-30)
-- **`from_gnash/misc-ming.all/place_and_remove_object_insane_test`
-  17/22 in graphics-native vs 22/22 NO_GRAPHICS** (was 15/19 vs 19/19;
-  upstream line totals grew, gap persists — re-checked against merged
-  CI of 2026-06-30, SHA `56970ac27`). Same diff appears in
-  `--mode=graphics-headless-legacy`, so the bug is in shared code
-  (tag.c or `#ifdef NO_GRAPHICS`-gated tag handling), not swf.c.
-  Defer to a tag.c-focused session. (2026-05-11, updated 2026-07-02)

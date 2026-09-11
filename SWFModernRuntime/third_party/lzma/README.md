@@ -46,5 +46,4 @@ bytes.
 Copied flat into the build directory alongside the other vendored trees, by:
 
 - `ruffle-tests/verify_output.py` (`compile_native`, AVM2 branch)
-- `ruffle-tests/verify_output_keep.py`
 - `SWFRecomp/scripts/build_wasm_avm2.sh`
