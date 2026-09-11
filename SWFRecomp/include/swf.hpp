@@ -162,6 +162,15 @@ namespace SWFRecomp
 		u8 fill_spread_mode = 0;
 		u8 fill_interp = 0;      // gradient interpolation_mode (1 = linearRGB)
 		size_t fill_index = 0;
+		// LINESTYLE2 (DefineShape4) cap/join styles, SWF spec codes:
+		//   cap  0 = round, 1 = none (butt), 2 = square
+		//   join 0 = round, 1 = bevel,       2 = miter (+ MiterLimitFactor)
+		// Shape1/2/3 and MORPHLINESTYLE1 carry no such record at all, so these
+		// defaults keep every pre-v4 stroke on the historical round geometry.
+		u8 start_cap = 0;
+		u8 end_cap = 0;
+		u8 line_join = 0;
+		double miter_limit = 3.0;
 	};
 	
 	class SWFHeader
@@ -492,6 +501,6 @@ namespace SWFRecomp
 		void constructEdges(std::vector<Path>& paths, std::vector<Node>& nodes);
 		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations = 100000, size_t max_cycles = 8000);
 		void fillShape(Shape& shape, std::vector<Tri>& tris);
-		void drawLines(const Path& path, u16 width, std::vector<Tri>& tris);
+		void drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris);
 	};
 };

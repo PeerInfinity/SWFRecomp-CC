@@ -7595,6 +7595,9 @@ namespace SWFRecomp
 				u8 join_style = (flags1 >> 4) & 0x03;
 				bool has_fill = (flags1 >> 3) & 0x01;
 
+				line_styles[i].start_cap = (flags1 >> 6) & 0x03;
+				line_styles[i].line_join = join_style;
+
 				// Reserved(UB5), NoClose(UB1), EndCapStyle(UB2)
 				line_data.clearFields();
 				line_data.setFieldCount(1);
@@ -7602,6 +7605,8 @@ namespace SWFRecomp
 				line_data.configureNextField(SWF_FIELD_UI8, 8);
 
 				line_data.parseFields(cur_pos);
+
+				line_styles[i].end_cap = ((u8) line_data.fields[0].value) & 0x03;
 
 				// MiterLimitFactor: FIXED8 (only if JoinStyle == 2)
 				if (join_style == 2)
@@ -7613,7 +7618,12 @@ namespace SWFRecomp
 
 					line_data.parseFields(cur_pos);
 
-					// Miter limit parsed and ignored for now
+					// FIXED8. Ruffle hands this straight to lyon's
+					// with_miter_limit and degrades to a BEVEL below lyon's
+					// StrokeOptions::MINIMUM_MITER_LIMIT (1.0); drawLineJoin
+					// applies both rules.
+					line_styles[i].miter_limit =
+						((double) (u16) line_data.fields[0].value) / 256.0;
 				}
 
 				if (!has_fill)
@@ -10766,7 +10776,7 @@ namespace SWFRecomp
 
 						std::vector<Tri> tris;
 
-						drawLines(paths[i], line_style.width, tris);
+						drawLines(paths[i], line_style, tris);
 
 						tris_size += tris.size();
 
@@ -11417,7 +11427,17 @@ namespace SWFRecomp
 		}
 	}
 	
-	void drawLineJoin(const Vertex& a, const Vertex& b, const Vertex& c, u16 halfwidth, std::vector<Tri>& tris)
+	// LINESTYLE2 join geometry. `join_style` is the SWF code (0 round, 1 bevel,
+	// 2 miter) and `miter_limit` the FIXED8 MiterLimitFactor. Ruffle maps these
+	// onto lyon (render/src/tessellator.rs): Round -> LineJoin::Round,
+	// Bevel -> LineJoin::Bevel, Miter(limit) -> LineJoin::MiterClip with
+	// with_miter_limit(limit), falling back to Bevel below lyon's
+	// StrokeOptions::MINIMUM_MITER_LIMIT (1.0).
+	//
+	// Every shape older than DefineShape4 keeps join_style 0, for which this is
+	// bit-for-bit the historical round fan.
+	void drawLineJoin(const Vertex& a, const Vertex& b, const Vertex& c, u16 halfwidth,
+	                  u8 join_style, double miter_limit, std::vector<Tri>& tris)
 	{
 		Vertex vec_a_b;
 		vec_a_b.x = b.x - a.x;
@@ -11463,18 +11483,82 @@ namespace SWFRecomp
 		double end_angle = (angle_a_b < angle_b_c_unwrapped) ? angle_b_c_unwrapped : angle_a_b;
 
 		double angle_delta = (end_angle - start_angle)/num_midpoints;
-		
+
 		// Every vertex this join synthesises is a fixed offset from the SOURCE
 		// path vertex `b`, so it inherits b's morph_index: a morph stroke then
 		// rides the morphing outline instead of freezing at the start shape
 		// (see the stroke arm of interpretShape's morph emission).
-		Vertex last_point;
-		last_point.x = (s32) std::round(b.x + halfwidth*cos(start_angle));
-		last_point.y = (s32) std::round(b.y + halfwidth*sin(start_angle));
-		last_point.morph_index = b.morph_index;
+		//
+		// The two OUTER offset corners of the corner are shared by all three
+		// join styles; only what is drawn between them differs.
+		Vertex p_start;
+		p_start.x = (s32) std::round(b.x + halfwidth*cos(start_angle));
+		p_start.y = (s32) std::round(b.y + halfwidth*sin(start_angle));
+		p_start.morph_index = b.morph_index;
+
+		Vertex p_end;
+		p_end.x = (s32) std::round(b.x + halfwidth*cos(end_angle));
+		p_end.y = (s32) std::round(b.y + halfwidth*sin(end_angle));
+		p_end.morph_index = b.morph_index;
 
 		Tri t;
 		t.verts[0] = b;
+
+		if (join_style != 0)
+		{
+			if (join_style == 2)
+			{
+				// lyon's miter normal m = (n0 + n1)/(1 + n0.n1), expressed in
+				// half-width units, whose length is 1/cos(theta/2). `angle_a_b`
+				// and `angle_b_c` already carry the +-pi/2 outward offset, so
+				// their cos/sin ARE the two unit normals. lyon clips the tip
+				// when |m| > 2*miter_limit (stroke.rs miter_limit_is_exceeded),
+				// and refuses a miter below MINIMUM_MITER_LIMIT (1.0).
+				double n0x = cos(angle_a_b), n0y = sin(angle_a_b);
+				double n1x = cos(angle_b_c), n1y = sin(angle_b_c);
+				double den = 1.0 + n0x*n1x + n0y*n1y;
+
+				if (miter_limit >= 1.0 && den > 1e-6)
+				{
+					double mx = (n0x + n1x)/den;
+					double my = (n0y + n1y)/den;
+
+					if (mx*mx + my*my <= 4.0*miter_limit*miter_limit)
+					{
+						Vertex m_point;
+						m_point.x = (s32) std::round(b.x + halfwidth*mx);
+						m_point.y = (s32) std::round(b.y + halfwidth*my);
+						m_point.morph_index = b.morph_index;
+
+						t.verts[1] = p_start;
+						t.verts[2] = m_point;
+
+						tris.push_back(t);
+
+						t.verts[1] = m_point;
+						t.verts[2] = p_end;
+
+						tris.push_back(t);
+
+						return;
+					}
+				}
+			}
+
+			// Bevel: the flat chord between the two offset corners. This is
+			// also where a miter past its limit lands. lyon would draw the
+			// CLIPPED wedge there instead of the chord; the two differ only on
+			// corners sharper than the limit, and no corpus SWF declaring a
+			// miter join has one (see the report's LINESTYLE2 scan).
+			t.verts[1] = p_start;
+			t.verts[2] = p_end;
+
+			tris.push_back(t);
+
+			return;
+		}
+
+		Vertex last_point = p_start;
 
 		for (double current_angle = start_angle + angle_delta; current_angle < end_angle; current_angle += angle_delta)
 		{
@@ -11490,35 +11574,86 @@ namespace SWFRecomp
 		}
 
 		t.verts[1] = last_point;
-
-		t.verts[2].x = (s32) std::round(b.x + halfwidth*cos(end_angle));
-		t.verts[2].y = (s32) std::round(b.y + halfwidth*sin(end_angle));
-		t.verts[2].morph_index = b.morph_index;
+		t.verts[2] = p_end;
 
 		tris.push_back(t);
 	}
-	
-	void drawLineCap(const Vertex& a, const Vertex& b, u16 halfwidth, std::vector<Tri>& tris)
+
+	// LINESTYLE2 cap geometry (`cap_style`: 0 round, 1 none/butt, 2 square).
+	// `a` is the path END being capped and `b` its inward neighbour, so
+	// `angle_a_b` points INTO the stroke and the cap lives on -that direction.
+	void drawLineCap(const Vertex& a, const Vertex& b, u16 halfwidth, u8 cap_style,
+	                 std::vector<Tri>& tris)
 	{
+		// lyon's LineCap::Butt emits no geometry at all: the stroke simply ends
+		// on the offset chord the segment quad already covers.
+		if (cap_style == 1)
+		{
+			return;
+		}
+
 		Vertex vec_a_b;
 		vec_a_b.x = b.x - a.x;
 		vec_a_b.y = b.y - a.y;
-		
+
 		double angle_a_b = atan2(vec_a_b.y, vec_a_b.x);
-		
+
 		int num_midpoints = 5;
-		
+
 		double start_angle = angle_a_b + M_PI/2.0;
 		double end_angle = start_angle + M_PI;
-		
+
 		double angle_delta = (end_angle - start_angle)/num_midpoints;
-		
+
 		// As in drawLineJoin: the cap fan is a fixed offset from the source path
 		// vertex `a`, so it inherits a's morph_index.
-		Vertex last_point;
-		last_point.x = (s32) std::round(a.x + halfwidth*cos(start_angle));
-		last_point.y = (s32) std::round(a.y + halfwidth*sin(start_angle));
-		last_point.morph_index = a.morph_index;
+		double px_start = a.x + halfwidth*cos(start_angle);
+		double py_start = a.y + halfwidth*sin(start_angle);
+		double px_end = a.x + halfwidth*cos(end_angle);
+		double py_end = a.y + halfwidth*sin(end_angle);
+
+		Vertex p_start;
+		p_start.x = (s32) std::round(px_start);
+		p_start.y = (s32) std::round(py_start);
+		p_start.morph_index = a.morph_index;
+
+		Vertex p_end;
+		p_end.x = (s32) std::round(px_end);
+		p_end.y = (s32) std::round(py_end);
+		p_end.morph_index = a.morph_index;
+
+		if (cap_style == 2)
+		{
+			// Square: extrude both offset corners by half the width along the
+			// OUTWARD tangent, the quad lyon's LineCap::Square emits.
+			double ux = cos(angle_a_b), uy = sin(angle_a_b);
+
+			Vertex s_start;
+			s_start.x = (s32) std::round(px_start - halfwidth*ux);
+			s_start.y = (s32) std::round(py_start - halfwidth*uy);
+			s_start.morph_index = a.morph_index;
+
+			Vertex s_end;
+			s_end.x = (s32) std::round(px_end - halfwidth*ux);
+			s_end.y = (s32) std::round(py_end - halfwidth*uy);
+			s_end.morph_index = a.morph_index;
+
+			Tri sq;
+			sq.verts[0] = p_start;
+			sq.verts[1] = p_end;
+			sq.verts[2] = s_end;
+
+			tris.push_back(sq);
+
+			sq.verts[1] = s_end;
+			sq.verts[2] = s_start;
+
+			tris.push_back(sq);
+
+			return;
+		}
+
+		Vertex last_point = p_start;
 
 		Tri t;
 		t.verts[0] = a;
@@ -11537,16 +11672,20 @@ namespace SWFRecomp
 		}
 
 		t.verts[1] = last_point;
-
-		t.verts[2].x = (s32) std::round(a.x + halfwidth*cos(end_angle));
-		t.verts[2].y = (s32) std::round(a.y + halfwidth*sin(end_angle));
-		t.verts[2].morph_index = a.morph_index;
+		t.verts[2] = p_end;
 
 		tris.push_back(t);
 	}
-	
-	void SWF::drawLines(const Path& path, u16 width, std::vector<Tri>& tris)
+
+	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris)
 	{
+		u16 width = style.width;
+
+		// LINESTYLE2 cap/join words. Pre-v4 shapes leave these at 0, which is
+		// the round-everything geometry this builder has always drawn.
+		const u8 join_style = style.line_join;
+		const double miter_limit = style.miter_limit;
+
 		if (width != 0 && width < 20)
 		{
 			width = 20;
@@ -11573,7 +11712,7 @@ namespace SWFRecomp
 			{
 				const Vertex& last_last_v = path.verts[i - 2];
 				
-				drawLineJoin(last_last_v, last_v, v, halfwidth, tris);
+				drawLineJoin(last_last_v, last_v, v, halfwidth, join_style, miter_limit, tris);
 			}
 			
 			// Each offset corner inherits the morph_index of the source path
@@ -11611,13 +11750,16 @@ namespace SWFRecomp
 			const Vertex& b = path.verts[0];
 			const Vertex& c = path.verts[1];
 			
-			drawLineJoin(a, b, c, halfwidth, tris);
+			drawLineJoin(a, b, c, halfwidth, join_style, miter_limit, tris);
 		}
-		
+
 		else
 		{
-			drawLineCap(path.verts[0], path.verts[1], halfwidth, tris);
-			drawLineCap(path.verts.back(), path.verts[path.verts.size() - 2], halfwidth, tris);
+			// verts[0] is the path START (StartCapStyle), verts.back() its END
+			// (EndCapStyle) — lyon caps the two ends independently too.
+			drawLineCap(path.verts[0], path.verts[1], halfwidth, style.start_cap, tris);
+			drawLineCap(path.verts.back(), path.verts[path.verts.size() - 2], halfwidth,
+			            style.end_cap, tris);
 		}
 	}
 };

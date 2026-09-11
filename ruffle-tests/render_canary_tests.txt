@@ -104,3 +104,29 @@ visual/filters/color_matrix                 # filters proper
 visual/blend_modes/multiply                 # blend proper
 regression/avm2_morph                       # morph shapes (no expected PNG)
 from_shumway/acid/acid-blend-2
+
+# SESSION 19 ADDITIONS (s19 wave-2 `w2-gfx-geometry`). The audit found the set
+# structurally BLIND to all three of that slice's change classes: no member
+# reads getBounds/getRect off a runtime `Graphics`, no member calls
+# `drawRoundRect`, and — crucially — not one of the five corpus SWFs that
+# declare a non-round LINESTYLE2 cap/join was in the list, so a change to
+# `drawLineCap`/`drawLineJoin` could only ever report IDENTICAL.
+
+# tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
+avm2/graphics_bitmaps                       # drawRoundRect + bitmap fills; the
+                                            #   only CI-PASSING drawRoundRect
+                                            #   caller in the corpus
+from_shumway/acid/acid-small                # LINESTYLE2 miter joins + MIXED
+                                            #   caps, and it PASSES while being
+                                            #   drawn with the wrong (round)
+                                            #   styles — the cap/join tripwire
+
+# tier=2  (CI-failing / skipped; A/B signal only)
+avm2/displayobject_getbounds_shape          # the SWF draws its own getBounds
+                                            #   box, so curve-bounds arithmetic
+                                            #   is visible in pixels
+avm2/graphics_simple_shapes                 # drawRoundRect + one-fill-across-
+                                            #   lineStyle
+visual/simple_shapes/layers                 # LINESTYLE2 square caps + miter
+                                            #   join, miterLimit 1.0, 20-30 px
+                                            #   strokes
