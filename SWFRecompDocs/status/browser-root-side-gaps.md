@@ -258,9 +258,13 @@ MCL-loaded holder reports `_totalframes` **1** while its `_currentframe` walks
 1→3. The direct-`loadMovie` fixtures read `tf:5` correctly, so MCL's
 registration is not setting the holder's frame count. Filed.
 
+**Fixed 2026-09-11**, together with the `onLoadInit h cf:0` row above, which
+turned out to be the same omission: Ruffle reads `cf:1` in `onLoadInit`.
+See `SWFRecompDocs/status/avm1-mcl-holder-totalframes.md`.
+
 ## 7. What is left
 
-* The MCL one-tick phase offset and the MCL `_totalframes` gap above.
+* The MCL one-tick phase offset. (The MCL `_totalframes` gap above is fixed, 2026-09-11.)
 * The `#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)` blocks the
   previous slice added to `swf.c` (the loaded-movie drains, the pending-removal
   finalize + dead-child reclaim) exclude the **native windowed** player, which

@@ -36976,6 +36976,19 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                     // getBytesTotal() > 4" idiom never completes
                     // (avm2/mouse_pick_avm1_root's avm1.swf is exactly that).
                     loads[i].target->byte_size = loads[i].entry->file_size;
+                    // Same for the frame counts: the loaded movie becomes the
+                    // target's timeline (Ruffle replace_with_movie, before
+                    // onLoadProgress), so _totalframes / _framesloaded are the
+                    // MOVIE's. Without this a createEmptyMovieClip holder kept
+                    // reading its own 1 forever (regression/
+                    // avm1_mcl_holder_totalframes). Root replacement keeps its
+                    // own write in Phase 2.
+                    extern MovieClip root_movieclip;
+                    if (loads[i].target != &root_movieclip) {
+                        loads[i].target->load_failed = 0;
+                        loads[i].target->totalframes = loads[i].entry->frame_count;
+                        loads[i].target->framesloaded = loads[i].entry->frame_count;
+                    }
                 }
                 // Clear _name on root replacement (Flash clears it before callbacks fire)
                 extern MovieClip root_movieclip;
@@ -37097,6 +37110,12 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 root_movieclip.totalframes = loads[i].entry->frame_count;
                 root_movieclip.framesloaded = loads[i].entry->frame_count;
                 root_movieclip.currentframe = 1;
+            } else if (loads[i].target != NULL) {
+                // The movie's frame 1 runs below, before onLoadInit, so the
+                // handler reads _currentframe 1 (Ruffle; the progress/complete
+                // handlers before it still read 0). The per-tick driver takes
+                // it from here. Mirrors actionFirePendingDirectLoads.
+                loads[i].target->currentframe = 1;
             }
             // Run child in target MC context with child's SWF version (with per-movie global)
             MovieClip* _saved_ctx = g_current_context;

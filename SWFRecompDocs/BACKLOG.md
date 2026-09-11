@@ -524,14 +524,40 @@ first).
   - **An MCL-loaded holder reports `_totalframes` 1** while its `_currentframe`
     walks 1→3 — in BOTH builds equally, so not a browser gap. The
     direct-`loadMovie` fixtures read `tf:5` correctly, so MCL's registration is
-    not setting the holder's frame count. Own entry below.
+    not setting the holder's frame count. FIXED 2026-09-11, entry below.
+  - **The probe's `onLoadInit h cf:0` was a bug too, not Flash behaviour.**
+    Ruffle reads `_currentframe` **1** in `onLoadInit`, because the loaded
+    movie's first frame has run by then, and 0 only in
+    `onLoadProgress`/`onLoadComplete` before it. Measured with the local
+    exporter and confirmed in `loader.rs` (`movie_clip_loaded` fires only for
+    clips that have run their first frame). Fixed with the `_totalframes` entry
+    below. (2026-09-11)
   Detail: `SWFRecompDocs/status/browser-root-side-gaps.md` §6.
-- **`MovieClipLoader.loadClip` leaves the holder's `_totalframes` at 1.** The
-  loaded movie's own frames run and `_currentframe` advances 1→3, but
-  `holder._totalframes` stays 1 in every build. Direct `loadMovie` sets it
-  correctly (`regression/avm1_child_timeline_advance` reads `tf:5`), so the
-  gap is in the MCL registration path, not the movie-entry machinery.
-  (2026-09-04)
+- ~~**`MovieClipLoader.loadClip` leaves the holder's `_totalframes` at 1.**~~
+  **DONE 2026-09-11.** The MCL drain (`actionFirePendingLoadInits`) wrote the
+  frame counts onto its target only for a ROOT replacement or an image, while
+  the direct-`loadMovie` drain always did. A `createEmptyMovieClip` holder
+  therefore kept its own `tf:1 fl:1` forever, and read `cf:0` at `onLoadInit`,
+  until the per-tick driver first advanced it. Now the Pre-phase writes
+  `totalframes`/`framesloaded` (and clears `load_failed`) next to the existing
+  `byte_size` write, and Phase 2 sets `currentframe = 1` before the movie's
+  frame 1, mirroring the direct path. `getBytesLoaded`/`getBytesTotal` read
+  `byte_size` and were already right. Anchored by
+  `regression/avm1_mcl_holder_totalframes` (with a direct-`loadMovie` holder as
+  the negative control). Closeout:
+  `SWFRecompDocs/status/avm1-mcl-holder-totalframes.md`. (2026-09-11)
+- **MovieClipLoader's `onLoadStart` does not see Ruffle's loading state.**
+  Ruffle puts the target into an "initial loading" movie before `onLoadStart`
+  (`loader.rs` `load_initial_loading_swf`), so the handler reads
+  `_totalframes` 0, `_framesloaded` 0, `getBytesLoaded()` 0 and
+  `getBytesTotal()` 0. The real movie replaces it before `onLoadProgress`. Our
+  MCL Pre-phase writes the loaded movie's values before Phase 1 fires
+  `onLoadStart`, so the handler reads them early (`tf:4 fl:4 bl:35 bt:35` on
+  a 4-frame, 35-byte child). The byte half predates the `_totalframes` fix.
+  No corpus test reads these inside `onLoadStart`. Grading it needs care:
+  `from_gnash/actionscript.all/MovieClipLoader-v5..v8` assert on
+  `getProgress()` bytes inside the handlers. Scratch probe and Ruffle trace:
+  `SWFRecompDocs/status/avm1-mcl-holder-totalframes.md` §2. (2026-09-11)
 - ~~**`_root._currentframe` reads `undefined` in browser-WASM**~~ and
   ~~**`typeof` a root-placed named bare `DefineShape` is `object`**~~ — DONE
   2026-09-04. **One owner for both, and it was neither the playhead nor
