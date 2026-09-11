@@ -86,6 +86,12 @@ the slice.
 - Pattern kills are guard-denied. Use literal PIDs.
 - Dispatch CI modes serially, and never run a status-poll loop alongside a live
   `gh run watch`. The zero-quota fallback is in `.claude/pipeline-handoff.md`.
+- **Another slice may be sharing this tree and CI**: `browser-webgpu-device-lost`
+  (browser-only, `render_webgpu.c`). Stage by name only, and **before each
+  `ruffle-tests.yml` dispatch, confirm no run of it is in progress or queued**
+  (`gh run list --workflow ruffle-tests.yml --status in_progress`, then
+  `--status queued`). If one is, `gh run watch` it to completion first.
+  Overlapping runs clobber each other's results merge.
 
 ## 5. Done means
 
