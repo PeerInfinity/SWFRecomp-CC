@@ -1,0 +1,12 @@
+parent:Inner visible=false
+load
+  Inner ctor
+  Outer ctor, kid=Inner
+  Child ctor, numChildren=1
+timeline:Outer kid:Inner
+parent:Inner visible=false
+script: new Outer()
+  Inner ctor
+  Outer ctor, kid=Inner
+script:Outer kid:Inner
+done

@@ -380,6 +380,22 @@ uint16_t avm2_display_child_char_for_class(Avm2Context* ctx, Avm2Class* cls)
 	return 0;
 }
 
+// The domain of the CHILD movie whose tables bind `cls` — the same class walk
+// avm2_display_child_char_for_class takes, answering with the defining file's
+// load scope instead of the char. A script-created symbol instance is that
+// movie's character (Ruffle class_symbol -> (movie, id)), so the children its
+// timeline places resolve their SymbolClass names there. NULL = the main movie.
+static const Avm2DomainScope* child_class_movie_scope(Avm2Class* cls)
+{
+	for (Avm2Class* c = cls; c != NULL; c = c->super_class)
+	{
+		if (c->instance_init.file == NULL) continue;  // builtin
+		if (avm2_display_movie_for_abc(c->instance_init.file->data) != NULL)
+			return c->instance_init.file->scope;
+	}
+	return NULL;
+}
+
 // Exported for avm2_text.c (Font.registerFont / Font.enumerateFonts): the font
 // tables are the one character kind whose lookups live outside this file.
 uint32_t avm2_display_child_movie_count(void)
@@ -1732,7 +1748,17 @@ void avm2_display_resolve_frame_symbols(Avm2Context* ctx, uint32_t frame_idx,
 	}
 }
 
-static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
+// `movie_scope` is the domain of the movie INSTANCE placing the character (the
+// placing parent's ext->movie_scope; NULL = the main movie). The main movie's
+// rows always resolve in the root scope. A CHILD movie's rows resolve in the
+// placing instance's domain, as Ruffle's preload_symbol_class does
+// (library_for_movie(self.movie()).avm2_domain()): a child loaded into a fresh
+// ApplicationDomain defines its SymbolClass classes there and nowhere else, so
+// a root-scope lookup finds nothing and the character comes up a bare
+// MovieClip. The id alone picks the defining movie (char_id_base), but not the
+// domain — the same SWF loaded twice has one table set and two domains.
+static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id,
+                                 const Avm2DomainScope* movie_scope)
 {
 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 	{
@@ -1756,8 +1782,9 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 		{
 			if (t->symbol_classes[i].char_id != char_id
 			    || t->symbol_classes[i].class_name == NULL) continue;
-			Avm2Class* cls = class_for_dotted_name(
-				ctx, t->symbol_classes[i].class_name);
+			Avm2Class* cls = class_for_dotted_name_in(
+				ctx, movie_scope != NULL ? movie_scope : avm2_domain_root_scope(ctx),
+				t->symbol_classes[i].class_name);
 			if (cls != NULL && class_is_a(cls, ctx->builtins.display_object_class))
 				return cls;
 		}
@@ -1791,7 +1818,8 @@ static Avm2Class* class_for_char(Avm2Context* ctx, uint16_t char_id)
 
 // The (non-display) class bound to `char_id`, or NULL — used to build a
 // timeline Bitmap's bitmapData (BitmapData subclass binding).
-static Avm2Class* nondisplay_class_for_char(Avm2Context* ctx, uint16_t char_id)
+static Avm2Class* nondisplay_class_for_char(Avm2Context* ctx, uint16_t char_id,
+                                            const Avm2DomainScope* movie_scope)
 {
 	for (uint32_t i = 0; i < avm2_generated_symbol_class_count; i++)
 	{
@@ -1811,8 +1839,9 @@ static Avm2Class* nondisplay_class_for_char(Avm2Context* ctx, uint16_t char_id)
 		{
 			if (t->symbol_classes[i].char_id != char_id
 			    || t->symbol_classes[i].class_name == NULL) continue;
-			Avm2Class* cls = class_for_dotted_name(
-				ctx, t->symbol_classes[i].class_name);
+			Avm2Class* cls = class_for_dotted_name_in(
+				ctx, movie_scope != NULL ? movie_scope : avm2_domain_root_scope(ctx),
+				t->symbol_classes[i].class_name);
 			if (cls != NULL && !class_is_a(cls, ctx->builtins.display_object_class))
 				return cls;
 		}
@@ -1961,7 +1990,7 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 		        op->char_id, op->depth);
 		return NULL;
 	}
-	Avm2Class* cls = class_for_char(ctx, op->char_id);
+	Avm2Class* cls = class_for_char(ctx, op->char_id, pext->movie_scope);
 	if (cls == NULL) return NULL;
 
 	g_timeline_instantiation = 1;
@@ -1971,6 +2000,7 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 	Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
 	if (cext == NULL) return NULL;
 	cext->char_id = op->char_id;
+	cext->movie_scope = pext->movie_scope;   // Ruffle: the child shares self.movie()
 	resolve_shape_geom(cext, op->char_id);
 	resolve_static_text(cext, op->char_id);
 	cext->timeline = timeline_for_char(op->char_id);
@@ -2004,7 +2034,8 @@ static Avm2Object* instantiate_child(Avm2Context* ctx, Avm2Object* parent,
 		else if (ci != NULL && ci->kind == AVM2_CHAR_BITMAP)
 		{
 			avm2_bitmap_seed_timeline(ctx, child, op->char_id,
-			                          nondisplay_class_for_char(ctx, op->char_id));
+			                          nondisplay_class_for_char(ctx, op->char_id,
+			                                                    pext->movie_scope));
 		}
 		else if (ci != NULL && ci->init_text != NULL)
 		{
@@ -6035,6 +6066,9 @@ static void loader_boot_child_swf(Avm2Context* ctx, Avm2Object* li,
 	if (cext == NULL) return;
 	cext->is_root = 1;
 	cext->char_id = root_char;
+	// Before the frame-1 places below: every character this root places
+	// inherits it, and resolves its SymbolClass name in THIS load's domain.
+	cext->movie_scope = scope;
 	cext->timeline = timeline_for_char(root_char);
 	cext->instantiated_by_timeline = 1;
 	cext->depth = 0;
@@ -12437,13 +12471,14 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 	{
 		const Avm2ButtonRecordData* rec = &bd->records[i];
 		if ((rec->state_flags & state_bit) == 0) continue;
-		Avm2Class* cls = class_for_char(ctx, rec->char_id);
+		Avm2Class* cls = class_for_char(ctx, rec->char_id, bext->movie_scope);
 		if (cls == NULL) continue;
 		g_timeline_instantiation = 1;
 		Avm2Object* child = display_alloc_instance(ctx, cls);
 		g_timeline_instantiation = 0;
 		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
 		cext->char_id = rec->char_id;
+		cext->movie_scope = bext->movie_scope;
 		// A button record's character is placed exactly like a timeline
 		// child, so it needs the SAME place-time resolution (place_child /
 		// replace_child_character both do both halves). Without the shape
@@ -13360,6 +13395,8 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 		{
 			ext->char_id = char_id;
 			ext->timeline = timeline_for_char(char_id);
+			if (g_child_movie_count > 0)
+				ext->movie_scope = child_class_movie_scope(obj->cls);
 		}
 		// Ruffle new_with_avm2 does NOT set PLAYING (new_with_data does):
 		// a plain `new MovieClip()` never advances past frame 0.

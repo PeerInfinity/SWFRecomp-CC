@@ -643,6 +643,16 @@ typedef struct Avm2DisplayObjectExt
 	// `loader.contentLoaderInfo === loader.content.loaderInfo` true.
 	// NULL = the main movie, whose objects answer g_root_loader_info.
 	Avm2Object* loader_info;
+	// The ApplicationDomain of the movie INSTANCE this object's character came
+	// from — Ruffle's DisplayObject::movie() -> library_for_movie(movie)
+	// .avm2_domain(), which is where preload_symbol_class resolves the
+	// SymbolClass names of every character that movie places. Set on a
+	// Loader-loaded root (its LoaderInfo's scope) and inherited by each
+	// timeline child from the parent that placed it. It cannot be derived
+	// from the character's tables: the same SWF loaded twice shares one
+	// Avm2MovieTables but loads into two domains (loader_duplicate_class).
+	// NULL = the main movie (the root scope).
+	const Avm2DomainScope* movie_scope;
 
 	// DisplayObject.filters (filters arc F1). Stored as VALUES, never as the
 	// AS objects the script handed us — which is what makes mutating an

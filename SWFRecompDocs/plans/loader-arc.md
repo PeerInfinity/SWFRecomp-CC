@@ -1261,7 +1261,7 @@ could be ambiguous.
 
 | Test | State | Disposition |
 |---|---|---|
-| `loader_duplicate_class` 3/48 | failing | **child-SWF timeline character instantiation.** Domains are DONE for it: every `DuplicateClass` now resolves to the right SWF, including the fourth load correctly picking up `loader_same_domain`'s through the parent chain. What is missing is the placed MovieClip its constructors read (`this.childFromDomainChild` is `null`) — §8's deferred child-geometry work, a different arc |
+| `loader_duplicate_class` 3/48 | **PASS 2026-09-11** (`status/avm2-child-symbolclass-binding.md`: the placed character's SymbolClass name was resolved in the ROOT domain, not the child's) — was: failing | **child-SWF timeline character instantiation.** Domains are DONE for it: every `DuplicateClass` now resolves to the right SWF, including the fourth load correctly picking up `loader_same_domain`'s through the parent chain. What is missing is the placed MovieClip its constructors read (`this.childFromDomainChild` is `null`) — §8's deferred child-geometry work, a different arc |
 | `loader_load` 124/128 | failing | retired to `RUFFLE_VS_FLASH` (hash-ordered property enumeration) |
 | `loader_method` 83/85 | failing | corpus-wide uncaught-error tracing, gated on the Stage3D/PixelBender/filters arcs (§7) |
 | `loader_try_click_root` 0/16 | failing | child-SWF **shape bounds** — deferred with child geometry (§8). Note §9 recorded this as 1/16 from a stale run; CI has had it at 0/16 for the whole arc, unchanged by tranche 8 |

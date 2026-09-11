@@ -171,6 +171,30 @@ first).
   gnash `attachImported`/`attachExtImported` confirmed unmoved. Anchored by
   three new rows in `regression/avm2_parent_child_symbol_stride`. Closeout:
   `SWFRecompDocs/status/child-embedded-asset-lookup.md`. (2026-09-03)
+- ~~**A loaded AS3 child's timeline-placed characters never get their
+  SymbolClass class** (`avm2/loader_duplicate_class` 32/48).~~ **DONE
+  2026-09-11**, and the cause was not the MAIN-only `g_symbol_map` that session 18's
+  diagnosis blamed. `class_for_char` already fell through to every child's
+  `symbol_classes` and found the row by id. It then resolved the class NAME in
+  the ROOT domain, and a child loaded with the default `LoaderContext` defines
+  its classes in a FRESH domain, so the lookup returned NULL and the character
+  came up a bare `MovieClip`. The key is (char id, domain of the placing movie
+  INSTANCE), per Ruffle's `preload_symbol_class`. It cannot come from the
+  tables, because one SWF loaded twice shares one `Avm2MovieTables` across two
+  domains. The domain now rides on each display object
+  (`Avm2DisplayObjectExt.movie_scope`: stamped on a loaded root, inherited by
+  every timeline child, and taken from the class's own ABC file for a
+  script-created symbol instance). 48/48 in both modes. Anchored by
+  `regression/avm2_parent_child_symbolclass_domain`, whose `script:` rows grade
+  the arm the corpus test does not. Closeout:
+  `SWFRecompDocs/status/avm2-child-symbolclass-binding.md`. (2026-09-11)
+- **A loaded child's `SimpleButton` has no states.** `button_data_for_char`
+  (`avm2_display.c`) scans `avm2_generated_buttons` only. It has no
+  `g_child_movies` fall-through, although `Avm2MovieTables` carries `buttons`.
+  So a child's `DefineButton2` instantiates as a `SimpleButton` whose every
+  `button_create_state` returns NULL. Found by code reading while threading
+  `movie_scope` through `button_create_state`; not yet reproduced, and no corpus
+  test is known to grade it. (2026-09-11)
 - ~~**`_x` on a loaded child's TAG-PLACED clip reads uninitialized memory.**~~
   **DONE 2026-09-03.** It was an out-of-bounds read, not an unwritten field: a
   display entry's `transform_id` indexes the transform table of the movie whose

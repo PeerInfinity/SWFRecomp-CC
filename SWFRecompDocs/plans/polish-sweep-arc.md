@@ -2678,7 +2678,7 @@ results`, dispatched at closeout).
 
 **Trace.**
 - `hitarea_sweep` / `hitarea_remove_owner_drag` — shape-based (not AABB) picking + a single topmost pick (every AABB-containing button-mode clip fires today, in creation order). Second arc, `w2-avm1-hitarea-report.md`.
-- `loader_duplicate_class` 32/48 — timeline-placed characters in a loaded child never get their SymbolClass class (`avm2_display_char_for_class` / `g_symbol_map` is main-movie-only); own slot.
+- ~~`loader_duplicate_class` 32/48~~ **LANDED 2026-09-11 (48/48, both modes), with the diagnosis CORRECTED:** the lookup was not main-movie-only. `class_for_char` already fell through to the child's `symbol_classes` and found the row. It resolved the NAME in the ROOT domain, and the child had loaded into a fresh one. Fix: the placing movie INSTANCE's domain rides on each display object (`Avm2DisplayObjectExt.movie_scope`). Closeout: `SWFRecompDocs/status/avm2-child-symbolclass-binding.md`; anchored by `regression/avm2_parent_child_symbolclass_domain`.
 - `number_convert_errors` → pass needs the static-type int/uint outer frame = recompiler early binding (`abc_emit.cpp` has TK_INT/TK_UINT); 0 headline movement.
 - `matrix3d_append_rotation` rm → pass in ~10 LOC (Flash's NaN pivot path is a real 4×4 product); `matrix3d_recompose_edge_cases` #2004 predicate undiagnosed.
 - `missing_frame_scripts` S3/S4 = main-timeline advance/removal, NOT orphan-phase (relabelled); `links_in_scrolled_text` s16 patch still 0 flips; leg-F focus family; LoaderInfo `unload`; instance-name counter (A/B first).
