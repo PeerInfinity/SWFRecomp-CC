@@ -106,13 +106,21 @@ static uint32_t with_alpha(uint32_t c, uint32_t a)
 }
 
 // blend_over (bitmap_data.rs): self = dest, source on top; both premultiplied.
+//
+// The inverse-alpha factor is `256 - sa` scaled by a >>8, NOT `(255 - sa)/255`.
+// Ruffle 0c6a734da switched to this form with the note "verified against Flash
+// Player output across the full 0..255 alpha range", and avm2/bitmapdata_
+// copypixels_blend encodes the same expression in ActionScript and asserts
+// 0 mismatches against Flash over a 1024-row sweep. The two forms agree only
+// where the truncations happen to land on the same byte (68 of 256 alphas
+// differ on a mid-grey destination).
 static uint32_t blend_over(uint32_t dest, uint32_t src)
 {
-	uint32_t sa = CA(src);
-	uint8_t r = (uint8_t) (CR(src) + (uint8_t) ((CR(dest) * (255 - sa)) / 255));
-	uint8_t g = (uint8_t) (CG(src) + (uint8_t) ((CG(dest) * (255 - sa)) / 255));
-	uint8_t b = (uint8_t) (CB(src) + (uint8_t) ((CB(dest) * (255 - sa)) / 255));
-	uint8_t a = (uint8_t) (CA(src) + (uint8_t) ((CA(dest) * (255 - sa)) / 255));
+	uint32_t inv = 256u - CA(src);
+	uint8_t r = (uint8_t) (CR(src) + (uint8_t) ((CR(dest) * inv) >> 8));
+	uint8_t g = (uint8_t) (CG(src) + (uint8_t) ((CG(dest) * inv) >> 8));
+	uint8_t b = (uint8_t) (CB(src) + (uint8_t) ((CB(dest) * inv) >> 8));
+	uint8_t a = (uint8_t) (CA(src) + (uint8_t) ((CA(dest) * inv) >> 8));
 	return CMK(r, g, b, a);
 }
 
@@ -275,14 +283,15 @@ static uint32_t blend_mode_apply(int mode, uint32_t dst, uint32_t src)
 // is a contiguous span dispatched to one of these.
 //
 // Byte-exactness is the hard constraint: the SIMD lanes reproduce blend_over's
-// truncating /255 + uint8 wrap EXACTLY via the magic pair (x*32897)>>23 == x/255
-// for x in [0,65025] (proven exhaustively) — NOT a *257>>16 approximation. Guard
-// with the scalar fallback for native/verify gcc (no SIMD); -DAVM2_BLIT_VERIFY
-// re-runs the scalar per pixel and aborts on any divergence; -DSWF_NO_BLIT_SIMD
-// forces the scalar path (A/B baseline).
+// `(dst_c * (256 - sa)) >> 8` + uint8 wrap EXACTLY. The products stay in 16-bit
+// lanes (max 255*256 = 65280 < 65536), so this is a plain u16 multiply and a
+// logical shift — no magic-multiply trick is needed any more (the old /255 form
+// used (x*32897)>>23). Guard with the scalar fallback for native/verify gcc
+// (no SIMD); -DAVM2_BLIT_VERIFY re-runs the scalar per pixel and aborts on any
+// divergence; -DSWF_NO_BLIT_SIMD forces the scalar path (A/B baseline).
 // ---------------------------------------------------------------------------
 
-// out_c = (uint8)(src_c + (dst_c*(255-sa))/255) per channel; `opaque` forces the
+// out_c = (uint8)(src_c + ((dst_c*(256-sa))>>8)) per channel; `opaque` forces the
 // dest alpha to 0xFF afterwards (with_alpha(...,0xFF)).
 static void blend_over_span_scalar(uint32_t* d, const uint32_t* s, uint32_t n,
                                    int opaque)
@@ -312,32 +321,28 @@ static void blend_over_span_simd(uint32_t* d, const uint32_t* s, uint32_t n,
 	const v128_t amask = wasm_i32x4_const(0xFF000000, 0xFF000000, 0xFF000000,
 	                                      0xFF000000);
 	const v128_t lo255 = wasm_i16x8_splat(0x00FF);
-	const v128_t magic = wasm_i32x4_splat(32897);
-	const v128_t ffb = wasm_i8x16_splat((int8_t) 0xFF);
+	const v128_t v256 = wasm_i16x8_splat(256);
 	uint32_t i = 0;
 	for (; i + 4 <= n; i += 4)
 	{
 		v128_t vs = wasm_v128_load(s + i);
 		v128_t vd = wasm_v128_load(d + i);
-		// factor = 255 - src_alpha, broadcast to each pixel's 4 byte lanes
+		// factor = 256 - src_alpha, broadcast to each pixel's 4 byte lanes
 		// (byte lanes 3/7/11/15 hold alpha in little-endian 0xAARRGGBB storage).
+		// 256 does not fit in a byte lane, so the subtract is done 16-bit-wide
+		// after the zero-extend.
 		v128_t sa = wasm_i8x16_shuffle(vs, vs, 3, 3, 3, 3, 7, 7, 7, 7,
 		                               11, 11, 11, 11, 15, 15, 15, 15);
-		v128_t fac = wasm_i8x16_sub(ffb, sa);  // 255 - sa (no wrap: sa<=255)
 		// low 8 bytes (pixels 0,1)
-		v128_t t_lo = wasm_i16x8_mul(wasm_u16x8_extend_low_u8x16(vd),
-		                             wasm_u16x8_extend_low_u8x16(fac));
-		v128_t div_lo = wasm_u16x8_narrow_i32x4(
-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_low_u16x8(t_lo), magic), 23),
-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_high_u16x8(t_lo), magic), 23));
+		v128_t fac_lo = wasm_i16x8_sub(v256, wasm_u16x8_extend_low_u8x16(sa));
+		v128_t t_lo = wasm_i16x8_mul(wasm_u16x8_extend_low_u8x16(vd), fac_lo);
+		v128_t div_lo = wasm_u16x8_shr(t_lo, 8);
 		v128_t o_lo = wasm_v128_and(
 			wasm_i16x8_add(wasm_u16x8_extend_low_u8x16(vs), div_lo), lo255);
 		// high 8 bytes (pixels 2,3)
-		v128_t t_hi = wasm_i16x8_mul(wasm_u16x8_extend_high_u8x16(vd),
-		                             wasm_u16x8_extend_high_u8x16(fac));
-		v128_t div_hi = wasm_u16x8_narrow_i32x4(
-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_low_u16x8(t_hi), magic), 23),
-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_high_u16x8(t_hi), magic), 23));
+		v128_t fac_hi = wasm_i16x8_sub(v256, wasm_u16x8_extend_high_u8x16(sa));
+		v128_t t_hi = wasm_i16x8_mul(wasm_u16x8_extend_high_u8x16(vd), fac_hi);
+		v128_t div_hi = wasm_u16x8_shr(t_hi, 8);
 		v128_t o_hi = wasm_v128_and(
 			wasm_i16x8_add(wasm_u16x8_extend_high_u8x16(vs), div_hi), lo255);
 		v128_t out = wasm_u8x16_narrow_i16x8(o_lo, o_hi);
@@ -1285,15 +1290,17 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 	if (arg_present(act, 4)) read_point_i32(ctx, act->args[4], &ax, &ay);
 	int merge_alpha = arg_present(act, 5) ? avm2_coerce_to_boolean(act->args[5]) : 0;
 
-	// Build source & dest regions and jointly clamp.
-	PixelRegion src_region = pr_for_region_i32(sx, sy, sw, sh);
-	pr_clamp(&src_region, src->width, src->height);
+	// Build source & dest regions and jointly clamp. Both start as the WHOLE
+	// bitmap and the RAW rect is handed to the intersection, exactly as Ruffle
+	// core/src/bitmap/operations.rs::copy_pixels does. Pre-clamping the source
+	// rect first (what this used to do) throws away the part of the rect that
+	// lies off the source, and then anchors the intersection on the CLAMPED
+	// origin -- so a Rectangle(-8,-8,16,16) lost the +8,+8 shift the destination
+	// point is supposed to pick up, and every off-bitmap or negative source rect
+	// landed in the wrong place.
+	PixelRegion src_region = pr_whole(src->width, src->height);
 	PixelRegion dst_region = pr_whole(dst->width, dst->height);
-	// Overlap: dest_point on dst, src_region.min on src, size = src region.
-	int32_t size_x = (int32_t) pr_w(&src_region);
-	int32_t size_y = (int32_t) pr_h(&src_region);
-	pr_clamp_intersection(&dst_region, dx, dy, (int32_t) src_region.x_min,
-	                      (int32_t) src_region.y_min, size_x, size_y, &src_region);
+	pr_clamp_intersection(&dst_region, dx, dy, sx, sy, sw, sh, &src_region);
 	if (pr_w(&dst_region) == 0 || pr_h(&dst_region) == 0) return avm2_undefined();
 
 	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
@@ -1307,6 +1314,16 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 	// from the scalar forward order under intra-buffer overlap).
 	int has_alpha = (alpha != NULL && !alpha->disposed);
 	int same_buf = (src->pixels == dst->pixels);
+	// Self-copy iteration order (Ruffle operations/copy_on_cpu.rs::copy_on_cpu_self,
+	// ea3956e89). Overlapping regions inside one buffer would otherwise read pixels
+	// the same blit already overwrote, so the walk has to run backwards -- but Flash
+	// Player only reverses when BOTH axes move the same way. When the deltas
+	// disagree in sign FP really does read overwritten data, and
+	// avm2/bitmapdata_copypixels_self pins those rows, so the forward walk is kept
+	// for them rather than "fixed".
+	int self_reverse = same_buf
+		&& dst_region.x_min >= src_region.x_min
+		&& dst_region.y_min >= src_region.y_min;
 	// Identity self-copy on the pure-copy path: same buffer, same stride,
 	// src rect == dst rect, transparent dest (so the copy arm is exactly
 	// `dst[i] = dst[i]`, no with_alpha rewrite), no blend — every write is a
@@ -1342,10 +1359,12 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 		return avm2_undefined();
 	}
 
-	for (uint32_t j = 0; j < rh; j++)
+	for (uint32_t jj = 0; jj < rh; jj++)
 	{
-		for (uint32_t i = 0; i < rw; i++)
+		uint32_t j = self_reverse ? (rh - 1u - jj) : jj;
+		for (uint32_t ii = 0; ii < rw; ii++)
 		{
+			uint32_t i = self_reverse ? (rw - 1u - ii) : ii;
 			uint32_t sxx = src_region.x_min + i, syy = src_region.y_min + j;
 			uint32_t dxx = dst_region.x_min + i, dyy = dst_region.y_min + j;
 			uint32_t sc = bd_get_raw(src, sxx, syy);
@@ -1366,10 +1385,16 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 				// transparency flag; a non-transparent BitmapData stores alpha 255
 				// everywhere, so with the a == 255 arm the two paths agree and we
 				// do not need a separate branch here.
-				if (src->transparency)
-					final_alpha = (a == 255) ? CA(sc) : ((a * CA(sc)) >> 8);
-				else
-					final_alpha = a;
+				//
+				// A NON-transparent SOURCE is not `final_alpha = a` (that is what
+				// Ruffle does, and it is what avm2/bitmapdata_copypixels_alpha_merge
+				// rows 5-6 catch it on): Flash runs the same `>> 8` scale with the
+				// source alpha pinned at 255, so alpha-pixel 254 yields 253, not 254,
+				// and alpha-pixel 1 yields 0 — the destination survives untouched.
+				// Since a non-transparent source stores alpha 255 in every pixel,
+				// the two arms collapse into one expression over `sa_eff`.
+				uint32_t sa_eff = src->transparency ? CA(sc) : 255u;
+				final_alpha = (a == 255) ? sa_eff : ((a * sa_eff) >> 8);
 				// Un-premultiply source, reapply final alpha, re-premultiply.
 				double af = (double) CA(sc) / 255.0;
 				uint8_t r = af > 0 ? (uint8_t) round((double) CR(sc) / af) : 0;
@@ -1502,13 +1527,12 @@ static Avm2Value bd_threshold(Avm2Activation* act)
 	int copy_source = arg_present(act, 7) ? avm2_coerce_to_boolean(act->args[7]) : 0;
 	uint32_t masked_threshold = threshold & mask;
 
-	PixelRegion src_region = pr_for_region_i32(sx, sy, sw, sh);
-	pr_clamp(&src_region, src->width, src->height);
+	// Whole source + RAW rect, same as bd_copy_pixels above and as Ruffle
+	// operations.rs::threshold; pre-clamping the source rect loses the
+	// destination shift for an off-bitmap or negative rect.
+	PixelRegion src_region = pr_whole(src->width, src->height);
 	PixelRegion dst_region = pr_whole(dst->width, dst->height);
-	int32_t size_x = (int32_t) pr_w(&src_region);
-	int32_t size_y = (int32_t) pr_h(&src_region);
-	pr_clamp_intersection(&dst_region, dx, dy, (int32_t) src_region.x_min,
-	                      (int32_t) src_region.y_min, size_x, size_y, &src_region);
+	pr_clamp_intersection(&dst_region, dx, dy, sx, sy, sw, sh, &src_region);
 	if (pr_w(&dst_region) == 0 || pr_h(&dst_region) == 0) return avm2_uint_value(0);
 
 	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);

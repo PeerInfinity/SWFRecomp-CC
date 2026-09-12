@@ -12810,13 +12810,24 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
     int mergeAlpha = 0;
     if (arg_count >= 6) mergeAlpha = (int)varToDoubleSimple(&args[5]);
 
-    // When source and destination are the same BitmapData (or the alpha
-    // bitmap aliases either of them), we can't read-as-we-write: later
-    // iterations would pick up already-overwritten pixels. Snapshot the
-    // aliasing source(s) into temp buffers before the loop.
+    // The alpha-bitmap arm below is the only one that still needs a snapshot of an
+    // aliasing source: it is a per-pixel un/re-premultiply walk with no
+    // direction rule of its own, so reading as we write would pick up
+    // already-overwritten pixels.
+    int bdcp_alpha_path = (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent);
+    // The plain (no alpha bitmap) self-copy instead follows Flash's own overwrite
+    // rule, mirroring Ruffle operations/copy_on_cpu.rs::copy_on_cpu_self
+    // (ea3956e89): walk backwards when the destination moved in the SAME direction
+    // on both axes, forwards otherwise. A snapshot would be "correct" but wrong:
+    // when the two deltas disagree in sign Flash Player really does read pixels it
+    // has already overwritten, and avm1/bitmapdata_copypixels_self pins those rows.
+    // The deltas are taken before clamping; clamping shifts the source and
+    // destination minima together, so the difference is preserved.
+    int bdcp_self_reverse = (src_bmp == dest_bmp) && !bdcp_alpha_path
+                            && (dx - rx) >= 0 && (dy - ry) >= 0;
     uint32_t* src_snapshot = NULL;
     uint32_t* alpha_snapshot = NULL;
-    if (src_bmp == dest_bmp) {
+    if (src_bmp == dest_bmp && bdcp_alpha_path) {
         size_t nb = (size_t)src_bmp->width * (size_t)src_bmp->height * sizeof(uint32_t);
         src_snapshot = (uint32_t*) malloc(nb);
         memcpy(src_snapshot, src_bmp->pixels, nb);
@@ -12829,7 +12840,7 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
     uint32_t* src_pixels = src_snapshot ? src_snapshot : src_bmp->pixels;
     uint32_t* alpha_pixels = (alpha_bmp ? (alpha_snapshot ? alpha_snapshot : alpha_bmp->pixels) : NULL);
 
-    if (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent) {
+    if (bdcp_alpha_path) {
         // Transparent alpha bitmap path — blend when mergeAlpha || dest is opaque
         int alpha_blend = mergeAlpha || !dest_bmp->transparent;
         for (int sy = 0; sy < rh; sy++) {
@@ -12864,15 +12875,18 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
                 if (alpha_blend) {
                     uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
                     uint32_t spa = (src_px >> 24) & 0xFF;
-                    uint32_t inv_sa = 255 - spa;
+                    // blend_over: the inverse-alpha factor is (256 - sa) >> 8, not
+                    // (255 - sa)/255 (ruffle 0c6a734da, Flash-verified over the full
+                    // 0..255 alpha range; the twin of avm2_bitmap.c::blend_over).
+                    uint32_t inv_sa = 256 - spa;
                     uint32_t da = (dst_px >> 24) & 0xFF;
                     uint32_t dr = (dst_px >> 16) & 0xFF;
                     uint32_t dg = (dst_px >> 8) & 0xFF;
                     uint32_t db = dst_px & 0xFF;
-                    uint32_t oa = spa + (da * inv_sa) / 255;
-                    uint32_t or_ = ((src_px >> 16) & 0xFF) + (dr * inv_sa) / 255;
-                    uint32_t og = ((src_px >> 8) & 0xFF) + (dg * inv_sa) / 255;
-                    uint32_t ob = (src_px & 0xFF) + (db * inv_sa) / 255;
+                    uint32_t oa = spa + ((da * inv_sa) >> 8);
+                    uint32_t or_ = ((src_px >> 16) & 0xFF) + ((dr * inv_sa) >> 8);
+                    uint32_t og = ((src_px >> 8) & 0xFF) + ((dg * inv_sa) >> 8);
+                    uint32_t ob = (src_px & 0xFF) + ((db * inv_sa) >> 8);
                     if (oa > 255) oa = 255;
                     if (or_ > 255) or_ = 255;
                     if (og > 255) og = 255;
@@ -12888,8 +12902,10 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
     } else {
         // No alpha bitmap — blend when (source transparent && dest opaque) || mergeAlpha
         int blend = (src_bmp->transparent && !dest_bmp->transparent) || mergeAlpha;
-        for (int sy = 0; sy < rh; sy++) {
-            for (int sx = 0; sx < rw; sx++) {
+        for (int syi = 0; syi < rh; syi++) {
+            int sy = bdcp_self_reverse ? (rh - 1 - syi) : syi;
+            for (int sxi = 0; sxi < rw; sxi++) {
+                int sx = bdcp_self_reverse ? (rw - 1 - sxi) : sxi;
                 int src_x = rx + sx;
                 int src_y = ry + sy;
                 int dst_x = dx + sx;
@@ -12900,15 +12916,17 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
                 if (blend) {
                     uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
                     uint32_t sa = (src_px >> 24) & 0xFF;
-                    uint32_t inv_sa = 255 - sa;
+                    // blend_over, (256 - sa) >> 8 form — see the note in the
+                    // alpha-bitmap arm above.
+                    uint32_t inv_sa = 256 - sa;
                     uint32_t da = (dst_px >> 24) & 0xFF;
                     uint32_t dr = (dst_px >> 16) & 0xFF;
                     uint32_t dg = (dst_px >> 8) & 0xFF;
                     uint32_t db = dst_px & 0xFF;
-                    uint32_t oa = sa + (da * inv_sa) / 255;
-                    uint32_t or_ = ((src_px >> 16) & 0xFF) + (dr * inv_sa) / 255;
-                    uint32_t og = ((src_px >> 8) & 0xFF) + (dg * inv_sa) / 255;
-                    uint32_t ob = (src_px & 0xFF) + (db * inv_sa) / 255;
+                    uint32_t oa = sa + ((da * inv_sa) >> 8);
+                    uint32_t or_ = ((src_px >> 16) & 0xFF) + ((dr * inv_sa) >> 8);
+                    uint32_t og = ((src_px >> 8) & 0xFF) + ((dg * inv_sa) >> 8);
+                    uint32_t ob = (src_px & 0xFF) + ((db * inv_sa) >> 8);
                     if (oa > 255) oa = 255;
                     if (or_ > 255) or_ = 255;
                     if (og > 255) og = 255;

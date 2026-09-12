@@ -126,6 +126,26 @@ text/auto_size/width                        # EDITTEXT BORDER, ALIASED        1 
 # tolerance 0 locally and on CI.
 from_shumway/doubleAndRegister              # SetProperty OPCODE (`_x`)        1 cmp
 
+# SESSION 19 ADDITIONS (s19 wave-2 `w2-bitmapdata`, per the wave-2 rule "audit
+# canary coverage against YOUR change class"). The change class was
+# avm2_bitmap.c::blend_over — the premultiplied source-over used by copyPixels,
+# by BitmapData.draw's CPU composite and by glyph_raster_core. The audit found
+# the standing set had ZERO members that reach it: the two pre-existing bitmap
+# members are fillRect and applyFilter, and the two bitmap-fill members are
+# render-side STYLE fills. Four members added, all Tier 1, all image-PASSING in
+# graphics run 34645805030, all re-rendered locally before landing.
+#   copyPixels blend  from_shumway/acid/acid-bitmapData-copyPixels  (tol 0)
+#   copyPixels+alpha  visual/bitmapdata_copypixels_with_alpha_oob   (tol 0)
+#   BitmapData.draw   from_shumway/acid/acid-bitmapData-draw        (tol 0/650)
+#   draw self-blend   avm2/bitmapdata_draw_self_via_graphic         (tol 0)
+# The last one is the tightest: its blend_over_round comment documents a
+# deliberate one-LSB GPU-vs-CPU tie, so it is the member that would catch a
+# blend_over change leaking into the draw display-object walk.
+from_shumway/acid/acid-bitmapData-copyPixels  # copyPixels BLEND path      1 cmp
+visual/bitmapdata_copypixels_with_alpha_oob   # copyPixels alphaBitmapData 1 cmp
+from_shumway/acid/acid-bitmapData-draw        # BitmapData.draw composite  1 cmp
+avm2/bitmapdata_draw_self_via_graphic         # draw self-blend, 1-LSB tie 1 cmp
+
 # tier=2  (CI-failing / skipped; A/B signal only)
 visual/simple_shapes/masks                  # mask compositing (largest gap)
 visual/simple_shapes/gradients/gradients    # gradient ramps
