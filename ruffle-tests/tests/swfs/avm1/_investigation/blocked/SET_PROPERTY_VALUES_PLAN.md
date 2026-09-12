@@ -1,3 +1,10 @@
+> **RESOLVED 2026-09-11 (session 19): all three variants PASS.** The hard-blocker
+> premise below is REFUTED — `_x`/`_y` are S32 twips, not pixels, so saturating the
+> read quantizer produces `-107374182.4` exactly with `float` storage untouched.
+> This file is kept for its decoded quirk map, which was accurate and useful. Its
+> "unpromotable" verdict is not. See `BLOCKER_SUMMARY.md` Blocker 10 and
+> `polish-sweep-arc.md` §20.
+
 # set_property_values/{swf4,swf5,swf6,swf7} — coercion grind, swf5-7 unpromotable
 
 **Status:** BLOCKED (swf5/6/7 cannot reach full PASS) / large grind (swf4).

@@ -561,3 +561,35 @@ itself, and the 17-significant-digit subnormal/denormal spellings
 `1.1754943999999998e-38`) that `number_to_string` already owns, plus Flash's
 lower-precision `strtod` on a 270-digit literal. Not added to
 `ignored_tests.txt`: the row counts as an effective pass.
+
+---
+
+## SWF4 `setProperty` with an unparseable string: Flash abandons the set, Ruffle stores 0
+
+**Test**: `from_gnash/misc-swfc.all/swf4opcode` (2026-09-11, session 19)
+
+**Our behaviour matches Flash.** In SWF4, `setProperty(_x, "not a number")` leaves
+the property untouched. Ruffle instead runs `parse_float_impl` in its non-strict
+SWF<5 mode and folds the resulting NaN to `0.0` (`core/src/avm1/value.rs:970`),
+storing 0 — which is why this test ships as `known_failure` with an
+`output.ruffle.txt`.
+
+**Example diff** (`swf4opcode.sc:239`, ours vs Ruffle's expectation):
+
+```
+ours/Flash: PASSED: /mc1.x == 100
+Ruffle:     FAILED: expected: 100 obtained: 0
+```
+
+**How this nearly went wrong**: session 19's twips-quantizer fix routed ALL
+strings through the strict SWF5+ parse that `set_property_values/swf5-7` needs,
+which silently imported Ruffle's SWF4 rule too and moved this test from `pass` to
+`ruffle_matched`. That is a REGRESSION even though the effective count does not
+change. The fix gates the strict parse to SWF5+, so SWF4 keeps prefix-parsing
+(`"10x"` is 10 there) and only SWF5+ yields NaN. The two goals were never in
+conflict.
+
+**Decision**: keep Flash's behaviour. The version gate is the mechanism; a sweep
+for a change to a version-gated coercion helper must be selected by SWF VERSION,
+not by feature name (the original sweep covered `actionscript.all` and
+`misc-ming.all` but not `misc-swfc.all`).

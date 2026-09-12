@@ -57,7 +57,7 @@ Changes vs the 2026-06-19 state of this doc:
     and bitmap-vs-bitmap paths keep plain `>=`.
   - `amf_strict_array_serialization` (1/7) — joins Bucket A's AMF codec group.
 - **Unchanged:** Bucket A (AMF, FileReference, multi-SWF child frames), Bucket
-  B (`sound_setters` 14/43), `set_property_values/*` (still blocked at 92.9% /
+  B (`sound_setters` 14/43), `set_property_values/*` (RESOLVED 2026-09-11, was 92.9% /
   swf4 22.3%).
 
 ## Already resolved this session
@@ -99,9 +99,9 @@ Changes vs the 2026-06-19 state of this doc:
 
 | Test | % | Effort | Notes |
 |------|---|--------|-------|
-| `set_property_values/swf5` | 92.9% | **BLOCKED** | **Unpromotable** — full PASS needs `_x`/`_y`←Inf to read back `-107374182.4` (INT_MIN/20, 9 sig figs) but `mc->x/.y` are `float` → `-107374184`. No `output.ruffle.txt`. ~111 other lines are fixable coercion quirks on the shared setProperty hot path. Full quirk map + plan: `blocked/SET_PROPERTY_VALUES_PLAN.md` (2026-06-19). |
-| `set_property_values/swf6` | 92.9% | **BLOCKED** | Same source/blocker, SWF6 gates. See `blocked/SET_PROPERTY_VALUES_PLAN.md`. |
-| `set_property_values/swf7` | 92.9% | **BLOCKED** | Same source/blocker, SWF7 gates. See `blocked/SET_PROPERTY_VALUES_PLAN.md`. |
+| `set_property_values/swf5` | **PASS** | **RESOLVED 2026-09-11 (session 19)** | The blocker was a category error: `_x`/`_y` are S32 TWIPS, not pixels, so a saturating read quantizer (`round(x*20)/20` with I32 saturation) reads back `-107374182.4` exactly, with `float` storage untouched. Also: no disposition entry for this family ever existed. |
+| `set_property_values/swf6` | **PASS** | Same fix as swf5 (2026-09-11). |
+| `set_property_values/swf7` | **PASS** | Same fix as swf5 (2026-09-11). |
 | `set_property_values/swf4` | 22.3% | Large | Same source; `output.ruffle.txt` **present** so `ruffle_matched` reachable, but a much bigger, *separate* SWF4 gap (likely SWF4 property-number addressing) — not addressed by the swf5-7 quirk fixes. |
 | `coerce_to_primitive_resolve` | **100% ✅** | **FIXED 2026-06-19** | Whole diff was **1 missing `[type Object]`** from `trace(obj3)`. Real mechanism is Ruffle `action_trace`: on `coerce_to_string` Err it prints fallback `[type Object]` **and** propagates. Fixed by wrapping `actionTrace` object-coercion in a local `setjmp` frame (print + re-throw). `complete/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`. |
 | ~~`array_unshift`~~ | — | **FIXED** | → PASS (see 2026-07-02 update). Was: sparse/own-property + length semantics. |
@@ -113,7 +113,7 @@ Changes vs the 2026-06-19 state of this doc:
 
 1. ~~`coerce_to_primitive_resolve`~~ — **FIXED 2026-06-19** (100%). Was a real Ruffle behavior after all (in `action_trace`, not `coerce_to_string`); the "no oracle" call was an artifact of a stale `~/CC/ruffle` checkout. `complete/COERCE_TO_PRIMITIVE_RESOLVE_PLAN.md`.
 2. ~~`virtual_property_special_recursion_swf6/double_swf6`~~ — **FIXED `63f7af229`** (type-1 getter/setter param pad; the predicted broad `set`/`addProperty` dispatch fix). Remaining family members: `virtual_property_recursion_double_swf7` + `virtual_property_recursion_scope` (see 2026-07-02 update).
-3. ~~`set_property_values/swf5-7`~~ — **BLOCKED/unpromotable** (float precision on `_x`/`_y`←Inf; no RM file). See `blocked/SET_PROPERTY_VALUES_PLAN.md`. Don't re-investigate.
+3. ~~`set_property_values/swf5-7`~~ — **DONE 2026-09-11 (session 19), all three PASS.** The "float precision" blocker was wrong (twips, not pixels — see `SET_PROPERTY_VALUES_PLAN.md`). The "don't re-investigate" note here cost two sessions; treat a blocked verdict as a claim to re-test.
 
 Bucket A is genuinely blocked on infrastructure (AMF codec, file-dialog input, multi-SWF child frames) — low ROI until a shipped game or a larger test cohort needs those subsystems.
 

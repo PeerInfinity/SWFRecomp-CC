@@ -8,18 +8,26 @@ This document catalogs the root-cause blockers preventing further progress on th
 
 ## Active Blockers
 
-### Blocker 10: `setProperty` value coercion grind — swf5/6/7 unpromotable (float precision)
+### ~~Blocker 10: `setProperty` value coercion grind — swf5/6/7 unpromotable~~ — RESOLVED 2026-09-11 (session 19)
 
-`set_property_values/swf{5,6,7}` (1620/1743 ≈ 93%, no `output.ruffle.txt`) can
-**never** reach full PASS: `_x`/`_y` ← `±Infinity` must read back `-107374182.4`
-(= INT_MIN/20), but `MovieClip.x/.y` are `float` (~7 sig figs) so it reads back
-`-107374184`. Widening to `double` = out-of-scope cross-runtime change. The other
-~111 lines/variant are real, fixable coercion quirks (string strict-parse,
-`_alpha` truncation, `_name` toString, per-property ±Inf routing) but sit on the
-shared `actionSetProperty`/`actionGetProperty` hot path (CI-gated, multi-cycle)
-and yield **zero swf5-7 promotions** because of the float blocker. swf4 (22%) has
-a *separate, larger* SWF4 property-addressing gap. Full decoded quirk map +
-fix plan: `blocked/SET_PROPERTY_VALUES_PLAN.md`. Diagnosed 2026-06-19.
+**All three variants now PASS, and the blocker as written was wrong.** It claimed
+`_x`/`_y` <- `+/-Infinity` could never read back `-107374182.4` because
+`MovieClip.x/.y` are `float`. That is a category error: those fields are **S32
+twips**, not pixels. Ruffle maps any infinity to `-Infinity` then
+`Twips::from_pixels`, a saturating `(px * 20.0) as i32`; `(float)(INT_MIN/20)` is
+exactly `-107374184`, `round(*20)` is `-2147483680`, which saturates to `INT_MIN`
+and reads back as exactly `-107374182.4`. Saturating the read quantizer was the
+whole fix and `float` storage never changed.
+
+The secondary claims were wrong too: the ~111 remaining lines per variant were
+not gated by the blocker (the big buckets were `_alpha`, which used `roundf`
+where Ruffle truncates via `Fixed8::from_f64`, and `_name`, which only ever
+assigned already-string values), and no disposition entry for this family ever
+existed in any of the four docs or any `ignored_tests.txt`.
+
+Still open: `swf4` is `known_failure` with a separate, larger SWF4
+property-number addressing gap, and `propertyCoerceToNumber` (the SetMember
+path) keeps the pre-fix behaviour on every game's hot path.
 
 ### ~~Blocker 11: `coerce_to_primitive_resolve`~~ — RESOLVED 2026-06-19
 

@@ -15544,9 +15544,21 @@ static double spvTwipsQuantizePixels(double px)
 // `coerceVarToNumber` (lenient `strtod` prefix parse), strings go through the
 // SWF-version-aware STRICT parser, so "10x" is NaN — not 10.
 // (core/src/avm1/value.rs:string_to_f64 / parse_float_impl, strict for SWF5+.)
+// SWF5+ ONLY. In SWF4 Flash and Ruffle DISAGREE and we follow Flash:
+// Ruffle's `string_to_f64` runs `parse_float_impl` in non-strict mode for
+// SWF<5 and then folds a NaN result to **0.0** (value.rs:970), so
+// `setProperty(_x, "not a number")` sets the property to 0. Flash leaves the
+// property alone — `from_gnash/misc-swfc.all/swf4opcode` (`known_failure`,
+// with an `output.ruffle.txt`) pins exactly this at `swf4opcode.sc:239`:
+// Flash keeps `/mc1.x == 100`, Ruffle reports 0. Routing SWF4 strings through
+// `varToDoubleSWF` therefore turns an unparseable string from "invalid, do not
+// set" into a real 0, which is Ruffle's wrong answer. For SWF<5 we keep the
+// prefix `strtod` with "no digits consumed -> NaN" that `coerceVarToNumber`
+// already implements, which is what this path did before the twips work.
+// (SWF4 still prefix-parses, so `"10x"` is 10 there and NaN only in SWF5+.)
 static double spvCoerceToF64(SWFAppContext* app_context, ActionVar* value)
 {
-	if (value->type == ACTION_STACK_VALUE_STRING)
+	if (value->type == ACTION_STACK_VALUE_STRING && g_swf_version >= 5)
 		return varToDoubleSWF(app_context, value, g_swf_version);
 	return coerceVarToNumber(app_context, value);
 }
