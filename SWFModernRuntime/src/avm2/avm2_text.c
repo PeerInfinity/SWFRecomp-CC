@@ -8356,37 +8356,51 @@ static Avm2Value txt_get_first_char_in_paragraph(Avm2Activation* act)
 	return avm2_integer((int32_t) i);
 }
 
-// getLineIndexAtPoint(x, y) -> line index or -1 (Ruffle
-// line_index_at_point: bounds shrunk by the gutter, y below last line
-// clamps to the last line).
-static Avm2Value txt_get_line_index_at_point(Avm2Activation* act)
+// Shared core of getLineIndexAtPoint / getCharIndexAtPoint (Ruffle
+// line_index_at_point, edit_text.rs:2323): bounds shrunk by the gutter, then
+// local -> layout y (which carries the vertical scroll offset), then
+// LayoutLines::find_line_index_by_y (layout.rs:906), whose comparison is
+// `bounds.extent_y() + probe.leading() <= y` -- i.e. a line owns the LEADING
+// band below it. y below the last line clamps to the last line.
+// px/py are the (already +1px-translated) local position in twips.
+// Returns the line index, or -1 when the point is outside the field.
+static uint32_t et_line_at_y(const LLayout* l, int32_t y);
+
+static int64_t et_line_index_at_point(Avm2Context* ctx, Avm2EditTextExt* et,
+                                      int32_t px, int32_t py, LLayout** out_l)
 {
-	Avm2Context* ctx = act->ctx;
-	Avm2EditTextExt* et = this_et(act);
-	if (et == NULL) return avm2_undefined();
-	double x_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 0));
-	double y_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 1));
-	int32_t px = twips_from_px(x_px);
-	int32_t py = twips_from_px(y_px);
 	// NB: reads the raw bounds; pending autosize bounds are NOT applied
 	// (Ruffle line_index_at_point).
 	if (px < et->bounds_x + GUTTER || px > et->bounds_x + et->bounds_w - GUTTER
 	    || py < et->bounds_y + GUTTER || py > et->bounds_y + et->bounds_h - GUTTER)
 	{
-		return avm2_number(-1);
+		return -1;
 	}
 	LLayout* l = et_layout(ctx, et);
+	if (out_l != NULL) *out_l = l;
 	int32_t ly = py - GUTTER;
 	{
 		uint32_t si = (uint32_t) (et->scroll - 1);
 		if (si > 0 && si < l->line_count) ly += l->lines[si].y;
 	}
-	for (uint32_t i = 0; i < l->line_count; i++)
-	{
-		if (ly < l->lines[i].y + l->lines[i].h) return avm2_integer((int32_t) i);
-	}
-	if (l->line_count > 0) return avm2_integer((int32_t) l->line_count - 1);
-	return avm2_number(-1);
+	if (l->line_count == 0) return -1;
+	return (int64_t) et_line_at_y(l, ly);
+}
+
+// getLineIndexAtPoint(x, y) -> line index or -1.
+static Avm2Value txt_get_line_index_at_point(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2EditTextExt* et = this_et(act);
+	if (et == NULL) return avm2_undefined();
+	// FP applies the same weird 1px translation on x as getCharIndexAtPoint
+	// (Ruffle text_field.rs:1633).
+	double x_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 0)) + 1.0;
+	double y_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 1));
+	int64_t li = et_line_index_at_point(ctx, et, twips_from_px(x_px),
+	                                    twips_from_px(y_px), NULL);
+	if (li < 0) return avm2_number(-1);
+	return avm2_integer((int32_t) li);
 }
 
 static Avm2Value txt_get_paragraph_length(Avm2Activation* act)
@@ -8565,24 +8579,15 @@ static Avm2Value txt_get_char_index_at_point(Avm2Activation* act)
 	double y_px = avm2_coerce_to_number(ctx, arg_or_undef(act, 1));
 	int32_t px = twips_from_px(x_px);
 	int32_t py = twips_from_px(y_px);
-	// Inside bounds shrunk by the gutter?
-	if (px < et->bounds_x + GUTTER || px > et->bounds_x + et->bounds_w - GUTTER
-	    || py < et->bounds_y + GUTTER || py > et->bounds_y + et->bounds_h - GUTTER)
-	{
-		return avm2_number(-1);
-	}
-	LLayout* l = et_layout(ctx, et);
-	// local -> layout y (embedded: minus gutter; scroll offset of scroll=1
-	// is 0).
-	int32_t ly = py - GUTTER;
-	int64_t li = -1;
-	for (uint32_t i = 0; i < l->line_count; i++)
-	{
-		if (ly < l->lines[i].y + l->lines[i].h) { li = i; break; }
-	}
-	if (li < 0) li = (int64_t) l->line_count - 1;
-	if (li < 0) return avm2_number(-1);
+	// Ruffle char_index_at_point (edit_text.rs:2350) DELEGATES the row pick to
+	// line_index_at_point, so the bounds test, the vertical scroll offset and
+	// the leading band all come along.
+	LLayout* l = NULL;
+	int64_t li = et_line_index_at_point(ctx, et, px, py, &l);
+	if (li < 0 || l == NULL) return avm2_number(-1);
 	LLine* line = &l->lines[li];
+	// KJ (Ruffle): it is a bug in FP that x ignores the horizontal scroll,
+	// but the vertical scroll (folded into the line pick above) does count.
 	int32_t x = px - GUTTER;
 	if (x == 0) return avm2_integer((int32_t) line->start);
 	for (uint32_t ch = line->start; ch < line->end; ch++)
@@ -8596,6 +8601,14 @@ static Avm2Value txt_get_char_index_at_point(Avm2Activation* act)
 			if (rel >= b->char_count) continue;
 			int32_t a = b->x + (rel == 0 ? 0 : b->char_end[rel - 1]);
 			int32_t bx = b->x + b->char_end[rel];
+			// Justified stretch: a box-final char runs to the next box's
+			// start (Ruffle LayoutLine::char_x_bounds, layout.rs:1052 --
+			// the same rule txt_get_char_boundaries already applies).
+			if (b->end == ch + 1 && i + 1 < line->box_count)
+			{
+				LBox* nb = &line->boxes[i + 1];
+				if (!nb->is_bullet && nb->char_count > 0) bx = nb->x;
+			}
 			if (a < x && x <= bx) return avm2_integer((int32_t) ch);
 		}
 	}
@@ -10106,18 +10119,43 @@ static void et_layout_origin(Avm2Context* ctx, Avm2EditTextExt* et,
 	*oy = et->bounds_y + GUTTER - vscroll;
 }
 
-// Ruffle Layout::find_line_index_by_y: the first line whose bottom (including
-// its leading) is past y, clamped into range. y < 0 lands on the first line.
+// Ruffle Layout::find_line_index_by_y (html/layout.rs:906). Its comparator is
+//     bounds.extent_y() + leading <= y  -> Less
+//     y < bounds.offset_y()             -> Greater
+//     otherwise                         -> Equal
+// A line with NEGATIVE leading makes that comparator non-monotonic: its band
+// can end before the next line begins, or overlap it. Ruffle runs the
+// comparator through Rust's `slice::binary_search_by`, so on such a layout the
+// answer depends on the exact probe sequence, not merely on "the first line
+// whose band contains y" -- a linear scan disagrees with it on every field
+// that uses a negative or shrinking <textformat leading=...>. Port the probe
+// sequence verbatim.
+// Returns -1 Less / 0 Equal / +1 Greater, in the comparator's own sense.
+static int et_line_cmp_y(const LLine* ln, int32_t y)
+{
+	if (ln->y + ln->h + ln->leading <= y) return -1;
+	if (y < ln->y) return 1;
+	return 0;
+}
+
 static uint32_t et_line_at_y(const LLayout* l, int32_t y)
 {
 	if (l->line_count == 0) return 0;
-	if (y < 0) return 0;
-	for (uint32_t i = 0; i < l->line_count; i++)
+	if (y < 0) return 0;  // Ruffle: Err(0) -> unwrap_or_else -> 0
+	// core::slice::binary_search_by, verbatim.
+	uint32_t size = l->line_count;
+	uint32_t base = 0;
+	while (size > 1)
 	{
-		const LLine* ln = &l->lines[i];
-		if (y < ln->y + ln->h + ln->leading) return i;
+		uint32_t half = size / 2;
+		uint32_t mid = base + half;
+		if (et_line_cmp_y(&l->lines[mid], y) != 1) base = mid;
+		size -= half;
 	}
-	return l->line_count - 1;
+	int cmp = et_line_cmp_y(&l->lines[base], y);
+	uint32_t line = (cmp == 0) ? base : base + (cmp == -1 ? 1u : 0u);
+	uint32_t max_line = l->line_count - 1;
+	return line <= max_line ? line : max_line;  // Ruffle: Err(max_line)
 }
 
 // Ruffle EditText::screen_position_to_index, given a point already mapped into
