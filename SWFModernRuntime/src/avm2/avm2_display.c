@@ -822,12 +822,30 @@ static void rect_union_xform(Rect* acc, const Rect* src, const Mat* m)
 	}
 }
 
-static Rect char_self_bounds(uint16_t char_id)
+// `no_strokes` is Ruffle's `BoundsMode::ScriptWithoutStrokes` (AVM2
+// `DisplayObject.getRect` only): a DefineShape4 / DefineMorphShape2 character
+// then reports its EdgeBounds box instead of its ShapeBounds box
+// (graphic.rs `self_bounds`, morph_shape.rs `self_bounds`). Tags that carry no
+// EdgeBounds keep the shape box, exactly as Ruffle's reader substitutes it.
+static Rect char_self_bounds(uint16_t char_id, int no_strokes)
 {
 	Rect r = { 0, 0, 0, 0, 0 };
 	const Avm2CharInfo* ci = char_info(char_id);
-	if (ci != NULL
-	    && (ci->xmin != 0 || ci->xmax != 0 || ci->ymin != 0 || ci->ymax != 0))
+	if (ci == NULL) return r;
+	if (no_strokes && ci->has_edge)
+	{
+		if (ci->exmin != 0 || ci->exmax != 0 || ci->eymin != 0
+		    || ci->eymax != 0)
+		{
+			r.valid = 1;
+			r.xmin = ci->exmin;
+			r.xmax = ci->exmax;
+			r.ymin = ci->eymin;
+			r.ymax = ci->eymax;
+		}
+		return r;
+	}
+	if (ci->xmin != 0 || ci->xmax != 0 || ci->ymin != 0 || ci->ymax != 0)
 	{
 		r.valid = 1;
 		r.xmin = ci->xmin;
@@ -861,12 +879,11 @@ static Rect display_self_bounds(const Avm2DisplayObjectExt* ext)
 			return r2;
 		}
 	}
-	Rect r = char_self_bounds(ext->char_id);
-	// `Drawing::self_bounds(include_strokes)`: shape box or edge box. A
-	// DefineShape character only carries ShapeBounds in Avm2CharInfo, so
-	// char_self_bounds stays stroke-inclusive in both modes (Ruffle would use
-	// the tag's EdgeBounds; emitting it is a recompiler-side change).
+	// `Drawing::self_bounds(include_strokes)`: shape box or edge box, for both
+	// the placed character (DefineShape4 / DefineMorphShape2 EdgeBounds, which
+	// the recompiler emits into Avm2CharInfo) and any `graphics` drawing.
 	int no_strokes = g_bounds_no_strokes;
+	Rect r = char_self_bounds(ext->char_id, no_strokes);
 	if (no_strokes ? ext->draw_edge_valid : ext->draw_valid)
 	{
 		Rect d = no_strokes

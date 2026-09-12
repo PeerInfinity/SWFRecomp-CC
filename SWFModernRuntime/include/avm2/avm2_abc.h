@@ -369,6 +369,16 @@ typedef struct Avm2CharInfo
 	int32_t xmin, xmax, ymin, ymax;
 	// DefineEditText initial text (NULL when absent / not an EditText).
 	const char* init_text;
+	// Stroke-EXCLUSIVE self bounds in twips: DefineShape4's `EdgeBounds` and
+	// DefineMorphShape2's `StartEdgeBounds` (SWF19). AVM2
+	// `DisplayObject.getRect` reports this box where `getBounds` reports the
+	// shape bounds above (Ruffle `BoundsMode::ScriptWithoutStrokes`).
+	// `has_edge == 0` means the tag carried no EdgeBounds (DefineShape1-3,
+	// DefineMorphShape1) and the shape bounds stand in, matching Ruffle's
+	// reader. Trailing fields: older generated tables use a positional
+	// initializer that stops at `init_text` and these zero out.
+	int32_t exmin, exmax, eymin, eymax;
+	uint8_t has_edge;
 } Avm2CharInfo;
 
 // Per-DefineShape geometry: a (vert_offset, vert_count) range into the

@@ -724,6 +724,13 @@ struct CharInfo
 	int32_t bounds[4] = { 0, 0, 0, 0 };
 	bool has_text = false;
 	std::string init_text;
+	// Stroke-EXCLUSIVE box (SWF19 DefineShape4 `EdgeBounds` / DefineMorphShape2
+	// `StartEdgeBounds`), which AVM2 `DisplayObject.getRect` reports where
+	// `getBounds` reports `bounds` above. Absent on DefineShape1-3 and
+	// DefineMorphShape1, where Ruffle (swf/src/read.rs) substitutes the shape
+	// bounds — so `has_edge == false` means "fall back to bounds".
+	int32_t edge[4] = { 0, 0, 0, 0 };
+	bool has_edge = false;
 };
 
 // Full DefineEditText data (flag bits mirror AVM2_ETF_* in avm2_abc.h).
@@ -1178,7 +1185,14 @@ struct Scanner
 		buttons.push_back(bd);
 	}
 
-	void defineChar(ByteReader r, uint8_t kind, bool has_rect_bounds)
+	// `edge_kind` selects how the tag's stroke-exclusive EdgeBounds RECT is
+	// reached, per SWF19: 0 = the tag has none (DefineShape1-3,
+	// DefineMorphShape1, DefineVideoStream); 1 = DefineShape4, where EdgeBounds
+	// directly follows ShapeBounds; 2 = DefineMorphShape2, where StartBounds is
+	// followed by EndBounds and only then by StartEdgeBounds. Reading further
+	// into `r` is free — it is a by-value cursor the caller discards.
+	void defineChar(ByteReader r, uint8_t kind, bool has_rect_bounds,
+	                int edge_kind = 0)
 	{
 		CharInfo ci;
 		ci.char_id = r.u16();
@@ -1186,6 +1200,12 @@ struct Scanner
 		if (has_rect_bounds)
 		{
 			skipRect(r, ci.bounds);
+			if (edge_kind == 2) skipRect(r, nullptr);  // EndBounds
+			if (edge_kind != 0)
+			{
+				skipRect(r, ci.edge);
+				ci.has_edge = true;
+			}
 		}
 		chars.push_back(ci);
 	}
@@ -1331,11 +1351,13 @@ struct Scanner
 			case TAG_DEFINE_SHAPE2:
 			case TAG_DEFINE_SHAPE3:
 			case TAG_DEFINE_SHAPE4:
-				defineChar(body, 0 /* SHAPE */, true);
+				defineChar(body, 0 /* SHAPE */, true,
+				           code == TAG_DEFINE_SHAPE4 ? 1 : 0);
 				break;
 			case TAG_DEFINE_MORPH_SHAPE:
 			case TAG_DEFINE_MORPH_SHAPE2:
-				defineChar(body, 6 /* MORPHSHAPE */, true);
+				defineChar(body, 6 /* MORPHSHAPE */, true,
+				           code == TAG_DEFINE_MORPH_SHAPE2 ? 2 : 0);
 				break;
 			case TAG_DEFINE_TEXT:
 			case TAG_DEFINE_TEXT2:
@@ -2087,6 +2109,9 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 			    << ", " << ci.bounds[3] << ", "
 			    << (ci.has_text ? ("\"" + cEscape(ci.init_text) + "\"")
 			                    : std::string("NULL"))
+			    << ", " << ci.edge[0] << ", " << ci.edge[1] << ", "
+			    << ci.edge[2] << ", " << ci.edge[3] << ", "
+			    << (ci.has_edge ? 1 : 0)
 			    << " },\n";
 		}
 		out << "};\n";
