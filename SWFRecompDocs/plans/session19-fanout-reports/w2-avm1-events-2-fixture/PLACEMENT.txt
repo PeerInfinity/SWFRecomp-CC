@@ -1,0 +1,5 @@
+Move these four files to:
+  ruffle-tests/tests/swfs/regression/ctor_before_first_call_locals/
+and stage them with patch 2 (w2-avm1-events-2-scopectx.patch).
+The SWF is reproducible: `python3 create_test_swf.py` in that directory.
+output.txt came from the Ruffle exporter (--trace-log), not from SWFRecomp.

@@ -1,0 +1,77 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 743308834..1cc0f405e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -9244,6 +9244,63 @@ static Avm2Value gfx_line_to(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// A quadratic segment's contribution to both bounds boxes.
++//
++// Ruffle's `Drawing::add_command` sends a QuadraticCurveTo through
++// `stretch_bounds` -> `shape_utils::quadratic_curve_bounds`, which folds the
++// curve's OWN EXTREMA, not the control point: the control point is only
++// consulted to find the parameter `t = (from - ctrl)/(from - 2*ctrl + anchor)`
++// (clamped to 0..1) at which the quadratic turns, and the point AT that
++// parameter is what enters the box. Unioning the raw control point instead
++// inflates the box by the whole control-point overshoot, which is what made
++// `avm2/displayobject_getbounds_shape`'s self-drawn getBounds rectangle
++// 46 px too wide.
++//
++// Ruffle works in twips throughout (`Twips::to_pixels` in, `Twips::from_pixels`
++// out), so quantize the endpoints the same way before solving; the shape box
++// then grows by the stroke half-width per side and the edge box takes the
++// extrema raw, exactly as `stretch_bounds` does with `stroke_width` vs
++// `Twips::ZERO`.
++static void draw_union_quad(Avm2DisplayObjectExt* ext, const Avm2GraphicsExt* g,
++                            double cx, double cy, double ax, double ay)
++{
++	double fx = 0.0, fy = 0.0;
++	if (g != NULL && g->pen_set) { fx = g->pen_x; fy = g->pen_y; }
++	fx = gfx_quantize_twips(fx);
++	fy = gfx_quantize_twips(fy);
++	double qcx = gfx_quantize_twips(cx), qcy = gfx_quantize_twips(cy);
++	double qax = gfx_quantize_twips(ax), qay = gfx_quantize_twips(ay);
++	double min_x = fx < qax ? fx : qax, max_x = fx > qax ? fx : qax;
++	double min_y = fy < qay ? fy : qay, max_y = fy > qay ? fy : qay;
++	if (qcx < min_x || qcx > max_x)
++	{
++		double den = fx - qcx * 2.0 + qax;
++		double t = den != 0.0 ? (fx - qcx) / den : 0.0;
++		if (t < 0.0) t = 0.0; else if (t > 1.0) t = 1.0;
++		double s = 1.0 - t;
++		double q = s * s * fx + s * 2.0 * t * qcx + t * t * qax;
++		if (q < min_x) min_x = q;
++		if (q > max_x) max_x = q;
++	}
++	if (qcy < min_y || qcy > max_y)
++	{
++		double den = fy - qcy * 2.0 + qay;
++		double t = den != 0.0 ? (fy - qcy) / den : 0.0;
++		if (t < 0.0) t = 0.0; else if (t > 1.0) t = 1.0;
++		double s = 1.0 - t;
++		double q = s * s * fy + s * 2.0 * t * qcy + t * t * qay;
++		if (q < min_y) min_y = q;
++		if (q > max_y) max_y = q;
++	}
++	int32_t r = gfx_stroke_radius_tw(g);
++	int32_t tmin_x = twips_from_pixels(min_x), tmin_y = twips_from_pixels(min_y);
++	int32_t tmax_x = twips_from_pixels(max_x), tmax_y = twips_from_pixels(max_y);
++	draw_union_shape_tw(ext, tmin_x - r, tmin_y - r);
++	draw_union_shape_tw(ext, tmax_x + r, tmax_y + r);
++	draw_union_edge_tw(ext, tmin_x, tmin_y);
++	draw_union_edge_tw(ext, tmax_x, tmax_y);
++}
++
+ // curveTo(cx, cy, ax, ay)
+ static Avm2Value gfx_curve_to(Avm2Activation* act)
+ {
+@@ -9255,7 +9312,7 @@ static Avm2Value gfx_curve_to(Avm2Activation* act)
+ 		double cy = avm2_coerce_to_number(act->ctx, act->args[1]);
+ 		double ax = avm2_coerce_to_number(act->ctx, act->args[2]);
+ 		double ay = avm2_coerce_to_number(act->ctx, act->args[3]);
+-		if (ext != NULL) { draw_union_stroke(ext, g, cx, cy); draw_union_stroke(ext, g, ax, ay); }
++		if (ext != NULL) draw_union_quad(ext, g, cx, cy, ax, ay);
+ 		if (g != NULL)
+ 		{
+ 			if (!g->pen_set) gfx_add_cmd(g, 0, 0, 0, 0, 0);

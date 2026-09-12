@@ -1,0 +1,149 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_abc.h b/SWFModernRuntime/include/avm2/avm2_abc.h
+index 407875bce..23fbb895b 100644
+--- a/SWFModernRuntime/include/avm2/avm2_abc.h
++++ b/SWFModernRuntime/include/avm2/avm2_abc.h
+@@ -369,6 +369,16 @@ typedef struct Avm2CharInfo
+ 	int32_t xmin, xmax, ymin, ymax;
+ 	// DefineEditText initial text (NULL when absent / not an EditText).
+ 	const char* init_text;
++	// Stroke-EXCLUSIVE self bounds in twips: DefineShape4's `EdgeBounds` and
++	// DefineMorphShape2's `StartEdgeBounds` (SWF19). AVM2
++	// `DisplayObject.getRect` reports this box where `getBounds` reports the
++	// shape bounds above (Ruffle `BoundsMode::ScriptWithoutStrokes`).
++	// `has_edge == 0` means the tag carried no EdgeBounds (DefineShape1-3,
++	// DefineMorphShape1) and the shape bounds stand in, matching Ruffle's
++	// reader. Trailing fields: older generated tables use a positional
++	// initializer that stops at `init_text` and these zero out.
++	int32_t exmin, exmax, eymin, eymax;
++	uint8_t has_edge;
+ } Avm2CharInfo;
+ 
+ // Per-DefineShape geometry: a (vert_offset, vert_count) range into the
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 976d63da7..ea9b1cbbf 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -822,12 +822,30 @@ static void rect_union_xform(Rect* acc, const Rect* src, const Mat* m)
+ 	}
+ }
+ 
+-static Rect char_self_bounds(uint16_t char_id)
++// `no_strokes` is Ruffle's `BoundsMode::ScriptWithoutStrokes` (AVM2
++// `DisplayObject.getRect` only): a DefineShape4 / DefineMorphShape2 character
++// then reports its EdgeBounds box instead of its ShapeBounds box
++// (graphic.rs `self_bounds`, morph_shape.rs `self_bounds`). Tags that carry no
++// EdgeBounds keep the shape box, exactly as Ruffle's reader substitutes it.
++static Rect char_self_bounds(uint16_t char_id, int no_strokes)
+ {
+ 	Rect r = { 0, 0, 0, 0, 0 };
+ 	const Avm2CharInfo* ci = char_info(char_id);
+-	if (ci != NULL
+-	    && (ci->xmin != 0 || ci->xmax != 0 || ci->ymin != 0 || ci->ymax != 0))
++	if (ci == NULL) return r;
++	if (no_strokes && ci->has_edge)
++	{
++		if (ci->exmin != 0 || ci->exmax != 0 || ci->eymin != 0
++		    || ci->eymax != 0)
++		{
++			r.valid = 1;
++			r.xmin = ci->exmin;
++			r.xmax = ci->exmax;
++			r.ymin = ci->eymin;
++			r.ymax = ci->eymax;
++		}
++		return r;
++	}
++	if (ci->xmin != 0 || ci->xmax != 0 || ci->ymin != 0 || ci->ymax != 0)
+ 	{
+ 		r.valid = 1;
+ 		r.xmin = ci->xmin;
+@@ -861,12 +879,11 @@ static Rect display_self_bounds(const Avm2DisplayObjectExt* ext)
+ 			return r2;
+ 		}
+ 	}
+-	Rect r = char_self_bounds(ext->char_id);
+-	// `Drawing::self_bounds(include_strokes)`: shape box or edge box. A
+-	// DefineShape character only carries ShapeBounds in Avm2CharInfo, so
+-	// char_self_bounds stays stroke-inclusive in both modes (Ruffle would use
+-	// the tag's EdgeBounds; emitting it is a recompiler-side change).
++	// `Drawing::self_bounds(include_strokes)`: shape box or edge box, for both
++	// the placed character (DefineShape4 / DefineMorphShape2 EdgeBounds, which
++	// the recompiler emits into Avm2CharInfo) and any `graphics` drawing.
+ 	int no_strokes = g_bounds_no_strokes;
++	Rect r = char_self_bounds(ext->char_id, no_strokes);
+ 	if (no_strokes ? ext->draw_edge_valid : ext->draw_valid)
+ 	{
+ 		Rect d = no_strokes
+diff --git a/SWFRecomp/src/abc/abc_timeline.cpp b/SWFRecomp/src/abc/abc_timeline.cpp
+index 8c0d00d07..7cdc092c3 100644
+--- a/SWFRecomp/src/abc/abc_timeline.cpp
++++ b/SWFRecomp/src/abc/abc_timeline.cpp
+@@ -724,6 +724,13 @@ struct CharInfo
+ 	int32_t bounds[4] = { 0, 0, 0, 0 };
+ 	bool has_text = false;
+ 	std::string init_text;
++	// Stroke-EXCLUSIVE box (SWF19 DefineShape4 `EdgeBounds` / DefineMorphShape2
++	// `StartEdgeBounds`), which AVM2 `DisplayObject.getRect` reports where
++	// `getBounds` reports `bounds` above. Absent on DefineShape1-3 and
++	// DefineMorphShape1, where Ruffle (swf/src/read.rs) substitutes the shape
++	// bounds — so `has_edge == false` means "fall back to bounds".
++	int32_t edge[4] = { 0, 0, 0, 0 };
++	bool has_edge = false;
+ };
+ 
+ // Full DefineEditText data (flag bits mirror AVM2_ETF_* in avm2_abc.h).
+@@ -1178,7 +1185,14 @@ struct Scanner
+ 		buttons.push_back(bd);
+ 	}
+ 
+-	void defineChar(ByteReader r, uint8_t kind, bool has_rect_bounds)
++	// `edge_kind` selects how the tag's stroke-exclusive EdgeBounds RECT is
++	// reached, per SWF19: 0 = the tag has none (DefineShape1-3,
++	// DefineMorphShape1, DefineVideoStream); 1 = DefineShape4, where EdgeBounds
++	// directly follows ShapeBounds; 2 = DefineMorphShape2, where StartBounds is
++	// followed by EndBounds and only then by StartEdgeBounds. Reading further
++	// into `r` is free — it is a by-value cursor the caller discards.
++	void defineChar(ByteReader r, uint8_t kind, bool has_rect_bounds,
++	                int edge_kind = 0)
+ 	{
+ 		CharInfo ci;
+ 		ci.char_id = r.u16();
+@@ -1186,6 +1200,12 @@ struct Scanner
+ 		if (has_rect_bounds)
+ 		{
+ 			skipRect(r, ci.bounds);
++			if (edge_kind == 2) skipRect(r, nullptr);  // EndBounds
++			if (edge_kind != 0)
++			{
++				skipRect(r, ci.edge);
++				ci.has_edge = true;
++			}
+ 		}
+ 		chars.push_back(ci);
+ 	}
+@@ -1331,11 +1351,13 @@ struct Scanner
+ 			case TAG_DEFINE_SHAPE2:
+ 			case TAG_DEFINE_SHAPE3:
+ 			case TAG_DEFINE_SHAPE4:
+-				defineChar(body, 0 /* SHAPE */, true);
++				defineChar(body, 0 /* SHAPE */, true,
++				           code == TAG_DEFINE_SHAPE4 ? 1 : 0);
+ 				break;
+ 			case TAG_DEFINE_MORPH_SHAPE:
+ 			case TAG_DEFINE_MORPH_SHAPE2:
+-				defineChar(body, 6 /* MORPHSHAPE */, true);
++				defineChar(body, 6 /* MORPHSHAPE */, true,
++				           code == TAG_DEFINE_MORPH_SHAPE2 ? 2 : 0);
+ 				break;
+ 			case TAG_DEFINE_TEXT:
+ 			case TAG_DEFINE_TEXT2:
+@@ -2050,6 +2072,9 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
+ 			    << ", " << ci.bounds[3] << ", "
+ 			    << (ci.has_text ? ("\"" + cEscape(ci.init_text) + "\"")
+ 			                    : std::string("NULL"))
++			    << ", " << ci.edge[0] << ", " << ci.edge[1] << ", "
++			    << ci.edge[2] << ", " << ci.edge[3] << ", "
++			    << (ci.has_edge ? 1 : 0)
+ 			    << " },\n";
+ 		}
+ 		out << "};\n";

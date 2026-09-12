@@ -1,0 +1,1634 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_gc.h b/SWFModernRuntime/include/avm2/avm2_gc.h
+index 934583055..fa840c773 100644
+--- a/SWFModernRuntime/include/avm2/avm2_gc.h
++++ b/SWFModernRuntime/include/avm2/avm2_gc.h
+@@ -151,5 +151,8 @@ void avm2_bytearray_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
+ void avm2_display_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
+ void avm2_events_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
+ void avm2_text_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
++// Stage3D (tranche S3): back/front/depth buffers, retained vertex and index
++// buffer words, retained AGAL bytecode.
++void avm2_stage3d_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
+ 
+ #endif // AVM2_GC_H
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 976d63da7..535f0b6fa 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -19679,12 +19679,41 @@ static void avm2_render_highlight(Avm2Context* ctx)
+ 	renderer_draw_rect(context, fx + fw - t, fy, t, fh, 1, 1, 0, 1, 0, 0);     // right
+ }
+ 
++// Stage3D composite (tranche S3). The front buffers live in avm2_stage3d.c;
++// this is the only place they reach the renderer.
++extern int avm2_stage3d_front_buffer(Avm2Context* ctx, uint32_t index,
++                                     uint32_t stage_w, uint32_t stage_h,
++                                     const uint32_t** pixels, uint32_t* w,
++                                     uint32_t* h, double* x, double* y);
++
++static void avm2_render_stage3ds(Avm2Context* ctx)
++{
++	SWFAppContext* app = ctx->app;
++	uint32_t sw = (uint32_t) (app->width > 0 ? app->width : 1);
++	uint32_t sh = (uint32_t) (app->height > 0 ? app->height : 1);
++	for (uint32_t i = 0; i < 4; i++)
++	{
++		const uint32_t* px = NULL;
++		uint32_t w = 0, h = 0;
++		double x = 0.0, y = 0.0;
++		if (!avm2_stage3d_front_buffer(ctx, i, sw, sh, &px, &w, &h, &x, &y))
++			continue;
++		renderer_draw_bitmap_quad_scaled(context, px, w, h, w, h,
++			(float) (x * 20.0), (float) (y * 20.0), 0, 0);
++	}
++}
++
+ static void avm2_render_walk(Avm2Context* ctx)
+ {
+ 	renderer_open_pass(context);
+ 	g_avm2_xform_next = g_avm2_xform_base;
+ 	g_avm2_cxform_next = g_avm2_cxform_base;
+ 	g_avm2_cur_cx = AVM2_CX_IDENTITY;
++	// Stage3D composites UNDERNEATH the whole display list, in stage3Ds index
++	// order, each at its own (x, y) (stage.rs:625-634). The quad is the back
++	// buffer at 1:1 stage pixels, opaque and nearest-sampled, which is what
++	// Ruffle's `bitmap_opaque` REPLACE pipeline does (surface/commands.rs:866).
++	avm2_render_stage3ds(ctx);
+ 	Mat id = mat_identity();
+ 	if (ctx->stage != NULL)
+ 		avm2_render_node(ctx, ctx->stage, &id, 1.0, &AVM2_CX_IDENTITY);
+diff --git a/SWFModernRuntime/src/avm2/avm2_gc.c b/SWFModernRuntime/src/avm2/avm2_gc.c
+index 914f38be7..41f4e8315 100644
+--- a/SWFModernRuntime/src/avm2/avm2_gc.c
++++ b/SWFModernRuntime/src/avm2/avm2_gc.c
+@@ -613,6 +613,7 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
+ 		avm2_events_gc_free_ext(ctx, o);
+ 		avm2_text_gc_free_ext(ctx, o);
+ 		avm2_flixel_gc_free_ext(ctx, o);
++		avm2_stage3d_gc_free_ext(ctx, o);
+ 		heap_free(app, o->native_ext);
+ 	}
+ 	// Per-object vtables: only newactivation/newcatch allocate a vtable owned
+diff --git a/SWFModernRuntime/src/avm2/avm2_stage3d.c b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+index 9c5319ec0..a27c79d3e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_stage3d.c
++++ b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+@@ -59,6 +59,7 @@
+ #include <avm2/avm2_main.h>
+ #include <avm2/avm2_object.h>
+ #include <avm2/avm2_value.h>
++#include <memory/heap.h>
+ 
+ // ---------------------------------------------------------------------------
+ // shared helpers
+@@ -249,10 +250,22 @@ typedef struct Avm2Stage3DExt
+ 	double x, y;
+ } Avm2Stage3DExt;
+ 
++// Tranche S3 (phase A). Everything renderable hangs off S3dBackend, a single
++// heap block reached through the ext; the ext itself keeps only the OBJECT
++// edges (program, bound vertex buffers) because the collector's ext scan is
++// conservative over the blob and cannot follow into a side allocation.
++typedef struct S3dBackend S3dBackend;
++
++#define S3D_ATTRS 8
++
+ typedef struct Avm2Context3DExt
+ {
+ 	Avm2EventDispatcherExt dispatcher;  // extends EventDispatcher (MUST be first)
+ 	Avm2Object* stage3d;
++	// GC-visible edges: the conservative ext scan marks these.
++	Avm2Object* program;
++	Avm2Object* va_buf[S3D_ATTRS];
++	S3dBackend* be;                     // not an object; freed by the ext hook
+ 	uint8_t profile;
+ 	uint8_t enable_error_checking;
+ } Avm2Context3DExt;
+@@ -275,12 +288,22 @@ typedef struct Avm2Buffer3DExt
+ 	Avm2Object* context3d;
+ 	uint32_t count;            // numIndices, or numVertices
+ 	uint32_t data32_per_vertex;
++	// S3: the retained payload. A vertex buffer holds count*data32_per_vertex
++	// raw 32-bit words (reinterpreted per attribute format at fetch time); an
++	// index buffer holds `count` indices. Freed by avm2_stage3d_gc_free_ext.
++	uint32_t* words;
++	uint32_t word_count;
+ } Avm2Buffer3DExt;
+ 
+ typedef struct Avm2Program3DExt
+ {
+ 	Avm2Object* context3d;
+ 	uint8_t uploaded;
++	// S3: the validated AGAL bytecode, retained for the interpreter.
++	uint8_t* vcode;
++	uint8_t* fcode;
++	uint32_t vlen;
++	uint32_t flen;
+ } Avm2Program3DExt;
+ 
+ static Avm2Class* g_stage3d_class;
+@@ -323,6 +346,810 @@ static Avm2Context3DExt* context3d_ext(Avm2Activation* act)
+ static Avm2Texture3DExt* texture_ext(Avm2Activation* act)
+ { return (Avm2Texture3DExt*) s3d_ext_of(s3d_this(act), g_texturebase_class); }
+ 
++// ===========================================================================
++// Tranche S3 phase A — the software Stage3D backend.
++// ===========================================================================
++//
++// Everything below turns the validating no-op surface above into something
++// that actually produces pixels: retained buffers/programs/constants, an AGAL
++// *interpreter*, a software MSAA rasteriser, and a front buffer that
++// avm2_display.c composites underneath the display list.
++//
++// It is a CPU implementation on purpose. Ruffle's own goldens are produced by
++// lavapipe, so an exact-pixel match is not automatic either way; what IS
++// measured (SWFRecompDocs/plans/session19-fanout-reports/w1-gfx-stage3d-report.md
++// §4) is that this four-part model reproduces `avm2/stage3d_triangle`'s golden
++// to max channel diff 1 with zero channels over tolerance:
++//
++//   1. the back buffer composites at (Stage3D.x, Stage3D.y) UNSCALED and
++//      opaque, underneath the whole display list (stage.rs:625-634 +
++//      surface/commands.rs:866, which scales the unit quad by the texture
++//      size and draws it through the `bitmap_opaque` REPLACE/ColorWrites::COLOR
++//      pipeline — so the alpha channel of the 3D content never reaches the
++//      stage);
++//   2. standard Vulkan/D3D 4x sample positions;
++//   3. fragment attributes are evaluated at the PIXEL CENTRE, extrapolated
++//      when the centre falls outside the primitive (this is what a real GPU's
++//      per-pixel quad does; masking to centre-inside leaves a wrong edge);
++//   4. each sample stores round(clamp(c,0,1)*255) and the resolve is
++//      floor(mean of the samples).
++//
++// The AGAL half is a transliteration of naga-agal (render/naga-agal/src/
++// {types,builder}.rs) the same way `agal_validate` above transliterates
++// parse_bytecode, and for the same licence reason (memory
++// `ruffle-code-reuse-ruled-out`): the algorithm is the spec, the code is ours.
++// Transliterated functions: `SourceField::parse` / `DestField::parse`
++// (types.rs:100-124), `emit_source_field_load_with_swizzle_out`
++// (builder.rs:909-1063) including the indirect-constant arm,
++// `VertexAttributeFormat::extend_to_float4` (builder.rs:156-236),
++// `emit_dest_store` (builder.rs:1063-1130) including its scalar-write rule,
++// and `process_opcode` (builder.rs:1164-1720).
++//
++// NOT in phase A: textures (`tex` writes zeros), stencil, colour mask, blend
++// factors, render-to-texture, `drawToBitmapData`. Those are phases A'/B.
++
++// Forward declarations of the S2 validator's little-endian readers (defined
++// with the validator, further down) and of the Matrix3D accessor (defined with
++// flash.geom.Matrix3D at the bottom of this file).
++static uint32_t agal_u32le(const uint8_t* p);
++static uint64_t agal_u64le(const uint8_t* p);
++int avm2_geom_matrix3d_read(Avm2Object* o, double* out);
++
++// types.rs RegisterType (repeated identically next to the S2 validator, which
++// is where they were introduced; an identical macro redefinition is legal C).
++#define AGAL_REG_ATTRIBUTE 0
++#define AGAL_REG_CONSTANT  1
++#define AGAL_REG_TEMPORARY 2
++#define AGAL_REG_OUTPUT    3
++#define AGAL_REG_VARYING   4
++#define AGAL_REG_SAMPLER   5
++#define AGAL_REG_FRAGMENT  6
++
++#define S3D_MAX_SAMPLES  4
++#define S3D_VERT_CONSTS  128
++#define S3D_FRAG_CONSTS  28
++#define S3D_TEMPS        26
++#define S3D_VARYINGS     8
++
++// Vertex-attribute formats, indexed the way S3D_VERTEX_FORMAT spells them.
++#define S3D_VF_NONE   0
++#define S3D_VF_FLOAT1 1
++#define S3D_VF_FLOAT2 2
++#define S3D_VF_FLOAT3 3
++#define S3D_VF_FLOAT4 4
++#define S3D_VF_BYTES4 5
++
++// Context3DCompareMode, in S3D_COMPARE_MODE order.
++#define S3D_CMP_NEVER 0
++#define S3D_CMP_LESS 1
++#define S3D_CMP_EQUAL 2
++#define S3D_CMP_LEQUAL 3
++#define S3D_CMP_GREATER 4
++#define S3D_CMP_NOTEQUAL 5
++#define S3D_CMP_GEQUAL 6
++#define S3D_CMP_ALWAYS 7
++
++// Context3DClearMask (context_3d.rs COLOR/DEPTH/STENCIL_MASK).
++#define S3D_CLEAR_COLOR   1u
++#define S3D_CLEAR_DEPTH   2u
++#define S3D_CLEAR_STENCIL 4u
++
++struct S3dBackend
++{
++	uint32_t w, h;
++	uint32_t samples;           // 1 or 4
++	uint8_t has_depth;
++	uint8_t presented;
++	float* color;               // w*h*samples*4 (RGBA, linear 0..1)
++	float* depth;               // w*h*samples
++	uint32_t* front;            // w*h ARGB8888, resolved at present()
++
++	// Ruffle defers a clear to the render pass opened by the NEXT draw, and
++	// present() drops an unconsumed one (mod.rs:206-227, 1221-1242).
++	uint8_t pending_clear;
++	float clear_rgba[4];
++	float clear_depth;
++	uint32_t clear_mask;
++
++	float vc[S3D_VERT_CONSTS][4];
++	float fc[S3D_FRAG_CONSTS][4];
++
++	uint8_t va_fmt[S3D_ATTRS];
++	uint32_t va_off32[S3D_ATTRS];
++
++	// Composite scratch: the visible sub-rectangle of `front`, materialised
++	// only when the back buffer is larger than the stage (see
++	// avm2_stage3d_front_buffer).
++	uint32_t* crop;
++	uint32_t crop_cap;
++
++	uint8_t cull;               // index into S3D_TRIANGLE_FACE
++	uint8_t depth_mask;
++	uint8_t depth_func;
++	uint8_t scissor_on;
++	int32_t sc_x0, sc_y0, sc_x1, sc_y1;
++};
++
++// Index of `v` in a NULL-terminated spelling table, or -1.
++static int s3d_enum_index(const Avm2String* v, const char* const* table)
++{
++	for (int i = 0; table[i] != NULL; i++)
++		if (s3d_str_is(v, table[i])) return i;
++	return -1;
++}
++
++static void s3d_backend_free_buffers(Avm2Context* ctx, S3dBackend* be)
++{
++	if (be == NULL) return;
++	if (be->color != NULL) { heap_free(ctx->app, be->color); be->color = NULL; }
++	if (be->depth != NULL) { heap_free(ctx->app, be->depth); be->depth = NULL; }
++	if (be->front != NULL) { heap_free(ctx->app, be->front); be->front = NULL; }
++	if (be->crop != NULL) { heap_free(ctx->app, be->crop); be->crop = NULL; }
++	be->crop_cap = 0;
++}
++
++// Lazily create the backend block. Returns NULL if the ext is missing or the
++// allocation fails (an honest blank render beats a crash).
++static S3dBackend* s3d_backend(Avm2Context* ctx, Avm2Context3DExt* e)
++{
++	if (e == NULL) return NULL;
++	if (e->be != NULL) return e->be;
++	S3dBackend* be = (S3dBackend*) heap_alloc(ctx->app, sizeof(S3dBackend));
++	if (be == NULL) return NULL;
++	memset(be, 0, sizeof(*be));
++	be->depth_mask = 1;
++	be->depth_func = S3D_CMP_LEQUAL;   // current_pipeline.rs:169
++	be->clear_depth = 1.0f;
++	e->be = be;
++	return be;
++}
++
++// Back the buffer with `words` 32-bit words, zeroed. A buffer big enough to
++// be implausible is left unbacked (the draw then renders nothing).
++static void s3d_buffer_alloc(Avm2Context* ctx, Avm2Buffer3DExt* e,
++                             uint64_t words)
++{
++	if (e->words != NULL) { heap_free(ctx->app, e->words); e->words = NULL; }
++	e->word_count = 0;
++	if (words == 0 || words > (1u << 26)) return;
++	e->words = (uint32_t*) heap_alloc(ctx->app, (size_t) words * 4);
++	if (e->words == NULL) return;
++	memset(e->words, 0, (size_t) words * 4);
++	e->word_count = (uint32_t) words;
++}
++
++// ---------------------------------------------------------------------------
++// The AGAL interpreter
++// ---------------------------------------------------------------------------
++
++typedef struct S3dShader
++{
++	float temp[S3D_TEMPS][4];
++	float vary[S3D_VARYINGS][4];
++	float out[4];
++	const float (*consts)[4];
++	uint32_t nconsts;
++	float attr[S3D_ATTRS][4];      // vertex stage: already extended to float4
++	const uint8_t* attr_fmt;       // vertex stage: declared formats
++	int killed;                    // fragment stage: `kil` fired
++} S3dShader;
++
++// Read one register WITHOUT the swizzle (the `load_register` closure,
++// builder.rs:915-944). Unbound / unimplemented register types read as zero.
++static void s3d_reg_read(const S3dShader* sh, uint32_t rtype, uint32_t reg,
++                         float* o)
++{
++	o[0] = o[1] = o[2] = o[3] = 0.0f;
++	switch (rtype)
++	{
++	case AGAL_REG_ATTRIBUTE:
++		if (reg < S3D_ATTRS) memcpy(o, sh->attr[reg], 4 * sizeof(float));
++		break;
++	case AGAL_REG_CONSTANT:
++		if (sh->consts != NULL && reg < sh->nconsts)
++			memcpy(o, sh->consts[reg], 4 * sizeof(float));
++		break;
++	case AGAL_REG_TEMPORARY:
++		if (reg < S3D_TEMPS) memcpy(o, sh->temp[reg], 4 * sizeof(float));
++		break;
++	case AGAL_REG_VARYING:
++		if (reg < S3D_VARYINGS) memcpy(o, sh->vary[reg], 4 * sizeof(float));
++		break;
++	default:
++		break;
++	}
++}
++
++// emit_source_field_load_with_swizzle_out. Attributes are always extended to
++// float4 first (the extension pads (0,0,1) exactly as naga's Compose does), so
++// truncating the result to the caller's component count is equivalent to
++// Ruffle's narrower load.
++static void s3d_src_load(const S3dShader* sh, uint64_t src, float* o)
++{
++	uint32_t reg = (uint32_t) (src & 0xFFFF);
++	uint32_t ind_off = (uint32_t) ((src >> 16) & 0xFF);
++	uint32_t swz = (uint32_t) ((src >> 24) & 0xFF);
++	uint32_t rtype = (uint32_t) ((src >> 32) & 0xF);
++	uint32_t itype = (uint32_t) ((src >> 40) & 0xF);
++	uint32_t isel = (uint32_t) ((src >> 48) & 0x3);
++	int indirect = (int) ((src >> 63) & 0x1);
++
++	float base[4];
++	if (indirect && rtype == AGAL_REG_CONSTANT)
++	{
++		// `vc[regN.X + offset]` (builder.rs:949-1030). A Float1 index register
++		// is used as the scalar it is, rather than component-selected.
++		float idx[4];
++		s3d_reg_read(sh, itype, reg, idx);
++		float f = idx[isel];
++		if (itype == AGAL_REG_ATTRIBUTE && sh->attr_fmt != NULL
++		    && reg < S3D_ATTRS && sh->attr_fmt[reg] == S3D_VF_FLOAT1)
++			f = idx[0];
++		// Naga converts to u32 (a negative value is UB there; clamp at 0).
++		uint32_t i = (f > 0.0f) ? (uint32_t) f : 0u;
++		i += ind_off;
++		base[0] = base[1] = base[2] = base[3] = 0.0f;
++		if (sh->consts != NULL && i < sh->nconsts)
++			memcpy(base, sh->consts[i], 4 * sizeof(float));
++	}
++	else
++	{
++		s3d_reg_read(sh, rtype, reg, base);
++	}
++
++	for (int i = 0; i < 4; i++) o[i] = base[(swz >> (2 * i)) & 3];
++}
++
++// emit_dest_store. `mask` with exactly one bit takes component 0 of the source
++// (builder.rs:1096-1110) — dp3/dp4 results are splatted before they get here,
++// which makes the `source_is_scalar` arm fall out of the same rule.
++static void s3d_dest_store(S3dShader* sh, uint32_t destw, const float* v)
++{
++	uint32_t reg = destw & 0xFFFF;
++	uint32_t mask = (destw >> 16) & 0xF;
++	uint32_t rtype = (destw >> 24) & 0xF;
++	float* d = NULL;
++	if (rtype == AGAL_REG_OUTPUT) d = sh->out;
++	else if (rtype == AGAL_REG_VARYING && reg < S3D_VARYINGS) d = sh->vary[reg];
++	else if (rtype == AGAL_REG_TEMPORARY && reg < S3D_TEMPS) d = sh->temp[reg];
++	if (d == NULL) return;
++
++	int bits = 0;
++	for (int i = 0; i < 4; i++) if (mask & (1u << i)) bits++;
++	for (int i = 0; i < 4; i++)
++		if (mask & (1u << i)) d[i] = (bits == 1) ? v[0] : v[i];
++}
++
++static void s3d_splat(float* o, float s)
++{ o[0] = o[1] = o[2] = o[3] = s; }
++
++// set_program_constants: float `i` of the run lands in register
++// `first + i/4`, component `i%4`.
++static void s3d_store_const_float(S3dBackend* be, int is_fragment,
++                                  uint32_t first, uint32_t i, float v)
++{
++	float (*dst)[4] = is_fragment ? be->fc : be->vc;
++	uint32_t cap = is_fragment ? S3D_FRAG_CONSTS : S3D_VERT_CONSTS;
++	uint32_t reg = first + i / 4;
++	if (reg < cap) dst[reg][i % 4] = v;
++}
++
++static void s3d_store_consts(S3dBackend* be, int is_fragment,
++                             uint32_t first, const float* v, uint32_t n)
++{
++	for (uint32_t i = 0; i < n; i++)
++		s3d_store_const_float(be, is_fragment, first, i, v[i]);
++}
++
++// `VertexAttributeFormat::Float3.extend_to_float4` and friends: pad with
++// (0, 0, 1) up to four components.
++static void s3d_extend4(float* v, int have)
++{
++	for (int i = have; i < 3; i++) v[i] = 0.0f;
++	if (have < 4) v[3] = 1.0f;
++}
++
++// Execute one AGAL program. `code`/`len` have already passed agal_validate.
++static void s3d_run_agal(const uint8_t* code, uint32_t len, S3dShader* sh)
++{
++	if (code == NULL || len < 7) return;
++	uint32_t pos = 7;
++	// if/else nesting: `skip` counts how many enclosing blocks are inactive.
++	int depth = 0;
++	int skip_from = -1;      // depth at which we started skipping, or -1
++	int taken[32];
++	while (pos + 24 <= len)
++	{
++		const uint8_t* t = code + pos;
++		pos += 24;
++		uint32_t op = agal_u32le(t);
++		uint32_t destw = agal_u32le(t + 4);
++		uint64_t s1w = agal_u64le(t + 8);
++		uint64_t s2w = agal_u64le(t + 16);
++
++		// Control flow first, so the skip bookkeeping stays consistent.
++		if (op >= 0x1c && op <= 0x1f)   // ife / ine / ifg / ifl
++		{
++			int active = (skip_from < 0);
++			int cond = 0;
++			if (active)
++			{
++				float a[4], b[4];
++				s3d_src_load(sh, s1w, a);
++				s3d_src_load(sh, s2w, b);
++				cond = (op == 0x1c) ? (a[0] == b[0])
++				     : (op == 0x1d) ? (a[0] != b[0])
++				     : (op == 0x1e) ? (a[0] > b[0])
++				                    : (a[0] < b[0]);
++			}
++			if (depth < 32) taken[depth] = cond;
++			depth++;
++			if (active && !cond) skip_from = depth;
++			continue;
++		}
++		if (op == 0x20)   // els
++		{
++			if (skip_from == depth) skip_from = -1;
++			else if (skip_from < 0 && depth > 0 && depth <= 32
++			         && taken[depth - 1])
++				skip_from = depth;
++			continue;
++		}
++		if (op == 0x21)   // eif
++		{
++			if (skip_from == depth) skip_from = -1;
++			if (depth > 0) depth--;
++			continue;
++		}
++		if (skip_from >= 0) continue;
++		if (sh->killed) continue;
++
++		float a[4], b[4], r[4];
++		switch (op)
++		{
++		case 0x00:  // mov
++			s3d_src_load(sh, s1w, r);
++			s3d_dest_store(sh, destw, r);
++			break;
++		case 0x01:  // add
++		case 0x02:  // sub
++		case 0x03:  // mul
++		case 0x04:  // div
++		case 0x06:  // min
++		case 0x07:  // max
++		case 0x0b:  // pow
++		case 0x29:  // sge
++		case 0x2a:  // slt
++		case 0x2c:  // seq
++		case 0x2d:  // sne
++			s3d_src_load(sh, s1w, a);
++			s3d_src_load(sh, s2w, b);
++			for (int i = 0; i < 4; i++)
++			{
++				switch (op)
++				{
++				case 0x01: r[i] = a[i] + b[i]; break;
++				case 0x02: r[i] = a[i] - b[i]; break;
++				case 0x03: r[i] = a[i] * b[i]; break;
++				case 0x04: r[i] = a[i] / b[i]; break;
++				case 0x06: r[i] = a[i] < b[i] ? a[i] : b[i]; break;
++				case 0x07: r[i] = a[i] > b[i] ? a[i] : b[i]; break;
++				case 0x0b: r[i] = powf(a[i], b[i]); break;
++				case 0x29: r[i] = a[i] >= b[i] ? 1.0f : 0.0f; break;
++				case 0x2a: r[i] = a[i] < b[i] ? 1.0f : 0.0f; break;
++				case 0x2c: r[i] = a[i] == b[i] ? 1.0f : 0.0f; break;
++				default:   r[i] = a[i] != b[i] ? 1.0f : 0.0f; break;
++				}
++			}
++			s3d_dest_store(sh, destw, r);
++			break;
++		case 0x05:  // rcp
++		case 0x08:  // frc
++		case 0x09:  // sqt
++		case 0x0a:  // rsq
++		case 0x0c:  // log
++		case 0x0d:  // exp
++		case 0x0f:  // sin
++		case 0x10:  // cos
++		case 0x14:  // abs
++		case 0x15:  // neg
++		case 0x16:  // sat
++			s3d_src_load(sh, s1w, a);
++			for (int i = 0; i < 4; i++)
++			{
++				switch (op)
++				{
++				case 0x05: r[i] = 1.0f / a[i]; break;
++				case 0x08: r[i] = a[i] - floorf(a[i]); break;
++				case 0x09: r[i] = sqrtf(a[i]); break;
++				case 0x0a: r[i] = 1.0f / sqrtf(a[i]); break;
++				case 0x0c: r[i] = log2f(a[i]); break;
++				case 0x0d: r[i] = exp2f(a[i]); break;
++				case 0x0f: r[i] = sinf(a[i]); break;
++				case 0x10: r[i] = cosf(a[i]); break;
++				case 0x14: r[i] = fabsf(a[i]); break;
++				case 0x15: r[i] = -a[i]; break;
++				default:
++					r[i] = a[i] < 0.0f ? 0.0f : (a[i] > 1.0f ? 1.0f : a[i]);
++					break;
++				}
++			}
++			s3d_dest_store(sh, destw, r);
++			break;
++		case 0x0e:  // nrm — first three components only
++		{
++			s3d_src_load(sh, s1w, a);
++			float l = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
++			r[0] = a[0] / l; r[1] = a[1] / l; r[2] = a[2] / l; r[3] = 0.0f;
++			s3d_dest_store(sh, destw, r);
++			break;
++		}
++		case 0x11:  // crs — cross of the first three, extended with w = 1
++			s3d_src_load(sh, s1w, a);
++			s3d_src_load(sh, s2w, b);
++			r[0] = a[1] * b[2] - a[2] * b[1];
++			r[1] = a[2] * b[0] - a[0] * b[2];
++			r[2] = a[0] * b[1] - a[1] * b[0];
++			s3d_extend4(r, 3);
++			s3d_dest_store(sh, destw, r);
++			break;
++		case 0x12:  // dp3
++		case 0x13:  // dp4
++		{
++			s3d_src_load(sh, s1w, a);
++			s3d_src_load(sh, s2w, b);
++			int n = (op == 0x12) ? 3 : 4;
++			float d = 0.0f;
++			for (int i = 0; i < n; i++) d += a[i] * b[i];
++			s3d_splat(r, d);
++			s3d_dest_store(sh, destw, r);
++			break;
++		}
++		case 0x17:  // m33
++		case 0x18:  // m44
++		case 0x19:  // m34
++		{
++			int rows = (op == 0x18) ? 4 : 3;
++			int vecn = (op == 0x17) ? 3 : 4;
++			s3d_src_load(sh, s1w, a);
++			for (int i = 0; i < rows; i++)
++			{
++				uint64_t rowsrc = s2w;
++				if ((rowsrc >> 63) & 1)
++					rowsrc = (rowsrc & ~(uint64_t) 0xFF0000)
++					         | ((uint64_t) (((rowsrc >> 16) & 0xFF) + i) << 16);
++				else
++					rowsrc = (rowsrc & ~(uint64_t) 0xFFFF)
++					         | (uint64_t) (((rowsrc & 0xFFFF) + i) & 0xFFFF);
++				s3d_src_load(sh, rowsrc, b);
++				float d = 0.0f;
++				for (int k = 0; k < vecn; k++) d += b[k] * a[k];
++				r[i] = d;
++			}
++			if (rows < 4) s3d_extend4(r, rows);
++			s3d_dest_store(sh, destw, r);
++			break;
++		}
++		case 0x1a:  // ddx
++		case 0x1b:  // ddy
++			// Screen-space derivatives need a 2x2 quad; the CPU raster shades
++			// one pixel at a time, so these read as 0 (phase A).
++			s3d_splat(r, 0.0f);
++			s3d_dest_store(sh, destw, r);
++			break;
++		case 0x27:  // kil — discard when the scalar source is < 0
++			s3d_src_load(sh, s1w, a);
++			if (a[0] < 0.0f) sh->killed = 1;
++			break;
++		case 0x28:  // tex — phase B
++			s3d_splat(r, 0.0f);
++			s3d_dest_store(sh, destw, r);
++			break;
++		default:
++			break;
++		}
++	}
++}
++
++// ---------------------------------------------------------------------------
++// The software rasteriser
++// ---------------------------------------------------------------------------
++
++// Standard Vulkan/D3D 4x sample positions, in pixel-local coordinates.
++static const float S3D_SAMPLE_XY[S3D_MAX_SAMPLES][2] = {
++	{ 0.375f, 0.125f }, { 0.875f, 0.375f },
++	{ 0.125f, 0.625f }, { 0.625f, 0.875f },
++};
++
++static float s3d_edge(float ax, float ay, float bx, float by,
++                      float px, float py)
++{ return (px - ax) * (by - ay) - (py - ay) * (bx - ax); }
++
++// ---------------------------------------------------------------------------
++// The cost guard.
++//
++// A CPU rasteriser has a work ceiling a GPU does not, and the corpus contains
++// content that sails straight past it: avm2/stage3d_raytrace is an 833-token
++// OGSL fragment shader over a 550x400 buffer for 80 frames — ~15 BILLION
++// interpreted instructions, i.e. hours. That test currently PASSES on trace
++// (its image is the graded axis), and a backend that hangs would turn a green
++// trace row red, which is a strictly worse outcome than the blank render it
++// replaces.
++//
++// So: a whole-run budget of shading work. Once it is spent, rasterisation stops
++// and every later draw is a no-op — the trace side is untouched and the image
++// side is no worse than the blank it was.
++//
++// The unit has to be "instructions PLUS a fixed per-pixel charge", not
++// instructions alone: away3d's shaders are short, so an instruction-only budget
++// let it shade tens of millions of pixels and pushed its run from 10.5 s
++// (baseline) past verify_output.py's hard 30 s execution timeout — turning a
++// green trace row red, i.e. exactly the regression the guard exists to prevent.
++// S3D_PIXEL_COST prices the coverage tests, the varying interpolation and the
++// per-fragment register reset that every shaded pixel pays regardless of shader
++// length.
++//
++// The budget is ~8x the most expensive phase-A row (agal_cross_product, a
++// 500x500 quad = 2.25 M units) and is spent inside one frame by
++// raytrace/away3d, which are phase-C rows either way.
++// Spending the budget LATCHES the whole backend off, not just the shading
++// loop: the per-frame clear and resolve are themselves O(w*h*samples) (a
++// 960x700 4x buffer is a 43 MB colour clear and an 11 M-sample resolve EVERY
++// tick), so leaving them running after the draws stopped kept away3d near the
++// timeout even with the shading budget exhausted. Once latched, the last front
++// buffer keeps compositing and nothing else costs anything.
++#define S3D_FRAG_BUDGET 12000000u
++#define S3D_PIXEL_COST 8u
++static uint64_t g_s3d_frag_budget = S3D_FRAG_BUDGET;
++
++static int s3d_depth_pass(uint8_t func, float src, float dst)
++{
++	switch (func)
++	{
++	case S3D_CMP_NEVER:    return 0;
++	case S3D_CMP_LESS:     return src < dst;
++	case S3D_CMP_EQUAL:    return src == dst;
++	case S3D_CMP_LEQUAL:   return src <= dst;
++	case S3D_CMP_GREATER:  return src > dst;
++	case S3D_CMP_NOTEQUAL: return src != dst;
++	case S3D_CMP_GEQUAL:   return src >= dst;
++	default:               return 1;
++	}
++}
++
++// Consume a deferred clear, exactly where Ruffle opens its render pass.
++static void s3d_apply_pending_clear(S3dBackend* be)
++{
++	if (!be->pending_clear || g_s3d_frag_budget == 0) return;
++	be->pending_clear = 0;
++	size_t n = (size_t) be->w * be->h * be->samples;
++	if (be->color != NULL && (be->clear_mask & S3D_CLEAR_COLOR))
++		for (size_t i = 0; i < n; i++)
++			memcpy(be->color + i * 4, be->clear_rgba, 4 * sizeof(float));
++	if (be->depth != NULL && (be->clear_mask & S3D_CLEAR_DEPTH))
++		for (size_t i = 0; i < n; i++) be->depth[i] = be->clear_depth;
++}
++
++typedef struct S3dVertexOut
++{
++	float clip[4];                  // op
++	float vary[S3D_VARYINGS][4];
++} S3dVertexOut;
++
++// Fetch + extend one vertex attribute (buffer words are raw 32-bit; the
++// format decides how they are read, matching current_pipeline.rs:455-470).
++static void s3d_fetch_attr(const Avm2Buffer3DExt* vb, uint32_t vertex,
++                           uint32_t off32, uint8_t fmt, float* o)
++{
++	o[0] = o[1] = o[2] = o[3] = 0.0f;
++	if (fmt == S3D_VF_NONE || vb == NULL || vb->words == NULL) return;
++	uint32_t stride = vb->data32_per_vertex;
++	if (stride == 0) return;
++	int comps = (fmt == S3D_VF_BYTES4) ? 1 : (int) fmt;
++	uint64_t base = (uint64_t) vertex * stride + off32;
++	if (base + (uint64_t) comps > vb->word_count) return;
++	const uint32_t* w = vb->words + base;
++	if (fmt == S3D_VF_BYTES4)
++	{
++		// wgpu::VertexFormat::Unorm8x4 — byte 0 becomes .x.
++		for (int i = 0; i < 4; i++)
++			o[i] = (float) ((w[0] >> (8 * i)) & 0xFF) / 255.0f;
++		return;
++	}
++	for (int i = 0; i < comps; i++) memcpy(&o[i], &w[i], sizeof(float));
++	s3d_extend4(o, comps);
++}
++
++static void s3d_run_vertex(S3dBackend* be, const uint8_t* code, uint32_t len,
++                           Avm2Buffer3DExt* const* vb, uint32_t vertex,
++                           S3dVertexOut* out)
++{
++	S3dShader sh;
++	memset(&sh, 0, sizeof(sh));
++	sh.consts = be->vc;
++	sh.nconsts = S3D_VERT_CONSTS;
++	sh.attr_fmt = be->va_fmt;
++	for (uint32_t i = 0; i < S3D_ATTRS; i++)
++		s3d_fetch_attr(vb[i], vertex, be->va_off32[i], be->va_fmt[i],
++		               sh.attr[i]);
++	s3d_run_agal(code, len, &sh);
++	memcpy(out->clip, sh.out, sizeof(out->clip));
++	memcpy(out->vary, sh.vary, sizeof(out->vary));
++}
++
++// One drawTriangles. Everything is already validated; a missing piece renders
++// nothing rather than throwing (Ruffle warns and skips too).
++static void s3d_raster_draw(S3dBackend* be, const uint8_t* fcode,
++                            uint32_t flen, const S3dVertexOut* v0,
++                            const S3dVertexOut* v1, const S3dVertexOut* v2)
++{
++	const S3dVertexOut* vs[3] = { v0, v1, v2 };
++	float sx[3], sy[3], sz[3], invw[3];
++	for (int i = 0; i < 3; i++)
++	{
++		float w = vs[i]->clip[3];
++		if (!(w > 0.0f)) return;     // no near-plane clipper in phase A
++		invw[i] = 1.0f / w;
++		sx[i] = (vs[i]->clip[0] * invw[i] * 0.5f + 0.5f) * (float) be->w;
++		sy[i] = (0.5f - vs[i]->clip[1] * invw[i] * 0.5f) * (float) be->h;
++		sz[i] = vs[i]->clip[2] * invw[i];
++	}
++
++	float area = s3d_edge(sx[0], sy[0], sx[1], sy[1], sx[2], sy[2]);
++	if (area == 0.0f) return;
++	// FrontFace::Cw (current_pipeline.rs:576): with y pointing down, a
++	// clockwise winding has a negative signed area under this edge function.
++	int is_front = (area < 0.0f);
++	if (be->cull == 3) return;                          // frontAndBack
++	if (be->cull == 1 && !is_front) return;             // back
++	if (be->cull == 2 && is_front) return;              // front
++	float sign = (area > 0.0f) ? 1.0f : -1.0f;
++	float inv_area = 1.0f / fabsf(area);
++
++	int x0 = (int) floorf(fminf(fminf(sx[0], sx[1]), sx[2]));
++	int x1 = (int) ceilf(fmaxf(fmaxf(sx[0], sx[1]), sx[2]));
++	int y0 = (int) floorf(fminf(fminf(sy[0], sy[1]), sy[2]));
++	int y1 = (int) ceilf(fmaxf(fmaxf(sy[0], sy[1]), sy[2]));
++	if (x0 < 0) x0 = 0;
++	if (y0 < 0) y0 = 0;
++	if (x1 > (int) be->w) x1 = (int) be->w;
++	if (y1 > (int) be->h) y1 = (int) be->h;
++	if (be->scissor_on)
++	{
++		if (x0 < be->sc_x0) x0 = be->sc_x0;
++		if (y0 < be->sc_y0) y0 = be->sc_y0;
++		if (x1 > be->sc_x1) x1 = be->sc_x1;
++		if (y1 > be->sc_y1) y1 = be->sc_y1;
++	}
++
++	uint32_t ns = be->samples;
++	uint64_t ftokens = (flen > 7) ? (flen - 7) / 24 : 1;
++	if (ftokens == 0) ftokens = 1;
++	uint64_t pixel_cost = ftokens + S3D_PIXEL_COST;
++
++	// The fragment register file is reset per pixel, not re-zeroed: AGAL
++	// temporaries are naga `LocalVariable`s with no initialiser, so their
++	// value across fragments is undefined in Ruffle too, and clearing ~600
++	// bytes per pixel was the single largest cost in the rasteriser.
++	S3dShader sh;
++	memset(&sh, 0, sizeof(sh));
++	sh.consts = be->fc;
++	sh.nconsts = S3D_FRAG_CONSTS;
++
++	for (int py = y0; py < y1; py++)
++	{
++		if (g_s3d_frag_budget == 0) return;
++		for (int px = x0; px < x1; px++)
++		{
++			// Coverage first: a pixel with no covered sample is never shaded.
++			// Scanning a pixel costs even when it is not covered (a thin
++			// triangle with a large bounding box is all scan and no shading),
++			// so the scan is budgeted too — otherwise away3d's mesh spends its
++			// whole run walking bounding boxes after the shading budget is
++			// gone.
++			if (g_s3d_frag_budget == 0) return;
++			g_s3d_frag_budget--;
++
++			int cov[S3D_MAX_SAMPLES];
++			int any = 0;
++			float bs[S3D_MAX_SAMPLES][3];
++			for (uint32_t s = 0; s < ns; s++)
++			{
++				float qx = (float) px + (ns == 1 ? 0.5f : S3D_SAMPLE_XY[s][0]);
++				float qy = (float) py + (ns == 1 ? 0.5f : S3D_SAMPLE_XY[s][1]);
++				float e0 = s3d_edge(sx[1], sy[1], sx[2], sy[2], qx, qy) * sign;
++				float e1 = s3d_edge(sx[2], sy[2], sx[0], sy[0], qx, qy) * sign;
++				float e2 = s3d_edge(sx[0], sy[0], sx[1], sy[1], qx, qy) * sign;
++				cov[s] = (e0 > 0.0f && e1 > 0.0f && e2 > 0.0f);
++				bs[s][0] = e0 * inv_area;
++				bs[s][1] = e1 * inv_area;
++				bs[s][2] = e2 * inv_area;
++				any |= cov[s];
++			}
++			if (!any) continue;
++			if (g_s3d_frag_budget < pixel_cost)
++			{
++				g_s3d_frag_budget = 0;
++				return;
++			}
++			g_s3d_frag_budget -= pixel_cost;
++
++			// Attributes at the PIXEL CENTRE, extrapolated (w1 report §4.3).
++			float cx = (float) px + 0.5f, cy = (float) py + 0.5f;
++			float bc[3];
++			bc[0] = s3d_edge(sx[1], sy[1], sx[2], sy[2], cx, cy) * sign * inv_area;
++			bc[1] = s3d_edge(sx[2], sy[2], sx[0], sy[0], cx, cy) * sign * inv_area;
++			bc[2] = s3d_edge(sx[0], sy[0], sx[1], sy[1], cx, cy) * sign * inv_area;
++			float pw = bc[0] * invw[0] + bc[1] * invw[1] + bc[2] * invw[2];
++			float pb[3];
++			if (pw != 0.0f)
++				for (int i = 0; i < 3; i++) pb[i] = bc[i] * invw[i] / pw;
++			else
++				for (int i = 0; i < 3; i++) pb[i] = bc[i];
++
++			sh.killed = 0;
++			for (int vi = 0; vi < S3D_VARYINGS; vi++)
++				for (int c = 0; c < 4; c++)
++					sh.vary[vi][c] = pb[0] * vs[0]->vary[vi][c]
++					               + pb[1] * vs[1]->vary[vi][c]
++					               + pb[2] * vs[2]->vary[vi][c];
++			s3d_run_agal(fcode, flen, &sh);
++			if (sh.killed) continue;
++
++			for (uint32_t s = 0; s < ns; s++)
++			{
++				if (!cov[s]) continue;
++				size_t si = ((size_t) py * be->w + px) * ns + s;
++				// No depth attachment at all when configureBackBuffer was
++				// called with enableDepthAndStencil = false (mod.rs:228-243).
++				if (be->has_depth && be->depth != NULL)
++				{
++					// Depth is interpolated per SAMPLE, linearly in screen
++					// space (no perspective divide).
++					float z = bs[s][0] * sz[0] + bs[s][1] * sz[1]
++					        + bs[s][2] * sz[2];
++					if (!s3d_depth_pass(be->depth_func, z, be->depth[si]))
++						continue;
++					if (be->depth_mask) be->depth[si] = z;
++				}
++				memcpy(be->color + si * 4, sh.out, 4 * sizeof(float));
++			}
++		}
++	}
++}
++
++// present(): resolve the back buffer to the front one. Per sample, store
++// round(clamp(c,0,1)*255); the resolve is floor(mean) (w1 report §4.4). The
++// composite is opaque (ColorWrites::COLOR), so the front buffer's alpha is
++// forced to 255 and the RGB is left un-premultiplied-equivalent.
++static void s3d_present(S3dBackend* be)
++{
++	if (be->color == NULL || be->front == NULL) return;
++	// Latched off (see the cost guard): the resolve is O(w*h*samples) and
++	// would re-derive an unchanged front buffer every tick.
++	if (g_s3d_frag_budget == 0) { be->pending_clear = 0; return; }
++	uint32_t ns = be->samples;
++	for (size_t p = 0; p < (size_t) be->w * be->h; p++)
++	{
++		uint32_t acc[3] = { 0, 0, 0 };
++		for (uint32_t s = 0; s < ns; s++)
++		{
++			const float* c = be->color + (p * ns + s) * 4;
++			for (int k = 0; k < 3; k++)
++			{
++				float v = c[k];
++				if (!(v > 0.0f)) v = 0.0f;
++				if (v > 1.0f) v = 1.0f;
++				acc[k] += (uint32_t) (v * 255.0f + 0.5f);
++			}
++		}
++		be->front[p] = 0xFF000000u
++			| ((acc[0] / ns) << 16) | ((acc[1] / ns) << 8) | (acc[2] / ns);
++	}
++	be->presented = 1;
++	be->pending_clear = 0;
++}
++
+ // ---------------------------------------------------------------------------
+ // flash.display.Stage3D
+ // ---------------------------------------------------------------------------
+@@ -582,20 +1409,75 @@ static Avm2Value context3d_configure_back_buffer(Avm2Activation* act)
+ 		avm2_throw_error(ctx, NULL, "Error #3781: Requested height of backbuffer "
+ 		                            "is not in allowed range 32 to 16384.");
+ 	}
++
++	// S3: (re)allocate the render targets. `antiAlias` is rounded DOWN to a
++	// power of two and clamped by what the backend supports (mod.rs:522-560);
++	// the software rasteriser supports 1 and 4, which is what the corpus asks
++	// for. A failed allocation leaves the context blank rather than throwing.
++	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
++	if (be != NULL)
++	{
++		uint32_t s = 1;
++		while (s * 2 <= anti_alias && s * 2 <= S3D_MAX_SAMPLES) s *= 2;
++		// A 16384x16384 back buffer at 4x would be a 16 GB colour buffer, so
++		// drop the sample count and then refuse outright rather than take the
++		// allocator down. 8 M samples = 128 MB colour + 32 MB depth, which is
++		// four times the largest buffer the corpus configures (1300x810x4).
++		while (s > 1 && (uint64_t) width * height * s > 8u * 1024 * 1024) s /= 2;
++		s3d_backend_free_buffers(ctx, be);
++		be->w = width;
++		be->h = height;
++		be->samples = s;
++		be->has_depth = (uint8_t) (depth_stencil != 0);
++		be->presented = 0;
++		be->pending_clear = 0;
++		size_t n = (size_t) width * height * s;
++		if ((uint64_t) width * height * s > 8u * 1024 * 1024)
++		{
++			be->w = be->h = 0;
++			return avm2_undefined();
++		}
++		be->color = (float*) heap_alloc(ctx->app, n * 4 * sizeof(float));
++		be->depth = (float*) heap_alloc(ctx->app, n * sizeof(float));
++		be->front = (uint32_t*) heap_alloc(ctx->app,
++		                                   (size_t) width * height * 4);
++		if (be->color == NULL || be->depth == NULL || be->front == NULL)
++		{
++			s3d_backend_free_buffers(ctx, be);
++			be->w = be->h = 0;
++		}
++		else
++		{
++			memset(be->color, 0, n * 4 * sizeof(float));
++			for (size_t i = 0; i < n; i++) be->depth[i] = 1.0f;
++			// A never-presented front buffer reads as opaque black, which is
++			// what a freshly created wgpu texture composites as.
++			for (size_t i = 0; i < (size_t) width * height; i++)
++				be->front[i] = 0xFF000000u;
++		}
++	}
+ 	return avm2_undefined();
+ }
+ 
+ static Avm2Value context3d_set_culling(Avm2Activation* act)
+ {
+-	s3d_check_enum(act->ctx, s3d_arg_string(act, 0, "triangleFaceToCull", NULL),
+-	               S3D_TRIANGLE_FACE, "triangleFaceToCull");
++	const Avm2String* f = s3d_arg_string(act, 0, "triangleFaceToCull", NULL);
++	s3d_check_enum(act->ctx, f, S3D_TRIANGLE_FACE, "triangleFaceToCull");
++	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
++	if (be != NULL) be->cull = (uint8_t) s3d_enum_index(f, S3D_TRIANGLE_FACE);
+ 	return avm2_undefined();
+ }
+ 
+ static Avm2Value context3d_set_depth_test(Avm2Activation* act)
+ {
+-	s3d_check_enum(act->ctx, s3d_arg_string(act, 1, "passCompareMode", NULL),
+-	               S3D_COMPARE_MODE, "passCompareMode");
++	const Avm2String* m = s3d_arg_string(act, 1, "passCompareMode", NULL);
++	s3d_check_enum(act->ctx, m, S3D_COMPARE_MODE, "passCompareMode");
++	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
++	if (be != NULL)
++	{
++		be->depth_mask = (uint8_t) s3d_arg_bool(act, 0, 0);
++		be->depth_func = (uint8_t) s3d_enum_index(m, S3D_COMPARE_MODE);
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -642,27 +1524,65 @@ static Avm2Value context3d_set_sampler_state_at(Avm2Activation* act)
+ static Avm2Value context3d_set_program_constants_from_matrix(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+-	s3d_check_enum(ctx, s3d_arg_string(act, 0, "programType", NULL),
+-	               S3D_PROGRAM_TYPE, "programType");
+-	if (s3d_arg_object(act, 2) == NULL) s3d_throw_2007(ctx, "matrix");
++	const Avm2String* pt = s3d_arg_string(act, 0, "programType", NULL);
++	s3d_check_enum(ctx, pt, S3D_PROGRAM_TYPE, "programType");
++	Avm2Object* mo = s3d_arg_object(act, 2);
++	if (mo == NULL) s3d_throw_2007(ctx, "matrix");
++
++	// The registers take rawData verbatim, four floats each; `transposedMatrix`
++	// transposes FIRST (context_3d.rs:287-303 — and its comment about
++	// column-major order, which the corpus agrees with).
++	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
++	double raw[16];
++	if (be != NULL && avm2_geom_matrix3d_read(mo, raw))
++	{
++		if (s3d_arg_bool(act, 3, 0))
++		{
++			for (int r = 0; r < 4; r++)
++				for (int c = r + 1; c < 4; c++)
++				{
++					double t = raw[r * 4 + c];
++					raw[r * 4 + c] = raw[c * 4 + r];
++					raw[c * 4 + r] = t;
++				}
++		}
++		float f[16];
++		for (int i = 0; i < 16; i++) f[i] = (float) raw[i];
++		s3d_store_consts(be, s3d_str_is(pt, "fragment"),
++		                 s3d_arg_u32(act, 1, 0), f, 16);
++	}
+ 	return avm2_undefined();
+ }
+ 
+ static Avm2Value context3d_set_program_constants_from_vector(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+-	s3d_check_enum(ctx, s3d_arg_string(act, 0, "programType", NULL),
+-	               S3D_PROGRAM_TYPE, "programType");
++	const Avm2String* pt = s3d_arg_string(act, 0, "programType", NULL);
++	s3d_check_enum(ctx, pt, S3D_PROGRAM_TYPE, "programType");
+ 	Avm2Object* vo = s3d_arg_object(act, 2);
+ 	if (vo == NULL) s3d_throw_2007(ctx, "vector");
+ 	Avm2VectorExt* vec = avm2_vector_ext(vo);
+ 	int32_t num_registers = s3d_arg_i32(act, 3, -1);
+ 	// numRegisters == -1 means "use the whole vector"; anything else demands
+ 	// 4 floats per register (context_3d.rs:337-347).
++	uint32_t to_take = (vec != NULL) ? vec->length : 0;
+ 	if (num_registers != -1)
+ 	{
+ 		uint32_t required = (uint32_t) num_registers * 4u;
+ 		if (vec == NULL || vec->length < required) s3d_throw_3669(ctx);
++		to_take = required;
++	}
++
++	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
++	if (be != NULL && vec != NULL && to_take > 0)
++	{
++		uint32_t first = s3d_arg_u32(act, 1, 0);
++		int is_frag = s3d_str_is(pt, "fragment");
++		for (uint32_t i = 0; i < to_take; i++)
++		{
++			float f = (float) avm2_coerce_to_number(ctx, vec->elems[i]);
++			s3d_store_const_float(be, is_frag, first, i, f);
++		}
+ 	}
+ 	return avm2_undefined();
+ }
+@@ -673,8 +1593,8 @@ static Avm2Value context3d_set_program_constants_from_vector(Avm2Activation* act
+ static Avm2Value context3d_set_program_constants_from_byte_array(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+-	s3d_check_enum(ctx, s3d_arg_string(act, 0, "programType", NULL),
+-	               S3D_PROGRAM_TYPE, "programType");
++	const Avm2String* pt = s3d_arg_string(act, 0, "programType", NULL);
++	s3d_check_enum(ctx, pt, S3D_PROGRAM_TYPE, "programType");
+ 	int32_t num_registers = s3d_arg_i32(act, 2, 0);
+ 	Avm2Value dv = s3d_arg(act, 3);
+ 	if (dv.kind != AVM2_VALUE_OBJECT) s3d_throw_2007(ctx, "data");
+@@ -686,6 +1606,22 @@ static Avm2Value context3d_set_program_constants_from_byte_array(Avm2Activation*
+ 	if (offset > len) s3d_throw_3669(ctx);
+ 	uint32_t whole_floats = (len - offset) / 4u;
+ 	if (whole_floats < (uint32_t) num_registers * 4u) s3d_throw_3669(ctx);
++
++	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
++	if (be != NULL && ba != NULL)
++	{
++		uint32_t first = s3d_arg_u32(act, 1, 0);
++		int is_frag = s3d_str_is(pt, "fragment");
++		uint32_t n = (uint32_t) num_registers * 4u;
++		for (uint32_t i = 0; i < n; i++)
++		{
++			// Raw little-endian floats, whatever the ByteArray's `endian`.
++			uint32_t bits = agal_u32le(ba->bytes + offset + i * 4);
++			float f;
++			memcpy(&f, &bits, sizeof(f));
++			s3d_store_const_float(be, is_frag, first, i, f);
++		}
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -694,15 +1630,53 @@ static Avm2Value context3d_set_scissor_rectangle(Avm2Activation* act)
+ 	// A null rectangle turns scissoring off; a zero-width/height one is
+ 	// ignored by Stage3D (stage3d/scissor_rectangle_invalid). Either way
+ 	// nothing is validated.
+-	(void) s3d_arg(act, 0);
++	Avm2Context* ctx = act->ctx;
++	Avm2Value rv = s3d_arg(act, 0);
++	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
++	if (be == NULL) return avm2_undefined();
++	if (rv.kind != AVM2_VALUE_OBJECT)
++	{
++		be->scissor_on = 0;
++		return avm2_undefined();
++	}
++	double rx = avm2_coerce_to_number(ctx,
++		avm2_get_public_property(ctx, rv, "x", 1, NULL));
++	double ry = avm2_coerce_to_number(ctx,
++		avm2_get_public_property(ctx, rv, "y", 1, NULL));
++	double rw = avm2_coerce_to_number(ctx,
++		avm2_get_public_property(ctx, rv, "width", 5, NULL));
++	double rh = avm2_coerce_to_number(ctx,
++		avm2_get_public_property(ctx, rv, "height", 6, NULL));
++	if (!(rw > 0.0) || !(rh > 0.0))
++	{
++		// wgpu rejects an empty scissor; Ruffle keeps the previous one, which
++		// for stage3d/scissor_rectangle_invalid means "no scissor at all".
++		be->scissor_on = 0;
++		return avm2_undefined();
++	}
++	be->scissor_on = 1;
++	be->sc_x0 = (int32_t) rx;
++	be->sc_y0 = (int32_t) ry;
++	be->sc_x1 = (int32_t) (rx + rw);
++	be->sc_y1 = (int32_t) (ry + rh);
+ 	return avm2_undefined();
+ }
+ 
+ static Avm2Value context3d_clear(Avm2Activation* act)
+ {
+ 	// All seven parameters are declared numeric, so they are already coerced;
+-	// there is nothing left to validate.
+-	(void) act;
++	// there is nothing left to validate. The clear itself is DEFERRED to the
++	// render pass the next draw opens (mod.rs:206-227) — a clear with no
++	// following draw never reaches the buffer.
++	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
++	if (be == NULL) return avm2_undefined();
++	be->clear_rgba[0] = (float) s3d_arg_number(act, 0, 0.0);
++	be->clear_rgba[1] = (float) s3d_arg_number(act, 1, 0.0);
++	be->clear_rgba[2] = (float) s3d_arg_number(act, 2, 0.0);
++	be->clear_rgba[3] = (float) s3d_arg_number(act, 3, 1.0);
++	be->clear_depth = (float) s3d_arg_number(act, 4, 1.0);
++	be->clear_mask = s3d_arg_u32(act, 6, 0xFFFFFFFFu);
++	be->pending_clear = 1;
+ 	return avm2_undefined();
+ }
+ 
+@@ -722,7 +1696,12 @@ static Avm2Value context3d_create_index_buffer(Avm2Activation* act)
+ 	Avm2Object* o = s3d_new_child(act, g_indexbuffer_class);
+ 	if (o == NULL) return avm2_null();
+ 	Avm2Buffer3DExt* e = (Avm2Buffer3DExt*) o->native_ext;
+-	if (e != NULL) { e->context3d = s3d_this(act); e->count = num_indices; }
++	if (e != NULL)
++	{
++		e->context3d = s3d_this(act);
++		e->count = num_indices;
++		s3d_buffer_alloc(ctx, e, num_indices);
++	}
+ 	return avm2_object_value(o);
+ }
+ 
+@@ -745,6 +1724,7 @@ static Avm2Value context3d_create_vertex_buffer(Avm2Activation* act)
+ 		e->context3d = s3d_this(act);
+ 		e->count = num_vertices;
+ 		e->data32_per_vertex = per_vertex;
++		s3d_buffer_alloc(ctx, e, (uint64_t) num_vertices * per_vertex);
+ 	}
+ 	return avm2_object_value(o);
+ }
+@@ -763,18 +1743,207 @@ static Avm2Value context3d_create_program(Avm2Activation* act)
+ // and expects silence.
+ static Avm2Value context3d_set_vertex_buffer_at(Avm2Activation* act)
+ {
+-	if (s3d_arg_object(act, 1) != NULL)
++	Avm2Object* buf = s3d_arg_object(act, 1);
++	const Avm2String* fmt = NULL;
++	if (buf != NULL)
+ 	{
+-		s3d_check_enum(act->ctx,
+-		               s3d_arg_string(act, 3, "vertexStreamFormat", "float4"),
+-		               S3D_VERTEX_FORMAT, "vertexStreamFormat");
++		fmt = s3d_arg_string(act, 3, "vertexStreamFormat", "float4");
++		s3d_check_enum(act->ctx, fmt, S3D_VERTEX_FORMAT, "vertexStreamFormat");
+ 	}
++	uint32_t idx = s3d_arg_u32(act, 0, 0);
++	Avm2Context3DExt* e = context3d_ext(act);
++	S3dBackend* be = s3d_backend(act->ctx, e);
++	if (e != NULL && be != NULL && idx < S3D_ATTRS)
++	{
++		e->va_buf[idx] = buf;
++		be->va_off32[idx] = s3d_arg_u32(act, 2, 0);
++		be->va_fmt[idx] = (buf == NULL) ? S3D_VF_NONE
++			: (uint8_t) (s3d_enum_index(fmt, S3D_VERTEX_FORMAT) + 1);
++	}
++	return avm2_undefined();
++}
++
++static Avm2Value context3d_set_program(Avm2Activation* act)
++{
++	Avm2Context3DExt* e = context3d_ext(act);
++	if (e != NULL) e->program = s3d_arg_object(act, 0);
+ 	return avm2_undefined();
+ }
+ 
++// drawTriangles(indexBuffer, firstIndex = 0, numTriangles = -1). Everything
++// here is best-effort: a missing program / unbacked buffer renders nothing,
++// which is what Ruffle's own "unbound required textures" arm does, and — per
++// the w1 report's §6.7 warning — adds no new throw to a block of tests that
++// currently pass on trace.
+ static Avm2Value context3d_draw_triangles(Avm2Activation* act)
+ {
+-	if (s3d_arg_object(act, 0) == NULL) s3d_throw_2007(act->ctx, "indexBuffer");
++	Avm2Context* ctx = act->ctx;
++	Avm2Object* ibo = s3d_arg_object(act, 0);
++	if (ibo == NULL) s3d_throw_2007(ctx, "indexBuffer");
++	uint32_t first_index = s3d_arg_u32(act, 1, 0);
++	int32_t num_triangles = s3d_arg_i32(act, 2, -1);
++
++	Avm2Context3DExt* e = context3d_ext(act);
++	S3dBackend* be = (e != NULL) ? e->be : NULL;
++	if (be == NULL || be->color == NULL || be->w == 0 || be->h == 0)
++		return avm2_undefined();
++	if (g_s3d_frag_budget == 0) return avm2_undefined();   // latched off
++
++	Avm2Buffer3DExt* ib = (Avm2Buffer3DExt*) s3d_ext_of(ibo, g_indexbuffer_class);
++	if (ib == NULL || ib->words == NULL) return avm2_undefined();
++	Avm2Program3DExt* pr = (e->program != NULL)
++		? (Avm2Program3DExt*) s3d_ext_of(e->program, g_program3d_class) : NULL;
++	if (pr == NULL || !pr->uploaded || pr->vcode == NULL || pr->fcode == NULL)
++		return avm2_undefined();
++
++	uint32_t avail = ib->word_count > first_index
++		? ib->word_count - first_index : 0;
++	uint32_t tris = (num_triangles < 0) ? avail / 3
++		: (uint32_t) num_triangles;
++	if (tris > avail / 3) tris = avail / 3;
++	if (tris == 0) return avm2_undefined();
++
++	s3d_apply_pending_clear(be);
++
++	Avm2Buffer3DExt* vb[S3D_ATTRS];
++	for (uint32_t i = 0; i < S3D_ATTRS; i++)
++	{
++		vb[i] = (e->va_buf[i] != NULL)
++			? (Avm2Buffer3DExt*) s3d_ext_of(e->va_buf[i], g_vertexbuffer_class)
++			: NULL;
++	}
++
++	// Vertex work has to be budgeted in its own right, not just stopped once
++	// the FRAGMENT budget is gone: a mesh whose triangles are off-screen or
++	// behind the eye is rejected before it shades a single pixel, so it spends
++	// nothing on the pixel budget while still running the vertex shader three
++	// times per triangle. That is where away3d's ~14 s went.
++	uint64_t vtokens = (pr->vlen > 7) ? (pr->vlen - 7) / 24 : 1;
++	uint64_t tri_cost = 3 * (vtokens + 2);
++
++	for (uint32_t t = 0; t < tris; t++)
++	{
++		if (g_s3d_frag_budget < tri_cost) { g_s3d_frag_budget = 0; break; }
++		g_s3d_frag_budget -= tri_cost;
++		S3dVertexOut vo[3];
++		for (int k = 0; k < 3; k++)
++		{
++			uint32_t vi = ib->words[first_index + t * 3 + k];
++			s3d_run_vertex(be, pr->vcode, pr->vlen, vb, vi, &vo[k]);
++		}
++		s3d_raster_draw(be, pr->fcode, pr->flen, &vo[0], &vo[1], &vo[2]);
++	}
++	return avm2_undefined();
++}
++
++static Avm2Value context3d_present(Avm2Activation* act)
++{
++	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
++	if (be != NULL) s3d_present(be);
++	return avm2_undefined();
++}
++
++// ---------------------------------------------------------------------------
++// Buffer uploads (index_buffer_3d.rs / vertex_buffer_3d.rs)
++// ---------------------------------------------------------------------------
++
++static Avm2Buffer3DExt* s3d_buffer_ext(Avm2Activation* act, Avm2Class* want)
++{ return (Avm2Buffer3DExt*) s3d_ext_of(s3d_this(act), want); }
++
++static Avm2Value indexbuffer_upload_from_vector(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Buffer3DExt* e = s3d_buffer_ext(act, g_indexbuffer_class);
++	Avm2Object* vo = s3d_arg_object(act, 0);
++	uint32_t start = s3d_arg_u32(act, 1, 0);
++	uint32_t count = s3d_arg_u32(act, 2, 0);
++	if (e == NULL || vo == NULL) return avm2_undefined();
++	Avm2VectorExt* vec = avm2_vector_ext(vo);
++	if (vec == NULL) return avm2_undefined();
++	if (e->words == NULL || start + count > e->word_count)
++		s3d_buffer_alloc(ctx, e, (uint64_t) start + count);
++	if (e->words == NULL) return avm2_undefined();
++	for (uint32_t i = 0; i < count && i < vec->length; i++)
++	{
++		// Ruffle narrows to u16 ("FIXME - use the low 16 bytes").
++		uint32_t v = avm2_coerce_to_u32(ctx, vec->elems[i]) & 0xFFFFu;
++		if (start + i < e->word_count) e->words[start + i] = v;
++	}
++	return avm2_undefined();
++}
++
++static Avm2Value indexbuffer_upload_from_byte_array(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Buffer3DExt* e = s3d_buffer_ext(act, g_indexbuffer_class);
++	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(s3d_arg(act, 0));
++	uint32_t byte_off = s3d_arg_u32(act, 1, 0);
++	uint32_t start = s3d_arg_u32(act, 2, 0);
++	uint32_t count = s3d_arg_u32(act, 3, 0);
++	if (e == NULL || ba == NULL || ba->bytes == NULL) return avm2_undefined();
++	if (e->words == NULL || start + count > e->word_count)
++		s3d_buffer_alloc(ctx, e, (uint64_t) start + count);
++	if (e->words == NULL) return avm2_undefined();
++	for (uint32_t i = 0; i < count; i++)
++	{
++		uint64_t off = (uint64_t) byte_off + (uint64_t) i * 2;
++		if (off + 2 > ba->len || start + i >= e->word_count) break;
++		// Each index is always 16 bits, little-endian.
++		e->words[start + i] =
++			(uint32_t) ba->bytes[off] | ((uint32_t) ba->bytes[off + 1] << 8);
++	}
++	return avm2_undefined();
++}
++
++static Avm2Value vertexbuffer_upload_from_vector(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Buffer3DExt* e = s3d_buffer_ext(act, g_vertexbuffer_class);
++	Avm2Object* vo = s3d_arg_object(act, 0);
++	uint32_t start_vertex = s3d_arg_u32(act, 1, 0);
++	uint32_t num_vertices = s3d_arg_u32(act, 2, 0);
++	if (e == NULL || vo == NULL || e->data32_per_vertex == 0)
++		return avm2_undefined();
++	Avm2VectorExt* vec = avm2_vector_ext(vo);
++	if (vec == NULL) return avm2_undefined();
++	uint64_t base = (uint64_t) start_vertex * e->data32_per_vertex;
++	uint64_t n = (uint64_t) num_vertices * e->data32_per_vertex;
++	if (e->words == NULL || base + n > e->word_count)
++		s3d_buffer_alloc(ctx, e, base + n);
++	if (e->words == NULL) return avm2_undefined();
++	for (uint64_t i = 0; i < n && i < vec->length; i++)
++	{
++		float f = (float) avm2_coerce_to_number(ctx, vec->elems[i]);
++		uint32_t bits;
++		memcpy(&bits, &f, sizeof(bits));
++		if (base + i < e->word_count) e->words[base + i] = bits;
++	}
++	return avm2_undefined();
++}
++
++static Avm2Value vertexbuffer_upload_from_byte_array(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Buffer3DExt* e = s3d_buffer_ext(act, g_vertexbuffer_class);
++	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(s3d_arg(act, 0));
++	uint32_t byte_off = s3d_arg_u32(act, 1, 0);
++	uint32_t start_vertex = s3d_arg_u32(act, 2, 0);
++	uint32_t num_vertices = s3d_arg_u32(act, 3, 0);
++	if (e == NULL || ba == NULL || ba->bytes == NULL
++	    || e->data32_per_vertex == 0)
++		return avm2_undefined();
++	uint64_t base = (uint64_t) start_vertex * e->data32_per_vertex;
++	uint64_t n = (uint64_t) num_vertices * e->data32_per_vertex;
++	if (e->words == NULL || base + n > e->word_count)
++		s3d_buffer_alloc(ctx, e, base + n);
++	if (e->words == NULL) return avm2_undefined();
++	for (uint64_t i = 0; i < n; i++)
++	{
++		uint64_t off = (uint64_t) byte_off + i * 4;
++		if (off + 4 > ba->len || base + i >= e->word_count) break;
++		// Raw 32-bit words; the attribute format decides how they are read.
++		e->words[base + i] = agal_u32le(ba->bytes + off);
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -1243,7 +2412,33 @@ static Avm2Value program3d_upload(Avm2Activation* act)
+ 
+ 	Avm2Program3DExt* e =
+ 		(Avm2Program3DExt*) s3d_ext_of(s3d_this(act), g_program3d_class);
+-	if (e != NULL) e->uploaded = 1;
++	if (e != NULL)
++	{
++		// S3: retain the validated bytecode for the interpreter. A failed
++		// allocation leaves the program un-drawable rather than throwing.
++		e->uploaded = 1;
++		if (e->vcode != NULL) { heap_free(ctx->app, e->vcode); e->vcode = NULL; }
++		if (e->fcode != NULL) { heap_free(ctx->app, e->fcode); e->fcode = NULL; }
++		e->vlen = e->flen = 0;
++		if (vba != NULL && vba->len > 0)
++		{
++			e->vcode = (uint8_t*) heap_alloc(ctx->app, vba->len);
++			if (e->vcode != NULL)
++			{
++				memcpy(e->vcode, vba->bytes, vba->len);
++				e->vlen = vba->len;
++			}
++		}
++		if (fba != NULL && fba->len > 0)
++		{
++			e->fcode = (uint8_t*) heap_alloc(ctx->app, fba->len);
++			if (e->fcode != NULL)
++			{
++				memcpy(e->fcode, fba->bytes, fba->len);
++				e->flen = fba->len;
++			}
++		}
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -2810,13 +4005,13 @@ void avm2_register_stage3d(Avm2Context* ctx)
+ 	                        context3d_create_video_texture);
+ 	avm2_builtin_add_method(ctx, c3d, "setVertexBufferAt",
+ 	                        context3d_set_vertex_buffer_at);
+-	avm2_builtin_add_method(ctx, c3d, "setProgram", s3d_noop);
++	avm2_builtin_add_method(ctx, c3d, "setProgram", context3d_set_program);
+ 	avm2_builtin_add_method(ctx, c3d, "setTextureAt", s3d_noop);
+ 	avm2_builtin_add_method(ctx, c3d, "setColorMask", s3d_noop);
+ 	avm2_builtin_add_method(ctx, c3d, "setStencilReferenceValue", s3d_noop);
+ 	avm2_builtin_add_method(ctx, c3d, "setRenderToBackBuffer", s3d_noop);
+ 	avm2_builtin_add_method(ctx, c3d, "drawToBitmapData", s3d_noop);
+-	avm2_builtin_add_method(ctx, c3d, "present", s3d_noop);
++	avm2_builtin_add_method(ctx, c3d, "present", context3d_present);
+ 	avm2_builtin_add_method(ctx, c3d, "clear", context3d_clear);
+ 	avm2_builtin_add_method(ctx, c3d, "drawTriangles", context3d_draw_triangles);
+ 	avm2_builtin_add_method(ctx, c3d, "setCulling", context3d_set_culling);
+@@ -2849,15 +4044,19 @@ void avm2_register_stage3d(Avm2Context* ctx)
+ 	Avm2Class* vb = s3d_class(ctx, "VertexBuffer3D", b->object_class);
+ 	g_vertexbuffer_class = vb;
+ 	vb->native_ext_size = sizeof(Avm2Buffer3DExt);
+-	avm2_builtin_add_method(ctx, vb, "uploadFromByteArray", s3d_noop);
+-	avm2_builtin_add_method(ctx, vb, "uploadFromVector", s3d_noop);
++	avm2_builtin_add_method(ctx, vb, "uploadFromByteArray",
++	                        vertexbuffer_upload_from_byte_array);
++	avm2_builtin_add_method(ctx, vb, "uploadFromVector",
++	                        vertexbuffer_upload_from_vector);
+ 	avm2_builtin_add_method(ctx, vb, "dispose", s3d_noop);
+ 
+ 	Avm2Class* ib = s3d_class(ctx, "IndexBuffer3D", b->object_class);
+ 	g_indexbuffer_class = ib;
+ 	ib->native_ext_size = sizeof(Avm2Buffer3DExt);
+-	avm2_builtin_add_method(ctx, ib, "uploadFromByteArray", s3d_noop);
+-	avm2_builtin_add_method(ctx, ib, "uploadFromVector", s3d_noop);
++	avm2_builtin_add_method(ctx, ib, "uploadFromByteArray",
++	                        indexbuffer_upload_from_byte_array);
++	avm2_builtin_add_method(ctx, ib, "uploadFromVector",
++	                        indexbuffer_upload_from_vector);
+ 	avm2_builtin_add_method(ctx, ib, "dispose", s3d_noop);
+ 
+ 	// flash.display3D.textures.* — one ext for the whole ladder, so the
+@@ -2922,3 +4121,113 @@ void avm2_register_stage3d(Avm2Context* ctx)
+ 		                        stage_get_stage3ds);
+ 	}
+ }
++
++// ---------------------------------------------------------------------------
++// S3 exports: the composite hook and the ext-free hook
++// ---------------------------------------------------------------------------
++
++// Hand avm2_display.c one Stage3D's front buffer, in the order and under the
++// rules stage.rs:625-634 uses: `stage3Ds` index order, skipping invisible ones
++// and ones whose context never had configureBackBuffer called. Returns 0 when
++// there is nothing to composite for `index`.
++int avm2_stage3d_front_buffer(Avm2Context* ctx, uint32_t index,
++                              uint32_t stage_w, uint32_t stage_h,
++                              const uint32_t** pixels, uint32_t* w, uint32_t* h,
++                              double* x, double* y)
++{
++	if (index >= 4) return 0;
++	Avm2Object* s = g_stage3ds[index];
++	if (s == NULL) return 0;
++	Avm2Stage3DExt* se = (Avm2Stage3DExt*) s3d_ext_of(s, g_stage3d_class);
++	if (se == NULL || !se->visible || se->context3d == NULL) return 0;
++	Avm2Context3DExt* ce =
++		(Avm2Context3DExt*) s3d_ext_of(se->context3d, g_context3d_class);
++	if (ce == NULL || ce->be == NULL) return 0;
++	S3dBackend* be = ce->be;
++	if (be->front == NULL || be->w == 0 || be->h == 0) return 0;
++
++	// The renderer drops a dynamic-bitmap source larger than
++	// `dynamic_bitmap_max`, which avm2_render_init sets to the STAGE's longest
++	// side — and a Stage3D back buffer is routinely bigger than the stage
++	// (stage3d/scissor_rectangle configures 640x480 on a 550x400 stage, and
++	// rendered blank until this crop existed). Ruffle draws the whole quad and
++	// lets the render target clip it, which is visibly identical to drawing
++	// only the part inside the stage, so crop here: the result always fits,
++	// because max(crop_w, crop_h) <= max(stage_w, stage_h) = the cap.
++	int32_t ox = (int32_t) se->x;
++	int32_t oy = (int32_t) se->y;
++	int32_t vx0 = ox > 0 ? ox : 0;
++	int32_t vy0 = oy > 0 ? oy : 0;
++	int64_t vx1 = (int64_t) ox + be->w;
++	int64_t vy1 = (int64_t) oy + be->h;
++	if (vx1 > (int64_t) stage_w) vx1 = stage_w;
++	if (vy1 > (int64_t) stage_h) vy1 = stage_h;
++	if (vx1 <= vx0 || vy1 <= vy0) return 0;
++	uint32_t cw = (uint32_t) (vx1 - vx0);
++	uint32_t ch = (uint32_t) (vy1 - vy0);
++
++	if (cw == be->w && ch == be->h && ox >= 0 && oy >= 0)
++	{
++		*pixels = be->front;
++		*w = be->w;
++		*h = be->h;
++		*x = se->x;
++		*y = se->y;
++		return 1;
++	}
++
++	if (be->crop == NULL || be->crop_cap < cw * ch)
++	{
++		if (be->crop != NULL) heap_free(ctx->app, be->crop);
++		be->crop = (uint32_t*) heap_alloc(ctx->app, (size_t) cw * ch * 4);
++		be->crop_cap = (be->crop != NULL) ? cw * ch : 0;
++	}
++	if (be->crop == NULL) return 0;
++	for (uint32_t r = 0; r < ch; r++)
++	{
++		uint32_t sy = (uint32_t) (vy0 - oy) + r;
++		memcpy(be->crop + (size_t) r * cw,
++		       be->front + (size_t) sy * be->w + (uint32_t) (vx0 - ox),
++		       (size_t) cw * 4);
++	}
++	*pixels = be->crop;
++	*w = cw;
++	*h = ch;
++	*x = (double) vx0;
++	*y = (double) vy0;
++	return 1;
++}
++
++// Every heap block the S3 backend owns hangs off one of three ext kinds; the
++// collector calls this just before it frees the ext blob itself.
++void avm2_stage3d_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
++{
++	if (o == NULL || o->native_ext == NULL || o->cls == NULL) return;
++	if (g_context3d_class != NULL && class_is_a(o->cls, g_context3d_class))
++	{
++		Avm2Context3DExt* e = (Avm2Context3DExt*) o->native_ext;
++		if (e->be != NULL)
++		{
++			s3d_backend_free_buffers(ctx, e->be);
++			heap_free(ctx->app, e->be);
++			e->be = NULL;
++		}
++		return;
++	}
++	if ((g_vertexbuffer_class != NULL && class_is_a(o->cls, g_vertexbuffer_class))
++	    || (g_indexbuffer_class != NULL
++	        && class_is_a(o->cls, g_indexbuffer_class)))
++	{
++		Avm2Buffer3DExt* e = (Avm2Buffer3DExt*) o->native_ext;
++		if (e->words != NULL) { heap_free(ctx->app, e->words); e->words = NULL; }
++		e->word_count = 0;
++		return;
++	}
++	if (g_program3d_class != NULL && class_is_a(o->cls, g_program3d_class))
++	{
++		Avm2Program3DExt* e = (Avm2Program3DExt*) o->native_ext;
++		if (e->vcode != NULL) { heap_free(ctx->app, e->vcode); e->vcode = NULL; }
++		if (e->fcode != NULL) { heap_free(ctx->app, e->fcode); e->fcode = NULL; }
++		e->vlen = e->flen = 0;
++	}
++}
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 61da5aa16..447ca886a 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -130,3 +130,23 @@ avm2/graphics_simple_shapes                 # drawRoundRect + one-fill-across-
+ visual/simple_shapes/layers                 # LINESTYLE2 square caps + miter
+                                             #   join, miterLimit 1.0, 20-30 px
+                                             #   strokes
++
++# SESSION 19 ADDITIONS (s19 wave-2 `w2-stage3d-a`). Before this slice the set
++# had NO Stage3D member at all and could not get one: every Stage3D row was a
++# flat blank render, so a change to the (nonexistent) backend could only ever
++# report IDENTICAL. The w1 scoping report's canary-audit lead named
++# `avm2/stage3d_triangle` as the pick the moment phase A landed.
++#
++# Both members are listed tier=2 because their CI verdict at the time of
++# writing is the pre-patch blank. `stage3d_triangle` graded 0 outliers /
++# max diff 1 against its golden LOCALLY after the patch (tolerance 1,
++# max_outliers 0) — promote it to tier=1 once a CI images run confirms that.
++
++# tier=2  (CI-failing / skipped; A/B signal only)
++avm2/stage3d_triangle                       # the whole phase-A path in one
++                                            #   comparison: AGAL interpret,
++                                            #   4x MSAA raster, resolve,
++                                            #   present, opaque composite
++avm2/stage3d_rotating_cube                  # m44 + setProgramConstantsFrom-
++                                            #   Matrix + back-face culling +
++                                            #   the multi-tick redraw path

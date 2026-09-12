@@ -1,0 +1,162 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 743308834..1cc0f405e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -9276,8 +9333,111 @@ static void gfx_emit_rect(Avm2GraphicsExt* g, double x, double y,
+ 	gfx_add_cmd(g, 1, x,       y,       0, 0);
+ }
+ 
+-// drawRect/drawRoundRect/drawEllipse(x, y, w, h) — round-rect corner radii are
+-// approximated as a plain rect this tranche (AABB unchanged).
++// Ruffle's UNIT_CIRCLE_POINTS (avm2/globals/flash/display/graphics.rs): the
++// five control/anchor points of the quarter-ellipse Flash Player itself uses
++// for a rounded corner, kept bit-for-bit including Ruffle's asymmetric
++// 0.414.../6.12e-17 literals (its own TODO notes they are not tidied).
++static const double GFX_UCP[5][2] = {
++	{ 1.0, 0.0 },
++	{ 1.0, 0.41421356237309503 },
++	{ 0.7071067811865476, 0.7071067811865476 },
++	{ 0.4142135623730951, 1.0 },
++	{ 0.00000000000000006123233995736766, 1.0 },
++};
++
++// Port of Ruffle `draw_round_rect_internal`. Four independent corner ellipses,
++// each radius clamped to half the corresponding side, traced from the MIDDLE of
++// the bottom-right ellipse (that is where Flash Player starts) anticlockwise
++// through bottom, left, top and right. Every corner is two quadratics; the four
++// straight sides are the LineTos between them, and they degenerate to zero
++// length when the radii eat the whole side.
++static void gfx_emit_round_rect(Avm2GraphicsExt* g, double x, double y,
++                                double width, double height,
++                                double tlw, double tlh, double trw, double trh,
++                                double blw, double blh, double brw, double brh)
++{
++	double hw = width / 2.0, hh = height / 2.0;
++	if (tlw > hw) tlw = hw;
++	if (tlh > hh) tlh = hh;
++	if (trw > hw) trw = hw;
++	if (trh > hh) trh = hh;
++	if (blw > hw) blw = hw;
++	if (blh > hh) blh = hh;
++	if (brw > hw) brw = hw;
++	if (brh > hh) brh = hh;
++
++	double brcx = x + width - brw, brcy = y + height - brh;
++	double blcx = x + blw,         blcy = y + height - blh;
++	double tlcx = x + tlw,         tlcy = y + tlh;
++	double trcx = x + width - trw, trcy = y + trh;
++
++	// Middle of the bottom-right ellipse.
++	double br_x = brcx + brw * GFX_UCP[2][0], br_y = brcy + brh * GFX_UCP[2][1];
++	gfx_add_cmd(g, 0, br_x, br_y, 0, 0);
++	gfx_add_cmd(g, 2, brcx + brw * GFX_UCP[4][0], brcy + brh * GFX_UCP[4][1],
++	                  brcx + brw * GFX_UCP[3][0], brcy + brh * GFX_UCP[3][1]);
++	// Bottom side.
++	gfx_add_cmd(g, 1, blcx - blw * GFX_UCP[4][0], blcy + blh * GFX_UCP[4][1], 0, 0);
++	// Bottom-left ellipse.
++	gfx_add_cmd(g, 2, blcx - blw * GFX_UCP[2][0], blcy + blh * GFX_UCP[2][1],
++	                  blcx - blw * GFX_UCP[3][0], blcy + blh * GFX_UCP[3][1]);
++	gfx_add_cmd(g, 2, blcx - blw * GFX_UCP[0][0], blcy + blh * GFX_UCP[0][1],
++	                  blcx - blw * GFX_UCP[1][0], blcy + blh * GFX_UCP[1][1]);
++	// Left side.
++	gfx_add_cmd(g, 1, tlcx - tlw * GFX_UCP[0][0], tlcy - tlh * GFX_UCP[0][1], 0, 0);
++	// Top-left ellipse.
++	gfx_add_cmd(g, 2, tlcx - tlw * GFX_UCP[2][0], tlcy - tlh * GFX_UCP[2][1],
++	                  tlcx - tlw * GFX_UCP[1][0], tlcy - tlh * GFX_UCP[1][1]);
++	gfx_add_cmd(g, 2, tlcx - tlw * GFX_UCP[4][0], tlcy - tlh * GFX_UCP[4][1],
++	                  tlcx - tlw * GFX_UCP[3][0], tlcy - tlh * GFX_UCP[3][1]);
++	// Top side.
++	gfx_add_cmd(g, 1, trcx + trw * GFX_UCP[4][0], trcy - trh * GFX_UCP[4][1], 0, 0);
++	// Top-right ellipse.
++	gfx_add_cmd(g, 2, trcx + trw * GFX_UCP[2][0], trcy - trh * GFX_UCP[2][1],
++	                  trcx + trw * GFX_UCP[3][0], trcy - trh * GFX_UCP[3][1]);
++	gfx_add_cmd(g, 2, trcx + trw * GFX_UCP[0][0], trcy - trh * GFX_UCP[0][1],
++	                  trcx + trw * GFX_UCP[1][0], trcy - trh * GFX_UCP[1][1]);
++	// Right side, then the other half of the bottom-right ellipse.
++	gfx_add_cmd(g, 1, brcx + brw * GFX_UCP[0][0], brcy + brh * GFX_UCP[0][1], 0, 0);
++	gfx_add_cmd(g, 2, br_x, br_y,
++	                  brcx + brw * GFX_UCP[1][0], brcy + brh * GFX_UCP[1][1]);
++}
++
++// drawRoundRect(x, y, w, h, ellipseWidth, ellipseHeight). A missing/NaN
++// ellipseHeight mirrors ellipseWidth (Ruffle `draw_round_rect`), and the single
++// ellipse size is HALVED into a per-corner radius pair.
++//
++// The AABB is still unioned from the two rectangle corners rather than walked
++// per command: the extreme point of every corner ellipse lies exactly on the
++// rectangle edge (ucp[0].x = ucp[4].y = 1), so the two boxes are identical and
++// this keeps the bounds independent of the emitted curve list.
++static Avm2Value gfx_draw_round_rect(Avm2Activation* act)
++{
++	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
++	Avm2GraphicsExt* g = gfx_self_ext(act);
++	if (act->argc >= 5)
++	{
++		double x = avm2_coerce_to_number(act->ctx, act->args[0]);
++		double y = avm2_coerce_to_number(act->ctx, act->args[1]);
++		double w = avm2_coerce_to_number(act->ctx, act->args[2]);
++		double h = avm2_coerce_to_number(act->ctx, act->args[3]);
++		double ew = avm2_coerce_to_number(act->ctx, act->args[4]);
++		double eh = act->argc > 5 ? avm2_coerce_to_number(act->ctx, act->args[5])
++		                          : (double) NAN;
++		if (isnan(eh)) eh = ew;
++		if (ext != NULL)
++		{
++			draw_union_stroke(ext, g, x, y);
++			draw_union_stroke(ext, g, x + w, y + h);
++		}
++		if (g != NULL)
++			gfx_emit_round_rect(g, x, y, w, h, ew / 2.0, eh / 2.0, ew / 2.0,
++			                    eh / 2.0, ew / 2.0, eh / 2.0, ew / 2.0, eh / 2.0);
++	}
++	return avm2_undefined();
++}
++
++// drawRect/drawEllipse(x, y, w, h).
+ static Avm2Value gfx_draw_rect(Avm2Activation* act)
+ {
+ 	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
+@@ -9294,11 +9454,31 @@ static Avm2Value gfx_draw_rect(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
+-// drawRoundRectComplex(x, y, w, h, tl, tr, bl, br) — the four radii are
+-// approximated away exactly like drawRoundRect's single radius (AABB unchanged).
++// drawRoundRectComplex(x, y, w, h, tl, tr, bl, br). Ruffle passes each radius
++// in as BOTH the width and the height of its corner ellipse (circular corners).
+ static Avm2Value gfx_draw_round_rect_complex(Avm2Activation* act)
+ {
+-	return gfx_draw_rect(act);
++	Avm2DisplayObjectExt* ext = graphics_owner_ext(act);
++	Avm2GraphicsExt* g = gfx_self_ext(act);
++	if (act->argc >= 8)
++	{
++		double x  = avm2_coerce_to_number(act->ctx, act->args[0]);
++		double y  = avm2_coerce_to_number(act->ctx, act->args[1]);
++		double w  = avm2_coerce_to_number(act->ctx, act->args[2]);
++		double h  = avm2_coerce_to_number(act->ctx, act->args[3]);
++		double tl = avm2_coerce_to_number(act->ctx, act->args[4]);
++		double tr = avm2_coerce_to_number(act->ctx, act->args[5]);
++		double bl = avm2_coerce_to_number(act->ctx, act->args[6]);
++		double br = avm2_coerce_to_number(act->ctx, act->args[7]);
++		if (ext != NULL)
++		{
++			draw_union_stroke(ext, g, x, y);
++			draw_union_stroke(ext, g, x + w, y + h);
++		}
++		if (g != NULL)
++			gfx_emit_round_rect(g, x, y, w, h, tl, tl, tr, tr, bl, bl, br, br);
++	}
++	return avm2_undefined();
+ }
+ 
+ // cubicCurveTo(c1x, c1y, c2x, c2y, ax, ay). Our command stream carries
+@@ -16912,7 +17092,7 @@ void avm2_register_display(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, graphics, "curveTo", gfx_curve_to);
+ 	avm2_builtin_add_method(ctx, graphics, "cubicCurveTo", gfx_cubic_curve_to);
+ 	avm2_builtin_add_method(ctx, graphics, "drawRect", gfx_draw_rect);
+-	avm2_builtin_add_method(ctx, graphics, "drawRoundRect", gfx_draw_rect);
++	avm2_builtin_add_method(ctx, graphics, "drawRoundRect", gfx_draw_round_rect);
+ 	avm2_builtin_add_method(ctx, graphics, "drawRoundRectComplex",
+ 	                        gfx_draw_round_rect_complex);
+ 	avm2_builtin_add_method(ctx, graphics, "drawEllipse", gfx_draw_ellipse);

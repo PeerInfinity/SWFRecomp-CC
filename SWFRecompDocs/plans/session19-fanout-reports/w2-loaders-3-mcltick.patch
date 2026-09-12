@@ -1,0 +1,555 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index 337fba6ed..f76a68fac 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -233,6 +233,17 @@ void actionQueueClipActionUnloadDeferred(void (*fn)(SWFAppContext*), MovieClip*
+ void actionQueueDynamicChildUnloads(MovieClip* parent_mc);
+ // Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame
+ void actionFirePendingLoadInits(SWFAppContext* app_context);
++// Fire the onLoadInit/onLoadError handlers the drain above PARKED for the next
++// tick. Must run immediately before actionAdvancePlayingLevels (and once after
++// the tick loop), so the sequence is enterFrame -> onLoadInit -> the loaded
++// movie's next frame. See regression/avm1_mcl_load_tick.
++void actionDrainPendingLoadInits(SWFAppContext* app_context);
++// Same, but for the final tick / loop exit: no next tick exists, so entries
++// queued by THIS tick fire too instead of being dropped.
++void actionDrainPendingLoadInitsFinal(SWFAppContext* app_context);
++// Non-zero while at least one onLoadInit is parked — an exit-condition reason
++// to keep ticking, like a pending MCL load.
++int actionHasPendingLoadInits(void);
+ // ImportAssets: load an imported SWF's init function in the current context
+ void actionImportAssets(SWFAppContext* app_context, const char* url);
+ // ImportAssets: issue the imported URL's GET at PRELOAD time (called from
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 89cd79b76..4c8a465cf 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -24234,13 +24234,15 @@ typedef struct {
+ 	                       //   driver runs in the SAME tick right after it, so an
+ 	                       //   armed-at-birth entry runs TWO of the movie's frames
+ 	                       //   on its load tick. Flash gives it one per tick.
+-	                       //   Clip targets of a direct loadMovie start unarmed;
+-	                       //   _levelN and MovieClipLoader targets start ARMED,
+-	                       //   keeping the double step they have always had --
+-	                       //   from_shumway/avm1/moviecliploader has num_frames=3
+-	                       //   and only reaches its loadee's frame 2 because of
+-	                       //   it, which says our MCL load itself completes a tick
+-	                       //   later than Flash's. Fixing that is its own change.
++	                       //   Clip targets of a direct loadMovie start unarmed,
++	                       //   and so do MovieClipLoader targets since the
++	                       //   Phase-3 split (the double step was compensating
++	                       //   for onLoadInit firing inside the load's own
++	                       //   drain; see g_pending_load_inits and
++	                       //   regression/avm1_mcl_load_tick). Only a _levelN
++	                       //   target of a DIRECT loadMovieNum still starts
++	                       //   ARMED -- nothing grades it, and unarming it
++	                       //   widens the blast radius for no measured gain.
+ } LevelAdvanceEntry;
+ #define MAX_LEVEL_ADVANCE 128
+ static LevelAdvanceEntry g_level_advance[MAX_LEVEL_ADVANCE];
+@@ -24325,10 +24327,19 @@ void actionRegisterChildMovieAdvance(MovieClip* mc, MovieEntry* entry, int start
+ 	e->armed = (u8)(start_armed ? 1 : 0);
+ }
+ 
+-// MovieClipLoader targets. Kept armed at birth: see the `armed` field comment.
++// MovieClipLoader targets.
++//
++// UNARMED since the Phase-3 split (regression/avm1_mcl_load_tick): the loader
++// already ran the movie's frame 1 itself, so the same tick's
++// actionAdvancePlayingLevels must not run frame 2 as well. The double step was
++// compensating for Phase 3 firing inside the load's own drain — with
++// onLoadInit moved to the next tick's pre-advance slot, arming at birth would
++// put the movie a whole frame ahead of Ruffle from `c2` onwards.
++// `_levelN` targets (actionRegisterChildMovieAdvance's other caller) are
++// deliberately left armed: nothing grades them and it widens the blast radius.
+ void actionRegisterLevelAdvance(MovieClip* mc, MovieEntry* entry)
+ {
+-	actionRegisterChildMovieAdvance(mc, entry, /*start_armed=*/1);
++	actionRegisterChildMovieAdvance(mc, entry, /*start_armed=*/0);
+ }
+ 
+ // Stop per-tick frame advancement for a previously-registered level/MC.
+@@ -24961,6 +24972,10 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
+ 	int saved_quit = quit_swf;
+ 	quit_swf = 0;
+ 	actionFirePendingDirectLoads(app_context);
++	// The MCL Phase-3 slot, same as swf_core.c / swf.c: the previous AVM2
++	// tick's drain parked onLoadInit, and it fires here, just before the
++	// loaded movie's own advance.
++	actionDrainPendingLoadInits(app_context);
+ 	actionAdvancePlayingLevels(app_context);
+ 	actionFirePendingUnloads(app_context);
+ 	quit_swf = saved_quit;
+@@ -36394,6 +36409,30 @@ static PendingMCLLoad g_pending_mcl_loads_next_tick[MAX_PENDING_MCL_LOADS];
+ int g_pending_mcl_load_count_next_tick = 0;
+ int g_pending_mcl_load_count = 0;  // sum of both buckets (for exit-condition checks)
+ 
++// Phase 3 (`onLoadInit` / `onLoadError`) is NOT fired by the drain that ran
++// phases 1 and 2 — it is parked here and fired by actionDrainPendingLoadInits
++// on the NEXT tick, immediately BEFORE actionAdvancePlayingLevels.
++//
++// Ruffle/Flash order for a one-frame loader (regression/avm1_mcl_load_tick,
++// oracled against the Ruffle exporter):
++//
++//     c1, t1 h.cf=1, onLoadInit cf=1, c2, t2 h.cf=2, c3, ...
++//               ^ the root's own onEnterFrame for the tick AFTER the load,
++//                 then onLoadInit, then the loaded movie's frame 2
++//
++// so the slot is: after the tick's enterFrame broadcast, before the loaded
++// movie's advance. Draining at the existing end-of-tick MCL site instead would
++// give `t1, c2, onLoadInit` — the position is the whole point of the queue.
++// Entries are pushed in Phase 3's LIFO order and drained in push order, so the
++// relative firing order between several loads is unchanged.
++// The stamp is what makes it "next tick" rather than "later in this tick": the
++// drain that queues an entry runs inside tagShowFrame, which is EARLIER in the
++// same tick than the pre-advance slot, so a position-only move would still fire
++// onLoadInit before the next enterFrame broadcast.
++static PendingMCLLoad g_pending_load_inits[MAX_PENDING_MCL_LOADS];
++static size_t g_pending_load_init_tick[MAX_PENDING_MCL_LOADS];
++static int g_pending_load_init_count = 0;
++
+ // Helper: create an ActionVar string from an ASCII C string
+ static ActionVar makeStringVar(SWFAppContext* app_context, const char* str)
+ {
+@@ -37190,10 +37229,59 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
+         }
+     }
+ 
+-    // Phase 3: Fire onLoadInit (success) or onLoadError (failure) for each load (LIFO order)
++    // Phase 3: QUEUE onLoadInit / onLoadError (LIFO order, preserved by the
++    // FIFO drain). It fires on the next tick, in actionDrainPendingLoadInits —
++    // see the g_pending_load_inits comment for why the slot matters.
++    {
++        extern size_t g_tick_count;
++        for (int i = count - 1; i >= 0; i--) {
++            if (g_pending_load_init_count >= MAX_PENDING_MCL_LOADS) break;
++            g_pending_load_init_tick[g_pending_load_init_count] = g_tick_count;
++            g_pending_load_inits[g_pending_load_init_count++] = loads[i];
++        }
++    }
++}
++
++// Fire the onLoadInit / onLoadError handlers parked by the previous drain.
++// Called immediately BEFORE actionAdvancePlayingLevels in every tick loop
++// (swf_core.c, swf.c, and the AVM1-under-AVM2 tick in this file), and once
++// more after the loop so a load parked on the final tick is not dropped.
++int actionHasPendingLoadInits(void)
++{
++    return g_pending_load_init_count > 0;
++}
++
++static void drain_pending_load_inits(SWFAppContext* app_context, int force)
++{
++    extern size_t g_tick_count;
++    if (g_pending_load_init_count == 0) return;
++    // Take only the entries queued on an EARLIER tick (unless forced, which is
++    // the end-of-run case). Copy and reset first: a handler may chain another
++    // loadClip, whose own Phase 3 must land in a FRESH queue, not extend this
++    // pass.
++    PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
++    int count = 0, keep = 0;
++    for (int i = 0; i < g_pending_load_init_count; i++) {
++        if (force || g_pending_load_init_tick[i] != g_tick_count) {
++            loads[count++] = g_pending_load_inits[i];
++        } else {
++            g_pending_load_init_tick[keep] = g_pending_load_init_tick[i];
++            g_pending_load_inits[keep++] = g_pending_load_inits[i];
++        }
++    }
++    g_pending_load_init_count = keep;
++    if (count == 0) return;
++
+     // For root replacement, onLoadInit fires in child's SWF version context
+-    for (int i = count - 1; i >= 0; i--) {
++    for (int i = 0; i < count; i++) {
+         if (g_execution_halted) break;
++        // Same dead-clip gate the queue side uses: a removeMovieClip between
++        // the load's own drain and this one cancels the remaining handler.
++        MovieClip* t = loads[i].target;
++        if (t != NULL && (t->avm1_removed || t->pending_removal
++                          || t->depth == INT_MIN)) {
++            continue;
++        }
+         ActionVar mc_var = {0};
+         mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+         mc_var.data.numeric_value = (u64)loads[i].target;
+@@ -37228,6 +37316,19 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
+     }
+ }
+ 
++// The per-tick slot: fires only what an EARLIER tick queued.
++void actionDrainPendingLoadInits(SWFAppContext* app_context)
++{
++    drain_pending_load_inits(app_context, 0);
++}
++
++// End of run (final tick / loop exit): there is no next tick to fire in, so
++// everything goes, same-tick entries included.
++void actionDrainPendingLoadInitsFinal(SWFAppContext* app_context)
++{
++    drain_pending_load_inits(app_context, 1);
++}
++
+ // Query button MC visibility for button state machine (tag.c)
+ int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name, MovieClip* parent)
+ {
+diff --git a/SWFModernRuntime/src/libswf/swf.c b/SWFModernRuntime/src/libswf/swf.c
+index 9fa8041e4..d1c099a14 100644
+--- a/SWFModernRuntime/src/libswf/swf.c
++++ b/SWFModernRuntime/src/libswf/swf.c
+@@ -513,6 +513,7 @@ void tagMain(SWFAppContext* app_context)
+ 			    && !hasPlayingLevels()
+ 			    && !hasClipEnterFrameHandlers()
+ 			    && g_pending_mcl_load_count == 0
++			    && !actionHasPendingLoadInits()
+ 			    && g_pending_direct_load_count == 0) break;
+ 
+ 			// FSCommand:quit was called in a prior tick — exit as soon as
+@@ -1276,6 +1277,10 @@ void tagMain(SWFAppContext* app_context)
+ 		// not in display_list — advance_sprite_frames doesn't reach those).
+ 		// Mirrors swf_core.c line ~1299.
+ 		{
++			// The MCL Phase-3 slot, mirroring swf_core.c: after this tick's
++			// enterFrame broadcast, before the loaded movie's own advance.
++			// See actionDrainPendingLoadInits / regression/avm1_mcl_load_tick.
++			actionDrainPendingLoadInits(app_context);
+ 			extern void actionAdvancePlayingLevels(SWFAppContext*);
+ 			actionAdvancePlayingLevels(app_context);
+ 		}
+@@ -1334,6 +1339,8 @@ void tagMain(SWFAppContext* app_context)
+ 				while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
+ 					actionFirePendingLoadInits(app_context);
+ 			}
++			// …and the deferred Phase 3, which has no next tick to fire in.
++			actionDrainPendingLoadInitsFinal(app_context);
+ 		}
+ #endif
+ 
+@@ -1383,6 +1390,10 @@ void tagMain(SWFAppContext* app_context)
+ 				actionFirePendingDirectLoads(app_context);
+ 		}
+ 		{
++			// The MCL Phase-3 slot, mirroring swf_core.c: after this tick's
++			// enterFrame broadcast, before the loaded movie's own advance.
++			// See actionDrainPendingLoadInits / regression/avm1_mcl_load_tick.
++			actionDrainPendingLoadInits(app_context);
+ 			extern void actionAdvancePlayingLevels(SWFAppContext*);
+ 			actionAdvancePlayingLevels(app_context);
+ 		}
+diff --git a/SWFModernRuntime/src/libswf/swf_core.c b/SWFModernRuntime/src/libswf/swf_core.c
+index a30bce7de..400193a42 100644
+--- a/SWFModernRuntime/src/libswf/swf_core.c
++++ b/SWFModernRuntime/src/libswf/swf_core.c
+@@ -1186,6 +1186,10 @@ void swfStart(SWFAppContext* app_context)
+ 				    && !hasPlayingLevels()
+ 				    && !hasClipEnterFrameHandlers()
+ 				    && g_pending_mcl_load_count == 0
++				    // A parked onLoadInit keeps the player alive exactly like
++				    // a pending load: it fires at this tick's pre-advance slot,
++				    // which is below this check.
++				    && !actionHasPendingLoadInits()
+ 				    && g_pending_direct_load_count == 0) break;
+ 			}
+ 			{
+@@ -1459,6 +1463,10 @@ void swfStart(SWFAppContext* app_context)
+ 		// not in display_list, so advance_sprite_frames doesn't reach them — but
+ 		// their timelines still need to play after the initial loadMovieNum.
+ 		{
++			// The MCL Phase-3 slot: after this tick's enterFrame broadcast,
++			// before the loaded movie's own advance. See
++			// actionDrainPendingLoadInits / regression/avm1_mcl_load_tick.
++			actionDrainPendingLoadInits(app_context);
+ 			extern void actionAdvancePlayingLevels(SWFAppContext*);
+ 			actionAdvancePlayingLevels(app_context);
+ 		}
+@@ -1529,6 +1537,12 @@ void swfStart(SWFAppContext* app_context)
+ 			while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
+ 				actionFirePendingLoadInits(app_context);
+ 		}
++		// …and the same rule for the deferred Phase 3: onLoadInit normally
++		// fires at the NEXT tick's pre-advance slot, which does not exist on
++		// the final iteration. Fire it here rather than dropping it.
++		if (tick_count >= max_ticks) {
++			actionDrainPendingLoadInitsFinal(app_context);
++		}
+ 
+ 		// A goto issued from a timer/event callback (setInterval, etc.) queues the
+ 		// target frame's DoAction via ng_executeGotoCatchUp's drain-suppressed
+@@ -1574,6 +1588,9 @@ void swfStart(SWFAppContext* app_context)
+ 			if (g_events && g_event_pos < g_event_count) continue;
+ 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
+ 			if (g_pending_mcl_load_count > 0) continue;
++			// A parked onLoadInit is a reason to keep ticking, exactly like a
++			// pending load: it fires at the NEXT tick's pre-advance slot.
++			if (actionHasPendingLoadInits()) continue;
+ 			if (g_pending_direct_load_count > 0) continue;
+ 			{ extern int hasPlayingLevels(void); if (hasPlayingLevels()) continue; }
+ 			{ extern int hasPlayingSounds(void); if (hasPlayingSounds()) continue; }
+@@ -1664,6 +1681,9 @@ void swfStart(SWFAppContext* app_context)
+ 			// end of frame 0 but pending loadClip in _next_tick still needs
+ 			// promote+drain on tick 2).
+ 			if (g_pending_mcl_load_count > 0) continue;
++			// A parked onLoadInit is a reason to keep ticking, exactly like a
++			// pending load: it fires at the NEXT tick's pre-advance slot.
++			if (actionHasPendingLoadInits()) continue;
+ 			if (g_pending_direct_load_count > 0) continue;
+ 			break;
+ 		}
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/Parent.as b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/Parent.as
+new file mode 100644
+index 000000000..d6273be2e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/Parent.as
+@@ -0,0 +1,22 @@
++class Parent {
++    static var mcl:MovieClipLoader;
++    static var lis:Object;
++    static var t:Number = 0;
++    static function main(root:MovieClip) {
++        var h:MovieClip = root.createEmptyMovieClip("h", 1);
++        mcl = new MovieClipLoader();
++        lis = new Object();
++        lis.onLoadStart = function(tgt) { trace("onLoadStart"); };
++        lis.onLoadProgress = function(tgt, bl, bt) { trace("onLoadProgress"); };
++        lis.onLoadComplete = function(tgt) { trace("onLoadComplete"); };
++        lis.onLoadInit = function(tgt) { trace("onLoadInit cf=" + tgt._currentframe); };
++        mcl.addListener(lis);
++        root.onEnterFrame = function() {
++            Parent.t++;
++            trace("t" + Parent.t + " h.cf=" + root.h._currentframe);
++            if (Parent.t >= 6) { delete root.onEnterFrame; }
++        };
++        trace("loadClip");
++        mcl.loadClip("child.swf", h);
++    }
++}
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/README.md b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/README.md
+new file mode 100644
+index 000000000..c0a98e5ad
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/README.md
+@@ -0,0 +1,69 @@
++# avm1_mcl_load_tick
++
++Where a `MovieClipLoader` load lands in the tick. Two coupled facts, fixed
++together; each is a one-line-pair discriminator on its own.
++
++1. **`onLoadInit` fires on the tick AFTER the load's own drain**, in the slot
++   between that tick's `enterFrame` broadcast and the loaded movie's advance —
++   `t1 h.cf=1`, then `onLoadInit cf=1`, then `c2`. Our Phase 3 used to run in
++   the same pass as phases 1 and 2, inside `tagShowFrame`, which is ahead of
++   the root's first `onEnterFrame`. The queue that defers it is
++   `g_pending_load_inits` in `action.c`; the drain is
++   `actionDrainPendingLoadInits`, called immediately before
++   `actionAdvancePlayingLevels` in `swf_core.c`, `swf.c`, and the
++   AVM1-under-AVM2 tick. **The position is the whole point** — draining at the
++   existing end-of-tick MCL site instead gives `t1, c2, onLoadInit`.
++2. **A MovieClipLoader target starts UNARMED.** The loader runs the movie's
++   frame 1 itself (Phase 2) and `actionAdvancePlayingLevels` runs later in the
++   *same* tick, so arming at birth ran frame 2 as well. That double step was
++   compensating for (1)'s position, not for the delivery tick.
++
++| revert | you get |
++|---|---|
++| (1) alone | `c1, onLoadInit cf=1, t1 h.cf=1, c2` — onLoadInit above `t1` |
++| (2) alone | `c1, c2, t1 h.cf=2, onLoadInit cf=2` — the movie a frame ahead |
++| both (the pre-fix state) | `c1, onLoadInit cf=1, c2, t1 h.cf=2, c3, t2 h.cf=3` |
++
++## What this test deliberately does NOT encode
++
++The **delivery** tick. Our `onLoadStart`/`onLoadProgress`/`onLoadComplete`
++(and the movie's frame 1) land one tick later than Ruffle's, and that is
++**Flash's** order: `from_shumway/avm1/moviecliploader` grades exactly this —
++its Flash `output.txt` puts `loader frame 2` before `onLoadStart`, its
++`output.ruffle.txt` does not, and we pass it by following Flash. Moving
++delivery to Ruffle's tick would turn that `pass` into `ruffle_matched` on a
++`known_failure = true` test, i.e. a regression.
++
++So this fixture uses a **one-frame** loader, for which `loadClip` takes the
++`_this_tick` bucket and the whole Ruffle trace is reachable without touching
++the two-bucket deferral (`builtin_mcl_loadClip`'s `defer_to_next_tick` +
++`actionPromotePendingMCLLoads`). A two-frame-loader fixture would encode
++Ruffle's delivery tick and must not be created. Analysis:
++`SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md` §4.
++
++## The shape
++
++    test.swf   AVM1 (MTASC, Parent.as), ONE frame: createEmptyMovieClip("h"),
++               a MovieClipLoader with all four handlers, an _root.onEnterFrame
++               tracing `t<N> h.cf=<h._currentframe>` (self-deleting after 6),
++               then loadClip("child.swf", h)
++    child.swf  hand-assembled, 3 frames: DoAction Push "cN" + Trace per frame,
++               with a Stop on frame 3 so the playhead parks (the `t4..t6
++               h.cf=3` rows)
++
++`num_ticks = 8` — enough for all six `t` rows plus the load tick.
++
++## Oracle
++
++`output.txt` is the local Ruffle exporter's trace, byte for byte — never our
++own output. Recipe (memory `mcl_load_timing`): both SWFs under
++`<dir>/armorgames.com/`, then
++
++    RUFFLE_LOCAL_FETCH_DIR=<dir> RUFFLE_MOVIE_URL=https://armorgames.com/test.swf \
++      ~/CC/ruffle/target/release/exporter test.swf out -s -f 8 --trace-log ruffle.txt
++
++A plain `file://` movie URL silently never loads the child.
++
++## Rebuild
++
++    python3 create_test_swf.py     # needs ~/CC/mtasc/bin/mtasc
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/child.swf b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..932762455494ab5abac7247fe7cf49ccf72d66ad
+GIT binary patch
+literal 62
+zcmZ<@59Y9AU|`5#kau8Uy~DsD$IQUVJdK5cA=!{YjlluNF#>bAATq`bYV1HM1_l5W
+C;|J>i
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/create_test_swf.py
+new file mode 100644
+index 000000000..1b7d2f731
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/create_test_swf.py
+@@ -0,0 +1,91 @@
++#!/usr/bin/env python3
++"""Regenerate test.swf + child.swf for avm1_mcl_load_tick.
++
++Pins down the TICK POSITION of a MovieClipLoader load, which is two coupled
++facts (both fixed together — reverting either flips a different pair of lines):
++
++  1. `onLoadInit` fires on the tick AFTER the load's own drain, in the slot
++     between that tick's enterFrame broadcast and the loaded movie's advance.
++     Before: `c1, onLoadInit, c2, t1 h.cf=2` — the handler ran inside
++     tagShowFrame, ahead of the root's first onEnterFrame.
++  2. A MovieClipLoader target starts UNARMED. The loader already runs the
++     movie's frame 1 itself (Phase 2), so arming at birth made the same tick's
++     actionAdvancePlayingLevels run frame 2 as well — a double step that was
++     compensating for (1)'s position, not for the delivery tick.
++
++Reverting only (2) gives `c1, c2, t1 h.cf=2, onLoadInit cf=2`; reverting only
++(1) gives `c1, onLoadInit, t1 h.cf=1`. Both are one-line-pair discriminators.
++
++What is DELIBERATELY not changed: the two-bucket delivery deferral in
++`builtin_mcl_loadClip` (`defer_to_next_tick` + actionPromotePendingMCLLoads).
++Our onLoadStart/Progress/Complete land one tick later than Ruffle's, and that
++is FLASH's order — `from_shumway/avm1/moviecliploader` grades it (its Flash
++`output.txt` puts `loader frame 2` before `onLoadStart`, its
++`output.ruffle.txt` does not), and we pass it. So this fixture uses a ONE-FRAME
++loader, whose Ruffle order is reachable without touching delivery at all.
++See SWFRecompDocs/plans/session19-fanout-reports/w1-loaders-report.md §4.
++
++The loader is MTASC-compiled; the 3-frame child is hand-assembled (each frame
++is one DoAction: Push "cN", Trace; then ShowFrame), because a compiler-built
++child would drag in class-init frames and blur the frame boundaries the test
++is measuring.
++
++output.txt is the Ruffle exporter's trace, byte for byte; see README.md.
++"""
++import pathlib
++import struct
++import subprocess
++
++HERE = pathlib.Path(__file__).resolve().parent
++MTASC = pathlib.Path.home() / "CC/mtasc/bin/mtasc"
++MTASC_STD = pathlib.Path.home() / "CC/mtasc/ocaml/mtasc/std"
++
++T_END, T_SHOWFRAME, T_DOACTION = 0, 1, 12
++ACTION_PUSH, ACTION_TRACE, ACTION_STOP = 0x96, 0x26, 0x07
++
++
++def tag(code, body):
++    if len(body) < 0x3F:
++        return struct.pack("<H", (code << 6) | len(body)) + body
++    return struct.pack("<HI", (code << 6) | 0x3F, len(body)) + body
++
++
++def rect(xmax_tw, ymax_tw, nbits=13):
++    bits = format(nbits, "05b") + "".join(
++        format(v & ((1 << nbits) - 1), f"0{nbits}b")
++        for v in (0, xmax_tw, 0, ymax_tw)
++    )
++    bits += "0" * ((-len(bits)) % 8)
++    return bytes(int(bits[i:i + 8], 2) for i in range(0, len(bits), 8))
++
++
++def do_trace(text, stop=False):
++    payload = b"\x00" + text.encode("ascii") + b"\x00"     # push type 0 = string
++    body = bytes([ACTION_PUSH]) + struct.pack("<H", len(payload)) + payload
++    body += bytes([ACTION_TRACE])
++    if stop:
++        body += bytes([ACTION_STOP])
++    body += b"\x00"                                         # end of actions
++    return tag(T_DOACTION, body)
++
++
++def build_child(path):
++    """3 frames tracing c1 / c2 / c3; frame 3 also stops, so the playhead
++    parks there instead of wrapping (the oracle's `t4..t6 h.cf=3` rows).
++    200x150 @ 30fps, SWF 8."""
++    body = rect(200 * 20, 150 * 20) + struct.pack("<HH", 30 * 256, 3)
++    for i in (1, 2, 3):
++        body += do_trace(f"c{i}", stop=(i == 3)) + tag(T_SHOWFRAME, b"")
++    body += tag(T_END, b"")
++    path.write_bytes(b"FWS" + bytes([8]) + struct.pack("<I", 8 + len(body)) + body)
++
++
++def build_parent(path):
++    subprocess.run(
++        [str(MTASC), "-cp", str(MTASC_STD), "-main", "-header", "200:150:30",
++         str(HERE / "Parent.as"), "-swf", str(path), "-version", "8"],
++        check=True, cwd=str(HERE))
++
++
++build_child(HERE / "child.swf")
++build_parent(HERE / "test.swf")
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/output.txt b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/output.txt
+new file mode 100644
+index 000000000..0c2c85385
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/output.txt
+@@ -0,0 +1,14 @@
++loadClip
++onLoadStart
++onLoadProgress
++onLoadComplete
++c1
++t1 h.cf=1
++onLoadInit cf=1
++c2
++t2 h.cf=2
++c3
++t3 h.cf=3
++t4 h.cf=3
++t5 h.cf=3
++t6 h.cf=3
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/test.swf b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..7ac72377049f7fc3aecd404ba3365e3bb360863a
+GIT binary patch
+literal 553
+zcmV+^0@nRQS5pYI0{{Sc+H6zJZrVT)9<L2H<tHtaxUC|TQ>0vYfJ#w<XhI_eV?pm|
+zF&l7eyw-aAlP73S9DVD1^kMoEm3mKS*CvosA7*#P-^_gb?d&%&{s5GI0dx%LlL!1N
+zWx&rj(4038(c;dZPJJ4Dq6?OGeJWTi;i1tn74H5wyn-S&T||6FBS-|7T;3%NRy2%Z
+z34(J8fnZd!%T*%phWty&`cas`Dv03GyWw=s1Vmv9quECmNZ_%GO(YeYy)XDeurw{)
+zK3^pfldN#B<52EwkAvGYm<FGPqIWCkiUFO^Z^Bfv7#s2UGL}qS=^qk~mtBRAR9VF>
+zSccKOn|{58-ekfgc22G$x=0}-;J{I{`Gde4q8#H$ht`gg&U}sLJE}IyEU>^K9y*4b
+zJLbBf6g5vF7v-msHNaM4JC;q<Qqr}`V@x7$-YKhqW812><6Mlku}U6$_83E3@szEu
+z>qQ$P7ZS>va`j{nS6jD{Fq8_MIg7xWZSb{yeEolQ>-)IIQ(O(QGB^hoah`jFf6#Vu
+z{5)Xm^cQ1&@?45$E-N|3K`Js)$X1ci^8C?Lf1s9^gKYsz*HoRijayz;0$Yvxdwq{}
+z*lGCI)fC$&Srw4;VSX{Y1lwbT9OTT2W!UN|IPRH?x1zY{dl|vG`3~3n4#tKbdXxTi
+r*t_;XE^)q#7o*>YW~BzkEoNyW3DF(Ru?rXI{sjO4|NjF3{|&m-<`@k^
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/test.toml b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/test.toml
+new file mode 100644
+index 000000000..4637108fd
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mcl_load_tick/test.toml
+@@ -0,0 +1 @@
++num_ticks = 8

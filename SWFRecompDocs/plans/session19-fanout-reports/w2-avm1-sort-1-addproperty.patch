@@ -1,0 +1,26 @@
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -69494,6 +69494,23 @@
+ 
+ 					g_prev_executing_func = prev_exec_fm;
+ 					g_current_executing_func = mfunc;
++					// A builtin reached through the virtual Function.prototype ->
++					// Object.prototype chain takes the RECEIVER's own_props as its
++					// `this_obj`, and every one of them bails out on NULL
++					// (builtin_object_addProperty: `if (this_obj == NULL ...) return
++					// ret;`). A plain `var f = function(){}` has own_props == NULL
++					// until something writes a property on it, so addProperty /
++					// watch / unwatch / hasOwnProperty / isPropertyEnumerable all
++					// silently no-opped on a fresh function:
++					// avm1/new_class_prototype_getter's
++					// `testCls.addProperty("prototype", getter, null)` returned
++					// false and installed nothing. Mint the bag lazily here — same
++					// idiom as the Function.prototype.call/apply thisArg path
++					// above.
++					if (func != NULL && func->own_props == NULL) {
++						func->own_props = allocObject(app_context, 4);
++						retainObject(func->own_props);
++					}
+ 					g_call_depth++;
+ 					ActionVar result = mfunc->advanced_func(app_context, args, num_args, registers, (void*) func->own_props);
+ 					g_call_depth--;

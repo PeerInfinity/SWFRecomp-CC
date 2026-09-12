@@ -1,0 +1,283 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 89cd79b76..8e8ba766d 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -12801,13 +12801,24 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
+     int mergeAlpha = 0;
+     if (arg_count >= 6) mergeAlpha = (int)varToDoubleSimple(&args[5]);
+ 
+-    // When source and destination are the same BitmapData (or the alpha
+-    // bitmap aliases either of them), we can't read-as-we-write: later
+-    // iterations would pick up already-overwritten pixels. Snapshot the
+-    // aliasing source(s) into temp buffers before the loop.
++    // The alpha-bitmap arm below is the only one that still needs a snapshot of an
++    // aliasing source: it is a per-pixel un/re-premultiply walk with no
++    // direction rule of its own, so reading as we write would pick up
++    // already-overwritten pixels.
++    int bdcp_alpha_path = (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent);
++    // The plain (no alpha bitmap) self-copy instead follows Flash's own overwrite
++    // rule, mirroring Ruffle operations/copy_on_cpu.rs::copy_on_cpu_self
++    // (ea3956e89): walk backwards when the destination moved in the SAME direction
++    // on both axes, forwards otherwise. A snapshot would be "correct" but wrong:
++    // when the two deltas disagree in sign Flash Player really does read pixels it
++    // has already overwritten, and avm1/bitmapdata_copypixels_self pins those rows.
++    // The deltas are taken before clamping; clamping shifts the source and
++    // destination minima together, so the difference is preserved.
++    int bdcp_self_reverse = (src_bmp == dest_bmp) && !bdcp_alpha_path
++                            && (dx - rx) >= 0 && (dy - ry) >= 0;
+     uint32_t* src_snapshot = NULL;
+     uint32_t* alpha_snapshot = NULL;
+-    if (src_bmp == dest_bmp) {
++    if (src_bmp == dest_bmp && bdcp_alpha_path) {
+         size_t nb = (size_t)src_bmp->width * (size_t)src_bmp->height * sizeof(uint32_t);
+         src_snapshot = (uint32_t*) malloc(nb);
+         memcpy(src_snapshot, src_bmp->pixels, nb);
+@@ -12820,7 +12831,7 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
+     uint32_t* src_pixels = src_snapshot ? src_snapshot : src_bmp->pixels;
+     uint32_t* alpha_pixels = (alpha_bmp ? (alpha_snapshot ? alpha_snapshot : alpha_bmp->pixels) : NULL);
+ 
+-    if (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent) {
++    if (bdcp_alpha_path) {
+         // Transparent alpha bitmap path — blend when mergeAlpha || dest is opaque
+         int alpha_blend = mergeAlpha || !dest_bmp->transparent;
+         for (int sy = 0; sy < rh; sy++) {
+@@ -12855,15 +12866,18 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
+                 if (alpha_blend) {
+                     uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
+                     uint32_t spa = (src_px >> 24) & 0xFF;
+-                    uint32_t inv_sa = 255 - spa;
++                    // blend_over: the inverse-alpha factor is (256 - sa) >> 8, not
++                    // (255 - sa)/255 (ruffle 0c6a734da, Flash-verified over the full
++                    // 0..255 alpha range; the twin of avm2_bitmap.c::blend_over).
++                    uint32_t inv_sa = 256 - spa;
+                     uint32_t da = (dst_px >> 24) & 0xFF;
+                     uint32_t dr = (dst_px >> 16) & 0xFF;
+                     uint32_t dg = (dst_px >> 8) & 0xFF;
+                     uint32_t db = dst_px & 0xFF;
+-                    uint32_t oa = spa + (da * inv_sa) / 255;
+-                    uint32_t or_ = ((src_px >> 16) & 0xFF) + (dr * inv_sa) / 255;
+-                    uint32_t og = ((src_px >> 8) & 0xFF) + (dg * inv_sa) / 255;
+-                    uint32_t ob = (src_px & 0xFF) + (db * inv_sa) / 255;
++                    uint32_t oa = spa + ((da * inv_sa) >> 8);
++                    uint32_t or_ = ((src_px >> 16) & 0xFF) + ((dr * inv_sa) >> 8);
++                    uint32_t og = ((src_px >> 8) & 0xFF) + ((dg * inv_sa) >> 8);
++                    uint32_t ob = (src_px & 0xFF) + ((db * inv_sa) >> 8);
+                     if (oa > 255) oa = 255;
+                     if (or_ > 255) or_ = 255;
+                     if (og > 255) og = 255;
+@@ -12879,8 +12893,10 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
+     } else {
+         // No alpha bitmap — blend when (source transparent && dest opaque) || mergeAlpha
+         int blend = (src_bmp->transparent && !dest_bmp->transparent) || mergeAlpha;
+-        for (int sy = 0; sy < rh; sy++) {
+-            for (int sx = 0; sx < rw; sx++) {
++        for (int syi = 0; syi < rh; syi++) {
++            int sy = bdcp_self_reverse ? (rh - 1 - syi) : syi;
++            for (int sxi = 0; sxi < rw; sxi++) {
++                int sx = bdcp_self_reverse ? (rw - 1 - sxi) : sxi;
+                 int src_x = rx + sx;
+                 int src_y = ry + sy;
+                 int dst_x = dx + sx;
+@@ -12891,15 +12907,17 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
+                 if (blend) {
+                     uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
+                     uint32_t sa = (src_px >> 24) & 0xFF;
+-                    uint32_t inv_sa = 255 - sa;
++                    // blend_over, (256 - sa) >> 8 form — see the note in the
++                    // alpha-bitmap arm above.
++                    uint32_t inv_sa = 256 - sa;
+                     uint32_t da = (dst_px >> 24) & 0xFF;
+                     uint32_t dr = (dst_px >> 16) & 0xFF;
+                     uint32_t dg = (dst_px >> 8) & 0xFF;
+                     uint32_t db = dst_px & 0xFF;
+-                    uint32_t oa = sa + (da * inv_sa) / 255;
+-                    uint32_t or_ = ((src_px >> 16) & 0xFF) + (dr * inv_sa) / 255;
+-                    uint32_t og = ((src_px >> 8) & 0xFF) + (dg * inv_sa) / 255;
+-                    uint32_t ob = (src_px & 0xFF) + (db * inv_sa) / 255;
++                    uint32_t oa = sa + ((da * inv_sa) >> 8);
++                    uint32_t or_ = ((src_px >> 16) & 0xFF) + ((dr * inv_sa) >> 8);
++                    uint32_t og = ((src_px >> 8) & 0xFF) + ((dg * inv_sa) >> 8);
++                    uint32_t ob = (src_px & 0xFF) + ((db * inv_sa) >> 8);
+                     if (oa > 255) oa = 255;
+                     if (or_ > 255) or_ = 255;
+                     if (og > 255) og = 255;
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 93c08502c..de34df6b7 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -106,13 +106,21 @@ static uint32_t with_alpha(uint32_t c, uint32_t a)
+ }
+ 
+ // blend_over (bitmap_data.rs): self = dest, source on top; both premultiplied.
++//
++// The inverse-alpha factor is `256 - sa` scaled by a >>8, NOT `(255 - sa)/255`.
++// Ruffle 0c6a734da switched to this form with the note "verified against Flash
++// Player output across the full 0..255 alpha range", and avm2/bitmapdata_
++// copypixels_blend encodes the same expression in ActionScript and asserts
++// 0 mismatches against Flash over a 1024-row sweep. The two forms agree only
++// where the truncations happen to land on the same byte (68 of 256 alphas
++// differ on a mid-grey destination).
+ static uint32_t blend_over(uint32_t dest, uint32_t src)
+ {
+-	uint32_t sa = CA(src);
+-	uint8_t r = (uint8_t) (CR(src) + (uint8_t) ((CR(dest) * (255 - sa)) / 255));
+-	uint8_t g = (uint8_t) (CG(src) + (uint8_t) ((CG(dest) * (255 - sa)) / 255));
+-	uint8_t b = (uint8_t) (CB(src) + (uint8_t) ((CB(dest) * (255 - sa)) / 255));
+-	uint8_t a = (uint8_t) (CA(src) + (uint8_t) ((CA(dest) * (255 - sa)) / 255));
++	uint32_t inv = 256u - CA(src);
++	uint8_t r = (uint8_t) (CR(src) + (uint8_t) ((CR(dest) * inv) >> 8));
++	uint8_t g = (uint8_t) (CG(src) + (uint8_t) ((CG(dest) * inv) >> 8));
++	uint8_t b = (uint8_t) (CB(src) + (uint8_t) ((CB(dest) * inv) >> 8));
++	uint8_t a = (uint8_t) (CA(src) + (uint8_t) ((CA(dest) * inv) >> 8));
+ 	return CMK(r, g, b, a);
+ }
+ 
+@@ -275,14 +283,15 @@ static uint32_t blend_mode_apply(int mode, uint32_t dst, uint32_t src)
+ // is a contiguous span dispatched to one of these.
+ //
+ // Byte-exactness is the hard constraint: the SIMD lanes reproduce blend_over's
+-// truncating /255 + uint8 wrap EXACTLY via the magic pair (x*32897)>>23 == x/255
+-// for x in [0,65025] (proven exhaustively) — NOT a *257>>16 approximation. Guard
+-// with the scalar fallback for native/verify gcc (no SIMD); -DAVM2_BLIT_VERIFY
+-// re-runs the scalar per pixel and aborts on any divergence; -DSWF_NO_BLIT_SIMD
+-// forces the scalar path (A/B baseline).
++// `(dst_c * (256 - sa)) >> 8` + uint8 wrap EXACTLY. The products stay in 16-bit
++// lanes (max 255*256 = 65280 < 65536), so this is a plain u16 multiply and a
++// logical shift — no magic-multiply trick is needed any more (the old /255 form
++// used (x*32897)>>23). Guard with the scalar fallback for native/verify gcc
++// (no SIMD); -DAVM2_BLIT_VERIFY re-runs the scalar per pixel and aborts on any
++// divergence; -DSWF_NO_BLIT_SIMD forces the scalar path (A/B baseline).
+ // ---------------------------------------------------------------------------
+ 
+-// out_c = (uint8)(src_c + (dst_c*(255-sa))/255) per channel; `opaque` forces the
++// out_c = (uint8)(src_c + ((dst_c*(256-sa))>>8)) per channel; `opaque` forces the
+ // dest alpha to 0xFF afterwards (with_alpha(...,0xFF)).
+ static void blend_over_span_scalar(uint32_t* d, const uint32_t* s, uint32_t n,
+                                    int opaque)
+@@ -312,32 +321,28 @@ static void blend_over_span_simd(uint32_t* d, const uint32_t* s, uint32_t n,
+ 	const v128_t amask = wasm_i32x4_const(0xFF000000, 0xFF000000, 0xFF000000,
+ 	                                      0xFF000000);
+ 	const v128_t lo255 = wasm_i16x8_splat(0x00FF);
+-	const v128_t magic = wasm_i32x4_splat(32897);
+-	const v128_t ffb = wasm_i8x16_splat((int8_t) 0xFF);
++	const v128_t v256 = wasm_i16x8_splat(256);
+ 	uint32_t i = 0;
+ 	for (; i + 4 <= n; i += 4)
+ 	{
+ 		v128_t vs = wasm_v128_load(s + i);
+ 		v128_t vd = wasm_v128_load(d + i);
+-		// factor = 255 - src_alpha, broadcast to each pixel's 4 byte lanes
++		// factor = 256 - src_alpha, broadcast to each pixel's 4 byte lanes
+ 		// (byte lanes 3/7/11/15 hold alpha in little-endian 0xAARRGGBB storage).
++		// 256 does not fit in a byte lane, so the subtract is done 16-bit-wide
++		// after the zero-extend.
+ 		v128_t sa = wasm_i8x16_shuffle(vs, vs, 3, 3, 3, 3, 7, 7, 7, 7,
+ 		                               11, 11, 11, 11, 15, 15, 15, 15);
+-		v128_t fac = wasm_i8x16_sub(ffb, sa);  // 255 - sa (no wrap: sa<=255)
+ 		// low 8 bytes (pixels 0,1)
+-		v128_t t_lo = wasm_i16x8_mul(wasm_u16x8_extend_low_u8x16(vd),
+-		                             wasm_u16x8_extend_low_u8x16(fac));
+-		v128_t div_lo = wasm_u16x8_narrow_i32x4(
+-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_low_u16x8(t_lo), magic), 23),
+-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_high_u16x8(t_lo), magic), 23));
++		v128_t fac_lo = wasm_i16x8_sub(v256, wasm_u16x8_extend_low_u8x16(sa));
++		v128_t t_lo = wasm_i16x8_mul(wasm_u16x8_extend_low_u8x16(vd), fac_lo);
++		v128_t div_lo = wasm_u16x8_shr(t_lo, 8);
+ 		v128_t o_lo = wasm_v128_and(
+ 			wasm_i16x8_add(wasm_u16x8_extend_low_u8x16(vs), div_lo), lo255);
+ 		// high 8 bytes (pixels 2,3)
+-		v128_t t_hi = wasm_i16x8_mul(wasm_u16x8_extend_high_u8x16(vd),
+-		                             wasm_u16x8_extend_high_u8x16(fac));
+-		v128_t div_hi = wasm_u16x8_narrow_i32x4(
+-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_low_u16x8(t_hi), magic), 23),
+-			wasm_u32x4_shr(wasm_i32x4_mul(wasm_u32x4_extend_high_u16x8(t_hi), magic), 23));
++		v128_t fac_hi = wasm_i16x8_sub(v256, wasm_u16x8_extend_high_u8x16(sa));
++		v128_t t_hi = wasm_i16x8_mul(wasm_u16x8_extend_high_u8x16(vd), fac_hi);
++		v128_t div_hi = wasm_u16x8_shr(t_hi, 8);
+ 		v128_t o_hi = wasm_v128_and(
+ 			wasm_i16x8_add(wasm_u16x8_extend_high_u8x16(vs), div_hi), lo255);
+ 		v128_t out = wasm_u8x16_narrow_i16x8(o_lo, o_hi);
+@@ -1307,6 +1312,16 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
+ 	// from the scalar forward order under intra-buffer overlap).
+ 	int has_alpha = (alpha != NULL && !alpha->disposed);
+ 	int same_buf = (src->pixels == dst->pixels);
++	// Self-copy iteration order (Ruffle operations/copy_on_cpu.rs::copy_on_cpu_self,
++	// ea3956e89). Overlapping regions inside one buffer would otherwise read pixels
++	// the same blit already overwrote, so the walk has to run backwards -- but Flash
++	// Player only reverses when BOTH axes move the same way. When the deltas
++	// disagree in sign FP really does read overwritten data, and
++	// avm2/bitmapdata_copypixels_self pins those rows, so the forward walk is kept
++	// for them rather than "fixed".
++	int self_reverse = same_buf
++		&& dst_region.x_min >= src_region.x_min
++		&& dst_region.y_min >= src_region.y_min;
+ 	// Identity self-copy on the pure-copy path: same buffer, same stride,
+ 	// src rect == dst rect, transparent dest (so the copy arm is exactly
+ 	// `dst[i] = dst[i]`, no with_alpha rewrite), no blend — every write is a
+@@ -1342,10 +1357,12 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
+ 		return avm2_undefined();
+ 	}
+ 
+-	for (uint32_t j = 0; j < rh; j++)
++	for (uint32_t jj = 0; jj < rh; jj++)
+ 	{
+-		for (uint32_t i = 0; i < rw; i++)
++		uint32_t j = self_reverse ? (rh - 1u - jj) : jj;
++		for (uint32_t ii = 0; ii < rw; ii++)
+ 		{
++			uint32_t i = self_reverse ? (rw - 1u - ii) : ii;
+ 			uint32_t sxx = src_region.x_min + i, syy = src_region.y_min + j;
+ 			uint32_t dxx = dst_region.x_min + i, dyy = dst_region.y_min + j;
+ 			uint32_t sc = bd_get_raw(src, sxx, syy);
+@@ -1366,10 +1383,16 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
+ 				// transparency flag; a non-transparent BitmapData stores alpha 255
+ 				// everywhere, so with the a == 255 arm the two paths agree and we
+ 				// do not need a separate branch here.
+-				if (src->transparency)
+-					final_alpha = (a == 255) ? CA(sc) : ((a * CA(sc)) >> 8);
+-				else
+-					final_alpha = a;
++				//
++				// A NON-transparent SOURCE is not `final_alpha = a` (that is what
++				// Ruffle does, and it is what avm2/bitmapdata_copypixels_alpha_merge
++				// rows 5-6 catch it on): Flash runs the same `>> 8` scale with the
++				// source alpha pinned at 255, so alpha-pixel 254 yields 253, not 254,
++				// and alpha-pixel 1 yields 0 — the destination survives untouched.
++				// Since a non-transparent source stores alpha 255 in every pixel,
++				// the two arms collapse into one expression over `sa_eff`.
++				uint32_t sa_eff = src->transparency ? CA(sc) : 255u;
++				final_alpha = (a == 255) ? sa_eff : ((a * sa_eff) >> 8);
+ 				// Un-premultiply source, reapply final alpha, re-premultiply.
+ 				double af = (double) CA(sc) / 255.0;
+ 				uint8_t r = af > 0 ? (uint8_t) round((double) CR(sc) / af) : 0;
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 0f4fa0f78..4c2393881 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -96,6 +96,26 @@ visual/edittext/edittext_border_transform   # EDITTEXT BACKGROUND / BORDER    6
+                                             #   the per-comparison rows, never
+                                             #   the test-level verdict.
+ 
++# SESSION 19 ADDITIONS (s19 wave-2 `w2-bitmapdata`, per the wave-2 rule "audit
++# canary coverage against YOUR change class"). The change class was
++# avm2_bitmap.c::blend_over — the premultiplied source-over used by copyPixels,
++# by BitmapData.draw's CPU composite and by glyph_raster_core. The audit found
++# the standing set had ZERO members that reach it: the two pre-existing bitmap
++# members are fillRect and applyFilter, and the two bitmap-fill members are
++# render-side STYLE fills. Four members added, all Tier 1, all image-PASSING in
++# graphics run 34645805030, all re-rendered locally before landing.
++#   copyPixels blend  from_shumway/acid/acid-bitmapData-copyPixels  (tol 0)
++#   copyPixels+alpha  visual/bitmapdata_copypixels_with_alpha_oob   (tol 0)
++#   BitmapData.draw   from_shumway/acid/acid-bitmapData-draw        (tol 0/650)
++#   draw self-blend   avm2/bitmapdata_draw_self_via_graphic         (tol 0)
++# The last one is the tightest: its blend_over_round comment documents a
++# deliberate one-LSB GPU-vs-CPU tie, so it is the member that would catch a
++# blend_over change leaking into the draw display-object walk.
++from_shumway/acid/acid-bitmapData-copyPixels  # copyPixels BLEND path      1 cmp
++visual/bitmapdata_copypixels_with_alpha_oob   # copyPixels alphaBitmapData 1 cmp
++from_shumway/acid/acid-bitmapData-draw        # BitmapData.draw composite  1 cmp
++avm2/bitmapdata_draw_self_via_graphic         # draw self-blend, 1-LSB tie 1 cmp
++
+ # tier=2  (CI-failing / skipped; A/B signal only)
+ visual/simple_shapes/masks                  # mask compositing (largest gap)
+ visual/simple_shapes/gradients/gradients    # gradient ramps

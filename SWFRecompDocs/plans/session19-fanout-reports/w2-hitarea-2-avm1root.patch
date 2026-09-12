@@ -1,0 +1,19 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 20df9768f..4e4d0e765 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -22035,6 +22035,14 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
+     // because det==0). Set to 100% scale so the level acts as identity.
+     mc->xscale = 100;
+     mc->yscale = 100;
++    // Same class of bug as the xscale/yscale zero above: HCALLOC leaves
++    // `visible` at 0, so a freshly minted level root reads back as HIDDEN.
++    // `_levelN._visible` is script-visible and wrong on its own, but it only
++    // became load-bearing once AVM1 picking grew Ruffle's `if self.visible()`
++    // gate (mouse_pick_avm1, movie_clip.rs:2995) — that walks the parent chain,
++    // so every clip under a loaded level stopped receiving mouse events.
++    // Repro: avm2/mouse_pick_avm1_root, whose AVM1 child lives under _level1.
++    mc->visible = 1;
+     g_levels[level_num] = mc;
+     if (level_num > g_levels_high_water) g_levels_high_water = level_num;
+     // Register in child_mc_cache so lookups find it

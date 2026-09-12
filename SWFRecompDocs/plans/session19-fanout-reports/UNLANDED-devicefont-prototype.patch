@@ -1,0 +1,276 @@
+diff --git a/SWFRecomp/src/abc/abc_devicefont.cpp b/SWFRecomp/src/abc/abc_devicefont.cpp
+index dca85632a..6737258c5 100644
+--- a/SWFRecomp/src/abc/abc_devicefont.cpp
++++ b/SWFRecomp/src/abc/abc_devicefont.cpp
+@@ -2,6 +2,7 @@
+ // See include/abc/abc_devicefont.hpp for why this lives in the recompiler.
+ 
+ #include <algorithm>
++#include <cmath>
+ #include <cstdio>
+ #include <cstring>
+ #include <strings.h>
+@@ -38,8 +39,181 @@ struct DeviceFaceDef
+ 	std::vector<int32_t> advances;
+ 	std::vector<KernPair> kerns;
+ 	std::vector<uint32_t> fallback;  // indices into the emitted device table
++	// PROTOTYPE (session 19 pricing probe): flattened glyph outlines in the
++	// face's own font units, y NEGATED (Ruffle font_face.rs GlyphToDrawing
++	// emits `-y`), indexed exactly like `codes`/`advances`.
++	std::vector<int32_t> glyph_pts;             // x,y pairs
++	std::vector<uint32_t> glyph_pt_start;       // nglyphs+1
++	std::vector<uint32_t> glyph_contour_ends;   // absolute pair indices
++	std::vector<uint32_t> glyph_contour_start;  // nglyphs+1
+ };
+ 
++// --- Raph Levien parabola-integral quadratic flattening --------------------
++// Twin of abc_timeline.cpp's glyphLevien* block (lyon_geom 1.0.6
++// `src/quadratic_bezier.rs`), kept local so the device-font pipeline does not
++// depend on the DefineFont2/3 parser. The embedded-font tolerance is 2.0 units
++// on a 20480 em; a device face has its own upem, so the caller scales it.
++
++struct DevLevienParams
++{
++	uint32_t count;
++	float integral_from;
++	float integral_step;
++	float inv_integral_from;
++	float div_inv_integral_diff;
++};
++
++float devParabolaIntegral(float x)
++{
++	const float d = 0.67f;
++	return x / (1.0f - d + sqrtf(sqrtf(d*d*d*d + 0.25f*x*x)));
++}
++
++float devParabolaInvIntegral(float x)
++{
++	const float b = 0.39f;
++	return x * (1.0f - b + sqrtf(b*b + 0.25f*x*x));
++}
++
++DevLevienParams devLevienInit(float x0, float y0, float cx, float cy,
++                              float x1, float y1, float tolerance)
++{
++	DevLevienParams p = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
++	if (x0 == x1 && y0 == y1) return p;
++	{
++		float bx = x1 - x0, by = y1 - y0;
++		float len2 = bx*bx + by*by;
++		float cross = (cx - x0) * by - (cy - y0) * bx;
++		if (len2 > 0.0f && (cross*cross) / len2 <= tolerance * tolerance * 4.0f) return p;
++	}
++	float ddx = 2.0f*cx - x0 - x1;
++	float ddy = 2.0f*cy - y0 - y1;
++	float crs = (x1 - x0) * ddy - (y1 - y0) * ddx;
++	if (crs == 0.0f) return p;
++
++	float inv_crs = 1.0f / crs;
++	float parabola_from = ((cx - x0) * ddx + (cy - y0) * ddy) * inv_crs;
++	float parabola_to   = ((x1 - cx) * ddx + (y1 - cy) * ddy) * inv_crs;
++	float scale = fabsf(crs) / (sqrtf(ddx*ddx + ddy*ddy) * fabsf(parabola_to - parabola_from));
++
++	float integral_from = devParabolaIntegral(parabola_from);
++	float integral_to   = devParabolaIntegral(parabola_to);
++	float integral_diff = integral_to - integral_from;
++
++	float inv_integral_from = devParabolaInvIntegral(integral_from);
++	float inv_integral_to   = devParabolaInvIntegral(integral_to);
++
++	float count = ceilf(0.5f * fabsf(integral_diff) * sqrtf(scale / tolerance));
++	if (!std::isfinite(count) || count < 1.0f) return p;
++	if (count > 64.0f) count = 64.0f;
++
++	p.count = (uint32_t) count;
++	p.integral_from = integral_from;
++	p.integral_step = integral_diff / count;
++	p.inv_integral_from = inv_integral_from;
++	p.div_inv_integral_diff = 1.0f / (inv_integral_to - inv_integral_from);
++	return p;
++}
++
++float devLevienT(const DevLevienParams& p, uint32_t i)
++{
++	float u = devParabolaInvIntegral(p.integral_from + p.integral_step * (float) i);
++	return (u - p.inv_integral_from) * p.div_inv_integral_diff;
++}
++
++// Flatten one TTF glyph outline into fd's contour arrays. Coordinates stay in
++// the face's font units; y is negated and each coordinate TRUNCATES toward
++// zero, matching Ruffle's GlyphToDrawing (`x as i32` / `-y as i32`).
++void appendGlyphOutline(const stbtt_fontinfo* info, int g, DeviceFaceDef& fd,
++                        float tol)
++{
++	stbtt_vertex* verts = NULL;
++	int nv = stbtt_GetGlyphShape((stbtt_fontinfo*) info, g, &verts);
++	if (nv <= 0)
++	{
++		if (verts != NULL) stbtt_FreeShape((stbtt_fontinfo*) info, verts);
++		return;
++	}
++
++	std::vector<int32_t> cur;  // x,y pairs of the open contour
++	auto push = [&](double x, double y) {
++		cur.push_back((int32_t) x);
++		cur.push_back((int32_t) (-y));
++	};
++	auto flush = [&]() {
++		if (cur.size() >= 6)  // a fillable contour needs >= 3 points
++		{
++			fd.glyph_pts.insert(fd.glyph_pts.end(), cur.begin(), cur.end());
++			fd.glyph_contour_ends.push_back((uint32_t) (fd.glyph_pts.size() / 2));
++		}
++		cur.clear();
++	};
++
++	double px = 0.0, py = 0.0;
++	for (int i = 0; i < nv; i++)
++	{
++		const stbtt_vertex& v = verts[i];
++		if (v.type == STBTT_vmove)
++		{
++			flush();
++			px = v.x;
++			py = v.y;
++		}
++		else if (v.type == STBTT_vline)
++		{
++			if (cur.empty()) push(px, py);
++			px = v.x;
++			py = v.y;
++			push(px, py);
++		}
++		else if (v.type == STBTT_vcurve)
++		{
++			double x0 = px, y0 = py;
++			double cx = v.cx, cy = v.cy;
++			double ax = v.x, ay = v.y;
++			if (cur.empty()) push(x0, y0);
++			DevLevienParams lp = devLevienInit((float) x0, (float) y0,
++			                                   (float) cx, (float) cy,
++			                                   (float) ax, (float) ay, tol);
++			uint32_t nseg = (lp.count < 1) ? 1 : lp.count;
++			for (uint32_t k = 1; k <= nseg; k++)
++			{
++				double t = (k < lp.count) ? (double) devLevienT(lp, k) : 1.0;
++				double u = 1.0 - t;
++				push(u*u*x0 + 2.0*u*t*cx + t*t*ax,
++				     u*u*y0 + 2.0*u*t*cy + t*t*ay);
++			}
++			px = ax;
++			py = ay;
++		}
++		else if (v.type == STBTT_vcubic)
++		{
++			// TrueType outlines are quadratic-only; this arm only fires for a
++			// CFF face. A fixed 16-chord split is fine for a prototype.
++			double x0 = px, y0 = py;
++			double c1x = v.cx, c1y = v.cy;
++			double c2x = v.cx1, c2y = v.cy1;
++			double ax = v.x, ay = v.y;
++			if (cur.empty()) push(x0, y0);
++			for (int k = 1; k <= 16; k++)
++			{
++				double t = (double) k / 16.0, u = 1.0 - t;
++				push(u*u*u*x0 + 3.0*u*u*t*c1x + 3.0*u*t*t*c2x + t*t*t*ax,
++				     u*u*u*y0 + 3.0*u*u*t*c1y + 3.0*u*t*t*c2y + t*t*t*ay);
++			}
++			px = ax;
++			py = ay;
++		}
++	}
++	flush();
++	stbtt_FreeShape((stbtt_fontinfo*) info, verts);
++}
++
++// PROTOTYPE size control: emitting outlines for every cmap codepoint would
++// produce megabytes of C for a full BMP face. Glyphs above this cap get an
++// empty contour range (and so still render blank).
++const int DEVFONT_OUTLINE_MAX_CP = 0x2FF;
++
+ // --- minimal big-endian TrueType table directory reader -------------------
+ // stb_truetype exposes hhea + OS/2 typo metrics but not unitsPerEm,
+ // OS/2.version, fsSelection or the usWin* pair, and its table finder is
+@@ -205,6 +379,7 @@ bool loadFace(const std::string& path, DeviceFaceDef& fd)
+ 	// the BMP range once. Glyph 0 (.notdef) is never a cmap hit for a sane
+ 	// font; codepoints below 0x20 are not laid out.
+ 	std::vector<std::pair<int, uint16_t>> glyph_to_code;
++	std::vector<int> glyph_ids;  // parallel to fd.codes (outline emission order)
+ 	for (int cp = 0x20; cp <= 0xFFFF; cp++)
+ 	{
+ 		int g = stbtt_FindGlyphIndex(&info, cp);
+@@ -213,10 +388,35 @@ bool loadFace(const std::string& path, DeviceFaceDef& fd)
+ 		stbtt_GetGlyphHMetrics(&info, g, &adv, &lsb);
+ 		fd.codes.push_back((uint16_t) cp);
+ 		fd.advances.push_back((int32_t) adv);
++		glyph_ids.push_back(g);
+ 		glyph_to_code.push_back({ g, (uint16_t) cp });
+ 	}
+ 	if (fd.codes.empty()) return false;
+ 
++	// PROTOTYPE: real glyph outlines, in the same index space as codes/advances.
++	// Ruffle's glyph tolerance is 2.0 units on a 20480 em (0.1 px); scale it to
++	// this face's em so the flattening error matches at the same pixel size.
++	{
++		float tol = 2.0f * (float) fd.em_square / 20480.0f;
++		if (!(tol > 0.0f)) tol = 2.0f;
++		for (size_t i = 0; i < glyph_ids.size(); i++)
++		{
++			fd.glyph_pt_start.push_back((uint32_t) (fd.glyph_pts.size() / 2));
++			fd.glyph_contour_start.push_back(
++				(uint32_t) fd.glyph_contour_ends.size());
++			if (fd.codes[i] > DEVFONT_OUTLINE_MAX_CP) continue;
++			appendGlyphOutline(&info, glyph_ids[i], fd, tol);
++		}
++		fd.glyph_pt_start.push_back((uint32_t) (fd.glyph_pts.size() / 2));
++		fd.glyph_contour_start.push_back((uint32_t) fd.glyph_contour_ends.size());
++		if (fd.glyph_pts.empty())
++		{
++			fd.glyph_pt_start.clear();
++			fd.glyph_contour_ends.clear();
++			fd.glyph_contour_start.clear();
++		}
++	}
++
+ 	// Kerning. Ruffle reads the `kern` table ONLY (font.rs:261-269, 327-340) —
+ 	// never GPOS — so use stbtt_GetKerningTable (kern, horizontal, format 0)
+ 	// rather than stbtt_GetGlyphKernAdvance, which prefers GPOS when present.
+@@ -351,6 +551,21 @@ void emitDeviceFonts(std::ostream& out)
+ 			for (auto& k : fd.kerns) out << k.value << ", ";
+ 			out << "};\n";
+ 		}
++		if (!fd.glyph_pts.empty())
++		{
++			out << "static const int32_t devfont_" << i << "_pts[] = { ";
++			for (auto v : fd.glyph_pts) out << v << ", ";
++			out << "};\n";
++			out << "static const uint32_t devfont_" << i << "_pt_start[] = { ";
++			for (auto v : fd.glyph_pt_start) out << v << ", ";
++			out << "};\n";
++			out << "static const uint32_t devfont_" << i << "_contour_ends[] = { ";
++			for (auto v : fd.glyph_contour_ends) out << v << ", ";
++			out << "};\n";
++			out << "static const uint32_t devfont_" << i << "_contour_start[] = { ";
++			for (auto v : fd.glyph_contour_start) out << v << ", ";
++			out << "};\n";
++		}
+ 		if (!fd.fallback.empty())
+ 		{
+ 			out << "static const uint32_t devfont_" << i << "_fallback[] = { ";
+@@ -370,8 +585,13 @@ void emitDeviceFonts(std::ostream& out)
+ 			    << ", 1, " << fd.em_square << ", "
+ 			    << fd.ascent << ", " << fd.descent << ", " << fd.leading << ", "
+ 			    << fd.codes.size()
+-			    << ", devfont_" << n << "_codes, devfont_" << n << "_advances,"
+-			    << " NULL, NULL, NULL, NULL, ";
++			    << ", devfont_" << n << "_codes, devfont_" << n << "_advances,";
++			if (fd.glyph_pts.empty())
++				out << " NULL, NULL, NULL, NULL, ";
++			else
++				out << " devfont_" << n << "_pts, devfont_" << n << "_pt_start,"
++				    << " devfont_" << n << "_contour_ends, devfont_" << n
++				    << "_contour_start, ";
+ 			if (fd.kerns.empty())
+ 				out << "NULL, NULL, NULL, 0, ";
+ 			else

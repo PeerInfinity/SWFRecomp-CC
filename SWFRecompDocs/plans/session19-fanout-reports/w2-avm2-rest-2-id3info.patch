@@ -1,0 +1,402 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_media.c b/SWFModernRuntime/src/avm2/avm2_media.c
+index eef25340a..6fe6090c5 100644
+--- a/SWFModernRuntime/src/avm2/avm2_media.c
++++ b/SWFModernRuntime/src/avm2/avm2_media.c
+@@ -450,6 +450,11 @@ typedef struct Avm2SoundObjExt
+ 	double ext_duration_ms;
+ 	uint8_t ext_loaded;      // bytes resolved: length/bytesTotal are live
+ 	uint8_t ext_load_queued; // events not delivered yet
++	// The resolved file's bytes, for the ID3 walk at dispatch time. These
++	// point into the linked-in DataFileEntry payload (static storage), never
++	// into the GC heap.
++	const unsigned char* ext_data;
++	uint32_t ext_data_len;
+ } Avm2SoundObjExt;
+ 
+ static Avm2SoundObjExt* sound_ext_of(Avm2Context* ctx, Avm2Object* o)
+@@ -559,10 +564,18 @@ static Avm2Value sound_get_url(Avm2Activation* act)
+ 	return avm2_null();
+ }
+ 
++// `Sound.id3` holds the ID3Info built by the load (id3_read_and_dispatch), and
++// is parked on the Sound itself as a dont-enum dynamic prop so the GC traces it
++// with its owner — the same trick AVTagData uses for its backing fields.
++#define AVM2_SOUND_ID3_SLOT "_id3"
++#define AVM2_SOUND_ID3_SLOT_LEN 4
++
+ static Avm2Value sound_get_id3(Avm2Activation* act)
+ {
+-	(void) act;
+-	return avm2_null();
++	Avm2Value v = avm2_get_public_property(act->ctx, act->this_val,
++	                                       AVM2_SOUND_ID3_SLOT,
++	                                       AVM2_SOUND_ID3_SLOT_LEN, NULL);
++	return v.kind == AVM2_VALUE_OBJECT ? v : avm2_null();
+ }
+ 
+ // --- URL-loaded sounds ------------------------------------------------------
+@@ -634,6 +647,8 @@ static void sound_start_url_load(Avm2Context* ctx, Avm2Object* self,
+ 
+ 	s->ext_loaded = 1;
+ 	s->data_size = (uint32_t) d->content_length;
++	s->ext_data = (const unsigned char*) d->content;
++	s->ext_data_len = (uint32_t) d->content_length;
+ 	s->ext_duration_ms = mp3_duration_ms((const unsigned char*) d->content,
+ 	                                     (size_t) d->content_length);
+ 	if (s->ext_load_queued) return;
+@@ -751,6 +766,330 @@ void avm2_media_register_sounds(Avm2Context* ctx)
+ #endif
+ }
+ 
++// ---------------------------------------------------------------------------
++// flash.media.ID3Info + the ID3v2 tag walk
++//
++// Ruffle SoundObject::read_and_call_id3_event (avm2/object/sound_object.rs):
++// build an ID3Info, copy the seven fields the class exposes out of the tag,
++// store it on the Sound, and dispatch Event.ID3 — but ONLY when the bytes
++// actually parsed as a tag. The class itself is `public final dynamic class
++// ID3Info` with seven `public var ...:String` (ID3Info.as); we back the seven
++// with dont-enum dynamic props pre-seeded to `null`, which reads exactly like
++// an unassigned String slot.
++// ---------------------------------------------------------------------------
++
++static Avm2Class* g_id3info_class;
++
++// One decoded ID3 text field, already UTF-8 and NUL-terminated.
++#define AVM2_ID3_TEXT_MAX 512
++
++// ID3 text encodings (SWF-independent; ID3v2 §4).
++enum { ID3_ENC_LATIN1 = 0, ID3_ENC_UTF16_BOM = 1, ID3_ENC_UTF16BE = 2,
++       ID3_ENC_UTF8 = 3 };
++
++static void id3_put_utf8(char* out, size_t cap, size_t* n, uint32_t cp)
++{
++	unsigned char buf[4];
++	size_t len;
++	if (cp < 0x80) { buf[0] = (unsigned char) cp; len = 1; }
++	else if (cp < 0x800)
++	{
++		buf[0] = (unsigned char) (0xC0 | (cp >> 6));
++		buf[1] = (unsigned char) (0x80 | (cp & 0x3F));
++		len = 2;
++	}
++	else if (cp < 0x10000)
++	{
++		buf[0] = (unsigned char) (0xE0 | (cp >> 12));
++		buf[1] = (unsigned char) (0x80 | ((cp >> 6) & 0x3F));
++		buf[2] = (unsigned char) (0x80 | (cp & 0x3F));
++		len = 3;
++	}
++	else
++	{
++		buf[0] = (unsigned char) (0xF0 | (cp >> 18));
++		buf[1] = (unsigned char) (0x80 | ((cp >> 12) & 0x3F));
++		buf[2] = (unsigned char) (0x80 | ((cp >> 6) & 0x3F));
++		buf[3] = (unsigned char) (0x80 | (cp & 0x3F));
++		len = 4;
++	}
++	if (*n + len >= cap) return;
++	memcpy(out + *n, buf, len);
++	*n += len;
++}
++
++// Decode `len` bytes in ID3 encoding `enc` into UTF-8. Trailing NUL padding is
++// dropped (encoders pad text frames), and the result is always terminated.
++static void id3_decode(uint8_t enc, const unsigned char* p, size_t len,
++                       char* out, size_t cap)
++{
++	size_t n = 0;
++	out[0] = '\0';
++	if (enc == ID3_ENC_UTF16_BOM || enc == ID3_ENC_UTF16BE)
++	{
++		int big = (enc == ID3_ENC_UTF16BE);
++		if (enc == ID3_ENC_UTF16_BOM && len >= 2)
++		{
++			if (p[0] == 0xFF && p[1] == 0xFE) { big = 0; p += 2; len -= 2; }
++			else if (p[0] == 0xFE && p[1] == 0xFF) { big = 1; p += 2; len -= 2; }
++		}
++		while (len >= 2)
++		{
++			uint32_t u = big ? (uint32_t) ((p[0] << 8) | p[1])
++			                 : (uint32_t) ((p[1] << 8) | p[0]);
++			p += 2;
++			len -= 2;
++			if (u >= 0xD800 && u <= 0xDBFF && len >= 2)
++			{
++				uint32_t lo = big ? (uint32_t) ((p[0] << 8) | p[1])
++				                  : (uint32_t) ((p[1] << 8) | p[0]);
++				if (lo >= 0xDC00 && lo <= 0xDFFF)
++				{
++					p += 2;
++					len -= 2;
++					u = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
++				}
++			}
++			if (u == 0) break;
++			id3_put_utf8(out, cap, &n, u);
++		}
++	}
++	else if (enc == ID3_ENC_UTF8)
++	{
++		for (size_t i = 0; i < len; i++)
++		{
++			if (p[i] == 0) break;
++			if (n + 1 >= cap) break;
++			out[n++] = (char) p[i];
++		}
++	}
++	else
++	{
++		// ISO-8859-1: every byte is its own code point.
++		for (size_t i = 0; i < len; i++)
++		{
++			if (p[i] == 0) break;
++			id3_put_utf8(out, cap, &n, (uint32_t) p[i]);
++		}
++	}
++	out[n] = '\0';
++}
++
++// Offset of the terminator of a string in `enc`, starting at p[0..len).
++// Returns `len` when unterminated; *adv receives the terminator's width.
++static size_t id3_term(uint8_t enc, const unsigned char* p, size_t len,
++                       size_t* adv)
++{
++	if (enc == ID3_ENC_UTF16_BOM || enc == ID3_ENC_UTF16BE)
++	{
++		*adv = 2;
++		for (size_t i = 0; i + 1 < len; i += 2)
++			if (p[i] == 0 && p[i + 1] == 0) return i;
++		return len;
++	}
++	*adv = 1;
++	for (size_t i = 0; i < len; i++)
++		if (p[i] == 0) return i;
++	return len;
++}
++
++typedef struct Avm2Id3Fields
++{
++	char album[AVM2_ID3_TEXT_MAX];
++	char artist[AVM2_ID3_TEXT_MAX];
++	char comment[AVM2_ID3_TEXT_MAX];
++	char genre[AVM2_ID3_TEXT_MAX];
++	char song_name[AVM2_ID3_TEXT_MAX];
++	char track[AVM2_ID3_TEXT_MAX];
++	char year[AVM2_ID3_TEXT_MAX];
++	uint8_t has_album, has_artist, has_comment, has_genre, has_song_name,
++	        has_track, has_year;
++} Avm2Id3Fields;
++
++// `tag.track()` / `tag.year()` are numeric in the id3 crate Ruffle uses, so a
++// frame that is not a plain integer (with the optional "n/total" split for
++// TRCK) yields None and the property stays unset.
++static int id3_numeric(const char* s, char* out, size_t cap, int allow_slash)
++{
++	size_t n = 0;
++	const char* p = s;
++	while (*p == ' ') p++;
++	if (*p < '0' || *p > '9') return 0;
++	while (*p >= '0' && *p <= '9')
++	{
++		if (n + 1 >= cap) return 0;
++		out[n++] = *p++;
++	}
++	out[n] = '\0';
++	if (*p == '\0') return 1;
++	if (allow_slash && *p == '/') return 1;
++	return 0;
++}
++
++// ID3v2.2/2.3/2.4 frame walk. Returns 0 when the bytes carry no readable tag
++// (the `Err` arm of Ruffle's `Tag::read_from2`, which suppresses the event).
++static int id3_parse(const unsigned char* p, size_t len, Avm2Id3Fields* f)
++{
++	memset(f, 0, sizeof(*f));
++	if (p == NULL || len < 10) return 0;
++	if (p[0] != 'I' || p[1] != 'D' || p[2] != '3') return 0;
++	uint8_t major = p[3];
++	if (major < 2 || major > 4) return 0;
++	uint8_t hdr_flags = p[5];
++	size_t tag_size = (size_t) (((p[6] & 0x7F) << 21) | ((p[7] & 0x7F) << 14)
++	                            | ((p[8] & 0x7F) << 7) | (p[9] & 0x7F));
++	size_t pos = 10;
++	size_t end = pos + tag_size;
++	if (end > len) end = len;
++	// Unsynchronisation (bit 7) rewrites the frame bytes; we do not undo it,
++	// and neither does any test asset. Extended header (bit 6) is skipped.
++	if ((hdr_flags & 0x40) != 0 && pos + 4 <= end)
++	{
++		if (major >= 4)
++		{
++			size_t ext = (size_t) (((p[pos] & 0x7F) << 21)
++			                       | ((p[pos + 1] & 0x7F) << 14)
++			                       | ((p[pos + 2] & 0x7F) << 7)
++			                       | (p[pos + 3] & 0x7F));
++			pos += ext > 0 ? ext : 4;
++		}
++		else
++		{
++			size_t ext = (size_t) ((p[pos] << 24) | (p[pos + 1] << 16)
++			                       | (p[pos + 2] << 8) | p[pos + 3]);
++			pos += 4 + ext;
++		}
++	}
++
++	int id_len = (major == 2) ? 3 : 4;
++	int hdr_len = (major == 2) ? 6 : 10;
++	int found = 0;
++	while (pos + (size_t) hdr_len <= end)
++	{
++		const unsigned char* id = p + pos;
++		if (id[0] == 0) break;  // padding
++		size_t fsize;
++		if (major == 2)
++			fsize = (size_t) ((id[3] << 16) | (id[4] << 8) | id[5]);
++		else if (major == 4)
++			fsize = (size_t) (((id[4] & 0x7F) << 21) | ((id[5] & 0x7F) << 14)
++			                  | ((id[6] & 0x7F) << 7) | (id[7] & 0x7F));
++		else
++			fsize = (size_t) ((id[4] << 24) | (id[5] << 16) | (id[6] << 8)
++			                  | id[7]);
++		pos += (size_t) hdr_len;
++		if (fsize == 0 || pos + fsize > end) break;
++		const unsigned char* body = p + pos;
++		pos += fsize;
++		found = 1;
++
++		char name[5];
++		memcpy(name, id, (size_t) id_len);
++		name[id_len] = '\0';
++
++		int is_comment = (strcmp(name, "COMM") == 0 || strcmp(name, "COM") == 0);
++		if (name[0] != 'T' && !is_comment) continue;
++
++		uint8_t enc = body[0];
++		char text[AVM2_ID3_TEXT_MAX];
++		if (is_comment)
++		{
++			// encoding(1) language(3) short-description(term) text
++			if (fsize < 5) continue;
++			size_t off = 4;
++			size_t adv = 1;
++			size_t t = id3_term(enc, body + off, fsize - off, &adv);
++			off += t + adv;
++			if (off > fsize) continue;
++			id3_decode(enc, body + off, fsize - off, text, sizeof(text));
++			if (!f->has_comment)
++			{
++				memcpy(f->comment, text, sizeof(text));
++				f->has_comment = 1;
++			}
++			continue;
++		}
++		id3_decode(enc, body + 1, fsize - 1, text, sizeof(text));
++
++		const char* n4 = name;
++		if (strcmp(n4, "TALB") == 0 || strcmp(n4, "TAL") == 0)
++		{
++			memcpy(f->album, text, sizeof(text));
++			f->has_album = 1;
++		}
++		else if (strcmp(n4, "TPE1") == 0 || strcmp(n4, "TP1") == 0)
++		{
++			memcpy(f->artist, text, sizeof(text));
++			f->has_artist = 1;
++		}
++		else if (strcmp(n4, "TCON") == 0 || strcmp(n4, "TCO") == 0)
++		{
++			memcpy(f->genre, text, sizeof(text));
++			f->has_genre = 1;
++		}
++		else if (strcmp(n4, "TIT2") == 0 || strcmp(n4, "TT2") == 0)
++		{
++			memcpy(f->song_name, text, sizeof(text));
++			f->has_song_name = 1;
++		}
++		else if (strcmp(n4, "TRCK") == 0 || strcmp(n4, "TRK") == 0)
++		{
++			if (id3_numeric(text, f->track, sizeof(f->track), 1))
++				f->has_track = 1;
++		}
++		else if (strcmp(n4, "TYER") == 0 || strcmp(n4, "TYE") == 0)
++		{
++			if (id3_numeric(text, f->year, sizeof(f->year), 0))
++				f->has_year = 1;
++		}
++		else if (strcmp(n4, "TDRC") == 0 && !f->has_year)
++		{
++			// v2.4 recording time: the leading four digits are the year.
++			if (id3_numeric(text, f->year, sizeof(f->year), 0))
++				f->has_year = 1;
++		}
++	}
++	return found;
++}
++
++static void id3_set(Avm2Context* ctx, Avm2Object* o, const char* name,
++                    uint32_t nlen, int present, const char* utf8)
++{
++	Avm2Value v = present
++		? avm2_string(avm2_string_new(ctx, utf8, (uint32_t) strlen(utf8)))
++		: avm2_null();
++	Avm2DynProp* dp = avm2_object_set_dynamic(ctx, o, name, nlen, v);
++	if (dp != NULL) dp->dont_enum = 1;
++}
++
++// Build the ID3Info, park it on the Sound, and dispatch Event.ID3. Ruffle runs
++// this BETWEEN the progress and complete events of the load (loader.rs).
++static void id3_read_and_dispatch(Avm2Context* ctx, Avm2Object* sound,
++                                  Avm2SoundObjExt* s)
++{
++	if (g_id3info_class == NULL) return;
++	Avm2Id3Fields f;
++	int ok = id3_parse(s->ext_data, (size_t) s->ext_data_len, &f);
++	Avm2Value iv = avm2_class_construct(ctx, g_id3info_class, NULL, 0);
++	if (iv.kind != AVM2_VALUE_OBJECT || iv.u.obj == NULL) return;
++	Avm2Object* info = iv.u.obj;
++	id3_set(ctx, info, "album", 5, f.has_album, f.album);
++	id3_set(ctx, info, "artist", 6, f.has_artist, f.artist);
++	id3_set(ctx, info, "comment", 7, f.has_comment, f.comment);
++	id3_set(ctx, info, "genre", 5, f.has_genre, f.genre);
++	id3_set(ctx, info, "songName", 8, f.has_song_name, f.song_name);
++	id3_set(ctx, info, "track", 5, f.has_track, f.track);
++	id3_set(ctx, info, "year", 4, f.has_year, f.year);
++	Avm2DynProp* slot = avm2_object_set_dynamic(ctx, sound, AVM2_SOUND_ID3_SLOT,
++	                                            AVM2_SOUND_ID3_SLOT_LEN,
++	                                            avm2_object_value(info));
++	if (slot != NULL) slot->dont_enum = 1;
++	if (!ok) return;
++	Avm2Object* ev = avm2_event_new(ctx, avm2_string_from_literal(ctx, "id3"),
++	                                0, 0);
++	if (ev != NULL) avm2_dispatch_event(ctx, sound, ev);
++}
++
+ // Deliver the queued open/progress/complete for URL-loaded sounds, then
+ // advance every simulated playback clock by one frame budget and dispatch
+ // Event.SOUND_COMPLETE for the ones that drained. Both halves are
+@@ -777,6 +1116,7 @@ static void media_poll_simulated(Avm2Context* ctx)
+ 				ctx, avm2_string_from_literal(ctx, "progress"),
+ 				(double) s->data_size, (double) s->data_size);
+ 			if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
++			id3_read_and_dispatch(ctx, obj, s);
+ 			ev = avm2_event_new(
+ 				ctx, avm2_string_from_literal(ctx, "complete"), 0, 0);
+ 			if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+@@ -1428,6 +1768,16 @@ void avm2_register_media(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, snd, "close", sound_close);
+ 	avm2_builtin_add_method(ctx, snd, "load", sound_load);
+ 
++	// flash.media.ID3Info — `public final dynamic class` with seven
++	// `public var ...:String` and nothing else (Ruffle ID3Info.as). The seven
++	// are dont-enum dynamic props written by id3_read_and_dispatch.
++	{
++		Avm2Class* id3 = avm2_builtin_class(ctx, "flash.media", "ID3Info",
++		                                    b->object_class);
++		id3->flags |= AVM2_CLASS_FLAG_FINAL;
++		g_id3info_class = id3;
++	}
++
+ 	// flash.media.StageVideo — [Ruffle(Abstract)], no members at all. Only
+ 	// abstract_classes reads it.
+ 	{

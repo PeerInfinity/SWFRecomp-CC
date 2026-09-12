@@ -1,0 +1,43 @@
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -64386,7 +64386,20 @@
+ 	// Consolidation, Stage 4). Behavior-preserving, per-branch flags:
+ 	//
+ 	// - Type-2 restores the comparator's captured scope chain
+-	//   (INV_CAPTURED_SCOPE), this_var = NULL. The migration originally
++	//   (INV_CAPTURED_SCOPE) and, since 2026-09-11, gets the same fresh local
++	//   frame + undefined `this` bind the type-1 arm has always had. It had
++	//   neither before, which defeated the whole point of this helper for
++	//   SWF7+ content: a DefineFunction2 body that binds its parameters BY
++	//   NAME (Ming emits function2 for SWF7+, and its prologue is a literal
++	//   `setVariableByName("a", &args[0]); setVariableByName("b", &args[1]);`)
++	//   wrote them into the enclosing timeline. from_gnash
++	//   actionscript.all/array-v7 and -v8 lose 26 lines to exactly that:
++	//   `randomComparator(a, b)` clobbers the root's `b` with a sorted element
++	//   (array.as:455 onward) and the comparator sees the root MovieClip as
++	//   `this` instead of undefined (array.as:296). v6 was never affected
++	//   because Ming emits function1 there. Flash/Ruffle call a comparator as
++	//   a PLAIN function, so `this` is undefined, not the caller's clip.
++	//   The migration originally
+ 	//   preserved the old bare call (flags = 0); the pass-(b) remainder
+ 	//   (master-list item 7, sort comparator captured scopes for type-2)
+ 	//   adds INV_CAPTURED_SCOPE — a factory-returned func2 closure comparator
+@@ -64416,13 +64429,12 @@
+ 	// then popped into the NEXT sort's comparator params); a 3-param
+ 	// comparator popped the caller's stack. regression/
+ 	// sort_comparator_type1_args pins both shapes.
++	// Both arms now share one flag set — the type-2/type-1 split above was the
++	// bug, not a semantic. `&undef_this` leaves the ABI `this` pointer NULL for
++	// a type-2 callee exactly as the old `NULL` this_var did (invokeFunctionValue
++	// derives this_ptr only from OBJECT/MOVIECLIP/ARRAY/FUNCTION tags), so the
++	// only type-2 change is the fresh local frame and the by-name `this` bind.
+ 	ActionVar result;
+-	if (comparator->function_type == 2)
+-	{
+-		InvokeOpts opts = { .flags = INV_CAPTURED_SCOPE };
+-		result = invokeFunctionValue(app_context, comparator, NULL, args, 2, &opts);
+-	}
+-	else
+ 	{
+ 		ActionVar undef_this = {0};
+ 		undef_this.type = ACTION_STACK_VALUE_UNDEFINED;

@@ -1,0 +1,200 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bytearray.c b/SWFModernRuntime/src/avm2/avm2_bytearray.c
+index b59c9e836..a54c154e7 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bytearray.c
++++ b/SWFModernRuntime/src/avm2/avm2_bytearray.c
+@@ -1339,6 +1339,31 @@ Avm2Value avm2_amf_write_object(Avm2Activation* act);
+ // Registration
+ // ---------------------------------------------------------------------------
+ 
++// Which movie's character tables does `cls` belong to? Same class walk
++// avm2_display_child_char_for_class takes (avm2_display.c), answering with the
++// DEFINING file's tables. NULL = the main movie, whose chars are the
++// avm2_generated_* globals. Needed because a SymbolClass char id is only
++// meaningful inside the movie that carried the tag: two movies can define the
++// same raw id as different character kinds.
++static const Avm2CharInfo* ba_char_info_for_class(Avm2Class* cls, uint16_t char_id)
++{
++	const Avm2CharInfo* chars = avm2_generated_chars;
++	uint32_t count = avm2_generated_char_count;
++	for (Avm2Class* c = cls; c != NULL; c = c->super_class)
++	{
++		if (c->instance_init.file == NULL) continue;  // builtin
++		const Avm2MovieTables* t =
++			avm2_display_movie_for_abc(c->instance_init.file->data);
++		if (t == NULL) continue;                      // the MAIN movie
++		chars = t->chars;
++		count = t->char_count;
++		break;
++	}
++	for (uint32_t i = 0; i < count; i++)
++		if (chars[i].char_id == char_id) return &chars[i];
++	return NULL;
++}
++
+ static void ba_native_init(Avm2Context* ctx, Avm2Object* obj)
+ {
+ 	Avm2ByteArrayExt* ba = (Avm2ByteArrayExt*) obj->native_ext;
+@@ -1378,6 +1403,36 @@ static void ba_native_init(Avm2Context* ctx, Avm2Object* obj)
+ 			memcpy(ba->bytes, bin->bytes, bin->len);
+ 			ba->position = 0;
+ 		}
++		else if (bin == NULL)
++		{
++			// The class IS SymbolClass-bound, but to something that is not a
++			// DefineBinaryData. Ruffle's ByteArray allocator
++			// (object/bytearray_object.rs) looks the bound character up and
++			// raises #2136 ("The SWF file <url> contains invalid data.") for
++			// any non-BinaryData kind — avm2/bytearray_bad_symbol_class binds
++			// `MyBytes` to a DefineVideoStream and Flash throws there too.
++			//
++			// The predicate is deliberately "a KNOWN character of a non-binary
++			// kind", not "no binary payload found": a DefineBinaryData whose
++			// payload the emitter dropped (or a child movie whose binaries[]
++			// table is empty) must keep seeding an empty ByteArray rather than
++			// start throwing. abc_timeline.cpp records a kind-8 (OTHER)
++			// CharInfo for every DefineBinaryData and for nothing else, so
++			// kind 8 is exactly "binary" here; an id that names no character
++			// at all (bin == NULL, ci == NULL) also stays silent.
++			const Avm2CharInfo* ci = ba_char_info_for_class(obj->cls, char_id);
++			if (ci != NULL && ci->kind != AVM2_CHAR_OTHER)
++			{
++#ifdef SWF_URL
++				const char* url = SWF_URL;
++#else
++				const char* url = "";
++#endif
++				avm2_throw_error(ctx, NULL,
++				                 "Error #2136: The SWF file %s contains "
++				                 "invalid data.", url);
++			}
++		}
+ 	}
+ }
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_filters.c b/SWFModernRuntime/src/avm2/avm2_filters.c
+index 502f301b4..6e1da5f06 100644
+--- a/SWFModernRuntime/src/avm2/avm2_filters.c
++++ b/SWFModernRuntime/src/avm2/avm2_filters.c
+@@ -1035,6 +1035,11 @@ static Avm2Class* new_filter_class(Avm2Context* ctx, const char* name, uint8_t k
+ {
+ 	Avm2Class* c = avm2_builtin_class(ctx, "flash.filters", name,
+ 	                                  g_bitmapfilter_class);
++	// avm2_builtin_class copies native_init down from the super, and
++	// BitmapFilter's is the abstract #2012 gate (avm2_register_filters). The
++	// nine engine filters are concrete, so clear it back. Same reset in
++	// avm2_pixelbender.c for ShaderFilter, which extends BitmapFilter too.
++	c->native_init = NULL;
+ 	c->flags |= AVM2_CLASS_FLAG_SEALED | AVM2_CLASS_FLAG_FINAL;
+ 	c->native_ext_size = sizeof(Avm2FilterObjExt);
+ 	c->instance_init.fn = ctor;
+@@ -1050,6 +1055,17 @@ void avm2_register_filters(Avm2Context* ctx)
+ 	// ShaderFilter (avm2_pixelbender.c) extends it through the accessor.
+ 	g_bitmapfilter_class = avm2_builtin_class(ctx, "flash.filters", "BitmapFilter",
+ 	                                          ctx->builtins.object_class);
++	// …but it IS [Ruffle(Abstract)]: Ruffle's bitmap_filter allocator
++	// (globals/flash/filters/bitmap_filter.rs) throws #2012 unless the class
++	// being allocated has one of the ten engine filter classes in its chain,
++	// so both `new BitmapFilter()` and `new CustomFilter()` (a direct script
++	// subclass) throw, while a subclass of ConvolutionFilter constructs.
++	// Inheritance of native_init gives us exactly that shape for free: the
++	// engine classes clear the hook (new_filter_class / ShaderFilter) and a
++	// SWF subclass inherits whatever its super ended up with
++	// (avm2_class.c's link step). Nothing in the runtime mints the base
++	// class, so the unconditional gate needs no script-new guard.
++	avm2_builtin_set_abstract(ctx, g_bitmapfilter_class);
+ 	avm2_builtin_add_method(ctx, g_bitmapfilter_class, "clone", bitmapfilter_clone);
+ 
+ 	Avm2Class* c;
+diff --git a/SWFModernRuntime/src/avm2/avm2_pixelbender.c b/SWFModernRuntime/src/avm2/avm2_pixelbender.c
+index 1c8247588..22256c2e7 100644
+--- a/SWFModernRuntime/src/avm2/avm2_pixelbender.c
++++ b/SWFModernRuntime/src/avm2/avm2_pixelbender.c
+@@ -2340,6 +2340,11 @@ void avm2_register_pixelbender(Avm2Context* ctx)
+ 		Avm2Class* sf = avm2_builtin_class(ctx, "flash.filters", "ShaderFilter",
+ 			(super != NULL) ? super : b->object_class);
+ 		g_shaderfilter_class = sf;
++		// BitmapFilter is abstract (#2012 at allocation); avm2_builtin_class
++		// copies its native_init down. ShaderFilter is concrete, so clear it
++		// back — the same reset new_filter_class does for the nine engine
++		// filters in avm2_filters.c.
++		sf->native_init = NULL;
+ 		sf->flags |= AVM2_CLASS_FLAG_SEALED;
+ 		sf->native_ext_size = sizeof(Avm2ShaderFilterExt);
+ 		sf->instance_init.fn = sf_ctor;
+diff --git a/SWFModernRuntime/src/avm2/avm2_stage3d.c b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+index 7476bd7c7..9c5319ec0 100644
+--- a/SWFModernRuntime/src/avm2/avm2_stage3d.c
++++ b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+@@ -1667,12 +1667,21 @@ static Avm2Value matrix3d_xform(Avm2Activation* act, int kind, int prepend)
+ 			double px = m3d_component(act->ctx, pivot, "x");
+ 			double py = m3d_component(act->ctx, pivot, "y");
+ 			double pz = m3d_component(act->ctx, pivot, "z");
+-			double rx = px * t[0] + py * t[4] + pz * t[8];
+-			double ry = px * t[1] + py * t[5] + pz * t[9];
+-			double rz = px * t[2] + py * t[6] + pz * t[10];
+-			t[12] = px - rx;
+-			t[13] = py - ry;
+-			t[14] = pz - rz;
++			// FP runs T(-p) * R * T(p) as three GENUINE 4x4 products rather
++			// than folding the pivot into the translation column, and the
++			// difference is observable: with p = (NaN,NaN,NaN) the zeros in
++			// R's projection column meet a NaN, 0*NaN = NaN, and ALL SIXTEEN
++			// cells go NaN (avm2/matrix3d_append_rotation's "zero axis, NaN
++			// pivot" row; Ruffle short-circuits like we used to and reports
++			// NaN,NaN,NaN,0,...,1). For a finite pivot the two forms are
++			// bit-identical -- the folded form's `px - p*Rcol` IS the c=3
++			// column of this product, and the 3x3 block picks up only
++			// `px * tmp[3]` with tmp[3] an exact 0 -- so no finite row moves.
++			double tn[16], tp[16], tmp[16];
++			m3d_build_translation(tn, -px, -py, -pz);
++			m3d_build_translation(tp, px, py, pz);
++			m3d_mul(tmp, tn, t);   // T(-p) then R
++			m3d_mul(t, tmp, tp);   // ... then T(p)
+ 		}
+ 	}
+ 	else
+@@ -1994,6 +2003,44 @@ static Avm2Value matrix3d_recompose(Avm2Activation* act)
+ 			x *= sin(w / 2); y *= sin(w / 2); z *= sin(w / 2);
+ 			w = cos(w / 2);
+ 		}
++		else
++		{
++			// QUATERNION only: FP validates that the rotation Vector3D IS a
++			// unit quaternion and raises ArgumentError #2004 if it is not,
++			// leaving the matrix untouched. Measured over every arm of
++			// matrix3d_recompose_edge_cases's testQuaternion(): (0,0,0,±1),
++			// (1,0,0,0) and the four (±0.5,0.5,±0.5,0.5) permutations pass;
++			// (0,0,0,0), (0.5,0,0,0), (2,0,0,0), (1,1,1,1) and every
++			// NaN/Infinity spelling throw. No separate isfinite() arm is
++			// needed: a NaN norm makes the <= below false (so the negation
++			// throws) and an infinite one is trivially outside the window.
++			// Ruffle's Matrix3D.as skips the check entirely and
++			// recomposes anyway (its output.ruffle.txt traces `true` plus an
++			// all-NaN matrix). The axisAngle arm above is genuinely
++			// unvalidated in FP — NaN simply propagates there.
++			//
++			// The comparison MUST be tolerant, not exact, and the tolerance is
++			// the one number here the corpus cannot pin.
++			// avm2/matrix3d_compose round-trips `decompose("quaternion")`
++			// straight back into recompose; that matrix carries shear, so the
++			// extracted quaternion is genuinely NOT unit — its norm is
++			// 0.99973, off by 2.7e-4 — and FP accepts it (measured: an exact
++			// `!= 1.0`, and a 1e-4 window, both regress that test). So FP's
++			// window is wider than 2.7e-4, and narrower than 0.75 (the
++			// distance of the nearest REJECTED norm, 0.25). Nothing in the
++			// corpus narrows it further: every rejected norm is 0, 0.25, 4 or
++			// non-finite. 1e-2 is chosen inside that bracket with ~37x
++			// headroom over the observed legitimate round-trip and ~75x below
++			// the nearest real rejection. If a fixture ever pins FP's real
++			// epsilon, this is the one constant to change.
++			double qn = x * x + y * y + z * z + w * w;
++			if (!(fabs(qn - 1.0) <= 1e-2))
++			{
++				avm2_throw_error(ctx, ctx->builtins.argument_error_class,
++				                 "Error #2004: One of the parameters is "
++				                 "invalid.");
++			}
++		}
+ 		m[0] = (1 - 2 * y * y - 2 * z * z) * sx3;
+ 		m[1] = (2 * x * y + 2 * w * z) * sx3;
+ 		m[2] = (2 * x * z - 2 * w * y) * sx3;

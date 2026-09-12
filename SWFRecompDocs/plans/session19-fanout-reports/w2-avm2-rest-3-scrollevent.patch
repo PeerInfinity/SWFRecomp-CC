@@ -1,0 +1,55 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 5b8bf5420..a69f76ef5 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -2322,6 +2322,9 @@ static void edittext_init_common(Avm2Context* ctx, Avm2Object* obj,
+ 	et->grid_fit = 1;     // pixel
+ 	et->border_color = 0x000000;
+ 	et->background_color = 0xFFFFFF;
++	// Ruffle EditTextData::mouse_wheel_enabled defaults to TRUE
++	// (edit_text.rs:347); the zeroed ext left every field deaf to the wheel.
++	et->mouse_wheel_enabled = 1;
+ 	et->scroll = 1;
+ 	et->text = empty_string(ctx);
+ 	et->style_sheet = NULL;
+@@ -8257,6 +8260,20 @@ static Avm2Value txt_get_max_scroll_h(Avm2Activation* act)
+ 	return avm2_integer((int32_t) et_maxhscroll(act->ctx, et));
+ }
+ 
++// Ruffle EditText::on_scroller, AVM2 arm (edit_text.rs:2142): a scrollV write
++// that actually MOVES the clamped value dispatches a bare, non-bubbling,
++// non-cancelable "scroll" event on the field, synchronously and inside the
++// setter. set_hscroll has no such hook, and `programmatic` only gates the AVM1
++// `onScroller` broadcast — an AVM2 field dispatches either way.
++static void et_dispatch_scroll(Avm2Context* ctx, Avm2EditTextExt* et)
++{
++	if (et == NULL || et->owner == NULL) return;
++	Avm2Object* ev = avm2_event_new(ctx,
++	                                avm2_string_from_literal(ctx, "scroll"),
++	                                0, 0);
++	if (ev != NULL) avm2_dispatch_event(ctx, et->owner, ev);
++}
++
+ static Avm2Value txt_set_scroll_v(Avm2Activation* act)
+ {
+ 	Avm2EditTextExt* et = this_et(act);
+@@ -8266,7 +8283,9 @@ static Avm2Value txt_set_scroll_v(Avm2Activation* act)
+ 	if (v < 1) v = 1;
+ 	int32_t maxv = et_maxscroll(act->ctx, et);
+ 	if (v > maxv) v = maxv;
++	if (v == et->scroll) return avm2_undefined();
+ 	et->scroll = v;
++	et_dispatch_scroll(act->ctx, et);
+ 	return avm2_undefined();
+ }
+ 
+@@ -10433,6 +10452,9 @@ int avm2_text_mouse_wheel(Avm2Context* ctx, Avm2Object* obj, int32_t delta_lines
+ 	if (v > maxv) v = maxv;
+ 	if (v == et->scroll) return 0;
+ 	et->scroll = v;
++	// Same set_scroll hook as the scrollV setter: the wheel is a non-
++	// programmatic scroll, and an AVM2 field dispatches "scroll" for it.
++	et_dispatch_scroll(ctx, et);
+ 	return 1;
+ }
+ 

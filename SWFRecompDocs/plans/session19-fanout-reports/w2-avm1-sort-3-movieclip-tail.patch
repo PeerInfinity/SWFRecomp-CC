@@ -1,0 +1,395 @@
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -16134,8 +16134,11 @@
+                               const char* target, u8 send_vars_method);
+ static int avm1_var_to_utf8(SWFAppContext* app_context, const ActionVar* v,
+                             char* out, int cap);
++static void avm1_log_form_fetch(SWFAppContext* app_context, MovieClip* mc,
++                                const char* url, u8 send_vars_method);
+ #else
+ #define avm1_log_navigate(app_context, url, target, m) ((void) 0)
++#define avm1_log_form_fetch(app_context, mc, url, m) ((void) 0)
+ #endif
+ 
+ // MovieClip.prototype.getURL(url, window, method) — globals/movie_clip.rs
+@@ -24190,6 +24193,120 @@
+ static PendingDirectLoad g_pending_direct_loads[MAX_PENDING_DIRECT_LOADS];
+ int g_pending_direct_load_count = 0;
+ 
++// --- Deferred loadVariables `onData` queue ---------------------------------
++// Ruffle's load_form_into_object (core/src/loader.rs:1028-1042) parses the form
++// response into the target clip and then QUEUES `onData` on the action queue —
++// it never runs inside the caller's own frame. Our form loads are synchronous
++// file reads out of the test's data registry, so the parse has already
++// happened by the time we get here; only the event is deferred. The queue is
++// drained from actionFirePendingDirectLoads, which both frame loops
++// (libswf/swf_core.c and libswf/swf.c) already call once per tick, so this
++// needs no new call site in either loop.
++//
++// Entries are NOT deduplicated: Flash fires one onData per completed load, and
++// the drain copies-and-clears before dispatching, so an onData that issues
++// another loadVariables (from_gnash actionscript.all/MovieClip-v6 does exactly
++// that) lands on the NEXT tick rather than recursing.
++#define MAX_PENDING_FORM_DATA 16
++static MovieClip* g_pending_form_data[MAX_PENDING_FORM_DATA];
++static int g_pending_form_data_count = 0;
++
++static void avm1QueueFormDataEvent(MovieClip* mc)
++{
++	if (mc == NULL) return;
++	if (g_pending_form_data_count < MAX_PENDING_FORM_DATA)
++		g_pending_form_data[g_pending_form_data_count++] = mc;
++}
++
++// One clip's `onData`. Deliberately a private copy of mc_call_as2_handler_ng's
++// invoke ritual rather than a call into it, for two reasons: that function is
++// owned by a sibling change this session, and it can only find handlers stored
++// in mc->dynamic_props — which is the wrong store for the ROOT clip, whose
++// timeline variables live in the global var_map (see actionSetVariable's
++// `_uq_target == &root_movieclip falls through to the global var_map` arm).
++// gnash's MovieClip.as installs its handler with a bare `onData = function(){}`
++// on the root timeline, so the root case has to resolve through the ordinary
++// variable chain.
++static void avm1FireFormDataEvent(SWFAppContext* app_context, MovieClip* mc)
++{
++	extern MovieClip root_movieclip;
++	if (mc == NULL || g_execution_halted) return;
++
++	ActionVar handler = {0};
++	handler.type = ACTION_STACK_VALUE_UNDEFINED;
++	if (mc->dynamic_props != NULL)
++	{
++		ActionVar* p = getPropertyWithPrototype((ASObject*) mc->dynamic_props, "onData", 6);
++		if (p != NULL) handler = *p;
++	}
++	if (handler.type != ACTION_STACK_VALUE_FUNCTION && mc == &root_movieclip)
++	{
++		MovieClip* _fd_saved = g_current_context;
++		actionSetCurrentContext(mc);
++		PUSH_STR("onData", 6);
++		actionGetVariable(app_context);
++		popVar(app_context, &handler);
++		actionSetCurrentContext(_fd_saved);
++	}
++	if (handler.type != ACTION_STACK_VALUE_FUNCTION) return;
++
++	ASFunction* func = (ASFunction*)(uintptr_t) handler.data.numeric_value;
++	if (func == NULL) return;
++	if (g_call_depth >= g_max_call_depth - 1) { g_execution_halted = 1; return; }
++
++	ActionVar this_var = {0};
++	this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
++	this_var.data.numeric_value = (u64)(uintptr_t) mc;
++
++	g_inside_event_handler++;
++	// Ruffle dispatches this as ActionType::Method{args: vec![]}, so the
++	// handler sees a real zero-length `arguments` — MovieClip.as:2207 asserts
++	// `arguments.length == 0`. A type-2 body builds its own `arguments` in its
++	// prologue; a type-1 body has none unless the caller binds it on a local
++	// frame, hence INV_LOCAL_SCOPE + INV_ACT_ARGUMENTS on both arms. The frame
++	// holds only `this`/`arguments`, and actionSetVariable only writes to a
++	// scope frame that ALREADY carries the name, so the handler's own
++	// `dataLoaded++` still lands on the timeline.
++	InvokeOpts opts = { .flags = INV_THIS_STACK | INV_CAPTURED_SCOPE |
++	                             INV_VERSION_SWITCH | INV_LOCAL_SCOPE |
++	                             INV_BIND_THIS,
++	                    .act_flags = INV_ACT_ARGUMENTS };
++	if (func->function_type == 2)
++		opts.flags |= INV_LOCAL_SCOPE_MC | INV_EVENT_THIS_MC |
++		              INV_MC_THIS_NULL_PTR | INV_EXEC_FUNC;
++	g_call_depth++;
++	(void) invokeFunctionValue(app_context, func, &this_var, NULL, 0, &opts);
++	g_call_depth--;
++	g_inside_event_handler--;
++}
++
++static void avm1FireFormDataEvents(SWFAppContext* app_context)
++{
++	// Bounded re-entrant drain, mirroring processLoadVarsLoads' own
++	// `while (pending && guard++ < 16)` shape. An onData that issues another
++	// loadVariables (MovieClip-v6's two-round vars.txt handshake does exactly
++	// that) must still complete inside the movie's frame budget: our loads are
++	// synchronous reads out of the data registry, not real network fetches, so
++	// there is no latency to spread a chain over several ticks — and the
++	// gnash tests put the whole handshake in the LAST frame's script, leaving
++	// no later tick to drain into.
++	int guard = 0;
++	while (g_pending_form_data_count > 0 && guard++ < 8)
++	{
++		int count = g_pending_form_data_count;
++		MovieClip* pend[MAX_PENDING_FORM_DATA];
++		for (int i = 0; i < count; i++) pend[i] = g_pending_form_data[i];
++		g_pending_form_data_count = 0;
++		for (int i = 0; i < count; i++)
++		{
++			MovieClip* mc = pend[i];
++			if (mc == NULL || mc->depth == INT_MIN || mc->avm1_removed || mc->pending_removal)
++				continue;
++			avm1FireFormDataEvent(app_context, mc);
++		}
++	}
++}
++
+ // --- Per-tick loaded-child-movie advancement ---
+ // A movie loaded into a _levelN slot (loadMovieNum), into a holder clip
+ // (loadMovie), or into an MCL target (MovieClipLoader.loadClip) BECOMES that
+@@ -35631,6 +35748,56 @@
+ 	}
+ }
+ 
++// Ruffle's load_form_into_object body (core/src/loader.rs:990-1027): fetch the
++// URL, decode it per the charset rules, and set every "k=v" pair on the target
++// clip. Factored out of actionGetURL2's loadVariables branch so the
++// MovieClip.loadVariables METHOD form shares one implementation with the
++// ActionGetURL2 TAG form. `url` may carry a GET query string (object_into_request
++// appends the caller's form values to it); the data-registry lookup uses the
++// path part only.
++// Returns 1 when the fetch resolved to a real payload (Ruffle's future resolved
++// Ok, i.e. the point at which it queues `onData`); 0 on a miss, where Ruffle's
++// future errors out and no event fires.
++static int avm1LoadFormIntoMC(SWFAppContext* app_context, MovieClip* mc, const char* url)
++{
++	extern DataFileEntry* findDataFile(const char* name);
++	if (mc == NULL || url == NULL || url[0] == '\0') return 0;
++
++	char path[512];
++	size_t n = 0;
++	while (url[n] != '\0' && url[n] != '?' && n < sizeof(path) - 1) { path[n] = url[n]; n++; }
++	path[n] = '\0';
++
++	DataFileEntry* data = findDataFile(path);
++	if (data == NULL || data->content == NULL || data->content_length <= 0) return 0;
++	int len = data->content_length;
++	if (len > 4096) len = 4096;
++
++	// The form loader is charset-aware; every other loader (LoadVars.load,
++	// XML.load, StyleSheet.load) is not. Mirrors Ruffle's load_form_into_object
++	// (core/src/loader.rs:1004-1022): useCodepage sniffs, else a root SWF of
++	// version <= 5 is windows-1252, else the bytes pass through untouched. The
++	// version has to be the ROOT movie's — g_swf_version is swapped per call
++	// frame, g_main_movie_swf_version is not.
++	LegacyCharset cs;
++	if (avm1_system_use_codepage()) {
++		cs = legacy_charset_detect((const unsigned char*) data->content, len);
++	} else if (g_main_movie_swf_version <= 5) {
++		cs = LEGACY_CS_WINDOWS_1252;
++	} else {
++		cs = LEGACY_CS_UTF8;   // verbatim
++	}
++
++	// Heap, not a 4097-byte stack buffer: decoding expands (up to 3x) and
++	// parseURLEncodedVars mutates its argument.
++	char* buf = legacy_charset_to_utf8((const unsigned char*) data->content, len, cs, NULL);
++	if (buf != NULL) {
++		parseURLEncodedVars(app_context, buf, mc);
++		free(buf);
++	}
++	return 1;
++}
++
+ // Strip query string from URL (modifies url in-place), parse FlashVars, set on target MC
+ static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieClip* target_mc) {
+ 	char* query = strchr(url, '?');
+@@ -35762,6 +35929,79 @@
+ 	return n;
+ }
+ 
++// Rust's form_urlencoded::Serializer, which is what Activation::object_into_request
++// builds the GET query / POST body from: alphanumerics and `*-._` survive, a space
++// becomes '+', everything else is %XX. Deliberately NOT lv_url_encode — that one is
++// _global.escape (space → %20) and is user-overridable.
++static int avm1_form_urlencode(const char* in, int in_len, char* out, int out_cap)
++{
++	static const char hex[] = "0123456789ABCDEF";
++	int o = 0;
++	for (int i = 0; i < in_len && o < out_cap - 4; i++)
++	{
++		unsigned char c = (unsigned char) in[i];
++		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
++		    (c >= '0' && c <= '9') || c == '*' || c == '-' || c == '.' || c == '_')
++			out[o++] = (char) c;
++		else if (c == ' ')
++			out[o++] = '+';
++		else { out[o++] = '%'; out[o++] = hex[c >> 4]; out[o++] = hex[c & 0x0F]; }
++	}
++	if (o < out_cap) out[o] = '\0';
++	return o;
++}
++
++// The "Navigator::fetch:" block MovieClip.loadVariables(url, method) issues.
++// Ruffle: object_into_request(clip, url, method) — GET appends the clip's own
++// variables to the query string, POST sends them as an
++// application/x-www-form-urlencoded body; no method at all is a bare GET with
++// neither. send_vars_method: 0 = none, 1 = GET, 2 = POST.
++static void avm1_log_form_fetch(SWFAppContext* app_context, MovieClip* mc,
++                                const char* url, u8 send_vars_method)
++{
++	if (url == NULL) return;
++	if (send_vars_method == 0)
++	{
++		swf_log_fetch_queue(url, strlen(url), "GET", 3, NULL, 0, NULL, 0, NULL, 0, 0, 0);
++		swf_log_fetch_flush();
++		return;
++	}
++
++	SwfLogPair pairs[AVM1_MAX_NAV_PARAMS];
++	char pbuf[AVM1_NAV_PARAM_BUF];
++	size_t np = avm1_collect_form_values(app_context, mc, pairs,
++	                                     AVM1_MAX_NAV_PARAMS, pbuf, sizeof(pbuf));
++	char q[AVM1_NAV_PARAM_BUF * 3];
++	int qn = 0;
++	for (size_t i = 0; i < np; i++)
++	{
++		if (qn > 0 && qn < (int) sizeof(q) - 1) q[qn++] = '&';
++		qn += avm1_form_urlencode(pairs[i].name, (int) pairs[i].name_len,
++		                          q + qn, (int) sizeof(q) - qn);
++		if (qn < (int) sizeof(q) - 1) q[qn++] = '=';
++		qn += avm1_form_urlencode(pairs[i].value, (int) pairs[i].value_len,
++		                          q + qn, (int) sizeof(q) - qn);
++	}
++	q[qn] = '\0';
++
++	if (send_vars_method == 2)
++	{
++		swf_log_fetch_queue(url, strlen(url), "POST", 4, NULL, 0,
++		                    "application/x-www-form-urlencoded", 33,
++		                    (const unsigned char*) q, (size_t) qn, 1, 1);
++	}
++	else
++	{
++		char full[1024];
++		const char* sep = (strchr(url, '?') != NULL) ? "&" : "?";
++		int fn = snprintf(full, sizeof(full), "%s%s%s", url, sep, q);
++		if (fn < 0) fn = 0;
++		if (fn > (int) sizeof(full) - 1) fn = (int) sizeof(full) - 1;
++		swf_log_fetch_queue(full, (size_t) fn, "GET", 3, NULL, 0, NULL, 0, NULL, 0, 0, 0);
++	}
++	swf_log_fetch_flush();
++}
++
+ // send_vars_method: 0 = none (no Method/Param lines), 1 = GET, 2 = POST.
+ static void avm1_log_navigate(SWFAppContext* app_context, const char* url,
+                               const char* target, u8 send_vars_method)
+@@ -40475,6 +40715,18 @@
+ // instance; default onData calls decode() + onLoad(true) or onLoad(false).
+ void processLoadVarsLoads(SWFAppContext* app_context)
+ {
++	// loadVariables' deferred `onData` rides this drain: it is the existing
++	// per-tick "fire the form loader's callbacks" hook, it is called
++	// UNCONDITIONALLY by both native frame loops (libswf/swf_core.c ~:1476 and
++	// libswf/swf.c ~:1302), and it needs no new call site in either. (The
++	// direct-load drain next to it is gated on g_pending_direct_load_count > 0
++	// at BOTH call sites, so hanging a second queue off
++	// actionFirePendingDirectLoads would have starved it.) One drain per tick,
++	// so a loadVariables issued from inside onData fires on the NEXT tick —
++	// which is what from_gnash actionscript.all/MovieClip-v6's two-round
++	// vars.txt handshake expects.
++	avm1FireFormDataEvents(app_context);
++
+ 	int guard = 0;
+ 	while (g_pending_lv_load_count > 0 && guard++ < 16) {
+ 		// Copy locally so onData handlers that call load() again don't
+@@ -50156,6 +50408,16 @@
+ 				} else {
+ 					_lv_mc = getOrCreateLevel(app_context, level_num);
+ 				}
++			} else if (strcmp(target_utf8, "_root") == 0) {
++				// `loadVariables("vars.txt", _root)` compiles to a STRING
++				// target of "_root" with loadTarget=1 — the name is pushed as
++				// a constant, not resolved to a MovieClip first, so
++				// _gu2_target_mc is NULL and the child_mc_cache name scan
++				// below never matches. from_gnash actionscript.all/
++				// MovieClip-v6's onData handler reloads through exactly this
++				// form, and the reload was silently dropped.
++				extern MovieClip root_movieclip;
++				_lv_mc = &root_movieclip;
+ 			} else if (strcmp(target_utf8, "this") == 0 || strcmp(target_utf8, "") == 0) {
+ 				// "this" or empty → current context (root)
+ 				extern MovieClip root_movieclip;
+@@ -50173,36 +50435,12 @@
+ 		}
+ 
+ 		if (_lv_mc != NULL && url_utf8[0] != '\0') {
+-			DataFileEntry* data = findDataFile(url_utf8);
+-			if (data != NULL && data->content != NULL && data->content_length > 0) {
+-				int _lv_len = data->content_length;
+-				if (_lv_len > 4096) _lv_len = 4096;
+-
+-				// The form loader is charset-aware; every other loader
+-				// (LoadVars.load, XML.load, StyleSheet.load) is not. Mirrors
+-				// Ruffle's load_form_into_object (core/src/loader.rs:1004-1022):
+-				// useCodepage sniffs, else a root SWF of version <= 5 is
+-				// windows-1252, else the bytes pass through untouched.
+-				// The version has to be the ROOT movie's — g_swf_version is
+-				// swapped per call frame, g_main_movie_swf_version is not.
+-				LegacyCharset _lv_cs;
+-				if (avm1_system_use_codepage()) {
+-					_lv_cs = legacy_charset_detect((const unsigned char*) data->content, _lv_len);
+-				} else if (g_main_movie_swf_version <= 5) {
+-					_lv_cs = LEGACY_CS_WINDOWS_1252;
+-				} else {
+-					_lv_cs = LEGACY_CS_UTF8;   // verbatim
+-				}
+-
+-				// Heap, not the old 4097-byte stack buffer: decoding expands
+-				// (up to 3x) and parseURLEncodedVars mutates its argument.
+-				char* _lv_buf = legacy_charset_to_utf8((const unsigned char*) data->content,
+-				                                       _lv_len, _lv_cs, NULL);
+-				if (_lv_buf != NULL) {
+-					parseURLEncodedVars(app_context, _lv_buf, _lv_mc);
+-					free(_lv_buf);
+-				}
+-			}
++			// Body moved to avm1LoadFormIntoMC (shared with the
++			// MovieClip.loadVariables method form).
++			// Ruffle fires onData for the ActionGetURL2 tag form too — it is
++			// the same load_form_into_object future.
++			if (avm1LoadFormIntoMC(app_context, _lv_mc, url_utf8))
++				avm1QueueFormDataEvent(_lv_mc);
+ 		}
+ 		return;
+ 	}
+@@ -73655,6 +73893,43 @@
+ 				}
+ 			}
+ 			if (args != NULL) FREE(args);
++			pushUndefined(app_context);
++			return;
++		}
++		else if (method_name_len == 13 && strncasecmp(method_name, "loadVariables", 13) == 0)
++		{
++			// mc.loadVariables(url [, method]) — Ruffle globals/movie_clip.rs
++			// load_variables: object_into_request (the clip's OWN variables
++			// become the GET query string or the POST body) followed by
++			// loader.rs load_form_into_object (parse the response into the
++			// clip, then queue `onData` on it). Until now this was a
++			// registered NAME with no dispatch branch, so `typeof
++			// mc.loadVariables == "function"` but calling it was a silent
++			// no-op — avm1/loadvariables_method emitted nothing at all, and
++			// from_gnash actionscript.all/MovieClip-v6/-v7/-v8 stopped before
++			// their `vars.txt` + onData tail. The GetURL2 TAG form
++			// (load_variables_flag) was already implemented; this is the
++			// method form, and both now share avm1LoadFormIntoMC.
++			if (mc != NULL && num_args >= 1) {
++				char _lvm_url[512];
++				varToStringBuf(app_context, &args[0], _lvm_url, sizeof(_lvm_url));
++				// NavigationMethod::from_method_str — anything that is not a
++				// case-insensitive "GET"/"POST" (including a missing argument)
++				// means "no method", i.e. send no variables at all.
++				u8 _lvm_method = 0;
++				if (num_args >= 2) {
++					char _lvm_m[16];
++					varToStringBuf(app_context, &args[1], _lvm_m, sizeof(_lvm_m));
++					if (strcasecmp(_lvm_m, "GET") == 0) _lvm_method = 1;
++					else if (strcasecmp(_lvm_m, "POST") == 0) _lvm_method = 2;
++				}
++				if (_lvm_url[0] != '\0') {
++					avm1_log_form_fetch(app_context, mc, _lvm_url, _lvm_method);
++					if (avm1LoadFormIntoMC(app_context, mc, _lvm_url))
++						avm1QueueFormDataEvent(mc);
++				}
++			}
++			if (args != NULL) FREE(args);
+ 			pushUndefined(app_context);
+ 			return;
+ 		}

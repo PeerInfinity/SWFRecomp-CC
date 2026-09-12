@@ -821,10 +821,10 @@ pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
 
 ## 18. Session-19 state of the board (2026-09-11/12)
 
-Baseline: images run `34645805030` at `0ccafbc4e`, **381 / 580**. Grading runs
-this session: `34657699925` at `f48c532bf` (first six patches) and
-`34662909136` at `521a53782` (everything except hitArea, which is trace-only).
-Reports: `session19-fanout-reports/`.
+Baseline: images run `34645805030` at `0ccafbc4e`, **381 / 580**. Final images
+run `34666689502` at `d8da5a18c`: **392 / 580 (67.6 %)** = **+22 flips, 16 band
+moves improved / 0 worsened**, against 11 pass→fail rows that are upstream
+tolerance drift and not ours (see below). Reports: `session19-fanout-reports/`.
 
 **+21 pixel flips priced and locally verified** (Stage3D 13, text 5, geometry 2,
 bitmap 1), plus four band moves: `graphics_simple_shapes` 230 → 154,

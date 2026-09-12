@@ -2688,14 +2688,30 @@ results`, dispatched at closeout).
 
 **Pixels.** See playbook §17.
 
-## 20. Session 19 (2026-09-11/12) — dual-axis fan-out #11: trace +NN, pixels +NN
+## 20. Session 19 (2026-09-11/12) — dual-axis fan-out #11: trace +25 (4436/4520 eff), pixels +22 (392/580, 67.6 %), 2 regressions found and fixed
 
-Commits `bd5027f69..8072df940` on master (20 code commits + 1 disposition/doc
-commit, each carrying its agent's patch, report and brief under
+Commits `bd5027f69..fe79e0c79` on master (23 code commits + doc/disposition
+commits, each carrying its agent's patch, report and brief under
 `session19-fanout-reports/`). Baseline was trace **4412 effective / 4518
 intersection** (results `627830f2a`, run `34648878013` at `254145a5b`) and
 pixels **381 / 580** (images run `34645805030`). 8 wave-1 + 11 wave-2 agents,
 all on Opus, coordinator included.
+
+**Grading runs.** `34657699925` at `f48c532bf` (first six patches): trace +8, 0
+regressions. `34662909136` at `521a53782`: trace **+24, 0 pass→fail**; pixels
+**381 → 392**. `34666689502` at `d8da5a18c` (adds hitArea + the SWF4 gate):
+trace **+24 = 25 gains − 1 regression**, pixels **392/580 (+22 flips, 16 band
+moves improved / 0 worsened)**. No-graphics/full `34668484717` at the same code:
+**4411 → 4431 (+20 on its own 4516 intersection), same single regression** —
+mode parity holds. Both regressions were found by CI, fixed by their authors,
+and re-verified in `34670617554` at `fe79e0c79`, the run of record: **4411 →
+4436 effective (+25), ZERO regressions**, histogram 83 mismatch / 4195 pass /
+241 ruffle_matched / 1 runtime_error, with both remaining status moves
+(`swf4_vars`, `matrix3d_append_rotation`) being `ruffle_matched → pass` quality
+gains. The two regressions were `swf4opcode` (a `pass → ruffle_matched` drift
+onto Ruffle's SWF4 coercion rule, fixed in `abb3faee3`) and
+`mouse_pick_avm1_root` (fixed in `fe79e0c79`: `_levelN` roots had never been
+marked visible, latent until AVM1 picking grew a visibility gate).
 
 Merge order: w2-avm2-json · w2-avm2-smalls · w2-loaders ×3 · w2-gfx-geometry ×2 ·
 w2-avm1-events ×2 · w2-setprops · w2-avm2-z · w2-avm1-sort · w2-gfx-text ×3 ·
