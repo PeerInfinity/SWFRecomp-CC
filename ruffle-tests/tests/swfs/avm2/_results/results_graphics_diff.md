@@ -1,51 +1,34 @@
 # Ruffle Test Results Diff
 
-**Previous:** `254145a5b617` (2026-09-11T21:45:09.797368+00:00)
-**Current:** `f48c532bf170` (2026-09-12T00:02:29.983572+00:00)
+**Previous:** `f48c532bf170` (2026-09-12T00:02:29.983572+00:00)
+**Current:** `521a53782850` (2026-09-12T01:30:44.539343+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1200 | 1205 | +5 |
-| Total | 1272 | 1274 | +2 |
-| Pass rate | 94.3% | 94.6% | +0.3% |
-| Mismatched lines | 4189 | 4044 | -145 |
-|   Decreased | | | -267 |
+| Passing | 1205 | 1213 | +8 |
+| Total | 1274 | 1274 | 0 |
+| Pass rate | 94.6% | 95.2% | +0.6% |
+| Mismatched lines | 4044 | 2888 | -1156 |
+|   Decreased | | | -1157 |
+|   Increased | | | +1 |
 
-## Newly Passing (5)
+## Newly Passing (8)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `bitmap_filter_abstract` | output_mismatch | 0/6 | 6/6 |
-| `bytearray_bad_symbol_class` | output_mismatch | 1/3 | 3/3 |
-| `bytearray_bad_symbol_class_other_movie` | output_mismatch | 4/6 | 6/6 |
-| `json_parse_errors` | output_mismatch | 4/84 | 84/84 |
-| `matrix3d_append_rotation` | ruffle_matched | 22/23 | 23/23 |
-
-## Status Changed (2)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `json_parse_numbers` | output_mismatch | ruffle_matched | 31/131 | 127/131 |
-| `loader_events_2` | output_mismatch | ruffle_matched | 2/35 | 5/35 |
-
-## Added Tests (3)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `goto_framescript_queued/swf10` | output_mismatch | 15/59 |
-| `goto_framescript_queued/swf13` | ruffle_matched | 17/59 |
-| `goto_framescript_queued/swf9` | output_mismatch | 11/52 |
-
-## Removed Tests (1)
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
-| `goto_framescript_queued` | ruffle_matched | 1/6 |
+| `bitmapdata_copypixels_alpha_merge` | output_mismatch | 5/9 | 9/9 |
+| `bitmapdata_copypixels_blend` | output_mismatch | 0/1029 | 1029/1029 |
+| `bitmapdata_copypixels_self` | output_mismatch | 571/612 | 612/612 |
+| `displayobject_getrect` | output_mismatch | 11/16 | 16/16 |
+| `displayobject_z` | output_mismatch | 6/38 | 38/38 |
+| `edittext_scroll_event` | output_mismatch | 2/37 | 37/37 |
+| `geom_transform` | output_mismatch | 71/74 | 74/74 |
+| `id3_info` | output_mismatch | 0/8 | 8/8 |
 
 ## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `matrix3d_recompose_edge_cases` | ruffle_matched | 113/198 | 190/198 | -77 |
+| `textblock_recreateline` | output_mismatch | 41/180 | 40/180 | +1 |

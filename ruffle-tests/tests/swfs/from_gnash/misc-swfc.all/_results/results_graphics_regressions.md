@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 11/20 passing | Graphics: 11/20 passing
+Trace: 11/20 passing | Graphics: 10/20 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `swf4opcode` | Ruffle Matched | 110/117 lines match |
 
 ## Graphics Improvements (0 tests)
 

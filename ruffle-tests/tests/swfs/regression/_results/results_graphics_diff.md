@@ -1,20 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `254145a5b617` (2026-09-11T21:45:09.844706+00:00)
-**Current:** `f48c532bf170` (2026-09-12T00:02:30.098699+00:00)
+**Previous:** `f48c532bf170` (2026-09-12T00:02:30.098699+00:00)
+**Current:** `521a53782850` (2026-09-12T01:30:44.656932+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 92 | 94 | +2 |
-| Total | 92 | 94 | +2 |
+| Passing | 94 | 95 | +1 |
+| Total | 94 | 95 | +1 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (2)
+## Added Tests (1)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm1_mcl_load_tick` | pass | 14/14 |
-| `avm2_child_simplebutton` | pass | 10/10 |
+| `ctor_before_first_call_locals` | pass | 5/5 |
