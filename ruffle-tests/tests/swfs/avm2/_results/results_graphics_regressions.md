@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 1200/1270 passing | Graphics: 1213/1274 passing
+Trace: 1200/1270 passing | Graphics: 1212/1274 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `mouse_pick_avm1_root` | Output Mismatch | 0/2 lines match |
 
 ## Graphics Improvements (11 tests)
 
