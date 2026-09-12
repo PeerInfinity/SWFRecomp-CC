@@ -8438,6 +8438,46 @@ static ASFunction* lookupFunctionFromVar(ActionVar* var) {
 // bracketed at the call site.)
 
 // Invoke an addProperty getter with a specific this_obj
+// A MovieClip's script-visible properties live in a separate `dynamic_props`
+// ASObject, and every MC accessor call site passes THAT object as the accessor
+// receiver. Ruffle has no such split: the receiver of a `mc.addProperty(...)`
+// getter/setter is the clip itself, so `this` inside the body is a movieclip
+// (`typeof this == "movieclip"`, `this._name`, `this.removeMovieClip()` all
+// work). Binding the bag instead made `this` a bare object in EVERY MovieClip
+// accessor in the corpus — measured on avm1/hitarea_sweep's `btn_rm`, whose
+// getter calls `this.removeMovieClip()` and silently did nothing.
+//
+// Mapping back is a search because dynamic_props carries no owner pointer, but
+// it is cheap in practice: the MT_KIND_DPROPS tag rejects every non-clip
+// receiver in one load (the overwhelmingly common case), and a one-entry cache
+// absorbs repeated getter calls on the same clip.
+static MovieClip* ng_mc_for_dynamic_props(void* dprops)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	extern MovieClip root_movieclip;
+	static void* s_dp_last_key = NULL;
+	static MovieClip* s_dp_last_mc = NULL;
+
+	if (dprops == NULL) return NULL;
+	if (((ASObject*)dprops)->mt_kind != MT_KIND_DPROPS) return NULL;
+	if (dprops == s_dp_last_key && s_dp_last_mc != NULL &&
+	    s_dp_last_mc->dynamic_props == dprops)
+		return s_dp_last_mc;
+	if (root_movieclip.dynamic_props == dprops) {
+		s_dp_last_key = dprops; s_dp_last_mc = &root_movieclip;
+		return &root_movieclip;
+	}
+	for (int i = child_mc_count - 1; i >= 0; i--) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc != NULL && mc->dynamic_props == dprops) {
+			s_dp_last_key = dprops; s_dp_last_mc = mc;
+			return mc;
+		}
+	}
+	return NULL;
+}
+
 static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* func, void* this_obj)
 {
 	ActionVar undef = {0};
@@ -8453,6 +8493,20 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 	ActionVar this_var = {0};
 	this_var.type = ACTION_STACK_VALUE_OBJECT;
 	this_var.data.numeric_value = (u64) this_obj;
+	// MovieClip receiver: bind the CLIP, not its dynamic_props bag (see
+	// ng_mc_for_dynamic_props). INV_EVENT_THIS_MC + INV_MC_THIS_NULL_PTR are
+	// the same pairing every other MOVIECLIP-this dispatcher uses, so a type-2
+	// body's generated preload_this resolves the clip instead of taking the
+	// bag as an ABI pointer.
+	u16 _mc_this_flags = 0;
+	{
+		MovieClip* _recv_mc = ng_mc_for_dynamic_props(this_obj);
+		if (_recv_mc != NULL) {
+			this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+			this_var.data.numeric_value = (u64)(uintptr_t) _recv_mc;
+			_mc_this_flags = (u16)(INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR);
+		}
+	}
 
 	// INV_DEPTH_GUARD: an accessor invocation is a function call — it counts
 	// toward Flash's ScriptLimits recursion bound, and blowing it kills the whole
@@ -8465,7 +8519,8 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 	// or exec-func tracking: none were ever done on the getter path.
 	InvokeOpts opts = { .flags = (u16)(INV_DEPTH_GUARD | INV_THIS_STACK |
 	                                   INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
-	                                   INV_BIND_THIS | INV_BASE_CLIP),
+	                                   INV_BIND_THIS | INV_BASE_CLIP |
+	                                   _mc_this_flags),
 	                    .super_depth = 0 };
 
 	// A virtual-property getter receives NO arguments in Flash (p1=p2=undefined;
@@ -8695,7 +8750,14 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 	// keeps the type-2 advanced_func receiving NULL (as this_obj was) on that
 	// path, so preload_this resolves the MC via g_event_this_mc.
 	ActionVar this_var = {0};
-	if (this_obj != NULL) {
+	u16 _mc_this_flags = 0;
+	MovieClip* _recv_mc = ng_mc_for_dynamic_props(this_obj);
+	if (_recv_mc != NULL) {
+		// MovieClip receiver: bind the clip itself (see ng_mc_for_dynamic_props).
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.data.numeric_value = (u64)(uintptr_t) _recv_mc;
+		_mc_this_flags = (u16)INV_EVENT_THIS_MC;
+	} else if (this_obj != NULL) {
 		this_var.type = ACTION_STACK_VALUE_OBJECT;
 		this_var.data.numeric_value = (u64) this_obj;
 	} else if (g_event_this_mc != NULL) {
@@ -8722,7 +8784,7 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 	InvokeOpts opts = { .flags = (u16)(INV_DEPTH_GUARD | INV_RESET_THIS_DEPTH |
 	                                   INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
 	                                   INV_BIND_THIS | INV_BASE_CLIP |
-	                                   INV_MC_THIS_NULL_PTR),
+	                                   INV_MC_THIS_NULL_PTR | _mc_this_flags),
 	                    .super_depth = 0 };
 
 	// The assigned value is the sole argument. The core's type-1 loop pushes it as
@@ -35660,6 +35722,51 @@ void actionStopSounds(SWFAppContext* app_context)
 // Builds the path string for the highest-depth matching MC. Walks each
 // candidate's parent chain to construct a slash-path (e.g. "/target10",
 // "/loadedTarget/target20"), matching the Flash _droptarget format.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Does this drawing-API clip's ART (not its bounding box) cover the given point
+// in the clip's own local pixel space? Same geometry test MovieClip.hitTest's
+// shapeflag arm uses: the tessellated fill/line triangles, or a winding test
+// over the raw command list when nothing has been finalized yet.
+//
+// Ruffle's drop-target pick is `run_mouse_pick(context, false)`, which ends in
+// `hit_test_shape` — art, not bounds. The difference is invisible for the
+// filled rectangles most content draws (bbox == art) and decisive for line art:
+// avm1/hitarea_sweep's `guide` is six 1-px horizontal rules whose bbox is the
+// whole 20..780 x 70..650 block, so an AABB pick reported `/guide` for every
+// probe in the sweep.
+//
+// Returns 1 "hit" for a clip with no tessellated geometry at all, so this is
+// only ever a refinement of the bounds test its one caller already did.
+static int ng_drawing_art_contains_local(MovieClip* mc, double lx_px, double ly_px)
+{
+	if (mc == NULL || mc->drawing_state == NULL) return 1;
+	DrawingState* ds = (DrawingState*)mc->drawing_state;
+	if (ds->path_count == 0 && ds->cmd_count == 0) return 1;
+	if (ds->path_count == 0)
+		return drawingCmdWindingHitTest(ds, lx_px, ly_px) ? 1 : 0;
+
+	double ltx = lx_px * 20.0, lty = ly_px * 20.0;   // paths are in twips
+	for (u32 p = 0; p < ds->path_count; p++) {
+		DrawPath* dp = &ds->paths[p];
+		for (u32 v = 0; v + 5 < dp->fill_vert_count * 2; v += 6) {
+			float* fv = &dp->fill_verts[v];
+			double d1 = (ltx - (double)fv[2]) * ((double)fv[1] - (double)fv[3]) - ((double)fv[0] - (double)fv[2]) * (lty - (double)fv[3]);
+			double d2 = (ltx - (double)fv[4]) * ((double)fv[3] - (double)fv[5]) - ((double)fv[2] - (double)fv[4]) * (lty - (double)fv[5]);
+			double d3 = (ltx - (double)fv[0]) * ((double)fv[5] - (double)fv[1]) - ((double)fv[4] - (double)fv[0]) * (lty - (double)fv[1]);
+			if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return 1;
+		}
+		for (u32 v = 0; v + 5 < dp->line_vert_count * 2; v += 6) {
+			float* lv = &dp->line_verts[v];
+			double d1 = (ltx - (double)lv[2]) * ((double)lv[1] - (double)lv[3]) - ((double)lv[0] - (double)lv[2]) * (lty - (double)lv[3]);
+			double d2 = (ltx - (double)lv[4]) * ((double)lv[3] - (double)lv[5]) - ((double)lv[2] - (double)lv[4]) * (lty - (double)lv[5]);
+			double d3 = (ltx - (double)lv[0]) * ((double)lv[5] - (double)lv[1]) - ((double)lv[4] - (double)lv[0]) * (lty - (double)lv[1]);
+			if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return 1;
+		}
+	}
+	return 0;
+}
+#endif
+
 int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
     const char* skip_name, char* out_path, size_t out_size)
 {
@@ -35702,6 +35809,8 @@ int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
 		// Check drawing bounds
 		if (lx < ch->draw_xmin || lx > ch->draw_xmax) continue;
 		if (ly < ch->draw_ymin || ly > ch->draw_ymax) continue;
+		// Bounds are only the fast reject; the pick is against the art.
+		if (!ng_drawing_art_contains_local(ch, lx, ly)) continue;
 		// Take the front-most (highest-depth) hit
 		if (ch->depth > best_depth) {
 			best = ch;
@@ -35753,27 +35862,35 @@ int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
 #endif
 }
 
-// Recompute mc->droptarget on-the-fly if mc is currently being dragged.
-// _droptarget reflects the live drop target while a drag is active; without
-// this, the cached value from actionEndDrag goes stale (and is empty during
-// an in-progress startDrag-without-endDrag pattern).
-static void actionRefreshDropTargetIfDragged(MovieClip* mc)
+// Recompute the dragged clip's stored `_droptarget`. This is Ruffle's
+// `Player::update_drag` tail (player.rs:1534): the drop target is a SNAPSHOT
+// stored on the clip, refreshed at exactly two moments — when a mouse event is
+// delivered (player.rs:1408, BEFORE that event's press/release/roll dispatch)
+// and at the end of a frame's action run (player.rs:2433, after enterFrame).
+// `startDrag` itself does NOT refresh it, so the first enterFrame after a
+// startDrag inside an onPress still reads the pre-drag value. avm1/hitarea_sweep
+// grades that one-frame lag directly.
+static void ng_update_drag_droptarget(void)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	if (mc == NULL || !is_dragging) return;
-	if (g_drag_target_name[0] == '\0') return;
-	// Match by name (g_drag_target_name may be a path like "_level0.draggable50";
-	// the basename is what mc->name carries).
+	if (!is_dragging || g_drag_target_name[0] == '\0') return;
 	const char* base = strrchr(g_drag_target_name, '.');
 	base = base ? base + 1 : g_drag_target_name;
-	if (mc->name[0] == '\0' || strcmp(mc->name, base) != 0) return;
+	MovieClip* drag_mc = actionFindMovieClipByName(base);
+	if (drag_mc == NULL) return;
 	extern int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 	    const char* skip_name, char* out_path, size_t out_size);
 	ng_compute_droptarget(g_drag_virt_x, g_drag_virt_y,
-	    g_drag_target_name, mc->droptarget, sizeof(mc->droptarget));
-#else
-	(void)mc;
+	    g_drag_target_name, drag_mc->droptarget, sizeof(drag_mc->droptarget));
 #endif
+}
+
+// Reading `_droptarget` is a plain field read of that snapshot — deliberately
+// NOT a recompute (it used to be, which made every read see a drop target Flash
+// had not computed yet).
+static void actionRefreshDropTargetIfDragged(MovieClip* mc)
+{
+	(void)mc;
 }
 
 // ============================================================================
@@ -38120,6 +38237,11 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 	}
 
 	g_inside_enterframe_dispatch = 0;
+
+	// Ruffle's post-action drag refresh (`Player::update()` tail, player.rs:2433):
+	// the dragged clip's `_droptarget` snapshot is recomputed once a frame, AFTER
+	// this frame's enterFrame handlers have read the previous value.
+	ng_update_drag_droptarget();
 
 	// Mark all dynamic MCs (without display_obj) as eligible for next tick's enterFrame.
 	// This ensures MCs created by createEmptyMovieClip don't fire onEnterFrame on
@@ -75516,7 +75638,12 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 // Tests: avm1/hitarea_lazy_getter, avm1/hitarea_remove_sibling,
 // from_shumway/avm1/hitarea.
 
-typedef struct { MovieClip* owner; MovieClip* area; } NgHitAreaEntry;
+// `blocked` = the resolved hit area exists but can never be hit (Ruffle's
+// `area.hit_test_shape(.., SKIP_MASK)` returning false because the area is
+// currently a mask). The owner then picks on NOTHING — it does NOT fall back
+// to its own shape, because Ruffle only reaches the own-shape arm when the
+// property resolved to no usable display object at all.
+typedef struct { MovieClip* owner; MovieClip* area; unsigned char blocked; } NgHitAreaEntry;
 static NgHitAreaEntry* s_hit_area_tbl = NULL;
 static int s_hit_area_tbl_count = 0;
 static int s_hit_area_tbl_cap = 0;
@@ -75537,7 +75664,7 @@ static int mc_is_avm1_gone_ng(MovieClip* mc)
 	return mc == NULL || mc->avm1_removed || mc->pending_removal;
 }
 
-static void ng_hit_area_tbl_push(MovieClip* owner, MovieClip* area)
+static void ng_hit_area_tbl_push(MovieClip* owner, MovieClip* area, int blocked)
 {
 	if (s_hit_area_tbl_count >= s_hit_area_tbl_cap) {
 		int ncap = s_hit_area_tbl_cap ? s_hit_area_tbl_cap * 2 : 8;
@@ -75548,7 +75675,26 @@ static void ng_hit_area_tbl_push(MovieClip* owner, MovieClip* area)
 	}
 	s_hit_area_tbl[s_hit_area_tbl_count].owner = owner;
 	s_hit_area_tbl[s_hit_area_tbl_count].area = area;
+	s_hit_area_tbl[s_hit_area_tbl_count].blocked = (unsigned char)(blocked ? 1 : 0);
 	s_hit_area_tbl_count++;
+}
+
+// Ruffle gates the WHOLE of `mouse_pick_avm1` behind `if self.visible()`
+// (`movie_clip.rs:2995`), and the walk that reaches a child has already passed
+// its ancestors' gates. So an invisible clip picks on nothing at all — not even
+// through a visible `hitArea` (avm1/hitarea_sweep's `btn_oinv`), and its
+// hitArea getter never runs. `hit_test_shape`'s own SKIP_INVISIBLE, by
+// contrast, is NOT applied to the hit area itself ("an invisible hit area still
+// hits", `movie_clip.rs:3033`), which is what the sibling `btn_inv` grades.
+static int ng_mc_pick_visible(MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	int guard = 0;
+	for (MovieClip* p = mc; p != NULL && guard < 256; p = p->parent, guard++) {
+		if (!p->visible) return 0;
+		if (p == &root_movieclip) break;
+	}
+	return 1;
 }
 
 // Snapshot the clips alive right now (called just before this pick's first
@@ -75681,6 +75827,7 @@ static void mc_hit_area_pick_begin(SWFAppContext* app_context)
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
 		if (mc_is_avm1_gone_ng(mc)) continue;
+		if (!ng_mc_pick_visible(mc)) continue;   // invisible owner: no pick, no getter
 		if (!actionMCHasButtonHandlers(mc)) continue;
 		s_hit_order[n_cand++] = i;
 	}
@@ -75692,7 +75839,15 @@ static void mc_hit_area_pick_begin(SWFAppContext* app_context)
 		// A getter earlier in this pick may already have removed this clip.
 		if (mc == NULL || mc_is_avm1_gone_ng(mc)) continue;
 		MovieClip* area = ng_resolve_hit_area(app_context, mc);
-		if (area != NULL) ng_hit_area_tbl_push(mc, area);
+		if (area == NULL) continue;
+		// A MovieClip hit area that is currently a MASK hits nothing
+		// (`hit_test_shape(.., SKIP_MASK)` bails on `maskee().is_some()`,
+		// movie_clip.rs:2683). A TextField hit area does NOT: EditText has no
+		// hit_test_shape override and the default bounds impl ignores
+		// SKIP_MASK. avm1/hitarea_sweep grades both halves (`btn_mask` silent,
+		// `btn_tfmask` firing).
+		int blocked = (!MC_IS_TEXTFIELD(area) && actionAvm1IsLiveMasker(area));
+		ng_hit_area_tbl_push(mc, area, blocked);
 	}
 }
 
@@ -75703,6 +75858,7 @@ static int mc_hit_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	for (int i = 0; i < s_hit_area_tbl_count; i++) {
 		if (s_hit_area_tbl[i].owner == mc) {
 			MovieClip* area = s_hit_area_tbl[i].area;
+			if (s_hit_area_tbl[i].blocked) return 0;   // masked hit area: hits nothing
 			if (area != NULL && !mc_is_avm1_gone_ng(area))
 				return mc_get_pixel_aabb_ng(area, x1, y1, x2, y2);
 			break;
@@ -75718,6 +75874,10 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 	float mx = app_context->mouse.stage_x / 20.0f;  // stage_x is in twips; convert to pixels
 	float my = app_context->mouse.stage_y / 20.0f;
 
+	// Ruffle refreshes the drag snapshot on mouse-event delivery, before the
+	// event's own dispatch (player.rs:1408).
+	ng_update_drag_droptarget();
+
 	mc_hit_area_pick_begin(app_context);
 
 	for (int i = 0; i < child_mc_count; i++) {
@@ -75726,6 +75886,7 @@ void actionDispatchMCPress(SWFAppContext* app_context)
 		// Text fields don't receive onPress/onRelease — clicking them acquires focus instead
 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
 		if (mc_removed_during_pick_ng(mc)) continue;
+		if (!ng_mc_pick_visible(mc)) continue;   // invisible owner never picks
 
 		float x1, y1, x2, y2;
 		if (!mc_hit_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
@@ -75745,6 +75906,7 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 	float mx = app_context->mouse.stage_x / 20.0f;
 	float my = app_context->mouse.stage_y / 20.0f;
 
+	ng_update_drag_droptarget();   // see actionDispatchMCPress
 	mc_hit_area_pick_begin(app_context);
 
 	for (int i = 0; i < child_mc_count; i++) {
@@ -75758,7 +75920,8 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 
 		float x1, y1, x2, y2;
 		int have_bounds = mc_hit_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2);
-		int inside = have_bounds && (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
+		int inside = have_bounds && ng_mc_pick_visible(mc) &&
+		             (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
 
 		mc->mc_as_pressed = 0;
 
@@ -75864,6 +76027,8 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 	float my = app_context->mouse.stage_y / 20.0f;
 	int btn_down = app_context->mouse.button_down;
 
+	ng_update_drag_droptarget();   // see actionDispatchMCPress
+
 	// Resolve every button-mode clip's hitArea first, topmost-depth first: the
 	// property get can run a user getter, and Ruffle orders those by depth and
 	// excludes any clip such a getter removes from the rest of the pick.
@@ -75889,7 +76054,12 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 			continue;
 
 		int was_inside = mc->mc_mouse_inside;
-		int now_inside = (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
+		// An invisible clip is not picked at all (Ruffle's `if self.visible()`
+		// gate). Modelled as "not inside" rather than a `continue` so a clip
+		// hidden while hovered still gets its RollOut, exactly as Ruffle's
+		// previous-picked vs current-picked derivation would produce.
+		int now_inside = ng_mc_pick_visible(mc) &&
+		                 (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
 		mc->mc_mouse_inside = (u8)now_inside;
 
 		if (!was_inside && now_inside) {
