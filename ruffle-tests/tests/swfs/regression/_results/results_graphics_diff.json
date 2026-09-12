@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-11T21:09:53.291094+00:00",
-    "old_git_sha": "0ccafbc4eb896f2a1ee5fe7dd8a0bb31f0f7de3f",
-    "new_timestamp": "2026-09-11T21:45:09.844706+00:00",
-    "new_git_sha": "254145a5b61728677da2f19d196541043d98e1e5",
+    "old_timestamp": "2026-09-11T21:45:09.844706+00:00",
+    "old_git_sha": "254145a5b61728677da2f19d196541043d98e1e5",
+    "new_timestamp": "2026-09-12T00:02:30.098699+00:00",
+    "new_git_sha": "f48c532bf170367cdb5a78ecdeebd540db7f1b83",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 92,
     "old_total": 92,
     "old_pass_rate": 100.0,
-    "new_pass": 92,
+    "new_pass": 94,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 92,
-    "new_total": 92,
+    "new_effective_pass": 94,
+    "new_total": 94,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,33 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 92,
-    "added": 0,
+    "added": 2,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_mcl_load_tick",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      }
+    },
+    {
+      "test": "avm2_child_simplebutton",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      }
+    }
+  ]
 }
