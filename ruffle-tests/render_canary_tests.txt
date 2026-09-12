@@ -96,6 +96,20 @@ visual/edittext/edittext_border_transform   # EDITTEXT BACKGROUND / BORDER    6 
                                             #   the per-comparison rows, never
                                             #   the test-level verdict.
 
+# SESSION 19 ADDITION (s19 wave-2 `w2-setprops`). The `set_property_values`
+# work changed the AVM1 **SetProperty/GetProperty OPCODE** path
+# (`actionSetProperty` / `actionGetProperty`) — the `_x`/`_y` twips quantizer,
+# the `_alpha` Fixed8 rounding mode, and the per-property infinity rules. An
+# audit of all 374 `[image_comparisons]` tests in the corpus found that the
+# standing canary set had ZERO members emitting either opcode (the 21 PNGs it
+# renders come entirely from SetMember-form property writes), so it was blind
+# to that whole change class. `from_shumway/doubleAndRegister` is the ONLY
+# image-comparison test anywhere in the corpus whose recompiled scripts emit
+# `actionSetProperty` (`setProperty(_x, 200)`, tolerance 0, 1 cmp) — it is the
+# covering member for opcode-form property writes. Tier 1: it passes at
+# tolerance 0 locally and on CI.
+from_shumway/doubleAndRegister              # SetProperty OPCODE (`_x`)        1 cmp
+
 # tier=2  (CI-failing / skipped; A/B signal only)
 visual/simple_shapes/masks                  # mask compositing (largest gap)
 visual/simple_shapes/gradients/gradients    # gradient ramps

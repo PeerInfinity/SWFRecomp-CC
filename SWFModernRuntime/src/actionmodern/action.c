@@ -15434,6 +15434,57 @@ static int32_t clampToI32(double d)
 	return INT32_MIN;
 }
 
+// --- SetProperty-opcode (`setProperty()`) coercion helpers -------------------
+// Flash/Ruffle keep `_x`/`_y` in S32 twips: `Twips::from_pixels(px)` is
+// `(px * 20.0) as i32`, a SATURATING cast (swf/src/types/twips.rs:102), so a
+// read can never leave the range +/-107374182.4 px (= INT32_MIN/20 .. INT32_MAX/20).
+// We keep pixels in a `float` and quantize on read, so the bare
+// `round(px*20.0)/20.0` we used before could report a value outside that range:
+// `setProperty(_x, +/-Infinity)` stores the sentinel `(float)(INT32_MIN/20.0)`,
+// which is exactly -107374184, and `round(-107374184*20)` is -2147483680 —
+// reading back -107374184 instead of Flash's -107374182.4. Saturating the twips
+// product restores the exact value (-2147483680 clamps to INT32_MIN, /20 is
+// exactly -107374182.4 in double), so `float` storage is NOT a blocker here.
+// NaN is passed through unchanged (Ruffle's twips can never hold it).
+static double spvTwipsQuantizePixels(double px)
+{
+	if (isnan(px)) return px;
+	double t = round(px * 20.0);
+	if (t < (double)INT32_MIN) t = (double)INT32_MIN;
+	else if (t > (double)INT32_MAX) t = (double)INT32_MAX;
+	return t / 20.0;
+}
+
+// The pixel value `set_x`/`set_y` store for a value that is out of twips range.
+// Ruffle maps ANY infinity to -Infinity first (stage_object.rs:337), so both
+// +Infinity and -Infinity land on i32::MIN twips.
+#define SPV_COORD_SENTINEL ((float)((double)INT32_MIN / 20.0))
+
+// Ruffle's `Value::coerce_to_f64` for the stage-object setters. Unlike
+// `coerceVarToNumber` (lenient `strtod` prefix parse), strings go through the
+// SWF-version-aware STRICT parser, so "10x" is NaN — not 10.
+// (core/src/avm1/value.rs:string_to_f64 / parse_float_impl, strict for SWF5+.)
+static double spvCoerceToF64(SWFAppContext* app_context, ActionVar* value)
+{
+	if (value->type == ACTION_STACK_VALUE_STRING)
+		return varToDoubleSWF(app_context, value, g_swf_version);
+	return coerceVarToNumber(app_context, value);
+}
+
+// Ruffle's `property_coerce_to_number` (stage_object.rs:701) EXACTLY: undefined
+// and null do not set, and NaN does not set — but +/-Infinity DOES reach the
+// setter, which handles it per-property. (`propertyCoerceToNumber` above rejects
+// Infinity too; that is the SetMember-by-name path and is left untouched here.)
+static int spvPropertyCoerceToNumber(SWFAppContext* app_context, ActionVar* value, double* out_d)
+{
+	if (value->type == ACTION_STACK_VALUE_UNDEFINED || value->type == ACTION_STACK_VALUE_NULL)
+		return 0;
+	double d = spvCoerceToF64(app_context, value);
+	if (isnan(d)) return 0;
+	*out_d = d;
+	return 1;
+}
+
 // Normalize a quality string (case-insensitive) to its canonical uppercase form.
 // Returns 1 and writes the canonical form (NUL-terminated) into out_buf on success;
 // returns 0 (and leaves out_buf untouched) for invalid quality values.
@@ -45461,8 +45512,8 @@ check_special_vars:
 #endif
 			extern MovieClip root_movieclip;
 			MovieClip* mc = &root_movieclip;
-			if (strcasecmp(var_name, "_x") == 0) { double v = round((double)mc->x * 20.0) / 20.0; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
-			if (strcasecmp(var_name, "_y") == 0) { double v = round((double)mc->y * 20.0) / 20.0; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
+			if (strcasecmp(var_name, "_x") == 0) { double v = spvTwipsQuantizePixels((double)mc->x); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
+			if (strcasecmp(var_name, "_y") == 0) { double v = spvTwipsQuantizePixels((double)mc->y); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
 			if (strcasecmp(var_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -47175,7 +47226,7 @@ void actionGetProperty(SWFAppContext* app_context)
 					}
 				}
 			}
-			{ double _dx = mc ? round((double)mc->x * 20.0) / 20.0 : 0.0;
+			{ double _dx = mc ? spvTwipsQuantizePixels((double)mc->x) : 0.0;
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx)); return; }
 		case 1:  // _y
 			if (mc) syncTransformIfNeeded(mc);
@@ -47189,7 +47240,7 @@ void actionGetProperty(SWFAppContext* app_context)
 					}
 				}
 			}
-			{ double _dy = mc ? round((double)mc->y * 20.0) / 20.0 : 0.0;
+			{ double _dy = mc ? spvTwipsQuantizePixels((double)mc->y) : 0.0;
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
 		case 2:  // _xscale
 			if (mc) syncTransformIfNeeded(mc);
@@ -55639,7 +55690,7 @@ void actionGetMember(SWFAppContext* app_context)
 				// for full precision (e.g. `_x = 0.09` stores 0.05f ≈ 0.05000000074
 				// in float; snap recovers exact 0.05 in double).
 				{
-					double dx = round((double)mc->x * 20.0) / 20.0;
+					double dx = spvTwipsQuantizePixels((double)mc->x);
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dx)); return;
 				} }
 			if (strcasecmp(prop_name, "_y") == 0) {
@@ -55697,7 +55748,7 @@ void actionGetMember(SWFAppContext* app_context)
 				// AS-set or fallback: snap stored float to twips and return as F64
 				// for full precision (mirrors `_x` path above).
 				{
-					double dy = round((double)mc->y * 20.0) / 20.0;
+					double dy = spvTwipsQuantizePixels((double)mc->y);
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dy)); return;
 				} }
 			if (strcasecmp(prop_name, "_xscale") == 0) {
@@ -59333,53 +59384,35 @@ void actionSetProperty(SWFAppContext* app_context)
 	}
 	if (!mc) return; // Invalid target
 
-	// 5. Set property value based on index
-	// Convert value to float for numeric properties.
-	// For numeric properties (0-10, 12), undefined, null, and non-finite values
-	// must be a no-op — mirrors Ruffle's property_coerce_to_number
-	// (core/src/avm1/object/stage_object.rs:661).
-	float num_value = 0.0f;
-	int numeric_no_op = 0;
+	// 5. Set property value based on index.
+	// Ruffle `property_coerce_to_number` (stage_object.rs:701) for the number
+	// properties (0-10, 12) and `coerce_to_f64` + the setters' own null/undefined
+	// and NaN guards for the f64 properties (16 `_highquality`, 18 `_soundbuftime`,
+	// 20/21 `_xmouse`/`_ymouse`, the last two read-only): undefined, null and NaN
+	// are a no-op, but +/-Infinity FLOWS THROUGH to the setter, which handles it
+	// per property (twips sentinel for `_x`/`_y`, stored as-is for the scales,
+	// fmod→NaN for `_rotation`, 0 for `_alpha`, `!= 0` for `_visible`,
+	// clamp_to_i32 → INT32_MIN for `_soundbuftime`). Strings use the STRICT,
+	// SWF-version-aware parse, so `"10x"` is NaN (a no-op), not 10.
+	double dnum = 0.0;
 	int is_numeric_prop = ((prop_index >= 0 && prop_index <= 10) || prop_index == 12);
+	int is_f64_prop = (prop_index == 16 || prop_index == 18 ||
+	                   prop_index == 20 || prop_index == 21);
 
-	if (value_var.type == ACTION_STACK_VALUE_F32) {
-		num_value = VAL(float, &value_var.data.numeric_value);
-		if (is_numeric_prop && !isfinite(num_value)) numeric_no_op = 1;
-	} else if (value_var.type == ACTION_STACK_VALUE_F64) {
-		double dv = VAL(double, &value_var.data.numeric_value);
-		num_value = (float) dv;
-		if (is_numeric_prop && !isfinite(dv)) numeric_no_op = 1;
-	} else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
-		num_value = value_var.data.numeric_value ? 1.0f : 0.0f;
-	} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
-		const uint16_t* _u16 = varGetU16Ptr(&value_var);
-		char _sp_val_buf[256];
-		if (_u16 && value_var.str_size > 0)
-			u16_to_utf8(_u16, value_var.str_size, _sp_val_buf, sizeof(_sp_val_buf));
-		else
-			_sp_val_buf[0] = '\0';
-		if (is_numeric_prop) {
-			// Strict parse: unparseable / empty string → NaN → no-op.
-			char* _ep;
-			double _d = strtod(_sp_val_buf, &_ep);
-			if (_ep == _sp_val_buf || !isfinite(_d)) {
-				numeric_no_op = 1;
-			} else {
-				num_value = (float) _d;
-			}
-		} else {
-			num_value = (float) atof(_sp_val_buf);
-		}
-	} else if (value_var.type == ACTION_STACK_VALUE_UNDEFINED ||
-	           value_var.type == ACTION_STACK_VALUE_NULL) {
-		if (is_numeric_prop) numeric_no_op = 1;
+	if (is_numeric_prop || is_f64_prop) {
+		if (!spvPropertyCoerceToNumber(app_context, &value_var, &dnum))
+			return;
 	}
-
-	if (numeric_no_op) return;
+	float num_value = (float) dnum;
 
 	switch (prop_index) {
 		case 0:  // _x
-			mc->x = num_value;
+			// Ruffle set_x: any infinity becomes -Infinity, then
+			// `Twips::from_pixels` saturates the cast to i32::MIN. Store that
+			// sentinel in pixels; `spvTwipsQuantizePixels` reads it back as
+			// exactly INT32_MIN/20 = -107374182.4. Finite out-of-range values
+			// need no special case — the read-side saturation covers them.
+			mc->x = isinf(dnum) ? SPV_COORD_SENTINEL : num_value;
 			// Unconditional in all modes (matches actionSetMember). Browser-WASM
 			// previously left as_set_flags alone here, which meant opcode-form
 			// SetProperty `_x` wrote mc->x but apply_as_transform's compose-time
@@ -59390,8 +59423,8 @@ void actionSetProperty(SWFAppContext* app_context)
 			mc->as_set_flags |= 1;
 			markTransformedByScript(mc);
 			break;
-		case 1:  // _y
-			mc->y = num_value;
+		case 1:  // _y — see case 0 for the infinity sentinel
+			mc->y = isinf(dnum) ? SPV_COORD_SENTINEL : num_value;
 			mc->as_set_flags |= 2;
 			markTransformedByScript(mc);
 			break;
@@ -59405,13 +59438,23 @@ void actionSetProperty(SWFAppContext* app_context)
 			mc->as_set_flags |= 8;
 			markTransformedByScript(mc);
 			break;
-		case 6:  // _alpha
-			// Quantize through 8.8 fixed-point like Flash's color transform
-			mc->alpha = (float)((double)(int16_t)roundf(num_value * 256.0f / 100.0f) * 100.0 / 256.0);
+		case 6: { // _alpha
+			// Ruffle set_alpha: infinity → 0, then `set_alpha(val / 100.0)`,
+			// which stores a Fixed8 color-transform multiplier. `Fixed8::from_f64`
+			// is `(n * 256.0) as i16` — a Rust float→int cast, so it TRUNCATES
+			// toward zero (and saturates), it does NOT round. `roundf` here made
+			// every block's value one 1/256 step too large (e.g. -5 → -5.078125
+			// instead of Flash's -4.6875) and poisoned the following reads.
+			double _a_fx = (isinf(dnum) ? 0.0 : dnum) / 100.0 * 256.0;
+			if (_a_fx < -32768.0) _a_fx = -32768.0;
+			else if (_a_fx > 32767.0) _a_fx = 32767.0;
+			mc->alpha = (float)((double)(int16_t) _a_fx / 256.0 * 100.0);
 			mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
 			break;
-		case 7: { // _visible
-			int new_vis = (num_value != 0.0f) ? 1 : 0;
+		}
+		case 7: { // _visible — Ruffle set_visible: `n != 0.0` on the f64, so
+			// +/-Infinity is visible and NaN never reaches here.
+			int new_vis = (dnum != 0.0) ? 1 : 0;
 			if (mc->visible && !new_vis && g_focused_mc == mc)
 				selection_do_focus_change(app_context, mc, NULL);
 			mc->visible = new_vis;
@@ -59437,18 +59480,37 @@ void actionSetProperty(SWFAppContext* app_context)
 			mc->as_set_flags |= 16;
 			markTransformedByScript(mc);
 			break;
-		case 13: // _name
-			if (value_var.type == ACTION_STACK_VALUE_STRING) {
-				const uint16_t* _nm_u16 = varGetU16Ptr(&value_var);
-				char _nm_buf[256];
-				if (_nm_u16 && value_var.str_size > 0)
-					u16_to_utf8(_nm_u16, value_var.str_size, _nm_buf, sizeof(_nm_buf));
-				else
-					_nm_buf[0] = '\0';
-				strncpy(mc->name, _nm_buf, sizeof(mc->name) - 1);
-				mc->name[sizeof(mc->name) - 1] = '\0';
+		case 13: { // _name
+			// Ruffle set_name (stage_object.rs:521) coerces ANY value type to a
+			// string, with one quirk: a NaN Number becomes 0 in SWF7+. We used to
+			// set the name only for an already-string value, so every numeric /
+			// boolean / undefined / null block left the previous block's name in
+			// place. (Objects were already toString-coerced in step 4 above.)
+			ActionVar _nm_val = value_var;
+			if (g_swf_version >= 7 &&
+			    (_nm_val.type == ACTION_STACK_VALUE_F32 || _nm_val.type == ACTION_STACK_VALUE_F64) &&
+			    isnan(varToDouble(&_nm_val))) {
+				double _nm_zero = 0.0;
+				_nm_val.type = ACTION_STACK_VALUE_F64;
+				_nm_val.str_size = 0;
+				memcpy(&_nm_val.data.numeric_value, &_nm_zero, sizeof(double));
 			}
+			char _nm_buf[256];
+			int _nm_len;
+			if (_nm_val.type == ACTION_STACK_VALUE_UNDEFINED && g_swf_version < 7) {
+				// coerce_to_string: `Value::Undefined` is "" before SWF7.
+				_nm_buf[0] = '\0';
+				_nm_len = 0;
+			} else {
+				_nm_len = varToStringBuf(app_context, &_nm_val, _nm_buf, sizeof(_nm_buf));
+			}
+			if (_nm_len < 0) _nm_len = 0;
+			if (_nm_len > (int)sizeof(_nm_buf) - 1) _nm_len = (int)sizeof(_nm_buf) - 1;
+			_nm_buf[_nm_len] = '\0';
+			strncpy(mc->name, _nm_buf, sizeof(mc->name) - 1);
+			mc->name[sizeof(mc->name) - 1] = '\0';
 			break;
+		}
 		case 17: { // _focusrect
 			extern MovieClip root_movieclip;
 			int _is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
@@ -59462,15 +59524,11 @@ void actionSetProperty(SWFAppContext* app_context)
 					_rmc->focusrect = 0.0f;
 				else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
 					_rmc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
-				else if (value_var.type == ACTION_STACK_VALUE_STRING) {
-					const uint16_t* _u16 = varGetU16Ptr(&value_var);
-					char _fb[64]; _fb[0] = '\0';
-					if (_u16 && value_var.str_size > 0) u16_to_utf8(_u16, value_var.str_size, _fb, sizeof(_fb));
-					char* _ep; double _d = strtod(_fb, &_ep);
-					if (_ep != _fb && !isnan(_d)) _rmc->focusrect = (_d != 0.0) ? 1.0f : 0.0f;
-				} else {
-					double _dv = (value_var.type == ACTION_STACK_VALUE_F64) ?
-						VAL(double, &value_var.data.numeric_value) : (double)num_value;
+				else {
+					// Ruffle set_focus_rect (stage branch): `coerce_to_f64` then
+					// NaN → ignore. Strings use the STRICT parse, so "10x" is a
+					// no-op rather than the prefix-parsed 10.
+					double _dv = spvCoerceToF64(app_context, &value_var);
 					if (!isnan(_dv)) _rmc->focusrect = (_dv != 0.0) ? 1.0f : 0.0f;
 				}
 			} else {
@@ -59493,18 +59551,23 @@ void actionSetProperty(SWFAppContext* app_context)
 						mc->focusrect = (_ep != _fb && !isnan(_d) && _d != 0.0) ? 1.0f : 0.0f;
 					}
 				} else {
-					double _dv = (value_var.type == ACTION_STACK_VALUE_F64) ?
-						VAL(double, &value_var.data.numeric_value) : (double)num_value;
+					double _dv = spvCoerceToF64(app_context, &value_var);
 					mc->focusrect = (!isnan(_dv) && _dv != 0.0) ? 1.0f : 0.0f;
 				}
 			}
 			break;
 		}
 		case 16: // _highquality — stage-wide; mirrors Ruffle set_high_quality
-			setStageQualityFromHighquality((double)num_value);
+			// null/undefined/NaN already returned above (is_f64_prop), and
+			// setStageQualityFromHighquality reproduces Ruffle's >1.5 → BEST,
+			// == 0 → LOW, else HIGH — which is why +/-Infinity must reach it.
+			setStageQualityFromHighquality(dnum);
 			break;
 		case 18: // _soundbuftime — stage-wide
-			if (isfinite((double)num_value)) g_soundbuftime = (float)clampToI32((double)num_value);
+			// Ruffle set_sound_buf_time: `clamp_to_i32`, which maps +/-Infinity
+			// and every out-of-range value to INT32_MIN. The old `isfinite` gate
+			// swallowed the infinities instead.
+			g_soundbuftime = (float)clampToI32(dnum);
 			break;
 		case 19: { // _quality — stage-wide; value already toString-coerced
 			char _q_buf[32];
@@ -60215,8 +60278,8 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 	result->str_size = 0;
 	result->data.numeric_value = 0;
 
-	if (strcasecmp(name, "_x") == 0) { double v = round((double)mc->x * 20.0) / 20.0; result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
-	if (strcasecmp(name, "_y") == 0) { double v = round((double)mc->y * 20.0) / 20.0; result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
+	if (strcasecmp(name, "_x") == 0) { double v = spvTwipsQuantizePixels((double)mc->x); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
+	if (strcasecmp(name, "_y") == 0) { double v = spvTwipsQuantizePixels((double)mc->y); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
 	if (strcasecmp(name, "_xscale") == 0) { float v = mc->xscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_yscale") == 0) { float v = mc->yscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_rotation") == 0) { float v = mc->rotation; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
