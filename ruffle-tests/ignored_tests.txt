@@ -70,7 +70,9 @@ geturl
 #                         `load()`), and only one of them dispatches `onLoad`.
 #                         4 lines + a blank. A near-pass re-triage lead, not a
 #                         capability gap.
-#   loadvariables_method  0/7 — we emit NOTHING. `MovieClip.loadVariables` is a
+#   loadvariables_method  RESOLVED 2026-09-11 (session 19): now passes 7/7 and is
+#                         pruned from the list below. It was: 0/7, we emit NOTHING —
+#                         `MovieClip.loadVariables` was a
 #                         registered *name* (action.c ~:15731, so
 #                         `typeof mc.loadVariables == "function"`) with no
 #                         branch in the MovieClip method dispatch (~:72078,
@@ -92,7 +94,6 @@ geturl
 #                         `stylesheet` tests pass), so this is one function.
 form_loader_encoding_4
 load_vars
-loadvariables_method
 stylesheet_load
 
 # --- XML networking/sockets ---
