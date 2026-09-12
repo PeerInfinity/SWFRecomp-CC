@@ -670,3 +670,18 @@ first).
   Guarded the free with `variableIsArrayOwned`. case-v5 + case-v6
   now 10/10 in graphics, both still pass NO_GRAPHICS, ASAN clean
   (only pre-existing `u16_concat` Dejagnu leaks). (2026-05-30)
+- **The EditText border's bottom-right corner is binary, where Flash's is 63 %
+  covered.** `avm2_render_textbox` draws the border as four full-coverage
+  `avm2_border_rect` quads, so that corner pixel can only be 0 % or 100 % inked;
+  today's `corner_missing` boolean just picks one, and no boolean can produce
+  Ruffle's 63 %. Fix: give the bottom and right rects their true fractional
+  device extent `(by+bh)/dtw` on the antialiased arm and let MSAA resolve it.
+  Note `e5dff31ab` left the `MSAA_SAMPLES > 1` arm alone on the assertion that
+  "both antialiased segments cover the corner, so it is always painted";
+  `visual/edittext/edittext_caret_empty` is `quality = "high"` and disproves
+  that. Blast radius: the four tier-1 `edittext_border_*` canary comparisons
+  plus the `text/auto_size/*` rows, so it needs the same four-golden
+  measurement on the High arm. Fold in `edittext_caret_multiline`, which is new
+  in this run's JSON and absent from s18's. Evidence:
+  `SWFRecompDocs/plans/session19-fanout-reports/w2-gfx-geometry-4-caret-adjudication.md`.
+  (2026-09-11, session 19)
