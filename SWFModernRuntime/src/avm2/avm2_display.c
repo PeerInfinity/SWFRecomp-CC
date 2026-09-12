@@ -18602,32 +18602,45 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 		// inside the test's tolerance of 128, and much closer than leaving it
 		// blank (144 off white).
 		//
-		// ...but that "all four corners" reading only holds while the box lands
-		// on WHOLE pixels. When the bottom edge sits at a fractional pixel
-		// position the shared bottom-right corner is produced by neither
-		// segment: the right edge's line stops short of that pixel (its end
-		// point is inside the pixel without crossing it) and the bottom edge's
-		// run starts one pixel further in. Measured off the two goldens:
-		//   avm2/edittext_autosize_height_dynamic  36 x 44 at the origin
-		//     -> rows 0 and 44 both x = 0..36, cols 0 and 36 both y = 0..44;
-		//   text/auto_size/width                   210 x 77.75 at (30,30)
-		//     -> top row x = 30..240 and left col y = 30..108, but bottom row
-		//        only x = 30..239 and right col only y = 30..107, i.e. (240,108)
-		//        is white.
-		// Only the Low arm above can leave `bd` fractional (the high arm
-		// nearbyint()s it), so this cannot move a default-quality field — and
-		// the corpus has exactly two quality = "low" AVM2 EditText comparisons.
+		// ...but that "all four corners" reading only holds on an ANTIALIASED
+		// build. avm2/edittext_autosize_height_dynamic (36 x 44 at the origin)
+		// is quality = high: rows 0 and 44 both run x = 0..36 and cols 0 and 36
+		// both run y = 0..44, all four corners inked. On the aliased build the
+		// shared bottom-right corner is produced by neither segment unless the
+		// bottom edge falls below the corner pixel's centre — see the
+		// MSAA_SAMPLES == 1 arm below for the measurements.
 		// The fractional-WIDTH case is unmeasured; it is left drawing the full
 		// corner, i.e. unchanged from before.
 		double bx = btx, by = bty, bw = ba * 20.0, bh = bd * 20.0;
-		int frac_bottom = fabs((by + bh) / dtw
-		                       - nearbyint((by + bh) / dtw)) > 1e-6;
+#if MSAA_SAMPLES == 1
+		// ...and the "fractional extent" reading above is BACKWARDS. Measured
+		// off four quality = "low" goldens, writing f = frac(by + bh) in device
+		// pixels (each row is "does the BR corner pixel carry ink"):
+		//   text/auto_size/height  250 x 204    at (25,25)   f = 0    MISSING
+		//   text/auto_size/return   75 x 103    at (25,25)   f = 0    MISSING
+		//   text/auto_size/return   75 x  29.25 at (375,25)  f = 0.25 PRESENT
+		//   text/auto_size/width   210 x  77.75 at (30,30)   f = 0.75 MISSING
+		// so the corner survives only for f in (0, 0.5) — it is NOT "whenever
+		// the extent is fractional". That matches the hardware line rule at the
+		// shared BR vertex: the right edge's segment ENDS inside that pixel
+		// without leaving its diamond, so the pixel is inked only when the
+		// bottom edge's segment leaves the diamond on its way left, i.e. only
+		// when the bottom edge passes strictly BELOW the pixel centre.
+		double bry_px = (by + bh) / dtw;
+		double bry_frac = bry_px - floor(bry_px);
+		int corner_missing = !(bry_frac > 1e-6 && bry_frac < 0.5 - 1e-6);
+#else
+		// MSAA build: both antialiased segments cover the corner, so it is
+		// always painted. Unchanged (the high arm nearbyint()s bd anyway).
+		int corner_missing = fabs((by + bh) / dtw
+		                          - nearbyint((by + bh) / dtw)) > 1e-6;
+#endif
 		avm2_border_rect(bx, by, bw + dtw, dtw, bc, alpha);          // top
-		avm2_border_rect(bx, by + bh, frac_bottom ? bw : bw + dtw,
+		avm2_border_rect(bx, by + bh, corner_missing ? bw : bw + dtw,
 		                 dtw, bc, alpha);                            // bottom
 		avm2_border_rect(bx, by, dtw, bh + dtw, bc, alpha);          // left
 		avm2_border_rect(bx + bw, by, dtw,
-		                 frac_bottom ? bh : bh + dtw, bc, alpha);    // right
+		                 corner_missing ? bh : bh + dtw, bc, alpha); // right
 		return;
 	}
 	// Rotated / sheared: fall back to Ruffle's emulated 1px line rects, whose

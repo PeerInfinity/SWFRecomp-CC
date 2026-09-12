@@ -95,6 +95,22 @@ visual/edittext/edittext_border_transform   # EDITTEXT BACKGROUND / BORDER    6 
                                             #   inside a tier-1 member. Read
                                             #   the per-comparison rows, never
                                             #   the test-level verdict.
+text/auto_size/width                        # EDITTEXT BORDER, ALIASED        1 cmp
+                                            #   added s19 (w2-gfx-text). The
+                                            #   canary audit found the set had
+                                            #   NO quality = "low" EditText
+                                            #   border member, so the
+                                            #   MSAA_SAMPLES == 1 arm of
+                                            #   avm2_render_textbox — the arm
+                                            #   that decides whether the shared
+                                            #   bottom-right corner pixel is
+                                            #   inked — was invisible to it
+                                            #   (edittext_border_transform is
+                                            #   quality = high). Six autosized
+                                            #   210 x 77.75 bordered fields,
+                                            #   CI-PASSING at 0 of 18 outliers,
+                                            #   i.e. a full-headroom tier-1
+                                            #   absolute verdict.
 
 # SESSION 19 ADDITION (s19 wave-2 `w2-setprops`). The `set_property_values`
 # work changed the AVM1 **SetProperty/GetProperty OPCODE** path
