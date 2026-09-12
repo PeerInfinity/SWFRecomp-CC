@@ -6,18 +6,18 @@
     "total_available": 733,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 21,
+    "ignored_count": 20,
     "filtered": true
   },
-  "total": 712,
+  "total": 713,
   "pass": 689,
   "ruffle_matched": 13,
-  "fail": 10,
-  "pass_rate": 96.8,
+  "fail": 11,
+  "pass_rate": 96.6,
   "effective_pass": 702,
-  "effective_pass_rate": 98.6,
+  "effective_pass_rate": 98.5,
   "breakdown": {
-    "output_mismatch": 10,
+    "output_mismatch": 11,
     "ruffle_matched": 13
   },
   "tests": [
@@ -5909,6 +5909,25 @@
       },
       "duration": 17.55,
       "status": "pass"
+    },
+    {
+      "test": "loadvariables_method",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 18.379,
+        "run": 0.004
+      },
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 7,
+        "matching_lines": 0
+      },
+      "duration": 18.39,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=0, expected=7)",
+      "actual_output": "",
+      "expected_output": "Navigator::fetch:\n  URL: testvars.txt\n  Method: POST\n  Mime-Type: application/x-www-form-urlencoded\n  Body: baz=%5Bobject+Object%5D&bar=1&foo=foo\nHurray\nThe test passed"
     },
     {
       "test": "loadvariablesnum",

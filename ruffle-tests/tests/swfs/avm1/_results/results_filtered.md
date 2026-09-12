@@ -6,26 +6,26 @@
 
 **Run Duration**: 68m 60s
 
-**Filtered**: 21 tests ignored out of 733 available
+**Filtered**: 20 tests ignored out of 733 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 712 |
-| Passing | **689** (96.8%) |
+| Total tests | 713 |
+| Passing | **689** (96.6%) |
 | Ruffle-matched | 13 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **702** (98.6%) |
-| Failing | 10 |
-| Total expected lines | 113463 |
+| Effective pass | **702** (98.5%) |
+| Failing | 11 |
+| Total expected lines | 113470 |
 | Matching lines | 110106 (97.0%) |
-| Mismatched lines | 3357 |
+| Mismatched lines | 3364 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 10 | 100.0% |
+| Output Mismatch | 11 | 100.0% |
 
 ## Passing Tests
 
@@ -770,7 +770,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**10 tests** with output mismatch, sorted by match rate (best first)
+**11 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -784,6 +784,7 @@ No timeouts.
 | 8 | `new_class_prototype_getter` | 16.7% | 1/6 | 5 | 6 |  |
 | 9 | `hitarea_sweep` | 8.1% | 3/37 | 37 | 33 |  |
 | 10 | `edittext_onscroller` | 0.0% | 0/14 | 0 | 14 |  |
+| 11 | `loadvariables_method` | 0.0% | 0/7 | 0 | 7 | [54](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) [56](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADVARIABLES_PLAN.md) |
 
 ## Investigation Documents
 
@@ -842,9 +843,9 @@ No timeouts.
 | 51 | [issue_768.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/issue_768.md) | 1 | 1 | 0 |
 | 52 | [LOADBITMAP_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADBITMAP_PLAN.md) | 0 | 0 | 0 |
 | 53 | [LOADMOVIE_MULTI_SWF_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_MULTI_SWF_PLAN.md) | 2 | 2 | 0 |
-| 54 | [LOADMOVIE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) | 44 | 44 | 0 |
+| 54 | [LOADMOVIE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_PLAN.md) | 45 | 44 | 1 |
 | 55 | [LOADMOVIE_REMAINING_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADMOVIE_REMAINING_PLAN.md) | 4 | 4 | 0 |
-| 56 | [LOADVARIABLES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADVARIABLES_PLAN.md) | 3 | 3 | 0 |
+| 56 | [LOADVARIABLES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOADVARIABLES_PLAN.md) | 4 | 3 | 1 |
 | 57 | [LOCALCONNECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/LOCALCONNECTION_PLAN.md) | 1 | 1 | 0 |
 | 58 | [LOCKROOT_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/LOCKROOT_PLAN.md) | 1 | 1 | 0 |
 | 59 | [MATH_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/MATH_PLAN.md) | 4 | 4 | 0 |
