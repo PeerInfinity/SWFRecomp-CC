@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-11T16:55:04.484721+00:00",
-    "old_git_sha": "13dfc5b483e9808c4c4f4fd3cf47ab44eb714e64",
-    "new_timestamp": "2026-09-11T18:44:39.924380+00:00",
-    "new_git_sha": "ea6960eacaf65ad686362801e99283102f895c6a",
+    "old_timestamp": "2026-09-11T18:44:39.924380+00:00",
+    "old_git_sha": "ea6960eacaf65ad686362801e99283102f895c6a",
+    "new_timestamp": "2026-09-12T03:19:52.893105+00:00",
+    "new_git_sha": "d8da5a18c35426c8bc5f16291d61b404ab3d3c52",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 90,
+    "old_pass": 91,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 90,
-    "old_total": 90,
+    "old_effective_pass": 91,
+    "old_total": 91,
     "old_pass_rate": 100.0,
-    "new_pass": 91,
+    "new_pass": 95,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 91,
-    "new_total": 91,
+    "new_effective_pass": 95,
+    "new_total": 95,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,13 +25,49 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 90,
-    "added": 1,
+    "unchanged": 91,
+    "added": 4,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_mcl_holder_totalframes",
+      "test": "avm1_mcl_load_tick",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      }
+    },
+    {
+      "test": "avm2_child_simplebutton",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      }
+    },
+    {
+      "test": "bitmap_pool_layer_cap",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "ctor_before_first_call_locals",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
