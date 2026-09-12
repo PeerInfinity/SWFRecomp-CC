@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-09-12 02:42 UTC
+**Date**: 2026-09-12 04:11 UTC
 
-**Git SHA**: `d8da5a18c3`
+**Git SHA**: `fe79e0c794`
 
-**Run Duration**: 5m 40s
+**Run Duration**: 5m 45s
 
 ## Summary
 
@@ -31,17 +31,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.1s |  |
-| 2 | `edittext_test1` | 47 | 22.5s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 22.1s |  |
-| 4 | `hello` | 4 | 1.8s |  |
-| 5 | `mouse_drag_test` | 12 | 22.9s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 16.1s |  |
-| 7 | `opcode_guard_test2` | 24 | 22.0s |  |
-| 8 | `soft_reference_test1` | 45 | 13.5s |  |
-| 9 | `stackscope` | 11 | 21.4s |  |
-| 10 | `submoviegetvar` | 4 | 17.8s |  |
-| 11 | `swf4opcode` | 117 | 24.2s |  |
+| 1 | `button_test1` | 31 | 2.7s |  |
+| 2 | `edittext_test1` | 47 | 22.7s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 17.3s |  |
+| 4 | `hello` | 4 | 2.4s |  |
+| 5 | `mouse_drag_test` | 12 | 22.3s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 16.5s |  |
+| 7 | `opcode_guard_test2` | 24 | 23.6s |  |
+| 8 | `soft_reference_test1` | 45 | 17.6s |  |
+| 9 | `stackscope` | 11 | 22.7s |  |
+| 10 | `submoviegetvar` | 4 | 21.6s |  |
+| 11 | `swf4opcode` | 117 | 22.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -49,11 +49,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 23.1s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 23.2s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.7s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 23.4s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 23.1s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 22.0s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 24.7s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.2s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 23.1s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 18.0s |  |
 
 ## Near-Passing Tests
 

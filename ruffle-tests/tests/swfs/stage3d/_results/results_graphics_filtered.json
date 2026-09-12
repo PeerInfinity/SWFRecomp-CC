@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-12T02:42:47.436672+00:00",
-    "git_sha": "d8da5a18c35426c8bc5f16291d61b404ab3d3c52",
-    "duration_seconds": 71.2,
+    "timestamp": "2026-09-12T04:11:23.764763+00:00",
+    "git_sha": "fe79e0c7947e75bfa21358e0298734b070161311",
+    "duration_seconds": 69.93,
     "total_available": 7,
     "shards": 30,
     "expected_shards": 30,
@@ -22,7 +22,7 @@
       "test": "request_matching_profiles",
       "phases": {
         "recomp": 0.007,
-        "compile": 8.776,
+        "compile": 8.3,
         "run": 0.265
       },
       "num_frames": 126,
@@ -31,14 +31,14 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 9.06,
+      "duration": 8.58,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
         "recomp": 0.006,
-        "compile": 8.271,
+        "compile": 8.545,
         "run": 0.215
       },
       "num_frames": 12,
@@ -47,15 +47,15 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 8.5,
+      "duration": 8.78,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.016,
-        "compile": 8.438,
-        "run": 0.265
+        "recomp": 0.024,
+        "compile": 10.571,
+        "run": 0.315
       },
       "num_frames": 1,
       "lines": {
@@ -63,7 +63,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 8.92,
+      "duration": 11.19,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -72,21 +72,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 255,
-            "diff_channels": 592854,
-            "mean_diff": 2.858,
-            "outliers": 7854,
-            "max_outliers": 782,
-            "tolerance": 1,
-            "excess_outliers": 7072
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
+          "known_failure": false
         }
       },
       "status": "pass"
@@ -94,8 +80,8 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.024,
-        "compile": 11.244,
+        "recomp": 0.023,
+        "compile": 10.698,
         "run": 0.315
       },
       "num_frames": 1,
@@ -104,7 +90,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 11.82,
+      "duration": 11.28,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -113,20 +99,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 1,
-            "diff_channels": 794,
-            "mean_diff": 0.0009,
-            "outliers": 0,
-            "max_outliers": 0,
-            "tolerance": 1,
-            "excess_outliers": 0
-          },
-          "expected_source": "repo"
+          "known_failure": false
         }
       },
       "status": "pass"
@@ -134,9 +107,9 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.023,
-        "compile": 10.814,
-        "run": 0.566
+        "recomp": 0.019,
+        "compile": 8.689,
+        "run": 0.415
       },
       "num_frames": 1,
       "lines": {
@@ -144,7 +117,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 11.65,
+      "duration": 9.32,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -153,20 +126,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 1,
-            "diff_channels": 1246,
-            "mean_diff": 0.0014,
-            "outliers": 0,
-            "max_outliers": 0,
-            "tolerance": 1,
-            "excess_outliers": 0
-          },
-          "expected_source": "repo"
+          "known_failure": false
         }
       },
       "status": "pass"
@@ -174,49 +134,8 @@
     {
       "test": "unbound_texture",
       "phases": {
-        "recomp": 0.024,
-        "compile": 10.786,
-        "run": 0.365
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 11.44,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 118800 outliers exceed limit of 0, max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 255,
-            "diff_channels": 118800,
-            "mean_diff": 25.245,
-            "outliers": 118800,
-            "max_outliers": 0,
-            "tolerance": 1,
-            "excess_outliers": 118800
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "unbound_texture_multiple",
-      "phases": {
-        "recomp": 0.016,
-        "compile": 8.967,
+        "recomp": 0.019,
+        "compile": 8.383,
         "run": 0.265
       },
       "num_frames": 1,
@@ -225,7 +144,34 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.43,
+      "duration": 8.87,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 118800 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "unbound_texture_multiple",
+      "phases": {
+        "recomp": 0.025,
+        "compile": 10.925,
+        "run": 0.318
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 11.53,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -234,21 +180,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 255,
-            "diff_channels": 49500,
-            "mean_diff": 10.5188,
-            "outliers": 49500,
-            "max_outliers": 0,
-            "tolerance": 1,
-            "excess_outliers": 49500
-          },
-          "expected_source": "repo",
-          "reason": "pixel_mismatch"
+          "known_failure": false
         }
       },
       "status": "pass"
