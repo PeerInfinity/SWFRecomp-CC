@@ -2687,3 +2687,124 @@ results`, dispatched at closeout).
 - KF/NO-GO of record: `number_tostring` (31 corrupt lines, ACCEPTED), `bug_483783` (OOM, needs mid-method GC), `pcre_find_fixedlength` (255-capture ceiling), audio trio (real FFT), `avm1_loads_avm2` (harness), `globals_monkeypatch` (arc), gnash `array-v*`/`MovieClip-v*` (multi-phase plans).
 
 **Pixels.** See playbook §17.
+
+## 20. Session 19 (2026-09-11/12) — dual-axis fan-out #11: trace +NN, pixels +NN
+
+Commits `bd5027f69..8072df940` on master (20 code commits + 1 disposition/doc
+commit, each carrying its agent's patch, report and brief under
+`session19-fanout-reports/`). Baseline was trace **4412 effective / 4518
+intersection** (results `627830f2a`, run `34648878013` at `254145a5b`) and
+pixels **381 / 580** (images run `34645805030`). 8 wave-1 + 11 wave-2 agents,
+all on Opus, coordinator included.
+
+Merge order: w2-avm2-json · w2-avm2-smalls · w2-loaders ×3 · w2-gfx-geometry ×2 ·
+w2-avm1-events ×2 · w2-setprops · w2-avm2-z · w2-avm1-sort · w2-gfx-text ×3 ·
+w2-avm2-rest · w2-stage3d-a · w2-bitmapdata · w2-hitarea. Zero textual merge
+conflicts in source; `render_canary_tests.txt` conflicted three ways (every
+agent appends at EOF) and was resolved by `git apply --3way`, keeping all blocks.
+
+### 20.1 Ledger (trace)
+
+| patch | flips | tests |
+|---|---:|---|
+| w2-bitmapdata | +4 | bitmapdata_copypixels_blend, _self (avm1 + avm2), _alpha_merge |
+| w2-avm2-smalls | +3 | bytearray_bad_symbol_class, _other_movie, bitmap_filter_abstract (+ matrix3d_append_rotation rm→pass, recompose 57→8 lines) |
+| w2-setprops | +3 | set_property_values/swf5, /swf6, /swf7 |
+| w2-avm2-rest | +3 | displayobject_getrect, id3_info, edittext_scroll_event |
+| w2-avm2-json | +2 | json_parse_errors (pass), json_parse_numbers (rm) |
+| w2-avm1-events | +2 | PrototypeEventListeners (rm), edittext_onscroller (rm) |
+| w2-avm2-z | +2 | displayobject_z, geom_transform |
+| w2-avm1-sort | +2 | new_class_prototype_getter, loadvariables_method (un-ignored) |
+| w2-loaders | +1 | loader_events_2 (rm) |
+| w2-hitarea | +1 | hitarea_sweep |
+| (side effect) | +1 | from_avmplus/ecma3/JSON/adhoc (rm) — the JSON patch; w1-drift priced it, counted ONCE |
+
+### 20.2 Ledger (pixels)
+
+| patch | flips | comparisons |
+|---|---:|---|
+| w2-stage3d-a | +13 | stage3d_triangle ×5 variants, multistage_triangle, agal_cross_product, stage_scale_factor, program_constants_bytearray_be/_le, rotating_cube, stage3d/scissor_rectangle{,_invalid} |
+| w2-gfx-text | +5 | edittext_get_char/line_index_at_point, define_font_glyph_table_order, text/auto_size/{height,return} |
+| w2-gfx-geometry | +2 | displayobject_getbounds_shape, blend_across_masks_issue_24549 |
+| w2-bitmapdata | +1 | from_shumway/acid/acid-bitmapData-copyPixels |
+| (band moves) | 0 | graphics_simple_shapes 230→154, graphics_gradients 469→349, graphics_bitmaps 1057→959, acid-shapes-testing 44565→41339 |
+
+### 20.3 Zero-flip work that still landed
+
+Four items paid in correctness rather than score, each anchored by a new
+`regression/` fixture whose expected output is a Ruffle-exporter oracle:
+`avm2_child_simplebutton` (a loaded child's SimpleButton had no states),
+`avm1_mcl_load_tick` (onLoadInit fired before the root's first enterFrame),
+`ctor_before_first_call_locals` (a local set in a constructor running before
+the first call was silently dropped), and the AVM2 `mouseWheelEnabled` default
+(the wheel was dead for EVERY AVM2 TextField, found while chasing
+`edittext_scroll_event`).
+
+### 20.4 Method notes (deltas vs s18)
+
+- **Wave-1 refutation yield was again the headline, and twice it killed
+  expensive work before it started.** The device-font arc was priced by BUILDING
+  it (+110 LOC in a throwaway worktree): it flips nothing, because
+  `leading_device_font` goes 12 978 → 18 against a `max_outliers` of 0. And
+  s18's named completion mechanism for the `blend_modes` family (integer-twip
+  truncation in `addCurvedEdgeLevien`) is refuted — with float vertices, add
+  goes 5 → 6 and multiply 16 → 13 while the failing pixels MOVE to a new set of
+  the same size. Neither the recompiler A/B sweep nor its broken tooling had to
+  be funded. Archived, unlanded: `UNLANDED-devicefont-prototype.patch`.
+- **Two "blocked" verdicts of record were wrong, and both were cheap.**
+  `set_property_values` had no disposition entry anywhere (the inventory's ACC
+  flag was a substring false positive) and its "float storage blocker" was a
+  category error: `_x`/`_y` are S32 twips, so saturating the read quantizer
+  flips all three variants. `avm1/loadvariables_method` was an ignore-list entry
+  whose own rationale said "prune on pass"; it now passes.
+- **A pixel "regression" that was upstream tolerance drift.** 11
+  `edittext_caret_empty` comparisons went pass → fail in the first grading run.
+  Ruffle `0fa6a04af` tightened that test's tolerance 128 → 64 with zero
+  `expected.png` changes. The cheap tell: `max_diff` was 95 on BOTH sides while
+  only the outlier count moved, and our PNG md5 is identical at the session base
+  and at HEAD. **A render regression moves `max_diff`.** The misc categories'
+  image baseline was 6 days older than the re-synced test tree, which is exactly
+  when this happens.
+- **Same-function collisions are cheaper to reassign than to merge.** Two agents
+  independently found bugs in `bd_copy_pixels`; the function's owner took the
+  sibling's find as a fourth patch with its own ledger, and measured at three
+  tree states to keep the two ledgers separable (clean FAIL 53 760, blend-only
+  FAIL 53 760 bit-identical, rect-only PASS 0).
+- **Canary blind spots keep being found by the agents that need them.** The
+  standing set had NO member reaching `blend_over`, none emitting
+  `actionSetProperty`/`actionGetProperty` (corpus-wide exactly one image test
+  does), and none exercising Stage3D. All three gaps were closed by the patches
+  that exposed them; the file now has 107 members and conflicts three ways per
+  session, so expect to `--3way` it.
+- **An agent's own cost guard nearly shipped a timeout**: the Stage3D budget
+  guard turned `away3d` from a 10.5 s pass into a 30 s timeout. It was caught
+  only because the agent ran an out-of-scope row it had been told to skip.
+
+### 20.5 Left on the board (session 20)
+
+**Trace.**
+- `hitarea_remove_owner_drag` re-prices to ONE mechanism: the single topmost
+  pick (the droptarget snapshot landed its `dt: /btnRm` line, and deleting one
+  spurious `rollover Z` leaves it byte-identical to `output.txt`). Blast radius
+  is still the largest on the board — it rewrites roll events for every
+  overlapping-button title and must reconcile `tag.c`'s second hover machine.
+- `masks_test` is now 124/175 (was 28): 34 of the 50 remaining diff lines are
+  `hitTest` on masked/mask clips — a hit-test slice, not an events one.
+- gnash `array-v7`/`-v8` gained exactly the 26 comparator lines and need 3 more
+  mechanisms; `MovieClip-v6/-v7` gained their whole onData/onUnload tail and are
+  held by a 2-line mechanism (a descendant `onUnload` of a clip swapped to depth
+  −32849 shifts the tail two indices). `MovieClip-v8` is out (SWF8 filters).
+- `avm1/bitmapdata_custom_rectangle` → `ruffle_matched` (+1) is still unclaimed:
+  built-in `getColorBoundsRect` must construct via the dynamically-resolved
+  `flash.geom.Rectangle`.
+- `propertyCoerceToNumber` (the SetMember path) still rejects `±Infinity` and
+  still uses `roundf` for `_alpha`, unlike the opcode path just fixed — wrong vs
+  Ruffle, and it is every game's hot path.
+- Unchanged NO-GO of record: `external_interface` (102 lines are one AVM2 test
+  harness), the audio trio (blocked on `computeSpectrum`, FLV audio decode and a
+  mixer tap — note s18's "needs a real FFT" reason was wrong, it is a hand-rolled
+  DFT), `embed_name_lookup`, `bug_483783`, `pcre_find_fixedlength`,
+  `number_tostring`, `avm1_loads_avm2` (harness gate), `GradientFillTest`
+  (structurally unpromotable), `getpixel-from-embedded` (a disposition, not a fix).
+
+**Pixels.** See playbook §18.

@@ -818,3 +818,66 @@ pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
   for GradientGlow/GradientBevel; the other 9 cells are byte-exact. Matching
   the golden means hiding content Flash draws; blast radius exactly this one
   comparison. **Won't-fix (Ruffle divergence), not a bug of ours.**
+
+## 18. Session-19 state of the board (2026-09-11/12)
+
+Baseline: images run `34645805030` at `0ccafbc4e`, **381 / 580**. Grading runs
+this session: `34657699925` at `f48c532bf` (first six patches) and
+`34662909136` at `521a53782` (everything except hitArea, which is trace-only).
+Reports: `session19-fanout-reports/`.
+
+**+21 pixel flips priced and locally verified** (Stage3D 13, text 5, geometry 2,
+bitmap 1), plus four band moves: `graphics_simple_shapes` 230 → 154,
+`graphics_gradients` 469 → 349, `graphics_bitmaps` 1057 → 959,
+`acid-shapes-testing` 44565 → 41339.
+
+- **Stage3D was the single biggest pool and it is no longer blank.** 29
+  comparisons (not 22 — five are `stage3d`-suite, i.e. the CI misc group and
+  invisible at `categories=all`). The backend did not exist at all:
+  `drawTriangles` was a null check, `present` was a no-op, and buffers,
+  programs and textures retained no data. Phase A is a CPU rasteriser in the
+  existing `avm2_stage3d.c` TU, built to a model measured pixel-by-pixel off
+  the goldens: opaque nearest composite under the display list, Vulkan 4x
+  sample positions, attributes extrapolated at the pixel centre even outside
+  the primitive, per-sample round-to-unorm8 then `floor(mean)`. 13/13 targets
+  pass, eight at 0 outliers. AGAL is transliterated from Ruffle's `builder.rs`
+  per the standing licence ruling, never vendored. Remaining phases: A′
+  stencil/colorMask (+2), B textures/RTT (up to 9), B′ ATF/DXT (2), C
+  (`raytrace`, `away3d`) — and `stage3d_bitmap` needs a SECOND mechanism
+  (our actual is uniformly black, plus `with_default_font`).
+- **The at-point probes were never a metrics problem.** s18's "NO-GO until the
+  metrics are exact" is refuted: the metrics were right and the probes omitted
+  `leading`. Implementing it found three more defects in the same two functions
+  (a missing +1 px x translation, a linear scan where Ruffle runs a
+  NON-MONOTONIC comparator through `binary_search_by`, and the justified-space
+  stretch rule).
+- **Device fonts: priced by building, flips nothing.** Outline emission works
+  (+110 LOC) and moves `leading_device_font` 12 978 → 18 against `max_outliers`
+  0. It is a band/correctness arc, not a flip arc. 100 % of `device-font`'s own
+  residual is a different ~15-LOC bug: the device-face lookup has no
+  bold/italic ladder, so the italic run falls back to the baked Noto and
+  inflates the line box.
+- **`blend_modes` ×12 is NO-GO** and s18's completion mechanism for it is
+  refuted (see arc §20.4). Do not fund the recompiler A/B sweep for it.
+- **`bitmapbuttons` is not a `0x43` bug**: `swf.cpp:10709` marks every
+  bitmap-filled shape `renderable = 0`, so the AVM2 walk skips it. Feature slice.
+- **Top unclaimed pixel lead**: Ruffle keeps ONE even-odd fill across
+  `lineStyle()` changes while we flush the path per style, so overlapping
+  subpaths stop cancelling — that owns 152 of `graphics_simple_shapes`' 154
+  remaining channels. Our fill is already even-odd; the defect is
+  `gfx_line_style` calling `gfx_finalize_path`, which closes the fill too.
+- **LINESTYLE2 caps/joins now reach the stroke builder**, and the calibration
+  worth keeping: cap/join style is invisible below ~2 px of stroke, and 4 of the
+  5 non-round corpus SWFs use 1-px strokes. `visual/simple_shapes/layers` was
+  predicted to flip and did NOT — an instrumented build shows its 5 stroked
+  paths all select their array's last (round/round) entry.
+- **EditText border corner**: the bottom-right pixel is binary where Flash's is
+  63 % covered — four full-coverage quads, so no boolean can produce it. Owner
+  and fix in `BACKLOG.md`; `e5dff31ab`'s `MSAA_SAMPLES > 1` assertion is
+  disproved by `edittext_caret_empty` (`quality = "high"`).
+
+### Process note added this session
+When the misc categories' image JSON is older than the last test-tree sync, a
+misc pass → fail is **upstream `test.toml` drift until proven otherwise**. The
+fingerprint is `max_diff` unchanged while `outliers` moves; check the upstream
+`test.toml` before attributing it to any patch (see arc §20.4).
