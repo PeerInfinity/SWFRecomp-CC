@@ -11483,14 +11483,39 @@ static void m3d_stub_set(Avm2Context* ctx, Avm2Object* target, int on)
 		->dont_enum = 1;
 }
 
+// --- DisplayObject.z --------------------------------------------------------
+// Ruffle keeps `tz` as a plain f64 on DisplayObjectBase (display_object.rs:472
+// / :1621) that is NOT part of the 2D matrix, and `set z` additionally raises
+// the matrix3d stub bit above (avm2/globals/flash/display/display_object.rs
+// set_z:388). Stored the same way as that bit -- a dont_enum dyn prop on the
+// display object -- so no shared struct field is needed.
+#define M3D_TZ_KEY "__mtz"
+
+static double m3d_tz_get(Avm2Context* ctx, Avm2Object* target)
+{
+	Avm2Value* v = target != NULL
+		? avm2_object_find_dynamic(target, M3D_TZ_KEY, 5) : NULL;
+	return v != NULL ? avm2_coerce_to_number(ctx, *v) : 0.0;
+}
+
+static void m3d_tz_set(Avm2Context* ctx, Avm2Object* target, double tz)
+{
+	if (target == NULL) return;
+	avm2_object_set_dynamic(ctx, target, M3D_TZ_KEY, 5, avm2_number(tz))
+		->dont_enum = 1;
+}
+
 // flash.geom.Matrix3D is minted in avm2_stage3d.c (Stage3D needs it first).
 extern Avm2Object* avm2_geom_matrix3d_new(Avm2Context* ctx, const double* raw);
 extern int avm2_geom_matrix3d_read(Avm2Object* o, double* out);
 
 // Ruffle render/src/matrix3d.rs Matrix3D::from_matrix -- column-major, with the
 // 2D matrix in columns 0/1 and its (already twip-quantised) translation in
-// column 3.
-static Avm2Value m3d_from_ext(Avm2Context* ctx, Avm2DisplayObjectExt* ext)
+// column 3. transform.rs get_matrix_3d:294 then overwrites tz (raw[14]) with
+// the display object's `z`, which lives outside the 2D matrix; the constructor
+// narrows the whole array to f32, matching Ruffle's `set_tz(z as f32)`.
+static Avm2Value m3d_from_ext(Avm2Context* ctx, Avm2DisplayObjectExt* ext,
+                              double tz)
 {
 	double raw[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 	if (ext != NULL)
@@ -11502,11 +11527,13 @@ static Avm2Value m3d_from_ext(Avm2Context* ctx, Avm2DisplayObjectExt* ext)
 		raw[12] = twips_to_pixels(ext->mtx_tx);
 		raw[13] = twips_to_pixels(ext->mtx_ty);
 	}
+	raw[14] = tz;
 	Avm2Object* o = avm2_geom_matrix3d_new(ctx, raw);
 	return o != NULL ? avm2_object_value(o) : avm2_null();
 }
 
-// Matrix3D::to_matrix -- only the 2D block survives.
+// Matrix3D::to_matrix -- only the 2D block survives (tz is carried separately
+// by the caller, exactly as transform.rs set_matrix_3d:319 does).
 static void m3d_to_ext(Avm2DisplayObjectExt* ext, const double* raw)
 {
 	if (ext == NULL) return;
@@ -11891,7 +11918,7 @@ static Avm2Value transform_get_matrix3d(Avm2Activation* act)
 	Avm2TransformExt* text = self->native_ext;
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, text->target);
 	if (ext == NULL || !m3d_stub_get(text->target)) return avm2_null();
-	return m3d_from_ext(ctx, ext);
+	return m3d_from_ext(ctx, ext, m3d_tz_get(ctx, text->target));
 }
 
 static Avm2Value transform_set_matrix3d(Avm2Activation* act)
@@ -11922,6 +11949,9 @@ static Avm2Value transform_set_matrix3d(Avm2Activation* act)
 		avm2_object_set_dynamic(ctx, mo, M3D_OWNER_KEY, 10,
 		                        avm2_object_value(text->target))->dont_enum = 1;
 		m3d_to_ext(ext, raw);
+		// transform.rs set_matrix_3d:319-329 -- the 4x4's tz becomes the
+		// display object's `z`, separately from the 2D block.
+		m3d_tz_set(ctx, text->target, raw[14]);
 		m3d_stub_set(ctx, text->target, 1);
 		return avm2_undefined();
 	}
@@ -11934,6 +11964,8 @@ static Avm2Value transform_set_matrix3d(Avm2Activation* act)
 	ext->mtx_tx = 0;
 	ext->mtx_ty = 0;
 	ext->scale_rot_cached = 0;
+	// ...and the same arm resets `z` to 0 (transform.rs:324, `(_, false, 0.0)`).
+	m3d_tz_set(ctx, text->target, 0.0);
 	m3d_stub_set(ctx, text->target, 0);
 	return avm2_undefined();
 }
@@ -12632,6 +12664,30 @@ static Avm2Value do_get_zero(Avm2Activation* act)
 {
 	(void) act;
 	return avm2_number(0);
+}
+
+// DisplayObject.z (Ruffle avm2/globals/flash/display/display_object.rs:375-401).
+// The getter is the raw f64 tz; the setter stores it AND raises the matrix3d
+// stub bit, which is what flips transform.matrix to null and transform.matrix3D
+// to a live Matrix3D the moment anything assigns `z` -- even `z = 0`.
+static Avm2Value do_get_z(Avm2Activation* act)
+{
+	return avm2_number(m3d_tz_get(act->ctx, this_obj(act)));
+}
+
+static Avm2Value do_set_z(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	double z = act->argc > 0 ? avm2_coerce_to_number(ctx, act->args[0]) : 0.0;
+	m3d_tz_set(ctx, self, z);
+	m3d_stub_set(ctx, self, 1);
+	// display_object.rs set_z:476-480 marks transformed-by-script like the
+	// other position setters do.
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, self);
+	if (ext != NULL) mark_transformed_by_script(ext);
+	return avm2_undefined();
 }
 
 static Avm2Value do_get_one(Avm2Activation* act)
@@ -16848,7 +16904,7 @@ void avm2_register_display(Avm2Context* ctx)
 	add_getset(ctx, dobj, "blendMode", do_blendmode_get, do_blendmode_set);
 	add_getset(ctx, dobj, "blendShader", NULL, do_blendshader_set);
 	add_getset(ctx, dobj, "scale9Grid", do_scale9grid_get, do_scale9grid_set);
-	add_getset(ctx, dobj, "z", do_get_zero, do_set_noop);
+	add_getset(ctx, dobj, "z", do_get_z, do_set_z);
 	add_getset(ctx, dobj, "rotationX", do_get_zero, do_set_noop);
 	add_getset(ctx, dobj, "rotationY", do_get_zero, do_set_noop);
 	add_getset(ctx, dobj, "rotationZ", do_get_rotation, do_set_rotation);
@@ -17366,7 +17422,7 @@ void avm2_register_display(Avm2Context* ctx)
 			{ "scrollRect", do_scrollrect_get }, { "tabEnabled", io_get_tab_enabled },
 			{ "tabIndex", io_get_tab_index }, { "transform", do_get_transform },
 			{ "visible", do_get_visible }, { "width", do_get_width },
-			{ "x", do_get_x }, { "y", do_get_y }, { "z", do_get_zero },
+			{ "x", do_get_x }, { "y", do_get_y }, { "z", do_get_z },
 		};
 		for (size_t i = 0; i < sizeof(ov) / sizeof(ov[0]); i++)
 		{
