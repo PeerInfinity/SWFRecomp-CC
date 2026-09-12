@@ -1521,6 +1521,26 @@ struct Scanner
 					}
 					code_table_off = wide_offsets ? body.u32() : body.u16();
 				}
+				// The glyph offset table is NOT guaranteed to be sorted: SWFs
+				// exist whose DefineFont3 offsets are deliberately out of
+				// order, and Ruffle simply seeks to each offset and reads
+				// shape records until the EndShapeRecord, with no end bound at
+				// all (read.rs:1050). parseGlyphShape stops at the
+				// EndShapeRecord too, so the g1 below is only a safety bound —
+				// but taking it as glyph_offsets[i + 1] silently DROPS every
+				// glyph whose successor offset is smaller. Use the smallest
+				// offset strictly greater than g0 instead; on a sorted table
+				// that is exactly glyph_offsets[i + 1] / code_table_off, so
+				// the blast radius outside out-of-order fonts is nil.
+				bool offsets_sorted = true;
+				for (uint16_t i = 0; i + 1 < nglyphs; i++)
+				{
+					if (glyph_offsets[i + 1] <= glyph_offsets[i])
+					{
+						offsets_sorted = false;
+						break;
+					}
+				}
 				// Parse each glyph SHAPE into flattened contour outlines
 				// (the CPU rasterizer behind BitmapData.draw(TextField)).
 				for (uint16_t i = 0; i < nglyphs; i++)
@@ -1530,8 +1550,25 @@ struct Scanner
 					fd.glyph_contour_start.push_back(
 						(uint32_t) (fd.glyph_contour_ends.size()));
 					uint32_t g0 = glyph_offsets[i];
-					uint32_t g1 = i + 1 < nglyphs ? glyph_offsets[i + 1]
-					                              : code_table_off;
+					uint32_t g1;
+					if (offsets_sorted)
+					{
+						g1 = i + 1 < nglyphs ? glyph_offsets[i + 1]
+						                     : code_table_off;
+					}
+					else
+					{
+						g1 = (uint32_t) (body.end - offtab);
+						if (code_table_off > g0 && code_table_off < g1)
+						{
+							g1 = code_table_off;
+						}
+						for (uint16_t j = 0; j < nglyphs; j++)
+						{
+							uint32_t o = glyph_offsets[j];
+							if (o > g0 && o < g1) g1 = o;
+						}
+					}
 					if (g1 <= g0 || offtab + g1 > body.end) continue;
 					parseGlyphShape(offtab + g0, offtab + g1, fd);
 				}
