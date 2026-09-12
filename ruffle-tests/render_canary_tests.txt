@@ -160,3 +160,23 @@ avm2/graphics_simple_shapes                 # drawRoundRect + one-fill-across-
 visual/simple_shapes/layers                 # LINESTYLE2 square caps + miter
                                             #   join, miterLimit 1.0, 20-30 px
                                             #   strokes
+
+# SESSION 19 ADDITIONS (s19 wave-2 `w2-stage3d-a`). Before this slice the set
+# had NO Stage3D member at all and could not get one: every Stage3D row was a
+# flat blank render, so a change to the (nonexistent) backend could only ever
+# report IDENTICAL. The w1 scoping report's canary-audit lead named
+# `avm2/stage3d_triangle` as the pick the moment phase A landed.
+#
+# Both members are listed tier=2 because their CI verdict at the time of
+# writing is the pre-patch blank. `stage3d_triangle` graded 0 outliers /
+# max diff 1 against its golden LOCALLY after the patch (tolerance 1,
+# max_outliers 0) — promote it to tier=1 once a CI images run confirms that.
+
+# tier=2  (CI-failing / skipped; A/B signal only)
+avm2/stage3d_triangle                       # the whole phase-A path in one
+                                            #   comparison: AGAL interpret,
+                                            #   4x MSAA raster, resolve,
+                                            #   present, opaque composite
+avm2/stage3d_rotating_cube                  # m44 + setProgramConstantsFrom-
+                                            #   Matrix + back-face culling +
+                                            #   the multi-tick redraw path

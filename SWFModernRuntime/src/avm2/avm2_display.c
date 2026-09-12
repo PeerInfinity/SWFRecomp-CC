@@ -19765,12 +19765,41 @@ static void avm2_render_highlight(Avm2Context* ctx)
 	renderer_draw_rect(context, fx + fw - t, fy, t, fh, 1, 1, 0, 1, 0, 0);     // right
 }
 
+// Stage3D composite (tranche S3). The front buffers live in avm2_stage3d.c;
+// this is the only place they reach the renderer.
+extern int avm2_stage3d_front_buffer(Avm2Context* ctx, uint32_t index,
+                                     uint32_t stage_w, uint32_t stage_h,
+                                     const uint32_t** pixels, uint32_t* w,
+                                     uint32_t* h, double* x, double* y);
+
+static void avm2_render_stage3ds(Avm2Context* ctx)
+{
+	SWFAppContext* app = ctx->app;
+	uint32_t sw = (uint32_t) (app->width > 0 ? app->width : 1);
+	uint32_t sh = (uint32_t) (app->height > 0 ? app->height : 1);
+	for (uint32_t i = 0; i < 4; i++)
+	{
+		const uint32_t* px = NULL;
+		uint32_t w = 0, h = 0;
+		double x = 0.0, y = 0.0;
+		if (!avm2_stage3d_front_buffer(ctx, i, sw, sh, &px, &w, &h, &x, &y))
+			continue;
+		renderer_draw_bitmap_quad_scaled(context, px, w, h, w, h,
+			(float) (x * 20.0), (float) (y * 20.0), 0, 0);
+	}
+}
+
 static void avm2_render_walk(Avm2Context* ctx)
 {
 	renderer_open_pass(context);
 	g_avm2_xform_next = g_avm2_xform_base;
 	g_avm2_cxform_next = g_avm2_cxform_base;
 	g_avm2_cur_cx = AVM2_CX_IDENTITY;
+	// Stage3D composites UNDERNEATH the whole display list, in stage3Ds index
+	// order, each at its own (x, y) (stage.rs:625-634). The quad is the back
+	// buffer at 1:1 stage pixels, opaque and nearest-sampled, which is what
+	// Ruffle's `bitmap_opaque` REPLACE pipeline does (surface/commands.rs:866).
+	avm2_render_stage3ds(ctx);
 	Mat id = mat_identity();
 	if (ctx->stage != NULL)
 		avm2_render_node(ctx, ctx->stage, &id, 1.0, &AVM2_CX_IDENTITY);

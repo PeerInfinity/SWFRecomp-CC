@@ -613,6 +613,7 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
 		avm2_events_gc_free_ext(ctx, o);
 		avm2_text_gc_free_ext(ctx, o);
 		avm2_flixel_gc_free_ext(ctx, o);
+		avm2_stage3d_gc_free_ext(ctx, o);
 		heap_free(app, o->native_ext);
 	}
 	// Per-object vtables: only newactivation/newcatch allocate a vtable owned

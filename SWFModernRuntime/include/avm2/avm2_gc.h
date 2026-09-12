@@ -151,5 +151,8 @@ void avm2_bytearray_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 void avm2_display_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 void avm2_events_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 void avm2_text_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
+// Stage3D (tranche S3): back/front/depth buffers, retained vertex and index
+// buffer words, retained AGAL bytecode.
+void avm2_stage3d_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 
 #endif // AVM2_GC_H
