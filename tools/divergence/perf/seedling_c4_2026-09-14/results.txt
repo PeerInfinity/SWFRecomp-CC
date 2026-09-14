@@ -1,0 +1,148 @@
+# C4 profile results
+## demo k=544
+total sampled 10496.9 ms
+| Entity.collide: property-get helpers | 4038.8 | 38.5% |
+| Entity.collide: compiled AS3 body | 2303.1 | 21.9% |
+| Entity.collide: numeric add/coerce helpers | 1671.3 | 15.9% |
+| Entity.collide: type-check/coerce helpers | 1348.0 | 12.8% |
+| mp3 decode (sound_play → minimp3) | 515.2 | 4.9% |
+| Tile.check outside collide (addGrass/drawEdges/…) | 202.4 | 1.9% |
+| other | 180.1 | 1.7% |
+| allocator + GC (recompiler runtime) | 158.5 | 1.5% |
+| Game.update: other | 51.6 | 0.5% |
+| Entity.collide: other helpers | 27.4 | 0.3% |
+| idle (window edge) | 0.5 | 0.0% |
+## demo k=543
+total sampled 470.1 ms
+| loadlevel: entity construction + Tilemap/Grid | 221.6 | 47.1% |
+| other | 149.2 | 31.7% |
+| idle (window edge) | 52.8 | 11.2% |
+| allocator + GC (recompiler runtime) | 26.8 | 5.7% |
+| XML parse / E4X | 19.6 | 4.2% |
+## p4d k=1
+total sampled 1293.7 ms
+| mp3 decode (sound_play → minimp3) | 751.5 | 58.1% |
+| Entity.collide: property-get helpers | 146.0 | 11.3% |
+| other | 139.6 | 10.8% |
+| Entity.collide: compiled AS3 body | 78.8 | 6.1% |
+| Entity.collide: numeric add/coerce helpers | 64.1 | 5.0% |
+| Tile.check outside collide (addGrass/drawEdges/…) | 45.3 | 3.5% |
+| Entity.collide: type-check/coerce helpers | 34.8 | 2.7% |
+| Game.update: other | 27.1 | 2.1% |
+| Entity.collide: other helpers | 4.0 | 0.3% |
+| allocator + GC (recompiler runtime) | 1.7 | 0.1% |
+| idle (window edge) | 0.8 | 0.1% |
+frame k=544 cpu=10496.9 ms, window page 19786–30283; 51253 samples, 10496.9 ms sampled
+neighbours: cpu[k-1]=470.0 cpu[k+1]=65.2; frames>1s: 544:10497
+
+## SELF
+   2303.1 ms  21.9%  abc0_m96
+   2159.4 ms  20.6%  avm2_op_getproperty_static_ic
+   1590.1 ms  15.1%  resolved_get
+    959.7 ms   9.1%  avm2_op_add_values
+    829.3 ms   7.9%  avm2_value_is_of_type
+    373.2 ms   3.6%  avm2_coerce_to_primitive
+    349.1 ms   3.3%  mp3d_synth_granule
+    343.9 ms   3.3%  avm2_value_vtable
+    340.0 ms   3.2%  avm2_coerce_to_number
+    334.4 ms   3.2%  avm2_coerce_to_class
+    198.9 ms   1.9%  avm2_coerce_to_type_mn
+    106.0 ms   1.0%  avm2_call_method_ref
+     86.4 ms   0.8%  mp3dec_decode_frame
+     31.1 ms   0.3%  resolve_key
+     31.0 ms   0.3%  L3_imdct36
+     30.6 ms   0.3%  wrapper_cmp
+     28.1 ms   0.3%  sound_play
+     27.0 ms   0.3%  avm2_op_add
+     26.4 ms   0.3%  gc_collect
+     21.5 ms   0.2%  sift
+     20.9 ms   0.2%  mp3d_synth_pair
+     18.1 ms   0.2%  trinkle
+     17.9 ms   0.2%  memcmp
+     17.5 ms   0.2%  avm2_setup_locals
+     13.8 ms   0.1%  cycle
+
+## INCLUSIVE
+  10496.9 ms 100.0%  (root)
+  10465.4 ms  99.7%  (anon)
+  10464.8 ms  99.7%  wrapper
+  10464.8 ms  99.7%  wasm-to-js
+  10464.8 ms  99.7%  runSWF
+  10464.8 ms  99.7%  js-to-wasm::
+  10464.8 ms  99.7%  callUserCallback
+  10464.8 ms  99.7%  doRewind
+  10464.1 ms  99.7%  invoke_vi
+  10463.9 ms  99.7%  dynCall_vi
+  10463.9 ms  99.7%  js-to-wasm:ii:
+  10314.5 ms  98.3%  invoke_viiiiii
+  10314.5 ms  98.3%  dispatch_event_to_target
+  10314.5 ms  98.3%  avm2_broadcast_event
+  10314.5 ms  98.3%  avm2_display_run_tick
+  10314.3 ms  98.3%  avm2_call_method_ref
+  10314.3 ms  98.3%  callproperty_common
+  10314.3 ms  98.3%  avm2_op_callproperty_ic
+  10314.3 ms  98.3%  abc0_m7
+  10314.3 ms  98.3%  avm2_call_function_obj
+  10314.3 ms  98.3%  avm2_call_value
+  10314.3 ms  98.3%  dynCall_viiiiii
+  10314.3 ms  98.3%  js-to-wasm:iiiiiii:
+  10265.1 ms  97.8%  avm2_op_callsuper
+  10252.1 ms  97.7%  abc0_m78
+frame k=1 cpu=1294.6 ms, window page 1419–2713; 5797 samples, 1293.7 ms sampled
+neighbours: cpu[k-1]=339.2 cpu[k+1]=37.8; frames>1s: 1:1295
+
+## SELF
+    511.8 ms  39.6%  mp3d_synth_granule
+    139.7 ms  10.8%  mp3dec_decode_frame
+     86.2 ms   6.7%  avm2_call_method_ref
+     83.2 ms   6.4%  avm2_op_getproperty_static_ic
+     78.8 ms   6.1%  abc0_m103
+     58.1 ms   4.5%  resolved_get
+     37.1 ms   2.9%  sound_play
+     35.7 ms   2.8%  mp3d_synth_pair
+     35.3 ms   2.7%  avm2_op_add_values
+     27.8 ms   2.1%  L3_imdct36
+     19.6 ms   1.5%  avm2_value_is_of_type
+     17.3 ms   1.3%  avm2_value_vtable
+     16.1 ms   1.2%  avm2_coerce_to_number
+     14.4 ms   1.1%  avm2_coerce_to_primitive
+     12.4 ms   1.0%  avm2_coerce_to_class
+      6.7 ms   0.5%  __registerCallback
+      6.7 ms   0.5%  avm2_coerce_to_type_mn
+      4.9 ms   0.4%  avm2_render_present
+      4.5 ms   0.3%  bd_draw
+      4.1 ms   0.3%  resolve_key
+      3.0 ms   0.2%  avm2_setup_locals
+      2.9 ms   0.2%  avm2_vtable_find_mn
+      2.8 ms   0.2%  avm2_op_callproperty_ic
+      2.5 ms   0.2%  (program)
+      2.3 ms   0.2%  avm2_op_findpropstrict_ic
+
+## INCLUSIVE
+   1293.7 ms 100.0%  (root)
+   1287.4 ms  99.5%  (anon)
+   1287.0 ms  99.5%  wrapper
+   1287.0 ms  99.5%  callUserCallback
+   1287.0 ms  99.5%  doRewind
+   1286.8 ms  99.5%  js-to-wasm::i
+   1286.8 ms  99.5%  wasm-to-js
+   1286.8 ms  99.5%  runSWF
+   1275.9 ms  98.6%  dynCall_vi
+   1275.9 ms  98.6%  invoke_vi
+   1275.5 ms  98.6%  avm2_display_run_tick
+   1273.9 ms  98.5%  avm2_call_function_obj
+   1273.9 ms  98.5%  dynCall_viiiiii
+   1273.9 ms  98.5%  invoke_viiiiii
+   1273.0 ms  98.4%  avm2_call_method_ref
+   1271.3 ms  98.3%  callproperty_common
+   1271.3 ms  98.3%  avm2_op_callproperty_ic
+   1271.1 ms  98.3%  avm2_call_value
+   1271.1 ms  98.3%  dispatch_event_to_target
+   1270.3 ms  98.2%  avm2_broadcast_event
+   1269.7 ms  98.1%  abc0_m7
+   1238.7 ms  95.7%  avm2_op_callsuper
+   1185.8 ms  91.7%  abc0_m85
+   1172.7 ms  90.7%  abc0_m3
+   1153.3 ms  89.1%  abc0_m590
+{"oel":"/home/robert/CC/seedling_original_src/assets/levels/OverWorld/region1.oel","tiles":2400,"iters":11723179,"ms":[114.25,107.33,86.54,78.83,89.9,93.67,88.96]}
+{"oel":"/home/robert/CC/seedling_original_src/assets/levels/OverWorld.oel","tiles":400,"iters":335816,"ms":[7.97,2.36,2.69,2.57,2.66,2.76,2.26]}

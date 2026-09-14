@@ -128,6 +128,46 @@ first).
   make both harmless today; revisit if headroom shrinks or session
   lengths grow. (2026-07-18)
 
+## AVM2 — performance
+
+- **Seedling's first `Game.update` after a level load takes ~10 s: the
+  generic value helpers cost ~100× a JIT per operation in a hot AS3
+  loop.** Profiled on the shipped `seedling_original` build (a
+  `--profiling-funcs` relink of the same objects; name section stripped
+  = the pinned bytes) with the CDP sampling profiler at ~205 µs. The
+  frame is FlashPunk's one-shot `check()` pass: every `Tile.check()`
+  makes four `Entity.collide("Tile", …)` calls and `collide` walks the
+  whole Tile type list, so L12 (2,400 tiles) does ~11.7 M AABB tests in
+  one frame — the quadratic is the game's. The 10 s is ours: 77 % of the
+  frame is runtime helpers called from the compiled loop body —
+  property gets through the inline cache 38.5 %
+  (`avm2_op_getproperty_static_ic` `SWFModernRuntime/src/avm2/avm2_ops.c:798`
+  2.16 s, `resolved_get` 1.59 s, `avm2_value_vtable`
+  `avm2_class.c:1640` 0.34 s), boxed numeric add/coerce 15.9 %
+  (`avm2_op_add_values` `avm2_value.c:970`, `coerce_to_primitive`,
+  `coerce_to_number`), type checks 12.8 % (`avm2_value_is_of_type`
+  `avm2_class.c:1733`, `coerce_to_class`, `coerce_to_type_mn`); the
+  compiled body itself (`abc0_m96`) is 21.9 %; allocator + GC 1.5 %;
+  E4X 0 %. Measured cost per inner iteration ≈ 800 ns (p4d's L0 boot
+  pass: ≈ 980 ns); the same loop as plain JS on V8 ≈ 7.5 ns (`jitcontrol.mjs`).
+  Candidates, unmeasured: keep unboxed Numbers/ints through `add`
+  on the locals the loop touches; a monomorphic fast path in the
+  property-get IC for a slot on a sealed class instance; hoist the
+  `is_of_type` checks the loop repeats per element. Nothing in
+  Archipelago-CC's gates drives this frame (the tier and wasm gates
+  drive p4d, whose boot pass is 0.33 s), so this is a game-speed item,
+  not a gate. Evidence: `tools/divergence/perf/seedling_c4_2026-09-14/`
+  (`demo-load.cpuprofile`, `p4d-boot.cpuprofile`, `results.txt`, the
+  phase/JIT-control scripts); the write-up is Archipelago-CC's plan
+  `NewDocs/plans/seedling-headless-webgpu-plan.md` §23.1.3. (2026-09-14)
+- **`Sound.play` decodes the whole mp3 synchronously on the main
+  thread.** `sound_play` (`SWFModernRuntime/src/avm2/avm2_media.c:663`) →
+  minimp3 (`src/audio/audio.c`): the music starting in Seedling's first
+  `Game.update` costs 0.75 s on p4d's boot frame (58 % of it) and 0.52 s
+  on the demo's. Same profile as above. Candidates: decode lazily per
+  buffer from the audio callback, or decode once off-thread/at load.
+  (2026-09-14)
+
 ## Multi-SWF (loaded children)
 
 - ~~**The child-movie char-id offset list is hand-maintained and known
