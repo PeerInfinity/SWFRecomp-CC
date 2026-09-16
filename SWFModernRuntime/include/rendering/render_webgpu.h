@@ -484,4 +484,40 @@ int render_webgpu_save_png(WebGPURenderContext* context, const char* path);
 void render_webgpu_request_browser_capture(WebGPURenderContext* context);
 int  render_webgpu_browser_capture_ready(WebGPURenderContext* context);   // 1 when RGBA ready
 unsigned char* render_webgpu_browser_capture_data(WebGPURenderContext* context); // RGBA ptr or NULL
+
+// Frame oracle for perf levers (-DSWF_FRAME_DIGEST, used only by
+// render_webgpu.c's upload/draw macros): an FNV-1a digest of every byte a
+// frame uploads (writeBuffer/writeTexture payloads + offsets) and every draw's
+// arguments, pushed per submit to window.__swfDigest. The upload stream is
+// issued even on a lost device (every call is a valid no-op), so the digest is
+// available headless with no pixels. Lives here, not in render_webgpu.c, so the
+// default build's assert() __LINE__ constants — and therefore its bytes — do
+// not move.
+#if defined(SWF_FRAME_DIGEST) && defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+static uint64_t g_frame_digest = 1469598103934665603ULL;
+static inline void frame_digest_bytes(const void* data, size_t n)
+{
+	const uint8_t* b = (const uint8_t*) data;
+	uint64_t h = g_frame_digest;
+	for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ULL; }
+	g_frame_digest = h;
+}
+static inline void frame_digest_u64(uint64_t v) { frame_digest_bytes(&v, sizeof(v)); }
+#define FRAME_DIGEST_BYTES(d, n) frame_digest_bytes((d), (size_t) (n))
+#define FRAME_DIGEST_U64(v) frame_digest_u64((uint64_t) (v))
+#define FRAME_DIGEST_DRAW(vc, ic, fv, fi) \
+	do { FRAME_DIGEST_U64(vc); FRAME_DIGEST_U64(ic); FRAME_DIGEST_U64(fv); FRAME_DIGEST_U64(fi); } while (0)
+#define FRAME_DIGEST_FLUSH() \
+	do { EM_ASM({ var a = globalThis.__swfDigest || (globalThis.__swfDigest = []); \
+	              a.push(($0 >>> 0).toString(16).padStart(8, '0') + ($1 >>> 0).toString(16).padStart(8, '0')); }, \
+	             (uint32_t) (g_frame_digest >> 32), (uint32_t) g_frame_digest); \
+	     g_frame_digest = 1469598103934665603ULL; } while (0)
+#else
+#define FRAME_DIGEST_BYTES(d, n) ((void) 0)
+#define FRAME_DIGEST_U64(v) ((void) 0)
+#define FRAME_DIGEST_DRAW(vc, ic, fv, fi) ((void) 0)
+#define FRAME_DIGEST_FLUSH() ((void) 0)
+#endif
+
 #endif

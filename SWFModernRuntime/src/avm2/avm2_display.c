@@ -3839,6 +3839,9 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// Stage 8: deliver this tick's injected input (Ruffle processes input at
 	// frame boundaries — after the frame's scripts). One WAIT group per tick.
 	avm2_input_pump_tick(ctx);
+#ifdef AVM2_HOTLOOP_PROF
+	avm2_hotloop_prof_tick(ctx);
+#endif
 }
 
 // ---------------------------------------------------------------------------

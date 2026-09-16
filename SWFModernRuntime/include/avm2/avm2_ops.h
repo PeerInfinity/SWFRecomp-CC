@@ -99,13 +99,69 @@ typedef struct Avm2InlineCache
 	const Avm2VTable* vt;    // receiver vtable this entry was resolved against
 	uint32_t vt_count;       // vt->count at resolve time (guards realloc/growth)
 	uint32_t entry_index;    // index into vt->entries (stable across realloc)
+#ifndef AVM2_NO_IC_SLOT_INLINE
+	// GetPropertyStatic only: the cached entry is a SLOT trait → its
+	// slot_index + 1 (0 = not a slot, or the cache is empty). Written together
+	// with vt/vt_count/entry_index, so the four always describe one resolve.
+	uint32_t slot_plus1;
+#endif
 } Avm2InlineCache;
+
+#ifdef AVM2_HOTLOOP_PROF
+// Per-tick dump + reset of the hot-loop counters (avm2_ops.c).
+void avm2_hotloop_prof_tick(Avm2Context* ctx);
+#endif
 
 // Property access. *_dyn variants take the lazy runtime name.
 Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx);
 // Inline-cached variant: identical semantics, threads a per-call-site cache.
+#ifdef AVM2_NO_IC_SLOT_INLINE
 Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
                                         uint32_t mn_idx, Avm2InlineCache* ic);
+#else
+// Everything except the inline slot hit below: the out-of-line IC (its own
+// vtable-replay hit for non-slot entries, then the full resolve + populate).
+Avm2Value avm2_op_getproperty_static_ic_slow(Avm2Activation* act, Avm2Value recv,
+                                             uint32_t mn_idx, Avm2InlineCache* ic);
+#ifdef AVM2_IC_SLOT_VERIFY
+void avm2_ic_slot_verify_fail(Avm2Activation* act, uint32_t mn_idx, Avm2Value fast,
+                              Avm2Value slow);
+#endif
+// Seedling hot-loop lever (SWFRecompDocs/status/seedling-collide-hotloop.md):
+// the out-of-line IC hit — two calls, a zeroed Resolved and resolved_get's
+// branch chain before `slots[i]` — cost ~60 % of a FlashPunk collide pass, and
+// 99.97 % of its 54 M gets per frame were hits on SLOT entries. Here, a hit
+// on a cached SLOT entry is the bare load, inlined into the generated code.
+// Equivalent to the out-of-line hit for all inputs: the receiver is exactly
+// the one `unbox_scope_prim` leaves alone (an OBJECT that is not a primitive
+// scope box), `vt` is computed as avm2_value_vtable does, and the out-of-line
+// hit with a SLOT entry reads `recv.u.obj->slots[entry->slot_index]`. Build
+// -DAVM2_IC_SLOT_VERIFY to run the out-of-line op on every inline hit and
+// abort on any difference; -DAVM2_NO_IC_SLOT_INLINE removes the lever.
+static inline Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
+                                                      uint32_t mn_idx, Avm2InlineCache* ic)
+{
+	if (recv.kind == AVM2_VALUE_OBJECT && ic->slot_plus1 != 0)
+	{
+		Avm2Object* o = recv.u.obj;
+		const Avm2VTable* vt = o->vtable != NULL ? o->vtable
+		                     : (o->cls != NULL ? &o->cls->ivtable : NULL);
+		if (vt == ic->vt && vt->count == ic->vt_count && !o->is_prim_box)
+		{
+			Avm2Value v = o->slots[ic->slot_plus1 - 1];
+#ifdef AVM2_IC_SLOT_VERIFY
+			Avm2Value g = avm2_op_getproperty_static_ic_slow(act, recv, mn_idx, ic);
+			if (v.kind != g.kind || memcmp(&v.u, &g.u, sizeof(v.u)) != 0)
+			{
+				avm2_ic_slot_verify_fail(act, mn_idx, v, g);
+			}
+#endif
+			return v;
+		}
+	}
+	return avm2_op_getproperty_static_ic_slow(act, recv, mn_idx, ic);
+}
+#endif
 // Compile-time slot-bound read (recompiler's type-specialization pass): the
 // recompiler proved the receiver is `this` — an instance of a sealed ABC class
 // whose full superclass chain to Object is ABC-defined — and the accessed name

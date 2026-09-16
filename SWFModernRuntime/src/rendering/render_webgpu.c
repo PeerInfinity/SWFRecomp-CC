@@ -80,13 +80,13 @@ static unsigned long g_perf_wt_bytes = 0;
 // Count + forward to the real API. The parenthesised callee name is NOT a
 // macro invocation (not followed by '('), so this does not recurse.
 #define wgpuQueueWriteBuffer(q, b, o, d, s) \
-	do { g_perf_wb_calls++; g_perf_wb_bytes += (unsigned long)(s); \
+	do { g_perf_wb_calls++; g_perf_wb_bytes += (unsigned long)(s); FRAME_DIGEST_U64(o); FRAME_DIGEST_BYTES(d, s); \
 	     (wgpuQueueWriteBuffer)(q, b, o, d, s); } while (0)
 #define wgpuQueueWriteTexture(q, d, data, sz, l, e) \
-	do { g_perf_wt_calls++; g_perf_wt_bytes += (unsigned long)(sz); \
+	do { g_perf_wt_calls++; g_perf_wt_bytes += (unsigned long)(sz); FRAME_DIGEST_BYTES(data, sz); \
 	     (wgpuQueueWriteTexture)(q, d, data, sz, l, e); } while (0)
 #define wgpuRenderPassEncoderDraw(p, vc, ic, fv, fi) \
-	do { g_perf_draw_calls++; (wgpuRenderPassEncoderDraw)(p, vc, ic, fv, fi); } while (0)
+	do { g_perf_draw_calls++; FRAME_DIGEST_DRAW(vc, ic, fv, fi); (wgpuRenderPassEncoderDraw)(p, vc, ic, fv, fi); } while (0)
 
 EM_JS(void, swf_render_stats, (double wb_calls, double wb_bytes, double draws, double submit_ms, double wt_calls, double wt_bytes), {
 	var R = globalThis.__swfRender;
@@ -3849,7 +3849,7 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	                 (double)g_perf_draw_calls, emscripten_get_now() - _submit_t0,
 	                 (double)g_perf_wt_calls, (double)g_perf_wt_bytes);
 	g_perf_wb_calls = 0; g_perf_wb_bytes = 0; g_perf_draw_calls = 0;
-	g_perf_wt_calls = 0; g_perf_wt_bytes = 0;
+	g_perf_wt_calls = 0; g_perf_wt_bytes = 0; FRAME_DIGEST_FLUSH();  // (frame_digest.h; keep on this line: no __LINE__ shift)
 #endif
 
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)

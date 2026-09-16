@@ -171,6 +171,9 @@ WARN=(
 # .o cache keys on mtime, NOT on -D flags, so a flag change needs FRESH=1 (or touch
 # the affected .c) or you'll link stale objects (the coerce-memo flag-staleness trap).
 read -r -a EXTRA_CFLAGS_ARR <<< "${EXTRA_CFLAGS:-}"
+# Extra LINK flags, e.g. EXTRA_LDFLAGS="--profiling-funcs" for a named build whose
+# stripped bytes (llvm-objcopy --remove-section=name) equal the default link.
+read -r -a EXTRA_LDFLAGS_ARR <<< "${EXTRA_LDFLAGS:-}"
 
 # Pick per-TU opt level: the two giant generated ABC TUs get ABC_OPT.
 opt_for() {
@@ -227,6 +230,7 @@ emcc "${OBJS[@]}" \
     -sUSE_ZLIB=1 \
     -sASYNCIFY \
     -sASYNCIFY_STACK_SIZE=65536 \
+    "${EXTRA_LDFLAGS_ARR[@]}" \
     ${RT_OPT}
 
 echo ""

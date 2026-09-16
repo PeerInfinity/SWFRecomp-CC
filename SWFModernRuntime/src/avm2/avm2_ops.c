@@ -172,6 +172,19 @@ typedef struct Resolved
 	const Avm2String* proxy_local;
 } Resolved;
 
+#ifdef AVM2_HOTLOOP_PROF
+// §7-rule-6 counters for hot AS3 loops (build -DAVM2_HOTLOOP_PROF; see the
+// definitions at the end of this file). Dumped per tick by
+// avm2_hotloop_prof_tick when a tick does enough property gets to matter.
+enum { HL_HIT = 0, HL_MISS_NONOBJ, HL_MISS_NOVT, HL_MISS_COLD, HL_MISS_VT,
+       HL_MISS_COUNT, HL_N };
+static void hl_ic_note(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                       const Avm2InlineCache* ic, int outcome,
+                       const Avm2PropEntry* hit_entry);
+static void hl_add_note(Avm2Value a, Avm2Value b);
+static void hl_coerce_note(Avm2Activation* act, Avm2Value v, uint32_t mn_idx);
+#endif
+
 static int value_is_null_like(Avm2Value v)
 {
 	return v.kind == AVM2_VALUE_UNDEFINED || v.kind == AVM2_VALUE_NULL;
@@ -759,6 +772,9 @@ static Avm2Value getproperty_static_impl(Avm2Activation* act, Avm2Value recv,
 				ic->vt = vt;
 				ic->vt_count = vt->count;
 				ic->entry_index = (uint32_t) (e - vt->entries);
+#ifndef AVM2_NO_IC_SLOT_INLINE
+				ic->slot_plus1 = e->kind == AVM2_PROP_SLOT ? e->slot_index + 1 : 0;
+#endif
 			}
 		}
 	}
@@ -795,10 +811,33 @@ Avm2Value avm2_op_getproperty_static(Avm2Activation* act, Avm2Value recv, uint32
 	return getproperty_static_impl(act, recv, mn_idx, NULL);
 }
 
+#ifdef AVM2_NO_IC_SLOT_INLINE
 Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
                                         uint32_t mn_idx, Avm2InlineCache* ic)
+#else
+// The inline slot hit lives in avm2_ops.h; this is everything else.
+Avm2Value avm2_op_getproperty_static_ic_slow(Avm2Activation* act, Avm2Value recv,
+                                             uint32_t mn_idx, Avm2InlineCache* ic)
+#endif
 {
 	recv = unbox_scope_prim(recv);
+#ifdef AVM2_HOTLOOP_PROF
+	{
+		int outcome;
+		const Avm2PropEntry* he = NULL;
+		if (recv.kind != AVM2_VALUE_OBJECT) outcome = HL_MISS_NONOBJ;
+		else
+		{
+			const Avm2VTable* pvt = avm2_value_vtable(act->ctx, recv);
+			if (pvt == NULL) outcome = HL_MISS_NOVT;
+			else if (ic->vt == NULL) outcome = HL_MISS_COLD;
+			else if (ic->vt != pvt) outcome = HL_MISS_VT;
+			else if (ic->vt_count != pvt->count) outcome = HL_MISS_COUNT;
+			else { outcome = HL_HIT; he = &pvt->entries[ic->entry_index]; }
+		}
+		hl_ic_note(act, recv, mn_idx, ic, outcome, he);
+	}
+#endif
 	// Fast path: same receiver vtable (and unchanged entry count) as the cached
 	// resolve → replay the resolved entry, skipping the multiname match. A
 	// matching vt guarantees the receiver is a non-null, non-xmlish object whose
@@ -819,6 +858,19 @@ Avm2Value avm2_op_getproperty_static_ic(Avm2Activation* act, Avm2Value recv,
 	}
 	return getproperty_static_impl(act, recv, mn_idx, ic);
 }
+
+#if defined(AVM2_IC_SLOT_VERIFY) && !defined(AVM2_NO_IC_SLOT_INLINE)
+void avm2_ic_slot_verify_fail(Avm2Activation* act, uint32_t mn_idx, Avm2Value fast,
+                              Avm2Value slow)
+{
+	const char* name;
+	uint32_t name_len;
+	avm2_mn_name(act->file->data, mn_idx, &name, &name_len);
+	avm2_fatal("AVM2 ic-slot-verify: %.*s — inline slot hit (kind=%u) != "
+	           "out-of-line getproperty (kind=%u)", (int) name_len, name,
+	           fast.kind, slow.kind);
+}
+#endif
 
 #ifdef AVM2_SLOT_VERIFY
 // Verify build: prove the recompiler's compile-time slot index matches what the
@@ -3802,6 +3854,9 @@ Avm2Value avm2_op_newarray(Avm2Activation* act, const Avm2Value* values, uint32_
 
 Avm2Value avm2_op_add(Avm2Activation* act, Avm2Value a, Avm2Value b)
 {
+#ifdef AVM2_HOTLOOP_PROF
+	hl_add_note(a, b);
+#endif
 	return avm2_op_add_values(act->ctx, a, b);
 }
 
@@ -4126,6 +4181,9 @@ Avm2Value avm2_op_astypelate(Avm2Activation* act, Avm2Value value, Avm2Value typ
 
 Avm2Value avm2_op_coerce(Avm2Activation* act, Avm2Value v, uint32_t mn_idx)
 {
+#ifdef AVM2_HOTLOOP_PROF
+	hl_coerce_note(act, v, mn_idx);
+#endif
 	return avm2_coerce_to_type_mn(act->ctx, act->file, mn_idx, v);
 }
 
@@ -4696,3 +4754,163 @@ void avm2_op_dxnslate(Avm2Activation* act, Avm2Value v)
 	Avm2NamespaceExt* n = avm2_namespace_ext_of(v);
 	ctx->dxns = (n != NULL) ? n->uri : avm2_coerce_to_string(ctx, v);
 }
+
+#ifdef AVM2_HOTLOOP_PROF
+// ---------------------------------------------------------------------------
+// Hot-loop counters (§7 rule 6: name the input, not just the function).
+// Per GetPropertyStatic IC site (keyed by the site's static cache address):
+// hit / miss split by reason, the hit entry's kind, and the distinct receiver
+// classes seen. Per Add: the operand-kind pair. Per Coerce site (mn): the
+// value's kind and how far avm2_value_is_of_type walks to prove it.
+// ---------------------------------------------------------------------------
+#define HL_SITES 8192
+#define HL_CLS 32
+typedef struct
+{
+	const Avm2InlineCache* ic;
+	const Avm2AbcFileData* data;
+	uint32_t mn;
+	uint64_t n[HL_N];
+	uint64_t kind[8];                 // hit entry kind (Avm2PropKind)
+	const Avm2Class* cls[HL_CLS];     // distinct receiver classes (first HL_CLS)
+	uint32_t ncls;
+} HlIcSite;
+static HlIcSite g_hl_ic[HL_SITES];
+static uint64_t g_hl_ic_calls;
+static uint64_t g_hl_add[6];   // ii, nn, in, ni, str-involved, other
+typedef struct
+{
+	const Avm2AbcFileData* data;
+	uint32_t mn;
+	uint64_t n, null_like, obj, other;
+	uint64_t depth[6];                // chain steps to reach the target (5 = more / not found)
+	const Avm2Class* cls[HL_CLS];
+	uint32_t ncls;
+} HlCoerceSite;
+static HlCoerceSite g_hl_co[1024];
+
+static void hl_cls_note(const Avm2Class** set, uint32_t* n, const Avm2Class* c)
+{
+	uint32_t m = *n < HL_CLS ? *n : HL_CLS;
+	for (uint32_t i = 0; i < m; i++) if (set[i] == c) return;
+	if (*n < HL_CLS) set[*n] = c;
+	if (*n <= HL_CLS) (*n)++;   // HL_CLS + 1 = "more than HL_CLS distinct"
+}
+
+static void hl_ic_note(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx,
+                       const Avm2InlineCache* ic, int outcome,
+                       const Avm2PropEntry* hit_entry)
+{
+	uintptr_t h = ((uintptr_t) ic >> 2) * 2654435761u;
+	for (uint32_t k = 0; k < HL_SITES; k++)
+	{
+		HlIcSite* s = &g_hl_ic[(h + k) & (HL_SITES - 1)];
+		if (s->ic != NULL && s->ic != ic) continue;
+		if (s->ic == NULL) { s->ic = ic; s->data = act->file->data; s->mn = mn_idx; }
+		s->n[outcome]++;
+		if (hit_entry != NULL) s->kind[hit_entry->kind & 7]++;
+		if (recv.kind == AVM2_VALUE_OBJECT) hl_cls_note(s->cls, &s->ncls, recv.u.obj->cls);
+		g_hl_ic_calls++;
+		return;
+	}
+}
+
+static void hl_add_note(Avm2Value a, Avm2Value b)
+{
+	int ai = a.kind == AVM2_VALUE_INTEGER, an = a.kind == AVM2_VALUE_NUMBER;
+	int bi = b.kind == AVM2_VALUE_INTEGER, bn = b.kind == AVM2_VALUE_NUMBER;
+	if (ai && bi) g_hl_add[0]++;
+	else if (an && bn) g_hl_add[1]++;
+	else if (ai && bn) g_hl_add[2]++;
+	else if (an && bi) g_hl_add[3]++;
+	else if (a.kind == AVM2_VALUE_STRING || b.kind == AVM2_VALUE_STRING) g_hl_add[4]++;
+	else g_hl_add[5]++;
+}
+
+static void hl_coerce_note(Avm2Activation* act, Avm2Value v, uint32_t mn_idx)
+{
+	const Avm2AbcFileData* data = act->file->data;
+	uint32_t h = (mn_idx * 2654435761u) ^ (uint32_t) ((uintptr_t) data >> 3);
+	for (uint32_t k = 0; k < 1024; k++)
+	{
+		HlCoerceSite* s = &g_hl_co[(h + k) & 1023];
+		if (s->n != 0 && (s->mn != mn_idx || s->data != data)) continue;
+		s->mn = mn_idx; s->data = data; s->n++;
+		if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED) { s->null_like++; return; }
+		if (v.kind != AVM2_VALUE_OBJECT) { s->other++; return; }
+		s->obj++;
+		hl_cls_note(s->cls, &s->ncls, v.u.obj->cls);
+		Avm2Class* target = avm2_class_for_mn(act->ctx, act->file, mn_idx);
+		uint32_t d = 0;
+		Avm2Class* c = v.u.obj->cls;
+		while (c != NULL && c != target && d < 5) { c = c->super_class; d++; }
+		s->depth[(c == target) ? d : 5]++;
+		return;
+	}
+}
+
+static void hl_cls_print(const Avm2Class* const* set, uint32_t n)
+{
+	for (uint32_t i = 0; i < n && i < HL_CLS; i++)
+	{
+		printf(" %.*s", set[i] ? (int) set[i]->name.name_len : 4,
+		       set[i] ? set[i]->name.name : "NULL");
+	}
+	if (n > HL_CLS) printf(" (+more)");
+}
+
+void avm2_hotloop_prof_tick(Avm2Context* ctx)
+{
+	static uint32_t tick;
+	(void) ctx;
+	tick++;
+	if (g_hl_ic_calls >= 1000000)
+	{
+		printf("[HLPROF] tick=%u ic_calls=%llu add ii=%llu nn=%llu in=%llu ni=%llu str=%llu other=%llu\n",
+		       tick, (unsigned long long) g_hl_ic_calls,
+		       (unsigned long long) g_hl_add[0], (unsigned long long) g_hl_add[1],
+		       (unsigned long long) g_hl_add[2], (unsigned long long) g_hl_add[3],
+		       (unsigned long long) g_hl_add[4], (unsigned long long) g_hl_add[5]);
+		for (uint32_t i = 0; i < HL_SITES; i++)
+		{
+			HlIcSite* s = &g_hl_ic[i];
+			uint64_t tot = 0;
+			for (int k = 0; k < HL_N; k++) tot += s->n[k];
+			if (s->ic == NULL || tot < 10000) continue;
+			const char* nm; uint32_t nl;
+			avm2_mn_name(s->data, s->mn, &nm, &nl);
+			printf("[HLPROF-IC] site=%p mn=%u %.*s calls=%llu hit=%llu nonobj=%llu novt=%llu cold=%llu vt=%llu count=%llu kind[slot=%llu method=%llu getter=%llu getset=%llu other=%llu] ncls=%u:",
+			       (void*) s->ic, s->mn, (int) nl, nm, (unsigned long long) tot,
+			       (unsigned long long) s->n[HL_HIT], (unsigned long long) s->n[HL_MISS_NONOBJ],
+			       (unsigned long long) s->n[HL_MISS_NOVT], (unsigned long long) s->n[HL_MISS_COLD],
+			       (unsigned long long) s->n[HL_MISS_VT], (unsigned long long) s->n[HL_MISS_COUNT],
+			       (unsigned long long) s->kind[AVM2_PROP_SLOT], (unsigned long long) s->kind[AVM2_PROP_METHOD],
+			       (unsigned long long) s->kind[AVM2_PROP_GETTER], (unsigned long long) s->kind[AVM2_PROP_GETSET],
+			       (unsigned long long) (s->kind[3] + s->kind[5] + s->kind[6] + s->kind[7]),
+			       s->ncls);
+			hl_cls_print(s->cls, s->ncls);
+			printf("\n");
+		}
+		for (uint32_t i = 0; i < 1024; i++)
+		{
+			HlCoerceSite* s = &g_hl_co[i];
+			if (s->n < 10000) continue;
+			const char* nm; uint32_t nl;
+			avm2_mn_name(s->data, s->mn, &nm, &nl);
+			printf("[HLPROF-CO] mn=%u %.*s n=%llu null=%llu obj=%llu other=%llu depth0..4,miss=%llu,%llu,%llu,%llu,%llu,%llu ncls=%u:",
+			       s->mn, (int) nl, nm, (unsigned long long) s->n, (unsigned long long) s->null_like,
+			       (unsigned long long) s->obj, (unsigned long long) s->other,
+			       (unsigned long long) s->depth[0], (unsigned long long) s->depth[1],
+			       (unsigned long long) s->depth[2], (unsigned long long) s->depth[3],
+			       (unsigned long long) s->depth[4], (unsigned long long) s->depth[5], s->ncls);
+			hl_cls_print(s->cls, s->ncls);
+			printf("\n");
+		}
+		fflush(stdout);
+	}
+	memset(g_hl_ic, 0, sizeof(g_hl_ic));
+	memset(g_hl_co, 0, sizeof(g_hl_co));
+	memset(g_hl_add, 0, sizeof(g_hl_add));
+	g_hl_ic_calls = 0;
+}
+#endif
