@@ -160,6 +160,12 @@ first).
   (`demo-load.cpuprofile`, `p4d-boot.cpuprofile`, `results.txt`, the
   phase/JIT-control scripts); the write-up is Archipelago-CC's plan
   `NewDocs/plans/seedling-headless-webgpu-plan.md` §23.1.3. (2026-09-14)
+  **Update 2026-09-16 (`2973513c4`):** the property-get share is fixed —
+  counters showed 99.97 % IC *hits*, and inlining the slot hit took the frame
+  12.2 → 8.7 s (1.41x, same-session headless A/B). Still open, each ~2.2 s of
+  the remaining frame and counted: `add` of Number+int (19.96 M per frame,
+  none take `add_values`' same-kind arms) and `coerce Entity` (11.93 M at
+  superclass depth 1). `SWFRecompDocs/status/seedling-collide-hotloop.md` §7.
 - **`Sound.play` decodes the whole mp3 synchronously on the main
   thread.** `sound_play` (`SWFModernRuntime/src/avm2/avm2_media.c:663`) →
   minimp3 (`src/audio/audio.c`): the music starting in Seedling's first

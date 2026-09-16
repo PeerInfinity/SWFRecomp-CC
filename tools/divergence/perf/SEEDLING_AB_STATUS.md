@@ -1,5 +1,44 @@
 # Seedling perf A/B — status
 
+## ★★★ UPDATE 2026-09-16 (`swfrecomp-seedling-hotloop-1`) — IC SLOT-HIT INLINE: the 10 s level-load collide frame 1.41x (12,235.5 → 8,689.0 ms), 5/5 rounds, byte-identical
+The brief (Archipelago-CC's C4 profile) read `resolved_get` as the IC slow path.
+**Counters said otherwise** (`-DAVM2_HOTLOOP_PROF`, frame 544 of the pinned
+`seedling_original`, FlashPunk's one-shot `Tile.check` → `Entity.collide` pass):
+```
+  getproperty_static_ic  53,905,556 calls   hit 99.97 %  (all SLOT entries; 16-class "Tile" list re-caches ~2.5 K / 11.9 M)
+  add                    19,971,981         Number+int 99.9 %   (add_values has only int+int / Number+Number arms)
+  coerce Entity          11,932,546         object 99.99 %, superclass depth 1
+```
+The IC was applying; its HIT was ~40 % of the frame (`avm2_value_vtable` +
+`avm2_mn_name` + zeroed `Resolved` + `resolved_get`'s branch chain before
+`slots[i]`). Lever: a hit on a cached SLOT entry is now a `static inline` bare
+load in `avm2_ops.h` (`Avm2InlineCache.slot_plus1`). Runtime + header only.
+**The toggle gates exactly the lever:** `-DAVM2_NO_IC_SLOT_INLINE` builds of this
+tree strip to the PINNED md5s (`1d3fac3e…` seedling_original, `5c81dfe7…` p4d).
+
+**A/B — headless logic-only Chromium (the frames are CPU-bound; device lost at the
+first present), 5 strictly interleaved rounds (alternating order), box shared with
+other sessions (load 2–6), medians of `swf_perf_report` elapsed. CSV:
+`seedling_hotloop_2026-09-16/ab.csv`:**
+```
+  seedling_original k=544   ON  8566  8689  8376  9341.5  8731.1   median  8,689.0
+                            OFF 12235.5 11955.9 12410.1 12087.1 12357.7  median 12,235.5   1.41x, ON<OFF 5/5
+  seedling_bot_ap_p4d k=1   ON  1023.3 1020 1075.6 1087 1068.6         median  1,068.6
+                            OFF 1259.2 1122.1 1126.8 1169.6 1175.5     median  1,169.6    1.09x, ON<OFF 5/5
+  steady frames (orig 30–559 excl. 543/544): median 2.10 / 2.10 ms, mean 3.88 / 4.12 — no regression
+```
+Post-lever phase table (k=544): property-get helpers 5,180.6 → **20.9 ms**; body
+2,552.9 → 3,699.4 (absorbs the inline loads); numeric 2,224.0 and type-check
+2,154.8 are now the helper cost (next levers, counted above, not built).
+
+**Correctness:** `-DSWF_FRAME_DIGEST` (FNV of every upload + draw per submit) over
+load + 600 frames: **601/601 digests identical OFF / ON / `-DAVM2_IC_SLOT_VERIFY`**
+(191 distinct), 56/56 console lines identical, 0 verify aborts. Local native avm2
+tests pass in default and verify mode. Full-suite CI: see
+`SWFRecompDocs/status/seedling-collide-hotloop.md` §6. Commit `2973513c4`.
+
+---
+
 ## ★★★ UPDATE 2026-07-15 (session 10) — RECTANGLE FIELD-SLOT FAST PATH in the blit: +1.1 ms (~5%), 5/6 rounds, byte-identical
 Step-9's Matrix/Point gate-out surfaced the one real geom lever: `rect_to_xywh`
 (`avm2_bitmap.c`) read a Rectangle's x/y/width/height **by public name — 4 full

@@ -62,6 +62,7 @@ than the game's own arithmetic. Layer legend: **[RT]** runtime
 | coerce-class memo | `e05a8fe0d` | [RT] memoize `avm2_class_for_mn` per (file, mn_idx) in `coerce_class_memo[]`; caches non-NULL only (names are transiently unresolvable during their own cinit) | ~6 ms (~12%) |
 | blit SIMD | `8cc2f5440` | [RT] `bd_copy_pixels`/`bd_draw` dispatch whole rows as 4-px WASM-SIMD spans (`blend_over`/`copy_force_opaque`/memcpy); byte-exact via `(x*32897)>>23 == floor(x/255)`; `-msimd128` in `build_wasm_avm2.sh`; scalar fallback | ~1.4 ms (~6%), fastest in 11/11 paired rounds |
 | Rectangle slot fast path | `88f6f4ad6` | [RT] `rect_to_xywh` reads `slots[1..4]` directly when `cls == g_rectangle_class` (was 4 multiname resolves per copyPixels, ~279/frame) | ~1.1 ms (~5%) |
+| IC slot-hit inline (2026-09-16) | `2973513c4` | [RT] a GetPropertyStatic IC hit on a SLOT entry is a bare `slots[i]` load inlined into the generated code (`Avm2InlineCache.slot_plus1`); was out of line through `avm2_value_vtable` + `avm2_mn_name` + a zeroed `Resolved` + `resolved_get`'s branch chain. Diagnosed by counters: FlashPunk's one-shot `Tile.check` collide pass did 53.9 M IC gets in one frame at **99.97 % hits** — the IC was applying, the hit was the cost. Toggle `-DAVM2_NO_IC_SLOT_INLINE` (= the pinned bytes), verify `-DAVM2_IC_SLOT_VERIFY`. Record: `status/seedling-collide-hotloop.md` | level-load frame (k=544) **12.2 → 8.7 s (1.41x)**, p4d boot 1.17 → 1.07 s (1.09x); steady frames unchanged; headless logic-only, 5 interleaved rounds, byte-identical frame digests |
 
 ### RWK arc — levers 1-7 (2026-07-18/20, `RWK_AB_STATUS.md`)
 
@@ -226,6 +227,9 @@ arithmetic *before* being built, which is the arc's core method lesson.
 | `AVM2_NO_WALK_SKIP=1` | env: disable the goto catch-up walk gate (§3) — the A/B and bisect switch |
 | `AVM2_GOTO_PROF=1` / `=2` | env: rolling `[GOTOSUM]` per 1000 gotos (wall time split, nodes walked, children scanned, orphan count) / per-goto `[GOTOPROF]` + `[FS]` lines |
 | `-DAVM2_SLOT_VERIFY`, `-DAVM2_ARITH_VERIFY` | verify builds: dual-run old+new path, abort on divergence |
+| `-DAVM2_NO_IC_SLOT_INLINE` / `-DAVM2_IC_SLOT_VERIFY` | compile-time: remove / dual-run-verify the IC slot-hit inline (§1) |
+| `-DAVM2_HOTLOOP_PROF` | compile-time: per-tick `[HLPROF]` counters — per-IC-site hit/miss-by-reason + receiver classes, `add` operand-kind pairs, `coerce` value kind + superclass depth (§7 rule 6 for a hot AS3 loop) |
+| `-DSWF_FRAME_DIGEST` | compile-time (browser): per-submit FNV digest of every upload + draw → `window.__swfDigest`; a headless byte-identity oracle that survives a lost device |
 | `SWFRECOMP_DUMP_FINGERPRINTS`, `SWFRECOMP_FP_DISASM=1` | recompiler: fingerprint report / pool-resolved disassembly |
 
 ---
