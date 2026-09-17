@@ -178,10 +178,22 @@ boot frame is the collide pass.
 
 ## 6. CI
 
-`2973513c4`: graphics `categories=full` run `35163868554`; verify
-(`no-graphics`, `categories=full`, `extra_defines=-DAVM2_IC_SLOT_VERIFY`,
-publishes nothing) run `35163877697`; no-graphics `categories=full` after
-the graphics publish. Verdicts: see the closeout addendum below.
+All on `2973513c4` (the code), baseline `2aa6596d6`, read with
+`scripts/corpus_status_diff.py`:
+
+| run | mode / inputs | verdict |
+|---|---|---|
+| `35163868554` | graphics, `categories=full` | effective 4440 → 4439 over the 4526-test intersection; **1 move: `avm2/goto_framescript_queued/swf13` ruffle_matched → output_mismatch — upstream drift, not this change** (below). Merged `6c1329197` → `317ac43cf` |
+| `35166754380` | no-graphics, `categories=full` (at `317ac43cf`) | effective 4439 → 4439: the same drift test, plus `avm2/mouse_pick_avm1_root` output_mismatch → pass, which is the no-graphics baseline being stale (the 2026-09-12 canary; graphics already passed it). Merged `6bf7f3c30` |
+| `35163877697` | no-graphics, `categories=full`, `extra_defines=-DAVM2_IC_SLOT_VERIFY` (publishes nothing) | **0 `ic-slot-verify` aborts** in any shard artifact; per-test status + matching-line count identical to the normal no-graphics run for **4,477 / 4,477** tests |
+
+**The drift.** Ruffle `7e8e2de8a` (2026-09-15, "avm2: Queue play/stop action
+alongside the frame for queued gotos") rewrote `goto_framescript_queued`'s
+`output.txt` and `output.ruffle.txt`, and `b20e2fdf9` added
+`goto_framescript_queued_same_frame`. Our actual output is the same 48 lines
+with 17 matching on both sides of the run, so only the Ruffle reference moved
+under us. That makes it a candidate for the AVM2 timeline backlog, not a
+regression.
 
 ## 7. What is left in this frame, measured and not built
 

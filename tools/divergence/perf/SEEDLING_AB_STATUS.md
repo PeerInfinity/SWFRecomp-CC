@@ -34,8 +34,12 @@ Post-lever phase table (k=544): property-get helpers 5,180.6 → **20.9 ms**; bo
 **Correctness:** `-DSWF_FRAME_DIGEST` (FNV of every upload + draw per submit) over
 load + 600 frames: **601/601 digests identical OFF / ON / `-DAVM2_IC_SLOT_VERIFY`**
 (191 distinct), 56/56 console lines identical, 0 verify aborts. Local native avm2
-tests pass in default and verify mode. Full-suite CI: see
-`SWFRecompDocs/status/seedling-collide-hotloop.md` §6. Commit `2973513c4`.
+tests pass in default and verify mode. **Full-suite CI, `categories=full`:** graphics
+`35163868554` and no-graphics `35166754380` show 0 regressions from the lever (the one
+move, `avm2/goto_framescript_queued/swf13`, is Ruffle `7e8e2de8a` rewriting that test's
+expected output on 2026-09-15). Verify `35163877697` (`-DAVM2_IC_SLOT_VERIFY`) had 0
+aborts and was per-test identical to the normal no-graphics run (4,477/4,477). Commit
+`2973513c4`.
 
 ---
 
