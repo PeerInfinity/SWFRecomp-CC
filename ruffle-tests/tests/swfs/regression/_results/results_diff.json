@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-13T08:50:16.150398+00:00",
-    "old_git_sha": "bdf734c46c7ce4f2cb5466ac615cc6d884b4e51b",
-    "new_timestamp": "2026-09-17T01:04:31.501020+00:00",
-    "new_git_sha": "317ac43cffd3c374468367a58b3f2cb7ea2357ad",
+    "old_timestamp": "2026-09-17T01:04:31.501020+00:00",
+    "old_git_sha": "317ac43cffd3c374468367a58b3f2cb7ea2357ad",
+    "new_timestamp": "2026-09-19T12:56:43.201037+00:00",
+    "new_git_sha": "53a188c38f4ea18db048016d24fc54222a0dd8ca",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 95,
     "old_total": 95,
     "old_pass_rate": 100.0,
-    "new_pass": 95,
+    "new_pass": 96,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 95,
-    "new_total": 95,
+    "new_effective_pass": 96,
+    "new_total": 96,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,21 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 95,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_display_prop_coercion",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      }
+    }
+  ]
 }
