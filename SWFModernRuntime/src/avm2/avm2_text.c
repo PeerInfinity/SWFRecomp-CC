@@ -7653,6 +7653,18 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 	tl->specified_width = width;
 	tl->previous_line = prev;
 	if (pl != NULL) pl->next_line = tlv.u.obj;
+	// Recreation also clears the line's SCRIPT-visible state. Ruffle does it in
+	// two places and Flash agrees with both (textblock_recreateline traces
+	// `null` for userData and `0` for y immediately after the call):
+	//   * TextBlock.as:127 `textLine.userData = null;` ("Clear AS-side
+	//     properties of the text line") -- note NULL, not undefined, which is
+	//     what a fresh line carries.
+	//   * TextLine::reset_properties (text_line.rs:92-97) zeroes x and y before
+	//     the re-layout; the line keeps its identity, so a stale y would
+	//     survive otherwise.
+	tl->user_data = avm2_null();
+	tl->display.mtx_tx = 0;
+	tl->display.mtx_ty = 0;
 	// The recreated line becomes the tail of the chain; the line that used to
 	// follow it keeps its own (now stale) previousLine, exactly as FP leaves it.
 	tl->next_line = NULL;

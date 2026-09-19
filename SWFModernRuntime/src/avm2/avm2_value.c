@@ -635,12 +635,11 @@ static int shortest_digits(double d, char* digs, int* exp10)
 }
 
 // Plain (exponent-free) decimal rendering of a positive double, Rust
-// Display style.
-static int format_plain(char* buf, int buf_size, double d)
+// Display style. Takes the shortest round-tripping digits from the caller
+// (which needs them anyway to pick the notation), so the expensive
+// shortest_digits probe loop runs once per format, not twice.
+static int format_plain(char* buf, int buf_size, const char* digs, int n, int e)
 {
-	char digs[24];
-	int e;
-	int n = shortest_digits(d, digs, &e);
 	int pos = 0;
 
 #define PUTC(c) do { if (pos < buf_size - 1) buf[pos] = (c); pos++; } while (0)
@@ -683,7 +682,8 @@ int avm2_format_number(char* buf, int buf_size, double d)
 	if (isinf(d)) return snprintf(buf, buf_size, "Infinity");
 
 	// Fast path: exact positive integers below 1e15 render as a plain decimal
-	// (floor(log10(d)) < 15 < MAX_DIGITS, so the plain branch would apply), but
+	// (the shortest repr of such a value has n <= 15 <= 21, so the fixed branch
+	// below would apply anyway), but
 	// skip shortest_digits' up-to-18 snprintf("%.*e")/strtod round-trip probes —
 	// number formatting is ~10% of Seedling's frame self-time and dominated by
 	// integer coordinates/counters. Integers < 1e15 are exact in f64 (< 2^53),
@@ -700,12 +700,26 @@ int avm2_format_number(char* buf, int buf_size, double d)
 		return w;
 	}
 
-	const double MIN_DIGITS = -6.0;
-	const double MAX_DIGITS = 21.0;
+	// ECMA-262 7.1.12.1 (Number::toString) picks the notation from the decimal
+	// exponent `n` of the SHORTEST round-tripping representation -- the value is
+	// digits x 10^(n-k) -- and uses fixed notation iff -6 < n <= 21.
+	// `floor(log10(d))` is NOT that quantity and disagrees on both boundaries:
+	//   * log10(9.999999999999997e-7) rounds to exactly -6.0 in f64, so the old
+	//     test took the fixed branch where ECMA (and Flash, and Ruffle) take
+	//     exponential -- 10 lines of avm2/number_to_string;
+	//   * 9.999999999999999e20 has n = 21, i.e. fixed ("999999999999999900000"),
+	//     while floor(log10) reports 21, which the old `>= 21.0` test sent to
+	//     exponential -- 2 more lines of the same test.
+	// The whole behavioural delta is 36 doubles: the 5 representable values
+	// immediately below 1e-6 and the 31 immediately below 1e21 (enumerated by
+	// ULP walk over both boundaries; a 600k-value random sweep finds no others).
+	// shortest_digits' exp10 is the power of ten of the FIRST digit, i.e. n-1,
+	// so the test is e10 < -6 || e10 > 20.
+	char digs[24];
+	int e10 = 0;
+	int nd = shortest_digits(d, digs, &e10);
 
-	double digits = floor(log10(d));
-
-	if (digits < MIN_DIGITS || digits >= MAX_DIGITS)
+	if (e10 < -6 || e10 > 20)
 	{
 		// Exponential form, Ruffle value.rs::f64_to_string_finite_nonzero:
 		// take the SHORTEST round-tripping decimal and, for a POSITIVE
@@ -718,9 +732,6 @@ int avm2_format_number(char* buf, int buf_size, double d)
 		// the truncated value by 10^digits reintroduces error, so 1e40 came
 		// out as the malformed "0.9999999999999999e+40" and 3e50 as
 		// "2.9999999999999996e+50" (avm2/matrix3d_precision grades both).
-		char digs[24];
-		int e10 = 0;
-		int nd = shortest_digits(d, digs, &e10);
 		char mant[40];
 		int mp = 0;
 		mant[mp++] = digs[0];
@@ -745,7 +756,7 @@ int avm2_format_number(char* buf, int buf_size, double d)
 		                e10 < 0 ? '-' : '+', e10 < 0 ? -e10 : e10);
 	}
 
-	return format_plain(buf, buf_size, d);
+	return format_plain(buf, buf_size, digs, nd, e10);
 }
 
 // ---------------------------------------------------------------------------
