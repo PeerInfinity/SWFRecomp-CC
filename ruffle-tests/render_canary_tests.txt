@@ -200,3 +200,36 @@ avm2/stage3d_triangle                       # the whole phase-A path in one
 avm2/stage3d_rotating_cube                  # m44 + setProgramConstantsFrom-
                                             #   Matrix + back-face culling +
                                             #   the multi-tick redraw path
+
+# SESSION 20 ADDITION (s20 wave-2 `w2-evenodd`). The change class was the
+# AVM2 Graphics fill/stroke split: `gfx_line_style` now closes only the STROKE
+# run (deferring it into a pending list) so ONE even-odd fill spans every
+# `lineStyle()` change, and `gfx_finalize_path` emits [fill][pending strokes]
+# [current stroke] as SEPARATE Avm2GfxPath entries instead of one fill+stroke
+# path.
+#
+# Canary audit against that class — the set was NOT blind, and the two members
+# that see it were both already present (both added in s19):
+#   * `avm2/graphics_bitmaps` (tier 1, CI-passing) pins the UNCHANGED half: its
+#     `simple_shapes_fill` changes the fill style four times with no lineStyle,
+#     and its `simple_shapes_stroke` changes the stroke style five times with
+#     NO fill open — i.e. both `gfx_flush_stroke_run(to_pending = 0)` and the
+#     begin*Fill full-flush, with an absolute verdict. It stayed byte-identical.
+#   * `avm2/graphics_simple_shapes` (tier 2) is the ONLY test in the whole
+#     corpus whose source calls `lineStyle` between a `begin*Fill` and its
+#     `endFill` (verified by scanning every `.as` in every suite), so it is the
+#     only member that can see the changed half. It moved 152 channels.
+# The one real gap the audit DID find: no member reaches
+# `avm2_graphics_cpu_composite` (the CPU / getPixel raster of a SCRIPT-DRAWN
+# Graphics) — and that walk consumes the path array whose shape and ORDER this
+# change alters. One member added, tier 1, CI-image-PASSING, re-rendered
+# locally before landing.
+regression/avm2_graphics_runtime            # runtime Graphics through the CPU
+                                            #   composite (BitmapData.draw +
+                                            #   getPixel gate): beginFill,
+                                            #   beginGradientFill, endFill,
+                                            #   drawTriangles and a lineStyle
+                                            #   with NO fill open, all in one
+                                            #   comparison. The only canary
+                                            #   member that reads a script-drawn
+                                            #   Graphics off the CPU raster.

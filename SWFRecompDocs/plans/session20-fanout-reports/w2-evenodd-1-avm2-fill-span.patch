@@ -1,0 +1,328 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 2fade77f4..c61c473fe 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -8313,6 +8313,19 @@ typedef struct Avm2GraphicsExt
+ 	// Finalized paths.
+ 	Avm2GfxPath* paths;
+ 	uint32_t path_count, path_cap;
++	// ONE fill across lineStyle() (Ruffle core/src/drawing.rs). Ruffle's
++	// Drawing keeps a single `current_fill` whose command list is NOT broken
++	// by set_line_style: only the STROKE is closed there, deferred into
++	// `pending_lines` while a fill is open, and flushed AFTER the fill at the
++	// next new_fill()/register. That is what makes overlapping subpaths drawn
++	// under one beginFill cancel under the even-odd rule, and what puts every
++	// stroke on top of the fill it decorates.
++	//   `stroke_start` — index into `cmds` where the CURRENT line style's run
++	//     begins (Ruffle re-seeds the new DrawingLine with MoveTo(cursor)).
++	//   `pend`         — closed stroke-only paths waiting for their fill.
++	uint32_t stroke_start;
++	Avm2GfxPath* pend;
++	uint32_t pend_count, pend_cap;
+ 	// Join/cap style of the CURRENT line style (see Avm2GfxPath above).
+ 	uint8_t  cljoints, clcaps;
+ 	float    clmiter;
+@@ -8452,6 +8465,9 @@ static void gfx_reset(Avm2GraphicsExt* g)
+ {
+ 	for (uint32_t i = 0; i < g->path_count; i++) gfx_free_path(&g->paths[i]);
+ 	free(g->paths); g->paths = NULL; g->path_count = g->path_cap = 0;
++	for (uint32_t i = 0; i < g->pend_count; i++) gfx_free_path(&g->pend[i]);
++	free(g->pend); g->pend = NULL; g->pend_count = g->pend_cap = 0;
++	g->stroke_start = 0;
+ 	free(g->cmds); g->cmds = NULL; g->cmd_count = g->cmd_cap = 0;
+ 	free(g->cbmp_px); g->cbmp_px = NULL; g->cbmp_w = g->cbmp_h = 0;
+ 	free(g->clsty.bmp_px);
+@@ -8689,16 +8705,16 @@ static void gfx_build_stroke(Avm2GfxPath* path, const float* poly,
+ 	path->line_vert_count = wv;
+ }
+ 
+-// Flatten the active command buffer into contours (pixels), tessellate the fill
+-// (libtess2, nonzero winding) and build the stroke, into a new Avm2GfxPath that
+-// snapshots the current fill/line style. Mirrors action.c drawingFinalizePath.
+-static void gfx_finalize_path(Avm2GraphicsExt* g)
++// Flatten cmds[from, to) into contours (pixels). `seed` prepends a MoveTo at
++// (sx, sy): Ruffle's set_line_style seeds the freshly-opened DrawingLine with
++// MoveTo(cursor), so a stroke run that starts in the MIDDLE of a subpath still
++// carries its first vertex. The curve start point is read at the absolute
++// index (cmds[i-1]), which for i == from > 0 is exactly that same cursor.
++static void gfx_flatten_cmds(const Avm2GraphicsExt* g, uint32_t from, uint32_t to,
++                             int seed, float sx_, float sy_,
++                             float** out_poly, uint32_t* out_poly_count,
++                             uint32_t** out_cstarts, uint32_t* out_ccount)
+ {
+-	if (g->cmd_count == 0) return;
+-	int want_fill = (g->cur_fill != 0);
+-	int want_line = (g->cur_line != 0);
+-	if (!want_fill && !want_line) { g->cmd_count = 0; return; }
+-
+ 	float* poly = NULL; uint32_t poly_count = 0, poly_cap = 0;
+ 	uint32_t* cstarts = NULL, ccount = 0, ccap = 0;
+ 	#define _GADDC() do { if (ccount >= ccap) { ccap = ccap ? ccap*2 : 8; \
+@@ -8708,7 +8724,8 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
+ 		poly_cap = poly_cap ? poly_cap*2 : 64; \
+ 		poly = realloc(poly, poly_cap * 2 * sizeof(float)); } \
+ 		poly[poly_count*2] = (px); poly[poly_count*2+1] = (py); poly_count++; } while (0)
+-	for (uint32_t i = 0; i < g->cmd_count; i++)
++	if (seed) { _GADDC(); _GADDP(sx_, sy_); }
++	for (uint32_t i = from; i < to; i++)
+ 	{
+ 		Avm2GfxCmd* c = &g->cmds[i];
+ 		if (c->type == 0) { _GADDC(); _GADDP(c->x, c->y); }
+@@ -8737,14 +8754,111 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
+ 	}
+ 	#undef _GADDP
+ 	#undef _GADDC
++	*out_poly = poly; *out_poly_count = poly_count;
++	*out_cstarts = cstarts; *out_ccount = ccount;
++}
+ 
++// Append a zeroed Avm2GfxPath to `paths` / `pend`.
++static Avm2GfxPath* gfx_push_path(Avm2GraphicsExt* g)
++{
+ 	if (g->path_count >= g->path_cap)
+ 	{
+ 		g->path_cap = g->path_cap ? g->path_cap * 2 : 8;
+ 		g->paths = realloc(g->paths, g->path_cap * sizeof(Avm2GfxPath));
+ 	}
+-	Avm2GfxPath* path = &g->paths[g->path_count++];
+-	memset(path, 0, sizeof(Avm2GfxPath));
++	Avm2GfxPath* p = &g->paths[g->path_count++];
++	memset(p, 0, sizeof(Avm2GfxPath));
++	return p;
++}
++
++static Avm2GfxPath* gfx_push_pend(Avm2GraphicsExt* g)
++{
++	if (g->pend_count >= g->pend_cap)
++	{
++		g->pend_cap = g->pend_cap ? g->pend_cap * 2 : 4;
++		g->pend = realloc(g->pend, g->pend_cap * sizeof(Avm2GfxPath));
++	}
++	Avm2GfxPath* p = &g->pend[g->pend_count++];
++	memset(p, 0, sizeof(Avm2GfxPath));
++	return p;
++}
++
++// Snapshot the CURRENT line style onto a path (owning copy of a bitmap ramp).
++static void gfx_snapshot_line(Avm2GraphicsExt* g, Avm2GfxPath* path)
++{
++	path->has_line = g->cur_line;
++	path->lr = g->clr; path->lg = g->clg; path->lb = g->clb; path->la = g->cla;
++	path->ljoints = g->cljoints;
++	path->lcaps = g->clcaps;
++	path->lmiter = g->clmiter;
++	if (!g->cur_line) return;
++	path->lsty = g->clsty;          // by value; the ramp travels with it
++	path->lsty.bmp_px = NULL;
++	if (g->clsty.kind == 3 && g->clsty.bmp_px != NULL)
++	{
++		size_t lnb = (size_t) g->clsty.bmp_w * g->clsty.bmp_h * sizeof(uint32_t);
++		path->lsty.bmp_px = (uint32_t*) malloc(lnb);
++		if (path->lsty.bmp_px != NULL)
++			memcpy(path->lsty.bmp_px, g->clsty.bmp_px, lnb);
++		else
++			path->lsty.kind = 0;
++	}
++}
++
++// Close the CURRENT stroke run — Ruffle's Drawing::set_line_style. The fill is
++// left open: `cmds` is NOT cleared, only `stroke_start` advances, so the fill
++// tessellates as ONE even-odd polygon spanning every lineStyle() change. The
++// finished run goes to `pend` while a fill is open (Ruffle's pending_lines,
++// which are emitted AFTER the fill) and straight to `paths` otherwise.
++// `to_pending = 0` forces the direct form, which is what gfx_finalize_path
++// wants for the LAST run once it has already emitted the fill.
++static void gfx_flush_stroke_run(Avm2GraphicsExt* g, int to_pending)
++{
++	uint32_t from = g->stroke_start, to = g->cmd_count;
++	if (from > to) from = to;              // defensive: cmds was reset under us
++	if (g->cur_line && to > from)
++	{
++		int seed = (from > 0 && g->cmds[from].type != 0);
++		float* poly = NULL; uint32_t poly_count = 0;
++		uint32_t* cstarts = NULL, ccount = 0;
++		gfx_flatten_cmds(g, from, to, seed,
++		                 seed ? g->cmds[from-1].x : 0.0f,
++		                 seed ? g->cmds[from-1].y : 0.0f,
++		                 &poly, &poly_count, &cstarts, &ccount);
++		Avm2GfxPath* p = to_pending ? gfx_push_pend(g) : gfx_push_path(g);
++		gfx_snapshot_line(g, p);
++		// `filled` auto-closes each contour, which is what Ruffle's
++		// close_path() does to the current line whenever a fill is open.
++		gfx_build_stroke(p, poly, poly_count, cstarts, ccount,
++		                 g->cur_fill != 0, g->clw * 0.5f * 20.0f);
++		free(poly); free(cstarts);
++	}
++	g->stroke_start = to;
++}
++
++// Flatten the active command buffer into contours (pixels), tessellate the fill
++// (libtess2, even-odd unless drawPath asked for nonzero) and build the strokes.
++// Mirrors Ruffle's Drawing::new_fill: the ONE fill path first, then the stroke
++// runs that were deferred while it was open, then the current run. (action.c
++// drawingFinalizePath is the AVM1 twin, which keeps one fill + one line per
++// DrawPath — see the note in drawingBeginNewLineStyle.)
++static void gfx_finalize_path(Avm2GraphicsExt* g)
++{
++	int want_fill = (g->cur_fill != 0);
++	int want_line = (g->cur_line != 0);
++	if (g->cmd_count == 0 && g->pend_count == 0) { g->stroke_start = 0; return; }
++	if (!want_fill && !want_line && g->pend_count == 0)
++	{ g->cmd_count = 0; g->stroke_start = 0; return; }
++
++	float* poly = NULL; uint32_t poly_count = 0;
++	uint32_t* cstarts = NULL, ccount = 0;
++	if (want_fill && g->cmd_count > 0)
++		gfx_flatten_cmds(g, 0, g->cmd_count, 0, 0.0f, 0.0f,
++		                 &poly, &poly_count, &cstarts, &ccount);
++
++	Avm2GfxPath* path = want_fill && g->cmd_count > 0 ? gfx_push_path(g) : NULL;
++	if (path != NULL)
++	{
+ 	path->fill_kind = g->cur_fill;
+ 	path->fr = g->cfr; path->fg = g->cfg; path->fb = g->cfb; path->fa = g->cfa;
+ 	if (g->cur_fill == 3 && g->cbmp_px != NULL)
+@@ -8773,26 +8887,12 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
+ 		memcpy(path->grad_fwd16, g->cfwd16, sizeof(path->grad_fwd16));
+ 		memcpy(path->grad_inv2d, g->cinv2d, sizeof(path->grad_inv2d));
+ 	}
+-	path->has_line = g->cur_line;
+-	path->lr = g->clr; path->lg = g->clg; path->lb = g->clb; path->la = g->cla;
++	// The stroke is NO LONGER carried on the fill path: it is a separate
++	// Avm2GfxPath emitted after this one, so that a lineStyle() change inside
++	// the fill can give each run its own style without splitting the fill.
+ 	path->winding = g->cur_winding;
+-	if (g->cur_line)
+-	{
+-		path->lsty = g->clsty;      // by value; the ramp travels with it
+-		path->lsty.bmp_px = NULL;
+-		if (g->clsty.kind == 3 && g->clsty.bmp_px != NULL)
+-		{
+-			size_t lnb = (size_t) g->clsty.bmp_w * g->clsty.bmp_h
+-			             * sizeof(uint32_t);
+-			path->lsty.bmp_px = (uint32_t*) malloc(lnb);
+-			if (path->lsty.bmp_px != NULL)
+-				memcpy(path->lsty.bmp_px, g->clsty.bmp_px, lnb);
+-			else
+-				path->lsty.kind = 0;
+-		}
+-	}
+ 
+-	if (want_fill && poly_count >= 3 && ccount > 0)
++	if (poly_count >= 3 && ccount > 0)
+ 	{
+ 		float* tw = malloc(poly_count * 2 * sizeof(float));
+ 		for (uint32_t i = 0; i < poly_count; i++)
+@@ -8835,17 +8935,20 @@ static void gfx_finalize_path(Avm2GraphicsExt* g)
+ 		}
+ 		free(tw);
+ 	}
+-	if (want_line)
+-	{
+-		path->ljoints = g->cljoints;
+-		path->lcaps = g->clcaps;
+-		path->lmiter = g->clmiter;
+-		gfx_build_stroke(path, poly, poly_count, cstarts, ccount,
+-		                 want_fill, g->clw * 0.5f * 20.0f);
+-	}
+-
++	}  // if (path != NULL)
+ 	free(poly); free(cstarts);
++
++	// Ruffle new_fill(): `paths.extend(pending_lines.drain(..))` — every stroke
++	// run that was closed while this fill was open lands AFTER it, in order,
++	// and then the run that is still current. Moving the Avm2GfxPath by value
++	// transfers ownership of its malloc'd vertex/ramp buffers.
++	for (uint32_t i = 0; i < g->pend_count; i++)
++		*gfx_push_path(g) = g->pend[i];
++	g->pend_count = 0;
++	gfx_flush_stroke_run(g, 0);
++
+ 	g->cmd_count = 0;
++	g->stroke_start = 0;
+ }
+ 
+ // (sRGB<->linear + the per-channel lerps now live in the shared
+@@ -9207,14 +9310,22 @@ static uint8_t gfx_joints_code(Avm2Context* ctx, Avm2Value v)
+ 	return 0;
+ }
+ 
+-// lineStyle(thickness, color=0, alpha=1, ...): flush, then set the current
+-// stroke (solid only this tranche; a fill-typed stroke degrades to no stroke).
++// lineStyle(thickness, color=0, alpha=1, ...): close the current STROKE run,
++// then set the current stroke (solid only this tranche; a fill-typed stroke
++// degrades to no stroke).
++//
++// Ruffle's Drawing::set_line_style closes only the line — the fill's command
++// list is untouched and survives until the next new_fill() — so a drawing like
++//   beginFill(); drawRoundRect(); lineStyle(); drawCircle(); endFill();
++// tessellates BOTH subpaths as one even-odd polygon and their overlap cancels
++// (avm2/graphics_simple_shapes). Calling gfx_finalize_path here instead, as
++// this did before s20, split the fill per style and painted the overlap solid.
+ static Avm2Value gfx_line_style(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+ 	Avm2GraphicsExt* g = gfx_self_ext(act);
+ 	if (g == NULL) return avm2_undefined();
+-	gfx_finalize_path(g);
++	gfx_flush_stroke_run(g, g->cur_fill != 0);
+ 	// A fresh LineStyle: any lineBitmapStyle/lineGradientStyle fill attached to
+ 	// the previous one is gone (Ruffle set_line_style replaces the whole style).
+ 	free(g->clsty.bmp_px);
+@@ -9749,7 +9860,8 @@ static Avm2Value gfx_line_bitmap_style(Avm2Activation* act)
+ 	memset(&st, 0, sizeof(st));
+ 	if (!gfx_build_bitmap_style(act->ctx, act->args, act->argc, &st))
+ 		return avm2_undefined();
+-	gfx_finalize_path(g);
++	// Ruffle set_line_fill_style -> set_line_style: a STROKE boundary only.
++	gfx_flush_stroke_run(g, g->cur_fill != 0);
+ 	gfx_commit_line_style(g, &st, 3);
+ 	return avm2_undefined();
+ }
+@@ -9762,18 +9874,21 @@ static Avm2Value gfx_line_gradient_style(Avm2Activation* act)
+ 	memset(&st, 0, sizeof(st));
+ 	if (!gfx_build_gradient_style(act->ctx, act->args, act->argc, &st))
+ 		return avm2_undefined();
+-	gfx_finalize_path(g);
++	// Ruffle set_line_fill_style -> set_line_style: a STROKE boundary only.
++	gfx_flush_stroke_run(g, g->cur_fill != 0);
+ 	gfx_commit_line_style(g, &st, 2);
+ 	return avm2_undefined();
+ }
+ 
+ // lineShaderStyle: still a stub (Ruffle stub_method's it too); keep the old
+-// clear-the-stroke convention rather than leaking the previous style.
++// clear-the-stroke convention rather than leaking the previous style. It is a
++// STROKE boundary, not a fill one — Ruffle's stub does not touch the fill at
++// all, so breaking the fill here would be strictly further from it.
+ static Avm2Value gfx_line_fill_style(Avm2Activation* act)
+ {
+ 	Avm2GraphicsExt* g = gfx_self_ext(act);
+ 	if (g == NULL) return avm2_undefined();
+-	gfx_finalize_path(g);
++	gfx_flush_stroke_run(g, g->cur_fill != 0);
+ 	g->cur_line = 0;
+ 	return avm2_undefined();
+ }
+@@ -10299,7 +10414,10 @@ static void gfx_apply_stroke_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
+                                      Avm2Object* o)
+ {
+ 	double th = avm2_coerce_to_number(ctx, gfx_prop(o, "thickness", 9));
+-	gfx_finalize_path(g);
++	// Ruffle's graphicsstroke arm is set_line_style(..): a STROKE boundary,
++	// so a GraphicsStroke between two GraphicsPaths of the same fill must not
++	// split that fill either.
++	gfx_flush_stroke_run(g, g->cur_fill != 0);
+ 	free(g->clsty.bmp_px);
+ 	memset(&g->clsty, 0, sizeof(g->clsty));
+ 	if (isnan(th))
+@@ -14475,7 +14593,8 @@ static int has_pick_geometry(Avm2DisplayObjectExt* ext)
+ 	if (ext->graphics_obj != NULL)
+ 	{
+ 		Avm2GraphicsExt* g = (Avm2GraphicsExt*) ext->graphics_obj->native_ext;
+-		if (g != NULL && (g->path_count > 0 || g->cmd_count > 0)) return 1;
++		if (g != NULL && (g->path_count > 0 || g->cmd_count > 0
++		                  || g->pend_count > 0)) return 1;
+ 	}
+ 	return 0;
+ }
