@@ -17,6 +17,37 @@ also tells its agent to reply "not my brief" if a message does not match its tas
 | 7 | w2-evenodd | 2 | worktree | one even-odd fill across `lineStyle()` (`gfx_line_style`/`gfx_finalize_path`) |
 | 8 | w2-gfx-text-smalls | 2 | worktree | device-face bold/italic ladder + EditText border corner |
 
+## Batch 2 (spawned as batch-1 slots freed)
+
+| # | label | wave | isolation | task | replaced |
+|---|---|---|---|---|---|
+| 9 | w1-avm2-smalls | 1 | main tree, read-only | the 16-row unpriced `avm2` tail + 3 loader riders | w1-avm1-globals |
+| 10 | w2-goto-framescript | 2 | worktree | `goto_framescript_queued/{swf9,swf10,swf13}` + `…_same_frame`, M1 version-gate + M2 `ext->playing` placement — **+4 eff for ~25 LOC, cheapest yield on the board** (priced by w1-drift) | w1-drift |
+| 11 | w2-avm1-nearflips | 2 | worktree | `xml_getbytes` phase error, `geturl` re-diagnosis, 7 stale ignore prunes, `image_triage.py:911` wording bug (all from w1-drift's refutations) | w1-gnash-actionorder |
+
+## Completed, with verdicts
+
+| label | outcome |
+|---|---|
+| w1-avm1-globals | **+1 priced, not funded.** Cluster refuted: 2 rows, not 5 (`DONT_DELETE`/CONFIGURABLE flag, not an inventory gap). Raw inventory diff-lines overstate the real defect count **30–180×** on `known_failure` rows. `globals_swf5` NO-GO — upstream ships two contradictory Flash captures and we already pass the other three rows. Found: `results_flash.json` is 0 pass / 3 fail on 2026-04-13 fixtures, still wired into CI. |
+| w1-drift | **CI name-set delta EMPTY** (proved two ways: commit timestamps + a 4527−95=4432=4440−8 name reconciliation). So every flip this session is real yield, not drift. Spun off agents 10 and 11. |
+| w1-gnash-actionorder | **Premise REFUTED, 0 flips, slot saved.** See the method lesson below. |
+
+## Method lesson earned this session — absence from the board ≠ unpriced
+
+I funded the `from_gnash/.../action_order` cluster on the inference *"largest cluster the s20
+board doesn't name ⇒ unclaimed cheap yield."* **That inference is inverted.** Those rows are
+absent from `polish-sweep-arc.md` §20.5 because **s17 STRUCK them** (the strike is recorded at
+`polish-sweep-arc.md:2277`), after the family had been adjudicated in six consecutive sessions
+(s13, s14, s15, s17, s18, s19 — s19 re-verified 9 of the 11 rows byte-identical one session
+ago). They are also not one mechanism: eight core rows = five mechanisms, two of them
+**sign-opposite** (`_test6` wants cancelled-placement events to FIRE, `PlaceAndRemove` wants
+them SUPPRESSED), which is why three prior implementation attempts each bought +1/+2 lines.
+
+**Rule for future coordinators: before funding a cluster because the board omits it, grep the
+arc doc for a STRIKE on it.** A struck family looks identical to an unpriced one from the
+failure inventory alone.
+
 ## Held queue (written briefs; spawn as slots free — NEVER exceed ~8 live)
 
 The 5-hour cap killed 12 live agents in s18 and the weekly cap killed 10 in s16. Nothing is
