@@ -74,3 +74,39 @@ reason was wrong, it is a hand-rolled DFT) · `fonts/embed_name_lookup` ·
 `mixed_avm/avm1_loads_avm2` (harness gate) · `from_gnash/misc-ming.all/GradientFillTest`
 (structurally unpromotable) · `from_shumway/bitmapdata/getpixel-from-embedded` (a disposition,
 not a fix) · pixel: `blend_modes` ×12.
+
+
+## Batch 3 + resumes (spawned as slots freed)
+
+| label | wave | task | origin |
+|---|---|---|---|
+| w2-goto-framescript | 2 | the 4-row `goto_framescript_queued` arc | w1-drift's GO |
+| w2-avm1-nearflips | 2 | `xml_getbytes`, `geturl`, 7 ignore prunes, `image_triage.py` | w1-drift's refutations |
+| w2-masks-hittest | 2 | `masks_test` hitTest arity | held-queue |
+| w2-arraysort (resume of w1-gnash-array) | 2 | Flash-exact quicksort arc, **user-funded** | user ruling |
+| w2-avm2-smalls (resume of w1-avm2-smalls) | 2 | textblock/number_to_string/avm1_root | its own nomination |
+| w2-stage3d (resume of w1-stage3d) | 2 | productionize the measured A′/B prototype | its own prototype |
+| w2-smalls-2 | 2 | `bitmapdata_custom_rectangle` + `tab_ordering_properties` | §20.5 + sibling |
+
+**Resuming a completed wave-1 agent as its own wave-2 implementer was the cheapest
+pattern this session** — it keeps every located line number, every measurement and every
+refutation, at zero re-derivation cost. Used four times (arraysort, avm2-smalls, stage3d,
+and masks by message). The agent creates its own worktree with `git worktree add`; the
+coordinator reaps it.
+
+## Ledger at the early grading run (`35421084855` @ `8040b8f63`)
+
+Trace flips realised and headline re-checked at merge: **+8**
+- `from_gnash/misc-ming.all/masks_test` → ruffle_matched (`0298748e8`)
+- `avm1/xml_getbytes` → pass (`974be3738`)
+- `avm2/goto_framescript_queued_same_frame`, `/swf9`, `/swf10` → pass; `/swf13` → ruffle_matched (`9bf25e809`)
+- `avm1/bitmapdata_custom_rectangle` → ruffle_matched; `avm2/tab_ordering_properties` → pass (`166b2b4f4`)
+
+Pixel flips realised: **+11** (`visual/edittext/edittext_caret_empty` ×11, `6cf74920c`)
+
+Honest zero-flip work landed: the AVM2 even-odd fill (`78030002d`, −152 channels), the
+array ladder's M1+M4 (`6b7486783`, one mechanism from +3 now), the four-path coercion gate
+(`3a8870200` + `d5278b4e9`, new `regression` fixture 18/36 wrong → PASS), the device-face
+ladder (`6cf74920c`, a prerequisite that moves nothing alone).
+
+Still out at dispatch: w2-avm2-smalls (+3 priced), w2-stage3d (+8 pixels measured).
