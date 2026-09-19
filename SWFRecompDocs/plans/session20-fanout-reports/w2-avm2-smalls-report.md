@@ -289,27 +289,36 @@ Two things I checked before trusting the flip, both of which my wave-1 report li
 
 ---
 
-## 8. `tab_ordering_properties` — fund it in **session 21**, not 20
+## 8. `tab_ordering_properties` — **LANDED, `pass`** (superseded; do NOT carry into session 21)
 
-My nominated next slot, unchanged in substance, with one correction to its risk note. It is the
-only `+1 **pass**` (not merely effective) row left in the family, and its code is genuinely small:
+**Corrected after merge.** This section originally nominated the row for a dedicated session-21
+slot. That is obsolete: a sibling landed it earlier in session 20 as `166b2b4f4`
+("seal TextField/SimpleButton"), and `avm2/tab_ordering_properties` is
+`output_mismatch` (171 diff lines) → **`pass`**, +1. My merge is `476b45fdc`.
 
-* **M1** — seal `TextField` and `SimpleButton` (2 × `cls->flags |= AVM2_CLASS_FLAG_SEALED;`). Both
-  are sealed in Flash and in Ruffle (`TextField.as:11`, `SimpleButton.as:10`); our sealed machinery
-  already emits the exact `#1069` / `#1056` strings the fixture expects, and internal
-  `avm2_object_set_dynamic` bypasses the check, so runtime-internal expandos survive. ≈168 of the
-  171 diff lines.
-* **M2** — one line: `io_get_tab_enabled` (`avm2_display.c:7222`) must call the already-correct
-  per-type `obj_tab_enabled` (`:15821`) instead of reading the raw field. 3 lines.
+It shipped with exactly the two mechanisms diagnosed in my wave-1 report, implemented as sketched:
 
-**Why 21 and not 20:** the cost is a 134-test canary (111 `avm2` tests mention `TextField`, 23
-mention `SimpleButton`), and at this session's observed pace — ~30 s/test idle, ~2.5 min/test with
-a sibling's headless browser on the box — that sweep alone is 1–5 hours, i.e. a whole slot with no
-room for the follow-up that a class-shape change usually needs. It also wants a CI run behind it
-rather than a local sweep, because the risk is *behavioural* (latent expando use anywhere in the
-runtime), not *expectational* (I grepped every `output*.txt`: `tab_ordering_properties` is the only
-corpus file that asserts `#1056`/`#1069` on either class). Give it a dedicated s21 slot with
-`categories=full`; do not stack it behind surgical work.
+* `textfield->flags |= AVM2_CLASS_FLAG_SEALED;` / `button->flags |= AVM2_CLASS_FLAG_SEALED;`
+* a forward-declared `obj_tab_enabled` so `io_get_tab_enabled` returns the per-type default
+  instead of the raw ext field.
+
+**Where my estimate was wrong, and the lesson.** I priced the canary at 134 tests (111 `avm2`
+tests mention `TextField`, 23 mention `SimpleButton`) and held the row out of my own patch set on
+that basis. The real canary was **12 tests**. The reason is a static property of AS3 that my grep
+could not see: a miss on a *typed* reference (`var t:TextField; t.foo`) is a **compile** error, so
+only an **untyped** receiver (`var t:*` / `Object`) can reach the sealed-object runtime path at
+all. That collapses the candidate set from "every test that mentions the class" to "every test
+that touches one of these classes through an untyped reference".
+
+Holding it out was still the right call on the information I had — the sibling's argued canary is
+what made it cheap, not a smaller change — but the estimate itself was conservative by an order of
+magnitude. **Method note for future blast-radius pricing: when the change is to a *class-shape*
+rule, filter the candidate set by what the type system lets a script actually express, not by
+textual mentions of the class.** That is the same shape as this session's other two measurement
+lessons — the cheap screen (grep / ours-only count) screens; the property that actually decides is
+narrower.
+
+Nothing in this family is left open on this row.
 
 ---
 
