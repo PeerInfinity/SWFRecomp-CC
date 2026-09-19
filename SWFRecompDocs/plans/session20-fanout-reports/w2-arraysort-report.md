@@ -404,7 +404,28 @@ fixtures named in `_invoke_sort_comparator`'s own comment, the gnash `Function-v
 rows (Instance-vN is the test the `new Object(primitive)` prototype template exists for, i.e.
 M4's nearest neighbour), and the whole `regression` suite.
 
-**RESULTS: see §7.1 — filled in from the completed sweep.**
+### 7.1 Results — clean
+
+| group | tests | result |
+|---|---|---|
+| `regression` suite (full) | **95** | **95/95 PASS**, `vs prev: no changes` on every row and on the final summary |
+| `avm1` array/sort battery | 18 | **18/18 PASS** — `array_sort`, `array_sort_random`, `array_call_method`, `array_concat`, `array_constructor`, `array_enumerate`, `array_length`, `array_properties`, `array_prototyping`, `array_reverse`, `array_shift`, `array_slice`, `array_splice`, `array_trivial`, `array_unshift`, `global_array`, `init_array_invalid`, `object_prototypes` |
+| `avm1` M4 neighbours | 1 | `new_class_prototype_getter` **PASS** |
+| `from_gnash/actionscript.all` | 6 | `Function-v6/-v7/-v8`, `Instance-v6/-v7/-v8` — **6/6 PASS** |
+| `from_gnash` array ladder | 4 | `array-v5/-v6/-v7/-v8` — `output_mismatch` before **and** after, strictly fewer diff lines (§4.1) |
+
+**`pass → ruffle_matched` moves: NONE.** Every row above that was `pass` is still `pass`; the
+four array rows were `output_mismatch` on both legs and neither promoted nor demoted. There is
+no row anywhere in the sweep whose status changed in either direction.
+
+The `regression` suite's own runner prints a `vs prev` diff per test against its stored
+`_results/results.json`; it reported **`no changes` on all 95** plus the final summary line, which
+is an independent check on top of the raw PASS counts. `regression` includes the two fixtures
+`_invoke_sort_comparator`'s comment names as its canaries (`sort_comparator_captured_scope`,
+`sort_comparator_type1_args`) and the whole `*_type1_args` family that exercises AVM1 argument
+binding through sorts, watches and callbacks.
+
+**Six `RECOMP_FAIL` rows are worktree artifacts, not regressions** — see §9.
 
 ---
 
