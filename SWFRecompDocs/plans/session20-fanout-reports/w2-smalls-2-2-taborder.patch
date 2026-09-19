@@ -1,0 +1,54 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index c61c473fe..783b49007 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -7219,11 +7219,21 @@ static Avm2Value io_set_double_click_enabled(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// Forward: the tab-order walk's per-type `tabEnabled` rule (Ruffle
++// InteractiveObject::tab_enabled = the explicit value when set, else
++// tab_enabled_default: editable for EditText, true for an AVM2 button,
++// buttonMode for a MovieClip, false otherwise).
++static int obj_tab_enabled(Avm2Context* ctx, Avm2Object* obj);
++
+ static Avm2Value io_get_tab_enabled(Avm2Activation* act)
+ {
+-	Avm2DisplayObjectExt* ext = this_display(act);
+-	if (ext == NULL) return avm2_bool(false);
+-	return avm2_bool(ext->tab_enabled_set ? ext->tab_enabled_val != 0 : false);
++	Avm2Object* self = this_obj(act);
++	if (self == NULL) return avm2_bool(false);
++	// The PUBLIC getter answers the same rule the walk uses. It used to read
++	// the raw stored value and report `false` for every unset object, so an
++	// input TextField / SimpleButton / buttonMode MovieClip lied about its
++	// own default (avm2/tab_ordering_properties).
++	return avm2_bool(obj_tab_enabled(act->ctx, self) != 0);
+ }
+ 
+ static Avm2Value io_set_tab_enabled(Avm2Activation* act)
+@@ -17283,6 +17293,14 @@ void avm2_register_display(Avm2Context* ctx)
+ 	// avm2_text.c (Stage 6); the class shell stays here so the display
+ 	// alloc hook and timeline instantiation wire up.
+ 	Avm2Class* textfield = avm2_builtin_class(ctx, "flash.text", "TextField", iobj);
++	// playerglobal declares `public class TextField extends InteractiveObject`
++	// with no `dynamic` (Ruffle globals/flash/text/TextField.as:10), so a
++	// property miss is #1069 on read and #1056 on write and `for..in` finds
++	// nothing. We had it dynamic, which invented an enumerable expando for
++	// every `tf.tabChildren = x` (avm2/tab_ordering_properties). Runtime
++	// internals reach dynamic storage through avm2_object_set_dynamic, which
++	// does not consult the flag, so our own bookkeeping is unaffected.
++	textfield->flags |= AVM2_CLASS_FLAG_SEALED;
+ 	textfield->native_init = display_native_init;
+ 	g_textfield_class = textfield;
+ 	avm2_text_init_textfield_class(ctx, textfield);
+@@ -17495,6 +17513,9 @@ void avm2_register_display(Avm2Context* ctx)
+ 	// flash.display.SimpleButton.
+ 	Avm2Class* button =
+ 		avm2_builtin_class(ctx, "flash.display", "SimpleButton", iobj);
++	// Sealed in playerglobal exactly as TextField is
++	// (Ruffle globals/flash/display/SimpleButton.as:10) — see the note there.
++	button->flags |= AVM2_CLASS_FLAG_SEALED;
+ 	button->native_init = display_native_init;
+ 	button->instance_init.fn = simplebutton_init;
+ 	button->instance_init.debug_name = "SimpleButton";
