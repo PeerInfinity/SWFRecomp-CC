@@ -57449,6 +57449,46 @@ void actionNewObject(SWFAppContext* app_context)
 		// Pre-create props with native_type and __proto__ pointing to Array.prototype
 		// so that instanceof Array works and sparse[N] crawls Array.prototype[N]
 		initArrayProto(app_context, arr);
+		// --- M4: honour a REBOUND `_global.Array` whose `prototype` is a primitive.
+		// `new Array()` resolves through _global.Array, which a script may have
+		// replaced with its own function. If that function's `prototype` has been
+		// set to a non-object, Flash propagates the value verbatim as the new
+		// array's __proto__ (gnash array.as:1771-1777):
+		//   h = function(){}; h.prototype = 8; _global.Array = h;
+		//   ar = new Array();  typeof(ar.__proto__) == "number"   (array.as:1777)
+		// NOTE we must read `_global`'s OWN property here, not actionGetVariable
+		// ("Array"): the name-resolution path answers "Array" from the builtin
+		// constructor table and never sees a script's `_global.Array = h` rebind.
+		// The same rule already exists for `new Object(primitive)` wrappers whose
+		// String/Number/Boolean prototype was replaced (`_ow_stored_proto` below);
+		// this is that rule for the Array constructor slot.
+		{
+			PUSH_STR("_global", 7);
+			actionGetVariable(app_context);
+			ActionVar _gv; popVar(app_context, &_gv);
+			if (_gv.type == ACTION_STACK_VALUE_OBJECT && _gv.data.numeric_value != 0)
+			{
+				ActionVar* _ga = getProperty((ASObject*) _gv.data.numeric_value, "Array", 5);
+				if (_ga != NULL && _ga->type == ACTION_STACK_VALUE_FUNCTION)
+				{
+					ASFunction* _acf = (ASFunction*) _ga->data.numeric_value;
+					// Only a USER rebind can carry a primitive prototype; the engine's
+					// own Array constructor keeps a real prototype object.
+					if (_acf != NULL && _acf->own_props != NULL)
+					{
+						ActionVar* _ap = getProperty(_acf->own_props, "prototype", 9);
+						if (_ap != NULL &&
+						    _ap->type != ACTION_STACK_VALUE_UNDEFINED &&
+						    _ap->type != ACTION_STACK_VALUE_OBJECT &&
+						    arr->props != NULL)
+						{
+							setPropertyWithFlags(app_context, arr->props, "__proto__", 9,
+							                     _ap, PROPERTY_FLAGS_DONTENUM);
+						}
+					}
+				}
+			}
+		}
 		new_obj = arr;
 		obj_type = ACTION_STACK_VALUE_ARRAY;
 		if (args_heap != NULL)
@@ -66278,6 +66318,36 @@ static int callArrayMethod(SWFAppContext* app_context,
 		{
 			ActionVar* _qbuf = arr->elements;
 
+			// --- M1: a sort must not DESTROY an index's own-property status ---
+			// We model "index i is an own property" as `elements[i].type !=
+			// ACTION_STACK_VALUE_HOLE` (see the array `hasOwnProperty` branch
+			// above and actionEnumerate2's array arm). The in-place quicksort
+			// permutes HOLEs around, so a sparse array's originally-set slot can
+			// receive a HOLE and silently stop being an own property.
+			//
+			// Flash does not work that way: sorting writes the sorted values to
+			// their DESTINATION indices as new own properties and leaves the
+			// SOURCE indices own (with value undefined). gnash array.as:
+			//   gaparray=[]; gaparray[4]='4'; gaparray[16]='16'; gaparray.sort();
+			//   -> gaparray[4] == undefined          (:223)   own, but undefined
+			//      gaparray.hasOwnProperty('4')      (:246)   TRUE
+			//      !gaparray.hasOwnProperty('0')     (:247)   still FALSE
+			// So: snapshot which indices are non-HOLE before the sort, and
+			// afterwards promote any of those that the permutation turned into a
+			// HOLE to a typed UNDEFINED (own, enumerable, value undefined).
+			// Indices that were already holes are left alone.
+			u8* _qs_was_own = NULL;
+			if (n > 0)
+			{
+				_qs_was_own = (u8*) HALLOC(n * sizeof(u8));
+				if (_qs_was_own != NULL)
+				{
+					for (u32 _wi = 0; _wi < n; _wi++)
+						_qs_was_own[_wi] =
+							(_qbuf[_wi].type != ACTION_STACK_VALUE_HOLE) ? 1 : 0;
+				}
+			}
+
 			typedef struct { u32 low; u32 high; } _QS_Range;
 			_QS_Range* _qs_stack = (_QS_Range*) HALLOC(n * sizeof(_QS_Range));
 			if (_qs_stack != NULL)
@@ -66383,6 +66453,28 @@ static int callArrayMethod(SWFAppContext* app_context,
 					_qbuf[_qhi] = _qtmp;
 					_qlo++; _qhi--;
 				}
+			}
+			// M1 (see above): re-own every index that was own before the sort.
+			// Re-read elements/length: a comparator that mutates the array
+			// mid-sort (the documented sort-UB case) can have shrunk or
+			// reallocated it, and we must not resurrect slots past the live
+			// length — array.as:317 asserts the popped length SURVIVES the sort.
+			if (_qs_was_own != NULL)
+			{
+				ActionVar* _wbuf = arr->elements;
+				u32 _wn = (arr->length < n) ? arr->length : n;
+				if (_wbuf != NULL)
+				{
+					for (u32 _wi = 0; _wi < _wn; _wi++)
+					{
+						if (!_qs_was_own[_wi]) continue;
+						if (_wbuf[_wi].type != ACTION_STACK_VALUE_HOLE) continue;
+						_wbuf[_wi].type = ACTION_STACK_VALUE_UNDEFINED;
+						_wbuf[_wi].str_size = 0;
+						_wbuf[_wi].data.numeric_value = 0;
+					}
+				}
+				FREE(_qs_was_own);
 			}
 		}
 

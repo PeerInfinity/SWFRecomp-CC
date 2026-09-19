@@ -1,0 +1,51 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index db8243db8..11e87b2b9 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -57449,6 +57449,46 @@ void actionNewObject(SWFAppContext* app_context)
+ 		// Pre-create props with native_type and __proto__ pointing to Array.prototype
+ 		// so that instanceof Array works and sparse[N] crawls Array.prototype[N]
+ 		initArrayProto(app_context, arr);
++		// --- M4: honour a REBOUND `_global.Array` whose `prototype` is a primitive.
++		// `new Array()` resolves through _global.Array, which a script may have
++		// replaced with its own function. If that function's `prototype` has been
++		// set to a non-object, Flash propagates the value verbatim as the new
++		// array's __proto__ (gnash array.as:1771-1777):
++		//   h = function(){}; h.prototype = 8; _global.Array = h;
++		//   ar = new Array();  typeof(ar.__proto__) == "number"   (array.as:1777)
++		// NOTE we must read `_global`'s OWN property here, not actionGetVariable
++		// ("Array"): the name-resolution path answers "Array" from the builtin
++		// constructor table and never sees a script's `_global.Array = h` rebind.
++		// The same rule already exists for `new Object(primitive)` wrappers whose
++		// String/Number/Boolean prototype was replaced (`_ow_stored_proto` below);
++		// this is that rule for the Array constructor slot.
++		{
++			PUSH_STR("_global", 7);
++			actionGetVariable(app_context);
++			ActionVar _gv; popVar(app_context, &_gv);
++			if (_gv.type == ACTION_STACK_VALUE_OBJECT && _gv.data.numeric_value != 0)
++			{
++				ActionVar* _ga = getProperty((ASObject*) _gv.data.numeric_value, "Array", 5);
++				if (_ga != NULL && _ga->type == ACTION_STACK_VALUE_FUNCTION)
++				{
++					ASFunction* _acf = (ASFunction*) _ga->data.numeric_value;
++					// Only a USER rebind can carry a primitive prototype; the engine's
++					// own Array constructor keeps a real prototype object.
++					if (_acf != NULL && _acf->own_props != NULL)
++					{
++						ActionVar* _ap = getProperty(_acf->own_props, "prototype", 9);
++						if (_ap != NULL &&
++						    _ap->type != ACTION_STACK_VALUE_UNDEFINED &&
++						    _ap->type != ACTION_STACK_VALUE_OBJECT &&
++						    arr->props != NULL)
++						{
++							setPropertyWithFlags(app_context, arr->props, "__proto__", 9,
++							                     _ap, PROPERTY_FLAGS_DONTENUM);
++						}
++					}
++				}
++			}
++		}
+ 		new_obj = arr;
+ 		obj_type = ACTION_STACK_VALUE_ARRAY;
+ 		if (args_heap != NULL)
