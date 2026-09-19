@@ -6,26 +6,26 @@
 
 **Run Duration**: 43m 0s
 
-**Filtered**: 20 tests ignored out of 734 available
+**Filtered**: 19 tests ignored out of 734 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 714 |
-| Passing | **697** (97.6%) |
+| Total tests | 715 |
+| Passing | **697** (97.5%) |
 | Ruffle-matched | 13 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **710** (99.4%) |
-| Failing | 4 |
-| Total expected lines | 114100 |
-| Matching lines | 111132 (97.4%) |
-| Mismatched lines | 2968 |
+| Effective pass | **710** (99.3%) |
+| Failing | 5 |
+| Total expected lines | 114117 |
+| Matching lines | 111141 (97.4%) |
+| Mismatched lines | 2976 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 4 | 100.0% |
+| Output Mismatch | 5 | 100.0% |
 
 ## Passing Tests
 
@@ -755,9 +755,11 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `xml_getbytes` | 52.9% | 9 | 17 | 8 | [107](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) |
 
 ## Segfaults
 
@@ -773,14 +775,15 @@ No timeouts.
 
 ## All Output Mismatches
 
-**4 tests** with output mismatch, sorted by match rate (best first)
+**5 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `bitmapdata_custom_rectangle` | 35.7% | 15/42 | 30 | 42 |  |
-| 2 | `set_property_values/swf4` | 19.9% | 346/1743 | 1743 | 1571 |  |
-| 3 | `hitarea_remove_owner_drag` | 18.2% | 2/11 | 11 | 10 |  |
-| 4 | `globals_monkeypatch` | 15.9% | 39/246 | 158 | 246 |  |
+| 1 | `xml_getbytes` | 52.9% | 9/17 | 17 | 17 | [107](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) |
+| 2 | `bitmapdata_custom_rectangle` | 35.7% | 15/42 | 30 | 42 |  |
+| 3 | `set_property_values/swf4` | 19.9% | 346/1743 | 1743 | 1571 |  |
+| 4 | `hitarea_remove_owner_drag` | 18.2% | 2/11 | 11 | 10 |  |
+| 5 | `globals_monkeypatch` | 15.9% | 39/246 | 158 | 246 |  |
 
 ## Investigation Documents
 
@@ -892,5 +895,5 @@ No timeouts.
 | 104 | [UNLOAD_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNLOAD_PLAN.md) | 12 | 12 | 0 |
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 5 | 0 |
-| 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 32 | 32 | 0 |
+| 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 33 | 32 | 1 |
 | | *(tests not in any document)* | 234 | 221 | 13 |

@@ -6,15 +6,15 @@
     "total_available": 47,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 1,
+    "ignored_count": 0,
     "filtered": true
   },
-  "total": 46,
-  "pass": 46,
+  "total": 47,
+  "pass": 47,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 46,
+  "effective_pass": 47,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -256,6 +256,22 @@
         "matching_lines": 3
       },
       "duration": 1.38,
+      "status": "pass"
+    },
+    {
+      "test": "hitarea",
+      "phases": {
+        "recomp": 0.006,
+        "compile": 1.582,
+        "run": 0.005
+      },
+      "num_frames": 7,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 1.6,
       "status": "pass"
     },
     {

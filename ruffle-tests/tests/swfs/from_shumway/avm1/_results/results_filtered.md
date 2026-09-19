@@ -6,22 +6,22 @@
 
 **Run Duration**: 1m 56s
 
-**Filtered**: 1 tests ignored out of 47 available
+**Filtered**: 0 tests ignored out of 47 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 46 |
-| Passing | **46** (100.0%) |
+| Total tests | 47 |
+| Passing | **47** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 487 |
-| Matching lines | 487 (100.0%) |
+| Total expected lines | 491 |
+| Matching lines | 491 (100.0%) |
 | Mismatched lines | 0 |
 
 ## Passing Tests
 
-**46 tests passing**
+**47 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -40,37 +40,38 @@
 | 13 | `filters` | 149 | 1.6s |  |
 | 14 | `haxe/flocons1` | 2 | 1.2s |  |
 | 15 | `haxe/flocons2` | 3 | 1.4s |  |
-| 16 | `label` | 4 | 1.0s |  |
-| 17 | `levels` | 9 | 1.0s |  |
-| 18 | `loadevent` | 9 | 1.2s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 1.0s |  |
-| 20 | `loadvariables/loadvars` | 2 | 1.3s |  |
-| 21 | `lookup` | 3 | 1.4s |  |
-| 22 | `mouse-transparency` | 1 | 1.4s |  |
-| 23 | `moviecliploader` | 7 | 20.8s |  |
-| 24 | `nativeinheritance` | 6 | 1.4s |  |
-| 25 | `nested-button` | 1 | 1.4s |  |
-| 26 | `operations` | 13 | 1.4s |  |
-| 27 | `property-paths/property-paths-6` | 6 | 1.3s |  |
-| 28 | `property-paths/property-paths-7` | 7 | 1.2s |  |
-| 29 | `propertycase/propertycase` | 7 | 1.2s |  |
-| 30 | `propertycase/propertycase-preserving-6` | 2 | 1.2s |  |
-| 31 | `propertycase/propertycase-preserving-7` | 5 | 0.9s |  |
-| 32 | `rollover` | 4 | 16.4s |  |
-| 33 | `scope` | 14 | 1.0s |  |
-| 34 | `setinterval` | 20 | 1.4s |  |
-| 35 | `settimeout` | 17 | 1.0s |  |
-| 36 | `super` | 11 | 0.9s |  |
-| 37 | `target` | 18 | 1.2s |  |
-| 38 | `text-bind` | 0 | 24.7s |  |
-| 39 | `textfield/textfield-html` | 4 | 1.4s |  |
-| 40 | `textfield/textfield-text-setters` | 8 | 1.4s |  |
-| 41 | `undefined/undefined-swf6` | 39 | 1.1s |  |
-| 42 | `undefined/undefined-swf7` | 39 | 1.0s |  |
-| 43 | `watch` | 2 | 0.1s |  |
-| 44 | `xml/xmlbuild` | 1 | 1.4s |  |
-| 45 | `xml/xmlload` | 4 | 1.4s |  |
-| 46 | `xml/xmlstring` | 9 | 1.2s |  |
+| 16 | `hitarea` | 4 | 1.6s |  |
+| 17 | `label` | 4 | 1.0s |  |
+| 18 | `levels` | 9 | 1.0s |  |
+| 19 | `loadevent` | 9 | 1.2s |  |
+| 20 | `loadvariables/loadvariables` | 7 | 1.0s |  |
+| 21 | `loadvariables/loadvars` | 2 | 1.3s |  |
+| 22 | `lookup` | 3 | 1.4s |  |
+| 23 | `mouse-transparency` | 1 | 1.4s |  |
+| 24 | `moviecliploader` | 7 | 20.8s |  |
+| 25 | `nativeinheritance` | 6 | 1.4s |  |
+| 26 | `nested-button` | 1 | 1.4s |  |
+| 27 | `operations` | 13 | 1.4s |  |
+| 28 | `property-paths/property-paths-6` | 6 | 1.3s |  |
+| 29 | `property-paths/property-paths-7` | 7 | 1.2s |  |
+| 30 | `propertycase/propertycase` | 7 | 1.2s |  |
+| 31 | `propertycase/propertycase-preserving-6` | 2 | 1.2s |  |
+| 32 | `propertycase/propertycase-preserving-7` | 5 | 0.9s |  |
+| 33 | `rollover` | 4 | 16.4s |  |
+| 34 | `scope` | 14 | 1.0s |  |
+| 35 | `setinterval` | 20 | 1.4s |  |
+| 36 | `settimeout` | 17 | 1.0s |  |
+| 37 | `super` | 11 | 0.9s |  |
+| 38 | `target` | 18 | 1.2s |  |
+| 39 | `text-bind` | 0 | 24.7s |  |
+| 40 | `textfield/textfield-html` | 4 | 1.4s |  |
+| 41 | `textfield/textfield-text-setters` | 8 | 1.4s |  |
+| 42 | `undefined/undefined-swf6` | 39 | 1.1s |  |
+| 43 | `undefined/undefined-swf7` | 39 | 1.0s |  |
+| 44 | `watch` | 2 | 0.1s |  |
+| 45 | `xml/xmlbuild` | 1 | 1.4s |  |
+| 46 | `xml/xmlload` | 4 | 1.4s |  |
+| 47 | `xml/xmlstring` | 9 | 1.2s |  |
 
 ## Near-Passing Tests
 

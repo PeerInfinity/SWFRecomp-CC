@@ -6,15 +6,15 @@
     "total_available": 1275,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 46,
+    "ignored_count": 40,
     "filtered": true
   },
-  "total": 1229,
-  "pass": 1205,
+  "total": 1235,
+  "pass": 1211,
   "ruffle_matched": 12,
   "fail": 12,
-  "pass_rate": 98.0,
-  "effective_pass": 1217,
+  "pass_rate": 98.1,
+  "effective_pass": 1223,
   "effective_pass_rate": 99.0,
   "breakdown": {
     "output_mismatch": 12,
@@ -403,6 +403,86 @@
         "matching_lines": 121
       },
       "duration": 0.6,
+      "status": "pass"
+    },
+    {
+      "test": "all_classes/events/swf10",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 7.278,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1638,
+        "expected_lines": 1638,
+        "matching_lines": 1638
+      },
+      "duration": 7.31,
+      "status": "pass"
+    },
+    {
+      "test": "all_classes/events/swf11",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 0.577,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1750,
+        "expected_lines": 1750,
+        "matching_lines": 1750
+      },
+      "duration": 0.61,
+      "status": "pass"
+    },
+    {
+      "test": "all_classes/events/swf12",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 0.576,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1814,
+        "expected_lines": 1814,
+        "matching_lines": 1814
+      },
+      "duration": 0.61,
+      "status": "pass"
+    },
+    {
+      "test": "all_classes/events/swf30",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 0.582,
+        "run": 0.032
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2353,
+        "expected_lines": 2353,
+        "matching_lines": 2353
+      },
+      "duration": 0.63,
+      "status": "pass"
+    },
+    {
+      "test": "all_classes/events/swf9",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 0.579,
+        "run": 0.016
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 1030,
+        "expected_lines": 1030,
+        "matching_lines": 1030
+      },
+      "duration": 0.61,
       "status": "pass"
     },
     {
@@ -4618,6 +4698,22 @@
         "matching_lines": 1284
       },
       "duration": 8.26,
+      "status": "pass"
+    },
+    {
+      "test": "displayobject_scrollrect",
+      "phases": {
+        "recomp": 0.009,
+        "compile": 8.657,
+        "run": 0.008
+      },
+      "num_frames": 100,
+      "lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
+      },
+      "duration": 8.68,
       "status": "pass"
     },
     {
