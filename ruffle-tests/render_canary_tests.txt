@@ -233,3 +233,35 @@ regression/avm2_graphics_runtime            # runtime Graphics through the CPU
                                             #   comparison. The only canary
                                             #   member that reads a script-drawn
                                             #   Graphics off the CPU raster.
+# SESSION 20 ADDITIONS (s20 wave-2 `w2-gfx-text-smalls`). Two change classes
+# this slice touches had NO canary member that could see them:
+#
+#  (a) the AVM2 EditText border on the ANTIALIASED arm. The set's only EditText
+#      border members were `visual/edittext/edittext_border_transform` (AVM1 —
+#      SWF v8, no ABC, so it is `tag.c::textfield_render_cb`, not
+#      `avm2_display.c::avm2_render_textbox`) and `text/auto_size/width`
+#      (AVM2 but quality = "low", i.e. the MSAA_SAMPLES == 1 arm). The
+#      MSAA_SAMPLES > 1 arm of avm2_render_textbox — both its device-font and
+#      its embedded-font box painter — was invisible to the canary.
+#  (b) the AVM2 DEVICE-FACE lookup (`avm2_text.c::find_device_font_list`). No
+#      member registered a `[fonts.*]` device face at all, so a change to the
+#      device-face matching ladder could only ever report IDENTICAL.
+
+# tier=1  (CI-passing, absolute verdicts)
+avm2/edittext_autosize_height_dynamic       # AVM2 EDITTEXT BORDER, ANTIALIASED
+                                            #   quality = "high", tolerance 128,
+                                            #   CI-PASSING. Six autosized
+                                            #   bordered fields drawn through
+                                            #   avm2_render_textbox's MSAA arm,
+                                            #   including the bottom-right
+                                            #   corner pixel this session's
+                                            #   patch 2 changes (golden 111,
+                                            #   ours 0 before / 64 after).
+fonts/device_font_kerning                   # AVM2 DEVICE-FACE LOOKUP     1 cmp
+                                            #   quality = "high", tolerance 0,
+                                            #   max_outliers 0, CI-PASSING at
+                                            #   max diff 0 — a full-headroom
+                                            #   absolute verdict on
+                                            #   find_device_font_list, which
+                                            #   patch 1 rewrites into a
+                                            #   bold/italic fallback ladder.

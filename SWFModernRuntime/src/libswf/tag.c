@@ -5581,6 +5581,13 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 int g_in_action_call = 0;
 
 #ifndef NO_GRAPHICS
+// The harness passes -DMSAA_SAMPLES=N only when it differs from the default of
+// 4 (verify_output.py:2695), so an undefined macro means the antialiased build.
+// Mirrors avm2_display.c:18379.
+#ifndef MSAA_SAMPLES
+#define MSAA_SAMPLES 4
+#endif
+
 // Callback for actionIterateTextFields: render text field background/border rectangles.
 static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data)
 {
@@ -5775,10 +5782,37 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 			renderer_draw_rect(context, x, y + bt, bl, h - bt, r, g, b, 1.0f, xform_slot, 0);          // left
 			renderer_draw_rect(context, x + w - bl, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0); // right
 		} else {
+			// The CLOSED line-rect's bottom-right corner is PARTIAL, not binary.
+			// Ruffle emits it as one LineStrip [0,1,2,3,0] (wgpu
+			// descriptors.rs:237, pipelines.rs:118) whose vertices sit at the
+			// HALF_PX-offset box corners, so the bottom and right segments each
+			// STOP at the centre of that corner pixel: the bottom inks its left
+			// half, the right its top half, union 3/4 — while the top and left
+			// segments RUN THROUGH the other three corners and ink them solid.
+			// Measured in the goldens (BR pixel value, 0 = solid black); both
+			// of these are SWF v8, i.e. this painter, NOT avm2_render_textbox:
+			//   visual/edittext/edittext_caret_empty   12 boxes, 40x20    95
+			//   visual/edittext/edittext_border_transform .04/.06          95
+			// Four full-coverage rects can only produce 0 or 255 there. Both
+			// values were tried: full (0) is 95 off, and the open polyline
+			// (255, the `line_rect` branch above) is 160 off — which is why
+			// edittext_caret_empty stayed red at tolerance 64 / max_outliers 0
+			// either way. Ending the bottom rect half a device pixel short and
+			// extending the right rect half a device pixel down makes the two
+			// meet at the corner pixel's CENTRE, so MSAA resolves 3/4 coverage
+			// (64 of 255) — 31 off the golden, inside tolerance at last.
+			// MSAA-gated: at MSAA_SAMPLES == 1 the lone pixel-centre sample
+			// lands exactly on the new edge and would drop the corner to white,
+			// and the aliased arm has its own measured rule (avm2_display.c).
+			float bot_w = w, rgt_h = h - 2*bt;
+#if MSAA_SAMPLES > 1
+			bot_w = w - bl * 0.5f;
+			rgt_h = h - 2*bt + bt * 0.5f;
+#endif
 			renderer_draw_rect(context, x, y, w, bt, r, g, b, 1.0f, xform_slot, 0);            // top
-			renderer_draw_rect(context, x, y + h - bt, w, bt, r, g, b, 1.0f, xform_slot, 0);   // bottom
+			renderer_draw_rect(context, x, y + h - bt, bot_w, bt, r, g, b, 1.0f, xform_slot, 0);   // bottom
 			renderer_draw_rect(context, x, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0);          // left
-			renderer_draw_rect(context, x + w - bl, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0); // right
+			renderer_draw_rect(context, x + w - bl, y + bt, bl, rgt_h, r, g, b, 1.0f, xform_slot, 0); // right
 		}
 	}
 }

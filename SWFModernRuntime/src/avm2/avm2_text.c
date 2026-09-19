@@ -2592,6 +2592,51 @@ static const Avm2FontData* find_device_font(const char* name, uint32_t len,
 	return NULL;
 }
 
+// Ruffle `get_or_load_device_font` (library.rs:576-590) is NOT a bare exact
+// probe: it tries the exact FontQuery first and then falls back to
+// `FontMap::find` (library.rs:788-845), the SAME bold/italic compatibility
+// ladder `resolve_font` below already runs for EMBEDDED faces. Device faces
+// were missing it entirely, so a span asking for a style the device family does
+// not register — e.g. the `<i>Abc</i>` run of visual/fonts/device-font, whose
+// test.toml declares only regular + bold Tinos — fell all the way through to
+// the metrics-only baked `noto_device_font`. That loses the run's glyphs AND
+// inflates the line box, because the baked Noto's ascent (21931 / em 20480, so
+// 32.1 px at size 30) is far larger than Tinos's (1825 / em 2048, 26.7 px):
+// every line after an unmatched italic/bold run sits ~5 px low and the
+// line-to-line pitch grows from the golden's 33 px to 36 px.
+//
+// Ladder order is load-bearing and is Ruffle's, tested upstream in
+// tests/swfs/fonts/embed_matching/fallback_preferences. It runs PER
+// COMMA-SEPARATED ENTRY, because layout.rs:583 loops the names and calls
+// `get_or_sort_device_fonts` on each — the two-pass "exact over all names, then
+// ladder over all names" form is `get_or_load_default_font`, which serves the
+// `_sans`/`_serif` DefaultFont aliases, not a named family list.
+static const Avm2FontData* find_device_font_ladder(const char* name,
+                                                    uint32_t len,
+                                                    int bold, int italic)
+{
+	const Avm2FontData* fd = find_device_font(name, len, bold, italic);
+	if (fd != NULL) return fd;
+	if (bold ^ italic)
+	{
+		// One of the two set: bold-italic, then regular, then the other one.
+		fd = find_device_font(name, len, 1, 1);
+		if (fd == NULL) fd = find_device_font(name, len, 0, 0);
+		if (fd == NULL) fd = find_device_font(name, len, !bold, !italic);
+	}
+	else
+	{
+		// Asked for regular or bold-italic: (bold-italic only) regular, then
+		// bold, then italic, then (regular only) bold-italic.
+		if (bold && italic) fd = find_device_font(name, len, 0, 0);
+		if (fd == NULL) fd = find_device_font(name, len, 1, 0);
+		if (fd == NULL) fd = find_device_font(name, len, 0, 1);
+		if (fd == NULL && !bold && !italic)
+			fd = find_device_font(name, len, 1, 1);
+	}
+	return fd;
+}
+
 // Rust `str::trim` — strips Unicode whitespace; ASCII whitespace is all the
 // corpus needs and all the layout code can see here.
 static int is_ws(char c)
@@ -2617,8 +2662,9 @@ static const Avm2FontData* find_device_font_list(const Avm2String* name,
 		while (end > start && is_ws(name->utf8[end - 1])) end--;
 		if (end > start)
 		{
-			const Avm2FontData* fd = find_device_font(name->utf8 + start,
-			                                          end - start, bold, italic);
+			const Avm2FontData* fd = find_device_font_ladder(name->utf8 + start,
+			                                                 end - start,
+			                                                 bold, italic);
 			if (fd != NULL) return fd;
 		}
 		if (i >= name->len) break;

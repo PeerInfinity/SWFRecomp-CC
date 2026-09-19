@@ -18716,10 +18716,29 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 			// line runs (x_min, y_min+0.5px) -> (x_min+w, y_min+0.5px) and the left
 			// line is its transpose; unlike the closed line-strip of draw_line_rect
 			// every edge keeps both terminal pixels, so the outline is symmetric.
+			//
+			// ...except at the BOTTOM-RIGHT corner, where it is not. Every
+			// measured golden inks TL, TR and BL solid and the BR pixel only
+			// PARTIALLY — 111 of 255 in avm2/edittext_autosize_height_dynamic
+			// (36 x 44 at the origin, quality = "high") and in
+			// visual/edittext/edittext_selection_leading, 95 in the AVM1 twin
+			// of this painter (visual/edittext/edittext_caret_empty, drawn by
+			// tag.c::textfield_render_cb — SWF v8). Four full-coverage quads can
+			// only give 0 or 255 there, and we gave 0, i.e. 111 off on a
+			// tolerance of 128. Ending the bottom and right rects half a device
+			// pixel short makes them meet at the corner pixel's CENTRE, so MSAA
+			// resolves 3/4 coverage (64) — 47 off instead of 111. Gated on MSAA
+			// because at MSAA_SAMPLES == 1 the single pixel-centre sample would
+			// land on the new edge and drop the corner entirely, and no aliased
+			// device-font golden has been measured to justify that.
+			double corner_dev = dtw;
+#if MSAA_SAMPLES > 1
+			corner_dev = dtw / 2.0;
+#endif
 			avm2_border_rect(x0, y0, w + dtw, dtw, bc, alpha);
-			avm2_border_rect(x0, y0 + h, w + dtw, dtw, bc, alpha);
+			avm2_border_rect(x0, y0 + h, w + corner_dev, dtw, bc, alpha);
 			avm2_border_rect(x0, y0, dtw, h + dtw, bc, alpha);
-			avm2_border_rect(x0 + w, y0, dtw, h + dtw, bc, alpha);
+			avm2_border_rect(x0 + w, y0, dtw, h + corner_dev, bc, alpha);
 		}
 		return;
 	}
@@ -18812,18 +18831,50 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 		double bry_px = (by + bh) / dtw;
 		double bry_frac = bry_px - floor(bry_px);
 		int corner_missing = !(bry_frac > 1e-6 && bry_frac < 0.5 - 1e-6);
+		// Aliased: a pixel is all or nothing, so the present corner is full.
+		double corner_ext = dtw;
 #else
-		// MSAA build: both antialiased segments cover the corner, so it is
-		// always painted. Unchanged (the high arm nearbyint()s bd anyway).
+		// MSAA build. e5dff31ab left this arm alone on the assertion that "both
+		// antialiased segments cover the corner, so it is always painted"; that
+		// is HALF right — the corner IS painted, but only PARTIALLY, and a
+		// full-coverage quad can only ever produce 0 % or 100 %.
+		//
+		// Ruffle draws the box as ONE LineStrip, indices [0,1,2,3,0]
+		// (wgpu descriptors.rs:237, pipelines.rs:118 PrimitiveTopology::LineStrip),
+		// whose vertices sit at the HALF_PX-offset box corners. Each 1px-wide
+		// segment therefore STOPS at the CENTRE of the bottom-right corner
+		// pixel: the bottom segment inks only that pixel's left half, the right
+		// segment only its top half. Their union is 3/4 of the pixel, not 4/4.
+		// The other three corners are unaffected because the top and left
+		// segments RUN THROUGH them (they start/end at the far corners), which
+		// is why the goldens show TL/TR/BL solid and only BR partial.
+		//
+		// Measured in the AVM2 goldens (value of the BR corner pixel, 0 = solid):
+		//   avm2/edittext_autosize_height_dynamic     36 x 44     111  (tol 128)
+		//   visual/edittext/edittext_selection_leading             111  (tol 128)
+		// Ours was 0 in both, i.e. 111 off on a tolerance of 128 — inside the
+		// bar but with only 17 to spare. The AVM1 twin of this painter,
+		// tag.c::textfield_render_cb, had the same bug against a tolerance of
+		// 64 and it WAS failing: 11 of visual/edittext/edittext_caret_empty's
+		// 12 comparisons, on those 12 corner pixels alone.
 		int corner_missing = fabs((by + bh) / dtw
 		                          - nearbyint((by + bh) / dtw)) > 1e-6;
+		// Half a device pixel: the bottom and right rects now MEET at the corner
+		// pixel's centre exactly as Ruffle's two line segments do, and MSAA
+		// resolves the 3/4 coverage (64 of 255 at MSAA_SAMPLES == 4, 128 at 2)
+		// instead of the binary 0/255 a full-extent quad can produce. The
+		// fractional-extent case keeps its existing corner_missing verdict, so
+		// the tolerance-0 rows that depend on it (edittext_border_transform
+		// .01-.03) are untouched.
+		double corner_ext = dtw / 2.0;
 #endif
 		avm2_border_rect(bx, by, bw + dtw, dtw, bc, alpha);          // top
-		avm2_border_rect(bx, by + bh, corner_missing ? bw : bw + dtw,
+		avm2_border_rect(bx, by + bh, corner_missing ? bw : bw + corner_ext,
 		                 dtw, bc, alpha);                            // bottom
 		avm2_border_rect(bx, by, dtw, bh + dtw, bc, alpha);          // left
 		avm2_border_rect(bx + bw, by, dtw,
-		                 corner_missing ? bh : bh + dtw, bc, alpha); // right
+		                 corner_missing ? bh : bh + corner_ext,
+		                 bc, alpha);                                 // right
 		return;
 	}
 	// Rotated / sheared: fall back to Ruffle's emulated 1px line rects, whose

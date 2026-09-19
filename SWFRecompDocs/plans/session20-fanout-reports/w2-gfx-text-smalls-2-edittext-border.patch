@@ -1,0 +1,190 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 2fade77f4..d691c4b7f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -18553,10 +18553,29 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+ 			// line runs (x_min, y_min+0.5px) -> (x_min+w, y_min+0.5px) and the left
+ 			// line is its transpose; unlike the closed line-strip of draw_line_rect
+ 			// every edge keeps both terminal pixels, so the outline is symmetric.
++			//
++			// ...except at the BOTTOM-RIGHT corner, where it is not. Every
++			// measured golden inks TL, TR and BL solid and the BR pixel only
++			// PARTIALLY — 111 of 255 in avm2/edittext_autosize_height_dynamic
++			// (36 x 44 at the origin, quality = "high") and in
++			// visual/edittext/edittext_selection_leading, 95 in the AVM1 twin
++			// of this painter (visual/edittext/edittext_caret_empty, drawn by
++			// tag.c::textfield_render_cb — SWF v8). Four full-coverage quads can
++			// only give 0 or 255 there, and we gave 0, i.e. 111 off on a
++			// tolerance of 128. Ending the bottom and right rects half a device
++			// pixel short makes them meet at the corner pixel's CENTRE, so MSAA
++			// resolves 3/4 coverage (64) — 47 off instead of 111. Gated on MSAA
++			// because at MSAA_SAMPLES == 1 the single pixel-centre sample would
++			// land on the new edge and drop the corner entirely, and no aliased
++			// device-font golden has been measured to justify that.
++			double corner_dev = dtw;
++#if MSAA_SAMPLES > 1
++			corner_dev = dtw / 2.0;
++#endif
+ 			avm2_border_rect(x0, y0, w + dtw, dtw, bc, alpha);
+-			avm2_border_rect(x0, y0 + h, w + dtw, dtw, bc, alpha);
++			avm2_border_rect(x0, y0 + h, w + corner_dev, dtw, bc, alpha);
+ 			avm2_border_rect(x0, y0, dtw, h + dtw, bc, alpha);
+-			avm2_border_rect(x0 + w, y0, dtw, h + dtw, bc, alpha);
++			avm2_border_rect(x0 + w, y0, dtw, h + corner_dev, bc, alpha);
+ 		}
+ 		return;
+ 	}
+@@ -18649,18 +18668,50 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+ 		double bry_px = (by + bh) / dtw;
+ 		double bry_frac = bry_px - floor(bry_px);
+ 		int corner_missing = !(bry_frac > 1e-6 && bry_frac < 0.5 - 1e-6);
++		// Aliased: a pixel is all or nothing, so the present corner is full.
++		double corner_ext = dtw;
+ #else
+-		// MSAA build: both antialiased segments cover the corner, so it is
+-		// always painted. Unchanged (the high arm nearbyint()s bd anyway).
++		// MSAA build. e5dff31ab left this arm alone on the assertion that "both
++		// antialiased segments cover the corner, so it is always painted"; that
++		// is HALF right — the corner IS painted, but only PARTIALLY, and a
++		// full-coverage quad can only ever produce 0 % or 100 %.
++		//
++		// Ruffle draws the box as ONE LineStrip, indices [0,1,2,3,0]
++		// (wgpu descriptors.rs:237, pipelines.rs:118 PrimitiveTopology::LineStrip),
++		// whose vertices sit at the HALF_PX-offset box corners. Each 1px-wide
++		// segment therefore STOPS at the CENTRE of the bottom-right corner
++		// pixel: the bottom segment inks only that pixel's left half, the right
++		// segment only its top half. Their union is 3/4 of the pixel, not 4/4.
++		// The other three corners are unaffected because the top and left
++		// segments RUN THROUGH them (they start/end at the far corners), which
++		// is why the goldens show TL/TR/BL solid and only BR partial.
++		//
++		// Measured in the AVM2 goldens (value of the BR corner pixel, 0 = solid):
++		//   avm2/edittext_autosize_height_dynamic     36 x 44     111  (tol 128)
++		//   visual/edittext/edittext_selection_leading             111  (tol 128)
++		// Ours was 0 in both, i.e. 111 off on a tolerance of 128 — inside the
++		// bar but with only 17 to spare. The AVM1 twin of this painter,
++		// tag.c::textfield_render_cb, had the same bug against a tolerance of
++		// 64 and it WAS failing: 11 of visual/edittext/edittext_caret_empty's
++		// 12 comparisons, on those 12 corner pixels alone.
+ 		int corner_missing = fabs((by + bh) / dtw
+ 		                          - nearbyint((by + bh) / dtw)) > 1e-6;
++		// Half a device pixel: the bottom and right rects now MEET at the corner
++		// pixel's centre exactly as Ruffle's two line segments do, and MSAA
++		// resolves the 3/4 coverage (64 of 255 at MSAA_SAMPLES == 4, 128 at 2)
++		// instead of the binary 0/255 a full-extent quad can produce. The
++		// fractional-extent case keeps its existing corner_missing verdict, so
++		// the tolerance-0 rows that depend on it (edittext_border_transform
++		// .01-.03) are untouched.
++		double corner_ext = dtw / 2.0;
+ #endif
+ 		avm2_border_rect(bx, by, bw + dtw, dtw, bc, alpha);          // top
+-		avm2_border_rect(bx, by + bh, corner_missing ? bw : bw + dtw,
++		avm2_border_rect(bx, by + bh, corner_missing ? bw : bw + corner_ext,
+ 		                 dtw, bc, alpha);                            // bottom
+ 		avm2_border_rect(bx, by, dtw, bh + dtw, bc, alpha);          // left
+ 		avm2_border_rect(bx + bw, by, dtw,
+-		                 corner_missing ? bh : bh + dtw, bc, alpha); // right
++		                 corner_missing ? bh : bh + corner_ext,
++		                 bc, alpha);                                 // right
+ 		return;
+ 	}
+ 	// Rotated / sheared: fall back to Ruffle's emulated 1px line rects, whose
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 8405110e2..2e8ba11c2 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -5581,6 +5581,13 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
+ int g_in_action_call = 0;
+ 
+ #ifndef NO_GRAPHICS
++// The harness passes -DMSAA_SAMPLES=N only when it differs from the default of
++// 4 (verify_output.py:2695), so an undefined macro means the antialiased build.
++// Mirrors avm2_display.c:18379.
++#ifndef MSAA_SAMPLES
++#define MSAA_SAMPLES 4
++#endif
++
+ // Callback for actionIterateTextFields: render text field background/border rectangles.
+ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data)
+ {
+@@ -5775,10 +5782,37 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
+ 			renderer_draw_rect(context, x, y + bt, bl, h - bt, r, g, b, 1.0f, xform_slot, 0);          // left
+ 			renderer_draw_rect(context, x + w - bl, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0); // right
+ 		} else {
++			// The CLOSED line-rect's bottom-right corner is PARTIAL, not binary.
++			// Ruffle emits it as one LineStrip [0,1,2,3,0] (wgpu
++			// descriptors.rs:237, pipelines.rs:118) whose vertices sit at the
++			// HALF_PX-offset box corners, so the bottom and right segments each
++			// STOP at the centre of that corner pixel: the bottom inks its left
++			// half, the right its top half, union 3/4 — while the top and left
++			// segments RUN THROUGH the other three corners and ink them solid.
++			// Measured in the goldens (BR pixel value, 0 = solid black); both
++			// of these are SWF v8, i.e. this painter, NOT avm2_render_textbox:
++			//   visual/edittext/edittext_caret_empty   12 boxes, 40x20    95
++			//   visual/edittext/edittext_border_transform .04/.06          95
++			// Four full-coverage rects can only produce 0 or 255 there. Both
++			// values were tried: full (0) is 95 off, and the open polyline
++			// (255, the `line_rect` branch above) is 160 off — which is why
++			// edittext_caret_empty stayed red at tolerance 64 / max_outliers 0
++			// either way. Ending the bottom rect half a device pixel short and
++			// extending the right rect half a device pixel down makes the two
++			// meet at the corner pixel's CENTRE, so MSAA resolves 3/4 coverage
++			// (64 of 255) — 31 off the golden, inside tolerance at last.
++			// MSAA-gated: at MSAA_SAMPLES == 1 the lone pixel-centre sample
++			// lands exactly on the new edge and would drop the corner to white,
++			// and the aliased arm has its own measured rule (avm2_display.c).
++			float bot_w = w, rgt_h = h - 2*bt;
++#if MSAA_SAMPLES > 1
++			bot_w = w - bl * 0.5f;
++			rgt_h = h - 2*bt + bt * 0.5f;
++#endif
+ 			renderer_draw_rect(context, x, y, w, bt, r, g, b, 1.0f, xform_slot, 0);            // top
+-			renderer_draw_rect(context, x, y + h - bt, w, bt, r, g, b, 1.0f, xform_slot, 0);   // bottom
++			renderer_draw_rect(context, x, y + h - bt, bot_w, bt, r, g, b, 1.0f, xform_slot, 0);   // bottom
+ 			renderer_draw_rect(context, x, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0);          // left
+-			renderer_draw_rect(context, x + w - bl, y + bt, bl, h - 2*bt, r, g, b, 1.0f, xform_slot, 0); // right
++			renderer_draw_rect(context, x + w - bl, y + bt, bl, rgt_h, r, g, b, 1.0f, xform_slot, 0); // right
+ 		}
+ 	}
+ }
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index d51a4bf06..cf2896ce3 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -200,3 +200,36 @@ avm2/stage3d_triangle                       # the whole phase-A path in one
+ avm2/stage3d_rotating_cube                  # m44 + setProgramConstantsFrom-
+                                             #   Matrix + back-face culling +
+                                             #   the multi-tick redraw path
++
++# SESSION 20 ADDITIONS (s20 wave-2 `w2-gfx-text-smalls`). Two change classes
++# this slice touches had NO canary member that could see them:
++#
++#  (a) the AVM2 EditText border on the ANTIALIASED arm. The set's only EditText
++#      border members were `visual/edittext/edittext_border_transform` (AVM1 —
++#      SWF v8, no ABC, so it is `tag.c::textfield_render_cb`, not
++#      `avm2_display.c::avm2_render_textbox`) and `text/auto_size/width`
++#      (AVM2 but quality = "low", i.e. the MSAA_SAMPLES == 1 arm). The
++#      MSAA_SAMPLES > 1 arm of avm2_render_textbox — both its device-font and
++#      its embedded-font box painter — was invisible to the canary.
++#  (b) the AVM2 DEVICE-FACE lookup (`avm2_text.c::find_device_font_list`). No
++#      member registered a `[fonts.*]` device face at all, so a change to the
++#      device-face matching ladder could only ever report IDENTICAL.
++
++# tier=1  (CI-passing, absolute verdicts)
++avm2/edittext_autosize_height_dynamic       # AVM2 EDITTEXT BORDER, ANTIALIASED
++                                            #   quality = "high", tolerance 128,
++                                            #   CI-PASSING. Six autosized
++                                            #   bordered fields drawn through
++                                            #   avm2_render_textbox's MSAA arm,
++                                            #   including the bottom-right
++                                            #   corner pixel this session's
++                                            #   patch 2 changes (golden 111,
++                                            #   ours 0 before / 64 after).
++fonts/device_font_kerning                   # AVM2 DEVICE-FACE LOOKUP     1 cmp
++                                            #   quality = "high", tolerance 0,
++                                            #   max_outliers 0, CI-PASSING at
++                                            #   max diff 0 — a full-headroom
++                                            #   absolute verdict on
++                                            #   find_device_font_list, which
++                                            #   patch 1 rewrites into a
++                                            #   bold/italic fallback ladder.
