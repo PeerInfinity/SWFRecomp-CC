@@ -1,0 +1,70 @@
+diff --git a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+index 54cb3ddaf..edd6200f2 100644
+--- a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+@@ -151,7 +151,10 @@ soundchannel_soundcomplete
+ #    pass" was WRONG: verify_output.py already simulates it — test.toml's
+ #    [player_options] viewport_dimensions.scale_factor is compiled in as
+ #    -DVIEWPORT_SCALE_FACTOR; only the getter was stubbed to 1.)
+-displayobject_scrollrect
++#   (displayobject_scrollrect: PASSES as of s20 w2-avm1-nearflips — pruned.
++#    Re-tested locally 2026-09-18 and `pass` in the graded run 35163868554
++#    @ 2973513c4; the entry's note still described a scrollRect residual that
++#    no longer exists.)
+ 
+ # Upstream known_failure = true (Ruffle itself fails these)
+ #
+@@ -163,11 +166,13 @@ displayobject_scrollrect
+ # T9/§5a): both are `pass` 1125/1125 at `aeebf9ede`, i.e. we match the Flash
+ # oracle where Ruffle does not, and the entries were hiding two wins. Their
+ # `*_toexponential` siblings stay: still `ruffle_matched` (1139/1215, 1115/1215).
+-all_classes/events/swf10
+-all_classes/events/swf11
+-all_classes/events/swf12
+-all_classes/events/swf30
+-all_classes/events/swf9
++#
++# PRUNED 2026-09-18 (s20 w2-avm1-nearflips, from w1-drift's ignore-list re-test):
++# `all_classes/events/swf9`, `swf10`, `swf11`, `swf12`, `swf30` — all five are
++# `pass` (1030/1030, 1638/1638, 1750/1750, 1814/1814, 2353/2353) in the graded
++# run 35163868554 @ 2973513c4 and re-tested locally. Same shape as the
++# `*_toprecision` prune above: we match the Flash oracle where Ruffle does not,
++# and the entries were hiding five wins.
+ array_access_oob_interpreter
+ array_sort_swf10_64bit
+ avm1_root
+@@ -181,7 +186,14 @@ edittext_getcharboundaries_missing_embedded_font
+ edittext_tab_stops
+ encode_uri_surrogate_pair_swf10
+ freestanding_superclass
+-goto_framescript_queued
++#   (goto_framescript_queued: INERT as of s20 — upstream d5b707265 deleted the
++#    flat test and replaced it with `goto_framescript_queued/swf9`, `/swf10`,
++#    `/swf13`; b20e2fdf9 then added `goto_framescript_queued_same_frame`. This
++#    entry matched the old flat name and now dispositions nothing, so it is
++#    removed. Do NOT re-add it for the replacements: after 7e8e2de8a only
++#    `/swf13` is still `known_failure`, and the other three are legitimately
++#    visible. The cluster is live work — see SWFRecompDocs/plans/
++#    session20-fanout-reports/w1-drift-report.md ss2.)
+ graphics_draw_path
+ int_toexponential
+ simplebutton_childevents_multichild
+diff --git a/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt b/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt
+index 36cc2f187..ee794421c 100644
+--- a/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt
+@@ -14,6 +14,11 @@
+ # avm1/_investigation/ACCEPTED_DIFFS.md and in its summary table.
+ 
+ # Ruffle known_failure — test fails in Ruffle's own test suite.
+-# `hitarea` is `ruffle_matched`: we match Ruffle but not Flash's output.txt,
+-# so it is a real remaining divergence and stays listed.
+-hitarea
++#
++# PRUNED 2026-09-18 (s20 w2-avm1-nearflips, 1 -> 0 entries). `hitarea` was kept
++# on the entry's own criterion — "`hitarea` is `ruffle_matched` ... so it is a
++# real remaining divergence and stays listed". It is no longer `ruffle_matched`:
++# it is `pass` (4/4) in the graded run 35163868554 @ 2973513c4 and re-tested
++# locally, i.e. we now match Flash's output.txt where Ruffle fails it. The list
++# is intentionally left empty rather than deleted, so the header's prune history
++# survives.

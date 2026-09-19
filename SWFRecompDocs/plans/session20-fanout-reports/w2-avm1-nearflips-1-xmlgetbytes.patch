@@ -1,0 +1,95 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 4e4d0e765..d788e0e79 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -20298,6 +20298,24 @@ static void aq_dispatch_xml_load(SWFAppContext* app_context, void* user) {
+ 			xml_set_null(app_context, doc, "firstChild", 10);
+ 			xml_set_null(app_context, doc, "lastChild", 9);
+ 
++			// The response has arrived: NOW the byte counters get their real
++			// values, immediately before onData fires (Ruffle
++			// core/src/loader.rs:1070-1090 — `_bytesTotal` always, and
++			// `_bytesLoaded` only when the body is non-empty). Doing it at
++			// request time instead reports the counts one phase early and
++			// leaves nothing to report here; `avm1/xml_getbytes` pins both
++			// phases. Flags stay DONT_ENUM | DONT_DELETE (no CONFIGURABLE),
++			// so the `delete this._bytesLoaded` that xml_getbytes' onData
++			// performs is a no-op, as it is in Flash.
++			{
++				ActionVar bn = {0}; bn.type = ACTION_STACK_VALUE_F64;
++				VAL(double, &bn.data.numeric_value) = (double) d->content_length;
++				setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bn,
++					PROPERTY_FLAG_WRITABLE);
++				setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bn,
++					PROPERTY_FLAG_WRITABLE);
++			}
++
+ 			// Build raw src string and call this.onData(src). Default onData
+ 			// parses and fires onLoad(true); overrides may intercept.
+ 			u32 src_u16_len;
+@@ -20344,18 +20362,29 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
+ 	// Set loaded = false initially (observable synchronously)
+ 	xml_store_loaded(app_context, doc, 0);
+ 
++	// Request phase. Ruffle's spawn_xml_fetch (core/src/avm1/globals/xml.rs:541-565)
++	// creates/resets the byte counters to `_bytesLoaded = 0` and
++	// `_bytesTotal = undefined` BEFORE the fetch is issued, unconditionally —
++	// the real counts are written at response time (see aq_dispatch_xml_load).
++	// XML.as:945-946 checks hasOwnProperty('_bytesLoaded') right after load(),
++	// so both must exist as own properties from here on.
++	// DONT_ENUM | DONT_DELETE = WRITABLE alone (no ENUMERABLE, no CONFIGURABLE).
++	{
++		ActionVar bz = {0}; bz.type = ACTION_STACK_VALUE_F64;
++		VAL(double, &bz.data.numeric_value) = 0.0;
++		setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bz,
++			PROPERTY_FLAG_WRITABLE);
++		ActionVar bu = {0}; bu.type = ACTION_STACK_VALUE_UNDEFINED;
++		setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bu,
++			PROPERTY_FLAG_WRITABLE);
++	}
++
+ 	// Look up URL in embedded data file registry
+ 	extern DataFileEntry* findDataFile(const char* name);
+ 	DataFileEntry* data = findDataFile(url_utf8);
+ 	int success = 0;
+ 
+ 	if (data != NULL && data->content != NULL && data->content_length > 0) {
+-		// Track bytesLoaded / bytesTotal (DONT_ENUM) + status synchronously —
+-		// XML.as:945-946 checks hasOwnProperty('_bytesLoaded') right after load().
+-		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
+-		VAL(double, &bv.data.numeric_value) = (double)data->content_length;
+-		setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
+-		setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
+ 		xml_store_status(app_context, doc, 0.0);
+ 		success = 1;
+ 	}
+diff --git a/ruffle-tests/ignored_tests.txt b/ruffle-tests/ignored_tests.txt
+index 85db60ec1..94795a6c9 100644
+--- a/ruffle-tests/ignored_tests.txt
++++ b/ruffle-tests/ignored_tests.txt
+@@ -97,11 +118,22 @@ load_vars
+ stylesheet_load
+ 
+ # --- XML networking/sockets ---
+-# These tests require network connections or XML HTTP loading.
+ # (xml_socket, xml_socket_close_in_handler, xml_socket_connect_null,
+ #  xml_socket_on_data, xml_socket_segmented removed 2026-08-01 — all now
+-#  `pass`, xml_socket in BOTH avm1 and avm2. Only xml_getbytes still fails.)
+-xml_getbytes
++#  `pass`, xml_socket in BOTH avm1 and avm2.)
++# (xml_getbytes removed 2026-09-18, s20 w2-avm1-nearflips — now `pass` 17/17.
++#  The bucket header "require network connections or XML HTTP loading" was a
++#  CATEGORY claim that no per-name measurement ever supported: the residual was
++#  never networking, it was an XML.load byte-counter PHASE error. We wrote the
++#  real counts at request time instead of response time, so the post-load probe
++#  read 27/27 where Flash reads 0/undefined and the onData probe read
++#  undefined×4 where Flash reads 27×4. Fixed by matching Ruffle's split —
++#  spawn_xml_fetch (avm1/globals/xml.rs:541) defines _bytesLoaded = 0 /
++#  _bytesTotal = undefined DONT_DELETE|DONT_ENUM at request time, loader.rs:1070
++#  writes the real counts immediately before onData.)
++#
++# This bucket is now EMPTY. Do not re-add a name to it on the strength of the
++# header alone — grade the test first.
+ 
+ # --- Sound/audio ---
+ # These tests require audio playback or streaming.

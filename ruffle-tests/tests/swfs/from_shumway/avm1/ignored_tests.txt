@@ -14,6 +14,11 @@
 # avm1/_investigation/ACCEPTED_DIFFS.md and in its summary table.
 
 # Ruffle known_failure — test fails in Ruffle's own test suite.
-# `hitarea` is `ruffle_matched`: we match Ruffle but not Flash's output.txt,
-# so it is a real remaining divergence and stays listed.
-hitarea
+#
+# PRUNED 2026-09-18 (s20 w2-avm1-nearflips, 1 -> 0 entries). `hitarea` was kept
+# on the entry's own criterion — "`hitarea` is `ruffle_matched` ... so it is a
+# real remaining divergence and stays listed". It is no longer `ruffle_matched`:
+# it is `pass` (4/4) in the graded run 35163868554 @ 2973513c4 and re-tested
+# locally, i.e. we now match Flash's output.txt where Ruffle fails it. The list
+# is intentionally left empty rather than deleted, so the header's prune history
+# survives.

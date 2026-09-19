@@ -20298,6 +20298,24 @@ static void aq_dispatch_xml_load(SWFAppContext* app_context, void* user) {
 			xml_set_null(app_context, doc, "firstChild", 10);
 			xml_set_null(app_context, doc, "lastChild", 9);
 
+			// The response has arrived: NOW the byte counters get their real
+			// values, immediately before onData fires (Ruffle
+			// core/src/loader.rs:1070-1090 — `_bytesTotal` always, and
+			// `_bytesLoaded` only when the body is non-empty). Doing it at
+			// request time instead reports the counts one phase early and
+			// leaves nothing to report here; `avm1/xml_getbytes` pins both
+			// phases. Flags stay DONT_ENUM | DONT_DELETE (no CONFIGURABLE),
+			// so the `delete this._bytesLoaded` that xml_getbytes' onData
+			// performs is a no-op, as it is in Flash.
+			{
+				ActionVar bn = {0}; bn.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &bn.data.numeric_value) = (double) d->content_length;
+				setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bn,
+					PROPERTY_FLAG_WRITABLE);
+				setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bn,
+					PROPERTY_FLAG_WRITABLE);
+			}
+
 			// Build raw src string and call this.onData(src). Default onData
 			// parses and fires onLoad(true); overrides may intercept.
 			u32 src_u16_len;
@@ -20344,18 +20362,29 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 	// Set loaded = false initially (observable synchronously)
 	xml_store_loaded(app_context, doc, 0);
 
+	// Request phase. Ruffle's spawn_xml_fetch (core/src/avm1/globals/xml.rs:541-565)
+	// creates/resets the byte counters to `_bytesLoaded = 0` and
+	// `_bytesTotal = undefined` BEFORE the fetch is issued, unconditionally —
+	// the real counts are written at response time (see aq_dispatch_xml_load).
+	// XML.as:945-946 checks hasOwnProperty('_bytesLoaded') right after load(),
+	// so both must exist as own properties from here on.
+	// DONT_ENUM | DONT_DELETE = WRITABLE alone (no ENUMERABLE, no CONFIGURABLE).
+	{
+		ActionVar bz = {0}; bz.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &bz.data.numeric_value) = 0.0;
+		setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bz,
+			PROPERTY_FLAG_WRITABLE);
+		ActionVar bu = {0}; bu.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bu,
+			PROPERTY_FLAG_WRITABLE);
+	}
+
 	// Look up URL in embedded data file registry
 	extern DataFileEntry* findDataFile(const char* name);
 	DataFileEntry* data = findDataFile(url_utf8);
 	int success = 0;
 
 	if (data != NULL && data->content != NULL && data->content_length > 0) {
-		// Track bytesLoaded / bytesTotal (DONT_ENUM) + status synchronously —
-		// XML.as:945-946 checks hasOwnProperty('_bytesLoaded') right after load().
-		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
-		VAL(double, &bv.data.numeric_value) = (double)data->content_length;
-		setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
-		setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
 		xml_store_status(app_context, doc, 0.0);
 		success = 1;
 	}
@@ -36094,6 +36123,10 @@ static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieCli
 #define AVM1_MAX_NAV_PARAMS 32
 #define AVM1_NAV_PARAM_BUF 4096
 
+// Defined far below; the root form-values walk needs the root's load-time
+// properties ($version) to exist before it reads them.
+static void ensureGlobalInit(SWFAppContext* app_context);
+
 // Coerce one ActionVar to UTF-8 through the stack, so it picks up the
 // interpreter's own number/object formatting instead of a second, divergent
 // copy of it. Returns the byte length written.
@@ -36115,11 +36148,72 @@ static int avm1_var_to_utf8(SWFAppContext* app_context, const ActionVar* v,
 	return n;
 }
 
+// One root-timeline variable harvested from var_map. The hashmap keeps every
+// live entry on a linked list in INSERTION order (lib/c-hashmap/map.c: "a
+// linked list of all valid entries, in order"), so a forward iterate collects
+// them in insertion order and a backwards emit is AVM1's reverse-insertion
+// enumeration order.
+#define AVM1_MAX_ROOT_VARS AVM1_MAX_NAV_PARAMS
+struct Avm1RootVarState
+{
+	const char* keys[AVM1_MAX_ROOT_VARS];
+	u32 klens[AVM1_MAX_ROOT_VARS];
+	ActionVar* vals[AVM1_MAX_ROOT_VARS];
+	size_t n;
+};
+
+// A var_map entry mirrored onto root.dynamic_props as DontEnum is not
+// enumerable: SetMember on the root MC syncs the value to var_map but does not
+// propagate flags (same rule as enum_varmap_callback, which for-in uses).
+static int avm1_root_var_enumerable(const char* name, u32 name_len)
+{
+	extern MovieClip root_movieclip;
+	ASObject* rdp = (ASObject*) root_movieclip.dynamic_props;
+	if (rdp == NULL) return 1;
+	for (u32 i = 0; i < rdp->num_used; i++)
+	{
+		if (rdp->properties[i].name != NULL &&
+		    rdp->properties[i].name_length == name_len &&
+		    memcmp(rdp->properties[i].name, name, name_len) == 0)
+			return (rdp->properties[i].flags & PROPERTY_FLAG_ENUMERABLE) ? 1 : 0;
+	}
+	return 1;
+}
+
+static int avm1_root_var_cb(const void* key, size_t ksize, uintptr_t value, void* usr)
+{
+	struct Avm1RootVarState* st = (struct Avm1RootVarState*) usr;
+	ActionVar* var = (ActionVar*) value;
+	if (var == NULL || st->n >= AVM1_MAX_ROOT_VARS) return 0;
+	// Uninitialised sentinel (type=STRING, size 0, NULL heap_ptr) — a slot that
+	// getVariable() minted on a failed lookup, not a variable. Same skip as
+	// enum_varmap_callback.
+	if (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 &&
+	    var->data.string_data.heap_ptr == NULL) return 0;
+	if (!avm1_root_var_enumerable((const char*) key, (u32) ksize)) return 0;
+	st->keys[st->n] = (const char*) key;
+	st->klens[st->n] = (u32) ksize;
+	st->vals[st->n] = var;
+	st->n++;
+	return 0;
+}
+
 // object_into_form_values (avm1/activation.rs): every enumerable property of
 // the scope's locals — for a frame script, the timeline clip's variable object
 // — coerced to a string. AVM1 enumeration is reverse-insertion order, hence the
 // backwards walk; `geturl` pins it ($version was inserted at movie load, so it
 // comes out last).
+//
+// Ruffle keeps ALL of the root timeline's variables on one object. We split
+// them across two stores: a scopeless DefineLocal/SetVariable at root lands in
+// the global var_array/var_map (actionDefineLocal's "Fall back to global
+// variable table" arm), while the clip's own dynamic_props carry the load-time
+// properties — `$version`, defined at SWF load (Ruffle context.rs:417). So for
+// the root the enumeration is one reverse-insertion walk over the union, and
+// the var_map entries (script-time, i.e. later) come out before the
+// dynamic_props ones (load-time, i.e. earlier). `geturl` pins exactly that:
+// value2, value1, $version. Non-root clips keep their variables on
+// dynamic_props and are unaffected (`loadvariables_method` pins that half).
 //
 // Values are coerced through the stack so they pick up the interpreter's own
 // number/object formatting rather than a second, divergent copy of it. Names
@@ -36129,16 +36223,68 @@ static size_t avm1_collect_form_values(SWFAppContext* app_context, MovieClip* mc
                                        SwfLogPair* out, size_t max,
                                        char* buf, size_t buf_cap)
 {
-	if (mc == NULL || mc->dynamic_props == NULL) return 0;
-	ASObject* obj = (ASObject*) mc->dynamic_props;
+	if (mc == NULL) return 0;
 	size_t n = 0;
 	size_t used = 0;
 	char str_buffer[17];
+
+	extern MovieClip root_movieclip;
+	if (mc == &root_movieclip)
+	{
+		// `$version` is defined on the ROOT OBJECT at SWF load in Ruffle
+		// (context.rs:432). Here it lands on root_movieclip.dynamic_props from
+		// ensureGlobalInit, which is lazy — a movie whose first actions are
+		// DefineLocal + getURL has not touched a global yet, so the root would
+		// otherwise have no dynamic_props at all and `geturl` would lose its
+		// last form value. Idempotent (g_global_init_done), and this whole
+		// translation unit only exists in LOG_FETCH builds.
+		ensureGlobalInit(app_context);
+
+		extern hashmap* var_map;
+		struct Avm1RootVarState st;
+		st.n = 0;
+		if (var_map != NULL) hashmap_iterate(var_map, avm1_root_var_cb, &st);
+		for (int i = (int) st.n - 1; i >= 0 && n < max; i--)
+		{
+			u32 klen = st.klens[i];
+			if (used + klen + 1 > buf_cap) break;
+			char* name_dst = buf + used;
+			memcpy(name_dst, st.keys[i], klen);
+			used += klen;
+
+			char* val_dst = buf + used;
+			int val_len = 0;
+			if (used < buf_cap)
+				val_len = avm1_var_to_utf8(app_context, st.vals[i], val_dst,
+				                           (int) (buf_cap - used));
+			used += (size_t) val_len;
+
+			out[n].name = name_dst;
+			out[n].name_len = klen;
+			out[n].value = val_dst;
+			out[n].value_len = (size_t) val_len;
+			n++;
+		}
+	}
+
+	if (mc->dynamic_props == NULL) return n;
+	ASObject* obj = (ASObject*) mc->dynamic_props;
 	for (int i = (int) obj->num_used - 1; i >= 0 && n < max; i--)
 	{
 		ASProperty* p = &obj->properties[i];
 		if (!(p->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
 		if (p->name == NULL) continue;
+		// A root variable that is mirrored into both stores is one property.
+		{
+			int dup = 0;
+			for (size_t j = 0; j < n; j++)
+			{
+				if (out[j].name_len == p->name_length &&
+				    memcmp(out[j].name, p->name, p->name_length) == 0)
+				{ dup = 1; break; }
+			}
+			if (dup) continue;
+		}
 		if (used + p->name_length + 1 > buf_cap) break;
 		char* name_dst = buf + used;
 		memcpy(name_dst, p->name, p->name_length);

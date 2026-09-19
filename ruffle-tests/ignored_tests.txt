@@ -43,10 +43,31 @@
 # (`Navigator::navigate_to_url:` + URL/Target lines), not Flash trace output.
 # Loader-arc tranche 5 emits that log (utils.c swf_log_navigate, gated on the
 # per-test `log_fetch` key), so the two *_target_normalize tests now pass and
-# are no longer ignored. `geturl` stays: it additionally wants Param:/Body:
-# form values — the root timeline's variables in enumeration order — which live
-# in the global var_array/var_map with no insertion order to walk. Same gap as
-# `for (i in _root)`; see loader-arc.md §7.
+# are no longer ignored.
+#
+# RATIONALE REFUTED 2026-09-18 (s20 w2-avm1-nearflips). The old reason —
+# "the root timeline's variables ... live in the global var_array/var_map with
+# no insertion order to walk" — was wrong on both halves. c-hashmap keeps every
+# live entry on a linked list in INSERTION order (lib/c-hashmap/map.c), so a
+# forward iterate + backwards emit is exactly AVM1's reverse-insertion
+# enumeration; and the missing piece was simply that avm1_collect_form_values
+# only ever walked `mc->dynamic_props`, which for the ROOT holds the load-time
+# properties ($version) and none of the script variables. Both halves are now
+# implemented and the Param: lines come out in the expected order.
+#
+# `geturl` STAYS IGNORED for exactly one token: 4/7 -> 6/7, and the one
+# remaining diff is `Param: $version=LNX 32,0,0,0` vs our `WIN 32,0,0,0`. That
+# is platform identity, not a bug — Ruffle hard-codes Manufacturer::Linux in
+# its DEFAULT SystemProperties (core/src/system_properties.rs:287) on every
+# host, while we deliberately present a Windows player throughout
+# (System.capabilities.os = "Windows XP", .manufacturer = "Macromedia Windows",
+# avm2_globals.c:7385 version = "WIN 32,0,0,0"), and
+# SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md already
+# filters `$version=` as "pure platform metadata; can never match".
+# TO CLOSE: flip all four constants to Ruffle's Linux defaults together and
+# record it in avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md. It is a
+# project-identity decision worth +1 effective, not a local fix; no other test
+# in the corpus observes any of the four.
 geturl
 
 # --- Network/form loading (no multi-SWF infrastructure needed) ---
@@ -97,11 +118,22 @@ load_vars
 stylesheet_load
 
 # --- XML networking/sockets ---
-# These tests require network connections or XML HTTP loading.
 # (xml_socket, xml_socket_close_in_handler, xml_socket_connect_null,
 #  xml_socket_on_data, xml_socket_segmented removed 2026-08-01 — all now
-#  `pass`, xml_socket in BOTH avm1 and avm2. Only xml_getbytes still fails.)
-xml_getbytes
+#  `pass`, xml_socket in BOTH avm1 and avm2.)
+# (xml_getbytes removed 2026-09-18, s20 w2-avm1-nearflips — now `pass` 17/17.
+#  The bucket header "require network connections or XML HTTP loading" was a
+#  CATEGORY claim that no per-name measurement ever supported: the residual was
+#  never networking, it was an XML.load byte-counter PHASE error. We wrote the
+#  real counts at request time instead of response time, so the post-load probe
+#  read 27/27 where Flash reads 0/undefined and the onData probe read
+#  undefined×4 where Flash reads 27×4. Fixed by matching Ruffle's split —
+#  spawn_xml_fetch (avm1/globals/xml.rs:541) defines _bytesLoaded = 0 /
+#  _bytesTotal = undefined DONT_DELETE|DONT_ENUM at request time, loader.rs:1070
+#  writes the real counts immediately before onData.)
+#
+# This bucket is now EMPTY. Do not re-add a name to it on the strength of the
+# header alone — grade the test first.
 
 # --- Sound/audio ---
 # These tests require audio playback or streaming.

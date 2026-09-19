@@ -438,6 +438,14 @@ _IMAGE_AXIS_RE = re.compile(
 #     <!-- image-axis: frames 1-2 only -->    partial: the scope is printed
 _AXIS_OVERRIDE_RE = re.compile(r"<!--\s*image-axis:\s*(.*?)\s*-->", re.IGNORECASE)
 _AXIS_NONE = {"none", "no", "false", "trace", "trace-only", "trace-axis"}
+# Does the entry ALREADY say it is stale on the image axis? This tool lists every
+# dispositioned-but-passing entry under "DISPOSITIONED BUT NOT FAILING"; without
+# this check it asked for a one-line note in the doc unconditionally, including
+# for entries whose heading has carried that note for sessions (session 14 and
+# session 20 both spent an agent slot re-discovering that — `avm1
+# display_object_properties` even pre-refutes the request in its own body).
+_STALE_NOTE_RE = re.compile(
+    r"\bSTALE\b|\bNOT FAILING\b|\bnow PASS(?:ES)?\b|\bnow 0 px\b", re.IGNORECASE)
 
 
 def scan_disposition_doc(path):
@@ -456,6 +464,7 @@ def scan_disposition_doc(path):
         return out
 
     def record(names, subject, body):
+        noted = bool(_STALE_NOTE_RE.search(body))
         m = _AXIS_OVERRIDE_RE.search(body)
         scope = None
         if m:
@@ -468,7 +477,10 @@ def scan_disposition_doc(path):
             # in these docs, and the heading is the readable one.
             e = out.setdefault(name, {"subject": subject.strip(),
                                       "image_axis": False, "scope": None,
-                                      "explicit": False})
+                                      "explicit": False, "stale_noted": False})
+            # Independent of the axis logic: ANY of the entry's shapes (heading,
+            # body, summary-table row) carrying the note is enough.
+            e["stale_noted"] = e["stale_noted"] or noted
             if e["explicit"]:
                 continue          # an explicit marker is authoritative
             e["image_axis"] = e["image_axis"] or img
@@ -563,6 +575,20 @@ class Dispositions:
             lo, hi = int(nums[0]), int(nums[1])
             return lo <= n <= hi
         return n in {int(x) for x in nums}
+
+    def stale_noted(self, suite, test):
+        """Does the matching disposition entry already carry a stale note?
+
+        Same name precedence as `lookup` (first doc that names the test wins),
+        so the answer describes the entry `lookup` returned.
+        """
+        qualified = f"{suite}/{test}"
+        base = test.split("/")[-1]
+        for _label, _scope, names in self.docs:
+            hit = names.get(qualified) or names.get(test) or names.get(base)
+            if hit is not None:
+                return bool(hit.get("stale_noted"))
+        return False
 
     def lookup(self, suite, test, comparison=None):
         """-> (label, confidence, hard); (None, None, False) when undispositioned.
@@ -800,7 +826,8 @@ def stale_dispositions(all_rows, failing_keys, disp):
 
     Reported rather than silently dropped: a disposition whose comparison now
     PASSES (or that has no `[image_comparisons]` block at all) is a stale entry
-    in ACCEPTED_DIFFS on the image axis, and worth a one-line note there.
+    in ACCEPTED_DIFFS on the image axis, and worth a one-line note there — but
+    only when the entry does not already carry one, hence the 5th tuple field.
     """
     by_test = defaultdict(list)
     for r in all_rows:
@@ -813,7 +840,7 @@ def stale_dispositions(all_rows, failing_keys, disp):
         if not (label and hard):
             continue
         st = Counter(r["status"] for r in rs)
-        out.append((key, dict(st), label, conf))
+        out.append((key, dict(st), label, conf, disp.stale_noted(*key)))
     return out
 
 
@@ -908,11 +935,22 @@ def emit_text(rows, board, live, args, meta, phase, stale, out=sys.stdout):
         p("   " + ", ".join(f"{s} {n}" for s, n in by_suite.most_common()))
 
     if stale:
+        todo = [e for e in stale if not e[4]]
+        noted = [e for e in stale if e[4]]
         p(f"\n== DISPOSITIONED BUT NOT FAILING ({len(stale)}) — the entry is stale "
-          f"on the image axis; worth a one-line note in its doc ==")
-        for (s, t), st, label, conf in stale:
-            heur = " (basename)" if conf == "basename" else ""
-            p(f"  {s}/{t}  {dict(st)}  <- {label}{heur}")
+          f"on the image axis ==")
+        if todo:
+            p(f"  -- {len(todo)} with NO stale note in the doc — worth a "
+              f"one-line note there:")
+            for (s, t), st, label, conf, _ in todo:
+                heur = " (basename)" if conf == "basename" else ""
+                p(f"     {s}/{t}  {dict(st)}  <- {label}{heur}")
+        if noted:
+            p(f"  -- {len(noted)} ALREADY noted as stale in the doc — NO ACTION, "
+              f"do not re-raise:")
+            for (s, t), st, label, conf, _ in noted:
+                heur = " (basename)" if conf == "basename" else ""
+                p(f"     {s}/{t}  {dict(st)}  <- {label}{heur}")
 
     kf = [r for r in rows if r.get("known_failure")]
     p(f"\n== RUFFLE known_failure ({len(kf)}) — Ruffle is NOT the oracle here, "
@@ -1026,14 +1064,29 @@ def emit_markdown(rows, board, live, args, meta, phase, stale, path):
             A(f"| `{s}` | {n} |")
         A("")
     if stale:
+        todo = [e for e in stale if not e[4]]
+        noted = [e for e in stale if e[4]]
         A(f"## Dispositioned but not failing ({len(stale)})")
         A("")
         A("The entry is stale on the image axis — it passes, or it has no "
-          "`[image_comparisons]` block at all. Worth a one-line note in its doc.")
+          "`[image_comparisons]` block at all.")
         A("")
-        for (s, t), st, label, conf in stale:
-            A(f"- `{s}/{t}` — {st} — {label}{' (basename)' if conf == 'basename' else ''}")
-        A("")
+        if todo:
+            A(f"**No stale note in the doc ({len(todo)})** — worth a one-line "
+              "note there.")
+            A("")
+            for (s, t), st, label, conf, _ in todo:
+                A(f"- `{s}/{t}` — {st} — {label}"
+                  f"{' (basename)' if conf == 'basename' else ''}")
+            A("")
+        if noted:
+            A(f"**Already noted as stale in the doc ({len(noted)})** — no action; "
+              "do not re-raise.")
+            A("")
+            for (s, t), st, label, conf, _ in noted:
+                A(f"- `{s}/{t}` — {st} — {label}"
+                  f"{' (basename)' if conf == 'basename' else ''}")
+            A("")
     kf = [r for r in rows if r.get("known_failure")]
     A(f"## Ruffle `known_failure` ({len(kf)})")
     A("")
