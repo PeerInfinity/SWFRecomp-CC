@@ -1,0 +1,365 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 4e4d0e765..b4da68a4e 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -15490,21 +15490,12 @@ static double coerceVarToNumber(SWFAppContext* app_context, ActionVar* value)
+ 	return NAN;
+ }
+ 
+-// Ruffle-compatible property_coerce_to_number for MC numeric setters
+-// (_x, _y, _xscale, _yscale, _rotation, _alpha, _width, _height, _visible).
+-// Mirrors core/src/avm1/object/stage_object.rs:property_coerce_to_number.
+-//
+-// Returns 1 with *out_d set to a finite double if the value is a valid number;
+-// returns 0 (no-op) if the value is undefined, null, NaN, or +/-Infinity.
+-static int propertyCoerceToNumber(SWFAppContext* app_context, ActionVar* value, double* out_d)
+-{
+-	if (value->type == ACTION_STACK_VALUE_UNDEFINED || value->type == ACTION_STACK_VALUE_NULL)
+-		return 0;
+-	double d = coerceVarToNumber(app_context, value);
+-	if (!isfinite(d)) return 0;
+-	*out_d = d;
+-	return 1;
+-}
++// (The old second gate `propertyCoerceToNumber` lived here. It rejected
++// +/-Infinity via `!isfinite` and prefix-parsed strings, and was used by the
++// SetVariable/SetMember-by-name paths only. Ruffle has exactly ONE gate --
++// `property_coerce_to_number` -- shared by SetProperty, SetMember and
++// SetVariable, so the duplicate is gone and every caller now uses
++// `spvPropertyCoerceToNumber` below.)
+ 
+ // Ruffle's `clamp_to_i32` (avm1/clamp.rs): in-range float → cast to i32 (trunc);
+ // NaN / +/-Infinity / out-of-range → INT32_MIN.
+@@ -15565,8 +15556,16 @@ static double spvCoerceToF64(SWFAppContext* app_context, ActionVar* value)
+ 
+ // Ruffle's `property_coerce_to_number` (stage_object.rs:701) EXACTLY: undefined
+ // and null do not set, and NaN does not set — but +/-Infinity DOES reach the
+-// setter, which handles it per-property. (`propertyCoerceToNumber` above rejects
+-// Infinity too; that is the SetMember-by-name path and is left untouched here.)
++// setter, which handles it per-property.
++//
++// This is the SINGLE property-coercion gate for EVERY AVM1 display-property
++// write, because Ruffle has only one. `SetProperty` (activation.rs:1991),
++// `SetMember` (script_object.rs:287, via `display_properties().get_by_name`)
++// and `SetVariable` (`set_variable` -> `Object::set`) all end in the same
++// `DisplayProperty::set` -> the same `set_x` / `set_alpha` / ... functions, so
++// `mc._x = v`, `with(mc){ _x = v }` and `setProperty(mc, _x, v)` are required
++// to agree bit for bit. They did not: the removed `propertyCoerceToNumber`
++// rejected +/-Infinity and prefix-parsed strings.
+ static int spvPropertyCoerceToNumber(SWFAppContext* app_context, ActionVar* value, double* out_d)
+ {
+ 	if (value->type == ACTION_STACK_VALUE_UNDEFINED || value->type == ACTION_STACK_VALUE_NULL)
+@@ -46508,15 +46507,16 @@ void actionSetVariable(SWFAppContext* app_context)
+ 		peekVar(app_context, &value_var);
+ 		int handled = 0;
+ 		// Lazily resolve numeric value via property_coerce_to_number when a numeric
+-		// MC property handler is dispatched. num_ok=0 means undefined/null/NaN/Inf
+-		// → no-op. Mirrors Ruffle stage_object.rs:property_coerce_to_number.
++		// MC property handler is dispatched. num_ok=0 means undefined/null/NaN
++		// → no-op; +/-Infinity DOES pass and is handled per-property below, exactly
++		// as in actionSetProperty. Mirrors Ruffle stage_object.rs:property_coerce_to_number.
+ 		double dval = NAN;
+ 		float fval = 0.0f;
+ 		int num_resolved = 0, num_ok = 0;
+ 		#define RESOLVE_NUM_PROP() do { \
+ 			if (!num_resolved) { \
+ 				num_resolved = 1; \
+-				num_ok = propertyCoerceToNumber(app_context, &value_var, &dval); \
++				num_ok = spvPropertyCoerceToNumber(app_context, &value_var, &dval); \
+ 				if (num_ok) fval = (float) dval; \
+ 			} \
+ 		} while (0)
+@@ -46529,12 +46529,12 @@ void actionSetVariable(SWFAppContext* app_context)
+ 		// flag-gated overlay skipped the entry and the clip rendered frozen at
+ 		// its timeline placement. NG/OFFSCREEN behavior is unchanged (those modes
+ 		// already set the scale/rotation bits; _x/_y stay as before there).
+-		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->x = fval;
++		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->x = isinf(dval) ? SPV_COORD_SENTINEL : fval;
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ 			mc->as_set_flags |= 1; markTransformedByScript(mc);
+ #endif
+ 			} handled = 1; }
+-		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->y = fval;
++		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->y = isinf(dval) ? SPV_COORD_SENTINEL : fval;
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ 			mc->as_set_flags |= 2; markTransformedByScript(mc);
+ #endif
+@@ -46560,10 +46560,17 @@ void actionSetVariable(SWFAppContext* app_context)
+ 		else if (strcasecmp(var_name, "_alpha") == 0) {
+ 			RESOLVE_NUM_PROP();
+ 			if (num_ok) {
++				// Ruffle set_alpha (stage_object.rs:301) maps an infinity to 0.0
++				// BEFORE the Fixed8 conversion, so `_alpha = 1/0` is fully
++				// transparent. Without this the infinity would reach an int16_t
++				// cast, which is undefined behaviour in C. Same rule as
++				// actionSetProperty case 6.
++				double _a_in = isinf(dval) ? 0.0 : dval;
++				float _a_f = (float) _a_in;
+ 				// Quantize through 8.8 fixed-point like Flash's color transform
+-				mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
++				mc->alpha = (float)((double)(int16_t)roundf(_a_f * 256.0f / 100.0f) * 100.0 / 256.0);
+ 				mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
+-				mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
++				mc->cx_aa = (float)quantifyColorMultClamp(_a_in);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
+ 				mcSyncAlphaToDisplayObj(mc);
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+ 				// Sync with display list cx_aa so Color.getTransform() reads the updated value
+@@ -46580,7 +46587,10 @@ void actionSetVariable(SWFAppContext* app_context)
+ 		else if (strcasecmp(var_name, "_visible") == 0) {
+ 			RESOLVE_NUM_PROP();
+ 			if (num_ok) {
+-				int new_vis = (fval != 0.0f) ? 1 : 0;
++				// Ruffle set_visible tests the f64 (`n != 0.0`), not a float, so
++				// +/-Infinity is visible and a sub-float-epsilon magnitude such as
++				// 1e-300 is too. Same as actionSetProperty case 7.
++				int new_vis = (dval != 0.0) ? 1 : 0;
+ 				if (mc->visible && !new_vis && g_focused_mc == mc)
+ 					selection_do_focus_change(app_context, mc, NULL);
+ 				mc->visible = new_vis;
+@@ -46634,10 +46644,16 @@ void actionSetVariable(SWFAppContext* app_context)
+ 			handled = 1;
+ 		}
+ 		else if (strcasecmp(var_name, "_soundbuftime") == 0) {
+-			// Ruffle: coerce to f64 (calls valueOf for objects, parses strings).
+-			// NaN → no-op (e.g. {} without valueOf, "string"). Otherwise clamp to i32.
+-			double sb_d = coerceVarToNumber(app_context, &value_var);
+-			if (!isnan(sb_d)) g_soundbuftime = (float) clampToI32(sb_d);
++			// Ruffle set_sound_buf_time: null/undefined return early, then
++			// `coerce_to_f64` (STRICT string parse for SWF5+, valueOf for objects)
++			// and NaN → no-op; every other value including +/-Infinity goes through
++			// `clamp_to_i32`, which maps the infinities to INT32_MIN. Same as
++			// actionSetProperty case 18.
++			if (value_var.type != ACTION_STACK_VALUE_NULL &&
++			    value_var.type != ACTION_STACK_VALUE_UNDEFINED) {
++				double sb_d = spvCoerceToF64(app_context, &value_var);
++				if (!isnan(sb_d)) g_soundbuftime = (float) clampToI32(sb_d);
++			}
+ 			handled = 1;
+ 		}
+ 		if (handled)
+@@ -52363,58 +52379,94 @@ void actionSetMember(SWFAppContext* app_context)
+ 			// Handle built-in writable properties
+ 			if (prop_name_len > 0 && prop_name[0] == '_')
+ 			{
+-				// Use proper numeric conversion (varToDoubleSimple handles string/boolean/null/undefined)
++				// Use proper numeric conversion (varToDoubleSimple handles string/boolean/null/undefined).
++				// Kept for the properties with their own coercion rules below
++				// (`_focusrect`, `_lockroot`); it has no side effects.
+ 				double dval = varToDoubleSimple(&value_var);
+ 				float fval = (float)dval;
+ 				// For numeric MC properties: undefined/null/NaN → no-op (Flash ignores invalid values)
+ 				int dval_invalid = isnan(dval) ||
+ 				    value_var.type == ACTION_STACK_VALUE_NULL ||
+ 				    value_var.type == ACTION_STACK_VALUE_UNDEFINED;
++				// The DISPLAY properties (`_x`, `_y`, the scales, `_rotation`,
++				// `_alpha`, `_width`, `_height`, `_highquality`) must use Ruffle's
++				// single gate instead: `mc._x = v` (SetMember) reaches exactly the
++				// same `set_x` as `setProperty(mc, _x, v)` (script_object.rs:287 vs
++				// activation.rs:1991), so the two paths have to agree. Differences
++				// this closes: strings are STRICT-parsed for SWF5+ ("10x" is a no-op,
++				// not 10), an object's `valueOf` is honoured, and +/-Infinity reaches
++				// the setter (which maps it per-property just below). Resolved
++				// lazily so a non-numeric property never runs a `valueOf` script.
++				double pdval = NAN;
++				float pfval = 0.0f;
++				int pnum_resolved = 0, pnum_ok = 0;
++				#define SM_RESOLVE_NUM_PROP() do { \
++					if (!pnum_resolved) { \
++						pnum_resolved = 1; \
++						pnum_ok = spvPropertyCoerceToNumber(app_context, &value_var, &pdval); \
++						if (pnum_ok) pfval = (float) pdval; \
++					} \
++				} while (0)
+ 				if (strcasecmp(prop_name, "_x") == 0) {
+-					if (dval_invalid) return;
++					SM_RESOLVE_NUM_PROP();
++					if (!pnum_ok) return;
+ 					mc->as_set_flags |= 1;
+ 					markTransformedByScript(mc);
+-					// Flash stores positions in twips (1/20 pixel), truncating fractional twips
+-					mc->x = (float)(floor(dval * 20.0) / 20.0); return;
++					// Flash stores positions in twips (1/20 pixel), truncating fractional twips.
++					// Ruffle set_x maps ANY infinity to -Infinity first, so both land on
++					// i32::MIN twips -- the sentinel that spvTwipsQuantizePixels reads
++					// back as exactly -107374182.4.
++					mc->x = isinf(pdval) ? SPV_COORD_SENTINEL : (float)(floor(pdval * 20.0) / 20.0); return;
+ 				}
+ 				if (strcasecmp(prop_name, "_y") == 0) {
+-					if (dval_invalid) return;
++					SM_RESOLVE_NUM_PROP();
++					if (!pnum_ok) return;
+ 
+ 					mc->as_set_flags |= 2;
+ 					markTransformedByScript(mc);
+ 
+-					mc->y = (float)(floor(dval * 20.0) / 20.0); return;
++					mc->y = isinf(pdval) ? SPV_COORD_SENTINEL : (float)(floor(pdval * 20.0) / 20.0); return;
+ 				}
+ 				if (strcasecmp(prop_name, "_xscale") == 0) {
+-					if (dval_invalid) return;
++					SM_RESOLVE_NUM_PROP();
++					if (!pnum_ok) return;
+ 
+ 					mc->as_set_flags |= 4;
+ 					markTransformedByScript(mc);
+ 
+-					mc->xscale = fval; return;
++					mc->xscale = pfval; return;
+ 				}
+ 				if (strcasecmp(prop_name, "_yscale") == 0) {
+-					if (dval_invalid) return;
++					SM_RESOLVE_NUM_PROP();
++					if (!pnum_ok) return;
+ 
+ 					mc->as_set_flags |= 8;
+ 					markTransformedByScript(mc);
+ 
+-					mc->yscale = fval; return;
++					mc->yscale = pfval; return;
+ 				}
+ 				if (strcasecmp(prop_name, "_rotation") == 0) {
+-					if (dval_invalid) return;
++					SM_RESOLVE_NUM_PROP();
++					if (!pnum_ok) return;
+ 
+ 					mc->as_set_flags |= 16;
+ 					markTransformedByScript(mc);
+ 
+-					mc->rotation = normalizeRotation(fval); return;
++					// fmodf(+/-Infinity, 360) is NaN, which is what Ruffle's
++					// `degrees %= 360.0` produces for an infinity too.
++					mc->rotation = normalizeRotation(pfval); return;
+ 				}
+ 				if (strcasecmp(prop_name, "_alpha") == 0) {
+-					if (dval_invalid) return;
++					SM_RESOLVE_NUM_PROP();
++					if (!pnum_ok) return;
++					// Ruffle set_alpha maps an infinity to 0.0 before the Fixed8
++					// conversion (an int16_t cast of an infinity is UB in C).
++					double _a_in = isinf(pdval) ? 0.0 : pdval;
++					float _a_f = (float) _a_in;
+ 					// Quantize through 8.8 fixed-point like Flash's color transform
+-					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
++					mc->alpha = (float)((double)(int16_t)roundf(_a_f * 256.0f / 100.0f) * 100.0 / 256.0);
+ 					mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
+-					mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
++					mc->cx_aa = (float)quantifyColorMultClamp(_a_in);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
+ 					mcSyncAlphaToDisplayObj(mc);
+ 					// Sync with display list cx_aa so Color.getTransform() reads the updated value
+ 					{
+@@ -52490,8 +52542,8 @@ void actionSetMember(SWFAppContext* app_context)
+ 					}
+ 					return;
+ 				}
+-				if (strcasecmp(prop_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); markTransformedByScript(mc); return; }
+-				if (strcasecmp(prop_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); markTransformedByScript(mc); return; }
++				if (strcasecmp(prop_name, "_width") == 0) { SM_RESOLVE_NUM_PROP(); if (!pnum_ok) return; mcSetEffectiveWidth(app_context, mc, pdval); markTransformedByScript(mc); return; }
++				if (strcasecmp(prop_name, "_height") == 0) { SM_RESOLVE_NUM_PROP(); if (!pnum_ok) return; mcSetEffectiveHeight(app_context, mc, pdval); markTransformedByScript(mc); return; }
+ 				if (strcasecmp(prop_name, "_quality") == 0)
+ 				{
+ 					char buf[32];
+@@ -52505,7 +52557,7 @@ void actionSetMember(SWFAppContext* app_context)
+ 					}
+ 					return;
+ 				}
+-				if (strcasecmp(prop_name, "_highquality") == 0) { if (!dval_invalid) setStageQualityFromHighquality(dval); return; }
++				if (strcasecmp(prop_name, "_highquality") == 0) { SM_RESOLVE_NUM_PROP(); if (pnum_ok) setStageQualityFromHighquality(pdval); return; }
+ 				if (strcasecmp(prop_name, "_focusrect") == 0) {
+ 					extern MovieClip root_movieclip;
+ 					int _is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
+@@ -60700,8 +60752,25 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
+ {
+ 	if (name_len < 2 || name[0] != '_') return 0;
+ 
+-	double dval = varToDoubleSimple(value);
+-	float fval = (float)dval;
++	// Ruffle's ONE display-property gate (see spvPropertyCoerceToNumber): this
++	// helper is the `with(mc){ _x = v }` / SetVariable-on-a-scope-clip and the
++	// attachMovie-initObject setter, and it lands in the same `set_x`/`set_alpha`
++	// as the SetProperty opcode, so it has to coerce identically. Before this it
++	// used the raw `varToDoubleSimple` with NO validity gate at all, so
++	// `with(mc){ _x = undefined }` (or a NaN, or an unparseable string) wrote a
++	// NaN straight into mc->x instead of being ignored. Resolved lazily and only
++	// inside a property arm, so a name this helper does not handle never runs a
++	// `valueOf` script (`varToDoubleSimple` had no side effects; this does).
++	double dval = NAN;
++	float fval = 0.0f;
++	int num_resolved = 0, num_ok = 0;
++	#define MCB_RESOLVE_NUM_PROP() do { \
++		if (!num_resolved) { \
++			num_resolved = 1; \
++			num_ok = spvPropertyCoerceToNumber(app_context, value, &dval); \
++			if (num_ok) fval = (float) dval; \
++		} \
++	} while (0)
+ 
+ 	// as_set_flags must be set in ALL modes (was NG/OFFSCREEN-only): browser-WASM's
+ 	// tagShowFrame renders a script-moved timeline clip via a flag-gated
+@@ -60710,38 +60779,51 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
+ 	// `with(Pacman){ _x -= pacStep }` and the ghosts' `_x`/`_y` writes — the actual
+ 	// Pacman/ghost movement path. NG/OFFSCREEN already set these bits → unchanged.
+ 	if (strcasecmp(name, "_x") == 0) {
++		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
+ 		mc->as_set_flags |= 1;
+ 		markTransformedByScript(mc);
+-		mc->x = fval; return 1;
++		// Ruffle set_x: any infinity becomes -Infinity, then the saturating
++		// `Twips::from_pixels` lands on i32::MIN. See SPV_COORD_SENTINEL.
++		mc->x = isinf(dval) ? SPV_COORD_SENTINEL : fval; return 1;
+ 	}
+ 	if (strcasecmp(name, "_y") == 0) {
++		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
+ 		mc->as_set_flags |= 2;
+ 		markTransformedByScript(mc);
+-		mc->y = fval; return 1;
++		mc->y = isinf(dval) ? SPV_COORD_SENTINEL : fval; return 1;
+ 	}
+ 	if (strcasecmp(name, "_xscale") == 0) {
++		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
+ 		mc->as_set_flags |= 4;
+ 		markTransformedByScript(mc);
+ 		mc->xscale = fval; return 1;
+ 	}
+ 	if (strcasecmp(name, "_yscale") == 0) {
++		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
+ 		mc->as_set_flags |= 8;
+ 		markTransformedByScript(mc);
+ 		mc->yscale = fval; return 1;
+ 	}
+ 	if (strcasecmp(name, "_rotation") == 0) {
++		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
+ 		mc->as_set_flags |= 16;
+ 		markTransformedByScript(mc);
+ 		mc->rotation = normalizeRotation(fval); return 1;
+ 	}
+ 	if (strcasecmp(name, "_alpha") == 0) {
++		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
++		// Ruffle set_alpha maps an infinity to 0.0 before the Fixed8 conversion
++		// (an int16_t cast of an infinity is UB in C).
++		float _a_f = isinf(dval) ? 0.0f : fval;
+ 		// Quantize through 8.8 fixed-point like Flash's color transform
+-		mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
++		mc->alpha = (float)((double)(int16_t)roundf(_a_f * 256.0f / 100.0f) * 100.0 / 256.0);
+ 		mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
+ 		return 1;
+ 	}
+ 	if (strcasecmp(name, "_visible") == 0) {
+-		int new_vis = (fval != 0.0f) ? 1 : 0;
++		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
++		// Ruffle set_visible tests the f64, not a float (`n != 0.0`).
++		int new_vis = (dval != 0.0) ? 1 : 0;
+ 		if (mc->visible && !new_vis && g_focused_mc == mc)
+ 			selection_do_focus_change(app_context, mc, NULL);
+ 		mc->visible = new_vis;
+@@ -60754,8 +60836,9 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
+ 		markTransformedByScript(mc);
+ 		return 1;
+ 	}
+-	if (strcasecmp(name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); markTransformedByScript(mc); return 1; }
+-	if (strcasecmp(name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); markTransformedByScript(mc); return 1; }
++	if (strcasecmp(name, "_width") == 0) { MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1; mcSetEffectiveWidth(app_context, mc, dval); markTransformedByScript(mc); return 1; }
++	if (strcasecmp(name, "_height") == 0) { MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1; mcSetEffectiveHeight(app_context, mc, dval); markTransformedByScript(mc); return 1; }
++	#undef MCB_RESOLVE_NUM_PROP
+ 	return 0;
+ }
+ 

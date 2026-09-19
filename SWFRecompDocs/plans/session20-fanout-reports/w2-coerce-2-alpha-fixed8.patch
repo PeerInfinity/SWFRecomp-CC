@@ -1,0 +1,62 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index b4da68a4e..f64d81189 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -46566,9 +46566,15 @@ void actionSetVariable(SWFAppContext* app_context)
+ 				// cast, which is undefined behaviour in C. Same rule as
+ 				// actionSetProperty case 6.
+ 				double _a_in = isinf(dval) ? 0.0 : dval;
+-				float _a_f = (float) _a_in;
+-				// Quantize through 8.8 fixed-point like Flash's color transform
+-				mc->alpha = (float)((double)(int16_t)roundf(_a_f * 256.0f / 100.0f) * 100.0 / 256.0);
++				// Ruffle stores `_alpha` as a Fixed8 colour-transform multiplier and
++				// `Fixed8::from_f64` is `(n * 256.0) as i16` -- a Rust float->int cast, so it
++				// TRUNCATES toward zero and SATURATES; it does NOT round. `roundf` made every
++				// value one 1/256 step too large (e.g. -5 -> -5.078125 instead of Flash's
++				// -4.6875). Identical quantizer to actionSetProperty case 6.
++				double _a_fx = _a_in / 100.0 * 256.0;
++				if (_a_fx < -32768.0) _a_fx = -32768.0;
++				else if (_a_fx > 32767.0) _a_fx = 32767.0;
++				mc->alpha = (float)((double)(int16_t) _a_fx / 256.0 * 100.0);
+ 				mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
+ 				mc->cx_aa = (float)quantifyColorMultClamp(_a_in);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
+ 				mcSyncAlphaToDisplayObj(mc);
+@@ -52462,9 +52468,15 @@ void actionSetMember(SWFAppContext* app_context)
+ 					// Ruffle set_alpha maps an infinity to 0.0 before the Fixed8
+ 					// conversion (an int16_t cast of an infinity is UB in C).
+ 					double _a_in = isinf(pdval) ? 0.0 : pdval;
+-					float _a_f = (float) _a_in;
+-					// Quantize through 8.8 fixed-point like Flash's color transform
+-					mc->alpha = (float)((double)(int16_t)roundf(_a_f * 256.0f / 100.0f) * 100.0 / 256.0);
++					// Ruffle stores `_alpha` as a Fixed8 colour-transform multiplier and
++					// `Fixed8::from_f64` is `(n * 256.0) as i16` -- a Rust float->int cast, so it
++					// TRUNCATES toward zero and SATURATES; it does NOT round. `roundf` made every
++					// value one 1/256 step too large (e.g. -5 -> -5.078125 instead of Flash's
++					// -4.6875). Identical quantizer to actionSetProperty case 6.
++					double _a_fx = _a_in / 100.0 * 256.0;
++					if (_a_fx < -32768.0) _a_fx = -32768.0;
++					else if (_a_fx > 32767.0) _a_fx = 32767.0;
++					mc->alpha = (float)((double)(int16_t) _a_fx / 256.0 * 100.0);
+ 					mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
+ 					mc->cx_aa = (float)quantifyColorMultClamp(_a_in);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
+ 					mcSyncAlphaToDisplayObj(mc);
+@@ -60814,9 +60826,16 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
+ 		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
+ 		// Ruffle set_alpha maps an infinity to 0.0 before the Fixed8 conversion
+ 		// (an int16_t cast of an infinity is UB in C).
+-		float _a_f = isinf(dval) ? 0.0f : fval;
+-		// Quantize through 8.8 fixed-point like Flash's color transform
+-		mc->alpha = (float)((double)(int16_t)roundf(_a_f * 256.0f / 100.0f) * 100.0 / 256.0);
++		double _a_in = isinf(dval) ? 0.0 : dval;
++		// Ruffle stores `_alpha` as a Fixed8 colour-transform multiplier and
++		// `Fixed8::from_f64` is `(n * 256.0) as i16` -- a Rust float->int cast, so it
++		// TRUNCATES toward zero and SATURATES; it does NOT round. `roundf` made every
++		// value one 1/256 step too large (e.g. -5 -> -5.078125 instead of Flash's
++		// -4.6875). Identical quantizer to actionSetProperty case 6.
++		double _a_fx = _a_in / 100.0 * 256.0;
++		if (_a_fx < -32768.0) _a_fx = -32768.0;
++		else if (_a_fx > 32767.0) _a_fx = 32767.0;
++		mc->alpha = (float)((double)(int16_t) _a_fx / 256.0 * 100.0);
+ 		mc->as_set_flags |= 32;  // _alpha set by AS — placement/timeline cxform alpha must not clobber it (see syncTransformIfNeeded)
+ 		return 1;
+ 	}

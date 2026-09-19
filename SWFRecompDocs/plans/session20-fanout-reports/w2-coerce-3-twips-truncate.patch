@@ -1,0 +1,93 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index f64d81189..add388d5b 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -15526,6 +15526,21 @@ static double spvTwipsQuantizePixels(double px)
+ 	return t / 20.0;
+ }
+ 
++// Ruffle's WRITE-side quantizer. `Twips::from_pixels(px)` is `(px * 20.0) as i32`
++// -- a Rust float->int cast, so it TRUNCATES TOWARD ZERO and saturates; `floor`
++// is a different function for a negative coordinate (`mc._x = -10.53` is -210.6
++// twips: Ruffle stores -210 = -10.5 px, `floor` stores -211 = -10.55 px), and
++// leaving the raw pixel value for the read side to `round` gives -10.55 too.
++// Quantizing on WRITE is also what makes the read exact: the stored float is a
++// twip multiple, which `spvTwipsQuantizePixels` recovers without error.
++static float spvTwipsTruncatePixels(double px)
++{
++	double t = trunc(px * 20.0);
++	if (t < (double)INT32_MIN) t = (double)INT32_MIN;
++	else if (t > (double)INT32_MAX) t = (double)INT32_MAX;
++	return (float)(t / 20.0);
++}
++
+ // The pixel value `set_x`/`set_y` store for a value that is out of twips range.
+ // Ruffle maps ANY infinity to -Infinity first (stage_object.rs:337), so both
+ // +Infinity and -Infinity land on i32::MIN twips.
+@@ -46529,12 +46544,12 @@ void actionSetVariable(SWFAppContext* app_context)
+ 		// flag-gated overlay skipped the entry and the clip rendered frozen at
+ 		// its timeline placement. NG/OFFSCREEN behavior is unchanged (those modes
+ 		// already set the scale/rotation bits; _x/_y stay as before there).
+-		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->x = isinf(dval) ? SPV_COORD_SENTINEL : fval;
++		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->x = isinf(dval) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(dval);
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ 			mc->as_set_flags |= 1; markTransformedByScript(mc);
+ #endif
+ 			} handled = 1; }
+-		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->y = isinf(dval) ? SPV_COORD_SENTINEL : fval;
++		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->y = isinf(dval) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(dval);
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ 			mc->as_set_flags |= 2; markTransformedByScript(mc);
+ #endif
+@@ -52422,7 +52437,7 @@ void actionSetMember(SWFAppContext* app_context)
+ 					// Ruffle set_x maps ANY infinity to -Infinity first, so both land on
+ 					// i32::MIN twips -- the sentinel that spvTwipsQuantizePixels reads
+ 					// back as exactly -107374182.4.
+-					mc->x = isinf(pdval) ? SPV_COORD_SENTINEL : (float)(floor(pdval * 20.0) / 20.0); return;
++					mc->x = isinf(pdval) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(pdval); return;
+ 				}
+ 				if (strcasecmp(prop_name, "_y") == 0) {
+ 					SM_RESOLVE_NUM_PROP();
+@@ -52431,7 +52446,7 @@ void actionSetMember(SWFAppContext* app_context)
+ 					mc->as_set_flags |= 2;
+ 					markTransformedByScript(mc);
+ 
+-					mc->y = isinf(pdval) ? SPV_COORD_SENTINEL : (float)(floor(pdval * 20.0) / 20.0); return;
++					mc->y = isinf(pdval) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(pdval); return;
+ 				}
+ 				if (strcasecmp(prop_name, "_xscale") == 0) {
+ 					SM_RESOLVE_NUM_PROP();
+@@ -59874,7 +59889,7 @@ void actionSetProperty(SWFAppContext* app_context)
+ 			// sentinel in pixels; `spvTwipsQuantizePixels` reads it back as
+ 			// exactly INT32_MIN/20 = -107374182.4. Finite out-of-range values
+ 			// need no special case — the read-side saturation covers them.
+-			mc->x = isinf(dnum) ? SPV_COORD_SENTINEL : num_value;
++			mc->x = isinf(dnum) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(dnum);
+ 			// Unconditional in all modes (matches actionSetMember). Browser-WASM
+ 			// previously left as_set_flags alone here, which meant opcode-form
+ 			// SetProperty `_x` wrote mc->x but apply_as_transform's compose-time
+@@ -59886,7 +59901,7 @@ void actionSetProperty(SWFAppContext* app_context)
+ 			markTransformedByScript(mc);
+ 			break;
+ 		case 1:  // _y — see case 0 for the infinity sentinel
+-			mc->y = isinf(dnum) ? SPV_COORD_SENTINEL : num_value;
++			mc->y = isinf(dnum) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(dnum);
+ 			mc->as_set_flags |= 2;
+ 			markTransformedByScript(mc);
+ 			break;
+@@ -60796,13 +60811,13 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
+ 		markTransformedByScript(mc);
+ 		// Ruffle set_x: any infinity becomes -Infinity, then the saturating
+ 		// `Twips::from_pixels` lands on i32::MIN. See SPV_COORD_SENTINEL.
+-		mc->x = isinf(dval) ? SPV_COORD_SENTINEL : fval; return 1;
++		mc->x = isinf(dval) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(dval); return 1;
+ 	}
+ 	if (strcasecmp(name, "_y") == 0) {
+ 		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;
+ 		mc->as_set_flags |= 2;
+ 		markTransformedByScript(mc);
+-		mc->y = isinf(dval) ? SPV_COORD_SENTINEL : fval; return 1;
++		mc->y = isinf(dval) ? SPV_COORD_SENTINEL : spvTwipsTruncatePixels(dval); return 1;
+ 	}
+ 	if (strcasecmp(name, "_xscale") == 0) {
+ 		MCB_RESOLVE_NUM_PROP(); if (!num_ok) return 1;

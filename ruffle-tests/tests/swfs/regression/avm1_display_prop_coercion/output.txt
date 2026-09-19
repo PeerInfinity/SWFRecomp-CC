@@ -1,0 +1,36 @@
+-- SetMember (mc._prop = v) --
+_x inf: -107374182.4
+_x -inf: -107374182.4
+_y inf: -107374182.4
+_x undefined: 7
+_x null: 7
+_x '10x': 7
+_x '25': 25
+_x valueOf42: 42
+_x -10.53: -10.5
+_x 10.53: 10.5
+_alpha -5: -4.6875
+_alpha 33.3: 33.203125
+_alpha 12.5: 12.5
+_alpha inf: 0
+_alpha undefined: 76.953125
+_alpha '10x': 76.953125
+_visible inf: true
+_rotation inf: NaN
+_rotation undefined: 7
+_xscale inf: Infinity
+_xscale '10x': 77
+-- with(mc) { _prop = v } --
+_x inf: -107374182.4
+_x undefined: 7
+_x null: 7
+_x '10x': 7
+_x '25': 25
+_x valueOf42: 42
+_alpha -5: -4.6875
+_alpha inf: 0
+_alpha undefined: 76.953125
+_alpha '10x': 76.953125
+_visible inf: true
+_rotation undefined: 7
+_xscale undefined: 77
