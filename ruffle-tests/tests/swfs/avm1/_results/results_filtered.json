@@ -6,18 +6,18 @@
     "total_available": 734,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 20,
+    "ignored_count": 19,
     "filtered": true
   },
-  "total": 714,
+  "total": 715,
   "pass": 697,
   "ruffle_matched": 13,
-  "fail": 4,
-  "pass_rate": 97.6,
+  "fail": 5,
+  "pass_rate": 97.5,
   "effective_pass": 710,
-  "effective_pass_rate": 99.4,
+  "effective_pass_rate": 99.3,
   "breakdown": {
-    "output_mismatch": 4,
+    "output_mismatch": 5,
     "ruffle_matched": 13
   },
   "tests": [
@@ -11111,6 +11111,25 @@
       },
       "duration": 1.03,
       "status": "pass"
+    },
+    {
+      "test": "xml_getbytes",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 1.044,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 9
+      },
+      "duration": 1.06,
+      "status": "output_mismatch",
+      "detail": "8 line(s) differ (actual=17, expected=17)",
+      "actual_output": "... (2 lines before) ...\nxml.getBytesTotal(): undefined\nxml._bytesLoaded: undefined\nxml._bytesTotal: undefined\n\n// XML loading requested\nxml.getBytesLoaded(): 27\nxml.getBytesTotal(): 27\nxml._bytesLoaded: 27\nxml._bytesTotal: 27\n\n// XML received data: <test>H\u00e9llo W\u00f6rld!</test>\nxml.getBytesLoaded(): undefined\nxml.getBytesTotal(): undefined\nxml._bytesLoaded: undefined\nxml._bytesTotal: undefined",
+      "expected_output": "... (2 lines before) ...\nxml.getBytesTotal(): undefined\nxml._bytesLoaded: undefined\nxml._bytesTotal: undefined\n\n// XML loading requested\nxml.getBytesLoaded(): 0\nxml.getBytesTotal(): undefined\nxml._bytesLoaded: 0\nxml._bytesTotal: undefined\n\n// XML received data: <test>H\u00e9llo W\u00f6rld!</test>\nxml.getBytesLoaded(): 27\nxml.getBytesTotal(): 27\nxml._bytesLoaded: 27\nxml._bytesTotal: 27"
     },
     {
       "test": "xml_has_child_nodes",
