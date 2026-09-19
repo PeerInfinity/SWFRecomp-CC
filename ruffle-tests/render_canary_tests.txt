@@ -265,3 +265,32 @@ fonts/device_font_kerning                   # AVM2 DEVICE-FACE LOOKUP     1 cmp
                                             #   find_device_font_list, which
                                             #   patch 1 rewrites into a
                                             #   bold/italic fallback ladder.
+
+# ---------------------------------------------------------------------------
+# SESSION 20 ADDITIONS (s20 wave-2 `w2-stage3d`). Change class: Stage3D phases
+# A' (blend factors, stencil plane, colour mask) and B (texel storage, uploads,
+# `tex` sampling, sampler-state precedence, the unbound-texture draw skip),
+# PLUS two changes to the SHARED software rasteriser — the D3D/Vulkan top-left
+# fill rule and an 8-bit subpixel snap of vertex positions.
+#
+# Canary audit against that class: the set already had the two s19 Stage3D
+# members, and they cover the rasteriser half (`stage3d_rotating_cube` moved
+# 2144 -> 2148 outliers under the snap, so it can see it). Nothing in the set
+# could see blend, stencil, colour mask or ANY texture sampling — every other
+# member renders through the 2D path, which this change does not touch at all.
+# Two members added to close that. Both are tier 2 until the first
+# `categories=full images=true` grading run confirms them; `stage3d_stencil`
+# should then be promoted to TIER 1, because it grades at tolerance 0 /
+# max_outliers 0 and now passes at max diff 0 — the strictest single guard the
+# Stage3D backend can have.
+avm2/stage3d_stencil                        # stencil plane + setStencilActions
+                                            #   + setStencilReferenceValue
+                                            #   read/write masks + setColorMask
+                                            #   + the top-left fill rule + the
+                                            #   subpixel snap, all in one
+                                            #   tolerance-0 comparison.
+avm2/stage3d_sampler                        # uploadFromBitmapData + `tex` over
+                                            #   all four wrap modes x nearest
+                                            #   and linear, with the
+                                            #   setSamplerStateAt-vs-setProgram
+                                            #   precedence rule.

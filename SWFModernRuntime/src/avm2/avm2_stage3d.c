@@ -265,6 +265,9 @@ typedef struct Avm2Context3DExt
 	// GC-visible edges: the conservative ext scan marks these.
 	Avm2Object* program;
 	Avm2Object* va_buf[S3D_ATTRS];
+	// Phase B: setTextureAt bindings. These are OBJECT edges and so must live
+	// in the ext blob, where avm2_gc.c's conservative ext scan can see them.
+	Avm2Object* tex_bound[S3D_ATTRS];
 	S3dBackend* be;                     // not an object; freed by the ext hook
 	uint8_t profile;
 	uint8_t enable_error_checking;
@@ -281,6 +284,12 @@ typedef struct Avm2Texture3DExt
 	uint8_t is_cube;
 	uint8_t format_bgra;                // "bgra"
 	uint8_t format_compressed_alpha;    // "compressedAlpha"
+	// Phase B: the texel store, RGBA8 in 0xAABBGGRR word order (little-endian
+	// byte order R,G,B,A), `layers` faces of width*height. Freed by the ext
+	// hook. A texture that has never been uploaded reads as transparent
+	// black, which is what a freshly created wgpu texture samples as.
+	uint32_t* texels;
+	uint32_t layers;
 } Avm2Texture3DExt;
 
 typedef struct Avm2Buffer3DExt
@@ -304,6 +313,13 @@ typedef struct Avm2Program3DExt
 	uint8_t* fcode;
 	uint32_t vlen;
 	uint32_t flen;
+	// Phase B: naga_agal::extract_sampler_configs over the FRAGMENT program.
+	// `fs_have[i]` is Rust's `Option::is_some` — an `ignoresampler` tex leaves
+	// the entry None, which is what makes setProgram not clobber the state AND
+	// what makes the texture non-required for has_unbound_required_textures.
+	uint8_t fs_have[8];
+	uint8_t fs_wrap[8];
+	uint8_t fs_filter[8];
 } Avm2Program3DExt;
 
 static Avm2Class* g_stage3d_class;
@@ -429,6 +445,42 @@ int avm2_geom_matrix3d_read(Avm2Object* o, double* out);
 #define S3D_CMP_GEQUAL 6
 #define S3D_CMP_ALWAYS 7
 
+// naga_agal Wrapping / Filter numbering (types.rs:129-152).
+#define S3D_WRAP_CLAMP            0
+#define S3D_WRAP_REPEAT           1
+#define S3D_WRAP_CLAMP_U_REPEAT_V 2
+#define S3D_WRAP_REPEAT_U_CLAMP_V 3
+#define S3D_FILTER_NEAREST 0
+#define S3D_FILTER_LINEAR  1
+
+// The two string tables spell these in their own orders; translate once.
+static const uint8_t S3D_WRAP_FROM_SPELLING[4] =
+	{ S3D_WRAP_CLAMP, S3D_WRAP_CLAMP_U_REPEAT_V,
+	  S3D_WRAP_REPEAT, S3D_WRAP_REPEAT_U_CLAMP_V };
+static const uint8_t S3D_FILTER_FROM_SPELLING[6] = { 5, 2, 3, 4, 1, 0 };
+
+// S3D_BLEND_FACTOR index order (the spelling table is alphabetical).
+#define S3D_BF_DST_ALPHA       0
+#define S3D_BF_DST_COLOR       1
+#define S3D_BF_ONE             2
+#define S3D_BF_INV_DST_ALPHA   3
+#define S3D_BF_INV_DST_COLOR   4
+#define S3D_BF_INV_SRC_ALPHA   5
+#define S3D_BF_INV_SRC_COLOR   6
+#define S3D_BF_SRC_ALPHA       7
+#define S3D_BF_SRC_COLOR       8
+#define S3D_BF_ZERO            9
+
+// S3D_STENCIL_ACTION index order.
+#define S3D_SA_DEC_SAT   0
+#define S3D_SA_DEC_WRAP  1
+#define S3D_SA_INC_SAT   2
+#define S3D_SA_INC_WRAP  3
+#define S3D_SA_INVERT    4
+#define S3D_SA_KEEP      5
+#define S3D_SA_SET       6
+#define S3D_SA_ZERO      7
+
 // Context3DClearMask (context_3d.rs COLOR/DEPTH/STENCIL_MASK).
 #define S3D_CLEAR_COLOR   1u
 #define S3D_CLEAR_DEPTH   2u
@@ -468,6 +520,27 @@ struct S3dBackend
 	uint8_t depth_func;
 	uint8_t scissor_on;
 	int32_t sc_x0, sc_y0, sc_x1, sc_y1;
+
+	// ---- phase A' : blend, colour mask, stencil -------------------------
+	// Blend factors are stored in S3D_BLEND_FACTOR index order; the default
+	// is the REPLACE component (src ONE, dst ZERO) that
+	// current_pipeline.rs:179 starts with.
+	uint8_t blend_src, blend_dst;
+	uint8_t color_mask;         // bit i = channel i (R,G,B,A) is written
+	uint8_t* stencil;           // w*h*samples, or NULL when there is no
+	                            // depth/stencil attachment
+	uint32_t clear_stencil;
+	// wgpu::StencilState: per-face {compare, fail, depth_fail, pass} plus the
+	// SHARED read/write masks and reference value
+	// (current_pipeline.rs:637-682).
+	uint8_t st_cmp[2], st_fail[2], st_dfail[2], st_pass[2];  // [0]=front
+	uint8_t st_ref, st_read, st_write;
+
+	// ---- phase B : textures ---------------------------------------------
+	// Live sampler state, in naga_agal Wrapping/Filter numbering. Written by
+	// BOTH setSamplerStateAt and setProgram (see s3d_apply_program_samplers).
+	uint8_t samp_wrap[S3D_ATTRS];
+	uint8_t samp_filter[S3D_ATTRS];
 };
 
 // Index of `v` in a NULL-terminated spelling table, or -1.
@@ -484,6 +557,8 @@ static void s3d_backend_free_buffers(Avm2Context* ctx, S3dBackend* be)
 	if (be->color != NULL) { heap_free(ctx->app, be->color); be->color = NULL; }
 	if (be->depth != NULL) { heap_free(ctx->app, be->depth); be->depth = NULL; }
 	if (be->front != NULL) { heap_free(ctx->app, be->front); be->front = NULL; }
+	if (be->stencil != NULL)
+	{ heap_free(ctx->app, be->stencil); be->stencil = NULL; }
 	if (be->crop != NULL) { heap_free(ctx->app, be->crop); be->crop = NULL; }
 	be->crop_cap = 0;
 }
@@ -500,6 +575,26 @@ static S3dBackend* s3d_backend(Avm2Context* ctx, Avm2Context3DExt* e)
 	be->depth_mask = 1;
 	be->depth_func = S3D_CMP_LEQUAL;   // current_pipeline.rs:169
 	be->clear_depth = 1.0f;
+	// current_pipeline.rs:171-181 — BlendComponent::REPLACE, a fully open
+	// colour mask, StencilState::default() (Always/Keep, masks 0xFF, ref 0)
+	// and SamplerConfig::default() = Clamp/Nearest on all eight registers.
+	be->blend_src = S3D_BF_ONE;
+	be->blend_dst = S3D_BF_ZERO;
+	be->color_mask = 0xF;
+	be->st_read = 0xFF;
+	be->st_write = 0xFF;
+	for (int i = 0; i < 2; i++)
+	{
+		be->st_cmp[i] = S3D_CMP_ALWAYS;
+		be->st_fail[i] = S3D_SA_KEEP;
+		be->st_dfail[i] = S3D_SA_KEEP;
+		be->st_pass[i] = S3D_SA_KEEP;
+	}
+	for (int i = 0; i < S3D_ATTRS; i++)
+	{
+		be->samp_wrap[i] = S3D_WRAP_CLAMP;
+		be->samp_filter[i] = S3D_FILTER_NEAREST;
+	}
 	e->be = be;
 	return be;
 }
@@ -532,7 +627,92 @@ typedef struct S3dShader
 	float attr[S3D_ATTRS][4];      // vertex stage: already extended to float4
 	const uint8_t* attr_fmt;       // vertex stage: declared formats
 	int killed;                    // fragment stage: `kil` fired
+	// Fragment stage: the eight `setTextureAt` bindings and the live sampler
+	// state, both indexed by sampler register (phase B).
+	Avm2Texture3DExt* const* tex_bound;
+	const uint8_t* samp_wrap;
+	const uint8_t* samp_filter;
 } S3dShader;
+
+// ---------------------------------------------------------------------------
+// Phase B — the texture sampler.
+//
+// Every Stage3D texture is Rgba8Unorm in Ruffle (mod.rs:1258-1278 maps bgra,
+// bgraPacked4444, bgrPacked565 and `compressed` all onto Rgba8Unorm), so there
+// is no gamma step: the sample is the stored byte over 255. `mipnone` is the
+// only mip filter the corpus uses and Ruffle uploads a single mip level, so
+// naga's SampleLevel::Auto always resolves to LOD 0 and no derivative is
+// needed. Wrapping/Filter carry naga_agal's numbering (types.rs:129-152).
+// ---------------------------------------------------------------------------
+
+static int s3d_wrap_index(int i, int n, int repeat)
+{
+	if (n <= 0) return 0;
+	if (repeat)
+	{
+		i %= n;
+		if (i < 0) i += n;
+		return i;
+	}
+	if (i < 0) return 0;
+	if (i >= n) return n - 1;
+	return i;
+}
+
+static void s3d_texel(const Avm2Texture3DExt* t, int x, int y, uint32_t layer,
+                      float* o)
+{
+	o[0] = o[1] = o[2] = o[3] = 0.0f;
+	if (t == NULL || t->texels == NULL || t->width == 0 || t->height == 0)
+		return;
+	if (layer >= t->layers) layer = 0;
+	uint32_t v = t->texels[((size_t) layer * t->height + (uint32_t) y)
+	                       * t->width + (uint32_t) x];
+	o[0] = (float) (v & 0xFF) / 255.0f;
+	o[1] = (float) ((v >> 8) & 0xFF) / 255.0f;
+	o[2] = (float) ((v >> 16) & 0xFF) / 255.0f;
+	o[3] = (float) ((v >> 24) & 0xFF) / 255.0f;
+}
+
+// One 2D sample. `wrap`/`filter` are the LIVE sampler state, which is what
+// wgpu binds (current_pipeline.rs:290-345 picks the sampler object from
+// (wrapping, filter); anisotropic filters degrade to linear here).
+static void s3d_tex_sample(const Avm2Texture3DExt* t, float u, float v,
+                           uint8_t wrap, uint8_t filter, float* o)
+{
+	o[0] = o[1] = o[2] = o[3] = 0.0f;
+	if (t == NULL || t->texels == NULL || t->width == 0 || t->height == 0)
+		return;
+	int ru = (wrap == S3D_WRAP_REPEAT || wrap == S3D_WRAP_REPEAT_U_CLAMP_V);
+	int rv = (wrap == S3D_WRAP_REPEAT || wrap == S3D_WRAP_CLAMP_U_REPEAT_V);
+	int w = (int) t->width, h = (int) t->height;
+	if (filter == S3D_FILTER_NEAREST)
+	{
+		int x = s3d_wrap_index((int) floorf(u * (float) w), w, ru);
+		int y = s3d_wrap_index((int) floorf(v * (float) h), h, rv);
+		s3d_texel(t, x, y, 0, o);
+		return;
+	}
+	float fx = u * (float) w - 0.5f;
+	float fy = v * (float) h - 0.5f;
+	float bx = floorf(fx), by = floorf(fy);
+	float ax = fx - bx, ay = fy - by;
+	int x0 = s3d_wrap_index((int) bx, w, ru);
+	int x1 = s3d_wrap_index((int) bx + 1, w, ru);
+	int y0 = s3d_wrap_index((int) by, h, rv);
+	int y1 = s3d_wrap_index((int) by + 1, h, rv);
+	float c00[4], c10[4], c01[4], c11[4];
+	s3d_texel(t, x0, y0, 0, c00);
+	s3d_texel(t, x1, y0, 0, c10);
+	s3d_texel(t, x0, y1, 0, c01);
+	s3d_texel(t, x1, y1, 0, c11);
+	for (int i = 0; i < 4; i++)
+	{
+		float top = c00[i] + (c10[i] - c00[i]) * ax;
+		float bot = c01[i] + (c11[i] - c01[i]) * ax;
+		o[i] = top + (bot - top) * ay;
+	}
+}
 
 // Read one register WITHOUT the swizzle (the `load_register` closure,
 // builder.rs:915-944). Unbound / unimplemented register types read as zero.
@@ -841,10 +1021,24 @@ static void s3d_run_agal(const uint8_t* code, uint32_t len, S3dShader* sh)
 			s3d_src_load(sh, s1w, a);
 			if (a[0] < 0.0f) sh->killed = 1;
 			break;
-		case 0x28:  // tex — phase B
-			s3d_splat(r, 0.0f);
+		case 0x28:  // tex (builder.rs:1269-1319)
+		{
+			s3d_src_load(sh, s1w, a);
+			uint32_t reg = (uint32_t) (s2w & 0xFFFF);
+			uint32_t dim = (uint32_t) ((s2w >> 44) & 0xF);
+			r[0] = r[1] = r[2] = r[3] = 0.0f;
+			if (sh->tex_bound != NULL && reg < S3D_ATTRS)
+			{
+				// Dimension::Cube samples a 3-component direction; the CPU
+				// backend only models 2D (no corpus row in phases A'/B uses a
+				// cube map — away3d does, and is phase C).
+				if (dim == 0)
+					s3d_tex_sample(sh->tex_bound[reg], a[0], a[1],
+					               sh->samp_wrap[reg], sh->samp_filter[reg], r);
+			}
 			s3d_dest_store(sh, destw, r);
 			break;
+		}
 		default:
 			break;
 		}
@@ -898,6 +1092,24 @@ static float s3d_edge(float ax, float ay, float bx, float by,
 // tick), so leaving them running after the draws stopped kept away3d near the
 // timeout even with the shading budget exhausted. Once latched, the last front
 // buffer keeps compositing and nothing else costs anything.
+//
+// THE CONSTANT IS MEASURED IN BOTH DIRECTIONS — do not "tune" it without
+// re-running these four rows (session 20, w1/w2-stage3d):
+//
+//   * 12 M is close to the MINIMUM phases A'/B need. Swept down to 6 M,
+//     avm2/stage3d_stencil FAILS at 710 400 outliers (it needs 0) and
+//     avm2/stage3d_blend FAILS at 2 888 875 (limit 37 000) — both latch off
+//     part-way through their frame. avm2/stage3d_sampler,
+//     stage3d_ignore_sampler_override and stage3d_rotating_cube are
+//     unaffected at 6 M.
+//   * It is also close to the MAXIMUM avm2/away3d_advanced_shallow_water_demo
+//     can afford: that test is the one row at verify_output.py's hard 30 s
+//     execution wall, and s19 already turned it from a pass into a TIMEOUT
+//     once with a looser guard.
+//   * avm2/stage3d_fractal would need ~200 M (197 fragment tokens x 800x600
+//     x 2 frames) and avm2/stage3d_raytrace ~15 G. Both are out of reach on
+//     the CPU route at any budget that keeps away3d green; fractal's
+//     completion mechanism is a faster rasteriser, not a bigger number here.
 #define S3D_FRAG_BUDGET 12000000u
 #define S3D_PIXEL_COST 8u
 static uint64_t g_s3d_frag_budget = S3D_FRAG_BUDGET;
@@ -917,6 +1129,68 @@ static int s3d_depth_pass(uint8_t func, float src, float dst)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Phase A' — blend, colour mask, stencil.
+// ---------------------------------------------------------------------------
+
+// The render target is Rgba8Unorm (mod.rs:203), so every colour that reaches
+// it is quantised to 8 bits. Phase A stored raw floats and quantised only at
+// resolve, which is indistinguishable for an opaque overwrite but NOT for
+// blending, where the destination read has to be the stored byte. Quantising
+// at store time is idempotent with the resolve (round(k/255*255) == k), so it
+// costs phase A nothing and makes the blend arithmetic match the GPU.
+static float s3d_quant(float v)
+{
+	if (!(v > 0.0f)) return 0.0f;
+	if (v > 1.0f) return 1.0f;
+	return (float) ((int) (v * 255.0f + 0.5f)) / 255.0f;
+}
+
+// mod.rs:1121-1162 convert_blend_factor. Each Context3DBlendFactor maps to a
+// pair (colour factor, alpha factor); the *Color factors degrade to the
+// matching *Alpha factor on the alpha channel, everything else is the same on
+// all four. The operation is always Add.
+static void s3d_blend_factor(uint8_t f, const float* src, const float* dst,
+                             float* o)
+{
+	float sa = src[3], da = dst[3];
+	switch (f)
+	{
+	case S3D_BF_ZERO:          o[0] = o[1] = o[2] = o[3] = 0.0f; return;
+	case S3D_BF_ONE:           o[0] = o[1] = o[2] = o[3] = 1.0f; return;
+	case S3D_BF_SRC_ALPHA:     o[0] = o[1] = o[2] = o[3] = sa; return;
+	case S3D_BF_INV_SRC_ALPHA: o[0] = o[1] = o[2] = o[3] = 1.0f - sa; return;
+	case S3D_BF_DST_ALPHA:     o[0] = o[1] = o[2] = o[3] = da; return;
+	case S3D_BF_INV_DST_ALPHA: o[0] = o[1] = o[2] = o[3] = 1.0f - da; return;
+	case S3D_BF_SRC_COLOR:
+		o[0] = src[0]; o[1] = src[1]; o[2] = src[2]; o[3] = sa; return;
+	case S3D_BF_INV_SRC_COLOR:
+		o[0] = 1.0f - src[0]; o[1] = 1.0f - src[1];
+		o[2] = 1.0f - src[2]; o[3] = 1.0f - sa; return;
+	case S3D_BF_DST_COLOR:
+		o[0] = dst[0]; o[1] = dst[1]; o[2] = dst[2]; o[3] = da; return;
+	default:   // S3D_BF_INV_DST_COLOR
+		o[0] = 1.0f - dst[0]; o[1] = 1.0f - dst[1];
+		o[2] = 1.0f - dst[2]; o[3] = 1.0f - da; return;
+	}
+}
+
+// wgpu::StencilOperation, applied under the shared write mask.
+static uint8_t s3d_stencil_op(uint8_t op, uint8_t cur, uint8_t ref)
+{
+	switch (op)
+	{
+	case S3D_SA_ZERO:     return 0;
+	case S3D_SA_SET:      return ref;
+	case S3D_SA_INVERT:   return (uint8_t) ~cur;
+	case S3D_SA_INC_SAT:  return cur == 0xFF ? 0xFF : (uint8_t) (cur + 1);
+	case S3D_SA_DEC_SAT:  return cur == 0 ? 0 : (uint8_t) (cur - 1);
+	case S3D_SA_INC_WRAP: return (uint8_t) (cur + 1);
+	case S3D_SA_DEC_WRAP: return (uint8_t) (cur - 1);
+	default:              return cur;   // S3D_SA_KEEP
+	}
+}
+
 // Consume a deferred clear, exactly where Ruffle opens its render pass.
 static void s3d_apply_pending_clear(S3dBackend* be)
 {
@@ -928,6 +1202,8 @@ static void s3d_apply_pending_clear(S3dBackend* be)
 			memcpy(be->color + i * 4, be->clear_rgba, 4 * sizeof(float));
 	if (be->depth != NULL && (be->clear_mask & S3D_CLEAR_DEPTH))
 		for (size_t i = 0; i < n; i++) be->depth[i] = be->clear_depth;
+	if (be->stencil != NULL && (be->clear_mask & S3D_CLEAR_STENCIL))
+		memset(be->stencil, (int) (be->clear_stencil & 0xFF), n);
 }
 
 typedef struct S3dVertexOut
@@ -980,7 +1256,8 @@ static void s3d_run_vertex(S3dBackend* be, const uint8_t* code, uint32_t len,
 // One drawTriangles. Everything is already validated; a missing piece renders
 // nothing rather than throwing (Ruffle warns and skips too).
 static void s3d_raster_draw(S3dBackend* be, const uint8_t* fcode,
-                            uint32_t flen, const S3dVertexOut* v0,
+                            uint32_t flen, Avm2Texture3DExt* const* texb,
+                            const S3dVertexOut* v0,
                             const S3dVertexOut* v1, const S3dVertexOut* v2)
 {
 	const S3dVertexOut* vs[3] = { v0, v1, v2 };
@@ -992,6 +1269,19 @@ static void s3d_raster_draw(S3dBackend* be, const uint8_t* fcode,
 		invw[i] = 1.0f / w;
 		sx[i] = (vs[i]->clip[0] * invw[i] * 0.5f + 0.5f) * (float) be->w;
 		sy[i] = (0.5f - vs[i]->clip[1] * invw[i] * 0.5f) * (float) be->h;
+		// SUBPIXEL SNAP. A real rasteriser quantises vertex positions to a
+		// fixed-point grid before the edge functions (Vulkan requires at
+		// least 8 subpixel bits, D3D11 mandates exactly 8), and lavapipe —
+		// which produces the upstream goldens — is no exception. Without it
+		// an axis-aligned edge that should land exactly on x = 240.0 lands on
+		// 240.0000038, so the "sample exactly on the edge" case of the
+		// top-left rule never fires where it should and the shared diagonals
+		// of avm2/stage3d_stencil's quads keep an 81-px residual at
+		// tolerance 0.
+		sx[i] = (float) ((int) (sx[i] * 256.0f + (sx[i] >= 0.0f ? 0.5f : -0.5f)))
+		        / 256.0f;
+		sy[i] = (float) ((int) (sy[i] * 256.0f + (sy[i] >= 0.0f ? 0.5f : -0.5f)))
+		        / 256.0f;
 		sz[i] = vs[i]->clip[2] * invw[i];
 	}
 
@@ -1000,11 +1290,32 @@ static void s3d_raster_draw(S3dBackend* be, const uint8_t* fcode,
 	// FrontFace::Cw (current_pipeline.rs:576): with y pointing down, a
 	// clockwise winding has a negative signed area under this edge function.
 	int is_front = (area < 0.0f);
+	// wgpu::StencilState keeps a separate face state; `frontAndBack` sets both
+	// and `none` sets neither (current_pipeline.rs:652-660).
+	int face = is_front ? 0 : 1;
 	if (be->cull == 3) return;                          // frontAndBack
 	if (be->cull == 1 && !is_front) return;             // back
 	if (be->cull == 2 && is_front) return;              // front
 	float sign = (area > 0.0f) ? 1.0f : -1.0f;
 	float inv_area = 1.0f / fabsf(area);
+
+	// The D3D/Vulkan TOP-LEFT fill rule. Phase A used a strict `> 0` on all
+	// three edges, which drops every sample that lands exactly ON an edge —
+	// invisible on the MSAA rows, but avm2/stage3d_stencil draws axis-aligned
+	// quads as two triangles sharing a diagonal that passes exactly through
+	// pixel centres, and at tolerance 0 the 1-px-wide unowned diagonal of
+	// every quad (1920 px) is the entire residual. With the winding
+	// normalised by `sign`, an edge is `top` when it is horizontal and runs
+	// leftwards and `left` when it runs downwards; a sample with e == 0 is
+	// covered iff its edge is one of those, so each shared edge is owned by
+	// exactly one of the two triangles.
+	float ex[3], ey[3];
+	int tl[3];
+	ex[0] = (sx[2] - sx[1]) * sign; ey[0] = (sy[2] - sy[1]) * sign;
+	ex[1] = (sx[0] - sx[2]) * sign; ey[1] = (sy[0] - sy[2]) * sign;
+	ex[2] = (sx[1] - sx[0]) * sign; ey[2] = (sy[1] - sy[0]) * sign;
+	for (int i = 0; i < 3; i++)
+		tl[i] = (ey[i] > 0.0f) || (ey[i] == 0.0f && ex[i] < 0.0f);
 
 	int x0 = (int) floorf(fminf(fminf(sx[0], sx[1]), sx[2]));
 	int x1 = (int) ceilf(fmaxf(fmaxf(sx[0], sx[1]), sx[2]));
@@ -1035,6 +1346,33 @@ static void s3d_raster_draw(S3dBackend* be, const uint8_t* fcode,
 	memset(&sh, 0, sizeof(sh));
 	sh.consts = be->fc;
 	sh.nconsts = S3D_FRAG_CONSTS;
+	sh.tex_bound = texb;
+	sh.samp_wrap = be->samp_wrap;
+	sh.samp_filter = be->samp_filter;
+
+	// Per-draw state, hoisted out of the per-sample loop. The compiler cannot
+	// do this itself: `be->color` / `be->depth` / `be->stencil` are writable
+	// float*/uint8_t* that may alias `*be` as far as it knows, so every
+	// `be->blend_src` inside the loop is a reload. This is a pure hoist —
+	// bit-identical output, verified by an md5 render-canary A/B — and it is
+	// the cheapest lever on avm2/away3d, the one row near the 30 s wall.
+	float* be_color = be->color;
+	float* be_depth = be->depth;
+	uint8_t* be_stencil = be->stencil;
+	const int has_depth = (be->has_depth && be_depth != NULL);
+	const int has_stencil = (has_depth && be_stencil != NULL);
+	const uint8_t depth_func = be->depth_func;
+	const int depth_write = be->depth_mask;
+	const uint8_t st_cmp = be->st_cmp[face], st_pass = be->st_pass[face];
+	const uint8_t st_dfail = be->st_dfail[face], st_fail = be->st_fail[face];
+	const uint8_t st_ref = be->st_ref, st_read = be->st_read;
+	const uint8_t st_write = be->st_write;
+	const float st_ref_masked = (float) (st_ref & st_read);
+	const uint8_t blend_src = be->blend_src, blend_dst = be->blend_dst;
+	const int blend_replace =
+		(blend_src == S3D_BF_ONE && blend_dst == S3D_BF_ZERO);
+	const uint8_t cmask = be->color_mask;
+	const uint32_t be_w = be->w;
 
 	for (int py = y0; py < y1; py++)
 	{
@@ -1060,7 +1398,9 @@ static void s3d_raster_draw(S3dBackend* be, const uint8_t* fcode,
 				float e0 = s3d_edge(sx[1], sy[1], sx[2], sy[2], qx, qy) * sign;
 				float e1 = s3d_edge(sx[2], sy[2], sx[0], sy[0], qx, qy) * sign;
 				float e2 = s3d_edge(sx[0], sy[0], sx[1], sy[1], qx, qy) * sign;
-				cov[s] = (e0 > 0.0f && e1 > 0.0f && e2 > 0.0f);
+				cov[s] = ((e0 > 0.0f) || (e0 == 0.0f && tl[0]))
+				      && ((e1 > 0.0f) || (e1 == 0.0f && tl[1]))
+				      && ((e2 > 0.0f) || (e2 == 0.0f && tl[2]));
 				bs[s][0] = e0 * inv_area;
 				bs[s][1] = e1 * inv_area;
 				bs[s][2] = e2 * inv_area;
@@ -1099,20 +1439,55 @@ static void s3d_raster_draw(S3dBackend* be, const uint8_t* fcode,
 			for (uint32_t s = 0; s < ns; s++)
 			{
 				if (!cov[s]) continue;
-				size_t si = ((size_t) py * be->w + px) * ns + s;
+				size_t si = ((size_t) py * be_w + px) * ns + s;
 				// No depth attachment at all when configureBackBuffer was
-				// called with enableDepthAndStencil = false (mod.rs:228-243).
-				if (be->has_depth && be->depth != NULL)
+				// called with enableDepthAndStencil = false (mod.rs:228-243);
+				// the stencil plane shares that attachment.
+				if (has_depth)
 				{
 					// Depth is interpolated per SAMPLE, linearly in screen
 					// space (no perspective divide).
 					float z = bs[s][0] * sz[0] + bs[s][1] * sz[1]
 					        + bs[s][2] * sz[2];
-					if (!s3d_depth_pass(be->depth_func, z, be->depth[si]))
-						continue;
-					if (be->depth_mask) be->depth[si] = z;
+					int depth_ok = s3d_depth_pass(depth_func, z, be_depth[si]);
+					if (has_stencil)
+					{
+						// wgpu order: stencil test, then depth test. The
+						// compare is (ref & read) OP (buf & read), and the
+						// chosen op is written back under `write`.
+						uint8_t cur = be_stencil[si];
+						int st_ok = s3d_depth_pass(
+							st_cmp, st_ref_masked, (float) (cur & st_read));
+						uint8_t op = st_ok ? (depth_ok ? st_pass : st_dfail)
+						                   : st_fail;
+						uint8_t nv = s3d_stencil_op(op, cur, st_ref);
+						be_stencil[si] = (uint8_t)
+							((cur & ~st_write) | (nv & st_write));
+						if (!st_ok) continue;
+					}
+					if (!depth_ok) continue;
+					if (depth_write) be_depth[si] = z;
 				}
-				memcpy(be->color + si * 4, sh.out, 4 * sizeof(float));
+				float* d = be_color + si * 4;
+				float out[4];
+				if (blend_replace)
+				{
+					for (int k = 0; k < 4; k++) out[k] = s3d_quant(sh.out[k]);
+				}
+				else
+				{
+					float dq[4], fs[4], fd[4];
+					for (int k = 0; k < 4; k++) dq[k] = d[k];
+					s3d_blend_factor(blend_src, sh.out, dq, fs);
+					s3d_blend_factor(blend_dst, sh.out, dq, fd);
+					for (int k = 0; k < 4; k++)
+						out[k] = s3d_quant(sh.out[k] * fs[k] + dq[k] * fd[k]);
+				}
+				if (cmask == 0xF)
+					memcpy(d, out, 4 * sizeof(float));
+				else
+					for (int k = 0; k < 4; k++)
+						if (cmask & (1u << k)) d[k] = out[k];
 			}
 		}
 	}
@@ -1441,7 +1816,13 @@ static Avm2Value context3d_configure_back_buffer(Avm2Activation* act)
 		be->depth = (float*) heap_alloc(ctx->app, n * sizeof(float));
 		be->front = (uint32_t*) heap_alloc(ctx->app,
 		                                   (size_t) width * height * 4);
-		if (be->color == NULL || be->depth == NULL || be->front == NULL)
+		// The stencil plane shares the depth attachment's lifetime
+		// (Depth24PlusStencil8, mod.rs:183) — there is no stencil at all when
+		// enableDepthAndStencil is false.
+		be->stencil = depth_stencil
+			? (uint8_t*) heap_alloc(ctx->app, n) : NULL;
+		if (be->color == NULL || be->depth == NULL || be->front == NULL
+		    || (depth_stencil && be->stencil == NULL))
 		{
 			s3d_backend_free_buffers(ctx, be);
 			be->w = be->h = 0;
@@ -1450,6 +1831,7 @@ static Avm2Value context3d_configure_back_buffer(Avm2Activation* act)
 		{
 			memset(be->color, 0, n * 4 * sizeof(float));
 			for (size_t i = 0; i < n; i++) be->depth[i] = 1.0f;
+			if (be->stencil != NULL) memset(be->stencil, 0, n);
 			// A never-presented front buffer reads as opaque black, which is
 			// what a freshly created wgpu texture composites as.
 			for (size_t i = 0; i < (size_t) width * height; i++)
@@ -1483,10 +1865,43 @@ static Avm2Value context3d_set_depth_test(Avm2Activation* act)
 
 static Avm2Value context3d_set_blend_factors(Avm2Activation* act)
 {
-	s3d_check_enum(act->ctx, s3d_arg_string(act, 0, "sourceFactor", NULL),
-	               S3D_BLEND_FACTOR, "sourceFactor");
-	s3d_check_enum(act->ctx, s3d_arg_string(act, 1, "destinationFactor", NULL),
-	               S3D_BLEND_FACTOR, "destinationFactor");
+	const Avm2String* sf = s3d_arg_string(act, 0, "sourceFactor", NULL);
+	s3d_check_enum(act->ctx, sf, S3D_BLEND_FACTOR, "sourceFactor");
+	const Avm2String* df = s3d_arg_string(act, 1, "destinationFactor", NULL);
+	s3d_check_enum(act->ctx, df, S3D_BLEND_FACTOR, "destinationFactor");
+	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
+	if (be != NULL)
+	{
+		be->blend_src = (uint8_t) s3d_enum_index(sf, S3D_BLEND_FACTOR);
+		be->blend_dst = (uint8_t) s3d_enum_index(df, S3D_BLEND_FACTOR);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value context3d_set_color_mask(Avm2Activation* act)
+{
+	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
+	if (be != NULL)
+	{
+		uint8_t m = 0;
+		for (int i = 0; i < 4; i++)
+			if (s3d_arg_bool(act, i, 0)) m |= (uint8_t) (1u << i);
+		be->color_mask = m;
+	}
+	return avm2_undefined();
+}
+
+// setStencilReferenceValue(referenceValue, readMask = 255, writeMask = 255).
+// The two masks live on the shared wgpu::StencilState, not per face.
+static Avm2Value context3d_set_stencil_reference_value(Avm2Activation* act)
+{
+	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
+	if (be != NULL)
+	{
+		be->st_ref = (uint8_t) s3d_arg_u32(act, 0, 0);
+		be->st_read = (uint8_t) s3d_arg_u32(act, 1, 255);
+		be->st_write = (uint8_t) s3d_arg_u32(act, 2, 255);
+	}
 	return avm2_undefined();
 }
 
@@ -1495,29 +1910,84 @@ static Avm2Value context3d_set_blend_factors(Avm2Activation* act)
 static Avm2Value context3d_set_stencil_actions(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	s3d_check_enum(ctx, s3d_arg_string(act, 0, "triangleFace", "frontAndBack"),
-	               S3D_TRIANGLE_FACE, "triangleFace");
-	s3d_check_enum(ctx, s3d_arg_string(act, 1, "compareMode", "always"),
-	               S3D_COMPARE_MODE, "compareMode");
-	s3d_check_enum(ctx, s3d_arg_string(act, 2, "actionOnBothPass", "keep"),
-	               S3D_STENCIL_ACTION, "actionOnBothPass");
-	s3d_check_enum(ctx, s3d_arg_string(act, 3, "actionOnDepthFail", "keep"),
-	               S3D_STENCIL_ACTION, "actionOnDepthFail");
-	s3d_check_enum(ctx, s3d_arg_string(act, 4, "actionOnDepthPassStencilFail",
-	                                   "keep"),
-	               S3D_STENCIL_ACTION, "actionOnDepthPassStencilFail");
+	const Avm2String* tf =
+		s3d_arg_string(act, 0, "triangleFace", "frontAndBack");
+	s3d_check_enum(ctx, tf, S3D_TRIANGLE_FACE, "triangleFace");
+	const Avm2String* cm = s3d_arg_string(act, 1, "compareMode", "always");
+	s3d_check_enum(ctx, cm, S3D_COMPARE_MODE, "compareMode");
+	const Avm2String* ap = s3d_arg_string(act, 2, "actionOnBothPass", "keep");
+	s3d_check_enum(ctx, ap, S3D_STENCIL_ACTION, "actionOnBothPass");
+	const Avm2String* ad = s3d_arg_string(act, 3, "actionOnDepthFail", "keep");
+	s3d_check_enum(ctx, ad, S3D_STENCIL_ACTION, "actionOnDepthFail");
+	const Avm2String* af =
+		s3d_arg_string(act, 4, "actionOnDepthPassStencilFail", "keep");
+	s3d_check_enum(ctx, af, S3D_STENCIL_ACTION, "actionOnDepthPassStencilFail");
+
+	// current_pipeline.rs:637-666. NOTE the AS3 parameter names lie about the
+	// wgpu slots: actionOnDepthPassStencilFail is the STENCIL-fail op and
+	// actionOnDepthFail is the depth-fail op.
+	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
+	if (be != NULL)
+	{
+		int face = s3d_enum_index(tf, S3D_TRIANGLE_FACE);   // 0..3
+		uint8_t cmp = (uint8_t) s3d_enum_index(cm, S3D_COMPARE_MODE);
+		uint8_t pass = (uint8_t) s3d_enum_index(ap, S3D_STENCIL_ACTION);
+		uint8_t dfail = (uint8_t) s3d_enum_index(ad, S3D_STENCIL_ACTION);
+		uint8_t sfail = (uint8_t) s3d_enum_index(af, S3D_STENCIL_ACTION);
+		for (int i = 0; i < 2; i++)
+		{
+			// S3D_TRIANGLE_FACE = { none, back, front, frontAndBack };
+			// slot 0 is front, slot 1 is back.
+			int set = (face == 3) || (face == 2 && i == 0)
+			          || (face == 1 && i == 1);
+			if (set)
+			{
+				be->st_cmp[i] = cmp;
+				be->st_pass[i] = pass;
+				be->st_dfail[i] = dfail;
+				be->st_fail[i] = sfail;
+			}
+			else
+			{
+				// StencilFaceState::IGNORE
+				be->st_cmp[i] = S3D_CMP_ALWAYS;
+				be->st_pass[i] = S3D_SA_KEEP;
+				be->st_dfail[i] = S3D_SA_KEEP;
+				be->st_fail[i] = S3D_SA_KEEP;
+			}
+		}
+	}
 	return avm2_undefined();
 }
 
 static Avm2Value context3d_set_sampler_state_at(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
-	s3d_check_enum(ctx, s3d_arg_string(act, 1, "wrap", NULL),
-	               S3D_WRAP_MODE, "wrap");
-	s3d_check_enum(ctx, s3d_arg_string(act, 2, "filter", NULL),
-	               S3D_TEXTURE_FILTER, "filter");
+	const Avm2String* wr = s3d_arg_string(act, 1, "wrap", NULL);
+	s3d_check_enum(ctx, wr, S3D_WRAP_MODE, "wrap");
+	const Avm2String* fi = s3d_arg_string(act, 2, "filter", NULL);
+	s3d_check_enum(ctx, fi, S3D_TEXTURE_FILTER, "filter");
 	// mipfilter is read but never validated (context_3d.rs:772).
 	(void) s3d_arg_string(act, 3, "mipfilter", NULL);
+	uint32_t idx = s3d_arg_u32(act, 0, 0);
+	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
+	if (be != NULL && idx < S3D_ATTRS)
+	{
+		int w = s3d_enum_index(wr, S3D_WRAP_MODE);
+		int f = s3d_enum_index(fi, S3D_TEXTURE_FILTER);
+		if (w >= 0) be->samp_wrap[idx] = S3D_WRAP_FROM_SPELLING[w];
+		if (f >= 0) be->samp_filter[idx] = S3D_FILTER_FROM_SPELLING[f];
+	}
+	return avm2_undefined();
+}
+
+// setTextureAt(sampler, texture). Ruffle keeps the binding on the pipeline;
+// we keep it on the ext, where the conservative GC scan can see the edge.
+static Avm2Value context3d_set_texture_at(Avm2Activation* act)
+{
+	Avm2Context3DExt* e = context3d_ext(act);
+	uint32_t idx = s3d_arg_u32(act, 0, 0);
+	if (e != NULL && idx < S3D_ATTRS) e->tex_bound[idx] = s3d_arg_object(act, 1);
 	return avm2_undefined();
 }
 
@@ -1675,6 +2145,7 @@ static Avm2Value context3d_clear(Avm2Activation* act)
 	be->clear_rgba[2] = (float) s3d_arg_number(act, 2, 0.0);
 	be->clear_rgba[3] = (float) s3d_arg_number(act, 3, 1.0);
 	be->clear_depth = (float) s3d_arg_number(act, 4, 1.0);
+	be->clear_stencil = s3d_arg_u32(act, 5, 0);
 	be->clear_mask = s3d_arg_u32(act, 6, 0xFFFFFFFFu);
 	be->pending_clear = 1;
 	return avm2_undefined();
@@ -1763,10 +2234,28 @@ static Avm2Value context3d_set_vertex_buffer_at(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// setProgram. current_pipeline.rs:192-204: the fragment program's sampler
+// configs OVERRIDE the live sampler state, EXCEPT where `ignoresampler` left
+// the config empty — there the previous setSamplerStateAt/setProgram value
+// survives. avm2/stage3d_ignore_sampler_override grades all six orderings.
 static Avm2Value context3d_set_program(Avm2Activation* act)
 {
 	Avm2Context3DExt* e = context3d_ext(act);
-	if (e != NULL) e->program = s3d_arg_object(act, 0);
+	if (e == NULL) return avm2_undefined();
+	Avm2Object* po = s3d_arg_object(act, 0);
+	e->program = po;
+	S3dBackend* be = s3d_backend(act->ctx, e);
+	Avm2Program3DExt* pr = (po != NULL)
+		? (Avm2Program3DExt*) s3d_ext_of(po, g_program3d_class) : NULL;
+	if (be != NULL && pr != NULL)
+	{
+		for (int i = 0; i < 8; i++)
+		{
+			if (!pr->fs_have[i]) continue;
+			be->samp_wrap[i] = pr->fs_wrap[i];
+			be->samp_filter[i] = pr->fs_filter[i];
+		}
+	}
 	return avm2_undefined();
 }
 
@@ -1805,11 +2294,32 @@ static Avm2Value context3d_draw_triangles(Avm2Activation* act)
 
 	s3d_apply_pending_clear(be);
 
+	// current_pipeline.rs:206-215 has_unbound_required_textures: a fragment
+	// program that declares a sampler config for register i (a `tex` WITHOUT
+	// `ignoresampler`) makes texture i *required*; if nothing is bound there,
+	// mod.rs:862-907 opens the render pass anyway — so the deferred CLEAR
+	// still lands — and only skips `draw_indexed`. stage3d/unbound_texture's
+	// expected render is exactly that: the clear colour and no triangle.
+	for (uint32_t i = 0; i < 8; i++)
+	{
+		if (pr->fs_have[i] && e->tex_bound[i] == NULL)
+			return avm2_undefined();
+	}
+
 	Avm2Buffer3DExt* vb[S3D_ATTRS];
 	for (uint32_t i = 0; i < S3D_ATTRS; i++)
 	{
 		vb[i] = (e->va_buf[i] != NULL)
 			? (Avm2Buffer3DExt*) s3d_ext_of(e->va_buf[i], g_vertexbuffer_class)
+			: NULL;
+	}
+
+	Avm2Texture3DExt* texb[S3D_ATTRS];
+	for (uint32_t i = 0; i < S3D_ATTRS; i++)
+	{
+		texb[i] = (e->tex_bound[i] != NULL)
+			? (Avm2Texture3DExt*) s3d_ext_of(e->tex_bound[i],
+			                                 g_texturebase_class)
 			: NULL;
 	}
 
@@ -1831,7 +2341,7 @@ static Avm2Value context3d_draw_triangles(Avm2Activation* act)
 			uint32_t vi = ib->words[first_index + t * 3 + k];
 			s3d_run_vertex(be, pr->vcode, pr->vlen, vb, vi, &vo[k]);
 		}
-		s3d_raster_draw(be, pr->fcode, pr->flen, &vo[0], &vo[1], &vo[2]);
+		s3d_raster_draw(be, pr->fcode, pr->flen, texb, &vo[0], &vo[1], &vo[2]);
 	}
 	return avm2_undefined();
 }
@@ -1946,6 +2456,103 @@ static Avm2Value vertexbuffer_upload_from_byte_array(Avm2Activation* act)
 	}
 	return avm2_undefined();
 }
+
+// ---------------------------------------------------------------------------
+// Phase B — texture uploads.
+//
+// Ruffle routes every upload through an intermediate BitmapData and then
+// copy_bitmapdata_to_texture (texture.rs:14-67 + context3d_object.rs:350-375),
+// which writes source_width x source_height texels at origin (0,0) of the
+// destination and leaves the rest of the texture untouched — that is what
+// avm2/stage3d_sampler_partial_upload grades (a 4x4 BitmapData into an 8x8
+// texture). A never-written texel stays at wgpu's zero-initialised value.
+// ---------------------------------------------------------------------------
+
+static uint32_t* s3d_texels(Avm2Context* ctx, Avm2Texture3DExt* t)
+{
+	if (t == NULL || t->width == 0 || t->height == 0) return NULL;
+	if (t->texels != NULL) return t->texels;
+	uint32_t layers = t->is_cube ? 6u : 1u;
+	uint64_t n = (uint64_t) t->width * t->height * layers;
+	if (n > (1u << 26)) return NULL;
+	t->texels = (uint32_t*) heap_alloc(ctx->app, (size_t) n * 4);
+	if (t->texels == NULL) return NULL;
+	memset(t->texels, 0, (size_t) n * 4);
+	t->layers = layers;
+	return t->texels;
+}
+
+// BitmapData stores 0xAARRGGBB; the texel store is byte order R,G,B,A.
+static uint32_t s3d_argb_to_rgba(uint32_t v)
+{
+	return ((v >> 16) & 0xFF) | (((v >> 8) & 0xFF) << 8)
+	     | ((v & 0xFF) << 16) | (((v >> 24) & 0xFF) << 24);
+}
+
+static Avm2Value s3d_upload_bitmapdata(Avm2Activation* act, int side_arg,
+                                       int mip_arg)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Texture3DExt* t = texture_ext(act);
+	Avm2BitmapDataExt* bd = avm2_bitmapdata_ext_of(ctx, s3d_arg(act, 0));
+	if (t == NULL || bd == NULL || bd->pixels == NULL) return avm2_undefined();
+	// miplevel != 0 is a Ruffle stub (texture.rs:22-29) — it warns and drops.
+	if (mip_arg >= 0 && s3d_arg_u32(act, mip_arg, 0) != 0)
+		return avm2_undefined();
+	uint32_t side = (side_arg >= 0) ? s3d_arg_u32(act, side_arg, 0) : 0;
+	uint32_t* tex = s3d_texels(ctx, t);
+	if (tex == NULL || side >= t->layers) return avm2_undefined();
+	uint32_t cw = bd->width < t->width ? bd->width : t->width;
+	uint32_t ch = bd->height < t->height ? bd->height : t->height;
+	for (uint32_t y = 0; y < ch; y++)
+		for (uint32_t x = 0; x < cw; x++)
+			tex[((size_t) side * t->height + y) * t->width + x] =
+				s3d_argb_to_rgba(bd->pixels[(size_t) y * bd->width + x]);
+	return avm2_undefined();
+}
+
+// uploadFromByteArray reads 4*width*height bytes in B,G,R,A order
+// (texture.rs:38-53) — the whole texture, not a sub-rectangle.
+static Avm2Value s3d_upload_bytearray(Avm2Activation* act, int side_arg,
+                                      int mip_arg)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Texture3DExt* t = texture_ext(act);
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(s3d_arg(act, 0));
+	if (t == NULL || ba == NULL || ba->bytes == NULL) return avm2_undefined();
+	if (mip_arg >= 0 && s3d_arg_u32(act, mip_arg, 0) != 0)
+		return avm2_undefined();
+	// Only `bgra` is handled; anything else warns and drops (texture.rs:55-61).
+	if (!t->format_bgra) return avm2_undefined();
+	uint32_t off = s3d_arg_u32(act, 1, 0);
+	uint32_t side = (side_arg >= 0) ? s3d_arg_u32(act, side_arg, 0) : 0;
+	uint32_t* tex = s3d_texels(ctx, t);
+	if (tex == NULL || side >= t->layers) return avm2_undefined();
+	uint64_t need = (uint64_t) 4 * t->width * t->height;
+	if ((uint64_t) off + need > ba->len) return avm2_undefined();
+	const uint8_t* b = ba->bytes + off;
+	for (uint64_t i = 0; i < (uint64_t) t->width * t->height; i++)
+	{
+		const uint8_t* c = b + i * 4;
+		tex[(size_t) side * t->width * t->height + i] =
+			(uint32_t) c[2] | ((uint32_t) c[1] << 8)
+			| ((uint32_t) c[0] << 16) | ((uint32_t) c[3] << 24);
+	}
+	return avm2_undefined();
+}
+
+static Avm2Value texture_upload_bitmapdata_2d(Avm2Activation* act)
+{ return s3d_upload_bitmapdata(act, -1, 1); }
+static Avm2Value texture_upload_bitmapdata_cube(Avm2Activation* act)
+{ return s3d_upload_bitmapdata(act, 1, 2); }
+static Avm2Value texture_upload_bitmapdata_rect(Avm2Activation* act)
+{ return s3d_upload_bitmapdata(act, -1, -1); }
+static Avm2Value texture_upload_bytearray_2d(Avm2Activation* act)
+{ return s3d_upload_bytearray(act, -1, 2); }
+static Avm2Value texture_upload_bytearray_cube(Avm2Activation* act)
+{ return s3d_upload_bytearray(act, 2, 3); }
+static Avm2Value texture_upload_bytearray_rect(Avm2Activation* act)
+{ return s3d_upload_bytearray(act, -1, -1); }
 
 static Avm2Object* s3d_make_texture(Avm2Activation* act, Avm2Class* cls,
                                     uint32_t w, uint32_t h,
@@ -2177,8 +2784,11 @@ static int agal_check_source(uint64_t src, uint32_t token, int operand,
 // naga_agal::parse_bytecode + (fragment only) extract_sampler_configs.
 // `check_samplers` mirrors ShaderPairAgal::new, which runs the sampler-config
 // pass on the FRAGMENT program only.
-static int agal_validate(const uint8_t* b, uint32_t len, int check_samplers,
-                         AgalErr* err)
+// `out_have`/`out_wrap`/`out_filter` (8 entries each, optional) receive
+// extract_sampler_configs' result for the fragment program.
+static int agal_validate_cfg(const uint8_t* b, uint32_t len, int check_samplers,
+                             AgalErr* err, uint8_t* out_have,
+                             uint8_t* out_wrap, uint8_t* out_filter)
 {
 	err->kind = AGAL_OK;
 	if (len == 0)
@@ -2298,6 +2908,17 @@ static int agal_validate(const uint8_t* b, uint32_t len, int check_samplers,
 			}
 		}
 	}
+
+	if (out_have != NULL)
+	{
+		for (int i = 0; i < 8; i++)
+		{
+			out_have[i] = (uint8_t) have_cfg[i];
+			// The bytecode field already carries naga_agal's numbering.
+			out_wrap[i] = (uint8_t) (cfg[i] & 0xF);
+			out_filter[i] = (uint8_t) ((cfg[i] >> 8) & 0xF);
+		}
+	}
 	return 0;
 }
 
@@ -2389,6 +3010,10 @@ static _Noreturn void agal_throw(Avm2Context* ctx, const AgalErr* e)
 	}
 }
 
+static int agal_validate(const uint8_t* b, uint32_t len, int check_samplers,
+                         AgalErr* err)
+{ return agal_validate_cfg(b, len, check_samplers, err, NULL, NULL, NULL); }
+
 // Program3D.upload(vertexProgram, fragmentProgram). ShaderPairAgal::new parses
 // the vertex program, then the fragment program, then runs the sampler-config
 // pass on the fragment one — so a bad vertex program masks a bad fragment one.
@@ -2406,8 +3031,10 @@ static Avm2Value program3d_upload(Avm2Activation* act)
 	if (agal_validate(vba != NULL ? vba->bytes : NULL,
 	                  vba != NULL ? vba->len : 0, 0, &err))
 		agal_throw(ctx, &err);
-	if (agal_validate(fba != NULL ? fba->bytes : NULL,
-	                  fba != NULL ? fba->len : 0, 1, &err))
+	uint8_t fs_have[8], fs_wrap[8], fs_filter[8];
+	if (agal_validate_cfg(fba != NULL ? fba->bytes : NULL,
+	                      fba != NULL ? fba->len : 0, 1, &err,
+	                      fs_have, fs_wrap, fs_filter))
 		agal_throw(ctx, &err);
 
 	Avm2Program3DExt* e =
@@ -2417,6 +3044,9 @@ static Avm2Value program3d_upload(Avm2Activation* act)
 		// S3: retain the validated bytecode for the interpreter. A failed
 		// allocation leaves the program un-drawable rather than throwing.
 		e->uploaded = 1;
+		memcpy(e->fs_have, fs_have, 8);
+		memcpy(e->fs_wrap, fs_wrap, 8);
+		memcpy(e->fs_filter, fs_filter, 8);
 		if (e->vcode != NULL) { heap_free(ctx->app, e->vcode); e->vcode = NULL; }
 		if (e->fcode != NULL) { heap_free(ctx->app, e->fcode); e->fcode = NULL; }
 		e->vlen = e->flen = 0;
@@ -4006,9 +4636,12 @@ void avm2_register_stage3d(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, c3d, "setVertexBufferAt",
 	                        context3d_set_vertex_buffer_at);
 	avm2_builtin_add_method(ctx, c3d, "setProgram", context3d_set_program);
-	avm2_builtin_add_method(ctx, c3d, "setTextureAt", s3d_noop);
-	avm2_builtin_add_method(ctx, c3d, "setColorMask", s3d_noop);
-	avm2_builtin_add_method(ctx, c3d, "setStencilReferenceValue", s3d_noop);
+	avm2_builtin_add_method(ctx, c3d, "setTextureAt",
+	                        context3d_set_texture_at);
+	avm2_builtin_add_method(ctx, c3d, "setColorMask",
+	                        context3d_set_color_mask);
+	avm2_builtin_add_method(ctx, c3d, "setStencilReferenceValue",
+	                        context3d_set_stencil_reference_value);
 	avm2_builtin_add_method(ctx, c3d, "setRenderToBackBuffer", s3d_noop);
 	avm2_builtin_add_method(ctx, c3d, "drawToBitmapData", s3d_noop);
 	avm2_builtin_add_method(ctx, c3d, "present", context3d_present);
@@ -4070,24 +4703,30 @@ void avm2_register_stage3d(Avm2Context* ctx)
 	Avm2Class* tex = avm2_builtin_class(ctx, "flash.display3D.textures",
 	                                    "Texture", tb);
 	g_texture_class = tex;
-	avm2_builtin_add_method(ctx, tex, "uploadFromBitmapData", s3d_noop);
-	avm2_builtin_add_method(ctx, tex, "uploadFromByteArray", s3d_noop);
+	avm2_builtin_add_method(ctx, tex, "uploadFromBitmapData",
+	                        texture_upload_bitmapdata_2d);
+	avm2_builtin_add_method(ctx, tex, "uploadFromByteArray",
+	                        texture_upload_bytearray_2d);
 	avm2_builtin_add_method(ctx, tex, "uploadCompressedTextureFromByteArray",
 	                        texture_upload_compressed_2d);
 
 	Avm2Class* cube = avm2_builtin_class(ctx, "flash.display3D.textures",
 	                                     "CubeTexture", tb);
 	g_cubetexture_class = cube;
-	avm2_builtin_add_method(ctx, cube, "uploadFromBitmapData", s3d_noop);
-	avm2_builtin_add_method(ctx, cube, "uploadFromByteArray", s3d_noop);
+	avm2_builtin_add_method(ctx, cube, "uploadFromBitmapData",
+	                        texture_upload_bitmapdata_cube);
+	avm2_builtin_add_method(ctx, cube, "uploadFromByteArray",
+	                        texture_upload_bytearray_cube);
 	avm2_builtin_add_method(ctx, cube, "uploadCompressedTextureFromByteArray",
 	                        texture_upload_compressed_cube);
 
 	Avm2Class* rect = avm2_builtin_class(ctx, "flash.display3D.textures",
 	                                     "RectangleTexture", tb);
 	g_rectangletexture_class = rect;
-	avm2_builtin_add_method(ctx, rect, "uploadFromBitmapData", s3d_noop);
-	avm2_builtin_add_method(ctx, rect, "uploadFromByteArray", s3d_noop);
+	avm2_builtin_add_method(ctx, rect, "uploadFromBitmapData",
+	                        texture_upload_bitmapdata_rect);
+	avm2_builtin_add_method(ctx, rect, "uploadFromByteArray",
+	                        texture_upload_bytearray_rect);
 
 	Avm2Class* vt = avm2_builtin_class(ctx, "flash.display3D.textures",
 	                                   "VideoTexture", tb);
@@ -4221,6 +4860,14 @@ void avm2_stage3d_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
 		Avm2Buffer3DExt* e = (Avm2Buffer3DExt*) o->native_ext;
 		if (e->words != NULL) { heap_free(ctx->app, e->words); e->words = NULL; }
 		e->word_count = 0;
+		return;
+	}
+	if (g_texturebase_class != NULL && class_is_a(o->cls, g_texturebase_class))
+	{
+		Avm2Texture3DExt* e = (Avm2Texture3DExt*) o->native_ext;
+		if (e->texels != NULL)
+		{ heap_free(ctx->app, e->texels); e->texels = NULL; }
+		e->layers = 0;
 		return;
 	}
 	if (g_program3d_class != NULL && class_is_a(o->cls, g_program3d_class))
