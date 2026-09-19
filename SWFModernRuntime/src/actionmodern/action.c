@@ -46798,15 +46798,17 @@ void actionSetVariable(SWFAppContext* app_context)
 				mc->focusrect = 0.0f;
 			else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
 				mc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
-			else if (value_var.type == ACTION_STACK_VALUE_STRING) {
-				const uint16_t* _u16 = varGetU16Ptr(&value_var);
-				char _fr_buf[64]; _fr_buf[0] = '\0';
-				if (_u16 && value_var.str_size > 0) u16_to_utf8(_u16, value_var.str_size, _fr_buf, sizeof(_fr_buf));
-				char* _ep; double _d = strtod(_fr_buf, &_ep);
-				if (_ep != _fr_buf && !isnan(_d)) mc->focusrect = (_d != 0.0) ? 1.0f : 0.0f;
-			} else {
-				// F32/F64 numeric
-				if (!isnan(dval)) mc->focusrect = (dval != 0.0) ? 1.0f : 0.0f;
+			else {
+				// Ruffle set_focus_rect (stage branch): `coerce_to_f64` then NaN →
+				// ignore, for strings and numbers alike — the STRICT SWF5+ parse, so
+				// "10x" is a no-op rather than the prefix-parsed 10. Identical to
+				// actionSetProperty case 17.
+				//
+				// This arm also used to read the SHARED `dval` slot, which
+				// RESOLVE_NUM_PROP() is deliberately never called on here, so it was
+				// still NAN and a bare numeric `_focusrect = 1` silently did nothing.
+				double _fr_d = spvCoerceToF64(app_context, &value_var);
+				if (!isnan(_fr_d)) mc->focusrect = (_fr_d != 0.0) ? 1.0f : 0.0f;
 			}
 			handled = 1;
 		}
