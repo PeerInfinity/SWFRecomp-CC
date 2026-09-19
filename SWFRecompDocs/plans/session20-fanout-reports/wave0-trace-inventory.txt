@@ -1,0 +1,94 @@
+# Session-20 wave-0 trace inventory — 88 failing rows
+# source: WORKTREE results_graphics (run 35163868554 @ 2973513c4); corpus 4527, effective 4439
+# flags: IGN=in an ignored_tests.txt  ACC/RVF/TWK/FBR=named in that disposition doc
+#        KF=upstream known_failure  RTXT=output.ruffle.txt present  DIR?=test dir missing locally
+
+STATUS           TEST                                                              MATCH/EXP   ACT  FLAGS
+output_mismatch  audio/aac                                                              3/18    24  
+output_mismatch  audio/g711                                                              2/6     8  
+output_mismatch  avm1/bitmap_data_thorough/pixelDissolve                           1335/1371  1371  IGN ACC
+output_mismatch  avm1/bitmapdata_custom_rectangle                                      15/42    30  KF RTXT
+output_mismatch  avm1/date                                                         6289/6335  6335  IGN ACC FBR RVF
+output_mismatch  avm1/geturl                                                             4/7     4  IGN
+output_mismatch  avm1/global_instance_decls                                           26/758   786  IGN KF RTXT
+output_mismatch  avm1/global_proto_decls                                            803/4497  3863  IGN RVF KF RTXT
+output_mismatch  avm1/global_proto_decls_delete                                     461/4158  2371  IGN RVF KF RTXT
+output_mismatch  avm1/globals_monkeypatch                                             39/246   158  KF RTXT
+output_mismatch  avm1/globals_swf5                                                   294/304   304  IGN RVF KF RTXT
+output_mismatch  avm1/hitarea_remove_owner_drag                                         2/10    11  
+output_mismatch  avm1/load_vars                                                        29/35    30  IGN
+output_mismatch  avm1/movieclip_hittest_shapeflag                                    332/338   338  IGN ACC
+output_mismatch  avm1/native_objects_swf6                                            114/115   115  IGN ACC RVF KF RTXT
+output_mismatch  avm1/sandbox_type_remote                                                1/3     1  IGN
+output_mismatch  avm1/set_property_values/swf4                                      346/1571  1743  KF RTXT
+output_mismatch  avm1/stylesheet_load                                                   1/49     2  IGN
+output_mismatch  avm1/xml_getbytes                                                      9/17    17  IGN
+output_mismatch  avm2/audio_computespectrum                                            0/118   478  IGN
+output_mismatch  avm2/avm1_root                                                        12/58    34  IGN RVF KF RTXT
+output_mismatch  avm2/bom                                                                6/9     9  IGN RVF
+output_mismatch  avm2/dependent_strings                                                46/84    83  IGN RVF
+output_mismatch  avm2/external_interface                                               3/105     7  
+output_mismatch  avm2/focus_events_mixed_avm_edittext                                   0/49    23  RVF
+output_mismatch  avm2/goto_framescript_queued/swf10                                    15/59    48  
+output_mismatch  avm2/goto_framescript_queued/swf13                                    17/59    48  KF RTXT
+output_mismatch  avm2/goto_framescript_queued/swf9                                     11/52    46  
+output_mismatch  avm2/goto_framescript_queued_same_frame                                 3/4     4  
+output_mismatch  avm2/loader_applicationDomain                                           0/4     0  IGN ACC RVF
+output_mismatch  avm2/loader_load                                                    126/128   128  IGN RVF
+output_mismatch  avm2/mouse_pick_loader_avm1                                           16/42    40  RVF
+output_mismatch  avm2/netstream_play_flv                                                0/16     1  IGN ACC RVF
+output_mismatch  avm2/netstream_play_stop_replay                                        1/11     1  IGN
+output_mismatch  avm2/netstream_seek_flv                                                0/49     1  IGN
+output_mismatch  avm2/number_to_string                                               237/353   353  ACC RVF KF RTXT
+output_mismatch  avm2/number_tostring                                               882/1050  1050  IGN ACC
+output_mismatch  avm2/sandbox_type_remote                                                1/3     1  IGN
+output_mismatch  avm2/selection_onsetfocus_mixed_avm                                     0/5     0  
+output_mismatch  avm2/simplebutton_childevents_multichild                             33/152   132  IGN KF RTXT
+output_mismatch  avm2/sound_load_multiple                                               3/19     7  IGN
+output_mismatch  avm2/swz                                                                0/2     0  IGN ACC RVF
+output_mismatch  avm2/tab_ordering_properties                                        561/732   732  ACC
+output_mismatch  avm2/textblock_recreateline                                          40/180   181  KF RTXT
+output_mismatch  avm2/textline_atom_index_at_char_index                                21/40    37  KF RTXT
+output_mismatch  avm2/verify_method_info_duplicate                                       1/2     1  IGN ACC KF RTXT
+output_mismatch  fonts/embed_name_lookup                                              86/242   242  
+output_mismatch  from_avmplus/ecma3/Statements/eforin_001                              12/16    16  IGN ACC KF RTXT
+output_mismatch  from_avmplus/ecma3/Statements/eforin_002                               0/10    10  IGN ACC RVF KF RTXT
+output_mismatch  from_avmplus/recursion/pcre_find_fixedlength                          19/20    20  KF RTXT
+runtime_error    from_avmplus/regress/bug_483783                                         0/1     0  
+output_mismatch  from_gnash/actionscript.all/MovieClip-v6                            901/936   935  KF
+output_mismatch  from_gnash/actionscript.all/MovieClip-v7                            934/969   968  KF
+output_mismatch  from_gnash/actionscript.all/MovieClip-v8                          1020/1087  1086  KF
+output_mismatch  from_gnash/actionscript.all/TextField-v6                            467/545   545  ACC KF
+output_mismatch  from_gnash/actionscript.all/TextField-v7                            476/570   570  ACC KF
+output_mismatch  from_gnash/actionscript.all/TextField-v8                            478/571   571  ACC KF
+output_mismatch  from_gnash/actionscript.all/argstest-v6                             80/2192  2661  IGN ACC KF
+output_mismatch  from_gnash/actionscript.all/argstest-v7                            110/2061  2661  IGN ACC KF
+output_mismatch  from_gnash/actionscript.all/argstest-v8                            175/2434  3023  IGN ACC KF
+output_mismatch  from_gnash/actionscript.all/array-v5                                551/560   560  IGN ACC KF RTXT
+output_mismatch  from_gnash/actionscript.all/array-v6                                623/644   644  KF
+output_mismatch  from_gnash/actionscript.all/array-v7                                630/654   654  KF
+output_mismatch  from_gnash/actionscript.all/array-v8                                630/654   654  KF
+output_mismatch  from_gnash/misc-ming.all/DrawingApiTest                               81/93    95  RVF KF RTXT
+output_mismatch  from_gnash/misc-ming.all/GradientFillTest                           123/278   278  
+output_mismatch  from_gnash/misc-ming.all/NetStream-SquareTest                        91/216   201  KF RTXT
+output_mismatch  from_gnash/misc-ming.all/action_order/ActionOrderTest3                 4/62    83  KF RTXT
+output_mismatch  from_gnash/misc-ming.all/action_order/ActionOrderTest4                10/64    94  KF RTXT
+output_mismatch  from_gnash/misc-ming.all/action_order/ActionOrderTest5                 6/51    58  KF RTXT
+output_mismatch  from_gnash/misc-ming.all/action_order/PlaceAndRemove                  15/96    45  
+output_mismatch  from_gnash/misc-ming.all/action_order/action_execution_order_extend_test         7/32    28  KF
+output_mismatch  from_gnash/misc-ming.all/action_order/action_execution_order_test11        26/32    32  
+output_mismatch  from_gnash/misc-ming.all/action_order/action_execution_order_test6         0/24    20  KF RTXT
+output_mismatch  from_gnash/misc-ming.all/masks_test                                 125/175   175  KF RTXT
+output_mismatch  from_gnash/misc-ming.all/register_class/RegisterClassTest4             7/42    54  IGN ACC KF RTXT
+output_mismatch  from_gnash/misc-swfc.all/matrix_accuracy_test1                        10/18    18  IGN ACC
+output_mismatch  from_gnash/misc-swfc.all/movieclip_destruction_test3                   5/18    16  KF
+output_mismatch  from_gnash/misc-swfc.all/movieclip_destruction_test4                   8/40    24  KF RTXT
+output_mismatch  from_gnash/misc-swfc.all/sound                                          7/7    12  IGN RVF ACC
+output_mismatch  from_shumway/as3-loader/LoaderLoadBytesTest                             1/4     3  
+output_mismatch  from_shumway/as3-loader/events/loader-events                           5/36    35  KF RTXT
+output_mismatch  from_shumway/bitmapdata/getpixel-from-embedded                          1/2     2  
+output_mismatch  from_shumway/esc                                                        0/2    13  IGN ACC FBR RVF
+output_mismatch  mixed_avm/avm1_loads_avm2                                               3/7     3  
+output_mismatch  mixed_avm/avm2_loads_avm1_events                                       5/26    26  KF RTXT
+output_mismatch  text/links_in_scrolled_text                                             0/1     0  
+output_mismatch  timeline/missing_frame_scripts                                        12/22    27  
