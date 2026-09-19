@@ -73350,15 +73350,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					double ptx = round(rra * ptx_local + rrc * pty_local + rrtx);
 					double pty = round(rrb * ptx_local + rrd * pty_local + rrty);
 
-					// AVM hitTest skips masks (Ruffle: AVM_HIT_TEST contains SKIP_MASK).
-					// A clip used as a mask returns false from hitTest(x, y, ...).
-					if (mc != NULL && mc->is_mask) {
-						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
-						return;
-					}
-
 					// Check bounding box first (fast reject)
 					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
+
+					// AVM hitTest skips masks — but ONLY on the SHAPE arity.
+					// Ruffle's `hit_test` (core/src/avm1/globals/movie_clip.rs:246-251)
+					// branches on shapeFlag: `true` calls `hit_test_shape(...,
+					// HitTestOptions::AVM_HIT_TEST)`, and AVM_HIT_TEST is exactly
+					// SKIP_MASK (display_object.rs:3074), which makes
+					// `hit_test_shape` return false when `self.maskee().is_some()`
+					// i.e. when this clip is being used as somebody's mask
+					// (movie_clip.rs:2695). shapeFlag `false` calls
+					// `hit_test_bounds(point)`, which has NO mask logic at all — a
+					// clip used as a mask still reports its own world bounds.
+					// Rejecting the bounding-box arity here cost
+					// from_gnash/misc-ming.all/masks_test 34 assertions.
+					if (hit && shape_flag && mc != NULL && mc->is_mask)
+						hit = 0;
 
 
 					// If shapeFlag=true and BB says hit, refine with shape-accurate test

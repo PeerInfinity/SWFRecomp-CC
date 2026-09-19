@@ -2804,8 +2804,24 @@ the first call was silently dropped), and the AVM2 `mouseWheelEnabled` default
   spurious `rollover Z` leaves it byte-identical to `output.txt`). Blast radius
   is still the largest on the board — it rewrites roll events for every
   overlapping-button title and must reconcile `tag.c`'s second hover machine.
-- `masks_test` is now 124/175 (was 28): 34 of the 50 remaining diff lines are
-  `hitTest` on masked/mask clips — a hit-test slice, not an events one.
+- `masks_test` is CLOSED at `ruffle_matched` (s20 w2-masks-hittest). The "34 of 50
+  diff lines" framing was right about the slice and wrong about the price: the row
+  is `known_failure` with a bare `output.ruffle.txt`, so the grading target was
+  `ruffle_matched`, and our residual 16 lines were Ruffle's own diff set verbatim
+  ({141,146,153,154,155,159,161,162,163,164,165,170,171,172,173,174} — 14
+  shape-arity assertions Ruffle also fails, plus the two `#passed:`/`#failed:`
+  counters). The row was ONE mechanism from flipping, not fifty lines. The 34 were
+  also under-specified: every one is the BOUNDING-BOX arity `hitTest(x, y, false)`
+  on a clip that setMask had made a masker, and every shape-arity line we failed
+  was one Ruffle fails too. Cause: `action.c`'s `hitTest` had an unconditional
+  `if (mc->is_mask) { push false; return; }` ahead of the shapeFlag branch, citing
+  Ruffle's `AVM_HIT_TEST`/`SKIP_MASK`; Ruffle only takes that path for
+  shapeFlag=true (`core/src/avm1/globals/movie_clip.rs:246-251` routes false to
+  `hit_test_bounds`, which has no mask logic at all). Gating the skip on
+  `shape_flag` took 124/175 -> `ruffle_matched`. Standing lesson: on a
+  `known_failure` row, measure the ours-only set AND check positional alignment
+  before pricing; here all 175 lines were aligned, so the subset was a real closed
+  defect set.
 - gnash `array-v7`/`-v8` gained exactly the 26 comparator lines and need 3 more
   mechanisms; `MovieClip-v6/-v7` gained their whole onData/onUnload tail and are
   held by a 2-line mechanism (a descendant `onUnload` of a clip swapped to depth
