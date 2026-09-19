@@ -1,20 +1,37 @@
 # masks_test Plan
 <!-- TESTS: misc-ming.all/masks_test -->
 
-Last updated: 2026-05-19 (graduated from REMAINING_TAIL_TRIAGE
-"masks_test" entry which explicitly said "Promote to standalone
-plan when work begins")
+Last updated: **2026-09-18 (s20) — CLOSED at `ruffle_matched`.**
+
+> **CLOSING NOTE (s20).** This plan's entire premise was wrong, in two
+> independent ways, and it is kept only as a record of that.
+>
+> 1. **Phase 1 was never needed.** The plan calls for "synthetic input
+>    infrastructure (auto-keypress)" — a `verify_output.py` change. The test
+>    never needed it: `masks_test/input.json` **exists** and drives all four
+>    `- Press any key to continue -` gates. The `related:` note below asserting
+>    "masks_test specifically does NOT have input.json" is false and was
+>    probably false when written.
+> 2. **The real blockers were runtime bugs.** s19 fixed `actionNextFrame`'s
+>    deferred-goto arm on a stopped root; s20 fixed a one-line AVM1 `hitTest`
+>    bounding-box arity bug (we skipped MASKER clips on the bounds arity, but
+>    Ruffle only skips them on the SHAPE arity). That closed the row.
+>
+> The 28/175 baseline in the table below is four months stale — the row went
+> 28 → 124/175 (s17-s19) → `ruffle_matched` (s20).
+>
+> Full account: `SWFRecompDocs/plans/session20-fanout-reports/w2-masks-hittest-report.md`.
 
 <!-- PLAN_META
 id: MASKS_TEST_PLAN
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Synthetic input infrastructure: auto-keypress for tests with 'Press any key' prompt"
-    status: pending
+    status: cancelled  # never needed: masks_test/input.json exists
   - id: 2
     name: "Once input infrastructure lands: re-baseline masks_test against post-keypress expected output"
-    status: pending
+    status: cancelled  # superseded: closed by runtime fixes in s19+s20
 dependencies: []
 related:
   - id: INPUT_EVENTS_PLAN

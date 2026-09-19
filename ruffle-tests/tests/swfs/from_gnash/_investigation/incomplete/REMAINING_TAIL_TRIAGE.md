@@ -467,7 +467,7 @@ Category 1 entry "opcode_guard_test (misc-ming.all) — Gnash silently
 swallows the failed-setTarget warning" for the full diff-index
 analysis.
 
-### ~~masks_test~~ — graduated to `incomplete/MASKS_TEST_PLAN.md` (2026-05-19); blocked on synthetic-input infrastructure
+### ~~masks_test~~ — CLOSED at `ruffle_matched` (s20, 2026-09-18). The synthetic-input blocker was never real; see `complete/MASKS_TEST_PLAN.md`.
 
 ### ~~action_order/action_execution_order_test6~~ — graduated to `incomplete/ACTION_EXECUTION_ORDER_TEST6_PLAN.md` (2026-05-19); contains the 2026-05-08 case-(c) root-cause analysis verbatim
 
@@ -665,7 +665,7 @@ wins:
 4. ~~**`swf4opcode`**~~ — promoted to ruffle_matched 2026-05-02 (Group A defer).
 5. **`matrix_test`** (6-9 hours, standalone-worthy) — three independent geometry / FP issues; promote to its own plan when work begins.
 6. **`NetStream-SquareTest`** (4-6 hours, standalone-worthy) — netstream timing.
-7. **`masks_test`** (verifier change required) — needs synthetic keypress mechanism. Promote to standalone plan; this is verifier scope.
+7. ~~**`masks_test`**~~ — **CLOSED at `ruffle_matched` (s20, 2026-09-18).** NOT verifier scope: the "needs a synthetic keypress mechanism / promote to a standalone plan" reading here was wrong and would have sent a session into `verify_output.py`. The real blockers were runtime bugs — s19 fixed `actionNextFrame`'s deferred-goto arm on a stopped root, and s20 fixed a one-line AVM1 `hitTest` bounding-box arity bug on maskers. See `SWFRecompDocs/plans/session20-fanout-reports/w2-masks-hittest-report.md`.
 
 Then (after the cluster plans land and recovery is measured):
 
