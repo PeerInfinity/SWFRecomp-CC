@@ -1,0 +1,19 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -17131,7 +17131,14 @@
+ 	avm2_builtin_add_getter(ctx, movieclip, "currentFrame", mc_get_current_frame);
+ 	avm2_builtin_add_getter(ctx, movieclip, "totalFrames", mc_get_total_frames);
+ 	avm2_builtin_add_getter(ctx, movieclip, "framesLoaded", mc_get_frames_loaded);
+-	avm2_builtin_add_getter(ctx, movieclip, "isPlaying", mc_get_is_playing);
++	// `isPlaying` is an API-673 member: it does not exist below SWF13, where
++	// an unqualified `isPlaying` must therefore raise a ReferenceError rather
++	// than resolve. The version is the one avm2_globals.c's dtd_m_MovieClip
++	// already carries for the describeType side (`min_swf` 13).
++	if (ctx->swf_version >= 13)
++	{
++		avm2_builtin_add_getter(ctx, movieclip, "isPlaying", mc_get_is_playing);
++	}
+ 	avm2_builtin_add_getter(ctx, movieclip, "currentLabel", mc_get_current_label);
+ 	avm2_builtin_add_getter(ctx, movieclip, "currentFrameLabel",
+ 	                        mc_get_current_frame_label);

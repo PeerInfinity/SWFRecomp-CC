@@ -2551,6 +2551,35 @@ static void on_construction_complete(Avm2Context* ctx, Avm2Object* obj)
 	ext->initialized = 1;
 }
 
+// goto_frame_now (Ruffle MC:937, post-7e8e2de8a "Queue play/stop action
+// alongside the frame for queued gotos"). The play/stop half of a goto is
+// applied HERE, not when goto_frame was called: when the goto is deferred
+// because an AVM2 frame script is running, its play()/stop() side effect
+// defers with it, so a later stop()/play() inside the same frame script no
+// longer wins. Pre-fix, `playing` was assigned unconditionally at the top of
+// goto_frame.
+static void mc_goto_frame_now(Avm2Context* ctx, Avm2Object* obj,
+                              Avm2DisplayObjectExt* ext, uint16_t frame,
+                              int stop)
+{
+	ext->playing = stop ? 0 : 1;
+	// In AS3 a no-op goto still has user-visible side effects, so it runs.
+	if (frame != ext->current_frame)
+	{
+		run_goto(ctx, obj, frame, 0);
+	}
+	else
+	{
+		// no_op_goto: clear the queue, then a nested frame with no tag
+		// changes. run_inner_goto_frame is a skip_next_enter_frame set
+		// for SWF<=9 (frame_lifecycle.rs:129).
+		ext->queued_goto_frame = -1;
+		extern void avm2_display_inner_goto_frame(Avm2Context* ctx);
+		avm2_display_inner_goto_frame(ctx);
+		if (ctx->swf_version <= 9) ext->skip_next_enter_frame = 1;
+	}
+}
+
 static void run_local_frame_scripts(Avm2Context* ctx, Avm2Object* obj)
 {
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
@@ -2588,17 +2617,9 @@ static void run_local_frame_scripts(Avm2Context* ctx, Avm2Object* obj)
 	if (ext->queued_goto_frame >= 0)
 	{
 		uint16_t frame = (uint16_t) ext->queued_goto_frame;
+		int stop = ext->queued_goto_stop;
 		ext->queued_goto_frame = -1;
-		if (frame != ext->current_frame)
-		{
-			run_goto(ctx, obj, frame, 0);
-		}
-		else
-		{
-			// no_op_goto: nested frame with no tag changes.
-			extern void avm2_display_inner_goto_frame(Avm2Context* ctx);
-			avm2_display_inner_goto_frame(ctx);
-		}
+		mc_goto_frame_now(ctx, obj, ext, frame, stop);
 		if (ctx->swf_version <= 9)
 		{
 			construct_frame_obj(ctx, obj);
@@ -3245,19 +3266,22 @@ static void mc_goto_frame(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int
 		g_gp_src_frame = (int) frame;
 		g_gp_src_noop = (frame == ext->current_frame);
 	}
-	if (stop) ext->playing = 0;
-	else ext->playing = 1;
 	if (frame < 1) frame = 1;
 	avm2_display_mark_frame_work(ctx, obj);
 	if (ext->executing_frame_script)
 	{
 		if (ctx->swf_version <= 9 && frame == ext->current_frame)
 		{
-			ext->queued_goto_frame = -1;
-			ext->skip_next_enter_frame = 1;
+			// SWF<=9: a "queued" goto to the current frame is run
+			// immediately, which is a no-op goto that sets
+			// skip_next_enter_frame (Ruffle MC:913).
+			mc_goto_frame_now(ctx, obj, ext, frame, stop);
 			return;
 		}
+		// The play/stop is queued with the frame and applied by
+		// mc_goto_frame_now when the queue is flushed.
 		ext->queued_goto_frame = frame;
+		ext->queued_goto_stop = stop ? 1 : 0;
 		if (frame < ext->frame_script_cap
 		    && ext->frame_scripts[frame].kind == AVM2_VALUE_OBJECT)
 		{
@@ -3266,16 +3290,7 @@ static void mc_goto_frame(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int
 	}
 	else
 	{
-		if (frame != ext->current_frame)
-		{
-			run_goto(ctx, obj, frame, 0);
-		}
-		else
-		{
-			ext->queued_goto_frame = -1;
-			avm2_display_inner_goto_frame(ctx);
-			if (ctx->swf_version <= 9) ext->skip_next_enter_frame = 1;
-		}
+		mc_goto_frame_now(ctx, obj, ext, frame, stop);
 	}
 }
 
@@ -13763,6 +13778,7 @@ static void display_native_init(Avm2Context* ctx, Avm2Object* obj)
 	ext->use_hand_cursor = 1;
 	ext->playing = 1;
 	ext->queued_goto_frame = -1;
+	ext->queued_goto_stop = 0;
 	ext->last_queued_script_frame = -1;
 	ext->tab_index = -1;
 
@@ -17234,7 +17250,14 @@ void avm2_register_display(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, movieclip, "currentFrame", mc_get_current_frame);
 	avm2_builtin_add_getter(ctx, movieclip, "totalFrames", mc_get_total_frames);
 	avm2_builtin_add_getter(ctx, movieclip, "framesLoaded", mc_get_frames_loaded);
-	avm2_builtin_add_getter(ctx, movieclip, "isPlaying", mc_get_is_playing);
+	// `isPlaying` is an API-673 member: it does not exist below SWF13, where
+	// an unqualified `isPlaying` must therefore raise a ReferenceError rather
+	// than resolve. The version is the one avm2_globals.c's dtd_m_MovieClip
+	// already carries for the describeType side (`min_swf` 13).
+	if (ctx->swf_version >= 13)
+	{
+		avm2_builtin_add_getter(ctx, movieclip, "isPlaying", mc_get_is_playing);
+	}
 	avm2_builtin_add_getter(ctx, movieclip, "currentLabel", mc_get_current_label);
 	avm2_builtin_add_getter(ctx, movieclip, "currentFrameLabel",
 	                        mc_get_current_frame_label);

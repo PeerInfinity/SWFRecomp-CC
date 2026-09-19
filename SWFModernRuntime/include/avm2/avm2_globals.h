@@ -573,6 +573,10 @@ typedef struct Avm2DisplayObjectExt
 	uint8_t loop_queued;
 	uint8_t initialized;
 	int32_t queued_goto_frame;   // -1 = none
+	// The play/stop half of a queued goto (Ruffle GotoInfo.stop_or_play,
+	// movie_clip.rs 7e8e2de8a): 1 = gotoAndStop, 0 = gotoAndPlay. Only
+	// meaningful while queued_goto_frame >= 0.
+	uint8_t queued_goto_stop;
 	uint16_t queued_script_frame;
 	int32_t last_queued_script_frame;  // -1 = none
 	uint8_t has_pending_script;
