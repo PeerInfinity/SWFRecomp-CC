@@ -213,7 +213,55 @@ never set it). A byte scan of every `.swf` in `avm1`, `from_gnash`, `from_shumwa
 plus the picking / button / drag / mask-and-clipDepth neighbours the coordinator
 asked for and the `regression` suite.
 
-SWEEP_TABLE_PLACEHOLDER
+The sweep was **scoped by argument, then trimmed by argument** (the box was at
+load 11.4 on 8 cores with the fleet running, ~200 s per compile). 24 candidates
+screened, 7 run. Every drop is disqualified by the test's own expected output, not
+by cost:
+
+| dropped | why it cannot observe the change |
+|---|---|
+| `from_gnash/actionscript.all/MovieClip-v6`, `-v7`, `-v8` | screened in on the SWF *strings* only. Their expected output's sole references are `PASSED: MovieClip.prototype.hasOwnProperty("setMask")`, `typeof(mc.setMask) == 'function'`, `typeof(mc.hitTest) == 'function'` — existence checks. No pairing is ever made, nothing is ever hit-tested. (Also the three most expensive rows, ~900–1100 expected lines each.) |
+| `from_gnash/actionscript.all/BitmapData-v8` | its one hitTest line is `Bitmap.prototype.hasOwnProperty('hitTest')` — that is `BitmapData.hitTest` (`bitmapDataHitTest`, registered at `action.c:14938`), a different builtin. |
+| `avm1/netstream_play_flv_screen` | both strings present in the SWF, neither appears anywhere in its expected output — dead code path. |
+| `avm1/movieclip_setmask`, `mask_reapply`, `mask_with_drawing` | pair masks but never call `hitTest` (byte scan), so an arity change in `hitTest` is unobservable. |
+| `avm1/movieclip_hittest`, `hittest_lockroot`, `hittest_winding_rule`, `hittest_morph`; `from_gnash/actionscript.all/HitTest-v6/-v7/-v8`; `from_gnash/misc-ming.all/masks_test2`; `from_shumway/hitTestStyleChange` | call `hitTest` but contain no `setMask`, so no clip in them is ever a masker. (`masks_test2` masks by `clipDepth`, which never sets `is_mask` — that flag is written in exactly one place, `avm1_mask_pair`.) |
+
+Scoping argument in one line: `is_mask` is set only by `setMask`, and the changed
+branch is reached only when a clip with `is_mask` receives `hitTest(x, y, falsy)`.
+A test must contain **both** to observe it. Picking, buttons, drag, AVM2 and the
+render paths are covered by the §3 audit rather than by sampling.
+
+**Results (all `--mode` default / no-graphics; mode parity is complete since s18):**
+
+| test | before | after | verdict |
+|---|---|---|---|
+| `from_gnash/misc-ming.all/masks_test` | `output_mismatch` 124/175 | **`ruffle_matched`** | **the flip** |
+| `avm1/movieclip_hittest_shapeflag` | `output_mismatch` 332/338 | `output_mismatch` 332/338, diff byte-identical | unchanged (rider, `IGN`+`ACC`) |
+| `avm1/movieclip_invalid_get_bounds_6` | pass | **pass** | unchanged |
+| `avm1/movieclip_invalid_get_bounds_7` | pass | **pass** | unchanged |
+| `from_gnash/misc-ming.all/DrawingApiTest` | `output_mismatch` 81/93 act=95 (`RVF KF RTXT`) | `output_mismatch`, **actual output byte-identical** (A/B verified) | unchanged |
+| `from_gnash/misc-ming.all/RollOverOutTest` | pass | **pass** | unchanged |
+| `regression/mask_nested_intersect` | pass | **pass** | unchanged |
+| `regression/mask_sibling_union` | pass | **pass** | unchanged |
+
+**`pass → ruffle_matched` check (brief rule 3, the trap that bit s19 here):
+NONE.** No test moved status in either direction except the intended `masks_test`
+flip. `DrawingApiTest` was the only row that could plausibly have drifted — it
+carries **74** `hitTest` assertions, 12 of which sit in its standing diff — so it
+got an explicit A/B leg rather than a status comparison: patch reverted with
+`git apply -R` (never `git stash` — `refs/stash` is shared across worktrees),
+rebuilt, re-run, and its **actual output compared line by line against the patched
+run — byte-identical**, then the patch re-applied. `RollOverOutTest`,
+`regression/mask_nested_intersect` and `regression/mask_sibling_union` pass before
+and after.
+
+**Procedural note, for anyone reusing the runner.** The trim was first attempted by
+rewriting the runner's worklist file in place, keeping the already-consumed lines
+byte-identical so the `while read … done < file` loop would pick up the new tail at
+its current fd offset. **That does not work**: the editor replaces the inode, so the
+loop's open fd still sees the old content. The trim had to be done by stopping the
+background task and relaunching with a short list. If you want a mid-flight-editable
+worklist, the loop must re-read the file each iteration.
 
 ---
 
