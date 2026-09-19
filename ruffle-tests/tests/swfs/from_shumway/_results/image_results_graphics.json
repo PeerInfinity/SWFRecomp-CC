@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-09-12T02:42:50.593991+00:00",
+    "timestamp": "2026-09-19T05:45:07.768857+00:00",
     "suite": "from_shumway",
     "stem": "results_graphics",
-    "git_sha": "d8da5a18c35426c8bc5f16291d61b404ab3d3c52",
+    "git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "34666689502",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/34666689502",
+    "run_id": "35423176371",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/35423176371",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 71,
@@ -1597,8 +1597,8 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 3241,
-      "mean_diff": 0.2248,
+      "diff_channels": 3244,
+      "mean_diff": 0.225,
       "outliers": 552,
       "max_outliers": 600,
       "tolerance": 128,
