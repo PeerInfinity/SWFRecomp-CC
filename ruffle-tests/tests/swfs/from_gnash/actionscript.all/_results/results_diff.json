@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-17T01:04:31.526727+00:00",
-    "old_git_sha": "317ac43cffd3c374468367a58b3f2cb7ea2357ad",
-    "new_timestamp": "2026-09-19T12:56:43.227130+00:00",
+    "old_timestamp": "2026-09-19T12:56:43.227130+00:00",
+    "old_git_sha": "53a188c38f4ea18db048016d24fc54222a0dd8ca",
+    "new_timestamp": "2026-09-20T08:49:33.651742+00:00",
     "new_git_sha": "53a188c38f4ea18db048016d24fc54222a0dd8ca",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
     "old_pass": 141,
@@ -18,81 +18,16 @@
     "new_effective_pass": 230,
     "new_total": 243,
     "new_pass_rate": 58.0,
-    "old_mismatched_lines": 8310,
+    "old_mismatched_lines": 8296,
     "new_mismatched_lines": 8296,
     "increased_mismatches": 0,
-    "decreased_mismatches": 14,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 239,
+    "unchanged": 243,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "array-v5",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 560,
-        "expected_lines": 560,
-        "matching_lines": 551
-      },
-      "new_lines": {
-        "actual_lines": 560,
-        "expected_lines": 560,
-        "matching_lines": 553
-      }
-    },
-    {
-      "test": "array-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 644,
-        "expected_lines": 644,
-        "matching_lines": 623
-      },
-      "new_lines": {
-        "actual_lines": 644,
-        "expected_lines": 644,
-        "matching_lines": 627
-      }
-    },
-    {
-      "test": "array-v7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 654,
-        "expected_lines": 654,
-        "matching_lines": 630
-      },
-      "new_lines": {
-        "actual_lines": 654,
-        "expected_lines": 654,
-        "matching_lines": 634
-      }
-    },
-    {
-      "test": "array-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 654,
-        "expected_lines": 654,
-        "matching_lines": 630
-      },
-      "new_lines": {
-        "actual_lines": 654,
-        "expected_lines": 654,
-        "matching_lines": 634
-      }
-    }
-  ]
+  "changes": []
 }
