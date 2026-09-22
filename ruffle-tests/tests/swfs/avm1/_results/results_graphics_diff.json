@@ -1,61 +1,61 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-19T05:03:20.770559+00:00",
-    "old_git_sha": "8040b8f633f8b928e38f6c8b4698e09d2aa6143e",
-    "new_timestamp": "2026-09-19T05:45:05.222980+00:00",
-    "new_git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
+    "old_timestamp": "2026-09-19T05:45:05.222980+00:00",
+    "old_git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
+    "new_timestamp": "2026-09-22T21:18:27.556868+00:00",
+    "new_git_sha": "19ba5337291e1726846e631103f7fb9a3ff2d063",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 700,
-    "old_ruffle_matched": 19,
-    "old_effective_pass": 719,
-    "old_total": 734,
-    "old_pass_rate": 95.4,
-    "new_pass": 700,
+    "old_ruffle_matched": 20,
+    "old_effective_pass": 720,
+    "old_total": 735,
+    "old_pass_rate": 95.2,
+    "new_pass": 701,
     "new_ruffle_matched": 20,
-    "new_effective_pass": 720,
-    "new_total": 735,
+    "new_effective_pass": 721,
+    "new_total": 736,
     "new_pass_rate": 95.2,
-    "old_mismatched_lines": 11273,
-    "new_mismatched_lines": 11261,
+    "old_mismatched_lines": 11261,
+    "new_mismatched_lines": 11264,
     "increased_mismatches": 0,
-    "decreased_mismatches": 13,
-    "newly_passing": 0,
+    "decreased_mismatches": 1,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 733,
+    "status_changed": 1,
+    "unchanged": 734,
     "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "global_instance_decls",
+      "test": "geturl",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 815,
-        "expected_lines": 758,
-        "matching_lines": 13
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 6
       },
       "new_lines": {
-        "actual_lines": 786,
-        "expected_lines": 758,
-        "matching_lines": 26
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
       }
     },
     {
-      "test": "goto_rewind_movieclip_replace",
+      "test": "removed_clip_function_scope",
       "change_type": "added",
       "old_status": null,
-      "new_status": "ruffle_matched",
+      "new_status": "output_mismatch",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 7,
-        "expected_lines": 8,
-        "matching_lines": 7
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 8
       }
     }
   ]

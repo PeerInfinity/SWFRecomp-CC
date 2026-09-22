@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-19T05:45:05.290747+00:00",
-    "git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
-    "duration_seconds": 47.24,
+    "timestamp": "2026-09-22T21:18:27.658914+00:00",
+    "git_sha": "19ba5337291e1726846e631103f7fb9a3ff2d063",
+    "duration_seconds": 49.58,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30
@@ -20,7 +20,7 @@
       "test": "avm1_imports_avm1",
       "phases": {
         "recomp": 0.007,
-        "compile": 4.322,
+        "compile": 4.295,
         "run": 0.566
       },
       "num_frames": 1,
@@ -29,7 +29,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 5.14,
+      "duration": 5.11,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -38,20 +38,7 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false,
-          "stats": {
-            "width": 550,
-            "height": 400,
-            "total_channels": 880000,
-            "max_diff": 191,
-            "diff_channels": 2506,
-            "mean_diff": 0.159,
-            "outliers": 459,
-            "max_outliers": 500,
-            "tolerance": 100,
-            "excess_outliers": 0
-          },
-          "expected_source": "repo"
+          "known_failure": false
         }
       },
       "status": "pass"
@@ -59,8 +46,8 @@
     {
       "test": "avm1_non_swf_import",
       "phases": {
-        "recomp": 0.005,
-        "compile": 22.257,
+        "recomp": 0.006,
+        "compile": 23.96,
         "run": 0.265
       },
       "num_frames": 4,
@@ -69,15 +56,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 22.53,
+      "duration": 24.24,
       "status": "pass"
     },
     {
       "test": "empty_url",
       "phases": {
-        "recomp": 0.003,
-        "compile": 19.169,
-        "run": 0.215
+        "recomp": 0.006,
+        "compile": 19.776,
+        "run": 0.265
       },
       "num_frames": 2,
       "lines": {
@@ -85,7 +72,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.39,
+      "duration": 20.05,
       "status": "pass"
     }
   ]
