@@ -6,26 +6,26 @@
 
 **Run Duration**: 45m 29s
 
-**Filtered**: 19 tests ignored out of 735 available
+**Filtered**: 18 tests ignored out of 735 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 716 |
-| Passing | **698** (97.5%) |
+| Total tests | 717 |
+| Passing | **698** (97.4%) |
 | Ruffle-matched | 15 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **713** (99.6%) |
-| Failing | 3 |
-| Total expected lines | 114125 |
-| Matching lines | 111156 (97.4%) |
-| Mismatched lines | 2969 |
+| Effective pass | **713** (99.4%) |
+| Failing | 4 |
+| Total expected lines | 114132 |
+| Matching lines | 111162 (97.4%) |
+| Mismatched lines | 2970 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 3 | 100.0% |
+| Output Mismatch | 4 | 100.0% |
 
 ## Passing Tests
 
@@ -758,9 +758,11 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `geturl` | 85.7% | 6 | 7 | 1 | [103](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNCOVERED_SMALL_TESTS_PLAN.md) |
 
 ## Segfaults
 
@@ -776,13 +778,14 @@ No timeouts.
 
 ## All Output Mismatches
 
-**3 tests** with output mismatch, sorted by match rate (best first)
+**4 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `set_property_values/swf4` | 19.9% | 346/1743 | 1743 | 1571 |  |
-| 2 | `hitarea_remove_owner_drag` | 18.2% | 2/11 | 11 | 10 |  |
-| 3 | `globals_monkeypatch` | 15.9% | 39/246 | 158 | 246 |  |
+| 1 | `geturl` | 85.7% | 6/7 | 7 | 7 | [103](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNCOVERED_SMALL_TESTS_PLAN.md) |
+| 2 | `set_property_values/swf4` | 19.9% | 346/1743 | 1743 | 1571 |  |
+| 3 | `hitarea_remove_owner_drag` | 18.2% | 2/11 | 11 | 10 |  |
+| 4 | `globals_monkeypatch` | 15.9% | 39/246 | 158 | 246 |  |
 
 ## Investigation Documents
 
@@ -890,7 +893,7 @@ No timeouts.
 | 100 | [TRY_CATCH_FINALLY_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TRY_CATCH_FINALLY_PLAN.md) | 5 | 5 | 0 |
 | 101 | [TRY_CATCH_STACK_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TRY_CATCH_STACK_PLAN.md) | 1 | 1 | 0 |
 | 102 | [TYPE_COERCION_ADVANCED_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TYPE_COERCION_ADVANCED_PLAN.md) | 2 | 2 | 0 |
-| 103 | [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNCOVERED_SMALL_TESTS_PLAN.md) | 14 | 14 | 0 |
+| 103 | [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNCOVERED_SMALL_TESTS_PLAN.md) | 15 | 14 | 1 |
 | 104 | [UNLOAD_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNLOAD_PLAN.md) | 12 | 12 | 0 |
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 0 | 0 | 0 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 5 | 0 |

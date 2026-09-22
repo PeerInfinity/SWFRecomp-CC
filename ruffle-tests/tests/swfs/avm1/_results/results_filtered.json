@@ -6,18 +6,18 @@
     "total_available": 735,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 19,
+    "ignored_count": 18,
     "filtered": true
   },
-  "total": 716,
+  "total": 717,
   "pass": 698,
   "ruffle_matched": 15,
-  "fail": 3,
-  "pass_rate": 97.5,
+  "fail": 4,
+  "pass_rate": 97.4,
   "effective_pass": 713,
-  "effective_pass_rate": 99.6,
+  "effective_pass_rate": 99.4,
   "breakdown": {
-    "output_mismatch": 3,
+    "output_mismatch": 4,
     "ruffle_matched": 15
   },
   "tests": [
@@ -4518,6 +4518,25 @@
       },
       "duration": 1.43,
       "status": "pass"
+    },
+    {
+      "test": "geturl",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 21.366,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 6
+      },
+      "duration": 21.38,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=7, expected=7)",
+      "actual_output": "... (1 lines before) ...\n  URL: http://www.example.com\n  Target: _blank\n  Method: POST\n  Param: value2=2\n  Param: value1=string\n  Param: $version=WIN 32,0,0,0",
+      "expected_output": "... (1 lines before) ...\n  URL: http://www.example.com\n  Target: _blank\n  Method: POST\n  Param: value2=2\n  Param: value1=string\n  Param: $version=LNX 32,0,0,0"
     },
     {
       "test": "geturl_opcode_target_normalize",
