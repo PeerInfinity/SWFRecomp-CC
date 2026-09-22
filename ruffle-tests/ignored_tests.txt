@@ -55,20 +55,13 @@
 # properties ($version) and none of the script variables. Both halves are now
 # implemented and the Param: lines come out in the expected order.
 #
-# `geturl` STAYS IGNORED for exactly one token: 4/7 -> 6/7, and the one
-# remaining diff is `Param: $version=LNX 32,0,0,0` vs our `WIN 32,0,0,0`. That
-# is platform identity, not a bug — Ruffle hard-codes Manufacturer::Linux in
-# its DEFAULT SystemProperties (core/src/system_properties.rs:287) on every
-# host, while we deliberately present a Windows player throughout
-# (System.capabilities.os = "Windows XP", .manufacturer = "Macromedia Windows",
-# avm2_globals.c:7385 version = "WIN 32,0,0,0"), and
-# SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md already
-# filters `$version=` as "pure platform metadata; can never match".
-# TO CLOSE: flip all four constants to Ruffle's Linux defaults together and
-# record it in avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md. It is a
-# project-identity decision worth +1 effective, not a local fix; no other test
-# in the corpus observes any of the four.
-geturl
+# `geturl` UN-IGNORED 2026-09-22: it now PASSES 7/7.
+# Closed NOT by adopting Ruffle's Linux identity but by reporting the REAL host
+# OS with a test pin, mirroring MOCK_DATE_TIME (see MOCK_PLATFORM in action.c
+# and get_mock_platform() in verify_output.py). Neither a hardcoded WIN nor a
+# hardcoded LNX is Flash-correct -- real Flash Player reports the host OS --
+# so the old "project-identity decision" framing was a false choice between
+# two fixed lies.
 
 # --- Network/form loading (no multi-SWF infrastructure needed) ---
 # These tests require network connections, HTTP POST, or browser-level form submission.

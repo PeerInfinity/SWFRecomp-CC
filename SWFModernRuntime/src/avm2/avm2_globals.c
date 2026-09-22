@@ -7356,6 +7356,35 @@ static void register_abstract_gates(Avm2Context* ctx)
 	ctx->builtins.class_class->native_init = class_class_native_init;
 }
 
+
+// --- Player platform identity (mirrors action.c; see the MOCK_PLATFORM note
+// there). Real Flash reports the HOST OS; verify_output.py pins it for tests.
+#ifndef MOCK_PLATFORM
+#  if defined(_WIN32)
+#    define MOCK_PLATFORM 0
+#  elif defined(__APPLE__)
+#    define MOCK_PLATFORM 2
+#  else
+#    define MOCK_PLATFORM 1
+#  endif
+#endif
+#if MOCK_PLATFORM == 0
+#  define PLAYER_VER_STR  "WIN 32,0,0,0"
+#  define PLAYER_SRV_V    "WIN%208%2C5%2C0%2C208"
+#  define PLAYER_SRV_M    "Adobe%20Windows"
+#  define PLAYER_SRV_OS   "Windows%20XP"
+#elif MOCK_PLATFORM == 2
+#  define PLAYER_VER_STR  "MAC 32,0,0,0"
+#  define PLAYER_SRV_V    "MAC%208%2C5%2C0%2C208"
+#  define PLAYER_SRV_M    "Adobe%20Macintosh"
+#  define PLAYER_SRV_OS   "MacOS"
+#else
+#  define PLAYER_VER_STR  "LNX 32,0,0,0"
+#  define PLAYER_SRV_V    "LNX%208%2C5%2C0%2C208"
+#  define PLAYER_SRV_M    "Adobe%20Linux"
+#  define PLAYER_SRV_OS   "Linux"
+#endif
+
 static void register_capabilities(Avm2Context* ctx)
 {
 	Avm2Class* cls = avm2_builtin_class(ctx, "flash.system", "Capabilities",
@@ -7378,11 +7407,11 @@ static void register_capabilities(Avm2Context* ctx)
 #endif
 		{ "screenColor", "color" },
 		{ "serverString", "A=t&SA=t&SV=t&EV=t&MP3=t&AE=t&VE=t&ACC=f&PR=f&SP=t&SB=f"
-		                  "&DEB=t&V=WIN%208%2C5%2C0%2C208&M=Adobe%20Windows"
-		                  "&R=1600x1200&DP=72&COL=color&AR=1.0&OS=Windows%20XP"
+		                  "&DEB=t&V=" PLAYER_SRV_V "&M=" PLAYER_SRV_M
+		                  "&R=1600x1200&DP=72&COL=color&AR=1.0&OS=" PLAYER_SRV_OS
 		                  "&L=en&PT=External&AVD=f&LFD=f&WD=f" },
 		{ "touchscreenType", "none" },
-		{ "version", "WIN 32,0,0,0" },
+		{ "version", PLAYER_VER_STR },
 	};
 	for (size_t i = 0; i < sizeof(strings) / sizeof(strings[0]); i++)
 	{

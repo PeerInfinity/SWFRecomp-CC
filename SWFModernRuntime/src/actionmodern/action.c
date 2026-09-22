@@ -144,9 +144,58 @@ static const uint16_t u16_pixel[] = {'p','i','x','e','l',0};
 static const uint16_t u16_localWithFile[] = {'l','o','c','a','l','W','i','t','h','F','i','l','e',0};
 static const uint16_t u16_localWithNetwork[] = {'l','o','c','a','l','W','i','t','h','N','e','t','w','o','r','k',0};
 static const uint16_t u16_StandAlone[] = {'S','t','a','n','d','A','l','o','n','e',0};
-static const uint16_t u16_WIN_ver[] = {'W','I','N',' ','3','2',',','0',',','0',',','0',0};
-static const uint16_t u16_Windows_XP[] = {'W','i','n','d','o','w','s',' ','X','P',0};
-static const uint16_t u16_Macromedia_Windows[] = {'M','a','c','r','o','m','e','d','i','a',' ','W','i','n','d','o','w','s',0};
+// --- Player platform identity -------------------------------------------
+// Real Flash Player reports the HOST OS, so that is the default here. Tests
+// PIN it, exactly as MOCK_DATE_TIME pins the clock: verify_output.py passes
+// -DMOCK_PLATFORM on every build so graded output is host-independent and a
+// Windows dev box grades identically to Linux CI.
+//
+// The test default is Linux because Ruffle -- the oracle our expected output
+// comes from -- hardcodes Manufacturer::Linux and OperatingSystem::Linux in
+// SystemProperties::new() on EVERY host (core/src/system_properties.rs), with
+// no override in its web or desktop frontend. A Ruffle user on Windows also
+// sees "LNX 32,0,0,0". That is Ruffle's quirk, not Flash's behaviour, which is
+// why we do not adopt it outside tests.
+//
+//   MOCK_PLATFORM: 0 = Windows, 1 = Linux, 2 = Macintosh
+#ifndef MOCK_PLATFORM
+#  if defined(_WIN32)
+#    define MOCK_PLATFORM 0
+#  elif defined(__APPLE__)
+#    define MOCK_PLATFORM 2
+#  elif defined(__EMSCRIPTEN__)
+     // Browser build: the real host is the BROWSER's OS, not the build
+     // machine's, and we cannot see it from C. Ruffle-web reports Linux on
+     // every host; match that until this reads navigator.platform.
+#    define MOCK_PLATFORM 1
+#  else
+#    define MOCK_PLATFORM 1
+#  endif
+#endif
+
+#if MOCK_PLATFORM == 0
+static const uint16_t u16_player_ver[] = {'W','I','N',' ','3','2',',','0',',','0',',','0',0};
+static const uint16_t u16_player_os[] = {'W','i','n','d','o','w','s',' ','X','P',0};
+static const uint16_t u16_player_mfr[] = {'M','a','c','r','o','m','e','d','i','a',' ','W','i','n','d','o','w','s',0};
+#define PLAYER_OS_LEN  10
+#define PLAYER_MFR_LEN 18
+#elif MOCK_PLATFORM == 2
+static const uint16_t u16_player_ver[] = {'M','A','C',' ','3','2',',','0',',','0',',','0',0};
+static const uint16_t u16_player_os[] = {'M','a','c','O','S',0};
+static const uint16_t u16_player_mfr[] = {'M','a','c','r','o','m','e','d','i','a',' ','M','a','c','i','n','t','o','s','h',0};
+#define PLAYER_OS_LEN  5
+#define PLAYER_MFR_LEN 20
+#else
+static const uint16_t u16_player_ver[] = {'L','N','X',' ','3','2',',','0',',','0',',','0',0};
+static const uint16_t u16_player_os[] = {'L','i','n','u','x',0};
+static const uint16_t u16_player_mfr[] = {'M','a','c','r','o','m','e','d','i','a',' ','L','i','n','u','x',0};
+#define PLAYER_OS_LEN  5
+#define PLAYER_MFR_LEN 16
+#endif
+// "XXX 32,0,0,0" is 12 code units. The previous literal used 13, which counted
+// the NUL terminator and emitted a stray trailing unit -- visible in the
+// divergence harness as `"WIN 32,0,0,0 "`.
+#define PLAYER_VER_LEN 12
 static const uint16_t u16_en[] = {'e','n',0};
 static const uint16_t u16_justify[] = {'j','u','s','t','i','f','y',0};
 static const uint16_t u16_Times_New_Roman[] = {'T','i','m','e','s',' ','N','e','w',' ','R','o','m','a','n',0};
@@ -41668,7 +41717,7 @@ static void initSystemObject(SWFAppContext* app_context)
 		setProperty(app_context, caps_obj, "serverString", 12, &ss);
 		// version
 		ActionVar ver_val = {0}; ver_val.type = ACTION_STACK_VALUE_STRING;
-		ver_val.str_size = 13; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
+		ver_val.str_size = PLAYER_VER_LEN; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_player_ver;
 		setProperty(app_context, caps_obj, "version", 7, &ver_val);
 		// hasStreamingAudio
 		setProperty(app_context, caps_obj, "hasStreamingAudio", 17, &bv_true);
@@ -41701,11 +41750,11 @@ static void initSystemObject(SWFAppContext* app_context)
 		setProperty(app_context, caps_obj, "isEmbeddedInAcrobat", 19, &bv_false);
 		// manufacturer
 		ActionVar mfr_val = {0}; mfr_val.type = ACTION_STACK_VALUE_STRING;
-		mfr_val.str_size = 18; VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
+		mfr_val.str_size = PLAYER_MFR_LEN; VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_player_mfr;
 		setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
 		// os
 		ActionVar os_val = {0}; os_val.type = ACTION_STACK_VALUE_STRING;
-		os_val.str_size = 10; VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
+		os_val.str_size = PLAYER_OS_LEN; VAL(u64, &os_val.data.numeric_value) = (u64)u16_player_os;
 		setProperty(app_context, caps_obj, "os", 2, &os_val);
 		// cpuArchitecture
 		ActionVar ca = makeStringActionVar(app_context, "x86", 3);
@@ -43397,7 +43446,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			root_movieclip.dynamic_props = (void*) allocDynamicProps(app_context, 8);
 		}
 		ActionVar ver_val = {0}; ver_val.type = ACTION_STACK_VALUE_STRING;
-		ver_val.str_size = 13; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
+		ver_val.str_size = PLAYER_VER_LEN; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_player_ver;
 		setProperty(app_context, (ASObject*)root_movieclip.dynamic_props, "$version", 8, &ver_val);
 	}
 

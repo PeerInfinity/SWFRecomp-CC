@@ -124,3 +124,40 @@ spelling of the same rule (`norm != 1.0`, i.e. an exact comparison) regressed
 `avm2/matrix3d_compose` from pass to fail — exact equality is definitely wrong.
 
 **File**: `SWFModernRuntime/src/avm2/avm2_stage3d.c` — the `recompose` path.
+
+## Player platform identity: real host OS, pinned to Linux for tests
+
+**Tests:** `avm1/geturl` (`Param: $version=`), and the `System.capabilities`
+`version` / `os` / `manufacturer` / `serverString` surface in both VMs.
+
+**The tweak.** The runtime reports the **real host OS** — `WIN` on Windows, `MAC` on
+macOS, `LNX` otherwise — and `verify_output.py` passes `-DMOCK_PLATFORM` on *every*
+build so graded output never depends on which machine ran it. The pinned test value is
+**Linux**, and *that* pin is the Ruffle-compat choice recorded here.
+
+**Why Linux is the right pin and not the right default.** Ruffle hardcodes
+`Manufacturer::Linux` and `OperatingSystem::Linux` in `SystemProperties::new()`
+(`core/src/system_properties.rs`) on **every host**, with no override in its web or
+desktop frontend — a Ruffle user on Windows also sees `LNX 32,0,0,0`. Since every
+`output.txt` in the corpus is a Ruffle-derived oracle, the expected token is `LNX`. But
+that is **Ruffle's quirk, not Flash's behaviour**: real Flash Player reports the host OS,
+which is why we do not adopt it outside tests.
+
+**What this replaces.** The prior framing — "flip all four constants to Ruffle's Linux
+defaults; it is a project-identity decision" — was a false choice between two fixed lies.
+We previously hardcoded Windows; Ruffle hardcodes Linux; *neither* is what Flash does. The
+user's call (2026-09-22) was to report the real OS and pin it for tests, exactly as
+`MOCK_DATE_TIME` pins the clock.
+
+**Per-test override:** `mock_platform = "windows" | "linux" | "macintosh"` (or `0|1|2`) in
+`test.toml`, parsed by `get_mock_platform()`. No corpus test needs one today.
+
+**Latent bug fixed alongside:** the version literal's `str_size` was `13` for a 12-unit
+string, counting the NUL and emitting a stray trailing unit — the `"WIN 32,0,0,0 "` seen
+in `SWFRecompDocs/status/2026-05-24-divergence-harness-findings.md`. Now `PLAYER_VER_LEN`.
+
+**Follow-up not taken:** in the Emscripten build the real host is the *browser's* OS,
+which C cannot see; it defaults to Linux (matching Ruffle-web) until this reads
+`navigator.platform`. And `$version=` can now come **out** of the divergence harness's
+`NOISE_PATTERNS`, since both sides agree under the pin — that filter was hiding a real
+comparison.

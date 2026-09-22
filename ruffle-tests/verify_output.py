@@ -2182,6 +2182,34 @@ def get_mock_date_time(test_dir):
     return None
 
 
+def get_mock_platform(test_dir):
+    """Parse mock_platform from test.toml if present.
+
+    Mirrors get_mock_date_time. Real Flash Player reports the HOST OS, and so
+    does the runtime by default -- but graded output must not depend on which
+    machine ran it, so every build gets an explicit -DMOCK_PLATFORM.
+
+    The default is Linux because RUFFLE is the oracle every `output.txt` comes
+    from, and Ruffle hardcodes Manufacturer::Linux / OperatingSystem::Linux in
+    SystemProperties::new() on EVERY host (core/src/system_properties.rs), with
+    no override in its web or desktop frontend -- a Ruffle user on Windows also
+    sees "LNX 32,0,0,0". Accepts a name or a raw int.
+    """
+    names = {"windows": 0, "win": 0, "linux": 1, "lnx": 1,
+             "macintosh": 2, "mac": 2, "macos": 2}
+    toml_path = test_dir / "test.toml"
+    if toml_path.exists():
+        text = toml_path.read_text()
+        m = re.search(r"mock_platform\s*=\s*\"?([A-Za-z0-9]+)\"?", text)
+        if m:
+            tok = m.group(1).lower()
+            if tok.isdigit():
+                return int(tok)
+            if tok in names:
+                return names[tok]
+    return None
+
+
 def get_msaa_samples(test_dir):
     """Parse [player_options].with_renderer.quality from test.toml and map it to
     an MSAA sample count, mirroring Ruffle's StageQuality::sample_count()
@@ -2625,6 +2653,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         # 2001-02-03 04:05:06 NPT (UTC+5:45) = 981152406000 ms since epoch
         mock_time = 981152406000
     extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
+    mock_platform = get_mock_platform(test_dir)
+    if mock_platform is None:
+        mock_platform = 1  # Linux -- Ruffle's universal default, see the helper
+    extra_defines.append(f"-DMOCK_PLATFORM={mock_platform}")
     if get_log_fetch(test_dir):
         extra_defines.append("-DLOG_FETCH=1")
     if get_runtime_is_air(test_dir):
@@ -3069,6 +3101,10 @@ def compile_wasm(test_dir, num_frames, build_dir):
     if mock_time is None:
         mock_time = 981152406000
     extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
+    mock_platform = get_mock_platform(test_dir)
+    if mock_platform is None:
+        mock_platform = 1  # Linux -- Ruffle's universal default, see the helper
+    extra_defines.append(f"-DMOCK_PLATFORM={mock_platform}")
     if get_log_fetch(test_dir):
         extra_defines.append("-DLOG_FETCH=1")
     if get_runtime_is_air(test_dir):
