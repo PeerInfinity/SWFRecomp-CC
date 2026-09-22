@@ -881,3 +881,97 @@ When the misc categories' image JSON is older than the last test-tree sync, a
 misc pass → fail is **upstream `test.toml` drift until proven otherwise**. The
 fingerprint is `max_diff` unchanged while `outliers` moves; check the upstream
 `test.toml` before attributing it to any patch (see arc §20.4).
+
+## 19. Session-20 state of the board (2026-09-18/19)
+
+Baseline: images run `34666689502` at `d8da5a18c`, **393 / 587** — six days stale by
+construction, since `images=false` is the per-change default. Final images run
+`35423176371` at `d6bcfa56c`: **413 / 587 (70.4 %)** = **+20 flips, 4 band moves improved /
+1 worsened, ZERO pass→fail**. Reports: `session20-fanout-reports/`.
+
+**+19 priced, +20 measured.** The extra is `avm1/edittext_stylesheet`, uncredited
+collateral from the EditText border-corner fix.
+
+- **Stage3D phases A′ and B landed, +8, and the arc was priced by BUILDING it.** A wave-1
+  slot produced a measured 1013-line prototype rather than an estimate, which turned wave 2
+  into productionizing — the cheapest accurate path for a backend slice, now used in s16,
+  s19 and s20. `stage3d_stencil` reaches **0 outliers / max diff 0 at tolerance 0/0**;
+  `stage3d_blend` 692565 → 35576 (limit 37000); the four sampler rows to 0–50. Grading
+  tolerance-0 on the stencil row exposed **two genuine rasteriser bugs** as collateral — a
+  missing top-left fill rule (4320 → 126) and a missing 8-bit subpixel snap (126 → 0) —
+  both of which also improved already-passing rows.
+- **Three of the eight are `stage3d`-suite, i.e. the CI misc group**, invisible at
+  `categories=all`. A Stage3D grading run must be `categories=full`.
+- **Four inherited §18 numbers were refuted, two of which would have misdirected work.**
+  `stage3d_blend` is **not a texture row** — its `Test.as` contains no `tex`/`setTextureAt`
+  at all, it is pure `setBlendFactors`, ~60 LOC, and s19 filed the board's biggest Stage3D
+  row into phase B. `stage3d_fractal` is **not an A′ row** — its only A′ call is a
+  `setColorMask(...,false)` that is a no-op against an opaque composite; it is
+  **budget-latched** (197M units needed vs a 12M cap). **RTT flips nothing** and must not be
+  funded: its only two rows are `stage3d_texture` (blocked by device fonts) and `away3d`
+  (HOLD). And `stage3d_bitmap`'s "second mechanism" is **not a Stage3D gap** — the expected
+  PNG is itself 86 % black, phase B renders the sprite art pixel-correct, and the residual
+  is sprite **placement** (7 `Math.random` + 7 `getTimer` calls). It is the one **worsened**
+  band this session, +59 %, and that is phase B working: correct art in wrong positions is
+  more outliers, not fewer.
+- **The EditText border corner: +11, and the `BACKLOG.md` entry named the WRONG OWNER.**
+  `edittext_caret_empty` is SWF v8 / AVM1, so its painter is `tag.c::textfield_render_cb`,
+  not `avm2_render_textbox`. The agent patched the named owner first, got a byte-identical
+  render, and that is how it surfaced. The backlog's *obvious* reading ("give the rects
+  their true fractional extent") would have **regressed** `border_transform` `.01-.03`,
+  which pass precisely because `corner_missing` drops the corner on fractional extents.
+  Mechanism: Ruffle draws the box as ONE `LineStrip [0,1,2,3,0]` whose bottom and right
+  segments **terminate at the centre** of the BR pixel (left half + top half = 3/4) while
+  top and left run *through* the other three corners — goldens show BR = 95 or 111, never
+  0 or 255. Ending the bottom rect half a device pixel short and the right half a pixel
+  long makes them meet at that centre; MSAA resolves 64. All 11 land at **0 outliers**.
+- **The slice was 11 comparisons, not 19** — `edittext_caret_multiline` is a **missing
+  caret** (20 px of solid black bar at three positions, a separate owner) and
+  `edittext_border_transform`'s corners differ by 95 against *its* tolerance of 128, i.e.
+  already inside budget. Refuted before any code was written.
+- **s19's device-font A1 verdict is REOPENED, in our favour.** s19 priced the outline-
+  emission prototype by building it and concluded it flips nothing. Same tree, same build,
+  A/B'd: **A1 alone = 13065 outliers (s19's number, reproduced); A1 + this session's
+  bold/italic ladder = 15, against a budget of 3.** The ladder is **99.89 %** of A1's
+  residual — so A1 is not a band arc, it is **five pixels** from flipping `device-font`.
+  The prototype is still unlanded at
+  `session19-fanout-reports/UNLANDED-devicefont-prototype.patch`.
+  **Do not over-read this**: the Stage3D text rows (`stage3d_texture`, `stage3d_fractal`)
+  need A1 and are unaffected by the ladder — measured with the ladder in base,
+  `stage3d_texture` still grades 206968, byte-for-byte its pre-ladder number. Those rows
+  fail a step earlier: **no glyph outlines are emitted at all**, so there is nothing for a
+  ladder to choose between. Two different rows, two different bottlenecks.
+- **The even-odd fill across `lineStyle()` closed 152 of 154 channels and still fails.**
+  Tolerance 1, `max_outliers` 0, and the 2 residual channels are one pixel at max diff 255.
+  A −99 % band move worth landing, but **a band lead is not a flip lead** and nobody had
+  checked. Residual named and its easy fix falsified: the last 2 channels are the ellipse
+  stroke's **inner** edge (we flatten the centreline at lyon's *fill* tolerance and offset
+  the chords — 2.0141 vs 2.0653 px against a 2.0 half-width); setting
+  `CURVE_FLATTEN_TOLERANCE = 0.002` fixes that pixel and makes the comparison **worse**
+  (2 → 24 channels).
+- **`away3d` was the session's one open landing risk and it closed clean.** The wave-1
+  A/B was inconclusive (30.17 s patched vs 30.20 s reverted) because **two things were
+  stacked**: the timeouts happen on **master too** at load ~9-10 — that row runs 15-30 s at
+  unchanged code and is the corpus's nearest row to the 30 s wall regardless — *and* the
+  pre-hoist patch genuinely cost +3 s (+12 %), because the per-sample store reloaded
+  `be->blend_src`/`be->color_mask`/`be->st_*[face]` every sample (`be->color` may alias
+  `*be`, so the compiler could not hoist). A loop-invariant hoist proven **bit-identical**
+  by a pre/post canary A/B (18/18 md5) made the patched build *faster* than master: 14.60 s
+  vs 15.95 s, raytrace 1.88 → 1.83 s. CI confirms `away3d`, `raytrace`, `bitmap`, `fractal`
+  and `texture` all **pass**, no timeouts.
+- **Canary blind spots, again found by the patches that needed them.** The set could not see
+  blend/stencil/colour-mask/texture sampling (only the shared rasteriser half, via
+  `rotating_cube`), had **no** member for the EditText antialiased border arm or the
+  device-face lookup, and no member reaching `avm2_graphics_cpu_composite` with a
+  script-drawn Graphics. Five members added across three patches. `render_canary_tests.txt`
+  conflicted three ways at merge as it does every session — `--3way`, keep all blocks.
+
+### Process notes added this session
+
+- **Hold `images=true` until the pixel work has all landed.** One combined
+  `mode=graphics categories=full images=true` run grades both axes and refreshes the
+  baseline; dispatching an earlier `images=false` run over the first N landed commits
+  catches trace regressions while the last agents still have context, at no pixel cost.
+- **A band that worsens is not automatically a regression.** `stage3d_bitmap` +59 % is the
+  expected consequence of a fix working upstream of an unfixed defect. Say which, with the
+  mechanism, or the next session will bisect it.

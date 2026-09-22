@@ -2840,3 +2840,144 @@ the first call was silently dropped), and the AVM2 `mouseWheelEnabled` default
   (structurally unpromotable), `getpixel-from-embedded` (a disposition, not a fix).
 
 **Pixels.** See playbook §18.
+
+## 21. Session 20 (2026-09-18/19) — dual-axis fan-out #12: trace +10 (4449/4527 eff), pixels +20 (413/587, 70.4 %), ZERO regressions in either axis or either mode
+
+Commits `574207007..0ba87d056` on master (11 code commits + doc/disposition commits,
+each carrying its agent's patch, report and brief under `session20-fanout-reports/`).
+Baseline read fresh off `origin/ruffle-test-results`: trace **4439 effective / 4527**
+(graphics results `6c1329197`, run `35163868554`; no-graphics `6bf7f3c30`, run
+`35166754380`), pixels **393 / 587** (images run `34666689502` at `d8da5a18c`, six days
+stale by construction). 5 wave-1 + 10 wave-2 agent-slots, all Opus, coordinator included.
+
+**Grading runs.** `35421084855` at `8040b8f63` (first ten commits, `categories=full`,
+`images=false`): trace **+8, 0 regressions, 0 other status moves**. `35423176371` at
+`d6bcfa56c` (`categories=full`, `images=true`, the combined run): trace **4439 → 4449
+(+10)**, pixels **393 → 413 (+20)**, **0 regressions on either axis**, band moves 4
+improved / 1 worsened. No-graphics `35442545248` at `53a188c38`: **+10, identical
+per-suite**, and a per-test comparison of the two modes' result files shows **0
+differences across all 4 529 rows** (4451/4529 effective in both). Mode parity is total.
+
+**Denominator note.** The corpus went 4527 → 4529 and effective 4439 → 4451. Only **+10
+is ours**: `+1` is our own new fixture (`regression/avm1_display_prop_coercion`) and `+1`
+is upstream drift (`avm1/goto_rewind_movieclip_replace`, which arrived `ruffle_matched`).
+The wave-1 drift audit's "empty name-set delta" was correct when made on 09-17; that test
+merged upstream before the grading run re-downloaded the corpus on 09-19. Never book
+either as yield.
+
+### 21.1 Ledger (trace +10)
+
+| patch | flips | tests |
+|---|---:|---|
+| w2-goto-framescript | +4 | `goto_framescript_queued_same_frame`, `/swf9`, `/swf10` → pass; `/swf13` → rm |
+| w2-avm2-smalls | +2 | `textblock_recreateline`, `number_to_string` (both → rm) |
+| w2-smalls-2 | +2 | `bitmapdata_custom_rectangle` (rm), `tab_ordering_properties` (pass) |
+| w2-masks-hittest | +1 | `from_gnash/misc-ming.all/masks_test` (rm) |
+| w2-avm1-nearflips | +1 | `avm1/xml_getbytes` (pass) |
+
+### 21.2 Ledger (pixels +20)
+
+| patch | flips | comparisons |
+|---|---:|---|
+| w2-stage3d | +8 | `stage3d_stencil`, `_blend`, `_sampler`, `_sampler_partial_upload`, `_ignore_sampler_override`, `stage3d/sampler_odd_size`, `/unbound_texture`, `/unbound_texture_multiple` |
+| w2-gfx-text-smalls | +11 | `visual/edittext/edittext_caret_empty` ×11, all at 0 outliers / max diff 31 vs tolerance 64 |
+| (uncredited collateral) | +1 | `avm1/edittext_stylesheet` — flipped by the border-corner fix; predicted +19, measured +20 |
+| (band moves) | 0 | `graphics_simple_shapes` 154 → 2 (−99 %), three `stage3d_texture_bytearray*` rows −37 % to −75 %; **`stage3d_bitmap` +59 % worse, and that is phase B working** — its residual is sprite *placement* (RNG draw order + clock phase), so correct art in wrong positions is more outliers, not fewer |
+
+### 21.3 Zero-flip work that still landed
+
+- **The AVM2 even-odd fill across `lineStyle()`** (`78030002d`): `graphics_simple_shapes`
+  154 → 2 channels and **still fails** (tolerance 1, `max_outliers` 0, the 2 residual
+  channels are one pixel at max diff 255). s19's note had the arithmetic right and the
+  pricing missing — nobody had checked whether closing 152 channels got under budget. Its
+  named mechanism was also **half a fix**: 32 of the 152 are fill/stroke *z-order*, and a
+  bare split inverts them, because Ruffle's deferral of closed strokes into a pending list
+  *is* the z-order rule.
+- **The array ladder's M1 + M4** (`6b7486783`): zero flips, strictly monotone, and the
+  ladder is now **one mechanism (M3) from +3** instead of three, with `array-v5` promoting
+  alongside it.
+- **The four-path display-property coercion gate** (`3a8870200`, `d5278b4e9`): new
+  `regression/avm1_display_prop_coercion` fixture goes 18-of-36-lines-wrong → PASS,
+  byte-identical to a Ruffle-exporter oracle.
+- **The device-face bold/italic ladder** (`6cf74920c`): 0 flips and 0 band at HEAD, landed
+  as a correctness prerequisite — and it **re-prices s19's unlanded A1 arc** (see §21.5).
+
+### 21.4 Method notes (deltas vs s19)
+
+- **The documentation of record was wrong more often than the code was.** Seven standing
+  verdicts fell, and none fell to reading — each fell to compiling the thing and running
+  it: `textblock_recreateline`'s "adjudicated unflippable" (s12/s15/s16), s18's
+  "`number_to_string` buys 12 lines and 0 flips on its own" (those 12 lines *were* the
+  flip), a "session-sized cross-VM machinery" estimate for `avm1_root` that was one line,
+  two ignore entries that were **hidden wins**, a `BACKLOG.md` entry naming the wrong owner
+  file, and a plan whose stated blocker file was sitting on disk the whole time.
+- **A disposition doc ages into an instruction, and nothing re-tests it.**
+  `REMAINING_TAIL_TRIAGE.md:668` told future sessions `masks_test` "needs synthetic
+  keypress mechanism… this is verifier scope" — a standing instruction to spend a slot
+  inside `verify_output.py`, which was never the blocker. **Entries that say what KIND of
+  work a row needs are the expensive kind to leave stale: they misdirect a whole slot, not
+  a line.** Every ignore entry should now carry a prune criterion (added to `array-v5`).
+- **THE CHEAP SCREEN SCREENS; THE PROPERTY THAT ACTUALLY DECIDES IS NARROWER.** Three
+  instances, and it cut in *both* directions, which is what makes it a rule rather than a
+  bias toward pessimism:
+  | cheap screen | what decides | effect |
+  |---|---|---|
+  | grep for a class name | what the type system lets a script express | 134 → 12-test canary |
+  | ours-only diff count | positional alignment | killed 2 false cheap rows; **saved** `bitmapdata_custom_rectangle`, whose small count was a real 6-line shortfall |
+  | substituting expected text | the actual-output diff | exposed an `avm1_root` "+1" that was a **quality regression on its own row** |
+- **Absence from the board can mean STRUCK, not unpriced.** The coordinator funded the
+  `from_gnash/.../action_order` cluster on "largest cluster the board doesn't name ⇒ cheap
+  unclaimed yield". Inverted: s17 struck it (`polish-sweep-arc.md:2277`) after six
+  sessions adjudicated it, and s19 re-verified 9 of its 11 rows byte-identical one session
+  earlier. **Grep the arc doc for a STRIKE before funding an omitted cluster.**
+- **Resuming a completed wave-1 agent as its own wave-2 implementer was the cheapest
+  pattern of the session.** It keeps every located line number, measurement and refutation
+  at zero re-derivation cost; used four times (arraysort, avm2-smalls, stage3d, masks).
+  The agent creates its own worktree; the coordinator reaps it.
+- **A funded arc can be refuted without loss.** The user chose the Flash-exact quicksort
+  over a compatibility waiver specifically to avoid trading `array.as:317`. The agent
+  transcribed avmplus's `ArraySort::qsort` verbatim, measured it losing 317 *and* failing
+  to win 324/325, and stopped at the agreed hour-one checkpoint. Root cause: `adobe/avmplus`
+  is **Tamarin — AVM2** — with no AS1 Array, while these are SWF 5-8. That phrase had
+  propagated through four documents and into the funding decision. All six dispositions
+  corrected in `0ba87d056`.
+- **Sweeps scoped by ARGUMENT, not volume.** Under a loaded box the masks agent cut 24
+  tests to 7, arguing each drop from the test's own expected output (`is_mask` is written
+  in one place, so a test must contain both constructs to observe the change; 11 candidates
+  corpus-wide, 7 disqualified because their only references are `typeof x.foo == 'function'`
+  existence checks, and one apparent hit was a *different builtin*). Recorded as deliberate,
+  not truncated. **Corrected trick:** editing a running `while read … done < file` loop's
+  worklist in place does **not** retarget it — the editor replaces the inode and the loop
+  keeps reading the old one. Trim by stopping and relaunching the runner (TaskStop, never
+  `pkill -f`).
+- **An agent volunteered a correction against its own credit**, twice: the worklist trick
+  above (after the coordinator asked for it to be written into the playbook), and
+  `w2-avm2-smalls` refuting its own `avm1_root` finding at the cost of a third of its
+  delivered yield.
+
+### 21.5 Left on the board (session 21)
+
+**Trace.**
+- **M3, the array sort-UB split** — the only reachable yield in the gnash array family:
+  `array-v5` + `array-v6` promote on M3 alone (+2, one an ignore-list prune), `-v7`/`-v8`
+  need M3 **plus** `array.as:253` for +2 more. **Hard gate: reproduce BOTH legs in
+  `search.c` before touching `action.c`.** Strongest lead is an in-place bubble family over
+  a **non-clearing `pop()`**; every quicksort variant is a measured dead end. Full brief:
+  `session20-fanout-reports/w2-arraysort-report.md` §6.5.
+- **`geturl` is one platform constant from +1**, and it is a **project-identity decision,
+  not an agent slot**: expected `LNX 32,0,0,0`, ours `WIN 32,0,0,0`. Ruffle hard-codes
+  Linux as its universal default; we present Windows consistently in 4 places and no other
+  corpus test observes any of them. Flip all four together + a `RUFFLE_COMPAT_TWEAKS.md`
+  entry, or decline deliberately.
+- `swf13`'s last 3 lines: NO-GO with a measured mechanism — a deferred stop must halt the
+  playhead without clearing the `isPlaying` observable, which needs `ext->playing` split
+  into advance-vs-reported across every reader. **(A) without (B) is a net loss.**
+- Unclaimed and still open: `simplebutton_childevents_multichild`,
+  `textline_atom_index_at_char_index`, `sound_load_multiple`; `avm1_root`'s
+  `_level0` is now a **measured** NO-GO, do not re-price it.
+- Unchanged NO-GOs of record: `external_interface`, the audio trio, `embed_name_lookup`,
+  `bug_483783`, `pcre_find_fixedlength`, `number_tostring`, `avm1_loads_avm2`,
+  `GradientFillTest`, `getpixel-from-embedded`, and the whole `action_order` family
+  (STRUCK s17 — do not re-fund).
+
+**Pixels.** See playbook §19.
