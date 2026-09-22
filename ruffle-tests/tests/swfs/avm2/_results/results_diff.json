@@ -1,62 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-13T08:50:16.065114+00:00",
-    "old_git_sha": "bdf734c46c7ce4f2cb5466ac615cc6d884b4e51b",
-    "new_timestamp": "2026-09-17T01:04:31.397110+00:00",
-    "new_git_sha": "317ac43cffd3c374468367a58b3f2cb7ea2357ad",
+    "old_timestamp": "2026-09-19T12:56:43.095335+00:00",
+    "old_git_sha": "53a188c38f4ea18db048016d24fc54222a0dd8ca",
+    "new_timestamp": "2026-09-20T08:49:33.521789+00:00",
+    "new_git_sha": "53a188c38f4ea18db048016d24fc54222a0dd8ca",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 1213,
-    "old_ruffle_matched": 36,
-    "old_effective_pass": 1249,
-    "old_total": 1274,
-    "old_pass_rate": 95.2,
-    "new_pass": 1213,
-    "new_ruffle_matched": 35,
-    "new_effective_pass": 1248,
+    "old_pass": 1217,
+    "old_ruffle_matched": 38,
+    "old_effective_pass": 1255,
+    "old_total": 1275,
+    "old_pass_rate": 95.5,
+    "new_pass": 1217,
+    "new_ruffle_matched": 38,
+    "new_effective_pass": 1255,
     "new_total": 1275,
-    "new_pass_rate": 95.1,
-    "old_mismatched_lines": 2888,
-    "new_mismatched_lines": 2889,
+    "new_pass_rate": 95.5,
+    "old_mismatched_lines": 2579,
+    "new_mismatched_lines": 2579,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 1,
-    "status_changed": 1,
-    "unchanged": 1273,
-    "added": 1,
+    "newly_failing": 0,
+    "status_changed": 0,
+    "unchanged": 1275,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "goto_framescript_queued/swf13",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 48,
-        "expected_lines": 59,
-        "matching_lines": 17
-      },
-      "new_lines": {
-        "actual_lines": 48,
-        "expected_lines": 59,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "goto_framescript_queued_same_frame",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 3
-      }
-    }
-  ]
+  "changes": []
 }
