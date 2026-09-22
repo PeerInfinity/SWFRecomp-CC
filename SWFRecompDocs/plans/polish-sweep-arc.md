@@ -2964,11 +2964,24 @@ either as yield.
   `search.c` before touching `action.c`.** Strongest lead is an in-place bubble family over
   a **non-clearing `pop()`**; every quicksort variant is a measured dead end. Full brief:
   `session20-fanout-reports/w2-arraysort-report.md` §6.5.
-- **`geturl` is one platform constant from +1**, and it is a **project-identity decision,
-  not an agent slot**: expected `LNX 32,0,0,0`, ours `WIN 32,0,0,0`. Ruffle hard-codes
-  Linux as its universal default; we present Windows consistently in 4 places and no other
-  corpus test observes any of them. Flip all four together + a `RUFFLE_COMPAT_TWEAKS.md`
-  entry, or decline deliberately.
+- ~~**`geturl` is one platform constant from +1**~~ — **CLOSED 2026-09-22 (`19ba53372`),
+  +1 effective, graded in run `35780999591` with zero regressions.** Recorded here because
+  the framing this board inherited was wrong, not merely stale: "a project-identity
+  decision — adopt Ruffle's Linux or keep our Windows" is **a false choice between two
+  fixed lies**. Real Flash Player reports the **host OS**; we hardcoded Windows, Ruffle
+  hardcodes Linux on every host (`SystemProperties::new()`, no web/desktop override), so
+  neither value was Flash-correct and there was nothing to decide. The runtime now reports
+  the real host and **tests pin it via `MOCK_PLATFORM`**, exactly as `MOCK_DATE_TIME` pins
+  the clock — without the pin this row would pass on Linux CI and fail on a Windows dev
+  box. The pin defaults to Linux because every `output.txt` is a Ruffle-derived oracle;
+  the *default* matches Flash and the *pin* matches the oracle, which are different
+  questions that the old framing conflated. It covered **six** sites, not the four named
+  (the AVM2 `serverString` also embeds `V=`/`M=`/`OS=`), and fixed a latent off-by-one:
+  the version literal's `str_size` was 13 for a 12-unit string, emitting the stray
+  trailing unit recorded as `"WIN 32,0,0,0 "` in the May divergence findings.
+  **Still open:** the Emscripten build cannot see the browser's OS from C and defaults to
+  Linux until it reads `navigator.platform`; and `$version=` should now come **out** of
+  the divergence harness's `NOISE_PATTERNS`, since both sides agree under the pin.
 - `swf13`'s last 3 lines: NO-GO with a measured mechanism — a deferred stop must halt the
   playhead without clearing the `isPlaying` observable, which needs `ext->playing` split
   into advance-vs-reported across every reader. **(A) without (B) is a net loss.**
