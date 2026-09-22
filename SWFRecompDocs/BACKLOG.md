@@ -95,6 +95,21 @@ first).
   walks the entry's `ratio` and route them through `ng_getCharBoundsForRatio`.
   (2026-09-04)
 
+## Browser-WASM — player identity
+
+- **The Emscripten build cannot see the browser's OS, so it reports Linux.**
+  `MOCK_PLATFORM` (`action.c`, mirrored in `avm2_globals.c`) picks the player
+  platform at compile time from `_WIN32` / `__APPLE__`, which is correct for
+  native builds but meaningless for WASM: the real host is the *browser's* OS,
+  not the build machine's. The `__EMSCRIPTEN__` arm defaults to Linux, matching
+  Ruffle-web, which reports `LNX 32,0,0,0` on every host. Fix: read
+  `navigator.platform` (or `navigator.userAgentData.platform`) at startup and
+  set the four strings at runtime rather than via `#if`. Affects `$version` on
+  the root plus `System.capabilities.version`/`os`/`manufacturer` and the AVM2
+  `serverString`, i.e. anything a real SWF sniffs to branch on platform.
+  Native builds and all graded tests are unaffected (tests pin `MOCK_PLATFORM`
+  explicitly). (2026-09-22, session 20)
+
 ## Native windowed graphics (assessment: `reference/native-windowed-graphics-assessment.md`)
 
 - **flashbang backend: delete or fold into render_webgpu.c.** Second
@@ -675,6 +690,16 @@ first).
   purpose (`ruffle-tests.yml --exclude`): two 0.0001 ms setIntervals with no
   minimum-interval floor in `timer.c` — a 10 ms floor is the lead
   (`session18-fanout-reports/w2-avm1-goto-report.md`).
+- **`$version=` is still in the divergence harness's `NOISE_PATTERNS` and no
+  longer needs to be.** `tools/divergence/divergence_test.py:57` filters the line
+  on the 2026-05-24 finding that it is "pure platform metadata; can never
+  match" — true then, because we hardcoded `WIN` and Ruffle hardcodes `LNX`.
+  Since `19ba53372` both sides agree under `MOCK_PLATFORM`, so the filter is
+  now **suppressing a real comparison**: a genuine `$version` divergence
+  against the Ruffle oracle would be silently swallowed. Remove the pattern and
+  re-run a game capture to confirm it stays quiet. General point worth keeping:
+  a noise filter outlives its cause, and every one still in the list is a
+  comparison the harness has given up. (2026-09-22, session 20)
 - **`SWFRecomp/build/run-SWFRecomp.sh` hardcodes the LIVE tree's binary.** The
   wrapper is untracked (`build/` is gitignored) and its only line is
   `exec /home/robert/CC/SWFRecomp-CC/SWFRecomp/build/SWFRecomp "$@"`, so any
@@ -716,18 +741,24 @@ first).
   Guarded the free with `variableIsArrayOwned`. case-v5 + case-v6
   now 10/10 in graphics, both still pass NO_GRAPHICS, ASAN clean
   (only pre-existing `u16_concat` Dejagnu leaks). (2026-05-30)
-- **The EditText border's bottom-right corner is binary, where Flash's is 63 %
-  covered.** `avm2_render_textbox` draws the border as four full-coverage
-  `avm2_border_rect` quads, so that corner pixel can only be 0 % or 100 % inked;
-  today's `corner_missing` boolean just picks one, and no boolean can produce
-  Ruffle's 63 %. Fix: give the bottom and right rects their true fractional
-  device extent `(by+bh)/dtw` on the antialiased arm and let MSAA resolve it.
-  Note `e5dff31ab` left the `MSAA_SAMPLES > 1` arm alone on the assertion that
-  "both antialiased segments cover the corner, so it is always painted";
-  `visual/edittext/edittext_caret_empty` is `quality = "high"` and disproves
-  that. Blast radius: the four tier-1 `edittext_border_*` canary comparisons
-  plus the `text/auto_size/*` rows, so it needs the same four-golden
-  measurement on the High arm. Fold in `edittext_caret_multiline`, which is new
-  in this run's JSON and absent from s18's. Evidence:
-  `SWFRecompDocs/plans/session19-fanout-reports/w2-gfx-geometry-4-caret-adjudication.md`.
-  (2026-09-11, session 19)
+- ~~**The EditText border's bottom-right corner is binary, where Flash's is
+  63 % covered.**~~ **CLOSED 2026-09-22 (session 20, `6cf74920c`): +11 pixel
+  comparisons, `visual/edittext/edittext_caret_empty` `output.{01,02,04..12}`,
+  all at 0 outliers / max diff 31 against a tolerance of 64.** Two corrections
+  worth keeping. (a) **This entry named the wrong owner file.** The test is SWF
+  v8 / AVM1, so its painter is `tag.c::textfield_render_cb`, not
+  `avm2_render_textbox`; the agent patched the owner named here first, got a
+  byte-identical render, and that is how it surfaced. Both painters are fixed.
+  (b) **The fix proposed here would have REGRESSED three passing rows.** Giving
+  the rects "their true fractional device extent" breaks
+  `edittext_border_transform` `.01-.03` (tolerance 0), which pass *because*
+  `corner_missing` drops the corner on fractional extents. The real mechanism:
+  Ruffle draws one `LineStrip [0,1,2,3,0]` whose bottom and right segments
+  terminate at the **centre** of the BR pixel (left half + top half = 3/4) while
+  top and left run through the other three corners — goldens show BR = 95 or
+  111, never 0 or 255. Ending the bottom rect half a device pixel short and the
+  right half a pixel long makes them meet there; MSAA resolves 64. The
+  `MSAA_SAMPLES > 1` note above was right to be doubted. `edittext_caret_multiline`
+  is NOT this bug — it is a missing caret (20 px of solid black bar at three
+  positions), still open and unowned. Full account: playbook §19 and
+  `session20-fanout-reports/w2-gfx-text-smalls-report.md`.
