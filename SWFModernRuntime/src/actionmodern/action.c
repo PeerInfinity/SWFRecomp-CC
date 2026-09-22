@@ -66596,16 +66596,31 @@ static int callArrayMethod(SWFAppContext* app_context,
 		//
 		// Sorts the LIVE array in place. A comparator that mutates the array
 		// mid-sort (gnash array.as testCmpBogus5/6: `trysortarray.pop(); return ±1`)
-		// is documented Flash sort UB — Flash's in-place avmplus sort produces
-		// DIFFERENT results per return value (length 0 for `return -1`, length 4 /
-		// "2,3,4,1" for `return +1`), which depends on Flash's exact comparison/swap
-		// interleaving with the pops. We replicate the `return -1` → length 0 case
-		// (array.as:317) by sorting in place; the `return +1` → length 4 case
-		// (array.as:324/325) we do NOT replicate (would need a Flash-exact in-place
-		// quicksort). Do NOT switch to a snapshot-and-write-back sort to "fix"
-		// 324/325: that matches Ruffle but DIVERGES from Flash on 317 (Ruffle gets
-		// 317 wrong too). Project policy is to match Flash over Ruffle on conflicts;
-		// array-v5's residual sort-UB diff is documented in
+		// is documented Flash sort UB: Flash produces DIFFERENT results per return
+		// value — length 0 for `return -1` (array.as:317), length 4 / "2,3,4,1" for
+		// `return +1` (array.as:324/325). We replicate 317 by sorting in place; we
+		// do NOT replicate 324/325.
+		//
+		// Do NOT switch to a snapshot-and-write-back sort to "fix" 324/325: that
+		// matches Ruffle but DIVERGES from Flash on 317 (Ruffle gets 317 wrong too).
+		// Project policy is to match Flash over Ruffle on genuine conflicts.
+		//
+		// The completion mechanism is NOT "a Flash-exact in-place avmplus quicksort".
+		// That framing was wrong and is retired (s20, w2-arraysort): adobe/avmplus is
+		// Tamarin — the AVM2 VM — and contains no ActionScript-1 Array at all, while
+		// array-v5..v8 are SWF 5-8 (AVM1). ArraySort::qsort (ArrayClass.cpp:637) was
+		// transcribed verbatim and driven by a popping comparator: it yields length 4
+		// on BOTH legs ("4,2,1,3" for -1, "3,4,1,2" for +1), so it loses 317 AND fails
+		// to win 324/325. Nor can a different write-back rule rescue it — both legs
+		// enter with identical len/iFirstAbsent (4) and leave with identical post-pop
+		// live length (0), so any write-back that is a function of those gives the
+		// SAME length for both, and Flash's 0-vs-4 split is unreachable.
+		//
+		// Open lead: of 5 algorithm families x 3 write-back models swept, only an
+		// IN-PLACE BUBBLE-family sort reproduces the 0-vs-4 length split (no quicksort
+		// does), and a single bubble pass over a snapshot reproduces the "2,3,4,1"
+		// contents. Gate any future attempt on a harness reproducing BOTH legs before
+		// touching this code. array-v5's residual sort-UB diff is documented in
 		// from_gnash/_investigation/ACCEPTED_DIFFS.md and the test is on the
 		// actionscript.all ignored list.
 		{

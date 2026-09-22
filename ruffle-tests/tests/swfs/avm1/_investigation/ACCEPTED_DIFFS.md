@@ -1234,7 +1234,11 @@ nothing and mislabel the pixel board.
 **Not the same bug as `avm2/number_to_string`.** That test is base-10
 `avm2_format_number`; this one is `print_with_radix`'s 2–36 loop. Disjoint code,
 disjoint defects — `number_to_string`'s residual (subnormal shortest-round-trip
-digits) is a live HOLD, not an accepted diff.
+digits) is a live HOLD, not an accepted diff. **As of s20 `number_to_string` is
+`ruffle_matched`** (`476b45fdc`: it was choosing notation with `floor(log10(d))`
+instead of ECMA's shortest-round-trip exponent rule, `n < -5 || n > 21`); the
+subnormal arm is what still keeps it off `pass`. `number_tostring` itself — the
+Category 14 NO-GO documented here — is untouched and unaffected.
 
 ---
 

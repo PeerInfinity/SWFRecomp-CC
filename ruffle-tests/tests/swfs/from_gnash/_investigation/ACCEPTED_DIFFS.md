@@ -509,9 +509,8 @@ to `from_gnash/misc-swfc.all/ignored_tests.txt`.
 
 **Root cause.** `array.as` sorts with comparators that MUTATE the array
 mid-sort (`testCmpBogus5`: `trysortarray.pop(); return -1`; `testCmpBogus6`:
-`trysortarray.pop(); return 1`). This is documented Flash sort UB: Flash's
-in-place avmplus sort produces *different* results depending on the
-comparator's return value —
+`trysortarray.pop(); return 1`). This is documented Flash sort UB: Flash produces *different* results depending on
+the comparator's return value —
 
 | Comparator | Flash | Ruffle | Us |
 |------------|-------|--------|-----|
@@ -529,12 +528,22 @@ reproduces Flash on line 317 but not 324/325. Ruffle uses a
 on 317). We deliberately do NOT adopt Ruffle's snapshot sort, because that would
 trade a Flash-correct line (317) for two Ruffle-correct ones — net Flash-drift on
 a *genuine Ruffle-vs-Flash conflict*, which project policy resolves in Flash's
-favour. Reproducing Flash on BOTH 317 and 324/325 would require a Flash-exact
-in-place AVM1 quicksort (high effort, the residual sort-UB nobody fully nails);
-not pursued. Because we pass 317 (Ruffle fails it) our diff is NOT a subset of
+favour. Reproducing Flash on BOTH 317 and 324/325 remains open, but the long-standing
+"Flash-exact in-place avmplus quicksort" framing is **RETIRED** (session 20,
+`SWFRecompDocs/plans/session20-fanout-reports/w2-arraysort-report.md` §2).
+`adobe/avmplus` is Tamarin — the **AVM2** VM — and contains no ActionScript-1
+Array at all, while these are SWF 5-8 (AVM1). `ArraySort::qsort`
+(`ArrayClass.cpp:637`) was transcribed verbatim and driven by a popping
+comparator: it returns length 4 on BOTH legs, so it loses 317 *and* fails to win
+324/325, and no write-back rule can rescue it (both legs enter and leave with
+identical lengths, so Flash's 0-vs-4 split is unreachable from a quicksort).
+**Open lead:** of 5 algorithm families × 3 write-back models swept, only an
+in-place **bubble**-family sort reproduces the 0-vs-4 split. Gate any future
+attempt on a harness reproducing BOTH legs first. Because we pass 317 (Ruffle fails it) our diff is NOT a subset of
 Ruffle's, so array-v5 cannot promote to `ruffle_matched`; added to
-`from_gnash/actionscript.all/ignored_tests.txt`. The remaining array-v5 diffs
-(260/263/1630/1636) are separate clusters both engines also miss vs Flash.
+`from_gnash/actionscript.all/ignored_tests.txt`. The remaining array-v5 diffs are
+`1630`/`1636` — separate clusters both engines also miss vs Flash. (`260`/`263`
+were in this list and are now FIXED, s20 w2-arraysort M1/M4.)
 
 > **Policy note:** `ruffle_matched` (diff ⊆ Ruffle's diff vs Flash) is an
 > *automatic-promotion convenience* for tests where our remaining diffs are

@@ -462,6 +462,22 @@ pixel-axis row (same reasoning as `loader_load` / `bom` above).
 **Test:** `avm2/avm1_root` (58 expected / 46 differing lines at HEAD;
 `known_failure = true` in its own `test.toml`)
 
+> **s20 measurement (w2-avm2-smalls §3) — the decision and the ceiling both stand,
+> now with a mechanism instead of an estimate.** The row is exactly **one ours-only
+> index** from `ruffle_matched`, and taking that index **costs three Flash-exact
+> lines** (`matching_lines` 12 → 10). The reason is that Flash's own `output.txt`
+> contains *both* answers: `_level0: undefined` in the child's frame 1, and
+> `_level0: _level0` ten lines later — resolving to the AVM2 root, `#1056 … on
+> Test` — in a second AVM1 movie loaded afterwards. **So the rule is temporal
+> (attachment state), not static**, and no single gate can express it.
+> Two narrowing gates were built and measured as failures; do not build them a
+> third time. (a) `g_child_swf_init` — also covers MCL child init, so it fires for
+> both movies. (b) A dedicated first-frame flag — fails because our MCL drain runs
+> *nested inside* the child's frame-0 pass, which is the cross-VM ordering this
+> entry's original NO-GO already named. Reverted and re-verified at baseline.
+> This also re-confirms the s15/s16/s17 verdict that had been re-priced as cheap
+> twice: a `+1 effective` here is a **quality regression on the same row**.
+
 <!-- image-axis: none -->
 
 This test's directory ships **two** oracles: `output.txt` (Flash) and

@@ -23,10 +23,16 @@ phases:
     note: "Landed 2026-05-24: Function.prototype.apply's type-2 branch in actionCallMethod now sets g_call_this_type before invoking advanced_func (mirroring the .call path). SWF5 gate (g_swf_version >= 6) preserves SWF5's documented undefined-return behaviour. +2 lines on each of array-v6/v7/v8 (passes 592→594 / 573→575 / 573→575)."
   - id: 3
     name: "Sparse-array hasOwnProperty for densified indices"
-    status: pending
+    status: completed  # s20 w2-arraysort M1. NOTE: this phase's STATED root cause
+                       # ("densification put it in elements but not arr->props") was
+                       # WRONG. Real model: Array.sort's in-place quicksort permutes a
+                       # HOLE into the source slot, and own-ness is modelled as
+                       # elements[i] != HOLE. See patch 1's comment in action.c.
   - id: 4
     name: "sortOn(field, RETURNINDEXEDARRAY) length tracking + stability"
-    status: pending
+    status: split     # s20: array.as:260/:263 are FIXED (M1/M4). The remaining
+                      # :324/:325 belong to the M3 / ARRAY_V5 sort-UB entry, not
+                      # here -- see ACCEPTED_DIFFS.md and w2-arraysort-report.md §6.5.
   - id: 5
     name: "splice/concat/sort edge cases newly visible at SWF6+"
     status: pending
@@ -46,6 +52,11 @@ status_note: |
 -->
 
 ## Status
+
+> **STALE (four sessions old).** The table below is the 2026-05-15 picture. Current
+> ours-only residual after s20 `6b7486783` is **2 / 3 / 3** on v6 / v7 / v8, and the
+> ladder is ONE mechanism (M3) from +3 — `array-v5` promotes with it. The diff-line
+> index sets are strictly monotone vs that baseline (zero new differing lines).
 
 Local CI baseline (commit `eb8206f8`, 2026-05-15):
 
