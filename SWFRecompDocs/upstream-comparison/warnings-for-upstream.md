@@ -1,8 +1,11 @@
 # AVM1 Traps Ahead: Warnings for Upstream
 
-**Living document.** Last updated: July 4, 2026.
+**Living document.** Last updated: September 22, 2026 (previous: July 4, 2026).
 **Audience:** LittleCube / upstream contributors — written to be shared. Expanded
 from §5.2 of [`../merge/upstream-relationship-2026-07.md`](../merge/upstream-relationship-2026-07.md).
+**Delivery:** shared on the SWFRecomp Discord on July 4, 2026 and acknowledged.
+The September revision adds §1's correction, the post-July AVM1 findings in
+§§2, 6, 8, 11, and a new §12 (AVM2) for whenever upstream gets there.
 
 > **This is the deliverable LittleCube asked for** (July 2026): *"whatever
 > information you have about flash features that games will expect to behave in a
@@ -24,7 +27,12 @@ architecture. These are the *semantics*, which are.
 
 ---
 
-## 1. `super` (upstream's `super-var` branch is here now)
+## 1. `super`
+
+(July 2026 note: upstream's `super-var` branch was fighting this at the time;
+`super` has since shipped in master via PR #3, and `super-var` is abandoned.
+The rules below still apply — the second bullet in particular only shows up
+with multi-argument methods.)
 
 - **`super` is depth-based, not "call parent".** Each `super` invocation must
   resolve against the prototype chain *relative to where the currently executing
@@ -39,6 +47,10 @@ architecture. These are the *semantics*, which are.
   width/height in a real game's UI. Multi-arg + super is the test to write.
 - **SWF5 vs SWF6+ closure/scope capture differ**, and `super` preload flags in
   DefineFunction2 interact with it. Test both version gates.
+- **A `super` reference used as a *value* proxies the instance.** `super.m.apply(super, args)`
+  must bind `this` to the object `super` was resolved from, not to `_global` or
+  the prototype; we had it landing on `_global` until an AMF test called
+  through it (July 2026).
 
 ## 2. `removeMovieClip` and clip lifecycle
 
@@ -59,6 +71,14 @@ architecture. These are the *semantics*, which are.
 - **Duplicating over a live clip must fully reset the reused slot** (nested display
   lists, frame counters, current-frame state) — otherwise re-clone merges frame-1
   content onto stale state.
+- **Nothing may be freed the moment its refcount hits zero — if scripts can
+  hold uncounted references.** Directly relevant to a refcounted design: AVM1
+  locals and registers live in the generated function's C frame, so if any of
+  those are borrowed (ours are), dropping an object's last *counted* reference
+  mid-script frees memory the script can still name. We moved all destruction
+  to a tick-boundary drain (July 2026, after a use-after-free in a real game).
+  Your stack-integrated `PUSH_OBJ`/`POP` retains avoid the stack half of this;
+  the register/local half is worth an audit.
 
 ## 3. Virtual properties (`addProperty`) — the 65 budget
 
@@ -131,6 +151,16 @@ Trace tests barely touch this; games live in it.
 - **Method calls must bind `this` to the receiver for simple functions too**, not
   only register-based DefineFunction2 ones. Simple-function methods silently
   reading the *caller's* `this` works surprisingly often — until it doesn't.
+- **Every asynchronous dispatch site is a dispatch site.** When we finally
+  funnelled all ~129 call sites through one core (July 2026) it found six more
+  live bugs in paths nobody thinks of as "calling a function": the root
+  `onEnterFrame` running under the wrong SWF version, `onUnload` leaking its
+  parameters into the timeline scope, `valueOf` during numeric coercion missing
+  `this`, a sort comparator losing its captured scope, `Object.watch` callbacks
+  dropping their userData argument, and `LoadVars`' URL encoder. Thirteen
+  shipped bugs from one structural cause, total. If you keep one calling
+  convention (you do), keep it for timers, events, coercions, comparators and
+  watchers as well — not just `CallFunction`/`CallMethod`.
 
 ## 7. Case sensitivity is a *runtime mode*, not a constant (SWF ≤ 6)
 
@@ -172,6 +202,16 @@ test suites both depend on it. Two traps:
   densifies holes and moves a reassigned index to the *end* of enumeration
   order. When you implement Enumerate, the Ruffle/Gnash enumeration tests are
   the oracle to run early.
+- **`Array.shift` is a per-element native move with flag semantics** (July
+  2026): each reassigned index has its `ASSetPropFlags` reset and is
+  re-inserted at the end of enumeration order; a DontDelete index keeps its
+  value slot, flags and position but still gets overwritten; a move is blocked
+  only when the index is DontDelete *and* ReadOnly. Ruffle's `array_shift`
+  test is the oracle.
+- **`addProperty` creates an ordinary, *enumerable* property.** Only the
+  names `constructor` and `__proto__` are force-hidden by `setProperty`;
+  `addProperty` hides nothing. We had virtual properties invisible to `for..in`
+  until an AMF serialization test enumerated one.
 
 ## 9. Determinism for testing (adopt early — cheap now, expensive later)
 
@@ -235,6 +275,85 @@ Flash's internal numeric representation (float vs twips int) leaks into results.
 - **Duplicate label handling** in the recompiler (upstream hit this — `fc9664b`):
   real SWFs contain duplicate and forward-referenced labels; MTASC output and
   hand-authored content differ here.
+- **Array indices are integer-only.** Flash's array-index scanner accepts only
+  canonical non-negative integers: `arr[2.5] = x` and `arr["1e3"] = x` are
+  *named* properties and must not bump `length`. Also make sure capacity
+  arithmetic for `arr[hugeIndex] = x` is 64-bit — ours overflowed u32 into an
+  out-of-bounds write (July 2026).
+- **Geometry is integer twips.** Flash (and Ruffle's `Twips`, an `i32`) keeps
+  positions, bounds and mouse coordinates as whole twips. Carry doubles if you
+  like, but *quantize before any comparison* — tab-order and hit-test decisions
+  hinge on exact `<=` between edges, `localX`/`localY` are always an exact twip
+  count, and an "invalid bounds" sentinel is `0x7ffffff` on all four edges,
+  not the origin. Four separate defects in our input/focus work traced to this
+  one rule (July 2026).
+- **AMF0 serialization is channel-scoped** (relevant once you touch
+  `NetConnection`/`SharedObject`/`LocalConnection`): on the *wire* a native
+  Array whose keys are all indices is a StrictArray (`0x0A`), densified with
+  `undefined` for holes, at every nesting level, and one non-index key demotes
+  the whole value to ECMAArray (`0x08`); in *local* serialization (`ByteArray.
+  writeObject`, LSO bodies) it is always ECMAArray and sparse writes emit only
+  the present keys. Typed objects (`0x10`) nest, XML is `0x0F`, and a write
+  reference table counts only referenceable values. Ruffle gets three of these
+  wrong and marks the tests `known_failure`; Flash is the oracle, not Ruffle.
+- **Report the real host OS.** `System.capabilities.os` / `$version` must say
+  what the host actually is; content branches on it. Pin it for tests the way
+  you pin the clock (we use a `MOCK_PLATFORM` macro next to `MOCK_DATE_TIME`).
+
+## 12. AVM2 (ActionScript 3) — for when you get there
+
+Upstream has no AVM2 today, so this section is short and stays at the level of
+"design for this now". We built our AVM2 runtime July–September 2026 against
+Ruffle's avm2 corpus (1,278 tests) and Tamarin's acceptance suite (1,574); the
+traps below each cost a session.
+
+- **Private namespaces compare by identity, not name.** ASC emits one
+  `PrivateNamespace` pool entry per class, all with the same empty name. Compare
+  by pool-entry identity (per ABC file + index) or every class's privates alias
+  every other class's — `Base`'s method reads `Sub`'s shadowing slot.
+  Ruffle's `namespace.rs` says this outright.
+- **Dynamic property names that parse as canonical `uint`s become integer
+  keys** and enumerate *ahead of* string keys; `"00"` and `"-1"` stay strings.
+  Object literals set pairs last-first. Two graded outputs disagree about
+  "insertion order" until you see the key-class partition.
+- **Calling a class as a function is a one-argument coercion**: `C()` and
+  `C(a, b)` throw `ArgumentError #1112` — unless the class installs its own call
+  behavior (Array, String, Number/int/uint/Boolean, Error, Date, RegExp,
+  Function, Object, Vector, Namespace, QName, XML, XMLList all do). Static-only
+  classes (`JSON`, `Math`) are abstract: `new JSON()` throws `#2012`.
+- **Vector index errors are not version-gated.** A valid `uint` index out of
+  range is `RangeError #1125` at every SWF version; non-`uint` names keep the
+  versioned `#1069`/`#1056` behavior; `delete v[i]` is true, `delete v.length`
+  false. Ruffle gates `#1125` behind SWF 11 and is wrong.
+- **An accessor's two halves can be declared by different classes.** A subclass
+  may override only the setter and call `super.prop = v` inside it; if your
+  vtable entry stores one "defining class" for the pair, `super` resolves from
+  the wrong class. Keep a per-half binding.
+- **Builtin prototypes are instances with default primitives.**
+  `String.prototype.toString()` is `""`, `Number.prototype.valueOf()` is `0`.
+  A "coerce the receiver" implementation recurses to stack overflow when the
+  receiver is the prototype object itself — every ES3 method on a builtin
+  prototype needs a non-coercing guard.
+- **`null` is not `undefined` for optional object arguments.** AS3 code passes
+  explicit `null` for optional matrices/colorTransforms/clip rects constantly;
+  an `arg_present()` that only checks `undefined` then reads `.a` off `null` as
+  0/NaN and silently draws nothing. Test `bmp.draw(src, null, null)`.
+- **Sealed `Array` subclasses are version-gated** (avmplus bug 654807): SWF ≥ 13
+  gets no element storage; SWF ≤ 12 gets storage *and* sealed index access, so
+  the dense-path methods work and the generic-loop ones throw `#1069`.
+- **Loader timing is an executor drain, not "next frame".** A `load()` issued
+  in frame N resolves *after* frame N; a load started from the resulting
+  `complete` handler resolves in the same drain; `init`/`complete` fire inline
+  for images but one tick later for child SWFs. Three chained loads in two
+  ticks is a real test.
+- **The root SymbolClass binding is "any id that names no character"**, not
+  id 0 — obfuscated SWFs use other invalid ids. And the bound class must have
+  `Sprite` in its chain.
+- **Trace-first, then games.** Ruffle implements nearly all of `flash.*` in
+  ActionScript (~470 `.as` files / ~23K lines compiled into a playerglobal
+  SWF) with only native-flagged leaf methods in Rust; its build metadata is an
+  inventory of the minimal native surface an AVM2 host must provide. That is
+  the same shape as your AS2 prelude — the approach transfers.
 
 ---
 

@@ -2,7 +2,16 @@
 
 Analyses comparing SWFRecomp-CC ("downstream") with the upstream SWFRecomp org
 repositories, now that the two projects have settled into a permanent-friendly-fork
-relationship (see [`../merge/upstream-relationship-2026-07.md`](../merge/upstream-relationship-2026-07.md)).
+relationship (see [`../merge/upstream-relationship-2026-07.md`](../merge/upstream-relationship-2026-07.md);
+its §7 is the September 2026 status check — what was delivered, what upstream did
+since, and the corrected repository map).
+
+**Status at a glance (September 22, 2026):** upstream master has not moved since
+the July 3 merges; all new upstream work is a `mavlink` branch (ArduPilot SITL
+front-end). SWFRecomp-CC added a full AVM2 runtime and mirrored the whole
+upstream test corpus (98.2% effective of 4,437). The living docs below were
+refreshed for both facts; the AVM2 work is where upstream's interning and
+single-call-convention ideas were adopted.
 
 This directory answers questions of the form *"what would X buy us?"*, *"what does
 upstream do better?"*, *"what do we do better?"* — analysis, not merge planning.
@@ -36,8 +45,10 @@ tracking lives in `upstream/MERGE-ANALYSIS.md` (local-only, gitignored).
 - [`downstream-architecture-advantages.md`](downstream-architecture-advantages.md) —
   What this fork's architecture and process do better.
 - [`warnings-for-upstream.md`](warnings-for-upstream.md) — AVM1 traps upstream is
-  likely to hit as its coverage grows, with what we learned the hard way. Kept as a
+  likely to hit as its coverage grows, with what we learned the hard way, plus a
+  short AVM2 section (§12) for whenever upstream gets there. Kept as a
   **separate document** (rather than folded into the advantages docs) because its
-  audience is different: it is written to be shared with LittleCube, and it grows
-  over time as upstream tracking (`upstream/MERGE-ANALYSIS.md`) shows upstream
-  entering territory we have maps of.
+  audience is different: it is written to be shared with LittleCube (delivered
+  July 4, 2026, acknowledged), and it grows over time — from upstream tracking
+  (`upstream/MERGE-ANALYSIS.md`) when upstream enters territory we have maps of,
+  and from our own arcs otherwise (the September 2026 revision).

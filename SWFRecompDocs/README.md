@@ -1,8 +1,8 @@
 # SWFRecomp Documentation
 
-This repository contains documentation for the [SWFRecomp project](https://github.com/SWFRecomp/SWFRecomp), which aims to recompile Adobe Flash (SWF) content to C code.
+Documentation for SWFRecomp-CC, which recompiles Adobe Flash (SWF) content to C code. This directory began as the [SWFRecomp/SWFRecompDocs](https://github.com/SWFRecomp/SWFRecompDocs) repository (frozen November 2025) and has been maintained inside the combined [SWFRecomp-CC](https://github.com/PeerInfinity/SWFRecomp-CC) repository since. For how this project relates to LittleCube's upstream SWFRecomp, see [merge/README.md](merge/README.md).
 
-**Live Demos:** [https://swfrecomp.github.io/SWFRecompDocs/](https://swfrecomp.github.io/SWFRecompDocs/) - See Flash running as WebAssembly!
+**Live Demos:** [https://peerinfinity.github.io/SWFRecomp-CC/](https://peerinfinity.github.io/SWFRecomp-CC/) - Flash running as WebAssembly, plus an in-browser recompiler.
 
 ## Documentation Structure
 
@@ -38,17 +38,13 @@ Current project status and progress tracking (see [status/README.md](status/READ
 - **[project-status.md](status/project-status.md)** - Current status of the SWFRecomp project
 - **[2025-11-01-string-variable-implementation.md](status/2025-11-01-string-variable-implementation.md)** - String variable storage and optimization implementation summary
 
-### Merge Analyses
+### Upstream Relationship
 
-Branch merge documentation for coordinating updates across repositories (see [merge/README.md](merge/README.md) for details):
+How SWFRecomp-CC relates to the upstream SWFRecomp org repositories (see [merge/README.md](merge/README.md) for the repository map):
 
-**Branch Comparison Documents:**
-- **[swfrecomp-branch-differences.md](merge/swfrecomp-branch-differences.md)** - Complete diff analysis: SWFRecomp wasm-support vs master
-- **[swfmodernruntime-branch-differences.md](merge/swfmodernruntime-branch-differences.md)** - Complete diff analysis: SWFModernRuntime wasm-support vs master
-
-**Merge Analyses:**
-- **[swfrecomp-wasm-support-merge-analysis.md](merge/swfrecomp-wasm-support-merge-analysis.md)** - SWFRecomp wasm-support → master merge analysis
-- **[swfmodernruntime-wasm-support-merge-analysis.md](merge/swfmodernruntime-wasm-support-merge-analysis.md)** - SWFModernRuntime wasm-support → master merge analysis
+- **[merge/upstream-relationship-2026-07.md](merge/upstream-relationship-2026-07.md)** - The July 2026 decision: permanent friendly fork, knowledge exchange, no code merges; §7 is the running status check
+- **[upstream-comparison/](upstream-comparison/README.md)** - What each architecture does better, "what would X buy us?" analyses, and the trap map maintained for upstream (`warnings-for-upstream.md`)
+- **[deprecated/merge/](deprecated/merge/)** - Historical: the 2025 `wasm-support` branch comparisons and merge analyses from the original fork creation
 
 ### Reference
 

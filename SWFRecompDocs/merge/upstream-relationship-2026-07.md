@@ -258,3 +258,114 @@ LittleCube replied shortly after this document was shared. Answers recorded inli
 
 Upstream tracking history and per-update commit logs: `upstream/MERGE-ANALYSIS.md`
 (local-only, gitignored). Historical merge planning: this directory.
+
+---
+
+## 7. Status check — September 22, 2026
+
+Eleven weeks in. What the arrangement produced, what it didn't, and what changed
+on each side. (Tracking detail: `upstream/MERGE-ANALYSIS.md` §"September 22, 2026".)
+
+### 7.1 Delivery record
+
+| Item | Sent | Response |
+|---|---|---|
+| This document | Jul 2, Discord | Jul 4: friendly fork confirmed; answers recorded in §6 |
+| `upstream-comparison/README.md` + the four analyses | Jul 4, Discord | — |
+| [`warnings-for-upstream.md`](../upstream-comparison/warnings-for-upstream.md) (the §5.2 deliverable) | Jul 4, Discord, with the pointer that §4 (timeline/goto) is the RhythmPlanets-relevant part | Jul 4: *"awesome, tyvm"* |
+| [`plans/avm2-support-plan.md`](../plans/avm2-support-plan.md) §4 architecture sketch, with a specific ask for a reaction on the value/vtable layout (§4.2) before our Stage 2 locked it in | Jul 10, Discord | Jul 10: *"very cool, i'll read the doc later on and respond"*; Jul 12: *"no pressure either way, i'm caught up in some other stuff atm"*. **No reaction received**; Stage 2 locked in on Jul 11 (AVM2 went from nothing to over half the avm2 corpus in a day). |
+
+Not yet used: the **GitHub-issues channel** agreed in §6.4. Zero issues have been
+filed on the org repos since July — not because nothing was found, but because
+upstream did not enter any new AVM1 territory (see 7.2), so there was nothing
+behavioral to report against *their* code. Two small candidates now exist (a
+`trace()` string leak upstream acknowledges in its own commit message, and a
+string-literal escaper that misses cases real SWFs contain); they are logged in
+the tracking file to be filed.
+
+### 7.2 Upstream since July
+
+**Master has not moved in any SWFRecomp org repo since the July 3 squash merges.**
+All new work is on a `mavlink` branch (runtime 15 commits, recompiler 3,
+AS2Runtime 2; Aug 18 → Sep 8): SWFRecomp as a **simulation front-end for ArduPilot
+SITL over MAVLink** — UDP/TCP sockets (Linux + Windows), vendored MAVLink headers,
+yyjson, and `recompSITL*` natives exposed to AS2 through the prelude. Engine-level
+deltas are minor: the `Duplicate` opcode implemented, scope objects reused instead
+of re-allocated per call, the free thread now sleeps when idle, a renderer
+multisample fix. The abandoned `super-var` branch that the warnings doc's §1
+originally addressed is dead; `super` shipped in master via PR #3.
+
+Reading: upstream's near-term direction is **not** games or AVM1 breadth. That
+lowers the immediate value of the AVM1 trap map to them and raises the value of
+the things that *do* overlap — deterministic testing, the socket/serialization
+semantics (our net/socket arc, AMF0, `LocalConnection`, `XMLSocket`) and the
+platform-abstraction lessons from the WASM build. Nothing about the friendly-fork
+verdict changes.
+
+### 7.3 SWFRecomp-CC since July
+
+The §2 description of this fork — "the AVM1 semantics project" — is now too
+narrow. Since July 2:
+
+- **AVM2 (ActionScript 3) runtime** built from scratch under
+  `SWFModernRuntime/src/avm2/` (a separate module tree, not a second `action.c`),
+  from the July 10 plan: Ruffle's verifier/optimizer design as the AOT front-end,
+  interned multinames, slot/vtable lowering. Playable AVM2 games include Seedling,
+  Robot Wants Kitty and sequels, Elephant Quest, Snailiad, and a 235-title Flixel
+  survey.
+- **Full upstream corpus mirrored** (2026-07-24): 14 categories, no AVM filter,
+  including the 1,574 Tamarin acceptance tests (`from_avmplus`).
+- **Pass rates, CI of Sep 22, 2026 (graphics mode, effective = pass + ruffle_matched):**
+
+  | Suite | Effective |
+  |---|---|
+  | avm1 | 721 / 736 |
+  | avm2 | 1255 / 1278 |
+  | from_avmplus | 1570 / 1574 |
+  | from_gnash (5 sub-suites) | 375 / 403 |
+  | from_shumway (incl. avm1) | 225 / 229 |
+  | nine small categories | 210 / 217 |
+  | **Upstream corpus total** | **4356 / 4437 (98.2%)** |
+  | our own `regression` suite | 96 / 96 |
+
+- **Function-dispatch consolidation completed** (2026-07-17): every call path
+  runs through one `invokeFunctionValue()` core; the legacy dispatchers are
+  deleted. Upstream advantage #6 in the comparison doc is neutralized.
+- **In-browser recompiler** (`docs/recompiler/`, the recompiler itself compiled
+  to WASM; live since February) gained AVM2 support, and the demo gallery on
+  GitHub Pages now includes AVM2 titles.
+- **Net/socket arc**: AMF0/AMF3, `NetConnection.call`, `SharedObject`,
+  `LocalConnection` as a real wire channel, `XMLSocket`/`Socket` replay.
+
+Runtime `action.c` is ~79.8K lines (was ~75K); the AVM2 tree is another ~93K across 36 files.
+
+### 7.4 What the July offers (§5) look like now
+
+- **§5.1 investigation docs / §5.2 warnings** — delivered and acknowledged. The
+  warnings doc was refreshed in September with the post-July AVM1 findings and a
+  new AVM2 section (kept short; upstream has no AVM2 yet).
+- **§5.3 tests** — still deferred at LittleCube's request; nothing has changed
+  that would make suite runs meaningful for upstream yet (no `Enumerate`, no
+  text pipeline).
+- **§5.4 targeted PRs** — none warranted; see 7.1 for the two issue candidates.
+- **§3 "the one upstream idea we may adopt" (string-ID interning)** — still
+  planned, not started (`plans/string-id-interning-plan.md`). The June 2026
+  mitigations plus the GPU-bound profiles of the games we run kept it below the
+  line. AVM2 was built with interned multinames from day one, so the idea *was*
+  adopted — on the new VM, not retrofitted onto AVM1.
+
+### 7.5 Repository map (corrected)
+
+The READMEs in this repo still described a pre-July world (a "fork that
+regularly syncs with upstream", live-demo links into the org's frozen docs site,
+PR-vehicle forks presented as live). Corrected September 22, 2026:
+
+| Repository | Role today |
+|---|---|
+| `PeerInfinity/SWFRecomp-CC` (this repo) | The living fork. All work happens here, on `master`. |
+| `SWFRecomp/SWFRecomp`, `SWFRecomp/SWFModernRuntime` | Upstream; tracked read-only in `upstream/` (gitignored clones), never merged. |
+| `SWFRecomp/AS2Runtime`, `SWFRecomp/mtasc` | Upstream's AS2 prelude stdlib and the MTASC fork that compiles it. Tracked for design reference only; we use stock MTASC at `~/CC/mtasc` for test authoring. |
+| `SWFRecomp/RecompTemplate`, `SWFRecomp/RhythmPlanets*` | Upstream's game-recompilation template and first game target (idle since May/June). |
+| `SWFRecomp/libtess2` | Upstream's tessellator fork. We vendor libtess2 independently (recompile-time). |
+| `PeerInfinity/SWFRecomp`, `PeerInfinity/SWFModernRuntime` | **Historical.** The forks that carried the `wasm-support` branches (2025) and then hosted LittleCube's `feature/objects-and-functions` PR branches. Last push Jul 3, 2026. Their commit history is the only unsquashed record of PRs #3/#4. Not used for anything current. |
+| `SWFRecomp/SWFRecompDocs` | **Frozen** (Nov 5, 2025). The docs were flattened into this repo's `SWFRecompDocs/` on Nov 5, 2025 and have been maintained there since. |

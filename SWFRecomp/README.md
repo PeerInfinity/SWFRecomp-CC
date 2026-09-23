@@ -2,61 +2,36 @@
 
 Static recompiler for Adobe Flash SWF files - translates Flash bytecode into portable C code that can be compiled to native executables or WebAssembly.
 
-**Live Demos:** https://swfrecomp.github.io/SWFRecompDocs/
+**Live Demos:** https://peerinfinity.github.io/SWFRecomp-CC/ (including an [in-browser recompiler](https://peerinfinity.github.io/SWFRecomp-CC/recompiler/))
 
 ## What is This?
 
 SWFRecomp is a **static recompiler** (not an emulator) that converts Flash SWF files into C code. Inspired by [N64Recomp](https://github.com/N64Recomp/N64Recomp) by Wiseguy, this project applies the same approach to preserve Flash content.
 
-This fork adds:
-- **Improved build system** - Automated native and WASM builds with no manual file copying
-- **Better project structure** - Clean separation of source, generated, and build files
-- **Enhanced documentation** - Complete guides for the entire recompilation process
-- **WebAssembly examples** - Working demos that run in your browser
+This is the recompiler half of [SWFRecomp-CC](https://github.com/PeerInfinity/SWFRecomp-CC), forked in October 2025 from [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) by LittleCube. Since July 2026 the two are a **permanent friendly fork** — knowledge is exchanged, code is not merged in either direction; see [`../SWFRecompDocs/merge/upstream-relationship-2026-07.md`](../SWFRecompDocs/merge/upstream-relationship-2026-07.md). Relative to the October 2025 fork point this recompiler adds AVM2 (ActionScript 3 / ABC) recompilation, recompile-time shape tessellation, the emission modes used by the test corpus, a WebAssembly build of the recompiler itself, and the automated native and WASM build scripts under `scripts/`.
 
 ## Documentation
 
 ### This Repository
 
-**Core Documentation:**
-- **[TRACE_SWF_4_WASM_GENERATION_GUIDE.md](TRACE_SWF_4_WASM_GENERATION_GUIDE.md)** - Complete guide to the entire SWF → WASM pipeline
-- **[WASM_PROJECT_PLAN.md](WASM_PROJECT_PLAN.md)** - Detailed WASM development plan and roadmap
-- **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Current project status and progress
+The recompiler's documentation lives in the combined repo's [`SWFRecompDocs/`](../SWFRecompDocs/README.md) directory (the per-repo guide files that used to sit here moved there when the repositories were flattened in November 2025):
 
-**ActionScript 3 Support (Pure C):**
-- **[AS3_IMPLEMENTATION_GUIDE.md](AS3_IMPLEMENTATION_GUIDE.md)** - Complete AS3 implementation guide in pure C
-- **[SEEDLING_IMPLEMENTATION_GUIDE.md](SEEDLING_IMPLEMENTATION_GUIDE.md)** - Targeted AS3 implementation guide for Seedling game
-- **[ABC_PARSER_GUIDE.md](ABC_PARSER_GUIDE.md)** - Detailed guide for Phase 1: ABC Parser implementation
-- **[ABC_PARSER_RESEARCH.md](ABC_PARSER_RESEARCH.md)** - ABC format specification verification and license analysis
-- **[ABC_IMPLEMENTATION_INFO.md](ABC_IMPLEMENTATION_INFO.md)** - Complete reference for implementing ABC parser (codebase integration, opcodes, roadmap)
-- **[AS3_TEST_SWF_GENERATION_GUIDE.md](AS3_TEST_SWF_GENERATION_GUIDE.md)** - Guide for creating AS3 test SWF files using Flex SDK and AIR SDK
-
-**Font and Text Support:**
-- **[FONT_IMPLEMENTATION_ANALYSIS.md](FONT_IMPLEMENTATION_ANALYSIS.md)** - Complete analysis of font implementation status and requirements
-- **[FONT_PHASE1_IMPLEMENTATION.md](FONT_PHASE1_IMPLEMENTATION.md)** - Step-by-step guide for implementing Phase 1: Basic font support with DefineFontInfo parsing
-
-**Deprecated Documentation (Moved to deprecated/):**
-- **[deprecated/AS3_C_IMPLEMENTATION_PLAN.md](deprecated/AS3_C_IMPLEMENTATION_PLAN.md)** - Original AS3 plan with time estimates
-- **[deprecated/SEEDLING_C_IMPLEMENTATION_PLAN.md](deprecated/SEEDLING_C_IMPLEMENTATION_PLAN.md)** - Original Seedling plan with time estimates
-- **[deprecated/C_VS_CPP_ARCHITECTURE.md](deprecated/C_VS_CPP_ARCHITECTURE.md)** - Why SWFRecomp uses C++ for build tools and C for runtime
-- **[deprecated/AS3_IMPLEMENTATION_PLAN.md](deprecated/AS3_IMPLEMENTATION_PLAN.md)** - Full AS3 with C++
-- **[deprecated/SEEDLING_IMPLEMENTATION_PLAN.md](deprecated/SEEDLING_IMPLEMENTATION_PLAN.md)** - Seedling with C++
-- **[deprecated/SEEDLING_MANUAL_C_CONVERSION.md](deprecated/SEEDLING_MANUAL_C_CONVERSION.md)** - Manual AS3→C conversion for Seedling
-- **[deprecated/SEEDLING_MANUAL_CPP_CONVERSION.md](deprecated/SEEDLING_MANUAL_CPP_CONVERSION.md)** - Manual AS3→C++ conversion
-- **[deprecated/SYNERGY_ANALYSIS_C.md](deprecated/SYNERGY_ANALYSIS_C.md)** - How manual C conversion and SWFRecomp can work together
-- **[deprecated/SYNERGY_ANALYSIS.md](deprecated/SYNERGY_ANALYSIS.md)** - Synergy analysis with C++
+- **[trace-swf4-wasm-generation.md](../SWFRecompDocs/reference/trace-swf4-wasm-generation.md)** - Complete walkthrough of the SWF → C → WebAssembly pipeline
+- **[status/](../SWFRecompDocs/status/)** and **[plans/](../SWFRecompDocs/plans/README.md)** - Project status and plans
+- **[guides/](../SWFRecompDocs/guides/)** - Implementation guides (AS3/ABC, fonts, game debugging)
+- **[deprecated/](../SWFRecompDocs/deprecated/)** - Superseded plans kept for history
 
 **Build System:**
-- Each test directory has a `Makefile` and `build_wasm.sh` for automated builds
-- Runtime files are in `tests/*/runtime/` directories
+- `scripts/` holds the build scripts (`build_test.sh`, `deploy_example.sh`, `deploy_wasm_demo.sh`, ...)
+- `tests/` is the original hand-written suite; the Ruffle-derived corpus is under `../ruffle-tests/`
 
 ### SWFModernRuntime
 
-- **[README.md](https://github.com/PeerInfinity/SWFModernRuntime/tree/wasm-support/README.md)** - Main README file
+- **[../SWFModernRuntime/README.md](../SWFModernRuntime/README.md)** - The runtime, in the same repository
 
 ### Upstream
 
-- **[Upstream README](https://github.com/SWFRecomp/SWFRecomp/blob/master/README.md)** - Original SWFRecomp documentation
+- **[Upstream README](https://github.com/SWFRecomp/SWFRecomp/blob/master/README.md)** - LittleCube's SWFRecomp (tracked, not merged)
 
 ## Quick Start
 
@@ -213,10 +188,10 @@ Same as upstream SWFRecomp (check LICENSE file).
 
 ## Credits
 
-- **Upstream:** [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) by LittleCube
+- **Origin:** [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) by LittleCube
 - **Inspiration:** [N64Recomp](https://github.com/N64Recomp/N64Recomp) by Wiseguy
-- **Related:** [SWFModernRuntime](https://github.com/PeerInfinity/SWFModernRuntime) - Runtime for recompiled SWFs
+- **Related:** [SWFModernRuntime](../SWFModernRuntime/) - Runtime for recompiled SWFs (same repository)
 
 ---
 
-**Note:** This is a community fork. The upstream project (by LittleCube) provides the core recompilation engine. This fork adds improved build tooling, WASM support, and documentation.
+**Note:** This is a friendly fork. The upstream project (by LittleCube) is the architecture-first implementation of the same idea; this fork is the behavioral-parity implementation. The two exchange knowledge, not code.

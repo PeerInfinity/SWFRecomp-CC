@@ -1,7 +1,16 @@
 # Advantages of the Upstream Architecture
 
-**Living document.** Last updated: July 4, 2026 (upstream master `4e7c773` /
-`b17653d`, the merged objects-and-functions architecture).
+**Living document.** Last updated: September 22, 2026 (upstream master still
+`4e7c773` / `b17653d`, the merged objects-and-functions architecture; all
+post-July upstream work is on a `mavlink` branch — see §11). Previous update July 4, 2026.
+
+> **September 2026 scope note.** Every entry below compares *AVM1* runtimes.
+> SWFRecomp-CC has since built an AVM2 (ActionScript 3) runtime
+> (`SWFModernRuntime/src/avm2/`, ~93K lines, 36 files, 1255/1278 on Ruffle's avm2
+> corpus and 1570/1574 on Tamarin's acceptance suite as of Sep 22) that upstream
+> has no counterpart to. Where an upstream design idea was adopted *on the AVM2
+> side* rather than retrofitted onto AVM1, the entry says so — that happened for
+> #1, #2 and #6.
 
 What upstream's design does better than ours, with emphasis on problems **we
 demonstrably still carry that their architecture solves** — this document therefore
@@ -39,6 +48,14 @@ user-visible payoff: the profiled games are currently GPU-bound or frame-capped,
 so this buys CPU%/battery and headless throughput first, wall-clock FPS only on
 CPU-bound titles.
 
+**Status September 2026:** the AVM1 plan is still *planned, not started* — the
+June mitigations plus GPU-bound game profiles kept it below the line all summer.
+The idea was adopted wholesale on **AVM2** instead: multinames are interned at
+recompile time from the ABC constant pool, compile-time-known names lower to
+static slot/vtable indices (Ruffle's verifier/optimizer design), and only truly
+dynamic names go through a runtime intern table. So the deficiency this entry
+describes is now AVM1-only.
+
 ## 2. Ordered property storage (red-black tree) vs linear array
 
 **Their design:** rbtree keyed by string ID — O(log n) lookup/insert/delete.
@@ -57,7 +74,9 @@ path (see `plans/string-id-interning-plan.md`) therefore keys *comparison* by id
 but keeps the insertion-ordered array as storage.
 
 **Actionable:** Comparison-by-id yes (Stage 3 of the interning plan); the tree
-itself no.
+itself no. (AVM2 keeps a partitioned insertion-ordered dynamic-property list for
+the same reason — integer-spelled keys enumerate first, then strings in insertion
+order, which is what both avmplus and Ruffle do.)
 
 ## 3. All state in `app_context` — instantiability and re-entrancy
 
@@ -177,6 +196,17 @@ argument (`9a8c6dce3`), and setInterval callbacks running under the caller's SWF
 version instead of their own (`60070d96a`). Seven shipped bugs from one
 structural cause and counting.
 
+**Neutralized 2026-07-17.** The consolidation ran to completion over five
+sessions: every invocation point now goes through one `invokeFunctionValue()`
+core with per-site behavior expressed as flags; the last legacy dispatcher
+(`invokeSpecialFunction`) was deleted. Along the way it surfaced and fixed a
+further six instances (root `onEnterFrame` version switch, `onUnload` local
+frame leaking params to the timeline, `convertFloat` type-1 `this`, sort
+comparator captured scopes, `watch` userData delivery, `LoadVars` URL encoder)
+— **thirteen shipped bugs from one structural cause, total**, and the class is
+now closed by construction on our side too. AVM2 was built with a single call
+convention from the start.
+
 ## 7. Runtime-side tessellation (libtess2)
 
 **Their design:** Shapes are tessellated at runtime (`triangulation.c`, libtess2,
@@ -221,19 +251,36 @@ better starting point. Structural.
   growth discipline.
 - **Deliberate pre-merge hygiene** — upstream held a PR open ~4 months to finish
   consolidation before merging; the discipline itself is an asset.
+- **Scope-object reuse** (`mavlink` branch, Aug 2026): per-call scope objects are
+  pre-allocated at init and emptied on function exit instead of freed and
+  re-allocated. Small, but it removes an alloc/lock/release round trip from
+  every call. We allocate a fresh `var_map` per call; worth a look if AVM1
+  call overhead ever shows in a profile.
 
+## 11. Where upstream went after July (context, not an advantage)
+
+All upstream commits since the July 3 merges are on a `mavlink` branch (runtime
+15 commits, recompiler 3, AS2Runtime 2; Aug 18 → Sep 8, 2026): SWFRecomp used as
+a **simulation front-end for ArduPilot SITL over MAVLink** — a socket layer
+(Linux + Windows), vendored MAVLink headers, yyjson, and `recompSITL*` natives
+exposed to AS2 through the prelude. The engine deltas are minor (the `Duplicate`
+opcode, the scope reuse above, an idle sleep in the free thread, a renderer
+multisample fix). It tells us upstream's near-term optimization target is *not*
+game/AVM1 breadth, which is why the "issues in downstream that upstream has
+already fixed" list did not grow this quarter. Details:
+`upstream/MERGE-ANALYSIS.md` §"September 22, 2026".
 ---
 
 ## Summary table
 
 | # | Advantage | Solves a problem we measurably have? | Actionable for us? |
 |---|-----------|--------------------------------------|--------------------|
-| 1 | String-ID interning | **Yes** — name-lookup complex was 67%, still ~40% after landed mitigations | Yes (top candidate) |
-| 2 | rbtree properties | Yes — O(n) scans | Yes (with #1) |
+| 1 | String-ID interning | **AVM1 only** — name-lookup complex was 67%, still ~40% after landed mitigations; AVM2 interns from day one | Yes (AVM1 plan written, not started) |
+| 2 | rbtree properties | Yes — O(n) scans (AVM1) | Yes (with #1) |
 | 3 | app_context instantiability | Barely (see thread-safety analysis) | Deliberately declined |
 | 4 | GC + stack-integrated refcounts | **Neutralized 2026-07-04** — our root-traced collector shipped default-on; residual gap = reclamation promptness only | Done (differently) |
 | 5 | AS2 prelude stdlib | Partly — semantics-by-construction | Pattern only, for net-new surface |
-| 6 | Single calling convention | **Yes** — recurring arg-marshalling bug class | Yes (internal consolidation) |
+| 6 | Single calling convention | **Neutralized 2026-07-17** — one `invokeFunctionValue()` core, 13 bugs closed by construction | Done (differently) |
 | 7 | Uniform runtime tessellation | Partly — our morph/glyph paths still earcut | Trade-off |
 | 8 | Small modular codebase | Yes — monolith risk (duplicate-site bugs) | Mechanical split possible |
 | 9 | SDL3 platform layer | No (for current targets) | No |

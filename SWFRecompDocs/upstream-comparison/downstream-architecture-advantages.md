@@ -1,6 +1,6 @@
 # Advantages of the Downstream (SWFRecomp-CC) Architecture
 
-**Living document.** Last updated: July 4, 2026.
+**Living document.** Last updated: September 22, 2026 (previous: July 4, 2026).
 
 What this fork's architecture and process do better than upstream's. The flip side
 is [`upstream-architecture-advantages.md`](upstream-architecture-advantages.md).
@@ -11,9 +11,14 @@ the code as much as any structural choice, and it is the harder half to replicat
 
 ## 1. Proven behavioral parity — the asset everything else serves
 
-- **704 Ruffle AVM1 trace tests at 96.7% filtered pass rate**, plus the Gnash
-  (335 tests, 5 sub-suites) and Shumway (92 flat + 47 avm1) suites, plus 158
-  hand-written trace tests and 59 graphics tests — all in CI on every change.
+- **The full upstream corpus, 4,437 tests across 14 categories, at 98.2%
+  effective** (CI of Sep 22, 2026, graphics mode; effective = pass +
+  `ruffle_matched`). Per suite: avm1 721/736, avm2 1255/1278, Tamarin
+  `from_avmplus` 1570/1574, Gnash 375/403 over five sub-suites, Shumway
+  225/229, the nine small categories 210/217 — plus our own 96-test
+  `regression` suite at 96/96, and the 158 hand-written trace + 59 graphics
+  tests. All in CI on every change. (July 2026 figure for comparison: 704
+  AVM1 tests at 96.7% filtered; the corpus was AVM1-only then.)
 - The remaining diffs are *classified*, not merely failing: unfixable-by-design
   cases are documented in `ACCEPTED_DIFFS.md`, Ruffle-divergences-from-Flash in
   `RUFFLE_VS_FLASH_DIFFERENCES.md`, deliberate bug replication in
@@ -26,17 +31,31 @@ the code as much as any structural choice, and it is the harder half to replicat
 This is the moat. Architecture can be refactored; nine months of adversarially
 discovered AVM1 semantics cannot be re-derived quickly on any foundation.
 
-## 2. Full AVM1 surface area
+## 2. Full AVM1 surface area — and an AVM2 runtime
 
-Essentially the complete opcode set plus the built-in class library: Object, Array,
+Essentially the complete AVM1 opcode set plus the built-in class library: Object, Array,
 String, Number, Boolean, Date, Math, Function, MovieClip, TextField, TextFormat,
 TextField.StyleSheet-adjacent behaviors, Color, Transform/ColorTransform, Sound,
-XML/XMLNode, BitmapData, Selection, Key, Mouse, Stage — with the deep semantics
+XML/XMLNode, BitmapData, Selection, Key, Mouse, Stage, plus the net surface
+(AMF0, `NetConnection.call`, `SharedObject`, `LocalConnection` as a real wire
+channel, `XMLSocket`) — with the deep semantics
 attached: `super` depth-based dispatch, `__resolve`, `Object.registerClass`,
 `addProperty` virtual properties with Flash's re-entry budget, `with` scope, soft
 references, clip events, intervals/timeouts, drag, `tellTarget`, slash paths.
 Upstream is at the "Sound class started, DefineFont2 in progress" stage of this
 curve; we are at the long tail.
+
+**AVM2 (ActionScript 3), July–September 2026.** A second VM under
+`SWFModernRuntime/src/avm2/` (~93K lines, 36 files, deliberately *not* a second
+monolith): ABC front-end in the recompiler with Ruffle's verifier/optimizer
+design (resolved multinames, slot/vtable lowering), interned names, a
+class/trait/vtable object model, E4X, Vector, ByteArray with LZMA, JSON, RegExp
+via PCRE, AMF3, the display list and event model, Flash Text Engine, Loader,
+Stage3D stubs, and enough of `flash.*` to run Flixel/FlashPunk games. Built
+from a plan shared with upstream on July 10 (`plans/avm2-support-plan.md`);
+crossed half the avm2 corpus within a day of starting and sits at 1255/1278 +
+1570/1574 now. Upstream has no AVM2 work. Playable: Seedling, Robot Wants Kitty
+and its sequels, Elephant Quest, Snailiad, and a 235-title Flixel survey.
 
 ## 3. Three execution modes upstream doesn't have
 
@@ -49,7 +68,10 @@ curve; we are at the long tail.
 3. **Browser WASM** (emscripten + WebGPU) — the actual product target, with the
    perf work done to make it real: batched + retained-skip GPU uploads (57→3ms
    idle frame in Minesweeper), 8MB stack sizing, timer pumping, GPU readback
-   debugging hooks.
+   debugging hooks. Since February 2026 the **recompiler itself also runs in the
+   browser** (`docs/recompiler/`: drop a `.swf`, get C, or compile and run it
+   in-page with no toolchain) — the whole pipeline is deployable as static
+   files.
 
 Upstream renders via SDL3 GPU natively; it has no headless trace mode, no
 pixel-oracle harness, and no browser deployment. For a *correctness-first* project
@@ -62,7 +84,8 @@ these modes are the whole game.
 - **Sharded CI** (30-way) with regression detection *by name* (pass→fail surfaced
   per test), dispatchable per-mode, resumable pipeline state.
 - **Determinism as policy** — `Math.random` and `Date.getTime` seeded per test
-  (`MOCK_DATE_TIME`, matching Ruffle's `--deterministic`); two CI runs at the same
+  (`MOCK_DATE_TIME`, matching Ruffle's `--deterministic`), and the reported host
+  OS pinned the same way (`MOCK_PLATFORM`); two CI runs at the same
   SHA are byte-identical across all suites. "Flaky" therefore always means "real
   bug," which is worth more than it sounds.
 - **Game debugging tooling** — divergence harnesses (frame-exact trace comparison
@@ -138,8 +161,8 @@ hooks, injected scripts).
 
 | # | Advantage | Upstream's position |
 |---|-----------|---------------------|
-| 1 | Behavioral parity, classified diffs, playable games | Early on the same curve |
-| 2 | Full AVM1 opcode + builtin surface | ~10 builtin classes, growing |
+| 1 | Behavioral parity (98.2% of a 4,437-test corpus), classified diffs, playable games | Early on the same curve |
+| 2 | Full AVM1 opcode + builtin surface, **plus a complete AVM2 runtime** | ~10 AVM1 builtin classes; no AVM2 |
 | 3 | Headless / pixel-oracle / browser-WASM modes | SDL3 native only |
 | 4 | Test + debugging infrastructure, determinism policy | 56 test dirs, no harness |
 | 5 | Single-threaded deterministic model (WASM-friendly) | Threads + concurrent GC |

@@ -1,24 +1,26 @@
 # SWFModernRuntime
 
-WebAssembly port of [SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) by LittleCube.
+The runtime library of [SWFRecomp-CC](https://github.com/PeerInfinity/SWFRecomp-CC): executes the C code that the `SWFRecomp/` recompiler generates from Flash SWF files, natively (headless or with offscreen Dawn/WebGPU rendering) or as WebAssembly in the browser.
+
+Forked in October 2025 from [SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) by LittleCube. Since July 2026 the two are a **permanent friendly fork** — same idea, diverged architectures, knowledge exchanged but no code merged in either direction. See [`../SWFRecompDocs/merge/upstream-relationship-2026-07.md`](../SWFRecompDocs/merge/upstream-relationship-2026-07.md) for the decision and status, and [`../SWFRecompDocs/upstream-comparison/`](../SWFRecompDocs/upstream-comparison/) for what each side's architecture does better.
 
 ## What is This?
 
-This fork adds **WebAssembly compilation support** to SWFModernRuntime, enabling Flash SWF files to run natively in web browsers without Flash Player or emulation.
+This runtime contains an AVM1 (ActionScript 1/2) implementation in `src/actionmodern/`, an AVM2 (ActionScript 3) implementation in `src/avm2/`, the SWF tag/display-list layer in `src/libswf/`, and rendering in `src/rendering/` (native offscreen via Dawn, browser via emscripten + WebGPU). It runs the full Ruffle, Gnash, Shumway and Tamarin test corpora in CI.
 
-**Live Demos:** https://swfrecomp.github.io/SWFRecompDocs/
+**Live Demos:** https://peerinfinity.github.io/SWFRecomp-CC/
 
 ## Documentation
 
-See the [SWFRecompDocs](https://github.com/SWFRecomp/SWFRecompDocs) repository for comprehensive documentation:
+Everything lives in the combined repo's [`SWFRecompDocs/`](../SWFRecompDocs/README.md) directory (the upstream `SWFRecompDocs` repository it descends from has been frozen since November 2025):
 
-- **[Live Demos](https://swfrecomp.github.io/SWFRecompDocs/)** - See working examples
-- **[Reference Guides](https://github.com/SWFRecomp/SWFRecompDocs/tree/master/reference)** - Technical documentation
-- **[Implementation Guides](https://github.com/SWFRecomp/SWFRecompDocs/tree/master/guides)** - Step-by-step guides
+- **[Session start guide](../ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md)** - Architecture, how to run tests, infrastructure
+- **[Reference](../SWFRecompDocs/reference/)** - Technical documentation
+- **[Guides](../SWFRecompDocs/guides/)** - Step-by-step guides
 
 **Related Repositories:**
-- **[SWFRecomp](https://github.com/SWFRecomp/SWFRecomp)** - The static recompiler
-- **[Upstream SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime)** - Original runtime by LittleCube
+- **[SWFRecomp/](../SWFRecomp/)** - The static recompiler (same repo)
+- **[SWFRecomp/SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime)** - Upstream runtime by LittleCube (SDL3, concurrent GC, AS2-prelude stdlib) — tracked, not merged
 
 ## Quick Demo
 
@@ -99,29 +101,22 @@ This runtime is used by [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) when
 - **Memory Management**: Proper heap allocation and cleanup
 - **Ownership Tracking**: No memory leaks or dangling pointers
 
-See the [branch differences document](https://github.com/SWFRecomp/SWFRecompDocs/blob/master/merge/swfmodernruntime-branch-differences.md) for complete technical details.
+See the [branch differences document](../SWFRecompDocs/deprecated/merge/swfmodernruntime-branch-differences.md) (historical, November 2025) for the details of that first divergence.
 
-## Upstream Sync
+## Upstream
 
-This fork regularly syncs with [upstream](https://github.com/SWFRecomp/SWFModernRuntime):
-
-```bash
-git fetch upstream
-git merge upstream/master
-```
-
-All WASM code is in separate directories to minimize merge conflicts.
+There is no sync. Upstream is tracked read-only in the combined repo's gitignored `upstream/` clones (`upstream/MERGE-ANALYSIS.md` is the log); behavioral findings about upstream's code are reported as GitHub issues on the org repo, per the arrangement agreed with LittleCube in July 2026.
 
 ## License
 
-Same as upstream SWFModernRuntime (check upstream LICENSE file).
+Same as upstream SWFModernRuntime (see [LICENSE](LICENSE)).
 
 ## Credits
 
-- **Upstream:** [SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) by LittleCube
-- **Upstream:** [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) by LittleCube
+- **Origin:** [SWFModernRuntime](https://github.com/SWFRecomp/SWFModernRuntime) by LittleCube
+- **Origin:** [SWFRecomp](https://github.com/SWFRecomp/SWFRecomp) by LittleCube
 - **Inspiration:** [N64Recomp](https://github.com/N64Recomp/N64Recomp) by Wiseguy
 
 ---
 
-**Note:** This is a community fork. The upstream project (by LittleCube) focuses on native runtime development. WASM support is maintained independently but syncs regularly with upstream improvements.
+**Note:** This is a friendly fork. The upstream project (by LittleCube) is the architecture-first implementation of the same idea; this fork is the behavioral-parity implementation. The two exchange knowledge, not code.
