@@ -223,7 +223,16 @@ tolerance = 5          # per-channel difference threshold (0-255)
 max_outliers = 100     # max channels allowed to exceed tolerance
 ```
 
-Multiple check configs can be provided; the test passes if ANY check passes.
+Multiple check configs can be provided (`[[image_comparisons.NAME.checks]]`);
+the comparison passes only if **ALL** applicable checks pass, matching Ruffle's
+`tests/framework/src/runner/image_test.rs` (it returns on the first failing
+check). A check may carry a `filter` (cfg-like expression over `os`/`arch`/
+`family`, e.g. `filter = 'not(os = "macos")'`); checks whose filter does not
+match the grading platform are skipped, and a comparison with no applicable
+check fails ("No checks executed"). We grade as Linux x86_64 (CI's platform)
+on every host; override with `SWFRECOMP_IMAGE_FILTER_OS/_ARCH/_FAMILY`.
+(Before s21, 2026-09-28, `verify_output.py` wrongly passed a comparison when
+ANY check passed and ignored `filter`.)
 
 ### Expected images
 

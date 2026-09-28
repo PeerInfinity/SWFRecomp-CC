@@ -975,3 +975,23 @@ collateral from the EditText border-corner fix.
 - **A band that worsens is not automatically a regression.** `stage3d_bitmap` +59 % is the
   expected consequence of a fix working upstream of an unfixed defect. Say which, with the
   mechanism, or the next session will bisect it.
+
+### s21 correction: multi-check comparisons are ALL, not ANY (2026-09-28)
+
+Until s21, `verify_output.compare_images` passed a comparison if **any** of its
+`[[image_comparisons.X.checks]]` passed, and it ignored each check's `filter`. Ruffle
+(`tests/framework/src/runner/image_test.rs::test`) requires **every** applicable check to pass:
+it returns on the first failing one, skips checks whose `filter` (cfg-like, over
+`os`/`arch`/`family`) excludes the platform, and fails with "No checks executed" if none apply.
+The s14/s15 reports and earlier sections here that say "passes if ANY check passes" are wrong;
+this note does not rewrite them. `verify_output.py` now grades ALL + `filter` (pinned to Linux
+x86_64, CI's platform) and records per-check stats (`checks`, `failed_checks`,
+`applicable_checks`) in the image JSON. For multi-check rows the flat `outliers` /
+`max_outliers` / `excess_outliers` now name the failing check furthest past its budget, so
+the 11 multi-check comparisons that already failed can **band-move** with no render change.
+`image_status_diff.py` prints a GRADING SEMANTICS banner when one side is pre-s21 and tags
+multi-check pass -> fail rows `[ANY->ALL, render unchanged]`.
+**Price: 413 -> 408 (-5), a baseline correction, not a regression.** Each local render matched
+CI's stored `max_diff` and `diff_channels` exactly. The five: `from_shumway/acid/acid-clip`,
+`acid/acid-bitmapData-draw`, `acid/acid-shapes`, `acid/acid-small [output.01]`, and
+`visual/cache_as_bitmap/text`. Detail: `session21-fanout-reports/w2-image-semantics-report.md`.

@@ -712,7 +712,10 @@ def work(job):
     keep = ("suite", "test", "comparison", "trace_status", "known_failure",
             "reason", "max_diff", "outliers", "max_outliers", "excess_outliers",
             "total_channels", "diff_channels", "mean_diff", "width", "height",
-            "_git_sha")
+            "_git_sha",
+            # Per-check grading (s21+, ALL-checks semantics). Absent (None)
+            # on rows from pre-s21 image runs.
+            "tolerance", "checks", "applicable_checks", "failed_checks")
     return {**{k: row.get(k) for k in keep},
             "cluster": cluster, "why": why,
             "actual_png": str(a), "expected_png": str(e),
@@ -1113,6 +1116,13 @@ def emit_explain(rows, sel):
               f"trace={r['trace_status']}")
         print(f"  outliers  {r['outliers']} / budget {r['max_outliers']} "
               f"-> excess {r['excess_outliers']}   max_diff {r['max_diff']}")
+        for i, c in enumerate(r.get("checks") or []):
+            verdict = ("skipped (filter)" if c.get("skipped")
+                       else "pass" if c.get("passed") else "FAIL")
+            flt = f"   filter {c['filter']}" if c.get("filter") else ""
+            print(f"  check {i}   tol {c.get('tolerance')}: "
+                  f"{c.get('outliers', '-')} / {c.get('max_outliers')}  "
+                  f"{verdict}{flt}")
         print(f"  actual    {r['actual_png']}")
         print(f"  expected  {r['expected_png']}")
         for k, v in sorted(r["features"].items()):

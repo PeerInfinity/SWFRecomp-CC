@@ -938,7 +938,8 @@ def rebuild_json_from_disk(tests, json_path):
                 }
                 continue
             passed, message, max_diff, _stats = compare_images(
-                actual, expected, cmp_cfg["checks"])
+                actual, expected, cmp_cfg["checks"],
+                config_error=cmp_cfg.get("config_error"))
             # compare_images derives the diff PNG path from actual.stem,
             # which here is "<cmp>.actual" (because we feed it the
             # test-dir-resident copy), so the diff lands at

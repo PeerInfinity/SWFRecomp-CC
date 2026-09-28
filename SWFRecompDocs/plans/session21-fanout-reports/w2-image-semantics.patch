@@ -1,0 +1,537 @@
+diff --git a/SWFRecompDocs/plans/graphics-fanout-playbook.md b/SWFRecompDocs/plans/graphics-fanout-playbook.md
+index 3d3e513d5..ad4195a48 100644
+--- a/SWFRecompDocs/plans/graphics-fanout-playbook.md
++++ b/SWFRecompDocs/plans/graphics-fanout-playbook.md
+@@ -975,3 +975,23 @@ collateral from the EditText border-corner fix.
+ - **A band that worsens is not automatically a regression.** `stage3d_bitmap` +59 % is the
+   expected consequence of a fix working upstream of an unfixed defect. Say which, with the
+   mechanism, or the next session will bisect it.
++
++### s21 correction: multi-check comparisons are ALL, not ANY (2026-09-28)
++
++Until s21, `verify_output.compare_images` passed a comparison if **any** of its
++`[[image_comparisons.X.checks]]` passed, and it ignored each check's `filter`. Ruffle
++(`tests/framework/src/runner/image_test.rs::test`) requires **every** applicable check to pass:
++it returns on the first failing one, skips checks whose `filter` (cfg-like, over
++`os`/`arch`/`family`) excludes the platform, and fails with "No checks executed" if none apply.
++The s14/s15 reports and earlier sections here that say "passes if ANY check passes" are wrong;
++this note does not rewrite them. `verify_output.py` now grades ALL + `filter` (pinned to Linux
++x86_64, CI's platform) and records per-check stats (`checks`, `failed_checks`,
++`applicable_checks`) in the image JSON. For multi-check rows the flat `outliers` /
++`max_outliers` / `excess_outliers` now name the failing check furthest past its budget, so
++the 11 multi-check comparisons that already failed can **band-move** with no render change.
++`image_status_diff.py` prints a GRADING SEMANTICS banner when one side is pre-s21 and tags
++multi-check pass -> fail rows `[ANY->ALL, render unchanged]`.
++**Price: 413 -> 408 (-5), a baseline correction, not a regression.** Each local render matched
++CI's stored `max_diff` and `diff_channels` exactly. The five: `from_shumway/acid/acid-clip`,
++`acid/acid-bitmapData-draw`, `acid/acid-shapes`, `acid/acid-small [output.01]`, and
++`visual/cache_as_bitmap/text`. Detail: `session21-fanout-reports/w2-image-semantics-report.md`.
+diff --git a/ruffle-tests/run_image_tests.py b/ruffle-tests/run_image_tests.py
+index 719f05753..0b73b25ba 100755
+--- a/ruffle-tests/run_image_tests.py
++++ b/ruffle-tests/run_image_tests.py
+@@ -938,7 +938,8 @@ def rebuild_json_from_disk(tests, json_path):
+                 }
+                 continue
+             passed, message, max_diff, _stats = compare_images(
+-                actual, expected, cmp_cfg["checks"])
++                actual, expected, cmp_cfg["checks"],
++                config_error=cmp_cfg.get("config_error"))
+             # compare_images derives the diff PNG path from actual.stem,
+             # which here is "<cmp>.actual" (because we feed it the
+             # test-dir-resident copy), so the diff lands at
+diff --git a/ruffle-tests/tests/swfs/_investigation/HEADLESS_SETUP.md b/ruffle-tests/tests/swfs/_investigation/HEADLESS_SETUP.md
+index 09f18352d..005c7296d 100644
+--- a/ruffle-tests/tests/swfs/_investigation/HEADLESS_SETUP.md
++++ b/ruffle-tests/tests/swfs/_investigation/HEADLESS_SETUP.md
+@@ -223,7 +223,16 @@ tolerance = 5          # per-channel difference threshold (0-255)
+ max_outliers = 100     # max channels allowed to exceed tolerance
+ ```
+ 
+-Multiple check configs can be provided; the test passes if ANY check passes.
++Multiple check configs can be provided (`[[image_comparisons.NAME.checks]]`);
++the comparison passes only if **ALL** applicable checks pass, matching Ruffle's
++`tests/framework/src/runner/image_test.rs` (it returns on the first failing
++check). A check may carry a `filter` (cfg-like expression over `os`/`arch`/
++`family`, e.g. `filter = 'not(os = "macos")'`); checks whose filter does not
++match the grading platform are skipped, and a comparison with no applicable
++check fails ("No checks executed"). We grade as Linux x86_64 (CI's platform)
++on every host; override with `SWFRECOMP_IMAGE_FILTER_OS/_ARCH/_FAMILY`.
++(Before s21, 2026-09-28, `verify_output.py` wrongly passed a comparison when
++ANY check passed and ignored `filter`.)
+ 
+ ### Expected images
+ 
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/TEST_HARNESS_COMPARISON.md b/ruffle-tests/tests/swfs/avm1/_investigation/TEST_HARNESS_COMPARISON.md
+index 18dda6010..8088c0362 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/TEST_HARNESS_COMPARISON.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/TEST_HARNESS_COMPARISON.md
+@@ -49,7 +49,8 @@ tolerance = 0                # Per-channel pixel tolerance (0-255)
+ max_outliers = 0             # Max pixels exceeding tolerance
+ trigger = "last_frame"       # When to capture
+ 
+-# Multiple checks per comparison (test passes if ANY check passes)
++# Multiple checks per comparison (test passes only if ALL applicable checks pass;
++# a check may carry filter = 'os = "macos"' etc. to apply on one platform only)
+ [[image_comparisons.output.checks]]
+ tolerance = 0
+ max_outliers = 5200
+@@ -81,7 +82,9 @@ max_outliers = 1500
+ 3. For each pixel, compute per-channel absolute difference
+ 4. Count outlier channels (any channel difference > tolerance)
+ 5. If outlier count ≤ `max_outliers`, the check passes
+-6. Multiple `[[checks]]` entries: test passes if ANY check passes
++6. Multiple `[[checks]]` entries: test passes only if ALL applicable checks pass
++   (checks whose `filter` excludes the platform are skipped; zero applicable
++   checks is an error). Corrected s21 (2026-09-28) — this line used to say ANY.
+ 7. On failure, generates difference images (`*.difference-color-*.png`, `*.difference-alpha-*.png`)
+ 
+ **Key detail:** Tests can have BOTH trace output comparison AND image comparison simultaneously. They are independent checks — both must pass for the test to pass.
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 34e6a2783..e1ff82ef2 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -208,10 +208,13 @@ def parse_image_comparisons(test_dir):
+       - max_outliers (default 0): max channels allowed to exceed tolerance
+       - trigger (default "last_frame"): when to capture ("last_frame", "fs_command", or int)
+       - known_failure (default false): whether the comparison is expected to fail
+-      - checks: list of {tolerance, max_outliers} dicts (advanced mode)
++      - checks: list of {tolerance, max_outliers[, filter]} dicts (advanced
++        mode). EVERY applicable check must pass (Ruffle semantics); `filter`
++        is a cfg-like platform gate, see `evaluate_check_filter`.
+ 
+-    If both simple (tolerance/max_outliers) and advanced (checks) are specified,
+-    the simple values are used as a single check.
++    If both simple (tolerance/max_outliers) and advanced (checks) are
++    specified, Ruffle rejects the comparison. We keep the simple values as a
++    single check and set `config_error`, which makes compare_images() fail it.
+ 
+     Returns a dict of comparison_name -> {checks: [...], trigger: ..., known_failure: bool}
+     or empty dict if no image comparisons are configured.
+@@ -260,12 +263,19 @@ def parse_image_comparisons(test_dir):
+             trigger = ("last_frame",)
+ 
+         # Parse checks: either simple (tolerance/max_outliers at top level)
+-        # or advanced (list of check dicts under "checks" key)
++        # or advanced (list of check dicts under "checks" key). Mirrors
++        # Ruffle's `ImageComparison::checks()`
++        # (tests/framework/src/options/image_comparison.rs).
+         checks_raw = config.get("checks", [])
+         has_simple = "tolerance" in config or "max_outliers" in config
++        config_error = None
+ 
+         if has_simple and checks_raw:
+-            # Ruffle treats this as an error; we use simple values only
++            # Ruffle rejects this outright ("Both simple and advanced checks
++            # are defined") and the comparison fails. Keep the simple values
++            # so the stats stay informative, but record the error so
++            # compare_images() fails the comparison the way Ruffle does.
++            config_error = "simple_and_advanced_checks"
+             checks = [{
+                 "tolerance": config.get("tolerance", 0),
+                 "max_outliers": config.get("max_outliers", 0),
+@@ -274,10 +284,15 @@ def parse_image_comparisons(test_dir):
+             checks = []
+             for c in checks_raw:
+                 if isinstance(c, dict):
+-                    checks.append({
++                    check = {
+                         "tolerance": c.get("tolerance", 0),
+                         "max_outliers": c.get("max_outliers", 0),
+-                    })
++                    }
++                    # Per-check platform gate (cfg-like expression over
++                    # os/arch/family), evaluated in compare_images().
++                    if c.get("filter") is not None:
++                        check["filter"] = str(c["filter"])
++                    checks.append(check)
+             if not checks:
+                 checks = [{"tolerance": 0, "max_outliers": 0}]
+         else:
+@@ -291,6 +306,8 @@ def parse_image_comparisons(test_dir):
+             "trigger": trigger,
+             "known_failure": known_failure,
+         }
++        if config_error:
++            result[name]["config_error"] = config_error
+ 
+     return result
+ 
+@@ -354,14 +371,96 @@ def resolve_expected_filename(test_dir, suffix_override=None):
+     return best_output_path
+ 
+ 
+-def compare_images(actual_path, expected_path, checks):
++# Platform the per-check `filter` expressions are evaluated against. Ruffle
++# evaluates them against the host's `std::env::consts` (OS/ARCH/FAMILY); our
++# grading platform is CI's Linux x86_64 (lavapipe), and pinning it keeps a
++# local run on any host grading exactly like CI. Override only to ask "what
++# would Ruffle on <platform> require" (e.g. SWFRECOMP_IMAGE_FILTER_OS=macos).
++IMAGE_FILTER_PLATFORM = {
++    "os": os.environ.get("SWFRECOMP_IMAGE_FILTER_OS", "linux"),
++    "arch": os.environ.get("SWFRECOMP_IMAGE_FILTER_ARCH", "x86_64"),
++    "family": os.environ.get("SWFRECOMP_IMAGE_FILTER_FAMILY", "unix"),
++}
++
++
++def evaluate_check_filter(expr, platform=None):
++    """Evaluate a Ruffle `TestExpression` (cfg-like) image-check filter.
++
++    Grammar (the subset of `cfg_expr` Ruffle's tests use): `key = "value"`,
++    `all(e, ...)`, `any(e, ...)`, `not(e)`. Keys are `os`, `arch` and
++    `family`; any other predicate is an error in Ruffle
++    (tests/framework/src/options/expression.rs), and raises ValueError here.
++    Returns True when the check applies on `platform`.
++    """
++    platform = platform or IMAGE_FILTER_PLATFORM
++    tokens = re.findall(r'\s*(?:([A-Za-z_][A-Za-z0-9_]*)|("(?:[^"\\]|\\.)*")|(.))', expr)
++    toks = []
++    for ident, string, punct in tokens:
++        if ident:
++            toks.append(("id", ident))
++        elif string:
++            toks.append(("str", string[1:-1]))
++        elif punct.strip():
++            toks.append(("p", punct))
++    pos = 0
++
++    def peek():
++        return toks[pos] if pos < len(toks) else (None, None)
++
++    def expect(kind, val=None):
++        nonlocal pos
++        k, v = peek()
++        if k != kind or (val is not None and v != val):
++            raise ValueError(f"Cannot parse expression {expr!r} at token {pos}")
++        pos += 1
++        return v
++
++    def parse():
++        name = expect("id")
++        if name in ("all", "any", "not"):
++            expect("p", "(")
++            args = []
++            while peek() != ("p", ")"):
++                args.append(parse())
++                if peek() == ("p", ","):
++                    expect("p", ",")
++                else:
++                    break
++            expect("p", ")")
++            if name == "not":
++                if len(args) != 1:
++                    raise ValueError(f"not() takes one argument: {expr!r}")
++                return not args[0]
++            return all(args) if name == "all" else any(args)
++        if peek() == ("p", "="):
++            expect("p", "=")
++            val = expect("str")
++            if name not in platform:
++                raise ValueError(f"Unknown predicate used in expression: {name}")
++            return platform[name] == val
++        raise ValueError(f"Unknown predicate used in expression: {name}")
++
++    result = parse()
++    if pos != len(toks):
++        raise ValueError(f"Cannot parse expression {expr!r}: trailing tokens")
++    return result
++
++
++def compare_images(actual_path, expected_path, checks, config_error=None):
+     """Compare two PNG images using Ruffle's per-pixel per-channel algorithm.
+ 
+     Args:
+         actual_path: Path to the actual (rendered) PNG image.
+         expected_path: Path to the expected PNG image.
+-        checks: List of dicts with 'tolerance' (int, 0-255) and 'max_outliers' (int).
+-                Test passes if ANY check passes.
++        checks: List of dicts with 'tolerance' (int, 0-255), 'max_outliers'
++                (int) and optional 'filter' (cfg-like platform expression).
++                The comparison passes only if EVERY applicable check passes
++                (Ruffle's `image_test.rs::test` returns on the first failing
++                check). Checks whose filter does not match the grading
++                platform are skipped; if none remain, the comparison fails
++                ("No checks executed"), as in Ruffle.
++        config_error: set by parse_image_comparisons() for a test.toml Ruffle
++                itself rejects; fails the comparison (stats still computed).
+ 
+     Returns:
+         (passed: bool, message: str, max_diff: int, stats: dict)
+@@ -371,13 +470,22 @@ def compare_images(actual_path, expected_path, checks):
+     verdict). It is always a dict; on an early bail-out (no Pillow, missing
+     file, size mismatch) it holds only `error`.
+ 
++    Per-check stats land in `stats["checks"]` (one dict per configured check:
++    tolerance, max_outliers, outliers, passed, and filter/skipped for a
++    platform-gated check), plus `failed_checks` / `applicable_checks`. The
++    flat `outliers` / `max_outliers` / `tolerance` / `excess_outliers` keys
++    keep their old meaning for single-check comparisons; for multi-check
++    ones they name the BINDING check: on a fail, the failing check furthest
++    past its budget (largest excess); on a pass, the check with the least
++    slack (excess_outliers is 0).
++
+     Algorithm (matching Ruffle):
+     1. Both images are converted to RGBA.
+     2. Dimensions must match exactly.
+     3. Per-pixel, per-channel absolute difference is computed (4 channels: R, G, B, A).
+-    4. For each check: count how many individual channels exceed the tolerance.
+-       If the count <= max_outliers, the check passes.
+-    5. The test passes if any check passes.
++    4. For each applicable check: count how many individual channels exceed
++       the tolerance. If the count <= max_outliers, the check passes.
++    5. The comparison passes only if ALL applicable checks pass.
+     6. max_diff is the maximum single-channel difference across all pixels.
+     """
+     if not HAS_PIL:
+@@ -480,47 +588,91 @@ def compare_images(actual_path, expected_path, checks):
+         except Exception:
+             pass
+ 
+-    # Try each check -- test passes if ANY check passes (Ruffle semantics)
+-    best_outliers = None
+-    best_max_outliers = None
+-    best_tolerance = None
++    # Grade every check -- the comparison passes only if ALL applicable checks
++    # pass (Ruffle's image_test.rs returns on the first failing check; a
++    # check whose `filter` excludes the grading platform is skipped). All
++    # checks are evaluated, not just up to the first failure, so the stats
++    # show every check's outcome.
++    # Outliers at tolerance t = channels whose diff > t; one histogram of the
++    # channel diffs answers every check exactly.
++    hist = [0] * 256
++    for d in difference_data:
++        hist[d] += 1
++    above = [0] * 256          # above[t] = channels with diff > t
++    running = 0
++    for t in range(255, -1, -1):
++        above[t] = running
++        running += hist[t]
++
++    check_stats = []
++    failed = []
++    passed_checks = []
+     for check in checks:
+-        tolerance = check["tolerance"]
+-        max_outliers = check["max_outliers"]
+-
+-        # Count outlier channels (each channel independently, matching Ruffle)
+-        outliers = 0
+-        for px in range(num_pixels):
+-            base = px * 4
+-            outliers += (difference_data[base] > tolerance)
+-            outliers += (difference_data[base + 1] > tolerance)
+-            outliers += (difference_data[base + 2] > tolerance)
+-            outliers += (difference_data[base + 3] > tolerance)
+-
+-        if outliers <= max_outliers:
+-            stats.update(outliers=outliers, max_outliers=max_outliers,
+-                         tolerance=tolerance, excess_outliers=0)
+-            return (True,
+-                    f"Image check passed: {outliers} outliers (limit {max_outliers}), "
+-                    f"max difference {max_diff}",
+-                    max_diff, stats)
+-
+-        # Track the closest failing check for the error message
+-        if best_outliers is None or outliers < best_outliers:
+-            best_outliers = outliers
+-            best_max_outliers = max_outliers
+-            best_tolerance = tolerance
+-
+-    # All checks failed. The difference image was already saved above
+-    # (or skipped, if max_diff was 0 — which can't happen on a fail).
+-    # `excess_outliers` is the near-miss axis the baseline report bins on:
+-    # how far past its own budget this comparison went, not how far from zero.
+-    stats.update(outliers=best_outliers, max_outliers=best_max_outliers,
+-                 tolerance=best_tolerance,
+-                 excess_outliers=best_outliers - best_max_outliers)
+-    return (False,
+-            f"Image comparison failed: {best_outliers} outliers exceed limit of "
+-            f"{best_max_outliers}, max difference {max_diff}",
++        tolerance = int(check["tolerance"])
++        max_outliers = int(check["max_outliers"])
++        cs = {"tolerance": tolerance, "max_outliers": max_outliers}
++        flt = check.get("filter")
++        if flt is not None:
++            cs["filter"] = flt
++            try:
++                applies = evaluate_check_filter(flt)
++            except ValueError as e:
++                stats.update(checks=check_stats + [cs], error="bad_filter")
++                return (False, f"Image check filter error: {e}", max_diff,
++                        stats)
++            if not applies:
++                cs["skipped"] = True
++                check_stats.append(cs)
++                continue
++        outliers = above[max(0, min(tolerance, 255))]
++        cs["outliers"] = outliers
++        cs["passed"] = outliers <= max_outliers
++        check_stats.append(cs)
++        (passed_checks if cs["passed"] else failed).append(cs)
++
++    applicable = len(passed_checks) + len(failed)
++    stats.update(checks=check_stats, applicable_checks=applicable,
++                 failed_checks=len(failed))
++
++    if applicable == 0:
++        stats["error"] = "no_checks_executed"
++        return (False, "Image comparison failed: No checks executed "
++                "(every check filtered out)", max_diff, stats)
++
++    if failed:
++        # The binding check: furthest past its own budget. `excess_outliers`
++        # is the near-miss axis the baseline report bins on -- how far past
++        # its own budget this comparison went, not how far from zero.
++        worst = max(failed, key=lambda c: c["outliers"] - c["max_outliers"])
++        stats.update(outliers=worst["outliers"],
++                     max_outliers=worst["max_outliers"],
++                     tolerance=worst["tolerance"],
++                     excess_outliers=worst["outliers"] - worst["max_outliers"])
++        if config_error:
++            stats["error"] = config_error
++        which = (f" (check tol {worst['tolerance']}; {len(failed)} of "
++                 f"{applicable} checks failed)" if applicable > 1 else "")
++        return (False,
++                f"Image comparison failed: {worst['outliers']} outliers exceed "
++                f"limit of {worst['max_outliers']}, max difference {max_diff}"
++                f"{which}",
++                max_diff, stats)
++
++    # All applicable checks passed. Headline the check with the least slack.
++    tight = min(passed_checks, key=lambda c: c["max_outliers"] - c["outliers"])
++    stats.update(outliers=tight["outliers"], max_outliers=tight["max_outliers"],
++                 tolerance=tight["tolerance"], excess_outliers=0)
++    if config_error:
++        # Ruffle rejects the test.toml itself; never report a pass.
++        stats["error"] = config_error
++        return (False,
++                f"Image comparison config error ({config_error}): Ruffle "
++                f"rejects 'tolerance'/'max_outliers' alongside 'checks'",
++                max_diff, stats)
++    which = f" ({applicable} checks)" if applicable > 1 else ""
++    return (True,
++            f"Image check passed: {tight['outliers']} outliers "
++            f"(limit {tight['max_outliers']}), max difference {max_diff}{which}",
+             max_diff, stats)
+ 
+ 
+@@ -4423,7 +4575,8 @@ def main():
+                         }
+                         continue
+                     passed, message, max_diff, cmp_stats = compare_images(
+-                        actual_png, expected_png, cmp_config["checks"])
++                        actual_png, expected_png, cmp_config["checks"],
++                        config_error=cmp_config.get("config_error"))
+                     image_results[cmp_name] = {
+                         "status": "pass" if passed else "fail",
+                         "message": message,
+diff --git a/scripts/image_status_diff.py b/scripts/image_status_diff.py
+index b64db0ed3..6b19bc58c 100755
+--- a/scripts/image_status_diff.py
++++ b/scripts/image_status_diff.py
+@@ -149,6 +149,34 @@ def rows_of(doc, suite):
+             for r in (doc.get("results") or [])}
+ 
+ 
++# Grading semantics. Until s21 (2026-09-28) verify_output.compare_images
++# passed a multi-check comparison if ANY check passed; Ruffle (and we, since)
++# require ALL applicable checks. Rows graded under the new rule carry a
++# per-check `checks` list; rows without one are pre-s21 (ANY) rows. Old-format
++# files stay fully readable -- this only adds the banner and the annotation.
++def graded_all(rows):
++    return any(isinstance(r.get("checks"), list) for r in rows.values())
++
++
++def failed_checks_note(row):
++    """`tol 64: 397/140` for each failing check of a per-check row, else ''."""
++    checks = row.get("checks")
++    if not isinstance(checks, list):
++        return ""
++    bad = [c for c in checks if c.get("passed") is False]
++    if not bad:
++        return ""
++    return "; failing " + ", ".join(
++        f"tol {c.get('tolerance')}: {c.get('outliers')}/{c.get('max_outliers')}"
++        for c in bad)
++
++
++def is_multi_check(row):
++    checks = row.get("checks")
++    return isinstance(checks, list) and sum(
++        1 for c in checks if not c.get("skipped")) > 1
++
++
+ # --------------------------------------------------------------------------
+ # provenance
+ # --------------------------------------------------------------------------
+@@ -323,6 +351,18 @@ def main():
+         print("   Comparisons below are on the intersection and are still valid,")
+         print("   but any absolute total from the flagged side is short.")
+ 
++    old_all, new_all = graded_all(old_rows), graded_all(new_rows)
++    semantics_changed = new_all and not old_all
++    if old_all != new_all:
++        print("\n!! GRADING SEMANTICS DIFFER between the sides:")
++        print(f"     old = {'ALL checks' if old_all else 'ANY check (pre-s21)'}, "
++              f"new = {'ALL checks' if new_all else 'ANY check (pre-s21)'}")
++        print("   Pre-s21 files passed a multi-check comparison when ANY of its")
++        print("   checks passed; Ruffle requires ALL applicable ones. A multi-")
++        print("   check pass -> fail tagged [ANY->ALL] below can be that baseline")
++        print("   correction, not a render regression: check whether max_diff /")
++        print("   diff_channels moved (graphics-fanout-playbook.md §19, s21 note).")
++
+     # ---------------- histograms ----------------
+     hs_old, hs_new = collections.Counter(), collections.Counter()
+     hb_old, hb_new = collections.Counter(), collections.Counter()
+@@ -358,11 +398,19 @@ def main():
+         if so != "pass" and sn == "pass":
+             gains.append(f"{label}: {so} -> pass")
+         elif so == "pass" and sn != "pass":
++            tag = ""
++            if sn == "fail" and semantics_changed and is_multi_check(n):
++                same = (o.get("max_diff") == n.get("max_diff")
++                        and o.get("diff_channels") == n.get("diff_channels"))
++                tag = (" [ANY->ALL, render unchanged]" if same
++                       else " [ANY->ALL, render also moved]")
+             regressions.append(
+                 f"{label}: pass -> {sn}"
+                 + (f" ({n.get('reason', '')}, excess "
+-                   f"{n.get('excess_outliers', '?')})" if sn == "fail" else
+-                   f" ({n.get('reason', '')})"))
++                   f"{n.get('excess_outliers', '?')}{failed_checks_note(n)})"
++                   if sn == "fail" else
++                   f" ({n.get('reason', '')})")
++                + tag)
+         elif so == "fail" and sn == "fail":
+             eo, en = o.get("excess_outliers"), n.get("excess_outliers")
+             if eo is None or en is None:
+diff --git a/scripts/image_triage.py b/scripts/image_triage.py
+index 0d474df85..e9695bc47 100644
+--- a/scripts/image_triage.py
++++ b/scripts/image_triage.py
+@@ -712,7 +712,10 @@ def work(job):
+     keep = ("suite", "test", "comparison", "trace_status", "known_failure",
+             "reason", "max_diff", "outliers", "max_outliers", "excess_outliers",
+             "total_channels", "diff_channels", "mean_diff", "width", "height",
+-            "_git_sha")
++            "_git_sha",
++            # Per-check grading (s21+, ALL-checks semantics). Absent (None)
++            # on rows from pre-s21 image runs.
++            "tolerance", "checks", "applicable_checks", "failed_checks")
+     return {**{k: row.get(k) for k in keep},
+             "cluster": cluster, "why": why,
+             "actual_png": str(a), "expected_png": str(e),
+@@ -1113,6 +1116,13 @@ def emit_explain(rows, sel):
+               f"trace={r['trace_status']}")
+         print(f"  outliers  {r['outliers']} / budget {r['max_outliers']} "
+               f"-> excess {r['excess_outliers']}   max_diff {r['max_diff']}")
++        for i, c in enumerate(r.get("checks") or []):
++            verdict = ("skipped (filter)" if c.get("skipped")
++                       else "pass" if c.get("passed") else "FAIL")
++            flt = f"   filter {c['filter']}" if c.get("filter") else ""
++            print(f"  check {i}   tol {c.get('tolerance')}: "
++                  f"{c.get('outliers', '-')} / {c.get('max_outliers')}  "
++                  f"{verdict}{flt}")
+         print(f"  actual    {r['actual_png']}")
+         print(f"  expected  {r['expected_png']}")
+         for k, v in sorted(r["features"].items()):

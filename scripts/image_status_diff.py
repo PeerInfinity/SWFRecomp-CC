@@ -149,6 +149,34 @@ def rows_of(doc, suite):
             for r in (doc.get("results") or [])}
 
 
+# Grading semantics. Until s21 (2026-09-28) verify_output.compare_images
+# passed a multi-check comparison if ANY check passed; Ruffle (and we, since)
+# require ALL applicable checks. Rows graded under the new rule carry a
+# per-check `checks` list; rows without one are pre-s21 (ANY) rows. Old-format
+# files stay fully readable -- this only adds the banner and the annotation.
+def graded_all(rows):
+    return any(isinstance(r.get("checks"), list) for r in rows.values())
+
+
+def failed_checks_note(row):
+    """`tol 64: 397/140` for each failing check of a per-check row, else ''."""
+    checks = row.get("checks")
+    if not isinstance(checks, list):
+        return ""
+    bad = [c for c in checks if c.get("passed") is False]
+    if not bad:
+        return ""
+    return "; failing " + ", ".join(
+        f"tol {c.get('tolerance')}: {c.get('outliers')}/{c.get('max_outliers')}"
+        for c in bad)
+
+
+def is_multi_check(row):
+    checks = row.get("checks")
+    return isinstance(checks, list) and sum(
+        1 for c in checks if not c.get("skipped")) > 1
+
+
 # --------------------------------------------------------------------------
 # provenance
 # --------------------------------------------------------------------------
@@ -323,6 +351,18 @@ def main():
         print("   Comparisons below are on the intersection and are still valid,")
         print("   but any absolute total from the flagged side is short.")
 
+    old_all, new_all = graded_all(old_rows), graded_all(new_rows)
+    semantics_changed = new_all and not old_all
+    if old_all != new_all:
+        print("\n!! GRADING SEMANTICS DIFFER between the sides:")
+        print(f"     old = {'ALL checks' if old_all else 'ANY check (pre-s21)'}, "
+              f"new = {'ALL checks' if new_all else 'ANY check (pre-s21)'}")
+        print("   Pre-s21 files passed a multi-check comparison when ANY of its")
+        print("   checks passed; Ruffle requires ALL applicable ones. A multi-")
+        print("   check pass -> fail tagged [ANY->ALL] below can be that baseline")
+        print("   correction, not a render regression: check whether max_diff /")
+        print("   diff_channels moved (graphics-fanout-playbook.md §19, s21 note).")
+
     # ---------------- histograms ----------------
     hs_old, hs_new = collections.Counter(), collections.Counter()
     hb_old, hb_new = collections.Counter(), collections.Counter()
@@ -358,11 +398,19 @@ def main():
         if so != "pass" and sn == "pass":
             gains.append(f"{label}: {so} -> pass")
         elif so == "pass" and sn != "pass":
+            tag = ""
+            if sn == "fail" and semantics_changed and is_multi_check(n):
+                same = (o.get("max_diff") == n.get("max_diff")
+                        and o.get("diff_channels") == n.get("diff_channels"))
+                tag = (" [ANY->ALL, render unchanged]" if same
+                       else " [ANY->ALL, render also moved]")
             regressions.append(
                 f"{label}: pass -> {sn}"
                 + (f" ({n.get('reason', '')}, excess "
-                   f"{n.get('excess_outliers', '?')})" if sn == "fail" else
-                   f" ({n.get('reason', '')})"))
+                   f"{n.get('excess_outliers', '?')}{failed_checks_note(n)})"
+                   if sn == "fail" else
+                   f" ({n.get('reason', '')})")
+                + tag)
         elif so == "fail" and sn == "fail":
             eo, en = o.get("excess_outliers"), n.get("excess_outliers")
             if eo is None or en is None:

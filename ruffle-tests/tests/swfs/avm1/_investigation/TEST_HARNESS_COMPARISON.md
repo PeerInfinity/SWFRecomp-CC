@@ -49,7 +49,8 @@ tolerance = 0                # Per-channel pixel tolerance (0-255)
 max_outliers = 0             # Max pixels exceeding tolerance
 trigger = "last_frame"       # When to capture
 
-# Multiple checks per comparison (test passes if ANY check passes)
+# Multiple checks per comparison (test passes only if ALL applicable checks pass;
+# a check may carry filter = 'os = "macos"' etc. to apply on one platform only)
 [[image_comparisons.output.checks]]
 tolerance = 0
 max_outliers = 5200
@@ -81,7 +82,9 @@ max_outliers = 1500
 3. For each pixel, compute per-channel absolute difference
 4. Count outlier channels (any channel difference > tolerance)
 5. If outlier count ≤ `max_outliers`, the check passes
-6. Multiple `[[checks]]` entries: test passes if ANY check passes
+6. Multiple `[[checks]]` entries: test passes only if ALL applicable checks pass
+   (checks whose `filter` excludes the platform are skipped; zero applicable
+   checks is an error). Corrected s21 (2026-09-28) — this line used to say ANY.
 7. On failure, generates difference images (`*.difference-color-*.png`, `*.difference-alpha-*.png`)
 
 **Key detail:** Tests can have BOTH trace output comparison AND image comparison simultaneously. They are independent checks — both must pass for the test to pass.
