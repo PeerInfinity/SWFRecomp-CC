@@ -2839,7 +2839,14 @@ static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
 	// Mirrors getLocalMatrixForMC in action.c: uses mc->skew so that direct
 	// `transform.matrix = ...` assignments with non-rotation-only matrices
 	// (e.g. Matrix(2, -1.3, 2.4, 1, ...)) reconstruct correctly.
-	if (flags & (4|8|16))
+	if ((flags & (4|8|16)) && mc_exact_matrix_live(mc))
+	{
+		// s21 w2-px-b: a live `transform.matrix =` assignment renders its
+		// exact f32 a/b/c/d, not the f32 scale/rotation/skew recomposition.
+		slot[0] = (float)mc->exact_m_a; slot[1] = (float)mc->exact_m_b;
+		slot[4] = (float)mc->exact_m_c; slot[5] = (float)mc->exact_m_d;
+	}
+	else if (flags & (4|8|16))
 	{
 		float sx = mc->xscale / 100.0f;
 		float sy = mc->yscale / 100.0f;
@@ -5598,6 +5605,94 @@ int g_in_action_call = 0;
 #define MSAA_SAMPLES 4
 #endif
 
+// s21 w2-px-b: one segment of Ruffle's border LineStrip (wgpu
+// `draw_line_rect`: the box's unit-square corners + HALF_PX, drawn as
+// PrimitiveTopology::LineStrip [0,1,2,3,0] on every non-Dx12 backend — the
+// goldens' backend). `a`/`b` are the already-transformed, pixel-snapped
+// corners in STAGE twips; the HALF_PX offset and the 1-device-pixel width are
+// applied here in DEVICE space, so neither is scaled or sheared by the
+// field's matrix (lines.rs: "the thickness and line caps should not be
+// transformed"). The segment is rasterised as a non-strict line: a
+// parallelogram one device pixel wide along the MINOR axis. That beat the
+// literal Dx12 `emulate_line_as_rect` (1 px perpendicular) on both failing
+// comparisons of edittext_border_transform: 16/15 vs 18/17 outliers,
+// max diff 176/144 vs 207/208. Drawn as the unit square through a
+// per-segment GPU transform slot whose columns are the segment and the
+// 1-device-px minor-axis step.
+static void tf_border_line_segment(float ax, float ay, float bx, float by,
+	float dtw, float r, float g, float b)
+{
+	float dx = bx - ax, dy = by - ay;
+	if (!(fabsf(dx) > 0.0f || fabsf(dy) > 0.0f)) return;
+	u32 slot = g_next_dynamic_xform_slot;
+	if (slot >= g_xform_slot_capacity) return;
+	g_next_dynamic_xform_slot++;
+	// y-major -> 1 px along x; x-major (and the exact-45-degree tie) -> along y.
+	float wx = 0.0f, wy = dtw;
+	if (fabsf(dy) > fabsf(dx)) { wx = dtw; wy = 0.0f; }
+	const float half = dtw * 0.5f;
+	float xf[16] = {
+		dx,   dy,   0.0f, 0.0f,
+		wx,   wy,   0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		ax + half - wx * 0.5f, ay + half - wy * 0.5f, 0.0f, 1.0f,
+	};
+	renderer_write_transform(context, slot, xf);
+	renderer_draw_rect(context, 0.0f, 0.0f, 1.0f, 1.0f, r, g, b, 1.0f, slot, 0);
+}
+
+// s21 w2-px-b: Ruffle `draw_text_box` (edit_text.rs ~2939) border for an
+// EMBEDDED-font field whose world matrix rotates or shears it. The old path
+// drew four locally-thickened rects through the field's transform slot, so the
+// border's thickness was rotated/sheared with the box and its diagonals landed
+// ~half a pixel inside Ruffle's (the whole residual of
+// edittext_border_transform .04/.06). Axis-aligned matrices (incl. 90/180
+// degree rotations) keep the old path and its measured corner rules. Returns 1
+// when it drew the border.
+static int tf_border_skewed_line_rect(const TextFieldRenderInfo* info,
+	float dscale, float r, float g, float b)
+{
+	const float ma = info->m_a, mb = info->m_b, mc = info->m_c, md = info->m_d;
+	int axis_aligned = (fabsf(mb) < 1e-4f && fabsf(mc) < 1e-4f)
+	                || (fabsf(ma) < 1e-4f && fabsf(md) < 1e-4f);
+	if (axis_aligned) return 0;
+	if (!info->edge_x || !info->edge_y) return 0;   // negative-dimension fields keep the old path
+	// text_box = transform.matrix * create_box(width, height, x_min, y_min), in
+	// DEVICE pixels (Ruffle's transform stack starts at the view matrix).
+	const float lx = info->x * 20.0f, ly = info->y * 20.0f;   // local twips
+	const float lw = info->w * 20.0f, lh = info->h * 20.0f;
+	const float k = dscale / 20.0f;                           // stage twips -> device px
+	float A = ma * lw * k, B = mb * lw * k;
+	float C = mc * lh * k, D = md * lh * k;
+	float TX = (ma * lx + mc * ly + info->m_tx) * k;
+	float TY = (mb * lx + md * ly + info->m_ty) * k;
+	// EditTextPixelSnapping::apply, quality != Low (edit_text.rs ~3614).
+	// Twips::new(2) is 0.1 px; trunc_to_pixel truncates toward zero.
+	TX = truncf(TX + 0.1f);
+	TY = truncf(TY + 0.1f);
+	int x_snap = fabsf(C) < 0.001f || fabsf(D) < 0.001f;
+	int y_snap = fabsf(A) < 0.001f || fabsf(B) < 0.001f;
+	if (x_snap) {
+		A = rintf(A - 0.35f);
+		B = rintf(B - 0.35f);
+	}
+	if (y_snap) {
+		C = rintf(C - 0.35f);
+		D = rintf(D - 0.35f);
+	}
+	// Corners of the unit square through text_box, back to stage twips.
+	const float s = 20.0f / dscale;
+	float px[4] = { TX, TX + A, TX + A + C, TX + C };
+	float py[4] = { TY, TY + B, TY + B + D, TY + D };
+	const float dtw = 20.0f / dscale;
+	for (int i = 0; i < 4; i++) {
+		int j = (i + 1) & 3;
+		tf_border_line_segment(px[i] * s, py[i] * s, px[j] * s, py[j] * s,
+			dtw, r, g, b);
+	}
+	return 1;
+}
+
 // Callback for actionIterateTextFields: render text field background/border rectangles.
 static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data)
 {
@@ -5780,7 +5875,11 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 		float r = ((info->border_color >> 16) & 0xFF) / 255.0f;
 		float g = ((info->border_color >> 8) & 0xFF) / 255.0f;
 		float b = (info->border_color & 0xFF) / 255.0f;
-		if (line_rect) {
+		if (!device_box && info->has_matrix && xform_slot != 0
+		    && tf_border_skewed_line_rect(info, dscale, r, g, b)) {
+			// s21 w2-px-b: rotated / sheared embedded-font box — four
+			// device-space line segments, see tf_border_skewed_line_rect.
+		} else if (line_rect) {
 			// Ruffle traces the border as an OPEN polyline
 			// (x0,y0)->(x1,y0)->(x1,y1)->(x0,y1)->(x0,y0), so the
 			// bottom-right corner pixel is drawn exactly once — i.e. not at

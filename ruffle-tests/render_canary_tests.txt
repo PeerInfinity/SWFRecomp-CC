@@ -325,3 +325,24 @@ avm2/bitmapdata_copypixels
 # inside a root sprite) — compose_children's as_set_flags overlay, which was
 # browser-WASM-only until s21. No other member has a nested script-moved child.
 visual/cache_as_bitmap/nested_rotation
+# s21 w2-px-b — exact transform.matrix + AVM1 transformed-border lines
+# tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
+visual/edittext/edittext_device_transform_small_rotation
+                                            # DEVICE-FONT SHEAR/ROT CULL    1 cmp
+                                            #   11 of 11 outliers: ZERO
+                                            #   headroom. Reads the clip's
+                                            #   render matrix through
+                                            #   tf_world_matrix.
+# tier=2  (CI-failing / skipped; A/B signal only)
+visual/edittext/edittext_device_transform_small_shear
+                                            # EXACT transform.matrix        1 cmp
+                                            #   nested near-cancelling
+                                            #   matrices (1,500.001)x(1,-500);
+                                            #   the render must use the stored
+                                            #   f32 matrix, not a recomposition
+                                            #   of f32 scale/rotation.
+visual/fonts/leading_device_font            # AVM2 BORDER BR CORNER         1 cmp
+                                            #   untransformed field: golden
+                                            #   wants the BR corner EMPTY,
+                                            #   edittext_border_transform wants
+                                            #   it 3/4 inked (s21 lead D2).
