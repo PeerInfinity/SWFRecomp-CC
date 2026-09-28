@@ -6,18 +6,18 @@
     "total_available": 1279,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 40,
+    "ignored_count": 39,
     "filtered": true
   },
-  "total": 1239,
+  "total": 1240,
   "pass": 1216,
   "ruffle_matched": 15,
-  "fail": 8,
+  "fail": 9,
   "pass_rate": 98.1,
   "effective_pass": 1231,
-  "effective_pass_rate": 99.4,
+  "effective_pass_rate": 99.3,
   "breakdown": {
-    "output_mismatch": 8,
+    "output_mismatch": 9,
     "ruffle_matched": 15
   },
   "tests": [
@@ -15515,6 +15515,26 @@
       },
       "duration": 8.08,
       "status": "pass"
+    },
+    {
+      "test": "sound_load_multiple",
+      "phases": {
+        "recomp": 0.024,
+        "compile": 9.103,
+        "run": 0.004
+      },
+      "num_frames": 16,
+      "error_signature": "TypeError: Error #1006: loadCompressedDataFromByteArray is not a function.",
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 19,
+        "matching_lines": 3
+      },
+      "duration": 9.14,
+      "status": "output_mismatch",
+      "detail": "16 line(s) differ (actual=7, expected=19)",
+      "actual_output": "1\nPassed\n2\nPassed\n3\nTypeError: Error #1006: loadCompressedDataFromByteArray is not a function.\n\tat Test()",
+      "expected_output": "1\nFailed: Error: Error #2037: Functions called in incorrect sequence, or earlier call was unsuccessful.\n2\nFailed: Error: Error #2037: Functions called in incorrect sequence, or earlier call was unsuccessful.\n3\nFailed: Error: Error #2037: Functions called in incorrect sequence, or earlier call was unsuccessful.\n4\nPassed\n5\nFailed: Error: Error #2037: Functions called in incorrect sequence, or earlier call was unsuccessful.\n6\nPassed\n7\nPassed\n8\nPassed\n9\nFailed: ArgumentError: Error #2084: The AMF encoding of the arguments cannot exceed 40K.\nFinished"
     },
     {
       "test": "sound_play",

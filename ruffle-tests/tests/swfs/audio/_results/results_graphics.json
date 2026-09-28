@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-28T21:10:40.215660+00:00",
-    "git_sha": "1b7a987cf4d98bd1245a79701512c9ce6c9258d3",
-    "duration_seconds": 78.83,
+    "timestamp": "2026-09-28T23:17:24.895529+00:00",
+    "git_sha": "0341c033aff45db4b36d6a72036b890dbe14d8ab",
+    "duration_seconds": 70.64,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -21,9 +21,9 @@
     {
       "test": "aac",
       "phases": {
-        "recomp": 0.009,
-        "compile": 8.911,
-        "run": 0.767
+        "recomp": 0.007,
+        "compile": 5.959,
+        "run": 0.416
       },
       "num_frames": 400,
       "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
@@ -32,7 +32,7 @@
         "expected_lines": 18,
         "matching_lines": 3
       },
-      "duration": 9.7,
+      "duration": 6.39,
       "status": "output_mismatch",
       "detail": "21 line(s) differ (actual=24, expected=18)",
       "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()",
@@ -41,9 +41,9 @@
     {
       "test": "g711",
       "phases": {
-        "recomp": 0.007,
-        "compile": 5.661,
-        "run": 0.566
+        "recomp": 0.015,
+        "compile": 9.033,
+        "run": 1.121
       },
       "num_frames": 600,
       "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
@@ -52,7 +52,7 @@
         "expected_lines": 6,
         "matching_lines": 2
       },
-      "duration": 6.24,
+      "duration": 10.17,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=8, expected=6)",
       "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()",
@@ -61,24 +61,8 @@
     {
       "test": "g711_event_alaw",
       "phases": {
-        "recomp": 0.005,
-        "compile": 16.936,
-        "run": 0.215
-      },
-      "num_frames": 2,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 17.16,
-      "status": "pass"
-    },
-    {
-      "test": "g711_event_mulaw",
-      "phases": {
-        "recomp": 0.005,
-        "compile": 21.587,
+        "recomp": 0.006,
+        "compile": 21.838,
         "run": 0.265
       },
       "num_frames": 2,
@@ -87,15 +71,31 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 21.87,
+      "duration": 22.12,
+      "status": "pass"
+    },
+    {
+      "test": "g711_event_mulaw",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 13.818,
+        "run": 0.164
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 13.99,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
-        "recomp": 0.01,
-        "compile": 23.111,
-        "run": 0.466
+        "recomp": 0.008,
+        "compile": 17.327,
+        "run": 0.365
       },
       "num_frames": 120,
       "lines": {
@@ -103,7 +103,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 23.6,
+      "duration": 17.71,
       "status": "pass"
     }
   ]
