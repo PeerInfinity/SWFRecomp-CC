@@ -1,0 +1,115 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_abc.h b/SWFModernRuntime/include/avm2/avm2_abc.h
+index 23fbb895b..c6561d860 100644
+--- a/SWFModernRuntime/include/avm2/avm2_abc.h
++++ b/SWFModernRuntime/include/avm2/avm2_abc.h
+@@ -344,6 +344,12 @@ typedef struct Avm2TimelineData
+ 	const uint32_t* frame_op_starts;  // frame_count + 1 entries into ops[]
+ 	uint32_t label_count;
+ 	const Avm2FrameLabelData* labels;
++	// 1 when the tag stream ended WITHOUT an End tag (Ruffle
++	// preload_progress.has_end_tag == false): such a clip does not loop at its
++	// last frame (determine_next_frame -> Same). Inverted sense on purpose so
++	// the zero default -- and every timeline the recompiler emits without this
++	// trailing field -- keeps the ordinary looping behaviour.
++	uint8_t no_end_tag;
+ } Avm2TimelineData;
+ 
+ // Character dictionary entry (Define* tags): classification + bounds.
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 2e1bb4dcf..f3e231454 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -2179,7 +2179,11 @@ static uint32_t total_frames(const Avm2DisplayObjectExt* ext)
+ static int determine_next_frame(const Avm2DisplayObjectExt* ext)
+ {
+ 	if ((uint32_t) ext->current_frame < frames_loaded(ext)) return NEXT_FRAME_NEXT;
++	// Ruffle movie_clip.rs determine_next_frame: a clip does not loop when it
++	// really has only one frame OR its tag stream had no End tag
++	// (timeline/missing_frame_scripts' `Spawn`, char 13).
+ 	if (frames_loaded(ext) <= 1) return NEXT_FRAME_SAME;
++	if (ext->timeline != NULL && ext->timeline->no_end_tag) return NEXT_FRAME_SAME;
+ 	return NEXT_FRAME_FIRST;
+ }
+ 
+@@ -3775,14 +3779,12 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 	}
+ 	broadcast_named(ctx, "frameConstructed");
+ 
++	// Orphans BEFORE the stage, as in the Enter and Construct phases above
++	// (Ruffle frame_lifecycle.rs run_all_phases_avm2 runs each_orphan_obj
++	// first in all three). Stage-first made a clip created by a stage frame
++	// script run its frame-1 script in the creating tick and then trail the
++	// stage's scripts every tick after (timeline/missing_frame_scripts).
+ 	ctx->frame_phase = PHASE_FRAME_SCRIPTS;
+-	{
+-		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, ctx->stage);
+-		for (uint32_t i = 0; i < sext->render_len; i++)
+-		{
+-			run_frame_scripts_obj(ctx, sext->render_list[i]);
+-		}
+-	}
+ 	for (uint32_t i = 0, snap = orphan_walk_bound();
+ 	     i < snap && i < orphan_walk_bound(); i++)
+ 	{
+@@ -3790,6 +3792,13 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
+ 		run_frame_scripts_obj(ctx, o);
+ 	}
++	{
++		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, ctx->stage);
++		for (uint32_t i = 0; i < sext->render_len; i++)
++		{
++			run_frame_scripts_obj(ctx, sext->render_list[i]);
++		}
++	}
+ 	run_frame_script_cleanup(ctx);
+ 
+ 	ctx->frame_phase = PHASE_EXIT;
+@@ -12958,7 +12967,12 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
+ 		n++;
+ 	}
+ 	(void) recs;
+-	if (n == 0) return NULL;
++	// n == 0 falls through to the wrapper path on purpose: Ruffle
++	// avm2_button.rs::create_state builds a state Sprite for every child
++	// count except exactly one -- INCLUDING zero -- and fire_state_events
++	// names it, so an empty over/down/hit state consumes an instanceN number
++	// and reads back as an empty Sprite, not null
++	// (avm2/simplebutton_childevents_multichild).
+ 	if (n == 1)
+ 	{
+ 		Avm2Object* child = children[0];
+diff --git a/SWFRecomp/src/abc/abc_timeline.cpp b/SWFRecomp/src/abc/abc_timeline.cpp
+index 89104c4d6..15de868df 100644
+--- a/SWFRecomp/src/abc/abc_timeline.cpp
++++ b/SWFRecomp/src/abc/abc_timeline.cpp
+@@ -700,6 +700,7 @@ struct Timeline
+ 	std::vector<std::vector<TOp>> frames;   // closed frames (ShowFrame)
+ 	std::vector<TOp> current;               // ops since the last ShowFrame
+ 	std::vector<std::pair<uint32_t, std::string>> labels;
++	bool has_end_tag = false;  // stream terminated on TAG_END
+ 
+ 	void showFrame()
+ 	{
+@@ -1228,6 +1229,7 @@ struct Scanner
+ 			switch (code)
+ 			{
+ 				case TAG_END:
++					tl.has_end_tag = true;
+ 					return;
+ 				case TAG_SHOW_FRAME:
+ 					tl.showFrame();
+@@ -2020,8 +2022,11 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
+ 		                      : std::string("NULL"))
+ 		    << ", tl_" << t << "_starts, " << tl.labels.size() << ", "
+ 		    << (!tl.labels.empty() ? ("tl_" + std::to_string(t) + "_labels")
+-		                           : std::string("NULL"))
+-		    << " },\n";
++		                           : std::string("NULL"));
++		// Trailing no_end_tag: emitted ONLY when set, so the generated C of
++		// every End-terminated timeline (all but a handful) is unchanged.
++		if (!tl.has_end_tag) out << ", 1";
++		out << " },\n";
+ 	}
+ 	out << "};\n";
+ 	out << "const uint32_t avm2_generated_timeline_count = "

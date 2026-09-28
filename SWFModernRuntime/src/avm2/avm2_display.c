@@ -2179,7 +2179,11 @@ static uint32_t total_frames(const Avm2DisplayObjectExt* ext)
 static int determine_next_frame(const Avm2DisplayObjectExt* ext)
 {
 	if ((uint32_t) ext->current_frame < frames_loaded(ext)) return NEXT_FRAME_NEXT;
+	// Ruffle movie_clip.rs determine_next_frame: a clip does not loop when it
+	// really has only one frame OR its tag stream had no End tag
+	// (timeline/missing_frame_scripts' `Spawn`, char 13).
 	if (frames_loaded(ext) <= 1) return NEXT_FRAME_SAME;
+	if (ext->timeline != NULL && ext->timeline->no_end_tag) return NEXT_FRAME_SAME;
 	return NEXT_FRAME_FIRST;
 }
 
@@ -3775,20 +3779,25 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	}
 	broadcast_named(ctx, "frameConstructed");
 
+	// Orphans BEFORE the stage, as in the Enter and Construct phases above
+	// (Ruffle frame_lifecycle.rs run_all_phases_avm2 runs each_orphan_obj
+	// first in all three). Stage-first made a clip created by a stage frame
+	// script run its frame-1 script in the creating tick and then trail the
+	// stage's scripts every tick after (timeline/missing_frame_scripts).
 	ctx->frame_phase = PHASE_FRAME_SCRIPTS;
-	{
-		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, ctx->stage);
-		for (uint32_t i = 0; i < sext->render_len; i++)
-		{
-			run_frame_scripts_obj(ctx, sext->render_list[i]);
-		}
-	}
 	for (uint32_t i = 0, snap = orphan_walk_bound();
 	     i < snap && i < orphan_walk_bound(); i++)
 	{
 		Avm2Object* o = walk_skip_on() ? g_orphan_dirty[i] : g_orphans[i];
 		if (orphan_dirty_ext(o, walk_skip_on()) == NULL) continue;
 		run_frame_scripts_obj(ctx, o);
+	}
+	{
+		Avm2DisplayObjectExt* sext = avm2_display_ext_of(ctx, ctx->stage);
+		for (uint32_t i = 0; i < sext->render_len; i++)
+		{
+			run_frame_scripts_obj(ctx, sext->render_list[i]);
+		}
 	}
 	run_frame_script_cleanup(ctx);
 
@@ -12958,7 +12967,12 @@ static Avm2Object* button_create_state(Avm2Context* ctx, Avm2Object* button,
 		n++;
 	}
 	(void) recs;
-	if (n == 0) return NULL;
+	// n == 0 falls through to the wrapper path on purpose: Ruffle
+	// avm2_button.rs::create_state builds a state Sprite for every child
+	// count except exactly one -- INCLUDING zero -- and fire_state_events
+	// names it, so an empty over/down/hit state consumes an instanceN number
+	// and reads back as an empty Sprite, not null
+	// (avm2/simplebutton_childevents_multichild).
 	if (n == 1)
 	{
 		Avm2Object* child = children[0];

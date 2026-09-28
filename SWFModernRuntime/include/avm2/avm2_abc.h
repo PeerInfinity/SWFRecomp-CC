@@ -344,6 +344,12 @@ typedef struct Avm2TimelineData
 	const uint32_t* frame_op_starts;  // frame_count + 1 entries into ops[]
 	uint32_t label_count;
 	const Avm2FrameLabelData* labels;
+	// 1 when the tag stream ended WITHOUT an End tag (Ruffle
+	// preload_progress.has_end_tag == false): such a clip does not loop at its
+	// last frame (determine_next_frame -> Same). Inverted sense on purpose so
+	// the zero default -- and every timeline the recompiler emits without this
+	// trailing field -- keeps the ordinary looping behaviour.
+	uint8_t no_end_tag;
 } Avm2TimelineData;
 
 // Character dictionary entry (Define* tags): classification + bounds.

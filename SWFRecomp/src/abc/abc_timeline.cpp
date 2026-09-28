@@ -700,6 +700,7 @@ struct Timeline
 	std::vector<std::vector<TOp>> frames;   // closed frames (ShowFrame)
 	std::vector<TOp> current;               // ops since the last ShowFrame
 	std::vector<std::pair<uint32_t, std::string>> labels;
+	bool has_end_tag = false;  // stream terminated on TAG_END
 
 	void showFrame()
 	{
@@ -1228,6 +1229,7 @@ struct Scanner
 			switch (code)
 			{
 				case TAG_END:
+					tl.has_end_tag = true;
 					return;
 				case TAG_SHOW_FRAME:
 					tl.showFrame();
@@ -2020,8 +2022,11 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		                      : std::string("NULL"))
 		    << ", tl_" << t << "_starts, " << tl.labels.size() << ", "
 		    << (!tl.labels.empty() ? ("tl_" + std::to_string(t) + "_labels")
-		                           : std::string("NULL"))
-		    << " },\n";
+		                           : std::string("NULL"));
+		// Trailing no_end_tag: emitted ONLY when set, so the generated C of
+		// every End-terminated timeline (all but a handful) is unchanged.
+		if (!tl.has_end_tag) out << ", 1";
+		out << " },\n";
 	}
 	out << "};\n";
 	out << "const uint32_t avm2_generated_timeline_count = "
