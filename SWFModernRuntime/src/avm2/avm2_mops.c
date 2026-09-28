@@ -248,3 +248,43 @@ void avm2_mops_register(Avm2Context* ctx, Avm2Class* appdomain_cls)
 	                              "MIN_DOMAIN_MEMORY_LENGTH",
 	                              avm2_integer(AVM2_MIN_DOMAIN_MEMORY_LENGTH));
 }
+
+// avm2.intrinsics.memory::casi32(address:int, expectedValue:int,
+// newValue:int):int and ::mfence():void -- the two package-level natives
+// of the intrinsics package that are NOT compiled to opcodes (li32 & co.
+// are). Registered as globals in avm2_globals.c. Semantics per Ruffle
+// core/src/avm2/globals/concurrent.rs and avm2/casi32: the address is
+// taken as unsigned (negatives land far out of range), must satisfy
+// addr <= len - 4 AND addr % 4 == 0, else RangeError #1506; the old value
+// is returned and newValue is stored only when old == expectedValue. We
+// have no Workers, so "atomic" is trivially satisfied.
+Avm2Value avm2_intrinsic_casi32(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value a0 = act->argc > 0 ? act->args[0] : avm2_undefined();
+	Avm2Value a1 = act->argc > 1 ? act->args[1] : avm2_undefined();
+	Avm2Value a2 = act->argc > 2 ? act->args[2] : avm2_undefined();
+	uint32_t addr = (uint32_t) avm2_coerce_to_i32(ctx, a0);
+	int32_t expected = avm2_coerce_to_i32(ctx, a1);
+	int32_t update = avm2_coerce_to_i32(ctx, a2);
+	uint8_t* base;
+	uint32_t len;
+	mops_window(ctx, &base, &len);
+	if (len < 4 || addr > len - 4 || (addr & 3u) != 0)
+	{
+		throw_1506(ctx);
+	}
+	int32_t old;
+	memcpy(&old, base + addr, 4);
+	if (old == expected)
+	{
+		memcpy(base + addr, &update, 4);
+	}
+	return avm2_integer(old);
+}
+
+Avm2Value avm2_intrinsic_mfence(Avm2Activation* act)
+{
+	(void) act;
+	return avm2_undefined();
+}

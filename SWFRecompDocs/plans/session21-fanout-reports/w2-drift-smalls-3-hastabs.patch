@@ -1,0 +1,41 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 37e763f28..d92d26e52 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -7841,6 +7873,27 @@ static Avm2Value tb_release_lines(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// TextLine.hasTabs: true iff THIS line's span of the block text contains
++// U+0009 (Ruffle display_object/text_line.rs has_tabs, ae2c796c3). No other
++// tab-like code point counts (avm2/textline_has_tabs probes ~35 of them).
++static Avm2Value tl_get_has_tabs(Avm2Activation* act)
++{
++	Avm2TextLineExt* tl = this_tl(act);
++	if (tl == NULL || tl->text_block == NULL) return avm2_bool(false);
++	Avm2TextBlockExt* tb = textblock_ext_of(tl->text_block);
++	if (tb == NULL || tb->content == NULL) return avm2_bool(false);
++	const Avm2String* text = ce_text_of(act->ctx, tb->content);
++	if (text == NULL) return avm2_bool(false);
++	uint32_t b0 = u16_to_byte(text, tl->begin_index);
++	uint32_t b1 = u16_to_byte(text, tl->begin_index + tl->raw_text_length);
++	if (b1 > text->len) b1 = text->len;
++	for (uint32_t i = b0; i < b1; i++)
++	{
++		if (text->utf8[i] == '\t') return avm2_bool(true);
++	}
++	return avm2_bool(false);
++}
++
+ void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
+ {
+ 	g_textline_class = textline;
+@@ -7869,7 +7922,7 @@ void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
+ 	avm2_builtin_add_getter(ctx, textline, "textWidth", tl_const_0);
+ 	avm2_builtin_add_getter(ctx, textline, "textHeight", tl_const_0);
+ 	avm2_builtin_add_getter(ctx, textline, "hasGraphicElement", tl_const_false);
+-	avm2_builtin_add_getter(ctx, textline, "hasTabs", tl_const_false);
++	avm2_builtin_add_getter(ctx, textline, "hasTabs", tl_get_has_tabs);
+ 	avm2_builtin_add_getter(ctx, textline, "atomCount", tl_get_raw_text_length);
+ 	avm2_builtin_add_method(ctx, textline, "getBaselinePosition", tl_const_0);
+ 	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtPoint", tl_const_im1);

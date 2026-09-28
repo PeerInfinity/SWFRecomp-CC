@@ -6863,6 +6863,20 @@ static Avm2Value tj_clone(Avm2Activation* act)
 	return avm2_null();   // the abstract base's clone
 }
 
+static Avm2Value tj_set_locale(Avm2Activation* act)
+{
+	Avm2JustifierExt* j = this_just(act);
+	Avm2Value v = arg_or_undef(act, 0);
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED)
+	{
+		throw_2007(act->ctx, "locale");
+	}
+	const Avm2String* loc = avm2_coerce_to_string(act->ctx, v);
+	if (u16_length(loc) < 2) fte_throw_2004(act->ctx);
+	if (j != NULL) j->locale = loc;
+	return avm2_undefined();
+}
+
 static void tj_init(Avm2Activation* act, Avm2Value locale, Avm2Value lj)
 {
 	Avm2JustifierExt* j = this_just(act);
@@ -6873,13 +6887,31 @@ static void tj_init(Avm2Activation* act, Avm2Value locale, Avm2Value lj)
 	{
 		fte_throw_2012(act->ctx, "TextJustifier$");
 	}
-	j->locale = (locale.kind == AVM2_VALUE_NULL
-	             || locale.kind == AVM2_VALUE_UNDEFINED)
-		? NULL : avm2_coerce_to_string(act->ctx, locale);
+	// FP (and Ruffle 42a874b4b) route the locale through a private
+	// setLocale(): null -> TypeError #2007, fewer than 2 UTF-16 units ->
+	// ArgumentError #2004, both reported from the setLocale frame.
+	fte_ctor_set(act, tj_set_locale,
+	             "flash.text.engine::TextJustifier/setLocale", locale);
 	Avm2Activation sub = *act;
 	sub.args = &lj;
 	sub.argc = 1;
 	tj_set_line_justification(&sub);
+}
+
+// SpaceJustifier / EastAsianJustifier call `super(locale, ...)` in FP, so a
+// throw from setLocale shows "at flash.text.engine::TextJustifier()" between
+// setLocale and the subclass constructor frame. Our subclass ctors call
+// tj_init natively, so synthesize that frame here. (A user AS subclass of
+// TextJustifier itself reaches tj_ctor through a real super() call, which
+// already carries the frame.)
+static void tj_init_from_subclass(Avm2Activation* act, Avm2Value locale,
+                                  Avm2Value lj)
+{
+	static const Avm2MethodRef tj_frame =
+		{ NULL, NULL, "flash.text.engine::TextJustifier", 0 };
+	avm2_callstack_push(act->ctx, &tj_frame, NULL);
+	tj_init(act, locale, lj);
+	avm2_callstack_pop(act->ctx);
 }
 
 static Avm2Value tj_ctor(Avm2Activation* act)
@@ -6936,7 +6968,7 @@ static Avm2Value sj_ctor(Avm2Activation* act)
 		: avm2_string(fte_lit(ctx, "en"));
 	Avm2Value lj = act->argc > 1 ? act->args[1]
 		: avm2_string(fte_lit(ctx, "unjustified"));
-	tj_init(act, locale, lj);
+	tj_init_from_subclass(act, locale, lj);
 	Avm2JustifierExt* j = this_just(act);
 	if (j != NULL)
 	{
@@ -6993,7 +7025,7 @@ static Avm2Value eaj_ctor(Avm2Activation* act)
 		: avm2_string(fte_lit(ctx, "allButLast"));
 	Avm2Value js = act->argc > 2 ? act->args[2]
 		: avm2_string(fte_lit(ctx, "pushInKinsoku"));
-	tj_init(act, locale, lj);
+	tj_init_from_subclass(act, locale, lj);
 	Avm2Activation sub = *act;
 	sub.args = &js;
 	sub.argc = 1;
@@ -7841,6 +7873,27 @@ static Avm2Value tb_release_lines(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// TextLine.hasTabs: true iff THIS line's span of the block text contains
+// U+0009 (Ruffle display_object/text_line.rs has_tabs, ae2c796c3). No other
+// tab-like code point counts (avm2/textline_has_tabs probes ~35 of them).
+static Avm2Value tl_get_has_tabs(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	if (tl == NULL || tl->text_block == NULL) return avm2_bool(false);
+	Avm2TextBlockExt* tb = textblock_ext_of(tl->text_block);
+	if (tb == NULL || tb->content == NULL) return avm2_bool(false);
+	const Avm2String* text = ce_text_of(act->ctx, tb->content);
+	if (text == NULL) return avm2_bool(false);
+	uint32_t b0 = u16_to_byte(text, tl->begin_index);
+	uint32_t b1 = u16_to_byte(text, tl->begin_index + tl->raw_text_length);
+	if (b1 > text->len) b1 = text->len;
+	for (uint32_t i = b0; i < b1; i++)
+	{
+		if (text->utf8[i] == '\t') return avm2_bool(true);
+	}
+	return avm2_bool(false);
+}
+
 void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
 {
 	g_textline_class = textline;
@@ -7869,7 +7922,7 @@ void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
 	avm2_builtin_add_getter(ctx, textline, "textWidth", tl_const_0);
 	avm2_builtin_add_getter(ctx, textline, "textHeight", tl_const_0);
 	avm2_builtin_add_getter(ctx, textline, "hasGraphicElement", tl_const_false);
-	avm2_builtin_add_getter(ctx, textline, "hasTabs", tl_const_false);
+	avm2_builtin_add_getter(ctx, textline, "hasTabs", tl_get_has_tabs);
 	avm2_builtin_add_getter(ctx, textline, "atomCount", tl_get_raw_text_length);
 	avm2_builtin_add_method(ctx, textline, "getBaselinePosition", tl_const_0);
 	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtPoint", tl_const_im1);

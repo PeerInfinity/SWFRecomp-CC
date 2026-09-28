@@ -1,0 +1,56 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 804c01458..1520e0605 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -14571,11 +14571,33 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
+     BitmapDataNative* dest_bmp = getBitmapNative(obj);
+     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+     if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+-    if (arg_count < 1) return r;
++    // Return codes follow Ruffle avm1/globals/bitmap_data.rs draw(): 0 on a
++    // successful draw, -3 for a disposed BitmapData source, -2 for anything
++    // that is neither a BitmapData nor a display object (a missing argument
++    // is `undefined`, so -2 too). A STRING source is a target path resolved
++    // from the current target clip, like resolve_target_display_object with
++    // allow_empty = false (avm1/bitmap_data_draw_string_target).
++    if (arg_count < 1) { r = makeF64(-2); return r; }
++
++    MovieClip* src_mc = NULL;
++    if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP && args[0].data.numeric_value != 0) {
++        src_mc = (MovieClip*) (uintptr_t) args[0].data.numeric_value;
++    } else if (args[0].type == ACTION_STACK_VALUE_STRING) {
++        char path_buf[256];
++        const uint16_t* u16ptr = varGetU16Ptr(&args[0]);
++        int n = (u16ptr != NULL && args[0].str_size > 0)
++            ? u16_to_utf8(u16ptr, args[0].str_size, path_buf, sizeof(path_buf)) : 0;
++        if (n > 0) {
++            extern MovieClip* g_current_context;
++            MovieClip* start = g_current_context ? g_current_context : &root_movieclip;
++            src_mc = resolveFlashPathToMC(app_context, path_buf, (u32)n, start, 1, 0);
++            if (!src_mc) src_mc = resolveObjectPathToMC(app_context, path_buf, (u32)n, start, 1);
++        }
++        if (src_mc == NULL) { r = makeF64(-2); return r; }
++    }
+ 
+     // MovieClip source: rasterize the MC's drawing-API paths into the dest bitmap.
+-    if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP && args[0].data.numeric_value != 0) {
+-        MovieClip* src_mc = (MovieClip*) (uintptr_t) args[0].data.numeric_value;
++    if (src_mc != NULL) {
+         // Extract matrix (arg1) — defaults to identity
+         double ma = 1, mb = 0, mcc = 0, md = 1, mtx = 0, mty = 0;
+         if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT && args[1].data.numeric_value != 0) {
+@@ -14669,10 +14691,12 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
+     }
+ 
+     // Source must be a BitmapData object otherwise.
+-    if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
++    if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) { r = makeF64(-2); return r; }
+     ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+     BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+-    if (!src_bmp || src_bmp->disposed) return r;
++    if (!src_bmp) { r = makeF64(-2); return r; }
++    if (src_bmp->disposed) { r = makeF64(-3); return r; }
++    r = makeF64(0);   // every remaining path is a (possibly empty) draw
+ 
+     // Extract matrix (arg1) — defaults to identity
+     double ma = 1, mb = 0, mc = 0, md = 1, mtx = 0, mty = 0;

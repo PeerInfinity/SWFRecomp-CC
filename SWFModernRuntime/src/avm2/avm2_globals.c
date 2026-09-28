@@ -8309,6 +8309,16 @@ void avm2_register_toplevel(Avm2Context* ctx)
 	avm2_builtin_add_global_fn_n(ctx, "decodeURIComponent",
 	                             global_decode_uri_component, 1);
 	builtin_add_global_fn_ns(ctx, "flash.system", "fscommand", global_fscommand);
+	// avm2.intrinsics.memory natives that are real calls, not opcodes
+	// (implemented in avm2_mops.c next to the domain-memory window).
+	{
+		extern Avm2Value avm2_intrinsic_casi32(Avm2Activation* act);
+		extern Avm2Value avm2_intrinsic_mfence(Avm2Activation* act);
+		builtin_add_global_fn_ns(ctx, "avm2.intrinsics.memory", "casi32",
+		                         avm2_intrinsic_casi32);
+		builtin_add_global_fn_ns(ctx, "avm2.intrinsics.memory", "mfence",
+		                         avm2_intrinsic_mfence);
+	}
 	builtin_add_global_fn_ns(ctx, "flash.utils", "escapeMultiByte",
 	                         global_escape_multi_byte);
 	builtin_add_global_fn_ns(ctx, "flash.utils", "unescapeMultiByte",
