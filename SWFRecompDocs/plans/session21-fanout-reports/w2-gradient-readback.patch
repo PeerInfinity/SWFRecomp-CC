@@ -1,0 +1,116 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_filters.c b/SWFModernRuntime/src/avm2/avm2_filters.c
+index 6e1da5f06..299f27c82 100644
+--- a/SWFModernRuntime/src/avm2/avm2_filters.c
++++ b/SWFModernRuntime/src/avm2/avm2_filters.c
+@@ -244,6 +244,14 @@ static uint8_t passes_of(uint32_t quality)
+ 	return (uint8_t) (quality > 15 ? 15 : quality);
+ }
+ 
++// Script-object path: the `quality:int` slot is read with coerce_to_i32 and
++// clamped to 0..15, so a negative quality reads back 0 (Flash; Ruffle
++// cb2b60ff5 — which applied it to every filter class, not just gradients).
++static uint8_t passes_of_i32(int32_t quality)
++{
++	return (uint8_t) (quality < 0 ? 0 : (quality > 15 ? 15 : quality));
++}
++
+ static double deg_of_rad(double r) { return r * (180.0 / 3.14159265358979323846); }
+ static double rad_of_deg(double d) { return d * (3.14159265358979323846 / 180.0); }
+ 
+@@ -310,8 +318,10 @@ static void gradient_from_object(Avm2Context* ctx, const Avm2FilterObjExt* e,
+ 	Avm2Object* ratios = as_array(e->ratios);
+ 	out->grad_count = 0;
+ 	if (colors == NULL || alphas == NULL || ratios == NULL) return;
++	// Flash keeps min(colors, ratios) entries; a short alphas array is
++	// padded with 1.0 (Ruffle cb2b60ff5 get_gradient_colors).
+ 	uint32_t n = avm2_array_ext(ratios)->length;
+-	if (avm2_array_ext(alphas)->length < n) n = avm2_array_ext(alphas)->length;
++	uint32_t n_alphas = avm2_array_ext(alphas)->length;
+ 	if (avm2_array_ext(colors)->length < n) n = avm2_array_ext(colors)->length;
+ 	if (n > AVM2_FILTER_MAX_GRAD) n = AVM2_FILTER_MAX_GRAD;
+ 	for (uint32_t i = 0; i < n; i++)
+@@ -323,11 +333,14 @@ static void gradient_from_object(Avm2Context* ctx, const Avm2FilterObjExt* e,
+ 		Avm2Value av = avm2_array_get(alphas, i);
+ 		Avm2Value rv = avm2_array_get(ratios, i);
+ 		uint32_t color = cv.kind == AVM2_VALUE_HOLE ? 0 : avm2_coerce_to_u32(ctx, cv);
+-		double alpha = av.kind == AVM2_VALUE_HOLE ? 0.0 : avm2_coerce_to_number(ctx, av);
+-		uint32_t ratio = rv.kind == AVM2_VALUE_HOLE ? 0 : avm2_coerce_to_u32(ctx, rv);
++		double alpha = i >= n_alphas ? 1.0
++			: av.kind == AVM2_VALUE_HOLE ? 0.0 : avm2_coerce_to_number(ctx, av);
++		// coerce_to_i32 then clamp(0, 255): negative ratios read back 0.
++		int32_t ratio = rv.kind == AVM2_VALUE_HOLE ? 0 : avm2_coerce_to_i32(ctx, rv);
+ 		out->grad_colors[out->grad_count] = color & 0xFFFFFF;
+ 		out->grad_alphas[out->grad_count] = alpha_byte(alpha);
+-		out->grad_ratios[out->grad_count] = (uint8_t) (ratio > 255 ? 255 : ratio);
++		out->grad_ratios[out->grad_count] =
++			(uint8_t) (ratio < 0 ? 0 : (ratio > 255 ? 255 : ratio));
+ 		out->grad_count++;
+ 	}
+ }
+@@ -364,9 +377,8 @@ int avm2_filter_from_object(Avm2Context* ctx, Avm2Object* obj, Avm2FilterVal* ou
+ 	Avm2FilterObjExt* e = (Avm2FilterObjExt*) obj->native_ext;
+ 	if (e == NULL) return 0;
+ 
+-	// coerce_to_u32 THEN clamp(0,15): a negative quality wraps to a huge u32
+-	// and therefore reads back as 15, not as 0.
+-	out->quality = passes_of((uint32_t) e->quality);
++	// coerce_to_i32 THEN clamp(0,15): a negative quality reads back as 0.
++	out->quality = passes_of_i32(e->quality);
+ 	out->blur_x = fixed16(e->blur_x > 0.0 ? e->blur_x : 0.0);
+ 	out->blur_y = fixed16(e->blur_y > 0.0 ? e->blur_y : 0.0);
+ 	out->angle = fixed16(rad_of_deg(e->angle));
+@@ -902,6 +914,25 @@ static Avm2Value displacement_ctor(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// GradientBevelFilter / GradientGlowFilter `set type()` rejects null with
++// TypeError #2007 (Flash; Ruffle 11624b551). The plain BevelFilter does not.
++static void gradient_check_type(Avm2Context* ctx, Avm2Value v)
++{
++	if (v.kind == AVM2_VALUE_NULL)
++		avm2_throw_error(ctx, ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter type must be non-null.");
++}
++
++static Avm2Value f_set_type_gradient(Avm2Activation* act)
++{
++	Avm2FilterObjExt* e = filter_ext(act);
++	if (e == NULL) return avm2_undefined();
++	Avm2Value v = coerce_string_slot(act->ctx, arg_or(act, 0, avm2_null()));
++	gradient_check_type(act->ctx, v);
++	e->type = v;
++	return avm2_undefined();
++}
++
+ static Avm2Value gradient_ctor_common(Avm2Activation* act, uint8_t kind)
+ {
+ 	ext_init(act, kind);
+@@ -917,6 +948,19 @@ static Avm2Value gradient_ctor_common(Avm2Activation* act, uint8_t kind)
+ 	e->strength = arg_num(act, 7, 1.0);
+ 	e->quality = arg_int(act, 8, 1);
+ 	e->type = arg_string(act, 9, "inner");
++	if (e->type.kind == AVM2_VALUE_NULL)
++	{
++		// The AS constructor assigns through `this.type = type`, so the
++		// throw reports the setter frame above the constructor's own. (No
++		// pop: the throw unwinds call_depth to the catching frame.)
++		static const Avm2MethodRef set_type_frame[2] = {
++			{ NULL, NULL, "flash.filters::GradientGlowFilter/set type", 0 },
++			{ NULL, NULL, "flash.filters::GradientBevelFilter/set type", 0 },
++		};
++		avm2_callstack_push(act->ctx,
++			&set_type_frame[kind == AVM2_FILTER_GRADIENT_BEVEL ? 1 : 0], NULL);
++		gradient_check_type(act->ctx, e->type);
++	}
+ 	e->knockout = arg_bool(act, 10, 0);
+ 	return avm2_undefined();
+ }
+@@ -1162,7 +1206,7 @@ void avm2_register_filters(Avm2Context* ctx)
+ 		avm2_builtin_add_getset(ctx, c, "quality", f_get_quality, f_set_quality);
+ 		avm2_builtin_add_getset(ctx, c, "ratios", f_get_ratios, f_set_ratios);
+ 		avm2_builtin_add_getset(ctx, c, "strength", f_get_strength, f_set_strength);
+-		avm2_builtin_add_getset(ctx, c, "type", f_get_type, f_set_type);
++		avm2_builtin_add_getset(ctx, c, "type", f_get_type, f_set_type_gradient);
+ 	}
+ 
+ 	// The three constant bags.
