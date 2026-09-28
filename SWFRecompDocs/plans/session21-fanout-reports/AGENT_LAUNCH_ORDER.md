@@ -48,6 +48,7 @@ Agent ids are recorded below as they return.
 | w2-gradient-readback | a963dab1ef7f92165 | gradient_values_readback → rm |
 | w2-px-c | a7ed7505dd7f1fef2 | RESUMED again (was w2-px-a); un-gate EditText hscroll + selection in tag.c |
 | w2-tt-e | ac07f0c018726f566 | NetStream-SquareTest |
+| w1-recomp-nondet | acc9edf96057ae2fa | recompiler nondeterminism (away3d draws.c) |
 | w2-drift-smalls | ab5ffada3eb151d3d | RESUMED w1-drift; casi32, textjustifier, hasTabs, bitmap_data_draw ×2; own worktree |
 
 ## Held queue
@@ -69,6 +70,7 @@ Agent ids are recorded below as they return.
 | w2-tt-c | GO, landed 36b11419a (+1 trace predicted) |
 | w2-tt-a | GO, landed 8a51014b8 (+2 trace predicted) |
 | w2-tt-b | GO, landed 43d0199c8 (+2 trace predicted, + new regression fixture) |
+| w2-noto-d1 | GO, landed 713c0ad3a (+1 px colormatrix; blur disposition retired → +1 more) |
 | w2-image-semantics | GO, landed c61f6ebe5 (baseline correction: 5 pass→fail, render-unchanged) |
 | w2-px-a | GO, landed ca6a8043b + 8b4d8207e (+2 px predicted) |
 | w2-mixed | GO, landed 804787bf1 + 92adceb68 (+2 trace predicted) |
