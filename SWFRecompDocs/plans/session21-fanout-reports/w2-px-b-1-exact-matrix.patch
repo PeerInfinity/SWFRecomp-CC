@@ -1,0 +1,109 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index f76a68fac..27092bd63 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -145,6 +145,19 @@ struct MovieClip {
+ 	u32 opaque_bg_rgb;
+ };
+ 
++// s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
++// is still authoritative (no later _xscale/_yscale/_rotation setter changed the
++// decomposed snapshot). Ruffle's Transform stores the matrix and only CACHES
++// scale/rotation; rebuilding a/b/c/d from f32 degrees loses ~1e-4 relative,
++// which near-cancelling nested matrices amplify (small_shear: b 0.0102 vs
++// 0.001). Shared by getLocalMatrixForMC{,_render} and tag.c::apply_as_transform.
++static inline int mc_exact_matrix_live(const MovieClip* mc)
++{
++	return mc->has_exact_matrix &&
++		mc->xscale == mc->exact_m_xs && mc->yscale == mc->exact_m_ys &&
++		mc->rotation == mc->exact_m_rot && mc->skew == mc->exact_m_skew;
++}
++
+ // Global root MovieClip
+ extern MovieClip root_movieclip;
+ 
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 804c01458..f40fec328 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -9395,9 +9395,7 @@ static void getLocalMatrixForMC(MovieClip* mc,
+ 		// touched by a later _xscale/_yscale/_rotation setter), return the
+ 		// exact assigned a/b/c/d instead of recomposing — avoids round-trip
+ 		// float drift (Transform-v8: a=3 vs a=2.99999996073879).
+-		if (mc->has_exact_matrix &&
+-		    mc->xscale == mc->exact_m_xs && mc->yscale == mc->exact_m_ys &&
+-		    mc->rotation == mc->exact_m_rot && mc->skew == mc->exact_m_skew) {
++		if (mc_exact_matrix_live(mc)) {
+ 			ba = mc->exact_m_a; bb = mc->exact_m_b;
+ 			bc = mc->exact_m_c; bd = mc->exact_m_d;
+ 		} else {
+@@ -9456,6 +9454,11 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
+ 		bty = (int32_t)rintf((float)mc->y * 20.0f);
+ 	}
+ 	if (mc->as_set_flags & (4|8|16)) {
++		if (mc_exact_matrix_live(mc)) {
++			// s21 w2-px-b: exact f32 matrix from transform.matrix (see action.h).
++			ba = (float)mc->exact_m_a; bb = (float)mc->exact_m_b;
++			bc = (float)mc->exact_m_c; bd = (float)mc->exact_m_d;
++		} else {
+ 		double xs = (double)mc->xscale / 100.0;
+ 		double ys = (double)mc->yscale / 100.0;
+ 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
+@@ -9463,6 +9466,7 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
+ 		double cr_x = cos(rot), sr_x = sin(rot);
+ 		double cr_y = cos(rot + skew), sr_y = sin(rot + skew);
+ 		ba = (float)(xs*cr_x); bb = (float)(xs*sr_x); bc = (float)(-(ys*sr_y)); bd = (float)(ys*cr_y);
++		}
+ 	}
+ 	if (mc->as_set_flags & 1) btx = (int32_t)rintf((float)mc->x * 20.0f);
+ 	if (mc->as_set_flags & 2) bty = (int32_t)rintf((float)mc->y * 20.0f);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 2e8ba11c2..cd9154d20 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -2839,7 +2839,14 @@ static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
+ 	// Mirrors getLocalMatrixForMC in action.c: uses mc->skew so that direct
+ 	// `transform.matrix = ...` assignments with non-rotation-only matrices
+ 	// (e.g. Matrix(2, -1.3, 2.4, 1, ...)) reconstruct correctly.
+-	if (flags & (4|8|16))
++	if ((flags & (4|8|16)) && mc_exact_matrix_live(mc))
++	{
++		// s21 w2-px-b: a live `transform.matrix =` assignment renders its
++		// exact f32 a/b/c/d, not the f32 scale/rotation/skew recomposition.
++		slot[0] = (float)mc->exact_m_a; slot[1] = (float)mc->exact_m_b;
++		slot[4] = (float)mc->exact_m_c; slot[5] = (float)mc->exact_m_d;
++	}
++	else if (flags & (4|8|16))
+ 	{
+ 		float sx = mc->xscale / 100.0f;
+ 		float sy = mc->yscale / 100.0f;
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 127b70eef..b81278ad6 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -316,3 +316,25 @@ visual/fonts/device-font                    # DEVICE-FONT OUTLINES, ALIASED    1
+                                             #   tolerance 0, byte-exact vs the
+                                             #   golden (0 of 3 outliers): any
+                                             #   flattening change shows here.
++
++# s21 w2-px-b — exact transform.matrix + AVM1 transformed-border lines
++# tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
++visual/edittext/edittext_device_transform_small_rotation
++                                            # DEVICE-FONT SHEAR/ROT CULL    1 cmp
++                                            #   11 of 11 outliers: ZERO
++                                            #   headroom. Reads the clip's
++                                            #   render matrix through
++                                            #   tf_world_matrix.
++# tier=2  (CI-failing / skipped; A/B signal only)
++visual/edittext/edittext_device_transform_small_shear
++                                            # EXACT transform.matrix        1 cmp
++                                            #   nested near-cancelling
++                                            #   matrices (1,500.001)x(1,-500);
++                                            #   the render must use the stored
++                                            #   f32 matrix, not a recomposition
++                                            #   of f32 scale/rotation.
++visual/fonts/leading_device_font            # AVM2 BORDER BR CORNER         1 cmp
++                                            #   untransformed field: golden
++                                            #   wants the BR corner EMPTY,
++                                            #   edittext_border_transform wants
++                                            #   it 3/4 inked (s21 lead D2).
