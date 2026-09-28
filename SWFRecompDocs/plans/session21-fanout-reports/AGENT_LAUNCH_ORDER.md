@@ -42,6 +42,9 @@ Agent ids are recorded below as they return.
 | w2-mixed | ae1059e683ec56d94 | RESUMED w1-mixedavm-tail; links_in_scrolled_text + LoaderLoadBytesTest extraction; own worktree |
 | w2-image-semantics | accebe47b7da90c82 | TOOLING: all-checks image rule + filter |
 | w2-removed-scope | a13d0a46a8c6887e4 | port 4b7edd6ad |
+| w2-tt-d | a4379ea6ac3a60eac | RESUMED again (was w2-tt-a); MovieClip-v6/-v7 |
+| w2-filters-snap | acc2d95de3eff51f3 | RESUMED w1-filters-snap; productionize snap (+2 px) |
+| w2-noto-d1 | a984e8c2cb85bc74d | RESUMED w2-devicefont-a1; default-font (Noto) outlines |
 | w2-drift-smalls | ab5ffada3eb151d3d | RESUMED w1-drift; casi32, textjustifier, hasTabs, bitmap_data_draw ×2; own worktree |
 
 ## Held queue
@@ -61,3 +64,6 @@ Agent ids are recorded below as they return.
 | w2-arraysort-m3 | GO, landed 835d9f539 (+4 trace predicted; write-back-only-moved rule) — CONFIRMED +4 by run 36479505052 |
 | w2-drift-smalls | GO, landed ac51147ec (+5 trace predicted) |
 | w2-tt-c | GO, landed 36b11419a (+1 trace predicted) |
+| w2-tt-a | GO, landed 8a51014b8 (+2 trace predicted) |
+| w2-tt-b | GO, landed 43d0199c8 (+2 trace predicted, + new regression fixture) |
+| w1-filters-snap | GO — refuted 'arithmetically unflippable'; +2 px measured (blur/drop_shadow_scales_with_screen) |
