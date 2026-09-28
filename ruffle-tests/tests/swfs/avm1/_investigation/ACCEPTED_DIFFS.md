@@ -975,7 +975,12 @@ materially above ~359 channels, this entry does not cover it.
 
 ### `avm2/bitmapdata_applyfilter_blur` — residual is the default-font text, not the blur (30 844 outlier channels, mean 1.21)
 
-<!-- image-axis: avm2/bitmapdata_applyfilter_blur output -->
+<!-- image-axis: none -->
+
+**RESOLVED 2026-09-28 (s21, `w2-noto-d1`).** The recompiler now emits NotoSans
+outlines for `with_default_font` tests and device fields use Noto's real
+ascent/descent there; this comparison renders at 0 outliers / max diff 2 locally.
+The image-axis exclusion is withdrawn; the history below is kept for reference.
 
 `Test.as`'s `createSource()` draws a `TextField` into the source bitmap with
 `with_default_font = true`, and the fixture itself carries the upstream note

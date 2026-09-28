@@ -2532,6 +2532,12 @@ static const Avm2FontData noto_device_font = {
 	0, "Noto Sans", 0, 0, 1, 20480, 21931, 5973, 3413,
 	sizeof(noto_codes) / sizeof(noto_codes[0]), noto_codes, noto_advances,
 };
+// D1-2: the same face with Noto Sans's own hhea ascent/descent (see the
+// with_default_font arm at the end of resolve_font).
+static const Avm2FontData noto_default_font_metrics = {
+	0, "Noto Sans", 0, 0, 1, 20480, 21893, 6000, 3413,
+	sizeof(noto_codes) / sizeof(noto_codes[0]), noto_codes, noto_advances,
+};
 
 // Resolved font for measurement.
 typedef struct LFont
@@ -2644,6 +2650,18 @@ static int is_ws(char c)
 	       || c == '\v';
 }
 
+// The outline-only default-font row (NULL name, see resolve_font's final
+// fallback), or NULL when the test does not set with_default_font.
+static const Avm2FontData* default_font_outline(void)
+{
+	for (uint32_t i = 0; i < avm2_generated_device_font_count; i++)
+	{
+		const Avm2FontData* fd = &avm2_generated_device_fonts[i];
+		if (fd->name == NULL && fd->glyph_pts != NULL) return fd;
+	}
+	return NULL;
+}
+
 // Ruffle html/layout.rs:562-598: split the format's font name on ',', trim
 // each entry, return the first registered device face. NULL when the whole
 // list misses (Ruffle then goes to a DefaultFont; we keep the baked-in Noto).
@@ -2748,7 +2766,23 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
 	}
 	f.data = &noto_device_font;
 	f.is_device = 1;
-	f.outline = NULL;
+	// D1-2: when the test really has Ruffle's default font (the recompiler
+	// emitted its outlines), a DEVICE field uses that face's true vertical
+	// metrics — Noto Sans hhea 1069/293 per 1000 em, i.e. 21893/6000 on the
+	// baked 20480 em (the same numbers swf.cpp's AVM1 zero-glyph synthesis
+	// emits). The baked 21931/5973 came from a Flash DefineFont3 embedding.
+	// Advances and leading stay baked.
+	if (et->device_font && default_font_outline() != NULL)
+		f.data = &noto_default_font_metrics;
+	// D1: under `with_default_font` the recompiler appends the real Noto
+	// Sans outlines as a NULL-named device row (abc_devicefont.cpp
+	// appendDefaultFontOutlines). Borrow its SHAPES only — every layout
+	// number still comes from the baked face, as in the A1b borrow above.
+	// Device fields only: an embedFonts field whose name matched nothing
+	// lands here too, and Flash draws NOTHING for it — Ruffle's fallback
+	// is a known_failure (fonts/embed_matching/no_font_found, whose Flash
+	// golden is blank and which we pass today).
+	f.outline = et->device_font ? default_font_outline() : NULL;
 	return f;
 }
 

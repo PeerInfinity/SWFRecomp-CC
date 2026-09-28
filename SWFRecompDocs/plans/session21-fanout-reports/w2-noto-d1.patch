@@ -1,0 +1,191 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 43ce9bf7a..593c87cf6 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -2644,6 +2644,18 @@ static int is_ws(char c)
+ 	       || c == '\v';
+ }
+ 
++// The outline-only default-font row (NULL name, see resolve_font's final
++// fallback), or NULL when the test does not set with_default_font.
++static const Avm2FontData* default_font_outline(void)
++{
++	for (uint32_t i = 0; i < avm2_generated_device_font_count; i++)
++	{
++		const Avm2FontData* fd = &avm2_generated_device_fonts[i];
++		if (fd->name == NULL && fd->glyph_pts != NULL) return fd;
++	}
++	return NULL;
++}
++
+ // Ruffle html/layout.rs:562-598: split the format's font name on ',', trim
+ // each entry, return the first registered device face. NULL when the whole
+ // list misses (Ruffle then goes to a DefaultFont; we keep the baked-in Noto).
+@@ -2748,7 +2760,15 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
+ 	}
+ 	f.data = &noto_device_font;
+ 	f.is_device = 1;
+-	f.outline = NULL;
++	// D1: under `with_default_font` the recompiler appends the real Noto
++	// Sans outlines as a NULL-named device row (abc_devicefont.cpp
++	// appendDefaultFontOutlines). Borrow its SHAPES only — every layout
++	// number still comes from the baked face, as in the A1b borrow above.
++	// Device fields only: an embedFonts field whose name matched nothing
++	// lands here too, and Flash draws NOTHING for it — Ruffle's fallback
++	// is a known_failure (fonts/embed_matching/no_font_found, whose Flash
++	// golden is blank and which we pass today).
++	f.outline = et->device_font ? default_font_outline() : NULL;
+ 	return f;
+ }
+ 
+diff --git a/SWFRecomp/src/abc/abc_devicefont.cpp b/SWFRecomp/src/abc/abc_devicefont.cpp
+index 99b36c29f..6a395c988 100644
+--- a/SWFRecomp/src/abc/abc_devicefont.cpp
++++ b/SWFRecomp/src/abc/abc_devicefont.cpp
+@@ -6,6 +6,8 @@
+ #include <cstdio>
+ #include <cstring>
+ #include <strings.h>
++#include <unistd.h>
++#include <iterator>
+ #include <string>
+ #include <vector>
+ 
+@@ -40,6 +42,9 @@ struct DeviceFaceDef
+ 	std::vector<int32_t> advances;
+ 	std::vector<KernPair> kerns;
+ 	std::vector<uint32_t> fallback;  // indices into the emitted device table
++	// Outline-only face with a NULL name (the with_default_font Noto, see
++	// appendDefaultFontOutlines): invisible to every by-name device lookup.
++	bool hidden = false;
+ 	// Flattened glyph outlines in the face's own font units, y NEGATED
+ 	// (Ruffle font_face.rs GlyphToDrawing emits `-y`), indexed exactly like
+ 	// `codes`/`advances` (see appendGlyphOutline).
+@@ -348,7 +353,8 @@ std::string cEsc(const std::string& s)
+ }
+ 
+ // Loads one declared face. Returns false when the TTF is missing/unparsable.
+-bool loadFace(const std::string& path, DeviceFaceDef& fd)
++bool loadFace(const std::string& path, DeviceFaceDef& fd,
++              const std::vector<uint16_t>* only_codes = NULL)
+ {
+ 	std::vector<uint8_t> data;
+ 	if (!readFile(path, data)) return false;
+@@ -372,7 +378,12 @@ bool loadFace(const std::string& path, DeviceFaceDef& fd)
+ 	// font; codepoints below 0x20 are not laid out.
+ 	std::vector<std::pair<int, uint16_t>> glyph_to_code;
+ 	std::vector<int> glyph_ids;  // parallel to fd.codes (outline emission order)
+-	for (int cp = 0x20; cp <= 0xFFFF; cp++)
++	std::vector<int> cps;
++	if (only_codes != NULL)
++		cps.assign(only_codes->begin(), only_codes->end());
++	else
++		for (int cp = 0x20; cp <= 0xFFFF; cp++) cps.push_back(cp);
++	for (int cp : cps)
+ 	{
+ 		int g = stbtt_FindGlyphIndex(&info, cp);
+ 		if (g <= 0) continue;
+@@ -442,6 +453,76 @@ bool loadFace(const std::string& path, DeviceFaceDef& fd)
+ 
+ }  // namespace
+ 
++// --- with_default_font (Ruffle's bundled Noto Sans) ---------------------------
++// Ruffle's test harness registers core/assets/notosans.subset.ttf.gz as the
++// device face "Noto Sans" behind every DefaultFont when a test.toml sets
++// `[player_options] with_default_font = true` (core/src/player.rs, the
++// `default_font` block). SWFRecomp/assets/NotoSans.ttf is byte-identical to
++// that subset (s19). The runtime lays such text out with its baked,
++// metrics-only `noto_device_font` (avm2_text.c) and so drew nothing.
++//
++// This emits ONLY the glyph outlines, as a NULL-named row appended to the
++// device table: no by-name lookup can see it (find_device_font skips NULL
++// names), so no layout number changes, and the runtime borrows its shapes
++// for the baked face exactly like the A1b embedded-twin borrow. The
++// codepoints mirror the baked face's `noto_codes[]` in avm2_text.c — a glyph
++// the layout cannot place is never drawn, so emitting more is dead weight.
++// Keep the two lists in sync.
++const uint16_t DEFAULT_FONT_CODES[] = {
++	32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
++	50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
++	68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
++	86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102,
++	103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
++	117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 160, 710, 732, 8211,
++	8212, 8216, 8217, 8218, 8220, 8221, 8222, 8224, 8225, 8226, 8230, 8240,
++	8249, 8250, 8364, 8482,
++};
++
++// Same search order as swf.cpp loadDeviceFont (cwd-relative, then relative
++// to the executable).
++std::string findDefaultFontPath()
++{
++	std::vector<std::string> paths = {
++		"assets/NotoSans.ttf", "../assets/NotoSans.ttf",
++		"SWFRecomp/assets/NotoSans.ttf", "../SWFRecomp/assets/NotoSans.ttf",
++	};
++	char exe_path[4096];
++	ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
++	if (len > 0)
++	{
++		exe_path[len] = '\0';
++		std::string exe_dir(exe_path);
++		size_t slash = exe_dir.rfind('/');
++		if (slash != std::string::npos)
++		{
++			exe_dir = exe_dir.substr(0, slash);
++			paths.push_back(exe_dir + "/../assets/NotoSans.ttf");
++			paths.push_back(exe_dir + "/assets/NotoSans.ttf");
++		}
++	}
++	for (const auto& p : paths)
++	{
++		FILE* f = fopen(p.c_str(), "rb");
++		if (f != NULL) { fclose(f); return p; }
++	}
++	return "";
++}
++
++void appendDefaultFontOutlines(std::vector<DeviceFaceDef>& faces)
++{
++	std::string path = findDefaultFontPath();
++	if (path.empty()) return;
++	std::vector<uint16_t> codes(std::begin(DEFAULT_FONT_CODES),
++	                            std::end(DEFAULT_FONT_CODES));
++	DeviceFaceDef fd;
++	fd.family = "Noto Sans";
++	fd.hidden = true;
++	if (!loadFace(path, fd, &codes) || fd.glyph_pts.empty()) return;
++	fd.kerns.clear();  // shapes only: layout never reads this row
++	faces.push_back(std::move(fd));
++}
++
+ void emitDeviceFonts(std::ostream& out)
+ {
+ 	std::vector<DeviceFaceDef> faces;
+@@ -517,6 +598,13 @@ void emitDeviceFonts(std::ostream& out)
+ 				}
+ 			}
+ 		}
++
++		// Appended LAST so the font_sorts indices above stay valid.
++		if (const toml::table* po = tbl["player_options"].as_table())
++		{
++			if ((*po)["with_default_font"].value_or(false))
++				appendDefaultFontOutlines(faces);
++		}
+ 	}
+ 
+ 	out << "\n// Device fonts declared by the test harness (test.toml [fonts.*]).\n";
+@@ -570,7 +658,11 @@ void emitDeviceFonts(std::ostream& out)
+ 		{
+ 			const DeviceFaceDef& fd = faces[i];
+ 			std::string n = std::to_string(i);
+-			out << "\t{ 0, \"" << cEsc(fd.family) << "\", "
++			if (fd.hidden)
++				out << "\t{ 0, NULL, ";
++			else
++				out << "\t{ 0, \"" << cEsc(fd.family) << "\", ";
++			out
+ 			    << (fd.bold ? 1 : 0) << ", " << (fd.italic ? 1 : 0)
+ 			    << ", 1, " << fd.em_square << ", "
+ 			    << fd.ascent << ", " << fd.descent << ", " << fd.leading << ", "

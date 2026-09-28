@@ -135,7 +135,7 @@ exactly these markers plus the global `ignored_tests.txt`.
 | `visual/video/deblocking output` | Spark IDCT precision, one Cb level | 104 channels, max 4 |
 | `avm1/netstream_play_flv output` | Sorenson Spark pixel parity | 44 channels, max 3 |
 | `visual/simple_shapes/masks output` + `…/masks_equal_clipdepth output` | **NARROWED s16** — was "1-sample rasteriser tie" for all 1738 channels; 1474 of them were our mask stencil rasterising the masker's STROKE (fixed s16). | now scoped to the **359 interior** channels measured after the fix (1738 → 359, mean 0.4927 → 0.0940; curve flattening / AA). A residual materially above ~359 is NOT covered. |
-| `avm2/bitmapdata_applyfilter_blur output` | **NEW s16** — the residual is the `with_default_font = true` TextField the fixture draws into the source bitmap, replicated across six cells; the blur itself contributes none of it. | 30 844 channels, mean 1.21, confined to four glyph bands. Above ~31 k, or excess outside the bands ⇒ re-triage the blur path. |
+| `avm2/bitmapdata_applyfilter_blur output` | **RESOLVED s21 (w2-noto-d1, default-font outlines + Noto metrics; 0 outliers locally)** — was NEW s16 — the residual is the `with_default_font = true` TextField the fixture draws into the source bitmap, replicated across six cells; the blur itself contributes none of it. | 30 844 channels, mean 1.21, confined to four glyph bands. Above ~31 k, or excess outside the bands ⇒ re-triage the blur path. |
 
 **Explicitly NOT dispositioned (do not add):**
 

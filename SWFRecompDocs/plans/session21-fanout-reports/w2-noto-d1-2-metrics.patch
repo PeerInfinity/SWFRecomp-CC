@@ -1,0 +1,31 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -2532,6 +2532,12 @@
+ 	0, "Noto Sans", 0, 0, 1, 20480, 21931, 5973, 3413,
+ 	sizeof(noto_codes) / sizeof(noto_codes[0]), noto_codes, noto_advances,
+ };
++// D1-2: the same face with Noto Sans's own hhea ascent/descent (see the
++// with_default_font arm at the end of resolve_font).
++static const Avm2FontData noto_default_font_metrics = {
++	0, "Noto Sans", 0, 0, 1, 20480, 21893, 6000, 3413,
++	sizeof(noto_codes) / sizeof(noto_codes[0]), noto_codes, noto_advances,
++};
+ 
+ // Resolved font for measurement.
+ typedef struct LFont
+@@ -2760,6 +2766,14 @@
+ 	}
+ 	f.data = &noto_device_font;
+ 	f.is_device = 1;
++	// D1-2: when the test really has Ruffle's default font (the recompiler
++	// emitted its outlines), a DEVICE field uses that face's true vertical
++	// metrics — Noto Sans hhea 1069/293 per 1000 em, i.e. 21893/6000 on the
++	// baked 20480 em (the same numbers swf.cpp's AVM1 zero-glyph synthesis
++	// emits). The baked 21931/5973 came from a Flash DefineFont3 embedding.
++	// Advances and leading stay baked.
++	if (et->device_font && default_font_outline() != NULL)
++		f.data = &noto_default_font_metrics;
+ 	// D1: under `with_default_font` the recompiler appends the real Noto
+ 	// Sans outlines as a NULL-named device row (abc_devicefont.cpp
+ 	// appendDefaultFontOutlines). Borrow its SHAPES only — every layout
