@@ -1,0 +1,179 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_media.c b/SWFModernRuntime/src/avm2/avm2_media.c
+index 6fe6090c5..b55741456 100644
+--- a/SWFModernRuntime/src/avm2/avm2_media.c
++++ b/SWFModernRuntime/src/avm2/avm2_media.c
+@@ -23,6 +23,7 @@
+ // not exist there); the bridge bodies compile away.
+ 
+ #include <math.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
+ #include <audio/audio.h>
+@@ -455,8 +456,19 @@ typedef struct Avm2SoundObjExt
+ 	// into the GC heap.
+ 	const unsigned char* ext_data;
+ 	uint32_t ext_data_len;
++	// Ruffle's SoundLoadingState (avm2/object/sound_object.rs): New until
++	// load()/new Sound(request) starts a URL load (Loading); Loaded once that
++	// load completes or loadCompressedDataFromByteArray/loadPCMFromByteArray
++	// runs. load() outside New throws #2037, the byte-array loaders are
++	// no-ops once Loaded, and a URL load finishing after Loaded is dropped
++	// (loader.rs load_sound_avm2).
++	uint8_t load_state;
+ } Avm2SoundObjExt;
+ 
++#define AVM2_SOUND_LOAD_NEW     0
++#define AVM2_SOUND_LOAD_LOADING 1
++#define AVM2_SOUND_LOAD_LOADED  2
++
+ static Avm2SoundObjExt* sound_ext_of(Avm2Context* ctx, Avm2Object* o)
+ {
+ 	if (o == NULL || o->cls == NULL
+@@ -517,7 +529,10 @@ static Avm2Value sound_ctor(Avm2Activation* act)
+ 	// `new Sound(request)` starts the load immediately (Sound.as), exactly as
+ 	// `new URLLoader(request)` does.
+ 	else if (act->argc > 0 && act->args[0].kind == AVM2_VALUE_OBJECT)
++	{
+ 		sound_start_url_load(ctx, self, s, act->args[0]);
++		s->load_state = AVM2_SOUND_LOAD_LOADING;
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -738,7 +753,79 @@ static Avm2Value sound_load(Avm2Activation* act)
+ 	// A SymbolClass-bound (embedded) sound keeps its own data: Flash ignores
+ 	// the load on one, and so did the previous no-op.
+ 	if (s == NULL || s->has_sound || act->argc == 0) return avm2_undefined();
++	// Ruffle sound.rs load(): the state check precedes the null check.
++	if (s->load_state != AVM2_SOUND_LOAD_NEW)
++		avm2_throw_error(act->ctx, act->ctx->builtins.error_class,
++		                 "Error #2037: Functions called in incorrect sequence, "
++		                 "or earlier call was unsuccessful.");
++	// FP ignores `load(null)`.
++	if (act->args[0].kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+ 	sound_start_url_load(act->ctx, this_obj(act), s, act->args[0]);
++	s->load_state = AVM2_SOUND_LOAD_LOADING;
++	return avm2_undefined();
++}
++
++static void id3_read_and_dispatch(Avm2Context* ctx, Avm2Object* sound,
++                                  Avm2SoundObjExt* s);
++
++// loadCompressedDataFromByteArray(bytes:ByteArray, bytesLength:uint) — Ruffle
++// sound.rs: a no-op once Loaded; reads `bytesLength` bytes at the ByteArray's
++// position (advancing it), throwing ArgumentError #2084 on a short read (FP's
++// actual choice); then a synchronous `progress`, the ID3 walk, and Loaded.
++static Avm2Value sound_load_compressed_data_from_byte_array(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Object* self = this_obj(act);
++	Avm2SoundObjExt* s = this_sound(act);
++	if (s == NULL || s->has_sound || s->load_state == AVM2_SOUND_LOAD_LOADED)
++		return avm2_undefined();
++	Avm2Value bv = act->argc > 0 ? act->args[0] : avm2_undefined();
++	if (bv.kind == AVM2_VALUE_NULL || bv.kind == AVM2_VALUE_UNDEFINED)
++		avm2_throw_error(ctx, ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter bytes must be non-null.");
++	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(bv);
++	if (ba == NULL) return avm2_undefined();
++	uint32_t want = act->argc > 1 ? avm2_coerce_to_u32(ctx, act->args[1]) : 0;
++	if (ba->position > ba->len || want > ba->len - ba->position)
++		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
++		                 "Error #2084: The AMF encoding of the arguments "
++		                 "cannot exceed 40K.");
++	// Ruffle owns the bytes it read before dispatching anything; a progress
++	// handler may resize the ByteArray, so take a private copy.
++	unsigned char* copy = NULL;
++	if (want > 0)
++	{
++		copy = (unsigned char*) malloc(want);
++		if (copy != NULL) memcpy(copy, ba->bytes + ba->position, want);
++	}
++	ba->position += want;
++
++	s->ext_loaded = 1;
++	s->data_size = want;
++	s->ext_duration_ms = copy != NULL ? mp3_duration_ms(copy, (size_t) want) : 0.0;
++	s->load_state = AVM2_SOUND_LOAD_LOADED;
++	Avm2Object* ev = avm2_progress_event_new(
++		ctx, avm2_string_from_literal(ctx, "progress"),
++		(double) want, (double) want);
++	if (ev != NULL) avm2_dispatch_event(ctx, self, ev);
++	// ext_data must not outlive this call (it otherwise points at static
++	// DataFileEntry storage): scope the copy to the synchronous ID3 walk.
++	s->ext_data = copy;
++	s->ext_data_len = copy != NULL ? want : 0;
++	id3_read_and_dispatch(ctx, self, s);
++	s->ext_data = NULL;
++	s->ext_data_len = 0;
++	free(copy);
++	return avm2_undefined();
++}
++
++// loadPCMFromByteArray — Ruffle stubs it: a no-op once Loaded, else Loaded.
++static Avm2Value sound_load_pcm_from_byte_array(Avm2Activation* act)
++{
++	Avm2SoundObjExt* s = this_sound(act);
++	if (s == NULL || s->has_sound || s->load_state == AVM2_SOUND_LOAD_LOADED)
++		return avm2_undefined();
++	s->load_state = AVM2_SOUND_LOAD_LOADED;
+ 	return avm2_undefined();
+ }
+ 
+@@ -1109,6 +1196,10 @@ static void media_poll_simulated(Avm2Context* ctx)
+ 			Avm2SoundObjExt* s = (Avm2SoundObjExt*) obj->native_ext;
+ 			if (!s->ext_load_queued) continue;
+ 			s->ext_load_queued = 0;
++			// Already Loaded from a ByteArray: Ruffle's load_sound_avm2
++			// returns without touching the sound or dispatching anything.
++			if (s->load_state == AVM2_SOUND_LOAD_LOADED) continue;
++			s->load_state = AVM2_SOUND_LOAD_LOADED;
+ 			Avm2Object* ev = avm2_event_new(
+ 				ctx, avm2_string_from_literal(ctx, "open"), 0, 0);
+ 			if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+@@ -1767,6 +1858,10 @@ void avm2_register_media(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, snd, "play", sound_play);
+ 	avm2_builtin_add_method(ctx, snd, "close", sound_close);
+ 	avm2_builtin_add_method(ctx, snd, "load", sound_load);
++	avm2_builtin_add_method(ctx, snd, "loadCompressedDataFromByteArray",
++	                        sound_load_compressed_data_from_byte_array);
++	avm2_builtin_add_method(ctx, snd, "loadPCMFromByteArray",
++	                        sound_load_pcm_from_byte_array);
+ 
+ 	// flash.media.ID3Info — `public final dynamic class` with seven
+ 	// `public var ...:String` and nothing else (Ruffle ID3Info.as). The seven
+diff --git a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+index edd6200f2..58344ff0c 100644
+--- a/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/avm2/ignored_tests.txt
+@@ -77,14 +77,13 @@
+ #                               (`SeekStart.Notify` / `Seek.Notify` /
+ #                               `Seek.Complete`) and the rendered video frame.
+ #                               Strictly downstream of the row above.
+-#   sound_load_multiple         3/19, dies at case 3 on
+-#                               `#1006 loadCompressedDataFromByteArray is not a
+-#                               function`. The fixture asserts Flash's *error*
+-#                               sequencing (`#2037 Functions called in incorrect
+-#                               sequence` for 5 of its 9 cases, `#2084` AMF 40K
+-#                               for the last), so the row needs both the method
+-#                               and its state-machine guards; passing cases
+-#                               cannot be scored piecemeal.
++#   sound_load_multiple         PRUNED 2026-09-28 (s21 `w2-tt-b`) — `pass`
++#                               19/19. Ported Ruffle's SoundLoadingState
++#                               (New/Loading/Loaded) into avm2_media.c:
++#                               load() outside New throws #2037, and
++#                               loadCompressedDataFromByteArray (#2084 on a
++#                               short read) / loadPCMFromByteArray now exist
++#                               and set Loaded.
+ #   soundmixer_soundtransform   PRUNED 2026-09-04 (s18 `w2-soundtransform`) —
+ #                               `pass` 900/900. The entry's own diagnosis was
+ #                               wrong on the owner: it called the two report
+@@ -104,7 +103,6 @@ audio_computespectrum
+ netstream_play_flv
+ netstream_play_stop_replay
+ netstream_seek_flv
+-sound_load_multiple
+ soundchannel_position
+ soundchannel_soundcomplete
+ 

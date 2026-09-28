@@ -7119,6 +7119,19 @@ static Avm2Value tl_get_text_block_begin_index(Avm2Activation* act)
 	return avm2_integer(tl != NULL ? (int32_t) tl->begin_index : 0);
 }
 
+// getAtomIndexAtCharIndex(charIndex:int):int — Ruffle TextLine.as: one atom
+// per UTF-16 code unit of this line, so the atom index is the char index
+// relative to the line's start, and -1 outside [0, rawTextLength).
+static Avm2Value tl_get_atom_index_at_char_index(Avm2Activation* act)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	int32_t ci = act->argc > 0 ? avm2_coerce_to_i32(act->ctx, act->args[0]) : 0;
+	if (tl == NULL) return avm2_integer(-1);
+	int64_t idx = (int64_t) ci - (int64_t) tl->begin_index;
+	if (idx < 0 || idx >= (int64_t) tl->raw_text_length) return avm2_integer(-1);
+	return avm2_integer((int32_t) idx);
+}
+
 static Avm2Value tl_get_specified_width(Avm2Activation* act)
 {
 	Avm2TextLineExt* tl = this_tl(act);
@@ -7629,14 +7642,39 @@ static void tb_trace_2175(Avm2Context* ctx)
 	fputc('\n', stdout);
 }
 
+// Ruffle text_block.rs handle_content_element: a GroupElement recurses into
+// its children and needs no format of its own; a GraphicElement contributes
+// no text and is never checked; a text-bearing element needs a format only
+// when its text is non-null (FP ignores a null-text element entirely).
+static int tb_content_has_null_format(Avm2Object* o, int depth)
+{
+	Avm2ContentElementExt* ce = ce_ext(o);
+	if (ce == NULL) return 1;
+	if (obj_is_class(o, g_groupelement_class))
+	{
+		Avm2VectorExt* v = ce->elements != NULL ? avm2_vector_ext(ce->elements)
+		                                        : NULL;
+		if (depth > 64) return 0;
+		for (uint32_t i = 0; v != NULL && i < v->length; i++)
+		{
+			Avm2Value e = v->elems[i];
+			if (e.kind == AVM2_VALUE_OBJECT
+			    && tb_content_has_null_format(e.u.obj, depth + 1))
+				return 1;
+		}
+		return 0;
+	}
+	if (obj_is_class(o, g_graphicelement_class)) return 0;
+	return ce->text != NULL && ce->element_format == NULL;
+}
+
 static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
                                         double width)
 {
 	Avm2Context* ctx = act->ctx;
 	Avm2TextBlockExt* tb = this_tb(act);
 	Avm2Object* self = this_obj(act);
-	Avm2ContentElementExt* ce = ce_ext(tb->content);
-	if (ce == NULL || ce->element_format == NULL)
+	if (tb_content_has_null_format(tb->content, 0))
 	{
 		tb_trace_2175(ctx);
 		return avm2_null();
@@ -7927,7 +7965,7 @@ void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
 	avm2_builtin_add_method(ctx, textline, "getBaselinePosition", tl_const_0);
 	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtPoint", tl_const_im1);
 	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtCharIndex",
-	                        tl_const_im1);
+	                        tl_get_atom_index_at_char_index);
 	avm2_builtin_add_method(ctx, textline, "getAtomBidiLevel", tl_const_i0);
 	avm2_builtin_add_method(ctx, textline, "getAtomBounds", tl_get_atom_bounds);
 	avm2_builtin_add_method(ctx, textline, "getAtomCenter", tl_const_1);

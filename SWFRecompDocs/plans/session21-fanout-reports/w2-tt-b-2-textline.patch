@@ -1,0 +1,84 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 37e763f28..64a46900d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -7087,6 +7087,19 @@ static Avm2Value tl_get_text_block_begin_index(Avm2Activation* act)
+ 	return avm2_integer(tl != NULL ? (int32_t) tl->begin_index : 0);
+ }
+ 
++// getAtomIndexAtCharIndex(charIndex:int):int — Ruffle TextLine.as: one atom
++// per UTF-16 code unit of this line, so the atom index is the char index
++// relative to the line's start, and -1 outside [0, rawTextLength).
++static Avm2Value tl_get_atom_index_at_char_index(Avm2Activation* act)
++{
++	Avm2TextLineExt* tl = this_tl(act);
++	int32_t ci = act->argc > 0 ? avm2_coerce_to_i32(act->ctx, act->args[0]) : 0;
++	if (tl == NULL) return avm2_integer(-1);
++	int64_t idx = (int64_t) ci - (int64_t) tl->begin_index;
++	if (idx < 0 || idx >= (int64_t) tl->raw_text_length) return avm2_integer(-1);
++	return avm2_integer((int32_t) idx);
++}
++
+ static Avm2Value tl_get_specified_width(Avm2Activation* act)
+ {
+ 	Avm2TextLineExt* tl = this_tl(act);
+@@ -7597,14 +7610,39 @@ static void tb_trace_2175(Avm2Context* ctx)
+ 	fputc('\n', stdout);
+ }
+ 
++// Ruffle text_block.rs handle_content_element: a GroupElement recurses into
++// its children and needs no format of its own; a GraphicElement contributes
++// no text and is never checked; a text-bearing element needs a format only
++// when its text is non-null (FP ignores a null-text element entirely).
++static int tb_content_has_null_format(Avm2Object* o, int depth)
++{
++	Avm2ContentElementExt* ce = ce_ext(o);
++	if (ce == NULL) return 1;
++	if (obj_is_class(o, g_groupelement_class))
++	{
++		Avm2VectorExt* v = ce->elements != NULL ? avm2_vector_ext(ce->elements)
++		                                        : NULL;
++		if (depth > 64) return 0;
++		for (uint32_t i = 0; v != NULL && i < v->length; i++)
++		{
++			Avm2Value e = v->elems[i];
++			if (e.kind == AVM2_VALUE_OBJECT
++			    && tb_content_has_null_format(e.u.obj, depth + 1))
++				return 1;
++		}
++		return 0;
++	}
++	if (obj_is_class(o, g_graphicelement_class)) return 0;
++	return ce->text != NULL && ce->element_format == NULL;
++}
++
+ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
+                                         double width)
+ {
+ 	Avm2Context* ctx = act->ctx;
+ 	Avm2TextBlockExt* tb = this_tb(act);
+ 	Avm2Object* self = this_obj(act);
+-	Avm2ContentElementExt* ce = ce_ext(tb->content);
+-	if (ce == NULL || ce->element_format == NULL)
++	if (tb_content_has_null_format(tb->content, 0))
+ 	{
+ 		tb_trace_2175(ctx);
+ 		return avm2_null();
+@@ -7874,7 +7912,7 @@ void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
+ 	avm2_builtin_add_method(ctx, textline, "getBaselinePosition", tl_const_0);
+ 	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtPoint", tl_const_im1);
+ 	avm2_builtin_add_method(ctx, textline, "getAtomIndexAtCharIndex",
+-	                        tl_const_im1);
++	                        tl_get_atom_index_at_char_index);
+ 	avm2_builtin_add_method(ctx, textline, "getAtomBidiLevel", tl_const_i0);
+ 	avm2_builtin_add_method(ctx, textline, "getAtomBounds", tl_get_atom_bounds);
+ 	avm2_builtin_add_method(ctx, textline, "getAtomCenter", tl_const_1);
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index b8a298c53..51e088ce8 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -99,3 +99,4 @@ arms cannot be reached any other way.
+ | `avm1_parent_child_render` | A loaded child movie's SHAPES: `tagDefineShape`'s vertex offset and `ng_record_char_path`'s path offset are movie-LOCAL, and every reader used the MAIN movie's arrays — so a child's shape drew the root's triangles and hit-tested against the root's outline. Five `hitTest` rows over two probe points against both movies (two flip; the bbox row is a control, since character bounds are stored as VALUES and were always right), plus a tolerance-0 image comparison of four squares — parent/child x solid/gradient — against a Ruffle golden. The gradients have two IDENTICAL stops on purpose: the row grades the ramp INDEX, not ramp fidelity. Fixed by the multi-SWF render slice (`SWFRecompDocs/status/per-movie-render-tables.md`) |
+ | `avm1_parent_child_bitmap_fill` | The same slice's PIXEL-only half: a loaded child's static bitmap reaching the size-class texture pools (its `defineBitmap` arrives at loadMovie time, long after the pools are latched at the root's `finalizeBitmaps`) and its shape's fill style naming the right slot (the index is baked into the VERTEX at recompile time). No trace assertion exists for either — every AS-visible read of a child bitmap goes through the metadata tables — so this is graded by `[image_comparisons.output]` alone and its trace output only proves the movie ran |
+ | `bitmap_pool_layer_cap` | the renderer's static bitmap pools stay under the DEVICE's `maxTextureArrayLayers`. A static pool used to take one layer per member of its size class with no cap, so more than 256 same-class bitmaps made an invalid texture on SwiftShader / the WebGPU default limits, which invalidated the bind group and dropped every frame: the movie ticked, the canvas was black. Hand-built AVM1 SWF: 300 flat-colour 2x2 bitmaps (size class 0) in a 20x15 grid of distinct colours plus one 100x1 strip (class 1), 301 bitmap-filled shapes. `test.toml`'s `[swfrecomp] gpu_max_texture_array_layers = 256` becomes `-DSWF_GPU_MAX_TEXTURE_ARRAY_LAYERS=256`, which requests 256 layers from lavapipe (it would grant 2048) — without the knob a native run cannot reach the wall. Graded by the tolerance-0 image comparison against a Ruffle golden (trace output only proves the movie ran). Before the fix: pool 0 = 300 layers, 309 WebGPU validation errors in 2 frames, capture all zeros. After: pool 0 = 256, 44 bitmaps spill into pool 1, 0 outliers. Closeout: `SWFRecompDocs/status/bitmap-pool-layer-cap.md` |
++| `avm2_sound_bytes_and_group_format` | the ungraded halves of two s21 (`w2-tt-b`) ports. **Sound** (Ruffle's `SoundLoadingState`): `loadCompressedDataFromByteArray` dispatches `progress` then `id3` synchronously inside the call and advances the ByteArray position; a second byte load is a no-op once Loaded; `load(null)` leaves the state at New; `load()` after `loadPCMFromByteArray` is #2037; a short read is `ArgumentError #2084` with the position untouched. **TextBlock** (Ruffle `handle_content_element`): a GroupElement needs no format of its own, a null-text TextElement without a format is ignored, a GraphicElement adds no text (its line's `rawTextLength` is deliberately NOT printed: FP counts the graphic as one U+FDEF, Ruffle as nothing), and a text-bearing unformatted child is the traced #2175. Expected output is the local Ruffle exporter's trace (mxmlc via `build_swf.sh`) with one splice: Ruffle routes the traced #2175 block to its ERROR log instead of the trace log, so those six lines (text verbatim from that log) sit where Flash prints them (`avm2/textblock_createline_errors` pins the Flash form). `sound.mp3` is Ruffle's `avm2/sound_load_multiple` asset |

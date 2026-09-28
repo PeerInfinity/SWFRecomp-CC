@@ -1,0 +1,143 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 76522bc0c..4084368a9 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -19385,6 +19385,26 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	int saved_active = g_avm2_filter_active;
+ 	g_avm2_filter_active = 1;
+ 
++	// s21 proto: Ruffle's filter-implied cacheAsBitmap blits the cache with
++	// PixelSnapping::Always, i.e. the whole subtree moves by
++	// round(bounds.x_min_px) - bounds.x_min_px (see tag.c cab_snap_delta).
++	Mat snapped_world = *parent_world;
++	{
++		Mat own = ext_matrix(ext);
++		Mat w = mat_mul(parent_world, &own);
++		Rect acc = { 0, 0, 0, 0, 0 };
++		bounds_with_transform(ctx, obj, &w, &acc);
++		if (acc.valid && getenv("SWF_NO_FILTER_SNAP") == NULL)
++		{
++			double vs = (context->stage_scale > 0.0f)
++			          ? (double) context->stage_scale : 1.0;
++			double xpx = acc.xmin / 20.0 * vs, ypx = acc.ymin / 20.0 * vs;
++			snapped_world.tx += (round(xpx) - xpx) * 20.0 / vs;
++			snapped_world.ty += (round(ypx) - ypx) * 20.0 / vs;
++		}
++	}
++	parent_world = &snapped_world;
++
+ 	if (n == 0)
+ 	{
+ 		// Every filter is impotent or unsupported: render normally.
+@@ -19483,6 +19503,16 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	                ? avm2_filter_fixed16(last->distance) : 0.0f;
+ 	float du = cosf(angle_rad) * dist_px / (float) context->width * fit_x;
+ 	float dv = sinf(angle_rad) * dist_px / (float) context->height * fit_y;
++	if (getenv("SWF_NO_NEAREST_OFFSET") == NULL)
++	{
++		// s21 proto: nearest-sampled offset (see tag.c render_filtered_object).
++		float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
++		float xd = cosf(angle_rad) * dist_px * vs, yd = sinf(angle_rad) * dist_px * vs;
++		float uvx = fit_x / ((float) context->width * vs);
++		float uvy = fit_y / ((float) context->height * vs);
++		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
++		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
++	}
+ 	float strength = avm2_filter_fixed8(last->strength);
+ 	float hi_r = (float) ((last->color2 >> 16) & 0xFF) / 255.0f;
+ 	float hi_g = (float) ((last->color2 >> 8) & 0xFF) / 255.0f;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 2e8ba11c2..9f7f204bb 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3091,8 +3091,11 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
+                           float* dx, float* dy)
+ {
+ 	*dx = 0.0f; *dy = 0.0f;
+-	if (obj == NULL || !obj->cache_as_bitmap) return 0;
+-	// SCOPED DIVERGENCE: skip filtered entries. Ruffle snaps them too, but its
++	// s21 proto: Ruffle's recheck_cache_as_bitmap caches (and therefore
++	// PixelSnapping::Always-blits) any object with a non-empty filter list.
++	if (obj == NULL || !(obj->cache_as_bitmap || obj->filter_type != 0)) return 0;
++	if (obj->filter_type != 0 && getenv("SWF_NO_FILTER_SNAP") != NULL) return 0;   // A/B: exact pre-proto gate
++	// (was) SCOPED DIVERGENCE: skip filtered entries. Ruffle snaps them too, but its
+ 	// blit position is `bounds.x_min + draw_offset` where draw_offset is the
+ 	// filter's dest-rect growth and the *blurred* pixels live in the cache
+ 	// texture. Our AVM1 filter path is stage-sized (s16 cut 1), so it has no
+@@ -3103,13 +3106,16 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
+ 	// max_outliers 0, so no status flip either way). Completion mechanism: a
+ 	// real offscreen cache pass (or filters cut 2's object-sized FilterSource),
+ 	// after which this gate comes out.
+-	if (obj->filter_type != 0) return 0;
+ 	float xmin, ymin;
+ 	if (!cab_world_bounds_min(obj, world, &xmin, &ymin)) return 0;
+-	double xpx = (double) xmin / 20.0;
+-	double ypx = (double) ymin / 20.0;
+-	*dx = (float) ((round(xpx) - xpx) * 20.0);
+-	*dy = (float) ((round(ypx) - ypx) * 20.0);
++	// Ruffle's bounds (and the blit it snaps) live under the STAGE VIEW
++	// matrix, so the rounding grid is DEVICE pixels, not stage pixels.
++	double vs = (context != NULL && context->stage_scale > 0.0f)
++	          ? (double) context->stage_scale : 1.0;
++	double xpx = (double) xmin / 20.0 * vs;
++	double ypx = (double) ymin / 20.0 * vs;
++	*dx = (float) ((round(xpx) - xpx) * 20.0 / vs);
++	*dy = (float) ((round(ypx) - ypx) * 20.0 / vs);
+ 	return (*dx != 0.0f) || (*dy != 0.0f);
+ }
+ 
+@@ -3157,7 +3163,7 @@ static const float* cab_snap_world(DisplayObject* obj, const float* in,
+ // which keeps the slot pool untouched for the overwhelming majority of frames.
+ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
+ {
+-	if (obj == NULL || !obj->cache_as_bitmap) return;
++	if (obj == NULL || !(obj->cache_as_bitmap || obj->filter_type != 0)) return;
+ 	u32 baked = (u32)(app_context->transform_data_size / (16 * sizeof(float)));
+ 	if (obj->transform_id >= baked) return;   // already a dynamic slot
+ 	const float* src = (const float*)app_context->transform_data + obj->transform_id * 16;
+@@ -3308,7 +3314,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 		// translate and BEFORE the slot allocation, so the entry's own slot and
+ 		// the `composed` handed to the SPRITE/BUTTON recursions carry the same
+ 		// shift (Ruffle blits the whole cached subtree at one snapped origin).
+-		if (obj->cache_as_bitmap) cab_snap_in_place(obj, composed);
++		if (obj->cache_as_bitmap || obj->filter_type != 0) cab_snap_in_place(obj, composed);
+ 
+ 		// Allocate a dynamic transform slot to avoid overwriting shared slots
+ 		u32 new_slot = g_next_dynamic_xform_slot;
+@@ -4149,6 +4155,18 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
+ 	float dist_px = (is_shadow || is_bevel) ? last->distance : 0.0f;
+ 	float du = cosf(angle_rad) * dist_px / (float)app_context->width * fit_x;
+ 	float dv = sinf(angle_rad) * dist_px / (float)app_context->height * fit_y;
++	if (getenv("SWF_NO_NEAREST_OFFSET") == NULL)
++	{
++		// s21 proto: Ruffle samples the blurred texture with a NEAREST sampler
++		// (glow.rs / bevel.rs get_sampler(false, false)) at the fractional
++		// offset, i.e. the offset is effectively floor(off + 0.5) device px.
++		float vs = (context != NULL && context->stage_scale > 0.0f) ? context->stage_scale : 1.0f;
++		float xd = cosf(angle_rad) * dist_px * vs, yd = sinf(angle_rad) * dist_px * vs;
++		float uvx = fit_x / ((float)app_context->width * vs);
++		float uvy = fit_y / ((float)app_context->height * vs);
++		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
++		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
++	}
+ 
+ 	if (draw_source_before)
+ 		render_single_object(app_context, obj);
+@@ -6639,7 +6657,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 		// text is deliberately skipped — renderer_compose_text_transforms
+ 		// reads the CPU-side transform table, which has no entry at a dynamic
+ 		// slot.
+-		if (obj->cache_as_bitmap && ch->type != CHAR_TYPE_SPRITE
++		if ((obj->cache_as_bitmap || obj->filter_type != 0) && ch->type != CHAR_TYPE_SPRITE
+ 		    && ch->type != CHAR_TYPE_BUTTON && ch->type != CHAR_TYPE_TEXT)
+ 			cab_snap_root_leaf(app_context, obj);
+ 		if (ch->type == CHAR_TYPE_SPRITE)
+@@ -7571,7 +7589,7 @@ void tagShowFrame(SWFAppContext* app_context)
+ 		// text is deliberately skipped — renderer_compose_text_transforms
+ 		// reads the CPU-side transform table, which has no entry at a dynamic
+ 		// slot.
+-		if (obj->cache_as_bitmap && ch->type != CHAR_TYPE_SPRITE
++		if ((obj->cache_as_bitmap || obj->filter_type != 0) && ch->type != CHAR_TYPE_SPRITE
+ 		    && ch->type != CHAR_TYPE_BUTTON && ch->type != CHAR_TYPE_TEXT)
+ 			cab_snap_root_leaf(app_context, obj);
+ 		if (ch->type == CHAR_TYPE_SPRITE)

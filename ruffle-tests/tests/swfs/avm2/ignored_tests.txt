@@ -77,14 +77,13 @@
 #                               (`SeekStart.Notify` / `Seek.Notify` /
 #                               `Seek.Complete`) and the rendered video frame.
 #                               Strictly downstream of the row above.
-#   sound_load_multiple         3/19, dies at case 3 on
-#                               `#1006 loadCompressedDataFromByteArray is not a
-#                               function`. The fixture asserts Flash's *error*
-#                               sequencing (`#2037 Functions called in incorrect
-#                               sequence` for 5 of its 9 cases, `#2084` AMF 40K
-#                               for the last), so the row needs both the method
-#                               and its state-machine guards; passing cases
-#                               cannot be scored piecemeal.
+#   sound_load_multiple         PRUNED 2026-09-28 (s21 `w2-tt-b`) — `pass`
+#                               19/19. Ported Ruffle's SoundLoadingState
+#                               (New/Loading/Loaded) into avm2_media.c:
+#                               load() outside New throws #2037, and
+#                               loadCompressedDataFromByteArray (#2084 on a
+#                               short read) / loadPCMFromByteArray now exist
+#                               and set Loaded.
 #   soundmixer_soundtransform   PRUNED 2026-09-04 (s18 `w2-soundtransform`) —
 #                               `pass` 900/900. The entry's own diagnosis was
 #                               wrong on the owner: it called the two report
@@ -104,7 +103,6 @@ audio_computespectrum
 netstream_play_flv
 netstream_play_stop_replay
 netstream_seek_flv
-sound_load_multiple
 soundchannel_position
 soundchannel_soundcomplete
 

@@ -1,0 +1,27 @@
+A: bytes load
+  before
+  A event progress 8586/8586
+  A event id3
+  after, position delta 0
+  id3 is null: false
+B: second bytes load is a no-op
+  position unchanged: true
+C: load(null) keeps New
+  load(null) ok
+  pcm ok
+  Error: Error #2037: Functions called in incorrect sequence, or earlier call was unsuccessful.
+D: short read
+  ArgumentError: Error #2084: The AMF encoding of the arguments cannot exceed 40K. position 1
+E: group with null-text unformatted element
+  line rawTextLength 2
+F: group with graphic between text
+  line created
+G: group with unformatted text
+Error: Error #2175: One or more elements of the content of the TextBlock has a null ElementFormat.
+	at flash.text.engine::TextBlock/DoCreateTextLine()
+	at flash.text.engine::TextBlock/createTextLine()
+	at Test/tryBlock()
+	at Test/textRows()
+	at Test()
+  line null
+Finished
