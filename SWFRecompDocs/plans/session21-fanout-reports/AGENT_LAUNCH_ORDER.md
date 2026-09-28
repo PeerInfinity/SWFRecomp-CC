@@ -39,16 +39,25 @@ Agent ids are recorded below as they return.
 | w2-tt-b | ab3225a30581e8b60 | sound_load_multiple + textline |
 | w2-tt-c | aa7259e54bee7a61b | hitarea_remove_owner_drag |
 | w2-px-b | a5b2168e1b262bfde | small_shear exact matrix + border_transform line-as-rect |
+| w2-mixed | ae1059e683ec56d94 | RESUMED w1-mixedavm-tail; links_in_scrolled_text + LoaderLoadBytesTest extraction; own worktree |
+| w2-image-semantics | accebe47b7da90c82 | TOOLING: all-checks image rule + filter |
+| w2-removed-scope | a13d0a46a8c6887e4 | port 4b7edd6ad |
+| w2-drift-smalls | ab5ffada3eb151d3d | RESUMED w1-drift; casi32, textjustifier, hasTabs, bitmap_data_draw ×2; own worktree |
 
 ## Held queue
 | label | task | source |
 |---|---|---|
 | w2-tt-d | MovieClip-v6 + -v7 (+2, 4 mechanisms all required) | w1-trace-tail slot suggestion |
 | w2-tt-e | NetStream-SquareTest (+1 rm, 2 mechanisms) | w1-trace-tail slot C second half |
+| w2-removed-scope | port upstream 4b7edd6ad: removed clip in scope chain → current target (`avm1/removed_clip_function_scope`, +1) | w1-drift slot 4 |
+| w2-gradient-readback | `avm2/gradient_values_readback` → ruffle_matched (+1 eff), 4 fixes in avm2_filters.c, DON'T touch angle rounding | w1-drift slot 3 |
+| w2-image-semantics | TOOLING: image comparator all-checks rule + per-check `filter` + per-check stats (baseline correction −1..−50, not yield) | w1-drift slot 5 |
 
 ## Completed
 | label | outcome |
 |---|---|
 | w2-caret-multiline | GO, landed 4077fc4dc (+6 cmps predicted) |
 | w2-devicefont-a1 | GO, landed a3e7d2858 (+1 cmp; L3 refuted as raster question — two prototype shortcuts) |
-| w2-arraysort-m3 | GO, landed 835d9f539 (+4 trace predicted; write-back-only-moved rule) |
+| w2-arraysort-m3 | GO, landed 835d9f539 (+4 trace predicted; write-back-only-moved rule) — CONFIRMED +4 by run 36479505052 |
+| w2-drift-smalls | GO, landed ac51147ec (+5 trace predicted) |
+| w2-tt-c | GO, landed 36b11419a (+1 trace predicted) |
