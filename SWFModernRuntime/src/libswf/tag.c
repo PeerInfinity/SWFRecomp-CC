@@ -3229,13 +3229,24 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			local_xform = attached_xform;
 		} else {
 			local_xform = &transforms[obj->transform_id * 16];
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-			// Browser-WASM: a nested timeline child whose clip action mutated
-			// its spatial props (e.g. Doodle Jump blue platform charId 32 "aaa"
-			// doing `this._x += ac` each enterFrame). Overlay the MC's
-			// as_set_flags onto the static placement transform so the per-tick
+			// A nested timeline child whose script mutated its spatial props
+			// (Doodle Jump blue platform charId 32 "aaa" doing `this._x += ac`
+			// each enterFrame; visual/cache_as_bitmap/nested_rotation's
+			// `a._rotation = 10` from its parent sprite's frame 2). Overlay the
+			// MC's as_set_flags onto the static placement transform so the
 			// change renders. Match by display_obj==obj — NOT by name, since
 			// every recycled platform owns a distinct "aaa" instance.
+			//
+			// This was browser-WASM-only (8deefbb5c: "CI compiles neither
+			// path" — a precaution, not a known divergence). CI graphics
+			// (OFFSCREEN_RENDER) has no other route for it: the top-of-frame
+			// as_set_flags loop in tagShowFrame/tagRerenderFrame walks the
+			// ROOT display_list only, and for SPRITE entries defers to the
+			// compose loop, which only builds the effective matrix for
+			// root-level sprites — so a nested child's scripted _x/_rotation
+			// silently never reached the screen (s21 w2-px-a). Render-only:
+			// the composed matrix lands in a per-frame GPU slot; the CPU
+			// transform tables that hit tests read are untouched.
 			if (obj->instance_name != NULL) {
 				extern MovieClip* child_mc_cache[];
 				extern int child_mc_count;
@@ -3251,7 +3262,6 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 					break;
 				}
 			}
-#endif
 		}
 		float composed[16];
 		hit_test_mat4_multiply(composed, parent_composed, local_xform);

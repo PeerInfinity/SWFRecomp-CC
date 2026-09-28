@@ -316,3 +316,12 @@ visual/fonts/device-font                    # DEVICE-FONT OUTLINES, ALIASED    1
                                             #   tolerance 0, byte-exact vs the
                                             #   golden (0 of 3 outliers): any
                                             #   flattening change shows here.
+
+# s21 w2-px-a (1): AVM2 copyPixels with an alphaBitmapData smaller than the
+# source rect — both out-of-bounds arms (transparent alpha bitmap: skip the
+# pixel; opaque alpha bitmap: bounds ignored). No other member reaches them.
+avm2/bitmapdata_copypixels
+# s21 w2-px-a (2): scripted _rotation on a NESTED timeline child (sprite
+# inside a root sprite) — compose_children's as_set_flags overlay, which was
+# browser-WASM-only until s21. No other member has a nested script-moved child.
+visual/cache_as_bitmap/nested_rotation
