@@ -9395,9 +9395,7 @@ static void getLocalMatrixForMC(MovieClip* mc,
 		// touched by a later _xscale/_yscale/_rotation setter), return the
 		// exact assigned a/b/c/d instead of recomposing — avoids round-trip
 		// float drift (Transform-v8: a=3 vs a=2.99999996073879).
-		if (mc->has_exact_matrix &&
-		    mc->xscale == mc->exact_m_xs && mc->yscale == mc->exact_m_ys &&
-		    mc->rotation == mc->exact_m_rot && mc->skew == mc->exact_m_skew) {
+		if (mc_exact_matrix_live(mc)) {
 			ba = mc->exact_m_a; bb = mc->exact_m_b;
 			bc = mc->exact_m_c; bd = mc->exact_m_d;
 		} else {
@@ -9456,6 +9454,11 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
 		bty = (int32_t)rintf((float)mc->y * 20.0f);
 	}
 	if (mc->as_set_flags & (4|8|16)) {
+		if (mc_exact_matrix_live(mc)) {
+			// s21 w2-px-b: exact f32 matrix from transform.matrix (see action.h).
+			ba = (float)mc->exact_m_a; bb = (float)mc->exact_m_b;
+			bc = (float)mc->exact_m_c; bd = (float)mc->exact_m_d;
+		} else {
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
@@ -9463,6 +9466,7 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
 		double cr_x = cos(rot), sr_x = sin(rot);
 		double cr_y = cos(rot + skew), sr_y = sin(rot + skew);
 		ba = (float)(xs*cr_x); bb = (float)(xs*sr_x); bc = (float)(-(ys*sr_y)); bd = (float)(ys*cr_y);
+		}
 	}
 	if (mc->as_set_flags & 1) btx = (int32_t)rintf((float)mc->x * 20.0f);
 	if (mc->as_set_flags & 2) bty = (int32_t)rintf((float)mc->y * 20.0f);

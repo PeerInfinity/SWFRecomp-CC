@@ -145,6 +145,19 @@ struct MovieClip {
 	u32 opaque_bg_rgb;
 };
 
+// s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
+// is still authoritative (no later _xscale/_yscale/_rotation setter changed the
+// decomposed snapshot). Ruffle's Transform stores the matrix and only CACHES
+// scale/rotation; rebuilding a/b/c/d from f32 degrees loses ~1e-4 relative,
+// which near-cancelling nested matrices amplify (small_shear: b 0.0102 vs
+// 0.001). Shared by getLocalMatrixForMC{,_render} and tag.c::apply_as_transform.
+static inline int mc_exact_matrix_live(const MovieClip* mc)
+{
+	return mc->has_exact_matrix &&
+		mc->xscale == mc->exact_m_xs && mc->yscale == mc->exact_m_ys &&
+		mc->rotation == mc->exact_m_rot && mc->skew == mc->exact_m_skew;
+}
+
 // Global root MovieClip
 extern MovieClip root_movieclip;
 
