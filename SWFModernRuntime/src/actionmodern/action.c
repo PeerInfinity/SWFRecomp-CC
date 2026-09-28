@@ -66643,72 +66643,55 @@ static int callArrayMethod(SWFAppContext* app_context,
 
 		// --- Standard sort: Flash QuickSort (iterative, leftmost pivot) ---
 		//
-		// Sorts the LIVE array in place. A comparator that mutates the array
-		// mid-sort (gnash array.as testCmpBogus5/6: `trysortarray.pop(); return ±1`)
-		// is documented Flash sort UB: Flash produces DIFFERENT results per return
-		// value — length 0 for `return -1` (array.as:317), length 4 / "2,3,4,1" for
-		// `return +1` (array.as:324/325). We replicate 317 by sorting in place; we
-		// do NOT replicate 324/325.
+		// Model (session 21, w2-arraysort-m3): sort a SNAPSHOT of the elements
+		// with Flash's leftmost-pivot quicksort (the same partition Ruffle's
+		// avm1 `qsort` uses), tracking each slot's ORIGIN index, then write
+		// back ONLY the positions whose origin changed (origin[i] != i).
+		// Unchanged positions are never touched.
 		//
-		// Do NOT switch to a snapshot-and-write-back sort to "fix" 324/325: that
-		// matches Ruffle but DIVERGES from Flash on 317 (Ruffle gets 317 wrong too).
-		// Project policy is to match Flash over Ruffle on genuine conflicts.
-		//
-		// The completion mechanism is NOT "a Flash-exact in-place avmplus quicksort".
-		// That framing was wrong and is retired (s20, w2-arraysort): adobe/avmplus is
-		// Tamarin — the AVM2 VM — and contains no ActionScript-1 Array at all, while
-		// array-v5..v8 are SWF 5-8 (AVM1). ArraySort::qsort (ArrayClass.cpp:637) was
-		// transcribed verbatim and driven by a popping comparator: it yields length 4
-		// on BOTH legs ("4,2,1,3" for -1, "3,4,1,2" for +1), so it loses 317 AND fails
-		// to win 324/325. Nor can a different write-back rule rescue it — both legs
-		// enter with identical len/iFirstAbsent (4) and leave with identical post-pop
-		// live length (0), so any write-back that is a function of those gives the
-		// SAME length for both, and Flash's 0-vs-4 split is unreachable.
-		//
-		// Open lead: of 5 algorithm families x 3 write-back models swept, only an
-		// IN-PLACE BUBBLE-family sort reproduces the 0-vs-4 length split (no quicksort
-		// does), and a single bubble pass over a snapshot reproduces the "2,3,4,1"
-		// contents. Gate any future attempt on a harness reproducing BOTH legs before
-		// touching this code. array-v5's residual sort-UB diff is documented in
-		// from_gnash/_investigation/ACCEPTED_DIFFS.md and the test is on the
-		// actionscript.all ignored list.
+		// This one rule reproduces every observed Flash result for the gnash
+		// array.as sort block, including the two that looked contradictory:
+		//  * testCmpBogus5 `pop(); return -1` — the permutation is the
+		//    identity, nothing is written, the pops stand: length 0 (:317).
+		//  * testCmpBogus6 `pop(); return +1` — the permutation is a rotation,
+		//    all four positions are written (re-growing the popped array):
+		//    length 4, "2,3,4,1" (:324/:325).
+		//  * sparse `gaparray.sort()` own-property sets: SWF6 {4,15,16}
+		//    (:245-248), SWF7+ {0,1,2,4,16} (:249-253) — a written position
+		//    becomes an own property even when the value written is a hole
+		//    (own, value undefined); unwritten holes stay absent.
+		//  * testCmp is called exactly 7 times on the 4-element array (:297).
+		// Ruffle writes back EVERY position (hence length 4 on :317 and a
+		// fully-own sparse array); an in-place sort over the live array reads
+		// the popped state and gets :324/:325 wrong. Harness of record:
+		// SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md.
 		{
-			ActionVar* _qbuf = arr->elements;
-
-			// --- M1: a sort must not DESTROY an index's own-property status ---
-			// We model "index i is an own property" as `elements[i].type !=
-			// ACTION_STACK_VALUE_HOLE` (see the array `hasOwnProperty` branch
-			// above and actionEnumerate2's array arm). The in-place quicksort
-			// permutes HOLEs around, so a sparse array's originally-set slot can
-			// receive a HOLE and silently stop being an own property.
-			//
-			// Flash does not work that way: sorting writes the sorted values to
-			// their DESTINATION indices as new own properties and leaves the
-			// SOURCE indices own (with value undefined). gnash array.as:
-			//   gaparray=[]; gaparray[4]='4'; gaparray[16]='16'; gaparray.sort();
-			//   -> gaparray[4] == undefined          (:223)   own, but undefined
-			//      gaparray.hasOwnProperty('4')      (:246)   TRUE
-			//      !gaparray.hasOwnProperty('0')     (:247)   still FALSE
-			// So: snapshot which indices are non-HOLE before the sort, and
-			// afterwards promote any of those that the permutation turned into a
-			// HOLE to a typed UNDEFINED (own, enumerable, value undefined).
-			// Indices that were already holes are left alone.
-			u8* _qs_was_own = NULL;
-			if (n > 0)
-			{
-				_qs_was_own = (u8*) HALLOC(n * sizeof(u8));
-				if (_qs_was_own != NULL)
-				{
-					for (u32 _wi = 0; _wi < n; _wi++)
-						_qs_was_own[_wi] =
-							(_qbuf[_wi].type != ACTION_STACK_VALUE_HOLE) ? 1 : 0;
-				}
-			}
-
+			ActionVar* _qbuf = (ActionVar*) HALLOC(n * sizeof(ActionVar));
+			u32* _qorig = (u32*) HALLOC(n * sizeof(u32));
 			typedef struct { u32 low; u32 high; } _QS_Range;
 			_QS_Range* _qs_stack = (_QS_Range*) HALLOC(n * sizeof(_QS_Range));
-			if (_qs_stack != NULL)
+			if (_qbuf != NULL && _qorig != NULL && _qs_stack != NULL)
 			{
+				// Snapshot. arr->length can exceed capacity (a large
+				// `arr.length = N` is not backed); those slots are holes.
+				for (u32 _wi = 0; _wi < n; _wi++)
+				{
+					if (_wi < arr->capacity && arr->elements != NULL)
+						_qbuf[_wi] = arr->elements[_wi];
+					else
+					{
+						_qbuf[_wi].type = ACTION_STACK_VALUE_HOLE;
+						_qbuf[_wi].str_size = 0;
+						_qbuf[_wi].data.numeric_value = 0;
+					}
+					_qorig[_wi] = _wi;
+				}
+
+				#define _QS_SWAP(_x, _y) do { \
+					ActionVar _qtv = _qbuf[_x]; _qbuf[_x] = _qbuf[_y]; _qbuf[_y] = _qtv; \
+					u32 _qto = _qorig[_x]; _qorig[_x] = _qorig[_y]; _qorig[_y] = _qto; \
+				} while (0)
+
 				int _qs_top = 0;
 				int _qs_flags = flags & ~2;  // strip DESCENDING (reversed after sort)
 				_qs_stack[_qs_top].low = 0;
@@ -66726,7 +66709,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 					u32 _qleft = _ql + 1;
 					u32 _qright = _qh;
 
-						u32 _qs_inner = 0;
+					u32 _qs_inner = 0;
 					for (;;)
 					{
 						// Guard against non-converging comparators (bogus/inconsistent user functions)
@@ -66772,15 +66755,12 @@ static int callArrayMethod(SWFAppContext* app_context,
 						}
 						if (g_execution_halted) break;
 						if (_qleft >= _qright) break;
-						// Swap _qbuf[_qleft] and _qbuf[_qright]
-						ActionVar _qtmp = _qbuf[_qleft];
-						_qbuf[_qleft] = _qbuf[_qright];
-						_qbuf[_qright] = _qtmp;
+						_QS_SWAP(_qleft, _qright);
 					}
 
-					// Place pivot at its final position
-					_qbuf[_ql] = _qbuf[_qright];
-					_qbuf[_qright] = _qpivot;
+					// Place pivot at its final position (the pivot slot _ql is
+					// never touched by the partition loop, so this is a swap)
+					_QS_SWAP(_ql, _qright);
 
 					// Push right subarray first (LIFO -> left processed first)
 					if (_qright + 1 <= _qh && _qs_top < (int)n)
@@ -66797,42 +66777,67 @@ static int callArrayMethod(SWFAppContext* app_context,
 						_qs_top++;
 					}
 				}
-				FREE(_qs_stack);
-			}
-			// DESCENDING: reverse array after sort (same as Ruffle)
-			if (flags & 2)
-			{
-				u32 _qlo = 0, _qhi = n - 1;
-				while (_qlo < _qhi)
+				// DESCENDING: reverse after sort (same as Ruffle)
+				if (flags & 2)
 				{
-					ActionVar _qtmp = _qbuf[_qlo];
-					_qbuf[_qlo] = _qbuf[_qhi];
-					_qbuf[_qhi] = _qtmp;
-					_qlo++; _qhi--;
-				}
-			}
-			// M1 (see above): re-own every index that was own before the sort.
-			// Re-read elements/length: a comparator that mutates the array
-			// mid-sort (the documented sort-UB case) can have shrunk or
-			// reallocated it, and we must not resurrect slots past the live
-			// length — array.as:317 asserts the popped length SURVIVES the sort.
-			if (_qs_was_own != NULL)
-			{
-				ActionVar* _wbuf = arr->elements;
-				u32 _wn = (arr->length < n) ? arr->length : n;
-				if (_wbuf != NULL)
-				{
-					for (u32 _wi = 0; _wi < _wn; _wi++)
+					u32 _qlo = 0, _qhi = n - 1;
+					while (_qlo < _qhi)
 					{
-						if (!_qs_was_own[_wi]) continue;
-						if (_wbuf[_wi].type != ACTION_STACK_VALUE_HOLE) continue;
-						_wbuf[_wi].type = ACTION_STACK_VALUE_UNDEFINED;
-						_wbuf[_wi].str_size = 0;
-						_wbuf[_wi].data.numeric_value = 0;
+						_QS_SWAP(_qlo, _qhi);
+						_qlo++; _qhi--;
 					}
 				}
-				FREE(_qs_was_own);
+				#undef _QS_SWAP
+
+				// Write back ONLY the positions whose origin changed. For a
+				// comparator that did not mutate the array this is an exact,
+				// refcount-neutral permutation of the array's own slots (raw
+				// copies, like the old in-place swaps). A position past the
+				// live length (the comparator popped) is re-grown through
+				// setArrayElement(undefined), which HOLE-fills any gap, bumps
+				// length and grows capacity, then receives the raw value.
+				if (!g_execution_halted)
+				{
+					for (u32 _wi = 0; _wi < n; _wi++)
+					{
+						if (_qorig[_wi] == _wi) continue;
+						ActionVar _wv = _qbuf[_wi];
+						if (_wv.type == ACTION_STACK_VALUE_HOLE)
+						{
+							// Writing a hole creates an own property whose
+							// value is undefined.
+							_wv.type = ACTION_STACK_VALUE_UNDEFINED;
+							_wv.str_size = 0;
+							_wv.data.numeric_value = 0;
+						}
+						int _w_new_key = 0;
+						if (_wi >= arr->length || _wi >= arr->capacity)
+						{
+							ActionVar _wu = {0};
+							_wu.type = ACTION_STACK_VALUE_UNDEFINED;
+							setArrayElement(app_context, arr, _wi, &_wu);  // tracks the key
+							if (_wi >= arr->capacity || _wi >= arr->length) continue;  // grow failed
+						}
+						else if (arr->elements[_wi].type == ACTION_STACK_VALUE_HOLE)
+						{
+							_w_new_key = 1;
+						}
+						arr->elements[_wi] = _wv;
+						if (_w_new_key && arr->enum_keys != NULL)
+						{
+							// A hole that became own joins the insertion-ordered
+							// enumeration list (without tracking it would be
+							// skipped by for-in once any key is tracked).
+							char _wk[12];
+							int _wkl = snprintf(_wk, sizeof(_wk), "%u", _wi);
+							arrayTrackKey(arr, _wk, (u32) _wkl);
+						}
+					}
+				}
 			}
+			if (_qs_stack != NULL) FREE(_qs_stack);
+			if (_qorig != NULL) FREE(_qorig);
+			if (_qbuf != NULL) FREE(_qbuf);
 		}
 
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);

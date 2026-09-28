@@ -1,0 +1,13 @@
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 2e8ba11c2..f09a3440b 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3229,7 +3229,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 			local_xform = attached_xform;
+ 		} else {
+ 			local_xform = &transforms[obj->transform_id * 16];
+-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
++#if !defined(NO_GRAPHICS)
+ 			// Browser-WASM: a nested timeline child whose clip action mutated
+ 			// its spatial props (e.g. Doodle Jump blue platform charId 32 "aaa"
+ 			// doing `this._x += ac` each enterFrame). Overlay the MC's

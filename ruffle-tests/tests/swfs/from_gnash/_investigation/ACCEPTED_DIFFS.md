@@ -497,7 +497,25 @@ realistic position values to AS over time). Test has no `output.ruffle.txt`
 or `known_failure = true`, so it cannot promote to `ruffle_matched`. Added
 to `from_gnash/misc-swfc.all/ignored_tests.txt`.
 
-### array-v5 (actionscript.all) — sort-mutating-comparator UB; we match Flash, Ruffle does not (Ruffle-vs-Flash conflict)
+### ~~array-v5 (actionscript.all) — sort-mutating-comparator UB; we match Flash, Ruffle does not (Ruffle-vs-Flash conflict)~~ — RESOLVED 2026-09-28 (session 21)
+
+> **RESOLVED — kept for history; everything below this note is the superseded
+> pre-fix record.** `array.as:317`, `:324` and `:325` now ALL match Flash, so
+> array-v5's ours-only set is empty; it promotes to `ruffle_matched` and was
+> removed from `actionscript.all/ignored_tests.txt` (its prune criterion).
+> The "split" was never UB-dependent: Flash sorts a **snapshot** with the same
+> leftmost-pivot quicksort Ruffle uses, then writes back **only the positions
+> whose element changed**. `pop(); return -1` yields the identity permutation →
+> nothing is written → the pops stand (length 0). `pop(); return +1` yields a
+> rotation → all four positions are written, re-growing the array (length 4,
+> `"2,3,4,1"`). Ruffle writes every position back (hence its length 4 on 317);
+> our old in-place sort read the popped live array. The same rule also yields
+> Flash's sparse-sort own-property sets exactly (SWF6 `{4,15,16}`, SWF7+
+> `{0,1,2,4,16}` — `array.as:253`, which the s20 report had called an
+> unidentified mechanism) and testCmp's 7 calls. array-v6/-v7/-v8 promote with
+> it. Report: `SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md`.
+> The "bubble-family" lead named below was a false lead: no bubble sort was
+> needed once the write-back rule was isolated.
 
 **Example diff (against Flash `output.txt`):**
 ```

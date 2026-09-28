@@ -1,0 +1,19 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index 88018f757..ef6dbb969 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -1374,10 +1374,12 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
+ 				uint32_t axx = (uint32_t) (ax + (int32_t) sxx - sx);
+ 				uint32_t ayy = (uint32_t) (ay + (int32_t) syy - sy);
+ 				uint32_t a;
+-				if (axx < alpha->width && ayy < alpha->height)
++				if (!alpha->transparency)
++					a = 255u;
++				else if (axx < alpha->width && ayy < alpha->height)
+ 					a = CA(bd_get_raw(alpha, axx, ayy));
+ 				else
+-					a = 0;
++					continue;
+ 				// Ruffle core/src/bitmap/operations.rs::copy_pixels_with_alpha_source:
+ 				// a fully opaque alpha pixel leaves the source alpha untouched
+ 				// (the `>> 8` scale would otherwise lose one step, 0xFF -> 0xFE).

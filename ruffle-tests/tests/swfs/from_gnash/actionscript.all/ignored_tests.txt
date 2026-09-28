@@ -42,22 +42,12 @@ argstest-v8
 #  _investigation/ACCEPTED_DIFFS.md Category 1 and
 #  _investigation/complete/GETVARIABLE_VN_PLAN.md.)
 
-# array-v5 — sort-mutating-comparator UB.
-# A comparator that pops the array mid-sort yields DIFFERENT Flash results per
-# return value: `pop(); return -1` → length 0 (array.as:317), `pop(); return +1`
-# → length 4 / "2,3,4,1" (array.as:324/325). We sort in place and match Flash on
-# 317 but NOT 324/325. Ruffle uses a snapshot-and-write-back sort that gets
-# 324/325 right but 317 WRONG (length 4) — a genuine Ruffle-vs-Flash conflict.
-# Per project policy we match Flash, so our diff is NOT a subset of Ruffle's (we
-# pass 317 where Ruffle fails; Ruffle passes 324/325 where we fail) -> no
-# ruffle_matched promotion.
-# The old "needs a Flash-exact in-place avmplus quicksort" note is RETIRED (s20):
-# avmplus is the AVM2 VM and has no AS1 Array; the verbatim port loses 317 without
-# winning 324/325. Open lead is an in-place bubble-family sort. See
-# SWFRecompDocs/plans/session20-fanout-reports/w2-arraysort-report.md §2.
-# PRUNE CRITERION: this entry becomes removable the moment 324/325 match — at that
-# point array-v5's ours-only set is empty and it promotes to ruffle_matched.
-# Remaining non-ours-only diffs: 1630/1636 (both engines miss these vs Flash).
-# See _investigation/ACCEPTED_DIFFS.md Category 1 and
-# _investigation/incomplete/ARRAY_V5_PLAN.md.
-array-v5
+# (array-v5 removed 2026-09-28, session 21 w2-arraysort-m3 — its PRUNE
+#  CRITERION was met: array.as:324/325 now match while :317 still does, so its
+#  ours-only set is empty and it promotes to `ruffle_matched`. The sort-UB
+#  "split" was not UB-dependent at all: Flash sorts a snapshot with the
+#  leftmost-pivot quicksort and writes back ONLY the positions whose element
+#  changed (identity permutation under `pop(); return -1` -> nothing written,
+#  length 0; rotation under `pop(); return +1` -> all four written, length 4,
+#  "2,3,4,1"). Historical detail: _investigation/ACCEPTED_DIFFS.md and
+#  SWFRecompDocs/plans/session21-fanout-reports/w2-arraysort-m3-report.md.)
