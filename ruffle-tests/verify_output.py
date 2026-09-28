@@ -12,12 +12,14 @@ Pipeline for each test:
 import argparse
 import atexit
 import glob
+import hashlib
 import json
 import os
 import re
 import resource
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import tarfile
@@ -1106,7 +1108,64 @@ def _dir_is_own_test(d):
     return resolved is not None and (d / resolved).exists()
 
 
-def find_child_swfs(test_dir):
+def _swf_body(data):
+    """Uncompressed SWF body (after the 8-byte header), or None."""
+    sig = data[:3]
+    try:
+        if sig == b"FWS":
+            return data[8:]
+        if sig == b"CWS":
+            return zlib.decompress(data[8:])
+        if sig == b"ZWS":
+            import lzma
+            size = struct.unpack("<I", data[4:8])[0] - 8
+            return lzma.LZMADecompressor(format=lzma.FORMAT_ALONE).decompress(
+                data[12:17] + struct.pack("<Q", size) + data[17:])
+    except Exception:
+        return None
+    return None
+
+
+def embedded_swf_payloads(swf_path):
+    """[(char_id, bytes)] for every DefineBinaryData whose payload is a SWF.
+
+    `[Embed(source='x.swf', mimeType='application/octet-stream')]` compiles to
+    a DefineBinaryData (tag 87) holding the whole child SWF, which the test
+    hands to `Loader.loadBytes`. The runtime already resolves loadBytes by
+    matching the payload's size against the child-movie registry, so such a
+    payload only needs to be recompiled like any on-disk child
+    (from_shumway/as3-loader/LoaderLoadBytesTest embeds a Loadee.swf the test
+    directory does not ship).
+    """
+    try:
+        body = _swf_body(Path(swf_path).read_bytes())
+    except OSError:
+        return []
+    if not body:
+        return []
+    nbits = body[0] >> 3
+    pos = (5 + 4 * nbits + 7) // 8 + 4  # RECT + frame rate + frame count
+    out = []
+    while pos + 2 <= len(body):
+        code_len = struct.unpack("<H", body[pos:pos + 2])[0]
+        pos += 2
+        code, length = code_len >> 6, code_len & 0x3F
+        if length == 0x3F:
+            if pos + 4 > len(body):
+                break
+            length = struct.unpack("<I", body[pos:pos + 4])[0]
+            pos += 4
+        tag = body[pos:pos + length]
+        pos += length
+        if code == 0:
+            break
+        # DefineBinaryData: u16 char id, u32 reserved, payload.
+        if code == 87 and len(tag) > 14 and tag[6:9] in (b"FWS", b"CWS", b"ZWS"):
+            out.append((struct.unpack("<H", tag[:2])[0], bytes(tag[6:])))
+    return out
+
+
+def find_child_swfs(test_dir, extract_dir=None):
     """Find child .swf/.png/.jpg files (non-test.swf) in a test directory.
 
     Recurses into subdirectories (loader-arc tranche 8): four Loader tests keep
@@ -1138,6 +1197,32 @@ def find_child_swfs(test_dir):
             elif f.suffix.lower() in image_exts:
                 children.append(f)
     children.sort(key=lambda p: p.relative_to(test_dir).as_posix())
+
+    # SWFs embedded in test.swf (see embedded_swf_payloads). Written to the
+    # caller's per-run build dir — never into the test directory, so nothing
+    # appears in `git status` and a re-run starts from scratch — and appended
+    # AFTER the on-disk children so their movie ids are unchanged. A payload
+    # that is byte-identical to a child already on disk is skipped: two
+    # same-size registry entries would make loadBytes' size match ambiguous
+    # (avm2/loader_loadbytes_events, avm2/large_preload_from_bytes ship their
+    # embedded SWFs as files too).
+    if extract_dir is not None:
+        on_disk = set()
+        for c in children:
+            if c.suffix == ".swf":
+                try:
+                    on_disk.add(hashlib.sha256(c.read_bytes()).hexdigest())
+                except OSError:
+                    pass
+        for char_id, payload in embedded_swf_payloads(test_dir / "test.swf"):
+            digest = hashlib.sha256(payload).hexdigest()
+            if digest in on_disk:
+                continue
+            on_disk.add(digest)
+            out = Path(extract_dir) / f"embedded_binarydata_{char_id}.swf"
+            if not out.exists() or out.read_bytes() != payload:
+                out.write_bytes(payload)
+            children.append(out)
     return children
 
 
@@ -2446,7 +2531,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
                     shutil.copy2(f, build_dir)
 
     # Handle child SWFs (multi-SWF tests like loadMovie)
-    child_swfs = find_child_swfs(test_dir)
+    child_swfs = find_child_swfs(test_dir, extract_dir=build_dir)
     child_prefixes = []
     has_children = len(child_swfs) > 0
 
@@ -2995,7 +3080,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
                     shutil.copy2(f, build_dir)
 
     # Handle child SWFs (same logic as compile_native)
-    child_swfs = find_child_swfs(test_dir)
+    child_swfs = find_child_swfs(test_dir, extract_dir=build_dir)
     child_prefixes = []
     has_children = len(child_swfs) > 0
     parent_max_string_id = 0
