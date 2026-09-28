@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-19T12:56:43.074234+00:00",
+    "old_timestamp": "2026-09-20T08:49:33.500661+00:00",
     "old_git_sha": "53a188c38f4ea18db048016d24fc54222a0dd8ca",
-    "new_timestamp": "2026-09-20T08:49:33.500661+00:00",
-    "new_git_sha": "53a188c38f4ea18db048016d24fc54222a0dd8ca",
+    "new_timestamp": "2026-09-27T08:50:10.793330+00:00",
+    "new_git_sha": "fa4caf2efd895875912e4cb2bb9e2845413db0d8",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
     "old_pass": 700,
@@ -13,21 +13,74 @@
     "old_effective_pass": 720,
     "old_total": 735,
     "old_pass_rate": 95.2,
-    "new_pass": 700,
+    "new_pass": 701,
     "new_ruffle_matched": 20,
-    "new_effective_pass": 720,
-    "new_total": 735,
-    "new_pass_rate": 95.2,
+    "new_effective_pass": 721,
+    "new_total": 738,
+    "new_pass_rate": 95.0,
     "old_mismatched_lines": 11261,
-    "new_mismatched_lines": 11261,
+    "new_mismatched_lines": 11306,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 1,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 735,
-    "added": 0,
+    "status_changed": 1,
+    "unchanged": 734,
+    "added": 3,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "bitmap_data_draw_return_value",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "bitmap_data_draw_string_target",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "geturl",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "removed_clip_function_scope",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 8
+      }
+    }
+  ]
 }
