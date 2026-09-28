@@ -49,6 +49,7 @@ Agent ids are recorded below as they return.
 | w2-px-c | a7ed7505dd7f1fef2 | RESUMED again (was w2-px-a); un-gate EditText hscroll + selection in tag.c |
 | w2-tt-e | ac07f0c018726f566 | NetStream-SquareTest |
 | w1-recomp-nondet | acc9edf96057ae2fa | recompiler nondeterminism (away3d draws.c) |
+| w2-px-d | a5b2168e1b262bfde | RESUMED (was w2-px-b); leading_device_font corner rule (D2) |
 | w2-drift-smalls | ab5ffada3eb151d3d | RESUMED w1-drift; casi32, textjustifier, hasTabs, bitmap_data_draw ×2; own worktree |
 
 ## Held queue
@@ -70,6 +71,9 @@ Agent ids are recorded below as they return.
 | w2-tt-c | GO, landed 36b11419a (+1 trace predicted) |
 | w2-tt-a | GO, landed 8a51014b8 (+2 trace predicted) |
 | w2-tt-b | GO, landed 43d0199c8 (+2 trace predicted, + new regression fixture) |
+| w2-gradient-readback | GO, landed 391aba282 (+1 trace predicted) |
+| w2-px-b | GO, landed d14b4c221 + 8aaf1ec0e + e3ba02834 (+3 px predicted; e3ba02834 fixes a mis-staged split) |
+| grading run 36493242924 | +12 trace, 0 regressions, 0 other moves (drift-smalls 5, hitarea 1, tt-a 2, tt-b 2, mixed 2) |
 | w2-noto-d1 | GO, landed 713c0ad3a (+1 px colormatrix; blur disposition retired → +1 more) |
 | w2-image-semantics | GO, landed c61f6ebe5 (baseline correction: 5 pass→fail, render-unchanged) |
 | w2-px-a | GO, landed ca6a8043b + 8b4d8207e (+2 px predicted) |
