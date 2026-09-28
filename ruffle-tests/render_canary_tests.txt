@@ -305,3 +305,14 @@ avm2/stage3d_sampler                        # uploadFromBitmapData + `tex` over
 visual/edittext/edittext_caret_multiline    # AVM2 CARET: char-index x + line-index
                                             #   y, empty-line boxes, the born
                                             #   (never-sel_active) selection.  6 cmps
+visual/fonts/device-font                    # DEVICE-FONT OUTLINES, ALIASED    1 cmp
+                                            #   added s21 (w2-devicefont-a1).
+                                            #   The set had NO `[fonts.*]`
+                                            #   member, so the recompiler's
+                                            #   TTF outline emission
+                                            #   (abc_devicefont.cpp) and the
+                                            #   device bold/italic ladder were
+                                            #   invisible to it. quality=low,
+                                            #   tolerance 0, byte-exact vs the
+                                            #   golden (0 of 3 outliers): any
+                                            #   flattening change shows here.

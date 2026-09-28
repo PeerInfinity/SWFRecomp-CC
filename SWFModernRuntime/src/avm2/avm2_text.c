@@ -2538,13 +2538,12 @@ typedef struct LFont
 {
 	const Avm2FontData* data;
 	uint8_t is_device;
-	// s18 w2-gfx-text (A1b). A `[fonts.*]` device face carries metrics,
-	// advances and the TTF `kern` table but NO glyph outlines —
-	// abc_devicefont.cpp emits none, so a device-font field renders BLANK.
-	// When the SWF also EMBEDS a face of the same name (fonts/device_font_
-	// kerning embeds the very TTF it then asks for as a device font), the
-	// outlines are already in the dictionary: keep every layout number from
-	// `data` and source the glyph SHAPES from here. NULL = draw from `data`.
+	// s18 w2-gfx-text (A1b). Since s21 abc_devicefont.cpp emits a
+	// `[fonts.*]` device face's own glyph outlines, but only for codepoints
+	// <= 0x2FF. When the SWF also EMBEDS a face of the same name, its
+	// outlines still win (as before s21) so no codepoint the embedded twin
+	// covers goes blank: keep every layout number from `data` and source
+	// the glyph SHAPES from here. NULL = draw from `data`.
 	const Avm2FontData* outline;
 } LFont;
 
@@ -2728,13 +2727,16 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
 		{
 			f.data = fd;
 			f.is_device = 1;
-			// A1b: a metrics-only device face borrows outlines from a
-			// same-name embedded face when the SWF has one. Everything the
-			// layout reads still comes from `fd`, so advances, kerning and
-			// getLineMetrics are byte-identical to before; only the glyph
-			// SHAPES appear where there used to be nothing.
+			// A1b: a device face borrows outlines from a same-name
+			// embedded face when the SWF has one. Everything the layout
+			// reads still comes from `fd`, so advances, kerning and
+			// getLineMetrics are byte-identical; only the glyph SHAPES come
+			// from the embedded face. Deliberately NOT gated on
+			// `fd->glyph_pts == NULL` any more: the recompiler now emits
+			// device outlines only up to U+02FF (abc_devicefont.cpp
+			// DEVFONT_OUTLINE_MAX_CP), and gating on it would blank any
+			// higher codepoint the embedded twin used to draw.
 			f.outline = NULL;
-			if (fd->glyph_pts == NULL)
 			{
 				const Avm2FontData* efd =
 					find_embedded_font(fmt->font, fmt->bold != 0,
