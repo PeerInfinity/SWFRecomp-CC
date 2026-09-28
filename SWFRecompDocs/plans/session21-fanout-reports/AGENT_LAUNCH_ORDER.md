@@ -45,6 +45,8 @@ Agent ids are recorded below as they return.
 | w2-tt-d | a4379ea6ac3a60eac | RESUMED again (was w2-tt-a); MovieClip-v6/-v7 |
 | w2-filters-snap | acc2d95de3eff51f3 | RESUMED w1-filters-snap; productionize snap (+2 px) |
 | w2-noto-d1 | a984e8c2cb85bc74d | RESUMED w2-devicefont-a1; default-font (Noto) outlines |
+| w2-gradient-readback | a963dab1ef7f92165 | gradient_values_readback → rm |
+| w2-px-c | a7ed7505dd7f1fef2 | RESUMED again (was w2-px-a); un-gate EditText hscroll + selection in tag.c |
 | w2-drift-smalls | ab5ffada3eb151d3d | RESUMED w1-drift; casi32, textjustifier, hasTabs, bitmap_data_draw ×2; own worktree |
 
 ## Held queue
@@ -66,4 +68,6 @@ Agent ids are recorded below as they return.
 | w2-tt-c | GO, landed 36b11419a (+1 trace predicted) |
 | w2-tt-a | GO, landed 8a51014b8 (+2 trace predicted) |
 | w2-tt-b | GO, landed 43d0199c8 (+2 trace predicted, + new regression fixture) |
+| w2-px-a | GO, landed ca6a8043b + 8b4d8207e (+2 px predicted) |
+| w2-mixed | GO, landed 804787bf1 + 92adceb68 (+2 trace predicted) |
 | w1-filters-snap | GO — refuted 'arithmetically unflippable'; +2 px measured (blur/drop_shadow_scales_with_screen) |
