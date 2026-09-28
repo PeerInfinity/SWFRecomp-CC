@@ -28871,6 +28871,20 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 // 1 when a text field is editable — Ruffle's `!EditTextFlag::READ_ONLY`, which
 // our runtime surfaces as the AS `type` property ("input" vs "dynamic").
 // Ruffle only renders a bare caret on an editable field (edit_text.rs:1063).
+// Strict "is this an input field": `type == "input"`. Unlike tf_is_editable
+// (which treats a missing `type` as editable for the caret paths), an unset
+// type is a dynamic field here — Ruffle's layout keeps an empty trailing line
+// in text_size only for input fields (html/layout.rs, `!self.is_input &&
+// is_line_empty && last_line`).
+static int tf_is_input_type(ASObject* props)
+{
+	if (props == NULL) return 0;
+	ActionVar* ty = getProperty(props, "type", 4);
+	if (ty == NULL || ty->type != ACTION_STACK_VALUE_STRING) return 0;
+	const uint16_t* tyu = varGetU16Ptr(ty);
+	return (ty->str_size == 5 && tyu != NULL && tyu[0] == 'i') ? 1 : 0;
+}
+
 static int tf_is_editable(ASObject* props)
 {
 	ActionVar* ty = getProperty(props, "type", 4);
@@ -54997,6 +55011,7 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 				left_margin_twips, right_margin_twips, indent_twips, ls_twips,
 				0.0f, 1,
 				run_starts, run_lengths, run_font_heights, rc,
+				0, /* is_input: irrelevant, only the text height is read */
 				NULL, NULL, &th_twips);
 			*out_result = (double)(th_twips / 20);
 		} else {
@@ -55327,51 +55342,35 @@ static __attribute__((noinline)) int computeScrollProperty(
 		if (scroll < 1) scroll = 1;
 	}
 
-	if (has_mixed_fonts) {
-		// Mixed-font path: use per-line heights
-		u32 run_starts[512], run_lengths[512];
-		u16 run_font_heights[512];
-		int rc = (int)run_table->run_count;
-		if (rc > 512) rc = 512;
-		for (int r = 0; r < rc; r++) {
-			run_starts[r] = run_table->runs[r].start;
-			run_lengths[r] = run_table->runs[r].length;
-			run_font_heights[r] = (u16)run_table->runs[r].font_height;
-		}
-		int maxscroll, bottomscroll;
-		ng_computeScrollMixedFont(font_id, font_height, leading,
-			utf8, utf8_len,
-			word_wrap, field_width_twips, g_swf_version,
-			left_margin_twips, right_margin_twips, indent_twips, ls_twips,
-			mc->height, scroll,
-			run_starts, run_lengths, run_font_heights, rc,
-			&maxscroll, &bottomscroll, NULL);
-		if (scroll > maxscroll) scroll = maxscroll;
-		if (is_maxscroll) {
-			*out_result = (double)maxscroll;
-		} else {
-			*out_result = (double)bottomscroll;
-		}
+	// One formula for every field, uniform or mixed font: Ruffle
+	// edit_text.rs::maxscroll is pixel-based (the first line whose top is at
+	// or below `text_height - window_height`), NOT `lines - visible + 1`. The
+	// two disagree whenever the window holds a fractional line
+	// (text/links_in_scrolled_text: 8 vs 9). A uniform field is just the
+	// run-less case of the mixed-font walker.
+	if (!has_mixed_fonts) run_table = NULL;
+	u32 run_starts[512], run_lengths[512];
+	u16 run_font_heights[512];
+	int rc = run_table ? (int)run_table->run_count : 0;
+	if (rc > 512) rc = 512;
+	for (int r = 0; r < rc; r++) {
+		run_starts[r] = run_table->runs[r].start;
+		run_lengths[r] = run_table->runs[r].length;
+		run_font_heights[r] = (u16)run_table->runs[r].font_height;
+	}
+	int maxscroll, bottomscroll;
+	ng_computeScrollMixedFont(font_id, font_height, leading,
+		utf8, utf8_len,
+		word_wrap, field_width_twips, g_swf_version,
+		left_margin_twips, right_margin_twips, indent_twips, ls_twips,
+		mc->height, scroll,
+		run_starts, run_lengths, run_font_heights, rc,
+		tf_is_input_type(props),
+		&maxscroll, &bottomscroll, NULL);
+	if (is_maxscroll) {
+		*out_result = (double)maxscroll;
 	} else {
-		// Uniform font path: original algorithm
-		int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
-			word_wrap, field_width_twips, g_swf_version,
-			left_margin_twips, right_margin_twips, indent_twips, ls_twips);
-		int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
-
-		int maxscroll = total_lines - visible_lines + 1;
-		if (maxscroll < 1) maxscroll = 1;
-
-		if (is_maxscroll) {
-			*out_result = (double)maxscroll;
-		} else {
-			// bottomScroll = scroll + visible_lines - 1, clamped to total_lines
-			if (scroll > maxscroll) scroll = maxscroll;
-			int bottom = scroll + visible_lines - 1;
-			if (bottom > total_lines) bottom = total_lines;
-			if (bottom < 1) bottom = 1;
-			*out_result = (double)bottom;
-		}
+		*out_result = (double)bottomscroll;
 	}
 	return 1;
 }
@@ -55379,25 +55378,10 @@ static __attribute__((noinline)) int computeScrollProperty(
 // Recompute maxscroll for a textfield MC. Used by scroll setter.
 static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc)
 {
-	char utf8[4096];
-	u16 font_id, font_height;
-	s16 leading;
-	int word_wrap, field_width_twips;
-	int left_margin_twips, right_margin_twips, indent_twips;
-	size_t utf8_len = extractTextFieldParams(app_context, mc, utf8,
-		&font_id, &font_height, &leading,
-		&word_wrap, &field_width_twips,
-		&left_margin_twips, &right_margin_twips, &indent_twips);
-
-	setDeviceFontModeForMC(mc);
-	int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
-		word_wrap, field_width_twips, g_swf_version,
-		left_margin_twips, right_margin_twips, indent_twips, getLetterSpacingTwips(mc));
-	int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
-
-	int maxscroll = total_lines - visible_lines + 1;
-	if (maxscroll < 1) maxscroll = 1;
-	return maxscroll;
+	// Same answer the `maxscroll` getter gives — the setter must clamp to it.
+	double ms = 1.0;
+	computeScrollProperty(app_context, mc, "maxscroll", 9, &ms);
+	return ms < 1.0 ? 1 : (int)ms;
 }
 
 void actionGetMember(SWFAppContext* app_context)
@@ -77669,6 +77653,34 @@ float ng_get_textfield_scroll_x(void* mc_v)
 	return 0.0f;
 }
 
+// AVM1 `TextField.scroll` / `.hscroll`: the AUTHOR-set view offsets (first
+// visible LINE, 1-based, and a horizontal shift in pixels), stored clamped on
+// the field's own AS object by the property setters. They are NOT the same
+// thing as `_tf_scroll_x` above, which is the caret auto-scroll of an editable
+// single-line field. A click has to be read against the scrolled view, so the
+// hit-test path adds these back before asking for a character index
+// (text/links_in_scrolled_text clicks an `asfunction:` link six lines below
+// the top of a field with `scroll`/`hscroll` set). Both return 0 for a field
+// nobody scrolled, which is every other field in the corpus.
+static int tf_view_scroll_lines(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 0;
+	ActionVar* p = getProperty((ASObject*) mc->dynamic_props, "scroll", 6);
+	if (p == NULL) return 0;
+	double d = varToDoubleSimple(p);
+	if (!(d > 1.0)) return 0;
+	return (int) d - 1;
+}
+
+static float tf_view_hscroll_px(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 0.0f;
+	ActionVar* p = getProperty((ASObject*) mc->dynamic_props, "hscroll", 7);
+	if (p == NULL) return 0.0f;
+	double d = varToDoubleSimple(p);
+	return d > 0.0 ? (float) d : 0.0f;
+}
+
 void ng_set_textfield_scroll_x(SWFAppContext* app_context, void* mc_v, float twips)
 {
 	MovieClip* mc = (MovieClip*) mc_v;
@@ -78112,8 +78124,10 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 				}
 			}
 			int char_idx = ng_getCharIndexAtPoint(
-				g_focused_mc->ng_textfield_idx, local_x, local_y,
-				text_utf8, text_byte_len);
+				g_focused_mc->ng_textfield_idx,
+				local_x + tf_view_hscroll_px(g_focused_mc), local_y,
+				text_utf8, text_byte_len,
+				tf_view_scroll_lines(g_focused_mc));
 			g_selection_begin = char_idx;
 			g_selection_end = char_idx;
 			g_selection_caret = char_idx;
@@ -78163,7 +78177,8 @@ static int tf_char_index_at_mouse(SWFAppContext* app_context)
 		}
 	}
 	return ng_getCharIndexAtPoint(g_focused_mc->ng_textfield_idx,
-		local_x, local_y, text_utf8, text_byte_len);
+		local_x + tf_view_hscroll_px(g_focused_mc), local_y,
+		text_utf8, text_byte_len, tf_view_scroll_lines(g_focused_mc));
 }
 
 // Called from swf_core.c on EV_MOUSE_MOVE while button is down.
@@ -78324,6 +78339,19 @@ static void handle_asfunction(SWFAppContext* app_context, const char* href, Movi
 			}
 		}
 
+		// A field placed on _root: root-timeline variables live in the global
+		// var_map, not on root_movieclip.dynamic_props (text/links_in_scrolled_text
+		// defines `callback = function…` on the main timeline). hasVariable
+		// first — getVariable creates the slot on a miss.
+		if (func == NULL && container == &root_movieclip
+		    && hasVariable(func_name, name_len)) {
+			ActionVar* mv = getVariable(func_name, name_len);
+			if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION) {
+				func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
+				this_obj = container;
+				this_is_mc = 1;
+			}
+		}
 		if (func == NULL && global_object != NULL) {
 			ActionVar* mv = getPropertyWithPrototype(global_object, func_name, (u32)name_len);
 			if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION) {
@@ -78407,8 +78435,11 @@ void actionTextFieldDragEnd(SWFAppContext* app_context)
 				text_byte_len = (size_t)out_pos;
 			}
 		}
-		int char_idx = ng_getCharIndexAtPoint(mc->ng_textfield_idx, local_x, local_y,
-		                                       text_utf8, text_byte_len);
+		int char_idx = ng_getCharIndexAtPoint(mc->ng_textfield_idx,
+		                                       local_x + tf_view_hscroll_px(mc),
+		                                       local_y,
+		                                       text_utf8, text_byte_len,
+		                                       tf_view_scroll_lines(mc));
 		if (char_idx < 0) continue;
 		TFRun* run = tf_find_run_at_index(table, (u32)char_idx);
 		if (run != NULL && run->href[0] != '\0') {

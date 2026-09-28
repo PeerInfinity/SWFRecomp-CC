@@ -635,8 +635,10 @@ int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square)
 s32 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx);
 void ng_setTabStops(const int* stops_twips, int count, u16 font_height);
 void ng_clearTabStops(void);
+// `scroll_lines` is the field's AVM1 `scroll` property minus one — the number
+// of whole lines scrolled off the top of the view. 0 for an unscrolled field.
 int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
-                           const char* text, size_t text_len);
+                           const char* text, size_t text_len, int scroll_lines);
 int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
     int left_margin_twips, int right_margin_twips, int indent_twips, int align,
@@ -657,6 +659,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
     int letter_spacing_twips,
     float field_height_pixels, int scroll,
     const u32* run_starts, const u32* run_lengths, const u16* run_font_heights, int run_count,
+    int is_input, /* keep an empty last line in the scroll window (input fields) */
     int* out_maxscroll, int* out_bottomscroll, int* out_text_height_twips);
 // ng_findFontIdByName, ng_getTextExtent, ng_lookupExport, ng_getSoundDuration
 // are declared above (outside #ifdef NO_GRAPHICS) since action.c needs them in all modes.

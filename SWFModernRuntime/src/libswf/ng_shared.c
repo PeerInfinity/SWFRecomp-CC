@@ -1708,6 +1708,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
     int letter_spacing_twips,
     float field_height_pixels, int scroll,
     const u32* run_starts, const u32* run_lengths, const u16* run_font_heights, int run_count,
+    int is_input,
     int* out_maxscroll, int* out_bottomscroll, int* out_text_height_twips)
 {
 	int fi = ng_find_font_with_metrics(font_id);
@@ -1942,7 +1943,11 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 	int window_height = (int)(field_height_pixels * 20.0f) - 80;
 	if (window_height <= 0) window_height = 1;
 
-	int target = full_text_height - window_height;
+	// Ruffle edit_text.rs::maxscroll measures against layout.text_size(),
+	// which (html/layout.rs) drops an empty LAST line for non-input fields
+	// only — the phantom line a trailing `</p>` leaves. Input fields keep it
+	// so the caret can be placed there.
+	int target = (is_input ? full_text_height : reported_text_height) - window_height;
 	int maxscroll = 1;
 	if (target > 0) {
 		for (int i = 0; i < total_visual_lines && i < MAX_LAYOUT_LINES; i++) {
@@ -2052,7 +2057,7 @@ void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t
 }
 
 int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
-                           const char* text, size_t text_len)
+                           const char* text, size_t text_len, int scroll_lines)
 {
 	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
 
@@ -2086,6 +2091,10 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
 	int target_line = 0;
 	if (text_y > 0 && line_height_px > 0)
 		target_line = (int)(text_y / line_height_px);
+	// The view is scrolled: line 0 of the VIEW is line `scroll - 1` of the
+	// layout (text/links_in_scrolled_text). 0 for every unscrolled field, so
+	// this is a no-op everywhere else.
+	if (scroll_lines > 0) target_line += scroll_lines;
 	if (target_line < 0) target_line = 0;
 	// Ruffle Layout::find_line_index_by_y clamps past-the-end to the LAST line
 	// (`Err(max_line)`), so a click below the text places the caret on the final
