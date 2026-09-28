@@ -1,0 +1,267 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 67622f810..01a9b45fb 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -3110,6 +3110,7 @@ typedef struct {
+ 	double meta_width;
+ 	double meta_height;
+ 	double meta_framerate;
++	double bytes_total;  // loaded FLV byte length (bytesLoaded/bytesTotal getters)
+ } ActiveNetStream;
+ 
+ static ActiveNetStream g_active_netstreams[MAX_ACTIVE_NETSTREAMS];
+@@ -4195,6 +4196,7 @@ static ActionVar builtin_ns_play(SWFAppContext* app_context, ActionVar* args, u3
+ 	g_active_netstreams[slot].meta_width = width;
+ 	g_active_netstreams[slot].meta_height = height;
+ 	g_active_netstreams[slot].meta_framerate = framerate;
++	g_active_netstreams[slot].bytes_total = (double)entry->content_length;
+ 	g_has_active_netstreams = 1;
+ 
+ 	// Decode first video frame (ScreenVideo only)
+@@ -15901,6 +15903,27 @@ static inline ASFunction* getMovieClipCtor(int version) {
+ }
+ 
+ // Get the version-appropriate MovieClip.prototype
++// Timeline Video display objects share the MovieClip wrapper struct; this
++// tells them apart by the placed character (DefineVideoStream registry, which
++// is populated in the NO_GRAPHICS / OFFSCREEN_RENDER builds).
++static int mcIsTimelineVideo(MovieClip* mc)
++{
++	extern int ng_isVideoChar(size_t char_id);
++	if (mc == NULL || mc->display_obj == NULL) return 0;
++	DisplayObject* d = (DisplayObject*)mc->display_obj;
++	return d->char_id != 0 && ng_isVideoChar(d->char_id);
++}
++
++static void initVideoPrototype(SWFAppContext* app_context, ASFunction* ctor);
++static ASObject* videoPrototypeForMc(SWFAppContext* app_context)
++{
++	extern ASFunction g_stub_ctors[];
++	ASFunction* vctor = &g_stub_ctors[16]; // Video
++	if (vctor->prototype_obj == NULL)
++		initVideoPrototype(app_context, vctor);
++	return vctor->prototype_obj;
++}
++
+ static inline ASObject* getMovieClipPrototype(int version) {
+ 	ASFunction* ctor = getMovieClipCtor(version);
+ 	return ctor->prototype_obj;
+@@ -39820,6 +39843,159 @@ static void initNetConnectionPrototype(SWFAppContext* app_context, ASFunction* c
+ 	setPropertyWithFlags(app_context, ctor->prototype_obj, "farNonce", 8, &undef_val, 0);
+ }
+ 
++// ---------------------------------------------------------------------------
++// NetStream native data properties (bufferLength / bufferTime / bytesLoaded /
++// bytesTotal / time, plus Flash's currentFps / liveDelay).
++//
++// Ruffle core/src/avm1/globals/netstream.rs:37-41 declares the first five as
++// GETTER-ONLY properties of NetStream.prototype: hasOwnProperty on the
++// prototype is true, typeof is always "number", and a write through an
++// instance goes nowhere, so `stream.bufferTime = 20` still reads the native
++// value that `setBufferTime(2)` stored (gnash misc-ming.all/NetStream-SquareTest
++// :340-376). Flash additionally exposes currentFps / liveDelay the same way
++// (NetStream-SquareTest :223/:226/:333-337/:364-366 — Ruffle lacks both).
++// Flash installs them lazily, the first time a NetStream is constructed with
++// a connected NetConnection (gnash actionscript.all/NetStream.as :58-75 asserts
++// they are absent before that), so installation stays at that site.
++// ---------------------------------------------------------------------------
++
++#define MAX_NS_NATIVE_STATES 32
++typedef struct { ASObject* obj; double buffer_time; } NsNativeState;
++static NsNativeState g_ns_native_states[MAX_NS_NATIVE_STATES];
++static int g_ns_native_state_count = 0;
++
++// Ruffle NetStream::new: buffer_time defaults to 0.1 s (core/src/streams.rs).
++#define NS_DEFAULT_BUFFER_TIME 0.1
++
++// Ruffle's getters answer only for a NetStream-native `this` (anything else,
++// e.g. reading NetStream.prototype.bufferTime directly, is undefined). Our
++// NetStreams are plain objects, so "native" = NetStream.prototype on the chain.
++static int nsIsNetStreamInstance(ASObject* obj)
++{
++	extern ASFunction g_stub_ctors[];
++	ASObject* ns_proto = g_stub_ctors[11].prototype_obj;
++	if (obj == NULL || ns_proto == NULL || obj == ns_proto) return 0;
++	ASObject* cur = obj;
++	for (int depth = 0; cur != NULL && depth < 64; depth++) {
++		ActionVar* pv = getProperty(cur, "__proto__", 9);
++		if (pv == NULL || pv->type != ACTION_STACK_VALUE_OBJECT) return 0;
++		cur = (ASObject*)(uintptr_t)pv->data.numeric_value;
++		if (cur == ns_proto) return 1;
++	}
++	return 0;
++}
++
++static NsNativeState* nsFindNativeState(ASObject* obj)
++{
++	for (int i = 0; i < g_ns_native_state_count; i++)
++		if (g_ns_native_states[i].obj == obj) return &g_ns_native_states[i];
++	return NULL;
++}
++
++static ActiveNetStream* nsFindActive(ASObject* obj)
++{
++	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
++		if (g_active_netstreams[i].active && g_active_netstreams[i].ns_obj == obj)
++			return &g_active_netstreams[i];
++	return NULL;
++}
++
++enum { NS_PROP_BUFFER_LENGTH, NS_PROP_BUFFER_TIME, NS_PROP_BYTES_LOADED,
++       NS_PROP_BYTES_TOTAL, NS_PROP_TIME, NS_PROP_CURRENT_FPS, NS_PROP_LIVE_DELAY };
++
++static ActionVar nsNativeGet(void* this_obj, int which)
++{
++	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
++	ASObject* ns = (ASObject*)this_obj;
++	if (!nsIsNetStreamInstance(ns)) return r;
++	double v = 0.0;
++	switch (which) {
++	case NS_PROP_BUFFER_LENGTH:  // Ruffle stub: reports buffer_time
++	case NS_PROP_BUFFER_TIME: {
++		NsNativeState* st = nsFindNativeState(ns);
++		v = st ? st->buffer_time : NS_DEFAULT_BUFFER_TIME;
++		break;
++	}
++	case NS_PROP_BYTES_LOADED:
++	case NS_PROP_BYTES_TOTAL: {
++		ActiveNetStream* a = nsFindActive(ns);
++		v = a ? a->bytes_total : 0.0;
++		break;
++	}
++	case NS_PROP_TIME: {
++		ActiveNetStream* a = nsFindActive(ns);
++		v = (a && a->playing) ? a->elapsed_ms / 1000.0 : 0.0;
++		break;
++	}
++	default: v = 0.0; break;  // currentFps / liveDelay: no live decode rate
++	}
++	r.type = ACTION_STACK_VALUE_F64;
++	memcpy(&r.data.numeric_value, &v, sizeof(double));
++	return r;
++}
++
++#define NS_GETTER(fn, which) \
++	static ActionVar fn(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) \
++	{ (void)app_context; (void)args; (void)arg_count; (void)registers; return nsNativeGet(this_obj, which); }
++NS_GETTER(nsGetBufferLength, NS_PROP_BUFFER_LENGTH)
++NS_GETTER(nsGetBufferTime,   NS_PROP_BUFFER_TIME)
++NS_GETTER(nsGetBytesLoaded,  NS_PROP_BYTES_LOADED)
++NS_GETTER(nsGetBytesTotal,   NS_PROP_BYTES_TOTAL)
++NS_GETTER(nsGetTime,         NS_PROP_TIME)
++NS_GETTER(nsGetCurrentFps,   NS_PROP_CURRENT_FPS)
++NS_GETTER(nsGetLiveDelay,    NS_PROP_LIVE_DELAY)
++#undef NS_GETTER
++
++// NetStream.prototype.setBufferTime(t) — Ruffle netstream.rs set_buffer_time:
++// coerce arg 0 to a number and store it (native NetStreams only).
++static ActionVar builtin_ns_setBufferTime(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)registers;
++	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
++	ASObject* ns = (ASObject*)this_obj;
++	if (!nsIsNetStreamInstance(ns)) return ret;
++	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
++	double t = coerceVarToNumber(app_context, arg_count > 0 ? &args[0] : &undef);
++	NsNativeState* st = nsFindNativeState(ns);
++	if (st == NULL && g_ns_native_state_count < MAX_NS_NATIVE_STATES) {
++		st = &g_ns_native_states[g_ns_native_state_count++];
++		st->obj = ns;
++		// Same lifetime policy as g_active_netstreams: the side-table entry
++		// holds the stream, so pointer-identity lookups can never alias a
++		// recycled allocation.
++		retainObject(ns);
++	}
++	if (st != NULL) st->buffer_time = t;
++	return ret;
++}
++
++static ASFunction g_ns_set_buffer_time_func;
++static ASFunction g_ns_prop_getter_funcs[7];
++
++// Install the getter-only native properties on NetStream.prototype (idempotent).
++static void nsInstallNativeProps(SWFAppContext* app_context, ASObject* proto)
++{
++	static const struct { const char* name; u32 len; Function2Ptr fn; } props[7] = {
++		{ "currentFps",   10, (Function2Ptr) nsGetCurrentFps },
++		{ "bufferLength", 12, (Function2Ptr) nsGetBufferLength },
++		{ "bufferTime",   10, (Function2Ptr) nsGetBufferTime },
++		{ "liveDelay",     9, (Function2Ptr) nsGetLiveDelay },
++		{ "time",          4, (Function2Ptr) nsGetTime },
++		{ "bytesLoaded",  11, (Function2Ptr) nsGetBytesLoaded },
++		{ "bytesTotal",   10, (Function2Ptr) nsGetBytesTotal },
++	};
++	if (proto == NULL || hasPropertyRaw(proto, "bufferTime", 10)) return;
++	for (int i = 0; i < 7; i++) {
++		ASFunction* g = &g_ns_prop_getter_funcs[i];
++		memset(g, 0, sizeof(ASFunction));
++		snprintf(g->name, sizeof(g->name), "get %s", props[i].name);
++		g->function_type = 2;
++		g->advanced_func = props[i].fn;
++		// A pre-existing plain slot (never expected) is replaced by the accessor.
++		setAddProperty(app_context, proto, props[i].name, props[i].len, g, NULL);
++	}
++}
++
+ // NetStream.prototype: 13 methods + 3 READ_ONLY undefined
+ static void initNetStreamPrototype(SWFAppContext* app_context, ASFunction* ctor)
+ {
+@@ -39876,7 +40052,17 @@ static void initNetStreamPrototype(SWFAppContext* app_context, ASFunction* ctor)
+ 	addStubMethodToProto(app_context, ctor->prototype_obj, "attachAudio", 11, mflags);
+ 	addStubMethodToProto(app_context, ctor->prototype_obj, "attachVideo", 11, mflags);
+ 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
+-	addStubMethodToProto(app_context, ctor->prototype_obj, "setBufferTime", 13, mflags);
++	// setBufferTime — real implementation (stores the native buffer_time)
++	{
++		memset(&g_ns_set_buffer_time_func, 0, sizeof(ASFunction));
++		strncpy(g_ns_set_buffer_time_func.name, "setBufferTime", 255);
++		g_ns_set_buffer_time_func.function_type = 2;
++		g_ns_set_buffer_time_func.advanced_func = (Function2Ptr) builtin_ns_setBufferTime;
++		setupNativeFuncOwnProps(app_context, &g_ns_set_buffer_time_func);
++		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
++		fv.data.numeric_value = (u64)&g_ns_set_buffer_time_func;
++		setPropertyWithFlags(app_context, ctor->prototype_obj, "setBufferTime", 13, &fv, mflags);
++	}
+ 	addStubMethodToProto(app_context, ctor->prototype_obj, "getInfo", 7, mflags);
+ 	// READ_ONLY undefined properties
+ 	ActionVar undef_val = {0};
+@@ -57559,6 +57745,12 @@ void actionGetMember(SWFAppContext* app_context)
+ 		{
+ 			int mc_ver = (mc != NULL && mc->swf_version) ? mc->swf_version : g_swf_version;
+ 			ASObject* mc_proto = getMovieClipPrototype(mc_ver);
++			// A timeline-placed Video (DefineVideoStream) is not a MovieClip:
++			// its chain is Video.prototype -> Object.prototype, so MovieClip
++			// methods (hitTest, getBounds, ...) must not resolve on it
++			// (Ruffle avm1/globals/video.rs; gnash NetStream-SquareTest :471-472).
++			if (mcIsTimelineVideo(mc))
++				mc_proto = videoPrototypeForMc(app_context);
+ 			if (mc_proto != NULL)
+ 			{
+ 				ActionVar* prop = getPropertyWithPrototype(mc_proto, prop_name, prop_name_len);
+@@ -59164,13 +59356,10 @@ void actionNewObject(SWFAppContext* app_context)
+ 					ActionVar* is_conn = getProperty(nc_obj, "isConnected", 11);
+ 					if (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN &&
+ 					    is_conn->data.numeric_value != 0) {
+-						// Install currentFps on prototype if not already present
+-						if (ctor_func->prototype_obj != NULL &&
+-						    !hasPropertyRaw(ctor_func->prototype_obj, "currentFps", 10)) {
+-							ActionVar uv = {0};
+-							uv.type = ACTION_STACK_VALUE_UNDEFINED;
+-							setProperty(app_context, ctor_func->prototype_obj, "currentFps", 10, &uv);
+-						}
++						// Install the getter-only native data properties
++						// (currentFps, bufferLength, bufferTime, liveDelay,
++						// time, bytesLoaded, bytesTotal) on the prototype.
++						nsInstallNativeProps(app_context, ctor_func->prototype_obj);
+ 					}
+ 				}
+ 			}
+@@ -79755,6 +79944,8 @@ void actionGcMarkRoots(void)
+ 	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
+ 		if (g_active_netstreams[i].active)
+ 			swfGcMarkObject(g_active_netstreams[i].ns_obj);
++	for (int i = 0; i < g_ns_native_state_count; i++)
++		swfGcMarkObject(g_ns_native_states[i].obj);
+ 	for (int i = 0; i < g_nc_state_count; i++)
+ 		swfGcMarkObject(g_nc_states[i].nc);
+ 	// XMLSocket side table: the mock transport holds each socket from C, the
