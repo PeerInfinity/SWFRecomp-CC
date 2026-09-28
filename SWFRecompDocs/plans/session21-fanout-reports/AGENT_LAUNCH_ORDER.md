@@ -29,3 +29,26 @@ Agent ids are recorded below as they return.
 | w2-caret-multiline | a007a90196d9ee8c6 |
 | w1-filters-snap | acc2d95de3eff51f3 |
 | w1-pixel-smalls | a7ed7505dd7f1fef2 |
+
+## Batch 2 (wave 2)
+
+| label | agent id | note |
+|---|---|---|
+| w2-tt-a | a4379ea6ac3a60eac | RESUMED w1-trace-tail; own worktree `.claude/worktrees/w2-tt-a` |
+| w2-px-a | a7ed7505dd7f1fef2 | RESUMED w1-pixel-smalls; own worktree `.claude/worktrees/w2-px-a` |
+| w2-tt-b | ab3225a30581e8b60 | sound_load_multiple + textline |
+| w2-tt-c | aa7259e54bee7a61b | hitarea_remove_owner_drag |
+| w2-px-b | a5b2168e1b262bfde | small_shear exact matrix + border_transform line-as-rect |
+
+## Held queue
+| label | task | source |
+|---|---|---|
+| w2-tt-d | MovieClip-v6 + -v7 (+2, 4 mechanisms all required) | w1-trace-tail slot suggestion |
+| w2-tt-e | NetStream-SquareTest (+1 rm, 2 mechanisms) | w1-trace-tail slot C second half |
+
+## Completed
+| label | outcome |
+|---|---|
+| w2-caret-multiline | GO, landed 4077fc4dc (+6 cmps predicted) |
+| w2-devicefont-a1 | GO, landed a3e7d2858 (+1 cmp; L3 refuted as raster question — two prototype shortcuts) |
+| w2-arraysort-m3 | GO, landed 835d9f539 (+4 trace predicted; write-back-only-moved rule) |
