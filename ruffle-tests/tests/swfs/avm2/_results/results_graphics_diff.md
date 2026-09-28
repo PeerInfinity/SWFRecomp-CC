@@ -1,20 +1,30 @@
 # Ruffle Test Results Diff
 
-**Previous:** `19ba5337291e` (2026-09-22T21:18:27.580158+00:00)
-**Current:** `1b7a987cf4d9` (2026-09-28T21:10:40.137946+00:00)
+**Previous:** `1b7a987cf4d9` (2026-09-28T21:10:40.137946+00:00)
+**Current:** `0341c033aff4` (2026-09-28T23:17:24.814568+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1217 | 1218 | +1 |
-| Total | 1278 | 1280 | +2 |
-| Pass rate | 95.2% | 95.2% | 0% |
-| Mismatched lines | 2865 | 2996 | +131 |
+| Passing | 1218 | 1222 | +4 |
+| Total | 1280 | 1280 | 0 |
+| Pass rate | 95.2% | 95.5% | +0.3% |
+| Mismatched lines | 2996 | 2660 | -336 |
+|   Decreased | | | -336 |
 
-## Added Tests (2)
+## Newly Passing (4)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `date_set_time_out_of_range` | pass | 62/62 |
-| `gradient_values_readback` | output_mismatch | 81/212 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `casi32` | output_mismatch | 9/166 | 166/166 |
+| `sound_load_multiple` | output_mismatch | 3/19 | 19/19 |
+| `textjustifier_locale` | output_mismatch | 8/132 | 132/132 |
+| `textline_has_tabs` | output_mismatch | 42/47 | 47/47 |
+
+## Status Changed (2)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `simplebutton_childevents_multichild` | output_mismatch | ruffle_matched | 33/152 | 51/152 |
+| `textline_atom_index_at_char_index` | output_mismatch | ruffle_matched | 21/40 | 37/40 |

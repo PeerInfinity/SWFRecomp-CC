@@ -6,26 +6,26 @@
 
 **Run Duration**: 216m 31s
 
-**Filtered**: 40 tests ignored out of 1279 available
+**Filtered**: 39 tests ignored out of 1279 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1239 |
+| Total tests | 1240 |
 | Passing | **1216** (98.1%) |
 | Ruffle-matched | 15 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1231** (99.4%) |
-| Failing | 8 |
-| Total expected lines | 152021 |
-| Matching lines | 150450 (99.0%) |
-| Mismatched lines | 1571 |
+| Effective pass | **1231** (99.3%) |
+| Failing | 9 |
+| Total expected lines | 152040 |
+| Matching lines | 150453 (99.0%) |
+| Mismatched lines | 1587 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 8 | 100.0% |
+| Output Mismatch | 9 | 100.0% |
 
 ## Passing Tests
 
@@ -1297,15 +1297,16 @@ No timeouts.
 
 ## All Output Mismatches
 
-**8 tests** with output mismatch, sorted by match rate (best first)
+**9 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `textline_has_tabs` | 89.4% | 42/47 | 47 | 47 |  |
 | 2 | `textline_atom_index_at_char_index` | 52.5% | 21/40 | 37 | 40 |  |
 | 3 | `mouse_pick_loader_avm1` | 38.1% | 16/42 | 40 | 42 |  |
-| 4 | `textjustifier_locale` | 6.1% | 8/132 | 52 | 132 |  |
-| 5 | `casi32` | 5.2% | 9/174 | 174 | 166 |  |
-| 6 | `external_interface` | 2.9% | 3/105 | 7 | 105 |  |
-| 7 | `focus_events_mixed_avm_edittext` | 0.0% | 0/49 | 23 | 49 |  |
-| 8 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
+| 4 | `sound_load_multiple` | 15.8% | 3/19 | 7 | 19 |  |
+| 5 | `textjustifier_locale` | 6.1% | 8/132 | 52 | 132 |  |
+| 6 | `casi32` | 5.2% | 9/174 | 174 | 166 |  |
+| 7 | `external_interface` | 2.9% | 3/105 | 7 | 105 |  |
+| 8 | `focus_events_mixed_avm_edittext` | 0.0% | 0/49 | 23 | 49 |  |
+| 9 | `selection_onsetfocus_mixed_avm` | 0.0% | 0/5 | 0 | 5 |  |
