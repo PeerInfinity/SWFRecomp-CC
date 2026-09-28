@@ -16,3 +16,16 @@ Verify a SendMessage recipient against this table before sending (s14 lesson).
 | 8 | w1-pixel-smalls | 1 | main tree, read-only | price unclaimed pixel smalls |
 
 Agent ids are recorded below as they return.
+
+## Id map (batch 1)
+
+| label | agent id |
+|---|---|
+| w1-drift | ab5ffada3eb151d3d |
+| w1-mixedavm-tail | ae1059e683ec56d94 |
+| w1-trace-tail | a4379ea6ac3a60eac |
+| w2-arraysort-m3 | ab5549fbce3bd8255 |
+| w2-devicefont-a1 | a984e8c2cb85bc74d |
+| w2-caret-multiline | a007a90196d9ee8c6 |
+| w1-filters-snap | acc2d95de3eff51f3 |
+| w1-pixel-smalls | a7ed7505dd7f1fef2 |

@@ -18497,6 +18497,10 @@ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
 // field-local twips (Ruffle render_layout_box / render_underline).
 uint32_t avm2_edittext_collect_underlines(Avm2Context* ctx, Avm2Object* tf_obj,
                                           int32_t** out);
+// avm2_text.c: the focused field's caret, {x, y, h, 0xRRGGBB} in field-local
+// twips (Ruffle render_layout_box's caret test). 0 = no visible caret.
+int avm2_edittext_collect_caret(Avm2Context* ctx, Avm2Object* tf_obj,
+                                int32_t out[4]);
 
 // One world-transform + alpha-cxform slot pair for a text field (field-local
 // twips -> stage). The selection fill and the glyphs both draw under it,
@@ -18668,6 +18672,41 @@ static void avm2_render_underlines(const int32_t* u, uint32_t n,
 		// offset by HALF_PX along the line and its normal.
 		avm2_draw_border_line(ax, ay, ax + sa, ay + sb, rgb, alpha);
 	}
+}
+
+// s21 w2-caret-multiline. Ruffle EditText::render_caret (edit_text.rs:1330):
+//   caret = world * translate(box origin)
+//           * create_box_with_rotation(1.0, h_px, PI/2, x, 0)
+// i.e. a = world.c * h, b = world.d * h (the line direction, px), c = -world.a,
+// d = -world.b; then EditTextPixelSnapping on the whole matrix, ty -= HALF_PX,
+// and a DrawLine — emulate_line_as_rect between M*(0,0) and M*(1px,0). The
+// command is replayed AFTER the field mask is popped ("We have to draw the
+// caret outside of the text mask"), in the raw text colour (no colour
+// transform: the DrawLine is pushed straight onto the command list).
+// `c` is {x, y, h, 0xRRGGBB} in field-local twips.
+static void avm2_render_caret(const int32_t c[4], const Mat* world)
+{
+	double lx = (double) c[0], ly = (double) c[1], h = (double) c[2];
+	uint32_t rgb = (uint32_t) c[3];
+	double ax = world->a * lx + world->c * ly + world->tx;
+	double ay = world->b * lx + world->d * ly + world->ty;
+	double sa = world->c * h, sb = world->d * h;           // stage twips
+#if MSAA_SAMPLES == 1
+	ax = tw_round_to_device_px(ax);
+	ay = tw_round_to_device_px(ay);
+#else
+	ax = tw_trunc_to_device_px(ax + 2.0);
+	ay = tw_trunc_to_device_px(ay + 2.0);
+	// x_snap tests the caret matrix's c/d, which are -world.a / -world.b.
+	if (fabs(world->a) < 0.001 || fabs(world->b) < 0.001)
+	{
+		double d = avm2_text_device_twip();
+		sa = nearbyint(sa / d - 0.35) * d;
+		sb = nearbyint(sb / d - 0.35) * d;
+	}
+#endif
+	ay -= avm2_text_device_twip() / 2.0;                    // ty -= HALF_PX
+	avm2_draw_border_line(ax, ay, ax + sa, ay + sb, rgb, 1.0);
 }
 
 static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
@@ -19091,6 +19130,12 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 		if (un > 0) avm2_render_underlines(ul, un, world, alpha);
 		if (has_clip) renderer_end_clip(context);
 	}
+	// Caret last, outside the field mask (Ruffle replays draw_caret_command
+	// after popping the mask). Its geometry is already stage twips, so it
+	// rides the identity slot like the border and the underlines.
+	int32_t caret[4];
+	if (avm2_edittext_collect_caret(ctx, obj, caret))
+		avm2_render_caret(caret, world);
 	if (sel != NULL) heap_free(ctx->app, sel);
 	if (gl != NULL) heap_free(ctx->app, gl);
 	if (ul != NULL) heap_free(ctx->app, ul);

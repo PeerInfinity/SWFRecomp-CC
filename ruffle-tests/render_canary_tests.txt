@@ -294,3 +294,14 @@ avm2/stage3d_sampler                        # uploadFromBitmapData + `tex` over
                                             #   and linear, with the
                                             #   setSamplerStateAt-vs-setProgram
                                             #   precedence rule.
+
+# SESSION 21 ADDITION (s21 wave-2 `w2-caret-multiline`). The AVM2 EditText
+# CARET (avm2_display.c::avm2_render_caret, fed by avm2_text.c::
+# avm2_edittext_collect_caret). No standing member held a FOCUSED, EDITABLE
+# AVM2 field with a collapsed selection, so nothing could see the caret arm.
+# Listed under tier 2 because it was CI-failing when added; it passes locally
+# at max diff 0 on all 6 comparisons — promote to TIER 1 once a graded run
+# confirms. Its AVM1 twin (tag.c caret) is visual/edittext/edittext_caret_empty.
+visual/edittext/edittext_caret_multiline    # AVM2 CARET: char-index x + line-index
+                                            #   y, empty-line boxes, the born
+                                            #   (never-sel_active) selection.  6 cmps

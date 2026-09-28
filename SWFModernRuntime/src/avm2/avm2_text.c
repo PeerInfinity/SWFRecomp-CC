@@ -3979,6 +3979,77 @@ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
 	return n;
 }
 
+// s21 w2-caret-multiline. Caret geometry in field-local twips — Ruffle
+// render_layout_box (edit_text.rs:1237-1310). Every text box tests whether the
+// collapsed selection sits in [start, end) — `end + 1` for the last box of a
+// line, so the position of the newline / the very end of the text lands on
+// that line's last box — and the LAST matching box wins (each match overwrites
+// render_state.draw_caret_command). The caret is x = the glyph origin at the
+// caret position (or the pen after the last glyph), top = the box top, height
+// = the box font's ascent + descent. Returns 1 and fills
+// out = {x, y, h, 0xRRGGBB} when a caret is visible, else 0.
+//
+// Visibility: Ruffle's visible_selection caret arm (focused, not read-only;
+// the harness captures inside the first half of the 1s blink cycle, so the
+// blink phase is always "on" in the goldens). AS3 selections are MANDATORY
+// (edit_text.rs:308-312) — a field is born with a caret at the end of its
+// initial text and keeps it until something moves it — so, unlike the
+// highlight/inversion paths, this does NOT wait for `sel_active` (which the
+// born selection and the TextControl move/select arms leave cleared). The one
+// real "selection = None" transition, an IME update without a cursor, is
+// honoured through `ime_active` (it leaves sel_active cleared mid-composition).
+int avm2_edittext_collect_caret(Avm2Context* ctx, Avm2Object* tf_obj,
+                                int32_t out[4])
+{
+	Avm2EditTextExt* et = edittext_of(ctx, tf_obj);
+	if (et == NULL || et->text == NULL) return 0;
+	if (et->sel_begin != et->sel_end) return 0;
+	if (et->ime_active && !et->sel_active) return 0;
+	if (et->read_only || !avm2_display_object_has_focus(tf_obj)) return 0;
+	int32_t caret = et->sel_begin;
+	if (caret < 0) return 0;
+
+	LLayout* l = et_layout(ctx, et);
+	et_apply_lazy_bounds(et);
+	int32_t vscroll = 0;
+	if (et->scroll > 1 && (uint32_t) et->scroll <= l->line_count)
+		vscroll = l->lines[et->scroll - 1].y;
+	int32_t off_x = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
+	int32_t off_y = et->bounds_y + GUTTER - vscroll;
+
+	int found = 0;
+	for (uint32_t li = 0; li < l->line_count; li++)
+	{
+		LLine* line = &l->lines[li];
+		for (uint32_t bi = 0; bi < line->box_count; bi++)
+		{
+			LBox* b = &line->boxes[bi];
+			if (b->is_bullet || b->font.data == NULL) continue;
+			// Same cull as the glyph walk (render_layout_box returns before
+			// the caret test for a box below the field bottom).
+			if (b->y + GUTTER - vscroll > et->bounds_h) continue;
+			uint32_t end = b->end;
+			if (bi + 1 == line->box_count) end++;
+			if ((uint32_t) caret < b->start || (uint32_t) caret >= end)
+				continue;
+			uint32_t i = (uint32_t) caret - b->start;
+			int32_t cx = 0;
+			if (i > 0 && b->char_end != NULL && b->char_count > 0)
+				cx = b->char_end[(i <= b->char_count ? i : b->char_count) - 1];
+			EvalParams p;
+			p.height = twips_from_px(b->size_px);
+			const Avm2TextFormatFields* fmt = span_at_pos(et, b->start);
+			out[0] = off_x + b->x + cx;
+			out[1] = off_y + b->y;
+			out[2] = font_ascent(&b->font, p.height)
+			         + font_descent(&b->font, p.height);
+			out[3] = (int32_t) ((fmt->color >> 8) & 0xFFFFFF);
+			found = 1;
+		}
+	}
+	return found;
+}
+
 // Underline segments in field-local twips — Ruffle render_layout_box
 // (edit_text.rs:1318-1329) + render_underline (:1365-1378). The underline is a
 // property of the LAYOUT BOX, not of a character run: it spans the box's full

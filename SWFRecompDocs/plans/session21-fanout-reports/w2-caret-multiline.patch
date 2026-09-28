@@ -1,0 +1,171 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 76522bc0c..2e1bb4dcf 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -18497,6 +18497,10 @@ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
+ // field-local twips (Ruffle render_layout_box / render_underline).
+ uint32_t avm2_edittext_collect_underlines(Avm2Context* ctx, Avm2Object* tf_obj,
+                                           int32_t** out);
++// avm2_text.c: the focused field's caret, {x, y, h, 0xRRGGBB} in field-local
++// twips (Ruffle render_layout_box's caret test). 0 = no visible caret.
++int avm2_edittext_collect_caret(Avm2Context* ctx, Avm2Object* tf_obj,
++                                int32_t out[4]);
+ 
+ // One world-transform + alpha-cxform slot pair for a text field (field-local
+ // twips -> stage). The selection fill and the glyphs both draw under it,
+@@ -18670,6 +18674,41 @@ static void avm2_render_underlines(const int32_t* u, uint32_t n,
+ 	}
+ }
+ 
++// s21 w2-caret-multiline. Ruffle EditText::render_caret (edit_text.rs:1330):
++//   caret = world * translate(box origin)
++//           * create_box_with_rotation(1.0, h_px, PI/2, x, 0)
++// i.e. a = world.c * h, b = world.d * h (the line direction, px), c = -world.a,
++// d = -world.b; then EditTextPixelSnapping on the whole matrix, ty -= HALF_PX,
++// and a DrawLine — emulate_line_as_rect between M*(0,0) and M*(1px,0). The
++// command is replayed AFTER the field mask is popped ("We have to draw the
++// caret outside of the text mask"), in the raw text colour (no colour
++// transform: the DrawLine is pushed straight onto the command list).
++// `c` is {x, y, h, 0xRRGGBB} in field-local twips.
++static void avm2_render_caret(const int32_t c[4], const Mat* world)
++{
++	double lx = (double) c[0], ly = (double) c[1], h = (double) c[2];
++	uint32_t rgb = (uint32_t) c[3];
++	double ax = world->a * lx + world->c * ly + world->tx;
++	double ay = world->b * lx + world->d * ly + world->ty;
++	double sa = world->c * h, sb = world->d * h;           // stage twips
++#if MSAA_SAMPLES == 1
++	ax = tw_round_to_device_px(ax);
++	ay = tw_round_to_device_px(ay);
++#else
++	ax = tw_trunc_to_device_px(ax + 2.0);
++	ay = tw_trunc_to_device_px(ay + 2.0);
++	// x_snap tests the caret matrix's c/d, which are -world.a / -world.b.
++	if (fabs(world->a) < 0.001 || fabs(world->b) < 0.001)
++	{
++		double d = avm2_text_device_twip();
++		sa = nearbyint(sa / d - 0.35) * d;
++		sb = nearbyint(sb / d - 0.35) * d;
++	}
++#endif
++	ay -= avm2_text_device_twip() / 2.0;                    // ty -= HALF_PX
++	avm2_draw_border_line(ax, ay, ax + sa, ay + sb, rgb, 1.0);
++}
++
+ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
+                                 double alpha)
+ {
+@@ -19091,6 +19130,12 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
+ 		if (un > 0) avm2_render_underlines(ul, un, world, alpha);
+ 		if (has_clip) renderer_end_clip(context);
+ 	}
++	// Caret last, outside the field mask (Ruffle replays draw_caret_command
++	// after popping the mask). Its geometry is already stage twips, so it
++	// rides the identity slot like the border and the underlines.
++	int32_t caret[4];
++	if (avm2_edittext_collect_caret(ctx, obj, caret))
++		avm2_render_caret(caret, world);
+ 	if (sel != NULL) heap_free(ctx->app, sel);
+ 	if (gl != NULL) heap_free(ctx->app, gl);
+ 	if (ul != NULL) heap_free(ctx->app, ul);
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 5cbde92b1..16f882ecf 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -3979,6 +3979,77 @@ uint32_t avm2_edittext_collect_selection(Avm2Context* ctx, Avm2Object* tf_obj,
+ 	return n;
+ }
+ 
++// s21 w2-caret-multiline. Caret geometry in field-local twips — Ruffle
++// render_layout_box (edit_text.rs:1237-1310). Every text box tests whether the
++// collapsed selection sits in [start, end) — `end + 1` for the last box of a
++// line, so the position of the newline / the very end of the text lands on
++// that line's last box — and the LAST matching box wins (each match overwrites
++// render_state.draw_caret_command). The caret is x = the glyph origin at the
++// caret position (or the pen after the last glyph), top = the box top, height
++// = the box font's ascent + descent. Returns 1 and fills
++// out = {x, y, h, 0xRRGGBB} when a caret is visible, else 0.
++//
++// Visibility: Ruffle's visible_selection caret arm (focused, not read-only;
++// the harness captures inside the first half of the 1s blink cycle, so the
++// blink phase is always "on" in the goldens). AS3 selections are MANDATORY
++// (edit_text.rs:308-312) — a field is born with a caret at the end of its
++// initial text and keeps it until something moves it — so, unlike the
++// highlight/inversion paths, this does NOT wait for `sel_active` (which the
++// born selection and the TextControl move/select arms leave cleared). The one
++// real "selection = None" transition, an IME update without a cursor, is
++// honoured through `ime_active` (it leaves sel_active cleared mid-composition).
++int avm2_edittext_collect_caret(Avm2Context* ctx, Avm2Object* tf_obj,
++                                int32_t out[4])
++{
++	Avm2EditTextExt* et = edittext_of(ctx, tf_obj);
++	if (et == NULL || et->text == NULL) return 0;
++	if (et->sel_begin != et->sel_end) return 0;
++	if (et->ime_active && !et->sel_active) return 0;
++	if (et->read_only || !avm2_display_object_has_focus(tf_obj)) return 0;
++	int32_t caret = et->sel_begin;
++	if (caret < 0) return 0;
++
++	LLayout* l = et_layout(ctx, et);
++	et_apply_lazy_bounds(et);
++	int32_t vscroll = 0;
++	if (et->scroll > 1 && (uint32_t) et->scroll <= l->line_count)
++		vscroll = l->lines[et->scroll - 1].y;
++	int32_t off_x = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
++	int32_t off_y = et->bounds_y + GUTTER - vscroll;
++
++	int found = 0;
++	for (uint32_t li = 0; li < l->line_count; li++)
++	{
++		LLine* line = &l->lines[li];
++		for (uint32_t bi = 0; bi < line->box_count; bi++)
++		{
++			LBox* b = &line->boxes[bi];
++			if (b->is_bullet || b->font.data == NULL) continue;
++			// Same cull as the glyph walk (render_layout_box returns before
++			// the caret test for a box below the field bottom).
++			if (b->y + GUTTER - vscroll > et->bounds_h) continue;
++			uint32_t end = b->end;
++			if (bi + 1 == line->box_count) end++;
++			if ((uint32_t) caret < b->start || (uint32_t) caret >= end)
++				continue;
++			uint32_t i = (uint32_t) caret - b->start;
++			int32_t cx = 0;
++			if (i > 0 && b->char_end != NULL && b->char_count > 0)
++				cx = b->char_end[(i <= b->char_count ? i : b->char_count) - 1];
++			EvalParams p;
++			p.height = twips_from_px(b->size_px);
++			const Avm2TextFormatFields* fmt = span_at_pos(et, b->start);
++			out[0] = off_x + b->x + cx;
++			out[1] = off_y + b->y;
++			out[2] = font_ascent(&b->font, p.height)
++			         + font_descent(&b->font, p.height);
++			out[3] = (int32_t) ((fmt->color >> 8) & 0xFFFFFF);
++			found = 1;
++		}
++	}
++	return found;
++}
++
+ // Underline segments in field-local twips — Ruffle render_layout_box
+ // (edit_text.rs:1318-1329) + render_underline (:1365-1378). The underline is a
+ // property of the LAYOUT BOX, not of a character run: it spans the box's full
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 88d0d7bc3..25677e880 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -294,3 +294,14 @@ avm2/stage3d_sampler                        # uploadFromBitmapData + `tex` over
+                                             #   and linear, with the
+                                             #   setSamplerStateAt-vs-setProgram
+                                             #   precedence rule.
++
++# SESSION 21 ADDITION (s21 wave-2 `w2-caret-multiline`). The AVM2 EditText
++# CARET (avm2_display.c::avm2_render_caret, fed by avm2_text.c::
++# avm2_edittext_collect_caret). No standing member held a FOCUSED, EDITABLE
++# AVM2 field with a collapsed selection, so nothing could see the caret arm.
++# Listed under tier 2 because it was CI-failing when added; it passes locally
++# at max diff 0 on all 6 comparisons — promote to TIER 1 once a graded run
++# confirms. Its AVM1 twin (tag.c caret) is visual/edittext/edittext_caret_empty.
++visual/edittext/edittext_caret_multiline    # AVM2 CARET: char-index x + line-index
++                                            #   y, empty-line boxes, the born
++                                            #   (never-sel_active) selection.  6 cmps
