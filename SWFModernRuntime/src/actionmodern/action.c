@@ -76525,6 +76525,57 @@ static int mc_has_button_mode_ancestor_with_mouse(MovieClip* mc, float mx, float
 	return 0;
 }
 
+// A sprite clip that takes part in the single AVM1 roll pick: button mode
+// (own BUTTON_EVENT_METHODS handler) and not a DefineButton wrapper, whose
+// hover machine is tag.c's ng_update_button_states.
+static int ng_roll_pick_candidate(MovieClip* mc)
+{
+	extern int actionMCHasButtonHandlers(MovieClip* mc);
+	if (mc == NULL || mc->dynamic_props == NULL || mc->is_button_mc) return 0;
+	if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) return 0;
+	return actionMCHasButtonHandlers(mc);
+}
+
+// Render-order compare for the roll pick: >0 when Ruffle's mouse_pick_avm1
+// reaches `a` before `b`. An ancestor comes before its descendants (a
+// button-mode clip returns itself before recursing); otherwise the higher
+// depth at the first divergent level wins (render list walked in reverse).
+static int ng_roll_pick_order_cmp(MovieClip* a, MovieClip* b)
+{
+	MovieClip* ca[64];
+	MovieClip* cb[64];
+	int na = 0, nb = 0;
+	for (MovieClip* p = a; p != NULL && na < 64; p = p->parent) ca[na++] = p;
+	for (MovieClip* p = b; p != NULL && nb < 64; p = p->parent) cb[nb++] = p;
+	int i = na - 1, j = nb - 1;
+	while (i >= 0 && j >= 0 && ca[i] == cb[j]) { i--; j--; }
+	if (i < 0) return 1;    // a is b or an ancestor of b
+	if (j < 0) return -1;   // b is an ancestor of a
+	if (ca[i]->depth != cb[j]->depth) return (ca[i]->depth > cb[j]->depth) ? 1 : -1;
+	return 0;
+}
+
+// The ONE button-mode sprite this mouse move picks (Ruffle mouse_pick_avm1,
+// movie_clip.rs:2994): the first hit in render order. Non-button-mode clips
+// do not occlude (require_button_mode => !check_non_interactive). Must run
+// after mc_hit_area_pick_begin so hitArea resolution is in place.
+static MovieClip* ng_roll_pick_topmost(float mx, float my)
+{
+	MovieClip* picked = NULL;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (!ng_roll_pick_candidate(mc)) continue;
+		if (mc_removed_during_pick_ng(mc) || mc_is_avm1_gone_ng(mc)) continue;
+		if (!ng_mc_pick_visible(mc)) continue;
+		float x1, y1, x2, y2;
+		if (!mc_hit_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+		if (picked == NULL || ng_roll_pick_order_cmp(mc, picked) > 0)
+			picked = mc;
+	}
+	return picked;
+}
+
 // Dispatch AS2 onRollOver/onRollOut/onDragOver/onDragOut on mouse-move.
 // Called from swf_core.c on EV_MOUSE_MOVE (after updating mouse state).
 void actionDispatchMCMouseMove(SWFAppContext* app_context)
@@ -76539,6 +76590,11 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 	// property get can run a user getter, and Ruffle orders those by depth and
 	// excludes any clip such a getter removes from the rest of the pick.
 	mc_hit_area_pick_begin(app_context);
+
+	// Button-mode sprites share ONE pick: only the topmost one under the
+	// pointer is "inside" (avm1/hitarea_remove_owner_drag: btnRm at depth 2
+	// occludes btnZ at depth 1).
+	MovieClip* roll_picked = ng_roll_pick_topmost(mx, my);
 
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
@@ -76566,6 +76622,8 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 		// previous-picked vs current-picked derivation would produce.
 		int now_inside = ng_mc_pick_visible(mc) &&
 		                 (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
+		if (ng_roll_pick_candidate(mc))
+			now_inside = (mc == roll_picked);
 		mc->mc_mouse_inside = (u8)now_inside;
 
 		if (!was_inside && now_inside) {
