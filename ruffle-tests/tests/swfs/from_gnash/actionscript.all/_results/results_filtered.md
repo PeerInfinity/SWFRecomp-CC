@@ -6,26 +6,26 @@
 
 **Run Duration**: 30m 60s
 
-**Filtered**: 4 tests ignored out of 243 available
+**Filtered**: 3 tests ignored out of 243 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 239 |
-| Passing | **141** (59.0%) |
+| Total tests | 240 |
+| Passing | **141** (58.8%) |
 | Ruffle-matched | 89 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **230** (96.2%) |
-| Failing | 9 |
-| Total expected lines | 31544 |
-| Matching lines | 29577 (93.8%) |
-| Mismatched lines | 1967 |
+| Effective pass | **230** (95.8%) |
+| Failing | 10 |
+| Total expected lines | 32104 |
+| Matching lines | 30130 (93.9%) |
+| Mismatched lines | 1974 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 9 | 100.0% |
+| Output Mismatch | 10 | 100.0% |
 
 ## Passing Tests
 
@@ -275,19 +275,20 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**9 tests** within reach
+**10 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `array-v6` | 97.4% | 627 | 644 | 17 |  |
-| 2 | `array-v7` | 96.9% | 634 | 654 | 20 |  |
-| 3 | `array-v8` | 96.9% | 634 | 654 | 20 |  |
-| 4 | `MovieClip-v7` | 96.4% | 934 | 969 | 35 |  |
-| 5 | `MovieClip-v6` | 96.3% | 901 | 936 | 35 |  |
-| 6 | `MovieClip-v8` | 93.8% | 1020 | 1087 | 67 |  |
-| 7 | `TextField-v6` | 85.7% | 467 | 545 | 78 |  |
-| 8 | `TextField-v8` | 83.7% | 478 | 571 | 93 |  |
-| 9 | `TextField-v7` | 83.5% | 476 | 570 | 94 |  |
+| 1 | `array-v5` | 98.8% | 553 | 560 | 7 |  |
+| 2 | `array-v6` | 97.4% | 627 | 644 | 17 |  |
+| 3 | `array-v7` | 96.9% | 634 | 654 | 20 |  |
+| 4 | `array-v8` | 96.9% | 634 | 654 | 20 |  |
+| 5 | `MovieClip-v7` | 96.4% | 934 | 969 | 35 |  |
+| 6 | `MovieClip-v6` | 96.3% | 901 | 936 | 35 |  |
+| 7 | `MovieClip-v8` | 93.8% | 1020 | 1087 | 67 |  |
+| 8 | `TextField-v6` | 85.7% | 467 | 545 | 78 |  |
+| 9 | `TextField-v8` | 83.7% | 478 | 571 | 93 |  |
+| 10 | `TextField-v7` | 83.5% | 476 | 570 | 94 |  |
 
 ## Segfaults
 
@@ -303,16 +304,17 @@ No timeouts.
 
 ## All Output Mismatches
 
-**9 tests** with output mismatch, sorted by match rate (best first)
+**10 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `array-v6` | 97.4% | 627/644 | 644 | 644 |  |
-| 2 | `array-v7` | 96.9% | 634/654 | 654 | 654 |  |
-| 3 | `array-v8` | 96.9% | 634/654 | 654 | 654 |  |
-| 4 | `MovieClip-v7` | 96.4% | 934/969 | 968 | 969 |  |
-| 5 | `MovieClip-v6` | 96.3% | 901/936 | 935 | 936 |  |
-| 6 | `MovieClip-v8` | 93.8% | 1020/1087 | 1086 | 1087 |  |
-| 7 | `TextField-v6` | 85.7% | 467/545 | 545 | 545 |  |
-| 8 | `TextField-v8` | 83.7% | 478/571 | 571 | 571 |  |
-| 9 | `TextField-v7` | 83.5% | 476/570 | 570 | 570 |  |
+| 1 | `array-v5` | 98.8% | 553/560 | 560 | 560 |  |
+| 2 | `array-v6` | 97.4% | 627/644 | 644 | 644 |  |
+| 3 | `array-v7` | 96.9% | 634/654 | 654 | 654 |  |
+| 4 | `array-v8` | 96.9% | 634/654 | 654 | 654 |  |
+| 5 | `MovieClip-v7` | 96.4% | 934/969 | 968 | 969 |  |
+| 6 | `MovieClip-v6` | 96.3% | 901/936 | 935 | 936 |  |
+| 7 | `MovieClip-v8` | 93.8% | 1020/1087 | 1086 | 1087 |  |
+| 8 | `TextField-v6` | 85.7% | 467/545 | 545 | 545 |  |
+| 9 | `TextField-v8` | 83.7% | 478/571 | 571 | 571 |  |
+| 10 | `TextField-v7` | 83.5% | 476/570 | 570 | 570 |  |
