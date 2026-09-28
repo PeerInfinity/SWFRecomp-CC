@@ -1373,18 +1373,26 @@ static Avm2Value bd_copy_pixels(Avm2Activation* act)
 			{
 				uint32_t axx = (uint32_t) (ax + (int32_t) sxx - sx);
 				uint32_t ayy = (uint32_t) (ay + (int32_t) syy - sy);
+				// Ruffle core/src/bitmap/operations.rs::copy_pixels_with_alpha_source
+				// gates the alpha lookup on the ALPHA bitmap's own transparency flag:
+				//  * transparent alpha bitmap: a source pixel whose alpha position
+				//    falls outside the alpha bitmap is SKIPPED (`continue`) — the
+				//    destination pixel is left untouched, not written with alpha 0;
+				//  * non-transparent alpha bitmap: its bounds are never consulted,
+				//    the pixel is copied with the source's own alpha (a = 255 here
+				//    reduces to exactly that through the a == 255 arm below).
+				// avm2/bitmapdata_copypixels copies an 80-px source rect through a
+				// 40-px alpha bitmap; the right half of every cell pins both arms.
+				// The AVM1 twin (action.c bitmapDataCopyPixels) already does this.
 				uint32_t a;
-				if (axx < alpha->width && ayy < alpha->height)
+				if (!alpha->transparency)
+					a = 255u;
+				else if (axx < alpha->width && ayy < alpha->height)
 					a = CA(bd_get_raw(alpha, axx, ayy));
 				else
-					a = 0;
-				// Ruffle core/src/bitmap/operations.rs::copy_pixels_with_alpha_source:
-				// a fully opaque alpha pixel leaves the source alpha untouched
+					continue;
+				// A fully opaque alpha pixel leaves the source alpha untouched
 				// (the `>> 8` scale would otherwise lose one step, 0xFF -> 0xFE).
-				// Ruffle also gates this whole block on the ALPHA bitmap's own
-				// transparency flag; a non-transparent BitmapData stores alpha 255
-				// everywhere, so with the a == 255 arm the two paths agree and we
-				// do not need a separate branch here.
 				//
 				// A NON-transparent SOURCE is not `final_alpha = a` (that is what
 				// Ruffle does, and it is what avm2/bitmapdata_copypixels_alpha_merge
