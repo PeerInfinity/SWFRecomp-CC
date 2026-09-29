@@ -3781,9 +3781,38 @@ static void draw_entry_opaque_background(SWFAppContext* app_context,
 		1.0f, obj->transform_id, 0);
 }
 
+#ifndef NO_GRAPHICS
+// Filtered root-timeline EditText (s21 w2-edittext-filters). Ruffle treats a
+// non-empty filter list as an implied cacheAsBitmap on ANY display object
+// (display_object.rs recheck_cache_as_bitmap), so an EditText placed with a
+// PlaceObject3 filter list renders its box + glyphs into the cache and the
+// filters run over that. Our EditText paint is not a DisplayObject draw at all
+// (the text iterators are driven per root depth by tf_draw_at_root_depth, or
+// by the orphan walk), so render_single_object's CHAR_TYPE_TEXT arm drew
+// nothing and render_filtered_object filtered an EMPTY layer — the "structural
+// no-op" HOLD of s18 (edittext_border_filters). While the root loops send such
+// an entry through render_filtered_object, these name it, and the TEXT arm
+// paints that one field (wrapper or orphan) into whatever pass is current:
+// the offscreen capture, and the framebuffer again for draw_source_{before,
+// after}. Root-timeline entries only; a filtered EditText inside a sprite is
+// still drawn unfiltered by the REST pass.
+static const DisplayObject* g_tf_filter_obj = NULL;
+static int g_tf_filter_depth = -1;
+static int g_tf_filter_max_depth = 0;
+static void tf_draw_filtered_root_entry(SWFAppContext* app_context);
+#endif
+
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
 	if (cxform_forces_invisible(app_context, obj->cxform_id)) return;
+#ifndef NO_GRAPHICS
+	// Before the type switch: a DefineEditText with no initial text never
+	// receives a tagDefineText, so its dictionary type is not CHAR_TYPE_TEXT.
+	if (obj == g_tf_filter_obj) {
+		tf_draw_filtered_root_entry(app_context);
+		return;
+	}
+#endif
 #ifdef OFFSCREEN_RENDER
 	// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary because
 	// tagDefineVideoStream doesn't set a type. Check for video BEFORE the switch.
@@ -6081,6 +6110,25 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	}
 }
 
+// One glyph's pen advance in TWIPS, as Ruffle lays it out (font_like.rs
+// FontLike::evaluate): `Twips::new((advance as f32 * scale) as i32)`, i.e.
+// truncated to a whole twip PER GLYPH, where scale = height / em. Summing the
+// unrounded product instead drifts right by up to ~1 twip per glyph: three
+// 16380/20480-em glyphs at 600 twips are 3 x 479 = 1437 twips in Ruffle and
+// 1439.6 in the float sum, which moved the end-of-text caret and the
+// selection box's right edge a whole pixel right in
+// visual/cache_as_bitmap/edittext_selection (s21 w2-edittext-filters).
+// A DEVICE-font field (DefineEditText without UseOutlines) additionally has
+// each advance rounded to a whole pixel (`round_to_pixel`, f64::round = half
+// away from zero, which roundf matches): visual/cache_as_bitmap/edittext_scroll
+// and the device-font labels of visual/filters/bevel* need it.
+static inline float tf_glyph_advance_twips(s32 adv, float scale, int device_font)
+{
+	float t = (float)(s32)((float)adv * scale);
+	if (device_font) t = roundf(t / 20.0f) * 20.0f;
+	return t;
+}
+
 // Callback for actionIterateTextFieldGlyphs: render text field glyph shapes.
 // Reads glyph vertices from shape_data, applies CPU-side transform, renders via draw_tris.
 // When info->runs is non-NULL, per-byte color and font_height are looked up
@@ -6167,6 +6215,22 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	}
 	float baseline_scale = (float)baseline_fh / (float)em_square;
 	float y_pos = info->y * 20.0f + bymin_off + (float)ascent * baseline_scale + gutter_twips;
+	// Author-set vertical scroll (TextField.scroll, or a mouse-wheel notch):
+	// Ruffle draws the layout translated up by the top of line `scroll - 1`
+	// (edit_text.rs render_self, `scroll_offset`), clipped to the field box.
+	// This layout's line pitch is font_height + leading (the newline advance
+	// below), so hiding N lines is N such pitches. The caret and selection
+	// derive from y_pos and move with it. Lines above the view are not drawn
+	// at all (the golden shows no descenders of line `scroll - 1` peeking in
+	// under the top gutter), only laid out.
+	int hidden_lines = 0, line_no = 0;
+	if (info->mc != NULL) {
+		extern int ng_get_textfield_view_scroll_lines(void* mc_v);
+		hidden_lines = ng_get_textfield_view_scroll_lines(info->mc);
+		if (hidden_lines > 0)
+			y_pos -= (float)hidden_lines
+			         * ((float)info->font_height + (float)info->leading_twips);
+	}
 
 	// Per-glyph vertex buffer. SWF glyphs are stored as triangulated fills in
 	// shape_data, and complex glyphs can hold many vertices (e.g. Bitstream
@@ -6267,7 +6331,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
 			if (adv >= 0 && cur_par < MAX_TF_PARAGRAPHS) {
 				float scale = (float)cur_fh / (float)em_square;
-				pars[cur_par].width += (float)adv * scale;
+				pars[cur_par].width += tf_glyph_advance_twips(adv, scale, info->device_font);
 			}
 		}
 		if (par_has_run && cur_par < MAX_TF_PARAGRAPHS) {
@@ -6367,7 +6431,9 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				if (gi >= 0) {
 					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
 					if (a >= 0)
-						caret_off += (float)a * ((float)info->font_height / (float)em_square);
+						caret_off += tf_glyph_advance_twips(a,
+							(float)info->font_height / (float)em_square,
+							info->device_font);
 				}
 				cc++;
 			}
@@ -6438,7 +6504,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				int gi = ng_font_find_glyph(font_idx, cp);
 				if (gi >= 0) {
 					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
-					if (a >= 0) xx += (float)a * sscale;
+					if (a >= 0) xx += tf_glyph_advance_twips(a, sscale, info->device_font);
 				}
 				cc++;
 			}
@@ -6533,6 +6599,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			par_idx++;
 			x_pos = base_x + (par_idx < par_count ? par_x_offset[par_idx] : 0.0f);
 			y_pos += (float)info->font_height + (float)info->leading_twips;
+			line_no++;
 			continue;
 		}
 
@@ -6559,7 +6626,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		//    global (the OFFSCREEN_RENDER layout turns that OOB into a SIGABRT).
 		// Bound-check against the actual glyph_data length (4 u32 per glyph).
 		// The pen still advances below for layout either way.
-		if (!ng_font_is_builtin(font_idx) && (4 * global_idx + 1) < glyph_data_entries) {
+		if (line_no >= hidden_lines
+		    && !ng_font_is_builtin(font_idx) && (4 * global_idx + 1) < glyph_data_entries) {
 		// glyph_base is already a COMBINED glyph index (tagDefineFontGlyphBase
 		// re-bases it), and the generated `glyph_data` / `shape_data` symbols
 		// are only the ROOT's prefix of the combined tables once a child movie
@@ -6589,7 +6657,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		// Advance x by glyph advance width
 		s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
 		if (adv >= 0) {
-			x_pos += (float)adv * scale;
+			x_pos += tf_glyph_advance_twips(adv, scale, info->device_font);
 		}
 	}
 	#undef MAX_TF_PARAGRAPHS
@@ -6827,6 +6895,51 @@ static void tf_draw_at_root_depth(SWFAppContext* app_context, int depth,
 	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, app_context);
 	actionSetTextFieldDepthWindow(TF_WINDOW_ALL, 0, 0);
 }
+
+// 1 when root display-list entry `obj` is an EditText that the root loops send
+// through render_filtered_object (see g_tf_filter_obj). The root loops then
+// skip tf_draw_at_root_depth at its depth and the orphan walk skips it, so the
+// field is painted exactly once, by the filter route. Must agree with the
+// branch order of both root loops: clip-depth entries and Alpha/Erase blend
+// entries never reach render_filtered_object.
+int tag_root_edittext_is_filtered(const DisplayObject* obj)
+{
+	if (obj == NULL || obj->char_id == 0 || obj->filter_type == 0) return 0;
+	if (obj->clip_depth > 0) return 0;
+	if (obj->blend_mode == 11 || obj->blend_mode == 12) return 0;
+	// No dictionary-type test: an EditText with empty initial text is never
+	// typed CHAR_TYPE_TEXT (no tagDefineText is emitted for it).
+	return ng_getCharTextfieldIdx(obj->char_id) >= 0;
+}
+
+static void tf_draw_filtered_root_entry(SWFAppContext* app_context)
+{
+	if (g_tf_filter_depth < 0) return;
+	// Wrapper-backed field (script-touched): the per-depth window.
+	tf_draw_at_root_depth(app_context, g_tf_filter_depth, g_tf_filter_max_depth);
+	// Untouched placement: the orphan emitter for this one entry.
+	actionEmitOrphanRootTextField(app_context, g_tf_filter_depth,
+		textfield_render_cb, textfield_glyph_render_cb, app_context);
+}
+
+// Root-loop wrapper around render_filtered_object that names a filtered
+// EditText entry for render_single_object's TEXT arm while it runs.
+static void render_filtered_root_entry(SWFAppContext* app_context,
+                                       DisplayObject* obj, int depth,
+                                       int max_depth_i)
+{
+	int tf = tag_root_edittext_is_filtered(obj);
+	if (tf) {
+		g_tf_filter_obj = obj;
+		g_tf_filter_depth = depth;
+		g_tf_filter_max_depth = max_depth_i;
+	}
+	render_filtered_object(app_context, obj);
+	if (tf) {
+		g_tf_filter_obj = NULL;
+		g_tf_filter_depth = -1;
+	}
+}
 #endif
 
 // Re-render current display list state (for headless per-tick image capture).
@@ -7058,7 +7171,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			renderer_end_clip(context);
 			active_clip_depth = 0;
 		}
-		tf_draw_at_root_depth(app_context, (int) i, (int) max_depth);
+		if (!tag_root_edittext_is_filtered(&display_list[i]))
+			tf_draw_at_root_depth(app_context, (int) i, (int) max_depth);
 		DisplayObject* obj = &display_list[i];
 		if (obj->char_id == 0) continue;
 		// AVM1 setMask pairing (mask defect B) — see render_display_list.
@@ -7135,7 +7249,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			renderer_composite_blend(context, obj->blend_mode,
 				active_clip_depth > 0 ? 1 : 0);
 		} else if (obj->filter_type != 0) {
-			render_filtered_object(app_context, obj);
+			render_filtered_root_entry(app_context, obj, (int) i, (int) max_depth);
 			if (obj->blend_mode > 1 && !blend_layered)
 				renderer_set_blend_mode(context, obj->blend_mode);
 		} else {
@@ -8047,7 +8161,8 @@ void tagShowFrame(SWFAppContext* app_context)
 			active_clip_depth = 0;
 		}
 
-		tf_draw_at_root_depth(app_context, (int) i, (int) max_depth);
+		if (!tag_root_edittext_is_filtered(&display_list[i]))
+			tf_draw_at_root_depth(app_context, (int) i, (int) max_depth);
 
 		DisplayObject* obj = &display_list[i];
 
@@ -8155,7 +8270,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Check if this object has a visual filter
 		else if (obj->filter_type != 0)
 		{
-			render_filtered_object(app_context, obj);
+			render_filtered_root_entry(app_context, obj, (int) i, (int) max_depth);
 
 			// Re-bind blend state after filter pipeline switches
 			if (obj->blend_mode > 1 && !blend_layered)

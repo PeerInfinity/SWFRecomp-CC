@@ -911,6 +911,10 @@ typedef struct TextFieldGlyphInfo {
     // focused — so the highlight, like the caret, is browser-only / never in CI.
     int sel_begin;
     int sel_end;
+    // 1 for a DefineEditText field WITHOUT UseOutlines (a device-font field):
+    // Ruffle rounds each device-font glyph advance to a whole pixel
+    // (font_like.rs FontLike::evaluate, FontType::Device). 0 otherwise.
+    int device_font;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
@@ -922,6 +926,12 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data);
 // from the static metadata + the current value of the bound variable (if
 // any), and invokes the supplied callbacks. Mirrors Flash's behavior where
 // every placed DisplayObject renders regardless of script interaction.
+// One root-timeline orphan EditText at swf `depth` (the filtered-entry route
+// in tag.c's root loops; the orphan walk skips such entries). Returns 1 if
+// emitted.
+int actionEmitOrphanRootTextField(SWFAppContext* app_context, int depth,
+	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
+	void* user_data);
 int actionIterateOrphanTextFields(SWFAppContext* app_context,
 	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
 	void* user_data);

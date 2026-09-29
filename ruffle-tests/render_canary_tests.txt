@@ -382,3 +382,18 @@ visual/fonts/leading_device_font            # AVM2 DEVICE-FONT BORDER CORNER 1 c
 visual/filters/drop_shadow_scales_with_screen # PO3 DropShadow, 2x view, rotated  1 cmp
 visual/filters/blur_scales_with_screen      # nested cab+Blur under 5x sprite,   1 cmp
                                             #   2x view (device-grid snap)
+
+# SESSION 21 ADDITION (s21 cloud `w2-edittext-filters`). AVM1 EditText on the
+# PlaceObject3 filter route (tag.c render_filtered_root_entry: the field is
+# painted INTO the filter capture instead of beside it), plus the author-set
+# vertical TextField.scroll offset in the glyph painter (reached here by two
+# mouse-wheel notches on a script-free field), plus Ruffle's per-glyph advance
+# (whole twips; whole PIXELS for a device-font field). The first rows where an
+# EditText is the SOURCE of a filter. edittext_hscroll / edittext_selection
+# (above) are on the same route. Tier 2 when added: CI-failing until a graded
+# run confirms (locally border_filters passes, edittext_scroll .01 passes and
+# .02 misses by one aliased glyph-edge pixel).
+# tier=2  (CI-failing / skipped; A/B signal only)
+visual/edittext/edittext_border_filters     # PO3 filter LIST on DefineEditText  1 cmp
+                                            #   (6 filtered placements, 2 fields)
+visual/cache_as_bitmap/edittext_scroll      # wheel-scrolled field + DropShadow 2 cmps

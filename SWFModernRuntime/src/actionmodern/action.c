@@ -29367,6 +29367,8 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			info.bounds_ymin_twips = _bymin;
 		}
 		info.mc = (void*)mc;
+		info.device_font = (mc->ng_textfield_idx >= 0
+		    && !(ng_getTextFieldFlags(mc->ng_textfield_idx) & 0x0080)) ? 1 : 0;
 		// Caret + selection range for the keyboard-focused field. Mirrors
 		// Ruffle's `EditText::visible_selection` (edit_text.rs:1059):
 		//
@@ -29699,10 +29701,15 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	info.bounds_ymin_twips = (s32) bymin;
 	info.caret_char = -1;  // orphan/static path: never the focused editable field
 	info.mc = NULL;
+	info.device_font = !(ng_getTextFieldFlags(tf_idx) & 0x0080);
 	info.sel_begin = -1;
 	info.sel_end = -1;
 	glyph_cb(&info, user_data);
 }
+
+// tag.c: 1 when a root display-list EditText entry takes the filter route.
+extern int tag_root_edittext_is_filtered(const DisplayObject* obj);
+extern DisplayObject* display_list;
 
 static void otf_walk_dl(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max,
@@ -29736,6 +29743,10 @@ static void otf_walk_dl(SWFAppContext* app_context,
 
 		int tf_idx = ng_find_textfield(obj->char_id);
 		if (tf_idx >= 0) {
+			// A filtered ROOT entry is painted by the root loop's filter
+			// route (actionEmitOrphanRootTextField), not by this post-pass.
+			if (dl == display_list && tag_root_edittext_is_filtered(obj))
+				continue;
 			MovieClip* tf_mc = otf_find_child_mc(parent_mc, obj->instance_name);
 			if (tf_mc == NULL || !MC_IS_TEXTFIELD(tf_mc)) {
 				otf_emit_textfield(app_context, tf_idx, obj,
@@ -29781,6 +29792,33 @@ int actionIterateOrphanTextFields(SWFAppContext* app_context,
 	otf_walk_dl(app_context, display_list, max_depth, &root_movieclip,
 		0.0f, 0.0f, render_cb, glyph_cb, user_data, &count);
 	return count;
+}
+
+// Emit the ONE root-timeline orphan EditText at swf depth `depth` (the entry
+// the root loop is sending through the filter route; otf_walk_dl skips it).
+// Same geometry as otf_walk_dl's root level. Returns 1 if a field was emitted,
+// 0 when the entry is not an EditText or a wrapper MovieClip owns it (the
+// wrapper is painted by the per-depth window instead).
+int actionEmitOrphanRootTextField(SWFAppContext* app_context, int depth,
+	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
+	void* user_data)
+{
+	extern size_t max_depth;
+	extern MovieClip root_movieclip;
+	GEN_EXTERN_TRANSFORM_DATA;
+	if (display_list == NULL || depth < 1 || (size_t)depth > max_depth) return 0;
+	DisplayObject* obj = &display_list[depth];
+	if (obj->char_id == 0) return 0;
+	int tf_idx = ng_find_textfield(obj->char_id);
+	if (tf_idx < 0) return 0;
+	MovieClip* tf_mc = otf_find_child_mc(&root_movieclip, obj->instance_name);
+	if (tf_mc != NULL && MC_IS_TEXTFIELD(tf_mc)) return 0;
+	u32 tid = ng_get_original_transform_id(obj);
+	float (*otd)[16] = ng_entryTransformData(obj);
+	otf_emit_textfield(app_context, tf_idx, obj,
+		otd[tid][12] / 20.0f, otd[tid][13] / 20.0f,
+		render_cb, glyph_cb, user_data);
+	return 1;
 }
 
 #endif // !NO_GRAPHICS
@@ -78117,6 +78155,13 @@ static float tf_view_hscroll_px(MovieClip* mc)
 float ng_get_textfield_view_hscroll_px(void* mc_v)
 {
 	return tf_view_hscroll_px((MovieClip*) mc_v);
+}
+
+// Same, for the author-set VERTICAL scroll: lines hidden above the view
+// (`scroll - 1`, 0 for an unscrolled field).
+int ng_get_textfield_view_scroll_lines(void* mc_v)
+{
+	return tf_view_scroll_lines((MovieClip*) mc_v);
 }
 
 void ng_set_textfield_scroll_x(SWFAppContext* app_context, void* mc_v, float twips)
