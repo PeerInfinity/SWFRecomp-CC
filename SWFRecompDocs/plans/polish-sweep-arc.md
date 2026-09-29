@@ -3096,8 +3096,13 @@ from the brief re-pays build and diagnosis.
   (+1 rm for `swf4opcode` pass → rm) is DECLINED; do not re-price it. The row stays failing until a
   Flash-exact SWF4 `setProperty` arc lands: `"10x"` abandons the set (not prefix-parse), SWF4
   `_xscale` quantisation (2 → `1.9989013671875`), the `Object is not a function` debugger lines
-  (74 of 295 blocks differ, `w1-trace-tail-report.md` §9). Cheap Flash-correct rider available
-  now: SWF4 `setProperty(_name, true)` must print `1`/`0` (2 lines, 0 flips).
+  (74 of 295 blocks differ, `w1-trace-tail-report.md` §9). **The "SWF4 `setProperty(_name,
+  true)` must print `1`/`0`" rider is REFUTED (2026-09-29):** Flash's own block
+  (`output.txt:1112-1114`) prints `true`/`true`, exactly as we do; only Ruffle prints `1`. It
+  looked ours-only because the index-subset check compared misaligned lines (Flash's index 1214
+  holds a `_highquality` block's `1`). Doing it would match Ruffle against Flash — do not.
+  General lesson: an "ours-only line" on a misaligned row must be checked by CONTENT against the
+  same block in Flash's file before it is called a bug.
 - **Cross-VM focus/pick arc** (`selection_onsetfocus_mixed_avm` = 4 mechanisms,
   `focus_events_mixed_avm_edittext`, `mouse_pick_loader_avm1`): the loaded AVM1 movie's wrapper
   answers clicks with its whole stage rect (`avm2_display.c:14961-14975`); plus AVM1 button
