@@ -1,0 +1,422 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index d95bb64ba..f7cd4b04d 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -352,6 +352,10 @@ typedef struct WebGPURenderContext
+ 	// compose_pipeline_layout: binding 0 = maskee layer, binding 3 = mask layer,
+ 	// binding 2 = an unused uniform block the shared layout still demands.
+ 	WGPURenderPipeline alpha_mask_pipeline;
++	// One-shot integer texel shift for the NEXT render_webgpu_run_blur call
++	// (set by render_webgpu_set_blur_shift, consumed and cleared by run_blur).
++	int blur_shift_x;
++	int blur_shift_y;
+ } WebGPURenderContext;
+ 
+ // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
+@@ -422,6 +426,11 @@ void render_webgpu_resume_pass(WebGPURenderContext* context);
+ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* context);
+ void render_webgpu_end_offscreen_pass(WebGPURenderContext* context);
+ void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float blur_y, u8 quality, float strength, float r, float g, float b, float a, int colorize);
++// Make the next run_blur produce blur(x + (sx, sy)) texels instead of blur(x):
++// a drop shadow's integer offset folded INTO the blur, so the offset is read
++// from the source layer (whose content ends on-stage) rather than from the
++// blurred layer (whose tail past the stage edge was never stored).
++void render_webgpu_set_blur_shift(WebGPURenderContext* context, int sx, int sy);
+ void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
+ // Copy the offscreen source out of filter_tex_a before the blur ping-pong
+ // overwrites it. Call with the main pass SUSPENDED, between
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index 932dee7a8..c718aa1d1 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -56,6 +56,7 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_begin_offscreen_pass(ctx)            render_webgpu_begin_offscreen_pass(ctx)
+ #define renderer_end_offscreen_pass(ctx)              render_webgpu_end_offscreen_pass(ctx)
+ #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) render_webgpu_run_blur(ctx, bx, by, q, s, r, g, b, a, c)
++#define renderer_set_blur_shift(ctx, sx, sy)          render_webgpu_set_blur_shift(ctx, sx, sy)
+ #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) render_webgpu_composite_filtered(ctx, ox, oy, tr, tg, tb, ta)
+ #define renderer_snapshot_filter_source(ctx)           render_webgpu_snapshot_filter_source(ctx)
+ #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) \
+@@ -118,6 +119,7 @@ typedef FlashbangContext RenderContext;
+ #define renderer_begin_offscreen_pass(ctx)            ((void)0)
+ #define renderer_end_offscreen_pass(ctx)              ((void)0)
+ #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) ((void)0)
++#define renderer_set_blur_shift(ctx, sx, sy)          ((void)0)
+ #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) ((void)0)
+ #define renderer_snapshot_filter_source(ctx)           ((void)0)
+ #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) ((void)0)
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 37f58fd94..2336d9433 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -19426,6 +19426,44 @@ static void avm2_run_displacement_filter(Avm2Context* ctx, Avm2Object* obj,
+ // and composite the result back into the suspended main pass. Mirrors
+ // tag.c::render_filtered_object; the flag derivations below are that function's,
+ // kept in the same order so the two stay diffable.
++// Ruffle render_base's integer `draw_offset` (device px) for a filter list:
++// floor of the top-left of (0, 0, w, h) grown by each filter's
++// calculate_dest_rect after Filter::scale. Mirrors tag.c
++// filter_draw_offset_px; `list` is already impotent-filtered.
++static void avm2_filter_draw_offset_px(const Avm2FilterVal* const* list,
++                                       uint32_t n, double vs,
++                                       double* ox, double* oy)
++{
++	static const double pass_scales[15] = {
++		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
++	long x_min = 0, y_min = 0;   // twips
++	for (uint32_t i = 0; i < n; i++)
++	{
++		const Avm2FilterVal* f = list[i];
++		if (f->kind != AVM2_FILTER_BLUR && f->kind != AVM2_FILTER_DROP_SHADOW
++		    && f->kind != AVM2_FILTER_GLOW && f->kind != AVM2_FILTER_BEVEL)
++			continue;
++		double bx = (avm2_filter_fixed16(f->blur_x) - 1.0) * vs + 1.0;
++		double by = (avm2_filter_fixed16(f->blur_y) - 1.0) * vs + 1.0;
++		int passes = f->quality < 1 ? 1 : (f->quality > 15 ? 15 : f->quality);
++		double sc = pass_scales[passes - 1];
++		x_min -= (long) ((sc * bx > 0.0 ? sc * bx : 0.0) * 20.0);
++		y_min -= (long) ((sc * by > 0.0 ? sc * by : 0.0) * 20.0);
++		if (f->kind == AVM2_FILTER_DROP_SHADOW || f->kind == AVM2_FILTER_BEVEL)
++		{
++			double dist = avm2_filter_fixed16(f->distance) * vs;
++			double ang = avm2_filter_fixed16(f->angle);
++			long dx = (long) (cos(ang) * dist * 20.0);
++			long dy = (long) (sin(ang) * dist * 20.0);
++			if (f->kind == AVM2_FILTER_DROP_SHADOW)
++			{ if (dx < 0) x_min += dx; if (dy < 0) y_min += dy; }
++			else { x_min -= labs(dx); y_min -= labs(dy); }
++		}
++	}
++	*ox = floor((double) x_min / 20.0);
++	*oy = floor((double) y_min / 20.0);
++}
++
+ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+                                  Avm2DisplayObjectExt* ext,
+                                  const Mat* parent_world, double parent_alpha,
+@@ -19458,8 +19496,13 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 			double vs = (context->stage_scale > 0.0f)
+ 			          ? (double) context->stage_scale : 1.0;
+ 			double xpx = acc.xmin / 20.0 * vs, ypx = acc.ymin / 20.0 * vs;
+-			snapped_world.tx += (round(xpx) - xpx) * 20.0 / vs;
+-			snapped_world.ty += (round(ypx) - ypx) * 20.0 / vs;
++			// Ruffle rounds bounds.min + draw_offset (the integer floor of the
++			// filter-grown cache rect's corner); only an x.5 tie can tell the
++			// difference (tag.c filter_draw_offset_px has the derivation).
++			double ox = 0.0, oy = 0.0;
++			avm2_filter_draw_offset_px(list, n, vs, &ox, &oy);
++			snapped_world.tx += (round(xpx + ox) - ox - xpx) * 20.0 / vs;
++			snapped_world.ty += (round(ypx + oy) - oy - ypx) * 20.0 / vs;
+ 		}
+ 	}
+ 	parent_world = &snapped_world;
+@@ -19508,6 +19551,25 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	if (needs_source_tex)
+ 		renderer_snapshot_filter_source(context);
+ 
++	// A lone drop shadow's whole-pixel offset is folded into the blur (see
++	// tag.c render_filtered_object): the stage-sized layer never stored the
++	// blur tail past the stage edge, so reading the BLUR at +offset cut a
++	// shadow thrown back onto the stage; shifting the blur's INPUT read is exact.
++	int shadow_pre_shifted = 0;
++	if (is_shadow && n == 1)
++	{
++		float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
++		float a_ = avm2_filter_fixed16(last->angle);
++		float d_ = avm2_filter_fixed16(last->distance);
++		int sx = (int) floorf(-cosf(a_) * d_ * vs + 0.5f);
++		int sy = (int) floorf(-sinf(a_) * d_ * vs + 0.5f);
++		if (sx != 0 || sy != 0)
++		{
++			renderer_set_blur_shift(context, sx, sy);
++			shadow_pre_shifted = 1;
++		}
++	}
++
+ 	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
+ 	// of plain blurs chains for free and is bit-equal to one blur of quality N,
+ 	// exactly as Flash requires. A non-final glow/dropShadow/bevel is
+@@ -19571,6 +19633,8 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 		float uvy = fit_y / ((float) context->height * vs);
+ 		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
+ 		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
++		// Already applied inside the blur (shadow_pre_shifted above).
++		if (shadow_pre_shifted) { du = 0.0f; dv = 0.0f; }
+ 	}
+ 	float strength = avm2_filter_fixed8(last->strength);
+ 	float hi_r = (float) ((last->color2 >> 16) & 0xFF) / 255.0f;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index b4a0c44ec..db69dd904 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3099,6 +3099,54 @@ static int cab_world_bounds_min(DisplayObject* obj, const float world[16],
+ 	return 1;
+ }
+ 
++static int build_filter_chain(const DisplayObject* obj,
++                              FilterListEntry* scratch,
++                              const FilterListEntry** chain, int cap);
++
++// Ruffle render_base's `draw_offset` for a filtered entry, in DEVICE pixels:
++// floor() of the cache rect's top-left after every non-impotent filter's
++// calculate_dest_rect has grown (0, 0, w, h) (swf/src/types/*_filter.rs, each
++// filter first scaled by the stage view like Filter::scale). Always <= 0, and
++// only its effect on a round-half-away-from-zero TIE matters (see
++// cab_snap_delta): round(b + d) - d == round(b) unless b is k + 0.5 and b + d
++// < 0 (visual/filters/blur_size_grows: y_min 40.5 px, d = -60 -> -19.5 rounds
++// to -20, so Ruffle snaps UP by 0.5 where round(40.5) would snap down).
++static void filter_draw_offset_px(const DisplayObject* obj, double vs,
++                                  double* ox, double* oy)
++{
++	static const double pass_scales[15] = {
++		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
++	FilterListEntry scratch;
++	const FilterListEntry* chain[MAX_FILTER_LIST_SIZE];
++	int n = build_filter_chain(obj, &scratch, chain, MAX_FILTER_LIST_SIZE);
++	long x_min = 0, y_min = 0;   // twips, like Ruffle's Rectangle<Twips>
++	for (int i = 0; i < n; i++)
++	{
++		const FilterListEntry* f = chain[i];
++		if (f->type < 1 || f->type > 4) continue;
++		double bx = ((double) f->blur_x - 1.0) * vs + 1.0;   // scale_blur
++		double by = ((double) f->blur_y - 1.0) * vs + 1.0;
++		int passes = f->quality;
++		if (f->type == 1 && (passes == 0 || (bx <= 1.0 && by <= 1.0)))
++			continue;                                         // impotent blur
++		if (passes < 1) passes = 1;
++		if (passes > 15) passes = 15;
++		double sc = pass_scales[passes - 1];
++		x_min -= (long) ((sc * bx > 0.0 ? sc * bx : 0.0) * 20.0);
++		y_min -= (long) ((sc * by > 0.0 ? sc * by : 0.0) * 20.0);
++		if (f->type == 2 || f->type == 4)
++		{
++			double dist = (double) f->distance * vs;          // distance *= y
++			long dx = (long) (cos((double) f->angle) * dist * 20.0);
++			long dy = (long) (sin((double) f->angle) * dist * 20.0);
++			if (f->type == 2) { if (dx < 0) x_min += dx; if (dy < 0) y_min += dy; }
++			else { x_min -= labs(dx); y_min -= labs(dy); }
++		}
++	}
++	*ox = floor((double) x_min / 20.0);
++	*oy = floor((double) y_min / 20.0);
++}
++
+ // Snap translation (twips) for a bitmap-cached entry; 0 when nothing moves.
+ static int cab_snap_delta(DisplayObject* obj, const float world[16],
+                           float* dx, float* dy)
+@@ -3129,8 +3177,13 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
+ 	          ? (double) context->stage_scale : 1.0;
+ 	double xpx = (double) xmin / 20.0 * vs;
+ 	double ypx = (double) ymin / 20.0 * vs;
+-	*dx = (float) ((round(xpx) - xpx) * 20.0 / vs);
+-	*dy = (float) ((round(ypx) - ypx) * 20.0 / vs);
++	// Ruffle rounds the BLIT position, bounds.min + draw_offset, not bounds.min
++	// itself; the integer draw_offset only matters on an x.5 tie (see
++	// filter_draw_offset_px). 0 for an unfiltered cacheAsBitmap entry.
++	double ox = 0.0, oy = 0.0;
++	if (obj->filter_type != 0) filter_draw_offset_px(obj, vs, &ox, &oy);
++	*dx = (float) ((round(xpx + ox) - ox - xpx) * 20.0 / vs);
++	*dy = (float) ((round(ypx + oy) - oy - ypx) * 20.0 / vs);
+ 	return (*dx != 0.0f) || (*dy != 0.0f);
+ }
+ 
+@@ -4046,6 +4099,21 @@ static void cxform_apply_rgba(const float cx[20], double* r, double* g,
+ 	*r = o[0]; *g = o[1]; *b = o[2]; *a = o[3];
+ }
+ 
++// A drop shadow's sampling offset in whole DEVICE pixels: the shadow at x is
++// the blurred layer at x + (sx, sy). Same rounding as the nearest-offset block
++// in render_filtered_object (Ruffle samples NEAREST: floor(-off + 0.5)).
++// Returns 0 when the offset is zero.
++static int filter_shadow_offset_px(RenderContext* rc, const FilterListEntry* f,
++                                   int* sx, int* sy)
++{
++	float vs = (rc != NULL && rc->stage_scale > 0.0f) ? rc->stage_scale : 1.0f;
++	float xd = cosf(f->angle) * f->distance * vs;
++	float yd = sinf(f->angle) * f->distance * vs;
++	*sx = (int) floorf(-xd + 0.5f);
++	*sy = (int) floorf(-yd + 0.5f);
++	return (*sx != 0) || (*sy != 0);
++}
++
+ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
+ {
+ 	FilterListEntry chain_scratch;
+@@ -4128,6 +4196,20 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
+ 	// RAW blurred alpha ((1 - blur) * strength, not 1 - blur*strength).
+ 	int legacy = !(is_shadow || is_glow || is_bevel);
+ 
++	// A single drop shadow reads the blurred layer at a whole-pixel offset (see
++	// the nearest-offset block below). Fold that offset INTO the blur instead:
++	// the layer is stage-sized, so a blur tail that runs past the stage edge
++	// was never stored, and reading it back at +offset came out empty — a
++	// shadow thrown back onto the stage was cut off (from_shumway/acid/
++	// acid-filter: halo clipped at x = stage_w - 32). The blur's own input (the
++	// captured object) is all there, so the shifted blur is exact. Unchained
++	// only: a chain snapshots the layer entering its last filter.
++	int shadow_shift_x = 0, shadow_shift_y = 0;
++	int shadow_pre_shifted = is_shadow && !chained
++		&& filter_shadow_offset_px(context, last, &shadow_shift_x, &shadow_shift_y);
++	if (shadow_pre_shifted)
++		renderer_set_blur_shift(context, shadow_shift_x, shadow_shift_y);
++
+ 	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
+ 	// chains for free: N plain blurs are bit-equal to one blur of quality N,
+ 	// exactly as Flash requires. A NON-FINAL glow / drop-shadow / bevel is
+@@ -4201,6 +4283,8 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
+ 		float uvy = fit_y / ((float)app_context->height * vs);
+ 		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
+ 		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
++		// Already applied inside the blur (shadow_pre_shifted above).
++		if (shadow_pre_shifted) { du = 0.0f; dv = 0.0f; }
+ 	}
+ 
+ 	if (draw_source_before)
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index a230762f3..e271a4b7c 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -4183,11 +4183,34 @@ static const char* blur_wgsl =
+ 	"  strength: f32,\n"
+ 	"  colorize: f32,\n"        // 0=blur, 1=colorize alpha
+ 	"  color: vec4f,\n"         // for colorize (glow/shadow)
++	"  shift: vec2f,\n"         // whole-texel read offset (set_blur_shift)
++	"  border: f32,\n"          // 1 = texels outside the layer read as 0
++	"  shift_pad: f32,\n"
+ 	"}\n"
+ 	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
+ 	"@group(0) @binding(1) var in_samp: sampler;\n"
+ 	"@group(0) @binding(2) var<uniform> params: Params;\n"
+ 	"\n"
++	// A linear tap at `p` (along params.direction) with transparent texels
++	// outside the layer instead of ClampToEdge's replicated edge. When exactly
++	// one of the tap's two texels is outside, the clamped sample is that one
++	// in-range texel, and the true value is it times its own bilinear weight;
++	// both outside -> 0; both inside -> unchanged. Only a SHIFTED run sets
++	// params.border: its first pass reads the capture at +offset, so it reaches
++	// past the edge on purpose and must not smear the edge row/column inward.
++	"fn tap(p: vec2f) -> vec4f {\n"
++	"  let s = textureSample(in_tex, in_samp, p);\n"
++	"  let dims = vec2f(textureDimensions(in_tex));\n"
++	"  let c = dot(p * dims, params.direction) - 0.5;\n"
++	"  let n = dot(dims, params.direction);\n"
++	"  let i = floor(c);\n"
++	"  let f = c - i;\n"
++	"  let in0 = select(0.0, 1.0, i >= 0.0 && i < n);\n"
++	"  let in1 = select(0.0, 1.0, i + 1.0 >= 0.0 && i + 1.0 < n);\n"
++	"  let k = in0 * (1.0 - f) + in1 * f;\n"
++	"  return select(s, s * k, params.border > 0.5 && !(in0 > 0.5 && in1 > 0.5));\n"
++	"}\n"
++	"\n"
+ 	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+ 	"\n"
+ 	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+@@ -4207,24 +4230,27 @@ static const char* blur_wgsl =
+ 	"\n"
+ 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+ 	"  let step = params.direction * params.texel_size;\n"
++	// Integer texel shift (0 except on a shifted run's first H / first V pass):
++	// out(x) = blur(in)(x + shift). A whole-texel move keeps the paired linear
++	// taps below on texel boundaries, so the blur arithmetic is unchanged.
++	"  let uv_s = uv + params.shift * params.texel_size;\n"
+ 	// Pre-shift so the first unit-weight texel sits at offset 0. Ruffle does
+ 	// this in the vertex stage; doing it here is the same arithmetic and keeps
+ 	// the uniform buffer out of the vertex shader's visibility set.
+-	"  let base = uv - step * params.m;\n"
++	"  let base = uv_s - step * params.m;\n"
+ 	"  var total = vec4f(0.0);\n"
+ 	// The outermost texel on the low side, at the fractional weight.
+-	"  total += textureSample(in_tex, in_samp, base - step) * params.first_weight;\n"
++	"  total += tap(base - step) * params.first_weight;\n"
+ 	// The unit-weight interior: sampling exactly between two texels with a
+ 	// linear sampler returns their average, so one sample x2 covers a pair.
+ 	"  var center = vec4f(0.0);\n"
+ 	"  for (var i = 0.5; i < params.m2; i = i + 2.0) {\n"
+-	"    center += textureSample(in_tex, in_samp, base + step * i);\n"
++	"    center += tap(base + step * i);\n"
+ 	"  }\n"
+ 	"  total += center * 2.0;\n"
+ 	// The last pair, fused into one sample: last_offset/last_weight are chosen
+ 	// so texel m lands on weight 1 and texel m+1 on first_weight.
+-	"  total += textureSample(in_tex, in_samp,\n"
+-	"      base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
++	"  total += tap(base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
+ 	"  var result = total / params.full_size;\n"
+ 	"  if (params.full_size > 1.0) {\n"
+ 	// Imitate FP's fixed-point accumulator (ruffle blur.wgsl does the same).
+@@ -4495,7 +4521,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
+ 		entries[2].binding = 2;
+ 		entries[2].visibility = WGPUShaderStage_Fragment;
+ 		entries[2].buffer.type = WGPUBufferBindingType_Uniform;
+-		entries[2].buffer.minBindingSize = 64;
++		entries[2].buffer.minBindingSize = 80;
+ 
+ 		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+ 		bgl_desc.entryCount = 3;
+@@ -5335,10 +5361,17 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 	blur_box_kernel((blur_x - 1.0f) * stage_scale + 1.0f, kx);
+ 	blur_box_kernel((blur_y - 1.0f) * stage_scale + 1.0f, ky);
+ 
+-	// Params layout (64 bytes): vec2f direction (8), vec2f texel_size (8),
++	// Params layout (80 bytes): vec2f direction (8), vec2f texel_size (8),
+ 	// f32 full_size/m/m2/first_weight (16), f32 last_offset/last_weight/
+-	// strength/colorize (16), vec4f color (16).
+-	float params[16]; // 64 bytes
++	// strength/colorize (16), vec4f color (16), vec2f shift + pad (16).
++	float params[20]; // 80 bytes
++	// One-shot whole-texel shift (render_webgpu_set_blur_shift): applied on
++	// the first H pass (x) and the first V pass (y) only — a shift commutes
++	// with the box passes, so once is the whole of it.
++	float shift_x = (float) ctx->blur_shift_x, shift_y = (float) ctx->blur_shift_y;
++	ctx->blur_shift_x = 0; ctx->blur_shift_y = 0;
++	// The whole shifted run reads transparent past the layer edge (tap()).
++	float border = (shift_x != 0.0f || shift_y != 0.0f) ? 1.0f : 0.0f;
+ 
+ 	for (u8 q = 0; q < quality; q++)
+ 	{
+@@ -5355,6 +5388,8 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 		params[10] = 1.0f;                                 // strength: V pass only
+ 		params[11] = 0.0f;                                 // colorize: V pass only
+ 		params[12] = r; params[13] = g; params[14] = b; params[15] = a; // color
++		params[16] = (q == 0) ? shift_x : 0.0f; params[17] = 0.0f;
++		params[18] = border; params[19] = 0.0f;
+ 
+ 		// Create bind group for H-blur: read filter_tex_a
+ 		WGPUBindGroupEntry bg_entries[3] = {0};
+@@ -5364,8 +5399,8 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 		bg_entries[1].sampler = ctx->filter_sampler;
+ 		bg_entries[2].binding = 2;
+ 		bg_entries[2].buffer = ctx->filter_uniform_ring;
+-		bg_entries[2].offset = filter_uniform_push(ctx, params, 64);
+-		bg_entries[2].size = 64;
++		bg_entries[2].offset = filter_uniform_push(ctx, params, 80);
++		bg_entries[2].size = 80;
+ 
+ 		WGPUBindGroupDescriptor bg_desc = {0};
+ 		bg_desc.layout = ctx->blur_bgl;
+@@ -5400,9 +5435,10 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 		params[8] = ky[4]; params[9] = ky[5];
+ 		params[10] = (q == quality - 1) ? strength : 1.0f;
+ 		params[11] = (q == quality - 1 && colorize) ? 1.0f : 0.0f;
++		params[16] = 0.0f; params[17] = (q == 0) ? shift_y : 0.0f;
+ 
+ 		bg_entries[0].textureView = ctx->filter_view_b;
+-		bg_entries[2].offset = filter_uniform_push(ctx, params, 64);
++		bg_entries[2].offset = filter_uniform_push(ctx, params, 80);
+ 		bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+ 
+ 		color_att.view = ctx->filter_view_a;
+@@ -5418,6 +5454,13 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 	}
+ }
+ 
++void render_webgpu_set_blur_shift(WebGPURenderContext* ctx, int sx, int sy)
++{
++	if (ctx == NULL) return;
++	ctx->blur_shift_x = sx;
++	ctx->blur_shift_y = sy;
++}
++
+ void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
+ 	float offset_x, float offset_y,
+ 	float tint_r, float tint_g, float tint_b, float tint_a)

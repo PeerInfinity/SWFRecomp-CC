@@ -3099,6 +3099,54 @@ static int cab_world_bounds_min(DisplayObject* obj, const float world[16],
 	return 1;
 }
 
+static int build_filter_chain(const DisplayObject* obj,
+                              FilterListEntry* scratch,
+                              const FilterListEntry** chain, int cap);
+
+// Ruffle render_base's `draw_offset` for a filtered entry, in DEVICE pixels:
+// floor() of the cache rect's top-left after every non-impotent filter's
+// calculate_dest_rect has grown (0, 0, w, h) (swf/src/types/*_filter.rs, each
+// filter first scaled by the stage view like Filter::scale). Always <= 0, and
+// only its effect on a round-half-away-from-zero TIE matters (see
+// cab_snap_delta): round(b + d) - d == round(b) unless b is k + 0.5 and b + d
+// < 0 (visual/filters/blur_size_grows: y_min 40.5 px, d = -60 -> -19.5 rounds
+// to -20, so Ruffle snaps UP by 0.5 where round(40.5) would snap down).
+static void filter_draw_offset_px(const DisplayObject* obj, double vs,
+                                  double* ox, double* oy)
+{
+	static const double pass_scales[15] = {
+		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
+	FilterListEntry scratch;
+	const FilterListEntry* chain[MAX_FILTER_LIST_SIZE];
+	int n = build_filter_chain(obj, &scratch, chain, MAX_FILTER_LIST_SIZE);
+	long x_min = 0, y_min = 0;   // twips, like Ruffle's Rectangle<Twips>
+	for (int i = 0; i < n; i++)
+	{
+		const FilterListEntry* f = chain[i];
+		if (f->type < 1 || f->type > 4) continue;
+		double bx = ((double) f->blur_x - 1.0) * vs + 1.0;   // scale_blur
+		double by = ((double) f->blur_y - 1.0) * vs + 1.0;
+		int passes = f->quality;
+		if (f->type == 1 && (passes == 0 || (bx <= 1.0 && by <= 1.0)))
+			continue;                                         // impotent blur
+		if (passes < 1) passes = 1;
+		if (passes > 15) passes = 15;
+		double sc = pass_scales[passes - 1];
+		x_min -= (long) ((sc * bx > 0.0 ? sc * bx : 0.0) * 20.0);
+		y_min -= (long) ((sc * by > 0.0 ? sc * by : 0.0) * 20.0);
+		if (f->type == 2 || f->type == 4)
+		{
+			double dist = (double) f->distance * vs;          // distance *= y
+			long dx = (long) (cos((double) f->angle) * dist * 20.0);
+			long dy = (long) (sin((double) f->angle) * dist * 20.0);
+			if (f->type == 2) { if (dx < 0) x_min += dx; if (dy < 0) y_min += dy; }
+			else { x_min -= labs(dx); y_min -= labs(dy); }
+		}
+	}
+	*ox = floor((double) x_min / 20.0);
+	*oy = floor((double) y_min / 20.0);
+}
+
 // Snap translation (twips) for a bitmap-cached entry; 0 when nothing moves.
 static int cab_snap_delta(DisplayObject* obj, const float world[16],
                           float* dx, float* dy)
@@ -3129,8 +3177,13 @@ static int cab_snap_delta(DisplayObject* obj, const float world[16],
 	          ? (double) context->stage_scale : 1.0;
 	double xpx = (double) xmin / 20.0 * vs;
 	double ypx = (double) ymin / 20.0 * vs;
-	*dx = (float) ((round(xpx) - xpx) * 20.0 / vs);
-	*dy = (float) ((round(ypx) - ypx) * 20.0 / vs);
+	// Ruffle rounds the BLIT position, bounds.min + draw_offset, not bounds.min
+	// itself; the integer draw_offset only matters on an x.5 tie (see
+	// filter_draw_offset_px). 0 for an unfiltered cacheAsBitmap entry.
+	double ox = 0.0, oy = 0.0;
+	if (obj->filter_type != 0) filter_draw_offset_px(obj, vs, &ox, &oy);
+	*dx = (float) ((round(xpx + ox) - ox - xpx) * 20.0 / vs);
+	*dy = (float) ((round(ypx + oy) - oy - ypx) * 20.0 / vs);
 	return (*dx != 0.0f) || (*dy != 0.0f);
 }
 
@@ -4075,6 +4128,21 @@ static void cxform_apply_rgba(const float cx[20], double* r, double* g,
 	*r = o[0]; *g = o[1]; *b = o[2]; *a = o[3];
 }
 
+// A drop shadow's sampling offset in whole DEVICE pixels: the shadow at x is
+// the blurred layer at x + (sx, sy). Same rounding as the nearest-offset block
+// in render_filtered_object (Ruffle samples NEAREST: floor(-off + 0.5)).
+// Returns 0 when the offset is zero.
+static int filter_shadow_offset_px(RenderContext* rc, const FilterListEntry* f,
+                                   int* sx, int* sy)
+{
+	float vs = (rc != NULL && rc->stage_scale > 0.0f) ? rc->stage_scale : 1.0f;
+	float xd = cosf(f->angle) * f->distance * vs;
+	float yd = sinf(f->angle) * f->distance * vs;
+	*sx = (int) floorf(-xd + 0.5f);
+	*sy = (int) floorf(-yd + 0.5f);
+	return (*sx != 0) || (*sy != 0);
+}
+
 static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
 {
 	FilterListEntry chain_scratch;
@@ -4157,6 +4225,20 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	// RAW blurred alpha ((1 - blur) * strength, not 1 - blur*strength).
 	int legacy = !(is_shadow || is_glow || is_bevel);
 
+	// A single drop shadow reads the blurred layer at a whole-pixel offset (see
+	// the nearest-offset block below). Fold that offset INTO the blur instead:
+	// the layer is stage-sized, so a blur tail that runs past the stage edge
+	// was never stored, and reading it back at +offset came out empty — a
+	// shadow thrown back onto the stage was cut off (from_shumway/acid/
+	// acid-filter: halo clipped at x = stage_w - 32). The blur's own input (the
+	// captured object) is all there, so the shifted blur is exact. Unchained
+	// only: a chain snapshots the layer entering its last filter.
+	int shadow_shift_x = 0, shadow_shift_y = 0;
+	int shadow_pre_shifted = is_shadow && !chained
+		&& filter_shadow_offset_px(context, last, &shadow_shift_x, &shadow_shift_y);
+	if (shadow_pre_shifted)
+		renderer_set_blur_shift(context, shadow_shift_x, shadow_shift_y);
+
 	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
 	// chains for free: N plain blurs are bit-equal to one blur of quality N,
 	// exactly as Flash requires. A NON-FINAL glow / drop-shadow / bevel is
@@ -4230,6 +4312,8 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 		float uvy = fit_y / ((float)app_context->height * vs);
 		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
 		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
+		// Already applied inside the blur (shadow_pre_shifted above).
+		if (shadow_pre_shifted) { du = 0.0f; dv = 0.0f; }
 	}
 
 	if (draw_source_before)

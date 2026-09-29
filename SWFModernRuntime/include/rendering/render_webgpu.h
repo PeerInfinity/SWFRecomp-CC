@@ -352,6 +352,10 @@ typedef struct WebGPURenderContext
 	// compose_pipeline_layout: binding 0 = maskee layer, binding 3 = mask layer,
 	// binding 2 = an unused uniform block the shared layout still demands.
 	WGPURenderPipeline alpha_mask_pipeline;
+	// One-shot integer texel shift for the NEXT render_webgpu_run_blur call
+	// (set by render_webgpu_set_blur_shift, consumed and cleared by run_blur).
+	int blur_shift_x;
+	int blur_shift_y;
 } WebGPURenderContext;
 
 // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
@@ -422,6 +426,11 @@ void render_webgpu_resume_pass(WebGPURenderContext* context);
 void render_webgpu_begin_offscreen_pass(WebGPURenderContext* context);
 void render_webgpu_end_offscreen_pass(WebGPURenderContext* context);
 void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float blur_y, u8 quality, float strength, float r, float g, float b, float a, int colorize);
+// Make the next run_blur produce blur(x + (sx, sy)) texels instead of blur(x):
+// a drop shadow's integer offset folded INTO the blur, so the offset is read
+// from the source layer (whose content ends on-stage) rather than from the
+// blurred layer (whose tail past the stage edge was never stored).
+void render_webgpu_set_blur_shift(WebGPURenderContext* context, int sx, int sy);
 void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
 // Copy the offscreen source out of filter_tex_a before the blur ping-pong
 // overwrites it. Call with the main pass SUSPENDED, between

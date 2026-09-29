@@ -19426,6 +19426,44 @@ static void avm2_run_displacement_filter(Avm2Context* ctx, Avm2Object* obj,
 // and composite the result back into the suspended main pass. Mirrors
 // tag.c::render_filtered_object; the flag derivations below are that function's,
 // kept in the same order so the two stay diffable.
+// Ruffle render_base's integer `draw_offset` (device px) for a filter list:
+// floor of the top-left of (0, 0, w, h) grown by each filter's
+// calculate_dest_rect after Filter::scale. Mirrors tag.c
+// filter_draw_offset_px; `list` is already impotent-filtered.
+static void avm2_filter_draw_offset_px(const Avm2FilterVal* const* list,
+                                       uint32_t n, double vs,
+                                       double* ox, double* oy)
+{
+	static const double pass_scales[15] = {
+		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
+	long x_min = 0, y_min = 0;   // twips
+	for (uint32_t i = 0; i < n; i++)
+	{
+		const Avm2FilterVal* f = list[i];
+		if (f->kind != AVM2_FILTER_BLUR && f->kind != AVM2_FILTER_DROP_SHADOW
+		    && f->kind != AVM2_FILTER_GLOW && f->kind != AVM2_FILTER_BEVEL)
+			continue;
+		double bx = (avm2_filter_fixed16(f->blur_x) - 1.0) * vs + 1.0;
+		double by = (avm2_filter_fixed16(f->blur_y) - 1.0) * vs + 1.0;
+		int passes = f->quality < 1 ? 1 : (f->quality > 15 ? 15 : f->quality);
+		double sc = pass_scales[passes - 1];
+		x_min -= (long) ((sc * bx > 0.0 ? sc * bx : 0.0) * 20.0);
+		y_min -= (long) ((sc * by > 0.0 ? sc * by : 0.0) * 20.0);
+		if (f->kind == AVM2_FILTER_DROP_SHADOW || f->kind == AVM2_FILTER_BEVEL)
+		{
+			double dist = avm2_filter_fixed16(f->distance) * vs;
+			double ang = avm2_filter_fixed16(f->angle);
+			long dx = (long) (cos(ang) * dist * 20.0);
+			long dy = (long) (sin(ang) * dist * 20.0);
+			if (f->kind == AVM2_FILTER_DROP_SHADOW)
+			{ if (dx < 0) x_min += dx; if (dy < 0) y_min += dy; }
+			else { x_min -= labs(dx); y_min -= labs(dy); }
+		}
+	}
+	*ox = floor((double) x_min / 20.0);
+	*oy = floor((double) y_min / 20.0);
+}
+
 static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
                                  Avm2DisplayObjectExt* ext,
                                  const Mat* parent_world, double parent_alpha,
@@ -19458,8 +19496,13 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 			double vs = (context->stage_scale > 0.0f)
 			          ? (double) context->stage_scale : 1.0;
 			double xpx = acc.xmin / 20.0 * vs, ypx = acc.ymin / 20.0 * vs;
-			snapped_world.tx += (round(xpx) - xpx) * 20.0 / vs;
-			snapped_world.ty += (round(ypx) - ypx) * 20.0 / vs;
+			// Ruffle rounds bounds.min + draw_offset (the integer floor of the
+			// filter-grown cache rect's corner); only an x.5 tie can tell the
+			// difference (tag.c filter_draw_offset_px has the derivation).
+			double ox = 0.0, oy = 0.0;
+			avm2_filter_draw_offset_px(list, n, vs, &ox, &oy);
+			snapped_world.tx += (round(xpx + ox) - ox - xpx) * 20.0 / vs;
+			snapped_world.ty += (round(ypx + oy) - oy - ypx) * 20.0 / vs;
 		}
 	}
 	parent_world = &snapped_world;
@@ -19507,6 +19550,25 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	renderer_end_offscreen_pass(context);
 	if (needs_source_tex)
 		renderer_snapshot_filter_source(context);
+
+	// A lone drop shadow's whole-pixel offset is folded into the blur (see
+	// tag.c render_filtered_object): the stage-sized layer never stored the
+	// blur tail past the stage edge, so reading the BLUR at +offset cut a
+	// shadow thrown back onto the stage; shifting the blur's INPUT read is exact.
+	int shadow_pre_shifted = 0;
+	if (is_shadow && n == 1)
+	{
+		float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
+		float a_ = avm2_filter_fixed16(last->angle);
+		float d_ = avm2_filter_fixed16(last->distance);
+		int sx = (int) floorf(-cosf(a_) * d_ * vs + 0.5f);
+		int sy = (int) floorf(-sinf(a_) * d_ * vs + 0.5f);
+		if (sx != 0 || sy != 0)
+		{
+			renderer_set_blur_shift(context, sx, sy);
+			shadow_pre_shifted = 1;
+		}
+	}
 
 	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
 	// of plain blurs chains for free and is bit-equal to one blur of quality N,
@@ -19571,6 +19633,8 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 		float uvy = fit_y / ((float) context->height * vs);
 		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
 		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
+		// Already applied inside the blur (shadow_pre_shifted above).
+		if (shadow_pre_shifted) { du = 0.0f; dv = 0.0f; }
 	}
 	float strength = avm2_filter_fixed8(last->strength);
 	float hi_r = (float) ((last->color2 >> 16) & 0xFF) / 255.0f;

@@ -4183,10 +4183,33 @@ static const char* blur_wgsl =
 	"  strength: f32,\n"
 	"  colorize: f32,\n"        // 0=blur, 1=colorize alpha
 	"  color: vec4f,\n"         // for colorize (glow/shadow)
+	"  shift: vec2f,\n"         // whole-texel read offset (set_blur_shift)
+	"  border: f32,\n"          // 1 = texels outside the layer read as 0
+	"  shift_pad: f32,\n"
 	"}\n"
 	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
 	"@group(0) @binding(1) var in_samp: sampler;\n"
 	"@group(0) @binding(2) var<uniform> params: Params;\n"
+	"\n"
+	// A linear tap at `p` (along params.direction) with transparent texels
+	// outside the layer instead of ClampToEdge's replicated edge. When exactly
+	// one of the tap's two texels is outside, the clamped sample is that one
+	// in-range texel, and the true value is it times its own bilinear weight;
+	// both outside -> 0; both inside -> unchanged. Only a SHIFTED run sets
+	// params.border: its first pass reads the capture at +offset, so it reaches
+	// past the edge on purpose and must not smear the edge row/column inward.
+	"fn tap(p: vec2f) -> vec4f {\n"
+	"  let s = textureSample(in_tex, in_samp, p);\n"
+	"  let dims = vec2f(textureDimensions(in_tex));\n"
+	"  let c = dot(p * dims, params.direction) - 0.5;\n"
+	"  let n = dot(dims, params.direction);\n"
+	"  let i = floor(c);\n"
+	"  let f = c - i;\n"
+	"  let in0 = select(0.0, 1.0, i >= 0.0 && i < n);\n"
+	"  let in1 = select(0.0, 1.0, i + 1.0 >= 0.0 && i + 1.0 < n);\n"
+	"  let k = in0 * (1.0 - f) + in1 * f;\n"
+	"  return select(s, s * k, params.border > 0.5 && !(in0 > 0.5 && in1 > 0.5));\n"
+	"}\n"
 	"\n"
 	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
 	"\n"
@@ -4207,24 +4230,27 @@ static const char* blur_wgsl =
 	"\n"
 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
 	"  let step = params.direction * params.texel_size;\n"
+	// Integer texel shift (0 except on a shifted run's first H / first V pass):
+	// out(x) = blur(in)(x + shift). A whole-texel move keeps the paired linear
+	// taps below on texel boundaries, so the blur arithmetic is unchanged.
+	"  let uv_s = uv + params.shift * params.texel_size;\n"
 	// Pre-shift so the first unit-weight texel sits at offset 0. Ruffle does
 	// this in the vertex stage; doing it here is the same arithmetic and keeps
 	// the uniform buffer out of the vertex shader's visibility set.
-	"  let base = uv - step * params.m;\n"
+	"  let base = uv_s - step * params.m;\n"
 	"  var total = vec4f(0.0);\n"
 	// The outermost texel on the low side, at the fractional weight.
-	"  total += textureSample(in_tex, in_samp, base - step) * params.first_weight;\n"
+	"  total += tap(base - step) * params.first_weight;\n"
 	// The unit-weight interior: sampling exactly between two texels with a
 	// linear sampler returns their average, so one sample x2 covers a pair.
 	"  var center = vec4f(0.0);\n"
 	"  for (var i = 0.5; i < params.m2; i = i + 2.0) {\n"
-	"    center += textureSample(in_tex, in_samp, base + step * i);\n"
+	"    center += tap(base + step * i);\n"
 	"  }\n"
 	"  total += center * 2.0;\n"
 	// The last pair, fused into one sample: last_offset/last_weight are chosen
 	// so texel m lands on weight 1 and texel m+1 on first_weight.
-	"  total += textureSample(in_tex, in_samp,\n"
-	"      base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
+	"  total += tap(base + step * (params.m2 + params.last_offset)) * params.last_weight;\n"
 	"  var result = total / params.full_size;\n"
 	"  if (params.full_size > 1.0) {\n"
 	// Imitate FP's fixed-point accumulator (ruffle blur.wgsl does the same).
@@ -4495,7 +4521,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		entries[2].binding = 2;
 		entries[2].visibility = WGPUShaderStage_Fragment;
 		entries[2].buffer.type = WGPUBufferBindingType_Uniform;
-		entries[2].buffer.minBindingSize = 64;
+		entries[2].buffer.minBindingSize = 80;
 
 		WGPUBindGroupLayoutDescriptor bgl_desc = {0};
 		bgl_desc.entryCount = 3;
@@ -5335,10 +5361,17 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 	blur_box_kernel((blur_x - 1.0f) * stage_scale + 1.0f, kx);
 	blur_box_kernel((blur_y - 1.0f) * stage_scale + 1.0f, ky);
 
-	// Params layout (64 bytes): vec2f direction (8), vec2f texel_size (8),
+	// Params layout (80 bytes): vec2f direction (8), vec2f texel_size (8),
 	// f32 full_size/m/m2/first_weight (16), f32 last_offset/last_weight/
-	// strength/colorize (16), vec4f color (16).
-	float params[16]; // 64 bytes
+	// strength/colorize (16), vec4f color (16), vec2f shift + pad (16).
+	float params[20]; // 80 bytes
+	// One-shot whole-texel shift (render_webgpu_set_blur_shift): applied on
+	// the first H pass (x) and the first V pass (y) only — a shift commutes
+	// with the box passes, so once is the whole of it.
+	float shift_x = (float) ctx->blur_shift_x, shift_y = (float) ctx->blur_shift_y;
+	ctx->blur_shift_x = 0; ctx->blur_shift_y = 0;
+	// The whole shifted run reads transparent past the layer edge (tap()).
+	float border = (shift_x != 0.0f || shift_y != 0.0f) ? 1.0f : 0.0f;
 
 	for (u8 q = 0; q < quality; q++)
 	{
@@ -5355,6 +5388,8 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		params[10] = 1.0f;                                 // strength: V pass only
 		params[11] = 0.0f;                                 // colorize: V pass only
 		params[12] = r; params[13] = g; params[14] = b; params[15] = a; // color
+		params[16] = (q == 0) ? shift_x : 0.0f; params[17] = 0.0f;
+		params[18] = border; params[19] = 0.0f;
 
 		// Create bind group for H-blur: read filter_tex_a
 		WGPUBindGroupEntry bg_entries[3] = {0};
@@ -5364,8 +5399,8 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		bg_entries[1].sampler = ctx->filter_sampler;
 		bg_entries[2].binding = 2;
 		bg_entries[2].buffer = ctx->filter_uniform_ring;
-		bg_entries[2].offset = filter_uniform_push(ctx, params, 64);
-		bg_entries[2].size = 64;
+		bg_entries[2].offset = filter_uniform_push(ctx, params, 80);
+		bg_entries[2].size = 80;
 
 		WGPUBindGroupDescriptor bg_desc = {0};
 		bg_desc.layout = ctx->blur_bgl;
@@ -5400,9 +5435,10 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		params[8] = ky[4]; params[9] = ky[5];
 		params[10] = (q == quality - 1) ? strength : 1.0f;
 		params[11] = (q == quality - 1 && colorize) ? 1.0f : 0.0f;
+		params[16] = 0.0f; params[17] = (q == 0) ? shift_y : 0.0f;
 
 		bg_entries[0].textureView = ctx->filter_view_b;
-		bg_entries[2].offset = filter_uniform_push(ctx, params, 64);
+		bg_entries[2].offset = filter_uniform_push(ctx, params, 80);
 		bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
 
 		color_att.view = ctx->filter_view_a;
@@ -5416,6 +5452,13 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
 		wgpuRenderPassEncoderRelease(pass);
 		wgpuBindGroupRelease(bg);
 	}
+}
+
+void render_webgpu_set_blur_shift(WebGPURenderContext* ctx, int sx, int sy)
+{
+	if (ctx == NULL) return;
+	ctx->blur_shift_x = sx;
+	ctx->blur_shift_y = sy;
 }
 
 void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
