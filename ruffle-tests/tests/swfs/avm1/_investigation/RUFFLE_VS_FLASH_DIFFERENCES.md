@@ -605,6 +605,17 @@ change. The fix gates the strict parse to SWF5+, so SWF4 keeps prefix-parsing
 (`"10x"` is 10 there) and only SWF5+ yields NaN. The two goals were never in
 conflict.
 
+**Correction (s21, 2026-09-29).** The "`\"10x\"` is 10 there" clause above describes what
+OUR SWF4 path does, not Flash: Flash's own oracle in `avm1/set_property_values/swf4` shows
+`setProperty(_x, "10x")` ABANDONS the set (the property keeps its value), exactly like the
+fully-unparseable case. Prefix-parsing may still be right for SWF4 arithmetic, but not for
+`setProperty`. Tracked as part of the SWF4 `setProperty` arc (`polish-sweep-arc.md` §22.5).
+
+**User ruling (2026-09-29): match Flash.** Adopting Ruffle's store-0 rule would promote
+`avm1/set_property_values/swf4` to `ruffle_matched` (+1) only by moving `swf4opcode`
+pass → `ruffle_matched`; that trade is declined. `set_property_values/swf4` stays failing until
+a Flash-exact SWF4 `setProperty` arc lands.
+
 **Decision**: keep Flash's behaviour. The version gate is the mechanism; a sweep
 for a change to a version-gated coercion helper must be selected by SWF VERSION,
 not by feature name (the original sweep covered `actionscript.all` and

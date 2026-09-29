@@ -3092,9 +3092,12 @@ from the brief re-pays build and diagnosis.
 **Trace** (62 output_mismatch + 1 runtime_error remain):
 - **`MovieClip-v8`**: 27 ours-only lines after s21 (was 41), the 14 shared with v6/v7 are closed;
   the SWF-8-specific residue is unpriced (`w2-tt-d-report.md`).
-- **`set_property_values/swf4` is now a measured POLICY TRADE**, not an arc: adopting Ruffle's
-  SWF4 store-0 rule promotes it to rm but moves `swf4opcode` pass → rm (a regression under rule
-  3). Plus 2 independent lines (SWF4 `setProperty(_name, true)` must print `1`/`0`). Needs a ruling.
+- **`set_property_values/swf4` — RULED 2026-09-29 (user): match Flash.** The store-0 trade
+  (+1 rm for `swf4opcode` pass → rm) is DECLINED; do not re-price it. The row stays failing until a
+  Flash-exact SWF4 `setProperty` arc lands: `"10x"` abandons the set (not prefix-parse), SWF4
+  `_xscale` quantisation (2 → `1.9989013671875`), the `Object is not a function` debugger lines
+  (74 of 295 blocks differ, `w1-trace-tail-report.md` §9). Cheap Flash-correct rider available
+  now: SWF4 `setProperty(_name, true)` must print `1`/`0` (2 lines, 0 flips).
 - **Cross-VM focus/pick arc** (`selection_onsetfocus_mixed_avm` = 4 mechanisms,
   `focus_events_mixed_avm_edittext`, `mouse_pick_loader_avm1`): the loaded AVM1 movie's wrapper
   answers clicks with its whole stage rect (`avm2_display.c:14961-14975`); plus AVM1 button
@@ -3107,7 +3110,6 @@ from the brief re-pays build and diagnosis.
   hitarea), script-assigned `onEnterFrame` on children of attached clips, removed-scope's five
   leads (undeclared-var assignment → `_global`, `with(removedClip)`, …), `sortOn` / index-sort
   write-back rule, `array.as:1394/:444/:1628-1636`.
-- Doc fix owed: `RUFFLE_VS_FLASH_DIFFERENCES.md:604-606` (Flash abandons the set rather than
-  prefix-parsing `"10x"` in SWF4 `setProperty`).
+- ~~Doc fix owed: `RUFFLE_VS_FLASH_DIFFERENCES.md:604-606`~~ — corrected 2026-09-29.
 
 **Pixels.** See `graphics-fanout-playbook.md` §20.
