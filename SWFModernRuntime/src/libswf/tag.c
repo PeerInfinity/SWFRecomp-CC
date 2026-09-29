@@ -5254,6 +5254,75 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// attachMovie'd clips' STANDALONE child lists (CI modes: NO_GRAPHICS /
+// OFFSCREEN_RENDER).
+//
+// ng_attachMovie gives the attached clip a heap display_obj flagged
+// attach_standalone that lives in NO display-list array, and runs the symbol's
+// frame 0 into that struct's sprite_display_list. A child placed there with
+// onClipEvent(enterFrame) was initialized (process_sprite_needs_init_public in
+// the attach-init drain sets sprite_initialized=1) but was then invisible to
+// every per-tick pass: upgrade_sprite_initialized, dispatch_enterframe_clip_
+// actions and hasClipEnterFrameHandlers all walk only the root display_list.
+// So the handler never fired (Ruffle fires it every frame — regression test
+// avm1_attach_clipevent_enterframe). Browser-WASM has its own separate passes
+// (upgrade_attached_clip_initialized / dispatch_attached_clip_enterframe) and
+// is untouched here.
+//
+// Collects (dobj, mc) pairs, deduplicated by dobj so two cache MCs aliasing one
+// struct can never double-fire. Returns the pair count.
+// ---------------------------------------------------------------------------
+#define ATTACHED_STANDALONE_CAP 4096
+// Scratch for collect_attached_standalone. Static (not stack) — every consumer
+// finishes reading it before any AS handler runs, so it is never live across a
+// re-entrant call.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+static DisplayObject* g_att_sa_d[ATTACHED_STANDALONE_CAP];
+static MovieClip* g_att_sa_mc[ATTACHED_STANDALONE_CAP];
+#endif
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+static size_t collect_attached_standalone(DisplayObject** out_d, MovieClip** out_mc)
+{
+	size_t n = 0;
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	for (int i = 0; i < child_mc_count && n < ATTACHED_STANDALONE_CAP; i++)
+	{
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
+		if (mc->avm1_removed) continue;
+		DisplayObject* d = (DisplayObject*)mc->display_obj;
+		if (!d->attach_standalone || d->char_id == 0) continue;
+		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
+		int dup = 0;
+		for (size_t k = 0; k < n; k++) if (out_d[k] == d) { dup = 1; break; }
+		if (dup) continue;
+		out_d[n] = d;
+		out_mc[n] = mc;
+		n++;
+	}
+	return n;
+}
+#endif
+
+// Promote sprite_initialized 1→2 inside attached clips' standalone lists. Called
+// at the tick boundary (swf_core.c / swf.c), so a clip attached (and init-drained)
+// during tick N first dispatches enterFrame in tick N+1 — the same "init tick
+// fires LOAD, not enterFrame" model tagShowFrame's upgrade_sprite_initialized
+// applies to timeline-placed clips. The tick-boundary site (rather than
+// tagShowFrame) also covers attaches made while the root is stopped or past its
+// last frame, where no tagShowFrame runs.
+void ng_upgrade_attached_standalone_initialized(void)
+{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (!g_any_clip_ef_placed) return;
+	size_t n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
+	for (size_t k = 0; k < n; k++)
+		upgrade_sprite_initialized(g_att_sa_d[k]->sprite_display_list, g_att_sa_d[k]->sprite_max_depth);
+#endif
+}
+
 // Recursively gather all eligible CLIP_EVENT_ENTER_FRAME entries into a flat
 // list, with each entry's parent_mc tracked so dispatch can resolve names.
 // Stops gathering (returns early) if the cap is exceeded; caller falls back
@@ -5401,8 +5470,8 @@ static void dispatch_enterframe_clip_actions_recursive(SWFAppContext* app_contex
 // when the gather cap is exceeded.
 //
 // Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
-void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
-	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
+static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc, int include_attached)
 {
 	// No CLIP_EVENT_ENTER_FRAME clip action has ever been placed → the gather
 	// walk would find nothing to dispatch. Skip the whole tree traversal.
@@ -5410,11 +5479,47 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	#define CLIP_EF_FLAT_CAP 2048
 	ClipEFEntry entries[CLIP_EF_FLAT_CAP];
 	size_t n = 0;
-	if (!gather_clip_ef_entries(app_context, dl, dl_max, parent_mc,
-		entries, &n, CLIP_EF_FLAT_CAP))
+	int gathered = gather_clip_ef_entries(app_context, dl, dl_max, parent_mc,
+		entries, &n, CLIP_EF_FLAT_CAP);
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Root dispatch also gathers every attachMovie'd clip's standalone child
+	// list (see collect_attached_standalone), into the SAME flat list so the
+	// place_seq DESC sort below interleaves them with timeline clips exactly
+	// like Ruffle's single global exec list.
+	size_t att_n = 0;
+	if (include_attached) {
+		att_n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
+		for (size_t k = 0; k < att_n && gathered; k++)
+			gathered = gather_clip_ef_entries(app_context,
+				g_att_sa_d[k]->sprite_display_list, g_att_sa_d[k]->sprite_max_depth,
+				g_att_sa_mc[k], entries, &n, CLIP_EF_FLAT_CAP);
+	}
+#else
+	(void)include_attached;
+#endif
+	if (!gathered)
 	{
 		// Overflow: fall back to per-subtree recursion (pre-flat-LIFO behavior).
 		dispatch_enterframe_clip_actions_recursive(app_context, dl, dl_max, parent_mc);
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+		// The collected pairs are consumed here before any handler can re-enter
+		// collect (static scratch); copy them off first.
+		if (att_n > 0) {
+			DisplayObject** ad = (DisplayObject**)malloc(att_n * sizeof(DisplayObject*));
+			MovieClip** am = (MovieClip**)malloc(att_n * sizeof(MovieClip*));
+			if (ad != NULL && am != NULL) {
+				memcpy(ad, g_att_sa_d, att_n * sizeof(DisplayObject*));
+				memcpy(am, g_att_sa_mc, att_n * sizeof(MovieClip*));
+				for (size_t k = 0; k < att_n; k++) {
+					if (am[k]->depth == INT_MIN || am[k]->display_obj != (void*)ad[k]) continue;
+					dispatch_enterframe_clip_actions_recursive(app_context,
+						ad[k]->sprite_display_list, ad[k]->sprite_max_depth, am[k]);
+				}
+			}
+			free(ad);
+			free(am);
+		}
+#endif
 		return;
 	}
 
@@ -5489,6 +5594,22 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	}
 
 	g_clip_ef_rebase_head = _ef_frame.prev;
+}
+
+void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
+{
+	dispatch_enterframe_clip_actions_impl(app_context, dl, dl_max, parent_mc, 0);
+}
+
+// Per-tick ROOT dispatch: the root display_list plus (CI modes) every
+// attachMovie'd clip's standalone child list. Browser-WASM keeps its own
+// dispatch_attached_clip_enterframe pass, so there this is the plain root walk.
+void dispatch_root_enterframe_clip_actions(SWFAppContext* app_context)
+{
+	extern MovieClip root_movieclip;
+	dispatch_enterframe_clip_actions_impl(app_context, display_list, max_depth,
+		&root_movieclip, 1);
 }
 
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
@@ -5615,10 +5736,7 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	set_enterframe_eligible_recursive(display_list, max_depth);
 	// Dispatch clip event ENTER_FRAME (recursive, children before parents).
 	// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
-	{
-		extern MovieClip root_movieclip;
-		dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
-	}
+	dispatch_root_enterframe_clip_actions(app_context);
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	// Browser-WASM: fire enterFrame for clip actions on sprites nested inside
 	// attachMovie'd clips (e.g. Doodle Jump blue platform charId 32 "aaa"),
@@ -13173,7 +13291,20 @@ static int hasClipEnterFrameHandlers_impl(DisplayObject* dl, size_t dl_max)
 }
 int hasClipEnterFrameHandlers(void)
 {
-	return hasClipEnterFrameHandlers_impl(display_list, max_depth);
+	if (hasClipEnterFrameHandlers_impl(display_list, max_depth)) return 1;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// attachMovie'd clips' standalone child lists (see collect_attached_standalone):
+	// an attached clip's child with onClipEvent(enterFrame) keeps the loop alive
+	// exactly like a timeline-placed one.
+	if (g_any_clip_ef_placed) {
+		size_t n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
+		for (size_t k = 0; k < n; k++)
+			if (hasClipEnterFrameHandlers_impl(g_att_sa_d[k]->sprite_display_list,
+			                                   g_att_sa_d[k]->sprite_max_depth))
+				return 1;
+	}
+#endif
+	return 0;
 }
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)

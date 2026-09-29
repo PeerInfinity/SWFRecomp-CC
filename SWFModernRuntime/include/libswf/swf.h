@@ -343,6 +343,18 @@ typedef struct DisplayObject
 	// placement arms), and re-set by the tagBeginFilterList that follows the
 	// tagSetFilter of the same placement.
 	const void* filter_chain;
+
+	// 1 on the STANDALONE heap DisplayObject that ng_attachMovie allocates as an
+	// attachMovie'd clip's display_obj. That struct lives in no display-list
+	// array (root attaches are never registered; a non-root attach's parent
+	// registration is a separate copy that is never sprite_initialized), so the
+	// root enterFrame walk cannot reach the clip's children. The CI modes
+	// (NO_GRAPHICS / OFFSCREEN_RENDER) walk flagged lists explicitly: promotion
+	// (ng_upgrade_attached_standalone_initialized), CLIP_EVENT_ENTER_FRAME
+	// dispatch and hasClipEnterFrameHandlers. Clones' standalone structs are
+	// deliberately NOT flagged — their root registration entry shares the child
+	// list and is already walked (flagging them would double-fire).
+	u8 attach_standalone;
 } DisplayObject;
 
 typedef struct KeyState {

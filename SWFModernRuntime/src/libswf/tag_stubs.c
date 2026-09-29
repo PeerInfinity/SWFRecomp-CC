@@ -480,6 +480,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		if (new_mc->display_obj == NULL) {
 			DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
 			dobj->char_id = char_id;
+			dobj->attach_standalone = 1;   // see swf.h: walked for clip enterFrame
 			dobj->sprite_dl_capacity = 64;
 			// Use HCALLOC so grow_ptr/ENSURE_SIZE/FREE can operate on it consistently
 			dobj->sprite_display_list = HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));

@@ -1,0 +1,443 @@
+diff --git a/SWFModernRuntime/include/libswf/swf.h b/SWFModernRuntime/include/libswf/swf.h
+index 5d468339c..ed4f9b395 100644
+--- a/SWFModernRuntime/include/libswf/swf.h
++++ b/SWFModernRuntime/include/libswf/swf.h
+@@ -343,6 +343,18 @@ typedef struct DisplayObject
+ 	// placement arms), and re-set by the tagBeginFilterList that follows the
+ 	// tagSetFilter of the same placement.
+ 	const void* filter_chain;
++
++	// 1 on the STANDALONE heap DisplayObject that ng_attachMovie allocates as an
++	// attachMovie'd clip's display_obj. That struct lives in no display-list
++	// array (root attaches are never registered; a non-root attach's parent
++	// registration is a separate copy that is never sprite_initialized), so the
++	// root enterFrame walk cannot reach the clip's children. The CI modes
++	// (NO_GRAPHICS / OFFSCREEN_RENDER) walk flagged lists explicitly: promotion
++	// (ng_upgrade_attached_standalone_initialized), CLIP_EVENT_ENTER_FRAME
++	// dispatch and hasClipEnterFrameHandlers. Clones' standalone structs are
++	// deliberately NOT flagged — their root registration entry shares the child
++	// list and is already walked (flagging them would double-fire).
++	u8 attach_standalone;
+ } DisplayObject;
+ 
+ typedef struct KeyState {
+diff --git a/SWFModernRuntime/src/libswf/swf.c b/SWFModernRuntime/src/libswf/swf.c
+index d1c099a14..487dd7be1 100644
+--- a/SWFModernRuntime/src/libswf/swf.c
++++ b/SWFModernRuntime/src/libswf/swf.c
+@@ -444,6 +444,13 @@ void tagMain(SWFAppContext* app_context)
+ 		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
+ 		{ extern size_t g_tick_count; g_tick_count++; }
+ 
++		// Tick boundary: promote last tick's freshly-initialized children of
++		// attachMovie'd clips (no-op outside the CI modes). Mirrors swf_core.c.
++		{
++			extern void ng_upgrade_attached_standalone_initialized(void);
++			ng_upgrade_attached_standalone_initialized();
++		}
++
+ 		// Tick boundary = VM quiescent: release dynamic_props detached last
+ 		// tick (memory-reclamation plan Stage 1; see actionDeferDpropsRelease).
+ 		actionDrainDpropsReleases(app_context);
+diff --git a/SWFModernRuntime/src/libswf/swf_core.c b/SWFModernRuntime/src/libswf/swf_core.c
+index f4c81900e..2cb72c7ec 100644
+--- a/SWFModernRuntime/src/libswf/swf_core.c
++++ b/SWFModernRuntime/src/libswf/swf_core.c
+@@ -955,6 +955,15 @@ void swfStart(SWFAppContext* app_context)
+ 		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
+ 		{ extern size_t g_tick_count; g_tick_count++; }
+ 
++		// Tick boundary: promote last tick's freshly-initialized children of
++		// attachMovie'd clips (standalone lists no root walk reaches) so their
++		// onClipEvent(enterFrame) dispatches from this tick on. See tag.c
++		// collect_attached_standalone.
++		{
++			extern void ng_upgrade_attached_standalone_initialized(void);
++			ng_upgrade_attached_standalone_initialized();
++		}
++
+ 		// Tick boundary = VM quiescent: release dynamic_props detached last
+ 		// tick (memory-reclamation plan Stage 1; see actionDeferDpropsRelease).
+ 		actionDrainDpropsReleases(app_context);
+@@ -1227,9 +1236,8 @@ void swfStart(SWFAppContext* app_context)
+ 			}
+ 			// Dispatch clip event ENTER_FRAME (recursive, children before parents)
+ 			{
+-				extern MovieClip root_movieclip;
+-				extern void dispatch_enterframe_clip_actions(SWFAppContext*, DisplayObject*, size_t, MovieClip*);
+-				dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
++				extern void dispatch_root_enterframe_clip_actions(SWFAppContext*);
++				dispatch_root_enterframe_clip_actions(app_context);
+ 			}
+ 			actionDispatchEnterFrameHandlers(app_context);
+ 			actionDispatchRootVarMapEnterFrame(app_context);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index a09bacae8..66c49a5be 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -5217,6 +5217,75 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
+ 	}
+ }
+ 
++// ---------------------------------------------------------------------------
++// attachMovie'd clips' STANDALONE child lists (CI modes: NO_GRAPHICS /
++// OFFSCREEN_RENDER).
++//
++// ng_attachMovie gives the attached clip a heap display_obj flagged
++// attach_standalone that lives in NO display-list array, and runs the symbol's
++// frame 0 into that struct's sprite_display_list. A child placed there with
++// onClipEvent(enterFrame) was initialized (process_sprite_needs_init_public in
++// the attach-init drain sets sprite_initialized=1) but was then invisible to
++// every per-tick pass: upgrade_sprite_initialized, dispatch_enterframe_clip_
++// actions and hasClipEnterFrameHandlers all walk only the root display_list.
++// So the handler never fired (Ruffle fires it every frame — regression test
++// avm1_attach_clipevent_enterframe). Browser-WASM has its own separate passes
++// (upgrade_attached_clip_initialized / dispatch_attached_clip_enterframe) and
++// is untouched here.
++//
++// Collects (dobj, mc) pairs, deduplicated by dobj so two cache MCs aliasing one
++// struct can never double-fire. Returns the pair count.
++// ---------------------------------------------------------------------------
++#define ATTACHED_STANDALONE_CAP 4096
++// Scratch for collect_attached_standalone. Static (not stack) — every consumer
++// finishes reading it before any AS handler runs, so it is never live across a
++// re-entrant call.
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++static DisplayObject* g_att_sa_d[ATTACHED_STANDALONE_CAP];
++static MovieClip* g_att_sa_mc[ATTACHED_STANDALONE_CAP];
++#endif
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++static size_t collect_attached_standalone(DisplayObject** out_d, MovieClip** out_mc)
++{
++	size_t n = 0;
++	extern MovieClip* child_mc_cache[];
++	extern int child_mc_count;
++	for (int i = 0; i < child_mc_count && n < ATTACHED_STANDALONE_CAP; i++)
++	{
++		MovieClip* mc = child_mc_cache[i];
++		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
++		if (mc->avm1_removed) continue;
++		DisplayObject* d = (DisplayObject*)mc->display_obj;
++		if (!d->attach_standalone || d->char_id == 0) continue;
++		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
++		int dup = 0;
++		for (size_t k = 0; k < n; k++) if (out_d[k] == d) { dup = 1; break; }
++		if (dup) continue;
++		out_d[n] = d;
++		out_mc[n] = mc;
++		n++;
++	}
++	return n;
++}
++#endif
++
++// Promote sprite_initialized 1→2 inside attached clips' standalone lists. Called
++// at the tick boundary (swf_core.c / swf.c), so a clip attached (and init-drained)
++// during tick N first dispatches enterFrame in tick N+1 — the same "init tick
++// fires LOAD, not enterFrame" model tagShowFrame's upgrade_sprite_initialized
++// applies to timeline-placed clips. The tick-boundary site (rather than
++// tagShowFrame) also covers attaches made while the root is stopped or past its
++// last frame, where no tagShowFrame runs.
++void ng_upgrade_attached_standalone_initialized(void)
++{
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	if (!g_any_clip_ef_placed) return;
++	size_t n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
++	for (size_t k = 0; k < n; k++)
++		upgrade_sprite_initialized(g_att_sa_d[k]->sprite_display_list, g_att_sa_d[k]->sprite_max_depth);
++#endif
++}
++
+ // Recursively gather all eligible CLIP_EVENT_ENTER_FRAME entries into a flat
+ // list, with each entry's parent_mc tracked so dispatch can resolve names.
+ // Stops gathering (returns early) if the cap is exceeded; caller falls back
+@@ -5364,8 +5433,8 @@ static void dispatch_enterframe_clip_actions_recursive(SWFAppContext* app_contex
+ // when the gather cap is exceeded.
+ //
+ // Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
+-void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+-	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
++static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
++	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc, int include_attached)
+ {
+ 	// No CLIP_EVENT_ENTER_FRAME clip action has ever been placed → the gather
+ 	// walk would find nothing to dispatch. Skip the whole tree traversal.
+@@ -5373,11 +5442,47 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+ 	#define CLIP_EF_FLAT_CAP 2048
+ 	ClipEFEntry entries[CLIP_EF_FLAT_CAP];
+ 	size_t n = 0;
+-	if (!gather_clip_ef_entries(app_context, dl, dl_max, parent_mc,
+-		entries, &n, CLIP_EF_FLAT_CAP))
++	int gathered = gather_clip_ef_entries(app_context, dl, dl_max, parent_mc,
++		entries, &n, CLIP_EF_FLAT_CAP);
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	// Root dispatch also gathers every attachMovie'd clip's standalone child
++	// list (see collect_attached_standalone), into the SAME flat list so the
++	// place_seq DESC sort below interleaves them with timeline clips exactly
++	// like Ruffle's single global exec list.
++	size_t att_n = 0;
++	if (include_attached) {
++		att_n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
++		for (size_t k = 0; k < att_n && gathered; k++)
++			gathered = gather_clip_ef_entries(app_context,
++				g_att_sa_d[k]->sprite_display_list, g_att_sa_d[k]->sprite_max_depth,
++				g_att_sa_mc[k], entries, &n, CLIP_EF_FLAT_CAP);
++	}
++#else
++	(void)include_attached;
++#endif
++	if (!gathered)
+ 	{
+ 		// Overflow: fall back to per-subtree recursion (pre-flat-LIFO behavior).
+ 		dispatch_enterframe_clip_actions_recursive(app_context, dl, dl_max, parent_mc);
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++		// The collected pairs are consumed here before any handler can re-enter
++		// collect (static scratch); copy them off first.
++		if (att_n > 0) {
++			DisplayObject** ad = (DisplayObject**)malloc(att_n * sizeof(DisplayObject*));
++			MovieClip** am = (MovieClip**)malloc(att_n * sizeof(MovieClip*));
++			if (ad != NULL && am != NULL) {
++				memcpy(ad, g_att_sa_d, att_n * sizeof(DisplayObject*));
++				memcpy(am, g_att_sa_mc, att_n * sizeof(MovieClip*));
++				for (size_t k = 0; k < att_n; k++) {
++					if (am[k]->depth == INT_MIN || am[k]->display_obj != (void*)ad[k]) continue;
++					dispatch_enterframe_clip_actions_recursive(app_context,
++						ad[k]->sprite_display_list, ad[k]->sprite_max_depth, am[k]);
++				}
++			}
++			free(ad);
++			free(am);
++		}
++#endif
+ 		return;
+ 	}
+ 
+@@ -5454,6 +5559,22 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+ 	g_clip_ef_rebase_head = _ef_frame.prev;
+ }
+ 
++void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
++	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
++{
++	dispatch_enterframe_clip_actions_impl(app_context, dl, dl_max, parent_mc, 0);
++}
++
++// Per-tick ROOT dispatch: the root display_list plus (CI modes) every
++// attachMovie'd clip's standalone child list. Browser-WASM keeps its own
++// dispatch_attached_clip_enterframe pass, so there this is the plain root walk.
++void dispatch_root_enterframe_clip_actions(SWFAppContext* app_context)
++{
++	extern MovieClip root_movieclip;
++	dispatch_enterframe_clip_actions_impl(app_context, display_list, max_depth,
++		&root_movieclip, 1);
++}
++
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ // Browser-WASM: dispatch CLIP_EVENT_ENTER_FRAME for sprites nested inside
+ // attachMovie'd clips. The root walk above (over display_list) cannot reach
+@@ -5578,10 +5699,7 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
+ 	set_enterframe_eligible_recursive(display_list, max_depth);
+ 	// Dispatch clip event ENTER_FRAME (recursive, children before parents).
+ 	// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
+-	{
+-		extern MovieClip root_movieclip;
+-		dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
+-	}
++	dispatch_root_enterframe_clip_actions(app_context);
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ 	// Browser-WASM: fire enterFrame for clip actions on sprites nested inside
+ 	// attachMovie'd clips (e.g. Doodle Jump blue platform charId 32 "aaa"),
+@@ -13135,7 +13253,20 @@ static int hasClipEnterFrameHandlers_impl(DisplayObject* dl, size_t dl_max)
+ }
+ int hasClipEnterFrameHandlers(void)
+ {
+-	return hasClipEnterFrameHandlers_impl(display_list, max_depth);
++	if (hasClipEnterFrameHandlers_impl(display_list, max_depth)) return 1;
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	// attachMovie'd clips' standalone child lists (see collect_attached_standalone):
++	// an attached clip's child with onClipEvent(enterFrame) keeps the loop alive
++	// exactly like a timeline-placed one.
++	if (g_any_clip_ef_placed) {
++		size_t n = collect_attached_standalone(g_att_sa_d, g_att_sa_mc);
++		for (size_t k = 0; k < n; k++)
++			if (hasClipEnterFrameHandlers_impl(g_att_sa_d[k]->sprite_display_list,
++			                                   g_att_sa_d[k]->sprite_max_depth))
++				return 1;
++	}
++#endif
++	return 0;
+ }
+ 
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+diff --git a/SWFModernRuntime/src/libswf/tag_stubs.c b/SWFModernRuntime/src/libswf/tag_stubs.c
+index cca1b700c..decd65661 100644
+--- a/SWFModernRuntime/src/libswf/tag_stubs.c
++++ b/SWFModernRuntime/src/libswf/tag_stubs.c
+@@ -480,6 +480,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
+ 		if (new_mc->display_obj == NULL) {
+ 			DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
+ 			dobj->char_id = char_id;
++			dobj->attach_standalone = 1;   // see swf.h: walked for clip enterFrame
+ 			dobj->sprite_dl_capacity = 64;
+ 			// Use HCALLOC so grow_ptr/ENSURE_SIZE/FREE can operate on it consistently
+ 			dobj->sprite_display_list = HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 51e088ce8..41b190645 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -100,3 +100,4 @@ arms cannot be reached any other way.
+ | `avm1_parent_child_bitmap_fill` | The same slice's PIXEL-only half: a loaded child's static bitmap reaching the size-class texture pools (its `defineBitmap` arrives at loadMovie time, long after the pools are latched at the root's `finalizeBitmaps`) and its shape's fill style naming the right slot (the index is baked into the VERTEX at recompile time). No trace assertion exists for either — every AS-visible read of a child bitmap goes through the metadata tables — so this is graded by `[image_comparisons.output]` alone and its trace output only proves the movie ran |
+ | `bitmap_pool_layer_cap` | the renderer's static bitmap pools stay under the DEVICE's `maxTextureArrayLayers`. A static pool used to take one layer per member of its size class with no cap, so more than 256 same-class bitmaps made an invalid texture on SwiftShader / the WebGPU default limits, which invalidated the bind group and dropped every frame: the movie ticked, the canvas was black. Hand-built AVM1 SWF: 300 flat-colour 2x2 bitmaps (size class 0) in a 20x15 grid of distinct colours plus one 100x1 strip (class 1), 301 bitmap-filled shapes. `test.toml`'s `[swfrecomp] gpu_max_texture_array_layers = 256` becomes `-DSWF_GPU_MAX_TEXTURE_ARRAY_LAYERS=256`, which requests 256 layers from lavapipe (it would grant 2048) — without the knob a native run cannot reach the wall. Graded by the tolerance-0 image comparison against a Ruffle golden (trace output only proves the movie ran). Before the fix: pool 0 = 300 layers, 309 WebGPU validation errors in 2 frames, capture all zeros. After: pool 0 = 256, 44 bitmaps spill into pool 1, 0 outliers. Closeout: `SWFRecompDocs/status/bitmap-pool-layer-cap.md` |
+ | `avm2_sound_bytes_and_group_format` | the ungraded halves of two s21 (`w2-tt-b`) ports. **Sound** (Ruffle's `SoundLoadingState`): `loadCompressedDataFromByteArray` dispatches `progress` then `id3` synchronously inside the call and advances the ByteArray position; a second byte load is a no-op once Loaded; `load(null)` leaves the state at New; `load()` after `loadPCMFromByteArray` is #2037; a short read is `ArgumentError #2084` with the position untouched. **TextBlock** (Ruffle `handle_content_element`): a GroupElement needs no format of its own, a null-text TextElement without a format is ignored, a GraphicElement adds no text (its line's `rawTextLength` is deliberately NOT printed: FP counts the graphic as one U+FDEF, Ruffle as nothing), and a text-bearing unformatted child is the traced #2175. Expected output is the local Ruffle exporter's trace (mxmlc via `build_swf.sh`) with one splice: Ruffle routes the traced #2175 block to its ERROR log instead of the trace log, so those six lines (text verbatim from that log) sit where Flash prints them (`avm2/textblock_createline_errors` pins the Flash form). `sound.mp3` is Ruffle's `avm2/sound_load_multiple` asset |
++| `avm1_attach_clipevent_enterframe` | `onClipEvent(enterFrame)` on a child that an attachMovie'd symbol's frame 1 places (s21 `w2-ef-attach`). In both CI modes the handler never fired: `ng_attachMovie` gives the attached clip a STANDALONE display object in no display-list array, so the per-tick promotion (`sprite_initialized` 1→2), the clip-event enterFrame walk and `hasClipEnterFrameHandlers` never reached its children (the same symbol placed on the root timeline fired). Fixed by flagging that struct (`attach_standalone`) and walking every flagged list in the tick-boundary promotion, the root enterFrame gather (one flat place_seq-DESC list, so ordering interleaves like Ruffle's exec list) and the keep-alive check. Rows: a ROOT attach (`ef a`), a NON-root attach into a `createEmptyMovieClip` holder (`ef b`, fires first as the newer clip), and `a.removeMovieClip()` on frame 3 stopping `ef a`. Hand-assembled SWF 8; expected output is the Ruffle exporter's trace log |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/create_test_swf.py
+new file mode 100644
+index 000000000..66141b1c5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/create_test_swf.py
+@@ -0,0 +1,106 @@
++#!/usr/bin/env python3
++"""avm1_attach_clipevent_enterframe — onClipEvent(enterFrame) on a child placed
++inside an attachMovie'd clip's timeline must fire every frame.
++
++Pins down (session 21, w2-ef-attach): in both CI modes an exported symbol whose
++frame 1 PlaceObject2s a child carrying onClipEvent(enterFrame) never fired that
++handler once the symbol was instantiated with attachMovie (the same symbol placed
++on the root timeline fired correctly). The attached clip's display object lives
++in no display-list array, so the per-tick promotion (sprite_initialized 1->2),
++the clip-event enterFrame walk and the keep-alive check never reached its
++children. Fixed by walking every attachMovie'd clip's standalone child list
++(tag.c collect_attached_standalone).
++
++Rows:
++  * `ef a`  — child of `_root.a` (ROOT attach, symbol `lib`)
++  * `ef b`  — child of `_root.h.b` (NON-root attach into a createEmptyMovieClip
++              holder, symbol `lib2`)
++  * `a.removeMovieClip()` on frame 3 — `ef a` must stop from then on.
++  * `f1`..`f5` frame scripts anchor the per-frame order (enterFrame before
++    the frame's DoAction; the attach frame fires no enterFrame).
++Expected output is the Ruffle exporter's trace log (5 frames), never ours.
++Hand-assembled SWF 8 (MTASC cannot emit onClipEvent clip actions).
++"""
++import struct
++
++
++def tag(code, body):
++    if len(body) < 63:
++        return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++
++
++def push_str(s):
++    d = b'\x00' + s.encode() + b'\x00'
++    return b'\x96' + struct.pack('<H', len(d)) + d
++
++
++def push_int(i):
++    d = b'\x07' + struct.pack('<i', i)
++    return b'\x96' + struct.pack('<H', len(d)) + d
++
++
++TRACE = b'\x26'
++GETVAR = b'\x1c'
++CALLMETHOD = b'\x52'
++POP = b'\x17'
++STOP = b'\x07'
++
++
++def rect():
++    nb = 16
++    vals = [0, 4000, 0, 4000]
++    bits = format(nb, '05b') + ''.join(format(v, '0%db' % nb) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return bytes(int(bits[i:i + 8], 2) for i in range(0, len(bits), 8))
++
++
++def clip_actions(ev_flag, actions):
++    rec = struct.pack('<I', ev_flag) + struct.pack('<I', len(actions)) + actions
++    return struct.pack('<H', 0) + struct.pack('<I', ev_flag) + rec + struct.pack('<I', 0)
++
++
++def call_method(obj_expr, method, args):
++    """obj.method(args...) with the result popped. Args pushed right-to-left."""
++    out = b''
++    for a in reversed(args):
++        out += push_int(a) if isinstance(a, int) else push_str(a)
++    out += push_int(len(args)) + push_str(obj_expr) + GETVAR + push_str(method) + CALLMETHOD + POP
++    return out
++
++
++def lib_sprite(sprite_id, label):
++    ef = push_str('ef ' + label) + TRACE + b'\x00'
++    # PlaceObject2 (HasClipActions|HasName|HasCharacter) depth 1, char 1, name "inner"
++    po = bytes([0xA2]) + struct.pack('<HH', 1, 1) + b'inner\x00' + clip_actions(0x2, ef)  # 0x2 = EnterFrame
++    return tag(39, struct.pack('<HH', sprite_id, 1) + tag(26, po) + tag(1, b'') + tag(0, b''))
++
++
++def frame(actions):
++    return tag(12, actions + b'\x00') + tag(1, b'')
++
++
++def build():
++    t = b''
++    t += tag(69, struct.pack('<I', 0))          # FileAttributes
++    t += tag(9, b'\xff\xff\xff')                # SetBackgroundColor
++    t += tag(39, struct.pack('<HH', 1, 1) + tag(1, b'') + tag(0, b''))  # sprite 1: empty `inner`
++    t += lib_sprite(2, 'a')
++    t += lib_sprite(3, 'b')
++    t += tag(56, struct.pack('<H', 2) + struct.pack('<H', 2) + b'lib\x00'
++             + struct.pack('<H', 3) + b'lib2\x00')   # ExportAssets
++    t += frame(push_str('f1') + TRACE
++               + call_method('_root', 'attachMovie', ['lib', 'a', 1])
++               + call_method('_root', 'createEmptyMovieClip', ['h', 5])
++               + call_method('_root.h', 'attachMovie', ['lib2', 'b', 1]))
++    t += frame(push_str('f2') + TRACE)
++    t += frame(push_str('f3') + TRACE + call_method('_root.a', 'removeMovieClip', []))
++    t += frame(push_str('f4') + TRACE)
++    t += frame(push_str('f5') + TRACE + STOP)
++    t += tag(0, b'')
++    body = rect() + struct.pack('<HH', 30 << 8, 5) + t
++    return b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(body)) + body
++
++
++if __name__ == '__main__':
++    open('test.swf', 'wb').write(build())
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/output.txt b/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/output.txt
+new file mode 100644
+index 000000000..e57d2faac
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/output.txt
+@@ -0,0 +1,11 @@
++f1
++ef b
++ef a
++f2
++ef b
++ef a
++f3
++ef b
++f4
++ef b
++f5
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/test.swf b/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..5056d725c8fd954bbcc5ca7894da6ba96c1c1217
+GIT binary patch
+literal 459
+zcma)2u}%U(6r8&i&XcII(S{JJD@j1CB?0Vgw6G+5WXW9u9Jy>rEKK~0{QxV!!rFwt
+z@du9Cy%VpXuz0)gy`7miZy#QsPj?>h4!prdr-8{8Q;hwhD854v9!4yGLZ8`Z^TRgM
+z^;+d@`c<@en<k(ZU5SVVDvtOUC$4cWFMP@_(-^{@1Kf)*t9}A3`iM*e0sX=VK!TNn
+z+AbR~0Wiz6Orvei3D8>3lgDhEDm>j-5b=(hSZZMH*D2S)JXcby>1v~29dEo$Hx>7H
+zZ0uHb-VSraYHlw%HkqFh3b(<4n~pFni`#M?nt(Y7NDA=(bG6F0s&3&=WavcBN|8H6
+H0iS?9A_Y|M
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/test.toml b/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/test.toml
+new file mode 100644
+index 000000000..1e15fdf27
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attach_clipevent_enterframe/test.toml
+@@ -0,0 +1 @@
++num_frames = 5

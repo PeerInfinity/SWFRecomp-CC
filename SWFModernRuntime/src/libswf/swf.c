@@ -444,6 +444,13 @@ void tagMain(SWFAppContext* app_context)
 		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
 		{ extern size_t g_tick_count; g_tick_count++; }
 
+		// Tick boundary: promote last tick's freshly-initialized children of
+		// attachMovie'd clips (no-op outside the CI modes). Mirrors swf_core.c.
+		{
+			extern void ng_upgrade_attached_standalone_initialized(void);
+			ng_upgrade_attached_standalone_initialized();
+		}
+
 		// Tick boundary = VM quiescent: release dynamic_props detached last
 		// tick (memory-reclamation plan Stage 1; see actionDeferDpropsRelease).
 		actionDrainDpropsReleases(app_context);

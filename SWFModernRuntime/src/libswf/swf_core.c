@@ -955,6 +955,15 @@ void swfStart(SWFAppContext* app_context)
 		// SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
 		{ extern size_t g_tick_count; g_tick_count++; }
 
+		// Tick boundary: promote last tick's freshly-initialized children of
+		// attachMovie'd clips (standalone lists no root walk reaches) so their
+		// onClipEvent(enterFrame) dispatches from this tick on. See tag.c
+		// collect_attached_standalone.
+		{
+			extern void ng_upgrade_attached_standalone_initialized(void);
+			ng_upgrade_attached_standalone_initialized();
+		}
+
 		// Tick boundary = VM quiescent: release dynamic_props detached last
 		// tick (memory-reclamation plan Stage 1; see actionDeferDpropsRelease).
 		actionDrainDpropsReleases(app_context);
@@ -1227,9 +1236,8 @@ void swfStart(SWFAppContext* app_context)
 			}
 			// Dispatch clip event ENTER_FRAME (recursive, children before parents)
 			{
-				extern MovieClip root_movieclip;
-				extern void dispatch_enterframe_clip_actions(SWFAppContext*, DisplayObject*, size_t, MovieClip*);
-				dispatch_enterframe_clip_actions(app_context, display_list, max_depth, &root_movieclip);
+				extern void dispatch_root_enterframe_clip_actions(SWFAppContext*);
+				dispatch_root_enterframe_clip_actions(app_context);
 			}
 			actionDispatchEnterFrameHandlers(app_context);
 			actionDispatchRootVarMapEnterFrame(app_context);
