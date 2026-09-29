@@ -298,24 +298,39 @@ detached capture processes are gone (`ps` filtered by its worktree hash), and
 archive its newest WIP patch plus a status table to master. Then brief the
 cloud worker to start from that WIP rather than from scratch.
 
-**All-cloud session mode (user directive for s22, 2026-09-29).** Every subagent, wave 1 and
-wave 2, runs as a cloud worker; the coordinator stays local, since it merges, runs CI and holds
-the id map. Everything runs on Opus: the coordinator, the cloud workers (the account default model
-is Opus; confirm `init: model=claude-opus-*` in each worker's first `get_run_log`), and any
-fallback local agent. What changes:
-- **Wave-1 workers deliver on a branch too** (`fanout/<slug>`, report only, no source changes).
-  Watch every branch with one background `git ls-remote` loop over all expected refs.
-- **Ruffle source:** the cloud has no `~/CC/ruffle`. Briefs say
-  `git clone --depth 1 https://github.com/ruffle-rs/ruffle` (github.com is reachable), or pin the
-  commit the coordinator synced. **No Ruffle exporter oracle in the cloud**: a slot that needs a
-  fresh exporter run gets the output generated LOCALLY by the coordinator and archived to master
-  before launch.
-- **Resuming a completed worker** (the s20/s21 default) uses the one-routine-per-session recipe in
-  memory `cloud-session-launch-cli` (update the routine's prompt, `run` with NO body, disable).
-  If that fails, launch a fresh worker whose brief includes the first worker's pushed report.
-- **Concurrency:** the cloud boxes don't load the local machine, so the ~8-live cap is now about
-  Opus usage limits (5-hour / weekly), not CPU. Keep ~8 and hold the rest.
-- Each launch needs everything it reads PUSHED first. Batch archive commits before a launch wave.
+**Hybrid session mode — user directive for s22 (2026-09-29): diagnose locally, implement in the
+cloud, one CPU-heavy local task at a time, Opus everywhere, same total size as s21.**
+
+- **Wave 1 (diagnosis) runs LOCALLY**: it needs `~/CC/ruffle` (our local exporter edits), the
+  Ruffle exporter oracle, and the synced corpus. Several diagnosis agents may be live at once,
+  because reading and reasoning are cheap. **Only ONE CPU-heavy local task may run at a time**:
+  any gcc/test compile, `verify_output.py`, `render_canary.py`, cargo/cmake build, or exporter
+  run. That includes the coordinator's own headline re-checks and local merge verification.
+  Enforce it with one shared lock that every brief requires:
+  ```bash
+  LOCK=/tmp/swfrecomp-cpu.lock      # the same path for every agent and the coordinator
+  flock "$LOCK" python3 ruffle-tests/verify_output.py ... # wrap EVERY heavy command
+  ```
+  A long sweep holds the lock for its whole duration. Briefs say to keep sweeps short and argued
+  (scope by argument, not volume), and to run under the lock ONE command at a time, never a whole
+  background queue. `-P 1` inside the lock.
+- **Wave 2 (implementation + canary) runs in the CLOUD** whenever the slot needs nothing that
+  only exists locally. The procedure is §5a above plus `scripts/fanout_cloud_worker.sh`. Before
+  launching, the coordinator archives the wave-1 report plus any oracle outputs to master and
+  PUSHES. A slot that needs a fresh Ruffle-exporter run, our local Ruffle edits, or a Windows /
+  real-GPU browser probe stays local, under the lock. Cloud workers can read upstream Ruffle
+  source via `git clone --depth 1 https://github.com/ruffle-rs/ruffle`.
+- **Opus for everything**: coordinator, local agents (`model: "opus"`), cloud workers (the account
+  default; confirm `init: model=claude-opus-*` in each worker's first `get_run_log`).
+- **Size = s21's**: about 7 wave-1 diagnosis slots, about 20-22 wave-2 slots, 3-4 grading runs,
+  one closeout. Stop funding new slots once that budget is reached, even if leads remain; put
+  them on the s23 board.
+- **Resuming** a finished cloud worker uses the one-routine-per-session recipe (memory
+  `cloud-session-launch-cli`), or a fresh worker briefed with the first worker's pushed report.
+  A finished LOCAL diagnosis agent can still be resumed with SendMessage, but only to write a
+  cloud brief, not to implement locally.
+- **Concurrency**: at most about 8 cloud workers live (Opus usage limits). Local diagnosis agents
+  are bounded by the lock, not by a count.
 
 ## 6. Canary rules
 
