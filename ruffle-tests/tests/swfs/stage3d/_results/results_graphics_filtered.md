@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-28 23:17 UTC
+**Date**: 2026-09-29 03:41 UTC
 
-**Git SHA**: `0341c033af`
+**Git SHA**: `02df69d280`
 
-**Run Duration**: 1m 8s
+**Run Duration**: 1m 10s
 
 **Filtered**: 0 tests ignored out of 7 available
 
@@ -25,13 +25,13 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `request_matching_profiles` | 190 | 7.5s |  |
-| 2 | `request_profiles` | 16 | 11.2s |  |
-| 3 | `sampler_odd_size` | 1 | 12.2s |  |
-| 4 | `scissor_rectangle` | 0 | 7.5s |  |
-| 5 | `scissor_rectangle_invalid` | 1 | 9.5s |  |
-| 6 | `unbound_texture` | 0 | 9.4s |  |
-| 7 | `unbound_texture_multiple` | 0 | 10.2s |  |
+| 1 | `request_matching_profiles` | 190 | 9.3s |  |
+| 2 | `request_profiles` | 16 | 8.9s |  |
+| 3 | `sampler_odd_size` | 1 | 12.0s |  |
+| 4 | `scissor_rectangle` | 0 | 9.0s |  |
+| 5 | `scissor_rectangle_invalid` | 1 | 9.4s |  |
+| 6 | `unbound_texture` | 0 | 11.7s |  |
+| 7 | `unbound_texture_multiple` | 0 | 9.3s |  |
 
 ## Near-Passing Tests
 

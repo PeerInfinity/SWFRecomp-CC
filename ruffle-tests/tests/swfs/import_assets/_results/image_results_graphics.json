@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-09-19T05:45:07.711392+00:00",
+    "timestamp": "2026-09-29T03:41:02.808065+00:00",
     "suite": "import_assets",
     "stem": "results_graphics",
-    "git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
+    "git_sha": "02df69d28006ea9571a0a76bdb1d59f35368aa8c",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "35423176371",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/35423176371",
+    "run_id": "36515003936",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/36515003936",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 1,
@@ -34,6 +34,16 @@
       "total_channels": 880000,
       "diff_channels": 2506,
       "mean_diff": 0.159,
+      "checks": [
+        {
+          "tolerance": 100,
+          "max_outliers": 500,
+          "outliers": 459,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 459,
       "max_outliers": 500,
       "tolerance": 100,

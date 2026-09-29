@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-09-19T05:45:07.713372+00:00",
+    "timestamp": "2026-09-29T03:41:02.811646+00:00",
     "suite": "fonts",
     "stem": "results_graphics",
-    "git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
+    "git_sha": "02df69d28006ea9571a0a76bdb1d59f35368aa8c",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "35423176371",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/35423176371",
+    "run_id": "36515003936",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/36515003936",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 5,
@@ -34,6 +34,16 @@
       "total_channels": 20000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -54,6 +64,16 @@
       "total_channels": 20000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -66,7 +86,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 24 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 24 outliers exceed limit of 6, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
@@ -75,10 +95,20 @@
       "total_channels": 2200000,
       "diff_channels": 24,
       "mean_diff": 0.0028,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 6,
+          "outliers": 24,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 24,
-      "max_outliers": 0,
+      "max_outliers": 6,
       "tolerance": 3,
-      "excess_outliers": 24
+      "excess_outliers": 18
     },
     {
       "suite": "fonts",
@@ -96,6 +126,16 @@
       "total_channels": 880000,
       "diff_channels": 3,
       "mean_diff": 0.0009,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 0,
+          "outliers": 3,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 3,
       "max_outliers": 0,
       "tolerance": 3,
@@ -116,6 +156,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
