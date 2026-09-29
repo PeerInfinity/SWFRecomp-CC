@@ -51,7 +51,10 @@ Agent ids are recorded below as they return.
 | w1-recomp-nondet | acc9edf96057ae2fa | recompiler nondeterminism (away3d draws.c) |
 | w2-px-d | a5b2168e1b262bfde | RESUMED (was w2-px-b); leading_device_font corner rule (D2) |
 | w2-ef-attach | ad05d983604e31032 | attachMovie onClipEvent(enterFrame) never fires (both modes) |
-| w2-edittext-filters | a2957f375f4fa288c | AVM1 EditText through the filter route (5 cmps) |
+| w2-edittext-filters | a2957f375f4fa288c → STOPPED 18:50 (user: move to cloud); WIP archived aac54afd0 | AVM1 EditText through the filter route (5 cmps) |
+| w2-edittext-filters (CLOUD) | session_01ThbQq6HQxWrm1Vw4VcyXvw, env "SWFRecomp fan-out" | resumes from the WIP; delivers to branch `fanout/edittext-filters` |
+| w2-acid-filter | acc2d95de3eff51f3 | RESUMED (was w2-filters-snap); acid-filter chained blur |
+| w2-removed-scope | a13d0a46a8c6887e4 | landed 7755698f8 |
 | w2-drift-smalls | ab5ffada3eb151d3d | RESUMED w1-drift; casi32, textjustifier, hasTabs, bitmap_data_draw ×2; own worktree |
 
 ## Held queue
