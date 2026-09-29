@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-09-19T05:45:07.744443+00:00",
+    "timestamp": "2026-09-29T03:41:02.865897+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
+    "git_sha": "02df69d28006ea9571a0a76bdb1d59f35368aa8c",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "35423176371",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/35423176371",
+    "run_id": "36515003936",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/36515003936",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 13,
@@ -34,6 +34,16 @@
       "total_channels": 160000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -54,6 +64,16 @@
       "total_channels": 160000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -74,6 +94,16 @@
       "total_channels": 160000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -94,6 +124,16 @@
       "total_channels": 160000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -134,6 +174,16 @@
       "total_channels": 640000,
       "diff_channels": 96,
       "mean_diff": 0.01,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 400,
+          "outliers": 96,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 96,
       "max_outliers": 400,
       "tolerance": 0,
@@ -154,6 +204,16 @@
       "total_channels": 640000,
       "diff_channels": 100,
       "mean_diff": 0.0098,
+      "checks": [
+        {
+          "tolerance": 255,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 255,
@@ -184,6 +244,16 @@
       "total_channels": 640000,
       "diff_channels": 212,
       "mean_diff": 0.0082,
+      "checks": [
+        {
+          "tolerance": 255,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 255,
@@ -204,6 +274,16 @@
       "total_channels": 512000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -224,6 +304,16 @@
       "total_channels": 160000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -244,6 +334,16 @@
       "total_channels": 160000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,

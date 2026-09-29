@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-09-19T05:45:07.466842+00:00",
+    "timestamp": "2026-09-29T03:41:02.361999+00:00",
     "suite": "avm1",
     "stem": "results_graphics",
-    "git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
+    "git_sha": "02df69d28006ea9571a0a76bdb1d59f35368aa8c",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "35423176371",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/35423176371",
+    "run_id": "36515003936",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/36515003936",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 33,
@@ -34,6 +34,16 @@
       "total_channels": 880000,
       "diff_channels": 48876,
       "mean_diff": 0.0556,
+      "checks": [
+        {
+          "tolerance": 5,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 5,
@@ -54,6 +64,16 @@
       "total_channels": 3240000,
       "diff_channels": 6216,
       "mean_diff": 0.0019,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 2,
@@ -74,6 +94,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -94,6 +124,16 @@
       "total_channels": 3840000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -114,6 +154,16 @@
       "total_channels": 750000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -134,6 +184,16 @@
       "total_channels": 90000,
       "diff_channels": 45000,
       "mean_diff": 0.5,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -154,6 +214,16 @@
       "total_channels": 880000,
       "diff_channels": 10000,
       "mean_diff": 0.0114,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -174,6 +244,16 @@
       "total_channels": 10000,
       "diff_channels": 90,
       "mean_diff": 0.009,
+      "checks": [
+        {
+          "tolerance": 5,
+          "max_outliers": 4,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 4,
       "tolerance": 5,
@@ -194,6 +274,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 5,
+          "max_outliers": 4,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 4,
       "tolerance": 5,
@@ -214,6 +304,16 @@
       "total_channels": 880000,
       "diff_channels": 724,
       "mean_diff": 0.0193,
+      "checks": [
+        {
+          "tolerance": 90,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 90,
@@ -234,6 +334,16 @@
       "total_channels": 1920000,
       "diff_channels": 6,
       "mean_diff": 0.0001,
+      "checks": [
+        {
+          "tolerance": 64,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 64,
@@ -246,14 +356,24 @@
       "trace_status": "pass",
       "known_failure": true,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 64",
-      "max_diff": 64,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 1",
+      "max_diff": 1,
       "expected_source": "repo",
       "width": 50,
       "height": 300,
       "total_channels": 60000,
-      "diff_channels": 240,
-      "mean_diff": 0.2552,
+      "diff_channels": 48,
+      "mean_diff": 0.0008,
+      "checks": [
+        {
+          "tolerance": 128,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 128,
@@ -274,6 +394,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -294,6 +424,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -314,6 +454,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -334,6 +484,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -354,6 +514,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -374,6 +544,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -394,6 +574,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -414,6 +604,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -434,6 +634,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -454,6 +664,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -474,6 +694,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -494,6 +724,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -514,6 +754,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -534,6 +784,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -554,6 +814,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -574,6 +844,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -594,6 +874,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -614,6 +904,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -634,6 +934,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -654,6 +964,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -674,6 +994,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -694,6 +1024,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -714,6 +1054,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -734,6 +1084,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -754,6 +1114,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -774,6 +1144,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -794,6 +1174,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -814,6 +1204,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -834,6 +1234,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -854,6 +1264,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -874,6 +1294,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -894,6 +1324,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -914,6 +1354,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -934,6 +1384,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -954,6 +1414,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -974,6 +1444,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -994,6 +1474,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1014,6 +1504,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1034,6 +1534,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1054,6 +1564,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1074,6 +1594,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1094,6 +1624,16 @@
       "total_channels": 160000,
       "diff_channels": 1,
       "mean_diff": 0.0016,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 1,
+          "outliers": 1,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 1,
       "max_outliers": 1,
       "tolerance": 0,
@@ -1114,6 +1654,16 @@
       "total_channels": 40000,
       "diff_channels": 1,
       "mean_diff": 0.0064,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 1,
+          "outliers": 1,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 1,
       "max_outliers": 1,
       "tolerance": 0,
@@ -1134,6 +1684,16 @@
       "total_channels": 90000,
       "diff_channels": 152,
       "mean_diff": 0.0017,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1154,6 +1714,16 @@
       "total_channels": 160000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1174,6 +1744,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1194,6 +1774,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1214,6 +1804,16 @@
       "total_channels": 880000,
       "diff_channels": 1901,
       "mean_diff": 0.0025,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 3,
@@ -1234,6 +1834,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1254,6 +1864,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1275,6 +1895,16 @@
       "total_channels": 632400,
       "diff_channels": 38904,
       "mean_diff": 0.084,
+      "checks": [
+        {
+          "tolerance": 6,
+          "max_outliers": 0,
+          "outliers": 132,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 132,
       "max_outliers": 0,
       "tolerance": 6,
@@ -1295,6 +1925,16 @@
       "total_channels": 40000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1316,6 +1956,16 @@
       "total_channels": 632400,
       "diff_channels": 16432,
       "mean_diff": 0.0845,
+      "checks": [
+        {
+          "tolerance": 6,
+          "max_outliers": 0,
+          "outliers": 1023,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 1023,
       "max_outliers": 0,
       "tolerance": 6,
@@ -1336,6 +1986,16 @@
       "total_channels": 129600,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1356,6 +2016,16 @@
       "total_channels": 1254400,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1377,6 +2047,16 @@
       "total_channels": 880000,
       "diff_channels": 137,
       "mean_diff": 0.0002,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 44,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 44,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1398,6 +2078,16 @@
       "total_channels": 65536,
       "diff_channels": 44844,
       "mean_diff": 108.8792,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 44751,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 44751,
       "max_outliers": 0,
       "tolerance": 1,

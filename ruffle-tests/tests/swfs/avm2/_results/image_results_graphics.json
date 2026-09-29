@@ -1,23 +1,23 @@
 {
   "metadata": {
-    "timestamp": "2026-09-19T05:45:07.574540+00:00",
+    "timestamp": "2026-09-29T03:41:02.558017+00:00",
     "suite": "avm2",
     "stem": "results_graphics",
-    "git_sha": "d6bcfa56c4c0b310644b33a76e05f46b730fb99b",
+    "git_sha": "02df69d28006ea9571a0a76bdb1d59f35368aa8c",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "35423176371",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/35423176371",
+    "run_id": "36515003936",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/36515003936",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 110,
   "comparisons": 125,
-  "pass": 89,
-  "fail": 36,
+  "pass": 92,
+  "fail": 33,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 3,
-  "pass_rate": 71.2,
+  "pass_rate": 73.6,
   "results": [
     {
       "suite": "avm2",
@@ -26,19 +26,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 1331566 outliers exceed limit of 400, max difference 255",
+      "message": "Image comparison failed: 1328033 outliers exceed limit of 400, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 960,
       "height": 700,
       "total_channels": 2688000,
-      "diff_channels": 1996142,
-      "mean_diff": 37.6572,
-      "outliers": 1331566,
+      "diff_channels": 1983550,
+      "mean_diff": 37.4551,
+      "checks": [
+        {
+          "tolerance": 30,
+          "max_outliers": 400,
+          "outliers": 1328033,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
+      "outliers": 1328033,
       "max_outliers": 400,
       "tolerance": 30,
-      "excess_outliers": 1331166
+      "excess_outliers": 1327633
     },
     {
       "suite": "avm2",
@@ -56,6 +66,16 @@
       "total_channels": 700000,
       "diff_channels": 3831,
       "mean_diff": 1.3956,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 3831,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 3831,
       "max_outliers": 0,
       "tolerance": 0,
@@ -76,6 +96,16 @@
       "total_channels": 750000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -87,20 +117,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 28871 outliers exceed limit of 0, max difference 246",
-      "reason": "pixel_mismatch",
-      "max_diff": 246,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 2",
+      "max_diff": 2,
       "expected_source": "repo",
       "width": 550,
       "height": 700,
       "total_channels": 1540000,
-      "diff_channels": 51087,
-      "mean_diff": 0.88,
-      "outliers": 28871,
+      "diff_channels": 10861,
+      "mean_diff": 0.0073,
+      "checks": [
+        {
+          "tolerance": 12,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
       "max_outliers": 0,
       "tolerance": 12,
-      "excess_outliers": 28871
+      "excess_outliers": 0
     },
     {
       "suite": "avm2",
@@ -108,20 +147,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 7419 outliers exceed limit of 0, max difference 255",
-      "reason": "pixel_mismatch",
-      "max_diff": 255,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 1",
+      "max_diff": 1,
       "expected_source": "repo",
       "width": 550,
       "height": 700,
       "total_channels": 1540000,
-      "diff_channels": 55579,
-      "mean_diff": 0.634,
-      "outliers": 7419,
+      "diff_channels": 48117,
+      "mean_diff": 0.0312,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
       "max_outliers": 0,
       "tolerance": 2,
-      "excess_outliers": 7419
+      "excess_outliers": 0
     },
     {
       "suite": "avm2",
@@ -138,6 +186,16 @@
       "total_channels": 960000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -159,6 +217,16 @@
       "total_channels": 1200000,
       "diff_channels": 216020,
       "mean_diff": 10.8844,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 35,
+          "outliers": 149477,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 149477,
       "max_outliers": 35,
       "tolerance": 1,
@@ -179,6 +247,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -200,6 +278,16 @@
       "total_channels": 880000,
       "diff_channels": 49534,
       "mean_diff": 0.1095,
+      "checks": [
+        {
+          "tolerance": 5,
+          "max_outliers": 0,
+          "outliers": 726,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 726,
       "max_outliers": 0,
       "tolerance": 5,
@@ -220,6 +308,16 @@
       "total_channels": 131072,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -231,20 +329,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 20800 outliers exceed limit of 0, max difference 187",
-      "reason": "pixel_mismatch",
-      "max_diff": 187,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 1",
+      "max_diff": 1,
       "expected_source": "repo",
       "width": 900,
       "height": 900,
       "total_channels": 3240000,
-      "diff_channels": 22720,
-      "mean_diff": 0.5069,
-      "outliers": 20800,
+      "diff_channels": 1120,
+      "mean_diff": 0.0003,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
       "max_outliers": 0,
       "tolerance": 2,
-      "excess_outliers": 20800
+      "excess_outliers": 0
     },
     {
       "suite": "avm2",
@@ -253,7 +360,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 24578 outliers exceed limit of 600, max difference 255",
+      "message": "Image comparison failed: 37079 outliers exceed limit of 1500, max difference 255 (check tol 64; 3 of 3 checks failed)",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
@@ -262,10 +369,32 @@
       "total_channels": 1320000,
       "diff_channels": 39803,
       "mean_diff": 5.5653,
-      "outliers": 24578,
-      "max_outliers": 600,
-      "tolerance": 128,
-      "excess_outliers": 23978
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 5200,
+          "outliers": 39803,
+          "passed": false
+        },
+        {
+          "tolerance": 64,
+          "max_outliers": 1500,
+          "outliers": 37079,
+          "passed": false
+        },
+        {
+          "tolerance": 128,
+          "max_outliers": 600,
+          "outliers": 24578,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 3,
+      "failed_checks": 3,
+      "outliers": 37079,
+      "max_outliers": 1500,
+      "tolerance": 64,
+      "excess_outliers": 35579
     },
     {
       "suite": "avm2",
@@ -282,6 +411,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -303,6 +442,16 @@
       "total_channels": 102400,
       "diff_channels": 2400,
       "mean_diff": 5.8023,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 80,
+          "outliers": 2400,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 2400,
       "max_outliers": 80,
       "tolerance": 0,
@@ -323,6 +472,16 @@
       "total_channels": 750000,
       "diff_channels": 10000,
       "mean_diff": 0.0133,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -343,6 +502,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -364,6 +533,16 @@
       "total_channels": 80000,
       "diff_channels": 14400,
       "mean_diff": 45.9,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 14400,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 14400,
       "max_outliers": 0,
       "tolerance": 0,
@@ -385,6 +564,16 @@
       "total_channels": 80000,
       "diff_channels": 2700,
       "mean_diff": 8.6062,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 2700,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 2700,
       "max_outliers": 0,
       "tolerance": 0,
@@ -406,6 +595,16 @@
       "total_channels": 880000,
       "diff_channels": 348,
       "mean_diff": 0.1008,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 348,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 348,
       "max_outliers": 0,
       "tolerance": 0,
@@ -426,6 +625,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -446,6 +655,16 @@
       "total_channels": 25600,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -466,6 +685,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -486,6 +715,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -506,6 +745,16 @@
       "total_channels": 1100000,
       "diff_channels": 23200,
       "mean_diff": 0.394,
+      "checks": [
+        {
+          "tolerance": 5,
+          "max_outliers": 1700,
+          "outliers": 1603,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 1603,
       "max_outliers": 1700,
       "tolerance": 5,
@@ -526,6 +775,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -546,6 +805,16 @@
       "total_channels": 750000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -566,6 +835,16 @@
       "total_channels": 90000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -586,6 +865,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -606,6 +895,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -618,7 +917,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 1237 outliers exceed limit of 0, max difference 204",
+      "message": "Image comparison failed: 40323 outliers exceed limit of 3300, max difference 204 (check tol 2; 3 of 3 checks failed)",
       "reason": "pixel_mismatch",
       "max_diff": 204,
       "expected_source": "repo",
@@ -627,10 +926,32 @@
       "total_channels": 880000,
       "diff_channels": 51539,
       "mean_diff": 3.9577,
-      "outliers": 1237,
-      "max_outliers": 0,
-      "tolerance": 180,
-      "excess_outliers": 1237
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 3300,
+          "outliers": 40323,
+          "passed": false
+        },
+        {
+          "tolerance": 64,
+          "max_outliers": 280,
+          "outliers": 26497,
+          "passed": false
+        },
+        {
+          "tolerance": 180,
+          "max_outliers": 0,
+          "outliers": 1237,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 3,
+      "failed_checks": 3,
+      "outliers": 40323,
+      "max_outliers": 3300,
+      "tolerance": 2,
+      "excess_outliers": 37023
     },
     {
       "suite": "avm2",
@@ -647,6 +968,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -667,6 +998,16 @@
       "total_channels": 160000,
       "diff_channels": 4800,
       "mean_diff": 0.03,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -687,6 +1028,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -707,6 +1058,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -727,6 +1088,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -747,6 +1118,16 @@
       "total_channels": 400000,
       "diff_channels": 3716,
       "mean_diff": 1.2289,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 3800,
+          "outliers": 3716,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 3716,
       "max_outliers": 3800,
       "tolerance": 0,
@@ -767,6 +1148,16 @@
       "total_channels": 500000,
       "diff_channels": 812,
       "mean_diff": 0.4141,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 900,
+          "outliers": 812,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 812,
       "max_outliers": 900,
       "tolerance": 0,
@@ -787,6 +1178,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -808,6 +1209,16 @@
       "total_channels": 160000,
       "diff_channels": 2,
       "mean_diff": 0.0032,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 2,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 2,
       "max_outliers": 0,
       "tolerance": 1,
@@ -828,6 +1239,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -848,6 +1269,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -868,6 +1299,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -888,6 +1329,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -900,7 +1351,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 211814 outliers exceed limit of 6500, max difference 255",
+      "message": "Image comparison failed: 223951 outliers exceed limit of 17500, max difference 255 (check tol 10; 2 of 2 checks failed)",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
@@ -909,10 +1360,26 @@
       "total_channels": 1000000,
       "diff_channels": 226485,
       "mean_diff": 43.0968,
-      "outliers": 211814,
-      "max_outliers": 6500,
-      "tolerance": 100,
-      "excess_outliers": 205314
+      "checks": [
+        {
+          "tolerance": 100,
+          "max_outliers": 6500,
+          "outliers": 211814,
+          "passed": false
+        },
+        {
+          "tolerance": 10,
+          "max_outliers": 17500,
+          "outliers": 223951,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 2,
+      "failed_checks": 2,
+      "outliers": 223951,
+      "max_outliers": 17500,
+      "tolerance": 10,
+      "excess_outliers": 206451
     },
     {
       "suite": "avm2",
@@ -929,6 +1396,16 @@
       "total_channels": 22000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -949,6 +1426,16 @@
       "total_channels": 640000,
       "diff_channels": 18,
       "mean_diff": 0.0013,
+      "checks": [
+        {
+          "tolerance": 128,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 128,
@@ -969,6 +1456,16 @@
       "total_channels": 800000,
       "diff_channels": 42,
       "mean_diff": 0.0025,
+      "checks": [
+        {
+          "tolerance": 128,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 128,
@@ -989,6 +1486,16 @@
       "total_channels": 160000,
       "diff_channels": 6,
       "mean_diff": 0.0018,
+      "checks": [
+        {
+          "tolerance": 128,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 128,
@@ -1009,6 +1516,16 @@
       "total_channels": 2560000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1029,6 +1546,16 @@
       "total_channels": 640000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1049,6 +1576,16 @@
       "total_channels": 60000,
       "diff_channels": 96,
       "mean_diff": 0.0016,
+      "checks": [
+        {
+          "tolerance": 128,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 128,
@@ -1069,6 +1606,16 @@
       "total_channels": 400,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1089,6 +1636,16 @@
       "total_channels": 400,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1109,6 +1666,16 @@
       "total_channels": 400,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1129,6 +1696,16 @@
       "total_channels": 400,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1149,6 +1726,16 @@
       "total_channels": 1600,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1169,6 +1756,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1189,6 +1786,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1209,6 +1816,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1229,6 +1846,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1249,6 +1876,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1269,6 +1906,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1289,6 +1936,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1309,6 +1966,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1329,6 +1996,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1349,6 +2026,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1369,6 +2056,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1389,6 +2086,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1409,6 +2116,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1429,6 +2146,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1450,6 +2177,16 @@
       "total_channels": 1000000,
       "diff_channels": 13481,
       "mean_diff": 2.8671,
+      "checks": [
+        {
+          "tolerance": 10,
+          "max_outliers": 4000,
+          "outliers": 12746,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 12746,
       "max_outliers": 4000,
       "tolerance": 10,
@@ -1470,6 +2207,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1490,6 +2237,16 @@
       "total_channels": 750000,
       "diff_channels": 1784,
       "mean_diff": 0.0041,
+      "checks": [
+        {
+          "tolerance": 5,
+          "max_outliers": 60,
+          "outliers": 56,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 56,
       "max_outliers": 60,
       "tolerance": 5,
@@ -1502,7 +2259,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 959 outliers (limit 4000), max difference 242",
+      "message": "Image check passed: 525 outliers (limit 600), max difference 242 (3 checks)",
       "max_diff": 242,
       "expected_source": "repo",
       "width": 550,
@@ -1510,9 +2267,31 @@
       "total_channels": 880000,
       "diff_channels": 11327,
       "mean_diff": 0.0696,
-      "outliers": 959,
-      "max_outliers": 4000,
-      "tolerance": 8,
+      "checks": [
+        {
+          "tolerance": 8,
+          "max_outliers": 4000,
+          "outliers": 959,
+          "passed": true
+        },
+        {
+          "tolerance": 16,
+          "max_outliers": 800,
+          "outliers": 709,
+          "passed": true
+        },
+        {
+          "tolerance": 32,
+          "max_outliers": 600,
+          "outliers": 525,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 3,
+      "failed_checks": 0,
+      "outliers": 525,
+      "max_outliers": 600,
+      "tolerance": 32,
       "excess_outliers": 0
     },
     {
@@ -1522,7 +2301,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 587 outliers exceed limit of 300, max difference 255",
+      "message": "Image comparison failed: 2503 outliers exceed limit of 1800, max difference 255 (check tol 32; 4 of 4 checks failed)",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
@@ -1531,10 +2310,38 @@
       "total_channels": 880000,
       "diff_channels": 6601,
       "mean_diff": 0.2995,
-      "outliers": 587,
-      "max_outliers": 300,
-      "tolerance": 64,
-      "excess_outliers": 287
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 6000,
+          "outliers": 6601,
+          "passed": false
+        },
+        {
+          "tolerance": 16,
+          "max_outliers": 4000,
+          "outliers": 4270,
+          "passed": false
+        },
+        {
+          "tolerance": 32,
+          "max_outliers": 1800,
+          "outliers": 2503,
+          "passed": false
+        },
+        {
+          "tolerance": 64,
+          "max_outliers": 300,
+          "outliers": 587,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 4,
+      "failed_checks": 4,
+      "outliers": 2503,
+      "max_outliers": 1800,
+      "tolerance": 32,
+      "excess_outliers": 703
     },
     {
       "suite": "avm2",
@@ -1552,6 +2359,16 @@
       "total_channels": 18000,
       "diff_channels": 4,
       "mean_diff": 0.0567,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 4,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 4,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1573,6 +2390,16 @@
       "total_channels": 22000,
       "diff_channels": 1813,
       "mean_diff": 11.852,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 1812,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 1812,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1594,6 +2421,16 @@
       "total_channels": 880000,
       "diff_channels": 1441,
       "mean_diff": 0.0124,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 349,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 349,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1614,6 +2451,16 @@
       "total_channels": 750000,
       "diff_channels": 120000,
       "mean_diff": 0.4208,
+      "checks": [
+        {
+          "tolerance": 5,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 5,
@@ -1635,6 +2482,16 @@
       "total_channels": 880000,
       "diff_channels": 2,
       "mean_diff": 0.0006,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 2,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 2,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1655,6 +2512,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1675,6 +2542,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1696,6 +2573,16 @@
       "total_channels": 225000,
       "diff_channels": 136151,
       "mean_diff": 45.8563,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 136033,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 136033,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1717,6 +2604,16 @@
       "total_channels": 40000,
       "diff_channels": 22252,
       "mean_diff": 40.5255,
+      "checks": [
+        {
+          "tolerance": 48,
+          "max_outliers": 1500,
+          "outliers": 11574,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 11574,
       "max_outliers": 1500,
       "tolerance": 48,
@@ -1737,6 +2634,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -1757,6 +2664,16 @@
       "total_channels": 90000,
       "diff_channels": 152,
       "mean_diff": 0.0017,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1777,6 +2694,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1797,6 +2724,16 @@
       "total_channels": 10000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1817,6 +2754,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1838,6 +2785,16 @@
       "total_channels": 880000,
       "diff_channels": 229948,
       "mean_diff": 6.3271,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 229724,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 229724,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1859,6 +2816,16 @@
       "total_channels": 880000,
       "diff_channels": 51259,
       "mean_diff": 11.2878,
+      "checks": [
+        {
+          "tolerance": 30,
+          "max_outliers": 271,
+          "outliers": 40943,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 40943,
       "max_outliers": 271,
       "tolerance": 30,
@@ -1880,6 +2847,16 @@
       "total_channels": 3686400,
       "diff_channels": 2764800,
       "mean_diff": 92.781,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 19929,
+          "outliers": 2764800,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 2764800,
       "max_outliers": 19929,
       "tolerance": 1,
@@ -1900,6 +2877,16 @@
       "total_channels": 1680000,
       "diff_channels": 10651,
       "mean_diff": 0.0063,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 1003,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 1003,
       "tolerance": 3,
@@ -1921,6 +2908,16 @@
       "total_channels": 1680000,
       "diff_channels": 907754,
       "mean_diff": 29.3539,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 1003,
+          "outliers": 784195,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 784195,
       "max_outliers": 1003,
       "tolerance": 3,
@@ -1942,6 +2939,16 @@
       "total_channels": 4000000,
       "diff_channels": 892354,
       "mean_diff": 26.6038,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 380,
+          "outliers": 879464,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 879464,
       "max_outliers": 380,
       "tolerance": 3,
@@ -1962,6 +2969,16 @@
       "total_channels": 880000,
       "diff_channels": 729,
       "mean_diff": 0.0008,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -1982,6 +2999,16 @@
       "total_channels": 880000,
       "diff_channels": 513,
       "mean_diff": 0.0006,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2002,6 +3029,16 @@
       "total_channels": 1680000,
       "diff_channels": 4410,
       "mean_diff": 0.0026,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 1003,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 1003,
       "tolerance": 3,
@@ -2022,6 +3059,16 @@
       "total_channels": 880000,
       "diff_channels": 92638,
       "mean_diff": 0.1053,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2042,6 +3089,16 @@
       "total_channels": 20000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -2063,6 +3120,16 @@
       "total_channels": 880000,
       "diff_channels": 914,
       "mean_diff": 0.001,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 914,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 914,
       "max_outliers": 0,
       "tolerance": 0,
@@ -2083,6 +3150,16 @@
       "total_channels": 880000,
       "diff_channels": 553386,
       "mean_diff": 0.6288,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 10,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 10,
       "tolerance": 2,
@@ -2095,19 +3172,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 136586 outliers exceed limit of 24, max difference 255",
+      "message": "Image comparison failed: 135413 outliers exceed limit of 24, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 600,
       "height": 400,
       "total_channels": 960000,
-      "diff_channels": 157064,
-      "mean_diff": 8.8642,
-      "outliers": 136586,
+      "diff_channels": 155891,
+      "mean_diff": 8.5526,
+      "checks": [
+        {
+          "tolerance": 4,
+          "max_outliers": 24,
+          "outliers": 135413,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
+      "outliers": 135413,
       "max_outliers": 24,
       "tolerance": 4,
-      "excess_outliers": 136562
+      "excess_outliers": 135389
     },
     {
       "suite": "avm2",
@@ -2116,7 +3203,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 35576 outliers (limit 37000), max difference 32",
+      "message": "Image check passed: 5064 outliers (limit 5200), max difference 32 (2 checks)",
       "max_diff": 32,
       "expected_source": "repo",
       "width": 1300,
@@ -2124,9 +3211,25 @@
       "total_channels": 4212000,
       "diff_channels": 65860,
       "mean_diff": 0.0968,
-      "outliers": 35576,
-      "max_outliers": 37000,
-      "tolerance": 3,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 37000,
+          "outliers": 35576,
+          "passed": true
+        },
+        {
+          "tolerance": 16,
+          "max_outliers": 5200,
+          "outliers": 5064,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 2,
+      "failed_checks": 0,
+      "outliers": 5064,
+      "max_outliers": 5200,
+      "tolerance": 16,
       "excess_outliers": 0
     },
     {
@@ -2144,6 +3247,16 @@
       "total_channels": 256000,
       "diff_channels": 3560,
       "mean_diff": 0.0139,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 2,
@@ -2156,19 +3269,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 1101100 outliers exceed limit of 100, max difference 255",
+      "message": "Image comparison failed: 1099378 outliers exceed limit of 100, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 800,
       "height": 600,
       "total_channels": 1920000,
-      "diff_channels": 1101100,
-      "mean_diff": 76.2019,
-      "outliers": 1101100,
+      "diff_channels": 1099415,
+      "mean_diff": 75.6135,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 100,
+          "outliers": 1099378,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
+      "outliers": 1099378,
       "max_outliers": 100,
       "tolerance": 2,
-      "excess_outliers": 1101000
+      "excess_outliers": 1099278
     },
     {
       "suite": "avm2",
@@ -2185,6 +3308,16 @@
       "total_channels": 1320000,
       "diff_channels": 614670,
       "mean_diff": 0.4668,
+      "checks": [
+        {
+          "tolerance": 8,
+          "max_outliers": 1935,
+          "outliers": 6,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 6,
       "max_outliers": 1935,
       "tolerance": 8,
@@ -2205,6 +3338,16 @@
       "total_channels": 880000,
       "diff_channels": 95800,
       "mean_diff": 0.1089,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2225,6 +3368,16 @@
       "total_channels": 750000,
       "diff_channels": 183449,
       "mean_diff": 0.8845,
+      "checks": [
+        {
+          "tolerance": 50,
+          "max_outliers": 5000,
+          "outliers": 3523,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 3523,
       "max_outliers": 5000,
       "tolerance": 50,
@@ -2245,6 +3398,16 @@
       "total_channels": 750000,
       "diff_channels": 183449,
       "mean_diff": 0.8845,
+      "checks": [
+        {
+          "tolerance": 50,
+          "max_outliers": 5000,
+          "outliers": 3523,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 3523,
       "max_outliers": 5000,
       "tolerance": 50,
@@ -2266,6 +3429,16 @@
       "total_channels": 880000,
       "diff_channels": 660000,
       "mean_diff": 105.2511,
+      "checks": [
+        {
+          "tolerance": 8,
+          "max_outliers": 10,
+          "outliers": 660000,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 660000,
       "max_outliers": 10,
       "tolerance": 8,
@@ -2278,7 +3451,7 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 2148 outliers (limit 2160), max difference 64",
+      "message": "Image check passed: 244 outliers (limit 250), max difference 64 (3 checks)",
       "max_diff": 64,
       "expected_source": "repo",
       "width": 550,
@@ -2286,9 +3459,31 @@
       "total_channels": 880000,
       "diff_channels": 160861,
       "mean_diff": 0.2323,
-      "outliers": 2148,
-      "max_outliers": 2160,
-      "tolerance": 3,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 2160,
+          "outliers": 2148,
+          "passed": true
+        },
+        {
+          "tolerance": 16,
+          "max_outliers": 1250,
+          "outliers": 1224,
+          "passed": true
+        },
+        {
+          "tolerance": 32,
+          "max_outliers": 250,
+          "outliers": 244,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 3,
+      "failed_checks": 0,
+      "outliers": 244,
+      "max_outliers": 250,
+      "tolerance": 32,
       "excess_outliers": 0
     },
     {
@@ -2306,6 +3501,16 @@
       "total_channels": 880000,
       "diff_channels": 543664,
       "mean_diff": 0.6322,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 850,
+          "outliers": 50,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 50,
       "max_outliers": 850,
       "tolerance": 1,
@@ -2326,6 +3531,16 @@
       "total_channels": 880000,
       "diff_channels": 540844,
       "mean_diff": 0.6146,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 782,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 782,
       "tolerance": 1,
@@ -2346,6 +3561,16 @@
       "total_channels": 2560000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,
@@ -2358,19 +3583,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 206968 outliers exceed limit of 117, max difference 255",
+      "message": "Image comparison failed: 204784 outliers exceed limit of 117, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 206968,
-      "mean_diff": 29.9311,
-      "outliers": 206968,
+      "diff_channels": 204784,
+      "mean_diff": 29.3198,
+      "checks": [
+        {
+          "tolerance": 8,
+          "max_outliers": 117,
+          "outliers": 204784,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
+      "outliers": 204784,
       "max_outliers": 117,
       "tolerance": 8,
-      "excess_outliers": 206851
+      "excess_outliers": 204667
     },
     {
       "suite": "avm2",
@@ -2388,6 +3623,16 @@
       "total_channels": 880000,
       "diff_channels": 563936,
       "mean_diff": 5.2934,
+      "checks": [
+        {
+          "tolerance": 4,
+          "max_outliers": 0,
+          "outliers": 35747,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 35747,
       "max_outliers": 0,
       "tolerance": 4,
@@ -2409,6 +3654,16 @@
       "total_channels": 880000,
       "diff_channels": 599945,
       "mean_diff": 7.4214,
+      "checks": [
+        {
+          "tolerance": 4,
+          "max_outliers": 66,
+          "outliers": 58606,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 58606,
       "max_outliers": 66,
       "tolerance": 4,
@@ -2430,6 +3685,16 @@
       "total_channels": 880000,
       "diff_channels": 599920,
       "mean_diff": 7.2882,
+      "checks": [
+        {
+          "tolerance": 4,
+          "max_outliers": 66,
+          "outliers": 55079,
+          "passed": false
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 1,
       "outliers": 55079,
       "max_outliers": 66,
       "tolerance": 4,
@@ -2450,6 +3715,16 @@
       "total_channels": 880000,
       "diff_channels": 95915,
       "mean_diff": 0.109,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2470,6 +3745,16 @@
       "total_channels": 880000,
       "diff_channels": 95783,
       "mean_diff": 0.1088,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2490,6 +3775,16 @@
       "total_channels": 880000,
       "diff_channels": 95220,
       "mean_diff": 0.1082,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2510,6 +3805,16 @@
       "total_channels": 880000,
       "diff_channels": 95915,
       "mean_diff": 0.109,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2530,6 +3835,16 @@
       "total_channels": 3520000,
       "diff_channels": 839372,
       "mean_diff": 0.2385,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
@@ -2550,6 +3865,16 @@
       "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 0,

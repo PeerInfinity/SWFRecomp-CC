@@ -1,22 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1b7a987cf4d9` (2026-09-28T21:10:40.115998+00:00)
-**Current:** `0341c033aff4` (2026-09-28T23:17:24.792534+00:00)
+**Previous:** `0341c033aff4` (2026-09-28T23:17:24.792534+00:00)
+**Current:** `02df69d28006` (2026-09-29T03:41:00.043278+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 701 | 704 | +3 |
+| Passing | 704 | 705 | +1 |
 | Total | 738 | 738 | 0 |
-| Pass rate | 95.0% | 95.4% | +0.4% |
-| Mismatched lines | 11306 | 11256 | -50 |
-|   Decreased | | | -50 |
+| Pass rate | 95.4% | 95.5% | +0.1% |
+| Mismatched lines | 11256 | 11252 | -4 |
+|   Decreased | | | -4 |
 
-## Newly Passing (3)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `bitmap_data_draw_return_value` | output_mismatch | 3/9 | 9/9 |
-| `bitmap_data_draw_string_target` | output_mismatch | 4/40 | 40/40 |
-| `hitarea_remove_owner_drag` | output_mismatch | 2/10 | 10/10 |
+| `removed_clip_function_scope` | output_mismatch | 8/12 | 12/12 |
