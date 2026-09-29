@@ -14,6 +14,7 @@ namespace SWFRecomp
 		type = SWF_FIELD_NONE;
 		value = 0;
 		is_nbits = false;
+		exact_width = false;
 	}
 	
 	void SWFField::parse(char*& field_buffer, u32& nbits, u32& cur_byte_bits_left, bool& prev_was_bitfield)
@@ -85,7 +86,7 @@ namespace SWFRecomp
 			
 			case SWF_FIELD_SB:
 			{
-				u8 length = (bit_length == 0) ? nbits : bit_length;
+				u8 length = (bit_length == 0 && !exact_width) ? nbits : bit_length;
 				
 				parseBitField(field_buffer, length, cur_byte_bits_left);
 				
@@ -106,7 +107,7 @@ namespace SWFRecomp
 			
 			case SWF_FIELD_UB:
 			{
-				parseBitField(field_buffer, (bit_length == 0) ? nbits : bit_length, cur_byte_bits_left);
+				parseBitField(field_buffer, (bit_length == 0 && !exact_width) ? nbits : bit_length, cur_byte_bits_left);
 				
 				if (is_nbits)
 				{
@@ -120,7 +121,7 @@ namespace SWFRecomp
 			
 			case SWF_FIELD_FB:
 			{
-				u32 length = (bit_length == 0) ? nbits : bit_length;
+				u32 length = (bit_length == 0 && !exact_width) ? nbits : bit_length;
 				
 				parseBitField(field_buffer, length, cur_byte_bits_left);
 				

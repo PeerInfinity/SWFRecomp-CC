@@ -49,8 +49,15 @@ namespace SWFRecomp
 		fields[next_field].type = type;
 		fields[next_field].bit_length = bit_length;
 		fields[next_field].is_nbits = is_nbits;
+		fields[next_field].exact_width = false;
 		
 		next_field += 1;
+	}
+	
+	void SWFTag::configureNextFieldExactBits(FieldType type, u32 bit_length)
+	{
+		configureNextField(type, bit_length, false);
+		fields[next_field - 1].exact_width = true;
 	}
 	
 	void SWFTag::parseFields(char*& tag_buffer, u32 nbits)

@@ -48,6 +48,10 @@ namespace SWFRecomp
 		FieldType type;
 		s64 value;
 		bool is_nbits;
+		// true: bit_length is the literal width, even when 0 (a zero-width
+		// UB/SB reads nothing and yields 0). false (default): a bit_length of 0
+		// means "use the running nbits" (RECT/MATRIX/CXFORM NBits fields).
+		bool exact_width;
 		
 		SWFField();
 		

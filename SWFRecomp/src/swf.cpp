@@ -2414,7 +2414,7 @@ namespace SWFRecomp
 
 				u16 num_entries;
 				char* offset_table;
-				std::vector<u16> entry_offsets;
+				std::vector<u32> entry_offsets;  // u32: DefineFont2/3 WideOffsets (glyph data > 64 KiB)
 				bool wide_codes = false;
 				bool has_layout = false;
 
@@ -2474,7 +2474,7 @@ namespace SWFRecomp
 							tag.parseFields(cur_pos);
 
 							for (u16 i = 0; i < num_offsets; ++i)
-								entry_offsets.push_back((u16) tag.fields[i].value);
+								entry_offsets.push_back((u32) tag.fields[i].value);
 						}
 						else
 						{
@@ -7351,7 +7351,7 @@ namespace SWFRecomp
 	{
 		SWFTag fill_data;
 		
-		FillStyle* fill_styles = new FillStyle[fill_style_count];
+		FillStyle* fill_styles = new FillStyle[fill_style_count]();
 		
 		for (u16 i = 0; i < fill_style_count; ++i)
 		{
@@ -7565,7 +7565,7 @@ namespace SWFRecomp
 	{
 		SWFTag line_data;
 
-		LineStyle* line_styles = new LineStyle[line_style_count];
+		LineStyle* line_styles = new LineStyle[line_style_count]();
 
 		for (u16 i = 0; i < line_style_count; ++i)
 		{
@@ -7721,7 +7721,7 @@ namespace SWFRecomp
 	{
 		SWFTag fill_data;
 
-		FillStyle* fill_styles = new FillStyle[fill_style_count];
+		FillStyle* fill_styles = new FillStyle[fill_style_count]();
 
 		for (u16 i = 0; i < fill_style_count; ++i)
 		{
@@ -7995,7 +7995,7 @@ namespace SWFRecomp
 	{
 		SWFTag line_data;
 
-		LineStyle* line_styles = new LineStyle[line_style_count];
+		LineStyle* line_styles = new LineStyle[line_style_count]();
 
 		for (u16 i = 0; i < line_style_count; ++i)
 		{
@@ -8379,9 +8379,9 @@ namespace SWFRecomp
 					t.configureNextField(SWF_FIELD_SB, 0);
 					t.configureNextField(SWF_FIELD_SB, 0);
 				}
-				if (state_fill_style_0) t.configureNextField(SWF_FIELD_UB, fill_bits);
-				if (state_fill_style_1) t.configureNextField(SWF_FIELD_UB, fill_bits);
-				if (state_line_style)   t.configureNextField(SWF_FIELD_UB, line_bits);
+				if (state_fill_style_0) t.configureNextFieldExactBits(SWF_FIELD_UB, fill_bits);
+				if (state_fill_style_1) t.configureNextFieldExactBits(SWF_FIELD_UB, fill_bits);
+				if (state_line_style)   t.configureNextFieldExactBits(SWF_FIELD_UB, line_bits);
 
 				t.parseFieldsContinue(pos, bits_left);
 
@@ -8590,6 +8590,7 @@ namespace SWFRecomp
 				std::vector<u16> all_fill_style_counts;
 				u16 line_style_count;
 				std::vector<LineStyle*> all_line_styles;
+				std::vector<u16> all_line_style_counts;
 				size_t morph_color_start_saved = current_color;
 				size_t morph_end_color_before = current_morph_end_color;
 				s32 shape_bounds_xmin = 0, shape_bounds_xmax = 0;
@@ -8795,10 +8796,12 @@ namespace SWFRecomp
 					if (is_morph)
 					{
 						all_line_styles.push_back(parseMorphLineStyles(line_style_count));
+						all_line_style_counts.push_back(line_style_count);
 					}
 					else
 					{
 						all_line_styles.push_back(parseLineStyles(line_style_count));
+						all_line_style_counts.push_back(line_style_count);
 					}
 				}
 
@@ -9413,13 +9416,18 @@ namespace SWFRecomp
 					
 					// StateNewStyles is only used by DefineShape2, DefineShape3, and DefineShape4
 					bool state_new_styles = (state_flags & 0b10000) != 0;
-					bool state_line_style = !is_font && (state_flags & 0b01000) != 0;
+					// The LineStyle field's BITS are present whenever the flag is
+					// set — glyph shapes included (Ruffle read_shape_record reads
+					// them unconditionally). Fonts only ignore the VALUE; skipping
+					// the bits desyncs every later record of the glyph.
+					bool state_line_style_bits = (state_flags & 0b01000) != 0;
+					bool state_line_style = !is_font && state_line_style_bits;
 					bool state_fill_style_1 = (state_flags & 0b00100) != 0;
 					bool state_fill_style_0 = (state_flags & 0b00010) != 0;
 					bool state_move_to = (state_flags & 0b00001) != 0;
 					
 					shape_tag.clearFields();
-					shape_tag.setFieldCount(3*state_move_to + state_fill_style_0 + state_fill_style_1 + state_line_style);
+					shape_tag.setFieldCount(3*state_move_to + state_fill_style_0 + state_fill_style_1 + state_line_style_bits);
 					
 					if (state_move_to)
 					{
@@ -9430,17 +9438,17 @@ namespace SWFRecomp
 					
 					if (state_fill_style_0)
 					{
-						shape_tag.configureNextField(SWF_FIELD_UB, fill_bits);
+						shape_tag.configureNextFieldExactBits(SWF_FIELD_UB, fill_bits);
 					}
 					
 					if (state_fill_style_1)
 					{
-						shape_tag.configureNextField(SWF_FIELD_UB, fill_bits);
+						shape_tag.configureNextFieldExactBits(SWF_FIELD_UB, fill_bits);
 					}
 					
-					if (state_line_style)
+					if (state_line_style_bits)
 					{
-						shape_tag.configureNextField(SWF_FIELD_UB, line_bits);
+						shape_tag.configureNextFieldExactBits(SWF_FIELD_UB, line_bits);
 					}
 					
 					shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
@@ -9566,6 +9574,7 @@ namespace SWFRecomp
 						}
 
 						all_line_styles.push_back(parseLineStyles(line_style_count));
+						all_line_style_counts.push_back(line_style_count);
 
 						current_line_style_list += 1;
 						
@@ -10769,6 +10778,16 @@ namespace SWFRecomp
 				for (size_t i = 0; i < paths.size(); ++i)
 				{
 					u8 line_style_i = paths[i].line_style;
+
+					// A LineStyle index past its LINESTYLEARRAY (malformed or
+					// mis-parsed record) would read off the heap array — skip
+					// it like the fill path skips an out-of-range inner_fill.
+					if (line_style_i != 0
+					    && (paths[i].line_style_list >= all_line_styles.size()
+					        || line_style_i > all_line_style_counts[paths[i].line_style_list]))
+					{
+						line_style_i = 0;
+					}
 
 					if (line_style_i != 0)
 					{
