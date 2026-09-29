@@ -1,0 +1,77 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 67622f810..6afa66ff0 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -77681,6 +77681,13 @@ static float tf_view_hscroll_px(MovieClip* mc)
+ 	return d > 0.0 ? (float) d : 0.0f;
+ }
+ 
++// Exported for the glyph painter (tag.c textfield_glyph_render_cb), which must
++// translate the text by the same author-set hscroll the hit test adds back.
++float ng_get_textfield_view_hscroll_px(void* mc_v)
++{
++	return tf_view_hscroll_px((MovieClip*) mc_v);
++}
++
+ void ng_set_textfield_scroll_x(SWFAppContext* app_context, void* mc_v, float twips)
+ {
+ 	MovieClip* mc = (MovieClip*) mc_v;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 4a20116bb..ca3348923 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -6073,12 +6073,22 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	// paragraph start (right after newline / on first byte).
+ 	float base_x = info->x * 20.0f + bxmin_off + gutter_twips;
+ 
+-	// Horizontal scroll: shift the whole layout left so the caret stays inside
+-	// the field when the text is wider than the field. Single-line + focused
+-	// only; the field clip mask hides the scrolled-out glyphs. Browser-WASM only
+-	// (in OFFSCREEN/headless nothing is focused → caret_char<0 → no shift → CI
+-	// render byte-identical).
+-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
++	// Horizontal scroll, two independent offsets — the same pair the click
++	// hit test adds back (action.c tf_view_hscroll_px + _tf_scroll_x):
++	//  1. caret auto-scroll: shift the layout left so the caret stays inside
++	//     a focused single-line field whose text is wider than the field;
++	//  2. the AUTHOR-set `hscroll` (pixels, clamped to maxhscroll by the
++	//     setter) — Ruffle edit_text.rs render_self translates the text by
++	//     -hscroll for every field, focused or not.
++	// The field clip mask hides the scrolled-out glyphs.
++	//
++	// (1) used to be browser-WASM-only on the premise that "in OFFSCREEN/
++	// headless nothing is focused → caret_char<0 → CI render byte-identical".
++	// Refuted: input.json focus/TextControl events are replayed in CI (the
++	// caret itself was un-gated on the same evidence), so it now runs in
++	// every render build. (2) was not rendered anywhere, so
++	// visual/cache_as_bitmap/edittext_hscroll [output.02] (`text.hscroll =
++	// text.maxhscroll` on Escape) drew the unscrolled text. s21 w2-px-c.
+ 	if (info->caret_char >= 0 && info->mc != NULL) {
+ 		int multiline = 0;
+ 		for (size_t i = 0; i < text_len; i++) {
+@@ -6120,7 +6130,10 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			ng_set_textfield_scroll_x(_gd_ctx, info->mc, 0.0f);
+ 		}
+ 	}
+-#endif
++	{
++		extern float ng_get_textfield_view_hscroll_px(void* mc_v);
++		base_x -= ng_get_textfield_view_hscroll_px(info->mc) * 20.0f;
++	}
+ 
+ 	int par_idx = 0;
+ 	float x_pos = base_x + (par_count > 0 ? par_x_offset[0] : 0.0f);
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index e3489938c..35e25e5d9 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -325,3 +325,9 @@ avm2/bitmapdata_copypixels
+ # inside a root sprite) — compose_children's as_set_flags overlay, which was
+ # browser-WASM-only until s21. No other member has a nested script-moved child.
+ visual/cache_as_bitmap/nested_rotation
++
++# s21 w2-px-c (A): AVM1 author-set TextField.hscroll rendered (text translated
++# by -hscroll), plus the caret auto-scroll now compiled into CI. .02 is the
++# scrolled frame; .01 stays failing on the EditText DropShadow (no filters on
++# DefineEditText yet).
++visual/cache_as_bitmap/edittext_hscroll

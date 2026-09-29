@@ -78067,6 +78067,13 @@ static float tf_view_hscroll_px(MovieClip* mc)
 	return d > 0.0 ? (float) d : 0.0f;
 }
 
+// Exported for the glyph painter (tag.c textfield_glyph_render_cb), which must
+// translate the text by the same author-set hscroll the hit test adds back.
+float ng_get_textfield_view_hscroll_px(void* mc_v)
+{
+	return tf_view_hscroll_px((MovieClip*) mc_v);
+}
+
 void ng_set_textfield_scroll_x(SWFAppContext* app_context, void* mc_v, float twips)
 {
 	MovieClip* mc = (MovieClip*) mc_v;

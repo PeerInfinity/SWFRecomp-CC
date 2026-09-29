@@ -346,3 +346,14 @@ visual/fonts/leading_device_font            # AVM2 BORDER BR CORNER         1 cm
                                             #   wants the BR corner EMPTY,
                                             #   edittext_border_transform wants
                                             #   it 3/4 inked (s21 lead D2).
+
+# s21 w2-px-c (A): AVM1 author-set TextField.hscroll rendered (text translated
+# by -hscroll), plus the caret auto-scroll now compiled into CI. .02 is the
+# scrolled frame; .01 stays failing on the EditText DropShadow (no filters on
+# DefineEditText yet).
+visual/cache_as_bitmap/edittext_hscroll
+
+# s21 w2-px-c (B): AVM1 focused-field selection highlight (black box, selected
+# glyphs white). .02 is the select-all frame; all three comparisons stay failing
+# on the EditText DropShadow, so this is an A/B-only (tier-2) member.
+visual/cache_as_bitmap/edittext_selection

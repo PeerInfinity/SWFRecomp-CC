@@ -6172,12 +6172,22 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// paragraph start (right after newline / on first byte).
 	float base_x = info->x * 20.0f + bxmin_off + gutter_twips;
 
-	// Horizontal scroll: shift the whole layout left so the caret stays inside
-	// the field when the text is wider than the field. Single-line + focused
-	// only; the field clip mask hides the scrolled-out glyphs. Browser-WASM only
-	// (in OFFSCREEN/headless nothing is focused → caret_char<0 → no shift → CI
-	// render byte-identical).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Horizontal scroll, two independent offsets — the same pair the click
+	// hit test adds back (action.c tf_view_hscroll_px + _tf_scroll_x):
+	//  1. caret auto-scroll: shift the layout left so the caret stays inside
+	//     a focused single-line field whose text is wider than the field;
+	//  2. the AUTHOR-set `hscroll` (pixels, clamped to maxhscroll by the
+	//     setter) — Ruffle edit_text.rs render_self translates the text by
+	//     -hscroll for every field, focused or not.
+	// The field clip mask hides the scrolled-out glyphs.
+	//
+	// (1) used to be browser-WASM-only on the premise that "in OFFSCREEN/
+	// headless nothing is focused → caret_char<0 → CI render byte-identical".
+	// Refuted: input.json focus/TextControl events are replayed in CI (the
+	// caret itself was un-gated on the same evidence), so it now runs in
+	// every render build. (2) was not rendered anywhere, so
+	// visual/cache_as_bitmap/edittext_hscroll [output.02] (`text.hscroll =
+	// text.maxhscroll` on Escape) drew the unscrolled text. s21 w2-px-c.
 	if (info->caret_char >= 0 && info->mc != NULL) {
 		int multiline = 0;
 		for (size_t i = 0; i < text_len; i++) {
@@ -6219,17 +6229,32 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			ng_set_textfield_scroll_x(_gd_ctx, info->mc, 0.0f);
 		}
 	}
-#endif
+	{
+		extern float ng_get_textfield_view_hscroll_px(void* mc_v);
+		base_x -= ng_get_textfield_view_hscroll_px(info->mc) * 20.0f;
+	}
 
 	int par_idx = 0;
 	float x_pos = base_x + (par_count > 0 ? par_x_offset[0] : 0.0f);
 	int at_par_start = 1;
 	(void)at_par_start;
 
-	// Selection highlight: draw a box behind the selected glyphs (single-line,
-	// focused field). Browser-WASM only, same rationale as the caret — nothing is
-	// selected in headless/OFFSCREEN, so CI render output is unchanged.
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Selection highlight (single-line, focused field): Ruffle edit_text.rs
+	// render_selection_background_for_line draws a BLACK box (GRAY when the
+	// field is unfocused but alwaysShowSelection — our producer only reports a
+	// selection for the focused field) from the first selected char's left
+	// edge to the last selected char's right edge, over the line box
+	// (ascent + descent; leading only when the selection continues onto the
+	// next line), and render_layout_box then draws every selected glyph with an
+	// IDENTITY colour transform, i.e. white — `sel_invert_lo/hi` below.
+	//
+	// This used to be browser-WASM-only, drawn light blue with the text left in
+	// its own colour, on the premise that "nothing is selected in headless/
+	// OFFSCREEN". Refuted the same way as the caret: input.json focus/
+	// TextControl events are replayed in CI (visual/cache_as_bitmap/
+	// edittext_selection [output.02] is a select-all after Selection.setFocus).
+	// s21 w2-px-c.
+	int sel_invert_lo = -1, sel_invert_hi = -1;
 	if (info->sel_begin >= 0 && info->sel_end >= 0 && info->sel_begin != info->sel_end) {
 		int sel_lo = info->sel_begin < info->sel_end ? info->sel_begin : info->sel_end;
 		int sel_hi = info->sel_begin > info->sel_end ? info->sel_begin : info->sel_end;
@@ -6265,14 +6290,14 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			if (x_lo >= 0.0f && x_hi > x_lo) {
 				float sb_scale = (float)baseline_fh / (float)em_square;
 				float sel_top = y_pos - (float)ascent * sb_scale;
-				float sel_h = (float)baseline_fh;
-				// Light-blue highlight; the (usually black) text draws on top.
+				float sel_h = (float)(ascent + descent) * sb_scale;
 				renderer_draw_rect(context, x_lo, sel_top, x_hi - x_lo, sel_h,
-					0.45f, 0.62f, 0.95f, 1.0f, 0, 0);
+					0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
+				sel_invert_lo = sel_lo;
+				sel_invert_hi = sel_hi;
 			}
 		}
 	}
-#endif
 
 	size_t pos = 0;
 	int run_idx = 0;
@@ -6363,6 +6388,12 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		float r = ((cur_color >> 16) & 0xFF) / 255.0f;
 		float g = ((cur_color >> 8) & 0xFF) / 255.0f;
 		float b = (cur_color & 0xFF) / 255.0f;
+		// Selected glyphs draw white over the black selection box (see the
+		// selection block above). caret_count was bumped for THIS char already.
+		if (sel_invert_lo >= 0 && (int)caret_count - 1 >= sel_invert_lo
+		    && (int)caret_count - 1 < sel_invert_hi) {
+			r = g = b = 1.0f;
+		}
 
 		// Global glyph index
 		size_t global_idx = glyph_base + (size_t)glyph_idx;

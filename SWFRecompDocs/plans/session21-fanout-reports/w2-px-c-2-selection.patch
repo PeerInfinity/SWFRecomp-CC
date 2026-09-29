@@ -1,0 +1,76 @@
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 4a20116bb..77b36cfb0 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -6127,10 +6127,22 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	int at_par_start = 1;
+ 	(void)at_par_start;
+ 
+-	// Selection highlight: draw a box behind the selected glyphs (single-line,
+-	// focused field). Browser-WASM only, same rationale as the caret — nothing is
+-	// selected in headless/OFFSCREEN, so CI render output is unchanged.
+-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
++	// Selection highlight (single-line, focused field): Ruffle edit_text.rs
++	// render_selection_background_for_line draws a BLACK box (GRAY when the
++	// field is unfocused but alwaysShowSelection — our producer only reports a
++	// selection for the focused field) from the first selected char's left
++	// edge to the last selected char's right edge, over the line box
++	// (ascent + descent; leading only when the selection continues onto the
++	// next line), and render_layout_box then draws every selected glyph with an
++	// IDENTITY colour transform, i.e. white — `sel_invert_lo/hi` below.
++	//
++	// This used to be browser-WASM-only, drawn light blue with the text left in
++	// its own colour, on the premise that "nothing is selected in headless/
++	// OFFSCREEN". Refuted the same way as the caret: input.json focus/
++	// TextControl events are replayed in CI (visual/cache_as_bitmap/
++	// edittext_selection [output.02] is a select-all after Selection.setFocus).
++	// s21 w2-px-c.
++	int sel_invert_lo = -1, sel_invert_hi = -1;
+ 	if (info->sel_begin >= 0 && info->sel_end >= 0 && info->sel_begin != info->sel_end) {
+ 		int sel_lo = info->sel_begin < info->sel_end ? info->sel_begin : info->sel_end;
+ 		int sel_hi = info->sel_begin > info->sel_end ? info->sel_begin : info->sel_end;
+@@ -6166,14 +6178,14 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			if (x_lo >= 0.0f && x_hi > x_lo) {
+ 				float sb_scale = (float)baseline_fh / (float)em_square;
+ 				float sel_top = y_pos - (float)ascent * sb_scale;
+-				float sel_h = (float)baseline_fh;
+-				// Light-blue highlight; the (usually black) text draws on top.
++				float sel_h = (float)(ascent + descent) * sb_scale;
+ 				renderer_draw_rect(context, x_lo, sel_top, x_hi - x_lo, sel_h,
+-					0.45f, 0.62f, 0.95f, 1.0f, 0, 0);
++					0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
++				sel_invert_lo = sel_lo;
++				sel_invert_hi = sel_hi;
+ 			}
+ 		}
+ 	}
+-#endif
+ 
+ 	size_t pos = 0;
+ 	int run_idx = 0;
+@@ -6264,6 +6276,12 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		float r = ((cur_color >> 16) & 0xFF) / 255.0f;
+ 		float g = ((cur_color >> 8) & 0xFF) / 255.0f;
+ 		float b = (cur_color & 0xFF) / 255.0f;
++		// Selected glyphs draw white over the black selection box (see the
++		// selection block above). caret_count was bumped for THIS char already.
++		if (sel_invert_lo >= 0 && (int)caret_count - 1 >= sel_invert_lo
++		    && (int)caret_count - 1 < sel_invert_hi) {
++			r = g = b = 1.0f;
++		}
+ 
+ 		// Global glyph index
+ 		size_t global_idx = glyph_base + (size_t)glyph_idx;
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index e3489938c..da5eac335 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -325,3 +325,8 @@ avm2/bitmapdata_copypixels
+ # inside a root sprite) — compose_children's as_set_flags overlay, which was
+ # browser-WASM-only until s21. No other member has a nested script-moved child.
+ visual/cache_as_bitmap/nested_rotation
++
++# s21 w2-px-c (B): AVM1 focused-field selection highlight (black box, selected
++# glyphs white). .02 is the select-all frame; all three comparisons stay failing
++# on the EditText DropShadow, so this is an A/B-only (tier-2) member.
++visual/cache_as_bitmap/edittext_selection
