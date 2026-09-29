@@ -205,6 +205,12 @@ extern MovieClip* g_event_this_mc;
 // MovieClip currently executing (targetClip/base_clip interaction).
 extern MovieClip* g_current_context;
 
+// The clip a SWF6+ closure call enters: its live defining clip, else the
+// clip re-resolved at its path, else `this_mc` (may be NULL), else the
+// caller's g_current_context (removed-clip scope rule, action.c).
+MovieClip* actionClosureBaseClip(SWFAppContext* app_context, MovieClip* base_clip,
+                                 MovieClip* this_mc);
+
 // Type tag of the thisArg passed through Function.prototype.call/apply
 // (ACTION_STACK_VALUE_*). Lets builtin wrappers distinguish an ASArray
 // receiver (this_obj is a raw ASArray*, NOT an ASObject*) from a real

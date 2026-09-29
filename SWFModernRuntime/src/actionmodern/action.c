@@ -6760,7 +6760,7 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 		ei_flags |= INV_BIND_THIS;
 	MovieClip* _ei_saved_base = g_current_context;
 	if (g_swf_version >= 6 && func->base_clip != NULL)
-		g_current_context = (MovieClip*)func->base_clip;
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, NULL);
 	InvokeOpts ei_opts = { .flags = ei_flags };
 	ActionVar _ei_result = invokeFunctionValue(app_context, func, &this_var, args, (u32)arg_count, &ei_opts);
 	g_current_context = _ei_saved_base;
@@ -15193,7 +15193,7 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 				int _vof_saved_ver; ASObject* _vof_saved_global; int _vof_saved_midx;
 				switchToFunctionVersion(func, &_vof_saved_ver, &_vof_saved_global, &_vof_saved_midx);
 				if (func->base_clip != NULL)
-					actionSetCurrentContext(func->base_clip);
+					actionSetCurrentContext(actionClosureBaseClip(app_context, func->base_clip, NULL));
 				ASFunction* _vof_prev_exec_func = g_current_executing_func;
 				g_current_executing_func = func;
 
@@ -15348,7 +15348,7 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 			int _ts_saved_ver; ASObject* _ts_saved_global; int _ts_saved_midx;
 			switchToFunctionVersion(func, &_ts_saved_ver, &_ts_saved_global, &_ts_saved_midx);
 			if (func->base_clip != NULL)
-				actionSetCurrentContext(func->base_clip);
+				actionSetCurrentContext(actionClosureBaseClip(app_context, func->base_clip, NULL));
 			ASFunction* _ts_prev_exec_func = g_current_executing_func;
 			g_current_executing_func = func;
 
@@ -16288,7 +16288,8 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 
 		MovieClip* saved_context = g_current_context;
 		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
+			g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip,
+			                                          this_is_mc ? (MovieClip*)this_ptr : NULL);
 
 		if ((flags & INV_OVERRIDE_THIS) && opts != NULL && opts->override_this != NULL)
 		{
@@ -16336,7 +16337,8 @@ static ActionVar invokeFunctionValue(SWFAppContext* app_context, ASFunction* fun
 
 		MovieClip* saved_context = g_current_context;
 		if ((flags & INV_BASE_CLIP) && g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
+			g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip,
+			                                          this_is_mc ? (MovieClip*)this_ptr : NULL);
 
 		if ((flags & INV_OVERRIDE_THIS) && opts != NULL && opts->override_this != NULL)
 		{
@@ -21134,6 +21136,32 @@ static MovieClip* reResolveDeadBaseClip(SWFAppContext* app_context, MovieClip* m
 			return resolved;
 	}
 	return mc;
+}
+
+// The clip a SWF6+ closure call enters (Ruffle function.rs Avm1Function::exec
+// `base_clip`, plus scope.rs Scope::resolve since upstream 4b7edd6ad):
+//   - the defining clip, when it is alive;
+//   - else the clip now at its original path (MovieClipReference re-resolve);
+//   - else `this_do`: `this` when it is a clip (removed or not), otherwise the
+//     caller's target — the context current at the call site.
+// A removed defining clip no longer takes part in variable lookup: its names
+// resolve on that target instead (then _global), not on the removed clip.
+// Only the removed-clip case changes anything — a live base clip is returned
+// untouched. Every arm that enters a callee's base clip goes through here, so
+// the rule is the same on every call path (CallFunction, CallMethod,
+// Function.call/apply, event and callback dispatch).
+MovieClip* actionClosureBaseClip(SWFAppContext* app_context, MovieClip* base_clip,
+                                 MovieClip* this_mc)
+{
+	if (base_clip == NULL || base_clip->depth != INT_MIN)
+		return base_clip;
+	MovieClip* bc = reResolveDeadBaseClip(app_context, base_clip);
+	if (bc != NULL && bc->depth != INT_MIN)
+		return bc;
+	if (this_mc != NULL)
+		return this_mc;
+	extern MovieClip root_movieclip;
+	return g_current_context != NULL ? g_current_context : &root_movieclip;
 }
 
 // ---------------------------------------------------------------------------
@@ -31977,6 +32005,11 @@ static void enterClosureFrame(SWFAppContext* app_context, ClosureFrame* cf,
 		MovieClip* bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
 		if (cf_flags & CF_CTX)
 		{
+			// A removed defining clip that did not re-resolve: enter
+			// this_do (actionClosureBaseClip) — the MOVIECLIP receiver
+			// when there is one, else the caller's target.
+			if (bc->depth == INT_MIN)
+				bc = actionClosureBaseClip(app_context, bc, ctx_receiver);
 			actionSetCurrentContext(bc);
 			g_current_sprite_obj = NULL;
 		}
@@ -38606,7 +38639,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		// branch handles the version side (receiver MC's current version).
 		MovieClip* ef_saved_base = g_current_context;
 		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = (MovieClip*)func->base_clip;
+			g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, mc);
 
 		// Type-1 keeps its fresh local activation (absorbs plain assignments
 		// and `var` declarations that would otherwise leak onto the receiver)
@@ -38663,7 +38696,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 					_ref_this.data.numeric_value = (u64)(uintptr_t)&root_movieclip;
 					MovieClip* _ref_saved_base = g_current_context;
 					if (func->function_type == 2 && g_swf_version >= 6 && func->base_clip != NULL)
-						g_current_context = (MovieClip*)func->base_clip;
+						g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, &root_movieclip);
 					u32 _ref_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
 					if (func->function_type == 2)
 						_ref_flags |= INV_MC_THIS_NULL_PTR;
@@ -38862,7 +38895,7 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 	// Both branches: the core honored INV_BASE_CLIP on its t1 AND t2 paths.
 	MovieClip* _ol_saved_base = g_current_context;
 	if (g_swf_version >= 6 && func->base_clip != NULL)
-		g_current_context = (MovieClip*)func->base_clip;
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, mc);
 	InvokeOpts _ol_opts = { .flags = _ol_flags, .act_flags = _ol_act };
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &_ol_this, NULL, 0, &_ol_opts);
@@ -39002,7 +39035,7 @@ static void actionDispatchMCOnConstruct(SWFAppContext* app_context, MovieClip* m
 	// Both branches: the core honored INV_BASE_CLIP on its t1 AND t2 paths.
 	MovieClip* _oc_saved_base = g_current_context;
 	if (g_swf_version >= 6 && func->base_clip != NULL)
-		g_current_context = (MovieClip*)func->base_clip;
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, mc);
 	InvokeOpts _oc_opts = { .flags = _oc_flags, .act_flags = _oc_act };
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &_oc_this, NULL, 0, &_oc_opts);
@@ -41638,7 +41671,7 @@ static void fireLoadVarsCallback(SWFAppContext* app_context, ASObject* obj,
 
 	MovieClip* _flv_saved_base = g_current_context;
 	if (g_swf_version >= 6 && func->base_clip != NULL)
-		g_current_context = (MovieClip*)func->base_clip;
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, NULL);
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
 	g_call_depth--;
@@ -45561,8 +45594,14 @@ void actionGetVariable(SWFAppContext* app_context)
 		// In Ruffle, each clip has its own StageObject scope; root-level variables
 		// are not visible from child clips. Skip global variable table for live MCs.
 		//
-		// Exception: REMOVED MCs (depth==INT_MIN) get a fallback to root (matching
-		// Ruffle's resolve_recursive removed-clip fallback at scope.rs:156-166).
+		// Exception: REMOVED MCs (depth==INT_MIN) get a fallback to root. Since
+		// upstream 4b7edd6ad this no longer models Scope::resolve (a closure
+		// whose defining clip is gone now enters this_do instead — see
+		// actionClosureBaseClip); what still reaches here is code running ON a
+		// removed clip, e.g. a frame script after removeMovieClip(this), where
+		// Ruffle's action_remove_sprite resets the target to root and pushes
+		// root's Target scope (avm1/removed_target_clip_scope,
+		// string_paths_variable_scopes).
 		if (g_current_context->depth != INT_MIN) {
 			goto check_special_vars;
 		}
@@ -52500,7 +52539,7 @@ void actionSetMember(SWFAppContext* app_context)
 							// the callee's version, the MC arms' preserved accident).
 							MovieClip* _wb_saved_base = g_current_context;
 							if (g_swf_version >= 6 && _wf->base_clip != NULL)
-								g_current_context = (MovieClip*)_wf->base_clip;
+								g_current_context = actionClosureBaseClip(app_context, (MovieClip*)_wf->base_clip, NULL);
 							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
 							{
 								// pname handed non-owning and never freed (deliberate
@@ -54507,7 +54546,7 @@ void actionSetMember(SWFAppContext* app_context)
 								scope_chain[scope_depth++] = (ASObject*)_sf->captured_scope[i];
 							}
 							MovieClip* _sc = g_current_context;
-							if (g_swf_version >= 6 && _sf->base_clip != NULL) g_current_context = (MovieClip*)_sf->base_clip;
+							if (g_swf_version >= 6 && _sf->base_clip != NULL) g_current_context = actionClosureBaseClip(app_context, (MovieClip*)_sf->base_clip, NULL);
 							ActionVar _tv = {0}; _tv.type = ACTION_STACK_VALUE_MOVIECLIP; _tv.data.numeric_value = (u64)(uintptr_t)mc;
 							setVariableByName("this", &_tv);
 							((ActionVar(*)(SWFAppContext*))_sf->simple_func)(app_context);
@@ -61534,7 +61573,7 @@ static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
 								}
 								MovieClip* saved_context = g_current_context;
 								if (g_swf_version >= 6 && setter_func->base_clip != NULL)
-									g_current_context = (MovieClip*)setter_func->base_clip;
+									g_current_context = actionClosureBaseClip(app_context, (MovieClip*)setter_func->base_clip, mc);
 								// Set "this" as MOVIECLIP so GetMember finds MC builtins
 								ActionVar this_var = {0};
 								this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
@@ -64924,9 +64963,15 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// outer_func must NOT see outer_func's local `a`).
 			int _cf_caller_ver = g_swf_version;
 			ClosureFrame cf;
+			// ctx_receiver = the scope-chain clip the callee was found on
+			// (Ruffle Callable(this, fn)); only consulted when the base clip
+			// was removed (actionClosureBaseClip's this_do).
+			MovieClip* _cf_this_mc = (has_callable_this &&
+			                          callable_this.type == ACTION_STACK_VALUE_MOVIECLIP)
+			                         ? (MovieClip*)(uintptr_t)callable_this.data.numeric_value : NULL;
 			enterClosureFrame(app_context, &cf, func,
 			                  (u8)(CF_RESET_SCOPE |
-			                       (_cf_caller_ver >= 6 ? (CF_VERSION | CF_CTX) : 0)), NULL);
+			                       (_cf_caller_ver >= 6 ? (CF_VERSION | CF_CTX) : 0)), _cf_this_mc);
 
 			if (func->function_type == 2)
 			{
@@ -70095,7 +70140,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 					MovieClip* prev_ctx_op = g_current_context;
 					if (g_swf_version >= 6 && own_func->base_clip != NULL)
-						g_current_context = own_func->base_clip;
+						g_current_context = actionClosureBaseClip(app_context, own_func->base_clip, NULL);
 
 					g_prev_executing_func = prev_exec_op;
 					g_current_executing_func = own_func;
@@ -70963,7 +71008,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// Switch context to base_clip for SWF6+
 					MovieClip* prev_ctx_fm = g_current_context;
 					if (g_swf_version >= 6 && mfunc->base_clip != NULL)
-						g_current_context = mfunc->base_clip;
+						g_current_context = actionClosureBaseClip(app_context, mfunc->base_clip, NULL);
 
 					g_prev_executing_func = prev_exec_fm;
 					g_current_executing_func = mfunc;
@@ -73236,7 +73281,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					MovieClip* saved_base = NULL;
 					if (g_swf_version >= 6 && ts_ctor->base_clip != NULL) {
 						saved_base = g_current_context;
-						actionSetCurrentContext(ts_ctor->base_clip);
+						actionSetCurrentContext(actionClosureBaseClip(app_context, ts_ctor->base_clip, NULL));
 					}
 
 					u32 saved_td = g_this_depth;
@@ -78657,7 +78702,8 @@ static void call_function_with_this(SWFAppContext* app_context, ASFunction* func
 
 	MovieClip* _cfwt_saved_base = g_current_context;
 	if (func->function_type == 2 && g_swf_version >= 6 && func->base_clip != NULL)
-		g_current_context = (MovieClip*)func->base_clip;
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip,
+		                                          this_is_mc ? (MovieClip*)this_obj : NULL);
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &this_var, args, (u32)arg_count, &opts);
 	g_call_depth--;
@@ -79922,7 +79968,7 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 
 	MovieClip* _sfc_saved_base = g_current_context;
 	if (g_swf_version >= 6 && func->base_clip != NULL)
-		g_current_context = (MovieClip*)func->base_clip;
+		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, NULL);
 	g_call_depth++;
 	(void) invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
 	g_call_depth--;

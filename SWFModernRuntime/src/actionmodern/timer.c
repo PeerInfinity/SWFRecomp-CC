@@ -387,7 +387,7 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 		// handles the version side the same way).
 		MovieClip* old_context = g_current_context;
 		if (g_swf_version >= 6 && func->base_clip != NULL)
-			g_current_context = func->base_clip;
+			g_current_context = actionClosureBaseClip(app_context, func->base_clip, NULL);
 
 		// this_var = NULL: the core passes NULL as the ABI receiver, as both
 		// arms always did. Type-1 keeps no captured scopes (a type-1 closure

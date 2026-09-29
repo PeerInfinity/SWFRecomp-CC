@@ -333,7 +333,7 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		MovieClip* saved_base = NULL;
 		if (g_swf_version >= 6 && ctor_func->base_clip != NULL) {
 			saved_base = g_current_context;
-			actionSetCurrentContext(ctor_func->base_clip);
+			actionSetCurrentContext(actionClosureBaseClip(app_context, ctor_func->base_clip, mc));
 		}
 		// Push 'this' as MOVIECLIP onto g_this_stack (GetVariable("this") checks this first)
 		u32 saved_this_depth = g_this_depth;
@@ -404,7 +404,7 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 		MovieClip* saved_base = NULL;
 		if (g_swf_version >= 6 && ctor_func->base_clip != NULL) {
 			saved_base = g_current_context;
-			actionSetCurrentContext(ctor_func->base_clip);
+			actionSetCurrentContext(actionClosureBaseClip(app_context, ctor_func->base_clip, mc));
 		}
 
 		g_call_depth++;

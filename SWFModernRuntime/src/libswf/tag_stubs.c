@@ -2103,6 +2103,7 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 	if (old_depth == SIZE_MAX || old_depth == new_swf_depth) return;
 
 	// Ensure display_list is large enough for new_swf_depth
+	DisplayObject* udd_old_dl = display_list;
 	if (new_swf_depth >= display_list_capacity)
 	{
 		// Grow display_list using HCALLOC (copy + free old)
@@ -2179,6 +2180,22 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 	if (new_swf_depth > max_depth) max_depth = new_swf_depth;
 	// Shrink max_depth if we just cleared the last entry
 	while (max_depth > 0 && display_list[max_depth].char_id == 0) max_depth--;
+
+	// The grow above strands the root sentinel (root_movieclip.display_obj,
+	// ng_shared.c) on the OLD buffer, which is leaked, not freed, and still
+	// holds the pre-move entry. resolveSlashPathToMC's display_obj fallback
+	// then finds the moved clip at its OLD depth and conjures a fresh MC
+	// for it — e.g. `child.swapDepths(1000); child.removeMovieClip()` left
+	// "/child" resolvable for the rest of the frame, so a removed closure
+	// base clip re-resolved to that ghost (avm1/removed_clip_function_scope).
+	if (display_list != udd_old_dl)
+	{
+		extern void* ng_get_root_display_obj(void);
+		extern void ng_sync_root_display_obj(void);
+		DisplayObject* udd_root = (DisplayObject*)ng_get_root_display_obj();
+		if (udd_root != NULL && udd_root->sprite_display_list == udd_old_dl)
+			ng_sync_root_display_obj();
+	}
 }
 
 void ng_swapDisplayDepths(const char* name1, const char* name2)
