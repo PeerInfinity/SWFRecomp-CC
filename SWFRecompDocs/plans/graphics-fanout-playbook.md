@@ -298,6 +298,25 @@ detached capture processes are gone (`ps` filtered by its worktree hash), and
 archive its newest WIP patch plus a status table to master. Then brief the
 cloud worker to start from that WIP rather than from scratch.
 
+**All-cloud session mode (user directive for s22, 2026-09-29).** Every subagent, wave 1 and
+wave 2, runs as a cloud worker; the coordinator stays local, since it merges, runs CI and holds
+the id map. Everything runs on Opus: the coordinator, the cloud workers (the account default model
+is Opus; confirm `init: model=claude-opus-*` in each worker's first `get_run_log`), and any
+fallback local agent. What changes:
+- **Wave-1 workers deliver on a branch too** (`fanout/<slug>`, report only, no source changes).
+  Watch every branch with one background `git ls-remote` loop over all expected refs.
+- **Ruffle source:** the cloud has no `~/CC/ruffle`. Briefs say
+  `git clone --depth 1 https://github.com/ruffle-rs/ruffle` (github.com is reachable), or pin the
+  commit the coordinator synced. **No Ruffle exporter oracle in the cloud**: a slot that needs a
+  fresh exporter run gets the output generated LOCALLY by the coordinator and archived to master
+  before launch.
+- **Resuming a completed worker** (the s20/s21 default) uses the one-routine-per-session recipe in
+  memory `cloud-session-launch-cli` (update the routine's prompt, `run` with NO body, disable).
+  If that fails, launch a fresh worker whose brief includes the first worker's pushed report.
+- **Concurrency:** the cloud boxes don't load the local machine, so the ~8-live cap is now about
+  Opus usage limits (5-hour / weekly), not CPU. Keep ~8 and hold the rest.
+- Each launch needs everything it reads PUSHED first. Batch archive commits before a launch wave.
+
 ## 6. Canary rules
 
 - **Tool:** `ruffle-tests/render_canary.py capture --label X` / `compare A B`,
