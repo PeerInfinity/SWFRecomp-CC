@@ -71,6 +71,19 @@ regressions across three graded runs; 36 bands improved / 1 worsened
 strokes). Mechanisms and the session-19 board: `graphics-fanout-playbook.md`
 §17; per-patch ledgers in `session18-fanout-reports/`.**
 
+**Update 2026-09-29, session 21 fan-out (run
+[36515003936](https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/36515003936)
+at `02df69d28`): 433/587 pass (73.8%), up from 413/587 (s20, run `35423176371`).
++25 flips, all predicted by a patch ledger. −5 pass→fail are a GRADING
+CORRECTION, not render changes: as of `c61f6ebe5` a comparison passes only if
+ALL its applicable `test.toml` checks pass (Ruffle `image_test.rs`); before,
+ANY check passing was enough. The five (`acid-clip`, `acid-bitmapData-draw`,
+`acid-shapes`, `acid-small .01`, `cache_as_bitmap/text`) render byte-for-byte
+as before. Every earlier pass count in this doc used the old, looser rule.
+Bands: 23 improved / 0 worsened (four apparent worsenings were the same
+grading change re-picking which check a failing row reports — see
+`graphics-fanout-playbook.md` §20).**
+
 ## How to reproduce this
 
 ```bash

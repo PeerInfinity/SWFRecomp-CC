@@ -2994,3 +2994,120 @@ either as yield.
   (STRUCK s17 — do not re-fund).
 
 **Pixels.** See playbook §19.
+
+## 22. Session 21 (2026-09-28/29) — dual-axis fan-out #13: trace +21 (4476/4539 eff), pixels +25 flips / −5 grading correction (433/587, 73.8 %), ZERO regressions in either axis or either mode
+
+Commits `263427d08..02df69d28` on master (20 code commits + doc commits; every agent's patch and
+report under `session21-fanout-reports/`). Baseline read fresh: trace **4452 effective** (graphics
+run `35780999591`, results `5c3bf1d80`; no-graphics weekly `36305576918`, results `1d9975c60`),
+pixels **413/587** (images run `35423176371`). Upstream synced at session start: `~/CC/ruffle`
+`f2aaf0703 → 0dacba55f` (local exporter edits re-applied cleanly, exporter rebuilt), corpus
+re-downloaded (9 new tests, 5 modified). 7 wave-1 + 22 wave-2 agent-slots (10 of them RESUMED
+completed agents), all Opus, **plus the project's first cloud worker** (§22.4).
+
+**Grading runs.** `36479505052` (graphics/full, first 3 commits): **+4, 0 regressions**.
+`36493242924` (graphics/full): **+12, 0 regressions, 0 other moves**. `36509518802`
+(no-graphics/full): **+20 over the weekly baseline** (+21 counting `gradient_values_readback`,
+absent from that baseline), **0 regressions**. `36515003936` (graphics/full/images=true, final):
+**+5, 0 regressions**. Against the session baseline the shared rows show **+18**; with the three
+new upstream tests we flipped the session is **+21 ours**. The raw effective count moved
+4452 → 4476 (+24): the other +3 are one upstream arrival that came in passing
+(`avm2/date_set_time_out_of_range`) and our two new regression fixtures — never book either.
+
+### 22.1 Ledger (trace +21)
+
+| patch | flips | tests |
+|---|---:|---|
+| w2-drift-smalls | +5 | `avm2/casi32`, `textjustifier_locale`, `textline_has_tabs`; `avm1/bitmap_data_draw_return_value`, `_string_target` (both new upstream) |
+| w2-arraysort-m3 | +4 | gnash `array-v5..v8` → rm (the M3 write-back rule; array-v5 ignore entry pruned) |
+| w2-tt-a | +2 | `simplebutton_childevents_multichild` (rm), `timeline/missing_frame_scripts` (pass) |
+| w2-tt-b | +2 | `sound_load_multiple` (pass, ignore pruned), `textline_atom_index_at_char_index` (rm) |
+| w2-mixed | +2 | `text/links_in_scrolled_text`, `from_shumway/as3-loader/LoaderLoadBytesTest` |
+| w2-tt-d | +2 | gnash `MovieClip-v6`, `-v7` (rm) |
+| w2-tt-c | +1 | `avm1/hitarea_remove_owner_drag` |
+| w2-tt-e | +1 | gnash `NetStream-SquareTest` (rm) |
+| w2-removed-scope | +1 | `avm1/removed_clip_function_scope` (new upstream; port of Ruffle `4b7edd6ad` + a swapDepths ghost-clip bug) |
+| w2-gradient-readback | +1 | `avm2/gradient_values_readback` (rm; new upstream) |
+
+Zero-flip trace work that landed: `onClipEvent(enterFrame)` on `attachMovie` clips (both native
+modes; new fixture `regression/avm1_attach_clipevent_enterframe`), recompiler determinism
+(three SWF bit-stream parser bugs wrote uninitialised heap into `draws.c` for 6 SWFs), and
+fixture `regression/avm2_sound_bytes_and_group_format`.
+
+### 22.2 Standing verdicts that fell (again, all to building the thing)
+
+- **"The array ladder needs an in-place bubble sort over a non-clearing pop()"** — the quicksort
+  was right all along; Flash sorts a SNAPSHOT and writes back only positions that moved. The same
+  rule is `array.as:253`'s "separate, unidentified" mechanism.
+- **`LoaderLoadBytesTest` "needs a recompiler arc"** — the runtime already matched loadBytes
+  payloads by size; the passing loadBytes tests passed because an on-disk copy happened to exist.
+  A harness change.
+- **`missing_frame_scripts` "worth its own solo session"** — orphans must run frame scripts before
+  the stage, plus the End-tag rule: two small hunks.
+- **`simplebutton_childevents_multichild` "medium"** — one line (an empty button state still
+  builds a Sprite that consumes an `instanceN`).
+- **`set_property_values/swf4` "173 lines short"** — measured with the wrong instrument; 23
+  ours-only lines under the promotion rule, 21 of them one policy trade (see §22.5).
+- **Our image comparator since s14 passed a comparison if ANY check passed**; Ruffle requires ALL
+  (found by the wave-1 drift agent reading `image_test.rs`). Fixed in `c61f6ebe5`; −5 passes, all
+  render-unchanged. Every earlier pixel total used the looser rule.
+- Pixel-side refutations are in `graphics-fanout-playbook.md` §20.
+
+### 22.3 Method notes (deltas vs s20)
+
+- **A wave-1 drift audit is worth a slot every session.** It priced 9 new/5 modified upstream
+  tests into +7, rebuilt the exporter, and found the grading bug above.
+- **Resuming a completed agent as its next slot's implementer was the default, not the exception**
+  (10 of 22 wave-2 slots). Zero re-derivation, and every resumed agent delivered.
+- **Interim grading runs graded exactly and cost nothing**: +4, +12, +20 (no-graphics), +5 — every
+  number equal to the ledger, zero regressions in four runs.
+- **Mis-staged split commit.** `git apply --cached p.patch | tail -2 && git commit` — the pipe
+  swallowed the apply's failure, the commit chain continued, and one commit carried only a patch
+  file while the next carried both patches' `tag.c` hunks (fixed forward in `e3ba02834`; no CI
+  run graded the gap). **Never pipe `git apply`; after staging a split, prove each patch present
+  with `git apply --check -R --exclude=<canary list> <patch>` before committing.**
+- **`git apply --3way` is atomic per patch**: a conflict in `render_canary_tests.txt` from the
+  PREVIOUS patch's unresolved markers makes the NEXT patch fail entirely ("does not exist in
+  index"). Resolve the canary list after every patch, and verify with `--check -R`.
+- **Browser-only `#ifdef` gates hid CI-graded behaviour twice** (nested script transforms;
+  EditText hscroll/selection), both justified by "nothing is focused/moved offscreen". The
+  w2-px-a report carries an audit of all 25 gates in `tag.c`.
+- Per-event background monitors in agents still waste turns (the gradient agent woke once per
+  canary test until told to block once).
+
+### 22.4 The first cloud worker
+
+`w2-edittext-filters` was moved mid-canary from a local agent to a Claude Code cloud session
+(user request; the local 100-test render A/B needed ~3 h at load 7-8). Procedure now in
+`graphics-fanout-playbook.md` §5a with launcher `scripts/fanout_cloud_worker.sh`. The WIP patch +
+measurements were archived to master first (the cloud sees only pushed commits); the worker
+delivered on branch `fanout/edittext-filters` in **47 minutes**, converted the WIP's one worsened
+band (`edittext_scroll`) into a flip by finding the missing vertical-scroll render, and reported
++6 flips that local Dawn reproduced to the digit and CI confirmed. Lesson: the cloud is best for
+slots with long verification that have not started, or whose WIP can be archived — a restart
+from the brief re-pays build and diagnosis.
+
+### 22.5 Left on the board (session 22)
+
+**Trace** (62 output_mismatch + 1 runtime_error remain):
+- **`MovieClip-v8`**: 27 ours-only lines after s21 (was 41), the 14 shared with v6/v7 are closed;
+  the SWF-8-specific residue is unpriced (`w2-tt-d-report.md`).
+- **`set_property_values/swf4` is now a measured POLICY TRADE**, not an arc: adopting Ruffle's
+  SWF4 store-0 rule promotes it to rm but moves `swf4opcode` pass → rm (a regression under rule
+  3). Plus 2 independent lines (SWF4 `setProperty(_name, true)` must print `1`/`0`). Needs a ruling.
+- **Cross-VM focus/pick arc** (`selection_onsetfocus_mixed_avm` = 4 mechanisms,
+  `focus_events_mixed_avm_edittext`, `mouse_pick_loader_avm1`): the loaded AVM1 movie's wrapper
+  answers clicks with its whole stage rect (`avm2_display.c:14961-14975`); plus AVM1 button
+  onRelease under AVM2. The RVF flags on the latter two are misapplied — Ruffle passes both.
+- **Cross-VM load-tick reordering** (`avm2_loads_avm1_events`, `loader-events` + its instance-name
+  counter and missing `httpStatus`).
+- Unchanged: `globals_monkeypatch` (`_global` indirection), `movieclip_destruction_test3/4`
+  (deferred removeMovieClip), and the NO-GOs of record in §21.5.
+- Unpriced correctness leads (no corpus row): press/release single-pick (same helper as
+  hitarea), script-assigned `onEnterFrame` on children of attached clips, removed-scope's five
+  leads (undeclared-var assignment → `_global`, `with(removedClip)`, …), `sortOn` / index-sort
+  write-back rule, `array.as:1394/:444/:1628-1636`.
+- Doc fix owed: `RUFFLE_VS_FLASH_DIFFERENCES.md:604-606` (Flash abandons the set rather than
+  prefix-parsing `"10x"` in SWF4 `setProperty`).
+
+**Pixels.** See `graphics-fanout-playbook.md` §20.

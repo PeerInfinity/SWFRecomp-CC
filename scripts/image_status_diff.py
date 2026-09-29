@@ -171,6 +171,24 @@ def failed_checks_note(row):
         for c in bad)
 
 
+def like_for_like(old_row, new_row):
+    """Excess of the new row's check at the OLD row's headline tolerance.
+
+    None unless the old row is pre-s21 (no `checks`), the new row has per-check
+    stats, the headline tolerances differ, and the new row ran a check at the
+    old tolerance."""
+    checks = new_row.get("checks")
+    if isinstance(old_row.get("checks"), list) or not isinstance(checks, list):
+        return None
+    tol = old_row.get("tolerance")
+    if tol is None or tol == new_row.get("tolerance"):
+        return None
+    for c in checks:
+        if c.get("tolerance") == tol and "outliers" in c:
+            return max(0, c["outliers"] - c["max_outliers"])
+    return None
+
+
 def is_multi_check(row):
     checks = row.get("checks")
     return isinstance(checks, list) and sum(
@@ -413,6 +431,18 @@ def main():
                 + tag)
         elif so == "fail" and sn == "fail":
             eo, en = o.get("excess_outliers"), n.get("excess_outliers")
+            like = like_for_like(o, n) if semantics_changed else None
+            if like is not None:
+                # The two sides headline DIFFERENT checks (pre-s21 rows
+                # report one check, s21+ rows the worst-excess one). Compare
+                # the new side's stats for the old side's check instead, and
+                # say so -- a headline-check switch is not a render move.
+                same = all(o.get(f) == n.get(f) for f in
+                           ("max_diff", "diff_channels", "mean_diff"))
+                label += (f" [ANY->ALL headline tol {o.get('tolerance')}->"
+                          f"{n.get('tolerance')}, excess {en} at new headline"
+                          f"{'; render unchanged' if same else ''}]")
+                en = like
             if eo is None or en is None:
                 if bo != bn:
                     band_moves.append((None, label, bo, bn, eo, en))

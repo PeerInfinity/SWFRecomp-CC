@@ -1075,3 +1075,85 @@ multi-check pass -> fail rows `[ANY->ALL, render unchanged]`.
 CI's stored `max_diff` and `diff_channels` exactly. The five: `from_shumway/acid/acid-clip`,
 `acid/acid-bitmapData-draw`, `acid/acid-shapes`, `acid/acid-small [output.01]`, and
 `visual/cache_as_bitmap/text`. Detail: `session21-fanout-reports/w2-image-semantics-report.md`.
+
+## 20. Session-21 state of the board (2026-09-28/29)
+
+Baseline: images run `35423176371` at `d6bcfa56c`, **413 / 587**. Final images run
+`36515003936` at `02df69d28`: **433 / 587 (73.8 %)** = **+25 flips, every one predicted by a
+patch ledger; −5 pass→fail that are a GRADING CORRECTION; bands 23 improved / 0 worsened.**
+Reports: `session21-fanout-reports/`. Trace side: `polish-sweep-arc.md` §22.
+
+| patch | flips | comparisons |
+|---|---:|---|
+| w2-caret-multiline | +6 | `edittext_caret_multiline` .01-.06 (AVM2 had no caret painter at all) |
+| w2-edittext-filters (CLOUD) | +6 | `edittext_hscroll .01`, `edittext_selection .01-.03`, `edittext_border_filters`, `edittext_scroll .01` |
+| w2-px-b | +3 | `edittext_device_transform_small_shear`, `edittext_border_transform .04/.06` |
+| w2-filters-snap | +2 | `blur_scales_with_screen`, `drop_shadow_scales_with_screen` |
+| w2-noto-d1 | +2 | `bitmapdata_applyfilter_colormatrix`, `bitmapdata_applyfilter_blur` (its image-axis disposition retired) |
+| w2-px-a | +2 | `avm2/bitmapdata_copypixels`, `cache_as_bitmap/nested_rotation` |
+| w2-devicefont-a1 | +1 | `visual/fonts/device-font` |
+| w2-px-c | +1 | `edittext_hscroll .02` |
+| w2-px-d | +1 | `visual/fonts/leading_device_font` |
+| w2-acid-filter | +1 | `from_shumway/acid/acid-filter` |
+
+- **The grading correction (−5).** As of `c61f6ebe5`, a comparison passes only if ALL its
+  applicable `test.toml` checks pass, and per-check `filter`s are honoured (Ruffle
+  `image_test.rs`). We passed on ANY check since s14. `acid-clip`, `acid-bitmapData-draw`,
+  `acid-shapes`, `acid-small .01`, `cache_as_bitmap/text` render byte-for-byte as before;
+  `image_status_diff.py` tags them `[ANY->ALL, render unchanged]`. **Every pixel total before s21
+  used the looser rule** — s14/s15 multi-check flips (stencil, scrollRect) were re-graded here and
+  survived.
+- **Four "worsened" bands were the same change, not rendering** (`blend_shader_luma_lighten`
+  1237 → 37023, `acid-morph`, `graphics_direct_commands`, `bitmapdata_draw`): a failing
+  multi-check row now reports the check furthest over budget (usually the tightest) instead of the
+  loosest. Each row's count at the OLD check is identical, as are `max_diff`/`diff_channels`/
+  `mean_diff` (`w3-band-attribution-report.md`). `image_status_diff.py` now compares such rows at
+  the old tolerance and tags them, so a diff spanning `c61f6ebe5` reads "worsened 0". The band
+  HISTOGRAM across that commit is still re-binned — don't read it as rendering.
+- **"Filters: arithmetically unflippable" (s17-s20) fell to a measured prototype.** Ruffle bitmap-
+  caches any filtered object and snaps it to whole DEVICE pixels; s17's "snapping hurts" measured
+  a STAGE-pixel snap on a 2× viewport. The family is now −85-98 % across glow/drop_shadow/bevel/
+  displacement_map. Its residual is owned by **1-px stroke staircase parity** (circle strokes step
+  on different rows than Ruffle's), which is now the single largest pixel lead in the family.
+- **s20's L3 "five pixel-centre ties" were two prototype shortcuts** (device units are twips at
+  scale 1 → tolerance 2.0 font units; truncate control/anchor points BEFORE flattening). No raster
+  change was needed.
+- **`w1-pixel-smalls` refuted `bitmapdata_copypixels`'s "phantom local outliers"** (local
+  reproduced CI's 20 800 exactly) and **found a browser-only `#ifdef` hiding CI behaviour**; its
+  audit of all 25 gates in `tag.c` (w2-px-a report) led to a second (EditText hscroll/selection).
+- **The corner rule wasn't contradictory.** `leading_device_font` wants the BR border corner empty
+  and `border_transform` wants it 3/4 inked because Ruffle picks the box painter by DEVICE FONT,
+  not by transform; our device branch had been calibrated on rows (`embedFonts=true`) that never
+  reach it.
+- **Recompiler nondeterminism fixed** (`86a1fa74f`): 6 SWFs emitted uninitialised heap into
+  `draws.c`; `3_joystick`'s old CI number (307) was effectively random — it is now 4 channels from
+  passing.
+
+### Left on the board (session 22)
+
+- **Stroke staircase parity** — owns the remaining filter family (bevel_* ~1000-3000, glow/
+  drop_shadow ~2600-7000 vs budgets 0-18) and much else. Needs its own scoping slot.
+- **Near-passes:** `3_joystick` (4 channels over tol-128 after the determinism fix),
+  `edittext_scroll .02` (one aliased pixel), `edittext_border_filters` passes AT tolerance (max
+  diff 32 = 32) — watch it.
+- **Off-stage filter sources**: the stage-sized filter layer loses any off-stage part of a filtered
+  object (`drop_shadow_angles`' top arc); the fix is an object-sized padded layer. Chained drop
+  shadows/bevels still sample offset past the stage edge; unshifted blurs repeat the edge pixel
+  where Ruffle reads transparent (needs its own A/B).
+- **`cab_mask_filters`** still needs compose-into-offscreen.
+- **`verify_output.py` grades 10 tests that Ruffle skips with `ignore = true`** in `test.toml`
+  (e.g. `bitmap_pixelsnapping`) — a harness semantics gap like the ALL-checks one. Price before
+  fixing (it removes comparisons, it doesn't flip them).
+- **Stage3D text rows** now draw text (Noto outlines) but don't move: phase B owns them.
+- `text/br_at_start` (a blank line too few, still 77 channels over at the best shift),
+  `drawing_order` (deeper diagnosis; tol 0), `blend_modes/layer_*` (0 flips even with layer
+  groups), `graphics_gradients` (repeating radial on a stroke).
+- Unpriced correctness: AVM2 keyboard `Select*` never sets `sel_active` (no highlight); caret blink
+  for wasm; the recompiler's other 8-bit line-style truncation; a recompile-twice determinism check
+  in CI.
+
+### Process notes added this session
+
+- **Cloud workers** — see §5a (first use: w2-edittext-filters, 47 min to delivery).
+- **A band move across a grading-semantics change is not a render move** — attribute from CI's own
+  per-check stats before building anything (the attribution agent needed 2 minutes and no render).
