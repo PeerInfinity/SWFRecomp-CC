@@ -8097,6 +8097,47 @@ static ASFunction g_wrapper_valueOf_func;
 static ASFunction g_prim_wrapper_toString_func;
 static int g_wrapper_funcs_init = 0;
 
+// Boolean.prototype.toString: a receiver that is not a Boolean wrapper (no
+// boxed primitive) answers `undefined`, not Object.prototype's
+// "[object Object]" (gnash MovieClip.as:2590 `mc.toString = Boolean.prototype.
+// toString; mc.toString() == undefined`; Ruffle boolean.rs to_string returns
+// Undefined for a non-Bool native). The Number/String prototypes keep the
+// shared builtin_prim_wrapper_toString fallback.
+static ASFunction g_bool_proto_toString_func;
+static ActionVar builtin_bool_proto_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	if (this_obj == NULL || getProperty((ASObject*) this_obj, "valueOf_value", 13) == NULL)
+	{
+		ActionVar u = {0};
+		u.type = ACTION_STACK_VALUE_UNDEFINED;
+		return u;
+	}
+	return builtin_prim_wrapper_toString(app_context, args, arg_count, registers, this_obj);
+}
+
+// Install Boolean.prototype.toString on a Boolean prototype object (every
+// version group's Boolean.prototype goes through here).
+static void installBoolProtoToString(SWFAppContext* app_context, ASObject* proto)
+{
+	static int init = 0;
+	if (proto == NULL) return;
+	if (!init)
+	{
+		memset(&g_bool_proto_toString_func, 0, sizeof(ASFunction));
+		strncpy(g_bool_proto_toString_func.name, "toString", 255);
+		g_bool_proto_toString_func.function_type = 2;
+		g_bool_proto_toString_func.param_count = 0;
+		g_bool_proto_toString_func.advanced_func = (Function2Ptr) builtin_bool_proto_toString;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_bool_proto_toString_func;
+		init = 1;
+	}
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_FUNCTION;
+	v.data.numeric_value = (u64) &g_bool_proto_toString_func;
+	setPropertyWithFlags(app_context, proto, "toString", 8, &v, PROPERTY_FLAG_WRITABLE);
+}
+
 // Get or create the global Object.prototype
 static ASObject* getObjectPrototype(SWFAppContext* app_context)
 {
@@ -16384,7 +16425,16 @@ static ActionVar builtin_mc_meth(SWFAppContext* app_context, ActionVar* args,
 	pushVar(app_context, &args[0]);
 	PUSH_STR("toLowerCase", 11);
 	char str_buffer_local[17];
+	// A builtin that calls back into script is that callee's
+	// `arguments.caller` (gnash MovieClip.as:2097: `retCaller == _root.meth`
+	// from a user Number.prototype.toLowerCase). The caller is captured from
+	// g_current_executing_func, so publish meth itself for the call.
+	ASFunction* _meth_prev_exec = g_current_executing_func;
+	for (int _mi = 0; _mi < MC_METHOD_COUNT; _mi++)
+		if (g_mc_method_funcs[_mi].advanced_func == (Function2Ptr) builtin_mc_meth)
+		{ g_current_executing_func = &g_mc_method_funcs[_mi]; break; }
 	actionCallMethod(app_context, str_buffer_local);
+	g_current_executing_func = _meth_prev_exec;
 	ActionVar tlc_result;
 	popVar(app_context, &tlc_result);
 
@@ -21391,6 +21441,31 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 				if (child_depth == SIZE_MAX && mc == &root_movieclip) {
 					child_depth = ng_findDisplayEntryByName(seg_buf);
 				}
+				// A script-created child (createEmptyMovieClip & co.) is a real
+				// display child even though it is not in the tag display list:
+				// resolve it by the child cache BEFORE consulting dynamic_props.
+				// Root dynamic_props is a mixed store (SetVariable mirrors user
+				// variables into it), so a same-named user variable there must
+				// not shadow the child — Ruffle resolve_target_path looks up
+				// display children FIRST, then object properties (gnash
+				// MovieClip.as:2191: `mc = _root; createEmptyMovieClip('mc',
+				// 10)` then GetProperty('mc', _x) reads the CHILD, 0). The
+				// browser-graphics branch below already scans the cache first.
+				if (child_depth == SIZE_MAX) {
+					MovieClip* _cc_hit = NULL;
+					for (int _cci = 0; _cci < child_mc_count; _cci++) {
+						MovieClip* _cc = child_mc_cache[_cci];
+						if (_cc == NULL || _cc->depth == INT_MIN) continue;
+						if (_cc->parent != mc || _cc->name_displaced) continue;
+						if (!swf_name_match(_cc->name, seg_buf)) continue;
+						if (_cc_hit == NULL || _cc->depth < _cc_hit->depth) _cc_hit = _cc;
+					}
+					if (_cc_hit != NULL && _cc_hit->display_obj == NULL) {
+						mc = _cc_hit;
+						cur_sprite_dl = NULL; cur_sprite_max = 0;
+						goto slash_path_segment_done;
+					}
+				}
 				// Fall back to dynamic_props for dynamically created MCs
 				// (createEmptyMovieClip creates MCs in the cache/dynamic_props
 				// but does NOT add them to the display list)
@@ -24355,7 +24430,11 @@ static void invokeUnloadHandler(SWFAppContext* app_context, ASFunction* func,
 	{
 		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 		this_var.data.numeric_value = (u64)(uintptr_t)this_mc;
-		opts.flags |= INV_THIS_STACK | INV_MC_THIS_NULL_PTR;
+		// INV_EVENT_THIS_MC: the generated preload_this of a type-2 handler
+		// reads g_event_this_mc — the only other source it had was the
+		// current context, which aq_dispatch_unload no longer switches for a
+		// SWF6+ closure (mc_call_as2_handler_ng uses the same pairing).
+		opts.flags |= INV_THIS_STACK | INV_MC_THIS_NULL_PTR | INV_EVENT_THIS_MC;
 	}
 	(void) invokeFunctionValue(app_context, func,
 	                           this_mc != NULL ? &this_var : NULL,
@@ -25911,6 +25990,22 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 // true for unload events by definition).
 typedef struct { ASFunction* func; MovieClip* mc; } PendingUnload;
 
+// (func, mc) pairs queued but not yet dispatched. Flash unloads a clip once:
+// removing a child of a clip whose removal is already deferred (gnash
+// MovieClip.as:730, `removeMovieClip(softref3child)` after `hardref3` was
+// removed) must not queue the child's onUnload a second time.
+static PendingUnload* g_unload_pending_set = NULL;
+static int g_unload_pending_count = 0;
+static int g_unload_pending_cap = 0;
+
+static int unloadPendingIndex(ASFunction* func, MovieClip* mc)
+{
+	for (int i = 0; i < g_unload_pending_count; i++)
+		if (g_unload_pending_set[i].func == func && g_unload_pending_set[i].mc == mc)
+			return i;
+	return -1;
+}
+
 // Payload uses plain malloc/free (not HCALLOC) because queueOnUnload has no
 // app_context in scope at its callers. The payload is a tiny two-pointer
 // struct freed in aq_dispatch_unload, so it doesn't pressure the heap arena.
@@ -25918,9 +26013,23 @@ static void aq_dispatch_unload(SWFAppContext* app_context, void* user)
 {
 	PendingUnload* pu = (PendingUnload*) user;
 	if (pu == NULL) return;
+	{
+		int _upi = unloadPendingIndex(pu->func, pu->mc);
+		if (_upi >= 0)
+			g_unload_pending_set[_upi] = g_unload_pending_set[--g_unload_pending_count];
+	}
 	if (!g_execution_halted) {
 		MovieClip* saved = g_current_context;
-		actionSetCurrentContext(pu->mc);
+		// SWF6+ functions are closures (Ruffle function.rs: `is_closure =
+		// swf_version >= 6` -> the DEFINING clip is the base clip and the
+		// defining scope is closed over), so a handler's bare names resolve
+		// through the timeline that defined it, not the unloading clip —
+		// exactly as mc_call_as2_handler_ng never switches context. Only a
+		// SWF5 handler takes `this` as its base clip.
+		int _uv = (pu->func != NULL && pu->func->swf_version != 0)
+			? (int) pu->func->swf_version : g_swf_version;
+		if (_uv < 6)
+			actionSetCurrentContext(pu->mc);
 		// this_mc = pu->mc reproduces this site's this-stack push (the only
 		// onUnload site that ever had one). Inert deltas vs the old inline
 		// push: the core's bound is MAX_THIS_DEPTH (64) where this site
@@ -25938,6 +26047,17 @@ static void queueOnUnload(ASFunction* func, MovieClip* mc)
 {
 	PendingUnload* pu = (PendingUnload*) malloc(sizeof(PendingUnload));
 	if (pu == NULL) return;
+	if (unloadPendingIndex(func, mc) >= 0) { free(pu); return; }
+	if (g_unload_pending_count >= g_unload_pending_cap) {
+		int ncap = g_unload_pending_cap ? g_unload_pending_cap * 2 : 16;
+		PendingUnload* n = (PendingUnload*) realloc(g_unload_pending_set, (size_t) ncap * sizeof(PendingUnload));
+		if (n != NULL) { g_unload_pending_set = n; g_unload_pending_cap = ncap; }
+	}
+	if (g_unload_pending_count < g_unload_pending_cap) {
+		g_unload_pending_set[g_unload_pending_count].func = func;
+		g_unload_pending_set[g_unload_pending_count].mc = mc;
+		g_unload_pending_count++;
+	}
 	pu->func = func;
 	pu->mc = mc;
 	actionQueueCallback(NULL, aq_dispatch_unload, (void*)pu,
@@ -43792,6 +43912,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			if (function_count < MAX_FUNCTIONS)
 				function_registry[function_count++] = &g_prim_wrapper_toString_func;
 
+
 			g_wrapper_funcs_init = 1;
 		}
 
@@ -43842,7 +43963,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setObjectProto(app_context, g_ctors[4].prototype_obj);
 		}
 		setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
-		setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "toString", 8, &ts_val, PROPERTY_FLAG_WRITABLE);
+		installBoolProtoToString(app_context, g_ctors[4].prototype_obj);
 
 		// Array.prototype (g_ctors[1]) — unify with g_array_constructor_static
 		// Both constructors must share the same prototype_obj = g_array_prototype
@@ -44451,6 +44572,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 			ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 			_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 			setPropertyWithFlags(app_context, sec_extra_ctors[i]->prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+			if (i == 2) installBoolProtoToString(app_context, sec_extra_ctors[i]->prototype_obj);  // Boolean
 			// Set prototype property on own_props
 			if (sec_extra_ctors[i]->own_props != NULL) {
 				ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
@@ -46109,6 +46231,7 @@ check_special_vars:
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 					setPropertyWithFlags(app_context, g_boolean_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+					installBoolProtoToString(app_context, g_boolean_constructor.prototype_obj);
 					// Boolean.prototype.constructor / __constructor__ = Boolean
 					ActionVar _bctor = {0}; _bctor.type = ACTION_STACK_VALUE_FUNCTION;
 					_bctor.data.numeric_value = (u64)&g_boolean_constructor;
@@ -68289,6 +68412,71 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 	return 0;
 }
 
+// A Number/Boolean primitive receiver calling a method the primitive fast path
+// does not implement (anything but toString/valueOf/hasOwnProperty): Flash
+// auto-boxes the primitive and looks the method up on the wrapper prototype, so
+// a user-defined `Number.prototype.toLowerCase` runs with `this` = the box
+// (gnash MovieClip.as:2092-2100 via MovieClip.prototype.meth). Mirrors the
+// String arm's user-override dispatch in actionCallMethod. Returns 1 and sets
+// *out when a function was dispatched; 0 leaves the old "undefined" answer.
+static int primNumBoolCallProtoMethod(SWFAppContext* app_context, ActionVar* obj_var,
+                                      const char* method_name, u32 method_name_len,
+                                      ActionVar* args, u32 num_args, ActionVar* out)
+{
+	ASObject* proto = getPrimitiveWrapperProto(obj_var->type);
+	if (proto == NULL) return 0;
+	ActionVar* mv = getPropertyWithPrototype(proto, method_name, method_name_len);
+	if (mv == NULL || mv->type != ACTION_STACK_VALUE_FUNCTION) return 0;
+	ASFunction* fn = lookupFunctionFromVar(mv);
+	if (fn == NULL) return 0;
+	if (fn->function_type == 2 && (
+	    fn->advanced_func == (Function2Ptr) builtin_stub_method ||
+	    fn->advanced_func == (Function2Ptr) builtin_prim_wrapper_toString ||
+	    fn->advanced_func == (Function2Ptr) builtin_wrapper_valueOf))
+		return 0;
+	if (!((fn->function_type == 2 && fn->advanced_func != NULL)
+	      || (fn->function_type == 1 && fn->simple_func != NULL)))
+		return 0;
+	if (g_call_depth >= g_max_call_depth - 1) return 0;
+
+	ASObject* wrap = allocObject(app_context, 4);
+	retainObject(wrap);
+	wrap->native_type = (obj_var->type == ACTION_STACK_VALUE_BOOLEAN) ? NATIVE_BOOLEAN : NATIVE_NUMBER;
+	ActionVar pv = {0};
+	pv.type = ACTION_STACK_VALUE_OBJECT;
+	pv.data.numeric_value = (u64) proto;
+	setPropertyWithFlags(app_context, wrap, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+	setPropertyWithFlags(app_context, wrap, "valueOf_value", 13, obj_var, PROPERTY_FLAGS_DONTENUM);
+
+	int is_t2 = (fn->function_type == 2);
+	int caller_ver = g_swf_version;
+	ClosureFrame cf;
+	enterClosureFrame(app_context, &cf, fn,
+	                  (u8)(CF_VERSION | (caller_ver >= 6 ? CF_CTX_LIVE : 0)), NULL);
+	ActionVar this_v = {0};
+	this_v.type = ACTION_STACK_VALUE_OBJECT;
+	this_v.data.numeric_value = (u64) wrap;
+	InvokeOpts opts = {
+		.flags = (INV_SUPER_CTX | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
+		.super_depth = 1,
+		.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS | INV_ACT_SUPER),
+	};
+	u8 saved_call_this_type = g_call_this_type;
+	if (is_t2) {
+		g_c_function_this_obj = wrap;
+		g_call_this_type = ACTION_STACK_VALUE_OBJECT;
+	}
+	g_call_depth++;
+	*out = invokeFunctionValue(app_context, fn, &this_v, args, num_args, &opts);
+	g_call_depth--;
+	if (is_t2) {
+		g_call_this_type = saved_call_this_type;
+		g_c_function_this_obj = NULL;
+	}
+	leaveClosureFrame(app_context, &cf);
+	return 1;
+}
+
 void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
@@ -75649,8 +75837,13 @@ _mc_user_dispatch: ;
 		}
 		else
 		{
+			ActionVar _pnb_res;
+			int _pnb_done = primNumBoolCallProtoMethod(app_context, &obj_var,
+			                                           method_name, method_name_len,
+			                                           args, num_args, &_pnb_res);
 			if (args != NULL) FREE(args);
-			pushUndefined(app_context);
+			if (_pnb_done) pushVar(app_context, &_pnb_res);
+			else pushUndefined(app_context);
 		}
 		return;
 	}
