@@ -19441,6 +19441,29 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	int saved_active = g_avm2_filter_active;
 	g_avm2_filter_active = 1;
 
+	// Ruffle's filter-implied cacheAsBitmap (recheck_cache_as_bitmap) blits
+	// the cache with PixelSnapping::Always: the whole subtree moves by
+	// round(bounds.x_min) - bounds.x_min in DEVICE pixels (the bounds are
+	// taken under the stage view matrix). The cache's draw_offset is an
+	// integer, so on our device-aligned stage-sized filter layer this source
+	// translation is the whole effect (see tag.c cab_snap_delta).
+	Mat snapped_world = *parent_world;
+	{
+		Mat own = ext_matrix(ext);
+		Mat w = mat_mul(parent_world, &own);
+		Rect acc = { 0, 0, 0, 0, 0 };
+		bounds_with_transform(ctx, obj, &w, &acc);
+		if (acc.valid)
+		{
+			double vs = (context->stage_scale > 0.0f)
+			          ? (double) context->stage_scale : 1.0;
+			double xpx = acc.xmin / 20.0 * vs, ypx = acc.ymin / 20.0 * vs;
+			snapped_world.tx += (round(xpx) - xpx) * 20.0 / vs;
+			snapped_world.ty += (round(ypx) - ypx) * 20.0 / vs;
+		}
+	}
+	parent_world = &snapped_world;
+
 	if (n == 0)
 	{
 		// Every filter is impotent or unsupported: render normally.
@@ -19539,6 +19562,16 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	                ? avm2_filter_fixed16(last->distance) : 0.0f;
 	float du = cosf(angle_rad) * dist_px / (float) context->width * fit_x;
 	float dv = sinf(angle_rad) * dist_px / (float) context->height * fit_y;
+	{
+		// NEAREST-sampled offset, floor(off + 0.5) device px (see
+		// tag.c render_filtered_object).
+		float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
+		float xd = cosf(angle_rad) * dist_px * vs, yd = sinf(angle_rad) * dist_px * vs;
+		float uvx = fit_x / ((float) context->width * vs);
+		float uvy = fit_y / ((float) context->height * vs);
+		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
+		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
+	}
 	float strength = avm2_filter_fixed8(last->strength);
 	float hi_r = (float) ((last->color2 >> 16) & 0xFF) / 255.0f;
 	float hi_g = (float) ((last->color2 >> 8) & 0xFF) / 255.0f;

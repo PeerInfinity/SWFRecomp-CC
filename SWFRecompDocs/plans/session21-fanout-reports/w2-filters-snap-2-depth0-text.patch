@@ -1,0 +1,49 @@
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 4a20116bb..652b2dfce 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3185,7 +3185,13 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 	const float* transforms = (const float*)app_context->transform_data;
+ 	if (parent_cx != NULL && cx_is_identity(parent_cx)) parent_cx = NULL;
+ 
+-	for (size_t i = 1; i <= dl_max_depth; ++i)
++	// Depth 0 is a real SWF depth (UI16; Ruffle's display list keys on it like
++	// any other) and tagPlaceObject2 stores it at dl[0], so the walk starts at
++	// 0: an unused dl[0] is zero-filled (char_id 0) and skipped below. Flash
++	// IDE output puts static text at depth 0 inside a DefineSprite — the
++	// "50%/100%/200%" labels of visual/filters/{bevel_inner,bevel_outer,
++	// bevel_full,glow_with_alpha_strength} (s21 w2-filters-snap-2).
++	for (size_t i = 0; i <= dl_max_depth; ++i)
+ 	{
+ 		DisplayObject* obj = &dl[i];
+ 		if (obj->char_id == 0) continue;
+@@ -3696,7 +3702,8 @@ static int opaque_bg_local_bounds(DisplayObject* obj, float* b)
+ 	if ((ch->type == CHAR_TYPE_SPRITE || ch->type == CHAR_TYPE_BUTTON)
+ 	    && obj->sprite_display_list != NULL)
+ 	{
+-		for (size_t i = 1; i <= obj->sprite_max_depth; i++)
++		// From depth 0 (see compose_children).
++		for (size_t i = 0; i <= obj->sprite_max_depth; i++)
+ 		{
+ 			DisplayObject* c = &obj->sprite_display_list[i];
+ 			if (c->char_id == 0 || c->clip_depth > 0) continue;
+@@ -4240,7 +4247,8 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
+ 	// unchanged. Same fix s12 made on the AVM2 walk (avm2_display.c:15548+).
+ 	u32 pre_clip_ref = renderer_clip_ref(context);
+ 	u32 active_clip_depth = 0;
+-	for (size_t i = 1; i <= dl_max_depth; ++i)
++	// From depth 0 (see compose_children).
++	for (size_t i = 0; i <= dl_max_depth; ++i)
+ 	{
+ 		if (active_clip_depth > 0 && i > active_clip_depth)
+ 		{
+@@ -8011,7 +8019,8 @@ int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
+ 	float xmin = 1e30f, xmax = -1e30f, ymin = 1e30f, ymax = -1e30f;
+ 	int found = 0;
+ 
+-	for (size_t i = 1; i <= dl_max; i++)
++	// From depth 0 (see compose_children).
++	for (size_t i = 0; i <= dl_max; i++)
+ 	{
+ 		DisplayObject* child = &dl[i];
+ 		if (child->char_id == 0) continue;

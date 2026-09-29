@@ -369,3 +369,16 @@ visual/fonts/leading_device_font            # AVM2 DEVICE-FONT BORDER CORNER 1 c
                                             #   (tolerance 128, max_outliers 0)
                                             #   since w2-px-d; the only corpus
                                             #   row that sees this corner.
+# SESSION 21 ADDITION (s21 wave-2 `w2-filters-snap`). FILTER-IMPLIED
+# cacheAsBitmap PIXEL SNAP (tag.c cab_snap_delta / avm2_display.c
+# avm2_render_filtered) on the DEVICE grid, plus the nearest-sampled
+# drop-shadow/bevel offset. These are the corpus's first passing image rows on
+# the AVM1 PlaceObject3-tag filter route (s18 §8.6's blind spot), both under a
+# 2x viewport, so they see the device-vs-stage grid too. Listed under tier 2
+# because they were CI-failing when added (both pass locally; promote to TIER 1
+# once a graded run confirms). blur_scales_with_screen passes at max diff 2 vs
+# tolerance 2 — it is on the edge by construction; an md5 A/B is the signal.
+# tier=2  (CI-failing / skipped; A/B signal only)
+visual/filters/drop_shadow_scales_with_screen # PO3 DropShadow, 2x view, rotated  1 cmp
+visual/filters/blur_scales_with_screen      # nested cab+Blur under 5x sprite,   1 cmp
+                                            #   2x view (device-grid snap)
