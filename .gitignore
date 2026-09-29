@@ -309,3 +309,11 @@ SWFRecomp/tests/swfbridge_toy_as3/recompiled/
 .image-results/
 /image_triage.json
 /image_triage.md
+
+# Per-comparison render artifacts that verify_output.py --verbose copies into
+# a test dir (<cmp>.actual.png, <cmp>.difference.png, and the
+# <cmp>.ruffle.difference.png from run_image_tests.py). Read from disk by
+# run_image_tests.py / triage_image_tests.py, never from git. Only matters in
+# tracked fixture dirs (e.g. regression/); upstream suites are ignored wholesale.
+ruffle-tests/tests/swfs/**/*.actual.png
+ruffle-tests/tests/swfs/**/*.difference.png
