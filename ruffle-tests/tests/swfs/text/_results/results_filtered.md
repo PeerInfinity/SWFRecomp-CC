@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-27 08:50 UTC
+**Date**: 2026-09-29 02:24 UTC
 
-**Git SHA**: `fa4caf2efd`
+**Git SHA**: `7755698f83`
 
-**Run Duration**: 3m 26s
+**Run Duration**: 3m 19s
 
 **Filtered**: 0 tests ignored out of 11 available
 
@@ -13,34 +13,29 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 11 |
-| Passing | **10** (90.9%) |
-| Failing | 1 |
+| Passing | **11** (100.0%) |
+| Failing | 0 |
 | Total expected lines | 973 |
-| Matching lines | 972 (99.9%) |
-| Mismatched lines | 1 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Matching lines | 973 (100.0%) |
+| Mismatched lines | 0 |
 
 ## Passing Tests
 
-**10 tests passing**
+**11 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `auto_size/height` | 1 | 27.9s |  |
-| 2 | `auto_size/return` | 12 | 28.5s |  |
-| 3 | `auto_size/width` | 6 | 20.2s |  |
+| 1 | `auto_size/height` | 1 | 18.0s |  |
+| 2 | `auto_size/return` | 12 | 20.0s |  |
+| 3 | `auto_size/width` | 6 | 27.8s |  |
 | 4 | `br_at_start` | 0 | 1.4s |  |
-| 5 | `html_entity_parsing` | 213 | 7.3s |  |
-| 6 | `style_changes_in_html` | 0 | 21.0s |  |
-| 7 | `text_caret_placement_align` | 248 | 28.9s |  |
-| 8 | `text_caret_placement_leading` | 244 | 17.5s |  |
-| 9 | `text_caret_placement_scroll` | 108 | 28.8s |  |
-| 10 | `text_caret_placement_translated_bounds` | 140 | 22.5s |  |
+| 5 | `html_entity_parsing` | 213 | 5.4s |  |
+| 6 | `links_in_scrolled_text` | 1 | 1.3s |  |
+| 7 | `style_changes_in_html` | 0 | 21.3s |  |
+| 8 | `text_caret_placement_align` | 248 | 24.4s |  |
+| 9 | `text_caret_placement_leading` | 244 | 27.3s |  |
+| 10 | `text_caret_placement_scroll` | 108 | 28.4s |  |
+| 11 | `text_caret_placement_translated_bounds` | 140 | 22.8s |  |
 
 ## Near-Passing Tests
 
@@ -64,8 +59,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `links_in_scrolled_text` | 0.0% | 0/1 | 0 | 1 |  |
+No output mismatches.
