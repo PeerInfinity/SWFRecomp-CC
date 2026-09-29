@@ -50,6 +50,8 @@ Agent ids are recorded below as they return.
 | w2-tt-e | ac07f0c018726f566 | NetStream-SquareTest |
 | w1-recomp-nondet | acc9edf96057ae2fa | recompiler nondeterminism (away3d draws.c) |
 | w2-px-d | a5b2168e1b262bfde | RESUMED (was w2-px-b); leading_device_font corner rule (D2) |
+| w2-ef-attach | ad05d983604e31032 | attachMovie onClipEvent(enterFrame) never fires (both modes) |
+| w2-edittext-filters | a2957f375f4fa288c | AVM1 EditText through the filter route (5 cmps) |
 | w2-drift-smalls | ab5ffada3eb151d3d | RESUMED w1-drift; casi32, textjustifier, hasTabs, bitmap_data_draw ×2; own worktree |
 
 ## Held queue
@@ -71,6 +73,11 @@ Agent ids are recorded below as they return.
 | w2-tt-c | GO, landed 36b11419a (+1 trace predicted) |
 | w2-tt-a | GO, landed 8a51014b8 (+2 trace predicted) |
 | w2-tt-b | GO, landed 43d0199c8 (+2 trace predicted, + new regression fixture) |
+| w2-tt-e | GO, landed 9930c8a23 (+1 trace predicted) |
+| w2-tt-d | GO, landed 7c91e4727 (+2 trace predicted) |
+| w2-px-c | GO, landed 0104c5fb3 (+1 px; selection −95% band) |
+| w1-recomp-nondet | GO, landed 86a1fa74f (recompiler determinism; 3 parser bugs) |
+| w2-px-d | GO, landed 17cd6c784 (+1 px leading_device_font) |
 | w2-gradient-readback | GO, landed 391aba282 (+1 trace predicted) |
 | w2-px-b | GO, landed d14b4c221 + 8aaf1ec0e + e3ba02834 (+3 px predicted; e3ba02834 fixes a mis-staged split) |
 | grading run 36493242924 | +12 trace, 0 regressions, 0 other moves (drift-smalls 5, hitarea 1, tt-a 2, tt-b 2, mixed 2) |
