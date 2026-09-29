@@ -218,6 +218,86 @@ the worktree AND `--recompile`. In a worktree, `DAWN_INSTALL` mis-resolves;
 need it exported. Main-tree `--tests-dir` is acceptable for exactly one case:
 a single agent working alone whose diff does not touch `SWFRecomp/`.
 
+## 5a. Cloud workers (added s21, 2026-09-28)
+
+A wave-2 slot can run as a Claude Code **cloud session** instead of a local
+worktree subagent. First used for `w2-edittext-filters` in s21, when a 100-test
+render A/B was going to take ~3 h on the shared 8-core box. Mechanics, verified
+end to end, are in memory `cloud-session-launch-cli`. This section is the
+procedure.
+
+**When to use one.** A slot whose verification is long (a large render-canary
+A/B, both CI modes) and which **hasn't started, or is still early**. The cloud
+box is the worker's own (4 CPU, 15 GB), so it takes load off the local machine
+instead of competing for it. Do **not** move a slot that is already in final
+verification: a cloud worker restarts from the brief, so the rebuild, corpus
+download and diagnosis are paid again. Cloud workers do not fan out their own
+subagents.
+
+**Environment.** "SWFRecomp fan-out" (`env_01QSs9FrDsLyis2RzQXg1UrW`). Its
+setup script is versioned at `scripts/cloud_env_setup.sh`; the user pastes it
+into the environment on claude.ai. It installs the apt deps and Pillow and
+downloads the prebuilt Dawn (repo `PeerInfinity/dawn-prebuilt`, tag
+`dawn-620a520f`, sha256-checked) to `/root/CC/dawn-install`, with a
+`/home/user/dawn-install` symlink so `verify_output.py`'s default resolves.
+Graphics mode then runs on llvmpipe. Status file: `$HOME/CC/SETUP_STATUS`. The
+session's auto-mode classifier denies ad-hoc downloads of that prebuilt from
+inside a session. **Never work around that**: the setup script is the
+sanctioned path.
+
+**Input is the launch prompt only.** Cloud→local messaging does not exist, and
+local→cloud SendMessage is held. A one-routine-per-target recipe exists (see
+the memory) but is fiddly, so write the prompt as the whole brief. The cloud
+clone sees only **pushed** commits, so:
+1. Archive whatever the worker needs into
+   `SWFRecompDocs/plans/sessionN-fanout-reports/` **on master and push**: the
+   brief, any WIP patch, measurements, canary list. Local scratchpad paths are
+   invisible to it.
+2. The prompt must include:
+   - `git fetch origin && git checkout -B fanout/<slug> origin/master` (this
+     avoids the stop hook's "unpushed commits on claude/<slug>" nag);
+   - the recompiler build;
+   - `download_tests.sh <categories>` **without `--clean`** (only `regression`
+     is in git);
+   - `SWFRECOMP_COMPILE_TIMEOUT=2400` and `-P 2`;
+   - a pointer to `BRIEFS_COMMON.md`, noting that its shared-machine and
+     worktree rules don't apply, but everything else does;
+   - the task;
+   - the verification bar;
+   - the delivery below.
+3. Tell it to delete stray generated files (`output.actual.png`, `Recompiled*`,
+   `_results` edits) before committing.
+
+**Delivery.** The user has approved cloud workers pushing to a scratch branch,
+`fanout/<slug>` **only**, never master. This is the one exception to trunk-only,
+and it applies to cloud workers alone. The worker commits:
+- its source changes;
+- `sessionN-fanout-reports/<slug>.patch`, i.e.
+  `git diff origin/master -- <source dirs> ruffle-tests/render_canary_tests.txt`;
+- `<slug>-report.md`.
+
+It then runs `git push -u origin fanout/<slug>`. The report file in the branch
+is the deliverable, because `get_run_log` truncates long messages. A NO-GO
+pushes its report too.
+
+**Launch and watch.**
+```bash
+scripts/fanout_cloud_worker.sh <slug> <prompt.md>   # prints session id + URL
+# then (run_in_background, shell-observable, no log polling):
+until git ls-remote --exit-code origin refs/heads/fanout/<slug> >/dev/null; do sleep 120; done
+```
+Check the first minute of `RemoteTrigger get_run_log session_id=session_…` for
+"Setup script … OK" and the branch checkout. Record the session id in
+`AGENT_LAUNCH_ORDER.md`.
+
+**Merge.** `git fetch origin fanout/<slug>`, then take the patch file from the
+branch. Land it through the same serial per-patch headline re-check as any
+local patch, and stage by name. Delete `fanout/<slug>` afterwards (in the
+approved plan). **Moving a running local slot:** TaskStop the agent, confirm its
+detached capture processes are gone (`ps` filtered by its worktree hash), and
+archive its newest WIP patch plus a status table to master. Then brief the
+cloud worker to start from that WIP rather than from scratch.
+
 ## 6. Canary rules
 
 - **Tool:** `ruffle-tests/render_canary.py capture --label X` / `compare A B`,
