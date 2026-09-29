@@ -18770,28 +18770,25 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 			// line is its transpose; unlike the closed line-strip of draw_line_rect
 			// every edge keeps both terminal pixels, so the outline is symmetric.
 			//
-			// ...except at the BOTTOM-RIGHT corner, where it is not. Every
-			// measured golden inks TL, TR and BL solid and the BR pixel only
-			// PARTIALLY — 111 of 255 in avm2/edittext_autosize_height_dynamic
-			// (36 x 44 at the origin, quality = "high") and in
-			// visual/edittext/edittext_selection_leading, 95 in the AVM1 twin
-			// of this painter (visual/edittext/edittext_caret_empty, drawn by
-			// tag.c::textfield_render_cb — SWF v8). Four full-coverage quads can
-			// only give 0 or 255 there, and we gave 0, i.e. 111 off on a
-			// tolerance of 128. Ending the bottom and right rects half a device
-			// pixel short makes them meet at the corner pixel's CENTRE, so MSAA
-			// resolves 3/4 coverage (64) — 47 off instead of 111. Gated on MSAA
-			// because at MSAA_SAMPLES == 1 the single pixel-centre sample would
-			// land on the new edge and drop the corner entirely, and no aliased
-			// device-font golden has been measured to justify that.
-			double corner_dev = dtw;
-#if MSAA_SAMPLES > 1
-			corner_dev = dtw / 2.0;
-#endif
+			// ...except at the BOTTOM-RIGHT corner, which NO segment inks: the
+			// bottom line runs x_min..x_max and the right line y_min..y_max, both
+			// ending exactly at the corner pixel's near edges, and the four lines
+			// are separate draws (not one strip), so nothing reaches past them.
+			// visual/fonts/leading_device_font (embedFonts = false, quality =
+			// "high") shows it on all 6 fields: TL/TR/BL solid, BR 255.
+			//
+			// s21 w2-px-d: this arm used to end the bottom/right rects HALF a
+			// pixel past the corner (MSAA 3/4 = 64), citing
+			// avm2/edittext_autosize_height_dynamic and
+			// visual/edittext/edittext_selection_leading (BR 111). Both set
+			// `embedFonts = true`, so et->device_font == 0 and they are drawn by
+			// the draw_text_box LineStrip arm below, which keeps its own measured
+			// partial corner; this arm never rendered either of them. The AVM1
+			// twin (tag.c device_box, `line_rect = 1`) already drops the corner.
 			avm2_border_rect(x0, y0, w + dtw, dtw, bc, alpha);
-			avm2_border_rect(x0, y0 + h, w + corner_dev, dtw, bc, alpha);
+			avm2_border_rect(x0, y0 + h, w, dtw, bc, alpha);
 			avm2_border_rect(x0, y0, dtw, h + dtw, bc, alpha);
-			avm2_border_rect(x0 + w, y0, dtw, h + corner_dev, bc, alpha);
+			avm2_border_rect(x0 + w, y0, dtw, h, bc, alpha);
 		}
 		return;
 	}

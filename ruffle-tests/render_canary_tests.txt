@@ -357,3 +357,15 @@ visual/cache_as_bitmap/edittext_hscroll
 # glyphs white). .02 is the select-all frame; all three comparisons stay failing
 # on the EditText DropShadow, so this is an A/B-only (tier-2) member.
 visual/cache_as_bitmap/edittext_selection
+
+# s21 w2-px-d — AVM2 device-font box (draw_device_text_box) BR corner
+# tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
+visual/fonts/leading_device_font            # AVM2 DEVICE-FONT BORDER CORNER 1 cmp
+                                            #   embedFonts = false: Ruffle's
+                                            #   four separate draw_lines leave
+                                            #   the BR corner EMPTY (the
+                                            #   embedded LineStrip arm inks it
+                                            #   3/4). Byte-exact vs golden
+                                            #   (tolerance 128, max_outliers 0)
+                                            #   since w2-px-d; the only corpus
+                                            #   row that sees this corner.
