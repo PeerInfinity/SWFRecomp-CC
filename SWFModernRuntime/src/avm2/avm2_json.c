@@ -19,6 +19,7 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+#include <memory/heap.h>
 
 _Noreturn static void throw_1132(Avm2Context* ctx)
 {
@@ -119,6 +120,43 @@ struct JVal
 	uint32_t count;
 };
 
+// Every allocation the parser makes (JVal nodes, decoded strings, entry
+// arrays) is SCRATCH: j_deserialize copies what it keeps into census
+// strings/objects. The scratch list owns them all and json_parse frees the
+// list on every exit, the throwing ones included — they used to leak per call
+// (the bridge's per-frame getItemQueue parse made that ~30 KB per host push).
+typedef struct JScratch
+{
+	Avm2Context* ctx;
+	void** p;
+	uint32_t n;
+	uint32_t cap;
+} JScratch;
+
+static void* jscratch_alloc(JScratch* sc, uint32_t size)
+{
+	if (sc->n == sc->cap)
+	{
+		uint32_t nc = sc->cap == 0 ? 64 : sc->cap * 2;
+		void** grown = avm2_alloc(sc->ctx, nc * (uint32_t) sizeof(void*));
+		if (sc->n > 0) memcpy(grown, sc->p, sc->n * sizeof(void*));
+		if (sc->p != NULL) heap_free(sc->ctx->app, sc->p);
+		sc->p = grown;
+		sc->cap = nc;
+	}
+	void* m = avm2_alloc(sc->ctx, size);
+	sc->p[sc->n++] = m;
+	return m;
+}
+
+static void jscratch_free(JScratch* sc)
+{
+	for (uint32_t i = 0; i < sc->n; i++) heap_free(sc->ctx->app, sc->p[i]);
+	if (sc->p != NULL) heap_free(sc->ctx->app, sc->p);
+	sc->p = NULL;
+	sc->n = sc->cap = 0;
+}
+
 typedef struct JParser
 {
 	Avm2Context* ctx;
@@ -126,6 +164,7 @@ typedef struct JParser
 	uint32_t len;
 	uint32_t i;
 	int failed;
+	JScratch* scratch;
 } JParser;
 
 static void jp_ws(JParser* p)
@@ -140,7 +179,7 @@ static void jp_ws(JParser* p)
 
 static JVal* jv_new(JParser* p, uint8_t kind)
 {
-	JVal* v = avm2_alloc(p->ctx, sizeof(JVal));
+	JVal* v = jscratch_alloc(p->scratch, sizeof(JVal));
 	memset(v, 0, sizeof(JVal));
 	v->kind = kind;
 	return v;
@@ -160,7 +199,7 @@ static int jp_hex(char c)
 // UTF-8; NULL on error.
 static const char* jp_string(JParser* p, uint32_t* out_len)
 {
-	char* out = avm2_alloc(p->ctx, p->len - p->i + 4);
+	char* out = jscratch_alloc(p->scratch, p->len - p->i + 4);
 	uint32_t n = 0;
 	while (p->i < p->len)
 	{
@@ -262,7 +301,7 @@ static int jp_append(JParser* p, JVal* v, uint32_t* cap, JEntry e)
 	if (v->count == *cap)
 	{
 		uint32_t new_cap = *cap == 0 ? 8 : *cap * 2;
-		JEntry* grown = avm2_alloc(p->ctx, new_cap * sizeof(JEntry));
+		JEntry* grown = jscratch_alloc(p->scratch, new_cap * sizeof(JEntry));
 		if (v->count > 0) memcpy(grown, v->items, v->count * sizeof(JEntry));
 		v->items = grown;
 		*cap = new_cap;
@@ -348,7 +387,7 @@ static JVal* jp_value(JParser* p)
 		if (nl >= sizeof(buf))
 		{
 			// Very long numbers still parse (strtod handles the precision).
-			char* big = avm2_alloc(p->ctx, nl + 1);
+			char* big = jscratch_alloc(p->scratch, nl + 1);
 			memcpy(big, p->s + start, nl);
 			big[nl] = '\0';
 			JVal* v = jv_new(p, 2);
@@ -524,13 +563,34 @@ static Avm2Value json_parse(Avm2Activation* act)
 		reviver = act->args[1];
 	}
 
-	JParser p = { ctx, text->utf8, text->len, 0, 0 };
-	JVal* v = jp_value(&p);
-	if (v == NULL) throw_1132_syntax(ctx);
-	jp_ws(&p);
-	if (p.i != p.len) throw_1132_syntax(ctx);
+	JScratch scratch;
+	memset(&scratch, 0, sizeof(scratch));
+	scratch.ctx = ctx;
+	JParser p = { ctx, text->utf8, text->len, 0, 0, &scratch };
+	// Parse errors and a throwing reviver unwind through here: catch, free
+	// the scratch, rethrow the same value. The reviver's top-level call runs
+	// after the tree is consumed, outside the frame.
+	Avm2Value val = avm2_undefined();
+	int syntax_error = 0;
+	Avm2TryFrame top;
+	avm2_try_push_catch_all_silent(ctx, &top);
+	if (setjmp(top.jb) == 0)
+	{
+		JVal* v = jp_value(&p);
+		if (v != NULL) jp_ws(&p);
+		if (v == NULL || p.i != p.len) syntax_error = 1;
+		else val = j_deserialize(ctx, v, reviver);
+		avm2_try_pop_frame(&top);
+	}
+	else
+	{
+		avm2_try_pop_frame(&top);
+		jscratch_free(&scratch);
+		avm2_throw(ctx, top.exc);
+	}
+	jscratch_free(&scratch);
+	if (syntax_error) throw_1132_syntax(ctx);
 
-	Avm2Value val = j_deserialize(ctx, v, reviver);
 	if (reviver.kind != AVM2_VALUE_UNDEFINED)
 	{
 		Avm2Value args[2];
@@ -560,6 +620,7 @@ static void sb_reserve(StrBuf* b, uint32_t extra)
 	while (new_cap < b->n + extra) new_cap *= 2;
 	char* grown = avm2_alloc(b->ctx, new_cap);
 	if (b->n > 0) memcpy(grown, b->p, b->n);
+	if (b->p != NULL) heap_free(b->ctx->app, b->p);
 	b->p = grown;
 	b->cap = new_cap;
 }
@@ -674,6 +735,7 @@ static void js_stack_push(JSer* js, Avm2Object* obj)
 		{
 			memcpy(grown, js->stack, js->stack_n * sizeof(Avm2Object*));
 		}
+		if (js->stack != NULL) heap_free(js->ctx->app, js->stack);
 		js->stack = grown;
 		js->stack_cap = new_cap;
 	}
@@ -791,6 +853,7 @@ static void js_build_prop_keys(JSer* js, Avm2Object* list)
 				memcpy(grown, js->prop_keys,
 				       js->prop_keys_n * sizeof(const Avm2String*));
 			}
+			if (js->prop_keys != NULL) heap_free(js->ctx->app, (void*) js->prop_keys);
 			js->prop_keys = grown;
 			cap = new_cap;
 		}
@@ -976,6 +1039,17 @@ static void js_serialize_value(JSer* js, StrBuf* b, Avm2Value v)
 	}
 }
 
+static void json_stringify_free(JSer* js, StrBuf* b)
+{
+	Avm2Context* ctx = js->ctx;
+	if (b->p != NULL) heap_free(ctx->app, b->p);
+	if (js->stack != NULL) heap_free(ctx->app, js->stack);
+	if (js->prop_keys != NULL) heap_free(ctx->app, (void*) js->prop_keys);
+	b->p = NULL;
+	js->stack = NULL;
+	js->prop_keys = NULL;
+}
+
 static Avm2Value json_stringify(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -990,6 +1064,22 @@ static Avm2Value json_stringify(Avm2Activation* act)
 	js.ctx = ctx;
 	js.act = act;
 	js.replacer_fn = avm2_undefined();
+	StrBuf b;
+	memset(&b, 0, sizeof(b));
+	b.ctx = ctx;
+	// The output buffer, the cycle stack and the PropList are scratch owned by
+	// this call; free them on every exit, a throwing replacer/toJSON or a
+	// cycle error (#1129) included — they used to leak per call (~4 KB per
+	// bridge readout of a 1.3 KB reply).
+	Avm2Value result = avm2_undefined();
+	Avm2TryFrame top;
+	avm2_try_push_catch_all_silent(ctx, &top);
+	if (setjmp(top.jb) != 0)
+	{
+		avm2_try_pop_frame(&top);
+		json_stringify_free(&js, &b);
+		avm2_throw(ctx, top.exc);
+	}
 
 	if (replacer.kind != AVM2_VALUE_NULL)
 	{
@@ -1034,12 +1124,12 @@ static Avm2Value json_stringify(Avm2Activation* act)
 		}
 	}
 
-	StrBuf b;
-	memset(&b, 0, sizeof(b));
-	b.ctx = ctx;
 	Avm2Value mapped = js_map_value(&js, "", 0, val);
 	js_serialize_value(&js, &b, mapped);
-	return avm2_string(avm2_string_new(ctx, b.p != NULL ? b.p : "", b.n));
+	result = avm2_string(avm2_string_new(ctx, b.p != NULL ? b.p : "", b.n));
+	avm2_try_pop_frame(&top);
+	json_stringify_free(&js, &b);
+	return result;
 }
 
 // ---------------------------------------------------------------------------

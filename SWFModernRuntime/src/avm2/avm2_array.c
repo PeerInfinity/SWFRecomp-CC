@@ -321,6 +321,7 @@ static Avm2Value array_unshift(Avm2Activation* act)
 			{
 				memcpy(grown, ext->elems, ext->dense_len * sizeof(Avm2Value));
 			}
+			if (ext->elems != NULL) heap_free(ctx->app, ext->elems);  // sole owner (see array_reserve)
 			ext->elems = grown;
 			ext->cap = new_cap;
 		}
@@ -466,6 +467,7 @@ static Avm2Value array_splice(Avm2Activation* act)
 		{
 			memcpy(grown, ext->elems, ext->dense_len * sizeof(Avm2Value));
 		}
+		if (ext->elems != NULL) heap_free(ctx->app, ext->elems);  // sole owner (see array_reserve)
 		ext->elems = grown;
 		ext->cap = new_cap;
 	}
@@ -593,6 +595,7 @@ static Avm2Value array_insert_at(Avm2Activation* act)
 		{
 			memcpy(grown, ext->elems, ext->dense_len * sizeof(Avm2Value));
 		}
+		if (ext->elems != NULL) heap_free(ctx->app, ext->elems);  // sole owner (see array_reserve)
 		ext->elems = grown;
 		ext->cap = new_cap;
 	}

@@ -12,6 +12,7 @@
 
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
+#include <memory/heap.h>
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_value.h>
@@ -251,6 +252,10 @@ static void array_reserve(Avm2Context* ctx, Avm2ArrayExt* ext, uint32_t need)
 	{
 		memcpy(grown, ext->elems, ext->dense_len * sizeof(Avm2Value));
 	}
+	// The old buffer is owned by this ext alone (every reader re-reads
+	// ext->elems; nothing caches the pointer across a call that can grow the
+	// array), so it is freed here — it used to leak on every growth.
+	if (ext->elems != NULL) heap_free(ctx->app, ext->elems);
 	ext->elems = grown;
 	ext->cap = new_cap;
 }

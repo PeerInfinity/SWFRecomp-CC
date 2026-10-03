@@ -60,6 +60,7 @@ static void vec_reserve(Avm2Context* ctx, Avm2VectorExt* ext, uint32_t need)
 	{
 		memcpy(grown, ext->elems, ext->length * sizeof(Avm2Value));
 	}
+	if (ext->elems != NULL) heap_free(ctx->app, ext->elems);  // sole owner (see array_reserve)
 	ext->elems = grown;
 	ext->cap = new_cap;
 }
