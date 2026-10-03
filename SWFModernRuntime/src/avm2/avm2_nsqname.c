@@ -18,6 +18,7 @@
 
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_e4x.h>
+#include <memory/heap.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
@@ -119,6 +120,7 @@ const Avm2String* avm2_qname_to_string(Avm2Context* ctx, const Avm2QNameExt* ext
 	memcpy(buf + ns_len + 2, local, local_len);
 	buf[ns_len + 2 + local_len] = '\0';
 	const Avm2String* s = avm2_string_new(ctx, buf, ns_len + 2 + local_len);
+	heap_free(ctx->app, buf);  // avm2_string_new copied it
 	return s;
 }
 

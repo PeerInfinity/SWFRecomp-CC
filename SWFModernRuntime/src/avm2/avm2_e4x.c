@@ -48,6 +48,7 @@ static void buf_reserve(Buf* b, uint32_t extra)
 	while (ncap < b->len + extra) ncap *= 2;
 	char* np = avm2_alloc(b->ctx, ncap);
 	memcpy(np, b->p, b->len);
+	heap_free(b->ctx->app, b->p);  // scratch: the builder owns it alone
 	b->p = np;
 	b->cap = ncap;
 }
@@ -75,9 +76,15 @@ static void buf_ch(Buf* b, char c)
 	b->p[b->len++] = c;
 }
 
+// The string COPIES the bytes; the builder buffer is scratch and is freed
+// here (every Buf ends in buf_take — it used to leak per serialization).
 static const Avm2String* buf_take(Buf* b)
 {
-	return avm2_string_new(b->ctx, b->p, b->len);
+	const Avm2String* s = avm2_string_new(b->ctx, b->p, b->len);
+	heap_free(b->ctx->app, b->p);
+	b->p = NULL;
+	b->cap = b->len = 0;
+	return s;
 }
 
 static const Avm2String* str_empty(Avm2Context* ctx)
@@ -107,8 +114,8 @@ E4XNode* avm2_e4x_node_new(Avm2Context* ctx, uint8_t kind, E4XNode* parent)
 	memset(n, 0, sizeof(*n));
 	n->kind = kind;
 	n->parent = parent;
-	// Enroll in the all-nodes registry: nodes are immortal but their string
-	// fields must be visible to the string GC as roots (see gc_all_next).
+	// Enroll in the all-nodes registry the E4X collector sweeps (see
+	// gc_all_next); gc_mark 0 = not reached yet.
 	n->gc_all_next = g_e4x_all_nodes;
 	g_e4x_all_nodes = n;
 	return n;
@@ -212,14 +219,6 @@ uint32_t avm2_e4x_gc_sweep_nodes(Avm2Context* ctx)
 		n = next;
 	}
 	return freed;
-}
-
-// GC root marker: E4X nodes are not roots — they live while a wrapper reaches
-// them (avm2_xml_gc_trace_ext → avm2_e4x_gc_mark_node; gc_collect opens the
-// node epoch with avm2_e4x_gc_begin before anything is marked).
-void avm2_gc_mark_roots_e4x(Avm2Context* ctx)
-{
-	(void) ctx;
 }
 
 E4XNode* avm2_e4x_text(Avm2Context* ctx, const Avm2String* s, E4XNode* parent)
@@ -1020,6 +1019,7 @@ uint32_t avm2_e4x_in_scope_namespaces(Avm2Context* ctx, const E4XNode* node,
 			{
 				E4XNamespace* nl = avm2_alloc(ctx, cap * 2 * sizeof(E4XNamespace));
 				memcpy(nl, list, count * sizeof(E4XNamespace));
+				heap_free(ctx->app, list);
 				list = nl;
 				cap *= 2;
 			}
@@ -1422,6 +1422,7 @@ static void to_xml_string_inner(Avm2Context* ctx, const E4XNode* node, Buf* b,
 				decls[decl_count++] = in_scope[i];
 			}
 		}
+		heap_free(ctx->app, in_scope);  // per-element scratch
 	}
 	AncNs here = { decls, decl_count, ancestors };
 	if (node->has_ns && anc_find_uri(&here, node->ns.uri) == NULL && decl_count < 64)
@@ -1782,6 +1783,7 @@ static void push_top(Parser* ps, E4XNode* node)
 		uint32_t ncap = ps->top_cap ? ps->top_cap * 2 : 4;
 		E4XNode** nt = avm2_alloc(ps->ctx, ncap * sizeof(E4XNode*));
 		memcpy(nt, ps->top, ps->top_count * sizeof(E4XNode*));
+		if (ps->top != NULL) heap_free(ps->ctx->app, ps->top);
 		ps->top = nt;
 		ps->top_cap = ncap;
 	}
@@ -2074,6 +2076,8 @@ static void push_open(Parser* ps, E4XNode* elem, const Avm2String* raw)
 		const Avm2String** nr = avm2_alloc(ps->ctx, ncap * sizeof(Avm2String*));
 		memcpy(no, ps->open, ps->open_count * sizeof(E4XNode*));
 		memcpy(nr, ps->open_raw, ps->open_count * sizeof(Avm2String*));
+		if (ps->open != NULL) heap_free(ps->ctx->app, ps->open);
+		if (ps->open_raw != NULL) heap_free(ps->ctx->app, (void*) ps->open_raw);
 		ps->open = no;
 		ps->open_raw = nr;
 		ps->open_cap = ncap;
@@ -2307,6 +2311,15 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
 		err_1085(&ps, ps.open_raw[ps.open_count - 1]);
 	}
 
+	// The open-element stack is parse scratch; the top-level array is the
+	// caller's to free (avm2_e4x_parse_free).
+	if (ps.open != NULL) heap_free(ctx->app, ps.open);
+	if (ps.open_raw != NULL) heap_free(ctx->app, (void*) ps.open_raw);
 	*out_count = ps.top_count;
 	return ps.top;
+}
+
+void avm2_e4x_parse_free(Avm2Context* ctx, E4XNode** nodes)
+{
+	if (nodes != NULL) heap_free(ctx->app, nodes);
 }

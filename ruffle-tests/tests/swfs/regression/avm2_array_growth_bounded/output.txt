@@ -1,0 +1,5 @@
+start
+tick 40 sum=3575520 keep=4000 first=1000 last=40099
+tick 80 sum=7151040 keep=8000 first=1000 last=80099
+tick 120 sum=10726560 keep=12000 first=1000 last=120099
+done

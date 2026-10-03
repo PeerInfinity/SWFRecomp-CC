@@ -1,0 +1,13 @@
+start
+replacer rethrows same: true
+toJSON rethrows same: true
+reviver rethrows same: true
+cycle: 1129
+syntax: 1132
+syntax2: 1132
+long string: 4000
+tick 40 check=42000 len=2948
+tick 80 check=84000 len=2948
+tick 120 check=126000 len=2948
+sample=58.5 -39 é中😀
+done

@@ -4525,6 +4525,13 @@ def main():
                 run_env["SWF_BRIDGE_CONFIG"] = str(sbn_cfg)
             # socket.json replay: argv slot 1 already belongs to the input
             # event file, so the socket script travels by env var instead.
+            # test_env.json ({"NAME": "value", ...}): per-test runtime env —
+            # e.g. the regression suite's memory-bounded tests set SWF_HEAP_MB
+            # so a per-call leak exhausts a small arena instead of passing.
+            test_env = test_dir / "test_env.json"
+            if test_env.exists():
+                run_env.update({str(k): str(v) for k, v in
+                                json.loads(test_env.read_text()).items()})
             socket_json = test_dir / "socket.json"
             if socket_json.exists():
                 socket_script = build_dir / "socket_script.txt"

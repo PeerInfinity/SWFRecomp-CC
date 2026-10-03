@@ -1321,11 +1321,14 @@ static E4XNode* xml_init_node(Avm2Context* ctx, Avm2Value value)
 	                                 st->ignore_white, &n);
 	if (n == 0)
 	{
+		avm2_e4x_parse_free(ctx, nodes);
 		return avm2_e4x_text(ctx, avm2_string_from_literal(ctx, ""), NULL);
 	}
 	if (n == 1)
 	{
-		return nodes[0];
+		E4XNode* only = nodes[0];
+		avm2_e4x_parse_free(ctx, nodes);
+		return only;
 	}
 	// Multiple top-level nodes: skip cdata/comments/PIs; whitespace-only
 	// text allowed; exactly one element.
@@ -1358,6 +1361,7 @@ static E4XNode* xml_init_node(Avm2Context* ctx, Avm2Value value)
 		element = NULL;
 		break;
 	}
+	avm2_e4x_parse_free(ctx, nodes);
 	if (element == NULL)
 	{
 		avm2_throw_error(ctx, ctx->builtins.type_error_class,
@@ -1423,6 +1427,7 @@ static Avm2Value xmllist_construct(Avm2Context* ctx, Avm2Class* cls,
 	{
 		avm2_xmllist_push(ctx, le, nodes[i]);
 	}
+	avm2_e4x_parse_free(ctx, nodes);
 	return avm2_object_value(obj);
 }
 
@@ -1608,25 +1613,34 @@ static Avm2Value n_xml_namespace(Avm2Activation* act)
 	E4XNode* node = this_xml_node(act);
 	E4XNamespace* in_scope;
 	uint32_t n = avm2_e4x_in_scope_namespaces(ctx, node, &in_scope);
+	Avm2Value out = avm2_undefined();
 	if (act->argc == 0)
 	{
 		if (node->kind != E4X_ELEMENT && node->kind != E4X_ATTRIBUTE)
 		{
-			return avm2_null();
+			out = avm2_null();
 		}
-		E4XNamespace ns = avm2_e4x_get_namespace(ctx, node, in_scope, n);
-		return avm2_object_value(ns_to_object(ctx, &ns));
+		else
+		{
+			E4XNamespace ns = avm2_e4x_get_namespace(ctx, node, in_scope, n);
+			out = avm2_object_value(ns_to_object(ctx, &ns));
+		}
+		heap_free(ctx->app, in_scope);
+		return out;
 	}
+	// (the coercion can run AS3 and throw: leaks only the scratch list)
 	const Avm2String* prefix = avm2_coerce_to_string(ctx, act->args[0]);
 	for (uint32_t i = 0; i < n; i++)
 	{
 		if (in_scope[i].prefix != NULL && in_scope[i].prefix->len == prefix->len
 		    && memcmp(in_scope[i].prefix->utf8, prefix->utf8, prefix->len) == 0)
 		{
-			return avm2_object_value(ns_to_object(ctx, &in_scope[i]));
+			out = avm2_object_value(ns_to_object(ctx, &in_scope[i]));
+			break;
 		}
 	}
-	return avm2_undefined();
+	heap_free(ctx->app, in_scope);
+	return out;
 }
 
 // Coerce an argument to a Namespace ext ({uri, prefix}).
@@ -1700,6 +1714,7 @@ static void remove_namespace_rec(Avm2Context* ctx, E4XNode* node,
 	E4XNamespace* in_scope;
 	uint32_t n = avm2_e4x_in_scope_namespaces(ctx, node, &in_scope);
 	E4XNamespace own = avm2_e4x_get_namespace(ctx, node, in_scope, n);
+	heap_free(ctx->app, in_scope);
 	int ns_prefix_none = (ns->prefix == NULL);
 	// The node's own namespace is never removed.
 	int own_matches = ns_prefix_none
@@ -1790,6 +1805,8 @@ static Avm2Value n_xml_namespace_declarations(Avm2Activation* act)
 			avm2_array_push(ctx, arr, avm2_object_value(ns_to_object(ctx, &own[i])));
 		}
 	}
+	if (anc != NULL) heap_free(ctx->app, anc);
+	heap_free(ctx->app, own);
 	return avm2_object_value(arr);
 }
 
@@ -1804,6 +1821,7 @@ static Avm2Value n_xml_in_scope_namespaces(Avm2Activation* act)
 	{
 		avm2_array_push(ctx, arr, avm2_object_value(ns_to_object(ctx, &in_scope[i])));
 	}
+	heap_free(ctx->app, in_scope);
 	if (n == 0)
 	{
 		// avmplus: never an empty array — push the default namespace.
@@ -3337,7 +3355,9 @@ static const Avm2String* xn_escape(Avm2Context* ctx, const Avm2String* s)
 			out[n++] = c;
 		}
 	}
-	return avm2_string_new(ctx, out, n);
+	const Avm2String* r = avm2_string_new(ctx, out, n);  // copies
+	heap_free(ctx->app, out);
+	return r;
 }
 
 static const Avm2String* xmlnode_to_string(Avm2Context* ctx, Avm2Value node)
@@ -3491,6 +3511,7 @@ static Avm2Value xmldoc_convert(Avm2Context* ctx, E4XNode* node)
 				E4XNamespace* in_scope;
 				uint32_t n = avm2_e4x_in_scope_namespaces(ctx, node, &in_scope);
 				E4XNamespace ns = avm2_e4x_get_namespace(ctx, node, in_scope, n);
+				heap_free(ctx->app, in_scope);
 				if (ns.prefix != NULL && ns.prefix->len > 0)
 				{
 					nm = avm2_string_concat(ctx, ns.prefix,
@@ -3590,6 +3611,7 @@ static void xmldocument_parse(Avm2Context* ctx, Avm2Value this_val,
 			               xmldoc_convert(ctx, nodes[i]->children[j]));
 		}
 	}
+	avm2_e4x_parse_free(ctx, nodes);
 }
 
 static Avm2Value n_xdoc_parse_xml(Avm2Activation* act)

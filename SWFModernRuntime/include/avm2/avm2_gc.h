@@ -55,9 +55,9 @@ void avm2_gc_enroll_string(Avm2String* s);
 //  - a static pool string / literal: no-op.
 // Only valid during a collection (the range lookup uses the per-cycle
 // census snapshot; outside a cycle both calls are safe no-ops).
-// Strings stored into immortal NON-census structures need a root marker
-// that re-marks them each cycle (the E4X all-nodes registry pattern,
-// avm2_gc_mark_roots_e4x) — there is no pin API for strings.
+// Strings stored into NON-census structures need a marker that re-marks them
+// each cycle (a root marker, or an ext tracer — the E4X node tree is marked
+// from its wrappers, avm2_e4x_gc_mark_node) — there is no pin API for strings.
 void avm2_gc_mark_string(const Avm2String* s);
 
 // Mark the census string whose allocation contains `p` (interior-pointer
@@ -117,9 +117,6 @@ void avm2_gc_mark_roots_media(Avm2Context* ctx);
 void avm2_gc_mark_roots_net(Avm2Context* ctx);
 void avm2_gc_mark_roots_globals(Avm2Context* ctx);
 void avm2_gc_mark_roots_external(Avm2Context* ctx);
-// E4X all-nodes registry: nodes are immortal non-census allocations whose
-// local/text/namespace string fields must stay live (avm2_e4x.c).
-void avm2_gc_mark_roots_e4x(Avm2Context* ctx);
 
 // Weak-registry prune (avm2_display.c): the orphan list holds WEAK references
 // (Ruffle OrphanManager stores DisplayObjectWeak — an otherwise-unreachable

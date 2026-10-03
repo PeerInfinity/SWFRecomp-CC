@@ -1,0 +1,18 @@
+start
+tick 1 total=590 rooms=12 firstRoomTiles=12
+  identity=true true leafParent=r2 leafRoot=true attrs=r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11 theme=cave note=room 0 of level 7 appended=<e>one</e> parent=holder
+  orphanLeaf=<tile x="2" y="4" kind="floor" xmlns:g="urn:game">t2</tile> room=r4 level=L3 sibling=floor
+detached: rooms=11 firstRoom.parent=undefined
+tick 40 total=23910 rooms=12 firstRoomTiles=13
+  identity=true true leafParent=r2 leafRoot=true attrs=r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11 theme=cave note=room 0 of level 7 appended=<e>one</e>
+<e>two</e> parent=holder
+  orphanLeaf=<tile x="2" y="4" kind="floor" xmlns:g="urn:game">t2</tile> room=r4 level=L3 sibling=floor
+tick 80 total=47910 rooms=12 firstRoomTiles=13
+  identity=true true leafParent=r2 leafRoot=true attrs=r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11 theme=cave note=room 0 of level 7 appended=<e>one</e>
+<e>two</e> parent=holder
+  orphanLeaf=<tile x="2" y="4" kind="floor" xmlns:g="urn:game">t2</tile> room=r4 level=L3 sibling=floor
+tick 120 total=72120 rooms=12 firstRoomTiles=13
+  identity=true true leafParent=r2 leafRoot=true attrs=r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11 theme=cave note=room 0 of level 7 appended=<e>one</e>
+<e>two</e> parent=holder
+  orphanLeaf=<tile x="2" y="4" kind="floor" xmlns:g="urn:game">t2</tile> room=r4 level=L3 sibling=floor
+done

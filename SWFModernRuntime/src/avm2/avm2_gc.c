@@ -979,8 +979,6 @@ static void gc_collect(Avm2Context* ctx)
 	avm2_gc_mark_roots_net(ctx);
 	g_why_parent = NULL; WHY_SET("root:external", 0);
 	avm2_gc_mark_roots_external(ctx);
-	g_why_parent = NULL; WHY_SET("root:e4x", 0);
-	avm2_gc_mark_roots_e4x(ctx);
 	// Flixel quadtree intrinsic: the AS3 `protected static _o / _oc` live as C
 	// globals and hold object refs across the tick boundary, as they did in AS3.
 	g_why_parent = NULL; WHY_SET("root:flixel", 0);
@@ -1098,10 +1096,11 @@ static void gc_collect(Avm2Context* ctx)
 
 	if (g_gc_verbose)
 	{
-		fprintf(stderr, "[avm2-gc] #%u live=%u swept=%u strings live=%u swept=%u (total alloc %.1f MB)\n",
+		fprintf(stderr, "[avm2-gc] #%u live=%u swept=%u strings live=%u swept=%u (total alloc %.1f MB, heap %.2f MB)\n",
 		        g_gc_collections, g_gc_live_objects, swept,
 		        g_gc_live_strings, str_swept,
-		        (double) g_gc_total_alloc_bytes / (1024.0 * 1024.0));
+		        (double) g_gc_total_alloc_bytes / (1024.0 * 1024.0),
+		        (double) heap_allocated_bytes(ctx->app) / (1024.0 * 1024.0));
 		if (e4x_freed > 0) fprintf(stderr, "[avm2-gc-e4x] #%u nodes swept=%u\n", g_gc_collections, e4x_freed);
 	}
 }

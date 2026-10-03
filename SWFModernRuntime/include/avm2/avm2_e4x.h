@@ -13,8 +13,8 @@
 //                conversions, settings statics, and the property-engine
 //                entry points called from avm2_ops.c.
 //
-// GC: like all AVM2 allocations, E4X nodes are census-invisible/immortal
-// (allocated via avm2_alloc).
+// GC: E4X nodes are non-census allocations (avm2_alloc) with their own
+// collector — see E4XNode.gc_all_next.
 
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
@@ -133,9 +133,12 @@ E4XNode* avm2_e4x_deep_copy(Avm2Context* ctx, const E4XNode* node);
 
 // Parse per the current XML settings flags. Returns the top-level node
 // list (count in *out_count); throws typed parse errors (1085/1088/...).
+// The array is scratch: release it with avm2_e4x_parse_free (the nodes are
+// owned by the E4X collector, not by the array).
 E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
                          int ignore_comments, int ignore_pi, int ignore_white,
                          uint32_t* out_count);
+void avm2_e4x_parse_free(Avm2Context* ctx, E4XNode** nodes);
 
 // Serialization.
 const Avm2String* avm2_e4x_to_xml_string(Avm2Context* ctx, const E4XNode* node);
@@ -164,7 +167,7 @@ int avm2_e4x_child_index(const E4XNode* node);  // -1 for attribute/detached
 
 // Namespace machinery.
 uint32_t avm2_e4x_in_scope_namespaces(Avm2Context* ctx, const E4XNode* node,
-                                      E4XNamespace** out);  // allocates
+                                      E4XNamespace** out);  // allocates; caller heap_frees *out
 E4XNamespace avm2_e4x_get_namespace(Avm2Context* ctx, const E4XNode* node,
                                     const E4XNamespace* in_scope, uint32_t n);
 void avm2_e4x_add_in_scope_namespace(Avm2Context* ctx, E4XNode* elem,

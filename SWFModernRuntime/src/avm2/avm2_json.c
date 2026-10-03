@@ -199,7 +199,16 @@ static int jp_hex(char c)
 // UTF-8; NULL on error.
 static const char* jp_string(JParser* p, uint32_t* out_len)
 {
-	char* out = jscratch_alloc(p->scratch, p->len - p->i + 4);
+	// Size the scratch to THIS string's raw span (up to the closing quote; a
+	// decoded body is never longer than its escaped source), not to the rest
+	// of the input — that made a parse quadratic in transient memory.
+	uint32_t end = p->i;
+	while (end < p->len && p->s[end] != '"')
+	{
+		end += (p->s[end] == '\\') ? 2 : 1;
+	}
+	if (end > p->len) end = p->len;
+	char* out = jscratch_alloc(p->scratch, end - p->i + 4);
 	uint32_t n = 0;
 	while (p->i < p->len)
 	{

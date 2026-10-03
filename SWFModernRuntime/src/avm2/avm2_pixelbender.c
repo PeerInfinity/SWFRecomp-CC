@@ -58,6 +58,7 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_value.h>
+#include <memory/heap.h>
 
 // ---------------------------------------------------------------------------
 // PBJ data model (parser.rs PixelBenderShader et al.)
@@ -2055,6 +2056,7 @@ static Avm2Value sj_start(Avm2Activation* act)
 						avm2_number((double) pixels[(size_t) i * 4 + k]);
 				}
 			}
+			if (target_vec->elems != NULL) heap_free(ctx->app, target_vec->elems);  // sole owner (see vec_reserve)
 			target_vec->elems = elems;
 			target_vec->length = nfloat;
 			target_vec->cap = nfloat ? nfloat : 1;
