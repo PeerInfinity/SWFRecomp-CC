@@ -6,6 +6,7 @@
 // settings, and the numbered FP parse errors (1085/1088/1090/...).
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <avm2/avm2_class.h>
@@ -16,8 +17,9 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
+#include <memory/heap.h>
 
-// All E4X nodes ever created (immortal; see avm2_gc_mark_roots_e4x).
+// Every live E4X node (the collector's registry; see E4XNode.gc_all_next).
 static E4XNode* g_e4x_all_nodes = NULL;
 
 // ---------------------------------------------------------------------------
@@ -112,33 +114,112 @@ E4XNode* avm2_e4x_node_new(Avm2Context* ctx, uint8_t kind, E4XNode* parent)
 	return n;
 }
 
-// GC root marker: mark every string reachable from any E4X node. Nodes are
-// immortal non-census allocations mutated by raw field assignments all over
-// e4x/xml code, so instead of pinning at ~20 store sites (and every future
-// one), walk the registry each cycle and mark the CURRENT field values.
+// --- collector ---------------------------------------------------------------
+//
+// Nodes used to be immortal (every node a root, every wrapper pinned), which
+// retained every XML document a game ever parsed — Seedling re-parses its room
+// XML on each world swap and ran out of arena after ~170 swaps. Now a node
+// lives while a wrapper reaches its tree. A wrapper reaching ANY node keeps
+// the whole connected tree (parent/children/attributes edges in both
+// directions), matching what AS3 can still navigate to (parent(), children()).
+// Marking runs inside the ordinary mark drain (avm2_xml_gc_trace_ext), so it
+// may mark wrapper objects; the sweep runs once the drain is complete.
+
+static uint32_t g_e4x_epoch = 1;
+static E4XNode** g_e4x_stack = NULL;
+static uint32_t g_e4x_stack_n = 0, g_e4x_stack_cap = 0;
+static int g_e4x_mark_failed = 0;
+
+void avm2_e4x_gc_begin(void)
+{
+	g_e4x_epoch++;
+	if (g_e4x_epoch == 0) g_e4x_epoch = 1;  // 0 = never marked (node_new)
+	g_e4x_mark_failed = 0;
+}
+
+static void e4x_stack_push(E4XNode* n)
+{
+	if (n == NULL || n->gc_mark == g_e4x_epoch) return;
+	if (g_e4x_stack_n == g_e4x_stack_cap)
+	{
+		uint32_t nc = g_e4x_stack_cap == 0 ? 1024 : g_e4x_stack_cap * 2;
+		E4XNode** grown = realloc(g_e4x_stack, nc * sizeof(E4XNode*));
+		if (grown == NULL)
+		{
+			// Cannot finish this mark: the node sweep is skipped this cycle
+			// (over-retain, never free a reachable node).
+			g_e4x_mark_failed = 1;
+			return;
+		}
+		g_e4x_stack = grown;
+		g_e4x_stack_cap = nc;
+	}
+	g_e4x_stack[g_e4x_stack_n++] = n;
+}
+
+static void e4x_mark_ns(const E4XNamespace* ns)
+{
+	avm2_gc_mark_string(ns->uri);
+	avm2_gc_mark_string(ns->prefix);
+}
+
+void avm2_e4x_gc_mark_node(E4XNode* root)
+{
+	e4x_stack_push(root);
+	while (g_e4x_stack_n > 0)
+	{
+		E4XNode* n = g_e4x_stack[--g_e4x_stack_n];
+		if (n->gc_mark == g_e4x_epoch) continue;
+		n->gc_mark = g_e4x_epoch;
+		avm2_gc_mark_string(n->local);
+		avm2_gc_mark_string(n->text);
+		if (n->has_ns) e4x_mark_ns(&n->ns);
+		for (uint32_t i = 0; i < n->ns_count; i++) e4x_mark_ns(&n->namespaces[i]);
+		// Object edges held only by the node: the cached wrapper (so a
+		// node's identity — a.x[0] === a.x[0] — survives while it lives)
+		// and the setNotification closure.
+		avm2_gc_mark_object(n->obj);
+		avm2_gc_mark_object(n->notify);
+		e4x_stack_push(n->parent);
+		for (uint32_t i = 0; i < n->child_count; i++) e4x_stack_push(n->children[i]);
+		for (uint32_t i = 0; i < n->attr_count; i++) e4x_stack_push(n->attributes[i]);
+	}
+}
+
+uint32_t avm2_e4x_gc_sweep_nodes(Avm2Context* ctx)
+{
+	if (g_e4x_mark_failed) return 0;
+	uint32_t freed = 0;
+	E4XNode** link = &g_e4x_all_nodes;
+	for (E4XNode* n = g_e4x_all_nodes; n != NULL; )
+	{
+		E4XNode* next = n->gc_all_next;
+		if (n->gc_mark == g_e4x_epoch)
+		{
+			link = &n->gc_all_next;
+			n = next;
+			continue;
+		}
+		// Unreached: no wrapper reaches its tree, and its own wrapper (n->obj)
+		// was not marked either (a marked wrapper marks its node), so it dies
+		// in this cycle's object sweep and never reads n again.
+		*link = next;
+		if (n->children != NULL) heap_free(ctx->app, n->children);
+		if (n->attributes != NULL) heap_free(ctx->app, n->attributes);
+		if (n->namespaces != NULL) heap_free(ctx->app, n->namespaces);
+		heap_free(ctx->app, n);
+		freed++;
+		n = next;
+	}
+	return freed;
+}
+
+// GC root marker: E4X nodes are not roots — they live while a wrapper reaches
+// them (avm2_xml_gc_trace_ext → avm2_e4x_gc_mark_node; gc_collect opens the
+// node epoch with avm2_e4x_gc_begin before anything is marked).
 void avm2_gc_mark_roots_e4x(Avm2Context* ctx)
 {
 	(void) ctx;
-	for (E4XNode* n = g_e4x_all_nodes; n != NULL; n = n->gc_all_next)
-	{
-		avm2_gc_mark_string(n->local);
-		avm2_gc_mark_string(n->text);
-		if (n->has_ns)
-		{
-			avm2_gc_mark_string(n->ns.uri);
-			avm2_gc_mark_string(n->ns.prefix);
-		}
-		for (uint32_t i = 0; i < n->ns_count; i++)
-		{
-			avm2_gc_mark_string(n->namespaces[i].uri);
-			avm2_gc_mark_string(n->namespaces[i].prefix);
-		}
-		// Object edges held only by the immortal node: the cached wrapper
-		// (also pinned at creation — defense) and the setNotification
-		// callback closure (otherwise invisible to the collector).
-		avm2_gc_mark_object(n->obj);
-		avm2_gc_mark_object(n->notify);
-	}
 }
 
 E4XNode* avm2_e4x_text(Avm2Context* ctx, const Avm2String* s, E4XNode* parent)
@@ -183,6 +264,7 @@ static void node_push_child(Avm2Context* ctx, E4XNode* elem, E4XNode* child)
 		uint32_t ncap = elem->child_cap ? elem->child_cap * 2 : 4;
 		E4XNode** np = avm2_alloc(ctx, ncap * sizeof(E4XNode*));
 		memcpy(np, elem->children, elem->child_count * sizeof(E4XNode*));
+		if (elem->children != NULL) heap_free(ctx->app, elem->children);  // node-owned
 		elem->children = np;
 		elem->child_cap = ncap;
 	}
@@ -196,6 +278,7 @@ void avm2_e4x_append_attribute(Avm2Context* ctx, E4XNode* elem, E4XNode* attr)
 		uint32_t ncap = elem->attr_cap ? elem->attr_cap * 2 : 4;
 		E4XNode** np = avm2_alloc(ctx, ncap * sizeof(E4XNode*));
 		memcpy(np, elem->attributes, elem->attr_count * sizeof(E4XNode*));
+		if (elem->attributes != NULL) heap_free(ctx->app, elem->attributes);  // node-owned
 		elem->attributes = np;
 		elem->attr_cap = ncap;
 	}
@@ -210,6 +293,7 @@ static void node_push_ns(Avm2Context* ctx, E4XNode* elem, E4XNamespace ns)
 		uint32_t ncap = elem->ns_cap ? elem->ns_cap * 2 : 2;
 		E4XNamespace* np = avm2_alloc(ctx, ncap * sizeof(E4XNamespace));
 		memcpy(np, elem->namespaces, elem->ns_count * sizeof(E4XNamespace));
+		if (elem->namespaces != NULL) heap_free(ctx->app, elem->namespaces);  // node-owned
 		elem->namespaces = np;
 		elem->ns_cap = ncap;
 	}

@@ -13,6 +13,7 @@
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_gc.h>
+#include <memory/heap.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_ops.h>
 
@@ -66,13 +67,44 @@ static Avm2Object* alloc_instance(Avm2Context* ctx, Avm2Class* cls, uint32_t ext
 	obj->native_ext = avm2_alloc(ctx, ext_size);
 	memset(obj->native_ext, 0, ext_size);
 	obj->native_ext_size = ext_size;  // GC conservative-scan span
-	// GC (Stage 11): XML/XMLList wrappers cache themselves in the (immortal,
-	// non-census) E4X node tree (node->obj); a collected wrapper would dangle
-	// that cache. The E4X tree is also the only path to child-element
-	// wrappers, which the conservative scan cannot follow. Pin the wrapper —
-	// XML is not on the Seedling hot path, so the over-retention is bounded.
-	avm2_gc_pin(obj);
+	// GC: not pinned. A wrapper keeps its node tree alive and a live node keeps
+	// its cached wrapper (node->obj) alive — avm2_xml_gc_trace_ext and
+	// avm2_e4x_gc_mark_node — so the node->obj cache can never dangle. (It was
+	// pinned while E4X nodes were immortal; that retained every parsed
+	// document: Seedling's per-swap room XML, ~2.7 MB a swap.)
 	return obj;
+}
+
+// GC ext tracer: an XML wrapper reaches its node's whole tree; an XMLList
+// reaches each item's tree, its target object and its target name strings.
+void avm2_xml_gc_trace_ext(Avm2Object* o)
+{
+	Avm2Context* ctx = avm2_get_context();
+	if (o->cls == ctx->builtins.xml_class)
+	{
+		Avm2XmlExt* xe = (Avm2XmlExt*) o->native_ext;
+		avm2_e4x_gc_mark_node(xe->node);
+	}
+	else if (o->cls == ctx->builtins.xml_list_class)
+	{
+		Avm2XmlListExt* le = (Avm2XmlListExt*) o->native_ext;
+		for (uint32_t i = 0; i < le->count; i++) avm2_e4x_gc_mark_node(le->items[i]);
+		avm2_gc_mark_object(le->target_object);
+		if (le->has_target_prop)
+		{
+			avm2_gc_mark_string(le->target_prop.local);
+			avm2_gc_mark_string(le->target_prop.single_uri);
+		}
+	}
+}
+
+// GC free hook: the XMLList item array is a separate allocation the list owns.
+void avm2_xml_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
+{
+	if (o->cls != ctx->builtins.xml_list_class) return;
+	Avm2XmlListExt* le = (Avm2XmlListExt*) o->native_ext;
+	if (le->items != NULL) heap_free(ctx->app, le->items);
+	le->items = NULL;
 }
 
 Avm2Object* avm2_xml_object_for_node(Avm2Context* ctx, E4XNode* node)
@@ -106,6 +138,7 @@ void avm2_xmllist_push(Avm2Context* ctx, Avm2XmlListExt* list, E4XNode* node)
 		uint32_t ncap = list->cap ? list->cap * 2 : 4;
 		E4XNode** ni = avm2_alloc(ctx, ncap * sizeof(E4XNode*));
 		memcpy(ni, list->items, list->count * sizeof(E4XNode*));
+		if (list->items != NULL) heap_free(ctx->app, list->items);  // list-owned
 		list->items = ni;
 		list->cap = ncap;
 	}

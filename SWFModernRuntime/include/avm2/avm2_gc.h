@@ -136,6 +136,7 @@ void avm2_display_gc_prune_dead_orphans(void);
 void avm2_events_gc_trace_ext(Avm2Object* o);
 void avm2_display_gc_trace_ext(Avm2Object* o);
 void avm2_text_gc_trace_ext(Avm2Object* o);
+void avm2_xml_gc_trace_ext(Avm2Object* o);
 
 // Per-module ext-FREE hooks: when the collector sweeps an ext-bearing object,
 // its native_ext blob owns further heap allocations (BitmapData pixel buffer,
@@ -151,6 +152,7 @@ void avm2_bytearray_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 void avm2_display_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 void avm2_events_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 void avm2_text_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
+void avm2_xml_gc_free_ext(Avm2Context* ctx, Avm2Object* o);
 // Stage3D (tranche S3): back/front/depth buffers, retained vertex and index
 // buffer words, retained AGAL bytecode.
 void avm2_stage3d_gc_free_ext(Avm2Context* ctx, Avm2Object* o);

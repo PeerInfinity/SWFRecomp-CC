@@ -12,6 +12,7 @@
 
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
+#include <avm2/avm2_e4x.h>
 #include <avm2/avm2_flixel.h>
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
@@ -572,6 +573,8 @@ static void trace_object(Avm2Object* o)
 		avm2_display_gc_trace_ext(o);
 		WHY_SET("ext:text", 0);
 		avm2_text_gc_trace_ext(o);
+		WHY_SET("ext:xml", 0);
+		avm2_xml_gc_trace_ext(o);
 		// Flixel quadtree intrinsic: the FlxList object edges hang off arena
 		// chunks the conservative blob scan cannot follow into.
 		WHY_SET("ext:flixel", 0);
@@ -662,6 +665,7 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
 		avm2_display_gc_free_ext(ctx, o);
 		avm2_events_gc_free_ext(ctx, o);
 		avm2_text_gc_free_ext(ctx, o);
+		avm2_xml_gc_free_ext(ctx, o);
 		avm2_flixel_gc_free_ext(ctx, o);
 		avm2_stage3d_gc_free_ext(ctx, o);
 		heap_free(app, o->native_ext);
@@ -919,6 +923,8 @@ static void gc_collect(Avm2Context* ctx)
 		if (g_why_tab) memset(g_why_tab, 0, g_why_cap * sizeof(WhyEntry));
 		g_why_used = 0;
 	}
+	// E4X nodes: open this cycle's node epoch before anything can mark one.
+	avm2_e4x_gc_begin();
 	g_why_parent = NULL;
 	WHY_SET("root:pinned", 0);
 	for (uint32_t i = 0; i < g_pinned_count; i++) avm2_gc_mark_object(g_pinned[i]);
@@ -1006,6 +1012,10 @@ static void gc_collect(Avm2Context* ctx)
 	// avm2_display_gc_prune_dead_orphans). Runs only on a completed mark.
 	avm2_display_gc_prune_dead_orphans();
 
+	// E4X nodes no wrapper reached die now (their wrappers die in the object
+	// sweep below and never read them). Only on a completed mark.
+	uint32_t e4x_freed = avm2_e4x_gc_sweep_nodes(ctx);
+
 	// Sweep: free every unmarked (white) census object. Marking is atomic
 	// between ticks, but the sweep is resumable — see gc_sweep_slice.
 	g_sweeping = 1;
@@ -1092,6 +1102,7 @@ static void gc_collect(Avm2Context* ctx)
 		        g_gc_collections, g_gc_live_objects, swept,
 		        g_gc_live_strings, str_swept,
 		        (double) g_gc_total_alloc_bytes / (1024.0 * 1024.0));
+		if (e4x_freed > 0) fprintf(stderr, "[avm2-gc-e4x] #%u nodes swept=%u\n", g_gc_collections, e4x_freed);
 	}
 }
 

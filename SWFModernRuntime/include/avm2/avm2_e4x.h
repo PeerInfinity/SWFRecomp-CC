@@ -67,12 +67,21 @@ struct E4XNode
 	Avm2Object* obj;
 	// setNotification callback (undocumented; xml_notification_bubbling).
 	Avm2Object* notify;
-	// GC: all-nodes registry link (avm2_e4x_node_new). E4X nodes are immortal
-	// non-census allocations, so the string GC walks EVERY node as a root each
-	// cycle, marking whatever local/text/ns strings its fields hold RIGHT NOW —
-	// robust against raw field assignments anywhere in e4x/xml code.
+	// GC: all-nodes registry link (avm2_e4x_node_new). Nodes are non-census
+	// allocations owned by the E4X collector: a node is live while any XML /
+	// XMLList wrapper reaches its tree (avm2_xml_gc_trace_ext marks the whole
+	// connected tree — parent, children, attributes — plus each node's strings,
+	// cached wrapper and notify closure); avm2_e4x_gc_sweep_nodes frees the
+	// rest. Marking reads the CURRENT field values, so raw field assignments
+	// anywhere in e4x/xml code stay safe.
 	E4XNode* gc_all_next;
+	uint32_t gc_mark;  // == the collector's node epoch when reached this cycle
 };
+
+// GC (avm2_gc.c drives these; see E4XNode.gc_all_next).
+void avm2_e4x_gc_begin(void);
+void avm2_e4x_gc_mark_node(E4XNode* n);
+uint32_t avm2_e4x_gc_sweep_nodes(Avm2Context* ctx);
 
 // ---------------------------------------------------------------------------
 // Query names (Ruffle Multiname as E4X sees it, post handle_input_multiname)
