@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-09-28T23:17:24.891019+00:00",
-    "git_sha": "0341c033aff45db4b36d6a72036b890dbe14d8ab",
-    "duration_seconds": 50.57,
+    "timestamp": "2026-09-29T03:41:00.147008+00:00",
+    "git_sha": "02df69d28006ea9571a0a76bdb1d59f35368aa8c",
+    "duration_seconds": 45.79,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "avm1_imports_avm1",
       "phases": {
         "recomp": 0.007,
-        "compile": 2.836,
-        "run": 0.315
+        "compile": 3.939,
+        "run": 0.415
       },
       "num_frames": 1,
       "lines": {
@@ -29,7 +29,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 3.27,
+      "duration": 4.53,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -38,7 +38,30 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 191,
+            "diff_channels": 2506,
+            "mean_diff": 0.159,
+            "checks": [
+              {
+                "tolerance": 100,
+                "max_outliers": 500,
+                "outliers": 459,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 459,
+            "max_outliers": 500,
+            "tolerance": 100,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -46,9 +69,9 @@
     {
       "test": "avm1_non_swf_import",
       "phases": {
-        "recomp": 0.006,
-        "compile": 23.985,
-        "run": 0.265
+        "recomp": 0.005,
+        "compile": 18.264,
+        "run": 0.215
       },
       "num_frames": 4,
       "lines": {
@@ -56,14 +79,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 24.26,
+      "duration": 18.49,
       "status": "pass"
     },
     {
       "test": "empty_url",
       "phases": {
         "recomp": 0.005,
-        "compile": 22.602,
+        "compile": 22.34,
         "run": 0.265
       },
       "num_frames": 2,
@@ -72,7 +95,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 22.88,
+      "duration": 22.62,
       "status": "pass"
     }
   ]

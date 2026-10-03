@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-09-29 03:41 UTC
+**Date**: 2026-10-03 17:23 UTC
 
-**Git SHA**: `02df69d280`
+**Git SHA**: `c6be20a884`
 
-**Run Duration**: 5m 56s
+**Run Duration**: 5m 24s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -33,17 +33,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.9s |  |
-| 2 | `edittext_test1` | 47 | 17.7s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 21.9s |  |
-| 4 | `hello` | 4 | 1.9s |  |
-| 5 | `mouse_drag_test` | 12 | 22.8s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 18.1s |  |
-| 7 | `opcode_guard_test2` | 24 | 22.9s |  |
-| 8 | `soft_reference_test1` | 45 | 22.9s |  |
-| 9 | `stackscope` | 11 | 22.0s |  |
-| 10 | `submoviegetvar` | 4 | 24.1s |  |
-| 11 | `swf4opcode` | 117 | 24.0s |  |
+| 1 | `button_test1` | 31 | 2.5s |  |
+| 2 | `edittext_test1` | 47 | 18.3s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 23.0s |  |
+| 4 | `hello` | 4 | 2.3s |  |
+| 5 | `mouse_drag_test` | 12 | 16.9s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 23.2s |  |
+| 7 | `opcode_guard_test2` | 24 | 19.4s |  |
+| 8 | `soft_reference_test1` | 45 | 19.1s |  |
+| 9 | `stackscope` | 11 | 17.6s |  |
+| 10 | `submoviegetvar` | 4 | 15.7s |  |
+| 11 | `swf4opcode` | 117 | 3.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 19.5s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 18.8s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.2s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 17.6s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 23.5s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 22.6s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 24.1s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.1s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 23.8s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 22.5s |  |
 
 ## Near-Passing Tests
 
