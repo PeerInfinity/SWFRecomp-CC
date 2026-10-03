@@ -1,20 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `0341c033aff4` (2026-09-28T23:17:24.814568+00:00)
-**Current:** `02df69d28006` (2026-09-29T03:41:00.067590+00:00)
+**Previous:** `02df69d28006` (2026-09-29T03:41:00.067590+00:00)
+**Current:** `c6be20a88416` (2026-10-03T17:23:20.573671+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 1222 | 1222 | 0 |
-| Total | 1280 | 1280 | 0 |
-| Pass rate | 95.5% | 95.5% | 0% |
-| Mismatched lines | 2660 | 2541 | -119 |
-|   Decreased | | | -119 |
+| Total | 1280 | 1283 | +3 |
+| Pass rate | 95.5% | 95.2% | -0.3% |
+| Mismatched lines | 2541 | 2644 | +103 |
 
-## Status Changed (1)
+## Added Tests (3)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `gradient_values_readback` | output_mismatch | ruffle_matched | 81/212 | 200/212 |
+| Test | Status | Lines |
+|------|--------|-------|
+| `goto_queued_invalid/swf10` | output_mismatch | 2/34 |
+| `goto_queued_invalid/swf11` | output_mismatch | 2/43 |
+| `goto_queued_invalid/swf9` | output_mismatch | 2/32 |
