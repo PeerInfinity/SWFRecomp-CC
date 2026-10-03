@@ -72,6 +72,37 @@ static int g_gc_time = 0;                 // AVM2_GC_TIME=1: per-collect phase t
 static uint32_t g_gc_collections = 0;
 static uint64_t g_gc_swept_total = 0;
 
+// --- retention diagnosis (AVM2_GC_WHY=<class-name substring>) ---------------
+// Records, during the ordinary mark, the FIRST marker of every object (its
+// parent object + the edge kind), then after the drain prints the path to a
+// root for each live instance whose class qname contains the target. Off (and
+// free) unless the env var is set; never changes what is marked.
+static const char* g_why_target = NULL;
+static int g_hist_on = 0;
+static Avm2Object* g_why_parent = NULL;
+static const char* g_why_edge = NULL;
+static uint32_t g_why_idx = 0;
+typedef struct WhyEntry { Avm2Object* obj; Avm2Object* parent; const char* edge; uint32_t idx; } WhyEntry;
+static WhyEntry* g_why_tab = NULL;
+static uint32_t g_why_cap = 0;   // power of two
+static uint32_t g_why_used = 0;
+#define WHY_SET(e, i) do { g_why_edge = (e); g_why_idx = (i); } while (0)
+static uint32_t why_hash(const void* p) { uintptr_t x = (uintptr_t) p; x ^= x >> 16; x *= 0x45d9f3bu; x ^= x >> 16; return (uint32_t) x; }
+static void why_record(Avm2Object* o)
+{
+	if (g_why_used * 2 >= g_why_cap) return;  // table full this cycle: lose precision, never block
+	uint32_t m = g_why_cap - 1, h = why_hash(o) & m;
+	while (g_why_tab[h].obj != NULL) h = (h + 1) & m;
+	g_why_tab[h].obj = o; g_why_tab[h].parent = g_why_parent; g_why_tab[h].edge = g_why_edge; g_why_tab[h].idx = g_why_idx;
+	g_why_used++;
+}
+static const WhyEntry* why_find(const Avm2Object* o)
+{
+	uint32_t m = g_why_cap - 1, h = why_hash(o) & m;
+	while (g_why_tab[h].obj != NULL) { if (g_why_tab[h].obj == o) return &g_why_tab[h]; h = (h + 1) & m; }
+	return NULL;
+}
+
 static void gc_configure(void)
 {
 	g_gc_configured = 1;
@@ -111,6 +142,9 @@ static void gc_configure(void)
 	if (sb != NULL && sb[0] != '\0') g_gc_sweep_budget = (uint64_t) atoll(sb);
 	if (getenv("AVM2_GC_VERBOSE") != NULL) g_gc_verbose = 1;
 	if (getenv("AVM2_GC_TIME") != NULL) g_gc_time = 1;
+	g_why_target = getenv("AVM2_GC_WHY");
+	g_hist_on = getenv("AVM2_GC_HIST") != NULL;
+	if (g_why_target != NULL && g_why_target[0] == '\0') g_why_target = NULL;
 }
 
 // Per-collect phase timing (AVM2_GC_TIME=1). One clock read per phase per
@@ -320,6 +354,7 @@ void avm2_gc_mark_object(Avm2Object* obj)
 	if (obj == NULL) return;
 	if ((obj->gc_mark >> 1) == g_gc_epoch) return;  // already marked this cycle
 	obj->gc_mark = (g_gc_epoch << 1) | (obj->gc_mark & 1);
+	if (g_why_tab != NULL) why_record(obj);
 	wl_push(obj);
 }
 
@@ -459,7 +494,8 @@ static void trace_array(Avm2Object* o)
 {
 	Avm2ArrayExt* ext = (Avm2ArrayExt*) o->native_ext;
 	if (ext == NULL) return;
-	for (uint32_t i = 0; i < ext->dense_len; i++) avm2_gc_mark_value(ext->elems[i]);
+	for (uint32_t i = 0; i < ext->dense_len; i++) { WHY_SET("elem", i); avm2_gc_mark_value(ext->elems[i]); }
+	WHY_SET("sparse", 0);
 	for (Avm2SparseElem* s = ext->sparse; s != NULL; s = s->next) avm2_gc_mark_value(s->v);
 }
 
@@ -467,15 +503,19 @@ static void trace_vector(Avm2Object* o)
 {
 	Avm2VectorExt* ext = (Avm2VectorExt*) o->native_ext;
 	if (ext == NULL) return;
-	for (uint32_t i = 0; i < ext->length; i++) avm2_gc_mark_value(ext->elems[i]);
+	for (uint32_t i = 0; i < ext->length; i++) { WHY_SET("velem", i); avm2_gc_mark_value(ext->elems[i]); }
 }
 
 static void trace_object(Avm2Object* o)
 {
+	g_why_parent = o;
+	WHY_SET("proto", 0);
 	avm2_gc_mark_object(o->proto);
-	for (uint32_t i = 0; i < o->slot_count; i++) avm2_gc_mark_value(o->slots[i]);
+	for (uint32_t i = 0; i < o->slot_count; i++) { WHY_SET("slot", i); avm2_gc_mark_value(o->slots[i]); }
+	uint32_t why_dyn = 0;
 	for (Avm2DynProp* p = o->dyn_props; p != NULL; p = p->next)
 	{
+		WHY_SET("dyn", why_dyn++);
 		avm2_gc_mark_value(p->value);
 		avm2_gc_mark_object(p->key_obj);
 		// The prop name is a by-value COPY of a heap string (set_dynamic:
@@ -483,14 +523,19 @@ static void trace_object(Avm2Object* o)
 		// string's inline bytes, which must survive as long as the prop does.
 		if (p->name.utf8 != NULL) avm2_gc_mark_string_bytes(p->name.utf8);
 	}
+	WHY_SET("bound_method", 0);
 	for (Avm2BoundMethod* bm = o->bound_methods; bm != NULL; bm = bm->next)
 	{
 		avm2_gc_mark_object(bm->fn);
 	}
 	// Function-closure payload.
+	WHY_SET("fn_receiver", 0);
 	avm2_gc_mark_value(o->fn_receiver);
+	WHY_SET("fn_prototype", 0);
 	avm2_gc_mark_object(o->fn_prototype);
+	WHY_SET("fn_scope", 0);
 	avm2_gc_mark_scope(o->fn_scope);
+	WHY_SET("class_payload", 0);
 	if (o->fn_bound_class != NULL) avm2_gc_mark_object(o->fn_bound_class->class_object);
 	// Class object payload: keep the class's proto + class object alive, and
 	// trace the class's captured scope chains. A class scope can hold arbitrary
@@ -521,12 +566,17 @@ static void trace_object(Avm2Object* o)
 	if (o->kind == AVM2_OBJ_VECTOR) { trace_vector(o); return; }
 	if (o->native_ext != NULL)
 	{
+		WHY_SET("ext:listeners", 0);
 		avm2_events_gc_trace_ext(o);
+		WHY_SET("ext:display", 0);
 		avm2_display_gc_trace_ext(o);
+		WHY_SET("ext:text", 0);
 		avm2_text_gc_trace_ext(o);
 		// Flixel quadtree intrinsic: the FlxList object edges hang off arena
 		// chunks the conservative blob scan cannot follow into.
+		WHY_SET("ext:flixel", 0);
 		avm2_flixel_gc_trace_ext(o);
+		WHY_SET("ext:conservative", 0);
 		conservative_scan(o);
 	}
 }
@@ -708,6 +758,122 @@ static uint32_t gc_sweep_slice(Avm2Context* ctx, uint64_t budget)
 
 // --- collection -------------------------------------------------------------
 
+static const char* why_name(const Avm2Object* o, char* buf, int size)
+{
+	if (o->kind == AVM2_OBJ_FUNCTION)
+	{
+		snprintf(buf, size, "fn:%s", o->fn_method.debug_name ? o->fn_method.debug_name : "?");
+		return buf;
+	}
+	if (o->kind == AVM2_OBJ_CLASS && o->class_ref != NULL)
+	{
+		int n = snprintf(buf, size, "class:");
+		avm2_class_qname_buf(o->class_ref, buf + n, size - n);
+		return buf;
+	}
+	if (o->cls == NULL) { snprintf(buf, size, "<nocls k%u>", o->kind); return buf; }
+	avm2_class_qname_buf(o->cls, buf, size);
+	return buf;
+}
+
+// The slot's trait name: the vtable entry whose SLOT index is i.
+static const char* why_slot_name(const Avm2Object* parent, uint32_t i, char* buf, int size)
+{
+	buf[0] = '\0';
+	const Avm2VTable* vt = parent->vtable;
+	if (vt == NULL) return buf;
+	for (uint32_t e = 0; e < vt->count; e++)
+	{
+		const Avm2PropEntry* pe = &vt->entries[e];
+		if (pe->kind == AVM2_PROP_SLOT && pe->slot_index == i && pe->key.name != NULL)
+		{
+			snprintf(buf, size, "%.*s", (int) pe->key.name_len, pe->key.name);
+			return buf;
+		}
+	}
+	return buf;
+}
+
+static const char* why_dyn_name(const Avm2Object* parent, uint32_t i, char* buf, int size)
+{
+	buf[0] = '\0';
+	uint32_t k = 0;
+	for (Avm2DynProp* p = parent->dyn_props; p != NULL; p = p->next, k++)
+		if (k == i) { snprintf(buf, size, "%.*s", (int) p->name.len, p->name.utf8 ? p->name.utf8 : ""); break; }
+	return buf;
+}
+
+static void why_report(void)
+{
+	char nb[256], eb[160], pb[256];
+	uint32_t total = 0, shown = 0;
+	for (Avm2Object* o = g_gc_head; o != NULL; o = o->gc_next)
+	{
+		if ((o->gc_mark >> 1) != g_gc_epoch) continue;
+		why_name(o, nb, sizeof nb);
+		if (strstr(nb, g_why_target) == NULL) continue;
+		// Exact-name match after the last '.' or ':' so "Game" does not also match "GameText".
+		const char* leaf = nb;
+		for (const char* c = nb; *c; c++) if (*c == '.' || *c == ':') leaf = c + 1;
+		if (strcmp(leaf, g_why_target) != 0) continue;
+		total++;
+		if (shown >= 8) continue;
+		shown++;
+		fprintf(stderr, "[avm2-gc-why] #%u %s@%p\n", g_gc_collections, nb, (void*) o);
+		const Avm2Object* cur = o;
+		for (int depth = 0; depth < 64 && cur != NULL; depth++)
+		{
+			const WhyEntry* w = why_find(cur);
+			if (w == NULL) { fprintf(stderr, "[avm2-gc-why]   (no record)\n"); break; }
+			eb[0] = '\0';
+			if (w->parent != NULL && w->edge != NULL && strcmp(w->edge, "slot") == 0) why_slot_name(w->parent, w->idx, eb, sizeof eb);
+			else if (w->parent != NULL && w->edge != NULL && strcmp(w->edge, "dyn") == 0) why_dyn_name(w->parent, w->idx, eb, sizeof eb);
+			if (w->parent == NULL)
+			{
+				fprintf(stderr, "[avm2-gc-why]   <- %s\n", w->edge ? w->edge : "?");
+				break;
+			}
+			why_name(w->parent, pb, sizeof pb);
+			fprintf(stderr, "[avm2-gc-why]   <- %s[%u%s%s] of %s@%p\n", w->edge ? w->edge : "?", w->idx,
+			        eb[0] ? " " : "", eb, pb, (void*) w->parent);
+			cur = w->parent;
+		}
+	}
+	fprintf(stderr, "[avm2-gc-why] #%u live %s instances: %u (recorded %u marks)\n", g_gc_collections, g_why_target, total, g_why_used);
+}
+
+// AVM2_GC_HIST=1: after the mark, the live (marked) census by class, top 40.
+typedef struct HistEnt { const void* key; uint8_t kind; uint32_t n; const Avm2Object* sample; } HistEnt;
+static int hist_cmp(const void* a, const void* b)
+{
+	uint32_t x = ((const HistEnt*) a)->n, y = ((const HistEnt*) b)->n;
+	return x < y ? 1 : x > y ? -1 : 0;
+}
+static void hist_report(void)
+{
+	enum { CAP = 1 << 14 };
+	HistEnt* t = calloc(CAP, sizeof(HistEnt));
+	if (t == NULL) return;
+	uint32_t total = 0;
+	for (Avm2Object* o = g_gc_head; o != NULL; o = o->gc_next)
+	{
+		if ((o->gc_mark >> 1) != g_gc_epoch) continue;
+		total++;
+		const void* key = o->kind == AVM2_OBJ_FUNCTION ? (const void*) o->fn_method.debug_name
+		                : o->kind == AVM2_OBJ_CLASS ? (const void*) o->class_ref : (const void*) o->cls;
+		uint32_t h = (uint32_t) (((uintptr_t) key * 2654435761u) ^ o->kind) & (CAP - 1);
+		while (t[h].sample != NULL && !(t[h].key == key && t[h].kind == o->kind)) h = (h + 1) & (CAP - 1);
+		if (t[h].sample == NULL) { t[h].key = key; t[h].kind = o->kind; t[h].sample = o; }
+		t[h].n++;
+	}
+	qsort(t, CAP, sizeof(HistEnt), hist_cmp);
+	char nb[256];
+	fprintf(stderr, "[avm2-gc-hist] #%u live=%u\n", g_gc_collections, total);
+	for (int i = 0; i < 40 && t[i].n > 0; i++)
+		fprintf(stderr, "[avm2-gc-hist] #%u %7u %s\n", g_gc_collections, t[i].n, why_name(t[i].sample, nb, sizeof nb));
+	free(t);
+}
+
 static void gc_collect(Avm2Context* ctx)
 {
 	g_gc_collections++;
@@ -745,6 +911,16 @@ static void gc_collect(Avm2Context* ctx)
 		}
 		qsort(g_census_sorted, g_census_sorted_count, sizeof(Avm2Object*), census_ptr_cmp);
 	}
+	if (g_why_target != NULL)
+	{
+		uint32_t want = 1024;
+		while (want < (g_gc_live_objects + 1024) * 2) want <<= 1;
+		if (want != g_why_cap) { free(g_why_tab); g_why_tab = malloc(want * sizeof(WhyEntry)); g_why_cap = g_why_tab ? want : 0; }
+		if (g_why_tab) memset(g_why_tab, 0, g_why_cap * sizeof(WhyEntry));
+		g_why_used = 0;
+	}
+	g_why_parent = NULL;
+	WHY_SET("root:pinned", 0);
 	for (uint32_t i = 0; i < g_pinned_count; i++) avm2_gc_mark_object(g_pinned[i]);
 	if (g_gc_time) t_snap = gc_now_ms();
 
@@ -781,17 +957,27 @@ static void gc_collect(Avm2Context* ctx)
 	g_gc_enrolled_since_collect = 0;
 
 	// Root markers (per module).
+	g_why_parent = NULL; WHY_SET("root:main", 0);
 	avm2_gc_mark_roots_main(ctx);
+	g_why_parent = NULL; WHY_SET("root:globals", 0);
 	avm2_gc_mark_roots_globals(ctx);
+	g_why_parent = NULL; WHY_SET("root:display", 0);
 	avm2_gc_mark_roots_display(ctx);
+	g_why_parent = NULL; WHY_SET("root:events", 0);
 	avm2_gc_mark_roots_events(ctx);
+	g_why_parent = NULL; WHY_SET("root:amf", 0);
 	avm2_gc_mark_roots_amf(ctx);
+	g_why_parent = NULL; WHY_SET("root:media", 0);
 	avm2_gc_mark_roots_media(ctx);
+	g_why_parent = NULL; WHY_SET("root:net", 0);
 	avm2_gc_mark_roots_net(ctx);
+	g_why_parent = NULL; WHY_SET("root:external", 0);
 	avm2_gc_mark_roots_external(ctx);
+	g_why_parent = NULL; WHY_SET("root:e4x", 0);
 	avm2_gc_mark_roots_e4x(ctx);
 	// Flixel quadtree intrinsic: the AS3 `protected static _o / _oc` live as C
 	// globals and hold object refs across the tick boundary, as they did in AS3.
+	g_why_parent = NULL; WHY_SET("root:flixel", 0);
 	avm2_gc_mark_roots_flixel(ctx);
 
 	// Drain: trace every marked object's edges (may mark more).
@@ -802,6 +988,9 @@ static void gc_collect(Avm2Context* ctx)
 	}
 
 	if (g_gc_time) t_trace = gc_now_ms();
+	if (g_why_tab != NULL) why_report();
+	if (g_hist_on) hist_report();
+	g_why_parent = NULL;
 
 	// If the worklist couldn't grow at any point this cycle, the mark is
 	// incomplete — abort the sweep (over-retain, never free a live object).

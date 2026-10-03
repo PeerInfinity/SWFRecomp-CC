@@ -366,10 +366,26 @@ static Avm2Value ei_call(Avm2Activation* act)
 // BridgeGeneric's callbacks are wireCheck() / configure(json) / readState()).
 // Returns NULL for: unknown name, callback threw, or a null/undefined result.
 // The returned pointer is valid until the next dispatch (static buffer).
+#ifdef HEAP_TRACK_SITES
+extern int g_heap_track_on;
+void heap_track_report(void);
+void heap_track_reset(void);
+// Diagnosis only: AVM2_EI_TRACK set → every heap_alloc inside a dispatch is
+// recorded; avm2_ei_track_report() prints what is still outstanding.
+EMSCRIPTEN_KEEPALIVE void avm2_ei_track_report(void) { heap_track_report(); }
+EMSCRIPTEN_KEEPALIVE void avm2_ei_track_reset(void) { heap_track_reset(); }
+EMSCRIPTEN_KEEPALIVE void avm2_ei_track_set(int on) { g_heap_track_on = on; }
+#endif
+
 EMSCRIPTEN_KEEPALIVE
 const char* avm2_ei_dispatch(const char* name, const char* arg, int has_arg)
 {
 	static char* ret_buf = NULL;
+#ifdef HEAP_TRACK_SITES
+	static int track = -1;
+	if (track < 0) track = getenv("AVM2_EI_TRACK") != NULL;
+	if (track) g_heap_track_on = 1;
+#endif
 
 	Avm2Context* ctx = g_ei_ctx;
 	if (ctx == NULL || name == NULL) return NULL;
@@ -400,6 +416,9 @@ const char* avm2_ei_dispatch(const char* name, const char* arg, int has_arg)
 		}
 	}
 	avm2_try_pop_frame(&top);
+#ifdef HEAP_TRACK_SITES
+	if (track) g_heap_track_on = 0;
+#endif
 	return out;
 }
 #endif

@@ -181,6 +181,104 @@ void heap_shutdown(SWFAppContext* app_context)
 
 #else  // !HEAP_PASSTHROUGH
 
+// --- allocation-site tracking (diagnosis only: -DHEAP_TRACK_SITES, wasm) ----
+// While g_heap_track_on is set, every heap_alloc records its pointer, size and
+// six return addresses; heap_free forgets it. heap_track_report() prints the
+// still-outstanding allocations grouped by call stack — the allocations a
+// tracked window made and nothing ever freed. Off unless compiled in.
+#if defined(__EMSCRIPTEN__) && defined(HEAP_TRACK_SITES)
+#include <stdint.h>
+extern void* emscripten_return_address(int level);
+int g_heap_track_on = 0;
+#define HT_FRAMES 6
+typedef struct { void* p; uint32_t size; uintptr_t pc[HT_FRAMES]; } HtEnt;
+#define HT_CAP (1u << 19)
+static HtEnt* g_ht = NULL;
+static uint32_t g_ht_live = 0;
+static uint32_t ht_h(const void* p) { uintptr_t x = (uintptr_t) p; x ^= x >> 15; x *= 0x2c1b3c6du; x ^= x >> 12; return (uint32_t) x & (HT_CAP - 1); }
+static void ht_add(void* p, size_t size)
+{
+	if (g_ht == NULL) { g_ht = calloc(HT_CAP, sizeof(HtEnt)); if (g_ht == NULL) return; }
+	if (g_ht_live >= HT_CAP / 2) return;
+	uint32_t h = ht_h(p);
+	while (g_ht[h].p != NULL) h = (h + 1) & (HT_CAP - 1);
+	g_ht[h].p = p;
+	g_ht[h].size = (uint32_t) size;
+	for (int i = 0; i < HT_FRAMES; i++) g_ht[h].pc[i] = (uintptr_t) emscripten_return_address(i);
+	g_ht_live++;
+}
+static void ht_remove(void* p)
+{
+	if (g_ht == NULL || g_ht_live == 0) return;
+	uint32_t h = ht_h(p);
+	while (g_ht[h].p != NULL && g_ht[h].p != p) h = (h + 1) & (HT_CAP - 1);
+	if (g_ht[h].p == NULL) return;
+	// Backward-shift deletion (linear probing, no tombstones).
+	uint32_t i = h;
+	for (;;)
+	{
+		g_ht[i].p = NULL;
+		uint32_t j = i;
+		for (;;)
+		{
+			j = (j + 1) & (HT_CAP - 1);
+			if (g_ht[j].p == NULL) { g_ht_live--; return; }
+			uint32_t k = ht_h(g_ht[j].p);
+			// Move j into i unless k lies cyclically in (i, j].
+			if ((i <= j) ? (i < k && k <= j) : (i < k || k <= j)) continue;
+			g_ht[i] = g_ht[j];
+			i = j;
+			break;
+		}
+	}
+}
+typedef struct { uintptr_t pc[HT_FRAMES]; uint32_t n; uint64_t bytes; void* sample; uint32_t sample_size; } HtGroup;
+static int ht_group_cmp(const void* a, const void* b)
+{
+	uint64_t x = ((const HtGroup*) a)->bytes, y = ((const HtGroup*) b)->bytes;
+	return x < y ? 1 : x > y ? -1 : 0;
+}
+void heap_track_report(void)
+{
+	if (g_ht == NULL) { fprintf(stderr, "[heap-track] nothing tracked\n"); return; }
+	enum { MAXG = 4096 };
+	HtGroup* g = calloc(MAXG, sizeof(HtGroup));
+	uint32_t ng = 0; uint64_t total = 0;
+	for (uint32_t i = 0; i < HT_CAP; i++)
+	{
+		if (g_ht[i].p == NULL) continue;
+		total += g_ht[i].size;
+		uint32_t k = 0;
+		for (; k < ng; k++) if (memcmp(g[k].pc, g_ht[i].pc, sizeof g[k].pc) == 0) break;
+		if (k == ng) { if (ng == MAXG) continue; memcpy(g[ng].pc, g_ht[i].pc, sizeof g[ng].pc); g[ng].sample = g_ht[i].p; g[ng].sample_size = g_ht[i].size; ng++; }
+		g[k].n++; g[k].bytes += g_ht[i].size;
+	}
+	qsort(g, ng, sizeof(HtGroup), ht_group_cmp);
+	fprintf(stderr, "[heap-track] outstanding %u allocations, %llu bytes, %u stacks\n", g_ht_live, (unsigned long long) total, ng);
+	for (uint32_t k = 0; k < ng && k < 25; k++)
+	{
+		fprintf(stderr, "[heap-track] #%u n=%u bytes=%llu sz=%u :", k, g[k].n, (unsigned long long) g[k].bytes, g[k].sample_size);
+		for (int f = 0; f < HT_FRAMES; f++)
+		{
+			fprintf(stderr, " < 0x%lx", (unsigned long) g[k].pc[f]);
+		}
+		fprintf(stderr, "\n[heap-track]    bytes:");
+		const unsigned char* b = (const unsigned char*) g[k].sample;
+		uint32_t m = g[k].sample_size < 48 ? g[k].sample_size : 48;
+		for (uint32_t i = 0; i < m; i++) fprintf(stderr, " %02x", b[i]);
+		fprintf(stderr, " |");
+		for (uint32_t i = 0; i < m; i++) fputc(b[i] >= 32 && b[i] < 127 ? b[i] : '.', stderr);
+		fprintf(stderr, "|\n");
+	}
+	free(g);
+}
+void heap_track_reset(void)
+{
+	if (g_ht != NULL) memset(g_ht, 0, HT_CAP * sizeof(HtEnt));
+	g_ht_live = 0;
+}
+#endif
+
 bool heap_init(SWFAppContext* app_context, size_t initial_size)
 {
 	if (app_context == NULL)
@@ -265,6 +363,9 @@ void* heap_alloc(SWFAppContext* app_context, size_t size)
 		fprintf(stderr, "ERROR: heap_alloc(%zu) failed - out of memory\n", size);
 		exit(1);
 	}
+#if defined(__EMSCRIPTEN__) && defined(HEAP_TRACK_SITES)
+	if (g_heap_track_on) ht_add(ptr, size);
+#endif
 
 	return ptr;
 }
@@ -311,6 +412,9 @@ void heap_free(SWFAppContext* app_context, void* ptr)
 		return;
 	}
 
+#if defined(__EMSCRIPTEN__) && defined(HEAP_TRACK_SITES)
+	if (g_ht_live > 0) ht_remove(ptr);
+#endif
 	o1heapFree(app_context->heap_instance, ptr);
 }
 
