@@ -15,6 +15,7 @@
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
+#include <memory/heap.h>
 #include <avm2/avm2_ops.h>
 
 #include "unicode_case_tables.h"
@@ -197,7 +198,7 @@ static Avm2Value make_sub16(Avm2Context* ctx, const Avm2String* s,
 		u += units;
 		i += clen;
 	}
-	return make_str(ctx, out, n);
+	{ Avm2Value r_ = make_str(ctx, out, n); heap_free(ctx->app, out); return r_; }  // copied: scratch
 }
 
 // Map a byte offset to a UTF-16 index.
@@ -315,7 +316,7 @@ static Avm2Value string_from_char_code(Avm2Activation* act)
 			out[n++] = (char) (0x80 | (cp & 0x3F));
 		}
 	}
-	return make_str(ctx, out, n);
+	{ Avm2Value r_ = make_str(ctx, out, n); heap_free(ctx->app, out); return r_; }  // copied: scratch
 }
 
 static int64_t find_sub(const Avm2String* s, uint32_t from, const Avm2String* pat)
@@ -644,7 +645,7 @@ static Avm2Value string_case_convert(Avm2Activation* act, int to_lower)
 		}
 		i += clen;
 	}
-	return make_str(ctx, out, n);
+	{ Avm2Value r_ = make_str(ctx, out, n); heap_free(ctx->app, out); return r_; }  // copied: scratch
 }
 
 static Avm2Value string_to_lower_case(Avm2Activation* act)

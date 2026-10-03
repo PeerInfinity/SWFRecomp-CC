@@ -1020,6 +1020,7 @@ static void render_list_grow(Avm2Context* ctx, Avm2DisplayObjectExt* ext)
 		uint32_t nc = ext->render_cap > 0 ? ext->render_cap * 2 : 8;
 		Avm2Object** grown = avm2_alloc(ctx, nc * sizeof(Avm2Object*));
 		memcpy(grown, ext->render_list, ext->render_len * sizeof(Avm2Object*));
+		if (ext->render_list != NULL) heap_free(ctx->app, ext->render_list);  // sole owner
 		ext->render_list = grown;
 		ext->render_cap = nc;
 	}
@@ -1132,6 +1133,7 @@ static Avm2Object* replace_at_depth(Avm2Context* ctx, Avm2DisplayObjectExt* ext,
 			uint32_t nc = ext->depth_cap > 0 ? ext->depth_cap * 2 : 8;
 			Avm2DepthEntry* grown = avm2_alloc(ctx, nc * sizeof(Avm2DepthEntry));
 			memcpy(grown, ext->depth_list, ext->depth_len * sizeof(Avm2DepthEntry));
+			if (ext->depth_list != NULL) heap_free(ctx->app, ext->depth_list);  // sole owner
 			ext->depth_list = grown;
 			ext->depth_cap = nc;
 		}
@@ -2251,6 +2253,10 @@ static void run_frame_internal(Avm2Context* ctx, Avm2Object* obj, int run_displa
 		}
 		if (nplaces > 0)
 		{
+			// One buffer per frame run; the previous run's was leaked on every
+			// timeline frame that places anything. (flush_queued_places has
+			// already drained it: placements flush before the next frame runs.)
+			if (ext->queued_places != NULL) heap_free(ctx->app, ext->queued_places);
 			ext->queued_places = avm2_alloc(ctx, nplaces * sizeof(int32_t));
 		}
 		Avm2QueuedDepth* qd = NULL;
@@ -7485,6 +7491,7 @@ static Avm2Value doc_remove_children(Avm2Activation* act)
 			orphan_add(ctx, snapshot[i]);
 		}
 	}
+	heap_free(ctx->app, snapshot);
 	return avm2_undefined();
 }
 
@@ -14084,7 +14091,7 @@ static Avm2Value statictext_get_text(Avm2Activation* act)
 	{
 		const Avm2StaticGlyph* sg = &glyphs[st->glyph_start + i];
 		const Avm2FontData* fd = statictext_font_by_id(sg->font_id);
-		if (fd == NULL || fd->codes == NULL) return avm2_null();
+		if (fd == NULL || fd->codes == NULL) { heap_free(ctx->app, buf); return avm2_null(); }
 		if (sg->glyph >= fd->glyph_count) continue;
 		uint32_t cp = fd->codes[sg->glyph];
 		if (cp < 0x80) buf[n++] = (char) cp;
@@ -14100,8 +14107,8 @@ static Avm2Value statictext_get_text(Avm2Activation* act)
 			buf[n++] = (char) (0x80 | (cp & 0x3F));
 		}
 	}
-	if (n == 0) return avm2_null();
-	return avm2_string(avm2_string_new(ctx, buf, n));
+	if (n == 0) { heap_free(ctx->app, buf); return avm2_null(); }
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, n); heap_free(ctx->app, buf); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 // flash.display.Stage: `new Stage()` is #2012, but display_alloc_instance

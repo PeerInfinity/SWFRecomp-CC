@@ -138,6 +138,10 @@ static void ba_set_length(Avm2Context* ctx, Avm2ByteArrayExt* ba, uint32_t new_l
 		}
 		uint8_t* grown = avm2_alloc(ctx, new_cap);
 		if (ba->len > 0) memcpy(grown, ba->bytes, ba->len);
+		// Sole owner: every reader re-reads ba->bytes (domain memory too —
+		// avm2_mops.c mops_window), and the self-copy paths (writeBytes of
+		// itself) memmove AFTER the growth. It used to leak on every growth.
+		if (ba->bytes != NULL) heap_free(ctx->app, ba->bytes);
 		ba->bytes = grown;
 		ba->cap = new_cap;
 	}
@@ -309,7 +313,7 @@ static const Avm2String* utf8_lossy(Avm2Context* ctx, const uint8_t* bytes, uint
 		}
 	}
 	buf[out] = '\0';
-	return avm2_string_new(ctx, buf, out);
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, out); heap_free(ctx->app, buf); return r_; }  // copied: the buffer is scratch
 }
 
 // avmplus's lenient UTF-8 decoder (Ruffle wstr DecodeAvmUtf8, used by
@@ -372,7 +376,7 @@ static const Avm2String* avm_utf8_lenient(Avm2Context* ctx, const uint8_t* bytes
 		out += utf8_encode(cp, buf + out);
 	}
 	buf[out] = '\0';
-	return avm2_string_new(ctx, buf, out);
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, out); heap_free(ctx->app, buf); return r_; }  // copied: the buffer is scratch
 }
 
 // Encode one code point as UTF-8.
@@ -435,7 +439,7 @@ static const Avm2String* utf16_to_utf8(Avm2Context* ctx, const uint8_t* bytes,
 		out += utf8_encode(cp, buf + out);
 	}
 	buf[out] = '\0';
-	return avm2_string_new(ctx, buf, out);
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, out); heap_free(ctx->app, buf); return r_; }  // copied: the buffer is scratch
 }
 
 // readUTF/readUTFBytes semantics (Ruffle read_utf_bytes): strip a UTF-8
@@ -550,7 +554,7 @@ static const Avm2String* iconv_decode(Avm2Context* ctx, const char* enc,
 	}
 	iconv_close(cd);
 	*out = '\0';
-	return avm2_string_new(ctx, buf, (uint32_t) (out - buf));
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, (uint32_t) (out - buf)); heap_free(ctx->app, buf); return r_; }  // copied: the buffer is scratch
 }
 
 // iconv encode UTF-8 -> `to`; undecodable chars are dropped.
@@ -1113,6 +1117,9 @@ static Avm2Value ba_write_multi_byte(Avm2Activation* act)
 	}
 #endif
 	ba_write_bytes(ctx, ba, bytes, n);
+	// A transcoded buffer is scratch (the passthrough case writes the
+	// string's own bytes, which are not ours to free).
+	if (bytes != (uint8_t*) s->utf8) heap_free(ctx->app, bytes);
 	return avm2_undefined();
 }
 
@@ -1233,6 +1240,7 @@ static Avm2Value ba_compress(Avm2Activation* act)
 	ba->len = 0;
 	ba->position = 0;
 	if (out_len > 0) ba_write_bytes(ctx, ba, out, out_len);
+	if (out != NULL) heap_free(ctx->app, out);  // scratch: copied in above
 	ba->position = ba->len;
 	return avm2_undefined();
 }
@@ -1295,6 +1303,7 @@ static Avm2Value ba_uncompress(Avm2Activation* act)
 			{
 				uint8_t* grown = avm2_alloc(ctx, cap * 2);
 				memcpy(grown, out, out_len);
+				heap_free(ctx->app, out);
 				out = grown;
 				cap *= 2;
 				continue;
@@ -1305,10 +1314,11 @@ static Avm2Value ba_uncompress(Avm2Activation* act)
 		break;
 	}
 	inflateEnd(&strm);
-	if (!ok) throw_2058(ctx);
+	if (!ok) { heap_free(ctx->app, out); throw_2058(ctx); }
 	ba->len = 0;
 	ba->position = 0;
 	if (out_len > 0) ba_write_bytes(ctx, ba, out, out_len);
+	heap_free(ctx->app, out);  // scratch: copied in above
 	ba->position = 0;
 	return avm2_undefined();
 }

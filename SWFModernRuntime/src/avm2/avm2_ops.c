@@ -17,6 +17,7 @@
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
+#include <memory/heap.h>
 #include <avm2/avm2_ops.h>
 
 // E4XName from a lazy QName value (uri NULL = any namespace).
@@ -3014,7 +3015,9 @@ static Avm2Value callproperty_common(Avm2Context* ctx, Avm2Value recv,
 		a[0] = avm2_object_value(
 			avm2_qname_new(ctx, r->proxy_uri, r->proxy_local));
 		for (uint32_t i = 0; i < argc; i++) a[i + 1] = args[i];
-		return avm2_proxy_call_hook(ctx, recv.u.obj, "callProperty", a, argc + 1);
+		Avm2Value pr = avm2_proxy_call_hook(ctx, recv.u.obj, "callProperty", a, argc + 1);
+		heap_free(ctx->app, a);  // scratch argument vector
+		return pr;
 	}
 	if (resolved_ok && r->entry != NULL && r->entry->kind == AVM2_PROP_METHOD)
 	{
@@ -4334,7 +4337,7 @@ static Avm2Value esc_xml(Avm2Activation* act, Avm2Value v, int attr)
 			out[n++] = c;
 		}
 	}
-	return avm2_string(avm2_string_new(ctx, out, n));
+	{ const Avm2String* r_ = avm2_string_new(ctx, out, n); heap_free(ctx->app, out); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 Avm2Value avm2_op_esc_xattr(Avm2Activation* act, Avm2Value v)

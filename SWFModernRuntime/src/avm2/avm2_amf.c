@@ -48,6 +48,7 @@
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
+#include <memory/heap.h>
 #include <avm2/avm2_ops.h>
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,7 @@ static void buf_put(AmfBuf* w, const void* p, uint32_t n)
 		while (new_cap < w->len + n) new_cap *= 2;
 		uint8_t* grown = avm2_alloc(w->ctx, new_cap);
 		if (w->len > 0) memcpy(grown, w->b, w->len);
+		if (w->b != NULL) heap_free(w->ctx->app, w->b);
 		w->b = grown;
 		w->cap = new_cap;
 	}
@@ -270,6 +272,7 @@ static void w3_str(Amf3Wr* w, const char* p, uint32_t n)
 			uint32_t nc = w->str_cap == 0 ? 16 : w->str_cap * 2;
 			StrEntry* g = avm2_alloc(w->ctx, nc * sizeof(StrEntry));
 			memcpy(g, w->strings, w->str_count * sizeof(StrEntry));
+			if (w->strings != NULL) heap_free(w->ctx->app, (void*) w->strings);
 			w->strings = g;
 			w->str_cap = nc;
 		}
@@ -299,6 +302,7 @@ static void w3_obj_store(Amf3Wr* w, Avm2Object* src)
 		uint32_t nc = w->obj_cap == 0 ? 16 : w->obj_cap * 2;
 		ObjEntry* g = avm2_alloc(w->ctx, nc * sizeof(ObjEntry));
 		memcpy(g, w->objs, w->obj_count * sizeof(ObjEntry));
+		if (w->objs != NULL) heap_free(w->ctx->app, (void*) w->objs);
 		w->objs = g;
 		w->obj_cap = nc;
 	}
@@ -512,6 +516,7 @@ static void w3_object_external(Amf3Wr* w, Avm2Object* obj, const Avm2String* ali
 			uint32_t nc = w->trait_cap == 0 ? 8 : w->trait_cap * 2;
 			TraitEntry* g = avm2_alloc(ctx, nc * sizeof(TraitEntry));
 			memcpy(g, w->traits, w->trait_count * sizeof(TraitEntry));
+			if (w->traits != NULL) heap_free(ctx->app, w->traits);
 			w->traits = g;
 			w->trait_cap = nc;
 		}
@@ -585,6 +590,7 @@ static void w3_object(Amf3Wr* w, Avm2Object* obj)
 			uint32_t nc = w->trait_cap == 0 ? 8 : w->trait_cap * 2;
 			TraitEntry* g = avm2_alloc(ctx, nc * sizeof(TraitEntry));
 			memcpy(g, w->traits, w->trait_count * sizeof(TraitEntry));
+			if (w->traits != NULL) heap_free(ctx->app, w->traits);
 			w->traits = g;
 			w->trait_cap = nc;
 		}
@@ -605,6 +611,8 @@ static void w3_object(Amf3Wr* w, Avm2Object* obj)
 		}
 	}
 	w3_object_body(w, obj, dynamic, statics, static_count);
+	// A new trait adopted `statics`; a matched one left it scratch.
+	if (trait_idx >= 0 && statics != NULL) heap_free(ctx->app, (void*) statics);
 }
 
 static void w3_array(Amf3Wr* w, Avm2Object* arr)
@@ -635,6 +643,9 @@ static void w3_array(Amf3Wr* w, Avm2Object* arr)
 			memcpy(n2, sp_names, sp_n * sizeof(Avm2Value));
 			Avm2Value* v2 = avm2_alloc(ctx, nc * sizeof(Avm2Value));
 			memcpy(v2, sp_vals, sp_n * sizeof(Avm2Value));
+			heap_free(ctx->app, dense);
+			heap_free(ctx->app, sp_names);
+			heap_free(ctx->app, sp_vals);
 			dense = d2;
 			sp_names = n2;
 			sp_vals = v2;
@@ -678,6 +689,10 @@ static void w3_array(Amf3Wr* w, Avm2Object* arr)
 	{
 		w3_value(w, dense[i]);
 	}
+	// The split is scratch (the values were written out above).
+	heap_free(ctx->app, dense);
+	heap_free(ctx->app, sp_names);
+	heap_free(ctx->app, sp_vals);
 }
 
 static void w3_vector(Amf3Wr* w, Avm2Object* vec)
@@ -906,6 +921,7 @@ static int w0_ref_or_store(Amf3Wr* w, Avm2Object* obj)
 		uint32_t nc = w->obj0_cap == 0 ? 16 : w->obj0_cap * 2;
 		ObjEntry* g = avm2_alloc(w->ctx, nc * sizeof(ObjEntry));
 		memcpy(g, w->objs0, w->obj0_count * sizeof(ObjEntry));
+		if (w->objs0 != NULL) heap_free(w->ctx->app, (void*) w->objs0);
 		w->objs0 = g;
 		w->obj0_cap = nc;
 	}
@@ -1118,6 +1134,33 @@ typedef struct Rd
 	uint32_t ref0_count, ref0_cap;
 } Rd;
 
+// Release a writer's / reader's tables (every entry point's are per-call
+// scratch; they used to leak on every writeObject/readObject and wire value).
+static void amf_wr_free(Amf3Wr* w)
+{
+	SWFAppContext* app = w->ctx->app;
+	if (w->out.b != NULL) heap_free(app, w->out.b);
+	if (w->strings != NULL) heap_free(app, w->strings);
+	for (uint32_t i = 0; i < w->trait_count; i++)
+		if (w->traits[i].statics != NULL) heap_free(app, (void*) w->traits[i].statics);
+	if (w->traits != NULL) heap_free(app, w->traits);
+	if (w->objs != NULL) heap_free(app, w->objs);
+	if (w->objs0 != NULL) heap_free(app, w->objs0);
+	memset(w, 0, sizeof(*w));
+}
+
+static void amf_rd_free(Rd* r)
+{
+	SWFAppContext* app = r->ctx->app;
+	if (r->strings != NULL) heap_free(app, (void*) r->strings);
+	for (uint32_t i = 0; i < r->trait_count; i++)
+		if (r->traits[i].statics != NULL) heap_free(app, (void*) r->traits[i].statics);
+	if (r->traits != NULL) heap_free(app, r->traits);
+	if (r->objs != NULL) heap_free(app, r->objs);
+	if (r->refs0 != NULL) heap_free(app, r->refs0);
+}
+
+
 static _Noreturn void rd_fail(Rd* r)
 {
 	avm2_throw_error(r->ctx, r->ctx->builtins.error_class, "Error: Invalid object");
@@ -1197,6 +1240,7 @@ static const Avm2String* rd3_str(Rd* r)
 			uint32_t nc = r->str_cap == 0 ? 16 : r->str_cap * 2;
 			const Avm2String** g = avm2_alloc(r->ctx, nc * sizeof(Avm2String*));
 			memcpy(g, r->strings, r->str_count * sizeof(Avm2String*));
+			if (r->strings != NULL) heap_free(r->ctx->app, (void*) r->strings);
 			r->strings = g;
 			r->str_cap = nc;
 		}
@@ -1212,6 +1256,7 @@ static uint32_t rd3_obj_reserve(Rd* r, Avm2Value v)
 		uint32_t nc = r->obj_cap == 0 ? 16 : r->obj_cap * 2;
 		Avm2Value* g = avm2_alloc(r->ctx, nc * sizeof(Avm2Value));
 		memcpy(g, r->objs, r->obj_count * sizeof(Avm2Value));
+		if (r->objs != NULL) heap_free(r->ctx->app, (void*) r->objs);
 		r->objs = g;
 		r->obj_cap = nc;
 	}
@@ -1269,6 +1314,7 @@ static Avm2Value rd3_read_object(Rd* r)
 			uint32_t nc = r->trait_cap == 0 ? 8 : r->trait_cap * 2;
 			TraitEntry* g = avm2_alloc(ctx, nc * sizeof(TraitEntry));
 			memcpy(g, r->traits, r->trait_count * sizeof(TraitEntry));
+			if (r->traits != NULL) heap_free(r->ctx->app, (void*) r->traits);
 			r->traits = g;
 			r->trait_cap = nc;
 		}
@@ -1295,10 +1341,14 @@ static Avm2Value rd3_read_object(Rd* r)
 		}
 	}
 
-	Avm2Class* cls = (trait->name->len > 0)
-		? alias_to_class(trait->name->utf8, trait->name->len)
+	// The nested reads below can add traits and MOVE the table (its old
+	// array is freed on growth): work from a copy, never through `trait`.
+	const TraitEntry tr = *trait;
+	trait = NULL;
+	Avm2Class* cls = (tr.name->len > 0)
+		? alias_to_class(tr.name->utf8, tr.name->len)
 		: NULL;
-	if (trait->externalizable)
+	if (tr.externalizable)
 	{
 		// The alias MUST resolve to a class implementing IExternalizable —
 		// there is no other way to interpret an opaque body.
@@ -1310,7 +1360,7 @@ static Avm2Value rd3_read_object(Rd* r)
 			                 "The class %.*s does not implement "
 			                 "flash.utils.IExternalizable but is aliased to an "
 			                 "externalizable class.",
-			                 (int) trait->name->len, trait->name->utf8);
+			                 (int) tr.name->len, tr.name->utf8);
 		}
 		Avm2Value objv = avm2_class_construct(ctx, cls, NULL, 0);
 		rd3_obj_reserve(r, objv);
@@ -1330,12 +1380,12 @@ static Avm2Value rd3_read_object(Rd* r)
 	Avm2Value objv = avm2_class_construct(ctx, cls, NULL, 0);
 	rd3_obj_reserve(r, objv);
 
-	for (uint32_t i = 0; i < trait->static_count; i++)
+	for (uint32_t i = 0; i < tr.static_count; i++)
 	{
 		Avm2Value v = rd3_value(r);
-		rd_set_prop_guarded(r, objv, trait->statics[i], v);
+		rd_set_prop_guarded(r, objv, tr.statics[i], v);
 	}
-	if (trait->dynamic)
+	if (tr.dynamic)
 	{
 		for (;;)
 		{
@@ -1570,6 +1620,7 @@ static uint32_t rd0_ref_reserve(Rd* r, Avm2Value v)
 		uint32_t nc = r->ref0_cap == 0 ? 16 : r->ref0_cap * 2;
 		Avm2Value* g = avm2_alloc(r->ctx, nc * sizeof(Avm2Value));
 		memcpy(g, r->refs0, r->ref0_count * sizeof(Avm2Value));
+		if (r->refs0 != NULL) heap_free(r->ctx->app, (void*) r->refs0);
 		r->refs0 = g;
 		r->ref0_cap = nc;
 	}
@@ -1739,6 +1790,7 @@ Avm2Value avm2_amf_write_object(Avm2Activation* act)
 	}
 	memcpy(ba->bytes + pos, w.out.b, w.out.len);
 	ba->position = pos + w.out.len;
+	amf_wr_free(&w);
 	return avm2_undefined();
 }
 
@@ -1756,6 +1808,7 @@ static unsigned char* amf_copy_out(Amf3Wr* w, size_t* out_len)
 	unsigned char* p = (unsigned char*) malloc(w->out.len > 0 ? w->out.len : 1);
 	if (p != NULL && w->out.len > 0) memcpy(p, w->out.b, w->out.len);
 	if (out_len != NULL) *out_len = (p != NULL) ? w->out.len : 0;
+	amf_wr_free(w);
 	return p;
 }
 
@@ -1792,7 +1845,9 @@ Avm2Value avm2_amf0_read_value(Avm2Context* ctx, const unsigned char* p, size_t 
 	r.p = p;
 	r.n = (uint32_t) n;
 	r.pos = 0;
-	return rd0_value(&r);
+	Avm2Value v = rd0_value(&r);
+	amf_rd_free(&r);
+	return v;
 }
 
 Avm2Value avm2_amf_read_object(Avm2Activation* act)
@@ -1808,6 +1863,7 @@ Avm2Value avm2_amf_read_object(Avm2Activation* act)
 	r.pos = ba->position;
 	Avm2Value v = (ba->object_encoding == 0) ? rd0_value(&r) : rd3_value(&r);
 	ba->position = r.pos;
+	amf_rd_free(&r);
 	return v;
 }
 

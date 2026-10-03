@@ -255,7 +255,7 @@ void heap_track_report(void)
 	}
 	qsort(g, ng, sizeof(HtGroup), ht_group_cmp);
 	fprintf(stderr, "[heap-track] outstanding %u allocations, %llu bytes, %u stacks\n", g_ht_live, (unsigned long long) total, ng);
-	for (uint32_t k = 0; k < ng && k < 25; k++)
+	for (uint32_t k = 0; k < ng && k < 60; k++)
 	{
 		fprintf(stderr, "[heap-track] #%u n=%u bytes=%llu sz=%u :", k, g[k].n, (unsigned long long) g[k].bytes, g[k].sample_size);
 		for (int f = 0; f < HT_FRAMES; f++)

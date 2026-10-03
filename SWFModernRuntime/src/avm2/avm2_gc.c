@@ -635,6 +635,16 @@ static void free_innards(Avm2Context* ctx, Avm2Object* o)
 		heap_free(app, p);
 		p = next;
 	}
+	// The bound-method cache nodes (obj.method === obj.method) are owned by
+	// the receiver; the closures they point at are census objects of their
+	// own. Leaked one node per cached method per dead receiver (FlashPunk's
+	// Mask caches three per instance — Seedling made ~1k a room swap).
+	for (Avm2BoundMethod* bm = o->bound_methods; bm != NULL; )
+	{
+		Avm2BoundMethod* next = bm->next;
+		heap_free(app, bm);
+		bm = next;
+	}
 	if (o->kind == AVM2_OBJ_ARRAY && o->native_ext != NULL)
 	{
 		Avm2ArrayExt* ext = (Avm2ArrayExt*) o->native_ext;

@@ -20,6 +20,7 @@
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
+#include <memory/heap.h>
 #include <avm2/avm2_ops.h>
 
 #include "libregexp.h"
@@ -148,6 +149,18 @@ static void retext_build(Avm2Context* ctx, const Avm2String* s, ReText* t)
 	t->u8off[n] = s->len;
 	t->n16 = n;
 }
+
+// The UTF-16 view is per-call scratch: every caller releases it (RT_RETURN)
+// on its normal exits. It used to leak twice the subject's length per
+// exec/test/match/search/replace/split call.
+static void retext_free(Avm2Context* ctx, ReText* t)
+{
+	if (t->units != NULL) heap_free(ctx->app, t->units);
+	if (t->u8off != NULL) heap_free(ctx->app, t->u8off);
+	t->units = NULL;
+	t->u8off = NULL;
+}
+#define RT_RETURN(v) do { Avm2Value rt_rv_ = (v); retext_free(ctx, &t); return rt_rv_; } while (0)
 
 // Substring by UTF-16 range (clamped).
 static const Avm2String* retext_sub(Avm2Context* ctx, const ReText* t,
@@ -892,8 +905,8 @@ static Avm2Value regexp_exec(Avm2Activation* act)
 	ReText t;
 	retext_build(ctx, text, &t);
 	ReMatch m;
-	if (!re_exec(ctx, ext, &t, &m)) return avm2_null();
-	return re_match_array(ctx, &t, &m);
+	if (!re_exec(ctx, ext, &t, &m)) RT_RETURN(avm2_null());
+	RT_RETURN(re_match_array(ctx, &t, &m));
 }
 
 static Avm2Value regexp_test(Avm2Activation* act)
@@ -905,7 +918,7 @@ static Avm2Value regexp_test(Avm2Activation* act)
 	ReText t;
 	retext_build(ctx, text, &t);
 	ReMatch m;
-	return avm2_bool(re_exec(ctx, ext, &t, &m) != 0);
+	RT_RETURN(avm2_bool(re_exec(ctx, ext, &t, &m) != 0));
 }
 
 // prototype.toString: "/source/gimsx"; throws 1034 for non-RegExp
@@ -944,7 +957,7 @@ static Avm2Value regexp_to_string(Avm2Activation* act)
 	if (ext->flags & AVM2_RE_MULTILINE) buf[n++] = 'm';
 	if (ext->flags & AVM2_RE_DOTALL) buf[n++] = 's';
 	if (ext->flags & AVM2_RE_EXTENDED) buf[n++] = 'x';
-	return avm2_string(avm2_string_new(ctx, buf, n));
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, n); heap_free(ctx->app, buf); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 // ---------------------------------------------------------------------------
@@ -995,7 +1008,7 @@ static Avm2Value string_match_regex(Avm2Activation* act)
 		{
 			re->last_index = 1;  // avmplus quirk (Ruffle match_internal)
 		}
-		return avm2_object_value(arr);
+		RT_RETURN(avm2_object_value(arr));
 	}
 	uint32_t old = re->last_index;
 	re->last_index = 0;
@@ -1003,10 +1016,10 @@ static Avm2Value string_match_regex(Avm2Activation* act)
 	if (re_exec(ctx, re, &t, &m))
 	{
 		re->last_index = old;
-		return re_match_array(ctx, &t, &m);
+		RT_RETURN(re_match_array(ctx, &t, &m));
 	}
 	re->last_index = old;
-	return avm2_null();
+	RT_RETURN(avm2_null());
 }
 
 static Avm2Value string_search_regex(Avm2Activation* act)
@@ -1022,8 +1035,8 @@ static Avm2Value string_search_regex(Avm2Activation* act)
 	ReMatch m;
 	int hit = re_exec(ctx, re, &t, &m);
 	re->last_index = old;
-	if (!hit) return avm2_integer(-1);
-	return avm2_integer((int32_t) m.g[0]);
+	if (!hit) RT_RETURN(avm2_integer(-1));
+	RT_RETURN(avm2_integer((int32_t) m.g[0]));
 }
 
 // Evaluate $-sequences of a string replacement (Ruffle
@@ -1175,6 +1188,7 @@ static Avm2Value string_replace_regex(Avm2Activation* act)
 			cargs[0] = avm2_string(pat);
 			cargs[1] = avm2_uint_value(pos16);
 			cargs[2] = avm2_string(text);
+			retext_free(ctx, &t);
 			Avm2Value r = avm2_call_value(ctx, replacement, avm2_null(), cargs, 3);
 			ret = avm2_string_concat(ctx, ret, avm2_coerce_to_string(ctx, r));
 		}
@@ -1203,7 +1217,7 @@ static Avm2Value string_replace_regex(Avm2Activation* act)
 	ReMatch m;
 	if (!re_find(ctx, re, &t, start, &m))
 	{
-		return avm2_string(text);  // lastIndex untouched (Ruffle)
+		RT_RETURN(avm2_string(text));  // lastIndex untouched (Ruffle)
 	}
 	const Avm2String* ret = avm2_string_from_literal(ctx, "");
 	int have = 1;
@@ -1243,7 +1257,7 @@ static Avm2Value string_replace_regex(Avm2Activation* act)
 		have = re_find(ctx, re, &t, start, &m);
 	}
 	ret = avm2_string_concat(ctx, ret, retext_sub(ctx, &t, start, t.n16));
-	return avm2_string(ret);
+	RT_RETURN(avm2_string(ret));
 }
 
 static Avm2Value string_split_regex(Avm2Activation* act)
@@ -1285,7 +1299,7 @@ static Avm2Value string_split_regex(Avm2Activation* act)
 			count++;
 			i = next;
 		}
-		return avm2_object_value(arr);
+		RT_RETURN(avm2_object_value(arr));
 	}
 
 	uint32_t start = 0;
@@ -1318,7 +1332,7 @@ static Avm2Value string_split_regex(Avm2Activation* act)
 	{
 		avm2_array_push(ctx, arr, avm2_string(retext_sub(ctx, &t, start, t.n16)));
 	}
-	return avm2_object_value(arr);
+	RT_RETURN(avm2_object_value(arr));
 }
 
 // ---------------------------------------------------------------------------

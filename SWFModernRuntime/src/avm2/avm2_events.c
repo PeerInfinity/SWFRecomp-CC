@@ -228,6 +228,7 @@ static Avm2Value event_format_to_string(Avm2Activation* act)
 			uint32_t new_cap = need * 2;
 			char* grown = avm2_alloc(ctx, new_cap);
 			memcpy(grown, buf, len);
+			heap_free(ctx->app, buf);
 			buf = grown;
 			cap = new_cap;
 		}
@@ -244,10 +245,11 @@ static Avm2Value event_format_to_string(Avm2Activation* act)
 	{
 		char* grown = avm2_alloc(ctx, len + 2);
 		memcpy(grown, buf, len);
+		heap_free(ctx->app, buf);
 		buf = grown;
 	}
 	buf[len++] = ']';
-	return avm2_string(avm2_string_new(ctx, buf, len));
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, len); heap_free(ctx->app, buf); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 static Avm2Value event_to_string(Avm2Activation* act)

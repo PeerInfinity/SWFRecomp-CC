@@ -123,6 +123,10 @@ static void sb_reserve(Avm2Context* ctx, SB* sb, uint32_t extra)
 	while (ncap < sb->len + extra) ncap *= 2;
 	char* nb = avm2_alloc(ctx, ncap);
 	if (sb->len > 0) memcpy(nb, sb->buf, sb->len);
+	// Nothing keeps a pointer into a builder that is still growing (a
+	// finished builder's buffer may be adopted — html attribute values — but
+	// is never appended to again), so the old buffer is freed here.
+	if (sb->buf != NULL) heap_free(ctx->app, sb->buf);
 	sb->buf = nb;
 	sb->cap = ncap;
 }
@@ -164,6 +168,19 @@ static void sb_cp(Avm2Context* ctx, SB* sb, uint32_t cp)
 static const Avm2String* sb_str(Avm2Context* ctx, SB* sb)
 {
 	return avm2_string_new(ctx, sb->buf != NULL ? sb->buf : "", sb->len);
+}
+// sb_str + release: the string copied the bytes, the builder was scratch.
+static const Avm2String* sb_take(Avm2Context* ctx, SB* sb)
+{
+	const Avm2String* s = sb_str(ctx, sb);
+	if (sb->buf != NULL) heap_free(ctx->app, sb->buf);
+	sb_init(sb);
+	return s;
+}
+static void sb_release(Avm2Context* ctx, SB* sb)
+{
+	if (sb->buf != NULL) heap_free(ctx->app, sb->buf);
+	sb_init(sb);
 }
 
 // ===========================================================================
@@ -1086,7 +1103,7 @@ static void spans_replace_text(Avm2Context* ctx, Avm2EditTextExt* et,
 	{
 		sb_bytes(ctx, &sb, et->text->utf8 + to_b, et->text->len - to_b);
 	}
-	et->text = sb_str(ctx, &sb);
+	et->text = sb_take(ctx, &sb);
 	et->original_html = NULL;
 	spans_normalize(ctx, et);
 }
@@ -1383,6 +1400,7 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 			Avm2TextFormatFields* fmt = &stack[stack_n - 1];
 			if ((fmt->present & TFP_DISPLAY) && fmt->display == DISPLAY_NONE)
 			{
+				sb_release(ctx, &decoded);
 				continue;
 			}
 			if (swf_version <= 7)
@@ -1392,7 +1410,7 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 				{
 					if (!swf_is_ws(decoded.buf[k])) { all_ws = 0; break; }
 				}
-				if (all_ws) continue;
+				if (all_ws) { sb_release(ctx, &decoded); continue; }
 			}
 			SB out;
 			sb_init(&out);
@@ -1425,6 +1443,8 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 			{
 				PUSH_TEXT_SPAN(out.buf, out.len, fmt);
 			}
+			sb_release(ctx, &out);
+			sb_release(ctx, &decoded);
 			continue;
 		}
 
@@ -1794,6 +1814,7 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 					uint32_t ncap = stack_cap * 2;
 					Avm2TextFormatFields* ns = avm2_alloc(ctx, ncap * sizeof(*ns));
 					memcpy(ns, stack, stack_n * sizeof(*ns));
+					heap_free(ctx->app, stack);
 					stack = ns;
 					stack_cap = ncap;
 				}
@@ -1870,7 +1891,7 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 #undef ATTR
 	}
 
-	et->text = sb_str(ctx, &text);
+	et->text = sb_take(ctx, &text);
 	et->original_html = NULL;
 	if (condense_white && ctx->swf_version >= 8)
 	{
@@ -1921,6 +1942,7 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 		}
 	}
 	spans_normalize(ctx, et);
+	heap_free(ctx->app, stack);  // the format stack is parse scratch
 #undef PUSH_TEXT_SPAN
 }
 
@@ -2262,7 +2284,7 @@ static const Avm2String* spans_to_html(Avm2Context* ctx, Avm2EditTextExt* et)
 		hw_push_text(&w, et->text->utf8 + sb2, eb - sb2);
 	}
 	hw_close_tags_till(&w, HT_TEXTFORMAT);
-	return sb_str(ctx, &w.out);
+	return sb_take(ctx, &w.out);
 }
 
 // ===========================================================================
@@ -3511,13 +3533,13 @@ static int64_t wrap_line(Avm2Context* ctx, const LFont* font,
 				}
 				else if (line_end <= 1)
 				{
-					return -1;
+					{ heap_free(ctx->app, breaks); return -1; }
 				}
 			}
-			return (int64_t) line_end;
+			{ heap_free(ctx->app, breaks); return (int64_t) line_end; }
 		}
 	}
-	return -1;
+	{ heap_free(ctx->app, breaks); return -1; }
 }
 
 // wrap_dimensions.
@@ -5047,7 +5069,7 @@ static const Avm2String* string_to_lower(Avm2Context* ctx, const Avm2String* s)
 		char c = s->utf8[i];
 		buf[i] = (c >= 'A' && c <= 'Z') ? (char) (c + 32) : c;
 	}
-	return avm2_string_new(ctx, buf, s->len);
+	{ const Avm2String* r_ = avm2_string_new(ctx, buf, s->len); heap_free(ctx->app, buf); return r_; }  // copied: the buffer is scratch
 }
 
 // parseInt(v, 10) over a value (ES semantics via avm2_string_to_int).
@@ -5190,7 +5212,7 @@ static Avm2TextFormatFields style_transform(Avm2Context* ctx, Avm2Object* obj)
 			if (out.len > 0) sb_ch(ctx, &out, ',');
 			sb_bytes(ctx, &out, val, vlen);
 		}
-		f.font = sb_str(ctx, &out);
+		f.font = sb_take(ctx, &out);
 		f.present |= TFP_FONT;
 	}
 	v = style_prop(ctx, obj, "fontSize");
@@ -6452,8 +6474,8 @@ static const Avm2String* group_text_of(Avm2Context* ctx, Avm2Object* o)
 			have = 0;
 		}
 	}
-	if (!have) return NULL;
-	return avm2_string_new(ctx, sb.buf != NULL ? sb.buf : "", sb.len);
+	if (!have) { sb_release(ctx, &sb); return NULL; }
+	return sb_take(ctx, &sb);
 }
 
 static const Avm2String* ce_text_of(Avm2Context* ctx, Avm2Object* o)
@@ -6649,7 +6671,7 @@ static Avm2Value te_replace_text(Avm2Activation* act)
 	sb_bytes(ctx, &sb, head->utf8, head->len);
 	sb_bytes(ctx, &sb, ins->utf8, ins->len);
 	sb_bytes(ctx, &sb, tail->utf8, tail->len);
-	ce->text = avm2_string_new(ctx, sb.buf != NULL ? sb.buf : "", sb.len);
+	ce->text = sb_take(ctx, &sb);
 	return avm2_undefined();
 }
 

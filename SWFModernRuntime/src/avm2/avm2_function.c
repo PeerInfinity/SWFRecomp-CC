@@ -12,6 +12,7 @@
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_object.h>
+#include <memory/heap.h>
 #include <avm2/avm2_ops.h>
 
 // Best-effort port of Ruffle function.rs display_function for error 1063.
@@ -299,7 +300,11 @@ static Avm2Value fn_apply(Avm2Activation* act)
 			args[i] = v;
 		}
 	}
-	return avm2_call_function_obj(ctx, fn, recv, args, n_args);
+	Avm2Value r = avm2_call_function_obj(ctx, fn, recv, args, n_args);
+	// The argument vector is scratch (callees copy what they keep: arguments,
+	// ...rest); it used to leak per apply() call.
+	if (args != NULL) heap_free(ctx->app, args);
+	return r;
 }
 
 static Avm2Value fn_get_length(Avm2Activation* act)

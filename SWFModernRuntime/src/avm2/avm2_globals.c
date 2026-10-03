@@ -25,6 +25,7 @@
 #include <avm2/avm2_globals.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
+#include <memory/heap.h>
 #include <avm2/avm2_ops.h>
 // swf_log_navigate / SWF_LOG_FETCH_ENABLED: the Ruffle test-navigator request
 // log (utils.h), shared with the AVM1 runtime.
@@ -1291,7 +1292,7 @@ static Avm2Value global_escape(Avm2Activation* act)
 			n += (uint32_t) snprintf(out + n, 7, "%%u%04X", 0xDC00 + (v & 0x3FF));
 		}
 	}
-	return avm2_string(avm2_string_new(ctx, out, n));
+	{ const Avm2String* r_ = avm2_string_new(ctx, out, n); heap_free(ctx->app, out); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 static int hex_digit(char c)
@@ -1366,7 +1367,7 @@ static Avm2Value global_unescape(Avm2Activation* act)
 			i++;
 		}
 	}
-	return avm2_string(avm2_string_new(ctx, out, n));
+	{ const Avm2String* r_ = avm2_string_new(ctx, out, n); heap_free(ctx->app, out); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 // --- flash.utils.escapeMultiByte / unescapeMultiByte ---
@@ -1440,13 +1441,13 @@ static const Avm2String* mb_escape(Avm2Context* ctx, const Avm2String* s)
 		for (uint32_t k = 0; k < m; k++)
 		{
 			unsigned char c = (unsigned char) enc[k];
-			if (c == 0) return avm2_string_new(ctx, out, n);
+			if (c == 0) { const Avm2String* r_ = avm2_string_new(ctx, out, n); heap_free(ctx->app, out); return r_; }  // copied: the buffer is scratch
 			if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
 			    || (c >= '0' && c <= '9')) out[n++] = (char) c;
 			else n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
 		}
 	}
-	return avm2_string_new(ctx, out, n);
+	{ const Avm2String* r_ = avm2_string_new(ctx, out, n); heap_free(ctx->app, out); return r_; }  // copied: the buffer is scratch
 }
 
 // One "%XX" body: two hex digits, CONSUMING whatever it looked at even when it
@@ -1507,7 +1508,10 @@ static const Avm2String* mb_unescape(Avm2Context* ctx, const Avm2String* s)
 			mb_append_cp(out, &n, g);
 		}
 	}
-	return avm2_string_new(ctx, out, n);
+	const Avm2String* r_ = avm2_string_new(ctx, out, n);  // copied: both buffers are scratch
+	heap_free(ctx->app, out);
+	heap_free(ctx->app, grp);
+	return r_;
 }
 
 static Avm2Value global_escape_multi_byte(Avm2Activation* act)
@@ -1577,7 +1581,7 @@ static Avm2Value uri_encode(Avm2Activation* act, int keep_reserved, const char* 
 			n += (uint32_t) snprintf(out + n, 4, "%%%02X", c);
 		}
 	}
-	return avm2_string(avm2_string_new(ctx, out, n));
+	{ const Avm2String* r_ = avm2_string_new(ctx, out, n); heap_free(ctx->app, out); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 _Noreturn static void uri_throw(Avm2Context* ctx, const char* fn)
@@ -1655,7 +1659,7 @@ static Avm2Value uri_decode(Avm2Activation* act, int keep_reserved, const char* 
 		}
 		n += utf8_put_cp(out + n, cp);
 	}
-	return avm2_string(avm2_string_new(ctx, out, n));
+	{ const Avm2String* r_ = avm2_string_new(ctx, out, n); heap_free(ctx->app, out); return avm2_string(r_); }  // copied: the buffer is scratch
 }
 
 static Avm2Value global_encode_uri(Avm2Activation* act)
@@ -6714,6 +6718,7 @@ static Avm2Value appdomain_get_qualified_definition_names(Avm2Activation* act)
 			memcpy(buf + e->key.ns_len + 2, e->key.name, e->key.name_len);
 			buf[len] = '\0';
 			s = avm2_string_new(ctx, buf, len);
+			heap_free(ctx->app, buf);
 		}
 		avm2_vector_set_index(ctx, out, n++, avm2_string(s));
 	}
@@ -7641,6 +7646,7 @@ static void urlvars_decode_string(Avm2Context* ctx, Avm2Value self,
 		const Avm2String* key = mb_unescape(ctx, avm2_string_new(ctx, buf, eq));
 		const Avm2String* val = mb_unescape(ctx,
 			avm2_string_new(ctx, buf + eq + 1, len - eq - 1));
+		heap_free(ctx->app, buf);  // both halves were copied
 		int found = 0;
 		Avm2Value cur = avm2_get_public_property(ctx, self, key->utf8, key->len,
 		                                         &found);
