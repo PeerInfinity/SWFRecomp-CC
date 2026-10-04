@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-09-29T02:24:03.766303+00:00",
-    "old_git_sha": "7755698f832916566c86e90df787a03953fc7878",
-    "new_timestamp": "2026-10-03T17:31:08.687063+00:00",
-    "new_git_sha": "c6be20a88416e8b3da24c9fca561cccc2cdb7447",
+    "old_timestamp": "2026-10-03T17:31:08.687063+00:00",
+    "old_git_sha": "c6be20a88416e8b3da24c9fca561cccc2cdb7447",
+    "new_timestamp": "2026-10-04T10:43:57.995828+00:00",
+    "new_git_sha": "8b69f982f7ab01556e6207306942fdbc75edd530",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 141,
-    "old_ruffle_matched": 95,
-    "old_effective_pass": 236,
+    "old_ruffle_matched": 94,
+    "old_effective_pass": 235,
     "old_total": 243,
     "old_pass_rate": 58.0,
     "new_pass": 141,
@@ -23,28 +23,11 @@
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 1,
-    "status_changed": 1,
-    "unchanged": 242,
+    "newly_failing": 0,
+    "status_changed": 0,
+    "unchanged": 243,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "Rectangle-v8",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 166,
-        "expected_lines": 166,
-        "matching_lines": 145
-      },
-      "new_lines": {
-        "actual_lines": 166,
-        "expected_lines": 166,
-        "matching_lines": 145
-      }
-    }
-  ]
+  "changes": []
 }
