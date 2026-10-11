@@ -1,23 +1,16 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c6be20a88416` (2026-10-03T17:31:08.535512+00:00)
-**Current:** `8b69f982f7ab` (2026-10-04T10:43:57.838635+00:00)
+**Previous:** `8b69f982f7ab` (2026-10-04T10:43:57.838635+00:00)
+**Current:** `8b69f982f7ab` (2026-10-11T08:51:58.482742+00:00)
+*Re-run on same commit — no comparison available.*
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 703 | 703 | 0 |
-| Total | 738 | 743 | +5 |
-| Pass rate | 95.3% | 94.6% | -0.7% |
-| Mismatched lines | 12003 | 12183 | +180 |
-
-## Added Tests (5)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `html_text_img_numeric_attributes` | output_mismatch | 1/3 |
-| `html_text_img_parsing` | output_mismatch | 116/175 |
-| `html_text_img_parsing_swf5` | output_mismatch | 63/106 |
-| `html_text_img_parsing_swf6` | output_mismatch | 85/102 |
-| `html_text_img_parsing_swf7` | output_mismatch | 116/175 |
+| Passing | 703 | 701 | -2 |
+| Total | 743 | 746 | +3 |
+| Pass rate | 94.6% | 94.0% | -0.6% |
+| Mismatched lines | 12183 | 13514 | +1331 |
+|   Decreased | | | -17 |
+|   Increased | | | +1121 |

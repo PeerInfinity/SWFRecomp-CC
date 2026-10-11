@@ -1,19 +1,16 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c6be20a88416` (2026-10-03T17:31:08.556357+00:00)
-**Current:** `8b69f982f7ab` (2026-10-04T10:43:57.859894+00:00)
+**Previous:** `8b69f982f7ab` (2026-10-04T10:43:57.859894+00:00)
+**Current:** `8b69f982f7ab` (2026-10-11T08:51:58.495545+00:00)
+*Re-run on same commit — no comparison available.*
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 1222 | 1222 | 0 |
-| Total | 1283 | 1284 | +1 |
-| Pass rate | 95.2% | 95.2% | 0% |
-| Mismatched lines | 2644 | 2701 | +57 |
-
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `html_text_img_parsing` | output_mismatch | 118/175 |
+| Total | 1284 | 1288 | +4 |
+| Pass rate | 95.2% | 94.9% | -0.3% |
+| Mismatched lines | 2701 | 3246 | +545 |
+|   Decreased | | | -2 |
+|   Increased | | | +205 |
