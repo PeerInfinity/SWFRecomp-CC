@@ -88,6 +88,7 @@ def main():
         build_commit = prev["source"]["commit"]
         built_src = rec_dir
     built = {rel: open(p, "rb").read() for rel, p in walk(built_src) if is_built(rel)}
+    modes = {rel: os.stat(p).st_mode & 0o777 for rel, p in walk(built_src) if is_built(rel)}   # kept as found
     if not built:
         refuse(f"no built files under {built_src}")
 
@@ -123,8 +124,12 @@ def main():
                "The built files would not be what this commit builds: rebuild (a user-gated re-pin in Archipelago-CC).")
 
     # --- page files at the page commit ---
-    page_files = [p for p in git("ls-tree", "-r", "--name-only", page_commit, "--", PAGE_DIR).splitlines() if p]
-    page = {p[len(PAGE_DIR) + 1:]: git("show", f"{page_commit}:{p}", binary=True) for p in page_files}
+    page, page_modes = {}, {}
+    for line in git("ls-tree", "-r", page_commit, "--", PAGE_DIR).splitlines():
+        meta, path = line.split("\t", 1)
+        rel = path[len(PAGE_DIR) + 1:]
+        page[rel] = git("show", f"{page_commit}:{path}", binary=True)
+        page_modes[rel] = 0o755 if meta.split()[0] == "100755" else 0o644
     clash = [p for p in page if is_built(p)]
     if clash:
         refuse(f"tracked page files overlap the built set: {clash}")
@@ -135,13 +140,15 @@ def main():
         return
 
     # --- write recompiler/ = built + page; nothing else survives ---
-    staged = {**{k: v for k, v in built.items()}, **page}
+    staged = {**built, **page}
+    staged_modes = {**modes, **page_modes}
     if os.path.isdir(rec_dir):
         shutil.rmtree(rec_dir)
     for rel, b in staged.items():
         p = os.path.join(rec_dir, rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)
         open(p, "wb").write(b)
+        os.chmod(p, staged_modes[rel])
 
     trees = {p: git("rev-parse", f"{build_commit}:{p}") for p in BUILD_INPUT_PATHS}
     build_info = json.loads(built["build_info.json"])
