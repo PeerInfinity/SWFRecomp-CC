@@ -1,0 +1,18 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action_queue.c b/SWFModernRuntime/src/actionmodern/action_queue.c
+index 92ab0f84..c32338ec 100644
+--- a/SWFModernRuntime/src/actionmodern/action_queue.c
++++ b/SWFModernRuntime/src/actionmodern/action_queue.c
+@@ -164,10 +164,11 @@ static void aq_drain(SWFAppContext* app_context, const DrainFilter* f)
+ 		// existing skip filter so goto_commands aggregation (place+remove in
+ 		// same goto sweep) remains canceled.
+ 		int fires_chronologically =
+-			(entry.kind == AQ_KIND_CLIP_INIT
++			((entry.kind == AQ_KIND_CLIP_INIT
+ 			 || entry.kind == AQ_KIND_CLIP_CONSTRUCT
+ 			 || entry.kind == AQ_KIND_REGISTER_CTOR)
+-			&& !entry.queued_in_catchup;
++			&& !entry.queued_in_catchup)
++			|| entry.kind == AQ_KIND_CLIP_CONSTRUCT; /* PROTO s22: goto-swept place+remove still fires onClipEvent(construct) */
+ 		if (!entry.is_unload && entry.clip && !fires_chronologically) {
+ 			if (entry.clip->avm1_removed || entry.clip->pending_removal) {
+ 				continue;

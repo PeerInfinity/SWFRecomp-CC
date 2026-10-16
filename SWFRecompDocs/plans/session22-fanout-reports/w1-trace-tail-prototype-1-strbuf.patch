@@ -1,0 +1,84 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_value.h b/SWFModernRuntime/include/avm2/avm2_value.h
+index 5588d086..bbbe65fa 100644
+--- a/SWFModernRuntime/include/avm2/avm2_value.h
++++ b/SWFModernRuntime/include/avm2/avm2_value.h
+@@ -39,10 +39,13 @@ typedef struct Avm2String
+ 	const char* utf8;
+ 	struct Avm2String* gc_next;  // census link (heap strings only)
+ 	uint32_t gc_flags;           // AVM2_STR_GC_* bits; 0 for static pool
++	uint32_t cap;                // AVM2_STR_GC_BUF only: inline byte capacity
+ } Avm2String;
+ 
+ #define AVM2_STR_GC_HEAP 1u  // heap-allocated + census-enrolled
+ #define AVM2_STR_GC_MARK 2u  // reachable this cycle (cleared each collect)
++#define AVM2_STR_GC_BUF  4u  // append buffer (never user-visible; len = frontier)
++#define AVM2_STR_GC_DEP  8u  // header whose bytes live in an AVM2_STR_GC_BUF
+ 
+ typedef enum Avm2ValueKind
+ {
+diff --git a/SWFModernRuntime/src/avm2/avm2_gc.c b/SWFModernRuntime/src/avm2/avm2_gc.c
+index 23970371..db0cc47e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_gc.c
++++ b/SWFModernRuntime/src/avm2/avm2_gc.c
+@@ -432,6 +432,12 @@ void avm2_gc_mark_string_bytes(const void* p)
+ void avm2_gc_mark_string(const Avm2String* s)
+ {
+ 	if (s == NULL) return;
++	if ((s->gc_flags & AVM2_STR_GC_DEP))
++	{
++		((Avm2String*) s)->gc_flags |= AVM2_STR_GC_MARK;
++		(((Avm2String*) s->utf8) - 1)->gc_flags |= AVM2_STR_GC_MARK;
++		return;
++	}
+ 	if ((s->gc_flags & AVM2_STR_GC_HEAP) && s->utf8 == (const char*) (s + 1))
+ 	{
+ 		// The census header itself (every string minted by avm2_string_new /
+diff --git a/SWFModernRuntime/src/avm2/avm2_value.c b/SWFModernRuntime/src/avm2/avm2_value.c
+index 325431bb..314220a0 100644
+--- a/SWFModernRuntime/src/avm2/avm2_value.c
++++ b/SWFModernRuntime/src/avm2/avm2_value.c
+@@ -145,6 +145,44 @@ const Avm2String* avm2_string_concat(Avm2Context* ctx, const Avm2String* a, cons
+ 	// unpaired low surrogate at the start of `b` re-forms one astral code
+ 	// point, shrinking the result by two bytes (3 + 3 -> 4).
+ 	bool join = wtf8_ends_with_high_surrogate(a) && wtf8_starts_with_low_surrogate(b);
++	// PROTOTYPE (s22 w1-trace-tail): append-in-place for long strings
++	// (avmplus String::append). `a` that ends at its buffer's frontier with
++	// spare capacity gets b written in place; the result is a dependent
++	// header sharing the buffer. Older prefix headers lose their utf8[len]
++	// NUL, hence the length threshold.
++	if (!join && b->len > 0 && a->len + b->len >= 4096u)
++	{
++		uint32_t total = a->len + b->len;
++		Avm2String* buf = NULL;
++		if ((a->gc_flags & AVM2_STR_GC_DEP))
++		{
++			Avm2String* o = ((Avm2String*) a->utf8) - 1;
++			if (o->len == a->len && (uint64_t) total + 1 <= o->cap) buf = o;
++		}
++		if (buf == NULL)
++		{
++			uint32_t cap = total * 2u + 1u;
++			buf = avm2_alloc(ctx, sizeof(Avm2String) + cap);
++			char* bb = (char*) (buf + 1);
++			memcpy(bb, a->utf8, a->len);
++			buf->len = a->len;
++			buf->utf8 = bb;
++			avm2_gc_enroll_string(buf);
++			buf->gc_flags |= AVM2_STR_GC_BUF;
++			buf->cap = cap;
++		}
++		char* bb = (char*) (buf + 1);
++		memcpy(bb + buf->len, b->utf8, b->len);
++		buf->len = total;
++		bb[total] = '\0';
++		Avm2String* d = avm2_alloc(ctx, sizeof(Avm2String));
++		d->len = total;
++		d->utf8 = bb;
++		avm2_gc_enroll_string(d);
++		d->gc_flags |= AVM2_STR_GC_DEP;
++		d->cap = 0;
++		return d;
++	}
+ 	uint32_t total = a->len + b->len - (join ? 2u : 0u);
+ 	Avm2String* s = avm2_alloc(ctx, sizeof(Avm2String) + total + 1);
+ 	char* bytes = (char*) (s + 1);
