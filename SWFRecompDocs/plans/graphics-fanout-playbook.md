@@ -298,6 +298,15 @@ detached capture processes are gone (`ps` filtered by its worktree hash), and
 archive its newest WIP patch plus a status table to master. Then brief the
 cloud worker to start from that WIP rather than from scratch.
 
+**Cloud-first mode — user directive 2026-10-16 (supersedes the hybrid mode below for s22).** "Any
+step that would make sense to run in the cloud runs in a cloud session, to minimize local CPU
+usage", Opus everywhere. This is the all-cloud mode above in practice: wave 1 runs as cloud workers
+too, delivering report-only branches. Local work is limited to merging, CI dispatch, results
+accounting, and the exporter oracle. Workers put exporter needs under `## LOCAL ORACLE REQUESTS`
+instead of blocking on them. Cloud graphics runs Dawn on mesa lavapipe, the CI rasterizer family,
+so a worker can grade a row absolutely after proving its before-render byte-identical to CI's
+actual PNG for that row. Common brief: `session22-fanout-reports/BRIEFS_COMMON.md`.
+
 **Hybrid session mode — user directive for s22 (2026-09-29): diagnose locally, implement in the
 cloud, one CPU-heavy local task at a time, Opus everywhere, same total size as s21.**
 
