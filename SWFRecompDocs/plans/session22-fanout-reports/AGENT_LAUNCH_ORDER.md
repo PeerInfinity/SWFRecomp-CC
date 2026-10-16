@@ -32,3 +32,4 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-crossvm | w1-crossvm slots 1-3 | mouse_pick_scroll_rect(+_loader,_button), mouse_pick_loader_avm1, avm2_loads_avm1_events (rm) | session_01WJfTLXUUuxzstmVBA8k32L |
 | w2-queue-regex | w1-trace-tail A | action_execution_order_test6 (rm), pcre_find_fixedlength | session_014xtNST7fsKSbQ6RVBmTLTy |
 | w2-goto-collator | w1-drift-avm2 slots 1(goto)+2 | goto_queued_invalid/swf9..11, collator_flags, collator_locale_ids_windows, collator_compare_basic | session_01HGTgTnncXGJ4Bi7uRJykNT |
+| w2-float-verts | w1-stroke-staircase slot 1 | +22 px (12 blend_modes, masks pair, overlaps, scroll_rect_mask, heavy_tesselation, layers, blur_size_grows, color_matrix, avm2_button_scroll_rect, cab/avm2_button), −1 acid-small .05 | |

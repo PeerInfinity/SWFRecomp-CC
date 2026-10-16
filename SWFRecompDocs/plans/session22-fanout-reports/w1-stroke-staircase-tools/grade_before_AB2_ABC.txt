@@ -1,0 +1,174 @@
+avm1/color | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/bitmap_data_fillrect | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/mask_with_drawing | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/movieclip_setmask | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/edittext_tag_indent | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.01a | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.01b | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.02a | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.02b | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.03a | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.03b | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.04a | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.04b | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.05a | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.05b | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.06a | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/focusrect_swf5 | output.06b | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm1/bitmapdata_applyfilter_colormatrix | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm2/blend_multiply_alpha | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/filters/glow_pass_scaling | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/cache_as_bitmap/masks | output.01 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/cache_as_bitmap/masks | output.02 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/cache_as_bitmap/masks | output.03 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/cache_as_bitmap/masks | output.04 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/cache_as_bitmap/masks | output.05 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/cache_as_bitmap/masks | output.06 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/cache_as_bitmap/masks | output.07 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/simple_shapes/winding_rule | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/cache_as_bitmap/shape_changed | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/timeline/timeline_as2_5 | output.01 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/timeline/timeline_as2_5 | output.02 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/timeline/timeline_as2_5 | output.03 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/timeline/timeline_as2_5 | output.04 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/timeline/timeline_as2_5 | output.05 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/timeline/timeline_as2_5 | output.06 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/timeline/timeline_as2_5 | output.07 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/acid/acid-gradient-0 | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+regression/avm2_timeline_stroke_gradient | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+regression/avm2_timeline_gradients | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+regression/mask_sibling_union | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+regression/mask_nested_intersect | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/acid/acid-bitmap-fill | output | PASS 242/300 | PASS 242/300 | PASS 242/300 | ident | ci:-
+from_shumway/acid/acid-bitmap-fill-2 | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/filters/displacement_map_through_applyFilter | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_border_transform | output.01 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_border_transform | output.02 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_border_transform | output.03 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_border_transform | output.04 | PASS 16/20 | PASS 16/20 | PASS 16/20 | ident | ci:-
+visual/edittext/edittext_border_transform | output.05 | PASS 0/20 | PASS 0/20 | PASS 0/20 | ident | ci:-
+visual/edittext/edittext_border_transform | output.06 | PASS 15/20 | PASS 15/20 | PASS 15/20 | ident | ci:-
+text/auto_size/width | output | PASS 0/18 | PASS 0/18 | PASS 0/18 | ident | ci:-
+from_shumway/doubleAndRegister | output | 26/0 | 2/0 | 2/0 | MOVED | ci:=
+from_shumway/acid/acid-bitmapData-copyPixels | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/bitmapdata_copypixels_with_alpha_oob | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+from_shumway/acid/acid-bitmapData-draw | output | 416/250 | 416/250 | 416/250 | ident | ci:=
+avm2/bitmapdata_draw_self_via_graphic | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/simple_shapes/masks | output | 181/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/simple_shapes/gradients/gradients | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/filters/drop_shadow | output | 3875/0 | 3/0 | 3/0 | MOVED | ci:=
+visual/filters/color_matrix | output | 6/0 | 12/0 | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/multiply | output | 16/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+regression/avm2_morph | output | n/a | n/a | n/a | ident | ci:-
+from_shumway/acid/acid-blend-2 | output.10 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+from_shumway/acid/acid-blend-2 | output.15 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+from_shumway/acid/acid-blend-2 | output.20 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+from_shumway/acid/acid-blend-2 | output.26 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+from_shumway/acid/acid-blend-2 | output.40 | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+avm2/graphics_bitmaps | output | PASS 525/600 | PASS 525/600 | PASS 525/600 | ident | ci:-
+from_shumway/acid/acid-small | output.01 | 3657/3000 | 3624/3000 | 3624/3000 | MOVED | ci:=
+from_shumway/acid/acid-small | output.05 | PASS 2997/3000 | 3027/3000 | 3027/3000 | MOVED | ci:-
+avm2/displayobject_getbounds_shape | output | PASS 3716/3800 | PASS 3716/3800 | PASS 3716/3800 | ident | ci:-
+avm2/graphics_simple_shapes | output | 2/0 | 2/0 | 2/0 | ident | ci:=
+visual/simple_shapes/layers | output | 23/0 | 23/0 | PASS 0/0 | MOVED | ci:=
+avm2/stage3d_triangle | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm2/stage3d_rotating_cube | output | PASS 244/250 | PASS 244/250 | PASS 244/250 | ident | ci:-
+regression/avm2_graphics_runtime | output | n/a | n/a | n/a | ident | ci:-
+avm2/edittext_autosize_height_dynamic | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+fonts/device_font_kerning | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm2/stage3d_stencil | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+avm2/stage3d_sampler | output | PASS 50/850 | PASS 50/850 | PASS 50/850 | ident | ci:-
+visual/edittext/edittext_caret_multiline | output.01 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_caret_multiline | output.02 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_caret_multiline | output.03 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_caret_multiline | output.04 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_caret_multiline | output.05 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_caret_multiline | output.06 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/fonts/device-font | output | PASS 0/3 | PASS 0/3 | PASS 0/3 | ident | ci:-
+avm2/bitmapdata_copypixels | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/cache_as_bitmap/nested_rotation | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/edittext/edittext_device_transform_small_rotation | output | PASS 11/11 | PASS 11/11 | PASS 11/11 | ident | ci:-
+visual/edittext/edittext_device_transform_small_shear | output | PASS 49/50 | PASS 49/50 | PASS 49/50 | ident | ci:-
+visual/fonts/leading_device_font | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/cache_as_bitmap/edittext_hscroll | output.01 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/cache_as_bitmap/edittext_hscroll | output.02 | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/cache_as_bitmap/edittext_selection | output.01 | PASS 0/8 | PASS 0/8 | PASS 0/8 | ident | ci:-
+visual/cache_as_bitmap/edittext_selection | output.02 | PASS 0/8 | PASS 0/8 | PASS 0/8 | ident | ci:-
+visual/cache_as_bitmap/edittext_selection | output.03 | PASS 0/8 | PASS 0/8 | PASS 0/8 | ident | ci:-
+visual/filters/drop_shadow_scales_with_screen | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | ident | ci:-
+visual/filters/blur_scales_with_screen | output | PASS 0/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:-
+visual/edittext/edittext_border_filters | output | PASS 0/17 | PASS 0/17 | PASS 0/17 | ident | ci:-
+visual/cache_as_bitmap/edittext_scroll | output.01 | PASS 0/5 | PASS 0/5 | PASS 0/5 | ident | ci:-
+visual/cache_as_bitmap/edittext_scroll | output.02 | 6/5 | 6/5 | 6/5 | ident | ci:=
+visual/filters/bevel | output | 3091/6 | 750/6 | 750/6 | MOVED | ci:=
+visual/filters/bevel_full | output | 1158/18 | 42/18 | 42/18 | MOVED | ci:=
+visual/filters/bevel_inner | output | 1018/18 | 42/18 | 42/18 | MOVED | ci:=
+visual/filters/bevel_outer | output | 1450/18 | 42/18 | 42/18 | MOVED | ci:=
+visual/filters/drop_shadow_angles | output | 6934/0 | 549/0 | 549/0 | MOVED | ci:=
+visual/filters/glow | output | 2659/0 | 3/0 | 3/0 | MOVED | ci:=
+visual/filters/glow_without_composite_source | output | 2917/0 | 3/0 | 3/0 | MOVED | ci:=
+visual/filters/glow_with_alpha_strength | output | 1123/18 | 42/18 | 42/18 | MOVED | ci:=
+visual/filters/blur_size_grows | output | 546/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/filters/displacement_map | output | 1436/72 | 408/72 | 408/72 | MOVED | ci:=
+visual/filters/any_blur_scales_with_screen | output | 4884/0 | 4884/0 | 4884/0 | ident | ci:=
+visual/simple_shapes/masks_equal_clipdepth | output | 181/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/simple_shapes/overlaps | output | 12/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/simple_shapes/scroll_rect_mask | output | 20/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/simple_shapes/text_field_mask | output | 56/0 | 56/0 | 56/0 | ident | ci:=
+visual/simple_shapes/heavy_tesselation | output | 2439/3 | PASS 3/3 | PASS 3/3 | MOVED | ci:=
+visual/avm2_button_scroll_rect | output | 6/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/cache_as_bitmap/avm2_button | output | 6/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/cache_as_bitmap/drawing_api | output | 2295/0 | 2295/0 | 2295/0 | ident | ci:=
+visual/blend_modes/add | output | 5/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/hardlight | output | 21/0 | PASS 0/0 | PASS 0/0 | MOVED | ci:=
+visual/fonts/glyph | output | 3/0 | 3/0 | 3/0 | ident | ci:=
+visual/definefont4 | output | 16086/0 | 16086/0 | 16086/0 | ident | ci:=
+avm1/movieclip_begin_gradient_fill | output | 132/0 | 132/0 | 132/0 | ident | ci:=
+avm1/movieclip_line_gradient_style | output | 1023/0 | 1023/0 | 1023/0 | ident | ci:=
+from_shumway/MaskTest | output | 1/0 | 1/0 | 1/0 | ident | ci:=
+from_shumway/acid/acid-gc | output | 234/0 | 234/0 | 234/0 | ident | ci:=
+from_shumway/acid/acid-scale | output | 106/0 | 22/0 | 8/0 | MOVED | ci:=
+from_shumway/acid/acid-gradient-2 | output | 38/0 | 3/0 | 3/0 | MOVED | ci:=
+from_shumway/acid/acid-color-0 | output | 17388/3 | 17368/3 | 17376/3 | MOVED | ci:=
+from_shumway/acid/acid-text-6 | output | 198/0 | 198/0 | 198/0 | ident | ci:=
+from_shumway/acid/acid-text-6 | frame5 | 12/0 | 12/0 | 12/0 | ident | ci:=
+from_shumway/acid/acid-text-escape | output | 112/0 | 110/0 | 110/0 | MOVED | ci:=
+from_shumway/acid/acid-shapes | output | 25681/25600 | 25681/25600 | 25681/25600 | ident | ci:=
+from_shumway/acid/acid-morph | output | 32195/5600 | 32197/5600 | 31977/5600 | MOVED | ci:=
+from_shumway/3_joystick | output | 4/0 | 4/0 | 4/0 | MOVED | ci:=
+avm2/sprite_with_frames | output | 914/0 | 914/0 | 914/0 | ident | ci:=
+avm2/bitmapdata_draw_rotation | output | 348/0 | 348/0 | 348/0 | ident | ci:=
+avm2/displayobject_opaque_background | output | 2/0 | 2/0 | 2/0 | ident | ci:=
+visual/blend_modes/alpha_no_layer | output | 18/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/darken | output | 16/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/difference | output | 7/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/erase_no_layer | output | 18/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/invert | output | 24/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/lighten | output | 5/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/overlay | output | 19/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/screen | output | 5/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/blend_modes/subtract | output | 7/0 | n/a | PASS 0/0 | MOVED | ci:=
+visual/drawing_api/fills_and_lines | output | 4/0 | n/a | 4/0 | ident | ci:=
+visual/drawing_api/gradient_focal_point | output | 60/0 | n/a | 60/0 | ident | ci:=
+from_gnash/misc-ming.all/morph_test1 | frame1 | 216/0 | n/a | 217/0 | MOVED | ci:=
+from_gnash/misc-ming.all/morph_test1 | frame2 | 15/0 | n/a | 12/0 | MOVED | ci:=
+from_gnash/misc-ming.all/morph_test1 | frame3 | 15/0 | n/a | 12/0 | MOVED | ci:=
+from_gnash/misc-ming.all/morph_test1 | frame4 | 15/0 | n/a | 12/0 | MOVED | ci:=
+from_gnash/misc-ming.all/morph_test1 | frame5 | 15/0 | n/a | 12/0 | MOVED | ci:=
+from_gnash/misc-ming.all/morph_test1 | frame6 | 15/0 | n/a | 12/0 | MOVED | ci:=
+from_gnash/misc-ming.all/BeginBitmapFill | output | 936/100 | n/a | 939/100 | MOVED | ci:=
+from_gnash/misc-ming.all/Video-EmbedSquareTest | output | 15/0 | n/a | 12/0 | MOVED | ci:=
+from_gnash/misc-ming.all/loop/simple_loop_test | frame1 | PASS 0/0 | n/a | PASS 0/0 | ident | ci:-
+from_gnash/misc-ming.all/loop/simple_loop_test | frame2 | PASS 0/0 | n/a | PASS 0/0 | ident | ci:-
+from_gnash/misc-ming.all/loop/simple_loop_test | frame3 | PASS 0/0 | n/a | PASS 0/0 | ident | ci:-
+from_gnash/misc-ming.all/loop/simple_loop_test | frame4 | PASS 0/0 | n/a | PASS 0/0 | ident | ci:-
+from_gnash/misc-ming.all/loop/simple_loop_test | frame5 | PASS 0/0 | n/a | PASS 0/0 | ident | ci:-
+from_gnash/misc-ming.all/loop/simple_loop_test | frame6 | PASS 0/0 | n/a | PASS 0/0 | ident | ci:-
+from_gnash/misc-ming.all/loop/simple_loop_test | frame7 | PASS 0/0 | n/a | PASS 0/0 | ident | ci:-
+avm2/graphics_gradients | output | 349/0 | n/a | 349/0 | ident | ci:=
+from_shumway/gradientTransform | output | 9/0 | n/a | 9/0 | ident | ci:=
+from_shumway/acid/acid-gradient | output | 6639/0 | n/a | 6639/0 | ident | ci:=
+from_shumway/acid/acid-stroke-0 | output | 52533/0 | n/a | 52522/0 | MOVED | ci:=
+from_shumway/acid/acid-shapes-testing | output | 41339/0 | n/a | 41339/0 | ident | ci:=
+from_shumway/MaskTest-2 | output | 7162/0 | n/a | 7162/0 | ident | ci:=
+fonts/embed_matching/match_style | output | 3/0 | n/a | 3/0 | ident | ci:=

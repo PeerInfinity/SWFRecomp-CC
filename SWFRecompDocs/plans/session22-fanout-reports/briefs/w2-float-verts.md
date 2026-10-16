@@ -1,0 +1,23 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 22 (dual-axis #14), slot `w2-float-verts`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-float-verts` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session22-fanout-reports/BRIEFS_COMMON.md` and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Read `CLAUDE.md`. Your branch is `fanout/w2-float-verts`; deliver `SWFRecompDocs/plans/session22-fanout-reports/w2-float-verts-report.md` and `SWFRecompDocs/plans/session22-fanout-reports/w2-float-verts.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Check `SWFRecompDocs/plans/session22-fanout-reports/SIBLING_FILE_MAP.md` for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**Productionize `w1-stroke-staircase` prototype ABC: keep sub-twip remainders of computed vertices in the recompiler (strokes, fills, lyon round-join/cap arc count).** Categories: `visual from_shumway avm1 avm2 text fonts from_gnash`.
+
+Diagnosis of record: `session22-fanout-reports/w1-stroke-staircase-report.md` (read all of it), prototype `w1-stroke-staircase-prototype.patch` (recompiler only), tools in `w1-stroke-staircase-tools/` (its `grade.py` grades captures with `verify_output.compare_images`; the worker proved its cloud renders byte-identical to CI's actual PNGs on all 39 ledger rows, so absolute grading against goldens is CI-grade).
+
+Work list (report §4 slot 1):
+- Land A + B + C. Keep `sizeof(Vertex) == 16` (`static_assert`); re-measure `heavy_tesselation` recompile peak RSS under `verify_output.py`'s `ulimit -v 4194304` and report it (a 24-B Vertex OOMs and silently blanks the shape).
+- Every leg needs `--recompile` (recompiler change). Rebuild `SWFRecomp/build` before each leg.
+- **Broader argued sweep** before delivering: render every CI-PASSING image row with recompiled curved/stroked timeline geometry outside the standing canary (a geometry change moves near-budget passes; `acid-small .05` was one). Report every pass row that moves, with its margin.
+- Docs in your patch: retire the `visual/simple_shapes/masks` + `masks_equal_clipdepth` image-axis entry in `ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md` (or wherever it lives — grep) and its row in `SWFRecompDocs/plans/graphics-fanout-playbook.md` §3; mark s18 §3-E "45° 1-sample ties" NO-GO as refuted (one line in the playbook); amend the `addCurvedEdge` "lroundf refuted" comment.
+- Canary additions at EOF of `ruffle-tests/render_canary_tests.txt`: `visual/simple_shapes/overlaps`, `visual/blend_modes/add`, `visual/filters/glow`.
+- Trace axis: the report's 120-test capture showed 0 moves; repeat at least the no-graphics hit-test sweep (`avm1/{hittest_morph, hittest_morph_input, hittest_winding_rule, movieclip_hittest, hitarea_sweep}`, `avm2/{displayobject_hittestpoint(_boundary), hittest_morph, button_hittest, mouse_pick_avm1_root}`) and a sample of recompiler-sensitive trace rows.
+- Optional, ONLY if A+B+C are done and verified with time left: the morph path (`addCurvedEdge` + earcut `fillShape`) remainder treatment (report §6 lead "Morph shapes"), measured separately and delivered as a second patch `w2-float-verts-2-morph.patch`.
+
+Ledger: the 22 flips in report §0 (`blur_size_grows`, `color_matrix`, `simple_shapes/masks`, `masks_equal_clipdepth`, `overlaps`, `scroll_rect_mask`, `heavy_tesselation`, `layers`, `avm2_button_scroll_rect`, `cache_as_bitmap/avm2_button`, 12 `blend_modes/*`), expected −1 `from_shumway/acid/acid-small output.05` (explained in §3; completion mechanism = device-scale minimum stroke width, a later slot). Sibling `w2-default-fonts-draw` edits `swf.cpp`'s zero-glyph device-font synth (~2593-2648) — different region; stay out of it.

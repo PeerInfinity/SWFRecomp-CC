@@ -1,0 +1,397 @@
+diff --git a/SWFRecomp/include/swf.hpp b/SWFRecomp/include/swf.hpp
+index 06d8a2b3..41a3c15a 100644
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -55,6 +55,16 @@ namespace SWFRecomp
+ 		s32 x;
+ 		s32 y;
+ 		s32 morph_index = -1;
++		// Sub-twip remainder of the unquantized position, in 1/16384 twip
++		// (same y-up frame as x/y): exact = x + fx_frac/16384. Nonzero only
++		// where a vertex is computed rather than read from the SWF (the Levien
++		// curve flattener, the stroke builders, libtess2 fill output); x/y stay
++		// the integer copy the fill graph keys on. Strokes and fills are emitted
++		// from the exact value, the way lyon tessellates Ruffle's f32 path.
++		// Two s16 keep sizeof(Vertex) at 16: heavy_tesselation's path graph
++		// already peaks near the recompiler's 4 GB address-space cap.
++		s16 fx_frac = 0;
++		s16 fy_frac = 0;
+ 	};
+ 	
+ 	struct Tri
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f204a865..f213f3f0 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -198,8 +198,21 @@ namespace SWFRecomp
+ 	// drawing-API tessellation (action.c). Output vertices may be NEW points (at
+ 	// intersections), so morph_index is NOT preserved on the result — callers that
+ 	// need per-vertex morph correspondence must keep using the earcut path.
++	//
++	// keep_float: feed libtess2 each vertex's unquantized position (Vertex::fx/fy,
++	// set by the Levien curve flattener) and keep the output unrounded, as lyon's
++	// f32 fill does in Ruffle. Shape fills only; glyph outlines keep the
++	// historical integer round trip.
++	static const double VERTEX_FRAC_SCALE = 16384.0;
++
++	static inline s16 vertexFrac(double exact, s32 quantized)
++	{
++		return (s16) std::lround((exact - (double) quantized) * VERTEX_FRAC_SCALE);
++	}
++
+ 	static void tessellateContours(const std::vector<std::vector<Vertex>>& contours,
+-	                               int winding_rule, std::vector<Tri>& tris)
++	                               int winding_rule, std::vector<Tri>& tris,
++	                               bool keep_float = false)
+ 	{
+ 		TESStesselator* tess = tessNewTess(NULL);
+ 		if (!tess)
+@@ -219,8 +232,8 @@ namespace SWFRecomp
+ 			coords.reserve(c.size() * 2);
+ 			for (const Vertex& v : c)
+ 			{
+-				coords.push_back((float) v.x);
+-				coords.push_back((float) v.y);
++				coords.push_back(keep_float ? (float) (v.x + v.fx_frac / VERTEX_FRAC_SCALE) : (float) v.x);
++				coords.push_back(keep_float ? (float) (v.y + v.fy_frac / VERTEX_FRAC_SCALE) : (float) v.y);
+ 			}
+ 
+ 			tessAddContour(tess, 2, coords.data(), sizeof(float) * 2, (int) c.size());
+@@ -254,6 +267,12 @@ namespace SWFRecomp
+ 				t.verts[j].x = (s32) std::lround(verts[idx * 2 + 0]);
+ 				t.verts[j].y = (s32) std::lround(verts[idx * 2 + 1]);
+ 				t.verts[j].morph_index = -1;
++
++				if (keep_float)
++				{
++					t.verts[j].fx_frac = vertexFrac(verts[idx * 2 + 0], t.verts[j].x);
++					t.verts[j].fy_frac = vertexFrac(verts[idx * 2 + 1], t.verts[j].y);
++				}
+ 			}
+ 
+ 			if (ok)
+@@ -8555,13 +8574,71 @@ namespace SWFRecomp
+ 			float u = 1.0f - t;
+ 
+ 			Vertex v;
+-			v.x = (s32) (u*u*current.x + 2*u*t*control.x + t*t*anchor.x);
+-			v.y = (s32) (u*u*current.y + 2*u*t*control.y + t*t*anchor.y);
++			float fx = u*u*current.x + 2*u*t*control.x + t*t*anchor.x;
++			float fy = u*u*current.y + 2*u*t*control.y + t*t*anchor.y;
++			v.x = (s32) fx;
++			v.y = (s32) fy;
++			v.fx_frac = vertexFrac(fx, v.x);
++			v.fy_frac = vertexFrac(fy, v.y);
+ 
+ 			path->verts.push_back(v);
+ 		}
+ 	}
+ 
++	// Stroke geometry is built from each vertex's unquantized position and
++	// emitted unrounded: Ruffle strokes an f32 path with lyon, so both the
++	// flattened curve points and the offset corners carry sub-twip precision.
++	// Truncating them to integer twips (up to 0.05 px of drift) moved whole
++	// staircase steps of every 1 px curved stroke under quality = "low".
++	struct Vertex2d
++	{
++		double x;
++		double y;
++	};
++
++	static inline double strokeX(const Vertex& v) { return v.x + v.fx_frac / VERTEX_FRAC_SCALE; }
++	static inline double strokeY(const Vertex& v) { return v.y + v.fy_frac / VERTEX_FRAC_SCALE; }
++
++	// Round join/cap arc segment count, lyon_tessellation 1.0 stroke.rs
++	// `num_arc_subdivisions`: the arc is bisected round(log2(ceil(angle/step)))
++	// times, step = 2*acos(1 - tol/r). Ruffle strokes with
++	// StrokeOptions::DEFAULT_TOLERANCE (0.1 px) at scale 1, i.e. 2 twips here.
++	static int strokeArcSegments(double radius, double angle)
++	{
++		const double tolerance = std::min(2.0, radius);
++		if (radius <= 0.0)
++		{
++			return 1;
++		}
++		double step = 2.0*acos((radius - tolerance)/radius);
++		if (!(step > 0.0))
++		{
++			return 1;
++		}
++		double segments = ceil(fabs(angle)/step);
++		if (!(segments >= 1.0))
++		{
++			return 1;
++		}
++		int subdivisions = (int) std::lround(log2(segments));
++		if (subdivisions > 16)
++		{
++			subdivisions = 16;
++		}
++		return 1 << subdivisions;
++	}
++
++	static inline Vertex strokeVertex(double x, double y, s32 morph_index)
++	{
++		Vertex v;
++		v.x = (s32) std::round(x);
++		v.y = (s32) std::round(y);
++		v.morph_index = morph_index;
++		v.fx_frac = vertexFrac(x, v.x);
++		v.fy_frac = vertexFrac(y, v.y);
++		return v;
++	}
++
+ 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
+ 	{
+ 		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2 || shape_tag.code == SWF_TAG_DEFINE_FONT_3);
+@@ -10707,7 +10784,7 @@ namespace SWFRecomp
+ 					{
+ 						std::vector<Tri> tris;
+ 
+-						tessellateContours(g.contours, winding_rule, tris);
++						tessellateContours(g.contours, winding_rule, tris, true);
+ 
+ 						tris_size += tris.size();
+ 
+@@ -10732,8 +10809,8 @@ namespace SWFRecomp
+ 						{
+ 							for (int j = 0; j < 3; ++j)
+ 							{
+-								float x_f = (float) t.verts[j].x;
+-								float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
++								float x_f = (float) strokeX(t.verts[j]);
++								float y_f = (float) ((double) FRAME_HEIGHT - strokeY(t.verts[j]));
+ 
+ 								shape_data << "\t" << "{ "
+ 										   << std::hex << std::uppercase
+@@ -10825,8 +10902,8 @@ namespace SWFRecomp
+ 						{
+ 							for (int j = 0; j < 3; ++j)
+ 							{
+-								float x_f = (float) t.verts[j].x;
+-								float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
++								float x_f = (float) strokeX(t.verts[j]);
++								float y_f = (float) ((double) FRAME_HEIGHT - strokeY(t.verts[j]));
+ 
+ 								shape_data << "\t" << "{ "
+ 										   << std::hex << std::uppercase
+@@ -11455,18 +11532,20 @@ namespace SWFRecomp
+ 	//
+ 	// Every shape older than DefineShape4 keeps join_style 0, for which this is
+ 	// bit-for-bit the historical round fan.
+-	void drawLineJoin(const Vertex& a, const Vertex& b, const Vertex& c, u16 halfwidth,
++	void drawLineJoin(const Vertex& a, const Vertex& b, const Vertex& c, double halfwidth,
+ 	                  u8 join_style, double miter_limit, std::vector<Tri>& tris)
+ 	{
+-		Vertex vec_a_b;
+-		vec_a_b.x = b.x - a.x;
+-		vec_a_b.y = b.y - a.y;
++		const double bx = strokeX(b), by = strokeY(b);
++
++		Vertex2d vec_a_b;
++		vec_a_b.x = bx - strokeX(a);
++		vec_a_b.y = by - strokeY(a);
+ 		
+-		Vertex vec_b_c;
+-		vec_b_c.x = c.x - b.x;
+-		vec_b_c.y = c.y - b.y;
++		Vertex2d vec_b_c;
++		vec_b_c.x = strokeX(c) - bx;
++		vec_b_c.y = strokeY(c) - by;
+ 		
+-		s32 cross = CROSS(vec_a_b, vec_b_c);
++		double cross = CROSS(vec_a_b, vec_b_c);
+ 		
+ 		double offset = (cross < 0) ? M_PI/2 : -M_PI/2;
+ 		
+@@ -11510,15 +11589,8 @@ namespace SWFRecomp
+ 		//
+ 		// The two OUTER offset corners of the corner are shared by all three
+ 		// join styles; only what is drawn between them differs.
+-		Vertex p_start;
+-		p_start.x = (s32) std::round(b.x + halfwidth*cos(start_angle));
+-		p_start.y = (s32) std::round(b.y + halfwidth*sin(start_angle));
+-		p_start.morph_index = b.morph_index;
+-
+-		Vertex p_end;
+-		p_end.x = (s32) std::round(b.x + halfwidth*cos(end_angle));
+-		p_end.y = (s32) std::round(b.y + halfwidth*sin(end_angle));
+-		p_end.morph_index = b.morph_index;
++		Vertex p_start = strokeVertex(bx + halfwidth*cos(start_angle), by + halfwidth*sin(start_angle), b.morph_index);
++		Vertex p_end = strokeVertex(bx + halfwidth*cos(end_angle), by + halfwidth*sin(end_angle), b.morph_index);
+ 
+ 		Tri t;
+ 		t.verts[0] = b;
+@@ -11544,10 +11616,7 @@ namespace SWFRecomp
+ 
+ 					if (mx*mx + my*my <= 4.0*miter_limit*miter_limit)
+ 					{
+-						Vertex m_point;
+-						m_point.x = (s32) std::round(b.x + halfwidth*mx);
+-						m_point.y = (s32) std::round(b.y + halfwidth*my);
+-						m_point.morph_index = b.morph_index;
++						Vertex m_point = strokeVertex(bx + halfwidth*mx, by + halfwidth*my, b.morph_index);
+ 
+ 						t.verts[1] = p_start;
+ 						t.verts[2] = m_point;
+@@ -11579,13 +11648,16 @@ namespace SWFRecomp
+ 
+ 		Vertex last_point = p_start;
+ 
+-		for (double current_angle = start_angle + angle_delta; current_angle < end_angle; current_angle += angle_delta)
++		const int join_segments = strokeArcSegments(halfwidth, end_angle - start_angle);
++		angle_delta = (end_angle - start_angle)/join_segments;
++
++		for (int k = 1; k < join_segments; ++k)
+ 		{
++			const double current_angle = start_angle + k*angle_delta;
++
+ 			t.verts[1] = last_point;
+ 
+-			t.verts[2].x = (s32) std::round(b.x + halfwidth*cos(current_angle));
+-			t.verts[2].y = (s32) std::round(b.y + halfwidth*sin(current_angle));
+-			t.verts[2].morph_index = b.morph_index;
++			t.verts[2] = strokeVertex(bx + halfwidth*cos(current_angle), by + halfwidth*sin(current_angle), b.morph_index);
+ 
+ 			tris.push_back(t);
+ 
+@@ -11601,7 +11673,7 @@ namespace SWFRecomp
+ 	// LINESTYLE2 cap geometry (`cap_style`: 0 round, 1 none/butt, 2 square).
+ 	// `a` is the path END being capped and `b` its inward neighbour, so
+ 	// `angle_a_b` points INTO the stroke and the cap lives on -that direction.
+-	void drawLineCap(const Vertex& a, const Vertex& b, u16 halfwidth, u8 cap_style,
++	void drawLineCap(const Vertex& a, const Vertex& b, double halfwidth, u8 cap_style,
+ 	                 std::vector<Tri>& tris)
+ 	{
+ 		// lyon's LineCap::Butt emits no geometry at all: the stroke simply ends
+@@ -11611,9 +11683,11 @@ namespace SWFRecomp
+ 			return;
+ 		}
+ 
+-		Vertex vec_a_b;
+-		vec_a_b.x = b.x - a.x;
+-		vec_a_b.y = b.y - a.y;
++		const double ax = strokeX(a), ay = strokeY(a);
++
++		Vertex2d vec_a_b;
++		vec_a_b.x = strokeX(b) - ax;
++		vec_a_b.y = strokeY(b) - ay;
+ 
+ 		double angle_a_b = atan2(vec_a_b.y, vec_a_b.x);
+ 
+@@ -11626,20 +11700,13 @@ namespace SWFRecomp
+ 
+ 		// As in drawLineJoin: the cap fan is a fixed offset from the source path
+ 		// vertex `a`, so it inherits a's morph_index.
+-		double px_start = a.x + halfwidth*cos(start_angle);
+-		double py_start = a.y + halfwidth*sin(start_angle);
+-		double px_end = a.x + halfwidth*cos(end_angle);
+-		double py_end = a.y + halfwidth*sin(end_angle);
+-
+-		Vertex p_start;
+-		p_start.x = (s32) std::round(px_start);
+-		p_start.y = (s32) std::round(py_start);
+-		p_start.morph_index = a.morph_index;
++		double px_start = ax + halfwidth*cos(start_angle);
++		double py_start = ay + halfwidth*sin(start_angle);
++		double px_end = ax + halfwidth*cos(end_angle);
++		double py_end = ay + halfwidth*sin(end_angle);
+ 
+-		Vertex p_end;
+-		p_end.x = (s32) std::round(px_end);
+-		p_end.y = (s32) std::round(py_end);
+-		p_end.morph_index = a.morph_index;
++		Vertex p_start = strokeVertex(px_start, py_start, a.morph_index);
++		Vertex p_end = strokeVertex(px_end, py_end, a.morph_index);
+ 
+ 		if (cap_style == 2)
+ 		{
+@@ -11647,15 +11714,8 @@ namespace SWFRecomp
+ 			// OUTWARD tangent, the quad lyon's LineCap::Square emits.
+ 			double ux = cos(angle_a_b), uy = sin(angle_a_b);
+ 
+-			Vertex s_start;
+-			s_start.x = (s32) std::round(px_start - halfwidth*ux);
+-			s_start.y = (s32) std::round(py_start - halfwidth*uy);
+-			s_start.morph_index = a.morph_index;
+-
+-			Vertex s_end;
+-			s_end.x = (s32) std::round(px_end - halfwidth*ux);
+-			s_end.y = (s32) std::round(py_end - halfwidth*uy);
+-			s_end.morph_index = a.morph_index;
++			Vertex s_start = strokeVertex(px_start - halfwidth*ux, py_start - halfwidth*uy, a.morph_index);
++			Vertex s_end = strokeVertex(px_end - halfwidth*ux, py_end - halfwidth*uy, a.morph_index);
+ 
+ 			Tri sq;
+ 			sq.verts[0] = p_start;
+@@ -11677,13 +11737,16 @@ namespace SWFRecomp
+ 		Tri t;
+ 		t.verts[0] = a;
+ 
+-		for (double current_angle = start_angle + angle_delta; current_angle < end_angle; current_angle += angle_delta)
++		const int cap_segments = strokeArcSegments(halfwidth, end_angle - start_angle);
++		angle_delta = (end_angle - start_angle)/cap_segments;
++
++		for (int k = 1; k < cap_segments; ++k)
+ 		{
++			const double current_angle = start_angle + k*angle_delta;
++
+ 			t.verts[1] = last_point;
+ 
+-			t.verts[2].x = (s32) std::round(a.x + halfwidth*cos(current_angle));
+-			t.verts[2].y = (s32) std::round(a.y + halfwidth*sin(current_angle));
+-			t.verts[2].morph_index = a.morph_index;
++			t.verts[2] = strokeVertex(ax + halfwidth*cos(current_angle), ay + halfwidth*sin(current_angle), a.morph_index);
+ 
+ 			tris.push_back(t);
+ 
+@@ -11715,7 +11778,7 @@ namespace SWFRecomp
+ 			return;
+ 		}
+ 		
+-		u16 halfwidth = width/2;
++		double halfwidth = width/2.0;
+ 		
+ 		Vertex last_v = path.verts[0];
+ 		
+@@ -11725,7 +11788,9 @@ namespace SWFRecomp
+ 			
+ 			Tri t;
+ 			
+-			double angle = atan2(v.y - last_v.y, v.x - last_v.x) - M_PI/2.0;
++			const double lx = strokeX(last_v), ly = strokeY(last_v);
++			const double vx = strokeX(v), vy = strokeY(v);
++			double angle = atan2(vy - ly, vx - lx) - M_PI/2.0;
+ 			
+ 			if (i > 1)
+ 			{
+@@ -11736,25 +11801,16 @@ namespace SWFRecomp
+ 			
+ 			// Each offset corner inherits the morph_index of the source path
+ 			// vertex it was offset from (see drawLineJoin).
+-			t.verts[0].x = (s32) std::round(last_v.x + halfwidth*cos(angle));
+-			t.verts[0].y = (s32) std::round(last_v.y + halfwidth*sin(angle));
+-			t.verts[0].morph_index = last_v.morph_index;
+-
+-			t.verts[2].x = (s32) std::round(v.x + halfwidth*cos(angle));
+-			t.verts[2].y = (s32) std::round(v.y + halfwidth*sin(angle));
+-			t.verts[2].morph_index = v.morph_index;
++			t.verts[0] = strokeVertex(lx + halfwidth*cos(angle), ly + halfwidth*sin(angle), last_v.morph_index);
++			t.verts[2] = strokeVertex(vx + halfwidth*cos(angle), vy + halfwidth*sin(angle), v.morph_index);
+ 
+ 			angle += M_PI;
+ 
+-			t.verts[1].x = (s32) std::round(last_v.x + halfwidth*cos(angle));
+-			t.verts[1].y = (s32) std::round(last_v.y + halfwidth*sin(angle));
+-			t.verts[1].morph_index = last_v.morph_index;
++			t.verts[1] = strokeVertex(lx + halfwidth*cos(angle), ly + halfwidth*sin(angle), last_v.morph_index);
+ 
+ 			tris.push_back(t);
+ 
+-			t.verts[0].x = (s32) std::round(v.x + halfwidth*cos(angle));
+-			t.verts[0].y = (s32) std::round(v.y + halfwidth*sin(angle));
+-			t.verts[0].morph_index = v.morph_index;
++			t.verts[0] = strokeVertex(vx + halfwidth*cos(angle), vy + halfwidth*sin(angle), v.morph_index);
+ 
+ 			tris.push_back(t);
+ 			
