@@ -255,3 +255,11 @@ loader_load
 bom
 dependent_strings
 verify_method_info_duplicate
+
+# --- sandbox_type_remote (added 2026-10-16, s22) ---
+# Was ignored only via the root (AVM1) list, which filter_results.py now
+# scopes to avm1. Same two mechanisms as the AVM1 twin (root ignored_tests.txt
+# `sandbox_type_remote` comment): an http://localhost:8000/NAME ->
+# <test>/localhost/NAME child-movie mapping, and a per-movie sandbox type keyed
+# on how the movie was fetched. Prune on `pass`.
+sandbox_type_remote

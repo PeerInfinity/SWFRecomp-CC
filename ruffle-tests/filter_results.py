@@ -105,7 +105,13 @@ def main():
     with open(input_path) as f:
         results = json.load(f)
 
-    ignored = load_ignored_tests(global_ignore_path)
+    # The root list is AVM1-authored (its dispositions cite avm1 test dirs),
+    # and entries are bare names, so applying it to every suite silently
+    # ignored same-named rows elsewhere (avm2/date, a pass, was hidden by the
+    # AVM1 `date` entry). Other suites use their own per-suite list.
+    ignored = set()
+    if input_path.parent.parent.name == "avm1":
+        ignored = load_ignored_tests(global_ignore_path)
     ignored |= load_ignored_tests(suite_ignore_path)
 
     filtered = filter_results(results, ignored)
