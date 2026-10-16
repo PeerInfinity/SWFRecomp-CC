@@ -32,4 +32,6 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-crossvm | w1-crossvm slots 1-3 | mouse_pick_scroll_rect(+_loader,_button), mouse_pick_loader_avm1, avm2_loads_avm1_events (rm) | session_01WJfTLXUUuxzstmVBA8k32L |
 | w2-queue-regex | w1-trace-tail A | action_execution_order_test6 (rm), pcre_find_fixedlength | session_014xtNST7fsKSbQ6RVBmTLTy |
 | w2-goto-collator | w1-drift-avm2 slots 1(goto)+2 | goto_queued_invalid/swf9..11, collator_flags, collator_locale_ids_windows, collator_compare_basic | session_01HGTgTnncXGJ4Bi7uRJykNT |
-| w2-float-verts | w1-stroke-staircase slot 1 | +22 px (12 blend_modes, masks pair, overlaps, scroll_rect_mask, heavy_tesselation, layers, blur_size_grows, color_matrix, avm2_button_scroll_rect, cab/avm2_button), −1 acid-small .05 | |
+| w2-float-verts | w1-stroke-staircase slot 1 | +22 px (12 blend_modes, masks pair, overlaps, scroll_rect_mask, heavy_tesselation, layers, blur_size_grows, color_matrix, avm2_button_scroll_rect, cab/avm2_button), −1 acid-small .05 | session_01GHaXsGDyCCvNJRoQh1p9mE |
+
+**Queue (launch order when a slot frees):** w2-jpegxr (user approved dep + env re-pasted 2026-10-16), w2-default-fonts-draw, w2-htmltext, w2-strbuf, w2-avm2-stage-view, w2-font-registry, w2-ei-provider, w2-atf-dxt5, w2-avm2-video-stamp, w2-draw-bigcap-aa; w2-geom-port after w2-as-core delivers.
