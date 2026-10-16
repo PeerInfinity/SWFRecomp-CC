@@ -1,0 +1,328 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d0140621..fdda4c47 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -25594,8 +25594,17 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
+ // Hit areas come from the same pixel AABBs actionDispatchMCPress/Release
+ // test, so a click the AVM2 side attributes to AVM1 is exactly a click the
+ // AVM1 dispatchers will act on.
++static int g_proto_pick = -1, g_proto_text, g_proto_btn, g_avm1u2_btn_hover;
++SWFAppContext* g_proto_app;
++static void proto_init(void) {
++	if (g_proto_pick >= 0) return;
++	g_proto_pick = getenv("PROTO_PICK") != NULL;
++	g_proto_text = getenv("PROTO_TEXT") != NULL;
++	g_proto_btn = getenv("PROTO_BTN") != NULL;
++}
+ int actionAvm1ChildMousePick(float x, float y)
+ {
++	proto_init();
+ 	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0)
+ 		return AVM1_CHILD_PICK_MISS;
+ 	extern MovieClip* child_mc_cache[];
+@@ -25617,12 +25626,48 @@ int actionAvm1ChildMousePick(float x, float y)
+ 				if (g_avm1u2[j].mc == p) { owned = 1; break; }
+ 		if (!owned) continue;
+ 		if (!actionMCMouseInsidePick(mc, x, y)) continue;
+-		found = AVM1_CHILD_PICK_CONTENT;
++		int is_tf = mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2;
++		// PROTO(M-pick): a level root or a timeline sprite answers through the
++		// exact display-list shape test below, never its AABB.
++		DisplayObject* pd = (DisplayObject*) mc->display_obj;
++		int timeline = 0;
++		for (int j = 0; j < g_avm1u2_count; j++) if (g_avm1u2[j].mc == mc) timeline = 1;
++		if (pd != NULL && pd->sprite_display_list != NULL) timeline = 1;
++		if (!(g_proto_pick && timeline && !is_tf)) found = AVM1_CHILD_PICK_CONTENT;
+ 		// Text fields take focus rather than onPress/onRelease, exactly as in
+ 		// actionDispatchMCPress.
+-		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
++		if (is_tf) { if (g_proto_text) return AVM1_CHILD_PICK_BUTTON; continue; }
+ 		if (actionMCHasButtonHandlers(mc)) return AVM1_CHILD_PICK_BUTTON;
+ 	}
++	if (g_proto_btn) {
++		extern int ng_proto_button_hit_at(SWFAppContext*, DisplayObject*, size_t, double, double);
++		extern SWFAppContext* g_proto_app;
++		MovieClip* r0 = g_avm1u2[0].mc;
++		DisplayObject* d0 = r0 ? (DisplayObject*) r0->display_obj : NULL;
++		if (g_proto_app && d0 && d0->sprite_display_list
++		    && ng_proto_button_hit_at(g_proto_app, d0->sprite_display_list, d0->sprite_max_depth,
++		                              x * 20.0, y * 20.0))
++			return AVM1_CHILD_PICK_BUTTON;
++	}
++	if (g_proto_pick && found == AVM1_CHILD_PICK_MISS) {
++		extern int ng_hitTestShapeFromDL(DisplayObject*, size_t, double, double,
++			double, double, double, double, double, double);
++		extern float (*g_active_transform_data)[16];
++		for (int j = 0; j < g_avm1u2_count; j++) {
++			MovieClip* r = g_avm1u2[j].mc;
++			if (r == NULL || r->depth == INT_MIN || r->unloaded) continue;
++			DisplayObject* d = (DisplayObject*) r->display_obj;
++			if (d == NULL || d->sprite_display_list == NULL) continue;
++			float (*std)[16] = g_active_transform_data;
++			if (g_avm1u2[j].entry && g_avm1u2[j].entry->transform_data_ptr)
++				g_active_transform_data = g_avm1u2[j].entry->transform_data_ptr;
++			int h = ng_hitTestShapeFromDL(d->sprite_display_list, d->sprite_max_depth,
++				1, 0, 0, 1, r->x * 20.0, r->y * 20.0, x * 20.0, y * 20.0);
++			g_active_transform_data = std;
++			if (h) return AVM1_CHILD_PICK_CONTENT;
++		}
++		return AVM1_CHILD_PICK_MISS;
++	}
+ 	// Timeline content (shapes/sprites placed by the child's own tags) never
+ 	// enters child_mc_cache, so ask the level roots for their display-list
+ 	// bounds as well before reporting a miss.
+@@ -25691,12 +25736,51 @@ void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext* app_context, int kind,
+ 	} else if (kind == AVM1_CHILD_MOUSE_DOWN) {
+ 		actionDispatchMouseDown(app_context);
+ 		actionDispatchMCMouseDown(app_context);
++		if (getenv("PROTO_FOCUS")) {
++			extern void actionMouseClickFocus(SWFAppContext*);
++			extern int g_proto_last_pick_avm1;
++			float sx0 = ms->stage_x, sy0 = ms->stage_y;
++			if (!g_proto_last_pick_avm1) { ms->stage_x = -1e7f; ms->stage_y = -1e7f; }
++			actionMouseClickFocus(app_context);
++			ms->stage_x = sx0; ms->stage_y = sy0;
++		}
+ 		actionDispatchMCPress(app_context);
+ 	} else {
+ 		actionDispatchMouseUp(app_context);
+ 		actionDispatchMCMouseUp(app_context);
+ 		actionDispatchMCRelease(app_context);
+ 	}
++	proto_init();
++	g_proto_app = app_context;
++	if (g_proto_btn) {
++		extern int ng_update_button_states(SWFAppContext*);
++		extern DisplayObject* display_list;
++		extern size_t max_depth;
++		extern size_t display_list_capacity;
++		extern float (*g_active_transform_data)[16];
++		MovieClip* r = g_avm1u2[0].mc;
++		DisplayObject* d = r ? (DisplayObject*) r->display_obj : NULL;
++		if (d != NULL && d->sprite_display_list != NULL) {
++			DisplayObject* sdl = display_list; size_t smax = max_depth, scap = display_list_capacity;
++			float (*std)[16] = g_active_transform_data;
++			display_list = d->sprite_display_list; max_depth = d->sprite_max_depth;
++			display_list_capacity = d->sprite_dl_capacity;
++			if (g_avm1u2[0].entry && g_avm1u2[0].entry->transform_data_ptr)
++				g_active_transform_data = g_avm1u2[0].entry->transform_data_ptr;
++			extern int ng_proto_button_hit_at(SWFAppContext*, DisplayObject*, size_t, double, double);
++			extern int g_proto_last_pick_avm1;
++			g_avm1u2_btn_hover = ng_proto_button_hit_at(app_context, display_list, max_depth,
++				x * 20.0, y * 20.0);
++			float sx0 = ms->stage_x, sy0 = ms->stage_y;
++			if (getenv("PROTO_GATE") && !g_proto_last_pick_avm1) { ms->stage_x = -1e7f; ms->stage_y = -1e7f; }
++			ng_update_button_states(app_context);
++			ms->stage_x = sx0; ms->stage_y = sy0;
++			d->sprite_display_list = display_list; d->sprite_max_depth = max_depth;
++			d->sprite_dl_capacity = display_list_capacity;
++			display_list = sdl; max_depth = smax; display_list_capacity = scap;
++			g_active_transform_data = std;
++		}
++	}
+ 	avm1UnderAvm2LeaveChild(&swap);
+ }
+ 
+@@ -78525,6 +78609,7 @@ void actionMouseClickFocus(SWFAppContext* app_context)
+ 		float x1, y1, x2, y2;
+ 		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+ 		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
++		if (getenv("PROTO_FOCUS") && !mc_is_focusable_by_click(mc)) continue;
+ 
+ 		hit_mc = mc;
+ 		break;
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 578d1cd7..efbab071 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -3733,6 +3733,9 @@ static void run_due_timers(Avm2Context* ctx)
+ // exitFrame broadcast.
+ static void avm2_loaderinfo_run_exit_frame(Avm2Context* ctx);
+ static void avm2_loader_drain(Avm2Context* ctx);
++static void avm2_loader_run_exit_frame(Avm2Context* ctx);
++static int g_proto_drain_skip_exit;
++static int g_avm1_child_levels;
+ 
+ // Dual-VM (session 15): advances any AVM1 child movie's timeline. Defined
+ // down with the loader, next to the boot that registers them; a no-op —
+@@ -3749,7 +3752,14 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 
+ 	// Before the AVM2 phases, and therefore before this tick's loader drain:
+ 	// a child booted by tick N's drain must first advance on tick N+1.
+-	avm1_child_tick(ctx);
++	static int proto_tick = -1;
++	if (proto_tick < 0) proto_tick = getenv("PROTO_TICK") != NULL;
++	static int proto_tick2 = -1;
++	if (proto_tick2 < 0) proto_tick2 = getenv("PROTO_TICK2") != NULL;
++	// Latched once per tick, so a child booted by this tick's drain does not
++	// switch the order mid-tick.
++	int t2 = proto_tick2 && g_avm1_child_levels != 0;
++	if (!proto_tick && !t2) avm1_child_tick(ctx);
+ 
+ 	ctx->frame_phase = PHASE_ENTER;
+ 	for (uint32_t i = 0, snap = g_orphan_count;
+@@ -3767,6 +3777,7 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 		}
+ 		broadcast_named(ctx, "enterFrame");
+ 	}
++	if (proto_tick) avm1_child_tick(ctx);
+ 
+ 	ctx->frame_phase = PHASE_CONSTRUCT;
+ 	for (uint32_t i = 0, snap = orphan_walk_bound();
+@@ -3825,8 +3836,24 @@ void avm2_display_run_tick(Avm2Context* ctx)
+ 	// LocalConnections::update_connections: inside run_frame, after the AVM2
+ 	// phases and BEFORE the NetConnection flush below (avm2/amf_array_
+ 	// serialization traces its delivered message ahead of both remoting packets).
++	if (t2)
++	{
++		// PROTO(w1-crossvm): Ruffle player.rs::run_frame order —
++		// run_all_phases_avm2 (its exit frame fires loader init/complete),
++		// then Avm1::run_frame, then LocalConnections::update_connections,
++		// then the executor resolves fetches.
++		avm2_loader_run_exit_frame(ctx);
++		avm1_child_tick(ctx);
++		avm2_net_deliver_local_connections(ctx);
++		g_proto_drain_skip_exit = 1;
++		avm2_loader_drain(ctx);
++		g_proto_drain_skip_exit = 0;
++	}
++	else
++	{
+ 	avm2_net_deliver_local_connections(ctx);
+ 	avm2_loader_drain(ctx);
++	}
+ 	// NetConnection.call: the queued packet is sent and its scripted response
+ 	// dispatched at the same executor-drain point a Loader fetch resolves at, so
+ 	// the fetch log and the Responder callbacks follow the calling frame's traces
+@@ -6238,6 +6265,7 @@ extern MovieClip* actionBootAvm1ChildUnderAvm2(SWFAppContext* app_context,
+ extern void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
+                                             double frame_duration_ms);
+ 
++int g_avm1_child_levels_proto_dummy;
+ static int g_avm1_child_levels = 0;
+ 
+ // Attach the AVM1 root the wrapper stands for, if the load really carried one.
+@@ -6440,6 +6468,7 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
+ 		// own recompiled AVM1 timeline boots behind it and ticks with the
+ 		// parent (avm1_child_boot / avm1_child_tick below).
+ 		avm1_child_boot(ctx, mov, pl->avm1_entry);
++		if (getenv("PROTO_AVM1INIT")) lx->defer_flushes = 1;
+ 	}
+ 	// Third `bytes` state: the real source bytes, now that content is loaded.
+ 	// Only bundled assets are kept — their storage is generated-static and
+@@ -6564,7 +6593,7 @@ static uint32_t g_pending_url_load_count;
+ 
+ static void avm2_loader_drain(Avm2Context* ctx)
+ {
+-	avm2_loader_run_exit_frame(ctx);
++	if (!g_proto_drain_skip_exit) avm2_loader_run_exit_frame(ctx);
+ 	for (uint32_t round = 0; round < AVM2_MAX_LOAD_CHAIN; round++)
+ 	{
+ 		// The queued fetch log belongs to THIS round's requests: Ruffle logs
+@@ -14809,6 +14838,23 @@ static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
+ 	return point_in_self(ctx, obj, px, py);
+ }
+ 
++// Ruffle DisplayObject::global_in_scroll_rect (387ea68a4): a COMMITTED
++// scrollRect clips mouse picking to its viewport. The rect is in the object's
++// scrolled local space, i.e. through local_to_global (which carries the
++// object's own scroll translate). No rect = no clip; singular = outside.
++static int pk_in_scroll_rect(Avm2Context* ctx, Avm2Object* obj,
++                             Avm2DisplayObjectExt* ext, double px, double py)
++{
++	if (!ext->sr_committed) return 1;
++	Mat m = display_l2g_matrix(ctx, obj);
++	if (m.a * m.d - m.b * m.c == 0.0) return 0;
++	Mat inv = mat_invert(&m);
++	double lx = inv.a * px + inv.c * py + inv.tx;
++	double ly = inv.b * px + inv.d * py + inv.ty;
++	return lx >= ext->csr_xmin && lx <= ext->csr_xmax
++	       && ly >= ext->csr_ymin && ly <= ext->csr_ymax;
++}
++
+ typedef enum { PK_MISS, PK_PROP, PK_HIT } PkKind;
+ typedef struct { PkKind kind; Avm2Object* target; } Pk;
+ 
+@@ -14903,6 +14949,8 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
+ 	if (obj->cls != NULL
+ 	    && class_is_a(obj->cls, ctx->builtins.simple_button_class))
+ 	{
++		if (!pk_in_scroll_rect(ctx, obj, ext, px, py))
++			return pk_make(PK_MISS, NULL);
+ 		Avm2Object* hit = ext->btn_hit != NULL ? ext->btn_hit : ext->btn_up;
+ 		Avm2DisplayObjectExt* hext = hit != NULL
+ 			? avm2_display_ext_of(ctx, hit) : NULL;
+@@ -14944,6 +14992,10 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
+ 		return pk_make(PK_MISS, NULL);
+ 	}
+ 
++	// Ruffle movie_clip.rs / loader_display.rs mouse_pick_avm2 (387ea68a4).
++	if (!ext->is_stage && !pk_in_scroll_rect(ctx, obj, ext, px, py))
++		return pk_make(PK_MISS, NULL);
++
+ 	Pk found_prop = pk_make(PK_MISS, NULL);
+ 	// Timeline clip layers: every child with clip_depth > 0 masks the depth
+ 	// range (depth+1 ..= clip_depth). Ruffle walks them as a single reversed,
+@@ -14989,7 +15041,7 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
+ 					// only ADDS the clips (MCL-loaded content, drawing-API
+ 					// children) that rect can miss.
+ 					int in = a == AVM1_CHILD_PICK_CONTENT
+-					         || (cext->visible
++					         || (getenv("PROTO_NO_WRAP") == NULL && cext->visible
+ 					             && point_in_self(ctx, child, px, py));
+ 					res = in ? (ext->mouse_enabled ? pk_make(PK_HIT, obj)
+ 					                               : pk_make(PK_PROP, NULL))
+@@ -15456,6 +15508,7 @@ static void avm2_dbg_pick_label(Avm2Context* ctx, const char* tag, Avm2Object* o
+ 		ext != NULL ? ext->mouse_enabled : -1);
+ }
+ 
++int g_proto_last_pick_avm1;
+ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_moved)
+ {
+ 	Avm2Object* stage = ctx->stage;
+@@ -15463,6 +15516,7 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
+ 	update_drag(ctx);
+ 	int mouse_in_stage = 1;
+ 	Avm2Object* new_over = mouse_in_stage ? run_mouse_pick(ctx) : NULL;
++	g_proto_last_pick_avm1 = PICK_IS_AVM1(new_over);
+ 	if (changed_button == 0)
+ 		avm2_dbg_pick_label(ctx, g_mouse_btn_down[0] ? "down" : "up", new_over);
+ 	Avm2Object* cur_over = g_mouse_hovered;
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index d3d7dcee..37506e9b 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -5330,6 +5330,33 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 	}
+ }
+ 
++// PROTO(w1-crossvm): pure geometric probe -- does a top-level DefineButton's
++// hit shape in `dl` cover stage twips (sx, sy)? No state change.
++int ng_proto_button_hit_at(SWFAppContext* app_context, DisplayObject* dl,
++                           size_t dl_max, double sx, double sy)
++{
++	extern int ng_hitTestShapeChar(size_t char_id, u16 ratio,
++	    double ma, double mb, double mc_m, double md, double mtx, double mty,
++	    double test_x, double test_y);
++	for (size_t i = dl_max; i >= 1; i--)
++	{
++		DisplayObject* obj = &dl[i];
++		if (obj->char_id == 0) continue;
++		Character* ch = &dictionary[obj->char_id];
++		if (ch->type != CHAR_TYPE_BUTTON) continue;
++		u32 xf_id = ch->button_hit_transform_id;
++		size_t hc = ch->button_hit_char_id;
++		if (resolve_hit_shape(ch->button_hit_char_id, &xf_id, &hc, 0) == NULL) continue;
++		const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
++		const float* hit_xf = (const float*)(app_context->transform_data) + xf_id * 16;
++		float c[16];
++		hit_test_mat4_multiply(c, place_xf, hit_xf);
++		if (ng_hitTestShapeChar(hc, obj->ratio, c[0], c[1], c[4], c[5], c[12], c[13], sx, sy))
++			return 1;
++	}
++	return 0;
++}
++
+ int ng_update_button_states(SWFAppContext* app_context)
+ {
+ 	if (app_context->shape_data == NULL) return 0;

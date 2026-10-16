@@ -10,3 +10,4 @@
 | w2-atf-dxt5 | `avm2_stage3d.c` ATF upload |
 | w2-avm2-video-stamp | `avm2_display.c` Video/attachNetStream (~17332); `avm2_net.c` ns_play (~2015); `video_codec.c` |
 | w2-draw-bigcap-aa | `avm2_display.c` dynamic_bitmap_max (~20238, ~18261); CPU draw rasteriser in `avm2_bitmap.c` (AA) — coordinate with w2-default-fonts-draw (draw() clipRect/mask) |
+| w2-crossvm | `avm2_display.c` `mouse_pick` (~14884-14991), `update_mouse_state` (~15459), `avm2_display_run_tick` (~3752), `avm2_loader_drain` (~6565), `loader_deliver` (~6442); `action.c` AVM1-under-AVM2 block (`actionAvm1ChildMousePick` ~25597, ~25661, `actionMouseClickFocus` ~78513); `tag.c` button states (~5333); `tag_stubs.c` (read-only use of `ng_hitTestShapeFromDL`) |
