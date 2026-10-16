@@ -21,7 +21,9 @@ log() { echo "[swf-setup] $*"; echo "$*" >> "$STATUS"; }
 # --- 1. apt packages -------------------------------------------------------
 # build tools + ccache (per-test compiles), Vulkan/lavapipe + ffmpeg dev libs
 # (graphics mode; same set as .github/actions/graphics-apt-deps).
-PKGS="build-essential cmake ccache mesa-vulkan-drivers libvulkan1 vulkan-tools libavcodec-dev libavutil-dev libswscale-dev"
+# libjxr-dev + liblzma-dev: JPEG-XR (Loader JXR, Stage3D ATF formats 1/4),
+# probed by verify_output.py as SWF_HAVE_LIBJXR (added 2026-10-16, s22).
+PKGS="build-essential cmake ccache mesa-vulkan-drivers libvulkan1 vulkan-tools libavcodec-dev libavutil-dev libswscale-dev libjxr-dev liblzma-dev"
 export DEBIAN_FRONTEND=noninteractive
 # Some preinstalled PPAs 403 behind the proxy; that only produces warnings.
 timeout 300 apt-get update -qq -o Acquire::Retries=3 >/dev/null 2>&1 || true

@@ -2989,6 +2989,23 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             mode_libs.extend(av_libs)
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
+        # jxrlib (libjxr-dev) + liblzma for JPEG-XR: Loader-loaded .jxr and
+        # Stage3D ATF formats 1/4 (Ruffle's `jpegxr` crate wraps the same
+        # jxrlib). Probe like libavcodec; absent, those decode paths stay off.
+        try:
+            jxr_cflags = subprocess.check_output(
+                ["pkg-config", "--cflags", "libjxr", "liblzma"],
+                stderr=subprocess.DEVNULL,
+            ).decode().split()
+            jxr_libs = subprocess.check_output(
+                ["pkg-config", "--libs", "libjxr", "liblzma"],
+                stderr=subprocess.DEVNULL,
+            ).decode().split()
+            mode_defines.append("-DSWF_HAVE_LIBJXR")
+            mode_includes.extend(jxr_cflags)
+            mode_libs.extend(jxr_libs)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
     else:
         mode_defines = ["-DNO_GRAPHICS"]
 

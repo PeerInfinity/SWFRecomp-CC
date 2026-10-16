@@ -23,7 +23,8 @@ runs:
         # Keep this list in ONE place. `vulkan-tools` used to be here and was
         # dropped 2026-07-25: it is vulkaninfo and friends, diagnostics only —
         # nothing in .github/, ruffle-tests/ or SWFRecomp/scripts/ invokes it.
-        pkgs="mesa-vulkan-drivers libvulkan1 libavcodec-dev libavutil-dev libswscale-dev"
+        # libjxr-dev + liblzma-dev: JPEG-XR decode (SWF_HAVE_LIBJXR), added 2026-10-16.
+        pkgs="mesa-vulkan-drivers libvulkan1 libavcodec-dev libavutil-dev libswscale-dev libjxr-dev liblzma-dev"
         echo "pkgs=$pkgs" >> "$GITHUB_OUTPUT"
         hash=$(printf '%s' "$pkgs" | sha256sum | cut -c1-16)
         # ImageVersion is load-bearing, not decoration. `--download-only`
