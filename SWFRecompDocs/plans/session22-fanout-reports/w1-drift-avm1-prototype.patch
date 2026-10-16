@@ -1,0 +1,90 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d0140621..fc2850e1 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -4559,6 +4559,7 @@ static void addStubMethodToProto(SWFAppContext* app_context, ASObject* proto, co
+ static int isNativeTextFieldProperty(const char* name, u32 len); // forward decl
+ 
+ // Built-in hasOwnProperty checks if a property exists directly on the object
++static int callArrayMethod(SWFAppContext* app_context, ASArray* arr, const char* method_name, u32 method_name_len, ActionVar* args, u32 num_args);
+ static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	ActionVar ret;
+@@ -4566,6 +4567,16 @@ static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, Actio
+ 	ret.str_size = 0;
+ 	ret.data.numeric_value = 0; // false by default
+ 
++	// hasOwnProperty.call(array, name): this_obj is an ASArray*, not an
++	// ASObject* — route to the array-aware implementation instead of
++	// mis-casting it (segfault in findPropertySlot).
++	if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_ARRAY)
++	{
++		if (callArrayMethod(app_context, (ASArray*) this_obj, "hasOwnProperty", 14, args, args ? arg_count : 0))
++			popVar(app_context, &ret);
++		return ret;
++	}
++
+ 	if (this_obj != NULL && args != NULL && arg_count >= 1)
+ 	{
+ 		ASObject* obj = (ASObject*) this_obj;
+@@ -15511,6 +15522,7 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
+ 				otp_this.type = ACTION_STACK_VALUE_OBJECT;
+ 				otp_this.data.numeric_value = (u64)(uintptr_t)obj;
+ 				InvokeOpts otp_opts = { .flags = INV_VERSION_SWITCH | INV_SPECIAL_GUARD |
++				                        INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+ 				                        ((func->function_type == 1)
+ 				                                     ? INV_THIS_STACK : 0u) };
+ 				ActionVar result = invokeFunctionValue(app_context, func, &otp_this,
+@@ -26715,9 +26727,42 @@ static int tf_parse_font_color(const char* val, u32 val_len, u32* out_color) {
+ 
+ // Parser state for attribute extraction
+ static int tf_get_attr(const char* tag_content, u32 tag_len, const char* attr_name, char* val_buf, u32 val_buf_size) {
+-	// Case-insensitive attribute search
++	// Case-insensitive attribute search. PROTOTYPE (s22 w1-drift-avm1): Flash
++	// takes the LAST occurrence of a duplicated attribute (Ruffle 69a017387).
+ 	u32 attr_len = (u32)strlen(attr_name);
++	int found_any = 0;
++	for (u32 i = tag_len > attr_len ? tag_len - attr_len - 1 : 0; ; i--) {
++		if (i + attr_len < tag_len && (i == 0 || tag_content[i-1] == ' ' || tag_content[i-1] == '\t' || tag_content[i-1] == '\n' || tag_content[i-1] == '\r')) {
++			int match = 1;
++			for (u32 j = 0; j < attr_len; j++) {
++				char a = tag_content[i+j], b = attr_name[j];
++				if (a >= 'A' && a <= 'Z') a += 32;
++				if (b >= 'A' && b <= 'Z') b += 32;
++				if (a != b) { match = 0; break; }
++			}
++			if (match && tag_content[i + attr_len] == '=') { found_any = 1; break; }
++		}
++		if (i == 0) break;
++	}
++	if (!found_any) return 0;
+ 	for (u32 i = 0; i + attr_len < tag_len; i++) {
++		if (!(i == 0 || tag_content[i-1] == ' ' || tag_content[i-1] == '\t' || tag_content[i-1] == '\n' || tag_content[i-1] == '\r')) continue;
++		{
++			// only accept the last occurrence
++			int later = 0;
++			for (u32 k = i + 1; k + attr_len < tag_len; k++) {
++				if (!(tag_content[k-1] == ' ' || tag_content[k-1] == '\t' || tag_content[k-1] == '\n' || tag_content[k-1] == '\r')) continue;
++				int m2 = 1;
++				for (u32 j = 0; j < attr_len; j++) {
++					char a = tag_content[k+j], b = attr_name[j];
++					if (a >= 'A' && a <= 'Z') a += 32;
++					if (b >= 'A' && b <= 'Z') b += 32;
++					if (a != b) { m2 = 0; break; }
++				}
++				if (m2 && tag_content[k + attr_len] == '=') { later = 1; break; }
++			}
++			if (later) continue;
++		}
+ 		int match = 1;
+ 		for (u32 j = 0; j < attr_len; j++) {
+ 			char a = tag_content[i+j], b = attr_name[j];
+@@ -69622,7 +69667,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				// type-1 loop this replaces pushed num_args of them, neither clamping
+ 				// nor padding — see regression/method_type1_args.
+ 				InvokeOpts opts = {
+-					.flags = (INV_SUPER_CTX | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
++					.flags = (INV_SUPER_CTX | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
+ 					.super_depth = (u16)method_search_depth,
+ 					.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS | INV_ACT_SUPER),
+ 					// advanced_func receives the raw receiver, NULL included; this_var

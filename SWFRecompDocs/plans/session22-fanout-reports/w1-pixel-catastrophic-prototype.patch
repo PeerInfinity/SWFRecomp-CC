@@ -1,0 +1,107 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index cb944e0a..a7c8fc4e 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2626,8 +2626,30 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 	// the draw matrix's pixel translation (mtx,mty) is scaled to twips.
+ 	if (shape_src != NULL)
+ 	{
++		// PROTO clipRect (arg 4): snapshot, draw, restore outside the rect.
++		uint32_t* snap = NULL;
++		int cx0 = 0, cy0 = 0, cx1 = 0, cy1 = 0;
++		if (arg_present(act, 4) && act->args[4].kind == AVM2_VALUE_OBJECT && dst->pixels)
++		{
++			Avm2Value cr = act->args[4];
++			double rx = read_prop_num(ctx, cr, "x"), ry = read_prop_num(ctx, cr, "y");
++			double rw = read_prop_num(ctx, cr, "width"), rh = read_prop_num(ctx, cr, "height");
++			cx0 = (int) floor(rx); cy0 = (int) floor(ry);
++			cx1 = (int) floor(rx + rw); cy1 = (int) floor(ry + rh);
++			size_t n = (size_t) dst->width * dst->height;
++			snap = (uint32_t*) malloc(n * sizeof(uint32_t));
++			if (snap) memcpy(snap, dst->pixels, n * sizeof(uint32_t));
++		}
+ 		bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
+ 		                   mtx * 20.0, mty * 20.0, 1.0, 0);
++		if (snap)
++		{
++			for (int y = 0; y < (int) dst->height; y++)
++				for (int x = 0; x < (int) dst->width; x++)
++					if (x < cx0 || x >= cx1 || y < cy0 || y >= cy1)
++						dst->pixels[(size_t) y * dst->width + x] = snap[(size_t) y * dst->width + x];
++			free(snap);
++		}
+ 		return avm2_undefined();
+ 	}
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 578d1cd7..a3888408 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -20237,6 +20237,7 @@ void avm2_render_init(Avm2Context* ctx)
+ 	// browser title with a giant atlas drawn every frame.
+ 	uint32_t maxdim = app->width > app->height ? app->width : app->height;
+ 	if (maxdim < 256) maxdim = 256;
++	if (getenv("PROTO_BMPCAP")) { uint32_t pc = (uint32_t) atoi(getenv("PROTO_BMPCAP")); if (maxdim < pc) maxdim = pc; }
+ 	context->dynamic_bitmap_max_w = maxdim;
+ 	context->dynamic_bitmap_max_h = maxdim;
+ 	if ((uint32_t) app->bitmap_highest_w > context->dynamic_bitmap_max_w)
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 72d025c2..ee5cb69c 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -2786,6 +2786,12 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
+ 			return f;
+ 		}
+ 	}
++	{ // PROTO [default_fonts]: Ruffle layout.rs:611 name -> DefaultFont -> family list
++		const char* fam = getenv("PROTO_DEFAULT_FAMILY");
++		const Avm2FontData* fd = fam ? find_device_font_ladder(fam, (uint32_t) strlen(fam),
++			fmt->bold != 0, fmt->italic != 0) : NULL;
++		if (fd != NULL) { f.data = fd; f.is_device = 1; f.outline = NULL; return f; }
++	}
+ 	f.data = &noto_device_font;
+ 	f.is_device = 1;
+ 	// D1-2: when the test really has Ruffle's default font (the recompiler
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index d3d7dcee..c498303c 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3214,7 +3214,7 @@ static const float* cab_snap_world(DisplayObject* obj, const float* in,
+ 	memcpy(out, in, 16 * sizeof(float));
+ 	out[12] += dx;
+ 	out[13] += dy;
+-	if (g_next_dynamic_xform_slot < g_xform_slot_capacity)
++	if (!getenv("PROTO_NOSLOT") && g_next_dynamic_xform_slot < g_xform_slot_capacity)
+ 	{
+ 		u32 slot = g_next_dynamic_xform_slot++;
+ 		xform_overrides_push(obj, obj->transform_id);
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f204a865..e8e75f53 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -100,6 +100,7 @@ static bool loadDeviceFont()
+ 
+ 	// Try explicit path first, then paths relative to the binary
+ 	std::vector<std::string> paths;
++	if (getenv("SWFRECOMP_PROTO_DEVFONT")) paths.push_back(getenv("SWFRECOMP_PROTO_DEVFONT")); // PROTO
+ 	if (!g_device_font_path.empty()) paths.push_back(g_device_font_path);
+ 	paths.push_back("assets/NotoSans.ttf");
+ 	paths.push_back("../assets/NotoSans.ttf");
+@@ -2603,7 +2604,7 @@ namespace SWFRecomp
+ 					stbtt_GetFontVMetrics(&g_device_font, &ttf_ascent_em,
+ 						&ttf_descent_em, &ttf_linegap_em);
+ 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
+-					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
++					float ttf_scale = swf_em * stbtt_ScaleForMappingEmToPixels(&g_device_font, 1.0f); // PROTO: face upem
+ 
+ 					const u16 SYNTH_FIRST_CP = 32;
+ 					const u16 SYNTH_LAST_CP  = 126;
+@@ -2645,7 +2646,7 @@ namespace SWFRecomp
+ 				    && loadDeviceFont())
+ 				{
+ 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
+-					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
++					float ttf_scale = swf_em * stbtt_ScaleForMappingEmToPixels(&g_device_font, 1.0f); // PROTO: face upem
+ 
+ 					for (u16 i = 0; i < num_entries; i++) {
+ 						if (i >= font_code_tables[font_id].size()) continue;
