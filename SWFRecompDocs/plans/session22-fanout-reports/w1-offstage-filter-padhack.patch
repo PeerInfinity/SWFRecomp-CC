@@ -1,0 +1,84 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 578d1cd7..255825aa 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -19391,6 +19391,10 @@ static int avm2_filter_screen_rect(Avm2Context* ctx, Avm2Object* obj,
+ 			if (py > py_max) py_max = py;
+ 		}
+ 	}
++	if (getenv("SWF_PAD_HACK")) { // MEASUREMENT HACK: undo the pad scale's float error
++		px_min = round(px_min * 1e4) / 1e4; px_max = round(px_max * 1e4) / 1e4;
++		py_min = round(py_min * 1e4) / 1e4; py_max = round(py_max * 1e4) / 1e4;
++	}
+ 	out[0] = floorf((float) px_min + 0.5f);
+ 	out[1] = floorf((float) py_min + 0.5f);
+ 	out[2] = ceilf((float) (px_max - px_min));
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index e271a4b7..8b4cea7a 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -6211,6 +6211,20 @@ int render_webgpu_save_png(WebGPURenderContext* ctx, const char* path)
+ 
+ 	wgpuBufferUnmap(ctx->readback_buffer);
+ 
++	// MEASUREMENT HACK (w1-offstage-filter): SWF_PAD_HACK=P pads the whole
++	// render target by P px per side (main.c); crop back to the movie box.
++	{
++		const char* ph = getenv("SWF_PAD_HACK");
++		int P = ph ? atoi(ph) : 0;
++		if (P > 0 && w > 2 * P && h > 2 * P)
++		{
++			int cw = w - 2 * P, chh = h - 2 * P;
++			for (int y = 0; y < chh; y++)
++				memmove(rgba + (size_t) y * cw * 4,
++				        rgba + ((size_t) (y + P) * w + P) * 4, (size_t) cw * 4);
++			w = cw; h = chh;
++		}
++	}
+ 	// Write PNG
+ 	int ok = stbi_write_png(path, w, h, 4, rgba, w * 4);
+ 	free(rgba);
+diff --git a/SWFRecomp/wasm_wrappers/main.c b/SWFRecomp/wasm_wrappers/main.c
+index da505f0f..d0121083 100644
+--- a/SWFRecomp/wasm_wrappers/main.c
++++ b/SWFRecomp/wasm_wrappers/main.c
+@@ -2,6 +2,7 @@
+ #include <swf.h>
+ #include <out.h>
+ #include <string.h>
++#include <stdlib.h>
+ #include "constants.h"
+ 
+ #ifndef FRAME_RATE
+@@ -185,6 +186,31 @@ int main(int argc, char* argv[]) {
+     app_context.stage_scale   = 1.0f;
+     app_context.stage_fit_x   = 1.0f;
+     app_context.stage_fit_y   = 1.0f;
++#endif
++#if !defined(__EMSCRIPTEN__)
++    // MEASUREMENT HACK (w1-offstage-filter): pad the render target by P px
++    // per side with the stage centred (a pure NDC scale, like the fit above);
++    // render_webgpu_save_png crops it back.
++    {
++        const char* ph = getenv("SWF_PAD_HACK");
++        int P = ph ? atoi(ph) : 0;
++        if (P > 0)
++        {
++            static float pad_stage_to_ndc[16];
++            float ow = (float) app_context.render_width, oh = (float) app_context.render_height;
++            float kx = ow / (ow + 2.0f * P), ky = oh / (oh + 2.0f * P);
++            app_context.render_width  += 2 * P;
++            app_context.render_height += 2 * P;
++            app_context.stage_fit_x   *= kx;
++            app_context.stage_fit_y   *= ky;
++            memcpy(pad_stage_to_ndc, app_context.stage_to_ndc, sizeof(pad_stage_to_ndc));
++            pad_stage_to_ndc[0]  *= kx;  pad_stage_to_ndc[4]  *= kx;
++            pad_stage_to_ndc[8]  *= kx;  pad_stage_to_ndc[12] *= kx;
++            pad_stage_to_ndc[1]  *= ky;  pad_stage_to_ndc[5]  *= ky;
++            pad_stage_to_ndc[9]  *= ky;  pad_stage_to_ndc[13] *= ky;
++            app_context.stage_to_ndc = pad_stage_to_ndc;
++        }
++    }
+ #endif
+     app_context.bitmap_count = BITMAP_COUNT;
+     app_context.bitmap_highest_w = BITMAP_HIGHEST_W;

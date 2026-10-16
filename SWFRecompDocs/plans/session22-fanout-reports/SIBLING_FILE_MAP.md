@@ -19,3 +19,4 @@
 | w2-htmltext (+AVM2) | also `avm2_text.c` `spans_from_html` (~1337), `spans_to_html` (~2264) |
 | w2-jpegxr | NEW jxrlib-facing TU (or one existing TU); `avm2_stage3d.c` ATF formats 1/4 (separate fns from w2-atf-dxt5); Loader image sniff/decode for JXR; `SWFModernRuntime/CMakeLists.txt` WITH_LIBJXR |
 | w2-float-verts | `SWFRecomp/include/swf.hpp` `Vertex`; `SWFRecomp/src/swf.cpp` `addCurvedEdgeLevien` (~8547), `drawLines`/`drawLineJoin`/`drawLineCap` (~11458-11785), `tessellateContours` (~202-270), fill/stroke emission (~10735, ~10822) |
+| w2-filter-fixes | `swf.cpp` PlaceObject3 Visible (~4510, ~5998); `tag.c` `tagSetVisible` (new, near `tagSetCacheAsBitmap`), `tagRerenderFrame` (~7247), `build_filter_chain` gate (~4062), chain loop in `render_filtered_object` (~4267); `avm2_display.c` `avm2_render_filtered`, `avm2_render_alpha_masked`; `render_webgpu.c` new `compose_layer_pipeline` + compose-to-layer; `tag.h`, `render_webgpu.h`, `renderer.h` |

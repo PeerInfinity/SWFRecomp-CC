@@ -1,0 +1,478 @@
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index b2dc4e53..6ff67c58 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -122,6 +122,7 @@ void tagSetOpaqueBackground(SWFAppContext* app_context, size_t depth,
+     u8 set, u32 rgb);
+ // PlaceObject3 BitmapCache -> DisplayObject.cacheAsBitmap.
+ void tagSetCacheAsBitmap(SWFAppContext* app_context, size_t depth, u8 on);
++void tagSetVisible(SWFAppContext* app_context, size_t depth, u8 visible);
+ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+     double r, double g, double b, double a);
+ void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20);
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index f7cd4b04..a34e9938 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -356,6 +356,10 @@ typedef struct WebGPURenderContext
+ 	// (set by render_webgpu_set_blur_shift, consumed and cleared by run_blur).
+ 	int blur_shift_x;
+ 	int blur_shift_y;
++	// compose_pipeline twin for a 1-sample, stencil-less target: composes a
++	// filter INTO filter_tex_b (then copied back to filter_tex_a) instead of the
++	// framebuffer — the compose-into-offscreen step a filter chain needs.
++	WGPURenderPipeline compose_layer_pipeline;
+ } WebGPURenderContext;
+ 
+ // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
+@@ -446,6 +450,14 @@ void render_webgpu_compose_filter(WebGPURenderContext* context, int kind,
+ 	float c1r, float c1g, float c1b, float c1a,
+ 	float c2r, float c2g, float c2b, float c2a,
+ 	float strength, int variant, int knockout, int composite_source);
++// Same as render_webgpu_compose_filter, but the result REPLACES filter_tex_a
++// (composed into filter_tex_b over transparent, then copied back), so the
++// next filter in a chain receives it. Main pass must be suspended.
++void render_webgpu_compose_filter_to_layer(WebGPURenderContext* context, int kind,
++	float blur_off_x, float blur_off_y,
++	float c1r, float c1g, float c1b, float c1a,
++	float c2r, float c2g, float c2b, float c2a,
++	float strength, int variant, int knockout, int composite_source);
+ void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
+ // Composite an alpha mask (s17 P3): filter_tex_a = maskee layer, filter_src_tex
+ // = mask layer; draws maskee * mask.a over the RESUMED main pass. Ruffle's
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index c718aa1d..32f297fb 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -61,6 +61,8 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_snapshot_filter_source(ctx)           render_webgpu_snapshot_filter_source(ctx)
+ #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) \
+ 	render_webgpu_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs)
++#define renderer_compose_filter_to_layer(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) \
++	render_webgpu_compose_filter_to_layer(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs)
+ #define renderer_ensure_filter_resources(ctx)          render_webgpu_ensure_filter_resources(ctx)
+ // s17 P3: composite the alpha-mask pair (maskee layer x mask layer alpha).
+ #define renderer_composite_alpha_mask(ctx)             render_webgpu_composite_alpha_mask(ctx)
+@@ -123,6 +125,7 @@ typedef FlashbangContext RenderContext;
+ #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) ((void)0)
+ #define renderer_snapshot_filter_source(ctx)           ((void)0)
+ #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) ((void)0)
++#define renderer_compose_filter_to_layer(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) ((void)0)
+ #define renderer_ensure_filter_resources(ctx)          ((void)0)
+ #define renderer_composite_alpha_mask(ctx)             ((void)0)
+ #define renderer_run_displacement(ctx, mp, mw, mh, rx, ry, rw, rh, px, py, sx, sy, vs, cx, cy, md, cr, cg, cb, ca) ((void)0)
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 578d1cd7..dcf5d733 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -19471,6 +19471,75 @@ static void avm2_filter_draw_offset_px(const Avm2FilterVal* const* list,
+ 	*oy = floor((double) y_min / 20.0);
+ }
+ 
++// Run an object's filter list IN PLACE on the layer already in filter_tex_a,
++// leaving the filtered result there (no framebuffer composite). Each composed
++// filter (glow / drop shadow / bevel) snapshots its input as its composite
++// source, blurs, and composes back INTO the layer, so the next filter receives
++// exactly the previous one's output — Ruffle's per-filter ping-pong
++// (render/wgpu/src/filters.rs apply_filter). Main pass must be suspended.
++// Displacement maps are skipped (they need the object rect; none in a mask
++// layer in the corpus).
++static void avm2_filter_one_in_place(Avm2Context* ctx, const Avm2FilterVal* f)
++{
++	SWFAppContext* app = ctx->app;
++	float fit_x = app->stage_fit_x > 0.0f ? app->stage_fit_x : 1.0f;
++	float fit_y = app->stage_fit_y > 0.0f ? app->stage_fit_y : 1.0f;
++	float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
++	do
++	{
++		int is_blur = (f->kind == AVM2_FILTER_BLUR);
++		int is_shadow = (f->kind == AVM2_FILTER_DROP_SHADOW);
++		int is_glow = (f->kind == AVM2_FILTER_GLOW);
++		int is_bevel = (f->kind == AVM2_FILTER_BEVEL);
++		if (!(is_blur || is_shadow || is_glow || is_bevel)) break;
++		if (!is_blur) renderer_snapshot_filter_source(context);
++		float cr = (float) ((f->color >> 16) & 0xFF) / 255.0f;
++		float cg = (float) ((f->color >> 8) & 0xFF) / 255.0f;
++		float cb = (float) (f->color & 0xFF) / 255.0f;
++		float ca = (float) f->alpha / 255.0f;
++		renderer_run_blur(context,
++			avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
++			f->quality, 1.0f, cr, cg, cb, ca, 0);
++		if (is_blur) break;
++		int f_inner = f->inner, f_knockout = f->knockout;
++		int f_composite = f->hide_object ? 0 : 1;
++		int bevel_type = 0;
++		if (is_bevel) { bevel_type = f->on_top ? 2 : (f_inner ? 1 : 0); f_composite = 1; }
++		float angle_rad = avm2_filter_fixed16(f->angle);
++		float dist_px = (is_shadow || is_bevel) ? avm2_filter_fixed16(f->distance) : 0.0f;
++		float xd = cosf(angle_rad) * dist_px * vs, yd = sinf(angle_rad) * dist_px * vs;
++		float uvx = fit_x / ((float) context->width * vs);
++		float uvy = fit_y / ((float) context->height * vs);
++		float du, dv;
++		if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
++		else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
++		float strength = avm2_filter_fixed8(f->strength);
++		if (is_bevel)
++			renderer_compose_filter_to_layer(context, 1, du, dv,
++				(float) ((f->color2 >> 16) & 0xFF) / 255.0f,
++				(float) ((f->color2 >> 8) & 0xFF) / 255.0f,
++				(float) (f->color2 & 0xFF) / 255.0f,
++				(float) f->alpha2 / 255.0f,
++				cr, cg, cb, ca, strength, bevel_type, f_knockout, f_composite);
++		else
++			renderer_compose_filter_to_layer(context, 0, -du, -dv,
++				cr, cg, cb, ca, 0.0f, 0.0f, 0.0f, 0.0f,
++				strength, f_inner, f_knockout, f_composite);
++	} while (0);
++}
++
++static void avm2_filter_layer_in_place(Avm2Context* ctx,
++                                       const Avm2DisplayObjectExt* ext)
++{
++	for (uint32_t i = 0; i < ext->filter_count; i++)
++	{
++		const Avm2FilterVal* f = &ext->filters[i];
++		if (!avm2_filter_renderable(f)) continue;
++		if (f->kind == AVM2_FILTER_DISPLACEMENT_MAP) continue;
++		avm2_filter_one_in_place(ctx, f);
++	}
++}
++
+ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+                                  Avm2DisplayObjectExt* ext,
+                                  const Mat* parent_world, double parent_alpha,
+@@ -19546,6 +19615,18 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	int draw_source_after  = is_bevel ? (!f_knockout && bevel_type == 0)
+ 	                                  : (!f_inner && !f_knockout && f_composite);
+ 	int draw_source_before = is_bevel && !f_knockout && bevel_type == 2;
++	// CHAINED (compose-into-offscreen): every non-final composed filter is
++	// composed back into the layer (avm2_filter_one_in_place), so the LAST
++	// filter's composite source is the layer it receives, not the crisp object
++	// — same rule as tag.c render_filtered_object. Snapshot it inside the loop
++	// and let the shader composite.
++	int chained = (n > 1) && getenv("SWF_NO_CHAIN_LAYER") == NULL;
++	if (chained)
++	{
++		needs_source_tex = 1;
++		draw_source_after = 0;
++		draw_source_before = 0;
++	}
+ 	int shader_composite = (draw_source_after || draw_source_before)
+ 	                       ? 0 : f_composite;
+ 	// Plain blur has no composition flags and keeps the legacy blit-back.
+@@ -19555,7 +19636,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	renderer_begin_offscreen_pass(context);
+ 	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+ 	renderer_end_offscreen_pass(context);
+-	if (needs_source_tex)
++	if (needs_source_tex && !chained)
+ 		renderer_snapshot_filter_source(context);
+ 
+ 	// A lone drop shadow's whole-pixel offset is folded into the blur (see
+@@ -19593,6 +19674,13 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 			continue;
+ 		}
+ 		int f_is_blur = (f->kind == AVM2_FILTER_BLUR);
++		if (chained && !f_last && !f_is_blur)
++		{
++			avm2_filter_one_in_place(ctx, f);
++			continue;
++		}
++		if (chained && f_last)
++			renderer_snapshot_filter_source(context);
+ 		// AS3 BlurFilter has no `strength` property, so Avm2FilterVal.strength
+ 		// stays 0 for it - passing that through would multiply the layer by
+ 		// zero and the object would VANISH. Plain blur is always strength 1.
+@@ -19819,6 +19907,10 @@ static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
+ 	g_avm2_alpha_maskee = NULL;
+ 	avm2_render_node(ctx, ext->mask, &mpw, 1.0, &AVM2_CX_IDENTITY);
+ 	renderer_end_offscreen_pass(context);
++	// Ruffle's alpha arm renders the masker WITH its filters
++	// (`m.render_with_options`); only the layer's alpha is consumed.
++	if (mext->filter_count > 0 && getenv("SWF_NO_MASK_FILTERS") == NULL)
++		avm2_filter_layer_in_place(ctx, mext);
+ 	renderer_snapshot_filter_source(context);
+ 
+ 	// (2) the MASKEE layer, into filter_tex_a (the offscreen pass clears it).
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index d3d7dcee..3b9ecbd0 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -4063,7 +4063,9 @@ static int build_filter_chain(const DisplayObject* obj,
+ 	{
+ 		u8 t = chain[i]->type;
+ 		int ok = (t == 1)
+-		      || ((t == 2 || t == 3) && chain[i]->flags == 0);
++		      || ((t == 2 || t == 3) && chain[i]->flags == 0)
++		      // compose_chain_entry_to_layer carries any non-final composed filter.
++		      || (getenv("SWF_NO_CHAIN_LAYER") == NULL);
+ 		if (!ok)
+ 		{
+ 			chain[0] = scratch;
+@@ -4143,6 +4145,60 @@ static int filter_shadow_offset_px(RenderContext* rc, const FilterListEntry* f,
+ 	return (*sx != 0) || (*sy != 0);
+ }
+ 
++// Compose a NON-FINAL glow / drop shadow / bevel of a chain back INTO the
++// filter layer (compose-into-offscreen), so the next filter receives this
++// one's real output — source composited in, knockout/inner honoured — instead
++// of the old "colorize inside the blur" approximation. The caller has already
++// snapshotted the layer as this filter's source and blurred it. Same flag
++// decoding and offset rounding as the final-filter path in
++// render_filtered_object.
++static void compose_chain_entry_to_layer(SWFAppContext* app_context,
++                                         const FilterListEntry* f,
++                                         int have_obj_cx, const float obj_cx[20])
++{
++	int is_bevel = (f->type == 4);
++	u8 flags = f->flags;
++	int f_inner, f_knockout, f_composite, bevel_type = 0;
++	if (is_bevel)
++	{
++		f_inner    = (flags >> 3) & 1;
++		f_knockout = (flags >> 2) & 1;
++		bevel_type = (flags & 1) ? 2 : (f_inner ? 1 : 0);
++		f_composite = 1;
++	}
++	else
++	{
++		f_composite = flags & 1;
++		f_knockout  = (flags >> 1) & 1;
++		f_inner     = (flags >> 2) & 1;
++	}
++	float fit_x = app_context->stage_fit_x > 0.0f ? app_context->stage_fit_x : 1.0f;
++	float fit_y = app_context->stage_fit_y > 0.0f ? app_context->stage_fit_y : 1.0f;
++	float vs = (context != NULL && context->stage_scale > 0.0f) ? context->stage_scale : 1.0f;
++	float dist_px = (f->type == 2 || is_bevel) ? (float) f->distance : 0.0f;
++	float xd = cosf((float) f->angle) * dist_px * vs, yd = sinf((float) f->angle) * dist_px * vs;
++	float uvx = fit_x / ((float)app_context->width * vs);
++	float uvy = fit_y / ((float)app_context->height * vs);
++	float du, dv;
++	if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
++	else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
++	double c_r = f->color_r, c_g = f->color_g, c_b = f->color_b, c_a = f->color_a;
++	double h_r = f->highlight_r, h_g = f->highlight_g, h_b = f->highlight_b, h_a = f->highlight_a;
++	if (have_obj_cx)
++	{
++		cxform_apply_rgba(obj_cx, &c_r, &c_g, &c_b, &c_a);
++		cxform_apply_rgba(obj_cx, &h_r, &h_g, &h_b, &h_a);
++	}
++	if (is_bevel)
++		renderer_compose_filter_to_layer(context, 1, du, dv,
++			h_r, h_g, h_b, h_a, c_r, c_g, c_b, c_a,
++			f->strength, bevel_type, f_knockout, f_composite);
++	else
++		renderer_compose_filter_to_layer(context, 0, -du, -dv,
++			c_r, c_g, c_b, c_a, 0.0f, 0.0f, 0.0f, 0.0f,
++			f->strength, f_inner, f_knockout, f_composite);
++}
++
+ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
+ {
+ 	FilterListEntry chain_scratch;
+@@ -4265,6 +4321,14 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
+ 		// are last (inner needs the RAW blurred alpha), inside the blur when not.
+ 		if (f_last && !f_is_blur) st = 1.0f;
+ 		int colorize = (!f_last && !f_is_blur) ? 1 : 0;
++		// Non-final composed filter: compose into the layer instead.
++		int to_layer = colorize && getenv("SWF_NO_CHAIN_LAYER") == NULL;
++		if (to_layer)
++		{
++			renderer_snapshot_filter_source(context);
++			st = 1.0f;
++			colorize = 0;
++		}
+ 		// A3: the filter's own colour carries the object's colour transform.
+ 		double fr = f->color_r, fg = f->color_g, fb = f->color_b, fa = f->color_a;
+ 		if (have_obj_cx) cxform_apply_rgba(obj_cx, &fr, &fg, &fb, &fa);
+@@ -4273,6 +4337,8 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
+ 			f->quality,
+ 			st,
+ 			fr, fg, fb, fa, colorize);
++		if (to_layer)
++			compose_chain_entry_to_layer(app_context, f, have_obj_cx, obj_cx);
+ 	}
+ 
+ 	renderer_resume_pass(context);
+@@ -7265,6 +7331,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			if (entry_is_live_masker(obj)) continue;
+ 			avm1_masker = avm1_masker_for_entry(obj);
+ 		}
++		// Same _visible / PlaceObject3-Visible skip as tagShowFrame.
++		if (obj->clip_depth == 0 && obj->as_hidden) continue;
+ 		if (obj->clip_depth > 0) {
+ 			// Pop before pushing — see render_display_list for why (a second
+ 			// clip range opened inside a live one leaks a stencil LEVEL under
+@@ -12907,6 +12975,15 @@ void tagSetCacheAsBitmap(SWFAppContext* app_context, size_t depth, u8 on)
+ 		display_list[depth].cache_as_bitmap = on ? 1u : 0u;
+ }
+ 
++// PlaceObject3 Visible (SWF >= 11; the recompiler enforces the version gate,
++// Ruffle display_object.rs:2592). Same render-skip flag AS `_visible` drives.
++void tagSetVisible(SWFAppContext* app_context, size_t depth, u8 visible)
++{
++	(void)app_context;
++	if (depth <= max_depth)
++		display_list[depth].as_hidden = visible ? 0u : 1u;
++}
++
+ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
+     double r, double g, double b, double a)
+ {
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index e271a4b7..ece7c775 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -4714,6 +4714,13 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
+ 		rpd.multisample.mask = 0xFFFFFFFF;
+ 		rpd.depthStencil = &ds;
+ 		ctx->compose_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
++		// Single-sample, stencil-less twin for composing into filter_tex_b.
++		rpd.label = WGPU_LABEL("compose_layer_pipeline");
++		rpd.multisample.count = 1;
++		rpd.depthStencil = NULL;
++		ctx->compose_layer_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
++		rpd.multisample.count = MSAA_SAMPLES;
++		rpd.depthStencil = &ds;
+ 		wgpuShaderModuleRelease(sm);
+ 
+ 		// --- Alpha-mask composite (s17 P3) -------------------------------
+@@ -5583,6 +5590,71 @@ void render_webgpu_compose_filter(WebGPURenderContext* ctx, int kind,
+ 	wgpuBindGroupRelease(bg);
+ }
+ 
++void render_webgpu_compose_filter_to_layer(WebGPURenderContext* ctx, int kind,
++	float blur_off_x, float blur_off_y,
++	float c1r, float c1g, float c1b, float c1a,
++	float c2r, float c2g, float c2b, float c2a,
++	float strength, int variant, int knockout, int composite_source)
++{
++	if (!ctx->renderer_ok || ctx->compose_layer_pipeline == NULL) return;
++
++	float params[20] = {0};
++	params[0] = c1r; params[1] = c1g; params[2] = c1b; params[3] = c1a;
++	params[4] = c2r; params[5] = c2g; params[6] = c2b; params[7] = c2a;
++	params[8] = blur_off_x; params[9] = blur_off_y;
++	params[12] = (float)kind;
++	params[13] = (float)variant;
++	params[14] = knockout ? 1.0f : 0.0f;
++	params[15] = composite_source ? 1.0f : 0.0f;
++	params[16] = strength;
++	u32 params_offset = filter_uniform_push(ctx, params, 80);
++
++	WGPUBindGroupEntry bg_entries[4] = {0};
++	bg_entries[0].binding = 0;
++	bg_entries[0].textureView = ctx->filter_view_a;   // blurred
++	bg_entries[1].binding = 1;
++	bg_entries[1].sampler = ctx->filter_sampler;
++	bg_entries[2].binding = 2;
++	bg_entries[2].buffer = ctx->filter_uniform_ring;
++	bg_entries[2].offset = params_offset;
++	bg_entries[2].size = 80;
++	bg_entries[3].binding = 3;
++	bg_entries[3].textureView = ctx->filter_src_view; // unblurred source
++
++	WGPUBindGroupDescriptor bg_desc = {0};
++	bg_desc.layout = ctx->compose_bgl;
++	bg_desc.entryCount = 4;
++	bg_desc.entries = bg_entries;
++	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
++
++	WGPURenderPassColorAttachment color_att = {0};
++	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
++	color_att.view = ctx->filter_view_b;
++	color_att.loadOp = WGPULoadOp_Clear;
++	color_att.storeOp = WGPUStoreOp_Store;
++	color_att.clearValue = (WGPUColor){0, 0, 0, 0};
++	WGPURenderPassDescriptor rp_desc = {0};
++	rp_desc.label = WGPU_LABEL("compose_to_layer");
++	rp_desc.colorAttachmentCount = 1;
++	rp_desc.colorAttachments = &color_att;
++	WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
++	wgpuRenderPassEncoderSetPipeline(pass, ctx->compose_layer_pipeline);
++	wgpuRenderPassEncoderSetBindGroup(pass, 0, bg, 0, NULL);
++	wgpuRenderPassEncoderDraw(pass, 6, 1, 0, 0);
++	wgpuRenderPassEncoderEnd(pass);
++	wgpuRenderPassEncoderRelease(pass);
++	wgpuBindGroupRelease(bg);
++
++	WGPUTexelCopyTextureInfo src = {0};
++	src.texture = ctx->filter_tex_b;
++	src.aspect = WGPUTextureAspect_All;
++	WGPUTexelCopyTextureInfo dst = {0};
++	dst.texture = ctx->filter_tex_a;
++	dst.aspect = WGPUTextureAspect_All;
++	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
++	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
++}
++
+ // Composite an ALPHA MASK (s17 P3): filter_tex_a holds the maskee layer and
+ // filter_src_tex the mask layer (put there by snapshot_filter_source before the
+ // second offscreen pass overwrote filter_tex_a). Draws maskee * mask.a over the
+@@ -6090,6 +6162,7 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
+ 	if (ctx->filter_src_tex) wgpuTextureRelease(ctx->filter_src_tex);
+ 	if (ctx->alpha_mask_pipeline) wgpuRenderPipelineRelease(ctx->alpha_mask_pipeline);
+ 	if (ctx->compose_pipeline) wgpuRenderPipelineRelease(ctx->compose_pipeline);
++	if (ctx->compose_layer_pipeline) wgpuRenderPipelineRelease(ctx->compose_layer_pipeline);
+ 	if (ctx->compose_bgl) wgpuBindGroupLayoutRelease(ctx->compose_bgl);
+ 	if (ctx->compose_pipeline_layout) wgpuPipelineLayoutRelease(ctx->compose_pipeline_layout);
+ 	// DisplacementMapFilter (cut 2) — all NULL unless the movie used one.
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f204a865..61165fcd 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -4507,9 +4507,13 @@ namespace SWFRecomp
+ 					cur_pos += 1;
+ 				}
+ 
++				u8 visible_val = 1;
+ 				if (is_po3 && has_visible)
+ 				{
+-					cur_pos += 1; // skip Visible UI8
++					// PlaceObject3 Visible UI8. Ruffle display_object.rs:2592
++					// applies it only for SWF version >= 11 (0 = hidden).
++					visible_val = (*(u8*) cur_pos != 0) ? 1u : 0u;
++					cur_pos += 1;
+ 				}
+ 
+ 				u8 opaque_bg_set = 0;
+@@ -4816,6 +4820,14 @@ namespace SWFRecomp
+ 						<< ");" << endl;
+ 				}
+ 
++				// PlaceObject3 Visible -> DisplayObject.visible (SWF >= 11).
++				if (is_po3 && has_visible && header.version >= 11)
++				{
++					context.tag_main << "\t" << "tagSetVisible(app_context, "
++						<< to_string(depth) << ", " << to_string((unsigned) visible_val)
++						<< ");" << endl;
++				}
++
+ 				// Emit filter if parsed
+ 				if (parsed_filter_type != 0)
+ 				{
+@@ -5995,7 +6007,8 @@ namespace SWFRecomp
+ 								sp_cab_set = (*(u8*) cur_pos != 0) ? 1u : 0u;
+ 								cur_pos += 1;
+ 							}
+-							if (is_sprite_po3 && sp_has_visible) cur_pos += 1;
++							u8 sp_visible_val = 1;
++							if (is_sprite_po3 && sp_has_visible) { sp_visible_val = (*(u8*) cur_pos != 0) ? 1u : 0u; cur_pos += 1; }
+ 							// PlaceObject3 BackgroundColor inside a DefineSprite.
+ 							// The sprite arm grew the cacheAsBitmap and filter
+ 							// twins of the root arm but never this one, so the
+@@ -6267,6 +6280,14 @@ namespace SWFRecomp
+ 									<< ");" << endl;
+ 							}
+ 
++							// PlaceObject3 Visible (twin of the root arm).
++							if (is_sprite_po3 && sp_has_visible && header.version >= 11)
++							{
++								sprite_definitions << "\t" << "tagSetVisible(app_context, "
++									<< to_string(depth) << ", " << to_string((unsigned) sp_visible_val)
++									<< ");" << endl;
++							}
++
+ 							// Emit filter if parsed
+ 							if (sp_filter_type != 0)
+ 							{
