@@ -17,3 +17,4 @@
 | w2-font-registry | recompiler font-tag emission (DefineFont2/3, DefineFontInfo, ExportAssets — NOT the zero-glyph synth); `ng_shared.c` (~674) font name registry; embedded-font-missing fallback in text layout |
 | w2-goto-collator | `avm2_display.c` `mc_goto_with_args` (~8013, ~8095), `run_goto` (~3153); `avm2_globals.c` new Collator block (~7130-7310) |
 | w2-htmltext (+AVM2) | also `avm2_text.c` `spans_from_html` (~1337), `spans_to_html` (~2264) |
+| w2-jpegxr | NEW jxrlib-facing TU (or one existing TU); `avm2_stage3d.c` ATF formats 1/4 (separate fns from w2-atf-dxt5); Loader image sniff/decode for JXR; `SWFModernRuntime/CMakeLists.txt` WITH_LIBJXR |
