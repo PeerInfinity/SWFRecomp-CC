@@ -3150,10 +3150,17 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
 	// steps (a removed handler during the goto reads the NEW currentFrame
 	// — movieclip_displayevents_timeline).
 	ext->current_frame = clamped;
-	ext->queued_script_frame = clamped;
-	if (ext->last_queued_script_frame != (int32_t) clamped)
+	// Ruffle run_goto: only a goto that HIT its target frame re-arms the
+	// frame script (run_frame_internal); gotoAndPlay(999) shows the last
+	// frame but its actions don't run (goto_queued_invalid/swf10). Flash
+	// still runs them in SWF<=9 (goto_queued_invalid/swf9; Ruffle KF there).
+	if (clamped == frame || ctx->swf_version <= 9)
 	{
-		ext->last_queued_script_frame = -1;
+		ext->queued_script_frame = clamped;
+		if (ext->last_queued_script_frame != (int32_t) clamped)
+		{
+			ext->last_queued_script_frame = -1;
+		}
 	}
 
 	if (is_rewind)
@@ -8011,6 +8018,9 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
 	// Integers demote to Number and take the string path.
 	int32_t frame = 1;
 	Avm2Value arg = act->args[0];
+	// `frame:Object` — coercing undefined to Object yields null, so the
+	// label path sees "null" (goto_queued_invalid/swf11 #2109 message).
+	if (arg.kind == AVM2_VALUE_UNDEFINED) arg = avm2_null();
 	int use_int_path = 0;
 	int32_t int_val = 0;
 	if (arg.kind == AVM2_VALUE_INTEGER)
@@ -8092,6 +8102,10 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
 			}
 		}
 	}
+	// Ruffle e092c78c2: frame zero (and every invalid value coerced into
+	// it) NOOPs a goto issued while this clip runs a frame script — the
+	// clip neither jumps to frame 1 nor stops/plays.
+	if (frame == 0 && ext->executing_frame_script) return;
 	if (!stop) mc_set_programmatically_played(ext);
 	if (frame < 1) frame = 1;
 	// TRUNCATING u16 cast (Ruffle `frame.max(1) as u16`).

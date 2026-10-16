@@ -620,3 +620,28 @@ a Flash-exact SWF4 `setProperty` arc lands.
 for a change to a version-gated coercion helper must be selected by SWF VERSION,
 not by feature name (the original sweep covered `actionscript.all` and
 `misc-ming.all` but not `misc-swfc.all`).
+
+## AVM2 goto past the last frame: SWF ≤ 9 still runs the landing frame's script (Flash), Ruffle never does
+
+**Test**: `avm2/goto_queued_invalid/swf9` (`known_failure = true` upstream; ships `output.ruffle.txt`).
+Siblings `goto_queued_invalid/swf10` and `/swf11` are where Flash and Ruffle agree.
+
+**Ruffle** (`display_object/movie_clip.rs` `run_goto`): *"gotoAndStop(9999) displays the final frame, but
+actions don't run!"* `run_frame_internal`, the only writer of the queued frame script, is skipped when the
+goto did not hit its target frame. That holds for every SWF version.
+
+**Flash**: the same rule from SWF 10 on (swf10: `gotoAndPlay(999)` lands on frame 6, its script does not
+run, the next tick wraps to frame 1). In SWF 9, Flash DOES run the landing frame's script:
+
+```
+Flash (output.txt):          Ruffle (output.ruffle.txt):
+// gotoAndPlay(999)          // gotoAndPlay(999)
+Entered frame 6              (no line: frame 6's script skipped)
+// stop()                    enterFrame : currentFrame=1 ...
+```
+
+**Ours** (`avm2_display.c` `run_goto`, session 22 `w2-goto-collator`): re-arm `queued_script_frame` only when
+`clamped == frame || ctx->swf_version <= 9`. Applying Ruffle's rule unconditionally moved swf9 to
+`ruffle_matched`, a regression under rule 3 (KF test), so the SWF ≤ 9 arm was kept.
+
+**Decision**: match Flash. swf9, swf10 and swf11 all pass.
