@@ -1,0 +1,255 @@
+avm1/bitmap_data_fillrect | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/bitmapdata_applyfilter_colormatrix | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/color | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/edittext_tag_indent | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.01a | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.01b | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.02a | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.02b | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.03a | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.03b | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.04a | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.04b | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.05a | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.05b | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.06a | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/focusrect_swf5 | output.06b | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/mask_with_drawing | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/mouse_events_visible_enabled | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/movieclip_setmask | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm1/netstream_play_flv_screen | output | ci=fail | before FAIL 44751/0 | after FAIL 44751/0 | ident | ci-png:= | 
+avm2/away3d_advanced_shallow_water_demo | output | ci=fail | before FAIL 1328033/400 | after FAIL 1328034/400 | MOVED | ci-png:= | 
+avm2/bitmapdata_copypixels | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm2/bitmapdata_draw_self_via_graphic | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm2/blend_multiply_alpha | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm2/displayobject_getbounds_shape | output | ci=pass | before PASS 3716/3800 | after PASS 3716/3800 | ident | ci-png:- | 
+avm2/edittext_autosize_height_dynamic | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm2/graphics_bitmaps | output | ci=pass | before PASS 525/600 | after PASS 525/600 | ident | ci-png:- | 
+avm2/graphics_simple_shapes | output | ci=fail | before FAIL 2/0 | after FAIL 2/0 | ident | ci-png:= | 
+avm2/sprite_with_frames | output | ci=fail | before FAIL 914/0 | after FAIL 914/0 | ident | ci-png:= | 
+avm2/stage3d_rotating_cube | output | ci=pass | before PASS 244/250 | after PASS 244/250 | ident | ci-png:- | 
+avm2/stage3d_sampler | output | ci=pass | before PASS 50/850 | after PASS 50/850 | ident | ci-png:- | 
+avm2/stage3d_stencil | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm2/stage3d_triangle | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+avm2/symbol_class_conflict | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+fonts/device_font_kerning | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+fonts/embed_matching/fallback_preferences | output | ci=fail | before FAIL 24/6 | after FAIL 24/6 | ident | ci-png:= | 
+fonts/embed_matching/match_style | output | ci=fail | before FAIL 3/0 | after FAIL 3/0 | ident | ci-png:= | 
+from_gnash/misc-ming.all/BeginBitmapFill | output | ci=fail | before FAIL 936/100 | after FAIL 939/100 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/Video-EmbedSquareTest | output | ci=fail | before FAIL 15/0 | after FAIL 12/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/loop/simple_loop_test | frame1 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_gnash/misc-ming.all/loop/simple_loop_test | frame2 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_gnash/misc-ming.all/loop/simple_loop_test | frame3 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_gnash/misc-ming.all/loop/simple_loop_test | frame4 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_gnash/misc-ming.all/loop/simple_loop_test | frame5 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_gnash/misc-ming.all/loop/simple_loop_test | frame6 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_gnash/misc-ming.all/loop/simple_loop_test | frame7 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_gnash/misc-ming.all/morph_test1 | frame1 | ci=fail | before FAIL 216/0 | after FAIL 217/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/morph_test1 | frame2 | ci=fail | before FAIL 15/0 | after FAIL 12/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/morph_test1 | frame3 | ci=fail | before FAIL 15/0 | after FAIL 12/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/morph_test1 | frame4 | ci=fail | before FAIL 15/0 | after FAIL 12/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/morph_test1 | frame5 | ci=fail | before FAIL 15/0 | after FAIL 12/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/morph_test1 | frame6 | ci=fail | before FAIL 15/0 | after FAIL 12/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/place_object_test | output | ci=fail | before FAIL 41844/0 | after FAIL 41874/0 | MOVED | ci-png:= | 
+from_gnash/misc-ming.all/shape_test | output | ci=fail | before FAIL 16068/0 | after FAIL 16074/0 | MOVED | ci-png:= | 
+from_shumway/3_joystick | output | ci=fail | before FAIL 4/0 | after FAIL 4/0 | MOVED | ci-png:= | 
+from_shumway/acid/acid | output.01 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.02 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.03 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.04 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.05 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.06 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.07 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.08 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.09 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.10 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.11 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.12 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.13 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.14 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.15 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.16 | ci=pass | before PASS 200/360 | after PASS 200/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.17 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid | output.18 | ci=pass | before PASS 198/360 | after PASS 198/360 | MOVED | ci-png:- | 
+from_shumway/acid/acid-bitmap-draw_quality_high | output | ci=fail | before FAIL 195744/700 | after FAIL 195744/700 | ident | ci-png:= | 
+from_shumway/acid/acid-bitmap-draw_quality_low | output | ci=fail | before FAIL 195744/700 | after FAIL 195744/700 | ident | ci-png:= | 
+from_shumway/acid/acid-bitmap-fill | output | ci=pass | before PASS 242/300 | after PASS 242/300 | ident | ci-png:- | 
+from_shumway/acid/acid-bitmap-fill-2 | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-bitmapData-copyPixels | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-bitmapData-draw | output | ci=fail | before FAIL 416/250 | after FAIL 416/250 | ident | ci-png:= | 
+from_shumway/acid/acid-blend | output | ci=pass | before PASS 39/348 | after PASS 5/348 | MOVED | ci-png:- | 
+from_shumway/acid/acid-blend-2 | output.10 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+from_shumway/acid/acid-blend-2 | output.15 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+from_shumway/acid/acid-blend-2 | output.20 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+from_shumway/acid/acid-blend-2 | output.26 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+from_shumway/acid/acid-blend-2 | output.40 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+from_shumway/acid/acid-chars | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-clip | output | ci=fail | before FAIL 397/140 | after FAIL 409/140 | MOVED | ci-png:= | 
+from_shumway/acid/acid-clip-2 | output | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+from_shumway/acid/acid-clip-3 | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-clip-3 | frame3 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-color-0 | output | ci=fail | before FAIL 17388/3 | after FAIL 17376/3 | MOVED | ci-png:= | 
+from_shumway/acid/acid-color-2 | output | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+from_shumway/acid/acid-filter-2 | output | ci=fail | before FAIL 2986/0 | after FAIL 2986/0 | MOVED | ci-png:= | 
+from_shumway/acid/acid-gradient-0 | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-gradient-2 | output | ci=fail | before FAIL 38/0 | after FAIL 3/0 | MOVED | ci-png:= | 
+from_shumway/acid/acid-mask | output.01 | ci=fail | before FAIL 12051/16 | after FAIL 12018/16 | MOVED | ci-png:= | 
+from_shumway/acid/acid-mask | output.05 | ci=fail | before FAIL 10970/16 | after FAIL 10915/16 | MOVED | ci-png:= | 
+from_shumway/acid/acid-mask | output.10 | ci=fail | before FAIL 9486/16 | after FAIL 9447/16 | MOVED | ci-png:= | 
+from_shumway/acid/acid-morph | output | ci=fail | before FAIL 32195/5600 | after FAIL 31977/5600 | MOVED | ci-png:= | 
+from_shumway/acid/acid-scale | output | ci=fail | before FAIL 106/0 | after FAIL 8/0 | MOVED | ci-png:= | 
+from_shumway/acid/acid-small | output.01 | ci=fail | before FAIL 3657/3000 | after FAIL 3624/3000 | MOVED | ci-png:= | 
+from_shumway/acid/acid-small | output.05 | ci=pass | before PASS 2997/3000 | after FAIL 3027/3000 | MOVED | ci-png:- | FLIP-
+from_shumway/acid/acid-stroke-0 | output | ci=fail | before FAIL 52533/0 | after FAIL 52522/0 | MOVED | ci-png:= | 
+from_shumway/acid/acid-text | output | ci=fail | before FAIL 5022/0 | after FAIL 5019/0 | MOVED | ci-png:= | 
+from_shumway/acid/acid-text-2 | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-text-4 | output | ci=fail | before FAIL 51678/0 | after FAIL 51678/0 | ident | ci-png:= | 
+from_shumway/acid/acid-text-5 | output | ci=fail | before FAIL 422247/6 | after FAIL 422247/6 | ident | ci-png:= | 
+from_shumway/acid/acid-text-6 | output | ci=fail | before FAIL 198/0 | after FAIL 198/0 | ident | ci-png:= | 
+from_shumway/acid/acid-text-6 | frame5 | ci=fail | before FAIL 12/0 | after FAIL 12/0 | ident | ci-png:= | 
+from_shumway/acid/acid-text-escape | output | ci=fail | before FAIL 112/0 | after FAIL 110/0 | MOVED | ci-png:= | 
+from_shumway/acid/acid-text-x | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/acid/acid-textfield | output | ci=fail | before FAIL 15754/0 | after FAIL 15754/0 | ident | ci-png:= | 
+from_shumway/acid/acid-textfield-scroll | output | ci=pass | before PASS 552/600 | after PASS 552/600 | ident | ci-png:- | 
+from_shumway/acid/acid-video | output.01 | ci=pass | before PASS 278/300 | after PASS 270/300 | MOVED | ci-png:- | 
+from_shumway/acid/acid-video | output.10 | ci=pass | before PASS 254/300 | after PASS 254/300 | MOVED | ci-png:- | 
+from_shumway/acid/acid-video | output.20 | ci=pass | before PASS 99/130 | after PASS 101/130 | MOVED | ci-png:- | 
+from_shumway/bitmapbuttons | output | ci=fail | before FAIL 618042/0 | after FAIL 618042/0 | ident | ci-png:= | 
+from_shumway/button3 | output.1 | ci=pass | before PASS 3480/3500 | after PASS 3480/3500 | ident | ci-png:- | 
+from_shumway/button3 | output.2 | ci=pass | before PASS 3480/3500 | after PASS 3480/3500 | ident | ci-png:- | 
+from_shumway/button3 | output.3 | ci=pass | before PASS 3480/3500 | after PASS 3480/3500 | ident | ci-png:- | 
+from_shumway/button3 | output.4 | ci=pass | before PASS 3480/3500 | after PASS 3480/3500 | ident | ci-png:- | 
+from_shumway/doubleAndRegister | output | ci=fail | before FAIL 26/0 | after FAIL 2/0 | MOVED | ci-png:= | 
+from_shumway/flash_text_TextField2 | output | ci=pass | before PASS 250/250 | after PASS 250/250 | ident | ci-png:- | 
+from_shumway/timeline/timeline_as2_5 | output.01 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/timeline/timeline_as2_5 | output.02 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/timeline/timeline_as2_5 | output.03 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/timeline/timeline_as2_5 | output.04 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/timeline/timeline_as2_5 | output.05 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/timeline/timeline_as2_5 | output.06 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/timeline/timeline_as2_5 | output.07 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+from_shumway/timeline/timeline_loop | output.02 | ci=pass | before PASS 57/70 | after PASS 65/70 | MOVED | ci-png:- | 
+from_shumway/timeline/timeline_loop | output.06 | ci=pass | before PASS 77/90 | after PASS 84/90 | MOVED | ci-png:- | 
+from_shumway/timeline/timeline_loop | output.07 | ci=pass | before PASS 57/70 | after PASS 65/70 | MOVED | ci-png:- | 
+from_shumway/timeline/timeline_loop | output.11 | ci=pass | before PASS 77/90 | after PASS 84/90 | MOVED | ci-png:- | 
+from_shumway/timeline/timeline_loop | output.15 | ci=pass | before PASS 77/90 | after PASS 84/90 | MOVED | ci-png:- | 
+from_shumway/timeline/timeline_loop | output.16 | ci=pass | before PASS 77/90 | after PASS 84/90 | MOVED | ci-png:- | 
+from_shumway/timeline/timeline_loop | output.12 | ci=pass | before PASS 57/70 | after PASS 65/70 | MOVED | ci-png:- | 
+import_assets/avm1_imports_avm1 | output | ci=pass | before PASS 459/500 | after PASS 458/500 | MOVED | ci-png:- | 
+regression/avm2_graphics_runtime output noexp
+regression/avm2_morph output noexp
+regression/avm2_parent_child_render | output | ci=pass | before PASS 96/400 | after PASS 0/400 | MOVED | ci-png:- | 
+regression/avm2_timeline_gradients | output | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+regression/avm2_timeline_solid output noexp
+regression/avm2_timeline_stroke_gradient | output | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+regression/mask_nested_intersect | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+regression/mask_sibling_union | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+text/auto_size/height | output | ci=pass | before PASS 3/3 | after PASS 3/3 | ident | ci-png:- | 
+text/auto_size/return | output | ci=pass | before PASS 6/18 | after PASS 6/18 | ident | ci-png:- | 
+text/auto_size/width | output | ci=pass | before PASS 0/18 | after PASS 0/18 | ident | ci-png:- | 
+text/br_at_start | output | ci=fail | before FAIL 3683/8 | after FAIL 3681/8 | MOVED | ci-png:= | 
+text/style_changes_in_html | output | ci=fail | before FAIL 25024/0 | after FAIL 25024/0 | MOVED | ci-png:= | 
+visual/avm2_button_scroll_rect | output | ci=fail | before FAIL 6/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/bitmapdata_copypixels_with_alpha_oob | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/blend_modes/add | output | ci=fail | before FAIL 5/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/alpha_no_layer | output | ci=fail | before FAIL 18/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/darken | output | ci=fail | before FAIL 16/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/difference | output | ci=fail | before FAIL 7/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/erase_no_layer | output | ci=fail | before FAIL 18/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/hardlight | output | ci=fail | before FAIL 21/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/invert | output | ci=fail | before FAIL 24/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/layer_alpha | output | ci=fail | before FAIL 66759/0 | after FAIL 66744/0 | MOVED | ci-png:= | 
+visual/blend_modes/layer_erase | output | ci=fail | before FAIL 66964/0 | after FAIL 66949/0 | MOVED | ci-png:= | 
+visual/blend_modes/lighten | output | ci=fail | before FAIL 5/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/multiply | output | ci=fail | before FAIL 16/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/overlay | output | ci=fail | before FAIL 19/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/overlay_onto_stage | output | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/blend_modes/screen | output | ci=fail | before FAIL 5/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/blend_modes/subtract | output | ci=fail | before FAIL 7/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/cache_as_bitmap/avm2_button | output | ci=fail | before FAIL 6/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/cache_as_bitmap/edittext_hscroll | output.01 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/edittext_hscroll | output.02 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/edittext_scroll | output.01 | ci=pass | before PASS 0/5 | after PASS 0/5 | ident | ci-png:- | 
+visual/cache_as_bitmap/edittext_scroll | output.02 | ci=fail | before FAIL 6/5 | after FAIL 6/5 | ident | ci-png:= | 
+visual/cache_as_bitmap/edittext_selection | output.01 | ci=pass | before PASS 0/8 | after PASS 0/8 | ident | ci-png:- | 
+visual/cache_as_bitmap/edittext_selection | output.02 | ci=pass | before PASS 0/8 | after PASS 0/8 | ident | ci-png:- | 
+visual/cache_as_bitmap/edittext_selection | output.03 | ci=pass | before PASS 0/8 | after PASS 0/8 | ident | ci-png:- | 
+visual/cache_as_bitmap/masks | output.01 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/masks | output.02 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/masks | output.03 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/masks | output.04 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/masks | output.05 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/masks | output.06 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/masks | output.07 | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/nested_rotation | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/oversize/swf_10_masks | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/oversize/swf_10_too_big | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/oversize/swf_9_masks | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/oversize/swf_9_too_big | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/scroll_rect | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/cache_as_bitmap/scroll_rect_scaled | output | ci=pass | before PASS 800/900 | after PASS 799/900 | MOVED | ci-png:- | 
+visual/cache_as_bitmap/shape_changed | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/drawing_api/drawing_order | output | ci=fail | before FAIL 6658/0 | after FAIL 6658/0 | ident | ci-png:= | 
+visual/edittext/edittext_border_filters | output | ci=pass | before PASS 0/17 | after PASS 0/17 | ident | ci-png:- | 
+visual/edittext/edittext_border_transform | output.01 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_border_transform | output.02 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_border_transform | output.03 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_border_transform | output.04 | ci=pass | before PASS 16/20 | after PASS 16/20 | ident | ci-png:- | 
+visual/edittext/edittext_border_transform | output.05 | ci=pass | before PASS 0/20 | after PASS 0/20 | ident | ci-png:- | 
+visual/edittext/edittext_border_transform | output.06 | ci=pass | before PASS 15/20 | after PASS 15/20 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.01 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.02 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.03 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.04 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.05 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.06 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.07 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.08 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.09 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.10 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.11 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_empty | output.12 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_multiline | output.01 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_multiline | output.02 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_multiline | output.03 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_multiline | output.04 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_multiline | output.05 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_caret_multiline | output.06 | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/edittext/edittext_device_transform_small_rotation | output | ci=pass | before PASS 11/11 | after PASS 11/11 | ident | ci-png:- | 
+visual/edittext/edittext_device_transform_small_shear | output | ci=pass | before PASS 49/50 | after PASS 49/50 | ident | ci-png:- | 
+visual/filters/bevel | output | ci=fail | before FAIL 3091/6 | after FAIL 750/6 | MOVED | ci-png:= | 
+visual/filters/bevel_full | output | ci=fail | before FAIL 1158/18 | after FAIL 42/18 | MOVED | ci-png:= | 
+visual/filters/bevel_inner | output | ci=fail | before FAIL 1018/18 | after FAIL 42/18 | MOVED | ci-png:= | 
+visual/filters/bevel_outer | output | ci=fail | before FAIL 1450/18 | after FAIL 42/18 | MOVED | ci-png:= | 
+visual/filters/blur_scales_with_screen | output | ci=pass | before PASS 0/0 | after PASS 0/0 | MOVED | ci-png:- | 
+visual/filters/blur_size_grows | output | ci=fail | before FAIL 546/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/filters/color_matrix | output | ci=fail | before FAIL 6/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/filters/displacement_map | output | ci=fail | before FAIL 1436/72 | after FAIL 408/72 | MOVED | ci-png:= | 
+visual/filters/displacement_map_through_applyFilter | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/filters/drop_shadow | output | ci=fail | before FAIL 3875/0 | after FAIL 3/0 | MOVED | ci-png:= | 
+visual/filters/drop_shadow_angles | output | ci=fail | before FAIL 6934/0 | after FAIL 549/0 | MOVED | ci-png:= | 
+visual/filters/drop_shadow_scales_with_screen | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/filters/glow | output | ci=fail | before FAIL 2659/0 | after FAIL 3/0 | MOVED | ci-png:= | 
+visual/filters/glow_pass_scaling | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/filters/glow_with_alpha_strength | output | ci=fail | before FAIL 1123/18 | after FAIL 42/18 | MOVED | ci-png:= | 
+visual/filters/glow_without_composite_source | output | ci=fail | before FAIL 2917/0 | after FAIL 3/0 | MOVED | ci-png:= | 
+visual/fonts/device-font | output | ci=pass | before PASS 0/3 | after PASS 0/3 | ident | ci-png:- | 
+visual/fonts/duplicate_font | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/fonts/font_lookup_as3 | output | ci=fail | before FAIL 19584/72 | after FAIL 19584/72 | ident | ci-png:= | 
+visual/fonts/glyph | output | ci=fail | before FAIL 3/0 | after FAIL 3/0 | ident | ci-png:= | 
+visual/fonts/leading_device_font | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/opaque_background | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/simple_shapes/gradients/focal_radial | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/simple_shapes/gradients/gradients | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/simple_shapes/gradients/radial | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/simple_shapes/gradients/reflect | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/simple_shapes/gradients/repeat | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 
+visual/simple_shapes/heavy_tesselation | output | ci=fail | before FAIL 2439/3 | after PASS 3/3 | MOVED | ci-png:= | FLIP+
+visual/simple_shapes/layers | output | ci=fail | before FAIL 23/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/simple_shapes/masks | output | ci=fail | before FAIL 181/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/simple_shapes/masks_equal_clipdepth | output | ci=fail | before FAIL 181/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/simple_shapes/overlaps | output | ci=fail | before FAIL 12/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/simple_shapes/scroll_rect_mask | output | ci=fail | before FAIL 20/0 | after PASS 0/0 | MOVED | ci-png:= | FLIP+
+visual/simple_shapes/strokes/scale | output | ci=fail | before FAIL 72633/0 | after FAIL 71397/0 | MOVED | ci-png:= | 
+visual/simple_shapes/text_field_mask | output | ci=fail | before FAIL 56/0 | after FAIL 56/0 | ident | ci-png:= | 
+visual/simple_shapes/winding_rule | output | ci=pass | before PASS 0/0 | after PASS 0/0 | ident | ci-png:- | 

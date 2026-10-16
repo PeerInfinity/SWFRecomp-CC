@@ -55,7 +55,22 @@ namespace SWFRecomp
 		s32 x;
 		s32 y;
 		s32 morph_index = -1;
+		// Sub-twip remainder of the unquantized position, in 1/16384 twip
+		// (same y-up frame as x/y): exact = x + fx_frac/16384. Nonzero only
+		// where a vertex is computed rather than read from the SWF (the Levien
+		// curve flattener, the stroke builders, libtess2 fill output); x/y stay
+		// the integer copy the fill graph keys on. Strokes and fills are emitted
+		// from the exact value, the way lyon tessellates Ruffle's f32 path.
+		// Two s16 keep sizeof(Vertex) at 16: heavy_tesselation's path graph
+		// already peaks near the recompiler's 4 GB address-space cap.
+		s16 fx_frac = 0;
+		s16 fy_frac = 0;
 	};
+	
+	static_assert(sizeof(Vertex) == 16,
+	              "Vertex must stay 16 bytes: a 24-byte Vertex pushes "
+	              "heavy_tesselation's recompile past verify_output.py's "
+	              "4 GB ulimit -v (std::bad_alloc, the shape silently blanks)");
 	
 	struct Tri
 	{

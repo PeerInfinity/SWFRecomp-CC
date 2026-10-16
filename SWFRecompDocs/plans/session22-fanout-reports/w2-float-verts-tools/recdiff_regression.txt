@@ -1,0 +1,102 @@
+NOSWF regression/_results
+SAME regression/array_element_type1_args
+SAME regression/array_method_type1_args
+SAME regression/avm1_attach_clipevent_enterframe
+SAME (2 swfs) regression/avm1_child_timeline_advance
+SAME (2 swfs) regression/avm1_child_timeline_frame1_stop
+SAME (2 swfs) regression/avm1_child_timeline_holder_stop
+SAME (3 swfs) regression/avm1_child_timeline_loop
+SAME regression/avm1_display_prop_coercion
+SAME (2 swfs) regression/avm1_mcl_holder_totalframes
+SAME (2 swfs) regression/avm1_mcl_load_tick
+SAME (2 swfs) regression/avm1_parent_as3_child_payload
+SAME (2 swfs) regression/avm1_parent_child_bitmap
+SAME (2 swfs) regression/avm1_parent_child_bitmap_fill
+SAME (2 swfs) regression/avm1_parent_child_modify_place
+SAME (2 swfs) regression/avm1_parent_child_morph
+SAME (2 swfs) regression/avm1_parent_child_render
+SAME (2 swfs) regression/avm1_parent_child_sprite_meta
+SAME (2 swfs) regression/avm1_parent_child_text
+SAME regression/avm1_root_identity_and_playhead
+SAME regression/avm2_agi_shell
+SAME regression/avm2_array_growth_bounded
+CHANGED regression/avm2_bitmapdata_draw_textfield
+SAME (2 swfs) regression/avm2_child_simplebutton
+SAME regression/avm2_contextmenu_stub
+SAME regression/avm2_e4x_parse_bounded
+SAME regression/avm2_embed_bytearray
+SAME regression/avm2_external_interface_unavailable
+SAME regression/avm2_findprop_this_resolution
+SAME regression/avm2_gc_dynprop_tombstone_purge
+SAME regression/avm2_gc_string_concat_reclaim
+SAME regression/avm2_gc_string_survives_collect
+SAME regression/avm2_goto_catchup_scale
+SAME regression/avm2_graphics_runtime
+SAME regression/avm2_json_roundtrip_bounded
+SAME regression/avm2_loader_stub
+SAME regression/avm2_localconnection_domain
+SAME regression/avm2_morph
+CHANGED (2 swfs) regression/avm2_parent_child_render
+SAME (2 swfs) regression/avm2_parent_child_static_text
+SAME (2 swfs) regression/avm2_parent_child_symbol_stride
+SAME (2 swfs) regression/avm2_parent_child_symbolclass_domain
+SAME regression/avm2_reflect_trait_hooks
+SAME regression/avm2_sharedobject_flushstatus
+SAME regression/avm2_simplebutton_click
+SAME regression/avm2_slot_default_template
+SAME regression/avm2_sound_bytes_and_group_format
+SAME regression/avm2_static_and_store_slots
+SAME regression/avm2_static_text
+CHANGED regression/avm2_timeline_gradients
+CHANGED regression/avm2_timeline_solid
+CHANGED regression/avm2_timeline_stroke_gradient
+CHANGED regression/avm2_timeline_text
+SAME regression/avm2_tolerant_verify_quarantine
+SAME regression/avm2_typed_value_ops
+SAME regression/bitmap_pool_layer_cap
+SAME (2 swfs) regression/broadcast_cross_swf_version
+SAME regression/broadcast_type1_args
+SAME (2 swfs) regression/coerce_cross_swf_version
+SAME regression/coerce_recursion_guard
+SAME regression/coerce_type1_args
+SAME regression/convertfloat_type1_this
+SAME regression/ctor_before_first_call_locals
+SAME regression/ei_closure_scope_order
+SAME regression/ei_cross_swf_version
+SAME regression/ei_type1_args
+SAME regression/enterframe_type1_args
+SAME regression/fn_call_builtin_type1_args
+SAME regression/fn_call_type1_args
+SAME regression/fn_empty_method_type1_args
+SAME regression/lc_method_type1_args
+SAME regression/lc_onstatus_type1_args
+SAME (2 swfs) regression/lv_cross_swf_version
+SAME regression/lv_ondata_type1_args
+SAME regression/mask_nested_intersect
+SAME regression/mask_sibling_union
+SAME (2 swfs) regression/mc_event_cross_swf_version
+SAME regression/mc_event_type1_args
+SAME (2 swfs) regression/mc_method_v5_caller_gate
+SAME regression/mc_resolve_type1_args
+SAME regression/method_type1_args
+SAME regression/nc_onstatus_closure
+SAME regression/nc_onstatus_type1_args
+SAME (2 swfs) regression/onconstruct_cross_swf_version
+SAME regression/onconstruct_type1_args
+SAME regression/onload_type1_args
+SAME regression/onunload_type1_args
+SAME regression/onunload_type1_local_frame
+SAME regression/resolve_type1_args
+SAME (2 swfs) regression/root_enterframe_cross_swf_version
+SAME regression/sort_comparator_captured_scope
+SAME regression/sort_comparator_type1_args
+SAME regression/string_prim_method_type1_args
+SAME (2 swfs) regression/timer_cross_swf_version
+SAME regression/timer_type1_args
+SAME (2 swfs) regression/watch_cross_swf_version
+SAME regression/watch_mc_reentrant_setmember
+SAME regression/watch_mc_type1_args
+SAME regression/watch_setmember_type1_args
+SAME regression/watch_timeline_named_params
+SAME regression/watch_timeline_reentrant
+SAME regression/xml_onload_type1_args

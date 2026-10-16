@@ -1,0 +1,51 @@
+from_shumway/acid/acid output.01 before PASS t0:8681/9100, t128:198/360 || after PASS t0:8677/9100, t128:198/360
+from_shumway/acid/acid output.02 before PASS t0:11849/12500, t128:198/360 || after PASS t0:11845/12500, t128:198/360
+from_shumway/acid/acid output.03 before PASS t0:9827/11000, t128:198/360 || after PASS t0:9829/11000, t128:198/360
+from_shumway/acid/acid output.04 before PASS t0:11637/12100, t128:198/360 || after PASS t0:11635/12100, t128:198/360
+from_shumway/acid/acid output.05 before PASS t0:9953/11000, t128:198/360 || after PASS t0:9961/11000, t128:198/360
+from_shumway/acid/acid output.06 before PASS t0:11843/12500, t128:198/360 || after PASS t0:11831/12500, t128:198/360
+from_shumway/acid/acid output.07 before PASS t0:9987/11000, t128:198/360 || after PASS t0:9985/11000, t128:198/360
+from_shumway/acid/acid output.08 before PASS t0:9887/11000, t128:198/360 || after PASS t0:9885/11000, t128:198/360
+from_shumway/acid/acid output.09 before PASS t0:11507/12500, t128:198/360 || after PASS t0:11493/12500, t128:198/360
+from_shumway/acid/acid output.10 before PASS t0:9951/11000, t128:198/360 || after PASS t0:9961/11000, t128:198/360
+from_shumway/acid/acid output.11 before PASS t0:12135/13000, t128:198/360 || after PASS t0:12135/13000, t128:198/360
+from_shumway/acid/acid output.12 before PASS t0:12015/13000, t128:198/360 || after PASS t0:12015/13000, t128:198/360
+from_shumway/acid/acid output.13 before PASS t0:12049/13000, t128:198/360 || after PASS t0:12045/13000, t128:198/360
+from_shumway/acid/acid output.14 before PASS t0:12101/13000, t128:198/360 || after PASS t0:12099/13000, t128:198/360
+from_shumway/acid/acid output.15 before PASS t0:11871/13000, t128:198/360 || after PASS t0:11875/13000, t128:198/360
+from_shumway/acid/acid output.16 before PASS t0:12365/13000, t128:200/360 || after PASS t0:12363/13000, t128:200/360
+from_shumway/acid/acid output.17 before PASS t0:11997/13000, t128:198/360 || after PASS t0:11985/13000, t128:198/360
+from_shumway/acid/acid output.18 before PASS t0:12105/13000, t128:198/360 || after PASS t0:12097/13000, t128:198/360
+from_shumway/acid/acid-blend output before PASS t11:39/348 || after PASS t11:5/348
+from_shumway/acid/acid-blend-2 output.10 before PASS t20:4114/5000, t130:0/0 || after PASS t20:4129/5000, t130:0/0
+from_shumway/acid/acid-blend-2 output.15 before PASS t20:5926/6000, t135:0/0 || after PASS t20:5929/6000, t135:0/0
+from_shumway/acid/acid-blend-2 output.20 before PASS t20:5286/5500, t130:0/0 || after PASS t20:5300/5500, t130:0/0
+from_shumway/acid/acid-blend-2 output.26 before PASS t20:5618/6000, t120:0/0 || after PASS t20:5638/6000, t120:0/0
+from_shumway/acid/acid-blend-2 output.40 before PASS t20:8506/9000, t40:1467/1500, t160:0/0 || after PASS t20:8477/9000, t40:1460/1500, t160:0/0
+from_shumway/acid/acid-clip-2 output before PASS t0:2863/3000, t32:1011/1300, t64:210/300, t110:0/0 || after PASS t0:2886/3000, t32:1044/1300, t64:219/300, t110:0/0
+from_shumway/acid/acid-color-2 output before PASS t0:5727/6400, t32:1334/1500, t52:70/100, t80:0/0 || after PASS t0:5714/6400, t32:1299/1500, t52:64/100, t80:0/0
+from_shumway/acid/acid-small output.05 before PASS t0:25959/30000, t20:19494/21000, t80:2997/3000 || after FAIL t0:25974/30000, t20:19476/21000, t80:3027/3000
+from_shumway/acid/acid-video output.01 before PASS t5:16648/20000, t50:278/300 || after PASS t5:16153/20000, t50:270/300
+from_shumway/acid/acid-video output.10 before PASS t5:15890/18000, t50:254/300 || after PASS t5:15438/18000, t50:254/300
+from_shumway/acid/acid-video output.20 before PASS t5:14066/15000, t50:99/130 || after PASS t5:13389/15000, t50:101/130
+from_shumway/timeline/timeline_loop output.02 before PASS t32:57/70 || after PASS t32:65/70
+from_shumway/timeline/timeline_loop output.06 before PASS t32:77/90 || after PASS t32:84/90
+from_shumway/timeline/timeline_loop output.07 before PASS t32:57/70 || after PASS t32:65/70
+from_shumway/timeline/timeline_loop output.11 before PASS t32:77/90 || after PASS t32:84/90
+from_shumway/timeline/timeline_loop output.15 before PASS t32:77/90 || after PASS t32:84/90
+from_shumway/timeline/timeline_loop output.16 before PASS t32:77/90 || after PASS t32:84/90
+from_shumway/timeline/timeline_loop output.12 before PASS t32:57/70 || after PASS t32:65/70
+import_assets/avm1_imports_avm1 output before PASS t100:459/500 || after PASS t100:458/500
+regression/avm2_parent_child_render output before PASS t0:96/400 || after PASS t0:0/400
+regression/avm2_timeline_gradients output before PASS t255:0/0 || after PASS t255:0/0
+regression/avm2_timeline_stroke_gradient output before PASS t255:0/0 || after PASS t255:0/0
+visual/blend_modes/overlay_onto_stage output before PASS t0:33900/40000, t16:1182/1300, t32:45/60, t64:0/0 || after PASS t0:33908/40000, t16:1194/1300, t32:48/60, t64:0/0
+visual/cache_as_bitmap/masks output.01 before PASS t10:3103/3200, t64:298/350, t128:0/0 || after PASS t10:3118/3200, t64:312/350, t128:0/0
+visual/cache_as_bitmap/masks output.02 before PASS t10:3014/3200, t64:319/350, t128:0/0 || after PASS t10:3032/3200, t64:345/350, t128:0/0
+visual/cache_as_bitmap/masks output.03 before PASS t10:3010/3200, t64:295/350, t128:0/0 || after PASS t10:3034/3200, t64:323/350, t128:0/0
+visual/cache_as_bitmap/masks output.04 before PASS t10:3105/3200, t64:286/350, t128:0/0 || after PASS t10:3120/3200, t64:318/350, t128:0/0
+visual/cache_as_bitmap/masks output.05 before PASS t10:2985/3200, t64:292/350, t128:0/0 || after PASS t10:2998/3200, t64:298/350, t128:0/0
+visual/cache_as_bitmap/masks output.06 before PASS t10:2625/3200, t64:262/350, t128:0/0 || after PASS t10:2632/3200, t64:276/350, t128:0/0
+visual/cache_as_bitmap/masks output.07 before PASS t10:2520/3200, t64:246/350, t128:0/0 || after PASS t10:2532/3200, t64:264/350, t128:0/0
+visual/cache_as_bitmap/scroll_rect_scaled output before PASS t0:2445/2800, t64:800/900 || after PASS t0:2442/2800, t64:799/900
+visual/filters/blur_scales_with_screen output before PASS t2:0/0 || after PASS t2:0/0

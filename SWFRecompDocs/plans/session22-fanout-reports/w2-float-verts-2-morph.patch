@@ -1,0 +1,186 @@
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 19fae12..bd2f8c9 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -8640,6 +8640,20 @@ namespace SWFRecomp
+ 		return v;
+ 	}
+ 
++	// morph_end_shape_data coordinate literal: whole twips keep the historical
++	// one-decimal form (so a morph with no computed vertices emits byte-for-byte
++	// what it did), a sub-twip remainder gets enough digits to carry it.
++	struct MorphEndCoord
++	{
++		float v;
++	};
++
++	static std::ostream& operator<<(std::ostream& os, MorphEndCoord c)
++	{
++		const bool whole = (c.v == std::floor(c.v));
++		return os << std::dec << std::fixed << std::setprecision(whole ? 1 : 5) << c.v << "f";
++	}
++
+ 	void SWF::interpretShape(Context& context, SWFTag& shape_tag)
+ 	{
+ 		bool is_font = (shape_tag.code == SWF_TAG_DEFINE_FONT || shape_tag.code == SWF_TAG_DEFINE_FONT_2 || shape_tag.code == SWF_TAG_DEFINE_FONT_3);
+@@ -9215,8 +9229,12 @@ namespace SWFRecomp
+ 						else
+ 						{
+ 							float ft = (float) p / (float) n;
+-							v.x = (s32) ((float) from_x + ft * (float) (target_x - from_x));
+-							v.y = (s32) ((float) from_y + ft * (float) (target_y - from_y));
++							float fx = (float) from_x + ft * (float) (target_x - from_x);
++							float fy = (float) from_y + ft * (float) (target_y - from_y);
++							v.x = (s32) fx;
++							v.y = (s32) fy;
++							v.fx_frac = vertexFrac(fx, v.x);
++							v.fy_frac = vertexFrac(fy, v.y);
+ 						}
+ 
+ 						if (is_morph) v.morph_index = morph_vertex_counter++;
+@@ -9772,8 +9790,12 @@ namespace SWFRecomp
+ 							else
+ 							{
+ 								float ft = (float) p / (float) n;
+-								ev.x = (s32) ((float) from_x + ft * (float) (target_x - from_x));
+-								ev.y = (s32) ((float) from_y + ft * (float) (target_y - from_y));
++								float fx = (float) from_x + ft * (float) (target_x - from_x);
++								float fy = (float) from_y + ft * (float) (target_y - from_y);
++								ev.x = (s32) fx;
++								ev.y = (s32) fy;
++								ev.fx_frac = vertexFrac(fx, ev.x);
++								ev.fy_frac = vertexFrac(fy, ev.y);
+ 							}
+ 
+ 							morph_end_positions.push_back(ev);
+@@ -9955,8 +9977,12 @@ namespace SWFRecomp
+ 									float ft = (float) p / passes;
+ 									float fu = 1.0f - ft;
+ 									Vertex ev;
+-									ev.x = (s32)(fu*fu*cur_v.x + 2*fu*ft*ctrl.x + ft*ft*anch.x);
+-									ev.y = (s32)(fu*fu*cur_v.y + 2*fu*ft*ctrl.y + ft*ft*anch.y);
++									float fx = fu*fu*cur_v.x + 2*fu*ft*ctrl.x + ft*ft*anch.x;
++									float fy = fu*fu*cur_v.y + 2*fu*ft*ctrl.y + ft*ft*anch.y;
++									ev.x = (s32) fx;
++									ev.y = (s32) fy;
++									ev.fx_frac = vertexFrac(fx, ev.x);
++									ev.fy_frac = vertexFrac(fy, ev.y);
+ 									morph_end_positions.push_back(ev);
+ 								}
+ 
+@@ -10573,8 +10599,8 @@ namespace SWFRecomp
+ 							{
+ 								for (int j = 0; j < 3; ++j)
+ 								{
+-									float x_f = (float) t.verts[j].x;
+-									float y_f = (float) (FRAME_HEIGHT - t.verts[j].y);
++									float x_f = (float) strokeX(t.verts[j]);
++									float y_f = (float) ((double) FRAME_HEIGHT - strokeY(t.verts[j]));
+ 
+ 									FillStyle& fs = all_fill_styles[shapes[i].fill_style_list][shapes[i].inner_fill - 1];
+ 									// Encode spread_mode in bits 8-9 of the style type for gradients
+@@ -10609,21 +10635,19 @@ namespace SWFRecomp
+ 									if (is_morph && t.verts[j].morph_index >= 0 && (size_t)t.verts[j].morph_index < morph_end_positions.size())
+ 									{
+ 										Vertex& end_v = morph_end_positions[t.verts[j].morph_index];
+-										float end_x_f = (float) end_v.x;
+-										float end_y_f = (float) (FRAME_HEIGHT - end_v.y);
++										float end_x_f = (float) strokeX(end_v);
++										float end_y_f = (float) ((double) FRAME_HEIGHT - strokeY(end_v));
+ 										morph_end_shape_data << "\t" << "{ "
+-															 << std::dec << std::fixed << std::setprecision(1)
+-															 << end_x_f << "f, "
+-															 << end_y_f << "f"
++															 << MorphEndCoord{end_x_f} << ", "
++															 << MorphEndCoord{end_y_f}
+ 															 << " }," << endl;
+ 									}
+ 									else if (is_morph)
+ 									{
+ 										// Fallback: use start position
+ 										morph_end_shape_data << "\t" << "{ "
+-															 << std::dec << std::fixed << std::setprecision(1)
+-															 << x_f << "f, "
+-															 << y_f << "f"
++															 << MorphEndCoord{x_f} << ", "
++															 << MorphEndCoord{y_f}
+ 															 << " }," << endl;
+ 									}
+ 
+@@ -10955,16 +10979,15 @@ namespace SWFRecomp
+ 										const Vertex& start_v = morph_start_positions[mi];
+ 										const Vertex& end_v = morph_end_positions[mi];
+ 
+-										end_x_f = x_f + (float) (end_v.x - start_v.x);
++										end_x_f = x_f + (float) (strokeX(end_v) - strokeX(start_v));
+ 										// y_f is FRAME_HEIGHT - y, so the flipped
+ 										// delta is the negated raw delta.
+-										end_y_f = y_f - (float) (end_v.y - start_v.y);
++										end_y_f = y_f - (float) (strokeY(end_v) - strokeY(start_v));
+ 									}
+ 
+ 									morph_end_shape_data << "\t" << "{ "
+-														 << std::dec << std::fixed << std::setprecision(1)
+-														 << end_x_f << "f, "
+-														 << end_y_f << "f"
++														 << MorphEndCoord{end_x_f} << ", "
++														 << MorphEndCoord{end_y_f}
+ 														 << " }," << endl;
+ 
+ 									current_morph_end_vertex += 1;
+@@ -11171,14 +11194,16 @@ namespace SWFRecomp
+ 			// we can grade at full fidelity, and adds an outlier to output.26.
+ 			// Amended s22 (w1-stroke-staircase-report.md §5): rounding is still
+ 			// quantization; the real fix is KEEPING the sub-twip remainder
+-			// (Vertex::fx_frac/fy_frac), which addCurvedEdgeLevien does for
+-			// non-morph shapes. This morph-only flattener stays integer.
+-			s32 x = (s32) (u*u*current.x + 2*u*t*control.x + t*t*anchor.x);
+-			s32 y = (s32) (u*u*current.y + 2*u*t*control.y + t*t*anchor.y);
++			// (Vertex::fx_frac/fy_frac), which this morph-only flattener now
++			// records too. x/y stay the truncated copy earcut keys on.
++			float fx = u*u*current.x + 2*u*t*control.x + t*t*anchor.x;
++			float fy = u*u*current.y + 2*u*t*control.y + t*t*anchor.y;
+ 
+ 			Vertex v;
+-			v.x = x;
+-			v.y = y;
++			v.x = (s32) fx;
++			v.y = (s32) fy;
++			v.fx_frac = vertexFrac(fx, v.x);
++			v.fy_frac = vertexFrac(fy, v.y);
+ 			if (morph_counter != nullptr)
+ 			{
+ 				v.morph_index = (*morph_counter)++;
+@@ -11477,6 +11502,7 @@ namespace SWFRecomp
+ 
+ 		std::vector<std::array<Coord, 2>> all_points;
+ 		std::vector<s32> all_morph_indices;
++		std::vector<std::array<s16, 2>> all_fracs;
+ 
+ 		for (const Vertex& v : shape.verts)
+ 		{
+@@ -11487,6 +11513,7 @@ namespace SWFRecomp
+ 
+ 			all_points.push_back(array);
+ 			all_morph_indices.push_back(v.morph_index);
++			all_fracs.push_back({v.fx_frac, v.fy_frac});
+ 		}
+ 
+ 		polygon.push_back(shape_array);
+@@ -11504,6 +11531,7 @@ namespace SWFRecomp
+ 
+ 				all_points.push_back(array);
+ 				all_morph_indices.push_back(v.morph_index);
++				all_fracs.push_back({v.fx_frac, v.fy_frac});
+ 			}
+ 
+ 			polygon.push_back(shape_array);
+@@ -11520,6 +11548,8 @@ namespace SWFRecomp
+ 			t.verts[tri_index].x = all_points[indices[i]][0];
+ 			t.verts[tri_index].y = all_points[indices[i]][1];
+ 			t.verts[tri_index].morph_index = all_morph_indices[indices[i]];
++			t.verts[tri_index].fx_frac = all_fracs[indices[i]][0];
++			t.verts[tri_index].fy_frac = all_fracs[indices[i]][1];
+ 
+ 			if (tri_index == 2)
+ 			{

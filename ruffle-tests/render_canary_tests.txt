@@ -409,3 +409,21 @@ visual/cache_as_bitmap/edittext_scroll      # wheel-scrolled field + DropShadow 
 avm2/loader_jpegxr_alpha                    # Loader .jxr, 32bppBGRA, premultiply
 avm2/stage3d_texture_bytearray_compressed_alpha  # ATF fmt 4 (two textures)
 avm2/stage3d_texture_bytearray              # ATF fmt 1 (JPEG-XR RGBA) + bgra uploads
+
+# SESSION 22 ADDITION (s22 cloud `w2-float-verts`). RECOMPILER VERTEX
+# PRECISION: computed vertices (Levien curve points, stroke offset corners,
+# libtess2 fill output) keep their sub-twip remainder (Vertex::fx_frac/fy_frac,
+# swf.cpp) and round joins/caps use lyon's tolerance-driven arc count. Before
+# this the set had no tolerance-0 curve-fill or 1-px curved-stroke member, so
+# the quantization was invisible to it. overlaps/add/glow were CI-failing when
+# added (overlaps + add pass locally at 0/0 with the change; glow is 3/0, one
+# EditText label pixel) — promote overlaps/add to tier 1 once a graded run
+# confirms. timeline_loop is CI-passing and the corpus's nearest-to-budget
+# curve-fill row after the change (t32: 65/70 and 84/90): a geometry tripwire.
+# tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
+from_shumway/timeline/timeline_loop         # curved fills, MSAA, t32 near budget 7 cmps
+# tier=2  (CI-failing / skipped; A/B signal only)
+visual/simple_shapes/overlaps               # curve-fill witness, tol 0          1 cmp
+visual/blend_modes/add                      # blend over curved fills, tol 0     1 cmp
+visual/filters/glow                         # 1-px curved strokes, quality=low   1 cmp
+                                            #   (the stroke staircase witness)

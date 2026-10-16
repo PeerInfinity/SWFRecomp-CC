@@ -134,7 +134,7 @@ exactly these markers plus the global `ignored_tests.txt`.
 | `visual/video/colorconversion/h263 output` | Spark IDCT precision | 10 808 channels, max 2 |
 | `visual/video/deblocking output` | Spark IDCT precision, one Cb level | 104 channels, max 4 |
 | `avm1/netstream_play_flv output` | Sorenson Spark pixel parity | 44 channels, max 3 |
-| `visual/simple_shapes/masks output` + `…/masks_equal_clipdepth output` | **NARROWED s16** — was "1-sample rasteriser tie" for all 1738 channels; 1474 of them were our mask stencil rasterising the masker's STROKE (fixed s16). | now scoped to the **359 interior** channels measured after the fix (1738 → 359, mean 0.4927 → 0.0940; curve flattening / AA). A residual materially above ~359 is NOT covered. |
+| ~~`visual/simple_shapes/masks output` + `…/masks_equal_clipdepth output`~~ | **RETIRED s22 (`w2-float-verts`): not a tie — integer-twip vertex quantization in the recompiler; both render 0 outliers with the sub-twip remainder kept (`session22-fanout-reports/w1-stroke-staircase-report.md`).** History: **NARROWED s16** — was "1-sample rasteriser tie" for all 1738 channels; 1474 of them were our mask stencil rasterising the masker's STROKE (fixed s16). | now scoped to the **359 interior** channels measured after the fix (1738 → 359, mean 0.4927 → 0.0940; curve flattening / AA). A residual materially above ~359 is NOT covered. |
 | `avm2/bitmapdata_applyfilter_blur output` | **RESOLVED s21 (w2-noto-d1, default-font outlines + Noto metrics; 0 outliers locally)** — was NEW s16 — the residual is the `with_default_font = true` TextField the fixture draws into the source bitmap, replicated across six cells; the blur itself contributes none of it. | 30 844 channels, mean 1.21, confined to four glyph bands. Above ~31 k, or excess outside the bands ⇒ re-triage the blur path. |
 
 **Explicitly NOT dispositioned (do not add):**
@@ -925,7 +925,10 @@ pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
   `render_single_object`, so PlaceObject3 filters on a DefineEditText are a
   structural no-op (HOLD).
 - **Smalls board**: the a_epsilon 45° ties on masks/scrollRect rows are
-  1-sample (quality=low) run-edge ties, deterministic, NOT lavapipe AA;
+  1-sample (quality=low) run-edge ties, deterministic, NOT lavapipe AA
+  (**§3-E "45° 1-sample ties" NO-GO REFUTED s22**: they were recompiler
+  vertex quantization — Levien truncation + libtess2 `lround` — and flip with
+  `w2-float-verts`; `session22-fanout-reports/w1-stroke-staircase-report.md` §5);
   `morph_test1` ×6 is the "- xtrace enabled" status-bar text, not morph
   geometry; `bitmapbuttons` (618 042) is NOT parked — four `0x43` clipped-bitmap
   fill characters render nothing; `Bitmap.pixelSnapping` is unimplemented (3 831).
@@ -982,6 +985,8 @@ bitmap 1), plus four band moves: `graphics_simple_shapes` 230 → 154,
   inflates the line box.
 - **`blend_modes` ×12 is NO-GO** and s18's completion mechanism for it is
   refuted (see arc §20.4). Do not fund the recompiler A/B sweep for it.
+  (**Superseded s22:** all 12 flip with `w2-float-verts`, sub-twip vertex
+  remainders; the residual was quantization, not blending.)
 - **`bitmapbuttons` is not a `0x43` bug**: `swf.cpp:10709` marks every
   bitmap-filled shape `renderable = 0`, so the AVM2 walk skips it. Feature slice.
 - **Top unclaimed pixel lead**: Ruffle keeps ONE even-odd fill across

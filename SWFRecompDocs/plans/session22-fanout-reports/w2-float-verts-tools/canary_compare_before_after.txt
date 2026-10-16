@@ -1,0 +1,381 @@
+RENDER CANARY  before=before  after=after   159 tests / 255 comparisons
+
+  IDENTICAL   140
+  DIFFERS     115
+  APPEARED      0   VANISHED 0   NO_RENDER 0
+
+  DIFFERS:
+    avm2/away3d_advanced_shallow_water_demo  output   [DIFFERS]
+        diff_channels 14/2688000  mean 0.0011  max 255   bbox (29,616)-(79,661)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/BeginBitmapFill  output   [DIFFERS]
+        diff_channels 3/1920000  mean 0.0004  max 255   bbox (55,154)-(56,155)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/Video-EmbedSquareTest  output   [DIFFERS]
+        diff_channels 3/122880  mean 0.0062  max 255   bbox (185,4)-(186,5)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame1   [DIFFERS]
+        diff_channels 1/1920000  mean 0.0001  max 255   bbox (45,4)-(46,5)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame2   [DIFFERS]
+        diff_channels 3/1920000  mean 0.0004  max 255   bbox (45,4)-(46,5)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame3   [DIFFERS]
+        diff_channels 3/1920000  mean 0.0004  max 255   bbox (45,4)-(46,5)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame4   [DIFFERS]
+        diff_channels 3/1920000  mean 0.0004  max 255   bbox (45,4)-(46,5)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame5   [DIFFERS]
+        diff_channels 3/1920000  mean 0.0004  max 255   bbox (45,4)-(46,5)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/morph_test1  frame6   [DIFFERS]
+        diff_channels 3/1920000  mean 0.0004  max 255   bbox (45,4)-(46,5)
+        image status: fail -> fail    trace: pass -> pass
+    from_gnash/misc-ming.all/place_object_test  output   [DIFFERS]
+        diff_channels 72/1920000  mean 0.0096  max 255   bbox (12,4)-(581,102)
+        image status: fail -> fail    trace: ruffle_matched -> ruffle_matched
+    from_gnash/misc-ming.all/shape_test  output   [DIFFERS]
+        diff_channels 12/1920000  mean 0.0016  max 255   bbox (12,4)-(46,30)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/3_joystick  output   [DIFFERS]
+        diff_channels 1320/431520  mean 0.0188  max 74   bbox (53,54)-(386,183)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid  output.01   [DIFFERS]
+        diff_channels 56/1572864  mean 0.0018  max 51   bbox (161,136)-(352,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.02   [DIFFERS]
+        diff_channels 52/1572864  mean 0.0018  max 102   bbox (161,136)-(352,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.03   [DIFFERS]
+        diff_channels 52/1572864  mean 0.0017  max 51   bbox (161,136)-(348,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.04   [DIFFERS]
+        diff_channels 46/1572864  mean 0.0015  max 51   bbox (161,136)-(352,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.05   [DIFFERS]
+        diff_channels 54/1572864  mean 0.0018  max 51   bbox (161,135)-(353,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.06   [DIFFERS]
+        diff_channels 54/1572864  mean 0.0018  max 51   bbox (161,136)-(353,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.07   [DIFFERS]
+        diff_channels 58/1572864  mean 0.002  max 102   bbox (161,135)-(347,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.08   [DIFFERS]
+        diff_channels 60/1572864  mean 0.0019  max 51   bbox (161,135)-(353,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.09   [DIFFERS]
+        diff_channels 58/1572864  mean 0.0019  max 102   bbox (161,135)-(353,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.10   [DIFFERS]
+        diff_channels 50/1572864  mean 0.0017  max 102   bbox (161,135)-(351,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.11   [DIFFERS]
+        diff_channels 60/1572864  mean 0.002  max 102   bbox (161,135)-(352,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.12   [DIFFERS]
+        diff_channels 50/1572864  mean 0.0016  max 51   bbox (161,136)-(353,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.13   [DIFFERS]
+        diff_channels 40/1572864  mean 0.0013  max 51   bbox (161,135)-(351,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.14   [DIFFERS]
+        diff_channels 62/1572864  mean 0.0021  max 102   bbox (161,136)-(352,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.15   [DIFFERS]
+        diff_channels 46/1572864  mean 0.0016  max 102   bbox (161,135)-(351,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.16   [DIFFERS]
+        diff_channels 70/1572864  mean 0.0023  max 51   bbox (161,136)-(354,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.17   [DIFFERS]
+        diff_channels 58/1572864  mean 0.0019  max 51   bbox (161,135)-(354,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid  output.18   [DIFFERS]
+        diff_channels 54/1572864  mean 0.0019  max 102   bbox (161,134)-(354,225)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-blend  output   [DIFFERS]
+        diff_channels 34/880000  mean 0.0053  max 255   bbox (164,96)-(436,276)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-blend-2  output.10   [DIFFERS]
+        diff_channels 120/880000  mean 0.0054  max 64   bbox (86,116)-(426,313)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-blend-2  output.15   [DIFFERS]
+        diff_channels 141/880000  mean 0.0063  max 91   bbox (122,116)-(426,311)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-blend-2  output.20   [DIFFERS]
+        diff_channels 171/880000  mean 0.0062  max 71   bbox (141,116)-(426,307)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-blend-2  output.26   [DIFFERS]
+        diff_channels 156/880000  mean 0.0054  max 93   bbox (155,104)-(427,298)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-blend-2  output.40   [DIFFERS]
+        diff_channels 184/880000  mean 0.0074  max 100   bbox (188,46)-(499,307)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-clip  output   [DIFFERS]
+        diff_channels 262/880000  mean 0.0083  max 127   bbox (15,14)-(326,302)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-clip-2  output   [DIFFERS]
+        diff_channels 192/880000  mean 0.0122  max 107   bbox (57,37)-(210,199)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-color-0  output   [DIFFERS]
+        diff_channels 28/4194304  mean 0.0016  max 255   bbox (541,292)-(628,358)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-color-2  output   [DIFFERS]
+        diff_channels 126/880000  mean 0.0046  max 77   bbox (59,27)-(179,175)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-filter-2  output   [DIFFERS]
+        diff_channels 2938/880000  mean 0.0068  max 38   bbox (29,21)-(319,200)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-gradient-2  output   [DIFFERS]
+        diff_channels 41/880000  mean 0.011  max 255   bbox (228,161)-(323,222)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-mask  output.01   [DIFFERS]
+        diff_channels 619/880000  mean 0.0206  max 109   bbox (89,56)-(429,330)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-mask  output.05   [DIFFERS]
+        diff_channels 486/880000  mean 0.0163  max 109   bbox (89,65)-(425,338)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-mask  output.10   [DIFFERS]
+        diff_channels 374/880000  mean 0.0129  max 109   bbox (89,81)-(425,323)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-morph  output   [DIFFERS]
+        diff_channels 562/880000  mean 0.0753  max 255   bbox (251,33)-(525,382)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-scale  output   [DIFFERS]
+        diff_channels 106/880000  mean 0.0184  max 255   bbox (5,87)-(451,215)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-small  output.01   [DIFFERS]
+        diff_channels 606/880000  mean 0.0316  max 102   bbox (69,94)-(249,371)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-small  output.05   [DIFFERS]
+        diff_channels 528/880000  mean 0.0283  max 64   bbox (69,95)-(249,369)
+        image status: pass -> fail    trace: pass -> pass
+    from_shumway/acid/acid-stroke-0  output   [DIFFERS]
+        diff_channels 29/2097152  mean 0.0035  max 255   bbox (84,87)-(953,426)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-text  output   [DIFFERS]
+        diff_channels 3/880000  mean 0.0009  max 255   bbox (416,35)-(417,36)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-text-escape  output   [DIFFERS]
+        diff_channels 2/880000  mean 0.0006  max 255   bbox (110,79)-(111,80)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-video  output.01   [DIFFERS]
+        diff_channels 3486/3145728  mean 0.0085  max 92   bbox (65,48)-(700,569)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-video  output.10   [DIFFERS]
+        diff_channels 3221/3145728  mean 0.0079  max 68   bbox (68,50)-(700,569)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/acid/acid-video  output.20   [DIFFERS]
+        diff_channels 3354/3145728  mean 0.0083  max 64   bbox (49,53)-(680,568)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/doubleAndRegister  output   [DIFFERS]
+        diff_channels 24/880000  mean 0.0063  max 255   bbox (107,7)-(387,40)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/timeline/timeline_loop  output.02   [DIFFERS]
+        diff_channels 51/880000  mean 0.0012  max 40   bbox (148,12)-(299,75)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/timeline/timeline_loop  output.06   [DIFFERS]
+        diff_channels 87/880000  mean 0.0021  max 40   bbox (212,127)-(363,239)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/timeline/timeline_loop  output.07   [DIFFERS]
+        diff_channels 51/880000  mean 0.0012  max 40   bbox (148,12)-(299,75)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/timeline/timeline_loop  output.11   [DIFFERS]
+        diff_channels 87/880000  mean 0.0021  max 40   bbox (212,127)-(363,239)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/timeline/timeline_loop  output.12   [DIFFERS]
+        diff_channels 51/880000  mean 0.0012  max 40   bbox (148,12)-(299,75)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/timeline/timeline_loop  output.15   [DIFFERS]
+        diff_channels 87/880000  mean 0.0021  max 40   bbox (196,86)-(347,198)
+        image status: pass -> pass    trace: pass -> pass
+    from_shumway/timeline/timeline_loop  output.16   [DIFFERS]
+        diff_channels 87/880000  mean 0.0021  max 40   bbox (212,127)-(363,239)
+        image status: pass -> pass    trace: pass -> pass
+    import_assets/avm1_imports_avm1  output   [DIFFERS]
+        diff_channels 154/880000  mean 0.0098  max 128   bbox (140,148)-(243,240)
+        image status: pass -> pass    trace: pass -> pass
+    regression/avm2_parent_child_render  output   [DIFFERS]
+        diff_channels 96/640000  mean 0.01  max 128   bbox (40,142)-(359,260)
+        image status: pass -> pass    trace: pass -> pass
+    regression/avm2_timeline_gradients  output   [DIFFERS]
+        diff_channels 96/640000  mean 0.0098  max 128   bbox (20,22)-(339,140)
+        image status: pass -> pass    trace: pass -> pass
+    regression/avm2_timeline_solid  output   [DIFFERS]
+        diff_channels 120/640000  mean 0.0088  max 64   bbox (201,50)-(340,190)
+        image status: skip -> skip    trace: pass -> pass
+    regression/avm2_timeline_stroke_gradient  output   [DIFFERS]
+        diff_channels 80/640000  mean 0.008  max 64   bbox (181,80)-(320,220)
+        image status: pass -> pass    trace: pass -> pass
+    text/br_at_start  output   [DIFFERS]
+        diff_channels 2/880000  mean 0.0001  max 64   bbox (232,162)-(233,163)
+        image status: fail -> fail    trace: pass -> pass
+    text/style_changes_in_html  output   [DIFFERS]
+        diff_channels 6/385000  mean 0.0012  max 102   bbox (77,13)-(202,96)
+        image status: fail -> fail    trace: pass -> pass
+    visual/avm2_button_scroll_rect  output   [DIFFERS]
+        diff_channels 6/160000  mean 0.0051  max 255   bbox (26,41)-(30,46)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/add  output   [DIFFERS]
+        diff_channels 5/880000  mean 0.0005  max 131   bbox (156,132)-(387,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/alpha_no_layer  output   [DIFFERS]
+        diff_channels 18/880000  mean 0.0023  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/darken  output   [DIFFERS]
+        diff_channels 16/880000  mean 0.0021  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/difference  output   [DIFFERS]
+        diff_channels 7/880000  mean 0.0011  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/erase_no_layer  output   [DIFFERS]
+        diff_channels 18/880000  mean 0.0023  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/hardlight  output   [DIFFERS]
+        diff_channels 21/880000  mean 0.0025  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/invert  output   [DIFFERS]
+        diff_channels 24/880000  mean 0.0046  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/layer_alpha  output   [DIFFERS]
+        diff_channels 18/880000  mean 0.0023  max 255   bbox (148,132)-(408,355)
+        image status: fail -> fail    trace: pass -> pass
+    visual/blend_modes/layer_erase  output   [DIFFERS]
+        diff_channels 18/880000  mean 0.0023  max 255   bbox (148,132)-(408,355)
+        image status: fail -> fail    trace: pass -> pass
+    visual/blend_modes/lighten  output   [DIFFERS]
+        diff_channels 5/880000  mean 0.0005  max 131   bbox (156,132)-(387,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/multiply  output   [DIFFERS]
+        diff_channels 16/880000  mean 0.0021  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/overlay  output   [DIFFERS]
+        diff_channels 19/880000  mean 0.0012  max 124   bbox (148,132)-(387,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/overlay_onto_stage  output   [DIFFERS]
+        diff_channels 27/880000  mean 0.0008  max 26   bbox (104,35)-(393,344)
+        image status: pass -> pass    trace: pass -> pass
+    visual/blend_modes/screen  output   [DIFFERS]
+        diff_channels 5/880000  mean 0.0005  max 131   bbox (156,132)-(387,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/blend_modes/subtract  output   [DIFFERS]
+        diff_channels 7/880000  mean 0.0016  max 255   bbox (148,132)-(408,355)
+        image status: fail -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/avm2_button  output   [DIFFERS]
+        diff_channels 6/62500  mean 0.0245  max 255   bbox (20,16)-(82,90)
+        image status: fail -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/masks  output.01   [DIFFERS]
+        diff_channels 110/880000  mean 0.0084  max 128   bbox (211,46)-(339,370)
+        image status: pass -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/masks  output.02   [DIFFERS]
+        diff_channels 68/880000  mean 0.0054  max 128   bbox (228,46)-(340,370)
+        image status: pass -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/masks  output.03   [DIFFERS]
+        diff_channels 87/880000  mean 0.0067  max 128   bbox (219,46)-(338,370)
+        image status: pass -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/masks  output.04   [DIFFERS]
+        diff_channels 119/880000  mean 0.0091  max 128   bbox (213,46)-(340,370)
+        image status: pass -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/masks  output.05   [DIFFERS]
+        diff_channels 110/880000  mean 0.0084  max 128   bbox (213,46)-(336,370)
+        image status: pass -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/masks  output.06   [DIFFERS]
+        diff_channels 44/880000  mean 0.0036  max 128   bbox (217,47)-(326,370)
+        image status: pass -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/masks  output.07   [DIFFERS]
+        diff_channels 30/880000  mean 0.0026  max 128   bbox (246,237)-(326,370)
+        image status: pass -> pass    trace: pass -> pass
+    visual/cache_as_bitmap/scroll_rect_scaled  output   [DIFFERS]
+        diff_channels 15/302500  mean 0.0017  max 64   bbox (41,35)-(84,76)
+        image status: pass -> pass    trace: pass -> pass
+    visual/filters/bevel  output   [DIFFERS]
+        diff_channels 48608/1430000  mean 0.0798  max 253   bbox (59,44)-(512,640)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/bevel_full  output   [DIFFERS]
+        diff_channels 85254/2880000  mean 0.0615  max 250   bbox (71,82)-(810,726)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/bevel_inner  output   [DIFFERS]
+        diff_channels 15161/2880000  mean 0.035  max 254   bbox (88,91)-(805,714)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/bevel_outer  output   [DIFFERS]
+        diff_channels 70385/2880000  mean 0.0633  max 250   bbox (71,82)-(810,726)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/blur_scales_with_screen  output   [DIFFERS]
+        diff_channels 1065/640000  mean 0.0017  max 1   bbox (53,271)-(287,296)
+        image status: pass -> pass    trace: pass -> pass
+    visual/filters/blur_size_grows  output   [DIFFERS]
+        diff_channels 22165/880000  mean 0.0516  max 213   bbox (85,14)-(420,349)
+        image status: fail -> pass    trace: pass -> pass
+    visual/filters/color_matrix  output   [DIFFERS]
+        diff_channels 6/880000  mean 0.0017  max 255   bbox (359,82)-(361,84)
+        image status: fail -> pass    trace: pass -> pass
+    visual/filters/displacement_map  output   [DIFFERS]
+        diff_channels 1760/2000000  mean 0.0398  max 254   bbox (0,12)-(457,930)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/drop_shadow  output   [DIFFERS]
+        diff_channels 3923/880000  mean 0.1002  max 255   bbox (32,21)-(490,392)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/drop_shadow_angles  output   [DIFFERS]
+        diff_channels 6385/880000  mean 0.1388  max 255   bbox (5,11)-(524,391)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/glow  output   [DIFFERS]
+        diff_channels 2683/880000  mean 0.0694  max 255   bbox (32,19)-(486,390)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/glow_with_alpha_strength  output   [DIFFERS]
+        diff_channels 48015/2880000  mean 0.049  max 252   bbox (78,89)-(803,719)
+        image status: fail -> fail    trace: pass -> pass
+    visual/filters/glow_without_composite_source  output   [DIFFERS]
+        diff_channels 2914/880000  mean 0.0582  max 204   bbox (32,19)-(486,390)
+        image status: fail -> fail    trace: pass -> pass
+    visual/simple_shapes/heavy_tesselation  output   [DIFFERS]
+        diff_channels 2442/1839552  mean 0.0276  max 79   bbox (1,7)-(869,528)
+        image status: fail -> pass    trace: pass -> pass
+    visual/simple_shapes/layers  output   [DIFFERS]
+        diff_channels 23/880000  mean 0.0062  max 255   bbox (117,47)-(449,359)
+        image status: fail -> pass    trace: pass -> pass
+    visual/simple_shapes/masks  output   [DIFFERS]
+        diff_channels 181/880000  mean 0.047  max 255   bbox (20,9)-(543,386)
+        image status: fail -> pass    trace: pass -> pass
+    visual/simple_shapes/masks_equal_clipdepth  output   [DIFFERS]
+        diff_channels 181/880000  mean 0.047  max 255   bbox (20,9)-(543,386)
+        image status: fail -> pass    trace: pass -> pass
+    visual/simple_shapes/overlaps  output   [DIFFERS]
+        diff_channels 12/880000  mean 0.0019  max 204   bbox (214,213)-(242,270)
+        image status: fail -> pass    trace: pass -> pass
+    visual/simple_shapes/scroll_rect_mask  output   [DIFFERS]
+        diff_channels 20/880000  mean 0.0058  max 255   bbox (213,95)-(385,267)
+        image status: fail -> pass    trace: pass -> pass
+    visual/simple_shapes/strokes/scale  output   [DIFFERS]
+        diff_channels 4440/880000  mean 0.6566  max 255   bbox (8,0)-(538,385)
+        image status: fail -> fail    trace: pass -> pass
+
+  TRACE STATUS CHANGES: (none)
+  IMAGE STATUS CHANGES:
+    from_shumway/acid/acid-small  output.05   pass -> fail        <-- REVIEW
+    visual/avm2_button_scroll_rect  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/add  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/alpha_no_layer  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/darken  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/difference  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/erase_no_layer  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/hardlight  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/invert  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/lighten  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/multiply  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/overlay  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/screen  output   fail -> pass        <-- REVIEW
+    visual/blend_modes/subtract  output   fail -> pass        <-- REVIEW
+    visual/cache_as_bitmap/avm2_button  output   fail -> pass        <-- REVIEW
+    visual/filters/blur_size_grows  output   fail -> pass        <-- REVIEW
+    visual/filters/color_matrix  output   fail -> pass        <-- REVIEW
+    visual/simple_shapes/heavy_tesselation  output   fail -> pass        <-- REVIEW
+    visual/simple_shapes/layers  output   fail -> pass        <-- REVIEW
+    visual/simple_shapes/masks  output   fail -> pass        <-- REVIEW
+    visual/simple_shapes/masks_equal_clipdepth  output   fail -> pass        <-- REVIEW
+    visual/simple_shapes/overlaps  output   fail -> pass        <-- REVIEW
+    visual/simple_shapes/scroll_rect_mask  output   fail -> pass        <-- REVIEW
+
+  before/after PNGs + difference PNGs: /home/user/SWFRecomp-CC/.render_canary/_compare/before__after
+  json: /tmp/claude-0/-home-user-SWFRecomp-CC/15d99e90-f764-5f37-bfa7-def94ec8c99f/scratchpad/compare.json

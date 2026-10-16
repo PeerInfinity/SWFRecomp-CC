@@ -878,7 +878,15 @@ banding in the diff), a distinct next target. Do not file these as accepted.
 
 ### `visual/simple_shapes/masks` + `visual/simple_shapes/masks_equal_clipdepth` — 1-sample rasteriser tie (1686 outlier channels each)
 
-<!-- image-axis: both tests, the single `output` comparison of each -->
+<!-- image-axis: none -->
+
+**RESOLVED 2026-10-16 (s22, `w2-float-verts`).** Not a rasteriser tie: the residual
+was integer-twip quantization of computed vertices in the recompiler (Levien
+curve points truncated, libtess2 fill output `lround`ed). Keeping the sub-twip
+remainder (`Vertex::fx_frac/fy_frac`, `SWFRecomp/src/swf.cpp`
+`addCurvedEdgeLevien` / `tessellateContours(keep_float)`) renders both
+comparisons at **0 outliers**. Diagnosis: `SWFRecompDocs/plans/session22-fanout-reports/w1-stroke-staircase-report.md`.
+The image-axis exclusion is withdrawn; the history below is kept for reference.
 
 **This is NOT mask work. Do not book it in a mask session.** The two comparisons
 are identical (550×400, `tolerance = 0`, `max_outliers = 0`, excess 1686, mean
@@ -1276,8 +1284,8 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | `avm1/netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | **44** image outliers, max diff **3** (was ~52k/64, then 1654/8) | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected twice: the colour half was `sws_scale` (ported exactly, 2026-08-06) and the second half was the missing deblocking filter (ported 2026-08-12); the residual is Spark IDCT precision × the GPU sample-stretch |
 | `visual/video/deblocking` | Spark IDCT precision on the least-quantised stream (Category 9) — deblocking filter + flags byte + `MAX_EMBEDDED_VIDEO_STREAMS` 8→16 all landed 2026-08-12 | **104** image outlier channels, max **4**, mean 0.0 (was 2 906 999 / 255) | Accept (image axis only; trace passes). 11 of 12 streams byte-exact; all 104 channels are one Cb level on chroma row 232 of stream 9, whose planes have no remainder lane — decoder precision, not the filter |
 | `visual/video/colorconversion/h263` | Spark IDCT precision after the exact BT.601 port (Category 9) | 10 808 image outlier channels, max 2 | Accept (image axis only; trace passes). Every `idct_algo` arm still fails `max_outliers = 0`, and the closest one is a float IDCT = CI determinism hazard |
-| `visual/simple_shapes/masks` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels (776 px), ink IoU 1.00 | Accept, capped with the AA family. **Not mask work** — no `DoABC`, no `setMask`, no `scrollRect`; defects B/C cannot reach it |
-| `visual/simple_shapes/masks_equal_clipdepth` | Graphics: 1-sample rasteriser tie at `quality = "low"` (Category 11) | 1686 image outlier channels, identical to the row above | Accept; same mechanism, same decision |
+| ~~`visual/simple_shapes/masks`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
+| ~~`visual/simple_shapes/masks_equal_clipdepth`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
 | `avm2/verify_method_info_duplicate` | Cross-test inconsistent Flash captures (Category 2) — the trailing `#1065` contradicts the PASSING `verify_method_info_oob` | 1 of 2 | Accept; the +1 is only reachable by keying the error on `1121`, which would demote `_oob` to `ruffle_matched`. Suite-local ignore only |
 | ~~`watch_special_recursion_swf7`~~ (= `watch_recursion_swf7`) | ~~Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 1042/1042. De-listed from `ignored_tests.txt`; see Category 10** |
 | ~~`watch_special_recursion_double_swf7`~~ (= `watch_recursion_double_swf7`) | ~~Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 3118/3118. De-listed; see Category 10** |
