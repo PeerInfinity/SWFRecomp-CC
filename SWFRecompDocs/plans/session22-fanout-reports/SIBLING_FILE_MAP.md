@@ -15,3 +15,5 @@
 | w2-strbuf | `avm2_value.c` (`avm2_string_concat` ~142), `avm2_value.h` (Avm2String), `avm2_gc.c` (mark_string); C-string consumers across `src/avm2` (read-mostly; wrapper `avm2_string_cstr`) |
 | w2-ei-provider | `avm2_external.c`; new `avm2/external_interface/test_harness.c` |
 | w2-font-registry | recompiler font-tag emission (DefineFont2/3, DefineFontInfo, ExportAssets — NOT the zero-glyph synth); `ng_shared.c` (~674) font name registry; embedded-font-missing fallback in text layout |
+| w2-goto-collator | `avm2_display.c` `mc_goto_with_args` (~8013, ~8095), `run_goto` (~3153); `avm2_globals.c` new Collator block (~7130-7310) |
+| w2-htmltext (+AVM2) | also `avm2_text.c` `spans_from_html` (~1337), `spans_to_html` (~2264) |

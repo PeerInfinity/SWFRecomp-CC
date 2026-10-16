@@ -1,0 +1,82 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 578d1cd7..33ee257f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -3150,10 +3150,17 @@ static void run_goto(Avm2Context* ctx, Avm2Object* obj, uint16_t frame, int is_i
+ 	// steps (a removed handler during the goto reads the NEW currentFrame
+ 	// — movieclip_displayevents_timeline).
+ 	ext->current_frame = clamped;
+-	ext->queued_script_frame = clamped;
+-	if (ext->last_queued_script_frame != (int32_t) clamped)
++	// Ruffle run_goto: only a goto that HIT its target frame re-arms the
++	// frame script (run_frame_internal); gotoAndPlay(999) shows the last
++	// frame but its actions don't run (goto_queued_invalid/swf10). Flash
++	// still runs them in SWF<=9 (goto_queued_invalid/swf9; Ruffle KF there).
++	if (clamped == frame || ctx->swf_version <= 9)
+ 	{
+-		ext->last_queued_script_frame = -1;
++		ext->queued_script_frame = clamped;
++		if (ext->last_queued_script_frame != (int32_t) clamped)
++		{
++			ext->last_queued_script_frame = -1;
++		}
+ 	}
+ 
+ 	if (is_rewind)
+@@ -8011,6 +8018,9 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
+ 	// Integers demote to Number and take the string path.
+ 	int32_t frame = 1;
+ 	Avm2Value arg = act->args[0];
++	// `frame:Object` — coercing undefined to Object yields null, so the
++	// label path sees "null" (goto_queued_invalid/swf11 #2109 message).
++	if (arg.kind == AVM2_VALUE_UNDEFINED) arg = avm2_null();
+ 	int use_int_path = 0;
+ 	int32_t int_val = 0;
+ 	if (arg.kind == AVM2_VALUE_INTEGER)
+@@ -8092,6 +8102,10 @@ static void mc_goto_with_args(Avm2Activation* act, int stop)
+ 			}
+ 		}
+ 	}
++	// Ruffle e092c78c2: frame zero (and every invalid value coerced into
++	// it) NOOPs a goto issued while this clip runs a frame script — the
++	// clip neither jumps to frame 1 nor stops/plays.
++	if (frame == 0 && ext->executing_frame_script) return;
+ 	if (!stop) mc_set_programmatically_played(ext);
+ 	if (frame < 1) frame = 1;
+ 	// TRUNCATING u16 cast (Ruffle `frame.max(1) as u16`).
+@@ -14881,6 +14895,22 @@ static Pk pk_combine(Avm2Context* ctx, Pk p, Avm2Object* parent)
+ }
+ 
+ // Ruffle movie_clip.rs::mouse_pick_avm2. point in twips.
++// Ruffle DisplayObject::global_in_scroll_rect (387ea68a4): a stage point is
++// inside the committed scrollRect viewport. No rect -> no clip; a singular
++// transform counts as outside.
++static int pick_in_scroll_rect(Avm2Context* ctx, Avm2Object* obj,
++                               Avm2DisplayObjectExt* ext, double px, double py)
++{
++	if (!ext->sr_committed) return 1;
++	Mat m = display_l2g_matrix(ctx, obj);
++	if (m.a * m.d - m.b * m.c == 0.0) return 0;
++	Mat inv = mat_invert(&m);
++	double lx = inv.a * px + inv.c * py + inv.tx;
++	double ly = inv.b * px + inv.d * py + inv.ty;
++	return lx >= ext->csr_xmin && lx <= ext->csr_xmax
++	    && ly >= ext->csr_ymin && ly <= ext->csr_ymax;
++}
++
+ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
+ {
+ 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+@@ -14893,6 +14923,12 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
+ 		return pk_make(PK_MISS, NULL);
+ 	if (ext->maskee != NULL) return pk_make(PK_MISS, NULL);
+ 
++	// Containers (MovieClip/Sprite, Loader, SimpleButton) clip the pick to
++	// their scrollRect viewport (Ruffle 387ea68a4). TextField does not.
++	if (ext->edittext == NULL && !ext->is_stage
++	    && !pick_in_scroll_rect(ctx, obj, ext, px, py))
++		return pk_make(PK_MISS, NULL);
++
+ 	// SimpleButton (Ruffle avm2_button.rs::mouse_pick_avm2): the visual/hit
+ 	// state children live in btn_hit/btn_up, NOT render_list, so the generic
+ 	// render_list + self-bounds pick below never sees them. Hit-test the hit

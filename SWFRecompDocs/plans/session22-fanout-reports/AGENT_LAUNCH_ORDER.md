@@ -30,5 +30,5 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-array-global | w1-drift-avm1 S2 | array_constructor, gnash array-v6..v8 | session_016pAABBwk2wbPvc3rNN3pCE |
 | w2-as-core | w1-drift-avm1 S1 | as_broadcaster, AsBroadcaster-v6..v8, context_menu, context_menu_item, context_menu_swf6, as_setup_error | session_01CFASq4VYcgHb1361oQ9iiP |
 | w2-crossvm | w1-crossvm slots 1-3 | mouse_pick_scroll_rect(+_loader,_button), mouse_pick_loader_avm1, avm2_loads_avm1_events (rm) | session_01WJfTLXUUuxzstmVBA8k32L |
-| w2-queue-regex | w1-trace-tail A | action_execution_order_test6 (rm), pcre_find_fixedlength | |
-
+| w2-queue-regex | w1-trace-tail A | action_execution_order_test6 (rm), pcre_find_fixedlength | session_014xtNST7fsKSbQ6RVBmTLTy |
+| w2-goto-collator | w1-drift-avm2 slots 1(goto)+2 | goto_queued_invalid/swf9..11, collator_flags, collator_locale_ids_windows, collator_compare_basic | |
