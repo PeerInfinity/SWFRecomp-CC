@@ -1,0 +1,17 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 22 (dual-axis #14), slot `w1-drift-avm1`, wave 1. Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w1-drift-avm1` (and ONLY that branch; never master, never force-push). Your report on that branch is your only deliverable.
+
+FIRST: read `SWFRecompDocs/plans/session22-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules and Delivery sections exactly. Your branch is `fanout/w1-drift-avm1`; your report is `SWFRecompDocs/plans/session22-fanout-reports/w1-drift-avm1-report.md`. Also read `CLAUDE.md`.
+
+---- YOUR TASK ----
+**Upstream drift pricing, AVM1 side** (Ruffle `0dacba55f..45366370e`; file list in `wave0-upstream-drift-namestatus.txt`). Categories to download: `avm1 from_gnash` (plus `regression` is in git).
+
+Upstream migrated several AVM1 builtins to ActionScript and rewrote/expanded their tests. Five of our passes became fails purely because the tests changed. These are the cheapest re-flips this session; price them precisely.
+
+1. For EVERY added or modified AVM1 test in the list (`avm1/array_constructor`, `as_broadcaster` (+ the deleted `as_broadcaster_initialize`/`_undef`), `as_setup_error`, `context_menu`, `context_menu_item`, `context_menu_swf6`, `edittext_html_duplicate_attributes`, `html_text_img_numeric_attributes`, `html_text_img_parsing_swf5..swf8` (and the pre-existing `avm1/html_text_img_parsing`), `matrix`, `point`, `rectangle`; plus the `output.ruffle.txt`-only changes on `global_*_decls*`, `globals_monkeypatch`, `globals_swf5`): run it with `--mode=graphics --diff --verbose`. Report status, matching/expected, and for failures the mechanism (owner `file:line` in `SWFModernRuntime/src/actionmodern/` etc.), a flip price, and GO/NO-GO for a wave-2 slot. Check `test.toml` (`known_failure`, `num_ticks`, approx settings) and `output.ruffle.txt`.
+2. For the gnash `actionscript.all` rows whose `test.toml` changed and `output.ruffle.txt` was DELETED (AsBroadcaster-v5..v8, ContextMenu-v7/v8, Matrix-v6..v8, Point-v8, Rectangle-v8): diff the old vs new `test.toml` in `/root/ruffle` and say what it means for our grading (most likely `known_failure` was removed because Ruffle now passes them, which turns our `ruffle_matched` into a plain fail). Run each and price it. Same for the `.fp*.ruffle.txt` changes on Function/TextField/argstest/array: say whether any of our verdicts can move.
+3. Read the relevant upstream Ruffle commits (`git -C /root/ruffle log 0dacba55f..45366370e -- core/src/avm1`, e.g. Matrix/Point/Rectangle/ContextMenu/AsBroadcaster/Error/AsSetupError "Migrate to ActionScript", `dd4e73d59` global Array resolution, the HTML `<img>` parsing series `8cbada89a..16b334374`) and say which ones encode Flash behaviour we lack. Remember the Flash-over-Ruffle ruling: `output.txt` is truth.
+4. Group the failures by shared mechanism (e.g. "one Matrix method family accounts for N lines across matrix + Matrix-v6..v8"), so wave 2 can fund one slot per mechanism.
+
+Deliverable: the price table first, then mechanisms, then the wave-2 slots you would fund (one-line brief each, with expected flips by test name). Siblings: `w1-drift-avm2` owns AVM2/fonts drift and harness semantics; `w1-trace-tail` owns the non-drift AVM1/gnash tail.
