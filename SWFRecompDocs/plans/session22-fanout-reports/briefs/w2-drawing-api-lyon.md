@@ -1,0 +1,18 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 22 (dual-axis #14), slot `w2-drawing-api-lyon`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-drawing-api-lyon` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session22-fanout-reports/BRIEFS_COMMON.md` and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Read `CLAUDE.md`. Your branch is `fanout/w2-drawing-api-lyon`; deliver `SWFRecompDocs/plans/session22-fanout-reports/w2-drawing-api-lyon-report.md` and `SWFRecompDocs/plans/session22-fanout-reports/w2-drawing-api-lyon.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Check `SWFRecompDocs/plans/session22-fanout-reports/SIBLING_FILE_MAP.md` for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**Slot W2-B of `w1-pixel-smalls-report.md` §2: drawing-API lyon parity (runtime only): drawCircle/drawEllipse via the round-rect port, miter-limit predicate + MiterClip (AVM1 + AVM2), lyon cubic flattening.** Categories: `avm1 avm2 visual from_shumway`.
+
+Pixel-axis slot: the wave-1 worker proved cloud renders byte-identical to CI's actual PNGs on all these rows, so absolute grading against goldens is CI-grade. Diagnosis: report §1 rows 1, 2, 7, 8, §2 W2-B, §4.3, §5; prototype `w1-pixel-smalls-prototype.patch` — take ONLY the `avm2_display.c`/`action.c` drawing hunks (NOT `swf.hpp`/`swf.cpp`, which sibling `w2-float-verts` owns, and NOT the glyph ÷8 hunks, sibling `w2-glyph-subunit`'s). Remove every `// PROBE` marker and write proper comments.
+- drawCircle/drawEllipse → `gfx_emit_round_rect` (Ruffle `graphics.rs:528,813` anchor order) **with the zero-length-side skip in `gfx_add_side`** (without it `avm2/graphics_bitmaps` regresses 525/600 → 648/600).
+- miter: lyon's `|m| > 2·limit` test and MiterClip at `limit·0.5·half_w` (`stroke.rs:2114-2121, 2320`), AVM1 `action.c:~30511` and AVM2 `avm2_display.c:~8660`; extra-verts bound 6 → 9.
+- one shared `gfx_add_cubic` (lyon_geom 1.0.6 `for_each_flattened_with_t`: split into ⌈(err/(432·(0.4tol)²))^(1/6)⌉ sub-cubics → `to_quadratic()` → flatten at 0.8·tol, unquantized) used by `cubicCurveTo` and `drawPath` CUBIC_CURVE_TO.
+- Sweeps: the report's §4.3 lists (19 circle/ellipse/roundRect users, 6 cubic/drawPath users) PLUS every `avm1/` drawing-API test (the wave-1 worker could not download avm1: AVM1 miter users live there), both trace and image, and the standing canary.
+
+Ledger (pixel): `from_shumway/MaskTest`, `avm2/displayobject_opaque_background`, `visual/drawing_api/fills_and_lines` (max diff 2 = tol 2: report margin), `avm2/graphics_draw_path`. Band: `avm2/graphics_gradients` 349 → ~148. Siblings editing `avm2_display.c` (crossvm, goto-collator, stage-view, filter-fixes, bigcap) are in other regions — keep to the `gfx_*` drawing helpers.

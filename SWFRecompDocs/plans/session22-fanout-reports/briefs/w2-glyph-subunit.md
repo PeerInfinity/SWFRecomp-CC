@@ -1,0 +1,16 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 22 (dual-axis #14), slot `w2-glyph-subunit`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-glyph-subunit` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session22-fanout-reports/BRIEFS_COMMON.md` and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Read `CLAUDE.md`. Your branch is `fanout/w2-glyph-subunit`; deliver `SWFRecompDocs/plans/session22-fanout-reports/w2-glyph-subunit-report.md` and `SWFRecompDocs/plans/session22-fanout-reports/w2-glyph-subunit.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Check `SWFRecompDocs/plans/session22-fanout-reports/SIBLING_FILE_MAP.md` for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**Slot W2-C of `w1-pixel-smalls-report.md` §2: AVM2 glyph outlines keep sub-font-unit precision (no `lround` of flattened points).** Categories: `fonts visual avm2 text`.
+
+Pixel-axis slot (cloud renders proven CI-identical on these rows). Diagnosis: report §1 rows 9-11, §2 W2-C, §4.3 (text sweep), prototype `w1-pixel-smalls-prototype.patch` — take ONLY the `abc_timeline.cpp` (~929), `abc_devicefont.cpp` (~126, ~169) glyph hunks and the two consumers (`avm2_display.c:~19027`, `avm2_bitmap.c:~2032`). The prototype stores ×8 sub-units; pick a cleaner landing representation (float arrays, or a documented fixed-point scale constant) and justify it. Ruffle flattens the integer glyph curve in f32 and never rounds.
+
+Recompiler change: rebuild + `--recompile` every leg. Sweep: the report's 42 CI-passing text/EditText image tests + every AVM2 text trace test that measures glyph bounds (`textWidth`/`getCharBoundaries`/`getLineMetrics` users), the standing canary. Add `fonts/embed_matching/fallback_preferences` and `visual/edittext/edittext_border_filters` (both at zero headroom) to the canary list.
+
+Ledger (pixel): `visual/fonts/glyph`, `fonts/embed_matching/match_style`, `fonts/embed_matching/fallback_preferences` (passes AT the limit 6/6 — report the exact count). Siblings: `w2-default-fonts-draw` edits `abc_devicefont.cpp`'s `[default_fonts]` emit (different function) and `avm2_text.c` device lookup; `w2-font-registry` edits embedded-font NAME registration; `w2-float-verts` edits `swf.cpp` shape geometry. Stay in the glyph-outline emission functions.
