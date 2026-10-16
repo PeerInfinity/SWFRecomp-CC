@@ -27,5 +27,5 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
-| w2-array-global | w1-drift-avm1 S2 | array_constructor, gnash array-v6..v8 | |
-| w2-as-core | w1-drift-avm1 S1 | as_broadcaster, AsBroadcaster-v6..v8, context_menu, context_menu_item, context_menu_swf6, as_setup_error | |
+| w2-array-global | w1-drift-avm1 S2 | array_constructor, gnash array-v6..v8 | session_016pAABBwk2wbPvc3rNN3pCE |
+| w2-as-core | w1-drift-avm1 S1 | as_broadcaster, AsBroadcaster-v6..v8, context_menu, context_menu_item, context_menu_swf6, as_setup_error | session_01CFASq4VYcgHb1361oQ9iiP |

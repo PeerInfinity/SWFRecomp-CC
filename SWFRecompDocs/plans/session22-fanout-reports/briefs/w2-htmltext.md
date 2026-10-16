@@ -1,0 +1,18 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 22 (dual-axis #14), slot `w2-htmltext`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-htmltext` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session22-fanout-reports/BRIEFS_COMMON.md` and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Read `CLAUDE.md`. Your branch is `fanout/w2-htmltext`; deliver `SWFRecompDocs/plans/session22-fanout-reports/w2-htmltext-report.md` and `SWFRecompDocs/plans/session22-fanout-reports/w2-htmltext.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Check `SWFRecompDocs/plans/session22-fanout-reports/SIBLING_FILE_MAP.md` for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**AVM1 htmlText: last-wins attributes, setNewTextFormat device-font name, `<img>` for SWF ≥ 7 (incl. numeric-prefix attributes), and — if it is a single gate — SWF5 htmlText semantics.** Categories: `avm1 from_gnash`.
+
+Diagnosis of record: `session22-fanout-reports/w1-drift-avm1-report.md` §M7a-d and wave-2 slot S4 (+ the HOLD on M7d); prototype hunk 4 in `w1-drift-avm1-prototype.patch` (M7a last-wins `tf_get_attr`). Upstream Ruffle `8cbada89a..16b334374` + `69a017387`. Flash (`output.txt`) is truth: numeric prefixes (`40.9px` → `WIDTH="40"`) are Flash behaviour Ruffle lacks — implement Flash.
+- M7a `tf_get_attr` (`action.c:26729`): last occurrence wins even when invalid; case-insensitive; word-boundary match.
+- M7b `setNewTextFormat` (`action.c:72799`) stores only `_tf_fontId`; also store the font NAME and prefer it in the `tf_get_defaults` callers (`:22705`, `:57088`).
+- M7c `<img>` in `tf_parse_html` (`:26815`) + the htmlText serializer for SWF ≥ 7: placeholder space, `<FONT SIZE="2"><IMG …> </FONT>`, SWF8 nests IMG inside `<A>` (SWF7 outside; Ruffle `text_format.rs:1694-1704`), case-sensitive align, CHECKPOLICYFILE only when true, entity-decoded src/id, numeric-prefix parse.
+- M7d (time-box 1 hour of Ruffle source reading first, `stage_object.rs` SWF5 paths ~`:538`, `:595-601`, the EditText `text` getter under SWF5): Flash prints `TEXT=` empty and `HTML=` raw source in SWF5. Implement only if it is one SWF5 gate; otherwise report the mechanism and leave it.
+
+Expected flips: `avm1/edittext_html_duplicate_attributes` (KF; matching Flash), `html_text_img_parsing_swf7`, `_swf8`, `html_text_img_numeric_attributes` (KF; Flash-correct gives a pass), and `_swf5` only if M7d lands. Canaries (all pass now, must stay): the 10 `avm1/edittext_html_*`, gnash `TextFieldHTML-v5..v8`, `html_text_img_parsing_swf6`, plus every `regression/` test with htmlText. Sibling slots `w2-as-core` and `w2-array-global` also edit `action.c` (different regions; see SIBLING_FILE_MAP.md).

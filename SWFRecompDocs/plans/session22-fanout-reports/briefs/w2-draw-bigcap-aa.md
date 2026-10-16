@@ -1,0 +1,16 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 22 (dual-axis #14), slot `w2-draw-bigcap-aa`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-draw-bigcap-aa` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session22-fanout-reports/BRIEFS_COMMON.md` and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Read `CLAUDE.md`. Your branch is `fanout/w2-draw-bigcap-aa`; deliver `SWFRecompDocs/plans/session22-fanout-reports/w2-draw-bigcap-aa-report.md` and `SWFRecompDocs/plans/session22-fanout-reports/w2-draw-bigcap-aa.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Check `SWFRecompDocs/plans/session22-fanout-reports/SIBLING_FILE_MAP.md` for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**AVM2 runtime BitmapData larger than max(stage, 256) renders blank; then CPU `draw()` anti-aliasing. Prototype-first.** Categories: `avm2 from_shumway visual`.
+
+Pixel-axis slot: prove cloud↔CI fidelity on your headline rows first (w1-pixel-catastrophic proved md5 identity with CI actual PNGs on several rows, so absolute grading against goldens is valid where your before-render matches CI). Run `render_canary.py` capture (before) / compare (after) over `render_canary_tests.txt`; only your ledger rows may differ.
+
+Diagnosis of record: `w1-pixel-catastrophic-report.md` §1 row 9, §2 item 7, slot `w2-draw-bigcap-aa`, prototype hunk `PROTO_BMPCAP`. (a) `dynamic_bitmap_max = max(stage, 256)` (`avm2_display.c:20238`) silently skips any larger runtime BitmapData (`:18261`). Size it to what's live (or the device limit, see memory note "bitmap-texture-pools": planned vs DEVICE limits, knob `SWF_GPU_MAX_TEXTURE_ARRAY_LAYERS`) — never a constant that silently drops content; log once when anything is still dropped. **Sweep first**: list every AVM2 corpus row whose runtime BitmapData exceeds max(stage, 256) and A/B them all. (b) Flash anti-aliases CPU `draw()` even at stage quality low; add 4x-sample AA to the CPU draw rasteriser (precedent: the Stage3D CPU rasteriser's Vulkan 4x sample positions). Do (a) fully before (b); deliver (a) even if (b) doesn't close.
+
+Expected: `from_shumway/acid/acid-bitmap-draw_quality_high` (flip with AA), `_quality_low` (Ruffle known_failure: matching Flash flips it too); band moves elsewhere from (a). Watch for regressions in every `bitmapdata_draw*` test: AA changes every CPU draw, so expect band moves and grade them all.
