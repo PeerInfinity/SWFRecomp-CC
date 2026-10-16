@@ -35,8 +35,9 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-float-verts | w1-stroke-staircase slot 1 | +22 px (12 blend_modes, masks pair, overlaps, scroll_rect_mask, heavy_tesselation, layers, blur_size_grows, color_matrix, avm2_button_scroll_rect, cab/avm2_button), −1 acid-small .05 | session_01GHaXsGDyCCvNJRoQh1p9mE |
 | w2-filter-fixes | w1-offstage-filter | any_blur_scales_with_screen, cab_mask_filters, acid-filter-2 | session_013VbsEmy2b4JKfMBadEJTrh |
 | w2-drawing-api-lyon | w1-pixel-smalls W2-B | MaskTest, displayobject_opaque_background, fills_and_lines, graphics_draw_path | session_01W4qaTLdonsB2sRwZP3LAmB |
+| w2-glyph-subunit | w1-pixel-smalls W2-C | fonts/glyph, match_style, fallback_preferences | session_01KmL6XEUPUAPhFxEHtV67RK |
 
-**Queue (launch order when a slot frees):** w2-glyph-subunit, w2-default-fonts-draw, w2-htmltext, w2-strbuf, w2-avm2-stage-view, w2-font-registry, w2-ei-provider, w2-atf-dxt5, w2-avm2-video-stamp, w2-draw-bigcap-aa; w2-geom-port after w2-as-core delivers.
+**Queue (launch order when a slot frees):** w2-default-fonts-draw, w2-htmltext, w2-strbuf, w2-avm2-stage-view, w2-font-registry, w2-ei-provider, w2-atf-dxt5, w2-avm2-video-stamp, w2-draw-bigcap-aa; w2-geom-port after w2-as-core delivers.
 | w2-jpegxr | user-approved dep | loader_jpegxr, loader_jpegxr_alpha, stage3d_texture_bytearray, _compressed_alpha | session_017A1bzC1vtg96PMxQT8BxpM |
 
 **Merge obligations:** at w2-as-core merge, `installAsBroadcaster`'s `_listeners` must go through `arrayResolveGlobalCtor()` (w2-array-global report §4; flips the as_broadcaster "with Array replaced" line) unless as-core creates it as a literal. Follow-up for after as-core: `actionCallMethod` object-method arm alias dispatch for `Array` (`pushArrayCalledAsFunction`).
