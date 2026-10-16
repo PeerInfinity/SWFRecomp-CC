@@ -29,6 +29,7 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_filters.h>
 #include <avm2/avm2_globals.h>
+#include <avm2/avm2_jpegxr.h>
 #include <avm2/avm2_main.h>
 #include <memory/heap.h>
 
@@ -3667,11 +3668,51 @@ void avm2_bitmap_wire_bitmap(Avm2Context* ctx, Avm2Class* bitmap_cls)
 // with "not enough pixels" — the test still expects a Bitmap whose width is
 // 1024. Only a buffer whose header is unreadable gives up and returns NULL,
 // which leaves `content` null without inventing an ioError no test asserts.
+// Ruffle decode_jpegxr (render/src/utils.rs): jxrlib's rows are straight RGBA
+// and the bitmap is always transparent (BitmapFormat::Rgba). The rows are
+// premultiplied here exactly like the PNG/GIF path below: loader_jpegxr_alpha's
+// golden is the straight-alpha composite of THESE decoded values (its (5,30)
+// pixel 250,72,0 @127 over 0xCC gives 226,137,102; the source PNG's 255 red
+// would give 229), so storing them un-premultiplied would composite
+// additively. A decode failure (or a build without SWF_HAVE_LIBJXR) leaves
+// `content` null, as the Rust `?` does.
+static Avm2Object* bitmap_from_jpegxr(Avm2Context* ctx, const uint8_t* data,
+                                      uint32_t len)
+{
+	uint32_t w = 0, h = 0;
+	uint8_t* rgba = NULL;
+	if (!avm2_jxr_decode_rgba(data, len, &w, &h, &rgba)) return NULL;
+	Avm2Object* bdo = bd_alloc_bare(ctx);
+	if (bdo == NULL)
+	{
+		free(rgba);
+		return NULL;
+	}
+	Avm2BitmapDataExt* bd = (Avm2BitmapDataExt*) bdo->native_ext;
+	bd_alloc(ctx, bd, w, h, 1);
+	uint32_t n = w * h;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		const uint8_t* c = rgba + (size_t) i * 4;
+		uint32_t a = c[3];
+		bd->pixels[i] = CMK(c[0] * a / 255, c[1] * a / 255, c[2] * a / 255, a);
+	}
+	free(rgba);
+	Avm2Value arg = avm2_object_value(bdo);
+	Avm2Value bmp = avm2_class_construct(ctx, g_bitmap_class, &arg, 1);
+	return bmp.kind == AVM2_VALUE_OBJECT ? bmp.u.obj : NULL;
+}
+
 Avm2Object* avm2_bitmap_from_image_bytes(Avm2Context* ctx, const uint8_t* data,
                                          uint32_t len)
 {
 	if (ctx == NULL || data == NULL || len == 0 || g_bitmap_class == NULL)
 		return NULL;
+
+	// JPEG-XR ("II\xBC\x01", render/src/utils.rs determine_jpeg_tag_format).
+	if (len >= 4 && data[0] == 0x49 && data[1] == 0x49 && data[2] == 0xBC
+	    && data[3] == 0x01)
+		return bitmap_from_jpegxr(ctx, data, len);
 
 	int w = 0, h = 0, comp = 0;
 	uint8_t* rgba = stbi_load_from_memory(data, (int) len, &w, &h, &comp, 4);

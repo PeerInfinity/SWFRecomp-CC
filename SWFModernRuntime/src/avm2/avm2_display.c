@@ -6353,14 +6353,14 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 
 	// Known content. An image is decoded here — Ruffle builds the Bitmap before
 	// it reports the final progress — and becomes the Loader's `content` and,
-	// per movie_loader_complete, its child at index 0. JPEG-XR deliberately
-	// gets no decode attempt: stb cannot read it, and loader_jpegxr /
-	// loader_jpegxr_alpha only ever trace `contentType`, so sniffing it must
-	// keep short-circuiting here rather than falling into a failed decode.
+	// per movie_loader_complete, its child at index 0. JPEG-XR decodes through
+	// jxrlib (avm2_jpegxr.c); without SWF_HAVE_LIBJXR it yields no Bitmap and
+	// `content` stays null, which is all loader_jpegxr's trace grades.
 	// A SWF's content still awaits an AVM2 child entry point (loader-arc.md
 	// tranche 6), so `content` stays null for it.
 	int is_image = (pl->content_type == LI_CT_PNG || pl->content_type == LI_CT_JPEG
-	                || pl->content_type == LI_CT_GIF);
+	                || pl->content_type == LI_CT_GIF
+	                || pl->content_type == LI_CT_JPEGXR);
 	// A child SWF's `bytes` and `parameters` are readable from the FINAL
 	// progress event onwards (loader_events reads bytes.length = 1490 and
 	// Parameters: (len=2) there), so they land before it — unlike the byte

@@ -2569,6 +2569,7 @@ AVM2_CORE_SOURCES = [
     "src/avm2/avm2_text.c",
     "src/avm2/avm2_display.c",
     "src/avm2/avm2_stage3d.c",
+    "src/avm2/avm2_jpegxr.c",   # stub unless -DSWF_HAVE_LIBJXR (graphics probe)
     "src/avm2/avm2_pixelbender.c",
     "src/avm2/avm2_filters.c",
     "src/avm2/avm2_bitmap.c",

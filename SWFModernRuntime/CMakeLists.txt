@@ -23,6 +23,16 @@ else()
     option(WITH_LIBAVCODEC "Link libavcodec for full Flash video codec support" ON)
 endif()
 
+# Link jxrlib for JPEG-XR decode (Loader-loaded .jxr, Stage3D ATF formats 1/4;
+# src/avm2/avm2_jpegxr.c). Same defaults as libavcodec: ON for a native
+# graphics build, OFF for NO_GRAPHICS and Emscripten, where the decoder is a
+# stub. The ATF LZMA records use the xz `lzma` target linked below.
+if(NO_GRAPHICS OR EMSCRIPTEN)
+    option(WITH_LIBJXR "Link jxrlib for JPEG-XR decode" OFF)
+else()
+    option(WITH_LIBJXR "Link jxrlib for JPEG-XR decode" ON)
+endif()
+
 # Core sources (always included)
 set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/action.c
@@ -119,6 +129,23 @@ if(WITH_LIBAVCODEC)
     message(STATUS "WITH_LIBAVCODEC: ON (libavcodec ${LIBAV_libavcodec_VERSION})")
 else()
     message(STATUS "WITH_LIBAVCODEC: OFF — only ScreenVideo (codec id 3) will decode")
+endif()
+
+# jxrlib (libjxr-dev). avm2_jpegxr.c is the only TU that includes its headers.
+# It is always compiled (its entry points are called unconditionally and stub
+# out without SWF_HAVE_LIBJXR); the library itself is optional, so a box
+# without libjxr-dev still builds, just without JPEG-XR decode.
+target_sources(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/src/avm2/avm2_jpegxr.c)
+if(WITH_LIBJXR)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBJXR IMPORTED_TARGET libjxr)
+endif()
+if(WITH_LIBJXR AND LIBJXR_FOUND)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE SWF_HAVE_LIBJXR)
+    target_link_libraries(${PROJECT_NAME} PUBLIC PkgConfig::LIBJXR)
+    message(STATUS "WITH_LIBJXR: ON (libjxr ${LIBJXR_VERSION})")
+else()
+    message(STATUS "WITH_LIBJXR: OFF — JPEG-XR content and ATF formats 1/4 stay undecoded")
 endif()
 
 if(NO_GRAPHICS)

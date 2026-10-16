@@ -397,3 +397,15 @@ visual/filters/blur_scales_with_screen      # nested cab+Blur under 5x sprite,  
 visual/edittext/edittext_border_filters     # PO3 filter LIST on DefineEditText  1 cmp
                                             #   (6 filtered placements, 2 fields)
 visual/cache_as_bitmap/edittext_scroll      # wheel-scrolled field + DropShadow 2 cmps
+# SESSION 22 ADDITIONS (s22 wave-2 `w2-jpegxr`). Change class: JPEG-XR decode
+# (jxrlib, avm2_jpegxr.c) — Loader-sniffed .jxr content and Stage3D ATF
+# formats 1/4 (format 4 = LZMA DXT tables + JPEG-XR endpoints -> BC3 -> RGBA).
+# No standing member reached either path (both rendered blank before). Tier 2
+# when added: CI-failing until a graded images run confirms (locally both pass:
+# 0/1500 max 1, and 1/66 max 5). Needs libjxr-dev on the box; without it both
+# render blank again (SWF_HAVE_LIBJXR off) — an A/B move here can mean the
+# dependency went missing, not a code regression.
+# tier=2  (CI-failing / skipped; A/B signal only)
+avm2/loader_jpegxr_alpha                    # Loader .jxr, 32bppBGRA, premultiply
+avm2/stage3d_texture_bytearray_compressed_alpha  # ATF fmt 4 (two textures)
+avm2/stage3d_texture_bytearray              # ATF fmt 1 (JPEG-XR RGBA) + bgra uploads

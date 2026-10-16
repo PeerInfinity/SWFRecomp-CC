@@ -56,6 +56,7 @@
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_gc.h>
 #include <avm2/avm2_globals.h>
+#include <avm2/avm2_jpegxr.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <avm2/avm2_value.h>
@@ -3109,6 +3110,30 @@ static int atf_parse_header(const uint8_t* b, uint32_t len,
 	return 1;
 }
 
+// The JPEG-XR-backed ATF formats 1 (RGBA8888, also 0) and 4 (CompressedAlpha)
+// — atf_jpegxr.rs:38-144, decoded in avm2_jpegxr.c (a no-op without
+// SWF_HAVE_LIBJXR). Ruffle uploads face 0 / mip 0 into layer 0 whatever the
+// texture's declared format; format 4 arrives here already DXT5-decoded to
+// RGBA8, the texel store's layout.
+static void s3d_upload_atf_jxr(Avm2Context* ctx, Avm2Texture3DExt* te,
+                               const uint8_t* atf, uint32_t len)
+{
+	uint8_t* rgba = NULL;
+	if (!avm2_atf_jxr_decode(atf, len, te->width, te->height, &rgba)) return;
+	uint32_t* tex = s3d_texels(ctx, te);
+	if (tex != NULL)
+	{
+		uint64_t n = (uint64_t) te->width * te->height;
+		for (uint64_t i = 0; i < n; i++)
+		{
+			const uint8_t* c = rgba + i * 4;
+			tex[i] = (uint32_t) c[0] | ((uint32_t) c[1] << 8)
+			       | ((uint32_t) c[2] << 16) | ((uint32_t) c[3] << 24);
+		}
+	}
+	free(rgba);
+}
+
 static Avm2Value texture_upload_compressed(Avm2Activation* act, int is_cube)
 {
 	Avm2Context* ctx = act->ctx;
@@ -3139,6 +3164,7 @@ static Avm2Value texture_upload_compressed(Avm2Activation* act, int is_cube)
 	if ((is_cube != 0) != (cube != 0))
 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
 		                 "Error #3675: Texture format mismatch.");
+	s3d_upload_atf_jxr(ctx, te, ba->bytes + offset, ba->len - offset);
 	return avm2_undefined();
 }
 
