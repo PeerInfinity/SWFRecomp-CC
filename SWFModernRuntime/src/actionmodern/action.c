@@ -25608,10 +25608,30 @@ void actionTickAvm1ChildrenUnderAvm2(SWFAppContext* app_context,
 //             Ruffle's LoaderDisplay absorbs that into the Loader itself.
 //   MISS    — the point is outside the AVM1 child entirely.
 //
-// Hit areas come from the same pixel AABBs actionDispatchMCPress/Release
-// test, so a click the AVM2 side attributes to AVM1 is exactly a click the
-// AVM1 dispatchers will act on.
-int actionAvm1ChildMousePick(float x, float y)
+// Button-mode clips are found by the same pixel AABBs actionDispatchMCPress/
+// Release test, so a click the AVM2 side attributes to AVM1 is exactly a click
+// the AVM1 dispatchers will act on. Everything else answers through Ruffle's
+// mouse_pick_avm1 rules:
+//   * a selectable/input TextField is itself the AVM1 target
+//     (edit_text.rs::mouse_pick_avm1), so the AVM2 side traces no `click`;
+//   * a timeline DefineButton whose hit shape covers the point is the target
+//     (avm1_button.rs::mouse_pick_avm1) — its state machine runs in
+//     actionMouseAvm1ChildrenUnderAvm2 below;
+//   * a level root and any timeline sprite (one that owns a display list)
+//     answer through the exact shape walk AVM1 hitTest(x, y, true) uses, never
+//     their AABB: an L-shaped or ring sprite, or the level root's union box,
+//     must not claim the empty space inside it (avm2/mouse_pick_loader_avm1).
+static int mc_is_focusable_by_click(MovieClip* mc);
+
+static int avm1UnderAvm2IsTimelineClip(MovieClip* mc)
+{
+	for (int j = 0; j < g_avm1u2_count; j++)
+		if (g_avm1u2[j].mc == mc) return 1;
+	DisplayObject* d = (DisplayObject*) mc->display_obj;
+	return d != NULL && d->sprite_display_list != NULL;
+}
+
+int actionAvm1ChildMousePick(SWFAppContext* app_context, float x, float y)
 {
 	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0)
 		return AVM1_CHILD_PICK_MISS;
@@ -25619,6 +25639,10 @@ int actionAvm1ChildMousePick(float x, float y)
 	extern int child_mc_count;
 	extern int actionMCHasButtonHandlers(MovieClip*);
 	extern int actionMCMouseInsidePick(MovieClip*, float, float);
+	extern int ng_button_hit_in_dl(SWFAppContext*, DisplayObject*, size_t,
+	                               const float (*)[16], double, double);
+	extern int ng_hitTestShapeFromDL(DisplayObject*, size_t, double, double,
+	                                 double, double, double, double, double, double);
 
 	int found = AVM1_CHILD_PICK_MISS;
 	for (int i = 0; i < child_mc_count; i++) {
@@ -25634,24 +25658,45 @@ int actionAvm1ChildMousePick(float x, float y)
 				if (g_avm1u2[j].mc == p) { owned = 1; break; }
 		if (!owned) continue;
 		if (!actionMCMouseInsidePick(mc, x, y)) continue;
-		found = AVM1_CHILD_PICK_CONTENT;
 		// Text fields take focus rather than onPress/onRelease, exactly as in
-		// actionDispatchMCPress.
-		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
+		// actionDispatchMCPress; a selectable one is the pick target itself.
+		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) {
+			if (mc_is_focusable_by_click(mc)) return AVM1_CHILD_PICK_BUTTON;
+			found = AVM1_CHILD_PICK_CONTENT;
+			continue;
+		}
+		// A timeline clip's box is not its shape: the exact walk below decides.
+		if (!avm1UnderAvm2IsTimelineClip(mc)) found = AVM1_CHILD_PICK_CONTENT;
 		if (actionMCHasButtonHandlers(mc)) return AVM1_CHILD_PICK_BUTTON;
 	}
-	// Timeline content (shapes/sprites placed by the child's own tags) never
-	// enters child_mc_cache, so ask the level roots for their display-list
-	// bounds as well before reporting a miss.
-	if (found == AVM1_CHILD_PICK_MISS) {
-		for (int j = 0; j < g_avm1u2_count; j++) {
-			MovieClip* r = g_avm1u2[j].mc;
-			if (r == NULL || r->depth == INT_MIN || r->unloaded) continue;
-			if (actionMCMouseInsidePick(r, x, y))
-				return AVM1_CHILD_PICK_CONTENT;
-		}
+	// Timeline DefineButtons (never in child_mc_cache as button-mode clips).
+	for (int j = 0; j < g_avm1u2_count; j++) {
+		MovieClip* r = g_avm1u2[j].mc;
+		if (r == NULL || r->depth == INT_MIN || r->unloaded || !r->visible) continue;
+		DisplayObject* d = (DisplayObject*) r->display_obj;
+		if (d == NULL || d->sprite_display_list == NULL) continue;
+		const float (*td)[16] = g_avm1u2[j].entry != NULL
+			? (const float (*)[16]) g_avm1u2[j].entry->transform_data_ptr : NULL;
+		if (ng_button_hit_in_dl(app_context, d->sprite_display_list,
+		                        d->sprite_max_depth, td, x * 20.0, y * 20.0))
+			return AVM1_CHILD_PICK_BUTTON;
 	}
-	return found;
+	if (found != AVM1_CHILD_PICK_MISS) return found;
+	// Timeline content (shapes/sprites placed by the child's own tags): the
+	// level roots' display lists, shape-exact.
+	for (int j = 0; j < g_avm1u2_count; j++) {
+		MovieClip* r = g_avm1u2[j].mc;
+		if (r == NULL || r->depth == INT_MIN || r->unloaded || !r->visible) continue;
+		DisplayObject* d = (DisplayObject*) r->display_obj;
+		if (d == NULL || d->sprite_display_list == NULL) continue;
+		double a = 1, b = 0, c = 0, dd = 1, tx = 0, ty = 0;
+		getConcatMatrixForMC(r, &a, &b, &c, &dd, &tx, &ty);
+		if (ng_hitTestShapeFromDL(d->sprite_display_list, d->sprite_max_depth,
+		                          a, b, c, dd, tx * 20.0, ty * 20.0,
+		                          x * 20.0, y * 20.0))
+			return AVM1_CHILD_PICK_CONTENT;
+	}
+	return AVM1_CHILD_PICK_MISS;
 }
 
 // Mouse event kinds the AVM2 input pump forwards into AVM1 (mirrored, with the
@@ -25675,8 +25720,61 @@ int actionAvm1ChildMousePick(float x, float y)
 //
 // The child-context swap around the dispatch is avm1UnderAvm2EnterChild's,
 // above.
+//
+// `avm2_pick_is_avm1` is whether the AVM2 pick for this event resolved to the
+// AVM1 object (Ruffle's single pick decides both VMs). The two AVM1 mechanisms
+// that Flash drives from that pick — the timeline DefineButton state machine
+// and click focus — see the real point only then; otherwise they see the
+// pointer as outside every AVM1 object (an AVM2 `mouseChildren = false`
+// container above the Loader must not let an AVM1 button fire).
+static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
+                                 int click_focusable_only);
+extern int ng_update_button_states_in_level(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* level_mc,
+	const float (*hit_td)[16]);
+
+static void avm1UnderAvm2RunButtons(SWFAppContext* app_context, int avm2_pick_is_avm1)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern size_t display_list_capacity;
+	MouseState* ms = &app_context->mouse;
+	float sx = ms->stage_x, sy = ms->stage_y;
+	if (!avm2_pick_is_avm1) { ms->stage_x = -1e7f; ms->stage_y = -1e7f; }
+	for (int j = 0; j < g_avm1u2_count; j++) {
+		MovieClip* r = g_avm1u2[j].mc;
+		if (r == NULL || r->depth == INT_MIN || r->unloaded) continue;
+		DisplayObject* d = (DisplayObject*) r->display_obj;
+		if (d == NULL || d->sprite_display_list == NULL) continue;
+		// Same display-list and transform-table swap avm1UnderAvm2RunFrame
+		// does: a button state change places its state children through the
+		// global list, with the child's placement ids.
+		extern float (*g_active_transform_data)[16];
+		DisplayObject* sdl = display_list;
+		size_t smax = max_depth, scap = display_list_capacity;
+		float (*std)[16] = g_active_transform_data;
+		display_list = d->sprite_display_list;
+		max_depth = d->sprite_max_depth;
+		display_list_capacity = d->sprite_dl_capacity;
+		float (*td)[16] = g_avm1u2[j].entry != NULL
+			? g_avm1u2[j].entry->transform_data_ptr : NULL;
+		if (td != NULL) g_active_transform_data = td;
+		ng_update_button_states_in_level(app_context, display_list, max_depth, r,
+		                                 (const float (*)[16]) td);
+		g_active_transform_data = std;
+		d->sprite_display_list = display_list;
+		d->sprite_max_depth = max_depth;
+		d->sprite_dl_capacity = display_list_capacity;
+		display_list = sdl;
+		max_depth = smax;
+		display_list_capacity = scap;
+	}
+	ms->stage_x = sx;
+	ms->stage_y = sy;
+}
+
 void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext* app_context, int kind,
-                                      float x, float y)
+                                      float x, float y, int avm2_pick_is_avm1)
 {
 	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0) return;
 	extern void actionDispatchMCMouseDown(SWFAppContext*);
@@ -25708,12 +25806,17 @@ void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext* app_context, int kind,
 	} else if (kind == AVM1_CHILD_MOUSE_DOWN) {
 		actionDispatchMouseDown(app_context);
 		actionDispatchMCMouseDown(app_context);
+		// swf_core.c's order: click focus, then the press dispatch. A click the
+		// AVM2 side owns only kills a mouse-focused AVM1 field.
+		if (avm2_pick_is_avm1) mouse_click_focus_at(app_context, x, y, 1);
+		else mouse_click_focus_at(app_context, -1e6f, -1e6f, 1);
 		actionDispatchMCPress(app_context);
 	} else {
 		actionDispatchMouseUp(app_context);
 		actionDispatchMCMouseUp(app_context);
 		actionDispatchMCRelease(app_context);
 	}
+	avm1UnderAvm2RunButtons(app_context, avm2_pick_is_avm1);
 	avm1UnderAvm2LeaveChild(&swap);
 }
 
@@ -78688,13 +78791,26 @@ int actionMouseOverFocusableTextField(SWFAppContext* app_context)
 	return 0;
 }
 
+static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
+                                 int click_focusable_only);
+
 // On mouse click, determine which MC was clicked and set focus if appropriate.
 // Called from swf_core.c before press dispatch on EV_MOUSE_DOWN_LEFT.
 void actionMouseClickFocus(SWFAppContext* app_context)
 {
-	float mx = app_context->mouse.stage_x / 20.0f;
-	float my = app_context->mouse.stage_y / 20.0f;
+	mouse_click_focus_at(app_context, app_context->mouse.stage_x / 20.0f,
+	                     app_context->mouse.stage_y / 20.0f, 0);
+}
 
+// The body of actionMouseClickFocus at stage pixel (mx, my).
+// `click_focusable_only` is for the AVM1-under-AVM2 caller only: there the
+// child's level root (an AABB spanning the whole loaded movie) sits in
+// child_mc_cache in front of the field it contains, and the AVM2 pick has
+// already decided the click is AVM1's, so the scan skips clips that could
+// never take click focus. The pure-AVM1 scan (flag 0) is unchanged.
+static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
+                                 int click_focusable_only)
+{
 	// Find the frontmost MC that was hit by the click
 	// Iterate in reverse (highest depth = frontmost) to find topmost hit
 	MovieClip* hit_mc = NULL;
@@ -78705,6 +78821,7 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 		float x1, y1, x2, y2;
 		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
 		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+		if (click_focusable_only && !mc_is_focusable_by_click(mc)) continue;
 
 		hit_mc = mc;
 		break;

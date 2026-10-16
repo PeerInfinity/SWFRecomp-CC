@@ -3740,6 +3740,9 @@ static void run_due_timers(Avm2Context* ctx)
 // exitFrame broadcast.
 static void avm2_loaderinfo_run_exit_frame(Avm2Context* ctx);
 static void avm2_loader_drain(Avm2Context* ctx);
+static void avm2_loader_run_exit_frame(Avm2Context* ctx);
+static void avm2_loader_resolve_fetches(Avm2Context* ctx);
+static int g_avm1_child_levels;   // defined with the AVM1 child boot below
 
 // Dual-VM (session 15): advances any AVM1 child movie's timeline. Defined
 // down with the loader, next to the boot that registers them; a no-op —
@@ -3754,9 +3757,16 @@ void avm2_display_run_tick(Avm2Context* ctx)
 {
 	if (ctx->stage == NULL) return;
 
+	// With an AVM1 child loaded, the tail of the tick follows Ruffle's
+	// player.rs::run_frame order (see below). Latched once per tick, so a child
+	// booted by THIS tick's drain does not switch the order mid-tick. Without
+	// one, the AVM1 tick (a no-op) stays here and the pure-AVM2 order is
+	// untouched.
+	int mixed_avm1 = g_avm1_child_levels != 0;
+
 	// Before the AVM2 phases, and therefore before this tick's loader drain:
 	// a child booted by tick N's drain must first advance on tick N+1.
-	avm1_child_tick(ctx);
+	if (!mixed_avm1) avm1_child_tick(ctx);
 
 	ctx->frame_phase = PHASE_ENTER;
 	for (uint32_t i = 0, snap = g_orphan_count;
@@ -3832,8 +3842,28 @@ void avm2_display_run_tick(Avm2Context* ctx)
 	// LocalConnections::update_connections: inside run_frame, after the AVM2
 	// phases and BEFORE the NetConnection flush below (avm2/amf_array_
 	// serialization traces its delivered message ahead of both remoting packets).
-	avm2_net_deliver_local_connections(ctx);
-	avm2_loader_drain(ctx);
+	if (mixed_avm1)
+	{
+		// Ruffle player.rs::run_frame: run_all_phases_avm2 (whose exit frame
+		// fires loader init/complete — LoadManager::run_exit_frame), THEN
+		// Avm1::run_frame, THEN LocalConnections::update_connections, then
+		// the executor resolves fetches. An AVM1 child's init/complete is
+		// gated on its first AVM1 frame having run (movie_clip.rs
+		// try_fire_loaderinfo_events, the INITIALIZED flag, which only
+		// run_frame_avm1 sets), hence loader_deliver's defer for it.
+		// mixed_avm/avm2_loads_avm1_events grades the order; _v9 / _v10 pin
+		// the LC position (their `complete` handler send()s, and with
+		// num_frames = 3 the delivery must land in the same tick).
+		avm2_loader_run_exit_frame(ctx);
+		avm1_child_tick(ctx);
+		avm2_net_deliver_local_connections(ctx);
+		avm2_loader_resolve_fetches(ctx);
+	}
+	else
+	{
+		avm2_net_deliver_local_connections(ctx);
+		avm2_loader_drain(ctx);
+	}
 	// NetConnection.call: the queued packet is sent and its scripted response
 	// dispatched at the same executor-drain point a Loader fetch resolves at, so
 	// the fetch log and the Responder callbacks follow the calling frame's traces
@@ -6283,11 +6313,17 @@ static void avm1_child_tick(Avm2Context* ctx)
 #define AVM1_CHILD_MOUSE_MOVE 0
 #define AVM1_CHILD_MOUSE_DOWN 1
 #define AVM1_CHILD_MOUSE_UP   2
+//
+// The last flag is whether the AVM2 pick for this event (update_mouse_state,
+// which always runs first) resolved to the AVM1 object: in Ruffle one pick
+// decides both VMs, so the AVM1 button state machine and AVM1 click focus act
+// only on a point the AVM2 walk handed to AVM1.
+static int g_last_pick_avm1;
 static void avm1_child_mouse(Avm2Context* ctx, int kind, float x, float y)
 {
 	if (g_avm1_child_levels == 0 || ctx == NULL || ctx->app == NULL) return;
-	extern void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext*, int, float, float);
-	actionMouseAvm1ChildrenUnderAvm2(ctx->app, kind, x, y);
+	extern void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext*, int, float, float, int);
+	actionMouseAvm1ChildrenUnderAvm2(ctx->app, kind, x, y, g_last_pick_avm1);
 }
 
 // An AVM1Movie's transform is the AVM1 root's transform (Ruffle keeps one
@@ -6447,6 +6483,10 @@ static void loader_deliver(Avm2Context* ctx, Avm2Object* li,
 		// own recompiled AVM1 timeline boots behind it and ticks with the
 		// parent (avm1_child_boot / avm1_child_tick below).
 		avm1_child_boot(ctx, mov, pl->avm1_entry);
+		// Its init/complete wait for its first AVM1 frame (Ruffle's
+		// INITIALIZED gate): the next tick's exit-frame flush runs BEFORE
+		// that frame (avm2_display_run_tick's mixed order), so hold one more.
+		lx->defer_flushes = 1;
 	}
 	// Third `bytes` state: the real source bytes, now that content is loaded.
 	// Only bundled assets are kept — their storage is generated-static and
@@ -6572,6 +6612,13 @@ static uint32_t g_pending_url_load_count;
 static void avm2_loader_drain(Avm2Context* ctx)
 {
 	avm2_loader_run_exit_frame(ctx);
+	avm2_loader_resolve_fetches(ctx);
+}
+
+// Stage 2 of the drain alone (avm2_display_run_tick's mixed AVM1 order runs
+// the AVM1 tick and LocalConnection delivery between the two stages).
+static void avm2_loader_resolve_fetches(Avm2Context* ctx)
+{
 	for (uint32_t round = 0; round < AVM2_MAX_LOAD_CHAIN; round++)
 	{
 		// The queued fetch log belongs to THIS round's requests: Ruffle logs
@@ -14823,6 +14870,24 @@ static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
 	return point_in_self(ctx, obj, px, py);
 }
 
+// Ruffle DisplayObject::global_in_scroll_rect: a COMMITTED scrollRect clips
+// mouse picking to its viewport. The rect is in the object's scrolled local
+// space, i.e. through local_to_global (which carries the object's own scroll
+// translate). No rect = no clip; a singular matrix = outside; the rect test is
+// inclusive on all four edges (Rectangle::contains). Point in stage twips.
+static int pk_in_scroll_rect(Avm2Context* ctx, Avm2Object* obj,
+                             Avm2DisplayObjectExt* ext, double px, double py)
+{
+	if (!ext->sr_committed) return 1;
+	Mat m = display_l2g_matrix(ctx, obj);
+	if (m.a * m.d - m.b * m.c == 0.0) return 0;
+	Mat inv = mat_invert(&m);
+	double lx = inv.a * px + inv.c * py + inv.tx;
+	double ly = inv.b * px + inv.d * py + inv.ty;
+	return lx >= ext->csr_xmin && lx <= ext->csr_xmax
+	       && ly >= ext->csr_ymin && ly <= ext->csr_ymax;
+}
+
 typedef enum { PK_MISS, PK_PROP, PK_HIT } PkKind;
 typedef struct { PkKind kind; Avm2Object* target; } Pk;
 
@@ -14852,7 +14917,7 @@ static int pk_is_movie_root(Avm2Context* ctx, Avm2Object* o)
 #define AVM1_CHILD_PICK_MISS    0
 #define AVM1_CHILD_PICK_CONTENT 1
 #define AVM1_CHILD_PICK_BUTTON  2
-extern int actionAvm1ChildMousePick(float x, float y);
+extern int actionAvm1ChildMousePick(SWFAppContext* app_context, float x, float y);
 
 // The pick target that stands for "an AVM1 display object". It is deliberately
 // NOT a usable Avm2Object: an AVM1 hit means the AVM2 side dispatches nothing
@@ -14917,6 +14982,8 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 	if (obj->cls != NULL
 	    && class_is_a(obj->cls, ctx->builtins.simple_button_class))
 	{
+		if (!pk_in_scroll_rect(ctx, obj, ext, px, py))
+			return pk_make(PK_MISS, NULL);
 		Avm2Object* hit = ext->btn_hit != NULL ? ext->btn_hit : ext->btn_up;
 		Avm2DisplayObjectExt* hext = hit != NULL
 			? avm2_display_ext_of(ctx, hit) : NULL;
@@ -14958,6 +15025,12 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 		return pk_make(PK_MISS, NULL);
 	}
 
+	// movie_clip.rs / loader_display.rs mouse_pick_avm2: outside a committed
+	// scrollRect nothing below this container is pickable (EditText, above,
+	// is not gated — matching Ruffle).
+	if (!ext->is_stage && !pk_in_scroll_rect(ctx, obj, ext, px, py))
+		return pk_make(PK_MISS, NULL);
+
 	Pk found_prop = pk_make(PK_MISS, NULL);
 	// Timeline clip layers: every child with clip_depth > 0 masks the depth
 	// range (depth+1 ..= clip_depth). Ruffle walks them as a single reversed,
@@ -14989,7 +15062,7 @@ static Pk mouse_pick(Avm2Context* ctx, Avm2Object* obj, double px, double py)
 				// answers first, and only if it finds nothing interactive does
 				// the container absorb the hit as its own (`child
 				// .hit_test_shape() -> Hit(self)`).
-				int a = actionAvm1ChildMousePick((float) (px / 20.0),
+				int a = actionAvm1ChildMousePick(ctx->app, (float) (px / 20.0),
 				                                 (float) (py / 20.0));
 				if (a == AVM1_CHILD_PICK_BUTTON)
 				{
@@ -15477,6 +15550,7 @@ static void update_mouse_state(Avm2Context* ctx, int changed_button, int is_move
 	update_drag(ctx);
 	int mouse_in_stage = 1;
 	Avm2Object* new_over = mouse_in_stage ? run_mouse_pick(ctx) : NULL;
+	g_last_pick_avm1 = PICK_IS_AVM1(new_over);
 	if (changed_button == 0)
 		avm2_dbg_pick_label(ctx, g_mouse_btn_down[0] ? "down" : "up", new_over);
 	Avm2Object* cur_over = g_mouse_hovered;

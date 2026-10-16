@@ -427,3 +427,16 @@ visual/simple_shapes/overlaps               # curve-fill witness, tol 0         
 visual/blend_modes/add                      # blend over curved fills, tol 0     1 cmp
 visual/filters/glow                         # 1-px curved strokes, quality=low   1 cmp
                                             #   (the stroke staircase witness)
+
+# SESSION 22 ADDITION (s22 cloud `w2-crossvm`). Input-driven pick / focus and
+# the AVM2 loader drain. Until now no member exercised the AVM2 mouse_pick walk,
+# the AVM1 click-focus scan (actionMouseClickFocus, factored into
+# mouse_click_focus_at), or the loader drain split (avm2_loader_resolve_fetches)
+# with a render attached. The AVM1-under-AVM2 arcs themselves (cross-VM pick,
+# DefineButton state machine, mixed-movie tick order) have NO image-bearing row
+# in the corpus: no mixed_avm test carries [image_comparisons]. All three pass
+# their images locally at tolerance <= 1 and are absent from the s22 image board.
+# tier=1  (CI-passing; A/B signal + meaningful absolute verdict)
+avm2/mouse_pick_dobj_mask                   # AVM2 mouse_pick walk + mask     1 cmp
+avm1/focusrect_mouse_swf8                   # AVM1 click focus + focusrect    8 cmps
+avm2/loader_events                          # AVM2 Loader drain / init order  1 cmp

@@ -4745,6 +4745,12 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
 // parent_xf is the composed transform of the enclosing button's placement,
 // and parent_mc is the enclosing button's MovieClip context (used as the
 // "this" scope when firing the nested button's actions).
+// A button's hit-record transform id indexes the DEFINING movie's own table:
+// unlike placement ids (ng_cache_transform), tagDefineButton never re-bases it
+// onto the combined table. NULL = app_context->transform_data, the pure-AVM1
+// behaviour; ng_update_button_states_in_level sets it for an AVM1 child level.
+static const float (*g_btn_hit_td)[16] = NULL;
+
 static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max,
 	const float* parent_xf, MovieClip* parent_mc,
@@ -4901,7 +4907,9 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 			{
 				// Compose: parent_xf * placement * hit-record transform
 				const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
-				const float* hit_xf = (const float*)(app_context->transform_data) + resolved_hit_xf_id * 16;
+				const float* hit_xf = g_btn_hit_td != NULL
+					? g_btn_hit_td[resolved_hit_xf_id]
+					: (const float*)(app_context->transform_data) + resolved_hit_xf_id * 16;
 				float temp[16], composed[16];
 				hit_test_mat4_multiply(temp, parent_xf, place_xf);
 				hit_test_mat4_multiply(composed, temp, hit_xf);
@@ -5328,6 +5336,84 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 
 		obj->button_prev_state = old_state;
 	}
+}
+
+// AVM1-under-AVM2 (action.c actionMouseAvm1ChildrenUnderAvm2): the state
+// machine above over an AVM1 child's level display list, with the level root
+// as the timeline its buttons belong to. The caller swaps `dl` in as the global
+// display_list, exactly as it does around the child's frame funcs. `hit_td`
+// is the child movie's own transform table (see g_btn_hit_td).
+int ng_update_button_states_in_level(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* level_mc,
+	const float (*hit_td)[16])
+{
+	if (app_context->shape_data == NULL) return 0;
+	static const float identity[16] = {
+		1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1
+	};
+	int found_hover = 0;
+	const float (*saved_hit_td)[16] = g_btn_hit_td;
+	g_btn_hit_td = hit_td;
+	ng_update_button_states_in_dl(app_context, dl, dl_max, identity, level_mc,
+		NULL, &found_hover);
+	g_btn_hit_td = saved_hit_td;
+	return found_hover;
+}
+
+// Pure geometric probe for the AVM1-under-AVM2 pick (action.c
+// actionAvm1ChildMousePick): does a visible DefineButton's hit shape in `dl`,
+// or in any sprite below it, cover stage twips (sx, sy)? No state changes.
+// Same hit composition as ng_update_button_states_in_dl (placement, then the
+// hit record), but each placement id is read from the table it indexes and the
+// hit record from `hit_td`, the defining movie's own table (g_btn_hit_td).
+static int ng_button_hit_walk(SWFAppContext* app_context, DisplayObject* dl,
+	size_t dl_max, const float* parent_xf, const float (*hit_td)[16],
+	double sx, double sy, int depth)
+{
+	extern int ng_hitTestShapeChar(size_t char_id, u16 ratio,
+	    double ma, double mb, double mc_m, double md, double mtx, double mty,
+	    double test_x, double test_y);
+	if (depth > 32) return 0;
+	for (size_t i = dl_max; i >= 1; i--)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0 || obj->char_id >= dictionary_capacity) continue;
+		if (obj->clip_depth > 0) continue;
+		Character* ch = &dictionary[obj->char_id];
+		const float* place_xf = ng_entryTransformData(obj)[obj->transform_id];
+		float xf[16];
+		hit_test_mat4_multiply(xf, parent_xf, place_xf);
+		if (ch->type == CHAR_TYPE_SPRITE)
+		{
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0
+			    && ng_button_hit_walk(app_context, obj->sprite_display_list,
+			                          obj->sprite_max_depth, xf, hit_td, sx, sy,
+			                          depth + 1))
+				return 1;
+			continue;
+		}
+		if (ch->type != CHAR_TYPE_BUTTON) continue;
+		u32 xf_id = ch->button_hit_transform_id;
+		size_t hc = ch->button_hit_char_id;
+		if (resolve_hit_shape(ch->button_hit_char_id, &xf_id, &hc, 0) == NULL) continue;
+		const float* hit_xf = hit_td != NULL ? hit_td[xf_id]
+			: (const float*)(app_context->transform_data) + xf_id * 16;
+		float c[16];
+		hit_test_mat4_multiply(c, xf, hit_xf);
+		if (ng_hitTestShapeChar(hc, obj->ratio, c[0], c[1], c[4], c[5], c[12], c[13], sx, sy))
+			return 1;
+	}
+	return 0;
+}
+
+int ng_button_hit_in_dl(SWFAppContext* app_context, DisplayObject* dl,
+	size_t dl_max, const float (*hit_td)[16], double sx, double sy)
+{
+	if (app_context == NULL || app_context->shape_data == NULL || dl == NULL) return 0;
+	static const float identity[16] = {
+		1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1
+	};
+	return ng_button_hit_walk(app_context, dl, dl_max, identity, hit_td, sx, sy, 0);
 }
 
 int ng_update_button_states(SWFAppContext* app_context)
