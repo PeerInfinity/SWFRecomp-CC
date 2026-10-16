@@ -941,6 +941,8 @@ static ASObject* g_object_prototype = NULL;
 // Global Array.prototype — shared by all arrays for instanceof and arguments.__proto__
 static ASObject* g_array_prototype = NULL;
 static int g_array_proto_methods_init = 0;  // Whether Array.prototype methods have been registered
+// The function ensureGlobalInit registers as `_global.Array` (see arrayResolveGlobalCtor)
+static ASFunction* g_array_ctor_registered = NULL;
 static ASFunction g_array_proto_funcs[12];  // push,pop,shift,unshift,reverse,join,toString,concat,slice,splice,sort,sortOn
 // File-scope Array constructor (shared between actionGetVariable("Array") and initArrayPrototypeMethods)
 static ASFunction g_array_constructor_static;
@@ -4559,12 +4561,23 @@ static void addStubMethodToProto(SWFAppContext* app_context, ASObject* proto, co
 static int isNativeTextFieldProperty(const char* name, u32 len); // forward decl
 
 // Built-in hasOwnProperty checks if a property exists directly on the object
+static int callArrayMethod(SWFAppContext* app_context, ASArray* arr, const char* method_name, u32 method_name_len, ActionVar* args, u32 num_args);
 static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_BOOLEAN;
 	ret.str_size = 0;
 	ret.data.numeric_value = 0; // false by default
+
+	// hasOwnProperty.call(array, name): this_obj is an ASArray*, not an
+	// ASObject* — route to the array-aware implementation instead of
+	// mis-casting it (segfault in findPropertySlot).
+	if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_ARRAY)
+	{
+		if (callArrayMethod(app_context, (ASArray*) this_obj, "hasOwnProperty", 14, args, args ? arg_count : 0))
+			popVar(app_context, &ret);
+		return ret;
+	}
 
 	if (this_obj != NULL && args != NULL && arg_count >= 1)
 	{
@@ -8432,6 +8445,9 @@ static void ensureBuiltinPrototypeProps(SWFAppContext* app_context, ASObject* pr
 	fixBuiltinPrototypeFlags(proto);
 }
 
+static void arrayResolveGlobalCtor(SWFAppContext* app_context, ASArray* arr,
+                                   ASObject* default_proto, u32 proto_flags);
+
 // Set up arguments object properties: __proto__ = Array.prototype, callee, caller.
 // Called after creating the arguments ASArray for any user-defined function call.
 static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
@@ -8467,6 +8483,7 @@ static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
 		pv.type = ACTION_STACK_VALUE_OBJECT;
 		pv.data.numeric_value = (u64)g_array_prototype;
 		setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, _ARGS_HIDDEN);
+		arrayResolveGlobalCtor(app_context, arr, g_array_prototype, _ARGS_HIDDEN);
 	}
 
 	// callee = the function being called (non-enumerable)
@@ -43799,6 +43816,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 #endif
 	REG_FUNC("String", 6, &g_ctors[2]);
 	REG_FUNC("Array", 5, &g_ctors[1]);
+	g_array_ctor_registered = &g_ctors[1];
 	REG_OBJ("Math", 4, actionMathGetObject(app_context));
 	REG_FUNC("Sound", 5, &g_stub_ctors[14]);
 	REG_FUNC("XMLNode", 7, &g_xmlnode_constructor);
@@ -51525,6 +51543,186 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 	(void)send_vars_method;
 }
 
+// Arrays built by literals, `arguments`, String.split and Array() called as a
+// function resolve `_global.Array` AT CREATION (Ruffle dd4e73d59,
+// ArrayBuilder::new; we follow its FP24 branch): own `__proto__ =
+// _global.Array.prototype` and own `constructor = _global.Array`. Both are read
+// as DATA: attributes are ignored and accessors are not called (the data slot
+// survives an addProperty on the same name). With no class there is neither;
+// with a class but no prototype there is only `constructor`. `new Array()`
+// keeps the inherited constructor and does not come here.
+//
+// The caller has already installed default_proto as `__proto__` (or, with
+// props == NULL, relies on the builtin Array.prototype fallback). Fast path —
+// `_global.Array` is a function whose prototype is that same object — writes
+// nothing: the own `constructor` stays virtual in arr->virt_ctor (functions are
+// never freed, see the g_gc_fn_head root walk) and is materialised on write.
+// Otherwise both slots go into props. Pinned by avm1/array_constructor and
+// gnash array.as:1755-1793.
+static void arrayResolveGlobalCtor(SWFAppContext* app_context, ASArray* arr,
+                                   ASObject* default_proto, u32 proto_flags)
+{
+	if (arr == NULL) return;
+	ASObject* g = getActiveGlobal();
+	if (g == NULL || g_array_ctor_registered == NULL)
+	{
+		// _global not built yet (ensureGlobalInit is lazy; any script access
+		// to `_global` runs it first), so `_global.Array` is still the builtin.
+		if (g_array_proto_methods_init)
+			arr->virt_ctor = &g_array_constructor_static;
+		return;
+	}
+	ASProperty* gp = findPropertyRaw(g, "Array", 5);
+	ActionVar ctor = {0};
+	ctor.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (gp != NULL &&
+	    (gp->value.type == ACTION_STACK_VALUE_FUNCTION || gp->value.type == ACTION_STACK_VALUE_OBJECT) &&
+	    gp->value.data.numeric_value != 0)
+		ctor = gp->value;
+
+	// The engine registers `_global.Array` as its own ASFunction, but the Array
+	// that scripts observe (`Array`, `Array.prototype.constructor`) is
+	// g_array_constructor_static; report that one.
+	if (ctor.type == ACTION_STACK_VALUE_FUNCTION &&
+	    g_array_ctor_registered != NULL &&
+	    ctor.data.numeric_value == (u64) g_array_ctor_registered && g_array_proto_methods_init)
+		ctor.data.numeric_value = (u64) &g_array_constructor_static;
+
+	ActionVar proto = {0};
+	int has_proto = 0;
+	if (ctor.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		ASFunction* fn = (ASFunction*) ctor.data.numeric_value;
+		if (fn->prototype_obj != NULL)
+		{
+			if (fn->prototype_obj == default_proto)
+			{
+				arr->virt_ctor = fn;
+				return;
+			}
+			proto.type = ACTION_STACK_VALUE_OBJECT;
+			proto.data.numeric_value = (u64) fn->prototype_obj;
+			has_proto = 1;
+		}
+		else
+		{
+			// A primitive `fn.prototype = 8` lives in own_props (the data
+			// slot survives an addProperty on the same name, as in Ruffle).
+			ASProperty* pp = (fn->own_props != NULL) ? findPropertyRaw(fn->own_props, "prototype", 9) : NULL;
+			if (pp != NULL && pp->value.type != ACTION_STACK_VALUE_UNDEFINED)
+			{
+				proto = pp->value;
+				has_proto = 1;
+			}
+			else if (pp == NULL)
+			{
+				// Never read yet: GetMember creates the lazy prototype object.
+				pushVar(app_context, &ctor);
+				PUSH_STR("prototype", 9);
+				actionGetMember(app_context);
+				popVar(app_context, &proto);
+				has_proto = (proto.type != ACTION_STACK_VALUE_UNDEFINED);
+			}
+		}
+	}
+	else if (ctor.type == ACTION_STACK_VALUE_OBJECT)
+	{
+		ASProperty* pp = findPropertyRaw((ASObject*) ctor.data.numeric_value, "prototype", 9);
+		if (pp != NULL)
+		{
+			proto = pp->value;
+			has_proto = 1;
+		}
+	}
+
+	if (arr->props == NULL)
+	{
+		arr->props = allocObject(app_context, 4);
+		retainObject(arr->props);
+	}
+	arr->no_proto_fallback = 1;
+	if (has_proto)
+		setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &proto, proto_flags);
+	else
+		deleteProperty(app_context, arr->props, "__proto__", 9);
+	if (ctor.type != ACTION_STACK_VALUE_UNDEFINED)
+		setPropertyWithFlags(app_context, arr->props, "constructor", 11, &ctor,
+		                     PROPERTY_FLAG_WRITABLE);
+}
+
+// Write/flag paths see a real slot: move a virtual own `constructor` into props.
+static void arrayMaterializeVirtCtor(SWFAppContext* app_context, ASArray* arr)
+{
+	if (arr == NULL || arr->virt_ctor == NULL) return;
+	if (arr->props == NULL)
+	{
+		arr->props = allocObject(app_context, 4);
+		retainObject(arr->props);
+	}
+	ActionVar cv = {0};
+	cv.type = ACTION_STACK_VALUE_FUNCTION;
+	cv.data.numeric_value = (u64) arr->virt_ctor;
+	arr->virt_ctor = NULL;
+	if (findPropertyRaw(arr->props, "constructor", 11) == NULL)
+		setPropertyWithFlags(app_context, arr->props, "constructor", 11, &cv, PROPERTY_FLAG_WRITABLE);
+}
+
+// Push a natively built array (props == NULL, so it inherits the builtin
+// Array.prototype) after resolving the creation-time `_global.Array`.
+static void pushCreatedArray(SWFAppContext* app_context, ASArray* arr)
+{
+	initArrayPrototypeMethods(app_context);
+	arrayResolveGlobalCtor(app_context, arr, g_array_prototype, PROPERTY_FLAGS_DONTENUM);
+	PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
+}
+
+// Array(...) called as a function (by name, through an alias, or
+// `Array.call`): same element rules as `new Array(...)`, but the result is built
+// through arrayResolveGlobalCtor like a literal (Ruffle dd4e73d59).
+static void pushArrayCalledAsFunction(SWFAppContext* app_context, ActionVar* args, u32 num_args)
+{
+	if (num_args == 0)
+	{
+		// Array() — empty array
+		ASArray* arr = allocArray(app_context, 4);
+		arr->length = 0;
+		pushCreatedArray(app_context, arr);
+	}
+	else if (num_args == 1 &&
+	         (args[0].type == ACTION_STACK_VALUE_F32 ||
+	          args[0].type == ACTION_STACK_VALUE_F64))
+	{
+		// Array(length)
+		double length_d = (args[0].type == ACTION_STACK_VALUE_F32) ?
+			(double) VAL(float, &args[0].data.numeric_value) :
+			VAL(double, &args[0].data.numeric_value);
+		u32 length = (u32) ecmaToInt32(length_d);
+		int32_t signed_len = (int32_t) length;
+		u32 alloc_size = 0;
+		if (signed_len > 0)
+			alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
+		ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
+		arr->length = length;
+		pushCreatedArray(app_context, arr);
+	}
+	else
+	{
+		// Array(elem1, elem2, ...) — array with elements
+		ASArray* arr = allocArray(app_context, num_args);
+		arr->length = num_args;
+		for (u32 i = 0; i < num_args; i++)
+		{
+			setArrayElement(app_context, arr, i, &args[i]);
+		}
+		pushCreatedArray(app_context, arr);
+	}
+}
+
+static inline int isConstructorName(const char* name, u32 len)
+{
+	return len == 11 && memcmp(name, "constructor", 11) == 0;
+}
+
 void actionInitArray(SWFAppContext* app_context)
 {
 	// 1. Pop array element count
@@ -51584,6 +51782,7 @@ void actionInitArray(SWFAppContext* app_context)
 			pv.data.numeric_value = (u64)ver_arr_proto;
 			setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
 		}
+		arrayResolveGlobalCtor(app_context, arr, ver_arr_proto, PROPERTY_FLAGS_DONTENUM);
 	}
 
 	// 4. Push array reference to stack
@@ -52741,6 +52940,8 @@ void actionSetMember(SWFAppContext* app_context)
 		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
 		if (arr != NULL)
 		{
+			if (arr->virt_ctor != NULL && isConstructorName(prop_name, prop_name_len))
+				arrayMaterializeVirtCtor(app_context, arr);
 			// Check for addProperty setter in arr->props first (overrides built-in behavior)
 			if (arr->props != NULL)
 			{
@@ -55094,6 +55295,11 @@ void actionDelete(SWFAppContext* app_context)
 					return;
 				}
 			}
+			// Virtual own `constructor` is DONT_DELETE (arrayResolveGlobalCtor)
+			if (arr->virt_ctor != NULL && isConstructorName(prop_name, prop_name_len)) {
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+				return;
+			}
 			// Non-numeric property — try deleting from arr->props
 			if (arr->props != NULL) {
 				bool success = deleteProperty(app_context, arr->props, prop_name, prop_name_len);
@@ -56351,9 +56557,14 @@ void actionGetMember(SWFAppContext* app_context)
 				// (Phase 6 of XML_XMLNODE_PLAN — XMLNode tests check
 				// `node.childNodes.push` truthiness).
 				ActionVar* pv = NULL;
+				if (arr->virt_ctor != NULL && isConstructorName(prop_name, prop_name_len))
+				{
+					PUSH(ACTION_STACK_VALUE_FUNCTION, (u64) arr->virt_ctor);
+					return;
+				}
 				if (arr->props != NULL)
 					pv = getPropertyWithPrototype(arr->props, prop_name, prop_name_len);
-				if (pv == NULL)
+				if (pv == NULL && !arr->no_proto_fallback)
 				{
 					initArrayPrototypeMethods(app_context);
 					if (g_array_prototype != NULL)
@@ -63738,44 +63949,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// Array() — called as function, same behavior as new Array()
 	else if (func_name_len == 5 && strncmp(func_name, "Array", 5) == 0)
 	{
-		if (num_args == 0)
-		{
-			// Array() — empty array
-			ASArray* arr = allocArray(app_context, 4);
-			arr->length = 0;
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
-		}
-		else if (num_args == 1 &&
-		         (args[0].type == ACTION_STACK_VALUE_F32 ||
-		          args[0].type == ACTION_STACK_VALUE_F64))
-		{
-			// Array(length)
-			double length_d = (args[0].type == ACTION_STACK_VALUE_F32) ?
-				(double) VAL(float, &args[0].data.numeric_value) :
-				VAL(double, &args[0].data.numeric_value);
-			u32 length = (u32) ecmaToInt32(length_d);
-			int32_t signed_len = (int32_t) length;
-			u32 alloc_size = 0;
-			if (signed_len > 0)
-				alloc_size = (u32)signed_len < 1000000 ? (u32)signed_len : 1000000;
-			ASArray* arr = allocArray(app_context, alloc_size > 0 ? alloc_size : 4);
-			arr->length = length;
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
-		}
-		else
-		{
-			// Array(elem1, elem2, ...) — array with elements
-			ASArray* arr = allocArray(app_context, num_args);
-			arr->length = num_args;
-			for (u32 i = 0; i < num_args; i++)
-			{
-				setArrayElement(app_context, arr, i, &args[i]);
-			}
-			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
-		}
+		pushArrayCalledAsFunction(app_context, args, num_args);
+		if (args != NULL) FREE(args);
 		builtin_handled = 1;
 	}
 
@@ -65065,7 +65240,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				{
 					// Check if this is a built-in converter function (called without new)
 					const char* fname = func->name;
-					if (strcmp(fname, "Number") == 0)
+					if (strcmp(fname, "Array") == 0)
+					{
+						// Array() through an alias (`var f = Array; f(1, 2)`)
+						pushArrayCalledAsFunction(app_context, args, num_args);
+						if (args != NULL) FREE(args);
+					}
+					else if (strcmp(fname, "Number") == 0)
 					{
 						// Number() → primitive number: 0 if no args, else toNumber(arg)
 						double _nc_result = 0.0;
@@ -66006,6 +66187,8 @@ static int callArrayMethod(SWFAppContext* app_context,
 						found = 1;
 				}
 				if (!found && arr->props != NULL && hasPropertyRaw(arr->props, nb, nlen))
+					found = 1;
+				if (!found && arr->virt_ctor != NULL && isConstructorName(nb, nlen))
 					found = 1;
 			}
 		}
@@ -68319,7 +68502,7 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 				elem.str_size = str_len;
 				elem.data.numeric_value = (u64)str_value;
 				setArrayElement(app_context, arr, 0, &elem);
-				PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
+				pushCreatedArray(app_context, arr);
 				return 1;
 			}
 		}
@@ -68366,7 +68549,7 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 
 		if (limit == 0)
 		{
-			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)allocArray(app_context, 1));
+			pushCreatedArray(app_context, allocArray(app_context, 1));
 			return 1;
 		}
 
@@ -68453,7 +68636,7 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 			}
 		}
 
-		PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
+		pushCreatedArray(app_context, arr);
 		return 1;
 	}
 
@@ -70460,10 +70643,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 					if (call_args != NULL) FREE(call_args);
 					if (args != NULL) FREE(args);
-					ActionVar _r = {0};
-					_r.type = ACTION_STACK_VALUE_ARRAY;
-					_r.data.numeric_value = (u64) arr;
-					pushVar(app_context, &_r);
+					pushCreatedArray(app_context, arr);
 				}
 				else
 				{
