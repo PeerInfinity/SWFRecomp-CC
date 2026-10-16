@@ -37,8 +37,9 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-drawing-api-lyon | w1-pixel-smalls W2-B | MaskTest, displayobject_opaque_background, fills_and_lines, graphics_draw_path | session_01W4qaTLdonsB2sRwZP3LAmB |
 | w2-glyph-subunit | w1-pixel-smalls W2-C | fonts/glyph, match_style, fallback_preferences | session_01KmL6XEUPUAPhFxEHtV67RK |
 | w2-default-fonts-draw | w1-pixel-catastrophic | text-bind, cab/text, bitmapdata_draw_masks, bitmapdata_draw | session_01MSbMWKPyx6Jy1iTxnUmLff |
+| w2-htmltext | w1-drift-avm1 S4 + w1-drift-avm2 §1.4 | edittext_html_duplicate_attributes, html_text_img_parsing_swf7/_swf8, html_text_img_numeric_attributes, avm2/html_text_img_parsing (rm) | session_01TTs24XtdUhz4v7x5CtLiMw |
 
-**Queue (launch order when a slot frees):** w2-htmltext, w2-strbuf, w2-avm2-stage-view, w2-font-registry, w2-ei-provider, w2-atf-dxt5, w2-avm2-video-stamp, w2-draw-bigcap-aa; w2-geom-port after w2-as-core delivers.
+**Queue (launch order when a slot frees):** w2-strbuf, w2-avm2-stage-view, w2-font-registry, w2-ei-provider, w2-atf-dxt5, w2-avm2-video-stamp, w2-draw-bigcap-aa, w2-hairline-device-width; w2-geom-port after w2-as-core delivers.
 | w2-jpegxr | user-approved dep | loader_jpegxr, loader_jpegxr_alpha, stage3d_texture_bytearray, _compressed_alpha | session_017A1bzC1vtg96PMxQT8BxpM — LANDED 5dee7a4b4 |
 
 **Merge obligations:** at w2-as-core merge, `installAsBroadcaster`'s `_listeners` must go through `arrayResolveGlobalCtor()` (w2-array-global report §4; flips the as_broadcaster "with Array replaced" line) unless as-core creates it as a literal. Follow-up for after as-core: `actionCallMethod` object-method arm alias dispatch for `Array` (`pushArrayCalledAsFunction`).
