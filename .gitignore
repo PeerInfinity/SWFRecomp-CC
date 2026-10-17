@@ -148,6 +148,12 @@ ruffle-tests/tests/swfs/avm2/*/
 !ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/
 ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/*
 !ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/test.local.toml
+# Ruffle runs avm2/external_interface under its ExternalInterfaceTestProvider
+# (tests/tests/external_interface/); our provider is the git-tracked
+# test_harness.c (the avm1 twin's mechanism, above).
+!ruffle-tests/tests/swfs/avm2/external_interface/
+ruffle-tests/tests/swfs/avm2/external_interface/*
+!ruffle-tests/tests/swfs/avm2/external_interface/test_harness.c
 
 # from_avmplus tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_avmplus/*/

@@ -1,0 +1,708 @@
+diff --git a/.gitignore b/.gitignore
+index 484f6505d..1a2744ac6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -148,6 +148,12 @@ ruffle-tests/tests/swfs/avm2/*/
+ !ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/
+ ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/*
+ !ruffle-tests/tests/swfs/avm2/loader_loadbytes_url/test.local.toml
++# Ruffle runs avm2/external_interface under its ExternalInterfaceTestProvider
++# (tests/tests/external_interface/); our provider is the git-tracked
++# test_harness.c (the avm1 twin's mechanism, above).
++!ruffle-tests/tests/swfs/avm2/external_interface/
++ruffle-tests/tests/swfs/avm2/external_interface/*
++!ruffle-tests/tests/swfs/avm2/external_interface/test_harness.c
+ 
+ # from_avmplus tests (downloaded test data, keep results and investigation)
+ ruffle-tests/tests/swfs/from_avmplus/*/
+diff --git a/SWFModernRuntime/include/avm2/avm2_external.h b/SWFModernRuntime/include/avm2/avm2_external.h
+new file mode 100644
+index 000000000..70178d839
+--- /dev/null
++++ b/SWFModernRuntime/include/avm2/avm2_external.h
+@@ -0,0 +1,66 @@
++#ifndef AVM2_EXTERNAL_H
++#define AVM2_EXTERNAL_H
++
++// flash.external.ExternalInterface — test-provider surface (avm2_external.c).
++//
++// Mirrors Ruffle's ExternalInterfaceProvider + external::Value
++// (core/src/external.rs) for per-test C harnesses (verify_output.py compiles a
++// test dir's test_harness.c into the build): a harness installs a provider,
++// which makes ExternalInterface.available true and receives every
++// ExternalInterface.call(); host → AS3 calls go through
++// avm2_ei_call_internal (Ruffle's Player::call_internal_interface). Values
++// cross the boundary as a C-owned tree, never as GC-managed AVM2 values.
++// Builds that install no provider are unaffected.
++
++#include <stdbool.h>
++#include <stdint.h>
++
++typedef enum Avm2EiKind
++{
++	AVM2_EI_UNDEFINED = 0,
++	AVM2_EI_NULL,
++	AVM2_EI_BOOL,
++	AVM2_EI_NUMBER,
++	AVM2_EI_STRING,
++	AVM2_EI_LIST,
++	AVM2_EI_OBJECT,
++} Avm2EiKind;
++
++typedef struct Avm2EiValue
++{
++	Avm2EiKind kind;
++	bool b;                       // BOOL
++	double d;                     // NUMBER
++	char* str;                    // STRING: malloc'd UTF-8
++	uint32_t count;               // LIST / OBJECT entry count
++	struct Avm2EiValue* items;    // LIST elements / OBJECT values (malloc'd)
++	char** keys;                  // OBJECT keys, sorted by byte order (BTreeMap)
++} Avm2EiValue;
++
++// Provider: receives call(name, ...args) with args already converted from AS3
++// (Ruffle Value::from_avm2); the returned tree is converted back with
++// into_avm2 and then freed by the runtime. Must not keep `args`.
++typedef Avm2EiValue (*Avm2EiProvider)(const char* name, const Avm2EiValue* args,
++                                      uint32_t argc);
++
++void avm2_ei_set_provider(Avm2EiProvider provider);
++
++// Host → AS3: invoke the callback registered under `name` with `args`
++// (converted with into_avm2). Returns the callback's result converted with
++// from_avm2; NULL for an unknown name or a callback that threw (reported as an
++// uncaught error). The caller owns the result (avm2_ei_value_free).
++Avm2EiValue avm2_ei_call_internal(const char* name, const Avm2EiValue* args,
++                                  uint32_t argc);
++
++// Constructors / destructor for harness-built trees. avm2_ei_object takes
++// ownership of `keys`' strings and `values` (both malloc'd arrays of n).
++Avm2EiValue avm2_ei_undefined(void);
++Avm2EiValue avm2_ei_null(void);
++Avm2EiValue avm2_ei_bool(bool b);
++Avm2EiValue avm2_ei_number(double d);
++Avm2EiValue avm2_ei_string(const char* s);
++Avm2EiValue avm2_ei_list(const Avm2EiValue* items, uint32_t n);    // copies the array
++Avm2EiValue avm2_ei_object(char** keys, Avm2EiValue* values, uint32_t n);
++void avm2_ei_value_free(Avm2EiValue* v);
++
++#endif // AVM2_EXTERNAL_H
+diff --git a/SWFModernRuntime/src/avm2/avm2_external.c b/SWFModernRuntime/src/avm2/avm2_external.c
+index bd3d93059..6f702254d 100644
+--- a/SWFModernRuntime/src/avm2/avm2_external.c
++++ b/SWFModernRuntime/src/avm2/avm2_external.c
+@@ -36,6 +36,7 @@
+ 
+ #include <avm2/avm2_class.h>
+ #include <avm2/avm2_error.h>
++#include <avm2/avm2_external.h>
+ #include <avm2/avm2_gc.h>
+ #include <avm2/avm2_globals.h>
+ #include <avm2/avm2_main.h>
+@@ -58,6 +59,7 @@ typedef struct Avm2EiCallback
+ static Avm2EiCallback g_ei_callbacks[AVM2_EI_MAX_CALLBACKS];
+ static Avm2Context* g_ei_ctx = NULL;   // set at registration (one VM per process)
+ static bool g_marshall_exceptions = false;
++static Avm2EiProvider g_ei_provider = NULL;   // test harness only (avm2_external.h)
+ 
+ // ---------------------------------------------------------------------------
+ // Availability gate
+@@ -65,6 +67,7 @@ static bool g_marshall_exceptions = false;
+ 
+ static int ei_available_now(void)
+ {
++	if (g_ei_provider != NULL) return 1;
+ #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+ 	static int memo = -1;
+ 	if (memo < 0)
+@@ -240,6 +243,220 @@ static void ei_notify_callback(const char* name, int registered)
+ 
+ #endif // __EMSCRIPTEN__ && !OFFSCREEN_RENDER
+ 
++// ---------------------------------------------------------------------------
++// Structured values + test provider (avm2_external.h)
++// ---------------------------------------------------------------------------
++//
++// Ruffle's external::Value with its from_avm2 / into_avm2 conversions
++// (core/src/external.rs), used only when a test harness installed a provider.
++// Trees are C-heap owned, so nothing here needs GC rooting; the transient
++// AVM2 values built by into_avm2 live only within one call, and the GC only
++// collects between ticks.
++
++Avm2EiValue avm2_ei_undefined(void) { Avm2EiValue v = {0}; v.kind = AVM2_EI_UNDEFINED; return v; }
++Avm2EiValue avm2_ei_null(void) { Avm2EiValue v = {0}; v.kind = AVM2_EI_NULL; return v; }
++Avm2EiValue avm2_ei_bool(bool b) { Avm2EiValue v = {0}; v.kind = AVM2_EI_BOOL; v.b = b; return v; }
++Avm2EiValue avm2_ei_number(double d) { Avm2EiValue v = {0}; v.kind = AVM2_EI_NUMBER; v.d = d; return v; }
++
++static Avm2EiValue ei_string_n(const char* s, uint32_t len)
++{
++	Avm2EiValue v = {0};
++	v.kind = AVM2_EI_STRING;
++	v.str = malloc((size_t) len + 1);
++	memcpy(v.str, s, len);
++	v.str[len] = '\0';
++	return v;
++}
++
++Avm2EiValue avm2_ei_string(const char* s) { return ei_string_n(s, (uint32_t) strlen(s)); }
++
++Avm2EiValue avm2_ei_list(const Avm2EiValue* items, uint32_t n)
++{
++	Avm2EiValue v = {0};
++	v.kind = AVM2_EI_LIST;
++	v.count = n;
++	if (n > 0)
++	{
++		v.items = malloc(n * sizeof(Avm2EiValue));
++		memcpy(v.items, items, n * sizeof(Avm2EiValue));
++	}
++	return v;
++}
++
++// Insert key → value into a sorted map, replacing an existing key (BTreeMap
++// insert). Takes ownership of `key` and `val`.
++static void ei_map_insert(Avm2EiValue* m, uint32_t* cap, char* key, Avm2EiValue val)
++{
++	uint32_t pos = 0;
++	while (pos < m->count && strcmp(m->keys[pos], key) < 0) pos++;
++	if (pos < m->count && strcmp(m->keys[pos], key) == 0)
++	{
++		free(key);
++		avm2_ei_value_free(&m->items[pos]);
++		m->items[pos] = val;
++		return;
++	}
++	if (m->count == *cap)
++	{
++		*cap = *cap ? *cap * 2 : 8;
++		m->keys = realloc(m->keys, *cap * sizeof(char*));
++		m->items = realloc(m->items, *cap * sizeof(Avm2EiValue));
++	}
++	memmove(&m->keys[pos + 1], &m->keys[pos], (m->count - pos) * sizeof(char*));
++	memmove(&m->items[pos + 1], &m->items[pos], (m->count - pos) * sizeof(Avm2EiValue));
++	m->keys[pos] = key;
++	m->items[pos] = val;
++	m->count++;
++}
++
++Avm2EiValue avm2_ei_object(char** keys, Avm2EiValue* values, uint32_t n)
++{
++	Avm2EiValue m = {0};
++	m.kind = AVM2_EI_OBJECT;
++	uint32_t cap = 0;
++	for (uint32_t i = 0; i < n; i++) ei_map_insert(&m, &cap, keys[i], values[i]);
++	free(keys);
++	free(values);
++	return m;
++}
++
++void avm2_ei_value_free(Avm2EiValue* v)
++{
++	if (v == NULL) return;
++	free(v->str);
++	for (uint32_t i = 0; i < v->count; i++)
++	{
++		if (v->items != NULL) avm2_ei_value_free(&v->items[i]);
++		if (v->keys != NULL) free(v->keys[i]);
++	}
++	free(v->items);
++	free(v->keys);
++	memset(v, 0, sizeof(*v));
++}
++
++// Value::from_avm2. Arrays become List (holes read as Null); every other
++// object becomes Object over its enumerable properties. A cyclic graph would
++// recurse forever in Ruffle; cap the depth instead.
++static Avm2EiValue ei_from_avm2(Avm2Context* ctx, Avm2Value v, int depth)
++{
++	switch (v.kind)
++	{
++		case AVM2_VALUE_UNDEFINED: return avm2_ei_undefined();
++		case AVM2_VALUE_NULL:      return avm2_ei_null();
++		case AVM2_VALUE_BOOL:      return avm2_ei_bool(v.u.b);
++		case AVM2_VALUE_INTEGER:   return avm2_ei_number((double) v.u.i);
++		case AVM2_VALUE_NUMBER:    return avm2_ei_number(v.u.d);
++		case AVM2_VALUE_STRING:
++		{
++			const Avm2String* s = avm2_coerce_to_string(ctx, v);
++			return ei_string_n(s->utf8, s->len);
++		}
++		case AVM2_VALUE_OBJECT:
++		{
++			Avm2Object* obj = v.u.obj;
++			if (obj == NULL || depth > 256) return avm2_ei_null();
++			if (obj->kind == AVM2_OBJ_ARRAY)
++			{
++				Avm2ArrayExt* ext = avm2_array_ext(obj);
++				uint32_t n = ext ? ext->length : 0;
++				Avm2EiValue l = {0};
++				l.kind = AVM2_EI_LIST;
++				l.count = n;
++				if (n > 0) l.items = calloc(n, sizeof(Avm2EiValue));
++				for (uint32_t i = 0; i < n; i++)
++				{
++					Avm2Value e = avm2_array_get(obj, i);
++					l.items[i] = (e.kind == AVM2_VALUE_HOLE)
++						? avm2_ei_null() : ei_from_avm2(ctx, e, depth + 1);
++				}
++				return l;
++			}
++			Avm2EiValue m = {0};
++			m.kind = AVM2_EI_OBJECT;
++			uint32_t cap = 0;
++			for (uint32_t idx = avm2_object_next_enumerant(obj, 0); idx != 0;
++			     idx = avm2_object_next_enumerant(obj, idx))
++			{
++				const Avm2String* name = avm2_coerce_to_string(ctx,
++					avm2_object_enumerant_name(ctx, obj, idx));
++				char* key = malloc((size_t) name->len + 1);
++				memcpy(key, name->utf8, name->len);
++				key[name->len] = '\0';
++				Avm2Value ev = avm2_object_enumerant_value(ctx, obj, idx);
++				ei_map_insert(&m, &cap, key, ei_from_avm2(ctx, ev, depth + 1));
++			}
++			return m;
++		}
++		default:
++			return avm2_ei_null();
++	}
++}
++
++// Value::into_avm2: Object → a fresh plain Object (dynamic props in key
++// order), List → Array.
++static Avm2Value ei_into_avm2(Avm2Context* ctx, const Avm2EiValue* v)
++{
++	switch (v->kind)
++	{
++		case AVM2_EI_NULL:   return avm2_null();
++		case AVM2_EI_BOOL:   return avm2_bool(v->b);
++		case AVM2_EI_NUMBER: return avm2_number(v->d);
++		case AVM2_EI_STRING:
++			return avm2_string(avm2_string_new(ctx, v->str, (uint32_t) strlen(v->str)));
++		case AVM2_EI_LIST:
++		{
++			Avm2Object* arr = avm2_array_new(ctx, 0);
++			for (uint32_t i = 0; i < v->count; i++)
++			{
++				avm2_array_push(ctx, arr, ei_into_avm2(ctx, &v->items[i]));
++			}
++			return avm2_object_value(arr);
++		}
++		case AVM2_EI_OBJECT:
++		{
++			Avm2Object* obj = avm2_object_alloc(ctx, AVM2_OBJ_SCRIPT, 0);
++			obj->cls = ctx->builtins.object_class;
++			obj->proto = ctx->builtins.object_class->prototype_obj;
++			for (uint32_t i = 0; i < v->count; i++)
++			{
++				avm2_object_set_dynamic(ctx, obj, v->keys[i], (uint32_t) strlen(v->keys[i]),
++				                        ei_into_avm2(ctx, &v->items[i]));
++			}
++			return avm2_object_value(obj);
++		}
++		default:
++			return avm2_undefined();
++	}
++}
++
++void avm2_ei_set_provider(Avm2EiProvider provider)
++{
++	g_ei_provider = provider;
++}
++
++// ExternalInterface.call under a provider (Ruffle external_interface.rs call).
++static Avm2Value ei_provider_call(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
++	char* cname = malloc((size_t) name->len + 1);
++	memcpy(cname, name->utf8, name->len);
++	cname[name->len] = '\0';
++
++	uint32_t n = act->argc - 1;
++	Avm2EiValue* args = n ? calloc(n, sizeof(Avm2EiValue)) : NULL;
++	for (uint32_t i = 0; i < n; i++) args[i] = ei_from_avm2(ctx, act->args[i + 1], 0);
++
++	Avm2EiValue r = g_ei_provider(cname, args, n);
++
++	for (uint32_t i = 0; i < n; i++) avm2_ei_value_free(&args[i]);
++	free(args);
++	free(cname);
++	Avm2Value out = ei_into_avm2(ctx, &r);
++	avm2_ei_value_free(&r);
++	return out;
++}
++
+ // ---------------------------------------------------------------------------
+ // Static methods / properties
+ // ---------------------------------------------------------------------------
+@@ -331,6 +548,8 @@ static Avm2Value ei_call(Avm2Activation* act)
+ 	if (!ei_available_now()) ei_throw_2067(ctx);
+ 	if (act->argc < 1) return avm2_null();
+ 
++	if (g_ei_provider != NULL) return ei_provider_call(act);
++
+ #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+ 	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
+ 
+@@ -423,6 +642,31 @@ const char* avm2_ei_dispatch(const char* name, const char* arg, int has_arg)
+ }
+ #endif
+ 
++// Host → AS3, structured (Ruffle Player::call_internal_interface +
++// Callback::call): unknown name → Null; the callback runs with a null
++// receiver; a throw is reported as uncaught and yields Null.
++Avm2EiValue avm2_ei_call_internal(const char* name, const Avm2EiValue* args,
++                                  uint32_t argc)
++{
++	Avm2Context* ctx = g_ei_ctx;
++	Avm2EiCallback* cb = (ctx != NULL && name != NULL) ? ei_find_callback(name) : NULL;
++	if (cb == NULL) return avm2_ei_null();
++
++	Avm2EiValue out = avm2_ei_null();
++	Avm2Value* vals = argc ? calloc(argc, sizeof(Avm2Value)) : NULL;
++	Avm2TryFrame top;
++	avm2_try_push_catch_all(ctx, &top);
++	if (setjmp(top.jb) == 0)
++	{
++		for (uint32_t i = 0; i < argc; i++) vals[i] = ei_into_avm2(ctx, &args[i]);
++		Avm2Value r = avm2_call_value(ctx, cb->fn, avm2_null(), vals, argc);
++		out = ei_from_avm2(ctx, r, 0);
++	}
++	avm2_try_pop_frame(&top);
++	free(vals);
++	return out;
++}
++
+ // ---------------------------------------------------------------------------
+ // GC + registration
+ // ---------------------------------------------------------------------------
+diff --git a/SWFModernRuntime/src/avm2/avm2_main.c b/SWFModernRuntime/src/avm2/avm2_main.c
+index a875b63c3..6829b1b3c 100644
+--- a/SWFModernRuntime/src/avm2/avm2_main.c
++++ b/SWFModernRuntime/src/avm2/avm2_main.c
+@@ -895,6 +895,15 @@ void runSWF_avm2(SWFAppContext* app_context)
+ 		}
+ 		avm2_try_pop_frame(&top);
+ 
++		// After-tick hook (per-test test_harness.c, e.g. the ExternalInterface
++		// provider's host calls) — the AVM1 loops' hook, 1-based tick count.
++		{
++			typedef void (*AfterTickHandler)(SWFAppContext*, int);
++			extern AfterTickHandler g_after_tick_handler;
++			if (g_after_tick_handler)
++				g_after_tick_handler(ctx->app, (int) tick + 1);
++		}
++
+ 		size_t tick_peak = heap_peak_since_mark_bytes(ctx->app);
+ 		size_t gross = (tick_peak > tick_base) ? (tick_peak - tick_base) : 0;
+ 		if (tick == 0)
+diff --git a/ruffle-tests/tests/swfs/avm2/external_interface/test_harness.c b/ruffle-tests/tests/swfs/avm2/external_interface/test_harness.c
+new file mode 100644
+index 000000000..347b2cbda
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/avm2/external_interface/test_harness.c
+@@ -0,0 +1,303 @@
++/*
++ * Test harness for avm2/external_interface.
++ *
++ * Ruffle runs this SWF from tests/tests/external_interface/tests.rs
++ * (external_interface_avm2) with ExternalInterfaceTestProvider (mod.rs):
++ *
++ *   "ping"    -> traces "[ExternalInterface] ping", returns "Pong!"
++ *   "trace"   -> traces "[ExternalInterface] trace: <args Debug>", returns "Traced!"
++ *   "reentry" -> traces "[ExternalInterface] starting reentry", then calls the
++ *                registered "callWith" callback with ("trace", "successful reentry!")
++ *                and returns its result
++ *   anything else -> Null
++ *
++ * After the first tick the harness makes five host calls (parrot x2,
++ * freestanding, removeMe, callWith) and traces each result's Rust Debug form.
++ * The AVM1 twin is avm1/external_interface/test_harness.c.
++ */
++
++#include <math.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include <swf.h>
++#include <avm2/avm2_external.h>
++
++/* ------------------------------------------------------------------ */
++/* Rust #[derive(Debug)] formatting of ruffle_core::external::Value    */
++/* ------------------------------------------------------------------ */
++
++typedef struct DbgBuf
++{
++	char* buf;
++	size_t len;
++	size_t cap;
++} DbgBuf;
++
++static void db_put(DbgBuf* b, const char* s, size_t n)
++{
++	if (b->len + n + 1 > b->cap)
++	{
++		size_t cap = b->cap ? b->cap : 256;
++		while (cap < b->len + n + 1) cap *= 2;
++		b->buf = realloc(b->buf, cap);
++		b->cap = cap;
++	}
++	memcpy(b->buf + b->len, s, n);
++	b->len += n;
++	b->buf[b->len] = '\0';
++}
++
++static void db_puts(DbgBuf* b, const char* s) { db_put(b, s, strlen(s)); }
++
++/* f64 Debug (core::fmt::float, float_to_general_debug): shortest round-trip
++ * digits; decimal with at least one fractional digit when
++ * 1e-4 <= |d| < 1e16 (or d == 0), otherwise exponential ("1e16", "1.5e-5"). */
++static void db_f64(DbgBuf* b, double d)
++{
++	char out[64];
++	if (isnan(d)) { db_puts(b, "NaN"); return; }
++	if (isinf(d)) { db_puts(b, d < 0 ? "-inf" : "inf"); return; }
++	if (d == 0.0) { db_puts(b, signbit(d) ? "-0.0" : "0.0"); return; }
++
++	char e[40];
++	for (int p = 0; p < 17; p++)
++	{
++		snprintf(e, sizeof(e), "%.*e", p, d);
++		if (strtod(e, NULL) == d) break;
++	}
++	/* e = [-]D[.DDD]e[+-]XX */
++	const char* s = e;
++	int neg = 0;
++	if (*s == '-') { neg = 1; s++; }
++	char digits[32];
++	int nd = 0;
++	for (; *s && *s != 'e'; s++)
++	{
++		if (*s != '.') digits[nd++] = *s;
++	}
++	digits[nd] = '\0';
++	int exp = atoi(s + 1);
++
++	int pos = 0;
++	if (neg) out[pos++] = '-';
++	double a = fabs(d);
++	if (a < 1e-4 || a >= 1e16)
++	{
++		out[pos++] = digits[0];
++		if (nd > 1)
++		{
++			out[pos++] = '.';
++			memcpy(out + pos, digits + 1, (size_t) nd - 1);
++			pos += nd - 1;
++		}
++		pos += snprintf(out + pos, sizeof(out) - (size_t) pos, "e%d", exp);
++	}
++	else if (exp < 0)
++	{
++		out[pos++] = '0';
++		out[pos++] = '.';
++		for (int i = 0; i < -exp - 1; i++) out[pos++] = '0';
++		memcpy(out + pos, digits, (size_t) nd);
++		pos += nd;
++	}
++	else
++	{
++		int int_digits = exp + 1;
++		for (int i = 0; i < int_digits; i++) out[pos++] = i < nd ? digits[i] : '0';
++		out[pos++] = '.';
++		if (nd > int_digits)
++		{
++			memcpy(out + pos, digits + int_digits, (size_t) (nd - int_digits));
++			pos += nd - int_digits;
++		}
++		else
++		{
++			out[pos++] = '0';
++		}
++	}
++	out[pos] = '\0';
++	db_puts(b, out);
++}
++
++/* str Debug: quotes, with \" \\ \n \r \t \0 and \u{..} for other controls. */
++static void db_str(DbgBuf* b, const char* s)
++{
++	db_put(b, "\"", 1);
++	for (; *s; s++)
++	{
++		unsigned char c = (unsigned char) *s;
++		char esc[16];
++		switch (c)
++		{
++			case '"':  db_puts(b, "\\\""); break;
++			case '\\': db_puts(b, "\\\\"); break;
++			case '\n': db_puts(b, "\\n"); break;
++			case '\r': db_puts(b, "\\r"); break;
++			case '\t': db_puts(b, "\\t"); break;
++			case '\0': db_puts(b, "\\0"); break;
++			default:
++				if (c < 0x20 || c == 0x7f)
++				{
++					snprintf(esc, sizeof(esc), "\\u{%x}", c);
++					db_puts(b, esc);
++				}
++				else
++				{
++					db_put(b, (const char*) &c, 1);
++				}
++		}
++	}
++	db_put(b, "\"", 1);
++}
++
++static void db_value(DbgBuf* b, const Avm2EiValue* v)
++{
++	switch (v->kind)
++	{
++		case AVM2_EI_UNDEFINED: db_puts(b, "Undefined"); break;
++		case AVM2_EI_NULL:      db_puts(b, "Null"); break;
++		case AVM2_EI_BOOL:      db_puts(b, v->b ? "Bool(true)" : "Bool(false)"); break;
++		case AVM2_EI_NUMBER:
++			db_puts(b, "Number(");
++			db_f64(b, v->d);
++			db_puts(b, ")");
++			break;
++		case AVM2_EI_STRING:
++			db_puts(b, "String(");
++			db_str(b, v->str);
++			db_puts(b, ")");
++			break;
++		case AVM2_EI_LIST:
++			db_puts(b, "List([");
++			for (uint32_t i = 0; i < v->count; i++)
++			{
++				if (i > 0) db_puts(b, ", ");
++				db_value(b, &v->items[i]);
++			}
++			db_puts(b, "])");
++			break;
++		case AVM2_EI_OBJECT:
++			db_puts(b, "Object({");
++			for (uint32_t i = 0; i < v->count; i++)
++			{
++				if (i > 0) db_puts(b, ", ");
++				db_str(b, v->keys[i]);
++				db_puts(b, ": ");
++				db_value(b, &v->items[i]);
++			}
++			db_puts(b, "})");
++			break;
++	}
++}
++
++/* Debug of a value, or of an args slice ("[a, b]") when `slice` is set. */
++static void trace_debug(const char* prefix, const Avm2EiValue* vals, uint32_t n, int slice)
++{
++	DbgBuf b = {0};
++	db_puts(&b, prefix);
++	if (slice) db_puts(&b, "[");
++	for (uint32_t i = 0; i < n; i++)
++	{
++		if (i > 0) db_puts(&b, ", ");
++		db_value(&b, &vals[i]);
++	}
++	if (slice) db_puts(&b, "]");
++	printf("%s\n", b.buf);
++	free(b.buf);
++}
++
++/* ------------------------------------------------------------------ */
++/* ExternalInterfaceTestProvider                                       */
++/* ------------------------------------------------------------------ */
++
++static Avm2EiValue provider_call(const char* name, const Avm2EiValue* args, uint32_t argc)
++{
++	if (strcmp(name, "trace") == 0)
++	{
++		trace_debug("[ExternalInterface] trace: ", args, argc, 1);
++		return avm2_ei_string("Traced!");
++	}
++	if (strcmp(name, "ping") == 0)
++	{
++		printf("[ExternalInterface] ping\n");
++		return avm2_ei_string("Pong!");
++	}
++	if (strcmp(name, "reentry") == 0)
++	{
++		printf("[ExternalInterface] starting reentry\n");
++		Avm2EiValue cb_args[2] = {
++			avm2_ei_string("trace"),
++			avm2_ei_string("successful reentry!"),
++		};
++		Avm2EiValue r = avm2_ei_call_internal("callWith", cb_args, 2);
++		avm2_ei_value_free(&cb_args[0]);
++		avm2_ei_value_free(&cb_args[1]);
++		return r;
++	}
++	return avm2_ei_null();
++}
++
++/* ------------------------------------------------------------------ */
++/* Host calls after the first tick (tests.rs external_interface_avm2)  */
++/* ------------------------------------------------------------------ */
++
++static void host_call(const char* name, Avm2EiValue* args, uint32_t argc, const char* label)
++{
++	Avm2EiValue r = avm2_ei_call_internal(name, args, argc);
++	for (uint32_t i = 0; i < argc; i++) avm2_ei_value_free(&args[i]);
++	if (label != NULL) trace_debug(label, &r, 1, 0);
++	avm2_ei_value_free(&r);
++}
++
++static void after_tick(SWFAppContext* ctx, int tick)
++{
++	(void) ctx;
++	if (tick != 1) return;
++
++	{
++		Avm2EiValue args[1] = { avm2_ei_string("Hello World!") };
++		host_call("parrot", args, 1, "After calling `parrot` with a string: ");
++	}
++	{
++		char** keys = malloc(2 * sizeof(char*));
++		Avm2EiValue* vals = malloc(2 * sizeof(Avm2EiValue));
++		keys[0] = strdup("a");
++		vals[0] = avm2_ei_number(100.0);
++		keys[1] = strdup("b");
++		vals[1] = avm2_ei_string("string");
++		Avm2EiValue args[1] = { avm2_ei_object(keys, vals, 2) };
++		host_call("parrot", args, 1, "After calling `parrot` with an object: ");
++	}
++	{
++		Avm2EiValue args[1] = { avm2_ei_string("Hello World!") };
++		host_call("freestanding", args, 1, NULL);
++	}
++	printf("Before calling `removeMe`\n");
++	host_call("removeMe", NULL, 0, "After calling `removeMe`: ");
++	{
++		Avm2EiValue items[4] = {
++			avm2_ei_string("string"),
++			avm2_ei_number(100.0),
++			avm2_ei_null(),
++			avm2_ei_bool(false),
++		};
++		Avm2EiValue args[2] = { avm2_ei_string("trace"), avm2_ei_list(items, 4) };
++		host_call("callWith", args, 2, "After calling `callWith` with a complex payload: ");
++	}
++	fflush(stdout);
++}
++
++/* ------------------------------------------------------------------ */
++/* Initialization                                                      */
++/* ------------------------------------------------------------------ */
++
++void test_harness_init(SWFAppContext* ctx)
++{
++	typedef void (*AfterTickHandler)(SWFAppContext*, int);
++	extern AfterTickHandler g_after_tick_handler;
++	(void) ctx;
++	avm2_ei_set_provider(provider_call);
++	g_after_tick_handler = after_tick;
++}

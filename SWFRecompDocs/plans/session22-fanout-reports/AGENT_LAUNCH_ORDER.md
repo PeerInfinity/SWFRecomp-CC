@@ -42,9 +42,10 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-geom-port | w1-drift-avm1 S3 | point, rectangle, matrix, Rectangle-v8, Matrix-v6..v8 | session_019oWz76tcX3D7afubJF3Wbg |
 | w2-avm2-stage-view | w1-pixel-catastrophic | pixelbender_effect_glassDisplace, displayobject_z | session_01Sv4zxmSzXYtd4doWuLve4R |
 | w2-font-registry | w1-trace-tail D | fonts/embed_name_lookup | session_01SKhEcTjpjxygKijBE1r4Dz |
-| w2-ei-provider | w1-trace-tail C | avm2/external_interface | session_0171KTbmxMRKzLEq2FKryiT6 |
+| w2-ei-provider | w1-trace-tail C | avm2/external_interface | session_0171KTbmxMRKzLEq2FKryiT6 — LANDED |
+| w2-atf-dxt5 | w1-pixel-catastrophic | stage3d_texture_bytearray_compressed_raw_alpha | session_01BCEB1oUi9rtAyWJhxtUX72 |
 
-**Queue (launch order when a slot frees):** w2-atf-dxt5, w2-avm2-video-stamp, w2-draw-bigcap-aa, w2-hairline-device-width.
+**Queue (launch order when a slot frees):** w2-avm2-video-stamp, w2-draw-bigcap-aa, w2-hairline-device-width.
 | w2-jpegxr | user-approved dep | loader_jpegxr, loader_jpegxr_alpha, stage3d_texture_bytearray, _compressed_alpha | session_017A1bzC1vtg96PMxQT8BxpM — LANDED 5dee7a4b4 |
 
 **Merge obligations (DISCHARGED: as-core builds `_listeners` as a literal):** at w2-as-core merge, `installAsBroadcaster`'s `_listeners` must go through `arrayResolveGlobalCtor()` (w2-array-global report §4; flips the as_broadcaster "with Array replaced" line) unless as-core creates it as a literal. Follow-up for after as-core: `actionCallMethod` object-method arm alias dispatch for `Array` (`pushArrayCalledAsFunction`).
