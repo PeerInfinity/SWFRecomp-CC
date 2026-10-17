@@ -50,3 +50,8 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-jpegxr | user-approved dep | loader_jpegxr, loader_jpegxr_alpha, stage3d_texture_bytearray, _compressed_alpha | session_017A1bzC1vtg96PMxQT8BxpM — LANDED 5dee7a4b4 |
 
 **Merge obligations (DISCHARGED: as-core builds `_listeners` as a literal):** at w2-as-core merge, `installAsBroadcaster`'s `_listeners` must go through `arrayResolveGlobalCtor()` (w2-array-global report §4; flips the as_broadcaster "with Array replaced" line) unless as-core creates it as a literal. Follow-up for after as-core: `actionCallMethod` object-method arm alias dispatch for `Array` (`pushArrayCalledAsFunction`).
+
+**Local oracle requests (batch into ONE exporter rebuild near closeout):**
+- w2-strbuf: Ruffle exporter run of `regression/avm2_strbuf_stale_prefix/test.swf` to confirm its ECMA-derived `output.txt` (report §LOCAL ORACLE REQUESTS).
+- w2-as-core / w1-drift-avm1: closure-as-method fixture oracle (optional).
+- w1-pixel-catastrophic: `font_lookup_as3` golden provenance; `stage3d_bitmap` RNG/timer trace; `bitmapdata_draw` line metrics; `displayobject_z` render (all optional).
