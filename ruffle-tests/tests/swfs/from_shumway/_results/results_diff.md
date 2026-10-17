@@ -1,8 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `8b69f982f7ab` (2026-10-04T10:43:57.982074+00:00)
-**Current:** `8b69f982f7ab` (2026-10-11T08:51:58.566477+00:00)
-*Re-run on same commit — no comparison available.*
+**Previous:** `8b69f982f7ab` (2026-10-11T08:51:58.566477+00:00)
+**Current:** `9396522982a2` (2026-10-17T02:06:22.863323+00:00)
 
 ## Summary
 
@@ -12,3 +11,9 @@
 | Total | 229 | 229 | 0 |
 | Pass rate | 93.4% | 93.4% | 0% |
 | Mismatched lines | 88 | 88 | 0 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `avm1movie` | ruffle_matched | 1/13 | 1/13 | 0 |

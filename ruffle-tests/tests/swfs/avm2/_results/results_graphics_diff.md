@@ -1,42 +1,42 @@
 # Ruffle Test Results Diff
 
-**Previous:** `4c450f076e82` (2026-10-03T20:48:40.536165+00:00)
-**Current:** `bdf127c35cca` (2026-10-17T00:59:01.879549+00:00)
+**Previous:** `bdf127c35cca` (2026-10-17T00:59:01.879549+00:00)
+**Current:** `9396522982a2` (2026-10-17T01:43:11.346667+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1222 | 1228 | +6 |
-| Total | 1284 | 1291 | +7 |
-| Pass rate | 95.2% | 95.1% | -0.1% |
-| Mismatched lines | 2701 | 2851 | +150 |
-|   Decreased | | | -105 |
-|   Increased | | | +205 |
+| Passing | 1228 | 1233 | +5 |
+| Total | 1291 | 1292 | +1 |
+| Pass rate | 95.1% | 95.4% | +0.3% |
+| Mismatched lines | 2851 | 2530 | -321 |
+|   Decreased | | | -337 |
 
-## Newly Passing (3)
+## Newly Passing (5)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `goto_queued_invalid/swf10` | output_mismatch | 2/34 | 34/34 |
-| `goto_queued_invalid/swf11` | output_mismatch | 2/43 | 43/43 |
-| `goto_queued_invalid/swf9` | output_mismatch | 2/32 | 32/32 |
+| `external_interface` | output_mismatch | 3/105 | 105/105 |
+| `mouse_pick_loader_avm1` | output_mismatch | 16/42 | 42/42 |
+| `mouse_pick_scroll_rect` | output_mismatch | 3/27 | 27/27 |
+| `mouse_pick_scroll_rect_button` | output_mismatch | 3/5 | 5/5 |
+| `mouse_pick_scroll_rect_loader` | output_mismatch | 1/5 | 5/5 |
 
-## Added Tests (7)
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `html_text_img_parsing` | output_mismatch | ruffle_matched | 338/600 | 505/600 |
+
+## Added Tests (1)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `collator_compare_basic` | pass | 93/93 |
-| `collator_flags` | pass | 111/111 |
-| `collator_locale_ids_windows` | pass | 120/120 |
-| `mouse_pick_scroll_rect` | output_mismatch | 3/27 |
-| `mouse_pick_scroll_rect_button` | output_mismatch | 3/5 |
-| `mouse_pick_scroll_rect_loader` | output_mismatch | 1/5 |
-| `textline_metrics` | output_mismatch | 0/20 |
+| `dictionary_qname_keys` | output_mismatch | 29/45 |
 
-## Line Count Changed (2)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `textblock_recreateline` | ruffle_matched | 42/180 | 42/178 | -2 |
-| `html_text_img_parsing` | output_mismatch | 118/175 | 338/600 | +205 |
+| `focus_events_mixed_avm_edittext` | output_mismatch | 0/49 | 12/49 | -12 |

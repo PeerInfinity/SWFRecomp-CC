@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `4c450f076e82` (2026-10-03T20:48:40.622151+00:00)
-**Current:** `bdf127c35cca` (2026-10-17T00:59:01.963557+00:00)
+**Previous:** `bdf127c35cca` (2026-10-17T00:59:01.963557+00:00)
+**Current:** `9396522982a2` (2026-10-17T01:43:11.401534+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 6 | 6 | 0 |
-| Total | 8 | 9 | +1 |
-| Pass rate | 75.0% | 66.7% | -8.3% |
-| Mismatched lines | 170 | 182 | +12 |
+| Total | 9 | 9 | 0 |
+| Pass rate | 66.7% | 66.7% | 0% |
+| Mismatched lines | 182 | 182 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `device_font_name_case` | output_mismatch | 1/13 |
+No changes detected.

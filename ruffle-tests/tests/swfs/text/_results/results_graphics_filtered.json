@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-10-17T00:59:01.945492+00:00",
-    "git_sha": "bdf127c35ccad332c171fb3681d4c08d0f0d4ccb",
-    "duration_seconds": 233.71,
+    "timestamp": "2026-10-17T01:43:11.389282+00:00",
+    "git_sha": "9396522982a2e510ab9ee4117eec7510ee9ff163",
+    "duration_seconds": 223.54,
     "total_available": 11,
     "shards": 30,
     "expected_shards": 30,
@@ -21,9 +21,9 @@
     {
       "test": "auto_size/height",
       "phases": {
-        "recomp": 0.062,
-        "compile": 32.897,
-        "run": 1.017
+        "recomp": 0.037,
+        "compile": 19.602,
+        "run": 0.465
       },
       "num_frames": 1,
       "lines": {
@@ -31,16 +31,39 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 34.08,
+      "duration": 20.14,
       "image_comparisons": {
         "output": {
           "status": "pass",
-          "message": "Image check passed: 3 outliers (limit 3), max difference 255",
-          "max_diff": 255,
+          "message": "Image check passed: 0 outliers (limit 3), max difference 0",
+          "max_diff": 0,
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 300,
+            "height": 250,
+            "total_channels": 300000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 3,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 3,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -48,9 +71,9 @@
     {
       "test": "auto_size/return",
       "phases": {
-        "recomp": 0.067,
-        "compile": 31.243,
-        "run": 0.866
+        "recomp": 0.074,
+        "compile": 33.443,
+        "run": 0.917
       },
       "num_frames": 1,
       "lines": {
@@ -58,34 +81,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 32.38,
-      "image_comparisons": {
-        "output": {
-          "status": "pass",
-          "message": "Image check passed: 6 outliers (limit 18), max difference 255",
-          "max_diff": 255,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
-      "status": "pass"
-    },
-    {
-      "test": "auto_size/width",
-      "phases": {
-        "recomp": 0.065,
-        "compile": 28.575,
-        "run": 0.315
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 29.08,
+      "duration": 34.58,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -94,7 +90,80 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 375,
+            "total_channels": 825000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 18,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 18,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "auto_size/width",
+      "phases": {
+        "recomp": 0.071,
+        "compile": 29.891,
+        "run": 0.315
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 30.43,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 18), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "stats": {
+            "width": 500,
+            "height": 350,
+            "total_channels": 700000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 18,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 18,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -102,8 +171,8 @@
     {
       "test": "br_at_start",
       "phases": {
-        "recomp": 0.025,
-        "compile": 1.863,
+        "recomp": 0.03,
+        "compile": 2.066,
         "run": 0.315
       },
       "num_frames": 1,
@@ -112,16 +181,40 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 2.39,
+      "duration": 2.61,
       "image_comparisons": {
         "output": {
           "status": "fail",
-          "message": "Image comparison failed: 3683 outliers exceed limit of 8, max difference 255",
+          "message": "Image comparison failed: 3681 outliers exceed limit of 8, max difference 255",
           "max_diff": 255,
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 255,
+            "diff_channels": 6435,
+            "mean_diff": 1.2312,
+            "checks": [
+              {
+                "tolerance": 128,
+                "max_outliers": 8,
+                "outliers": 3681,
+                "passed": false
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 1,
+            "outliers": 3681,
+            "max_outliers": 8,
+            "tolerance": 128,
+            "excess_outliers": 3673
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -130,7 +223,7 @@
       "test": "html_entity_parsing",
       "phases": {
         "recomp": 0.007,
-        "compile": 8.611,
+        "compile": 8.771,
         "run": 0.265
       },
       "num_frames": 1,
@@ -139,14 +232,14 @@
         "expected_lines": 213,
         "matching_lines": 213
       },
-      "duration": 8.89,
+      "duration": 9.06,
       "status": "pass"
     },
     {
       "test": "links_in_scrolled_text",
       "phases": {
-        "recomp": 0.051,
-        "compile": 2.027,
+        "recomp": 0.048,
+        "compile": 1.821,
         "run": 0.315
       },
       "num_frames": 2,
@@ -155,15 +248,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 2.4,
+      "duration": 2.19,
       "status": "pass"
     },
     {
       "test": "style_changes_in_html",
       "phases": {
-        "recomp": 0.017,
-        "compile": 18.585,
-        "run": 0.215
+        "recomp": 0.021,
+        "compile": 22.254,
+        "run": 0.265
       },
       "num_frames": 1,
       "lines": {
@@ -171,7 +264,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 18.91,
+      "duration": 22.65,
       "image_comparisons": {
         "output": {
           "status": "fail",
@@ -180,7 +273,31 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 175,
+            "total_channels": 385000,
+            "max_diff": 103,
+            "diff_channels": 25024,
+            "mean_diff": 3.7168,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 0,
+                "outliers": 25024,
+                "passed": false
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 1,
+            "outliers": 25024,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 25024
+          },
+          "expected_source": "repo",
+          "reason": "pixel_mismatch"
         }
       },
       "status": "pass"
@@ -188,9 +305,9 @@
     {
       "test": "text_caret_placement_align",
       "phases": {
-        "recomp": 0.059,
-        "compile": 31.512,
-        "run": 0.365
+        "recomp": 0.063,
+        "compile": 29.592,
+        "run": 0.316
       },
       "num_frames": 2,
       "lines": {
@@ -198,14 +315,14 @@
         "expected_lines": 248,
         "matching_lines": 248
       },
-      "duration": 31.95,
+      "duration": 29.98,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
         "recomp": 0.034,
-        "compile": 20.568,
+        "compile": 17.823,
         "run": 0.215
       },
       "num_frames": 2,
@@ -214,15 +331,15 @@
         "expected_lines": 244,
         "matching_lines": 244
       },
-      "duration": 20.83,
+      "duration": 18.08,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
-        "recomp": 0.058,
-        "compile": 28.831,
-        "run": 0.316
+        "recomp": 0.062,
+        "compile": 29.822,
+        "run": 0.315
       },
       "num_frames": 2,
       "lines": {
@@ -230,14 +347,14 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 29.22,
+      "duration": 30.21,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
         "recomp": 0.051,
-        "compile": 22.62,
+        "compile": 22.664,
         "run": 0.265
       },
       "num_frames": 2,
@@ -246,7 +363,7 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 22.95,
+      "duration": 22.99,
       "status": "pass"
     }
   ]
