@@ -53,10 +53,13 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 
 **Merge obligations (DISCHARGED: as-core builds `_listeners` as a literal):** at w2-as-core merge, `installAsBroadcaster`'s `_listeners` must go through `arrayResolveGlobalCtor()` (w2-array-global report §4; flips the as_broadcaster "with Array replaced" line) unless as-core creates it as a literal. Follow-up for after as-core: `actionCallMethod` object-method arm alias dispatch for `Array` (`pushArrayCalledAsFunction`).
 
-**Local oracle requests (batch into ONE exporter rebuild near closeout):**
-- w2-strbuf: Ruffle exporter run of `regression/avm2_strbuf_stale_prefix/test.swf` to confirm its ECMA-derived `output.txt` (report §LOCAL ORACLE REQUESTS).
-- w2-as-core / w1-drift-avm1: closure-as-method fixture oracle (optional).
-- w1-pixel-catastrophic: `font_lookup_as3` golden provenance; `stage3d_bitmap` RNG/timer trace; `bitmapdata_draw` line metrics; `displayobject_z` render (all optional).
+**Local oracle requests — RESOLVED 2026-10-17** (exporter rebuilt at `45366370e`, 5m20s, local edits compiled unchanged):
+- w2-strbuf `regression/avm2_strbuf_stale_prefix`: Ruffle exporter trace == the ECMA-derived `output.txt`, byte for byte. Confirmed.
+- closure-as-method fixture (w1-drift-avm1 / w2-as-core): new `regression/avm1_closure_method_scope` (MTASC SWF7, output from the exporter); fails on `0cea97b3e~1`, passes on master in both modes.
+- `font_lookup_as3` golden provenance: re-rendered wholesale by Ruffle renderer commits `0f6dae56b` (2023-11, 18 PNGs) and `4965d7ff7` (2024-10, 22 PNGs) — a RUFFLE render, not a Flash capture (its test.toml: "shouldn't depend on the default font"). Our "unmatched embedded field draws nothing" rule (`avm2_text.c`) stays.
+- `bitmapdata_draw` line metrics: moot — w2-default-fonts-draw showed the golden is a Flash capture and Ruffle's model puts the baseline where we do.
+- `displayobject_z` render: moot — w2-avm2-stage-view landed and the row passes on CI.
+- NOT DONE: `stage3d_bitmap` Math.random/getTimer trace — the exporter is not Ruffle's deterministic test harness, so its values are not the graded ones; needs an injected AS3 probe + Ruffle's test runner (cargo test of the tests crate). s23 board, optional.
 
 ## Grading runs
 

@@ -1,0 +1,7 @@
+method A
+valueOf A
+true
+own push arr 5
+string proto S
+ctor K
+done
