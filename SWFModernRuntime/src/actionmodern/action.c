@@ -30804,7 +30804,7 @@ static u32 drawing_arc_segments(float radius_tw, float sweep_abs)
 // half-width, used to size the stroke vertex buffer.
 static u32 drawing_stroke_extra_verts(float half_w, u8 joints, u8 caps)
 {
-	u32 n = 6;                                       // miter = 2 triangles
+	u32 n = 9;                                       // MiterClip = 3 triangles
 	if (joints == 0)
 	{
 		u32 j = 3u * drawing_arc_segments(half_w, (float) DRAWING_STROKE_PI);
@@ -30952,19 +30952,40 @@ static u32 drawing_emit_stroke_join(float* out,
 	}
 	float mx = o0x + o1x, my = o0y + o1y;
 	float mlen = sqrtf(mx*mx + my*my);
-	// Miter ratio = 1/cos_half (miter length over stroke half-width); past the
-	// limit the spike is clipped to a bevel. A miter limit below lyon's
-	// MINIMUM_MITER_LIMIT (1.0) is a plain bevel in Ruffle's tessellator.
+	// Miter ratio |m| = 1/cos_half (miter length over stroke half-width). Ruffle
+	// tessellates a miter joint as lyon LineJoin::MiterClip, so the semantics
+	// are lyon's: the full miter survives while |m| <= 2*limit
+	// (stroke.rs miter_limit_is_exceeded: |m|^2 > 4*limit^2); past that the
+	// tip is CLIPPED by a line perpendicular to the bisector at distance
+	// limit*0.5*half_w from the joint (stroke.rs get_clip_intersections), not
+	// beveled. A miter limit below lyon's MINIMUM_MITER_LIMIT (1.0) is a plain
+	// bevel in Ruffle's tessellator.
 	if (joints == 1 && mlen > 1e-4f && miter_limit >= 1.0f) {
 		float mhx = mx/mlen, mhy = my/mlen;
 		float cos_half = mhx*o0x + mhy*o0y;      // cos(half the corner angle)
-		if (cos_half * miter_limit > 1.0f) {
+		if (cos_half > 1e-6f && 1.0f <= 4.0f * miter_limit * miter_limit * cos_half * cos_half) {
 			float miter_len = half_w / cos_half;
 			float Mx = vx + mhx*miter_len;
 			float My = vy + mhy*miter_len;
 			out[0]=vx;  out[1]=vy;   out[2]=p0x; out[3]=p0y;  out[4]=Mx;  out[5]=My;
 			out[6]=vx;  out[7]=vy;   out[8]=Mx;  out[9]=My;   out[10]=p1x; out[11]=p1y;
 			return 6;
+		} else {
+			// MiterClip: slide each offset corner p0/p1 along its edge
+			// direction (t0/t1) until it reaches the clip line; the clipped
+			// tip is the fan vx, p0, c0, c1, p1 (3 triangles).
+			float dclip = miter_limit * 0.5f * half_w, base = half_w * cos_half;
+			float t0x = -o0y, t0y = o0x, t1x = -o1y, t1y = o1x;
+			float k0 = t0x*mhx + t0y*mhy, k1 = t1x*mhx + t1y*mhy;
+			if (fabsf(k0) > 1e-6f && fabsf(k1) > 1e-6f) {
+				float s0 = (dclip - base) / k0, s1 = (dclip - base) / k1;
+				float c0x = p0x + t0x*s0, c0y = p0y + t0y*s0;
+				float c1x = p1x + t1x*s1, c1y = p1y + t1y*s1;
+				out[0]=vx;  out[1]=vy;   out[2]=p0x; out[3]=p0y;  out[4]=c0x; out[5]=c0y;
+				out[6]=vx;  out[7]=vy;   out[8]=c0x; out[9]=c0y;  out[10]=c1x; out[11]=c1y;
+				out[12]=vx; out[13]=vy;  out[14]=c1x; out[15]=c1y; out[16]=p1x; out[17]=p1y;
+				return 9;
+			}
 		}
 	}
 	// Bevel fallback (sharp angle or near-degenerate bisector).

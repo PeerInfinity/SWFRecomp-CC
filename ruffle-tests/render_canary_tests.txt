@@ -440,3 +440,14 @@ visual/filters/glow                         # 1-px curved strokes, quality=low  
 avm2/mouse_pick_dobj_mask                   # AVM2 mouse_pick walk + mask     1 cmp
 avm1/focusrect_mouse_swf8                   # AVM1 click focus + focusrect    8 cmps
 avm2/loader_events                          # AVM2 Loader drain / init order  1 cmp
+
+# SESSION 22 ADDITION (s22 cloud `w2-drawing-api-lyon`). Runtime drawing-API
+# geometry ported from lyon: MiterClip joins (|m| > 2*limit, AVM1
+# action.c drawing_emit_stroke_join; fills_and_lines passes at max diff 2 =
+# tolerance 2, zero headroom) and the shared cubic flattener gfx_add_cubic
+# (drawPath CUBIC_CURVE_TO / cubicCurveTo). The standing set above did not
+# see either class. Tier 2 when added: both CI-failing until a graded run
+# confirms (locally both pass after the change).
+# tier=2  (CI-failing / skipped; A/B signal only)
+visual/drawing_api/fills_and_lines          # AVM1 lineStyle miter/MiterClip   1 cmp
+avm2/graphics_draw_path                     # drawPath cubic (lyon flatten)    1 cmp
