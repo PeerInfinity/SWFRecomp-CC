@@ -22,6 +22,57 @@
 
 #include <avm2/avm2_jpegxr.h>
 
+// One BC3 (DXT5) block -> 4x4 RGBA8, Mesa's util_format s3tc decode
+// (texcompress_s3tc_tmp.h): 565 endpoints bit-replicated to 8 bits, colour
+// thirds and alpha sevenths/fifths by truncating integer division. BC3 colour
+// is always the four-colour mode. Outside SWF_HAVE_LIBJXR: ATF format 5
+// (raw DXT5, avm2_stage3d.c) needs no JPEG-XR.
+void avm2_bc3_decode_block(const uint8_t* b, uint8_t* dst, uint32_t dst_stride)
+{
+	uint8_t a[8];
+	a[0] = b[0];
+	a[1] = b[1];
+	for (int c = 2; c < 8; c++)
+	{
+		if (a[0] > a[1])
+			a[c] = (uint8_t) ((a[0] * (8 - c) + a[1] * (c - 1)) / 7);
+		else if (c < 6)
+			a[c] = (uint8_t) ((a[0] * (6 - c) + a[1] * (c - 1)) / 5);
+		else
+			a[c] = (c == 6) ? 0 : 255;
+	}
+	uint64_t abits = 0;
+	for (int i = 0; i < 6; i++) abits |= (uint64_t) b[2 + i] << (8 * i);
+
+	uint32_t c0 = b[8] | (b[9] << 8);
+	uint32_t c1 = b[10] | (b[11] << 8);
+	uint8_t col[4][3];
+	col[0][0] = (uint8_t) (((c0 >> 8) & 0xF8) | ((c0 >> 13) & 0x7));
+	col[0][1] = (uint8_t) (((c0 >> 3) & 0xFC) | ((c0 >> 9) & 0x3));
+	col[0][2] = (uint8_t) (((c0 << 3) & 0xF8) | ((c0 >> 2) & 0x7));
+	col[1][0] = (uint8_t) (((c1 >> 8) & 0xF8) | ((c1 >> 13) & 0x7));
+	col[1][1] = (uint8_t) (((c1 >> 3) & 0xFC) | ((c1 >> 9) & 0x3));
+	col[1][2] = (uint8_t) (((c1 << 3) & 0xF8) | ((c1 >> 2) & 0x7));
+	for (int k = 0; k < 3; k++)
+	{
+		col[2][k] = (uint8_t) ((col[0][k] * 2 + col[1][k]) / 3);
+		col[3][k] = (uint8_t) ((col[0][k] + col[1][k] * 2) / 3);
+	}
+	uint32_t cbits = b[12] | (b[13] << 8) | (b[14] << 16) | ((uint32_t) b[15] << 24);
+
+	for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++)
+		{
+			int p = j * 4 + i;
+			uint8_t* o = dst + (size_t) j * dst_stride + (size_t) i * 4;
+			int cc = (cbits >> (2 * p)) & 3;
+			o[0] = col[cc][0];
+			o[1] = col[cc][1];
+			o[2] = col[cc][2];
+			o[3] = a[(abits >> (3 * p)) & 7];
+		}
+}
+
 #ifdef SWF_HAVE_LIBJXR
 
 #include <lzma.h>
@@ -268,56 +319,6 @@ static uint8_t* atf_lzma(const uint8_t* d, size_t n, size_t want)
 	return out;
 }
 
-// One BC3 (DXT5) block -> 4x4 RGBA8, Mesa's util_format s3tc decode
-// (texcompress_s3tc_tmp.h): 565 endpoints bit-replicated to 8 bits, colour
-// thirds and alpha sevenths/fifths by truncating integer division. BC3 colour
-// is always the four-colour mode.
-static void bc3_decode_block(const uint8_t* b, uint8_t* dst, uint32_t dst_stride)
-{
-	uint8_t a[8];
-	a[0] = b[0];
-	a[1] = b[1];
-	for (int c = 2; c < 8; c++)
-	{
-		if (a[0] > a[1])
-			a[c] = (uint8_t) ((a[0] * (8 - c) + a[1] * (c - 1)) / 7);
-		else if (c < 6)
-			a[c] = (uint8_t) ((a[0] * (6 - c) + a[1] * (c - 1)) / 5);
-		else
-			a[c] = (c == 6) ? 0 : 255;
-	}
-	uint64_t abits = 0;
-	for (int i = 0; i < 6; i++) abits |= (uint64_t) b[2 + i] << (8 * i);
-
-	uint32_t c0 = b[8] | (b[9] << 8);
-	uint32_t c1 = b[10] | (b[11] << 8);
-	uint8_t col[4][3];
-	col[0][0] = (uint8_t) (((c0 >> 8) & 0xF8) | ((c0 >> 13) & 0x7));
-	col[0][1] = (uint8_t) (((c0 >> 3) & 0xFC) | ((c0 >> 9) & 0x3));
-	col[0][2] = (uint8_t) (((c0 << 3) & 0xF8) | ((c0 >> 2) & 0x7));
-	col[1][0] = (uint8_t) (((c1 >> 8) & 0xF8) | ((c1 >> 13) & 0x7));
-	col[1][1] = (uint8_t) (((c1 >> 3) & 0xFC) | ((c1 >> 9) & 0x3));
-	col[1][2] = (uint8_t) (((c1 << 3) & 0xF8) | ((c1 >> 2) & 0x7));
-	for (int k = 0; k < 3; k++)
-	{
-		col[2][k] = (uint8_t) ((col[0][k] * 2 + col[1][k]) / 3);
-		col[3][k] = (uint8_t) ((col[0][k] + col[1][k] * 2) / 3);
-	}
-	uint32_t cbits = b[12] | (b[13] << 8) | (b[14] << 16) | ((uint32_t) b[15] << 24);
-
-	for (int j = 0; j < 4; j++)
-		for (int i = 0; i < 4; i++)
-		{
-			int p = j * 4 + i;
-			uint8_t* o = dst + (size_t) j * dst_stride + (size_t) i * 4;
-			int cc = (cbits >> (2 * p)) & 3;
-			o[0] = col[cc][0];
-			o[1] = col[cc][1];
-			o[2] = col[cc][2];
-			o[3] = a[(abits >> (3 * p)) & 7];
-		}
-}
-
 // ATFFormat::CompressedAlpha (4): rebuild the DXT5 stream exactly as
 // atf_jpegxr.rs:49-144 does, then decode it.
 static uint8_t* atf_compressed_alpha(const uint8_t* dxt1a_z, size_t dxt1a_n,
@@ -355,7 +356,7 @@ static uint8_t* atf_compressed_alpha(const uint8_t* dxt1a_z, size_t dxt1a_n,
 		memcpy(blk + 10, bgr + blocks * 2 + i * 2, 2);
 		memcpy(blk + 12, color_tab + i * 4, 4);
 		size_t bx = i % bw, by = i / bw;
-		bc3_decode_block(blk, rgba + (by * 4 * w + bx * 4) * 4, w * 4);
+		avm2_bc3_decode_block(blk, rgba + (by * 4 * w + bx * 4) * 4, w * 4);
 	}
 done:
 	free(alpha_tab);

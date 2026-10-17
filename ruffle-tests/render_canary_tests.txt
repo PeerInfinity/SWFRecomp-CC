@@ -481,3 +481,11 @@ fonts/embed_matching/fallback_preferences   # AVM2 embedded + fallback glyphs 1 
 # restore branch); twirl is the 550x400-into-600x700 showAll fit.
 avm2/stage_scale_factor                     # AVM2 noScale @ scale_factor 2   1 cmp
 avm2/pixelbender_effect_twirl               # AVM2 showAll non-uniform fit    1 cmp
+
+# SESSION 22 ADDITION (s22 cloud `w2-atf-dxt5`). The set's two ATF members
+# (formats 1 and 4) both go through jxrlib; none covered ATF format 5
+# (RawCompressedAlpha = raw DXT5 records, avm2_stage3d.c
+# s3d_upload_atf_raw_dxt5 + avm2_bc3_decode_block). Two 512x512 BC3 textures;
+# passes 0/66 outliers, max diff 3, so a BC3 palette/rounding move shows here.
+# tier=1  (CI-passing once w2-atf-dxt5 lands)
+avm2/stage3d_texture_bytearray_compressed_raw_alpha  # ATF fmt 5 (raw DXT5) 1 cmp

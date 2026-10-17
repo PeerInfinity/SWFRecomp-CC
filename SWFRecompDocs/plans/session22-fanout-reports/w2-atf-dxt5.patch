@@ -1,0 +1,252 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_jpegxr.h b/SWFModernRuntime/include/avm2/avm2_jpegxr.h
+index ef59149df..1b748eb21 100644
+--- a/SWFModernRuntime/include/avm2/avm2_jpegxr.h
++++ b/SWFModernRuntime/include/avm2/avm2_jpegxr.h
+@@ -5,9 +5,9 @@
+ #include <stdint.h>
+ 
+ // JPEG-XR decode (jxrlib) for Loader-loaded .jxr content and the JPEG-XR-backed
+-// Stage3D ATF formats. Every function is a stub returning 0 unless the build
+-// defines SWF_HAVE_LIBJXR (verify_output.py graphics mode / CMake WITH_LIBJXR);
+-// no-graphics and WASM builds never decode JPEG-XR.
++// Stage3D ATF formats. Every JPEG-XR function is a stub returning 0 unless the
++// build defines SWF_HAVE_LIBJXR (verify_output.py graphics mode / CMake
++// WITH_LIBJXR); no-graphics and WASM builds never decode JPEG-XR.
+ //
+ // All jxrlib headers stay inside avm2_jpegxr.c: they define Bool / U8 / max
+ // and friends, which would collide with runtime code.
+@@ -30,4 +30,9 @@ int avm2_jxr_decode_rgba(const uint8_t* data, size_t len,
+ int avm2_atf_jxr_decode(const uint8_t* atf, size_t len, uint32_t w, uint32_t h,
+                         uint8_t** out_rgba);
+ 
++// One BC3 (DXT5) block (16 bytes) -> 4x4 straight RGBA8 at `dst` (row stride
++// `dst_stride` bytes), Mesa util_format s3tc rounding. Always built: it needs
++// no jxrlib, and ATF format 5 (RawCompressedAlpha) is raw DXT5.
++void avm2_bc3_decode_block(const uint8_t* b, uint8_t* dst, uint32_t dst_stride);
++
+ #endif
+diff --git a/SWFModernRuntime/src/avm2/avm2_jpegxr.c b/SWFModernRuntime/src/avm2/avm2_jpegxr.c
+index e5c333b45..7405fe707 100644
+--- a/SWFModernRuntime/src/avm2/avm2_jpegxr.c
++++ b/SWFModernRuntime/src/avm2/avm2_jpegxr.c
+@@ -22,6 +22,57 @@
+ 
+ #include <avm2/avm2_jpegxr.h>
+ 
++// One BC3 (DXT5) block -> 4x4 RGBA8, Mesa's util_format s3tc decode
++// (texcompress_s3tc_tmp.h): 565 endpoints bit-replicated to 8 bits, colour
++// thirds and alpha sevenths/fifths by truncating integer division. BC3 colour
++// is always the four-colour mode. Outside SWF_HAVE_LIBJXR: ATF format 5
++// (raw DXT5, avm2_stage3d.c) needs no JPEG-XR.
++void avm2_bc3_decode_block(const uint8_t* b, uint8_t* dst, uint32_t dst_stride)
++{
++	uint8_t a[8];
++	a[0] = b[0];
++	a[1] = b[1];
++	for (int c = 2; c < 8; c++)
++	{
++		if (a[0] > a[1])
++			a[c] = (uint8_t) ((a[0] * (8 - c) + a[1] * (c - 1)) / 7);
++		else if (c < 6)
++			a[c] = (uint8_t) ((a[0] * (6 - c) + a[1] * (c - 1)) / 5);
++		else
++			a[c] = (c == 6) ? 0 : 255;
++	}
++	uint64_t abits = 0;
++	for (int i = 0; i < 6; i++) abits |= (uint64_t) b[2 + i] << (8 * i);
++
++	uint32_t c0 = b[8] | (b[9] << 8);
++	uint32_t c1 = b[10] | (b[11] << 8);
++	uint8_t col[4][3];
++	col[0][0] = (uint8_t) (((c0 >> 8) & 0xF8) | ((c0 >> 13) & 0x7));
++	col[0][1] = (uint8_t) (((c0 >> 3) & 0xFC) | ((c0 >> 9) & 0x3));
++	col[0][2] = (uint8_t) (((c0 << 3) & 0xF8) | ((c0 >> 2) & 0x7));
++	col[1][0] = (uint8_t) (((c1 >> 8) & 0xF8) | ((c1 >> 13) & 0x7));
++	col[1][1] = (uint8_t) (((c1 >> 3) & 0xFC) | ((c1 >> 9) & 0x3));
++	col[1][2] = (uint8_t) (((c1 << 3) & 0xF8) | ((c1 >> 2) & 0x7));
++	for (int k = 0; k < 3; k++)
++	{
++		col[2][k] = (uint8_t) ((col[0][k] * 2 + col[1][k]) / 3);
++		col[3][k] = (uint8_t) ((col[0][k] + col[1][k] * 2) / 3);
++	}
++	uint32_t cbits = b[12] | (b[13] << 8) | (b[14] << 16) | ((uint32_t) b[15] << 24);
++
++	for (int j = 0; j < 4; j++)
++		for (int i = 0; i < 4; i++)
++		{
++			int p = j * 4 + i;
++			uint8_t* o = dst + (size_t) j * dst_stride + (size_t) i * 4;
++			int cc = (cbits >> (2 * p)) & 3;
++			o[0] = col[cc][0];
++			o[1] = col[cc][1];
++			o[2] = col[cc][2];
++			o[3] = a[(abits >> (3 * p)) & 7];
++		}
++}
++
+ #ifdef SWF_HAVE_LIBJXR
+ 
+ #include <lzma.h>
+@@ -268,56 +319,6 @@ static uint8_t* atf_lzma(const uint8_t* d, size_t n, size_t want)
+ 	return out;
+ }
+ 
+-// One BC3 (DXT5) block -> 4x4 RGBA8, Mesa's util_format s3tc decode
+-// (texcompress_s3tc_tmp.h): 565 endpoints bit-replicated to 8 bits, colour
+-// thirds and alpha sevenths/fifths by truncating integer division. BC3 colour
+-// is always the four-colour mode.
+-static void bc3_decode_block(const uint8_t* b, uint8_t* dst, uint32_t dst_stride)
+-{
+-	uint8_t a[8];
+-	a[0] = b[0];
+-	a[1] = b[1];
+-	for (int c = 2; c < 8; c++)
+-	{
+-		if (a[0] > a[1])
+-			a[c] = (uint8_t) ((a[0] * (8 - c) + a[1] * (c - 1)) / 7);
+-		else if (c < 6)
+-			a[c] = (uint8_t) ((a[0] * (6 - c) + a[1] * (c - 1)) / 5);
+-		else
+-			a[c] = (c == 6) ? 0 : 255;
+-	}
+-	uint64_t abits = 0;
+-	for (int i = 0; i < 6; i++) abits |= (uint64_t) b[2 + i] << (8 * i);
+-
+-	uint32_t c0 = b[8] | (b[9] << 8);
+-	uint32_t c1 = b[10] | (b[11] << 8);
+-	uint8_t col[4][3];
+-	col[0][0] = (uint8_t) (((c0 >> 8) & 0xF8) | ((c0 >> 13) & 0x7));
+-	col[0][1] = (uint8_t) (((c0 >> 3) & 0xFC) | ((c0 >> 9) & 0x3));
+-	col[0][2] = (uint8_t) (((c0 << 3) & 0xF8) | ((c0 >> 2) & 0x7));
+-	col[1][0] = (uint8_t) (((c1 >> 8) & 0xF8) | ((c1 >> 13) & 0x7));
+-	col[1][1] = (uint8_t) (((c1 >> 3) & 0xFC) | ((c1 >> 9) & 0x3));
+-	col[1][2] = (uint8_t) (((c1 << 3) & 0xF8) | ((c1 >> 2) & 0x7));
+-	for (int k = 0; k < 3; k++)
+-	{
+-		col[2][k] = (uint8_t) ((col[0][k] * 2 + col[1][k]) / 3);
+-		col[3][k] = (uint8_t) ((col[0][k] + col[1][k] * 2) / 3);
+-	}
+-	uint32_t cbits = b[12] | (b[13] << 8) | (b[14] << 16) | ((uint32_t) b[15] << 24);
+-
+-	for (int j = 0; j < 4; j++)
+-		for (int i = 0; i < 4; i++)
+-		{
+-			int p = j * 4 + i;
+-			uint8_t* o = dst + (size_t) j * dst_stride + (size_t) i * 4;
+-			int cc = (cbits >> (2 * p)) & 3;
+-			o[0] = col[cc][0];
+-			o[1] = col[cc][1];
+-			o[2] = col[cc][2];
+-			o[3] = a[(abits >> (3 * p)) & 7];
+-		}
+-}
+-
+ // ATFFormat::CompressedAlpha (4): rebuild the DXT5 stream exactly as
+ // atf_jpegxr.rs:49-144 does, then decode it.
+ static uint8_t* atf_compressed_alpha(const uint8_t* dxt1a_z, size_t dxt1a_n,
+@@ -355,7 +356,7 @@ static uint8_t* atf_compressed_alpha(const uint8_t* dxt1a_z, size_t dxt1a_n,
+ 		memcpy(blk + 10, bgr + blocks * 2 + i * 2, 2);
+ 		memcpy(blk + 12, color_tab + i * 4, 4);
+ 		size_t bx = i % bw, by = i / bw;
+-		bc3_decode_block(blk, rgba + (by * 4 * w + bx * 4) * 4, w * 4);
++		avm2_bc3_decode_block(blk, rgba + (by * 4 * w + bx * 4) * 4, w * 4);
+ 	}
+ done:
+ 	free(alpha_tab);
+diff --git a/SWFModernRuntime/src/avm2/avm2_stage3d.c b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+index a498c0763..658ac69ad 100644
+--- a/SWFModernRuntime/src/avm2/avm2_stage3d.c
++++ b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+@@ -3134,6 +3134,66 @@ static void s3d_upload_atf_jxr(Avm2Context* ctx, Avm2Texture3DExt* te,
+ 	free(rgba);
+ }
+ 
++// ATF format 5 (RawCompressedAlpha): each face/mip is four length-prefixed
++// records (dxt5, pvrtc, etc1, etc2; render/src/atf.rs:143-161). Ruffle uploads
++// face 0 / mip 0's dxt5 record as-is (atf_jpegxr.rs:146-163), which wgpu
++// samples as Bc3RgbaUnorm; the texel store is RGBA8, so decode it here with
++// the Mesa s3tc rounding avm2_bc3_decode_block uses. No JPEG-XR is involved.
++// Returns 1 for a format-5 upload (a record of the wrong size leaves the
++// texture untouched), 0 for any other format or a truncated record.
++static int s3d_upload_atf_raw_dxt5(Avm2Context* ctx, Avm2Texture3DExt* te,
++                                   const uint8_t* b, uint32_t len)
++{
++	// Header: "ATF", then either u24 length (version 0) or 0,0,0,0xFF,
++	// version, u32 length; then tdata, log2 w, log2 h, mip count.
++	uint32_t p;
++	int version = 0;
++	if (len < 7) return 0;
++	if (b[6] == 0xFF)
++	{
++		if (len < 12) return 0;
++		version = b[7];
++		p = 12;
++	}
++	else
++	{
++		p = 6;
++	}
++	if (len - p < 4 || (b[p] & 0x7F) != 5) return 0;
++	p += 4;
++
++	uint32_t n;
++	if (version == 0)
++	{
++		if (len - p < 3) return 0;
++		n = ((uint32_t) b[p] << 16) | ((uint32_t) b[p + 1] << 8) | b[p + 2];
++		p += 3;
++	}
++	else
++	{
++		if (len - p < 4) return 0;
++		n = ((uint32_t) b[p] << 24) | ((uint32_t) b[p + 1] << 16)
++		  | ((uint32_t) b[p + 2] << 8) | b[p + 3];
++		p += 4;
++	}
++	if (len - p < n) return 0;
++
++	// The record holds exactly (w/4)*(h/4) 16-byte blocks; Ruffle's
++	// copy_pixels_to_texture rejects any other size, so do we.
++	uint32_t w = te->width, h = te->height;
++	if (w < 4 || h < 4 || (uint64_t) (w / 4) * (h / 4) * 16 != n) return 1;
++	uint32_t* tex = s3d_texels(ctx, te);
++	if (tex == NULL) return 1;
++	const uint8_t* blocks = b + p;
++	uint32_t bw = w / 4, bh = h / 4;
++	for (uint32_t by = 0; by < bh; by++)
++		for (uint32_t bx = 0; bx < bw; bx++)
++			avm2_bc3_decode_block(blocks + ((size_t) by * bw + bx) * 16,
++			                      (uint8_t*) (tex + (size_t) by * 4 * w + bx * 4),
++			                      w * 4);
++	return 1;
++}
++
+ static Avm2Value texture_upload_compressed(Avm2Activation* act, int is_cube)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -3164,7 +3224,8 @@ static Avm2Value texture_upload_compressed(Avm2Activation* act, int is_cube)
+ 	if ((is_cube != 0) != (cube != 0))
+ 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+ 		                 "Error #3675: Texture format mismatch.");
+-	s3d_upload_atf_jxr(ctx, te, ba->bytes + offset, ba->len - offset);
++	if (!s3d_upload_atf_raw_dxt5(ctx, te, ba->bytes + offset, ba->len - offset))
++		s3d_upload_atf_jxr(ctx, te, ba->bytes + offset, ba->len - offset);
+ 	return avm2_undefined();
+ }
+ 
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 39e5e4014..952133e8f 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -475,3 +475,11 @@ avm2/bitmapdata_draw_masks                  # draw(src) honours src.mask, tol 0
+ # zero-headroom row the brief named, is already a member above.)
+ # tier=1  (CI-passing once w2-glyph-subunit lands; zero headroom)
+ fonts/embed_matching/fallback_preferences   # AVM2 embedded + fallback glyphs 1 cmp
++
++# SESSION 22 ADDITION (s22 cloud `w2-atf-dxt5`). The set's two ATF members
++# (formats 1 and 4) both go through jxrlib; none covered ATF format 5
++# (RawCompressedAlpha = raw DXT5 records, avm2_stage3d.c
++# s3d_upload_atf_raw_dxt5 + avm2_bc3_decode_block). Two 512x512 BC3 textures;
++# passes 0/66 outliers, max diff 3, so a BC3 palette/rounding move shows here.
++# tier=1  (CI-passing once w2-atf-dxt5 lands)
++avm2/stage3d_texture_bytearray_compressed_raw_alpha  # ATF fmt 5 (raw DXT5) 1 cmp

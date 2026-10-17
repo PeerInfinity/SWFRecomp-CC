@@ -43,7 +43,7 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-avm2-stage-view | w1-pixel-catastrophic | pixelbender_effect_glassDisplace, displayobject_z | session_01Sv4zxmSzXYtd4doWuLve4R — LANDED (+3 incl. geom_transform) |
 | w2-font-registry | w1-trace-tail D | fonts/embed_name_lookup | session_01SKhEcTjpjxygKijBE1r4Dz |
 | w2-ei-provider | w1-trace-tail C | avm2/external_interface | session_0171KTbmxMRKzLEq2FKryiT6 — LANDED |
-| w2-atf-dxt5 | w1-pixel-catastrophic | stage3d_texture_bytearray_compressed_raw_alpha | session_01BCEB1oUi9rtAyWJhxtUX72 |
+| w2-atf-dxt5 | w1-pixel-catastrophic | stage3d_texture_bytearray_compressed_raw_alpha | session_01BCEB1oUi9rtAyWJhxtUX72 — LANDED |
 | w2-avm2-video-stamp | w1-pixel-catastrophic | visual/video/h264_multinalu | session_013tm6bjkHMY5ugv1wytug2c |
 | w2-draw-bigcap-aa | w1-pixel-catastrophic | acid-bitmap-draw_quality_high/_low | session_01LXYQe4b2PbkKvF1qAiQgQg |
 | w2-hairline-device-width | w1-stroke-staircase L1 | acid-small .05 (recover), .01, acid-scale, simple_loop_test | session_01JmdeVMCdk5knmRhi5YiyES |
