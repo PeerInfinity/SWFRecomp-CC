@@ -1,42 +1,43 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-10-17 02:06 UTC
+**Date**: 2026-10-17 04:26 UTC
 
-**Git SHA**: `9396522982`
+**Git SHA**: `38cf9b1a0a`
 
-**Run Duration**: 2m 46s
+**Run Duration**: 2m 50s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 9 |
-| Passing | **6** (66.7%) |
+| Passing | **7** (77.8%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **7** (77.8%) |
-| Failing | 2 |
+| Effective pass | **8** (88.9%) |
+| Failing | 1 |
 | Total expected lines | 377 |
-| Matching lines | 195 (51.7%) |
-| Mismatched lines | 182 |
+| Matching lines | 351 (93.1%) |
+| Mismatched lines | 26 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 2 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**6 tests passing**
+**7 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `device_font_glyph_fallback` | 36 | 23.2s |  |
-| 2 | `device_font_kerning` | 4 | 22.1s |  |
-| 3 | `device_font_list` | 64 | 28.1s |  |
-| 4 | `embed_matching/fallback_preferences` | 0 | 28.5s |  |
-| 5 | `embed_matching/match_style` | 0 | 7.8s |  |
-| 6 | `embed_matching/no_font_found` | 0 | 7.7s |  |
+| 1 | `device_font_glyph_fallback` | 36 | 27.9s |  |
+| 2 | `device_font_kerning` | 4 | 18.0s |  |
+| 3 | `device_font_list` | 64 | 27.5s |  |
+| 4 | `embed_matching/fallback_preferences` | 0 | 29.5s |  |
+| 5 | `embed_matching/match_style` | 0 | 5.5s |  |
+| 6 | `embed_matching/no_font_found` | 0 | 7.3s |  |
+| 7 | `embed_name_lookup` | 242 | 22.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -44,7 +45,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `device_font_no_ink` | 14 | 14 | 24.5s |  |
+| 1 | `device_font_no_ink` | 14 | 14 | 29.6s |  |
 
 ## Near-Passing Tests
 
@@ -68,9 +69,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**2 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `embed_name_lookup` | 35.5% | 86/242 | 242 | 242 |  |
-| 2 | `device_font_name_case` | 7.7% | 1/13 | 13 | 13 |  |
+| 1 | `device_font_name_case` | 7.7% | 1/13 | 13 | 13 |  |
