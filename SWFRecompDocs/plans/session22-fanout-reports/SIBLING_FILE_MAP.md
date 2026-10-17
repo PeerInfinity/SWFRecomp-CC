@@ -23,3 +23,4 @@
 | w2-drawing-api-lyon | `avm2_display.c` `gfx_*` drawing helpers (`gfx_draw_circle` ~9737, `gfx_emit_round_rect`, `gfx_add_side`, new `gfx_add_cubic`, `gfx_decode_path`, miter ~8660); `action.c` drawing-API miter (~30511) |
 | w2-glyph-subunit | `abc_timeline.cpp` (~929), `abc_devicefont.cpp` glyph outline emit (~126, ~169); consumers `avm2_display.c` (~19027), `avm2_bitmap.c` (~2032) |
 | w2-hairline-device-width | `swf.cpp` `drawLines`/stroke emission (timeline strokes) + whatever runtime re-expansion it needs in the shape render path (`tag.c`/`render_webgpu.c`); NOT the drawing-API `gfx_*` helpers |
+| w2-geom-port | `action.c` geom natives (Point/Matrix/Rectangle, registration `registerGeomMethod`) + native construction sites of flash.geom instances; may ADD to the `as_*` helper block |
