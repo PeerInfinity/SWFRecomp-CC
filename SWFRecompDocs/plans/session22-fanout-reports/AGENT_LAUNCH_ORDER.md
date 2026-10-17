@@ -46,8 +46,9 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-atf-dxt5 | w1-pixel-catastrophic | stage3d_texture_bytearray_compressed_raw_alpha | session_01BCEB1oUi9rtAyWJhxtUX72 |
 | w2-avm2-video-stamp | w1-pixel-catastrophic | visual/video/h264_multinalu | session_013tm6bjkHMY5ugv1wytug2c |
 | w2-draw-bigcap-aa | w1-pixel-catastrophic | acid-bitmap-draw_quality_high/_low | session_01LXYQe4b2PbkKvF1qAiQgQg |
+| w2-hairline-device-width | w1-stroke-staircase L1 | acid-small .05 (recover), .01, acid-scale, simple_loop_test | session_01JmdeVMCdk5knmRhi5YiyES |
 
-**Queue (launch order when a slot frees):** w2-hairline-device-width.
+**Queue:** empty — 21 wave-2 slots funded (s21-sized budget reached); further leads go to the s23 board.
 | w2-jpegxr | user-approved dep | loader_jpegxr, loader_jpegxr_alpha, stage3d_texture_bytearray, _compressed_alpha | session_017A1bzC1vtg96PMxQT8BxpM — LANDED 5dee7a4b4 |
 
 **Merge obligations (DISCHARGED: as-core builds `_listeners` as a literal):** at w2-as-core merge, `installAsBroadcaster`'s `_listeners` must go through `arrayResolveGlobalCtor()` (w2-array-global report §4; flips the as_broadcaster "with Array replaced" line) unless as-core creates it as a literal. Follow-up for after as-core: `actionCallMethod` object-method arm alias dispatch for `Array` (`pushArrayCalledAsFunction`).
