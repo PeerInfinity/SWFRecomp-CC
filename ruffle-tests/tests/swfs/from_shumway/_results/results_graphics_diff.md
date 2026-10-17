@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bdf127c35cca` (2026-10-17T00:59:02.000664+00:00)
-**Current:** `9396522982a2` (2026-10-17T01:43:11.432639+00:00)
+**Previous:** `9396522982a2` (2026-10-17T01:43:11.432639+00:00)
+**Current:** `38cf9b1a0ab8` (2026-10-17T04:05:11.366754+00:00)
 
 ## Summary
 
@@ -12,8 +12,4 @@
 | Pass rate | 93.4% | 93.4% | 0% |
 | Mismatched lines | 88 | 88 | 0 |
 
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `avm1movie` | ruffle_matched | 1/13 | 1/13 | 0 |
+No changes detected.

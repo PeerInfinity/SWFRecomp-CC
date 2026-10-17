@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bdf127c35cca` (2026-10-17T00:59:02.030158+00:00)
-**Current:** `9396522982a2` (2026-10-17T01:43:11.453461+00:00)
+**Previous:** `9396522982a2` (2026-10-17T01:43:11.453461+00:00)
+**Current:** `38cf9b1a0ab8` (2026-10-17T04:05:11.385853+00:00)
 
 ## Summary
 
@@ -10,18 +10,6 @@
 | Passing | 69 | 69 | 0 |
 | Total | 111 | 111 | 0 |
 | Pass rate | 62.2% | 62.2% | 0% |
-| Mismatched lines | 1021 | 1012 | -9 |
-|   Decreased | | | -19 |
-|   Increased | | | +10 |
+| Mismatched lines | 1012 | 1012 | 0 |
 
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `action_order/action_execution_order_test6` | output_mismatch | ruffle_matched | 0/24 | 19/24 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `loop/loop_test6` | ruffle_matched | 22/23 | 12/23 | +10 |
+No changes detected.

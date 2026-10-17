@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-10-17T00:59:02.000664+00:00",
-    "old_git_sha": "bdf127c35ccad332c171fb3681d4c08d0f0d4ccb",
-    "new_timestamp": "2026-10-17T01:43:11.432639+00:00",
-    "new_git_sha": "9396522982a2e510ab9ee4117eec7510ee9ff163",
+    "old_timestamp": "2026-10-17T01:43:11.432639+00:00",
+    "old_git_sha": "9396522982a2e510ab9ee4117eec7510ee9ff163",
+    "new_timestamp": "2026-10-17T04:05:11.366754+00:00",
+    "new_git_sha": "38cf9b1a0ab840bc6be0edbc5eb8938e8eafad09",
     "partial": false,
     "same_commit": false
   },
@@ -25,26 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 228,
+    "unchanged": 229,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1movie",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 13,
-        "matching_lines": 1
-      }
-    }
-  ]
+  "changes": []
 }
