@@ -3118,3 +3118,95 @@ from the brief re-pays build and diagnosis.
 - ~~Doc fix owed: `RUFFLE_VS_FLASH_DIFFERENCES.md:604-606`~~ — corrected 2026-09-29.
 
 **Pixels.** See `graphics-fanout-playbook.md` §20.
+
+## 23. Session 22 (2026-10-16/17) — dual-axis fan-out #14, CLOUD-FIRST: trace +26 (4502/4562 eff), pixels +57 (490/587, 83.5 %), ZERO code regressions in either axis or either mode
+
+Commits `be8f4b621..` on master (21 code commits + docs; every report and patch under
+`session22-fanout-reports/`). **First cloud-first session** (user directive 2026-10-16: every step that can
+run in the cloud does): all 8 wave-1 diagnosis slots and all 21 wave-2 implementation slots ran as Claude Code
+cloud sessions (env "SWFRecomp fan-out", Opus), delivering on `fanout/<slug>` branches. Local CPU was spent only
+on the upstream sync, merges (`git apply --3way`, `--check -R` proof) and three incremental recompiler builds /
+`gcc -fsyntax-only` checks on stacked TUs. Baseline read fresh: graphics/full run on `4c450f076` (results
+`846adcc6b`): **4476 eff / 4551**; pixels **433/587** (images run `36515003936`). Upstream synced
+`0dacba55f → 45366370e` (110 commits; 98 added / 84 modified / 25 deleted test files).
+
+**Grading runs.** `38982271584` (graphics/full, 2 patches): ledger exact. `38989007619` (graphics/full/images,
+13 patches) + `38989015179` (no-graphics/full): **4494/4562 both modes**, pixels **468/587**. Final
+`38995363802` (graphics/full/images, all 21) + `38995369372` (no-graphics/full): **4502/4562 both modes,
+per-test identical**; pixels **490/587**. Every gain in every run was on a patch ledger; the only losses were
+pre-labelled upstream drift (fixed by later patches) and one decided Flash-over-Ruffle trade (pixel, below).
+
+**Denominator honesty.** Intersection gains 18 (one, `html_text_img_parsing_swf6`, is upstream drift arriving
+passing — not ours) + 9 new upstream rows we flipped (`as_setup_error`, `context_menu_swf6`,
+`html_text_img_parsing_swf8`, `collator_*` ×3, `mouse_pick_scroll_rect*` ×3) + our new fixture
+`regression/avm2_strbuf_stale_prefix` − 2 deleted passes (`as_broadcaster_initialize/_undef`). **Hidden
+yield not visible in that number:** upstream rewrote/expanded 17 rows we passed (`point`, `rectangle`, `matrix`,
+`context_menu(_item)`, `as_broadcaster`, `array_constructor` → SEGFAULT, gnash `AsBroadcaster-v6..8`,
+`Matrix-v6..8`, `array-v6..8`, `Rectangle-v8`); all 17 are back to pass/ruffle_matched.
+
+### 23.1 Ledger (trace)
+
+| patch | flips | tests |
+|---|---:|---|
+| w2-geom-port | +7 | `avm1/point`, `rectangle`, `matrix`, gnash `Rectangle-v8`, `Matrix-v6..v8` (flash.geom ported to AS semantics) |
+| w2-as-core | +8 | `as_setup_error`, `context_menu`, `context_menu_item`, `context_menu_swf6`, gnash `AsBroadcaster-v6..v8`, `as_broadcaster` (with array-global) |
+| w2-goto-collator | +6 | `goto_queued_invalid/swf9..11`, `collator_flags`, `collator_locale_ids_windows`, `collator_compare_basic` |
+| w2-crossvm | +5 | `mouse_pick_scroll_rect(+_loader,_button)`, `mouse_pick_loader_avm1`, `avm2_loads_avm1_events` (rm) |
+| w2-htmltext | +5 | `html_text_img_parsing_swf5/_swf7/_swf8`, `html_text_img_numeric_attributes`, `avm2/html_text_img_parsing` (rm) |
+| w2-array-global | +4 | `array_constructor` (segfault), gnash `array-v6..v8` (rm) |
+| w2-queue-regex | +2 | `action_execution_order_test6` (rm), `pcre_find_fixedlength` |
+| w2-strbuf | +1 | `from_avmplus/regress/bug_483783` (the corpus's only runtime_error) |
+| w2-ei-provider | +1 | `avm2/external_interface` |
+| w2-font-registry | +1 | `fonts/embed_name_lookup` |
+
+Harness: `filter_results.py` scoped the root (AVM1) ignore list to avm1 (`avm2/date` reappears in the filtered
+view). Build: optional JPEG-XR dependency (`libjxr-dev`, user-approved) wired into CI, the cloud env and CMake.
+
+### 23.2 Standing verdicts that fell
+
+- **`bug_483783` "needs dependent strings + a GC single-block-free change"** — needs neither: O(n²) `+=`
+  copying; append-in-place buffers fix it with no collection (395 MB RSS).
+- **`pcre_find_fixedlength` "documented ceiling: libregexp stores capture indices as bytes"** — an operand
+  width, widened to u16. Also found a latent stack overflow in `re_find`'s capture array.
+- **`mouse_pick_loader_avm1` NO-GO, "the wrapper answers clicks with its whole stage rect"** — removing that OR
+  was byte-identical; the cause was the AVM1 side's AABB pick. Four mechanisms, one slot, pass.
+- **"M5 = two sites"** — closure captured scope was missing on six invocation arms, each pinned by a line.
+- **The RVF flags on `focus_events_mixed_avm_edittext` / `mouse_pick_loader_avm1`** were misapplied.
+- **`text-bind` ACCEPTED_DIFFS ("per-test fontconfig is high effort")** — retired; it passes.
+- Pixel-side refutations: `graphics-fanout-playbook.md` §21.
+
+### 23.3 Method notes (deltas vs s21)
+
+- **Cloud-first worked end to end with zero lost slots.** 29 cloud sessions, ≤ 8 live, every one delivered on
+  its branch; cloud lavapipe proved byte-identical to CI's actual PNGs on every row any worker checked, so cloud
+  workers graded pixels absolutely, not just A/B. The cost of losing the local exporter oracle was nil this
+  session (4 optional requests, none blocking; see `AGENT_LAUNCH_ORDER.md`).
+- **Replace the per-patch local headline re-check with `--3way` + `--check -R` + interim CI.** Three interim/
+  final grading pairs graded every ledger exactly; the only semantic-merge risk (several patches stacking on
+  `action.c` / `swf.cpp` / `abc_devicefont.cpp`) was covered by `gcc -fsyntax-only` and incremental recompiler
+  builds (~1 min each).
+- **Merge-time build-safety review pays.** `w2-jpegxr` made libjxr REQUIRED by default for native CMake and left
+  OFF builds unable to link; fixed at merge (always compile the stub TU, optional pkg-config).
+- **Drift pre-labelling.** The wave-1 drift slot found 8 drift drops no CI run had shown yet; pre-labelling them
+  in `AGENT_LAUNCH_ORDER.md` made the interim CI read instant.
+- **Wave-1 reports that ship a measured prototype keep winning**: 7 of 8 did; wave 2 then productionized
+  (float-verts reproduced its prototype's 22 flips row for row).
+
+### 23.4 Left on the board (session 23)
+
+**Trace** (60 failing graphics rows):
+- `avm1/edittext_html_duplicate_attributes` 241/247: AVM1 `getTextFormat` ignores styleSheet CSS (w2-htmltext §6).
+- Cross-VM **leg F** (`focus_events_mixed_avm_edittext` 31/49 after s22, `selection_onsetfocus_mixed_avm`):
+  F-bcast + F-slot + F-tab (+ F-scope), +2, session-sized (w1-crossvm §3).
+- `movieclip_destruction_test3/4`: probe the attached-chain frame-8 timing first (w1-trace-tail §7).
+- `audio/aac`, `audio/g711`: `SoundMixer.computeSpectrum` + NetStream audio tap (+2, M/L).
+- `avm2/textline_metrics` (new): DefineFont4 typo metrics (GO-maybe); `fonts/device_font_name_case` (new): AVM1
+  device-font slot; `avm2/dictionary_qname_keys` (new upstream after the sync, unpriced).
+- `loader-events` root `httpStatus` is Ruffle-only (Flash prints progress) — NO-GO by ruling.
+- Unchanged NO-GOs: `MovieClip-v8` (7 mechanisms), action_order family, `globals_monkeypatch`, `GradientFillTest`.
+- Correctness leads with no corpus row: `CF_RESET_SCOPE` on method arms; `ActionGetVariable("Error")` fast path
+  ignores a replaced `_global.Error`; `Array !== _global.Array` (two ctor objects); array-literal cost ~60 %
+  removable (`props` alloc + `__proto__` insert per literal); goto-sweep cancels `CLIP_INIT`/`REGISTER_CTOR`
+  (test6 evidence says Flash fires them); AVM1 click-focus scan by AABB; `actionMCMouseInsidePick` AABB everywhere.
+
+**Pixels.** See `graphics-fanout-playbook.md` §21.

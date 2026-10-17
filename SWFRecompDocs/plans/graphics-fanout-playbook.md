@@ -1208,3 +1208,65 @@ Reports: `session21-fanout-reports/`. Trace side: `polish-sweep-arc.md` §22.
 - **Cloud workers** — see §5a (first use: w2-edittext-filters, 47 min to delivery).
 - **A band move across a grading-semantics change is not a render move** — attribute from CI's own
   per-check stats before building anything (the attribution agent needed 2 minutes and no render).
+
+## 21. Session-22 state of the board (2026-10-16/17)
+
+Baseline: images run `36515003936` at `02df69d28`, **433 / 587**. Interim images run `38989007619` at
+`939652298`: **468** (+36 gains, all ledgered; −1 `acid-small .05` predicted). Final images run `38995363802` at
+`38cf9b1a0`: **490 / 587 (83.5 %) = +59 flips, every one predicted by a patch ledger; −2 pass→fail by DECISION
+(Flash-over-Ruffle, below); 0 unexplained.** Reports: `session22-fanout-reports/`. Trace side:
+`polish-sweep-arc.md` §23. All pixel work ran in cloud sessions on lavapipe, byte-identical to CI's actual PNGs.
+
+| patch | flips | comparisons |
+|---|---:|---|
+| w2-float-verts | +22 | 12 `blend_modes/*` (s11 "CAPPED" and s18 §3-E "1-sample ties" REFUTED), `simple_shapes/masks` + `masks_equal_clipdepth` (image-axis disposition retired), `overlaps`, `scroll_rect_mask`, `heavy_tesselation`, `layers`, `blur_size_grows`, `color_matrix`, `avm2_button_scroll_rect`, `cache_as_bitmap/avm2_button` |
+| w2-avm2-video-stamp | +12 | `visual/video/h264_multinalu`, `h264 [frame2..11]`, `avm2/netstream_seek_flv` (AVM2 NetStream→Video, H.264 framing) |
+| w2-jpegxr | +4 | `loader_jpegxr`, `loader_jpegxr_alpha`, `stage3d_texture_bytearray`, `_compressed_alpha` (jxrlib, user-approved dep) |
+| w2-drawing-api-lyon | +4 | `MaskTest`, `displayobject_opaque_background`, `fills_and_lines` (at tol), `graphics_draw_path` |
+| w2-default-fonts-draw | +3 | `from_shumway/avm1/text-bind`, `cache_as_bitmap/text`, `bitmapdata_draw_masks` |
+| w2-glyph-subunit | +3 | `visual/fonts/glyph`, `match_style`, `fallback_preferences` (AT limit, canary member) |
+| w2-avm2-stage-view | +3 | `pixelbender_effect_glassDisplace`, `displayobject_z`, `geom_transform` |
+| w2-filter-fixes | +3 | `any_blur_scales_with_screen` (s16 disposition struck), `cab_mask_filters`, `acid-filter-2` |
+| w2-draw-bigcap-aa | +3 / −2 | `acid-bitmap-draw_quality_high`, `_quality_low` (Ruffle KF), `acid-bitmapData-draw` / `bitmapdata_opaque`, `blend_scroll` |
+| w2-hairline-device-width | +2 | `acid-small .01`, `.05` (recovers float-verts' −1) |
+| w2-atf-dxt5 | +1 | `stage3d_texture_bytearray_compressed_raw_alpha` |
+
+- **The decided −2.** Flash anti-aliases `BitmapData.draw()` at stage quality LOW (Flash acid goldens are
+  md5-identical high/low; Ruffle FIXME). `bitmapdata_opaque` / `blend_scroll` pass only against Ruffle's aliased
+  LOW goldens. Matching Flash per the user ruling; RVF entry added; the Ruffle-parity alternative is archived as
+  `w2-draw-bigcap-aa-qualitygate.patch`. They stay visible fails.
+- **The headline finding: integer-twip vertex quantization in the recompiler** (truncated Levien points, rounded
+  stroke corners, `lround`ed libtess2 output) owned the "stroke staircase", the blend "ties", the masks
+  disposition and most filter residuals. A float model reproduced Ruffle's golden stroke mask at 0 px; the
+  same family recurred in AVM2 glyph outlines (`lround` to font units) and the drawing API (cubic flattening,
+  circle anchors). **Lesson: before calling an edge "AA" or a "tie", model the geometry in float against the
+  golden; quality=low rows are 1-sample point-in-triangle tests, no AA at all.**
+- **Five dispositions/verdicts fell**: `blend_modes` CAP (s11), s18 §3-E ties, `simple_shapes/masks` ACCEPTED,
+  s16 `any_blur_scales_with_screen` "Ruffle divergence" (the SWF hides those cells via PlaceObject3 Visible),
+  s19 "h264 is an unrefreshed stem" (AVM2 had no NetStream video pipeline at all).
+- Cloud workers graded absolutely after proving their before-render md5 = CI actual PNG on each row; cheaper than
+  any local A/B and CI-grade.
+
+### Left on the board (session 23)
+
+- **Filter label residuals**: `glow`, `glow_without_composite_source`, `drop_shadow` are each **3/0** (one EditText
+  label pixel, the comma of "K,I"); `bevel_*` ×3 + `glow_with_alpha_strength` at 24/18 (label pixels) — 7 rows
+  within reach of a depth-0 text glyph fix.
+- **Padded filter layer** (w1-offstage-filter §1.4): `drop_shadow_angles` 549 and `displacement_map` 336 now that
+  stroke parity landed; `bevel` 744 is one filter-edge row at y=305.
+- `avm2/bitmapdata_draw`: tol-128 check 753/600 is the last one failing (1-px text baseline; golden is a Flash
+  capture — Ruffle's model puts the baseline where we do).
+- AVM1 embedded-glyph precision: the same 4 xtrace pixels fail `morph_test1` frame2-6 + `Video-EmbedSquareTest`
+  (6 comparisons, w1-pixel-smalls lead 1); `edittext_scroll .02` needs a port of Ruffle's device glyph build.
+- **Watch**: `gnash misc-ming.all/shape_test` worsened 16074 → 17911 in the final run (still failing; attribute it
+  — likely the stroke re-expansion or filter capture change) and the zero-headroom rows (`fallback_preferences`,
+  `fills_and_lines`, `edittext_border_filters`).
+- `netstream_play_flv` 179/… (Spark decode precision, same family as `colorconversion/h263`);
+  `pixelbender_effect_glassDisplace_shaderfilter` (ShaderFilter), `blend_shader_luma_lighten` (blendShader),
+  `stage3d_texture` (RTT + true advances), `acid-color-0` TextField colour bug (band), `definefont4` (FTE arc).
+- Harness: `verify_output.py` ignores `ignore = true` (1 image comparison, `bitmap_pixelsnapping`) — board flag
+  rather than skip; subtest images (`bitmapdata_drawwithquality`) are not graded.
+
+### Process notes added this session
+
+- **Cloud-first mode** (§5a): wave 1 AND wave 2 in the cloud; local = merge/CI/oracle. See arc §23.3.
