@@ -57,3 +57,11 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 - w2-strbuf: Ruffle exporter run of `regression/avm2_strbuf_stale_prefix/test.swf` to confirm its ECMA-derived `output.txt` (report §LOCAL ORACLE REQUESTS).
 - w2-as-core / w1-drift-avm1: closure-as-method fixture oracle (optional).
 - w1-pixel-catastrophic: `font_lookup_as3` golden provenance; `stage3d_bitmap` RNG/timer trace; `bitmapdata_draw` line metrics; `displayobject_z` render (all optional).
+
+## Grading runs
+
+| run | mode / categories / images | code | result |
+|---|---|---|---|
+| 38982271584 | graphics / full / no | bdf127c35 (goto-collator, array-global) | effective 4471/4560; ledger exact (goto ×3, collators ×3 new); all losses = pre-labelled drift; 0 code regressions |
+| 38989007619 | graphics / full / **images=true** | 939652298 (13 patches) | trace **4494/4562** eff (baseline 4476/4551); pixels **433 → 468/587 (+35)**: 36 gains all ledgered, −1 `acid-small .05` predicted (recovered by hairline, landed later); bands 22 improved / 1 worsened. Losses = Matrix drift (fixed by geom-port, landed later) |
+| 38989015179 | no-graphics / full / no | 939652298 | **4494/4562** eff — per-test parity with graphics; 21 gains, 0 losses |
