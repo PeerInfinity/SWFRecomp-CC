@@ -10147,6 +10147,25 @@ static Avm2Value video_noop(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// Set once any Video has had a NetStream attached, so the render walk skips
+// the per-node Video lookup in every movie that never does.
+static uint8_t g_video_netstream_attached;
+
+// attachNetStream(netStream:NetStream) -> Ruffle video.rs attach_netstream:
+// the Video now shows the stream's last decoded frame. The stream is kept on
+// the Video itself (a hidden slot, which also keeps it alive for the GC);
+// null detaches, and the Video draws nothing again.
+static Avm2Value video_attach_net_stream(Avm2Activation* act)
+{
+	Avm2Object* self = this_obj(act);
+	if (self == NULL) return avm2_undefined();
+	Avm2Value ns = act->argc > 0 ? act->args[0] : avm2_null();
+	if (ns.kind != AVM2_VALUE_OBJECT) ns = avm2_null();
+	avm2_object_set_dynamic(act->ctx, self, "_netStream", 10, ns)->dont_enum = 1;
+	if (ns.kind == AVM2_VALUE_OBJECT) g_video_netstream_attached = 1;
+	return avm2_undefined();
+}
+
 static Avm2Value do_get_graphics(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -17524,7 +17543,7 @@ void avm2_register_display(Avm2Context* ctx)
 	                        video_set_smoothing);
 	avm2_builtin_add_getter(ctx, video, "videoWidth", video_get_zero);
 	avm2_builtin_add_getter(ctx, video, "videoHeight", video_get_zero);
-	avm2_builtin_add_method(ctx, video, "attachNetStream", video_noop);
+	avm2_builtin_add_method(ctx, video, "attachNetStream", video_attach_net_stream);
 	avm2_builtin_add_method(ctx, video, "attachCamera", video_noop);
 	avm2_builtin_add_method(ctx, video, "clear", video_noop);
 
@@ -18475,6 +18494,43 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
 	renderer_draw_bitmap_quad_scaled(context, bd->pixels,
 		bd->width, bd->height, bd->width, bd->height,
 		0.0f, 0.0f, xid, cxid);
+}
+
+// Blit a NetStream-attached Video: the stream's last decoded frame, stretched
+// over the Video's own bounds (Ruffle video.rs render_with_options scales by
+// bounds / bitmap size). NetStream video is never smoothed (Ruffle hardcodes
+// `false` for the NetStream source), which is the quad's Nearest sampler.
+static void avm2_render_video(Avm2Context* ctx, Avm2Object* obj,
+                              const Mat* world)
+{
+	if (!g_video_netstream_attached || g_video_class == NULL) return;
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext == NULL || !ext->draw_valid) return;
+	Avm2Value* nsv = avm2_object_find_dynamic(obj, "_netStream", 10);
+	if (nsv == NULL || nsv->kind != AVM2_VALUE_OBJECT) return;
+	const uint32_t* px = NULL;
+	int fw = 0, fh = 0;
+	if (!avm2_net_netstream_video_frame(nsv->u.obj, &px, &fw, &fh)) return;
+	if ((uint32_t) fw > context->dynamic_bitmap_max_w
+	    || (uint32_t) fh > context->dynamic_bitmap_max_h)
+		return;
+	double bw = (double) (ext->draw_xmax - ext->draw_xmin) / 20.0;
+	double bh = (double) (ext->draw_ymax - ext->draw_ymin) / 20.0;
+	int dw = (int) (bw + 0.5), dh = (int) (bh + 0.5);
+	if (dw <= 0 || dh <= 0) return;
+
+	uint32_t xid = 0;
+	if (g_avm2_xform_next < context->xform_slot_count)
+	{
+		float m16[16];
+		avm2_world_to_mat16(world, m16);
+		xid = g_avm2_xform_next++;
+		renderer_write_transform(context, xid, m16);
+	}
+	uint32_t cxid = avm2_alloc_cx_slot();
+	renderer_draw_bitmap_quad_scaled(context, px, (uint32_t) fw, (uint32_t) fh,
+		(uint32_t) dw, (uint32_t) dh,
+		(float) ext->draw_xmin, (float) ext->draw_ymin, xid, cxid);
 }
 
 // Draw one renderable timeline shape node: its pre-tessellated triangles
@@ -20346,6 +20402,9 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 		world = mat_mul(&world, &sr_tr);
 		z_visible = avm2_z_project(&world, node_tz, &draw_world);
 	}
+
+	if (g_video_netstream_attached && z_visible)
+		avm2_render_video(ctx, obj, &draw_world);
 
 	if (!z_visible)
 	{

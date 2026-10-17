@@ -509,3 +509,9 @@ from_shumway/acid/acid-filter-2             # Glow(compositeSource)+Blur     1 c
 # shrink to 1 device px) plus the 2-twip hairlines. KF: A/B signal only.
 # tier=2  (CI-failing, known_failure)
 visual/simple_shapes/strokes/scale          # stroke width vs draw scale, 1 cmp
+
+# s22 w2-avm2-video-stamp: the AVM2 NetStream -> Video pipeline (FLV demux on
+# the stream clock, H.264 AVCC decode, Video quad). No member above attaches a
+# NetStream, so nothing else here can see that path move.
+# tier=1  (CI-passing once w2-avm2-video-stamp lands; tolerance 2, max diff 0)
+visual/video/h264_multinalu                 # AVM2 NetStream FLV H.264 video   1 cmp

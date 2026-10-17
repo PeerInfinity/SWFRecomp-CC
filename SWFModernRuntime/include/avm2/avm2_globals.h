@@ -852,6 +852,11 @@ void avm2_net_deliver_local_connections(Avm2Context* ctx);
 // (the script-data half of playback — see avm2_net.c's NetStream section).
 // Called from the same per-tick drain point as the NetConnection flush.
 void avm2_net_deliver_netstream_meta(Avm2Context* ctx);
+// The last frame a NetStream's FLV video decoded (premultiplied ARGB, owned by
+// the stream; valid until its next tick), for an attached flash.media.Video
+// to draw. Returns 0 when `ns` has decoded nothing (or is not a NetStream).
+int avm2_net_netstream_video_frame(const Avm2Object* ns, const uint32_t** out_argb,
+                                   int* out_w, int* out_h);
 // The movie's LocalConnection domain (avm2_globals.c owns the URL parsing).
 const char* avm2_local_connection_domain(void);
 
