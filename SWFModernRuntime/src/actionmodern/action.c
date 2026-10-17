@@ -10,6 +10,7 @@
 #include "tesselator.h"
 #include <curve_flatten.h>  // w2-gfx-flatten: lyon/Levien quadratic flattening
 #include <gradient_ramp.h>  // w2-gfx-gradient: Ruffle CommonGradient::new ramp walk
+#include <html_img.h>       // w2-htmltext: shared AVM1/AVM2 htmlText <img> rules
 
 #include <libswf/generated_data.h>
 #ifdef __EMSCRIPTEN__
@@ -22721,6 +22722,7 @@ typedef struct TFRun_s {
 	u8 bold; u8 italic; u8 underline;
 	char font_name[64]; char href[256]; char href_target[64];
 	char tabstops[128]; // Comma-separated tab stop values, empty = none
+	u16 img; // html_img.h pool index of an <img> placeholder run (0 = none)
 } TFRun;
 #define TF_MAX_RUNS   512
 #define TF_MAX_TABLES  32
@@ -22737,6 +22739,7 @@ typedef struct {
 static TFRunTable* tf_get_table(MovieClip* mc);
 static TFRunTable* tf_find_table(MovieClip* mc);
 static void tf_get_defaults(MovieClip* mc, TFRun* def);
+static int tf_apply_new_format_font(MovieClip* mc, TFRun* def);
 static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
                          const TFRun* defaults, int condense_white, int swf_version, int is_multiline);
 static char* tf_serialize_html(TFRunTable* table, int is_multiline);
@@ -23038,6 +23041,7 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
 	table->from_html_text = 1;
 	TFRun defaults;
 	tf_get_defaults(mc, &defaults);
+	tf_apply_new_format_font(mc, &defaults);
 	{
 		ActionVar* tc_prop = getProperty(props, "textColor", 9);
 		if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
@@ -27077,6 +27081,17 @@ static void tf_get_defaults(MovieClip* mc, TFRun* def) {
 	}
 }
 
+// setNewTextFormat's font NAME (device fonts have no SWF font id) overrides
+// the default face. Returns 1 when applied.
+static int tf_apply_new_format_font(MovieClip* mc, TFRun* def) {
+	if (mc->dynamic_props == NULL) return 0;
+	ActionVar* fn_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_fontName", 12);
+	if (fn_prop == NULL || fn_prop->type != ACTION_STACK_VALUE_STRING || fn_prop->str_size == 0) return 0;
+	size_t n = u16_to_utf8(varGetU16Ptr(fn_prop), fn_prop->str_size, def->font_name, sizeof(def->font_name));
+	def->font_name[n < sizeof(def->font_name) - 1 ? n : sizeof(def->font_name) - 1] = '\0';
+	return 1;
+}
+
 // =============================================
 // HTML Entity decoding helper
 // =============================================
@@ -27165,9 +27180,23 @@ static int tf_parse_font_color(const char* val, u32 val_len, u32* out_color) {
 
 // Parser state for attribute extraction
 static int tf_get_attr(const char* tag_content, u32 tag_len, const char* attr_name, char* val_buf, u32 val_buf_size) {
-	// Case-insensitive attribute search
+	// Case-insensitive attribute search. A duplicated attribute resolves to
+	// its LAST occurrence, even when that one is invalid (Flash; Ruffle
+	// 69a017387 `attributes.iter().rev()`), and the name must start at a
+	// word boundary so `size` never matches inside e.g. `fontsize=`.
 	u32 attr_len = (u32)strlen(attr_name);
-	for (u32 i = 0; i + attr_len < tag_len; i++) {
+	u32 start = 0;
+	int found = 0;
+	for (u32 i = 1; i + attr_len < tag_len; i++) {
+		char pc = tag_content[i-1];
+		if (pc != ' ' && pc != '\t' && pc != '\n' && pc != '\r') continue;
+		if (tag_content[i + attr_len] != '=') continue;
+		if (strncasecmp(&tag_content[i], attr_name, attr_len) != 0) continue;
+		start = i;
+		found = 1;
+	}
+	if (!found) return 0;
+	for (u32 i = start; i + attr_len < tag_len; i++) {
 		int match = 1;
 		for (u32 j = 0; j < attr_len; j++) {
 			char a = tag_content[i+j], b = attr_name[j];
@@ -27432,6 +27461,46 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 			if (!is_close && tf_tag_is(tname, tname_len, "br")) {
 				ADD_BR_BREAK(cur_para_type);
 				last_break_was_p = 0;
+			} else if (!is_close && swf_version >= 7 && tf_tag_is(tname, tname_len, "img")) {
+				// <img> (SWF7+; SWF<=6 drops it): one placeholder space at
+				// size 2 carrying the image, format stack untouched. Rules:
+				// html_img.h.
+				static const char* const img_attrs[] = {
+					"src", "id", "width", "height", "align", "hspace", "vspace", "checkpolicyfile" };
+				char av[HTML_IMG_SRC_MAX];
+				if (tf_get_attr(tname, tname_len, "src", av, sizeof(av))) {
+					HtmlImg img;
+					html_img_init(&img);
+					for (u32 ai = 0; ai < sizeof(img_attrs) / sizeof(img_attrs[0]); ai++) {
+						if (!tf_get_attr(tname, tname_len, img_attrs[ai], av, sizeof(av))) continue;
+						char dv[HTML_IMG_SRC_MAX];
+						u32 dn = 0, al = (u32)strlen(av);
+						for (u32 ci = 0; ci < al && dn + 4 < sizeof(dv); ) {
+							u32 ob = 0, cons = 0;
+							if (av[ci] == '&' && tf_decode_entity(av, al, ci, &dv[dn], &ob, &cons)) {
+								dn += ob; ci += cons;
+							} else {
+								dv[dn++] = av[ci++];
+							}
+						}
+						dv[dn] = '\0';
+						html_img_set_attr(&img, img_attrs[ai], dv);
+					}
+					FLUSH_RUN();
+					ADD_CH(' ');
+					if (table->run_count < TF_MAX_RUNS) {
+						TFRun* r = &table->runs[table->run_count];
+						*r = fmt_stack[fmt_sp];
+						r->font_height = 2 * 20;
+						r->img = html_img_intern(&img);
+						r->start = table->text_len - 1;
+						r->length = 1;
+						table->run_count++;
+					}
+					run_text_start = table->text_len;
+					cw8_para_start = 0;
+					last_break_was_p = 0;
+				}
 			} else if (!is_close && tf_tag_is(tname, tname_len, "p")) {
 				if (!in_paragraph) {
 					// <p> opens a new paragraph. Bare content before it is included
@@ -27780,6 +27849,10 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				all_ws = 0;
 				break;
 			}
+		}
+		// An <img> placeholder space is content, not whitespace.
+		for (u32 ri = 0; all_ws && ri < table->run_count; ri++) {
+			if (table->runs[ri].img != 0 && table->runs[ri].length > 0) all_ws = 0;
 		}
 		if (all_ws) {
 			// Check if there are any tag breaks — if so, keep them (for multiline)
@@ -28176,6 +28249,7 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 				    r->bold != nr->bold ||
 				    r->italic != nr->italic ||
 				    r->underline != nr->underline ||
+				    r->img != nr->img ||
 				    strcmp(r->href, nr->href) != 0)
 					break;
 				group_end++;
@@ -28248,12 +28322,20 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			}
 
 			int need_a = (r->href[0] != '\0');
+			// <img> placeholder: one IMG tag per merged group, outside <A>
+			// in SWF7 and inside it in SWF8+ (Ruffle text_format.rs set_span).
+			char imgtag[HTML_IMG_SRC_MAX + HTML_IMG_ID_MAX + 160];
+			imgtag[0] = '\0';
+			if (r->img != 0 && html_img_get(r->img) != NULL)
+				html_img_serialize(html_img_get(r->img), imgtag, sizeof(imgtag));
 
+			if (table->swf_version < 8) TF_EMIT(buf, bp, bsz, imgtag);
 			if (need_a) {
 				char atag[512];
 				snprintf(atag, sizeof(atag), "<A HREF=\"%s\" TARGET=\"%s\">", r->href, r->href_target);
 				TF_EMIT(buf, bp, bsz, atag);
 			}
+			if (table->swf_version >= 8) TF_EMIT(buf, bp, bsz, imgtag);
 
 			if (r->bold) TF_EMIT(buf, bp, bsz, "<B>");
 			if (r->italic) TF_EMIT(buf, bp, bsz, "<I>");
@@ -28395,6 +28477,31 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 				char ab[256];
 				snprintf(ab, sizeof(ab), "<FONT COLOR=\"#%06X\"></FONT>", pfmt.color & 0xFFFFFF);
 				TF_EMIT(buf, bp, bsz, ab);
+			}
+		}
+
+		// A paragraph whose last content is an <img> placeholder (size 2) and
+		// that ends in a break: the break character carries the surrounding
+		// font, so Flash's writer opens it (set_font) before dropping the
+		// newline itself -> an empty `<FONT SIZE="12"></FONT>` unless that font
+		// is already on the FONT stack (Ruffle close_font_if_feasible).
+		if (prcnt > 0 && pruns[prcnt - 1]->img != 0 && have_pfmt && pe < table->text_len) {
+			int on_stack = 0;
+			for (int ai = font_ctx_sp; ai >= 0; ai--) {
+				if (strcmp(pfmt.font_name, font_ctx[ai].font_name) == 0 &&
+				    pfmt.font_height == font_ctx[ai].font_height &&
+				    pfmt.color == font_ctx[ai].color &&
+				    pfmt.letter_spacing == font_ctx[ai].letter_spacing &&
+				    pfmt.kerning == font_ctx[ai].kerning) { on_stack = 1; break; }
+			}
+			if (!on_stack) {
+				char ab[256];
+				TF_EMIT(buf, bp, bsz, "<FONT");
+				if (strcmp(pfmt.font_name, CTX.font_name) != 0) { snprintf(ab, sizeof(ab), " FACE=\"%s\"", pfmt.font_name); TF_EMIT(buf, bp, bsz, ab); }
+				if (pfmt.font_height != CTX.font_height) { snprintf(ab, sizeof(ab), " SIZE=\"%d\"", pfmt.font_height / 20); TF_EMIT(buf, bp, bsz, ab); }
+				if (pfmt.color != CTX.color) { snprintf(ab, sizeof(ab), " COLOR=\"#%06X\"", pfmt.color & 0xFFFFFF); TF_EMIT(buf, bp, bsz, ab); }
+				if (pfmt.kerning != CTX.kerning) { snprintf(ab, sizeof(ab), " KERNING=\"%d\"", pfmt.kerning); TF_EMIT(buf, bp, bsz, ab); }
+				TF_EMIT(buf, bp, bsz, "></FONT>");
 			}
 		}
 
@@ -45393,7 +45500,32 @@ static ASObject* getVersionedArrayProto(SWFAppContext* app_context)
 // (`_root['_level0']`, `_root._level`) still resolves to root.
 int g_path_walk_level0_undef = 0;
 
+// SWF<=5: a reference to a non-MovieClip display object resolves to its first
+// MovieClip ancestor (Ruffle object_reference.rs process_swf5_references,
+// applied on every AVM1 stack push, activation.rs stack_push). So in SWF5
+// `var tf = _root[name]` on a text field IS `_root`, and tf.htmlText/tf.text
+// are plain properties of the clip (avm1/html_text_img_parsing_swf5: Flash
+// prints TEXT= empty and HTML= the raw source). Applied to the results of
+// GetMember / GetVariable, which is where display-object refs are produced.
+static void swf5TextFieldRefToClip(SWFAppContext* app_context)
+{
+	if (g_swf_version > 5 || STACK_TOP_TYPE != ACTION_STACK_VALUE_MOVIECLIP) return;
+	MovieClip* mc = (MovieClip*) STACK_TOP_VALUE;
+	if (mc == NULL || !(mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2)) return;
+	MovieClip* p = mc->parent;
+	while (p != NULL && (p->ng_textfield_idx >= 0 || p->ng_textfield_idx == -2)) p = p->parent;
+	if (p != NULL) STACK_TOP_VALUE = (u64) p;
+}
+
+static void actionGetVariableImpl(SWFAppContext* app_context);
+
 void actionGetVariable(SWFAppContext* app_context)
+{
+	actionGetVariableImpl(app_context);
+	swf5TextFieldRefToClip(app_context);
+}
+
+static void actionGetVariableImpl(SWFAppContext* app_context)
 {
 	// Clear callable_this tracking — will be set if value is found on a WITH scope
 	g_last_callable_this_set = 0;
@@ -54660,8 +54792,12 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 			}
 			// TextField htmlText: parse HTML into format runs, extract plain text
+			// (SWF<=5: only on a real text field. A SWF5 text-field ref is its
+			// parent clip — swf5TextFieldRefToClip — where htmlText is a plain
+			// property.)
 			if (strcmp(prop_name, "htmlText") == 0 && mc->dynamic_props != NULL
-				&& value_var.type == ACTION_STACK_VALUE_STRING)
+				&& value_var.type == ACTION_STACK_VALUE_STRING
+				&& (g_swf_version > 5 || MC_IS_TEXTFIELD(mc)))
 			{
 				ASObject* props = (ASObject*) mc->dynamic_props;
 				// Check if html property is true
@@ -54697,6 +54833,7 @@ void actionSetMember(SWFAppContext* app_context)
 					table->from_html_text = 1; // Content set via .htmlText
 					TFRun defaults;
 					tf_get_defaults(mc, &defaults);
+					tf_apply_new_format_font(mc, &defaults);
 					// Override defaults from textColor
 					ActionVar* tc_prop = getProperty(props, "textColor", 9);
 					if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
@@ -56507,7 +56644,15 @@ static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc)
 	return ms < 1.0 ? 1 : (int)ms;
 }
 
+static void actionGetMemberImpl(SWFAppContext* app_context);
+
 void actionGetMember(SWFAppContext* app_context)
+{
+	actionGetMemberImpl(app_context);
+	swf5TextFieldRefToClip(app_context);
+}
+
+static void actionGetMemberImpl(SWFAppContext* app_context)
 {
 	// Some recompiled functions preload `_global` directly from the `global_object`
 	// C symbol at function entry, bypassing GetVariable("_global") which would
@@ -57785,7 +57930,9 @@ void actionGetMember(SWFAppContext* app_context)
 								_ht_def.font_height = (s16)fh;
 							}
 							ActionVar* _ht_fid = getProperty(_ht_dprops, "_tf_fontId", 10);
-							if (_ht_fid != NULL && _ht_fid->type == ACTION_STACK_VALUE_F64) {
+							if (tf_apply_new_format_font(mc, &_ht_def)) {
+								// setNewTextFormat face (device fonts included) wins
+							} else if (_ht_fid != NULL && _ht_fid->type == ACTION_STACK_VALUE_F64) {
 								double fid_d; memcpy(&fid_d, &_ht_fid->data.numeric_value, sizeof(double));
 								u16 fid = (u16)fid_d;
 								const char* fn = ng_getFontName(fid);
@@ -73487,6 +73634,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					fid_val.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_fontId", 10, &fid_val);
+					// Also keep the NAME: a device font ("Times") has no SWF font
+					// id, and the html default face must still be that name.
+					ActionVar fname_val = makeStringActionVar(app_context, _font_name, strlen(_font_name));
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_fontName", 12, &fname_val);
 				}
 				// Store leading (in twips) from TextFormat
 				ActionVar* ld_prop = getProperty(fmt_obj, "leading", 7);

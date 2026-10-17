@@ -12,6 +12,7 @@
 #include <strings.h>
 
 #include <avm2/avm2_value.h>
+#include <html_img.h>  // w2-htmltext: shared AVM1/AVM2 htmlText <img> rules
 #include <memory/heap.h>
 
 #include <avm2/avm2_gc.h>
@@ -759,6 +760,7 @@ typedef struct Avm2TextSpan
 {
 	uint32_t length;  // UTF-16 units
 	Avm2TextFormatFields fmt;  // fully present
+	uint16_t img;  // html_img.h pool index of an <img> placeholder (0 = none)
 } Avm2TextSpan;
 
 struct LLayout;
@@ -886,6 +888,7 @@ static void spans_push(Avm2Context* ctx, Avm2EditTextExt* et, uint32_t length,
 	s->fmt = span_default(ctx);
 	fields_apply(&s->fmt, tf);
 	s->fmt.display = DISPLAY_BLOCK;
+	s->img = 0;
 }
 
 static void spans_insert(Avm2Context* ctx, Avm2EditTextExt* et, uint32_t at,
@@ -896,6 +899,7 @@ static void spans_insert(Avm2Context* ctx, Avm2EditTextExt* et, uint32_t at,
 	        (et->span_count - at) * sizeof(Avm2TextSpan));
 	et->spans[at].length = length;
 	et->spans[at].fmt = *concrete;
+	et->spans[at].img = 0;
 	et->span_count++;
 }
 
@@ -947,7 +951,7 @@ static void spans_normalize(Avm2Context* ctx, Avm2EditTextExt* et)
 		{
 			spans_remove_range(et, i + 1, i + 2);
 		}
-		else if (fields_equal(&a->fmt, &b->fmt))
+		else if (fields_equal(&a->fmt, &b->fmt) && a->img == b->img)
 		{
 			a->length += b->length;
 			spans_remove_range(et, i + 1, i + 2);
@@ -995,6 +999,7 @@ static void span_break_at(Avm2Context* ctx, Avm2EditTextExt* et, uint32_t pos)
 			Avm2TextFormatFields fmt = et->spans[i].fmt;
 			et->spans[i].length = first;
 			spans_insert(ctx, et, i + 1, e - pos, &fmt);
+			et->spans[i + 1].img = et->spans[i].img;
 			return;
 		}
 		acc = e;
@@ -1265,14 +1270,16 @@ typedef struct HtmlAttr
 	uint32_t value_len;
 } HtmlAttr;
 
+// A duplicated attribute resolves to its LAST occurrence (Flash; Ruffle
+// 69a017387 `attributes.iter().rev()`).
 static const HtmlAttr* attr_find(const HtmlAttr* attrs, uint32_t n, const char* name)
 {
 	uint32_t nl = (uint32_t) strlen(name);
-	for (uint32_t i = 0; i < n; i++)
+	for (uint32_t i = n; i > 0; i--)
 	{
-		if (attrs[i].name_len == nl && strncasecmp(attrs[i].name, name, nl) == 0)
+		if (attrs[i - 1].name_len == nl && strncasecmp(attrs[i - 1].name, name, nl) == 0)
 		{
-			return &attrs[i];
+			return &attrs[i - 1];
 		}
 	}
 	return NULL;
@@ -1574,6 +1581,32 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 			else if (strcmp(tag_name, "sbr") == 0)
 			{
 				PUSH_TEXT_SPAN("\r", 1, &format);
+				skip_push = 1;
+				handle_end = 0;
+			}
+			else if (strcmp(tag_name, "img") == 0)
+			{
+				// One placeholder space at size 2 carrying the image; the
+				// format stack is untouched. Rules: html_img.h.
+				static const char* const img_attrs[] = {
+					"src", "id", "width", "height", "align", "hspace", "vspace",
+					"checkpolicyfile" };
+				const HtmlAttr* src = ATTR("src");
+				if (swf_version >= 7 && src != NULL && src->value != NULL)
+				{
+					HtmlImg img;
+					html_img_init(&img);
+					for (uint32_t ai = 0; ai < sizeof(img_attrs) / sizeof(img_attrs[0]); ai++)
+					{
+						const HtmlAttr* a = ATTR(img_attrs[ai]);
+						if (a != NULL && a->value != NULL) html_img_set_attr(&img, img_attrs[ai], a->value);
+					}
+					Avm2TextFormatFields img_format = format;
+					img_format.size = 2.0;
+					img_format.present |= TFP_SIZE;
+					PUSH_TEXT_SPAN(" ", 1, &img_format);
+					et->spans[et->span_count - 1].img = html_img_intern(&img);
+				}
 				skip_push = 1;
 				handle_end = 0;
 			}
@@ -1905,10 +1938,30 @@ static void spans_from_html(Avm2Context* ctx, Avm2EditTextExt* et,
 		uint32_t nrem = 0;
 		int have_start = 1;
 		uint32_t rem_start = 0;
+		uint32_t img_span = 0, img_acc = 0;
 		for (uint32_t i = 0; i < len; i++)
 		{
 			int is_nl = (u[i] == '\r');
 			int is_sp = (u[i] == ' ');
+			// An <img> placeholder space (the start of an image span) is
+			// never removed, but whitespace after it still collapses.
+			while (img_span < et->span_count && img_acc + et->spans[img_span].length <= i)
+			{
+				img_acc += et->spans[img_span].length;
+				img_span++;
+			}
+			int is_image = is_sp && img_span < et->span_count && img_acc == i
+			               && et->spans[img_span].img != 0;
+			if (is_image && have_start)
+			{
+				if (nrem < 256)
+				{
+					to_remove[nrem][0] = rem_start;
+					to_remove[nrem][1] = i;
+					nrem++;
+				}
+				have_start = 0;
+			}
 			if (is_nl || !is_sp)
 			{
 				if (have_start && nrem < 256)
@@ -1968,6 +2021,7 @@ typedef struct HtmlWriter
 	int open_tags[16];
 	uint32_t open_n;
 	Avm2TextFormatFields default_span;
+	uint16_t img;  // <img> of the span being set (html_img.h index, 0 = none)
 } HtmlWriter;
 
 static void hw_puts(HtmlWriter* w, const char* s)
@@ -2218,7 +2272,15 @@ static void hw_set_span(HtmlWriter* w, const Avm2TextFormatFields* span)
 		hw_open_tag(w, span->bullet ? HT_LI : HT_P);
 	}
 	hw_set_font(w, span);
+	// IMG is not closeable: written outside <A> before SWF8, inside after.
+	char imgtag[HTML_IMG_SRC_MAX + HTML_IMG_ID_MAX + 160];
+	imgtag[0] = '\0';
+	if (w->img != 0 && html_img_get(w->img) != NULL)
+		html_img_serialize(html_img_get(w->img), imgtag, sizeof(imgtag));
+	if (w->ctx->swf_version < 8) hw_puts(w, imgtag);
 	if (span->url != NULL && span->url->len > 0) hw_open_tag(w, HT_A);
+	if (w->ctx->swf_version >= 8) hw_puts(w, imgtag);
+	w->img = 0;
 	if (span->bold) hw_open_tag(w, HT_B);
 	if (span->italic) hw_open_tag(w, HT_I);
 	if (span->underline) hw_open_tag(w, HT_U);
@@ -2278,6 +2340,7 @@ static const Avm2String* spans_to_html(Avm2Context* ctx, Avm2EditTextExt* et)
 		acc = end;
 		if (end > u16_length(et->text)) end = u16_length(et->text);
 		if (end <= start) continue;
+		w.img = et->spans[i].img;
 		hw_set_span(&w, &et->spans[i].fmt);
 		uint32_t sb2 = u16_to_byte(et->text, start);
 		uint32_t eb = u16_to_byte(et->text, end);
