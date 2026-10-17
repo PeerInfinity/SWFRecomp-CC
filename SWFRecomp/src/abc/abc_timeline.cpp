@@ -782,11 +782,11 @@ struct FontDef
 	// lands exactly on 32768 and measured as -32px.
 	std::vector<int32_t> advances;
 	// Flattened contour polylines in font units (quadratic curves subdivided
-	// at parse time). Contours of glyph g are contour indices
-	// [glyph_contour_start[g], glyph_contour_start[g+1]); contour k's points
-	// are pair indices [k == glyph_contour_start[g] ? glyph_pt_start[g]
-	// : contour_ends[k-1], contour_ends[k]) into glyph_pts.
-	std::vector<int32_t> glyph_pts;             // x,y pairs
+	// at parse time; f32 and unrounded, like Ruffle's). Contours of glyph g
+	// are contour indices [glyph_contour_start[g], glyph_contour_start[g+1]);
+	// contour k's points are pair indices [k == glyph_contour_start[g] ?
+	// glyph_pt_start[g] : contour_ends[k-1], contour_ends[k]) into glyph_pts.
+	std::vector<float> glyph_pts;               // x,y pairs
 	std::vector<uint32_t> glyph_pt_start;       // nglyphs+1
 	std::vector<uint32_t> glyph_contour_ends;   // absolute pair indices
 	std::vector<uint32_t> glyph_contour_start;  // nglyphs+1
@@ -856,7 +856,7 @@ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
 	uint32_t fill_bits = r.ub(4);
 	uint32_t line_bits = r.ub(4);
 	int32_t px = 0, py = 0;
-	std::vector<int32_t> cur;  // x,y pairs of the open contour
+	std::vector<float> cur;  // x,y pairs of the open contour
 
 	auto flush = [&]() {
 		if (cur.size() >= 6)  // a fillable contour needs >= 3 points
@@ -893,21 +893,21 @@ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
 			if (r.ub(1)) { dx = r.sb(nb); dy = r.sb(nb); }
 			else if (r.ub(1)) dy = r.sb(nb);
 			else dx = r.sb(nb);
-			if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
+			if (cur.empty()) { cur.push_back((float) px); cur.push_back((float) py); }
 			px += dx;
 			py += dy;
-			cur.push_back(px);
-			cur.push_back(py);
+			cur.push_back((float) px);
+			cur.push_back((float) py);
 		}
 		else  // curved edge (quadratic)
 		{
 			uint32_t nb = r.ub(4) + 2;
 			int32_t cdx = r.sb(nb), cdy = r.sb(nb);
 			int32_t adx = r.sb(nb), ady = r.sb(nb);
-			double x0 = px, y0 = py;
-			double cx = px + cdx, cy = py + cdy;
-			double ax = cx + adx, ay = cy + ady;
-			if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
+			float x0 = (float) px, y0 = (float) py;
+			float cx = (float) (px + cdx), cy = (float) (py + cdy);
+			float ax = (float) (px + cdx + adx), ay = (float) (py + cdy + ady);
+			if (cur.empty()) { cur.push_back(x0); cur.push_back(y0); }
 			// Ruffle flattens a glyph outline with lyon's Levien schedule at
 			// FillOptions::DEFAULT_TOLERANCE (0.1 px = 2.0 glyph units, since
 			// register_shape tessellates glyphs at scale 1.0 and reads a glyph
@@ -915,22 +915,22 @@ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
 			// left up to dev/64 of error, ~30x the integer-unit quantisation on
 			// a 20480-em face, and that error is what the AVM2 text image tests
 			// were losing run-edge pixels to.
-			GlyphLevienParams lp = glyphLevienInit((float) x0, (float) y0,
-			                                       (float) cx, (float) cy,
-			                                       (float) ax, (float) ay,
+			// The flattened points stay f32 and unrounded, as in Ruffle
+			// (glyphQuadSample).
+			GlyphLevienParams lp = glyphLevienInit(x0, y0, cx, cy, ax, ay,
 			                                       GLYPH_LEVIEN_TOL);
-			uint32_t nseg = (lp.count < 1) ? 1 : lp.count;
-			for (uint32_t k = 1; k <= nseg; k++)
+			for (uint32_t k = 1; k < lp.count; k++)
 			{
-				double t = (k < lp.count) ? (double) glyphLevienT(lp, k) : 1.0;
-				double u = 1.0 - t;
-				double qx = u * u * x0 + 2.0 * u * t * cx + t * t * ax;
-				double qy = u * u * y0 + 2.0 * u * t * cy + t * t * ay;
-				cur.push_back((int32_t) lround(qx));
-				cur.push_back((int32_t) lround(qy));
+				float qx, qy;
+				glyphQuadSample(x0, y0, cx, cy, ax, ay, glyphLevienT(lp, k),
+				                &qx, &qy);
+				cur.push_back(qx);
+				cur.push_back(qy);
 			}
-			px = (int32_t) lround(ax);
-			py = (int32_t) lround(ay);
+			cur.push_back(ax);
+			cur.push_back(ay);
+			px += cdx + adx;
+			py += cdy + ady;
 		}
 	}
 	flush();
@@ -2199,8 +2199,8 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		}
 		if (!fd.glyph_pts.empty())
 		{
-			out << "static const int32_t font_" << i << "_pts[] = { ";
-			for (auto v : fd.glyph_pts) out << v << ", ";
+			out << "static const float font_" << i << "_pts[] = { ";
+			glyphEmitPts(out, fd.glyph_pts);
 			out << "};\n";
 			out << "static const uint32_t font_" << i << "_pt_start[] = { ";
 			for (auto v : fd.glyph_pt_start) out << v << ", ";

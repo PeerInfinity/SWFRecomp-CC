@@ -1,0 +1,306 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_abc.h b/SWFModernRuntime/include/avm2/avm2_abc.h
+index c6561d860..8a0844ca1 100644
+--- a/SWFModernRuntime/include/avm2/avm2_abc.h
++++ b/SWFModernRuntime/include/avm2/avm2_abc.h
+@@ -476,13 +476,15 @@ typedef struct Avm2FontData
+ 	// and a DefineFont3 face can legitimately store 32768.
+ 	const int32_t* advances;
+ 	// Glyph outlines: contour polylines in font units, curves pre-flattened
+-	// at recompile time. All NULL when outlines are unavailable (device
++	// at recompile time. Points are f32 and NOT rounded to integer units:
++	// Ruffle tessellates glyphs in f32 (lyon), and a 0.5-unit rounding is
++	// about the rasterizer's subpixel at large text sizes. All NULL when outlines are unavailable (device
+ 	// fallback font, older generated tables). Contours of glyph g are
+ 	// contour indices [glyph_contour_start[g], glyph_contour_start[g+1]);
+ 	// contour k's points are pair indices
+ 	// [k == glyph_contour_start[g] ? glyph_pt_start[g] : glyph_contour_ends[k-1],
+ 	//  glyph_contour_ends[k]) into glyph_pts. Contours are implicitly closed.
+-	const int32_t* glyph_pts;             // x,y pairs
++	const float* glyph_pts;               // x,y pairs
+ 	const uint32_t* glyph_pt_start;       // glyph_count+1 entries
+ 	const uint32_t* glyph_contour_ends;   // absolute pair indices
+ 	const uint32_t* glyph_contour_start;  // glyph_count+1 entries
+diff --git a/SWFRecomp/include/abc/abc_glyph_flatten.hpp b/SWFRecomp/include/abc/abc_glyph_flatten.hpp
+index 2229c278a..891850ee8 100644
+--- a/SWFRecomp/include/abc/abc_glyph_flatten.hpp
++++ b/SWFRecomp/include/abc/abc_glyph_flatten.hpp
+@@ -17,6 +17,8 @@
+ 
+ #include <cmath>
+ #include <cstdint>
++#include <ostream>
++#include <vector>
+ 
+ namespace SWFRecomp
+ {
+@@ -92,5 +94,39 @@ inline float glyphLevienT(const GlyphLevienParams& p, uint32_t i)
+ 	return (u - p.inv_integral_from) * p.div_inv_integral_diff;
+ }
+ 
++// One flattened point of the quadratic (x0,y0)-(cx,cy)-(x1,y1) at t, in f32
++// with lyon's own operation order (QuadraticBezierSegment::sample). Ruffle
++// tessellates in f32 and never rounds a flattened point back to an integer
++// unit, so the outline tables store these floats as-is: an integer-unit
++// lround moved run edges by up to 0.5 unit (~1/256 px for a 200 px glyph on a
++// 20480-em face, the lavapipe subpixel), which is what visual/fonts/glyph and
++// fonts/embed_matching/* were losing pixels to. Every SWF/TTF endpoint is an
++// integer < 2^24, so f32 holds the unflattened points exactly.
++inline void glyphQuadSample(float x0, float y0, float cx, float cy,
++                            float x1, float y1, float t,
++                            float* ox, float* oy)
++{
++	float t2 = t * t;
++	float one_t = 1.0f - t;
++	float one_t2 = one_t * one_t;
++	*ox = x0 * one_t2 + cx * 2.0f * one_t * t + x1 * t2;
++	*oy = y0 * one_t2 + cy * 2.0f * one_t * t + y1 * t2;
++}
++
++// Emit a glyph point table as a C `float` initializer list. 9 significant
++// digits round-trip any f32 exactly (FLT_DECIMAL_DIG).
++inline void glyphEmitPts(std::ostream& out, const std::vector<float>& pts)
++{
++	std::streamsize old_prec = out.precision(9);
++	for (float v : pts)
++	{
++		if (v == std::floor(v) && std::fabs(v) < 16777216.0f)
++			out << (long) v << ", ";
++		else
++			out << v << "f, ";
++	}
++	out.precision(old_prec);
++}
++
+ }  // namespace abc
+ }  // namespace SWFRecomp
+diff --git a/SWFRecomp/src/abc/abc_devicefont.cpp b/SWFRecomp/src/abc/abc_devicefont.cpp
+index 6a395c988..cbeebbd52 100644
+--- a/SWFRecomp/src/abc/abc_devicefont.cpp
++++ b/SWFRecomp/src/abc/abc_devicefont.cpp
+@@ -47,8 +47,9 @@ struct DeviceFaceDef
+ 	bool hidden = false;
+ 	// Flattened glyph outlines in the face's own font units, y NEGATED
+ 	// (Ruffle font_face.rs GlyphToDrawing emits `-y`), indexed exactly like
+-	// `codes`/`advances` (see appendGlyphOutline).
+-	std::vector<int32_t> glyph_pts;             // x,y pairs
++	// `codes`/`advances` (see appendGlyphOutline). Flattened points are f32
++	// and unrounded, as in Ruffle (abc_glyph_flatten.hpp glyphQuadSample).
++	std::vector<float> glyph_pts;               // x,y pairs
+ 	std::vector<uint32_t> glyph_pt_start;       // nglyphs+1
+ 	std::vector<uint32_t> glyph_contour_ends;   // absolute pair indices
+ 	std::vector<uint32_t> glyph_contour_start;  // nglyphs+1
+@@ -70,7 +71,7 @@ struct DeviceFaceDef
+ struct OutlineSink
+ {
+ 	DeviceFaceDef& fd;
+-	std::vector<int32_t> cur;  // x,y pairs of the open contour
++	std::vector<float> cur;    // x,y pairs of the open contour
+ 	int32_t px = 0, py = 0;    // pen, already truncated + y-negated
+ 
+ 	explicit OutlineSink(DeviceFaceDef& f) : fd(f) {}
+@@ -89,7 +90,7 @@ struct OutlineSink
+ 	}
+ 	void start()
+ 	{
+-		if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
++		if (cur.empty()) { cur.push_back((float) px); cur.push_back((float) py); }
+ 	}
+ 	void moveTo(double x, double y)
+ 	{
+@@ -102,32 +103,31 @@ struct OutlineSink
+ 		start();
+ 		px = tw(x);
+ 		py = tw(-y);
+-		cur.push_back(px);
+-		cur.push_back(py);
++		cur.push_back((float) px);
++		cur.push_back((float) py);
+ 	}
+ 	void quadTo(double cxf, double cyf, double axf, double ayf)
+ 	{
+ 		start();
+-		// Flatten the TRUNCATED curve (Ruffle truncates before lyon sees it),
+-		// rounding each flattened point back to a font unit exactly as the
+-		// embedded-glyph path does.
+-		double x0 = px, y0 = py;
+-		double cx = tw(cxf), cy = tw(-cyf);
+-		double ax = tw(axf), ay = tw(-ayf);
+-		GlyphLevienParams lp = glyphLevienInit((float) x0, (float) y0,
+-		                                       (float) cx, (float) cy,
+-		                                       (float) ax, (float) ay,
++		// Flatten the TRUNCATED curve (Ruffle truncates before lyon sees it);
++		// the flattened points stay f32, exactly as the embedded-glyph path.
++		float x0 = (float) px, y0 = (float) py;
++		float cx = (float) tw(cxf), cy = (float) tw(-cyf);
++		float ax = (float) tw(axf), ay = (float) tw(-ayf);
++		GlyphLevienParams lp = glyphLevienInit(x0, y0, cx, cy, ax, ay,
+ 		                                       GLYPH_LEVIEN_TOL);
+-		uint32_t nseg = (lp.count < 1) ? 1 : lp.count;
+-		for (uint32_t k = 1; k <= nseg; k++)
++		for (uint32_t k = 1; k < lp.count; k++)
+ 		{
+-			double t = (k < lp.count) ? (double) glyphLevienT(lp, k) : 1.0;
+-			double u = 1.0 - t;
+-			cur.push_back((int32_t) lround(u*u*x0 + 2.0*u*t*cx + t*t*ax));
+-			cur.push_back((int32_t) lround(u*u*y0 + 2.0*u*t*cy + t*t*ay));
++			float qx, qy;
++			glyphQuadSample(x0, y0, cx, cy, ax, ay, glyphLevienT(lp, k),
++			                &qx, &qy);
++			cur.push_back(qx);
++			cur.push_back(qy);
+ 		}
+-		px = (int32_t) ax;
+-		py = (int32_t) ay;
++		cur.push_back(ax);
++		cur.push_back(ay);
++		px = tw(axf);
++		py = tw(-ayf);
+ 	}
+ 	void cubicTo(double c1xf, double c1yf, double c2xf, double c2yf,
+ 	             double axf, double ayf)
+@@ -166,8 +166,8 @@ struct OutlineSink
+ 			{
+ 				double t = (j < lp.count) ? (double) glyphLevienT(lp, j) : 1.0;
+ 				double u = 1.0 - t;
+-				cur.push_back((int32_t) lround(u*u*lx + 2.0*u*t*qcx + t*t*ex));
+-				cur.push_back((int32_t) lround(u*u*ly + 2.0*u*t*qcy + t*t*ey));
++				cur.push_back((float) (u*u*lx + 2.0*u*t*qcx + t*t*ex));
++				cur.push_back((float) (u*u*ly + 2.0*u*t*qcy + t*t*ey));
+ 			}
+ 			lx = ex;
+ 			ly = ey;
+@@ -631,8 +631,8 @@ void emitDeviceFonts(std::ostream& out)
+ 		}
+ 		if (!fd.glyph_pts.empty())
+ 		{
+-			out << "static const int32_t devfont_" << i << "_pts[] = { ";
+-			for (auto v : fd.glyph_pts) out << v << ", ";
++			out << "static const float devfont_" << i << "_pts[] = { ";
++			glyphEmitPts(out, fd.glyph_pts);
+ 			out << "};\n";
+ 			out << "static const uint32_t devfont_" << i << "_pt_start[] = { ";
+ 			for (auto v : fd.glyph_pt_start) out << v << ", ";
+diff --git a/SWFRecomp/src/abc/abc_timeline.cpp b/SWFRecomp/src/abc/abc_timeline.cpp
+index 15de868df..118caab27 100644
+--- a/SWFRecomp/src/abc/abc_timeline.cpp
++++ b/SWFRecomp/src/abc/abc_timeline.cpp
+@@ -782,11 +782,11 @@ struct FontDef
+ 	// lands exactly on 32768 and measured as -32px.
+ 	std::vector<int32_t> advances;
+ 	// Flattened contour polylines in font units (quadratic curves subdivided
+-	// at parse time). Contours of glyph g are contour indices
+-	// [glyph_contour_start[g], glyph_contour_start[g+1]); contour k's points
+-	// are pair indices [k == glyph_contour_start[g] ? glyph_pt_start[g]
+-	// : contour_ends[k-1], contour_ends[k]) into glyph_pts.
+-	std::vector<int32_t> glyph_pts;             // x,y pairs
++	// at parse time; f32 and unrounded, like Ruffle's). Contours of glyph g
++	// are contour indices [glyph_contour_start[g], glyph_contour_start[g+1]);
++	// contour k's points are pair indices [k == glyph_contour_start[g] ?
++	// glyph_pt_start[g] : contour_ends[k-1], contour_ends[k]) into glyph_pts.
++	std::vector<float> glyph_pts;               // x,y pairs
+ 	std::vector<uint32_t> glyph_pt_start;       // nglyphs+1
+ 	std::vector<uint32_t> glyph_contour_ends;   // absolute pair indices
+ 	std::vector<uint32_t> glyph_contour_start;  // nglyphs+1
+@@ -856,7 +856,7 @@ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
+ 	uint32_t fill_bits = r.ub(4);
+ 	uint32_t line_bits = r.ub(4);
+ 	int32_t px = 0, py = 0;
+-	std::vector<int32_t> cur;  // x,y pairs of the open contour
++	std::vector<float> cur;  // x,y pairs of the open contour
+ 
+ 	auto flush = [&]() {
+ 		if (cur.size() >= 6)  // a fillable contour needs >= 3 points
+@@ -893,21 +893,21 @@ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
+ 			if (r.ub(1)) { dx = r.sb(nb); dy = r.sb(nb); }
+ 			else if (r.ub(1)) dy = r.sb(nb);
+ 			else dx = r.sb(nb);
+-			if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
++			if (cur.empty()) { cur.push_back((float) px); cur.push_back((float) py); }
+ 			px += dx;
+ 			py += dy;
+-			cur.push_back(px);
+-			cur.push_back(py);
++			cur.push_back((float) px);
++			cur.push_back((float) py);
+ 		}
+ 		else  // curved edge (quadratic)
+ 		{
+ 			uint32_t nb = r.ub(4) + 2;
+ 			int32_t cdx = r.sb(nb), cdy = r.sb(nb);
+ 			int32_t adx = r.sb(nb), ady = r.sb(nb);
+-			double x0 = px, y0 = py;
+-			double cx = px + cdx, cy = py + cdy;
+-			double ax = cx + adx, ay = cy + ady;
+-			if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
++			float x0 = (float) px, y0 = (float) py;
++			float cx = (float) (px + cdx), cy = (float) (py + cdy);
++			float ax = (float) (px + cdx + adx), ay = (float) (py + cdy + ady);
++			if (cur.empty()) { cur.push_back(x0); cur.push_back(y0); }
+ 			// Ruffle flattens a glyph outline with lyon's Levien schedule at
+ 			// FillOptions::DEFAULT_TOLERANCE (0.1 px = 2.0 glyph units, since
+ 			// register_shape tessellates glyphs at scale 1.0 and reads a glyph
+@@ -915,22 +915,22 @@ static void parseGlyphShape(const uint8_t* p, const uint8_t* end, FontDef& fd)
+ 			// left up to dev/64 of error, ~30x the integer-unit quantisation on
+ 			// a 20480-em face, and that error is what the AVM2 text image tests
+ 			// were losing run-edge pixels to.
+-			GlyphLevienParams lp = glyphLevienInit((float) x0, (float) y0,
+-			                                       (float) cx, (float) cy,
+-			                                       (float) ax, (float) ay,
++			// The flattened points stay f32 and unrounded, as in Ruffle
++			// (glyphQuadSample).
++			GlyphLevienParams lp = glyphLevienInit(x0, y0, cx, cy, ax, ay,
+ 			                                       GLYPH_LEVIEN_TOL);
+-			uint32_t nseg = (lp.count < 1) ? 1 : lp.count;
+-			for (uint32_t k = 1; k <= nseg; k++)
++			for (uint32_t k = 1; k < lp.count; k++)
+ 			{
+-				double t = (k < lp.count) ? (double) glyphLevienT(lp, k) : 1.0;
+-				double u = 1.0 - t;
+-				double qx = u * u * x0 + 2.0 * u * t * cx + t * t * ax;
+-				double qy = u * u * y0 + 2.0 * u * t * cy + t * t * ay;
+-				cur.push_back((int32_t) lround(qx));
+-				cur.push_back((int32_t) lround(qy));
++				float qx, qy;
++				glyphQuadSample(x0, y0, cx, cy, ax, ay, glyphLevienT(lp, k),
++				                &qx, &qy);
++				cur.push_back(qx);
++				cur.push_back(qy);
+ 			}
+-			px = (int32_t) lround(ax);
+-			py = (int32_t) lround(ay);
++			cur.push_back(ax);
++			cur.push_back(ay);
++			px += cdx + adx;
++			py += cdy + ady;
+ 		}
+ 	}
+ 	flush();
+@@ -2199,8 +2199,8 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
+ 		}
+ 		if (!fd.glyph_pts.empty())
+ 		{
+-			out << "static const int32_t font_" << i << "_pts[] = { ";
+-			for (auto v : fd.glyph_pts) out << v << ", ";
++			out << "static const float font_" << i << "_pts[] = { ";
++			glyphEmitPts(out, fd.glyph_pts);
+ 			out << "};\n";
+ 			out << "static const uint32_t font_" << i << "_pt_start[] = { ";
+ 			for (auto v : fd.glyph_pt_start) out << v << ", ";
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 390a54039..7c0dcdbca 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -397,3 +397,13 @@ visual/filters/blur_scales_with_screen      # nested cab+Blur under 5x sprite,
+ visual/edittext/edittext_border_filters     # PO3 filter LIST on DefineEditText  1 cmp
+                                             #   (6 filtered placements, 2 fields)
+ visual/cache_as_bitmap/edittext_scroll      # wheel-scrolled field + DropShadow 2 cmps
++
++# SESSION 22 ADDITION (s22 cloud `w2-glyph-subunit`). The set had no member
++# whose pixels depend on AVM2 glyph-outline geometry (DefineFont3 / device-face
++# outline tables from abc_timeline.cpp / abc_devicefont.cpp, rasterised by
++# avm2_display.c avm2_render_glyphs). Passes AT its outlier limit (6/6) once
++# the outline points keep sub-unit precision, so any glyph-geometry move shows
++# here first. (`visual/edittext/edittext_border_filters`, the other
++# zero-headroom row the brief named, is already a member above.)
++# tier=1  (CI-passing once w2-glyph-subunit lands; zero headroom)
++fonts/embed_matching/fallback_preferences   # AVM2 embedded + fallback glyphs 1 cmp

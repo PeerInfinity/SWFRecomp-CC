@@ -17,6 +17,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <ostream>
+#include <vector>
 
 namespace SWFRecomp
 {
@@ -90,6 +92,40 @@ inline float glyphLevienT(const GlyphLevienParams& p, uint32_t i)
 {
 	float u = glyphParabolaInvIntegral(p.integral_from + p.integral_step * (float) i);
 	return (u - p.inv_integral_from) * p.div_inv_integral_diff;
+}
+
+// One flattened point of the quadratic (x0,y0)-(cx,cy)-(x1,y1) at t, in f32
+// with lyon's own operation order (QuadraticBezierSegment::sample). Ruffle
+// tessellates in f32 and never rounds a flattened point back to an integer
+// unit, so the outline tables store these floats as-is: an integer-unit
+// lround moved run edges by up to 0.5 unit (~1/256 px for a 200 px glyph on a
+// 20480-em face, the lavapipe subpixel), which is what visual/fonts/glyph and
+// fonts/embed_matching/* were losing pixels to. Every SWF/TTF endpoint is an
+// integer < 2^24, so f32 holds the unflattened points exactly.
+inline void glyphQuadSample(float x0, float y0, float cx, float cy,
+                            float x1, float y1, float t,
+                            float* ox, float* oy)
+{
+	float t2 = t * t;
+	float one_t = 1.0f - t;
+	float one_t2 = one_t * one_t;
+	*ox = x0 * one_t2 + cx * 2.0f * one_t * t + x1 * t2;
+	*oy = y0 * one_t2 + cy * 2.0f * one_t * t + y1 * t2;
+}
+
+// Emit a glyph point table as a C `float` initializer list. 9 significant
+// digits round-trip any f32 exactly (FLT_DECIMAL_DIG).
+inline void glyphEmitPts(std::ostream& out, const std::vector<float>& pts)
+{
+	std::streamsize old_prec = out.precision(9);
+	for (float v : pts)
+	{
+		if (v == std::floor(v) && std::fabs(v) < 16777216.0f)
+			out << (long) v << ", ";
+		else
+			out << v << "f, ";
+	}
+	out.precision(old_prec);
 }
 
 }  // namespace abc

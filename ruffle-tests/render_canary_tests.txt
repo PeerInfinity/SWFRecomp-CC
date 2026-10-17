@@ -465,3 +465,13 @@ avm2/graphics_draw_path                     # drawPath cubic (lyon flatten)    1
 visual/cache_as_bitmap/text                 # AVM1 CAB root + device EditText 1 cmp
 from_shumway/avm1/text-bind                 # AVM1 `_sans` via [default_fonts] 1 cmp
 avm2/bitmapdata_draw_masks                  # draw(src) honours src.mask, tol 0 1 cmp
+
+# SESSION 22 ADDITION (s22 cloud `w2-glyph-subunit`). The set had no member
+# whose pixels depend on AVM2 glyph-outline geometry (DefineFont3 / device-face
+# outline tables from abc_timeline.cpp / abc_devicefont.cpp, rasterised by
+# avm2_display.c avm2_render_glyphs). Passes AT its outlier limit (6/6) once
+# the outline points keep sub-unit precision, so any glyph-geometry move shows
+# here first. (`visual/edittext/edittext_border_filters`, the other
+# zero-headroom row the brief named, is already a member above.)
+# tier=1  (CI-passing once w2-glyph-subunit lands; zero headroom)
+fonts/embed_matching/fallback_preferences   # AVM2 embedded + fallback glyphs 1 cmp

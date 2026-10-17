@@ -47,8 +47,9 @@ struct DeviceFaceDef
 	bool hidden = false;
 	// Flattened glyph outlines in the face's own font units, y NEGATED
 	// (Ruffle font_face.rs GlyphToDrawing emits `-y`), indexed exactly like
-	// `codes`/`advances` (see appendGlyphOutline).
-	std::vector<int32_t> glyph_pts;             // x,y pairs
+	// `codes`/`advances` (see appendGlyphOutline). Flattened points are f32
+	// and unrounded, as in Ruffle (abc_glyph_flatten.hpp glyphQuadSample).
+	std::vector<float> glyph_pts;               // x,y pairs
 	std::vector<uint32_t> glyph_pt_start;       // nglyphs+1
 	std::vector<uint32_t> glyph_contour_ends;   // absolute pair indices
 	std::vector<uint32_t> glyph_contour_start;  // nglyphs+1
@@ -70,7 +71,7 @@ struct DeviceFaceDef
 struct OutlineSink
 {
 	DeviceFaceDef& fd;
-	std::vector<int32_t> cur;  // x,y pairs of the open contour
+	std::vector<float> cur;    // x,y pairs of the open contour
 	int32_t px = 0, py = 0;    // pen, already truncated + y-negated
 
 	explicit OutlineSink(DeviceFaceDef& f) : fd(f) {}
@@ -89,7 +90,7 @@ struct OutlineSink
 	}
 	void start()
 	{
-		if (cur.empty()) { cur.push_back(px); cur.push_back(py); }
+		if (cur.empty()) { cur.push_back((float) px); cur.push_back((float) py); }
 	}
 	void moveTo(double x, double y)
 	{
@@ -102,32 +103,31 @@ struct OutlineSink
 		start();
 		px = tw(x);
 		py = tw(-y);
-		cur.push_back(px);
-		cur.push_back(py);
+		cur.push_back((float) px);
+		cur.push_back((float) py);
 	}
 	void quadTo(double cxf, double cyf, double axf, double ayf)
 	{
 		start();
-		// Flatten the TRUNCATED curve (Ruffle truncates before lyon sees it),
-		// rounding each flattened point back to a font unit exactly as the
-		// embedded-glyph path does.
-		double x0 = px, y0 = py;
-		double cx = tw(cxf), cy = tw(-cyf);
-		double ax = tw(axf), ay = tw(-ayf);
-		GlyphLevienParams lp = glyphLevienInit((float) x0, (float) y0,
-		                                       (float) cx, (float) cy,
-		                                       (float) ax, (float) ay,
+		// Flatten the TRUNCATED curve (Ruffle truncates before lyon sees it);
+		// the flattened points stay f32, exactly as the embedded-glyph path.
+		float x0 = (float) px, y0 = (float) py;
+		float cx = (float) tw(cxf), cy = (float) tw(-cyf);
+		float ax = (float) tw(axf), ay = (float) tw(-ayf);
+		GlyphLevienParams lp = glyphLevienInit(x0, y0, cx, cy, ax, ay,
 		                                       GLYPH_LEVIEN_TOL);
-		uint32_t nseg = (lp.count < 1) ? 1 : lp.count;
-		for (uint32_t k = 1; k <= nseg; k++)
+		for (uint32_t k = 1; k < lp.count; k++)
 		{
-			double t = (k < lp.count) ? (double) glyphLevienT(lp, k) : 1.0;
-			double u = 1.0 - t;
-			cur.push_back((int32_t) lround(u*u*x0 + 2.0*u*t*cx + t*t*ax));
-			cur.push_back((int32_t) lround(u*u*y0 + 2.0*u*t*cy + t*t*ay));
+			float qx, qy;
+			glyphQuadSample(x0, y0, cx, cy, ax, ay, glyphLevienT(lp, k),
+			                &qx, &qy);
+			cur.push_back(qx);
+			cur.push_back(qy);
 		}
-		px = (int32_t) ax;
-		py = (int32_t) ay;
+		cur.push_back(ax);
+		cur.push_back(ay);
+		px = tw(axf);
+		py = tw(-ayf);
 	}
 	void cubicTo(double c1xf, double c1yf, double c2xf, double c2yf,
 	             double axf, double ayf)
@@ -166,8 +166,8 @@ struct OutlineSink
 			{
 				double t = (j < lp.count) ? (double) glyphLevienT(lp, j) : 1.0;
 				double u = 1.0 - t;
-				cur.push_back((int32_t) lround(u*u*lx + 2.0*u*t*qcx + t*t*ex));
-				cur.push_back((int32_t) lround(u*u*ly + 2.0*u*t*qcy + t*t*ey));
+				cur.push_back((float) (u*u*lx + 2.0*u*t*qcx + t*t*ex));
+				cur.push_back((float) (u*u*ly + 2.0*u*t*qcy + t*t*ey));
 			}
 			lx = ex;
 			ly = ey;
@@ -718,8 +718,8 @@ void emitDeviceFonts(std::ostream& out)
 		}
 		if (!fd.glyph_pts.empty())
 		{
-			out << "static const int32_t devfont_" << i << "_pts[] = { ";
-			for (auto v : fd.glyph_pts) out << v << ", ";
+			out << "static const float devfont_" << i << "_pts[] = { ";
+			glyphEmitPts(out, fd.glyph_pts);
 			out << "};\n";
 			out << "static const uint32_t devfont_" << i << "_pt_start[] = { ";
 			for (auto v : fd.glyph_pt_start) out << v << ", ";
