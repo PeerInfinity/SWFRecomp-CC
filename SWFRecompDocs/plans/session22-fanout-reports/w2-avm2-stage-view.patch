@@ -1,0 +1,374 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index a5760037e..e15565b51 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -673,6 +673,11 @@ typedef struct Avm2DisplayObjectExt
+ 	uint8_t opaque_bg_set;
+ 	uint32_t opaque_bg_rgb;      // 0xRRGGBB, alpha implicit 255
+ 
++	// DisplayObject.z, mirrored from its `__mtz` dyn prop at set time
++	// (m3d_tz_set) so the render walk's perspective arm reads a field, not
++	// a dynamic lookup per node per frame (w2-avm2-stage-view).
++	double render_tz;
++
+ 	// COMMITTED scrollRect. Ruffle keeps two rects per object: `next_scroll_
+ 	// rect`, which is what AS just wrote and what the `scrollRect` getter
+ 	// reports, and `scroll_rect`, which is what bounds, hit tests and the
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index b13c366cb..c21f8cce2 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -11743,6 +11743,8 @@ static void m3d_tz_set(Avm2Context* ctx, Avm2Object* target, double tz)
+ 	if (target == NULL) return;
+ 	avm2_object_set_dynamic(ctx, target, M3D_TZ_KEY, 5, avm2_number(tz))
+ 		->dont_enum = 1;
++	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, target);
++	if (ext != NULL) ext->render_tz = tz;
+ }
+ 
+ // flash.geom.Matrix3D is minted in avm2_stage3d.c (Stage3D needs it first).
+@@ -13709,14 +13711,49 @@ static Avm2Value stage_set_stage_focus_rect(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++// Stage.scaleMode / Stage.align (w2-avm2-stage-view). Ruffle stores both on
++// the Stage and rebuilds its view matrix on every set (display_object/
++// stage.rs set_scale_mode / set_align -> build_matrices); the render side is
++// avm2_stage_view_apply below the render gate. align is a bitflag set parsed
++// char-by-char (stage.rs FromWStr for StageAlign: any T/B/L/R, case-folded,
++// everything else ignored) and read back in AVM2 order T,B,L,R
++// (globals/flash/display/stage.rs get_align).
++enum { AVM2_SCALE_SHOW_ALL = 0, AVM2_SCALE_EXACT_FIT, AVM2_SCALE_NO_BORDER, AVM2_SCALE_NO_SCALE };
++enum { AVM2_ALIGN_T = 1, AVM2_ALIGN_B = 2, AVM2_ALIGN_L = 4, AVM2_ALIGN_R = 8 };
++static int g_stage_scale_mode = AVM2_SCALE_SHOW_ALL;
++static int g_stage_align = 0;
++static void avm2_stage_view_apply(Avm2Context* ctx);
++
+ static Avm2Value stage_get_align(Avm2Activation* act)
+ {
+-	return avm2_string(avm2_string_from_literal(act->ctx, ""));
++	char buf[5];
++	int n = 0;
++	if (g_stage_align & AVM2_ALIGN_T) buf[n++] = 'T';
++	if (g_stage_align & AVM2_ALIGN_B) buf[n++] = 'B';
++	if (g_stage_align & AVM2_ALIGN_L) buf[n++] = 'L';
++	if (g_stage_align & AVM2_ALIGN_R) buf[n++] = 'R';
++	buf[n] = '\0';
++	return avm2_string(avm2_string_new(act->ctx, buf, (uint32_t) n));
+ }
+ 
+ static Avm2Value stage_set_align(Avm2Activation* act)
+ {
+-	(void) act;
++	if (act->argc < 1) return avm2_undefined();
++	const Avm2String* s = avm2_coerce_to_string(act->ctx, act->args[0]);
++	int align = 0;
++	for (uint32_t i = 0; s != NULL && i < s->len; i++)
++	{
++		switch (s->utf8[i])
++		{
++			case 'T': case 't': align |= AVM2_ALIGN_T; break;
++			case 'B': case 'b': align |= AVM2_ALIGN_B; break;
++			case 'L': case 'l': align |= AVM2_ALIGN_L; break;
++			case 'R': case 'r': align |= AVM2_ALIGN_R; break;
++			default: break;
++		}
++	}
++	g_stage_align = align;
++	avm2_stage_view_apply(act->ctx);
+ 	return avm2_undefined();
+ }
+ 
+@@ -13770,12 +13807,36 @@ static Avm2Value stage_set_color_correction(Avm2Activation* act)
+ 
+ static Avm2Value stage_get_scale_mode(Avm2Activation* act)
+ {
+-	return avm2_string(avm2_string_from_literal(act->ctx, "showAll"));
++	static const char* const names[] = { "showAll", "exactFit", "noBorder", "noScale" };
++	return avm2_string(avm2_string_from_literal(act->ctx, names[g_stage_scale_mode]));
+ }
+ 
++// Case-insensitive match (stage.rs FromWStr for StageScaleMode). Ruffle throws
++// ArgumentError #2008 on anything else; we keep the previous mode silently
++// (no corpus test sets an invalid mode).
+ static Avm2Value stage_set_scale_mode(Avm2Activation* act)
+ {
+-	(void) act;
++	if (act->argc < 1) return avm2_undefined();
++	const Avm2String* s = avm2_coerce_to_string(act->ctx, act->args[0]);
++	static const char* const names[] = { "showall", "exactfit", "noborder", "noscale" };
++	for (int m = 0; s != NULL && m < 4; m++)
++	{
++		size_t len = strlen(names[m]);
++		if (s->len != len) continue;
++		uint32_t i = 0;
++		for (; i < len; i++)
++		{
++			char c = s->utf8[i];
++			if (c >= 'A' && c <= 'Z') c = (char) (c - 'A' + 'a');
++			if (c != names[m][i]) break;
++		}
++		if (i == len)
++		{
++			g_stage_scale_mode = m;
++			avm2_stage_view_apply(act->ctx);
++			break;
++		}
++	}
+ 	return avm2_undefined();
+ }
+ 
+@@ -19932,6 +19993,43 @@ static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
+ // Depth-ordered render-list walk (paint order, back-to-front), accumulating the
+ // world matrix + concatenated alpha down the tree. Invisible subtrees are
+ // culled, matching render_apply_text_bounds.
++// DisplayObject.z perspective (w2-avm2-stage-view). Ruffle accumulates tz
++// ADDITIVELY down the transform stack (render/src/transform.rs:26, unscaled by
++// any ancestor's 2D matrix) and applies one fixed global projection in the
++// vertex shader (render/wgpu/src/globals.rs:30-63: the default
++// PerspectiveProjection, fieldOfView 55, centred on the viewport, focal length
++// f = (viewport_w/2) * tan(62.5 deg) = 480.25 px on a 500-px viewport). For a
++// z-only object (no rotationX/Y, which we do not model) the divide reduces to
++// an exact 2D scale k = f / (f + tz) about the viewport centre, applied AFTER
++// the full 2D world concat -- so it is composed onto the leaf draw matrix
++// here, never onto the matrix the children inherit. w <= 0 (tz <= -f) clips
++// the whole primitive away; returns 0 then. The translation is kept unrounded
++// (the shader works in continuous f32, not twips).
++static double g_avm2_render_tz = 0.0;
++
++static int avm2_z_project(const Mat* world, double tz, Mat* out)
++{
++	*out = *world;
++	if (tz == 0.0 || context == NULL || context->stage_to_ndc == NULL) return 1;
++	const float* m = context->stage_to_ndc;
++	if (m[0] == 0.0f || m[5] == 0.0f || context->width == 0) return 1;
++	const double rad = 55.0 * (M_PI / 180.0);
++	double f = (double) (float) tan((M_PI - rad) / 2.0);
++	double vw = (double) context->width / 2.0;
++	double w = (double) (float) tz / vw + f;
++	if (!(w > 0.0)) return 0;
++	double k = f / w;
++	double cx = -(double) m[12] / (double) m[0];   // viewport centre, stage twips
++	double cy = -(double) m[13] / (double) m[5];
++	out->a = world->a * k;
++	out->b = world->b * k;
++	out->c = world->c * k;
++	out->d = world->d * k;
++	out->tx = world->tx * k + cx * (1.0 - k);
++	out->ty = world->ty * k + cy * (1.0 - k);
++	return 1;
++}
++
+ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+                              const Mat* parent_world, double parent_alpha,
+                              const Avm2Cx* parent_cx)
+@@ -20042,6 +20140,11 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 	Mat local = ext_matrix(ext);
+ 	Mat world = mat_mul(parent_world, &local);
+ 	double alpha = parent_alpha * ((double) ext->alpha_fixed8 / 256.0);
++	double saved_render_tz = g_avm2_render_tz;
++	double node_tz = saved_render_tz + ext->render_tz;
++	g_avm2_render_tz = node_tz;
++	Mat draw_world;
++	int z_visible = avm2_z_project(&world, node_tz, &draw_world);
+ 
+ 	// Concatenate this node's FULL colour transform onto the parent's and
+ 	// publish it for the leaf writers below (they read g_avm2_cur_cx via
+@@ -20054,8 +20157,8 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 
+ 	// opaqueBackground — painted UNDER this node and outside its own mask /
+ 	// scrollRect, exactly where Ruffle's render_base emits it.
+-	if (g_avm2_mask_capture == 0)
+-		avm2_draw_opaque_background(ctx, obj, ext, &world);
++	if (g_avm2_mask_capture == 0 && z_visible)
++		avm2_draw_opaque_background(ctx, obj, ext, &draw_world);
+ 
+ 	// DisplayObject.mask — clip this node AND its whole subtree to the masker's
+ 	// silhouette. The masker lives elsewhere in the tree, so its stencil pass
+@@ -20106,25 +20209,33 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 		Mat sr_tr = { 1.0, 0.0, 0.0, 1.0,
+ 		              -(double) ext->sr_xmin, -(double) ext->sr_ymin };
+ 		world = mat_mul(&world, &sr_tr);
++		z_visible = avm2_z_project(&world, node_tz, &draw_world);
+ 	}
+ 
+-	if (ext->is_bitmap)
+-		avm2_render_bitmap(ctx, obj, &world, alpha);
++	if (!z_visible)
++	{
++		// culled by the perspective divide; children may still draw
++	}
++	else if (ext->is_bitmap)
++		avm2_render_bitmap(ctx, obj, &draw_world, alpha);
+ 	else if (ext->is_morph_shape && ext->shape_vert_count > 0)
+-		avm2_render_morph(ctx, obj, &world, alpha);
++		avm2_render_morph(ctx, obj, &draw_world, alpha);
+ 	else if (ext->shape_vert_count > 0)
+-		avm2_render_shape(ctx, obj, &world, alpha);
++		avm2_render_shape(ctx, obj, &draw_world, alpha);
+ 
+-	// Native timeline TextField (DefineEditText) glyphs.
+-	if (ext->edittext != NULL)
+-		avm2_render_text(ctx, obj, &world, alpha);
++	if (z_visible)
++	{
++		// Native timeline TextField (DefineEditText) glyphs.
++		if (ext->edittext != NULL)
++			avm2_render_text(ctx, obj, &draw_world, alpha);
+ 
+-	// Native timeline static text (DefineText/2 -> StaticText) glyphs.
+-	if (ext->statictext != NULL)
+-		avm2_render_statictext(ctx, obj, &world, alpha);
++		// Native timeline static text (DefineText/2 -> StaticText) glyphs.
++		if (ext->statictext != NULL)
++			avm2_render_statictext(ctx, obj, &draw_world, alpha);
+ 
+-	// T4: script-drawn Graphics geometry (independent of a timeline shape).
+-	avm2_render_graphics(ctx, obj, &world, alpha);
++		// T4: script-drawn Graphics geometry (independent of a timeline shape).
++		avm2_render_graphics(ctx, obj, &draw_world, alpha);
++	}
+ 
+ 	// SimpleButton (Ruffle avm2_button.rs::render_self): paint the child for
+ 	// the CURRENT state, and only that one — never the hit area, and no Up
+@@ -20205,6 +20316,7 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
+ 		renderer_restore_clip(context, saved_sr_ref);
+ 	if (pushed_mask)
+ 		renderer_restore_clip(context, saved_clip_ref);
++	g_avm2_render_tz = saved_render_tz;
+ }
+ 
+ // Focus highlight, drawn on TOP of the whole stage (Ruffle
+@@ -20260,6 +20372,7 @@ static void avm2_render_walk(Avm2Context* ctx)
+ 	g_avm2_xform_next = g_avm2_xform_base;
+ 	g_avm2_cxform_next = g_avm2_cxform_base;
+ 	g_avm2_cur_cx = AVM2_CX_IDENTITY;
++	g_avm2_render_tz = 0.0;
+ 	// Stage3D composites UNDERNEATH the whole display list, in stage3Ds index
+ 	// order, each at its own (x, y) (stage.rs:625-634). The quad is the back
+ 	// buffer at 1:1 stage pixels, opaque and nearest-sampled, which is what
+@@ -20416,3 +20529,110 @@ int avm2_render_present(Avm2Context* ctx)
+ #endif
+ 
+ #endif  // render gate
++
++// Stage view transform for the current scaleMode/align (w2-avm2-stage-view).
++// A literal port of Ruffle display_object/stage.rs build_matrices: per-mode
++// scale (NoScale = the HiDPI scale factor), then L>R>centre / T>B>centre
++// translation of the width/height delta, truncated to twips
++// (Twips::from_pixels). The harness's showAll/centred fit (wasm_wrappers/
++// main.c) stays the authority whenever the result equals it: the original
++// stage_to_ndc / stage_scale / stage_fit pointer and values are restored
++// verbatim, so every test that sets a mode equivalent to the default (viewport
++// == stage, or a 2x viewport at scale_factor 2) is bit-identical. Like main.c
++// the fit goes into the projection, not a SetViewport, so content outside the
++// movie box is drawn into the margins (Ruffle's tests never letterbox).
++#if defined(OFFSCREEN_RENDER) || (defined(__EMSCRIPTEN__) && !defined(NO_GRAPHICS))
++static void avm2_stage_view_apply(Avm2Context* ctx)
++{
++	static int saved = 0;
++	static const float* base_ndc;
++	static float base_scale, base_fit_x, base_fit_y;
++	static float view_ndc[16];
++	SWFAppContext* app = ctx->app;
++	if (app == NULL) return;
++	if (!saved)
++	{
++		saved = 1;
++		base_ndc = app->stage_to_ndc;
++		base_scale = app->stage_scale;
++		base_fit_x = app->stage_fit_x;
++		base_fit_y = app->stage_fit_y;
++	}
++	double vw = (double) (app->render_width > 0 ? app->render_width : app->width);
++	double vh = (double) (app->render_height > 0 ? app->render_height : app->height);
++	double mw = (double) app->width, mh = (double) app->height;
++	if (mw <= 0.0 || mh <= 0.0 || vw <= 0.0 || vh <= 0.0) return;
++#ifdef VIEWPORT_SCALE_FACTOR
++	double sf = (double) (VIEWPORT_SCALE_FACTOR);
++#else
++	double sf = 1.0;
++#endif
++	double show_all = (vw / vh > mw / mh) ? vh / mh : vw / mw;
++	double sx, sy;
++	switch (g_stage_scale_mode)
++	{
++		case AVM2_SCALE_NO_BORDER:
++			sx = sy = (vw / vh < mw / mh) ? vh / mh : vw / mw;
++			break;
++		case AVM2_SCALE_EXACT_FIT:
++			sx = vw / mw;
++			sy = vh / mh;
++			break;
++		case AVM2_SCALE_NO_SCALE:
++			sx = sy = sf;
++			break;
++		default:
++			sx = sy = show_all;
++			break;
++	}
++	double wd = vw - mw * sx, hd = vh - mh * sy;
++	double tx = (g_stage_align & AVM2_ALIGN_L) ? 0.0
++	          : (g_stage_align & AVM2_ALIGN_R) ? wd : wd / 2.0;
++	double ty = (g_stage_align & AVM2_ALIGN_T) ? 0.0
++	          : (g_stage_align & AVM2_ALIGN_B) ? hd : hd / 2.0;
++	int tx_tw = (int) (tx * 20.0), ty_tw = (int) (ty * 20.0);
++	int def_tx_tw = (int) ((vw - mw * show_all) / 2.0 * 20.0);
++	int def_ty_tw = (int) ((vh - mh * show_all) / 2.0 * 20.0);
++
++	const float* ndc;
++	float scale, fit_x, fit_y;
++	if (sx == show_all && sy == show_all && tx_tw == def_tx_tw && ty_tw == def_ty_tw)
++	{
++		ndc = base_ndc;
++		scale = base_scale;
++		fit_x = base_fit_x;
++		fit_y = base_fit_y;
++	}
++	else
++	{
++		// stage twips -> device px: px = s*(X/20 - origin) + t; then NDC.
++		double ox = (double) avm2_generated_stage_rect[0] / 20.0;
++		double oy = (double) avm2_generated_stage_rect[2] / 20.0;
++		memset(view_ndc, 0, sizeof(view_ndc));
++		view_ndc[0]  = (float) (2.0 * sx / (20.0 * vw));
++		view_ndc[5]  = (float) (-2.0 * sy / (20.0 * vh));
++		view_ndc[10] = 1.0f;
++		view_ndc[12] = (float) (-1.0 + 2.0 * (tx_tw / 20.0 - sx * ox) / vw);
++		view_ndc[13] = (float) (1.0 - 2.0 * (ty_tw / 20.0 - sy * oy) / vh);
++		view_ndc[15] = 1.0f;
++		ndc = view_ndc;
++		scale = (float) (sx < sy ? sx : sy);
++		fit_x = (float) (mw * sx / vw);
++		fit_y = (float) (mh * sy / vh);
++	}
++	app->stage_to_ndc = ndc;
++	app->stage_scale = scale;
++	app->stage_fit_x = fit_x;
++	app->stage_fit_y = fit_y;
++	if (context != NULL)
++	{
++		context->stage_to_ndc = ndc;
++		context->stage_scale = scale > 0.0f ? scale : 1.0f;
++	}
++}
++#else
++static void avm2_stage_view_apply(Avm2Context* ctx)
++{
++	(void) ctx;
++}
++#endif
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 86e65b5f4..afd107ebe 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -440,3 +440,9 @@ visual/filters/glow                         # 1-px curved strokes, quality=low
+ avm2/mouse_pick_dobj_mask                   # AVM2 mouse_pick walk + mask     1 cmp
+ avm1/focusrect_mouse_swf8                   # AVM1 click focus + focusrect    8 cmps
+ avm2/loader_events                          # AVM2 Loader drain / init order  1 cmp
++# s22 w2-avm2-stage-view: the AVM2 Stage view transform (scaleMode/align ->
++# stage_to_ndc) had no member. Both are CI-passing viewport_dimensions tests:
++# stage_scale_factor sets noScale on a 2x HiDPI viewport (the equals-default
++# restore branch); twirl is the 550x400-into-600x700 showAll fit.
++avm2/stage_scale_factor                     # AVM2 noScale @ scale_factor 2   1 cmp
++avm2/pixelbender_effect_twirl               # AVM2 showAll non-uniform fit    1 cmp

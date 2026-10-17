@@ -40,7 +40,7 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-htmltext | w1-drift-avm1 S4 + w1-drift-avm2 §1.4 | edittext_html_duplicate_attributes, html_text_img_parsing_swf7/_swf8, html_text_img_numeric_attributes, avm2/html_text_img_parsing (rm) | session_01TTs24XtdUhz4v7x5CtLiMw — LANDED (+5; dup_attributes 241/247 not a flip) |
 | w2-strbuf | w1-trace-tail B | bug_483783 (runtime_error -> pass) | session_01NLFHMLUtdLyVm8z4tkEcfq — LANDED |
 | w2-geom-port | w1-drift-avm1 S3 | point, rectangle, matrix, Rectangle-v8, Matrix-v6..v8 | session_019oWz76tcX3D7afubJF3Wbg |
-| w2-avm2-stage-view | w1-pixel-catastrophic | pixelbender_effect_glassDisplace, displayobject_z | session_01Sv4zxmSzXYtd4doWuLve4R |
+| w2-avm2-stage-view | w1-pixel-catastrophic | pixelbender_effect_glassDisplace, displayobject_z | session_01Sv4zxmSzXYtd4doWuLve4R — LANDED (+3 incl. geom_transform) |
 | w2-font-registry | w1-trace-tail D | fonts/embed_name_lookup | session_01SKhEcTjpjxygKijBE1r4Dz |
 | w2-ei-provider | w1-trace-tail C | avm2/external_interface | session_0171KTbmxMRKzLEq2FKryiT6 — LANDED |
 | w2-atf-dxt5 | w1-pixel-catastrophic | stage3d_texture_bytearray_compressed_raw_alpha | session_01BCEB1oUi9rtAyWJhxtUX72 |

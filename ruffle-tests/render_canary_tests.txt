@@ -475,3 +475,9 @@ avm2/bitmapdata_draw_masks                  # draw(src) honours src.mask, tol 0 
 # zero-headroom row the brief named, is already a member above.)
 # tier=1  (CI-passing once w2-glyph-subunit lands; zero headroom)
 fonts/embed_matching/fallback_preferences   # AVM2 embedded + fallback glyphs 1 cmp
+# s22 w2-avm2-stage-view: the AVM2 Stage view transform (scaleMode/align ->
+# stage_to_ndc) had no member. Both are CI-passing viewport_dimensions tests:
+# stage_scale_factor sets noScale on a 2x HiDPI viewport (the equals-default
+# restore branch); twirl is the 550x400-into-600x700 showAll fit.
+avm2/stage_scale_factor                     # AVM2 noScale @ scale_factor 2   1 cmp
+avm2/pixelbender_effect_twirl               # AVM2 showAll non-uniform fit    1 cmp

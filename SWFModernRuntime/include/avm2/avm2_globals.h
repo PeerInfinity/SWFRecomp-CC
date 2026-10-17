@@ -673,6 +673,11 @@ typedef struct Avm2DisplayObjectExt
 	uint8_t opaque_bg_set;
 	uint32_t opaque_bg_rgb;      // 0xRRGGBB, alpha implicit 255
 
+	// DisplayObject.z, mirrored from its `__mtz` dyn prop at set time
+	// (m3d_tz_set) so the render walk's perspective arm reads a field, not
+	// a dynamic lookup per node per frame (w2-avm2-stage-view).
+	double render_tz;
+
 	// COMMITTED scrollRect. Ruffle keeps two rects per object: `next_scroll_
 	// rect`, which is what AS just wrote and what the `scrollRect` getter
 	// reports, and `scroll_rect`, which is what bounds, hit tests and the
