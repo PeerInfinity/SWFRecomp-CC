@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-10-17T04:05:32.914751+00:00",
+    "timestamp": "2026-10-17T04:26:16.018244+00:00",
     "git_sha": "38cf9b1a0ab840bc6be0edbc5eb8938e8eafad09",
-    "duration_seconds": 16.86,
+    "duration_seconds": 0.99,
     "total_available": 3
   },
   "total": 3,
@@ -19,8 +19,8 @@
     {
       "test": "global_instance_decls",
       "phases": {
-        "recomp": 0.005,
-        "compile": 15.389,
+        "recomp": 0.006,
+        "compile": 0.36,
         "run": 0.032
       },
       "num_frames": 1,
@@ -29,7 +29,7 @@
         "expected_lines": 853,
         "matching_lines": 431
       },
-      "duration": 15.43,
+      "duration": 0.4,
       "status": "output_mismatch",
       "detail": "422 line(s) differ (actual=786, expected=853)",
       "actual_output": "... (74 lines before) ...\n  concat, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.geom.Matrix, instance=[(a=1, b=0, c=0, d=1, tx=0, ty=0)], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  d, own, DONT_ENUM, type=[number]\n  a, own, DONT_ENUM, type=[number]\n  c, own, DONT_ENUM, type=[number]\n  b, own, DONT_ENUM, type=[number]\n  ty, own, DONT_ENUM, type=[number]\n  tx, own, DONT_ENUM, type=[number]\n  concat, DONT_ENUM, type=[function]\n  invert, DONT_ENUM, type=[function]\n  createBox, DONT_ENUM, type=[function]\n  createGradientBox, DONT_ENUM, type=[function]\n  clone, DONT_ENUM, type=[function]\n  identity, DONT_ENUM, type=[function]\n  rotate, DONT_ENUM, type=[function]\n  translate, DONT_ENUM, type=[function]\n  scale, DONT_ENUM, type=[function]\n  deltaTransformPoint, DONT_ENUM, type=[function]\n  transformPoint, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.geom.Matrix, instance=[(a=1, b=undefined, c=undefined, d=undefined, tx=undefined, ty=undefined)], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  a, own, DONT_ENUM, type=[number]\n  b, own, DONT_ENUM, type=[undefined]\n  c, own, DONT_ENUM, type=[undefined]\n  d, own, DONT_ENUM, type=[undefined]\n  tx, own, DONT_ENUM, type=[undefined]\n  ty, own, DONT_ENUM, type=[undefined]\n  concat, DONT_ENUM, type=[function]\n  invert, DONT_ENUM, type=[function]\n  createBox, DONT_ENUM, type=[function]\n  createGradientBox, DONT_ENUM, type=[function]\n  clone, DONT_ENUM, type=[function]\n  identity, DONT_ENUM, type=[function]\n  rotate, DONT_ENUM, type=[function]\n  translate, DONT_ENUM, type=[function]\n  scale, DONT_ENUM, type=[function]\n  deltaTransformPoint, DONT_ENUM, type=[function]\n  transformPoint, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.geom.Matrix, instance=[(a=1, b=2, c=3, d=4, tx=undefined, ty=undefined)], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  a, own, DONT_ENUM, type=[number]\n  b, own, DONT_ENUM, type=[number]\n  c, own, DONT_ENUM, type=[number]\n... (662 lines after) ...",
@@ -38,8 +38,8 @@
     {
       "test": "global_proto_decls",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.624,
+        "recomp": 0.006,
+        "compile": 0.188,
         "run": 0.032
       },
       "num_frames": 1,
@@ -48,7 +48,7 @@
         "expected_lines": 3714,
         "matching_lines": 1400
       },
-      "duration": 0.67,
+      "duration": 0.24,
       "status": "output_mismatch",
       "detail": "2463 line(s) differ (actual=3863, expected=3714)",
       "actual_output": "... (516 lines before) ...\nTesting _global.System\n  privateBytes, own, READ_ONLY, type=[number]\n  IME, own, type=[object]\n  setClipboard, own, type=[function]\n  security, own, type=[object]\n  useCodepage, own, type=[boolean]\n  exactSettings, own, type=[boolean]\n  showSettings, own, type=[function]\n  Product, own, type=[function]\n  capabilities, own, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.privateBytes\nTesting _global.System.IME\n  _listeners, own, DONT_ENUM, READ_ONLY, type=[object]\n  removeListener, own, DONT_ENUM, READ_ONLY, type=[function]\n  addListener, own, DONT_ENUM, READ_ONLY, type=[function]\n  broadcastMessage, own, DONT_ENUM, READ_ONLY, type=[function]\n  doConversion, own, DONT_ENUM, READ_ONLY, type=[function]\n  setCompositionString, own, DONT_ENUM, READ_ONLY, type=[function]\n  setConversionMode, own, DONT_ENUM, READ_ONLY, type=[function]\n  getConversionMode, own, DONT_ENUM, READ_ONLY, type=[function]\n  setEnabled, own, DONT_ENUM, READ_ONLY, type=[function]\n  getEnabled, own, DONT_ENUM, READ_ONLY, type=[function]\n  ALPHANUMERIC_FULL, own, DONT_ENUM, READ_ONLY, type=[string]\n  ALPHANUMERIC_HALF, own, DONT_ENUM, READ_ONLY, type=[string]\n  CHINESE, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_HIRAGANA, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_KATAKANA_FULL, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_KATAKANA_HALF, own, DONT_ENUM, READ_ONLY, type=[string]\n  KOREAN, own, DONT_ENUM, READ_ONLY, type=[string]\n  UNKNOWN, own, DONT_ENUM, READ_ONLY, type=[string]\n  __proto__, own, READ_ONLY, type=[object]\n  constructor, own, READ_ONLY, type=[function]\nTesting _global.System.IME._listeners\nTesting _global.System.IME.removeListener\n  prototype, own, DONT_ENUM, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.removeListener.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.addListener\n  prototype, own, DONT_ENUM, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.addListener.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.broadcastMessage\n... (3297 lines after) ...",
@@ -58,7 +58,7 @@
       "test": "global_proto_decls_delete",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.615,
+        "compile": 0.162,
         "run": 0.016
       },
       "num_frames": 1,
@@ -67,7 +67,7 @@
         "expected_lines": 874,
         "matching_lines": 338
       },
-      "duration": 0.64,
+      "duration": 0.19,
       "status": "output_mismatch",
       "detail": "2033 line(s) differ (actual=2371, expected=874)",
       "actual_output": "... (326 lines before) ...\n  UNKNOWN, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.setClipboard\nTesting _global.System.security.PolicyFileResolver\n  prototype, DONT_DELETE\nTesting _global.System.security.PolicyFileResolver.prototype\nTesting _global.System.security.sandboxType\nTesting _global.System.security.escapeDomain\nTesting _global.System.security.chooseLocalSwfPath\nTesting _global.System.security.loadPolicyFile\nTesting _global.System.security.allowInsecureDomain\nTesting _global.System.security.allowDomain\nTesting _global.System.security.__constructor__\n  prototype, DONT_DELETE\nTesting _global.System.security.__constructor__.prototype\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.security\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  __proto__, DONT_DELETE\nTesting _global.System.useCodepage\nTesting _global.System.exactSettings\nTesting _global.System.showSettings\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\nTesting _global.System.Product\n... (1995 lines after) ...",
