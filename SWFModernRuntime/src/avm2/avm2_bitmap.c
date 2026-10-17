@@ -2675,24 +2675,25 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	int blend_mode = BM_NORMAL;
 	if (arg_present(act, 3))
 	{
-		const Avm2String* bm = avm2_coerce_to_string(ctx, act->args[3]);
-		if (bm != NULL && bm->utf8 != NULL)
+		const Avm2String* bms = avm2_coerce_to_string(ctx, act->args[3]);
+		const char* bm = (bms != NULL && bms->utf8 != NULL) ? avm2_string_cstr(ctx, bms) : NULL;
+		if (bm != NULL)
 		{
-			if (strcmp(bm->utf8, "alpha") == 0 || strcmp(bm->utf8, "erase") == 0)
+			if (strcmp(bm, "alpha") == 0 || strcmp(bm, "erase") == 0)
 			{
 				blend_alpha_or_erase = 1;
-				blend_is_erase = (strcmp(bm->utf8, "erase") == 0);
+				blend_is_erase = (strcmp(bm, "erase") == 0);
 			}
-			else if (strcmp(bm->utf8, "multiply") == 0)   blend_mode = BM_MULTIPLY;
-			else if (strcmp(bm->utf8, "hardlight") == 0)  blend_mode = BM_HARDLIGHT;
-			else if (strcmp(bm->utf8, "add") == 0)        blend_mode = BM_ADD;
-			else if (strcmp(bm->utf8, "subtract") == 0)   blend_mode = BM_SUBTRACT;
-			else if (strcmp(bm->utf8, "screen") == 0)     blend_mode = BM_SCREEN;
-			else if (strcmp(bm->utf8, "lighten") == 0)    blend_mode = BM_LIGHTEN;
-			else if (strcmp(bm->utf8, "darken") == 0)     blend_mode = BM_DARKEN;
-			else if (strcmp(bm->utf8, "difference") == 0) blend_mode = BM_DIFFERENCE;
-			else if (strcmp(bm->utf8, "invert") == 0)     blend_mode = BM_INVERT;
-			else if (strcmp(bm->utf8, "overlay") == 0)    blend_mode = BM_OVERLAY;
+			else if (strcmp(bm, "multiply") == 0)   blend_mode = BM_MULTIPLY;
+			else if (strcmp(bm, "hardlight") == 0)  blend_mode = BM_HARDLIGHT;
+			else if (strcmp(bm, "add") == 0)        blend_mode = BM_ADD;
+			else if (strcmp(bm, "subtract") == 0)   blend_mode = BM_SUBTRACT;
+			else if (strcmp(bm, "screen") == 0)     blend_mode = BM_SCREEN;
+			else if (strcmp(bm, "lighten") == 0)    blend_mode = BM_LIGHTEN;
+			else if (strcmp(bm, "darken") == 0)     blend_mode = BM_DARKEN;
+			else if (strcmp(bm, "difference") == 0) blend_mode = BM_DIFFERENCE;
+			else if (strcmp(bm, "invert") == 0)     blend_mode = BM_INVERT;
+			else if (strcmp(bm, "overlay") == 0)    blend_mode = BM_OVERLAY;
 		}
 	}
 

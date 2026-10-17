@@ -15584,7 +15584,7 @@ static void avm2_dbg_pick_label(Avm2Context* ctx, const char* tag, Avm2Object* o
 	const char* cn = (o->cls != NULL && o->cls->name.name != NULL)
 		? o->cls->name.name : "?";
 	const char* nm = (ext != NULL && ext->name != NULL && ext->name->utf8 != NULL)
-		? ext->name->utf8 : "(anon)";
+		? avm2_string_cstr(ctx, ext->name) : "(anon)";
 	fprintf(stderr, "MPICK %s = %s '%s' me=%d\n", tag, cn, nm,
 		ext != NULL ? ext->mouse_enabled : -1);
 }
@@ -15931,7 +15931,7 @@ static void avm2_dbg_dump_node(Avm2Context* ctx, Avm2Object* obj, int depth)
 	const char* cn = (obj->cls != NULL && obj->cls->name.name != NULL)
 		? obj->cls->name.name : "?";
 	const char* nm = (ext->name != NULL && ext->name->utf8 != NULL)
-		? ext->name->utf8 : "(anon)";
+		? avm2_string_cstr(ctx, ext->name) : "(anon)";
 	Mat wm = display_world_matrix(ctx, obj);
 	Rect acc = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, obj, &wm, &acc);

@@ -503,10 +503,11 @@ static Avm2Value ei_add_callback(Avm2Activation* act)
 	if (!ei_available_now()) ei_throw_2067(ctx);
 	if (act->argc < 1) return avm2_undefined();
 
-	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
+	const Avm2String* name_s = avm2_coerce_to_string(ctx, act->args[0]);
+	const char* name = avm2_string_cstr(ctx, name_s);
 	Avm2Value fn = (act->argc > 1) ? act->args[1] : avm2_null();
 
-	Avm2EiCallback* cb = ei_find_callback(name->utf8);
+	Avm2EiCallback* cb = ei_find_callback(name);
 
 	// null/undefined closure unregisters (Ruffle's external_interface test:
 	// addCallback("removeMe", null) removes the callback).
@@ -519,7 +520,7 @@ static Avm2Value ei_add_callback(Avm2Activation* act)
 			cb->fn = avm2_undefined();
 			cb->in_use = 0;
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
-			ei_notify_callback(name->utf8, 0);
+			ei_notify_callback(name, 0);
 #endif
 		}
 		return avm2_undefined();
@@ -532,12 +533,12 @@ static Avm2Value ei_add_callback(Avm2Activation* act)
 			if (!g_ei_callbacks[i].in_use) { cb = &g_ei_callbacks[i]; break; }
 		}
 		if (cb == NULL) return avm2_undefined();   // registry full
-		cb->name = strdup(name->utf8);
+		cb->name = strdup(name);
 		cb->in_use = 1;
 	}
 	cb->fn = fn;
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
-	ei_notify_callback(name->utf8, 1);
+	ei_notify_callback(name, 1);
 #endif
 	return avm2_undefined();
 }
@@ -562,7 +563,7 @@ static Avm2Value ei_call(Avm2Activation* act)
 	}
 	ei_buf_put(&b, "]", 1);
 
-	char* ret = ei_browser_call(name->utf8, b.buf);
+	char* ret = ei_browser_call(avm2_string_cstr(ctx, name), b.buf);
 	free(b.buf);
 
 	if (ret == NULL) return avm2_null();

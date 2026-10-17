@@ -1,0 +1,732 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_value.h b/SWFModernRuntime/include/avm2/avm2_value.h
+index 5588d0861..436b4bacf 100644
+--- a/SWFModernRuntime/include/avm2/avm2_value.h
++++ b/SWFModernRuntime/include/avm2/avm2_value.h
+@@ -24,8 +24,10 @@ typedef struct Avm2Context Avm2Context;
+ // Interned or heap string: UTF-8 bytes + explicit length (ABC strings may
+ // embed NULs). Static pool entries are emitted by the recompiler; runtime
+ // strings are heap-allocated. `utf8` is also NUL-terminated for printf
+-// convenience wherever the runtime creates one; pool entries emitted by
+-// the recompiler are NUL-terminated too (string literals).
++// convenience wherever the runtime creates one, EXCEPT a stale prefix of an
++// append buffer (AVM2_STR_GC_DEP, below): C-string consumers go through
++// avm2_string_cstr(). Pool entries emitted by the recompiler are
++// NUL-terminated too (string literals).
+ //
+ // GC (avm2_gc.c string census): heap strings created by avm2_string_new /
+ // avm2_string_concat enroll in an intrusive census and are swept when
+@@ -43,6 +45,29 @@ typedef struct Avm2String
+ 
+ #define AVM2_STR_GC_HEAP 1u  // heap-allocated + census-enrolled
+ #define AVM2_STR_GC_MARK 2u  // reachable this cycle (cleared each collect)
++#define AVM2_STR_GC_BUF  4u  // append buffer (never user-visible; len = frontier)
++#define AVM2_STR_GC_DEP  8u  // header whose bytes live in an AVM2_STR_GC_BUF
++
++// Append-in-place buffers (avm2_string_concat; avmplus String::append). A
++// long `a + b` whose `a` ends at its buffer's frontier writes `b` in place and
++// returns a fresh DEP header sharing the buffer, so `s += x` loops are O(n)
++// instead of O(n^2) bytes. Layout of a BUF allocation:
++//   [Avm2String header][AVM2_STRBUF_PREFIX bytes: uint32 capacity][bytes...]
++// with header.utf8 == the bytes and header.len == the frontier. A DEP
++// header's utf8 is always the START of its buffer's bytes (a prefix), so the
++// owner is found by pointer arithmetic.
++//
++// CONTRACT: an older prefix header loses `utf8[len] == '\0'` once a later
++// append overwrites that byte (the bytes stay readable, the buffer is always
++// NUL-terminated at its frontier). Every consumer that needs a C string must
++// use avm2_string_cstr(); everything else must honour `len`.
++#define AVM2_STRBUF_PREFIX 8u
++#define AVM2_STRBUF_MIN_LEN 4096u  // results shorter than this never share
++
++static inline Avm2String* avm2_strbuf_owner(const Avm2String* dep)
++{
++	return ((Avm2String*) (void*) (dep->utf8 - AVM2_STRBUF_PREFIX)) - 1;
++}
+ 
+ typedef enum Avm2ValueKind
+ {
+@@ -130,6 +155,10 @@ const Avm2String* avm2_string_new(Avm2Context* ctx, const char* utf8, uint32_t l
+ const Avm2String* avm2_string_from_literal(Avm2Context* ctx, const char* lit);
+ const Avm2String* avm2_string_concat(Avm2Context* ctx, const Avm2String* a, const Avm2String* b);
+ bool avm2_string_equals(const Avm2String* a, const Avm2String* b);
++// NUL-terminated view of `s`: s->utf8 itself when terminated, else (a stale
++// prefix of an append buffer) a fresh heap copy, valid until the next
++// between-tick collection.
++const char* avm2_string_cstr(Avm2Context* ctx, const Avm2String* s);
+ // UTF-16 code-unit-order comparison (-1/0/1).
+ int avm2_string_utf16_cmp(const Avm2String* a, const Avm2String* b);
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_array.c b/SWFModernRuntime/src/avm2/avm2_array.c
+index f7b67fb60..06c99cf36 100644
+--- a/SWFModernRuntime/src/avm2/avm2_array.c
++++ b/SWFModernRuntime/src/avm2/avm2_array.c
+@@ -1175,7 +1175,7 @@ static void array_init_ctor_args(Avm2Context* ctx, Avm2Object* obj,
+ 		{
+ 			avm2_throw_error(ctx, ctx->builtins.range_error_class,
+ 			                 "Error #1005: Array index is not a positive integer (%s).",
+-			                 avm2_coerce_to_string(ctx, args[0])->utf8);
++			                 avm2_string_cstr(ctx, avm2_coerce_to_string(ctx, args[0])));
+ 		}
+ 		avm2_array_set_length(ctx, obj, n);
+ 		return;
+@@ -1198,7 +1198,7 @@ static Avm2Value array_construct(Avm2Context* ctx, Avm2Class* cls,
+ 		{
+ 			avm2_throw_error(ctx, ctx->builtins.range_error_class,
+ 			                 "Error #1005: Array index is not a positive integer (%s).",
+-			                 avm2_coerce_to_string(ctx, args[0])->utf8);
++			                 avm2_string_cstr(ctx, avm2_coerce_to_string(ctx, args[0])));
+ 		}
+ 		return avm2_object_value(avm2_array_new(ctx, n));
+ 	}
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index ad8d82d7b..4d4754600 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2524,24 +2524,25 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 	int blend_mode = BM_NORMAL;
+ 	if (arg_present(act, 3))
+ 	{
+-		const Avm2String* bm = avm2_coerce_to_string(ctx, act->args[3]);
+-		if (bm != NULL && bm->utf8 != NULL)
++		const Avm2String* bms = avm2_coerce_to_string(ctx, act->args[3]);
++		const char* bm = (bms != NULL && bms->utf8 != NULL) ? avm2_string_cstr(ctx, bms) : NULL;
++		if (bm != NULL)
+ 		{
+-			if (strcmp(bm->utf8, "alpha") == 0 || strcmp(bm->utf8, "erase") == 0)
++			if (strcmp(bm, "alpha") == 0 || strcmp(bm, "erase") == 0)
+ 			{
+ 				blend_alpha_or_erase = 1;
+-				blend_is_erase = (strcmp(bm->utf8, "erase") == 0);
++				blend_is_erase = (strcmp(bm, "erase") == 0);
+ 			}
+-			else if (strcmp(bm->utf8, "multiply") == 0)   blend_mode = BM_MULTIPLY;
+-			else if (strcmp(bm->utf8, "hardlight") == 0)  blend_mode = BM_HARDLIGHT;
+-			else if (strcmp(bm->utf8, "add") == 0)        blend_mode = BM_ADD;
+-			else if (strcmp(bm->utf8, "subtract") == 0)   blend_mode = BM_SUBTRACT;
+-			else if (strcmp(bm->utf8, "screen") == 0)     blend_mode = BM_SCREEN;
+-			else if (strcmp(bm->utf8, "lighten") == 0)    blend_mode = BM_LIGHTEN;
+-			else if (strcmp(bm->utf8, "darken") == 0)     blend_mode = BM_DARKEN;
+-			else if (strcmp(bm->utf8, "difference") == 0) blend_mode = BM_DIFFERENCE;
+-			else if (strcmp(bm->utf8, "invert") == 0)     blend_mode = BM_INVERT;
+-			else if (strcmp(bm->utf8, "overlay") == 0)    blend_mode = BM_OVERLAY;
++			else if (strcmp(bm, "multiply") == 0)   blend_mode = BM_MULTIPLY;
++			else if (strcmp(bm, "hardlight") == 0)  blend_mode = BM_HARDLIGHT;
++			else if (strcmp(bm, "add") == 0)        blend_mode = BM_ADD;
++			else if (strcmp(bm, "subtract") == 0)   blend_mode = BM_SUBTRACT;
++			else if (strcmp(bm, "screen") == 0)     blend_mode = BM_SCREEN;
++			else if (strcmp(bm, "lighten") == 0)    blend_mode = BM_LIGHTEN;
++			else if (strcmp(bm, "darken") == 0)     blend_mode = BM_DARKEN;
++			else if (strcmp(bm, "difference") == 0) blend_mode = BM_DIFFERENCE;
++			else if (strcmp(bm, "invert") == 0)     blend_mode = BM_INVERT;
++			else if (strcmp(bm, "overlay") == 0)    blend_mode = BM_OVERLAY;
+ 		}
+ 	}
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index b13c366cb..e908a18d3 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -15538,7 +15538,7 @@ static void avm2_dbg_pick_label(Avm2Context* ctx, const char* tag, Avm2Object* o
+ 	const char* cn = (o->cls != NULL && o->cls->name.name != NULL)
+ 		? o->cls->name.name : "?";
+ 	const char* nm = (ext != NULL && ext->name != NULL && ext->name->utf8 != NULL)
+-		? ext->name->utf8 : "(anon)";
++		? avm2_string_cstr(ctx, ext->name) : "(anon)";
+ 	fprintf(stderr, "MPICK %s = %s '%s' me=%d\n", tag, cn, nm,
+ 		ext != NULL ? ext->mouse_enabled : -1);
+ }
+@@ -15885,7 +15885,7 @@ static void avm2_dbg_dump_node(Avm2Context* ctx, Avm2Object* obj, int depth)
+ 	const char* cn = (obj->cls != NULL && obj->cls->name.name != NULL)
+ 		? obj->cls->name.name : "?";
+ 	const char* nm = (ext->name != NULL && ext->name->utf8 != NULL)
+-		? ext->name->utf8 : "(anon)";
++		? avm2_string_cstr(ctx, ext->name) : "(anon)";
+ 	Mat wm = display_world_matrix(ctx, obj);
+ 	Rect acc = { 0, 0, 0, 0, 0 };
+ 	bounds_with_transform(ctx, obj, &wm, &acc);
+diff --git a/SWFModernRuntime/src/avm2/avm2_external.c b/SWFModernRuntime/src/avm2/avm2_external.c
+index bd3d93059..b05b53910 100644
+--- a/SWFModernRuntime/src/avm2/avm2_external.c
++++ b/SWFModernRuntime/src/avm2/avm2_external.c
+@@ -286,10 +286,11 @@ static Avm2Value ei_add_callback(Avm2Activation* act)
+ 	if (!ei_available_now()) ei_throw_2067(ctx);
+ 	if (act->argc < 1) return avm2_undefined();
+ 
+-	const Avm2String* name = avm2_coerce_to_string(ctx, act->args[0]);
++	const Avm2String* name_s = avm2_coerce_to_string(ctx, act->args[0]);
++	const char* name = avm2_string_cstr(ctx, name_s);
+ 	Avm2Value fn = (act->argc > 1) ? act->args[1] : avm2_null();
+ 
+-	Avm2EiCallback* cb = ei_find_callback(name->utf8);
++	Avm2EiCallback* cb = ei_find_callback(name);
+ 
+ 	// null/undefined closure unregisters (Ruffle's external_interface test:
+ 	// addCallback("removeMe", null) removes the callback).
+@@ -302,7 +303,7 @@ static Avm2Value ei_add_callback(Avm2Activation* act)
+ 			cb->fn = avm2_undefined();
+ 			cb->in_use = 0;
+ #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+-			ei_notify_callback(name->utf8, 0);
++			ei_notify_callback(name, 0);
+ #endif
+ 		}
+ 		return avm2_undefined();
+@@ -315,12 +316,12 @@ static Avm2Value ei_add_callback(Avm2Activation* act)
+ 			if (!g_ei_callbacks[i].in_use) { cb = &g_ei_callbacks[i]; break; }
+ 		}
+ 		if (cb == NULL) return avm2_undefined();   // registry full
+-		cb->name = strdup(name->utf8);
++		cb->name = strdup(name);
+ 		cb->in_use = 1;
+ 	}
+ 	cb->fn = fn;
+ #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+-	ei_notify_callback(name->utf8, 1);
++	ei_notify_callback(name, 1);
+ #endif
+ 	return avm2_undefined();
+ }
+@@ -343,7 +344,7 @@ static Avm2Value ei_call(Avm2Activation* act)
+ 	}
+ 	ei_buf_put(&b, "]", 1);
+ 
+-	char* ret = ei_browser_call(name->utf8, b.buf);
++	char* ret = ei_browser_call(avm2_string_cstr(ctx, name), b.buf);
+ 	free(b.buf);
+ 
+ 	if (ret == NULL) return avm2_null();
+diff --git a/SWFModernRuntime/src/avm2/avm2_gc.c b/SWFModernRuntime/src/avm2/avm2_gc.c
+index 239703714..9b617156b 100644
+--- a/SWFModernRuntime/src/avm2/avm2_gc.c
++++ b/SWFModernRuntime/src/avm2/avm2_gc.c
+@@ -388,7 +388,8 @@ static uint32_t g_census_sorted_count = 0, g_census_sorted_cap = 0;
+ 
+ // Sorted snapshot of the STRING census, rebuilt each cycle. Unlike objects,
+ // string lookups are RANGE-based: a census string's allocation spans
+-// [s, s + sizeof(Avm2String) + s->len + 1) (header + inline bytes), and live
++// [s, str_alloc_end(s)) (header + inline bytes; an append buffer's span also
++// covers its capacity prefix, a dependent header's is the header alone), and live
+ // references may point at the header (Avm2Value.u.str), at the bytes (a
+ // by-value Avm2String copy's utf8, e.g. Avm2DynProp.name), or anywhere inside
+ // (conservative ext-scan words). Any pointer into the span marks the string.
+@@ -400,6 +401,15 @@ static uint32_t g_str_census_count = 0, g_str_census_cap = 0;
+ static const char* g_str_census_lo = NULL;
+ static const char* g_str_census_hi = NULL;
+ 
++// One past the end of a census string's allocation (the range-lookup span).
++static inline const char* str_alloc_end(const Avm2String* s)
++{
++	if (s->gc_flags & AVM2_STR_GC_DEP) return (const char*) (s + 1);
++	if (s->gc_flags & AVM2_STR_GC_BUF)
++		return (const char*) (s + 1) + AVM2_STRBUF_PREFIX + s->len + 1;
++	return (const char*) (s + 1) + s->len + 1;
++}
++
+ static int str_census_ptr_cmp(const void* a, const void* b)
+ {
+ 	Avm2String* pa = *(Avm2String* const*) a;
+@@ -423,15 +433,26 @@ void avm2_gc_mark_string_bytes(const void* p)
+ 	}
+ 	if (lo == 0) return;
+ 	Avm2String* s = g_str_census_sorted[lo - 1];
+-	if ((const char*) p < (const char*) s + sizeof(Avm2String) + s->len + 1)
++	if ((const char*) p < str_alloc_end(s))
+ 	{
+ 		s->gc_flags |= AVM2_STR_GC_MARK;
++		// A dependent header keeps its append buffer (the bytes) alive.
++		if (s->gc_flags & AVM2_STR_GC_DEP)
++			avm2_strbuf_owner(s)->gc_flags |= AVM2_STR_GC_MARK;
+ 	}
+ }
+ 
+ void avm2_gc_mark_string(const Avm2String* s)
+ {
+ 	if (s == NULL) return;
++	if (s->gc_flags & AVM2_STR_GC_DEP)
++	{
++		// An append-buffer header (or a by-value copy of one): mark it and the
++		// buffer holding its bytes — O(1), no range lookup.
++		((Avm2String*) s)->gc_flags |= AVM2_STR_GC_MARK;
++		avm2_strbuf_owner(s)->gc_flags |= AVM2_STR_GC_MARK;
++		return;
++	}
+ 	if ((s->gc_flags & AVM2_STR_GC_HEAP) && s->utf8 == (const char*) (s + 1))
+ 	{
+ 		// The census header itself (every string minted by avm2_string_new /
+@@ -963,7 +984,7 @@ static void gc_collect(Avm2Context* ctx)
+ 	{
+ 		Avm2String* last = g_str_census_sorted[g_str_census_count - 1];
+ 		g_str_census_lo = (const char*) g_str_census_sorted[0];
+-		g_str_census_hi = (const char*) last + sizeof(Avm2String) + last->len + 1;
++		g_str_census_hi = str_alloc_end(last);
+ 	}
+ 
+ 	if (g_gc_time) t_strsnap = gc_now_ms();
+diff --git a/SWFModernRuntime/src/avm2/avm2_value.c b/SWFModernRuntime/src/avm2/avm2_value.c
+index 325431bb3..611e787cc 100644
+--- a/SWFModernRuntime/src/avm2/avm2_value.c
++++ b/SWFModernRuntime/src/avm2/avm2_value.c
+@@ -139,12 +139,115 @@ static uint32_t wtf8_decode3(const unsigned char* p)
+ 	     | (uint32_t) (p[2] & 0x3F);
+ }
+ 
++// --- append-in-place buffers (see avm2_value.h) -----------------------------
++//
++// AVM2_STRBUF_CENSUS=1 prints a hit census at exit (in-place appends, buffers
++// minted, plain copies of branches off a stale prefix, avm2_string_cstr copies
++// of stale prefixes).
++
++static int g_strbuf_census = -1;  // -1 = env not read yet
++static unsigned long long g_strbuf_appends = 0;
++static unsigned long long g_strbuf_new = 0;
++static unsigned long long g_strbuf_new_bytes = 0;
++static unsigned long long g_strbuf_cstr_copies = 0;
++static unsigned long long g_strbuf_branches = 0;
++
++static void strbuf_census_report(void)
++{
++	fprintf(stderr, "[avm2-strbuf] appends=%llu buffers=%llu buffer_bytes=%llu branch_copies=%llu cstr_copies=%llu\n",
++	        g_strbuf_appends, g_strbuf_new, g_strbuf_new_bytes, g_strbuf_branches,
++	        g_strbuf_cstr_copies);
++}
++
++static int strbuf_census_on(void)
++{
++	if (g_strbuf_census < 0)
++	{
++		const char* e = getenv("AVM2_STRBUF_CENSUS");
++		g_strbuf_census = (e != NULL && e[0] != '\0' && strcmp(e, "0") != 0);
++		if (g_strbuf_census) atexit(strbuf_census_report);
++	}
++	return g_strbuf_census;
++}
++
++static inline uint32_t strbuf_cap(const Avm2String* buf)
++{
++	return *(const uint32_t*) (const void*) (buf + 1);
++}
++
++// `a` (len >= 1) + `b` (len >= 1) through a buffer; NULL when `a` is a stale
++// prefix or the result is too large for one allocation (the caller falls back
++// to a plain copy).
++static const Avm2String* strbuf_append(Avm2Context* ctx, const Avm2String* a,
++                                       const Avm2String* b, uint32_t total)
++{
++	Avm2String* buf = NULL;
++	if ((a->gc_flags & AVM2_STR_GC_DEP))
++	{
++		// In place only when `a` IS the frontier: an older prefix must never
++		// see its tail rewritten (a second branch off it would clobber the
++		// first's bytes). A branch off a stale prefix (`x = base + i` in a
++		// loop) copies exactly instead of minting a 2x buffer per branch.
++		Avm2String* o = avm2_strbuf_owner(a);
++		if (o->len != a->len)
++		{
++			if (strbuf_census_on()) g_strbuf_branches++;
++			return NULL;
++		}
++		if ((uint64_t) total + 1 <= strbuf_cap(o)) buf = o;
++	}
++	if (buf == NULL)
++	{
++		uint64_t cap = (uint64_t) total * 2u + 1u;
++		if (sizeof(Avm2String) + AVM2_STRBUF_PREFIX + cap > 0xFFFFFFF0u) return NULL;
++		buf = avm2_alloc(ctx, (uint32_t) (sizeof(Avm2String) + AVM2_STRBUF_PREFIX + cap));
++		*(uint32_t*) (void*) (buf + 1) = (uint32_t) cap;
++		char* nb = (char*) (buf + 1) + AVM2_STRBUF_PREFIX;
++		memcpy(nb, a->utf8, a->len);
++		buf->len = a->len;
++		buf->utf8 = nb;
++		avm2_gc_enroll_string(buf);
++		buf->gc_flags |= AVM2_STR_GC_BUF;
++		if (strbuf_census_on()) { g_strbuf_new++; g_strbuf_new_bytes += cap; }
++	}
++	else if (strbuf_census_on())
++	{
++		g_strbuf_appends++;
++	}
++	char* bytes = (char*) buf->utf8;
++	memcpy(bytes + buf->len, b->utf8, b->len);
++	bytes[total] = '\0';
++	buf->len = total;
++	Avm2String* d = avm2_alloc(ctx, sizeof(Avm2String));
++	d->len = total;
++	d->utf8 = bytes;
++	avm2_gc_enroll_string(d);
++	d->gc_flags |= AVM2_STR_GC_DEP;
++	return d;
++}
++
++const char* avm2_string_cstr(Avm2Context* ctx, const Avm2String* s)
++{
++	if (s->utf8[s->len] == '\0') return s->utf8;
++	if (strbuf_census_on()) g_strbuf_cstr_copies++;
++	return avm2_string_new(ctx, s->utf8, s->len)->utf8;
++}
++
+ const Avm2String* avm2_string_concat(Avm2Context* ctx, const Avm2String* a, const Avm2String* b)
+ {
+ 	// WTF-8 seam: an unpaired high surrogate at the end of `a` followed by an
+ 	// unpaired low surrogate at the start of `b` re-forms one astral code
+ 	// point, shrinking the result by two bytes (3 + 3 -> 4).
+ 	bool join = wtf8_ends_with_high_surrogate(a) && wtf8_starts_with_low_surrogate(b);
++	// Long results append in place (a seam join rewrites a's tail, so it
++	// always copies).
++	if (!join && a->len > 0 && b->len > 0
++	    && (uint64_t) a->len + b->len >= AVM2_STRBUF_MIN_LEN
++	    && (uint64_t) a->len + b->len < 0x7FFFFFFFu)
++	{
++		const Avm2String* r = strbuf_append(ctx, a, b, a->len + b->len);
++		if (r != NULL) return r;
++	}
+ 	uint32_t total = a->len + b->len - (join ? 2u : 0u);
+ 	Avm2String* s = avm2_alloc(ctx, sizeof(Avm2String) + total + 1);
+ 	char* bytes = (char*) (s + 1);
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 90b2a1e30..ab208337b 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -104,3 +104,4 @@ arms cannot be reached any other way.
+ | `avm2_json_roundtrip_bounded` | **per-call native leaks in `JSON.stringify` / `JSON.parse`** (seedling-wasm-leak L2). Stringify never freed its string builder, cycle stack or PropList; parse leaked its whole intermediate tree plus a per-string scratch sized to the REST of the input. `test_env.json` (a per-test runtime env, read by `verify_output.py`) pins `SWF_HEAP_MB=64`: 4,800 round-trips over 120 frames die with `heap_alloc ... out of memory` on the leaking runtime (still dead at 128 and 256 MB) and hold a flat 4.39 MB post-collect floor on the fixed one (passes at 32 MB). Also locks the scratch-freeing exits: a throwing replacer, `toJSON` and reviver each rethrow the SAME value, plus #1129 (cycle) and #1132 (syntax). Output is byte-identical between the two runtimes at an arena big enough for the leak |
+ | `avm2_array_growth_bounded` | **Array/Vector growth never freed the previous element buffer** (`array_reserve`, Array `unshift`/`splice`/`insertAt`, `vec_reserve`; seedling-wasm-leak L2). Same `SWF_HEAP_MB=64` arena: the leaking runtime OOMs (passes only at 256 MB), the fixed one holds 4.4–4.9 MB. Contents are checked through every growth path, including one array that lives and grows across all 120 ticks |
+ | `avm2_e4x_parse_bounded` | **collectable E4X** (seedling-wasm-leak L1). E4X used to be immortal (every node a GC root, every XML/XMLList wrapper pinned), so a game re-parsing a level document per room swap (Seedling) kept them all: the leaking runtime OOMs in a 64 MB arena (and in 256); the fixed one sweeps ~8,070 nodes per collection at a flat 5.14 MB with 1,035 live objects. The live half is a liveness lock under `AVM2_GC_STRESS=1`: identity across ticks, `parent()` navigation from a leaf held alone (the rest of its tree must survive), a detached subtree, attribute lists, namespaces, a list whose target object only the list reaches, and a `setNotification` closure. Also guards the E4X scratch frees (serializer builder, in-scope namespace lists, parser stacks) |
++| `avm2_strbuf_stale_prefix` | **append-in-place string buffers keep stale prefixes intact** (s22 w2-strbuf; `avm2_string_concat` → `strbuf_append`, `avm2_value.c`). A long `s += x` writes `x` into `s`'s buffer and returns a new header sharing the bytes, so the OLD header `p` loses `utf8[len] == '\0'`. Every row reads such a stale prefix after a later append, each through a different consumer (length, `==`, indexOf/lastIndexOf, charAt/slice, Number/parseInt, split, RegExp match, a property key), plus two branches off one stale prefix (`x1`/`x2`: the second must not clobber the first) and a prefix left behind while the frontier keeps growing in place (`b`). A consumer that read `utf8` as a C string would print `Number(q)=75`, not `7`. **A behavior LOCK, not a repro**: byte-identical on the pre-buffer baseline. Hand-assembled ABC (`create_test_swf.py`, top-level script code, no mxmlc in the cloud); the numeric rows pad with spaces, not zeros, because `avm2_string_to_f64` caps its digit copy at 380 characters (a separate open defect). Expected output is derived from ECMA-262 semantics; Ruffle confirmation is a w2-strbuf LOCAL ORACLE REQUEST |
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/create_test_swf.py
+new file mode 100644
+index 000000000..1b065297a
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/create_test_swf.py
+@@ -0,0 +1,278 @@
++#!/usr/bin/env python3
++"""AVM2 append-in-place string buffers: stale prefixes keep their value.
++
++Usage: create_test_swf.py [out.swf]   (default: test.swf beside this script)
++
++Pins down `avm2_string_concat`'s append-in-place path (s22 w2-strbuf): a long
++`s += x` writes x into s's buffer and returns a new header sharing it, so the
++OLD header `p` (a prefix) loses its `utf8[len] == '\\0'`. Every row reads such a
++stale prefix after a later append, through a different consumer (length,
++equality, indexOf/lastIndexOf, charAt/slice, Number/parseInt, split, RegExp
++match, a property key), plus two branches appended off one stale prefix (the
++second must not clobber the first) and a stale prefix left behind while the
++frontier keeps growing in place. A consumer that read `utf8` as a C string
++would see the longer string (e.g. Number(q) = 75 instead of 7).
++
++No mxmlc in the cloud, so the SWF is hand-assembled: one DoABC whose only
++script's init method holds the whole test (top-level code, like the avmplus
++acceptance tests). Expected output follows from ECMA-262/AS3 semantics; see the
++w2-strbuf report's LOCAL ORACLE REQUESTS for the Ruffle confirmation.
++"""
++import os
++import struct
++import sys
++
++
++def u30(v):
++    out = bytearray()
++    while True:
++        b = v & 0x7F
++        v >>= 7
++        if v:
++            out.append(b | 0x80)
++        else:
++            out.append(b)
++            return bytes(out)
++
++
++def s24(v):
++    return struct.pack('<i', v)[:3]
++
++
++class Abc:
++    def __init__(self):
++        self.strings = [None]        # index 0 is implicit; never emitted
++        self.multinames = [None]     # index 0 is implicit
++
++    def string(self, s):
++        if s not in self.strings:
++            self.strings.append(s)
++        return self.strings.index(s)
++
++    def qname(self, name):
++        key = ('q', name)
++        if key not in self.multinames:
++            self.multinames.append(key)
++        return self.multinames.index(key)
++
++
++class Code:
++    def __init__(self, abc):
++        self.abc = abc
++        self.b = bytearray()
++
++    def op(self, *bs):
++        self.b += bytes(bs)
++
++    def pushstring(self, s):
++        self.op(0x2c); self.b += u30(self.abc.string(s))
++
++    def pushshort(self, v):
++        self.op(0x25); self.b += u30(v & 0xFFFFFFFF if v >= 0 else (v & 0x3FFFFFFF))
++
++    def getlocal(self, i):
++        self.op(0x62); self.b += u30(i)
++
++    def setlocal(self, i):
++        self.op(0x63); self.b += u30(i)
++
++    def findpropstrict(self, n):
++        self.op(0x5d); self.b += u30(self.abc.qname(n))
++
++    def getlex(self, n):
++        self.op(0x60); self.b += u30(self.abc.qname(n))
++
++    def getproperty(self, n):
++        self.op(0x66); self.b += u30(self.abc.qname(n))
++
++    def callproperty(self, n, argc):
++        self.op(0x46); self.b += u30(self.abc.qname(n)) + u30(argc)
++
++    def callpropvoid(self, n, argc):
++        self.op(0x4f); self.b += u30(self.abc.qname(n)) + u30(argc)
++
++    def add(self):
++        self.op(0xa0)
++
++    def convert_s(self):
++        self.op(0x70)
++
++    def loop(self, var_i, count, body):
++        # for (i = 0; i < count; i++) body()
++        self.op(0x24, 0); self.setlocal(var_i)              # pushbyte 0
++        self.op(0x10); jpos = len(self.b); self.b += s24(0)  # jump -> cond
++        top = len(self.b)
++        self.op(0x09)                                        # label
++        body()
++        self.getlocal(var_i); self.op(0x91); self.setlocal(var_i)  # increment
++        cond = len(self.b)
++        self.b[jpos:jpos + 3] = s24(cond - (jpos + 3))
++        self.getlocal(var_i); self.pushshort(count)
++        self.op(0x15); here = len(self.b) + 3                # iflt -> top
++        self.b += s24(top - here)
++
++    def trace_expr(self, emit):
++        self.findpropstrict('trace')
++        emit()
++        self.callpropvoid('trace', 1)
++
++
++N = 5000  # > AVM2_STRBUF_MIN_LEN (4096): the buffer path
++
++
++def build_code(abc):
++    c = Code(abc)
++    S, P, I, Q, D, B, X1, X2, O = 1, 2, 3, 4, 5, 6, 7, 8, 9
++    c.op(0xd0, 0x30)                       # getlocal0; pushscope
++
++    # s = ""; for (i < N) s += "a"; p = s; s += "XYZ"
++    c.pushstring(''); c.setlocal(S)
++    def app_a():
++        c.getlocal(S); c.pushstring('a'); c.add(); c.setlocal(S)
++    c.loop(I, N, app_a)
++    c.getlocal(S); c.setlocal(P)
++    c.getlocal(S); c.pushstring('XYZ'); c.add(); c.setlocal(S)
++
++    def row(label, emit):
++        c.trace_expr(lambda: (c.pushstring(label), emit(), c.add()))
++
++    row('p.length=', lambda: (c.getlocal(P), c.getproperty('length')))
++    row('s.length=', lambda: (c.getlocal(S), c.getproperty('length')))
++    row('p==prefix=', lambda: (c.getlocal(P), c.getlocal(S), c.op(0x24, 0),
++                                c.getlocal(P), c.getproperty('length'),
++                                c.callproperty('substr', 2), c.op(0xab)))
++    row('p.indexOf(X)=', lambda: (c.getlocal(P), c.pushstring('X'),
++                                   c.callproperty('indexOf', 1)))
++    row('p.lastIndexOf(a)=', lambda: (c.getlocal(P), c.pushstring('a'),
++                                       c.callproperty('lastIndexOf', 1)))
++    row('p.slice(-3)=', lambda: (c.getlocal(P), c.op(0x24, 0xfd),
++                                  c.callproperty('slice', 1)))
++    row('p.charAt(N)=[', lambda: (c.getlocal(P), c.pushshort(N),
++                                   c.callproperty('charAt', 1),
++                                   c.pushstring(']'), c.add()))
++    row('p.split(a).length=', lambda: (c.getlocal(P), c.pushstring('a'),
++                                        c.callproperty('split', 1),
++                                        c.getproperty('length')))
++    row('p.match(a+$)=', lambda: (c.getlocal(P), c.findpropstrict('RegExp'),
++                                   c.pushstring('a+$'),
++                                   c.op(0x4a), c.b.extend(u30(abc.qname('RegExp')) + u30(1)),  # constructprop
++                                   c.callproperty('match', 1),
++                                   c.getproperty('0'), c.getproperty('length')))
++
++    # Numbers: q = "   ...7" (N chars, leading StrWhiteSpace); d = q + "5"
++    # (stale q). Spaces, not zeros: the number parser caps its digit copy.
++    c.pushstring(''); c.setlocal(D)
++    def app_0():
++        c.getlocal(D); c.pushstring(' '); c.add(); c.setlocal(D)
++    c.loop(I, N - 1, app_0)
++    c.getlocal(D); c.pushstring('7'); c.add(); c.setlocal(Q)
++    c.getlocal(Q); c.pushstring('5'); c.add(); c.setlocal(D)
++    row('Number(q)=', lambda: (c.findpropstrict('Number'), c.getlocal(Q),
++                                c.callproperty('Number', 1)))
++    row('parseInt(q)=', lambda: (c.findpropstrict('parseInt'), c.getlocal(Q),
++                                  c.callproperty('parseInt', 1)))
++    row('Number(d)=', lambda: (c.findpropstrict('Number'), c.getlocal(D),
++                                c.callproperty('Number', 1)))
++
++    # Two branches off stale p: x1 = p + "1"; x2 = p + "2".
++    c.getlocal(P); c.pushstring('1'); c.add(); c.setlocal(X1)
++    c.getlocal(P); c.pushstring('2'); c.add(); c.setlocal(X2)
++    row('x1.slice(-2)=', lambda: (c.getlocal(X1), c.op(0x24, 0xfe),
++                                   c.callproperty('slice', 1)))
++    row('x2.slice(-2)=', lambda: (c.getlocal(X2), c.op(0x24, 0xfe),
++                                   c.callproperty('slice', 1)))
++    row('s.slice(-4)=', lambda: (c.getlocal(S), c.op(0x24, 0xfc),
++                                  c.callproperty('slice', 1)))
++
++    # Property keys: o[p] = "P"; o[s] = "S"; distinct entries.
++    c.op(0x55); c.b += u30(0); c.setlocal(O)              # newobject {}
++    def setkey(var, val):
++        c.getlocal(O); c.getlocal(var); c.pushstring(val)
++        c.op(0x61); c.b += u30(abc.rt_multiname)          # setproperty [rt]
++    def getkey(var):
++        c.getlocal(O); c.getlocal(var)
++        c.op(0x66); c.b += u30(abc.rt_multiname)          # getproperty [rt]
++    setkey(P, 'P'); setkey(S, 'S')
++    row('o[p]=', lambda: getkey(P))
++    row('o[s]=', lambda: getkey(S))
++
++    # Stale prefix after a frontier that keeps growing (in-place appends).
++    c.getlocal(S); c.setlocal(B)
++    def app_b():
++        c.getlocal(S); c.pushstring('b'); c.add(); c.setlocal(S)
++    c.loop(I, N, app_b)
++    row('b.length=', lambda: (c.getlocal(B), c.getproperty('length')))
++    row('b.slice(-3)=', lambda: (c.getlocal(B), c.op(0x24, 0xfd),
++                                  c.callproperty('slice', 1)))
++    row('s.length=', lambda: (c.getlocal(S), c.getproperty('length')))
++
++    c.trace_expr(lambda: c.pushstring('done'))
++    c.op(0x47)                                             # returnvoid
++    return bytes(c.b), O + 1
++
++
++def build_abc():
++    abc = Abc()
++    # Pass 1 interns every string/QName (with a placeholder index for the
++    # runtime-name multiname); pass 2 re-emits the code against the final
++    # pool, whose last multiname is a MultinameL over ns set [public].
++    abc.rt_multiname = 0x7FFF
++    build_code(abc)
++    abc.rt_multiname = len(abc.multinames)
++    code, nlocals = build_code(abc)
++
++    out = bytearray()
++    out += struct.pack('<HH', 16, 46)
++    pool = bytearray()
++    pool += u30(0) + u30(0) + u30(0)
++    for (_, n) in abc.multinames[1:]:
++        abc.string(n)
++    pool += u30(len(abc.strings))
++    for s in abc.strings[1:]:
++        b = s.encode('utf-8')
++        pool += u30(len(b)) + b
++    pool += u30(2) + bytes([0x16]) + u30(abc.string(''))
++    pool += u30(2) + u30(1) + u30(1)                 # ns set 1 = [public]
++    pool += u30(len(abc.multinames) + 1)
++    for (_, n) in abc.multinames[1:]:
++        pool += bytes([0x07]) + u30(1) + u30(abc.string(n))
++    pool += bytes([0x1B]) + u30(1)                   # MultinameL, ns set 1
++    out += pool
++    # methods: 1 (script init), no params, no name, no flags
++    out += u30(1) + u30(0) + u30(0) + u30(0) + bytes([0])
++    out += u30(0)                                    # metadata
++    out += u30(0)                                    # classes
++    out += u30(1) + u30(0) + u30(0)                  # script 0: init=0, no traits
++    # method bodies
++    out += u30(1)
++    out += u30(0)                                    # method
++    out += u30(16)                                   # max_stack
++    out += u30(nlocals)                              # local_count
++    out += u30(0) + u30(1)                           # init/max scope depth
++    out += u30(len(code)) + code
++    out += u30(0) + u30(0)                           # exceptions, traits
++    return bytes(out)
++
++
++def tag(code, payload):
++    if len(payload) >= 63:
++        return struct.pack('<HI', (code << 6) | 63, len(payload)) + payload
++    return struct.pack('<H', (code << 6) | len(payload)) + payload
++
++
++def build_swf():
++    abc = build_abc()
++    rect = bytes([0x78, 0x00, 0x05, 0x5F, 0x00, 0x00, 0x0F, 0xA0, 0x00])  # 0..550x400
++    body = rect + struct.pack('<HH', 30 << 8, 1)
++    body += tag(69, struct.pack('<I', 0x08))                 # FileAttributes: AS3
++    body += tag(82, struct.pack('<I', 0) + b'strbuf\x00' + abc)  # DoABC2 (eager)
++    body += tag(1, b'')                                      # ShowFrame
++    body += tag(0, b'')
++    return b'FWS' + bytes([10]) + struct.pack('<I', 8 + len(body)) + body
++
++
++if __name__ == '__main__':
++    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
++        os.path.dirname(os.path.abspath(__file__)), 'test.swf')
++    open(out, 'wb').write(build_swf())
++    print('wrote', out)
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/output.txt b/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/output.txt
+new file mode 100644
+index 000000000..92fcbaea3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/output.txt
+@@ -0,0 +1,21 @@
++p.length=5000
++s.length=5003
++p==prefix=true
++p.indexOf(X)=-1
++p.lastIndexOf(a)=4999
++p.slice(-3)=aaa
++p.charAt(N)=[]
++p.split(a).length=5001
++p.match(a+$)=5000
++Number(q)=7
++parseInt(q)=7
++Number(d)=75
++x1.slice(-2)=a1
++x2.slice(-2)=a2
++s.slice(-4)=aXYZ
++o[p]=P
++o[s]=S
++b.length=5003
++b.slice(-3)=XYZ
++s.length=10003
++done
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/test.swf b/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1b7fb518df169cf0bc63e6870a6539ecd4098fb
+GIT binary patch
+literal 963
+zcmZWn&2G~`5T03Qy>XhPX=%$(p%h4|P2JEI5GP9@fl+&C5f!3PS;)I}+DL6`Vpqx=
+zz?Bz3zVi?qcmdvkJI?@=apG+v;lu8J`+c)B-;Dh?yOr+-Kp*&ffXNJC0pZzH834Y`
+zd?6zLlC&q!+R%Vjj@AG}WAE)dD{dV}-NW?Avl4x(#GV)TqIRe6)#6sCdl2<^+V-B~
+z;ocO<!zA4-?n1|_#;xSIqau6tfs@PCQP_K$+S`t|kHIvN@o^`$Lq|VOl9Mo1M|QZ<
+zbUcGrT*SxtsIq-_BBP%DA%8OLCDCR#&4Io@p!DmwQR}bkd>fRnzcGfYi3Sfz{1SKh
+z>3$q|v?hUv(vrG{s?<WNxpZ*ajd<D%Rb&oZVJ2six+Mzd6Jw6~z^gel$p_xdSJC0~
+ze#{51aLpY0C~FUF4jJO4z&iq)0+$5d6}T+W7U&4PCvZieD{xg{OW^%^#C$pcv>`Mq
+zfIp2NYc48mf-)L40866FGKJFktPE)^eOjLVb$%{UF(M2i0(47~wOO`<`I$?+IGd70
+zO~_f_U|$P`kjyRnB`lytkojE0ie$|{zNz7aWR%jUnyXn6P#Xl4M``Mk1(rLxWuafe
+z_QWtfdEg@t+-+ovYY!iX9=JP|sgf+Y)5KBfmx8J+`Bj~ICa4jtX*f$PFIcKzE>pRY
+z%b6-u=oKlNe@9hcmF01Gjk@r=U|)l>=+|KGd|0O)-RohU9=MU;wd;k&g`628>a;oX
+gf$q)!W<k-5(!6N;EoqK7aC{!OX+$pop3uDi0X5LyQ~&?~
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/test.toml b/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/test.toml
+new file mode 100644
+index 000000000..dbee897f5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm2_strbuf_stale_prefix/test.toml
+@@ -0,0 +1 @@
++num_frames = 1
