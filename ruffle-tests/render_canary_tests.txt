@@ -489,3 +489,15 @@ avm2/pixelbender_effect_twirl               # AVM2 showAll non-uniform fit    1 
 # passes 0/66 outliers, max diff 3, so a BC3 palette/rounding move shows here.
 # tier=1  (CI-passing once w2-atf-dxt5 lands)
 avm2/stage3d_texture_bytearray_compressed_raw_alpha  # ATF fmt 5 (raw DXT5) 1 cmp
+
+# SESSION 22 ADDITION (s22 cloud `w2-filter-fixes`). PlaceObject3 `Visible`
+# (SWF >= 11; recompiler emits tagSetVisible) plus the as_hidden skip in
+# tagRerenderFrame (the loop behind every graded final capture); the masker's
+# own filters on the AVM2 alpha-mask arm (compose-into-offscreen); and a
+# composed NON-FINAL filter in an AVM1 PlaceObject3 chain ([Glow(compositeSource),
+# Blur]). No standing member sees any of the three. Tier 2 when added:
+# CI-failing until a graded run confirms (locally all three pass).
+# tier=2  (CI-failing / skipped; A/B signal only)
+visual/filters/any_blur_scales_with_screen  # PO3 Visible=0 on 4 cells       1 cmp
+visual/cache_as_bitmap/cab_mask_filters     # filtered masker, alpha arm     1 cmp
+from_shumway/acid/acid-filter-2             # Glow(compositeSource)+Blur     1 cmp

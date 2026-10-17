@@ -4582,9 +4582,13 @@ namespace SWFRecomp
 					cur_pos += 1;
 				}
 
+				u8 visible_val = 1;
 				if (is_po3 && has_visible)
 				{
-					cur_pos += 1; // skip Visible UI8
+					// PlaceObject3 Visible UI8. Ruffle display_object.rs:2592
+					// applies it only for SWF version >= 11 (0 = hidden).
+					visible_val = (*(u8*) cur_pos != 0) ? 1u : 0u;
+					cur_pos += 1;
 				}
 
 				u8 opaque_bg_set = 0;
@@ -4888,6 +4892,14 @@ namespace SWFRecomp
 				{
 					context.tag_main << "\t" << "tagSetCacheAsBitmap(app_context, "
 						<< to_string(depth) << ", " << to_string((unsigned) cab_set)
+						<< ");" << endl;
+				}
+
+				// PlaceObject3 Visible -> DisplayObject.visible (SWF >= 11).
+				if (is_po3 && has_visible && header.version >= 11)
+				{
+					context.tag_main << "\t" << "tagSetVisible(app_context, "
+						<< to_string(depth) << ", " << to_string((unsigned) visible_val)
 						<< ");" << endl;
 				}
 
@@ -6070,7 +6082,12 @@ namespace SWFRecomp
 								sp_cab_set = (*(u8*) cur_pos != 0) ? 1u : 0u;
 								cur_pos += 1;
 							}
-							if (is_sprite_po3 && sp_has_visible) cur_pos += 1;
+							u8 sp_visible_val = 1;
+							if (is_sprite_po3 && sp_has_visible)
+							{
+								sp_visible_val = (*(u8*) cur_pos != 0) ? 1u : 0u;
+								cur_pos += 1;
+							}
 							// PlaceObject3 BackgroundColor inside a DefineSprite.
 							// The sprite arm grew the cacheAsBitmap and filter
 							// twins of the root arm but never this one, so the
@@ -6339,6 +6356,14 @@ namespace SWFRecomp
 							{
 								sprite_definitions << "\t" << "tagSetCacheAsBitmap(app_context, "
 									<< to_string(depth) << ", " << to_string((unsigned) sp_cab_set)
+									<< ");" << endl;
+							}
+
+							// PlaceObject3 Visible (twin of the root arm).
+							if (is_sprite_po3 && sp_has_visible && header.version >= 11)
+							{
+								sprite_definitions << "\t" << "tagSetVisible(app_context, "
+									<< to_string(depth) << ", " << to_string((unsigned) sp_visible_val)
 									<< ");" << endl;
 							}
 

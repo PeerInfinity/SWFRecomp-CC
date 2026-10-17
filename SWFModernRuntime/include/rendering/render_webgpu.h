@@ -356,6 +356,10 @@ typedef struct WebGPURenderContext
 	// (set by render_webgpu_set_blur_shift, consumed and cleared by run_blur).
 	int blur_shift_x;
 	int blur_shift_y;
+	// compose_pipeline twin for the 1-sample, stencil-less filter_tex_b target
+	// (sample count 1 by design): composes a non-final filter INTO the layer
+	// (then copied back to filter_tex_a) instead of the framebuffer.
+	WGPURenderPipeline compose_layer_pipeline;
 } WebGPURenderContext;
 
 // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
@@ -442,6 +446,14 @@ void render_webgpu_snapshot_filter_source(WebGPURenderContext* context);
 // c2 = shadow, variant = 0 outer / 1 inner / 2 full). blur_off_* is a UV-space
 // offset added to the blurred sample (bevel also samples at -blur_off).
 void render_webgpu_compose_filter(WebGPURenderContext* context, int kind,
+	float blur_off_x, float blur_off_y,
+	float c1r, float c1g, float c1b, float c1a,
+	float c2r, float c2g, float c2b, float c2a,
+	float strength, int variant, int knockout, int composite_source);
+// Same as render_webgpu_compose_filter, but the result REPLACES filter_tex_a
+// (composed into filter_tex_b over transparent, then copied back), so the
+// next filter in a chain receives it. Main pass must be suspended.
+void render_webgpu_compose_filter_to_layer(WebGPURenderContext* context, int kind,
 	float blur_off_x, float blur_off_y,
 	float c1r, float c1g, float c1b, float c1a,
 	float c2r, float c2g, float c2b, float c2a,

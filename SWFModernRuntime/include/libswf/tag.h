@@ -122,6 +122,7 @@ void tagSetOpaqueBackground(SWFAppContext* app_context, size_t depth,
     u8 set, u32 rgb);
 // PlaceObject3 BitmapCache -> DisplayObject.cacheAsBitmap.
 void tagSetCacheAsBitmap(SWFAppContext* app_context, size_t depth, u8 on);
+void tagSetVisible(SWFAppContext* app_context, size_t depth, u8 visible);
 void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
     double r, double g, double b, double a);
 void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20);

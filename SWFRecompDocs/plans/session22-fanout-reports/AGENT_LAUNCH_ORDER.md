@@ -33,7 +33,7 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-queue-regex | w1-trace-tail A | action_execution_order_test6 (rm), pcre_find_fixedlength | session_014xtNST7fsKSbQ6RVBmTLTy — LANDED |
 | w2-goto-collator | w1-drift-avm2 slots 1(goto)+2 | goto_queued_invalid/swf9..11, collator_flags, collator_locale_ids_windows, collator_compare_basic | session_01HGTgTnncXGJ4Bi7uRJykNT — LANDED e783f14e5 |
 | w2-float-verts | w1-stroke-staircase slot 1 | +22 px (12 blend_modes, masks pair, overlaps, scroll_rect_mask, heavy_tesselation, layers, blur_size_grows, color_matrix, avm2_button_scroll_rect, cab/avm2_button), −1 acid-small .05 | session_01GHaXsGDyCCvNJRoQh1p9mE — LANDED (main patch; morph leg HOLD) |
-| w2-filter-fixes | w1-offstage-filter | any_blur_scales_with_screen, cab_mask_filters, acid-filter-2 | session_013VbsEmy2b4JKfMBadEJTrh |
+| w2-filter-fixes | w1-offstage-filter | any_blur_scales_with_screen, cab_mask_filters, acid-filter-2 | session_013VbsEmy2b4JKfMBadEJTrh — LANDED |
 | w2-drawing-api-lyon | w1-pixel-smalls W2-B | MaskTest, displayobject_opaque_background, fills_and_lines, graphics_draw_path | session_01W4qaTLdonsB2sRwZP3LAmB — LANDED |
 | w2-glyph-subunit | w1-pixel-smalls W2-C | fonts/glyph, match_style, fallback_preferences | session_01KmL6XEUPUAPhFxEHtV67RK — LANDED |
 | w2-default-fonts-draw | w1-pixel-catastrophic | text-bind, cab/text, bitmapdata_draw_masks, bitmapdata_draw | session_01MSbMWKPyx6Jy1iTxnUmLff — LANDED (+3; bitmapdata_draw band only, baseline HOLD) |

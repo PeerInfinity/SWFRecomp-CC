@@ -920,7 +920,8 @@ pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
   compositeSource, both live defects), cxform applies to the filter output,
   DefineSprite placements keep `opaqueBackground`. `any_blur_scales_with_screen`
   (4884/0) flips only by drawing NOTHING for GradientGlow/GradientBevel like
-  Ruffle — dispositioned rather than implemented (see below).
+  Ruffle — dispositioned rather than implemented (see below; struck in s22:
+  the cells are PlaceObject3 `Visible = 0`).
   `edittext_border_filters`: an EditText is never drawn by
   `render_single_object`, so PlaceObject3 filters on a DefineEditText are a
   structural no-op (HOLD).
@@ -940,10 +941,12 @@ pixels**, 0 regressions (`polish-sweep-arc.md` §19.2). Reports:
   `from_shumway/acid/acid-filter`, `visual/opaque_background` (all pass now).
 
 ### Image-axis dispositions added this session
-- `visual/filters/any_blur_scales_with_screen` [output] — Ruffle renders nothing
+- ~~`visual/filters/any_blur_scales_with_screen` [output] — Ruffle renders nothing
   for GradientGlow/GradientBevel; the other 9 cells are byte-exact. Matching
   the golden means hiding content Flash draws; blast radius exactly this one
-  comparison. **Won't-fix (Ruffle divergence), not a bug of ours.**
+  comparison. **Won't-fix (Ruffle divergence), not a bug of ours.**~~
+  **STRUCK (s22):** the SWF hides those cells with PlaceObject3 `Visible = 0`, a
+  bug of ours, fixed — `session22-fanout-reports/w2-filter-fixes-report.md`.
 
 ## 18. Session-19 state of the board (2026-09-11/12)
 

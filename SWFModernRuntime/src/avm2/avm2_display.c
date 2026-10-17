@@ -19666,6 +19666,76 @@ static void avm2_filter_draw_offset_px(const Avm2FilterVal* const* list,
 	*oy = floor((double) y_min / 20.0);
 }
 
+// Run ONE filter IN PLACE on the layer already in filter_tex_a, leaving the
+// filtered result there (no framebuffer composite). A composed filter (glow /
+// drop shadow / bevel) snapshots its input as its composite source, blurs,
+// and is composed back INTO the layer (renderer_compose_filter_to_layer), so
+// the next filter receives exactly this one's output - Ruffle's per-filter
+// ping-pong (render/wgpu/src/filters.rs apply_filter). Same flag decoding and
+// offset rounding as the final-filter path of avm2_render_filtered. Main pass
+// must be suspended.
+static void avm2_filter_one_in_place(Avm2Context* ctx, const Avm2FilterVal* f)
+{
+	int is_blur = (f->kind == AVM2_FILTER_BLUR);
+	int is_shadow = (f->kind == AVM2_FILTER_DROP_SHADOW);
+	int is_glow = (f->kind == AVM2_FILTER_GLOW);
+	int is_bevel = (f->kind == AVM2_FILTER_BEVEL);
+	if (!(is_blur || is_shadow || is_glow || is_bevel)) return;
+	if (!is_blur) renderer_snapshot_filter_source(context);
+	float cr = (float) ((f->color >> 16) & 0xFF) / 255.0f;
+	float cg = (float) ((f->color >> 8) & 0xFF) / 255.0f;
+	float cb = (float) (f->color & 0xFF) / 255.0f;
+	float ca = (float) f->alpha / 255.0f;
+	renderer_run_blur(context,
+		avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
+		f->quality, 1.0f, cr, cg, cb, ca, 0);
+	if (is_blur) return;
+
+	SWFAppContext* app = ctx->app;
+	float fit_x = app->stage_fit_x > 0.0f ? app->stage_fit_x : 1.0f;
+	float fit_y = app->stage_fit_y > 0.0f ? app->stage_fit_y : 1.0f;
+	float vs = context->stage_scale > 0.0f ? context->stage_scale : 1.0f;
+	int f_inner = f->inner, f_knockout = f->knockout;
+	int f_composite = f->hide_object ? 0 : 1;
+	int bevel_type = 0;
+	if (is_bevel) { bevel_type = f->on_top ? 2 : (f_inner ? 1 : 0); f_composite = 1; }
+	float angle_rad = avm2_filter_fixed16(f->angle);
+	float dist_px = (is_shadow || is_bevel) ? avm2_filter_fixed16(f->distance) : 0.0f;
+	float xd = cosf(angle_rad) * dist_px * vs, yd = sinf(angle_rad) * dist_px * vs;
+	float uvx = fit_x / ((float) context->width * vs);
+	float uvy = fit_y / ((float) context->height * vs);
+	float du, dv;
+	if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
+	else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
+	float strength = avm2_filter_fixed8(f->strength);
+	if (is_bevel)
+		renderer_compose_filter_to_layer(context, 1, du, dv,
+			(float) ((f->color2 >> 16) & 0xFF) / 255.0f,
+			(float) ((f->color2 >> 8) & 0xFF) / 255.0f,
+			(float) (f->color2 & 0xFF) / 255.0f,
+			(float) f->alpha2 / 255.0f,
+			cr, cg, cb, ca, strength, bevel_type, f_knockout, f_composite);
+	else
+		renderer_compose_filter_to_layer(context, 0, -du, -dv,
+			cr, cg, cb, ca, 0.0f, 0.0f, 0.0f, 0.0f,
+			strength, f_inner, f_knockout, f_composite);
+}
+
+// Run an object's whole filter list in place (avm2_filter_one_in_place per
+// entry). Displacement maps are skipped: they need the object rect, and no
+// corpus mask layer carries one.
+static void avm2_filter_layer_in_place(Avm2Context* ctx,
+                                       const Avm2DisplayObjectExt* ext)
+{
+	for (uint32_t i = 0; i < ext->filter_count; i++)
+	{
+		const Avm2FilterVal* f = &ext->filters[i];
+		if (!avm2_filter_renderable(f)) continue;
+		if (f->kind == AVM2_FILTER_DISPLACEMENT_MAP) continue;
+		avm2_filter_one_in_place(ctx, f);
+	}
+}
+
 static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
                                  Avm2DisplayObjectExt* ext,
                                  const Mat* parent_world, double parent_alpha,
@@ -19741,6 +19811,18 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	int draw_source_after  = is_bevel ? (!f_knockout && bevel_type == 0)
 	                                  : (!f_inner && !f_knockout && f_composite);
 	int draw_source_before = is_bevel && !f_knockout && bevel_type == 2;
+	// CHAINED: every non-final composed filter is composed back into the
+	// layer (avm2_filter_one_in_place), so the LAST filter's composite source
+	// is the layer it receives, not the crisp object - same rule as tag.c
+	// render_filtered_object. Snapshot it inside the loop and let the shader
+	// composite.
+	int chained = (n > 1);
+	if (chained)
+	{
+		needs_source_tex = 1;
+		draw_source_after = 0;
+		draw_source_before = 0;
+	}
 	int shader_composite = (draw_source_after || draw_source_before)
 	                       ? 0 : f_composite;
 	// Plain blur has no composition flags and keeps the legacy blit-back.
@@ -19750,7 +19832,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	renderer_begin_offscreen_pass(context);
 	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
 	renderer_end_offscreen_pass(context);
-	if (needs_source_tex)
+	if (needs_source_tex && !chained)
 		renderer_snapshot_filter_source(context);
 
 	// A lone drop shadow's whole-pixel offset is folded into the blur (see
@@ -19774,10 +19856,10 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 
 	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
 	// of plain blurs chains for free and is bit-equal to one blur of quality N,
-	// exactly as Flash requires. A non-final glow/dropShadow/bevel is
-	// approximated by colorizing inside the blur - exact when the stacked
-	// filters are identical, an approximation otherwise; the exact form needs a
-	// compose-into-offscreen pipeline.
+	// exactly as Flash requires. A non-final glow/dropShadow/bevel is composed
+	// back into the layer (avm2_filter_one_in_place), so the next filter
+	// receives its real output (source composited in, inner/knockout
+	// honoured).
 	for (uint32_t i = 0; i < n; i++)
 	{
 		const Avm2FilterVal* f = list[i];
@@ -19788,21 +19870,27 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 			continue;
 		}
 		int f_is_blur = (f->kind == AVM2_FILTER_BLUR);
+		if (chained && !f_last && !f_is_blur)
+		{
+			avm2_filter_one_in_place(ctx, f);
+			continue;
+		}
+		if (chained && f_last)
+			renderer_snapshot_filter_source(context);
 		// AS3 BlurFilter has no `strength` property, so Avm2FilterVal.strength
 		// stays 0 for it - passing that through would multiply the layer by
 		// zero and the object would VANISH. Plain blur is always strength 1.
 		// For the final composed filter, strength is applied by the
 		// composition shader instead (inner needs the RAW blurred alpha).
-		float st = f_is_blur ? 1.0f : avm2_filter_fixed8(f->strength);
-		if (f_last && !f_is_blur) st = 1.0f;
-		int colorize = (!f_last && !f_is_blur) ? 1 : 0;
+		// (Non-final composed filters never reach here: they took the
+		// in-place arm above.)
 		renderer_run_blur(context,
 			avm2_filter_fixed16(f->blur_x), avm2_filter_fixed16(f->blur_y),
-			f->quality, st,
+			f->quality, 1.0f,
 			(float) ((f->color >> 16) & 0xFF) / 255.0f,
 			(float) ((f->color >> 8) & 0xFF) / 255.0f,
 			(float) (f->color & 0xFF) / 255.0f,
-			(float) f->alpha / 255.0f, colorize);
+			(float) f->alpha / 255.0f, 0);
 	}
 
 	renderer_resume_pass(context);
@@ -19998,22 +20086,23 @@ static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
 
 	// (1) the MASK layer, into filter_tex_a, then snapshotted aside.
 	//
-	// Filters on the masker are suppressed for the same structural reason cut 1
-	// suppresses them on a stencil masker: avm2_render_filtered drives the SAME
+	// avm2_render_filtered cannot be re-entered here: it drives the SAME
 	// suspend / offscreen / resume ping-pong this function is already holding,
-	// and re-entering it would end the layer pass mid-flight. Ruffle's alpha arm
-	// does apply them (`m.render_with_options`), so a FILTERED masker's alpha
-	// layer is its raw silhouette here — the one place this port knowingly
-	// diverges, and the reason cab_mask_filters' two maskeeCab cells still
-	// differ. Completion mechanism: a compose-into-offscreen pipeline (the same
-	// one the filter chain wants for a non-final glow), after which the masker
-	// layer can run its own filter chain inside this pass.
+	// and would end the layer pass mid-flight. So the masker is drawn with
+	// filters suppressed (g_avm2_filter_active) and its OWN filter list is then
+	// run in place on the finished layer (avm2_filter_layer_in_place, the
+	// compose-into-offscreen path) - Ruffle's alpha arm renders the masker WITH
+	// its filters (`m.render_with_options`) and consumes only the layer's
+	// alpha (s22: visual/cache_as_bitmap/cab_mask_filters). Filters on the
+	// masker's DESCENDANTS are still suppressed.
 	renderer_begin_offscreen_pass(context);
 	g_avm2_filter_active = 1;
 	g_avm2_alpha_masker = ext->mask;
 	g_avm2_alpha_maskee = NULL;
 	avm2_render_node(ctx, ext->mask, &mpw, 1.0, &AVM2_CX_IDENTITY);
 	renderer_end_offscreen_pass(context);
+	if (mext->filter_count > 0)
+		avm2_filter_layer_in_place(ctx, mext);
 	renderer_snapshot_filter_source(context);
 
 	// (2) the MASKEE layer, into filter_tex_a (the offscreen pass clears it).

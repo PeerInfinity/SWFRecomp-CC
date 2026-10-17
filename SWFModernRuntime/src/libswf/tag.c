@@ -4048,33 +4048,13 @@ static int build_filter_chain(const DisplayObject* obj,
 		return 1;
 	}
 
-	// EXPRESSIBILITY GATE. The ping-pong (filter_tex_a in, filter_tex_a out)
-	// can carry a non-final filter exactly only when that filter's output is
-	// "the blurred layer, optionally recoloured": a plain Blur, or a
-	// glow / drop-shadow with NO compositeSource, inner or knockout. Anything
-	// else has to blend its own source back INTO the layer, which needs a
-	// compose-into-offscreen pipeline we do not have; the `colorize` shortcut
-	// silently DROPS that source.
-	//
-	// Measured, on from_shumway/acid/acid-filter-2 ([Glow(compositeSource),
-	// Blur]): chaining it through colorize takes the row from 16 764 outliers
-	// to 64 921 — the ellipse under the glow disappears. So when the chain is
-	// not expressible we keep exactly the old single-filter behaviour (the
-	// scalar entry, i.e. the first filter) rather than trade one wrong render
-	// for a worse one. That is a HOLD on those lists, not a fix; the
-	// completion mechanism is the compose-into-offscreen pipeline that
-	// cab_mask_filters and the AVM2 `.filters` route also wait on.
-	for (int i = 0; i < n - 1; i++)
-	{
-		u8 t = chain[i]->type;
-		int ok = (t == 1)
-		      || ((t == 2 || t == 3) && chain[i]->flags == 0);
-		if (!ok)
-		{
-			chain[0] = scratch;
-			return 1;
-		}
-	}
+	// Every type 1-4 chain is rendered as-is. A non-final glow / drop shadow /
+	// bevel is composed back INTO the filter layer
+	// (compose_chain_entry_to_layer), so the next filter receives its real
+	// output - source composited in, inner / knockout honoured - and the old
+	// "collapse to the first filter" gate for compositeSource / inner /
+	// knockout members is gone (s22: from_shumway/acid/acid-filter-2,
+	// [Glow(compositeSource), Blur], now gets its final blur).
 	return n;
 }
 
@@ -4146,6 +4126,60 @@ static int filter_shadow_offset_px(RenderContext* rc, const FilterListEntry* f,
 	*sx = (int) floorf(-xd + 0.5f);
 	*sy = (int) floorf(-yd + 0.5f);
 	return (*sx != 0) || (*sy != 0);
+}
+
+// Compose a NON-FINAL glow / drop shadow / bevel of a chain back INTO the
+// filter layer (compose-into-offscreen), so the next filter receives this
+// one's real output — source composited in, knockout/inner honoured — instead
+// of the old "colorize inside the blur" approximation. The caller has already
+// snapshotted the layer as this filter's source and blurred it. Same flag
+// decoding and offset rounding as the final-filter path in
+// render_filtered_object.
+static void compose_chain_entry_to_layer(SWFAppContext* app_context,
+                                         const FilterListEntry* f,
+                                         int have_obj_cx, const float obj_cx[20])
+{
+	int is_bevel = (f->type == 4);
+	u8 flags = f->flags;
+	int f_inner, f_knockout, f_composite, bevel_type = 0;
+	if (is_bevel)
+	{
+		f_inner    = (flags >> 3) & 1;
+		f_knockout = (flags >> 2) & 1;
+		bevel_type = (flags & 1) ? 2 : (f_inner ? 1 : 0);
+		f_composite = 1;
+	}
+	else
+	{
+		f_composite = flags & 1;
+		f_knockout  = (flags >> 1) & 1;
+		f_inner     = (flags >> 2) & 1;
+	}
+	float fit_x = app_context->stage_fit_x > 0.0f ? app_context->stage_fit_x : 1.0f;
+	float fit_y = app_context->stage_fit_y > 0.0f ? app_context->stage_fit_y : 1.0f;
+	float vs = (context != NULL && context->stage_scale > 0.0f) ? context->stage_scale : 1.0f;
+	float dist_px = (f->type == 2 || is_bevel) ? (float) f->distance : 0.0f;
+	float xd = cosf((float) f->angle) * dist_px * vs, yd = sinf((float) f->angle) * dist_px * vs;
+	float uvx = fit_x / ((float)app_context->width * vs);
+	float uvy = fit_y / ((float)app_context->height * vs);
+	float du, dv;
+	if (is_bevel) { du = floorf(xd + 0.5f) * uvx; dv = floorf(yd + 0.5f) * uvy; }
+	else { du = -floorf(-xd + 0.5f) * uvx; dv = -floorf(-yd + 0.5f) * uvy; }
+	double c_r = f->color_r, c_g = f->color_g, c_b = f->color_b, c_a = f->color_a;
+	double h_r = f->highlight_r, h_g = f->highlight_g, h_b = f->highlight_b, h_a = f->highlight_a;
+	if (have_obj_cx)
+	{
+		cxform_apply_rgba(obj_cx, &c_r, &c_g, &c_b, &c_a);
+		cxform_apply_rgba(obj_cx, &h_r, &h_g, &h_b, &h_a);
+	}
+	if (is_bevel)
+		renderer_compose_filter_to_layer(context, 1, du, dv,
+			h_r, h_g, h_b, h_a, c_r, c_g, c_b, c_a,
+			f->strength, bevel_type, f_knockout, f_composite);
+	else
+		renderer_compose_filter_to_layer(context, 0, -du, -dv,
+			c_r, c_g, c_b, c_a, 0.0f, 0.0f, 0.0f, 0.0f,
+			f->strength, f_inner, f_knockout, f_composite);
 }
 
 static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
@@ -4246,11 +4280,12 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 
 	// filter_tex_a is the ping-pong's own input AND output, so an N-long list
 	// chains for free: N plain blurs are bit-equal to one blur of quality N,
-	// exactly as Flash requires. A NON-FINAL glow / drop-shadow / bevel is
-	// approximated by colorizing inside the blur (`colorize` = 1) — exact when
-	// the stacked filters are identical, an approximation otherwise; the exact
-	// form needs a compose-into-offscreen pipeline. This mirrors, line for
-	// line, the loop avm2_render_filtered already runs for `.filters` arrays.
+	// exactly as Flash requires. A NON-FINAL glow / drop-shadow / bevel
+	// snapshots the layer it receives as its composite source, blurs it, and
+	// is composed back INTO the layer (compose_chain_entry_to_layer), so the
+	// next filter receives exactly this one's output - Ruffle's per-filter
+	// ping-pong. This mirrors the loop avm2_render_filtered runs for
+	// `.filters` arrays.
 	for (int fi = 0; fi < chain_n; fi++)
 	{
 		const FilterListEntry* f = chain[fi];
@@ -4266,10 +4301,13 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 		// default (and Convolution-as-blur's explicit 1.0), so it is left
 		// alone: that is what the single-filter path has always passed.
 		if (f_is_blur && f != &chain_scratch) st = 1.0f;
-		// The composed kinds apply strength in the composition shader when they
-		// are last (inner needs the RAW blurred alpha), inside the blur when not.
-		if (f_last && !f_is_blur) st = 1.0f;
-		int colorize = (!f_last && !f_is_blur) ? 1 : 0;
+		// The composed kinds apply strength in the composition shader (inner
+		// needs the RAW blurred alpha), so their blur runs at strength 1.
+		if (!f_is_blur) st = 1.0f;
+		// Non-final composed filter: composed into the layer after its blur.
+		int to_layer = !f_last && !f_is_blur;
+		if (to_layer)
+			renderer_snapshot_filter_source(context);
 		// A3: the filter's own colour carries the object's colour transform.
 		double fr = f->color_r, fg = f->color_g, fb = f->color_b, fa = f->color_a;
 		if (have_obj_cx) cxform_apply_rgba(obj_cx, &fr, &fg, &fb, &fa);
@@ -4277,7 +4315,9 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 			f->blur_x, f->blur_y,
 			f->quality,
 			st,
-			fr, fg, fb, fa, colorize);
+			fr, fg, fb, fa, 0);
+		if (to_layer)
+			compose_chain_entry_to_layer(app_context, f, have_obj_cx, obj_cx);
 	}
 
 	renderer_resume_pass(context);
@@ -7356,6 +7396,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (entry_is_live_masker(obj)) continue;
 			avm1_masker = avm1_masker_for_entry(obj);
 		}
+		// Same _visible / PlaceObject3-Visible skip as tagShowFrame.
+		if (obj->clip_depth == 0 && obj->as_hidden) continue;
 		if (obj->clip_depth > 0) {
 			// Pop before pushing — see render_display_list for why (a second
 			// clip range opened inside a live one leaks a stencil LEVEL under
@@ -12999,6 +13041,15 @@ void tagSetCacheAsBitmap(SWFAppContext* app_context, size_t depth, u8 on)
 	(void)app_context;
 	if (depth <= max_depth)
 		display_list[depth].cache_as_bitmap = on ? 1u : 0u;
+}
+
+// PlaceObject3 Visible (SWF >= 11; the recompiler enforces the version gate,
+// Ruffle display_object.rs:2592). Same render-skip flag AS `_visible` drives.
+void tagSetVisible(SWFAppContext* app_context, size_t depth, u8 visible)
+{
+	(void)app_context;
+	if (depth <= max_depth)
+		display_list[depth].as_hidden = visible ? 0u : 1u;
 }
 
 void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,

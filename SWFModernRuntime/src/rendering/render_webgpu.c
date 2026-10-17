@@ -4714,6 +4714,17 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 		rpd.multisample.mask = 0xFFFFFFFF;
 		rpd.depthStencil = &ds;
 		ctx->compose_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		// Twin for composing INTO filter_tex_b (a non-final filter of a chain;
+		// render_webgpu_compose_filter_to_layer). Sample count 1 and no
+		// depth-stencil are deliberate, not a stand-in for MSAA_SAMPLES: the
+		// target is the single-sample, stencil-less filter texture. Every
+		// pipeline that draws into an MSAA target keeps MSAA_SAMPLES.
+		rpd.label = WGPU_LABEL("compose_layer_pipeline");
+		rpd.multisample.count = 1;
+		rpd.depthStencil = NULL;
+		ctx->compose_layer_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+		rpd.multisample.count = MSAA_SAMPLES;
+		rpd.depthStencil = &ds;
 		wgpuShaderModuleRelease(sm);
 
 		// --- Alpha-mask composite (s17 P3) -------------------------------
@@ -5583,6 +5594,71 @@ void render_webgpu_compose_filter(WebGPURenderContext* ctx, int kind,
 	wgpuBindGroupRelease(bg);
 }
 
+void render_webgpu_compose_filter_to_layer(WebGPURenderContext* ctx, int kind,
+	float blur_off_x, float blur_off_y,
+	float c1r, float c1g, float c1b, float c1a,
+	float c2r, float c2g, float c2b, float c2a,
+	float strength, int variant, int knockout, int composite_source)
+{
+	if (!ctx->renderer_ok || ctx->compose_layer_pipeline == NULL) return;
+
+	float params[20] = {0};
+	params[0] = c1r; params[1] = c1g; params[2] = c1b; params[3] = c1a;
+	params[4] = c2r; params[5] = c2g; params[6] = c2b; params[7] = c2a;
+	params[8] = blur_off_x; params[9] = blur_off_y;
+	params[12] = (float)kind;
+	params[13] = (float)variant;
+	params[14] = knockout ? 1.0f : 0.0f;
+	params[15] = composite_source ? 1.0f : 0.0f;
+	params[16] = strength;
+	u32 params_offset = filter_uniform_push(ctx, params, 80);
+
+	WGPUBindGroupEntry bg_entries[4] = {0};
+	bg_entries[0].binding = 0;
+	bg_entries[0].textureView = ctx->filter_view_a;   // blurred
+	bg_entries[1].binding = 1;
+	bg_entries[1].sampler = ctx->filter_sampler;
+	bg_entries[2].binding = 2;
+	bg_entries[2].buffer = ctx->filter_uniform_ring;
+	bg_entries[2].offset = params_offset;
+	bg_entries[2].size = 80;
+	bg_entries[3].binding = 3;
+	bg_entries[3].textureView = ctx->filter_src_view; // unblurred source
+
+	WGPUBindGroupDescriptor bg_desc = {0};
+	bg_desc.layout = ctx->compose_bgl;
+	bg_desc.entryCount = 4;
+	bg_desc.entries = bg_entries;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+
+	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	color_att.view = ctx->filter_view_b;
+	color_att.loadOp = WGPULoadOp_Clear;
+	color_att.storeOp = WGPUStoreOp_Store;
+	color_att.clearValue = (WGPUColor){0, 0, 0, 0};
+	WGPURenderPassDescriptor rp_desc = {0};
+	rp_desc.label = WGPU_LABEL("compose_to_layer");
+	rp_desc.colorAttachmentCount = 1;
+	rp_desc.colorAttachments = &color_att;
+	WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+	wgpuRenderPassEncoderSetPipeline(pass, ctx->compose_layer_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(pass, 0, bg, 0, NULL);
+	wgpuRenderPassEncoderDraw(pass, 6, 1, 0, 0);
+	wgpuRenderPassEncoderEnd(pass);
+	wgpuRenderPassEncoderRelease(pass);
+	wgpuBindGroupRelease(bg);
+
+	WGPUTexelCopyTextureInfo src = {0};
+	src.texture = ctx->filter_tex_b;
+	src.aspect = WGPUTextureAspect_All;
+	WGPUTexelCopyTextureInfo dst = {0};
+	dst.texture = ctx->filter_tex_a;
+	dst.aspect = WGPUTextureAspect_All;
+	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
+	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+}
+
 // Composite an ALPHA MASK (s17 P3): filter_tex_a holds the maskee layer and
 // filter_src_tex the mask layer (put there by snapshot_filter_source before the
 // second offscreen pass overwrote filter_tex_a). Draws maskee * mask.a over the
@@ -6090,6 +6166,7 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->filter_src_tex) wgpuTextureRelease(ctx->filter_src_tex);
 	if (ctx->alpha_mask_pipeline) wgpuRenderPipelineRelease(ctx->alpha_mask_pipeline);
 	if (ctx->compose_pipeline) wgpuRenderPipelineRelease(ctx->compose_pipeline);
+	if (ctx->compose_layer_pipeline) wgpuRenderPipelineRelease(ctx->compose_layer_pipeline);
 	if (ctx->compose_bgl) wgpuBindGroupLayoutRelease(ctx->compose_bgl);
 	if (ctx->compose_pipeline_layout) wgpuPipelineLayoutRelease(ctx->compose_pipeline_layout);
 	// DisplacementMapFilter (cut 2) — all NULL unless the movie used one.
