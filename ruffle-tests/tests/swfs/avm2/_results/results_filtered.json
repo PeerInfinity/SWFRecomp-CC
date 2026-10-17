@@ -6,15 +6,15 @@
     "total_available": 1288,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 39,
+    "ignored_count": 38,
     "filtered": true
   },
-  "total": 1249,
-  "pass": 1220,
+  "total": 1250,
+  "pass": 1221,
   "ruffle_matched": 17,
   "fail": 12,
   "pass_rate": 97.7,
-  "effective_pass": 1237,
+  "effective_pass": 1238,
   "effective_pass_rate": 99.0,
   "breakdown": {
     "output_mismatch": 12,
@@ -4054,6 +4054,22 @@
         "matching_lines": 7
       },
       "duration": 7.54,
+      "status": "pass"
+    },
+    {
+      "test": "date",
+      "phases": {
+        "recomp": 0.008,
+        "compile": 8.168,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "duration": 8.19,
       "status": "pass"
     },
     {

@@ -1,31 +1,31 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-10-03 20:48 UTC
+**Date**: 2026-10-17 00:59 UTC
 
-**Git SHA**: `4c450f076e`
+**Git SHA**: `bdf127c35c`
 
-**Run Duration**: 3m 7s
+**Run Duration**: 3m 6s
 
-**Filtered**: 0 tests ignored out of 8 available
+**Filtered**: 0 tests ignored out of 9 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 8 |
-| Passing | **6** (75.0%) |
+| Total tests | 9 |
+| Passing | **6** (66.7%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **7** (87.5%) |
-| Failing | 1 |
-| Total expected lines | 364 |
-| Matching lines | 194 (53.3%) |
-| Mismatched lines | 170 |
+| Effective pass | **7** (77.8%) |
+| Failing | 2 |
+| Total expected lines | 377 |
+| Matching lines | 195 (51.7%) |
+| Mismatched lines | 182 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Output Mismatch | 2 | 100.0% |
 
 ## Passing Tests
 
@@ -33,12 +33,12 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `device_font_glyph_fallback` | 36 | 28.6s |  |
-| 2 | `device_font_kerning` | 4 | 29.2s |  |
-| 3 | `device_font_list` | 64 | 29.0s |  |
-| 4 | `embed_matching/fallback_preferences` | 0 | 31.5s |  |
-| 5 | `embed_matching/match_style` | 0 | 10.4s |  |
-| 6 | `embed_matching/no_font_found` | 0 | 6.4s |  |
+| 1 | `device_font_glyph_fallback` | 36 | 29.9s |  |
+| 2 | `device_font_kerning` | 4 | 30.1s |  |
+| 3 | `device_font_list` | 64 | 28.9s |  |
+| 4 | `embed_matching/fallback_preferences` | 0 | 30.8s |  |
+| 5 | `embed_matching/match_style` | 0 | 7.9s |  |
+| 6 | `embed_matching/no_font_found` | 0 | 9.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -46,7 +46,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `device_font_no_ink` | 14 | 14 | 28.8s |  |
+| 1 | `device_font_no_ink` | 14 | 14 | 29.4s |  |
 
 ## Near-Passing Tests
 
@@ -70,8 +70,9 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**2 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `embed_name_lookup` | 35.5% | 86/242 | 242 | 242 |  |
+| 2 | `device_font_name_case` | 7.7% | 1/13 | 13 | 13 |  |

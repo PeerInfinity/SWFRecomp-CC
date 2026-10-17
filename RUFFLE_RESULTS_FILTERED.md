@@ -13,7 +13,7 @@
 |-------|-----:|------:|-----:|--------|
 | audio | 3 | 5 | 60.0% | [details](ruffle-tests/tests/swfs/audio/_results/results_filtered.md) |
 | avm1 | 699 | 728 | 96.0% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
-| avm2 | 1220 | 1249 | 97.7% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
+| avm2 | 1221 | 1250 | 97.7% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
 | fonts | 6 | 9 | 66.7% | [details](ruffle-tests/tests/swfs/fonts/_results/results_filtered.md) |
 | from_avmplus | 1529 | 1572 | 97.3% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_filtered.md) |
 | from_gnash/actionscript.all | 141 | 240 | 58.8% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) |
@@ -31,9 +31,9 @@
 | text | 11 | 11 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
 | timeline | 14 | 17 | 82.4% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
 | visual | 145 | 147 | 98.6% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
-| **Total** | **4261** | **4535** | **94.0%** | |
+| **Total** | **4262** | **4536** | **94.0%** | |
 
-*71 tests ignored.*
+*70 tests ignored.*
 
 ## Line-Level Accuracy
 
@@ -41,7 +41,7 @@
 |-------|--------:|---------:|---------:|
 | audio | 5 | 24 | 20.8% |
 | avm1 | 112,175 | 117,398 | 95.6% |
-| avm2 | 151,317 | 153,303 | 98.7% |
+| avm2 | 151,347 | 153,333 | 98.7% |
 | fonts | 195 | 377 | 51.7% |
 | from_avmplus | 85,548 | 85,970 | 99.5% |
 | from_gnash/actionscript.all | 30,193 | 32,104 | 94.0% |
@@ -59,7 +59,7 @@
 | text | 973 | 973 | 100% |
 | timeline | 365 | 371 | 98.4% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **390,054** | **401,090** | **97.2%** |
+| **Total** | **390,084** | **401,120** | **97.2%** |
 
 ## Failure Breakdown
 
@@ -132,10 +132,10 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm2
 
-- **Pass:** 1220/1249 (97.7%)
-- **Ignored:** 39 tests
+- **Pass:** 1221/1250 (97.7%)
+- **Ignored:** 38 tests
 - **Duration:** 3h02m07s across 30 shards
-- **Lines:** 151,317/153,303 matching (98.7%)
+- **Lines:** 151,347/153,333 matching (98.7%)
 - **Avg test duration:** 8.4s — slowest: `away3d_advanced_shallow_water_demo` (99.9s)
 
 ### fonts
