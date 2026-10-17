@@ -1,0 +1,461 @@
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index e271a4b7c..ba714a482 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -1737,6 +1737,87 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
+ 		                       "will not draw", dropped, n, L, D);
+ }
+ 
++// ---------------------------------------------------------------------------
++// Timeline stroke device-scale minimum width (hairline_*).
++//
++// The recompiler freezes a DefineShape stroke at max(width, 20) twips, i.e. at
++// least one STAGE pixel. Flash and Ruffle size it per draw in DEVICE pixels:
++// Ruffle tessellates with line_width = max(width_px, 1/scale)
++// (render/src/tessellator.rs:178-186), scale being
++// sqrt((|a+c|^2 + |b+d|^2)/2) of the full local->device matrix
++// (core/src/display_object/graphic.rs:254-259). A stroke under a 0.3x sprite
++// therefore stays 1 device px wide instead of shrinking to 0.3 px, and a
++// sub-20-twip stroke under a 2x parent stays 1 device px instead of 2.
++//
++// The recompiler also emits, per stroke run, its declared and emitted widths
++// and the centreline point of every vertex (SWF::stroke_run_data,
++// stroke_centre_data). Every stroke vertex is centre + (emitted half-width) *
++// d, so re-expanding a run to width W is vertex' = centre + k*(vertex -
++// centre), k = W / emitted. When a draw needs k != 1, its vertex range is
++// copied into the dynamic region with the stroke runs re-expanded, and that
++// copy is drawn instead; every other draw is untouched.
++//
++// The tables are weak so generated code without them still links (feature
++// off). The in-browser recompiler host (DYNAMIC_HOST) does not bridge them.
++// ---------------------------------------------------------------------------
++#ifndef DYNAMIC_HOST
++extern u32 __attribute__((weak)) stroke_run_count;
++extern u32 __attribute__((weak)) stroke_run_data[][5];
++extern u32 __attribute__((weak)) stroke_centre_data[][2];
++#endif
++
++static u32 hairline_run_n = 0;
++static const u32 (*hairline_runs)[5] = NULL;
++static const u32 (*hairline_centres)[2] = NULL;
++// CPU copy of every xform_buffer slot and of the current stage_to_ndc uniform,
++// i.e. the matrices the vertex shader composes for a draw.
++static float* hairline_xform = NULL;
++static u32 hairline_xform_slots = 0;
++static float hairline_stage[16];
++
++static void hairline_init(WebGPURenderContext* ctx)
++{
++	hairline_run_n = 0;
++	free(hairline_xform);
++	hairline_xform = NULL;
++	hairline_xform_slots = 0;
++#ifndef DYNAMIC_HOST
++	if (&stroke_run_count == NULL || stroke_run_data == NULL || stroke_centre_data == NULL)
++		return;
++	if (stroke_run_count == 0 || ctx->xform_slot_count == 0)
++		return;
++	hairline_xform = (float*) calloc((size_t) ctx->xform_slot_count * 16, sizeof(float));
++	if (hairline_xform == NULL)
++		return;
++	hairline_xform_slots = ctx->xform_slot_count;
++	if (ctx->transform_data && ctx->transform_data_size > 0)
++	{
++		size_t n = ctx->transform_data_size;
++		if (n > (size_t) hairline_xform_slots * 16 * sizeof(float))
++			n = (size_t) hairline_xform_slots * 16 * sizeof(float);
++		memcpy(hairline_xform, ctx->transform_data, n);
++	}
++	if (ctx->stage_to_ndc)
++		memcpy(hairline_stage, ctx->stage_to_ndc, sizeof(hairline_stage));
++	hairline_runs = (const u32 (*)[5]) stroke_run_data;
++	hairline_centres = (const u32 (*)[2]) stroke_centre_data;
++	hairline_run_n = stroke_run_count;
++#else
++	(void) ctx;
++#endif
++}
++
++static inline void hairline_note_xform(u32 transform_id, const float m[16])
++{
++	if (hairline_xform != NULL && transform_id < hairline_xform_slots)
++		memcpy(&hairline_xform[(size_t) transform_id * 16], m, 16 * sizeof(float));
++}
++
++static inline void hairline_note_stage(const float m[16])
++{
++	memcpy(hairline_stage, m, sizeof(hairline_stage));
++}
++
+ static void create_buffers_and_upload(WebGPURenderContext* ctx)
+ {
+ 	// Vertex buffer (shape geometry) — over-allocate for dynamic rendering.
+@@ -1826,6 +1907,8 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
+ 	ctx->prev_dyn_vtx_used = 0;
+ 	ctx->prev_dyn_rect_count = 0;
+ 
++	hairline_init(ctx);
++
+ 	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
+ 	#define MAX_DYNAMIC_GRADIENTS 64
+ 	u32 dynamic_bitmap_cap = MAX_DYNAMIC_BITMAP_SLOTS;
+@@ -2709,6 +2792,7 @@ void render_webgpu_set_background(WebGPURenderContext* ctx, u8 r, u8 g, u8 b)
+ void render_webgpu_upload_stage_transform(WebGPURenderContext* ctx, const float matrix[16])
+ {
+ 	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0, matrix, 16 * sizeof(float));
++	hairline_note_stage(matrix);
+ }
+ 
+ #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+@@ -2910,6 +2994,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
+ 	// Upload stage_to_ndc uniform
+ 	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0,
+ 	                     ctx->stage_to_ndc, 16 * sizeof(float));
++	hairline_note_stage(ctx->stage_to_ndc);
+ 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+ 
+ 	// Initialize extra_transform_id to 0, extra_transform to identity,
+@@ -2967,6 +3052,88 @@ static size_t mask_stencil_vert_count(const WebGPURenderContext* ctx,
+ 	return (n > 0 && n < num_verts) ? n : num_verts;
+ }
+ 
++// ---------------------------------------------------------------------------
++// hairline_restage: the device-scale stroke width pass described above
++// hairline_init. Returns the vertex offset to draw: `offset` itself, or the
++// base of a re-expanded copy in the dynamic region.
++// ---------------------------------------------------------------------------
++static inline void stage_dyn_verts(WebGPURenderContext* ctx, u32 vert_base,
++	const void* verts, u32 vcount);
++
++static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
++                               size_t num_verts, u32 transform_id)
++{
++	if (hairline_run_n == 0 || num_verts == 0) return offset;
++	if (transform_id >= hairline_xform_slots) return offset;
++	const size_t end = offset + num_verts;
++
++	// First run ending after `offset` (runs are emitted in vertex order).
++	u32 lo = 0, hi = hairline_run_n;
++	while (lo < hi)
++	{
++		u32 mid = lo + (hi - lo) / 2;
++		if ((size_t) hairline_runs[mid][0] + hairline_runs[mid][1] <= offset) lo = mid + 1;
++		else hi = mid;
++	}
++	if (lo >= hairline_run_n || hairline_runs[lo][0] >= end) return offset;
++
++	// Local twips -> device px: diag(W/2, H/2) * (stage_to_ndc * xform), the
++	// 2x2 part of the column-major mat4s. Ruffle's matrix is twips -> device
++	// twips, hence the 20.
++	const float* t = &hairline_xform[(size_t) transform_id * 16];
++	const float* p = hairline_stage;
++	const double a = (double) p[0] * t[0] + (double) p[4] * t[1];
++	const double b = (double) p[1] * t[0] + (double) p[5] * t[1];
++	const double c = (double) p[0] * t[4] + (double) p[4] * t[5];
++	const double d = (double) p[1] * t[4] + (double) p[5] * t[5];
++	const double hw = 20.0 * 0.5 * (double) ctx->width;
++	const double hh = 20.0 * 0.5 * (double) ctx->height;
++	const double sx = fabs(hw * (a + c));
++	const double sy = fabs(hh * (b + d));
++	const double scale = sqrt((sx * sx + sy * sy) / 2.0);
++	const double min_twips = (scale > 1e-6) ? 20.0 / scale : 20.0;
++
++	int changed = 0;
++	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
++	{
++		double w = (double) hairline_runs[r][3];
++		if (w < min_twips) w = min_twips;
++		if (fabs(w / (double) hairline_runs[r][4] - 1.0) > 1e-4) { changed = 1; break; }
++	}
++	if (!changed) return offset;
++
++	if (ctx->dynamic_vertex_used + num_verts > MAX_DYNAMIC_VERTICES) return offset;
++	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
++	u32* verts = (u32*) malloc(num_verts * 4 * sizeof(u32));
++	if (verts == NULL) return offset;
++	ctx->dynamic_vertex_used += (u32) num_verts;
++	memcpy(verts, ctx->shape_data + offset * 4 * sizeof(u32), num_verts * 4 * sizeof(u32));
++
++	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
++	{
++		double w = (double) hairline_runs[r][3];
++		if (w < min_twips) w = min_twips;
++		const float k = (float) (w / (double) hairline_runs[r][4]);
++		const size_t rs = hairline_runs[r][0], rn = hairline_runs[r][1];
++		for (size_t v = 0; v < rn; v++)
++		{
++			const size_t gv = rs + v;
++			if (gv < offset || gv >= end) continue;
++			const u32* cen = hairline_centres[hairline_runs[r][2] + v];
++			u32* dst = &verts[(gv - offset) * 4];
++			union { float f; u32 u; } vx, vy, cx, cy;
++			vx.u = dst[0]; vy.u = dst[1]; cx.u = cen[0]; cy.u = cen[1];
++			vx.f = cx.f + k * (vx.f - cx.f);
++			vy.f = cy.f + k * (vy.f - cy.f);
++			dst[0] = vx.u; dst[1] = vy.u;
++		}
++	}
++
++	stage_dyn_verts(ctx, vert_base, verts, (u32) num_verts);
++	free(verts);
++	return vert_base;
++}
++
+ // ---------------------------------------------------------------------------
+ // render_webgpu_draw_shape
+ // ---------------------------------------------------------------------------
+@@ -2976,6 +3143,8 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
+ 	if (!ctx->renderer_ok) return;
+ 	// Ruffle rasterises only a masker's fill geometry into the stencil.
+ 	num_verts = mask_stencil_vert_count(ctx, offset, num_verts);
++	// Timeline strokes thinner than one device pixel are re-expanded.
++	offset = hairline_restage(ctx, offset, num_verts, transform_id);
+ 	// Set vertex buffer with byte offset
+ 	uint64_t byte_offset = offset * 4 * sizeof(u32);
+ 	uint64_t byte_size = num_verts * 4 * sizeof(u32);
+@@ -4053,6 +4222,7 @@ static void mat4_multiply(float* out, const float* A, const float* B)
+ static inline void xform_slot_write(WebGPURenderContext* ctx, u32 transform_id,
+                                     const float composed[16])
+ {
++	hairline_note_xform(transform_id, composed);
+ 	if (ctx->xform_mirror != NULL && transform_id < ctx->xform_slot_count)
+ 	{
+ 		float* slot = &ctx->xform_mirror[(size_t)transform_id * 16];
+diff --git a/SWFRecomp/include/swf.hpp b/SWFRecomp/include/swf.hpp
+index 537c09d02..bfbdeaa3c 100644
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -259,6 +259,16 @@ namespace SWFRecomp
+ 		std::stringstream path_data;  // vector path data for hit testing (fills + strokes)
+ 		size_t current_path_entry;
+ 
++		// Timeline stroke runs for the runtime's device-scale minimum width
++		// (render_webgpu.c hairline_*): one {vert_start, vert_count,
++		// centre_start, width_twips, emitted_width_twips} row per drawLines
++		// call of a plain DefineShape, plus the centreline point of every
++		// stroke vertex in that run.
++		std::stringstream stroke_run_data;
++		std::stringstream stroke_centre_data;
++		size_t current_stroke_run = 0;
++		size_t current_stroke_centre = 0;
++
+ 		std::stringstream morph_end_shape_data;
+ 		size_t current_morph_end_vertex;
+ 		std::stringstream morph_end_color_data;
+@@ -516,6 +526,7 @@ namespace SWFRecomp
+ 		void constructEdges(std::vector<Path>& paths, std::vector<Node>& nodes);
+ 		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations = 100000, size_t max_cycles = 8000);
+ 		void fillShape(Shape& shape, std::vector<Tri>& tris);
+-		void drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris);
++		void drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
++		               double offset_scale = 1.0);
+ 	};
+ };
+\ No newline at end of file
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 7ec26ed77..6e7d2b30b 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -1129,6 +1129,19 @@ namespace SWFRecomp
+ 						  << (current_path_entry ? path_data.str() : "\t{0}\n")
+ 						  << "};" << endl;
+ 
++		// Timeline stroke runs + centrelines (see SWF::stroke_run_data). The
++		// runtime declares these weak, so a movie without them links too.
++		context.out_draws << endl
++						  << "u32 stroke_run_count = " << to_string(current_stroke_run) << ";" << endl
++						  << "u32 stroke_run_data[" << to_string(current_stroke_run ? current_stroke_run : 1) << "][5] =" << endl
++						  << "{" << endl
++						  << (current_stroke_run ? stroke_run_data.str() : "\t{0}\n")
++						  << "};" << endl
++						  << "u32 stroke_centre_data[" << to_string(current_stroke_centre ? current_stroke_centre : 1) << "][2] =" << endl
++						  << "{" << endl
++						  << (current_stroke_centre ? stroke_centre_data.str() : "\t{0}\n")
++						  << "};" << endl;
++
+ 		// Static bitmap descriptors ({offset, size, w, h} per slot) — see
+ 		// SWF::recordBitmapDesc. Always emitted, so a movie with no bitmaps
+ 		// still links; the runtime keys on BITMAP_COUNT, not on this length.
+@@ -10932,6 +10945,50 @@ namespace SWFRecomp
+ 
+ 						tris_size += tris.size();
+ 
++						// The same stroke with every offset collapsed (offset_scale
++						// 0) gives each emitted vertex the centreline point it was
++						// offset from, so the runtime can re-expand the run to a
++						// different width (vertex = centre + k*(vertex - centre))
++						// when it is drawn thinner than one device pixel. Morph and
++						// glyph strokes keep the frozen width.
++						if (!is_morph && !is_font && !tris.empty())
++						{
++							std::vector<Tri> centre_tris;
++
++							drawLines(paths[i], line_style, centre_tris, 0.0);
++
++							if (centre_tris.size() == tris.size())
++							{
++								const u32 emitted_width = line_style.width < 20 ? 20 : line_style.width;
++
++								stroke_run_data << "\t{ " << std::dec
++								                << to_string(3*(current_tri + tris_size - tris.size())) << ", "
++								                << to_string(3*tris.size()) << ", "
++								                << to_string(current_stroke_centre) << ", "
++								                << to_string((u32) line_style.width) << ", "
++								                << to_string(emitted_width) << " }," << endl;
++
++								current_stroke_run += 1;
++
++								for (const Tri& ct : centre_tris)
++								{
++									for (int j = 0; j < 3; ++j)
++									{
++										float cx_f = (float) strokeX(ct.verts[j]);
++										float cy_f = (float) ((double) FRAME_HEIGHT - strokeY(ct.verts[j]));
++
++										stroke_centre_data << "\t{ "
++										                   << std::hex << std::uppercase
++										                   << "0x" << VAL(u32, &cx_f) << ", "
++										                   << "0x" << VAL(u32, &cy_f)
++										                   << " }," << endl;
++									}
++								}
++
++								current_stroke_centre += 3*centre_tris.size();
++							}
++						}
++
+ 						// A LINESTYLE2 stroke whose FILLSTYLE is a gradient
+ 						// carries the gradient's style type (+ spread mode) and
+ 						// its gradient/inv-matrix index instead of a colour
+@@ -11593,8 +11650,16 @@ namespace SWFRecomp
+ 	// Every shape older than DefineShape4 keeps join_style 0, for which this is
+ 	// bit-for-bit the historical round fan.
+ 	void drawLineJoin(const Vertex& a, const Vertex& b, const Vertex& c, double halfwidth,
+-	                  u8 join_style, double miter_limit, std::vector<Tri>& tris)
++	                  u8 join_style, double miter_limit, std::vector<Tri>& tris,
++	                  double offset_scale = 1.0)
+ 	{
++		// `offset_scale` multiplies every offset from the source path vertex,
++		// while the arc segment count keeps the unscaled `halfwidth`. 0
++		// collapses each synthesised vertex onto the path vertex it was offset
++		// from: that is how the stroke emission recovers the centreline.
++		const double arc_halfwidth = halfwidth;
++		halfwidth *= offset_scale;
++
+ 		const double bx = strokeX(b), by = strokeY(b);
+ 
+ 		Vertex2d vec_a_b;
+@@ -11708,7 +11773,7 @@ namespace SWFRecomp
+ 
+ 		Vertex last_point = p_start;
+ 
+-		const int join_segments = strokeArcSegments(halfwidth, end_angle - start_angle);
++		const int join_segments = strokeArcSegments(arc_halfwidth, end_angle - start_angle);
+ 		angle_delta = (end_angle - start_angle)/join_segments;
+ 
+ 		for (int k = 1; k < join_segments; ++k)
+@@ -11734,8 +11799,12 @@ namespace SWFRecomp
+ 	// `a` is the path END being capped and `b` its inward neighbour, so
+ 	// `angle_a_b` points INTO the stroke and the cap lives on -that direction.
+ 	void drawLineCap(const Vertex& a, const Vertex& b, double halfwidth, u8 cap_style,
+-	                 std::vector<Tri>& tris)
++	                 std::vector<Tri>& tris, double offset_scale = 1.0)
+ 	{
++		// `offset_scale`: see drawLineJoin.
++		const double arc_halfwidth = halfwidth;
++		halfwidth *= offset_scale;
++
+ 		// lyon's LineCap::Butt emits no geometry at all: the stroke simply ends
+ 		// on the offset chord the segment quad already covers.
+ 		if (cap_style == 1)
+@@ -11797,7 +11866,7 @@ namespace SWFRecomp
+ 		Tri t;
+ 		t.verts[0] = a;
+ 
+-		const int cap_segments = strokeArcSegments(halfwidth, end_angle - start_angle);
++		const int cap_segments = strokeArcSegments(arc_halfwidth, end_angle - start_angle);
+ 		angle_delta = (end_angle - start_angle)/cap_segments;
+ 
+ 		for (int k = 1; k < cap_segments; ++k)
+@@ -11819,7 +11888,8 @@ namespace SWFRecomp
+ 		tris.push_back(t);
+ 	}
+ 
+-	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris)
++	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
++	                    double offset_scale)
+ 	{
+ 		u16 width = style.width;
+ 
+@@ -11839,6 +11909,7 @@ namespace SWFRecomp
+ 		}
+ 		
+ 		double halfwidth = width/2.0;
++		const double off_hw = halfwidth*offset_scale;
+ 		
+ 		Vertex last_v = path.verts[0];
+ 		
+@@ -11856,21 +11927,21 @@ namespace SWFRecomp
+ 			{
+ 				const Vertex& last_last_v = path.verts[i - 2];
+ 				
+-				drawLineJoin(last_last_v, last_v, v, halfwidth, join_style, miter_limit, tris);
++				drawLineJoin(last_last_v, last_v, v, halfwidth, join_style, miter_limit, tris, offset_scale);
+ 			}
+ 			
+ 			// Each offset corner inherits the morph_index of the source path
+ 			// vertex it was offset from (see drawLineJoin).
+-			t.verts[0] = strokeVertex(lx + halfwidth*cos(angle), ly + halfwidth*sin(angle), last_v.morph_index);
+-			t.verts[2] = strokeVertex(vx + halfwidth*cos(angle), vy + halfwidth*sin(angle), v.morph_index);
++			t.verts[0] = strokeVertex(lx + off_hw*cos(angle), ly + off_hw*sin(angle), last_v.morph_index);
++			t.verts[2] = strokeVertex(vx + off_hw*cos(angle), vy + off_hw*sin(angle), v.morph_index);
+ 
+ 			angle += M_PI;
+ 
+-			t.verts[1] = strokeVertex(lx + halfwidth*cos(angle), ly + halfwidth*sin(angle), last_v.morph_index);
++			t.verts[1] = strokeVertex(lx + off_hw*cos(angle), ly + off_hw*sin(angle), last_v.morph_index);
+ 
+ 			tris.push_back(t);
+ 
+-			t.verts[0] = strokeVertex(vx + halfwidth*cos(angle), vy + halfwidth*sin(angle), v.morph_index);
++			t.verts[0] = strokeVertex(vx + off_hw*cos(angle), vy + off_hw*sin(angle), v.morph_index);
+ 
+ 			tris.push_back(t);
+ 			
+@@ -11885,16 +11956,16 @@ namespace SWFRecomp
+ 			const Vertex& b = path.verts[0];
+ 			const Vertex& c = path.verts[1];
+ 			
+-			drawLineJoin(a, b, c, halfwidth, join_style, miter_limit, tris);
++			drawLineJoin(a, b, c, halfwidth, join_style, miter_limit, tris, offset_scale);
+ 		}
+ 
+ 		else
+ 		{
+ 			// verts[0] is the path START (StartCapStyle), verts.back() its END
+ 			// (EndCapStyle) — lyon caps the two ends independently too.
+-			drawLineCap(path.verts[0], path.verts[1], halfwidth, style.start_cap, tris);
++			drawLineCap(path.verts[0], path.verts[1], halfwidth, style.start_cap, tris, offset_scale);
+ 			drawLineCap(path.verts.back(), path.verts[path.verts.size() - 2], halfwidth,
+-			            style.end_cap, tris);
++			            style.end_cap, tris, offset_scale);
+ 		}
+ 	}
+ };
+\ No newline at end of file
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 39e5e4014..1b818d729 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -475,3 +475,11 @@ avm2/bitmapdata_draw_masks                  # draw(src) honours src.mask, tol 0
+ # zero-headroom row the brief named, is already a member above.)
+ # tier=1  (CI-passing once w2-glyph-subunit lands; zero headroom)
+ fonts/embed_matching/fallback_preferences   # AVM2 embedded + fallback glyphs 1 cmp
++
++# s22 w2-hairline-device-width: device-scale minimum stroke width for
++# timeline strokes (render_webgpu.c hairline_restage). acid-small (above) is
++# the sub-1-px witness (strokes under a 0.3x parent widen to 1 device px);
++# this row is the other direction (sub-20-twip strokes under a >1x parent
++# shrink to 1 device px) plus the 2-twip hairlines. KF: A/B signal only.
++# tier=2  (CI-failing, known_failure)
++visual/simple_shapes/strokes/scale          # stroke width vs draw scale, 1 cmp

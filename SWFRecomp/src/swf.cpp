@@ -1145,6 +1145,19 @@ namespace SWFRecomp
 						  << (current_path_entry ? path_data.str() : "\t{0}\n")
 						  << "};" << endl;
 
+		// Timeline stroke runs + centrelines (see SWF::stroke_run_data). The
+		// runtime declares these weak, so a movie without them links too.
+		context.out_draws << endl
+						  << "u32 stroke_run_count = " << to_string(current_stroke_run) << ";" << endl
+						  << "u32 stroke_run_data[" << to_string(current_stroke_run ? current_stroke_run : 1) << "][5] =" << endl
+						  << "{" << endl
+						  << (current_stroke_run ? stroke_run_data.str() : "\t{0}\n")
+						  << "};" << endl
+						  << "u32 stroke_centre_data[" << to_string(current_stroke_centre ? current_stroke_centre : 1) << "][2] =" << endl
+						  << "{" << endl
+						  << (current_stroke_centre ? stroke_centre_data.str() : "\t{0}\n")
+						  << "};" << endl;
+
 		// Static bitmap descriptors ({offset, size, w, h} per slot) — see
 		// SWF::recordBitmapDesc. Always emitted, so a movie with no bitmaps
 		// still links; the runtime keys on BITMAP_COUNT, not on this length.
@@ -11004,6 +11017,50 @@ namespace SWFRecomp
 
 						tris_size += tris.size();
 
+						// The same stroke with every offset collapsed (offset_scale
+						// 0) gives each emitted vertex the centreline point it was
+						// offset from, so the runtime can re-expand the run to a
+						// different width (vertex = centre + k*(vertex - centre))
+						// when it is drawn thinner than one device pixel. Morph and
+						// glyph strokes keep the frozen width.
+						if (!is_morph && !is_font && !tris.empty())
+						{
+							std::vector<Tri> centre_tris;
+
+							drawLines(paths[i], line_style, centre_tris, 0.0);
+
+							if (centre_tris.size() == tris.size())
+							{
+								const u32 emitted_width = line_style.width < 20 ? 20 : line_style.width;
+
+								stroke_run_data << "\t{ " << std::dec
+								                << to_string(3*(current_tri + tris_size - tris.size())) << ", "
+								                << to_string(3*tris.size()) << ", "
+								                << to_string(current_stroke_centre) << ", "
+								                << to_string((u32) line_style.width) << ", "
+								                << to_string(emitted_width) << " }," << endl;
+
+								current_stroke_run += 1;
+
+								for (const Tri& ct : centre_tris)
+								{
+									for (int j = 0; j < 3; ++j)
+									{
+										float cx_f = (float) strokeX(ct.verts[j]);
+										float cy_f = (float) ((double) FRAME_HEIGHT - strokeY(ct.verts[j]));
+
+										stroke_centre_data << "\t{ "
+										                   << std::hex << std::uppercase
+										                   << "0x" << VAL(u32, &cx_f) << ", "
+										                   << "0x" << VAL(u32, &cy_f)
+										                   << " }," << endl;
+									}
+								}
+
+								current_stroke_centre += 3*centre_tris.size();
+							}
+						}
+
 						// A LINESTYLE2 stroke whose FILLSTYLE is a gradient
 						// carries the gradient's style type (+ spread mode) and
 						// its gradient/inv-matrix index instead of a colour
@@ -11665,8 +11722,16 @@ namespace SWFRecomp
 	// Every shape older than DefineShape4 keeps join_style 0, for which this is
 	// bit-for-bit the historical round fan.
 	void drawLineJoin(const Vertex& a, const Vertex& b, const Vertex& c, double halfwidth,
-	                  u8 join_style, double miter_limit, std::vector<Tri>& tris)
+	                  u8 join_style, double miter_limit, std::vector<Tri>& tris,
+	                  double offset_scale = 1.0)
 	{
+		// `offset_scale` multiplies every offset from the source path vertex,
+		// while the arc segment count keeps the unscaled `halfwidth`. 0
+		// collapses each synthesised vertex onto the path vertex it was offset
+		// from: that is how the stroke emission recovers the centreline.
+		const double arc_halfwidth = halfwidth;
+		halfwidth *= offset_scale;
+
 		const double bx = strokeX(b), by = strokeY(b);
 
 		Vertex2d vec_a_b;
@@ -11780,7 +11845,7 @@ namespace SWFRecomp
 
 		Vertex last_point = p_start;
 
-		const int join_segments = strokeArcSegments(halfwidth, end_angle - start_angle);
+		const int join_segments = strokeArcSegments(arc_halfwidth, end_angle - start_angle);
 		angle_delta = (end_angle - start_angle)/join_segments;
 
 		for (int k = 1; k < join_segments; ++k)
@@ -11806,8 +11871,12 @@ namespace SWFRecomp
 	// `a` is the path END being capped and `b` its inward neighbour, so
 	// `angle_a_b` points INTO the stroke and the cap lives on -that direction.
 	void drawLineCap(const Vertex& a, const Vertex& b, double halfwidth, u8 cap_style,
-	                 std::vector<Tri>& tris)
+	                 std::vector<Tri>& tris, double offset_scale = 1.0)
 	{
+		// `offset_scale`: see drawLineJoin.
+		const double arc_halfwidth = halfwidth;
+		halfwidth *= offset_scale;
+
 		// lyon's LineCap::Butt emits no geometry at all: the stroke simply ends
 		// on the offset chord the segment quad already covers.
 		if (cap_style == 1)
@@ -11869,7 +11938,7 @@ namespace SWFRecomp
 		Tri t;
 		t.verts[0] = a;
 
-		const int cap_segments = strokeArcSegments(halfwidth, end_angle - start_angle);
+		const int cap_segments = strokeArcSegments(arc_halfwidth, end_angle - start_angle);
 		angle_delta = (end_angle - start_angle)/cap_segments;
 
 		for (int k = 1; k < cap_segments; ++k)
@@ -11891,7 +11960,8 @@ namespace SWFRecomp
 		tris.push_back(t);
 	}
 
-	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris)
+	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
+	                    double offset_scale)
 	{
 		u16 width = style.width;
 
@@ -11911,6 +11981,7 @@ namespace SWFRecomp
 		}
 		
 		double halfwidth = width/2.0;
+		const double off_hw = halfwidth*offset_scale;
 		
 		Vertex last_v = path.verts[0];
 		
@@ -11928,21 +11999,21 @@ namespace SWFRecomp
 			{
 				const Vertex& last_last_v = path.verts[i - 2];
 				
-				drawLineJoin(last_last_v, last_v, v, halfwidth, join_style, miter_limit, tris);
+				drawLineJoin(last_last_v, last_v, v, halfwidth, join_style, miter_limit, tris, offset_scale);
 			}
 			
 			// Each offset corner inherits the morph_index of the source path
 			// vertex it was offset from (see drawLineJoin).
-			t.verts[0] = strokeVertex(lx + halfwidth*cos(angle), ly + halfwidth*sin(angle), last_v.morph_index);
-			t.verts[2] = strokeVertex(vx + halfwidth*cos(angle), vy + halfwidth*sin(angle), v.morph_index);
+			t.verts[0] = strokeVertex(lx + off_hw*cos(angle), ly + off_hw*sin(angle), last_v.morph_index);
+			t.verts[2] = strokeVertex(vx + off_hw*cos(angle), vy + off_hw*sin(angle), v.morph_index);
 
 			angle += M_PI;
 
-			t.verts[1] = strokeVertex(lx + halfwidth*cos(angle), ly + halfwidth*sin(angle), last_v.morph_index);
+			t.verts[1] = strokeVertex(lx + off_hw*cos(angle), ly + off_hw*sin(angle), last_v.morph_index);
 
 			tris.push_back(t);
 
-			t.verts[0] = strokeVertex(vx + halfwidth*cos(angle), vy + halfwidth*sin(angle), v.morph_index);
+			t.verts[0] = strokeVertex(vx + off_hw*cos(angle), vy + off_hw*sin(angle), v.morph_index);
 
 			tris.push_back(t);
 			
@@ -11957,16 +12028,16 @@ namespace SWFRecomp
 			const Vertex& b = path.verts[0];
 			const Vertex& c = path.verts[1];
 			
-			drawLineJoin(a, b, c, halfwidth, join_style, miter_limit, tris);
+			drawLineJoin(a, b, c, halfwidth, join_style, miter_limit, tris, offset_scale);
 		}
 
 		else
 		{
 			// verts[0] is the path START (StartCapStyle), verts.back() its END
 			// (EndCapStyle) — lyon caps the two ends independently too.
-			drawLineCap(path.verts[0], path.verts[1], halfwidth, style.start_cap, tris);
+			drawLineCap(path.verts[0], path.verts[1], halfwidth, style.start_cap, tris, offset_scale);
 			drawLineCap(path.verts.back(), path.verts[path.verts.size() - 2], halfwidth,
-			            style.end_cap, tris);
+			            style.end_cap, tris, offset_scale);
 		}
 	}
 };

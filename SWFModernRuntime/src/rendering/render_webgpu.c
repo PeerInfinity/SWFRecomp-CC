@@ -1737,6 +1737,87 @@ static void build_static_bitmap_pools(WebGPURenderContext* ctx)
 		                       "will not draw", dropped, n, L, D);
 }
 
+// ---------------------------------------------------------------------------
+// Timeline stroke device-scale minimum width (hairline_*).
+//
+// The recompiler freezes a DefineShape stroke at max(width, 20) twips, i.e. at
+// least one STAGE pixel. Flash and Ruffle size it per draw in DEVICE pixels:
+// Ruffle tessellates with line_width = max(width_px, 1/scale)
+// (render/src/tessellator.rs:178-186), scale being
+// sqrt((|a+c|^2 + |b+d|^2)/2) of the full local->device matrix
+// (core/src/display_object/graphic.rs:254-259). A stroke under a 0.3x sprite
+// therefore stays 1 device px wide instead of shrinking to 0.3 px, and a
+// sub-20-twip stroke under a 2x parent stays 1 device px instead of 2.
+//
+// The recompiler also emits, per stroke run, its declared and emitted widths
+// and the centreline point of every vertex (SWF::stroke_run_data,
+// stroke_centre_data). Every stroke vertex is centre + (emitted half-width) *
+// d, so re-expanding a run to width W is vertex' = centre + k*(vertex -
+// centre), k = W / emitted. When a draw needs k != 1, its vertex range is
+// copied into the dynamic region with the stroke runs re-expanded, and that
+// copy is drawn instead; every other draw is untouched.
+//
+// The tables are weak so generated code without them still links (feature
+// off). The in-browser recompiler host (DYNAMIC_HOST) does not bridge them.
+// ---------------------------------------------------------------------------
+#ifndef DYNAMIC_HOST
+extern u32 __attribute__((weak)) stroke_run_count;
+extern u32 __attribute__((weak)) stroke_run_data[][5];
+extern u32 __attribute__((weak)) stroke_centre_data[][2];
+#endif
+
+static u32 hairline_run_n = 0;
+static const u32 (*hairline_runs)[5] = NULL;
+static const u32 (*hairline_centres)[2] = NULL;
+// CPU copy of every xform_buffer slot and of the current stage_to_ndc uniform,
+// i.e. the matrices the vertex shader composes for a draw.
+static float* hairline_xform = NULL;
+static u32 hairline_xform_slots = 0;
+static float hairline_stage[16];
+
+static void hairline_init(WebGPURenderContext* ctx)
+{
+	hairline_run_n = 0;
+	free(hairline_xform);
+	hairline_xform = NULL;
+	hairline_xform_slots = 0;
+#ifndef DYNAMIC_HOST
+	if (&stroke_run_count == NULL || stroke_run_data == NULL || stroke_centre_data == NULL)
+		return;
+	if (stroke_run_count == 0 || ctx->xform_slot_count == 0)
+		return;
+	hairline_xform = (float*) calloc((size_t) ctx->xform_slot_count * 16, sizeof(float));
+	if (hairline_xform == NULL)
+		return;
+	hairline_xform_slots = ctx->xform_slot_count;
+	if (ctx->transform_data && ctx->transform_data_size > 0)
+	{
+		size_t n = ctx->transform_data_size;
+		if (n > (size_t) hairline_xform_slots * 16 * sizeof(float))
+			n = (size_t) hairline_xform_slots * 16 * sizeof(float);
+		memcpy(hairline_xform, ctx->transform_data, n);
+	}
+	if (ctx->stage_to_ndc)
+		memcpy(hairline_stage, ctx->stage_to_ndc, sizeof(hairline_stage));
+	hairline_runs = (const u32 (*)[5]) stroke_run_data;
+	hairline_centres = (const u32 (*)[2]) stroke_centre_data;
+	hairline_run_n = stroke_run_count;
+#else
+	(void) ctx;
+#endif
+}
+
+static inline void hairline_note_xform(u32 transform_id, const float m[16])
+{
+	if (hairline_xform != NULL && transform_id < hairline_xform_slots)
+		memcpy(&hairline_xform[(size_t) transform_id * 16], m, 16 * sizeof(float));
+}
+
+static inline void hairline_note_stage(const float m[16])
+{
+	memcpy(hairline_stage, m, sizeof(hairline_stage));
+}
+
 static void create_buffers_and_upload(WebGPURenderContext* ctx)
 {
 	// Vertex buffer (shape geometry) — over-allocate for dynamic rendering.
@@ -1825,6 +1906,8 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 #endif
 	ctx->prev_dyn_vtx_used = 0;
 	ctx->prev_dyn_rect_count = 0;
+
+	hairline_init(ctx);
 
 	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
 	#define MAX_DYNAMIC_GRADIENTS 64
@@ -2709,6 +2792,7 @@ void render_webgpu_set_background(WebGPURenderContext* ctx, u8 r, u8 g, u8 b)
 void render_webgpu_upload_stage_transform(WebGPURenderContext* ctx, const float matrix[16])
 {
 	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0, matrix, 16 * sizeof(float));
+	hairline_note_stage(matrix);
 }
 
 #if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
@@ -2910,6 +2994,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	// Upload stage_to_ndc uniform
 	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0,
 	                     ctx->stage_to_ndc, 16 * sizeof(float));
+	hairline_note_stage(ctx->stage_to_ndc);
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
 
 	// Initialize extra_transform_id to 0, extra_transform to identity,
@@ -2968,6 +3053,88 @@ static size_t mask_stencil_vert_count(const WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
+// hairline_restage: the device-scale stroke width pass described above
+// hairline_init. Returns the vertex offset to draw: `offset` itself, or the
+// base of a re-expanded copy in the dynamic region.
+// ---------------------------------------------------------------------------
+static inline void stage_dyn_verts(WebGPURenderContext* ctx, u32 vert_base,
+	const void* verts, u32 vcount);
+
+static size_t hairline_restage(WebGPURenderContext* ctx, size_t offset,
+                               size_t num_verts, u32 transform_id)
+{
+	if (hairline_run_n == 0 || num_verts == 0) return offset;
+	if (transform_id >= hairline_xform_slots) return offset;
+	const size_t end = offset + num_verts;
+
+	// First run ending after `offset` (runs are emitted in vertex order).
+	u32 lo = 0, hi = hairline_run_n;
+	while (lo < hi)
+	{
+		u32 mid = lo + (hi - lo) / 2;
+		if ((size_t) hairline_runs[mid][0] + hairline_runs[mid][1] <= offset) lo = mid + 1;
+		else hi = mid;
+	}
+	if (lo >= hairline_run_n || hairline_runs[lo][0] >= end) return offset;
+
+	// Local twips -> device px: diag(W/2, H/2) * (stage_to_ndc * xform), the
+	// 2x2 part of the column-major mat4s. Ruffle's matrix is twips -> device
+	// twips, hence the 20.
+	const float* t = &hairline_xform[(size_t) transform_id * 16];
+	const float* p = hairline_stage;
+	const double a = (double) p[0] * t[0] + (double) p[4] * t[1];
+	const double b = (double) p[1] * t[0] + (double) p[5] * t[1];
+	const double c = (double) p[0] * t[4] + (double) p[4] * t[5];
+	const double d = (double) p[1] * t[4] + (double) p[5] * t[5];
+	const double hw = 20.0 * 0.5 * (double) ctx->width;
+	const double hh = 20.0 * 0.5 * (double) ctx->height;
+	const double sx = fabs(hw * (a + c));
+	const double sy = fabs(hh * (b + d));
+	const double scale = sqrt((sx * sx + sy * sy) / 2.0);
+	const double min_twips = (scale > 1e-6) ? 20.0 / scale : 20.0;
+
+	int changed = 0;
+	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
+	{
+		double w = (double) hairline_runs[r][3];
+		if (w < min_twips) w = min_twips;
+		if (fabs(w / (double) hairline_runs[r][4] - 1.0) > 1e-4) { changed = 1; break; }
+	}
+	if (!changed) return offset;
+
+	if (ctx->dynamic_vertex_used + num_verts > MAX_DYNAMIC_VERTICES) return offset;
+	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	u32* verts = (u32*) malloc(num_verts * 4 * sizeof(u32));
+	if (verts == NULL) return offset;
+	ctx->dynamic_vertex_used += (u32) num_verts;
+	memcpy(verts, ctx->shape_data + offset * 4 * sizeof(u32), num_verts * 4 * sizeof(u32));
+
+	for (u32 r = lo; r < hairline_run_n && hairline_runs[r][0] < end; r++)
+	{
+		double w = (double) hairline_runs[r][3];
+		if (w < min_twips) w = min_twips;
+		const float k = (float) (w / (double) hairline_runs[r][4]);
+		const size_t rs = hairline_runs[r][0], rn = hairline_runs[r][1];
+		for (size_t v = 0; v < rn; v++)
+		{
+			const size_t gv = rs + v;
+			if (gv < offset || gv >= end) continue;
+			const u32* cen = hairline_centres[hairline_runs[r][2] + v];
+			u32* dst = &verts[(gv - offset) * 4];
+			union { float f; u32 u; } vx, vy, cx, cy;
+			vx.u = dst[0]; vy.u = dst[1]; cx.u = cen[0]; cy.u = cen[1];
+			vx.f = cx.f + k * (vx.f - cx.f);
+			vy.f = cy.f + k * (vy.f - cy.f);
+			dst[0] = vx.u; dst[1] = vy.u;
+		}
+	}
+
+	stage_dyn_verts(ctx, vert_base, verts, (u32) num_verts);
+	free(verts);
+	return vert_base;
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_draw_shape
 // ---------------------------------------------------------------------------
 void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
@@ -2976,6 +3143,8 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 	if (!ctx->renderer_ok) return;
 	// Ruffle rasterises only a masker's fill geometry into the stencil.
 	num_verts = mask_stencil_vert_count(ctx, offset, num_verts);
+	// Timeline strokes thinner than one device pixel are re-expanded.
+	offset = hairline_restage(ctx, offset, num_verts, transform_id);
 	// Set vertex buffer with byte offset
 	uint64_t byte_offset = offset * 4 * sizeof(u32);
 	uint64_t byte_size = num_verts * 4 * sizeof(u32);
@@ -4053,6 +4222,7 @@ static void mat4_multiply(float* out, const float* A, const float* B)
 static inline void xform_slot_write(WebGPURenderContext* ctx, u32 transform_id,
                                     const float composed[16])
 {
+	hairline_note_xform(transform_id, composed);
 	if (ctx->xform_mirror != NULL && transform_id < ctx->xform_slot_count)
 	{
 		float* slot = &ctx->xform_mirror[(size_t)transform_id * 16];

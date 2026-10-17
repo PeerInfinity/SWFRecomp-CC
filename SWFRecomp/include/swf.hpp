@@ -259,6 +259,16 @@ namespace SWFRecomp
 		std::stringstream path_data;  // vector path data for hit testing (fills + strokes)
 		size_t current_path_entry;
 
+		// Timeline stroke runs for the runtime's device-scale minimum width
+		// (render_webgpu.c hairline_*): one {vert_start, vert_count,
+		// centre_start, width_twips, emitted_width_twips} row per drawLines
+		// call of a plain DefineShape, plus the centreline point of every
+		// stroke vertex in that run.
+		std::stringstream stroke_run_data;
+		std::stringstream stroke_centre_data;
+		size_t current_stroke_run = 0;
+		size_t current_stroke_centre = 0;
+
 		std::stringstream morph_end_shape_data;
 		size_t current_morph_end_vertex;
 		std::stringstream morph_end_color_data;
@@ -516,6 +526,7 @@ namespace SWFRecomp
 		void constructEdges(std::vector<Path>& paths, std::vector<Node>& nodes);
 		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations = 100000, size_t max_cycles = 8000);
 		void fillShape(Shape& shape, std::vector<Tri>& tris);
-		void drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris);
+		void drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
+		               double offset_scale = 1.0);
 	};
 };

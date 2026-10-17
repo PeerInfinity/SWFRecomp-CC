@@ -1,0 +1,29 @@
+RENDER CANARY  before=B  after=A   128 tests / 209 comparisons
+
+  IDENTICAL   204
+  DIFFERS       5
+  APPEARED      0   VANISHED 0   NO_RENDER 0
+
+  DIFFERS:
+    from_gnash/misc-ming.all/shape_test  output   [DIFFERS]
+        diff_channels 1911/1920000  mean 0.2538  max 255   bbox (99,139)-(281,281)
+        image status: fail -> fail    trace: pass -> pass
+    from_shumway/acid/acid-small  output.01   [DIFFERS]
+        diff_channels 17097/880000  mean 0.959  max 128   bbox (71,97)-(249,371)
+        image status: fail -> pass    trace: pass -> pass
+    from_shumway/acid/acid-small  output.05   [DIFFERS]
+        diff_channels 17307/880000  mean 0.9628  max 127   bbox (72,97)-(249,371)
+        image status: fail -> pass    trace: pass -> pass
+    from_shumway/acid/acid-stroke-0  output   [DIFFERS]
+        diff_channels 300/2097152  mean 0.0365  max 255   bbox (736,44)-(786,392)
+        image status: fail -> fail    trace: pass -> pass
+    visual/simple_shapes/strokes/scale  output   [DIFFERS]
+        diff_channels 52551/880000  mean 14.7308  max 255   bbox (88,0)-(279,136)
+        image status: fail -> fail    trace: pass -> pass
+
+  TRACE STATUS CHANGES: (none)
+  IMAGE STATUS CHANGES:
+    from_shumway/acid/acid-small  output.01   fail -> pass        <-- REVIEW
+    from_shumway/acid/acid-small  output.05   fail -> pass        <-- REVIEW
+
+  before/after PNGs + difference PNGs: /home/user/SWFRecomp-CC/.render_canary/_compare/B__A
