@@ -1,0 +1,1486 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d01406218..d1c4041f7 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -2880,181 +2880,454 @@ static ActionVar builtin_sound_start(SWFAppContext* app_context, ActionVar* args
+ 
+ // (setObjectProto is declared in action_internal.h)
+ 
+-// ContextMenuItem.copy() — creates a copy of the menu item by copying the 5
+-// instance-level properties (caption, onSelect, separatorBefore, enabled,
+-// visible). Forward-declared so ContextMenu.copy() can use it for customItems
+-// elements that are instanceof ContextMenuItem.
+-static ActionVar builtin_contextmenuitem_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
++// ============================================================================
++// AS-SEMANTICS HELPER LAYER (s22 w2-as-core)
++//
++// Flash implements several built-in classes in ActionScript bytecode, not in
++// native code (AsBroadcaster, ContextMenu, ContextMenuItem, AsSetupError,
++// flash.geom.Point/Rectangle/Matrix; Ruffle mirrors them as
++// core/src/avm1/globals/*.as). Their observable behaviour is the ORDER of every
++// property get/set and method dispatch, so a faithful C port must perform each
++// step the way the bytecode would: through the VM's own ops, never through raw
++// getProperty/setProperty. These helpers are that layer. Each one is a thin
++// wrapper over a stack op, so getters/setters (addProperty), __resolve,
++// watchers, primitive auto-boxing, user overrides and SWF-version rules all
++// apply exactly as they do for compiled AS.
++//
++// Contracts (all values are ActionVar by value; nothing is retained for the
++// caller beyond what the underlying op does):
++//   as_undef() / as_num(d) / as_bool(b) / as_str(app, utf8)
++//       Value constructors. as_num is always an F64.
++//   as_is_object(v)
++//       1 for OBJECT/ARRAY/FUNCTION/MOVIECLIP (the AS "object" values).
++//   as_this(this_obj)
++//       The receiver of a type-2 builtin as a value: OBJECT(this_obj), or ARRAY
++//       when the dispatcher flagged an array receiver; with this_obj == NULL,
++//       the method-arm receiver (g_c_function_this_obj) or the event clip.
++//       It trusts g_call_this_type, which the script dispatch arms set for a
++//       native callee; a builtin also called DIRECTLY from C with an ASObject
++//       must not use it (see builtin_broadcaster_broadcastMessage).
++//   as_get(app, obj, name)        == obj[name]      (ActionGetMember)
++//   as_get_index(app, obj, i)     == obj[i]         (ActionGetMember, numeric key)
++//   as_set(app, obj, name, val)   ;  obj[name] = val (ActionSetMember)
++//   as_call_method(app, obj, name, args, n) == obj[name](args...)
++//       ActionCallMethod: dispatches through the object (user overrides,
++//       __resolve, primitive receivers boxed by the dispatcher). Calling on
++//       undefined/null yields undefined, as in AS.
++//   as_get_global(app, name)      == _global[name] on the CURRENT global
++//       (the version-appropriate one, getActiveGlobal).
++//   as_new_global(app, name, args, n) == new _global[name](args...)
++//       ActionNewMethod on the CURRENT global: what a `new Name()` inside a
++//       globally-defined AS class body resolves to (its scope chain is only the
++//       global). Re-resolved on every call, so a replaced global is honoured.
++//   as_new_value(app, ctor, args, n) == new ctor(args...)
++//       ActionNewMethod with a blank name: constructs the given value.
++//   as_new_scoped(app, name, args, n) == new Name(args...), Name looked up
++//       through the CALLER's live scope chain in Flash order (scope entries
++//       innermost first, then the current timeline, then the current _global)
++//       and constructed as a value. Use where Flash's native resolves that way
++//       (AsSetupError finds `_root.Error` first). Unlike ActionNewObject /
++//       ActionGetVariable it never short-circuits a built-in name to the
++//       native class, so a replaced _global.Name is honoured.
++//   as_equals(app, a, b)  -> a == b   (ActionEquals2: valueOf/toString fire)
++//   as_less(app, a, b)    -> a < b    (ActionLess2: valueOf fires; NaN -> 0)
++//   as_add(app, a, b)     -> a + b    (ActionAdd2: string concat or numeric)
++//   as_set_prop_flags(app, obj, names, flags)
++//       ASSetPropFlags(obj, names, flags); names == NULL means `null` (all).
++// ============================================================================
++extern MovieClip* g_event_this_mc;
++extern u8 g_call_this_type;
++static inline ASObject* getActiveGlobal(void);
++static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVar* args, u32 num_args, ActionVar* registers, void* this_obj);
+ 
+-// True when `obj` has ContextMenuItem.prototype on its __proto__ chain.
+-static int isContextMenuItemInstance(ASObject* obj)
++static ActionVar as_undef(void)
+ {
+-	extern ASFunction g_stub_ctors[];
+-	if (obj == NULL || g_stub_ctors[5].prototype_obj == NULL) return 0;
+-	ASObject* p = obj;
+-	for (int i = 0; i < 64; i++) {
+-		ActionVar* pv = getProperty(p, "__proto__", 9);
+-		if (pv == NULL || pv->type != ACTION_STACK_VALUE_OBJECT || pv->data.numeric_value == 0) return 0;
+-		ASObject* parent = (ASObject*)(uintptr_t)pv->data.numeric_value;
+-		if (parent == g_stub_ctors[5].prototype_obj) return 1;
+-		if (parent == p) return 0;
+-		p = parent;
+-	}
+-	return 0;
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_UNDEFINED;
++	return v;
+ }
+ 
+-// ContextMenu.copy() — clone a ContextMenu (or ContextMenu-shaped) instance.
+-// Always sets the three instance properties (onSelect / builtInItems /
+-// customItems) on the new object so that hasOwnProperty(...) returns true
+-// regardless of which properties exist on the source. builtInItems is copied
+-// by reference (Flash semantics — see ContextMenu.as:195-197). customItems is
+-// rebuilt as a fresh Array, with elements deep-copied via
+-// ContextMenuItem.copy() only when they are instanceof ContextMenuItem
+-// (otherwise the slot becomes undefined; if the source customItems isn't an
+-// Array at all, the result is an empty Array).
+-static ActionVar builtin_contextmenu_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++static ActionVar as_num(double d)
+ {
+-	(void)args; (void)arg_count; (void)registers;
+-	ActionVar ret = {0};
+-	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+-	ASObject* cm = (ASObject*)this_obj;
+-	if (cm == NULL) return ret;
+-
+-	// Create new ContextMenu object with __proto__ from stub_ctors[4]
+-	extern ASFunction g_stub_ctors[]; // forward ref
+-	ASObject* new_cm = allocObject(app_context, 8);
+-	retainObject(new_cm);
+-	if (g_stub_ctors[4].prototype_obj != NULL) {
+-		ActionVar pv = {0};
+-		pv.type = ACTION_STACK_VALUE_OBJECT;
+-		pv.data.numeric_value = (u64)g_stub_ctors[4].prototype_obj;
+-		setProperty(app_context, new_cm, "__proto__", 9, &pv);
+-	}
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_F64;
++	VAL(double, &v.data.numeric_value) = d;
++	return v;
++}
++
++static ActionVar as_bool(int b)
++{
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_BOOLEAN;
++	v.data.numeric_value = b ? 1 : 0;
++	return v;
++}
+ 
+-	// onSelect: always present on copy. Use source's value if it has the
+-	// property (any type), else undefined.
++static ActionVar as_str(SWFAppContext* app_context, const char* utf8)
++{
++	ActionVar v = {0};
++	u32 u16_len = 0;
++	v.type = ACTION_STACK_VALUE_STRING;
++	v.data.numeric_value = (u64)(uintptr_t) utf8_to_u16(app_context, utf8, (u32) strlen(utf8), &u16_len);
++	v.str_size = u16_len;
++	return v;
++}
++
++static int as_is_object(const ActionVar* v)
++{
++	return v->type == ACTION_STACK_VALUE_OBJECT || v->type == ACTION_STACK_VALUE_ARRAY ||
++	       v->type == ACTION_STACK_VALUE_FUNCTION || v->type == ACTION_STACK_VALUE_MOVIECLIP;
++}
++
++static ActionVar as_this(void* this_obj)
++{
++	ActionVar v = as_undef();
++	if (this_obj != NULL)
+ 	{
+-		ActionVar* os_var = getProperty(cm, "onSelect", 8);
+-		ActionVar v = {0};
+-		v.type = ACTION_STACK_VALUE_UNDEFINED;
+-		if (os_var != NULL) v = *os_var;
+-		setProperty(app_context, new_cm, "onSelect", 8, &v);
++		v.type = (g_call_this_type == ACTION_STACK_VALUE_ARRAY) ? ACTION_STACK_VALUE_ARRAY
++		                                                         : ACTION_STACK_VALUE_OBJECT;
++		v.data.numeric_value = (u64)(uintptr_t) this_obj;
+ 	}
++	else if (g_c_function_this_obj != NULL)
++	{
++		v.type = ACTION_STACK_VALUE_OBJECT;
++		v.data.numeric_value = (u64)(uintptr_t) g_c_function_this_obj;
++	}
++	else if (g_event_this_mc != NULL && g_event_this_mc->depth != INT_MIN)
++	{
++		v.type = ACTION_STACK_VALUE_MOVIECLIP;
++		v.data.numeric_value = (u64)(uintptr_t) g_event_this_mc;
++	}
++	return v;
++}
++
++static ActionVar as_get(SWFAppContext* app_context, ActionVar* obj, const char* name)
++{
++	ActionVar o = *obj, k = as_str(app_context, name), r;
++	pushVar(app_context, &o);
++	pushVar(app_context, &k);
++	actionGetMember(app_context);
++	popVar(app_context, &r);
++	return r;
++}
++
++static ActionVar as_get_index(SWFAppContext* app_context, ActionVar* obj, u32 index)
++{
++	ActionVar o = *obj, k = as_num((double) index), r;
++	pushVar(app_context, &o);
++	pushVar(app_context, &k);
++	actionGetMember(app_context);
++	popVar(app_context, &r);
++	return r;
++}
++
++static void as_set(SWFAppContext* app_context, ActionVar* obj, const char* name, ActionVar* val)
++{
++	ActionVar o = *obj, k = as_str(app_context, name), v = *val;
++	pushVar(app_context, &o);
++	pushVar(app_context, &k);
++	pushVar(app_context, &v);
++	actionSetMember(app_context);
++}
+ 
+-	// builtInItems: always present on copy. Copy the value verbatim so
+-	// objects share a reference with the source (test: mutating o.g after
+-	// the copy must be visible through ff.builtInItems.g).
++// Pushes args in CallMethod/NewMethod order: last argument deepest, then the
++// count (args[0] ends up directly below the count).
++static void as_push_call_args(SWFAppContext* app_context, ActionVar* args, u32 n)
++{
++	for (u32 i = n; i > 0; i--)
+ 	{
+-		ActionVar* bi_var = getProperty(cm, "builtInItems", 12);
+-		ActionVar v = {0};
+-		v.type = ACTION_STACK_VALUE_UNDEFINED;
+-		if (bi_var != NULL) v = *bi_var;
+-		setProperty(app_context, new_cm, "builtInItems", 12, &v);
++		ActionVar a = args[i - 1];
++		pushVar(app_context, &a);
+ 	}
++	ActionVar c = as_num((double) n);
++	pushVar(app_context, &c);
++}
+ 
+-	// customItems: always present on copy as an Array. If the source's
+-	// customItems is an Array, clone it but only deep-copy elements that
+-	// are instanceof ContextMenuItem (other element types become
+-	// undefined). Otherwise, fresh empty Array.
++static ActionVar as_call_method(SWFAppContext* app_context, ActionVar* obj, const char* name, ActionVar* args, u32 n)
++{
++	char str_buffer[17];
++	ActionVar o = *obj, k = as_str(app_context, name), r;
++	as_push_call_args(app_context, args, n);
++	pushVar(app_context, &o);
++	pushVar(app_context, &k);
++	actionCallMethod(app_context, str_buffer);
++	popVar(app_context, &r);
++	return r;
++}
++
++static ActionVar as_get_global(SWFAppContext* app_context, const char* name)
++{
++	ActionVar g = as_undef();
++	ASObject* ag = getActiveGlobal();
++	if (ag == NULL) return g;
++	g.type = ACTION_STACK_VALUE_OBJECT;
++	g.data.numeric_value = (u64)(uintptr_t) ag;
++	return as_get(app_context, &g, name);
++}
++
++static ActionVar as_new_global(SWFAppContext* app_context, const char* name, ActionVar* args, u32 n)
++{
++	ActionVar g = as_undef(), k = as_str(app_context, name), r;
++	ASObject* ag = getActiveGlobal();
++	if (ag != NULL)
+ 	{
+-		ActionVar* ci_var = getProperty(cm, "customItems", 11);
+-		ASArray* new_ca;
+-		if (ci_var != NULL && ci_var->type == ACTION_STACK_VALUE_ARRAY) {
+-			ASArray* old_ca = (ASArray*)ci_var->data.numeric_value;
+-			u32 cap = old_ca->length > 0 ? old_ca->length : 4;
+-			new_ca = allocArray(app_context, cap);
+-			new_ca->length = old_ca->length;
+-			for (u32 i = 0; i < old_ca->length; i++) {
+-				ActionVar e = old_ca->elements[i];
+-				ActionVar copied = {0};
+-				copied.type = ACTION_STACK_VALUE_UNDEFINED;
+-				if (e.type == ACTION_STACK_VALUE_OBJECT && e.data.numeric_value != 0) {
+-					ASObject* eo = (ASObject*)(uintptr_t)e.data.numeric_value;
+-					if (isContextMenuItemInstance(eo)) {
+-						copied = builtin_contextmenuitem_copy(app_context, NULL, 0, NULL, eo);
+-					}
+-				}
+-				new_ca->elements[i] = copied;
+-			}
++		g.type = ACTION_STACK_VALUE_OBJECT;
++		g.data.numeric_value = (u64)(uintptr_t) ag;
++	}
++	as_push_call_args(app_context, args, n);
++	pushVar(app_context, &g);
++	pushVar(app_context, &k);
++	actionNewMethod(app_context);
++	popVar(app_context, &r);
++	return r;
++}
++
++static ActionVar as_new_value(SWFAppContext* app_context, ActionVar* ctor, ActionVar* args, u32 n)
++{
++	ActionVar c = *ctor, k = as_undef(), r;
++	as_push_call_args(app_context, args, n);
++	pushVar(app_context, &c);
++	pushVar(app_context, &k);
++	actionNewMethod(app_context);
++	popVar(app_context, &r);
++	return r;
++}
++
++static ActionVar as_new_scoped(SWFAppContext* app_context, const char* name, ActionVar* args, u32 n)
++{
++	extern MovieClip root_movieclip;
++	ActionVar ctor = as_undef();
++	// Innermost scope first: locals/with objects/captured frames, then the
++	// current timeline, then the current _global.
++	for (int i = (int) scope_depth - 1; i >= 0 && ctor.type == ACTION_STACK_VALUE_UNDEFINED; i--)
++	{
++		ActionVar holder = as_undef();
++		if (scope_mc[i] != NULL) {
++			holder.type = ACTION_STACK_VALUE_MOVIECLIP;
++			holder.data.numeric_value = (u64)(uintptr_t) scope_mc[i];
++		} else if (scope_chain[i] != NULL) {
++			holder.type = ACTION_STACK_VALUE_OBJECT;
++			holder.data.numeric_value = (u64)(uintptr_t) scope_chain[i];
+ 		} else {
+-			new_ca = allocArray(app_context, 4);
+-			new_ca->length = 0;
++			continue;
+ 		}
+-		ActionVar cv = {0};
+-		cv.type = ACTION_STACK_VALUE_ARRAY;
+-		cv.data.numeric_value = (u64)new_ca;
+-		setProperty(app_context, new_cm, "customItems", 11, &cv);
++		ctor = as_get(app_context, &holder, name);
++	}
++	if (ctor.type == ACTION_STACK_VALUE_UNDEFINED)
++	{
++		ActionVar tl = as_undef();
++		tl.type = ACTION_STACK_VALUE_MOVIECLIP;
++		tl.data.numeric_value = (u64)(uintptr_t)(g_current_context ? g_current_context : &root_movieclip);
++		ctor = as_get(app_context, &tl, name);
+ 	}
++	if (ctor.type == ACTION_STACK_VALUE_UNDEFINED)
++		ctor = as_get_global(app_context, name);
++	return as_new_value(app_context, &ctor, args, n);
++}
+ 
+-	ret.type = ACTION_STACK_VALUE_OBJECT;
+-	ret.data.numeric_value = (u64)new_cm;
+-	return ret;
++static int as_equals(SWFAppContext* app_context, ActionVar* a, ActionVar* b)
++{
++	ActionVar x = *a, y = *b, r;
++	pushVar(app_context, &x);
++	pushVar(app_context, &y);
++	actionEquals2(app_context);
++	popVar(app_context, &r);
++	return r.type == ACTION_STACK_VALUE_BOOLEAN && r.data.numeric_value != 0;
+ }
+ 
+-// ContextMenuItem.copy() — creates a copy of the menu item
+-static ActionVar builtin_contextmenuitem_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++static int as_less(SWFAppContext* app_context, ActionVar* a, ActionVar* b)
+ {
+-	(void)args; (void)arg_count; (void)registers;
+-	ActionVar ret = {0};
+-	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+-	ASObject* cmi = (ASObject*)this_obj;
+-	if (cmi == NULL) return ret;
++	ActionVar x = *a, y = *b, r;
++	pushVar(app_context, &x);
++	pushVar(app_context, &y);
++	actionLess2(app_context);
++	popVar(app_context, &r);
++	if (r.type == ACTION_STACK_VALUE_BOOLEAN) return r.data.numeric_value != 0;
++	if (r.type == ACTION_STACK_VALUE_F64) return VAL(double, &r.data.numeric_value) != 0.0;
++	if (r.type == ACTION_STACK_VALUE_F32) return VAL(float, &r.data.numeric_value) != 0.0f;
++	return 0;
++}
+ 
+-	extern ASFunction g_stub_ctors[];
+-	ASObject* new_cmi = allocObject(app_context, 8);
+-	retainObject(new_cmi);
+-	if (g_stub_ctors[5].prototype_obj != NULL) {
+-		ActionVar pv = {0};
+-		pv.type = ACTION_STACK_VALUE_OBJECT;
+-		pv.data.numeric_value = (u64)g_stub_ctors[5].prototype_obj;
+-		setProperty(app_context, new_cmi, "__proto__", 9, &pv);
+-	}
+-	// Copy all properties
+-	const char* props[] = {"caption", "onSelect", "separatorBefore", "enabled", "visible"};
+-	int lens[] = {7, 8, 15, 7, 7};
+-	for (int i = 0; i < 5; i++) {
+-		ActionVar* pv = getProperty(cmi, props[i], lens[i]);
+-		if (pv != NULL) setProperty(app_context, new_cmi, props[i], lens[i], pv);
+-	}
+-	ret.type = ACTION_STACK_VALUE_OBJECT;
+-	ret.data.numeric_value = (u64)new_cmi;
+-	return ret;
++static ActionVar as_add(SWFAppContext* app_context, ActionVar* a, ActionVar* b) __attribute__((unused));
++static ActionVar as_add(SWFAppContext* app_context, ActionVar* a, ActionVar* b)
++{
++	char str_buffer[17];
++	ActionVar x = *a, y = *b, r;
++	pushVar(app_context, &x);
++	pushVar(app_context, &y);
++	actionAdd2(app_context, str_buffer);
++	popVar(app_context, &r);
++	return r;
+ }
+ 
+-// ContextMenu.hideBuiltInItems() — sets `this.builtInItems` to a fresh object
+-// whose 8 known boolean properties (save/zoom/quality/play/loop/rewind/
+-// forward_back/print) are all `false`. Works on any receiver, not just real
+-// ContextMenu instances (gnash test: `e = {}; e.f = ContextMenu.prototype.
+-// hideBuiltInItems; e.f();` must populate `e.builtInItems`).
+-static ActionVar builtin_contextmenu_hideBuiltInItems(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++static void as_set_prop_flags(SWFAppContext* app_context, ActionVar* obj, const char* names, int flags)
+ {
+-	(void)args; (void)arg_count; (void)registers;
+-	ActionVar ret = {0};
+-	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+-	ASObject* recv = (ASObject*)this_obj;
+-	if (recv == NULL) return ret;
++	ActionVar a[3];
++	a[0] = *obj;
++	if (names != NULL) a[1] = as_str(app_context, names);
++	else { a[1] = as_undef(); a[1].type = ACTION_STACK_VALUE_NULL; }
++	a[2] = as_num((double) flags);
++	(void) actionASSetPropFlags_func2(app_context, a, 3, NULL, NULL);
++}
++// ============================================================================
++// END AS-SEMANTICS HELPER LAYER
++// ============================================================================
++
++// ContextMenu / ContextMenuItem — ports of Flash's ActionScript classes
++// (Ruffle core/src/avm1/globals/ContextMenu.as, ContextMenuItem.as; upstream
++// 8885104f0, dae634d8d). Every property access and construction goes through
++// the AS-semantics helper layer, so getters/setters, a replaced global
++// ContextMenu/ContextMenuItem/Array and overridden push/copy are all observed in
++// the order the AS bytecode would observe them. The constructors run both under
++// `new` and when called as plain functions (`ContextMenuItem.call(obj, ...)`).
++
++// Receiver of a ContextMenu builtin: the object the dispatcher handed over
++// (constructors, methods, .call/.apply all pass an ASObject-shaped receiver).
++static ActionVar cmThis(void* this_obj)
++{
++	if (this_obj == NULL) return as_this(NULL);
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_OBJECT;
++	v.data.numeric_value = (u64)(uintptr_t) this_obj;
++	return v;
++}
++
++static ActionVar cmArg(ActionVar* args, u32 arg_count, u32 i)
++{
++	return (args != NULL && i < arg_count) ? args[i] : as_undef();
++}
+ 
++// The `{save: v, zoom: v, quality: v, play: v, loop: v, rewind: v,
++// forward_back: v, print: v}` literal. An object literal never calls the
++// global Object constructor; insertion is reversed because enumeration is LIFO.
++static ActionVar cmBuiltInItemsLiteral(SWFAppContext* app_context, int value)
++{
+ 	ASObject* builtin = allocObject(app_context, 10);
+ 	retainObject(builtin);
+ 	setObjectProto(app_context, builtin);
+-	ActionVar bf = {0};
+-	bf.type = ACTION_STACK_VALUE_BOOLEAN;
+-	bf.data.numeric_value = 0;
+-	// LIFO insertion → enum order: save, zoom, quality, play, loop, rewind, forward_back, print
+-	setProperty(app_context, builtin, "print", 5, &bf);
+-	setProperty(app_context, builtin, "forward_back", 12, &bf);
+-	setProperty(app_context, builtin, "rewind", 6, &bf);
+-	setProperty(app_context, builtin, "loop", 4, &bf);
+-	setProperty(app_context, builtin, "play", 4, &bf);
+-	setProperty(app_context, builtin, "quality", 7, &bf);
+-	setProperty(app_context, builtin, "zoom", 4, &bf);
+-	setProperty(app_context, builtin, "save", 4, &bf);
++	ActionVar b = as_bool(value);
++	setProperty(app_context, builtin, "print", 5, &b);
++	setProperty(app_context, builtin, "forward_back", 12, &b);
++	setProperty(app_context, builtin, "rewind", 6, &b);
++	setProperty(app_context, builtin, "loop", 4, &b);
++	setProperty(app_context, builtin, "play", 4, &b);
++	setProperty(app_context, builtin, "quality", 7, &b);
++	setProperty(app_context, builtin, "zoom", 4, &b);
++	setProperty(app_context, builtin, "save", 4, &b);
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_OBJECT;
++	v.data.numeric_value = (u64) builtin;
++	return v;
++}
+ 
+-	ActionVar bv = {0};
+-	bv.type = ACTION_STACK_VALUE_OBJECT;
+-	bv.data.numeric_value = (u64)builtin;
+-	setProperty(app_context, recv, "builtInItems", 12, &bv);
+-	return ret;
++// function ContextMenu(callbackFunction) {
++//     this.onSelect = callbackFunction;          // not coerced, always assigned
++//     this.builtInItems = {save: true, ...};
++//     this.customItems = new Array();            // through the global Array
++// }
++static ActionVar builtin_contextmenu_ctor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)registers;
++	ActionVar self = cmThis(this_obj);
++	ActionVar cb = cmArg(args, arg_count, 0);
++	as_set(app_context, &self, "onSelect", &cb);
++	ActionVar bi = cmBuiltInItemsLiteral(app_context, 1);
++	as_set(app_context, &self, "builtInItems", &bi);
++	ActionVar ci = as_new_global(app_context, "Array", NULL, 0);
++	as_set(app_context, &self, "customItems", &ci);
++	return as_undef();
++}
++
++// function ContextMenuItem(caption, callbackFunction, separatorBefore, enabled, visible) {
++//     this.caption = caption;  this.onSelect = callbackFunction;   // not coerced
++//     this.separatorBefore = separatorBefore == null ? false : separatorBefore;
++//     this.enabled = enabled == null ? true : enabled;
++//     this.visible = visible == null ? true : visible;
++// }
++static ActionVar builtin_contextmenuitem_ctor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)registers;
++	static const char* const names[3] = { "separatorBefore", "enabled", "visible" };
++	ActionVar self = cmThis(this_obj);
++	ActionVar v = cmArg(args, arg_count, 0);
++	as_set(app_context, &self, "caption", &v);
++	v = cmArg(args, arg_count, 1);
++	as_set(app_context, &self, "onSelect", &v);
++	for (u32 i = 0; i < 3; i++) {
++		v = cmArg(args, arg_count, 2 + i);
++		// `x == null` holds exactly for null and undefined.
++		if (v.type == ACTION_STACK_VALUE_UNDEFINED || v.type == ACTION_STACK_VALUE_NULL)
++			v = as_bool(i != 0);
++		as_set(app_context, &self, names[i], &v);
++	}
++	return as_undef();
++}
++
++// ContextMenuItem.prototype.copy:
++//     var copy = new ContextMenuItem();   // global; defaults first
++//     copy.caption = this.caption; copy.onSelect = this.onSelect;
++//     copy.separatorBefore = this.separatorBefore;
++//     copy.enabled = this.enabled; copy.visible = this.visible;
++//     return copy;
++static ActionVar builtin_contextmenuitem_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)args; (void)arg_count; (void)registers;
++	static const char* const props[5] = { "caption", "onSelect", "separatorBefore", "enabled", "visible" };
++	ActionVar self = cmThis(this_obj);
++	ActionVar copy = as_new_global(app_context, "ContextMenuItem", NULL, 0);
++	for (u32 i = 0; i < 5; i++) {
++		ActionVar v = as_get(app_context, &self, props[i]);
++		as_set(app_context, &copy, props[i], &v);
++	}
++	return copy;
++}
++
++// ContextMenu.prototype.copy:
++//     var copy = new ContextMenu();                 // global
++//     copy.onSelect = this.onSelect;
++//     copy.builtInItems = this.builtInItems;        // shared, not copied
++//     copy.customItems = new Array();               // global
++//     for (var i = 0; i < this.customItems.length; i++)
++//         copy.customItems.push(this.customItems[i].copy());
++//     return copy;
++static ActionVar builtin_contextmenu_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)args; (void)arg_count; (void)registers;
++	ActionVar self = cmThis(this_obj);
++	ActionVar copy = as_new_global(app_context, "ContextMenu", NULL, 0);
++	ActionVar v = as_get(app_context, &self, "onSelect");
++	as_set(app_context, &copy, "onSelect", &v);
++	v = as_get(app_context, &self, "builtInItems");
++	as_set(app_context, &copy, "builtInItems", &v);
++	v = as_new_global(app_context, "Array", NULL, 0);
++	as_set(app_context, &copy, "customItems", &v);
++	for (u32 i = 0; ; i++) {
++		ActionVar iv = as_num((double) i);
++		ActionVar items = as_get(app_context, &self, "customItems");
++		ActionVar len = as_get(app_context, &items, "length");
++		if (!as_less(app_context, &iv, &len)) break;
++		// Argument first (this.customItems[i].copy()), then the receiver
++		// (copy.customItems), then the push — bytecode evaluation order.
++		items = as_get(app_context, &self, "customItems");
++		ActionVar item = as_get_index(app_context, &items, i);
++		ActionVar item_copy = as_call_method(app_context, &item, "copy", NULL, 0);
++		ActionVar dst = as_get(app_context, &copy, "customItems");
++		(void) as_call_method(app_context, &dst, "push", &item_copy, 1);
++	}
++	return copy;
++}
++
++// ContextMenu.prototype.hideBuiltInItems: `this.builtInItems = {save: false,
++// ...}` — replaced, not modified, so other references keep the old object.
++// Works on any receiver (gnash: `e = {}; e.f = ContextMenu.prototype.
++// hideBuiltInItems; e.f();`).
++static ActionVar builtin_contextmenu_hideBuiltInItems(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)args; (void)arg_count; (void)registers;
++	ActionVar self = cmThis(this_obj);
++	ActionVar bi = cmBuiltInItemsLiteral(app_context, 0);
++	as_set(app_context, &self, "builtInItems", &bi);
++	return as_undef();
+ }
+ 
+ static ActionVar builtin_return_zero(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+@@ -5304,6 +5577,35 @@ static ActionVar builtin_trace_func2(SWFAppContext* app_context, ActionVar* args
+ 	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+ }
+ 
++// AsSetupError(names) — port of Flash's ActionScript (Ruffle Error.as, 31223a80a):
++//     var namesArray = names.split(",");          // dispatched through `names`
++//     for (var i = 0; i < namesArray.length; i++) {
++//         var name = namesArray[i];
++//         var errorProto = new Error();
++//         errorProto.name = name;                  // name before message
++//         errorProto.message = name;
++//     }
++// `Error` is resolved through the CALLER's scope chain on every iteration:
++// Flash finds `_root.Error` before `_global.Error` (Ruffle, whose AS body only
++// sees the global scope, misses that one row). Returns undefined.
++static ActionVar builtin_as_setup_error(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++	(void)registers; (void)this_obj;
++	ActionVar names = (arg_count >= 1) ? args[0] : as_undef();
++	ActionVar comma = as_str(app_context, ",");
++	ActionVar names_array = as_call_method(app_context, &names, "split", &comma, 1);
++	for (u32 i = 0; ; i++) {
++		ActionVar iv = as_num((double) i);
++		ActionVar len = as_get(app_context, &names_array, "length");
++		if (!as_less(app_context, &iv, &len)) break;
++		ActionVar name = as_get_index(app_context, &names_array, i);
++		ActionVar error_proto = as_new_scoped(app_context, "Error", NULL, 0);
++		as_set(app_context, &error_proto, "name", &name);
++		as_set(app_context, &error_proto, "message", &name);
++	}
++	return as_undef();
++}
++
+ // All missing global function stubs
+ static ASFunction g_escape_func;
+ static ASFunction g_unescape_func;
+@@ -5348,7 +5650,7 @@ static void init_global_funcs(void)
+ 		{&g_ASSetNativeAccessor_func, "ASSetNativeAccessor", (Function2Ptr)builtin_assetnativeaccessor},
+ 		{&g_remoteLSOUsage_ctor, "RemoteLSOUsage", (Function2Ptr)builtin_noop_func},
+ 		{&g_assetCache_ctor, "AssetCache", (Function2Ptr)builtin_noop_func},
+-		{&g_asSetupError_ctor, "AsSetupError", (Function2Ptr)builtin_noop_func},
++		{&g_asSetupError_ctor, "AsSetupError", (Function2Ptr)builtin_as_setup_error},
+ 	};
+ 	for (int i = 0; i < (int)(sizeof(entries)/sizeof(entries[0])); i++) {
+ 		memset(entries[i].func, 0, sizeof(ASFunction));
+@@ -5356,10 +5658,10 @@ static void init_global_funcs(void)
+ 		entries[i].func->function_type = 2;
+ 		entries[i].func->advanced_func = entries[i].impl;
+ 	}
+-	// RemoteLSOUsage, AssetCache, AsSetupError are constructors (type 1)
++	// RemoteLSOUsage, AssetCache are constructors (type 1). AsSetupError keeps
++	// type 2 so its (ported) body runs when called.
+ 	g_remoteLSOUsage_ctor.function_type = 1;
+ 	g_assetCache_ctor.function_type = 1;
+-	g_asSetupError_ctor.function_type = 1;
+ 	g_global_funcs_init = 1;
+ }
+ 
+@@ -7340,6 +7642,28 @@ static ActionVar funcPrototypeVar(ASFunction* func)
+ 
+ // ASnative(class_id, method_index) — returns a native method by numeric address.
+ // Handles class 2 (ASNew), class 101 (Object.prototype), class 100 (global functions), class 200 (Math), class 252 (Array).
++static ActionVar builtin_broadcaster_broadcastMessage_as(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
++
++// A fresh native broadcastMessage function object: ASnative(101, 12). Flash
++// hands out a new function object on every ASnative call, and
++// AsBroadcaster.initialize installs a new one on each broadcaster, so
++// `b.broadcastMessage === AsBroadcaster.broadcastMessage` is false.
++static ActionVar newBroadcastMessageFunc(SWFAppContext* app_context)
++{
++	ActionVar v = {0};
++	v.type = ACTION_STACK_VALUE_UNDEFINED;
++	ASFunction* fn = (ASFunction*) calloc(1, sizeof(ASFunction));
++	if (fn == NULL) return v;
++	actionGcLinkFunction(fn);
++	strncpy(fn->name, "broadcastMessage", 255);
++	fn->function_type = 2;
++	fn->advanced_func = (Function2Ptr) builtin_broadcaster_broadcastMessage_as;
++	setupNativeFuncOwnProps(app_context, fn);
++	v.type = ACTION_STACK_VALUE_FUNCTION;
++	v.data.numeric_value = (u64)(uintptr_t) fn;
++	return v;
++}
++
+ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	(void)registers; (void)this_obj;
+@@ -7436,6 +7760,8 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
+ 			&g_object_isPropertyEnumerable_func, // 6
+ 			&g_object_isPrototypeOf_func,        // 7
+ 		};
++		if (method_index == 12)
++			return newBroadcastMessageFunc(app_context);  // AsBroadcaster's native core
+ 		if (method_index <= 7) {
+ 			ASFunction* fn = obj_methods[method_index];
+ 			if (fn->advanced_func != NULL || fn->simple_func != NULL) {
+@@ -15503,7 +15829,10 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
+ 				// a type-2 callee never saw a this-cell here — gate the flag
+ 				// per-branch rather than normalize (a new this-cell is
+ 				// observable to nested calls via actionGetVariable's early
+-				// path). No scopes, no exec-func — never done.
++				// path). No exec-func. The callee's captured scopes plus a
++				// local frame ARE installed (s22 M5): a closure valueOf
++				// (`{valueOf: function() { use outer var }}`) runs in its
++				// defining scope, as in Flash/Ruffle.
+ 				// INV_VERSION_SWITCH added by normalization pass (b):
+ 				// valueOf runs at its DEFINING movie's SWF version
+ 				// (regression/coerce_cross_swf_version, Less2 row).
+@@ -15511,6 +15840,7 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
+ 				otp_this.type = ACTION_STACK_VALUE_OBJECT;
+ 				otp_this.data.numeric_value = (u64)(uintptr_t)obj;
+ 				InvokeOpts otp_opts = { .flags = INV_VERSION_SWITCH | INV_SPECIAL_GUARD |
++				                        INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE |
+ 				                        ((func->function_type == 1)
+ 				                                     ? INV_THIS_STACK : 0u) };
+ 				ActionVar result = invokeFunctionValue(app_context, func, &otp_this,
+@@ -36959,11 +37289,6 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
+ // to identify which broadcaster object they operate on.
+ // ============================================================================
+ 
+-// AS2 abstract equality for listener dedup/remove. Defers to the full
+-// `actionEquals2` (ECMA-262 11.9.3 with object → primitive via valueOf), which
+-// handles null/undefined coercion and `obj.valueOf() == primitive` comparisons
+-// that the AsBroadcaster tests rely on (e.g. `removeListener('yes I am')`
+-// matching an object whose `valueOf` returns `'yes I am'`).
+ // Resolve the broadcaster the three builtins below operate on. `this_obj` is
+ // the receiver on the OBJECT dispatch arm; on the MOVIECLIP arm actionCallMethod
+ // passes this_obj = NULL and communicates the receiver via g_event_this_mc
+@@ -36982,126 +37307,139 @@ static ASObject* broadcasterReceiver(void* this_obj)
+     return receiver;
+ }
+ 
+-static int listenerAbstractEq(SWFAppContext* app_context, ActionVar* a, ActionVar* b) {
+-    pushVar(app_context, a);
+-    pushVar(app_context, b);
+-    actionEquals2(app_context);
+-    int eq = (STACK_TOP_TYPE == ACTION_STACK_VALUE_BOOLEAN) && (STACK_TOP_VALUE != 0);
+-    POP();
+-    return eq;
+-}
+-
+-static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++// The receiver of an AsBroadcaster method as a value. Same object the old
++// raw-access builtins used (broadcasterReceiver), so internal broadcasters and
++// MovieClip-backed ones (TextField instances) keep their receiver; an Array
++// receiver (`[].addListener = ...`) stays an Array.
++static ActionVar asBroadcasterThis(void* this_obj)
+ {
+-    (void)registers;
+-    ASObject* receiver = broadcasterReceiver(this_obj);
+-
+-    ActionVar result = {0};
+-    result.type = ACTION_STACK_VALUE_BOOLEAN;
+-    VAL(u64, &result.data.numeric_value) = 1;
+-
+-    if (!receiver) return result;
+-
+-    // Listener is args[0], or undefined if no args
+-    ActionVar undef_listener = {0};
+-    undef_listener.type = ACTION_STACK_VALUE_UNDEFINED;
+-    ActionVar* new_listener = (arg_count >= 1) ? &args[0] : &undef_listener;
+-
+-    // Flash's AsBroadcaster.addListener semantics (mirrors Ruffle
+-    // core/src/avm1/globals/as_broadcaster.rs `add_listener`):
+-    //   1) Look up `this._listeners`. Only proceed if it's an Object/Array.
+-    //      Do NOT auto-create — `obj.addListener()` on an object that wasn't
+-    //      AsBroadcaster.initialize'd should silently no-op (Flash test
+-    //      AsBroadcaster.as:144,150 expects `o._listeners` to remain undefined).
+-    //   2) If a listener equal to `new_listener` already exists, leave the
+-    //      array as-is (Flash actually moves it to the end via removeListener+
+-    //      push, which matches our "found → shift+append" behavior; Ruffle
+-    //      replaces in-place — both diverge from the other on
+-    //      AsBroadcaster.as:216 etc, but our move-to-end matches Flash).
+-    //   3) Otherwise append at the end.
+-    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
+-    if (!listeners_prop) return result;
+-    if (listeners_prop->type != ACTION_STACK_VALUE_ARRAY) {
+-        // Non-Array _listeners (e.g. user replaced it with a plain Object):
+-        // Ruffle uses `length`/indexed access + virtual `push` here. We don't
+-        // implement that path — return true and skip mutation. Test
+-        // AsBroadcaster.as:162-164 (which exercises this) is also failing in
+-        // Ruffle's expected output, so the diff stays within Ruffle's set.
+-        return result;
+-    }
+-    ASArray* arr = (ASArray*) listeners_prop->data.numeric_value;
+-    if (!arr) return result;
+-
+-    // Find first match using abstract equality (null == undefined in AS2)
+-    int found_idx = -1;
+-    for (u32 i = 0; i < arr->length; i++) {
+-        ActionVar* elem = getArrayElement(arr, i);
+-        if (elem && listenerAbstractEq(app_context, elem, new_listener)) {
+-            found_idx = (int)i;
+-            break;
+-        }
++    ActionVar self = {0};
++    self.type = ACTION_STACK_VALUE_UNDEFINED;
++    if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_ARRAY) {
++        self.type = ACTION_STACK_VALUE_ARRAY;
++        self.data.numeric_value = (u64)(uintptr_t) this_obj;
++        return self;
+     }
+-
+-    if (found_idx >= 0) {
+-        // Re-adding existing listener: remove first occurrence and append to end.
+-        // Flash semantics — the listener is moved to the last position.
+-        for (u32 j = (u32)found_idx; j + 1 < arr->length; j++) {
+-            ActionVar* next = getArrayElement(arr, j + 1);
+-            if (next) setArrayElement(app_context, arr, j, next);
+-        }
+-        arr->length--;
++    ASObject* receiver = broadcasterReceiver(this_obj);
++    if (receiver != NULL) {
++        self.type = ACTION_STACK_VALUE_OBJECT;
++        self.data.numeric_value = (u64)(uintptr_t) receiver;
+     }
+-    setArrayElement(app_context, arr, arr->length, new_listener);
+-    return result;
++    return self;
+ }
+ 
+-
++// AsBroadcaster.addListener — a port of AsBroadcaster.as (Flash implements it
++// in ActionScript; Ruffle c2a878a68):
++//     this.removeListener(listener);
++//     this._listeners.push(listener);
++//     return true;
++// Both steps dispatch through the receiver, so overriding removeListener or
++// the listeners' push is observable, and an already-registered listener moves
++// to the end. A receiver without _listeners silently does nothing.
++static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++    (void)registers;
++    ActionVar self = asBroadcasterThis(this_obj);
++    ActionVar listener = (arg_count >= 1) ? args[0] : as_undef();
++
++    (void) as_call_method(app_context, &self, "removeListener", &listener, 1);
++    ActionVar listeners = as_get(app_context, &self, "_listeners");
++    (void) as_call_method(app_context, &listeners, "push", &listener, 1);
++    return as_bool(1);
++}
++
++// AsBroadcaster.removeListener — port of AsBroadcaster.as:
++//     var listeners = this._listeners;
++//     for (var i = 0; i < listeners.length; i++)
++//         if (listeners[i] == listener) { listeners.splice(i, 1); return true; }
++//     return false;
++// `length` is re-read every iteration and elements are compared with `==`
++// (null == undefined; objects vs primitives run valueOf), all through getters.
+ static ActionVar builtin_broadcaster_removeListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+     (void)registers;
+-    ASObject* receiver = broadcasterReceiver(this_obj);
+-
+-    ActionVar false_result = {0};
+-    false_result.type = ACTION_STACK_VALUE_BOOLEAN;
+-    VAL(u64, &false_result.data.numeric_value) = 0;
+-
+-    if (!receiver) return false_result;
+-
+-    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
+-    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) return false_result;
+-    ASArray* arr = (ASArray*) listeners_prop->data.numeric_value;
+-    if (!arr) return false_result;
+-
+-    // Target is args[0], or undefined if no args
+-    ActionVar undef_target = {0};
+-    undef_target.type = ACTION_STACK_VALUE_UNDEFINED;
+-    ActionVar* target = (arg_count >= 1) ? &args[0] : &undef_target;
+-
+-    // Find and remove using abstract equality (null == undefined)
+-    for (u32 i = 0; i < arr->length; i++) {
+-        ActionVar* elem = getArrayElement(arr, i);
+-        if (elem && listenerAbstractEq(app_context, elem, target)) {
+-            for (u32 j = i; j + 1 < arr->length; j++) {
+-                ActionVar* next = getArrayElement(arr, j + 1);
+-                if (next) setArrayElement(app_context, arr, j, next);
+-            }
+-            arr->length--;
+-            ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
+-            return r;
++    ActionVar self = asBroadcasterThis(this_obj);
++    ActionVar listener = (arg_count >= 1) ? args[0] : as_undef();
++
++    ActionVar listeners = as_get(app_context, &self, "_listeners");
++    for (u32 i = 0; ; i++) {
++        ActionVar iv = as_num((double) i);
++        ActionVar len = as_get(app_context, &listeners, "length");
++        if (!as_less(app_context, &iv, &len)) break;
++        ActionVar elem = as_get_index(app_context, &listeners, i);
++        if (as_equals(app_context, &elem, &listener)) {
++            ActionVar splice_args[2] = { as_num((double) i), as_num(1.0) };
++            (void) as_call_method(app_context, &listeners, "splice", splice_args, 2);
++            return as_bool(1);
++        }
++    }
++    return as_bool(0);
++}
++
++// broadcastMessage's listener snapshot (Ruffle broadcast_internal: `length` and
++// every element are read as OWN DATA properties — no getters, no __resolve, no
++// prototype — before any listener runs, so listeners added or removed during
++// the broadcast don't change who gets called). Returns a HALLOC'd array the
++// caller FREEs (NULL when empty).
++static ActionVar* broadcastSnapshotListeners(SWFAppContext* app_context, ActionVar* listeners_var, u32* out_count)
++{
++    *out_count = 0;
++    if (listeners_var->type == ACTION_STACK_VALUE_ARRAY) {
++        ASArray* arr = (ASArray*)(uintptr_t) listeners_var->data.numeric_value;
++        if (arr == NULL || arr->length == 0) return NULL;
++        u32 n = arr->length;
++        if (n > (1u << 20)) n = 1u << 20;
++        ActionVar* snap = (ActionVar*) HALLOC(sizeof(ActionVar) * n);
++        for (u32 i = 0; i < n; i++) {
++            ActionVar* e = getArrayElement(arr, i);
++            if (e != NULL) snap[i] = *e;
++            else { memset(&snap[i], 0, sizeof(ActionVar)); snap[i].type = ACTION_STACK_VALUE_UNDEFINED; }
+         }
++        *out_count = n;
++        return snap;
+     }
+ 
+-    return false_result;
++    ASObject* bag = NULL;
++    if (listeners_var->type == ACTION_STACK_VALUE_OBJECT) {
++        bag = (ASObject*)(uintptr_t) listeners_var->data.numeric_value;
++    } else if (listeners_var->type == ACTION_STACK_VALUE_FUNCTION) {
++        ASFunction* f = (ASFunction*)(uintptr_t) listeners_var->data.numeric_value;
++        if (f != NULL) bag = f->own_props;
++    } else if (listeners_var->type == ACTION_STACK_VALUE_MOVIECLIP) {
++        MovieClip* mc = (MovieClip*)(uintptr_t) listeners_var->data.numeric_value;
++        if (mc != NULL) bag = (ASObject*) mc->dynamic_props;
++    }
++    if (bag == NULL) return NULL;
++
++    ASProperty* lp = findPropertyRaw(bag, "length", 6);
++    if (lp == NULL || lp->getter != NULL) return NULL;
++    double d = 0.0;
++    if (lp->value.type == ACTION_STACK_VALUE_F64 || lp->value.type == ACTION_STACK_VALUE_F32 ||
++        lp->value.type == ACTION_STACK_VALUE_BOOLEAN || lp->value.type == ACTION_STACK_VALUE_STRING)
++        d = varToDoubleSimple(&lp->value);
++    if (isnan(d) || d < 1.0) return NULL;
++    u32 n = (d > (double)(1u << 20)) ? (1u << 20) : (u32) d;
++    ActionVar* snap = (ActionVar*) HALLOC(sizeof(ActionVar) * n);
++    for (u32 i = 0; i < n; i++) {
++        char key[16];
++        int kl = snprintf(key, sizeof(key), "%u", i);
++        ASProperty* ep = findPropertyRaw(bag, key, (u32) kl);
++        if (ep != NULL && ep->getter == NULL) snap[i] = ep->value;
++        else { memset(&snap[i], 0, sizeof(ActionVar)); snap[i].type = ACTION_STACK_VALUE_UNDEFINED; }
++    }
++    *out_count = n;
++    return snap;
+ }
+ 
+-static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++// ASnative(101, 12): Flash's native broadcast core, shared by every
++// broadcaster (AsBroadcaster.as keeps it native). `self` is the broadcaster.
++// No event-name argument at all returns undefined; a present `undefined`
++// coerces like any string.
++static ActionVar broadcastMessageCore(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar self)
+ {
+-    (void)registers;
+     ActionVar undef = {0};
+     undef.type = ACTION_STACK_VALUE_UNDEFINED;
+-
+-    ASObject* receiver = broadcasterReceiver(this_obj);
+-    if (!receiver || arg_count < 1) return undef;
++    if (self.type == ACTION_STACK_VALUE_UNDEFINED || arg_count < 1) return undef;
+ 
+     // Convert method name to UTF-8 string. Push to stack and use convertString.
+     pushVar(app_context, &args[0]);
+@@ -37119,26 +37457,27 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
+ 
+     int method_name_len = (int)strlen(method_name);
+ 
+-    // Get the _listeners array
+-    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
+-    if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) {
+-        // No (or non-array) _listeners — return undefined (Flash behavior).
+-        return undef;
+-    }
+-    ASArray* arr = (ASArray*)(uintptr_t)listeners_prop->data.numeric_value;
+-    if (!arr || arr->length == 0) {
+-        // Empty listener list — return undefined (Flash behavior).
+-        return undef;
+-    }
++    // `this._listeners` is an ordinary get (getters and __resolve fire); any
++    // non-object means no listeners. The listeners themselves are snapshotted
++    // up front from own data properties (broadcastSnapshotListeners).
++    ActionVar listeners_var = as_get(app_context, &self, "_listeners");
++    if (!as_is_object(&listeners_var)) return undef;
++    u32 snap_count = 0;
++    ActionVar* snap = broadcastSnapshotListeners(app_context, &listeners_var, &snap_count);
++    int has_listeners = 0;
+ 
+     // Extra args to pass to the method (args[1..])
+     u32 extra_count = arg_count > 1 ? arg_count - 1 : 0;
+     ActionVar* extra_args = extra_count > 0 ? &args[1] : NULL;
+ 
+     // Call method on each listener
+-    for (u32 i = 0; i < arr->length; i++) {
+-        ActionVar* elem = getArrayElement(arr, i);
+-        if (!elem) continue;
++    for (u32 i = 0; i < snap_count; i++) {
++        ActionVar* elem = &snap[i];
++
++        // null/undefined are skipped and don't count as listeners.
++        if (elem->type == ACTION_STACK_VALUE_UNDEFINED || elem->type == ACTION_STACK_VALUE_NULL)
++            continue;
++        has_listeners = 1;
+ 
+         ASObject* listener_obj = NULL;
+         MovieClip* listener_mc = NULL;
+@@ -37156,7 +37495,15 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
+             if (listener_func && listener_func->own_props)
+                 listener_obj = listener_func->own_props;
+         } else {
+-            continue; // skip null/undefined/primitive listeners
++            // Primitive listener: Flash boxes it, so its prototype's method runs
++            // with a wrapper `this`. The primitive CallMethod arms do exactly
++            // that boxing. An empty name would call the box itself — never a
++            // function, so nothing happens.
++            if (method_name_len > 0) {
++                ActionVar prim = *elem;
++                (void) as_call_method(app_context, &prim, method_name, extra_args, extra_count);
++            }
++            continue;
+         }
+ 
+         ASFunction* func = NULL;
+@@ -37312,11 +37659,33 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
+         }
+         if (super_pushed) popSuperContext();
+     }
++    if (snap != NULL) FREE(snap);
+ 
+-    ActionVar true_result = {0};
+-    true_result.type = ACTION_STACK_VALUE_BOOLEAN;
+-    VAL(u64, &true_result.data.numeric_value) = 1;
+-    return true_result;
++    // true when at least one non-null listener was present, else undefined.
++    return has_listeners ? as_bool(1) : undef;
++}
++
++// Entry for the runtime's own C callers (Key/Mouse/Selection/MCL/TextField
++// event dispatch): `this_obj` is always the broadcaster's ASObject (or NULL for
++// the MovieClip arm), never an ASArray, so g_call_this_type is not consulted.
++static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++    (void)registers;
++    ActionVar self = as_undef();
++    ASObject* receiver = broadcasterReceiver(this_obj);
++    if (receiver != NULL) {
++        self.type = ACTION_STACK_VALUE_OBJECT;
++        self.data.numeric_value = (u64)(uintptr_t) receiver;
++    }
++    return broadcastMessageCore(app_context, args, arg_count, self);
++}
++
++// Entry for the script-visible broadcastMessage function objects, where the
++// dispatcher may hand over an Array receiver.
++static ActionVar builtin_broadcaster_broadcastMessage_as(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
++{
++    (void)registers;
++    return broadcastMessageCore(app_context, args, arg_count, asBroadcasterThis(this_obj));
+ }
+ 
+ // Static function objects for AsBroadcaster methods
+@@ -38376,7 +38745,7 @@ static void initAsBroadcasterFuncs(SWFAppContext* app_context)
+     memset(&g_ab_broadcastMessage_func, 0, sizeof(ASFunction));
+     strncpy(g_ab_broadcastMessage_func.name, "broadcastMessage", 255);
+     g_ab_broadcastMessage_func.function_type = 2;
+-    g_ab_broadcastMessage_func.advanced_func = (Function2Ptr)builtin_broadcaster_broadcastMessage;
++    g_ab_broadcastMessage_func.advanced_func = (Function2Ptr)builtin_broadcaster_broadcastMessage_as;
+ 
+     setupNativeFuncOwnProps(app_context, &g_ab_addListener_func);
+     setupNativeFuncOwnProps(app_context, &g_ab_removeListener_func);
+@@ -39304,40 +39673,49 @@ static void markAsBroadcasterSWF6(ASObject* obj)
+     }
+ }
+ 
+-// AsBroadcaster.initialize(obj) — static method callable from AS2.
+-// Installs _listeners, addListener, removeListener, broadcastMessage on the target.
++// AsBroadcaster.initialize(broadcaster) — port of AsBroadcaster.as:
++//     broadcaster.broadcastMessage = ASnative(101, 12);   // a NEW native each time
++//     broadcaster.addListener = AsBroadcaster.addListener;
++//     broadcaster.removeListener = AsBroadcaster.removeListener;
++//     broadcaster._listeners = [];
++//     ASSetPropFlags(broadcaster, "broadcastMessage,addListener,removeListener,_listeners", 3);
++// Every assignment goes through setters/watchers in that order, and
++// `AsBroadcaster` is re-read from the current _global for each method (so a
++// replaced AsBroadcaster — getters, __resolve — is observable). Returns
++// undefined.
+ static ActionVar builtin_asbroadcaster_initialize(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+     (void)registers; (void)this_obj;
+-    ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+-    if (arg_count < 1) return undef;
+-
+-    ASObject* target = NULL;
+-    if (args[0].type == ACTION_STACK_VALUE_OBJECT || args[0].type == ACTION_STACK_VALUE_ARRAY) {
+-        target = (ASObject*)(uintptr_t)args[0].data.numeric_value;
+-    } else if (args[0].type == ACTION_STACK_VALUE_FUNCTION) {
+-        ASFunction* f = lookupFunctionFromVar(&args[0]);
+-        if (f && f->own_props) target = f->own_props;
+-    } else if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+-        MovieClip* mc = (MovieClip*)(uintptr_t)args[0].data.numeric_value;
+-        // If the MC reference is stale (removeMovieClip + recreate at the
+-        // same name pattern), rebind it to the live MC at the same path so
+-        // `AsBroadcaster.initialize(staleRef)` after a recreate succeeds.
+-        // Mirrors Flash's "soft" MovieClip references (AsBroadcaster.as:173:
+-        // dang re-resolved to depth-2 'dangling' after removeMovieClip +
+-        // createEmptyMovieClip('dangling', 2)).
+-        if (mc != NULL) {
+-            mc = reResolveDeadBaseClip(app_context, mc);
+-        }
+-        if (mc != NULL && mc->dynamic_props == NULL && mc->depth != INT_MIN) {
+-            mc->dynamic_props = allocDynamicProps(app_context, 4);
+-        }
+-        if (mc && mc->dynamic_props) target = (ASObject*) mc->dynamic_props;
++    ActionVar broadcaster = (arg_count >= 1) ? args[0] : as_undef();
++    if (broadcaster.type == ACTION_STACK_VALUE_MOVIECLIP && broadcaster.data.numeric_value != 0) {
++        // A stale MC reference (removeMovieClip + recreate at the same path)
++        // rebinds to the live clip: Flash's "soft" MovieClip references
++        // (gnash AsBroadcaster.as:173).
++        MovieClip* mc = (MovieClip*)(uintptr_t) broadcaster.data.numeric_value;
++        mc = reResolveDeadBaseClip(app_context, mc);
++        if (mc != NULL) broadcaster.data.numeric_value = (u64)(uintptr_t) mc;
+     }
+-    if (!target) return undef;
+ 
+-    installAsBroadcaster(app_context, target);
+-    return undef;
++    ActionVar bm_var = newBroadcastMessageFunc(app_context);
++    as_set(app_context, &broadcaster, "broadcastMessage", &bm_var);
++
++    ActionVar ab = as_get_global(app_context, "AsBroadcaster");
++    ActionVar add = as_get(app_context, &ab, "addListener");
++    as_set(app_context, &broadcaster, "addListener", &add);
++    ab = as_get_global(app_context, "AsBroadcaster");
++    ActionVar rem = as_get(app_context, &ab, "removeListener");
++    as_set(app_context, &broadcaster, "removeListener", &rem);
++
++    // `[]`: an empty array literal, built exactly as ActionInitArray builds one.
++    ActionVar zero = as_num(0.0), listeners;
++    pushVar(app_context, &zero);
++    actionInitArray(app_context);
++    popVar(app_context, &listeners);
++    as_set(app_context, &broadcaster, "_listeners", &listeners);
++
++    as_set_prop_flags(app_context, &broadcaster,
++                      "broadcastMessage,addListener,removeListener,_listeners", 3);
++    return as_undef();
+ }
+ 
+ // Stub constructors: classes that need to exist as globals with a prototype
+@@ -41342,6 +41720,11 @@ static void initContextMenuPrototype(SWFAppContext* app_context, ASFunction* cto
+ 	hv.type = ACTION_STACK_VALUE_FUNCTION;
+ 	hv.data.numeric_value = (u64) &g_cm_hideBuiltIn_func;
+ 	setPropertyWithFlags(app_context, ctor->prototype_obj, "hideBuiltInItems", 16, &hv, mflags);
++	// ASSetPropFlags(o, ..., 1027): DONT_ENUM, DONT_DELETE, visible to SWF 7+.
++	ActionVar pv = {0};
++	pv.type = ACTION_STACK_VALUE_OBJECT;
++	pv.data.numeric_value = (u64) ctor->prototype_obj;
++	as_set_prop_flags(app_context, &pv, "copy,hideBuiltInItems", 1027);
+ }
+ 
+ // ContextMenuItem.prototype: copy
+@@ -41370,6 +41753,11 @@ static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction*
+ 	fv.type = ACTION_STACK_VALUE_FUNCTION;
+ 	fv.data.numeric_value = (u64) &g_cmi_copy_func;
+ 	setPropertyWithFlags(app_context, ctor->prototype_obj, "copy", 4, &fv, mflags);
++	// ASSetPropFlags(o, ..., 1027): DONT_ENUM, DONT_DELETE, visible to SWF 7+.
++	ActionVar pv = {0};
++	pv.type = ACTION_STACK_VALUE_OBJECT;
++	pv.data.numeric_value = (u64) ctor->prototype_obj;
++	as_set_prop_flags(app_context, &pv, "copy", 1027);
+ }
+ 
+ // LoadVars.decode(queryString): parse URL-encoded string into own properties
+@@ -43387,6 +43775,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
+ 			strncpy(g_stub_ctors[i].name, stub_names[i], 255);
+ 			g_stub_ctors[i].function_type = 1;
+ 		}
++		// ContextMenu / ContextMenuItem are ActionScript classes in Flash: their
++		// constructor bodies run under `new` and when called as functions.
++		g_stub_ctors[4].function_type = 2;
++		g_stub_ctors[4].advanced_func = (Function2Ptr) builtin_contextmenu_ctor;
++		g_stub_ctors[5].function_type = 2;
++		g_stub_ctors[5].advanced_func = (Function2Ptr) builtin_contextmenuitem_ctor;
+ 	}
+ 
+ 	// ---- Static global objects (Accessibility, Key, Mouse, Selection, Stage) ----
+@@ -59463,87 +59857,8 @@ void actionNewObject(SWFAppContext* app_context)
+ 				setProperty(app_context, (ASObject*)new_obj, "_listeners", 10, &arr_var);
+ 			}
+ 
+-			// ContextMenu constructor: create builtInItems and customItems
+-			// Property insertion order is reversed (LIFO enumeration)
+-			if (ctor_func == &g_stub_ctors[4]) {
+-				ASObject* cm_obj = (ASObject*)new_obj;
+-				// builtInItems: object with 8 boolean properties (all true)
+-				// Expected enum order: save,zoom,quality,play,loop,rewind,forward_back,print
+-				// LIFO: insert in reverse
+-				ASObject* builtin = allocObject(app_context, 10);
+-				retainObject(builtin);
+-				setObjectProto(app_context, builtin);
+-				ActionVar bt = {0};
+-				bt.type = ACTION_STACK_VALUE_BOOLEAN;
+-				bt.data.numeric_value = 1;
+-				setProperty(app_context, builtin, "print", 5, &bt);
+-				setProperty(app_context, builtin, "forward_back", 12, &bt);
+-				setProperty(app_context, builtin, "rewind", 6, &bt);
+-				setProperty(app_context, builtin, "loop", 4, &bt);
+-				setProperty(app_context, builtin, "play", 4, &bt);
+-				setProperty(app_context, builtin, "quality", 7, &bt);
+-				setProperty(app_context, builtin, "zoom", 4, &bt);
+-				setProperty(app_context, builtin, "save", 4, &bt);
+-				ActionVar bv = {0};
+-				bv.type = ACTION_STACK_VALUE_OBJECT;
+-				bv.data.numeric_value = (u64)builtin;
+-				// Expected enum order: customItems,builtInItems,onSelect
+-				// LIFO: insert onSelect, builtInItems, customItems
+-				// onSelect: first constructor arg (any type) or undefined.
+-				// gnash test ContextMenu.as:294-306 expects
+-				// `new ContextMenu(callback).onSelect == callback`.
+-				ActionVar os_var = {0};
+-				if (num_args > 0) {
+-					os_var = args[0];
+-				} else {
+-					os_var.type = ACTION_STACK_VALUE_UNDEFINED;
+-				}
+-				setProperty(app_context, cm_obj, "onSelect", 8, &os_var);
+-				setProperty(app_context, cm_obj, "builtInItems", 12, &bv);
+-				// customItems: empty array
+-				ASArray* custom = allocArray(app_context, 4);
+-				custom->length = 0;
+-				ActionVar cv = {0};
+-				cv.type = ACTION_STACK_VALUE_ARRAY;
+-				cv.data.numeric_value = (u64)custom;
+-				setProperty(app_context, cm_obj, "customItems", 11, &cv);
+-			}
+-
+-			// ContextMenuItem constructor: set caption, onSelect, etc.
+-			if (ctor_func == &g_stub_ctors[5]) {
+-				ASObject* cmi_obj = (ASObject*)new_obj;
+-				// caption from first arg (or undefined)
+-				if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+-					setProperty(app_context, cmi_obj, "caption", 7, &args[0]);
+-				} else {
+-					ActionVar uv = {0};
+-					uv.type = ACTION_STACK_VALUE_UNDEFINED;
+-					setProperty(app_context, cmi_obj, "caption", 7, &uv);
+-				}
+-				// onSelect callback from second arg (or undefined)
+-				if (num_args > 1) {
+-					setProperty(app_context, cmi_obj, "onSelect", 8, &args[1]);
+-				} else {
+-					ActionVar uv = {0};
+-					uv.type = ACTION_STACK_VALUE_UNDEFINED;
+-					setProperty(app_context, cmi_obj, "onSelect", 8, &uv);
+-				}
+-				// separatorBefore from third arg (default false)
+-				ActionVar sb = {0};
+-				sb.type = ACTION_STACK_VALUE_BOOLEAN;
+-				sb.data.numeric_value = (num_args > 2 && args[2].data.numeric_value) ? 1 : 0;
+-				setProperty(app_context, cmi_obj, "separatorBefore", 15, &sb);
+-				// enabled (default true)
+-				ActionVar en = {0};
+-				en.type = ACTION_STACK_VALUE_BOOLEAN;
+-				en.data.numeric_value = 1;
+-				setProperty(app_context, cmi_obj, "enabled", 7, &en);
+-				// visible (default true)
+-				ActionVar vi = {0};
+-				vi.type = ACTION_STACK_VALUE_BOOLEAN;
+-				vi.data.numeric_value = 1;
+-				setProperty(app_context, cmi_obj, "visible", 7, &vi);
+-			}
++			// (ContextMenu / ContextMenuItem: their bodies run as the constructors'
++			// advanced_func above — builtin_contextmenu_ctor / _item_ctor.)
+ 
+ 			// NetStream constructor: install native data properties on prototype
+ 			// when constructed with a connected NetConnection argument.
+@@ -59793,6 +60108,17 @@ void actionNewMethod(SWFAppContext* app_context)
+ 						registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+ 					}
+ 
++					// Captured scopes first (s22 M5): a closure used as a constructor
++					// (`new obj.Ctor()`) runs in its defining scope, as under NewObject.
++					u32 _nm_saved_scope_depth = scope_depth;
++					for (u8 _nm_ci = 0; _nm_ci < func->captured_scope_count; _nm_ci++) {
++						if (scope_depth < MAX_SCOPE_DEPTH) {
++							scope_is_with[scope_depth] = func->captured_scope_is_with[_nm_ci];
++							scope_mc[scope_depth] = func->captured_scope_mc[_nm_ci];
++							scope_chain[scope_depth++] = func->captured_scope[_nm_ci];
++						}
++					}
++
+ 					// Create local scope for function
+ 					ASObject* local_scope = allocObject(app_context, 8);
+ 					if (scope_depth < MAX_SCOPE_DEPTH) {
+@@ -59825,10 +60151,8 @@ void actionNewMethod(SWFAppContext* app_context)
+ 
+ 					g_current_executing_func = prev_executing_func_nm;
+ 
+-					// Pop local scope
+-					if (scope_depth > 0) {
+-						scope_depth--;
+-					}
++					// Pop local scope + captured scopes
++					scope_depth = _nm_saved_scope_depth;
+ 					releaseObject(app_context, local_scope);
+ 
+ 					if (registers != NULL) FREE(registers);
+@@ -60404,6 +60728,17 @@ void actionNewMethod(SWFAppContext* app_context)
+ 				registers = (ActionVar*) HCALLOC(user_ctor_func->register_count, sizeof(ActionVar));
+ 			}
+ 
++			// Captured scopes first (s22 M5): a closure used as a constructor
++			// (`new obj.Ctor()`) runs in its defining scope, as under NewObject.
++			u32 _nm_saved_scope_depth = scope_depth;
++			for (u8 _nm_ci = 0; _nm_ci < user_ctor_func->captured_scope_count; _nm_ci++) {
++				if (scope_depth < MAX_SCOPE_DEPTH) {
++					scope_is_with[scope_depth] = user_ctor_func->captured_scope_is_with[_nm_ci];
++					scope_mc[scope_depth] = user_ctor_func->captured_scope_mc[_nm_ci];
++					scope_chain[scope_depth++] = user_ctor_func->captured_scope[_nm_ci];
++				}
++			}
++
+ 			// Create local scope for function
+ 			ASObject* local_scope = allocObject(app_context, 8);
+ 			if (scope_depth < MAX_SCOPE_DEPTH) {
+@@ -60417,10 +60752,8 @@ void actionNewMethod(SWFAppContext* app_context)
+ 			return_value = user_ctor_func->advanced_func(app_context, args, num_args, registers, new_obj_inst);
+ 			popCtorContext();
+ 
+-			// Pop local scope
+-			if (scope_depth > 0) {
+-				scope_depth--;
+-			}
++			// Pop local scope + captured scopes
++			scope_depth = _nm_saved_scope_depth;
+ 			releaseObject(app_context, local_scope);
+ 
+ 			if (registers != NULL) FREE(registers);
+@@ -68539,8 +68872,10 @@ static int primNumBoolCallProtoMethod(SWFAppContext* app_context, ActionVar* obj
+ 	ActionVar this_v = {0};
+ 	this_v.type = ACTION_STACK_VALUE_OBJECT;
+ 	this_v.data.numeric_value = (u64) wrap;
++	// INV_CAPTURED_SCOPE: a closure method runs in its defining scope (s22 M5,
++	// same as the object-method arm).
+ 	InvokeOpts opts = {
+-		.flags = (INV_SUPER_CTX | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
++		.flags = (INV_SUPER_CTX | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
+ 		.super_depth = 1,
+ 		.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS | INV_ACT_SUPER),
+ 	};
+@@ -69597,9 +69932,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				int _om_caller_ver = g_swf_version;
+ 
+ 				// Unlike actionCallFunction, a method call does NOT reset the scope
+-				// chain and does NOT restore the callee's captured scopes — it stacks a
+-				// bare local frame on top of the caller's chain. Load-bearing asymmetry
+-				// (plan §3): reproduced, not normalized. CF_CTX_LIVE also refuses to
++				// chain: it stacks the callee's captured scopes (INV_CAPTURED_SCOPE,
++				// s22 M5 — a closure called as `obj.m()` sees its defining scope, as in
++				// Flash/Ruffle Activation::from_function) and a local frame on top of
++				// the caller's chain. Hiding the caller's chain (CF_RESET_SCOPE) is a
++				// separately-measured follow-up. CF_CTX_LIVE also refuses to
+ 				// enter a DESTROYED base clip and leaves g_current_sprite_obj alone,
+ 				// where actionCallFunction's CF_CTX does neither.
+ 				ClosureFrame cf;
+@@ -69622,7 +69959,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				// type-1 loop this replaces pushed num_args of them, neither clamping
+ 				// nor padding — see regression/method_type1_args.
+ 				InvokeOpts opts = {
+-					.flags = (INV_SUPER_CTX | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
++					.flags = (INV_SUPER_CTX | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
+ 					.super_depth = (u16)method_search_depth,
+ 					.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS | INV_ACT_SUPER),
+ 					// advanced_func receives the raw receiver, NULL included; this_var
+@@ -69835,10 +70172,40 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 			return;
+ 		}
+ 
++		// An OWN function property (`arr.push = function () {...}`) shadows the
++		// built-in of the same name, as for any object: Flash finds it first.
++		ActionVar* own_override = NULL;
++		if (arr->props != NULL) {
++			ASProperty* op = findPropertyRaw(arr->props, method_name, method_name_len);
++			if (op != NULL && op->getter == NULL && op->value.type == ACTION_STACK_VALUE_FUNCTION
++			    && !isPropertyHiddenAtVersion(op->flash_flags))
++				own_override = &op->value;
++		}
++		// So does a user-defined (script) function on the prototype chain
++		// (`Array.prototype.push = function () {...}`): the native fast path
++		// below would otherwise bypass it. Natives carry swf_version 0.
++		if (own_override == NULL) {
++			ASObject* aproto = NULL;
++			ASProperty* pp = (arr->props != NULL) ? findPropertyRaw(arr->props, "__proto__", 9) : NULL;
++			if (pp != NULL) {
++				if (pp->value.type == ACTION_STACK_VALUE_OBJECT)
++					aproto = (ASObject*)(uintptr_t) pp->value.data.numeric_value;
++			} else {
++				aproto = getVersionedArrayProto(app_context);
++			}
++			ActionVar* pm = (aproto != NULL) ? getPropertyWithPrototype(aproto, method_name, method_name_len) : NULL;
++			if (pm != NULL && pm->type == ACTION_STACK_VALUE_FUNCTION) {
++				ASFunction* pf = (ASFunction*)(uintptr_t) pm->data.numeric_value;
++				if (pf != NULL && pf->swf_version != 0)
++					own_override = pm;
++			}
++		}
++
+ 		// Try built-in array methods FIRST (push, pop, sort, etc.)
+-		int handled = callArrayMethod(app_context, arr,
+-		                               method_name, method_name_len,
+-		                               args, num_args);
++		int handled = (own_override != NULL) ? 0 :
++		              callArrayMethod(app_context, arr,
++		                              method_name, method_name_len,
++		                              args, num_args);
+ 
+ 		if (handled)
+ 		{
+@@ -69847,8 +70214,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 		}
+ 
+ 		// Not a built-in method — check arr->props (and prototype chain) for user-defined methods
+-		ActionVar* user_method_prop = NULL;
+-		if (arr->props != NULL) {
++		ActionVar* user_method_prop = own_override;
++		if (user_method_prop == NULL && arr->props != NULL) {
+ 			user_method_prop = getPropertyWithPrototype(arr->props, method_name, method_name_len);
+ 		}
+ 		if (user_method_prop != NULL && user_method_prop->type == ACTION_STACK_VALUE_FUNCTION) {
+@@ -69878,15 +70245,29 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				// The core pushes EXACTLY param_count operands. The type-1 loop this
+ 				// replaces pushed num_args of them, neither clamping a long call nor
+ 				// padding a short one — see regression/array_method_type1_args.
++				// INV_CAPTURED_SCOPE (type-2): a closure method runs in its defining
++				// scope (s22 M5, same as the object-method arm).
++				// INV_OVERRIDE_THIS (type-2 script callee): a preloaded `this` register
++				// must keep the ARRAY tag (the prologue would otherwise wrap the raw
++				// ASArray* as an OBJECT). Not for a native callee, which has no
++				// prologue to consume it (it would leak into a nested callback); a
++				// native reads the receiver kind off g_call_this_type instead.
++				int _am_script = (func->swf_version != 0);  // built-ins carry no version
+ 				InvokeOpts opts = {
+ 					.flags = (u32)(INV_THIS_STACK |
+-					               (_am_t2 ? (INV_LOCAL_SCOPE | INV_BIND_THIS) : 0)),
++					               (_am_t2 ? (INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_BIND_THIS) : 0) |
++					               ((_am_t2 && _am_script) ? INV_OVERRIDE_THIS : 0)),
++					.override_this = &this_var,
+ 				};
+ 
++				u8 _am_saved_call_this_type = g_call_this_type;
++				if (_am_t2 && !_am_script)
++					g_call_this_type = ACTION_STACK_VALUE_ARRAY;
+ 				g_call_depth++;
+ 				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
+ 				                                       args, num_args, &opts);
+ 				g_call_depth--;
++				g_call_this_type = _am_saved_call_this_type;
+ 
+ 				popSuperContext();
+ 				if (args != NULL) FREE(args);
+@@ -70059,8 +70440,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 						// INV_SUPER_CTX is safe here where .call/.apply and the array arms had to
+ 						// keep the super push outside: the receiver the core derives from
+ 						// this_var IS the one this arm pushes, since this_var = OBJECT(_sp_wrap).
++						//
++						// INV_CAPTURED_SCOPE: a closure method runs in its defining scope
++						// (s22 M5, same as the object-method arm).
+ 						InvokeOpts opts = {
+-							.flags = (INV_SUPER_CTX | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
++							.flags = (INV_SUPER_CTX | INV_CAPTURED_SCOPE | INV_LOCAL_SCOPE | INV_EXEC_FUNC),
+ 							.super_depth = 1,
+ 							.act_flags = (u8)(INV_ACT_THIS | INV_ACT_ARGUMENTS |
+ 							                  INV_ACT_SUPER),
