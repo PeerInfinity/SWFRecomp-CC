@@ -22712,6 +22712,7 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 	int* out_word_wrap, int* out_field_width_twips,
 	int* out_left_margin_twips, int* out_right_margin_twips, int* out_indent_twips);
 static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc, int skip_if_empty);
+static int tf_embedded_font_missing(MovieClip* mc, u16 font_id);
 
 // Forward declarations for HTML text format run system
 typedef struct TFRun_s {
@@ -23074,7 +23075,7 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
 			setProperty(app_context, props, "_tf_letterSpacing", 17, &ls_val);
 		}
 		if (first_run->font_name[0] != '\0') {
-			u16 found_fid = ng_findFontIdByName(first_run->font_name);
+			u16 found_fid = ng_resolveTextFormatFontId(first_run->font_name, first_run->bold, first_run->italic);
 			ActionVar fid_val = {0};
 			fid_val.type = ACTION_STACK_VALUE_F64;
 			VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
@@ -29676,6 +29677,9 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				}
 			}
 		}
+		// An embedFonts field whose font the SWF does not embed draws no
+		// glyphs (Flash; fonts/embed_matching/no_font_found's golden is blank).
+		if (tf_embedded_font_missing(mc, font_id)) continue;
 
 		// Get text color (fallback when no run table or run color missing)
 		u32 text_color = 0x000000;
@@ -54868,7 +54872,7 @@ void actionSetMember(SWFAppContext* app_context)
 						}
 						// Sync font name -> font_id
 						if (first_run->font_name[0] != '\0') {
-							u16 found_fid = ng_findFontIdByName(first_run->font_name);
+							u16 found_fid = ng_resolveTextFormatFontId(first_run->font_name, first_run->bold, first_run->italic);
 							ActionVar fid_val = {0};
 							fid_val.type = ACTION_STACK_VALUE_F64;
 							VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
@@ -56147,6 +56151,10 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 	if (font_id == 0 && mc->ng_textfield_idx >= 0) {
 		font_id = ng_getTextFieldFontId(mc->ng_textfield_idx);
 	}
+	if (tf_embedded_font_missing(mc, font_id)) {
+		*out_result = 0.0;
+		return 1;
+	}
 	// Check for leading override from setTextFormat/setNewTextFormat
 	ActionVar* leading_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_leading", 11);
 	if (leading_prop != NULL && leading_prop->type == ACTION_STACK_VALUE_F64) {
@@ -56299,6 +56307,26 @@ static int getLetterSpacingTwips(MovieClip* mc)
 			return (int)(ls * 20.0); // pixels to twips
 	}
 	return 0;
+}
+
+// 1 when TextFormat `fmt` carries `name` (bold / italic) as boolean true.
+static int tf_fmt_flag_set(ASObject* fmt, const char* name, u32 name_len)
+{
+	ActionVar* v = fmt ? getProperty(fmt, name, name_len) : NULL;
+	return (v != NULL && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value != 0);
+}
+
+// Flash: an embedFonts field whose font resolves to no embedded DefineFont2/3
+// (TextFormat.font names nothing the SWF embeds, or the createTextField
+// default) measures and draws nothing; it does NOT fall back to a device
+// font (fonts/embed_name_lookup: 63 rows of textWidth 0). font_id is the
+// field's resolved font after the static-field fallback.
+static int tf_embedded_font_missing(MovieClip* mc, u16 font_id)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 0;
+	ActionVar* ef = getProperty((ASObject*)mc->dynamic_props, "embedFonts", 10);
+	if (!(ef && ef->type == ACTION_STACK_VALUE_BOOLEAN && ef->data.numeric_value)) return 0;
+	return !ng_isSwfEmbeddedFont(font_id);
 }
 
 // Set device font mode based on text field's embedFonts property.
@@ -56481,6 +56509,8 @@ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc, int skip_if
 			// embedFonts=true: check if we actually have font data
 			// font_id=0 means no DefineFont tag, just built-in fallback
 			if (_as_fid == 0 && mc->ng_textfield_idx == -2)
+				_as_embed_no_font = 1;
+			if (tf_embedded_font_missing(mc, _as_fid))
 				_as_embed_no_font = 1;
 		}
 	}
@@ -73342,7 +73372,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						char _font_name[128];
 						size_t _fn_len = u16_to_utf8(varGetU16Ptr(font_prop), font_prop->str_size, _font_name, sizeof(_font_name));
 						_font_name[_fn_len < 127 ? _fn_len : 127] = '\0';
-						u16 found_fid = ng_findFontIdByName(_font_name);
+						u16 found_fid = ng_resolveTextFormatFontId(_font_name,
+							tf_fmt_flag_set(fmt_obj, "bold", 4), tf_fmt_flag_set(fmt_obj, "italic", 6));
 						ActionVar fid_val = {0};
 						fid_val.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
@@ -73629,7 +73660,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					char _font_name[128];
 					size_t _fn_len = u16_to_utf8(varGetU16Ptr(font_prop), font_prop->str_size, _font_name, sizeof(_font_name));
 					_font_name[_fn_len < 127 ? _fn_len : 127] = '\0';
-					u16 found_fid = ng_findFontIdByName(_font_name);
+					u16 found_fid = ng_resolveTextFormatFontId(_font_name,
+						tf_fmt_flag_set(fmt_obj, "bold", 4), tf_fmt_flag_set(fmt_obj, "italic", 6));
 					ActionVar fid_val = {0};
 					fid_val.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &fid_val.data.numeric_value) = (double)found_fid;

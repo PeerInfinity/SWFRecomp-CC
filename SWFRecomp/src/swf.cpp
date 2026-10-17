@@ -67,6 +67,22 @@ static inline std::string charId(size_t id)
 	return "CHARID(" + std::to_string(id != 0 ? id + g_char_id_base : 0) + ")";
 }
 
+// C string-literal body for a font / export name emitted into tagInit.
+static std::string escapeFontNameForC(const std::string& s)
+{
+	std::string out;
+	for (char c : s) {
+		if (c == '\\') out += "\\\\";
+		else if (c == '"') out += "\\\"";
+		else if (c == '\n') out += "\\n";
+		else if (c == '\r') out += "\\r";
+		else if (c == '\t') out += "\\t";
+		else if (c == '?') out += "\\?";
+		else out += c;
+	}
+	return out;
+}
+
 // ---------------------------------------------------------------------------
 // Device font (Noto Sans) for headless glyph rendering
 // ---------------------------------------------------------------------------
@@ -3689,8 +3705,29 @@ namespace SWFRecomp
 			}
 
 			case SWF_TAG_DEFINE_FONT_INFO:
+			case SWF_TAG_DEFINE_FONT_INFO_2:
 			{
-				cur_pos += tag.length;
+				// FontID(UI16), FontNameLen(UI8), FontName — an additional
+				// embedded-font name for an already-defined font. A FontInfo
+				// for a character id not yet defined is ignored (Flash;
+				// fonts/embed_name_lookup BS-BX, CO). The runtime registers
+				// it with the font's DefineFont2 style flags, not FontInfo's.
+				char* info_end = cur_pos + tag.length;
+				if (tag.length >= 3)
+				{
+					u16 info_font_id = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+					u8 info_name_len = (u8)cur_pos[2];
+					if (3 + (size_t)info_name_len <= tag.length && font_em_square.count(info_font_id))
+					{
+						std::string info_name(cur_pos + 3, info_name_len);
+						while (!info_name.empty() && info_name.back() == '\0')
+							info_name.pop_back();
+						tag_init << endl << "\ttagRegisterFontName(app_context, "
+						         << charId(info_font_id) << ", \""
+						         << escapeFontNameForC(info_name) << "\");";
+					}
+				}
+				cur_pos = info_end;
 
 				break;
 			}
@@ -5214,6 +5251,16 @@ namespace SWFRecomp
 					cur_pos += export_name.length() + 1;  // +1 for null terminator
 					// Emit registration call in tagInit
 					tag_init << endl << "\ttagRegisterExport(app_context, \"" << export_name << "\", " << charId(export_char_id) << ");";
+					// Embedded-font name registry: an export name wins over
+					// every font name, and an export of a non-font hides the
+					// name. An export of a not-yet-defined id is ignored.
+					if (defined_chars.count(export_char_id) || font_em_square.count(export_char_id))
+					{
+						tag_init << endl << "\ttagRegisterFontExport(app_context, \""
+						         << escapeFontNameForC(export_name) << "\", "
+						         << charId(export_char_id) << ", "
+						         << (font_em_square.count(export_char_id) ? "1" : "0") << ");";
+					}
 				}
 				break;
 			}

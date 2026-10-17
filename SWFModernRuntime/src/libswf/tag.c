@@ -13516,6 +13516,8 @@ DisplayObject* findDisplayObjectByName(const char* name)
 void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
 {
 	ng_record_font(app_context, font_id, name, bold, italic);
+	// A DefineFont2/3's own name is its first embedded-font name.
+	ng_register_swf_font(font_id, name, bold, italic);
 }
 
 void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,

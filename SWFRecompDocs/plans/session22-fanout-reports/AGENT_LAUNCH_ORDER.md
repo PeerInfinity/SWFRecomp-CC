@@ -41,7 +41,7 @@ Baseline: trace 4476 eff / 4551 (results `846adcc6b`, run on `4c450f076`); pixel
 | w2-strbuf | w1-trace-tail B | bug_483783 (runtime_error -> pass) | session_01NLFHMLUtdLyVm8z4tkEcfq — LANDED |
 | w2-geom-port | w1-drift-avm1 S3 | point, rectangle, matrix, Rectangle-v8, Matrix-v6..v8 | session_019oWz76tcX3D7afubJF3Wbg |
 | w2-avm2-stage-view | w1-pixel-catastrophic | pixelbender_effect_glassDisplace, displayobject_z | session_01Sv4zxmSzXYtd4doWuLve4R — LANDED (+3 incl. geom_transform) |
-| w2-font-registry | w1-trace-tail D | fonts/embed_name_lookup | session_01SKhEcTjpjxygKijBE1r4Dz |
+| w2-font-registry | w1-trace-tail D | fonts/embed_name_lookup | session_01SKhEcTjpjxygKijBE1r4Dz — LANDED |
 | w2-ei-provider | w1-trace-tail C | avm2/external_interface | session_0171KTbmxMRKzLEq2FKryiT6 — LANDED |
 | w2-atf-dxt5 | w1-pixel-catastrophic | stage3d_texture_bytearray_compressed_raw_alpha | session_01BCEB1oUi9rtAyWJhxtUX72 — LANDED |
 | w2-avm2-video-stamp | w1-pixel-catastrophic | visual/video/h264_multinalu | session_013tm6bjkHMY5ugv1wytug2c |

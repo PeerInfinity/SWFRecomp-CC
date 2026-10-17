@@ -1,0 +1,373 @@
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index b2dc4e535..29e8994ef 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -303,6 +303,14 @@ size_t ng_getSpriteByteSize(size_t char_id);
+ // Functions needed by action.c / tag.c in all build modes (NO_GRAPHICS, HEADLESS, GRAPHICS).
+ // Implementations live in tag_stubs.c (NO_GRAPHICS/HEADLESS) or swf.c stubs (GRAPHICS).
+ u16 ng_findFontIdByName(const char* name);
++// Embedded-font name registry (ng_shared.c): DefineFont2/3 own names,
++// DefineFontInfo/2 names and ExportAssets names, in tag order.
++void ng_register_swf_font(u16 font_id, const char* name, int bold, int italic);
++void tagRegisterFontName(SWFAppContext* app_context, u16 font_id, const char* name);
++void tagRegisterFontExport(SWFAppContext* app_context, const char* name, u16 char_id, int is_font);
++int ng_findEmbeddedFontId(const char* name, int bold, int italic, u16* out_id);
++u16 ng_resolveTextFormatFontId(const char* name, int bold, int italic);
++int ng_isSwfEmbeddedFont(u16 font_id);
+ void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
+     double width_px, double* out_ascent, double* out_descent,
+     double* out_width, double* out_height, double* out_tf_height, double* out_tf_width);
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 9ca237da6..280106350 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -22711,6 +22711,7 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
+ 	int* out_word_wrap, int* out_field_width_twips,
+ 	int* out_left_margin_twips, int* out_right_margin_twips, int* out_indent_twips);
+ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc, int skip_if_empty);
++static int tf_embedded_font_missing(MovieClip* mc, u16 font_id);
+ 
+ // Forward declarations for HTML text format run system
+ typedef struct TFRun_s {
+@@ -23070,7 +23071,7 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
+ 			setProperty(app_context, props, "_tf_letterSpacing", 17, &ls_val);
+ 		}
+ 		if (first_run->font_name[0] != '\0') {
+-			u16 found_fid = ng_findFontIdByName(first_run->font_name);
++			u16 found_fid = ng_resolveTextFormatFontId(first_run->font_name, first_run->bold, first_run->italic);
+ 			ActionVar fid_val = {0};
+ 			fid_val.type = ACTION_STACK_VALUE_F64;
+ 			VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+@@ -29569,6 +29570,9 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				}
+ 			}
+ 		}
++		// An embedFonts field whose font the SWF does not embed draws no
++		// glyphs (Flash; fonts/embed_matching/no_font_found's golden is blank).
++		if (tf_embedded_font_missing(mc, font_id)) continue;
+ 
+ 		// Get text color (fallback when no run table or run color missing)
+ 		u32 text_color = 0x000000;
+@@ -54722,7 +54726,7 @@ void actionSetMember(SWFAppContext* app_context)
+ 						}
+ 						// Sync font name -> font_id
+ 						if (first_run->font_name[0] != '\0') {
+-							u16 found_fid = ng_findFontIdByName(first_run->font_name);
++							u16 found_fid = ng_resolveTextFormatFontId(first_run->font_name, first_run->bold, first_run->italic);
+ 							ActionVar fid_val = {0};
+ 							fid_val.type = ACTION_STACK_VALUE_F64;
+ 							VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+@@ -56001,6 +56005,10 @@ static __attribute__((noinline)) int computeTextFieldDimension(
+ 	if (font_id == 0 && mc->ng_textfield_idx >= 0) {
+ 		font_id = ng_getTextFieldFontId(mc->ng_textfield_idx);
+ 	}
++	if (tf_embedded_font_missing(mc, font_id)) {
++		*out_result = 0.0;
++		return 1;
++	}
+ 	// Check for leading override from setTextFormat/setNewTextFormat
+ 	ActionVar* leading_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_leading", 11);
+ 	if (leading_prop != NULL && leading_prop->type == ACTION_STACK_VALUE_F64) {
+@@ -56155,6 +56163,26 @@ static int getLetterSpacingTwips(MovieClip* mc)
+ 	return 0;
+ }
+ 
++// 1 when TextFormat `fmt` carries `name` (bold / italic) as boolean true.
++static int tf_fmt_flag_set(ASObject* fmt, const char* name, u32 name_len)
++{
++	ActionVar* v = fmt ? getProperty(fmt, name, name_len) : NULL;
++	return (v != NULL && v->type == ACTION_STACK_VALUE_BOOLEAN && v->data.numeric_value != 0);
++}
++
++// Flash: an embedFonts field whose font resolves to no embedded DefineFont2/3
++// (TextFormat.font names nothing the SWF embeds, or the createTextField
++// default) measures and draws nothing; it does NOT fall back to a device
++// font (fonts/embed_name_lookup: 63 rows of textWidth 0). font_id is the
++// field's resolved font after the static-field fallback.
++static int tf_embedded_font_missing(MovieClip* mc, u16 font_id)
++{
++	if (mc == NULL || mc->dynamic_props == NULL) return 0;
++	ActionVar* ef = getProperty((ASObject*)mc->dynamic_props, "embedFonts", 10);
++	if (!(ef && ef->type == ACTION_STACK_VALUE_BOOLEAN && ef->data.numeric_value)) return 0;
++	return !ng_isSwfEmbeddedFont(font_id);
++}
++
+ // Set device font mode based on text field's embedFonts property.
+ // Device fonts (embedFonts=false) round per-glyph advances to pixel boundaries.
+ static void setDeviceFontModeForMC(MovieClip* mc)
+@@ -56336,6 +56364,8 @@ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc, int skip_if
+ 			// font_id=0 means no DefineFont tag, just built-in fallback
+ 			if (_as_fid == 0 && mc->ng_textfield_idx == -2)
+ 				_as_embed_no_font = 1;
++			if (tf_embedded_font_missing(mc, _as_fid))
++				_as_embed_no_font = 1;
+ 		}
+ 	}
+ 
+@@ -73186,7 +73216,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 						char _font_name[128];
+ 						size_t _fn_len = u16_to_utf8(varGetU16Ptr(font_prop), font_prop->str_size, _font_name, sizeof(_font_name));
+ 						_font_name[_fn_len < 127 ? _fn_len : 127] = '\0';
+-						u16 found_fid = ng_findFontIdByName(_font_name);
++						u16 found_fid = ng_resolveTextFormatFontId(_font_name,
++							tf_fmt_flag_set(fmt_obj, "bold", 4), tf_fmt_flag_set(fmt_obj, "italic", 6));
+ 						ActionVar fid_val = {0};
+ 						fid_val.type = ACTION_STACK_VALUE_F64;
+ 						VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+@@ -73473,7 +73504,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					char _font_name[128];
+ 					size_t _fn_len = u16_to_utf8(varGetU16Ptr(font_prop), font_prop->str_size, _font_name, sizeof(_font_name));
+ 					_font_name[_fn_len < 127 ? _fn_len : 127] = '\0';
+-					u16 found_fid = ng_findFontIdByName(_font_name);
++					u16 found_fid = ng_resolveTextFormatFontId(_font_name,
++						tf_fmt_flag_set(fmt_obj, "bold", 4), tf_fmt_flag_set(fmt_obj, "italic", 6));
+ 					ActionVar fid_val = {0};
+ 					fid_val.type = ACTION_STACK_VALUE_F64;
+ 					VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+diff --git a/SWFModernRuntime/src/libswf/ng_shared.c b/SWFModernRuntime/src/libswf/ng_shared.c
+index 8030ac0f2..8e06040aa 100644
+--- a/SWFModernRuntime/src/libswf/ng_shared.c
++++ b/SWFModernRuntime/src/libswf/ng_shared.c
+@@ -678,6 +678,142 @@ u16 ng_findFontIdByName(const char* name)
+ 	return 0;
+ }
+ 
++// ---------------------------------------------------------------------------
++// Embedded-font name registry (Flash's TextFormat.font → embedded font lookup)
++// ---------------------------------------------------------------------------
++// Flash resolves a TextFormat font name against two tables, both fed in SWF
++// tag order (fonts/embed_name_lookup derives every rule; Ruffle
++// library.rs get_embedded_font_by_name / FontMap):
++//   1. ExportAssets names. An export name wins over every other name, and an
++//      export of a NON-font hides the name entirely.
++//   2. Font names: a DefineFont2/3's own name and every DefineFontInfo/2 name
++//      for an already-defined font, keyed on (name, bold, italic) with the
++//      font's DefineFont2 style flags (DefineFontInfo's own flags are ignored);
++//      the first registration of a key wins. DefineFontName never registers.
++// The recompiler drops FontInfo / Export events whose character id is not yet
++// defined, which is what Flash does. Lookup is case-insensitive.
++#define MAX_FONT_NAMES_NG 256
++static struct { char name[128]; u16 font_id; u8 bold; u8 italic; } ng_font_names[MAX_FONT_NAMES_NG];
++static size_t ng_font_name_count = 0;
++#define MAX_FONT_EXPORTS_NG 256
++static struct { char name[128]; u16 char_id; u8 is_font; } ng_font_exports[MAX_FONT_EXPORTS_NG];
++static size_t ng_font_export_count = 0;
++
++static void ng_add_font_name(u16 font_id, const char* name, int bold, int italic)
++{
++	if (name == NULL || name[0] == '\0') return;
++	for (size_t i = 0; i < ng_font_name_count; i++) {
++		if (ng_font_names[i].bold == (u8)(bold != 0) && ng_font_names[i].italic == (u8)(italic != 0) &&
++		    strcasecmp(ng_font_names[i].name, name) == 0)
++			return; // first registration wins
++	}
++	if (ng_font_name_count >= MAX_FONT_NAMES_NG) return;
++	size_t s = ng_font_name_count++;
++	strncpy(ng_font_names[s].name, name, sizeof(ng_font_names[s].name) - 1);
++	ng_font_names[s].name[sizeof(ng_font_names[s].name) - 1] = '\0';
++	ng_font_names[s].font_id = font_id;
++	ng_font_names[s].bold = (u8)(bold != 0);
++	ng_font_names[s].italic = (u8)(italic != 0);
++}
++
++// Character ids defined by a DefineFont2/3 (independent of ng_fonts' capacity).
++static u8 ng_swf_font_bits[65536 / 8];
++
++// DefineFont2/3 (via tagDefineFontInfo): the font's own name.
++void ng_register_swf_font(u16 font_id, const char* name, int bold, int italic)
++{
++	ng_swf_font_bits[font_id >> 3] |= (u8)(1u << (font_id & 7));
++	ng_add_font_name(font_id, name, bold, italic);
++}
++
++// DefineFontInfo / DefineFontInfo2: an additional name for an already-defined
++// font, registered with the font's DefineFont2 style (DefineFont v1 has none).
++void tagRegisterFontName(SWFAppContext* app_context, u16 font_id, const char* name)
++{
++	(void)app_context;
++	ng_add_font_name(font_id, name, ng_getFontBold(font_id), ng_getFontItalic(font_id));
++}
++
++// ExportAssets of an already-defined character: is_font says whether that
++// character is a font. Later exports of the same name replace earlier ones.
++void tagRegisterFontExport(SWFAppContext* app_context, const char* name, u16 char_id, int is_font)
++{
++	(void)app_context;
++	if (name == NULL || name[0] == '\0') return;
++	size_t s = ng_font_export_count;
++	for (size_t i = 0; i < ng_font_export_count; i++) {
++		if (strcasecmp(ng_font_exports[i].name, name) == 0) { s = i; break; }
++	}
++	if (s == ng_font_export_count) {
++		if (ng_font_export_count >= MAX_FONT_EXPORTS_NG) return;
++		ng_font_export_count++;
++	}
++	strncpy(ng_font_exports[s].name, name, sizeof(ng_font_exports[s].name) - 1);
++	ng_font_exports[s].name[sizeof(ng_font_exports[s].name) - 1] = '\0';
++	ng_font_exports[s].char_id = char_id;
++	ng_font_exports[s].is_font = (u8)(is_font != 0);
++}
++
++static int ng_font_name_get(const char* name, int bold, int italic, u16* out_id)
++{
++	for (size_t i = 0; i < ng_font_name_count; i++) {
++		if (ng_font_names[i].bold == (u8)bold && ng_font_names[i].italic == (u8)italic &&
++		    strcasecmp(ng_font_names[i].name, name) == 0) {
++			*out_id = ng_font_names[i].font_id;
++			return 1;
++		}
++	}
++	return 0;
++}
++
++// Resolve a TextFormat font name to an embedded font's character id.
++// Returns 1 and sets *out_id when found, 0 when the SWF embeds no such font.
++// Style fallback order is Ruffle's FontMap::find (tested by
++// fonts/embed_matching/fallback_preferences).
++int ng_findEmbeddedFontId(const char* name, int bold, int italic, u16* out_id)
++{
++	if (name == NULL || name[0] == '\0' || out_id == NULL) return 0;
++	bold = bold != 0; italic = italic != 0;
++	for (size_t i = 0; i < ng_font_export_count; i++) {
++		if (strcasecmp(ng_font_exports[i].name, name) == 0) {
++			if (!ng_font_exports[i].is_font) return 0;
++			*out_id = ng_font_exports[i].char_id;
++			return 1;
++		}
++	}
++	if (ng_font_name_get(name, bold, italic, out_id)) return 1;
++	if (bold ^ italic) {
++		if (ng_font_name_get(name, 1, 1, out_id)) return 1;
++		if (ng_font_name_get(name, 0, 0, out_id)) return 1;
++		if (ng_font_name_get(name, !bold, !italic, out_id)) return 1;
++	} else {
++		if (bold && italic && ng_font_name_get(name, 0, 0, out_id)) return 1;
++		if (ng_font_name_get(name, 1, 0, out_id)) return 1;
++		if (ng_font_name_get(name, 0, 1, out_id)) return 1;
++		if (!bold && !italic && ng_font_name_get(name, 1, 1, out_id)) return 1;
++	}
++	return 0;
++}
++
++// TextFormat font name → font id for the AVM1 TextField paths; 0 (the builtin
++// device font) when the SWF embeds no font of that name. The legacy
++// one-name-per-font scan is only consulted if the registry overflowed.
++u16 ng_resolveTextFormatFontId(const char* name, int bold, int italic)
++{
++	u16 id = 0;
++	if (ng_findEmbeddedFontId(name, bold, italic, &id)) return id;
++	if (ng_font_name_count >= MAX_FONT_NAMES_NG) return ng_findFontIdByName(name);
++	return 0;
++}
++
++// 1 when font_id names a font the SWF itself defined with DefineFont2/3, 0 for
++// the builtin device font (id 0), a DefineFont v1, or an id no DefineFont2/3
++// registered.
++int ng_isSwfEmbeddedFont(u16 font_id)
++{
++	return (ng_swf_font_bits[font_id >> 3] >> (font_id & 7)) & 1;
++}
++
+ // A device-font EditText (UseOutlines/embedFonts = false) renders with a host
+ // system font, never with the SWF's embedded outlines. Many SWFs embed a font
+ // (e.g. "Arial") with only the glyph subset used by their static text, then
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index b368fd92b..85fb0c849 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -13457,6 +13457,8 @@ DisplayObject* findDisplayObjectByName(const char* name)
+ void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
+ {
+ 	ng_record_font(app_context, font_id, name, bold, italic);
++	// A DefineFont2/3's own name is its first embedded-font name.
++	ng_register_swf_font(font_id, name, bold, italic);
+ }
+ 
+ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
+diff --git a/SWFRecomp/include/tag.hpp b/SWFRecomp/include/tag.hpp
+index 095b2a1d8..68c46663a 100644
+--- a/SWFRecomp/include/tag.hpp
++++ b/SWFRecomp/include/tag.hpp
+@@ -26,6 +26,7 @@ namespace SWFRecomp
+ 		SWF_TAG_DEFINE_EDIT_TEXT = 37,
+ 		SWF_TAG_DO_ACTION = 12,
+ 		SWF_TAG_DEFINE_FONT_INFO = 13,
++		SWF_TAG_DEFINE_FONT_INFO_2 = 62,
+ 		SWF_TAG_DEFINE_SHAPE_2 = 22,
+ 		SWF_TAG_REMOVE_OBJECT = 5,
+ 		SWF_TAG_DEFINE_BUTTON = 7,
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index 19fae1221..75820a549 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -65,6 +65,22 @@ static inline std::string charId(size_t id)
+ 	return "CHARID(" + std::to_string(id != 0 ? id + g_char_id_base : 0) + ")";
+ }
+ 
++// C string-literal body for a font / export name emitted into tagInit.
++static std::string escapeFontNameForC(const std::string& s)
++{
++	std::string out;
++	for (char c : s) {
++		if (c == '\\') out += "\\\\";
++		else if (c == '"') out += "\\\"";
++		else if (c == '\n') out += "\\n";
++		else if (c == '\r') out += "\\r";
++		else if (c == '\t') out += "\\t";
++		else if (c == '?') out += "\\?";
++		else out += c;
++	}
++	return out;
++}
++
+ // ---------------------------------------------------------------------------
+ // Device font (Noto Sans) for headless glyph rendering
+ // ---------------------------------------------------------------------------
+@@ -3634,8 +3650,29 @@ namespace SWFRecomp
+ 			}
+ 
+ 			case SWF_TAG_DEFINE_FONT_INFO:
++			case SWF_TAG_DEFINE_FONT_INFO_2:
+ 			{
+-				cur_pos += tag.length;
++				// FontID(UI16), FontNameLen(UI8), FontName — an additional
++				// embedded-font name for an already-defined font. A FontInfo
++				// for a character id not yet defined is ignored (Flash;
++				// fonts/embed_name_lookup BS-BX, CO). The runtime registers
++				// it with the font's DefineFont2 style flags, not FontInfo's.
++				char* info_end = cur_pos + tag.length;
++				if (tag.length >= 3)
++				{
++					u16 info_font_id = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
++					u8 info_name_len = (u8)cur_pos[2];
++					if (3 + (size_t)info_name_len <= tag.length && font_em_square.count(info_font_id))
++					{
++						std::string info_name(cur_pos + 3, info_name_len);
++						while (!info_name.empty() && info_name.back() == '\0')
++							info_name.pop_back();
++						tag_init << endl << "\ttagRegisterFontName(app_context, "
++						         << charId(info_font_id) << ", \""
++						         << escapeFontNameForC(info_name) << "\");";
++					}
++				}
++				cur_pos = info_end;
+ 
+ 				break;
+ 			}
+@@ -5147,6 +5184,16 @@ namespace SWFRecomp
+ 					cur_pos += export_name.length() + 1;  // +1 for null terminator
+ 					// Emit registration call in tagInit
+ 					tag_init << endl << "\ttagRegisterExport(app_context, \"" << export_name << "\", " << charId(export_char_id) << ");";
++					// Embedded-font name registry: an export name wins over
++					// every font name, and an export of a non-font hides the
++					// name. An export of a not-yet-defined id is ignored.
++					if (defined_chars.count(export_char_id) || font_em_square.count(export_char_id))
++					{
++						tag_init << endl << "\ttagRegisterFontExport(app_context, \""
++						         << escapeFontNameForC(export_name) << "\", "
++						         << charId(export_char_id) << ", "
++						         << (font_em_square.count(export_char_id) ? "1" : "0") << ");";
++					}
+ 				}
+ 				break;
+ 			}
