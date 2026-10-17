@@ -1,0 +1,534 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_cpu_raster.h b/SWFModernRuntime/include/avm2/avm2_cpu_raster.h
+index 9f8c7a70e..9844d9ce2 100644
+--- a/SWFModernRuntime/include/avm2/avm2_cpu_raster.h
++++ b/SWFModernRuntime/include/avm2/avm2_cpu_raster.h
+@@ -22,6 +22,11 @@
+ // byte 0x00 -> solid via colour index), and gradients (0x10 linear / 0x12
+ // radial / 0x13 focal, pad/reflect/repeat). Bitmap fills (0x40-0x43) and masks
+ // (clip_depth, T7) are skipped.
++// 4x-sample anti-aliasing for the shape / tris / morph entry points below.
++// Off by default; BitmapData.draw() turns it on around its source walk.
++// Returns the previous setting.
++int avm2_cpu_raster_set_aa(int on);
++
+ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
+                            uint32_t vert_offset, uint32_t vert_count,
+                            double wa, double wb, double wc, double wd,
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index f7cd4b04d..24989b149 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -401,6 +401,9 @@ void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, flo
+ void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
+ void render_webgpu_draw_gradient_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, u8 gradient_type, u8 spread_mode, u8 interpolation, float focal_ratio, const u8* gradient_ramp, const float* gradient_matrix, u32 transform_id, u32 cxform_id);
+ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* context, const uint32_t* argb_pixels, u32 bmp_width, u32 bmp_height, float x_twips, float y_twips, u32 transform_id, u32 cxform_id);
++// Raise the dynamic-source limit to fit (src_w x src_h); 0 when the device
++// cannot (logged once). See render_webgpu.c.
++int render_webgpu_fit_dynamic_bitmap(WebGPURenderContext* ctx, u32 src_w, u32 src_h);
+ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* context, const uint32_t* argb_pixels, u32 src_w, u32 src_h, u32 dst_w, u32 dst_h, float x_twips, float y_twips, u32 transform_id, u32 cxform_id);
+ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, const uint32_t* argb_pixels, u32 src_w, u32 src_h, const float* user_matrix6, int repeat, int smooth, u32 transform_id, u32 cxform_id);
+ void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index c718aa1d1..220c493b2 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -27,6 +27,7 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_draw_bitmap_quad(ctx, px, w, h, x, y, t, c) render_webgpu_draw_bitmap_quad(ctx, px, w, h, x, y, t, c)
+ #define renderer_draw_bitmap_quad_scaled(ctx, px, sw, sh, dw, dh, x, y, t, c) render_webgpu_draw_bitmap_quad_scaled(ctx, px, sw, sh, dw, dh, x, y, t, c)
+ #define renderer_draw_bitmap_tris(ctx, v, n, px, sw, sh, m, rep, smo, t, c) render_webgpu_draw_bitmap_tris(ctx, v, n, px, sw, sh, m, rep, smo, t, c)
++#define renderer_fit_dynamic_bitmap(ctx, w, h) render_webgpu_fit_dynamic_bitmap(ctx, w, h)
+ #define renderer_begin_clip_mask(ctx)              render_webgpu_begin_clip_mask(ctx)
+ #define renderer_end_clip_mask(ctx)                render_webgpu_end_clip_mask(ctx)
+ #define renderer_end_clip(ctx)                     render_webgpu_end_clip(ctx)
+@@ -93,6 +94,7 @@ typedef FlashbangContext RenderContext;
+ #define renderer_draw_bitmap_quad(ctx, px, w, h, x, y, t, c) ((void)0)
+ #define renderer_draw_bitmap_quad_scaled(ctx, px, sw, sh, dw, dh, x, y, t, c) ((void)0)
+ #define renderer_draw_bitmap_tris(ctx, v, n, px, sw, sh, m, rep, smo, t, c) ((void)0)
++#define renderer_fit_dynamic_bitmap(ctx, w, h) (0)
+ #define renderer_begin_clip_mask(ctx)              ((void)0)
+ #define renderer_end_clip_mask(ctx)                ((void)0)
+ #define renderer_end_clip(ctx)                     ((void)0)
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index c9d1c758f..c0c76be17 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2804,8 +2804,12 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 	// the draw matrix's pixel translation (mtx,mty) is scaled to twips.
+ 	if (shape_src != NULL)
+ 	{
++		// Flash anti-aliases vector draw() whatever the stage quality (see
++		// avm2_cpu_raster.c "4x-sample anti-aliasing").
++		int prev_aa = avm2_cpu_raster_set_aa(1);
+ 		bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
+ 		                   mtx * 20.0, mty * 20.0, 1.0, 0);
++		avm2_cpu_raster_set_aa(prev_aa);
+ 		bd_clip_end(dst, clip_snap, clip_px);
+ 		return avm2_undefined();
+ 	}
+diff --git a/SWFModernRuntime/src/avm2/avm2_cpu_raster.c b/SWFModernRuntime/src/avm2/avm2_cpu_raster.c
+index f6a5f7381..42e79c7d3 100644
+--- a/SWFModernRuntime/src/avm2/avm2_cpu_raster.c
++++ b/SWFModernRuntime/src/avm2/avm2_cpu_raster.c
+@@ -25,6 +25,7 @@
+ #include <stdint.h>
+ #include <stddef.h>
+ #include <math.h>
++#include <stdlib.h>
+ 
+ #include "avm2/avm2_cpu_raster.h"
+ 
+@@ -258,10 +259,225 @@ static uint32_t grad_sample_ramp(const uint8_t* ramp, double t, int linear_out)
+ 	return (ai << 24) | (ri << 16) | (gi << 8) | bi;
+ }
+ 
++// ---------------------------------------------------------------------------
++// 4x-sample anti-aliasing for BitmapData.draw().
++//
++// Flash anti-aliases a vector draw() even at stage quality LOW (the
++// from_shumway/acid/acid-bitmap-draw_quality_{high,low} goldens are
++// md5-identical, and Ruffle marks `_low` known_failure for exactly this).
++// Ruffle's draw() goes through its GPU pipeline at 4x MSAA, so this is a CPU
++// MSAA: each entry point (one shape / one Graphics fill or stroke path / one
++// morph) rasterises into a 4-sample plane covering its own bounding box,
++// seeded from the target, and resolves it back once. Coverage is decided per
++// sample at the standard Vulkan/D3D 4x positions (the same table the Stage3D
++// CPU rasteriser uses, avm2_stage3d.c S3D_SAMPLE_XY); shading stays at the
++// pixel centre, as a GPU does without sample-rate shading. Per-call planes keep
++// triangles of ONE shape seamless (no conflation across its own tessellation),
++// while separate shapes composite one after another, as Flash's do.
++// Off by default: only bd_draw turns it on, so the AVM2_CPU_DUMP frame path
++// and every other caller are byte-unchanged.
++// ---------------------------------------------------------------------------
++
++static int g_cpu_aa = 0;
++
++int avm2_cpu_raster_set_aa(int on)
++{
++	int prev = g_cpu_aa;
++	g_cpu_aa = on != 0;
++	return prev;
++}
++
++static const double CPU_AA_XY[4][2] = {
++	{ 0.375, 0.125 }, { 0.875, 0.375 },
++	{ 0.125, 0.625 }, { 0.625, 0.875 },
++};
++
++// The open sample plane: (sw x sh x 4) premultiplied samples whose (0,0) is
++// target pixel (sx_org, sy_org) of `buf`. raster_tri routes into it when its
++// target is `buf`.
++static struct {
++	uint32_t* samples;
++	uint32_t* buf;
++	int W, sx_org, sy_org, sw, sh;
++} g_aa_plane;
++
++// Open the sample plane for device-pixel bounds [x0,x1) x [y0,y1) (clamped to
++// the target). Leaves it closed (aliased path) when AA is off, the box is
++// empty, or the allocation fails.
++static void cpu_aa_begin(uint32_t* buf, int W, int H,
++                         double x0, double y0, double x1, double y1)
++{
++	g_aa_plane.samples = NULL;
++	if (!g_cpu_aa) return;
++	// Clamp in double first: a huge or non-finite transform must not reach an
++	// int conversion (NaN fails every comparison and is caught by the last test).
++	if (x0 < 0.0) x0 = 0.0;
++	if (y0 < 0.0) y0 = 0.0;
++	if (x1 > (double) W) x1 = (double) W;
++	if (y1 > (double) H) y1 = (double) H;
++	if (!(x1 > x0 && y1 > y0)) return;
++	int ix0 = (int) floor(x0), iy0 = (int) floor(y0);
++	int ix1 = (int) ceil(x1), iy1 = (int) ceil(y1);
++	if (ix1 <= ix0 || iy1 <= iy0) return;
++	int sw = ix1 - ix0, sh = iy1 - iy0;
++	uint32_t* p = (uint32_t*) malloc((size_t) sw * (size_t) sh * 4 * sizeof(uint32_t));
++	if (p == NULL) return;
++	for (int y = 0; y < sh; y++)
++	{
++		const uint32_t* row = buf + (size_t) (iy0 + y) * W + ix0;
++		uint32_t* srow = p + (size_t) y * sw * 4;
++		for (int x = 0; x < sw; x++)
++			srow[4 * x] = srow[4 * x + 1] = srow[4 * x + 2] = srow[4 * x + 3] = row[x];
++	}
++	g_aa_plane.samples = p;
++	g_aa_plane.buf = buf;
++	g_aa_plane.W = W;
++	g_aa_plane.sx_org = ix0;
++	g_aa_plane.sy_org = iy0;
++	g_aa_plane.sw = sw;
++	g_aa_plane.sh = sh;
++}
++
++// Resolve: per channel, the rounded mean of the 4 samples. A pixel no triangle
++// touched has 4 equal samples, so it is written back unchanged.
++static void cpu_aa_end(void)
++{
++	if (g_aa_plane.samples == NULL) return;
++	for (int y = 0; y < g_aa_plane.sh; y++)
++	{
++		uint32_t* row = g_aa_plane.buf + (size_t) (g_aa_plane.sy_org + y) * g_aa_plane.W
++		              + g_aa_plane.sx_org;
++		const uint32_t* srow = g_aa_plane.samples + (size_t) y * g_aa_plane.sw * 4;
++		for (int x = 0; x < g_aa_plane.sw; x++)
++		{
++			const uint32_t* q = srow + 4 * x;
++			if (q[0] == q[1] && q[0] == q[2] && q[0] == q[3])
++			{
++				row[x] = q[0];
++				continue;
++			}
++			uint32_t out = 0;
++			for (int sh = 0; sh < 32; sh += 8)
++			{
++				uint32_t sum = ((q[0] >> sh) & 0xFF) + ((q[1] >> sh) & 0xFF)
++				             + ((q[2] >> sh) & 0xFF) + ((q[3] >> sh) & 0xFF);
++				out |= ((sum + 2) >> 2) << sh;
++			}
++			row[x] = out;
++		}
++	}
++	free(g_aa_plane.samples);
++	g_aa_plane.samples = NULL;
++}
++
++static inline void cpu_aa_grow_pt(double b[4], double x, double y)
++{
++	if (x < b[0]) b[0] = x;
++	if (y < b[1]) b[1] = y;
++	if (x > b[2]) b[2] = x;
++	if (y > b[3]) b[3] = y;
++}
++
++// Edge ownership for a sample exactly ON an edge: the edge vector (in the
++// sign-normalised winding) decides, antisymmetrically, so of two triangles
++// sharing an edge exactly one covers the sample — no double blend of a
++// translucent fill along its own tessellation.
++static inline int cpu_aa_edge_owns(double ex, double ey)
++{
++	return ey > 0.0 || (ey == 0.0 && ex > 0.0);
++}
++
++static void raster_tri_aa(RasterCtx* R,
++                          double ax, double ay, double bx, double by,
++                          double cx, double cy)
++{
++	double tx_min = ax < bx ? ax : bx; if (cx < tx_min) tx_min = cx;
++	double tx_max = ax > bx ? ax : bx; if (cx > tx_max) tx_max = cx;
++	double ty_min = ay < by ? ay : by; if (cy < ty_min) ty_min = cy;
++	double ty_max = ay > by ? ay : by; if (cy > ty_max) ty_max = cy;
++	int ox = g_aa_plane.sx_org, oy = g_aa_plane.sy_org, sw = g_aa_plane.sw;
++	double pxmax = (double) (ox + sw - 1), pymax = (double) (oy + g_aa_plane.sh - 1);
++	tx_min = fmax(floor(tx_min) - 1.0, (double) ox);
++	ty_min = fmax(floor(ty_min) - 1.0, (double) oy);
++	tx_max = fmin(ceil(tx_max), pxmax);
++	ty_max = fmin(ceil(ty_max), pymax);
++	if (!(tx_max >= tx_min && ty_max >= ty_min)) return;
++	int xlo = (int) tx_min, xhi = (int) tx_max;
++	int ylo = (int) ty_min, yhi = (int) ty_max;
++	double sgnd = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
++	if (sgnd == 0.0) return;
++	double abs_area = sgnd > 0 ? sgnd : -sgnd;
++	double sgn = sgnd > 0 ? 1.0 : -1.0;
++	double inv_area = 1.0 / abs_area;
++	int own0 = cpu_aa_edge_owns((bx - ax) * sgn, (by - ay) * sgn);
++	int own1 = cpu_aa_edge_owns((cx - bx) * sgn, (cy - by) * sgn);
++	int own2 = cpu_aa_edge_owns((ax - cx) * sgn, (ay - cy) * sgn);
++
++	for (int py = ylo; py <= yhi; py++)
++	{
++		uint32_t* srow = g_aa_plane.samples + (size_t) (py - oy) * sw * 4;
++		for (int px = xlo; px <= xhi; px++)
++		{
++			int mask = 0;
++			for (int s = 0; s < 4; s++)
++			{
++				double qx = (double) px + CPU_AA_XY[s][0];
++				double qy = (double) py + CPU_AA_XY[s][1];
++				double w0 = ((bx - ax) * (qy - ay) - (by - ay) * (qx - ax)) * sgn;
++				double w1 = ((cx - bx) * (qy - by) - (cy - by) * (qx - bx)) * sgn;
++				double w2 = ((ax - cx) * (qy - cy) - (ay - cy) * (qx - cx)) * sgn;
++				if (w0 < 0 || w1 < 0 || w2 < 0) continue;
++				if ((w0 == 0 && !own0) || (w1 == 0 && !own1) || (w2 == 0 && !own2))
++					continue;
++				mask |= 1 << s;
++			}
++			if (mask == 0) continue;
++
++			uint32_t straight;
++			if (!R->is_gradient)
++				straight = R->solid_argb;
++			else
++			{
++				// Shaded once at the pixel centre (extrapolated when the centre
++				// is outside the triangle), as the GPU's per-pixel fragment is.
++				double qx = (double) px + 0.5, qy = (double) py + 0.5;
++				double w0 = ((bx - ax) * (qy - ay) - (by - ay) * (qx - ax)) * sgn;
++				double w1 = ((cx - bx) * (qy - by) - (cy - by) * (qx - bx)) * sgn;
++				double w2 = ((ax - cx) * (qy - cy) - (ay - cy) * (qx - cx)) * sgn;
++				double aA = w1 * inv_area, aB = w2 * inv_area, aC = w0 * inv_area;
++				double sx = aA * R->sx0 + aB * R->sx1 + aC * R->sx2;
++				double sy = aA * R->sy0 + aB * R->sy1 + aC * R->sy2;
++				double gu = R->ia * sx + R->ic * sy + R->itx;
++				double gv = R->ib * sx + R->id * sy + R->ity;
++				double t = grad_t(R->style_type, gu, gv, R->focal_z, R->spread);
++				uint32_t sampled = R->ramp != NULL
++					? grad_sample_ramp(R->ramp, t, R->linear_out)
++					: grad_sample(R->style_id, t);
++				if (R->node_alpha < 0.999)
++				{
++					uint32_t sa = (uint32_t) (((sampled >> 24) & 0xFF)
++					                          * R->node_alpha + 0.5);
++					sampled = (sampled & 0x00FFFFFFu) | (sa << 24);
++				}
++				straight = sampled;
++			}
++			uint32_t pm = cpu_premul(straight);
++			uint32_t* q = srow + (size_t) (px - ox) * 4;
++			for (int s = 0; s < 4; s++)
++				if (mask & (1 << s)) q[s] = cpu_blend_over(q[s], pm);
++		}
++	}
++}
++
+ static void raster_tri(RasterCtx* R,
+                        double ax, double ay, double bx, double by,
+                        double cx, double cy)
+ {
++	if (g_aa_plane.samples != NULL && g_aa_plane.buf == R->buf)
++	{
++		raster_tri_aa(R, ax, ay, bx, by, cx, cy);
++		return;
++	}
+ 	uint32_t* buf = R->buf;
+ 	int W = R->W, H = R->H;
+ 	double tx_min = ax < bx ? ax : bx; if (cx < tx_min) tx_min = cx;
+@@ -337,6 +553,17 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
+ 
+ 	const uint32_t (*sd)[4] = cpu_shape_table();
+ 	const float (*cd)[4] = cpu_color_table();
++	if (g_cpu_aa)
++	{
++		double bb[4] = { 1e30, 1e30, -1e30, -1e30 };
++		for (uint32_t j = vert_offset; j < vert_offset + vert_count; j++)
++		{
++			double x = (double) bits_to_f(sd[j][0]), y = (double) bits_to_f(sd[j][1]);
++			double d[2] = { (wa * x + wc * y + wtx) / 20.0, (wb * x + wd * y + wty) / 20.0 };
++			cpu_aa_grow_pt(bb, d[0], d[1]);
++		}
++		cpu_aa_begin(buf, W, H, bb[0] - 1.0, bb[1] - 1.0, bb[2] + 1.0, bb[3] + 1.0);
++	}
+ 	for (uint32_t t = 0; t + 3 <= vert_count; t += 3)
+ 	{
+ 		uint32_t i0 = vert_offset + t;
+@@ -410,6 +637,7 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
+ 		}
+ 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
+ 	}
++	cpu_aa_end();
+ }
+ 
+ // T4 Part B — rasterize an explicit runtime triangle list with a fill
+@@ -451,6 +679,16 @@ void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
+ 		             | (f2b(fill->g) << 8) | f2b(fill->b);
+ 	}
+ 
++	if (g_cpu_aa)
++	{
++		double bb[4] = { 1e30, 1e30, -1e30, -1e30 };
++		for (uint32_t j = 0; j < vert_count; j++)
++		{
++			double x = xy_twips[j * 2], y = xy_twips[j * 2 + 1];
++			cpu_aa_grow_pt(bb, (wa * x + wc * y + wtx) / 20.0, (wb * x + wd * y + wty) / 20.0);
++		}
++		cpu_aa_begin(buf, W, H, bb[0] - 1.0, bb[1] - 1.0, bb[2] + 1.0, bb[3] + 1.0);
++	}
+ 	for (uint32_t t = 0; t + 3 <= vert_count; t += 3)
+ 	{
+ 		double sx[3], sy[3], dX[3], dY[3];
+@@ -468,6 +706,7 @@ void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
+ 		}
+ 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
+ 	}
++	cpu_aa_end();
+ }
+ 
+ // T6 — rasterize a DefineMorphShape at placement `ratio` (0..1). Each START
+@@ -495,6 +734,8 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
+ 	const float (*cd)[4] = cpu_color_table();
+ 	const float (*med)[2] = cpu_morph_end_shape_table();
+ 	const float (*mecd)[4] = cpu_morph_end_color_table();
++	// Rare in draw(): the plane simply spans the whole target.
++	cpu_aa_begin(buf, W, H, 0.0, 0.0, (double) W, (double) H);
+ 	for (uint32_t t = 0; t + 3 <= vert_count; t += 3)
+ 	{
+ 		uint32_t i0 = vert_offset + t;
+@@ -544,4 +785,5 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
+ 		R.solid_argb = (a_out << 24) | (cr << 16) | (cg << 8) | cb;
+ 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
+ 	}
++	cpu_aa_end();
+ }
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 99698ac98..e777cbbf8 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -18390,10 +18390,9 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
+ 	if (bd == NULL || bd->disposed || bd->pixels == NULL
+ 	    || bd->width == 0 || bd->height == 0)
+ 		return;
+-	// Honest failure: a BitmapData larger than the dynamic layer is skipped
+-	// (blank) rather than corrupting the texture / crashing.
+-	if (bd->width > context->dynamic_bitmap_max_w
+-	    || bd->height > context->dynamic_bitmap_max_h)
++	// A BitmapData larger than the dynamic layer raises it (up to the device
++	// limit; beyond that the renderer logs once and the node stays blank).
++	if (!renderer_fit_dynamic_bitmap(context, bd->width, bd->height))
+ 		return;
+ 
+ 	// Per-object world transform slot.
+@@ -18596,12 +18595,11 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
+ 			                            p->grad_type, p->grad_spread, p->grad_interp,
+ 			                            p->grad_focal, p->grad_ramp, p->grad_fwd16,
+ 			                            xid, cxid);
+-		// Honest failure: a source larger than the dynamic bitmap layer would
+-		// corrupt the texture, so it is skipped (blank) — the same guard
+-		// avm2_render_bitmap applies to a Bitmap node.
++		// A source larger than the dynamic bitmap layer raises it, as for a
++		// Bitmap node (avm2_render_bitmap); only a source past the device limit
++		// is skipped (logged once by the renderer).
+ 		else if (p->fill_kind == 3 && p->fill_vert_count >= 3 && p->bmp_px != NULL
+-		         && p->bmp_w <= context->dynamic_bitmap_max_w
+-		         && p->bmp_h <= context->dynamic_bitmap_max_h)
++		         && renderer_fit_dynamic_bitmap(context, p->bmp_w, p->bmp_h))
+ 			renderer_draw_bitmap_tris(context, p->fill_verts, p->fill_vert_count,
+ 			                          p->bmp_px, p->bmp_w, p->bmp_h,
+ 			                          p->bmp_matrix, p->bmp_repeat, p->bmp_smooth,
+@@ -18619,8 +18617,8 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
+ 				                            p->lsty.grad_ramp, p->lsty.grad_fwd16,
+ 				                            xid, cxid);
+ 			else if (p->lsty.kind == 3 && p->lsty.bmp_px != NULL
+-			         && p->lsty.bmp_w <= context->dynamic_bitmap_max_w
+-			         && p->lsty.bmp_h <= context->dynamic_bitmap_max_h)
++			         && renderer_fit_dynamic_bitmap(context, p->lsty.bmp_w,
++			                                        p->lsty.bmp_h))
+ 				renderer_draw_bitmap_tris(context, p->line_verts,
+ 				                          p->line_vert_count, p->lsty.bmp_px,
+ 				                          p->lsty.bmp_w, p->lsty.bmp_h,
+@@ -20352,8 +20350,9 @@ void avm2_render_init(Avm2Context* ctx)
+ 
+ 	// Dynamic bitmap-layer dims. The dynamic layer is sized to
+ 	// dynamic_bitmap_max_{w,h}+1 (render_webgpu init) and every runtime
+-	// BitmapData blits into it; larger BitmapData is skipped (blank) in
+-	// avm2_render_bitmap. Cover the whole stage AND every embedded bitmap
++	// BitmapData blits into it; a larger runtime BitmapData raises it on demand
++	// (render_webgpu_fit_dynamic_bitmap, up to the device limit), so this is
++	// the STARTING size only. Cover the whole stage AND every embedded bitmap
+ 	// character: an AVM2 movie that places a DefineBits* character directly
+ 	// seeds its BitmapData from that character (avm2_bitmap_seed_timeline),
+ 	// and those are routinely LARGER than the stage — from_shumway/acid's
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index e271a4b7c..69bdfe64d 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -1556,15 +1556,22 @@ static int dynamic_bitmap_acquire(WebGPURenderContext* ctx, u32 src_w, u32 src_h
+ 	}
+ 	u32 pi = BITMAP_STATIC_POOLS + d;
+ 	BitmapPool* p = &ctx->bitmap_pools[pi];
+-	if (p->used >= p->layers)
++	// render_webgpu_fit_dynamic_bitmap may have raised dynamic_bitmap_max since
++	// this pool was created, which changes the layer size of every pool whose
++	// nominal square it no longer clips; such a pool is reallocated at its new
++	// size (same reallocation path as growth, so draws already recorded this
++	// frame keep the old texture).
++	int resized = p->w != 0 && (p->w != pw || p->h != ph);
++	if (resized || p->used >= p->layers)
+ 	{
+-		if (p->w == 0) p->cap = dynamic_pool_cap(ctx, pw, ph);
+-		if (p->layers >= p->cap)
++		if (p->w == 0 || resized) p->cap = dynamic_pool_cap(ctx, pw, ph);
++		if (p->used >= p->cap)
+ 		{
+ 			dynamic_bitmap_capacity_hit(ctx, pi);
+ 			return 0;
+ 		}
+-		u32 want = p->layers ? p->layers * 2 : DYNAMIC_POOL_INITIAL_LAYERS;
++		u32 want = p->layers ? p->layers : DYNAMIC_POOL_INITIAL_LAYERS;
++		if (p->used >= want) want *= 2;
+ 		if (want > p->cap) want = p->cap;
+ 		// Layers used earlier this frame stay in the old texture (their draws
+ 		// were recorded against the old bind group); `used` keeps counting so
+@@ -1578,6 +1585,37 @@ static int dynamic_bitmap_acquire(WebGPURenderContext* ctx, u32 src_w, u32 src_h
+ 	return 1;
+ }
+ 
++// Make room for a (src_w x src_h) dynamic source: raise dynamic_bitmap_max to
++// cover it, up to the device's maxTextureDimension2D - 1. The cap used to be a
++// constant fixed at init (AVM2: max(stage, 256, largest embedded bitmap)), and
++// every larger runtime BitmapData was skipped SILENTLY — from_shumway/acid/
++// acid-bitmap-draw_quality_* drew a 512x512 BitmapData on a 256x256 stage and
++// rendered blank. Raising on demand sizes the dynamic pools to what is actually
++// drawn: a movie that never draws a larger source keeps its pools (and its
++// pixels) exactly as before. Returns 0 only when the source exceeds the device
++// limit, and logs that once (a drop must never be silent).
++int render_webgpu_fit_dynamic_bitmap(WebGPURenderContext* ctx, u32 src_w, u32 src_h)
++{
++	if (src_w <= ctx->dynamic_bitmap_max_w && src_h <= ctx->dynamic_bitmap_max_h)
++		return 1;
++	u32 dmax = ctx->max_texture_dimension_2d ? ctx->max_texture_dimension_2d - 1 : 8191;
++	if (src_w > dmax || src_h > dmax)
++	{
++		static int reported = 0;
++		if (!reported)
++		{
++			reported = 1;
++			render_texture_problem("[render] a %ux%u dynamic bitmap is larger than the GPU's "
++			                       "%u px texture limit and will not draw", src_w, src_h,
++			                       ctx->max_texture_dimension_2d);
++		}
++		return 0;
++	}
++	if (src_w > ctx->dynamic_bitmap_max_w) ctx->dynamic_bitmap_max_w = src_w;
++	if (src_h > ctx->dynamic_bitmap_max_h) ctx->dynamic_bitmap_max_h = src_h;
++	return 1;
++}
++
+ // Group static bitmaps into size-class pools, allocate them, upload every
+ // bitmap to its layer and publish the slot table. Called from
+ // render_webgpu_finalize_bitmaps (and defensively from open_pass).
+@@ -3339,7 +3377,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
+ {
+ 	if (!ctx->renderer_ok || argb_pixels == NULL) return;
+ 	if (src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0) return;
+-	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
++	if (!render_webgpu_fit_dynamic_bitmap(ctx, src_w, src_h)) return;
+ 	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
+ 
+ 	// Allocate a dynamic slot + a pool layer that fits the source.
+@@ -3500,7 +3538,7 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
+ {
+ 	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
+ 	if (argb_pixels == NULL || src_w == 0 || src_h == 0) return;
+-	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
++	if (!render_webgpu_fit_dynamic_bitmap(ctx, src_w, src_h)) return;
+ 	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
+ 		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
+ 	if (vertex_count == 0) return;
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 39e5e4014..ecad0a628 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -475,3 +475,13 @@ avm2/bitmapdata_draw_masks                  # draw(src) honours src.mask, tol 0
+ # zero-headroom row the brief named, is already a member above.)
+ # tier=1  (CI-passing once w2-glyph-subunit lands; zero headroom)
+ fonts/embed_matching/fallback_preferences   # AVM2 embedded + fallback glyphs 1 cmp
++# s22 w2-draw-bigcap-aa: a runtime BitmapData LARGER than max(stage, 256)
++# (512x512 on a 256x256 stage — the dynamic-bitmap cap used to drop it
++# silently, blank) drawn through CPU draw() with 4x-sample AA; CI-passing with
++# both. A move here is the cap or the draw() AA.
++# tier=1
++from_shumway/acid/acid-bitmap-draw_quality_high  # >stage BitmapData + draw() AA 1 cmp
++# draw() AA policy sentinel at quality = "low", tolerance 0: a Ruffle-rendered
++# (aliased) golden, so it FAILS while draw() anti-aliases at LOW as Flash does
++# (4 corner channels) and passes if draw() AA is gated off at LOW.
++avm2/bitmapdata_opaque                      # draw() AA at quality low, tol 0 1 cmp

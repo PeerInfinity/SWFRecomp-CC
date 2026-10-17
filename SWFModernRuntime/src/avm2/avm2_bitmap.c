@@ -2804,8 +2804,12 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	// the draw matrix's pixel translation (mtx,mty) is scaled to twips.
 	if (shape_src != NULL)
 	{
+		// Flash anti-aliases vector draw() whatever the stage quality (see
+		// avm2_cpu_raster.c "4x-sample anti-aliasing").
+		int prev_aa = avm2_cpu_raster_set_aa(1);
 		bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
 		                   mtx * 20.0, mty * 20.0, 1.0, 0);
+		avm2_cpu_raster_set_aa(prev_aa);
 		bd_clip_end(dst, clip_snap, clip_px);
 		return avm2_undefined();
 	}

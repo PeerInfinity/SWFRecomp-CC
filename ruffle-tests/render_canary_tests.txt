@@ -515,3 +515,13 @@ visual/simple_shapes/strokes/scale          # stroke width vs draw scale, 1 cmp
 # NetStream, so nothing else here can see that path move.
 # tier=1  (CI-passing once w2-avm2-video-stamp lands; tolerance 2, max diff 0)
 visual/video/h264_multinalu                 # AVM2 NetStream FLV H.264 video   1 cmp
+# s22 w2-draw-bigcap-aa: a runtime BitmapData LARGER than max(stage, 256)
+# (512x512 on a 256x256 stage — the dynamic-bitmap cap used to drop it
+# silently, blank) drawn through CPU draw() with 4x-sample AA; CI-passing with
+# both. A move here is the cap or the draw() AA.
+# tier=1
+from_shumway/acid/acid-bitmap-draw_quality_high  # >stage BitmapData + draw() AA 1 cmp
+# draw() AA policy sentinel at quality = "low", tolerance 0: a Ruffle-rendered
+# (aliased) golden, so it FAILS while draw() anti-aliases at LOW as Flash does
+# (4 corner channels) and passes if draw() AA is gated off at LOW.
+avm2/bitmapdata_opaque                      # draw() AA at quality low, tol 0 1 cmp

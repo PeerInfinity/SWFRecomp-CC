@@ -18470,10 +18470,9 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
 	if (bd == NULL || bd->disposed || bd->pixels == NULL
 	    || bd->width == 0 || bd->height == 0)
 		return;
-	// Honest failure: a BitmapData larger than the dynamic layer is skipped
-	// (blank) rather than corrupting the texture / crashing.
-	if (bd->width > context->dynamic_bitmap_max_w
-	    || bd->height > context->dynamic_bitmap_max_h)
+	// A BitmapData larger than the dynamic layer raises it (up to the device
+	// limit; beyond that the renderer logs once and the node stays blank).
+	if (!renderer_fit_dynamic_bitmap(context, bd->width, bd->height))
 		return;
 
 	// Per-object world transform slot.
@@ -18713,12 +18712,11 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 			                            p->grad_type, p->grad_spread, p->grad_interp,
 			                            p->grad_focal, p->grad_ramp, p->grad_fwd16,
 			                            xid, cxid);
-		// Honest failure: a source larger than the dynamic bitmap layer would
-		// corrupt the texture, so it is skipped (blank) — the same guard
-		// avm2_render_bitmap applies to a Bitmap node.
+		// A source larger than the dynamic bitmap layer raises it, as for a
+		// Bitmap node (avm2_render_bitmap); only a source past the device limit
+		// is skipped (logged once by the renderer).
 		else if (p->fill_kind == 3 && p->fill_vert_count >= 3 && p->bmp_px != NULL
-		         && p->bmp_w <= context->dynamic_bitmap_max_w
-		         && p->bmp_h <= context->dynamic_bitmap_max_h)
+		         && renderer_fit_dynamic_bitmap(context, p->bmp_w, p->bmp_h))
 			renderer_draw_bitmap_tris(context, p->fill_verts, p->fill_vert_count,
 			                          p->bmp_px, p->bmp_w, p->bmp_h,
 			                          p->bmp_matrix, p->bmp_repeat, p->bmp_smooth,
@@ -18736,8 +18734,8 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 				                            p->lsty.grad_ramp, p->lsty.grad_fwd16,
 				                            xid, cxid);
 			else if (p->lsty.kind == 3 && p->lsty.bmp_px != NULL
-			         && p->lsty.bmp_w <= context->dynamic_bitmap_max_w
-			         && p->lsty.bmp_h <= context->dynamic_bitmap_max_h)
+			         && renderer_fit_dynamic_bitmap(context, p->lsty.bmp_w,
+			                                        p->lsty.bmp_h))
 				renderer_draw_bitmap_tris(context, p->line_verts,
 				                          p->line_vert_count, p->lsty.bmp_px,
 				                          p->lsty.bmp_w, p->lsty.bmp_h,
@@ -20613,8 +20611,9 @@ void avm2_render_init(Avm2Context* ctx)
 
 	// Dynamic bitmap-layer dims. The dynamic layer is sized to
 	// dynamic_bitmap_max_{w,h}+1 (render_webgpu init) and every runtime
-	// BitmapData blits into it; larger BitmapData is skipped (blank) in
-	// avm2_render_bitmap. Cover the whole stage AND every embedded bitmap
+	// BitmapData blits into it; a larger runtime BitmapData raises it on demand
+	// (render_webgpu_fit_dynamic_bitmap, up to the device limit), so this is
+	// the STARTING size only. Cover the whole stage AND every embedded bitmap
 	// character: an AVM2 movie that places a DefineBits* character directly
 	// seeds its BitmapData from that character (avm2_bitmap_seed_timeline),
 	// and those are routinely LARGER than the stage — from_shumway/acid's

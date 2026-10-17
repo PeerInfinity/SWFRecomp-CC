@@ -645,3 +645,27 @@ Entered frame 6              (no line: frame 6's script skipped)
 `ruffle_matched`, a regression under rule 3 (KF test), so the SWF ≤ 9 arm was kept.
 
 **Decision**: match Flash. swf9, swf10 and swf11 all pass.
+
+## AVM2 `BitmapData.draw()` at stage quality LOW: Flash anti-aliases, Ruffle does not (pixel axis)
+
+**Tests (pixel axis, Ruffle-rendered goldens)**: `avm2/bitmapdata_opaque` (`quality = "low"`, tol 0: 4 channels,
+the four round-join corner pixels of a 2-px stroked rect, ours red 128 vs golden 255) and `avm2/blend_scroll`
+(`quality = "low"`, tol 0: 296 channels on the rims of two `drawCircle` fills drawn into an opaque BitmapData).
+Both were passes before session 22 and are fails after it, by decision.
+
+**Ruffle** draws `draw()` with the stage quality's sample count (LOW = 1, `render/src/quality.rs`), so its
+LOW goldens are aliased.
+
+**Flash** anti-aliases `draw()` at any stage quality. Evidence: the Shumway acid pair
+`from_shumway/acid/acid-bitmap-draw_quality_high` / `_quality_low` have **md5-identical, visibly AA'd Flash
+goldens**, and Ruffle marks `_low` `known_failure` with `FIXME Even on low quality, Flash uses antialiasing here`.
+There is no Flash render of the two tests above themselves, so the evidence for them is by mechanism, not by
+golden (an optional Flash capture of `bitmapdata_opaque` pixel (9,9) would settle it first-hand).
+
+**Ours** (session 22 `w2-draw-bigcap-aa`, CPU `draw()` 4x-sample AA): always anti-aliases, as Flash. The
+alternative (`session22-fanout-reports/w2-draw-bigcap-aa-qualitygate.patch`, AA off at LOW) would keep both
+rows passing and leave `_quality_low` failing — i.e. match Ruffle against Flash's own golden.
+
+**Decision**: match Flash (user ruling 2026-09-29). Net pixel effect: +3 (`acid-bitmap-draw_quality_high`,
+`_quality_low`, `acid-bitmapData-draw`) / −2 (the two rows above). The two rows stay visible fails; they are not
+added to an ignore list (a disposition, not an accepted diff).

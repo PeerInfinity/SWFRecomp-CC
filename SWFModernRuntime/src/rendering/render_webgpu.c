@@ -1556,15 +1556,22 @@ static int dynamic_bitmap_acquire(WebGPURenderContext* ctx, u32 src_w, u32 src_h
 	}
 	u32 pi = BITMAP_STATIC_POOLS + d;
 	BitmapPool* p = &ctx->bitmap_pools[pi];
-	if (p->used >= p->layers)
+	// render_webgpu_fit_dynamic_bitmap may have raised dynamic_bitmap_max since
+	// this pool was created, which changes the layer size of every pool whose
+	// nominal square it no longer clips; such a pool is reallocated at its new
+	// size (same reallocation path as growth, so draws already recorded this
+	// frame keep the old texture).
+	int resized = p->w != 0 && (p->w != pw || p->h != ph);
+	if (resized || p->used >= p->layers)
 	{
-		if (p->w == 0) p->cap = dynamic_pool_cap(ctx, pw, ph);
-		if (p->layers >= p->cap)
+		if (p->w == 0 || resized) p->cap = dynamic_pool_cap(ctx, pw, ph);
+		if (p->used >= p->cap)
 		{
 			dynamic_bitmap_capacity_hit(ctx, pi);
 			return 0;
 		}
-		u32 want = p->layers ? p->layers * 2 : DYNAMIC_POOL_INITIAL_LAYERS;
+		u32 want = p->layers ? p->layers : DYNAMIC_POOL_INITIAL_LAYERS;
+		if (p->used >= want) want *= 2;
 		if (want > p->cap) want = p->cap;
 		// Layers used earlier this frame stay in the old texture (their draws
 		// were recorded against the old bind group); `used` keeps counting so
@@ -1575,6 +1582,37 @@ static int dynamic_bitmap_acquire(WebGPURenderContext* ctx, u32 src_w, u32 src_h
 	*out_layer = p->used++;
 	*out_pool = pi;
 	*out_slot = ctx->dynamic_bitmap_base + ctx->dynamic_bitmap_used++;
+	return 1;
+}
+
+// Make room for a (src_w x src_h) dynamic source: raise dynamic_bitmap_max to
+// cover it, up to the device's maxTextureDimension2D - 1. The cap used to be a
+// constant fixed at init (AVM2: max(stage, 256, largest embedded bitmap)), and
+// every larger runtime BitmapData was skipped SILENTLY — from_shumway/acid/
+// acid-bitmap-draw_quality_* drew a 512x512 BitmapData on a 256x256 stage and
+// rendered blank. Raising on demand sizes the dynamic pools to what is actually
+// drawn: a movie that never draws a larger source keeps its pools (and its
+// pixels) exactly as before. Returns 0 only when the source exceeds the device
+// limit, and logs that once (a drop must never be silent).
+int render_webgpu_fit_dynamic_bitmap(WebGPURenderContext* ctx, u32 src_w, u32 src_h)
+{
+	if (src_w <= ctx->dynamic_bitmap_max_w && src_h <= ctx->dynamic_bitmap_max_h)
+		return 1;
+	u32 dmax = ctx->max_texture_dimension_2d ? ctx->max_texture_dimension_2d - 1 : 8191;
+	if (src_w > dmax || src_h > dmax)
+	{
+		static int reported = 0;
+		if (!reported)
+		{
+			reported = 1;
+			render_texture_problem("[render] a %ux%u dynamic bitmap is larger than the GPU's "
+			                       "%u px texture limit and will not draw", src_w, src_h,
+			                       ctx->max_texture_dimension_2d);
+		}
+		return 0;
+	}
+	if (src_w > ctx->dynamic_bitmap_max_w) ctx->dynamic_bitmap_max_w = src_w;
+	if (src_h > ctx->dynamic_bitmap_max_h) ctx->dynamic_bitmap_max_h = src_h;
 	return 1;
 }
 
@@ -3508,7 +3546,7 @@ void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
 {
 	if (!ctx->renderer_ok || argb_pixels == NULL) return;
 	if (src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0) return;
-	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
+	if (!render_webgpu_fit_dynamic_bitmap(ctx, src_w, src_h)) return;
 	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
 
 	// Allocate a dynamic slot + a pool layer that fits the source.
@@ -3669,7 +3707,7 @@ void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
 {
 	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
 	if (argb_pixels == NULL || src_w == 0 || src_h == 0) return;
-	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
+	if (!render_webgpu_fit_dynamic_bitmap(ctx, src_w, src_h)) return;
 	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
 		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
 	if (vertex_count == 0) return;
