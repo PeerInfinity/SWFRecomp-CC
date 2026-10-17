@@ -523,9 +523,94 @@ void appendDefaultFontOutlines(std::vector<DeviceFaceDef>& faces)
 	faces.push_back(std::move(fd));
 }
 
+// --- [default_fonts] ----------------------------------------------------------
+// Ruffle's test harness maps each DefaultFont to an ordered list of device
+// family names (tests/framework/src/options/font.rs DefaultFontsOptions ->
+// Player::set_default_font). The TOML key of each list and the name the
+// layout recognises for it (core/src/font.rs:102 DefaultFont::from_name).
+struct DefaultFontKey
+{
+	const char* toml_key;
+	const char* alias;
+};
+const DefaultFontKey DEFAULT_FONT_KEYS[] = {
+	{ "sans", "_sans" },
+	{ "serif", "_serif" },
+	{ "typewriter", "_typewriter" },
+	{ "japanese_gothic", "_\xE3\x82\xB4\xE3\x82\xB7\xE3\x83\x83\xE3\x82\xAF" },  // _ゴシック
+	{ "japanese_gothic_mono", "_\xE7\xAD\x89\xE5\xB9\x85" },                       // _等幅
+	{ "japanese_mincho", "_\xE6\x98\x8E\xE6\x9C\x9D" },                            // _明朝
+};
+const size_t DEFAULT_FONT_KEY_COUNT = sizeof(DEFAULT_FONT_KEYS) / sizeof(DEFAULT_FONT_KEYS[0]);
+
+// The family names listed under `[default_fonts] <toml_key>`, in order.
+std::vector<std::string> defaultFontFamilies(const toml::table& tbl, const char* toml_key)
+{
+	std::vector<std::string> names;
+	if (const toml::table* df = tbl["default_fonts"].as_table())
+	{
+		if (const toml::array* arr = (*df)[toml_key].as_array())
+		{
+			for (const auto& e : *arr)
+			{
+				std::string n = std::string(e.value_or(""));
+				if (!n.empty()) names.push_back(n);
+			}
+		}
+	}
+	return names;
+}
+
+// FontMap::find's bold/italic compatibility ladder (ruffle core/src/
+// library.rs:788-845), the same order the runtime's find_device_font_ladder
+// runs: exact; if bold XOR italic, bold-italic, regular, the other one; else
+// (bold-italic only) regular, then bold, italic, (regular only) bold-italic.
+// `has(b, i)` probes one style. Returns the index of the matching style in
+// {regular, bold, italic, bold-italic} order, or -1.
+template <typename Has>
+int styleLadder(bool bold, bool italic, Has has)
+{
+	auto idx = [](bool b, bool i) { return (b ? 1 : 0) + (i ? 2 : 0); };
+	if (has(bold, italic)) return idx(bold, italic);
+	if (bold != italic)
+	{
+		if (has(true, true)) return idx(true, true);
+		if (has(false, false)) return idx(false, false);
+		if (has(!bold, !italic)) return idx(!bold, !italic);
+		return -1;
+	}
+	if (bold && italic && has(false, false)) return idx(false, false);
+	if (has(true, false)) return idx(true, false);
+	if (has(false, true)) return idx(false, true);
+	if (!bold && !italic && has(true, true)) return idx(true, true);
+	return -1;
+}
+
+void collectDefaultFontAliases(const toml::table& tbl,
+                            const std::vector<DeviceFaceDef>& faces,
+                            std::vector<std::pair<std::string, size_t>>& aliases)
+{
+	for (size_t k = 0; k < DEFAULT_FONT_KEY_COUNT; k++)
+	{
+		for (const std::string& fam : defaultFontFamilies(tbl, DEFAULT_FONT_KEYS[k].toml_key))
+		{
+			for (size_t i = 0; i < faces.size(); i++)
+			{
+				if (!faces[i].hidden
+				    && strcasecmp(faces[i].family.c_str(), fam.c_str()) == 0)
+					aliases.push_back({ DEFAULT_FONT_KEYS[k].alias, i });
+			}
+		}
+	}
+}
+
 void emitDeviceFonts(std::ostream& out)
 {
 	std::vector<DeviceFaceDef> faces;
+	// [default_fonts]: extra rows named `_sans`/`_serif`/... that share a
+	// declared face's tables, so the runtime resolves a DefaultFont exactly
+	// like any other device family (avm2_text.c find_device_font_list).
+	std::vector<std::pair<std::string, size_t>> aliases;
 
 	toml::table tbl;
 	bool have_toml = false;
@@ -599,6 +684,8 @@ void emitDeviceFonts(std::ostream& out)
 			}
 		}
 
+		collectDefaultFontAliases(tbl, faces, aliases);
+
 		// Appended LAST so the font_sorts indices above stay valid.
 		if (const toml::table* po = tbl["player_options"].as_table())
 		{
@@ -654,11 +741,14 @@ void emitDeviceFonts(std::ostream& out)
 	if (!faces.empty())
 	{
 		out << "const Avm2FontData avm2_generated_device_fonts[] = {\n";
-		for (size_t i = 0; i < faces.size(); i++)
+		for (size_t row = 0; row < faces.size() + aliases.size(); row++)
 		{
+			size_t i = row < faces.size() ? row : aliases[row - faces.size()].second;
 			const DeviceFaceDef& fd = faces[i];
 			std::string n = std::to_string(i);
-			if (fd.hidden)
+			if (row >= faces.size())
+				out << "\t{ 0, \"" << cEsc(aliases[row - faces.size()].first) << "\", ";
+			else if (fd.hidden)
 				out << "\t{ 0, NULL, ";
 			else
 				out << "\t{ 0, \"" << cEsc(fd.family) << "\", ";
@@ -692,8 +782,86 @@ void emitDeviceFonts(std::ostream& out)
 	{
 		out << "const Avm2FontData avm2_generated_device_fonts[1];\n";
 	}
-	out << "const uint32_t avm2_generated_device_font_count = " << faces.size()
+	out << "const uint32_t avm2_generated_device_font_count = " << faces.size() + aliases.size()
 	    << ";\n\n";
+}
+
+std::string resolveTestDeviceFontPath(const std::string& name, bool bold, bool italic)
+{
+	toml::table tbl;
+	try
+	{
+		tbl = toml::parse_file("test.toml");
+	}
+	catch (...)
+	{
+		return "";
+	}
+
+	struct Face { std::string family, path; bool bold, italic; };
+	std::vector<Face> faces;
+	if (const toml::table* fonts = tbl["fonts"].as_table())
+	{
+		for (const auto& kv : *fonts)
+		{
+			const toml::table* ft = kv.second.as_table();
+			if (ft == NULL) continue;
+			Face f;
+			f.family = std::string((*ft)["family"].value_or(""));
+			f.path = std::string((*ft)["path"].value_or(""));
+			f.bold = (*ft)["bold"].value_or(false);
+			f.italic = (*ft)["italic"].value_or(false);
+			if (f.family.empty() || f.path.empty()) continue;
+			FILE* fp = fopen(f.path.c_str(), "rb");
+			if (fp == NULL) continue;
+			fclose(fp);
+			faces.push_back(f);
+		}
+	}
+	if (faces.empty()) return "";
+
+	auto find = [&](const std::string& family, bool b, bool i) -> const Face* {
+		for (const Face& f : faces)
+		{
+			if (f.bold == b && f.italic == i
+			    && strcasecmp(f.family.c_str(), family.c_str()) == 0)
+				return &f;
+		}
+		return NULL;
+	};
+	auto ladder = [&](const std::string& family) -> const Face* {
+		int s = styleLadder(bold, italic, [&](bool b, bool i) {
+			return find(family, b, i) != NULL;
+		});
+		return s < 0 ? NULL : find(family, (s & 1) != 0, (s & 2) != 0);
+	};
+
+	// layout.rs:573: a DefaultFont name (`_sans`, ...) goes straight to its
+	// list; any other name is first tried as a device family (layout.rs:589).
+	size_t cls = DEFAULT_FONT_KEY_COUNT;
+	for (size_t k = 0; k < DEFAULT_FONT_KEY_COUNT; k++)
+		if (name == DEFAULT_FONT_KEYS[k].alias) cls = k;
+	if (cls == DEFAULT_FONT_KEY_COUNT)
+	{
+		if (const Face* f = ladder(name)) return f->path;
+		// layout.rs:611-625: the well-known aliases, else Sans (like Flash).
+		if (name == "Times New Roman") cls = 1;
+		else if (name == "Arial") cls = 0;
+		else if (name == "Consolas" || name == "Courier" || name == "Courier New"
+		         || name == "NSimSun") cls = 2;
+		else if (name.find("Ming") != std::string::npos
+		         || name.find("\xE6\x98\x8E") != std::string::npos) cls = 5;  // 明
+		else cls = 0;
+	}
+
+	// library.rs:460 default_font: the first listed family with the exact
+	// style, then the first with a compatible one.
+	std::vector<std::string> fams = defaultFontFamilies(tbl, DEFAULT_FONT_KEYS[cls].toml_key);
+	for (const std::string& fam : fams)
+		if (const Face* f = find(fam, bold, italic)) return f->path;
+	for (const std::string& fam : fams)
+		if (const Face* f = ladder(fam)) return f->path;
+	return "";
 }
 
 }  // namespace abc

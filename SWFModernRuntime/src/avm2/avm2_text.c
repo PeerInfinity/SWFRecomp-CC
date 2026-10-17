@@ -2712,6 +2712,47 @@ static const Avm2FontData* find_device_font_list(const Avm2String* name,
 	return NULL;
 }
 
+// Ruffle layout.rs:604-625: the DefaultFont a device font list falls back to
+// when none of its names resolved, keyed on the FIRST (untrimmed) name: a
+// DefaultFont name itself, the well-known aliases, else Sans (like Flash).
+// Returns the `[default_fonts]` row for it, or NULL when the test declares
+// none (the caller then keeps the baked-in Noto).
+static const Avm2FontData* find_default_font_row(const Avm2String* name,
+                                                 int bold, int italic)
+{
+	if (avm2_generated_device_font_count == 0) return NULL;
+	const char* first = name != NULL ? name->utf8 : "";
+	uint32_t len = 0;
+	if (name != NULL)
+		while (len < name->len && first[len] != ',') len++;
+	const char* alias = "_sans";
+#define DF_IS(lit) (len == sizeof(lit) - 1 && memcmp(first, lit, len) == 0)
+	if (DF_IS("_sans") || DF_IS("_serif") || DF_IS("_typewriter")
+	    || DF_IS("_\xE3\x82\xB4\xE3\x82\xB7\xE3\x83\x83\xE3\x82\xAF")
+	    || DF_IS("_\xE7\xAD\x89\xE5\xB9\x85")
+	    || DF_IS("_\xE6\x98\x8E\xE6\x9C\x9D"))
+		return find_device_font_ladder(first, len, bold, italic);
+	if (DF_IS("Times New Roman"))
+		alias = "_serif";
+	else if (DF_IS("Consolas") || DF_IS("Courier") || DF_IS("Courier New")
+	         || DF_IS("NSimSun"))
+		alias = "_typewriter";
+	else
+	{
+		for (uint32_t i = 0; i < len; i++)
+		{
+			if ((i + 4 <= len && memcmp(first + i, "Ming", 4) == 0)
+			    || (i + 3 <= len && memcmp(first + i, "\xE6\x98\x8E", 3) == 0))
+			{
+				alias = "_\xE6\x98\x8E\xE6\x9C\x9D";
+				break;
+			}
+		}
+	}
+#undef DF_IS
+	return find_device_font_ladder(alias, (uint32_t) strlen(alias), bold, italic);
+}
+
 // Ruffle resolve_font: embedded lookup by name+bold+italic (only when the
 // field embeds fonts), else the device fallback.
 //
@@ -2783,6 +2824,24 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
 					                   fmt->italic != 0);
 				if (efd != NULL && efd->glyph_pts != NULL) f.outline = efd;
 			}
+			return f;
+		}
+	}
+	// layout.rs:604-635: a list that resolved nothing falls back to the
+	// DefaultFont its FIRST name maps to. The recompiler emits each
+	// test.toml `[default_fonts]` list as device rows named `_sans`/`_serif`/
+	// ... (abc_devicefont.cpp collectDefaultFontAliases), so this is an
+	// ordinary device probe. Device fields only, as below: an embedFonts field
+	// that matched nothing draws nothing in Flash.
+	if (et->device_font)
+	{
+		const Avm2FontData* fd = find_default_font_row(fmt->font, fmt->bold != 0,
+		                                               fmt->italic != 0);
+		if (fd != NULL)
+		{
+			f.data = fd;
+			f.is_device = 1;
+			f.outline = NULL;
 			return f;
 		}
 	}

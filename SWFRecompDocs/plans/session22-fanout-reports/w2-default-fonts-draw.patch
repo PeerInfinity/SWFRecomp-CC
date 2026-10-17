@@ -1,0 +1,918 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 0624522ca..24991caff 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -29331,6 +29331,15 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				if (_pidx >= 0 && (size_t)_pidx <= max_depth &&
+ 				    &display_list[_pidx] == (DisplayObject*)p->display_obj) {
+ 					u32 _ptid = ((DisplayObject*)p->display_obj)->transform_id;
++#ifndef NO_GRAPHICS
++					// A cacheAsBitmap root sprite is repointed at a dynamic
++					// slot for the frame (tag.c cab_snap_world), which has no
++					// CPU row. Its placement is the pre-snap matrix: Ruffle
++					// pixel-snaps device text on its own (EditTextPixelSnapping),
++					// and the unsnapped origin is the closer match
++					// (visual/cache_as_bitmap/text 1200 vs 1380 outliers @128).
++					_ptid = ng_get_original_transform_id((DisplayObject*)p->display_obj);
++#endif
+ 					float (*_ptd)[16] = ng_entryTransformData((DisplayObject*)p->display_obj);
+ 					if (!(p->as_set_flags & 1)) px = _ptd[_ptid][12] / 20.0f;
+ 					if (!(p->as_set_flags & 2)) py = _ptd[_ptid][13] / 20.0f;
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index ad8d82d7b..b28224ceb 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2353,6 +2353,111 @@ static void bd_draw_bitmap_node(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+ // transform/alpha are ignored (Flash draw() semantics — only the passed matrix
+ // and the subtree's internal child matrices apply). ColorTransform/blendMode on
+ // a shape source are not honoured yet (identity-only; probes use neither).
++static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
++                               Avm2Object* obj,
++                               double wa, double wb, double wc, double wd,
++                               double wtx, double wty, double alpha, int depth);
++
++// An object's local-to-global matrix (twips), stopping below the Stage like
++// Ruffle's local_to_global_matrix. m = {a, b, c, d, tx, ty}.
++static void bd_l2g_matrix(Avm2Context* ctx, Avm2Object* obj, double m[6])
++{
++	m[0] = 1.0; m[1] = 0.0; m[2] = 0.0; m[3] = 1.0; m[4] = 0.0; m[5] = 0.0;
++	for (int guard = 0; obj != NULL && guard < 256; guard++)
++	{
++		Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
++		if (e == NULL || e->is_stage) break;
++		// m = local(e) * m
++		double a = e->mtx_a, b = e->mtx_b, c = e->mtx_c, d = e->mtx_d;
++		double tx = (double) e->mtx_tx, ty = (double) e->mtx_ty;
++		double r[6] = {
++			a * m[0] + c * m[1], b * m[0] + d * m[1],
++			a * m[2] + c * m[3], b * m[2] + d * m[3],
++			a * m[4] + c * m[5] + tx, b * m[4] + d * m[5] + ty,
++		};
++		memcpy(m, r, sizeof(r));
++		obj = e->parent;
++	}
++}
++
++// `DisplayObject.mask` of a node inside a draw() source (Ruffle display_object.rs
++// apply_standard_mask_and_scroll): the masker renders as a stencil under
++// `world * global_to_local(node) * local_to_global(mask)`, the node's own
++// transform dropped for the draw ROOT (draw() renders it with apply_transform
++// off), so a mask that is not a child of the source keeps its OWN matrix in
++// draw space. The node is drawn as usual, then every pixel outside the mask's
++// coverage goes back to what the target held before.
++static void bd_draw_masked(Avm2Context* ctx, Avm2BitmapDataExt* dst,
++                           Avm2Object* obj, Avm2DisplayObjectExt* ext,
++                           double wa, double wb, double wc, double wd,
++                           double wtx, double wty, double alpha, int depth)
++{
++	size_t n = (size_t) dst->width * dst->height;
++	uint32_t* snap = (uint32_t*) malloc(n * sizeof(uint32_t));
++	uint32_t* cov = (uint32_t*) calloc(n, sizeof(uint32_t));
++	Avm2Object* mask = ext->mask;
++	if (snap == NULL || cov == NULL)
++	{
++		free(snap);
++		free(cov);
++		return;
++	}
++	memcpy(snap, dst->pixels, n * sizeof(uint32_t));
++
++	double g[6], mm[6] = { 1.0, 0.0, 0.0, 1.0, 0.0, 0.0 };
++	bd_l2g_matrix(ctx, mask, mm);
++	if (depth > 0)
++	{
++		// mm = inverse(l2g(node)) * l2g(mask)
++		bd_l2g_matrix(ctx, obj, g);
++		double det = g[0] * g[3] - g[2] * g[1];
++		if (det != 0.0 && isfinite(det))
++		{
++			double ia = g[3] / det, ib = -g[1] / det;
++			double ic = -g[2] / det, id = g[0] / det;
++			double itx = -(ia * g[4] + ic * g[5]);
++			double ity = -(ib * g[4] + id * g[5]);
++			double r[6] = {
++				ia * mm[0] + ic * mm[1], ib * mm[0] + id * mm[1],
++				ia * mm[2] + ic * mm[3], ib * mm[2] + id * mm[3],
++				ia * mm[4] + ic * mm[5] + itx, ib * mm[4] + id * mm[5] + ity,
++			};
++			memcpy(mm, r, sizeof(r));
++		}
++	}
++	// The mask's parent chain is already in mm; render it as a root (its own
++	// matrix is in mm too, which bd_draw_shape_walk expects in `w*`).
++	Avm2BitmapDataExt mdst = *dst;
++	mdst.pixels = cov;
++	mdst.transparency = 1;
++	Avm2Object* saved_mask = ext->mask;
++	ext->mask = NULL;  // the node itself, unmasked, below
++	bd_draw_shape_walk(ctx, &mdst, mask,
++	                   wa * mm[0] + wc * mm[1], wb * mm[0] + wd * mm[1],
++	                   wa * mm[2] + wc * mm[3], wb * mm[2] + wd * mm[3],
++	                   wa * mm[4] + wc * mm[5] + wtx, wb * mm[4] + wd * mm[5] + wty,
++	                   1.0, depth + 1);
++	bd_draw_shape_walk(ctx, dst, obj, wa, wb, wc, wd, wtx, wty, alpha, depth);
++	ext->mask = saved_mask;
++
++	for (size_t i = 0; i < n; i++)
++	{
++		uint32_t k = CA(cov[i]);
++		if (k == 0xFF) continue;
++		uint32_t o = snap[i], c = dst->pixels[i];
++		if (k == 0) { dst->pixels[i] = o; continue; }
++		uint32_t out = 0;
++		for (int sh = 0; sh < 32; sh += 8)
++		{
++			int32_t ov = (int32_t) ((o >> sh) & 0xFF), cv = (int32_t) ((c >> sh) & 0xFF);
++			out |= (uint32_t) (ov + ((cv - ov) * (int32_t) k + 127) / 255) << sh;
++		}
++		dst->pixels[i] = out;
++	}
++	free(snap);
++	free(cov);
++}
++
+ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                                Avm2Object* obj,
+                                double wa, double wb, double wc, double wd,
+@@ -2362,6 +2467,11 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+ 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+ 	if (ext == NULL) return;
+ 	if (!ext->is_stage && !ext->visible) return;
++	if (ext->mask != NULL && dst->pixels != NULL)
++	{
++		bd_draw_masked(ctx, dst, obj, ext, wa, wb, wc, wd, wtx, wty, alpha, depth);
++		return;
++	}
+ 
+ 	if (ext->is_bitmap)
+ 		// A Bitmap inside the drawn subtree. avm2_cpu_walk has had this arm all
+@@ -2428,6 +2538,9 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+ 		Avm2Object* child = ext->render_list[i];
+ 		Avm2DisplayObjectExt* cext = avm2_display_ext_of(ctx, child);
+ 		if (cext == NULL) continue;
++		// A masker renders only as its maskee's stencil (Ruffle
++		// render_base `skip_masks`), never as content.
++		if (cext->maskee != NULL) continue;
+ 		// child local matrix (twips->twips): compose world * child (mat_mul).
+ 		double ca = cext->mtx_a, cb = cext->mtx_b, cc = cext->mtx_c, cd = cext->mtx_d;
+ 		double ctx_ = (double) cext->mtx_tx, cty = (double) cext->mtx_ty;
+@@ -2474,6 +2587,44 @@ static void bd_blit_alpha_erase(Avm2BitmapDataExt* dst, Avm2BitmapDataExt* src,
+ 	}
+ }
+ 
++// draw() clipRect for the rendered (non-blit) sources: Ruffle pushes the rect
++// as a stencil mask in DESTINATION pixels, not transformed by the draw matrix
++// (operations.rs:1487), so a pixel survives iff its centre is inside the rect.
++// Implemented as snapshot -> draw -> restore everything outside. NULL (no
++// snapshot) when the rect covers the whole target.
++static uint32_t* bd_clip_begin(const Avm2BitmapDataExt* dst, double x, double y,
++                               double w, double h, int32_t px[4])
++{
++	px[0] = (int32_t) ceil(x - 0.5);
++	px[1] = (int32_t) ceil(y - 0.5);
++	px[2] = (int32_t) ceil(x + w - 0.5);
++	px[3] = (int32_t) ceil(y + h - 0.5);
++	if (dst->pixels == NULL
++	    || (px[0] <= 0 && px[1] <= 0
++	        && px[2] >= (int32_t) dst->width && px[3] >= (int32_t) dst->height))
++		return NULL;
++	size_t n = (size_t) dst->width * dst->height;
++	uint32_t* snap = (uint32_t*) malloc(n * sizeof(uint32_t));
++	if (snap != NULL) memcpy(snap, dst->pixels, n * sizeof(uint32_t));
++	return snap;
++}
++
++static void bd_clip_end(Avm2BitmapDataExt* dst, uint32_t* snap, const int32_t px[4])
++{
++	if (snap == NULL) return;
++	for (int32_t y = 0; y < (int32_t) dst->height; y++)
++	{
++		int inside_row = y >= px[1] && y < px[3];
++		for (int32_t x = 0; x < (int32_t) dst->width; x++)
++		{
++			if (inside_row && x >= px[0] && x < px[2]) continue;
++			size_t i = (size_t) y * dst->width + (size_t) x;
++			dst->pixels[i] = snap[i];
++		}
++	}
++	free(snap);
++}
++
+ static Avm2Value bd_draw(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -2572,17 +2723,42 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 	if ((!identity_2x2 && !can_affine) || !extra_matrix_ok)
+ 		return avm2_undefined();  // needs the offscreen GPU render path
+ 
++	// clipRect (arg 4). The translation-only BitmapData blit applies it as a
++	// pixel region (Ruffle's CPU fast path, operations.rs:1416); every other
++	// source goes through the snapshot clip above.
++	int has_clip = 0;
++	double clip_x = 0.0, clip_y = 0.0, clip_w = 0.0, clip_h = 0.0;
++	if (arg_present(act, 4) && act->args[4].kind == AVM2_VALUE_OBJECT)
++	{
++		Avm2Value cr = act->args[4];
++		clip_x = read_prop_num(ctx, cr, "x");
++		clip_y = read_prop_num(ctx, cr, "y");
++		clip_w = read_prop_num(ctx, cr, "width");
++		clip_h = read_prop_num(ctx, cr, "height");
++		has_clip = isfinite(clip_x) && isfinite(clip_y)
++		           && isfinite(clip_w) && isfinite(clip_h);
++	}
++	int clip_by_region = text_src == NULL && shape_src == NULL && identity_2x2
++	                     && !blend_alpha_or_erase;
++	int32_t clip_px[4] = { 0, 0, 0, 0 };
++	uint32_t* clip_snap = (has_clip && !clip_by_region)
++		? bd_clip_begin(dst, clip_x, clip_y, clip_w, clip_h, clip_px) : NULL;
++
+ 	// alpha/erase with a Bitmap display-object source (the BitmapData-source
+ 	// form already returned above as the Flash no-op quirk). Translation-only,
+ 	// and no other source kind: everything else keeps the old no-op.
+ 	if (blend_alpha_or_erase)
+ 	{
+ 		if (src == NULL || src->disposed || src->pixels == NULL || !identity_2x2)
++		{
++			free(clip_snap);
+ 			return avm2_undefined();  // needs the offscreen GPU render path
++		}
+ 		bd_blit_alpha_erase(dst, src,
+ 		                    (int32_t) floor(mtx + extra_tx),
+ 		                    (int32_t) floor(mty + extra_ty),
+ 		                    blend_is_erase);
++		bd_clip_end(dst, clip_snap, clip_px);
+ 		return avm2_undefined();
+ 	}
+ 
+@@ -2612,13 +2788,13 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 		               && ro == 0 && go == 0 && bo == 0 && ao == 0);
+ 	}
+ 
+-	// TextField source: CPU glyph rasterization (clipRect, like the bitmap
+-	// paths below, is not supported yet).
++	// TextField source: CPU glyph rasterization.
+ 	if (text_src != NULL)
+ 	{
+ 		bd_draw_textfield(ctx, dst, text_src, ma, mb, mc, md, mtx, mty,
+ 		                  has_cxform, rm, gm, bm, am, ro, go, bo, ao,
+ 		                  blend_mode);
++		bd_clip_end(dst, clip_snap, clip_px);
+ 		return avm2_undefined();
+ 	}
+ 
+@@ -2629,6 +2805,7 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 	{
+ 		bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
+ 		                   mtx * 20.0, mty * 20.0, 1.0, 0);
++		bd_clip_end(dst, clip_snap, clip_px);
+ 		return avm2_undefined();
+ 	}
+ 
+@@ -2650,7 +2827,10 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 		// floor(NaN) into out-of-bounds sampling below.
+ 		if (det == 0.0 || !isfinite(det)
+ 		    || !isfinite(mtx) || !isfinite(mty))
++		{
++			free(clip_snap);
+ 			return avm2_undefined();
++		}
+ 		double sw = (double) src->width, sh = (double) src->height;
+ 		double cxs[4] = { 0.0, sw, 0.0, sw };
+ 		double cys[4] = { 0.0, 0.0, sh, sh };
+@@ -2702,17 +2882,27 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 				bd_set_raw(dst, (uint32_t) dx, (uint32_t) dy, color);
+ 			}
+ 		}
++		bd_clip_end(dst, clip_snap, clip_px);
+ 		return avm2_undefined();
+ 	}
+ 
+ 	int32_t tx = (int32_t) floor(mtx + extra_tx);
+ 	int32_t ty = (int32_t) floor(mty + extra_ty);
+ 
+-	// Whole source at (tx,ty) in dest (clip_rect not supported yet).
++	// Whole source at (tx,ty) in dest, or the clipRect's pixel region (Ruffle
++	// operations.rs:1416: floor the origin, ceil the size).
+ 	PixelRegion src_region = pr_whole(src->width, src->height);
+ 	PixelRegion dst_region = pr_whole(dst->width, dst->height);
+-	pr_clamp_intersection(&dst_region, tx, ty, 0, 0,
+-	                      (int32_t) src->width, (int32_t) src->height, &src_region);
++	if (has_clip)
++	{
++		int32_t cx = (int32_t) floor(clip_x), cy = (int32_t) floor(clip_y);
++		pr_clamp_intersection(&dst_region, cx, cy, cx - tx, cy - ty,
++		                      (int32_t) ceil(clip_w), (int32_t) ceil(clip_h),
++		                      &src_region);
++	}
++	else
++		pr_clamp_intersection(&dst_region, tx, ty, 0, 0,
++		                      (int32_t) src->width, (int32_t) src->height, &src_region);
+ 	if (pr_w(&dst_region) == 0 || pr_h(&dst_region) == 0) return avm2_undefined();
+ 
+ 	uint32_t rw = pr_w(&dst_region), rh = pr_h(&dst_region);
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 72d025c27..50a8ed031 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -2712,6 +2712,47 @@ static const Avm2FontData* find_device_font_list(const Avm2String* name,
+ 	return NULL;
+ }
+ 
++// Ruffle layout.rs:604-625: the DefaultFont a device font list falls back to
++// when none of its names resolved, keyed on the FIRST (untrimmed) name: a
++// DefaultFont name itself, the well-known aliases, else Sans (like Flash).
++// Returns the `[default_fonts]` row for it, or NULL when the test declares
++// none (the caller then keeps the baked-in Noto).
++static const Avm2FontData* find_default_font_row(const Avm2String* name,
++                                                 int bold, int italic)
++{
++	if (avm2_generated_device_font_count == 0) return NULL;
++	const char* first = name != NULL ? name->utf8 : "";
++	uint32_t len = 0;
++	if (name != NULL)
++		while (len < name->len && first[len] != ',') len++;
++	const char* alias = "_sans";
++#define DF_IS(lit) (len == sizeof(lit) - 1 && memcmp(first, lit, len) == 0)
++	if (DF_IS("_sans") || DF_IS("_serif") || DF_IS("_typewriter")
++	    || DF_IS("_\xE3\x82\xB4\xE3\x82\xB7\xE3\x83\x83\xE3\x82\xAF")
++	    || DF_IS("_\xE7\xAD\x89\xE5\xB9\x85")
++	    || DF_IS("_\xE6\x98\x8E\xE6\x9C\x9D"))
++		return find_device_font_ladder(first, len, bold, italic);
++	if (DF_IS("Times New Roman"))
++		alias = "_serif";
++	else if (DF_IS("Consolas") || DF_IS("Courier") || DF_IS("Courier New")
++	         || DF_IS("NSimSun"))
++		alias = "_typewriter";
++	else
++	{
++		for (uint32_t i = 0; i < len; i++)
++		{
++			if ((i + 4 <= len && memcmp(first + i, "Ming", 4) == 0)
++			    || (i + 3 <= len && memcmp(first + i, "\xE6\x98\x8E", 3) == 0))
++			{
++				alias = "_\xE6\x98\x8E\xE6\x9C\x9D";
++				break;
++			}
++		}
++	}
++#undef DF_IS
++	return find_device_font_ladder(alias, (uint32_t) strlen(alias), bold, italic);
++}
++
+ // Ruffle resolve_font: embedded lookup by name+bold+italic (only when the
+ // field embeds fonts), else the device fallback.
+ //
+@@ -2786,6 +2827,24 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
+ 			return f;
+ 		}
+ 	}
++	// layout.rs:604-635: a list that resolved nothing falls back to the
++	// DefaultFont its FIRST name maps to. The recompiler emits each
++	// test.toml `[default_fonts]` list as device rows named `_sans`/`_serif`/
++	// ... (abc_devicefont.cpp collectDefaultFontAliases), so this is an
++	// ordinary device probe. Device fields only, as below: an embedFonts field
++	// that matched nothing draws nothing in Flash.
++	if (et->device_font)
++	{
++		const Avm2FontData* fd = find_default_font_row(fmt->font, fmt->bold != 0,
++		                                               fmt->italic != 0);
++		if (fd != NULL)
++		{
++			f.data = fd;
++			f.is_device = 1;
++			f.outline = NULL;
++			return f;
++		}
++	}
+ 	f.data = &noto_device_font;
+ 	f.is_device = 1;
+ 	// D1-2: when the test really has Ruffle's default font (the recompiler
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index d3d7dcee7..2e8981eac 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3206,6 +3206,11 @@ static void cab_snap_in_place(DisplayObject* obj, float world[16])
+ // with everything else. Leaving the slot alone renders the shape at the snapped
+ // position with its background one pixel back (measured: visual/opaque_background
+ // 3856 -> 1504 with the children-only snap, 3856 -> 4 with both).
++//
++// The minted slot has no CPU-side `transform_data` row: code that reads the
++// container's placement back from its slot during the frame resolves the
++// pre-snap id through ng_get_original_transform_id (compute_mc_world_xform,
++// the AVM1 TextField glyph walk in action.c).
+ static const float* cab_snap_world(DisplayObject* obj, const float* in,
+                                    float out[16])
+ {
+@@ -7495,7 +7500,10 @@ static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, fl
+ 		// entries the matrix compose_children already composed to world this
+ 		// frame. Overlay any AS-set transform, then we're done (no recursion:
+ 		// the slot is already world-space).
+-		memcpy(out, (const float*)app_context->transform_data + (size_t)d->transform_id * 16,
++		// A ROOT entry's slot is its baked placement unless cab_snap_world
++		// repointed it at a dynamic slot for the frame (no CPU row there).
++		u32 tid = in_root_dl ? ng_get_original_transform_id(d) : d->transform_id;
++		memcpy(out, (const float*)app_context->transform_data + (size_t)tid * 16,
+ 			16 * sizeof(float));
+ 		if (mc->as_set_flags != 0)
+ 			apply_as_transform(out, mc, mc->as_set_flags);
+diff --git a/SWFRecomp/include/abc/abc_devicefont.hpp b/SWFRecomp/include/abc/abc_devicefont.hpp
+index ed1d125b6..0dd1bc0b6 100644
+--- a/SWFRecomp/include/abc/abc_devicefont.hpp
++++ b/SWFRecomp/include/abc/abc_devicefont.hpp
+@@ -15,6 +15,7 @@
+ // and every runtime lookup behaves as before.
+ 
+ #include <ostream>
++#include <string>
+ 
+ namespace SWFRecomp
+ {
+@@ -26,5 +27,13 @@ namespace abc
+ 	// not valid TOML, declares no `[fonts.*]`, or every declared TTF fails to
+ 	// load — the runtime then keeps its baked-in Noto fallback.
+ 	void emitDeviceFonts(std::ostream& out);
++
++	// The TTF path Ruffle's test harness would render a device font `name`
++	// with, resolved through `./test.toml`: a `[fonts.*]` family match, else
++	// the `[default_fonts]` list of the DefaultFont the name maps to (ruffle
++	// core/src/html/layout.rs:560-625). "" when nothing resolves, in which
++	// case the caller keeps the bundled Noto Sans. Used by the AVM1
++	// zero-glyph DefineFont2/3 synthesis (swf.cpp).
++	std::string resolveTestDeviceFontPath(const std::string& name, bool bold, bool italic);
+ }
+ }
+diff --git a/SWFRecomp/src/abc/abc_devicefont.cpp b/SWFRecomp/src/abc/abc_devicefont.cpp
+index 6a395c988..258a264f4 100644
+--- a/SWFRecomp/src/abc/abc_devicefont.cpp
++++ b/SWFRecomp/src/abc/abc_devicefont.cpp
+@@ -523,9 +523,94 @@ void appendDefaultFontOutlines(std::vector<DeviceFaceDef>& faces)
+ 	faces.push_back(std::move(fd));
+ }
+ 
++// --- [default_fonts] ----------------------------------------------------------
++// Ruffle's test harness maps each DefaultFont to an ordered list of device
++// family names (tests/framework/src/options/font.rs DefaultFontsOptions ->
++// Player::set_default_font). The TOML key of each list and the name the
++// layout recognises for it (core/src/font.rs:102 DefaultFont::from_name).
++struct DefaultFontKey
++{
++	const char* toml_key;
++	const char* alias;
++};
++const DefaultFontKey DEFAULT_FONT_KEYS[] = {
++	{ "sans", "_sans" },
++	{ "serif", "_serif" },
++	{ "typewriter", "_typewriter" },
++	{ "japanese_gothic", "_\xE3\x82\xB4\xE3\x82\xB7\xE3\x83\x83\xE3\x82\xAF" },  // _ゴシック
++	{ "japanese_gothic_mono", "_\xE7\xAD\x89\xE5\xB9\x85" },                       // _等幅
++	{ "japanese_mincho", "_\xE6\x98\x8E\xE6\x9C\x9D" },                            // _明朝
++};
++const size_t DEFAULT_FONT_KEY_COUNT = sizeof(DEFAULT_FONT_KEYS) / sizeof(DEFAULT_FONT_KEYS[0]);
++
++// The family names listed under `[default_fonts] <toml_key>`, in order.
++std::vector<std::string> defaultFontFamilies(const toml::table& tbl, const char* toml_key)
++{
++	std::vector<std::string> names;
++	if (const toml::table* df = tbl["default_fonts"].as_table())
++	{
++		if (const toml::array* arr = (*df)[toml_key].as_array())
++		{
++			for (const auto& e : *arr)
++			{
++				std::string n = std::string(e.value_or(""));
++				if (!n.empty()) names.push_back(n);
++			}
++		}
++	}
++	return names;
++}
++
++// FontMap::find's bold/italic compatibility ladder (ruffle core/src/
++// library.rs:788-845), the same order the runtime's find_device_font_ladder
++// runs: exact; if bold XOR italic, bold-italic, regular, the other one; else
++// (bold-italic only) regular, then bold, italic, (regular only) bold-italic.
++// `has(b, i)` probes one style. Returns the index of the matching style in
++// {regular, bold, italic, bold-italic} order, or -1.
++template <typename Has>
++int styleLadder(bool bold, bool italic, Has has)
++{
++	auto idx = [](bool b, bool i) { return (b ? 1 : 0) + (i ? 2 : 0); };
++	if (has(bold, italic)) return idx(bold, italic);
++	if (bold != italic)
++	{
++		if (has(true, true)) return idx(true, true);
++		if (has(false, false)) return idx(false, false);
++		if (has(!bold, !italic)) return idx(!bold, !italic);
++		return -1;
++	}
++	if (bold && italic && has(false, false)) return idx(false, false);
++	if (has(true, false)) return idx(true, false);
++	if (has(false, true)) return idx(false, true);
++	if (!bold && !italic && has(true, true)) return idx(true, true);
++	return -1;
++}
++
++void collectDefaultFontAliases(const toml::table& tbl,
++                            const std::vector<DeviceFaceDef>& faces,
++                            std::vector<std::pair<std::string, size_t>>& aliases)
++{
++	for (size_t k = 0; k < DEFAULT_FONT_KEY_COUNT; k++)
++	{
++		for (const std::string& fam : defaultFontFamilies(tbl, DEFAULT_FONT_KEYS[k].toml_key))
++		{
++			for (size_t i = 0; i < faces.size(); i++)
++			{
++				if (!faces[i].hidden
++				    && strcasecmp(faces[i].family.c_str(), fam.c_str()) == 0)
++					aliases.push_back({ DEFAULT_FONT_KEYS[k].alias, i });
++			}
++		}
++	}
++}
++
+ void emitDeviceFonts(std::ostream& out)
+ {
+ 	std::vector<DeviceFaceDef> faces;
++	// [default_fonts]: extra rows named `_sans`/`_serif`/... that share a
++	// declared face's tables, so the runtime resolves a DefaultFont exactly
++	// like any other device family (avm2_text.c find_device_font_list).
++	std::vector<std::pair<std::string, size_t>> aliases;
+ 
+ 	toml::table tbl;
+ 	bool have_toml = false;
+@@ -599,6 +684,8 @@ void emitDeviceFonts(std::ostream& out)
+ 			}
+ 		}
+ 
++		collectDefaultFontAliases(tbl, faces, aliases);
++
+ 		// Appended LAST so the font_sorts indices above stay valid.
+ 		if (const toml::table* po = tbl["player_options"].as_table())
+ 		{
+@@ -654,11 +741,14 @@ void emitDeviceFonts(std::ostream& out)
+ 	if (!faces.empty())
+ 	{
+ 		out << "const Avm2FontData avm2_generated_device_fonts[] = {\n";
+-		for (size_t i = 0; i < faces.size(); i++)
++		for (size_t row = 0; row < faces.size() + aliases.size(); row++)
+ 		{
++			size_t i = row < faces.size() ? row : aliases[row - faces.size()].second;
+ 			const DeviceFaceDef& fd = faces[i];
+ 			std::string n = std::to_string(i);
+-			if (fd.hidden)
++			if (row >= faces.size())
++				out << "\t{ 0, \"" << cEsc(aliases[row - faces.size()].first) << "\", ";
++			else if (fd.hidden)
+ 				out << "\t{ 0, NULL, ";
+ 			else
+ 				out << "\t{ 0, \"" << cEsc(fd.family) << "\", ";
+@@ -692,9 +782,87 @@ void emitDeviceFonts(std::ostream& out)
+ 	{
+ 		out << "const Avm2FontData avm2_generated_device_fonts[1];\n";
+ 	}
+-	out << "const uint32_t avm2_generated_device_font_count = " << faces.size()
++	out << "const uint32_t avm2_generated_device_font_count = " << faces.size() + aliases.size()
+ 	    << ";\n\n";
+ }
+ 
++std::string resolveTestDeviceFontPath(const std::string& name, bool bold, bool italic)
++{
++	toml::table tbl;
++	try
++	{
++		tbl = toml::parse_file("test.toml");
++	}
++	catch (...)
++	{
++		return "";
++	}
++
++	struct Face { std::string family, path; bool bold, italic; };
++	std::vector<Face> faces;
++	if (const toml::table* fonts = tbl["fonts"].as_table())
++	{
++		for (const auto& kv : *fonts)
++		{
++			const toml::table* ft = kv.second.as_table();
++			if (ft == NULL) continue;
++			Face f;
++			f.family = std::string((*ft)["family"].value_or(""));
++			f.path = std::string((*ft)["path"].value_or(""));
++			f.bold = (*ft)["bold"].value_or(false);
++			f.italic = (*ft)["italic"].value_or(false);
++			if (f.family.empty() || f.path.empty()) continue;
++			FILE* fp = fopen(f.path.c_str(), "rb");
++			if (fp == NULL) continue;
++			fclose(fp);
++			faces.push_back(f);
++		}
++	}
++	if (faces.empty()) return "";
++
++	auto find = [&](const std::string& family, bool b, bool i) -> const Face* {
++		for (const Face& f : faces)
++		{
++			if (f.bold == b && f.italic == i
++			    && strcasecmp(f.family.c_str(), family.c_str()) == 0)
++				return &f;
++		}
++		return NULL;
++	};
++	auto ladder = [&](const std::string& family) -> const Face* {
++		int s = styleLadder(bold, italic, [&](bool b, bool i) {
++			return find(family, b, i) != NULL;
++		});
++		return s < 0 ? NULL : find(family, (s & 1) != 0, (s & 2) != 0);
++	};
++
++	// layout.rs:573: a DefaultFont name (`_sans`, ...) goes straight to its
++	// list; any other name is first tried as a device family (layout.rs:589).
++	size_t cls = DEFAULT_FONT_KEY_COUNT;
++	for (size_t k = 0; k < DEFAULT_FONT_KEY_COUNT; k++)
++		if (name == DEFAULT_FONT_KEYS[k].alias) cls = k;
++	if (cls == DEFAULT_FONT_KEY_COUNT)
++	{
++		if (const Face* f = ladder(name)) return f->path;
++		// layout.rs:611-625: the well-known aliases, else Sans (like Flash).
++		if (name == "Times New Roman") cls = 1;
++		else if (name == "Arial") cls = 0;
++		else if (name == "Consolas" || name == "Courier" || name == "Courier New"
++		         || name == "NSimSun") cls = 2;
++		else if (name.find("Ming") != std::string::npos
++		         || name.find("\xE6\x98\x8E") != std::string::npos) cls = 5;  // 明
++		else cls = 0;
++	}
++
++	// library.rs:460 default_font: the first listed family with the exact
++	// style, then the first with a compatible one.
++	std::vector<std::string> fams = defaultFontFamilies(tbl, DEFAULT_FONT_KEYS[cls].toml_key);
++	for (const std::string& fam : fams)
++		if (const Face* f = find(fam, bold, italic)) return f->path;
++	for (const std::string& fam : fams)
++		if (const Face* f = ladder(fam)) return f->path;
++	return "";
++}
++
+ }  // namespace abc
+ }  // namespace SWFRecomp
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index f204a865a..e19649411 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -1,6 +1,7 @@
+ #define _USE_MATH_DEFINES
+ #include <algorithm>
+ #include <array>
++#include <map>
+ #include <cmath>
+ #include <cstring>
+ #include <iomanip>
+@@ -23,6 +24,7 @@
+ 
+ #include "../../SWFModernRuntime/include/gradient_ramp.h"
+ 
++#include <abc/abc_devicefont.hpp>
+ #include <abc/abc_emit.hpp>
+ #include <abc/abc_timeline.hpp>
+ #include <abc/abc_parser.hpp>
+@@ -143,6 +145,44 @@ static bool loadDeviceFont()
+ 	return g_device_font_ok;
+ }
+ 
++// A device face declared by the test harness's test.toml (`[fonts.*]`,
++// reached through `[default_fonts]`), loaded once per path. NULL when the file
++// is missing or unparsable. See abc::resolveTestDeviceFontPath.
++static const stbtt_fontinfo* loadTestDeviceFace(const std::string& path)
++{
++	static std::map<std::string, stbtt_fontinfo*> cache;
++	auto it = cache.find(path);
++	if (it != cache.end()) return it->second;
++	stbtt_fontinfo* info = NULL;
++	FILE* f = fopen(path.c_str(), "rb");
++	if (f) {
++		fseek(f, 0, SEEK_END);
++		long sz = ftell(f);
++		fseek(f, 0, SEEK_SET);
++		unsigned char* data = sz > 0 ? (unsigned char*)malloc(sz) : NULL;
++		if (data && fread(data, 1, sz, f) == (size_t)sz) {
++			int off = stbtt_GetFontOffsetForIndex(data, 0);
++			info = new stbtt_fontinfo();
++			if (off < 0 || !stbtt_InitFont(info, data, off)) {
++				delete info;
++				info = NULL;
++			}
++		}
++		if (info == NULL) free(data);  // kept alive for the face otherwise
++		fclose(f);
++	}
++	cache[path] = info;
++	return info;
++}
++
++// The face's units-per-em (head.unitsPerEm), recovered from stb_truetype's
++// em scale. Exact for any integer upem, so the bundled 1000-upem Noto keeps
++// its `swf_em / 1000` scale bit-for-bit.
++static float faceUnitsPerEm(const stbtt_fontinfo* face)
++{
++	return (float)lroundf(1.0f / stbtt_ScaleForMappingEmToPixels(face, 1.0f));
++}
++
+ // JPEG / image-data helpers for DefineBits{,JPEG2,JPEG3,JPEG4} now live in
+ // include/jpeg_helpers.hpp — the AVM2/ABC character scanner needs them too.
+ 
+@@ -2593,17 +2633,31 @@ namespace SWFRecomp
+ 				// host system font. Pre-seed ASCII 32..126 from NotoSans.ttf
+ 				// so the device-font fallback loop below tessellates real
+ 				// glyphs for it.
++				//
++				// The host font is the one Ruffle's test harness would pick: a
++				// test.toml `[fonts.*]` family of that name, else the face its
++				// `[default_fonts]` list gives the DefaultFont the name maps to
++				// (`_sans`, `Times New Roman` -> serif, ...). Tests that declare
++				// none keep the bundled Noto Sans.
+ 				bool is_zero_glyph_synth = false;
++				const stbtt_fontinfo* synth_face = &g_device_font;
+ 				if ((tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
+ 				    && num_entries == 0
+ 				    && font_names.count(font_id) && !font_names[font_id].empty()
+ 				    && loadDeviceFont())
+ 				{
++					std::string test_face_path = abc::resolveTestDeviceFontPath(
++						font_names[font_id], font_bold_flags[font_id],
++						font_italic_flags[font_id]);
++					if (!test_face_path.empty()) {
++						const stbtt_fontinfo* tf = loadTestDeviceFace(test_face_path);
++						if (tf != NULL) synth_face = tf;
++					}
+ 					int ttf_ascent_em = 0, ttf_descent_em = 0, ttf_linegap_em = 0;
+-					stbtt_GetFontVMetrics(&g_device_font, &ttf_ascent_em,
++					stbtt_GetFontVMetrics(synth_face, &ttf_ascent_em,
+ 						&ttf_descent_em, &ttf_linegap_em);
+ 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
+-					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
++					float ttf_scale = swf_em / faceUnitsPerEm(synth_face);
+ 
+ 					const u16 SYNTH_FIRST_CP = 32;
+ 					const u16 SYNTH_LAST_CP  = 126;
+@@ -2616,7 +2670,7 @@ namespace SWFRecomp
+ 					for (u16 cp = SYNTH_FIRST_CP; cp <= SYNTH_LAST_CP; cp++) {
+ 						font_code_tables[font_id].push_back(cp);
+ 						int adv_em = 0, lsb = 0;
+-						stbtt_GetCodepointHMetrics(&g_device_font, cp, &adv_em, &lsb);
++						stbtt_GetCodepointHMetrics(synth_face, cp, &adv_em, &lsb);
+ 						font_advance_tables[font_id].push_back((s32)(adv_em * ttf_scale));
+ 					}
+ 					// stb_truetype returns descent as a negative number; flip
+@@ -2644,19 +2698,20 @@ namespace SWFRecomp
+ 				    && (is_zero_glyph_synth || deviceFontFallbackEnabled())
+ 				    && loadDeviceFont())
+ 				{
++					const stbtt_fontinfo* dev_face = is_zero_glyph_synth ? synth_face : &g_device_font;
+ 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
+-					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
++					float ttf_scale = swf_em / faceUnitsPerEm(dev_face);
+ 
+ 					for (u16 i = 0; i < num_entries; i++) {
+ 						if (i >= font_code_tables[font_id].size()) continue;
+ 						int needs_triangles = (font_glyph_entries[i].second == 0);
+ 
+ 						u16 codepoint = font_code_tables[font_id][i];
+-						int ttf_glyph = stbtt_FindGlyphIndex(&g_device_font, codepoint);
++						int ttf_glyph = stbtt_FindGlyphIndex(dev_face, codepoint);
+ 						if (ttf_glyph <= 0) continue;
+ 
+ 						stbtt_vertex* verts = NULL;
+-						int num_verts = stbtt_GetGlyphShape(&g_device_font, ttf_glyph, &verts);
++						int num_verts = stbtt_GetGlyphShape(dev_face, ttf_glyph, &verts);
+ 						if (num_verts <= 0) continue;
+ 
+ 						// Build polygon contours from TTF outline AND emit path commands
+@@ -2762,7 +2817,7 @@ namespace SWFRecomp
+ 							}
+ 						}
+ 						if (!contour.empty()) polygon.push_back(contour);
+-						stbtt_FreeShape(&g_device_font, verts);
++						stbtt_FreeShape(dev_face, verts);
+ 
+ 						// Always emit glyph path end marker (path data for hit testing)
+ 						emitGP(0.0f, 0.0f, 0.0f);
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 6f5c0818e..398536a91 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -409,3 +409,17 @@ visual/cache_as_bitmap/edittext_scroll      # wheel-scrolled field + DropShadow
+ avm2/loader_jpegxr_alpha                    # Loader .jxr, 32bppBGRA, premultiply
+ avm2/stage3d_texture_bytearray_compressed_alpha  # ATF fmt 4 (two textures)
+ avm2/stage3d_texture_bytearray              # ATF fmt 1 (JPEG-XR RGBA) + bgra uploads
++# SESSION 22 ADDITIONS (s22 wave-2 `w2-default-fonts-draw`). Change classes:
++# (1) test.toml `[default_fonts]` -> `[fonts.*]` resolution of zero-glyph AVM1
++#     device fonts in the recompiler (swf.cpp synth, abc_devicefont.cpp
++#     resolveTestDeviceFontPath) and of AVM2 device-list misses (`_sans`/
++#     `_serif` alias rows); (2) the AVM1 TextField walk under a cacheAsBitmap
++#     root sprite's snapped slot (tag.c cab_snap_world); (3) AVM2 draw() with a
++#     source `mask`. The set had no `[default_fonts]` member, no AVM1
++#     cacheAsBitmap-text member and no draw()-mask member. Tier 2 when added:
++#     all three were CI-failing before this patch (locally they now pass:
++#     cab/text 1200/1500 @128, text-bind 583/600 @64, draw_masks 0/0 @tol 0).
++# tier=2  (CI-failing / skipped; A/B signal only)
++visual/cache_as_bitmap/text                 # AVM1 CAB root + device EditText 1 cmp
++from_shumway/avm1/text-bind                 # AVM1 `_sans` via [default_fonts] 1 cmp
++avm2/bitmapdata_draw_masks                  # draw(src) honours src.mask, tol 0 1 cmp
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+index 98f34a9b2..6dc6d9735 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md
+@@ -472,59 +472,6 @@ investigated but fixing this point introduced 2 regressions at other scribble bo
+ 
+ ---
+ 
+-### `from_shumway/avm1/text-bind` — device-font file mismatch: text ~14px too low (~1900 outlier pixels, max diff 158)
+-
+-**Test:** image-only comparison. Both render "SUCCESS" in magenta
+-(`#d662c6`) at the same font size (42) with correctly-formed glyphs — but
+-our text sits **~14px lower** than the expected image (ours text-top
+-y≈86 vs expected y≈72; identical 31px glyph height = a pure vertical
+-offset). An aligned single-glyph comparison shows the glyph shapes/AA
+-match Ruffle; the outliers are the vertical misalignment, not glyph
+-quality.
+-
+-**Root cause (investigated end-to-end 2026-06-02): a device-font
+-font-FILE mismatch, not a layout or tessellation bug.** The SWF declares
+-font_id=1 as `_sans` device font with empty `<glyphs/>` (`DefineFont3`,
+-no embedded glyphs). Which Noto Sans resolves `_sans` decides the
+-baseline:
+-
+-- **Our recompiler** synthesizes device-font glyphs/metrics from its
+-  bundled `SWFRecomp/assets/NotoSans.ttf` — a full Noto, `unitsPerEm=1000`,
+-  `hhea.ascent=1069` = **1.069 em**. The runtime places the first-line
+-  baseline at `field_top + ascent·scale + gutter`
+-  (`tag.c::textfield_glyph_render_cb`), so text lands lower.
+-- **The `text-bind` test dir ships its OWN `NotoSans.ttf`** (25 KB subset,
+-  `unitsPerEm=1024`, `hhea.ascent=784` = **0.7656 em**) plus a `fonts.conf`
+-  mapping `sans-serif`→"Noto Sans". Ruffle's oracle resolves `_sans` to
+-  *that* font via fontconfig → baseline ~14px higher.
+-
+-**Proof:** temporarily swapping the test's `NotoSans.ttf` into
+-`SWFRecomp/assets/` moves our text-top from y=86 to **y=73, matching the
+-expected y=72 within 1px** (outliers 1961→1462; the residual is sub-pixel
+-AA). So our text layout is correct — only the font's vertical metrics
+-differ.
+-
+-**Why we don't "fix" it:** Ruffle's *own* bundled fallback device font
+-(`core/assets/notosans.subset.ttf.gz`) is **byte-identical to our
+-`assets/NotoSans.ttf`** (both 243912 bytes, 1.069 em). So in the normal
+-case — real games, and any SWF/test that doesn't ship a custom device
+-font — our device-font text **matches Ruffle's default**. (A bare Ruffle
+-exporter run on this SWF, ignoring the test's `fonts.conf`, renders at
+-y=84 ≈ our y=86.) text-bind diverges only because it bundles a custom
+-metrics font we don't resolve at recompile time. Replicating per-test
+-fontconfig device-font resolution in the recompiler is high-effort /
+-narrow value; switching our bundled font to the 0.7656 em subset would
+-fix this one test but **diverge from Ruffle's default fallback and from
+-real games** — a net regression. (Note: an earlier "shrink the
+-synthesized ascent" idea was wrong — it measured against this test's
+-custom-font oracle rather than Ruffle's default.)
+-
+-**Decision:** Accept; device-font vertical metrics depend on which font
+-resolves `_sans`, and our choice matches Ruffle's default fallback font.
+-The divergence is specific to this test's bundled custom font.
+-
+----
+-
+ ## Category 9: Video Decoder Implementation Differences
+ 
+ Image-comparison tests that render decoded FLV frames against a Ruffle-captured
+@@ -1018,7 +965,7 @@ three full-width 16-19-row bands ~217 rows apart (one per row of cells, each
+ spanning every cell's x-range) plus one 12×10 glyph patch, and **zero outliers
+ anywhere in the large blurred areas**. Matching it would mean reproducing
+ Ruffle's bundled default font's rasterisation — the same architectural gap as
+-the other device-font entries (`from_shumway/avm1/text-bind` above).
++the other device-font entries.
+ 
+ **Decision:** Accept the text-owned residual. Scope: the `output` comparison
+ only. **Standing invariant:** the blur half is *not* dispositioned — if the
+@@ -1269,7 +1216,6 @@ Category 14 NO-GO documented here — is untouched and unaffected.
+ | ~~`string_paths_reference_launder`~~ | ~~Ruffle known failure (stack_push)~~ | ~~2~~ | **RESOLVED 2026-08-01** — now PASS; we match Flash where Ruffle does not. De-listed from `ruffle-tests/ignored_tests.txt` |
+ | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
+ | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
+-| `from_shumway/avm1/text-bind` | Image: device-font file mismatch — text ~14px too low (test ships a 0.7656 em NotoSans + fonts.conf; we use our 1.069 em bundled Noto, which matches Ruffle's default fallback) | ~1900 px | Accept; device-font vertical metrics depend on which font resolves `_sans`; we match Ruffle's default |
+ | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
+ | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
+ | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 (trace lines; **no image comparison exists**) | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
+diff --git a/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt b/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt
+index ee794421c..30eef1f35 100644
+--- a/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt
++++ b/ruffle-tests/tests/swfs/from_shumway/avm1/ignored_tests.txt
+@@ -10,8 +10,10 @@
+ # font ~14px too low, ~1900 outliers) but sat in a TRACE-axis list, where it
+ # had no effect on the pixel board — scripts/image_triage.py classifies a
+ # suite-local ignore as "TRACE-axis triage, kept on the board". The trace test
+-# passes, so the entry is gone from here; the image rationale remains live in
+-# avm1/_investigation/ACCEPTED_DIFFS.md and in its summary table.
++# passes, so the entry is gone from here. The image rationale that lived in
++# avm1/_investigation/ACCEPTED_DIFFS.md was retired in s22 (w2-default-fonts-draw):
++# the recompiler now resolves `_sans` through test.toml [default_fonts] ->
++# [fonts.*], and the image passes.
+ 
+ # Ruffle known_failure — test fails in Ruffle's own test suite.
+ #

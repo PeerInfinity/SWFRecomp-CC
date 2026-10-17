@@ -1,6 +1,7 @@
 #define _USE_MATH_DEFINES
 #include <algorithm>
 #include <array>
+#include <map>
 #include <cmath>
 #include <cstring>
 #include <iomanip>
@@ -23,6 +24,7 @@
 
 #include "../../SWFModernRuntime/include/gradient_ramp.h"
 
+#include <abc/abc_devicefont.hpp>
 #include <abc/abc_emit.hpp>
 #include <abc/abc_timeline.hpp>
 #include <abc/abc_parser.hpp>
@@ -141,6 +143,44 @@ static bool loadDeviceFont()
 	g_device_font_ok = stbtt_InitFont(&g_device_font, g_device_font_data,
 		stbtt_GetFontOffsetForIndex(g_device_font_data, 0)) != 0;
 	return g_device_font_ok;
+}
+
+// A device face declared by the test harness's test.toml (`[fonts.*]`,
+// reached through `[default_fonts]`), loaded once per path. NULL when the file
+// is missing or unparsable. See abc::resolveTestDeviceFontPath.
+static const stbtt_fontinfo* loadTestDeviceFace(const std::string& path)
+{
+	static std::map<std::string, stbtt_fontinfo*> cache;
+	auto it = cache.find(path);
+	if (it != cache.end()) return it->second;
+	stbtt_fontinfo* info = NULL;
+	FILE* f = fopen(path.c_str(), "rb");
+	if (f) {
+		fseek(f, 0, SEEK_END);
+		long sz = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		unsigned char* data = sz > 0 ? (unsigned char*)malloc(sz) : NULL;
+		if (data && fread(data, 1, sz, f) == (size_t)sz) {
+			int off = stbtt_GetFontOffsetForIndex(data, 0);
+			info = new stbtt_fontinfo();
+			if (off < 0 || !stbtt_InitFont(info, data, off)) {
+				delete info;
+				info = NULL;
+			}
+		}
+		if (info == NULL) free(data);  // kept alive for the face otherwise
+		fclose(f);
+	}
+	cache[path] = info;
+	return info;
+}
+
+// The face's units-per-em (head.unitsPerEm), recovered from stb_truetype's
+// em scale. Exact for any integer upem, so the bundled 1000-upem Noto keeps
+// its `swf_em / 1000` scale bit-for-bit.
+static float faceUnitsPerEm(const stbtt_fontinfo* face)
+{
+	return (float)lroundf(1.0f / stbtt_ScaleForMappingEmToPixels(face, 1.0f));
 }
 
 // JPEG / image-data helpers for DefineBits{,JPEG2,JPEG3,JPEG4} now live in
@@ -2613,17 +2653,31 @@ namespace SWFRecomp
 				// host system font. Pre-seed ASCII 32..126 from NotoSans.ttf
 				// so the device-font fallback loop below tessellates real
 				// glyphs for it.
+				//
+				// The host font is the one Ruffle's test harness would pick: a
+				// test.toml `[fonts.*]` family of that name, else the face its
+				// `[default_fonts]` list gives the DefaultFont the name maps to
+				// (`_sans`, `Times New Roman` -> serif, ...). Tests that declare
+				// none keep the bundled Noto Sans.
 				bool is_zero_glyph_synth = false;
+				const stbtt_fontinfo* synth_face = &g_device_font;
 				if ((tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
 				    && num_entries == 0
 				    && font_names.count(font_id) && !font_names[font_id].empty()
 				    && loadDeviceFont())
 				{
+					std::string test_face_path = abc::resolveTestDeviceFontPath(
+						font_names[font_id], font_bold_flags[font_id],
+						font_italic_flags[font_id]);
+					if (!test_face_path.empty()) {
+						const stbtt_fontinfo* tf = loadTestDeviceFace(test_face_path);
+						if (tf != NULL) synth_face = tf;
+					}
 					int ttf_ascent_em = 0, ttf_descent_em = 0, ttf_linegap_em = 0;
-					stbtt_GetFontVMetrics(&g_device_font, &ttf_ascent_em,
+					stbtt_GetFontVMetrics(synth_face, &ttf_ascent_em,
 						&ttf_descent_em, &ttf_linegap_em);
 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
-					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
+					float ttf_scale = swf_em / faceUnitsPerEm(synth_face);
 
 					const u16 SYNTH_FIRST_CP = 32;
 					const u16 SYNTH_LAST_CP  = 126;
@@ -2636,7 +2690,7 @@ namespace SWFRecomp
 					for (u16 cp = SYNTH_FIRST_CP; cp <= SYNTH_LAST_CP; cp++) {
 						font_code_tables[font_id].push_back(cp);
 						int adv_em = 0, lsb = 0;
-						stbtt_GetCodepointHMetrics(&g_device_font, cp, &adv_em, &lsb);
+						stbtt_GetCodepointHMetrics(synth_face, cp, &adv_em, &lsb);
 						font_advance_tables[font_id].push_back((s32)(adv_em * ttf_scale));
 					}
 					// stb_truetype returns descent as a negative number; flip
@@ -2664,19 +2718,20 @@ namespace SWFRecomp
 				    && (is_zero_glyph_synth || deviceFontFallbackEnabled())
 				    && loadDeviceFont())
 				{
+					const stbtt_fontinfo* dev_face = is_zero_glyph_synth ? synth_face : &g_device_font;
 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
-					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
+					float ttf_scale = swf_em / faceUnitsPerEm(dev_face);
 
 					for (u16 i = 0; i < num_entries; i++) {
 						if (i >= font_code_tables[font_id].size()) continue;
 						int needs_triangles = (font_glyph_entries[i].second == 0);
 
 						u16 codepoint = font_code_tables[font_id][i];
-						int ttf_glyph = stbtt_FindGlyphIndex(&g_device_font, codepoint);
+						int ttf_glyph = stbtt_FindGlyphIndex(dev_face, codepoint);
 						if (ttf_glyph <= 0) continue;
 
 						stbtt_vertex* verts = NULL;
-						int num_verts = stbtt_GetGlyphShape(&g_device_font, ttf_glyph, &verts);
+						int num_verts = stbtt_GetGlyphShape(dev_face, ttf_glyph, &verts);
 						if (num_verts <= 0) continue;
 
 						// Build polygon contours from TTF outline AND emit path commands
@@ -2782,7 +2837,7 @@ namespace SWFRecomp
 							}
 						}
 						if (!contour.empty()) polygon.push_back(contour);
-						stbtt_FreeShape(&g_device_font, verts);
+						stbtt_FreeShape(dev_face, verts);
 
 						// Always emit glyph path end marker (path data for hit testing)
 						emitGP(0.0f, 0.0f, 0.0f);

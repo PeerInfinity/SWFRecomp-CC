@@ -29764,6 +29764,15 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				if (_pidx >= 0 && (size_t)_pidx <= max_depth &&
 				    &display_list[_pidx] == (DisplayObject*)p->display_obj) {
 					u32 _ptid = ((DisplayObject*)p->display_obj)->transform_id;
+#ifndef NO_GRAPHICS
+					// A cacheAsBitmap root sprite is repointed at a dynamic
+					// slot for the frame (tag.c cab_snap_world), which has no
+					// CPU row. Its placement is the pre-snap matrix: Ruffle
+					// pixel-snaps device text on its own (EditTextPixelSnapping),
+					// and the unsnapped origin is the closer match
+					// (visual/cache_as_bitmap/text 1200 vs 1380 outliers @128).
+					_ptid = ng_get_original_transform_id((DisplayObject*)p->display_obj);
+#endif
 					float (*_ptd)[16] = ng_entryTransformData((DisplayObject*)p->display_obj);
 					if (!(p->as_set_flags & 1)) px = _ptd[_ptid][12] / 20.0f;
 					if (!(p->as_set_flags & 2)) py = _ptd[_ptid][13] / 20.0f;

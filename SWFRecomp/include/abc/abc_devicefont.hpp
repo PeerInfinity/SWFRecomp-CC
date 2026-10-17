@@ -15,6 +15,7 @@
 // and every runtime lookup behaves as before.
 
 #include <ostream>
+#include <string>
 
 namespace SWFRecomp
 {
@@ -26,5 +27,13 @@ namespace abc
 	// not valid TOML, declares no `[fonts.*]`, or every declared TTF fails to
 	// load — the runtime then keeps its baked-in Noto fallback.
 	void emitDeviceFonts(std::ostream& out);
+
+	// The TTF path Ruffle's test harness would render a device font `name`
+	// with, resolved through `./test.toml`: a `[fonts.*]` family match, else
+	// the `[default_fonts]` list of the DefaultFont the name maps to (ruffle
+	// core/src/html/layout.rs:560-625). "" when nothing resolves, in which
+	// case the caller keeps the bundled Noto Sans. Used by the AVM1
+	// zero-glyph DefineFont2/3 synthesis (swf.cpp).
+	std::string resolveTestDeviceFontPath(const std::string& name, bool bold, bool italic);
 }
 }

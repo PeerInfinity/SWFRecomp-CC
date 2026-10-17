@@ -451,3 +451,17 @@ avm2/loader_events                          # AVM2 Loader drain / init order  1 
 # tier=2  (CI-failing / skipped; A/B signal only)
 visual/drawing_api/fills_and_lines          # AVM1 lineStyle miter/MiterClip   1 cmp
 avm2/graphics_draw_path                     # drawPath cubic (lyon flatten)    1 cmp
+# SESSION 22 ADDITIONS (s22 wave-2 `w2-default-fonts-draw`). Change classes:
+# (1) test.toml `[default_fonts]` -> `[fonts.*]` resolution of zero-glyph AVM1
+#     device fonts in the recompiler (swf.cpp synth, abc_devicefont.cpp
+#     resolveTestDeviceFontPath) and of AVM2 device-list misses (`_sans`/
+#     `_serif` alias rows); (2) the AVM1 TextField walk under a cacheAsBitmap
+#     root sprite's snapped slot (tag.c cab_snap_world); (3) AVM2 draw() with a
+#     source `mask`. The set had no `[default_fonts]` member, no AVM1
+#     cacheAsBitmap-text member and no draw()-mask member. Tier 2 when added:
+#     all three were CI-failing before this patch (locally they now pass:
+#     cab/text 1200/1500 @128, text-bind 583/600 @64, draw_masks 0/0 @tol 0).
+# tier=2  (CI-failing / skipped; A/B signal only)
+visual/cache_as_bitmap/text                 # AVM1 CAB root + device EditText 1 cmp
+from_shumway/avm1/text-bind                 # AVM1 `_sans` via [default_fonts] 1 cmp
+avm2/bitmapdata_draw_masks                  # draw(src) honours src.mask, tol 0 1 cmp

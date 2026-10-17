@@ -10,8 +10,10 @@
 # font ~14px too low, ~1900 outliers) but sat in a TRACE-axis list, where it
 # had no effect on the pixel board — scripts/image_triage.py classifies a
 # suite-local ignore as "TRACE-axis triage, kept on the board". The trace test
-# passes, so the entry is gone from here; the image rationale remains live in
-# avm1/_investigation/ACCEPTED_DIFFS.md and in its summary table.
+# passes, so the entry is gone from here. The image rationale that lived in
+# avm1/_investigation/ACCEPTED_DIFFS.md was retired in s22 (w2-default-fonts-draw):
+# the recompiler now resolves `_sans` through test.toml [default_fonts] ->
+# [fonts.*], and the image passes.
 
 # Ruffle known_failure — test fails in Ruffle's own test suite.
 #

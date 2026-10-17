@@ -3206,6 +3206,11 @@ static void cab_snap_in_place(DisplayObject* obj, float world[16])
 // with everything else. Leaving the slot alone renders the shape at the snapped
 // position with its background one pixel back (measured: visual/opaque_background
 // 3856 -> 1504 with the children-only snap, 3856 -> 4 with both).
+//
+// The minted slot has no CPU-side `transform_data` row: code that reads the
+// container's placement back from its slot during the frame resolves the
+// pre-snap id through ng_get_original_transform_id (compute_mc_world_xform,
+// the AVM1 TextField glyph walk in action.c).
 static const float* cab_snap_world(DisplayObject* obj, const float* in,
                                    float out[16])
 {
@@ -7581,7 +7586,10 @@ static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, fl
 		// entries the matrix compose_children already composed to world this
 		// frame. Overlay any AS-set transform, then we're done (no recursion:
 		// the slot is already world-space).
-		memcpy(out, (const float*)app_context->transform_data + (size_t)d->transform_id * 16,
+		// A ROOT entry's slot is its baked placement unless cab_snap_world
+		// repointed it at a dynamic slot for the frame (no CPU row there).
+		u32 tid = in_root_dl ? ng_get_original_transform_id(d) : d->transform_id;
+		memcpy(out, (const float*)app_context->transform_data + (size_t)tid * 16,
 			16 * sizeof(float));
 		if (mc->as_set_flags != 0)
 			apply_as_transform(out, mc, mc->as_set_flags);

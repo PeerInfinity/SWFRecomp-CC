@@ -472,59 +472,6 @@ investigated but fixing this point introduced 2 regressions at other scribble bo
 
 ---
 
-### `from_shumway/avm1/text-bind` — device-font file mismatch: text ~14px too low (~1900 outlier pixels, max diff 158)
-
-**Test:** image-only comparison. Both render "SUCCESS" in magenta
-(`#d662c6`) at the same font size (42) with correctly-formed glyphs — but
-our text sits **~14px lower** than the expected image (ours text-top
-y≈86 vs expected y≈72; identical 31px glyph height = a pure vertical
-offset). An aligned single-glyph comparison shows the glyph shapes/AA
-match Ruffle; the outliers are the vertical misalignment, not glyph
-quality.
-
-**Root cause (investigated end-to-end 2026-06-02): a device-font
-font-FILE mismatch, not a layout or tessellation bug.** The SWF declares
-font_id=1 as `_sans` device font with empty `<glyphs/>` (`DefineFont3`,
-no embedded glyphs). Which Noto Sans resolves `_sans` decides the
-baseline:
-
-- **Our recompiler** synthesizes device-font glyphs/metrics from its
-  bundled `SWFRecomp/assets/NotoSans.ttf` — a full Noto, `unitsPerEm=1000`,
-  `hhea.ascent=1069` = **1.069 em**. The runtime places the first-line
-  baseline at `field_top + ascent·scale + gutter`
-  (`tag.c::textfield_glyph_render_cb`), so text lands lower.
-- **The `text-bind` test dir ships its OWN `NotoSans.ttf`** (25 KB subset,
-  `unitsPerEm=1024`, `hhea.ascent=784` = **0.7656 em**) plus a `fonts.conf`
-  mapping `sans-serif`→"Noto Sans". Ruffle's oracle resolves `_sans` to
-  *that* font via fontconfig → baseline ~14px higher.
-
-**Proof:** temporarily swapping the test's `NotoSans.ttf` into
-`SWFRecomp/assets/` moves our text-top from y=86 to **y=73, matching the
-expected y=72 within 1px** (outliers 1961→1462; the residual is sub-pixel
-AA). So our text layout is correct — only the font's vertical metrics
-differ.
-
-**Why we don't "fix" it:** Ruffle's *own* bundled fallback device font
-(`core/assets/notosans.subset.ttf.gz`) is **byte-identical to our
-`assets/NotoSans.ttf`** (both 243912 bytes, 1.069 em). So in the normal
-case — real games, and any SWF/test that doesn't ship a custom device
-font — our device-font text **matches Ruffle's default**. (A bare Ruffle
-exporter run on this SWF, ignoring the test's `fonts.conf`, renders at
-y=84 ≈ our y=86.) text-bind diverges only because it bundles a custom
-metrics font we don't resolve at recompile time. Replicating per-test
-fontconfig device-font resolution in the recompiler is high-effort /
-narrow value; switching our bundled font to the 0.7656 em subset would
-fix this one test but **diverge from Ruffle's default fallback and from
-real games** — a net regression. (Note: an earlier "shrink the
-synthesized ascent" idea was wrong — it measured against this test's
-custom-font oracle rather than Ruffle's default.)
-
-**Decision:** Accept; device-font vertical metrics depend on which font
-resolves `_sans`, and our choice matches Ruffle's default fallback font.
-The divergence is specific to this test's bundled custom font.
-
----
-
 ## Category 9: Video Decoder Implementation Differences
 
 Image-comparison tests that render decoded FLV frames against a Ruffle-captured
@@ -1026,7 +973,7 @@ three full-width 16-19-row bands ~217 rows apart (one per row of cells, each
 spanning every cell's x-range) plus one 12×10 glyph patch, and **zero outliers
 anywhere in the large blurred areas**. Matching it would mean reproducing
 Ruffle's bundled default font's rasterisation — the same architectural gap as
-the other device-font entries (`from_shumway/avm1/text-bind` above).
+the other device-font entries.
 
 **Decision:** Accept the text-owned residual. Scope: the `output` comparison
 only. **Standing invariant:** the blur half is *not* dispositioned — if the
@@ -1277,7 +1224,6 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | ~~`string_paths_reference_launder`~~ | ~~Ruffle known failure (stack_push)~~ | ~~2~~ | **RESOLVED 2026-08-01** — now PASS; we match Flash where Ruffle does not. De-listed from `ruffle-tests/ignored_tests.txt` |
 | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
-| `from_shumway/avm1/text-bind` | Image: device-font file mismatch — text ~14px too low (test ships a 0.7656 em NotoSans + fonts.conf; we use our 1.069 em bundled Noto, which matches Ruffle's default fallback) | ~1900 px | Accept; device-font vertical metrics depend on which font resolves `_sans`; we match Ruffle's default |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 (trace lines; **no image comparison exists**) | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
