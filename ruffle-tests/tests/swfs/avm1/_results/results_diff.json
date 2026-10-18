@@ -1,98 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-10-17T02:06:22.716170+00:00",
-    "old_git_sha": "9396522982a2e510ab9ee4117eec7510ee9ff163",
-    "new_timestamp": "2026-10-17T04:26:14.656924+00:00",
-    "new_git_sha": "38cf9b1a0ab840bc6be0edbc5eb8938e8eafad09",
+    "old_timestamp": "2026-10-17T04:26:14.656924+00:00",
+    "old_git_sha": "38cf9b1a0ab840bc6be0edbc5eb8938e8eafad09",
+    "new_timestamp": "2026-10-18T08:49:49.625769+00:00",
+    "new_git_sha": "f55511379655b2fc1bd6eccc841bfdb493ebd79e",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 707,
+    "old_pass": 710,
     "old_ruffle_matched": 20,
-    "old_effective_pass": 727,
+    "old_effective_pass": 730,
     "old_total": 744,
-    "old_pass_rate": 95.0,
+    "old_pass_rate": 95.4,
     "new_pass": 710,
     "new_ruffle_matched": 20,
     "new_effective_pass": 730,
     "new_total": 744,
     "new_pass_rate": 95.4,
-    "old_mismatched_lines": 12772,
+    "old_mismatched_lines": 11256,
     "new_mismatched_lines": 11256,
     "increased_mismatches": 0,
-    "decreased_mismatches": 1516,
-    "newly_passing": 3,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 740,
+    "status_changed": 0,
+    "unchanged": 744,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "globals_monkeypatch",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 158,
-        "expected_lines": 246,
-        "matching_lines": 41
-      },
-      "new_lines": {
-        "actual_lines": 172,
-        "expected_lines": 246,
-        "matching_lines": 41
-      }
-    },
-    {
-      "test": "matrix",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 392,
-        "expected_lines": 810,
-        "matching_lines": 57
-      },
-      "new_lines": {
-        "actual_lines": 810,
-        "expected_lines": 810,
-        "matching_lines": 810
-      }
-    },
-    {
-      "test": "point",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 266,
-        "expected_lines": 329,
-        "matching_lines": 54
-      },
-      "new_lines": {
-        "actual_lines": 329,
-        "expected_lines": 329,
-        "matching_lines": 329
-      }
-    },
-    {
-      "test": "rectangle",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 413,
-        "expected_lines": 629,
-        "matching_lines": 141
-      },
-      "new_lines": {
-        "actual_lines": 629,
-        "expected_lines": 629,
-        "matching_lines": 629
-      }
-    }
-  ]
+  "changes": []
 }
