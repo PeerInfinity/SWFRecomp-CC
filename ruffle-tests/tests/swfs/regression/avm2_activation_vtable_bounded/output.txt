@@ -1,0 +1,5 @@
+start
+tick 40 sum=42089160 caught=2320
+tick 80 sum=84178320 caught=4640
+tick 120 sum=126267480 caught=6960
+done

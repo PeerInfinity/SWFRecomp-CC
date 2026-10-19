@@ -98,6 +98,9 @@ The fix landed in three steps. Each step uncovered the next.
   Seedling makes per swap cost under ~140 B/swap), so it was left alone.
 - Vtable `entries`/`metas` growth also never frees the old array: ICs and bound-method nodes hold `Avm2PropEntry*`
   pointers. Vtable growth is bootstrap-time, except for per-activation vtables.
+  - ⛔ **That exception WAS the next leak** (2026-10-19): the per-call `no_index` activation vtables leaked their
+    superseded arrays on every call, ~78 KB/frame on the panel page. They now free on growth. See
+    `avm2-seedling-frame-leak-fix.md`.
 - `verify_output.py` reads `test_env.json` for per-test runtime env.
 
 ## CI on the final SHA (`4c450f076`)
