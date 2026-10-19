@@ -84,9 +84,18 @@ The test calls both 400 times a frame for 120 frames.
 
 ## Verification
 
-Local ASAN + `-DHEAP_PASSTHROUGH` + `AVM2_GC_STRESS=1` (`ASAN_OPTIONS=detect_leaks=0`; LSan's exit-time report trips on every build because the runtime frees nothing at exit): in progress at commit time, recorded in the closeout below.
+- Local ASAN with `-DHEAP_PASSTHROUGH` and `AVM2_GC_STRESS=1`: **6/6 pass, 0 sanitizer reports.**
+  - `ASAN_OPTIONS=detect_leaks=0` is needed: LSan's exit-time report fails every build, because the runtime frees
+    nothing at exit.
+  - The six tests: `avm2_activation_vtable_bounded` and avm2 `activation_class`, `catch_scope_slot`, `closures`,
+    `newactivation_in_script_init`, `try_catch`.
 
-CI: recorded in the closeout below.
+- CI on the fix `c1fa89bc2`, graphics `categories=full`, run 39311823678 (published as `3f901de31`, merged into
+  master):
+  - `corpus_status_diff.py` from `0cb5464e5`: **0 regressions, 0 status moves**, effective 4503 of 4563 in the
+    intersection;
+  - the new regression test passes.
+- Graphics full with `avm2_gc=1` (stress), run 39311840733: **identical to the published run on all 4,625 tests**.
 
 ## For the Archipelago rebuild
 
