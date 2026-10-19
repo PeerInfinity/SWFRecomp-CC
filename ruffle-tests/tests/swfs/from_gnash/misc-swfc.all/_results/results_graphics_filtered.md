@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-10-17 16:50 UTC
+**Date**: 2026-10-19 20:20 UTC
 
-**Git SHA**: `aaf953dff9`
+**Git SHA**: `c1fa89bc20`
 
-**Run Duration**: 3m 40s
+**Run Duration**: 2m 41s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -33,17 +33,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.9s |  |
-| 2 | `edittext_test1` | 47 | 19.0s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 2.6s |  |
-| 4 | `hello` | 4 | 1.7s |  |
-| 5 | `mouse_drag_test` | 12 | 1.7s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 2.8s |  |
-| 7 | `opcode_guard_test2` | 24 | 2.1s |  |
-| 8 | `soft_reference_test1` | 45 | 18.9s |  |
-| 9 | `stackscope` | 11 | 18.2s |  |
-| 10 | `submoviegetvar` | 4 | 22.3s |  |
-| 11 | `swf4opcode` | 117 | 4.1s |  |
+| 1 | `button_test1` | 31 | 2.5s |  |
+| 2 | `edittext_test1` | 47 | 2.3s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 2.0s |  |
+| 4 | `hello` | 4 | 2.4s |  |
+| 5 | `mouse_drag_test` | 12 | 2.4s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 2.0s |  |
+| 7 | `opcode_guard_test2` | 24 | 3.5s |  |
+| 8 | `soft_reference_test1` | 45 | 22.4s |  |
+| 9 | `stackscope` | 11 | 14.5s |  |
+| 10 | `submoviegetvar` | 4 | 14.5s |  |
+| 11 | `swf4opcode` | 117 | 3.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 3.1s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 23.3s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.7s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 24.5s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 3.1s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 3.7s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 1.1s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.8s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 14.5s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 3.2s |  |
 
 ## Near-Passing Tests
 

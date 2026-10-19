@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-10-17T04:05:11.290045+00:00",
-    "old_git_sha": "38cf9b1a0ab840bc6be0edbc5eb8938e8eafad09",
-    "new_timestamp": "2026-10-17T16:50:24.782280+00:00",
-    "new_git_sha": "aaf953dff9e10469364b3d859beebdec6d3fe0ce",
+    "old_timestamp": "2026-10-17T16:50:24.782280+00:00",
+    "old_git_sha": "aaf953dff9e10469364b3d859beebdec6d3fe0ce",
+    "new_timestamp": "2026-10-19T20:20:55.487396+00:00",
+    "new_git_sha": "c1fa89bc20beb8636c94dfbe51977c6a529751f4",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,118 @@
     "old_effective_pass": 1275,
     "old_total": 1292,
     "old_pass_rate": 95.4,
-    "new_pass": 1233,
+    "new_pass": 1234,
     "new_ruffle_matched": 42,
-    "new_effective_pass": 1275,
-    "new_total": 1292,
-    "new_pass_rate": 95.4,
+    "new_effective_pass": 1276,
+    "new_total": 1300,
+    "new_pass_rate": 94.9,
     "old_mismatched_lines": 2530,
-    "new_mismatched_lines": 2530,
+    "new_mismatched_lines": 3412,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 1292,
-    "added": 0,
+    "added": 8,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "array_constructor",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 181,
+        "expected_lines": 234,
+        "matching_lines": 21
+      }
+    },
+    {
+      "test": "array_join_reentrant",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 68,
+        "expected_lines": 68,
+        "matching_lines": 58
+      }
+    },
+    {
+      "test": "context3d_draw_to_bitmap_data",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 11,
+        "expected_lines": 15,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "hit_test_scroll_rect",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 99,
+        "expected_lines": 99,
+        "matching_lines": 69
+      }
+    },
+    {
+      "test": "textfield_default_text_format_null",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 20,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "textfield_get_text_format_args",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 447,
+        "expected_lines": 567,
+        "matching_lines": 50
+      }
+    },
+    {
+      "test": "vector_join_reentrant",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 84,
+        "expected_lines": 96,
+        "matching_lines": 10
+      }
+    },
+    {
+      "test": "vector_prototype_some",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 125
+      }
+    }
+  ]
 }
