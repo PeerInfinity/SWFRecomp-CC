@@ -1,0 +1,12 @@
+== block=0 worklet
+{"path": "worklet", "state": "running", "cadencePerSec": 21.55, "cadencePerAudioSec": 21.558, "steadyZeroSamples": 2560, "framesPerCall": [2048], "cadenceThroughStallPerAudioSec": 25.965, "callsDuringStall": 0, "burstAfterStall": 5, "samples": 54272, "zeroSamples": 1408, "longestZeroRunMs": 31.9, "rawBackSteps": 128, "replays": []}
+== block=0 ?sp=1
+{"path": "scriptprocessor", "state": "running", "cadencePerSec": 21.35, "cadencePerAudioSec": 21.495, "steadyZeroSamples": 0, "framesPerCall": [2048], "cadenceThroughStallPerAudioSec": 25.039, "callsDuringStall": 0, "burstAfterStall": 4, "samples": 49664, "zeroSamples": 0, "longestZeroRunMs": 0, "rawBackSteps": 1, "replays": [[2576, 923648, 927743]]}
+== block=300 worklet
+{"path": "worklet", "state": "running", "cadencePerSec": 21.5, "cadencePerAudioSec": 21.533, "steadyZeroSamples": 0, "framesPerCall": [2048], "cadenceThroughStallPerAudioSec": 24.609, "callsDuringStall": 0, "burstAfterStall": 11, "samples": 65536, "zeroSamples": 14208, "longestZeroRunMs": 322.2, "rawBackSteps": 128, "replays": []}
+== block=300 ?sp=1
+{"path": "scriptprocessor", "state": "running", "cadencePerSec": 21.5, "cadencePerAudioSec": 21.533, "steadyZeroSamples": 0, "framesPerCall": [2048], "cadenceThroughStallPerAudioSec": 24.609, "callsDuringStall": 0, "burstAfterStall": 11, "samples": 64512, "zeroSamples": 0, "longestZeroRunMs": 0, "rawBackSteps": 5, "replays": [[3088, 929792, 933887], [7184, 929792, 933887], [11280, 929792, 933887], [15376, 929792, 933887], [19472, 929792, 933887]]}
+== block=1500 worklet
+{"path": "worklet", "state": "running", "cadencePerSec": 21.5, "cadencePerAudioSec": 21.508, "steadyZeroSamples": 0, "framesPerCall": [2048], "cadenceThroughStallPerAudioSec": 22.729, "callsDuringStall": 0, "burstAfterStall": 36, "samples": 117760, "zeroSamples": 66944, "longestZeroRunMs": 1518, "rawBackSteps": 129, "replays": []}
+== block=1500 ?sp=1
+{"path": "scriptprocessor", "state": "running", "cadencePerSec": 21.15, "cadencePerAudioSec": 21.533, "steadyZeroSamples": 0, "framesPerCall": [2048], "cadenceThroughStallPerAudioSec": 22.645, "callsDuringStall": 0, "burstAfterStall": 36, "samples": 115200, "zeroSamples": 1, "longestZeroRunMs": 0, "rawBackSteps": 17, "replays": [[3088, 907264, 911359], [7184, 907264, 911359], [11280, 907264, 911359], [15376, 907264, 911359], [19472, 907264, 911359], [23568, 907264, 911359], [27664, 907264, 911359], [31760, 907264, 911359], [35856, 907264, 911359], [39952, 907264, 911359], [44048, 907264, 91135

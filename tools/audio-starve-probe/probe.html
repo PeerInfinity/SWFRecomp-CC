@@ -1,0 +1,6 @@
+<!doctype html><html><body><canvas id="canvas" width="550" height="400"></canvas>
+<script>
+if (location.search.indexOf('sp=1') >= 0) window.SWF_AUDIO_SCRIPTPROCESSOR = true;
+window.Module = { canvas: document.getElementById('canvas'), print: function(t){console.log(t)}, printErr: function(t){console.log(t)}, onRuntimeInitialized: function(){ Module.ccall('runSWF', null, [], [], {async: true}); } };
+var s = document.createElement('script'); s.src = 'stop_sounds_swf_4.js'; document.body.appendChild(s);
+</script></body></html>
