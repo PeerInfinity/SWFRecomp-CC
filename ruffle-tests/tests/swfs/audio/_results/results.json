@@ -1,110 +1,77 @@
 {
   "metadata": {
-    "timestamp": "2026-10-18T08:49:49.731708+00:00",
-    "git_sha": "f55511379655b2fc1bd6eccc841bfdb493ebd79e",
-    "duration_seconds": 80.52,
+    "timestamp": "2026-10-25T08:41:41.576786+00:00",
+    "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
+    "duration_seconds": 72.84,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 5,
-  "pass": 3,
+  "pass": 0,
   "ruffle_matched": 0,
-  "fail": 2,
-  "pass_rate": 60.0,
-  "effective_pass": 3,
-  "effective_pass_rate": 60.0,
+  "fail": 5,
+  "pass_rate": 0.0,
+  "effective_pass": 0,
+  "effective_pass_rate": 0.0,
   "breakdown": {
-    "output_mismatch": 2
+    "compile_fail": 5
   },
   "tests": [
     {
       "test": "aac",
       "phases": {
-        "recomp": 0.009,
-        "compile": 8.0,
-        "run": 0.008
+        "recomp": 0.008,
+        "compile": 0.688
       },
       "num_frames": 400,
-      "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
-      "lines": {
-        "actual_lines": 24,
-        "expected_lines": 18,
-        "matching_lines": 3
-      },
-      "duration": 8.03,
-      "status": "output_mismatch",
-      "detail": "21 line(s) differ (actual=24, expected=18)",
-      "actual_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat Function/<anonymous>()",
-      "expected_output": "Starting tone: tone_mono_22050hz.flv\nMeasuring...\nPASS\nStarting tone: tone_mono_44100hz.flv\nMeasuring...\nPASS\nStarting tone: tone_mono_48000hz.flv\nMeasuring...\nPASS\nStarting tone: tone_stereo_22050hz.flv\nMeasuring...\nPASS\nStarting tone: tone_stereo_44100hz.flv\nMeasuring...\nPASS\nStarting tone: tone_stereo_48000hz.flv\nMeasuring...\nPASS"
+      "status": "compile_fail",
+      "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.7
     },
     {
       "test": "g711",
       "phases": {
-        "recomp": 0.009,
-        "compile": 8.198,
-        "run": 0.008
+        "recomp": 0.008,
+        "compile": 0.699
       },
       "num_frames": 600,
-      "error_signature": "TypeError: Error #1006: computeSpectrum is not a function.",
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 6,
-        "matching_lines": 2
-      },
-      "duration": 8.22,
-      "status": "output_mismatch",
-      "detail": "6 line(s) differ (actual=8, expected=6)",
-      "actual_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nTypeError: Error #1006: computeSpectrum is not a function.\n\tat MethodInfo-8()",
-      "expected_output": "Starting tone: tone_alaw_mono.flv\nMeasuring...\nPASS\nStarting tone: tone_mulaw_mono.flv\nMeasuring...\nPASS"
+      "status": "compile_fail",
+      "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.71
     },
     {
       "test": "g711_event_alaw",
       "phases": {
-        "recomp": 0.005,
-        "compile": 20.995,
-        "run": 0.002
+        "recomp": 0.006,
+        "compile": 25.033
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 21.01,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 25.04
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.005,
-        "compile": 21.41,
-        "run": 0.002
+        "compile": 22.985
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 21.42,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 22.99
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
         "recomp": 0.01,
-        "compile": 21.531,
-        "run": 0.002
+        "compile": 23.118
       },
       "num_frames": 120,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 21.55,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 23.13
     }
   ]
 }

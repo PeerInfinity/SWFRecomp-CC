@@ -1,37 +1,33 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-10-18 08:49 UTC
+**Date**: 2026-10-25 08:41 UTC
 
-**Git SHA**: `f555113796`
+**Git SHA**: `344c85a166`
 
-**Run Duration**: 1m 21s
+**Run Duration**: 1m 13s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 5 |
-| Passing | **3** (60.0%) |
-| Failing | 2 |
-| Total expected lines | 24 |
-| Matching lines | 5 (20.8%) |
-| Mismatched lines | 19 |
+| Passing | **0** (0.0%) |
+| Failing | 5 |
+| Total expected lines | 0 |
+| Matching lines | 0 (0.0%) |
+| Mismatched lines | 0 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 2 | 100.0% |
+| Compile Fail | 5 | 100.0% |
 
 ## Passing Tests
 
-**3 tests passing**
+**0 tests passing**
 
-| # | Test | Lines | Duration | Notes |
-|---|------|-------|----------|-------|
-| 1 | `g711_event_alaw` | 0 | 21.0s |  |
-| 2 | `g711_event_mulaw` | 0 | 21.4s |  |
-| 3 | `stream_incomplete_loop` | 0 | 21.6s |  |
+No passing tests.
 
 ## Near-Passing Tests
 
@@ -55,9 +51,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**2 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `g711` | 25.0% | 2/8 | 8 | 6 |  |
-| 2 | `aac` | 12.5% | 3/24 | 24 | 18 |  |
+No output mismatches.

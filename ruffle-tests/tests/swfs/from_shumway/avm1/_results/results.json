@@ -1,772 +1,539 @@
 {
   "metadata": {
-    "timestamp": "2026-10-18T08:49:49.763944+00:00",
-    "git_sha": "f55511379655b2fc1bd6eccc841bfdb493ebd79e",
-    "duration_seconds": 113.91,
+    "timestamp": "2026-10-25T08:41:42.253913+00:00",
+    "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
+    "duration_seconds": 80.83,
     "total_available": 47,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 47,
-  "pass": 47,
+  "pass": 0,
   "ruffle_matched": 0,
-  "fail": 0,
-  "pass_rate": 100.0,
-  "effective_pass": 47,
-  "effective_pass_rate": 100.0,
-  "breakdown": {},
+  "fail": 47,
+  "pass_rate": 0.0,
+  "effective_pass": 0,
+  "effective_pass_rate": 0.0,
+  "breakdown": {
+    "compile_fail": 47
+  },
   "tests": [
     {
       "test": "array",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.31,
-        "run": 0.004
+        "compile": 0.219
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.32,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.22
     },
     {
       "test": "bitmapdata/getPixel",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.231,
-        "run": 0.004
+        "compile": 0.267
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 1.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.27
     },
     {
       "test": "bitmapdata/loadBitmap",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.29,
-        "run": 0.004
+        "compile": 0.217
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 1.3,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.22
     },
     {
       "test": "callee",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.062,
-        "run": 0.004
+        "compile": 0.226
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 1.08,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.23
     },
     {
       "test": "depth",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.412,
-        "run": 0.065
+        "compile": 0.339
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.49,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "doactionorder/doactionorder",
       "phases": {
         "recomp": 0.023,
-        "compile": 1.651,
-        "run": 0.004
+        "compile": 0.38
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.68,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.4
     },
     {
       "test": "doactionorder/symbolclass",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.629,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 0.373
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 1.64,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.38
     },
     {
       "test": "duplicateMovieClip/dontremove",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.544,
-        "run": 0.008
+        "compile": 0.348
       },
       "num_frames": 4,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "duplicateMovieClip/duplicateMovieClip",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.341,
-        "run": 0.004
+        "compile": 0.333
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 1.35,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.34
     },
     {
       "test": "duplicateMovieClip/name-coercion",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.19,
-        "run": 0.004
+        "compile": 0.339
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 1.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "duplicateMovieClip/samedepth",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.424,
-        "run": 0.004
+        "compile": 0.354
       },
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.44,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.36
     },
     {
       "test": "externalinterface",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.244,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 0.343
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 1.26,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "filters",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.646,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 0.332
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 149,
-        "expected_lines": 149,
-        "matching_lines": 149
-      },
-      "duration": 1.66,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.34
     },
     {
       "test": "haxe/flocons1",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.336,
-        "run": 0.004
+        "recomp": 0.005,
+        "compile": 0.365
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 1.35,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.37
     },
     {
       "test": "haxe/flocons2",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.194,
-        "run": 0.004
+        "recomp": 0.004,
+        "compile": 0.289
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 1.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.29
     },
     {
       "test": "hitarea",
       "phases": {
-        "recomp": 0.006,
-        "compile": 21.259,
-        "run": 0.004
+        "recomp": 0.005,
+        "compile": 23.501
       },
       "num_frames": 7,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 21.27,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 23.51
     },
     {
       "test": "label",
       "phases": {
         "recomp": 0.006,
-        "compile": 13.954,
-        "run": 0.002
+        "compile": 23.341
       },
       "num_frames": 7,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 13.97,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 23.35
     },
     {
       "test": "levels",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.951,
-        "run": 0.004
+        "recomp": 0.005,
+        "compile": 0.359
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 0.96,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.36
     },
     {
       "test": "loadevent",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.511,
-        "run": 0.004
+        "compile": 0.333
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 1.53,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.34
     },
     {
       "test": "loadvariables/loadvariables",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.253,
-        "run": 0.004
+        "compile": 0.36
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.27,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.37
     },
     {
       "test": "loadvariables/loadvars",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.237,
-        "run": 0.002
+        "recomp": 0.006,
+        "compile": 0.379
       },
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 1.25,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.39
     },
     {
       "test": "lookup",
       "phases": {
-        "recomp": 0.019,
-        "compile": 1.173,
-        "run": 0.004
+        "recomp": 0.022,
+        "compile": 0.346
       },
       "num_frames": 10,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 1.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.37
     },
     {
       "test": "mouse-transparency",
       "phases": {
-        "recomp": 0.014,
-        "compile": 1.202,
-        "run": 0.002
+        "recomp": 0.013,
+        "compile": 0.382
       },
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 1.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.4
     },
     {
       "test": "moviecliploader",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.281,
-        "run": 0.004
+        "compile": 0.37
       },
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.29,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.38
     },
     {
       "test": "nativeinheritance",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.32,
-        "run": 0.004
+        "recomp": 0.007,
+        "compile": 0.353
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.33,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.36
     },
     {
       "test": "nested-button",
       "phases": {
-        "recomp": 0.005,
-        "compile": 0.845,
-        "run": 0.002
+        "recomp": 0.006,
+        "compile": 0.399
       },
       "num_frames": 4,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 0.86,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.41
     },
     {
       "test": "operations",
       "phases": {
         "recomp": 0.005,
-        "compile": 1.089,
-        "run": 0.002
+        "compile": 0.339
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      },
-      "duration": 1.1,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "property-paths/property-paths-6",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.022,
-        "run": 0.004
+        "compile": 0.343
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.04,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "property-paths/property-paths-7",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.964,
-        "run": 0.004
+        "compile": 0.243
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.98,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.25
     },
     {
       "test": "propertycase/propertycase",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.002,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 0.25
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.02,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.26
     },
     {
       "test": "propertycase/propertycase-preserving-6",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.623,
-        "run": 0.002
+        "recomp": 0.007,
+        "compile": 0.201
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 0.63,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.21
     },
     {
       "test": "propertycase/propertycase-preserving-7",
       "phases": {
-        "recomp": 0.004,
-        "compile": 0.444,
-        "run": 0.002
+        "recomp": 0.006,
+        "compile": 0.19
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      },
-      "duration": 0.45,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.2
     },
     {
       "test": "rollover",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.177,
-        "run": 0.002
+        "compile": 0.339
       },
       "num_frames": 6,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 1.19,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "scope",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.3,
-        "run": 0.004
+        "compile": 0.335
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      },
-      "duration": 1.31,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.34
     },
     {
       "test": "setinterval",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.379,
-        "run": 0.002
+        "recomp": 0.006,
+        "compile": 0.346
       },
       "num_frames": 50,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 1.39,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "settimeout",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.324,
-        "run": 0.004
+        "compile": 0.33
       },
       "num_frames": 50,
-      "lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      },
-      "duration": 1.34,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.34
     },
     {
       "test": "super",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.867,
-        "run": 0.002
+        "compile": 0.341
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "duration": 0.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "target",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.132,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 0.34
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 18
-      },
-      "duration": 1.14,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.35
     },
     {
       "test": "text-bind",
       "phases": {
-        "recomp": 0.023,
-        "compile": 22.661,
-        "run": 0.004
+        "recomp": 0.015,
+        "compile": 17.192
       },
       "num_frames": 6,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 22.69,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 17.21
     },
     {
       "test": "textfield/textfield-html",
       "phases": {
-        "recomp": 0.022,
-        "compile": 1.422,
-        "run": 0.004
+        "recomp": 0.021,
+        "compile": 0.345
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 1.45,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.37
     },
     {
       "test": "textfield/textfield-text-setters",
       "phases": {
-        "recomp": 0.018,
-        "compile": 1.093,
-        "run": 0.004
+        "recomp": 0.014,
+        "compile": 0.212
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      },
-      "duration": 1.12,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.23
     },
     {
       "test": "undefined/undefined-swf6",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.3,
-        "run": 0.002
+        "compile": 0.263
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      },
-      "duration": 1.31,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.27
     },
     {
       "test": "undefined/undefined-swf7",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.284,
-        "run": 0.002
+        "recomp": 0.006,
+        "compile": 0.216
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      },
-      "duration": 1.3,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.22
     },
     {
       "test": "watch",
       "phases": {
         "recomp": 0.006,
-        "compile": 1.258,
-        "run": 0.002
+        "compile": 0.359
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 1.27,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.37
     },
     {
       "test": "xml/xmlbuild",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.145,
-        "run": 0.004
+        "compile": 0.215
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 0.16,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.22
     },
     {
       "test": "xml/xmlload",
       "phases": {
-        "recomp": 0.02,
-        "compile": 1.28,
-        "run": 0.004
+        "recomp": 0.018,
+        "compile": 0.299
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 1.31,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.32
     },
     {
       "test": "xml/xmlstring",
       "phases": {
-        "recomp": 0.005,
-        "compile": 1.195,
-        "run": 0.004
+        "recomp": 0.008,
+        "compile": 0.258
       },
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 1.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.27
     }
   ]
 }

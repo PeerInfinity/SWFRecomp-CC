@@ -1,35 +1,33 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-10-18 08:49 UTC
+**Date**: 2026-10-25 08:41 UTC
 
-**Git SHA**: `f555113796`
+**Git SHA**: `344c85a166`
 
-**Run Duration**: 1m 10s
+**Run Duration**: 0m 37s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 7 |
-| Passing | **7** (100.0%) |
-| Failing | 0 |
-| Total expected lines | 208 |
-| Matching lines | 208 (100.0%) |
+| Total tests | 8 |
+| Passing | **0** (0.0%) |
+| Failing | 8 |
+| Total expected lines | 0 |
+| Matching lines | 0 (0.0%) |
 | Mismatched lines | 0 |
+
+### Failure Breakdown
+
+| Category | Count | % of Failures |
+|----------|-------|---------------|
+| Compile Fail | 8 | 100.0% |
 
 ## Passing Tests
 
-**7 tests passing**
+**0 tests passing**
 
-| # | Test | Lines | Duration | Notes |
-|---|------|-------|----------|-------|
-| 1 | `request_matching_profiles` | 190 | 7.9s |  |
-| 2 | `request_profiles` | 16 | 8.0s |  |
-| 3 | `sampler_odd_size` | 1 | 11.2s |  |
-| 4 | `scissor_rectangle` | 0 | 11.0s |  |
-| 5 | `scissor_rectangle_invalid` | 1 | 10.4s |  |
-| 6 | `unbound_texture` | 0 | 10.4s |  |
-| 7 | `unbound_texture_multiple` | 0 | 10.7s |  |
+No passing tests.
 
 ## Near-Passing Tests
 

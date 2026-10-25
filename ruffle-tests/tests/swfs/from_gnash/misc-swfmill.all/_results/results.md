@@ -1,57 +1,33 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-10-18 08:49 UTC
+**Date**: 2026-10-25 08:41 UTC
 
-**Git SHA**: `f555113796`
+**Git SHA**: `344c85a166`
 
-**Run Duration**: 6m 48s
+**Run Duration**: 7m 24s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 20 |
-| Passing | **19** (95.0%) |
-| Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **20** (100.0%) |
-| Failing | 0 |
-| Total expected lines | 95 |
-| Matching lines | 93 (97.9%) |
-| Mismatched lines | 2 |
+| Passing | **0** (0.0%) |
+| Failing | 20 |
+| Total expected lines | 0 |
+| Matching lines | 0 (0.0%) |
+| Mismatched lines | 0 |
+
+### Failure Breakdown
+
+| Category | Count | % of Failures |
+|----------|-------|---------------|
+| Compile Fail | 20 | 100.0% |
 
 ## Passing Tests
 
-**19 tests passing**
+**0 tests passing**
 
-| # | Test | Lines | Duration | Notes |
-|---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 20.8s |  |
-| 2 | `background` | 0 | 21.9s |  |
-| 3 | `dict_callframe` | 3 | 21.3s |  |
-| 4 | `dict_cross` | 3 | 24.6s |  |
-| 5 | `dict_event` | 5 | 21.0s |  |
-| 6 | `dict_override` | 2 | 21.5s |  |
-| 7 | `func_dict` | 3 | 23.2s |  |
-| 8 | `initaction_in_definesprite` | 2 | 21.4s |  |
-| 9 | `jump_after_end` | 3 | 13.7s |  |
-| 10 | `jump_to_prev_block` | 1 | 21.0s |  |
-| 11 | `missing_bitmap` | 0 | 17.1s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 21.0s |  |
-| 13 | `registers` | 36 | 21.2s |  |
-| 14 | `tags_after_last_showframe` | 1 | 22.6s |  |
-| 15 | `trace-as2/arguments` | 8 | 20.9s |  |
-| 16 | `trace-as2/root_onload` | 4 | 12.6s |  |
-| 17 | `trace-as2/shortstack` | 2 | 21.2s |  |
-| 18 | `trace-as2/super` | 8 | 21.7s |  |
-| 19 | `trace-as2/this` | 8 | 21.0s |  |
-
-## Ruffle-Matched Tests
-
-**1 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
-
-| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
-|---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 16.8s |  |
+No passing tests.
 
 ## Near-Passing Tests
 

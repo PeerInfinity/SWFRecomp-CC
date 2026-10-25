@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-10-18T08:49:49.792852+00:00",
-    "git_sha": "f55511379655b2fc1bd6eccc841bfdb493ebd79e",
-    "duration_seconds": 125.76,
+    "timestamp": "2026-10-25T08:41:42.733991+00:00",
+    "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
+    "duration_seconds": 116.49,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30,
@@ -10,165 +10,114 @@
     "filtered": true
   },
   "total": 9,
-  "pass": 7,
-  "ruffle_matched": 2,
-  "fail": 0,
-  "pass_rate": 77.8,
-  "effective_pass": 9,
-  "effective_pass_rate": 100.0,
+  "pass": 0,
+  "ruffle_matched": 0,
+  "fail": 9,
+  "pass_rate": 0.0,
+  "effective_pass": 0,
+  "effective_pass_rate": 0.0,
   "breakdown": {
-    "ruffle_matched": 2
+    "compile_fail": 9
   },
   "tests": [
     {
       "test": "TextFieldTest",
       "phases": {
-        "recomp": 0.007,
-        "compile": 21.582,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 15.569
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 7
-      },
-      "duration": 21.6,
-      "ruffle_diff_count": 1,
-      "ours_diff_count": 1,
-      "status": "ruffle_matched",
-      "detail": "diffs 1 \u2286 ruffle 1"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 15.58
     },
     {
       "test": "enum",
       "phases": {
-        "recomp": 0.007,
-        "compile": 1.961,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 0.205
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      },
-      "duration": 1.98,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.21
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.008,
-        "compile": 22.527,
-        "run": 0.004
+        "compile": 24.978
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      },
-      "duration": 22.54,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 24.99
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.008,
-        "compile": 25.764,
-        "run": 0.004
+        "compile": 25.866
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 26,
-        "expected_lines": 26,
-        "matching_lines": 26
-      },
-      "duration": 25.78,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 25.87
     },
     {
       "test": "hello",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.75,
-        "run": 0.004
+        "recomp": 0.007,
+        "compile": 0.336
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      },
-      "duration": 1.76,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.34
     },
     {
       "test": "implementsOpTest",
       "phases": {
-        "recomp": 0.008,
-        "compile": 22.945,
-        "run": 0.004
+        "recomp": 0.009,
+        "compile": 25.458
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 28,
-        "expected_lines": 28,
-        "matching_lines": 28
-      },
-      "duration": 22.96,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 25.47
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.007,
-        "compile": 23.224,
-        "run": 0.004
+        "compile": 22.785
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 22,
-        "expected_lines": 22,
-        "matching_lines": 22
-      },
-      "duration": 23.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 22.79
     },
     {
       "test": "levels",
       "phases": {
-        "recomp": 0.007,
-        "compile": 4.004,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 0.377
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 68,
-        "expected_lines": 68,
-        "matching_lines": 49
-      },
-      "duration": 4.02,
-      "ruffle_diff_count": 21,
-      "ours_diff_count": 19,
-      "status": "ruffle_matched",
-      "detail": "diffs 19 \u2286 ruffle 21"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.38
     },
     {
       "test": "super_test1",
       "phases": {
-        "recomp": 0.019,
-        "compile": 1.341,
-        "run": 0.004
+        "recomp": 0.008,
+        "compile": 0.336
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      },
-      "duration": 1.37,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.34
     }
   ]
 }

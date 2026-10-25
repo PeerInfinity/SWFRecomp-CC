@@ -1,31 +1,33 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-10-18 08:49 UTC
+**Date**: 2026-10-25 08:41 UTC
 
-**Git SHA**: `f555113796`
+**Git SHA**: `344c85a166`
 
-**Run Duration**: 0m 47s
+**Run Duration**: 0m 43s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 3 |
-| Passing | **3** (100.0%) |
-| Failing | 0 |
-| Total expected lines | 14 |
-| Matching lines | 14 (100.0%) |
+| Passing | **0** (0.0%) |
+| Failing | 3 |
+| Total expected lines | 0 |
+| Matching lines | 0 (0.0%) |
 | Mismatched lines | 0 |
+
+### Failure Breakdown
+
+| Category | Count | % of Failures |
+|----------|-------|---------------|
+| Compile Fail | 3 | 100.0% |
 
 ## Passing Tests
 
-**3 tests passing**
+**0 tests passing**
 
-| # | Test | Lines | Duration | Notes |
-|---|------|-------|----------|-------|
-| 1 | `avm1_imports_avm1` | 6 | 1.7s |  |
-| 2 | `avm1_non_swf_import` | 6 | 23.2s |  |
-| 3 | `empty_url` | 2 | 22.1s |  |
+No passing tests.
 
 ## Near-Passing Tests
 
