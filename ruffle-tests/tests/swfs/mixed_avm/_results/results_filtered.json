@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-10-25T08:41:41.913859+00:00",
+    "timestamp": "2026-11-01T08:33:54.752762+00:00",
     "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "duration_seconds": 31.74,
+    "duration_seconds": 32.16,
     "total_available": 12,
     "shards": 30,
     "expected_shards": 30,
@@ -24,7 +24,7 @@
       "test": "avm1_doabc",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.241
+        "compile": 0.249
       },
       "num_frames": 1,
       "status": "compile_fail",
@@ -35,7 +35,7 @@
       "test": "avm1_loads_avm2",
       "phases": {
         "recomp": 0.005,
-        "compile": 0.254
+        "compile": 0.253
       },
       "num_frames": 2,
       "status": "compile_fail",
@@ -45,112 +45,112 @@
     {
       "test": "avm1_loads_avm2_doaction",
       "phases": {
-        "recomp": 0.007,
-        "compile": 0.408
+        "recomp": 0.005,
+        "compile": 0.392
       },
       "num_frames": 3,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.41
+      "duration": 0.4
     },
     {
       "test": "avm1_sprite_sc_ignored",
       "phases": {
-        "recomp": 0.006,
-        "compile": 23.629
+        "recomp": 0.005,
+        "compile": 24.989
       },
       "num_frames": 3,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 23.64
+      "duration": 24.99
     },
     {
       "test": "avm2_doaction",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.659
+        "compile": 0.674
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.67
+      "duration": 0.68
     },
     {
       "test": "avm2_loads_avm1",
       "phases": {
-        "recomp": 0.007,
-        "compile": 0.835
+        "recomp": 0.008,
+        "compile": 0.772
       },
       "num_frames": 4,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.84
+      "duration": 0.78
     },
     {
       "test": "avm2_loads_avm1_doabc",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.718
+        "compile": 0.676
       },
       "num_frames": 4,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.73
+      "duration": 0.68
     },
     {
       "test": "avm2_loads_avm1_events",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.834
+        "compile": 0.581
       },
       "num_frames": 8,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.84
+      "duration": 0.59
     },
     {
       "test": "avm2_loads_avm1_loads_avm2_doabc",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.795
+        "compile": 0.642
       },
       "num_frames": 4,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.8
+      "duration": 0.65
     },
     {
       "test": "avm2_loads_avm1_loads_into_root",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.735
+        "compile": 0.757
       },
       "num_frames": 3,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.74
+      "duration": 0.77
     },
     {
       "test": "avm2_loads_avm1_v10",
       "phases": {
-        "recomp": 0.009,
-        "compile": 0.911
-      },
-      "num_frames": 3,
-      "status": "compile_fail",
-      "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.92
-    },
-    {
-      "test": "avm2_loads_avm1_v9",
-      "phases": {
         "recomp": 0.008,
-        "compile": 0.904
+        "compile": 0.9
       },
       "num_frames": 3,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
       "duration": 0.91
+    },
+    {
+      "test": "avm2_loads_avm1_v9",
+      "phases": {
+        "recomp": 0.007,
+        "compile": 0.691
+      },
+      "num_frames": 3,
+      "status": "compile_fail",
+      "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
+      "duration": 0.7
     }
   ]
 }

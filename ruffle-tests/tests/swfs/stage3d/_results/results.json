@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-10-25T08:41:42.013976+00:00",
+    "timestamp": "2026-11-01T08:33:54.756279+00:00",
     "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "duration_seconds": 36.69,
+    "duration_seconds": 37.99,
     "total_available": 8,
     "shards": 30,
     "expected_shards": 30
@@ -21,90 +21,90 @@
     {
       "test": "draw_to_bitmap_data_unconfigured",
       "phases": {
-        "recomp": 0.031,
-        "compile": 15.677
+        "recomp": 0.008,
+        "compile": 18.86
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 15.71
+      "duration": 18.87
     },
     {
       "test": "request_matching_profiles",
       "phases": {
-        "recomp": 0.007,
-        "compile": 0.632
+        "recomp": 0.008,
+        "compile": 0.673
       },
       "num_frames": 126,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.64
+      "duration": 0.68
     },
     {
       "test": "request_profiles",
       "phases": {
         "recomp": 0.008,
-        "compile": 0.816
+        "compile": 0.782
       },
       "num_frames": 12,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.82
+      "duration": 0.79
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.036,
-        "compile": 3.867
+        "recomp": 0.035,
+        "compile": 3.911
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 3.9
+      "duration": 3.95
     },
     {
       "test": "scissor_rectangle",
       "phases": {
         "recomp": 0.035,
-        "compile": 3.678
+        "compile": 3.806
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 3.71
+      "duration": 3.84
     },
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.035,
-        "compile": 4.064
+        "recomp": 0.036,
+        "compile": 3.623
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 4.1
+      "duration": 3.66
     },
     {
       "test": "unbound_texture",
       "phases": {
         "recomp": 0.034,
-        "compile": 3.65
+        "compile": 3.663
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 3.69
+      "duration": 3.7
     },
     {
       "test": "unbound_texture_multiple",
       "phases": {
-        "recomp": 0.033,
-        "compile": 3.614
+        "recomp": 0.022,
+        "compile": 2.15
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 3.65
+      "duration": 2.17
     }
   ]
 }

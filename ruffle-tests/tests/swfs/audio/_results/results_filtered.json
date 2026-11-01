@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-10-25T08:41:41.576786+00:00",
+    "timestamp": "2026-11-01T08:33:54.740927+00:00",
     "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "duration_seconds": 72.84,
+    "duration_seconds": 73.47,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30,
@@ -23,8 +23,8 @@
     {
       "test": "aac",
       "phases": {
-        "recomp": 0.008,
-        "compile": 0.688
+        "recomp": 0.009,
+        "compile": 0.696
       },
       "num_frames": 400,
       "status": "compile_fail",
@@ -35,45 +35,45 @@
       "test": "g711",
       "phases": {
         "recomp": 0.008,
-        "compile": 0.699
+        "compile": 0.734
       },
       "num_frames": 600,
       "status": "compile_fail",
       "detail": "avm2_date.c:231:35: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.71
+      "duration": 0.74
     },
     {
       "test": "g711_event_alaw",
       "phases": {
-        "recomp": 0.006,
-        "compile": 25.033
+        "recomp": 0.005,
+        "compile": 23.033
       },
       "num_frames": 2,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 25.04
+      "duration": 23.04
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.005,
-        "compile": 22.985
+        "compile": 25.16
       },
       "num_frames": 2,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 22.99
+      "duration": 25.17
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
         "recomp": 0.01,
-        "compile": 23.118
+        "compile": 23.609
       },
       "num_frames": 120,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 23.13
+      "duration": 23.62
     }
   ]
 }
