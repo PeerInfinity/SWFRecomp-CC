@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-01 08:33 UTC
+**Date**: 2026-11-08 08:30 UTC
 
 **Git SHA**: `344c85a166`
 
-**Run Duration**: 2m 35s
+**Run Duration**: 2m 23s
 
 **Filtered**: 0 tests ignored out of 20 available
 

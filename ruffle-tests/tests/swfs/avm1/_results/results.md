@@ -1,18 +1,18 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-01 08:33 UTC
+**Date**: 2026-11-08 08:30 UTC
 
 **Git SHA**: `344c85a166`
 
-**Run Duration**: 48m 15s
+**Run Duration**: 42m 49s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 749 |
+| Total tests | 752 |
 | Passing | **0** (0.0%) |
-| Failing | 749 |
+| Failing | 752 |
 | Total expected lines | 0 |
 | Matching lines | 0 (0.0%) |
 | Mismatched lines | 0 |
@@ -21,7 +21,7 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 749 | 100.0% |
+| Compile Fail | 752 | 100.0% |
 
 ## Passing Tests
 
@@ -166,4 +166,4 @@ No output mismatches.
 | 105 | [VECTOR_PATH_HITTEST_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/VECTOR_PATH_HITTEST_PLAN.md) | 1 | 0 | 1 |
 | 106 | [WITH_SCOPE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/WITH_SCOPE_PLAN.md) | 5 | 0 | 5 |
 | 107 | [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md) | 33 | 0 | 33 |
-| | *(tests not in any document)* | 251 | 0 | 251 |
+| | *(tests not in any document)* | 254 | 0 | 254 |

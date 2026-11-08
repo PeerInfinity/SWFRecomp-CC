@@ -1,18 +1,18 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-01 08:33 UTC
+**Date**: 2026-11-08 08:30 UTC
 
 **Git SHA**: `344c85a166`
 
-**Run Duration**: 76m 60s
+**Run Duration**: 72m 34s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1312 |
+| Total tests | 1316 |
 | Passing | **0** (0.0%) |
-| Failing | 1312 |
+| Failing | 1316 |
 | Total expected lines | 0 |
 | Matching lines | 0 (0.0%) |
 | Mismatched lines | 0 |
@@ -21,7 +21,7 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 1312 | 100.0% |
+| Compile Fail | 1316 | 100.0% |
 
 ## Passing Tests
 

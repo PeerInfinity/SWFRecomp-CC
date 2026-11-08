@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-01T08:33:55.770920+00:00",
+    "timestamp": "2026-11-08T08:30:25.930396+00:00",
     "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "duration_seconds": 0.67,
+    "duration_seconds": 1.48,
     "total_available": 3
   },
   "total": 3,
@@ -20,34 +20,34 @@
       "test": "global_instance_decls",
       "phases": {
         "recomp": 0.007,
-        "compile": 0.226
+        "compile": 1.187
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.23
+      "duration": 1.19
     },
     {
       "test": "global_proto_decls",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.125
+        "recomp": 0.005,
+        "compile": 0.099
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.13
+      "duration": 0.1
     },
     {
       "test": "global_proto_decls_delete",
       "phases": {
-        "recomp": 0.008,
-        "compile": 0.1
+        "recomp": 0.005,
+        "compile": 0.077
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.11
+      "duration": 0.08
     }
   ]
 }

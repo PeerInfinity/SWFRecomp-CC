@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "old_timestamp": "2026-10-25T08:41:41.479616+00:00",
+    "old_timestamp": "2026-11-01T08:33:54.676593+00:00",
     "old_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "new_timestamp": "2026-11-01T08:33:54.676593+00:00",
+    "new_timestamp": "2026-11-08T08:30:24.185276+00:00",
     "new_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
     "partial": false,
     "same_commit": true
@@ -16,7 +16,7 @@
     "new_pass": 0,
     "new_ruffle_matched": 0,
     "new_effective_pass": 0,
-    "new_total": 749,
+    "new_total": 752,
     "new_pass_rate": 0.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,33 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 749,
-    "added": 0,
+    "added": 3,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "video_prototype_lazy",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "video_prototype_lazy_swf6_child",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "video_width_height",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    }
+  ]
 }

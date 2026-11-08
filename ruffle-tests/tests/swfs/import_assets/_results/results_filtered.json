@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-01T08:33:54.737463+00:00",
+    "timestamp": "2026-11-08T08:30:24.232828+00:00",
     "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "duration_seconds": 41.01,
+    "duration_seconds": 31.18,
     "total_available": 3,
     "shards": 30,
     "expected_shards": 30,
@@ -23,35 +23,35 @@
     {
       "test": "avm1_imports_avm1",
       "phases": {
-        "recomp": 0.021,
-        "compile": 0.262
+        "recomp": 0.008,
+        "compile": 0.426
       },
       "num_frames": 1,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.28
+      "duration": 0.43
     },
     {
       "test": "avm1_non_swf_import",
       "phases": {
-        "recomp": 0.006,
-        "compile": 17.107
+        "recomp": 0.005,
+        "compile": 15.888
       },
       "num_frames": 4,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 17.11
+      "duration": 15.89
     },
     {
       "test": "empty_url",
       "phases": {
-        "recomp": 0.006,
-        "compile": 23.486
+        "recomp": 0.005,
+        "compile": 14.735
       },
       "num_frames": 2,
       "status": "compile_fail",
       "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 23.49
+      "duration": 14.74
     }
   ]
 }

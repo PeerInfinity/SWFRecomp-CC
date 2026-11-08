@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "old_timestamp": "2026-10-25T08:41:41.496086+00:00",
+    "old_timestamp": "2026-11-01T08:33:54.689744+00:00",
     "old_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "new_timestamp": "2026-11-01T08:33:54.689744+00:00",
+    "new_timestamp": "2026-11-08T08:30:24.197091+00:00",
     "new_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
     "partial": false,
     "same_commit": true
@@ -16,7 +16,7 @@
     "new_pass": 0,
     "new_ruffle_matched": 0,
     "new_effective_pass": 0,
-    "new_total": 1312,
+    "new_total": 1316,
     "new_pass_rate": 0.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,41 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 1312,
-    "added": 0,
+    "added": 4,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "loaderinfo_child_progress",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "loaderinfo_root_progress",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "loaderinfo_root_progress_goto",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "perspective_projection_center",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    }
+  ]
 }
