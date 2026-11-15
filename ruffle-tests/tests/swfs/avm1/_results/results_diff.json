@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-01T08:33:54.676593+00:00",
+    "old_timestamp": "2026-11-08T08:30:24.185276+00:00",
     "old_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "new_timestamp": "2026-11-08T08:30:24.185276+00:00",
+    "new_timestamp": "2026-11-15T08:31:27.821060+00:00",
     "new_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
     "partial": false,
     "same_commit": true
@@ -11,12 +11,12 @@
     "old_pass": 0,
     "old_ruffle_matched": 0,
     "old_effective_pass": 0,
-    "old_total": 749,
+    "old_total": 752,
     "old_pass_rate": 0.0,
     "new_pass": 0,
     "new_ruffle_matched": 0,
     "new_effective_pass": 0,
-    "new_total": 752,
+    "new_total": 764,
     "new_pass_rate": 0.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,13 +25,13 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 749,
-    "added": 3,
+    "unchanged": 752,
+    "added": 12,
     "removed": 0
   },
   "changes": [
     {
-      "test": "video_prototype_lazy",
+      "test": "amf0_array_matrix",
       "change_type": "added",
       "old_status": null,
       "new_status": "compile_fail",
@@ -39,7 +39,7 @@
       "new_lines": null
     },
     {
-      "test": "video_prototype_lazy_swf6_child",
+      "test": "amf0_utf8_probe",
       "change_type": "added",
       "old_status": null,
       "new_status": "compile_fail",
@@ -47,7 +47,79 @@
       "new_lines": null
     },
     {
-      "test": "video_width_height",
+      "test": "amf_array_indices",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "array_truncation_non_canonical_keys",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "edittext_set_text_same",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "edittext_set_text_same_after_edits",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "localconnection_reference_identity",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "localconnection_xml",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "localconnection_xml_unavailable",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "sparse_array_truncation_non_canonical_keys",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "xml_status_mismatched_tags",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "compile_fail",
+      "old_lines": null,
+      "new_lines": null
+    },
+    {
+      "test": "xml_stringify_utf16",
       "change_type": "added",
       "old_status": null,
       "new_status": "compile_fail",
