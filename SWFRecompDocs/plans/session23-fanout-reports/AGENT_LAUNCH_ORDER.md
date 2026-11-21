@@ -19,6 +19,8 @@ Baseline runs at `08709f658` (upstream `0ddd12b6a`): graphics/full/images `44922
 | 5 | w1-glyph-precision | pixel | morph_test1/Video-EmbedSquareTest glyph pixels, edittext_scroll, bitmapdata_draw, shape_test attribution | session_018CoDi4gT9iTUdsyJmtmsV5 — DELIVERED 16:32; prototype LANDED directly `7e2a045c1` |
 | 6 | w1-pixel-misc | pixel | Spark decode, ShaderFilter/blendShader, stage3d_texture, acid-color-0, definefont4, ignore=true/subtest harness | session_018CoDi4JVo1n3vja6iLtpWF |
 
+| 7 | w2-glyph-levien | pixel | productionize w1-filter-label mech B (recompiler device-font glyph Levien + float); glow trio, bevel_* ×3, glow_with_alpha_strength | session_018CoDi74CQBH5j8NnH5mCXM (16:50 UTC) |
+
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
