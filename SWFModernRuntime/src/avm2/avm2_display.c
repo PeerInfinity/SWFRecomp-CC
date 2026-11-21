@@ -4155,6 +4155,20 @@ static Mat display_l2g_matrix(Avm2Context* ctx, Avm2Object* obj)
 	return m;
 }
 
+// Ruffle DisplayObject::world_bounds: bounds_with_transform through
+// local_to_global_matrix_WITHOUT_OWN_scroll_rect. A committed scrollRect makes
+// bounds_with_transform return the rect's size at the object's origin, so the
+// object's own scroll translate must not be applied on top (it would shift the
+// box by -scrollRect.topLeft; hit_test_scroll_rect). Identical to
+// display_l2g_matrix for every object without a committed rect of its own.
+static Mat ht_world_bounds_matrix(Avm2Context* ctx, Avm2Object* obj)
+{
+	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
+	if (ext != NULL && ext->sr_committed && !ext->is_stage)
+		return display_l2g_matrix_no_own_sr(ctx, obj);
+	return display_l2g_matrix(ctx, obj);
+}
+
 // The mouse mapping's version of the same rule. Ruffle's MouseEvent
 // stageX/stageY (globals/flash/events/mouse_event.rs:41 `local_to_stage_x`)
 // and `local_mouse_position` both go through local_to_global /
@@ -4413,7 +4427,7 @@ static Avm2Value do_hit_test_point(Avm2Activation* act)
 		return avm2_bool(hit_test_shape_obj(ctx, self, tx, ty,
 		                                    HT_AVM_HIT_TEST) != 0);
 	}
-	Mat m = display_l2g_matrix(ctx, self);
+	Mat m = ht_world_bounds_matrix(ctx, self);
 	Rect r = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, self, &m, &r);
 	int hit = r.valid && tx >= r.xmin && tx <= r.xmax && ty >= r.ymin
@@ -4452,8 +4466,8 @@ static Avm2Value do_hit_test_object(Avm2Activation* act)
 	// world_bounds applies pending autosize bounds on TextFields.
 	avm2_text_apply_pending_bounds(ctx, self);
 	avm2_text_apply_pending_bounds(ctx, other);
-	Mat ma = display_l2g_matrix(ctx, self);
-	Mat mb = display_l2g_matrix(ctx, other);
+	Mat ma = ht_world_bounds_matrix(ctx, self);
+	Mat mb = ht_world_bounds_matrix(ctx, other);
 	Rect ra = { 0, 0, 0, 0, 0 }, rb = { 0, 0, 0, 0, 0 };
 	bounds_with_transform(ctx, self, &ma, &ra);
 	bounds_with_transform(ctx, other, &mb, &rb);
@@ -5445,6 +5459,19 @@ static Avm2Value li_get_loader(Avm2Activation* act)
 	return avm2_object_value(ext->loader);
 }
 
+// The root movie's final `progress` (bytesLoaded == bytesTotal == the SWF's
+// on-disk length), which Flash fires between `init` and `complete` even when
+// the movie was fully loaded before frame 1 ran (Ruffle
+// loaderinfo_object.rs fire_init_and_complete_events, `loader.is_none()` arm;
+// loaderinfo_root_progress). Child loaders report theirs from the fetch path.
+static void loaderinfo_root_final_progress(Avm2Context* ctx, Avm2Object* li)
+{
+	double total = (double) root_swf_size();
+	Avm2Object* ev = avm2_progress_event_new(
+		ctx, avm2_string_from_literal(ctx, "progress"), total, total);
+	if (ev != NULL) avm2_dispatch_event(ctx, li, ev);
+}
+
 // Ruffle fire_init_and_complete_events: idempotent, called at the end of every
 // frame for the root movie and for every in-flight loader. `init` precedes
 // `complete`, and both land AFTER the frame's exitFrame broadcast
@@ -5477,7 +5504,10 @@ static void loaderinfo_fire_init_and_complete(Avm2Context* ctx, Avm2Object* li)
 	}
 	if (!ext->complete_fired && ext->loaded)
 	{
+		// Set first: a goto in a progress/complete handler runs a nested
+		// frame that re-enters here (loaderinfo_root_progress_goto).
 		ext->complete_fired = 1;
+		if (ext->kind == LI_KIND_ROOT) loaderinfo_root_final_progress(ctx, li);
 		dispatch_simple_event(ctx, li, "complete", 0);
 	}
 }
@@ -14984,6 +15014,21 @@ static int point_in_self(Avm2Context* ctx, Avm2Object* obj, double px, double py
 #define HT_SKIP_CHILDREN  4
 #define HT_MOUSE_PICK     (HT_SKIP_MASK | HT_SKIP_INVISIBLE)
 
+// A leaf's Ruffle hit_test_shape (graphic.rs / bitmap.rs default) gates on
+// `world_bounds(Engine).contains(point)` before the local shape test. Only a
+// COMMITTED scrollRect makes that box differ from the self-bounds reject that
+// point_in_self already applies, so everything else skips the cost.
+static int ht_leaf_in_scroll_rect_bounds(Avm2Context* ctx, Avm2Object* obj,
+                                         Avm2DisplayObjectExt* ext,
+                                         double px, double py)
+{
+	if (!ext->sr_committed) return 1;
+	Mat m = ht_world_bounds_matrix(ctx, obj);
+	Rect b = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, obj, &m, &b);
+	return b.valid && px >= b.xmin && px <= b.xmax && py >= b.ymin && py <= b.ymax;
+}
+
 // Ruffle DisplayObject::hit_test_shape. The container flavour (movie_clip.rs)
 // honors the masker/maskee pair and the timeline clip layers and recurses into
 // the render list; Graphic/Bitmap/EditText use the leaf flavour, which is just
@@ -14997,6 +15042,7 @@ static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
 	                   && class_is_a(obj->cls, ctx->builtins.sprite_class);
 	if (!is_container)
 		return ((options & HT_SKIP_INVISIBLE) == 0 || ext->visible)
+		       && ht_leaf_in_scroll_rect_bounds(ctx, obj, ext, px, py)
 		       && point_in_self(ctx, obj, px, py);
 
 	// A maskee stays hit-testable while invisible: `visible = false` is how a
@@ -15011,7 +15057,7 @@ static int hit_test_shape_obj(Avm2Context* ctx, Avm2Object* obj,
 	// `hitTestPoint(..., true)` read false outside a scrolled clip.
 	if (ext->sr_committed)
 	{
-		Mat sw = display_l2g_matrix(ctx, obj);
+		Mat sw = ht_world_bounds_matrix(ctx, obj);
 		Rect sb = { 0, 0, 0, 0, 0 };
 		bounds_with_transform(ctx, obj, &sw, &sb);
 		if (!sb.valid || px < sb.xmin || px > sb.xmax

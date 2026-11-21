@@ -554,6 +554,10 @@ static void w3_object(Amf3Wr* w, Avm2Object* obj)
 
 	const Avm2String** statics;
 	uint32_t static_count = collect_static_props(ctx, obj, &statics);
+	// XMLList: dynamic, but Flash serializes neither its children nor any
+	// expandos, so it writes as a sealed member-less object (`0a 03 <alias>`;
+	// Ruffle amf.rs serializes_dynamic_properties; amf_xmllist).
+	if (avm2_xmllist_ext_of(avm2_object_value(obj)) != NULL) dynamic = 0;
 
 	// Trait table lookup: name + dynamic + static list.
 	int32_t trait_idx = -1;
@@ -1108,6 +1112,15 @@ static void w0_value(Amf3Wr* w, Avm2Value v)
 	else
 	{
 		buf_u8(&w->out, M0_OBJECT);
+	}
+	// XMLList is dynamic, but its children are not dynamic properties: Flash
+	// writes no members at all (avmplus AvmSerializer.cpp:294; Ruffle amf.rs
+	// serializes_dynamic_properties; amf_xmllist reads `03 00 00 09`).
+	if (avm2_xmllist_ext_of(v) != NULL)
+	{
+		buf_u16be(&w->out, 0);
+		buf_u8(&w->out, M0_OBJEND);
+		return;
 	}
 	w0_object_body(w, obj);
 }
@@ -2014,13 +2027,110 @@ static Avm2Object* so_new_data(Avm2Context* ctx)
 	return v.u.obj;
 }
 
+// Port of Ruffle core/src/shared_object.rs::local_shared_object_key: the
+// storage key "host/localPath/name" for getLocal(name, localPath, secure)
+// from the root movie's URL, or 0 when Flash can't create the shared object
+// (getLocal then throws #2134). Rejects: invalid name characters, an empty
+// localPath, a localPath that is not a '/'-bounded prefix of the SWF path,
+// secure=true from a non-https movie, and any path segment starting with '.'.
+static Avm2Value so_get_or_create(Avm2Context* ctx, const Avm2String* name);
+
+static int so_full_key(const char* name, const char* local_path, int secure,
+                       char* out, size_t out_cap)
+{
+	if (strpbrk(name, "~%&\\;:\"',<>?# ") != NULL) return 0;
+#ifdef SWF_URL
+	const char* url = SWF_URL;
+#else
+	const char* url = "file:///test.swf";
+#endif
+	const char* sep = strstr(url, "://");
+	if (sep == NULL) return 0;
+	size_t scheme_len = (size_t) (sep - url);
+	int is_file = scheme_len == 4 && strncmp(url, "file", 4) == 0;
+	int is_https = scheme_len == 5 && strncmp(url, "https", 5) == 0;
+	if (secure && !is_https) return 0;
+	const char* auth = sep + 3;
+	const char* path = auth + strcspn(auth, "/?#");
+	char host[256];
+	snprintf(host, sizeof(host), "%.*s", (int) (path - auth), auth);
+	{
+		// Strip userinfo and port from the authority (url::Url::host_str).
+		char* at = strrchr(host, '@');
+		if (at != NULL) memmove(host, at + 1, strlen(at + 1) + 1);
+		char* colon = strchr(host, ':');
+		if (colon != NULL) *colon = '\0';
+	}
+	size_t plen = strcspn(path, "?#");
+	// Remove leading/trailing slashes.
+	if (plen > 0 && path[0] == '/') { path++; plen--; }
+	if (plen > 0 && path[plen - 1] == '/') plen--;
+	if (is_file)
+	{
+		// Drop a Windows drive letter ("C:/..."), as Ruffle does.
+		if (plen >= 3 && path[1] == ':' && path[2] == '/') { path += 3; plen -= 3; }
+		snprintf(host, sizeof(host), "localhost");
+	}
+	const char* lp = path;
+	size_t lplen = plen;
+	if (local_path != NULL)
+	{
+		lp = local_path;
+		lplen = strlen(local_path);
+		if (lplen == 0) return 0;
+		if (lp[lplen - 1] == '/') lplen--;
+		if (lplen > 0 && lp[0] == '/') { lp++; lplen--; }
+		int ok = lplen <= plen && strncmp(path, lp, lplen) == 0
+			&& (lplen == 0 || lplen == plen || path[lplen] == '/');
+		if (!ok) return 0;
+	}
+	int n = snprintf(out, out_cap, "%s/%.*s/%s%s", host, (int) lplen, lp,
+	                 strchr(name, '/') != NULL ? "#" : "", name);
+	if (n < 0 || (size_t) n >= out_cap) return 0;
+	// No path segment may start with '.' (blocks "..").
+	for (const char* s = out; s != NULL; s = strchr(s, '/'))
+	{
+		if (*s == '/') s++;
+		if (*s == '.') return 0;
+	}
+	return 1;
+}
+
 static Avm2Value so_get_local(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	const Avm2String* name = act->argc > 0
 		? avm2_coerce_to_string(ctx, act->args[0])
 		: avm2_string_from_literal(ctx, "");
-	// Same-run identity: return the cached instance for this name.
+	const Avm2String* local_path = NULL;
+	if (act->argc > 1 && act->args[1].kind != AVM2_VALUE_NULL
+	    && act->args[1].kind != AVM2_VALUE_UNDEFINED)
+		local_path = avm2_coerce_to_string(ctx, act->args[1]);
+	int secure = act->argc > 2 && avm2_coerce_to_boolean(act->args[2]);
+	char key[1024];
+	if (!so_full_key(avm2_string_cstr(ctx, name),
+	                 local_path != NULL ? avm2_string_cstr(ctx, local_path) : NULL,
+	                 secure, key, sizeof(key)))
+	{
+		avm2_throw_error(ctx, ctx->builtins.error_class,
+		                 "Error #2134: Cannot create SharedObject.");
+	}
+	return so_get_or_create(ctx, avm2_string_new(ctx, key, (uint32_t) strlen(key)));
+}
+
+// getRemote keeps the pre-#2134 name-keyed model (no RTMP; nothing in the
+// corpus calls it).
+static Avm2Value so_get_remote(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	return so_get_or_create(ctx, act->argc > 0
+		? avm2_coerce_to_string(ctx, act->args[0])
+		: avm2_string_from_literal(ctx, ""));
+}
+
+static Avm2Value so_get_or_create(Avm2Context* ctx, const Avm2String* name)
+{
+	// Same-run identity: return the cached instance for this full key.
 	for (uint32_t i = 0; i < g_so_cache_count; i++)
 	{
 		if (strncmp(g_so_cache[i].name, name->utf8, name->len) == 0
@@ -2173,7 +2283,7 @@ void avm2_register_amf(Avm2Context* ctx)
 		so->native_ext_size = sizeof(Avm2SharedObjectExt);
 		g_shared_object_class = so;
 		avm2_builtin_add_static_method(ctx, so, "getLocal", so_get_local);
-		avm2_builtin_add_static_method(ctx, so, "getRemote", so_get_local);
+		avm2_builtin_add_static_method(ctx, so, "getRemote", so_get_remote);
 		avm2_builtin_add_getset(ctx, so, "data", so_get_data, NULL);
 		avm2_builtin_add_getset(ctx, so, "size", so_get_size, NULL);
 		avm2_builtin_add_method(ctx, so, "flush", so_flush);

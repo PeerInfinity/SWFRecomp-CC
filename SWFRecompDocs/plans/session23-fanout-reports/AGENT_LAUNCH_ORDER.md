@@ -48,7 +48,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 14 | w1-drift-avm1 | trace | AVM1/gnash/shumway upstream drift 45366370e..0ddd12b6a | session_018CoDi7LLFpbdSTkfTYwW6s — DELIVERED 18:11; prototype LANDED (+8) |
 | 15 | w1-drift-avm2 | both | AVM2/visual/small-suite drift + harness num_ticks | session_018CoDi6ghpj4pXCMReEcqgP — DELIVERED 18:00; prototype LANDED (+15 trace, +2 px) |
 | 16 | w2-avm1-devicefont | trace | trace-tail F: AVM1 device-font registry; fonts/device_font_name_case | session_018CoDi6nBjtTJ4GPXVQ2ife — LANDED (+1) |
-| 17 | w2-avm2-small-errors | trace | drift-avm2 S9 | session_018CoDi3zkCYHJCnpQGnoYp3 (18:20) |
+| 17 | w2-avm2-small-errors | trace | drift-avm2 S9 | session_018CoDi3zkCYHJCnpQGnoYp3 — LANDED (+6 eff) |
 | 18 | w2-stack-trace-names | trace | drift-avm2 S7 | session_018CoDi3a6sipw1TH1D3Q1bY — LANDED (+2) |
 | 19 | w2-array-vector-args | trace | drift-avm2 S5 | session_018CoDi3UaEumY9kycvtZWDx — LANDED (+5) |
 | 20 | w2-tf-css-avm2 | trace | AVM2 TextField format twins | session_018CoDi5BFztjYCFbFqJUhD8 — LANDED (+4 eff) |
@@ -83,6 +83,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `72ef0be14` | w2-harness-subtests (GRADING INSTRUMENT) | image report: denominator **+2** (ignored rows excluded; `[subtests]` rows keyed `<subtest>__<cmp>`; version-keyed subtests canonical-variant only), passes **+2** (`avm2/bitmapdata_drawwithquality` low__output.low + high__output.high, via drawWithQuality→bd_draw), fails ±0 (−`avm2/bitmap_pixelsnapping` → ignored, +`visual/edittext/edittext_device_transform_basic [embedded__output]` fail); new totals ignored=6, ruffle_matched_fail=9 (report-only: graphics_draw_path, cache_as_bitmap/avm1_color, …); band: `bitmapdata_draw_cab_quality` 2320→2640 (alias exposes a separate gap); `fonts/leading_device_font output` → `embedded__output` RENAME (image_status_diff pairs it); trace 0 moves |
 | `a0b18bc93` | w2-video-props | trace (both modes): `from_gnash/misc-ming.all/NetStream-SquareTest` fail→ruffle_matched (KF; last drift re-flip), `avm1/video_width_height` fail→pass; partial `video_prototype_lazy` 9→20/21, `_swf6_child` 2→4/8; pixels none |
 | `c216160c4` | w2-dynclip-transform (correctness) | px: `visual/filters/empty_child_filter_bounds` fail→fail 72840→24876 (no flip); 169-PNG A/B otherwise md5-identical; trace none. Lead R1: AVM1 runtime `mc.filters = [...]` is never rendered on ANY clip (1 corpus row, game-visible) |
+| (se) | w2-avm2-small-errors | trace (both modes) fail→pass: `avm2/shared_object_get_local_error`, `loaderinfo_root_progress`, `loaderinfo_root_progress_goto`, `amf_xmllist`, `hit_test_scroll_rect`; fail→ruffle_matched `from_shumway/as3-loader/events/loader-events` (KF; via Flash-correct root progress line); pixels none |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
