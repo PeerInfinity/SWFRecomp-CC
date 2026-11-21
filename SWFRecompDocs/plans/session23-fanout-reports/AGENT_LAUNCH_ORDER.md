@@ -57,6 +57,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 23 | w2-video-props | trace | drift-avm1 V: Video width/height lazy accessors | session_018CoDi3srDrx6YECoWarZYc (18:40) |
 | 24 | w2-harness-subtests | px (instrument) | ignore=true + [subtests] images + drawWithQuality + report-only ruffle-png bucket | session_018CoDi5m6iYZTWzXtXE2S8s (18:50) |
 | 25 | w2-xml-status | trace | drift-avm1 M3 XML status + AVM1 bundle | session_018CoDi58gxyHZVyRcAu87S1 (18:55) |
+| 26 | w2-dynclip-transform | px+correctness | AVM1 nested dynamic-clip transform/alpha inheritance (empty_child_filter_bounds) | session_018CoDi57QaPasoFxvAJyUzd (19:00) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
