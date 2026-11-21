@@ -819,6 +819,10 @@ struct Avm2EditTextExt
 	// the ext, so it always outlives it) used only to read the concatenated
 	// matrix for device_font_scale_x.
 	Avm2Object* owner;
+	// Ruffle EditTextFlag::FORCE_NEXT_TEXT_UPDATE: set by the
+	// defaultTextFormat setter so the next text/htmlText assignment applies
+	// (re-formatting with the default) even when the text is unchanged.
+	uint8_t force_next_text_update;
 };
 typedef struct Avm2EditTextExt Avm2EditTextExt;
 
@@ -4475,7 +4479,9 @@ static Avm2Value txt_set_text(Avm2Activation* act)
 		throw_2007(act->ctx, "text");
 	}
 	const Avm2String* s = avm2_coerce_to_string(act->ctx, v);
-	if (str_eq(et->text, s)) return avm2_undefined();
+	uint8_t force_update = et->force_next_text_update;
+	et->force_next_text_update = 0;
+	if (str_eq(et->text, s) && !force_update) return avm2_undefined();
 	if (et->style_sheet != NULL)
 	{
 		spans_from_html(act->ctx, et, s, et->multiline, et->condense_white);
@@ -4523,7 +4529,11 @@ static Avm2Value txt_set_html_text(Avm2Activation* act)
 	// (Ruffle set_html_text glue: set_is_html(true) first).
 	et->is_html = 1;
 	// set_html_text no-op check against the CURRENT html text (observable:
-	// formats are not reset when equal).
+	// formats are not reset when equal), unless the defaultTextFormat
+	// setter forced the next update (Ruffle take_force_next_text_update).
+	uint8_t force_update = et->force_next_text_update;
+	et->force_next_text_update = 0;
+	if (!force_update)
 	{
 		const Avm2String* cur = et->original_html != NULL
 			? et->original_html : spans_to_html(act->ctx, et);
@@ -4707,7 +4717,9 @@ static Avm2Value txt_set_text_color(Avm2Activation* act)
 	if (et == NULL) return avm2_undefined();
 	uint32_t rgb = avm2_coerce_to_u32(act->ctx, arg_or_undef(act, 0)) & 0xFFFFFF;
 	Avm2TextFormatFields desired = format_default();
-	desired.color = (rgb << 8) | 0xFF;  // from_rgb(rgb, 0xFF)
+	// from_rgb(rgb, 0): text format colors carry no alpha (Ruffle
+	// 37173f2b8; TextFormat.color then reads 0xFF0000, not -65536).
+	desired.color = rgb << 8;
 	desired.present |= TFP_COLOR;
 	spans_set_format(act->ctx, et, 0, u16_length(et->text), &desired);
 	spans_set_default_format(act->ctx, et, &desired);
@@ -5017,9 +5029,40 @@ static Avm2Value txt_set_default_text_format(Avm2Activation* act)
 		if (f != NULL)
 		{
 			spans_set_default_format(act->ctx, et, f);
+			// Ruffle set_default_text_format: the next text or HTML text
+			// assignment applies even when the text doesn't change.
+			et->force_next_text_update = 1;
 		}
 	}
 	return avm2_undefined();
+}
+
+// getTextFormat/setTextFormat index validation (Ruffle
+// avm2/globals/flash/text/text_field.rs get_text_format/set_text_format):
+// (-1, -1) is the whole text even when empty; otherwise begin -1 -> 0,
+// begin must be in [0, len), end -1 -> begin + 1, end must be in (0, len];
+// anything else is RangeError #2006. begin >= end afterwards is an empty
+// range (getTextFormat returns an all-null format, setTextFormat no-ops).
+static void txt_resolve_format_range(Avm2Activation* act, Avm2EditTextExt* et,
+                                     int32_t* begin_io, int32_t* end_io)
+{
+	int32_t begin = *begin_io;
+	int32_t end = *end_io;
+	int32_t len = (int32_t) u16_length(et->text);
+	if (begin == -1 && end == -1)
+	{
+		begin = 0;
+		end = len;
+	}
+	else
+	{
+		if (begin == -1) begin = 0;
+		if (begin < 0 || begin >= len) throw_2006(act->ctx);
+		if (end == -1) end = begin + 1;
+		if (end <= 0 || end > len) throw_2006(act->ctx);
+	}
+	*begin_io = begin;
+	*end_io = end;
 }
 
 static Avm2Value txt_get_text_format(Avm2Activation* act)
@@ -5028,12 +5071,13 @@ static Avm2Value txt_get_text_format(Avm2Activation* act)
 	if (et == NULL) return avm2_undefined();
 	int32_t begin = act->argc > 0 ? avm2_coerce_to_i32(act->ctx, act->args[0]) : -1;
 	int32_t end = act->argc > 1 ? avm2_coerce_to_i32(act->ctx, act->args[1]) : -1;
-	if (end >= 0 && (begin >= end || begin < 0))
+	txt_resolve_format_range(act, et, &begin, &end);
+	if (begin >= end)
 	{
-		throw_2006(act->ctx);
+		// FP/Ruffle: an empty range has no format (every field null).
+		Avm2TextFormatFields none = format_default();
+		return avm2_object_value(textformat_object_from_fields(act->ctx, &none));
 	}
-	if (begin < 0) begin = 0;
-	if (end < 0) end = (int32_t) u16_length(et->text);
 	Avm2TextFormatFields f = spans_get_format(et, (uint32_t) begin, (uint32_t) end);
 	return avm2_object_value(textformat_object_from_fields(act->ctx, &f));
 }
@@ -5043,19 +5087,21 @@ static Avm2Value txt_set_text_format(Avm2Activation* act)
 	Avm2EditTextExt* et = this_et(act);
 	if (et == NULL) return avm2_undefined();
 	Avm2Value fmt = arg_or_undef(act, 0);
-	if (fmt.kind != AVM2_VALUE_OBJECT || fmt.u.obj == NULL)
+	// FP: a null format is #2007 before any index check
+	// (avm2/textfield_set_text_format_args).
+	if (fmt.kind == AVM2_VALUE_NULL || fmt.kind == AVM2_VALUE_UNDEFINED
+	    || (fmt.kind == AVM2_VALUE_OBJECT && fmt.u.obj == NULL))
 	{
-		return avm2_undefined();
+		throw_2007(act->ctx, "format");
 	}
+	if (fmt.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
 	Avm2TextFormatFields* f = tf_fields_of(fmt.u.obj);
 	if (f == NULL) return avm2_undefined();
 	int32_t begin = act->argc > 1 ? avm2_coerce_to_i32(act->ctx, act->args[1]) : -1;
 	int32_t end = act->argc > 2 ? avm2_coerce_to_i32(act->ctx, act->args[2]) : -1;
-	int32_t len = (int32_t) u16_length(et->text);
-	if (begin < 0) begin = 0;
-	if (begin > len) throw_2006(act->ctx);
-	if (end < 0) end = len;
-	if (end > len) throw_2006(act->ctx);
+	txt_resolve_format_range(act, et, &begin, &end);
+	// FormatSpans::set_text_format: a degenerate range is a no-op.
+	if (begin >= end) return avm2_undefined();
 	spans_set_format(act->ctx, et, (uint32_t) begin, (uint32_t) end, f);
 	et_relayout(act->ctx, et);
 	return avm2_undefined();

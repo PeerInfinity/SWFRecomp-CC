@@ -565,3 +565,10 @@ visual/filters/displacement_map             # off-stage displacement source  1 c
 # A move here is RTT resolve, the budget latch, or default-font advances.
 # tier=1
 avm2/stage3d_texture                        # Stage3D RTT + default-font text 1 cmp
+# s23 w2-tf-css-avm2: AVM2 TextField getTextFormat/setTextFormat index-range
+# validation (#2006 / one-char (b) form), the defaultTextFormat-forced next
+# text assignment, and TextField.textColor storing no alpha. The standing set
+# had no AVM2 member calling ranged setTextFormat or textColor.
+# tier=1 (both CI-passing in run 44922638965)
+visual/edittext/edittext_selection_font_size # AVM2 textColor + defaultTextFormat 1 cmp
+visual/layout/line_vertical_align           # AVM2 ranged setTextFormat(tf, b, e) 1 cmp
