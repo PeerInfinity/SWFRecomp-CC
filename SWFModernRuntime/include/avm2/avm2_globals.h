@@ -857,6 +857,14 @@ void avm2_net_deliver_netstream_meta(Avm2Context* ctx);
 // to draw. Returns 0 when `ns` has decoded nothing (or is not a NetStream).
 int avm2_net_netstream_video_frame(const Avm2Object* ns, const uint32_t** out_argb,
                                    int* out_w, int* out_h);
+// NetStream audio tap (avm2_net.c): the mixer's sample history as Ruffle's
+// AudioMixer::get_sample_history sees it (the first `frames` of the last
+// complete 1024-frame block of the 44.1 kHz mixer clock), summed over every
+// NetStream's decoded FLV audio, written interleaved (L,R) into `out`
+// (zero-filled first; a stream past its last decoded sample contributes
+// silence). Returns 1 when at least one stream has audio. Feeds
+// SoundMixer.computeSpectrum.
+int avm2_net_netstream_audio_window(float* out, int frames);
 // The movie's LocalConnection domain (avm2_globals.c owns the URL parsing).
 const char* avm2_local_connection_domain(void);
 

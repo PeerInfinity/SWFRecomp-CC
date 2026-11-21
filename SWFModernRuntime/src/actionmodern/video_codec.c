@@ -750,3 +750,152 @@ done:
 	return 0;
 #endif
 }
+
+// ---------------------------------------------------------------------------
+// FLV audio (NetStream path). See video_codec.h.
+// ---------------------------------------------------------------------------
+
+struct AudioDecoderCtx {
+#ifdef SWF_HAVE_LIBAVCODEC
+	AVCodecContext* cctx;
+	AVPacket* pkt;
+	AVFrame* frame;
+#endif
+	int unused;
+};
+
+AudioDecoderCtx* audio_decoder_create(int flv_format, int sample_rate, int channels,
+                                      const unsigned char* extradata, int extradata_len)
+{
+#ifdef SWF_HAVE_LIBAVCODEC
+	enum AVCodecID id;
+	switch (flv_format) {
+		case 1:  id = AV_CODEC_ID_ADPCM_SWF; break;
+		case 2:  id = AV_CODEC_ID_MP3; break;
+		case 4: case 5: case 6: id = AV_CODEC_ID_NELLYMOSER; break;
+		case 10: id = AV_CODEC_ID_AAC; break;
+		case 11: id = AV_CODEC_ID_SPEEX; break;
+		case 14: id = AV_CODEC_ID_MP3; break;
+		default: return NULL;
+	}
+	const AVCodec* codec = avcodec_find_decoder(id);
+	if (codec == NULL) return NULL;
+	AudioDecoderCtx* ctx = (AudioDecoderCtx*) calloc(1, sizeof(*ctx));
+	if (ctx == NULL) return NULL;
+	ctx->cctx = avcodec_alloc_context3(codec);
+	ctx->pkt = av_packet_alloc();
+	ctx->frame = av_frame_alloc();
+	if (ctx->cctx == NULL || ctx->pkt == NULL || ctx->frame == NULL) goto fail;
+	ctx->cctx->sample_rate = sample_rate > 0 ? sample_rate : 44100;
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+	av_channel_layout_default(&ctx->cctx->ch_layout, channels == 2 ? 2 : 1);
+#else
+	ctx->cctx->channels = channels == 2 ? 2 : 1;
+#endif
+	if (extradata != NULL && extradata_len > 0) {
+		ctx->cctx->extradata = (uint8_t*) av_mallocz((size_t) extradata_len
+		                                             + AV_INPUT_BUFFER_PADDING_SIZE);
+		if (ctx->cctx->extradata == NULL) goto fail;
+		memcpy(ctx->cctx->extradata, extradata, (size_t) extradata_len);
+		ctx->cctx->extradata_size = extradata_len;
+	}
+	if (avcodec_open2(ctx->cctx, codec, NULL) < 0) goto fail;
+	return ctx;
+fail:
+	audio_decoder_destroy(ctx);
+	return NULL;
+#else
+	(void) flv_format; (void) sample_rate; (void) channels;
+	(void) extradata; (void) extradata_len;
+	return NULL;
+#endif
+}
+
+#ifdef SWF_HAVE_LIBAVCODEC
+static float audio_sample_at(const AVFrame* f, int ch, int i, int nch)
+{
+	int planar = av_sample_fmt_is_planar((enum AVSampleFormat) f->format);
+	const uint8_t* base = planar ? f->extended_data[ch] : f->extended_data[0];
+	int idx = planar ? i : i * nch + ch;
+	switch ((enum AVSampleFormat) f->format) {
+		case AV_SAMPLE_FMT_FLT: case AV_SAMPLE_FMT_FLTP:
+			return ((const float*) base)[idx];
+		case AV_SAMPLE_FMT_DBL: case AV_SAMPLE_FMT_DBLP:
+			return (float) ((const double*) base)[idx];
+		case AV_SAMPLE_FMT_S16: case AV_SAMPLE_FMT_S16P:
+			return (float) ((const int16_t*) base)[idx] / 32768.0f;
+		case AV_SAMPLE_FMT_S32: case AV_SAMPLE_FMT_S32P:
+			return (float) ((double) ((const int32_t*) base)[idx] / 2147483648.0);
+		case AV_SAMPLE_FMT_U8: case AV_SAMPLE_FMT_U8P:
+			return (float) ((int) base[idx] - 128) / 128.0f;
+		default:
+			return 0.0f;
+	}
+}
+#endif
+
+int audio_decoder_decode(AudioDecoderCtx* ctx, const unsigned char* data, int len,
+                         float** out_pcm, int* out_frames, int* out_channels,
+                         int* out_rate)
+{
+	*out_pcm = NULL;
+	*out_frames = 0;
+	*out_channels = 0;
+	*out_rate = 0;
+#ifdef SWF_HAVE_LIBAVCODEC
+	if (ctx == NULL || ctx->cctx == NULL || data == NULL || len <= 0) return 0;
+	uint8_t* buf = (uint8_t*) av_malloc((size_t) len + AV_INPUT_BUFFER_PADDING_SIZE);
+	if (buf == NULL) return 0;
+	memcpy(buf, data, (size_t) len);
+	memset(buf + len, 0, AV_INPUT_BUFFER_PADDING_SIZE);
+	av_packet_unref(ctx->pkt);
+	if (av_packet_from_data(ctx->pkt, buf, len) < 0) { av_free(buf); return 0; }
+	if (avcodec_send_packet(ctx->cctx, ctx->pkt) < 0) return 0;
+
+	float* pcm = NULL;
+	int total = 0, nch_out = 0, rate = 0;
+	for (;;) {
+		int r = avcodec_receive_frame(ctx->cctx, ctx->frame);
+		if (r < 0) break;
+		AVFrame* f = ctx->frame;
+#if LIBAVUTIL_VERSION_MAJOR >= 57
+		int nch = f->ch_layout.nb_channels;
+#else
+		int nch = f->channels;
+#endif
+		if (nch <= 0 || f->nb_samples <= 0) { av_frame_unref(f); continue; }
+		int oc = nch >= 2 ? 2 : 1;
+		if (nch_out == 0) { nch_out = oc; rate = f->sample_rate; }
+		if (oc != nch_out || f->sample_rate != rate) { av_frame_unref(f); continue; }
+		float* np = (float*) realloc(pcm, (size_t) (total + f->nb_samples) * (size_t) oc
+		                                  * sizeof(float));
+		if (np == NULL) { av_frame_unref(f); break; }
+		pcm = np;
+		for (int i = 0; i < f->nb_samples; i++)
+			for (int c = 0; c < oc; c++)
+				pcm[(size_t) (total + i) * (size_t) oc + (size_t) c]
+					= audio_sample_at(f, c, i, nch);
+		total += f->nb_samples;
+		av_frame_unref(f);
+	}
+	*out_pcm = pcm;
+	*out_frames = total;
+	*out_channels = nch_out;
+	*out_rate = rate;
+	return 1;
+#else
+	(void) ctx; (void) data; (void) len;
+	return 0;
+#endif
+}
+
+void audio_decoder_destroy(AudioDecoderCtx* ctx)
+{
+	if (ctx == NULL) return;
+#ifdef SWF_HAVE_LIBAVCODEC
+	if (ctx->cctx) avcodec_free_context(&ctx->cctx);
+	if (ctx->pkt) av_packet_free(&ctx->pkt);
+	if (ctx->frame) av_frame_free(&ctx->frame);
+#endif
+	free(ctx);
+}

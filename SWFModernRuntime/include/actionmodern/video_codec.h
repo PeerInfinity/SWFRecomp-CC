@@ -104,6 +104,30 @@ int video_avc_decoder_configure(VideoDecoderCtx* ctx,
 int video_resample_rgba(const unsigned char* src_rgba, int src_w, int src_h,
                         unsigned char** out_rgba, int dst_w, int dst_h);
 
+// Persistent FLV AUDIO decoder (NetStream path; libavcodec-backed). Kept in
+// this TU so callers need no libavcodec dependency: without
+// SWF_HAVE_LIBAVCODEC, audio_decoder_create returns NULL and the caller
+// decodes only what it handles itself (G.711, PCM).
+//
+// `flv_format` is the FLV SoundFormat (2 = MP3, 10 = AAC, 6 = Nellymoser,
+// 1 = ADPCM, ...). `extradata` is the AAC AudioSpecificConfig (AACPacketType
+// 0); `sample_rate` / `channels` are the tag header's values (used only by
+// codecs without in-band configuration). Returns NULL when unsupported.
+typedef struct AudioDecoderCtx AudioDecoderCtx;
+AudioDecoderCtx* audio_decoder_create(int flv_format, int sample_rate, int channels,
+                                      const unsigned char* extradata, int extradata_len);
+
+// Decode one packet. On success returns 1 with *out_pcm = malloc'd
+// interleaved float samples (caller frees; NULL when the packet produced no
+// output, e.g. decoder delay), *out_frames sample frames, *out_channels
+// (1 or 2: a wider layout keeps its first two) and *out_rate.
+int audio_decoder_decode(AudioDecoderCtx* ctx, const unsigned char* data, int len,
+                         float** out_pcm, int* out_frames, int* out_channels,
+                         int* out_rate);
+
+// Release; safe on NULL.
+void audio_decoder_destroy(AudioDecoderCtx* ctx);
+
 #ifdef __cplusplus
 }
 #endif

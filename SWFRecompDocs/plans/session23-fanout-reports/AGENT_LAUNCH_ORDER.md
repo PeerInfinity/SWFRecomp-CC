@@ -43,7 +43,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 9 | w2-attached-timeline | trace | trace-tail slot B: attached clips run natural timeline in CI modes; movieclip_destruction_test3/4 | session_018CoDi5yeX7FkuGneLRRe8H (16:58) |
 | 10 | w2-padded-filter | pixel | productionize w1-padded-filter (gated padded filter layer); drop_shadow_angles, displacement_map | session_018CoDi6x1pyS9L9PSYoDJZL (17:03) |
 | 11 | w2-stage3d-text | pixel | Stage3D RTT + budget 48M, AVM2 default-font advance rounding; stage3d_texture, stage3d_bitmap | session_018CoDi7QtMALGjWbWyYvecw (17:10) |
-| 12 | w2-netstream-audio | trace | trace-tail D: NetStream audio tap + computeSpectrum; audio/aac, audio/g711 | session_018CoDi3x3Uds6hHMQAvVQFk (17:10) |
+| 12 | w2-netstream-audio | trace | trace-tail D: NetStream audio tap + computeSpectrum; audio/aac, audio/g711 | session_018CoDi3x3Uds6hHMQAvVQFk — LANDED (+2 graphics) |
 | 13 | w2-qname-dict | trace | trace-tail C: QName multiname keys + #1069 rule; dictionary_qname_keys | session_018CoDi78a5woqe4YXREWSin (17:18) |
 | 14 | w1-drift-avm1 | trace | AVM1/gnash/shumway upstream drift 45366370e..0ddd12b6a | session_018CoDi7LLFpbdSTkfTYwW6s (17:37) |
 | 15 | w1-drift-avm2 | both | AVM2/visual/small-suite drift + harness num_ticks | session_018CoDi6ghpj4pXCMReEcqgP (17:37) |
@@ -55,6 +55,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `d35a55154` | w2-crossvm-legf | trace fail→pass (both modes): `avm2/focus_events_mixed_avm_edittext`, `avm2/selection_onsetfocus_mixed_avm`; pixels none |
 | `7b6a69124` | w1-pixel-misc §1 (FAAN IDCT, landed directly) | px fail→pass: `avm2/netstream_play_flv`, `avm1/netstream_play_flv`, `visual/video/deblocking`; `colorconversion/h263` 10808→3 (still fail); trace none |
 | `57015b2db` | w2-glyph-levien | px fail→pass: `visual/filters/glow`, `glow_without_composite_source`, `drop_shadow`, `bevel_inner`, `bevel_outer`, `bevel_full`, `glow_with_alpha_strength` (last 4 at 18/18 zero headroom); md5 moves on passing text-bind, cache_as_bitmap/text, edittext_scroll .01; trace none |
+| (next) | w2-netstream-audio | trace fail→pass GRAPHICS: `audio/aac`, `audio/g711`; NO-GRAPHICS: `audio/g711` only (`audio/aac` stays fail by design: no libavcodec in no-graphics builds → known mode-parity gap, 1 row); pixels none. AAC mono 44.1k/48k depend on matching Ruffle's mixer-clock alignment (fragile, see report §2) |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
@@ -63,3 +64,10 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 - trace-tail oracle request 1 (optional): attached 4-frame clip frame-order trace — do at w2-attached-timeline merge.
 - padded-filter oracle request (bevel row 305 at quality=low): DEFERRED — the local exporter has no quality option (renders at default/high quality on a real GPU, so it cannot answer a 1-sample point-sampling tie); needs Ruffle's own test runner (`cargo test` of the tests crate on lavapipe) or an exporter `--quality` patch. 0 flips at stake (disposition only). s24 board / optional.
 - pixel-misc queued: `w2-harness-subtests` (§4 GRADING-INSTRUMENT: ignore=true + [subtests] images + drawWithQuality alias; land AFTER an interim images run so attribution stays clean), `w2-text-cxform` (§3b acid-color-0 band, AVM1/timeline text gets ancestor colour transforms; correctness, 0 flips), `w2-shaderfilter` (§2a glassDisplace_shaderfilter +1 medium; rider pixelbender_dithering).
+
+## Grading runs
+
+| run | mode / categories / images | code | result |
+|---|---|---|---|
+| 44922638965 / 44922646202 | graphics/full/images + no-graphics/full | 08709f658 (baseline) | trace 4495/4563 intersection (4625/4752 all); pixels 488/593; all moves vs s22 = upstream drift |
+| 44930669727 / 44930677490 | graphics/full/images + no-graphics/full | bc91565ce (7e2a045c1, d35a55154, 7b6a69124, 57015b2db) | pending — expect +2 trace (both modes), +18 px |

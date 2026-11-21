@@ -415,6 +415,78 @@ void avm2_media_register_mixer_transform(Avm2Context* ctx, Avm2Class* cls)
 	                        sm_set_sound_transform);
 }
 
+// SoundMixer.computeSpectrum(outputArray, FFTMode = false, stretchFactor = 0)
+// — port of Ruffle sound_mixer.rs compute_spectrum over the mix history.
+// The history is the last 512 stereo frames of the NetStream audio tap
+// (avm2_net.c; embedded / Sound-object channels are not tapped yet, so they
+// contribute silence). FFTMode: a 2048-point real FFT of those 512 samples
+// zero-padded, each output bin k < 512 = max(ln|Re X[k]|, 0) / 4 (Ruffle's
+// reverse-engineered post-process; computed as a direct DFT of the 512 nonzero
+// inputs). stretch 0 keeps every second value; stretch s > 0 repeats each of
+// the first 256 values max(s - 1, 1) times. Always writes 512 floats (256 L
+// then 256 R) honouring the array's endianness, length 2048, position 0.
+static Avm2Value sm_compute_spectrum(Avm2Activation* act)
+{
+	Avm2ByteArrayExt* ba = act->argc > 0 ? avm2_bytearray_ext_of(act->args[0]) : NULL;
+	if (ba == NULL)
+	{
+		avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter outputArray must be non-null.");
+	}
+	int fft = act->argc > 1 ? avm2_coerce_to_boolean(act->args[1]) : 0;
+	int32_t stretch = act->argc > 2 ? avm2_coerce_to_i32(act->ctx, act->args[2]) : 0;
+
+	static float hist[1024];   // 512 interleaved stereo frames
+	avm2_net_netstream_audio_window(hist, 512);
+	if (fft)
+	{
+		static float out[1024];
+		static double cos_tab[2048];
+		if (cos_tab[0] == 0.0)
+			for (int j = 0; j < 2048; j++)
+				cos_tab[j] = cos(2.0 * 3.14159265358979323846 * (double) j / 2048.0);
+		for (int k = 0; k < 512; k++)
+		{
+			double re_l = 0, re_r = 0;
+			for (int n = 0; n < 512; n++)
+			{
+				double c = cos_tab[(k * n) & 2047];
+				re_l += hist[n * 2] * c;
+				re_r += hist[n * 2 + 1] * c;
+			}
+			double pl = log(fabs(re_l)) / 4.0, pr = log(fabs(re_r)) / 4.0;
+			out[k * 2] = (float) (pl > 0 ? pl : 0);
+			out[k * 2 + 1] = (float) (pr > 0 ? pr : 0);
+		}
+		memcpy(hist, out, sizeof(hist));
+	}
+	if (stretch == 0)
+	{
+		for (int i = 0; i < 256; i++)
+		{
+			hist[i * 2] = hist[i * 4];
+			hist[i * 2 + 1] = hist[i * 4 + 1];
+		}
+	}
+	int repeats = stretch - 1 > 1 ? stretch - 1 : 1;
+
+	avm2_bytearray_set_length_public(act->ctx, ba, 2048);
+	for (int ch = 0; ch < 2; ch++)
+	{
+		ba->position = (uint32_t) ch * 1024;
+		uint32_t stop = (uint32_t) (ch + 1) * 1024;
+		for (int i = 0; i < 256 && ba->position < stop; i++)
+		{
+			union { float f; uint32_t u; } cv;
+			cv.f = hist[i * 2 + ch];
+			for (int r = 0; r < repeats && ba->position < stop; r++)
+				avm2_bytearray_write_uint_public(act->ctx, ba, cv.u);
+		}
+	}
+	ba->position = 0;
+	return avm2_undefined();
+}
+
 static Avm2Value sm_stop_all(Avm2Activation* act)
 {
 #ifndef NO_GRAPHICS
@@ -1837,6 +1909,7 @@ void avm2_register_media(Avm2Context* ctx)
 	avm2_builtin_add_static_getset(ctx, sm, "soundTransform",
 	                               sm_get_sound_transform, sm_set_sound_transform);
 	avm2_builtin_add_static_method(ctx, sm, "stopAll", sm_stop_all);
+	avm2_builtin_add_static_method(ctx, sm, "computeSpectrum", sm_compute_spectrum);
 	avm2_builtin_add_static_method(ctx, sm, "areSoundsInaccessible",
 	                               sm_are_sounds_inaccessible);
 

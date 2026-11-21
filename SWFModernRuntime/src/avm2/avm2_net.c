@@ -35,6 +35,7 @@
 // event-dispatch and per-instance-ext idioms; see the block above
 // register_file_reference for the model.
 
+#include <math.h>
 #include <setjmp.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -2017,7 +2018,8 @@ static const unsigned char* flv_find_metadata(const unsigned char* data,
 // The media half of play() on a bundled .flv: video tags are demuxed on the
 // stream's own clock and decoded into the stream's "last decoded bitmap",
 // which an attached flash.media.Video draws (avm2_display.c, render walk).
-// Audio is not played. Port of Ruffle core/src/streams.rs NetStream::tick +
+// Audio is not played (it is decoded into the computeSpectrum tap above).
+// Port of Ruffle core/src/streams.rs NetStream::tick +
 // flv_video_tag, reduced to what a bundled file needs:
 //
 //   * play() activates the stream, but the bytes arrive through the loader
@@ -2042,6 +2044,270 @@ static const unsigned char* flv_find_metadata(const unsigned char* data,
 // No pause/seek/close handling: those methods stay no-ops, so a stream
 // plays from play() to end of file.
 
+// --- FLV audio tap --------------------------------------------------------
+//
+// Audio tags are not played, but their PCM is decoded into a per-stream
+// 44.1 kHz stereo float ring so SoundMixer.computeSpectrum can read the
+// NetStream's contribution to the mix (Ruffle mixes NetStream audio into the
+// same output whose last window get_sample_history returns). Only tags the
+// demuxer CONSUMES (non-lookahead) are decoded, in file order, so ring sample
+// n is the n-th sample the stream's sound feeds the mixer; it is "output" at
+// mixer-clock frame mix_start + n (see g_ns_mix_frames), and computeSpectrum
+// reads the mixer's sample history at that clock
+// (avm2_net_netstream_audio_window).
+//
+//   * G.711 A-law (7) / µ-law (8): 8 kHz per the FLV spec (the rate bits are
+//     ignored), decoded with the ITU tables here.
+//   * Linear PCM (0 = native, taken as little-endian; 3 = little-endian),
+//     8-bit unsigned or 16-bit signed, at the tag header's rate.
+//   * Everything else (MP3, AAC, ADPCM, Nellymoser, Speex) goes through
+//     video_codec.c's libavcodec audio decoder: AAC AACPacketType 0 is the
+//     AudioSpecificConfig (codec extradata), 1 is a raw frame. Builds without
+//     libavcodec decode only G.711 / PCM (audio_decoder_create -> NULL).
+//   * Any rate other than 44.1 kHz goes through a 32-tap Blackman-windowed
+//     sinc resampler (weights normalised per output sample, so DC gain is
+//     exactly 1); mono is duplicated to both channels. Decode is faithful:
+//     no gain compensation.
+
+#define NS_AUDIO_RATE 44100.0
+#define NS_AUDIO_RING 16384           // frames, power of two (~370 ms)
+#define NS_RS_HALF 16                 // sinc half-width, in input samples
+
+typedef struct NsAudio
+{
+	float* ring;                      // NS_AUDIO_RING stereo frames
+	int64_t written;                  // absolute frames written to the ring
+	uint8_t have_first;               // an audio tag has been consumed
+	int fmt;                          // FLV SoundFormat of `dec`, -1 = none
+	AudioDecoderCtx* dec;
+	// resampler (input converted to stereo first)
+	double rs_rate;                   // 0 = not primed
+	float* rs_buf;                    // stereo input frames
+	int rs_count, rs_cap;
+	double rs_pos;                    // read position in rs_buf frames
+	uint8_t mix_started;
+	int64_t mix_start;                // mixer clock frame of ring sample 0
+} NsAudio;
+
+// The mixer clock: sample frames "output" so far. Ruffle's test audio backend
+// mixes round(2 * 44100 / fps) interleaved floats, i.e. that / 2 whole stereo
+// frames, once per player tick (TestAudioBackend::set_frame_rate / tick); a
+// NetStream's sound enters the mix on the tick its first audio tag is
+// committed. Ruffle's tick order is update_timers -> StreamManager::tick ->
+// audio.tick, while our stream hook runs BEFORE run_due_timers in the tick
+// (avm2_display_run_tick), so our hook call N is Ruffle's stream + mix pass
+// of tick N-1: the first call mixes nothing. Without that, a timer callback
+// sees one extra tick of mix (and its 1024-frame block alignment moves):
+// audio/aac's mono 48 kHz row then lands its window in an AAC-noise patch.
+static int64_t g_ns_mix_frames;
+static uint8_t g_ns_mix_primed;
+
+static void ns_audio_reset(NsAudio* a)
+{
+	audio_decoder_destroy(a->dec);
+	a->dec = NULL;
+	a->fmt = -1;
+	a->written = 0;
+	a->have_first = 0;
+	a->rs_rate = 0;
+	a->rs_count = 0;
+	a->rs_pos = 0;
+	a->mix_started = 0;
+	a->mix_start = 0;
+}
+
+static void ns_audio_ring_push(NsAudio* a, float l, float r)
+{
+	if (a->ring == NULL)
+	{
+		a->ring = (float*) calloc((size_t) NS_AUDIO_RING * 2, sizeof(float));
+		if (a->ring == NULL) return;
+	}
+	size_t i = (size_t) (a->written & (NS_AUDIO_RING - 1)) * 2;
+	a->ring[i] = l;
+	a->ring[i + 1] = r;
+	a->written++;
+}
+
+static int ns_audio_rs_reserve(NsAudio* a, int frames)
+{
+	if (frames <= a->rs_cap) return 1;
+	int cap = a->rs_cap > 0 ? a->rs_cap : 1024;
+	while (cap < frames) cap *= 2;
+	float* nb = (float*) realloc(a->rs_buf, (size_t) cap * 2 * sizeof(float));
+	if (nb == NULL) return 0;
+	a->rs_buf = nb;
+	a->rs_cap = cap;
+	return 1;
+}
+
+static double ns_sinc(double x)
+{
+	if (x > -1e-9 && x < 1e-9) return 1.0;
+	double px = 3.14159265358979323846 * x;
+	return sin(px) / px;
+}
+
+// Feed `frames` interleaved frames (`ch` = 1 or 2) at `rate` Hz.
+static void ns_audio_feed(NsAudio* a, const float* in, int frames, int ch, double rate)
+{
+	if (frames <= 0 || rate <= 0) return;
+	if (rate == NS_AUDIO_RATE)
+	{
+		a->rs_rate = 0;
+		for (int i = 0; i < frames; i++)
+		{
+			float l = in[(size_t) i * (size_t) ch];
+			float r = ch == 2 ? in[(size_t) i * 2 + 1] : l;
+			ns_audio_ring_push(a, l, r);
+		}
+		return;
+	}
+	if (a->rs_rate != rate)
+	{
+		// (Re)prime: NS_RS_HALF frames of leading silence put output sample
+		// 0 exactly on input sample 0.
+		a->rs_rate = rate;
+		if (!ns_audio_rs_reserve(a, NS_RS_HALF)) return;
+		memset(a->rs_buf, 0, (size_t) NS_RS_HALF * 2 * sizeof(float));
+		a->rs_count = NS_RS_HALF;
+		a->rs_pos = NS_RS_HALF;
+	}
+	if (!ns_audio_rs_reserve(a, a->rs_count + frames)) return;
+	for (int i = 0; i < frames; i++)
+	{
+		float l = in[(size_t) i * (size_t) ch];
+		float r = ch == 2 ? in[(size_t) i * 2 + 1] : l;
+		a->rs_buf[(size_t) (a->rs_count + i) * 2] = l;
+		a->rs_buf[(size_t) (a->rs_count + i) * 2 + 1] = r;
+	}
+	a->rs_count += frames;
+
+	double step = rate / NS_AUDIO_RATE;
+	double fc = rate > NS_AUDIO_RATE ? NS_AUDIO_RATE / rate : 1.0;
+	while ((int) a->rs_pos + NS_RS_HALF < a->rs_count)
+	{
+		int i0 = (int) a->rs_pos;
+		double frac = a->rs_pos - i0;
+		double sl = 0, sr = 0, ws = 0;
+		for (int k = -NS_RS_HALF + 1; k <= NS_RS_HALF; k++)
+		{
+			double x = (double) k - frac;
+			double wx = x / NS_RS_HALF;
+			if (wx <= -1.0 || wx >= 1.0) continue;
+			double win = 0.42 + 0.5 * cos(3.14159265358979323846 * wx)
+			           + 0.08 * cos(2.0 * 3.14159265358979323846 * wx);
+			double w = fc * ns_sinc(fc * x) * win;
+			sl += w * a->rs_buf[(size_t) (i0 + k) * 2];
+			sr += w * a->rs_buf[(size_t) (i0 + k) * 2 + 1];
+			ws += w;
+		}
+		if (ws > 1e-9 || ws < -1e-9) { sl /= ws; sr /= ws; }
+		ns_audio_ring_push(a, (float) sl, (float) sr);
+		a->rs_pos += step;
+	}
+	// Keep the NS_RS_HALF frames of history the next output still needs.
+	int drop = (int) a->rs_pos - NS_RS_HALF;
+	if (drop > 0)
+	{
+		memmove(a->rs_buf, a->rs_buf + (size_t) drop * 2,
+		        (size_t) (a->rs_count - drop) * 2 * sizeof(float));
+		a->rs_count -= drop;
+		a->rs_pos -= drop;
+	}
+}
+
+static int ns_alaw_to_s16(uint8_t v)
+{
+	int a = v ^ 0x55;
+	int t = (a & 0x0F) << 4;
+	int seg = (a & 0x70) >> 4;
+	if (seg == 0) t += 8;
+	else if (seg == 1) t += 0x108;
+	else { t += 0x108; t <<= seg - 1; }
+	return (a & 0x80) ? t : -t;
+}
+
+static int ns_mulaw_to_s16(uint8_t v)
+{
+	int u = ~v & 0xFF;
+	int t = ((u & 0x0F) << 3) + 0x84;
+	t <<= (u & 0x70) >> 4;
+	return (u & 0x80) ? (0x84 - t) : (t - 0x84);
+}
+
+// One consumed FLV audio tag body (from its SoundFormat byte on).
+static void ns_audio_tag(NsAudio* a, uint32_t ts, const unsigned char* body, size_t size)
+{
+	if (size < 1) return;
+	int fmt = (body[0] >> 4) & 0xF;
+	int rate_idx = (body[0] >> 2) & 3;
+	int is16 = (body[0] >> 1) & 1;
+	int ch = (body[0] & 1) ? 2 : 1;
+	static const double k_rates[4] = { 5512.5, 11025.0, 22050.0, 44100.0 };
+	const unsigned char* p = body + 1;
+	size_t n = size - 1;
+	(void) ts;
+	a->have_first = 1;   // the sound enters the mix this tick
+
+	if (fmt == 7 || fmt == 8 || fmt == 0 || fmt == 3)
+	{
+		int bps = (fmt == 7 || fmt == 8) ? 1 : (is16 ? 2 : 1);
+		int frames = (int) (n / (size_t) (bps * ch));
+		if (frames <= 0) return;
+		float* pcm = (float*) malloc((size_t) frames * (size_t) ch * sizeof(float));
+		if (pcm == NULL) return;
+		for (int i = 0; i < frames * ch; i++)
+		{
+			float s;
+			if (fmt == 7) s = (float) ns_alaw_to_s16(p[i]) / 32768.0f;
+			else if (fmt == 8) s = (float) ns_mulaw_to_s16(p[i]) / 32768.0f;
+			else if (bps == 2)
+				s = (float) (int16_t) ((uint16_t) p[i * 2] | ((uint16_t) p[i * 2 + 1] << 8))
+				    / 32768.0f;
+			else s = (float) ((int) p[i] - 128) / 128.0f;
+			pcm[i] = s;
+		}
+		ns_audio_feed(a, pcm, frames, ch, (fmt == 7 || fmt == 8) ? 8000.0 : k_rates[rate_idx]);
+		free(pcm);
+		return;
+	}
+
+	int rate = (int) k_rates[rate_idx];
+	if (fmt == 4) rate = 16000;
+	else if (fmt == 5 || fmt == 14) rate = 8000;
+	if (fmt == 10)
+	{
+		if (n < 1) return;
+		int packet_type = p[0];
+		p++;
+		n--;
+		if (packet_type == 0)
+		{
+			audio_decoder_destroy(a->dec);
+			a->dec = audio_decoder_create(10, rate, ch, p, (int) n);
+			a->fmt = a->dec != NULL ? 10 : -1;
+			return;
+		}
+		if (packet_type != 1 || a->fmt != 10 || n == 0) return;
+	}
+	else if (a->dec == NULL || a->fmt != fmt)
+	{
+		audio_decoder_destroy(a->dec);
+		a->dec = audio_decoder_create(fmt, rate, ch, NULL, 0);
+		a->fmt = a->dec != NULL ? fmt : -1;
+		if (a->dec == NULL) return;
+	}
+	if (n == 0) return;
+
+	float* pcm = NULL;
+	int frames = 0, och = 0, orate = 0;
+	if (audio_decoder_decode(a->dec, p, (int) n, &pcm, &frames, &och, &orate)
+	    && pcm != NULL && frames > 0 && orate > 0)
+		ns_audio_feed(a, pcm, frames, och, (double) orate);
+	free(pcm);
+}
+
 typedef struct NsVideoStream
 {
 	Avm2Object* ns;               // GC root while the stream is active
@@ -2054,6 +2320,7 @@ typedef struct NsVideoStream
 	VideoDecoderCtx* dec;
 	uint32_t* argb;               // last decoded frame, premultiplied ARGB
 	int w, h;
+	NsAudio audio;                // FLV audio tap (computeSpectrum)
 } NsVideoStream;
 
 #define NS_MAX_VIDEO_STREAMS 8
@@ -2087,10 +2354,12 @@ static void ns_video_start(Avm2Object* ns, const unsigned char* data, size_t len
 		v = &g_ns_video[g_ns_video_count++];
 		memset(v, 0, sizeof(*v));
 		v->ns = ns;
+		v->audio.fmt = -1;
 	}
 	video_decoder_destroy(v->dec);
 	v->dec = NULL;
 	v->codec_id = 0;
+	ns_audio_reset(&v->audio);
 	v->data = data;
 	v->len = len;
 	size_t off = ((size_t) data[5] << 24) | ((size_t) data[6] << 16)
@@ -2193,6 +2462,7 @@ static void ns_video_tick_one(NsVideoStream* v, double dt)
 		if (lookahead && lookahead_audio_left == 0) break;
 		if (tag_type == 8 && lookahead) lookahead_audio_left--;
 		if (tag_type == 9 && !lookahead) ns_video_tag(v, v->data + body, tag_size);
+		if (tag_type == 8 && !lookahead) ns_audio_tag(&v->audio, ts, v->data + body, tag_size);
 		off = body + tag_size + 4;   // skip the trailing PreviousTagSize
 		if (!lookahead) v->offset = off;
 	}
@@ -2201,12 +2471,23 @@ static void ns_video_tick_one(NsVideoStream* v, double dt)
 
 static void ns_video_tick(void)
 {
-	if (g_ns_video_count == 0) return;
 	double fps = (double) (int16_t) avm2_generated_frame_rate / 256.0;
 	if (fps <= 0) fps = 24.0;
 	double dt = 1000.0 / fps;
 	for (int i = 0; i < g_ns_video_count; i++)
-		ns_video_tick_one(&g_ns_video[i], dt);
+	{
+		NsVideoStream* v = &g_ns_video[i];
+		ns_video_tick_one(v, dt);
+		if (v->audio.have_first && !v->audio.mix_started)
+		{
+			v->audio.mix_started = 1;
+			v->audio.mix_start = g_ns_mix_frames;
+		}
+	}
+	// The previous Ruffle tick's mix (see g_ns_mix_frames).
+	if (g_ns_mix_primed)
+		g_ns_mix_frames += (int64_t) floor(2.0 * NS_AUDIO_RATE / fps + 0.5) / 2;
+	g_ns_mix_primed = 1;
 }
 
 int avm2_net_netstream_video_frame(const Avm2Object* ns, const uint32_t** out_argb,
@@ -2218,6 +2499,33 @@ int avm2_net_netstream_video_frame(const Avm2Object* ns, const uint32_t** out_ar
 	*out_w = v->w;
 	*out_h = v->h;
 	return 1;
+}
+
+// The window is Ruffle's AudioMixer sample history: the output memory is a
+// 2048-frame circular buffer read one 1024-frame half at a time (the half
+// not being written), so it is the last COMPLETE aligned 1024-frame block of
+// the mixer clock; computeSpectrum takes its first 512 frames.
+int avm2_net_netstream_audio_window(float* out, int frames)
+{
+	memset(out, 0, (size_t) frames * 2 * sizeof(float));
+	int64_t blk = (g_ns_mix_frames / 1024) * 1024 - 1024;
+	int any = 0;
+	for (int i = 0; i < g_ns_video_count; i++)
+	{
+		NsVideoStream* v = &g_ns_video[i];
+		NsAudio* a = &v->audio;
+		if (v->ns == NULL || a->ring == NULL || !a->mix_started) continue;
+		any = 1;
+		for (int k = 0; k < frames; k++)
+		{
+			int64_t idx = blk + k - a->mix_start;
+			if (idx < 0 || idx >= a->written || idx < a->written - NS_AUDIO_RING) continue;
+			size_t r = (size_t) (idx & (NS_AUDIO_RING - 1)) * 2;
+			out[(size_t) k * 2] += a->ring[r];
+			out[(size_t) k * 2 + 1] += a->ring[r + 1];
+		}
+	}
+	return any;
 }
 
 // play(name) — the script-data half only. A name that resolves to a bundled
