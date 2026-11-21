@@ -71,7 +71,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `cfbcb6658` | w2-stage3d-text | px fail→pass: `avm2/stage3d_texture`, `avm2/stage3d_bitmap`; bands improve: `visual/fonts/font_lookup_as3` 19560→11592, away3d_shallow_water, stage3d_fractal; trace none (23 with_default_font rows identical both modes) |
 | `0798e815a` | w2-qname-dict | trace fail→pass (both modes): `avm2/dictionary_qname_keys`; 311-row #1069/#1081/ReferenceError sweep 0 other moves; pixels none |
 | `cfc56d74b` | w1-drift-avm1 prototype (landed directly) | trace +8 (both modes): `avm1/netconnection_serialize_arrays` (drift re-flip), new rows `array_truncation_non_canonical_keys`, `sparse_array_truncation_non_canonical_keys`, `amf_array_indices`, `localconnection_serialize_function_array_elements`, `xml_stringify_utf16`, `amf0_utf8_probe`, `shared_object_secure`; partial `amf0_array_matrix` 39→49/50, `localconnection_serialize_sparse_array_getters` 23→25/26; pixels none |
-| (c3d) | w2-context3d-readback | trace fail→pass (both modes): `avm2/context3d_draw_to_bitmap_data`, `avm2/stage3d_missing_vertex_stream` (KF, Flash-exact pass), `stage3d/draw_to_bitmap_data_unconfigured`; px fail→pass: `avm2/context3d_draw_to_bitmap_data` |
+| `995782154` | w2-context3d-readback | trace fail→pass (both modes): `avm2/context3d_draw_to_bitmap_data`, `avm2/stage3d_missing_vertex_stream` (KF, Flash-exact pass), `stage3d/draw_to_bitmap_data_unconfigured`; px fail→pass: `avm2/context3d_draw_to_bitmap_data` |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
