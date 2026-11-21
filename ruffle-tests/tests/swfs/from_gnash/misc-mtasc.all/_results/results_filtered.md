@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-15 08:31 UTC
+**Date**: 2026-11-21 17:00 UTC
 
-**Git SHA**: `344c85a166`
+**Git SHA**: `08709f6584`
 
-**Run Duration**: 1m 43s
+**Run Duration**: 1m 48s
 
 **Filtered**: 0 tests ignored out of 9 available
 
@@ -13,23 +13,36 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 9 |
-| Passing | **0** (0.0%) |
-| Failing | 9 |
-| Total expected lines | 0 |
-| Matching lines | 0 (0.0%) |
-| Mismatched lines | 0 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Compile Fail | 9 | 100.0% |
+| Passing | **7** (77.8%) |
+| Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **9** (100.0%) |
+| Failing | 0 |
+| Total expected lines | 231 |
+| Matching lines | 211 (91.3%) |
+| Mismatched lines | 20 |
 
 ## Passing Tests
 
-**0 tests passing**
+**7 tests passing**
 
-No passing tests.
+| # | Test | Lines | Duration | Notes |
+|---|------|-------|----------|-------|
+| 1 | `enum` | 19 | 1.5s |  |
+| 2 | `exception` | 35 | 17.4s |  |
+| 3 | `function_test` | 26 | 23.1s |  |
+| 4 | `hello` | 8 | 1.3s |  |
+| 5 | `implementsOpTest` | 28 | 26.7s |  |
+| 6 | `inheritance` | 22 | 15.1s |  |
+| 7 | `super_test1` | 17 | 1.4s |  |
+
+## Ruffle-Matched Tests
+
+**2 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+
+| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
+|---|------|-----------|--------------|----------|-------|
+| 1 | `TextFieldTest` | 1 | 1 | 17.6s |  |
+| 2 | `levels` | 19 | 21 | 3.2s |  |
 
 ## Near-Passing Tests
 

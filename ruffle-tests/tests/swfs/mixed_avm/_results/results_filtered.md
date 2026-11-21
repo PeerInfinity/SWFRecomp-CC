@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-15 08:31 UTC
+**Date**: 2026-11-21 17:00 UTC
 
-**Git SHA**: `344c85a166`
+**Git SHA**: `08709f6584`
 
-**Run Duration**: 0m 30s
+**Run Duration**: 1m 14s
 
 **Filtered**: 0 tests ignored out of 12 available
 
@@ -13,23 +13,44 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 12 |
-| Passing | **0** (0.0%) |
-| Failing | 12 |
-| Total expected lines | 0 |
-| Matching lines | 0 (0.0%) |
-| Mismatched lines | 0 |
+| Passing | **10** (83.3%) |
+| Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **11** (91.7%) |
+| Failing | 1 |
+| Total expected lines | 79 |
+| Matching lines | 57 (72.2%) |
+| Mismatched lines | 22 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 12 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**0 tests passing**
+**10 tests passing**
 
-No passing tests.
+| # | Test | Lines | Duration | Notes |
+|---|------|-------|----------|-------|
+| 1 | `avm1_doabc` | 1 | 0.9s |  |
+| 2 | `avm1_loads_avm2_doaction` | 2 | 0.9s |  |
+| 3 | `avm1_sprite_sc_ignored` | 3 | 21.9s |  |
+| 4 | `avm2_doaction` | 1 | 5.5s |  |
+| 5 | `avm2_loads_avm1` | 14 | 9.0s |  |
+| 6 | `avm2_loads_avm1_doabc` | 4 | 5.1s |  |
+| 7 | `avm2_loads_avm1_loads_avm2_doabc` | 3 | 5.5s |  |
+| 8 | `avm2_loads_avm1_loads_into_root` | 2 | 5.7s |  |
+| 9 | `avm2_loads_avm1_v10` | 8 | 5.7s |  |
+| 10 | `avm2_loads_avm1_v9` | 8 | 5.7s |  |
+
+## Ruffle-Matched Tests
+
+**1 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+
+| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
+|---|------|-----------|--------------|----------|-------|
+| 1 | `avm2_loads_avm1_events` | 18 | 18 | 6.6s |  |
 
 ## Near-Passing Tests
 
@@ -53,6 +74,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**0 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
-No output mismatches.
+| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
+|---|------|------------|----------------|--------|----------|-------|
+| 1 | `avm1_loads_avm2` | 42.9% | 3/7 | 3 | 7 |  |

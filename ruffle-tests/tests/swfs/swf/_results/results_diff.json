@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-08T08:30:24.230028+00:00",
+    "old_timestamp": "2026-11-15T08:31:27.879050+00:00",
     "old_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "new_timestamp": "2026-11-15T08:31:27.879050+00:00",
-    "new_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
+    "new_timestamp": "2026-11-21T17:00:08.540400+00:00",
+    "new_git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
     "old_pass": 0,
@@ -13,21 +13,106 @@
     "old_effective_pass": 0,
     "old_total": 7,
     "old_pass_rate": 0.0,
-    "new_pass": 0,
-    "new_ruffle_matched": 0,
-    "new_effective_pass": 0,
+    "new_pass": 5,
+    "new_ruffle_matched": 2,
+    "new_effective_pass": 7,
     "new_total": 7,
-    "new_pass_rate": 0.0,
+    "new_pass_rate": 71.4,
     "old_mismatched_lines": 0,
-    "new_mismatched_lines": 0,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 16,
+    "increased_mismatches": 16,
     "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "newly_passing": 7,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 7,
+    "status_changed": 7,
+    "unchanged": 0,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "convolution_filter_big_matrix",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "lzma_length_too_long",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 77,
+        "expected_lines": 19,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "lzma_length_too_short",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      }
+    },
+    {
+      "test": "swf_length_too_long",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 12
+      }
+    },
+    {
+      "test": "swf_length_too_short_no_end",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      }
+    },
+    {
+      "test": "swf_length_too_short_no_second_frame",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      }
+    },
+    {
+      "test": "swf_length_zero",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }

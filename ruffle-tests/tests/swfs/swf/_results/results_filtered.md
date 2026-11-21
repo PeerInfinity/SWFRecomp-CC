@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-15 08:31 UTC
+**Date**: 2026-11-21 17:00 UTC
 
-**Git SHA**: `344c85a166`
+**Git SHA**: `08709f6584`
 
-**Run Duration**: 0m 44s
+**Run Duration**: 1m 5s
 
 **Filtered**: 0 tests ignored out of 7 available
 
@@ -13,23 +13,34 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 7 |
-| Passing | **0** (0.0%) |
-| Failing | 7 |
-| Total expected lines | 0 |
-| Matching lines | 0 (0.0%) |
-| Mismatched lines | 0 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Compile Fail | 7 | 100.0% |
+| Passing | **5** (71.4%) |
+| Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **7** (100.0%) |
+| Failing | 0 |
+| Total expected lines | 94 |
+| Matching lines | 78 (83.0%) |
+| Mismatched lines | 16 |
 
 ## Passing Tests
 
-**0 tests passing**
+**5 tests passing**
 
-No passing tests.
+| # | Test | Lines | Duration | Notes |
+|---|------|-------|----------|-------|
+| 1 | `convolution_filter_big_matrix` | 2 | 17.3s |  |
+| 2 | `lzma_length_too_short` | 18 | 1.1s |  |
+| 3 | `swf_length_too_short_no_end` | 19 | 1.0s |  |
+| 4 | `swf_length_too_short_no_second_frame` | 18 | 25.1s |  |
+| 5 | `swf_length_zero` | 0 | 0.9s |  |
+
+## Ruffle-Matched Tests
+
+**2 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+
+| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
+|---|------|-----------|--------------|----------|-------|
+| 1 | `lzma_length_too_long` | 68 | 68 | 17.8s |  |
+| 2 | `swf_length_too_long` | 6 | 6 | 1.6s |  |
 
 ## Near-Passing Tests
 

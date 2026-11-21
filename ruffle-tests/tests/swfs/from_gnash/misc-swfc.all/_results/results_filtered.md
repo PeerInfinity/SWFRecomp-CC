@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-15 08:31 UTC
+**Date**: 2026-11-21 17:00 UTC
 
-**Git SHA**: `344c85a166`
+**Git SHA**: `08709f6584`
 
-**Run Duration**: 4m 38s
+**Run Duration**: 5m 19s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -13,23 +13,49 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 18 |
-| Passing | **0** (0.0%) |
-| Failing | 18 |
-| Total expected lines | 0 |
-| Matching lines | 0 (0.0%) |
-| Mismatched lines | 0 |
+| Passing | **11** (61.1%) |
+| Ruffle-matched | 5 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **16** (88.9%) |
+| Failing | 2 |
+| Total expected lines | 555 |
+| Matching lines | 424 (76.4%) |
+| Mismatched lines | 131 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 18 | 100.0% |
+| Output Mismatch | 2 | 100.0% |
 
 ## Passing Tests
 
-**0 tests passing**
+**11 tests passing**
 
-No passing tests.
+| # | Test | Lines | Duration | Notes |
+|---|------|-------|----------|-------|
+| 1 | `button_test1` | 31 | 1.4s |  |
+| 2 | `edittext_test1` | 47 | 23.4s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 26.2s |  |
+| 4 | `hello` | 4 | 1.1s |  |
+| 5 | `mouse_drag_test` | 12 | 14.2s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 17.0s |  |
+| 7 | `opcode_guard_test2` | 24 | 24.3s |  |
+| 8 | `soft_reference_test1` | 45 | 17.3s |  |
+| 9 | `stackscope` | 11 | 17.4s |  |
+| 10 | `submoviegetvar` | 4 | 22.6s |  |
+| 11 | `swf4opcode` | 117 | 18.2s |  |
+
+## Ruffle-Matched Tests
+
+**5 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+
+| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
+|---|------|-----------|--------------|----------|-------|
+| 1 | `action_execution_order_test10` | 11 | 14 | 18.5s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 18.2s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.3s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 18.1s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 26.0s |  |
 
 ## Near-Passing Tests
 
@@ -53,6 +79,9 @@ No timeouts.
 
 ## All Output Mismatches
 
-**0 tests** with output mismatch, sorted by match rate (best first)
+**2 tests** with output mismatch, sorted by match rate (best first)
 
-No output mismatches.
+| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
+|---|------|------------|----------------|--------|----------|-------|
+| 1 | `movieclip_destruction_test3` | 27.8% | 5/18 | 16 | 18 |  |
+| 2 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |

@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-08T08:30:24.245088+00:00",
+    "old_timestamp": "2026-11-15T08:31:27.897816+00:00",
     "old_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "new_timestamp": "2026-11-15T08:31:27.897816+00:00",
-    "new_git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
+    "new_timestamp": "2026-11-21T17:00:08.552825+00:00",
+    "new_git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
     "old_pass": 0,
@@ -13,21 +13,166 @@
     "old_effective_pass": 0,
     "old_total": 12,
     "old_pass_rate": 0.0,
-    "new_pass": 0,
-    "new_ruffle_matched": 0,
-    "new_effective_pass": 0,
+    "new_pass": 10,
+    "new_ruffle_matched": 1,
+    "new_effective_pass": 11,
     "new_total": 12,
-    "new_pass_rate": 0.0,
+    "new_pass_rate": 83.3,
     "old_mismatched_lines": 0,
-    "new_mismatched_lines": 0,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 22,
+    "increased_mismatches": 22,
     "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "newly_passing": 11,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 12,
+    "status_changed": 12,
+    "unchanged": 0,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_doabc",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "avm1_loads_avm2",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 7,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm1_loads_avm2_doaction",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "avm1_sprite_sc_ignored",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm2_doaction",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "avm2_loads_avm1",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      }
+    },
+    {
+      "test": "avm2_loads_avm1_doabc",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "avm2_loads_avm1_events",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "avm2_loads_avm1_loads_avm2_doabc",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "avm2_loads_avm1_loads_into_root",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "avm2_loads_avm1_v10",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "avm2_loads_avm1_v9",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    }
+  ]
 }

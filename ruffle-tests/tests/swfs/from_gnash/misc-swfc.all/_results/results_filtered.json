@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-15T08:31:27.937170+00:00",
-    "git_sha": "344c85a166c327c48b0361a5ef7e68983e4f48aa",
-    "duration_seconds": 278.06,
+    "timestamp": "2026-11-21T17:00:08.581607+00:00",
+    "git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
+    "duration_seconds": 319.02,
     "total_available": 20,
     "shards": 30,
     "expected_shards": 30,
@@ -10,213 +10,325 @@
     "filtered": true
   },
   "total": 18,
-  "pass": 0,
-  "ruffle_matched": 0,
-  "fail": 18,
-  "pass_rate": 0.0,
-  "effective_pass": 0,
-  "effective_pass_rate": 0.0,
+  "pass": 11,
+  "ruffle_matched": 5,
+  "fail": 2,
+  "pass_rate": 61.1,
+  "effective_pass": 16,
+  "effective_pass_rate": 88.9,
   "breakdown": {
-    "compile_fail": 18
+    "output_mismatch": 2,
+    "ruffle_matched": 5
   },
   "tests": [
     {
       "test": "action_execution_order_test10",
       "phases": {
-        "recomp": 0.01,
-        "compile": 18.56
+        "recomp": 0.005,
+        "compile": 18.492,
+        "run": 0.003
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 18.57
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 16,
+        "matching_lines": 5
+      },
+      "duration": 18.5,
+      "ruffle_diff_count": 14,
+      "ours_diff_count": 11,
+      "status": "ruffle_matched",
+      "detail": "diffs 11 \u2286 ruffle 14"
     },
     {
       "test": "action_execution_order_test12",
       "phases": {
-        "recomp": 0.009,
-        "compile": 22.584
+        "recomp": 0.005,
+        "compile": 18.198,
+        "run": 0.003
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 22.59
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 20
+      },
+      "duration": 18.21,
+      "ruffle_diff_count": 2,
+      "ours_diff_count": 2,
+      "status": "ruffle_matched",
+      "detail": "diffs 2 \u2286 ruffle 2"
     },
     {
       "test": "button_test1",
       "phases": {
-        "recomp": 0.009,
-        "compile": 0.299
+        "recomp": 0.004,
+        "compile": 1.368,
+        "run": 0.002
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.31
+      "lines": {
+        "actual_lines": 31,
+        "expected_lines": 31,
+        "matching_lines": 31
+      },
+      "duration": 1.38,
+      "status": "pass"
     },
     {
       "test": "edittext_test1",
       "phases": {
         "recomp": 0.01,
-        "compile": 22.903
+        "compile": 23.387,
+        "run": 0.004
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 22.91
+      "lines": {
+        "actual_lines": 47,
+        "expected_lines": 47,
+        "matching_lines": 47
+      },
+      "duration": 23.41,
+      "status": "pass"
     },
     {
       "test": "gotoFrameFromInterval2",
       "phases": {
-        "recomp": 0.008,
-        "compile": 0.326
+        "recomp": 0.004,
+        "compile": 1.332,
+        "run": 0.006
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.33
+      "lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 5
+      },
+      "duration": 1.34,
+      "ruffle_diff_count": 18,
+      "ours_diff_count": 18,
+      "status": "ruffle_matched",
+      "detail": "diffs 18 \u2286 ruffle 18"
     },
     {
       "test": "gotoFrameLabelAsFunction",
       "phases": {
         "recomp": 0.007,
-        "compile": 18.248
+        "compile": 26.238,
+        "run": 0.004
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 18.26
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 26.25,
+      "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
-        "recomp": 0.006,
-        "compile": 0.266
+        "recomp": 0.005,
+        "compile": 1.092,
+        "run": 0.002
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.27
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 1.1,
+      "status": "pass"
     },
     {
       "test": "mouse_drag_test",
       "phases": {
-        "recomp": 0.008,
-        "compile": 24.4
+        "recomp": 0.006,
+        "compile": 14.163,
+        "run": 0.003
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 24.41
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 14.18,
+      "status": "pass"
     },
     {
       "test": "movieclip_destruction_test1",
       "phases": {
-        "recomp": 0.009,
-        "compile": 14.954
+        "recomp": 0.005,
+        "compile": 18.043,
+        "run": 0.004
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 14.96
+      "lines": {
+        "actual_lines": 50,
+        "expected_lines": 52,
+        "matching_lines": 9
+      },
+      "duration": 18.05,
+      "ruffle_diff_count": 52,
+      "ours_diff_count": 43,
+      "status": "ruffle_matched",
+      "detail": "diffs 43 \u2286 ruffle 52"
     },
     {
       "test": "movieclip_destruction_test2",
       "phases": {
-        "recomp": 0.009,
-        "compile": 18.712
+        "recomp": 0.004,
+        "compile": 17.016,
+        "run": 0.002
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 18.72
+      "lines": {
+        "actual_lines": 56,
+        "expected_lines": 56,
+        "matching_lines": 56
+      },
+      "duration": 17.02,
+      "status": "pass"
     },
     {
       "test": "movieclip_destruction_test3",
       "phases": {
-        "recomp": 0.009,
-        "compile": 23.13
+        "recomp": 0.005,
+        "compile": 17.303,
+        "run": 0.002
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 23.14
+      "lines": {
+        "actual_lines": 16,
+        "expected_lines": 18,
+        "matching_lines": 5
+      },
+      "duration": 17.31,
+      "status": "output_mismatch",
+      "detail": "13 line(s) differ (actual=16, expected=18)",
+      "actual_output": "PASSED: typeof(nestedMovieClip) == movieclip  [movieclip_destruction_test3.sc:97]\nPASSED: nestedMovieClip.getDepth() == 10  [movieclip_destruction_test3.sc:98]\nPASSED: typeof(nestedMovieClip.mc11) == movieclip  [movieclip_destruction_test3.sc:99]\nPASSED: typeof(nestedMovieClip.mc11.mc111) == movieclip  [movieclip_destruction_test3.sc:100]\nPASSED: typeof(nestedMovieClip.mc11.mc111.mc1111) == movieclip  [movieclip_destruction_test3.sc:101]\nFAILED: nestedMovieClip.getDepth(): expected: \"-32779\" , obtained: \"10\"  [movieclip_destruction_test3.sc:116]\nFAILED: _root.x: expected: \"300\" , obtained: \"undefined\"  [movieclip_destruction_test3.sc:123]\nFAILED: typeof(nestedMovieClip): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test3.sc:124]\nFAILED: _root.as_order: expected: \"0+1+2+\" , obtained: \"0+\"  [movieclip_destruction_test3.sc:125]\nPASSED: mcARef.getDepth() == -32779  [movieclip_destruction_test3.sc:137]\nPASSED: mcARef['_root'] == _level0  [movieclip_destruction_test3.sc:138]\nPASSED: mcA['_root'] == _level0  [movieclip_destruction_test3.sc:134]\nTotal tests run: 12 typeof expected: number\n#passed: 8\n#failed: 4\n__END_OF_TEST__",
+      "expected_output": "PASSED: typeof(nestedMovieClip) == movieclip  [movieclip_destruction_test3.sc:97]\nPASSED: nestedMovieClip.getDepth() == 10  [movieclip_destruction_test3.sc:98]\nPASSED: typeof(nestedMovieClip.mc11) == movieclip  [movieclip_destruction_test3.sc:99]\nPASSED: typeof(nestedMovieClip.mc11.mc111) == movieclip  [movieclip_destruction_test3.sc:100]\nPASSED: typeof(nestedMovieClip.mc11.mc111.mc1111) == movieclip  [movieclip_destruction_test3.sc:101]\nnestedMovieClip removed at frame 10 [movieclip_destruction_test3.sc:63]\nactions here should not be executed [movieclip_destruction_test3.sc:67]\nPASSED: nestedMovieClip.getDepth() == -32779  [movieclip_destruction_test3.sc:116]\nFAILED: _root.x: expected: \"300\" , obtained: \"100\"  [movieclip_destruction_test3.sc:123]\nPASSED: typeof(nestedMovieClip) == undefined  [movieclip_destruction_test3.sc:124]\nFAILED: _root.as_order: expected: \"0+1+2+\" , obtained: \"0+1+2+4+\"  [movieclip_destruction_test3.sc:125]\nPASSED: mcARef.getDepth() == -32779  [movieclip_destruction_test3.sc:137]\nPASSED: mcARef['_root'] == _level0  [movieclip_destruction_test3.sc:138]\nPASSED: mcA['_root'] == _level0  [movieclip_destruction_test3.sc:134]\nTotal tests run: 12 typeof expected: number\n#passed: 10\n#failed: 2\n__END_OF_TEST__"
     },
     {
       "test": "movieclip_destruction_test4",
       "phases": {
         "recomp": 0.005,
-        "compile": 17.817
+        "compile": 17.726,
+        "run": 0.004
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 17.82
+      "lines": {
+        "actual_lines": 24,
+        "expected_lines": 40,
+        "matching_lines": 8
+      },
+      "duration": 17.74,
+      "status": "output_mismatch",
+      "detail": "32 line(s) differ (actual=24, expected=40)",
+      "actual_output": "... (3 lines before) ...\nRunning frame1[1] actions of mc2[/brother2] (adding red square) [movieclip_destruction_test4.sc:76]\nRunning frame1[1] actions of mc3[/brother3] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother4] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother5] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother6] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame3 actions of _root (nothing new) [movieclip_destruction_test4.sc:154]\nRunning frame5 actions of _root [movieclip_destruction_test4.sc:160]\nFAILED: typeof(brother1): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:161]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:162]\nFAILED: typeof(brother3): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:163]\nPASSED: typeof(brother4) == movieclip  [movieclip_destruction_test4.sc:164]\nPASSED: typeof(brother5) == movieclip  [movieclip_destruction_test4.sc:165]\nPASSED: typeof(brother6) == movieclip  [movieclip_destruction_test4.sc:166]\nFAILED: typeof(brother1): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:172]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:173]\nFAILED: typeof(brother3): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:174]\nTotal tests run: 9 typeof expected: number\nFAILED: TOTAL tests run: 9, expected: 19 [ [movieclip_destruction_test4.sc:176]]\n#passed: 5\n#failed: 5\n__END_OF_TEST__",
+      "expected_output": "... (3 lines before) ...\nRunning frame1[1] actions of mc2[/brother2] (adding red square) [movieclip_destruction_test4.sc:76]\nRunning frame1[1] actions of mc3[/brother3] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother4] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother5] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother6] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame2[2] actions of mc2[/brother2] (nothing new) [movieclip_destruction_test4.sc:81]\nRunning frame3 actions of _root (nothing new) [movieclip_destruction_test4.sc:154]\nRunning frame3[3] actions of mc2[/brother2] (removing brothers 1,3,4,5,6) [movieclip_destruction_test4.sc:85]\nRunning frame5 actions of _root [movieclip_destruction_test4.sc:160]\nPASSED: typeof(brother1) == undefined  [movieclip_destruction_test4.sc:161]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:162]\nPASSED: typeof(brother3) == undefined  [movieclip_destruction_test4.sc:163]\nPASSED: typeof(brother4) == movieclip  [movieclip_destruction_test4.sc:164]\nPASSED: typeof(brother5) == movieclip  [movieclip_destruction_test4.sc:165]\nPASSED: typeof(brother6) == movieclip  [movieclip_destruction_test4.sc:166]\nPASSED: this.getDepth() == -32809  [movieclip_destruction_test4.sc:121]\nPASSED: typeof(this.mc31) == undefined  [movieclip_destruction_test4.sc:124]\nPASSED: this.getDepth() == -16382  [movieclip_destruction_test4.sc:130]\nPASSED: typeof(this) == movieclip  [movieclip_destruction_test4.sc:131]\nPASSED: typeof(this._parent) == movieclip  [movieclip_destruction_test4.sc:132]\nPASSED: this._parent.getDepth() == -32819  [movieclip_destruction_test4.sc:133]\nPASSED: this.getDepth() == -16382  [movieclip_destruction_test4.sc:148]\nPASSED: this.getDepth() == -32829  [movieclip_destruction_test4.sc:140]\nPASSED: typeof(this.mc31) == movieclip  [movieclip_destruction_test4.sc:142]\nPASSED: this.mc31.getDepth() == -16382  [movieclip_destruction_test4.sc:143]\nRunning frame1[1] actions of mc2[/brother2] (adding red square) [movieclip_destruction_test4.sc:76]\nRunning frame2[2] actions of mc2[/brother2] (nothing new) [movieclip_destruction_test4.sc:81]\nRunning frame3[3] actions of mc2[/brother2] (removing brothers 1,3,4,5,6) [movieclip_destruction_test4.sc:85]\nRunning frame1[1] actions of mc2[/brother2] (adding red square) [movieclip_destruction_test4.sc:76]\nRunning frame2[2] actions of mc2[/brother2] (nothing new) [movieclip_destruction_test4.sc:81]\nPASSED: typeof(brother1) == undefined  [movieclip_destruction_test4.sc:172]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:173]\nPASSED: typeof(brother3) == undefined  [movieclip_destruction_test4.sc:174]\nTotal tests run: 19 typeof expected: number\n#passed: 19\n#failed: 0\n__END_OF_TEST__"
     },
     {
       "test": "opcode_guard_test2",
       "phases": {
         "recomp": 0.008,
-        "compile": 23.07
+        "compile": 24.252,
+        "run": 0.004
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 23.08
+      "lines": {
+        "actual_lines": 24,
+        "expected_lines": 24,
+        "matching_lines": 24
+      },
+      "duration": 24.27,
+      "status": "pass"
     },
     {
       "test": "registerclass_test3",
       "phases": {
         "recomp": 0.009,
-        "compile": 0.265
+        "compile": 26.008,
+        "run": 0.006
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.27
+      "lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 15
+      },
+      "duration": 26.03,
+      "ruffle_diff_count": 20,
+      "ours_diff_count": 12,
+      "status": "ruffle_matched",
+      "detail": "diffs 12 \u2286 ruffle 20"
     },
     {
       "test": "soft_reference_test1",
       "phases": {
-        "recomp": 0.007,
-        "compile": 23.741
+        "recomp": 0.004,
+        "compile": 17.265,
+        "run": 0.002
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 23.75
+      "lines": {
+        "actual_lines": 45,
+        "expected_lines": 45,
+        "matching_lines": 45
+      },
+      "duration": 17.27,
+      "status": "pass"
     },
     {
       "test": "stackscope",
       "phases": {
-        "recomp": 0.007,
-        "compile": 0.35
+        "recomp": 0.004,
+        "compile": 17.388,
+        "run": 0.002
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.36
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "duration": 17.4,
+      "status": "pass"
     },
     {
       "test": "submoviegetvar",
       "phases": {
-        "recomp": 0.007,
-        "compile": 23.816
+        "recomp": 0.006,
+        "compile": 22.539,
+        "run": 0.003
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 23.82
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 22.55,
+      "status": "pass"
     },
     {
       "test": "swf4opcode",
       "phases": {
-        "recomp": 0.027,
-        "compile": 0.338
+        "recomp": 0.013,
+        "compile": 18.208,
+        "run": 0.002
       },
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "date.c:186:28: error: implicit declaration of function \u2018timegm\u2019; did you mean \u2018time\u2019? [-Wimplicit-function-declaration]",
-      "duration": 0.37
+      "lines": {
+        "actual_lines": 117,
+        "expected_lines": 117,
+        "matching_lines": 117
+      },
+      "duration": 18.23,
+      "status": "pass"
     }
   ]
 }
