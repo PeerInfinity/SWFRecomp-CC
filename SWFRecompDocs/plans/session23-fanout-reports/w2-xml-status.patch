@@ -1,0 +1,423 @@
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index 177740c1..b6126f2d 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -648,6 +648,9 @@ void ng_clearTabStops(void);
+ // of whole lines scrolled off the top of the view. 0 for an unscrolled field.
+ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
+                            const char* text, size_t text_len, int scroll_lines);
++int ng_getCharIndexAtPointFont(u16 font_id, u16 font_height, s16 leading,
++                               u16 left_margin, float local_x_px, float local_y_px,
++                               const char* text, size_t text_len, int scroll_lines);
+ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
+     int word_wrap, int field_width_twips, int swf_version,
+     int left_margin_twips, int right_margin_twips, int indent_twips, int align,
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 06e80fa9..8ab9a4b1 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -19794,6 +19794,17 @@ static char* xml_escape(SWFAppContext* app_context, const char* input, u32 len,
+ 
+ // ---- XML Parser ----
+ 
++// Does `node`'s nodeName equal the UTF-8 bytes name[0..len)? Used by the
++// parser's end-tag matching (case-sensitive, as Flash).
++static int xml_node_name_equals(ASObject* node, const char* name, u32 len) {
++	if (node == NULL) return 0;
++	ActionVar* nn = getProperty(node, "nodeName", 8);
++	if (nn == NULL || nn->type != ACTION_STACK_VALUE_STRING) return 0;
++	char buf[512];
++	u16_to_wtf8(varGetU16Ptr(nn), nn->str_size, buf, sizeof(buf));
++	return strlen(buf) == len && memcmp(buf, name, len) == 0;
++}
++
+ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char* text, u32 text_len) {
+ 	// Check ignoreWhite property
+ 	int ignore_white = 0;
+@@ -19832,6 +19843,14 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
+ 	// (handled above) — only structural tag errors are.
+ 	int parse_failed = 0;
+ 
++	// XML.status result of this parse (Flash Player 32,
++	// avm1/xml_status_mismatched_tags): an end tag naming the PARENT of the
++	// open element is -9 (start-tag never closed); any other mismatch, or an
++	// end tag with nothing open, is -10. Either one stops the parse, keeping
++	// the tree built so far (open elements are implicitly closed). EOF with
++	// elements still open is -9.
++	int parse_status = 0;
++
+ 	while (pos < text_len) {
+ 		if (text[pos] == '<') {
+ 			// Flush accumulated text
+@@ -19866,10 +19885,25 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
+ 			if (text[pos] == '/') {
+ 				// Closing tag </tag>
+ 				pos++; // skip '/'
++				u32 end_name_start = pos;
++				while (pos < text_len && text[pos] != '>' && text[pos] != ' ' &&
++				       text[pos] != '\t' && text[pos] != '\n' && text[pos] != '\r') pos++;
++				u32 end_name_len = pos - end_name_start;
+ 				while (pos < text_len && text[pos] != '>') pos++;
+ 				if (pos < text_len) pos++; // skip '>'
+-				if (stack_top > 0) stack_top--;
+-				else parse_failed = 1; // orphan close tag — nothing to close
++				if (stack_top > 0 &&
++				    xml_node_name_equals(stack[stack_top], &text[end_name_start], end_name_len)) {
++					stack_top--;
++				} else {
++					// Mismatched or orphan end tag: stop here, keep the tree.
++					// (An orphan close at the very start leaves an empty
++					// document: gnash XML.as:1040 `</open><open>...` → "".)
++					parse_status = (stack_top >= 2 &&
++					    xml_node_name_equals(stack[stack_top - 1], &text[end_name_start], end_name_len))
++					    ? -9 : -10;
++					text_start = pos;
++					break;
++				}
+ 			}
+ 			else if (pos + 2 < text_len && text[pos] == '!' && text[pos+1] == '-' && text[pos+2] == '-') {
+ 				// Comment <!-- ... -->
+@@ -20145,8 +20179,13 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
+ 		free(unescaped);
+ 	}
+ 
++	if (parse_status == 0 && stack_top > 0) parse_status = -9; // EOF, still open
++	// Unterminated-tag failures (parse_failed) carry their own Flash codes
++	// (-6/-8) that are not modelled yet; leave status untouched for them.
++	if (!parse_failed) xml_store_status(app_context, doc, (double) parse_status);
++
+ 	// Fatal parse error: Flash discards the whole document — toString() is ""
+-	// (XML.as:1027 `<open att='`, 1030 unterminated tag, 1040 orphan close).
++	// (XML.as:1027 `<open att='`, 1030 unterminated tag).
+ 	if (parse_failed) {
+ 		ActionVar* rc = getProperty(doc, "__realChildren", 14);
+ 		if (rc != NULL && rc->type == ACTION_STACK_VALUE_ARRAY) {
+@@ -41043,6 +41082,20 @@ static void initSharedObjectPrototype(SWFAppContext* app_context, ASFunction* ct
+ 	// Replace getLocal + flush/getSize/clear with the real, same-run-cached
+ 	// implementations (avm1_amf.c). Everything else stays a stub.
+ 	avm1AmfInitSharedObject(app_context, ctor);
++
++	// The instance methods are VERSION_6 (Ruffle shared_object.rs decls,
++	// Flash-recorded avm1/shared_object_members_swf5): undefined to SWF5
++	// content until ASSetPropFlags clears the 128 bit.
++	if (ctor->prototype_obj != NULL) {
++		static const char* const v6_names[] = {
++			"connect", "send", "flush", "close", "getSize", "setFps", "clear"
++		};
++		for (int i = 0; i < 7; i++) {
++			ASProperty* p = findPropertyRaw(ctor->prototype_obj, v6_names[i],
++			                                (u32) strlen(v6_names[i]));
++			if (p != NULL) p->flash_flags |= 0x0080;
++		}
++	}
+ }
+ 
+ // Video.prototype: 2 methods
+@@ -41971,6 +42024,21 @@ static void filerefInstallBroadcaster(SWFAppContext* app_context, ASObject* prot
+ 	setPropertyWithFlags(app_context, proto, "_listeners", 10, &lv, f);
+ }
+ 
++// Every FileReference(List) instance owns its `_listeners` Array: the
++// AsBroadcaster trio lives on the prototype, but Flash's constructors define a
++// fresh, plain (enumerable, deletable) `_listeners` on each instance, so
++// listeners never leak between instances (Ruffle 2036a2eb2,
++// avm1/file_reference_listeners_per_instance).
++static void filerefDefineOwnListeners(SWFAppContext* app_context, ASObject* obj)
++{
++	if (obj == NULL) return;
++	ASArray* listeners = allocArray(app_context, 4);
++	ActionVar lv = {0};
++	lv.type = ACTION_STACK_VALUE_ARRAY;
++	lv.data.numeric_value = (u64) listeners;
++	setPropertyWithFlags(app_context, obj, "_listeners", 10, &lv, PROPERTY_FLAGS_DEFAULT);
++}
++
+ // ContextMenu.prototype: copy + hideBuiltInItems
+ static ASFunction g_cm_copy_func;
+ static ASFunction g_cm_hideBuiltIn_func;
+@@ -45525,6 +45593,25 @@ static ASObject* getVersionedArrayProto(SWFAppContext* app_context)
+ 	return g_array_prototype;
+ }
+ 
++// avm1_amf.c's array writer enumerates inherited keys through this: an
++// ASArray's own `__proto__` (an object, or an array's property bag), else the
++// version's Array.prototype.
++ASObject* actionArrayProtoForAmf(SWFAppContext* app_context, ASArray* arr)
++{
++	if (arr == NULL) return NULL;
++	ASProperty* pp = (arr->props != NULL) ? findPropertyRaw(arr->props, "__proto__", 9) : NULL;
++	if (pp != NULL) {
++		if (pp->value.type == ACTION_STACK_VALUE_OBJECT)
++			return (ASObject*)(uintptr_t) pp->value.data.numeric_value;
++		if (pp->value.type == ACTION_STACK_VALUE_ARRAY) {
++			ASArray* pa = (ASArray*)(uintptr_t) pp->value.data.numeric_value;
++			return (pa != NULL) ? pa->props : NULL;
++		}
++		return NULL;
++	}
++	return getVersionedArrayProto(app_context);
++}
++
+ // Set to 1 only while the getVariable dotted-path fallback walks INTERMEDIATE
+ // segments via GetMember. Tells actionGetMember's `_level0` (level 0) branch to
+ // return undefined instead of root, so `this._root._level0.var` resolves to
+@@ -61103,7 +61190,12 @@ void actionNewMethod(SWFAppContext* app_context)
+ 			else if (strcmp(ctor_name, "MovieClipLoader") == 0) new_obj_inst->native_type = NATIVE_MOVIECLIPLOADER;
+ 			else if (strcmp(ctor_name, "PrintJob") == 0) new_obj_inst->native_type = NATIVE_PRINTJOB;
+ 			else if (strcmp(ctor_name, "Button") == 0) new_obj_inst->native_type = NATIVE_BUTTON;
+-			else if (strcmp(ctor_name, "FileReference") == 0) new_obj_inst->native_type = NATIVE_FILEREF;
++			else if (strcmp(ctor_name, "FileReference") == 0) {
++				new_obj_inst->native_type = NATIVE_FILEREF;
++				filerefDefineOwnListeners(app_context, new_obj_inst);
++			}
++			else if (strcmp(ctor_name, "FileReferenceList") == 0)
++				filerefDefineOwnListeners(app_context, new_obj_inst);
+ 		}
+ 
+ 		// Set up prototype chain (new_obj.__proto__ = func.prototype)
+@@ -63384,6 +63476,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction*
+ 	if (strcmp(name, "FileReference") == 0) {
+ 		if (obj->native_type == NATIVE_NONE)
+ 			obj->native_type = NATIVE_FILEREF;
++		filerefDefineOwnListeners(app_context, obj);
+ 		return 1;
+ 	}
+ 
+@@ -79923,13 +80016,35 @@ void actionTextFieldDragEnd(SWFAppContext* app_context)
+ 	float my = app_context->mouse.stage_y / 20.0f;
+ 	for (int i = child_mc_count - 1; i >= 0; i--) {
+ 		MovieClip* mc = child_mc_cache[i];
+-		if (mc == NULL || mc->ng_textfield_idx < 0) continue;
++		// Dynamic (createTextField, idx -2) fields carry links too
++		// (avm1/edittext_asfunction_case_insensitive).
++		if (mc == NULL || !(mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2)) continue;
+ 		float x1, y1, x2, y2;
+ 		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+ 		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+ 		// Mouse hit this text field — check for href
+ 		TFRunTable* table = tf_find_table(mc);
+ 		if (table == NULL) continue;
++		if (mc->ng_textfield_idx == -2) {
++			// No static record: hit-test from the field's own format.
++			char _dyn_utf8[4096];
++			u16 _d_fid, _d_fh; s16 _d_ld;
++			int _d_ww, _d_fwt, _d_lm, _d_rm, _d_ind;
++			size_t _d_len = extractTextFieldParams(app_context, mc, _dyn_utf8,
++				&_d_fid, &_d_fh, &_d_ld, &_d_ww, &_d_fwt, &_d_lm, &_d_rm, &_d_ind);
++			setDeviceFontModeForMC(mc);
++			int _d_idx = ng_getCharIndexAtPointFont(_d_fid, _d_fh, _d_ld,
++				(u16)(_d_lm > 0 ? _d_lm : 0),
++				mx - x1 + ng_get_textfield_scroll_x(mc) / 20.0f + tf_view_hscroll_px(mc),
++				my - y1, _dyn_utf8, _d_len, tf_view_scroll_lines(mc));
++			if (_d_idx < 0) continue;
++			TFRun* _d_run = tf_find_run_at_index(table, (u32)_d_idx);
++			if (_d_run != NULL && _d_run->href[0] != '\0') {
++				handle_asfunction(app_context, _d_run->href, mc);
++				return;
++			}
++			continue;
++		}
+ 		float local_x = mx - x1 + ng_get_textfield_scroll_x(mc) / 20.0f;
+ 		float local_y = my - y1;
+ 		// Get text for char index calculation
+diff --git a/SWFModernRuntime/src/actionmodern/avm1_amf.c b/SWFModernRuntime/src/actionmodern/avm1_amf.c
+index 51360a79..7ac0337a 100644
+--- a/SWFModernRuntime/src/actionmodern/avm1_amf.c
++++ b/SWFModernRuntime/src/actionmodern/avm1_amf.c
+@@ -517,6 +517,42 @@ static void av_from_asobject_array(ArrayView* v, ASObject* obj)
+ 	}
+ }
+ 
++// The prototype an ASArray inherits from (its own `__proto__`, else the
++// version's Array.prototype). Defined in action.c.
++extern ASObject* actionArrayProtoForAmf(SWFAppContext* app_context, ASArray* arr);
++
++// Append the enumerable properties an array INHERITS (for-in order: nearest
++// prototype first, names already present skipped, `constructor` suppressed),
++// exactly as w0_object_pairs does for an object. Flash enumerates the array's
++// keys through the prototype chain, so a hole whose index the prototype
++// defines is written with the inherited value
++// (avm1/localconnection_serialize_inherited_array_indices; Ruffle's
++// serialize_array runs get_keys, which walks the chain).
++static void av_add_inherited(ArrayView* v, ASObject* proto)
++{
++	ASObject* cur = proto;
++	for (int depth = 0; cur != NULL && depth < 100; depth++)
++	{
++		for (u32 i = 0; i < cur->num_used; i++)
++		{
++			ASProperty* p = &cur->properties[i];
++			const char* name = p->name;
++			u32 len = p->name_length;
++			if (name == NULL || (uintptr_t) name < 4096) continue;
++			if (!(p->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
++			if (amf_name_eq(name, len, "__proto__")) continue;
++			if (amf_name_eq(name, len, "constructor")) continue;
++			if (amf_name_eq(name, len, "length")) continue;
++			if (av_find(v, name, len) != NULL) continue;
++			AmfEntry* e = av_add(v, name, len);
++			if (e == NULL) return;
++			amf_prop_value(p, &e->val);
++			av_note_key(v, e);
++		}
++		cur = amf_proto_of(cur);
++	}
++}
++
+ // Write an array-like value. On a wire channel Flash picks StrictArray whenever
+ // every key is an index (densifying holes to 0x06) and ECMAArray otherwise; in
+ // an LSO body nested arrays always take the ECMAArray form and sparse writes
+@@ -669,6 +705,7 @@ static void w0_object(Amf0Wr* w, ASObject* obj)
+ 		if (w0_ref_or_claim(w, obj)) return;
+ 		ArrayView v;
+ 		av_from_asobject_array(&v, obj);
++		av_add_inherited(&v, amf_proto_of(obj));
+ 		w0_array_view(w, &v);
+ 		return;
+ 	}
+@@ -754,6 +791,7 @@ static void w0_value(Amf0Wr* w, ActionVar* v)
+ 			if (w0_ref_or_claim(w, arr)) break;
+ 			ArrayView av;
+ 			av_from_asarray(&av, arr);
++			av_add_inherited(&av, actionArrayProtoForAmf(w->app, arr));
+ 			w0_array_view(w, &av);
+ 			break;
+ 		}
+@@ -868,6 +906,7 @@ typedef struct
+ 	int depth;
+ 	ActionVar refs[AMF_MAX_REFS];
+ 	int ref_count;
++	int lc_refs;   // LocalConnection: populate the table, sibling rule (below)
+ } Amf0Rd;
+ 
+ static ActionVar rd0_value(Amf0Rd* r);
+@@ -932,10 +971,36 @@ static const unsigned char* rd_bytes(Amf0Rd* r, size_t n)
+ // the live cached instance and never serializes at all). These two stay as the
+ // shape of a populated table so the intent is legible, but claiming a slot is
+ // deliberately a no-op.
++//
++// LocalConnection is the exception (Ruffle 6a6222860, Flash-recorded
++// avm1/localconnection_reference_identity): an argument's table IS populated,
++// so a DAG or cycle inside one top-level property survives, but a reference
++// into an EARLIER top-level sibling property still reads as undefined (the
++// slots stay counted; their values are hidden) -- which is the
++// `ref_strict_is_exact: false` amf0_serde_suite grades. The root (slot 0)
++// stays visible to every property.
+ static int rd_ref_claim(Amf0Rd* r, ActionVar v)
+ {
+-	(void) r; (void) v;
+-	return -1;
++	if (!r->lc_refs || r->ref_count >= AMF_MAX_REFS) return -1;
++	r->refs[r->ref_count] = v;
++	return r->ref_count++;
++}
++
++// After one top-level property of a LocalConnection argument has been read,
++// hide the slots it claimed from the properties that follow it.
++static int rd_lc_sibling_begin(Amf0Rd* r)
++{
++	return (r->lc_refs && r->depth == 1) ? r->ref_count : -1;
++}
++static void rd_lc_sibling_end(Amf0Rd* r, int start)
++{
++	if (start < 0) return;
++	for (int i = start; i < r->ref_count; i++)
++	{
++		r->refs[i].type = ACTION_STACK_VALUE_UNDEFINED;
++		r->refs[i].str_size = 0;
++		r->refs[i].data.numeric_value = 0;
++	}
+ }
+ 
+ static void rd_ref_set(Amf0Rd* r, int idx, ActionVar v)
+@@ -972,7 +1037,9 @@ static void rd0_pairs_into_object(Amf0Rd* r, ASObject* obj)
+ 			if (end != M0_OBJEND) r->bad = 1;
+ 			return;
+ 		}
++		int sib = rd_lc_sibling_begin(r);
+ 		ActionVar v = rd0_value(r);
++		rd_lc_sibling_end(r, sib);
+ 		if (r->bad) return;
+ 		setProperty(r->app, obj, name, len, &v);
+ 	}
+@@ -992,7 +1059,9 @@ static void rd0_pairs_into_array(Amf0Rd* r, ASArray* arr)
+ 			if (end != M0_OBJEND) r->bad = 1;
+ 			return;
+ 		}
++		int sib = rd_lc_sibling_begin(r);
+ 		ActionVar v = rd0_value(r);
++		rd_lc_sibling_end(r, sib);
+ 		if (r->bad) return;
+ 		unsigned long idx;
+ 		// Same 1 MiB cap script assignment uses (actionSetMember's ARRAY arm):
+@@ -1140,7 +1209,9 @@ static ActionVar rd0_value(Amf0Rd* r)
+ 			int slot = rd_ref_claim(r, out);
+ 			for (unsigned long i = 0; i < count && !r->bad; i++)
+ 			{
++				int sib = rd_lc_sibling_begin(r);
+ 				ActionVar ev = rd0_value(r);
++				rd_lc_sibling_end(r, sib);
+ 				setArrayElement(r->app, arr, (u32) i, &ev);
+ 			}
+ 			if (arr->length < count) arr->length = (u32) count;
+@@ -1201,6 +1272,7 @@ ActionVar avm1AmfReadValue(SWFAppContext* app_context,
+ 	r.bad = 0;
+ 	r.depth = 0;
+ 	r.ref_count = 0;
++	r.lc_refs = 0;
+ 	ActionVar v = rd0_value(&r);
+ 	if (r.bad) return rd_undef();
+ 	return v;
+@@ -1209,7 +1281,19 @@ ActionVar avm1AmfReadValue(SWFAppContext* app_context,
+ ActionVar avm1AmfDeserializeArg(SWFAppContext* app_context,
+                                 const unsigned char* p, size_t n)
+ {
+-	return avm1AmfReadValue(app_context, p, n);
++	if (p == NULL || n == 0) return rd_undef();
++	Amf0Rd r;
++	r.app = app_context;
++	r.p = p;
++	r.n = n;
++	r.pos = 0;
++	r.bad = 0;
++	r.depth = 0;
++	r.ref_count = 0;
++	r.lc_refs = 1;
++	ActionVar v = rd0_value(&r);
++	if (r.bad) return rd_undef();
++	return v;
+ }
+ 
+ // ==================================================================
+diff --git a/SWFModernRuntime/src/libswf/ng_shared.c b/SWFModernRuntime/src/libswf/ng_shared.c
+index 8e06040a..e99fd205 100644
+--- a/SWFModernRuntime/src/libswf/ng_shared.c
++++ b/SWFModernRuntime/src/libswf/ng_shared.c
+@@ -2197,14 +2197,23 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
+ {
+ 	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+ 
+-	u16 font_id = ng_textfields[tf_idx].font_id;
+-	u16 font_height = ng_textfields[tf_idx].font_height;
+ 	if (text == NULL) {
+ 		text = ng_textfields[tf_idx].plain_text;
+ 		text_len = strlen(text);
+ 	}
+-	s16 leading = ng_textfields[tf_idx].leading;
+-	u16 left_margin = ng_textfields[tf_idx].left_margin;
++	return ng_getCharIndexAtPointFont(ng_textfields[tf_idx].font_id,
++		ng_textfields[tf_idx].font_height, ng_textfields[tf_idx].leading,
++		ng_textfields[tf_idx].left_margin, local_x_px, local_y_px,
++		text, text_len, scroll_lines);
++}
++
++// Same hit test from explicit format parameters, for a field with no static
++// DefineEditText record (createTextField, ng_textfield_idx == -2).
++int ng_getCharIndexAtPointFont(u16 font_id, u16 font_height, s16 leading,
++                               u16 left_margin, float local_x_px, float local_y_px,
++                               const char* text, size_t text_len, int scroll_lines)
++{
++	if (text == NULL) return 0;
+ 
+ 	int fi = ng_find_font_with_metrics(font_id);
+ 	if (fi < 0 || text_len == 0) return 0;

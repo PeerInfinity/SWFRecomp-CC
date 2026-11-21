@@ -517,6 +517,42 @@ static void av_from_asobject_array(ArrayView* v, ASObject* obj)
 	}
 }
 
+// The prototype an ASArray inherits from (its own `__proto__`, else the
+// version's Array.prototype). Defined in action.c.
+extern ASObject* actionArrayProtoForAmf(SWFAppContext* app_context, ASArray* arr);
+
+// Append the enumerable properties an array INHERITS (for-in order: nearest
+// prototype first, names already present skipped, `constructor` suppressed),
+// exactly as w0_object_pairs does for an object. Flash enumerates the array's
+// keys through the prototype chain, so a hole whose index the prototype
+// defines is written with the inherited value
+// (avm1/localconnection_serialize_inherited_array_indices; Ruffle's
+// serialize_array runs get_keys, which walks the chain).
+static void av_add_inherited(ArrayView* v, ASObject* proto)
+{
+	ASObject* cur = proto;
+	for (int depth = 0; cur != NULL && depth < 100; depth++)
+	{
+		for (u32 i = 0; i < cur->num_used; i++)
+		{
+			ASProperty* p = &cur->properties[i];
+			const char* name = p->name;
+			u32 len = p->name_length;
+			if (name == NULL || (uintptr_t) name < 4096) continue;
+			if (!(p->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
+			if (amf_name_eq(name, len, "__proto__")) continue;
+			if (amf_name_eq(name, len, "constructor")) continue;
+			if (amf_name_eq(name, len, "length")) continue;
+			if (av_find(v, name, len) != NULL) continue;
+			AmfEntry* e = av_add(v, name, len);
+			if (e == NULL) return;
+			amf_prop_value(p, &e->val);
+			av_note_key(v, e);
+		}
+		cur = amf_proto_of(cur);
+	}
+}
+
 // Write an array-like value. On a wire channel Flash picks StrictArray whenever
 // every key is an index (densifying holes to 0x06) and ECMAArray otherwise; in
 // an LSO body nested arrays always take the ECMAArray form and sparse writes
@@ -669,6 +705,7 @@ static void w0_object(Amf0Wr* w, ASObject* obj)
 		if (w0_ref_or_claim(w, obj)) return;
 		ArrayView v;
 		av_from_asobject_array(&v, obj);
+		av_add_inherited(&v, amf_proto_of(obj));
 		w0_array_view(w, &v);
 		return;
 	}
@@ -754,6 +791,7 @@ static void w0_value(Amf0Wr* w, ActionVar* v)
 			if (w0_ref_or_claim(w, arr)) break;
 			ArrayView av;
 			av_from_asarray(&av, arr);
+			av_add_inherited(&av, actionArrayProtoForAmf(w->app, arr));
 			w0_array_view(w, &av);
 			break;
 		}
@@ -868,6 +906,7 @@ typedef struct
 	int depth;
 	ActionVar refs[AMF_MAX_REFS];
 	int ref_count;
+	int lc_refs;   // LocalConnection: populate the table, sibling rule (below)
 } Amf0Rd;
 
 static ActionVar rd0_value(Amf0Rd* r);
@@ -932,10 +971,36 @@ static const unsigned char* rd_bytes(Amf0Rd* r, size_t n)
 // the live cached instance and never serializes at all). These two stay as the
 // shape of a populated table so the intent is legible, but claiming a slot is
 // deliberately a no-op.
+//
+// LocalConnection is the exception (Ruffle 6a6222860, Flash-recorded
+// avm1/localconnection_reference_identity): an argument's table IS populated,
+// so a DAG or cycle inside one top-level property survives, but a reference
+// into an EARLIER top-level sibling property still reads as undefined (the
+// slots stay counted; their values are hidden) -- which is the
+// `ref_strict_is_exact: false` amf0_serde_suite grades. The root (slot 0)
+// stays visible to every property.
 static int rd_ref_claim(Amf0Rd* r, ActionVar v)
 {
-	(void) r; (void) v;
-	return -1;
+	if (!r->lc_refs || r->ref_count >= AMF_MAX_REFS) return -1;
+	r->refs[r->ref_count] = v;
+	return r->ref_count++;
+}
+
+// After one top-level property of a LocalConnection argument has been read,
+// hide the slots it claimed from the properties that follow it.
+static int rd_lc_sibling_begin(Amf0Rd* r)
+{
+	return (r->lc_refs && r->depth == 1) ? r->ref_count : -1;
+}
+static void rd_lc_sibling_end(Amf0Rd* r, int start)
+{
+	if (start < 0) return;
+	for (int i = start; i < r->ref_count; i++)
+	{
+		r->refs[i].type = ACTION_STACK_VALUE_UNDEFINED;
+		r->refs[i].str_size = 0;
+		r->refs[i].data.numeric_value = 0;
+	}
 }
 
 static void rd_ref_set(Amf0Rd* r, int idx, ActionVar v)
@@ -972,7 +1037,9 @@ static void rd0_pairs_into_object(Amf0Rd* r, ASObject* obj)
 			if (end != M0_OBJEND) r->bad = 1;
 			return;
 		}
+		int sib = rd_lc_sibling_begin(r);
 		ActionVar v = rd0_value(r);
+		rd_lc_sibling_end(r, sib);
 		if (r->bad) return;
 		setProperty(r->app, obj, name, len, &v);
 	}
@@ -992,7 +1059,9 @@ static void rd0_pairs_into_array(Amf0Rd* r, ASArray* arr)
 			if (end != M0_OBJEND) r->bad = 1;
 			return;
 		}
+		int sib = rd_lc_sibling_begin(r);
 		ActionVar v = rd0_value(r);
+		rd_lc_sibling_end(r, sib);
 		if (r->bad) return;
 		unsigned long idx;
 		// Same 1 MiB cap script assignment uses (actionSetMember's ARRAY arm):
@@ -1140,7 +1209,9 @@ static ActionVar rd0_value(Amf0Rd* r)
 			int slot = rd_ref_claim(r, out);
 			for (unsigned long i = 0; i < count && !r->bad; i++)
 			{
+				int sib = rd_lc_sibling_begin(r);
 				ActionVar ev = rd0_value(r);
+				rd_lc_sibling_end(r, sib);
 				setArrayElement(r->app, arr, (u32) i, &ev);
 			}
 			if (arr->length < count) arr->length = (u32) count;
@@ -1201,6 +1272,7 @@ ActionVar avm1AmfReadValue(SWFAppContext* app_context,
 	r.bad = 0;
 	r.depth = 0;
 	r.ref_count = 0;
+	r.lc_refs = 0;
 	ActionVar v = rd0_value(&r);
 	if (r.bad) return rd_undef();
 	return v;
@@ -1209,7 +1281,19 @@ ActionVar avm1AmfReadValue(SWFAppContext* app_context,
 ActionVar avm1AmfDeserializeArg(SWFAppContext* app_context,
                                 const unsigned char* p, size_t n)
 {
-	return avm1AmfReadValue(app_context, p, n);
+	if (p == NULL || n == 0) return rd_undef();
+	Amf0Rd r;
+	r.app = app_context;
+	r.p = p;
+	r.n = n;
+	r.pos = 0;
+	r.bad = 0;
+	r.depth = 0;
+	r.ref_count = 0;
+	r.lc_refs = 1;
+	ActionVar v = rd0_value(&r);
+	if (r.bad) return rd_undef();
+	return v;
 }
 
 // ==================================================================

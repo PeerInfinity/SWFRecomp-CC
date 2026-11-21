@@ -656,6 +656,9 @@ void ng_clearTabStops(void);
 // of whole lines scrolled off the top of the view. 0 for an unscrolled field.
 int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
                            const char* text, size_t text_len, int scroll_lines);
+int ng_getCharIndexAtPointFont(u16 font_id, u16 font_height, s16 leading,
+                               u16 left_margin, float local_x_px, float local_y_px,
+                               const char* text, size_t text_len, int scroll_lines);
 int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
     int left_margin_twips, int right_margin_twips, int indent_twips, int align,

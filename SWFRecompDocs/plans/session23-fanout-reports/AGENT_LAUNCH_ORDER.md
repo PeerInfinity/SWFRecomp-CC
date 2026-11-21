@@ -56,7 +56,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 22 | w2-doc-removal-events | trace | drift-avm2 S8 | session_018CoDi7jBSFh59hTPEMaK7G — LANDED (+3) |
 | 23 | w2-video-props | trace | drift-avm1 V: Video width/height lazy accessors | session_018CoDi3srDrx6YECoWarZYc — LANDED (+2 eff) |
 | 24 | w2-harness-subtests | px (instrument) | ignore=true + [subtests] images + drawWithQuality + report-only ruffle-png bucket | session_018CoDi5m6iYZTWzXtXE2S8s — LANDED (instrument) |
-| 25 | w2-xml-status | trace | drift-avm1 M3 XML status + AVM1 bundle | session_018CoDi58gxyHZVyRcAu87S1 (18:55) |
+| 25 | w2-xml-status | trace | drift-avm1 M3 XML status + AVM1 bundle | session_018CoDi58gxyHZVyRcAu87S1 — LANDED (+6) |
 | 26 | w2-dynclip-transform | px+correctness | AVM1 nested dynamic-clip transform/alpha inheritance (empty_child_filter_bounds) | session_018CoDi57QaPasoFxvAJyUzd — LANDED (correctness, 0 flips) |
 ## Landed patches + expected ledgers
 
@@ -84,6 +84,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `a0b18bc93` | w2-video-props | trace (both modes): `from_gnash/misc-ming.all/NetStream-SquareTest` fail→ruffle_matched (KF; last drift re-flip), `avm1/video_width_height` fail→pass; partial `video_prototype_lazy` 9→20/21, `_swf6_child` 2→4/8; pixels none |
 | `c216160c4` | w2-dynclip-transform (correctness) | px: `visual/filters/empty_child_filter_bounds` fail→fail 72840→24876 (no flip); 169-PNG A/B otherwise md5-identical; trace none. Lead R1: AVM1 runtime `mc.filters = [...]` is never rendered on ANY clip (1 corpus row, game-visible) |
 | `64e1aa60a` | w2-avm2-small-errors | trace (both modes) fail→pass: `avm2/shared_object_get_local_error`, `loaderinfo_root_progress`, `loaderinfo_root_progress_goto`, `amf_xmllist`, `hit_test_scroll_rect`; fail→ruffle_matched `from_shumway/as3-loader/events/loader-events` (KF; via Flash-correct root progress line); pixels none |
+| (xs) | w2-xml-status | trace fail→pass (both modes): `avm1/xml_status_mismatched_tags`, `file_reference_listeners_per_instance`, `localconnection_serialize_inherited_array_indices`, `localconnection_reference_identity`, `shared_object_members_swf5`, `edittext_asfunction_case_insensitive`; must stay rm: gnash XML-v5..8, XMLNode-v5..8, NetConnection-v6..8; pixels none |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).

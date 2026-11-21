@@ -19797,6 +19797,17 @@ static char* xml_escape(SWFAppContext* app_context, const char* input, u32 len, 
 
 // ---- XML Parser ----
 
+// Does `node`'s nodeName equal the UTF-8 bytes name[0..len)? Used by the
+// parser's end-tag matching (case-sensitive, as Flash).
+static int xml_node_name_equals(ASObject* node, const char* name, u32 len) {
+	if (node == NULL) return 0;
+	ActionVar* nn = getProperty(node, "nodeName", 8);
+	if (nn == NULL || nn->type != ACTION_STACK_VALUE_STRING) return 0;
+	char buf[512];
+	u16_to_wtf8(varGetU16Ptr(nn), nn->str_size, buf, sizeof(buf));
+	return strlen(buf) == len && memcmp(buf, name, len) == 0;
+}
+
 static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char* text, u32 text_len) {
 	// Check ignoreWhite property
 	int ignore_white = 0;
@@ -19835,6 +19846,14 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 	// (handled above) — only structural tag errors are.
 	int parse_failed = 0;
 
+	// XML.status result of this parse (Flash Player 32,
+	// avm1/xml_status_mismatched_tags): an end tag naming the PARENT of the
+	// open element is -9 (start-tag never closed); any other mismatch, or an
+	// end tag with nothing open, is -10. Either one stops the parse, keeping
+	// the tree built so far (open elements are implicitly closed). EOF with
+	// elements still open is -9.
+	int parse_status = 0;
+
 	while (pos < text_len) {
 		if (text[pos] == '<') {
 			// Flush accumulated text
@@ -19869,10 +19888,25 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 			if (text[pos] == '/') {
 				// Closing tag </tag>
 				pos++; // skip '/'
+				u32 end_name_start = pos;
+				while (pos < text_len && text[pos] != '>' && text[pos] != ' ' &&
+				       text[pos] != '\t' && text[pos] != '\n' && text[pos] != '\r') pos++;
+				u32 end_name_len = pos - end_name_start;
 				while (pos < text_len && text[pos] != '>') pos++;
 				if (pos < text_len) pos++; // skip '>'
-				if (stack_top > 0) stack_top--;
-				else parse_failed = 1; // orphan close tag — nothing to close
+				if (stack_top > 0 &&
+				    xml_node_name_equals(stack[stack_top], &text[end_name_start], end_name_len)) {
+					stack_top--;
+				} else {
+					// Mismatched or orphan end tag: stop here, keep the tree.
+					// (An orphan close at the very start leaves an empty
+					// document: gnash XML.as:1040 `</open><open>...` → "".)
+					parse_status = (stack_top >= 2 &&
+					    xml_node_name_equals(stack[stack_top - 1], &text[end_name_start], end_name_len))
+					    ? -9 : -10;
+					text_start = pos;
+					break;
+				}
 			}
 			else if (pos + 2 < text_len && text[pos] == '!' && text[pos+1] == '-' && text[pos+2] == '-') {
 				// Comment <!-- ... -->
@@ -20148,8 +20182,13 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 		free(unescaped);
 	}
 
+	if (parse_status == 0 && stack_top > 0) parse_status = -9; // EOF, still open
+	// Unterminated-tag failures (parse_failed) carry their own Flash codes
+	// (-6/-8) that are not modelled yet; leave status untouched for them.
+	if (!parse_failed) xml_store_status(app_context, doc, (double) parse_status);
+
 	// Fatal parse error: Flash discards the whole document — toString() is ""
-	// (XML.as:1027 `<open att='`, 1030 unterminated tag, 1040 orphan close).
+	// (XML.as:1027 `<open att='`, 1030 unterminated tag).
 	if (parse_failed) {
 		ActionVar* rc = getProperty(doc, "__realChildren", 14);
 		if (rc != NULL && rc->type == ACTION_STACK_VALUE_ARRAY) {
@@ -41088,6 +41127,20 @@ static void initSharedObjectPrototype(SWFAppContext* app_context, ASFunction* ct
 	// Replace getLocal + flush/getSize/clear with the real, same-run-cached
 	// implementations (avm1_amf.c). Everything else stays a stub.
 	avm1AmfInitSharedObject(app_context, ctor);
+
+	// The instance methods are VERSION_6 (Ruffle shared_object.rs decls,
+	// Flash-recorded avm1/shared_object_members_swf5): undefined to SWF5
+	// content until ASSetPropFlags clears the 128 bit.
+	if (ctor->prototype_obj != NULL) {
+		static const char* const v6_names[] = {
+			"connect", "send", "flush", "close", "getSize", "setFps", "clear"
+		};
+		for (int i = 0; i < 7; i++) {
+			ASProperty* p = findPropertyRaw(ctor->prototype_obj, v6_names[i],
+			                                (u32) strlen(v6_names[i]));
+			if (p != NULL) p->flash_flags |= 0x0080;
+		}
+	}
 }
 
 // Video.prototype: 2 methods
@@ -42326,6 +42379,21 @@ static void filerefInstallBroadcaster(SWFAppContext* app_context, ASObject* prot
 	lv.type = ACTION_STACK_VALUE_ARRAY;
 	lv.data.numeric_value = (u64) listeners;
 	setPropertyWithFlags(app_context, proto, "_listeners", 10, &lv, f);
+}
+
+// Every FileReference(List) instance owns its `_listeners` Array: the
+// AsBroadcaster trio lives on the prototype, but Flash's constructors define a
+// fresh, plain (enumerable, deletable) `_listeners` on each instance, so
+// listeners never leak between instances (Ruffle 2036a2eb2,
+// avm1/file_reference_listeners_per_instance).
+static void filerefDefineOwnListeners(SWFAppContext* app_context, ASObject* obj)
+{
+	if (obj == NULL) return;
+	ASArray* listeners = allocArray(app_context, 4);
+	ActionVar lv = {0};
+	lv.type = ACTION_STACK_VALUE_ARRAY;
+	lv.data.numeric_value = (u64) listeners;
+	setPropertyWithFlags(app_context, obj, "_listeners", 10, &lv, PROPERTY_FLAGS_DEFAULT);
 }
 
 // ContextMenu.prototype: copy + hideBuiltInItems
@@ -45880,6 +45948,25 @@ static ASObject* getVersionedArrayProto(SWFAppContext* app_context)
 	}
 	initArrayPrototypeMethods(app_context);
 	return g_array_prototype;
+}
+
+// avm1_amf.c's array writer enumerates inherited keys through this: an
+// ASArray's own `__proto__` (an object, or an array's property bag), else the
+// version's Array.prototype.
+ASObject* actionArrayProtoForAmf(SWFAppContext* app_context, ASArray* arr)
+{
+	if (arr == NULL) return NULL;
+	ASProperty* pp = (arr->props != NULL) ? findPropertyRaw(arr->props, "__proto__", 9) : NULL;
+	if (pp != NULL) {
+		if (pp->value.type == ACTION_STACK_VALUE_OBJECT)
+			return (ASObject*)(uintptr_t) pp->value.data.numeric_value;
+		if (pp->value.type == ACTION_STACK_VALUE_ARRAY) {
+			ASArray* pa = (ASArray*)(uintptr_t) pp->value.data.numeric_value;
+			return (pa != NULL) ? pa->props : NULL;
+		}
+		return NULL;
+	}
+	return getVersionedArrayProto(app_context);
 }
 
 // Set to 1 only while the getVariable dotted-path fallback walks INTERMEDIATE
@@ -61460,7 +61547,12 @@ void actionNewMethod(SWFAppContext* app_context)
 			else if (strcmp(ctor_name, "MovieClipLoader") == 0) new_obj_inst->native_type = NATIVE_MOVIECLIPLOADER;
 			else if (strcmp(ctor_name, "PrintJob") == 0) new_obj_inst->native_type = NATIVE_PRINTJOB;
 			else if (strcmp(ctor_name, "Button") == 0) new_obj_inst->native_type = NATIVE_BUTTON;
-			else if (strcmp(ctor_name, "FileReference") == 0) new_obj_inst->native_type = NATIVE_FILEREF;
+			else if (strcmp(ctor_name, "FileReference") == 0) {
+				new_obj_inst->native_type = NATIVE_FILEREF;
+				filerefDefineOwnListeners(app_context, new_obj_inst);
+			}
+			else if (strcmp(ctor_name, "FileReferenceList") == 0)
+				filerefDefineOwnListeners(app_context, new_obj_inst);
 		}
 
 		// Set up prototype chain (new_obj.__proto__ = func.prototype)
@@ -63741,6 +63833,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	if (strcmp(name, "FileReference") == 0) {
 		if (obj->native_type == NATIVE_NONE)
 			obj->native_type = NATIVE_FILEREF;
+		filerefDefineOwnListeners(app_context, obj);
 		return 1;
 	}
 
@@ -80280,13 +80373,35 @@ void actionTextFieldDragEnd(SWFAppContext* app_context)
 	float my = app_context->mouse.stage_y / 20.0f;
 	for (int i = child_mc_count - 1; i >= 0; i--) {
 		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->ng_textfield_idx < 0) continue;
+		// Dynamic (createTextField, idx -2) fields carry links too
+		// (avm1/edittext_asfunction_case_insensitive).
+		if (mc == NULL || !(mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2)) continue;
 		float x1, y1, x2, y2;
 		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
 		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
 		// Mouse hit this text field — check for href
 		TFRunTable* table = tf_find_table(mc);
 		if (table == NULL) continue;
+		if (mc->ng_textfield_idx == -2) {
+			// No static record: hit-test from the field's own format.
+			char _dyn_utf8[4096];
+			u16 _d_fid, _d_fh; s16 _d_ld;
+			int _d_ww, _d_fwt, _d_lm, _d_rm, _d_ind;
+			size_t _d_len = extractTextFieldParams(app_context, mc, _dyn_utf8,
+				&_d_fid, &_d_fh, &_d_ld, &_d_ww, &_d_fwt, &_d_lm, &_d_rm, &_d_ind);
+			setDeviceFontModeForMC(mc);
+			int _d_idx = ng_getCharIndexAtPointFont(_d_fid, _d_fh, _d_ld,
+				(u16)(_d_lm > 0 ? _d_lm : 0),
+				mx - x1 + ng_get_textfield_scroll_x(mc) / 20.0f + tf_view_hscroll_px(mc),
+				my - y1, _dyn_utf8, _d_len, tf_view_scroll_lines(mc));
+			if (_d_idx < 0) continue;
+			TFRun* _d_run = tf_find_run_at_index(table, (u32)_d_idx);
+			if (_d_run != NULL && _d_run->href[0] != '\0') {
+				handle_asfunction(app_context, _d_run->href, mc);
+				return;
+			}
+			continue;
+		}
 		float local_x = mx - x1 + ng_get_textfield_scroll_x(mc) / 20.0f;
 		float local_y = my - y1;
 		// Get text for char index calculation

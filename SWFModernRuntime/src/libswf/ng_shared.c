@@ -2366,14 +2366,23 @@ int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
 {
 	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
 
-	u16 font_id = ng_textfields[tf_idx].font_id;
-	u16 font_height = ng_textfields[tf_idx].font_height;
 	if (text == NULL) {
 		text = ng_textfields[tf_idx].plain_text;
 		text_len = strlen(text);
 	}
-	s16 leading = ng_textfields[tf_idx].leading;
-	u16 left_margin = ng_textfields[tf_idx].left_margin;
+	return ng_getCharIndexAtPointFont(ng_textfields[tf_idx].font_id,
+		ng_textfields[tf_idx].font_height, ng_textfields[tf_idx].leading,
+		ng_textfields[tf_idx].left_margin, local_x_px, local_y_px,
+		text, text_len, scroll_lines);
+}
+
+// Same hit test from explicit format parameters, for a field with no static
+// DefineEditText record (createTextField, ng_textfield_idx == -2).
+int ng_getCharIndexAtPointFont(u16 font_id, u16 font_height, s16 leading,
+                               u16 left_margin, float local_x_px, float local_y_px,
+                               const char* text, size_t text_len, int scroll_lines)
+{
+	if (text == NULL) return 0;
 
 	int fi = ng_find_font_with_metrics(font_id);
 	if (fi < 0 || text_len == 0) return 0;
