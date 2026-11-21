@@ -1,8 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `08709f65842a` (2026-11-21T17:00:08.554988+00:00)
-**Current:** `bc91565cea8e` (2026-11-21T19:30:16.470113+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `bc91565cea8e` (2026-11-21T19:30:16.470113+00:00)
+**Current:** `c489b84d9946` (2026-11-21T19:49:24.079548+00:00)
 
 ## Summary
 

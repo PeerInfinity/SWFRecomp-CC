@@ -1,11 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-21T17:00:08.546386+00:00",
-    "git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
-    "duration_seconds": 150.46,
+    "timestamp": "2026-11-21T19:30:16.457292+00:00",
+    "git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "duration_seconds": 141.96,
     "total_available": 9,
-    "shards": 30,
-    "expected_shards": 30
+    "shards": 29,
+    "expected_shards": 30,
+    "missing_shards": 1,
+    "incomplete": true
   },
   "total": 9,
   "pass": 7,
@@ -22,8 +24,8 @@
       "test": "device_font_glyph_fallback",
       "phases": {
         "recomp": 0.008,
-        "compile": 22.232,
-        "run": 0.004
+        "compile": 21.907,
+        "run": 0.003
       },
       "num_frames": 1,
       "lines": {
@@ -31,15 +33,15 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 22.25,
+      "duration": 21.92,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
-        "recomp": 0.007,
-        "compile": 21.9,
-        "run": 0.004
+        "recomp": 0.006,
+        "compile": 21.671,
+        "run": 0.003
       },
       "num_frames": 1,
       "lines": {
@@ -47,15 +49,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 21.92,
+      "duration": 21.69,
       "status": "pass"
     },
     {
       "test": "device_font_list",
       "phases": {
-        "recomp": 0.009,
-        "compile": 22.202,
-        "run": 0.004
+        "recomp": 0.016,
+        "compile": 23.981,
+        "run": 0.005
       },
       "num_frames": 1,
       "lines": {
@@ -63,15 +65,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 22.22,
+      "duration": 24.01,
       "status": "pass"
     },
     {
       "test": "device_font_name_case",
       "phases": {
-        "recomp": 0.006,
-        "compile": 1.436,
-        "run": 0.003
+        "recomp": 0.004,
+        "compile": 0.86,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -79,7 +81,7 @@
         "expected_lines": 13,
         "matching_lines": 1
       },
-      "duration": 1.45,
+      "duration": 0.87,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=13, expected=13)",
       "actual_output": "lower testfonta -> A=true, B=true\nupper TESTFONTA -> A=true, B=true\nmixed tEsTfOnTa -> A=true, B=true\nlower testfontb -> A=true, B=true\nupper TESTFONTB -> A=true, B=true\nprefix XTestFontA -> A=true, B=true\nsuffix TestFontAX -> A=true, B=true\nspace Test FontA -> A=true, B=true\nleading space  TestFontA -> A=true, B=true\ntrailing space TestFontA  -> A=true, B=true\nsuffix-hyphen TestFontA-Bold -> A=true, B=true\nsuffix-space TestFontA Bold -> A=true, B=true\ndone",
@@ -89,8 +91,8 @@
       "test": "device_font_no_ink",
       "phases": {
         "recomp": 0.007,
-        "compile": 22.26,
-        "run": 0.004
+        "compile": 21.32,
+        "run": 0.003
       },
       "num_frames": 1,
       "lines": {
@@ -98,7 +100,7 @@
         "expected_lines": 18,
         "matching_lines": 4
       },
-      "duration": 22.28,
+      "duration": 21.33,
       "ruffle_diff_count": 14,
       "ours_diff_count": 14,
       "status": "ruffle_matched",
@@ -107,24 +109,8 @@
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.252,
-        "compile": 33.603,
-        "run": 0.006
-      },
-      "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 33.88,
-      "status": "pass"
-    },
-    {
-      "test": "embed_matching/match_style",
-      "phases": {
-        "recomp": 0.018,
-        "compile": 5.401,
+        "recomp": 0.154,
+        "compile": 22.865,
         "run": 0.004
       },
       "num_frames": 1,
@@ -133,15 +119,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.43,
+      "duration": 23.03,
       "status": "pass"
     },
     {
-      "test": "embed_matching/no_font_found",
+      "test": "embed_matching/match_style",
       "phases": {
-        "recomp": 0.009,
-        "compile": 6.314,
-        "run": 0.005
+        "recomp": 0.017,
+        "compile": 5.863,
+        "run": 0.004
       },
       "num_frames": 1,
       "lines": {
@@ -149,15 +135,31 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.33,
+      "duration": 5.89,
+      "status": "pass"
+    },
+    {
+      "test": "embed_matching/no_font_found",
+      "phases": {
+        "recomp": 0.005,
+        "compile": 5.608,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 5.62,
       "status": "pass"
     },
     {
       "test": "embed_name_lookup",
       "phases": {
         "recomp": 0.013,
-        "compile": 14.372,
-        "run": 0.006
+        "compile": 17.295,
+        "run": 0.005
       },
       "num_frames": 1,
       "lines": {
@@ -165,7 +167,7 @@
         "expected_lines": 242,
         "matching_lines": 242
       },
-      "duration": 14.4,
+      "duration": 17.32,
       "status": "pass"
     }
   ]

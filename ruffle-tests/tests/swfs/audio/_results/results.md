@@ -1,45 +1,48 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-21 19:30 UTC
+**Date**: 2026-11-21 19:49 UTC
 
-**Git SHA**: `bc91565cea`
+**Git SHA**: `c489b84d99`
 
-**Run Duration**: 1m 4s
+**Run Duration**: 1m 13s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 5 |
-| Passing | **3** (60.0%) |
-| Failing | 2 |
+| Passing | **4** (80.0%) |
+| Failing | 1 |
 | Total expected lines | 24 |
-| Matching lines | 5 (20.8%) |
-| Mismatched lines | 19 |
+| Matching lines | 18 (75.0%) |
+| Mismatched lines | 6 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 2 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**3 tests passing**
+**4 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `g711_event_alaw` | 0 | 18.4s |  |
-| 2 | `g711_event_mulaw` | 0 | 16.9s |  |
-| 3 | `stream_incomplete_loop` | 0 | 16.8s |  |
+| 1 | `g711` | 6 | 6.0s |  |
+| 2 | `g711_event_alaw` | 0 | 16.4s |  |
+| 3 | `g711_event_mulaw` | 0 | 21.9s |  |
+| 4 | `stream_incomplete_loop` | 0 | 22.6s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `aac` | 66.7% | 12 | 18 | 6 |  |
 
 ## Segfaults
 
@@ -55,9 +58,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**2 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `g711` | 25.0% | 2/8 | 8 | 6 |  |
-| 2 | `aac` | 12.5% | 3/24 | 24 | 18 |  |
+| 1 | `aac` | 66.7% | 12/18 | 18 | 18 |  |

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-21 19:30 UTC
+**Date**: 2026-11-21 19:49 UTC
 
-**Git SHA**: `bc91565cea`
+**Git SHA**: `c489b84d99`
 
-**Run Duration**: 4m 46s
+**Run Duration**: 3m 44s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -12,38 +12,34 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 17 |
-| Passing | **11** (64.7%) |
+| Total tests | 18 |
+| Passing | **13** (72.2%) |
 | Ruffle-matched | 5 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **16** (94.1%) |
-| Failing | 1 |
-| Total expected lines | 537 |
-| Matching lines | 419 (78.0%) |
-| Mismatched lines | 118 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Effective pass | **18** (100.0%) |
+| Failing | 0 |
+| Total expected lines | 555 |
+| Matching lines | 469 (84.5%) |
+| Mismatched lines | 86 |
 
 ## Passing Tests
 
-**11 tests passing**
+**13 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 1.8s |  |
-| 2 | `edittext_test1` | 47 | 17.6s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 17.5s |  |
-| 4 | `hello` | 4 | 1.1s |  |
-| 5 | `mouse_drag_test` | 12 | 17.3s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 22.0s |  |
-| 7 | `opcode_guard_test2` | 24 | 17.2s |  |
-| 8 | `soft_reference_test1` | 45 | 22.7s |  |
-| 9 | `stackscope` | 11 | 17.3s |  |
-| 10 | `submoviegetvar` | 4 | 17.1s |  |
-| 11 | `swf4opcode` | 117 | 18.7s |  |
+| 1 | `button_test1` | 31 | 1.4s |  |
+| 2 | `edittext_test1` | 47 | 2.6s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 16.9s |  |
+| 4 | `hello` | 4 | 1.0s |  |
+| 5 | `mouse_drag_test` | 12 | 17.1s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 14.9s |  |
+| 7 | `movieclip_destruction_test3` | 18 | 17.8s |  |
+| 8 | `movieclip_destruction_test4` | 40 | 18.3s |  |
+| 9 | `opcode_guard_test2` | 24 | 1.5s |  |
+| 10 | `soft_reference_test1` | 45 | 17.8s |  |
+| 11 | `stackscope` | 11 | 17.0s |  |
+| 12 | `submoviegetvar` | 4 | 16.9s |  |
+| 13 | `swf4opcode` | 117 | 2.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +47,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 17.6s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 17.2s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.2s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 17.6s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 23.4s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 17.5s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 17.1s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.0s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 23.6s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 1.5s |  |
 
 ## Near-Passing Tests
 
@@ -79,8 +75,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
+No output mismatches.

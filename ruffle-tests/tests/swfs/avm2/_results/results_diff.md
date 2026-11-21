@@ -1,36 +1,43 @@
 # Ruffle Test Results Diff
 
-**Previous:** `08709f65842a` (2026-11-21T17:00:08.495417+00:00)
-**Current:** `bc91565cea8e` (2026-11-21T19:30:16.389765+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `bc91565cea8e` (2026-11-21T19:30:16.389765+00:00)
+**Current:** `c489b84d9946` (2026-11-21T19:49:24.020243+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1240 | 1198 | -42 |
-| Total | 1334 | 1289 | -45 |
-| Pass rate | 93.0% | 92.9% | -0.1% |
-| Mismatched lines | 5920 | 5876 | -44 |
-|   Decreased | | | -5 |
+| Passing | 1198 | 1253 | +55 |
+| Total | 1289 | 1335 | +46 |
+| Pass rate | 92.9% | 93.9% | +1.0% |
+| Mismatched lines | 5876 | 5744 | -132 |
+|   Decreased | | | -132 |
 
-## Newly Passing (1)
+## Newly Passing (9)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `selection_onsetfocus_mixed_avm` | output_mismatch | 0/5 | 5/5 |
+| `bitmapdata_encode_jpeg_visual` | output_mismatch | 0/0 | 0/0 |
+| `bitmapdata_encode_png_roundtrip` | output_mismatch | 1/33 | 33/33 |
+| `bitmapdata_encode_png_visual` | output_mismatch | 0/0 | 0/0 |
+| `dictionary_qname_keys` | output_mismatch | 29/45 | 45/45 |
+| `edittext_event_link_case_insensitive` | output_mismatch | 0/1 | 1/1 |
+| `perspective_projection_center` | output_mismatch | 6/34 | 34/34 |
+| `textfield_default_text_format_null` | output_mismatch | 7/20 | 20/20 |
+| `xml_many_namespace_declarations` | output_mismatch | 1/2 | 2/2 |
+| `xml_unescaping_nul_char_ref` | output_mismatch | 4/19 | 19/19 |
 
-## Missing Tests — Shard Failure (45)
+## Status Changed (1)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `event_handler_exception` | output_mismatch | ruffle_matched | 7/11 | 8/11 |
 
-- 43 were previously passing
-- 2 were previously failing
+## Added Tests (46)
 
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
+| `allow_networking` | pass | 72/72 |
 | `eventdispatcher_dispatchevent_indirect` | pass | 9/9 |
 | `eventdispatcher_dispatchevent_this` | pass | 5/5 |
 | `eventdispatcher_haseventlistener` | pass | 25/25 |
@@ -42,7 +49,7 @@ These tests were in the previous run but absent from this run due to missing sha
 | `fast_index_access` | pass | 12/12 |
 | `filefilter_properties` | pass | 4/4 |
 | `filereference_browse_cancel` | pass | 3/3 |
-| `filereference_browse_select` | output_mismatch | 7/9 |
+| `filereference_browse_select` | pass | 9/9 |
 | `filereference_load` | pass | 31/31 |
 | `filereference_save` | pass | 16/16 |
 | `filereference_save_and_browse` | pass | 42/42 |
@@ -67,7 +74,7 @@ These tests were in the previous run but absent from this run due to missing sha
 | `focus_events_key_basic` | pass | 132/132 |
 | `focus_events_key_navigation` | pass | 53/53 |
 | `focus_events_key_same_object` | pass | 26/26 |
-| `focus_events_mixed_avm_edittext` | output_mismatch | 12/49 |
+| `focus_events_mixed_avm_edittext` | pass | 49/49 |
 | `focus_events_mixed_key_mouse` | pass | 100/100 |
 | `focus_events_mouse_basic` | pass | 260/260 |
 | `focus_events_mouse_focusable` | pass | 112/112 |
@@ -77,4 +84,9 @@ These tests were in the previous run but absent from this run due to missing sha
 | `focus_stage` | pass | 1/1 |
 | `focusrect` | pass | 18/18 |
 
-</details>
+## Line Count Changed (2)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `bitmapdata_encode` | output_mismatch | 1/147 | 26/147 | -25 |
+| `audio_computespectrum` | output_mismatch | 0/118 | 0/118 | 0 |

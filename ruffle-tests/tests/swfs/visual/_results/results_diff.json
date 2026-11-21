@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-21T17:00:08.549004+00:00",
-    "old_git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
-    "new_timestamp": "2026-11-21T19:30:16.460957+00:00",
-    "new_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "old_timestamp": "2026-11-21T19:30:16.460957+00:00",
+    "old_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "new_timestamp": "2026-11-21T19:49:24.073623+00:00",
+    "new_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 148,
+    "old_pass": 144,
     "old_ruffle_matched": 2,
-    "old_effective_pass": 150,
-    "old_total": 150,
-    "old_pass_rate": 98.7,
-    "new_pass": 144,
+    "old_effective_pass": 146,
+    "old_total": 146,
+    "old_pass_rate": 98.6,
+    "new_pass": 149,
     "new_ruffle_matched": 2,
-    "new_effective_pass": 146,
-    "new_total": 146,
-    "new_pass_rate": 98.6,
+    "new_effective_pass": 151,
+    "new_total": 151,
+    "new_pass_rate": 98.7,
     "old_mismatched_lines": 49,
     "new_mismatched_lines": 49,
     "increased_mismatches": 0,
@@ -28,74 +25,61 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 145,
-    "added": 1,
-    "removed": 0,
-    "missing_from_incomplete_run": 5
+    "unchanged": 146,
+    "added": 5,
+    "removed": 0
   },
   "changes": [
     {
       "test": "drawing_api/drawing_order",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "drawing_api/fills_and_lines",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "drawing_api/gradient_focal_point",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "edittext/edittext_background_basic",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 0,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "edittext/edittext_background_basic_scale2",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "new_lines": null
-    },
-    {
-      "test": "video/vp6_inter_frames",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
