@@ -42,7 +42,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 8 | w2-tf-css | trace | trace-tail slot A: AVM1 htmlText CSS + getTextFormat url/para; + 5 new upstream getTextFormat rows | session_018CoDi3RqHac9QhfSJkkY34 — LANDED `228a5ff0c` (+4) |
 | 9 | w2-attached-timeline | trace | trace-tail slot B: attached clips run natural timeline in CI modes; movieclip_destruction_test3/4 | session_018CoDi5yeX7FkuGneLRRe8H — LANDED `3cdde8be0` (+2) |
 | 10 | w2-padded-filter | pixel | productionize w1-padded-filter (gated padded filter layer); drop_shadow_angles, displacement_map | session_018CoDi6x1pyS9L9PSYoDJZL — LANDED (+2 px) |
-| 11 | w2-stage3d-text | pixel | Stage3D RTT + budget 48M, AVM2 default-font advance rounding; stage3d_texture, stage3d_bitmap | session_018CoDi7QtMALGjWbWyYvecw (17:10) |
+| 11 | w2-stage3d-text | pixel | Stage3D RTT + budget 48M, AVM2 default-font advance rounding; stage3d_texture, stage3d_bitmap | session_018CoDi7QtMALGjWbWyYvecw — LANDED (+2 px) |
 | 12 | w2-netstream-audio | trace | trace-tail D: NetStream audio tap + computeSpectrum; audio/aac, audio/g711 | session_018CoDi3x3Uds6hHMQAvVQFk — LANDED (+2 graphics) |
 | 13 | w2-qname-dict | trace | trace-tail C: QName multiname keys + #1069 rule; dictionary_qname_keys | session_018CoDi78a5woqe4YXREWSin (17:18) |
 | 14 | w1-drift-avm1 | trace | AVM1/gnash/shumway upstream drift 45366370e..0ddd12b6a | session_018CoDi7LLFpbdSTkfTYwW6s (17:37) |
@@ -65,6 +65,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `3cdde8be0` | w2-attached-timeline | trace fail→pass (both modes): `from_gnash/misc-swfc.all/movieclip_destruction_test3`, `_test4` (Flash-exact); pixels none |
 | `353732f52` | w2-padded-filter | px fail→pass: `visual/filters/drop_shadow_angles`, `visual/filters/displacement_map`; md5 move on passing `displacement_map_scales_with_screen`; trace none |
 | `ca9c46595` | w1-drift-avm2 prototype (S1, landed directly) | trace +15 (graphics): drift re-flips `avm2/event_handler_exception` (→rm), `avm2/filereference_browse_select`, `from_avmplus/as3/RuntimeErrors/Error1092XmlUnterminatedXmlDecl`, `from_avmplus/e4x/XML/bug_564468` (→rm), `e4x/XML/misc_errors` (→rm), `from_avmplus/regress/bug_478501`; new rows `avm2/xml_unescaping_nul_char_ref`, `xml_many_namespace_declarations`, `edittext_event_link_case_insensitive`, `bitmapdata_encode_png_visual`, `bitmapdata_encode_png_roundtrip`, `bitmapdata_encode_jpeg_visual`, `textfield_default_text_format_null`, `perspective_projection_center`, `allow_networking` (NEW graded row via harness H1 subtest discovery; also `avm1/allow_networking_import_assets(2)` become graded — unpriced). px +2: `stage3d_texture_bytearray_compressed_alpha`, `bitmapdata_encode_png_visual` |
+| (s3d) | w2-stage3d-text | px fail→pass: `avm2/stage3d_texture`, `avm2/stage3d_bitmap`; bands improve: `visual/fonts/font_lookup_as3` 19560→11592, away3d_shallow_water, stage3d_fractal; trace none (23 with_default_font rows identical both modes) |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).

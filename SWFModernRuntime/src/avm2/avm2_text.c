@@ -2617,12 +2617,6 @@ static const Avm2FontData noto_device_font = {
 	0, "Noto Sans", 0, 0, 1, 20480, 21931, 5973, 3413,
 	sizeof(noto_codes) / sizeof(noto_codes[0]), noto_codes, noto_advances,
 };
-// D1-2: the same face with Noto Sans's own hhea ascent/descent (see the
-// with_default_font arm at the end of resolve_font).
-static const Avm2FontData noto_default_font_metrics = {
-	0, "Noto Sans", 0, 0, 1, 20480, 21893, 6000, 3413,
-	sizeof(noto_codes) / sizeof(noto_codes[0]), noto_codes, noto_advances,
-};
 
 // Resolved font for measurement.
 typedef struct LFont
@@ -2910,18 +2904,29 @@ static LFont resolve_font(const Avm2EditTextExt* et, const Avm2TextFormatFields*
 	}
 	f.data = &noto_device_font;
 	f.is_device = 1;
-	// D1-2: when the test really has Ruffle's default font (the recompiler
-	// emitted its outlines), a DEVICE field uses that face's true vertical
-	// metrics — Noto Sans hhea 1069/293 per 1000 em, i.e. 21893/6000 on the
-	// baked 20480 em (the same numbers swf.cpp's AVM1 zero-glyph synthesis
-	// emits). The baked 21931/5973 came from a Flash DefineFont3 embedding.
-	// Advances and leading stay baked.
-	if (et->device_font && default_font_outline() != NULL)
-		f.data = &noto_default_font_metrics;
+	// D1-2 / s23 w2-stage3d-text: when the test really has Ruffle's default
+	// font (the recompiler emitted it as the NULL-named row, see D1 below), a
+	// DEVICE field lays out with THAT face: Ruffle registers the bundled
+	// notosans.subset.ttf (player.rs:3139, byte-identical to
+	// SWFRecomp/assets/NotoSans.ttf) as a FontFace, whose numbers are the
+	// TTF's own — em 1000, hhea 1069/293, line gap 0, hmtx advances, no `kern`
+	// table so no kerning (font_face.rs). The baked table above came from a
+	// Flash DefineFont3 embedding and its advances are quantised to 10/20480
+	// em, which is enough to round a glyph to the other whole pixel under
+	// FontType::Device: ':' is 268/1000 em (9 px bold: 48 tw -> 2 px) but
+	// 6030/20480 baked (52 tw -> 3 px), shifting every later glyph of
+	// avm2/stage3d_bitmap's "FPS: 0" and stage3d_texture's labels 1 px right.
+	// The row carries exactly the baked face's codepoints
+	// (abc_devicefont.cpp DEFAULT_FONT_CODES), so coverage is unchanged.
+	if (et->device_font)
+	{
+		const Avm2FontData* dfo = default_font_outline();
+		if (dfo != NULL && dfo->advances != NULL && dfo->em_square != 0)
+			f.data = dfo;
+	}
 	// D1: under `with_default_font` the recompiler appends the real Noto
 	// Sans outlines as a NULL-named device row (abc_devicefont.cpp
-	// appendDefaultFontOutlines). Borrow its SHAPES only — every layout
-	// number still comes from the baked face, as in the A1b borrow above.
+	// appendDefaultFontOutlines); draw its SHAPES.
 	// Device fields only: an embedFonts field whose name matched nothing
 	// lands here too, and Flash draws NOTHING for it — Ruffle's fallback
 	// is a known_failure (fonts/embed_matching/no_font_found, whose Flash

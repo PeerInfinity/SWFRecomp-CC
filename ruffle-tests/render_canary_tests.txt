@@ -558,3 +558,10 @@ avm1/netstream_play_flv_screen              # attachMovie'd clip render     1 cm
 # tier=1  (CI-passing once w2-padded-filter lands)
 visual/filters/drop_shadow_angles           # off-stage shadow source (AVM1) 1 cmp
 visual/filters/displacement_map             # off-stage displacement source  1 cmp
+# s23 w2-stage3d-text: Stage3D render-to-texture (4x MSAA 1024x512 RTT +
+# full-screen post quad), the 48 M S3D_FRAG_BUDGET, and AVM2 device-font
+# layout on Ruffle's with_default_font Noto Sans TTF (labels "Driver: ...",
+# "Shapes: ..."). The set's first RTT and first with_default_font AVM2 member.
+# A move here is RTT resolve, the budget latch, or default-font advances.
+# tier=1
+avm2/stage3d_texture                        # Stage3D RTT + default-font text 1 cmp

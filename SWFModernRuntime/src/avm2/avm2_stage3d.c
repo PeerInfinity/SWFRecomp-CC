@@ -256,6 +256,7 @@ typedef struct Avm2Stage3DExt
 // edges (program, bound vertex buffers) because the collector's ext scan is
 // conservative over the blob and cannot follow into a side allocation.
 typedef struct S3dBackend S3dBackend;
+static void s3d_rtt_end(Avm2Context* ctx, S3dBackend* be, int resolve);
 
 #define S3D_ATTRS 8
 
@@ -272,6 +273,9 @@ typedef struct Avm2Context3DExt
 	S3dBackend* be;                     // not an object; freed by the ext hook
 	uint8_t profile;
 	uint8_t enable_error_checking;
+	// setRenderToTexture's target, as a GC-visible edge: S3dBackend.rtt_tex
+	// points into this object's ext, so it must outlive the RTT pass.
+	Avm2Object* rtt_obj;
 } Avm2Context3DExt;
 
 // TextureBase and its three concrete subclasses share one ext (the display-ext
@@ -542,6 +546,19 @@ struct S3dBackend
 	// BOTH setSamplerStateAt and setProgram (see s3d_apply_program_samplers).
 	uint8_t samp_wrap[S3D_ATTRS];
 	uint8_t samp_filter[S3D_ATTRS];
+
+	// ---- render-to-texture (context_3d mod.rs SetRenderToTexture) --------
+	// While rtt_tex != NULL the draw target fields above (w/h/samples/color/
+	// depth/stencil) point at an RTT surface; the back buffer's are parked
+	// in bb_*. setRenderToBackBuffer / present / configureBackBuffer resolve
+	// the surface into the texture's texel store and restore them.
+	struct Avm2Texture3DExt* rtt_tex;
+	uint32_t rtt_layer;
+	uint32_t bb_w, bb_h, bb_samples;
+	uint8_t bb_has_depth;
+	float* bb_color;
+	float* bb_depth;
+	uint8_t* bb_stencil;
 };
 
 // Index of `v` in a NULL-terminated spelling table, or -1.
@@ -1111,7 +1128,14 @@ static float s3d_edge(float ax, float ay, float bx, float by,
 //     x 2 frames) and avm2/stage3d_raytrace ~15 G. Both are out of reach on
 //     the CPU route at any budget that keeps away3d green; fractal's
 //     completion mechanism is a faster rasteriser, not a bigger number here.
-#define S3D_FRAG_BUDGET 12000000u
+//   * Raised 12 M -> 48 M in session 23 (w1-pixel-misc §3a / w2-stage3d-text)
+//     once render-to-texture landed: avm2/stage3d_texture (4x MSAA 1024x512
+//     RTT + a full-screen quad per frame) and avm2/stage3d_bitmap latched
+//     off mid-run at 12 M and froze their frame. 48 M is the measured
+//     minimum that unfreezes both (24 M: stage3d_texture still 14 933 px).
+//     away3d_advanced_shallow_water_demo and stage3d_fractal grade
+//     identically at 48 M (+0.6 s / +1.0 s run time).
+#define S3D_FRAG_BUDGET 48000000u
 #define S3D_PIXEL_COST 8u
 static uint64_t g_s3d_frag_budget = S3D_FRAG_BUDGET;
 
@@ -1800,6 +1824,7 @@ static Avm2Value context3d_configure_back_buffer(Avm2Activation* act)
 		// allocator down. 8 M samples = 128 MB colour + 32 MB depth, which is
 		// four times the largest buffer the corpus configures (1300x810x4).
 		while (s > 1 && (uint64_t) width * height * s > 8u * 1024 * 1024) s /= 2;
+		s3d_rtt_end(ctx, be, 1);
 		s3d_backend_free_buffers(ctx, be);
 		be->w = width;
 		be->h = height;
@@ -2349,8 +2374,12 @@ static Avm2Value context3d_draw_triangles(Avm2Activation* act)
 
 static Avm2Value context3d_present(Avm2Activation* act)
 {
-	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
-	if (be != NULL) s3d_present(be);
+	Avm2Context3DExt* ce = context3d_ext(act);
+	S3dBackend* be = s3d_backend(act->ctx, ce);
+	// Ruffle's present() ends with set_render_to_back_buffer (mod.rs:1249);
+	// ending an open RTT pass first also keeps s3d_present on the back buffer.
+	if (be != NULL) { s3d_rtt_end(act->ctx, be, 1); s3d_present(be); }
+	if (ce != NULL) ce->rtt_obj = NULL;
 	return avm2_undefined();
 }
 
@@ -2606,6 +2635,47 @@ static Avm2Value context3d_create_cube_texture(Avm2Activation* act)
 	return o != NULL ? avm2_object_value(o) : avm2_null();
 }
 
+// End a render-to-texture pass: resolve the RTT surface into its texture
+// (when `resolve`; same per-sample quantise + floor-mean as s3d_present,
+// alpha kept, i.e. wgpu's MSAA resolve onto an RGBA8 target) and restore the
+// parked back buffer. resolve=0 is the teardown path (the texture may already
+// be gone).
+static void s3d_rtt_end(Avm2Context* ctx, S3dBackend* be, int resolve)
+{
+	if (be->rtt_tex == NULL) return;
+	Avm2Texture3DExt* te = be->rtt_tex;
+	uint32_t* tx = resolve ? s3d_texels(ctx, te) : NULL;
+	uint32_t ns = be->samples;
+	if (tx != NULL && be->color != NULL)
+	{
+		uint32_t* dst = tx + (size_t) be->rtt_layer * te->width * te->height;
+		for (size_t p = 0; p < (size_t) be->w * be->h; p++)
+		{
+			uint32_t acc[4] = { 0, 0, 0, 0 };
+			for (uint32_t sm = 0; sm < ns; sm++)
+			{
+				const float* c = be->color + (p * ns + sm) * 4;
+				for (int k = 0; k < 4; k++)
+				{
+					float v = c[k];
+					if (!(v > 0.0f)) v = 0.0f;
+					if (v > 1.0f) v = 1.0f;
+					acc[k] += (uint32_t) (v * 255.0f + 0.5f);
+				}
+			}
+			dst[p] = (acc[0] / ns) | ((acc[1] / ns) << 8) | ((acc[2] / ns) << 16)
+			       | ((acc[3] / ns) << 24);
+		}
+	}
+	if (be->color) heap_free(ctx->app, be->color);
+	if (be->depth) heap_free(ctx->app, be->depth);
+	if (be->stencil) heap_free(ctx->app, be->stencil);
+	be->w = be->bb_w; be->h = be->bb_h; be->samples = be->bb_samples;
+	be->has_depth = be->bb_has_depth;
+	be->color = be->bb_color; be->depth = be->bb_depth; be->stencil = be->bb_stencil;
+	be->rtt_tex = NULL;
+}
+
 // setRenderToTexture's surfaceSelector bound depends on the texture kind
 // (context_3d.rs:632-645).
 static Avm2Value context3d_set_render_to_texture(Avm2Activation* act)
@@ -2635,6 +2705,56 @@ static Avm2Value context3d_set_render_to_texture(Avm2Activation* act)
 		                 "Error #3771: Surface selector out of bounds for "
 		                 "2D texture, must be 0.");
 	}
+	Avm2Context3DExt* ce = context3d_ext(act);
+	S3dBackend* be = s3d_backend(ctx, ce);
+	if (be == NULL) return avm2_undefined();
+	s3d_rtt_end(ctx, be, 1);
+	Avm2Texture3DExt* te = (Avm2Texture3DExt*) t->native_ext;
+	if (te == NULL || te->width == 0 || te->height == 0) return avm2_undefined();
+	int depth_stencil = s3d_arg_bool(act, 1, 0);
+	uint32_t anti_alias = s3d_arg_u32(act, 2, 0);
+	uint32_t sc = 1;
+	while (sc * 2 <= anti_alias && sc * 2 <= S3D_MAX_SAMPLES) sc *= 2;
+	if ((uint64_t) te->width * te->height * sc > 8u * 1024 * 1024) return avm2_undefined();
+	size_t n = (size_t) te->width * te->height * sc;
+	float* col = (float*) heap_alloc(ctx->app, n * 4 * sizeof(float));
+	float* dep = (float*) heap_alloc(ctx->app, n * sizeof(float));
+	uint8_t* stc = depth_stencil ? (uint8_t*) heap_alloc(ctx->app, n) : NULL;
+	if (col == NULL || dep == NULL || (depth_stencil && stc == NULL))
+	{
+		if (col) heap_free(ctx->app, col);
+		if (dep) heap_free(ctx->app, dep);
+		if (stc) heap_free(ctx->app, stc);
+		return avm2_undefined();
+	}
+	// Seed the surface from the texture's current contents (LoadOp::Load).
+	uint32_t* tx = s3d_texels(ctx, te);
+	for (size_t p = 0; p < (size_t) te->width * te->height; p++)
+	{
+		uint32_t v = tx ? tx[(size_t) surface * te->width * te->height + p] : 0;
+		float c[4] = { (float) (v & 0xFF) / 255.0f, (float) ((v >> 8) & 0xFF) / 255.0f,
+		               (float) ((v >> 16) & 0xFF) / 255.0f, (float) ((v >> 24) & 0xFF) / 255.0f };
+		for (uint32_t k = 0; k < sc; k++) memcpy(col + (p * sc + k) * 4, c, sizeof c);
+	}
+	for (size_t i = 0; i < n; i++) dep[i] = 1.0f;
+	if (stc) memset(stc, 0, n);
+	be->bb_w = be->w; be->bb_h = be->h; be->bb_samples = be->samples;
+	be->bb_has_depth = be->has_depth;
+	be->bb_color = be->color; be->bb_depth = be->depth; be->bb_stencil = be->stencil;
+	be->w = te->width; be->h = te->height; be->samples = sc;
+	be->has_depth = (uint8_t) (depth_stencil != 0);
+	be->color = col; be->depth = dep; be->stencil = stc;
+	be->rtt_tex = te; be->rtt_layer = surface;
+	ce->rtt_obj = t;
+	return avm2_undefined();
+}
+
+static Avm2Value context3d_set_render_to_back_buffer(Avm2Activation* act)
+{
+	Avm2Context3DExt* ce = context3d_ext(act);
+	S3dBackend* be = s3d_backend(act->ctx, ce);
+	if (be != NULL) s3d_rtt_end(act->ctx, be, 1);
+	if (ce != NULL) ce->rtt_obj = NULL;
 	return avm2_undefined();
 }
 
@@ -4729,7 +4849,7 @@ void avm2_register_stage3d(Avm2Context* ctx)
 	                        context3d_set_color_mask);
 	avm2_builtin_add_method(ctx, c3d, "setStencilReferenceValue",
 	                        context3d_set_stencil_reference_value);
-	avm2_builtin_add_method(ctx, c3d, "setRenderToBackBuffer", s3d_noop);
+	avm2_builtin_add_method(ctx, c3d, "setRenderToBackBuffer", context3d_set_render_to_back_buffer);
 	avm2_builtin_add_method(ctx, c3d, "drawToBitmapData", s3d_noop);
 	avm2_builtin_add_method(ctx, c3d, "present", context3d_present);
 	avm2_builtin_add_method(ctx, c3d, "clear", context3d_clear);
@@ -4870,7 +4990,10 @@ int avm2_stage3d_front_buffer(Avm2Context* ctx, uint32_t index,
 		(Avm2Context3DExt*) s3d_ext_of(se->context3d, g_context3d_class);
 	if (ce == NULL || ce->be == NULL) return 0;
 	S3dBackend* be = ce->be;
-	if (be->front == NULL || be->w == 0 || be->h == 0) return 0;
+	// A frame can end mid-RTT; `front` is always back-buffer sized.
+	const uint32_t bw = be->rtt_tex != NULL ? be->bb_w : be->w;
+	const uint32_t bh = be->rtt_tex != NULL ? be->bb_h : be->h;
+	if (be->front == NULL || bw == 0 || bh == 0) return 0;
 
 	// The renderer drops a dynamic-bitmap source larger than
 	// `dynamic_bitmap_max`, which avm2_render_init sets to the STAGE's longest
@@ -4884,19 +5007,19 @@ int avm2_stage3d_front_buffer(Avm2Context* ctx, uint32_t index,
 	int32_t oy = (int32_t) se->y;
 	int32_t vx0 = ox > 0 ? ox : 0;
 	int32_t vy0 = oy > 0 ? oy : 0;
-	int64_t vx1 = (int64_t) ox + be->w;
-	int64_t vy1 = (int64_t) oy + be->h;
+	int64_t vx1 = (int64_t) ox + bw;
+	int64_t vy1 = (int64_t) oy + bh;
 	if (vx1 > (int64_t) stage_w) vx1 = stage_w;
 	if (vy1 > (int64_t) stage_h) vy1 = stage_h;
 	if (vx1 <= vx0 || vy1 <= vy0) return 0;
 	uint32_t cw = (uint32_t) (vx1 - vx0);
 	uint32_t ch = (uint32_t) (vy1 - vy0);
 
-	if (cw == be->w && ch == be->h && ox >= 0 && oy >= 0)
+	if (cw == bw && ch == bh && ox >= 0 && oy >= 0)
 	{
 		*pixels = be->front;
-		*w = be->w;
-		*h = be->h;
+		*w = bw;
+		*h = bh;
 		*x = se->x;
 		*y = se->y;
 		return 1;
@@ -4913,7 +5036,7 @@ int avm2_stage3d_front_buffer(Avm2Context* ctx, uint32_t index,
 	{
 		uint32_t sy = (uint32_t) (vy0 - oy) + r;
 		memcpy(be->crop + (size_t) r * cw,
-		       be->front + (size_t) sy * be->w + (uint32_t) (vx0 - ox),
+		       be->front + (size_t) sy * bw + (uint32_t) (vx0 - ox),
 		       (size_t) cw * 4);
 	}
 	*pixels = be->crop;
@@ -4934,6 +5057,7 @@ void avm2_stage3d_gc_free_ext(Avm2Context* ctx, Avm2Object* o)
 		Avm2Context3DExt* e = (Avm2Context3DExt*) o->native_ext;
 		if (e->be != NULL)
 		{
+			s3d_rtt_end(ctx, e->be, 0);   // free the RTT surface, restore bb_*
 			s3d_backend_free_buffers(ctx, e->be);
 			heap_free(ctx->app, e->be);
 			e->be = NULL;
