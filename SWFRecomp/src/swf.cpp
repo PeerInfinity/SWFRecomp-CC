@@ -224,6 +224,107 @@ using Point = std::array<Coord, 2>;
 
 namespace SWFRecomp
 {
+	// ---------------------------------------------------------------------
+	// Raph Levien parabola-integral quadratic flattening, ported from
+	// lyon_geom 1.0.6 `src/quadratic_bezier.rs` (`FlatteningParameters::new`
+	// and `t_at_iteration`) — the flattener Ruffle's tessellator runs, via
+	// `FillOptions::DEFAULT_TOLERANCE / scale` in
+	// `ruffle/render/src/tessellator.rs`. Ruffle's lyon path is in PIXELS;
+	// we flatten in twips, so DEFAULT_TOLERANCE (0.1 px) is 2.0 twips.
+	//
+	// The plain-shape arm and the device-font glyph synth use this. Morph shapes keep equal-parameter
+	// stepping because their two streams are paired BY INDEX and a Levien
+	// schedule differs between the start and end curve.
+	// ---------------------------------------------------------------------
+
+	static const float LEVIEN_TOL_TWIPS = 2.0f;   // = lyon 0.1 px at 1:1
+
+	struct LevienParams
+	{
+		u32 count;               // 0 => a single straight chord
+		float integral_from;
+		float integral_step;
+		float inv_integral_from;
+		float div_inv_integral_diff;
+	};
+
+	static float levienParabolaIntegral(float x)
+	{
+		const float d = 0.67f;
+		return x / (1.0f - d + sqrtf(sqrtf(d*d*d*d + 0.25f*x*x)));
+	}
+
+	static float levienParabolaInvIntegral(float x)
+	{
+		const float b = 0.39f;
+		return x * (1.0f - b + sqrtf(b*b + 0.25f*x*x));
+	}
+
+	static LevienParams levienInit(float x0, float y0, float cx, float cy,
+	                               float x1, float y1, float tolerance)
+	{
+		LevienParams p = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
+
+		if (x0 == x1 && y0 == y1)
+		{
+			return p;
+		}
+
+		{
+			// lyon `is_linear`
+			float bx = x1 - x0, by = y1 - y0;
+			float len2 = bx*bx + by*by;
+			float cross = (cx - x0) * by - (cy - y0) * bx;
+			if (len2 > 0.0f && (cross*cross) / len2 <= tolerance * tolerance * 4.0f)
+			{
+				return p;
+			}
+		}
+
+		float ddx = 2.0f*cx - x0 - x1;
+		float ddy = 2.0f*cy - y0 - y1;
+		float crs = (x1 - x0) * ddy - (y1 - y0) * ddx;
+		if (crs == 0.0f)
+		{
+			return p;
+		}
+
+		float inv_crs = 1.0f / crs;
+		float parabola_from = ((cx - x0) * ddx + (cy - y0) * ddy) * inv_crs;
+		float parabola_to   = ((x1 - cx) * ddx + (y1 - cy) * ddy) * inv_crs;
+		float scale = fabsf(crs) / (sqrtf(ddx*ddx + ddy*ddy) * fabsf(parabola_to - parabola_from));
+
+		float integral_from = levienParabolaIntegral(parabola_from);
+		float integral_to   = levienParabolaIntegral(parabola_to);
+		float integral_diff = integral_to - integral_from;
+
+		float inv_integral_from = levienParabolaInvIntegral(integral_from);
+		float inv_integral_to   = levienParabolaInvIntegral(integral_to);
+
+		float count = ceilf(0.5f * fabsf(integral_diff) * sqrtf(scale / tolerance));
+		if (!std::isfinite(count) || count < 1.0f)
+		{
+			return p;
+		}
+		if (count > 64.0f)
+		{
+			count = 64.0f;   // same shape_data growth bound as before
+		}
+
+		p.count = (u32) count;
+		p.integral_from = integral_from;
+		p.integral_step = integral_diff / count;
+		p.inv_integral_from = inv_integral_from;
+		p.div_inv_integral_diff = 1.0f / (inv_integral_to - inv_integral_from);
+		return p;
+	}
+
+	static float levienT(const LevienParams& p, u32 i)
+	{
+		float u = levienParabolaInvIntegral(p.integral_from + p.integral_step * (float) i);
+		return (u - p.inv_integral_from) * p.div_inv_integral_diff;
+	}
+
 
 	// Writes a buffered script file. `defs` (try-helper mode's lifted try
 	// bodies, empty otherwise) are static functions that must sit at file
@@ -258,8 +359,8 @@ namespace SWFRecomp
 	// keep_float: feed libtess2 each vertex's unquantized position (x/y plus
 	// Vertex::fx_frac/fy_frac, set by the Levien curve flattener) and keep the
 	// output's sub-twip remainder too, as lyon's
-	// f32 fill does in Ruffle. Shape fills only; glyph outlines keep the
-	// historical integer round trip.
+	// f32 fill does in Ruffle. Both callers pass true: shape fills, and (since
+	// s23 w2-glyph-levien) the device-font glyph synth.
 	static const double VERTEX_FRAC_SCALE = 16384.0;
 
 	static inline s16 vertexFrac(double exact, s32 quantized)
@@ -2763,9 +2864,14 @@ namespace SWFRecomp
 						int num_verts = stbtt_GetGlyphShape(dev_face, ttf_glyph, &verts);
 						if (num_verts <= 0) continue;
 
-						// Build polygon contours from TTF outline AND emit path commands
-						std::vector<std::vector<std::array<Coord, 2>>> polygon;
-						std::vector<std::array<Coord, 2>> contour;
+						// Build polygon contours from TTF outline AND emit path commands.
+						// Contour points are doubles holding the exact scaled TTF position:
+						// Ruffle's lyon path is f32 in font_units/20 and is never quantized
+						// to a twip grid, so the triangles keep the float positions too
+						// (keep_float below). Truncating to the 20480-em integer grid moved
+						// sub-snap ties (s23 w1-filter-label §2, the `K` pixel in glow).
+						std::vector<std::vector<std::array<double, 2>>> polygon;
+						std::vector<std::array<double, 2>> contour;
 
 						// Emit glyph path header: fill1=1, non-zero winding (font glyphs)
 						size_t glyph_path_start = current_path_entry;
@@ -2790,22 +2896,18 @@ namespace SWFRecomp
 								// (the device-font glyph garble in PROGRESS #6). It
 								// also gives curve-first contours a correct x0/y0
 								// instead of defaulting to (0,0).
-								contour.push_back({(Coord)(verts[v].x * ttf_scale),
-								                   (Coord)(-verts[v].y * ttf_scale)});
+								contour.push_back({(double)verts[v].x * ttf_scale,
+								                   -(double)verts[v].y * ttf_scale});
 								// Emit MoveTo for path data
 								emitGP(5.0f, verts[v].x * ttf_scale, -verts[v].y * ttf_scale);
 							} else if (verts[v].type == STBTT_vline) {
 								float lx = verts[v].x * ttf_scale;
 								float ly = -verts[v].y * ttf_scale;
-								contour.push_back({(Coord)lx, (Coord)ly});
+								contour.push_back({(double)verts[v].x * ttf_scale,
+								                   -(double)verts[v].y * ttf_scale});
 								emitGP(2.0f, lx, ly);
 							} else if (verts[v].type == STBTT_vcurve) {
-								// Quadratic bezier: emit raw curve for path, subdivide for triangles
-								float x0, y0;
-								if (!contour.empty()) {
-									x0 = (float)contour.back()[0];
-									y0 = (float)contour.back()[1];
-								} else { x0 = 0; y0 = 0; }
+								// Quadratic bezier: emit raw curve for path, flatten for triangles
 								float cx = verts[v].cx * ttf_scale;
 								float cy = -verts[v].cy * ttf_scale;
 								float x1 = verts[v].x * ttf_scale;
@@ -2813,14 +2915,32 @@ namespace SWFRecomp
 								// Path: raw quadratic curve
 								emitGP(3.0f, cx, cy);
 								emitGP(4.0f, x1, y1);
-								// Triangulation: subdivide into 6 segments
-								for (int s = 1; s <= 6; s++) {
-									float t = (float)s / 6.0f;
-									float it = 1.0f - t;
-									contour.push_back({
-										(Coord)(it*it*x0 + 2*it*t*cx + t*t*x1),
-										(Coord)(it*it*y0 + 2*it*t*cy + t*t*y1)
-									});
+								// Triangulation: flatten as Ruffle does. Ruffle builds a
+								// device glyph in font units as Twips (font_face.rs
+								// GlyphToDrawing), so lyon sees font_units/20 and fills at
+								// DEFAULT_TOLERANCE 0.1 (tessellator.rs, scale 1): the
+								// Levien schedule over the TTF's own coordinates, not a
+								// fixed 6 equal steps (s23 w1-filter-label §2: the comma
+								// pixel in glow). The start point is the previous outline
+								// point in font units (stb's x/y is every vertex's end).
+								{
+									// Twips::to_pixels(): (f64)twips / 20, then as f32.
+									auto fu = [](float u) { return (float)((double)u / 20.0); };
+									float fu_x0 = (v > 0) ? (float)verts[v-1].x : 0.0f;
+									float fu_y0 = (v > 0) ? (float)verts[v-1].y : 0.0f;
+									float px0 = fu(fu_x0),        py0 = fu(-fu_y0);
+									float pcx = fu(verts[v].cx),  pcy = fu(-verts[v].cy);
+									float px1 = fu(verts[v].x),   py1 = fu(-verts[v].y);
+									LevienParams lp = levienInit(px0, py0, pcx, pcy, px1, py1, 0.1f);
+									u32 n = (lp.count < 1) ? 1 : lp.count;
+									double k = 20.0 * (double)ttf_scale;
+									for (u32 s = 1; s <= n; s++) {
+										float t = (s < lp.count) ? levienT(lp, s) : 1.0f;
+										float it = 1.0f - t;
+										float qx = it*it*px0 + 2*it*t*pcx + t*t*px1;
+										float qy = it*it*py0 + 2*it*t*pcy + t*t*py1;
+										contour.push_back({(double)qx * k, (double)qy * k});
+									}
 								}
 							} else if (verts[v].type == STBTT_vcubic) {
 								// Cubic bezier: decompose to quadratics for path, subdivide for triangles
@@ -2859,8 +2979,8 @@ namespace SWFRecomp
 									float t = (float)s / 8.0f;
 									float it = 1.0f - t;
 									contour.push_back({
-										(Coord)(it*it*it*x0 + 3*it*it*t*cx1 + 3*it*t*t*cx2 + t*t*t*x1),
-										(Coord)(it*it*it*y0 + 3*it*it*t*cy1 + 3*it*t*t*cy2 + t*t*t*y1)
+										(double)(it*it*it*x0 + 3*it*it*t*cx1 + 3*it*t*t*cx2 + t*t*t*x1),
+										(double)(it*it*it*y0 + 3*it*it*t*cy1 + 3*it*t*t*cy2 + t*t*t*y1)
 									});
 								}
 							}
@@ -2890,14 +3010,15 @@ namespace SWFRecomp
 							std::vector<Vertex> c;
 							c.reserve(ring.size());
 							for (auto& pt : ring) {
-								Vertex v; v.x = pt[0]; v.y = pt[1]; v.morph_index = -1;
+								Vertex v; v.x = (s32)lround(pt[0]); v.y = (s32)lround(pt[1]); v.morph_index = -1;
+								v.fx_frac = vertexFrac(pt[0], v.x); v.fy_frac = vertexFrac(pt[1], v.y);
 								c.push_back(v);
 							}
 							glyph_contours.push_back(std::move(c));
 						}
 
 						std::vector<Tri> tris;
-						tessellateContours(glyph_contours, TESS_WINDING_NONZERO, tris);
+						tessellateContours(glyph_contours, TESS_WINDING_NONZERO, tris, /*keep_float=*/true);
 						if (tris.empty()) continue;
 
 						// Only emit triangles if the SWF didn't already provide glyph shapes
@@ -2907,8 +3028,8 @@ namespace SWFRecomp
 
 							for (Tri& t : tris) {
 								for (int j = 0; j < 3; j++) {
-									float x_f = (float) t.verts[j].x;
-									float y_f = (float) t.verts[j].y;
+									float x_f = (float)(t.verts[j].x + t.verts[j].fx_frac / VERTEX_FRAC_SCALE);
+									float y_f = (float)(t.verts[j].y + t.verts[j].fy_frac / VERTEX_FRAC_SCALE);
 									shape_data << "\t{ "
 										<< std::hex << std::uppercase
 										<< "0x" << VAL(u32, &x_f) << ", "
@@ -8598,107 +8719,6 @@ namespace SWFRecomp
 		}
 
 		return (u32) n;
-	}
-
-	// ---------------------------------------------------------------------
-	// Raph Levien parabola-integral quadratic flattening, ported from
-	// lyon_geom 1.0.6 `src/quadratic_bezier.rs` (`FlatteningParameters::new`
-	// and `t_at_iteration`) — the flattener Ruffle's tessellator runs, via
-	// `FillOptions::DEFAULT_TOLERANCE / scale` in
-	// `ruffle/render/src/tessellator.rs`. Ruffle's lyon path is in PIXELS;
-	// we flatten in twips, so DEFAULT_TOLERANCE (0.1 px) is 2.0 twips.
-	//
-	// Only the plain-shape arm uses this. Morph shapes keep equal-parameter
-	// stepping because their two streams are paired BY INDEX and a Levien
-	// schedule differs between the start and end curve.
-	// ---------------------------------------------------------------------
-
-	static const float LEVIEN_TOL_TWIPS = 2.0f;   // = lyon 0.1 px at 1:1
-
-	struct LevienParams
-	{
-		u32 count;               // 0 => a single straight chord
-		float integral_from;
-		float integral_step;
-		float inv_integral_from;
-		float div_inv_integral_diff;
-	};
-
-	static float levienParabolaIntegral(float x)
-	{
-		const float d = 0.67f;
-		return x / (1.0f - d + sqrtf(sqrtf(d*d*d*d + 0.25f*x*x)));
-	}
-
-	static float levienParabolaInvIntegral(float x)
-	{
-		const float b = 0.39f;
-		return x * (1.0f - b + sqrtf(b*b + 0.25f*x*x));
-	}
-
-	static LevienParams levienInit(float x0, float y0, float cx, float cy,
-	                               float x1, float y1, float tolerance)
-	{
-		LevienParams p = { 0, 0.0f, 0.0f, 0.0f, 0.0f };
-
-		if (x0 == x1 && y0 == y1)
-		{
-			return p;
-		}
-
-		{
-			// lyon `is_linear`
-			float bx = x1 - x0, by = y1 - y0;
-			float len2 = bx*bx + by*by;
-			float cross = (cx - x0) * by - (cy - y0) * bx;
-			if (len2 > 0.0f && (cross*cross) / len2 <= tolerance * tolerance * 4.0f)
-			{
-				return p;
-			}
-		}
-
-		float ddx = 2.0f*cx - x0 - x1;
-		float ddy = 2.0f*cy - y0 - y1;
-		float crs = (x1 - x0) * ddy - (y1 - y0) * ddx;
-		if (crs == 0.0f)
-		{
-			return p;
-		}
-
-		float inv_crs = 1.0f / crs;
-		float parabola_from = ((cx - x0) * ddx + (cy - y0) * ddy) * inv_crs;
-		float parabola_to   = ((x1 - cx) * ddx + (y1 - cy) * ddy) * inv_crs;
-		float scale = fabsf(crs) / (sqrtf(ddx*ddx + ddy*ddy) * fabsf(parabola_to - parabola_from));
-
-		float integral_from = levienParabolaIntegral(parabola_from);
-		float integral_to   = levienParabolaIntegral(parabola_to);
-		float integral_diff = integral_to - integral_from;
-
-		float inv_integral_from = levienParabolaInvIntegral(integral_from);
-		float inv_integral_to   = levienParabolaInvIntegral(integral_to);
-
-		float count = ceilf(0.5f * fabsf(integral_diff) * sqrtf(scale / tolerance));
-		if (!std::isfinite(count) || count < 1.0f)
-		{
-			return p;
-		}
-		if (count > 64.0f)
-		{
-			count = 64.0f;   // same shape_data growth bound as before
-		}
-
-		p.count = (u32) count;
-		p.integral_from = integral_from;
-		p.integral_step = integral_diff / count;
-		p.inv_integral_from = inv_integral_from;
-		p.div_inv_integral_diff = 1.0f / (inv_integral_to - inv_integral_from);
-		return p;
-	}
-
-	static float levienT(const LevienParams& p, u32 i)
-	{
-		float u = levienParabolaInvIntegral(p.integral_from + p.integral_step * (float) i);
-		return (u - p.inv_integral_from) * p.div_inv_integral_diff;
 	}
 
 	// Levien-scheduled twin of SWF::addCurvedEdge. Non-morph only, so no

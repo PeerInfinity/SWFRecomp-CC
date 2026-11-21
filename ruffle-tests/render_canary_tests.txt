@@ -525,3 +525,11 @@ from_shumway/acid/acid-bitmap-draw_quality_high  # >stage BitmapData + draw() AA
 # (aliased) golden, so it FAILS while draw() anti-aliases at LOW as Flash does
 # (4 corner channels) and passes if draw() AA is gated off at LOW.
 avm2/bitmapdata_opaque                      # draw() AA at quality low, tol 0 1 cmp
+# s23 w2-glyph-levien: device-font glyph synth (recompiler zero-glyph Noto
+# Levien flattening + float vertices) and AVM1 EditText baseline truncation
+# (7e2a045c1). bevel_inner sits at 18/18 after the glyph change (zero
+# headroom); the other two flipped with the baseline truncation.
+# tier=1  (CI-passing with 7e2a045c1 + w2-glyph-levien)
+visual/filters/bevel_inner                  # zero-glyph _sans labels, low quality 1 cmp
+visual/simple_shapes/text_field_mask        # AVM1 EditText baseline 1 cmp
+from_shumway/acid/acid-text-escape          # AVM1 EditText baseline 1 cmp
