@@ -16111,12 +16111,48 @@ static int is_focusable_by_mouse(Avm2Context* ctx, Avm2Object* obj)
 	return obj_tab_enabled(ctx, obj);
 }
 
+// Cross-VM focus seams (action.c, header-free). The focus slot is shared with
+// AVM1: under an AVM2 root with an AVM1 child, AVM1's `g_focused_mc` is the
+// "focus holds an AVM1 object" half of Ruffle's single FocusTracker slot, and
+// at most one of the two halves is set. Every call is gated on
+// g_avm1_child_levels, so pure-AVM2 content never reaches them.
+extern void* actionAvm1UnderAvm2Focus(void);
+extern int actionAvm1UnderAvm2FocusableByMouse(void* mc);
+extern void* actionAvm1UnderAvm2FocusCandidate(SWFAppContext* app, float x, float y,
+                                               int* focusable);
+extern void actionAvm1UnderAvm2FocusChange(SWFAppContext* app, void* new_mc,
+                                           int by_mouse);
+extern int actionAvm1UnderAvm2TabCollect(SWFAppContext* app, void** out, float* xy,
+                                         int* tab_index, int max);
+
+static void* avm1_focus_half(Avm2Context* ctx)
+{
+	if (g_avm1_child_levels == 0 || ctx == NULL || ctx->app == NULL) return NULL;
+	return actionAvm1UnderAvm2Focus();
+}
+
+static void set_focus_x(Avm2Context* ctx, Avm2Object* new_focus, void* new_avm1,
+                        int by_mouse);
+
 // Set focus to new_focus (may be NULL), firing FocusEvent focusOut/focusIn.
 // related = the "other" object in the transition; when key-driven, key_code=9.
 static void set_focus(Avm2Context* ctx, Avm2Object* new_focus)
 {
+	set_focus_x(ctx, new_focus, NULL, 0);
+}
+
+// Ruffle FocusTracker::set_internal over the shared slot: `new_focus` is the
+// AVM2 half, `new_avm1` the AVM1 half (at most one is non-NULL). The AVM1
+// handlers and the AVM1 Selection broadcast run first, then the AVM2
+// focusOut/focusIn ("AVM2's focus events shouldn't fire yet, as that only
+// happens after all of AVM1's focus handlers have been fired"). An AVM1 object
+// crosses into a FocusEvent's relatedObject as null (it has no object2).
+static void set_focus_x(Avm2Context* ctx, Avm2Object* new_focus, void* new_avm1,
+                        int by_mouse)
+{
 	Avm2Object* old = g_stage_focus;
-	if (old == new_focus) return;
+	void* old_avm1 = avm1_focus_half(ctx);
+	if (old == new_focus && old_avm1 == new_avm1) return;
 	if (new_focus != NULL)
 		avm2_text_apply_pending_bounds(ctx, new_focus);
 	g_stage_focus = new_focus;
@@ -16125,6 +16161,10 @@ static void set_focus(Avm2Context* ctx, Avm2Object* new_focus)
 	// commits any open IME composition — so the preedit becomes real text and
 	// fires its textInput before anything observes the focus change.
 	if (old != NULL) avm2_text_ime_commit_pending(ctx, old);
+	// AVM1 half: onKillFocus/onSetFocus + Selection.onSetFocus.
+	if (g_avm1_child_levels != 0 && ctx->app != NULL)
+		actionAvm1UnderAvm2FocusChange(ctx->app, new_avm1, by_mouse);
+	if (old == new_focus) { avm2_update_highlight(ctx); return; }
 	// focusOut on the old target (bubbles, related = new).
 	if (old != NULL)
 	{
@@ -16159,41 +16199,59 @@ static void update_focus_on_press(Avm2Context* ctx, Avm2Object* pressed)
 {
 	// The stage is "no object" for focus purposes.
 	if (pressed == ctx->stage) pressed = NULL;
-	// So is AVM1 content: Ruffle's should_focus is
-	// `is_action_script_3() || is_focusable_by_mouse()`, and an AVM1 clip is
-	// neither an AS3 object nor focusable by mouse unless it is a text field —
-	// which is the cross-VM focus arc (leg F), not this one. Falling through
-	// with the sentinel would put it in a FocusEvent's relatedObject.
-	if (PICK_IS_AVM1(pressed)) pressed = NULL;
+	// AVM1 content: the pressed object is the AVM1 object under the point
+	// (an AVM1 object is never "AS3", so should_focus reduces to its own
+	// is_focusable_by_mouse — a selectable/editable AVM1 text field).
+	void* pressed_avm1 = NULL;
+	int avm1_focusable = 0;
+	if (PICK_IS_AVM1(pressed))
+	{
+		pressed = NULL;
+		if (g_avm1_child_levels != 0 && ctx->app != NULL)
+			pressed_avm1 = actionAvm1UnderAvm2FocusCandidate(ctx->app,
+				(float) g_mouse_x, (float) g_mouse_y, &avm1_focusable);
+	}
 	Avm2Object* old = g_stage_focus;
-	Avm2Object* target;
+	void* old_avm1 = avm1_focus_half(ctx);
+	Avm2Object* target = NULL;
+	void* target_avm1 = NULL;
 	if (pressed != NULL)
 	{
 		target = pressed;  // should_focus: always true for AS3 content
 	}
-	else if (old != NULL && is_focusable_by_mouse(ctx, old))
+	else if (pressed_avm1 != NULL && avm1_focusable)
 	{
-		target = NULL;  // clicking away clears a mouse-acquired focus
+		target_avm1 = pressed_avm1;
+	}
+	else if ((old != NULL && is_focusable_by_mouse(ctx, old))
+	         || (old_avm1 != NULL && actionAvm1UnderAvm2FocusableByMouse(old_avm1)))
+	{
+		// clicking away clears a mouse-acquired focus
 	}
 	else
 	{
 		return;  // nothing was focusable either side; no event
 	}
 	// set_by_mouse: unchanged object dispatches nothing (unlike keyFocusChange).
-	if (old == target) return;
-	// dispatch_focus_change_event: the OLD focus is the target, falling back to
-	// the stage when there is none.
-	Avm2Object* dispatch_on = old != NULL ? old : ctx->stage;
-	Avm2Object* ev = avm2_focus_event_new(ctx,
-		avm2_string_from_literal(ctx, "mouseFocusChange"), 1, 1, target, 0,
-		0, "none");
-	avm2_dispatch_event(ctx, dispatch_on, ev);
-	Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
-	if (eext != NULL && eext->cancelled) return;
+	if (old == target && old_avm1 == target_avm1) return;
+	// dispatch_focus_change_event: the OLD focus is the target. An AVM1 old
+	// focus has no AVM2 object, so nothing is dispatched; with no focus at all
+	// the stage stands in, but only when the new object is AVM2 (or nothing).
+	Avm2Object* dispatch_on = old != NULL ? old
+		: (old_avm1 == NULL && target_avm1 == NULL) ? ctx->stage : NULL;
+	if (dispatch_on != NULL)
+	{
+		Avm2Object* ev = avm2_focus_event_new(ctx,
+			avm2_string_from_literal(ctx, "mouseFocusChange"), 1, 1, target, 0,
+			0, "none");
+		avm2_dispatch_event(ctx, dispatch_on, ev);
+		Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
+		if (eext != NULL && eext->cancelled) return;
+	}
 	// `new.filter(is_focusable_by_mouse)` — the event fires for anything, the
 	// focus only lands on something that can hold it.
 	if (target != NULL && !is_focusable_by_mouse(ctx, target)) target = NULL;
-	set_focus(ctx, target);
+	set_focus_x(ctx, target, target_avm1, 1);
 }
 
 // tab_enabled (Ruffle InteractiveObject::tab_enabled): explicit value or the
@@ -16347,11 +16405,47 @@ static void avm2_update_highlight(Avm2Context* ctx)
 }
 
 typedef struct { Avm2Object* obj; int32_t tab_index; int has_index;
-                 double key; uint32_t fill_ord; } TabEnt;
+                 double key; uint32_t fill_ord;
+                 // AVM1 entry (obj == NULL): the AVM1 object and its automatic
+                 // order key, computed at collection time.
+                 void* avm1; double avm1_key; } TabEnt;
+
+// The AVM1 half of fill_tab_order: an AVM1Movie's AVM1 root is, in Ruffle, the
+// same display object, so the walk descends into it (avm2/
+// focus_events_mixed_avm_edittext tabs from an AS3 field into an AVM1 one and
+// on to the next AVM1 one). Keys use the AVM1Movie's world translation plus
+// each object's AVM1 global top-left, in twips.
+static void fill_tab_order_avm1(Avm2Context* ctx, Avm2Object* movie, TabEnt* list,
+                                uint32_t* n, uint32_t cap, int* any_index)
+{
+	if (g_avm1_child_levels == 0 || ctx->app == NULL || *n >= cap) return;
+	enum { AVM1_TAB_MAX = 128 };
+	void* objs[AVM1_TAB_MAX];
+	float xy[2 * AVM1_TAB_MAX];
+	int idx[AVM1_TAB_MAX];
+	uint32_t room = cap - *n;
+	int m = actionAvm1UnderAvm2TabCollect(ctx->app, objs, xy, idx,
+		room < AVM1_TAB_MAX ? (int) room : AVM1_TAB_MAX);
+	Mat w = display_world_matrix(ctx, movie);
+	for (int i = 0; i < m && *n < cap; i++)
+	{
+		TabEnt* t = &list[(*n)];
+		memset(t, 0, sizeof(*t));
+		t->avm1 = objs[i];
+		t->has_index = idx[i] != INT_MIN && idx[i] >= 0;
+		t->tab_index = t->has_index ? idx[i] : -1;
+		t->fill_ord = *n;
+		double x = nearbyint(w.tx + xy[2 * i] * 20.0);
+		double y = nearbyint(w.ty + xy[2 * i + 1] * 20.0);
+		t->avm1_key = 6.0 * y + x;
+		if (t->has_index) *any_index = 1;
+		(*n)++;
+	}
+}
 
 // Ruffle container::fill_tab_order (DFS render order, tabChildren gate).
 static void fill_tab_order(Avm2Context* ctx, Avm2Object* obj, TabEnt* list,
-                           uint32_t* n, uint32_t cap, int* any_index)
+                           uint32_t* n, uint32_t cap, int* any_index, int with_avm1)
 {
 	Avm2DisplayObjectExt* e = avm2_display_ext_of(ctx, obj);
 	if (e == NULL) return;
@@ -16364,6 +16458,7 @@ static void fill_tab_order(Avm2Context* ctx, Avm2Object* obj, TabEnt* list,
 		if (is_interactive(ctx, child) && obj_is_tabbable(ctx, child) && *n < cap)
 		{
 			TabEnt* t = &list[(*n)];
+			memset(t, 0, sizeof(*t));
 			t->obj = child;
 			t->has_index = ce->tab_index >= 0;
 			t->tab_index = ce->tab_index;
@@ -16371,7 +16466,10 @@ static void fill_tab_order(Avm2Context* ctx, Avm2Object* obj, TabEnt* list,
 			if (t->has_index) *any_index = 1;
 			(*n)++;
 		}
-		fill_tab_order(ctx, child, list, n, cap, any_index);
+		if (with_avm1 && g_avm1_child_levels != 0 && g_avm1movie_class != NULL
+		    && child->cls != NULL && class_is_a(child->cls, g_avm1movie_class))
+			fill_tab_order_avm1(ctx, child, list, n, cap, any_index);
+		fill_tab_order(ctx, child, list, n, cap, any_index, with_avm1);
 	}
 }
 
@@ -16393,11 +16491,11 @@ static int tab_cmp_auto(const void* a, const void* b)
 // navigation too, not just tabbing. Unsorted; `*any_index` reports which
 // ordering the caller should apply.
 static uint32_t collect_tab_order(Avm2Context* ctx, TabEnt* list, uint32_t cap,
-                                  int* any_index)
+                                  int* any_index, int with_avm1)
 {
 	uint32_t n = 0;
 	*any_index = 0;
-	fill_tab_order(ctx, ctx->stage, list, &n, cap, any_index);
+	fill_tab_order(ctx, ctx->stage, list, &n, cap, any_index, with_avm1);
 	if (*any_index)
 	{
 		uint32_t m = 0;
@@ -16409,11 +16507,12 @@ static uint32_t collect_tab_order(Avm2Context* ctx, TabEnt* list, uint32_t cap,
 }
 
 // Build the sorted tab order into `out` (Ruffle TabOrder::sort). Returns count.
-static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, uint32_t cap)
+static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, void** out_avm1,
+                                uint32_t cap)
 {
 	TabEnt list[256];
 	int any_index = 0;
-	uint32_t n = collect_tab_order(ctx, list, 256, &any_index);
+	uint32_t n = collect_tab_order(ctx, list, 256, &any_index, out_avm1 != NULL);
 	if (any_index)
 	{
 		qsort(list, n, sizeof(TabEnt), tab_cmp_custom);
@@ -16422,6 +16521,7 @@ static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, uint32_t cap
 	{
 		for (uint32_t i = 0; i < n; i++)
 		{
+			if (list[i].obj == NULL) { list[i].key = list[i].avm1_key; continue; }
 			double x, y;
 			obj_world_topleft(ctx, list[i].obj, &x, &y);
 			list[i].key = 6.0 * y + x;
@@ -16437,51 +16537,82 @@ static uint32_t build_tab_order(Avm2Context* ctx, Avm2Object** out, uint32_t cap
 		n = m;
 	}
 	uint32_t k = n < cap ? n : cap;
-	for (uint32_t i = 0; i < k; i++) out[i] = list[i].obj;
+	for (uint32_t i = 0; i < k; i++)
+	{
+		out[i] = list[i].obj;
+		if (out_avm1 != NULL) out_avm1[i] = list[i].avm1;
+	}
 	return k;
 }
 
 // Ruffle FocusTracker::set_by_key: a cancelable, bubbling `keyFocusChange` on
 // the current focus (or the Stage) with `relatedObject` = the candidate, then
 // the move — unless a listener called preventDefault().
+//
+// `next_avm1` is the AVM1 half of the candidate (shared focus slot). Same
+// dispatch_focus_change_event target rule as the mouse path: an AVM1 current
+// focus dispatches nothing, and the Stage stands in for "no focus" only when
+// the candidate is AVM2 (or nothing).
+static void focus_change_by_key_x(Avm2Context* ctx, Avm2Object* next,
+                                  void* next_avm1, int32_t key_code, int shift)
+{
+	Avm2Object* cur = g_stage_focus;
+	void* cur_avm1 = avm1_focus_half(ctx);
+	Avm2Object* dispatch_on = cur != NULL ? cur
+		: (cur_avm1 == NULL && next_avm1 == NULL) ? ctx->stage : NULL;
+	if (dispatch_on != NULL)
+	{
+		Avm2Object* ev = avm2_focus_event_new(ctx,
+			avm2_string_from_literal(ctx, "keyFocusChange"), 1, 1, next, shift,
+			key_code, "none");
+		avm2_dispatch_event(ctx, dispatch_on, ev);
+		Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
+		if (eext != NULL && eext->cancelled) return;
+	}
+	set_focus_x(ctx, next, next_avm1, 0);
+}
+
 static void focus_change_by_key(Avm2Context* ctx, Avm2Object* next,
                                 int32_t key_code, int shift)
 {
-	Avm2Object* cur = g_stage_focus;
-	Avm2Object* dispatch_on = cur != NULL ? cur : ctx->stage;
-	Avm2Object* ev = avm2_focus_event_new(ctx,
-		avm2_string_from_literal(ctx, "keyFocusChange"), 1, 1, next, shift,
-		key_code, "none");
-	avm2_dispatch_event(ctx, dispatch_on, ev);
-	Avm2EventExt* eext = (Avm2EventExt*) ev->native_ext;
-	if (eext == NULL || !eext->cancelled)
-		set_focus(ctx, next);
+	focus_change_by_key_x(ctx, next, NULL, key_code, shift);
 }
 
 static void input_handle_tab(Avm2Context* ctx, int shift)
 {
 	Avm2Object* order[256];
-	uint32_t n = build_tab_order(ctx, order, 256);
+	void* order_avm1[256];
+	uint32_t n = build_tab_order(ctx, order, order_avm1, 256);
 
+	// The shared focus slot: an entry matches on whichever half it carries.
 	Avm2Object* cur = g_stage_focus;
+	void* cur_avm1 = avm1_focus_half(ctx);
 	Avm2Object* next = NULL;
+	void* next_avm1 = NULL;
 	if (n > 0)
 	{
 		int cur_idx = -1;
-		for (uint32_t i = 0; i < n; i++) if (order[i] == cur) { cur_idx = (int) i; break; }
+		for (uint32_t i = 0; i < n; i++)
+		{
+			if (order[i] != NULL ? order[i] == cur
+			    : (cur_avm1 != NULL && order_avm1[i] == cur_avm1))
+			{ cur_idx = (int) i; break; }
+		}
+		int ni;
 		if (cur_idx < 0)
 		{
-			next = shift ? order[n - 1] : order[0];
+			ni = shift ? (int) n - 1 : 0;
 		}
 		else
 		{
-			int ni = cur_idx + (shift ? -1 : 1);
+			ni = cur_idx + (shift ? -1 : 1);
 			if (ni < 0) ni = (int) n - 1;
 			if (ni >= (int) n) ni = 0;
-			next = order[ni];
 		}
+		next = order[ni];
+		next_avm1 = order[ni] == NULL ? order_avm1[ni] : NULL;
 	}
-	focus_change_by_key(ctx, next, 9, shift);
+	focus_change_by_key_x(ctx, next, next_avm1, 9, shift);
 	// FocusTracker::cycle updates the highlight AGAIN after set_by_key, and
 	// unconditionally: Tab onto the object that already holds focus (a one-entry
 	// tab order, or a mouse press that reset the highlight without moving the
@@ -16570,7 +16701,7 @@ static void input_handle_navigate(Avm2Context* ctx, int32_t key_code)
 	// and unlike the automatic order there is no equal-key dedup.
 	TabEnt list[256];
 	int any_index = 0;
-	uint32_t n = collect_tab_order(ctx, list, 256, &any_index);
+	uint32_t n = collect_tab_order(ctx, list, 256, &any_index, 0);
 
 	Avm2Object* best = NULL;
 	int best_cat = 0;

@@ -25919,8 +25919,7 @@ int actionAvm1ChildMousePick(SWFAppContext* app_context, float x, float y)
 // and click focus — see the real point only then; otherwise they see the
 // pointer as outside every AVM1 object (an AVM2 `mouseChildren = false`
 // container above the Loader must not let an AVM1 button fire).
-static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
-                                 int click_focusable_only);
+static void avm1UnderAvm2ClickCaret(SWFAppContext* app_context, float x, float y);
 extern int ng_update_button_states_in_level(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* level_mc,
 	const float (*hit_td)[16]);
@@ -25998,10 +25997,11 @@ void actionMouseAvm1ChildrenUnderAvm2(SWFAppContext* app_context, int kind,
 	} else if (kind == AVM1_CHILD_MOUSE_DOWN) {
 		actionDispatchMouseDown(app_context);
 		actionDispatchMCMouseDown(app_context);
-		// swf_core.c's order: click focus, then the press dispatch. A click the
-		// AVM2 side owns only kills a mouse-focused AVM1 field.
-		if (avm2_pick_is_avm1) mouse_click_focus_at(app_context, x, y, 1);
-		else mouse_click_focus_at(app_context, -1e6f, -1e6f, 1);
+		// Click focus itself already ran on the AVM2 side (one focus tracker
+		// for both VMs: update_focus_on_press -> actionAvm1UnderAvm2FocusChange,
+		// before the AVM2 mouseDown). What is left of swf_core.c's click-focus
+		// step is the caret, for a press the AVM2 pick handed to AVM1.
+		if (avm2_pick_is_avm1) avm1UnderAvm2ClickCaret(app_context, x, y);
 		actionDispatchMCPress(app_context);
 	} else {
 		actionDispatchMouseUp(app_context);
@@ -78095,6 +78095,7 @@ void actionFlushDeferredRollEvents(SWFAppContext* app_context)
 
 // Fire focus change events and update g_focused_mc.
 // Fires: old_mc.onKillFocus(newFocus), new_mc.onSetFocus(oldFocus), Selection.broadcastMessage("onSetFocus").
+static void selection_broadcast_on_set_focus(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc);
 static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc)
 {
 	if (old_mc == new_mc) return;
@@ -78129,6 +78130,14 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 	// Mouse click focus does NOT select all — it places the caret.
 	g_tf_select_all = 0;
 	// 4. Selection.broadcastMessage("onSetFocus", old_path, new_path)
+	selection_broadcast_on_set_focus(app_context, old_mc, new_mc);
+}
+
+// Selection.broadcastMessage("onSetFocus", old, new) — step 4 above, shared with
+// the cross-VM focus seam (actionAvm1UnderAvm2FocusChange), which also
+// broadcasts focus changes that involve no AVM1 object at all.
+static void selection_broadcast_on_set_focus(SWFAppContext* app_context, MovieClip* old_mc, MovieClip* new_mc)
+{
 	if (!g_selection_obj) return;
 	static const uint16_t s_onSetFocus_u16[] = {
 		'o','n','S','e','t','F','o','c','u','s'
@@ -79108,8 +79117,15 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 // child_mc_cache in front of the field it contains, and the AVM2 pick has
 // already decided the click is AVM1's, so the scan skips clips that could
 // never take click focus. The pure-AVM1 scan (flag 0) is unchanged.
-static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
-                                 int click_focusable_only)
+//
+// It is three pieces: the hit scan, the focus decision and the caret. The
+// AVM1-under-AVM2 path makes the focus decision on the AVM2 side (one focus
+// tracker for both VMs, Ruffle focus_tracker.rs) and uses the other two
+// pieces through the seams at the end of this section.
+//
+// The hit scan half: the frontmost clip under stage pixel (mx, my).
+static MovieClip* click_focus_scan(SWFAppContext* app_context, float mx, float my,
+                                   int click_focusable_only)
 {
 	// Find the frontmost MC that was hit by the click
 	// Iterate in reverse (highest depth = frontmost) to find topmost hit
@@ -79155,23 +79171,14 @@ static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
 		}
 	}
 
-	MovieClip* old_focused = g_focused_mc;
-	if (hit_mc != NULL && mc_is_focusable_by_click(hit_mc)) {
-		if (hit_mc != g_focused_mc)
-			selection_do_focus_change(app_context, g_focused_mc, hit_mc);
-	} else {
-		// Clicked non-focusable or empty area: only clear focus if the
-		// current focus was itself mouse-focusable (i.e., a text field).
-		// Focus set by Tab or Selection.setFocus() on non-mouse-focusable
-		// objects (buttons, MCs) is NOT cleared by clicking elsewhere.
-		if (g_focused_mc != NULL && mc_is_focusable_by_click(g_focused_mc))
-			selection_do_focus_change(app_context, g_focused_mc, NULL);
-	}
-	// When focus changed during mouse-down, fire deferred rollOut on any
-	// previously-hovered MC.  Matches Ruffle's roll_over() in focus_tracker.
-	if (g_focused_mc != old_focused)
-		queue_hover_rollout_on_focus_change();
+	return hit_mc;
+}
 
+// The caret half of mouse_click_focus_at: place the caret of the focused
+// text field at the click point.
+static void click_focus_place_caret(SWFAppContext* app_context, float mx, float my)
+{
+	(void) app_context;
 	// Position caret at click location within text field
 	if (g_focused_mc != NULL && g_focused_mc->ng_textfield_idx >= 0) {
 		float x1, y1, x2, y2;
@@ -79218,6 +79225,147 @@ static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
 		}
 	}
 }
+
+static void mouse_click_focus_at(SWFAppContext* app_context, float mx, float my,
+                                 int click_focusable_only)
+{
+	MovieClip* hit_mc = click_focus_scan(app_context, mx, my, click_focusable_only);
+
+	MovieClip* old_focused = g_focused_mc;
+	if (hit_mc != NULL && mc_is_focusable_by_click(hit_mc)) {
+		if (hit_mc != g_focused_mc)
+			selection_do_focus_change(app_context, g_focused_mc, hit_mc);
+	} else {
+		// Clicked non-focusable or empty area: only clear focus if the
+		// current focus was itself mouse-focusable (i.e., a text field).
+		// Focus set by Tab or Selection.setFocus() on non-mouse-focusable
+		// objects (buttons, MCs) is NOT cleared by clicking elsewhere.
+		if (g_focused_mc != NULL && mc_is_focusable_by_click(g_focused_mc))
+			selection_do_focus_change(app_context, g_focused_mc, NULL);
+	}
+	// When focus changed during mouse-down, fire deferred rollOut on any
+	// previously-hovered MC.  Matches Ruffle's roll_over() in focus_tracker.
+	if (g_focused_mc != old_focused)
+		queue_hover_rollout_on_focus_change();
+
+	click_focus_place_caret(app_context, mx, my);
+}
+
+#ifdef SWF_AVM2
+// ---------------------------------------------------------------------------
+// Cross-VM focus seams (session 23, leg F). Flash/Ruffle keep ONE focus
+// tracker for both VMs (focus_tracker.rs): its slot can hold an AVM2 object or
+// an AVM1 one. Ours is split: AVM2 owns `g_stage_focus` (avm2_display.c) and
+// AVM1 owns `g_focused_mc`. Under an AVM2 root the AVM2 side drives every focus
+// change through the seams below, so the two slots behave as one (at most one
+// of them is set), and the AVM1 half of FocusTracker::set_internal — the AVM1
+// onKillFocus/onSetFocus handlers and the Selection broadcast — runs here.
+// All are no-ops until an AVM1 child has booted. Header-free, like the other
+// AVM1-under-AVM2 seams: avm2_display.c declares them itself.
+// ---------------------------------------------------------------------------
+
+// The AVM1 half of the focus slot (NULL: no AVM1 object holds focus).
+void* actionAvm1UnderAvm2Focus(void)
+{
+	if (!g_avm1_under_avm2_ready) return NULL;
+	return g_focused_mc;
+}
+
+// Ruffle is_focusable_by_mouse for an AVM1 object: a selectable or editable
+// text field (edit_text.rs:3175); never an AVM1 clip or button.
+int actionAvm1UnderAvm2FocusableByMouse(void* mc)
+{
+	return mc_is_focusable_by_click((MovieClip*) mc);
+}
+
+// The AVM1 object a left press at stage pixel (x, y) lands on, for focus, when
+// the AVM2 pick already handed the press to AVM1. `*focusable` reports
+// is_focusable_by_mouse for it.
+void* actionAvm1UnderAvm2FocusCandidate(SWFAppContext* app_context, float x, float y,
+                                        int* focusable)
+{
+	*focusable = 0;
+	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0) return NULL;
+	Avm1ChildSwap swap;
+	avm1UnderAvm2EnterChild(app_context, &swap);
+	MovieClip* hit = click_focus_scan(app_context, x, y, 1);
+	avm1UnderAvm2LeaveChild(&swap);
+	if (hit != NULL) *focusable = mc_is_focusable_by_click(hit);
+	return hit;
+}
+
+// The AVM1 half of FocusTracker::set_internal: `new_mc` is the AVM1 object
+// that now holds focus (NULL when the new focus is AVM2 or nothing). Runs
+// old.onKillFocus(new) / new.onSetFocus(old) with AVM2 objects crossing as
+// null (InteractiveObject::call_focus_handler's object1_or_null), then the
+// Selection broadcast, which fires for EVERY focus change — an AVM2-only
+// change included, with both arguments null. `by_mouse` replays the
+// mouse-path hover reset mouse_click_focus_at does.
+void actionAvm1UnderAvm2FocusChange(SWFAppContext* app_context, void* new_mc, int by_mouse)
+{
+	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0) return;
+	Avm1ChildSwap swap;
+	avm1UnderAvm2EnterChild(app_context, &swap);
+	MovieClip* old_mc = g_focused_mc;
+	MovieClip* nmc = (MovieClip*) new_mc;
+	if (old_mc != nmc) {
+		// No AVM1 roll queueing on a key change: Ruffle's roll_over bails
+		// whenever the hovered object or the new focus is AVM2, which is the
+		// only shape this seam serves that it could tell apart.
+		selection_do_focus_change(app_context, old_mc, nmc);
+		if (by_mouse) queue_hover_rollout_on_focus_change();
+		// Key / programmatic focus selects a text field's whole text
+		// (FocusTracker::update_edittext_selection, AVM1 fields only).
+		if (!by_mouse && nmc != NULL && MC_IS_TEXTFIELD(nmc)) {
+			g_tf_select_all = 1;
+			g_selection_begin = 0;
+			g_selection_caret = 0;
+			g_selection_end = 0;
+		}
+	} else {
+		selection_broadcast_on_set_focus(app_context, NULL, NULL);
+	}
+	avm1UnderAvm2LeaveChild(&swap);
+}
+
+// The caret half of a press the AVM2 pick handed to AVM1 (the focus half ran
+// on the AVM2 side, before the AVM2 mouseDown).
+static void avm1UnderAvm2ClickCaret(SWFAppContext* app_context, float x, float y)
+{
+	click_focus_place_caret(app_context, x, y);
+}
+
+// AVM2 fill_tab_order descends into an AVM1Movie (Ruffle keeps the AVM1 root
+// in the same display tree). Appends the AVM1 child's tabbable objects in
+// natural order: `xy` receives each one's global top-left in stage pixels
+// (relative to the AVM1 root), `tab_index` its explicit tabIndex (INT_MIN if
+// none). Returns the count.
+int actionAvm1UnderAvm2TabCollect(SWFAppContext* app_context, void** out, float* xy,
+                                  int* tab_index, int max)
+{
+	if (!g_avm1_under_avm2_ready || g_avm1u2_count == 0 || max <= 0) return 0;
+	MovieClip* r = g_avm1u2[0].mc;
+	if (r == NULL || r->depth == INT_MIN || r->unloaded) return 0;
+	if (!mc_get_tab_children(r)) return 0;
+	DisplayObject* d = (DisplayObject*) r->display_obj;
+	if (d == NULL || d->sprite_display_list == NULL) return 0;
+	Avm1ChildSwap swap;
+	avm1UnderAvm2EnterChild(app_context, &swap);
+	MovieClip* list[MAX_CHILD_MOVIECLIPS];
+	int n = 0;
+	int cap = max < MAX_CHILD_MOVIECLIPS ? max : MAX_CHILD_MOVIECLIPS;
+	tab_collect_recursive(app_context, d->sprite_display_list, d->sprite_max_depth,
+	                      r, 0.0f, 0.0f, 1.0f, 1.0f, list, &n, cap);
+	for (int i = 0; i < n; i++) {
+		out[i] = list[i];
+		xy[2 * i] = list[i]->x;
+		xy[2 * i + 1] = list[i]->y;
+		tab_index[i] = mc_get_explicit_tab_index(list[i]);
+	}
+	avm1UnderAvm2LeaveChild(&swap);
+	return n;
+}
+#endif  // SWF_AVM2
 
 // ---------------------------------------------------------------------------
 // Text field drag selection
