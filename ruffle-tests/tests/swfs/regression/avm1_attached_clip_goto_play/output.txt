@@ -1,0 +1,14 @@
+root f1
+a f1
+a f2
+root f2 goto
+a f4
+a f5
+root f3
+root f4 back
+a f2
+a f3
+root f5
+a f4
+root f6
+a f5

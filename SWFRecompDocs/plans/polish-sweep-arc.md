@@ -3297,8 +3297,12 @@ no-graphics builds carry no libavcodec by design. One known, predicted row.
 **Trace** (62 failing graphics rows on the intersection):
 - **AVM1 runtime `mc.filters = [...]` is never rendered on any clip** (w2-dynclip-transform R1) — game-visible; 1 corpus
   row (`empty_child_filter_bounds`, now 24876 after the transform fix).
-- Attach-tick child/parent frame-1 order (Ruffle runs the attached clip's timeline child BEFORE its parent on the attach
-  tick; probe + exporter oracle in `w2-attached-timeline-probe/`).
+- Attach-tick frame-1 order. **Refined in s24 (oracle-checked):** Ruffle runs an attached clip's frame-1 actions in
+  TAG order — a child's frame 1 runs at its PlaceObject, so child-first only when the PlaceObject precedes the clip's
+  own DoAction; with DoAction first, Ruffle prints the parent first. Both our paths (CI attach-init drain, browser live
+  queue) always run the clip's own DoAction first. Fix needs the child instantiated at its PlaceObject inside the attach
+  replay (not cheap); `regression/avm1_attached_clip_natural_timeline*` deliberately use DoAction-first so they don't
+  depend on it. Probe: `w2-attached-timeline-probe/`; report `browser-attached-timeline-report.md` §5.
 - Native builtin methods expose a `prototype` (`global_proto_decls`, `global_instance_decls`) — cross-cutting; price as its
   own wave-1 slot before touching `setupNativeFuncOwnProps`.
 - AVM1 `edittext_set_text_same(_after_edits)` (plain-text per-character format model, L), `amf0_array_matrix` (instanceof on

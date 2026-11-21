@@ -961,6 +961,22 @@ void tagMain(SWFAppContext* app_context)
 			extern void presync_nested_sprite_currentframe(SWFAppContext* app_context);
 			presync_nested_sprite_currentframe(app_context);
 		}
+#else
+		// Browser-WASM (and the native windowed player): run attachMovie'd clips'
+		// natural timelines — frame tags, DoActions and nested children — with the
+		// pump the CI modes run just above (s24 browser follow-up; before it these
+		// clips froze on frame 1 here, and only gotoAndPlay'd ones stepped forward,
+		// placement tags only). Same slot as OFFSCREEN: BEFORE the root frame
+		// func, so the scripts it queues drain in the frame func's
+		// actionDrainAllInPriorityOrder ahead of the root DoAction (Ruffle's
+		// newest-first exec list runs root last). Timeline sprites still advance
+		// later, inside tagShowFrame, in this build. Clips attached this tick are
+		// skipped until ng_promote_attached_playheads at the end of the tick, and a
+		// pending manual nav is left to advance_attached_clip_frames (tagShowFrame).
+		{
+			extern void ng_advance_attached_clip_playheads(SWFAppContext* app_context);
+			ng_advance_attached_clip_playheads(app_context);
+		}
 #endif
 
 		// Mark ENTER_FRAME dispatch pending. tagFlushPendingEnterFrame is
@@ -1444,6 +1460,16 @@ void tagMain(SWFAppContext* app_context)
 			if (actionActionQueuePending() > 0)
 				actionDrainAllInPriorityOrder(app_context);
 		}
+#ifndef OFFSCREEN_RENDER
+		// Browser-WASM: promote this tick's attachMovie'd clips so the pump above
+		// runs them from NEXT tick — after every drain that can run their queued
+		// frame-1 script (a frame-1 stop() must land before the first advance).
+		// OFFSCREEN promotes after its frame func (above); same contract.
+		{
+			extern void ng_promote_attached_playheads(void);
+			ng_promote_attached_playheads();
+		}
+#endif
 		if (manual_next_frame)
 		{
 			// Natural backward wrap (recompiler-emitted at end of last frame

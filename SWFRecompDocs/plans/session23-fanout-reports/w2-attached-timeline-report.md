@@ -179,6 +179,10 @@ Nothing else in the corpus exercises either rule, so nothing contradicts them, a
 
 ## 4. Browser-WASM `advance_attached_clip_natural`: should it follow? (lead, not changed)
 
+> **Done in s24:** see `browser-attached-timeline-report.md`. The browser now shares the pump. That slice also found
+> that the pump's shown/next playhead conversion (§1.1) mis-stepped after gotoAndPlay, and that non-root
+> registration aliases double-advanced their children in the CI modes. Both are fixed there.
+
 **Not touched.** It remains a separate, name-gated (`pfx*`) / explicit-`gotoAndPlay` one-shot that runs placement tags only:
 - It never runs DoActions, children, or 1-frame or stopped containers.
 - It self-removes `pfx*` particles on wrap instead of running their final-frame `removeMovieClip`.

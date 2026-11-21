@@ -29225,6 +29225,22 @@ void actionSetTextFieldDepthWindow(int mode, int swf_depth, int swf_max_depth)
 }
 
 // 1 = this field lies outside the active window and must be skipped.
+// A text field under a _visible=false ancestor is not drawn (Flash/Ruffle:
+// invisible display objects skip their whole subtree). The field passes used to
+// test only the field's own `visible`, so a hidden attachMovie'd holder still
+// painted its fields' backgrounds and glyphs — N's root-attached
+// inputBox/inputBox2 (`_visible = false` right after the attach) showed as two
+// white "level data"/"demo data" panels over the menu once browser-WASM stopped
+// dropping root attaches (s24).
+static int tf_ancestor_hidden(MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	int guard = 0;
+	for (MovieClip* p = mc->parent; p != NULL && p != &root_movieclip && guard < 256; p = p->parent, guard++)
+		if (!p->visible) return 1;
+	return 0;
+}
+
 static int tf_window_skip(MovieClip* mc)
 {
 	if (g_tf_window_mode == TF_WINDOW_ALL) return 0;
@@ -29287,6 +29303,7 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 		if (tf_window_skip(mc)) continue;
 		if (mc->dynamic_props == NULL) continue;
 		if (!mc->visible) continue;
+		if (tf_ancestor_hidden(mc)) continue;
 		// A live setMask masker is never painted as ordinary content — it only
 		// contributes to its maskee's stencil (mask defect B).
 		if (actionAvm1IsLiveMasker(mc)) continue;
@@ -29710,6 +29727,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		if (tf_window_skip(mc)) continue;
 		if (mc->dynamic_props == NULL) continue;
 		if (!mc->visible) continue;
+		if (tf_ancestor_hidden(mc)) continue;
 
 		ASObject* props = (ASObject*)mc->dynamic_props;
 
@@ -65527,18 +65545,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		if (num_args >= 3) {
 			extern MovieClip root_movieclip;
 			MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
-			// Browser-WASM only: root attaches are no-ops. Same reason as the
-			// method-form gate (CallMethod path) — root frame_funcs re-run every
-			// tick, so a root attachMovie's class constructor would fire every
-			// tick. See the longer comment on the CallMethod gate.
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-			if (mc == &root_movieclip) {
-				if (args != NULL) FREE(args);
-				pushUndefined(app_context);
-				builtin_handled = 1;
-				goto _am_func_done;
-			}
-#endif
+			// (Browser-WASM root attaches were no-ops until s24; see the
+			// CallMethod arm's comment.)
 			char _am_buf1[256], _am_buf2[256];
 			if (args[0].type == ACTION_STACK_VALUE_STRING) {
 				const uint16_t* _u16 = varGetU16Ptr(&args[0]);
@@ -65673,9 +65681,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 		}
 		builtin_handled = 1;
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	_am_func_done: ;
-#endif
 	}
 	// getNextHighestDepth() — as a global function, operates on root
 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
@@ -72713,7 +72718,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								// ng_gotoFrameByMC keeps in sync — sprite_current_frame
 								// is the *next* frame to run, not the displayed one.)
 								if (!is_play && mc->currentframe == (int)frame0 + 1) {
-									// already stopped on this frame — no-op
+									// already on this frame — no rebuild, but still
+									// STOP it: gotoAndStop(N) on a PLAYING clip that
+									// shows N stops it in Flash. Since s24 attached
+									// clips really play (shared attached-clip pump), so
+									// N's tileMC (attach, then gotoAndStop(1) while on
+									// frame 1) kept animating its 34 tile frames.
+									dobj->sprite_is_playing = 0;
 								}
 								// Tetris board cells (b_mc.attachMovie("block",...)
 								// then b_mc[pos].gotoAndStop(color+1)) need the
@@ -73274,25 +73285,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				new_name = _am_name_buf;
 				int depth_val = ecmaToInt32(varToDouble(&args[2]));
 
-				// Browser-WASM only: root attaches are no-ops. Root frame_funcs
-				// re-execute every tick (no is_playing gate), so a root-targeted
-				// attachMovie fires its registered class constructor every tick
-				// and accumulates state until the menu hangs after ~45 frames
-				// (Doodle_Jump script_15 _root.attachMovie("MCSpyConnection", ...)
-				// regression after enabling this codepath for browser-WASM —
-				// SpyConnection1 constructor opens LocalConnections and similar
-				// that aren't fully wired up in browser-WASM yet). Non-root
-				// attaches still run (DJ platforms via container.attachMovie).
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-				{
-					extern MovieClip root_movieclip;
-					if (mc == &root_movieclip) {
-						if (args != NULL) FREE(args);
-						pushUndefined(app_context);
-						return;
-					}
-				}
-#endif
+				// Browser-WASM made ROOT attaches no-ops from 3ff709191 (2026-05-26)
+				// to s24: root frame_funcs then re-executed every tick, so a root
+				// frame's attachMovie (Doodle Jump script_15's
+				// _root.attachMovie("MCSpyConnection", ...)) fired its class
+				// constructor every tick until the menu hung. 8588bb163 (two days
+				// later) made the root DoAction run once per frame ENTRY, which
+				// removed that premise, but the guard stayed — silently dropping
+				// every _root.attachMovie in shipped browser games. Removed in s24
+				// (browser attached-timeline follow-up) after a DJ smoke test.
 
 				// Lookup exported symbol (per-movie isolation)
 				size_t char_id = ng_lookupExportForMovie(linkage_id, mc->movie_id);

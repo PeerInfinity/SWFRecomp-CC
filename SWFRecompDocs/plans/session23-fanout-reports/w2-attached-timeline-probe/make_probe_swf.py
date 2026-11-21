@@ -23,11 +23,18 @@ holder=sprite(2,[place(1,3,'kid')])                                         # 1-
 stopper=sprite(4,[place(1,3,'kid2')+doaction(trace_self(' stopper f')+STOP)]+[doaction(trace_self(' stopper f')) for _ in range(2)])
 multi=sprite(5,[place(1,3,'kid3')+doaction(trace_self(' multi f'))]+[doaction(trace_self(' multi f')) for _ in range(2)])
 exp=tag(56,struct.pack('<H',3)+struct.pack('<H',2)+s('holder')+struct.pack('<H',4)+s('stopper')+struct.pack('<H',5)+s('multi'))
-def attach(lib,name,depth):  # _root.attachMovie(lib,name,depth); pop
-    return push(depth,name,lib,3,'_root')+GETVAR+push('attachMovie')+CALLM+POP
+# Optional 2nd arg "nonroot": attach into a timeline-placed empty 1-frame
+# container `c` (root depth 10) instead of _root. Default output unchanged
+# (md5 82368d06...). The nonroot variant isolates the attached-timeline pump
+# from browser-WASM's root-attach handling (s24 browser follow-up).
+HOST='c' if len(sys.argv)>2 and sys.argv[2]=='nonroot' else '_root'
+def attach(lib,name,depth):  # HOST.attachMovie(lib,name,depth); pop
+    return push(depth,name,lib,3,HOST)+GETVAR+push('attachMovie')+CALLM+POP
 root_f1=doaction(attach('holder','h',1)+attach('stopper','s',2)+attach('multi','m',3))
+if HOST=='c':
+    root_f1=place(10,6,'c')+root_f1
 root_f2=doaction(push('root f2')+TRACE)
-body=tag(69,struct.pack('<I',0))+tag(9,b'\xff\xff\xff')+anim+holder+stopper+multi+exp+root_f1+SHOW+root_f2+SHOW+doaction(STOP)+SHOW+tag(0,b'')
+body=tag(69,struct.pack('<I',0))+tag(9,b'\xff\xff\xff')+anim+holder+stopper+multi+(sprite(6,[b''])+b'' if HOST=='c' else b'')+exp+root_f1+SHOW+root_f2+SHOW+doaction(STOP)+SHOW+tag(0,b'')
 # RECT 0..4000 twips, nbits=13
 nb=13; bits='{:05b}'.format(nb)+''.join('{:013b}'.format(v) for v in (0,4000,0,3000))
 bits+='0'*((8-len(bits)%8)%8); rect=int(bits,2).to_bytes(len(bits)//8,'big')

@@ -576,9 +576,34 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		// fire later via PAI, not inline". Key test: avm1/default_names.
 		extern void actionGotoCatchupEnter(void);
 		extern void actionGotoCatchupLeave(void);
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM: run frame 0 LIVE. The CI modes run this clip's frame-1
+		// SCRIPT later through the AQ_KIND_ATTACH_INIT re-run
+		// (aq_dispatch_pending_attach_init), which depends on the script-only /
+		// attach-init gate states. Browser-WASM stubs every one of those accessors
+		// to 0 (graphics_stubs.c), so that re-run could never fire the script —
+		// and nothing in this build drains AQ_KIND_ATTACH_INIT (entries piled up
+		// forever). Live, the recompiled sprite gate (`!catch_up_mode`) QUEUES the
+		// frame-1 DoAction with this clip as context / base clip / sprite obj
+		// (so a bare frame-1 stop() stops this clip), and it drains with the
+		// caller's queue — after the attaching script, as in Flash. Frame-1
+		// StartSound tags play too (Flash does). s24 browser follow-up.
+		{
+			extern MovieClip* actionGetBaseClip(void);
+			extern void actionSetBaseClip(MovieClip* mc);
+			MovieClip* _am_saved_base = actionGetBaseClip();
+			actionSetBaseClip(new_mc);
+			g_current_sprite_obj = dobj;
+			catch_up_mode = 0;
+			funcs[0](app_context);
+			g_current_sprite_obj = NULL;
+			actionSetBaseClip(_am_saved_base);
+		}
+#else
 		actionGotoCatchupEnter();
 		funcs[0](app_context);
 		actionGotoCatchupLeave();
+#endif
 		g_active_transform_data = _am_saved_active_td;
 		catch_up_mode = saved_catch_up;
 		g_tag_skip_mode = _am_saved_tag_skip;
@@ -649,6 +674,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
 
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Queue the frame function for deferred script execution
 		// (Flash runs attached clip init scripts at end of frame)
 		// If an init is already pending for the same SWF depth, mutate it in
@@ -682,6 +708,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			}
 		skip_attach_init_queue: ;
 		}
+#endif // browser-WASM queued the frame-1 script live above (no ATTACH_INIT drain there)
 	}
 
 	// Register the new child in the parent's sprite display list so that
@@ -732,6 +759,10 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			if (target_d >= pdobj->sprite_dl_capacity)
 				goto skip_parent_dl_registration;
 			pdobj->sprite_display_list[target_d].char_id = char_id;
+			// Lookup/render alias only: the attached clip's timeline is run by
+			// ng_advance_attached_clip_playheads, so the parent's timeline walk
+			// must not advance this entry (its children would double-step).
+			pdobj->sprite_display_list[target_d].attach_registration = 1;
 			if (pdobj->sprite_display_list[target_d].instance_name)
 				free(pdobj->sprite_display_list[target_d].instance_name);
 			pdobj->sprite_display_list[target_d].instance_name = strdup(new_name);
@@ -769,10 +800,12 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// ParticleManager attachMovie's every effect (dust, blood, laser spark/charge,
 	// ...) as "pfx"+depth into a cyclic ring buffer and relies on each clip's OWN
 	// timeline playing forward to a final-frame this.removeMovieClip() to clean
-	// itself up. Browser-WASM has no auto-advance for attachMovie'd clips' own
-	// timelines (the OFFSCREEN ng_advance_attached_clip_playheads pump is gated
-	// out; advance_attached_clip_natural only services EXPLICITLY gotoAndPlay'd
-	// clips), so a particle FREEZES on frame 1 forever — leaving the "leftover
+	// itself up. (s24: every OTHER attached clip now plays its real timeline via
+	// the shared ng_advance_attached_clip_playheads pump; that pump SKIPS
+	// natural_oneshot clips for the morph-ratio reason in
+	// advance_attached_clip_natural.) Before this flag, browser-WASM had no
+	// auto-advance for attachMovie'd clips' own timelines, so a particle FROZE
+	// on frame 1 forever — leaving the "leftover
 	// laser/death lines" the user sees AND a permanent pile of full-opacity
 	// particle sprites whose overdraw is N's dominant GPU cost (user A/B-confirmed:
 	// skipping particle draws recovers fps far more than skipping the tile grid).
@@ -1449,12 +1482,10 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 	obj->sprite_current_frame = (fc > 0) ? ((frame + 1) % fc) : 0;
 	obj->sprite_manual_next_frame = 0;
 	obj->sprite_is_playing = play ? 1 : 0;
-	// Browser-WASM: mark an explicit gotoAndPlay so advance_attached_clip_natural
-	// will play this STANDALONE attached clip forward (coins' "COLLECTED" disappear,
-	// drones' "prefire"). gotoAndStop (play=0) clears it. Harmless on timeline-placed
-	// clips — the pump only processes standalone attached clips (display_obj outside
-	// the global display_list), which advance_sprite_frames doesn't reach.
-	obj->goto_play_active = play ? 1 : 0;
+	// A gotoAndPlay'd attached clip plays on through the shared attached-clip
+	// pump (ng_advance_attached_clip_playheads, every build since s24): it shows
+	// the target now and runs target+1 next tick, because sprite_current_frame
+	// is the NEXT frame to run for attached roots too.
 	mc->currentframe = (int)frame + 1;  // 1-indexed
 
 	// Propagate the updated display list to the parent's registration entry.

@@ -1004,6 +1004,10 @@ DisplayObject* g_exec_eager_built_obj = NULL;
 // iteration where mid-iter additions are never visited. See
 // SWFRecompDocs/plans/defer-newly-placed-sprite-advance-plan.md.
 size_t g_tick_count = 0;
+// Browser-WASM only (always 0 in the CI modes): set while a nested sprite
+// replays frame 0 on a natural loop wrap; silences the refused-Place warning
+// for surviving same-char children (see advance_sprite_frames).
+int g_nested_loopback_quiet = 0;
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Forward decl — defined alongside tagRemoveObject2 below. Recursively queues
@@ -1276,6 +1280,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		}
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
+		if (obj->attach_registration) continue; // timeline owned by the attached-clip pump
 		Character* ch = &dictionary[obj->char_id];
 
 		// Recurse into button display lists to advance their sprite children
@@ -1640,10 +1645,20 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			extern int g_loopback_replay;
 			int _lb_saved_replay = g_loopback_replay;
 			if (lb_wrapped) g_loopback_replay = 1;
+#else
+			// Browser-WASM keeps a surviving same-char child by REFUSING frame 0's
+			// re-place of it (tagPlaceObject2's occupied-depth gate); that refusal is
+			// the survives_rewind outcome, not Ruffle's avm_warning case, so don't
+			// print the warning for it. Every attached clip that loops reaches this
+			// since the s24 shared attached-clip pump.
+			int _lb_saved_quiet = g_nested_loopback_quiet;
+			if (lb_wrapped) g_nested_loopback_quiet = 1;
 #endif
 			CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[frame]);
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_loopback_replay = _lb_saved_replay;
+#else
+			g_nested_loopback_quiet = _lb_saved_quiet;
 #endif
 		}
 		(void)lb_wrapped;
@@ -1918,6 +1933,7 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 		}
 		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
+		if (obj->attach_registration) continue; // timeline owned by the attached-clip pump
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 		if (obj->sprite_display_list == NULL) continue;
@@ -2004,7 +2020,6 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 // frame-1 this.stop() (routed to its own display_obj by step 1) has applied
 // before it is ever advanced (the #10 record / apply-after-drain pattern).
 // ---------------------------------------------------------------------------
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Stamp an attached clip's standalone display_obj with the instantiation
 // sequence the timeline path uses (place_seq), so the pump can run attached
 // roots newest-first like Ruffle's AVM1 clip_exec_list. The standalone struct
@@ -2014,11 +2029,9 @@ static void ng_stamp_attach_seq(DisplayObject* obj)
 	extern size_t g_place_seq;
 	if (obj != NULL && obj->place_seq == 0) obj->place_seq = ++g_place_seq;
 }
-#endif
 
 void ng_record_attached_playable(MovieClip* mc)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (mc == NULL || mc->display_obj == NULL) return;
 	DisplayObject* obj = (DisplayObject*)mc->display_obj;
 	if (obj->char_id == 0) return;
@@ -2036,20 +2049,23 @@ void ng_record_attached_playable(MovieClip* mc)
 	// gotoAndStop in the attach-init drain overrides this to 0 before the first
 	// pump tick (drain runs this tick; pump runs next tick).
 	obj->sprite_is_playing = 1;
+	// sprite_current_frame is the NEXT frame to run — the convention every
+	// display-list entry, ng_gotoFrameByMC and action.c's gotoAndStop no-op guard
+	// already use. Frame index 0 was just shown by ng_attachMovie, so 1 is next.
+	// (Before s24 the pump read an attached root's value as the SHOWN frame, so
+	// after mc.gotoAndPlay(T) — which writes T+1 — it ran T+2, or wrapped to
+	// frame 1 from the second-to-last frame.)
+	obj->sprite_current_frame = 1;
 	// Re-attach of an already-active clip stays active (keeps advancing without
 	// burning another promotion tick); a fresh attach is pending so its creation
 	// tick is skipped.
 	if (mc->attached_playable != 2)
 		mc->attached_playable = 1;
 	ng_stamp_attach_seq(obj);
-#else
-	(void)mc;
-#endif
 }
 
 void ng_promote_attached_playheads(void)
 {
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern MovieClip* child_mc_cache[];
 	extern int child_mc_count;
 	for (int i = 0; i < child_mc_count; i++) {
@@ -2057,10 +2073,8 @@ void ng_promote_attached_playheads(void)
 		if (mc != NULL && mc->attached_playable == 1)
 			mc->attached_playable = 2;
 	}
-#endif
 }
 
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // ---------------------------------------------------------------------------
 // Attached-clip NATURAL timeline (s23 w2-attached-timeline; diagnosis
 // w1-trace-tail §2). The counter pump below used to bump only the playhead of
@@ -2073,8 +2087,12 @@ void ng_promote_attached_playheads(void)
 // Each object is advanced ALONE through a 1-entry scratch display list fed to
 // advance_sprite_frames with g_advance_defer_nested=1 (we do the recursion
 // ourselves), so the shared advance helper is reused unchanged.
-// Counter semantics differ: for the attached root `sprite_current_frame` is the
-// SHOWN frame (0-based); inside a display list it is the NEXT frame to run.
+// `sprite_current_frame` is the NEXT frame to run for the attached root too
+// (ng_record_attached_playable sets 1 at attach; ng_gotoFrameByMC writes
+// target+1), so the root needs no shown/next conversion.
+//
+// Shared by every build since s24 (browser follow-up): browser-WASM calls the
+// pump from swf.c's tick before the root frame func, exactly like OFFSCREEN.
 // ---------------------------------------------------------------------------
 static MovieClip* ng_attached_child_mc(MovieClip* parent, const char* name)
 {
@@ -2132,7 +2150,6 @@ static void ng_attached_run_tree(SWFAppContext* app_context, DisplayObject* obj,
 	DisplayObject* tmp = (DisplayObject*)calloc(2, sizeof(DisplayObject));
 	if (tmp == NULL) return;
 	tmp[1] = *obj;
-	if (depth_lvl == 0) tmp[1].sprite_current_frame = (obj->sprite_current_frame + 1) % fc; // shown -> next
 	DisplayObject* saved_dl = display_list;
 	size_t saved_max = max_depth, saved_cap = display_list_capacity;
 	display_list = tmp; max_depth = 1; display_list_capacity = 2;
@@ -2156,17 +2173,35 @@ static void ng_attached_run_tree(SWFAppContext* app_context, DisplayObject* obj,
 	*obj = tmp[1];
 	free(tmp);
 	if (self_mc) self_mc->display_obj = (void*)obj;
-	if (depth_lvl == 0) {
-		obj->sprite_current_frame = (next + fc - 1) % fc; // next -> shown
-		if (self_mc) self_mc->currentframe = (int)obj->sprite_current_frame + 1;
-	}
+	if (depth_lvl == 0 && self_mc)
+		self_mc->currentframe = (int)((next + fc - 1) % fc) + 1; // shown = next - 1
 }
-#endif
+
+// CI modes register a non-root attached clip in its parent's
+// sprite_display_list at [as_depth + 16384] as a lookup/render alias holding a
+// COPY of the clip's child-list fields (ng_attachMovie). Running the clip's
+// timeline can grow or rebase that list and place new depths, so re-copy the
+// fields or the parent's render recursion iterates a stale max_depth. Direct
+// index probe (the parent list is >16k entries long; never scan it).
+static void ng_sync_attach_registration(MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	if (mc == NULL || mc->parent == NULL || mc->parent == &root_movieclip) return;
+	DisplayObject* pd = (DisplayObject*)mc->parent->display_obj;
+	DisplayObject* d = (DisplayObject*)mc->display_obj;
+	if (pd == NULL || d == NULL || pd->sprite_display_list == NULL) return;
+	if (mc->depth == INT_MIN) return;
+	long idx = (long)mc->depth + 16384;
+	if (idx <= 0 || (size_t)idx > pd->sprite_max_depth || (size_t)idx >= pd->sprite_dl_capacity) return;
+	DisplayObject* e = &pd->sprite_display_list[idx];
+	if (!e->attach_registration || e->char_id != d->char_id || e == d) return;
+	e->sprite_display_list = d->sprite_display_list;
+	e->sprite_max_depth = d->sprite_max_depth;
+	e->sprite_dl_capacity = d->sprite_dl_capacity;
+}
 
 void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 {
-	(void)app_context;
-#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) return;
 	extern MovieClip* child_mc_cache[];
 	extern int child_mc_count;
@@ -2185,6 +2220,10 @@ void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 		DisplayObject* obj = (DisplayObject*)mc->display_obj;
 		if (obj == NULL) continue;
 		if (obj->sprite_manual_next_frame) continue;     // a pending goto handles its own nav
+		// Browser-WASM "pfx*" one-shot morph particles keep their dedicated
+		// counter path (advance_attached_clip_natural): re-running their
+		// placement tags draws ratio-0 morph geometry under ratio-N matrices.
+		if (obj->natural_oneshot) continue;
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
@@ -2197,10 +2236,11 @@ void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 	// Run each clip's natural timeline (frame tags + DoActions) and its
 	// nested children's, not just its counter. A stop()'d or 1-frame
 	// clip's own playhead stays put, but its children still play.
-	for (int k = 0; k < nroots; k++)
+	for (int k = 0; k < nroots; k++) {
 		ng_attached_run_tree(app_context, (DisplayObject*)roots[k]->display_obj, 0, roots[k]);
+		ng_sync_attach_registration(roots[k]);
+	}
 	#undef NG_ATT_ROOT_CAP
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -2369,6 +2409,7 @@ static void presync_nested_cf_recurse(SWFAppContext* app_context)
 	{
 		DisplayObject* obj = &display_list[d];
 		if (obj->char_id == 0) continue;
+		if (obj->attach_registration) continue; // timeline owned by the attached-clip pump
 		Character* ch = &dictionary[obj->char_id];
 
 		if (ch->type == CHAR_TYPE_BUTTON)
@@ -2573,9 +2614,15 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 		actionSetCurrentContext(mc);
 		g_place_gen++;
 		int saved_cm = catch_up_mode;
-		catch_up_mode = 1;   // placement tags only; suppress DoAction re-fire
+		// Intermediate frames: placement tags only. The TARGET frame runs with
+		// the caller's mode so its DoAction QUEUES (drains post-frame) — Flash
+		// runs a goto's target-frame actions; ng_gotoFrameByMC (the CI path for
+		// the same goto) does the same. Queued, never inline, so the reentrancy
+		// that made this pass deferred (Doodle Jump's attachBlocks loop) cannot
+		// recur.
 		for (size_t f = 0; f <= target && f < ch->sprite_frame_count; f++)
 		{
+			catch_up_mode = (f < target) ? 1 : saved_cm;
 			if (ch->sprite_frame_funcs[f] != NULL)
 				exec_sprite_frame(app_context, d, ch->sprite_frame_funcs[f]);
 		}
@@ -2589,20 +2636,28 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 		d->sprite_display_list = display_list;
 		d->sprite_max_depth = max_depth;
 		d->sprite_dl_capacity = display_list_capacity;
-		d->sprite_current_frame = target;
+		// NEXT frame to run (the attached-root convention, see
+		// ng_record_attached_playable): gotoAndPlay(T) shows T now and the shared
+		// pump (ng_advance_attached_clip_playheads, next tick's Phase 1) runs T+1.
+		d->sprite_current_frame = (target + 1) % ch->sprite_frame_count;
 		mc->currentframe = (int)target + 1;
 
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
-		// See advance_attached_clip_natural: a manual nav this tick must not also be
-		// auto-stepped this tick (gotoAndPlay(T) shows T now, plays T+1 next tick).
 		{ extern size_t g_tick_count; d->placed_at_tick = g_tick_count; }
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Browser-WASM per-tick forward play of EXPLICITLY gotoAndPlay'd attached clips.
+// Browser-WASM per-tick countdown of one-shot "pfx*" PARTICLE clips only.
+//
+// s24: every other attached clip — including the explicitly gotoAndPlay'd coins
+// and drones this pass was written for (v2 below) — now plays its real timeline
+// (frame tags + DoActions + nested children) through the pump shared with the CI
+// modes, ng_advance_attached_clip_playheads, called from swf.c's tick. That pump
+// skips natural_oneshot clips, which stay here for the morph-ratio reason below.
+// History of the gotoAndPlay'd half, kept for the record:
 //
 // Browser-WASM has no auto-advance for standalone attachMovie'd clips' own
 // timelines (advance_attached_clip_frames only services pending MANUAL navs; the
@@ -2643,20 +2698,19 @@ void advance_attached_clip_natural(SWFAppContext* app_context)
 		if (mc == NULL || mc->depth == INT_MIN || mc->avm1_removed) continue;
 		if (mc->display_obj == NULL) continue;
 		DisplayObject* d = (DisplayObject*)mc->display_obj;
-		// Two entry conditions: explicit gotoAndPlay'd clips (coins/drones, parked
-		// on wrap) and auto-play one-shot particles ("pfx*", REMOVED on wrap to
-		// mimic their final-frame removeMovieClip — see ng_attachMovie flagging).
+		// One-shot particles only ("pfx*", REMOVED on wrap to mimic their
+		// final-frame removeMovieClip — see ng_attachMovie flagging).
 		int is_oneshot = d->natural_oneshot;
-		if (!d->goto_play_active && !is_oneshot) continue;
+		if (!is_oneshot) continue;
 		// Standalone attached clips only — timeline-placed clips advance via
 		// advance_sprite_frames (the flag is inert on them).
 		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
-		if (!d->sprite_is_playing) { d->goto_play_active = 0; d->natural_oneshot = 0; continue; }
+		if (!d->sprite_is_playing) { d->natural_oneshot = 0; continue; }
 		if (d->sprite_manual_next_frame) continue;
 		if (d->placed_at_tick == g_tick_count) continue; // placed this tick -> show frame 1 first
-		if (d->char_id == 0) { d->goto_play_active = 0; d->natural_oneshot = 0; continue; }
+		if (d->char_id == 0) { d->natural_oneshot = 0; continue; }
 		Character* ch = &dictionary[d->char_id];
-		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count <= 1) { d->goto_play_active = 0; d->natural_oneshot = 0; continue; }
+		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count <= 1) { d->natural_oneshot = 0; continue; }
 		size_t fc = ch->sprite_frame_count;
 
 		// sprite_current_frame is the NEXT frame to execute (ng_gotoFrameByMC left
@@ -2679,7 +2733,6 @@ void advance_attached_clip_natural(SWFAppContext* app_context)
 				continue;
 			}
 			d->sprite_is_playing = 0;
-			d->goto_play_active = 0;
 			continue;
 		}
 
@@ -2704,39 +2757,6 @@ void advance_attached_clip_natural(SWFAppContext* app_context)
 			mc->currentframe = (int)frame + 1;
 			continue;
 		}
-
-		DisplayObject* saved_dl  = display_list;
-		size_t         saved_max = max_depth;
-		size_t         saved_cap = display_list_capacity;
-		MovieClip*     saved_ctx = g_current_context;
-		int            saved_cm  = catch_up_mode;
-
-		display_list = d->sprite_display_list;
-		max_depth = d->sprite_max_depth;
-		display_list_capacity = d->sprite_dl_capacity;
-		actionSetCurrentContext(mc);
-
-		// Placement tags only — catch_up_mode=1 suppresses every frame's DoAction
-		// (the recompiler gates script queueing on !catch_up_mode), so no clip can
-		// be spawned from here.
-		catch_up_mode = 1;
-		if (frame < fc && ch->sprite_frame_funcs[frame] != NULL)
-			exec_sprite_frame(app_context, d, ch->sprite_frame_funcs[frame]);
-		catch_up_mode = saved_cm;
-
-		actionSetCurrentContext(saved_ctx);
-
-		d->sprite_display_list = display_list;
-		d->sprite_max_depth = max_depth;
-		d->sprite_dl_capacity = display_list_capacity;
-		// Advance; wrap-to-0 next tick is caught above and stops the clip.
-		if (d->sprite_current_frame == frame)
-			d->sprite_current_frame = (frame + 1) % fc;
-		mc->currentframe = (int)frame + 1;
-
-		display_list = saved_dl;
-		max_depth = saved_max;
-		display_list_capacity = saved_cap;
 	}
 }
 
@@ -10394,7 +10414,8 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		// same-frame check at ~line 5362, which this earlier-firing gate would
 		// otherwise mask — e.g. avm1/placeobject_occupied_depth expects two
 		// such lines on stdout).
-		printf("Warning: Failed to place object at depth %zu.\n", depth);
+		if (!g_nested_loopback_quiet)
+			printf("Warning: Failed to place object at depth %zu.\n", depth);
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 		g_pending_instance_name = NULL;
@@ -10943,6 +10964,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// inheriting the previous occupant's list.
 	display_list[depth].filter_chain = NULL;
 	display_list[depth].depth_swapped = 0;
+	display_list[depth].attach_registration = 0;
 	// Restore persistent button state if the same character is being re-placed
 	// (e.g. a looping movie that removes+replaces a button each frame cycle).
 	if (display_list[depth].sticky_char_id == char_id && char_id != 0)
@@ -11525,6 +11547,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	// inheriting the previous occupant's list.
 	display_list[depth].filter_chain = NULL;
 	display_list[depth].depth_swapped = 0;
+	display_list[depth].attach_registration = 0;
 	// Restore persistent button state if the same character is being re-placed
 	// (e.g. a looping movie that removes+replaces a button each frame cycle).
 	if (display_list[depth].sticky_char_id == char_id && char_id != 0)
@@ -13935,7 +13958,28 @@ static int hasPlayingSprites_impl(DisplayObject* dl, size_t dl_max)
 
 int hasPlayingSprites(void)
 {
-	return hasPlayingSprites_impl(display_list, max_depth);
+	if (hasPlayingSprites_impl(display_list, max_depth)) return 1;
+	// attachMovie'd clips live in no display list (standalone display_obj), but
+	// since s23/s24 their timelines really play (ng_advance_attached_clip_
+	// playheads), so a playing attached clip — or a playing child inside a
+	// stopped / 1-frame one — keeps the player alive exactly like a timeline
+	// sprite. Without this the no-graphics loop quit as soon as the root
+	// stopped on its last frame while the graphics loop (which has no such
+	// quit) kept running them (regression/avm1_attached_clip_* no-graphics).
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->attached_playable == 0 || mc->avm1_removed || mc->depth == INT_MIN) continue;
+		DisplayObject* d = (DisplayObject*)mc->display_obj;
+		if (d == NULL || d->char_id == 0 || d->natural_oneshot) continue;
+		Character* ch = &dictionary[d->char_id];
+		if (ch->type != CHAR_TYPE_SPRITE) continue;
+		if (ch->sprite_frame_count > 1 && (d->sprite_is_playing || d->sprite_manual_next_frame)) return 1;
+		if (d->sprite_display_list != NULL && d->sprite_max_depth > 0
+		    && hasPlayingSprites_impl(d->sprite_display_list, d->sprite_max_depth)) return 1;
+	}
+	return 0;
 }
 
 // Check if any display_list entry (recursive) has CLIP_EVENT_ENTER_FRAME clip actions
