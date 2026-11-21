@@ -78,7 +78,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `9cf79e2fd` | w2-stack-trace-names | trace fail→pass (both modes): `avm2/error_stack_trace_class_names`, `avm2/error_stack_trace_limit`; 93-row `at`-frame sweep 0 other moves; pixels none |
 | `6f65d2115` | w2-tf-css-avm2 | trace (both modes): fail→pass `avm2/textfield_get_text_format_args`, `avm2/textfield_set_text_format_args`, `avm2/edittext_set_text_same`; fail→ruffle_matched `avm2/edittext_set_text_same_after_edits` (KF; Flash/Ruffle disagree, Flash-exact HOLD); pixels none (md5-only canary members added) |
 | `be53cbeaf` | w2-array-vector-args | trace fail→pass (both modes): `avm2/array_join_reentrant`, `avm2/vector_join_reentrant` (KF), `avm2/array_sort_arguments` (KF), `avm2/vector_sort_arguments` (KF), `avm2/array_constructor` (Flash-exact, avmplus source as oracle); 237-row sweep identical to CI; pixels none |
-| (df) | w2-avm1-devicefont | trace fail→pass (both modes): `fonts/device_font_name_case` (misc group → needs categories=full); pixels none. New generated `RecompiledTags/device_fonts.c` for AVM1 movies with named [fonts.*] faces |
+| `f5613a76c` | w2-avm1-devicefont | trace fail→pass (both modes): `fonts/device_font_name_case` (misc group → needs categories=full); pixels none. New generated `RecompiledTags/device_fonts.c` for AVM1 movies with named [fonts.*] faces |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
