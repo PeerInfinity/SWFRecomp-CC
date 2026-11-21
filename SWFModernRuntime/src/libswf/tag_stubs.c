@@ -963,6 +963,16 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 		}
 	}
 
+	// Video display object: define the lazy width/height accessors on the
+	// current Video.prototype and capture it as the clip's __proto__
+	// (action.c actionOnVideoPlaced; once per prototype, fresh clips only).
+	if (is_video)
+	{
+		extern void actionOnVideoPlaced(SWFAppContext* app_context, const char* instance_name,
+		                                DisplayObject* dobj);
+		actionOnVideoPlaced(app_context, obj->instance_name, obj);
+	}
+
 	// Allocate sprite display list and mark for initialization.
 	// The actual eager init (frame 0 with catch_up_mode=1) happens in tagPlaceObject2
 	// in tag.c, which handles clip event ordering (INITIALIZE before, CONSTRUCT after).
