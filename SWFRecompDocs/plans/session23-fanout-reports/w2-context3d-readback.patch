@@ -1,0 +1,232 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_stage3d.c b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+index e3748c7c..7a7df5a6 100644
+--- a/SWFModernRuntime/src/avm2/avm2_stage3d.c
++++ b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+@@ -325,6 +325,10 @@ typedef struct Avm2Program3DExt
+ 	uint8_t fs_have[8];
+ 	uint8_t fs_wrap[8];
+ 	uint8_t fs_filter[8];
++	// Bit i = the VERTEX program reads va<i> (directly or as an indirect index
++	// register): naga_agal builder.rs get_vertex_input, whose
++	// MissingVertexAttributeData makes drawTriangles skip the draw.
++	uint8_t va_read_mask;
+ } Avm2Program3DExt;
+ 
+ static Avm2Class* g_stage3d_class;
+@@ -559,6 +563,11 @@ struct S3dBackend
+ 	float* bb_color;
+ 	float* bb_depth;
+ 	uint8_t* bb_stencil;
++
++	// ---- the #3692 "clear before draw" state (mod.rs seen_clear_command) --
++	// Set by clear(); reset by configureBackBuffer and present(). Only
++	// drawToBitmapData consults it (Ruffle's drawTriangles merely warns).
++	uint8_t seen_clear;
+ };
+ 
+ // Index of `v` in a NULL-terminated spelling table, or -1.
+@@ -1832,6 +1841,8 @@ static Avm2Value context3d_configure_back_buffer(Avm2Activation* act)
+ 		be->has_depth = (uint8_t) (depth_stencil != 0);
+ 		be->presented = 0;
+ 		be->pending_clear = 0;
++		// e0923f3cf: the new buffers have to be cleared before they're read.
++		be->seen_clear = 0;
+ 		size_t n = (size_t) width * height * s;
+ 		if ((uint64_t) width * height * s > 8u * 1024 * 1024)
+ 		{
+@@ -2174,6 +2185,7 @@ static Avm2Value context3d_clear(Avm2Activation* act)
+ 	be->clear_stencil = s3d_arg_u32(act, 5, 0);
+ 	be->clear_mask = s3d_arg_u32(act, 6, 0xFFFFFFFFu);
+ 	be->pending_clear = 1;
++	be->seen_clear = 1;
+ 	return avm2_undefined();
+ }
+ 
+@@ -2320,6 +2332,21 @@ static Avm2Value context3d_draw_triangles(Avm2Activation* act)
+ 
+ 	s3d_apply_pending_clear(be);
+ 
++	// A vertex program that reads a stream with no buffer bound fails to
++	// compile in Ruffle (naga_agal MissingVertexAttributeData), which skips
++	// the draw after the pass, and so the clear, has opened. Flash does the
++	// same, and with enableErrorChecking throws #3611 (a plain Error) from
++	// drawTriangles: avm2/stage3d_missing_vertex_stream.
++	for (uint32_t i = 0; i < S3D_ATTRS; i++)
++	{
++		if (!(pr->va_read_mask & (1u << i))) continue;
++		if (e->va_buf[i] != NULL && be->va_fmt[i] != S3D_VF_NONE) continue;
++		if (e->enable_error_checking)
++			avm2_throw_error(ctx, NULL, "Error #3611: Stream %u is read by the "
++			                 "current vertex program but not set.", i);
++		return avm2_undefined();
++	}
++
+ 	// current_pipeline.rs:206-215 has_unbound_required_textures: a fragment
+ 	// program that declares a sampler config for register i (a `tex` WITHOUT
+ 	// `ignoresampler`) makes texture i *required*; if nothing is bound there,
+@@ -2378,11 +2405,97 @@ static Avm2Value context3d_present(Avm2Activation* act)
+ 	S3dBackend* be = s3d_backend(act->ctx, ce);
+ 	// Ruffle's present() ends with set_render_to_back_buffer (mod.rs:1249);
+ 	// ending an open RTT pass first also keeps s3d_present on the back buffer.
+-	if (be != NULL) { s3d_rtt_end(act->ctx, be, 1); s3d_present(be); }
++	if (be != NULL)
++	{
++		s3d_rtt_end(act->ctx, be, 1);
++		s3d_present(be);
++		be->seen_clear = 0;   // mod.rs:1268
++	}
+ 	if (ce != NULL) ce->rtt_obj = NULL;
+ 	return avm2_undefined();
+ }
+ 
++// drawToBitmapData(destination) — Ruffle b36debbc7 + e0923f3cf
++// (context_3d.rs draw_to_bitmap_data). Order: #2007 on null; a silent no-op
++// before configureBackBuffer; #3692 when nothing cleared the buffers since the
++// last configureBackBuffer/present; then the BACK buffer (not the presented
++// front one, and the parked one while render-to-texture is open) is drawn 1:1
++// at the destination's top-left: clipped, never scaled, the rest of the
++// destination keeps its pixels. Ruffle does that with render_bitmap
++// (premultiplied src-over, no smoothing); the source texel is the back
++// buffer's MSAA resolve, i.e. the same per-sample quantise + floor-mean that
++// s3d_present / s3d_rtt_end use, alpha kept.
++static Avm2Value context3d_draw_to_bitmap_data(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2Object* dobj = s3d_arg_object_non_null(act, 0, "destination");
++	Avm2Context3DExt* ce = context3d_ext(act);
++	S3dBackend* be = (ce != NULL) ? ce->be : NULL;
++	if (be == NULL) return avm2_undefined();
++	int in_rtt = be->rtt_tex != NULL;
++	uint32_t bw = in_rtt ? be->bb_w : be->w;
++	uint32_t bh = in_rtt ? be->bb_h : be->h;
++	uint32_t ns = in_rtt ? be->bb_samples : be->samples;
++	const float* col = in_rtt ? be->bb_color : be->color;
++	if (bw == 0 || bh == 0 || col == NULL) return avm2_undefined();
++	if (!be->seen_clear)
++		avm2_throw_error(ctx, NULL, "Error #3692: All buffers need to be "
++		                            "cleared every frame before drawing.");
++	Avm2BitmapDataExt* bd = avm2_bitmapdata_ext_of(ctx, avm2_object_value(dobj));
++	if (bd == NULL || bd->disposed || bd->pixels == NULL) return avm2_undefined();
++	// A clear with no draw after it is still pending; Flash's clear is
++	// immediate, so the read must see it (stage3d_missing_vertex_stream reads
++	// the clear colour after a draw that was skipped or threw).
++	if (!in_rtt) s3d_apply_pending_clear(be);
++	if (ns == 0) ns = 1;
++	uint32_t cw = bw < bd->width ? bw : bd->width;
++	uint32_t ch = bh < bd->height ? bh : bd->height;
++	for (uint32_t y = 0; y < ch; y++)
++	{
++		for (uint32_t x = 0; x < cw; x++)
++		{
++			size_t p = (size_t) y * bw + x;
++			uint32_t acc[4] = { 0, 0, 0, 0 };
++			for (uint32_t sm = 0; sm < ns; sm++)
++			{
++				const float* c = col + (p * ns + sm) * 4;
++				for (int k = 0; k < 4; k++)
++				{
++					float v = c[k];
++					if (!(v > 0.0f)) v = 0.0f;
++					if (v > 1.0f) v = 1.0f;
++					acc[k] += (uint32_t) (v * 255.0f + 0.5f);
++				}
++			}
++			uint32_t sr = acc[0] / ns, sg = acc[1] / ns, sb = acc[2] / ns;
++			uint32_t sa = acc[3] / ns;
++			uint32_t* dp = &bd->pixels[(size_t) y * bd->width + x];
++			uint32_t out;
++			if (sa == 255)
++			{
++				out = 0xFF000000u | (sr << 16) | (sg << 8) | sb;
++			}
++			else
++			{
++				// Premultiplied src-over onto the (premultiplied) store.
++				uint32_t d = *dp, inv = 255 - sa;
++				uint32_t s4[4] = { sb, sg, sr, sa };
++				out = 0;
++				for (int k = 0; k < 4; k++)
++				{
++					uint32_t dc = (d >> (8 * k)) & 0xFF;
++					uint32_t v = (s4[k] * 255 + dc * inv + 127) / 255;
++					if (v > 255) v = 255;
++					out |= v << (8 * k);
++				}
++			}
++			if (!bd->transparency) out |= 0xFF000000u;
++			*dp = out;
++		}
++	}
++	return avm2_undefined();
++}
++
+ // ---------------------------------------------------------------------------
+ // Buffer uploads (index_buffer_3d.rs / vertex_buffer_3d.rs)
+ // ---------------------------------------------------------------------------
+@@ -3138,6 +3251,48 @@ static int agal_validate(const uint8_t* b, uint32_t len, int check_samplers,
+ // Program3D.upload(vertexProgram, fragmentProgram). ShaderPairAgal::new parses
+ // the vertex program, then the fragment program, then runs the sampler-config
+ // pass on the fragment one — so a bad vertex program masks a bad fragment one.
++// The va<i> registers a (validated) vertex program reads, as a bitmask: every
++// source operand of every token (control flow included: this is a compile-time
++// property), and an indirect operand's index register too
++// (builder.rs emit_source_field_load_with_swizzle_out -> get_vertex_input).
++static int s3d_agal_binary(uint32_t op)
++{
++	switch (op)
++	{
++	case 0x00: case 0x05: case 0x08: case 0x09: case 0x0a: case 0x0c:
++	case 0x0d: case 0x0e: case 0x0f: case 0x10: case 0x14: case 0x15:
++	case 0x16: case 0x1a: case 0x1b: case AGAL_OP_KIL:
++		return 0;   // mov rcp frc sqt rsq log exp nrm sin cos abs neg sat ddx ddy kil
++	default:
++		return 1;
++	}
++}
++
++static uint8_t s3d_va_read_mask(const uint8_t* b, uint32_t len)
++{
++	uint8_t mask = 0;
++	if (b == NULL || len < 7) return 0;
++	for (uint32_t pos = 7; pos + 24 <= len; pos += 24)
++	{
++		uint32_t op = agal_u32le(b + pos);
++		if (!agal_has_sources(op)) continue;
++		for (int k = 0; k < 2; k++)
++		{
++			uint64_t src = agal_u64le(b + pos + 8 + 8 * k);
++			uint32_t reg = (uint32_t) (src & 0xFFFF);
++			uint32_t rtype = (uint32_t) ((src >> 32) & 0xF);
++			int indirect = (int) ((src >> 63) & 0x1);
++			if (indirect) rtype = (uint32_t) ((src >> 40) & 0xF);
++			// The sampler operand, and the zeroed second word of a one-source
++			// opcode (which would otherwise decode as va0).
++			if (k == 1 && (op == AGAL_OP_TEX || !s3d_agal_binary(op))) continue;
++			if (rtype == AGAL_REG_ATTRIBUTE && reg < S3D_ATTRS)
++				mask |= (uint8_t) (1u << reg);
++		}
++	}
++	return mask;
++}
++
+ static Avm2Value program3d_upload(Avm2Activation* act)
+ {
+ 	Avm2Context* ctx = act->ctx;
+@@ -3168,6 +3323,7 @@ static Avm2Value program3d_upload(Avm2Activation* act)
+ 		memcpy(e->fs_have, fs_have, 8);
+ 		memcpy(e->fs_wrap, fs_wrap, 8);
+ 		memcpy(e->fs_filter, fs_filter, 8);
++		e->va_read_mask = (vba != NULL) ? s3d_va_read_mask(vba->bytes, vba->len) : 0;
+ 		if (e->vcode != NULL) { heap_free(ctx->app, e->vcode); e->vcode = NULL; }
+ 		if (e->fcode != NULL) { heap_free(ctx->app, e->fcode); e->fcode = NULL; }
+ 		e->vlen = e->flen = 0;
+@@ -4850,7 +5006,8 @@ void avm2_register_stage3d(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, c3d, "setStencilReferenceValue",
+ 	                        context3d_set_stencil_reference_value);
+ 	avm2_builtin_add_method(ctx, c3d, "setRenderToBackBuffer", context3d_set_render_to_back_buffer);
+-	avm2_builtin_add_method(ctx, c3d, "drawToBitmapData", s3d_noop);
++	avm2_builtin_add_method(ctx, c3d, "drawToBitmapData",
++	                        context3d_draw_to_bitmap_data);
+ 	avm2_builtin_add_method(ctx, c3d, "present", context3d_present);
+ 	avm2_builtin_add_method(ctx, c3d, "clear", context3d_clear);
+ 	avm2_builtin_add_method(ctx, c3d, "drawTriangles", context3d_draw_triangles);
