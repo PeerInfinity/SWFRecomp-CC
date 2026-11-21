@@ -533,3 +533,13 @@ avm2/bitmapdata_opaque                      # draw() AA at quality low, tol 0 1 
 visual/filters/bevel_inner                  # zero-glyph _sans labels, low quality 1 cmp
 visual/simple_shapes/text_field_mask        # AVM1 EditText baseline 1 cmp
 from_shumway/acid/acid-text-escape          # AVM1 EditText baseline 1 cmp
+# s23 w2-tf-css: AVM1 htmlText styleSheet CSS applied into the TFRunTable (the
+# run table the glyph renderer draws from), the new <span class> arm, and
+# setTextFormat(b, fmt) formatting ONE character instead of b..end. No member
+# above sets an AVM1 styleSheet or calls ranged setTextFormat, so nothing else
+# here can see those render paths move.
+# tier=1  (CI-passing: 0 outliers, max diff 31)
+avm1/edittext_stylesheet                    # AVM1 styleSheet CSS + htmlText   1 cmp
+# tier=2  (KF; CI-failing on pixels — A/B only)
+from_shumway/acid/acid-textfield            # AVM1 ranged setTextFormat        1 cmp
+from_shumway/stylesheet                     # AVM1 TextField.StyleSheet render 1 cmp
