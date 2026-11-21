@@ -79,7 +79,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `6f65d2115` | w2-tf-css-avm2 | trace (both modes): fail→pass `avm2/textfield_get_text_format_args`, `avm2/textfield_set_text_format_args`, `avm2/edittext_set_text_same`; fail→ruffle_matched `avm2/edittext_set_text_same_after_edits` (KF; Flash/Ruffle disagree, Flash-exact HOLD); pixels none (md5-only canary members added) |
 | `be53cbeaf` | w2-array-vector-args | trace fail→pass (both modes): `avm2/array_join_reentrant`, `avm2/vector_join_reentrant` (KF), `avm2/array_sort_arguments` (KF), `avm2/vector_sort_arguments` (KF), `avm2/array_constructor` (Flash-exact, avmplus source as oracle); 237-row sweep identical to CI; pixels none |
 | `f5613a76c` | w2-avm1-devicefont | trace fail→pass (both modes): `fonts/device_font_name_case` (misc group → needs categories=full); pixels none. New generated `RecompiledTags/device_fonts.c` for AVM1 movies with named [fonts.*] faces |
-| (dr) | w2-doc-removal-events | trace fail→pass (both modes): `avm2/displayobjectcontainer_remove_reentrant`, `_remove_reparent`, `_removechildren_events`; 141-row add/remove sweep exact; pixels none |
+| `00077a281` | w2-doc-removal-events | trace fail→pass (both modes): `avm2/displayobjectcontainer_remove_reentrant`, `_remove_reparent`, `_removechildren_events`; 141-row add/remove sweep exact; pixels none |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
