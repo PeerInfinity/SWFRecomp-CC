@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-21T17:28:09.874511+00:00",
-    "old_git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
-    "new_timestamp": "2026-11-21T18:24:43.226741+00:00",
-    "new_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "old_timestamp": "2026-11-21T18:24:43.226741+00:00",
+    "old_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "new_timestamp": "2026-11-21T19:32:37.175946+00:00",
+    "new_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 148,
+    "old_pass": 149,
     "old_ruffle_matched": 2,
-    "old_effective_pass": 150,
-    "old_total": 150,
+    "old_effective_pass": 151,
+    "old_total": 151,
     "old_pass_rate": 98.7,
     "new_pass": 149,
     "new_ruffle_matched": 2,
@@ -25,22 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 150,
-    "added": 1,
+    "unchanged": 151,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "video/vp6_inter_frames",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    }
-  ]
+  "changes": []
 }

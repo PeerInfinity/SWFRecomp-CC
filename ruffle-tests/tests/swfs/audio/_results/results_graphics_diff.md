@@ -1,15 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `08709f65842a` (2026-11-21T17:28:09.869113+00:00)
-**Current:** `bc91565cea8e` (2026-11-21T18:24:43.220009+00:00)
+**Previous:** `bc91565cea8e` (2026-11-21T18:24:43.220009+00:00)
+**Current:** `c489b84d9946` (2026-11-21T19:32:37.170610+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 3 | 3 | 0 |
+| Passing | 3 | 5 | +2 |
 | Total | 5 | 5 | 0 |
-| Pass rate | 60.0% | 60.0% | 0% |
-| Mismatched lines | 19 | 19 | 0 |
+| Pass rate | 60.0% | 100.0% | +40.0% |
+| Mismatched lines | 19 | 0 | -19 |
+|   Decreased | | | -19 |
 
-No changes detected.
+## Newly Passing (2)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `aac` | output_mismatch | 3/18 | 18/18 |
+| `g711` | output_mismatch | 2/6 | 6/6 |
