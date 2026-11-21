@@ -53,6 +53,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 19 | w2-array-vector-args | trace | drift-avm2 S5 | session_018CoDi3UaEumY9kycvtZWDx (18:20) |
 | 20 | w2-tf-css-avm2 | trace | AVM2 TextField format twins | session_018CoDi5BFztjYCFbFqJUhD8 (18:20) |
 | 21 | w2-context3d-readback | both | drift-avm2 S4: drawToBitmapData + #3692 | session_018CoDi61VeqnzLTiyF5rwmk (18:27) |
+| 22 | w2-doc-removal-events | trace | drift-avm2 S8 | session_018CoDi7jBSFh59hTPEMaK7G (18:33) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
