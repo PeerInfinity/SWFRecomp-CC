@@ -19851,6 +19851,57 @@ static void avm2_filter_draw_offset_px(const Avm2FilterVal* const* list,
 	*oy = floor((double) y_min / 20.0);
 }
 
+// How far (device px) a filter list can carry content across the object's
+// own bounds, for the padded-layer gate and pad size in avm2_render_filtered:
+// the draw-offset growth (blur windows, shadow/bevel offsets), plus every
+// shadow/bevel distance again (the draw offset only grows the top-left), the
+// gradient filters' blur and distance, a convolution's half kernel and a
+// displacement's maximum sample reach (|scale| / 2), + 2 px of AA margin.
+// Over-estimating only pads more; it never changes an on-stage pixel's inputs.
+// with_displacement = 0 for the GATE: a displacement samples only inside the
+// object's own rect (outside it the source is transparent either way), so it
+// needs off-stage pixels only when the rect itself crosses the edge; its reach
+// sizes the pad (with_displacement = 1) but does not trigger it.
+static double avm2_filter_reach_px(const Avm2FilterVal* const* list,
+                                   uint32_t n, double vs, int with_displacement)
+{
+	double ox = 0.0, oy = 0.0;
+	avm2_filter_draw_offset_px(list, n, vs, &ox, &oy);
+	double g = -(ox < oy ? ox : oy);
+	for (uint32_t i = 0; i < n; i++)
+	{
+		const Avm2FilterVal* f = list[i];
+		switch (f->kind)
+		{
+		case AVM2_FILTER_DROP_SHADOW:
+		case AVM2_FILTER_BEVEL:
+			g += fabs(avm2_filter_fixed16(f->distance)) * vs;
+			break;
+		case AVM2_FILTER_GRADIENT_GLOW:
+		case AVM2_FILTER_GRADIENT_BEVEL:
+		{
+			double bx = avm2_filter_fixed16(f->blur_x), by = avm2_filter_fixed16(f->blur_y);
+			double q = f->quality < 1 ? 1.0 : (double) f->quality;
+			g += ((bx > by ? bx : by) * q + 2.0 * fabs(avm2_filter_fixed16(f->distance))) * vs;
+			break;
+		}
+		case AVM2_FILTER_CONVOLUTION:
+			g += (double) ((f->conv_cols > f->conv_rows ? f->conv_cols : f->conv_rows) / 2 + 1) * vs;
+			break;
+		case AVM2_FILTER_DISPLACEMENT_MAP:
+			if (!with_displacement) break;
+		{
+			double sx = fabs((double) f->scale_x), sy = fabs((double) f->scale_y);
+			g += 0.5 * (sx > sy ? sx : sy) * vs;
+			break;
+		}
+		default:
+			break;
+		}
+	}
+	return g + 2.0;
+}
+
 // Run ONE filter IN PLACE on the layer already in filter_tex_a, leaving the
 // filtered result there (no framebuffer composite). A composed filter (glow /
 // drop shadow / bevel) snapshots its input as its composite source, blurs,
@@ -20014,6 +20065,29 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	int legacy = !(is_shadow || is_glow || is_bevel);
 
 	renderer_suspend_pass(context);
+	// s23 padded filter layer (render_webgpu.h "PADDED filter layer"): when the
+	// last filter's input can cross the stage edge, capture into a layer
+	// padded by the filter's reach so the off-stage part of the object feeds
+	// the blur / shadow / displacement, as Ruffle's object-sized cache does.
+	// GATED: an on-stage filtered object keeps the exact stage-sized layer
+	// (md5-identical to the unpadded path). Unknown bounds pad.
+	{
+		double vs = (context->stage_scale > 0.0f) ? (double) context->stage_scale : 1.0;
+		// Gate margin: the reach of the filters BEFORE the last one (what
+		// the last filter's input can grow to, incl. 2 px AA); a single filter over
+		// an on-stage object has no off-stage source (same rule as tag.c
+		// filter_capture_needs_pad). The pad itself covers the whole chain.
+		double g = (n > 1) ? avm2_filter_reach_px(list, n - 1, vs, 0) : 2.0;
+		int pad = 1;
+		Mat own = ext_matrix(ext);
+		Mat w = mat_mul(parent_world, &own);
+		float r[4];
+		if (avm2_filter_screen_rect(ctx, obj, &w, r))
+			pad = (r[0] - g < 0.0) || (r[1] - g < 0.0)
+			   || (r[0] + r[2] + g > (double) context->width)
+			   || (r[1] + r[3] + g > (double) context->height);
+		if (pad) renderer_set_filter_pad(context, avm2_filter_reach_px(list, n, vs, 1));
+	}
 	renderer_begin_offscreen_pass(context);
 	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
 	renderer_end_offscreen_pass(context);

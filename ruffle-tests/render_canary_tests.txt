@@ -548,3 +548,13 @@ from_shumway/stylesheet                     # AVM1 TextField.StyleSheet render 1
 # doubleAndRegister above, this is the corpus's only image-compared row whose
 # SWF calls attachMovie. md5-identical across that change (2026-11-21).
 avm1/netstream_play_flv_screen              # attachMovie'd clip render     1 cmp
+
+# s23 w2-padded-filter: the PADDED filter layer (render_webgpu.c pad_swap /
+# pad_finish; gates tag.c filter_capture_needs_pad, avm2_display.c
+# avm2_render_filtered). Both rows have filtered content crossing the stage
+# edge, which the stage-sized layer clipped before it reached the blur /
+# displacement. No other member gates the pad ON (every other filtered member
+# is md5-identical with it). AVM1 timeline drop shadow; AVM2 displacement.
+# tier=1  (CI-passing once w2-padded-filter lands)
+visual/filters/drop_shadow_angles           # off-stage shadow source (AVM1) 1 cmp
+visual/filters/displacement_map             # off-stage displacement source  1 cmp

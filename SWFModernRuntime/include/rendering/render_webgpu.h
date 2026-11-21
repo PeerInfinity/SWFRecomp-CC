@@ -360,6 +360,36 @@ typedef struct WebGPURenderContext
 	// (sample count 1 by design): composes a non-final filter INTO the layer
 	// (then copied back to filter_tex_a) instead of the framebuffer.
 	WGPURenderPipeline compose_layer_pipeline;
+	// --- PADDED filter layer (s23 w1/w2-padded-filter) ---
+	// A filter capture opened with filter_pad_request = P > 0 renders into a
+	// (W+2P) x (H+2P) twin of filter_tex_{a,b}/filter_src/filter_msaa/filter_ds
+	// with the stage centred (stage_to_ndc scaled by W/(W+2P)), so the part of
+	// the filtered object (and its blur/shadow/displacement sources) that lies
+	// up to P px OFF-STAGE is rasterised. The blur/displacement/chain ping-pong
+	// runs in padded space; render_webgpu_resume_pass copies the stage window
+	// (P, P, W, H) of the layer and the source snapshot back into the
+	// stage-sized textures, so every composite path downstream is unchanged.
+	// While padded, the chosen set's handles are SWAPPED with the filter_*
+	// ones (and its bind group with vertex_uniform_bg).
+	//
+	// ONE SET PER PAD BUCKET (P = 16, 32, .., 128), each with its OWN padded
+	// stage_to_ndc buffer: queue writes are frame-ordered, not encoder-ordered,
+	// so two captures in one frame sharing one matrix buffer would both see
+	// the LAST matrix written (measured: visual/filters/glow_pass_scaling and
+	// blur_pass_scaling pass -> fail with a shared buffer and mixed P). Within
+	// a bucket the matrix depends only on the stage matrix, which is
+	// frame-constant.
+	int filter_pad_request;            // P for the NEXT outermost begin_offscreen_pass
+	int filter_pad;                    // P while a padded capture is open, else 0
+	int filter_pad_set;                // index into pad_sets while open
+	struct WebGPUFilterPadSet
+	{
+		int w, h;                      // padded size the textures were made for
+		WGPUTexture tex_a, tex_b, src_tex, msaa_texture, ds_texture;
+		WGPUTextureView view_a, view_b, src_view, msaa_view, ds_view;
+		WGPUBuffer stage_buf;          // padded stage_to_ndc
+		WGPUBindGroup vertex_uniform_bg; // vertex_uniform_bg twin over stage_buf
+	} pad_sets[8];
 } WebGPURenderContext;
 
 // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
@@ -438,6 +468,10 @@ void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float bl
 // from the source layer (whose content ends on-stage) rather than from the
 // blurred layer (whose tail past the stage edge was never stored).
 void render_webgpu_set_blur_shift(WebGPURenderContext* context, int sx, int sy);
+// Request a padded layer for the NEXT (outermost) filter capture. growth_px is
+// the filter list's reach past the object bounds in device px; the pad P is
+// derived from it (bucketed, capped; render_webgpu.c). <= 0: no pad.
+void render_webgpu_set_filter_pad(WebGPURenderContext* context, double growth_px);
 void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
 // Copy the offscreen source out of filter_tex_a before the blur ping-pong
 // overwrites it. Call with the main pass SUSPENDED, between

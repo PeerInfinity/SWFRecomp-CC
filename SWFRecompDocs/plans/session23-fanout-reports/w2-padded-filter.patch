@@ -1,0 +1,645 @@
+diff --git a/SWFModernRuntime/include/rendering/render_webgpu.h b/SWFModernRuntime/include/rendering/render_webgpu.h
+index 0d0b7f8d..f7d54f7a 100644
+--- a/SWFModernRuntime/include/rendering/render_webgpu.h
++++ b/SWFModernRuntime/include/rendering/render_webgpu.h
+@@ -360,6 +360,36 @@ typedef struct WebGPURenderContext
+ 	// (sample count 1 by design): composes a non-final filter INTO the layer
+ 	// (then copied back to filter_tex_a) instead of the framebuffer.
+ 	WGPURenderPipeline compose_layer_pipeline;
++	// --- PADDED filter layer (s23 w1/w2-padded-filter) ---
++	// A filter capture opened with filter_pad_request = P > 0 renders into a
++	// (W+2P) x (H+2P) twin of filter_tex_{a,b}/filter_src/filter_msaa/filter_ds
++	// with the stage centred (stage_to_ndc scaled by W/(W+2P)), so the part of
++	// the filtered object (and its blur/shadow/displacement sources) that lies
++	// up to P px OFF-STAGE is rasterised. The blur/displacement/chain ping-pong
++	// runs in padded space; render_webgpu_resume_pass copies the stage window
++	// (P, P, W, H) of the layer and the source snapshot back into the
++	// stage-sized textures, so every composite path downstream is unchanged.
++	// While padded, the chosen set's handles are SWAPPED with the filter_*
++	// ones (and its bind group with vertex_uniform_bg).
++	//
++	// ONE SET PER PAD BUCKET (P = 16, 32, .., 128), each with its OWN padded
++	// stage_to_ndc buffer: queue writes are frame-ordered, not encoder-ordered,
++	// so two captures in one frame sharing one matrix buffer would both see
++	// the LAST matrix written (measured: visual/filters/glow_pass_scaling and
++	// blur_pass_scaling pass -> fail with a shared buffer and mixed P). Within
++	// a bucket the matrix depends only on the stage matrix, which is
++	// frame-constant.
++	int filter_pad_request;            // P for the NEXT outermost begin_offscreen_pass
++	int filter_pad;                    // P while a padded capture is open, else 0
++	int filter_pad_set;                // index into pad_sets while open
++	struct WebGPUFilterPadSet
++	{
++		int w, h;                      // padded size the textures were made for
++		WGPUTexture tex_a, tex_b, src_tex, msaa_texture, ds_texture;
++		WGPUTextureView view_a, view_b, src_view, msaa_view, ds_view;
++		WGPUBuffer stage_buf;          // padded stage_to_ndc
++		WGPUBindGroup vertex_uniform_bg; // vertex_uniform_bg twin over stage_buf
++	} pad_sets[8];
+ } WebGPURenderContext;
+ 
+ // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
+@@ -438,6 +468,10 @@ void render_webgpu_run_blur(WebGPURenderContext* context, float blur_x, float bl
+ // from the source layer (whose content ends on-stage) rather than from the
+ // blurred layer (whose tail past the stage edge was never stored).
+ void render_webgpu_set_blur_shift(WebGPURenderContext* context, int sx, int sy);
++// Request a padded layer for the NEXT (outermost) filter capture. growth_px is
++// the filter list's reach past the object bounds in device px; the pad P is
++// derived from it (bucketed, capped; render_webgpu.c). <= 0: no pad.
++void render_webgpu_set_filter_pad(WebGPURenderContext* context, double growth_px);
+ void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
+ // Copy the offscreen source out of filter_tex_a before the blur ping-pong
+ // overwrites it. Call with the main pass SUSPENDED, between
+diff --git a/SWFModernRuntime/include/rendering/renderer.h b/SWFModernRuntime/include/rendering/renderer.h
+index 9ebe92e4..813986e8 100644
+--- a/SWFModernRuntime/include/rendering/renderer.h
++++ b/SWFModernRuntime/include/rendering/renderer.h
+@@ -58,6 +58,7 @@ typedef WebGPURenderContext RenderContext;
+ #define renderer_end_offscreen_pass(ctx)              render_webgpu_end_offscreen_pass(ctx)
+ #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) render_webgpu_run_blur(ctx, bx, by, q, s, r, g, b, a, c)
+ #define renderer_set_blur_shift(ctx, sx, sy)          render_webgpu_set_blur_shift(ctx, sx, sy)
++#define renderer_set_filter_pad(ctx, p)               render_webgpu_set_filter_pad(ctx, p)
+ #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) render_webgpu_composite_filtered(ctx, ox, oy, tr, tg, tb, ta)
+ #define renderer_snapshot_filter_source(ctx)           render_webgpu_snapshot_filter_source(ctx)
+ #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) \
+@@ -124,6 +125,7 @@ typedef FlashbangContext RenderContext;
+ #define renderer_end_offscreen_pass(ctx)              ((void)0)
+ #define renderer_run_blur(ctx, bx, by, q, s, r, g, b, a, c) ((void)0)
+ #define renderer_set_blur_shift(ctx, sx, sy)          ((void)0)
++#define renderer_set_filter_pad(ctx, p)               ((void)0)
+ #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) ((void)0)
+ #define renderer_snapshot_filter_source(ctx)           ((void)0)
+ #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) ((void)0)
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 1a6845f1..39d90dd3 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -19720,6 +19720,57 @@ static void avm2_filter_draw_offset_px(const Avm2FilterVal* const* list,
+ 	*oy = floor((double) y_min / 20.0);
+ }
+ 
++// How far (device px) a filter list can carry content across the object's
++// own bounds, for the padded-layer gate and pad size in avm2_render_filtered:
++// the draw-offset growth (blur windows, shadow/bevel offsets), plus every
++// shadow/bevel distance again (the draw offset only grows the top-left), the
++// gradient filters' blur and distance, a convolution's half kernel and a
++// displacement's maximum sample reach (|scale| / 2), + 2 px of AA margin.
++// Over-estimating only pads more; it never changes an on-stage pixel's inputs.
++// with_displacement = 0 for the GATE: a displacement samples only inside the
++// object's own rect (outside it the source is transparent either way), so it
++// needs off-stage pixels only when the rect itself crosses the edge; its reach
++// sizes the pad (with_displacement = 1) but does not trigger it.
++static double avm2_filter_reach_px(const Avm2FilterVal* const* list,
++                                   uint32_t n, double vs, int with_displacement)
++{
++	double ox = 0.0, oy = 0.0;
++	avm2_filter_draw_offset_px(list, n, vs, &ox, &oy);
++	double g = -(ox < oy ? ox : oy);
++	for (uint32_t i = 0; i < n; i++)
++	{
++		const Avm2FilterVal* f = list[i];
++		switch (f->kind)
++		{
++		case AVM2_FILTER_DROP_SHADOW:
++		case AVM2_FILTER_BEVEL:
++			g += fabs(avm2_filter_fixed16(f->distance)) * vs;
++			break;
++		case AVM2_FILTER_GRADIENT_GLOW:
++		case AVM2_FILTER_GRADIENT_BEVEL:
++		{
++			double bx = avm2_filter_fixed16(f->blur_x), by = avm2_filter_fixed16(f->blur_y);
++			double q = f->quality < 1 ? 1.0 : (double) f->quality;
++			g += ((bx > by ? bx : by) * q + 2.0 * fabs(avm2_filter_fixed16(f->distance))) * vs;
++			break;
++		}
++		case AVM2_FILTER_CONVOLUTION:
++			g += (double) ((f->conv_cols > f->conv_rows ? f->conv_cols : f->conv_rows) / 2 + 1) * vs;
++			break;
++		case AVM2_FILTER_DISPLACEMENT_MAP:
++			if (!with_displacement) break;
++		{
++			double sx = fabs((double) f->scale_x), sy = fabs((double) f->scale_y);
++			g += 0.5 * (sx > sy ? sx : sy) * vs;
++			break;
++		}
++		default:
++			break;
++		}
++	}
++	return g + 2.0;
++}
++
+ // Run ONE filter IN PLACE on the layer already in filter_tex_a, leaving the
+ // filtered result there (no framebuffer composite). A composed filter (glow /
+ // drop shadow / bevel) snapshots its input as its composite source, blurs,
+@@ -19883,6 +19934,29 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
+ 	int legacy = !(is_shadow || is_glow || is_bevel);
+ 
+ 	renderer_suspend_pass(context);
++	// s23 padded filter layer (render_webgpu.h "PADDED filter layer"): when the
++	// last filter's input can cross the stage edge, capture into a layer
++	// padded by the filter's reach so the off-stage part of the object feeds
++	// the blur / shadow / displacement, as Ruffle's object-sized cache does.
++	// GATED: an on-stage filtered object keeps the exact stage-sized layer
++	// (md5-identical to the unpadded path). Unknown bounds pad.
++	{
++		double vs = (context->stage_scale > 0.0f) ? (double) context->stage_scale : 1.0;
++		// Gate margin: the reach of the filters BEFORE the last one (what
++		// the last filter's input can grow to, incl. 2 px AA); a single filter over
++		// an on-stage object has no off-stage source (same rule as tag.c
++		// filter_capture_needs_pad). The pad itself covers the whole chain.
++		double g = (n > 1) ? avm2_filter_reach_px(list, n - 1, vs, 0) : 2.0;
++		int pad = 1;
++		Mat own = ext_matrix(ext);
++		Mat w = mat_mul(parent_world, &own);
++		float r[4];
++		if (avm2_filter_screen_rect(ctx, obj, &w, r))
++			pad = (r[0] - g < 0.0) || (r[1] - g < 0.0)
++			   || (r[0] + r[2] + g > (double) context->width)
++			   || (r[1] + r[3] + g > (double) context->height);
++		if (pad) renderer_set_filter_pad(context, avm2_filter_reach_px(list, n, vs, 1));
++	}
+ 	renderer_begin_offscreen_pass(context);
+ 	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+ 	renderer_end_offscreen_pass(context);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 528f47dd..c90816d7 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -4182,6 +4182,112 @@ static void compose_chain_entry_to_layer(SWFAppContext* app_context,
+ 			f->strength, f_inner, f_knockout, f_composite);
+ }
+ 
++// Set by render_filtered_root_entry while a ROOT display-list entry is being
++// filtered: only then is the entry's world matrix known here (its CPU-side
++// placement slot, already carrying any in-place AS transform for a leaf). A
++// nested entry (compose_children's filter arm) or an unnamed caller has an
++// unknown world and always pads.
++static int g_filter_root_entry = 0;
++
++// How far (device px) the first `m` filters of a chain can carry content
++// across the object's own bounds: each blur window at its quality's pass
++// scale (as filter_draw_offset_px), shadow/bevel distance, the gradient
++// filters' blur and distance, a convolution's half kernel. Over-estimates are
++// harmless (they only pad more, or pad larger).
++static double filter_chain_reach_px(const FilterListEntry* const* chain, int m,
++                                    double vs)
++{
++	static const double pass_scales[15] = {
++		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
++	double g = 0.0;
++	for (int i = 0; i < m; i++)
++	{
++		const FilterListEntry* f = chain[i];
++		if (f->type >= 1 && f->type <= 4)
++		{
++			double bx = ((double) f->blur_x - 1.0) * vs + 1.0;
++			double by = ((double) f->blur_y - 1.0) * vs + 1.0;
++			int passes = f->quality < 1 ? 1 : (f->quality > 15 ? 15 : f->quality);
++			double w = pass_scales[passes - 1] * (bx > by ? bx : by);
++			if (w > 0.0) g += w;
++			if (f->type == 2 || f->type == 4) g += fabs(f->distance) * vs;
++		}
++		else if (f->type == 7 || f->type == 8)
++		{
++			double bb = f->blur_x > f->blur_y ? f->blur_x : f->blur_y;
++			double q = f->quality < 1 ? 1.0 : (double) f->quality;
++			g += (bb * q + 2.0 * fabs(f->distance)) * vs;
++		}
++		else if (f->type == 5)
++			g += (double) ((f->conv_mx > f->conv_my ? f->conv_mx : f->conv_my) / 2 + 1) * vs;
++	}
++	return g;
++}
++
++// Padded-layer gate for render_filtered_object, the AVM1/timeline twin of
++// avm2_display.c avm2_render_filtered's. Returns 1 (and the pad reach in
++// device px: the whole chain's reach + 2 AA) when the capture must be padded,
++// else 0, keeping the exact stage-sized layer (md5-identical to master).
++//
++// Pads when the world is unknown (nested entry, _root AS transform, a root
++// sprite with AS-set transform, no bounds), or when the input of the LAST
++// filter can extend off-stage: the object's device rect grown by the reach
++// of the filters BEFORE the last one (+2 px AA, +1 px cacheAsBitmap snap)
++// crosses the stage edge. A single filter over an on-stage object has no
++// off-stage source, so its own (on- or off-stage) halo needs no pad.
++static int filter_capture_needs_pad(SWFAppContext* app_context,
++                                    DisplayObject* obj, double* reach_out)
++{
++	double vs = (context != NULL && context->stage_scale > 0.0f)
++	          ? (double) context->stage_scale : 1.0;
++	FilterListEntry scratch;
++	const FilterListEntry* chain[MAX_FILTER_LIST_SIZE];
++	int n = build_filter_chain(obj, &scratch, chain, MAX_FILTER_LIST_SIZE);
++	*reach_out = filter_chain_reach_px(chain, n, vs) + 2.0;
++	double e = (n > 1 ? filter_chain_reach_px(chain, n - 1, vs) : 0.0) + 3.0;
++
++	extern MovieClip root_movieclip;
++	if (!g_filter_root_entry || root_movieclip.as_set_flags != 0
++	    || app_context->stage_to_ndc == NULL || context == NULL
++	    || obj->char_id == 0)
++		return 1;
++	u8 ctype = dictionary[obj->char_id].type;
++	if (ctype == CHAR_TYPE_SPRITE || ctype == CHAR_TYPE_BUTTON)
++	{
++		// A root sprite/button with AS-set _x/_y/... composes its matrix on a
++		// stack buffer (tagShowFrame's compose loop); its slot is stale.
++		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
++		MovieClip* mc = (obj->instance_name != NULL)
++			? actionFindMovieClipByName(obj->instance_name) : NULL;
++		if (mc != NULL && mc->as_set_flags != 0) return 1;
++	}
++	float b[4];
++	if (!opaque_bg_local_bounds(obj, b)) return 1;
++	const float* m = ng_entryTransformData(obj)[ng_get_original_transform_id(obj)];
++	const float* v = app_context->stage_to_ndc;
++	double tw = (double) context->width, th = (double) context->height;
++	const float xs[4] = { b[0], b[1], b[0], b[1] };
++	const float ys[4] = { b[2], b[2], b[3], b[3] };
++	double px_min = 1e30, px_max = -1e30, py_min = 1e30, py_max = -1e30;
++	for (int k = 0; k < 4; k++)
++	{
++		// Placement (twips) then stage_to_ndc, then NDC -> device px, as the
++		// vertex shader and avm2_filter_screen_rect do.
++		double X = (double) m[0] * xs[k] + (double) m[4] * ys[k] + (double) m[12];
++		double Y = (double) m[1] * xs[k] + (double) m[5] * ys[k] + (double) m[13];
++		double nx = (double) v[0] * X + (double) v[4] * Y + (double) v[12];
++		double ny = (double) v[1] * X + (double) v[5] * Y + (double) v[13];
++		double px = (nx * 0.5 + 0.5) * tw;
++		double py = (0.5 - ny * 0.5) * th;
++		if (px < px_min) px_min = px;
++		if (px > px_max) px_max = px;
++		if (py < py_min) py_min = py;
++		if (py > py_max) py_max = py;
++	}
++	return (px_min - e < 0.0) || (py_min - e < 0.0)
++	    || (px_max + e > tw) || (py_max + e > th);
++}
++
+ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
+ {
+ 	FilterListEntry chain_scratch;
+@@ -4249,6 +4355,14 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
+ 
+ 	g_filter_capture_depth++;
+ 	renderer_suspend_pass(context);
++	// s23 padded filter layer: capture into a layer padded by the filter's
++	// reach when the object may cross the stage edge, so its off-stage part
++	// feeds the blur / shadow (render_webgpu.h "PADDED filter layer").
++	{
++		double reach = 0.0;
++		if (filter_capture_needs_pad(app_context, obj, &reach))
++			renderer_set_filter_pad(context, reach);
++	}
+ 	renderer_begin_offscreen_pass(context);
+ 	render_single_object(app_context, obj);
+ 	renderer_end_offscreen_pass(context);
+@@ -7160,7 +7274,9 @@ static void render_filtered_root_entry(SWFAppContext* app_context,
+ 		g_tf_filter_depth = depth;
+ 		g_tf_filter_max_depth = max_depth_i;
+ 	}
++	g_filter_root_entry = 1;
+ 	render_filtered_object(app_context, obj);
++	g_filter_root_entry = 0;
+ 	if (tf) {
+ 		g_tf_filter_obj = NULL;
+ 		g_tf_filter_depth = -1;
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 23510ae2..0e84db7d 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -5378,6 +5378,8 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32
+ 	wgpuBindGroupRelease(bg);
+ }
+ 
++static void pad_finish(WebGPURenderContext* ctx); // padded filter layer, below
++
+ void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
+ {
+ 	if (!ctx->renderer_ok) return;
+@@ -5392,6 +5394,7 @@ void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
+ void render_webgpu_resume_pass(WebGPURenderContext* ctx)
+ {
+ 	if (!ctx->renderer_ok) return;
++	pad_finish(ctx);
+ 	// Resume the main render pass with loadOp=Load to preserve existing content + stencil
+ 	WGPURenderPassColorAttachment color_att = {0};
+ 	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+@@ -5429,11 +5432,220 @@ void render_webgpu_resume_pass(WebGPURenderContext* ctx)
+ 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+ }
+ 
++// ---------------------------------------------------------------------------
++// PADDED filter layer (s23 w1/w2-padded-filter). See the struct comment
++// in render_webgpu.h. filter_tex_w/h are the size of the ping-pong textures
++// CURRENTLY bound as filter_tex_*: the stage size, or W+2P/H+2P while a padded
++// capture is open.
++// ---------------------------------------------------------------------------
++static inline u32 filter_tex_w(const WebGPURenderContext* ctx)
++{
++	return (u32) (ctx->width + 2 * ctx->filter_pad);
++}
++static inline u32 filter_tex_h(const WebGPURenderContext* ctx)
++{
++	return (u32) (ctx->height + 2 * ctx->filter_pad);
++}
++
++// growth_px = how far (device px) the filter list reaches past the object's
++// own bounds (blur window, shadow/bevel distance, displacement reach). The pad
++// P is that, rounded UP to a multiple of FILTER_PAD_BUCKET (one lazily made
++// resource set per bucket, see render_webgpu.h), clamped to
++// [FILTER_PAD_BUCKET, FILTER_PAD_MAX].
++// Off-stage content farther than `growth` from the stage edge cannot reach an
++// on-stage pixel through the filter, so P = growth is sufficient (measured:
++// P = 16 already saturates visual/filters/{drop_shadow_angles,displacement_map}).
++#define FILTER_PAD_BUCKET 16
++#define FILTER_PAD_MAX 128
++void render_webgpu_set_filter_pad(WebGPURenderContext* ctx, double growth_px)
++{
++	if (ctx == NULL) return;
++	int P = 0;
++	if (growth_px > 0.0)
++	{
++		double b = ceil(growth_px / (double) FILTER_PAD_BUCKET) * FILTER_PAD_BUCKET;
++		if (b > (double) FILTER_PAD_MAX) b = FILTER_PAD_MAX;
++		P = (int) b;
++		if (P < FILTER_PAD_BUCKET) P = FILTER_PAD_BUCKET;
++	}
++	ctx->filter_pad_request = P;
++}
++
++typedef struct WebGPUFilterPadSet FilterPadSet;
++
++static void pad_set_release(FilterPadSet* ps)
++{
++	if (ps->view_a) wgpuTextureViewRelease(ps->view_a);
++	if (ps->view_b) wgpuTextureViewRelease(ps->view_b);
++	if (ps->src_view) wgpuTextureViewRelease(ps->src_view);
++	if (ps->msaa_view) wgpuTextureViewRelease(ps->msaa_view);
++	if (ps->ds_view) wgpuTextureViewRelease(ps->ds_view);
++	if (ps->tex_a) wgpuTextureRelease(ps->tex_a);
++	if (ps->tex_b) wgpuTextureRelease(ps->tex_b);
++	if (ps->src_tex) wgpuTextureRelease(ps->src_tex);
++	if (ps->msaa_texture) wgpuTextureRelease(ps->msaa_texture);
++	if (ps->ds_texture) wgpuTextureRelease(ps->ds_texture);
++	ps->view_a = ps->view_b = ps->src_view = ps->msaa_view = ps->ds_view = NULL;
++	ps->tex_a = ps->tex_b = ps->src_tex = ps->msaa_texture = ps->ds_texture = NULL;
++	ps->w = ps->h = 0;
++}
++
++// The pad set for bucket P, (re)created when missing or when the stage size
++// changed. Only ever called with no padded capture open, so the set holds its
++// own padded textures, never the swapped-in stage-sized ones.
++static FilterPadSet* ensure_pad_resources(WebGPURenderContext* ctx, int P)
++{
++	int k = P / FILTER_PAD_BUCKET - 1;
++	if (k < 0 || k >= (int) (sizeof(ctx->pad_sets) / sizeof(ctx->pad_sets[0])))
++		return NULL;
++	FilterPadSet* ps = &ctx->pad_sets[k];
++	int pw_i = ctx->width + 2 * P, ph_i = ctx->height + 2 * P;
++	if (ps->tex_a != NULL && ps->w == pw_i && ps->h == ph_i) return ps;
++	pad_set_release(ps);
++	u32 pw = (u32) pw_i, ph = (u32) ph_i;
++
++	WGPUTextureDescriptor ftex_desc = {0};
++	ftex_desc.label = WGPU_LABEL("pad_tex_a");
++	ftex_desc.dimension = WGPUTextureDimension_2D;
++	ftex_desc.size = (WGPUExtent3D){pw, ph, 1};
++	ftex_desc.format = ctx->surface_format;
++	ftex_desc.mipLevelCount = 1;
++	ftex_desc.sampleCount = 1;
++	ftex_desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding
++	                | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc;
++	ps->tex_a = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
++	ftex_desc.label = WGPU_LABEL("pad_tex_b");
++	ps->tex_b = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
++	// The padded source snapshot is also copied OUT of (stage window).
++	ftex_desc.label = WGPU_LABEL("pad_src");
++	ftex_desc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst
++	                | WGPUTextureUsage_CopySrc;
++	ps->src_tex = wgpuDeviceCreateTexture(ctx->device, &ftex_desc);
++	WGPUTextureViewDescriptor fview_desc = {0};
++	fview_desc.mipLevelCount = 1;
++	fview_desc.arrayLayerCount = 1;
++	ps->view_a = wgpuTextureCreateView(ps->tex_a, &fview_desc);
++	ps->view_b = wgpuTextureCreateView(ps->tex_b, &fview_desc);
++	ps->src_view = wgpuTextureCreateView(ps->src_tex, &fview_desc);
++
++	WGPUTextureDescriptor msaa_desc = {0};
++	msaa_desc.label = WGPU_LABEL("pad_msaa");
++	msaa_desc.dimension = WGPUTextureDimension_2D;
++	msaa_desc.size = (WGPUExtent3D){pw, ph, 1};
++	msaa_desc.format = ctx->surface_format;
++	msaa_desc.mipLevelCount = 1;
++	msaa_desc.sampleCount = MSAA_SAMPLES;
++	msaa_desc.usage = WGPUTextureUsage_RenderAttachment;
++	ps->msaa_texture = wgpuDeviceCreateTexture(ctx->device, &msaa_desc);
++	ps->msaa_view = wgpuTextureCreateView(ps->msaa_texture, NULL);
++
++	WGPUTextureDescriptor td = {0};
++	td.label = WGPU_LABEL("pad_depth_stencil");
++	td.dimension = WGPUTextureDimension_2D;
++	td.size = (WGPUExtent3D){pw, ph, 1};
++	td.format = WGPUTextureFormat_Depth24PlusStencil8;
++	td.mipLevelCount = 1;
++	td.sampleCount = MSAA_SAMPLES;
++	td.usage = WGPUTextureUsage_RenderAttachment;
++	ps->ds_texture = wgpuDeviceCreateTexture(ctx->device, &td);
++	WGPUTextureViewDescriptor vd = {0};
++	vd.mipLevelCount = 1;
++	vd.arrayLayerCount = 1;
++	ps->ds_view = wgpuTextureCreateView(ps->ds_texture, &vd);
++
++	if (ps->stage_buf == NULL)
++	{
++		WGPUBufferDescriptor bd = {0};
++		bd.label = WGPU_LABEL("pad_stage_to_ndc");
++		bd.size = 64;
++		bd.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
++		ps->stage_buf = wgpuDeviceCreateBuffer(ctx->device, &bd);
++		WGPUBindGroupEntry e[2] = {0};
++		e[0].binding = 0;
++		e[0].buffer = ps->stage_buf;
++		e[0].size = 64;
++		e[1].binding = 1;
++		e[1].buffer = ctx->transform_id_buf;
++		e[1].size = 16;
++		WGPUBindGroupDescriptor bgd = {0};
++		bgd.label = WGPU_LABEL("pad_vertex_uniform_bg");
++		bgd.layout = ctx->vertex_uniform_bgl;
++		bgd.entryCount = 2;
++		bgd.entries = e;
++		ps->vertex_uniform_bg = wgpuDeviceCreateBindGroup(ctx->device, &bgd);
++	}
++	ps->w = pw_i;
++	ps->h = ph_i;
++	return ps;
++}
++
++#define PAD_SWAP(T, a, b) do { T t_ = (a); (a) = (b); (b) = t_; } while (0)
++static void pad_swap(WebGPURenderContext* ctx, FilterPadSet* ps)
++{
++	PAD_SWAP(WGPUTexture, ctx->filter_tex_a, ps->tex_a);
++	PAD_SWAP(WGPUTexture, ctx->filter_tex_b, ps->tex_b);
++	PAD_SWAP(WGPUTexture, ctx->filter_src_tex, ps->src_tex);
++	PAD_SWAP(WGPUTexture, ctx->filter_msaa_texture, ps->msaa_texture);
++	PAD_SWAP(WGPUTexture, ctx->filter_ds_texture, ps->ds_texture);
++	PAD_SWAP(WGPUTextureView, ctx->filter_view_a, ps->view_a);
++	PAD_SWAP(WGPUTextureView, ctx->filter_view_b, ps->view_b);
++	PAD_SWAP(WGPUTextureView, ctx->filter_src_view, ps->src_view);
++	PAD_SWAP(WGPUTextureView, ctx->filter_msaa_view, ps->msaa_view);
++	PAD_SWAP(WGPUTextureView, ctx->filter_ds_view, ps->ds_view);
++	PAD_SWAP(WGPUBindGroup, ctx->vertex_uniform_bg, ps->vertex_uniform_bg);
++}
++
++// Close a padded capture: copy the stage window of the padded layer (and of
++// the padded source snapshot) into the stage-sized textures, then unswap.
++// Encoder-level copies: the caller must have no render pass open.
++static void pad_finish(WebGPURenderContext* ctx)
++{
++	if (ctx->filter_pad <= 0) return;
++	FilterPadSet* ps = &ctx->pad_sets[ctx->filter_pad_set];
++	u32 P = (u32) ctx->filter_pad;
++	WGPUExtent3D extent = {(u32) ctx->width, (u32) ctx->height, 1};
++	WGPUTexelCopyTextureInfo src = {0}, dst = {0};
++	src.aspect = WGPUTextureAspect_All;
++	dst.aspect = WGPUTextureAspect_All;
++	src.origin = (WGPUOrigin3D){P, P, 0};
++	dst.origin = (WGPUOrigin3D){0, 0, 0};
++	src.texture = ctx->filter_tex_a;  dst.texture = ps->tex_a;
++	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
++	src.texture = ctx->filter_src_tex; dst.texture = ps->src_tex;
++	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
++	pad_swap(ctx, ps);
++	ctx->filter_pad = 0;
++}
++
+ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
+ {
+ 	if (!ctx->renderer_ok) return;
+ 	render_webgpu_ensure_filter_resources(ctx);
+ 	render_webgpu_ensure_blend_resources(ctx);
++	{
++		int P = ctx->filter_pad_request;
++		ctx->filter_pad_request = 0;
++		if (P > 0 && ctx->offscreen_depth == 0 && ctx->filter_pad == 0)
++		{
++			FilterPadSet* ps = ensure_pad_resources(ctx, P);
++			if (ps != NULL && ps->tex_a != NULL && ps->vertex_uniform_bg != NULL)
++			{
++				// Centre the stage in the padded target: a pure NDC scale of
++				// the CURRENT stage matrix (hairline_stage tracks every
++				// stage_to_ndc upload, including the _root AS transform).
++				float m[16];
++				memcpy(m, hairline_stage, sizeof(m));
++				float kx = (float) ctx->width / (float) (ctx->width + 2 * P);
++				float ky = (float) ctx->height / (float) (ctx->height + 2 * P);
++				m[0] *= kx; m[4] *= kx; m[8] *= kx; m[12] *= kx;
++				m[1] *= ky; m[5] *= ky; m[9] *= ky; m[13] *= ky;
++				wgpuQueueWriteBuffer(ctx->queue, ps->stage_buf, 0, m, sizeof(m));
++				pad_swap(ctx, ps);
++				ctx->filter_pad = P;
++				ctx->filter_pad_set = (int) (ps - ctx->pad_sets);
++			}
++		}
++	}
+ 	ctx->offscreen_depth++;
+ 
+ 	// The offscreen pass has its OWN depth-stencil, which it CLEARS below — the
+@@ -5565,8 +5777,8 @@ void render_webgpu_run_blur(WebGPURenderContext* ctx,
+ 	float strength, float r, float g, float b, float a, int colorize)
+ {
+ 	if (!ctx->renderer_ok) return;
+-	float texel_w = 1.0f / (float)ctx->width;
+-	float texel_h = 1.0f / (float)ctx->height;
++	float texel_w = 1.0f / (float)filter_tex_w(ctx);
++	float texel_h = 1.0f / (float)filter_tex_h(ctx);
+ 
+ 	// blur_x/blur_y arrive in the filtered object's own coordinate space, and
+ 	// are the FULL width of Flash's box window (not a radius). Flash scales
+@@ -5744,7 +5956,7 @@ void render_webgpu_snapshot_filter_source(WebGPURenderContext* ctx)
+ 	dst.origin = (WGPUOrigin3D){0, 0, 0};
+ 	dst.aspect = WGPUTextureAspect_All;
+ 
+-	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
++	WGPUExtent3D extent = {filter_tex_w(ctx), filter_tex_h(ctx), 1};
+ 	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+ }
+ 
+@@ -5809,6 +6021,13 @@ void render_webgpu_compose_filter_to_layer(WebGPURenderContext* ctx, int kind,
+ 	float strength, int variant, int knockout, int composite_source)
+ {
+ 	if (!ctx->renderer_ok || ctx->compose_layer_pipeline == NULL) return;
++	// The caller's UV offset is stage px / stage size; a padded layer's UV
++	// unit is (W+2P), so rescale (it stays a whole-texel offset).
++	if (ctx->filter_pad > 0)
++	{
++		blur_off_x *= (float) ctx->width / (float) filter_tex_w(ctx);
++		blur_off_y *= (float) ctx->height / (float) filter_tex_h(ctx);
++	}
+ 
+ 	float params[20] = {0};
+ 	params[0] = c1r; params[1] = c1g; params[2] = c1b; params[3] = c1a;
+@@ -5863,7 +6082,7 @@ void render_webgpu_compose_filter_to_layer(WebGPURenderContext* ctx, int kind,
+ 	WGPUTexelCopyTextureInfo dst = {0};
+ 	dst.texture = ctx->filter_tex_a;
+ 	dst.aspect = WGPUTextureAspect_All;
+-	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
++	WGPUExtent3D extent = {filter_tex_w(ctx), filter_tex_h(ctx), 1};
+ 	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+ }
+ 
+@@ -6214,7 +6433,10 @@ void render_webgpu_run_displacement(WebGPURenderContext* ctx,
+ 	params[14] = map_point_x; params[15] = map_point_y;
+ 	params[16] = viewscale; params[17] = viewscale;
+ 	params[18] = scale_x; params[19] = scale_y;
+-	params[20] = (float)ctx->width; params[21] = (float)ctx->height;
++	// Padded layer: the rect is in STAGE px; the layer's stage window starts
++	// at the integer (P, P), so the shift is exact.
++	params[8] += (float) ctx->filter_pad; params[9] += (float) ctx->filter_pad;
++	params[20] = (float)filter_tex_w(ctx); params[21] = (float)filter_tex_h(ctx);
+ 	u32 params_offset = filter_uniform_push(ctx, params, 96);
+ 
+ 	WGPUBindGroupEntry bg_entries[3] = {0};
+@@ -6267,7 +6489,7 @@ void render_webgpu_run_displacement(WebGPURenderContext* ctx,
+ 	dst.mipLevel = 0;
+ 	dst.origin = (WGPUOrigin3D){0, 0, 0};
+ 	dst.aspect = WGPUTextureAspect_All;
+-	WGPUExtent3D extent = {(u32)ctx->width, (u32)ctx->height, 1};
++	WGPUExtent3D extent = {filter_tex_w(ctx), filter_tex_h(ctx), 1};
+ 	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+ }
+ 
+@@ -6359,6 +6581,14 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
+ 	if (ctx->filter_msaa_view) wgpuTextureViewRelease(ctx->filter_msaa_view);
+ 	if (ctx->filter_msaa_texture) wgpuTextureRelease(ctx->filter_msaa_texture);
+ 	if (ctx->filter_view_a) wgpuTextureViewRelease(ctx->filter_view_a);
++	if (ctx->filter_pad > 0) pad_swap(ctx, &ctx->pad_sets[ctx->filter_pad_set]);
++	for (size_t k = 0; k < sizeof(ctx->pad_sets) / sizeof(ctx->pad_sets[0]); k++)
++	{
++		FilterPadSet* ps = &ctx->pad_sets[k];
++		pad_set_release(ps);
++		if (ps->vertex_uniform_bg) wgpuBindGroupRelease(ps->vertex_uniform_bg);
++		if (ps->stage_buf) wgpuBufferRelease(ps->stage_buf);
++	}
+ 	if (ctx->filter_tex_a) wgpuTextureRelease(ctx->filter_tex_a);
+ 	if (ctx->filter_view_b) wgpuTextureViewRelease(ctx->filter_view_b);
+ 	if (ctx->filter_tex_b) wgpuTextureRelease(ctx->filter_tex_b);
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 5e9a2e88..63057481 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -525,3 +525,13 @@ from_shumway/acid/acid-bitmap-draw_quality_high  # >stage BitmapData + draw() AA
+ # (aliased) golden, so it FAILS while draw() anti-aliases at LOW as Flash does
+ # (4 corner channels) and passes if draw() AA is gated off at LOW.
+ avm2/bitmapdata_opaque                      # draw() AA at quality low, tol 0 1 cmp
++
++# s23 w2-padded-filter: the PADDED filter layer (render_webgpu.c pad_swap /
++# pad_finish; gates tag.c filter_capture_needs_pad, avm2_display.c
++# avm2_render_filtered). Both rows have filtered content crossing the stage
++# edge, which the stage-sized layer clipped before it reached the blur /
++# displacement. No other member gates the pad ON (every other filtered member
++# is md5-identical with it). AVM1 timeline drop shadow; AVM2 displacement.
++# tier=1  (CI-passing once w2-padded-filter lands)
++visual/filters/drop_shadow_angles           # off-stage shadow source (AVM1) 1 cmp
++visual/filters/displacement_map             # off-stage displacement source  1 cmp

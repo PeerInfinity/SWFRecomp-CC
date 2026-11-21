@@ -4317,6 +4317,112 @@ static void compose_chain_entry_to_layer(SWFAppContext* app_context,
 			f->strength, f_inner, f_knockout, f_composite);
 }
 
+// Set by render_filtered_root_entry while a ROOT display-list entry is being
+// filtered: only then is the entry's world matrix known here (its CPU-side
+// placement slot, already carrying any in-place AS transform for a leaf). A
+// nested entry (compose_children's filter arm) or an unnamed caller has an
+// unknown world and always pads.
+static int g_filter_root_entry = 0;
+
+// How far (device px) the first `m` filters of a chain can carry content
+// across the object's own bounds: each blur window at its quality's pass
+// scale (as filter_draw_offset_px), shadow/bevel distance, the gradient
+// filters' blur and distance, a convolution's half kernel. Over-estimates are
+// harmless (they only pad more, or pad larger).
+static double filter_chain_reach_px(const FilterListEntry* const* chain, int m,
+                                    double vs)
+{
+	static const double pass_scales[15] = {
+		1.0, 2.1, 2.7, 3.1, 3.5, 3.8, 4.0, 4.2, 4.4, 4.6, 5.0, 6.0, 6.0, 7.0, 7.0 };
+	double g = 0.0;
+	for (int i = 0; i < m; i++)
+	{
+		const FilterListEntry* f = chain[i];
+		if (f->type >= 1 && f->type <= 4)
+		{
+			double bx = ((double) f->blur_x - 1.0) * vs + 1.0;
+			double by = ((double) f->blur_y - 1.0) * vs + 1.0;
+			int passes = f->quality < 1 ? 1 : (f->quality > 15 ? 15 : f->quality);
+			double w = pass_scales[passes - 1] * (bx > by ? bx : by);
+			if (w > 0.0) g += w;
+			if (f->type == 2 || f->type == 4) g += fabs(f->distance) * vs;
+		}
+		else if (f->type == 7 || f->type == 8)
+		{
+			double bb = f->blur_x > f->blur_y ? f->blur_x : f->blur_y;
+			double q = f->quality < 1 ? 1.0 : (double) f->quality;
+			g += (bb * q + 2.0 * fabs(f->distance)) * vs;
+		}
+		else if (f->type == 5)
+			g += (double) ((f->conv_mx > f->conv_my ? f->conv_mx : f->conv_my) / 2 + 1) * vs;
+	}
+	return g;
+}
+
+// Padded-layer gate for render_filtered_object, the AVM1/timeline twin of
+// avm2_display.c avm2_render_filtered's. Returns 1 (and the pad reach in
+// device px: the whole chain's reach + 2 AA) when the capture must be padded,
+// else 0, keeping the exact stage-sized layer (md5-identical to master).
+//
+// Pads when the world is unknown (nested entry, _root AS transform, a root
+// sprite with AS-set transform, no bounds), or when the input of the LAST
+// filter can extend off-stage: the object's device rect grown by the reach
+// of the filters BEFORE the last one (+2 px AA, +1 px cacheAsBitmap snap)
+// crosses the stage edge. A single filter over an on-stage object has no
+// off-stage source, so its own (on- or off-stage) halo needs no pad.
+static int filter_capture_needs_pad(SWFAppContext* app_context,
+                                    DisplayObject* obj, double* reach_out)
+{
+	double vs = (context != NULL && context->stage_scale > 0.0f)
+	          ? (double) context->stage_scale : 1.0;
+	FilterListEntry scratch;
+	const FilterListEntry* chain[MAX_FILTER_LIST_SIZE];
+	int n = build_filter_chain(obj, &scratch, chain, MAX_FILTER_LIST_SIZE);
+	*reach_out = filter_chain_reach_px(chain, n, vs) + 2.0;
+	double e = (n > 1 ? filter_chain_reach_px(chain, n - 1, vs) : 0.0) + 3.0;
+
+	extern MovieClip root_movieclip;
+	if (!g_filter_root_entry || root_movieclip.as_set_flags != 0
+	    || app_context->stage_to_ndc == NULL || context == NULL
+	    || obj->char_id == 0)
+		return 1;
+	u8 ctype = dictionary[obj->char_id].type;
+	if (ctype == CHAR_TYPE_SPRITE || ctype == CHAR_TYPE_BUTTON)
+	{
+		// A root sprite/button with AS-set _x/_y/... composes its matrix on a
+		// stack buffer (tagShowFrame's compose loop); its slot is stale.
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		MovieClip* mc = (obj->instance_name != NULL)
+			? actionFindMovieClipByName(obj->instance_name) : NULL;
+		if (mc != NULL && mc->as_set_flags != 0) return 1;
+	}
+	float b[4];
+	if (!opaque_bg_local_bounds(obj, b)) return 1;
+	const float* m = ng_entryTransformData(obj)[ng_get_original_transform_id(obj)];
+	const float* v = app_context->stage_to_ndc;
+	double tw = (double) context->width, th = (double) context->height;
+	const float xs[4] = { b[0], b[1], b[0], b[1] };
+	const float ys[4] = { b[2], b[2], b[3], b[3] };
+	double px_min = 1e30, px_max = -1e30, py_min = 1e30, py_max = -1e30;
+	for (int k = 0; k < 4; k++)
+	{
+		// Placement (twips) then stage_to_ndc, then NDC -> device px, as the
+		// vertex shader and avm2_filter_screen_rect do.
+		double X = (double) m[0] * xs[k] + (double) m[4] * ys[k] + (double) m[12];
+		double Y = (double) m[1] * xs[k] + (double) m[5] * ys[k] + (double) m[13];
+		double nx = (double) v[0] * X + (double) v[4] * Y + (double) v[12];
+		double ny = (double) v[1] * X + (double) v[5] * Y + (double) v[13];
+		double px = (nx * 0.5 + 0.5) * tw;
+		double py = (0.5 - ny * 0.5) * th;
+		if (px < px_min) px_min = px;
+		if (px > px_max) px_max = px;
+		if (py < py_min) py_min = py;
+		if (py > py_max) py_max = py;
+	}
+	return (px_min - e < 0.0) || (py_min - e < 0.0)
+	    || (px_max + e > tw) || (py_max + e > th);
+}
+
 static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
 {
 	FilterListEntry chain_scratch;
@@ -4384,6 +4490,14 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 
 	g_filter_capture_depth++;
 	renderer_suspend_pass(context);
+	// s23 padded filter layer: capture into a layer padded by the filter's
+	// reach when the object may cross the stage edge, so its off-stage part
+	// feeds the blur / shadow (render_webgpu.h "PADDED filter layer").
+	{
+		double reach = 0.0;
+		if (filter_capture_needs_pad(app_context, obj, &reach))
+			renderer_set_filter_pad(context, reach);
+	}
 	renderer_begin_offscreen_pass(context);
 	render_single_object(app_context, obj);
 	renderer_end_offscreen_pass(context);
@@ -7295,7 +7409,9 @@ static void render_filtered_root_entry(SWFAppContext* app_context,
 		g_tf_filter_depth = depth;
 		g_tf_filter_max_depth = max_depth_i;
 	}
+	g_filter_root_entry = 1;
 	render_filtered_object(app_context, obj);
+	g_filter_root_entry = 0;
 	if (tf) {
 		g_tf_filter_obj = NULL;
 		g_tf_filter_depth = -1;

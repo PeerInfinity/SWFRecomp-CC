@@ -41,7 +41,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 
 | 8 | w2-tf-css | trace | trace-tail slot A: AVM1 htmlText CSS + getTextFormat url/para; + 5 new upstream getTextFormat rows | session_018CoDi3RqHac9QhfSJkkY34 — LANDED `228a5ff0c` (+4) |
 | 9 | w2-attached-timeline | trace | trace-tail slot B: attached clips run natural timeline in CI modes; movieclip_destruction_test3/4 | session_018CoDi5yeX7FkuGneLRRe8H — LANDED `3cdde8be0` (+2) |
-| 10 | w2-padded-filter | pixel | productionize w1-padded-filter (gated padded filter layer); drop_shadow_angles, displacement_map | session_018CoDi6x1pyS9L9PSYoDJZL (17:03) |
+| 10 | w2-padded-filter | pixel | productionize w1-padded-filter (gated padded filter layer); drop_shadow_angles, displacement_map | session_018CoDi6x1pyS9L9PSYoDJZL — LANDED (+2 px) |
 | 11 | w2-stage3d-text | pixel | Stage3D RTT + budget 48M, AVM2 default-font advance rounding; stage3d_texture, stage3d_bitmap | session_018CoDi7QtMALGjWbWyYvecw (17:10) |
 | 12 | w2-netstream-audio | trace | trace-tail D: NetStream audio tap + computeSpectrum; audio/aac, audio/g711 | session_018CoDi3x3Uds6hHMQAvVQFk — LANDED (+2 graphics) |
 | 13 | w2-qname-dict | trace | trace-tail C: QName multiname keys + #1069 rule; dictionary_qname_keys | session_018CoDi78a5woqe4YXREWSin (17:18) |
@@ -59,6 +59,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `9ba5e552c` | w2-netstream-audio | trace fail→pass GRAPHICS: `audio/aac`, `audio/g711`; NO-GRAPHICS: `audio/g711` only (`audio/aac` stays fail by design: no libavcodec in no-graphics builds → known mode-parity gap, 1 row); pixels none. AAC mono 44.1k/48k depend on matching Ruffle's mixer-clock alignment (fragile, see report §2) |
 | `228a5ff0c` | w2-tf-css | trace fail→pass (both modes): `avm1/edittext_html_duplicate_attributes` (KF, Flash-exact pass), `textfield_get_text_format_args`, `textfield_set_text_format_args`, `textfield_set_text_format_text_change`; HOLD (L): `edittext_set_text_same(_after_edits)`; pixels: md5-only canary members added |
 | `3cdde8be0` | w2-attached-timeline | trace fail→pass (both modes): `from_gnash/misc-swfc.all/movieclip_destruction_test3`, `_test4` (Flash-exact); pixels none |
+| (padded) | w2-padded-filter | px fail→pass: `visual/filters/drop_shadow_angles`, `visual/filters/displacement_map`; md5 move on passing `displacement_map_scales_with_screen`; trace none |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
@@ -74,3 +75,4 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 |---|---|---|---|
 | 44922638965 / 44922646202 | graphics/full/images + no-graphics/full | 08709f658 (baseline) | trace 4495/4563 intersection (4625/4752 all); pixels 488/593; all moves vs s22 = upstream drift |
 | 44930669727 / 44930677490 | graphics/full/images + no-graphics/full | bc91565ce (7e2a045c1, d35a55154, 7b6a69124, 57015b2db) | pending — expect +2 trace (both modes), +18 px |
+- padded-filter N1: `visual/filters/empty_child_filter_bounds` is NOT filters — AVM1 nested dynamic-clip transform/alpha inheritance (parent _x/_xscale/_alpha set after children drawn never reaches grandchildren). Wave-1 diagnosis candidate.
