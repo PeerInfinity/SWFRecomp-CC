@@ -3235,7 +3235,7 @@ proved no pixel row moved without a test change.
 |---|---|---|---|---|
 | `44930669727` | 4 patches | 4515 → 4517 (+2), ledger exact | 489 → 523/610 (+18 ours, +16 new vp6 rows) | shard 12 lost to an apt mirror flake (`build-essential` no candidate) — infra |
 | `44935781892` / `…788709` | 12 patches | → 4548 (+31 by name) | → 529/610 (+6) | +32 (= graphics − `audio/aac`, graphics-only by design) |
-| `44944147057` / `44944153416` | all 24 | → **4580** (+32 by name) | → **532/612** (+1, instrument +2/+2) | see AGENT_LAUNCH_ORDER |
+| `44944147057` / `44944153416` | all 24 | → **4580** (+32 by name) | → **532/612** (+1, instrument +2/+2) | **4579 (+64)**; only mode difference `audio/aac` (predicted) |
 
 Every gain in every run was on a patch ledger, by name; 0 pass→fail; 0 other status moves.
 
