@@ -1,0 +1,71 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_error.c b/SWFModernRuntime/src/avm2/avm2_error.c
+index 81fcd20e..2cbc019f 100644
+--- a/SWFModernRuntime/src/avm2/avm2_error.c
++++ b/SWFModernRuntime/src/avm2/avm2_error.c
+@@ -174,6 +174,25 @@ static int frame_is_class_trait(const Avm2Class* cls, const Avm2MethodRef* m)
+ 	return 0;
+ }
+ 
++// The class half of a frame name (Ruffle function.rs display_function):
++// "only classes in public namespaces are printed with their namespace;
++// internal and private classes are printed with just their local name".
++// Ruffle's is_namespace() is true for the public kinds only (Namespace 0x08 /
++// PackageNamespace 0x16); a package-internal class prints "Hidden()", not
++// "pkg::Hidden()", and a file-private one "Priv()", not "Test.as$1::Priv()"
++// (avm2/error_stack_trace_class_names, Flash's output.txt). Builtins are
++// registered 0x16, so they keep their "flash.display::Sprite" spelling.
++static void frame_class_name(const Avm2Class* cls, char* buf, int size)
++{
++	uint8_t k = cls->name.ns_kind;
++	if (k == 0x08 || k == 0x16)
++	{
++		avm2_class_qname_colons_buf(cls, buf, size);
++		return;
++	}
++	snprintf(buf, size, "%.*s", (int) cls->name.name_len, cls->name.name);
++}
++
+ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+                                char* buf, int size)
+ {
+@@ -182,7 +201,7 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+ 	if (f->bound_class != NULL)
+ 	{
+ 		char cq[128];
+-		avm2_class_qname_colons_buf(f->bound_class, cq, sizeof(cq));
++		frame_class_name(f->bound_class, cq, sizeof(cq));
+ 		int is_iinit = f->bound_class->instance_init.fn == m->fn
+ 		               && f->bound_class->instance_init.file == m->file
+ 		               && f->bound_class->instance_init.method_index == m->method_index;
+@@ -211,7 +230,15 @@ void avm2_callstack_frame_name(Avm2Context* ctx, const Avm2CallFrame* f,
+ 			// http://www.adobe.com/2006/actionscript/flash/proxy::getProperty()").
+ 			const char* dn = (m->debug_name != NULL && m->debug_name[0] != '\0')
+ 				? m->debug_name : "<anonymous>";
+-			if (m->file != NULL)
++			// A name SYNTHESIZED from the trait (avm2_vtable_add_traits: no
++			// method_info debug name, so "get x" / "uri::f" was built from
++			// the trait QName) is already final. It is not the ABC's own
++			// pointer, and its URI may itself hold '/' ("http://example.com/
++			// custom::m" must not lose "http://example.com/").
++			int synthesized = m->file != NULL && m->file->data != NULL
++				&& m->method_index < m->file->data->method_count
++				&& m->debug_name != m->file->data->methods[m->method_index].debug_name;
++			if (m->file != NULL && !synthesized)
+ 			{
+ 				const char* slash = strrchr(dn, '/');
+ 				if (slash != NULL) dn = slash + 1;
+@@ -298,7 +325,13 @@ static const Avm2String* callstack_snapshot(Avm2Context* ctx)
+ 		if (!is_error_ctor) break;
+ 		top--;
+ 	}
+-	for (int64_t i = top; i >= 0 && n + 200 < sizeof(buf); i--)
++	// FP keeps only the innermost 64 frames of a captured stack (Ruffle
++	// call_stack.rs MAX_CAPTURED_FRAMES; avm2/error_stack_trace_limit: a
++	// depth-63 recursion loses its outermost "Test()" frame). The cap counts
++	// from the first frame below the Error-family constructors skipped above.
++	int64_t bottom = top - 63;
++	if (bottom < 0) bottom = 0;
++	for (int64_t i = top; i >= bottom && n + 200 < sizeof(buf); i--)
+ 	{
+ 		char name[176];
+ 		avm2_callstack_frame_name(ctx, &ctx->call_frames[i], name, sizeof(name));
