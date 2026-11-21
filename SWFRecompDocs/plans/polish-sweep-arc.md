@@ -3210,3 +3210,105 @@ view). Build: optional JPEG-XR dependency (`libjxr-dev`, user-approved) wired in
   (test6 evidence says Flash fires them); AVM1 click-focus scan by AABB; `actionMCMouseInsidePick` AABB everywhere.
 
 **Pixels.** See `graphics-fanout-playbook.md` §21.
+
+## 24. Session 23 (2026-11-21) — dual-axis fan-out #15, CLOUD-FIRST: trace +65 (4580/4642 intersection eff; 4584/4645 overall), pixels +27 ours (532/612, 86.9 %), ZERO code regressions in either axis or either mode
+
+Commits `08709f658..` on master (24 code commits + docs; every report and patch under
+`session23-fanout-reports/`). Cloud-first again (user directive 2026-10-16, re-confirmed 2026-11-21): 8 wave-1 + 18
+wave-2 cloud sessions (env "SWFRecomp fan-out", Opus), ≤ 8 live, all delivered on `fanout/<slug>` branches, 0 lost.
+Local CPU: git/merges, two incremental recompiler builds, `gcc -fsyntax-only` on shared TUs, `py_compile`, one
+exporter run (the attached-clip probe).
+
+**Session-start infra fix.** `ubuntu-latest` had moved to 26.04 (resolute): no `swfmill`, so every weekly canary since
+2026-10-25 failed its WASM link-smoke, and a newer mesa would have moved the lavapipe rasterizer under the pixel
+baseline and away from the 24.04 cloud env. `08709f658` pins every workflow to `ubuntu-24.04`; the fresh baseline
+proved no pixel row moved without a test change.
+
+**Baseline read fresh** (graphics/full/images `44922638965` + no-graphics/full `44922646202` at `08709f658`, upstream
+`0ddd12b6a`, 297 commits past s22's sync): trace **4515 eff / 4642** (79 new upstream rows, 0 removed; an early
+"4625/4752" was a nested-row double count, corrected by w1-drift-avm2), pixels **489 / 594**. vs s22 final: −8 trace /
+−3 pixel, **every move upstream drift** (named commits), 0 code regressions.
+
+**Grading runs.**
+
+| run | code | trace (graphics, intersection 4642) | pixels | no-graphics |
+|---|---|---|---|---|
+| `44930669727` | 4 patches | 4515 → 4517 (+2), ledger exact | 489 → 523/610 (+18 ours, +16 new vp6 rows) | shard 12 lost to an apt mirror flake (`build-essential` no candidate) — infra |
+| `44935781892` / `…788709` | 12 patches | → 4548 (+31 by name) | → 529/610 (+6) | +32 (= graphics − `audio/aac`, graphics-only by design) |
+| `44944147057` / `44944153416` | all 24 | → **4580** (+32 by name) | → **532/612** (+1, instrument +2/+2) | see AGENT_LAUNCH_ORDER |
+
+Every gain in every run was on a patch ledger, by name; 0 pass→fail; 0 other status moves.
+
+### 24.1 Ledger (trace, +65 intersection + 3 newly graded)
+
+| patch | flips | tests |
+|---|---:|---|
+| `ca9c46595` w1-drift-avm2 prototype | +14 (+1 new row) | drift re-flips `event_handler_exception` (rm), `filereference_browse_select`, `Error1092XmlUnterminatedXmlDecl`, `bug_564468` (rm), `misc_errors` (rm), `bug_478501`; new rows `xml_unescaping_nul_char_ref`, `xml_many_namespace_declarations`, `edittext_event_link_case_insensitive`, `bitmapdata_encode_png_visual`, `bitmapdata_encode_png_roundtrip`, `bitmapdata_encode_jpeg_visual`, `textfield_default_text_format_null`, `perspective_projection_center`; harness H1 newly grades `allow_networking` (+ avm1 `allow_networking_import_assets(2)`), all pass |
+| `cfc56d74b` w1-drift-avm1 prototype | +8 | `netconnection_serialize_arrays` (drift), `array_truncation_non_canonical_keys`, `sparse_…`, `amf_array_indices`, `localconnection_serialize_function_array_elements`, `xml_stringify_utf16`, `amf0_utf8_probe`, `shared_object_secure` |
+| `64e1aa60a` w2-avm2-small-errors | +6 | `shared_object_get_local_error`, `loaderinfo_root_progress(_goto)`, `amf_xmllist`, `hit_test_scroll_rect`, shumway `loader-events` (rm) |
+| `fcd7e1335` w2-xml-status | +6 | `xml_status_mismatched_tags`, `file_reference_listeners_per_instance`, `localconnection_serialize_inherited_array_indices`, `localconnection_reference_identity`, `shared_object_members_swf5`, `edittext_asfunction_case_insensitive` |
+| `be53cbeaf` w2-array-vector-args | +5 | `array_join_reentrant`, `vector_join_reentrant`, `array_sort_arguments`, `vector_sort_arguments`, `avm2/array_constructor` (avmplus source as oracle) |
+| `228a5ff0c` w2-tf-css | +4 | `edittext_html_duplicate_attributes`, `textfield_get/set_text_format_args`, `…_text_change` (AVM1) |
+| `6f65d2115` w2-tf-css-avm2 | +4 | AVM2 `textfield_get/set_text_format_args`, `edittext_set_text_same`, `…_after_edits` (rm) |
+| `995782154` w2-context3d-readback | +3 | `context3d_draw_to_bitmap_data`, `stage3d_missing_vertex_stream`, `draw_to_bitmap_data_unconfigured` |
+| `00077a281` w2-doc-removal-events | +3 | `displayobjectcontainer_remove_reentrant`, `_remove_reparent`, `_removechildren_events` |
+| `d35a55154` w2-crossvm-legf | +2 | `focus_events_mixed_avm_edittext`, `selection_onsetfocus_mixed_avm` (s21/s22 leg F; F-scope REFUTED) |
+| `3cdde8be0` w2-attached-timeline | +2 | `movieclip_destruction_test3`, `_test4` (Flash-exact) |
+| `9ba5e552c` w2-netstream-audio | +2 | `audio/aac` (graphics only), `audio/g711` |
+| `9cf79e2fd` w2-stack-trace-names | +2 | `error_stack_trace_class_names`, `error_stack_trace_limit` |
+| `a0b18bc93` w2-video-props | +2 | `NetStream-SquareTest` (rm, last drift re-flip), `video_width_height` |
+| `0798e815a` w2-qname-dict | +1 | `dictionary_qname_keys` |
+| `f5613a76c` w2-avm1-devicefont | +1 | `fonts/device_font_name_case` |
+
+**Mode parity:** per-test identical except `audio/aac`, which passes only where libavcodec is linked (graphics);
+no-graphics builds carry no libavcodec by design. One known, predicted row.
+
+### 24.2 Standing verdicts that fell
+
+- **"F-scope" (s21/s22 leg F, `selection_onsetfocus_mixed_avm`)** — the branch polarity was misread; `txt` must resolve.
+- **"movieclip_destruction_test3/4: chain frame-8 scripts land after the root check" (s22 §7)** — the chain never ran
+  another frame at all: attached clips' timelines were FROZEN after frame 1 in CI modes (a counter-only pump). Corpus-wide,
+  game-visible; fixed, with Ruffle-exporter oracle agreement on every tick ≥ 2.
+- **"audio: exact decode always passes"** — not for mono AAC: the window must land where Ruffle's mixer clock puts it.
+- **"textline/stage3d text: AVM2 does not round device advances"** — it already did; the font DATA (baked DefineFont3
+  quantised advances) was wrong.
+- **AVM2 getTextFormat "clamping"** — AVM2 validates strictly (#2006), the reverse of AVM1.
+- **"#2094 is a dispatch depth limit"** — it is a per-object being-removed flag.
+- **"part 3 of qname-dict would cost from_avmplus #1069/#1081 pins"** — 311-row sweep, 0 moves.
+- **"device-font names are trimmed"** — upstream `b8793d8a6` (inside the drift window) stopped trimming single names.
+
+### 24.3 Method notes (deltas vs s22)
+
+- **Land measured wave-1 prototypes directly** (5 of 8: glyph-precision, FAAN, both drift prototypes, plus the
+  pixel-misc FAAN hunk). Each was CI-grade (fidelity-proven) and argued-sweep clean; skipping the wave-2 slot cost
+  nothing and every one graded exactly.
+- **Launch non-drift wave 1 before the baseline lands**; launch drift slots after. Saved ~1.5 h; workers re-verify
+  their own rows live.
+- **Watch for the REPORT file, not the branch** — workers push interim WIP; `scripts`: a background loop that fetches
+  each `fanout/<slug>` and tests `git cat-file -e <ref>:<report>`.
+- **render_canary_tests.txt conflicts are append-only** — 6 of them; resolve by keeping both sides, prove the rest of the
+  patch with `git apply --check -R --exclude=ruffle-tests/render_canary_tests.txt`.
+- **Grading-instrument changes graded in their own window** (w2-harness-subtests landed after two interim images runs;
+  its predicted report delta was exact) — and `image_status_diff.py` now pairs subtest renames and lists ignored moves.
+- **A `fanout/*` branch delete was denied by the auto-mode classifier**; branches are left for the user to prune.
+
+### 24.4 Left on the board (session 24)
+
+**Trace** (62 failing graphics rows on the intersection):
+- **AVM1 runtime `mc.filters = [...]` is never rendered on any clip** (w2-dynclip-transform R1) — game-visible; 1 corpus
+  row (`empty_child_filter_bounds`, now 24876 after the transform fix).
+- Attach-tick child/parent frame-1 order (Ruffle runs the attached clip's timeline child BEFORE its parent on the attach
+  tick; probe + exporter oracle in `w2-attached-timeline-probe/`).
+- Native builtin methods expose a `prototype` (`global_proto_decls`, `global_instance_decls`) — cross-cutting; price as its
+  own wave-1 slot before touching `setupNativeFuncOwnProps`.
+- AVM1 `edittext_set_text_same(_after_edits)` (plain-text per-character format model, L), `amf0_array_matrix` (instanceof on
+  an LC-received ECMA array), `localconnection_serialize_sparse_array_getters` (array addProperty enumerability),
+  `localconnection_xml_unavailable`, `video_prototype_lazy(_swf6_child)` (20/21, 4/8).
+- AVM2: `bitmapdata_encode` + `jpeg_visual` pixel (JPEG encoder, ~400 lines), `primitive_bound_methods` /
+  `weird_number_bound_methods` (bound-method cache), `worker_terminate`, `textline_metrics` (recompiler DefineFont4),
+  e4x residuals (`bug_564468` caseless CDATA → pass; `misc_errors` #1095).
+- Harness: `G-d` tick emulation (`num_ticks` with runtime `stage.frameRate` ≠ header) — HOLD until a row proves a gain.
+- Unchanged NO-GOs: `MovieClip-v8`, action_order family, `globals_monkeypatch` (rewritten upstream), `GradientFillTest`,
+  `external_interface_monkeypatch`.
+
+**Pixels.** See `graphics-fanout-playbook.md` §22.

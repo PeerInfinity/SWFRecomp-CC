@@ -1270,3 +1270,52 @@ Baseline: images run `36515003936` at `02df69d28`, **433 / 587**. Interim images
 ### Process notes added this session
 
 - **Cloud-first mode** (§5a): wave 1 AND wave 2 in the cloud; local = merge/CI/oracle. See arc §23.3.
+
+## 22. Session-23 state of the board (2026-11-21)
+
+Baseline: images run `44922638965` at `08709f658` (CI pinned to `ubuntu-24.04`; no pixel row moved without an upstream
+test change), **489 / 594**. Interim `44930669727`: 523/610 (+18 ours, +16 NEW upstream `visual/video/vp6_inter_frames`
+comparisons, all passing). Interim `44935781892`: 529/610 (+6). Final `44944147057` at `9a970370e`: **532 / 612
+(86.9 %)** — +25 render flips + 2 instrument-enabled passes, every one on a ledger; **0 pass→fail**. Trace side:
+`polish-sweep-arc.md` §24. All pixel work ran in cloud sessions on lavapipe, byte-identical to CI's actual PNGs.
+
+| patch | flips | comparisons |
+|---|---:|---|
+| `7e2a045c1` w1-glyph-precision (AVM1 EditText baseline/pitch truncated to whole twips) | +8 | `morph_test1` frame2..6, `edittext_scroll .02`, `text_field_mask`, `acid-text-escape` |
+| `57015b2db` w2-glyph-levien (device-font glyph synth: lyon Levien + float) | +7 | `glow`, `glow_without_composite_source`, `drop_shadow`, `bevel_inner/outer/full`, `glow_with_alpha_strength` (last 4 at 18/18) |
+| `7b6a69124` FAAN IDCT for Spark | +3 | avm1+avm2 `netstream_play_flv`, `visual/video/deblocking` (`colorconversion/h263` 10808 → 3) |
+| `353732f52` w2-padded-filter | +2 | `drop_shadow_angles`, `displacement_map` |
+| `cfbcb6658` w2-stage3d-text (RTT + budget 48M + real Noto metrics) | +2 | `stage3d_texture`, `stage3d_bitmap` |
+| `ca9c46595` w1-drift-avm2 | +2 | `stage3d_texture_bytearray_compressed_alpha` (drift re-flip), `bitmapdata_encode_png_visual` |
+| `995782154` w2-context3d-readback | +1 | `context3d_draw_to_bitmap_data` |
+| `72ef0be14` w2-harness-subtests (GRADING INSTRUMENT) | +2 / denominator +2 | `bitmapdata_drawwithquality` low + high (drawWithQuality → draw); `bitmap_pixelsnapping` → ignored; `edittext_device_transform_basic [embedded__output]` newly graded (fail); 4 renames pass→pass; new totals ignored 6, ruffle_matched_fail 9 (report-only) |
+
+- **Instrument semantics now in force:** `ignore = true` comparisons are recorded `ignored` (out of the denominator);
+  ≥ 2 `[subtests]` grade per merged subtest (`<subtest>__<cmp>`), version-keyed sets grade the canonical variant only,
+  freetype subtests ignored. `ruffle_match` (vs `output.ruffle.png`) is REPORT-ONLY — those rows stay fails under the
+  Flash-over-Ruffle ruling (`graphics_draw_path`, `cache_as_bitmap/avm1_color` are byte-identical to Ruffle's sidecar).
+  `image_status_diff.py` pairs renames and lists ignored moves separately.
+- **Headline findings:** (a) the s22 "AVM1 embedded-glyph precision" family was a **0.656-twip baseline**, not outlines
+  (two workers found it independently); (b) Ruffle's device-font glyphs are coarse Levien chords — **finer flattening
+  moves AWAY from Ruffle**; (c) `stage3d_*` were frozen by a fragment budget latch, not RTT or sprite placement;
+  (d) `bevel` y=305 is a background-checker pixel-centre tie, not a filter edge.
+
+### Left on the board (session 24)
+
+- **AVM1 runtime `filters` never rendered** (`empty_child_filter_bounds` 24876; game-visible). Transform/alpha
+  inheritance of nested dynamic clips was fixed this session (`c216160c4`, correctness, 0 flips).
+- Zero-headroom rows: `bevel_inner/outer/full`, `glow_with_alpha_strength` (18/18), `fills_and_lines` (126 channels at
+  tol), `fallback_preferences` (0 outliers spare), `edittext_border_filters`; `text-bind` 587/600.
+- `bevel` y=305 checker tie: oracle needs Ruffle's own test runner at `quality=low` (the exporter has no quality option).
+- quality=low hairline tie-break (`shape_test` 15994; Flash takes the +0.5 px side) — A/B on `acid-small .01/.05` first.
+- Per-line max ascent/descent for the AVM1 render pitch (`br_at_start` 1664, `style_changes_in_html`).
+- `acid-color-0` 17376 → 749 with ancestor colour transforms on AVM1/timeline text (prototype in `w1-pixel-misc`), still
+  a band (gradient residual); AVM2 twin latent in `avm2_render_textbox`.
+- ShaderFilter on Bitmap + `applyFilter(ShaderFilter)` (`glassDisplace_shaderfilter` +1 medium; rider
+  `pixelbender_dithering`); `blend_shader_luma_lighten` NO-GO (needs PBJ→WGSL).
+- `bitmapdata_encode_jpeg_visual` (JPEG encoder), `bitmapdata_draw_cab_quality` (2640, exposed by the drawWithQuality
+  alias), `visual/static_text_offstage` (3 sub-mechanisms), `bitmapdata_draw` (tol-128 Flash hinting, NO-GO),
+  `definefont4` (DefineFont4 + TextLine render mini-arc), `colorconversion/h263` last pixel (h263-rs port, NO-GO).
+- Re-goldened to Flash upstream (`graphics_draw_path`, `cache_as_bitmap/avm1_color`, `graphics_simple_shapes`,
+  `graphics_gradients`, `sprite_with_frames`, `Video-EmbedSquareTest`): we match Ruffle's sidecar; real Flash fidelity
+  work, not drift fixes.
