@@ -704,6 +704,13 @@ typedef struct Avm2DisplayObjectExt
 	// AS blendMode / blendShader setters; read only by avm2_render_node's blend
 	// arm. "shader" has no SWF id and no backend, so it caches 0.
 	uint8_t blend_mode_id;
+
+	// Set while removeChild / removeChildAt / removeChildren dispatch this
+	// object's removal events (Ruffle DisplayObjectFlags::BEING_REMOVED_BY_AVM2,
+	// upstream 7bc23b837): a re-entrant removal of the same object by one of
+	// those three methods throws Error #2094 instead of recursing. The
+	// implicit removal inside addChild/addChildAt neither sets nor checks it.
+	uint8_t being_removed_by_avm2;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.

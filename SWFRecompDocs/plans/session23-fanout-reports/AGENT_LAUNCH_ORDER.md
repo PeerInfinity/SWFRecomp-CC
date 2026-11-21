@@ -53,7 +53,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 19 | w2-array-vector-args | trace | drift-avm2 S5 | session_018CoDi3UaEumY9kycvtZWDx — LANDED (+5) |
 | 20 | w2-tf-css-avm2 | trace | AVM2 TextField format twins | session_018CoDi5BFztjYCFbFqJUhD8 — LANDED (+4 eff) |
 | 21 | w2-context3d-readback | both | drift-avm2 S4: drawToBitmapData + #3692 | session_018CoDi61VeqnzLTiyF5rwmk — LANDED (+3 trace, +1 px) |
-| 22 | w2-doc-removal-events | trace | drift-avm2 S8 | session_018CoDi7jBSFh59hTPEMaK7G (18:33) |
+| 22 | w2-doc-removal-events | trace | drift-avm2 S8 | session_018CoDi7jBSFh59hTPEMaK7G — LANDED (+3) |
 | 23 | w2-video-props | trace | drift-avm1 V: Video width/height lazy accessors | session_018CoDi3srDrx6YECoWarZYc (18:40) |
 | 24 | w2-harness-subtests | px (instrument) | ignore=true + [subtests] images + drawWithQuality + report-only ruffle-png bucket | session_018CoDi5m6iYZTWzXtXE2S8s (18:50) |
 | 25 | w2-xml-status | trace | drift-avm1 M3 XML status + AVM1 bundle | session_018CoDi58gxyHZVyRcAu87S1 (18:55) |
@@ -79,6 +79,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `6f65d2115` | w2-tf-css-avm2 | trace (both modes): fail→pass `avm2/textfield_get_text_format_args`, `avm2/textfield_set_text_format_args`, `avm2/edittext_set_text_same`; fail→ruffle_matched `avm2/edittext_set_text_same_after_edits` (KF; Flash/Ruffle disagree, Flash-exact HOLD); pixels none (md5-only canary members added) |
 | `be53cbeaf` | w2-array-vector-args | trace fail→pass (both modes): `avm2/array_join_reentrant`, `avm2/vector_join_reentrant` (KF), `avm2/array_sort_arguments` (KF), `avm2/vector_sort_arguments` (KF), `avm2/array_constructor` (Flash-exact, avmplus source as oracle); 237-row sweep identical to CI; pixels none |
 | `f5613a76c` | w2-avm1-devicefont | trace fail→pass (both modes): `fonts/device_font_name_case` (misc group → needs categories=full); pixels none. New generated `RecompiledTags/device_fonts.c` for AVM1 movies with named [fonts.*] faces |
+| (dr) | w2-doc-removal-events | trace fail→pass (both modes): `avm2/displayobjectcontainer_remove_reentrant`, `_remove_reparent`, `_removechildren_events`; 141-row add/remove sweep exact; pixels none |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
