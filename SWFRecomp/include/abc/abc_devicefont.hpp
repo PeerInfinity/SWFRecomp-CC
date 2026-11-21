@@ -28,6 +28,13 @@ namespace abc
 	// load — the runtime then keeps its baked-in Noto fallback.
 	void emitDeviceFonts(std::ostream& out);
 
+	// AVM1 main movies: the same `[fonts.*]` (+ `[default_fonts]` alias) rows
+	// as a standalone RecompiledTags/device_fonts.c that defines
+	// ng_generated_register_device_fonts() (overriding the runtime's weak
+	// no-op in ng_shared.c). Returns false, writing nothing, when the test
+	// declares no named device face — the generated C is then unchanged.
+	bool emitAvm1DeviceFonts(std::ostream& out);
+
 	// The TTF path Ruffle's test harness would render a device font `name`
 	// with, resolved through `./test.toml`: a `[fonts.*]` family match, else
 	// the `[default_fonts]` list of the DefaultFont the name maps to (ruffle

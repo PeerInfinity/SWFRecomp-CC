@@ -311,6 +311,14 @@ void tagRegisterFontName(SWFAppContext* app_context, u16 font_id, const char* na
 void tagRegisterFontExport(SWFAppContext* app_context, const char* name, u16 char_id, int is_font);
 int ng_findEmbeddedFontId(const char* name, int bold, int italic, u16* out_id);
 u16 ng_resolveTextFormatFontId(const char* name, int bold, int italic);
+// Test-harness device faces (ng_shared.c AVM1 device-font registry): the
+// generated RecompiledTags/device_fonts.c registers each test.toml [fonts.*]
+// face; ng_resolveDeviceFontId runs Ruffle's comma-split/trim/style-ladder
+// name lookup over them (0 = the default device font).
+void ng_register_device_font(const char* name, int bold, int italic,
+    int em_square, int ascent, int descent, int leading,
+    const u16* codes, const s32* advances, size_t glyph_count);
+u16 ng_resolveDeviceFontId(const char* name, int bold, int italic);
 int ng_isSwfEmbeddedFont(u16 font_id);
 void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
     double width_px, double* out_ascent, double* out_descent,

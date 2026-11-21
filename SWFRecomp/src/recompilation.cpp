@@ -1,9 +1,11 @@
 #include <string>
 #include <fstream>
+#include <sstream>
 #include <sys/stat.h>
 
 #include <common.h>
 #include <abc/abc_emit.hpp>
+#include <abc/abc_devicefont.hpp>
 #include <swf.hpp>
 
 using std::string;
@@ -65,6 +67,19 @@ namespace SWFRecomp
 
 		// AVM2: write the RecompiledABC registry (no-op for AVM1 SWFs).
 		swf.finalizeAbcEmit();
+
+		// AVM1 main movie: the test.toml [fonts.*] device-font registry (the
+		// ABC path emits its own in abc_timeline.c). Player-level state, so a
+		// child movie never emits it. No file at all without named faces.
+		if (!swf.is_as3 && !swf.isChildRecompile())
+		{
+			std::ostringstream dev;
+			if (abc::emitAvm1DeviceFonts(dev))
+			{
+				ofstream dev_file(string("") + context.output_tags_folder + "device_fonts.c", ios_base::out);
+				dev_file << dev.str();
+			}
+		}
 
 		// Flush the accumulated tag_main buffer to tagMain.c.
 		{

@@ -470,7 +470,15 @@ static struct {
 	size_t glyph_count;
 	size_t glyph_base;
 	int is_builtin;
+	/* Test-harness device faces (ng_register_device_font): the code/advance
+	   tables live in the generated device_fonts.c and are read in place, so a
+	   full-BMP face is not truncated to MAX_FONT_GLYPHS. NULL otherwise. */
+	const u16* ext_codes;
+	const s32* ext_advances;
 } ng_fonts[MAX_FONTS_NG];
+
+#define NG_FONT_CODE(fi, j) (ng_fonts[fi].ext_codes ? ng_fonts[fi].ext_codes[j] : ng_fonts[fi].code_table[j])
+#define NG_FONT_ADV(fi, j) (ng_fonts[fi].ext_advances ? ng_fonts[fi].ext_advances[j] : ng_fonts[fi].advance_table[j])
 static size_t ng_font_count = 0;
 
 // Built-in Noto Sans fallback font for createTextField (no embedded font).
@@ -552,8 +560,8 @@ int ng_find_font_with_metrics(u16 font_id)
 static s32 ng_font_glyph_advance(int font_idx, u16 code_point)
 {
 	for (size_t j = 0; j < ng_fonts[font_idx].glyph_count; j++) {
-		if (ng_fonts[font_idx].code_table[j] == code_point)
-			return ng_fonts[font_idx].advance_table[j];
+		if (NG_FONT_CODE(font_idx, j) == code_point)
+			return NG_FONT_ADV(font_idx, j);
 	}
 	return -1;
 }
@@ -562,7 +570,7 @@ int ng_font_find_glyph(int font_idx, u16 code_point)
 {
 	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return -1;
 	for (size_t j = 0; j < ng_fonts[font_idx].glyph_count; j++) {
-		if (ng_fonts[font_idx].code_table[j] == code_point)
+		if (NG_FONT_CODE(font_idx, j) == code_point)
 			return (int)j;
 	}
 	return -1;
@@ -599,7 +607,7 @@ s32 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx)
 {
 	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return -1;
 	if (glyph_idx < 0 || (size_t)glyph_idx >= ng_fonts[font_idx].glyph_count) return -1;
-	return ng_fonts[font_idx].advance_table[glyph_idx];
+	return NG_FONT_ADV(font_idx, glyph_idx);
 }
 
 void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
@@ -803,7 +811,168 @@ u16 ng_resolveTextFormatFontId(const char* name, int bold, int italic)
 	u16 id = 0;
 	if (ng_findEmbeddedFontId(name, bold, italic, &id)) return id;
 	if (ng_font_name_count >= MAX_FONT_NAMES_NG) return ng_findFontIdByName(name);
-	return 0;
+	// No embedded face: a test.toml `[fonts.*]` device face of that name
+	// (Ruffle html/layout.rs device path), else 0 = the default device font.
+	return ng_resolveDeviceFontId(name, bold, italic);
+}
+
+// ---------------------------------------------------------------------------
+// Device-font name resolution, shared by BOTH VMs (avm2_text.c's
+// find_device_font_ladder / find_device_font_list delegate here; this file is
+// linked into every build). `probe(ctx, name, len, bold, italic)` is ONE exact
+// FontQuery(Device, name, bold, italic) — the caller's table, matched
+// case-insensitively on the full name — returning a row index or -1.
+// ---------------------------------------------------------------------------
+
+// Ruffle `get_or_load_device_font` (library.rs:576-590): the exact query, then
+// FontMap::find's bold/italic compatibility ladder (library.rs:788-845, order
+// tested upstream in tests/swfs/fonts/embed_matching/fallback_preferences).
+int ng_device_font_ladder(const char* name, uint32_t len, int bold, int italic,
+    int (*probe)(void* ctx, const char* name, uint32_t len, int bold, int italic),
+    void* ctx)
+{
+	int r = probe(ctx, name, len, bold, italic);
+	if (r >= 0) return r;
+	if (bold ^ italic)
+	{
+		// One of the two set: bold-italic, then regular, then the other one.
+		r = probe(ctx, name, len, 1, 1);
+		if (r < 0) r = probe(ctx, name, len, 0, 0);
+		if (r < 0) r = probe(ctx, name, len, !bold, !italic);
+	}
+	else
+	{
+		// Asked for regular or bold-italic: (bold-italic only) regular, then
+		// bold, then italic, then (regular only) bold-italic.
+		if (bold && italic) r = probe(ctx, name, len, 0, 0);
+		if (r < 0) r = probe(ctx, name, len, 1, 0);
+		if (r < 0) r = probe(ctx, name, len, 0, 1);
+		if (r < 0 && !bold && !italic) r = probe(ctx, name, len, 1, 1);
+	}
+	return r;
+}
+
+// Rust `str::trim` — strips Unicode whitespace; ASCII whitespace is all the
+// corpus needs and all the layout code can see here.
+static int ng_devfont_is_ws(char c)
+{
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f'
+	       || c == '\v';
+}
+
+// Ruffle html/layout.rs:561-596: split the format's font name on ',', run the
+// ladder per entry; the first entry that resolves wins. -1 when the whole list
+// misses (the caller then uses its DefaultFont). Entries are trimmed ONLY when
+// the name is a list (contains a comma): "Flash only trims whitespace around
+// commas in a font-family list; a single font name is looked up as-is"
+// (upstream b8793d8a6, fonts/device_font_name_case " TestFontA" -> no match).
+int ng_device_font_list(const char* name, uint32_t len, int bold, int italic,
+    int (*probe)(void* ctx, const char* name, uint32_t len, int bold, int italic),
+    void* ctx)
+{
+	if (name == NULL) return -1;
+	int is_list = memchr(name, ',', len) != NULL;
+	uint32_t i = 0;
+	while (i <= len)
+	{
+		uint32_t start = i;
+		while (i < len && name[i] != ',') i++;
+		uint32_t end = i;
+		if (is_list)
+		{
+			while (start < end && ng_devfont_is_ws(name[start])) start++;
+			while (end > start && ng_devfont_is_ws(name[end - 1])) end--;
+		}
+		if (end > start)
+		{
+			int r = ng_device_font_ladder(name + start, end - start,
+			                              bold, italic, probe, ctx);
+			if (r >= 0) return r;
+		}
+		if (i >= len) break;
+		i++;  // past the comma
+	}
+	return -1;
+}
+
+// ---------------------------------------------------------------------------
+// AVM1 device-font registry (test.toml `[fonts.*]`, Ruffle test.rs:109-145).
+// The recompiler emits RecompiledTags/device_fonts.c for an AVM1 main movie
+// whose test.toml declares named device faces; its strong
+// ng_generated_register_device_fonts() replaces the weak no-op below and calls
+// ng_register_device_font() once per row. Each row becomes a METRICS-ONLY
+// ng_fonts slot (is_builtin = 1: the glyph renderer draws nothing for it, as
+// for the baked-in Noto) with a reserved font id, so the existing AVM1
+// measurement paths (ng_computeTextWidth & co.) use that face's advances.
+// ---------------------------------------------------------------------------
+#define NG_DEVICE_FONT_ID_BASE 0xFF00u
+#define MAX_DEVICE_FONTS_NG 16
+static struct { char name[128]; u8 bold; u8 italic; u16 font_id; } ng_device_fonts[MAX_DEVICE_FONTS_NG];
+static size_t ng_device_font_count = 0;
+static int ng_device_fonts_loaded = 0;
+
+__attribute__((weak)) void ng_generated_register_device_fonts(void) {}
+
+void ng_register_device_font(const char* name, int bold, int italic,
+    int em_square, int ascent, int descent, int leading,
+    const u16* codes, const s32* advances, size_t glyph_count)
+{
+	if (name == NULL || name[0] == '\0' || glyph_count == 0) return;
+	if (ng_device_font_count >= MAX_DEVICE_FONTS_NG || ng_font_count >= MAX_FONTS_NG) return;
+	size_t k = ng_device_font_count++;
+	u16 fid = (u16)(NG_DEVICE_FONT_ID_BASE + k);
+	strncpy(ng_device_fonts[k].name, name, sizeof(ng_device_fonts[k].name) - 1);
+	ng_device_fonts[k].bold = (u8)(bold != 0);
+	ng_device_fonts[k].italic = (u8)(italic != 0);
+	ng_device_fonts[k].font_id = fid;
+
+	size_t idx = ng_font_count++;
+	ng_fonts[idx].font_id = fid;
+	strncpy(ng_fonts[idx].name, name, sizeof(ng_fonts[idx].name) - 1);
+	ng_fonts[idx].name[sizeof(ng_fonts[idx].name) - 1] = '\0';
+	ng_fonts[idx].bold = bold != 0;
+	ng_fonts[idx].italic = italic != 0;
+	ng_fonts[idx].is_builtin = 1;
+	ng_fonts[idx].has_metrics = 1;
+	ng_fonts[idx].ascent = (s16)(ascent > 32767 ? 32767 : ascent);
+	ng_fonts[idx].descent = (s16)(descent > 32767 ? 32767 : descent);
+	ng_fonts[idx].leading = (s16)(leading > 32767 ? 32767 : leading);
+	ng_fonts[idx].em_square = em_square > 0 ? em_square : 1024;
+	ng_fonts[idx].glyph_count = glyph_count;
+	ng_fonts[idx].glyph_base = 0;
+	ng_fonts[idx].ext_codes = codes;
+	ng_fonts[idx].ext_advances = advances;
+}
+
+static void ng_ensure_device_fonts(void)
+{
+	if (ng_device_fonts_loaded) return;
+	ng_device_fonts_loaded = 1;
+	ng_generated_register_device_fonts();
+}
+
+static int ng_device_font_probe(void* ctx, const char* name, uint32_t len, int bold, int italic)
+{
+	(void)ctx;
+	for (size_t i = 0; i < ng_device_font_count; i++) {
+		if (strlen(ng_device_fonts[i].name) != len) continue;
+		if (strncasecmp(name, ng_device_fonts[i].name, len) != 0) continue;
+		if (ng_device_fonts[i].bold != (u8)(bold != 0)) continue;
+		if (ng_device_fonts[i].italic != (u8)(italic != 0)) continue;
+		return (int)i;
+	}
+	return -1;
+}
+
+// TextFormat font name -> device face font id, 0 (the default device font)
+// on a miss or when the test declares no device faces.
+u16 ng_resolveDeviceFontId(const char* name, int bold, int italic)
+{
+	ng_ensure_device_fonts();
+	if (name == NULL || ng_device_font_count == 0) return 0;
+	int r = ng_device_font_list(name, (uint32_t)strlen(name), bold != 0, italic != 0,
+	                            ng_device_font_probe, NULL);
+	return r >= 0 ? ng_device_fonts[r].font_id : 0;
 }
 
 // 1 when font_id names a font the SWF itself defined with DefineFont2/3, 0 for

@@ -604,14 +604,13 @@ void collectDefaultFontAliases(const toml::table& tbl,
 	}
 }
 
-void emitDeviceFonts(std::ostream& out)
+// Parses ./test.toml into the device face rows both VMs' emitters share.
+// `aliases` are the [default_fonts] rows named `_sans`/`_serif`/... that share
+// a declared face's tables, so the runtime resolves a DefaultFont exactly like
+// any other device family (avm2_text.c find_device_font_list).
+static void collectDeviceFonts(std::vector<DeviceFaceDef>& faces,
+                               std::vector<std::pair<std::string, size_t>>& aliases)
 {
-	std::vector<DeviceFaceDef> faces;
-	// [default_fonts]: extra rows named `_sans`/`_serif`/... that share a
-	// declared face's tables, so the runtime resolves a DefaultFont exactly
-	// like any other device family (avm2_text.c find_device_font_list).
-	std::vector<std::pair<std::string, size_t>> aliases;
-
 	toml::table tbl;
 	bool have_toml = false;
 	try
@@ -693,6 +692,13 @@ void emitDeviceFonts(std::ostream& out)
 				appendDefaultFontOutlines(faces);
 		}
 	}
+}
+
+void emitDeviceFonts(std::ostream& out)
+{
+	std::vector<DeviceFaceDef> faces;
+	std::vector<std::pair<std::string, size_t>> aliases;
+	collectDeviceFonts(faces, aliases);
 
 	out << "\n// Device fonts declared by the test harness (test.toml [fonts.*]).\n";
 	for (size_t i = 0; i < faces.size(); i++)
@@ -784,6 +790,67 @@ void emitDeviceFonts(std::ostream& out)
 	}
 	out << "const uint32_t avm2_generated_device_font_count = " << faces.size() + aliases.size()
 	    << ";\n\n";
+}
+
+bool emitAvm1DeviceFonts(std::ostream& out)
+{
+	std::vector<DeviceFaceDef> faces;
+	std::vector<std::pair<std::string, size_t>> aliases;
+	collectDeviceFonts(faces, aliases);
+
+	// Same rows, same order as emitDeviceFonts (faces, then [default_fonts]
+	// aliases). Hidden faces (the outline-only with_default_font Noto) have no
+	// name, so no by-name lookup can reach them: skip them. AVM1 measures
+	// with codes + advances + vertical metrics only (the glyph renderer draws
+	// nothing for these metrics-only slots, as for the baked-in Noto).
+	std::vector<size_t> rows;
+	std::vector<std::string> names;
+	for (size_t i = 0; i < faces.size(); i++)
+	{
+		if (faces[i].hidden) continue;
+		rows.push_back(i);
+		names.push_back(faces[i].family);
+	}
+	for (const auto& a : aliases)
+	{
+		rows.push_back(a.second);
+		names.push_back(a.first);
+	}
+	if (rows.empty()) return false;
+
+	out << "// AVM1 device fonts declared by the test harness (test.toml [fonts.*]).\n"
+	    << "// Registered into the runtime's ng_fonts table (ng_shared.c\n"
+	    << "// ng_register_device_font); see abc_devicefont.hpp.\n"
+	    << "#include <stddef.h>\n#include <stdint.h>\n\n"
+	    << "void ng_register_device_font(const char* name, int bold, int italic,\n"
+	    << "    int em_square, int ascent, int descent, int leading,\n"
+	    << "    const uint16_t* codes, const int32_t* advances, size_t glyph_count);\n\n";
+	std::vector<bool> emitted(faces.size(), false);
+	for (size_t i : rows)
+	{
+		if (emitted[i]) continue;
+		emitted[i] = true;
+		const DeviceFaceDef& fd = faces[i];
+		out << "static const uint16_t avm1_devfont_" << i << "_codes[] = { ";
+		for (auto c : fd.codes) out << c << ", ";
+		out << "};\n";
+		out << "static const int32_t avm1_devfont_" << i << "_advances[] = { ";
+		for (auto a : fd.advances) out << a << ", ";
+		out << "};\n";
+	}
+	out << "\nvoid ng_generated_register_device_fonts(void)\n{\n";
+	for (size_t r = 0; r < rows.size(); r++)
+	{
+		const DeviceFaceDef& fd = faces[rows[r]];
+		std::string n = std::to_string(rows[r]);
+		out << "\tng_register_device_font(\"" << cEsc(names[r]) << "\", "
+		    << (fd.bold ? 1 : 0) << ", " << (fd.italic ? 1 : 0) << ", "
+		    << fd.em_square << ", " << fd.ascent << ", " << fd.descent << ", "
+		    << fd.leading << ", avm1_devfont_" << n << "_codes, avm1_devfont_"
+		    << n << "_advances, " << fd.codes.size() << ");\n";
+	}
+	out << "}\n";
+	return true;
 }
 
 std::string resolveTestDeviceFontPath(const std::string& name, bool bold, bool italic)

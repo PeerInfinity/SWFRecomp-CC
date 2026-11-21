@@ -2699,38 +2699,31 @@ static const Avm2FontData* find_device_font(const char* name, uint32_t len,
 // `get_or_sort_device_fonts` on each — the two-pass "exact over all names, then
 // ladder over all names" form is `get_or_load_default_font`, which serves the
 // `_sans`/`_serif` DefaultFont aliases, not a named family list.
+// The ladder itself is shared with the AVM1 device-font registry:
+// ng_shared.c ng_device_font_ladder (header-free seam; ng_shared.c is linked
+// into every build). `find_device_font` above is the per-probe query.
+int ng_device_font_ladder(const char* name, uint32_t len, int bold, int italic,
+    int (*probe)(void* ctx, const char* name, uint32_t len, int bold, int italic),
+    void* ctx);
+int ng_device_font_list(const char* name, uint32_t len, int bold, int italic,
+    int (*probe)(void* ctx, const char* name, uint32_t len, int bold, int italic),
+    void* ctx);
+
+static int avm2_device_font_probe(void* ctx, const char* name, uint32_t len,
+                                  int bold, int italic)
+{
+	(void) ctx;
+	const Avm2FontData* fd = find_device_font(name, len, bold, italic);
+	return fd != NULL ? (int) (fd - &avm2_generated_device_fonts[0]) : -1;
+}
+
 static const Avm2FontData* find_device_font_ladder(const char* name,
                                                     uint32_t len,
                                                     int bold, int italic)
 {
-	const Avm2FontData* fd = find_device_font(name, len, bold, italic);
-	if (fd != NULL) return fd;
-	if (bold ^ italic)
-	{
-		// One of the two set: bold-italic, then regular, then the other one.
-		fd = find_device_font(name, len, 1, 1);
-		if (fd == NULL) fd = find_device_font(name, len, 0, 0);
-		if (fd == NULL) fd = find_device_font(name, len, !bold, !italic);
-	}
-	else
-	{
-		// Asked for regular or bold-italic: (bold-italic only) regular, then
-		// bold, then italic, then (regular only) bold-italic.
-		if (bold && italic) fd = find_device_font(name, len, 0, 0);
-		if (fd == NULL) fd = find_device_font(name, len, 1, 0);
-		if (fd == NULL) fd = find_device_font(name, len, 0, 1);
-		if (fd == NULL && !bold && !italic)
-			fd = find_device_font(name, len, 1, 1);
-	}
-	return fd;
-}
-
-// Rust `str::trim` — strips Unicode whitespace; ASCII whitespace is all the
-// corpus needs and all the layout code can see here.
-static int is_ws(char c)
-{
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f'
-	       || c == '\v';
+	int r = ng_device_font_ladder(name, len, bold, italic,
+	                              avm2_device_font_probe, NULL);
+	return r >= 0 ? &avm2_generated_device_fonts[r] : NULL;
 }
 
 // The outline-only default-font row (NULL name, see resolve_font's final
@@ -2746,31 +2739,17 @@ static const Avm2FontData* default_font_outline(void)
 }
 
 // Ruffle html/layout.rs:562-598: split the format's font name on ',', trim
-// each entry, return the first registered device face. NULL when the whole
+// each entry (Rust `str::trim`, only when the name IS a list — upstream
+// b8793d8a6), return the first registered device face
+// (ng_shared.c ng_device_font_list). NULL when the whole
 // list misses (Ruffle then goes to a DefaultFont; we keep the baked-in Noto).
 static const Avm2FontData* find_device_font_list(const Avm2String* name,
                                                  int bold, int italic)
 {
 	if (name == NULL || avm2_generated_device_font_count == 0) return NULL;
-	uint32_t i = 0;
-	while (i <= name->len)
-	{
-		uint32_t start = i;
-		while (i < name->len && name->utf8[i] != ',') i++;
-		uint32_t end = i;
-		while (start < end && is_ws(name->utf8[start])) start++;
-		while (end > start && is_ws(name->utf8[end - 1])) end--;
-		if (end > start)
-		{
-			const Avm2FontData* fd = find_device_font_ladder(name->utf8 + start,
-			                                                 end - start,
-			                                                 bold, italic);
-			if (fd != NULL) return fd;
-		}
-		if (i >= name->len) break;
-		i++;  // past the comma
-	}
-	return NULL;
+	int r = ng_device_font_list(name->utf8, name->len, bold, italic,
+	                            avm2_device_font_probe, NULL);
+	return r >= 0 ? &avm2_generated_device_fonts[r] : NULL;
 }
 
 // Ruffle layout.rs:604-625: the DefaultFont a device font list falls back to
