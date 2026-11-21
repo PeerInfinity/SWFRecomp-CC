@@ -1,0 +1,636 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index f2bdd8a0..a4434049 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -29064,6 +29064,67 @@ int actionHasTextFieldAtDepth(int swf_depth)
+ 	return g_tf_depth_present[swf_depth];
+ }
+ 
++// PROTOTYPE (acid-color-0): the composed ancestor colour transform for the
++// orphan-EditText walk, diag mult + add (0..1). Identity = {1,1,1,0,0,0}.
++static float g_otf_cx_mult[3] = { 1.0f, 1.0f, 1.0f };
++static float g_otf_cx_add[3]  = { 0.0f, 0.0f, 0.0f };
++
++static int otf_entry_cx(SWFAppContext* app_context, const DisplayObject* obj,
++	float mult[3], float add[3])
++{
++	if (obj->cx_overridden) {
++		mult[0] = (float)(obj->cx_ra / 100.0); mult[1] = (float)(obj->cx_ga / 100.0);
++		mult[2] = (float)(obj->cx_ba / 100.0);
++		add[0] = (float)(obj->cx_rb / 255.0); add[1] = (float)(obj->cx_gb / 255.0);
++		add[2] = (float)(obj->cx_bb / 255.0);
++		return 1;
++	}
++	u32 baked = (app_context->cxform_data_size > 0)
++		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
++	if (obj->cxform_id == 0 || obj->cxform_id >= baked) return 0;
++	const float* c = (const float*)app_context->cxform_data + obj->cxform_id * 20;
++	mult[0] = c[0]; mult[1] = c[5]; mult[2] = c[10];
++	add[0] = c[16]; add[1] = c[17]; add[2] = c[18];
++	return 1;
++}
++
++static u32 otf_cx_rgb(u32 rgb)
++{
++	u32 out = 0;
++	for (int i = 0; i < 3; i++) {
++		float c = (float)((rgb >> (16 - 8 * i)) & 0xFF) / 255.0f;
++		float v = c * g_otf_cx_mult[i] + g_otf_cx_add[i];
++		if (v < 0.0f) v = 0.0f;
++		if (v > 1.0f) v = 1.0f;
++		out |= (u32)(v * 255.0f + 0.5f) << (16 - 8 * i);
++	}
++	return out;
++}
++
++// PROTOTYPE: compose the colour transforms of a TextField MovieClip's display
++// entry and every ancestor's, outermost first, into g_otf_cx_*.
++SWFAppContext* g_proto_tf_app = NULL;
++static void mc_text_cx(SWFAppContext* app_context, MovieClip* mc)
++{
++	if (app_context == NULL) app_context = g_proto_tf_app;
++	MovieClip* chain[64];
++	int n = 0;
++	for (MovieClip* m = mc; m != NULL && n < 64; m = m->parent) chain[n++] = m;
++	for (int i = 0; i < 3; i++) { g_otf_cx_mult[i] = 1.0f; g_otf_cx_add[i] = 0.0f; }
++	if (app_context == NULL) return;
++	for (int k = n - 1; k >= 0; k--) {
++		DisplayObject* e = (DisplayObject*)chain[k]->display_obj;
++		if (e == NULL) e = resolveMCDisplayEntry(chain[k]);
++		if (e == NULL) continue;
++		float m[3], a[3];
++		if (!otf_entry_cx(app_context, e, m, a)) continue;
++		for (int i = 0; i < 3; i++) {
++			g_otf_cx_add[i] = g_otf_cx_mult[i] * a[i] + g_otf_cx_add[i];
++			g_otf_cx_mult[i] = g_otf_cx_mult[i] * m[i];
++		}
++	}
++}
++
+ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
+ {
+ 	int count = 0;
+@@ -29138,9 +29199,10 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
+ 
+ 		TextFieldRenderInfo info;
+ 		info.has_background = has_bg;
+-		info.background_color = bg_color;
++		mc_text_cx(NULL, mc);
++		info.background_color = otf_cx_rgb(bg_color);
+ 		info.has_border = has_border;
+-		info.border_color = bd_color;
++		info.border_color = otf_cx_rgb(bd_color);
+ 		info.x = vis_off_x;
+ 		info.y = vis_off_y;
+ 		// The box is the DefineEditText bounds RECT, so a tag-defined field
+@@ -29539,6 +29601,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 		if (tf_embedded_font_missing(mc, font_id)) continue;
+ 
+ 		// Get text color (fallback when no run table or run color missing)
++		mc_text_cx(NULL, mc);
+ 		u32 text_color = 0x000000;
+ 		{
+ 			ActionVar* tc = getProperty(props, "textColor", 9);
+@@ -29609,7 +29672,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				TFRun* r = &table->runs[ri];
+ 				_tfg_runs[ri].byte_start = r->start;
+ 				_tfg_runs[ri].byte_length = r->length;
+-				_tfg_runs[ri].color = r->color & 0x00FFFFFF;
++				_tfg_runs[ri].color = otf_cx_rgb(r->color & 0x00FFFFFF);
+ 				_tfg_runs[ri].font_height = (u16)r->font_height;
+ 				// align/bullet drive the renderer's per-paragraph x layout. _tfg_runs
+ 				// is a shared static buffer reused across fields, so failing to set
+@@ -29638,7 +29701,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				utf8_len = 0;
+ 				_tfg_runs[0].byte_start = 0;
+ 				_tfg_runs[0].byte_length = 0;
+-				_tfg_runs[0].color = text_color & 0x00FFFFFF;
++				_tfg_runs[0].color = otf_cx_rgb(text_color & 0x00FFFFFF);
+ 				_tfg_runs[0].font_height = font_height;
+ 				_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
+ 				_tfg_runs[0].bullet = 0;
+@@ -29660,7 +29723,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				if (mc->ng_textfield_idx >= 0) {
+ 					_tfg_runs[0].byte_start = 0;
+ 					_tfg_runs[0].byte_length = (u32)utf8_len;
+-					_tfg_runs[0].color = text_color & 0x00FFFFFF;
++					_tfg_runs[0].color = otf_cx_rgb(text_color & 0x00FFFFFF);
+ 					_tfg_runs[0].font_height = font_height;
+ 					_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
+ 					_tfg_runs[0].bullet = 0;
+@@ -29753,7 +29816,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 		TextFieldGlyphInfo info;
+ 		info.font_id = font_id;
+ 		info.font_height = font_height;
+-		info.text_color = text_color;
++		info.text_color = otf_cx_rgb(text_color);
+ 		info.x = world_x + vis_off_x;
+ 		info.y = world_y + vis_off_y;
+ 		info.w = mc->width;
+@@ -29979,9 +30042,9 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 	if (render_cb && (has_bg || has_border)) {
+ 		TextFieldRenderInfo render_info = {0};
+ 		render_info.has_background = has_bg;
+-		render_info.background_color = 0xFFFFFF;
++		render_info.background_color = otf_cx_rgb(0xFFFFFF);
+ 		render_info.has_border = has_border;
+-		render_info.border_color = 0x000000;
++		render_info.border_color = otf_cx_rgb(0x000000);
+ 		render_info.x = field_x_px;
+ 		render_info.y = field_y_px;
+ 		// Flash includes the +1 edge pixel on positive-dimension fields.
+@@ -30071,7 +30134,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 					TFRun* r = &otf_html_table.runs[ri];
+ 					otf_html_runs[ri].byte_start = r->start;
+ 					otf_html_runs[ri].byte_length = r->length;
+-					otf_html_runs[ri].color = r->color & 0x00FFFFFF;
++					otf_html_runs[ri].color = otf_cx_rgb(r->color & 0x00FFFFFF);
+ 					otf_html_runs[ri].font_height = (u16)r->font_height;
+ 					otf_html_runs[ri].align = r->align;
+ 					otf_html_runs[ri].bullet = 0;
+@@ -30098,7 +30161,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 	if (emit_runs == NULL) {
+ 		otf_html_runs[0].byte_start = 0;
+ 		otf_html_runs[0].byte_length = (u32)text_len;
+-		otf_html_runs[0].color = text_color & 0x00FFFFFF;
++		otf_html_runs[0].color = otf_cx_rgb(text_color & 0x00FFFFFF);
+ 		otf_html_runs[0].font_height = font_height;
+ 		otf_html_runs[0].align = (u8)ng_getTextFieldAlign(tf_idx);
+ 		otf_html_runs[0].bullet = 0;
+@@ -30109,7 +30172,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 	TextFieldGlyphInfo info = {0};
+ 	info.font_id = font_id;
+ 	info.font_height = font_height;
+-	info.text_color = text_color;
++	info.text_color = otf_cx_rgb(text_color);
+ 	info.x = field_x_px;
+ 	info.y = field_y_px;
+ 	info.w = field_w_px;
+@@ -30200,10 +30263,18 @@ static void otf_walk_dl(SWFAppContext* app_context,
+ 		    && obj->sprite_display_list != NULL)
+ 		{
+ 			MovieClip* child_mc = otf_find_child_mc(parent_mc, obj->instance_name);
++			float sm[3], sa[3], m[3], a[3];
++			memcpy(sm, g_otf_cx_mult, sizeof sm); memcpy(sa, g_otf_cx_add, sizeof sa);
++			if (otf_entry_cx(app_context, obj, m, a))
++				for (int i = 0; i < 3; i++) {
++					g_otf_cx_add[i] = sm[i] * a[i] + sa[i];
++					g_otf_cx_mult[i] = sm[i] * m[i];
++				}
+ 			otf_walk_dl(app_context,
+ 				obj->sprite_display_list, obj->sprite_max_depth,
+ 				child_mc, world_x, world_y,
+ 				render_cb, glyph_cb, user_data, count);
++			memcpy(g_otf_cx_mult, sm, sizeof sm); memcpy(g_otf_cx_add, sa, sizeof sa);
+ 		}
+ 	}
+ }
+diff --git a/SWFModernRuntime/src/actionmodern/video_codec.c b/SWFModernRuntime/src/actionmodern/video_codec.c
+index b7bb68af..13fae028 100644
+--- a/SWFModernRuntime/src/actionmodern/video_codec.c
++++ b/SWFModernRuntime/src/actionmodern/video_codec.c
+@@ -393,6 +393,20 @@ static enum AVCodecID map_flv_codec_id(int codec_id)
+ 	}
+ }
+ 
++// Sorenson Spark (FLV1) IDCT choice. Ruffle decodes Spark with h263-rs, whose
++// IDCT (h263/src/decoder/cpu/idct.rs) is a separable f32 reference transform.
++// libavcodec's default (FF_IDCT_AUTO -> integer simple_idct) drifts 1-4 LSB
++// from it and the error compounds through P-frames. FF_IDCT_FAAN (float AAN,
++// plain C, no SIMD variant) is the closest built-in: it makes
++// avm1/avm2 netstream_play_flv and visual/video/deblocking byte-exact and
++// leaves visual/video/colorconversion/h263 one pixel off (lrintf's
++// round-half-even vs h263-rs's round-half-away). Only FLV1 consults it;
++// VP6 (vp3dsp) and H.264 (h264dsp) have their own fixed transforms.
++static void flv1_select_idct(AVCodecContext* c, enum AVCodecID avid)
++{
++	if (avid == AV_CODEC_ID_FLV1) c->idct_algo = FF_IDCT_FAAN;
++}
++
+ static int decode_via_libavcodec(int codec_id,
+                                  const unsigned char* payload, int payload_len,
+                                  int deblocking,
+@@ -413,6 +427,7 @@ static int decode_via_libavcodec(int codec_id,
+ 	int ok = 0;
+ 
+ 	if (!cctx || !pkt || !frame) goto done;
++	flv1_select_idct(cctx, avid);
+ 	if (avcodec_open2(cctx, codec, NULL) < 0) goto done;
+ 
+ 	pkt->data = (uint8_t*)payload;
+@@ -579,6 +594,7 @@ VideoDecoderCtx* video_decoder_create(int codec_id, int deblocking)
+ 	ctx->cctx = avcodec_alloc_context3(codec);
+ 	if (!ctx->cctx) { free(ctx); return NULL; }
+ 
++	flv1_select_idct(ctx->cctx, avid);
+ 	if (avcodec_open2(ctx->cctx, codec, NULL) < 0) {
+ 		avcodec_free_context(&ctx->cctx);
+ 		free(ctx);
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index c0c76be1..883fffb2 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -4022,7 +4022,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, bd, "lock", bd_noop);
+ 	avm2_builtin_add_method(ctx, bd, "unlock", bd_noop);
+ 	avm2_builtin_add_method(ctx, bd, "draw", bd_draw);
+-	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_noop);
++	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_draw);  // PROTOTYPE: quality arg ignored
+ 	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_apply_filter);
+ 	avm2_builtin_add_method(ctx, bd, "generateFilterRect", bd_generate_filter_rect);
+ 	avm2_builtin_add_method(ctx, bd, "merge", bd_noop);
+diff --git a/SWFModernRuntime/src/avm2/avm2_stage3d.c b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+index 658ac69a..05e4a062 100644
+--- a/SWFModernRuntime/src/avm2/avm2_stage3d.c
++++ b/SWFModernRuntime/src/avm2/avm2_stage3d.c
+@@ -256,6 +256,7 @@ typedef struct Avm2Stage3DExt
+ // edges (program, bound vertex buffers) because the collector's ext scan is
+ // conservative over the blob and cannot follow into a side allocation.
+ typedef struct S3dBackend S3dBackend;
++static void s3d_rtt_end(Avm2Context* ctx, S3dBackend* be);
+ 
+ #define S3D_ATTRS 8
+ 
+@@ -542,6 +543,19 @@ struct S3dBackend
+ 	// BOTH setSamplerStateAt and setProgram (see s3d_apply_program_samplers).
+ 	uint8_t samp_wrap[S3D_ATTRS];
+ 	uint8_t samp_filter[S3D_ATTRS];
++
++	// ---- PROTOTYPE: render-to-texture -----------------------------------
++	// While rtt_tex != NULL the draw target fields above (w/h/samples/color/
++	// depth/stencil) point at an RTT surface; the back buffer's are parked
++	// in bb_*. setRenderToBackBuffer resolves the surface into the
++	// texture's texel store and restores them.
++	struct Avm2Texture3DExt* rtt_tex;
++	uint32_t rtt_layer;
++	uint32_t bb_w, bb_h, bb_samples;
++	uint8_t bb_has_depth;
++	float* bb_color;
++	float* bb_depth;
++	uint8_t* bb_stencil;
+ };
+ 
+ // Index of `v` in a NULL-terminated spelling table, or -1.
+@@ -1111,7 +1125,7 @@ static float s3d_edge(float ax, float ay, float bx, float by,
+ //     x 2 frames) and avm2/stage3d_raytrace ~15 G. Both are out of reach on
+ //     the CPU route at any budget that keeps away3d green; fractal's
+ //     completion mechanism is a faster rasteriser, not a bigger number here.
+-#define S3D_FRAG_BUDGET 12000000u
++#define S3D_FRAG_BUDGET 48000000u
+ #define S3D_PIXEL_COST 8u
+ static uint64_t g_s3d_frag_budget = S3D_FRAG_BUDGET;
+ 
+@@ -1800,6 +1814,7 @@ static Avm2Value context3d_configure_back_buffer(Avm2Activation* act)
+ 		// allocator down. 8 M samples = 128 MB colour + 32 MB depth, which is
+ 		// four times the largest buffer the corpus configures (1300x810x4).
+ 		while (s > 1 && (uint64_t) width * height * s > 8u * 1024 * 1024) s /= 2;
++		s3d_rtt_end(ctx, be);
+ 		s3d_backend_free_buffers(ctx, be);
+ 		be->w = width;
+ 		be->h = height;
+@@ -2606,6 +2621,44 @@ static Avm2Value context3d_create_cube_texture(Avm2Activation* act)
+ 	return o != NULL ? avm2_object_value(o) : avm2_null();
+ }
+ 
++// PROTOTYPE: resolve the RTT surface into its texture and restore the back
++// buffer. Same per-sample quantisation as s3d_present, alpha kept.
++static void s3d_rtt_end(Avm2Context* ctx, S3dBackend* be)
++{
++	if (be->rtt_tex == NULL) return;
++	Avm2Texture3DExt* te = be->rtt_tex;
++	uint32_t* tx = s3d_texels(ctx, te);
++	uint32_t ns = be->samples;
++	if (tx != NULL && be->color != NULL)
++	{
++		uint32_t* dst = tx + (size_t) be->rtt_layer * te->width * te->height;
++		for (size_t p = 0; p < (size_t) be->w * be->h; p++)
++		{
++			uint32_t acc[4] = { 0, 0, 0, 0 };
++			for (uint32_t sm = 0; sm < ns; sm++)
++			{
++				const float* c = be->color + (p * ns + sm) * 4;
++				for (int k = 0; k < 4; k++)
++				{
++					float v = c[k];
++					if (!(v > 0.0f)) v = 0.0f;
++					if (v > 1.0f) v = 1.0f;
++					acc[k] += (uint32_t) (v * 255.0f + 0.5f);
++				}
++			}
++			dst[p] = (acc[0] / ns) | ((acc[1] / ns) << 8) | ((acc[2] / ns) << 16)
++			       | ((acc[3] / ns) << 24);
++		}
++	}
++	if (be->color) heap_free(ctx->app, be->color);
++	if (be->depth) heap_free(ctx->app, be->depth);
++	if (be->stencil) heap_free(ctx->app, be->stencil);
++	be->w = be->bb_w; be->h = be->bb_h; be->samples = be->bb_samples;
++	be->has_depth = be->bb_has_depth;
++	be->color = be->bb_color; be->depth = be->bb_depth; be->stencil = be->bb_stencil;
++	be->rtt_tex = NULL;
++}
++
+ // setRenderToTexture's surfaceSelector bound depends on the texture kind
+ // (context_3d.rs:632-645).
+ static Avm2Value context3d_set_render_to_texture(Avm2Activation* act)
+@@ -2635,6 +2688,52 @@ static Avm2Value context3d_set_render_to_texture(Avm2Activation* act)
+ 		                 "Error #3771: Surface selector out of bounds for "
+ 		                 "2D texture, must be 0.");
+ 	}
++	S3dBackend* be = s3d_backend(ctx, context3d_ext(act));
++	if (be == NULL) return avm2_undefined();
++	s3d_rtt_end(ctx, be);
++	Avm2Texture3DExt* te = (Avm2Texture3DExt*) t->native_ext;
++	if (te == NULL || te->width == 0 || te->height == 0) return avm2_undefined();
++	int depth_stencil = s3d_arg_bool(act, 1, 0);
++	uint32_t anti_alias = s3d_arg_u32(act, 2, 0);
++	uint32_t sc = 1;
++	while (sc * 2 <= anti_alias && sc * 2 <= S3D_MAX_SAMPLES) sc *= 2;
++	if ((uint64_t) te->width * te->height * sc > 8u * 1024 * 1024) return avm2_undefined();
++	size_t n = (size_t) te->width * te->height * sc;
++	float* col = (float*) heap_alloc(ctx->app, n * 4 * sizeof(float));
++	float* dep = (float*) heap_alloc(ctx->app, n * sizeof(float));
++	uint8_t* stc = depth_stencil ? (uint8_t*) heap_alloc(ctx->app, n) : NULL;
++	if (col == NULL || dep == NULL || (depth_stencil && stc == NULL))
++	{
++		if (col) heap_free(ctx->app, col);
++		if (dep) heap_free(ctx->app, dep);
++		if (stc) heap_free(ctx->app, stc);
++		return avm2_undefined();
++	}
++	// Seed the surface from the texture's current contents (LoadOp::Load).
++	uint32_t* tx = s3d_texels(ctx, te);
++	for (size_t p = 0; p < (size_t) te->width * te->height; p++)
++	{
++		uint32_t v = tx ? tx[(size_t) surface * te->width * te->height + p] : 0;
++		float c[4] = { (float) (v & 0xFF) / 255.0f, (float) ((v >> 8) & 0xFF) / 255.0f,
++		               (float) ((v >> 16) & 0xFF) / 255.0f, (float) ((v >> 24) & 0xFF) / 255.0f };
++		for (uint32_t k = 0; k < sc; k++) memcpy(col + (p * sc + k) * 4, c, sizeof c);
++	}
++	for (size_t i = 0; i < n; i++) dep[i] = 1.0f;
++	if (stc) memset(stc, 0, n);
++	be->bb_w = be->w; be->bb_h = be->h; be->bb_samples = be->samples;
++	be->bb_has_depth = be->has_depth;
++	be->bb_color = be->color; be->bb_depth = be->depth; be->bb_stencil = be->stencil;
++	be->w = te->width; be->h = te->height; be->samples = sc;
++	be->has_depth = (uint8_t) (depth_stencil != 0);
++	be->color = col; be->depth = dep; be->stencil = stc;
++	be->rtt_tex = te; be->rtt_layer = surface;
++	return avm2_undefined();
++}
++
++static Avm2Value context3d_set_render_to_back_buffer(Avm2Activation* act)
++{
++	S3dBackend* be = s3d_backend(act->ctx, context3d_ext(act));
++	if (be != NULL) s3d_rtt_end(act->ctx, be);
+ 	return avm2_undefined();
+ }
+ 
+@@ -4729,7 +4828,7 @@ void avm2_register_stage3d(Avm2Context* ctx)
+ 	                        context3d_set_color_mask);
+ 	avm2_builtin_add_method(ctx, c3d, "setStencilReferenceValue",
+ 	                        context3d_set_stencil_reference_value);
+-	avm2_builtin_add_method(ctx, c3d, "setRenderToBackBuffer", s3d_noop);
++	avm2_builtin_add_method(ctx, c3d, "setRenderToBackBuffer", context3d_set_render_to_back_buffer);
+ 	avm2_builtin_add_method(ctx, c3d, "drawToBitmapData", s3d_noop);
+ 	avm2_builtin_add_method(ctx, c3d, "present", context3d_present);
+ 	avm2_builtin_add_method(ctx, c3d, "clear", context3d_clear);
+diff --git a/SWFModernRuntime/src/libswf/swf.c b/SWFModernRuntime/src/libswf/swf.c
+index 487dd7be..89f77fcd 100644
+--- a/SWFModernRuntime/src/libswf/swf.c
++++ b/SWFModernRuntime/src/libswf/swf.c
+@@ -1719,6 +1719,7 @@ void swfStart(SWFAppContext* app_context)
+ 	context->bitmap_data_size = app_context->bitmap_data_size;
+ 	context->cxform_data = app_context->cxform_data;
+ 	context->cxform_data_size = app_context->cxform_data_size;
++	{ extern SWFAppContext* g_proto_tf_app; g_proto_tf_app = app_context; }  // PROTOTYPE acid-color-0
+ 
+ 	// Allocate stack into app_context (use system malloc, not heap - stack is allocated before heap_init)
+ 	app_context->stack = (char*) malloc(INITIAL_STACK_SIZE);
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 59dccb77..cbe1040e 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -235,10 +235,78 @@ def parse_image_comparisons(test_dir):
+         # image_comparisons configured" so the test still runs.
+         return {}
+ 
++    # GRADING-INSTRUMENT PROTOTYPE (s23 w1-pixel-misc).
++    # (1) `ignore = true` at the top level: Ruffle never runs the test, so its
++    #     comparisons are not part of Ruffle's suite. They are still rendered
++    #     and compared (board visibility) but recorded as status "ignored",
++    #     which build_image_report.py leaves out of the graded denominator.
++    # (2) `[subtests.NAME]`: Ruffle runs each subtest separately with the
++    #     top-level table deep-merged into it (tests/framework/src/options.rs
++    #     merge_into_subtest) and grades ONLY the subtests' comparisons. A
++    #     subtest whose device_font_renderer is "freetype" needs Ruffle's
++    #     optional `freetype` feature (FontRendererKind::can_run); the default
++    #     build skips it, so it is recorded as "ignored" too.
++    ignored_upstream = bool(data.get("ignore"))
++    subtests = data.get("subtests")
++    if isinstance(subtests, dict) and len(subtests) >= 2:
++        return _parse_subtest_image_comparisons(data, subtests, ignored_upstream)
++
+     ic_section = data.get("image_comparisons")
+     if not ic_section or not isinstance(ic_section, dict):
+         return {}
++    result = _parse_ic_section(ic_section)
++    if ignored_upstream:
++        for v in result.values():
++            v["ignored_upstream"] = "ignore = true"
++    return result
++
++
++def _deep_merge(base, over):
++    """Ruffle merge_into_subtest: tables merge recursively, else `over` wins."""
++    if isinstance(base, dict) and isinstance(over, dict):
++        out = dict(over)
++        for k, v in base.items():
++            out[k] = _deep_merge(v, over[k]) if k in over else v
++        return out
++    return over
++
+ 
++def _quality_to_msaa(q):
++    if not isinstance(q, str):
++        return None
++    return 1 if q.lower() == "low" else 4
++
++
++def _parse_subtest_image_comparisons(data, subtests, ignored_upstream):
++    base = {k: v for k, v in data.items() if k != "subtests"}
++    result = {}
++    for sub_name, sub in subtests.items():
++        if not isinstance(sub, dict):
++            continue
++        merged = _deep_merge(base, sub)
++        ic = merged.get("image_comparisons")
++        if not isinstance(ic, dict) or not ic:
++            continue
++        po = merged.get("player_options") or {}
++        wr = po.get("with_renderer") if isinstance(po, dict) else None
++        msaa = _quality_to_msaa(wr.get("quality")) if isinstance(wr, dict) else None
++        renderer = po.get("device_font_renderer") if isinstance(po, dict) else None
++        for cmp_name, cfg in _parse_ic_section(ic).items():
++            key = f"{sub_name}__{cmp_name}"
++            cfg["png_name"] = cmp_name
++            cfg["subtest"] = sub_name
++            cfg["msaa"] = msaa if msaa is not None else 4
++            if merged.get("known_failure"):
++                cfg["known_failure"] = True
++            if ignored_upstream or merged.get("ignore"):
++                cfg["ignored_upstream"] = "ignore = true"
++            elif renderer == "freetype":
++                cfg["ignored_upstream"] = "device_font_renderer = freetype"
++            result[key] = cfg
++    return result
++
++
++def _parse_ic_section(ic_section):
+     result = {}
+     for name, config in ic_section.items():
+         if not isinstance(config, dict):
+@@ -2447,6 +2515,9 @@ def get_mock_platform(test_dir):
+     return None
+ 
+ 
++MSAA_OVERRIDE = None  # set while rebuilding a [subtests] variant
++
++
+ def get_msaa_samples(test_dir):
+     """Parse [player_options].with_renderer.quality from test.toml and map it to
+     an MSAA sample count, mirroring Ruffle's StageQuality::sample_count()
+@@ -2460,6 +2531,8 @@ def get_msaa_samples(test_dir):
+     comparison (already passing) and clamping removes a Dawn/lavapipe sample-count
+     portability failure mode. Absent or unrecognised quality -> 4 (unchanged).
+     """
++    if MSAA_OVERRIDE is not None:
++        return MSAA_OVERRIDE
+     toml_path = test_dir / "test.toml"
+     if not toml_path.exists():
+         return 4
+@@ -4180,6 +4253,44 @@ def _fmt_phases(pt):
+     return f" [{' '.join(parts)}]" if parts else ""
+ 
+ 
++def _rerun_subtest_variants(test_dir, num_frames, build_dir, args,
++                            image_comparisons, run_env, event_file):
++    """Rebuild + rerun once per [subtests] MSAA that differs from the main
++    build, capturing only that variant's comparisons into build_dir."""
++    global MSAA_OVERRIDE
++    main_msaa = get_msaa_samples(test_dir)
++    by_msaa = {}
++    for cmp_name, cfg in image_comparisons.items():
++        m = cfg.get("msaa", main_msaa)
++        if m != main_msaa:
++            by_msaa.setdefault(m, []).append(cmp_name)
++    for msaa, names in sorted(by_msaa.items()):
++        vdir = build_dir / f"variant_msaa{msaa}"
++        vdir.mkdir(exist_ok=True)
++        MSAA_OVERRIDE = msaa
++        try:
++            ok, _err = compile_native(test_dir, num_frames, vdir, mode=args.mode,
++                                      has_image_comparisons=True, asan=args.asan,
++                                      use_ccache=not args.no_ccache)
++        finally:
++            MSAA_OVERRIDE = None
++        if not ok:
++            continue
++        env = dict(run_env)
++        trig = []
++        for n in names:
++            t = image_comparisons[n]["trigger"]
++            if t[0] == "specific_iteration":
++                trig.append(f"{n}:iteration:{t[1]}")
++            elif t[0] == "fs_command":
++                trig.append(f"{n}:fs_command")
++            else:
++                trig.append(f"{n}:last_frame")
++        env["CAPTURE_TRIGGERS"] = ",".join(trig)
++        env["CAPTURE_OUTPUT_DIR"] = str(build_dir)
++        run_binary(vdir, event_file=event_file, extra_env=env)
++
++
+ def main():
+     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
+     args = parse_args()
+@@ -4557,7 +4668,10 @@ def main():
+                 run_env["SWF_SOCKET_SCRIPT"] = str(socket_script)
+             if has_image_cmps and args.uses_dawn:
+                 triggers = []
++                main_msaa = get_msaa_samples(test_dir)
+                 for cmp_name, cmp_config in image_comparisons.items():
++                    if cmp_config.get("msaa", main_msaa) != main_msaa:
++                        continue  # captured by a rebuilt variant below
+                     trig = cmp_config["trigger"]
+                     if trig[0] == "last_frame":
+                         triggers.append(f"{cmp_name}:last_frame")
+@@ -4574,6 +4688,10 @@ def main():
+             raw_output, rc, run_stderr = run_binary(build_dir, event_file=event_file,
+                                                     extra_env=run_env if run_env else None)
+             phase_times["run"] = round(time.perf_counter() - _t, 3)
++            if (raw_output is not None and has_image_cmps and args.uses_dawn
++                    and not args.wasm):
++                _rerun_subtest_variants(test_dir, num_frames, build_dir, args,
++                                        image_comparisons, run_env, event_file)
+             if raw_output is None:
+                 stats["timeout"] += 1
+                 fail_list.append(name)
+@@ -4661,10 +4779,11 @@ def main():
+                     # comparison that only resolves through it passes locally
+                     # and skips in CI. Record which source won so the baseline
+                     # report can tell those apart instead of guessing.
+-                    expected_png = test_dir / f"{cmp_name}.expected.png"
++                    png_name = cmp_config.get("png_name", cmp_name)
++                    expected_png = test_dir / f"{png_name}.expected.png"
+                     expected_source = "repo"
+                     if not expected_png.exists() and RUFFLE_UPSTREAM.exists():
+-                        upstream_png = RUFFLE_UPSTREAM / name / f"{cmp_name}.expected.png"
++                        upstream_png = RUFFLE_UPSTREAM / name / f"{png_name}.expected.png"
+                         if upstream_png.exists():
+                             expected_png = upstream_png
+                             expected_source = "upstream_checkout"
+@@ -4694,6 +4813,11 @@ def main():
+                         "trigger": cmp_config["trigger"],
+                         "known_failure": cmp_config.get("known_failure", False),
+                     }
++                    if cmp_config.get("ignored_upstream"):
++                        # Not in Ruffle's graded set; keep the verdict visible.
++                        image_results[cmp_name]["status"] = "ignored"
++                        image_results[cmp_name]["would_pass"] = bool(passed)
++                        image_results[cmp_name]["ignored_upstream"] = cmp_config["ignored_upstream"]
+                     if args.images:
+                         # Instrument-mode extras. Gated so a normal run's
+                         # results JSON stays byte-for-byte what it was.
+diff --git a/scripts/build_image_report.py b/scripts/build_image_report.py
+index a3af3f09..6d74a8e6 100644
+--- a/scripts/build_image_report.py
++++ b/scripts/build_image_report.py
+@@ -192,6 +192,10 @@ def build_suite(suite, stem):
+                 "uncensused": True,
+             })
+ 
++    # GRADING-INSTRUMENT PROTOTYPE (s23 w1-pixel-misc): "ignored" rows (Ruffle
++    # never grades them: top-level `ignore = true`, or a freetype-only subtest)
++    # stay in `results` for the board but leave the graded denominator.
++    graded = [r for r in rows if r["status"] != "ignored"]
+     totals = Counter()
+     for row in rows:
+         totals[row["status"]] += 1
+@@ -215,13 +219,14 @@ def build_suite(suite, stem):
+             **run_provenance(),
+         },
+         "tests_with_comparisons": len(census),
+-        "comparisons": len(rows),
++        "comparisons": len(graded),
++        "ignored": totals["ignored"],
+         "pass": totals["pass"],
+         "fail": totals["fail"],
+         "skip": totals["skip"],
+         "no_render": totals["no_render"],
+         "fail_known_failure": totals["fail_known_failure"],
+-        "pass_rate": (round(100 * totals["pass"] / len(rows), 1) if rows else 0),
++        "pass_rate": (round(100 * totals["pass"] / len(graded), 1) if graded else 0),
+         "results": rows,
+     }
+ 

@@ -393,6 +393,20 @@ static enum AVCodecID map_flv_codec_id(int codec_id)
 	}
 }
 
+// Sorenson Spark (FLV1) IDCT choice. Ruffle decodes Spark with h263-rs, whose
+// IDCT (h263/src/decoder/cpu/idct.rs) is a separable f32 reference transform.
+// libavcodec's default (FF_IDCT_AUTO -> integer simple_idct) drifts 1-4 LSB
+// from it and the error compounds through P-frames. FF_IDCT_FAAN (float AAN,
+// plain C, no SIMD variant) is the closest built-in: it makes
+// avm1/avm2 netstream_play_flv and visual/video/deblocking byte-exact and
+// leaves visual/video/colorconversion/h263 one pixel off (lrintf's
+// round-half-even vs h263-rs's round-half-away). Only FLV1 consults it;
+// VP6 (vp3dsp) and H.264 (h264dsp) have their own fixed transforms.
+static void flv1_select_idct(AVCodecContext* c, enum AVCodecID avid)
+{
+	if (avid == AV_CODEC_ID_FLV1) c->idct_algo = FF_IDCT_FAAN;
+}
+
 static int decode_via_libavcodec(int codec_id,
                                  const unsigned char* payload, int payload_len,
                                  int deblocking,
@@ -413,6 +427,7 @@ static int decode_via_libavcodec(int codec_id,
 	int ok = 0;
 
 	if (!cctx || !pkt || !frame) goto done;
+	flv1_select_idct(cctx, avid);
 	if (avcodec_open2(cctx, codec, NULL) < 0) goto done;
 
 	pkt->data = (uint8_t*)payload;
@@ -579,6 +594,7 @@ VideoDecoderCtx* video_decoder_create(int codec_id, int deblocking)
 	ctx->cctx = avcodec_alloc_context3(codec);
 	if (!ctx->cctx) { free(ctx); return NULL; }
 
+	flv1_select_idct(ctx->cctx, avid);
 	if (avcodec_open2(ctx->cctx, codec, NULL) < 0) {
 		avcodec_free_context(&ctx->cctx);
 		free(ctx);
