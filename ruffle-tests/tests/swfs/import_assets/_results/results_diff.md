@@ -1,21 +1,16 @@
 # Ruffle Test Results Diff
 
-**Previous:** `344c85a166c3` (2026-11-15T08:31:27.882504+00:00)
-**Current:** `08709f65842a` (2026-11-21T17:00:08.542388+00:00)
+**Previous:** `08709f65842a` (2026-11-21T17:00:08.542388+00:00)
+**Current:** `bc91565cea8e` (2026-11-21T19:30:16.450763+00:00)
+**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 0 | 3 | +3 |
+| Passing | 3 | 3 | 0 |
 | Total | 3 | 3 | 0 |
-| Pass rate | 0.0% | 100.0% | +100.0% |
+| Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Newly Passing (3)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `avm1_imports_avm1` | compile_fail | - | 6/6 |
-| `avm1_non_swf_import` | compile_fail | - | 6/6 |
-| `empty_url` | compile_fail | - | 2/2 |
+No changes detected.

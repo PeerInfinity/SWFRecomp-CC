@@ -1,36 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `344c85a166c3` (2026-11-15T08:31:27.897816+00:00)
-**Current:** `08709f65842a` (2026-11-21T17:00:08.552825+00:00)
+**Previous:** `08709f65842a` (2026-11-21T17:00:08.552825+00:00)
+**Current:** `bc91565cea8e` (2026-11-21T19:30:16.466646+00:00)
+**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 0 | 10 | +10 |
-| Total | 12 | 12 | 0 |
-| Pass rate | 0.0% | 83.3% | +83.3% |
-| Mismatched lines | 0 | 22 | +22 |
-|   Increased | | | +22 |
+| Passing | 10 | 9 | -1 |
+| Total | 12 | 11 | -1 |
+| Pass rate | 83.3% | 81.8% | -1.5% |
+| Mismatched lines | 22 | 22 | 0 |
 
-## Newly Passing (10)
+## Missing Tests — Shard Failure (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `avm1_doabc` | compile_fail | - | 1/1 |
-| `avm1_loads_avm2_doaction` | compile_fail | - | 2/2 |
-| `avm1_sprite_sc_ignored` | compile_fail | - | 3/3 |
-| `avm2_doaction` | compile_fail | - | 1/1 |
-| `avm2_loads_avm1` | compile_fail | - | 14/14 |
-| `avm2_loads_avm1_doabc` | compile_fail | - | 4/4 |
-| `avm2_loads_avm1_loads_avm2_doabc` | compile_fail | - | 3/3 |
-| `avm2_loads_avm1_loads_into_root` | compile_fail | - | 2/2 |
-| `avm2_loads_avm1_v10` | compile_fail | - | 8/8 |
-| `avm2_loads_avm1_v9` | compile_fail | - | 8/8 |
+These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
 
-## Status Changed (2)
+- 1 were previously passing
+- 0 were previously failing
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `avm1_loads_avm2` | compile_fail | output_mismatch | - | 3/7 |
-| `avm2_loads_avm1_events` | compile_fail | ruffle_matched | - | 8/26 |
+<details><summary>Show all missing tests</summary>
+
+| Test | Previous Status | Lines |
+|------|----------------|-------|
+| `avm2_loads_avm1_v9` | pass | 8/8 |
+
+</details>

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-21T17:28:09.797615+00:00",
-    "old_git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
-    "new_timestamp": "2026-11-21T18:24:43.146802+00:00",
-    "new_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "old_timestamp": "2026-11-21T18:24:43.146802+00:00",
+    "old_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "new_timestamp": "2026-11-21T19:32:37.101881+00:00",
+    "new_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,286 @@
     "old_effective_pass": 735,
     "old_total": 775,
     "old_pass_rate": 92.0,
-    "new_pass": 713,
+    "new_pass": 727,
     "new_ruffle_matched": 22,
-    "new_effective_pass": 735,
-    "new_total": 775,
-    "new_pass_rate": 92.0,
+    "new_effective_pass": 749,
+    "new_total": 777,
+    "new_pass_rate": 93.6,
     "old_mismatched_lines": 13095,
-    "new_mismatched_lines": 13095,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "new_mismatched_lines": 12718,
+    "increased_mismatches": 1,
+    "decreased_mismatches": 378,
+    "newly_passing": 12,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 775,
-    "added": 0,
+    "status_changed": 12,
+    "unchanged": 760,
+    "added": 2,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "allow_networking_import_assets",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "allow_networking_import_assets2",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    },
+    {
+      "test": "amf0_array_matrix",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 52,
+        "expected_lines": 50,
+        "matching_lines": 39
+      },
+      "new_lines": {
+        "actual_lines": 50,
+        "expected_lines": 50,
+        "matching_lines": 49
+      }
+    },
+    {
+      "test": "amf0_utf8_probe",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 13
+      },
+      "new_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      }
+    },
+    {
+      "test": "amf_array_indices",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 32,
+        "matching_lines": 23
+      },
+      "new_lines": {
+        "actual_lines": 32,
+        "expected_lines": 32,
+        "matching_lines": 32
+      }
+    },
+    {
+      "test": "array_truncation_non_canonical_keys",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 29
+      },
+      "new_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      }
+    },
+    {
+      "test": "edittext_html_duplicate_attributes",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 247,
+        "expected_lines": 247,
+        "matching_lines": 241
+      },
+      "new_lines": {
+        "actual_lines": 247,
+        "expected_lines": 247,
+        "matching_lines": 247
+      }
+    },
+    {
+      "test": "localconnection_serialize_function_array_elements",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 14
+      },
+      "new_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      }
+    },
+    {
+      "test": "localconnection_serialize_inherited_array_indices",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 11
+      },
+      "new_lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 10
+      }
+    },
+    {
+      "test": "localconnection_serialize_sparse_array_getters",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 23
+      },
+      "new_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 25
+      }
+    },
+    {
+      "test": "netconnection_serialize_arrays",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "shared_object_secure",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 19
+      },
+      "new_lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      }
+    },
+    {
+      "test": "sparse_array_truncation_non_canonical_keys",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 43,
+        "expected_lines": 43,
+        "matching_lines": 35
+      },
+      "new_lines": {
+        "actual_lines": 43,
+        "expected_lines": 43,
+        "matching_lines": 43
+      }
+    },
+    {
+      "test": "textfield_get_text_format_args",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 249,
+        "expected_lines": 269,
+        "matching_lines": 87
+      },
+      "new_lines": {
+        "actual_lines": 269,
+        "expected_lines": 269,
+        "matching_lines": 269
+      }
+    },
+    {
+      "test": "textfield_set_text_format_args",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 205,
+        "expected_lines": 232,
+        "matching_lines": 127
+      },
+      "new_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 232
+      }
+    },
+    {
+      "test": "textfield_set_text_format_text_change",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 24,
+        "expected_lines": 37,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      }
+    },
+    {
+      "test": "xml_stringify_utf16",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 1
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      }
+    }
+  ]
 }
