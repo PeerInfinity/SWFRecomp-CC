@@ -8,6 +8,24 @@ swfmill; the weekly canary's WASM link-smoke had failed 4 weeks running; also ke
 Baseline runs at `08709f658` (upstream `0ddd12b6a`): graphics/full/images `44922638965`, no-graphics/full
 `44922646202`.
 
+## Fresh baseline (17:30 UTC)
+
+**FRESH BASELINE (landed 17:30 UTC, merged to master at `12ecaf53c`; read by the coordinator):** graphics/full/images
+run `44922638965` at `08709f658` vs s22 final `8d83af7e2`: trace intersection 4563 rows, effective **4503 → 4495 (−8)**;
+all graded rows **4625 effective / 4752**. Pixels: intersection 587, pass **490 → 487 (−3)**; plus 6 NEW comparisons
+(1 pass: `visual/scroll_rect_culling`) → **488 / 593**. **Every move is upstream drift** (the row's `output.txt`,
+`output.ruffle.txt` or `output.expected.png` changed in `45366370e..0ddd12b6a`); no row moved without a test change, so
+the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke green again).
+- Trace drift losses: `avm1/netconnection_serialize_arrays` (pass→fail), `avm2/filereference_browse_select` (pass→fail),
+  `avm2/event_handler_exception`, `from_avmplus/as3/RuntimeErrors/Error1092XmlUnterminatedXmlDecl`,
+  `from_avmplus/e4x/XML/bug_564468`, `from_avmplus/e4x/XML/misc_errors`, `from_avmplus/regress/bug_478501`,
+  `from_gnash/misc-ming.all/NetStream-SquareTest` (ruffle_matched→fail: sidecar changed or deleted).
+- Pixel drift losses: `avm2/graphics_draw_path`, `visual/cache_as_bitmap/avm1_color` (re-goldened `e7d71c98b`, +`output.ruffle.png`),
+  `avm2/stage3d_texture_bytearray_compressed_alpha` (`5021d0ed7`). Worsened bands (re-goldened): `Video-EmbedSquareTest`,
+  `graphics_simple_shapes`, `graphics_gradients`, `sprite_with_frames`. New failing comparisons: `bitmapdata_encode_jpeg_visual`,
+  `bitmapdata_encode_png_visual`, `context3d_draw_to_bitmap_data`, `visual/filters/empty_child_filter_bounds`, `visual/static_text_offstage`.
+- `origin/ruffle-image-results` now holds this run's failing PNGs (commit `10e5e39ca`), so fidelity checks compare against run `44922638965`.
+
 ## Wave 1 (diagnosis) + direct wave-2 slots
 
 | # | slug | axis | task | session id |
