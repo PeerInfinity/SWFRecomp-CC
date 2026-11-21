@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-21 19:32 UTC
+**Date**: 2026-11-21 20:48 UTC
 
-**Git SHA**: `c489b84d99`
+**Git SHA**: `9a970370e0`
 
-**Run Duration**: 2m 41s
+**Run Duration**: 3m 6s
 
 **Filtered**: 0 tests ignored out of 9 available
 
@@ -13,33 +13,28 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 9 |
-| Passing | **7** (77.8%) |
+| Passing | **8** (88.9%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **8** (88.9%) |
-| Failing | 1 |
+| Effective pass | **9** (100.0%) |
+| Failing | 0 |
 | Total expected lines | 377 |
-| Matching lines | 351 (93.1%) |
-| Mismatched lines | 26 |
-
-### Failure Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Matching lines | 363 (96.3%) |
+| Mismatched lines | 14 |
 
 ## Passing Tests
 
-**7 tests passing**
+**8 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `device_font_glyph_fallback` | 36 | 22.9s |  |
-| 2 | `device_font_kerning` | 4 | 24.9s |  |
-| 3 | `device_font_list` | 64 | 24.0s |  |
-| 4 | `embed_matching/fallback_preferences` | 0 | 27.2s |  |
-| 5 | `embed_matching/match_style` | 0 | 7.2s |  |
-| 6 | `embed_matching/no_font_found` | 0 | 6.8s |  |
-| 7 | `embed_name_lookup` | 242 | 23.2s |  |
+| 1 | `device_font_glyph_fallback` | 36 | 30.0s |  |
+| 2 | `device_font_kerning` | 4 | 33.8s |  |
+| 3 | `device_font_list` | 64 | 23.0s |  |
+| 4 | `device_font_name_case` | 13 | 1.4s |  |
+| 5 | `embed_matching/fallback_preferences` | 0 | 24.1s |  |
+| 6 | `embed_matching/match_style` | 0 | 10.4s |  |
+| 7 | `embed_matching/no_font_found` | 0 | 9.8s |  |
+| 8 | `embed_name_lookup` | 242 | 22.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -47,7 +42,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `device_font_no_ink` | 14 | 14 | 22.4s |  |
+| 1 | `device_font_no_ink` | 14 | 14 | 30.4s |  |
 
 ## Near-Passing Tests
 
@@ -71,8 +66,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `device_font_name_case` | 7.7% | 1/13 | 13 | 13 |  |
+No output mismatches.

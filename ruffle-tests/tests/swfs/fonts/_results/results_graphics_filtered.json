@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-21T19:32:37.172619+00:00",
-    "git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
-    "duration_seconds": 161.23,
+    "timestamp": "2026-11-21T20:48:07.004179+00:00",
+    "git_sha": "9a970370e096ca421802a4616b7acb9f32972031",
+    "duration_seconds": 186.17,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30,
@@ -10,23 +10,22 @@
     "filtered": true
   },
   "total": 9,
-  "pass": 7,
+  "pass": 8,
   "ruffle_matched": 1,
-  "fail": 1,
-  "pass_rate": 77.8,
-  "effective_pass": 8,
-  "effective_pass_rate": 88.9,
+  "fail": 0,
+  "pass_rate": 88.9,
+  "effective_pass": 9,
+  "effective_pass_rate": 100.0,
   "breakdown": {
-    "output_mismatch": 1,
     "ruffle_matched": 1
   },
   "tests": [
     {
       "test": "device_font_glyph_fallback",
       "phases": {
-        "recomp": 0.008,
-        "compile": 22.707,
-        "run": 0.177
+        "recomp": 0.016,
+        "compile": 29.75,
+        "run": 0.23
       },
       "num_frames": 1,
       "lines": {
@@ -34,15 +33,15 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 22.9,
+      "duration": 30.01,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
-        "recomp": 0.007,
-        "compile": 24.362,
-        "run": 0.54
+        "recomp": 0.013,
+        "compile": 32.848,
+        "run": 0.91
       },
       "num_frames": 1,
       "lines": {
@@ -50,9 +49,9 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 24.93,
+      "duration": 33.81,
       "image_comparisons": {
-        "output": {
+        "embedded__output": {
           "status": "pass",
           "message": "Image check passed: 0 outliers (limit 0), max difference 0",
           "max_diff": 0,
@@ -60,6 +59,44 @@
             "last_frame"
           ],
           "known_failure": false,
+          "subtest": "embedded",
+          "png_name": "output",
+          "stats": {
+            "width": 100,
+            "height": 50,
+            "total_channels": 20000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 0,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "freetype__output": {
+          "status": "ignored",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "would_pass": true,
+          "ignored_upstream": "device_font_renderer = freetype",
+          "subtest": "freetype",
+          "png_name": "output",
           "stats": {
             "width": 100,
             "height": 50,
@@ -90,9 +127,9 @@
     {
       "test": "device_font_list",
       "phases": {
-        "recomp": 0.016,
-        "compile": 23.783,
-        "run": 0.201
+        "recomp": 0.009,
+        "compile": 22.828,
+        "run": 0.184
       },
       "num_frames": 1,
       "lines": {
@@ -100,34 +137,31 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 24.01,
+      "duration": 23.03,
       "status": "pass"
     },
     {
       "test": "device_font_name_case",
       "phases": {
         "recomp": 0.006,
-        "compile": 2.005,
-        "run": 0.251
+        "compile": 1.255,
+        "run": 0.18
       },
       "num_frames": 1,
       "lines": {
         "actual_lines": 13,
         "expected_lines": 13,
-        "matching_lines": 1
+        "matching_lines": 13
       },
-      "duration": 2.27,
-      "status": "output_mismatch",
-      "detail": "12 line(s) differ (actual=13, expected=13)",
-      "actual_output": "lower testfonta -> A=true, B=true\nupper TESTFONTA -> A=true, B=true\nmixed tEsTfOnTa -> A=true, B=true\nlower testfontb -> A=true, B=true\nupper TESTFONTB -> A=true, B=true\nprefix XTestFontA -> A=true, B=true\nsuffix TestFontAX -> A=true, B=true\nspace Test FontA -> A=true, B=true\nleading space  TestFontA -> A=true, B=true\ntrailing space TestFontA  -> A=true, B=true\nsuffix-hyphen TestFontA-Bold -> A=true, B=true\nsuffix-space TestFontA Bold -> A=true, B=true\ndone",
-      "expected_output": "lower testfonta -> A=true, B=false\nupper TESTFONTA -> A=true, B=false\nmixed tEsTfOnTa -> A=true, B=false\nlower testfontb -> A=false, B=true\nupper TESTFONTB -> A=false, B=true\nprefix XTestFontA -> A=false, B=false\nsuffix TestFontAX -> A=false, B=false\nspace Test FontA -> A=false, B=false\nleading space  TestFontA -> A=false, B=false\ntrailing space TestFontA  -> A=false, B=false\nsuffix-hyphen TestFontA-Bold -> A=false, B=false\nsuffix-space TestFontA Bold -> A=false, B=false\ndone"
+      "duration": 1.45,
+      "status": "pass"
     },
     {
       "test": "device_font_no_ink",
       "phases": {
-        "recomp": 0.007,
-        "compile": 22.18,
-        "run": 0.175
+        "recomp": 0.013,
+        "compile": 30.103,
+        "run": 0.243
       },
       "num_frames": 1,
       "lines": {
@@ -135,9 +169,9 @@
         "expected_lines": 18,
         "matching_lines": 4
       },
-      "duration": 22.38,
+      "duration": 30.4,
       "image_comparisons": {
-        "output": {
+        "embedded__output": {
           "status": "pass",
           "message": "Image check passed: 0 outliers (limit 0), max difference 0",
           "max_diff": 0,
@@ -145,6 +179,44 @@
             "last_frame"
           ],
           "known_failure": false,
+          "subtest": "embedded",
+          "png_name": "output",
+          "stats": {
+            "width": 100,
+            "height": 50,
+            "total_channels": 20000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 0,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
+        },
+        "freetype__output": {
+          "status": "ignored",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false,
+          "would_pass": true,
+          "ignored_upstream": "device_font_renderer = freetype",
+          "subtest": "freetype",
+          "png_name": "output",
           "stats": {
             "width": 100,
             "height": 50,
@@ -178,9 +250,9 @@
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.192,
-        "compile": 26.083,
-        "run": 0.514
+        "recomp": 0.15,
+        "compile": 23.202,
+        "run": 0.456
       },
       "num_frames": 1,
       "lines": {
@@ -188,7 +260,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 27.2,
+      "duration": 24.11,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -228,9 +300,9 @@
     {
       "test": "embed_matching/match_style",
       "phases": {
-        "recomp": 0.016,
-        "compile": 6.703,
-        "run": 0.389
+        "recomp": 0.028,
+        "compile": 9.603,
+        "run": 0.627
       },
       "num_frames": 1,
       "lines": {
@@ -238,7 +310,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.2,
+      "duration": 10.41,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -278,9 +350,9 @@
     {
       "test": "embed_matching/no_font_found",
       "phases": {
-        "recomp": 0.006,
-        "compile": 6.534,
-        "run": 0.188
+        "recomp": 0.01,
+        "compile": 9.43,
+        "run": 0.257
       },
       "num_frames": 1,
       "lines": {
@@ -288,7 +360,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 6.82,
+      "duration": 9.85,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -329,8 +401,8 @@
       "test": "embed_name_lookup",
       "phases": {
         "recomp": 0.021,
-        "compile": 22.801,
-        "run": 0.371
+        "compile": 22.353,
+        "run": 0.361
       },
       "num_frames": 1,
       "lines": {
@@ -338,7 +410,7 @@
         "expected_lines": 242,
         "matching_lines": 242
       },
-      "duration": 23.2,
+      "duration": 22.74,
       "status": "pass"
     }
   ]
