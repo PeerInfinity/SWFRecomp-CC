@@ -204,6 +204,44 @@ static const uint16_t u16_default_colortransform[] = {'(','r','e','d','M','u','l
 static const uint16_t u16_default_matrix[] = {'(','a','=','1',',',' ','b','=','0',',',' ','c','=','0',',',' ','d','=','1',',',' ','t','x','=','0',',',' ','t','y','=','0',')',0};
 static const uint16_t u16_default_rect[] = {'(','x','=','0',',',' ','y','=','0',',',' ','w','=','0',',',' ','h','=','0',')',0};
 
+// WTF-8 variant of u16_to_utf8 for the XML subsystem, whose node tree is
+// UTF-8 internally: a lone surrogate is written as its own 3-byte sequence
+// instead of U+FFFD, so utf8_to_u16 (which does not validate) restores the
+// original unit on toString (avm1/xml_stringify_utf16, amf0_utf8_probe).
+static int u16_to_wtf8(const uint16_t* u16, u32 u16_len, char* out, int out_size)
+{
+	if (out_size <= 0) return 0;
+	if (u16 == NULL) { out[0] = '\0'; return 0; }
+	int pos = 0;
+	for (u32 i = 0; i < u16_len && pos < out_size - 1; i++) {
+		uint32_t cp = u16[i];
+		if (cp >= 0xD800 && cp <= 0xDBFF && i + 1 < u16_len &&
+		    u16[i + 1] >= 0xDC00 && u16[i + 1] <= 0xDFFF) {
+			cp = 0x10000 + ((cp - 0xD800) << 10) + (u16[i + 1] - 0xDC00);
+			if (pos + 4 > out_size - 1) break;
+			out[pos++] = (char)(0xF0 | (cp >> 18));
+			out[pos++] = (char)(0x80 | ((cp >> 12) & 0x3F));
+			out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+			out[pos++] = (char)(0x80 | (cp & 0x3F));
+			i++;
+			continue;
+		}
+		if (cp < 0x80) out[pos++] = (char)cp;
+		else if (cp < 0x800) {
+			if (pos + 2 > out_size - 1) break;
+			out[pos++] = (char)(0xC0 | (cp >> 6));
+			out[pos++] = (char)(0x80 | (cp & 0x3F));
+		} else {
+			if (pos + 3 > out_size - 1) break;
+			out[pos++] = (char)(0xE0 | (cp >> 12));
+			out[pos++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+			out[pos++] = (char)(0x80 | (cp & 0x3F));
+		}
+	}
+	out[pos] = '\0';
+	return pos;
+}
+
 // Count UTF-16 code units needed for a UTF-8 string
 static int utf8_utf16_length(const char* s, int byte_len)
 {
@@ -963,6 +1001,17 @@ static ASFunction* g_prev_executing_func = NULL;
 static ASFunction g_object_toString_func;
 static ASFunction g_object_valueOf_func;
 static ASFunction g_object_hasOwnProperty_func;
+
+// Flash treats only canonical decimal strings ("0", or [1-9][0-9]*) as array
+// indices; "05", " 5", "+5", "-0" are ordinary named properties
+// (Ruffle avm1 array_truncation_non_canonical_keys; strtoll accepts them all).
+static int isCanonicalIndexStr(const char* s)
+{
+	if (s == NULL || s[0] < '0' || s[0] > '9') return 0;
+	if (s[0] == '0' && s[1] != '\0') return 0;
+	return 1;
+}
+
 static ASFunction g_object_isPropertyEnumerable_func;
 static ASFunction g_object_isPrototypeOf_func;
 static ASFunction g_object_watch_func;
@@ -19191,7 +19240,7 @@ static void xml_append_str(SWFAppContext* ctx, ASObject* obj, const char* name, 
 	if (existing != NULL && existing->type == ACTION_STACK_VALUE_STRING && existing->str_size > 0) {
 		char buf[4096];
 		const uint16_t* eu16 = varGetU16Ptr(existing);
-		u32 elen = (u32) u16_to_utf8(eu16, existing->str_size, buf, sizeof(buf));
+		u32 elen = (u32) u16_to_wtf8(eu16, existing->str_size, buf, sizeof(buf));
 		if ((size_t)elen + vlen < sizeof(buf)) {
 			memcpy(buf + elen, val, vlen);
 			xml_set_str(ctx, obj, name, nlen, buf, elen + vlen);
@@ -19995,7 +20044,7 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 					if (nn != NULL && nn->type == ACTION_STACK_VALUE_STRING) {
 						char _xml_fname_buf[512];
 						const uint16_t* _xml_fname_u16 = varGetU16Ptr(nn);
-						u16_to_utf8(_xml_fname_u16, nn->str_size, _xml_fname_buf, sizeof(_xml_fname_buf));
+						u16_to_wtf8(_xml_fname_u16, nn->str_size, _xml_fname_buf, sizeof(_xml_fname_buf));
 						const char* full_name = _xml_fname_buf;
 						u32 full_len = (u32)strlen(full_name);
 						// Determine element's prefix
@@ -20049,7 +20098,7 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 									char _ns_uri_buf[512];
 									const uint16_t* _ns_uri_u16 = varGetU16Ptr(&aobj->properties[i].value);
 									u32 uri_len = aobj->properties[i].value.str_size;
-									u16_to_utf8(_ns_uri_u16, uri_len, _ns_uri_buf, sizeof(_ns_uri_buf));
+									u16_to_wtf8(_ns_uri_u16, uri_len, _ns_uri_buf, sizeof(_ns_uri_buf));
 									u32 uri_utf8_len = (u32)strlen(_ns_uri_buf);
 									if (uri_utf8_len > 0 || uri_len > 0) {
 										xml_set_str(app_context, elem, "namespaceURI", 12, _ns_uri_buf, uri_utf8_len);
@@ -20154,7 +20203,7 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 		if (nv != NULL && nv->type == ACTION_STACK_VALUE_STRING) {
 			char _xml_nv_buf[4096];
 			const uint16_t* _xml_nv_u16 = varGetU16Ptr(nv);
-			u16_to_utf8(_xml_nv_u16, nv->str_size, _xml_nv_buf, sizeof(_xml_nv_buf));
+			u16_to_wtf8(_xml_nv_u16, nv->str_size, _xml_nv_buf, sizeof(_xml_nv_buf));
 			const char* text = _xml_nv_buf;
 			if (nv->str_size > 0) {
 				u32 esc_len = 0;
@@ -20174,7 +20223,7 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 	u32 name_len = 0;
 	if (nn_prop != NULL && nn_prop->type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _xml_nn_u16 = varGetU16Ptr(nn_prop);
-		u16_to_utf8(_xml_nn_u16, nn_prop->str_size, _xml_nn_buf, sizeof(_xml_nn_buf));
+		u16_to_wtf8(_xml_nn_u16, nn_prop->str_size, _xml_nn_buf, sizeof(_xml_nn_buf));
 		nodeName = _xml_nn_buf;
 		name_len = (u32)strlen(nodeName);
 	}
@@ -20246,7 +20295,7 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 					char _xml_av_buf[512];
 					const uint16_t* _xml_av_u16 = varGetU16Ptr(&attrs->properties[i].value);
 					u32 avl = attrs->properties[i].value.str_size;
-					u16_to_utf8(_xml_av_u16, avl, _xml_av_buf, sizeof(_xml_av_buf));
+					u16_to_wtf8(_xml_av_u16, avl, _xml_av_buf, sizeof(_xml_av_buf));
 					if (avl > 0) {
 						u32 av_utf8_len = (u32)strlen(_xml_av_buf);
 						u32 el = 0;
@@ -20305,7 +20354,7 @@ static ActionVar builtin_xml_parseXML(SWFAppContext* app_context, ActionVar* arg
 	u32 text_len = 0;
 	if (args[0].type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _xml_parse_u16 = varGetU16Ptr(&args[0]);
-		u16_to_utf8(_xml_parse_u16, args[0].str_size, _xml_parse_buf, sizeof(_xml_parse_buf));
+		u16_to_wtf8(_xml_parse_u16, args[0].str_size, _xml_parse_buf, sizeof(_xml_parse_buf));
 		text = _xml_parse_buf;
 		text_len = (u32)strlen(text);
 	}
@@ -20345,7 +20394,7 @@ static ActionVar builtin_xml_createElement(SWFAppContext* app_context, ActionVar
 	}
 	char _xml_cname_buf[512];
 	const uint16_t* _xml_cname_u16 = varGetU16Ptr(&args[0]);
-	u16_to_utf8(_xml_cname_u16, args[0].str_size, _xml_cname_buf, sizeof(_xml_cname_buf));
+	u16_to_wtf8(_xml_cname_u16, args[0].str_size, _xml_cname_buf, sizeof(_xml_cname_buf));
 	const char* name = _xml_cname_buf;
 	u32 name_len = (u32)strlen(name);
 	ASObject* node = xml_create_node(app_context, 1, name, name_len, NULL, 0);
@@ -20361,7 +20410,7 @@ static ActionVar builtin_xml_createTextNode(SWFAppContext* app_context, ActionVa
 	u32 text_len = 0;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _xml_tnode_u16 = varGetU16Ptr(&args[0]);
-		u16_to_utf8(_xml_tnode_u16, args[0].str_size, _xml_tnode_buf, sizeof(_xml_tnode_buf));
+		u16_to_wtf8(_xml_tnode_u16, args[0].str_size, _xml_tnode_buf, sizeof(_xml_tnode_buf));
 		text = _xml_tnode_buf;
 		text_len = (u32)strlen(text);
 	}
@@ -20442,7 +20491,7 @@ static ActionVar builtin_xml_cloneNode(SWFAppContext* app_context, ActionVar* ar
 	const char* nodeName = NULL; u32 nameLen = 0;
 	if (nn && nn->type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _clone_nn_u16 = varGetU16Ptr(nn);
-		u16_to_utf8(_clone_nn_u16, nn->str_size, _clone_nn_buf, sizeof(_clone_nn_buf));
+		u16_to_wtf8(_clone_nn_u16, nn->str_size, _clone_nn_buf, sizeof(_clone_nn_buf));
 		nodeName = _clone_nn_buf;
 		nameLen = (u32)strlen(nodeName);
 	}
@@ -20451,7 +20500,7 @@ static ActionVar builtin_xml_cloneNode(SWFAppContext* app_context, ActionVar* ar
 	const char* nodeValue = NULL; u32 valLen = 0;
 	if (nv && nv->type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _clone_nv_u16 = varGetU16Ptr(nv);
-		u16_to_utf8(_clone_nv_u16, nv->str_size, _clone_nv_buf, sizeof(_clone_nv_buf));
+		u16_to_wtf8(_clone_nv_u16, nv->str_size, _clone_nv_buf, sizeof(_clone_nv_buf));
 		nodeValue = _clone_nv_buf;
 		valLen = (u32)strlen(nodeValue);
 	}
@@ -20513,7 +20562,7 @@ static ActionVar builtin_xml_getNamespaceForPrefix(SWFAppContext* app_context, A
 	u32 prefix_len = 0;
 	if (args[0].type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _xml_prefix_u16 = varGetU16Ptr(&args[0]);
-		u16_to_utf8(_xml_prefix_u16, args[0].str_size, _xml_prefix_buf, sizeof(_xml_prefix_buf));
+		u16_to_wtf8(_xml_prefix_u16, args[0].str_size, _xml_prefix_buf, sizeof(_xml_prefix_buf));
 		prefix = _xml_prefix_buf;
 		prefix_len = (u32)strlen(prefix);
 	}
@@ -20560,7 +20609,7 @@ static ActionVar builtin_xml_getPrefixForNamespace(SWFAppContext* app_context, A
 	u32 uri_len = 0;
 	if (args[0].type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* _xml_uri_u16 = varGetU16Ptr(&args[0]);
-		u16_to_utf8(_xml_uri_u16, args[0].str_size, _xml_uri_buf, sizeof(_xml_uri_buf));
+		u16_to_wtf8(_xml_uri_u16, args[0].str_size, _xml_uri_buf, sizeof(_xml_uri_buf));
 		uri = _xml_uri_buf;
 		uri_len = (u32)strlen(uri);
 	}
@@ -20582,7 +20631,7 @@ static ActionVar builtin_xml_getPrefixForNamespace(SWFAppContext* app_context, A
 					char _xml_nsv_buf[512];
 					const uint16_t* _xml_nsv_u16 = varGetU16Ptr(&attrs->properties[i].value);
 					u32 vl = attrs->properties[i].value.str_size;
-					u16_to_utf8(_xml_nsv_u16, vl, _xml_nsv_buf, sizeof(_xml_nsv_buf));
+					u16_to_wtf8(_xml_nsv_u16, vl, _xml_nsv_buf, sizeof(_xml_nsv_buf));
 					const char* v = _xml_nsv_buf;
 					u32 v_utf8_len = (u32)strlen(v);
 					if (v_utf8_len == uri_len && strncmp(v, uri, uri_len) == 0) {
@@ -20654,7 +20703,7 @@ static ActionVar builtin_xml_onData(SWFAppContext* app_context, ActionVar* args,
 	u32 u16_len = args[0].str_size;
 	char* buf = (char*) malloc((size_t)u16_len * 4 + 1);
 	if (buf != NULL) {
-		u32 utf8_len = (u32) u16_to_utf8(u16, u16_len, buf, u16_len * 4 + 1);
+		u32 utf8_len = (u32) u16_to_wtf8(u16, u16_len, buf, u16_len * 4 + 1);
 		xml_parse_into(app_context, doc, buf, utf8_len);
 		free(buf);
 	}
@@ -20768,7 +20817,7 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 	url_utf8[0] = '\0';
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
 		const uint16_t* u16 = varGetU16Ptr(&args[0]);
-		u16_to_utf8(u16, args[0].str_size, url_utf8, sizeof(url_utf8));
+		u16_to_wtf8(u16, args[0].str_size, url_utf8, sizeof(url_utf8));
 	}
 
 	// Set loaded = false initially (observable synchronously)
@@ -53609,7 +53658,7 @@ void actionSetMember(SWFAppContext* app_context)
 				errno = 0;
 				long long index_ll = strtoll(prop_name, &endptr, 10);
 				int strtoll_overflow = (errno == ERANGE);
-				int is_standard_index = (*endptr == '\0' && !strtoll_overflow && index_ll >= 0 && index_ll <= 2147483647LL);
+				int is_standard_index = (*endptr == '\0' && !strtoll_overflow && index_ll >= 0 && index_ll <= 2147483647LL && isCanonicalIndexStr(prop_name));
 
 				// Determine u32 index via ecmaToUint32 for extended indices
 				u32 idx_u32 = 0;
@@ -53631,12 +53680,21 @@ void actionSetMember(SWFAppContext* app_context)
 					// which Flash serializes with an ECMAArray length of 1.
 					// Integral spellings, including negative ones and digit runs
 					// far past 2^64, DO count (array_length).
-					int _idx_scannable = (prop_name_len > 0);
-					for (u32 _i = 0; _idx_scannable && _i < prop_name_len; _i++)
+					// Ruffle parse_array_index: leading ASCII whitespace is
+					// trimmed and an i32 sign ('+' or '-') is accepted, so
+					// " 3", "+5", "\t6" and "02" bump `length` even though the
+					// key itself stays a named (non-canonical) property
+					// (amf_array_indices). Trailing junk ("4 ") does not.
+					u32 _ws = 0;
+					while (_ws < prop_name_len && (prop_name[_ws] == ' ' || prop_name[_ws] == '\t' ||
+					       prop_name[_ws] == '\n' || prop_name[_ws] == '\r' || prop_name[_ws] == '\f'))
+						_ws++;
+					int _idx_scannable = (prop_name_len > _ws);
+					for (u32 _i = _ws; _idx_scannable && _i < prop_name_len; _i++)
 					{
-						if (_i == 0 && prop_name[0] == '-')
+						if (_i == _ws && (prop_name[_i] == '-' || prop_name[_i] == '+'))
 						{
-							if (prop_name_len < 2) _idx_scannable = 0;
+							if (prop_name_len < _ws + 2) _idx_scannable = 0;
 							continue;
 						}
 						if (prop_name[_i] < '0' || prop_name[_i] > '9')
@@ -53644,7 +53702,7 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 					if (_idx_scannable)
 					{
-						double d = strtod(prop_name, &endptr);
+						double d = strtod(prop_name + _ws, &endptr);
 						if (*endptr == '\0' && !isnan(d) && !isinf(d))
 						{
 							idx_u32 = ecmaToUint32(d);
@@ -55836,7 +55894,7 @@ void actionDelete(SWFAppContext* app_context)
 			// Try numeric index
 			char* endptr;
 			long long index_ll = strtoll(prop_name, &endptr, 10);
-			if (*endptr == '\0' && index_ll >= 0 && index_ll < (long long)arr->length)
+			if (*endptr == '\0' && index_ll >= 0 && index_ll < (long long)arr->length && isCanonicalIndexStr(prop_name))
 			{
 				u32 idx = (u32) index_ll;
 				if (idx < arr->capacity)
@@ -57052,7 +57110,7 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 
 			// Check if conversion was successful and entire string was consumed
 			// Valid array indices are 0 to INT_MAX (2147483647)
-			if (prop_name_len > 0 && *endptr == '\0' && index >= 0 && index <= 2147483647LL)
+			if (prop_name_len > 0 && *endptr == '\0' && index >= 0 && index <= 2147483647LL && isCanonicalIndexStr(prop_name))
 			{
 				// Valid numeric index — try elements array first
 				ActionVar* elem = getArrayElement(arr, (u32)index);
@@ -66669,7 +66727,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 			{
 				char* endptr;
 				long long idx = strtoll(nb, &endptr, 10);
-				if (nlen > 0 && *endptr == '\0' && idx >= 0 && idx <= 2147483647LL)
+				if (nlen > 0 && *endptr == '\0' && idx >= 0 && idx <= 2147483647LL && isCanonicalIndexStr(nb))
 				{
 					ActionVar* e = getArrayElement(arr, (u32) idx);
 					if (e != NULL && e->type != ACTION_STACK_VALUE_HOLE)
@@ -67394,7 +67452,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 			// Try as numeric index
 			char* endptr;
 			long index = strtol(key_buf, &endptr, 10);
-			if (*endptr == '\0' && index >= 0 && index <= 2147483647L)
+			if (*endptr == '\0' && index >= 0 && index <= 2147483647L && isCanonicalIndexStr(key_buf))
 			{
 				// Check if array element is set (not a hole)
 				ActionVar* elem = getArrayElement(arr, (u32)index);
@@ -79735,7 +79793,7 @@ static void call_function_with_this(SWFAppContext* app_context, ASFunction* func
 // tf_mc = the text field MC that was clicked. Resolution scope is tf_mc->parent.
 static void handle_asfunction(SWFAppContext* app_context, const char* href, MovieClip* tf_mc)
 {
-	if (strncmp(href, "asfunction:", 11) != 0) return;
+	if (strncasecmp(href, "asfunction:", 11) != 0) return;
 	const char* address = href + 11;
 	if (address[0] == '\0') return;
 

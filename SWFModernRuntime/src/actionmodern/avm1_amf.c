@@ -118,6 +118,7 @@ typedef struct
 	SWFAppContext* app;
 	AmfBuf* out;
 	int lso_mode;
+	int lc_mode;   // LocalConnection: Flash's dense-only StrictArray rule
 	int depth;
 	const void* refs[AMF_MAX_REFS];
 	int ref_count;
@@ -524,6 +525,42 @@ static void w0_array_view(Amf0Wr* w, ArrayView* v)
 {
 	int strict = !v->has_non_index && !w->lso_mode;
 	long count = 0;
+	// LocalConnection (Ruffle 5b29f2e73, Flash-confirmed): StrictArray only
+	// for a genuinely dense array -- every key canonical, one per index, and
+	// no undefined / function / display-object element (those would be
+	// indistinguishable from holes). Anything else is an ECMAArray that keeps
+	// the keys verbatim, omits functions, and declares
+	// max(length, max canonical index + 1).
+	long lc_len = 0;
+	if (w->lc_mode)
+	{
+		double lenv0 = v->length_readable ? v->length_val : 0.0;
+		lc_len = (lenv0 > 0.0 && !isnan(lenv0) && lenv0 < 4294967296.0) ? (long) lenv0 : 0;
+		int dense = 1, nkeys = 0;
+		for (int i = 0; i < v->count; i++)
+		{
+			const AmfEntry* e = &v->e[i];
+			nkeys++;
+			int canon = (e->len > 0 && e->name[0] >= '0' && e->name[0] <= '9' &&
+			             !(e->name[0] == '0' && e->len > 1));
+			unsigned long idx;
+			if (canon && amf_key_is_index(e->name, e->len, &idx))
+			{
+				if ((long) idx + 1 > lc_len) lc_len = (long) idx + 1;
+			}
+			else
+				dense = 0;
+			int t = e->val.type;
+			if (t == ACTION_STACK_VALUE_UNDEFINED || t == ACTION_STACK_VALUE_FUNCTION ||
+			    t == ACTION_STACK_VALUE_MOVIECLIP)
+				dense = 0;
+			if (t == ACTION_STACK_VALUE_OBJECT &&
+			    amf_is_display_object((ASObject*) e->val.data.numeric_value))
+				dense = 0;
+		}
+		if (nkeys != lc_len) dense = 0;
+		strict = dense;
+	}
 	if (strict)
 	{
 		double lenv = v->length_readable ? v->length_val : 0.0;
@@ -550,7 +587,9 @@ static void w0_array_view(Amf0Wr* w, ArrayView* v)
 			char b[12];
 			int n = snprintf(b, sizeof(b), "%ld", i);
 			AmfEntry* e = av_find(v, b, (u32) n);
-			if (e != NULL)
+			// A function-valued element occupies its index, so it becomes
+			// undefined rather than an object (netconnection_serialize_arrays).
+			if (e != NULL && e->val.type != ACTION_STACK_VALUE_FUNCTION)
 			{
 				w0_value(w, &e->val);
 			}
@@ -566,6 +605,7 @@ static void w0_array_view(Amf0Wr* w, ArrayView* v)
 	unsigned long declared = 0;
 	if (lenv > 0.0 && !isnan(lenv) && lenv < 4294967296.0)
 		declared = (unsigned long) lenv;
+	if (w->lc_mode && (unsigned long) lc_len > declared) declared = (unsigned long) lc_len;
 	amf_buf_u8(w->out, M0_ECMA);
 	amf_buf_u32be(w->out, declared);
 	for (int i = 0; i < v->count; i++)
@@ -752,6 +792,7 @@ unsigned char* avm1AmfWriteValue(SWFAppContext* app_context, ActionVar* v,
 	w.app = app_context;
 	w.out = &b;
 	w.lso_mode = (mode == AVM1_AMF_LSO);
+	w.lc_mode = 0;
 	w.depth = 0;
 	w.ref_count = 0;
 	w0_value(&w, v);
@@ -784,6 +825,7 @@ unsigned char* avm1AmfWriteLsoBody(SWFAppContext* app_context, ASObject* data,
 			w.app = app_context;
 			w.out = &b;
 			w.lso_mode = 1;
+			w.lc_mode = 0;
 			w.depth = 0;
 			w.ref_count = 0;
 			amf_buf_short_str(&b, name, len);
@@ -798,7 +840,18 @@ unsigned char* avm1AmfWriteLsoBody(SWFAppContext* app_context, ASObject* data,
 unsigned char* avm1AmfSerializeArg(SWFAppContext* app_context, ActionVar* v,
                                    size_t* out_len)
 {
-	return avm1AmfWriteValue(app_context, v, AVM1_AMF_WIRE, out_len);
+	AmfBuf b;
+	amf_buf_init(&b);
+	Amf0Wr w;
+	w.app = app_context;
+	w.out = &b;
+	w.lso_mode = 0;
+	w.lc_mode = 1;
+	w.depth = 0;
+	w.ref_count = 0;
+	w0_value(&w, v);
+	if (out_len != NULL) *out_len = b.len;
+	return b.data;
 }
 
 // ==================================================================
@@ -947,7 +1000,11 @@ static void rd0_pairs_into_array(Amf0Rd* r, ASArray* arr)
 		// dense element run. An ECMAArray in this stream can legitimately carry
 		// keys like "4294967295" (amf0_serde_suite), and growing `elements` to
 		// hold one is neither possible nor what Flash does.
-		if (amf_key_is_index(name, len, &idx)
+		// Only a canonical decimal key is an element; "02"/"007" stay named
+		// properties, exactly as script assignment keeps them
+		// (amf_array_indices: LC LeadingZero Key '02').
+		int canon = (len > 0 && !(name[0] == '0' && len > 1));
+		if (canon && amf_key_is_index(name, len, &idx)
 		    && (idx < 1048576UL || idx < arr->capacity))
 		{
 			setArrayElement(r->app, arr, (u32) idx, &v);
@@ -958,7 +1015,6 @@ static void rd0_pairs_into_array(Amf0Rd* r, ASArray* arr)
 			{
 				arr->props = allocObject(r->app, 4);
 				retainObject(arr->props);
-				setObjectProto(r->app, arr->props);
 			}
 			setProperty(r->app, arr->props, name, len, &v);
 			arrayTrackKey(arr, name, len);
@@ -1060,12 +1116,17 @@ static ActionVar rd0_value(Amf0Rd* r)
 		}
 		case M0_ECMA:
 		{
-			(void) rd_u32(r);   // declared length: advisory, the pairs decide
+			// Ruffle instantiates `new Array(declared)` and then sets the
+			// pairs, so the declared length is a floor (amf_array_indices:
+			// LC LeadingSpace Length 4 for a lone " 3" key).
+			unsigned long declared = rd_u32(r);
 			ASArray* arr = allocArray(r->app, 4);
 			out.type = ACTION_STACK_VALUE_ARRAY;
 			out.data.numeric_value = (u64) (uintptr_t) arr;
 			int slot = rd_ref_claim(r, out);
 			rd0_pairs_into_array(r, arr);
+			if (declared <= 2147483647UL && arr->length < (u32) declared)
+				arr->length = (u32) declared;
 			rd_ref_set(r, slot, out);
 			break;
 		}
@@ -1213,6 +1274,15 @@ static ActionVar builtin_so_getLocal(SWFAppContext* app_context, ActionVar* args
 	char* name = actionVarToUtf8Alloc(app_context, &args[0], &nlen);
 	if (name == NULL) return ret;
 	if (!so_name_is_valid(name)) { free(name); return ret; }
+	// secure === true (only the boolean, never coerced: "true"/1/objects all
+	// create) refuses a movie not served over HTTPS -- which a local test
+	// movie never is -- so getLocal returns null (shared_object_secure,
+	// Ruffle 42a8541b7 / Flash-recorded).
+	if (arg_count > 2 && args[2].type == ACTION_STACK_VALUE_BOOLEAN && args[2].data.numeric_value)
+	{
+		free(name);
+		return ret;
+	}
 
 	char local_path[256];
 	local_path[0] = '\0';
