@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-21T19:30:16.460957+00:00",
-    "old_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
-    "new_timestamp": "2026-11-21T19:49:24.073623+00:00",
-    "new_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
+    "old_timestamp": "2026-11-21T19:49:24.073623+00:00",
+    "old_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
+    "new_timestamp": "2026-11-21T21:08:32.077141+00:00",
+    "new_git_sha": "9a970370e096ca421802a4616b7acb9f32972031",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 144,
+    "old_pass": 149,
     "old_ruffle_matched": 2,
-    "old_effective_pass": 146,
-    "old_total": 146,
-    "old_pass_rate": 98.6,
+    "old_effective_pass": 151,
+    "old_total": 151,
+    "old_pass_rate": 98.7,
     "new_pass": 149,
     "new_ruffle_matched": 2,
     "new_effective_pass": 151,
@@ -25,70 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 146,
-    "added": 5,
+    "unchanged": 151,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "drawing_api/drawing_order",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "drawing_api/fills_and_lines",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "drawing_api/gradient_focal_point",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "edittext/edittext_background_basic",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "edittext/edittext_background_basic_scale2",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    }
-  ]
+  "changes": []
 }

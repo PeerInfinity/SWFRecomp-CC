@@ -1,26 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bc91565cea8e` (2026-11-21T19:30:16.482649+00:00)
-**Current:** `c489b84d9946` (2026-11-21T19:49:24.087889+00:00)
+**Previous:** `c489b84d9946` (2026-11-21T19:49:24.087889+00:00)
+**Current:** `9a970370e096` (2026-11-21T21:08:32.091127+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 206 | 214 | +8 |
-| Total | 221 | 229 | +8 |
-| Pass rate | 93.2% | 93.4% | +0.2% |
-| Mismatched lines | 88 | 88 | 0 |
+| Passing | 214 | 214 | 0 |
+| Total | 229 | 229 | 0 |
+| Pass rate | 93.4% | 93.4% | 0% |
+| Mismatched lines | 88 | 77 | -11 |
+|   Decreased | | | -11 |
 
-## Added Tests (8)
+## Status Changed (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `avm1/nested-button` | pass | 1/1 |
-| `avm1/operations` | pass | 13/13 |
-| `avm1/property-paths/property-paths-6` | pass | 6/6 |
-| `avm1/property-paths/property-paths-7` | pass | 7/7 |
-| `avm1/propertycase/propertycase` | pass | 7/7 |
-| `avm1/propertycase/propertycase-preserving-6` | pass | 2/2 |
-| `avm1/propertycase/propertycase-preserving-7` | pass | 5/5 |
-| `avm1/rollover` | pass | 4/4 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `as3-loader/events/loader-events` | output_mismatch | ruffle_matched | 5/36 | 16/36 |
