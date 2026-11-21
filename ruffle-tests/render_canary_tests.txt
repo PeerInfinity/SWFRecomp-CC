@@ -543,3 +543,8 @@ avm1/edittext_stylesheet                    # AVM1 styleSheet CSS + htmlText   1
 # tier=2  (KF; CI-failing on pixels — A/B only)
 from_shumway/acid/acid-textfield            # AVM1 ranged setTextFormat        1 cmp
 from_shumway/stylesheet                     # AVM1 TextField.StyleSheet render 1 cmp
+# s23 w2-attached-timeline: attachMovie'd clips now run their natural timeline
+# (frame tags, DoActions, nested children) in CI modes. Besides
+# doubleAndRegister above, this is the corpus's only image-compared row whose
+# SWF calls attachMovie. md5-identical across that change (2026-11-21).
+avm1/netstream_play_flv_screen              # attachMovie'd clip render     1 cmp

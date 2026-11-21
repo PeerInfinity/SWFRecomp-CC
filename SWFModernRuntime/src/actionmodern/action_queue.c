@@ -645,13 +645,31 @@ static int aq_sprite_ctx_removed(MovieClip* mc)
 	return 0;
 }
 
+// s23 w2-attached-timeline (Flash fp10, gnash movieclip_destruction_test3): a
+// clip removed by removeMovieClip that is kept alive by its OWN onUnload (the
+// deferred-removal branch: pending_removal, shifted depth, not INT_MIN) still
+// runs a frame action that was already queued for it this tick. A clip whose
+// ANCESTOR was removed (or that is alive only because a descendant defines
+// onUnload) does not. Ruffle and fp9 drop both; output.txt is fp10.
+static int aq_removed_but_self_kept_alive(MovieClip* mc)
+{
+	extern int actionMcHasOwnOnUnload(MovieClip* mc);
+	if (mc->depth == INT_MIN || !mc->pending_removal || !actionMcHasOwnOnUnload(mc))
+		return 0;
+	for (MovieClip* a = mc->parent; a != NULL; a = a->parent)
+		if (a->avm1_removed || a->pending_removal || a->depth == INT_MIN)
+			return 0;
+	return 1;
+}
+
 static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
 {
 	PendingSpriteScript* p = (PendingSpriteScript*)user;
 	if (!p) return;
 	// Skip if the captured MC (or any ancestor) was removed between queue and
 	// dispatch — see aq_sprite_ctx_removed above.
-	if (p->ctx_mc != NULL && aq_sprite_ctx_removed(p->ctx_mc)) {
+	if (p->ctx_mc != NULL && aq_sprite_ctx_removed(p->ctx_mc)
+	    && !aq_removed_but_self_kept_alive(p->ctx_mc)) {
 		free(p);
 		return;
 	}

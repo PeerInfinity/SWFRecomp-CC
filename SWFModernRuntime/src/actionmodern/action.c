@@ -24617,6 +24617,8 @@ void actionReclaimDeadChildMCSlots(void)
 // descendants fire onUnload. Non-survivors get the full recursive treatment
 // (own handler + queueChildOnUnloads subtree), matching the unfiltered path.
 static void queueOwnOnUnload(MovieClip* child);
+static void queueSubtreeOnUnloadsPostOrder(MovieClip* parent_mc, int lvl);
+static MovieClip* mcRemovedParentKeptChild(MovieClip* mc, const char* name);
 void actionQueueChildUnloadsFiltered(MovieClip* parent_mc,
 	int (*skip_child)(MovieClip*, void*), void* ud)
 {
@@ -26501,6 +26503,39 @@ static void queueChildOnUnloads(MovieClip* parent_mc)
 	}
 }
 
+// s23 w2-attached-timeline: removeMovieClip unload order. Flash fp10 / Ruffle
+// MovieClip::avm1_unload unload a subtree POST-ORDER: every child (render-list
+// order, i.e. ascending depth) unloads its own subtree first, then the clip
+// itself (gnash movieclip_destruction_test3). queueChildOnUnloads above is
+// pre-order and is kept for its other callers.
+static void queueSubtreeOnUnloadsPostOrder(MovieClip* parent_mc, int lvl)
+{
+	if (lvl > 64) return;
+	enum { CAP = 128 };
+	MovieClip* kids[CAP];
+	int n = 0;
+	for (int i = 0; i < child_mc_count && n < CAP; i++) {
+		MovieClip* c = child_mc_cache[i];
+		if (c == NULL || c == parent_mc || c->depth == INT_MIN || c->parent != parent_mc) continue;
+		int k = n++;
+		while (k > 0 && kids[k - 1]->depth > c->depth) { kids[k] = kids[k - 1]; k--; }
+		kids[k] = c;
+	}
+	for (int k = 0; k < n; k++) {
+		queueSubtreeOnUnloadsPostOrder(kids[k], lvl + 1);
+		queueOwnOnUnload(kids[k]);
+	}
+}
+
+// s23 w2-attached-timeline: 1 if `mc` itself has an AS-set onUnload function
+// (used by the action queue's removed-but-alive dispatch rule).
+int actionMcHasOwnOnUnload(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 0;
+	ActionVar* h = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
+	return h != NULL && h->type == ACTION_STACK_VALUE_FUNCTION && h->data.numeric_value != 0;
+}
+
 // Returns 1 if `mc` itself OR any descendant (recursively) has an AS-set
 // onUnload handler. Flash keeps a removed clip alive at a shifted depth if it
 // or any of its children defines onUnload — see gnash MovieClip.as hardref3:
@@ -26521,6 +26556,25 @@ static int mcOrDescendantHasOnUnload(MovieClip* mc)
 		if (mcOrDescendantHasOnUnload(child)) return 1;
 	}
 	return 0;
+}
+
+// s23 w2-attached-timeline (gnash movieclip_destruction_test4 sc:140-143,
+// Flash fp10): inside a removed parent's onUnload, `this.mc31` still resolves
+// when mc31 is kept alive by an onUnload in its own subtree, at its unshifted
+// depth; a child with no onUnload in its subtree is gone (sc:124 brother4).
+// The deferred-removal branch cuts mc->display_obj, so the display walks in
+// GetMember miss every child: resolve through child_mc_cache instead.
+static MovieClip* mcRemovedParentKeptChild(MovieClip* mc, const char* name)
+{
+	if (mc == NULL || name == NULL) return NULL;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* c = child_mc_cache[i];
+		if (c == NULL || c == mc || c->parent != mc || c->depth == INT_MIN) continue;
+		if (!swf_name_match(c->name, name)) continue;
+		if (!mcOrDescendantHasOnUnload(c)) continue;
+		return c;
+	}
+	return NULL;
 }
 
 // Strip non-surviving direct children of a clip that was deferred-removed ONLY
@@ -58078,6 +58132,17 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 					return;
 				}
 			}
+			// A removeMovieClip-deferred parent (display link already cut)
+			// still resolves a named child that is itself kept alive by an
+			// onUnload in its subtree. See mcRemovedParentKeptChild.
+			if (mc->avm1_removed && mc->display_obj == NULL)
+			{
+				MovieClip* _rpk = mcRemovedParentKeptChild(mc, child_name_buf);
+				if (_rpk != NULL) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_rpk);
+					return;
+				}
+			}
 		}
 
 		// Built-in defaults for non-underscore properties
@@ -61725,11 +61790,12 @@ void actionRemoveSprite(SWFAppContext* app_context)
 					if (_rs_unload_func != NULL) _rs_has_unload = 1;
 				}
 			}
-			// Queue AS-set onUnload handler for deferred firing at ShowFrame
+			// Queue AS-set onUnload handlers for deferred firing at ShowFrame:
+			// children's subtrees first, then this clip (post-order, as in
+			// the method form; see queueSubtreeOnUnloadsPostOrder).
+			queueSubtreeOnUnloadsPostOrder(_rs_mc, 0);
 			if (_rs_unload_func != NULL)
 				queueOnUnload(_rs_unload_func, _rs_mc);
-			// Recursively queue onUnload handlers for children
-			queueChildOnUnloads(_rs_mc);
 
 			// Defer removal when this clip OR a descendant defines onUnload.
 			// When deferred ONLY because of a descendant (clip itself has no
@@ -75842,11 +75908,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						if (_rmc_unload_func != NULL) _rmc_has_unload = 1;
 					}
 				}
-				// Queue onUnload handler for deferred firing at ShowFrame (matches Flash behavior)
+				// Queue onUnload handlers for deferred firing at ShowFrame (matches
+				// Flash behavior): children's subtrees first, then this clip
+				// (Flash fp10 / Ruffle avm1_unload post-order).
+				queueSubtreeOnUnloadsPostOrder(mc, 0);
 				if (_rmc_unload_func != NULL)
 					queueOnUnload(_rmc_unload_func, mc);
-				// Recursively queue onUnload handlers for children
-				queueChildOnUnloads(mc);
 
 				// Defer removal when this clip OR a descendant defines onUnload.
 				// When deferred ONLY because of a descendant (clip itself has no
