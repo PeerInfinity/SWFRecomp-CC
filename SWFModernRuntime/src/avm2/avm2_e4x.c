@@ -1255,6 +1255,8 @@ static void esc_element_value(Buf* b, const Avm2String* s)
 		if (c == '<') buf_lit(b, "&lt;");
 		else if (c == '>') buf_lit(b, "&gt;");
 		else if (c == '&') buf_lit(b, "&amp;");
+		// Flash escapes NUL back as a char reference (upstream 1a54c10d7).
+		else if (c == '\0') buf_lit(b, "&#x0;");
 		else buf_ch(b, c);
 	}
 }
@@ -1270,6 +1272,7 @@ static void esc_attribute_value(Buf* b, const Avm2String* s)
 		else if (c == '\n') buf_lit(b, "&#xA;");
 		else if (c == '\r') buf_lit(b, "&#xD;");
 		else if (c == '\t') buf_lit(b, "&#x9;");
+		else if (c == '\0') buf_lit(b, "&#x0;");
 		else buf_ch(b, c);
 	}
 }
@@ -1731,10 +1734,15 @@ static void decode_entities(Parser* ps, Buf* out, const char* s, uint32_t len)
 					else cp = cp * 10 + (uint32_t) (c - '0');
 				}
 			}
-			if (!ok || cp == 0 || cp > 0x10FFFF)
+			if (!ok || cp > 0x10FFFF)
 			{
 				// Preserve the raw entity text.
 				buf_bytes(out, s + i, j - i + 1);
+			}
+			else if (cp == 0)
+			{
+				// Flash decodes &#0; / &#x0; to NUL (upstream 1a54c10d7).
+				buf_ch(out, '\0');
 			}
 			else if (cp < 0x80)
 			{
@@ -1921,7 +1929,16 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
 		const Avm2String* raw_name;
 		const Avm2String* value;
 	} RawAttr;
-	RawAttr attrs[128];
+	// No cap: FP keeps every attribute (xml_many_namespace_declarations
+	// declares 257 namespaces). Past 128 entries the list spills into one
+	// process-wide heap buffer that only grows, so a parse_error longjmp out
+	// of this frame never leaks it. Children are parsed after this returns,
+	// so the shared spill buffer is never live in two frames at once.
+	RawAttr attrs_stack[128];
+	static RawAttr* attrs_heap;
+	static uint32_t attrs_heap_cap;
+	RawAttr* attrs = attrs_stack;
+	uint32_t attrs_cap = 128;
 	uint32_t attr_n = 0;
 
 	for (;;)
@@ -1958,7 +1975,29 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
 		const Avm2String* value =
 			decode_entities_str(ps, ps->p + vstart, ps->pos - vstart);
 		ps->pos++;
-		if (attr_n < 128)
+		if (attr_n == attrs_cap)
+		{
+			uint32_t ncap = attrs_cap * 2;
+			int on_heap = attrs != attrs_stack;
+			if (attrs_heap_cap < ncap)
+			{
+				// realloc keeps the heap contents when we are already on it.
+				RawAttr* g = (RawAttr*) realloc(attrs_heap, ncap * sizeof(RawAttr));
+				if (g != NULL) { attrs_heap = g; attrs_heap_cap = ncap; }
+			}
+			if (attrs_heap_cap >= ncap)
+			{
+				if (!on_heap)
+					memcpy(attrs_heap, attrs_stack, attr_n * sizeof(RawAttr));
+				attrs = attrs_heap;
+				attrs_cap = ncap;
+			}
+			else if (on_heap)
+			{
+				attrs = attrs_heap;  // realloc failed: keep the old block
+			}
+		}
+		if (attr_n < attrs_cap)
 		{
 			attrs[attr_n].raw_name = aname;
 			attrs[attr_n].value = value;
@@ -2149,7 +2188,9 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
 			if (!ps.ignore_comments)
 			{
 				E4XNode* n = avm2_e4x_node_new(ctx, E4X_COMMENT, NULL);
-				n->text = decode_entities_str(&ps, ps.p + start, ps.pos - start);
+				// Kept literal: FP leaves character references in comments
+				// undecoded (upstream cea0f2cf9, xml_unescaping_nul_char_ref).
+				n->text = avm2_string_new(ctx, ps.p + start, ps.pos - start);
 				push_childless(&ps, n);
 			}
 			ps.pos += 3;
@@ -2192,20 +2233,29 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
 		}
 		else if (starts_with(&ps, "<?"))
 		{
+			// avmplus XMLParser: a caseless "<?xml " opens an XML declaration,
+			// whose missing "?>" is #1092, not the generic PI #1097.
+			int xml_decl_open = starts_with_ci(&ps, "<?xml ");
 			ps.pos += 2;
 			uint32_t start = ps.pos;
 			for (;;)
 			{
 				if (ps.pos + 2 > ps.len)
 				{
+					if (xml_decl_open)
+					{
+						parse_error(&ps, "Error #1092: XML parser failure: "
+						            "Unterminated XML declaration.", NULL);
+					}
 					parse_error(&ps, "Error #1097: XML parser failure: "
 					            "Unterminated processing instruction.", NULL);
 				}
 				if (memcmp(ps.p + ps.pos, "?>", 2) == 0) break;
 				ps.pos++;
 			}
+			// PI bodies are kept literal too (upstream cea0f2cf9).
 			const Avm2String* body =
-				decode_entities_str(&ps, ps.p + start, ps.pos - start);
+				avm2_string_new(ctx, ps.p + start, ps.pos - start);
 			ps.pos += 2;
 			// Split at the first space: target / value (value trim_start).
 			uint32_t sp = 0;

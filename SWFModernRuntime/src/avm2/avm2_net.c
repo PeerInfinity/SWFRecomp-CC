@@ -2954,10 +2954,25 @@ static Avm2Value fileref_init(Avm2Activation* act)
 
 // The mock has no creation/modification time, so both dates read as null on a
 // selection (filereference_browse_select pins that) and throw before one.
-static Avm2Value fileref_get_date(Avm2Activation* act)
+// Ruffle's TestFileSelection (tests/framework/src/backends/ui.rs, upstream
+// 9ca80fab8) answers creation_time / modification_time with fixed UTC
+// instants for every open AND save selection; file_reference.rs wraps them
+// in a Date. 2000-10-20T01:02:03Z and 2000-10-25T04:05:06Z, in epoch ms.
+static Avm2Value fileref_date_value(Avm2Activation* act, double millis)
 {
 	fileref_require_selection(act);
-	return avm2_null();
+	Avm2Value arg = avm2_number(millis);
+	return avm2_class_construct(act->ctx, act->ctx->builtins.date_class, &arg, 1);
+}
+
+static Avm2Value fileref_get_creation_date(Avm2Activation* act)
+{
+	return fileref_date_value(act, 972003723000.0);
+}
+
+static Avm2Value fileref_get_date(Avm2Activation* act)
+{
+	return fileref_date_value(act, 972446706000.0);
 }
 
 static Avm2Value fileref_get_creator(Avm2Activation* act)
@@ -3349,7 +3364,7 @@ static void register_file_reference(Avm2Context* ctx)
 		cls->instance_init.debug_name = "FileReference";
 		cls->native_ext_size = sizeof(Avm2FileRefExt);
 		cls->flags |= AVM2_CLASS_FLAG_SEALED;
-		avm2_builtin_add_getter(ctx, cls, "creationDate", fileref_get_date);
+		avm2_builtin_add_getter(ctx, cls, "creationDate", fileref_get_creation_date);
 		avm2_builtin_add_getter(ctx, cls, "modificationDate", fileref_get_date);
 		avm2_builtin_add_getter(ctx, cls, "creator", fileref_get_creator);
 		avm2_builtin_add_getter(ctx, cls, "data", fileref_get_data);

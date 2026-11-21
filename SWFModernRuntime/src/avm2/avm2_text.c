@@ -4999,6 +4999,13 @@ static Avm2Value txt_set_default_text_format(Avm2Activation* act)
 	Avm2EditTextExt* et = this_et(act);
 	if (et == NULL) return avm2_undefined();
 	Avm2Value v = arg_or_undef(act, 0);
+	// FP: a null format is #2007 (avm2/textfield_default_text_format_null).
+	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED
+	    || (v.kind == AVM2_VALUE_OBJECT && v.u.obj == NULL))
+	{
+		avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter format must be non-null.");
+	}
 	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
 	{
 		Avm2TextFormatFields* f = tf_fields_of(v.u.obj);
@@ -10706,7 +10713,14 @@ static void et_open_url(Avm2Context* ctx, Avm2Object* obj, const Avm2String* url
 	static const char PREFIX[] = "event:";
 	const uint32_t plen = (uint32_t) (sizeof(PREFIX) - 1);
 	if (url == NULL || url->len < plen || url->utf8 == NULL) return;
-	if (memcmp(url->utf8, PREFIX, plen) != 0) return;
+	// The scheme matches caselessly ("EvEnT:greetings" fires LINK in FP;
+	// avm2/edittext_event_link_case_insensitive, upstream).
+	for (uint32_t k = 0; k < plen; k++)
+	{
+		char c = url->utf8[k];
+		if (c >= 'A' && c <= 'Z') c = (char) (c - 'A' + 'a');
+		if (c != PREFIX[k]) return;
+	}
 	const Avm2String* text = avm2_string_new(ctx, url->utf8 + plen,
 	                                         url->len - plen);
 	Avm2Object* ev = avm2_text_event_new(ctx,

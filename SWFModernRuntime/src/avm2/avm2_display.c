@@ -12552,6 +12552,14 @@ static Avm2Value pp_set_center(Avm2Activation* act)
 	Avm2Object* self = this_obj(act);
 	Avm2Value p = act->argc > 0 ? act->args[0] : avm2_undefined();
 	if (self == NULL) return avm2_undefined();
+	// FP: a null point is #2007 and leaves the center untouched
+	// (avm2/perspective_projection_center, upstream 8dc906c9b).
+	if (p.kind == AVM2_VALUE_NULL || p.kind == AVM2_VALUE_UNDEFINED
+	    || (p.kind == AVM2_VALUE_OBJECT && p.u.obj == NULL))
+	{
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter point must be non-null.");
+	}
 	double x = avm2_coerce_to_number(ctx,
 		avm2_get_public_property(ctx, p, "x", 1, NULL));
 	double y = avm2_coerce_to_number(ctx,

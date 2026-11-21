@@ -1,0 +1,455 @@
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index c0c76be1..1d591e5c 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -3478,27 +3478,42 @@ static Avm2Value bd_encode(Avm2Activation* act)
+ 	Avm2Context* ctx = act->ctx;
+ 	Avm2BitmapDataExt* bd = this_bd(act);
+ 	check_valid(ctx, bd);
+-	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(arg(act, 2));
+-	if (ba == NULL) return avm2_null();
+-
+-	// Only PNG. Anything else leaves the array untouched but still returns it.
+-	Avm2Value opts = arg(act, 1);
+-	char opt_name[128] = "";
+-	if (opts.kind == AVM2_VALUE_OBJECT && opts.u.obj != NULL)
+-		avm2_class_qname_buf(opts.u.obj->cls, opt_name, (int) sizeof(opt_name));
+-	if (strstr(opt_name, "PNG") == NULL) return arg(act, 2);
+ 
++	// PROTOTYPE (w1-drift-avm2): Ruffle bitmap_data.rs encode() order —
++	// rect -> #2006 on a non-positive or clamped-empty region -> output array
++	// (a fresh one when omitted/null) -> compressor.
+ 	int32_t rx, ry, rw, rh;
+ 	rect_to_xywh(ctx, arg(act, 0), &rx, &ry, &rw, &rh);
++	if (rw <= 0 || rh <= 0)
++		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
++		                 "Error #2006: The supplied index is out of bounds.");
+ 	PixelRegion r = pr_for_region_i32(rx, ry, rw, rh);
+ 	pr_clamp(&r, bd->width, bd->height);
+ 	uint32_t w = pr_w(&r), h = pr_h(&r);
+-	if (w == 0 || h == 0) return arg(act, 2);
++	if (w == 0 || h == 0)
++		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
++		                 "Error #2006: The supplied index is out of bounds.");
++
++	Avm2Value out = arg(act, 2);
++	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(out);
++	if (ba == NULL)
++	{
++		out = avm2_class_construct(ctx, ctx->builtins.bytearray_class, NULL, 0);
++		ba = avm2_bytearray_ext_of(out);
++		if (ba == NULL) return avm2_null();
++	}
++
++	// Only PNG. Anything else leaves the array untouched but still returns it.
++	Avm2Value opts = arg(act, 1);
++	char opt_name[128] = "";
++	if (opts.kind == AVM2_VALUE_OBJECT && opts.u.obj != NULL)
++		avm2_class_qname_buf(opts.u.obj->cls, opt_name, (int) sizeof(opt_name));
++	if (strstr(opt_name, "PNG") == NULL) return out;
+ 
+ 	uint32_t nch = bd->transparency ? 4 : 3;
+ 	size_t raw_len = (size_t) h * (1 + (size_t) w * nch);
+ 	uint8_t* raw = malloc(raw_len);
+-	if (raw == NULL) return arg(act, 2);
++	if (raw == NULL) return out;
+ 	uint8_t* p = raw;
+ 	for (uint32_t yy = r.y_min; yy < r.y_max; yy++)
+ 	{
+@@ -3518,7 +3533,7 @@ static Avm2Value bd_encode(Avm2Activation* act)
+ 	if (zbuf == NULL || compress2(zbuf, &zlen, raw, (uLong) raw_len, 9) != Z_OK)
+ 	{
+ 		free(raw); free(zbuf);
+-		return arg(act, 2);
++		return out;
+ 	}
+ 	free(raw);
+ 
+@@ -3533,7 +3548,7 @@ static Avm2Value bd_encode(Avm2Activation* act)
+ 
+ 	size_t total = 8 + (13 + 12) + ((size_t) zlen + 12) + 12;
+ 	uint8_t* png = malloc(total);
+-	if (png == NULL) { free(zbuf); return arg(act, 2); }
++	if (png == NULL) { free(zbuf); return out; }
+ 	static const uint8_t kSig[8] = { 137, 'P', 'N', 'G', '\r', '\n', 26, '\n' };
+ 	memcpy(png, kSig, 8);
+ 	size_t off = 8;
+@@ -3548,7 +3563,53 @@ static Avm2Value bd_encode(Avm2Activation* act)
+ 	memcpy(ba->bytes + pos, png, off);
+ 	ba->position = (uint32_t)(pos + off);
+ 	free(png);
+-	return arg(act, 2);
++	return out;
++}
++
++// PROTOTYPE (w1-drift-avm2): compare (Ruffle bitmap_data.rs compare +
++// operations.rs compare). 0 when every unmultiplied pixel matches, -3/-4 on a
++// width/height mismatch, else a fresh transparent BitmapData of per-pixel
++// differences (RGB delta with alpha 0xFF, or an alpha-only delta splatted to
++// all four channels).
++static Avm2Value bd_compare(Avm2Activation* act)
++{
++	Avm2Context* ctx = act->ctx;
++	Avm2BitmapDataExt* bd = this_bd(act);
++	if (bd == NULL) return avm2_integer(-1);
++	check_valid(ctx, bd);
++	Avm2BitmapDataExt* other = avm2_bitmapdata_ext_of(ctx, arg(act, 0));
++	if (other == NULL) return avm2_integer(-2);
++	check_valid(ctx, other);
++	if (bd->width != other->width) return avm2_integer(-3);
++	if (bd->height != other->height) return avm2_integer(-4);
++	uint32_t n = (uint32_t) bd->width * bd->height;
++	uint32_t* diff = malloc((size_t) (n ? n : 1) * 4);
++	if (diff == NULL) return avm2_integer(0);
++	int different = 0;
++	for (uint32_t i = 0; i < n; i++)
++	{
++		uint32_t a = unmul(bd->pixels[i]), b = unmul(other->pixels[i]);
++		if (a == b) { diff[i] = 0; continue; }
++		different = 1;
++		if ((a & 0x00FFFFFFu) != (b & 0x00FFFFFFu))
++		{
++			uint32_t r = (CR(a) - CR(b)) & 0xFF, g = (CG(a) - CG(b)) & 0xFF;
++			uint32_t bl = (CB(a) - CB(b)) & 0xFF;
++			diff[i] = CMK(r, g, bl, 0xFF);
++		}
++		else
++		{
++			uint32_t al = (CA(a) - CA(b)) & 0xFF;
++			diff[i] = CMK(al, al, al, al);
++		}
++	}
++	if (!different) { free(diff); return avm2_integer(0); }
++	Avm2Object* obj = bd_alloc_bare(ctx);
++	Avm2BitmapDataExt* nb = (Avm2BitmapDataExt*) obj->native_ext;
++	bd_alloc(ctx, nb, bd->width, bd->height, 1);
++	for (uint32_t i = 0; i < n; i++) nb->pixels[i] = premul(diff[i], 1);
++	free(diff);
++	return avm2_object_value(obj);
+ }
+ 
+ // copyChannel (operations.rs): copy one source channel into a dest channel.
+@@ -4016,6 +4077,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
+ 	avm2_builtin_add_method(ctx, bd, "copyChannel", bd_copy_channel);
+ 	avm2_builtin_add_method(ctx, bd, "scroll", bd_scroll);
+ 	avm2_builtin_add_method(ctx, bd, "encode", bd_encode);
++	avm2_builtin_add_method(ctx, bd, "compare", bd_compare);
+ 
+ 	// Image-only ops (graded in Stage 9): keep them callable no-ops so the
+ 	// vacuous image-comparison tests keep running.
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 615cbf89..3aaeea0a 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -12552,6 +12552,14 @@ static Avm2Value pp_set_center(Avm2Activation* act)
+ 	Avm2Object* self = this_obj(act);
+ 	Avm2Value p = act->argc > 0 ? act->args[0] : avm2_undefined();
+ 	if (self == NULL) return avm2_undefined();
++	// FP: a null point is #2007 and leaves the center untouched
++	// (avm2/perspective_projection_center, upstream 8dc906c9b).
++	if (p.kind == AVM2_VALUE_NULL || p.kind == AVM2_VALUE_UNDEFINED
++	    || (p.kind == AVM2_VALUE_OBJECT && p.u.obj == NULL))
++	{
++		avm2_throw_error(ctx, ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter point must be non-null.");
++	}
+ 	double x = avm2_coerce_to_number(ctx,
+ 		avm2_get_public_property(ctx, p, "x", 1, NULL));
+ 	double y = avm2_coerce_to_number(ctx,
+diff --git a/SWFModernRuntime/src/avm2/avm2_e4x.c b/SWFModernRuntime/src/avm2/avm2_e4x.c
+index 4d76be2d..ab7d9d09 100644
+--- a/SWFModernRuntime/src/avm2/avm2_e4x.c
++++ b/SWFModernRuntime/src/avm2/avm2_e4x.c
+@@ -1255,6 +1255,8 @@ static void esc_element_value(Buf* b, const Avm2String* s)
+ 		if (c == '<') buf_lit(b, "&lt;");
+ 		else if (c == '>') buf_lit(b, "&gt;");
+ 		else if (c == '&') buf_lit(b, "&amp;");
++		// Flash escapes NUL back as a char reference (upstream 1a54c10d7).
++		else if (c == '\0') buf_lit(b, "&#x0;");
+ 		else buf_ch(b, c);
+ 	}
+ }
+@@ -1270,6 +1272,7 @@ static void esc_attribute_value(Buf* b, const Avm2String* s)
+ 		else if (c == '\n') buf_lit(b, "&#xA;");
+ 		else if (c == '\r') buf_lit(b, "&#xD;");
+ 		else if (c == '\t') buf_lit(b, "&#x9;");
++		else if (c == '\0') buf_lit(b, "&#x0;");
+ 		else buf_ch(b, c);
+ 	}
+ }
+@@ -1731,11 +1734,16 @@ static void decode_entities(Parser* ps, Buf* out, const char* s, uint32_t len)
+ 					else cp = cp * 10 + (uint32_t) (c - '0');
+ 				}
+ 			}
+-			if (!ok || cp == 0 || cp > 0x10FFFF)
++			if (!ok || cp > 0x10FFFF)
+ 			{
+ 				// Preserve the raw entity text.
+ 				buf_bytes(out, s + i, j - i + 1);
+ 			}
++			else if (cp == 0)
++			{
++				// Flash decodes &#0; / &#x0; to NUL (upstream 1a54c10d7).
++				buf_ch(out, '\0');
++			}
+ 			else if (cp < 0x80)
+ 			{
+ 				buf_ch(out, (char) cp);
+@@ -1921,7 +1929,16 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
+ 		const Avm2String* raw_name;
+ 		const Avm2String* value;
+ 	} RawAttr;
+-	RawAttr attrs[128];
++	// No cap: FP keeps every attribute (xml_many_namespace_declarations
++	// declares 257 namespaces). Past 128 entries the list spills into one
++	// process-wide heap buffer that only grows, so a parse_error longjmp out
++	// of this frame never leaks it. Children are parsed after this returns,
++	// so the shared spill buffer is never live in two frames at once.
++	RawAttr attrs_stack[128];
++	static RawAttr* attrs_heap;
++	static uint32_t attrs_heap_cap;
++	RawAttr* attrs = attrs_stack;
++	uint32_t attrs_cap = 128;
+ 	uint32_t attr_n = 0;
+ 
+ 	for (;;)
+@@ -1958,7 +1975,29 @@ static E4XNode* parse_start_tag(Parser* ps, const Avm2String** out_raw,
+ 		const Avm2String* value =
+ 			decode_entities_str(ps, ps->p + vstart, ps->pos - vstart);
+ 		ps->pos++;
+-		if (attr_n < 128)
++		if (attr_n == attrs_cap)
++		{
++			uint32_t ncap = attrs_cap * 2;
++			int on_heap = attrs != attrs_stack;
++			if (attrs_heap_cap < ncap)
++			{
++				// realloc keeps the heap contents when we are already on it.
++				RawAttr* g = (RawAttr*) realloc(attrs_heap, ncap * sizeof(RawAttr));
++				if (g != NULL) { attrs_heap = g; attrs_heap_cap = ncap; }
++			}
++			if (attrs_heap_cap >= ncap)
++			{
++				if (!on_heap)
++					memcpy(attrs_heap, attrs_stack, attr_n * sizeof(RawAttr));
++				attrs = attrs_heap;
++				attrs_cap = ncap;
++			}
++			else if (on_heap)
++			{
++				attrs = attrs_heap;  // realloc failed: keep the old block
++			}
++		}
++		if (attr_n < attrs_cap)
+ 		{
+ 			attrs[attr_n].raw_name = aname;
+ 			attrs[attr_n].value = value;
+@@ -2149,7 +2188,9 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
+ 			if (!ps.ignore_comments)
+ 			{
+ 				E4XNode* n = avm2_e4x_node_new(ctx, E4X_COMMENT, NULL);
+-				n->text = decode_entities_str(&ps, ps.p + start, ps.pos - start);
++				// Kept literal: FP leaves character references in comments
++				// undecoded (upstream cea0f2cf9, xml_unescaping_nul_char_ref).
++				n->text = avm2_string_new(ctx, ps.p + start, ps.pos - start);
+ 				push_childless(&ps, n);
+ 			}
+ 			ps.pos += 3;
+@@ -2192,20 +2233,29 @@ E4XNode** avm2_e4x_parse(Avm2Context* ctx, Avm2Value value,
+ 		}
+ 		else if (starts_with(&ps, "<?"))
+ 		{
++			// avmplus XMLParser: a caseless "<?xml " opens an XML declaration,
++			// whose missing "?>" is #1092, not the generic PI #1097.
++			int xml_decl_open = starts_with_ci(&ps, "<?xml ");
+ 			ps.pos += 2;
+ 			uint32_t start = ps.pos;
+ 			for (;;)
+ 			{
+ 				if (ps.pos + 2 > ps.len)
+ 				{
++					if (xml_decl_open)
++					{
++						parse_error(&ps, "Error #1092: XML parser failure: "
++						            "Unterminated XML declaration.", NULL);
++					}
+ 					parse_error(&ps, "Error #1097: XML parser failure: "
+ 					            "Unterminated processing instruction.", NULL);
+ 				}
+ 				if (memcmp(ps.p + ps.pos, "?>", 2) == 0) break;
+ 				ps.pos++;
+ 			}
++			// PI bodies are kept literal too (upstream cea0f2cf9).
+ 			const Avm2String* body =
+-				decode_entities_str(&ps, ps.p + start, ps.pos - start);
++				avm2_string_new(ctx, ps.p + start, ps.pos - start);
+ 			ps.pos += 2;
+ 			// Split at the first space: target / value (value trim_start).
+ 			uint32_t sp = 0;
+diff --git a/SWFModernRuntime/src/avm2/avm2_events.c b/SWFModernRuntime/src/avm2/avm2_events.c
+index e3db66ee..bad4c28c 100644
+--- a/SWFModernRuntime/src/avm2/avm2_events.c
++++ b/SWFModernRuntime/src/avm2/avm2_events.c
+@@ -727,9 +727,9 @@ static Avm2Value ed_dispatch_event(Avm2Activation* act)
+ 		return avm2_bool(false);
+ 	}
+ 	// FP's EventDispatcher.dispatchEvent is AS3 playerglobal code whose body
+-	// is `return dispatchEventFunction(event)` (Flash) /
+-	// `dispatchEventInternal(event)` (Ruffle's playerglobal,
+-	// EventDispatcher.as), so a listener that throws reports TWO frames for
++	// is `return dispatchEventFunction(event)` (Flash, and Ruffle's
++	// playerglobal EventDispatcher.as since upstream 05a511c05 renamed its
++	// dispatchEventInternal), so a listener that throws reports TWO frames for
+ 	// the dispatch, not one: the inner native worker under the outer AS3
+ 	// method. Ours is a single native method, so push the worker's frame
+ 	// explicitly around the dispatch (avm2/event_handler_exception grades
+@@ -738,7 +738,7 @@ static Avm2Value ed_dispatch_event(Avm2Activation* act)
+ 	// FP shows no dispatch frames for those, which the same fixture's first
+ 	// trace pins.
+ 	static const Avm2MethodRef dispatch_internal = {
+-		NULL, NULL, "flash.events::EventDispatcher/dispatchEventInternal", 0, 0
++		NULL, NULL, "flash.events::EventDispatcher/dispatchEventFunction", 0, 0
+ 	};
+ 	avm2_callstack_push(ctx, &dispatch_internal, NULL);
+ 	avm2_dispatch_event(ctx, act->this_val.u.obj, event_val.u.obj);
+diff --git a/SWFModernRuntime/src/avm2/avm2_jpegxr.c b/SWFModernRuntime/src/avm2/avm2_jpegxr.c
+index 7405fe70..cba9c9ee 100644
+--- a/SWFModernRuntime/src/avm2/avm2_jpegxr.c
++++ b/SWFModernRuntime/src/avm2/avm2_jpegxr.c
+@@ -345,12 +345,12 @@ static uint8_t* atf_compressed_alpha(const uint8_t* dxt1a_z, size_t dxt1a_n,
+ 	if (rgba == NULL) goto done;
+ 	for (size_t i = 0; i < blocks; i++)
+ 	{
+-		// Ruffle reads the second alpha endpoint at BYTE offset
+-		// second_half + 4i of the RGBA-expanded plane (atf_jpegxr.rs:107) —
+-		// pixel second_half/4 + i, not second_half + i. The BGR plane below
+-		// is indexed in pixels. We follow Ruffle byte for byte.
++		// The second alpha endpoint of block i is PIXEL second_half + i of
++		// the RGBA-expanded plane, i.e. byte (second_half + i) * 4 (upstream
++		// 5021d0ed7 fixed Ruffle's old byte second_half + 4i, which we had
++		// mirrored). The BGR plane below is indexed in pixels.
+ 		blk[0] = alpha[i * 4];
+-		blk[1] = alpha[blocks + i * 4];
++		blk[1] = alpha[(blocks + i) * 4];
+ 		memcpy(blk + 2, alpha_tab + i * 6, 6);
+ 		memcpy(blk + 8, bgr + i * 2, 2);
+ 		memcpy(blk + 10, bgr + blocks * 2 + i * 2, 2);
+diff --git a/SWFModernRuntime/src/avm2/avm2_media.c b/SWFModernRuntime/src/avm2/avm2_media.c
+index b5574145..72c6f7f4 100644
+--- a/SWFModernRuntime/src/avm2/avm2_media.c
++++ b/SWFModernRuntime/src/avm2/avm2_media.c
+@@ -31,6 +31,7 @@
+ // Sound.load() resolves) are needed in both builds. Graphics builds also take
+ // the full SWFAppContext (app->audio_ctx) from here.
+ #include <libswf/swf.h>
++#include <utils.h>        // swf_log_fetch_queue / SWF_LOG_FETCH_ENABLED
+ 
+ #include <avm2/avm2_abc.h>
+ #include <avm2/avm2_class.h>
+@@ -648,6 +649,14 @@ static void sound_start_url_load(Avm2Context* ctx, Avm2Object* self,
+ 	}
+ 	if (url == NULL || url->len == 0) return;
+ 
++#if SWF_LOG_FETCH_ENABLED
++	// Ruffle sound.rs load_sound_from_url -> navigator.fetch: the test
++	// navigator logs the GET, queued and flushed at the load-drain point
++	// like every other AVM2 fetch (avm2_display.c avm2_log_fetch_request).
++	swf_log_fetch_queue(url->utf8, (size_t) url->len, "GET", 3, NULL, 0,
++	                    NULL, 0, NULL, 0, 0, 0);
++#endif
++
+ 	char name[256];
+ 	size_t n = (size_t) url->len < sizeof(name) - 1
+ 		? (size_t) url->len : sizeof(name) - 1;
+diff --git a/SWFModernRuntime/src/avm2/avm2_net.c b/SWFModernRuntime/src/avm2/avm2_net.c
+index 3953da74..e0c2ba60 100644
+--- a/SWFModernRuntime/src/avm2/avm2_net.c
++++ b/SWFModernRuntime/src/avm2/avm2_net.c
+@@ -2646,10 +2646,25 @@ static Avm2Value fileref_init(Avm2Activation* act)
+ 
+ // The mock has no creation/modification time, so both dates read as null on a
+ // selection (filereference_browse_select pins that) and throw before one.
+-static Avm2Value fileref_get_date(Avm2Activation* act)
++// Ruffle's TestFileSelection (tests/framework/src/backends/ui.rs, upstream
++// 9ca80fab8) answers creation_time / modification_time with fixed UTC
++// instants for every open AND save selection; file_reference.rs wraps them
++// in a Date. 2000-10-20T01:02:03Z and 2000-10-25T04:05:06Z, in epoch ms.
++static Avm2Value fileref_date_value(Avm2Activation* act, double millis)
+ {
+ 	fileref_require_selection(act);
+-	return avm2_null();
++	Avm2Value arg = avm2_number(millis);
++	return avm2_class_construct(act->ctx, act->ctx->builtins.date_class, &arg, 1);
++}
++
++static Avm2Value fileref_get_creation_date(Avm2Activation* act)
++{
++	return fileref_date_value(act, 972003723000.0);
++}
++
++static Avm2Value fileref_get_date(Avm2Activation* act)
++{
++	return fileref_date_value(act, 972446706000.0);
+ }
+ 
+ static Avm2Value fileref_get_creator(Avm2Activation* act)
+@@ -3041,7 +3056,7 @@ static void register_file_reference(Avm2Context* ctx)
+ 		cls->instance_init.debug_name = "FileReference";
+ 		cls->native_ext_size = sizeof(Avm2FileRefExt);
+ 		cls->flags |= AVM2_CLASS_FLAG_SEALED;
+-		avm2_builtin_add_getter(ctx, cls, "creationDate", fileref_get_date);
++		avm2_builtin_add_getter(ctx, cls, "creationDate", fileref_get_creation_date);
+ 		avm2_builtin_add_getter(ctx, cls, "modificationDate", fileref_get_date);
+ 		avm2_builtin_add_getter(ctx, cls, "creator", fileref_get_creator);
+ 		avm2_builtin_add_getter(ctx, cls, "data", fileref_get_data);
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index c802d983..e0a7f94c 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -4999,6 +4999,13 @@ static Avm2Value txt_set_default_text_format(Avm2Activation* act)
+ 	Avm2EditTextExt* et = this_et(act);
+ 	if (et == NULL) return avm2_undefined();
+ 	Avm2Value v = arg_or_undef(act, 0);
++	// FP: a null format is #2007 (avm2/textfield_default_text_format_null).
++	if (v.kind == AVM2_VALUE_NULL || v.kind == AVM2_VALUE_UNDEFINED
++	    || (v.kind == AVM2_VALUE_OBJECT && v.u.obj == NULL))
++	{
++		avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class,
++		                 "Error #2007: Parameter format must be non-null.");
++	}
+ 	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+ 	{
+ 		Avm2TextFormatFields* f = tf_fields_of(v.u.obj);
+@@ -10706,7 +10713,14 @@ static void et_open_url(Avm2Context* ctx, Avm2Object* obj, const Avm2String* url
+ 	static const char PREFIX[] = "event:";
+ 	const uint32_t plen = (uint32_t) (sizeof(PREFIX) - 1);
+ 	if (url == NULL || url->len < plen || url->utf8 == NULL) return;
+-	if (memcmp(url->utf8, PREFIX, plen) != 0) return;
++	// The scheme matches caselessly ("EvEnT:greetings" fires LINK in FP;
++	// avm2/edittext_event_link_case_insensitive, upstream).
++	for (uint32_t k = 0; k < plen; k++)
++	{
++		char c = url->utf8[k];
++		if (c >= 'A' && c <= 'Z') c = (char) (c - 'A' + 'a');
++		if (c != PREFIX[k]) return;
++	}
+ 	const Avm2String* text = avm2_string_new(ctx, url->utf8 + plen,
+ 	                                         url->len - plen);
+ 	Avm2Object* ev = avm2_text_event_new(ctx,
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 59dccb77..edb164df 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -349,7 +349,11 @@ def resolve_expected_filename(test_dir, suffix_override=None):
+     if not isinstance(subtests, dict) or not subtests:
+         return None
+ 
+-    best_version = -1
++    # -2, not -1: a [subtests] table whose variants carry NO version (the
++    # allow_networking tests key variants on player_options.allow_networking)
++    # scores every variant -1, and a -1 start made none of them win, leaving
++    # the test silently undiscovered. Ties keep the FIRST variant.
++    best_version = -2
+     best_output_path = None
+     for variant_name, variant in subtests.items():
+         if not isinstance(variant, dict):

@@ -31,6 +31,7 @@
 // Sound.load() resolves) are needed in both builds. Graphics builds also take
 // the full SWFAppContext (app->audio_ctx) from here.
 #include <libswf/swf.h>
+#include <utils.h>        // swf_log_fetch_queue / SWF_LOG_FETCH_ENABLED
 
 #include <avm2/avm2_abc.h>
 #include <avm2/avm2_class.h>
@@ -719,6 +720,14 @@ static void sound_start_url_load(Avm2Context* ctx, Avm2Object* self,
 		if (u.kind == AVM2_VALUE_STRING) url = u.u.str;
 	}
 	if (url == NULL || url->len == 0) return;
+
+#if SWF_LOG_FETCH_ENABLED
+	// Ruffle sound.rs load_sound_from_url -> navigator.fetch: the test
+	// navigator logs the GET, queued and flushed at the load-drain point
+	// like every other AVM2 fetch (avm2_display.c avm2_log_fetch_request).
+	swf_log_fetch_queue(url->utf8, (size_t) url->len, "GET", 3, NULL, 0,
+	                    NULL, 0, NULL, 0, 0, 0);
+#endif
 
 	char name[256];
 	size_t n = (size_t) url->len < sizeof(name) - 1

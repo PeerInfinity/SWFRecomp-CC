@@ -349,7 +349,11 @@ def resolve_expected_filename(test_dir, suffix_override=None):
     if not isinstance(subtests, dict) or not subtests:
         return None
 
-    best_version = -1
+    # -2, not -1: a [subtests] table whose variants carry NO version (the
+    # allow_networking tests key variants on player_options.allow_networking)
+    # scores every variant -1, and a -1 start made none of them win, leaving
+    # the test silently undiscovered. Ties keep the FIRST variant.
+    best_version = -2
     best_output_path = None
     for variant_name, variant in subtests.items():
         if not isinstance(variant, dict):

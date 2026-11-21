@@ -68,7 +68,7 @@ and archives the output for the wave-2 worker. Do not block on it: finish everyt
   **Never quote a total from a brief or closeout; read it.**
 **FRESH BASELINE (landed 17:30 UTC, merged to master at `12ecaf53c`; read by the coordinator):** graphics/full/images
 run `44922638965` at `08709f658` vs s22 final `8d83af7e2`: trace intersection 4563 rows, effective **4503 → 4495 (−8)**;
-all graded rows **4625 effective / 4752**. Pixels: intersection 587, pass **490 → 487 (−3)**; plus 6 NEW comparisons
+all graded rows **4515 effective / 4642** (corrected by w1-drift-avm2: an earlier 4625/4752 double-counted nested rows). Pixels: intersection 587, pass **490 → 487 (−3)**; plus 6 NEW comparisons
 (1 pass: `visual/scroll_rect_culling`) → **488 / 593**. **Every move is upstream drift** (the row's `output.txt`,
 `output.ruffle.txt` or `output.expected.png` changed in `45366370e..0ddd12b6a`); no row moved without a test change, so
 the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke green again).

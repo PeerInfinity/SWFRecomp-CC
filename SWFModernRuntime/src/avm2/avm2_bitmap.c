@@ -3478,27 +3478,42 @@ static Avm2Value bd_encode(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2BitmapDataExt* bd = this_bd(act);
 	check_valid(ctx, bd);
-	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(arg(act, 2));
-	if (ba == NULL) return avm2_null();
+
+	// PROTOTYPE (w1-drift-avm2): Ruffle bitmap_data.rs encode() order —
+	// rect -> #2006 on a non-positive or clamped-empty region -> output array
+	// (a fresh one when omitted/null) -> compressor.
+	int32_t rx, ry, rw, rh;
+	rect_to_xywh(ctx, arg(act, 0), &rx, &ry, &rw, &rh);
+	if (rw <= 0 || rh <= 0)
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2006: The supplied index is out of bounds.");
+	PixelRegion r = pr_for_region_i32(rx, ry, rw, rh);
+	pr_clamp(&r, bd->width, bd->height);
+	uint32_t w = pr_w(&r), h = pr_h(&r);
+	if (w == 0 || h == 0)
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2006: The supplied index is out of bounds.");
+
+	Avm2Value out = arg(act, 2);
+	Avm2ByteArrayExt* ba = avm2_bytearray_ext_of(out);
+	if (ba == NULL)
+	{
+		out = avm2_class_construct(ctx, ctx->builtins.bytearray_class, NULL, 0);
+		ba = avm2_bytearray_ext_of(out);
+		if (ba == NULL) return avm2_null();
+	}
 
 	// Only PNG. Anything else leaves the array untouched but still returns it.
 	Avm2Value opts = arg(act, 1);
 	char opt_name[128] = "";
 	if (opts.kind == AVM2_VALUE_OBJECT && opts.u.obj != NULL)
 		avm2_class_qname_buf(opts.u.obj->cls, opt_name, (int) sizeof(opt_name));
-	if (strstr(opt_name, "PNG") == NULL) return arg(act, 2);
-
-	int32_t rx, ry, rw, rh;
-	rect_to_xywh(ctx, arg(act, 0), &rx, &ry, &rw, &rh);
-	PixelRegion r = pr_for_region_i32(rx, ry, rw, rh);
-	pr_clamp(&r, bd->width, bd->height);
-	uint32_t w = pr_w(&r), h = pr_h(&r);
-	if (w == 0 || h == 0) return arg(act, 2);
+	if (strstr(opt_name, "PNG") == NULL) return out;
 
 	uint32_t nch = bd->transparency ? 4 : 3;
 	size_t raw_len = (size_t) h * (1 + (size_t) w * nch);
 	uint8_t* raw = malloc(raw_len);
-	if (raw == NULL) return arg(act, 2);
+	if (raw == NULL) return out;
 	uint8_t* p = raw;
 	for (uint32_t yy = r.y_min; yy < r.y_max; yy++)
 	{
@@ -3518,7 +3533,7 @@ static Avm2Value bd_encode(Avm2Activation* act)
 	if (zbuf == NULL || compress2(zbuf, &zlen, raw, (uLong) raw_len, 9) != Z_OK)
 	{
 		free(raw); free(zbuf);
-		return arg(act, 2);
+		return out;
 	}
 	free(raw);
 
@@ -3533,7 +3548,7 @@ static Avm2Value bd_encode(Avm2Activation* act)
 
 	size_t total = 8 + (13 + 12) + ((size_t) zlen + 12) + 12;
 	uint8_t* png = malloc(total);
-	if (png == NULL) { free(zbuf); return arg(act, 2); }
+	if (png == NULL) { free(zbuf); return out; }
 	static const uint8_t kSig[8] = { 137, 'P', 'N', 'G', '\r', '\n', 26, '\n' };
 	memcpy(png, kSig, 8);
 	size_t off = 8;
@@ -3548,7 +3563,53 @@ static Avm2Value bd_encode(Avm2Activation* act)
 	memcpy(ba->bytes + pos, png, off);
 	ba->position = (uint32_t)(pos + off);
 	free(png);
-	return arg(act, 2);
+	return out;
+}
+
+// PROTOTYPE (w1-drift-avm2): compare (Ruffle bitmap_data.rs compare +
+// operations.rs compare). 0 when every unmultiplied pixel matches, -3/-4 on a
+// width/height mismatch, else a fresh transparent BitmapData of per-pixel
+// differences (RGB delta with alpha 0xFF, or an alpha-only delta splatted to
+// all four channels).
+static Avm2Value bd_compare(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2BitmapDataExt* bd = this_bd(act);
+	if (bd == NULL) return avm2_integer(-1);
+	check_valid(ctx, bd);
+	Avm2BitmapDataExt* other = avm2_bitmapdata_ext_of(ctx, arg(act, 0));
+	if (other == NULL) return avm2_integer(-2);
+	check_valid(ctx, other);
+	if (bd->width != other->width) return avm2_integer(-3);
+	if (bd->height != other->height) return avm2_integer(-4);
+	uint32_t n = (uint32_t) bd->width * bd->height;
+	uint32_t* diff = malloc((size_t) (n ? n : 1) * 4);
+	if (diff == NULL) return avm2_integer(0);
+	int different = 0;
+	for (uint32_t i = 0; i < n; i++)
+	{
+		uint32_t a = unmul(bd->pixels[i]), b = unmul(other->pixels[i]);
+		if (a == b) { diff[i] = 0; continue; }
+		different = 1;
+		if ((a & 0x00FFFFFFu) != (b & 0x00FFFFFFu))
+		{
+			uint32_t r = (CR(a) - CR(b)) & 0xFF, g = (CG(a) - CG(b)) & 0xFF;
+			uint32_t bl = (CB(a) - CB(b)) & 0xFF;
+			diff[i] = CMK(r, g, bl, 0xFF);
+		}
+		else
+		{
+			uint32_t al = (CA(a) - CA(b)) & 0xFF;
+			diff[i] = CMK(al, al, al, al);
+		}
+	}
+	if (!different) { free(diff); return avm2_integer(0); }
+	Avm2Object* obj = bd_alloc_bare(ctx);
+	Avm2BitmapDataExt* nb = (Avm2BitmapDataExt*) obj->native_ext;
+	bd_alloc(ctx, nb, bd->width, bd->height, 1);
+	for (uint32_t i = 0; i < n; i++) nb->pixels[i] = premul(diff[i], 1);
+	free(diff);
+	return avm2_object_value(obj);
 }
 
 // copyChannel (operations.rs): copy one source channel into a dest channel.
@@ -4016,6 +4077,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, bd, "copyChannel", bd_copy_channel);
 	avm2_builtin_add_method(ctx, bd, "scroll", bd_scroll);
 	avm2_builtin_add_method(ctx, bd, "encode", bd_encode);
+	avm2_builtin_add_method(ctx, bd, "compare", bd_compare);
 
 	// Image-only ops (graded in Stage 9): keep them callable no-ops so the
 	// vacuous image-comparison tests keep running.

@@ -345,12 +345,12 @@ static uint8_t* atf_compressed_alpha(const uint8_t* dxt1a_z, size_t dxt1a_n,
 	if (rgba == NULL) goto done;
 	for (size_t i = 0; i < blocks; i++)
 	{
-		// Ruffle reads the second alpha endpoint at BYTE offset
-		// second_half + 4i of the RGBA-expanded plane (atf_jpegxr.rs:107) —
-		// pixel second_half/4 + i, not second_half + i. The BGR plane below
-		// is indexed in pixels. We follow Ruffle byte for byte.
+		// The second alpha endpoint of block i is PIXEL second_half + i of
+		// the RGBA-expanded plane, i.e. byte (second_half + i) * 4 (upstream
+		// 5021d0ed7 fixed Ruffle's old byte second_half + 4i, which we had
+		// mirrored). The BGR plane below is indexed in pixels.
 		blk[0] = alpha[i * 4];
-		blk[1] = alpha[blocks + i * 4];
+		blk[1] = alpha[(blocks + i) * 4];
 		memcpy(blk + 2, alpha_tab + i * 6, 6);
 		memcpy(blk + 8, bgr + i * 2, 2);
 		memcpy(blk + 10, bgr + blocks * 2 + i * 2, 2);
