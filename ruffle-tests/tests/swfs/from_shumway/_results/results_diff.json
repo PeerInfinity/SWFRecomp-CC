@@ -1,26 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-21T17:00:08.563366+00:00",
-    "old_git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
-    "new_timestamp": "2026-11-21T19:30:16.482649+00:00",
-    "new_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "old_timestamp": "2026-11-21T19:30:16.482649+00:00",
+    "old_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
+    "new_timestamp": "2026-11-21T19:49:24.087889+00:00",
+    "new_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
     "partial": false,
-    "same_commit": false,
-    "incomplete": true,
-    "missing_shards": 1,
-    "expected_shards": 30
+    "same_commit": false
   },
   "summary": {
-    "old_pass": 214,
+    "old_pass": 206,
     "old_ruffle_matched": 12,
-    "old_effective_pass": 226,
-    "old_total": 229,
-    "old_pass_rate": 93.4,
-    "new_pass": 206,
+    "old_effective_pass": 218,
+    "old_total": 221,
+    "old_pass_rate": 93.2,
+    "new_pass": 214,
     "new_ruffle_matched": 12,
-    "new_effective_pass": 218,
-    "new_total": 221,
-    "new_pass_rate": 93.2,
+    "new_effective_pass": 226,
+    "new_total": 229,
+    "new_pass_rate": 93.4,
     "old_mismatched_lines": 88,
     "new_mismatched_lines": 88,
     "increased_mismatches": 0,
@@ -29,106 +26,105 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 221,
-    "added": 0,
-    "removed": 0,
-    "missing_from_incomplete_run": 8
+    "added": 8,
+    "removed": 0
   },
   "changes": [
     {
       "test": "avm1/nested-button",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 1,
         "expected_lines": 1,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/operations",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 13,
         "expected_lines": 13,
         "matching_lines": 13
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/property-paths/property-paths-6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 6,
         "expected_lines": 6,
         "matching_lines": 6
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/property-paths/property-paths-7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/propertycase/propertycase",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 7,
         "matching_lines": 7
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/propertycase/propertycase-preserving-6",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/propertycase/propertycase-preserving-7",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 5,
         "expected_lines": 5,
         "matching_lines": 5
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "avm1/rollover",
-      "change_type": "missing_from_incomplete_run",
-      "old_status": "pass",
-      "new_status": null,
-      "old_lines": {
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 4,
         "expected_lines": 4,
         "matching_lines": 4
-      },
-      "new_lines": null
+      }
     }
   ]
 }

@@ -1,29 +1,42 @@
 # Ruffle Test Results Diff
 
-**Previous:** `08709f65842a` (2026-11-21T17:00:08.480588+00:00)
-**Current:** `bc91565cea8e` (2026-11-21T19:30:16.371895+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `bc91565cea8e` (2026-11-21T19:30:16.371895+00:00)
+**Current:** `c489b84d9946` (2026-11-21T19:49:24.005929+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 713 | 692 | -21 |
-| Total | 775 | 749 | -26 |
-| Pass rate | 92.0% | 92.4% | +0.4% |
-| Mismatched lines | 13095 | 3883 | -9212 |
+| Passing | 692 | 727 | +35 |
+| Total | 749 | 777 | +28 |
+| Pass rate | 92.4% | 93.6% | +1.2% |
+| Mismatched lines | 3883 | 12718 | +8835 |
+|   Decreased | | | -378 |
+|   Increased | | | +1 |
 
-## Missing Tests — Shard Failure (26)
+## Newly Passing (12)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `amf0_utf8_probe` | output_mismatch | 13/14 | 14/14 |
+| `amf_array_indices` | output_mismatch | 23/32 | 32/32 |
+| `array_truncation_non_canonical_keys` | output_mismatch | 29/37 | 37/37 |
+| `edittext_html_duplicate_attributes` | output_mismatch | 241/247 | 247/247 |
+| `localconnection_serialize_function_array_elements` | output_mismatch | 14/20 | 20/20 |
+| `netconnection_serialize_arrays` | output_mismatch | 5/6 | 6/6 |
+| `shared_object_secure` | output_mismatch | 19/20 | 20/20 |
+| `sparse_array_truncation_non_canonical_keys` | output_mismatch | 35/43 | 43/43 |
+| `textfield_get_text_format_args` | output_mismatch | 87/269 | 269/269 |
+| `textfield_set_text_format_args` | output_mismatch | 127/232 | 232/232 |
+| `textfield_set_text_format_text_change` | output_mismatch | 1/37 | 37/37 |
+| `xml_stringify_utf16` | output_mismatch | 1/4 | 4/4 |
 
-- 21 were previously passing
-- 5 were previously failing
+## Added Tests (28)
 
-<details><summary>Show all missing tests</summary>
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+| Test | Status | Lines |
+|------|--------|-------|
+| `allow_networking_import_assets` | pass | 4/4 |
+| `allow_networking_import_assets2` | pass | 4/4 |
 | `function_as_function` | pass | 35/35 |
 | `function_base_clip` | pass | 8/8 |
 | `function_base_clip_readded` | pass | 11/11 |
@@ -51,4 +64,10 @@ These tests were in the previous run but absent from this run due to missing sha
 | `globals_swf6` | pass | 304/304 |
 | `globals_swf7` | pass | 304/304 |
 
-</details>
+## Line Count Changed (3)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `amf0_array_matrix` | output_mismatch | 39/50 | 49/50 | -10 |
+| `localconnection_serialize_sparse_array_getters` | output_mismatch | 23/26 | 25/26 | -2 |
+| `localconnection_serialize_inherited_array_indices` | output_mismatch | 11/12 | 10/12 | +1 |

@@ -1,29 +1,35 @@
 # Ruffle Test Results Diff
 
-**Previous:** `08709f65842a` (2026-11-21T17:00:08.515873+00:00)
-**Current:** `bc91565cea8e` (2026-11-21T19:30:16.414972+00:00)
-**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `bc91565cea8e` (2026-11-21T19:30:16.414972+00:00)
+**Current:** `c489b84d9946` (2026-11-21T19:49:24.040284+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1531 | 1480 | -51 |
-| Total | 1574 | 1521 | -53 |
-| Pass rate | 97.3% | 97.3% | 0% |
-| Mismatched lines | 434 | 424 | -10 |
+| Passing | 1480 | 1533 | +53 |
+| Total | 1521 | 1574 | +53 |
+| Pass rate | 97.3% | 97.4% | +0.1% |
+| Mismatched lines | 424 | 428 | +4 |
+|   Decreased | | | -3 |
 
-## Missing Tests — Shard Failure (53)
+## Newly Passing (2)
 
-These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `as3/RuntimeErrors/Error1092XmlUnterminatedXmlDecl` | output_mismatch | 0/1 | 1/1 |
+| `regress/bug_478501` | output_mismatch | 0/1 | 1/1 |
 
-- 51 were previously passing
-- 2 were previously failing
+## Status Changed (1)
 
-<details><summary>Show all missing tests</summary>
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `e4x/XML/misc_errors` | output_mismatch | ruffle_matched | 31/33 | 32/33 |
 
-| Test | Previous Status | Lines |
-|------|----------------|-------|
+## Added Tests (53)
+
+| Test | Status | Lines |
+|------|--------|-------|
 | `e4x/Types/e9_2_1_10` | pass | 2/2 |
 | `e4x/Types/e9_2_1_2` | pass | 19/19 |
 | `e4x/Types/e9_2_1_3` | pass | 2/2 |
@@ -37,7 +43,7 @@ These tests were in the previous run but absent from this run due to missing sha
 | `e4x/XML/bug157597_2` | pass | 2/2 |
 | `e4x/XML/bug157735` | pass | 2/2 |
 | `e4x/XML/bug158506` | pass | 2/2 |
-| `e4x/XML/bug_564468` | output_mismatch | 3/10 |
+| `e4x/XML/bug_564468` | ruffle_matched | 6/10 |
 | `e4x/XML/e13_4_1` | pass | 18/18 |
 | `e4x/XML/e13_4_2` | pass | 36/36 |
 | `e4x/XML/e13_4_3` | pass | 35/35 |
@@ -77,5 +83,3 @@ These tests were in the previous run but absent from this run due to missing sha
 | `e4x/XML/e13_4_4_3/v21` | pass | 16/16 |
 | `e4x/XML/e13_4_4_3/v9` | pass | 16/16 |
 | `e4x/XML/e13_4_4_30` | ruffle_matched | 8/11 |
-
-</details>
