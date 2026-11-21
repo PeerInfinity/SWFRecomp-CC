@@ -55,6 +55,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 21 | w2-context3d-readback | both | drift-avm2 S4: drawToBitmapData + #3692 | session_018CoDi61VeqnzLTiyF5rwmk — LANDED (+3 trace, +1 px) |
 | 22 | w2-doc-removal-events | trace | drift-avm2 S8 | session_018CoDi7jBSFh59hTPEMaK7G (18:33) |
 | 23 | w2-video-props | trace | drift-avm1 V: Video width/height lazy accessors | session_018CoDi3srDrx6YECoWarZYc (18:40) |
+| 24 | w2-harness-subtests | px (instrument) | ignore=true + [subtests] images + drawWithQuality + report-only ruffle-png bucket | session_018CoDi5m6iYZTWzXtXE2S8s (18:50) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
