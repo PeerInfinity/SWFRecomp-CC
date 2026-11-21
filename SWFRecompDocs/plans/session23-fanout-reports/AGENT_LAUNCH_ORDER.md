@@ -39,8 +39,8 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 
 | 7 | w2-glyph-levien | pixel | productionize w1-filter-label mech B (recompiler device-font glyph Levien + float); glow trio, bevel_* ×3, glow_with_alpha_strength | session_018CoDi74CQBH5j8NnH5mCXM — LANDED `57015b2db` (+7 px) |
 
-| 8 | w2-tf-css | trace | trace-tail slot A: AVM1 htmlText CSS + getTextFormat url/para; + 5 new upstream getTextFormat rows | session_018CoDi3RqHac9QhfSJkkY34 (16:58) |
-| 9 | w2-attached-timeline | trace | trace-tail slot B: attached clips run natural timeline in CI modes; movieclip_destruction_test3/4 | session_018CoDi5yeX7FkuGneLRRe8H (16:58) |
+| 8 | w2-tf-css | trace | trace-tail slot A: AVM1 htmlText CSS + getTextFormat url/para; + 5 new upstream getTextFormat rows | session_018CoDi3RqHac9QhfSJkkY34 — LANDED `228a5ff0c` (+4) |
+| 9 | w2-attached-timeline | trace | trace-tail slot B: attached clips run natural timeline in CI modes; movieclip_destruction_test3/4 | session_018CoDi5yeX7FkuGneLRRe8H — LANDED `3cdde8be0` (+2) |
 | 10 | w2-padded-filter | pixel | productionize w1-padded-filter (gated padded filter layer); drop_shadow_angles, displacement_map | session_018CoDi6x1pyS9L9PSYoDJZL (17:03) |
 | 11 | w2-stage3d-text | pixel | Stage3D RTT + budget 48M, AVM2 default-font advance rounding; stage3d_texture, stage3d_bitmap | session_018CoDi7QtMALGjWbWyYvecw (17:10) |
 | 12 | w2-netstream-audio | trace | trace-tail D: NetStream audio tap + computeSpectrum; audio/aac, audio/g711 | session_018CoDi3x3Uds6hHMQAvVQFk — LANDED (+2 graphics) |
@@ -57,12 +57,14 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `7b6a69124` | w1-pixel-misc §1 (FAAN IDCT, landed directly) | px fail→pass: `avm2/netstream_play_flv`, `avm1/netstream_play_flv`, `visual/video/deblocking`; `colorconversion/h263` 10808→3 (still fail); trace none |
 | `57015b2db` | w2-glyph-levien | px fail→pass: `visual/filters/glow`, `glow_without_composite_source`, `drop_shadow`, `bevel_inner`, `bevel_outer`, `bevel_full`, `glow_with_alpha_strength` (last 4 at 18/18 zero headroom); md5 moves on passing text-bind, cache_as_bitmap/text, edittext_scroll .01; trace none |
 | `9ba5e552c` | w2-netstream-audio | trace fail→pass GRAPHICS: `audio/aac`, `audio/g711`; NO-GRAPHICS: `audio/g711` only (`audio/aac` stays fail by design: no libavcodec in no-graphics builds → known mode-parity gap, 1 row); pixels none. AAC mono 44.1k/48k depend on matching Ruffle's mixer-clock alignment (fragile, see report §2) |
+| `228a5ff0c` | w2-tf-css | trace fail→pass (both modes): `avm1/edittext_html_duplicate_attributes` (KF, Flash-exact pass), `textfield_get_text_format_args`, `textfield_set_text_format_args`, `textfield_set_text_format_text_change`; HOLD (L): `edittext_set_text_same(_after_edits)`; pixels: md5-only canary members added |
+| `3cdde8be0` | w2-attached-timeline | trace fail→pass (both modes): `from_gnash/misc-swfc.all/movieclip_destruction_test3`, `_test4` (Flash-exact); pixels none |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
 - glyph-precision lead 2: quality=low hairline tie-break (Flash takes the +0.5 px side); `shape_test` 17911 attributed to `e62daeb6f`. A/B on `acid-small .01/.05` first.
 - trace-tail slots queued (launch as cloud slots free): C `w2-qname-dict` (avm2_ops.c; dictionary_qname_keys +1; full CI for #1069/#1081), D `w2-netstream-audio` (audio/aac, g711 +2), E `w2-definefont4` (textline_metrics +1, recompiler DefineFont4), F `w2-avm1-devicefont` (device_font_name_case +1).
-- trace-tail oracle request 1 (optional): attached 4-frame clip frame-order trace — do at w2-attached-timeline merge.
+- trace-tail oracle request 1: DONE 18:10 — `w2-attached-timeline-probe/output.ruffle-exporter-45366370e.txt` (Ruffle exporter, 8 frames). Ticks ≥2 are IDENTICAL to ours (newest-first, child-before-parent, root last; stopped / 1-frame containers animate children). Attach tick DIFFERS (pre-existing, untouched by the patch): Ruffle runs each attached clip's timeline child frame 1 BEFORE its parent (`kid, kid2, stopper, kid3, multi`), we run parent first (`kid, stopper, kid2, multi, kid3`). Lead → s24 board / small slot; a `regression/` fixture from this probe would fail on that tick today, so none added.
 - padded-filter oracle request (bevel row 305 at quality=low): DEFERRED — the local exporter has no quality option (renders at default/high quality on a real GPU, so it cannot answer a 1-sample point-sampling tie); needs Ruffle's own test runner (`cargo test` of the tests crate on lavapipe) or an exporter `--quality` patch. 0 flips at stake (disposition only). s24 board / optional.
 - pixel-misc queued: `w2-harness-subtests` (§4 GRADING-INSTRUMENT: ignore=true + [subtests] images + drawWithQuality alias; land AFTER an interim images run so attribution stays clean), `w2-text-cxform` (§3b acid-color-0 band, AVM1/timeline text gets ancestor colour transforms; correctness, 0 flips), `w2-shaderfilter` (§2a glassDisplace_shaderfilter +1 medium; rider pixelbender_dithering).
 
