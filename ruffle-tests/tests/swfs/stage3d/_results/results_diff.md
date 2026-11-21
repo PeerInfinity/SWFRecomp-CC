@@ -1,32 +1,16 @@
 # Ruffle Test Results Diff
 
-**Previous:** `344c85a166c3` (2026-11-15T08:31:27.901333+00:00)
-**Current:** `08709f65842a` (2026-11-21T17:00:08.554988+00:00)
+**Previous:** `08709f65842a` (2026-11-21T17:00:08.554988+00:00)
+**Current:** `bc91565cea8e` (2026-11-21T19:30:16.470113+00:00)
+**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 0 | 7 | +7 |
+| Passing | 7 | 7 | 0 |
 | Total | 8 | 8 | 0 |
-| Pass rate | 0.0% | 87.5% | +87.5% |
-| Mismatched lines | 0 | 5 | +5 |
-|   Increased | | | +5 |
+| Pass rate | 87.5% | 87.5% | 0% |
+| Mismatched lines | 5 | 5 | 0 |
 
-## Newly Passing (7)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `request_matching_profiles` | compile_fail | - | 190/190 |
-| `request_profiles` | compile_fail | - | 16/16 |
-| `sampler_odd_size` | compile_fail | - | 1/1 |
-| `scissor_rectangle` | compile_fail | - | 0/0 |
-| `scissor_rectangle_invalid` | compile_fail | - | 1/1 |
-| `unbound_texture` | compile_fail | - | 0/0 |
-| `unbound_texture_multiple` | compile_fail | - | 0/0 |
-
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `draw_to_bitmap_data_unconfigured` | compile_fail | output_mismatch | - | 3/8 |
+No changes detected.

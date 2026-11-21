@@ -1,31 +1,16 @@
 # Ruffle Test Results Diff
 
-**Previous:** `344c85a166c3` (2026-11-15T08:31:27.879050+00:00)
-**Current:** `08709f65842a` (2026-11-21T17:00:08.540400+00:00)
+**Previous:** `08709f65842a` (2026-11-21T17:00:08.540400+00:00)
+**Current:** `bc91565cea8e` (2026-11-21T19:30:16.447377+00:00)
+**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 0 | 5 | +5 |
+| Passing | 5 | 5 | 0 |
 | Total | 7 | 7 | 0 |
-| Pass rate | 0.0% | 71.4% | +71.4% |
-| Mismatched lines | 0 | 16 | +16 |
-|   Increased | | | +16 |
+| Pass rate | 71.4% | 71.4% | 0% |
+| Mismatched lines | 16 | 16 | 0 |
 
-## Newly Passing (5)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `convolution_filter_big_matrix` | compile_fail | - | 2/2 |
-| `lzma_length_too_short` | compile_fail | - | 18/18 |
-| `swf_length_too_short_no_end` | compile_fail | - | 19/19 |
-| `swf_length_too_short_no_second_frame` | compile_fail | - | 18/18 |
-| `swf_length_zero` | compile_fail | - | 0/0 |
-
-## Status Changed (2)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `lzma_length_too_long` | compile_fail | ruffle_matched | - | 9/19 |
-| `swf_length_too_long` | compile_fail | ruffle_matched | - | 12/18 |
+No changes detected.
