@@ -21,6 +21,8 @@ Baseline runs at `08709f658` (upstream `0ddd12b6a`): graphics/full/images `44922
 
 | 7 | w2-glyph-levien | pixel | productionize w1-filter-label mech B (recompiler device-font glyph Levien + float); glow trio, bevel_* ×3, glow_with_alpha_strength | session_018CoDi74CQBH5j8NnH5mCXM (16:50 UTC) |
 
+| 8 | w2-tf-css | trace | trace-tail slot A: AVM1 htmlText CSS + getTextFormat url/para; + 5 new upstream getTextFormat rows | session_018CoDi3RqHac9QhfSJkkY34 (16:58) |
+| 9 | w2-attached-timeline | trace | trace-tail slot B: attached clips run natural timeline in CI modes; movieclip_destruction_test3/4 | session_018CoDi5yeX7FkuGneLRRe8H (16:58) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
