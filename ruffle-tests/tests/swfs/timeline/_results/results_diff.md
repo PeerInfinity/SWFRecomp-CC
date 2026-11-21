@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bc91565cea8e` (2026-11-21T19:30:16.438918+00:00)
-**Current:** `c489b84d9946` (2026-11-21T19:49:24.060316+00:00)
+**Previous:** `c489b84d9946` (2026-11-21T19:49:24.060316+00:00)
+**Current:** `9a970370e096` (2026-11-21T21:08:32.064043+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 14 | 14 | 0 |
-| Total | 16 | 17 | +1 |
-| Pass rate | 87.5% | 82.4% | -5.1% |
-| Mismatched lines | 4 | 6 | +2 |
+| Total | 17 | 17 | 0 |
+| Pass rate | 82.4% | 82.4% | 0% |
+| Mismatched lines | 6 | 6 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `swf_9_event_goto_frame_script` | ruffle_matched | 3/5 |
+No changes detected.

@@ -1,130 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-21T19:30:16.493029+00:00",
-    "old_git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
-    "new_timestamp": "2026-11-21T19:49:24.095254+00:00",
-    "new_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
+    "old_timestamp": "2026-11-21T19:49:24.095254+00:00",
+    "old_git_sha": "c489b84d994622e61964594f9b3ff7524aed9cd4",
+    "new_timestamp": "2026-11-21T21:08:32.098423+00:00",
+    "new_git_sha": "9a970370e096ca421802a4616b7acb9f32972031",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 144,
-    "old_ruffle_matched": 85,
-    "old_effective_pass": 229,
-    "old_total": 235,
-    "old_pass_rate": 61.3,
+    "old_pass": 148,
+    "old_ruffle_matched": 88,
+    "old_effective_pass": 236,
+    "old_total": 243,
+    "old_pass_rate": 60.9,
     "new_pass": 148,
     "new_ruffle_matched": 88,
     "new_effective_pass": 236,
     "new_total": 243,
     "new_pass_rate": 60.9,
-    "old_mismatched_lines": 7976,
+    "old_mismatched_lines": 8079,
     "new_mismatched_lines": 8079,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 235,
-    "added": 8,
+    "unchanged": 243,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "Mouse-v5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      }
-    },
-    {
-      "test": "Mouse-v6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      }
-    },
-    {
-      "test": "Mouse-v7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      }
-    },
-    {
-      "test": "Mouse-v8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      }
-    },
-    {
-      "test": "MovieClip-v5",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 363,
-        "expected_lines": 363,
-        "matching_lines": 352
-      }
-    },
-    {
-      "test": "MovieClip-v6",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 936,
-        "expected_lines": 936,
-        "matching_lines": 916
-      }
-    },
-    {
-      "test": "MovieClip-v7",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 969,
-        "expected_lines": 969,
-        "matching_lines": 949
-      }
-    },
-    {
-      "test": "MovieClip-v8",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1087,
-        "expected_lines": 1087,
-        "matching_lines": 1035
-      }
-    }
-  ]
+  "changes": []
 }
