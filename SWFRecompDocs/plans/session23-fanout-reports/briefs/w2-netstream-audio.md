@@ -1,0 +1,18 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 23 (dual-axis #15), slot `w2-netstream-audio`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-netstream-audio` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session23-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Your branch is `fanout/w2-netstream-audio`; deliver `SWFRecompDocs/plans/session23-fanout-reports/w2-netstream-audio-report.md` and `SWFRecompDocs/plans/session23-fanout-reports/w2-netstream-audio.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Also read `CLAUDE.md`. Check `SWFRecompDocs/plans/session23-fanout-reports/SIBLING_FILE_MAP.md` (if present) for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**Slot D of `w1-trace-tail`: NetStream audio decode tap + `SoundMixer.computeSpectrum`.** Read `session23-fanout-reports/w1-trace-tail-report.md` §3 FIRST (the pricing, the self-grading tolerances, the scope). Categories: `audio avm2` (+ `regression` in git).
+
+1. `avm2_net.c` `ns_video_tick_one` (~2194) walks FLV tags and skips audio (tag 8). Decode non-lookahead audio tags into a per-stream 44.1 kHz stereo float ring (mono duplicated): G.711 A-law/µ-law tables (8 kHz; resample with windowed sinc or at least cubic — linear passes with only 0.953 min amplitude margin) and AAC via libavcodec (already linked by `video_codec.c`; AACPacketType 0 = AudioSpecificConfig → extradata, 1 = raw frames; resample 22.05/44.1/48 kHz). Decode faithfully; do not compensate the encoded −3 dB.
+2. `SoundMixer.computeSpectrum(ba, FFTMode=false, stretch=0)` in `avm2_media.c` (SoundMixer statics ~359): write 512 floats (L then R, each `ring[end-512+2i]`, i<256), respecting ByteArray endianness. FFTMode=true: implement per Flash docs if cheap, otherwise return zeros and say so.
+3. Headline: `audio/aac`, `audio/g711` fail → PASS (exact text; the SWF self-grades). Check `test.toml`, `known_failure`, `output.ruffle.txt`.
+4. Verification: every `audio/*` row and every AVM2 row using NetStream/SoundMixer (grep), graphics AND no-graphics; `avm2/netstream_*` image rows md5-identical (the video path must not change — `7b6a69124` just changed Spark IDCT on master, so take before-renders on current master). Also confirm the browser/WASM build still links (if `avm2_net.c` gains a libavcodec dependency, it must respect `WITH_LIBAVCODEC` OFF builds: stub cleanly).
+5. Note in the report whether `avm2/audio_computespectrum` (ignored; needs a Sound-object mix tap) is now cheap.
+
+Siblings: `w2-stage3d-text` (avm2_stage3d.c, avm2_text.c), `w2-padded-filter`, `w2-glyph-levien`, `w2-tf-css`, `w2-attached-timeline` — none touch `avm2_net.c` / `avm2_media.c`.
