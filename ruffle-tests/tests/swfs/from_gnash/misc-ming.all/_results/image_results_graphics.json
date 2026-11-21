@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-10-17T04:05:13.506104+00:00",
+    "timestamp": "2026-11-21T17:28:13.083618+00:00",
     "suite": "from_gnash/misc-ming.all",
     "stem": "results_graphics",
-    "git_sha": "38cf9b1a0ab840bc6be0edbc5eb8938e8eafad09",
+    "git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "38995363802",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/38995363802",
+    "run_id": "44922638965",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/44922638965",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 7,
@@ -16,7 +16,7 @@
   "fail": 10,
   "skip": 0,
   "no_render": 0,
-  "fail_known_failure": 3,
+  "fail_known_failure": 4,
   "pass_rate": 44.4,
   "results": [
     {
@@ -85,31 +85,31 @@
       "test": "Video-EmbedSquareTest",
       "comparison": "output",
       "trace_status": "pass",
-      "known_failure": false,
+      "known_failure": true,
       "status": "fail",
-      "message": "Image comparison failed: 12 outliers exceed limit of 0, max difference 255",
+      "message": "Image comparison failed: 1794 outliers exceed limit of 0, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 320,
       "height": 96,
       "total_channels": 122880,
-      "diff_channels": 58,
-      "mean_diff": 0.0255,
+      "diff_channels": 14341,
+      "mean_diff": 1.9116,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 0,
-          "outliers": 12,
+          "outliers": 1794,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 12,
+      "outliers": 1794,
       "max_outliers": 0,
       "tolerance": 5,
-      "excess_outliers": 12
+      "excess_outliers": 1794
     },
     {
       "suite": "from_gnash/misc-ming.all",

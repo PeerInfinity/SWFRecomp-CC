@@ -1,26 +1,47 @@
 {
   "metadata": {
-    "timestamp": "2026-10-18T08:49:49.752845+00:00",
-    "git_sha": "f55511379655b2fc1bd6eccc841bfdb493ebd79e",
-    "duration_seconds": 69.87,
-    "total_available": 7,
+    "timestamp": "2026-11-21T17:00:08.554988+00:00",
+    "git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
+    "duration_seconds": 80.46,
+    "total_available": 8,
     "shards": 30,
     "expected_shards": 30
   },
-  "total": 7,
+  "total": 8,
   "pass": 7,
   "ruffle_matched": 0,
-  "fail": 0,
-  "pass_rate": 100.0,
+  "fail": 1,
+  "pass_rate": 87.5,
   "effective_pass": 7,
-  "effective_pass_rate": 100.0,
-  "breakdown": {},
+  "effective_pass_rate": 87.5,
+  "breakdown": {
+    "output_mismatch": 1
+  },
   "tests": [
+    {
+      "test": "draw_to_bitmap_data_unconfigured",
+      "phases": {
+        "recomp": 0.004,
+        "compile": 22.515,
+        "run": 0.004
+      },
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 8,
+        "matching_lines": 3
+      },
+      "duration": 22.53,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=4, expected=8)",
+      "actual_output": "no clear: ff808080\nclear: no error\nafter clear: ff808080\nafter configure: ff808080",
+      "expected_output": "no clear: ff808080\nclear: no error\nafter clear: ff808080\nafter configure: [class Error]\nError: Error #3692: All buffers need to be cleared every frame before drawing.\n\tat flash.display3D::Context3D/drawToBitmapData()\n\tat Test/read()\n\tat Test/onContext()"
+    },
     {
       "test": "request_matching_profiles",
       "phases": {
-        "recomp": 0.008,
-        "compile": 7.836,
+        "recomp": 0.005,
+        "compile": 6.033,
         "run": 0.004
       },
       "num_frames": 126,
@@ -29,14 +50,14 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 7.86,
+      "duration": 6.05,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
-        "recomp": 0.008,
-        "compile": 7.985,
+        "recomp": 0.004,
+        "compile": 5.62,
         "run": 0.004
       },
       "num_frames": 12,
@@ -45,15 +66,15 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 8.01,
+      "duration": 5.63,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.026,
-        "compile": 11.101,
-        "run": 0.016
+        "recomp": 0.025,
+        "compile": 10.954,
+        "run": 0.026
       },
       "num_frames": 1,
       "lines": {
@@ -61,15 +82,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 11.15,
+      "duration": 11.01,
       "status": "pass"
     },
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.025,
-        "compile": 10.922,
-        "run": 0.016
+        "recomp": 0.014,
+        "compile": 7.695,
+        "run": 0.014
       },
       "num_frames": 1,
       "lines": {
@@ -77,15 +98,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 10.97,
+      "duration": 7.73,
       "status": "pass"
     },
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.025,
-        "compile": 10.301,
-        "run": 0.032
+        "recomp": 0.026,
+        "compile": 12.144,
+        "run": 0.03
       },
       "num_frames": 1,
       "lines": {
@@ -93,14 +114,14 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 10.37,
+      "duration": 12.21,
       "status": "pass"
     },
     {
       "test": "unbound_texture",
       "phases": {
-        "recomp": 0.024,
-        "compile": 10.357,
+        "recomp": 0.015,
+        "compile": 6.534,
         "run": 0.008
       },
       "num_frames": 1,
@@ -109,15 +130,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 10.4,
+      "duration": 6.56,
       "status": "pass"
     },
     {
       "test": "unbound_texture_multiple",
       "phases": {
         "recomp": 0.021,
-        "compile": 10.64,
-        "run": 0.016
+        "compile": 8.419,
+        "run": 0.011
       },
       "num_frames": 1,
       "lines": {
@@ -125,7 +146,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 10.68,
+      "duration": 8.46,
       "status": "pass"
     }
   ]
