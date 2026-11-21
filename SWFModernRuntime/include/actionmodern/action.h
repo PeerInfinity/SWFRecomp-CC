@@ -149,6 +149,15 @@ struct MovieClip {
 	// GPU-only (past the end of the CPU transform_data table), so
 	// fillDrawingInfos' hairline-stroke scale reads this instead.
 	float dyn_xform_lin[4];
+	// AVM1 runtime `mc.filters = [...]` lowered to the render chain
+	// (`FilterListData*`, malloc'd on first assignment, owned by this immortal
+	// MovieClip, kept as void* so this header does not pull in tag.h). Written
+	// by the filters setter at ASSIGNMENT time (Flash value semantics: later
+	// mutation of the AS array changes nothing until reassigned). A placed
+	// clip mirrors it onto its display entry (filter_type + filter_chain); a
+	// dynamic clip (display_obj == NULL) is rendered through tag.c's filtered
+	// Drawing-API subtree path. NULL or count == 0 = no runtime filters.
+	void* as_filters;
 };
 
 // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
@@ -732,6 +741,17 @@ typedef struct {
 
 typedef void (*DrawingRenderCallback)(const DrawingRenderInfo* info, void* user_data);
 int actionIterateDrawings(DrawingRenderCallback cb, void* user_data);
+// AVM1 runtime filters on DYNAMIC clips (Drawing-API subtrees). While a hook
+// is installed, actionIterateDrawings skips every clip at or below a dynamic
+// clip with runtime `filters` and calls the hook ONCE for that filter root, at
+// the root's position in the walk. The hook renders the subtree via
+// actionIterateDynamicSubtreeDrawings (alpha relative to the root: the root's
+// own and its ancestors' `_alpha` are the group alpha, applied to the
+// filtered layer, which actionDynamicFilterGroupAlpha returns).
+typedef void (*DynamicFilterRootCallback)(void* mc, const void* filter_list, void* user_data);
+void actionSetDynamicFilterRootHook(DynamicFilterRootCallback cb, void* user_data);
+int actionIterateDynamicSubtreeDrawings(void* root_mc, DrawingRenderCallback cb, void* user_data);
+float actionDynamicFilterGroupAlpha(void* root_mc);
 
 // Masked MC iteration: callback receives (masked_mc_paths, mask_mc_paths) pairs
 typedef struct {

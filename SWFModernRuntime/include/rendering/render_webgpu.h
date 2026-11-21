@@ -473,6 +473,7 @@ void render_webgpu_set_blur_shift(WebGPURenderContext* context, int sx, int sy);
 // derived from it (bucketed, capped; render_webgpu.c). <= 0: no pad.
 void render_webgpu_set_filter_pad(WebGPURenderContext* context, double growth_px);
 void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset_x, float offset_y, float tint_r, float tint_g, float tint_b, float tint_a);
+void render_webgpu_composite_filtered_alpha(WebGPURenderContext* context, float group_alpha);
 // Copy the offscreen source out of filter_tex_a before the blur ping-pong
 // overwrites it. Call with the main pass SUSPENDED, between
 // render_webgpu_end_offscreen_pass() and render_webgpu_run_blur().

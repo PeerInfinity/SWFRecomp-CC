@@ -584,3 +584,13 @@ visual/layout/line_vertical_align           # AVM2 ranged setTextFormat(tf, b, e
 avm2/bitmapdata_drawwithquality             # drawWithQuality + subtest MSAA rerun 2 cmp
 # tier=2
 avm2/bitmapdata_draw_cab_quality            # drawWithQuality (CI-failing)       1 cmp
+# --- post-s23 avm1-runtime-filters ---
+# The only image row that assigns AVM1 runtime `filters`: two createEmptyMovieClip
+# clips with Drawing-API children, `_alpha = 40` and a BlurFilter set by script,
+# one with an empty glow-filtered child. Covers the dynamic filter-root path
+# (Drawing-API subtree captured into the filter layer, blitted once at the
+# group alpha) and the setter's lowering. Passes at 0 outliers, max diff 1 on
+# a CI-grade box (before-leg md5 == CI actual).
+# tier=1
+visual/filters/empty_child_filter_bounds    # AVM1 runtime filters, dyn subtree  1 cmp
+regression/avm1_runtime_filters               # AVM1 runtime filters probe (Ruffle golden) 1 cmp

@@ -60,6 +60,7 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_set_blur_shift(ctx, sx, sy)          render_webgpu_set_blur_shift(ctx, sx, sy)
 #define renderer_set_filter_pad(ctx, p)               render_webgpu_set_filter_pad(ctx, p)
 #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) render_webgpu_composite_filtered(ctx, ox, oy, tr, tg, tb, ta)
+#define renderer_composite_filtered_alpha(ctx, ga)   render_webgpu_composite_filtered_alpha(ctx, ga)
 #define renderer_snapshot_filter_source(ctx)           render_webgpu_snapshot_filter_source(ctx)
 #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) \
 	render_webgpu_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs)
@@ -127,6 +128,7 @@ typedef FlashbangContext RenderContext;
 #define renderer_set_blur_shift(ctx, sx, sy)          ((void)0)
 #define renderer_set_filter_pad(ctx, p)               ((void)0)
 #define renderer_composite_filtered(ctx, ox, oy, tr, tg, tb, ta) ((void)0)
+#define renderer_composite_filtered_alpha(ctx, ga)   ((void)0)
 #define renderer_snapshot_filter_source(ctx)           ((void)0)
 #define renderer_compose_filter(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) ((void)0)
 #define renderer_compose_filter_to_layer(ctx, k, ox, oy, c1r, c1g, c1b, c1a, c2r, c2g, c2b, c2a, st, va, ko, cs) ((void)0)

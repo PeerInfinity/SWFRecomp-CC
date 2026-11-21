@@ -4476,7 +4476,7 @@ static const char* blur_wgsl =
 
 static const char* composite_wgsl =
 	"struct Params {\n"
-	"  offset_and_mode: vec4f,\n"  // xy=NDC offset, z=tint_mode (0=passthrough, 1=tint), w=unused
+	"  offset_and_mode: vec4f,\n"  // xy=NDC offset, z=tint_mode (0=passthrough, 1=tint), w=group alpha (0 = none = 1.0)
 	"  tint: vec4f,\n"             // RGBA tint color (used when tint_mode > 0.5)
 	"}\n"
 	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
@@ -4501,7 +4501,8 @@ static const char* composite_wgsl =
 	"}\n"
 	"\n"
 	"@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
-	"  let c = textureSample(in_tex, in_samp, uv);\n"
+	"  let ga = select(1.0, params.offset_and_mode.w, params.offset_and_mode.w > 0.0);\n"
+	"  let c = textureSample(in_tex, in_samp, uv) * ga;\n"
 	"  let a_tinted = c.a * params.tint.a;\n"
 	"  let tinted = vec4f(params.tint.rgb * a_tinted, a_tinted);\n"
 	"  return select(c, tinted, params.offset_and_mode.z > 0.5);\n"
@@ -5892,14 +5893,37 @@ void render_webgpu_set_blur_shift(WebGPURenderContext* ctx, int sx, int sy)
 	ctx->blur_shift_y = sy;
 }
 
+static void composite_filtered_impl(WebGPURenderContext* ctx,
+	float offset_x, float offset_y,
+	float tint_r, float tint_g, float tint_b, float tint_a, float group_alpha);
+
 void render_webgpu_composite_filtered(WebGPURenderContext* ctx,
 	float offset_x, float offset_y,
 	float tint_r, float tint_g, float tint_b, float tint_a)
 {
+	composite_filtered_impl(ctx, offset_x, offset_y, tint_r, tint_g, tint_b, tint_a, 0.0f);
+}
+
+// The filter layer blitted at a GROUP alpha (premultiplied: rgba * alpha).
+// AVM1 runtime filters on a dynamic clip: Flash caches the filtered clip as
+// one bitmap and applies its `_alpha` to that bitmap, not per leaf. alpha
+// must be in (0, 1]; params.w == 0 is the "no group alpha" encoding every
+// other caller (and blend_layer_shader) keeps.
+void render_webgpu_composite_filtered_alpha(WebGPURenderContext* ctx, float group_alpha)
+{
+	if (!(group_alpha > 0.0f)) return;
+	if (group_alpha > 1.0f) group_alpha = 1.0f;
+	composite_filtered_impl(ctx, 0.0f, 0.0f, 0, 0, 0, 0, group_alpha);
+}
+
+static void composite_filtered_impl(WebGPURenderContext* ctx,
+	float offset_x, float offset_y,
+	float tint_r, float tint_g, float tint_b, float tint_a, float group_alpha)
+{
 	if (!ctx->renderer_ok) return;
 	// offset_x/y are in NDC space; tint rgba = 0 means passthrough
 	float has_tint = (tint_r != 0 || tint_g != 0 || tint_b != 0 || tint_a != 0) ? 1.0f : 0.0f;
-	float params[8] = {offset_x, offset_y, has_tint, 0, tint_r, tint_g, tint_b, tint_a};
+	float params[8] = {offset_x, offset_y, has_tint, group_alpha, tint_r, tint_g, tint_b, tint_a};
 	u32 params_offset = filter_uniform_push(ctx, params, 32);
 
 	// Create bind group for composite: read filter_tex_a

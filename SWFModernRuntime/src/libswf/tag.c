@@ -4503,14 +4503,59 @@ static int filter_capture_needs_pad(SWFAppContext* app_context,
 	    || (px_max + e > tw) || (py_max + e > th);
 }
 
+// AVM1 runtime filters on a DYNAMIC clip (avm1-runtime-filters): the source of
+// the filter layer is not one display entry but the clip's Drawing-API
+// subtree, drawn by `draw`, and the chain is the clip's runtime list (every
+// entry a renderer-native kind 1-4, see action.c avm1LowerFilterObject).
+// `group_alpha` < 1 is the clip's (and its dynamic ancestors') `_alpha`,
+// applied ONCE to the finished filter output - Flash caches a filtered clip as
+// a bitmap, so overlapping leaves share one alpha instead of compounding.
+typedef struct FilteredSource {
+	const FilterListData* list;
+	void (*draw)(SWFAppContext* app_context, void* ctx);
+	void* ctx;
+	float group_alpha;
+} FilteredSource;
+
+static void filtered_draw_source(SWFAppContext* app_context, DisplayObject* obj,
+                                 const FilteredSource* src)
+{
+	if (src != NULL) src->draw(app_context, src->ctx);
+	else render_single_object(app_context, obj);
+}
+
+static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+                                 const FilteredSource* src);
+
 static void render_filtered_object(SWFAppContext* app_context, DisplayObject* obj)
+{
+	render_filtered_core(app_context, obj, NULL);
+}
+
+static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
+                                 const FilteredSource* src)
 {
 	FilterListEntry chain_scratch;
 	const FilterListEntry* chain[MAX_FILTER_LIST_SIZE];
 	float obj_cx[20];
-	int have_obj_cx = filtered_object_cxform(app_context, obj, obj_cx);
-	int chain_n = build_filter_chain(obj, &chain_scratch, chain,
-	                                 MAX_FILTER_LIST_SIZE);
+	int have_obj_cx = 0;
+	int chain_n = 0;
+	if (src != NULL)
+	{
+		for (u8 i = 0; i < src->list->count && chain_n < MAX_FILTER_LIST_SIZE; i++)
+			if (src->list->entries[i].type >= 1 && src->list->entries[i].type <= 4)
+				chain[chain_n++] = &src->list->entries[i];
+		if (chain_n == 0) { src->draw(app_context, src->ctx); return; }
+	}
+	else
+	{
+		have_obj_cx = filtered_object_cxform(app_context, obj, obj_cx);
+		chain_n = build_filter_chain(obj, &chain_scratch, chain,
+		                             MAX_FILTER_LIST_SIZE);
+	}
+	// Group alpha: every filter (the last included) composes INTO the layer,
+	// which is then blitted once at that alpha.
+	int group = (src != NULL && src->group_alpha < 1.0f);
 	// Only the LAST filter's composition flags reach the framebuffer; the
 	// earlier ones fold into the blur ping-pong. Same rule (and the same
 	// caveats) as avm2_display.c::avm2_render_filtered, whose `.filters` array
@@ -4575,11 +4620,18 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	// feeds the blur / shadow (render_webgpu.h "PADDED filter layer").
 	{
 		double reach = 0.0;
-		if (filter_capture_needs_pad(app_context, obj, &reach))
+		if (src != NULL)
+		{
+			// A dynamic subtree's world is not tracked here: always pad.
+			double vs = (context != NULL && context->stage_scale > 0.0f)
+			          ? (double) context->stage_scale : 1.0;
+			renderer_set_filter_pad(context, filter_chain_reach_px(chain, chain_n, vs) + 2.0);
+		}
+		else if (filter_capture_needs_pad(app_context, obj, &reach))
 			renderer_set_filter_pad(context, reach);
 	}
 	renderer_begin_offscreen_pass(context);
-	render_single_object(app_context, obj);
+	filtered_draw_source(app_context, obj, src);
 	renderer_end_offscreen_pass(context);
 	// Unchained: the snapshot IS the source, so take it now. Chained: the
 	// snapshot must be the layer entering the LAST filter, so it is taken
@@ -4602,7 +4654,7 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	// captured object) is all there, so the shifted blur is exact. Unchained
 	// only: a chain snapshots the layer entering its last filter.
 	int shadow_shift_x = 0, shadow_shift_y = 0;
-	int shadow_pre_shifted = is_shadow && !chained
+	int shadow_pre_shifted = is_shadow && !chained && !group
 		&& filter_shadow_offset_px(context, last, &shadow_shift_x, &shadow_shift_y);
 	if (shadow_pre_shifted)
 		renderer_set_blur_shift(context, shadow_shift_x, shadow_shift_y);
@@ -4634,7 +4686,7 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 		// needs the RAW blurred alpha), so their blur runs at strength 1.
 		if (!f_is_blur) st = 1.0f;
 		// Non-final composed filter: composed into the layer after its blur.
-		int to_layer = !f_last && !f_is_blur;
+		int to_layer = (!f_last || group) && !f_is_blur;
 		if (to_layer)
 			renderer_snapshot_filter_source(context);
 		// A3: the filter's own colour carries the object's colour transform.
@@ -4651,6 +4703,12 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 
 	renderer_resume_pass(context);
 
+	if (group)
+	{
+		renderer_composite_filtered_alpha(context, src->group_alpha);
+		g_filter_capture_depth--;
+		return;
+	}
 	if (legacy)
 	{
 		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
@@ -4691,7 +4749,7 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	}
 
 	if (draw_source_before)
-		render_single_object(app_context, obj);
+		filtered_draw_source(app_context, obj, src);
 
 	// A3 again, for the composition half: shadow/glow colour and the bevel
 	// highlight are the filter's OUTPUT colour, so they take the object's
@@ -4727,7 +4785,7 @@ static void render_filtered_object(SWFAppContext* app_context, DisplayObject* ob
 	}
 
 	if (draw_source_after)
-		render_single_object(app_context, obj);
+		filtered_draw_source(app_context, obj, src);
 
 	g_filter_capture_depth--;
 }
@@ -7306,6 +7364,36 @@ static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data)
 	render_drawing_path(info);
 }
 
+// AVM1 runtime filters on a dynamic clip (avm1-runtime-filters): the
+// actionIterateDrawings hook. Renders the filter root's whole Drawing-API
+// subtree into the filter layer (render_filtered_core with a FilteredSource)
+// and blits the result at the root's group alpha. Installed only around the
+// two root-loop actionIterateDrawings calls.
+static void dyn_filter_root_draw(SWFAppContext* app_context, void* mc)
+{
+	(void)app_context;
+	actionIterateDynamicSubtreeDrawings(mc, drawing_render_cb, NULL);
+}
+
+static void dyn_filter_root_cb(void* mc, const void* filter_list, void* user_data)
+{
+	SWFAppContext* app_context = (SWFAppContext*) user_data;
+	FilteredSource src;
+	src.list = (const FilterListData*) filter_list;
+	src.draw = dyn_filter_root_draw;
+	src.ctx = mc;
+	src.group_alpha = actionDynamicFilterGroupAlpha(mc);
+	if (!(src.group_alpha > 0.0f)) return;
+	// Inside another capture / a mask: no nested filter layer (the same rule
+	// as compose_children's nested PlaceObject3 filters).
+	if (g_filter_capture_depth != 0 || g_clip_mask_capture)
+	{
+		dyn_filter_root_draw(app_context, mc);
+		return;
+	}
+	render_filtered_core(app_context, NULL, &src);
+}
+
 // Helper: render all paths in a DrawingMCInfo
 static void render_drawing_mc_paths(const DrawingMCInfo* mc_info)
 {
@@ -7870,7 +7958,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		textfield_glyph_render_cb, app_context);
 
 	// Drawing API fills and strokes
+	actionSetDynamicFilterRootHook(dyn_filter_root_cb, app_context);
 	actionIterateDrawings(drawing_render_cb, NULL);
+	actionSetDynamicFilterRootHook(NULL, NULL);
 	actionIterateMaskedDrawings(masked_drawing_render_cb, NULL);
 
 	// Attached bitmaps (from attachBitmap on dynamic MCs)
@@ -8923,7 +9013,9 @@ void tagShowFrame(SWFAppContext* app_context)
 		textfield_glyph_render_cb, app_context);
 
 	// --- Render Drawing API fills and strokes ---
+	actionSetDynamicFilterRootHook(dyn_filter_root_cb, app_context);
 	actionIterateDrawings(drawing_render_cb, NULL);
+	actionSetDynamicFilterRootHook(NULL, NULL);
 	actionIterateMaskedDrawings(masked_drawing_render_cb, NULL);
 
 	// --- Render attached bitmaps (from attachBitmap on dynamic MCs) ---

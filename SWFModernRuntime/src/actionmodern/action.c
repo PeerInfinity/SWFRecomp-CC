@@ -31656,6 +31656,15 @@ static void drawingClear(MovieClip* mc)
 	mc->draw_has_bounds = 0;
 }
 
+// AVM1 runtime filters (avm1-runtime-filters): while tag.c draws a dynamic
+// filter root's subtree into its filter layer, the root's own `_alpha` and its
+// ancestors' are the GROUP alpha (Flash caches a filtered clip as one bitmap
+// and blits it with the clip's colour transform), so the per-leaf fold stops
+// at this clip. NULL outside that capture: every other draw is unchanged.
+static MovieClip* g_dyn_alpha_root = NULL;
+static int g_avm1_runtime_filter_mcs;
+static int avm1McHasRuntimeFilters(const MovieClip* mc);
+
 // s23 w2-dynclip-transform: product of the AS `_alpha` of `mc`'s dynamic
 // (no display-list entry) ancestors, stopping at _root or a placed clip.
 static float dynMcChainAlpha(const MovieClip* mc)
@@ -31666,6 +31675,7 @@ static float dynMcChainAlpha(const MovieClip* mc)
 	     p = p->parent, guard++)
 	{
 		if (p->depth == INT_MIN || p->display_obj != NULL) break;
+		if (p == g_dyn_alpha_root) break;
 		if (p->as_set_flags & 32) {
 			float a = p->alpha / 100.0f;
 			if (a < 0.0f) a = 0.0f;
@@ -31691,7 +31701,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 	// MCs render with cxform_id 0, so this is the only channel the AS alpha
 	// can reach; gradient/bitmap drawing fills don't get the fold yet).
 	float as_alpha_mul = 1.0f;
-	if (mc->as_set_flags & 32) {
+	if ((mc->as_set_flags & 32) && mc != g_dyn_alpha_root) {
 		as_alpha_mul = mc->alpha / 100.0f;
 		if (as_alpha_mul < 0.0f) as_alpha_mul = 0.0f;
 		if (as_alpha_mul > 1.0f) as_alpha_mul = 1.0f;
@@ -32064,6 +32074,92 @@ void* actionAvm1MaskerForMC(const void* mc_ptr)
 	return masker;
 }
 
+// The OUTERMOST dynamic clip at or above `mc` (walking dynamic parents, stopping
+// at _root or a placed clip) whose runtime filter list is non-empty, or NULL.
+// A filter root nested inside another renders unfiltered inside the outer
+// capture, the same rule compose_children applies to nested PlaceObject3
+// filters (g_filter_capture_depth).
+static MovieClip* dynFilterRootOf(MovieClip* mc)
+{
+	MovieClip* fr = NULL;
+	int guard = 0;
+	for (MovieClip* p = mc; p != NULL && p != &root_movieclip && guard < 64;
+	     p = p->parent, guard++)
+	{
+		if (p->depth == INT_MIN || p->display_obj != NULL) break;
+		if (avm1McHasRuntimeFilters(p)) fr = p;
+	}
+	return fr;
+}
+
+// 1 when the filter root's Drawing-API subtree has any geometry. A root with
+// none (an empty dynamic clip, or a TIMELINE sprite whose runtime filters
+// already render through its display entry) gets no filter pass at all.
+static int dynSubtreeHasDrawings(MovieClip* root)
+{
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || !mc->visible) continue;
+		if (mc->is_mask || mc->mask_mc != NULL || mc->display_obj != NULL) continue;
+		DrawingState* ds = (DrawingState*) mc->drawing_state;
+		if (ds == NULL || (ds->path_count == 0 && ds->cmd_count == 0)) continue;
+		if (dynFilterRootOf(mc) == root) return 1;
+	}
+	return 0;
+}
+
+static DynamicFilterRootCallback g_dyn_filter_hook = NULL;
+static void* g_dyn_filter_hook_ud = NULL;
+
+void actionSetDynamicFilterRootHook(DynamicFilterRootCallback cb, void* user_data)
+{
+	g_dyn_filter_hook = cb;
+	g_dyn_filter_hook_ud = user_data;
+}
+
+int actionIterateDynamicSubtreeDrawings(void* root_mc, DrawingRenderCallback cb, void* user_data)
+{
+	MovieClip* root = (MovieClip*) root_mc;
+	if (root == NULL) return 0;
+	int count = 0;
+	MovieClip* saved = g_dyn_alpha_root;
+	g_dyn_alpha_root = root;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!mc->visible) continue;
+		if (mc->is_mask || mc->mask_mc != NULL) continue;
+		if (mc->display_obj != NULL) continue;
+		if (mc->drawing_state == NULL) continue;
+		if (dynFilterRootOf(mc) != root) continue;
+		DrawingRenderInfo infos[64];
+		int n = fillDrawingInfos(mc, infos, 64);
+		for (int j = 0; j < n; j++) {
+			cb(&infos[j], user_data);
+			count++;
+		}
+	}
+	g_dyn_alpha_root = saved;
+	return count;
+}
+
+float actionDynamicFilterGroupAlpha(void* root_mc)
+{
+	MovieClip* mc = (MovieClip*) root_mc;
+	if (mc == NULL) return 1.0f;
+	float a = 1.0f;
+	if (mc->as_set_flags & 32) {
+		a = mc->alpha / 100.0f;
+		if (a < 0.0f) a = 0.0f;
+		if (a > 1.0f) a = 1.0f;
+	}
+	MovieClip* saved = g_dyn_alpha_root;
+	g_dyn_alpha_root = NULL;
+	a *= dynMcChainAlpha(mc);
+	g_dyn_alpha_root = saved;
+	return a;
+}
+
 int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
 {
 	int count = 0;
@@ -32073,6 +32169,19 @@ int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
 		if (!mc->visible) continue;
 		if (mc->is_mask) continue;       // masks rendered via actionIterateMaskedDrawings
 		if (mc->mask_mc != NULL) continue; // masked MCs also via masked iterator
+		// AVM1 runtime filters on a dynamic subtree: the filter root renders
+		// its whole subtree through the hook (tag.c filtered layer), at the
+		// root's position in this walk; everything below it is skipped here.
+		if (g_dyn_filter_hook != NULL && g_avm1_runtime_filter_mcs > 0
+		    && mc->display_obj == NULL)
+		{
+			MovieClip* fr = dynFilterRootOf(mc);
+			if (fr != NULL) {
+				if (fr == mc && dynSubtreeHasDrawings(mc))
+					g_dyn_filter_hook(mc, mc->as_filters, g_dyn_filter_hook_ud);
+				continue;
+			}
+		}
 		// Skip clip_depth mask sprites (their drawings are rendered into stencil buffer by tag.c)
 		if (mc->display_obj != NULL) {
 			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
@@ -43686,6 +43795,271 @@ static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 ar
     return r;
 }
 
+// ---------------------------------------------------------------------------
+// AVM1 runtime `filters` -> render chain (post-s23 avm1-runtime-filters)
+// ---------------------------------------------------------------------------
+// `mc.filters = [...]` used to be a reflection-only store: the renderer reads
+// filter_type / filter_chain on a display entry, which only the SWF-authored
+// tagSetFilter ever wrote, so every AS2 runtime glow / blur / drop shadow was a
+// silent no-op. Ruffle (core/src/avm1/globals/movie_clip.rs set_filters)
+// converts each element to a native swf::Filter AT ASSIGNMENT TIME
+// (bitmap_filter.rs avm1_to_filter; non-filter elements are skipped) and a
+// non-object value clears the list. This lowers the array into the same
+// FilterListEntry layout swf.cpp emits for PlaceObject3, so the existing
+// render_filtered_object path renders it:
+//   1 Blur, 2 DropShadow, 3 Glow, 4 Bevel   exact (renderer-native kinds);
+//   7 GradientGlow -> glow, 8 GradientBevel -> bevel   the recompiler's own
+//     scalar approximations (swf.cpp, PlaceObject3 cases 4 / 7);
+//   5 Convolution, 6 ColorMatrix, DisplacementMap   NOT rendered (PlaceObject3
+//     folds ColorMatrix into the cxform and approximates Convolution as a blur;
+//     neither has a runtime-filter consumer yet).
+// Flag layouts are the renderer's (render_filtered_object): glow / shadow
+// bit0 compositeSource, bit1 knockout, bit2 inner; bevel bit0 onTop,
+// bit1 compositeSource, bit2 knockout, bit3 inner. Angles are stored in
+// RADIANS (the SWF unit), colours as straight 0..1 doubles.
+static int avm1FilterTypeOf(ASObject* o)
+{
+	if (o == NULL || o->native_type != NATIVE_FILTER) return 0;
+	ActionVar* pv = getProperty(o, "__proto__", 9);
+	for (int guard = 0; pv != NULL && guard < 16; guard++)
+	{
+		if (pv->type != ACTION_STACK_VALUE_OBJECT) break;
+		ASObject* p = (ASObject*)(uintptr_t) pv->data.numeric_value;
+		if (p == NULL) break;
+		for (int t = 1; t <= 8; t++)
+			if (g_filter_protos_by_type[t] == p) return t;
+		pv = getProperty(p, "__proto__", 9);
+	}
+	return 0;
+}
+
+static double avm1FiltNum(ASObject* o, const char* name, double dflt)
+{
+	ActionVar* v = getProperty(o, name, (u32) strlen(name));
+	if (v == NULL) return dflt;
+	if (v->type == ACTION_STACK_VALUE_BOOLEAN) return v->data.numeric_value ? 1.0 : 0.0;
+	double d = varToDoubleSimple(v);
+	return isnan(d) ? dflt : d;
+}
+
+static double avm1FiltClamp(double d, double lo, double hi)
+{
+	return d < lo ? lo : (d > hi ? hi : d);
+}
+
+// 0xRRGGBB + alpha (0..1, quantised like Ruffle's `(a * 255.0) as u8`).
+static void avm1FiltColor(double rgb, double alpha, double* r, double* g,
+                          double* b, double* a)
+{
+	u32 c = (u32)(s64) rgb & 0xFFFFFFu;
+	*r = (double)((c >> 16) & 0xFF) / 255.0;
+	*g = (double)((c >> 8) & 0xFF) / 255.0;
+	*b = (double)(c & 0xFF) / 255.0;
+	*a = (double)((int)(avm1FiltClamp(alpha, 0.0, 1.0) * 255.0)) / 255.0;
+}
+
+static void avm1FiltCommon(ASObject* o, FilterListEntry* e, double dflt_blur)
+{
+	e->blur_x = avm1FiltClamp(avm1FiltNum(o, "blurX", dflt_blur), 0.0, 255.0);
+	e->blur_y = avm1FiltClamp(avm1FiltNum(o, "blurY", dflt_blur), 0.0, 255.0);
+	e->quality = (u8) avm1FiltClamp(avm1FiltNum(o, "quality", 1.0), 0.0, 15.0);
+}
+
+// Lower one AS filter object. Returns 1 when `e` holds a renderable entry.
+static int avm1LowerFilterObject(ASObject* o, FilterListEntry* e)
+{
+	int t = avm1FilterTypeOf(o);
+	memset(e, 0, sizeof(*e));
+	double pi = 3.14159265358979323846;
+	switch (t)
+	{
+		case 1: // BlurFilter
+			e->type = 1;
+			avm1FiltCommon(o, e, 4.0);
+			e->strength = 1.0;
+			return 1;
+		case 2: // DropShadowFilter
+		case 3: // GlowFilter
+		{
+			e->type = (u8) t;
+			avm1FiltCommon(o, e, t == 2 ? 4.0 : 6.0);
+			avm1FiltColor(avm1FiltNum(o, "color", t == 2 ? 0.0 : 16711680.0),
+			              avm1FiltNum(o, "alpha", 1.0),
+			              &e->color_r, &e->color_g, &e->color_b, &e->color_a);
+			e->strength = avm1FiltClamp(avm1FiltNum(o, "strength", t == 2 ? 1.0 : 2.0), 0.0, 255.0);
+			int inner = avm1FiltNum(o, "inner", 0.0) != 0.0;
+			int knockout = avm1FiltNum(o, "knockout", 0.0) != 0.0;
+			int composite = (t == 2) ? !(avm1FiltNum(o, "hideObject", 0.0) != 0.0) : 1;
+			e->flags = (u8)((inner << 2) | (knockout << 1) | composite);
+			if (t == 2)
+			{
+				e->distance = avm1FiltNum(o, "distance", 4.0);
+				e->angle = avm1FiltNum(o, "angle", 45.0) * pi / 180.0;
+			}
+			return 1;
+		}
+		case 4: // BevelFilter
+		case 8: // GradientBevelFilter -> bevel (recompiler approximation)
+		{
+			e->type = 4;
+			avm1FiltCommon(o, e, 4.0);
+			e->strength = avm1FiltClamp(avm1FiltNum(o, "strength", 1.0), 0.0, 255.0);
+			e->distance = avm1FiltNum(o, "distance", 4.0);
+			e->angle = avm1FiltNum(o, "angle", 45.0) * pi / 180.0;
+			if (t == 4)
+			{
+				avm1FiltColor(avm1FiltNum(o, "shadowColor", 0.0), avm1FiltNum(o, "shadowAlpha", 1.0),
+				              &e->color_r, &e->color_g, &e->color_b, &e->color_a);
+				avm1FiltColor(avm1FiltNum(o, "highlightColor", 16777215.0), avm1FiltNum(o, "highlightAlpha", 1.0),
+				              &e->highlight_r, &e->highlight_g, &e->highlight_b, &e->highlight_a);
+			}
+			else
+			{
+				// First colour = shadow, last = highlight (swf.cpp case 7).
+				ActionVar* cv = getProperty(o, "colors", 6);
+				ActionVar* av = getProperty(o, "alphas", 6);
+				ASArray* ca = (cv && cv->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) cv->data.numeric_value : NULL;
+				ASArray* aa = (av && av->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) av->data.numeric_value : NULL;
+				u32 n = (ca && aa) ? (ca->length < aa->length ? ca->length : aa->length) : 0;
+				e->color_a = 1.0; e->highlight_r = e->highlight_g = e->highlight_b = e->highlight_a = 1.0;
+				if (n >= 1)
+					avm1FiltColor(varToDoubleSimple(&ca->elements[0]), varToDoubleSimple(&aa->elements[0]),
+					              &e->color_r, &e->color_g, &e->color_b, &e->color_a);
+				if (n >= 2)
+					avm1FiltColor(varToDoubleSimple(&ca->elements[n - 1]), varToDoubleSimple(&aa->elements[n - 1]),
+					              &e->highlight_r, &e->highlight_g, &e->highlight_b, &e->highlight_a);
+			}
+			int inner = 0, on_top = 0;
+			ActionVar* tv = getProperty(o, "type", 4);
+			if (tv != NULL && tv->type == ACTION_STACK_VALUE_STRING)
+			{
+				char tbuf[16];
+				int tl = u16_to_utf8((const uint16_t*)(uintptr_t) tv->data.numeric_value,
+				                     tv->str_size, tbuf, sizeof(tbuf));
+				if (tl == 5 && memcmp(tbuf, "inner", 5) == 0) inner = 1;
+				else if (tl == 5 && memcmp(tbuf, "outer", 5) == 0) inner = 0;
+				else on_top = 1; // "full" (and Ruffle's anything-else rule)
+			}
+			int knockout = avm1FiltNum(o, "knockout", 0.0) != 0.0;
+			e->flags = (u8)((inner << 3) | (knockout << 2) | (1 << 1) | on_top);
+			return 1;
+		}
+		case 7: // GradientGlowFilter -> glow with the LAST colour (swf.cpp case 4)
+		{
+			e->type = 3;
+			avm1FiltCommon(o, e, 4.0);
+			e->strength = avm1FiltClamp(avm1FiltNum(o, "strength", 1.0), 0.0, 255.0);
+			ActionVar* cv = getProperty(o, "colors", 6);
+			ActionVar* av = getProperty(o, "alphas", 6);
+			ASArray* ca = (cv && cv->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) cv->data.numeric_value : NULL;
+			ASArray* aa = (av && av->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) av->data.numeric_value : NULL;
+			u32 n = (ca && aa) ? (ca->length < aa->length ? ca->length : aa->length) : 0;
+			if (n == 0) return 0;
+			avm1FiltColor(varToDoubleSimple(&ca->elements[n - 1]), varToDoubleSimple(&aa->elements[n - 1]),
+			              &e->color_r, &e->color_g, &e->color_b, &e->color_a);
+			ActionVar* tv = getProperty(o, "type", 4);
+			int inner = 0;
+			if (tv != NULL && tv->type == ACTION_STACK_VALUE_STRING)
+			{
+				char tbuf[16];
+				int tl = u16_to_utf8((const uint16_t*)(uintptr_t) tv->data.numeric_value,
+				                     tv->str_size, tbuf, sizeof(tbuf));
+				inner = (tl == 5 && memcmp(tbuf, "inner", 5) == 0);
+			}
+			int knockout = avm1FiltNum(o, "knockout", 0.0) != 0.0;
+			e->flags = (u8)((inner << 2) | (knockout << 1) | 1);
+			return 1;
+		}
+		default:
+			return 0;
+	}
+}
+
+// Number of live MovieClips (placed or dynamic) whose runtime filter list is
+// non-empty; lets the Drawing-API walk skip its filter-root checks entirely in
+// the (overwhelmingly common) movie that never assigns `filters`.
+static int g_avm1_runtime_filter_mcs = 0;
+
+static FilterListData* avm1McFilterList(MovieClip* mc)
+{
+	if (mc->as_filters == NULL)
+	{
+		mc->as_filters = calloc(1, sizeof(FilterListData));
+		if (mc->as_filters != NULL)
+			((FilterListData*) mc->as_filters)->depth = (size_t) -1;
+	}
+	return (FilterListData*) mc->as_filters;
+}
+
+static int avm1McHasRuntimeFilters(const MovieClip* mc)
+{
+	return mc != NULL && mc->as_filters != NULL
+	    && ((const FilterListData*) mc->as_filters)->count > 0;
+}
+
+// Mirror the MC's runtime list onto a display entry: the scalar filter_* set
+// from entry 0 (every lowered entry is a renderer-native kind 1-4, so
+// build_filter_chain's "first non-ColorMatrix entry" is entry 0) plus the
+// chain pointer, exactly the pair tagSetFilter + tagBeginFilterList write.
+// An empty list clears both (Ruffle set_filters replaces the whole list,
+// SWF-authored members included).
+static void avm1ApplyRuntimeFiltersToEntry(DisplayObject* d, const FilterListData* fl)
+{
+	if (d == NULL) return;
+	if (fl == NULL || fl->count == 0)
+	{
+		d->filter_type = 0;
+		d->filter_chain = NULL;
+		return;
+	}
+	const FilterListEntry* e = &fl->entries[0];
+	d->filter_type = e->type;
+	d->filter_blur_x = e->blur_x;
+	d->filter_blur_y = e->blur_y;
+	d->filter_quality = e->quality;
+	d->filter_flags = e->flags;
+	d->filter_color_r = e->color_r;
+	d->filter_color_g = e->color_g;
+	d->filter_color_b = e->color_b;
+	d->filter_color_a = e->color_a;
+	d->filter_strength = e->strength;
+	d->filter_angle = e->angle;
+	d->filter_distance = e->distance;
+	d->filter_highlight_r = e->highlight_r;
+	d->filter_highlight_g = e->highlight_g;
+	d->filter_highlight_b = e->highlight_b;
+	d->filter_highlight_a = e->highlight_a;
+	d->filter_chain = fl;
+}
+
+// `mc.filters = <array>`: re-lower the whole list at assignment time and
+// mirror it onto the clip's display entry when it has one. AS-created clips
+// (createEmptyMovieClip & co.) never name-resolve to a timeline entry: they
+// are rendered by tag.c's dynamic filter-root path instead.
+static void avm1SetRuntimeFilters(MovieClip* mc, ASArray* arr)
+{
+	if (mc == NULL) return;
+	FilterListData* fl = avm1McFilterList(mc);
+	if (fl == NULL) return;
+	int had = fl->count > 0;
+	fl->count = 0;
+	if (arr != NULL)
+	{
+		for (u32 i = 0; i < arr->length && fl->count < MAX_FILTER_LIST_SIZE; i++)
+		{
+			ActionVar* el = &arr->elements[i];
+			if (el->type != ACTION_STACK_VALUE_OBJECT || el->data.numeric_value == 0) continue;
+			if (avm1LowerFilterObject((ASObject*)(uintptr_t) el->data.numeric_value,
+			                          &fl->entries[fl->count]))
+				fl->count++;
+		}
+	}
+	g_avm1_runtime_filter_mcs += (fl->count > 0) - had;
+	DisplayObject* d = (DisplayObject*) mc->display_obj;
+	if (d == NULL && !mc->as_created) d = resolveMCDisplayEntry(mc);
+	if (d != NULL) avm1ApplyRuntimeFiltersToEntry(d, fl);
+}
+
 // Create prototype_obj for a stub constructor if missing.
 // Sets constructor and __proto__ on prototype with DONT_DELETE.
 // Does NOT set up own_props (that's deferred to ensureGlobalInit Phase 8c-2.5).
@@ -54787,14 +55161,58 @@ void actionSetMember(SWFAppContext* app_context)
 				actionAvm1SetScrollRect(mc, &value_var);
 				return;
 			}
-			// filters setter: store array on dynamic_props (getter does the cloning)
+			// filters setter (Ruffle avm1/globals/movie_clip.rs set_filters):
+			// an Object value (Array or array-like plain object) is walked and
+			// every FILTER element is converted at assignment time; anything
+			// else is dropped. A non-Object value clears. The stored array is
+			// that snapshot (filter clones only), so later mutation of the
+			// assigned array / filter objects changes nothing until
+			// reassigned, and the getter (which clones again) hands out a fresh
+			// array per read. The same snapshot is lowered to the render chain
+			// (avm1SetRuntimeFilters).
 			if (prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0) {
-				if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
-					if (mc->dynamic_props == NULL) {
-						mc->dynamic_props = allocDynamicProps(app_context, 4);
-					}
-					setProperty(app_context, (ASObject*)mc->dynamic_props, "filters", 7, &value_var);
+				if (mc->dynamic_props == NULL) {
+					mc->dynamic_props = allocDynamicProps(app_context, 4);
 				}
+				ASArray* _snap = allocArray(app_context, 4);
+				_snap->length = 0;
+				initArrayProto(app_context, _snap);
+				#define _FILT_TAKE(_ev_) do { \
+					ActionVar* _e = (_ev_); \
+					if (_e->type == ACTION_STACK_VALUE_OBJECT && _e->data.numeric_value != 0 \
+					    && ((ASObject*)(uintptr_t) _e->data.numeric_value)->native_type == NATIVE_FILTER) { \
+						ActionVar _c = filterClone(app_context, NULL, 0, NULL, \
+							(void*)(uintptr_t) _e->data.numeric_value); \
+						if (_snap->length >= _snap->capacity) { \
+							u32 _nc = _snap->capacity * 2; \
+							ActionVar* _ne = (ActionVar*) realloc(_snap->elements, sizeof(ActionVar) * _nc); \
+							if (_ne == NULL) break; \
+							_snap->elements = _ne; _snap->capacity = _nc; \
+						} \
+						_snap->elements[_snap->length++] = _c; \
+					} } while (0)
+				if (value_var.type == ACTION_STACK_VALUE_ARRAY && value_var.data.numeric_value != 0) {
+					ASArray* _src = (ASArray*)(uintptr_t) value_var.data.numeric_value;
+					for (u32 _fi = 0; _fi < _src->length; _fi++)
+						_FILT_TAKE(&_src->elements[_fi]);
+				} else if (value_var.type == ACTION_STACK_VALUE_OBJECT && value_var.data.numeric_value != 0) {
+					// Array-like / plain object: every own property value that is
+					// a filter (gnash MovieClip.as:1180, `fake` with length 3).
+					ASObject* _so = (ASObject*)(uintptr_t) value_var.data.numeric_value;
+					for (u32 _pi = 0; _pi < _so->num_used; _pi++) {
+						u32 _nl = _so->properties[_pi].name_length;
+						const char* _nm = _so->properties[_pi].name;
+						if ((_nl == 9 && memcmp(_nm, "__proto__", 9) == 0)
+						    || (_nl == 15 && memcmp(_nm, "__constructor__", 15) == 0)) continue;
+						_FILT_TAKE(&_so->properties[_pi].value);
+					}
+				}
+				#undef _FILT_TAKE
+				ActionVar _sv = {0};
+				_sv.type = ACTION_STACK_VALUE_ARRAY;
+				_sv.data.numeric_value = (u64)(uintptr_t) _snap;
+				setProperty(app_context, (ASObject*)mc->dynamic_props, "filters", 7, &_sv);
+				avm1SetRuntimeFilters(mc, _snap);
 				return;
 			}
 			// _lockroot setter via non-underscore name (some tests use "lockroot" without underscore on dynamic_props)
@@ -58246,6 +58664,13 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 		if (mc != NULL && mc->dynamic_props != NULL)
 		{
 			ActionVar* prop = getPropertyWithPrototype((ASObject*) mc->dynamic_props, prop_name, prop_name_len);
+			// A stored `filters` snapshot is answered by the cloning getter
+			// below (a fresh array of fresh filter objects per read, Ruffle
+			// movie_clip.rs filters); returning it here leaked the stored
+			// array by reference (gnash MovieClip.as:1126-1157).
+			if (prop != NULL && prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0
+			    && prop->type == ACTION_STACK_VALUE_ARRAY)
+				prop = NULL;
 			if (prop != NULL)
 			{
 				// TextField htmlText getter: re-serialize from format runs.
@@ -63906,8 +64331,22 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		v = makeF64(d); setProperty(app_context, obj, "blurX", 5, &v);
 		d = (num_args > 7) ? varToDoubleSimple(&args[7]) : 4.0;
 		v = makeF64(d); setProperty(app_context, obj, "blurY", 5, &v);
-		{ ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
-		  u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, "inner", 5, &u16len);
+		// type = args[10] (Ruffle bevel_filter.rs:164 set_type: coerce to
+		// string, "inner"/"outer"/"full", anything else -> "full"); absent ->
+		// the "inner" default.
+		{ const char* bt = "inner"; u32 btl = 5;
+		  if (num_args > 10) {
+			bt = "full"; btl = 4;
+			if (args[10].type == ACTION_STACK_VALUE_STRING) {
+				char tb[8];
+				int tl = u16_to_utf8((const uint16_t*)(uintptr_t) args[10].data.numeric_value,
+				                     args[10].str_size, tb, sizeof(tb));
+				if (tl == 5 && memcmp(tb, "inner", 5) == 0) { bt = "inner"; btl = 5; }
+				else if (tl == 5 && memcmp(tb, "outer", 5) == 0) { bt = "outer"; btl = 5; }
+			}
+		  }
+		  ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
+		  u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, bt, btl, &u16len);
 		  sv.str_size = u16len; sv.data.string_data.heap_ptr = u16;
 		  setProperty(app_context, obj, "type", 4, &sv); }
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
@@ -63955,12 +64394,17 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
 		FILTER_SET_F64("color", 5, (num_args > 2) ? varToDoubleSimple(&args[2]) : 0.0);
 		FILTER_SET_F64("alpha", 5, (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0);
-		FILTER_SET_F64("quality", 7, (num_args > 6) ? varToDoubleSimple(&args[6]) : 1.0);
-		FILTER_SET_BOOL("inner", 5, (num_args > 7) ? (int)varToDoubleSimple(&args[7]) : 0);
-		FILTER_SET_BOOL("knockout", 8, (num_args > 8) ? (int)varToDoubleSimple(&args[8]) : 0);
+		// Argument order (Flash docs; Ruffle drop_shadow_filter.rs:103-113):
+		// distance, angle, color, alpha, blurX, blurY, strength, quality,
+		// inner, knockout, hideObject. Strength/quality/inner/knockout used to
+		// be read from args 9/6/7/8, so a 9-arg ctor came out as an INNER
+		// shadow (avm1-runtime-filters made that visible).
+		FILTER_SET_F64("quality", 7, (num_args > 7) ? varToDoubleSimple(&args[7]) : 1.0);
+		FILTER_SET_BOOL("inner", 5, (num_args > 8) ? (int)varToDoubleSimple(&args[8]) : 0);
+		FILTER_SET_BOOL("knockout", 8, (num_args > 9) ? (int)varToDoubleSimple(&args[9]) : 0);
 		FILTER_SET_F64("blurX", 5, (num_args > 4) ? varToDoubleSimple(&args[4]) : 4.0);
 		FILTER_SET_F64("blurY", 5, (num_args > 5) ? varToDoubleSimple(&args[5]) : 4.0);
-		FILTER_SET_F64("strength", 8, (num_args > 9) ? varToDoubleSimple(&args[9]) : 1.0);
+		FILTER_SET_F64("strength", 8, (num_args > 6) ? varToDoubleSimple(&args[6]) : 1.0);
 		FILTER_SET_BOOL("hideObject", 10, (num_args > 10) ? (int)varToDoubleSimple(&args[10]) : 0);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
