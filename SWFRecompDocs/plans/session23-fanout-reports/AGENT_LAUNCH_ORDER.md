@@ -112,3 +112,4 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 - Pages redeployed (dry run `44950285717` + deploy `44950683780`, both success) with all s23 runtime patches.
 - Local `~/CC/ruffle` fast-forwarded `45366370e → 0ddd12b6a`; local exporter edits re-applied (patch kept in the coordinator scratchpad; stash `s23-local-edits`); the `render/wgpu` `draw_counter` probe hunk DROPPED (upstream rewrote the draw path). Exporter rebuilt; probe trace identical to the old build.
 - One-task sessions launched: `browser-attached-timeline` (LOCAL — needs emsdk + browser; wsl-launch-claude, Opus), `avm1-runtime-filters` (cloud).
+- `avm1-runtime-filters` cloud session: session_018CoDi3Q3PQTNGCNN9d7jLV
