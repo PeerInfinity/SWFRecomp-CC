@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-21T17:28:13.053364+00:00",
+    "timestamp": "2026-11-21T18:24:45.344219+00:00",
     "suite": "from_shumway/avm1",
     "stem": "results_graphics",
-    "git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
+    "git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "44922638965",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/44922638965",
+    "run_id": "44930669727",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/44930669727",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 1,
@@ -26,31 +26,31 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 583 outliers (limit 600), max difference 152 (2 checks)",
-      "max_diff": 152,
+      "message": "Image check passed: 587 outliers (limit 600), max difference 155 (2 checks)",
+      "max_diff": 155,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 6627,
-      "mean_diff": 0.1527,
+      "diff_channels": 6618,
+      "mean_diff": 0.1547,
       "checks": [
         {
           "tolerance": 128,
           "max_outliers": 100,
-          "outliers": 64,
+          "outliers": 85,
           "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 600,
-          "outliers": 583,
+          "outliers": 587,
           "passed": true
         }
       ],
       "applicable_checks": 2,
       "failed_checks": 0,
-      "outliers": 583,
+      "outliers": 587,
       "max_outliers": 600,
       "tolerance": 64,
       "excess_outliers": 0

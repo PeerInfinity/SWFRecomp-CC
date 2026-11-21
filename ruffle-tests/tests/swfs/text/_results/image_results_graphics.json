@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "timestamp": "2026-11-21T17:28:12.991607+00:00",
+    "timestamp": "2026-11-21T18:24:45.276182+00:00",
     "suite": "text",
     "stem": "results_graphics",
-    "git_sha": "08709f65842ae8453e60b897894bb354b9da01d6",
+    "git_sha": "bc91565cea8ed8a397382483947b57a76bcfe189",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "44922638965",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/44922638965",
+    "run_id": "44930669727",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/44930669727",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 5,
@@ -116,29 +116,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 3681 outliers exceed limit of 8, max difference 255",
+      "message": "Image comparison failed: 1672 outliers exceed limit of 8, max difference 255",
       "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 6435,
-      "mean_diff": 1.2312,
+      "diff_channels": 3941,
+      "mean_diff": 0.5947,
       "checks": [
         {
           "tolerance": 128,
           "max_outliers": 8,
-          "outliers": 3681,
+          "outliers": 1672,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 3681,
+      "outliers": 1672,
       "max_outliers": 8,
       "tolerance": 128,
-      "excess_outliers": 3673
+      "excess_outliers": 1664
     },
     {
       "suite": "text",
@@ -147,29 +147,29 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "fail",
-      "message": "Image comparison failed: 25024 outliers exceed limit of 0, max difference 103",
+      "message": "Image comparison failed: 24998 outliers exceed limit of 0, max difference 103",
       "reason": "pixel_mismatch",
       "max_diff": 103,
       "expected_source": "repo",
       "width": 550,
       "height": 175,
       "total_channels": 385000,
-      "diff_channels": 25024,
-      "mean_diff": 3.7168,
+      "diff_channels": 24998,
+      "mean_diff": 3.7096,
       "checks": [
         {
           "tolerance": 0,
           "max_outliers": 0,
-          "outliers": 25024,
+          "outliers": 24998,
           "passed": false
         }
       ],
       "applicable_checks": 1,
       "failed_checks": 1,
-      "outliers": 25024,
+      "outliers": 24998,
       "max_outliers": 0,
       "tolerance": 0,
-      "excess_outliers": 25024
+      "excess_outliers": 24998
     }
   ]
 }
