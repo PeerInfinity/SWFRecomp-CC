@@ -3010,12 +3010,63 @@ static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
 // dynamic MC, we need to land that transform on a fresh GPU slot and route
 // fillDrawingInfos through it.
 //
-// Limitation: only world-space-equals-local-space cases work right now (i.e.
-// parent chain is identity). For dynamic children of transformed sprites, the
-// parent's world transform would need to compose here. Tracked in
-// DYNAMIC_MC_DRAWING_TRANSFORM_PLAN.
+// Parent chain (s23 w2-dynclip-transform): a chain of DYNAMIC ancestors is
+// composed here (dyn_mc_compose_parent_chain), and their AS `_alpha` folds in
+// fillDrawingInfos. Still a limitation: the chain stops at the first PLACED /
+// attached ancestor (display_obj != NULL) or _root, so dynamic children of
+// transformed timeline sprites still render in that ancestor's local space.
+// Tracked in DYNAMIC_MC_DRAWING_TRANSFORM_PLAN.
 // ---------------------------------------------------------------------------
 #if !defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// s23 w2-dynclip-transform: the dynamic (no display-list entry) ancestor of
+// `mc`, or NULL when the parent is _root, a placed/attached clip (handled by
+// the display-list compose walk, not here) or removed. Bounded walk.
+static MovieClip* dyn_mc_dynamic_parent(const MovieClip* mc)
+{
+	MovieClip* p = mc->parent;
+	if (p == NULL || p == &root_movieclip) return NULL;
+	if (p->depth == INT_MIN || p->display_obj != NULL) return NULL;
+	return p;
+}
+
+static int dyn_mc_chain_has_xform(const MovieClip* mc)
+{
+	int guard = 0;
+	for (MovieClip* p = dyn_mc_dynamic_parent(mc); p != NULL && guard < 64;
+	     p = dyn_mc_dynamic_parent(p), guard++)
+	{
+		if (p->as_set_flags & (1|2|4|8|16)) return 1;
+	}
+	return 0;
+}
+
+// world = parent_world * local, for each dynamic ancestor with an AS-set
+// transform (column-major 4x4; a=[0] b=[1] c=[4] d=[5] tx=[12] ty=[13]).
+static void dyn_mc_compose_parent_chain(float xform[16], const MovieClip* mc)
+{
+	int guard = 0;
+	for (MovieClip* p = dyn_mc_dynamic_parent(mc); p != NULL && guard < 64;
+	     p = dyn_mc_dynamic_parent(p), guard++)
+	{
+		if ((p->as_set_flags & (1|2|4|8|16)) == 0) continue;
+		float P[16] = {
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f,
+		};
+		apply_as_transform(P, p, (u8)(1|2|4|8|16));
+		float a = xform[0], b = xform[1], c = xform[4], d = xform[5];
+		float tx = xform[12], ty = xform[13];
+		xform[0]  = P[0] * a  + P[4] * b;
+		xform[1]  = P[1] * a  + P[5] * b;
+		xform[4]  = P[0] * c  + P[4] * d;
+		xform[5]  = P[1] * c  + P[5] * d;
+		xform[12] = P[0] * tx + P[4] * ty + P[12];
+		xform[13] = P[1] * tx + P[5] * ty + P[13];
+	}
+}
+
 static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 {
 	extern MovieClip* child_mc_cache[];
@@ -3029,7 +3080,12 @@ static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 		mc->dynamic_xform_slot = 0;
 		if (mc->depth == INT_MIN) continue;       // removed
 		if (mc->display_obj != NULL) continue;    // placed — handled by display_list loop
-		if (mc->as_set_flags == 0) continue;      // identity — fall through to last_transform_id
+		// s23 w2-dynclip-transform: a dynamic child of a dynamic parent must
+		// inherit the parent's AS-set transform (Flash composes the whole
+		// chain; empty_child_filter_bounds drew both clips' parts unscaled at
+		// the origin). Only the fully-dynamic chain composes here.
+		int chain_xf = dyn_mc_chain_has_xform(mc);
+		if (mc->as_set_flags == 0 && !chain_xf) continue;  // identity — fall through to last_transform_id
 
 		u32 new_slot = g_next_dynamic_xform_slot;
 		if (new_slot >= g_xform_slot_capacity) continue;  // exhausted
@@ -3046,10 +3102,14 @@ static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 		// Force-overlay all spatial fields so the slot reflects mc's current
 		// state regardless of which subset of flags is set (e.g. just _x or
 		// just _xscale).
-		apply_as_transform(xform, mc, (u8)(1|2|4|8|16));
+		if (mc->as_set_flags != 0)
+			apply_as_transform(xform, mc, (u8)(1|2|4|8|16));
+		if (chain_xf) dyn_mc_compose_parent_chain(xform, mc);
 
 		renderer_write_transform(context, new_slot, xform);
 		mc->dynamic_xform_slot = new_slot;
+		mc->dyn_xform_lin[0] = xform[0]; mc->dyn_xform_lin[1] = xform[1];
+		mc->dyn_xform_lin[2] = xform[4]; mc->dyn_xform_lin[3] = xform[5];
 	}
 	(void)app_context;
 }

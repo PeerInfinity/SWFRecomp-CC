@@ -31599,6 +31599,26 @@ static void drawingClear(MovieClip* mc)
 	mc->draw_has_bounds = 0;
 }
 
+// s23 w2-dynclip-transform: product of the AS `_alpha` of `mc`'s dynamic
+// (no display-list entry) ancestors, stopping at _root or a placed clip.
+static float dynMcChainAlpha(const MovieClip* mc)
+{
+	float mul = 1.0f;
+	int guard = 0;
+	for (MovieClip* p = mc->parent; p != NULL && p != &root_movieclip && guard < 64;
+	     p = p->parent, guard++)
+	{
+		if (p->depth == INT_MIN || p->display_obj != NULL) break;
+		if (p->as_set_flags & 32) {
+			float a = p->alpha / 100.0f;
+			if (a < 0.0f) a = 0.0f;
+			if (a > 1.0f) a = 1.0f;
+			mul *= a;
+		}
+	}
+	return mul;
+}
+
 // Iterator for rendering: calls cb for each filled/stroked path across all MCs.
 // Helper to fill DrawingRenderInfo array for an MC's drawing paths
 static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
@@ -31619,6 +31639,10 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		if (as_alpha_mul < 0.0f) as_alpha_mul = 0.0f;
 		if (as_alpha_mul > 1.0f) as_alpha_mul = 1.0f;
 	}
+	// s23 w2-dynclip-transform: a dynamic child inherits its dynamic
+	// ancestors' AS `_alpha` (same chain tag.c's apply_dynamic_mc_transforms
+	// composes for the matrix; placed ancestors are out of this route).
+	if (mc->display_obj == NULL) as_alpha_mul *= dynMcChainAlpha(mc);
 	int count = 0;
 	for (u32 p = 0; p < ds->path_count && count < max_out; p++) {
 		DrawPath* path = &ds->paths[p];
@@ -31695,7 +31719,13 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 			GEN_EXTERN_TRANSFORM_DATA;
 			const float (*_comb)[16] = ng_combinedTransformData();
 			float a, b, c, d;
-			if (_comb != NULL) {
+			if (mc->dynamic_xform_slot != 0) {
+				// s23 w2-dynclip-transform: the per-tick dynamic slot is
+				// GPU-only; read the composed linear part tag.c stashed
+				// (includes any dynamic parent chain's scale).
+				a = mc->dyn_xform_lin[0]; b = mc->dyn_xform_lin[1];
+				c = mc->dyn_xform_lin[2]; d = mc->dyn_xform_lin[3];
+			} else if (_comb != NULL) {
 				size_t _rows = ng_combinedTransformRows();
 				const float* _row = ((size_t)info->transform_id < _rows)
 					? _comb[info->transform_id] : NULL;

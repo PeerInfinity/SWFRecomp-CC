@@ -143,6 +143,12 @@ struct MovieClip {
 	// Mirrored onto the display-list entry, which is what the renderer reads.
 	u8 opaque_bg_set;
 	u32 opaque_bg_rgb;
+	// s23 w2-dynclip-transform: linear part (a, b, c, d) of the composed
+	// matrix tag.c's apply_dynamic_mc_transforms wrote to dynamic_xform_slot
+	// this tick. Valid only while dynamic_xform_slot != 0. That slot is
+	// GPU-only (past the end of the CPU transform_data table), so
+	// fillDrawingInfos' hairline-stroke scale reads this instead.
+	float dyn_xform_lin[4];
 };
 
 // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
