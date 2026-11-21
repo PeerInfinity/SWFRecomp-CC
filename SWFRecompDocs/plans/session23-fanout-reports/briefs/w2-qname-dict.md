@@ -1,0 +1,16 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 23 (dual-axis #15), slot `w2-qname-dict`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-qname-dict` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session23-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Your branch is `fanout/w2-qname-dict`; deliver `SWFRecompDocs/plans/session23-fanout-reports/w2-qname-dict-report.md` and `SWFRecompDocs/plans/session23-fanout-reports/w2-qname-dict.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Also read `CLAUDE.md`. Check `SWFRecompDocs/plans/session23-fanout-reports/SIBLING_FILE_MAP.md` (if present) for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**Slot C of `w1-trace-tail`: AVM2 QName values in runtime-name slots are multinames, not Dictionary identity keys; #1069 vs #1081 error selection.** Read `session23-fanout-reports/w1-trace-tail-report.md` §4.1 and lead 3, and the `avm2_ops.c` hunks of `w1-trace-tail-prototype.patch` FIRST. Categories: `avm2 from_avmplus` (+ `regression` in git).
+
+1. Productionize the three parts without env gates (`W1_NO_QNAME_DICT`, `W1_QN_ERR` removed): `dict_object_key()` rejects QName objects; `in` keeps identity lookup for a QName on a Dictionary; single-namespace (QName / RTQNameL) misses on a dynamic receiver throw #1069 (Ruffle `script_object.rs:383`: InvalidNsRead only when `has_multiple_ns()`), with `uri::local` in the message for `getproperty_qname` / `setproperty_qname` (#1056) / `getproperty_rtns_l`. Headline: `avm2/dictionary_qname_keys` 29/45 → PASS.
+2. **Risk = part 3 changes a generic error code.** `from_avmplus` pins #1069/#1081 heavily (see the `getproperty_common` comment block about `catch_class` / `AccStatPropViaSubClass`). Run every from_avmplus + avm2 row whose expected output contains `1069` or `1081` (grep `output.txt`), plus the report's 44-row AVM2 sweep, before/after (graphics; `-P 2`). If ANY pass→fail, narrow the rule until none, or HOLD part 3 and deliver parts 1-2 alone (state which).
+3. Lead 3 (the #1081-on-dynamic rule is wider than Ruffle's beyond Dictionary): price any EXTRA flips your sweep finds, by test name.
+
+Siblings: `w2-stage3d-text` (avm2_stage3d.c, avm2_text.c), `w2-netstream-audio` (avm2_net.c, avm2_media.c) — nobody else edits `avm2_ops.c`.
