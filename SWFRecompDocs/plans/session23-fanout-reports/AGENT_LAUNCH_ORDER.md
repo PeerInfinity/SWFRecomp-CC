@@ -26,6 +26,7 @@ Baseline runs at `08709f658` (upstream `0ddd12b6a`): graphics/full/images `44922
 | 10 | w2-padded-filter | pixel | productionize w1-padded-filter (gated padded filter layer); drop_shadow_angles, displacement_map | session_018CoDi6x1pyS9L9PSYoDJZL (17:03) |
 | 11 | w2-stage3d-text | pixel | Stage3D RTT + budget 48M, AVM2 default-font advance rounding; stage3d_texture, stage3d_bitmap | session_018CoDi7QtMALGjWbWyYvecw (17:10) |
 | 12 | w2-netstream-audio | trace | trace-tail D: NetStream audio tap + computeSpectrum; audio/aac, audio/g711 | session_018CoDi3x3Uds6hHMQAvVQFk (17:10) |
+| 13 | w2-qname-dict | trace | trace-tail C: QName multiname keys + #1069 rule; dictionary_qname_keys | session_018CoDi78a5woqe4YXREWSin (17:18) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
