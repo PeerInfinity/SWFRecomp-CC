@@ -48,6 +48,10 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 14 | w1-drift-avm1 | trace | AVM1/gnash/shumway upstream drift 45366370e..0ddd12b6a | session_018CoDi7LLFpbdSTkfTYwW6s (17:37) |
 | 15 | w1-drift-avm2 | both | AVM2/visual/small-suite drift + harness num_ticks | session_018CoDi6ghpj4pXCMReEcqgP — DELIVERED 18:00; prototype LANDED (+15 trace, +2 px) |
 | 16 | w2-avm1-devicefont | trace | trace-tail F: AVM1 device-font registry; fonts/device_font_name_case | session_018CoDi6nBjtTJ4GPXVQ2ife (17:59) |
+| 17 | w2-avm2-small-errors | trace | drift-avm2 S9 | session_018CoDi3zkCYHJCnpQGnoYp3 (18:20) |
+| 18 | w2-stack-trace-names | trace | drift-avm2 S7 | session_018CoDi3a6sipw1TH1D3Q1bY (18:20) |
+| 19 | w2-array-vector-args | trace | drift-avm2 S5 | session_018CoDi3UaEumY9kycvtZWDx (18:20) |
+| 20 | w2-tf-css-avm2 | trace | AVM2 TextField format twins | session_018CoDi5BFztjYCFbFqJUhD8 (18:20) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
