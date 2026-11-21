@@ -45,6 +45,8 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 11 | w2-stage3d-text | pixel | Stage3D RTT + budget 48M, AVM2 default-font advance rounding; stage3d_texture, stage3d_bitmap | session_018CoDi7QtMALGjWbWyYvecw (17:10) |
 | 12 | w2-netstream-audio | trace | trace-tail D: NetStream audio tap + computeSpectrum; audio/aac, audio/g711 | session_018CoDi3x3Uds6hHMQAvVQFk (17:10) |
 | 13 | w2-qname-dict | trace | trace-tail C: QName multiname keys + #1069 rule; dictionary_qname_keys | session_018CoDi78a5woqe4YXREWSin (17:18) |
+| 14 | w1-drift-avm1 | trace | AVM1/gnash/shumway upstream drift 45366370e..0ddd12b6a | session_018CoDi7LLFpbdSTkfTYwW6s (17:37) |
+| 15 | w1-drift-avm2 | both | AVM2/visual/small-suite drift + harness num_ticks | session_018CoDi6ghpj4pXCMReEcqgP (17:37) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
