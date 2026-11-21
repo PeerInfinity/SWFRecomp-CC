@@ -47,6 +47,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 13 | w2-qname-dict | trace | trace-tail C: QName multiname keys + #1069 rule; dictionary_qname_keys | session_018CoDi78a5woqe4YXREWSin (17:18) |
 | 14 | w1-drift-avm1 | trace | AVM1/gnash/shumway upstream drift 45366370e..0ddd12b6a | session_018CoDi7LLFpbdSTkfTYwW6s (17:37) |
 | 15 | w1-drift-avm2 | both | AVM2/visual/small-suite drift + harness num_ticks | session_018CoDi6ghpj4pXCMReEcqgP (17:37) |
+| 16 | w2-avm1-devicefont | trace | trace-tail F: AVM1 device-font registry; fonts/device_font_name_case | session_018CoDi6nBjtTJ4GPXVQ2ife (17:59) |
 ## Landed patches + expected ledgers
 
 | commit | from | expected (CI check) |
@@ -55,7 +56,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `d35a55154` | w2-crossvm-legf | trace fail→pass (both modes): `avm2/focus_events_mixed_avm_edittext`, `avm2/selection_onsetfocus_mixed_avm`; pixels none |
 | `7b6a69124` | w1-pixel-misc §1 (FAAN IDCT, landed directly) | px fail→pass: `avm2/netstream_play_flv`, `avm1/netstream_play_flv`, `visual/video/deblocking`; `colorconversion/h263` 10808→3 (still fail); trace none |
 | `57015b2db` | w2-glyph-levien | px fail→pass: `visual/filters/glow`, `glow_without_composite_source`, `drop_shadow`, `bevel_inner`, `bevel_outer`, `bevel_full`, `glow_with_alpha_strength` (last 4 at 18/18 zero headroom); md5 moves on passing text-bind, cache_as_bitmap/text, edittext_scroll .01; trace none |
-| (next) | w2-netstream-audio | trace fail→pass GRAPHICS: `audio/aac`, `audio/g711`; NO-GRAPHICS: `audio/g711` only (`audio/aac` stays fail by design: no libavcodec in no-graphics builds → known mode-parity gap, 1 row); pixels none. AAC mono 44.1k/48k depend on matching Ruffle's mixer-clock alignment (fragile, see report §2) |
+| `9ba5e552c` | w2-netstream-audio | trace fail→pass GRAPHICS: `audio/aac`, `audio/g711`; NO-GRAPHICS: `audio/g711` only (`audio/aac` stays fail by design: no libavcodec in no-graphics builds → known mode-parity gap, 1 row); pixels none. AAC mono 44.1k/48k depend on matching Ruffle's mixer-clock alignment (fragile, see report §2) |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
