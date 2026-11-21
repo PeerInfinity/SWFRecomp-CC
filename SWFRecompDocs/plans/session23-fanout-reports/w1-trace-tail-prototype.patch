@@ -1,0 +1,388 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index f2bdd8a0..181788ae 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -26492,6 +26492,13 @@ static void queueChildOnUnloads(MovieClip* parent_mc)
+ // onUnload handler. Flash keeps a removed clip alive at a shifted depth if it
+ // or any of its children defines onUnload — see gnash MovieClip.as hardref3:
+ // "still accessible due to onUnload defined for its child" (line 712-715).
++// [w1-trace-tail s23 prototype] own AS onUnload present?
++int actionMcHasOwnOnUnload(MovieClip* mc)
++{
++	if (mc == NULL || mc->dynamic_props == NULL) return 0;
++	ActionVar* h = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
++	return h != NULL && h->type == ACTION_STACK_VALUE_FUNCTION && h->data.numeric_value != 0;
++}
+ static int mcOrDescendantHasOnUnload(MovieClip* mc)
+ {
+ 	if (mc == NULL) return 0;
+@@ -27149,6 +27156,50 @@ static int tf_tag_is(const char* tag, u32 tag_len, const char* name) {
+ // condense_white: 1 = condenseWhite mode, 0 = normal
+ // swf_version: affects whitespace handling
+ // Returns 1 on success.
++// [w1-trace-tail s23 prototype] styleSheet CSS applied at parse time so the
++// TFRunTable (and therefore getTextFormat) sees class/tag selector formats.
++// Set by the html=true htmlText setter for the duration of one tf_parse_html.
++static ASObject* g_tf_parse_css_styles = NULL;
++static void tf_css_apply(TFRun* f, const char* sel, u32 sel_len) {
++	ASObject* so = g_tf_parse_css_styles;
++	if (so == NULL || sel_len == 0) return;
++	for (u32 pi = 0; pi < so->num_used; pi++) {
++		ASProperty* p = &so->properties[pi];
++		if (p->name_length != sel_len || strncasecmp(p->name, sel, sel_len) != 0) continue;
++		if (p->value.type != ACTION_STACK_VALUE_OBJECT || p->value.data.numeric_value == 0) return;
++		ASObject* fmt = (ASObject*)p->value.data.numeric_value;
++		ActionVar* v = getProperty(fmt, "color", 5);
++		if (v != NULL && v->type == ACTION_STACK_VALUE_F64) {
++			double d; memcpy(&d, &v->data.numeric_value, sizeof(double));
++			f->color = (u32)d & 0x00FFFFFF;
++		}
++		v = getProperty(fmt, "size", 4);
++		if (v != NULL && v->type == ACTION_STACK_VALUE_F64) {
++			double d; memcpy(&d, &v->data.numeric_value, sizeof(double));
++			if (d > 0) f->font_height = (s16)(d * 20.0);
++		}
++		v = getProperty(fmt, "bold", 4);
++		if (v != NULL && v->type == ACTION_STACK_VALUE_BOOLEAN) f->bold = v->data.numeric_value ? 1 : 0;
++		v = getProperty(fmt, "italic", 6);
++		if (v != NULL && v->type == ACTION_STACK_VALUE_BOOLEAN) f->italic = v->data.numeric_value ? 1 : 0;
++		v = getProperty(fmt, "underline", 9);
++		if (v != NULL && v->type == ACTION_STACK_VALUE_BOOLEAN) f->underline = v->data.numeric_value ? 1 : 0;
++		return;
++	}
++}
++static int tf_get_attr(const char* tag_content, u32 tag_len, const char* attr_name, char* val_buf, u32 val_buf_size);
++// Ruffle core/src/html/text_format.rs: <p>/<a>/<li>: tag selector then ".class";
++// <span>: ".class" only. The class value is taken verbatim (last duplicate wins).
++static void tf_css_apply_tag(TFRun* f, const char* tname, u32 tname_len, const char* tag, int with_tag) {
++	if (g_tf_parse_css_styles == NULL) return;
++	if (with_tag) tf_css_apply(f, tag, (u32)strlen(tag));
++	char cv[120];
++	if (tf_get_attr(tname, tname_len, "class", cv + 1, sizeof(cv) - 1) && cv[1] != '\0') {
++		cv[0] = '.';
++		tf_css_apply(f, cv, (u32)strlen(cv));
++	}
++}
++
+ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
+                          const TFRun* defaults, int condense_white, int swf_version, int is_multiline) {
+ 	(void)is_multiline;
+@@ -27171,6 +27222,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
+ 	#define TF_TAG_TF    6
+ 	#define TF_TAG_P     7
+ 	#define TF_TAG_LI    8
++	#define TF_TAG_SPAN  9
+ 	int tag_type_stack[TF_PARSE_STACK_MAX];
+ 	u32 tag_text_len_stack[TF_PARSE_STACK_MAX]; // text_len when tag was opened
+ 	u8 tag_had_ws_stripped[TF_PARSE_STACK_MAX]; // 1 if whitespace was stripped inside this tag
+@@ -27373,6 +27425,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
+ 						else if (strcasecmp(av, "center") == 0) fmt_stack[fmt_sp].align = 2;
+ 						else if (strcasecmp(av, "justify") == 0) fmt_stack[fmt_sp].align = 3;
+ 					}
++					tf_css_apply_tag(&fmt_stack[fmt_sp], tname, tname_len, "p", 1);
+ 					in_paragraph = 1;
+ 					cur_para_type = 0;
+ 				} else {
+@@ -27616,9 +27669,18 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
+ 					strncpy(fmt_stack[fmt_sp].href_target, av, 63);
+ 					fmt_stack[fmt_sp].href_target[63] = '\0';
+ 				}
++				tf_css_apply_tag(&fmt_stack[fmt_sp], tname, tname_len, "a", 1);
+ 			} else if (is_close && tf_tag_is(tname, tname_len, "a")) {
+ 				FLUSH_RUN();
+ 				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_A) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
++			} else if (g_tf_parse_css_styles != NULL && !is_close && tf_tag_is(tname, tname_len, "span")) {
++				FLUSH_RUN();
++				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
++				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_SPAN; }
++				tf_css_apply_tag(&fmt_stack[fmt_sp], tname, tname_len, "span", 0);
++			} else if (g_tf_parse_css_styles != NULL && is_close && tf_tag_is(tname, tname_len, "span")) {
++				FLUSH_RUN();
++				if (tag_sp > 0 && tag_type_stack[tag_sp - 1] == TF_TAG_SPAN) { tag_sp--; if (fmt_sp > 0) fmt_sp--; }
+ 			} else if (!is_close && tf_tag_is(tname, tname_len, "textformat")) {
+ 				FLUSH_RUN();
+ 				if (fmt_sp < TF_PARSE_STACK_MAX - 1) { fmt_sp++; fmt_stack[fmt_sp] = fmt_stack[fmt_sp - 1]; }
+@@ -54608,7 +54670,16 @@ void actionSetMember(SWFAppContext* app_context)
+ 						double tc_d; memcpy(&tc_d, &tc_prop->data.numeric_value, sizeof(double));
+ 						defaults.color = (u32)tc_d & 0x00FFFFFF;
+ 					}
++					{
++						ActionVar* _css_ss = getProperty(props, "styleSheet", 10);
++						if (_css_ss != NULL && _css_ss->type == ACTION_STACK_VALUE_OBJECT && _css_ss->data.numeric_value != 0) {
++							ActionVar* _css_st = getProperty((ASObject*)_css_ss->data.numeric_value, "_styles", 7);
++							if (_css_st != NULL && _css_st->type == ACTION_STACK_VALUE_OBJECT && _css_st->data.numeric_value != 0)
++								g_tf_parse_css_styles = (ASObject*)_css_st->data.numeric_value;
++						}
++					}
+ 					tf_parse_html(table, _ht_buf, src_len, &defaults, condense_white, g_swf_version, is_multiline);
++					g_tf_parse_css_styles = NULL;
+ 
+ 					// Sync font height and letter spacing from the first content run
+ 					// so that textWidth/textHeight computation uses the HTML-specified values.
+@@ -73499,18 +73570,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					}
+ 					// Find the format run containing query_pos
+ 					TFRun* found_run = NULL;
++					TFRun* marker_run = NULL;
+ 					for (u32 ri = 0; ri < run_table->run_count; ri++) {
+ 						TFRun* r = &run_table->runs[ri];
+ 						if (r->length == 0) continue; // skip markers
+ 						if (query_pos >= r->start && query_pos < r->start + r->length) {
+ 							// Skip break marker characters
+ 							if (r->length == 1 && r->start < run_table->text_len &&
+-							    (run_table->text[r->start] == SENTINEL_TAG_BREAK || run_table->text[r->start] == SENTINEL_BR_BREAK))
++							    (run_table->text[r->start] == SENTINEL_TAG_BREAK || run_table->text[r->start] == SENTINEL_BR_BREAK)) {
++								if (marker_run == NULL) marker_run = r;
+ 								continue;
++							}
+ 							found_run = r;
+ 							break;
+ 						}
+ 					}
++					// [w1-trace-tail s23 prototype] a query that lands on a paragraph
++					// break reads the break's own (paragraph) format.
++					if (found_run == NULL && marker_run != NULL && num_args >= 1) found_run = marker_run;
+ 					if (found_run != NULL) {
+ 						// Override color from format run
+ 						ActionVar color_val = {0};
+@@ -73535,6 +73612,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 							size_val.data.numeric_value = *(u64*)&(double){(double)(found_run->font_height / 20)};
+ 							setProperty(app_context, tf, "size", 4, &size_val);
+ 						}
++						if (found_run->href[0] != '\0' && num_args >= 1) {
++							u32 _u_len;
++							const uint16_t* _u16 = utf8_to_u16(app_context, found_run->href,
++								(u32)strlen(found_run->href), &_u_len);
++							ActionVar url_val = {0};
++							url_val.type = ACTION_STACK_VALUE_STRING;
++							url_val.str_size = _u_len;
++							url_val.data.string_data.heap_ptr = (uint16_t*)_u16;
++							url_val.data.string_data.owns_memory = 0;
++							setProperty(app_context, tf, "url", 3, &url_val);
++						}
+ 						// For bold/italic/underline: if getTextFormat() has no args (whole text),
+ 						// check if all runs agree; if mixed, keep null from createTextFormatFromField
+ 						int biu_uniform_bold = 1, biu_uniform_italic = 1, biu_uniform_underline = 1;
+@@ -75679,10 +75767,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					}
+ 				}
+ 				// Queue onUnload handler for deferred firing at ShowFrame (matches Flash behavior)
++				// [w1-trace-tail s23 prototype] children first (Flash fp10 /
++				// Ruffle avm1_unload: children unload before the parent).
++				if (getenv("W1_UNLOAD_CHILD_FIRST")) {
++					queueChildOnUnloads(mc);
++					if (_rmc_unload_func != NULL)
++						queueOnUnload(_rmc_unload_func, mc);
++				} else {
+ 				if (_rmc_unload_func != NULL)
+ 					queueOnUnload(_rmc_unload_func, mc);
+ 				// Recursively queue onUnload handlers for children
+ 				queueChildOnUnloads(mc);
++				}
+ 
+ 				// Defer removal when this clip OR a descendant defines onUnload.
+ 				// When deferred ONLY because of a descendant (clip itself has no
+diff --git a/SWFModernRuntime/src/actionmodern/action_queue.c b/SWFModernRuntime/src/actionmodern/action_queue.c
+index 8b2b1ab6..6fca1de0 100644
+--- a/SWFModernRuntime/src/actionmodern/action_queue.c
++++ b/SWFModernRuntime/src/actionmodern/action_queue.c
+@@ -1,3 +1,4 @@
++#include <stdio.h>
+ #include <actionmodern/action_queue.h>
+ #include <sprite_frame_scripts.h>
+ 
+@@ -652,8 +653,21 @@ static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
+ 	// Skip if the captured MC (or any ancestor) was removed between queue and
+ 	// dispatch — see aq_sprite_ctx_removed above.
+ 	if (p->ctx_mc != NULL && aq_sprite_ctx_removed(p->ctx_mc)) {
+-		free(p);
+-		return;
++		// [w1-trace-tail s23 prototype] Flash 10 (gnash movieclip_destruction_test3
++		// fp10): a clip removed by removeMovieClip that is kept alive by its OWN
++		// onUnload still runs its already-queued frame action; a clip whose
++		// ANCESTOR was removed does not.
++		int keep = 0;
++		if (getenv("W1_RUN_SELF_UNLOAD_ALIVE")) {
++			MovieClip* m = p->ctx_mc;
++			extern int actionMcHasOwnOnUnload(MovieClip*);
++			if (m->depth != INT_MIN && (m->avm1_removed || m->pending_removal) && actionMcHasOwnOnUnload(m)) {
++				keep = 1;
++				for (MovieClip* a = m->parent; a != NULL; a = a->parent)
++					if (a->avm1_removed || a->pending_removal || a->depth == INT_MIN) { keep = 0; break; }
++			}
++		}
++		if (!keep) { free(p); return; }
+ 	}
+ 	MovieClip* saved_ctx = g_current_context;
+ 	MovieClip* saved_base = actionGetBaseClip();
+diff --git a/SWFModernRuntime/src/avm2/avm2_ops.c b/SWFModernRuntime/src/avm2/avm2_ops.c
+index 9777a087..ff9d73db 100644
+--- a/SWFModernRuntime/src/avm2/avm2_ops.c
++++ b/SWFModernRuntime/src/avm2/avm2_ops.c
+@@ -251,6 +251,9 @@ static int dict_object_key(Avm2Value recv, Avm2Value name_val,
+ 		return 0;
+ 	}
+ 	if (!avm2_is_dictionary(recv.u.obj)) return 0;
++	// [w1-trace-tail s23 prototype] a QName lazy name is a multiname, not an
++	// object key (Ruffle 0ddd12b6a dictionary_qname_keys).
++	if (getenv("W1_NO_QNAME_DICT") == NULL && avm2_qname_ext_of(name_val) != NULL) return 0;
+ 	*out_dict = recv.u.obj;
+ 	*out_key = name_val.u.obj;
+ 	return 1;
+@@ -717,7 +720,10 @@ static Avm2Value getproperty_common(Avm2Activation* act, Avm2Value recv,
+ 	}
+ 	char cn[160];
+ 	class_name_of(ctx, recv, cn, sizeof(cn));
+-	int ns_read = dynamic || mn_attr || (mn_nsset && !mn_public);
++	// [w1-trace-tail s23 prototype] Ruffle get_dynamic_property: #1081 only for
++	// ns-SET multinames; a single-ns (QName) miss is #1069 even when dynamic.
++	int ns_read = (getenv("W1_QN_ERR") && !mn_nsset && !mn_public && 1)
++		? mn_attr : (dynamic || mn_attr || (mn_nsset && !mn_public));
+ 	avm2_throw_error(ctx, ctx->builtins.reference_error_class,
+ 	                 "Error #%s: Property %.*s not found on %s and there is "
+ 	                 "no default value.", ns_read ? "1081" : "1069",
+@@ -1819,6 +1825,13 @@ static Avm2Value getproperty_qname(Avm2Activation* act, Avm2Value recv,
+ 	Resolved r;
+ 	int ok = resolve_generic_key(ctx, recv, &key, pub, any_ns, &r);
+ 	// A runtime QName is a QName: Ruffle sets IS_QNAME, never HAS_MULTIPLE_NS.
++	if (!ok && getenv("W1_QN_ERR") && q->uri != NULL && q->uri->len > 0) {
++		char qb[512];
++		int n = snprintf(qb, sizeof(qb), "%.*s::%.*s", (int) q->uri->len, q->uri->utf8,
++		                 (int) key.name_len, key.name);
++		if (n > 0 && n < (int) sizeof(qb))
++			return getproperty_common(act, recv, qb, (uint32_t) n, ok, &r, pub, 0, 0);
++	}
+ 	return getproperty_common(act, recv, key.name, key.name_len, ok, &r, pub, 0, 0);
+ }
+ 
+@@ -1856,6 +1869,12 @@ static void setproperty_qname(Avm2Activation* act, Avm2Value recv,
+ 	}
+ 	if (!pub && recv.kind == AVM2_VALUE_OBJECT)
+ 	{
++		if (getenv("W1_QN_ERR") && q->uri != NULL && q->uri->len > 0) {
++			char qb[512];
++			int n = snprintf(qb, sizeof(qb), "%.*s::%.*s", (int) q->uri->len, q->uri->utf8,
++			                 (int) key.name_len, key.name);
++			if (n > 0 && n < (int) sizeof(qb)) setproperty_nonpublic_miss(ctx, recv, qb, (uint32_t) n);
++		}
+ 		setproperty_nonpublic_miss(ctx, recv, key.name, key.name_len);
+ 	}
+ 	setproperty_miss(ctx, recv, key.name, key.name_len, value);
+@@ -1961,6 +1980,13 @@ Avm2Value avm2_op_getproperty_rtns_l(Avm2Activation* act, Avm2Value recv, uint32
+ 	int pub = key_from_ns_value(act->ctx, ns_val, s->utf8, s->len, &key);
+ 	Resolved r;
+ 	int ok = resolve_key(ctx, recv, &key, pub, &r);
++	if (!ok && getenv("W1_QN_ERR") && key.ns_len > 0) {
++		char qb[512];
++		int n = snprintf(qb, sizeof(qb), "%.*s::%.*s", (int) key.ns_len, key.ns_uri,
++		                 (int) s->len, s->utf8);
++		if (n > 0 && n < (int) sizeof(qb))
++			return getproperty_common(act, recv, qb, (uint32_t) n, ok, &r, pub, 0, 0);
++	}
+ 	return getproperty_common(act, recv, s->utf8, s->len, ok, &r, pub, 0, 0);
+ }
+ 
+@@ -4080,6 +4106,15 @@ Avm2Value avm2_op_in(Avm2Activation* act, Avm2Value name, Avm2Value obj)
+ 		{
+ 			return avm2_bool(avm2_object_find_dynamic_obj(dict, key) != NULL);
+ 		}
++		// [w1-trace-tail s23 prototype] `in` keeps identity-key semantics for a
++		// QName key on a Dictionary (dictionary_qname_keys: `q in dict` false
++		// although dict[q] wrote dict["name"]).
++		if (obj.kind == AVM2_VALUE_OBJECT && name.kind == AVM2_VALUE_OBJECT
++		    && avm2_is_dictionary(obj.u.obj) && avm2_qname_ext_of(name) != NULL
++		    && getenv("W1_NO_QNAME_DICT") == NULL)
++		{
++			return avm2_bool(avm2_object_find_dynamic_obj(obj.u.obj, name.u.obj) != NULL);
++		}
+ 	}
+ 	if (obj.kind == AVM2_VALUE_OBJECT && avm2_is_proxy(obj.u.obj))
+ 	{
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index bb58ac07..25f9fc28 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -1300,7 +1300,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
+ 			continue;
+ 		}
+ 
+-		if (ch->type != CHAR_TYPE_SPRITE) continue;
++			if (ch->type != CHAR_TYPE_SPRITE) continue;
+ 
+ 		// Allocate persistent display list on first encounter
+ 		int just_allocated = 0;
+@@ -2040,6 +2040,66 @@ void ng_promote_attached_playheads(void)
+ #endif
+ }
+ 
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++// [w1-trace-tail s23 prototype] Run an attachMovie'd clip's natural timeline
++// (frame tags + DoActions + nested children), children FIRST: Ruffle's AVM1
++// clip_exec_list is newest-instantiated-first, and a subtree built at attach
++// time instantiates parent before child, so the deepest child runs first.
++// Each object is advanced alone via a 1-entry scratch display list with
++// nested recursion deferred (we do the recursion ourselves, post-order).
++static void w1_attached_post_order(SWFAppContext* app_context, DisplayObject* obj, int depth_lvl, MovieClip* given_mc)
++{
++	if (obj == NULL || obj->char_id == 0) return;
++	Character* ch = &dictionary[obj->char_id];
++	if (ch->type != CHAR_TYPE_SPRITE) return;
++	if (depth_lvl > 32) return;
++	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
++	MovieClip* self_mc = given_mc ? given_mc : (obj->instance_name ? actionFindMovieClipByName(obj->instance_name) : NULL);
++
++	// 1. children first (descending depth ~ newest first for a frame-1 build)
++	if (obj->sprite_display_list != NULL) {
++		MovieClip* saved_ctx = g_current_context;
++		if (self_mc) actionSetCurrentContext(self_mc);
++		for (size_t d = obj->sprite_max_depth; d >= 1; d--) {
++			DisplayObject* c = &obj->sprite_display_list[d];
++			if (c->char_id != 0) w1_attached_post_order(app_context, c, depth_lvl + 1, NULL);
++			if (d == 1) break;
++		}
++		actionSetCurrentContext(saved_ctx);
++	}
++
++	// 2. self, no nested recursion
++	size_t fc = ch->sprite_frame_count;
++	if (fc <= 1 || !obj->sprite_is_playing) return;
++	DisplayObject* tmp = (DisplayObject*)calloc(2, sizeof(DisplayObject));
++	if (tmp == NULL) return;
++	tmp[1] = *obj;
++	if (depth_lvl == 0) tmp[1].sprite_current_frame = (obj->sprite_current_frame + 1) % fc; // attached: shown -> next
++	DisplayObject* saved_dl = display_list;
++	size_t saved_max = max_depth, saved_cap = display_list_capacity;
++	display_list = tmp; max_depth = 1; display_list_capacity = 2;
++	int saved_defer = g_advance_defer_nested;
++	g_advance_defer_nested = 1;
++	MovieClip* saved_c2 = g_current_context;
++	MovieClip* saved_b2 = actionGetBaseClip();
++	if (self_mc && obj->instance_name == NULL) { actionSetCurrentContext(self_mc); actionSetBaseClip(self_mc); }
++	advance_sprite_frames(app_context);
++	actionSetCurrentContext(saved_c2);
++	actionSetBaseClip(saved_b2);
++	g_advance_defer_nested = saved_defer;
++	display_list = saved_dl; max_depth = saved_max; display_list_capacity = saved_cap;
++	actionQueueRebaseSpriteObjPayloads(tmp, 2 * sizeof(DisplayObject), (char*)obj - sizeof(DisplayObject));
++	size_t next = tmp[1].sprite_current_frame;
++	*obj = tmp[1];
++	free(tmp);
++	if (self_mc) self_mc->display_obj = (void*)obj;
++	if (depth_lvl == 0) {
++		obj->sprite_current_frame = (next + fc - 1) % fc; // next -> shown
++		if (self_mc) self_mc->currentframe = (int)obj->sprite_current_frame + 1;
++	}
++}
++#endif
++
+ void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
+ {
+ 	(void)app_context;
+@@ -2061,6 +2121,7 @@ void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
+ 		if (ch->type != CHAR_TYPE_SPRITE) continue;
+ 		size_t fc = ch->sprite_frame_count;
+ 		if (fc <= 1) continue;
++		if (getenv("W1_ATTACH_RUN")) { w1_attached_post_order(app_context, obj, 0, mc); continue; }
+ 		size_t new_frame = (obj->sprite_current_frame + 1) % fc;
+ 		obj->sprite_current_frame = new_frame;
+ 		mc->currentframe = (int)new_frame + 1;

@@ -13,7 +13,7 @@ Baseline runs at `08709f658` (upstream `0ddd12b6a`): graphics/full/images `44922
 | # | slug | axis | task | session id |
 |---|---|---|---|---|
 | 1 | w2-crossvm-legf | trace | cross-VM leg F (focus_events_mixed_avm_edittext, selection_onsetfocus_mixed_avm), direct wave 2 | session_018CoDi4rG1CSwsyx1QLEnLz (16:08 UTC) |
-| 2 | w1-trace-tail | trace | html dup-attr CSS, movieclip_destruction_test3/4, audio aac/g711, new s22 upstream rows, NO-GO reconfirm | session_018CoDi4r4bKbsW24Nr5EZWc |
+| 2 | w1-trace-tail | trace | html dup-attr CSS, movieclip_destruction_test3/4, audio aac/g711, new s22 upstream rows, NO-GO reconfirm | session_018CoDi4r4bKbsW24Nr5EZWc — DELIVERED 16:54 (+7 priced; slots A-F) |
 | 3 | w1-filter-label | pixel | glow/drop_shadow/bevel_* label glyph pixels (7 rows) | session_018CoDi3uVweQJapey3LuzYo — DELIVERED 16:45; mech A = 7e2a045c1 (confirmed independently), mech B → w2-glyph-levien |
 | 4 | w1-padded-filter | pixel | drop_shadow_angles, displacement_map, bevel edge row | session_018CoDi4bjPQagEMxkuV7Yx4 |
 | 5 | w1-glyph-precision | pixel | morph_test1/Video-EmbedSquareTest glyph pixels, edittext_scroll, bitmapdata_draw, shape_test attribution | session_018CoDi4gT9iTUdsyJmtmsV5 — DELIVERED 16:32; prototype LANDED directly `7e2a045c1` |
@@ -30,3 +30,5 @@ Baseline runs at `08709f658` (upstream `0ddd12b6a`): graphics/full/images `44922
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).
 - glyph-precision lead 2: quality=low hairline tie-break (Flash takes the +0.5 px side); `shape_test` 17911 attributed to `e62daeb6f`. A/B on `acid-small .01/.05` first.
+- trace-tail slots queued (launch as cloud slots free): C `w2-qname-dict` (avm2_ops.c; dictionary_qname_keys +1; full CI for #1069/#1081), D `w2-netstream-audio` (audio/aac, g711 +2), E `w2-definefont4` (textline_metrics +1, recompiler DefineFont4), F `w2-avm1-devicefont` (device_font_name_case +1).
+- trace-tail oracle request 1 (optional): attached 4-frame clip frame-order trace — do at w2-attached-timeline merge.
