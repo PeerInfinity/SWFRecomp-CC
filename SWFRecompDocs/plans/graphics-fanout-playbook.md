@@ -1319,3 +1319,16 @@ comparisons, all passing). Interim `44935781892`: 529/610 (+6). Final `449441470
 - Re-goldened to Flash upstream (`graphics_draw_path`, `cache_as_bitmap/avm1_color`, `graphics_simple_shapes`,
   `graphics_gradients`, `sprite_with_frames`, `Video-EmbedSquareTest`): we match Ruffle's sidecar; real Flash fidelity
   work, not drift fixes.
+
+### Process notes added in session 23
+
+- **No-graphics grading policy (user, 2026-11-21):** interim grading runs are `graphics/full` (+ `images=true` when
+  pixel patches landed) ONLY. The no-graphics leg runs on the FINAL grading run, and earlier only when a landed patch
+  touches no-graphics-only code (`swf_core.c`, `tag_stubs.c`, `#ifdef NO_GRAPHICS` arms without `|| OFFSCREEN_RENDER`).
+  The weekly `weekly-no-graphics.yml` canary stays. Evidence: s20–s23 per-test mode parity in every run, apart from
+  predicted rows (s23: `audio/aac`, graphics-only by design).
+- **Land measured wave-1 prototypes directly** when CI-grade and sweep-clean (s23: 5×, all graded exact).
+- **Trigger merges on the worker's REPORT file**, not on branch existence (workers push interim WIP).
+- **Branch cleanup:** a `.claude/settings.local.json` allow rule `Bash(git push origin --delete fanout/*)` (user, s23)
+  lets the coordinator prune merged `fanout/*` branches at closeout, after `cmp`-ing each branch's report with its
+  archived copy on master.

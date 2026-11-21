@@ -21,7 +21,11 @@ to make the pipeline resumable across sessions.
   ONLY when the change touches no-graphics-only code (`swf_core.c`,
   `tag_stubs.c`, `#ifdef NO_GRAPHICS` arms without `|| OFFSCREEN_RENDER`);
   otherwise the weekly `weekly-no-graphics.yml` canary covers it. When in
-  doubt for shared runtime code, run both.
+  doubt for shared runtime code, run both. **Fan-out sessions** (user,
+  2026-11-21): interim grading runs are graphics-only; add the no-graphics
+  leg to the FINAL grading run only (plus earlier if a landed patch touches
+  the no-graphics-only code above). s20–s23 found no mode divergence beyond
+  the predicted graphics-only `audio/aac` (no libavcodec in no-graphics).
 - **CI categories**: `all` (classic five suites) is the per-change default;
   use `categories=full` (adds from_avmplus + the misc group, ~+73% tests)
   when the change touches AVM2 runtime/recompiler emission. Weekly canary
