@@ -235,10 +235,112 @@ def parse_image_comparisons(test_dir):
         # image_comparisons configured" so the test still runs.
         return {}
 
+    # Grading instrument (s23 w2-harness-subtests, from the w1-pixel-misc
+    # prototype). Mirrors which comparisons Ruffle's own suite grades:
+    # (1) `ignore = true` at the top level: Ruffle never runs the test, so its
+    #     comparisons are not part of Ruffle's suite. They are still rendered
+    #     and compared (board visibility) but recorded as status "ignored",
+    #     which build_image_report.py leaves out of the graded denominator.
+    # (2) >=2 `[subtests.NAME]`: Ruffle runs each subtest separately with the
+    #     top-level table deep-merged into it (tests/framework/src/options.rs
+    #     merge_into_subtest) and grades ONLY the merged subtests'
+    #     comparisons, keyed here `<subtest>__<cmp>` (expected PNG is still
+    #     `<cmp>.expected.png`). A subtest whose device_font_renderer is
+    #     "freetype" needs Ruffle's optional `freetype` feature
+    #     (FontRendererKind::can_run); the default build skips it, so it is
+    #     recorded as "ignored" too. The trace side is independent: it grades
+    #     one canonical variant (resolve_expected_filename).
+    ignored_upstream = bool(data.get("ignore"))
+    subtests = data.get("subtests")
+    if isinstance(subtests, dict) and len(subtests) >= 2:
+        return _parse_subtest_image_comparisons(data, subtests, ignored_upstream)
+
     ic_section = data.get("image_comparisons")
     if not ic_section or not isinstance(ic_section, dict):
         return {}
+    result = _parse_ic_section(ic_section)
+    if ignored_upstream:
+        for v in result.values():
+            v["ignored_upstream"] = "ignore = true"
+    return result
 
+
+def _deep_merge(base, over):
+    """Ruffle merge_into_subtest: tables merge recursively, else `over` wins."""
+    if isinstance(base, dict) and isinstance(over, dict):
+        out = dict(over)
+        for k, v in base.items():
+            out[k] = _deep_merge(v, over[k]) if k in over else v
+        return out
+    return over
+
+
+def _quality_to_msaa(q):
+    """Same mapping as get_msaa_samples(): low -> 1, anything else -> 4."""
+    if not isinstance(q, str):
+        return None
+    return 1 if q.lower() == "low" else 4
+
+
+def _parse_subtest_image_comparisons(data, subtests, ignored_upstream):
+    base = {k: v for k, v in data.items() if k != "subtests"}
+
+    # Subtests that differ by player VERSION (e.g. gnash GradientFillTest
+    # fp9/fp10) cannot be emulated: we build once, at no version override
+    # (canonical-variant mode). Grade only the highest-version variant (ties:
+    # first), the same one resolve_expected_filename() grades on the trace
+    # side, and record the others as "ignored" so one render is not booked
+    # twice. Version-less subtest sets (quality / font-renderer splits) all
+    # tie at -1 and are all graded.
+    def _version(sub):
+        po = sub.get("player_options")
+        v = po.get("version") if isinstance(po, dict) else None
+        if v is None:
+            v = sub.get("player_options.version")
+        return int(v) if isinstance(v, (int, float)) else -1
+    versions = {n: _version(s) for n, s in subtests.items() if isinstance(s, dict)}
+    canonical = None
+    if len(set(versions.values())) > 1:
+        best = max(versions.values())
+        canonical = next(n for n, v in versions.items() if v == best)
+
+    result = {}
+    for sub_name, sub in subtests.items():
+        if not isinstance(sub, dict):
+            continue
+        merged = _deep_merge(base, sub)
+        ic = merged.get("image_comparisons")
+        if not isinstance(ic, dict) or not ic:
+            continue
+        po = merged.get("player_options") or {}
+        wr = po.get("with_renderer") if isinstance(po, dict) else None
+        msaa = _quality_to_msaa(wr.get("quality")) if isinstance(wr, dict) else None
+        renderer = po.get("device_font_renderer") if isinstance(po, dict) else None
+        for cmp_name, cfg in _parse_ic_section(ic).items():
+            key = f"{sub_name}__{cmp_name}"
+            cfg["png_name"] = cmp_name
+            cfg["subtest"] = sub_name
+            cfg["msaa"] = msaa if msaa is not None else 4
+            # A subtest's OWN known_failure marks its comparisons (as a
+            # per-comparison known_failure does). A top-level known_failure is
+            # not propagated: for a non-subtest test it never marks the image
+            # comparisons either (it is the trace's flag), so propagating it
+            # here would flag images on subtest tests only.
+            if sub.get("known_failure"):
+                cfg["known_failure"] = True
+            if ignored_upstream or merged.get("ignore"):
+                cfg["ignored_upstream"] = "ignore = true"
+            elif renderer == "freetype":
+                cfg["ignored_upstream"] = "device_font_renderer = freetype"
+            elif canonical is not None and sub_name != canonical:
+                cfg["ignored_upstream"] = (
+                    f"player version {versions[sub_name]} variant not emulated "
+                    f"(canonical-variant mode grades {canonical})")
+            result[key] = cfg
+    return result
+
+
+def _parse_ic_section(ic_section):
     result = {}
     for name, config in ic_section.items():
         if not isinstance(config, dict):
@@ -2451,6 +2553,9 @@ def get_mock_platform(test_dir):
     return None
 
 
+MSAA_OVERRIDE = None  # set while rebuilding a [subtests] variant
+
+
 def get_msaa_samples(test_dir):
     """Parse [player_options].with_renderer.quality from test.toml and map it to
     an MSAA sample count, mirroring Ruffle's StageQuality::sample_count()
@@ -2464,6 +2569,8 @@ def get_msaa_samples(test_dir):
     comparison (already passing) and clamping removes a Dawn/lavapipe sample-count
     portability failure mode. Absent or unrecognised quality -> 4 (unchanged).
     """
+    if MSAA_OVERRIDE is not None:
+        return MSAA_OVERRIDE
     toml_path = test_dir / "test.toml"
     if not toml_path.exists():
         return 4
@@ -4184,6 +4291,44 @@ def _fmt_phases(pt):
     return f" [{' '.join(parts)}]" if parts else ""
 
 
+def _rerun_subtest_variants(test_dir, num_frames, build_dir, args,
+                            image_comparisons, run_env, event_file):
+    """Rebuild + rerun once per [subtests] MSAA that differs from the main
+    build, capturing only that variant's comparisons into build_dir."""
+    global MSAA_OVERRIDE
+    main_msaa = get_msaa_samples(test_dir)
+    by_msaa = {}
+    for cmp_name, cfg in image_comparisons.items():
+        m = cfg.get("msaa", main_msaa)
+        if m != main_msaa:
+            by_msaa.setdefault(m, []).append(cmp_name)
+    for msaa, names in sorted(by_msaa.items()):
+        vdir = build_dir / f"variant_msaa{msaa}"
+        vdir.mkdir(exist_ok=True)
+        MSAA_OVERRIDE = msaa
+        try:
+            ok, _err = compile_native(test_dir, num_frames, vdir, mode=args.mode,
+                                      has_image_comparisons=True, asan=args.asan,
+                                      use_ccache=not args.no_ccache)
+        finally:
+            MSAA_OVERRIDE = None
+        if not ok:
+            continue
+        env = dict(run_env)
+        trig = []
+        for n in names:
+            t = image_comparisons[n]["trigger"]
+            if t[0] == "specific_iteration":
+                trig.append(f"{n}:iteration:{t[1]}")
+            elif t[0] == "fs_command":
+                trig.append(f"{n}:fs_command")
+            else:
+                trig.append(f"{n}:last_frame")
+        env["CAPTURE_TRIGGERS"] = ",".join(trig)
+        env["CAPTURE_OUTPUT_DIR"] = str(build_dir)
+        run_binary(vdir, event_file=event_file, extra_env=env)
+
+
 def main():
     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
     args = parse_args()
@@ -4561,7 +4706,10 @@ def main():
                 run_env["SWF_SOCKET_SCRIPT"] = str(socket_script)
             if has_image_cmps and args.uses_dawn:
                 triggers = []
+                main_msaa = get_msaa_samples(test_dir)
                 for cmp_name, cmp_config in image_comparisons.items():
+                    if cmp_config.get("msaa", main_msaa) != main_msaa:
+                        continue  # captured by a rebuilt variant below
                     trig = cmp_config["trigger"]
                     if trig[0] == "last_frame":
                         triggers.append(f"{cmp_name}:last_frame")
@@ -4578,6 +4726,10 @@ def main():
             raw_output, rc, run_stderr = run_binary(build_dir, event_file=event_file,
                                                     extra_env=run_env if run_env else None)
             phase_times["run"] = round(time.perf_counter() - _t, 3)
+            if (raw_output is not None and has_image_cmps and args.uses_dawn
+                    and not args.wasm):
+                _rerun_subtest_variants(test_dir, num_frames, build_dir, args,
+                                        image_comparisons, run_env, event_file)
             if raw_output is None:
                 stats["timeout"] += 1
                 fail_list.append(name)
@@ -4665,10 +4817,11 @@ def main():
                     # comparison that only resolves through it passes locally
                     # and skips in CI. Record which source won so the baseline
                     # report can tell those apart instead of guessing.
-                    expected_png = test_dir / f"{cmp_name}.expected.png"
+                    png_name = cmp_config.get("png_name", cmp_name)
+                    expected_png = test_dir / f"{png_name}.expected.png"
                     expected_source = "repo"
                     if not expected_png.exists() and RUFFLE_UPSTREAM.exists():
-                        upstream_png = RUFFLE_UPSTREAM / name / f"{cmp_name}.expected.png"
+                        upstream_png = RUFFLE_UPSTREAM / name / f"{png_name}.expected.png"
                         if upstream_png.exists():
                             expected_png = upstream_png
                             expected_source = "upstream_checkout"
@@ -4677,7 +4830,7 @@ def main():
                     if not expected_png.exists():
                         image_results[cmp_name] = {
                             "status": "skip",
-                            "message": f"No expected image: {cmp_name}.expected.png",
+                            "message": f"No expected image: {png_name}.expected.png",
                             "reason": "no_expected_image",
                         }
                         continue
@@ -4698,6 +4851,43 @@ def main():
                         "trigger": cmp_config["trigger"],
                         "known_failure": cmp_config.get("known_failure", False),
                     }
+                    if cmp_config.get("ignored_upstream"):
+                        # Not in Ruffle's graded set; keep the verdict visible.
+                        image_results[cmp_name]["status"] = "ignored"
+                        image_results[cmp_name]["would_pass"] = bool(passed)
+                        image_results[cmp_name]["ignored_upstream"] = cmp_config["ignored_upstream"]
+                    if cmp_config.get("subtest"):
+                        image_results[cmp_name]["subtest"] = cmp_config["subtest"]
+                        image_results[cmp_name]["png_name"] = png_name
+                    # REPORT-ONLY "matches Ruffle" bucket (s23 H3). A
+                    # known_failure comparison whose test ships Ruffle's own
+                    # render (`<png>.ruffle.png`) is also graded against that
+                    # sidecar with the SAME checks. It never changes the
+                    # verdict or the denominator (Flash-over-Ruffle ruling:
+                    # the Flash golden is the grade); it only tells a "we
+                    # render what Ruffle renders" fail from a real outlier.
+                    # The actual PNG is copied first so compare_images'
+                    # difference image does not overwrite the real one.
+                    ruffle_png = test_dir / f"{png_name}.ruffle.png"
+                    if (cmp_config.get("known_failure") and not passed
+                            and ruffle_png.exists()):
+                        vs_png = build_dir / f"{cmp_name}.vs_ruffle.png"
+                        try:
+                            shutil.copy2(str(actual_png), str(vs_png))
+                            r_pass, _r_msg, r_max, _r_stats = compare_images(
+                                vs_png, ruffle_png, cmp_config["checks"],
+                                config_error=cmp_config.get("config_error"))
+                            image_results[cmp_name]["ruffle_match"] = bool(r_pass)
+                            image_results[cmp_name]["ruffle_max_diff"] = r_max
+                        except Exception:
+                            pass
+                        # Leave the build dir as before: render_canary.py
+                        # harvests every *.png in it.
+                        for tmp in (vs_png, build_dir / f"{cmp_name}.vs_ruffle.difference.png"):
+                            try:
+                                tmp.unlink()
+                            except OSError:
+                                pass
                     if args.images:
                         # Instrument-mode extras. Gated so a normal run's
                         # results JSON stays byte-for-byte what it was.
@@ -4727,6 +4917,16 @@ def main():
                                 pass
                             except Exception:
                                 pass
+                # An ignored comparison that bailed early (no expected image /
+                # no render) is still out of Ruffle's graded set: keep its
+                # reason, but never let it count as a graded skip or fail.
+                for cmp_name, cmp_config in image_comparisons.items():
+                    r = image_results.get(cmp_name)
+                    if (r is not None and cmp_config.get("ignored_upstream")
+                            and r["status"] != "ignored"):
+                        r["would_pass"] = False
+                        r["status"] = "ignored"
+                        r["ignored_upstream"] = cmp_config["ignored_upstream"]
 
         # Step 4: Filter and compare trace output
         actual = filter_output(raw_output)

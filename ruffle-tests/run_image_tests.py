@@ -923,7 +923,7 @@ def rebuild_json_from_disk(tests, json_path):
         image_results = {}
         for cmp_name, cmp_cfg in cfg.items():
             actual = test_dir / f"{cmp_name}.actual.png"
-            expected = test_dir / f"{cmp_name}.expected.png"
+            expected = test_dir / f"{cmp_cfg.get('png_name', cmp_name)}.expected.png"
             # Fallback for expected: some tests keep upstream/<name>/<cmp>.expected.png
             # only — but verify_output's main run path copies them next to the test.
             # If neither exists, compare_images returns a meaningful error message.

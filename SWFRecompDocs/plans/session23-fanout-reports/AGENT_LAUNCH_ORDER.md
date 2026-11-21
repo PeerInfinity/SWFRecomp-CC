@@ -55,7 +55,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 21 | w2-context3d-readback | both | drift-avm2 S4: drawToBitmapData + #3692 | session_018CoDi61VeqnzLTiyF5rwmk — LANDED (+3 trace, +1 px) |
 | 22 | w2-doc-removal-events | trace | drift-avm2 S8 | session_018CoDi7jBSFh59hTPEMaK7G — LANDED (+3) |
 | 23 | w2-video-props | trace | drift-avm1 V: Video width/height lazy accessors | session_018CoDi3srDrx6YECoWarZYc (18:40) |
-| 24 | w2-harness-subtests | px (instrument) | ignore=true + [subtests] images + drawWithQuality + report-only ruffle-png bucket | session_018CoDi5m6iYZTWzXtXE2S8s (18:50) |
+| 24 | w2-harness-subtests | px (instrument) | ignore=true + [subtests] images + drawWithQuality + report-only ruffle-png bucket | session_018CoDi5m6iYZTWzXtXE2S8s — LANDED (instrument) |
 | 25 | w2-xml-status | trace | drift-avm1 M3 XML status + AVM1 bundle | session_018CoDi58gxyHZVyRcAu87S1 (18:55) |
 | 26 | w2-dynclip-transform | px+correctness | AVM1 nested dynamic-clip transform/alpha inheritance (empty_child_filter_bounds) | session_018CoDi57QaPasoFxvAJyUzd (19:00) |
 ## Landed patches + expected ledgers
@@ -80,6 +80,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `be53cbeaf` | w2-array-vector-args | trace fail→pass (both modes): `avm2/array_join_reentrant`, `avm2/vector_join_reentrant` (KF), `avm2/array_sort_arguments` (KF), `avm2/vector_sort_arguments` (KF), `avm2/array_constructor` (Flash-exact, avmplus source as oracle); 237-row sweep identical to CI; pixels none |
 | `f5613a76c` | w2-avm1-devicefont | trace fail→pass (both modes): `fonts/device_font_name_case` (misc group → needs categories=full); pixels none. New generated `RecompiledTags/device_fonts.c` for AVM1 movies with named [fonts.*] faces |
 | `00077a281` | w2-doc-removal-events | trace fail→pass (both modes): `avm2/displayobjectcontainer_remove_reentrant`, `_remove_reparent`, `_removechildren_events`; 141-row add/remove sweep exact; pixels none |
+| (hs) | w2-harness-subtests (GRADING INSTRUMENT) | image report: denominator **+2** (ignored rows excluded; `[subtests]` rows keyed `<subtest>__<cmp>`; version-keyed subtests canonical-variant only), passes **+2** (`avm2/bitmapdata_drawwithquality` low__output.low + high__output.high, via drawWithQuality→bd_draw), fails ±0 (−`avm2/bitmap_pixelsnapping` → ignored, +`visual/edittext/edittext_device_transform_basic [embedded__output]` fail); new totals ignored=6, ruffle_matched_fail=9 (report-only: graphics_draw_path, cache_as_bitmap/avm1_color, …); band: `bitmapdata_draw_cab_quality` 2320→2640 (alias exposes a separate gap); `fonts/leading_device_font output` → `embedded__output` RENAME (image_status_diff pairs it); trace 0 moves |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).

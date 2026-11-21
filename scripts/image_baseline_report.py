@@ -99,7 +99,8 @@ def main():
 
     rows = []
     for rep in reports:
-        rows.extend(rep["results"])
+        # "ignored" rows (s23: Ruffle never grades them) are not comparisons.
+        rows.extend(r for r in rep["results"] if r["status"] != "ignored")
 
     tot = Counter(r["status"] for r in rows)
     fails = [r for r in rows if r["status"] == "fail"]

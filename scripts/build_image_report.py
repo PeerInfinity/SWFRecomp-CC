@@ -147,8 +147,18 @@ def build_suite(suite, stem):
                 "trace_status": trace_status,
                 "known_failure": bool(cmps[cmp_name].get("known_failure")),
             }
+            cfg = cmps[cmp_name]
+            if cfg.get("subtest"):
+                row["subtest"] = cfg["subtest"]
+                row["png_name"] = cfg.get("png_name", cmp_name)
+            if cfg.get("ignored_upstream"):
+                row["ignored_upstream"] = cfg["ignored_upstream"]
             if r is None:
-                row.update(status="skip", reason=classify_absence(trace_status),
+                # An ignored comparison that produced no record is still
+                # ignored (out of the denominator), not a graded skip.
+                row.update(status=("ignored" if cfg.get("ignored_upstream")
+                                   else "skip"),
+                           reason=classify_absence(trace_status),
                            message="no image comparison recorded for this run")
             else:
                 row["status"] = r.get("status", "unknown")
@@ -167,6 +177,11 @@ def build_suite(suite, stem):
                     row["known_failure"] = True
                 if "max_diff" in r:
                     row["max_diff"] = r["max_diff"]
+                # Optional instrument fields (s23 w2-harness-subtests).
+                for k in ("would_pass", "ignored_upstream", "ruffle_match",
+                          "ruffle_max_diff"):
+                    if k in r:
+                        row[k] = r[k]
                 if r.get("expected_source"):
                     row["expected_source"] = r["expected_source"]
                 for k, v in (r.get("stats") or {}).items():
@@ -192,6 +207,13 @@ def build_suite(suite, stem):
                 "uncensused": True,
             })
 
+    # Grading instrument (s23 w2-harness-subtests): "ignored" rows (Ruffle
+    # never grades them: top-level `ignore = true`, or a freetype-only subtest)
+    # stay in `results` for the board but leave the graded denominator.
+    # `ruffle_matched_fail` is REPORT-ONLY: a known_failure fail whose render
+    # matches the test's `<png>.ruffle.png` under the comparison's own checks.
+    # It stays a fail and stays in the denominator (Flash-over-Ruffle ruling).
+    graded = [r for r in rows if r["status"] != "ignored"]
     totals = Counter()
     for row in rows:
         totals[row["status"]] += 1
@@ -199,6 +221,8 @@ def build_suite(suite, stem):
             totals["no_render"] += 1
         if row["status"] == "fail" and row.get("known_failure"):
             totals["fail_known_failure"] += 1
+        if row["status"] == "fail" and row.get("ruffle_match"):
+            totals["ruffle_matched_fail"] += 1
 
     return {
         "metadata": {
@@ -215,13 +239,15 @@ def build_suite(suite, stem):
             **run_provenance(),
         },
         "tests_with_comparisons": len(census),
-        "comparisons": len(rows),
+        "comparisons": len(graded),
+        "ignored": totals["ignored"],
         "pass": totals["pass"],
         "fail": totals["fail"],
         "skip": totals["skip"],
         "no_render": totals["no_render"],
         "fail_known_failure": totals["fail_known_failure"],
-        "pass_rate": (round(100 * totals["pass"] / len(rows), 1) if rows else 0),
+        "ruffle_matched_fail": totals["ruffle_matched_fail"],
+        "pass_rate": (round(100 * totals["pass"] / len(graded), 1) if graded else 0),
         "results": rows,
     }
 
@@ -353,7 +379,8 @@ def audit_expectations():
         for test, cmps in sorted(census_suite(suite).items()):
             for cmp_name in sorted(cmps):
                 total += 1
-                if not (SWFS_ROOT / suite / test / f"{cmp_name}.expected.png").exists():
+                png_name = cmps[cmp_name].get("png_name", cmp_name)
+                if not (SWFS_ROOT / suite / test / f"{png_name}.expected.png").exists():
                     missing.append((suite, test, cmp_name))
     print(f"[audit] {total - len(missing)}/{total} comparisons have an in-repo "
           f"expected PNG")
@@ -417,14 +444,19 @@ def main():
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(json.dumps(rep, indent=2))
         print(f"{suite}: {rep['pass']}/{rep['comparisons']} image comparisons pass "
-              f"({rep['fail']} fail, {rep['skip']} skip, {rep['no_render']} no-render)")
+              f"({rep['fail']} fail, {rep['skip']} skip, {rep['no_render']} no-render"
+              f"; {rep['ignored']} ignored, {rep['ruffle_matched_fail']} "
+              f"ruffle-matched fail)")
 
     tot = Counter()
     for rep in reports:
-        for k in ("comparisons", "pass", "fail", "skip", "no_render"):
+        for k in ("comparisons", "pass", "fail", "skip", "no_render",
+                  "ignored", "ruffle_matched_fail"):
             tot[k] += rep[k]
     print(f"TOTAL: {tot['pass']}/{tot['comparisons']} pass, {tot['fail']} fail, "
-          f"{tot['skip']} skip, {tot['no_render']} no-render")
+          f"{tot['skip']} skip, {tot['no_render']} no-render, "
+          f"{tot['ignored']} ignored (not graded), "
+          f"{tot['ruffle_matched_fail']} ruffle-matched fail (report-only)")
 
     if args.index_dir:
         write_index(reports, args.index_dir, args.png_dir)

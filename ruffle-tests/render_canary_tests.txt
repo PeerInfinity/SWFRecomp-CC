@@ -572,3 +572,15 @@ avm2/stage3d_texture                        # Stage3D RTT + default-font text 1 
 # tier=1 (both CI-passing in run 44922638965)
 visual/edittext/edittext_selection_font_size # AVM2 textColor + defaultTextFormat 1 cmp
 visual/layout/line_vertical_align           # AVM2 ranged setTextFormat(tf, b, e) 1 cmp
+
+# --- s23 w2-harness-subtests ---
+# The only two corpus SWFs that call BitmapData.drawWithQuality (constant-pool
+# scan of every test.swf, CWS+ZWS). drawWithQuality now aliases draw() (quality
+# arg ignored; s22 Flash ruling: draw() anti-aliases at LOW too).
+# bitmapdata_drawwithquality is also the corpus's only [subtests] MSAA split:
+# low__output.low renders at MSAA 1 in the main build, high__output.high in a
+# rebuilt MSAA-4 variant. Both pass near their limits (3152/3200, 3197/3204).
+# tier=1
+avm2/bitmapdata_drawwithquality             # drawWithQuality + subtest MSAA rerun 2 cmp
+# tier=2
+avm2/bitmapdata_draw_cab_quality            # drawWithQuality (CI-failing)       1 cmp

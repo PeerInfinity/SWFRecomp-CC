@@ -342,8 +342,44 @@ def main():
 
     shared = sorted(old_rows.keys() & new_rows.keys())
 
-    print(f"=== intersection: {len(shared)} comparisons "
-          f"({args.old_ref} -> {args.new_ref}, {args.stem}) ===\n")
+    # [subtests] split (s23 w2-harness-subtests): a comparison `c` of a test
+    # that grew >=2-subtest grading is re-keyed `<subtest>__c`, so the old
+    # row is GONE and its subtest rows are NEW although it is the same
+    # comparison. Pair the old row with its graded (non-ignored) subtest row
+    # when there is exactly one, so the move is classified like any other
+    # instead of reading as a loss plus a gain. Ignored siblings (freetype
+    # subtests) are listed as split-offs, never as gains/losses.
+    renames, split_ignored = [], []
+    new_keys_left = set(new_rows.keys() - old_rows.keys())
+    for ko in sorted(old_rows.keys() - new_rows.keys()):
+        s_, t_, c_ = ko
+        cands = sorted(k for k in new_keys_left
+                       if k[0] == s_ and k[1] == t_ and k[2].endswith("__" + c_))
+        graded = [k for k in cands if new_rows[k].get("status") != "ignored"]
+        if len(graded) != 1:
+            continue
+        renames.append((ko, graded[0]))
+        new_keys_left -= set(cands)
+        split_ignored += [k for k in cands if k != graded[0]]
+    # The reverse (a split undone, e.g. diffing across a revert) pairs the
+    # same way; its ignored old-side siblings are simply dropped.
+    old_keys_left = set(old_rows.keys() - new_rows.keys()) - {ko for ko, _ in renames}
+    split_ignored_old = []
+    for kn in sorted(new_keys_left):
+        s_, t_, c_ = kn
+        cands = sorted(k for k in old_keys_left
+                       if k[0] == s_ and k[1] == t_ and k[2].endswith("__" + c_))
+        graded = [k for k in cands if old_rows[k].get("status") != "ignored"]
+        if len(graded) != 1:
+            continue
+        renames.append((graded[0], kn))
+        old_keys_left -= set(cands)
+        split_ignored_old += [k for k in cands if k != graded[0]]
+    pairs = [(k, k) for k in shared] + renames
+
+    print(f"=== intersection: {len(shared)} comparisons"
+          + (f" + {len(renames)} renamed ([subtests] split)" if renames else "")
+          + f" ({args.old_ref} -> {args.new_ref}, {args.stem}) ===\n")
 
     print("PROVENANCE")
     print_side("old", args.old_ref, old_sha, old_runs)
@@ -390,9 +426,10 @@ def main():
 
     gains, regressions = [], []
     band_moves, reason_moves, status_moves = [], [], []
+    ignored_moves = []
 
-    for key in shared:
-        o, n = old_rows[key], new_rows[key]
+    for okey, key in pairs:
+        o, n = old_rows[okey], new_rows[key]
         so, sn = o.get("status", "unknown"), n.get("status", "unknown")
         hs_old[so] += 1
         hs_new[sn] += 1
@@ -413,6 +450,16 @@ def main():
         per_suite[key[0]][1] += sn == "pass"
 
         label = f"{key[0]}/{key[1]} [{key[2]}]"
+        if okey != key:
+            label = f"{key[0]}/{key[1]} [{okey[2]} -> {key[2]}, renamed]"
+        if "ignored" in (so, sn) and so != sn:
+            # Entering/leaving Ruffle's graded set (top-level `ignore = true`,
+            # freetype subtest) is a denominator move, never a gain or a loss.
+            wp = n.get("would_pass") if sn == "ignored" else None
+            ignored_moves.append(
+                f"{label}: {so} -> {sn}"
+                + (f" (would_pass={wp})" if wp is not None else ""))
+            continue
         if so != "pass" and sn == "pass":
             gains.append(f"{label}: {so} -> pass")
         elif so == "pass" and sn != "pass":
@@ -524,8 +571,29 @@ def main():
     if len(status_moves) + len(reason_moves) > cap:
         print(f"  ... and {len(status_moves) + len(reason_moves) - cap} more")
 
-    new_only = sorted(new_rows.keys() - old_rows.keys())
-    gone = sorted(old_rows.keys() - new_rows.keys())
+    print(f"\nIGNORED MOVES (into/out of `ignored`: denominator only, NOT "
+          f"gains/regressions): {len(ignored_moves)}")
+    for m in ignored_moves[:cap]:
+        print("  " + m)
+    print(f"RENAMED ([subtests] split, compared through the rename above): "
+          f"{len(renames)}")
+    for ko, kn in renames[:cap]:
+        print(f"  {ko[0]}/{ko[1]} [{ko[2]}] -> [{kn[2]}]  "
+              f"{old_rows[ko].get('status')} -> {new_rows[kn].get('status')}")
+    for k in split_ignored[:cap]:
+        print(f"  {k[0]}/{k[1]} [{k[2]}]  {new_rows[k].get('status')} "
+              f"(split-off, not graded)")
+
+    def rm_count(rows):
+        return sum(1 for r in rows.values()
+                   if r.get("status") == "fail" and r.get("ruffle_match"))
+    print(f"RUFFLE-MATCHED FAILS (report-only; still fails): "
+          f"{rm_count(old_rows)} -> {rm_count(new_rows)}")
+
+    renamed_new = {kn for _, kn in renames} | set(split_ignored)
+    renamed_old = {ko for ko, _ in renames} | set(split_ignored_old)
+    new_only = sorted(new_rows.keys() - old_rows.keys() - renamed_new)
+    gone = sorted(old_rows.keys() - new_rows.keys() - renamed_old)
     print(f"\nNEW (absent from baseline): {len(new_only)}")
     for s, t, c in new_only[:cap]:
         print(f"  {s}/{t} [{c}]  {new_rows[(s, t, c)].get('status')}")

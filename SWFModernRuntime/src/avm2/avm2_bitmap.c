@@ -4084,7 +4084,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	avm2_builtin_add_method(ctx, bd, "lock", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "unlock", bd_noop);
 	avm2_builtin_add_method(ctx, bd, "draw", bd_draw);
-	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_noop);
+	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_draw);  // 7th arg (quality) ignored: draw() renders at the stage quality, Flash AA-at-LOW ruling (s22)
 	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_apply_filter);
 	avm2_builtin_add_method(ctx, bd, "generateFilterRect", bd_generate_filter_rect);
 	avm2_builtin_add_method(ctx, bd, "merge", bd_noop);

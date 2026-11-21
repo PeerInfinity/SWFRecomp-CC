@@ -221,6 +221,9 @@ def attach_images(rows, out_path, images_dir, asset_dir, raw_base, local,
     for row in rows:
         imgs = {}
         suite, test, cmp_name = row["suite"], row["test"], row["comparison"]
+        # A [subtests] row is keyed `<subtest>__<cmp>` but its golden is
+        # `<cmp>.expected.png` (png_name); actual/difference keep cmp_name.
+        png_name = row.get("png_name", cmp_name)
         want_actual = row["status"] == "fail"
 
         if mode == "local":
@@ -236,7 +239,7 @@ def attach_images(rows, out_path, images_dir, asset_dir, raw_base, local,
         elif mode == "raw":
             if want_actual:
                 imgs["expected"] = (f"{RAW_EXPECTED_BASE}/{suite}/{test}/"
-                                    f"{cmp_name}.expected.png")
+                                    f"{png_name}.expected.png")
                 stats["with_expected"] += 1
             if want_actual:
                 for kind in ("actual", "difference"):
@@ -244,9 +247,9 @@ def attach_images(rows, out_path, images_dir, asset_dir, raw_base, local,
                                   f"{cmp_name}.{kind}.png")
             stats["raw"] += 1
         elif mode in ("copy", "link"):
-            src_expected = SWFS_ROOT / suite / test / f"{cmp_name}.expected.png"
+            src_expected = SWFS_ROOT / suite / test / f"{png_name}.expected.png"
             if not src_expected.exists() and exp_root is not None:
-                src_expected = exp_root / suite / test / f"{cmp_name}.expected.png"
+                src_expected = exp_root / suite / test / f"{png_name}.expected.png"
             sources = {}
             if want_actual and src_expected.exists():
                 sources["expected"] = src_expected
@@ -630,7 +633,8 @@ def build_page(reports, rows, stem, img_stats, images_dir, raw_base, local):
     tot = Counter()
     for r in rows:
         tot[r["status"]] += 1
-    tot["comparisons"] = len(rows)
+    # "ignored" rows (s23 w2-harness-subtests) leave the graded denominator.
+    tot["comparisons"] = sum(1 for r in rows if r["status"] != "ignored")
     tot["no_render"] = sum(1 for r in fails if r.get("reason") == "no_render")
     tot["known_failure"] = sum(1 for r in fails if r.get("known_failure"))
 
@@ -785,8 +789,9 @@ def main():
                               args.raw_base, bool(args.local_json)))
 
     tot = Counter(r["status"] for r in rows)
-    print(f"{out}: {tot['pass']}/{len(rows)} comparisons pass "
-          f"({tot['fail']} fail, {tot['skip']} skip) across {len(reports)} suites; "
+    print(f"{out}: {tot['pass']}/{len(rows) - tot['ignored']} comparisons pass "
+          f"({tot['fail']} fail, {tot['skip']} skip, {tot['ignored']} ignored) "
+          f"across {len(reports)} suites; "
           f"images mode={stats['mode']}, "
           f"{stats['with_actual']}/{stats['failures']} failures have a rendered PNG, "
           f"{stats['with_expected']}/{stats['failures']} have an expected PNG")
