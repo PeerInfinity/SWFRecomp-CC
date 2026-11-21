@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Pin emsdk to the version used locally (same as ruffle-tests.yml).
       EMSDK_VERSION: '5.0.0'

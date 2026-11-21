@@ -232,7 +232,7 @@ jobs:
   single-test:
     name: Single test (${{ inputs.single_test }})
     if: inputs.single_test != ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       # Same crash capture as the shards (see crash-capture-setup). Free here,
@@ -375,7 +375,7 @@ jobs:
   setup-parallel:
     name: Setup (Build + Download + Recompile)
     if: inputs.single_test == ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -525,7 +525,7 @@ jobs:
     name: Shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}
     if: inputs.single_test == ''
     needs: setup-parallel
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       # Crash capture: verify_output.py preserves the core + the exact
@@ -916,7 +916,7 @@ jobs:
     name: Combine Results
     if: inputs.single_test == '' && !cancelled()
     needs: [setup-parallel, ruffle-tests-shard]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -1416,7 +1416,7 @@ jobs:
   # job so a smoke failure is visible on its own, not buried in a shard.
   wasm-link-smoke:
     name: WASM link-smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       # Pin emsdk to the version used locally so the emdawnwebgpu port (pulled
