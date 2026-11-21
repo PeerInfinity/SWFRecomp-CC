@@ -504,6 +504,48 @@ static Avm2Value arg_or_undef(Avm2Activation* act, uint32_t i)
 	return i < act->argc ? act->args[i] : avm2_undefined();
 }
 
+// ---------------------------------------------------------------------------
+// FP frame spelling for Vector's AS3-namespaced methods. playerglobal defines
+// each method on one of four internal specialization classes and FP prints
+// that class's internal name plus the builtin namespace URI:
+// "Vector$object/http://adobe.com/AS3/2006/builtin::join()" for any
+// Vector.<T> of a reference type (they all extend Vector.<*>), "Vector$int",
+// "Vector$uint", "Vector$double" for the three primitive ones. The private
+// static `_sort` that `sort` forwards to is spelled by the c_class's display
+// name: "Vector.<int>$/_sort()". Only the frames corpus rows pin are renamed
+// (vector_join_reentrant, vector_sort_arguments).
+// ---------------------------------------------------------------------------
+
+#define VEC_AS3_NS "http://adobe.com/AS3/2006/builtin::"
+#define VEC_SPEC_FRAMES(meth)                                                  \
+	{ "Vector$object/" VEC_AS3_NS meth, "Vector$int/" VEC_AS3_NS meth,         \
+	  "Vector$uint/" VEC_AS3_NS meth, "Vector$double/" VEC_AS3_NS meth }
+
+static const char* const VEC_JOIN_FRAME[4] = VEC_SPEC_FRAMES("join");
+static const char* const VEC_SORT_FRAME[4] = VEC_SPEC_FRAMES("sort");
+static const char* const VEC_PUSH_FRAME[4] = VEC_SPEC_FRAMES("push");
+static const Avm2MethodRef VEC_SORT_NATIVE_FRAME[4] = {
+	{ NULL, NULL, "Vector.<*>$/_sort", 0, 0 },
+	{ NULL, NULL, "Vector.<int>$/_sort", 0, 0 },
+	{ NULL, NULL, "Vector.<uint>$/_sort", 0, 0 },
+	{ NULL, NULL, "Vector.<Number>$/_sort", 0, 0 },
+};
+
+// 0 = Vector$object (Vector.<*> and every reference-typed application),
+// 1 = int, 2 = uint, 3 = Number.
+static int vec_spec_index(Avm2Context* ctx, const Avm2Object* v)
+{
+	const Avm2Builtins* b = &ctx->builtins;
+	for (const Avm2Class* c = v->cls; c != NULL; c = c->super_class)
+	{
+		if (c == b->vector_int_class) return 1;
+		if (c == b->vector_uint_class) return 2;
+		if (c == b->vector_double_class) return 3;
+		if (c == b->vector_object_class) return 0;
+	}
+	return 0;
+}
+
 // ArrayIter element read on a vector: reads past the CURRENT length throw
 // 1125 (a callback shrank the vector mid-iteration).
 static Avm2Value vec_iter_get(Avm2Context* ctx, Avm2Object* vec, uint32_t i)
@@ -547,14 +589,22 @@ static Avm2Value vec_set_fixed(Avm2Activation* act)
 }
 
 // join: null/undefined elements render as "null" (Ruffle globals/vector.rs).
+// avmplus VectorImpl.as join reads `limit = length` ONCE and then `this[i]`
+// for each i < limit -- a typed, range-checked read, so a toString that
+// shrinks the vector mid-join throws RangeError #1125 at the first missing
+// index, and one that grows it does not extend the output
+// (avm2/vector_join_reentrant). `ext->elems` is re-read every step: a
+// reentrant push may reallocate it.
 static const Avm2String* vec_join_inner(Avm2Context* ctx, Avm2Object* vec,
                                         const Avm2String* sep)
 {
 	Avm2VectorExt* ext = avm2_vector_ext(vec);
+	uint32_t limit = ext->length;
 	const Avm2String* out = avm2_string_from_literal(ctx, "");
-	for (uint32_t i = 0; i < ext->length; i++)
+	for (uint32_t i = 0; i < limit; i++)
 	{
 		if (i > 0) out = avm2_string_concat(ctx, out, sep);
+		if (i >= ext->length) vec_throw_1125(ctx, (double) i, ext->length);
 		Avm2Value v = ext->elems[i];
 		if (v.kind == AVM2_VALUE_UNDEFINED || v.kind == AVM2_VALUE_NULL)
 		{
@@ -573,6 +623,8 @@ static Avm2Value vec_join(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* v = this_vector(act);
 	if (v == NULL) return avm2_undefined();
+	uint32_t depth0 = ctx->call_depth;
+	avm2_callstack_rename_frame(ctx, vec_join, VEC_JOIN_FRAME[vec_spec_index(ctx, v)]);
 	const Avm2String* sep;
 	if (act->argc > 0 && act->args[0].kind != AVM2_VALUE_UNDEFINED)
 	{
@@ -582,7 +634,10 @@ static Avm2Value vec_join(Avm2Activation* act)
 	{
 		sep = avm2_string_from_literal(ctx, ",");
 	}
-	return avm2_string(vec_join_inner(ctx, v, sep));
+	const Avm2String* r = vec_join_inner(ctx, v, sep);
+	// A throw longjmps past this; the unwind resets call_depth.
+	ctx->call_depth = depth0;
+	return avm2_string(r);
 }
 
 static Avm2Value vec_to_string(Avm2Activation* act)
@@ -630,7 +685,11 @@ static Avm2Value vec_push(Avm2Activation* act)
 	if (v == NULL) return avm2_undefined();
 	Avm2VectorExt* ext = avm2_vector_ext(v);
 	// Pushing nothing still throws on a fixed vector.
-	vec_check_fixed(ctx, ext);
+	if (ext->fixed)
+	{
+		avm2_callstack_rename_frame(ctx, vec_push, VEC_PUSH_FRAME[vec_spec_index(ctx, v)]);
+		vec_throw_1126(ctx);
+	}
 	// Coerce first (side effects must not observe a partial push).
 	Avm2Value coerced[64];
 	Avm2Value* cs = act->argc <= 64 ? coerced
@@ -639,7 +698,11 @@ static Avm2Value vec_push(Avm2Activation* act)
 	{
 		cs[i] = vec_coerce(ctx, ext, act->args[i]);
 	}
-	vec_check_fixed(ctx, ext);
+	if (ext->fixed)
+	{
+		avm2_callstack_rename_frame(ctx, vec_push, VEC_PUSH_FRAME[vec_spec_index(ctx, v)]);
+		vec_throw_1126(ctx);
+	}
 	vec_reserve(ctx, ext, ext->length + act->argc);
 	for (uint32_t i = 0; i < act->argc; i++)
 	{
@@ -1198,27 +1261,29 @@ static int vec_sort_cmp(void* ud, const Avm2SortItem* pa, const Avm2SortItem* pb
 	return (sc->options & 2) ? -cmp : cmp;  // DESCENDING
 }
 
-static Avm2Value vec_sort(Avm2Activation* act)
+// The sort itself: avmplus TypedVectorClassBase::_sort is ArrayClass::
+// generic_sort over `[comparefn]`, so argument decode, the NUMERIC
+// non-number #1034 and the "Vector.<T>$/_sort()" frame are Array's.
+static Avm2Value vec_sort_impl(Avm2Activation* act, Avm2Object* v, Avm2Value a0)
 {
 	Avm2Context* ctx = act->ctx;
-	Avm2Object* v = this_vector(act);
-	if (v == NULL) return avm2_undefined();
 	Avm2VectorExt* ext = avm2_vector_ext(v);
 
 	VecSortCtx sc;
 	memset(&sc, 0, sizeof(sc));
 	sc.act = act;
-	sc.compare_fn = avm2_undefined();
 	sc.unique_satisfied = 1;
-	Avm2Value a0 = arg_or_undef(act, 0);
-	if (a0.kind == AVM2_VALUE_OBJECT
-	    && (a0.u.obj->kind == AVM2_OBJ_FUNCTION || a0.u.obj->kind == AVM2_OBJ_CLASS))
+	avm2_sort_decode_args(ctx, &a0, 1, &sc.compare_fn, &sc.options);
+	sc.options &= 0xFF;
+
+	// NUMERIC check from the last index down, before allocating (a throw
+	// would leak `items`). A valueOf may shrink the vector: re-read length.
+	if (sc.compare_fn.kind == AVM2_VALUE_UNDEFINED && (sc.options & 16))
 	{
-		sc.compare_fn = a0;
-	}
-	else
-	{
-		sc.options = avm2_coerce_to_u32(ctx, a0) & 0xFF;
+		for (uint32_t i = ext->length; i > 0; i--)
+		{
+			if (i - 1 < ext->length) avm2_sort_numeric_check(ctx, ext->elems[i - 1]);
+		}
 	}
 
 	uint32_t len = ext->length;
@@ -1240,6 +1305,43 @@ static Avm2Value vec_sort(Avm2Activation* act)
 	}
 	heap_free(ctx->app, items);
 	return act->this_val;
+}
+
+// AS3 trait `sort(comparefn)`: exactly one declared parameter, no default,
+// so any other count is #1063 raised by the CALL, before the method's own
+// frame exists (vector_sort_arguments: apply() is the top frame).
+static Avm2Value vec_sort(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Object* v = this_vector(act);
+	if (v == NULL) return avm2_undefined();
+	int spec = vec_spec_index(ctx, v);
+	if (act->argc != 1)
+	{
+		if (ctx->call_depth > 0
+		    && ctx->call_frames[ctx->call_depth - 1].method.fn == vec_sort)
+		{
+			avm2_callstack_pop(ctx);
+		}
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #1063: Argument count mismatch on %s(). "
+		                 "Expected 1, got %u.", VEC_SORT_FRAME[spec], act->argc);
+	}
+	uint32_t depth0 = ctx->call_depth;
+	avm2_callstack_rename_frame(ctx, vec_sort, VEC_SORT_FRAME[spec]);
+	avm2_callstack_push(ctx, &VEC_SORT_NATIVE_FRAME[spec], NULL);
+	Avm2Value r = vec_sort_impl(act, v, act->args[0]);
+	// A throw longjmps past this; the unwind resets call_depth.
+	ctx->call_depth = depth0;
+	return r;
+}
+
+// Vector.prototype.sort = function(comparefn) -- a lenient ES3 function.
+static Avm2Value vec_sort_proto(Avm2Activation* act)
+{
+	Avm2Object* v = this_vector(act);
+	if (v == NULL) return avm2_undefined();
+	return vec_sort_impl(act, v, arg_or_undef(act, 0));
 }
 
 // ---------------------------------------------------------------------------
@@ -1313,7 +1415,7 @@ static void vec_register_methods(Avm2Context* ctx, Avm2Class* cls)
 	avm2_proto_add_function(ctx, proto, "forEach", vec_for_each);
 	avm2_proto_add_function(ctx, proto, "filter", vec_filter);
 	avm2_proto_add_function(ctx, proto, "map", vec_map);
-	avm2_proto_add_function(ctx, proto, "sort", vec_sort);
+	avm2_proto_add_function(ctx, proto, "sort", vec_sort_proto);
 }
 
 void avm2_register_vector(Avm2Context* ctx)

@@ -50,7 +50,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | 16 | w2-avm1-devicefont | trace | trace-tail F: AVM1 device-font registry; fonts/device_font_name_case | session_018CoDi6nBjtTJ4GPXVQ2ife (17:59) |
 | 17 | w2-avm2-small-errors | trace | drift-avm2 S9 | session_018CoDi3zkCYHJCnpQGnoYp3 (18:20) |
 | 18 | w2-stack-trace-names | trace | drift-avm2 S7 | session_018CoDi3a6sipw1TH1D3Q1bY — LANDED (+2) |
-| 19 | w2-array-vector-args | trace | drift-avm2 S5 | session_018CoDi3UaEumY9kycvtZWDx (18:20) |
+| 19 | w2-array-vector-args | trace | drift-avm2 S5 | session_018CoDi3UaEumY9kycvtZWDx — LANDED (+5) |
 | 20 | w2-tf-css-avm2 | trace | AVM2 TextField format twins | session_018CoDi5BFztjYCFbFqJUhD8 — LANDED (+4 eff) |
 | 21 | w2-context3d-readback | both | drift-avm2 S4: drawToBitmapData + #3692 | session_018CoDi61VeqnzLTiyF5rwmk — LANDED (+3 trace, +1 px) |
 | 22 | w2-doc-removal-events | trace | drift-avm2 S8 | session_018CoDi7jBSFh59hTPEMaK7G (18:33) |
@@ -77,6 +77,7 @@ the CI rasterizer did not change (runner pin `08709f658` worked; WASM link-smoke
 | `995782154` | w2-context3d-readback | trace fail→pass (both modes): `avm2/context3d_draw_to_bitmap_data`, `avm2/stage3d_missing_vertex_stream` (KF, Flash-exact pass), `stage3d/draw_to_bitmap_data_unconfigured`; px fail→pass: `avm2/context3d_draw_to_bitmap_data` |
 | `9cf79e2fd` | w2-stack-trace-names | trace fail→pass (both modes): `avm2/error_stack_trace_class_names`, `avm2/error_stack_trace_limit`; 93-row `at`-frame sweep 0 other moves; pixels none |
 | `6f65d2115` | w2-tf-css-avm2 | trace (both modes): fail→pass `avm2/textfield_get_text_format_args`, `avm2/textfield_set_text_format_args`, `avm2/edittext_set_text_same`; fail→ruffle_matched `avm2/edittext_set_text_same_after_edits` (KF; Flash/Ruffle disagree, Flash-exact HOLD); pixels none (md5-only canary members added) |
+| (av) | w2-array-vector-args | trace fail→pass (both modes): `avm2/array_join_reentrant`, `avm2/vector_join_reentrant` (KF), `avm2/array_sort_arguments` (KF), `avm2/vector_sort_arguments` (KF), `avm2/array_constructor` (Flash-exact, avmplus source as oracle); 237-row sweep identical to CI; pixels none |
 
 ## Leads held for wave 2 (from delivered reports)
 - glyph-precision lead 1: per-line max ascent/descent for the AVM1 render pitch (`br_at_start`, `style_changes_in_html`).

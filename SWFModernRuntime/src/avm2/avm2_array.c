@@ -161,15 +161,28 @@ static Avm2Value array_set_length(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// Above this many elements a join falls back to walking element storage
+// only: FP would build a multi-gigabyte string of separators and die, and a
+// hang here is worse than a short answer. Never reached by a real movie.
+#define ARRAY_JOIN_MAX_LEN 0x1000000u
+
+// avmplus Array.as _join: `n = uint(o.length)` is read ONCE, after the
+// separator has been stringified, and `o[i]` is re-read for every i < n. A
+// toString that shrinks the array therefore yields empty strings for the
+// missing tail, and one that grows it does not extend the output
+// (avm2/array_join_reentrant). `ext` is re-derived each step: a reentrant
+// push may reallocate element storage.
 static const Avm2String* array_join_inner(Avm2Context* ctx, Avm2Object* arr,
                                           const Avm2String* sep)
 {
 	Avm2ArrayExt* ext = avm2_array_ext(arr);
+	uint32_t n = ext->length;
+	if (n > ARRAY_JOIN_MAX_LEN) n = ext->dense_len;
 	const Avm2String* out = avm2_string_from_literal(ctx, "");
-	for (uint32_t i = 0; i < ext->dense_len; i++)
+	for (uint32_t i = 0; i < n; i++)
 	{
 		if (i > 0) out = avm2_string_concat(ctx, out, sep);
-		Avm2Value v = resolve_hole(arr, i, ext->elems[i]);
+		Avm2Value v = resolve_hole(arr, i, avm2_array_get(arr, i));
 		if (v.kind == AVM2_VALUE_UNDEFINED || v.kind == AVM2_VALUE_NULL)
 		{
 			continue;
@@ -184,7 +197,8 @@ static Avm2Value array_join(Avm2Activation* act)
 	Avm2Context* ctx = act->ctx;
 	Avm2Object* arr = this_array(act);
 	if (arr == NULL) return avm2_string(avm2_string_from_literal(ctx, ""));
-	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
+	// The separator is stringified BEFORE length is read (a separator whose
+	// toString pushes is seen in the output; one that truncates yields "").
 	const Avm2String* sep;
 	if (act->argc > 0 && act->args[0].kind != AVM2_VALUE_UNDEFINED)
 	{
@@ -194,6 +208,7 @@ static Avm2Value array_join(Avm2Activation* act)
 	{
 		sep = avm2_string_from_literal(ctx, ",");
 	}
+	sealed_generic_read(act, arr, avm2_array_ext(arr)->length);
 	return avm2_string(array_join_inner(ctx, arr, sep));
 }
 
@@ -1008,6 +1023,19 @@ static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
 	uint32_t len = ext->dense_len;
 	sealed_generic_read(act, arr, ext->length);
 
+	// avmplus reads (and NUMERIC-checks) the elements from the last index
+	// down before allocating anything we would leak on the throw.
+	if (sc->field_count == 0 && sc->compare_fn.kind == AVM2_VALUE_UNDEFINED
+	    && (sc->options & 16))
+	{
+		for (uint32_t i = len; i > 0; i--)
+		{
+			if (i - 1 >= ext->dense_len) continue;  // a valueOf shrank it
+			avm2_sort_numeric_check(ctx, resolve_hole(arr, i - 1, ext->elems[i - 1]));
+		}
+		len = ext->dense_len;
+	}
+
 	// values = (index, hole-resolved value) — Ruffle extract_array_values.
 	SortItem* items = avm2_alloc(ctx, (len + 1) * sizeof(SortItem));
 	uint8_t* was_hole = avm2_alloc(ctx, len + 1);
@@ -1064,32 +1092,142 @@ static Avm2Value sort_apply(Avm2Activation* act, SortCtx* sc)
 	return act->this_val;
 }
 
-static Avm2Value array_sort(Avm2Activation* act)
+// ---------------------------------------------------------------------------
+// Flash's sort-argument decode (avmplus ArrayClass::generic_sort), shared
+// with Vector.sort (whose AS3 wrapper is `_sort(this, [comparefn])`).
+// ---------------------------------------------------------------------------
+
+// avmplus AvmCore::atomToErrorString, the cases a sort argument can hit:
+// strings quoted, a class object "Name$", a function "Function", an Array
+// (any subclass) "[]@addr", any other object "ns::Name@addr", primitives as
+// ToString (error_1034_debug_string pins the spellings).
+void avm2_sort_arg_error_str(Avm2Context* ctx, Avm2Value v, char* buf, int size)
+{
+	if (v.kind == AVM2_VALUE_STRING)
+	{
+		snprintf(buf, size, "\"%.*s\"",
+		         v.u.str->len > 100 ? 100 : (int) v.u.str->len, v.u.str->utf8);
+		return;
+	}
+	if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+	{
+		Avm2Object* o = v.u.obj;
+		char cq[160];
+		if (o->kind == AVM2_OBJ_CLASS && o->class_ref != NULL)
+		{
+			avm2_class_qname_colons_buf(o->class_ref, cq, sizeof(cq));
+			snprintf(buf, size, "%s$", cq);
+			return;
+		}
+		if (o->kind == AVM2_OBJ_FUNCTION)
+		{
+			snprintf(buf, size, "Function");
+			return;
+		}
+		if (o->kind == AVM2_OBJ_ARRAY)
+		{
+			snprintf(buf, size, "[]@00000000000");
+			return;
+		}
+		avm2_class_qname_colons_buf(avm2_value_class(ctx, v), cq, sizeof(cq));
+		snprintf(buf, size, "%s@00000000000", cq);
+		return;
+	}
+	const Avm2String* str = avm2_coerce_to_string(ctx, v);
+	snprintf(buf, size, "%.*s", str->len > 100 ? 100 : (int) str->len, str->utf8);
+}
+
+_Noreturn static void sort_throw_1034(Avm2Context* ctx, Avm2Value v, const char* to)
+{
+	char dbg[200];
+	avm2_sort_arg_error_str(ctx, v, dbg, sizeof(dbg));
+	avm2_throw_error(ctx, ctx->builtins.type_error_class,
+	                 "Error #1034: Type Coercion failed: cannot convert %s to %s.",
+	                 dbg, to);
+}
+
+static int sort_is_number(Avm2Value v)
+{
+	return v.kind == AVM2_VALUE_INTEGER || v.kind == AVM2_VALUE_NUMBER;
+}
+
+// sort()                      -> default
+// sort(fn [, options:Number]) -> fn must coerce to Function; a second
+//                                argument that is not a Number is #1034
+// sort(options:Number, ...)   -> AvmCore::integer(options); the rest ignored
+// sort(anything else, ...)    -> #1034 "... to Function"
+// No valueOf/toString is ever called on an argument.
+void avm2_sort_decode_args(Avm2Context* ctx, const Avm2Value* args, uint32_t argc,
+                           Avm2Value* compare_fn, uint32_t* options)
+{
+	*compare_fn = avm2_undefined();
+	*options = 0;
+	if (argc == 0) return;
+	Avm2Value a0 = args[0];
+	if (a0.kind == AVM2_VALUE_OBJECT && a0.u.obj != NULL)
+	{
+		if (a0.u.obj->kind != AVM2_OBJ_FUNCTION) sort_throw_1034(ctx, a0, "Function");
+		*compare_fn = a0;
+		if (argc >= 2)
+		{
+			if (!sort_is_number(args[1])) sort_throw_1034(ctx, args[1], "Number");
+			*options = (uint32_t) avm2_coerce_to_i32(ctx, args[1]);
+		}
+		return;
+	}
+	if (sort_is_number(a0))
+	{
+		*options = (uint32_t) avm2_coerce_to_i32(ctx, a0);
+		return;
+	}
+	sort_throw_1034(ctx, a0, "Function");
+}
+
+// avmplus ArraySort's constructor: for a NUMERIC sort with no comparator,
+// every element (read from the LAST index down) that is not a Number and
+// whose Number() is NaN throws #1034 "... to Number" before anything moves.
+// Ruffle does not do this (array_sort_arguments / vector_sort_arguments
+// known_failure notes); Flash does, in every SWF version. Callers loop.
+void avm2_sort_numeric_check(Avm2Context* ctx, Avm2Value v)
+{
+	if (sort_is_number(v)) return;
+	if (isnan(avm2_coerce_to_number(ctx, v))) sort_throw_1034(ctx, v, "Number");
+}
+
+// FP's frames for Array.sort: the AS3 trait (builtin namespace) calls the
+// private native static `_sort` -- "Array$/_sort()" over
+// "Array/http://adobe.com/AS3/2006/builtin::sort()". Both stay on the stack
+// for the whole sort, so a throwing comparator reports them too.
+static const Avm2MethodRef ARRAY_SORT_NATIVE_FRAME = { NULL, NULL, "Array$/_sort", 0, 0 };
+
+static Avm2Value array_sort_impl(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
 	SortCtx sc;
 	memset(&sc, 0, sizeof(sc));
 	sc.act = act;
-	sc.compare_fn = avm2_undefined();
-	if (act->argc > 1)
-	{
-		sc.compare_fn = act->args[0];
-		sc.options = avm2_coerce_to_u32(ctx, act->args[1]) & 0xFF;
-	}
-	else if (act->argc == 1)
-	{
-		if (act->args[0].kind == AVM2_VALUE_OBJECT
-		    && (act->args[0].u.obj->kind == AVM2_OBJ_FUNCTION
-		        || act->args[0].u.obj->kind == AVM2_OBJ_CLASS))
-		{
-			sc.compare_fn = act->args[0];
-		}
-		else
-		{
-			sc.options = avm2_coerce_to_u32(ctx, act->args[0]) & 0xFF;
-		}
-	}
+	avm2_sort_decode_args(ctx, act->args, act->argc, &sc.compare_fn, &sc.options);
+	sc.options &= 0xFF;
 	return sort_apply(act, &sc);
+}
+
+static Avm2Value array_sort(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	uint32_t depth0 = ctx->call_depth;
+	avm2_callstack_rename_frame(ctx, array_sort,
+	                            "Array/http://adobe.com/AS3/2006/builtin::sort");
+	avm2_callstack_push(ctx, &ARRAY_SORT_NATIVE_FRAME, NULL);
+	Avm2Value r = array_sort_impl(act);
+	// A throw longjmps past this; the unwind resets call_depth.
+	ctx->call_depth = depth0;
+	return r;
+}
+
+// Array.prototype.sort (the ES3 layer): same semantics, no AS3-trait frame.
+static Avm2Value array_sort_proto(Avm2Activation* act)
+{
+	return array_sort_impl(act);
 }
 
 static Avm2Value array_sort_on(Avm2Activation* act)
@@ -1164,26 +1302,73 @@ static Avm2Value array_sort_on(Avm2Activation* act)
 // Shared by array_construct and array_super_init, so a SWF subclass's
 // `super(length)` behaves exactly like `new Array(length)`
 // (as3/Array/length_mods's Subarray passes its ctor arg straight through).
+// FP's Array constructor is AS3 (playerglobal Array.as):
+//   if (n == 1 && args[0] is Number) {
+//       var ulen:uint = dlen;
+//       if (ulen != dlen) Error.throwError(RangeError, 1005, dlen);
+//       length = ulen;
+//   } else { length = n; for (i < n) this[i] = args[i]; }
+// so the RangeError carries "Error$/throwError()" over "Array()", and
+// `length = ...` is a VIRTUAL property write: a subclass that overrides
+// `set length` sees it (with the elements still unset), between the
+// "Array()" frame and its own constructor frame (avm2/array_constructor).
+static const Avm2MethodRef ARRAY_CTOR_FRAME = { NULL, NULL, "Array", 0, 0 };
+
+static uint32_t array_ctor_length_arg(Avm2Context* ctx, Avm2Value a)
+{
+	double d = avm2_coerce_to_number(ctx, a);
+	uint32_t n = avm2_coerce_to_u32(ctx, a);
+	if ((double) n != d)
+	{
+		avm2_callstack_push_throwerror(ctx);
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #1005: Array index is not a positive integer (%s).",
+		                 avm2_string_cstr(ctx, avm2_coerce_to_string(ctx, a)));
+	}
+	return n;
+}
+
+// A subclass override of `set length` (anything but our own native setter).
+static int array_length_setter_overridden(Avm2Object* obj)
+{
+	if (obj->vtable == NULL) return 0;
+	const Avm2PropEntry* e = avm2_vtable_find_public(obj->vtable, "length", 6);
+	if (e == NULL) return 0;
+	if (e->kind != AVM2_PROP_SETTER && e->kind != AVM2_PROP_GETSET) return 0;
+	return e->setter.fn != array_set_length || e->setter.file != NULL;
+}
+
 static void array_init_ctor_args(Avm2Context* ctx, Avm2Object* obj,
                                  const Avm2Value* args, uint32_t argc)
 {
+	uint32_t depth0 = ctx->call_depth;
+	avm2_callstack_push(ctx, &ARRAY_CTOR_FRAME, NULL);
+	int virt = array_length_setter_overridden(obj);
 	if (argc == 1 && avm2_value_is_number(args[0]))
 	{
-		double d = avm2_coerce_to_number(ctx, args[0]);
-		uint32_t n = (uint32_t) d;
-		if ((double) n != d)
+		uint32_t n = array_ctor_length_arg(ctx, args[0]);
+		if (virt)
 		{
-			avm2_throw_error(ctx, ctx->builtins.range_error_class,
-			                 "Error #1005: Array index is not a positive integer (%s).",
-			                 avm2_string_cstr(ctx, avm2_coerce_to_string(ctx, args[0])));
+			avm2_set_public_property(ctx, avm2_object_value(obj), "length", 6,
+			                         avm2_uint_value(n));
 		}
-		avm2_array_set_length(ctx, obj, n);
+		else
+		{
+			avm2_array_set_length(ctx, obj, n);
+		}
+		ctx->call_depth = depth0;
 		return;
+	}
+	if (virt)
+	{
+		avm2_set_public_property(ctx, avm2_object_value(obj), "length", 6,
+		                         avm2_uint_value(argc));
 	}
 	for (uint32_t i = 0; i < argc; i++)
 	{
 		avm2_array_set(ctx, obj, i, args[i]);
 	}
+	ctx->call_depth = depth0;
 }
 
 static Avm2Value array_construct(Avm2Context* ctx, Avm2Class* cls,
@@ -1192,14 +1377,10 @@ static Avm2Value array_construct(Avm2Context* ctx, Avm2Class* cls,
 	(void) cls;
 	if (argc == 1 && avm2_value_is_number(args[0]))
 	{
-		double d = avm2_coerce_to_number(ctx, args[0]);
-		uint32_t n = (uint32_t) d;
-		if ((double) n != d)
-		{
-			avm2_throw_error(ctx, ctx->builtins.range_error_class,
-			                 "Error #1005: Array index is not a positive integer (%s).",
-			                 avm2_string_cstr(ctx, avm2_coerce_to_string(ctx, args[0])));
-		}
+		uint32_t depth0 = ctx->call_depth;
+		avm2_callstack_push(ctx, &ARRAY_CTOR_FRAME, NULL);
+		uint32_t n = array_ctor_length_arg(ctx, args[0]);
+		ctx->call_depth = depth0;
 		return avm2_object_value(avm2_array_new(ctx, n));
 	}
 	return avm2_object_value(avm2_array_from_values(ctx, args, argc));
@@ -1305,7 +1486,7 @@ void avm2_register_array(Avm2Context* ctx)
 	avm2_proto_add_function_n(ctx, proto, "shift", array_shift, 0);
 	avm2_proto_add_function_n(ctx, proto, "slice", array_slice, 2);
 	avm2_proto_add_function_n(ctx, proto, "some", array_some, 2);
-	avm2_proto_add_function_n(ctx, proto, "sort", array_sort, 0);
+	avm2_proto_add_function_n(ctx, proto, "sort", array_sort_proto, 0);
 	avm2_proto_add_function_n(ctx, proto, "sortOn", array_sort_on, 2);
 	avm2_proto_add_function_n(ctx, proto, "splice", array_splice, 0);
 	avm2_proto_add_function_n(ctx, proto, "toLocaleString", array_to_locale_string, 0);

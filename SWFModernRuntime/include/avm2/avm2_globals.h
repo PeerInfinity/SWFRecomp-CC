@@ -374,6 +374,12 @@ int avm2_vector_name_access(Avm2Context* ctx, Avm2Object* obj, const char* name,
 typedef struct Avm2SortItem { uint32_t idx; Avm2Value v; } Avm2SortItem;
 typedef int (*Avm2SortCmp)(void* ud, const Avm2SortItem* a, const Avm2SortItem* b);
 void avm2_avmplus_qsort(void* ud, Avm2SortCmp cmp, Avm2SortItem* s, uint32_t n);
+// Flash's generic_sort argument decode + NUMERIC pre-check + #1034 value
+// spelling, shared by Array.sort and Vector.sort (avm2_array.c).
+void avm2_sort_decode_args(Avm2Context* ctx, const Avm2Value* args, uint32_t argc,
+                           Avm2Value* compare_fn, uint32_t* options);
+void avm2_sort_numeric_check(Avm2Context* ctx, Avm2Value v);
+void avm2_sort_arg_error_str(Avm2Context* ctx, Avm2Value v, char* buf, int size);
 
 // EventDispatcher instance state (Avm2Object.native_ext). ed_target is the
 // EventDispatcher(target) constructor arg (the IEventDispatcher aggregation
