@@ -19,16 +19,25 @@ handshake sent).
 | 1 | w1-drift-avm2 | trace | 3 new upstream AVM2 rows (ShaderJob 1/2-channel, recreateTextLine width, LC allowNetworking) | session_018CoDi6J5YQJTWUQrMyZKvW — DELIVERED; prototype LANDED directly `1a10f176e` (+2: `pixelbender_shaderjob_output_channels`, `textblock_recreate_text_line_width`; LC row drift already passing; 0 riders/53, both modes; touches recompiler + browser-shared header → Pages dry run at grading) |
 | 2 | w1-textfield-vn | trace | gnash TextField-v6/7/8 plan of record (13 phases) + edittext_set_text_same pair | session_018CoDi6KKD2sWxiZX1qXQHn |
 | 3 | w1-avm1-proto-timeline | trace | loaded-root goto routing, TextFormat accessors, attach L4/L5/L2 (oracles in hand) | session_018CoDi7npxwH9NpjHNi23Dm |
-| 4 | w1-avm1-filters-complete | both | AVM1 PO3 multi-filter, getter depth, CM/Convolution/DM, dynamic-root bitmaps/text | session_018CoDi7rZSo5uSZfocqWxZk |
+| 4 | w1-avm1-filters-complete | both | AVM1 PO3 multi-filter, getter depth, CM/Convolution/DM, dynamic-root bitmaps/text | session_018CoDi7rZSo5uSZfocqWxZk — DELIVERED; 0 corpus flips (game-visibility family); prototype items 1+2+3a+4 ORACLE-CONFIRMED locally (dyn_ABD Ruffle render == prototype render; l1 nested == root) → w2-avm1-filters + w2-dynclip-cxform |
 | 5 | w1-pixel-nearpass | pixel | ~17 small-excess comparisons | session_018CoDi459cXj5v4ThUCiZ74 |
-| 6 | w1-pixel-text | pixel | acid-text*, captions, hardwrap, stylesheet, edittext device transform/gutter, static_text_offstage (c), acid-color-0 | session_018CoDi7WfMsx8cJhBoubZ9c |
-| 7 | w1-pixel-blend-mask | pixel | layer_alpha/erase, masks, colortransform, place_object_test, bitmapbuttons | session_018CoDi3WCycTC59VRC5FWW5 |
+| 6 | w1-pixel-text | pixel | acid-text*, captions, hardwrap, stylesheet, edittext device transform/gutter, static_text_offstage (c), acid-color-0 | session_018CoDi7WfMsx8cJhBoubZ9c — DELIVERED; prototype LANDED directly `20cd63b32` (+3 px: `edittext_device_transform_basic`, `_negative`, `edittext_gutter`; firing probe 116 tests) → w2-acid-text-kerning; button-bound EditText (`String_path_variable_button`) HELD until n-play-game lands |
+| 7 | w1-pixel-blend-mask | pixel | layer_alpha/erase, masks, colortransform, place_object_test, bitmapbuttons | session_018CoDi3WCycTC59VRC5FWW5 — DELIVERED; prototype LANDED directly `ee9ea8738` (+3 px: `layer_alpha`, `layer_erase`, `bitmapdata_colortransform`; canary 164/164; s21 layer NO-GO refuted) → w2-avm2-layer-groups, w2-netstream-flv-screen, w2-acid-morph-gradient |
 | 8 | w1-pixel-drawing | both | drawing API, strokes, bitmap fills, dithering; DrawingApiTest hitTest plan | session_018CoDi7j4VX9FRpURSWw5EY |
 
 ## Wave 2 (implementation, cloud)
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
+| (landed direct) w1-drift-avm2 prototype | w1-drift-avm2 | trace `pixelbender_shaderjob_output_channels`, `textblock_recreate_text_line_width` (+2) | — |
+| (landed direct) w1-pixel-blend-mask prototype | w1-pixel-blend-mask 1+2 | px `layer_alpha`, `layer_erase`, `bitmapdata_colortransform` (+3) | — |
+| (landed direct) w1-pixel-text prototype | w1-pixel-text A+B | px `edittext_device_transform_basic`, `edittext_device_transform_negative`, `edittext_gutter` (+3) | — |
+| w2-avm1-filters | w1-avm1-filters-complete 1+2+3a+4 (+XS side bugs) | 0 corpus; new `regression/avm1_runtime_filters_cm_bitmap`, `avm1_nested_po3_filters` | |
+| w2-dynclip-cxform | w1-avm1-filters-complete 5+3b | 0 corpus expected; new `regression/avm1_dynclip_color_transform` | |
+| w2-acid-text-kerning | w1-pixel-text C | px `acid-text` (likely, unmeasured) | |
+| w2-netstream-flv-screen | w1-pixel-blend-mask L1 | px `netstream_play_flv_screen` (possible; ignored row → prune) | |
+| w2-avm2-layer-groups | w1-pixel-blend-mask L4+L5 | 0 corpus; fixtures | |
+| w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | |
 
 ## Grading runs
 

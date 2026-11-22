@@ -1,0 +1,5 @@
+**`from_shumway/acid/acid-morph`: gradient content offset ~2-3 px inside morph fills.** From `w1-pixel-blend-mask` lead L2 (report on master; verdict row 8). The silhouettes match (XOR 1350 px). The diff is INSIDE the gradient fills: best-fit translation +3.25 px on the radial ellipse (morph 1), +2.3 px on the linear polygon. Baseline 31977 / 4022 against limits 5600 / 2600.
+
+1. Which ratio each depth shows at tick 30: depth 4 is replaced by static `DefineShape4` 6 on frame 30; depth 3 stays at ratio 63276. Check our DefineMorphShape gradient-MATRIX interpolation (start/end gradient matrices lerped per ratio, then the shape transform), Ruffle `core/src/display_object/morph_shape.rs` + `render/src/shape_utils.rs` lerp, and our recompiler/runtime morph path (`SWFRecomp` morph emission, runtime morph render).
+2. Price; prototype if cheap; measure CI-grade (prove fidelity first). Re-price against the limits.
+3. Sweep: every morph row with an image (`from_gnash/morph_test1` is a near-pass at 217 owned by `w1-pixel-nearpass`; give it as an A/B only), `visual/*morph*`, shumway morph rows, and the render canary.
