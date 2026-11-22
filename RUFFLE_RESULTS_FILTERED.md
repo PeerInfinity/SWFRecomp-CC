@@ -12,7 +12,7 @@
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 4 | 5 | 80.0% | [details](ruffle-tests/tests/swfs/audio/_results/results_filtered.md) |
-| avm1 | 732 | 762 | 96.1% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
+| avm1 | 732 | 764 | 95.8% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
 | avm2 | 1272 | 1297 | 98.1% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
 | fonts | 8 | 9 | 88.9% | [details](ruffle-tests/tests/swfs/fonts/_results/results_filtered.md) |
 | from_avmplus | 1533 | 1572 | 97.5% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_filtered.md) |
@@ -31,16 +31,16 @@
 | text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
 | timeline | 14 | 17 | 82.4% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
 | visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
-| **Total** | **4375** | **4630** | **94.5%** | |
+| **Total** | **4375** | **4632** | **94.5%** | |
 
-*70 tests ignored.*
+*68 tests ignored.*
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | audio | 18 | 24 | 75.0% |
-| avm1 | 115,757 | 119,324 | 97.0% |
+| avm1 | 115,787 | 119,408 | 97.0% |
 | avm2 | 157,004 | 158,449 | 99.1% |
 | fonts | 363 | 377 | 96.3% |
 | from_avmplus | 85,556 | 85,970 | 99.5% |
@@ -59,14 +59,14 @@
 | text | 979 | 979 | 100% |
 | timeline | 365 | 371 | 98.4% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **399,893** | **408,305** | **97.9%** |
+| **Total** | **399,923** | **408,389** | **97.9%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | ruffle_matched |
 |-------|-----------------:|----------------:|
 | audio | 1 | - |
-| avm1 | 13 | 17 |
+| avm1 | 15 | 17 |
 | avm2 | 5 | 20 |
 | fonts | - | 1 |
 | from_avmplus | - | 39 |
@@ -85,7 +85,7 @@
 | text | - | - |
 | timeline | - | 3 |
 | visual | - | 2 |
-| **Total** | **33** | **222** |
+| **Total** | **35** | **222** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -101,6 +101,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | from_gnash/actionscript.all | TextField-v6 | 86% |
 | from_gnash/actionscript.all | TextField-v8 | 84% |
 | from_gnash/actionscript.all | TextField-v7 | 84% |
+| avm1 | load_vars | 83% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test11 | 81% |
 
 ## Flash-Spec Results
@@ -122,10 +123,10 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm1
 
-- **Pass:** 732/762 (96.1%)
-- **Ignored:** 18 tests
+- **Pass:** 732/764 (95.8%)
+- **Ignored:** 16 tests
 - **Duration:** 1h02m25s across 30 shards
-- **Lines:** 115,757/119,324 matching (97.0%)
+- **Lines:** 115,787/119,408 matching (97.0%)
 - **Avg test duration:** 4.8s — slowest: `define_font_glyph_table_order` (35.7s)
 
 ### avm2
