@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-21T20:48:10.409864+00:00",
+    "timestamp": "2026-11-22T01:00:19.349232+00:00",
     "suite": "visual",
     "stem": "results_graphics",
-    "git_sha": "9a970370e096ca421802a4616b7acb9f32972031",
+    "git_sha": "ff2e2e9d6056e453af28144eec6ec644b5eda852",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "44944147057",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/44944147057",
+    "run_id": "44965247383",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/44965247383",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 148,
   "comparisons": 241,
   "ignored": 2,
-  "pass": 223,
-  "fail": 18,
+  "pass": 224,
+  "fail": 17,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 3,
   "ruffle_matched_fail": 1,
-  "pass_rate": 92.5,
+  "pass_rate": 92.9,
   "results": [
     {
       "suite": "visual",
@@ -4469,30 +4469,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 24876 outliers exceed limit of 0, max difference 76",
-      "reason": "pixel_mismatch",
-      "max_diff": 76,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 1",
+      "max_diff": 1,
       "expected_source": "repo",
       "width": 550,
       "height": 250,
       "total_channels": 550000,
-      "diff_channels": 65376,
-      "mean_diff": 2.1816,
+      "diff_channels": 1620,
+      "mean_diff": 0.0029,
       "checks": [
         {
           "tolerance": 1,
           "max_outliers": 0,
-          "outliers": 24876,
-          "passed": false
+          "outliers": 0,
+          "passed": true
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 1,
-      "outliers": 24876,
+      "failed_checks": 0,
+      "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
-      "excess_outliers": 24876
+      "excess_outliers": 0
     },
     {
       "suite": "visual",
