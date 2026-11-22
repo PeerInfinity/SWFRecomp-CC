@@ -1,6 +1,6 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 1281/1336 passing | Graphics: 1282/1338 passing
+Trace: 1281/1336 passing | Graphics: 1285/1339 passing
 
 ## Graphics Regressions (0 tests)
 
