@@ -38,3 +38,4 @@ Parallel LOCAL one-task session: `n-perf-ab` (Windows real-GPU frame-rate A/B of
 |---|---|---|---|
 | 44972916356 | graphics / full / no | 336749f14 (native-proto) | trace 4589 → 4591 (+2) on 4655, ledger exact (`lazy_prototype_shared`, `video_prototype_lazy`); 0 regressions |
 | 44976721092 | graphics / full / no | 292d0121f (avm1-tail +5, textformat-ctor +1, 2 new fixtures) | trace 4591 → 4597 (+6) on 4655, ledger exact by name (amf0_array_matrix, load_vars, localconnection_serialize_sparse_array_getters, localconnection_xml_unavailable, stylesheet_load, text_format_get_text_extent_own); new regression/avm1_xml(node)_first_action_proto pass; 0 regressions |
+| 44979572176 | graphics / full / **images** | 3f803679d (netstream-sound, text-pitch, bitmap-encode-shader, small-natives, n-perf 10b5dff69) | pending |
