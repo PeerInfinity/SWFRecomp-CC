@@ -37,7 +37,7 @@ handshake sent).
 | w2-avm1-filters | w1-avm1-filters-complete 1+2+3a+4 (+XS side bugs) | 0 corpus; new `regression/avm1_runtime_filters_cm_bitmap`, `avm1_nested_po3_filters` | session_018CoDi6SmBg5ngKPi9f1Fi1 |
 | w2-dynclip-cxform | w1-avm1-filters-complete 5+3b | 0 corpus expected; new `regression/avm1_dynclip_color_transform` | session_018CoDi86KRFXMH7buLiVYv9 |
 | w2-acid-text-kerning | w1-pixel-text C | px `acid-text` (likely, unmeasured) | session_018CoDi5bPZfEpmUKXk6hibE |
-| w2-netstream-flv-screen | w1-pixel-blend-mask L1 | px `netstream_play_flv_screen` (possible; ignored row → prune) | session_018CoDi3Vyahsk5YixoaurwN |
+| w2-netstream-flv-screen | w1-pixel-blend-mask L1 | px `netstream_play_flv_screen` (possible; ignored row → prune) | session_018CoDi3Vyahsk5YixoaurwN  — DELIVERED, LANDED (+1 px; cause = timer.c method-form MC receiver `this`, game-visible; RVF entry refuted + removed; fixture held: exporter never fires timers) |
 | w2-avm2-layer-groups | w1-pixel-blend-mask L4+L5 | 0 corpus; fixtures | session_018CoDi4yHAmxMG1pYf1JQnB — DELIVERED, LANDED `a281b60d4` (exact nested child layer + AVM2 port; 6 fixtures, all goldens confirmed vs local Ruffle exporter; canary 171/171) |
 | w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | session_018CoDi5kNpLqLbTbXGooXKw — DELIVERED, LANDED `78f15f639` (+1 px `acid-morph`; premise refuted: recompiler morph ramp over-emitted rows; generated C identical for 122 SWFs). NB commit trailer carries the worker's session URL by mistake |
 | w2-nearpass-land | w1-pixel-nearpass D+A+C+S+B | px +6 (+1 if B finishes) | session_018CoDi6T6H97ToTZbb3Tbeb |
