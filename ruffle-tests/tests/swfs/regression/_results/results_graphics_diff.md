@@ -1,28 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `2f7be1710fed` (2026-11-22T20:05:56.629885+00:00)
-**Current:** `9e24c763ca3a` (2026-11-22T20:56:27.273707+00:00)
+**Previous:** `9e24c763ca3a` (2026-11-22T20:56:27.273707+00:00)
+**Current:** `485eb555c3f9` (2026-11-22T21:58:22.700458+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 114 | 124 | +10 |
-| Total | 114 | 124 | +10 |
+| Passing | 124 | 127 | +3 |
+| Total | 124 | 127 | +3 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-## Added Tests (10)
+## Added Tests (3)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `avm1_array_generic_receivers` | pass | 16/16 |
-| `avm1_attached_clip_tagorder_po3` | pass | 34/34 |
-| `avm1_attached_clip_tagorder_ratio` | pass | 34/34 |
-| `avm1_closure_base_clip_root_frame` | pass | 5/5 |
-| `avm2_layer_group_alpha` | pass | 0/0 |
-| `avm2_layer_group_erase` | pass | 0/0 |
-| `avm2_layer_group_overlap_alpha` | pass | 0/0 |
-| `layer_group_in_add_alpha` | pass | 0/0 |
-| `layer_group_overlap_alpha` | pass | 0/0 |
-| `layer_group_overlap_erase` | pass | 0/0 |
+| `avm1_dynclip_color_transform` | pass | 2/2 |
+| `avm1_nested_po3_filters` | pass | 12/12 |
+| `avm1_runtime_filters_cm_bitmap` | pass | 5/5 |
