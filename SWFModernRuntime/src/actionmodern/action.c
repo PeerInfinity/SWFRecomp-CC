@@ -40770,11 +40770,19 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		// inert HERE (the guarded empty-stack pop already synthesized
 		// undefined; A/B-verified identical), locked rather than repro'd by
 		// regression/enterframe_type1_args.
+		// s25 w2-avm1-with-scope: the type-1 frame also binds `this` = the
+		// receiver clip by name (INV_BIND_THIS). Without it a type-1 body's
+		// GetVariable("this") found no this-stack entry and fell back to the
+		// closure base clip (the DEFINING timeline), so `delete
+		// this.onEnterFrame` inside `a.onEnterFrame` deleted _root's slot and
+		// the handler kept firing (gnash DrawingApiTest.as:281; Ruffle passes
+		// the receiver as `this` to every Avm1Function kind). Lexical, so a
+		// nested call's own `this` is unaffected.
 		u32 _ef_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
 		if (func->function_type == 2)
 			_ef_flags |= INV_MC_THIS_NULL_PTR;
 		else
-			_ef_flags |= INV_LOCAL_SCOPE;
+			_ef_flags |= INV_LOCAL_SCOPE | INV_BIND_THIS;
 		InvokeOpts _ef_opts = { .flags = _ef_flags };
 		g_call_depth++;
 		invokeFunctionValue(app_context, func, &_ef_this, NULL, 0, &_ef_opts);
@@ -65897,6 +65905,44 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	return 0; // Not recognized
 }
 
+// s25 w2-avm1-with-scope: innermost `with` target that a bare MovieClip
+// method name resolves on. A with-scope MovieClip answers (its prototype has
+// every MovieClip method); a with-scope plain object only shadows when it
+// carries the name itself, in which case the caller keeps its own path.
+static MovieClip* cfWithScopeMethodTarget(const char* name, u32 name_len)
+{
+	for (int _s = (int)scope_depth - 1; _s >= 0; _s--) {
+		if (!scope_is_with[_s]) continue;
+		if (scope_mc[_s] != NULL) return scope_mc[_s];
+		if (scope_chain[_s] != NULL &&
+		    findPropertyStructWithPrototype(scope_chain[_s], name, name_len) != NULL)
+			return NULL;
+	}
+	return NULL;
+}
+
+// Re-push a popped CallFunction's args as a CallMethod on `target` and run
+// actionCallMethod's MOVIECLIP arm (same stack synthesis as the bare
+// getBounds/hitTest arm below). Frees `args`.
+static void cfDelegateToMCMethod(SWFAppContext* app_context, char* str_buffer,
+	MovieClip* target, const char* name, u32 name_len, ActionVar* args, u32 num_args)
+{
+	for (int _i = (int)num_args - 1; _i >= 0; _i--)
+		pushVar(app_context, &args[_i]);
+	if (args != NULL) FREE(args);
+	// The arg count goes up as an F64 written with memcpy: a float store
+	// through VAL(float, &u64_field) followed by pushVar's u64 read is a
+	// strict-aliasing violation that gcc -O2 drops, so the callee popped
+	// num_args = 0 (this is why the bare hitTest arm below saw no args).
+	double _nd = (double)num_args;
+	u64 _nbits;
+	memcpy(&_nbits, &_nd, sizeof(_nbits));
+	PUSH(ACTION_STACK_VALUE_F64, _nbits);
+	PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target);
+	PUSH_STR(name, name_len);
+	actionCallMethod(app_context, str_buffer);
+}
+
 void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 {
 	if (g_execution_halted) return;
@@ -67178,6 +67224,18 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// createEmptyMovieClip(name, depth) — MovieClip method called as CallFunction
 	else if (func_name_len == 20 && strncmp(func_name, "createEmptyMovieClip", 20) == 0)
 	{
+		// Inside `with (clip)` the bare name resolves through the with-scope
+		// to MovieClip.prototype.createEmptyMovieClip with `this = clip`, so
+		// the new child belongs to that clip, not to the timeline (gnash
+		// misc-ming.all/DrawingApiTest.as:203/235: `with (a) {
+		// createEmptyMovieClip("x", 20) }` makes `a.x`, which then shadows
+		// the timeline variable `x`). Delegate to the CallMethod arm.
+		MovieClip* _cemc_with = cfWithScopeMethodTarget(func_name, func_name_len);
+		if (_cemc_with != NULL && g_swf_version >= 6) {
+			cfDelegateToMCMethod(app_context, str_buffer, _cemc_with,
+				func_name, func_name_len, args, num_args);
+			return;
+		}
 		// createEmptyMovieClip was introduced in SWF6 — in SWF5 resolution
 		// should leave the function undefined, not invoke this builtin.
 		if (g_swf_version < 6) {
@@ -67743,24 +67801,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		else if (func_name_len == 7 && strncmp(func_name, "hitTest", 7) == 0) _bm_match = 1;
 		if (_bm_match)
 		{
-			// Re-push args (in reverse-of-popped order) so actionCallMethod's
-			// popVar restores args[0..N-1] to the same indices we have.
-			for (int _bm_i = (int)num_args - 1; _bm_i >= 0; _bm_i--)
-				pushVar(app_context, &args[_bm_i]);
-			if (args != NULL) FREE(args);
-			ActionVar _bm_n = {0};
-			_bm_n.type = ACTION_STACK_VALUE_F32;
-			VAL(float, &_bm_n.data.numeric_value) = (float)num_args;
-			pushVar(app_context, &_bm_n);
 			// s25 w1-pixel-drawing PROTOTYPE: inside `with (clip)` the WITH
 			// object is searched first (gnash DrawingApiTest:126 `with (a) {
 			// hitTest(...) }`), so the bare call targets that clip.
 			MovieClip* _bm_target = g_current_context;
 			for (int _s = (int)scope_depth - 1; _s >= 0; _s--)
 				if (scope_is_with[_s] && scope_mc[_s] != NULL) { _bm_target = scope_mc[_s]; break; }
-			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_bm_target);
-			PUSH_STR(func_name, func_name_len);
-			actionCallMethod(app_context, str_buffer);
+			// s25 w2-avm1-with-scope: shared re-push (the old inline copy
+			// stored the arg count through a strict-aliasing float pun that
+			// gcc -O2 dropped, so the MOVIECLIP arm always saw 0 args).
+			cfDelegateToMCMethod(app_context, str_buffer, _bm_target,
+				func_name, func_name_len, args, num_args);
 			return;
 		}
 	}
@@ -77590,6 +77641,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 										// Test fill triangles
 										for (u32 _hdv = 0; _hdv + 5 < _hdpath->fill_vert_count * 2 && !hit; _hdv += 6) {
 											float* fv = &_hdpath->fill_verts[_hdv];
+											// s25 w2-avm1-with-scope: a zero-area triangle (a hairline's
+											// width-0 stroke quad, a collapsed cap) has d1=d2=d3=0 for
+											// every point on its supporting line, which the sign test
+											// below reads as inside: `a.hitTest(376, 180, true)` hit the
+											// 220..280 hairline at y=180 (gnash DrawingApiTest.as:125).
+											if (fabs(((double)fv[2] - fv[0]) * ((double)fv[5] - fv[1]) -
+											         ((double)fv[4] - fv[0]) * ((double)fv[3] - fv[1])) < 1e-9) continue;
 											double d1 = (ltx - (double)fv[2]) * ((double)fv[1] - (double)fv[3]) - ((double)fv[0] - (double)fv[2]) * (lty - (double)fv[3]);
 											double d2 = (ltx - (double)fv[4]) * ((double)fv[3] - (double)fv[5]) - ((double)fv[2] - (double)fv[4]) * (lty - (double)fv[5]);
 											double d3 = (ltx - (double)fv[0]) * ((double)fv[5] - (double)fv[1]) - ((double)fv[4] - (double)fv[0]) * (lty - (double)fv[1]);
@@ -77599,6 +77657,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 										// Test line triangles
 										for (u32 _hdv = 0; _hdv + 5 < _hdpath->line_vert_count * 2 && !hit; _hdv += 6) {
 											float* lv = &_hdpath->line_verts[_hdv];
+											if (fabs(((double)lv[2] - lv[0]) * ((double)lv[5] - lv[1]) -
+											         ((double)lv[4] - lv[0]) * ((double)lv[3] - lv[1])) < 1e-9) continue;  // zero-area: see above
 											double d1 = (ltx - (double)lv[2]) * ((double)lv[1] - (double)lv[3]) - ((double)lv[0] - (double)lv[2]) * (lty - (double)lv[3]);
 											double d2 = (ltx - (double)lv[4]) * ((double)lv[3] - (double)lv[5]) - ((double)lv[2] - (double)lv[4]) * (lty - (double)lv[5]);
 											double d3 = (ltx - (double)lv[0]) * ((double)lv[5] - (double)lv[1]) - ((double)lv[4] - (double)lv[0]) * (lty - (double)lv[1]);
