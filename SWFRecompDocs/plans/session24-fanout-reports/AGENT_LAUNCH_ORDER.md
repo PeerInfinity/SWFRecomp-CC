@@ -36,4 +36,5 @@ Parallel LOCAL one-task session: `n-perf-ab` (Windows real-GPU frame-rate A/B of
 
 | run | mode / categories / images | code | result |
 |---|---|---|---|
-| 44972916356 | graphics / full / no | 336749f14 (native-proto) | pending |
+| 44972916356 | graphics / full / no | 336749f14 (native-proto) | trace 4589 → 4591 (+2) on 4655, ledger exact (`lazy_prototype_shared`, `video_prototype_lazy`); 0 regressions |
+| 44976721092 | graphics / full / no | 292d0121f (avm1-tail +5, textformat-ctor +1, 2 new fixtures) | pending |

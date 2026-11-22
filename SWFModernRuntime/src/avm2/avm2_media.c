@@ -210,6 +210,12 @@ typedef struct Avm2SoundChannelExt
 	// identically in no-graphics and graphics (mode parity).
 	double sim_elapsed_ms, sim_duration_ms;
 	uint8_t sim_live;
+	// Set when the simulated clock drained (not on stop()): position then
+	// reports sim_final_ms, the sound's own length (Ruffle bcac30c19 —
+	// audio.rs sets a finished AVM2 channel's position to its duration).
+	uint8_t sim_done;
+	double sim_final_ms;
+	double mixer_len_ms;   // the playing sound's length (mixer drain -> position)
 } Avm2SoundChannelExt;
 
 static void sound_channel_native_init(Avm2Context* ctx, Avm2Object* obj)
@@ -307,6 +313,7 @@ static Avm2Value sc_get_position(Avm2Activation* act)
 	Avm2SoundChannelExt* sc = this_sc(act);
 	if (sc == NULL) return avm2_number(0.0);
 	if (sc->sim_live) return avm2_number(sc->sim_elapsed_ms);
+	if (sc->sim_done) return avm2_number(sc->sim_final_ms);
 #ifndef NO_GRAPHICS
 	// Live mixer playback clock (browser builds; in the native test harness
 	// nothing pulls audio_mix, so an active channel reports 0 — trace-inert).
@@ -415,6 +422,48 @@ void avm2_media_register_mixer_transform(Avm2Context* ctx, Avm2Class* cls)
 	avm2_builtin_add_getset(ctx, cls, "soundTransform", sm_get_sound_transform,
 	                        sm_set_sound_transform);
 }
+
+#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
+// with_audio harness mixer tap (s24 w2-avm2-netstream-sound). Ruffle's
+// TestAudioBackend mixes round(2*44100/fps)/2 frames per tick; avm2_net.c's
+// ns_video_tick advances the shared mixer clock and calls this with the
+// frames of that tick, so the real mixer (embedded Sound channels) is pulled
+// on the same clock as the NetStream tap and its output is kept in a ring
+// keyed by absolute clock frame for computeSpectrum.
+#define HM_RING 16384
+static float g_hm_ring[HM_RING * 2];
+static int64_t g_hm_written;      // absolute clock frames mixed so far
+static SWFAppContext* g_hm_app;
+void avm2_media_harness_mix(int64_t clock, int frames)
+{
+	if (g_hm_app == NULL || g_hm_app->audio_ctx == NULL || frames <= 0)
+	{
+		g_hm_written = clock + frames;
+		return;
+	}
+	static float buf[HM_RING * 2];
+	if (frames > HM_RING) frames = HM_RING;
+	audio_mix((AudioContext*) g_hm_app->audio_ctx, buf, (size_t) frames, 2, 44100);
+	for (int k = 0; k < frames; k++)
+	{
+		size_t r = (size_t) ((clock + k) & (HM_RING - 1)) * 2;
+		g_hm_ring[r] = buf[k * 2];
+		g_hm_ring[r + 1] = buf[k * 2 + 1];
+	}
+	g_hm_written = clock + frames;
+}
+void avm2_media_harness_window(float* out, int64_t blk, int frames)
+{
+	for (int k = 0; k < frames; k++)
+	{
+		int64_t idx = blk + k;
+		if (idx < 0 || idx >= g_hm_written || idx < g_hm_written - HM_RING) continue;
+		size_t r = (size_t) (idx & (HM_RING - 1)) * 2;
+		out[(size_t) k * 2] += g_hm_ring[r];
+		out[(size_t) k * 2 + 1] += g_hm_ring[r + 1];
+	}
+}
+#endif
 
 // SoundMixer.computeSpectrum(outputArray, FFTMode = false, stretchFactor = 0)
 // — port of Ruffle sound_mixer.rs compute_spectrum over the mix history.
@@ -797,6 +846,7 @@ static Avm2Value sound_play(Avm2Activation* act)
 			sc->mixer_gen = gen;
 			sc->mixer_live = 1;
 			g_live_channels[mch] = ch;
+			sc->mixer_len_ms = sound_length_ms(s);
 		}
 	}
 #endif
@@ -813,11 +863,41 @@ static Avm2Value sound_play(Avm2Activation* act)
 			if (g_sim_channels[i] != NULL) continue;
 			sc->sim_elapsed_ms = position > 0.0 ? position : 0.0;
 			sc->sim_duration_ms = s->ext_duration_ms;
+			sc->sim_final_ms = s->ext_duration_ms;
 			sc->sim_live = 1;
 			g_sim_channels[i] = ch;
 			break;
 		}
 	}
+#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
+	g_hm_app = ctx->app;
+#endif
+#ifdef SWF_HARNESS_WITH_AUDIO
+	// test.toml `with_audio = true` (s24 w2-avm2-netstream-sound) means
+	// Ruffle's test framework runs a real (TestAudioBackend) mixer, so
+	// embedded sounds drain and soundComplete fires. Nothing pulls audio_mix
+	// in the native harness, so simulate the embedded clock the same way the
+	// URL path above does: each of max(loops,1) passes plays start..length.
+	if (ch != NULL && s->has_sound && sound_length_ms(s) > 0.0
+	    && !((Avm2SoundChannelExt*) ch->native_ext)->mixer_live)
+	{
+		Avm2SoundChannelExt* sc = (Avm2SoundChannelExt*) ch->native_ext;
+		int32_t loops = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
+		if (loops < 1) loops = 1;
+		double len = sound_length_ms(s);
+		double start = position > 0.0 ? position : 0.0;
+		for (int i = 0; i < AVM2_MAX_SIM_CHANNELS; i++)
+		{
+			if (g_sim_channels[i] != NULL) continue;
+			sc->sim_elapsed_ms = start;
+			sc->sim_duration_ms = start + (double) loops * (len - start);
+			sc->sim_final_ms = len;
+			sc->sim_live = 1;
+			g_sim_channels[i] = ch;
+			break;
+		}
+	}
+#endif
 	return avm2_object_value(ch);
 }
 
@@ -1309,7 +1389,17 @@ static void media_poll_simulated(Avm2Context* ctx)
 		// Unregister BEFORE dispatch: the handler may start a new playback.
 		sc->sim_elapsed_ms = sc->sim_duration_ms;
 		sc->sim_live = 0;
+		sc->sim_done = 1;
 		g_sim_channels[i] = NULL;
+#ifndef NO_GRAPHICS
+		if (sc->mixer_live)
+		{
+			audio_channel_stop(ctx->app, sc->mixer_ch, sc->mixer_gen);
+			if (g_live_channels[sc->mixer_ch] == obj)
+				g_live_channels[sc->mixer_ch] = NULL;
+			sc->mixer_live = 0;
+		}
+#endif
 		Avm2Object* ev = avm2_event_new(
 			ctx, avm2_string_from_literal(ctx, "soundComplete"), 0, 0);
 		if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
@@ -1334,6 +1424,8 @@ void avm2_media_poll(Avm2Context* ctx)
 		// on this same (now free) mixer slot.
 		g_live_channels[i] = NULL;
 		sc->mixer_live = 0;
+		sc->sim_done = 1;
+		sc->sim_final_ms = sc->mixer_len_ms;
 		Avm2Object* ev = avm2_event_new(
 			ctx, avm2_string_from_literal(ctx, "soundComplete"), 0, 0);
 		avm2_dispatch_event(ctx, obj, ev);

@@ -3012,6 +3012,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         extra_defines.append("-DSWF_RUNTIME_AIR=1")
     if get_player_mode_is_release(test_dir):
         extra_defines.append("-DSWF_PLAYER_MODE_RELEASE=1")
+    if re.search(r'^\s*with_audio\s*=\s*true\s*$',
+                 (test_dir / "test.toml").read_text() if (test_dir / "test.toml").exists() else "",
+                 re.MULTILINE):
+        extra_defines.append("-DSWF_HARNESS_WITH_AUDIO=1")
     _gpu_layers = get_gpu_max_texture_array_layers(test_dir)
     if _gpu_layers is not None:
         extra_defines.append(f"-DSWF_GPU_MAX_TEXTURE_ARRAY_LAYERS={_gpu_layers}")

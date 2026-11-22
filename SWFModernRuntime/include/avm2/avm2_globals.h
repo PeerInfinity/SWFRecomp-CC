@@ -878,6 +878,10 @@ int avm2_net_netstream_video_frame(const Avm2Object* ns, const uint32_t** out_ar
 // silence). Returns 1 when at least one stream has audio. Feeds
 // SoundMixer.computeSpectrum.
 int avm2_net_netstream_audio_window(float* out, int frames);
+#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
+void avm2_media_harness_mix(int64_t clock, int frames);
+void avm2_media_harness_window(float* out, int64_t blk, int frames);
+#endif
 // The movie's LocalConnection domain (avm2_globals.c owns the URL parsing).
 const char* avm2_local_connection_domain(void);
 

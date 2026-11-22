@@ -99,10 +99,15 @@
 #                               mixer pair on SimpleButton and the per-object
 #                               pair on Sprite (was: one registration on
 #                               InteractiveObject).
-audio_computespectrum
-netstream_play_flv
-netstream_play_stop_replay
-netstream_seek_flv
+# PRUNED 2026-11-22 (s24 `w2-avm2-netstream-sound`): audio_computespectrum,
+# netstream_play_flv, netstream_play_stop_replay, netstream_seek_flv — all
+# `pass` (graphics). The "needs a decoder" claim above was already stale (the
+# s23 Spark decoder made both images pass); what was missing was the Ruffle
+# streams.rs status-event state machine + NetStream.time, and for
+# computeSpectrum a with_audio harness mixer tap (test.toml `with_audio = true`
+# -> -DSWF_HARNESS_WITH_AUDIO=1, exactly Ruffle's TestAudioBackend selection).
+# audio_computespectrum stays failing in no-graphics (no mixer there; same
+# documented gap as audio/aac). The two below stay ruffle_matched.
 soundchannel_position
 soundchannel_soundcomplete
 

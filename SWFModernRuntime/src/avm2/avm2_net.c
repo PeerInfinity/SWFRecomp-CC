@@ -2321,6 +2321,11 @@ typedef struct NsVideoStream
 	uint32_t* argb;               // last decoded frame, premultiplied ARGB
 	int w, h;
 	NsAudio audio;                // FLV audio tap (computeSpectrum)
+	// Ruffle streams.rs status-event state (s24 w2-avm2-netstream-sound).
+	uint8_t playing;
+	uint8_t has_seek;
+	double queued_seek_ms;
+	uint32_t gen;                 // bumped by every play(): "source replaced"
 } NsVideoStream;
 
 #define NS_MAX_VIDEO_STREAMS 8
@@ -2368,6 +2373,9 @@ static void ns_video_start(Avm2Object* ns, const unsigned char* data, size_t len
 	v->offset = off + 4;   // first PreviousTagSize
 	v->stream_time = 0;
 	v->loaded = 0;
+	v->playing = 1;
+	v->has_seek = 0;
+	v->gen++;
 }
 
 static void ns_video_store_frame(NsVideoStream* v, unsigned char* rgba, int w, int h)
@@ -2439,13 +2447,73 @@ static void ns_video_tag(NsVideoStream* v, const unsigned char* body, size_t siz
 		ns_video_store_frame(v, rgba, w, h);
 }
 
+static Avm2Context* g_ns_ctx;
+static void ns_status(Avm2Object* ns, const char* code, const char* desc)
+{
+	if (g_ns_ctx == NULL || ns == NULL) return;
+	static const char* const k3[3] = { "code", "description", "level" };
+	static const char* const k2[2] = { "code", "level" };
+	const char* v3[3] = { code, desc, "status" };
+	const char* v2[2] = { code, "status" };
+	Avm2Object* ev = desc != NULL
+		? avm2_net_status_event_new(g_ns_ctx, k3, v3, 3)
+		: avm2_net_status_event_new(g_ns_ctx, k2, v2, 2);
+	if (ev != NULL) avm2_dispatch_event(g_ns_ctx, ns, ev);
+}
+
+// Ruffle execute_seek over the bundled bytes: snap to the keyframe at or
+// before (backward) / at or after (forward) the offset.
+static void ns_execute_seek(NsVideoStream* v, double offset)
+{
+	ns_status(v->ns, "NetStream.Seek.Notify", NULL);
+	if (v->stream_time != offset)
+	{
+		size_t off = ((size_t) v->data[5] << 24) | ((size_t) v->data[6] << 16)
+		           | ((size_t) v->data[7] << 8) | (size_t) v->data[8];
+		if (off < 9 || off > v->len) off = 9;
+		off += 4;
+		int back = v->stream_time > offset;
+		size_t best = (size_t) -1; double best_ts = 0;
+		while (off + 11 <= v->len)
+		{
+			const unsigned char* t = v->data + off;
+			size_t sz = ((size_t) t[1] << 16) | ((size_t) t[2] << 8) | t[3];
+			uint32_t ts = ((uint32_t) t[7] << 24) | ((uint32_t) t[4] << 16)
+			            | ((uint32_t) t[5] << 8) | t[6];
+			if (off + 11 + sz > v->len) break;
+			int key = (t[0] & 0x1F) == 9 && sz > 0 && (t[11] >> 4) == 1;
+			if (key)
+			{
+				if (back ? ts <= offset : ts >= offset)
+				{
+					if (!back) { best = off; best_ts = ts; break; }
+					best = off; best_ts = ts;
+				}
+			}
+			off += 11 + sz + 4;
+		}
+		if (best != (size_t) -1) { v->offset = best; v->stream_time = best_ts; }
+	}
+	ns_status(v->ns, "NetStream.Seek.Complete", "Seek Complete -1");
+}
+
 static void ns_video_tick_one(NsVideoStream* v, double dt)
 {
+	if (v->loaded && v->has_seek)
+	{
+		v->has_seek = 0;
+		ns_execute_seek(v, v->queued_seek_ms);
+	}
+	if (v->loaded && !v->playing) return;
 	if (!v->loaded)
 	{
 		v->loaded = 1;
+		// Ruffle load_buffer: the bytes arrive -> Buffer.Full.
+		ns_status(v->ns, "NetStream.Buffer.Full", NULL);
 		return;
 	}
+	uint32_t gen = v->gen;
+	int underrun = 1, last_lookahead = 0;
 	double max_time = v->stream_time + dt;
 	int lookahead_audio_left = 5;
 	size_t off = v->offset;
@@ -2459,7 +2527,8 @@ static void ns_video_tick_one(NsVideoStream* v, double dt)
 		size_t body = off + 11;
 		if (body + tag_size > v->len) break;   // truncated: end of data
 		int lookahead = (double) ts >= max_time;
-		if (lookahead && lookahead_audio_left == 0) break;
+		last_lookahead = lookahead;
+		if (lookahead && lookahead_audio_left == 0) { underrun = 0; break; }
 		if (tag_type == 8 && lookahead) lookahead_audio_left--;
 		if (tag_type == 9 && !lookahead) ns_video_tag(v, v->data + body, tag_size);
 		if (tag_type == 8 && !lookahead) ns_audio_tag(&v->audio, ts, v->data + body, tag_size);
@@ -2467,6 +2536,16 @@ static void ns_video_tick_one(NsVideoStream* v, double dt)
 		if (!lookahead) v->offset = off;
 	}
 	v->stream_time = max_time;
+	if (underrun && !last_lookahead)
+	{
+		ns_status(v->ns, "NetStream.Buffer.Flush", NULL);
+		ns_status(v->ns, "NetStream.Play.Stop", NULL);
+		if (v->gen == gen)
+		{
+			ns_status(v->ns, "NetStream.Buffer.Empty", NULL);
+			v->playing = 0;
+		}
+	}
 }
 
 static void ns_video_tick(void)
@@ -2486,7 +2565,13 @@ static void ns_video_tick(void)
 	}
 	// The previous Ruffle tick's mix (see g_ns_mix_frames).
 	if (g_ns_mix_primed)
-		g_ns_mix_frames += (int64_t) floor(2.0 * NS_AUDIO_RATE / fps + 0.5) / 2;
+	{
+		int64_t nf = (int64_t) floor(2.0 * NS_AUDIO_RATE / fps + 0.5) / 2;
+#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
+		avm2_media_harness_mix(g_ns_mix_frames, (int) nf);
+#endif
+		g_ns_mix_frames += nf;
+	}
 	g_ns_mix_primed = 1;
 }
 
@@ -2510,6 +2595,10 @@ int avm2_net_netstream_audio_window(float* out, int frames)
 	memset(out, 0, (size_t) frames * 2 * sizeof(float));
 	int64_t blk = (g_ns_mix_frames / 1024) * 1024 - 1024;
 	int any = 0;
+#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
+	avm2_media_harness_window(out, blk, frames);
+	any = 1;
+#endif
 	for (int i = 0; i < g_ns_video_count; i++)
 	{
 		NsVideoStream* v = &g_ns_video[i];
@@ -2556,7 +2645,10 @@ static Avm2Value ns_play(Avm2Activation* act)
 	if (d == NULL) d = findDataFile(name);
 	if (d == NULL || d->content == NULL) return avm2_undefined();
 
+	g_ns_ctx = act->ctx;
 	ns_video_start(self, (const unsigned char*) d->content, (size_t) d->content_length);
+	if (ns_video_find(self) != NULL)
+		ns_status(self, "NetStream.Play.Start", NULL);
 
 	size_t mlen = 0;
 	const unsigned char* meta = flv_find_metadata(
@@ -2571,6 +2663,54 @@ static Avm2Value ns_play(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+static Avm2Value ns_get_time_proto(Avm2Activation* act)
+{
+	Avm2Object* self = net2_this(act);
+	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
+	return avm2_number(v != NULL ? v->stream_time / 1000.0 : 0.0);
+}
+static Avm2Value ns_seek_proto(Avm2Activation* act)
+{
+	Avm2Object* self = net2_this(act);
+	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
+	if (v == NULL) return avm2_undefined();
+	g_ns_ctx = act->ctx;
+	double ms = (act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : 0.0) * 1000.0;
+	v->queued_seek_ms = ms;
+	v->has_seek = 1;
+	char d[64];
+	snprintf(d, sizeof d, "Start Seeking %llu", (unsigned long long) (ms > 0 ? ms : 0));
+	ns_status(self, "NetStream.SeekStart.Notify", d);
+	return avm2_undefined();
+}
+static Avm2Value ns_pause_proto(Avm2Activation* act)
+{
+	Avm2Object* self = net2_this(act);
+	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
+	if (v == NULL) return avm2_undefined();
+	g_ns_ctx = act->ctx;
+	v->playing = 0;
+	ns_status(self, "NetStream.Pause.Notify", "Pausing");
+	return avm2_undefined();
+}
+// resume()/togglePause(): Ruffle streams.rs resume / toggle_paused only flip
+// `playing` (and re-activate the stream); unlike pause() they dispatch no
+// status event, so there is no Unpause.Notify here either (bcac30c19).
+static Avm2Value ns_resume_proto(Avm2Activation* act)
+{
+	Avm2Object* self = net2_this(act);
+	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
+	if (v != NULL) v->playing = 1;
+	return avm2_undefined();
+}
+static Avm2Value ns_toggle_proto(Avm2Activation* act)
+{
+	Avm2Object* self = net2_this(act);
+	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
+	if (v != NULL) v->playing = !v->playing;
+	return avm2_undefined();
+}
+
 // Per-tick drain, called from avm2_display_run_tick's executor-drain point
 // (beside the NetConnection flush). The client is whatever `client` holds at
 // delivery time, and a client without an onMetaData property is silent —
@@ -2579,6 +2719,7 @@ void avm2_net_deliver_netstream_meta(Avm2Context* ctx)
 {
 	// The media half rides the same per-tick hook (Ruffle runs
 	// StreamManager::tick once per player tick, after the frame).
+	g_ns_ctx = ctx;
 	ns_video_tick();
 	if (g_ns_pending_meta_count == 0) return;
 	Avm2Object* batch[NS_MAX_PENDING_META];
@@ -2680,16 +2821,16 @@ static void register_net_stream(Avm2Context* ctx)
 	cls->native_ext_size = sizeof(Avm2NetStreamExt);
 
 	avm2_builtin_add_getset(ctx, cls, "client", ns_get_client, ns_set_client);
-	avm2_builtin_add_getter(ctx, cls, "time", ns_get_zero);
+	avm2_builtin_add_getter(ctx, cls, "time", ns_get_time_proto);
 	avm2_builtin_add_getter(ctx, cls, "bytesLoaded", ns_get_zero);
 	avm2_builtin_add_getter(ctx, cls, "bytesTotal", ns_get_zero);
 	avm2_builtin_add_getter(ctx, cls, "currentFPS", ns_get_zero);
 	avm2_builtin_add_getter(ctx, cls, "bufferLength", ns_get_zero);
 	avm2_builtin_add_method(ctx, cls, "play", ns_play);
-	avm2_builtin_add_method(ctx, cls, "pause", net2_noop);
-	avm2_builtin_add_method(ctx, cls, "resume", net2_noop);
-	avm2_builtin_add_method(ctx, cls, "togglePause", net2_noop);
-	avm2_builtin_add_method(ctx, cls, "seek", net2_noop);
+	avm2_builtin_add_method(ctx, cls, "pause", ns_pause_proto);
+	avm2_builtin_add_method(ctx, cls, "resume", ns_resume_proto);
+	avm2_builtin_add_method(ctx, cls, "togglePause", ns_toggle_proto);
+	avm2_builtin_add_method(ctx, cls, "seek", ns_seek_proto);
 	avm2_builtin_add_method(ctx, cls, "close", net2_noop);
 	avm2_builtin_add_method(ctx, cls, "dispose", net2_noop);
 
