@@ -387,6 +387,14 @@ static inline int cpu_aa_edge_owns(double ex, double ey)
 	return ey > 0.0 || (ey == 0.0 && ex > 0.0);
 }
 
+// Direct3D/Vulkan top-left rule for the single-sample path, in the
+// sgn-normalised (screen-clockwise) winding: left edges run upward (ey < 0),
+// top edges run rightward (ey == 0, ex > 0).
+static inline int cpu_tl_edge_owns(double ex, double ey)
+{
+	return ey < 0.0 || (ey == 0.0 && ex > 0.0);
+}
+
 static void raster_tri_aa(RasterCtx* R,
                           double ax, double ay, double bx, double by,
                           double cx, double cy)
@@ -494,6 +502,11 @@ static void raster_tri(RasterCtx* R,
 	double abs_area = sgnd > 0 ? sgnd : -sgnd;
 	double sgn = sgnd > 0 ? 1.0 : -1.0;
 	double inv_area = 1.0 / abs_area;
+	// Same top-left ownership as raster_tri_aa / the GPU: a pixel centre
+	// exactly on an edge belongs to one of the two triangles sharing it.
+	int own0 = cpu_tl_edge_owns((bx - ax) * sgn, (by - ay) * sgn);
+	int own1 = cpu_tl_edge_owns((cx - bx) * sgn, (cy - by) * sgn);
+	int own2 = cpu_tl_edge_owns((ax - cx) * sgn, (ay - cy) * sgn);
 
 	for (int py = ylo; py <= yhi; py++)
 	{
@@ -506,6 +519,8 @@ static void raster_tri(RasterCtx* R,
 			double w1 = ((cx - bx) * (qy - by) - (cy - by) * (qx - bx)) * sgn;
 			double w2 = ((ax - cx) * (qy - cy) - (ay - cy) * (qx - cx)) * sgn;
 			if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+			if ((w0 == 0 && !own0) || (w1 == 0 && !own1) || (w2 == 0 && !own2))
+				continue;
 
 			uint32_t straight;
 			if (!R->is_gradient)

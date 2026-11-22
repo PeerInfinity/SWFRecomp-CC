@@ -24,6 +24,21 @@
 
 #include "stb_image.h"
 
+// BitmapData.encode(JPEGEncoderOptions): stb_image_write's baseline JPEG
+// encoder, compiled into this TU with static linkage so both NO_GRAPHICS and
+// graphics builds have it without clashing with render_webgpu.c's own
+// (extern) copy used for screenshots. Vendored at lib/stb/stb_image_write.h.
+#define STB_IMAGE_WRITE_STATIC
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+#include "stb_image_write.h"
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
 #include <avm2/avm2_class.h>
 #include <avm2/avm2_cpu_raster.h>
 #include <avm2/avm2_error.h>
@@ -758,6 +773,7 @@ static void bd_alloc(Avm2Context* ctx, Avm2BitmapDataExt* bd, uint32_t w, uint32
 	bd->transparency = transparency ? 1 : 0;
 	bd->disposed = 0;
 	bd->pixels = avm2_alloc(ctx, w * h * (uint32_t) sizeof(uint32_t));
+	avm2_bitmapdata_touch(bd);
 }
 
 // The bitmap tables of the movie that DEFINED the character, main or child.
@@ -806,6 +822,7 @@ static void bd_seed_embedded(Avm2Context* ctx, Avm2BitmapDataExt* bd,
 	bd->height = emb->height;
 	bd->transparency = 1;
 	bd->disposed = 0;
+	avm2_bitmapdata_touch(bd);
 	uint32_t n = (uint32_t) emb->width * emb->height;
 	if (n == 0)
 	{
@@ -869,7 +886,25 @@ static void bitmapdata_native_init(Avm2Context* ctx, Avm2Object* obj)
 	(void) ctx;
 	if (obj == NULL || obj->native_ext == NULL) return;
 	((Avm2BitmapDataExt*) obj->native_ext)->disposed = 1;
+	avm2_bitmapdata_touch((Avm2BitmapDataExt*) obj->native_ext);
 }
+
+static uint64_t g_bitmapdata_clock = 0;
+void avm2_bitmapdata_touch(Avm2BitmapDataExt* bd)
+{
+	if (bd != NULL) bd->version = ++g_bitmapdata_clock;
+}
+
+// Mutating BitmapData methods are registered through this wrapper, which
+// bumps the receiver's content version BEFORE the call (a throw part-way
+// through a write still leaves the version moved). Derived caches are only
+// consulted at render time, after the script has returned.
+#define BD_MUTATOR(fn) \
+	static Avm2Value fn##__mut(Avm2Activation* act) \
+	{ \
+		avm2_bitmapdata_touch(avm2_bitmapdata_ext_of(act->ctx, act->this_val)); \
+		return fn(act); \
+	}
 
 static Avm2Value bitmapdata_init(Avm2Activation* act)
 {
@@ -2806,9 +2841,58 @@ static Avm2Value bd_draw(Avm2Activation* act)
 	{
 		// Flash anti-aliases vector draw() whatever the stage quality (see
 		// avm2_cpu_raster.c "4x-sample anti-aliasing").
-		int prev_aa = avm2_cpu_raster_set_aa(1);
-		bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
-		                   mtx * 20.0, mty * 20.0, 1.0, 0);
+		// drawWithQuality's 7th arg: an explicit "low" renders aliased (Ruffle
+		// operations::draw honours the passed quality; draw() itself keeps the
+		// s22 Flash AA-at-stage-LOW ruling since it has no quality argument).
+		int draw_aa = 1;
+		if (arg_present(act, 6) && act->args[6].kind != AVM2_VALUE_NULL)
+		{
+			const Avm2String* qs = avm2_coerce_to_string(ctx, act->args[6]);
+			const char* q = (qs != NULL && qs->utf8 != NULL) ? avm2_string_cstr(ctx, qs) : NULL;
+			if (q != NULL && strcmp(q, "low") == 0) draw_aa = 0;
+		}
+		int prev_aa = avm2_cpu_raster_set_aa(draw_aa);
+		size_t layer_n = (size_t) dst->width * dst->height;
+		uint32_t* layer = (has_cxform || blend_mode != BM_NORMAL)
+			? (uint32_t*) calloc(layer_n ? layer_n : 1, sizeof(uint32_t)) : NULL;
+		if (layer != NULL)
+		{
+			// colorTransform / blendMode on a vector source: raster into a
+			// transparent layer, then transform each premultiplied texel and
+			// compose it onto the target (Ruffle renders the source with the
+			// cxform applied, then blends the layer with the named mode).
+			Avm2BitmapDataExt ldst = *dst;
+			ldst.pixels = layer;
+			ldst.transparency = 1;
+			bd_draw_shape_walk(ctx, &ldst, shape_src, ma, mb, mc, md,
+			                   mtx * 20.0, mty * 20.0, 1.0, 0);
+			int opaque_dst = !dst->transparency;
+			for (size_t i = 0; i < layer_n; i++)
+			{
+				uint32_t color = layer[i];
+				if (CA(color) == 0 && !has_cxform) continue;
+				if (has_cxform)
+				{
+					uint32_t c = unmul(color);
+					uint8_t r = ctx_channel(rm, ro, (uint8_t) CR(c));
+					uint8_t g = ctx_channel(gm, go, (uint8_t) CG(c));
+					uint8_t b = ctx_channel(bm, bo, (uint8_t) CB(c));
+					uint8_t a = ctx_channel(am, ao, (uint8_t) CA(c));
+					color = premul(CMK(r, g, b, a), 1);
+					if (CA(color) == 0) continue;
+				}
+				uint32_t under = dst->pixels[i];
+				color = (blend_mode != BM_NORMAL)
+					? blend_mode_apply(blend_mode, under, color)
+					: blend_over(under, color);
+				if (opaque_dst) color = with_alpha(color, 0xFF);
+				dst->pixels[i] = color;
+			}
+			free(layer);
+		}
+		else
+			bd_draw_shape_walk(ctx, dst, shape_src, ma, mb, mc, md,
+			                   mtx * 20.0, mty * 20.0, 1.0, 0);
 		avm2_cpu_raster_set_aa(prev_aa);
 		bd_clip_end(dst, clip_snap, clip_px);
 		return avm2_undefined();
@@ -3349,6 +3433,39 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	int32_t dx, dy;
 	read_point_i32(ctx, arg(act, 2), &dx, &dy);
 
+	// ShaderFilter (s24 w2-bitmap-encode-shader). Ruffle bitmap_data.rs
+	// applyFilter forces sourceRect to the WHOLE source for a ShaderFilter
+	// (Flash ignores its width/height); the shader renders a source-sized
+	// target with input 0 = the source (out-of-range = transparent black),
+	// which then replaces the destination region at destPoint.
+	if (f.kind == AVM2_FILTER_SHADER)
+	{
+		Avm2BitmapDataExt tmp = *src;
+		size_t n = (size_t) src->width * src->height;
+		tmp.pixels = (uint32_t*) calloc(n ? n : 1, sizeof(uint32_t));
+		tmp.transparency = 1;
+		if (tmp.pixels != NULL
+		    && avm2_pixelbender_run_filter(ctx, f.shader, src, &tmp, 0, 0))
+		{
+			for (uint32_t y = 0; y < src->height; y++)
+			{
+				int32_t ty = dy + (int32_t) y;
+				if (ty < 0 || ty >= (int32_t) dst->height) continue;
+				for (uint32_t x = 0; x < src->width; x++)
+				{
+					int32_t tx = dx + (int32_t) x;
+					if (tx < 0 || tx >= (int32_t) dst->width) continue;
+					uint32_t c = tmp.pixels[(size_t) y * src->width + x];
+					if (!dst->transparency) c = with_alpha(c, 0xFF);
+					bd_set_raw(dst, (uint32_t) tx, (uint32_t) ty, c);
+				}
+			}
+		}
+		free(tmp.pixels);
+		avm2_filter_release(ctx, &f);
+		return avm2_undefined();
+	}
+
 	// A gradient bevel/glow with no blur AND no distance contributes nothing
 	// over the composited source, so the whole pass is a straight copy. Any
 	// other kind we do not raster stays a no-op (matching the pre-arc stub).
@@ -3470,9 +3587,62 @@ static uint32_t png_chunk(uint8_t* out, const char* type, const uint8_t* data,
 
 // BitmapData.encode(rect, compressor, byteArray):ByteArray — Ruffle appends the
 // encoded image at the ByteArray's current position and returns the same array.
-// Only PNGEncoderOptions is honored: a straight RGBA8 (or RGB8 for an opaque
-// BitmapData) non-interlaced PNG, filter type 0 on every row. JPEGEncoderOptions
-// would need a DCT encoder and no graded line reaches it, so it writes nothing.
+// PNGEncoderOptions: a straight RGBA8 (or RGB8 when the region is fully
+// opaque) non-interlaced PNG, filter type 0 on every row.
+// JPEGEncoderOptions via stb_image_write's baseline encoder (static copy at
+// the top of this file, so both modes have it). Byte-exact output is not
+// needed: Ruffle uses image-rs, Flash libjpeg. Ruffle
+// operations.rs encode(): the PREMULTIPLIED colour (composited onto black),
+// RGB8, quality 0 -> 1, > 100 -> RangeError #2006, > 65500 px -> Error #3699.
+typedef struct { uint8_t* p; size_t n, cap; } JpgBuf;
+static void jpg_sink(void* c, void* data, int size)
+{
+	JpgBuf* b = (JpgBuf*) c;
+	if (b->n + (size_t) size > b->cap)
+	{
+		size_t nc = (b->cap ? b->cap * 2 : 4096);
+		while (nc < b->n + (size_t) size) nc *= 2;
+		uint8_t* q = (uint8_t*) realloc(b->p, nc);
+		if (q == NULL) return;
+		b->p = q; b->cap = nc;
+	}
+	memcpy(b->p + b->n, data, (size_t) size);
+	b->n += (size_t) size;
+}
+static Avm2Value bd_encode_jpeg(Avm2Context* ctx, Avm2BitmapDataExt* bd, const PixelRegion* r,
+                                Avm2Value opts, Avm2ByteArrayExt* ba, Avm2Value out)
+{
+	double qd = read_prop_num(ctx, opts, "quality");
+	uint32_t q = (isfinite(qd) && qd >= 0) ? (uint32_t) qd : (uint32_t) (int64_t) qd;
+	if (q > 100)
+		avm2_throw_error(ctx, ctx->builtins.range_error_class,
+		                 "Error #2006: The supplied index is out of bounds.");
+	if (q < 1) q = 1;
+	uint32_t w = pr_w(r), h = pr_h(r);
+	if (w > 65500 || h > 65500)
+		avm2_throw_error(ctx, ctx->builtins.error_class,
+		                 "Error #3699: Image encoding failed.");
+	uint8_t* rgb = (uint8_t*) malloc((size_t) w * h * 3 + 1);
+	if (rgb == NULL) return out;
+	uint8_t* p = rgb;
+	for (uint32_t yy = r->y_min; yy < r->y_max; yy++)
+		for (uint32_t xx = r->x_min; xx < r->x_max; xx++)
+		{
+			uint32_t pm = bd_get_raw(bd, xx, yy);  // premultiplied = over black
+			*p++ = (uint8_t) (pm >> 16); *p++ = (uint8_t) (pm >> 8); *p++ = (uint8_t) pm;
+		}
+	JpgBuf jb = { NULL, 0, 0 };
+	stbi_write_jpg_to_func(jpg_sink, &jb, (int) w, (int) h, 3, rgb, (int) q);
+	free(rgb);
+	uint32_t pos = ba->position;
+	if ((size_t) pos + jb.n > ba->len)
+		avm2_bytearray_set_length_public(ctx, ba, (uint32_t) (pos + jb.n));
+	if (jb.n) memcpy(ba->bytes + pos, jb.p, jb.n);
+	ba->position = (uint32_t) (pos + jb.n);
+	free(jb.p);
+	return out;
+}
+
 static Avm2Value bd_encode(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -3482,8 +3652,15 @@ static Avm2Value bd_encode(Avm2Activation* act)
 	// PROTOTYPE (w1-drift-avm2): Ruffle bitmap_data.rs encode() order —
 	// rect -> #2006 on a non-positive or clamped-empty region -> output array
 	// (a fresh one when omitted/null) -> compressor.
+	Avm2Value rectv0 = arg(act, 0), compv0 = arg(act, 1);
+	if (rectv0.kind == AVM2_VALUE_NULL || rectv0.kind == AVM2_VALUE_UNDEFINED)
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter rect must be non-null.");
 	int32_t rx, ry, rw, rh;
-	rect_to_xywh(ctx, arg(act, 0), &rx, &ry, &rw, &rh);
+	rect_to_xywh(ctx, rectv0, &rx, &ry, &rw, &rh);
+	if (compv0.kind == AVM2_VALUE_NULL || compv0.kind == AVM2_VALUE_UNDEFINED)
+		avm2_throw_error(ctx, ctx->builtins.type_error_class,
+		                 "Error #2007: Parameter compressor must be non-null.");
 	if (rw <= 0 || rh <= 0)
 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
 		                 "Error #2006: The supplied index is out of bounds.");
@@ -3508,9 +3685,19 @@ static Avm2Value bd_encode(Avm2Activation* act)
 	char opt_name[128] = "";
 	if (opts.kind == AVM2_VALUE_OBJECT && opts.u.obj != NULL)
 		avm2_class_qname_buf(opts.u.obj->cls, opt_name, (int) sizeof(opt_name));
-	if (strstr(opt_name, "PNG") == NULL) return out;
+	if (strstr(opt_name, "JPEG") != NULL && strstr(opt_name, "XR") == NULL)
+		return bd_encode_jpeg(ctx, bd, &r, opts, ba, out);
+	if (strstr(opt_name, "JPEGXR") != NULL) return avm2_null();  // Ruffle stub
+	if (strstr(opt_name, "PNGEncoderOptions") == NULL)
+		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
+		                 "Error #2004: One of the parameters is invalid.");
 
-	uint32_t nch = bd->transparency ? 4 : 3;
+	// Flash only writes an alpha channel if the encoded area has a non-opaque
+	// pixel (Ruffle operations.rs encode).
+	uint32_t nch = 3;
+	for (uint32_t yy = r.y_min; yy < r.y_max && nch == 3; yy++)
+		for (uint32_t xx = r.x_min; xx < r.x_max; xx++)
+			if (CA(bd_get_raw(bd, xx, yy)) != 0xFF) { nch = 4; break; }
 	size_t raw_len = (size_t) h * (1 + (size_t) w * nch);
 	uint8_t* raw = malloc(raw_len);
 	if (raw == NULL) return out;
@@ -4025,6 +4212,36 @@ Avm2Object* avm2_bitmap_from_image_bytes(Avm2Context* ctx, const uint8_t* data,
 // Registration
 // ---------------------------------------------------------------------------
 
+// JPEGEncoderOptions(quality:uint = 80): the class had no constructor, so
+// .quality was never stored and every encode ran at quality 1.
+static Avm2Value jpeg_options_init(Avm2Activation* act)
+{
+	Avm2Context* ctx = act->ctx;
+	Avm2Value self = act->this_val;
+	uint32_t q = arg_present(act, 0) ? avm2_coerce_to_u32(ctx, act->args[0]) : 80u;
+	avm2_set_public_property(ctx, self, "quality", 7, avm2_number((double) q));
+	return avm2_undefined();
+}
+
+// Every receiver-writing method (see BD_MUTATOR).
+BD_MUTATOR(bd_apply_filter)
+BD_MUTATOR(bd_color_transform)
+BD_MUTATOR(bd_copy_channel)
+BD_MUTATOR(bd_copy_pixels)
+BD_MUTATOR(bd_dispose)
+BD_MUTATOR(bd_draw)
+BD_MUTATOR(bd_fill_rect)
+BD_MUTATOR(bd_flood_fill)
+BD_MUTATOR(bd_noise)
+BD_MUTATOR(bd_noop)
+BD_MUTATOR(bd_pixel_dissolve)
+BD_MUTATOR(bd_scroll)
+BD_MUTATOR(bd_set_pixel)
+BD_MUTATOR(bd_set_pixel32)
+BD_MUTATOR(bd_set_pixels)
+BD_MUTATOR(bd_set_vector)
+BD_MUTATOR(bd_threshold)
+
 void avm2_register_bitmap(Avm2Context* ctx)
 {
 	Avm2Class* bd = avm2_builtin_class(ctx, "flash.display", "BitmapData",
@@ -4054,42 +4271,42 @@ void avm2_register_bitmap(Avm2Context* ctx)
 	avm2_builtin_add_getter(ctx, bd, "rect", bd_get_rect);
 	avm2_builtin_add_method(ctx, bd, "getPixel", bd_get_pixel);
 	avm2_builtin_add_method(ctx, bd, "getPixel32", bd_get_pixel32);
-	avm2_builtin_add_method(ctx, bd, "setPixel", bd_set_pixel);
-	avm2_builtin_add_method(ctx, bd, "setPixel32", bd_set_pixel32);
-	avm2_builtin_add_method(ctx, bd, "fillRect", bd_fill_rect);
+	avm2_builtin_add_method(ctx, bd, "setPixel", bd_set_pixel__mut);
+	avm2_builtin_add_method(ctx, bd, "setPixel32", bd_set_pixel32__mut);
+	avm2_builtin_add_method(ctx, bd, "fillRect", bd_fill_rect__mut);
 	avm2_builtin_add_method(ctx, bd, "clone", bd_clone);
-	avm2_builtin_add_method(ctx, bd, "dispose", bd_dispose);
-	avm2_builtin_add_method(ctx, bd, "noise", bd_noise);
+	avm2_builtin_add_method(ctx, bd, "dispose", bd_dispose__mut);
+	avm2_builtin_add_method(ctx, bd, "noise", bd_noise__mut);
 	avm2_builtin_add_method(ctx, bd, "getPixels", bd_get_pixels);
-	avm2_builtin_add_method(ctx, bd, "setPixels", bd_set_pixels);
+	avm2_builtin_add_method(ctx, bd, "setPixels", bd_set_pixels__mut);
 	avm2_builtin_add_method(ctx, bd, "copyPixelsToByteArray",
 	                        bd_copy_pixels_to_byte_array);
 	avm2_builtin_add_method(ctx, bd, "getVector", bd_get_vector);
-	avm2_builtin_add_method(ctx, bd, "setVector", bd_set_vector);
-	avm2_builtin_add_method(ctx, bd, "copyPixels", bd_copy_pixels);
-	avm2_builtin_add_method(ctx, bd, "floodFill", bd_flood_fill);
-	avm2_builtin_add_method(ctx, bd, "threshold", bd_threshold);
+	avm2_builtin_add_method(ctx, bd, "setVector", bd_set_vector__mut);
+	avm2_builtin_add_method(ctx, bd, "copyPixels", bd_copy_pixels__mut);
+	avm2_builtin_add_method(ctx, bd, "floodFill", bd_flood_fill__mut);
+	avm2_builtin_add_method(ctx, bd, "threshold", bd_threshold__mut);
 	avm2_builtin_add_method(ctx, bd, "hitTest", bd_hit_test);
 	avm2_builtin_add_method(ctx, bd, "histogram", bd_histogram);
-	avm2_builtin_add_method(ctx, bd, "pixelDissolve", bd_pixel_dissolve);
-	avm2_builtin_add_method(ctx, bd, "colorTransform", bd_color_transform);
+	avm2_builtin_add_method(ctx, bd, "pixelDissolve", bd_pixel_dissolve__mut);
+	avm2_builtin_add_method(ctx, bd, "colorTransform", bd_color_transform__mut);
 	avm2_builtin_add_method(ctx, bd, "getColorBoundsRect", bd_get_color_bounds_rect);
-	avm2_builtin_add_method(ctx, bd, "copyChannel", bd_copy_channel);
-	avm2_builtin_add_method(ctx, bd, "scroll", bd_scroll);
+	avm2_builtin_add_method(ctx, bd, "copyChannel", bd_copy_channel__mut);
+	avm2_builtin_add_method(ctx, bd, "scroll", bd_scroll__mut);
 	avm2_builtin_add_method(ctx, bd, "encode", bd_encode);
 	avm2_builtin_add_method(ctx, bd, "compare", bd_compare);
 
 	// Image-only ops (graded in Stage 9): keep them callable no-ops so the
 	// vacuous image-comparison tests keep running.
-	avm2_builtin_add_method(ctx, bd, "lock", bd_noop);
-	avm2_builtin_add_method(ctx, bd, "unlock", bd_noop);
-	avm2_builtin_add_method(ctx, bd, "draw", bd_draw);
-	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_draw);  // 7th arg (quality) ignored: draw() renders at the stage quality, Flash AA-at-LOW ruling (s22)
-	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_apply_filter);
+	avm2_builtin_add_method(ctx, bd, "lock", bd_noop__mut);
+	avm2_builtin_add_method(ctx, bd, "unlock", bd_noop__mut);
+	avm2_builtin_add_method(ctx, bd, "draw", bd_draw__mut);
+	avm2_builtin_add_method(ctx, bd, "drawWithQuality", bd_draw__mut);  // explicit quality "low" honoured for vector sources; draw() itself keeps the s22 Flash AA-at-LOW ruling
+	avm2_builtin_add_method(ctx, bd, "applyFilter", bd_apply_filter__mut);
 	avm2_builtin_add_method(ctx, bd, "generateFilterRect", bd_generate_filter_rect);
-	avm2_builtin_add_method(ctx, bd, "merge", bd_noop);
-	avm2_builtin_add_method(ctx, bd, "paletteMap", bd_noop);
-	avm2_builtin_add_method(ctx, bd, "perlinNoise", bd_noop);
+	avm2_builtin_add_method(ctx, bd, "merge", bd_noop__mut);
+	avm2_builtin_add_method(ctx, bd, "paletteMap", bd_noop__mut);
+	avm2_builtin_add_method(ctx, bd, "perlinNoise", bd_noop__mut);
 
 	// flash.display.BitmapDataChannel — the bit flags copyChannel /
 	// DisplacementMapFilter's componentX/Y are spelled with. copyChannel
@@ -4119,6 +4336,7 @@ void avm2_register_bitmap(Avm2Context* ctx)
 		Avm2Class* jpg = avm2_builtin_class_api(ctx, "flash.display",
 		                                        "JPEGEncoderOptions",
 		                                        ctx->builtins.object_class, 16);
-		(void) jpg;
+		jpg->instance_init.fn = jpeg_options_init;
+		jpg->instance_init.debug_name = "JPEGEncoderOptions";
 	}
 }

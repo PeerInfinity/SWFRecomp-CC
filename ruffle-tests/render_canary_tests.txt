@@ -604,3 +604,16 @@ regression/avm1_runtime_filters               # AVM1 runtime filters probe (Ruff
 # tier=1
 text/style_changes_in_html                  # per-run face + Fixed8 colour     1 cmp
 text/br_at_start                            # fractional tag leading           1 cmp
+# --- s24 w2-bitmap-encode-shader ---
+# BitmapData.encode(JPEGEncoderOptions) round trip (stb_image_write baseline
+# encoder, both modes) and a ShaderFilter on a Bitmap + applyFilter(ShaderFilter)
+# (CPU PixelBender in ShaderMode::Filter, output cached on the BitmapData
+# version). The third member the w1 report named, avm2/bitmapdata_draw_cab_quality
+# (vector draw() cxform + blendMode, explicit drawWithQuality "low", top-left
+# rule), is ALREADY in the set above (s23 harness-subtests block, tier=2); it
+# passes at 80/80 with this patch (zero headroom), and drawWithQuality no
+# longer ignores its quality arg for vector sources (draw() keeps the s22 AA
+# ruling). Both new members pass on a CI-grade box (before-leg md5 == CI actual).
+# tier=1
+avm2/bitmapdata_encode_jpeg_visual          # JPEG encode round trip (tol 14)  1 cmp
+avm2/pixelbender_effect_glassDisplace_shaderfilter # ShaderFilter display + applyFilter 1 cmp

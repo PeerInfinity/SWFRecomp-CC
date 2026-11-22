@@ -82,6 +82,7 @@ cp -r "${SWFMODERN_INC}" "${RT}/include"
 cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${SWFMODERN_ROOT}/lib/c-hashmap/map.h" "${RT}/lib/c-hashmap/"
 cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${RT}/lib/o1heap/"
 cp "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${RT}/lib/stb/"
+cp "${SWFMODERN_ROOT}/lib/stb/stb_image_write.h" "${RT}/lib/stb/"
 for tp in libtess2 quickjs-libregexp lzma; do
     mkdir -p "${RT}/third_party/${tp}"
     cp "${SWFMODERN_ROOT}/third_party/${tp}"/*.c "${SWFMODERN_ROOT}/third_party/${tp}"/*.h "${RT}/third_party/${tp}/" 2>/dev/null || true

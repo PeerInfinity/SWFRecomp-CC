@@ -2777,6 +2777,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
     shutil.copy2(SWFMODERN / "lib/stb/stb_image.h", build_dir)
+    shutil.copy2(SWFMODERN / "lib/stb/stb_image_write.h", build_dir)
     shutil.copy2(SWFMODERN / "include/memory/heap.h", mem_dir)
     # Copy libtess2 tessellation library
     libtess2_dir = SWFMODERN / "third_party" / "libtess2"
@@ -3348,6 +3349,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
     shutil.copy2(SWFMODERN / "lib/stb/stb_image.h", build_dir)
+    shutil.copy2(SWFMODERN / "lib/stb/stb_image_write.h", build_dir)
     shutil.copy2(SWFMODERN / "include/memory/heap.h", mem_dir)
     libtess2_dir = SWFMODERN / "third_party" / "libtess2"
     if libtess2_dir.exists():

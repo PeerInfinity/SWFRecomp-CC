@@ -774,6 +774,11 @@ static Avm2Value pbj_value_to_avm2(Avm2Context* ctx, const PbjValue* v,
 // ShaderParameter / ShaderInput
 // ---------------------------------------------------------------------------
 
+// Shader-parameter generation: bumped by every ShaderParameter.value /
+// ShaderInput.{input,width,height} / ShaderFilter.shader write. Part of the
+// Bitmap ShaderFilter cache key (avm2_pixelbender_filter_stamp).
+static uint64_t g_pb_param_gen = 1;
+
 static Avm2Value sp_ctor(Avm2Activation* act)
 {
 	Avm2ShaderParamExt* ext = act->this_val.u.obj->native_ext;
@@ -806,6 +811,7 @@ static Avm2Value sp_set_value(Avm2Activation* act)
 	// Stored by reference, no validation, never copied (ShaderParameter.as
 	// "FIXME - Is there some validation here?" — there is none).
 	sp_ext(act)->value = (act->argc > 0) ? act->args[0] : avm2_null();
+	g_pb_param_gen++;
 	return avm2_undefined();
 }
 
@@ -835,6 +841,7 @@ static Avm2Value si_set_width(Avm2Activation* act)
 {
 	si_ext(act)->width = (act->argc > 0)
 		? avm2_coerce_to_i32(act->ctx, act->args[0]) : 0;
+	g_pb_param_gen++;
 	return avm2_undefined();
 }
 
@@ -845,6 +852,7 @@ static Avm2Value si_set_height(Avm2Activation* act)
 {
 	si_ext(act)->height = (act->argc > 0)
 		? avm2_coerce_to_i32(act->ctx, act->args[0]) : 0;
+	g_pb_param_gen++;
 	return avm2_undefined();
 }
 
@@ -854,6 +862,7 @@ static Avm2Value si_get_input(Avm2Activation* act)
 static Avm2Value si_set_input(Avm2Activation* act)
 {
 	si_ext(act)->input = (act->argc > 0) ? act->args[0] : avm2_null();
+	g_pb_param_gen++;
 	return avm2_undefined();
 }
 
@@ -1225,11 +1234,27 @@ static void pb_store_matrix(PbEval* ev, const PbjReg* dst, const PbMat* m)
 // The incoming coordinate is in PIXELS.
 // ---------------------------------------------------------------------------
 
+// ShaderFilter mode (Ruffle ShaderMode::Filter)
+// reads transparent black outside the texture; input 0 and the target can be
+// supplied directly (a filter source / applyFilter destination).
+static int g_pb_filter_mode = 0;
+static const Avm2BitmapDataExt* g_pb_tex0_override = NULL;
+static Avm2BitmapDataExt* g_pb_target_override = NULL;
+// ShaderFilter extensions: output pixel (x, y) evaluates outCoord at
+// (x + off_x + 0.5, y + off_y + 0.5) in SOURCE space (off = -left/-top).
+static int32_t g_pb_out_off_x = 0, g_pb_out_off_y = 0;
+
 static void pb_texel(const PbTexture* t, int32_t x, int32_t y, float out[4])
 {
 	out[0] = out[1] = out[2] = 0.0f;
 	out[3] = (t->channels < 3) ? 1.0f : 0.0f;
 	if (!t->present || t->w == 0 || t->h == 0) { out[3] = 0.0f; return; }
+	if (g_pb_filter_mode
+	    && (x < 0 || y < 0 || (uint32_t) x >= t->w || (uint32_t) y >= t->h))
+	{
+		out[3] = 0.0f;
+		return;
+	}
 	if (x < 0) x = 0;
 	if (y < 0) y = 0;
 	if ((uint32_t) x >= t->w) x = (int32_t) t->w - 1;
@@ -1772,17 +1797,93 @@ static uint32_t pb_unorm8(float x)
 	return (uint32_t) floorf(x * 255.0f + 0.5f);
 }
 
+static int pb_run_job(Avm2Context* ctx, Avm2ShaderJobExt* job);
 static Avm2Value sj_start(Avm2Activation* act)
 {
-	Avm2Context* ctx = act->ctx;
-	Avm2ShaderJobExt* job = sj_ext(act);
+	pb_run_job(act->ctx, sj_ext(act));
+	return avm2_undefined();
+}
 
-	if (job->shader.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+// Run `shader` as a ShaderFilter (Ruffle ShaderMode::Filter): input 0 := src,
+// out-of-range texels read transparent black, and the output is written over
+// all of dst (dst->width x dst->height, straight-alpha unorm8 like a ShaderJob
+// target). Output pixel (x, y) is evaluated at source coordinate
+// (x + off_x, y + off_y), which is how the leftExtension/topExtension grow the
+// target. Never throws (this runs from the render walk too): returns 0 when
+// the shader is unusable or would have raised.
+int avm2_pixelbender_run_filter(Avm2Context* ctx, Avm2Value shader,
+                                const Avm2BitmapDataExt* src, Avm2BitmapDataExt* dst,
+                                int32_t off_x, int32_t off_y)
+{
+	if (shader.kind != AVM2_VALUE_OBJECT || dst == NULL || src == NULL) return 0;
+	Avm2ShaderJobExt job;
+	memset(&job, 0, sizeof(job));
+	job.shader = shader;
+	job.target = avm2_null();
+	g_pb_filter_mode = 1;
+	g_pb_tex0_override = src;
+	g_pb_target_override = dst;
+	g_pb_out_off_x = off_x;
+	g_pb_out_off_y = off_y;
+	int err = pb_run_job(ctx, &job);
+	g_pb_filter_mode = 0;
+	g_pb_tex0_override = NULL;
+	g_pb_target_override = NULL;
+	g_pb_out_off_x = g_pb_out_off_y = 0;
+	return err == 0;
+}
+
+// Cache stamp for a ShaderFilter's output: changes whenever anything the
+// filter run reads, other than input 0 (the caller keys that on its own
+// BitmapData version), may have changed: any shader-parameter write, the
+// shader identity, and the content version of every other BitmapData input.
+uint64_t avm2_pixelbender_filter_stamp(Avm2Context* ctx, Avm2Value shader)
+{
+	uint64_t h = 1469598103934665603ull;
+#define PB_MIX(v) do { h ^= (uint64_t) (v); h *= 1099511628211ull; } while (0)
+	PB_MIX(g_pb_param_gen);
+	if (shader.kind != AVM2_VALUE_OBJECT || shader.u.obj == NULL) return h;
+	PB_MIX((uintptr_t) shader.u.obj);
+	Avm2ShaderExt* sx = (Avm2ShaderExt*) shader.u.obj->native_ext;
+	if (sx == NULL || sx->data.kind != AVM2_VALUE_OBJECT) return h;
+	Avm2Object* data = sx->data.u.obj;
+	PB_MIX((uintptr_t) data);
+	Avm2ShaderDataExt* dx = (Avm2ShaderDataExt*) data->native_ext;
+	if (dx == NULL || dx->shader == NULL) return h;
+	const PbjShader* sh = dx->shader;
+	for (uint32_t i = 0; i < sh->nparams; i++)
+	{
+		const PbjParam* p = &sh->params[i];
+		if (!p->is_texture || p->tex_index == 0) continue;
+		Avm2Value* slot = avm2_object_find_dynamic(data, p->name,
+		                                           (uint32_t) strlen(p->name));
+		if (slot == NULL || slot->kind != AVM2_VALUE_OBJECT) continue;
+		Avm2Object* sin = slot->u.obj;
+		PB_MIX((uintptr_t) sin);
+		if (sin->cls != g_shaderinput_class) continue;
+		Avm2ShaderInputExt* ix = (Avm2ShaderInputExt*) sin->native_ext;
+		if (ix == NULL || ix->input.kind != AVM2_VALUE_OBJECT) continue;
+		PB_MIX((uintptr_t) ix->input.u.obj);
+		Avm2BitmapDataExt* bd = avm2_bitmapdata_ext_of(ctx, ix->input);
+		// A ByteArray / Vector input has no version: never cache over it.
+		if (bd == NULL) return 0;
+		PB_MIX(bd->version);
+		PB_MIX((uintptr_t) bd->pixels);
+	}
+#undef PB_MIX
+	return h ? h : 1;
+}
+
+// Returns 0 on success, else the error number (thrown here unless running as
+// a ShaderFilter, see avm2_pixelbender_run_filter).
+static int pb_run_job(Avm2Context* ctx, Avm2ShaderJobExt* job)
+{
+	if (job->shader.kind != AVM2_VALUE_OBJECT) return -1;
 	Avm2ShaderExt* sx = (Avm2ShaderExt*) job->shader.u.obj->native_ext;
-	if (sx == NULL || sx->data.kind != AVM2_VALUE_OBJECT) return avm2_undefined();
+	if (sx == NULL || sx->data.kind != AVM2_VALUE_OBJECT) return -1;
 	Avm2Object* data = sx->data.u.obj;
 	Avm2ShaderDataExt* dx = (Avm2ShaderDataExt*) data->native_ext;
-	if (dx == NULL || dx->shader == NULL) return avm2_undefined();
+	if (dx == NULL || dx->shader == NULL) return -1;
 	const PbjShader* sh = dx->shader;
 
 	// ---- register bank sizing -------------------------------------------
@@ -1830,6 +1931,16 @@ static Avm2Value sj_start(Avm2Activation* act)
 	for (uint32_t i = 0; i < sh->nparams && !err; i++)
 	{
 		const PbjParam* p = &sh->params[i];
+		if (p->is_texture && g_pb_tex0_override != NULL && p->tex_index == 0)
+		{
+			PbTexture* t = &ev.tex[0];
+			t->present = 1;
+			t->w = g_pb_tex0_override->width;
+			t->h = g_pb_tex0_override->height;
+			t->channels = 4;
+			t->bgra = g_pb_tex0_override->pixels;
+			continue;
+		}
 		if (p->is_texture)
 		{
 			Avm2Value* slot = avm2_object_find_dynamic(data, p->name,
@@ -1949,7 +2060,9 @@ static Avm2Value sj_start(Avm2Activation* act)
 	uint32_t out_w = 0, out_h = 0;
 	if (!err)
 	{
-		if (job->target.kind == AVM2_VALUE_OBJECT)
+		if (g_pb_target_override != NULL)
+			target_bd = g_pb_target_override;
+		else if (job->target.kind == AVM2_VALUE_OBJECT)
 		{
 			target_bd = avm2_bitmapdata_ext_of(ctx, job->target);
 			if (target_bd == NULL)
@@ -1991,8 +2104,8 @@ static Avm2Value sj_start(Avm2Activation* act)
 				{
 					PbVal c;
 					c.kind = PBJ_KIND_FLOAT;
-					c.f[0] = (float) x + 0.5f;   // pixel CENTRE
-					c.f[1] = (float) y + 0.5f;
+					c.f[0] = (float) ((int32_t) x + g_pb_out_off_x) + 0.5f;   // pixel CENTRE
+					c.f[1] = (float) ((int32_t) y + g_pb_out_off_y) + 0.5f;
 					c.f[2] = 0.0f;
 					c.f[3] = 0.0f;
 					pb_store(&ev, out_coord_reg, &c);
@@ -2015,6 +2128,7 @@ static Avm2Value sj_start(Avm2Activation* act)
 	{
 		if (target_bd != NULL)
 		{
+			avm2_bitmapdata_touch(target_bd);
 			for (uint32_t i = 0; i < npix; i++)
 			{
 				const float* s = &pixels[(size_t) i * 4];
@@ -2075,6 +2189,7 @@ static Avm2Value sj_start(Avm2Activation* act)
 	free(blocks);
 	for (int i = 0; i < PB_MAX_TEX; i++) free(owned[i]);
 
+	if (err && g_pb_filter_mode) return err;
 	if (err == 2162)
 	{
 		avm2_throw_error(ctx, ctx->builtins.argument_error_class,
@@ -2089,7 +2204,7 @@ static Avm2Value sj_start(Avm2Activation* act)
 		                 "enough data.", err_name != NULL ? err_name : "");
 	}
 	if (err) pb_throw_2004(ctx);
-	return avm2_undefined();
+	return err;
 }
 
 // ---------------------------------------------------------------------------
@@ -2180,6 +2295,7 @@ static Avm2Value sf_get_shader(Avm2Activation* act)
 static Avm2Value sf_set_shader(Avm2Activation* act)
 {
 	sf_ext(act)->shader = (act->argc > 0) ? act->args[0] : avm2_null();
+	g_pb_param_gen++;
 	return avm2_undefined();
 }
 

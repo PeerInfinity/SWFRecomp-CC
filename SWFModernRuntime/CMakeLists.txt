@@ -201,6 +201,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/include/memory
     ${PROJECT_SOURCE_DIR}/lib/c-hashmap
     ${PROJECT_SOURCE_DIR}/lib/o1heap
+    ${PROJECT_SOURCE_DIR}/lib/stb
     zlib
     lzma/liblzma/api
 )

@@ -962,7 +962,24 @@ typedef struct Avm2BitmapDataExt
 	uint8_t transparency;
 	uint8_t disposed;
 	uint32_t* pixels;  // width*height entries; NULL when 0-size / disposed
+	// Content version: a stamp from one global monotonic clock, refreshed by
+	// avm2_bitmapdata_touch on every write path (each mutating BitmapData
+	// method, ShaderJob targets, Stage3D drawToBitmapData). Caches derived
+	// from the pixels (the Bitmap ShaderFilter output, avm2_display.c) key on
+	// it; because the clock is global, a (ext, version) pair never repeats.
+	uint64_t version;
 } Avm2BitmapDataExt;
+// Mark `bd`'s pixels as changed (NULL-safe). Any code that writes
+// bd->pixels outside the BitmapData methods must call this.
+void avm2_bitmapdata_touch(Avm2BitmapDataExt* bd);
+// ShaderFilter support (avm2_pixelbender.c). run_filter: input 0 := src,
+// output over all of dst, output pixel (x, y) at source coord (x+off_x,
+// y+off_y); never throws, returns 0 if the shader is unusable. filter_stamp:
+// cache key for everything the run reads besides input 0 (0 = uncacheable).
+int avm2_pixelbender_run_filter(Avm2Context* ctx, Avm2Value shader,
+                                const Avm2BitmapDataExt* src, Avm2BitmapDataExt* dst,
+                                int32_t off_x, int32_t off_y);
+uint64_t avm2_pixelbender_filter_stamp(Avm2Context* ctx, Avm2Value shader);
 // NULL when the value is not a BitmapData (subclasses included).
 Avm2BitmapDataExt* avm2_bitmapdata_ext_of(Avm2Context* ctx, Avm2Value v);
 // Bitmap self-bounds hook for avm2_display.c: 1 + w/h (pixels) if obj is a

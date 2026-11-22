@@ -4805,10 +4805,50 @@ static Avm2Value do_set_metadata(Avm2Activation* act)
 	return avm2_undefined();
 }
 
+// ShaderFilter output cache for Bitmap nodes (avm2_render_bitmap). One entry
+// per display object that has drawn a ShaderFilter; keyed on everything the
+// CPU PixelBender run reads, so a static Bitmap runs its shader once instead
+// of every frame:
+//   - the source BitmapData (ext pointer, pixel pointer, size, content
+//     version: avm2_bitmapdata_touch on every write path);
+//   - avm2_pixelbender_filter_stamp of each ShaderFilter in the list (the
+//     shader-parameter generation + versions of the other image inputs);
+//   - each filter's extensions.
+// clear_filters drops the owner's entry, so a `filters` reassignment and the
+// swept-object free path both invalidate it (no stale pointer reuse).
+typedef struct Avm2SfCache
+{
+	const Avm2DisplayObjectExt* owner;
+	const Avm2BitmapDataExt* src;
+	const uint32_t* src_px;
+	uint32_t src_w, src_h;
+	uint64_t src_ver, stamp;
+	int valid;                 // 0: last run failed (draw unfiltered)
+	uint32_t out_w, out_h;
+	int32_t out_x, out_y;      // output origin in source pixels (-left, -top)
+	uint32_t* out;
+	struct Avm2SfCache* next;
+} Avm2SfCache;
+static Avm2SfCache* g_sf_cache = NULL;
+
+static void sf_cache_drop(const Avm2DisplayObjectExt* owner)
+{
+	for (Avm2SfCache** pp = &g_sf_cache; *pp != NULL; pp = &(*pp)->next)
+	{
+		if ((*pp)->owner != owner) continue;
+		Avm2SfCache* e = *pp;
+		*pp = e->next;
+		free(e->out);
+		free(e);
+		return;
+	}
+}
+
 // Drop a display object's stored filter list (also the free path for a swept
 // object: each entry may own an out-of-line convolution matrix).
 static void clear_filters(Avm2Context* ctx, Avm2DisplayObjectExt* ext)
 {
+	sf_cache_drop(ext);
 	if (ext->filters == NULL) { ext->filter_count = 0; return; }
 	for (uint32_t i = 0; i < ext->filter_count; i++)
 		avm2_filter_release(ctx, &ext->filters[i]);
@@ -18678,6 +18718,110 @@ static uint32_t avm2_alloc_cx_slot(void)
 	return cxid;
 }
 
+// The ShaderFilter output for a Bitmap node (Ruffle ShaderMode::Filter: input
+// 0 = the source, out-of-range texels transparent black). Several
+// ShaderFilters chain in list order. Each filter's left/right/top/bottom
+// extensions grow its target, with the source kept at (left, top) inside it
+// (Ruffle ignores the extensions and renders a source-sized target; no corpus
+// row sets them). Non-ShaderFilter entries are left to the normal filter
+// pipeline, and a ShaderFilter on any NON-Bitmap display object still renders
+// unfiltered (avm2_filter_renderable drops it): that would need the GPU
+// filter layer's readback, and no corpus row has one.
+// Returns the cache entry (NULL = no ShaderFilter in the list, or no memory).
+static const Avm2SfCache* sf_bitmap_output(Avm2Context* ctx,
+                                           const Avm2DisplayObjectExt* ext,
+                                           const Avm2BitmapDataExt* bd)
+{
+	uint64_t stamp = 1469598103934665603ull;
+	int any = 0, cacheable = 1;
+	for (uint32_t i = 0; i < ext->filter_count; i++)
+	{
+		const Avm2FilterVal* f = &ext->filters[i];
+		if (f->kind != AVM2_FILTER_SHADER) continue;
+		any = 1;
+		uint64_t st = avm2_pixelbender_filter_stamp(ctx, f->shader);
+		if (st == 0) cacheable = 0;
+		uint64_t parts[5] = { st, (uint32_t) f->ext_left, (uint32_t) f->ext_right,
+		                      (uint32_t) f->ext_top, (uint32_t) f->ext_bottom };
+		for (int k = 0; k < 5; k++) { stamp ^= parts[k]; stamp *= 1099511628211ull; }
+	}
+	if (!any) return NULL;
+
+	Avm2SfCache* e = g_sf_cache;
+	while (e != NULL && e->owner != ext) e = e->next;
+	if (e != NULL && cacheable && e->src == bd && e->src_px == bd->pixels
+	    && e->src_w == bd->width && e->src_h == bd->height
+	    && e->src_ver == bd->version && e->stamp == stamp)
+		return e;
+	if (e == NULL)
+	{
+		e = (Avm2SfCache*) calloc(1, sizeof(Avm2SfCache));
+		if (e == NULL) return NULL;
+		e->owner = ext;
+		e->next = g_sf_cache;
+		g_sf_cache = e;
+	}
+	e->src = bd;
+	e->src_px = bd->pixels;
+	e->src_w = bd->width;
+	e->src_h = bd->height;
+	e->src_ver = bd->version;
+	e->stamp = stamp;
+	e->valid = 0;
+
+	// Run the chain. `cur` is the current input (initially the BitmapData).
+	Avm2BitmapDataExt cur = *bd;
+	uint32_t* owned = NULL;
+	int32_t ox = 0, oy = 0;
+	int ok = 1;
+	for (uint32_t i = 0; i < ext->filter_count && ok; i++)
+	{
+		const Avm2FilterVal* f = &ext->filters[i];
+		if (f->kind != AVM2_FILTER_SHADER) continue;
+		int32_t l = f->ext_left > 0 ? f->ext_left : 0;
+		int32_t r = f->ext_right > 0 ? f->ext_right : 0;
+		int32_t t = f->ext_top > 0 ? f->ext_top : 0;
+		int32_t b = f->ext_bottom > 0 ? f->ext_bottom : 0;
+		uint64_t w64 = (uint64_t) cur.width + (uint64_t) l + (uint64_t) r;
+		uint64_t h64 = (uint64_t) cur.height + (uint64_t) t + (uint64_t) b;
+		if (w64 == 0 || h64 == 0 || w64 > 8191 || h64 > 8191) { ok = 0; break; }
+		Avm2BitmapDataExt dst = cur;
+		dst.width = (uint32_t) w64;
+		dst.height = (uint32_t) h64;
+		dst.transparency = 1;
+		dst.pixels = (uint32_t*) calloc((size_t) w64 * h64, sizeof(uint32_t));
+		if (dst.pixels == NULL) { ok = 0; break; }
+		if (!avm2_pixelbender_run_filter(ctx, f->shader, &cur, &dst, -l, -t))
+		{
+			free(dst.pixels);
+			ok = 0;
+			break;
+		}
+		free(owned);
+		owned = dst.pixels;
+		cur = dst;
+		ox -= l;
+		oy -= t;
+	}
+	free(e->out);
+	e->out = NULL;
+	if (ok && owned != NULL)
+	{
+		e->out = owned;
+		e->out_w = cur.width;
+		e->out_h = cur.height;
+		e->out_x = ox;
+		e->out_y = oy;
+		e->valid = 1;
+	}
+	else
+		free(owned);
+	// An uncacheable chain (a ByteArray/Vector image input) reruns next
+	// frame: force a miss by clearing the stored source.
+	if (!cacheable) e->src = NULL;
+	return e;
+}
+
 // Blit one Bitmap node: its BitmapData's premultiplied-ARGB pixels as a
 // textured quad under the node's world matrix + concatenated alpha. The
 // renderer uses a premultiplied-alpha blend, and the pixel store is already
@@ -18712,9 +18856,25 @@ static void avm2_render_bitmap(Avm2Context* ctx, Avm2Object* obj,
 	(void) alpha;
 	uint32_t cxid = avm2_alloc_cx_slot();
 
-	renderer_draw_bitmap_quad_scaled(context, bd->pixels,
-		bd->width, bd->height, bd->width, bd->height,
-		0.0f, 0.0f, xid, cxid);
+	// A Bitmap whose filter list holds a ShaderFilter draws the (cached)
+	// shader output instead of its pixels; a failed run draws unfiltered.
+	const uint32_t* px = bd->pixels;
+	uint32_t pw = bd->width, ph = bd->height;
+	float px_x = 0.0f, px_y = 0.0f;
+	const Avm2SfCache* sf = (ext->filter_count != 0)
+		? sf_bitmap_output(ctx, ext, bd) : NULL;
+	if (sf != NULL && sf->valid && sf->out != NULL
+	    && renderer_fit_dynamic_bitmap(context, sf->out_w, sf->out_h))
+	{
+		px = sf->out;
+		pw = sf->out_w;
+		ph = sf->out_h;
+		px_x = (float) sf->out_x * 20.0f;
+		px_y = (float) sf->out_y * 20.0f;
+	}
+
+	renderer_draw_bitmap_quad_scaled(context, px, pw, ph, pw, ph,
+		px_x, px_y, xid, cxid);
 }
 
 // Blit a NetStream-attached Video: the stream's last decoded frame, stretched

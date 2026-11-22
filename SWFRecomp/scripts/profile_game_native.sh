@@ -121,6 +121,7 @@ if [ "$RUN_ONLY" != true ]; then
     cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${BUILD_DIR}/"
     cp "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${BUILD_DIR}/"
+    cp "${SWFMODERN_ROOT}/lib/stb/stb_image_write.h" "${BUILD_DIR}/"
     cp "${SWFMODERN_INC}/memory/heap.h" "${BUILD_DIR}/memory/"
     if [ -d "${SWFMODERN_ROOT}/third_party/libtess2" ]; then
         cp "${SWFMODERN_ROOT}/third_party/libtess2/"*.c "${BUILD_DIR}/" 2>/dev/null || true

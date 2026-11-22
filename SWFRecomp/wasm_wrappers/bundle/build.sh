@@ -61,6 +61,7 @@ cp -p "${RT}/src/actionmodern/unicode_case_tables.h" "${SRC}/"
 cp -p "${RT}/lib/c-hashmap/map.c" "${RT}/lib/c-hashmap/map.h" "${SRC}/"
 cp -p "${RT}/lib/o1heap/o1heap.c" "${RT}/lib/o1heap/o1heap.h" "${SRC}/"
 cp -p "${RT}/lib/stb/stb_image.h" "${SRC}/"
+cp -p "${RT}/lib/stb/stb_image_write.h" "${SRC}/"
 cp -p "${RT}/third_party/libtess2"/*.c "${RT}/third_party/libtess2"/*.h "${SRC}/"
 mkdir -p "${SRC}/memory"; cp -p "${RT}/include/memory/heap.h" "${SRC}/memory/"
 

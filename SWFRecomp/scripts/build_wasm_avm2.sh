@@ -111,6 +111,7 @@ if [ -d "${SWFMODERN_ROOT}/third_party/libtess2" ]; then
     cp -p "${SWFMODERN_ROOT}/third_party/libtess2"/*.h "${SRC_DIR}/" 2>/dev/null || true
 fi
 cp -p "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${SRC_DIR}/" 2>/dev/null || true
+cp -p "${SWFMODERN_ROOT}/lib/stb/stb_image_write.h" "${SRC_DIR}/" 2>/dev/null || true
 mkdir -p "${SRC_DIR}/memory"
 cp -p "${SWFMODERN_INC}/memory/heap.h" "${SRC_DIR}/memory/" 2>/dev/null || true
 

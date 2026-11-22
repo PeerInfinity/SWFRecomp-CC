@@ -2443,6 +2443,7 @@ static Avm2Value context3d_draw_to_bitmap_data(Avm2Activation* act)
 		                            "cleared every frame before drawing.");
 	Avm2BitmapDataExt* bd = avm2_bitmapdata_ext_of(ctx, avm2_object_value(dobj));
 	if (bd == NULL || bd->disposed || bd->pixels == NULL) return avm2_undefined();
+	avm2_bitmapdata_touch(bd);  // writes bd->pixels below
 	// A clear with no draw after it is still pending; Flash's clear is
 	// immediate, so the read must see it (stage3d_missing_vertex_stream reads
 	// the clear colour after a draw that was skipped or threw).

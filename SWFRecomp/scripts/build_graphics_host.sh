@@ -74,6 +74,7 @@ cp -p "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${SRC}/"
 cp -p "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${SWFMODERN_ROOT}/lib/c-hashmap/map.h" "${SRC}/"
 cp -p "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${SRC}/"
 cp -p "${SWFMODERN_ROOT}/lib/stb/stb_image.h" "${SRC}/"
+cp -p "${SWFMODERN_ROOT}/lib/stb/stb_image_write.h" "${SRC}/"
 cp -p "${SWFMODERN_ROOT}/third_party/libtess2"/*.c "${SWFMODERN_ROOT}/third_party/libtess2"/*.h "${SRC}/"
 cp -p "${SWFRECOMP_ROOT}/wasm_wrappers/host_main_graphics.c" "${SRC}/"
 if [ "${AVM2}" = "1" ]; then
