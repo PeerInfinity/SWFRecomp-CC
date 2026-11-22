@@ -96,11 +96,12 @@ The other fixed caps in `ng_shared.c` were left alone: buttons 64, fonts 32, vid
   - images: root-attached tinted / `_alpha` sprites now render tinted;
   - images: root-attached clips are now drawn in depth order;
   - trace: only SWFs with more than 64 EditTexts, 256 shapes or 64 morphs change.
-- **Pages:**
+- **Pages (corrected after the coordinator's check):**
   - My dry run `45078593255` succeeded.
-  - My real deploy `45078853881` was cancelled by the concurrency group, superseded by the coordinator's deploy `45079004983` at `697669e5f`, which includes this commit. That deploy succeeded.
+  - My real deploy `45078853881` was cancelled by the concurrency group.
+  - `45079004983` (the coordinator's, at `697669e5f`) was ALSO a dry run, so its upload and deploy steps were skipped. **Nothing from this slice reached the live site during the session.** The coordinator then dispatched the real deploy at `697669e5f`, and **live verification is pending on that deploy**.
+  - So my live in-browser recompiler runs exercised the OLDER deployed runtime. On it, `avm1_attached_clip_hidden_capture` traces match. `avm1_attached_clip_color` traces `getRGB` as `undefined` because of a **pre-existing browser gap**, read from source: `colorGetRGB`'s non-OFFSCREEN `#else` arm returns `undefined`, so setRGB writes but getRGB never reads the colour back. That is independent of this change and listed as a lead in §6.
   - N itself is in `docs2` (local only, not OSS), so I verified it on the local build of the same runtime (§6).
-  - On the live in-browser recompiler, `avm1_attached_clip_hidden_capture` traces match. `avm1_attached_clip_color` traces `getRGB` as `undefined` because of a **pre-existing browser gap**: `colorGetRGB`'s non-OFFSCREEN `#else` arm returns `undefined`. setRGB writes, but getRGB never reads the colour back. That is unrelated to this change and listed as a lead in §6.
 
 ## 6. N after the fixes, and the next blocker
 
