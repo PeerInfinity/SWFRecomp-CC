@@ -17380,6 +17380,37 @@ static void textFormatDefineLazyProps(SWFAppContext* app_context, ASObject* prot
 	}
 }
 
+// s25 w1 PROTOTYPE: 1 when `name` is a TextFormat field that `obj` holds as an
+// own slot but no object on its __proto__ chain carries any more (the
+// prototype accessor Flash reads it through is gone).
+static int tfLazyFieldHidden(ASObject* obj, const char* name, u32 len)
+{
+	int is_field = 0;
+	for (int i = 0; i < 17; i++) {
+		if (strlen(g_tf_lazy_names[i]) == len && memcmp(g_tf_lazy_names[i], name, len) == 0) { is_field = 1; break; }
+	}
+	if (!is_field || findPropertyRaw(obj, name, len) == NULL) return 0;
+	// A TextFormat that itself got the lazy props (used as a prototype) holds
+	// the accessor on itself; its own slot stands for it.
+	for (int i = 0; i < g_lazy_proto_count; i++)
+		if (g_lazy_protos[i] == obj) return 0;
+	ActionVar* pv = getProperty(obj, "__proto__", 9);
+	int guard = 0;
+	while (pv != NULL && (pv->type == ACTION_STACK_VALUE_OBJECT || pv->type == ACTION_STACK_VALUE_ARRAY)
+	       && pv->data.numeric_value != 0 && guard++ < 64) {
+		if (pv->type == ACTION_STACK_VALUE_ARRAY) {
+			ASArray* a = (ASArray*)(uintptr_t)pv->data.numeric_value;
+			if (a->props != NULL && findPropertyRaw(a->props, name, len) != NULL) return 0;
+			pv = a->props != NULL ? getProperty(a->props, "__proto__", 9) : NULL;
+			continue;
+		}
+		ASObject* o = (ASObject*)(uintptr_t)pv->data.numeric_value;
+		if (findPropertyRaw(o, name, len) != NULL) return 0;
+		pv = getProperty(o, "__proto__", 9);
+	}
+	return 1;
+}
+
 // Helper: create a fresh TextFormat object with all null props + display="block", kerning=false
 static ASObject* createBlankTextFormat(SWFAppContext* app_context) {
 	initTextFormatPrototype(app_context);
@@ -17396,6 +17427,11 @@ static ASObject* createBlankTextFormat(SWFAppContext* app_context) {
 				break;
 			}
 		}
+		// Ruffle style_sheet.rs `transform` builds this through
+		// instantiate_class_as_script("TextFormat"), i.e. the real
+		// constructor, which defines the lazy fields on the prototype. The
+		// s25 accessor read gate (tfLazyFieldHidden) depends on it.
+		textFormatDefineLazyProps(app_context, g_textformat_constructor.prototype_obj);
 	}
 	// Initialize all properties to null
 	ActionVar null_val = {0};
@@ -58050,6 +58086,18 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 			return;
 		}
 
+		// s25 w1 PROTOTYPE (TextFormat accessor model, read half): in Flash a
+		// TextFormat's fields are native data read through ACCESSORS on the
+		// prototype it got at construction (textFormatDefineLazyProps). Our
+		// instance keeps own data slots, so gate the read: a field resolves
+		// only while some object on the __proto__ chain still carries that
+		// name. `delete TextFormat.prototype.font` -> tf.font is undefined
+		// (avm1/text_format_prototype_lazy lines 4/6/7).
+		if (obj->native_type == NATIVE_TEXTFORMAT && tfLazyFieldHidden(obj, prop_name, prop_name_len)) {
+			pushUndefined(app_context);
+			return;
+		}
+
 		// Sound native properties: duration and position are always computed
 		// (unless the user set them to a string, which sticks for SWF5 Place 0 pattern)
 		if (obj->native_type == NATIVE_SOUND) {
@@ -69551,7 +69599,17 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 
 	// Handle array-like ASObject this (e.g., Array.prototype.concat.call(plainObj, ...))
 	// Flash/Ruffle Array.prototype methods work on any object with numeric keys + length.
-	if (g_call_this_type == ACTION_STACK_VALUE_OBJECT) {
+	// Every receiver kind below arrives as an ASObject* property bag: a Function's
+	// own_props, a MovieClip's dynamic_props, and _global for an undefined/null
+	// .call thisArg (the .call/.apply arms of actionCallMethod and the own-method
+	// arms set this_obj that way and tag g_call_this_type with the receiver kind).
+	// Ruffle array.rs runs these generics on any Object (s25 L5,
+	// regression/avm1_array_generic_receivers).
+	if (g_call_this_type == ACTION_STACK_VALUE_OBJECT
+	    || g_call_this_type == ACTION_STACK_VALUE_FUNCTION
+	    || g_call_this_type == ACTION_STACK_VALUE_MOVIECLIP
+	    || g_call_this_type == ACTION_STACK_VALUE_UNDEFINED
+	    || g_call_this_type == ACTION_STACK_VALUE_NULL) {
 		ASObject* obj = (ASObject*) this_obj;
 		u32 old_length = 0;
 		ASArray* temp = objectToTempArray(app_context, obj, &old_length);
@@ -72158,9 +72216,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 					g_prev_executing_func = prev_exec_op;
 					g_current_executing_func = own_func;
+					// The receiver is a Function: tag it so a native generic
+					// (builtin_array_method) reads own_props as its `this` bag.
+					u8 _op_saved_call_this_type = g_call_this_type;
+					g_call_this_type = ACTION_STACK_VALUE_FUNCTION;
 					g_call_depth++;
 					ActionVar result = own_func->advanced_func(app_context, args, num_args, registers, (void*) func->own_props);
 					g_call_depth--;
+					g_call_this_type = _op_saved_call_this_type;
 					g_current_executing_func = prev_exec_op;
 					g_current_context = prev_ctx_op;
 					g_this_depth = saved_this_depth_op;
@@ -77723,8 +77786,20 @@ _mc_user_dispatch: ;
 						                           ? (CF_VERSION | CF_CTX_MC_FALLBACK)
 						                           : (CF_VERSION_RECEIVER | CF_CTX_RECEIVER)), mc);
 
+						// Array.prototype generics installed as an MC own method
+						// (`mc.join = Array.prototype.join`) work on the clip's
+						// property bag, as Array.prototype.join.call(mc) does
+						// (s25 L5). Every other native keeps the NULL receiver.
+						u8 _mc_saved_call_this_type = g_call_this_type;
+						if (func->advanced_func == (Function2Ptr)builtin_array_method
+						    && mc != NULL && mc->dynamic_props != NULL) {
+							_mc_o.has_this_ptr = 1;
+							_mc_o.this_ptr = mc->dynamic_props;
+							g_call_this_type = ACTION_STACK_VALUE_MOVIECLIP;
+						}
 						ActionVar result = invokeFunctionValue(app_context, func, &this_var,
 						                                       args, num_args, &_mc_o);
+						g_call_this_type = _mc_saved_call_this_type;
 
 						leaveClosureFrame(app_context, &cf);
 						g_call_depth--;

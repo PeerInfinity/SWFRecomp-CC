@@ -11629,7 +11629,15 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		extern int catch_up_backward;
 		extern int catch_up_mode;
 		extern size_t catch_up_target;
-		if (catch_up_backward && display_list[depth].char_id != 0)
+		// g_loopback_replay: the natural loop wrap of a nested/attached
+		// sprite (ng_advance_sprite_playhead raises it around the frame-0
+		// replay). Without it a Ratio re-place of a surviving same-char,
+		// same-ratio child fell through to a full fresh placement and the
+		// child's frame 1 ran a second time (s25 L4,
+		// regression/avm1_attached_clip_tagorder_ratio). Same rule as
+		// tagPlaceObject2's survives_rewind block.
+		extern int g_loopback_replay;
+		if ((catch_up_backward || g_loopback_replay) && display_list[depth].char_id != 0)
 		{
 			// Ruffle survives_rewind: for MovieClip, only ratio_equals is
 			// required; other types additionally need id_equals. See the
