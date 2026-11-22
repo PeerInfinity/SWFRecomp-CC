@@ -891,6 +891,7 @@ typedef struct TextFieldGlyphRun {
     u16 font_height; // twips
     u8 align;        // 0=left, 1=right, 2=center, 3=justify
     u8 bullet;       // non-zero when the run is inside <li>
+    u16 font_id;     // s24 w2-text-pitch: per-run EMBEDDED face (<b>/<i>/<font face>), 0 = info->font_id
 } TextFieldGlyphRun;
 
 // Text field glyph rendering info (used by tag.c for headless glyph rendering)

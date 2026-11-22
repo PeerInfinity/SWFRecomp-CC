@@ -22932,7 +22932,20 @@ typedef struct TFRun_s {
 	char font_name[64]; char href[256]; char href_target[64];
 	char tabstops[128]; // Comma-separated tab stop values, empty = none
 	u16 img; // html_img.h pool index of an <img> placeholder run (0 = none)
+	// s24 w2-text-pitch: the leading in TWIPS, alongside the whole-pixel
+	// `leading` above. A DefineEditText tag's Leading is twips and need not be
+	// a whole pixel (text/br_at_start: 533 tw); Ruffle keeps TextFormat.leading
+	// as f64 pixels and lays out with Twips::from_pixels (html/layout.rs
+	// line_leading_adjustment), so the _tf_leading sync uses this field.
+	// Every writer of `leading` writes this too (tf_set_run_leading_px).
+	s32 leading_tw;
 } TFRun;
+// Keep TFRun.leading (px) and TFRun.leading_tw in step for a whole-pixel value.
+static inline void tf_set_run_leading_px(TFRun* r, s16 px)
+{
+	r->leading = px;
+	r->leading_tw = (s32)px * 20;
+}
 #define TF_MAX_RUNS   512
 #define TF_MAX_TABLES  32
 typedef struct {
@@ -23296,7 +23309,7 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
 			if (existing_ld == NULL || existing_ld->type != ACTION_STACK_VALUE_F64) {
 				ActionVar ld_val = {0};
 				ld_val.type = ACTION_STACK_VALUE_F64;
-				VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
+				VAL(double, &ld_val.data.numeric_value) = (double)first_run->leading_tw;
 				setProperty(app_context, props, "_tf_leading", 11, &ld_val);
 			}
 		}
@@ -27335,6 +27348,7 @@ static void tf_get_defaults(MovieClip* mc, TFRun* def) {
 		def->align = ng_getTextFieldAlign(mc->ng_textfield_idx);
 		s16 leading_twips = ng_getTextFieldLeading(mc->ng_textfield_idx);
 		def->leading = leading_twips / 20; // twips → pixels
+		def->leading_tw = leading_twips;   // exact (s24 w2-text-pitch)
 		u16 lm = ng_getTextFieldLeftMargin(mc->ng_textfield_idx);
 		def->left_margin = (s16)(lm / 20);
 		u16 rm = ng_getTextFieldRightMargin(mc->ng_textfield_idx);
@@ -28085,7 +28099,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				if (tag_sp < TF_PARSE_STACK_MAX - 1) { tag_text_len_stack[tag_sp] = table->text_len; tag_had_ws_stripped[tag_sp] = 0; tag_type_stack[tag_sp++] = TF_TAG_TF; }
 				char av[64];
 				if (tf_get_attr(tname, tname_len, "leading", av, sizeof(av)))
-					fmt_stack[fmt_sp].leading = (s16)atoi(av);
+					tf_set_run_leading_px(&fmt_stack[fmt_sp], (s16)atoi(av));
 				if (tf_get_attr(tname, tname_len, "leftmargin", av, sizeof(av)))
 					fmt_stack[fmt_sp].left_margin = (s16)atoi(av);
 				if (tf_get_attr(tname, tname_len, "rightmargin", av, sizeof(av)))
@@ -29714,6 +29728,7 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 			out_runs[run_count].font_height = stack[sp].font_height; \
 			out_runs[run_count].align = stack[sp].align; \
 			out_runs[run_count].bullet = stack[sp].bullet; \
+			out_runs[run_count].font_id = 0; \
 			run_count++; \
 		} \
 		cur_run_start = out_pos; \
@@ -30097,6 +30112,18 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				// its top line right after the field acquired an MC wrapper.
 				_tfg_runs[ri].align = r->align;
 				_tfg_runs[ri].bullet = 0;
+				_tfg_runs[ri].font_id = 0;
+				// s24 w2-text-pitch: a run whose <b>/<i>/<font face>
+				// names a DIFFERENT embedded face draws with that face (Ruffle
+				// html/layout.rs resolve_font is per span). Embedded fields only.
+				if (mc->ng_textfield_idx >= 0
+				    && (ng_getTextFieldFlags(mc->ng_textfield_idx) & 0x0080)
+				    && r->font_name[0] != '\0') {
+					u16 _rf = 0;
+					if (ng_findEmbeddedFontId(r->font_name, r->bold, r->italic, &_rf)
+					    && _rf != font_id)
+						_tfg_runs[ri].font_id = _rf;
+				}
 			}
 			runs_out = _tfg_runs;
 			run_count_out = rc;
@@ -30120,6 +30147,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				_tfg_runs[0].font_height = font_height;
 				_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
 				_tfg_runs[0].bullet = 0;
+				_tfg_runs[0].font_id = 0;
 				runs_out = _tfg_runs;
 				run_count_out = 1;
 			} else {
@@ -30142,6 +30170,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 					_tfg_runs[0].font_height = font_height;
 					_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
 					_tfg_runs[0].bullet = 0;
+					_tfg_runs[0].font_id = 0;
 					runs_out = _tfg_runs;
 					run_count_out = 1;
 				}
@@ -30553,6 +30582,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 					otf_html_runs[ri].font_height = (u16)r->font_height;
 					otf_html_runs[ri].align = r->align;
 					otf_html_runs[ri].bullet = 0;
+					otf_html_runs[ri].font_id = 0;
 				}
 				emit_runs = otf_html_runs;
 				emit_run_count = rc;
@@ -30580,6 +30610,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 		otf_html_runs[0].font_height = font_height;
 		otf_html_runs[0].align = (u8)ng_getTextFieldAlign(tf_idx);
 		otf_html_runs[0].bullet = 0;
+		otf_html_runs[0].font_id = 0;
 		emit_runs = otf_html_runs;
 		emit_run_count = 1;
 	}
@@ -56036,7 +56067,7 @@ void actionSetMember(SWFAppContext* app_context)
 								// No existing leading set — use the parsed default
 								ActionVar ld_val = {0};
 								ld_val.type = ACTION_STACK_VALUE_F64;
-								VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
+								VAL(double, &ld_val.data.numeric_value) = (double)first_run->leading_tw;
 								setProperty(app_context, props, "_tf_leading", 11, &ld_val);
 							}
 							// If _tf_leading already exists (from setTextFormat/setNewTextFormat),
@@ -74592,7 +74623,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							}
 							if (p_leading != NULL && p_leading->type == ACTION_STACK_VALUE_F64) {
 								double v; memcpy(&v, &p_leading->data.numeric_value, sizeof(double));
-								r->leading = (s16)v;
+								tf_set_run_leading_px(r, (s16)v);
 							}
 							if (p_lm != NULL && p_lm->type == ACTION_STACK_VALUE_F64) {
 								double v; memcpy(&v, &p_lm->data.numeric_value, sizeof(double));
@@ -74650,7 +74681,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 						if (p_leading != NULL && p_leading->type == ACTION_STACK_VALUE_F64) {
 							double v; memcpy(&v, &p_leading->data.numeric_value, sizeof(double));
-							r->leading = (s16)v;
+							tf_set_run_leading_px(r, (s16)v);
 						}
 						if (p_lm != NULL && p_lm->type == ACTION_STACK_VALUE_F64) {
 							double v; memcpy(&v, &p_lm->data.numeric_value, sizeof(double));

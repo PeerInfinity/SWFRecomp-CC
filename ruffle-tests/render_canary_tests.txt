@@ -594,3 +594,13 @@ avm2/bitmapdata_draw_cab_quality            # drawWithQuality (CI-failing)      
 # tier=1
 visual/filters/empty_child_filter_bounds    # AVM1 runtime filters, dyn subtree  1 cmp
 regression/avm1_runtime_filters               # AVM1 runtime filters probe (Ruffle golden) 1 cmp
+# --- s24 w2-text-pitch (AVM1 EditText run rendering) ---
+# No earlier member saw either mechanism. style_changes_in_html (tol 0) sees
+# the per-run embedded face (<b>/<i> runs drawn with their own DefineFont3
+# subset) AND Ruffle's Fixed8 glyph colour quantisation (0x99 -> 152);
+# br_at_start sees fractional DefineEditText leading (533 tw kept in twips,
+# not truncated to 26 px). Both CI-grade on the cloud box (before-leg md5 ==
+# CI actual at baseline 44965247383); pass after this patch (0/0 and 4/8).
+# tier=1
+text/style_changes_in_html                  # per-run face + Fixed8 colour     1 cmp
+text/br_at_start                            # fractional tag leading           1 cmp
