@@ -4280,6 +4280,22 @@ uint32_t avm2_edittext_collect_underlines(Avm2Context* ctx, Avm2Object* tf_obj,
 	return n;
 }
 
+// s25 w1-pixel-text: the RENDER half of device_font_scale_x. Ruffle draws the
+// layout through layout_to_local_matrix = translate(bounds_x + GUTTER -
+// hscroll, ...) * scale(scale_x, 1) (edit_text.rs:799-815), so a device-font
+// glyph's x position AND its outline are scaled by d/a; the net glyph scale
+// is uniform at the field's concatenated y scale. Returns scale_x (1 for
+// embedded fields) and the layout-space x origin in local twips.
+float avm2_edittext_device_layout_sx(Avm2Context* ctx, Avm2Object* tf_obj,
+                                     int32_t* out_off_x)
+{
+	Avm2EditTextExt* et = edittext_of(ctx, tf_obj);
+	*out_off_x = 0;
+	if (et == NULL) return 1.0f;
+	*out_off_x = et->bounds_x + GUTTER - twips_from_px(et->hscroll);
+	return et_device_font_scale_x(ctx, et);
+}
+
 // Collect the rendered glyphs of a TextField in field-local twips, matching
 // Ruffle EditText::render_text: layout_to_local (bounds origin + gutter -
 // scroll offsets) composed with render_layout_box (box origin) and

@@ -19146,6 +19146,8 @@ static void avm2_render_graphics(Avm2Context* ctx, Avm2Object* obj,
 uint32_t avm2_edittext_collect_glyphs(Avm2Context* ctx, Avm2Object* tf_obj,
                                       Avm2GlyphPlacement** out,
                                       int32_t out_clip[4]);
+float avm2_edittext_device_layout_sx(Avm2Context* ctx, Avm2Object* tf_obj,
+                                     int32_t* out_off_x);
 uint32_t avm2_statictext_collect_glyphs(Avm2Context* ctx,
                                         const Avm2StaticTextData* st,
                                         Avm2GlyphPlacement** out);
@@ -19568,6 +19570,16 @@ static void avm2_render_textbox(struct Avm2EditTextExt* et, const Mat* world,
 		// .01-.03) are untouched.
 		double corner_ext = dtw / 2.0;
 #endif
+		if (bw == 0.0 && bh > 0.0)
+		{
+			// s25 w1-pixel-text: a ZERO-WIDTH box degenerates the strip
+			// [0,1,2,3,0] to one vertical segment drawn down and back up. A
+			// line segment inks its start pixel but not its end pixel, so the
+			// ink is rows y .. y+h-1 only (visual/edittext/edittext_gutter's
+			// width-0 fields: row y+h white in the golden; ours inked it).
+			avm2_border_rect(bx, by, dtw, bh, bc, alpha);
+			return;
+		}
 		avm2_border_rect(bx, by, bw + dtw, dtw, bc, alpha);          // top
 		avm2_border_rect(bx, by + bh, corner_missing ? bw : bw + corner_ext,
 		                 dtw, bc, alpha);                            // bottom
@@ -19752,6 +19764,18 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 		// glyph placements use, so it rides the same transform slot; the box and
 		// border were already drawn ABOVE, outside the mask, which is also the
 		// order Ruffle uses.
+		// s25 w1-pixel-text: a field narrower than 2*GUTTER makes Ruffle's
+		// bounds.grow_x(-GUTTER) an INVERTED rect (x_min > x_max; grow_x does
+		// not normalise), and create_box_from_rectangle draws it reflected, so
+		// the mask covers [x_max, x_min]. A zero-width mask shows nothing.
+		// The old `clip[2] > 0` test dropped the mask for both and drew the
+		// glyphs unclipped (visual/edittext/edittext_gutter widths 0..3).
+		if (clip[2] < 0)
+		{
+			clip[0] += clip[2];
+			clip[2] = -clip[2];
+		}
+		int clip_empty = (n > 0 && (clip[2] == 0 || clip[3] <= 0));
 		int has_clip = (n > 0 && clip[2] > 0 && clip[3] > 0);
 #if defined(USE_WEBGPU)
 		// ...but never while some OUTER clip is already active. Each mask owns
@@ -19782,13 +19806,30 @@ static void avm2_render_text(Avm2Context* ctx, Avm2Object* obj,
 			                   (float) ((sel_color >> 8) & 0xFF) / 255.0f,
 			                   (float) (sel_color & 0xFF) / 255.0f,
 			                   1.0f, xid, cxid);
-		avm2_render_glyphs(ctx, gl, n, xid, cxid);
+		// Device text: glyphs (and their underlines) live in layout space,
+		// which carries scale(d/a, 1) about the layout x origin; the box, the
+		// clip and the selection rects stay in local space.
+		int32_t dev_off_x = 0;
+		float dev_sx = avm2_edittext_device_layout_sx(ctx, obj, &dev_off_x);
+		Mat gworld = *world;
+		uint32_t gxid = xid;
+		if (dev_sx != 1.0f)
+		{
+			double s = (double) dev_sx, ox = (double) dev_off_x;
+			gworld.a = world->a * s;
+			gworld.b = world->b * s;
+			gworld.tx = world->tx + world->a * ox * (1.0 - s);
+			gworld.ty = world->ty + world->b * ox * (1.0 - s);
+			uint32_t gcx = 0;
+			avm2_text_slots(&gworld, alpha, &gxid, &gcx);
+		}
+		if (!clip_empty) avm2_render_glyphs(ctx, gl, n, gxid, cxid);
 		// Underlines last, still inside the field mask (Ruffle draws them at the
 		// end of render_layout_box, under the same transform stack as the
 		// glyphs). They go through the IDENTITY slot because the geometry is
 		// already stage twips — like the border, their thickness must not be
 		// transformed by the field matrix.
-		if (un > 0) avm2_render_underlines(ul, un, world, alpha);
+		if (un > 0) avm2_render_underlines(ul, un, &gworld, alpha);
 		if (has_clip) renderer_end_clip(context);
 	}
 	// Caret last, outside the field mask (Ruffle replays draw_caret_command
