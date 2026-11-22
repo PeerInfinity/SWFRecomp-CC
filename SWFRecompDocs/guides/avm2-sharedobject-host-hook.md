@@ -221,7 +221,7 @@ and the id length).
   copies; the post-deliver `new Game` reads the restored save; caveats about
   the new-game arm's time reset, botStart's sweep, and a flush-all before the
   reload).
-- **CI:** `ruffle-tests.yml` mode=graphics categories=full, run `45043930556`.
+- **CI:** `ruffle-tests.yml` mode=graphics categories=full, run `45043930556`: **success, 0 status moves, 0 regressions** corpus-wide vs the s24 final (`08fdbcad6 → 7f945eb41`, graphics intersection 4613 eff). Results merged `64c742e9e`.
   It was still queued at closeout. The local watcher was reaped by the
   low-memory guard and was not restarted, so the results merge and the
   regression report are still owed. Pages: the dry run `45043932663` and the
