@@ -638,3 +638,8 @@ visual/drawing_api/drawing_order            # z-order + attached-clip transform 
 visual/cache_as_bitmap/drawing_api          # dynamic child of a placed cab sprite 1 cmp
 # tier=2
 avm1/movieclip_line_gradient_style          # only translucent runtime stroke (band) 1 cmp
+# s25 w2-acid-morph-gradient: morph gradient ramps baked with gradient_ramp_build
+# (a non-increasing morph stop list used to over-emit rows and shift every later
+# gradient's texture row). The only corpus SWF with such a list.
+# tier=1
+from_shumway/acid/acid-morph                        # morph ramp row count       2 cmp

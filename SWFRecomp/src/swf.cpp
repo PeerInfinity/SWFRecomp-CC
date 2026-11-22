@@ -8098,6 +8098,9 @@ namespace SWFRecomp
 					fill_styles[i].gradient.interpolation_mode = 0;
 					fill_styles[i].gradient.num_grads = (u8) fill_data.fields[0].value;
 
+					// Parse every MORPHGRADRECORD (the count is a plain UI8, so it
+					// can exceed the 15-entry records[] array; keep the first 15 and
+					// skip the rest so cur_pos stays in step).
 					for (int j = 0; j < fill_styles[i].gradient.num_grads; ++j)
 					{
 						// StartRatio (UI8)
@@ -8108,109 +8111,64 @@ namespace SWFRecomp
 
 						fill_data.parseFields(cur_pos);
 
-						fill_styles[i].gradient.records[j].ratio = (u8) fill_data.fields[0].value;
+						u8 start_ratio = (u8) fill_data.fields[0].value;
 
 						// StartColor (RGBA)
 						RGBA.parseFields(cur_pos);
 
-						fill_styles[i].gradient.records[j].r = (u8) RGBA.fields[0].value;
-						fill_styles[i].gradient.records[j].g = (u8) RGBA.fields[1].value;
-						fill_styles[i].gradient.records[j].b = (u8) RGBA.fields[2].value;
-						fill_styles[i].gradient.records[j].a = (u8) RGBA.fields[3].value;
+						if (j < 15)
+						{
+							fill_styles[i].gradient.records[j].ratio = start_ratio;
+							fill_styles[i].gradient.records[j].r = (u8) RGBA.fields[0].value;
+							fill_styles[i].gradient.records[j].g = (u8) RGBA.fields[1].value;
+							fill_styles[i].gradient.records[j].b = (u8) RGBA.fields[2].value;
+							fill_styles[i].gradient.records[j].a = (u8) RGBA.fields[3].value;
+						}
 
 						// Skip EndRatio (1 byte) + EndColor (4 bytes) = 5 bytes
 						cur_pos += 5;
-
-						if (j == 0)
-						{
-							continue;
-						}
-
-						GradientRecord& last_grad = fill_styles[i].gradient.records[j - 1];
-						GradientRecord& grad = fill_styles[i].gradient.records[j];
-
-						// Pad the ramp head [0, first stop ratio) with the first stop
-						// color so every gradient emits exactly 256 rows and lands on
-						// its own texture row (see the non-morph path for the full
-						// rationale — an unpadded head misaligned later gradients).
-						if (j == 1)
-						{
-							GradientRecord& first_grad = fill_styles[i].gradient.records[0];
-							for (int head = 0; head < (int) first_grad.ratio; ++head)
-							{
-								gradient_data << "\t" << "{ "
-											  << to_string(first_grad.r) << ", "
-											  << to_string(first_grad.g) << ", "
-											  << to_string(first_grad.b) << ", "
-											  << to_string(first_grad.a) << " },"
-											  << endl;
-							}
-						}
-
-						for (u8 ratio = last_grad.ratio; ratio < grad.ratio; ++ratio)
-						{
-							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
-							float t = (ratio - last_grad.ratio)/ratio_diff;
-
-							u8 r = rgbLerp(last_grad.r, grad.r, t);
-							u8 g = rgbLerp(last_grad.g, grad.g, t);
-							u8 b = rgbLerp(last_grad.b, grad.b, t);
-							u8 a = rgbLerp(last_grad.a, grad.a, t);
-
-							gradient_data << "\t" << "{ "
-										  << to_string(r) << ", "
-										  << to_string(g) << ", "
-										  << to_string(b) << ", "
-										  << to_string(a) << " },"
-										  << endl;
-						}
-
-						if (grad.ratio == 255)
-						{
-							float ratio_diff = (float) (grad.ratio - last_grad.ratio);
-							float t = (255 - last_grad.ratio)/ratio_diff;
-
-							u8 r = rgbLerp(last_grad.r, grad.r, t);
-							u8 g = rgbLerp(last_grad.g, grad.g, t);
-							u8 b = rgbLerp(last_grad.b, grad.b, t);
-							u8 a = rgbLerp(last_grad.a, grad.a, t);
-
-							gradient_data << "\t" << "{ "
-										  << to_string(r) << ", "
-										  << to_string(g) << ", "
-										  << to_string(b) << ", "
-										  << to_string(a) << " },"
-										  << endl;
-						}
-
-						// Pad the ramp tail [last stop ratio, 255] with the last stop
-						// color when the final stop is below 255.
-						if (j == fill_styles[i].gradient.num_grads - 1 && grad.ratio < 255)
-						{
-							for (int tail = (int) grad.ratio; tail < 256; ++tail)
-							{
-								gradient_data << "\t" << "{ "
-											  << to_string(grad.r) << ", "
-											  << to_string(grad.g) << ", "
-											  << to_string(grad.b) << ", "
-											  << to_string(grad.a) << " },"
-											  << endl;
-							}
-						}
 					}
 
-					// Degenerate single-stop gradient: fill the whole 256-row ramp.
-					if (fill_styles[i].gradient.num_grads == 1)
+					if (fill_styles[i].gradient.num_grads > 15)
 					{
-						GradientRecord& only_grad = fill_styles[i].gradient.records[0];
-						for (int u = 0; u < 256; ++u)
+						fill_styles[i].gradient.num_grads = 15;
+					}
+
+					// Bake the start ramp with the same Ruffle CommonGradient walk as
+					// the plain-shape path (gradient_ramp.h). The old per-segment
+					// walker emitted one extra row for every additional stop at ratio
+					// 255 (and none for duplicate/decreasing ratios), so the row count
+					// stopped summing to 256 and every LATER gradient in the movie was
+					// read from a shifted texture row: from_shumway/acid/acid-morph's
+					// morph 1 (start stops 0,255,255,255,255,255,255) wrote 261 rows
+					// and slid the static shapes' rainbow ramps ~3 px right. Byte-
+					// identical to the old walker for strictly increasing ratios.
+					{
+						GradientRampStop ramp_stops[15];
+						int ramp_n = (int) fill_styles[i].gradient.num_grads;
+
+						for (int j = 0; j < ramp_n; ++j)
+						{
+							GradientRecord& gr = fill_styles[i].gradient.records[j];
+							ramp_stops[j].ratio = gr.ratio;
+							ramp_stops[j].r = gr.r;
+							ramp_stops[j].g = gr.g;
+							ramp_stops[j].b = gr.b;
+							ramp_stops[j].a = gr.a;
+						}
+
+						u8 ramp[256 * 4];
+						gradient_ramp_build(ramp_stops, ramp_n, GRADIENT_RAMP_SRGB,
+						                    GRADIENT_RAMP_TRUNC, ramp);
+
+						for (int t = 0; t < 256; ++t)
 						{
 							gradient_data << "\t" << "{ "
-										  << to_string(only_grad.r) << ", "
-										  << to_string(only_grad.g) << ", "
-										  << to_string(only_grad.b) << ", "
-										  << to_string(only_grad.a) << " },"
-										  << endl;
+							              << to_string(ramp[t * 4 + 0]) << ", "
+							              << to_string(ramp[t * 4 + 1]) << ", "
+							              << to_string(ramp[t * 4 + 2]) << ", "
+							              << to_string(ramp[t * 4 + 3]) << " },"
+							              << endl;
 						}
 					}
 
