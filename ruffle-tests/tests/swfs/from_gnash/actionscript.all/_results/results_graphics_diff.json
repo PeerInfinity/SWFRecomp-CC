@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-22T00:07:38.122576+00:00",
-    "old_git_sha": "161ecf124012e98f5652a344cac20090858666e5",
-    "new_timestamp": "2026-11-22T01:00:16.355186+00:00",
-    "new_git_sha": "ff2e2e9d6056e453af28144eec6ec644b5eda852",
+    "old_timestamp": "2026-11-22T01:00:16.355186+00:00",
+    "old_git_sha": "ff2e2e9d6056e453af28144eec6ec644b5eda852",
+    "new_timestamp": "2026-11-22T02:31:50.906216+00:00",
+    "new_git_sha": "336749f1425c5e0ea59060c35379d3a1ca3e6588",
     "partial": false,
     "same_commit": false
   },
@@ -18,32 +18,64 @@
     "new_effective_pass": 236,
     "new_total": 243,
     "new_pass_rate": 60.9,
-    "old_mismatched_lines": 8079,
-    "new_mismatched_lines": 8069,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 10,
+    "old_mismatched_lines": 8069,
+    "new_mismatched_lines": 8151,
+    "increased_mismatches": 86,
+    "decreased_mismatches": 4,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 242,
+    "unchanged": 240,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "MovieClip-v8",
+      "test": "argstest-v6",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1087,
-        "expected_lines": 1087,
-        "matching_lines": 1035
+        "actual_lines": 2661,
+        "expected_lines": 2192,
+        "matching_lines": 80
       },
       "new_lines": {
-        "actual_lines": 1087,
-        "expected_lines": 1087,
-        "matching_lines": 1045
+        "actual_lines": 2644,
+        "expected_lines": 2192,
+        "matching_lines": 84
+      }
+    },
+    {
+      "test": "argstest-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 2661,
+        "expected_lines": 2061,
+        "matching_lines": 110
+      },
+      "new_lines": {
+        "actual_lines": 2644,
+        "expected_lines": 2061,
+        "matching_lines": 78
+      }
+    },
+    {
+      "test": "argstest-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 3023,
+        "expected_lines": 2434,
+        "matching_lines": 175
+      },
+      "new_lines": {
+        "actual_lines": 3006,
+        "expected_lines": 2434,
+        "matching_lines": 121
       }
     }
   ]
