@@ -526,6 +526,8 @@ namespace SWFRecomp
 		void constructEdges(std::vector<Path>& paths, std::vector<Node>& nodes);
 		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations = 100000, size_t max_cycles = 8000);
 		void fillShape(Shape& shape, std::vector<Tri>& tris);
+		bool drawLinesLyon(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
+		                   double offset_scale);
 		void drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
 		               double offset_scale = 1.0);
 	};

@@ -151,7 +151,7 @@ static const char* vertex_wgsl =
 "    let inv_pos = inv_mats[out.v_style_id] * pos;\n"
 "    var focal_z = 0.0;\n"
 "    if (out.v_style_type == 0x13u) {\n"
-"      focal_z = (f32(style_upper) - 32768.0) / 16384.0;\n"
+"      focal_z = clamp((f32(style_upper) - 32768.0) / 16384.0, -0.98, 0.98);\n"
 "    }\n"
 "    out.v_args = vec4f(inv_pos.xy, focal_z, f32(spread_mode) + f32(is_linear_rgb) * 4.0);\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x40u) {\n"
@@ -3544,7 +3544,14 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 	u32 sx = (u32)gradient_type | ((u32)spread_mode << 8) | ((u32)interpolation << 10);
 
 	// Style Y: gradient_id in lower 16, focal_encoded in upper 16
-	u16 focal_encoded = (u16)(focal_ratio * 16384.0f + 32768.0f);
+	// Fixed8 focal ratios are exact in 1/16384 units; the +-0.98 clamp is
+	// applied in f32 in the shader, as Ruffle's wgpu backend does (lib.rs
+	// `focal_point.to_f32().clamp(-0.98, 0.98)`). Clamping to 0.98 here first
+	// encoded 0.97998 (16056/16384).
+	float focal_enc_src = focal_ratio;
+	if (focal_enc_src > 1.99f) focal_enc_src = 1.99f;
+	if (focal_enc_src < -1.99f) focal_enc_src = -1.99f;
+	u16 focal_encoded = (u16)(focal_enc_src * 16384.0f + 32768.0f);
 	u32 sy = (u32)grad_id | ((u32)focal_encoded << 16);
 
 	u32* verts = (u32*)malloc(vertex_count * 4 * sizeof(u32));

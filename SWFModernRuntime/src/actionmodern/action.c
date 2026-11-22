@@ -31874,15 +31874,49 @@ static void drawingGenerateGradientRamp(
 		stops[s].r = (colors[s] >> 16) & 0xFF;
 		stops[s].g = (colors[s] >> 8) & 0xFF;
 		stops[s].b = colors[s] & 0xFF;
-		stops[s].a = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
+		// Ruffle build_gradient_records: `(alpha / 100.0 * 255.0) as u8` --
+		// truncating (alpha 50 -> 127, not 128); NaN -> 0.
+		double a8 = (double) alphas[s] / 100.0 * 255.0;
+		stops[s].a = (a8 > 0.0) ? (a8 >= 255.0 ? 255 : (u8) a8) : 0;
 	}
 	// Ruffle truncates every ramp channel (`lerp(..) as u8`,
 	// render/wgpu/src/mesh.rs::CommonGradient::new); the recompiler's static
 	// gradient emitter already passes GRADIENT_RAMP_TRUNC (swf.cpp:7182), and
 	// the AVM2 twin (avm2_display.c::gfx_gen_ramp) moved with it.
+	// linearRGB: Ruffle lerps the FLOAT linear endpoints
+	// (`srgb_to_linear(c / 255.0) * 255.0`) and truncates once. The u8-quantised
+	// endpoints (GRADIENT_RAMP_LINEAR_U8) put texel 1 of a 0x19 -> 0xFF channel
+	// at 2 instead of 3, which the shader's linear->sRGB step amplifies to 7
+	// levels on a repeat wrap (avm1/movieclip_begin_gradient_fill).
 	gradient_ramp_build(stops, n,
-	                    use_linear_rgb ? GRADIENT_RAMP_LINEAR_U8 : GRADIENT_RAMP_SRGB,
+	                    use_linear_rgb ? GRADIENT_RAMP_LINEAR : GRADIENT_RAMP_SRGB,
 	                    GRADIENT_RAMP_TRUNC, out_ramp);
+}
+
+static float drawingFixed16(float v)
+{
+	if (!isfinite(v)) return 0.0f;
+	double s = (double) (v * 65536.0f);
+	if (s >= 2147483647.0) s = 2147483647.0;
+	if (s <= -2147483648.0) s = -2147483648.0;
+	return (float) ((double) (int32_t) s / 65536.0);
+}
+
+// Ruffle stores a Drawing-API gradient fill as an swf::Matrix, so the shader
+// sees a-d as Fixed16 (`Fixed16::from_f32`, truncating; matrix.rs
+// `impl From<Matrix> for swf::Matrix`). For a small box the 1/65536 quantum is
+// ~0.1 % of the scale and moves every repeat/reflect cycle boundary
+// (avm1/movieclip_begin_gradient_fill). Applied to the GPU copy only: the CPU
+// BitmapData.draw raster (nearest-texel sampler, tuned to Flash's pixel
+// probes) keeps the float matrix -- quantising it too flipped three
+// hard-stop probes in from_gnash/misc-ming.all/GradientFillTest.
+static void drawingGradientMatrixFixed16(const float* in, float* out)
+{
+	memcpy(out, in, 16 * sizeof(float));
+	out[0] = drawingFixed16(in[0]);
+	out[1] = drawingFixed16(in[1]);
+	out[4] = drawingFixed16(in[4]);
+	out[5] = drawingFixed16(in[5]);
 }
 
 // Build a 4x4 column-major gradient matrix from "box" parameters.
@@ -31892,12 +31926,16 @@ static void drawingBuildGradientBoxMatrix(float x, float y, float w, float h, fl
 	// Same as Ruffle: create_gradient_box
 	float scale_x = w / 1638.4f;  // w / (16384/10)
 	float scale_y = h / 1638.4f;
-	float tx = (x + w / 2.0f) * 20.0f;  // center, in twips
-	float ty = (y + h / 2.0f) * 20.0f;
+	// Ruffle create_gradient_box: Twips::from_pixels(x) + Twips::from_pixels(w/2),
+	// each truncated toward zero (swf Twips::from_pixels).
+	float tx = (float) ((int32_t) ((double) x * 20.0) + (int32_t) ((double) (w / 2.0f) * 20.0));
+	float ty = (float) ((int32_t) ((double) y * 20.0) + (int32_t) ((double) (h / 2.0f) * 20.0));
 	float cos_r = cosf(r), sin_r = sinf(r);
 
 	// Column-major 4x4 (same layout as recompileMatrix)
 	memset(out, 0, 16 * sizeof(float));
+	// a-d stay float here; the GPU copy is quantised to Fixed16 in
+	// fillDrawingInfos (drawingGradientMatrixFixed16).
 	out[0]  = cos_r * scale_x;    // a
 	out[1]  = sin_r * scale_y;    // b
 	out[4]  = -sin_r * scale_x;   // c
@@ -31918,8 +31956,8 @@ static void drawingBuildGradientAbcdMatrix(float a, float b, float c, float d,
 	out[4]  = c;
 	out[5]  = d;
 	out[10] = 1.0f;
-	out[12] = tx_pixels * 20.0f;  // pixels → twips
-	out[13] = ty_pixels * 20.0f;
+	out[12] = (float) (int32_t) ((double) tx_pixels * 20.0);  // Twips::from_pixels
+	out[13] = (float) (int32_t) ((double) ty_pixels * 20.0);
 	out[15] = 1.0f;
 }
 
@@ -32033,7 +32071,8 @@ static void applyGradientFillToMC(SWFAppContext* app_context, MovieClip* mc,
 		// spread it shifted the infinitely compressed cycles around the focal
 		// singularity, producing the bulk of this test's gradient diff.
 		focal = truncf(focal * 256.0f) / 256.0f;
-		if (focal > 0.98f) focal = 0.98f; else if (focal < -0.98f) focal = -0.98f;
+		// +-0.98 clamp happens in the gradient shader (render_webgpu.c), after
+		// the exact Fixed8 value is encoded.
 	}
 
 	// Build gradient matrix
@@ -32163,7 +32202,8 @@ static void applyLineGradientStyleToMC(SWFAppContext* app_context, MovieClip* mc
 		if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;
 		// Fixed8 truncation + renderer clamp; see beginGradientFill above.
 		focal = truncf(focal * 256.0f) / 256.0f;
-		if (focal > 0.98f) focal = 0.98f; else if (focal < -0.98f) focal = -0.98f;
+		// +-0.98 clamp happens in the gradient shader (render_webgpu.c), after
+		// the exact Fixed8 value is encoded.
 	}
 
 	DrawingState* ds = getOrCreateDrawingState(mc);
@@ -33015,7 +33055,11 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->interpolation = path->interpolation;
 		info->focal_ratio = path->focal_ratio;
 		info->gradient_ramp = path->has_gradient ? path->gradient_ramp : NULL;
-		info->gradient_matrix = path->has_gradient ? path->gradient_matrix : NULL;
+		info->gradient_matrix = NULL;
+		if (path->has_gradient) {
+			drawingGradientMatrixFixed16(path->gradient_matrix, info->gradient_matrix_fx);
+			info->gradient_matrix = info->gradient_matrix_fx;
+		}
 		// Bitmap fill — resolve BitmapDataNative live (may have changed/disposed since draw)
 		info->has_bitmap_fill = 0;
 		info->bitmap_pixels = NULL;
@@ -33046,7 +33090,11 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->line_interpolation = path->line_interpolation;
 		info->line_focal_ratio = path->line_focal_ratio;
 		info->line_gradient_ramp = path->has_line_gradient ? path->line_gradient_ramp : NULL;
-		info->line_gradient_matrix = path->has_line_gradient ? path->line_gradient_matrix : NULL;
+		info->line_gradient_matrix = NULL;
+		if (path->has_line_gradient) {
+			drawingGradientMatrixFixed16(path->line_gradient_matrix, info->line_gradient_matrix_fx);
+			info->line_gradient_matrix = info->line_gradient_matrix_fx;
+		}
 		// Prefer the per-tick dynamic GPU slot when the renderer has stashed one
 		// on this MC (tag.c's apply_dynamic_mc_transforms allocates these for
 		// dynamic MCs with AS-set transforms — see action.h MovieClip::dynamic_xform_slot).

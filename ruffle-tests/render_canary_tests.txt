@@ -677,3 +677,10 @@ avm2/graphics_gradients                     # translucent AVM2 gradient strokes 
 # only incidental createTextField users; this one is a plain created field.
 # tier=1
 avm1/movieclip_create_text_field                    # createTextField render     1 cmp
+# s25 w2-nearpass-land: lyon stroke join model (SWF::drawLinesLyon — inner
+# miter side-point, curve-interior miter vertices, round outer arcs). The
+# canary saw the join model only through doubleAndRegister and four rows
+# that pass with slack; this is a quality=low curved-stroke row at tol 0
+# with four pixel-centre stroke ties (CI 8 / 0 before, 0 / 0 with S).
+# tier=1
+from_shumway/acid/acid-scale                        # lyon stroke joins, tol 0   1 cmp

@@ -2300,6 +2300,37 @@ static uint32_t blend_over_round(uint32_t dest, uint32_t src)
 // honours dst->transparency and blends with blend_over_round.
 // `w*` maps bitmap-local twips -> dst-pixel*20, the same convention
 // avm2_cpu_raster_shape uses.
+// One-sample GPU coverage of triangle (a,b,c) at (cx,cy), all in 1/256 px,
+// y down: Vulkan/D3D top-left rule (a centre on a top or left edge is in).
+static int bd_tri_covers(long long ax, long long ay, long long bx, long long by,
+                         long long qx, long long qy, long long cx, long long cy)
+{
+	long long area = (bx - ax) * (qy - ay) - (by - ay) * (qx - ax);
+	if (area == 0) return 0;
+	if (area < 0)
+	{
+		long long tx = bx, ty = by;
+		bx = qx; by = qy; qx = tx; qy = ty;
+	}
+	long long X[3] = { ax, bx, qx }, Y[3] = { ay, by, qy };
+	for (int e = 0; e < 3; e++)
+	{
+		long long x0 = X[e], y0 = Y[e], x1 = X[(e + 1) % 3], y1 = Y[(e + 1) % 3];
+		long long w = (x1 - x0) * (cy - y0) - (y1 - y0) * (cx - x0);
+		if (w > 0) continue;
+		if (w < 0) return 0;
+		long long ddy = y1 - y0, ddx = x1 - x0;
+		if (!((ddy == 0 && ddx > 0) || ddy < 0)) return 0;
+	}
+	return 1;
+}
+
+static int bd_quad_covers(const long long* qx, const long long* qy, long long cx, long long cy)
+{
+	return bd_tri_covers(qx[0], qy[0], qx[1], qy[1], qx[2], qy[2], cx, cy)
+	    || bd_tri_covers(qx[0], qy[0], qx[2], qy[2], qx[3], qy[3], cx, cy);
+}
+
 static void bd_draw_bitmap_node(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                                 Avm2DisplayObjectExt* ext,
                                 double wa, double wb, double wc, double wd,
@@ -3016,17 +3047,33 @@ static Avm2Value bd_draw(Avm2Activation* act)
 		if (px1 > (int) dst->width) px1 = (int) dst->width;
 		if (py1 > (int) dst->height) py1 = (int) dst->height;
 		double ia = md / det, ic = -mc / det, ib = -mb / det, id = ma / det;
+		// Coverage as Ruffle's GPU quad (two triangles 0-1-2, 0-2-3) at one
+		// sample: corners snapped to 1/256 px, pixel centre owned by the
+		// top-left fill rule. An edge through pixel centres (a 45-degree
+		// rotation) is a pure tie the back-projection floor() resolved the
+		// opposite way on both diagonals (avm2/bitmapdata_draw_rotation).
+		long long qx[4], qy[4];
+		for (int k = 0; k < 4; k++)
+		{
+			double sxk = (k == 1 || k == 2) ? sw : 0.0;
+			double syk = (k >= 2) ? sh : 0.0;
+			qx[k] = llround((ma * sxk + mc * syk + mtx) * 256.0);
+			qy[k] = llround((mb * sxk + md * syk + mty) * 256.0);
+		}
 		for (int dy = py0; dy < py1; dy++)
 		{
 			for (int dx = px0; dx < px1; dx++)
 			{
 				double ex = (dx + 0.5) - mtx;
 				double ey = (dy + 0.5) - mty;
+				long long cx = (long long) dx * 256 + 128, cy = (long long) dy * 256 + 128;
+				if (!bd_quad_covers(qx, qy, cx, cy)) continue;
 				int spx = (int) floor(ia * ex + ic * ey);
 				int spy = (int) floor(ib * ex + id * ey);
-				if (spx < 0 || spy < 0
-				    || spx >= (int) src->width || spy >= (int) src->height)
-					continue;
+				if (spx < 0) spx = 0;
+				if (spy < 0) spy = 0;
+				if (spx >= (int) src->width) spx = (int) src->width - 1;
+				if (spy >= (int) src->height) spy = (int) src->height - 1;
 				uint32_t color = bd_get_raw(src, (uint32_t) spx, (uint32_t) spy);
 				if (has_cxform)
 				{

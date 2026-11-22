@@ -12177,10 +12177,317 @@ namespace SWFRecomp
 		tris.push_back(t);
 	}
 
+	// lyon_tessellation 1.0.15 stroke join model (the tessellator Ruffle
+	// strokes with, render/src/tessellator.rs). Each edge is a quad between
+	// per-vertex SIDE POINTS, and a join's side points are lyon's:
+	//  - a vertex inside a flattened curve (`flattened_step`): ONE miter vertex
+	//    on each side, position +- normal*hw, no join geometry;
+	//  - a vertex joining two SWF edges (`compute_join_side_positions_fixed_
+	//    width`): the inner (back) side is the single miter vertex, the outer
+	//    (front) side keeps both perpendicular offsets, joined by the interior
+	//    triangle plus the round arc / bevel; an unclipped miter puts a single
+	//    vertex on both sides; a sharp fold falls back to the old overlapping
+	//    quads + fan.
+	// The previous builder overlapped two perpendicular-offset quads at every
+	// vertex, so the inner side of each join bulged by a sliver past lyon's
+	// miter point: invisible except on exact pixel-centre ties, which at
+	// quality = "low" flip whole pixels (doubleAndRegister (106,23)).
+	// Computed in y-down (lyon's frame) so the edge diagonal and the side
+	// choice mirror lyon's; a Levien point is recognised by its nonzero
+	// sub-twip remainder (SWF anchors are whole twips).
+	namespace
+	{
+		struct LyonSide
+		{
+			double prev_x, prev_y, next_x, next_y;
+		};
+	}
+
+	bool SWF::drawLinesLyon(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
+	                        double offset_scale)
+	{
+		u16 width = style.width;
+		const u8 join_style = style.line_join;
+		const double miter_limit = style.miter_limit;
+
+		if (width != 0 && width < 20)
+		{
+			width = 20;
+		}
+		else if (width == 0)
+		{
+			return true;
+		}
+
+		const size_t n = path.verts.size();
+		if (n < 2)
+		{
+			return false;
+		}
+
+		const double hw = width/2.0;
+		const double ohw = hw*offset_scale;
+		const bool closed = n > 2 && path.verts.back().x == path.verts[0].x
+		                    && path.verts.back().y == path.verts[0].y
+		                    && path.verts.back().fx_frac == path.verts[0].fx_frac
+		                    && path.verts.back().fy_frac == path.verts[0].fy_frac;
+
+		// y-down positions
+		std::vector<double> px(n), py(n);
+		for (size_t i = 0; i < n; ++i)
+		{
+			px[i] = strokeX(path.verts[i]);
+			py[i] = -strokeY(path.verts[i]);
+		}
+
+		// Edge k = verts[k] -> verts[k+1]; reject zero-length edges (fall back).
+		const size_t ne = n - 1;
+		std::vector<double> tx(ne), ty(ne), len(ne);
+		for (size_t k = 0; k < ne; ++k)
+		{
+			double dx = px[k + 1] - px[k], dy = py[k + 1] - py[k];
+			double l = sqrt(dx*dx + dy*dy);
+			if (!(l > 0.0))
+			{
+				return false;
+			}
+			tx[k] = dx/l; ty[k] = dy/l; len[k] = l;
+		}
+
+		// side points (y-down), index 0 = POSITIVE, 1 = NEGATIVE
+		std::vector<LyonSide> sp[2];
+		sp[0].resize(n); sp[1].resize(n);
+		std::vector<u8> join_kind(n, 0);   // 0 none/end, 1 curve, 2 edge join, 3 fold
+		std::vector<int> front_side(n, 0);
+		std::vector<u8> front_single(n, 0);
+
+		auto setPerp = [&](size_t i, long prev_e, long next_e)
+		{
+			for (int s = 0; s < 2; ++s)
+			{
+				const double sg = s == 0 ? 1.0 : -1.0;
+				size_t pe = prev_e >= 0 ? (size_t) prev_e : (size_t) next_e;
+				size_t ne_ = next_e >= 0 ? (size_t) next_e : (size_t) prev_e;
+				sp[s][i].prev_x = px[i] + sg*(-ty[pe])*ohw;
+				sp[s][i].prev_y = py[i] + sg*(tx[pe])*ohw;
+				sp[s][i].next_x = px[i] + sg*(-ty[ne_])*ohw;
+				sp[s][i].next_y = py[i] + sg*(tx[ne_])*ohw;
+			}
+		};
+
+		const size_t last_join = closed ? n - 1 : n - 1;
+		for (size_t i = 0; i < n; ++i)
+		{
+			long pe, nx_e;
+			if (i == 0)
+			{
+				pe = closed ? (long) ne - 1 : -1;
+				nx_e = 0;
+			}
+			else if (i == n - 1)
+			{
+				pe = (long) ne - 1;
+				nx_e = -1;
+			}
+			else
+			{
+				pe = (long) i - 1;
+				nx_e = (long) i;
+			}
+			setPerp(i, pe, nx_e);
+			if (pe < 0 || nx_e < 0 || (closed && i == n - 1))
+			{
+				continue;
+			}
+			(void) last_join;
+
+			const double t0x = tx[pe], t0y = ty[pe], t1x = tx[nx_e], t1y = ty[nx_e];
+			// lyon math_utils::compute_normal
+			double nmx, nmy;
+			{
+				const double n1x = -t0y, n1y = t0x;
+				double vx = t0x + t1x, vy = t0y + t1y;
+				if (vx*vx + vy*vy < 1e-4)
+				{
+					nmx = 0.0; nmy = 0.0;
+				}
+				else
+				{
+					double l = sqrt(vx*vx + vy*vy);
+					double tgx = vx/l, tgy = vy/l;
+					double nx_ = -tgy, ny_ = tgx;
+					double inv_len = nx_*n1x + ny_*n1y;
+					if (fabs(inv_len) < 1e-4)
+					{
+						nmx = n1x; nmy = n1y;
+					}
+					else
+					{
+						nmx = nx_/inv_len; nmy = ny_/inv_len;
+					}
+				}
+			}
+
+			const Vertex& v = path.verts[i];
+			const bool curve_interior = (v.fx_frac != 0 || v.fy_frac != 0);
+
+			if (curve_interior)
+			{
+				join_kind[i] = 1;
+				for (int s = 0; s < 2; ++s)
+				{
+					const double sg = s == 0 ? 1.0 : -1.0;
+					double mx = px[i] + sg*nmx*ohw, my = py[i] + sg*nmy*ohw;
+					sp[s][i] = { mx, my, mx, my };
+				}
+				continue;
+			}
+
+			const double cross = t0x*t1y - t0y*t1x;
+			const int front = cross >= 0.0 ? 1 : 0;
+			const int back = 1 - front;
+			const double fsg = front == 0 ? 1.0 : -1.0;
+			const double fnx = fsg*nmx, fny = fsg*nmy;
+			const bool unclipped_miter = join_style == 2 && miter_limit >= 1.0
+			                             && !(fnx*fnx + fny*fny > miter_limit*miter_limit*4.0);
+			bool fold = false;
+			if (!unclipped_miter && (t1x*t0x + t1y*t0y) < 0.0)
+			{
+				const double ex = fnx*hw, ey = fny*hw;
+				double d_next = ex*(-t1x) + ey*(-t1y) - len[nx_e];
+				double d_prev = ex*t0x + ey*t0y - len[pe];
+				if (std::min(d_next, d_prev) > 0.0 || (nmx*nmx + nmy*nmy) < 1e-5)
+				{
+					fold = true;
+				}
+			}
+			if (fold)
+			{
+				join_kind[i] = 3;
+				continue;
+			}
+			join_kind[i] = 2;
+			front_side[i] = front;
+			{
+				const double bsg = back == 0 ? 1.0 : -1.0;
+				double mx = px[i] + bsg*nmx*ohw, my = py[i] + bsg*nmy*ohw;
+				sp[back][i] = { mx, my, mx, my };
+			}
+			if (unclipped_miter)
+			{
+				double mx = px[i] + fsg*nmx*ohw, my = py[i] + fsg*nmy*ohw;
+				sp[front][i] = { mx, my, mx, my };
+				front_single[i] = 1;
+			}
+		}
+		if (closed)
+		{
+			sp[0][n - 1] = sp[0][0];
+			sp[1][n - 1] = sp[1][0];
+		}
+
+		auto V = [&](double x, double y, const Vertex& src) -> Vertex
+		{
+			return strokeVertex(x, -y, src.morph_index);
+		};
+
+		// Edges (lyon add_edge_triangles): (p0_neg, p0_pos, p1_pos), (p0_neg, p1_pos, p1_neg)
+		for (size_t k = 0; k < ne; ++k)
+		{
+			const Vertex& a = path.verts[k];
+			const Vertex& b = path.verts[k + 1];
+			Vertex p0_pos = V(sp[0][k].next_x, sp[0][k].next_y, a);
+			Vertex p0_neg = V(sp[1][k].next_x, sp[1][k].next_y, a);
+			Vertex p1_pos = V(sp[0][k + 1].prev_x, sp[0][k + 1].prev_y, b);
+			Vertex p1_neg = V(sp[1][k + 1].prev_x, sp[1][k + 1].prev_y, b);
+			Tri t;
+			t.verts[0] = p0_neg; t.verts[1] = p0_pos; t.verts[2] = p1_pos;
+			tris.push_back(t);
+			t.verts[0] = p0_neg; t.verts[1] = p1_pos; t.verts[2] = p1_neg;
+			tris.push_back(t);
+		}
+
+		// Joins
+		for (size_t i = 0; i < n; ++i)
+		{
+			if (closed && i == n - 1)
+			{
+				continue;
+			}
+			if (join_kind[i] == 3)
+			{
+				const Vertex& a = path.verts[i == 0 ? n - 2 : i - 1];
+				const Vertex& c = path.verts[i + 1];
+				drawLineJoin(a, path.verts[i], c, hw, join_style, miter_limit, tris, offset_scale);
+				continue;
+			}
+			if (join_kind[i] != 2 || front_single[i])
+			{
+				continue;
+			}
+			const Vertex& b = path.verts[i];
+			const int f = front_side[i];
+			const int bk = 1 - f;
+			Vertex fp = V(sp[f][i].prev_x, sp[f][i].prev_y, b);
+			Vertex fn_ = V(sp[f][i].next_x, sp[f][i].next_y, b);
+			Vertex bs = V(sp[bk][i].prev_x, sp[bk][i].prev_y, b);
+			Tri t;
+			t.verts[0] = bs; t.verts[1] = fp; t.verts[2] = fn_;
+			tris.push_back(t);
+			if (join_style == 0)
+			{
+				// Angles from the unit side normals (not the offset points), so
+				// the offset_scale = 0 centre pass keeps the same arc count.
+				const size_t pe_i = (i == 0) ? ne - 1 : i - 1;
+				const size_t ne_i = i;
+				const double sgf = f == 0 ? 1.0 : -1.0;
+				double a0 = atan2(sgf*tx[pe_i], sgf*(-ty[pe_i]));
+				double a1 = atan2(sgf*tx[ne_i], sgf*(-ty[ne_i]));
+				double d = a1 - a0;
+				while (d > M_PI) d -= 2.0*M_PI;
+				while (d < -M_PI) d += 2.0*M_PI;
+				const int segs = strokeArcSegments(hw, fabs(d));
+				Vertex last = fp;
+				for (int s = 1; s < segs; ++s)
+				{
+					double ang = a0 + d*s/segs;
+					Vertex m = V(px[i] + ohw*cos(ang), py[i] + ohw*sin(ang), b);
+					t.verts[0] = fp; t.verts[1] = last; t.verts[2] = m;
+					if (s > 1) tris.push_back(t);
+					last = m;
+				}
+				if (segs > 1)
+				{
+					t.verts[0] = fp; t.verts[1] = last; t.verts[2] = fn_;
+					tris.push_back(t);
+				}
+			}
+		}
+
+		if (!closed)
+		{
+			drawLineCap(path.verts[0], path.verts[1], hw, style.start_cap, tris, offset_scale);
+			drawLineCap(path.verts.back(), path.verts[n - 2], hw, style.end_cap, tris, offset_scale);
+		}
+		return true;
+	}
+
 	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
 	                    double offset_scale)
 	{
 		u16 width = style.width;
+
+		// lyon's join model (Ruffle tessellates strokes with lyon); the
+		// per-segment quad builder below remains the fallback for lyon
+		// "fold" joins and degenerate edges.
+		{
+			std::vector<Tri> lyon_tris;
+			if (drawLinesLyon(path, style, lyon_tris, offset_scale))
+			{
+				tris.insert(tris.end(), lyon_tris.begin(), lyon_tris.end());
+				return;
+			}
+		}
 
 		// LINESTYLE2 cap/join words. Pre-v4 shapes leave these at 0, which is
 		// the round-everything geometry this builder has always drawn.

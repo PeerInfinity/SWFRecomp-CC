@@ -753,6 +753,11 @@ typedef struct {
 	const float* line_gradient_matrix;
 	u32 transform_id;         // MC's transform slot
 	u32 cxform_id;            // MC's cxform slot
+	// GPU copies of gradient_matrix / line_gradient_matrix with a-d stored as
+	// Fixed16 (Ruffle keeps the Drawing-API fill as an swf::Matrix); the
+	// *_matrix pointers above point here when a gradient is present.
+	float gradient_matrix_fx[16];
+	float line_gradient_matrix_fx[16];
 } DrawingRenderInfo;
 
 typedef void (*DrawingRenderCallback)(const DrawingRenderInfo* info, void* user_data);

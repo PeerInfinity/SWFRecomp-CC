@@ -3839,6 +3839,19 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		}
 		float composed[16];
 		hit_test_mat4_multiply(composed, parent_composed, local_xform);
+		// Ruffle TransformStack::push -> render/src/matrix.rs `Matrix * Matrix`:
+		// the composed translation is round_ties_even(a*tx + c*ty) (f32) plus
+		// the parent's integer-twip translation. A float world matrix put
+		// nested edges a fraction of a twip off and flipped pixel-centre ties.
+		{
+			float rx = parent_composed[0] * local_xform[12] + parent_composed[4] * local_xform[13];
+			float ry = parent_composed[1] * local_xform[12] + parent_composed[5] * local_xform[13];
+			if (isfinite(rx) && isfinite(ry) && fabsf(rx) < 2.0e9f && fabsf(ry) < 2.0e9f)
+			{
+				composed[12] = nearbyintf(rx) + parent_composed[12];
+				composed[13] = nearbyintf(ry) + parent_composed[13];
+			}
+		}
 
 		// MovieClip.scrollRect, the TRANSLATE half (Ruffle
 		// display_object.rs:1189 `transform_stack.push(translate(-x_min,
