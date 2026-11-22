@@ -145,7 +145,7 @@ CDP inclusive/self profile (`n_cdp_win.py`, 25 s, 200 µs sampling), checked wit
 - **Regression rows:** `regression/avm1_attached_clip_{goto_play,goto_play_nonroot,natural_timeline,natural_timeline_nonroot}` pass in graphics and no-graphics.
 - **Headline rows:** `from_gnash/misc-swfc.all/movieclip_destruction_test3`, `_test4` pass in both modes.
 - **N browser smoke:** FINAL screenshots at 10/30/50/70/90 s show the menu over cycling demo levels, with the ninja and limbs animating. No page errors in any run.
-- **CI at `10b5dff69`:** no-graphics `44978925327` `success`. `corpus_status_diff` (stem `results`): 0 regressions, +16 gains (all from other commits since the previous no-graphics baseline). All four `avm1_attached_clip_*` rows pass. The graphics check is folded into the s24 coordinator's next graphics `categories=full` run at ≥ `10b5dff69`.
+- **CI at `10b5dff69`:** no-graphics `44978925327` `success`. `corpus_status_diff` (stem `results`): 0 regressions, +16 gains (all from other commits since the previous no-graphics baseline). All four `avm1_attached_clip_*` rows pass. Graphics: coordinator run `44979572176` (full + images, at `3f803679d`, which includes `10b5dff69`) had 0 trace and 0 pixel regressions corpus-wide. All four `avm1_attached_clip_*` rows and `avm1_attach_clipevent_enterframe` pass; gnash `movieclip_destruction_test2/3/4` pass.
 
 ### Next slice
 
