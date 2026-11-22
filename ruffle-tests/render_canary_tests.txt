@@ -663,3 +663,11 @@ from_shumway/acid/acid-text                 # AVM1 EDITTEXT KERNING (tol 0)  1 c
 # clips are untinted. Ruffle exporter golden, exact at max_outliers 0.
 # tier=1
 regression/avm1_dynclip_color_transform     # dynamic-clip cxform + CM      1 cmp
+# s25 w2-avm2-cm-copyfrom: AVM2 ColorMatrixFilter (GPU filter-layer pass on stage +
+# CPU arm in BitmapData.draw), Graphics.copyFrom, truncated byte lineStyle alpha,
+# translucent AVM2 stroke union.
+# tier=1
+avm2/bitmapdata_draw_filters                # AVM2 CM on stage AND in draw()    1 cmp
+avm2/graphics_direct_commands               # copyFrom + 0.25-alpha dashes      1 cmp
+# tier=2
+avm2/graphics_gradients                     # translucent AVM2 gradient strokes (band) 1 cmp

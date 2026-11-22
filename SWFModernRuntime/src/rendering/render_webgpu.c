@@ -6781,11 +6781,191 @@ void render_webgpu_run_displacement(WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
+// ColorMatrixFilter pass (s25 w2-avm2-cm-copyfrom)
+// ---------------------------------------------------------------------------
+// A literal port of ruffle render/wgpu/shaders/filter/color_matrix.wgsl:
+// unpremultiply, the 4x5 matrix with the bias column / 255, clamp to 0..1,
+// re-premultiply. One texel in, one texel out (textureLoad at the fragment's
+// own pixel, so no sampler and no filtering), filter_tex_a -> filter_tex_b,
+// then copied back like the displacement pass so the ping-pong invariant
+// ("the layer ends up in filter_tex_a") holds and it chains with run_blur.
+//
+// Ruffle divides by src.a unguarded; a fully transparent texel gives NaN, and
+// clamp(NaN) is implementation-defined in WGSL. We pin src.a == 0 to an
+// unpremultiplied rgb of 0 — the same answer as the CPU twin
+// (avm2_bitmap.c color_matrix_pixel reads unmul()'s 0 for a = 0).
+//
+// Resources are file-static and lazily built on the first colour-matrix
+// filter (a movie that never uses one pays nothing). They hang off the device
+// they were made on, and are released in render_webgpu_free.
+static const char* color_matrix_wgsl =
+	"struct CMParams { r: vec4f, g: vec4f, b: vec4f, a: vec4f, bias: vec4f }\n"
+	"@group(0) @binding(0) var src_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(1) var<uniform> p: CMParams;\n"
+	"struct VSOut { @builtin(position) pos: vec4f }\n"
+	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+	"  var positions = array<vec2f, 6>(\n"
+	"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+	"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+	"  );\n"
+	"  var out: VSOut;\n"
+	"  out.pos = vec4f(positions[vi], 0.0, 1.0);\n"
+	"  return out;\n"
+	"}\n"
+	"@fragment fn fs_main(@builtin(position) fp: vec4f) -> @location(0) vec4f {\n"
+	"  let src = textureLoad(src_tex, vec2i(i32(fp.x), i32(fp.y)), 0);\n"
+	"  var s = vec4f(0.0, 0.0, 0.0, src.a);\n"
+	"  if (src.a > 0.0) { s = vec4f(src.rgb / src.a, src.a); }\n"
+	"  let c = clamp(vec4f(dot(p.r, s), dot(p.g, s), dot(p.b, s), dot(p.a, s))\n"
+	"                + p.bias / 255.0, vec4f(0.0), vec4f(1.0));\n"
+	"  return vec4f(c.rgb * c.a, c.a);\n"
+	"}\n";
+
+static WGPUDevice          g_cm_device;
+static WGPUBindGroupLayout g_cm_bgl;
+static WGPUPipelineLayout  g_cm_pipeline_layout;
+static WGPURenderPipeline  g_cm_pipeline;
+
+static void release_color_matrix_resources(void)
+{
+	if (g_cm_pipeline) wgpuRenderPipelineRelease(g_cm_pipeline);
+	if (g_cm_pipeline_layout) wgpuPipelineLayoutRelease(g_cm_pipeline_layout);
+	if (g_cm_bgl) wgpuBindGroupLayoutRelease(g_cm_bgl);
+	g_cm_pipeline = NULL;
+	g_cm_pipeline_layout = NULL;
+	g_cm_bgl = NULL;
+	g_cm_device = NULL;
+}
+
+static void ensure_color_matrix_resources(WebGPURenderContext* ctx)
+{
+	if (g_cm_device == ctx->device && g_cm_pipeline != NULL) return;
+	release_color_matrix_resources();
+	g_cm_device = ctx->device;
+
+	WGPUBindGroupLayoutEntry entries[2] = {0};
+	entries[0].binding = 0;
+	entries[0].visibility = WGPUShaderStage_Fragment;
+	entries[0].texture.sampleType = WGPUTextureSampleType_Float;
+	entries[0].texture.viewDimension = WGPUTextureViewDimension_2D;
+	entries[1].binding = 1;
+	entries[1].visibility = WGPUShaderStage_Fragment;
+	entries[1].buffer.type = WGPUBufferBindingType_Uniform;
+	entries[1].buffer.minBindingSize = 80;
+
+	WGPUBindGroupLayoutDescriptor bgl_desc = {0};
+	bgl_desc.entryCount = 2;
+	bgl_desc.entries = entries;
+	g_cm_bgl = wgpuDeviceCreateBindGroupLayout(ctx->device, &bgl_desc);
+
+	WGPUPipelineLayoutDescriptor pl_desc = {0};
+	pl_desc.bindGroupLayoutCount = 1;
+	pl_desc.bindGroupLayouts = &g_cm_bgl;
+	g_cm_pipeline_layout = wgpuDeviceCreatePipelineLayout(ctx->device, &pl_desc);
+
+	WGPUShaderModule sm = create_shader(ctx->device, color_matrix_wgsl, "color_matrix_shader");
+
+	WGPUColorTargetState ct = {0};
+	ct.format = ctx->surface_format;
+	ct.writeMask = WGPUColorWriteMask_All;
+	WGPUBlendState blend = {0};
+	blend.color.srcFactor = WGPUBlendFactor_One;
+	blend.color.dstFactor = WGPUBlendFactor_Zero;
+	blend.color.operation = WGPUBlendOperation_Add;
+	blend.alpha.srcFactor = WGPUBlendFactor_One;
+	blend.alpha.dstFactor = WGPUBlendFactor_Zero;
+	blend.alpha.operation = WGPUBlendOperation_Add;
+	ct.blend = &blend;
+
+	WGPUFragmentState fs = {0};
+	fs.module = sm;
+	fs.entryPoint = WGPU_LABEL("fs_main");
+	fs.targetCount = 1;
+	fs.targets = &ct;
+
+	WGPURenderPipelineDescriptor rpd = {0};
+	rpd.label = WGPU_LABEL("color_matrix_pipeline");
+	rpd.layout = g_cm_pipeline_layout;
+	rpd.vertex.module = sm;
+	rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+	rpd.fragment = &fs;
+	rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+	// Single-sampled, like every pass over the ping-pong pair (see the
+	// displacement pipeline above); MSAA_SAMPLES is the offscreen pass's.
+	rpd.multisample.count = 1;
+	rpd.multisample.mask = 0xFFFFFFFF;
+	g_cm_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+	wgpuShaderModuleRelease(sm);
+}
+
+void render_webgpu_run_color_matrix(WebGPURenderContext* ctx, const float* m20)
+{
+	if (!ctx->renderer_ok || m20 == NULL) return;
+	render_webgpu_ensure_filter_resources(ctx);
+	ensure_color_matrix_resources(ctx);
+	if (g_cm_pipeline == NULL) return;
+
+	// Rows r, g, b, a (the four multipliers), then the bias column.
+	float params[20];
+	for (int row = 0; row < 4; row++)
+	{
+		for (int col = 0; col < 4; col++) params[row * 4 + col] = m20[row * 5 + col];
+		params[16 + row] = m20[row * 5 + 4];
+	}
+	u32 params_offset = filter_uniform_push(ctx, params, 80);
+
+	WGPUBindGroupEntry bg_entries[2] = {0};
+	bg_entries[0].binding = 0;
+	bg_entries[0].textureView = ctx->filter_view_a;
+	bg_entries[1].binding = 1;
+	bg_entries[1].buffer = ctx->filter_uniform_ring;
+	bg_entries[1].offset = params_offset;
+	bg_entries[1].size = 80;
+
+	WGPUBindGroupDescriptor bg_desc = {0};
+	bg_desc.layout = g_cm_bgl;
+	bg_desc.entryCount = 2;
+	bg_desc.entries = bg_entries;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bg_desc);
+
+	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	color_att.view = ctx->filter_view_b;
+	color_att.loadOp = WGPULoadOp_Clear;
+	color_att.storeOp = WGPUStoreOp_Store;
+	color_att.clearValue = (WGPUColor){0, 0, 0, 0};
+
+	WGPURenderPassDescriptor rp_desc = {0};
+	rp_desc.label = WGPU_LABEL("color_matrix");
+	rp_desc.colorAttachmentCount = 1;
+	rp_desc.colorAttachments = &color_att;
+
+	WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+	wgpuRenderPassEncoderSetPipeline(pass, g_cm_pipeline);
+	wgpuRenderPassEncoderSetBindGroup(pass, 0, bg, 0, NULL);
+	wgpuRenderPassEncoderDraw(pass, 6, 1, 0, 0);
+	wgpuRenderPassEncoderEnd(pass);
+	wgpuRenderPassEncoderRelease(pass);
+	wgpuBindGroupRelease(bg);
+
+	// Back into filter_tex_a (same legality argument as the displacement pass).
+	WGPUTexelCopyTextureInfo src = {0};
+	src.texture = ctx->filter_tex_b;
+	src.aspect = WGPUTextureAspect_All;
+	WGPUTexelCopyTextureInfo dst = {0};
+	dst.texture = ctx->filter_tex_a;
+	dst.aspect = WGPUTextureAspect_All;
+	WGPUExtent3D extent = {filter_tex_w(ctx), filter_tex_h(ctx), 1};
+	wgpuCommandEncoderCopyTextureToTexture(ctx->encoder, &src, &dst, &extent);
+}
+
+// ---------------------------------------------------------------------------
 // render_webgpu_free: release all GPU resources
 // ---------------------------------------------------------------------------
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 {
 	(void)app_context;
+	release_color_matrix_resources();
 
 	// Release pipelines
 	if (ctx->render_pipeline)

@@ -9052,6 +9052,66 @@ static void gfx_snapshot_line(Avm2GraphicsExt* g, Avm2GfxPath* path)
 	}
 }
 
+// A translucent stroke is filled ONCE by Flash/Ruffle (the stroke outline is
+// one shape), but gfx_build_stroke emits a triangle soup of per-segment quads
+// plus join/cap wedges that overlap at every corner, so a translucent stroke
+// blended twice there. AVM2 twin of action.c drawingUnionTranslucentStroke
+// (s25 w1-pixel-drawing §B, AVM1 landed in 0f35012bd): re-tessellate the soup
+// as its nonzero union (each triangle normalised CCW). Opaque strokes, and
+// bitmap strokes, are left exactly as built (their overlap is invisible).
+static void gfx_union_translucent_stroke(Avm2GfxPath* path)
+{
+	if (path->line_verts == NULL || path->line_vert_count < 6) return;
+	int translucent = 0;
+	if (path->lsty.kind == 2)
+	{
+		for (int i = 0; i < 256; i++)
+			if (path->lsty.grad_ramp[i * 4 + 3] != 255) { translucent = 1; break; }
+	}
+	else if (path->lsty.kind == 0)
+		translucent = path->la < 0.999f;
+	if (!translucent) return;
+	TESStesselator* tess = tessNewTess(NULL);
+	if (tess == NULL) return;
+	uint32_t ntri_in = path->line_vert_count / 3;
+	for (uint32_t t = 0; t < ntri_in; t++)
+	{
+		const float* v = &path->line_verts[t * 6];
+		float area = (v[2] - v[0]) * (v[5] - v[1]) - (v[4] - v[0]) * (v[3] - v[1]);
+		if (fabsf(area) < 1e-4f) continue;
+		float tri[6];
+		if (area > 0) memcpy(tri, v, sizeof(tri));
+		else
+		{
+			tri[0] = v[0]; tri[1] = v[1];
+			tri[2] = v[4]; tri[3] = v[5];
+			tri[4] = v[2]; tri[5] = v[3];
+		}
+		tessAddContour(tess, 2, tri, sizeof(float) * 2, 3);
+	}
+	if (tessTesselate(tess, TESS_WINDING_NONZERO, TESS_POLYGONS, 3, 2, NULL))
+	{
+		const TESSreal* verts = tessGetVertices(tess);
+		const TESSindex* elems = tessGetElements(tess);
+		int ntris = tessGetElementCount(tess);
+		float* out = (float*) malloc((size_t) (ntris > 0 ? ntris : 1) * 6 * sizeof(float));
+		if (out != NULL)
+		{
+			for (int i = 0; i < ntris; i++)
+				for (int j = 0; j < 3; j++)
+				{
+					TESSindex idx = elems[i * 3 + j];
+					out[i * 6 + j * 2]     = (float) verts[idx * 2];
+					out[i * 6 + j * 2 + 1] = (float) verts[idx * 2 + 1];
+				}
+			free(path->line_verts);
+			path->line_verts = out;
+			path->line_vert_count = (uint32_t) ntris * 3;
+		}
+	}
+	tessDeleteTess(tess);
+}
+
 // Close the CURRENT stroke run — Ruffle's Drawing::set_line_style. The fill is
 // left open: `cmds` is NOT cleared, only `stroke_start` advances, so the fill
 // tessellates as ONE even-odd polygon spanning every lineStyle() change. The
@@ -9078,6 +9138,7 @@ static void gfx_flush_stroke_run(Avm2GraphicsExt* g, int to_pending)
 		// close_path() does to the current line whenever a fill is open.
 		gfx_build_stroke(p, poly, poly_count, cstarts, ccount,
 		                 g->cur_fill != 0, g->clw * 0.5f * 20.0f);
+		gfx_union_translucent_stroke(p);
 		free(poly); free(cstarts);
 	}
 	g->stroke_start = to;
@@ -9330,6 +9391,103 @@ void avm2_graphics_cpu_composite(Avm2Context* ctx, Avm2Object* obj,
 static Avm2Value gfx_noop(Avm2Activation* act)
 {
 	(void) act;
+	return avm2_undefined();
+}
+
+// ---- Graphics.copyFrom (s25 w2-avm2-cm-copyfrom) ----
+// Ruffle avm2/globals/flash/display/graphics.rs copy_from: `*target_drawing =
+// source_drawing.clone()`. The Drawing clone carries EVERYTHING: the finished
+// paths, the open fill and its command list, the current line style, the
+// pending (deferred) stroke runs, the cursor and both bounds boxes. So a
+// `beginFill` + `drawCircle` issued on the target BEFORE copyFrom is
+// discarded, and one issued AFTER continues the source's open fill with the
+// source's line style (avm2/graphics_direct_commands: the `partial` dot is
+// blue with the dash stroke, not red).
+static void* gfx_dup_buf(const void* src, size_t nb)
+{
+	if (src == NULL || nb == 0) return NULL;
+	void* d = malloc(nb);
+	if (d != NULL) memcpy(d, src, nb);
+	return d;
+}
+
+static void gfx_dup_path_owned(Avm2GfxPath* p)
+{
+	p->fill_verts = (float*) gfx_dup_buf(p->fill_verts,
+	                                     (size_t) p->fill_vert_count * 2 * sizeof(float));
+	if (p->fill_verts == NULL) p->fill_vert_count = 0;
+	p->line_verts = (float*) gfx_dup_buf(p->line_verts,
+	                                     (size_t) p->line_vert_count * 2 * sizeof(float));
+	if (p->line_verts == NULL) p->line_vert_count = 0;
+	p->bmp_px = (uint32_t*) gfx_dup_buf(p->bmp_px,
+	                                    (size_t) p->bmp_w * p->bmp_h * sizeof(uint32_t));
+	if (p->bmp_px == NULL) p->bmp_w = p->bmp_h = 0;
+	p->lsty.bmp_px = (uint32_t*) gfx_dup_buf(p->lsty.bmp_px,
+	                                         (size_t) p->lsty.bmp_w * p->lsty.bmp_h * sizeof(uint32_t));
+	if (p->lsty.bmp_px == NULL) p->lsty.bmp_w = p->lsty.bmp_h = 0;
+}
+
+static Avm2GfxPath* gfx_dup_path_array(const Avm2GfxPath* src, uint32_t count)
+{
+	if (src == NULL || count == 0) return NULL;
+	Avm2GfxPath* d = (Avm2GfxPath*) gfx_dup_buf(src, (size_t) count * sizeof(Avm2GfxPath));
+	if (d == NULL) return NULL;
+	for (uint32_t i = 0; i < count; i++) gfx_dup_path_owned(&d[i]);
+	return d;
+}
+
+static Avm2Value gfx_copy_from(Avm2Activation* act)
+{
+	Avm2GraphicsExt* dst = gfx_self_ext(act);
+	if (dst == NULL || act->argc < 1
+	    || act->args[0].kind != AVM2_VALUE_OBJECT || act->args[0].u.obj == NULL)
+		return avm2_undefined();
+	Avm2Object* src_obj = act->args[0].u.obj;
+	if (src_obj->cls != g_graphics_class || src_obj->native_ext == NULL)
+		return avm2_undefined();
+	Avm2GraphicsExt* src = (Avm2GraphicsExt*) src_obj->native_ext;
+	if (src == dst) return avm2_undefined();
+
+	Avm2Object* owner = dst->owner;
+	gfx_reset(dst);
+	*dst = *src;
+	dst->owner = owner;
+	dst->paths = gfx_dup_path_array(src->paths, src->path_count);
+	dst->path_cap = dst->paths ? src->path_count : 0;
+	if (dst->paths == NULL) dst->path_count = 0;
+	dst->pend = gfx_dup_path_array(src->pend, src->pend_count);
+	dst->pend_cap = dst->pend ? src->pend_count : 0;
+	if (dst->pend == NULL) dst->pend_count = 0;
+	dst->cmds = (Avm2GfxCmd*) gfx_dup_buf(src->cmds,
+	                                      (size_t) src->cmd_count * sizeof(Avm2GfxCmd));
+	dst->cmd_cap = dst->cmds ? src->cmd_count : 0;
+	if (dst->cmds == NULL) { dst->cmd_count = 0; dst->stroke_start = 0; }
+	dst->cbmp_px = (uint32_t*) gfx_dup_buf(src->cbmp_px,
+	                                       (size_t) src->cbmp_w * src->cbmp_h * sizeof(uint32_t));
+	if (dst->cbmp_px == NULL) dst->cbmp_w = dst->cbmp_h = 0;
+	dst->clsty.bmp_px = (uint32_t*) gfx_dup_buf(src->clsty.bmp_px,
+	                                            (size_t) src->clsty.bmp_w * src->clsty.bmp_h * sizeof(uint32_t));
+	if (dst->clsty.bmp_px == NULL) dst->clsty.bmp_w = dst->clsty.bmp_h = 0;
+
+	// Both bounds boxes travel with the Drawing (shape_bounds / edge_bounds).
+	Avm2DisplayObjectExt* de = avm2_display_ext_of(act->ctx, owner);
+	Avm2DisplayObjectExt* se = avm2_display_ext_of(act->ctx, src->owner);
+	if (de != NULL)
+	{
+		if (se != NULL)
+		{
+			de->draw_valid = se->draw_valid;
+			de->draw_xmin = se->draw_xmin; de->draw_xmax = se->draw_xmax;
+			de->draw_ymin = se->draw_ymin; de->draw_ymax = se->draw_ymax;
+			de->draw_edge_valid = se->draw_edge_valid;
+			de->draw_exmin = se->draw_exmin; de->draw_exmax = se->draw_exmax;
+			de->draw_eymin = se->draw_eymin; de->draw_eymax = se->draw_eymax;
+		}
+		else
+		{
+			de->draw_valid = 0; de->draw_edge_valid = 0;
+		}
+	}
 	return avm2_undefined();
 }
 
@@ -9602,7 +9760,11 @@ static Avm2Value gfx_line_style(Avm2Activation* act)
 	g->clr = ((rgb >> 16) & 0xFF) / 255.0f;
 	g->clg = ((rgb >>  8) & 0xFF) / 255.0f;
 	g->clb = ( rgb        & 0xFF) / 255.0f;
-	g->cla = (float) a;
+	// Byte alpha, TRUNCATED — Ruffle graphics.rs line_style uses the same
+	// color_from_args as beginFill (`(alpha * 255.0) as u8`; see
+	// gfx_set_solid_fill). 0.25 is 63/255: avm2/graphics_direct_commands'
+	// dashes are 230 (Flash), not 229, at every interior pixel.
+	g->cla = (float) ((double) (uint8_t) (a * 255.0) / 255.0);
 	// lineStyle(thickness, color, alpha, pixelHinting, scaleMode, caps,
 	// joints, miterLimit) — args 5..7. Both style defaults are ROUND.
 	g->clcaps = act->argc > 5 ? gfx_caps_code(ctx, act->args[5]) : 0;
@@ -10669,7 +10831,7 @@ static void gfx_apply_stroke_fill_carrier(Avm2Context* ctx, Avm2GraphicsExt* g,
 		g->clr = ((rgb >> 16) & 0xFF) / 255.0f;
 		g->clg = ((rgb >>  8) & 0xFF) / 255.0f;
 		g->clb = ( rgb        & 0xFF) / 255.0f;
-		g->cla = (float) al;
+		g->cla = (float) ((double) (uint8_t) (al * 255.0) / 255.0);  // byte, truncated (lineStyle)
 		return;
 	}
 	if (o->cls == g_graphicsgradientfill_class)
@@ -17884,7 +18046,7 @@ void avm2_register_display(Avm2Context* ctx)
 	                        gfx_draw_round_rect_complex);
 	avm2_builtin_add_method(ctx, graphics, "drawEllipse", gfx_draw_ellipse);
 	avm2_builtin_add_method(ctx, graphics, "drawCircle", gfx_draw_circle);
-	avm2_builtin_add_method(ctx, graphics, "copyFrom", gfx_noop);
+	avm2_builtin_add_method(ctx, graphics, "copyFrom", gfx_copy_from);
 	g_graphics_class = graphics;
 	// T4: drawPath/drawTriangles/drawGraphicsData + the Graphics* data classes.
 	avm2_graphics_register(ctx, graphics, b->object_class);
@@ -20004,6 +20166,13 @@ static float avm2_filter_fixed8(int16_t v)  { return (float) v / 256.0f; }
 //
 // quality == 0 skips for every kind: Flash runs zero blur passes, and
 // glow_pass_scaling's quality-0 tile is unfiltered in the golden.
+static int avm2_filter_cm_is_identity(const Avm2FilterVal* f)
+{
+	for (int i = 0; i < 20; i++)
+		if (f->cm[i] != ((i % 6 == 0) ? 1.0f : 0.0f)) return 0;
+	return 1;
+}
+
 static int avm2_filter_renderable(const Avm2FilterVal* f)
 {
 	// DisplacementMapFilter (cut 2) is checked FIRST and does not go through
@@ -20014,6 +20183,10 @@ static int avm2_filter_renderable(const Avm2FilterVal* f)
 	// with no map returns None, which leaves the source untouched.
 	if (f->kind == AVM2_FILTER_DISPLACEMENT_MAP)
 		return f->map_bitmap.kind == AVM2_VALUE_OBJECT;
+	// ColorMatrixFilter (s25): no quality property either, and its only
+	// impotence rule is swf::ColorMatrixFilter::impotent() — the identity.
+	if (f->kind == AVM2_FILTER_COLOR_MATRIX)
+		return !avm2_filter_cm_is_identity(f);
 	if (f->kind != AVM2_FILTER_BLUR && f->kind != AVM2_FILTER_DROP_SHADOW
 	    && f->kind != AVM2_FILTER_GLOW && f->kind != AVM2_FILTER_BEVEL)
 		return 0;
@@ -20216,6 +20389,12 @@ static double avm2_filter_reach_px(const Avm2FilterVal* const* list,
 // must be suspended.
 static void avm2_filter_one_in_place(Avm2Context* ctx, const Avm2FilterVal* f)
 {
+	if (f->kind == AVM2_FILTER_COLOR_MATRIX)
+	{
+		(void) ctx;
+		renderer_run_color_matrix(context, f->cm);
+		return;
+	}
 	int is_blur = (f->kind == AVM2_FILTER_BLUR);
 	int is_shadow = (f->kind == AVM2_FILTER_DROP_SHADOW);
 	int is_glow = (f->kind == AVM2_FILTER_GLOW);
@@ -20430,6 +20609,14 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 		if (f->kind == AVM2_FILTER_DISPLACEMENT_MAP)
 		{
 			avm2_run_displacement_filter(ctx, obj, ext, parent_world, f);
+			continue;
+		}
+		// ColorMatrixFilter: a per-texel pass, in place on the layer, at any
+		// position in the chain. As the LAST filter it composites through the
+		// legacy blit-back (no composition flags), like a blur.
+		if (f->kind == AVM2_FILTER_COLOR_MATRIX)
+		{
+			renderer_run_color_matrix(context, f->cm);
 			continue;
 		}
 		int f_is_blur = (f->kind == AVM2_FILTER_BLUR);

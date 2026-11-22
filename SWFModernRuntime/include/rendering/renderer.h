@@ -71,6 +71,7 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_composite_alpha_mask(ctx)             render_webgpu_composite_alpha_mask(ctx)
 #define renderer_run_displacement(ctx, mp, mw, mh, rx, ry, rw, rh, px, py, sx, sy, vs, cx, cy, md, cr, cg, cb, ca) \
 	render_webgpu_run_displacement(ctx, mp, mw, mh, rx, ry, rw, rh, px, py, sx, sy, vs, cx, cy, md, cr, cg, cb, ca)
+#define renderer_run_color_matrix(ctx, m20)            render_webgpu_run_color_matrix(ctx, m20)
 #define renderer_blend_mode_is_layered(ctx, m)         render_webgpu_blend_mode_is_layered(ctx, m)
 #define renderer_capture_backdrop(ctx, m)              render_webgpu_capture_backdrop(ctx, m)
 #define renderer_composite_blend(ctx, m, sr)           render_webgpu_composite_blend(ctx, m, sr)
@@ -137,6 +138,7 @@ typedef FlashbangContext RenderContext;
 #define renderer_ensure_filter_resources(ctx)          ((void)0)
 #define renderer_composite_alpha_mask(ctx)             ((void)0)
 #define renderer_run_displacement(ctx, mp, mw, mh, rx, ry, rw, rh, px, py, sx, sy, vs, cx, cy, md, cr, cg, cb, ca) ((void)0)
+#define renderer_run_color_matrix(ctx, m20)            ((void)0)
 #define renderer_blend_mode_is_layered(ctx, m)         (0)
 #define renderer_capture_backdrop(ctx, m)              ((void)0)
 #define renderer_composite_blend(ctx, m, sr)           ((void)0)

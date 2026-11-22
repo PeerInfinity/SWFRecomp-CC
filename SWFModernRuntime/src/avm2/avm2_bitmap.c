@@ -2500,6 +2500,69 @@ static void bd_draw_masked(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	free(cov);
 }
 
+// ColorMatrixFilter on a node inside a draw() source (s25 w2-avm2-cm-copyfrom).
+// Flash renders the filtered node into its cache and blits the cache, so
+// `bd.draw(s)` of a ColorMatrix-filtered `s` lands FILTERED (avm2/
+// bitmapdata_draw_filters, Flash golden; Ruffle's own render skips it, hence
+// that row's known_failure). CPU form: raster the node's subtree into a
+// transparent layer at alpha 1, run each non-identity ColorMatrixFilter over
+// it in list order (color_matrix_pixel, the applyFilter arm's kernel), then
+// compose the layer with the node's alpha. Other filter kinds stay unapplied
+// here, exactly as before this arm existed.
+static uint32_t color_matrix_pixel(uint32_t straight, const float* m);
+static Avm2Object* g_bd_cm_skip = NULL;   // node being captured (no re-entry)
+
+static int bd_cm_is_identity(const float* m)
+{
+	for (int i = 0; i < 20; i++)
+		if (m[i] != ((i % 6 == 0) ? 1.0f : 0.0f)) return 0;
+	return 1;
+}
+
+static int bd_node_has_cm(const Avm2DisplayObjectExt* ext)
+{
+	for (uint32_t i = 0; i < ext->filter_count; i++)
+		if (ext->filters[i].kind == AVM2_FILTER_COLOR_MATRIX
+		    && !bd_cm_is_identity(ext->filters[i].cm))
+			return 1;
+	return 0;
+}
+
+static void bd_draw_cm_filtered(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                                Avm2Object* obj, Avm2DisplayObjectExt* ext,
+                                double wa, double wb, double wc, double wd,
+                                double wtx, double wty, double alpha, int depth)
+{
+	size_t n = (size_t) dst->width * dst->height;
+	uint32_t* layer = (uint32_t*) calloc(n ? n : 1, sizeof(uint32_t));
+	if (layer == NULL) return;
+	Avm2BitmapDataExt ldst = *dst;
+	ldst.pixels = layer;
+	ldst.transparency = 1;
+	Avm2Object* saved_skip = g_bd_cm_skip;
+	g_bd_cm_skip = obj;
+	bd_draw_shape_walk(ctx, &ldst, obj, wa, wb, wc, wd, wtx, wty, 1.0, depth);
+	g_bd_cm_skip = saved_skip;
+	for (uint32_t k = 0; k < ext->filter_count; k++)
+	{
+		const Avm2FilterVal* f = &ext->filters[k];
+		if (f->kind != AVM2_FILTER_COLOR_MATRIX || bd_cm_is_identity(f->cm)) continue;
+		for (size_t i = 0; i < n; i++)
+			layer[i] = premul(color_matrix_pixel(unmul(layer[i]), f->cm), 1);
+	}
+	int opaque_dst = !dst->transparency;
+	for (size_t i = 0; i < n; i++)
+	{
+		uint32_t c = layer[i];
+		if (alpha < 1.0) c = bd_scale_premul(c, alpha < 0.0 ? 0.0 : alpha);
+		if (CA(c) == 0) continue;
+		uint32_t out = blend_over_round(dst->pixels[i], c);
+		if (opaque_dst) out = with_alpha(out, 0xFF);
+		dst->pixels[i] = out;
+	}
+	free(layer);
+}
+
 static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                                Avm2Object* obj,
                                double wa, double wb, double wc, double wd,
@@ -2509,6 +2572,12 @@ static void bd_draw_shape_walk(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
 	if (!ext->is_stage && !ext->visible) return;
+	if (obj != g_bd_cm_skip && dst->pixels != NULL && bd_node_has_cm(ext))
+	{
+		bd_draw_cm_filtered(ctx, dst, obj, ext, wa, wb, wc, wd, wtx, wty,
+		                    alpha, depth);
+		return;
+	}
 	if (ext->mask != NULL && dst->pixels != NULL)
 	{
 		bd_draw_masked(ctx, dst, obj, ext, wa, wb, wc, wd, wtx, wty, alpha, depth);
