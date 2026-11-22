@@ -1334,3 +1334,44 @@ comparisons, all passing). Interim `44935781892`: 529/610 (+6). Final `449441470
 - **Branch cleanup:** a `.claude/settings.local.json` allow rule `Bash(git push origin --delete fanout/*)` (user, s23)
   lets the coordinator prune merged `fanout/*` branches at closeout, after `cmp`-ing each branch's report with its
   archived copy on master.
+
+## 23. Session-24 state of the board (2026-11-21/22)
+
+Baseline: images run `44965247383` at `ff2e2e9d6` (the post-s23 grade), **534 / 613**. Interim `44979572176` at
+`3f803679d`: **539 / 613 (+5)**, every flip on a ledger by name, 0 pass→fail. Final `44986836161` at `9561027db`
+(+ attach-order, trace-only): 0 image moves. Trace side: `polish-sweep-arc.md` §25. All pixel work ran in cloud
+sessions on lavapipe; every landed hunk had a CI-grade before leg (md5 = CI actual).
+
+| patch | flips | comparisons |
+|---|---:|---|
+| `e51883660` w2-bitmap-encode-shader (JPEG encoder via vendored `stb_image_write`; ShaderFilter on Bitmap + `applyFilter(ShaderFilter)` via the CPU PixelBender evaluator, cached on a BitmapData version; drawWithQuality vector cxform/blend + explicit quality + top-left fill rule) | +3 | `bitmapdata_encode_jpeg_visual`, `pixelbender_effect_glassDisplace_shaderfilter` (byte-exact), `bitmapdata_draw_cab_quality`; band `pixelbender_dithering` 2744871 → 1277415 |
+| `fdfec3aaf` w2-text-pitch (EditText leading carried in twips; per-run embedded face for `<b>`/`<i>`; Fixed8 glyph colour; root static text per-instance glyph slots + bounds cull) | +2 | `text/br_at_start` (1672 → 4), `text/style_changes_in_html` (24998 → 0); band `visual/static_text_offstage` 16016 → 9600; `text-bind` max-1 move, outliers unchanged |
+
+- **Premises refuted by measurement:** `br_at_start` was fractional tag leading truncated to whole pixels, not the
+  per-line max ascent/descent; `style_changes_in_html` was the per-run embedded face plus Fixed8 colour;
+  `acid-color-0`'s residual is DefineBitsJPEG3 alpha edges + a ring edge + centring, not a gradient residual; the AVM2
+  textbox cxform twin is latent in no graded row.
+
+### Left on the board (session 25)
+
+- `visual/static_text_offstage` 9600: exactly the two squares of sub-mechanism (c), a general AVM1 `BitmapData.draw` gap.
+- `pixelbender_dithering` (now e_large): needs the CPU bitmap-fill arm in `avm2_cpu_raster_shape`.
+- `acid-color-0` band (JPEG3 alpha edges, ring edge, centring — w1-pixel-text §1).
+- ShaderFilter on non-Bitmap display objects (GPU filter-layer readback or a CPU walk; no row); ShaderJob/ShaderFilter
+  writeback stores straight alpha into the premultiplied store (a translucent source would show whether Flash
+  premultiplies).
+- Perf lead: key a GPU texture cache on `Avm2BitmapDataExt.version` (every Bitmap's pixels are re-uploaded every frame).
+- `bitmapdata_draw_cab_quality` canary tier 2 → 1 now that CI confirms the pass (zero headroom; non-EOF line edit).
+- Unchanged from §22: zero-headroom rows (`bevel_*`, `glow_with_alpha_strength`, `fills_and_lines`,
+  `fallback_preferences`, `edittext_border_filters`, `text-bind` 587/600 — re-confirmed NO-GO s24), `bevel` y=305 checker
+  tie (needs Ruffle's test runner at quality=low), quality=low hairline tie-break, `definefont4` (NO-GO, price unchanged),
+  `blend_shader_luma_lighten` (PBJ→WGSL), `bitmapdata_draw` (tol-128 hinting), `colorconversion/h263`, the re-goldened-
+  to-Flash rows.
+- Runtime-filter leftovers from §22 (CM/Convolution/DisplacementMap, dynamic filter root bitmaps/text, gradient filters
+  single-colour approximation) — still open, game-visible, no rows.
+- Optional local oracle fixtures (need mxmlc): `w2-bitmap-encode-shader-probe/` `shaderfilter_cache`, `draw_cxform_blend`.
+
+### Process notes added in session 24
+
+- Interim images run folded the parallel perf fix (`10b5dff69`) in rather than spending a separate graphics run on it.
+- Wave 1 sized to the board (6 slots); pixel slots each priced ≤ 3 flips and every priced flip landed.

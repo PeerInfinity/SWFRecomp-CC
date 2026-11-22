@@ -3328,3 +3328,103 @@ no-graphics builds carry no libavcodec by design. One known, predicted row.
   `external_interface_monkeypatch`.
 
 **Pixels.** See `graphics-fanout-playbook.md` §22.
+
+## 25. Session 24 (2026-11-21/22) — dual-axis fan-out #16, CLOUD-FIRST: trace +19 (4608/4655 intersection eff) + 5 new fixtures, pixels +5 (539/613), ZERO regressions in either axis or either mode
+
+Commits `c2f9e695b..9561027db` on master (8 code commits + docs; every report, patch and probe under
+`session24-fanout-reports/`). Cloud-first (user directive 2026-10-16, re-confirmed 2026-11-21): 6 wave-1 + 6 wave-2
+cloud sessions (env "SWFRecomp fan-out", Opus), all delivered on `fanout/<slug>` branches, 0 lost. Wave 1 was sized at
+6, not 8, because s23 took the cheap wins ("expect diminishing returns" in `BRIEFS_COMMON.md`); 2 of the 6 wave-1
+prototypes were measured and landed directly. One parallel LOCAL one-task session (`n-perf-ab`, real-GPU N frame-rate
+A/B). Local CPU: git/merges, single-row spot-checks of every landing, 3 Ruffle-exporter oracle runs.
+
+**Baseline** = the post-s23 grade run `44965247383` (graphics/full/images at `ff2e2e9d6`, results `67fb47bc2`,
+upstream `bcac30c19`): trace **4588 eff / 4653**, pixels **534 / 613**. It doubled as the s23-leftover grade (no
+separate wave-0 run).
+
+**Grading runs.**
+
+| run | code | trace (graphics) | pixels | no-graphics |
+|---|---|---|---|---|
+| `44972916356` | `336749f14` native-proto | 4589 → 4591 (+2), ledger exact | — | — |
+| `44976721092` | `292d0121f` (+avm1-tail, textformat-ctor) | → 4597 (+6) by name | — | — |
+| `44979572176` | `3f803679d` (+netstream-sound, text-pitch, bitmap-encode-shader, small-natives, n-perf `10b5dff69`) | → 4609/4657 (+10) by name | 534 → **539** (+5) by name, 2 bands improved | — |
+| `44986836161` / `44986843489` | `9561027db` (all, + attach-order `c9c020850`) | **+1** (`MovieClip-v8` → rm), 3 new fixtures pass | +0, 0 moves | **+1**, 3 fixtures pass |
+
+Session-wide (`67fb47bc2 → 08fdbcad6`, 4655-row graphics intersection): **4589 → 4608 eff (+19)**, every gain on a
+patch ledger by name, 0 pass→fail, 0 other status moves; plus 5 new `regression/` fixtures, all passing in both modes.
+**Mode parity:** per-test identical except `audio/aac` and `avm2/audio_computespectrum`, both graphics-only by design
+(no libavcodec / mixer tap in no-graphics) and both predicted on their ledgers. Pages redeployed `44987905814`.
+
+### 25.1 Ledger (trace, +19 intersection + 5 new fixtures)
+
+| patch | flips | tests |
+|---|---:|---|
+| `ee02076de` w1-avm1-tail prototype | +5 | `amf0_array_matrix`, `localconnection_serialize_sparse_array_getters`, `localconnection_xml_unavailable`, `load_vars`, `stylesheet_load` (last two were ignored rows; entries pruned) |
+| `ba7cb4d63` w2-avm2-netstream-sound | +5 (NG +4) | `netstream_play_flv`, `netstream_play_stop_replay`, `netstream_seek_flv`, `soundchannel_position_after_end`, `audio_computespectrum` (graphics only) |
+| `09ed83dc9` w2-avm2-small-natives | +4 | `weird_number_bound_methods`, `textline_metrics`, `worker_terminate`, `primitive_bound_methods` (rm) |
+| `336749f14` w1-native-proto prototype | +2 | `lazy_prototype_shared` (new upstream row), `video_prototype_lazy` |
+| `6b2054090` w2-textformat-ctor | +1 (+2 fixtures) | `text_format_get_text_extent_own`; new `regression/avm1_xml_first_action_proto`, `avm1_xmlnode_first_action_proto` |
+| `e51883660` w2-bitmap-encode-shader | +1 | `avm2/bitmapdata_encode` (vendored `stb_image_write`, both modes) |
+| `c9c020850` w2-attach-order-v8 | +1 (+3 fixtures) | `from_gnash/MovieClip-v8` (known_failure: mismatch → ruffle_matched, a gain); new `regression/avm1_attached_clip_tagorder{,_nonroot}`, `avm1_array_native_own_method` (Ruffle exporter `0ddd12b6a` oracles) |
+| `fdfec3aaf` w2-text-pitch | 0 trace | pixel-only (playbook §23) |
+| `10b5dff69` n-perf-ab | 0 | perf: attached-clip pump root sort was O(n²) (N back to pre-`161ecf124` frame rate); per-test parity |
+
+### 25.2 Standing verdicts that fell
+
+- **"Native builtin methods expose a `prototype`" is one fixable mechanism (s24 board)** — refuted: in the decls tests the
+  mismatch runs both ways (339 missing, 180 extra), and every row showing it is known_failure + ignored with thousands
+  of other missing lines. Nobody should touch `setupNativeFuncOwnProps` for score.
+- **`globals_swf5` disposition rationale** — refuted (w1-native-proto §3); the row stays NO-GO for a different reason
+  (flipping it costs 3 gnash passes).
+- **"Attach-tick frame-1 order: child instantiated at its PlaceObject is not cheap" (s24 board)** — it was a helper
+  (`ng_script_only_place`) on the existing script-only return; and `tagPlaceObject2Ratio` had NO script-only guard at all
+  (re-placed children in every Phase-2 replay, losing their instance names).
+- **"MovieClip-v8: price the other 42 checks separately before any slot" (s24 NO-GO)** — five small mechanisms (SWF8
+  half-thickness stroke bounds, blendMode u8 wrap, Transform enum order, `transform` undefined without
+  `flash.geom.Transform`, `pixelBounds` via `getBounds`) took it to ruffle_matched.
+- **`NetStream.resume()`/`togglePause()` should dispatch `Unpause.Notify`** — Ruffle dispatches nothing
+  (`streams.rs:639-651`); the flip-only natives are a faithful port. Flash's documented event needs a Flash capture.
+- **`text_format_get_text_extent_own` "lost dispatch"** — an unlinked prototype (`initTextFormatPrototype` linked
+  `__proto__` only when `g_object_prototype` already existed).
+
+### 25.3 Method notes (deltas vs s23)
+
+- **Size wave 1 to the board, not to the template.** 6 slots after a +65 session yielded +19/+5 with every slot
+  delivering; nothing was left unfunded that had a measured ledger.
+- **A new per-frame feature needs a real-GPU A/B.** `161ecf124` (browser attached-clip pump) was trace-perfect and
+  still cost N +1.5 ms/frame (O(n²) insertion sort over ~900 attached roots, visible only as `runSWF` SELF time because
+  binaryen inlines the pump). Found by the parallel `n-perf-ab` session, fixed at parity. Record:
+  `session23-fanout-reports/browser-attached-timeline-report.md` §6.
+- **The local main checkout is a `blob:none` partial clone**: `git gc` "bad tree object" was missing local trees, not
+  corruption (fix in memory `git-partial-clone-gc-bad-tree`).
+- **Local oracle turnaround works mid-wave**: the coordinator ran the attach-order exporter probes (root, non-root,
+  array own-method) between waves, so wave 2 shipped Ruffle-golden fixtures.
+
+### 25.4 Left on the board (session 25)
+
+**Trace** (47 failing graphics rows on the intersection):
+- **N "play game" does nothing in every one of our builds** (Ruffle opens episode select; predates the attach pump;
+  `n-perf-ab`). Game-visible — top lead; divergence-harness first.
+- Loaded-movie root `gotoAndStop`/`gotoAndPlay` is not routed to the child's `frame_funcs` (only stop/play are;
+  `action.c` ~25143). Sole cause of `avm1/video_prototype_lazy_swf6_child` (4/8); probably other loadMovie seeks. M.
+- TextFormat accessor model (w1-native-proto §2.3(1), L) — with (2)(3) unlocks `text_format_prototype_lazy` (now 23 LCS lines).
+- Attach leftovers: **L4** a Ratio-flagged child of an attached clip prints its frame-1 trace twice on each wrap
+  (natural-timeline wrap path, no corpus row); **L5** `builtin_array_method` generic receivers (Function / String object /
+  MovieClip) return undefined even through `.call` (needs Flash/Ruffle oracle #3 in the w2 report); **L2** `getBounds`
+  engine folds only a dynamic child's own drawing, not grandchildren (sweep first).
+- Recompiler DefineSprite PlaceObject3 filters keep only the first simple filter (`swf.cpp` ≈6085/6552; render + getter;
+  0 corpus rows; oracle probe `w1-avm1-tail-probe/l1_nested_filters`). Plus the s24.4 runtime-filters leftovers, still open
+  (filters getter ROOT-depth only; CM/Convolution/DisplacementMap runtime filters; dynamic filter root's bitmaps/text).
+- `set_property_values/swf4` has no disposition entry (add RUFFLE_COMPAT/ACCEPTED naming the three SWF4 semantics);
+  `ACCEPTED_DIFFS` Cat 8 (`movieclip_hittest_shapeflag`) records 9 lines, now 6 (doc only).
+- shumway `esc` (AVM2 #1009 in `Util::Hashtable/makeTable`); `LoadVars.sendAndLoad` with an XML target (no row).
+- AVM2: `primitive_bound_methods` Flash line 2 (`("ab"+"c")` twice shares one closure; avmplus `MethodEnv` read);
+  no-graphics `audio_computespectrum` (needs an NG mixer, same recipe as `audio/aac`); `NS_MAX_VIDEO_STREAMS` slots never
+  freed; Flash `NetStream.Unpause.Notify` (Flash capture first).
+- Perf (optional): an attached-playable registry would make the pump O(active) (~0.2 ms left on N).
+- Unchanged NO-GOs (re-confirmed s24): action_order family (6 rows, shapes identical since 2026-09-11, no attachMovie in
+  any of them), `global_proto_decls(_delete)`, `global_instance_decls`, `native_objects_swf6`, `globals_monkeypatch`,
+  `GradientFillTest`, `external_interface_monkeypatch`, the avm2 ACCEPTED/RvF set in w1-avm2-tail §0.3.
+
+**Pixels.** See `graphics-fanout-playbook.md` §23.
