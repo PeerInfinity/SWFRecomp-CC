@@ -40,8 +40,8 @@ handshake sent).
 | w2-netstream-flv-screen | w1-pixel-blend-mask L1 | px `netstream_play_flv_screen` (possible; ignored row → prune) | session_018CoDi3Vyahsk5YixoaurwN |
 | w2-avm2-layer-groups | w1-pixel-blend-mask L4+L5 | 0 corpus; fixtures | session_018CoDi4yHAmxMG1pYf1JQnB |
 | w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | session_018CoDi5kNpLqLbTbXGooXKw — DELIVERED, LANDED `78f15f639` (+1 px `acid-morph`; premise refuted: recompiler morph ramp over-emitted rows; generated C identical for 122 SWFs). NB commit trailer carries the worker's session URL by mistake |
-| w2-avm2-cm-copyfrom | w1-pixel-drawing D+E | px `bitmapdata_draw_filters`, `graphics_direct_commands` (unpriced) | |
-| w2-avm1-with-scope | w1-pixel-drawing C residual | trace DrawingApiTest lines (flip unpriced) | |
+| w2-avm2-cm-copyfrom | w1-pixel-drawing D+E | px `bitmapdata_draw_filters`, `graphics_direct_commands` (unpriced) | session_018CoDi8AeP44PYDaUTrzWMN |
+| w2-avm1-with-scope | w1-pixel-drawing C residual | trace DrawingApiTest lines (flip unpriced) | session_018CoDi645BCNVuhoF2enBcy |
 
 ## Grading runs
 
