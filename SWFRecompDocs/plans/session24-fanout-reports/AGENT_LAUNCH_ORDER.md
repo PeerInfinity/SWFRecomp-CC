@@ -14,7 +14,7 @@ Parallel LOCAL one-task session: `n-perf-ab` (Windows real-GPU frame-rate A/B of
 |---|---|---|---|---|
 | 1 | w1-native-proto | trace | AVM1 native builtin prototypes + lazy prototypes (9 rows, cross-cutting) || session_018CoDi6uqrzRVevzzxY9Y3o — DELIVERED; prototype LANDED directly (+2 ledger: `lazy_prototype_shared`, `video_prototype_lazy`; 0 riders/47) |
 | 2 | w1-avm1-tail | trace | AVM1 + gnash/shumway tail triage (~27 rows) + filters-getter L1 || session_018CoDi4M3bEUKQMx1tkwhVv — DELIVERED; prototype LANDED directly (+5: `amf0_array_matrix`, `localconnection_serialize_sparse_array_getters`, `localconnection_xml_unavailable`, `load_vars`, `stylesheet_load`; last two pruned from ignored_tests.txt) |
-| 3 | w1-avm2-tail | trace | AVM2 tail triage (~20 rows) || session_018CoDi67sPWpLegcVfoqSfP |
+| 3 | w1-avm2-tail | trace | AVM2 tail triage (~20 rows) || session_018CoDi67sPWpLegcVfoqSfP — DELIVERED; GO +9 → w2-avm2-netstream-sound + w2-avm2-small-natives (L6 → w2-bitmap-encode-shader) |
 | 4 | w1-attach-order | trace | attach-tick tag order, action_order family, MovieClip-v8 buckets || session_018CoDi4TVY3qMVvqEyLqBSt — DELIVERED; GO → w2-attach-order-v8 (oracles run locally: nonroot == root, array probe `1,2`) |
 | 5 | w1-pixel-text | pixel | acid-color-0, per-line ascent/descent, static_text_offstage, text-bind, definefont4 || session_018CoDi7fh5vYVwYccb2ey2L — DELIVERED; GO +2 px → w2-text-pitch |
 | 6 | w1-pixel-bitmap | pixel | JPEG encoder, ShaderFilter, draw_cab_quality, quality=low hairline, runtime-filter leftovers || session_018CoDi4KP8AqoumFHJqZ626 — DELIVERED; GO +3 px +1 trace → wave 2 `w2-bitmap-encode-shader` |
@@ -29,6 +29,8 @@ Parallel LOCAL one-task session: `n-perf-ab` (Windows real-GPU frame-rate A/B of
 | w2-textformat-ctor | w1-avm1-tail §3 + w1-native-proto §2.3(2)(3) | trace `avm1/text_format_get_text_extent_own` (+1; `text_format_prototype_lazy` improves, no flip) | session_018CoDi4u7e3tT9S75zqgX2n |
 | w2-attach-order-v8 | w1-attach-order 1+3 | trace `MovieClip-v8` mismatch→ruffle_matched (KF gain); new `regression/avm1_attached_clip_tagorder{,_nonroot}`, `avm1_array_native_own_method`; touches tag_stubs.c → no-graphics leg | session_018CoDi3RnZbXUjuQMVpuobM |
 | w2-text-pitch | w1-pixel-text 2 (+3ab riders) | px `text/br_at_start`, `text/style_changes_in_html`; `text-bind` max-1 move, outliers unchanged | session_018CoDi4vp6dB1DBvTMiPGjp |
+| w2-avm2-netstream-sound | w1-avm2-tail L1+L2 | trace `netstream_play_flv`, `netstream_play_stop_replay`, `netstream_seek_flv`, `soundchannel_position_after_end`, `audio_computespectrum` (NG: all but computespectrum); `netstream_seek_flv` image md5 change, stays pass | session_018CoDi6zgpVTGFaRYn7t9vi |
+| w2-avm2-small-natives | w1-avm2-tail L3+L4+L5 | trace `weird_number_bound_methods`, `textline_metrics`, `worker_terminate` pass; `primitive_bound_methods` rm | session_018CoDi6BbMw6PTYEbMiEn8G |
 
 ## Grading runs
 
