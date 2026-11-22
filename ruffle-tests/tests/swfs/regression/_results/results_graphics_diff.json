@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-22T17:09:27.486868+00:00",
-    "old_git_sha": "746c394898ffceb55caf9f970515677ae891c798",
-    "new_timestamp": "2026-11-22T20:05:56.629885+00:00",
-    "new_git_sha": "2f7be1710fedc14a1ba5ddf518434e797eab9318",
+    "old_timestamp": "2026-11-22T20:05:56.629885+00:00",
+    "old_git_sha": "2f7be1710fedc14a1ba5ddf518434e797eab9318",
+    "new_timestamp": "2026-11-22T20:56:27.273707+00:00",
+    "new_git_sha": "9e24c763ca3a16f1f0c5032f6a6f4793316fddac",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 114,
     "old_total": 114,
     "old_pass_rate": 100.0,
-    "new_pass": 114,
+    "new_pass": 124,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 114,
-    "new_total": 114,
+    "new_effective_pass": 124,
+    "new_total": 124,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,129 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 114,
-    "added": 0,
+    "added": 10,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_array_generic_receivers",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 16
+      }
+    },
+    {
+      "test": "avm1_attached_clip_tagorder_po3",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      }
+    },
+    {
+      "test": "avm1_attached_clip_tagorder_ratio",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      }
+    },
+    {
+      "test": "avm1_closure_base_clip_root_frame",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "avm2_layer_group_alpha",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm2_layer_group_erase",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm2_layer_group_overlap_alpha",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "layer_group_in_add_alpha",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "layer_group_overlap_alpha",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "layer_group_overlap_erase",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }
