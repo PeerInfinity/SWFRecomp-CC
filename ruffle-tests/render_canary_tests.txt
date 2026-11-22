@@ -652,3 +652,8 @@ from_shumway/acid/acid-morph                        # morph ramp row count      
 regression/layer_group_overlap_alpha        # overlapping ALPHA child (exact)  1 cmp
 regression/layer_group_in_add_alpha         # LAYER inside ADD offscreen       1 cmp
 regression/avm2_layer_group_overlap_alpha   # AVM2 arm, overlapping ALPHA      1 cmp
+# s25 w2-acid-text-kerning: DefineFont2/3 KERNING on the AVM1/timeline
+# EditText path (swf.cpp kern table emit -> ng_shared.c pair lookup ->
+# tag.c textfield_glyph_render_cb advance term). No standing member moved
+# under the change; this tol-0 aliased row is the only corpus row that sees it.
+from_shumway/acid/acid-text                 # AVM1 EDITTEXT KERNING (tol 0)  1 cmp

@@ -475,6 +475,11 @@ static struct {
 	   full-BMP face is not truncated to MAX_FONT_GLYPHS. NULL otherwise. */
 	const u16* ext_codes;
 	const s32* ext_advances;
+	/* s25 w2-acid-text-kerning: DefineFont2/3 kerning table, read in place
+	   from the generated tag code. kern_count triples (left, right, adj EM
+	   units), sorted by (left << 16 | right). NULL / 0 when the font has none. */
+	const s32* kern_pairs;
+	size_t kern_count;
 } ng_fonts[MAX_FONTS_NG];
 
 #define NG_FONT_CODE(fi, j) (ng_fonts[fi].ext_codes ? ng_fonts[fi].ext_codes[j] : ng_fonts[fi].code_table[j])
@@ -653,6 +658,35 @@ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
 			return;
 		}
 	}
+}
+
+void ng_record_font_kerning(u16 font_id, const s32* pairs, size_t count)
+{
+	for (size_t i = 0; i < ng_font_count; i++) {
+		if (ng_fonts[i].font_id == font_id) {
+			ng_fonts[i].kern_pairs = pairs;
+			ng_fonts[i].kern_count = pairs ? count : 0;
+			return;
+		}
+	}
+}
+
+// Kerning adjustment (EM units) for the (left, right) code-point pair, 0 when
+// the font has no such pair. Ruffle font.rs GlyphSource::get_kerning_offset.
+s32 ng_font_kerning_by_idx(int font_idx, u16 left, u16 right)
+{
+	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return 0;
+	const s32* kp = ng_fonts[font_idx].kern_pairs;
+	size_t lo = 0, hi = ng_fonts[font_idx].kern_count;
+	if (kp == NULL || hi == 0) return 0;
+	u32 key = ((u32)left << 16) | right;
+	while (lo < hi) {
+		size_t mid = lo + (hi - lo) / 2;
+		u32 k = ((u32)kp[3 * mid] << 16) | (u32)(u16)kp[3 * mid + 1];
+		if (k == key) return kp[3 * mid + 2];
+		if (k < key) lo = mid + 1; else hi = mid;
+	}
+	return 0;
 }
 
 void ng_record_font_glyph_base(u16 font_id, size_t glyph_base)

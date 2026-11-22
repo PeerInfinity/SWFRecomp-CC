@@ -29849,6 +29849,7 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 			out_runs[run_count].align = stack[sp].align; \
 			out_runs[run_count].bullet = stack[sp].bullet; \
 			out_runs[run_count].font_id = 0; \
+			out_runs[run_count].kerning = 0; \
 			run_count++; \
 		} \
 		cur_run_start = out_pos; \
@@ -30233,6 +30234,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				_tfg_runs[ri].align = r->align;
 				_tfg_runs[ri].bullet = 0;
 				_tfg_runs[ri].font_id = 0;
+				_tfg_runs[ri].kerning = r->kerning ? 1 : 0;
 				// s24 w2-text-pitch: a run whose <b>/<i>/<font face>
 				// names a DIFFERENT embedded face draws with that face (Ruffle
 				// html/layout.rs resolve_font is per span). Embedded fields only.
@@ -30268,6 +30270,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
 				_tfg_runs[0].bullet = 0;
 				_tfg_runs[0].font_id = 0;
+				_tfg_runs[0].kerning = 0;
 				runs_out = _tfg_runs;
 				run_count_out = 1;
 			} else {
@@ -30291,6 +30294,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 					_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
 					_tfg_runs[0].bullet = 0;
 					_tfg_runs[0].font_id = 0;
+					_tfg_runs[0].kerning = 0;
 					runs_out = _tfg_runs;
 					run_count_out = 1;
 				}
@@ -30703,6 +30707,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 					otf_html_runs[ri].align = r->align;
 					otf_html_runs[ri].bullet = 0;
 					otf_html_runs[ri].font_id = 0;
+					otf_html_runs[ri].kerning = r->kerning ? 1 : 0;
 				}
 				emit_runs = otf_html_runs;
 				emit_run_count = rc;
@@ -30731,6 +30736,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 		otf_html_runs[0].align = (u8)ng_getTextFieldAlign(tf_idx);
 		otf_html_runs[0].bullet = 0;
 		otf_html_runs[0].font_id = 0;
+		otf_html_runs[0].kerning = 0;
 		emit_runs = otf_html_runs;
 		emit_run_count = 1;
 	}

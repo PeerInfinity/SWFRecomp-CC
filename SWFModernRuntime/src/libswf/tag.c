@@ -6886,6 +6886,44 @@ static inline float tf_glyph_advance_twips(s32 adv, float scale, int device_font
 	return t;
 }
 
+// s25 w2-acid-text-kerning: DefineFont2/3 kerning term for the glyph `cp`
+// whose UTF-8 bytes end at `next_pos`, in EM units (added to the advance
+// BEFORE scaling, Ruffle font_like.rs FontLike::evaluate). Applies only when
+// the covering run has TextFormat.kerning set and the next character lies in
+// the SAME Ruffle text fragment: same span, no \n/\r/\t or paragraph
+// sentinel in between (lay_out_span splits on those), and not across a word
+// boundary in a justified paragraph (append_text splits per word). `run_idx`
+// < 0 looks the run up by byte offset.
+static s32 tf_kern_units(const TextFieldGlyphInfo* info, int run_idx, int kfont_idx,
+                         u16 cp, size_t next_pos)
+{
+	if (info->runs == NULL || info->run_count <= 0) return 0;
+	if (run_idx < 0) {
+		size_t cpos = next_pos > 0 ? next_pos - 1 : 0;
+		for (run_idx = 0; run_idx < info->run_count; run_idx++) {
+			const TextFieldGlyphRun* r = &info->runs[run_idx];
+			if (cpos >= (size_t)r->byte_start && cpos < (size_t)(r->byte_start + r->byte_length)) break;
+		}
+	}
+	if (run_idx >= info->run_count) return 0;
+	const TextFieldGlyphRun* run = &info->runs[run_idx];
+	if (!run->kerning) return 0;
+	if (cp == '\t' || (run->align == 3 && cp == ' ')) return 0;
+	if (next_pos >= info->text_len || next_pos >= (size_t)(run->byte_start + run->byte_length)) return 0;
+	const unsigned char* t = (const unsigned char*)info->text_utf8;
+	unsigned char c0 = t[next_pos];
+	u16 ncp;
+	if (c0 == 0xFE || c0 == 0xFF) return 0;
+	if (c0 >= 0xC0 && c0 < 0xE0 && next_pos + 1 < info->text_len)
+		ncp = ((c0 & 0x1F) << 6) | (t[next_pos + 1] & 0x3F);
+	else if (c0 >= 0xE0 && c0 < 0xF0 && next_pos + 2 < info->text_len)
+		ncp = ((c0 & 0x0F) << 12) | ((t[next_pos + 1] & 0x3F) << 6) | (t[next_pos + 2] & 0x3F);
+	else
+		ncp = c0;
+	if (ncp == '\n' || ncp == '\r' || ncp == '\t') return 0;
+	return ng_font_kerning_by_idx(kfont_idx, cp, ncp);
+}
+
 // Ruffle html/layout.rs newline(): the line pitch is max_ascent + max_descent
 // + leading, each metric truncated to whole twips (font.rs FontMetrics).
 static inline float tf_line_pitch_twips(s16 ascent, s16 descent, int em_square,
@@ -7115,6 +7153,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			s32 adv = ng_font_glyph_advance_by_idx(run_font_idx, glyph_idx);
 			if (adv >= 0 && cur_par < MAX_TF_PARAGRAPHS) {
 				float scale = (float)cur_fh / (float)run_em;
+				adv += tf_kern_units(info, run_idx, run_font_idx, cp, pos);
 				pars[cur_par].width += tf_glyph_advance_twips(adv, scale, info->device_font);
 			}
 		}
@@ -7214,6 +7253,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				int gi = ng_font_find_glyph(font_idx, cp);
 				if (gi >= 0) {
 					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
+					if (a >= 0) a += tf_kern_units(info, -1, font_idx, cp, p);
 					if (a >= 0)
 						caret_off += tf_glyph_advance_twips(a,
 							(float)info->font_height / (float)em_square,
@@ -7288,7 +7328,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				int gi = ng_font_find_glyph(font_idx, cp);
 				if (gi >= 0) {
 					s32 a = ng_font_glyph_advance_by_idx(font_idx, gi);
-					if (a >= 0) xx += tf_glyph_advance_twips(a, sscale, info->device_font);
+					if (a >= 0) xx += tf_glyph_advance_twips(a + tf_kern_units(info, -1, font_idx, cp, p),
+					                                         sscale, info->device_font);
 				}
 				cc++;
 			}
@@ -7450,6 +7491,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		// Advance x by glyph advance width
 		s32 adv = ng_font_glyph_advance_by_idx(run_font_idx, glyph_idx);
 		if (adv >= 0) {
+			adv += tf_kern_units(info, run_idx, run_font_idx, cp, pos);
 			x_pos += tf_glyph_advance_twips(adv, scale, info->device_font);
 		}
 	}
@@ -14274,6 +14316,11 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
 {
 	ng_record_font_metrics(app_context, font_id, ascent, descent, leading, em_square,
 	    code_table, advance_table, glyph_count);
+}
+
+void tagDefineFontKerning(u16 font_id, const s32* pairs, size_t count)
+{
+	ng_record_font_kerning(font_id, pairs, count);
 }
 
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)

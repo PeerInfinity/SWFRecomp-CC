@@ -242,6 +242,9 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s32* advance_table, size_t glyph_count);
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base);
+// DefineFont2/3 kerning table: count triples (left_code, right_code,
+// adjustment in EM units), sorted by (left << 16 | right).
+void tagDefineFontKerning(u16 font_id, const s32* pairs, size_t count);
 // `deblocking` is the tag's VideoFlagsDeblocking field (UB[3]) — a
 // VIDEO_DEBLOCK_* value from actionmodern/video_codec.h.
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height,
@@ -644,6 +647,8 @@ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s32* advance_table, size_t glyph_count);
 void ng_record_font_glyph_base(u16 font_id, size_t glyph_base);
+void ng_record_font_kerning(u16 font_id, const s32* pairs, size_t count);
+s32 ng_font_kerning_by_idx(int font_idx, u16 left, u16 right);
 int ng_find_font_with_metrics(u16 font_id);
 int ng_font_find_glyph(int font_idx, u16 code_point);
 size_t ng_font_get_glyph_base(int font_idx);

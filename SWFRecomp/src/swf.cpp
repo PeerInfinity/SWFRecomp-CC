@@ -2607,6 +2607,10 @@ namespace SWFRecomp
 				std::vector<u32> entry_offsets;  // u32: DefineFont2/3 WideOffsets (glyph data > 64 KiB)
 				bool wide_codes = false;
 				bool has_layout = false;
+				// DefineFont2/3 kerning table (left_code, right_code, adjustment
+				// in EM units), sorted by (left << 16 | right) for the runtime's
+				// binary search. Ruffle font.rs `kerning_pairs` (s25 w2-acid-text-kerning).
+				std::vector<std::array<s32, 3>> kern_pairs;
 
 				if (tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
 				{
@@ -2773,7 +2777,42 @@ namespace SWFRecomp
 						}
 					}
 
-					// Skip any remaining data (bounds table, kerning, etc.)
+					// Bounds table (NumGlyphs byte-aligned RECTs), then the
+					// kerning table: KerningCount(UI16) + records of
+					// code1/code2 (UI16 if wide codes, else UI8) + SI16 adjustment.
+					if (has_layout && num_entries > 0)
+					{
+						const unsigned char* kp = (const unsigned char*) cur_pos;
+						const unsigned char* kend = (const unsigned char*) (font_tag_start + font_tag_length);
+						for (u16 i = 0; i < num_entries && kp < kend; ++i)
+						{
+							u32 nb = kp[0] >> 3;
+							kp += (5 + 4 * nb + 7) / 8;
+						}
+						if (kp + 2 <= kend)
+						{
+							u32 kc = kp[0] | (kp[1] << 8);
+							kp += 2;
+							u32 code_sz = wide_codes ? 2 : 1;
+							u32 rec_sz = 2 * code_sz + 2;
+							for (u32 k = 0; k < kc && kp + rec_sz <= kend; ++k)
+							{
+								s32 l = wide_codes ? (s32) (kp[0] | (kp[1] << 8)) : (s32) kp[0];
+								s32 r = wide_codes ? (s32) (kp[2] | (kp[3] << 8)) : (s32) kp[1];
+								const unsigned char* ap = kp + 2 * code_sz;
+								s32 adj = (s32) (s16) (ap[0] | (ap[1] << 8));
+								kp += rec_sz;
+								if (adj != 0)
+									kern_pairs.push_back({l, r, adj});
+							}
+							std::stable_sort(kern_pairs.begin(), kern_pairs.end(),
+								[](const std::array<s32, 3>& x, const std::array<s32, 3>& y) {
+									return ((u32) x[0] << 16 | (u32) x[1]) < ((u32) y[0] << 16 | (u32) y[1]);
+								});
+						}
+					}
+
+					// Skip any remaining data
 					cur_pos = font_tag_start + font_tag_length;
 				}
 
@@ -3116,8 +3155,21 @@ namespace SWFRecomp
 								 << "font_" << font_id << "_codes, "
 								 << "font_" << font_id << "_advances, "
 								 << to_string(codes.size())
-								 << ");" << endl
-								 << "\t" << "}" << endl;
+								 << ");" << endl;
+						if (!kern_pairs.empty()) {
+							tag_init << "\t\t" << "static const s32 font_" << font_id << "_kerning[] = {";
+							for (size_t i = 0; i < kern_pairs.size(); i++) {
+								if (i > 0) tag_init << ",";
+								tag_init << kern_pairs[i][0] << "," << kern_pairs[i][1] << "," << kern_pairs[i][2];
+							}
+							tag_init << "};" << endl
+									 << "\t\t" << "tagDefineFontKerning("
+									 << charId(font_id) << ", "
+									 << "font_" << font_id << "_kerning, "
+									 << to_string(kern_pairs.size())
+									 << ");" << endl;
+						}
+						tag_init << "\t" << "}" << endl;
 						// Emit glyph base index for runtime glyph rendering
 						auto gb_it = font_glyph_bases.find(font_id);
 						if (gb_it != font_glyph_bases.end()) {
