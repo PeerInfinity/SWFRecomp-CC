@@ -7,6 +7,19 @@
 **Status:** Planning. Investigation complete (2026-05-13); Phase 1
 ready to implement.
 
+> **CORRECTION (s25 w2-netstream-flv-screen, 2026-11-22).** The
+> `netstream_play_flv_screen` "asset stamp" conclusion below (§3–§4 and the
+> test-impact notes) is **refuted**. FLVPlayback's `VideoPlayer.doAutoResize`
+> (a `setInterval(this, "doAutoResize", …)` timer) sizes the Video to the
+> stream's decoded 128×128 via `_video._width/_height` once `_video.width`
+> changes, then dispatches `ready`, and only then does FLVPlayback set the
+> player `_visible = true`. Our method-form timer passed the raw `MovieClip*`
+> as a DefineFunction2 `this`, so every `this.x` read in the callback was
+> undefined: the player never became visible and the frame was blank. With
+> `timer.c` fixed the render matches the golden at max diff 0 under the same
+> declared-bounds rule (Phase 1 stays correct). The RVF entry and the
+> `ignored_tests.txt` line were removed.
+
 **Relationship to other plans:** Complements
 [`video-codec-support-plan.md`](video-codec-support-plan.md). That plan
 covers *what we can decode* (Sorenson Spark, VP6, H.264, ScreenVideo,

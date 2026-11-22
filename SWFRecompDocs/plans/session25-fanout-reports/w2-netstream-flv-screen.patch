@@ -1,0 +1,157 @@
+diff --git a/SWFModernRuntime/src/actionmodern/timer.c b/SWFModernRuntime/src/actionmodern/timer.c
+index 67835d96e..296832dcf 100644
+--- a/SWFModernRuntime/src/actionmodern/timer.c
++++ b/SWFModernRuntime/src/actionmodern/timer.c
+@@ -351,12 +351,12 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
+ 		// clip, so there is no gate to compute against the switched version.
+ 		//
+ 		// this_var = &t->object: the core derives the same obj/mc ABI receiver
+-		// the arm used to compute by hand. INV_EVENT_THIS_MC on type-1 only —
+-		// the core's "set when the receiver is an MC" is exactly the old
+-		// `if (mc != NULL)`, and the type-2 arm never set it. No local scope
+-		// frame, no this-stack, no exec-func swap in either arm (preserved by
+-		// leaving those flags clear); depth bracket stays out here because the
+-		// path never had the g_max_call_depth halt check. The core additionally
++		// the arm used to compute by hand. INV_EVENT_THIS_MC is "set when the
++		// receiver is an MC" (the old `if (mc != NULL)`); the type-2 arm now
++		// sets it too, with INV_MC_THIS_NULL_PTR (see below). No local scope
++		// frame on type-1 (type-2 gets one, below), no this-stack, no
++		// exec-func swap (preserved by leaving those flags clear); depth
++		// bracket stays out here because the path never had the g_max_call_depth halt check. The core additionally
+ 		// clamps/pads type-1 args to param_count (the TYPE1_ARG_ORDER fix,
+ 		// regression/timer_type1_args), bounds + copies scope_mc on the
+ 		// captured-scope push (was stale), and NULL-checks the function
+@@ -364,7 +364,31 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
+ 		u32 _tm_flags = (method_func->function_type == 2)
+ 			? (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_VERSION_SWITCH)
+ 			: (INV_EVENT_THIS_MC | INV_VERSION_SWITCH);
+-		InvokeOpts _tm_opts = { .flags = _tm_flags };
++		// Type-2 method on a MOVIECLIP receiver (s25 w2-netstream-flv-screen).
++		// A DefineFunction2 body's preload-this tags a non-NULL ABI this_obj as
++		// ACTION_STACK_VALUE_OBJECT, so passing the raw MovieClip* made every
++		// `this.x` read go through the ASObject path and come back undefined
++		// (setInterval(this, "doAutoResize", ...) on an AS2 class instance
++		// registered onto an attached clip: mx.video.VideoPlayer never saw its
++		// own _autoResizeIntervalID, never dispatched "ready", and FLVPlayback
++		// kept the player _visible=false — avm1/netstream_play_flv_screen
++		// rendered blank). Use the same MC receiver convention as CallMethod
++		// (action.c, _sc_flags): NULL ABI this + g_event_this_mc.
++		if (method_func->function_type == 2 && mc != NULL)
++			_tm_flags |= INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
++		// A type-2 body that neither preloads nor suppresses `this` /
++		// `arguments` reads them by name off its activation frame, which this
++		// arm never built (GetVariable("this") / `arguments` were unbound in
++		// a setInterval(obj, "m") callee). Same activation as the onLoad
++		// dispatcher's type-2 arm: local frame + INV_ACT_THIS/ARGUMENTS
++		// (both gated inside the core on the callee's own preload/suppress bits).
++		u8 _tm_act = 0;
++		if (method_func->function_type == 2)
++		{
++			_tm_flags |= INV_LOCAL_SCOPE;
++			_tm_act = INV_ACT_THIS | INV_ACT_ARGUMENTS;
++		}
++		InvokeOpts _tm_opts = { .flags = _tm_flags, .act_flags = _tm_act };
+ 		g_call_depth++;
+ 		actionInvokeFunctionValue(app_context, method_func, &t->object,
+ 			t->extra_arg_count > 0 ? t->extra_args : NULL,
+diff --git a/SWFRecompDocs/plans/video-display-flash-parity-plan.md b/SWFRecompDocs/plans/video-display-flash-parity-plan.md
+index 29439deb4..dd75cd06f 100644
+--- a/SWFRecompDocs/plans/video-display-flash-parity-plan.md
++++ b/SWFRecompDocs/plans/video-display-flash-parity-plan.md
+@@ -7,6 +7,19 @@
+ **Status:** Planning. Investigation complete (2026-05-13); Phase 1
+ ready to implement.
+ 
++> **CORRECTION (s25 w2-netstream-flv-screen, 2026-11-22).** The
++> `netstream_play_flv_screen` "asset stamp" conclusion below (§3–§4 and the
++> test-impact notes) is **refuted**. FLVPlayback's `VideoPlayer.doAutoResize`
++> (a `setInterval(this, "doAutoResize", …)` timer) sizes the Video to the
++> stream's decoded 128×128 via `_video._width/_height` once `_video.width`
++> changes, then dispatches `ready`, and only then does FLVPlayback set the
++> player `_visible = true`. Our method-form timer passed the raw `MovieClip*`
++> as a DefineFunction2 `this`, so every `this.x` read in the callback was
++> undefined: the player never became visible and the frame was blank. With
++> `timer.c` fixed the render matches the golden at max diff 0 under the same
++> declared-bounds rule (Phase 1 stays correct). The RVF entry and the
++> `ignored_tests.txt` line were removed.
++
+ **Relationship to other plans:** Complements
+ [`video-codec-support-plan.md`](video-codec-support-plan.md). That plan
+ covers *what we can decode* (Sorenson Spark, VP6, H.264, ScreenVideo,
+diff --git a/ruffle-tests/ignored_tests.txt b/ruffle-tests/ignored_tests.txt
+index 15c1268da..10ed0ef29 100644
+--- a/ruffle-tests/ignored_tests.txt
++++ b/ruffle-tests/ignored_tests.txt
+@@ -18,8 +18,8 @@
+ #     `test in ignored_global` (and image_axis=False, "kept on the board",
+ #     for suite-local lists). So an entry whose rationale is a render
+ #     divergence must stay even when the TRACE test passes. That is why
+-#     `netstream_play_flv_screen` was NOT pruned — its trace passes, but its
+-#     image comparison fails and this entry is what dispositions it.
++#     `netstream_play_flv_screen` was the worked example (since removed:
++#     its image comparison was fixed in s25, see below).
+ #  2. `shared_object` / `shared_object_self_ref` never appear in any results
+ #     file, but the directories DO exist upstream — they ship output1.txt /
+ #     output2.txt and no output.txt, so discover_tests() skips them entirely.
+@@ -29,8 +29,8 @@
+ # RE-RUN 2026-08-18 (s17 wave-2 `tooling-hygiene`, trace board T9 / §5).
+ # The prune criterion was re-applied to this file against `aeebf9ede`
+ # (run 31877239992, graphics / categories=full): **zero entries qualify**, so
+-# nothing was removed here. `netstream_play_flv_screen` is `pass` on trace and
+-# stays for trap 1 above (its image comparison still fails). What DID change is
++# nothing was removed here. `netstream_play_flv_screen` was `pass` on trace and
++# stayed for trap 1 above (removed s25 once its image comparison was fixed). What DID change is
+ # that four entries which had no rationale of any kind — `load_vars`,
+ # `loadvariables_method`, `stylesheet_load`, `sandbox_type_remote` — gained one,
+ # inline, below. They are NOT in ACCEPTED_DIFFS.md and must not be added there:
+@@ -122,14 +122,11 @@ form_loader_encoding_4
+ # (netconnection_send_remote removed 2026-07-29 — the Flash Remoting wire is
+ # implemented in both VMs: AVM1 in net/socket tranche 7, AVM2 in tranche 8.)
+ # Trace passes (2/2). Image diff is a documented Ruffle vs Flash divergence:
+-# expected.png is a bit-exact stamp of rufflelogo.png (the source asset),
+-# inconsistent with both Flash's render-at-declared-bounds rule and Ruffle's
+-# own matrix-scale rule. We render correctly per Flash; see
+-# RUFFLE_VS_FLASH_DIFFERENCES.md "Video Display Object Render Bounds".
+-# DO NOT PRUNE on trace status: the trace test passes, and this entry exists
+-# for the IMAGE axis (see trap 1 in the header). Re-verified failing on the
+-# image board 2026-08-01.
+-netstream_play_flv_screen
++# `netstream_play_flv_screen` REMOVED 2026-11-22 (s25 w2-netstream-flv-screen):
++# the "asset stamp" rationale was refuted. Our render was blank because the
++# method-form setInterval passed a raw MovieClip* as a DefineFunction2 `this`
++# (timer.c), so FLVPlayback's VideoPlayer never ran doAutoResize / "ready"
++# and kept the player _visible=false. Fixed; the image passes at max diff 0.
+ 
+ # --- FileReference (OS file picker + network upload/download) ---
+ # All 8 entries removed 2026-08-01 — file_reference_{browse_cancel,
+diff --git a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
+index 6df88bbf9..5e0875c2a 100644
+--- a/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
++++ b/ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
+@@ -214,26 +214,6 @@ The DrawingApiTest source comment for line 89 — `check_equals(bnd, "80,80 220,
+ 
+ **Impact:** DrawingApiTest goes from 66/93 → 80/93 line match (closes all bounds-related diffs). Test stays `output_mismatch` because the residual 13 diffs are all hitTest precision failures (zshape.hitTest undefined, inv4/inv8 boolean drift) which Ruffle gets right and we now don't — our diffs are entirely disjoint from Ruffle's diff set, so no `ruffle_matched` promotion. matrix_test (already `ruffle_matched 1081/1086`) is unaffected.
+ 
+-## Video Display Object Render Bounds: `netstream_play_flv_screen` Asset Stamp
+-
+-**Test:** `netstream_play_flv_screen`
+-
+-**Trace:** PASS (2/2). **Image:** FAIL — ~13.5k outliers, max diff 255.
+-
+-The test SWF declares its embedded ScreenVideo at 160×120, plays back from a 128×128 ScreenVideo FLV onto a 128×128 stage with identity transform. Flash's documented Video render rule is to draw the decoded frame stretched to the SWF-declared bounds, then apply the placement matrix. So Flash renders to (0,0)–(160,120) on the 128×128 canvas — **overflowing the right and bottom edges**.
+-
+-That's exactly what our renderer now does after the 2026-05-13 Phase 1 landing of `renderer_draw_bitmap_quad_scaled`. The `output.actual.png` shows the top-left ~128×120 region of the stretched logo, exactly the visible portion of the over-sized render. But the test's `output.expected.png` is the unscaled 128×128 source asset.
+-
+-**Investigation chain (see `SWFRecompDocs/plans/video-display-flash-parity-plan.md` for full detail):**
+-
+-1. `output.expected.png` is **byte-for-byte identical** to the same directory's `rufflelogo.png` source asset (16,384/16,384 pixels match) — it's a literal asset stamp, not a render of any SWF.
+-2. The test SWF's `setSize` body (`script_defs.c:961`) is `_global.isLivePreview`-gated — at runtime the live-preview branch is skipped via `goto label_373`. The runtime FLVPlayback **does not call any visible code path that resizes the inner Video display object** in this test.
+-3. Adobe's `mx/controls/videoClasses/VideoPlayer.as` shows `setSize` does `super.width = w; super.height = h;`, but `doAutoResize` only updates `internalVideoWidth`/`internalVideoHeight` (the metadata-reporting getters) — **it does NOT call setSize**. Auto-resize-from-metadata is opt-in via explicit user code, not automatic.
+-4. Therefore Flash's render in this test would draw the Video at the SWF-declared 160×120 bounds, overflowing the 128×128 canvas. The expected.png is **not consistent with Flash's actual rendering**. The most plausible explanation is that Ruffle's test-harness generation pre-empted the renderer and stamped the source asset.
+-5. Pre-Phase-1 our renderer happened to match the asset stamp by coincidence (128×128 source, identity transform, 128×128 stage), not by following the Flash spec.
+-
+-**Decision:** Match Flash. The Phase 1 render-at-declared-bounds rule is correct; we accept the divergence from this Ruffle-specific test fixture. Test added to `ignored_tests.txt`.
+-
+ ## `gotoFrameFromInterval`: Ruffle's Expected Output Is an Unbounded Runaway
+ 
+ **Test:** `from_gnash/misc-swfc.all/gotoFrameFromInterval` (`known_failure = true`)

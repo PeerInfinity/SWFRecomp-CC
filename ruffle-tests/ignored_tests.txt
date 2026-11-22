@@ -18,8 +18,8 @@
 #     `test in ignored_global` (and image_axis=False, "kept on the board",
 #     for suite-local lists). So an entry whose rationale is a render
 #     divergence must stay even when the TRACE test passes. That is why
-#     `netstream_play_flv_screen` was NOT pruned — its trace passes, but its
-#     image comparison fails and this entry is what dispositions it.
+#     `netstream_play_flv_screen` was the worked example (since removed:
+#     its image comparison was fixed in s25, see below).
 #  2. `shared_object` / `shared_object_self_ref` never appear in any results
 #     file, but the directories DO exist upstream — they ship output1.txt /
 #     output2.txt and no output.txt, so discover_tests() skips them entirely.
@@ -29,8 +29,8 @@
 # RE-RUN 2026-08-18 (s17 wave-2 `tooling-hygiene`, trace board T9 / §5).
 # The prune criterion was re-applied to this file against `aeebf9ede`
 # (run 31877239992, graphics / categories=full): **zero entries qualify**, so
-# nothing was removed here. `netstream_play_flv_screen` is `pass` on trace and
-# stays for trap 1 above (its image comparison still fails). What DID change is
+# nothing was removed here. `netstream_play_flv_screen` was `pass` on trace and
+# stayed for trap 1 above (removed s25 once its image comparison was fixed). What DID change is
 # that four entries which had no rationale of any kind — `load_vars`,
 # `loadvariables_method`, `stylesheet_load`, `sandbox_type_remote` — gained one,
 # inline, below. They are NOT in ACCEPTED_DIFFS.md and must not be added there:
@@ -122,14 +122,11 @@ form_loader_encoding_4
 # (netconnection_send_remote removed 2026-07-29 — the Flash Remoting wire is
 # implemented in both VMs: AVM1 in net/socket tranche 7, AVM2 in tranche 8.)
 # Trace passes (2/2). Image diff is a documented Ruffle vs Flash divergence:
-# expected.png is a bit-exact stamp of rufflelogo.png (the source asset),
-# inconsistent with both Flash's render-at-declared-bounds rule and Ruffle's
-# own matrix-scale rule. We render correctly per Flash; see
-# RUFFLE_VS_FLASH_DIFFERENCES.md "Video Display Object Render Bounds".
-# DO NOT PRUNE on trace status: the trace test passes, and this entry exists
-# for the IMAGE axis (see trap 1 in the header). Re-verified failing on the
-# image board 2026-08-01.
-netstream_play_flv_screen
+# `netstream_play_flv_screen` REMOVED 2026-11-22 (s25 w2-netstream-flv-screen):
+# the "asset stamp" rationale was refuted. Our render was blank because the
+# method-form setInterval passed a raw MovieClip* as a DefineFunction2 `this`
+# (timer.c), so FLVPlayback's VideoPlayer never ran doAutoResize / "ready"
+# and kept the player _visible=false. Fixed; the image passes at max diff 0.
 
 # --- FileReference (OS file picker + network upload/download) ---
 # All 8 entries removed 2026-08-01 — file_reference_{browse_cancel,
