@@ -158,6 +158,22 @@ struct MovieClip {
 	// dynamic clip (display_obj == NULL) is rendered through tag.c's filtered
 	// Drawing-API subtree path. NULL or count == 0 = no runtime filters.
 	void* as_filters;
+	// s25 w2-dynclip-cxform: per-tick GPU cxform slot tag.c's
+	// apply_dynamic_mc_transforms mints for a DYNAMIC clip (display_obj ==
+	// NULL) whose colour transform (Color / transform.colorTransform cx_*,
+	// composed over its dynamic ancestors, plus any runtime ColorMatrixFilter)
+	// is non-identity. 0 = none (identity). fillDrawingInfos and the attached-
+	// bitmap pass draw through it. Reset every tick like dynamic_xform_slot.
+	u32 dynamic_cxform_slot;
+	float dyn_cx[20];   // that slot's 20 floats (valid while the slot != 0)
+	// Runtime ColorMatrixFilter members of `mc.filters` on a dynamic clip,
+	// composed in tag.c's 20-float cxform layout (column-major 4x4 mult +
+	// add/255), written by the filters setter. bit 0: dyn_cm (every CM member)
+	// is valid; bit 1: dyn_cm_post (only the CMs AFTER the first non-CM
+	// filter, what that filter's own colour goes through) is valid.
+	u8 dyn_cm_flags;
+	float dyn_cm[20];
+	float dyn_cm_post[20];
 };
 
 // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
@@ -812,6 +828,11 @@ typedef struct AttachedBitmapInfo {
 	// _xscale = -100 and friends have no effect at all on the render.
 	u32 xform_slot;
 	float alpha;              // 0..100, for the cxform slot
+	// s25 w2-dynclip-cxform: the MC's per-tick dynamic cxform slot (0 =
+	// identity) and its 20 floats (NULL when the slot is 0), so the bitmap
+	// pass can fold its own _alpha on top without double-applying.
+	u32 cxform_slot;
+	const float* cxform;
 } AttachedBitmapInfo;
 
 typedef void (*AttachedBitmapCallback)(const AttachedBitmapInfo* info, void* user_data);

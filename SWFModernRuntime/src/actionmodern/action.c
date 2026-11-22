@@ -32280,7 +32280,12 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->transform_id = (mc->dynamic_xform_slot != 0)
 			? mc->dynamic_xform_slot
 			: mc->last_transform_id;
-		info->cxform_id = 0;
+		// s25 w2-dynclip-cxform: a dynamic clip's colour transform (Color /
+		// transform.colorTransform / runtime ColorMatrix, composed over its
+		// dynamic ancestors) — tag.c apply_dynamic_mc_transforms mints the
+		// slot. Its alpha multiplier is left at 1: `_alpha` stays the fold
+		// above. 0 (identity) for placed clips and untinted dynamic ones.
+		info->cxform_id = mc->dynamic_cxform_slot;
 
 		// Flash renders every stroke at a minimum of 1 on-screen pixel. Our
 		// stroke geometry is baked in local twips, so re-expand it whenever the
@@ -32820,6 +32825,8 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
 		info.y_twips = mc->y * 20.0f;
 		info.xform_slot = mc->dynamic_xform_slot;
 		info.alpha = (float)mc->alpha;
+		info.cxform_slot = mc->dynamic_cxform_slot;
+		info.cxform = mc->dynamic_cxform_slot != 0 ? mc->dyn_cx : NULL;
 		cb(&info, user_data);
 		count++;
 	}
@@ -44665,6 +44672,68 @@ static void avm1ApplyRuntimeFiltersToEntry(DisplayObject* d, const FilterListDat
 	d->filter_chain = fl;
 }
 
+// s25 w2-dynclip-cxform: the ColorMatrixFilter members of a runtime list, for
+// the DYNAMIC-clip colour channel (tag.c apply_dynamic_mc_transforms folds
+// them into the clip's per-tick cxform slot). A CM is a straight-RGBA 4x5
+// matrix, the same shape as our cxform, and Ruffle (display_object.rs
+// render_base) runs it over the cached bitmap BEFORE the clip's colour
+// transform, so effective = cx o CM_n o ... o CM_1. dyn_cm_post holds only the
+// CMs after the first non-CM member (a glow / shadow / bevel colour goes
+// through those, not the ones before it). Recomputed on every assignment;
+// placed clips keep their own route (the display entry's filter chain).
+static void avm1DynClipCaptureCM(MovieClip* mc, ASArray* arr)
+{
+	mc->dyn_cm_flags = 0;
+	if (arr == NULL) return;
+	int seen_filter = 0;
+	for (u32 i = 0; i < arr->length; i++)
+	{
+		ActionVar* el = &arr->elements[i];
+		if (el->type != ACTION_STACK_VALUE_OBJECT || el->data.numeric_value == 0) continue;
+		ASObject* o = (ASObject*)(uintptr_t) el->data.numeric_value;
+		int t = avm1FilterTypeOf(o);
+		if (t == 0) continue;
+		if (t != 6) { seen_filter = 1; continue; }
+		ActionVar* mv = getProperty(o, "matrix", 6);
+		ASArray* ma = (mv && mv->type == ACTION_STACK_VALUE_ARRAY)
+			? (ASArray*)(uintptr_t) mv->data.numeric_value : NULL;
+		static const float ident[20] = {1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0};
+		float cm[20], m[20];
+		for (int k = 0; k < 20; k++)
+		{
+			double v = (ma && (u32) k < ma->length) ? varToDoubleSimple(&ma->elements[k]) : ident[k];
+			cm[k] = isnan(v) ? 0.0f : (float) v;
+		}
+		// Row-major 4x5 (Flash) -> column-major mult + add/255 (tag.c layout).
+		for (int col = 0; col < 4; col++)
+			for (int row = 0; row < 4; row++)
+				m[col * 4 + row] = cm[row * 5 + col];
+		for (int row = 0; row < 4; row++)
+			m[16 + row] = cm[row * 5 + 4] / 255.0f;
+		for (int pass = 0; pass < 2; pass++)
+		{
+			if (pass == 1 && !seen_filter) continue;
+			u8 bit = (u8)(1u << pass);
+			float* acc = pass ? mc->dyn_cm_post : mc->dyn_cm;
+			if (!(mc->dyn_cm_flags & bit)) { memcpy(acc, m, sizeof(m)); mc->dyn_cm_flags |= bit; continue; }
+			// acc = m o acc (m applies after the earlier members).
+			float t2[20];
+			for (int j = 0; j < 4; j++)
+				for (int r = 0; r < 4; r++) {
+					float s = 0.0f;
+					for (int k = 0; k < 4; k++) s += m[k * 4 + r] * acc[j * 4 + k];
+					t2[j * 4 + r] = s;
+				}
+			for (int r = 0; r < 4; r++) {
+				float s = 0.0f;
+				for (int k = 0; k < 4; k++) s += m[k * 4 + r] * acc[16 + k];
+				t2[16 + r] = s + m[16 + r];
+			}
+			memcpy(acc, t2, sizeof(t2));
+		}
+	}
+}
+
 // `mc.filters = <array>`: re-lower the whole list at assignment time and
 // mirror it onto the clip's display entry when it has one. AS-created clips
 // (createEmptyMovieClip & co.) never name-resolve to a timeline entry: they
@@ -44688,6 +44757,7 @@ static void avm1SetRuntimeFilters(MovieClip* mc, ASArray* arr)
 		}
 	}
 	g_avm1_runtime_filter_mcs += (fl->count > 0) - had;
+	avm1DynClipCaptureCM(mc, arr);
 	DisplayObject* d = (DisplayObject*) mc->display_obj;
 	if (d == NULL && !mc->as_created) d = resolveMCDisplayEntry(mc);
 	if (d != NULL) avm1ApplyRuntimeFiltersToEntry(d, fl);

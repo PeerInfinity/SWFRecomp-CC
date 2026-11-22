@@ -657,3 +657,9 @@ regression/avm2_layer_group_overlap_alpha   # AVM2 arm, overlapping ALPHA      1
 # tag.c textfield_glyph_render_cb advance term). No standing member moved
 # under the change; this tol-0 aliased row is the only corpus row that sees it.
 from_shumway/acid/acid-text                 # AVM1 EDITTEXT KERNING (tol 0)  1 cmp
+# s25 w2-dynclip-cxform: the DYNAMIC-clip colour channel (Color.setRGB /
+# runtime ColorMatrix / setRGB over a runtime Glow on createEmptyMovieClip
+# Drawing-API clips). No standing member saw it: every other row's dynamic
+# clips are untinted. Ruffle exporter golden, exact at max_outliers 0.
+# tier=1
+regression/avm1_dynclip_color_transform     # dynamic-clip cxform + CM      1 cmp

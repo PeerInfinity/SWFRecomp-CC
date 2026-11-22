@@ -125,3 +125,4 @@ arms cannot be reached any other way.
 | `layer_group_in_add_alpha` | a LAYER (with an overlapping ALPHA child) nested inside an ADD blend offscreen is isolated; Ruffle render pixel-identical |
 | `avm2_layer_group_alpha` / `avm2_layer_group_erase` | AVM2 twins of upstream `visual/blend_modes/layer_{alpha,erase}` (hand-assembled minimal DoABC so the AVM2 arm runs); golden = upstream's; the Ruffle exporter renders the twin pixel-identical to the AVM1 original |
 | `avm2_layer_group_overlap_alpha` | AVM2 twin of `layer_group_overlap_alpha`; Ruffle render pixel-identical |
+| `avm1_dynclip_color_transform` | **`Color.setRGB` / `setTransform` / `transform.colorTransform` and a runtime ColorMatrixFilter render on `createEmptyMovieClip` Drawing-API clips** (s25 `w2-dynclip-cxform`; dynclip R3). Trace + image golden = Ruffle exporter `0ddd12b6a` (`dyn_CEG`), pixel-exact |

@@ -3144,6 +3144,66 @@ static void dyn_mc_compose_parent_chain(float xform[16], const MovieClip* mc)
 
 static int cab_snap_delta(DisplayObject* obj, const float world[16],
                           float* dx, float* dy);
+// s25 w2-dynclip-cxform: the colour channel of a DYNAMIC clip. Color.setRGB /
+// setTransform and transform.colorTransform write mc->cx_*, and a runtime
+// ColorMatrixFilter lands in mc->dyn_cm (action.c avm1DynClipCaptureCM), but
+// the Drawing-API leaves were always drawn with cxform 0, so none of it ever
+// rendered (dynclip R3). local = cx o CM (Ruffle display_object.rs
+// render_base: the filters run on the cached bitmap, the colour transform
+// after). The alpha MULTIPLIER is left at 1: `_alpha` keeps its existing route
+// (folded into the fill/line alpha in fillDrawingInfos, the group alpha of a
+// filter root, AttachedBitmapInfo.alpha), so it is never applied twice.
+// `post` = 1 uses only the CMs after the first non-CM filter (dyn_cm_post):
+// what a filter root's own glow / shadow colour goes through.
+static void compose_cxform20(float out[20], const float* outer, const float* inner);
+static void dyn_mc_local_cxform(float out[20], const MovieClip* mc, int post)
+{
+	memset(out, 0, 20 * sizeof(float));
+	out[0]  = mc->cx_ra / 100.0f;
+	out[5]  = mc->cx_ga / 100.0f;
+	out[10] = mc->cx_ba / 100.0f;
+	out[15] = 1.0f;
+	out[16] = mc->cx_rb / 255.0f;
+	out[17] = mc->cx_gb / 255.0f;
+	out[18] = mc->cx_bb / 255.0f;
+	out[19] = mc->cx_ab / 255.0f;
+	u8 bit = post ? 2 : 1;
+	if (mc->dyn_cm_flags & bit) {
+		float t[20];
+		compose_cxform20(t, out, post ? mc->dyn_cm_post : mc->dyn_cm);
+		memcpy(out, t, sizeof(t));
+	}
+}
+
+static int dyn_cx_is_identity(const float cx[20])
+{
+	for (int k = 0; k < 16; k++)
+		if (fabsf(cx[k] - ((k % 5) == 0 ? 1.0f : 0.0f)) > 1e-6f) return 0;
+	for (int k = 16; k < 20; k++)
+		if (fabsf(cx[k]) > 1e-6f) return 0;
+	return 1;
+}
+
+// World colour transform of dynamic clip `mc`: its local one composed under
+// every dynamic ancestor's (the same chain dyn_mc_compose_parent_chain walks
+// for the matrix; it stops at _root or the first placed / attached clip).
+// Returns 1 when the result is non-identity.
+static int dyn_mc_world_cxform(float out[20], const MovieClip* mc, int self_post)
+{
+	dyn_mc_local_cxform(out, mc, self_post);
+	int guard = 0;
+	for (MovieClip* p = dyn_mc_dynamic_parent(mc); p != NULL && guard < 64;
+	     p = dyn_mc_dynamic_parent(p), guard++)
+	{
+		float P[20], t[20];
+		dyn_mc_local_cxform(P, p, 0);
+		if (dyn_cx_is_identity(P)) continue;
+		compose_cxform20(t, P, out);
+		memcpy(out, t, sizeof(t));
+	}
+	return !dyn_cx_is_identity(out);
+}
+
 static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 {
 	extern MovieClip* child_mc_cache[];
@@ -3155,6 +3215,7 @@ static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 		// Clear any stale slot from previous ticks (per-tick allocator
 		// resets g_next_dynamic_xform_slot, so stashed IDs are invalid).
 		mc->dynamic_xform_slot = 0;
+		mc->dynamic_cxform_slot = 0;
 		if (mc->depth == INT_MIN) continue;       // removed
 		if (mc->display_obj != NULL) {
 			// s25 w1-pixel-drawing PROTOTYPE: a clip WITH a display entry
@@ -3178,6 +3239,19 @@ static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 			mc->dyn_xform_lin[0] = wx[0]; mc->dyn_xform_lin[1] = wx[1];
 			mc->dyn_xform_lin[2] = wx[4]; mc->dyn_xform_lin[3] = wx[5];
 			continue;
+		}
+		// s25 w2-dynclip-cxform: mint the colour slot first (the matrix arm
+		// below skips identity-transform clips). Only non-identity colours
+		// take a slot, so an untinted movie spends none of the budget.
+		if (mc->drawing_state != NULL || mc->attached_bitmap_pixels != NULL) {
+			float cx[20];
+			if (dyn_mc_world_cxform(cx, mc, 0)
+			    && g_next_dynamic_cxform_slot < g_cxform_slot_capacity) {
+				u32 cslot = g_next_dynamic_cxform_slot++;
+				renderer_write_cxform(context, cslot, cx);
+				memcpy(mc->dyn_cx, cx, sizeof(cx));
+				mc->dynamic_cxform_slot = cslot;
+			}
 		}
 		// s23 w2-dynclip-transform: a dynamic child of a dynamic parent must
 		// inherit the parent's AS-set transform (Flash composes the whole
@@ -4631,6 +4705,11 @@ typedef struct FilteredSource {
 	void (*draw)(SWFAppContext* app_context, void* ctx);
 	void* ctx;
 	float group_alpha;
+	// s25 w2-dynclip-cxform: the root's world colour transform as the A3
+	// `obj_cx` (the filter's own colour takes it; the leaves drawn by `draw`
+	// already carry it through their dynamic cxform slots).
+	int have_cx;
+	float cx[20];
 } FilteredSource;
 
 static void filtered_draw_source(SWFAppContext* app_context, DisplayObject* obj,
@@ -4662,6 +4741,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 			if (src->list->entries[i].type >= 1 && src->list->entries[i].type <= 4)
 				chain[chain_n++] = &src->list->entries[i];
 		if (chain_n == 0) { src->draw(app_context, src->ctx); return; }
+		if (src->have_cx) { memcpy(obj_cx, src->cx, sizeof(obj_cx)); have_obj_cx = 1; }
 	}
 	else
 	{
@@ -7607,6 +7687,7 @@ static void dyn_filter_root_cb(void* mc, const void* filter_list, void* user_dat
 	src.ctx = mc;
 	src.group_alpha = actionDynamicFilterGroupAlpha(mc);
 	if (!(src.group_alpha > 0.0f)) return;
+	src.have_cx = dyn_mc_world_cxform(src.cx, (const MovieClip*) mc, 1);
 	// Inside another capture / a mask: no nested filter layer (the same rule
 	// as compose_children's nested PlaceObject3 filters).
 	if (g_filter_capture_depth != 0 || g_clip_mask_capture)
@@ -7723,8 +7804,11 @@ static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user
 	// (it handles negative scale correctly); route through it, drawing at the
 	// local origin because the slot bakes _x/_y in. MCs with no AS-set
 	// transform get slot 0 and keep the old stage-space path unchanged.
+	// s25 w2-dynclip-cxform: the MC's dynamic colour slot (alpha mult 1),
+	// with the bitmap's own _alpha folded on top when both apply.
+	u32 dyn_cx_slot = (info->cxform != NULL) ? info->cxform_slot : 0;
 	if (info->xform_slot != 0) {
-		u32 cx_slot = 0;
+		u32 cx_slot = dyn_cx_slot;
 		if (info->alpha < 99.99f) {
 			u32 slot = g_next_dynamic_cxform_slot;
 			if (slot < g_cxform_slot_capacity) {
@@ -7734,6 +7818,11 @@ static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user
 				cx[0] = cx[5] = cx[10] = 1.0f;
 				cx[15] = info->alpha / 100.0f;
 				if (cx[15] < 0.0f) cx[15] = 0.0f;
+				if (dyn_cx_slot != 0) {
+					float a = cx[15];
+					memcpy(cx, info->cxform, sizeof(cx));
+					for (int k = 3; k < 20; k += 4) cx[k] *= a;   // output-alpha row + add
+				}
 				renderer_write_cxform(context, slot, cx);
 				cx_slot = slot;
 			}
@@ -7743,7 +7832,7 @@ static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user
 		return;
 	}
 	renderer_draw_bitmap_quad(context, info->pixels, info->width, info->height,
-		info->x_twips, info->y_twips, 0, 0);
+		info->x_twips, info->y_twips, 0, dyn_cx_slot);
 }
 
 // Paint the EditText box + glyphs of the root-timeline fields sitting at
