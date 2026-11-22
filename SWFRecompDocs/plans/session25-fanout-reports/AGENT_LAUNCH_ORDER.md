@@ -42,7 +42,7 @@ handshake sent).
 | w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | session_018CoDi5kNpLqLbTbXGooXKw — DELIVERED, LANDED `78f15f639` (+1 px `acid-morph`; premise refuted: recompiler morph ramp over-emitted rows; generated C identical for 122 SWFs). NB commit trailer carries the worker's session URL by mistake |
 | w2-nearpass-land | w1-pixel-nearpass D+A+C+S+B | px +6 (+1 if B finishes) | session_018CoDi6T6H97ToTZbb3Tbeb |
 | w2-textfield-vn | w1-textfield-vn P0-P21 | trace gnash `TextField-v6/v7/v8` → ruffle_matched | session_018CoDi4kG6RDoukZHuF7UbE |
-| w2-edittext-span-model | w1-textfield-vn §4 | trace `edittext_set_text_same` (pass), `_after_edits` (rm) | session_018CoDi43SuykYDpM156pYNz |
+| w2-edittext-span-model | w1-textfield-vn §4 | trace `edittext_set_text_same` (pass), `_after_edits` (rm) | session_018CoDi43SuykYDpM156pYNz — DELIVERED, LANDED (+2 trace, both Flash-exact pass incl. the KF row; replaceText was unimplemented; TextField-v7/v8 +12 lines; 0 px moves) |
 | w2-avm2-cm-copyfrom | w1-pixel-drawing D+E | px `bitmapdata_draw_filters`, `graphics_direct_commands` (unpriced) | session_018CoDi8AeP44PYDaUTrzWMN — DELIVERED, LANDED (+2 px `bitmapdata_draw_filters`, `graphics_direct_commands`; gradients band) |
 | w2-avm1-with-scope | w1-pixel-drawing C residual | trace DrawingApiTest lines (flip unpriced) | session_018CoDi645BCNVuhoF2enBcy |
 
