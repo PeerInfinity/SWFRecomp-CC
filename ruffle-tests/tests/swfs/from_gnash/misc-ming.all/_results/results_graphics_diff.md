@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `746c394898ff` (2026-11-22T17:09:27.510881+00:00)
-**Current:** `2f7be1710fed` (2026-11-22T20:05:56.655775+00:00)
+**Previous:** `2f7be1710fed` (2026-11-22T20:05:56.655775+00:00)
+**Current:** `9e24c763ca3a` (2026-11-22T20:56:27.323607+00:00)
 
 ## Summary
 
@@ -10,6 +10,11 @@
 | Passing | 69 | 69 | 0 |
 | Total | 111 | 111 | 0 |
 | Pass rate | 62.2% | 62.2% | 0% |
-| Mismatched lines | 996 | 996 | 0 |
+| Mismatched lines | 996 | 989 | -7 |
+|   Decreased | | | -7 |
 
-No changes detected.
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `DrawingApiTest` | output_mismatch | 81/93 | 88/93 | -7 |

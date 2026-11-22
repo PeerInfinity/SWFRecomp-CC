@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-22T20:05:59.388821+00:00",
+    "timestamp": "2026-11-22T20:56:29.538282+00:00",
     "suite": "from_shumway",
     "stem": "results_graphics",
-    "git_sha": "2f7be1710fedc14a1ba5ddf518434e797eab9318",
+    "git_sha": "9e24c763ca3a16f1f0c5032f6a6f4793316fddac",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45060637552",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45060637552",
+    "run_id": "45065076248",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45065076248",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 71,
   "comparisons": 123,
   "ignored": 0,
-  "pass": 95,
-  "fail": 28,
+  "pass": 96,
+  "fail": 27,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 14,
   "ruffle_matched_fail": 5,
-  "pass_rate": 77.2,
+  "pass_rate": 78.0,
   "results": [
     {
       "suite": "from_shumway",
@@ -2115,36 +2115,35 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 31977 outliers exceed limit of 5600, max difference 255 (check tol 10; 2 of 2 checks failed)",
-      "reason": "pixel_mismatch",
-      "max_diff": 255,
+      "status": "pass",
+      "message": "Image check passed: 2517 outliers (limit 2600), max difference 191 (2 checks)",
+      "max_diff": 191,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 50802,
-      "mean_diff": 1.3652,
+      "diff_channels": 45963,
+      "mean_diff": 0.5672,
       "checks": [
         {
           "tolerance": 10,
           "max_outliers": 5600,
-          "outliers": 31977,
-          "passed": false
+          "outliers": 5400,
+          "passed": true
         },
         {
           "tolerance": 64,
           "max_outliers": 2600,
-          "outliers": 4022,
-          "passed": false
+          "outliers": 2517,
+          "passed": true
         }
       ],
       "applicable_checks": 2,
-      "failed_checks": 2,
-      "outliers": 31977,
-      "max_outliers": 5600,
-      "tolerance": 10,
-      "excess_outliers": 26377
+      "failed_checks": 0,
+      "outliers": 2517,
+      "max_outliers": 2600,
+      "tolerance": 64,
+      "excess_outliers": 0
     },
     {
       "suite": "from_shumway",

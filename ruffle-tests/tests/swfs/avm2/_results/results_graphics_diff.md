@@ -1,27 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `746c394898ff` (2026-11-22T17:09:27.419052+00:00)
-**Current:** `2f7be1710fed` (2026-11-22T20:05:56.557187+00:00)
+**Previous:** `2f7be1710fed` (2026-11-22T20:05:56.557187+00:00)
+**Current:** `9e24c763ca3a` (2026-11-22T20:56:27.174833+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 1282 | 1285 | +3 |
-| Total | 1338 | 1339 | +1 |
-| Pass rate | 95.8% | 96.0% | +0.2% |
-| Mismatched lines | 2319 | 2308 | -11 |
-|   Decreased | | | -11 |
+| Passing | 1285 | 1285 | 0 |
+| Total | 1339 | 1339 | 0 |
+| Pass rate | 96.0% | 96.0% | 0% |
+| Mismatched lines | 2308 | 2308 | 0 |
 
-## Newly Passing (2)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `pixelbender_shaderjob_output_channels` | output_mismatch | 8/16 | 16/16 |
-| `textblock_recreate_text_line_width` | output_mismatch | 2/5 | 5/5 |
-
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `local_connection_allow_networking` | pass | 30/30 |
+No changes detected.
