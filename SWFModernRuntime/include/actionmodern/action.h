@@ -837,6 +837,9 @@ typedef struct AttachedBitmapInfo {
 
 typedef void (*AttachedBitmapCallback)(const AttachedBitmapInfo* info, void* user_data);
 int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data);
+// The attachBitmap bitmaps of one AVM1 dynamic filter root's subtree (drawn
+// into its filter layer; the global pass then skips them).
+int actionIterateDynamicSubtreeBitmaps(void* root_mc, AttachedBitmapCallback cb, void* user_data);
 
 // Video frame access for headless rendering (decoded FLV frames).
 // Returns 1 if a decoded frame is available. Caller must free *out_argb.

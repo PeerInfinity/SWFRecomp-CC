@@ -1,0 +1,11 @@
+RENDER CANARY  before=before  after=after   114 tests / 171 comparisons
+
+  IDENTICAL   171
+  DIFFERS       0
+  APPEARED      0   VANISHED 0   NO_RENDER 0
+  MISSING       2   (test absent from one label)
+
+  TRACE STATUS CHANGES: (none)
+  IMAGE STATUS CHANGES: (none)
+  MISSING: regression/avm1_nested_po3_filters absent from label 'before'
+  MISSING: regression/avm1_runtime_filters_cm_bitmap absent from label 'before'

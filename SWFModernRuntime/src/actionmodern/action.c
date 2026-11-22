@@ -32622,7 +32622,8 @@ static int dynSubtreeHasDrawings(MovieClip* root)
 		if (mc == NULL || mc->depth == INT_MIN || !mc->visible) continue;
 		if (mc->is_mask || mc->mask_mc != NULL || mc->display_obj != NULL) continue;
 		DrawingState* ds = (DrawingState*) mc->drawing_state;
-		if (ds == NULL || (ds->path_count == 0 && ds->cmd_count == 0)) continue;
+		int has_geom = ds != NULL && (ds->path_count != 0 || ds->cmd_count != 0);
+		if (!has_geom && mc->attached_bitmap_pixels == NULL) continue;
 		if (dynFilterRootOf(mc) == root) return 1;
 	}
 	return 0;
@@ -32631,8 +32632,15 @@ static int dynSubtreeHasDrawings(MovieClip* root)
 static DynamicFilterRootCallback g_dyn_filter_hook = NULL;
 static void* g_dyn_filter_hook_ud = NULL;
 
+// Set while a root render loop has installed the filter-root hook, until the
+// following attached-bitmap pass: the bitmaps of a filter root's subtree are
+// then drawn by the hook (inside the filter layer) and the global pass skips
+// them. Any other caller of actionIterateAttachedBitmaps is unaffected.
+static int g_dyn_filter_bitmaps_claimed = 0;
+
 void actionSetDynamicFilterRootHook(DynamicFilterRootCallback cb, void* user_data)
 {
+	if (cb != NULL) g_dyn_filter_bitmaps_claimed = 1;
 	g_dyn_filter_hook = cb;
 	g_dyn_filter_hook_ud = user_data;
 }
@@ -32803,9 +32811,48 @@ int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo* 
 	return fillDrawingInfos(mc, out, max_out);
 }
 
+static void fillAttachedBitmapInfo(MovieClip* mc, AttachedBitmapInfo* info)
+{
+	info->pixels = mc->attached_bitmap_pixels;
+	info->width = mc->attached_bitmap_width;
+	info->height = mc->attached_bitmap_height;
+	info->x_twips = mc->x * 20.0f;
+	info->y_twips = mc->y * 20.0f;
+	info->xform_slot = mc->dynamic_xform_slot;
+	info->alpha = (float)mc->alpha;
+	// s25 coordinator merge (w2-avm1-filters x w2-dynclip-cxform): the colour
+	// channel fields dynclip added; left unset they were stack garbage and the
+	// filter-layer bitmap drew with a random cxform slot.
+	info->cxform_slot = mc->dynamic_cxform_slot;
+	info->cxform = mc->dynamic_cxform_slot != 0 ? mc->dyn_cx : NULL;
+}
+
+int actionIterateDynamicSubtreeBitmaps(void* root_mc, AttachedBitmapCallback cb, void* user_data)
+{
+	MovieClip* root = (MovieClip*) root_mc;
+	int count = 0;
+	if (root == NULL) return 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || !mc->visible) continue;
+		if (actionAvm1IsLiveMasker(mc)) continue;
+		if (mc->attached_bitmap_pixels == NULL || mc->display_obj != NULL) continue;
+		if (dynFilterRootOf(mc) != root) continue;
+		AttachedBitmapInfo info;
+		fillAttachedBitmapInfo(mc, &info);
+		// The root's own _alpha is the group alpha of the filter-layer blit.
+		if (mc == root) info.alpha = 100.0f;
+		cb(&info, user_data);
+		count++;
+	}
+	return count;
+}
+
 int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
 {
 	int count = 0;
+	int claimed = g_dyn_filter_bitmaps_claimed && g_avm1_runtime_filter_mcs > 0;
+	g_dyn_filter_bitmaps_claimed = 0;
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->depth == INT_MIN) continue;
@@ -32813,6 +32860,7 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
 		// Live setMask masker: stencil-only, never ordinary content.
 		if (actionAvm1IsLiveMasker(mc)) continue;
 		if (mc->attached_bitmap_pixels == NULL) continue;
+		if (claimed && mc->display_obj == NULL && dynFilterRootOf(mc) != NULL) continue;
 
 		AttachedBitmapInfo info;
 		info.pixels = mc->attached_bitmap_pixels;
@@ -44610,6 +44658,19 @@ static int avm1LowerFilterObject(ASObject* o, FilterListEntry* e)
 			e->flags = (u8)((inner << 2) | (knockout << 1) | 1);
 			return 1;
 		}
+		case 6: // ColorMatrixFilter: kept as a type-6 entry;
+		{       // tag.c obj_runtime_cm folds it into the entry's cxform.
+			ActionVar* mv = getProperty(o, "matrix", 6);
+			ASArray* ma = (mv && mv->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) mv->data.numeric_value : NULL;
+			static const float ident[20] = {1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0};
+			e->type = 6;
+			for (int k = 0; k < 20; k++)
+			{
+				double v = (ma && (u32) k < ma->length) ? varToDoubleSimple(&ma->elements[k]) : ident[k];
+				e->cm_matrix[k] = isnan(v) ? 0.0f : (float) v;
+			}
+			return 1;
+		}
 		default:
 			return 0;
 	}
@@ -44633,8 +44694,14 @@ static FilterListData* avm1McFilterList(MovieClip* mc)
 
 static int avm1McHasRuntimeFilters(const MovieClip* mc)
 {
-	return mc != NULL && mc->as_filters != NULL
-	    && ((const FilterListData*) mc->as_filters)->count > 0;
+	if (mc == NULL || mc->as_filters == NULL) return 0;
+	// A ColorMatrix-only list makes no filter root: it has no filter-layer pass
+	// (tag.c folds it into the cxform; dynamic clips have no colour-transform
+	// channel yet), and a filter root would cost the clip its group alpha.
+	const FilterListData* fl = (const FilterListData*) mc->as_filters;
+	for (u8 k = 0; k < fl->count; k++)
+		if (fl->entries[k].type != 6) return 1;
+	return 0;
 }
 
 // Mirror the MC's runtime list onto a display entry: the scalar filter_* set
@@ -44652,7 +44719,15 @@ static void avm1ApplyRuntimeFiltersToEntry(DisplayObject* d, const FilterListDat
 		d->filter_chain = NULL;
 		return;
 	}
-	const FilterListEntry* e = &fl->entries[0];
+	// The scalars describe the first NON-ColorMatrix member
+	// (build_filter_chain's scalar_idx rule); a CM-only list leaves the entry
+	// unfiltered (filter_type 0) with the chain still linked, and tag.c folds
+	// the CM into the entry's colour transform.
+	const FilterListEntry* e = NULL;
+	for (u8 k = 0; k < fl->count; k++)
+		if (fl->entries[k].type != 6) { e = &fl->entries[k]; break; }
+	d->filter_chain = fl;
+	if (e == NULL) { d->filter_type = 0; return; }
 	d->filter_type = e->type;
 	d->filter_blur_x = e->blur_x;
 	d->filter_blur_y = e->blur_y;
@@ -59912,10 +59987,14 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 				DisplayObject* entry = resolveMCDisplayEntry(mc);
 				size_t entry_depth = ng_objRootDepth(entry);
 
-				// Check multi-filter list first (from tagBeginFilterList/tagAdd*/tagEndFilterList).
-				// The filter side-tables are flat root-depth-keyed (filters only resolve at
-				// root level today; entry_depth is -1 for nested/dynamic entries).
-				const FilterListData* fld = (entry_depth != (size_t)-1) ? ng_getFilterListDataByDepth(entry_depth) : NULL;
+				// Check the multi-filter list first (tagBeginFilterList[At] / tagAdd* /
+				// tagEndFilterList), through the entry's own chain: a root entry's
+				// chain IS its by-depth table slot; a sprite-nested entry's is the
+				// recompiler's per-site static list (tagBeginFilterListAt), which the
+				// root-depth-keyed table never holds. The by-depth read stays as the
+				// fallback for a root entry whose chain is not linked.
+				const FilterListData* fld = (entry != NULL) ? (const FilterListData*) entry->filter_chain : NULL;
+				if (fld == NULL && entry_depth != (size_t)-1) fld = ng_getFilterListDataByDepth(entry_depth);
 				if (fld && fld->count > 0) {
 					// Ensure filter prototypes are initialized (they live in flash.filters package
 					// which is lazily created on first access to the "flash" global)

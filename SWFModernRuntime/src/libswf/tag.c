@@ -3031,6 +3031,15 @@ static void cxform_overrides_push(DisplayObject* obj, u32 original_id)
 	}
 }
 
+// The id an entry had before this tick's cxform overrides re-pointed it (its
+// baked placement slot), for the runtime-ColorMatrix fold.
+static u32 cxform_original_id(const DisplayObject* obj)
+{
+	for (int i = 0; i < g_cxform_override_count; i++)
+		if (g_cxform_overrides[i].obj == obj) return g_cxform_overrides[i].original_id;
+	return obj->cxform_id;
+}
+
 static void cxform_overrides_restore(void)
 {
 	for (int i = g_cxform_override_count - 1; i >= 0; --i)
@@ -3399,12 +3408,68 @@ static int cx_is_identity(const float cx[20])
 	return 1;
 }
 
+// The ColorMatrixFilter members of an AVM1 RUNTIME filter list (`mc.filters = [..., new ColorMatrixFilter(m)]`).
+// Only runtime lists are folded here: they are the MC-owned FilterListData
+// whose depth is (size_t)-1 (action.c avm1McFilterList). SWF-authored
+// PlaceObject3 ColorMatrix members are already folded into the placement
+// cxform by the recompiler and must not be applied twice.
+// The CM is a straight-RGBA 4x5 matrix, the same shape as our cxform
+// (column-major 4x4 + add/255), so it composes as one: Ruffle runs it as a
+// filter pass over the cached bitmap, before the object's colour transform
+// (display_object.rs render_base), i.e. effective = cx o CM. Exact for a
+// CM-only list and for CMs that follow every other filter. `suffix` = 1
+// composes only the CMs AFTER the first non-CM member (what a filter's own
+// colour must go through). A CM BEFORE a glow/shadow is approximated: only
+// the per-pass clamp ordering differs.
+static int obj_runtime_cm(const DisplayObject* obj, float out[20], int suffix)
+{
+	const FilterListData* fl = (const FilterListData*) obj->filter_chain;
+	if (fl == NULL || fl->depth != (size_t) -1 || fl->count == 0) return 0;
+	int have = 0, seen_filter = 0;
+	for (u8 n = 0; n < fl->count; n++)
+	{
+		const FilterListEntry* e = &fl->entries[n];
+		if (e->type != 6) { seen_filter = 1; continue; }
+		if (suffix && !seen_filter) continue;
+		float m[20];
+		for (int col = 0; col < 4; col++)
+			for (int row = 0; row < 4; row++)
+				m[col * 4 + row] = e->cm_matrix[row * 5 + col];
+		for (int row = 0; row < 4; row++)
+			m[16 + row] = e->cm_matrix[row * 5 + 4] / 255.0f;
+		if (!have) { memcpy(out, m, sizeof(m)); have = 1; }
+		else { float t[20]; compose_cxform20(t, m, out); memcpy(out, t, sizeof(t)); }
+	}
+	return have;
+}
+
+static void cx_set_identity(float out[20])
+{
+	memset(out, 0, 20 * sizeof(float));
+	out[0] = out[5] = out[10] = out[15] = 1.0f;
+}
+
 // Seed the recursive cxform composition from a ROOT display-list entry: its
 // runtime override when it has one, otherwise its baked placement slot.
 // Returns 1 (and fills out) only when the result is non-identity — an identity
 // seed is passed down as NULL so children keep their own baked slots and the
 // dynamic-slot budget is untouched.
+static int root_seed_cxform_base(SWFAppContext* app_context, DisplayObject* obj,
+	float out[20]);
 static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
+	float out[20])
+{
+	float rcm[20];
+	if (obj_runtime_cm(obj, rcm, 0)) {
+		float base[20], t[20];
+		if (!root_seed_cxform_base(app_context, obj, base)) cx_set_identity(base);
+		compose_cxform20(t, base, rcm);
+		memcpy(out, t, sizeof(t));
+		return !cx_is_identity(out);
+	}
+	return root_seed_cxform_base(app_context, obj, out);
+}
+static int root_seed_cxform_base(SWFAppContext* app_context, DisplayObject* obj,
 	float out[20])
 {
 	if (obj->cx_overridden) {
@@ -3414,15 +3479,36 @@ static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
 	GEN_EXTERN_CXFORM_DATA;
 	u32 baked = (app_context->cxform_data_size > 0)
 		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
-	if (obj->cxform_id != 0 && obj->cxform_id < baked) {
+	u32 seed_id = cxform_original_id(obj);
+	if (seed_id != 0 && seed_id < baked) {
 		// app_context->cxform_data, not the `cxform_data` symbol: with child
 		// movies linked the id is an index into the COMBINED table and the
 		// symbol is only the root's prefix of it (multi-SWF render slice).
-		memcpy(out, (const float*)app_context->cxform_data + obj->cxform_id * 20,
+		memcpy(out, (const float*)app_context->cxform_data + seed_id * 20,
 		       20 * sizeof(float));
 		return !cx_is_identity(out);
 	}
 	return 0;
+}
+
+// The two root "runtime cxform" loops: an AS-overridden cxform (cx_*), and a
+// runtime ColorMatrixFilter on a ROOT entry folded on top of whatever cxform
+// the entry already has. A sprite / button needs the minted
+// slot too: compose_children hands an un-tinted child the PARENT'S SLOT.
+static int root_entry_runtime_cxform(SWFAppContext* app_context,
+	DisplayObject* obj, float cx[20])
+{
+	float rcm[20];
+	int has_cm = obj_runtime_cm(obj, rcm, 0);
+	if (!obj->cx_overridden && !has_cm) return 0;
+	if (obj->cx_overridden) build_cxform_from_obj(cx, obj);
+	else if (!root_seed_cxform_base(app_context, obj, cx)) cx_set_identity(cx);
+	if (has_cm) {
+		float t[20];
+		compose_cxform20(t, cx, rcm);
+		memcpy(cx, t, sizeof(t));
+	}
+	return 1;
 }
 
 // Ruffle lerp_color: (a*start + b*end) as u8 — TRUNCATION on the u8 scale, per
@@ -3854,6 +3940,19 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			}
 		}
 
+		int own_rt_cm = 0;
+		{
+			float rcm[20];
+			if (obj_runtime_cm(obj, rcm, 0)) {
+				float t[20];
+				if (!have_own) cx_set_identity(own_cx);
+				compose_cxform20(t, own_cx, rcm);
+				memcpy(own_cx, t, sizeof(t));
+				have_own = 1;
+				own_rt_cm = 1;
+			}
+		}
+
 		float eff_cx[20];
 		int eff_cx_valid = 0;
 		if (parent_cx != NULL && have_own) {
@@ -3879,7 +3978,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		if (parent_cx != NULL && !have_own) {
 			eff_slot = parent_cxform_id;
 		} else if (eff_cx_valid
-		           && (parent_cx != NULL || obj->cx_overridden
+		           && (parent_cx != NULL || obj->cx_overridden || own_rt_cm
 		               || (attached_mc != NULL && (attached_mc->as_set_flags & 32)))) {
 			u32 cx_slot = g_next_dynamic_cxform_slot;
 			if (cx_slot < g_cxform_slot_capacity) {
@@ -4487,8 +4586,25 @@ static int build_filter_chain(const DisplayObject* obj,
 // AS-set runtime override. A slot minted by compose_children for a nested
 // COMPOSED cxform lives on the GPU with no CPU mirror, so a filtered object
 // deep inside a tinted container behaves exactly as it did before.
+static int filtered_object_cxform_base(SWFAppContext* app_context,
+                                       const DisplayObject* obj, float out[20]);
 static int filtered_object_cxform(SWFAppContext* app_context,
                                   const DisplayObject* obj, float out[20])
+{
+	// A runtime ColorMatrixFilter AFTER a filter recolours that
+	// filter's output too ([Glow(blue), CM swap R/B] -> a RED halo in Flash).
+	float rcm[20];
+	if (obj_runtime_cm(obj, rcm, 1)) {
+		float base[20], t[20];
+		if (!filtered_object_cxform_base(app_context, obj, base)) cx_set_identity(base);
+		compose_cxform20(t, base, rcm);
+		memcpy(out, t, sizeof(t));
+		return 1;
+	}
+	return filtered_object_cxform_base(app_context, obj, out);
+}
+static int filtered_object_cxform_base(SWFAppContext* app_context,
+                                       const DisplayObject* obj, float out[20])
 {
 	if (obj->cx_overridden) { build_cxform_from_obj(out, obj); return 1; }
 	if (obj->cxform_id == 0) return 0;
@@ -7672,10 +7788,14 @@ static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data)
 // subtree into the filter layer (render_filtered_core with a FilteredSource)
 // and blits the result at the root's group alpha. Installed only around the
 // two root-loop actionIterateDrawings calls.
+static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user_data);
 static void dyn_filter_root_draw(SWFAppContext* app_context, void* mc)
 {
 	(void)app_context;
 	actionIterateDynamicSubtreeDrawings(mc, drawing_render_cb, NULL);
+	// The subtree's attachBitmap bitmaps join the filter layer
+	// (drawn after its vector content, the same order as the global passes).
+	actionIterateDynamicSubtreeBitmaps(mc, attached_bitmap_render_cb, NULL);
 }
 
 static void dyn_filter_root_cb(void* mc, const void* filter_list, void* user_data)
@@ -8038,9 +8158,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		for (size_t i = 1; i <= max_depth; ++i)
 		{
 			DisplayObject* obj = &display_list[i];
-			if (obj->char_id == 0 || !obj->cx_overridden) continue;
+			if (obj->char_id == 0) continue;
 			float cx[20];
-			build_cxform_from_obj(cx, obj);
+			if (!root_entry_runtime_cxform(app_context, obj, cx)) continue;
 			u32 new_slot = g_next_dynamic_cxform_slot;
 			if (new_slot < g_cxform_slot_capacity) {
 				g_next_dynamic_cxform_slot++;
@@ -8986,11 +9106,10 @@ void tagShowFrame(SWFAppContext* app_context)
 		{
 			DisplayObject* obj = &display_list[i];
 			if (obj->char_id == 0) continue;
-			if (!obj->cx_overridden) continue;
 
 			// Build cxform from the runtime cx_* values and allocate a dynamic slot
 			float cx[20];
-			build_cxform_from_obj(cx, obj);
+			if (!root_entry_runtime_cxform(app_context, obj, cx)) continue;
 
 			u32 new_slot = g_next_dynamic_cxform_slot;
 			if (new_slot < g_cxform_slot_capacity) {
@@ -14036,7 +14155,7 @@ const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth)
 #define MAX_FILTER_LISTS 32
 static FilterListData g_filter_lists[MAX_FILTER_LISTS];
 static int g_filter_list_count = 0;
-static int g_current_filter_list_idx = -1; // index of list being built
+static FilterListData* g_current_filter_list = NULL; // list being built
 
 static FilterListData* getOrCreateFilterList(size_t depth)
 {
@@ -14054,6 +14173,7 @@ void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count)
 {
 	(void)app_context; (void)count;
 	FilterListData* fl = getOrCreateFilterList(depth);
+	g_current_filter_list = fl;
 	if (!fl) return;
 	fl->count = 0; // reset
 	// Link the list to the display entry so the RENDER path can walk the whole
@@ -14062,16 +14182,29 @@ void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count)
 	// (a depth swap copies the field with the rest of the struct).
 	if (depth <= max_depth)
 		display_list[depth].filter_chain = fl;
-	// Find index for subsequent tagAdd* calls
-	for (int i = 0; i < g_filter_list_count; i++) {
-		if (g_filter_lists[i].depth == depth) { g_current_filter_list_idx = i; return; }
-	}
+}
+
+// Begin a DefineSprite-nested PlaceObject3 filter list. The recompiler hands in a per-placement-site
+// STATIC list, so a nested depth never collides with the root-depth-keyed
+// table above (sprite frame code runs with display_list swapped to the
+// sprite's own list), nothing is heap-allocated per placement, and every
+// instance of the sprite shares the same immutable authored list. The
+// getter reads it through the entry's filter_chain.
+void tagBeginFilterListAt(SWFAppContext* app_context, size_t depth, FilterListData* fl)
+{
+	(void)app_context;
+	g_current_filter_list = fl;
+	if (!fl) return;
+	fl->count = 0;
+	fl->depth = depth;
+	if (depth <= max_depth)
+		display_list[depth].filter_chain = fl;
 }
 
 static FilterListEntry* filterListAppend(size_t depth)
 {
-	if (g_current_filter_list_idx < 0) return NULL;
-	FilterListData* fl = &g_filter_lists[g_current_filter_list_idx];
+	FilterListData* fl = g_current_filter_list;
+	if (fl == NULL) return NULL;
 	if (fl->depth != depth || fl->count >= MAX_FILTER_LIST_SIZE) return NULL;
 	FilterListEntry* e = &fl->entries[fl->count];
 	memset(e, 0, sizeof(FilterListEntry));
@@ -14098,9 +14231,8 @@ void tagAddSimpleFilterHighlight(SWFAppContext* app_context, size_t depth,
     double hr, double hg, double hb, double ha)
 {
 	(void)app_context;
-	if (g_current_filter_list_idx < 0) return;
-	FilterListData* fl = &g_filter_lists[g_current_filter_list_idx];
-	if (fl->depth != depth || fl->count == 0) return;
+	FilterListData* fl = g_current_filter_list;
+	if (fl == NULL || fl->depth != depth || fl->count == 0) return;
 	FilterListEntry* e = &fl->entries[fl->count - 1]; // last added
 	e->highlight_r = hr; e->highlight_g = hg; e->highlight_b = hb; e->highlight_a = ha;
 }
@@ -14155,7 +14287,7 @@ void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
 void tagEndFilterList(SWFAppContext* app_context, size_t depth)
 {
 	(void)app_context; (void)depth;
-	g_current_filter_list_idx = -1;
+	g_current_filter_list = NULL;
 }
 
 const FilterListData* ng_getFilterListDataByDepth(size_t depth)

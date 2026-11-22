@@ -1,0 +1,1407 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index ba06b6fc..21e3523c 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -816,6 +816,9 @@ typedef struct AttachedBitmapInfo {
+ 
+ typedef void (*AttachedBitmapCallback)(const AttachedBitmapInfo* info, void* user_data);
+ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data);
++// The attachBitmap bitmaps of one AVM1 dynamic filter root's subtree (drawn
++// into its filter layer; the global pass then skips them).
++int actionIterateDynamicSubtreeBitmaps(void* root_mc, AttachedBitmapCallback cb, void* user_data);
+ 
+ // Video frame access for headless rendering (decoded FLV frames).
+ // Returns 1 if a decoded frame is available. Caller must free *out_argb.
+diff --git a/SWFModernRuntime/include/libswf/tag.h b/SWFModernRuntime/include/libswf/tag.h
+index 8cd643d8..17edc8b9 100644
+--- a/SWFModernRuntime/include/libswf/tag.h
++++ b/SWFModernRuntime/include/libswf/tag.h
+@@ -183,6 +183,7 @@ typedef struct FilterListData {
+ } FilterListData;
+ 
+ void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count);
++void tagBeginFilterListAt(SWFAppContext* app_context, size_t depth, FilterListData* fl);
+ void tagAddSimpleFilter(SWFAppContext* app_context, size_t depth,
+     u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
+     double r, double g, double b, double a, double strength,
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d2d411b8..da8e2226 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -32432,7 +32432,8 @@ static int dynSubtreeHasDrawings(MovieClip* root)
+ 		if (mc == NULL || mc->depth == INT_MIN || !mc->visible) continue;
+ 		if (mc->is_mask || mc->mask_mc != NULL || mc->display_obj != NULL) continue;
+ 		DrawingState* ds = (DrawingState*) mc->drawing_state;
+-		if (ds == NULL || (ds->path_count == 0 && ds->cmd_count == 0)) continue;
++		int has_geom = ds != NULL && (ds->path_count != 0 || ds->cmd_count != 0);
++		if (!has_geom && mc->attached_bitmap_pixels == NULL) continue;
+ 		if (dynFilterRootOf(mc) == root) return 1;
+ 	}
+ 	return 0;
+@@ -32441,8 +32442,15 @@ static int dynSubtreeHasDrawings(MovieClip* root)
+ static DynamicFilterRootCallback g_dyn_filter_hook = NULL;
+ static void* g_dyn_filter_hook_ud = NULL;
+ 
++// Set while a root render loop has installed the filter-root hook, until the
++// following attached-bitmap pass: the bitmaps of a filter root's subtree are
++// then drawn by the hook (inside the filter layer) and the global pass skips
++// them. Any other caller of actionIterateAttachedBitmaps is unaffected.
++static int g_dyn_filter_bitmaps_claimed = 0;
++
+ void actionSetDynamicFilterRootHook(DynamicFilterRootCallback cb, void* user_data)
+ {
++	if (cb != NULL) g_dyn_filter_bitmaps_claimed = 1;
+ 	g_dyn_filter_hook = cb;
+ 	g_dyn_filter_hook_ud = user_data;
+ }
+@@ -32562,9 +32570,43 @@ int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo*
+ 	return fillDrawingInfos(mc, out, max_out);
+ }
+ 
++static void fillAttachedBitmapInfo(MovieClip* mc, AttachedBitmapInfo* info)
++{
++	info->pixels = mc->attached_bitmap_pixels;
++	info->width = mc->attached_bitmap_width;
++	info->height = mc->attached_bitmap_height;
++	info->x_twips = mc->x * 20.0f;
++	info->y_twips = mc->y * 20.0f;
++	info->xform_slot = mc->dynamic_xform_slot;
++	info->alpha = (float)mc->alpha;
++}
++
++int actionIterateDynamicSubtreeBitmaps(void* root_mc, AttachedBitmapCallback cb, void* user_data)
++{
++	MovieClip* root = (MovieClip*) root_mc;
++	int count = 0;
++	if (root == NULL) return 0;
++	for (int i = 0; i < child_mc_count; i++) {
++		MovieClip* mc = child_mc_cache[i];
++		if (mc == NULL || mc->depth == INT_MIN || !mc->visible) continue;
++		if (actionAvm1IsLiveMasker(mc)) continue;
++		if (mc->attached_bitmap_pixels == NULL || mc->display_obj != NULL) continue;
++		if (dynFilterRootOf(mc) != root) continue;
++		AttachedBitmapInfo info;
++		fillAttachedBitmapInfo(mc, &info);
++		// The root's own _alpha is the group alpha of the filter-layer blit.
++		if (mc == root) info.alpha = 100.0f;
++		cb(&info, user_data);
++		count++;
++	}
++	return count;
++}
++
+ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
+ {
+ 	int count = 0;
++	int claimed = g_dyn_filter_bitmaps_claimed && g_avm1_runtime_filter_mcs > 0;
++	g_dyn_filter_bitmaps_claimed = 0;
+ 	for (int i = 0; i < child_mc_count; i++) {
+ 		MovieClip* mc = child_mc_cache[i];
+ 		if (mc == NULL || mc->depth == INT_MIN) continue;
+@@ -32572,6 +32614,7 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
+ 		// Live setMask masker: stencil-only, never ordinary content.
+ 		if (actionAvm1IsLiveMasker(mc)) continue;
+ 		if (mc->attached_bitmap_pixels == NULL) continue;
++		if (claimed && mc->display_obj == NULL && dynFilterRootOf(mc) != NULL) continue;
+ 
+ 		AttachedBitmapInfo info;
+ 		info.pixels = mc->attached_bitmap_pixels;
+@@ -44367,6 +44410,19 @@ static int avm1LowerFilterObject(ASObject* o, FilterListEntry* e)
+ 			e->flags = (u8)((inner << 2) | (knockout << 1) | 1);
+ 			return 1;
+ 		}
++		case 6: // ColorMatrixFilter: kept as a type-6 entry;
++		{       // tag.c obj_runtime_cm folds it into the entry's cxform.
++			ActionVar* mv = getProperty(o, "matrix", 6);
++			ASArray* ma = (mv && mv->type == ACTION_STACK_VALUE_ARRAY) ? (ASArray*)(uintptr_t) mv->data.numeric_value : NULL;
++			static const float ident[20] = {1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0};
++			e->type = 6;
++			for (int k = 0; k < 20; k++)
++			{
++				double v = (ma && (u32) k < ma->length) ? varToDoubleSimple(&ma->elements[k]) : ident[k];
++				e->cm_matrix[k] = isnan(v) ? 0.0f : (float) v;
++			}
++			return 1;
++		}
+ 		default:
+ 			return 0;
+ 	}
+@@ -44390,8 +44446,14 @@ static FilterListData* avm1McFilterList(MovieClip* mc)
+ 
+ static int avm1McHasRuntimeFilters(const MovieClip* mc)
+ {
+-	return mc != NULL && mc->as_filters != NULL
+-	    && ((const FilterListData*) mc->as_filters)->count > 0;
++	if (mc == NULL || mc->as_filters == NULL) return 0;
++	// A ColorMatrix-only list makes no filter root: it has no filter-layer pass
++	// (tag.c folds it into the cxform; dynamic clips have no colour-transform
++	// channel yet), and a filter root would cost the clip its group alpha.
++	const FilterListData* fl = (const FilterListData*) mc->as_filters;
++	for (u8 k = 0; k < fl->count; k++)
++		if (fl->entries[k].type != 6) return 1;
++	return 0;
+ }
+ 
+ // Mirror the MC's runtime list onto a display entry: the scalar filter_* set
+@@ -44409,7 +44471,15 @@ static void avm1ApplyRuntimeFiltersToEntry(DisplayObject* d, const FilterListDat
+ 		d->filter_chain = NULL;
+ 		return;
+ 	}
+-	const FilterListEntry* e = &fl->entries[0];
++	// The scalars describe the first NON-ColorMatrix member
++	// (build_filter_chain's scalar_idx rule); a CM-only list leaves the entry
++	// unfiltered (filter_type 0) with the chain still linked, and tag.c folds
++	// the CM into the entry's colour transform.
++	const FilterListEntry* e = NULL;
++	for (u8 k = 0; k < fl->count; k++)
++		if (fl->entries[k].type != 6) { e = &fl->entries[k]; break; }
++	d->filter_chain = fl;
++	if (e == NULL) { d->filter_type = 0; return; }
+ 	d->filter_type = e->type;
+ 	d->filter_blur_x = e->blur_x;
+ 	d->filter_blur_y = e->blur_y;
+@@ -59594,10 +59664,14 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 				DisplayObject* entry = resolveMCDisplayEntry(mc);
+ 				size_t entry_depth = ng_objRootDepth(entry);
+ 
+-				// Check multi-filter list first (from tagBeginFilterList/tagAdd*/tagEndFilterList).
+-				// The filter side-tables are flat root-depth-keyed (filters only resolve at
+-				// root level today; entry_depth is -1 for nested/dynamic entries).
+-				const FilterListData* fld = (entry_depth != (size_t)-1) ? ng_getFilterListDataByDepth(entry_depth) : NULL;
++				// Check the multi-filter list first (tagBeginFilterList[At] / tagAdd* /
++				// tagEndFilterList), through the entry's own chain: a root entry's
++				// chain IS its by-depth table slot; a sprite-nested entry's is the
++				// recompiler's per-site static list (tagBeginFilterListAt), which the
++				// root-depth-keyed table never holds. The by-depth read stays as the
++				// fallback for a root entry whose chain is not linked.
++				const FilterListData* fld = (entry != NULL) ? (const FilterListData*) entry->filter_chain : NULL;
++				if (fld == NULL && entry_depth != (size_t)-1) fld = ng_getFilterListDataByDepth(entry_depth);
+ 				if (fld && fld->count > 0) {
+ 					// Ensure filter prototypes are initialized (they live in flash.filters package
+ 					// which is lazily created on first access to the "flash" global)
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index de727f1d..9c4851cf 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3031,6 +3031,15 @@ static void cxform_overrides_push(DisplayObject* obj, u32 original_id)
+ 	}
+ }
+ 
++// The id an entry had before this tick's cxform overrides re-pointed it (its
++// baked placement slot), for the runtime-ColorMatrix fold.
++static u32 cxform_original_id(const DisplayObject* obj)
++{
++	for (int i = 0; i < g_cxform_override_count; i++)
++		if (g_cxform_overrides[i].obj == obj) return g_cxform_overrides[i].original_id;
++	return obj->cxform_id;
++}
++
+ static void cxform_overrides_restore(void)
+ {
+ 	for (int i = g_cxform_override_count - 1; i >= 0; --i)
+@@ -3273,13 +3282,69 @@ static int cx_is_identity(const float cx[20])
+ 	return 1;
+ }
+ 
++// The ColorMatrixFilter members of an AVM1 RUNTIME filter list (`mc.filters = [..., new ColorMatrixFilter(m)]`).
++// Only runtime lists are folded here: they are the MC-owned FilterListData
++// whose depth is (size_t)-1 (action.c avm1McFilterList). SWF-authored
++// PlaceObject3 ColorMatrix members are already folded into the placement
++// cxform by the recompiler and must not be applied twice.
++// The CM is a straight-RGBA 4x5 matrix, the same shape as our cxform
++// (column-major 4x4 + add/255), so it composes as one: Ruffle runs it as a
++// filter pass over the cached bitmap, before the object's colour transform
++// (display_object.rs render_base), i.e. effective = cx o CM. Exact for a
++// CM-only list and for CMs that follow every other filter. `suffix` = 1
++// composes only the CMs AFTER the first non-CM member (what a filter's own
++// colour must go through). A CM BEFORE a glow/shadow is approximated: only
++// the per-pass clamp ordering differs.
++static int obj_runtime_cm(const DisplayObject* obj, float out[20], int suffix)
++{
++	const FilterListData* fl = (const FilterListData*) obj->filter_chain;
++	if (fl == NULL || fl->depth != (size_t) -1 || fl->count == 0) return 0;
++	int have = 0, seen_filter = 0;
++	for (u8 n = 0; n < fl->count; n++)
++	{
++		const FilterListEntry* e = &fl->entries[n];
++		if (e->type != 6) { seen_filter = 1; continue; }
++		if (suffix && !seen_filter) continue;
++		float m[20];
++		for (int col = 0; col < 4; col++)
++			for (int row = 0; row < 4; row++)
++				m[col * 4 + row] = e->cm_matrix[row * 5 + col];
++		for (int row = 0; row < 4; row++)
++			m[16 + row] = e->cm_matrix[row * 5 + 4] / 255.0f;
++		if (!have) { memcpy(out, m, sizeof(m)); have = 1; }
++		else { float t[20]; compose_cxform20(t, m, out); memcpy(out, t, sizeof(t)); }
++	}
++	return have;
++}
++
++static void cx_set_identity(float out[20])
++{
++	memset(out, 0, 20 * sizeof(float));
++	out[0] = out[5] = out[10] = out[15] = 1.0f;
++}
++
+ // Seed the recursive cxform composition from a ROOT display-list entry: its
+ // runtime override when it has one, otherwise its baked placement slot.
+ // Returns 1 (and fills out) only when the result is non-identity — an identity
+ // seed is passed down as NULL so children keep their own baked slots and the
+ // dynamic-slot budget is untouched.
++static int root_seed_cxform_base(SWFAppContext* app_context, DisplayObject* obj,
++	float out[20]);
+ static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
+ 	float out[20])
++{
++	float rcm[20];
++	if (obj_runtime_cm(obj, rcm, 0)) {
++		float base[20], t[20];
++		if (!root_seed_cxform_base(app_context, obj, base)) cx_set_identity(base);
++		compose_cxform20(t, base, rcm);
++		memcpy(out, t, sizeof(t));
++		return !cx_is_identity(out);
++	}
++	return root_seed_cxform_base(app_context, obj, out);
++}
++static int root_seed_cxform_base(SWFAppContext* app_context, DisplayObject* obj,
++	float out[20])
+ {
+ 	if (obj->cx_overridden) {
+ 		build_cxform_from_obj(out, obj);
+@@ -3288,17 +3353,38 @@ static int root_seed_cxform(SWFAppContext* app_context, DisplayObject* obj,
+ 	GEN_EXTERN_CXFORM_DATA;
+ 	u32 baked = (app_context->cxform_data_size > 0)
+ 		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
+-	if (obj->cxform_id != 0 && obj->cxform_id < baked) {
++	u32 seed_id = cxform_original_id(obj);
++	if (seed_id != 0 && seed_id < baked) {
+ 		// app_context->cxform_data, not the `cxform_data` symbol: with child
+ 		// movies linked the id is an index into the COMBINED table and the
+ 		// symbol is only the root's prefix of it (multi-SWF render slice).
+-		memcpy(out, (const float*)app_context->cxform_data + obj->cxform_id * 20,
++		memcpy(out, (const float*)app_context->cxform_data + seed_id * 20,
+ 		       20 * sizeof(float));
+ 		return !cx_is_identity(out);
+ 	}
+ 	return 0;
+ }
+ 
++// The two root "runtime cxform" loops: an AS-overridden cxform (cx_*), and a
++// runtime ColorMatrixFilter on a ROOT entry folded on top of whatever cxform
++// the entry already has. A sprite / button needs the minted
++// slot too: compose_children hands an un-tinted child the PARENT'S SLOT.
++static int root_entry_runtime_cxform(SWFAppContext* app_context,
++	DisplayObject* obj, float cx[20])
++{
++	float rcm[20];
++	int has_cm = obj_runtime_cm(obj, rcm, 0);
++	if (!obj->cx_overridden && !has_cm) return 0;
++	if (obj->cx_overridden) build_cxform_from_obj(cx, obj);
++	else if (!root_seed_cxform_base(app_context, obj, cx)) cx_set_identity(cx);
++	if (has_cm) {
++		float t[20];
++		compose_cxform20(t, cx, rcm);
++		memcpy(cx, t, sizeof(t));
++	}
++	return 1;
++}
++
+ // Ruffle lerp_color: (a*start + b*end) as u8 — TRUNCATION on the u8 scale, per
+ // channel. color_data / morph_end_color_data hold the SWF u8 channel divided by
+ // 255; recover the u8, lerp in double, truncate, re-normalise. Lerping in
+@@ -3728,6 +3814,19 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 			}
+ 		}
+ 
++		int own_rt_cm = 0;
++		{
++			float rcm[20];
++			if (obj_runtime_cm(obj, rcm, 0)) {
++				float t[20];
++				if (!have_own) cx_set_identity(own_cx);
++				compose_cxform20(t, own_cx, rcm);
++				memcpy(own_cx, t, sizeof(t));
++				have_own = 1;
++				own_rt_cm = 1;
++			}
++		}
++
+ 		float eff_cx[20];
+ 		int eff_cx_valid = 0;
+ 		if (parent_cx != NULL && have_own) {
+@@ -3753,7 +3852,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 		if (parent_cx != NULL && !have_own) {
+ 			eff_slot = parent_cxform_id;
+ 		} else if (eff_cx_valid
+-		           && (parent_cx != NULL || obj->cx_overridden
++		           && (parent_cx != NULL || obj->cx_overridden || own_rt_cm
+ 		               || (attached_mc != NULL && (attached_mc->as_set_flags & 32)))) {
+ 			u32 cx_slot = g_next_dynamic_cxform_slot;
+ 			if (cx_slot < g_cxform_slot_capacity) {
+@@ -4353,8 +4452,25 @@ static int build_filter_chain(const DisplayObject* obj,
+ // AS-set runtime override. A slot minted by compose_children for a nested
+ // COMPOSED cxform lives on the GPU with no CPU mirror, so a filtered object
+ // deep inside a tinted container behaves exactly as it did before.
++static int filtered_object_cxform_base(SWFAppContext* app_context,
++                                       const DisplayObject* obj, float out[20]);
+ static int filtered_object_cxform(SWFAppContext* app_context,
+                                   const DisplayObject* obj, float out[20])
++{
++	// A runtime ColorMatrixFilter AFTER a filter recolours that
++	// filter's output too ([Glow(blue), CM swap R/B] -> a RED halo in Flash).
++	float rcm[20];
++	if (obj_runtime_cm(obj, rcm, 1)) {
++		float base[20], t[20];
++		if (!filtered_object_cxform_base(app_context, obj, base)) cx_set_identity(base);
++		compose_cxform20(t, base, rcm);
++		memcpy(out, t, sizeof(t));
++		return 1;
++	}
++	return filtered_object_cxform_base(app_context, obj, out);
++}
++static int filtered_object_cxform_base(SWFAppContext* app_context,
++                                       const DisplayObject* obj, float out[20])
+ {
+ 	if (obj->cx_overridden) { build_cxform_from_obj(out, obj); return 1; }
+ 	if (obj->cxform_id == 0) return 0;
+@@ -7462,10 +7578,14 @@ static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data)
+ // subtree into the filter layer (render_filtered_core with a FilteredSource)
+ // and blits the result at the root's group alpha. Installed only around the
+ // two root-loop actionIterateDrawings calls.
++static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user_data);
+ static void dyn_filter_root_draw(SWFAppContext* app_context, void* mc)
+ {
+ 	(void)app_context;
+ 	actionIterateDynamicSubtreeDrawings(mc, drawing_render_cb, NULL);
++	// The subtree's attachBitmap bitmaps join the filter layer
++	// (drawn after its vector content, the same order as the global passes).
++	actionIterateDynamicSubtreeBitmaps(mc, attached_bitmap_render_cb, NULL);
+ }
+ 
+ static void dyn_filter_root_cb(void* mc, const void* filter_list, void* user_data)
+@@ -7816,9 +7936,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 		for (size_t i = 1; i <= max_depth; ++i)
+ 		{
+ 			DisplayObject* obj = &display_list[i];
+-			if (obj->char_id == 0 || !obj->cx_overridden) continue;
++			if (obj->char_id == 0) continue;
+ 			float cx[20];
+-			build_cxform_from_obj(cx, obj);
++			if (!root_entry_runtime_cxform(app_context, obj, cx)) continue;
+ 			u32 new_slot = g_next_dynamic_cxform_slot;
+ 			if (new_slot < g_cxform_slot_capacity) {
+ 				g_next_dynamic_cxform_slot++;
+@@ -8760,11 +8880,10 @@ void tagShowFrame(SWFAppContext* app_context)
+ 		{
+ 			DisplayObject* obj = &display_list[i];
+ 			if (obj->char_id == 0) continue;
+-			if (!obj->cx_overridden) continue;
+ 
+ 			// Build cxform from the runtime cx_* values and allocate a dynamic slot
+ 			float cx[20];
+-			build_cxform_from_obj(cx, obj);
++			if (!root_entry_runtime_cxform(app_context, obj, cx)) continue;
+ 
+ 			u32 new_slot = g_next_dynamic_cxform_slot;
+ 			if (new_slot < g_cxform_slot_capacity) {
+@@ -13800,7 +13919,7 @@ const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth)
+ #define MAX_FILTER_LISTS 32
+ static FilterListData g_filter_lists[MAX_FILTER_LISTS];
+ static int g_filter_list_count = 0;
+-static int g_current_filter_list_idx = -1; // index of list being built
++static FilterListData* g_current_filter_list = NULL; // list being built
+ 
+ static FilterListData* getOrCreateFilterList(size_t depth)
+ {
+@@ -13818,6 +13937,7 @@ void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count)
+ {
+ 	(void)app_context; (void)count;
+ 	FilterListData* fl = getOrCreateFilterList(depth);
++	g_current_filter_list = fl;
+ 	if (!fl) return;
+ 	fl->count = 0; // reset
+ 	// Link the list to the display entry so the RENDER path can walk the whole
+@@ -13826,16 +13946,29 @@ void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count)
+ 	// (a depth swap copies the field with the rest of the struct).
+ 	if (depth <= max_depth)
+ 		display_list[depth].filter_chain = fl;
+-	// Find index for subsequent tagAdd* calls
+-	for (int i = 0; i < g_filter_list_count; i++) {
+-		if (g_filter_lists[i].depth == depth) { g_current_filter_list_idx = i; return; }
+-	}
++}
++
++// Begin a DefineSprite-nested PlaceObject3 filter list. The recompiler hands in a per-placement-site
++// STATIC list, so a nested depth never collides with the root-depth-keyed
++// table above (sprite frame code runs with display_list swapped to the
++// sprite's own list), nothing is heap-allocated per placement, and every
++// instance of the sprite shares the same immutable authored list. The
++// getter reads it through the entry's filter_chain.
++void tagBeginFilterListAt(SWFAppContext* app_context, size_t depth, FilterListData* fl)
++{
++	(void)app_context;
++	g_current_filter_list = fl;
++	if (!fl) return;
++	fl->count = 0;
++	fl->depth = depth;
++	if (depth <= max_depth)
++		display_list[depth].filter_chain = fl;
+ }
+ 
+ static FilterListEntry* filterListAppend(size_t depth)
+ {
+-	if (g_current_filter_list_idx < 0) return NULL;
+-	FilterListData* fl = &g_filter_lists[g_current_filter_list_idx];
++	FilterListData* fl = g_current_filter_list;
++	if (fl == NULL) return NULL;
+ 	if (fl->depth != depth || fl->count >= MAX_FILTER_LIST_SIZE) return NULL;
+ 	FilterListEntry* e = &fl->entries[fl->count];
+ 	memset(e, 0, sizeof(FilterListEntry));
+@@ -13862,9 +13995,8 @@ void tagAddSimpleFilterHighlight(SWFAppContext* app_context, size_t depth,
+     double hr, double hg, double hb, double ha)
+ {
+ 	(void)app_context;
+-	if (g_current_filter_list_idx < 0) return;
+-	FilterListData* fl = &g_filter_lists[g_current_filter_list_idx];
+-	if (fl->depth != depth || fl->count == 0) return;
++	FilterListData* fl = g_current_filter_list;
++	if (fl == NULL || fl->depth != depth || fl->count == 0) return;
+ 	FilterListEntry* e = &fl->entries[fl->count - 1]; // last added
+ 	e->highlight_r = hr; e->highlight_g = hg; e->highlight_b = hb; e->highlight_a = ha;
+ }
+@@ -13919,7 +14051,7 @@ void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
+ void tagEndFilterList(SWFAppContext* app_context, size_t depth)
+ {
+ 	(void)app_context; (void)depth;
+-	g_current_filter_list_idx = -1;
++	g_current_filter_list = NULL;
+ }
+ 
+ const FilterListData* ng_getFilterListDataByDepth(size_t depth)
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index d7031443..798003ff 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -191,6 +191,190 @@ static const stbtt_fontinfo* loadTestDeviceFace(const std::string& path)
+ 	return info;
+ }
+ 
++// A PlaceObject3's ColorMatrixFilters folded into its placement colour
++// transform at recompile time. Flash and Ruffle run each CM as a filter pass
++// over the object, in list order, and apply the object's ColorTransform to the
++// filtered result, so the effective straight-RGBA transform is
++// cx ∘ CM_n ∘ … ∘ CM_1. Both are affine 4x5 maps (bias in 0..255 units), so
++// they compose exactly; only the per-pass clamp is lost.
++struct PlaceCmCompose
++{
++	double m[4][5];   // row-major, rows = R,G,B,A, cols = R,G,B,A,bias
++	bool any = false;
++	PlaceCmCompose()
++	{
++		for (int r = 0; r < 4; r++)
++			for (int c = 0; c < 5; c++)
++				m[r][c] = (r == c) ? 1.0 : 0.0;
++	}
++	// this = cm ∘ this  (cm = the next ColorMatrixFilter in the list)
++	void apply(const float cm[20])
++	{
++		double out[4][5];
++		for (int r = 0; r < 4; r++)
++		{
++			for (int c = 0; c < 4; c++)
++			{
++				double s = 0.0;
++				for (int k = 0; k < 4; k++) s += (double) cm[r * 5 + k] * m[k][c];
++				out[r][c] = s;
++			}
++			double b = 0.0;
++			for (int k = 0; k < 4; k++) b += (double) cm[r * 5 + k] * m[k][4];
++			out[r][4] = b + (double) cm[r * 5 + 4];
++		}
++		memcpy(m, out, sizeof(m));
++		any = true;
++	}
++	// Emit cx ∘ this as one cxform (column-major 4x4 multiply + 4 adds/255).
++	// cx is the placement CXFORMWITHALPHA (mult in 8.8, add in 0..255).
++	void emit(std::ostream& cxform_data, const s32 mult[4], const s32 add[4]) const
++	{
++		cxform_data << std::fixed;
++		for (int c = 0; c < 4; c++)
++			for (int r = 0; r < 4; r++)
++				cxform_data << "\t" << (mult[r] / 256.0) * m[r][c] << "f," << std::endl;
++		for (int r = 0; r < 4; r++)
++			cxform_data << "\t" << (mult[r] / 256.0) * m[r][4] + (double) add[r] << "f/255.0f," << std::endl;
++		cxform_data << std::defaultfloat;
++	}
++};
++
++// Emit the WHOLE PlaceObject3 filter list of a DefineSprite-nested placement, re-parsed from its raw
++// bytes. The root arm collects the same list into `all_filters` and emits
++// tagBeginFilterList / tagAdd* / tagEndFilterList; the sprite arm only ever
++// kept the first simple filter (tagSetFilter), so every later member and every
++// ColorMatrix/Convolution-only list was lost in render AND in the getter.
++// The list goes into a per-site `static FilterListData` (tagBeginFilterListAt)
++// instead of the runtime's root-depth-keyed table, which a nested depth would
++// collide with. Field encodings are the root arm's, byte for byte.
++static void emitSpriteFilterList(std::ostream& out, size_t depth,
++                                 const unsigned char* p, unsigned site)
++{
++	auto flit = [](float v) -> std::string {
++		std::ostringstream oss;
++		oss << std::setprecision(9) << v;
++		std::string s = oss.str();
++		if (s.find('.') == std::string::npos && s.find('e') == std::string::npos
++		    && s.find("inf") == std::string::npos && s.find("nan") == std::string::npos)
++			s += ".0";
++		s += "f";
++		return s;
++	};
++	auto rd32 = [](const unsigned char* q) { uint32_t v; memcpy(&v, q, 4); return v; };
++	auto rd16 = [](const unsigned char* q) { uint16_t v; memcpy(&v, q, 2); return v; };
++	auto fx = [&](const unsigned char* q) { return (double)(int32_t) rd32(q) / 65536.0; };
++	auto fl = [&](const unsigned char* q) { float v; memcpy(&v, q, 4); return v; };
++	std::string d = std::to_string(depth);
++	unsigned n = *p++;
++	out << "\t{ static FilterListData _sfl" << site << "; tagBeginFilterListAt(app_context, "
++	    << d << ", &_sfl" << site << ");" << std::endl;
++	for (unsigned i = 0; i < n; i++)
++	{
++		unsigned id = *p++;
++		switch (id)
++		{
++			case 0: case 2: // DropShadow / Glow
++			{
++				double r = p[0] / 255.0, g = p[1] / 255.0, b = p[2] / 255.0, a = p[3] / 255.0;
++				p += 4;
++				double bx = fx(p), by = fx(p + 4); p += 8;
++				double ang = 0, dist = 0;
++				if (id == 0) { ang = fx(p); dist = fx(p + 4); p += 8; }
++				double str = rd16(p) / 256.0; p += 2;
++				unsigned fl8 = *p++;
++				unsigned q = fl8 & 0x1F; if (!q) q = 1;
++				out << std::setprecision(15) << "\ttagAddSimpleFilter(app_context, " << d << ", "
++				    << (id == 0 ? 2 : 3) << ", " << bx << ", " << by << ", " << q << ", "
++				    << ((fl8 >> 5) & 7) << ", " << r << ", " << g << ", " << b << ", " << a << ", "
++				    << str << ", " << ang << ", " << dist << ");" << std::defaultfloat << std::endl;
++				break;
++			}
++			case 1: // Blur
++			{
++				double bx = fx(p), by = fx(p + 4); p += 8;
++				unsigned q = (*p++ >> 3) & 0x1F; if (!q) q = 1;
++				out << std::setprecision(15) << "\ttagAddSimpleFilter(app_context, " << d << ", 1, "
++				    << bx << ", " << by << ", " << q << ", 0, 0, 0, 0, 0, 0, 0, 0);"
++				    << std::defaultfloat << std::endl;
++				break;
++			}
++			case 3: // Bevel: highlight first, shadow second (Ruffle order)
++			{
++				const unsigned char* h = p; const unsigned char* s = p + 4; p += 8;
++				double bx = fx(p), by = fx(p + 4), ang = fx(p + 8), dist = fx(p + 12); p += 16;
++				double str = rd16(p) / 256.0; p += 2;
++				unsigned fl8 = *p++;
++				unsigned q = fl8 & 0x0F; if (!q) q = 1;
++				out << std::setprecision(15) << "\ttagAddSimpleFilter(app_context, " << d << ", 4, "
++				    << bx << ", " << by << ", " << q << ", " << ((fl8 >> 4) & 0x0F) << ", "
++				    << s[0] / 255.0 << ", " << s[1] / 255.0 << ", " << s[2] / 255.0 << ", " << s[3] / 255.0 << ", "
++				    << str << ", " << ang << ", " << dist << ");" << std::endl
++				    << "\ttagAddSimpleFilterHighlight(app_context, " << d << ", "
++				    << h[0] / 255.0 << ", " << h[1] / 255.0 << ", " << h[2] / 255.0 << ", " << h[3] / 255.0
++				    << ");" << std::defaultfloat << std::endl;
++				break;
++			}
++			case 4: case 7: // GradientGlow / GradientBevel
++			{
++				unsigned nc = *p++;
++				const unsigned char* cs = p; p += nc * 4;
++				const unsigned char* rs = p; p += nc;
++				float bx = (float) fx(p), by = (float) fx(p + 4), ang = (float) fx(p + 8), dist = (float) fx(p + 12);
++				p += 16;
++				float str = rd16(p) / 256.0f; p += 2;
++				unsigned fl8 = *p++;
++				unsigned q = fl8 & 0x0F; if (!q) q = 1;
++				unsigned flags = (((fl8 >> 7) & 1) << 2) | (((fl8 >> 6) & 1) << 1) | ((fl8 >> 4) & 1);
++				unsigned cnt = nc < 16 ? nc : 16;
++				out << "\t{ u32 _c[] = {";
++				for (unsigned k = 0; k < cnt; k++)
++					out << (k ? "," : "") << (((uint32_t) cs[k*4] << 16) | ((uint32_t) cs[k*4+1] << 8) | cs[k*4+2]);
++				out << (cnt ? "" : "0") << "}; float _a[] = {";
++				for (unsigned k = 0; k < cnt; k++) out << (k ? "," : "") << flit(cs[k*4+3] / 255.0f);
++				out << (cnt ? "" : "0") << "}; u8 _r[] = {";
++				for (unsigned k = 0; k < cnt; k++) out << (k ? "," : "") << (unsigned) rs[k];
++				out << (cnt ? "" : "0") << "}; tagAddGradientFilter(app_context, " << d << ", "
++				    << (id == 4 ? 7 : 8) << ", " << cnt << ", _c, _a, _r, " << flit(bx) << ", " << flit(by)
++				    << ", " << flit(ang) << ", " << flit(dist) << ", " << flit(str) << ", " << q << ", "
++				    << flags << "); }" << std::endl;
++				break;
++			}
++			case 5: // Convolution
++			{
++				unsigned mx = p[0], my = p[1]; p += 2;
++				float div = fl(p), bias = fl(p + 4); p += 8;
++				const unsigned char* ms = p; p += mx * my * 4;
++				const unsigned char* dc = p; p += 4;
++				unsigned fl8 = *p++;
++				unsigned cnt = mx * my < 25 ? mx * my : 25;
++				out << "\t{ float _m[] = {";
++				for (unsigned k = 0; k < cnt; k++) out << (k ? "," : "") << flit(fl(ms + k * 4));
++				out << (cnt ? "" : "0") << "}; tagAddConvolutionFilter(app_context, " << d << ", "
++				    << mx << ", " << my << ", _m, " << flit(div) << ", " << flit(bias) << ", "
++				    << (fl8 & 1) << ", " << ((fl8 >> 1) & 1) << ", " << (unsigned) dc[0] << ", "
++				    << (unsigned) dc[1] << ", " << (unsigned) dc[2] << ", " << (unsigned) dc[3] << "); }"
++				    << std::endl;
++				break;
++			}
++			case 6: // ColorMatrix
++			{
++				out << "\t{ float _cm[] = {";
++				for (int k = 0; k < 20; k++) out << (k ? "," : "") << flit(fl(p + k * 4));
++				p += 80;
++				out << "}; tagAddColorMatrixFilter(app_context, " << d << ", _cm); }" << std::endl;
++				break;
++			}
++			default:
++				// Unknown filter id: its size is unknown, so stop here (the
++				// sprite arm's own walk has the same limitation).
++				i = n;
++				break;
++		}
++	}
++	out << "\ttagEndFilterList(app_context, " << d << "); }" << std::endl;
++}
++
+ // The face's units-per-em (head.unitsPerEm), recovered from stb_truetype's
+ // em scale. Exact for any integer upem, so the bundled 1000-upem Noto keeps
+ // its `swf_em / 1000` scale bit-for-bit.
+@@ -4117,6 +4301,10 @@ namespace SWFRecomp
+ 				}
+ 
+ 				u32 cxform_id = 0;
++				// The placement cxform's raw terms, kept for composing a
++				// PlaceObject3 ColorMatrixFilter into it (PlaceCmCompose).
++				s32 po_cx_mult[4] = {256, 256, 256, 256};
++				s32 po_cx_add[4] = {0, 0, 0, 0};
+ 
+ 				if (has_color)
+ 				{
+@@ -4178,6 +4366,8 @@ namespace SWFRecomp
+ 					}
+ 
+ 					cxform_id = (u32) current_cxform;
++					po_cx_mult[0] = mult_r; po_cx_mult[1] = mult_g; po_cx_mult[2] = mult_b; po_cx_mult[3] = mult_a;
++					po_cx_add[0] = add_r; po_cx_add[1] = add_g; po_cx_add[2] = add_b; po_cx_add[3] = add_a;
+ 
+ 					// Write 20-float cxform matrix: 4x4 diagonal multiply + 4 additive
+ 					// Row 0: R multiply
+@@ -4241,8 +4431,8 @@ namespace SWFRecomp
+ 
+ 				// PlaceObject3 extra fields: FilterList, BlendMode, BitmapCache, Visible, OpaqueBackground
+ 				u8 blend_mode_val = 0;
+-				u32 color_matrix_cxform_id = 0;
+ 				bool has_color_matrix = false;
++				PlaceCmCompose po_cm;
+ 
+ 				// Filter data (first visual filter wins)
+ 				u8 parsed_filter_type = 0;
+@@ -4595,43 +4785,10 @@ namespace SWFRecomp
+ 									memcpy(ext_cm_matrix, cm, 80);
+ 								}
+ 
+-								// Convert to our cxform format:
+-								// 4x4 column-major multiply matrix + 4 additive values
+-								// SWF ColorMatrix row i: [mult_R, mult_G, mult_B, mult_A, bias]
+-								// Our cxform is stored as 20 floats: 4x4 column-major + 4 additive
++								// Fold into the placement cxform (emitted once, after
++								// the list, as cx ∘ CM_n ∘ … ∘ CM_1).
+ 								has_color_matrix = true;
+-								color_matrix_cxform_id = (u32) current_cxform;
+-
+-								// Column-major: col j, row i = cm[i*5 + j]
+-								// Col 0 (R mult): cm[0], cm[5], cm[10], cm[15]
+-								cxform_data << std::fixed
+-											<< "\t" << cm[0] << "f," << endl
+-											<< "\t" << cm[5] << "f," << endl
+-											<< "\t" << cm[10] << "f," << endl
+-											<< "\t" << cm[15] << "f," << endl;
+-								// Col 1 (G mult): cm[1], cm[6], cm[11], cm[16]
+-								cxform_data << "\t" << cm[1] << "f," << endl
+-											<< "\t" << cm[6] << "f," << endl
+-											<< "\t" << cm[11] << "f," << endl
+-											<< "\t" << cm[16] << "f," << endl;
+-								// Col 2 (B mult): cm[2], cm[7], cm[12], cm[17]
+-								cxform_data << "\t" << cm[2] << "f," << endl
+-											<< "\t" << cm[7] << "f," << endl
+-											<< "\t" << cm[12] << "f," << endl
+-											<< "\t" << cm[17] << "f," << endl;
+-								// Col 3 (A mult): cm[3], cm[8], cm[13], cm[18]
+-								cxform_data << "\t" << cm[3] << "f," << endl
+-											<< "\t" << cm[8] << "f," << endl
+-											<< "\t" << cm[13] << "f," << endl
+-											<< "\t" << cm[18] << "f," << endl;
+-								// Additive (RGBA bias / 255): cm[4], cm[9], cm[14], cm[19]
+-								cxform_data << "\t" << cm[4] << "f/255.0f," << endl
+-											<< "\t" << cm[9] << "f/255.0f," << endl
+-											<< "\t" << cm[14] << "f/255.0f," << endl
+-											<< "\t" << cm[19] << "f/255.0f," << endl
+-											<< std::defaultfloat;
+-
+-								current_cxform += 1;
++								po_cm.apply(cm);
+ 								if (all_filter_count < 16) {
+ 									auto& cf = all_filters[all_filter_count++];
+ 									memset(&cf, 0, sizeof(cf));
+@@ -4782,10 +4939,12 @@ namespace SWFRecomp
+ 					}
+ 				}
+ 
+-				// If ColorMatrixFilter provided a cxform, use it (compose with existing if any)
++				// ColorMatrixFilters: one cxform = placement cx ∘ CM_n ∘ … ∘ CM_1.
+ 				if (has_color_matrix)
+ 				{
+-					cxform_id = color_matrix_cxform_id;
++					po_cm.emit(cxform_data, po_cx_mult, po_cx_add);
++					cxform_id = (u32) current_cxform;
++					current_cxform += 1;
+ 				}
+ 
+ 				// Parse clip actions if present
+@@ -5961,6 +6120,10 @@ namespace SWFRecomp
+ 							}
+ 
+ 							u32 cxform_id = 0;
++							// Raw placement cxform terms, for composing a PlaceObject3 ColorMatrix
++							// into it (PlaceCmCompose).
++							s32 sp_cx_mult[4] = {256, 256, 256, 256};
++							s32 sp_cx_add[4] = {0, 0, 0, 0};
+ 							if (has_color)
+ 							{
+ 								// Parse CXFORMWITHALPHA
+@@ -6019,6 +6182,8 @@ namespace SWFRecomp
+ 								}
+ 
+ 								cxform_id = (u32) current_cxform;
++								sp_cx_mult[0] = mult_r; sp_cx_mult[1] = mult_g; sp_cx_mult[2] = mult_b; sp_cx_mult[3] = mult_a;
++								sp_cx_add[0] = add_r; sp_cx_add[1] = add_g; sp_cx_add[2] = add_b; sp_cx_add[3] = add_a;
+ 
+ 								cxform_data << "\t" << to_string(mult_r) << "/256.0f," << endl
+ 											<< "\t" << "0.0f," << endl
+@@ -6081,9 +6246,12 @@ namespace SWFRecomp
+ 							float sp_filter_r = 0, sp_filter_g = 0, sp_filter_b = 0, sp_filter_a = 0;
+ 							float sp_filter_strength = 1.0f, sp_filter_angle = 0, sp_filter_distance = 0;
+ 							float sp_highlight_r = 0, sp_highlight_g = 0, sp_highlight_b = 0, sp_highlight_a = 0;
++							PlaceCmCompose sp_cm;
+ 
++							const unsigned char* sp_filter_list_start = NULL;
+ 							if (is_sprite_po3 && sp_has_filter_list)
+ 							{
++								sp_filter_list_start = (const unsigned char*) cur_pos;
+ 								u8 num_filters = *(u8*) cur_pos; cur_pos += 1;
+ 								for (u8 f = 0; f < num_filters; f++)
+ 								{
+@@ -6192,7 +6360,7 @@ namespace SWFRecomp
+ 												sp_blur_x = (float)(s32)gg_bx/65536.0f; sp_blur_y = (float)(s32)gg_by/65536.0f;
+ 												sp_filter_angle = (float)(s32)gg_ang/65536.0f; sp_filter_distance = (float)(s32)gg_dist/65536.0f;
+ 												sp_filter_strength = (float)gg_str/256.0f;
+-												sp_filter_quality = gg_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
++												sp_filter_quality = gg_fl & 0x0F; if (!sp_filter_quality) sp_filter_quality = 1;
+ 												sp_filter_flags = (gg_fl >> 5) & 0x07;
+ 											}
+ 											break;
+@@ -6209,7 +6377,14 @@ namespace SWFRecomp
+ 											}
+ 											break;
+ 										}
+-										case 6: cur_pos += 80; break;
++										case 6: // ColorMatrixFilter: folded into the placement
++										{       // cxform after the list, as in the root arm.
++											float cm[20];
++											memcpy(cm, cur_pos, 80);
++											cur_pos += 80;
++											sp_cm.apply(cm);
++											break;
++										}
+ 										case 7: // GradientBevelFilter
+ 										{
+ 											u8 nc = *(u8*) cur_pos; cur_pos += 1;
+@@ -6241,7 +6416,7 @@ namespace SWFRecomp
+ 												sp_blur_x = (float)(s32)gb_bx/65536.0f; sp_blur_y = (float)(s32)gb_by/65536.0f;
+ 												sp_filter_angle = (float)(s32)gb_ang/65536.0f; sp_filter_distance = (float)(s32)gb_dist/65536.0f;
+ 												sp_filter_strength = (float)gb_str/256.0f;
+-												sp_filter_quality = gb_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
++												sp_filter_quality = gb_fl & 0x0F; if (!sp_filter_quality) sp_filter_quality = 1;
+ 												// Mapped to type 4: bevel flag layout (bit0 onTop,
+ 												// bit1 compositeSource, bit2 knockout, bit3 inner).
+ 												sp_filter_flags = (gb_fl >> 4) & 0x0F;
+@@ -6251,6 +6426,12 @@ namespace SWFRecomp
+ 									}
+ 								}
+ 							}
++							if (sp_cm.any)
++							{
++								sp_cm.emit(cxform_data, sp_cx_mult, sp_cx_add);
++								cxform_id = (u32) current_cxform;
++								current_cxform += 1;
++							}
+ 
+ 							if (is_sprite_po3 && sp_has_blend_mode)
+ 							{
+@@ -6578,6 +6759,12 @@ namespace SWFRecomp
+ 										<< std::defaultfloat << endl;
+ 								}
+ 							}
++							if (sp_filter_list_start != NULL)
++							{
++								static unsigned s_sprite_filter_site = 0;
++								emitSpriteFilterList(sprite_definitions, depth,
++								                     sp_filter_list_start, s_sprite_filter_site++);
++							}
+ 
+ 							{
+ 								size_t fi = sprite_frame_i - 1;
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index f8791fed..cd68caa6 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -631,3 +631,11 @@ avm2/bitmapdata_colortransform              # aMult-only Flash bug, AVM2 twin  1
+ visual/edittext/edittext_device_transform_basic     # device-font scale at render  2 cmp
+ visual/edittext/edittext_device_transform_negative  # reflected device field       1 cmp
+ visual/edittext/edittext_gutter                     # inverted gutter mask         1 cmp
++# s25 w2-avm1-filters: sprite-nested PlaceObject3 filter LISTS (emitSpriteFilterList),
++# runtime ColorMatrixFilter folded into the cxform (obj_runtime_cm), attachBitmap
++# bitmaps inside a dynamic filter root, and the authored CM fold (cx o CM_n o ... o CM_1).
++# The standing set had no nested multi-filter list and no runtime CM. The authored-CM
++# member the brief named, visual/filters/color_matrix, is already in the set (tier 1).
++# tier=1
++regression/avm1_runtime_filters_cm_bitmap   # runtime CM + filtered attachBitmap root  1 cmp
++regression/avm1_nested_po3_filters          # nested PO3 filter lists == root twins   1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 4048d2b6..2ef9716b 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -114,5 +114,7 @@ arms cannot be reached any other way.
+ | `avm1_attached_clip_tagorder_nonroot` | the same, attached into a timeline-placed container `c`; Ruffle output byte-identical to the root variant (`0ddd12b6a`) |
+ | `avm1_array_native_own_method` | **an Array.prototype native installed as an array's OWN method runs** (`ch.toString = backup.prototype.toString` after `_global.Array` was rebound): the array own-method arm of `actionCallMethod` invoked the native without publishing `g_current_executing_func`, so `builtin_array_method` could not name itself and returned `undefined` (`lit call: undefined`, `filters call: undefined`). The `_global.Array` rebound is what routes the call off the `callArrayMethod` fast path. Corpus instance: gnash `MovieClip-v8` (MovieClip.as:1194). s24 `w2-attach-order-v8`. Oracle: local Ruffle exporter `0ddd12b6a`, 1 frame |
+ | `avm1_runtime_filters` | **AVM1 runtime `clip.filters = [...]` renders** (post-s23 `avm1-runtime-filters`). Before it the setter only stored the array; nothing lowered it onto a display entry, and a `createEmptyMovieClip` clip had no entry to carry one. Five cases, one frame: A a timeline sprite with a GlowFilter set by script; B the setter SNAPSHOTS (mutating the source array after assignment does not change the render; `B 2` = blurX of the read-back clone); C `filters = null` clears; D a dynamic clip with two overlapping Drawing-API children at `_alpha 50` and a 9-arg DropShadowFilter (group alpha: the overlap is uniform; also locks the ctor argument order, which used to make this an INNER shadow); E a dynamic clip with a BevelFilter. Hand-assembled SWF 8 (`create_test_swf.py`, regenerates byte-identically). Expected trace and `output.expected.png` from the local Ruffle exporter at `0ddd12b6a`; our render matched it at 0 differing pixels |
++| `avm1_runtime_filters_cm_bitmap` | **AVM1 runtime `clip.filters` with a ColorMatrixFilter, and on an attachBitmap-only filter root** (s25 `w2-avm1-filters`). One frame, three cases: A a `createEmptyMovieClip` clip whose only content is an `attachBitmap` bitmap, with a blue GlowFilter (the bitmap was drawn outside the dynamic filter layer: no halo; fixed by `actionIterateDynamicSubtreeBitmaps` + `dyn_filter_root_draw`); B a timeline sprite with a runtime ColorMatrixFilter halving RGB, red -> (128,0,0) (`avm1LowerFilterObject` dropped type 6; fixed by its case 6 + `tag.c` `obj_runtime_cm`, which folds a RUNTIME CM into the entry's cxform); D `[GlowFilter(blue), ColorMatrixFilter(swap R/B)]`: a CM after a filter recolours the filter output too, blue box with a RED halo (`filtered_object_cxform`'s post-filter fold). Hand-assembled SWF 8 (`create_test_swf.py`, CASES=ABD of the s25 `mkdyn.py` probe, regenerates byte-identically). Expected trace and `output.expected.png` from the local Ruffle exporter at `0ddd12b6a`; our render matches it at 0 differing pixels |
++| `avm1_nested_po3_filters` | **SWF-authored PlaceObject3 filter LISTS on clips nested in a DefineSprite** (s25 `w2-avm1-filters`). Three nested placements (`[Glow]`, `[Blur, DropShadow]`, `[ColorMatrix halve]`) and their root-depth twins, read through the `filters` getter (3 ticks) and rendered. The recompiler's sprite PlaceObject3 arm kept only the FIRST simple filter and skipped ColorMatrix (`outer.two n=1`, `outer.cm n=0`; nested row without the shadow and the darkening). Fixed by `swf.cpp` `emitSpriteFilterList` (per-site static list, `tag.c` `tagBeginFilterListAt`), the sprite-arm CM fold into the placement cxform, and the getter reading the entry's own `filter_chain`. After, the nested row is pixel-identical to the root row, as in Ruffle. Hand-assembled SWF 8 (`create_test_swf.py`, from s24 `mkl1.py`). Expected trace and `output.expected.png` from the local Ruffle exporter at `0ddd12b6a`, 0 differing pixels |
+ | `avm1_xml_first_action_proto` | **a lazily-initialized builtin prototype must link to Object.prototype even when the movie names the class BEFORE Object.prototype exists** (s24 `w2-textformat-ctor` §2). The very first action is `typeof XML.prototype.hasOwnProperty`: `initXMLPrototype` used to link `__proto__` only `if (g_object_prototype != NULL)`, so the prototype had no parent and both rows traced `undefined`. Now linked through `getObjectPrototype()` (also TextFormat, StyleSheet). Hand-assembled SWF8 (`create_test_swf.py` writes every probe_<X>; this dir is `probe_XML`). Expected output from the local Ruffle exporter at `0ddd12b6a` |
+ | `avm1_xmlnode_first_action_proto` | the same for `XMLNode.prototype` (`probe_XMLNode`); Ruffle output at `0ddd12b6a` |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/create_test_swf.py
+new file mode 100644
+index 00000000..792c87ab
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/create_test_swf.py
+@@ -0,0 +1,118 @@
++"""regression/avm1_nested_po3_filters: SWF-authored PlaceObject3 filter lists on
++clips NESTED in a DefineSprite vs the same lists at root depth (s25 w2-avm1-filters).
++
++Three nested placements inside sprite `outer` ([Glow], [Blur, DropShadow],
++[ColorMatrix halving RGB]) and their root-depth twins, read back through the AVM1
++`filters` getter in frame 2 (3 ticks), and rendered.
++Before: the recompiler's DefineSprite PlaceObject3 arm kept only the FIRST simple
++filter (tagSetFilter) and skipped ColorMatrix, so `outer.two n=1`, its second
++member read undefined, `outer.cm n=0`, and the nested row rendered without the
++drop shadow and without the darkening. Fixed by swf.cpp emitSpriteFilterList
++(per-site static list via tag.c tagBeginFilterListAt), the sprite-arm ColorMatrix
++fold into the placement cxform, and the action.c `filters` getter reading the
++entry's own filter_chain. After, the nested row (y 0-160) is pixel-identical to
++the root row (y 160-320), as in Ruffle.
++
++Expected trace and output.expected.png: local Ruffle exporter at 0ddd12b6a
++(session25-fanout-reports/w1-avm1-filters-complete-oracle; render 1 frame, the
++content is static from frame 1). Generator from s24 w1-avm1-tail-probe/mkl1.py.
++Regenerate byte-identically: `python3 create_test_swf.py` (writes test.swf here).
++"""
++# L1 probe: SWF-authored (PlaceObject3) filters on clips NESTED in a sprite vs
++# at root depth, read back through the AVM1 `filters` getter.
++# Usage: python3 mkl1.py out.swf
++import struct, sys, os
++
++def s(x): return b'\x00' + x.encode() + b'\x00'
++def i(x): return b'\x07' + struct.pack('<i', x)
++def push(*items):
++    body = b''.join(items); return b'\x96' + struct.pack('<H', len(body)) + body
++GETVAR=b'\x1c'; GETMEM=b'\x4e'; TRACE=b'\x26'; ADD2=b'\x47'; STOP=b'\x07'
++def path(names):
++    out = push(s(names[0])) + GETVAR
++    for n in names[1:]:
++        out += push(i(n) if isinstance(n, int) else s(n)) + GETMEM
++    return out
++def cat(*codes):
++    out = codes[0]
++    for c in codes[1:]: out += c + ADD2
++    return out
++def trace(code): return code + TRACE
++
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.u(v, n)
++    return b.bytes()
++def matrix(tx, ty):
++    b = Bits(); b.u(0, 1); b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.u(tx, n); b.u(ty, n)
++    return b.bytes()
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++def shape(cid, w, h, rgb):
++    W, H = w * 20, h * 20
++    body = struct.pack('<H', cid) + rectrec(0, W, 0, H)
++    body += b'\x01\x00' + bytes(rgb) + b'\x00'
++    b = Bits(); b.u(1, 4); b.u(0, 4)
++    b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1, 1); b.u(1, 1)
++    n = nbits(0, 0); b.u(n, 5); b.u(0, n); b.u(0, n); b.u(1, 1)
++    for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++        n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++        if dx == 0: b.u(0, 1); b.u(1, 1); b.u(dy, n)
++        else: b.u(0, 1); b.u(0, 1); b.u(dx, n)
++    b.u(0, 6)
++    return tag(2, body + b.bytes())
++FX = lambda v: struct.pack('<i', int(v * 65536))
++F8 = lambda v: struct.pack('<H', int(v * 256))
++def f_blur(bx, by): return b'\x01' + FX(bx) + FX(by) + bytes([1 << 3])
++def f_glow(rgba, bx, by, st): return b'\x02' + bytes(rgba) + FX(bx) + FX(by) + F8(st) + bytes([0x20 | 1])
++def f_ds(rgba, bx, by, ang, dist, st): return b'\x00' + bytes(rgba) + FX(bx) + FX(by) + FX(ang) + FX(dist) + F8(st) + bytes([0x20 | 1])
++def f_cm(m): return b'\x06' + b''.join(struct.pack('<f', v) for v in m)
++def place3(depth, cid, tx, ty, name, filters):
++    f1 = 0x20 | 0x04 | 0x02
++    body = bytes([f1, 0x01 if filters else 0]) + struct.pack('<HH', depth, cid) + matrix(tx * 20, ty * 20) + s(name)[1:]
++    if filters: body += bytes([len(filters)]) + b''.join(filters)
++    return tag(70, body)
++def sprite(sid, tags):
++    return tag(39, struct.pack('<HH', sid, 1) + b''.join(tags) + tag(1, b'') + tag(0, b''))
++
++GLOW = f_glow((0, 0, 255, 255), 6, 6, 2)
++BLUR = f_blur(4, 4)
++DS = f_ds((0, 0, 0, 255), 7, 7, 0.785398, 4, 1)
++CM = f_cm([0.5,0,0,0,0, 0,0.5,0,0,0, 0,0,0.5,0,0, 0,0,0,1,0])
++
++body = rectrec(0, 550 * 20, 0, 400 * 20) + struct.pack('<HH', 30 << 8, 2)
++body += tag(69, struct.pack('<I', 0x00))          # FileAttributes: AS1/2 (no AS3 bit)
++body += tag(9, b'\xff\xff\xff')
++body += shape(1, 40, 30, (255, 0, 0))
++body += sprite(2, [tag(26, bytes([0x04 | 0x02]) + struct.pack('<HH', 1, 1) + matrix(0, 0))])
++body += sprite(3, [place3(1, 2, 0, 0, 'one', [GLOW]),
++                   place3(2, 2, 60, 0, 'two', [BLUR, DS]),
++                   place3(3, 2, 120, 0, 'cm', [CM])])
++body += place3(1, 3, 40, 40, 'outer', [])
++body += place3(2, 2, 40, 200, 'rootone', [GLOW])
++body += place3(3, 2, 100, 200, 'roottwo', [BLUR, DS])
++body += place3(4, 2, 160, 200, 'rootcm', [CM])
++body += tag(1, b'')
++a = b''
++for nm in (['outer', 'one'], ['outer', 'two'], ['outer', 'cm'], ['rootone'], ['roottwo'], ['rootcm']):
++    lab = '.'.join(nm)
++    a += trace(cat(push(s(lab + ' n=')), path(nm + ['filters', 'length'])))
++    a += trace(cat(push(s(lab + ' 0.blurX=')), path(nm + ['filters', 0, 'blurX']),
++                   push(s(' 1.blurX=')), path(nm + ['filters', 1, 'blurX']),
++                   push(s(' 0.matrix.length=')), path(nm + ['filters', 0, 'matrix', 'length'])))
++a += STOP + b'\x00'
++body += tag(12, a) + tag(1, b'') + tag(0, b'')
++swf = b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(body)) + body
++open(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test.swf'), 'wb').write(swf)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c9039478e4151a7616876278d4557c182ac4733f
+GIT binary patch
+literal 8034
+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
+OqddM@>(2Z-;K(1go8dqJ
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/output.txt b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/output.txt
+new file mode 100644
+index 00000000..b8bb667f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/output.txt
+@@ -0,0 +1,12 @@
++outer.one n=1
++outer.one 0.blurX=6 1.blurX=undefined 0.matrix.length=undefined
++outer.two n=2
++outer.two 0.blurX=4 1.blurX=7 0.matrix.length=undefined
++outer.cm n=1
++outer.cm 0.blurX=undefined 1.blurX=undefined 0.matrix.length=20
++rootone n=1
++rootone 0.blurX=6 1.blurX=undefined 0.matrix.length=undefined
++roottwo n=2
++roottwo 0.blurX=4 1.blurX=7 0.matrix.length=undefined
++rootcm n=1
++rootcm 0.blurX=undefined 1.blurX=undefined 0.matrix.length=20
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/test.swf b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6d87171946ea833f7fb90d99d4a1a461297f42d
+GIT binary patch
+literal 2209
+zcmcJRy-(Xf7{;G-zC|dctx$<j1&g~>7G;kTiK<bTEFH*3TS)m(5=+L2ES1>0Rq5gh
+zBr4HApi9@bTTqws7n$d52M|5mXQW1Q?7R1#$M^p3y-QwgyeWSz10xhRfw?o_sezX@
+z@Uw3CzJCINF18__^TB8DeD&FvvGeWo>)(I&aal3g{i#?KycuXQ?pJ>CJID5E%@nfN
+zfIaL%7>v=N$S5yk<vYVN_{0O;BO8VQ@(kv|>2NGi;;n?a3)y5uto*FK<)bNbl+`K2
+z)&N2pHhHN&8T*fe@hv)yYbG<uVPUce`_Sz<IFF`VUn~8EW81DWsUI8_%<f|}N;|V{
+zzSR_Ynb{=L{-^AkxpOk}9w5xjVj|1K20Y>pQ(f{3eB_#SybADPuh0As*x<VKd&3=f
+z7oE20J-)49wchs+ovw~cAy`-1@qK}aZr%*A{9@|SPM-=*ST1)=9?@jg8oYCzy^$5p
+zv;jRcdW8vw>VJ~GhQ;+%z>=%12TSVXU@2U(!%~~v6PDU64c6?mGPVYHS#cY)suNLh
+z6@xOgs8*6vdSnC@=W!oSab9Vds+gW50VQs=>9MkuwC^5XkGq8@UaSKqQLT+6(M1!6
+z+#d2Qio9g~>A;Y(n_7t%XMmx2HPu;Rs9n-v@HCXA5N#hGyJ0IC1%I<6(G7`MsSb!F
+Pu{MV!lN1c4;Qz!GO>X|^
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/test.toml b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/test.toml
+new file mode 100644
+index 00000000..ae6561c3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_nested_po3_filters/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 3
++
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 0
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/create_test_swf.py
+new file mode 100644
+index 00000000..020d7c31
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/create_test_swf.py
+@@ -0,0 +1,189 @@
++"""regression/avm1_runtime_filters_cm_bitmap: AVM1 runtime `clip.filters = [...]`
++with a ColorMatrixFilter and on a filtered attachBitmap root (s25 w2-avm1-filters).
++
++Pins three render paths, one frame, SWF 8:
++  A  a createEmptyMovieClip clip whose ONLY content is an attachBitmap bitmap,
++     with a blue GlowFilter. Before: the bitmap drew outside the dynamic filter
++     layer, so there was no halo. Fixed by actionIterateDynamicSubtreeBitmaps +
++     tag.c dyn_filter_root_draw.
++  B  a timeline sprite with a runtime ColorMatrixFilter halving RGB: red ->
++     (128,0,0). Before: avm1LowerFilterObject dropped type 6. Fixed by its case 6
++     + tag.c obj_runtime_cm (folds the CM into the entry's cxform).
++  D  a timeline sprite with [GlowFilter(blue), ColorMatrixFilter(swap R/B)]: a
++     CM after a filter recolours the filter output too -> blue box, RED halo
++     (tag.c filtered_object_cxform suffix fold).
++Traces read the getter back (A 1 / B 20 / D.n 2 / D.0.blurX 10 / D.1.matrix.n 20).
++
++Expected trace and output.expected.png: local Ruffle exporter at 0ddd12b6a
++(session25-fanout-reports/w1-avm1-filters-complete-oracle). Our render matches
++it at 0 differing pixels. Regenerate byte-identically: `python3 create_test_swf.py`
++(writes test.swf next to this file; CASES=ABD is the fixture cut; the probe's
++other cases C/E/G need the dynamic-clip colour-transform channel, F has no oracle).
++"""
++# s25 w1-avm1-filters-complete dynamic/CM probe. Helpers copied from s23 avm1-runtime-filters-probe/mkprobe.py.
++# Usage: python3 mkdyn.py out.swf
++import struct, sys, os
++DYN_PROP = 'filterz' if os.environ.get('NOFILT') else 'filters'
++
++def s(x): return b'\x00' + x.encode() + b'\x00'
++def i(x): return b'\x07' + struct.pack('<i', x)
++def d(x): return b'\x06' + struct.pack('<d', x)[4:] + struct.pack('<d', x)[:4]
++TRUE = b'\x05\x01'
++NULL = b'\x02'
++def push(*items):
++    body = b''.join(items); return b'\x96' + struct.pack('<H', len(body)) + body
++GETVAR=b'\x1c'; SETVAR=b'\x1d'; SETMEM=b'\x4f'; GETMEM=b'\x4e'; CALLM=b'\x52'; POP=b'\x17'
++NEWM=b'\x53'; INITARR=b'\x42'; TRACE=b'\x26'
++def path(names):
++    out = push(s(names[0])) + GETVAR
++    for n in names[1:]:
++        out += push(i(n) if isinstance(n, int) else s(n)) + GETMEM
++    return out
++def call(objpath, method, args):
++    out = push(*[a for a in reversed(args)]) + push(i(len(args)))
++    out += path(objpath) + push(s(method)) + CALLM + POP
++    return out
++def setp(objpath, prop, valcode):
++    return path(objpath) + push(s(prop)) + valcode + SETMEM
++def newfilter(cls, args):
++    # new flash.filters.<cls>(args...)  -> leaves the object on the stack
++    out = push(*[a for a in reversed(args)]) + push(i(len(args)))
++    out += push(s('flash')) + GETVAR + push(s('filters')) + GETMEM + push(s(cls)) + NEWM
++    return out
++def arr(*elem_codes):
++    # [e0, e1, ...]: InitArray pops count then elements (first popped = e0)
++    out = b''.join(reversed(elem_codes)) + push(i(len(elem_codes))) + INITARR
++    return out
++def trace(code): return code + TRACE
++def rect(p, x, y, w, h, color):
++    o = call(p, 'beginFill', [i(color), i(100)])
++    o += call(p, 'moveTo', [i(x), i(y)])
++    for (px, py) in [(x+w, y), (x+w, y+h), (x, y+h), (x, y)]: o += call(p, 'lineTo', [i(px), i(py)])
++    o += call(p, 'endFill', [])
++    return o
++
++class Bits:
++    def __init__(s): s.b = ''
++    def u(s, v, n): s.b += format(v & ((1 << n) - 1), '0%db' % n) if n else ''
++    def sb(s, v, n): s.u(v, n)
++    def bytes(s):
++        b = s.b + '0' * ((8 - len(s.b) % 8) % 8)
++        return bytes(int(b[k:k+8], 2) for k in range(0, len(b), 8))
++def nbits(*vals):
++    n = 1
++    for v in vals:
++        while not (-(1 << (n-1)) <= v < (1 << (n-1))): n += 1
++    return n
++def rectrec(x0, x1, y0, y1):
++    b = Bits(); n = nbits(x0, x1, y0, y1); b.u(n, 5)
++    for v in (x0, x1, y0, y1): b.sb(v, n)
++    return b.bytes()
++def matrix(tx, ty):
++    b = Bits(); b.u(0, 1); b.u(0, 1); n = nbits(tx, ty); b.u(n, 5); b.sb(tx, n); b.sb(ty, n)
++    return b.bytes()
++def tag(code, body):
++    if len(body) < 63: return struct.pack('<H', (code << 6) | len(body)) + body
++    return struct.pack('<HI', (code << 6) | 63, len(body)) + body
++def shape(cid, w, h, rgb):
++    W, H = w * 20, h * 20
++    body = struct.pack('<H', cid) + rectrec(0, W, 0, H)
++    body += b'\x01\x00' + bytes(rgb) + b'\x00'      # 1 solid fill, 0 lines
++    b = Bits(); b.u(1, 4); b.u(0, 4)                # NumFillBits=1, NumLineBits=0
++    # style change: moveTo(0,0), fill0 = 1
++    b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(0, 1); b.u(1, 1); b.u(1, 1)
++    n = nbits(0, 0); b.u(n, 5); b.sb(0, n); b.sb(0, n); b.u(1, 1)
++    for dx, dy in [(W, 0), (0, H), (-W, 0), (0, -H)]:
++        n = max(nbits(dx, dy), 2); b.u(1, 1); b.u(1, 1); b.u(n - 2, 4)
++        if dx == 0: b.u(0, 1); b.u(1, 1); b.sb(dy, n)
++        else: b.u(0, 1); b.u(0, 1); b.sb(dx, n)
++    b.u(0, 6)
++    return tag(2, body + b.bytes())
++def place(depth, cid, tx, ty, name):
++    body = bytes([0x20 | 0x04 | 0x02]) + struct.pack('<HH', depth, cid) + matrix(tx * 20, ty * 20) + s(name)[1:]
++    return tag(26, body)
++def sprite(sid, inner_cid):
++    inner = tag(26, bytes([0x02 | 0x04]) + struct.pack('<HH', 1, inner_cid) + matrix(0, 0)) + tag(1, b'') + tag(0, b'')
++    return tag(39, struct.pack('<HH', sid, 1) + inner)
++
++def new(pkg, cls, args):
++    # each arg: a push ITEM (from s/i/d/...) or full action CODE (tuple ('code', bytes))
++    out = b''.join(a[1] if isinstance(a, tuple) else push(a) for a in reversed(args)) + push(i(len(args)))
++    out += push(s('flash')) + GETVAR + push(s(pkg)) + GETMEM + push(s(cls)) + NEWM
++    return out
++def newglobal(cls, args):
++    return push(*[a for a in reversed(args)]) + push(i(len(args)), s(cls)) + b'\x40'  # NewObject
++def callv(objpath, method, args):   # call, keep result on stack
++    return push(*[a for a in reversed(args)]) + push(i(len(args))) + path(objpath) + push(s(method)) + CALLM
++CM_HALF = ('code', arr(*[push(d(v)) for v in [0.5,0,0,0,0, 0,0.5,0,0,0, 0,0,0.5,0,0, 0,0,0,1,0]]))
++CM_SWAP = ('code', arr(*[push(d(v)) for v in [0,0,1,0,0, 0,1,0,0,0, 1,0,0,0,0, 0,0,0,1,0]]))
++
++# Case selection: CASES env (default ABCDEG; F = GradientGlow is opt-in, see below).
++#   Fixture cut matching the s25 prototype:   CASES=ABD
++#   Fixture cut needing the dynamic-cxform channel (item 5): CASES=CEG
++CASES = os.environ.get('CASES', 'ABD') + ('F' if os.environ.get('WITH_GRADIENT') else '')
++def tr(label, codepath, prop):
++    return trace(push(s(label)) + path(codepath) + push(i(prop) if isinstance(prop, int) else s(prop)) + GETMEM + b'\x21')
++a = b''
++if 'A' in CASES:
++    # A (item 4): dynamic clip whose ONLY content is an attachBitmap bitmap + GlowFilter(blue).
++    a += call(['_root'], 'createEmptyMovieClip', [s('bb'), i(10)])
++    a += setp(['bb'], '_x', push(i(40))); a += setp(['bb'], '_y', push(i(40)))
++    a += push(s('bmd')) + new('display', 'BitmapData', [i(60), i(40), b'\x05\x00', i(0xFF0000)]) + SETVAR
++    a += push(i(1)) + push(s('bmd')) + GETVAR + push(i(2)) + path(['bb']) + push(s('attachBitmap')) + CALLM + POP
++    a += setp(['bb'], 'filters', arr(new('filters', 'GlowFilter', [i(0x0000FF), i(1), i(10), i(10), i(3), i(1)])))
++    a += tr('A ', ['bb', 'filters'], 'length')
++if 'B' in CASES:
++    # B (item 3, placed): timeline sprite p + runtime ColorMatrixFilter halving RGB -> (127/128,0,0)
++    a += setp(['p'], 'filters', arr(new('filters', 'ColorMatrixFilter', [CM_HALF])))
++    a += tr('B ', ['p', 'filters', 0, 'matrix'], 'length')
++if 'C' in CASES:
++    # C (item 3, dynamic): Drawing-API clip, red rect, ColorMatrix swapping R and B -> blue
++    a += call(['_root'], 'createEmptyMovieClip', [s('cc'), i(11)])
++    a += setp(['cc'], '_x', push(i(360))); a += setp(['cc'], '_y', push(i(40)))
++    a += rect(['cc'], 0, 0, 80, 60, 0xFF0000)
++    a += setp(['cc'], 'filters', arr(new('filters', 'ColorMatrixFilter', [CM_SWAP])))
++    a += tr('C ', ['cc', 'filters', 0, 'matrix'], 0)
++if 'D' in CASES:
++    # D (item 3, chain order): placed sprite q, [Glow(blue), CM_SWAP] -> Flash: box blue, halo RED
++    a += setp(['q'], 'filters', arr(new('filters', 'GlowFilter', [i(0x0000FF), i(1), i(10), i(10), i(3), i(1)]),
++                                   new('filters', 'ColorMatrixFilter', [CM_SWAP])))
++    a += tr('D.n ', ['q', 'filters'], 'length')
++    a += tr('D.0.blurX ', ['q', 'filters', 0], 'blurX')
++    a += tr('D.1.matrix.n ', ['q', 'filters', 1, 'matrix'], 'length')
++if 'E' in CASES:
++    # E (item 5): dynamic Drawing-API clip, black Glow, then Color.setRGB(0x00FF00):
++    #   the colour transform applies to the FILTER OUTPUT -> green box AND green halo.
++    a += call(['_root'], 'createEmptyMovieClip', [s('ee'), i(12)])
++    a += setp(['ee'], '_x', push(i(40))); a += setp(['ee'], '_y', push(i(180)))
++    a += rect(['ee'], 0, 0, 80, 60, 0xFF0000)
++    a += setp(['ee'], 'filters', arr(new('filters', 'GlowFilter', [i(0x000000), i(1), i(12), i(12), i(4), i(1)])))
++    a += push(s('col')) + newglobal('Color', [s('ee')]) + SETVAR
++    a += call(['col'], 'setRGB', [i(0x00FF00)])
++    a += tr('E ', ['ee', 'filters'], 'length')
++if 'G' in CASES:
++    # G (item 5 control, NO filter): dynamic Drawing-API clip + Color.setRGB(0x00FF00) -> solid green.
++    a += call(['_root'], 'createEmptyMovieClip', [s('gg'), i(13)])
++    a += setp(['gg'], '_x', push(i(200))); a += setp(['gg'], '_y', push(i(300)))
++    a += rect(['gg'], 0, 0, 80, 60, 0xFF0000)
++    a += push(s('col2')) + newglobal('Color', [s('gg')]) + SETVAR
++    a += call(['col2'], 'setRGB', [i(0x00FF00)])
++if 'F' in CASES:
++    # F (item 6): placed sprite r, GradientGlowFilter(0, 45, [white,blue,red], [0,1,1], [0,128,255],
++    #   16, 16, 2, 1, "outer"). Ruffle's wgpu renderer does NOT implement GradientGlow (it passes
++    #   the source through), so a Ruffle golden of this case is NOT a Flash oracle.
++    a += setp(['r'], 'filters', arr(new('filters', 'GradientGlowFilter',
++            [i(0), i(45), ('code', arr(push(i(0xFFFFFF)), push(i(0x0000FF)), push(i(0xFF0000)))),
++             ('code', arr(push(i(0)), push(i(1)), push(i(1)))), ('code', arr(push(i(0)), push(i(128)), push(i(255)))),
++             i(16), i(16), i(2), i(1), s('outer'), b'\x05\x00'])))
++    a += tr('F.n ', ['r', 'filters'], 'length')
++    a += tr('F.0.colors.n ', ['r', 'filters', 0, 'colors'], 'length')
++    a += tr('F.0.type ', ['r', 'filters', 0], 'type')
++a += b'\x00'
++
++body = rectrec(0, 550 * 20, 0, 400 * 20) + struct.pack('<HH', 30 << 8, 1)
++body += tag(9, b'\xff\xff\xff')
++body += shape(1, 80, 60, (255, 0, 0)) + sprite(2, 1)
++body += place(1, 2, 200, 40, 'p') + place(2, 2, 200, 180, 'q') + place(3, 2, 360, 180, 'r')
++body += tag(12, a) + tag(1, b'') + tag(0, b'')
++swf = b'FWS' + bytes([8]) + struct.pack('<I', 8 + len(body)) + body
++open(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test.swf'), 'wb').write(swf)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..b463c34018a49e92faeb3e5d13ddcaa753defa7c
+GIT binary patch
+literal 6971
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/output.txt b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/output.txt
+new file mode 100644
+index 00000000..beb94b1d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/output.txt
+@@ -0,0 +1,5 @@
++A 1
++B 20
++D.n 2
++D.0.blurX 10
++D.1.matrix.n 20
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/test.swf b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..2cab945946a40c40d6622125f9ac905534e90949
+GIT binary patch
+literal 1538
+zcmd5+!A{#i5Pfz?oK&b(Dgvnr6+IL<MQx9$5;RHSgptSrZs`ULv1G@_Ss=NgUbytY
+zX>XO<eoFZQ{s8`fGnX*4#*qmPq7oo{*_rXanYV9dcWJ$rH*-J-**Y-x3wUdwV)lBy
+zpD^$ZpMdv=26_Nqjn4i)o?kop6VCgKI4zj8;V73gXfd%!8-C<w*nD$o93y1U)Si{c
+zE_)gBis!~(L|Djt&jP9d>jmM^Xh3CQnPe&ps7FB{QB)JaX5<LzeDy=wT?zJGr{cLG
+z)+W`61{Ha&cQkm8z^gan-Bg^aHT*3d03Ak|$oBto>Car6R?4R-Y<r^JBnky!%Wa3A
+z=)zW`K-rbP2&+O0)TS6<#6X?B*gr%<?<F9l6r0T$mu60xw_Q&<QCk<j&SPb+iLfr5
+zE?JZR+z5_S%La)i=`_)0FF07z`B6)FmbE@#rqP!vMZ#8jz;jwVvI+a$j3OdoEI^W%
+z#Nev>i|vaAc5cVhd+uYOJ<mKO^ElBjC;IVhrUoO?#a6F@O5g?2ija}p`M2z4lKr-(
+zHs@xEwEVut$M(%u>^@a1hPCT|Tm8WMAE*_q_G8^Je!b|1(G{tdT5+=nx;A*l=sl^H
+nK9m~XUbHa;(4P((61`8~%`pakEXCt8v>0Le)wpA_^s9XZztaRO
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/test.toml b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/test.toml
+new file mode 100644
+index 00000000..f1a32aa4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_runtime_filters_cm_bitmap/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 1
++
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 0

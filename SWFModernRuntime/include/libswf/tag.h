@@ -183,6 +183,7 @@ typedef struct FilterListData {
 } FilterListData;
 
 void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count);
+void tagBeginFilterListAt(SWFAppContext* app_context, size_t depth, FilterListData* fl);
 void tagAddSimpleFilter(SWFAppContext* app_context, size_t depth,
     u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
     double r, double g, double b, double a, double strength,

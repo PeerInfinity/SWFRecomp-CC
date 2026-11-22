@@ -191,6 +191,190 @@ static const stbtt_fontinfo* loadTestDeviceFace(const std::string& path)
 	return info;
 }
 
+// A PlaceObject3's ColorMatrixFilters folded into its placement colour
+// transform at recompile time. Flash and Ruffle run each CM as a filter pass
+// over the object, in list order, and apply the object's ColorTransform to the
+// filtered result, so the effective straight-RGBA transform is
+// cx ∘ CM_n ∘ … ∘ CM_1. Both are affine 4x5 maps (bias in 0..255 units), so
+// they compose exactly; only the per-pass clamp is lost.
+struct PlaceCmCompose
+{
+	double m[4][5];   // row-major, rows = R,G,B,A, cols = R,G,B,A,bias
+	bool any = false;
+	PlaceCmCompose()
+	{
+		for (int r = 0; r < 4; r++)
+			for (int c = 0; c < 5; c++)
+				m[r][c] = (r == c) ? 1.0 : 0.0;
+	}
+	// this = cm ∘ this  (cm = the next ColorMatrixFilter in the list)
+	void apply(const float cm[20])
+	{
+		double out[4][5];
+		for (int r = 0; r < 4; r++)
+		{
+			for (int c = 0; c < 4; c++)
+			{
+				double s = 0.0;
+				for (int k = 0; k < 4; k++) s += (double) cm[r * 5 + k] * m[k][c];
+				out[r][c] = s;
+			}
+			double b = 0.0;
+			for (int k = 0; k < 4; k++) b += (double) cm[r * 5 + k] * m[k][4];
+			out[r][4] = b + (double) cm[r * 5 + 4];
+		}
+		memcpy(m, out, sizeof(m));
+		any = true;
+	}
+	// Emit cx ∘ this as one cxform (column-major 4x4 multiply + 4 adds/255).
+	// cx is the placement CXFORMWITHALPHA (mult in 8.8, add in 0..255).
+	void emit(std::ostream& cxform_data, const s32 mult[4], const s32 add[4]) const
+	{
+		cxform_data << std::fixed;
+		for (int c = 0; c < 4; c++)
+			for (int r = 0; r < 4; r++)
+				cxform_data << "\t" << (mult[r] / 256.0) * m[r][c] << "f," << std::endl;
+		for (int r = 0; r < 4; r++)
+			cxform_data << "\t" << (mult[r] / 256.0) * m[r][4] + (double) add[r] << "f/255.0f," << std::endl;
+		cxform_data << std::defaultfloat;
+	}
+};
+
+// Emit the WHOLE PlaceObject3 filter list of a DefineSprite-nested placement, re-parsed from its raw
+// bytes. The root arm collects the same list into `all_filters` and emits
+// tagBeginFilterList / tagAdd* / tagEndFilterList; the sprite arm only ever
+// kept the first simple filter (tagSetFilter), so every later member and every
+// ColorMatrix/Convolution-only list was lost in render AND in the getter.
+// The list goes into a per-site `static FilterListData` (tagBeginFilterListAt)
+// instead of the runtime's root-depth-keyed table, which a nested depth would
+// collide with. Field encodings are the root arm's, byte for byte.
+static void emitSpriteFilterList(std::ostream& out, size_t depth,
+                                 const unsigned char* p, unsigned site)
+{
+	auto flit = [](float v) -> std::string {
+		std::ostringstream oss;
+		oss << std::setprecision(9) << v;
+		std::string s = oss.str();
+		if (s.find('.') == std::string::npos && s.find('e') == std::string::npos
+		    && s.find("inf") == std::string::npos && s.find("nan") == std::string::npos)
+			s += ".0";
+		s += "f";
+		return s;
+	};
+	auto rd32 = [](const unsigned char* q) { uint32_t v; memcpy(&v, q, 4); return v; };
+	auto rd16 = [](const unsigned char* q) { uint16_t v; memcpy(&v, q, 2); return v; };
+	auto fx = [&](const unsigned char* q) { return (double)(int32_t) rd32(q) / 65536.0; };
+	auto fl = [&](const unsigned char* q) { float v; memcpy(&v, q, 4); return v; };
+	std::string d = std::to_string(depth);
+	unsigned n = *p++;
+	out << "\t{ static FilterListData _sfl" << site << "; tagBeginFilterListAt(app_context, "
+	    << d << ", &_sfl" << site << ");" << std::endl;
+	for (unsigned i = 0; i < n; i++)
+	{
+		unsigned id = *p++;
+		switch (id)
+		{
+			case 0: case 2: // DropShadow / Glow
+			{
+				double r = p[0] / 255.0, g = p[1] / 255.0, b = p[2] / 255.0, a = p[3] / 255.0;
+				p += 4;
+				double bx = fx(p), by = fx(p + 4); p += 8;
+				double ang = 0, dist = 0;
+				if (id == 0) { ang = fx(p); dist = fx(p + 4); p += 8; }
+				double str = rd16(p) / 256.0; p += 2;
+				unsigned fl8 = *p++;
+				unsigned q = fl8 & 0x1F; if (!q) q = 1;
+				out << std::setprecision(15) << "\ttagAddSimpleFilter(app_context, " << d << ", "
+				    << (id == 0 ? 2 : 3) << ", " << bx << ", " << by << ", " << q << ", "
+				    << ((fl8 >> 5) & 7) << ", " << r << ", " << g << ", " << b << ", " << a << ", "
+				    << str << ", " << ang << ", " << dist << ");" << std::defaultfloat << std::endl;
+				break;
+			}
+			case 1: // Blur
+			{
+				double bx = fx(p), by = fx(p + 4); p += 8;
+				unsigned q = (*p++ >> 3) & 0x1F; if (!q) q = 1;
+				out << std::setprecision(15) << "\ttagAddSimpleFilter(app_context, " << d << ", 1, "
+				    << bx << ", " << by << ", " << q << ", 0, 0, 0, 0, 0, 0, 0, 0);"
+				    << std::defaultfloat << std::endl;
+				break;
+			}
+			case 3: // Bevel: highlight first, shadow second (Ruffle order)
+			{
+				const unsigned char* h = p; const unsigned char* s = p + 4; p += 8;
+				double bx = fx(p), by = fx(p + 4), ang = fx(p + 8), dist = fx(p + 12); p += 16;
+				double str = rd16(p) / 256.0; p += 2;
+				unsigned fl8 = *p++;
+				unsigned q = fl8 & 0x0F; if (!q) q = 1;
+				out << std::setprecision(15) << "\ttagAddSimpleFilter(app_context, " << d << ", 4, "
+				    << bx << ", " << by << ", " << q << ", " << ((fl8 >> 4) & 0x0F) << ", "
+				    << s[0] / 255.0 << ", " << s[1] / 255.0 << ", " << s[2] / 255.0 << ", " << s[3] / 255.0 << ", "
+				    << str << ", " << ang << ", " << dist << ");" << std::endl
+				    << "\ttagAddSimpleFilterHighlight(app_context, " << d << ", "
+				    << h[0] / 255.0 << ", " << h[1] / 255.0 << ", " << h[2] / 255.0 << ", " << h[3] / 255.0
+				    << ");" << std::defaultfloat << std::endl;
+				break;
+			}
+			case 4: case 7: // GradientGlow / GradientBevel
+			{
+				unsigned nc = *p++;
+				const unsigned char* cs = p; p += nc * 4;
+				const unsigned char* rs = p; p += nc;
+				float bx = (float) fx(p), by = (float) fx(p + 4), ang = (float) fx(p + 8), dist = (float) fx(p + 12);
+				p += 16;
+				float str = rd16(p) / 256.0f; p += 2;
+				unsigned fl8 = *p++;
+				unsigned q = fl8 & 0x0F; if (!q) q = 1;
+				unsigned flags = (((fl8 >> 7) & 1) << 2) | (((fl8 >> 6) & 1) << 1) | ((fl8 >> 4) & 1);
+				unsigned cnt = nc < 16 ? nc : 16;
+				out << "\t{ u32 _c[] = {";
+				for (unsigned k = 0; k < cnt; k++)
+					out << (k ? "," : "") << (((uint32_t) cs[k*4] << 16) | ((uint32_t) cs[k*4+1] << 8) | cs[k*4+2]);
+				out << (cnt ? "" : "0") << "}; float _a[] = {";
+				for (unsigned k = 0; k < cnt; k++) out << (k ? "," : "") << flit(cs[k*4+3] / 255.0f);
+				out << (cnt ? "" : "0") << "}; u8 _r[] = {";
+				for (unsigned k = 0; k < cnt; k++) out << (k ? "," : "") << (unsigned) rs[k];
+				out << (cnt ? "" : "0") << "}; tagAddGradientFilter(app_context, " << d << ", "
+				    << (id == 4 ? 7 : 8) << ", " << cnt << ", _c, _a, _r, " << flit(bx) << ", " << flit(by)
+				    << ", " << flit(ang) << ", " << flit(dist) << ", " << flit(str) << ", " << q << ", "
+				    << flags << "); }" << std::endl;
+				break;
+			}
+			case 5: // Convolution
+			{
+				unsigned mx = p[0], my = p[1]; p += 2;
+				float div = fl(p), bias = fl(p + 4); p += 8;
+				const unsigned char* ms = p; p += mx * my * 4;
+				const unsigned char* dc = p; p += 4;
+				unsigned fl8 = *p++;
+				unsigned cnt = mx * my < 25 ? mx * my : 25;
+				out << "\t{ float _m[] = {";
+				for (unsigned k = 0; k < cnt; k++) out << (k ? "," : "") << flit(fl(ms + k * 4));
+				out << (cnt ? "" : "0") << "}; tagAddConvolutionFilter(app_context, " << d << ", "
+				    << mx << ", " << my << ", _m, " << flit(div) << ", " << flit(bias) << ", "
+				    << (fl8 & 1) << ", " << ((fl8 >> 1) & 1) << ", " << (unsigned) dc[0] << ", "
+				    << (unsigned) dc[1] << ", " << (unsigned) dc[2] << ", " << (unsigned) dc[3] << "); }"
+				    << std::endl;
+				break;
+			}
+			case 6: // ColorMatrix
+			{
+				out << "\t{ float _cm[] = {";
+				for (int k = 0; k < 20; k++) out << (k ? "," : "") << flit(fl(p + k * 4));
+				p += 80;
+				out << "}; tagAddColorMatrixFilter(app_context, " << d << ", _cm); }" << std::endl;
+				break;
+			}
+			default:
+				// Unknown filter id: its size is unknown, so stop here (the
+				// sprite arm's own walk has the same limitation).
+				i = n;
+				break;
+		}
+	}
+	out << "\ttagEndFilterList(app_context, " << d << "); }" << std::endl;
+}
+
 // The face's units-per-em (head.unitsPerEm), recovered from stb_truetype's
 // em scale. Exact for any integer upem, so the bundled 1000-upem Noto keeps
 // its `swf_em / 1000` scale bit-for-bit.
@@ -4169,6 +4353,10 @@ namespace SWFRecomp
 				}
 
 				u32 cxform_id = 0;
+				// The placement cxform's raw terms, kept for composing a
+				// PlaceObject3 ColorMatrixFilter into it (PlaceCmCompose).
+				s32 po_cx_mult[4] = {256, 256, 256, 256};
+				s32 po_cx_add[4] = {0, 0, 0, 0};
 
 				if (has_color)
 				{
@@ -4230,6 +4418,8 @@ namespace SWFRecomp
 					}
 
 					cxform_id = (u32) current_cxform;
+					po_cx_mult[0] = mult_r; po_cx_mult[1] = mult_g; po_cx_mult[2] = mult_b; po_cx_mult[3] = mult_a;
+					po_cx_add[0] = add_r; po_cx_add[1] = add_g; po_cx_add[2] = add_b; po_cx_add[3] = add_a;
 
 					// Write 20-float cxform matrix: 4x4 diagonal multiply + 4 additive
 					// Row 0: R multiply
@@ -4293,8 +4483,8 @@ namespace SWFRecomp
 
 				// PlaceObject3 extra fields: FilterList, BlendMode, BitmapCache, Visible, OpaqueBackground
 				u8 blend_mode_val = 0;
-				u32 color_matrix_cxform_id = 0;
 				bool has_color_matrix = false;
+				PlaceCmCompose po_cm;
 
 				// Filter data (first visual filter wins)
 				u8 parsed_filter_type = 0;
@@ -4647,43 +4837,10 @@ namespace SWFRecomp
 									memcpy(ext_cm_matrix, cm, 80);
 								}
 
-								// Convert to our cxform format:
-								// 4x4 column-major multiply matrix + 4 additive values
-								// SWF ColorMatrix row i: [mult_R, mult_G, mult_B, mult_A, bias]
-								// Our cxform is stored as 20 floats: 4x4 column-major + 4 additive
+								// Fold into the placement cxform (emitted once, after
+								// the list, as cx ∘ CM_n ∘ … ∘ CM_1).
 								has_color_matrix = true;
-								color_matrix_cxform_id = (u32) current_cxform;
-
-								// Column-major: col j, row i = cm[i*5 + j]
-								// Col 0 (R mult): cm[0], cm[5], cm[10], cm[15]
-								cxform_data << std::fixed
-											<< "\t" << cm[0] << "f," << endl
-											<< "\t" << cm[5] << "f," << endl
-											<< "\t" << cm[10] << "f," << endl
-											<< "\t" << cm[15] << "f," << endl;
-								// Col 1 (G mult): cm[1], cm[6], cm[11], cm[16]
-								cxform_data << "\t" << cm[1] << "f," << endl
-											<< "\t" << cm[6] << "f," << endl
-											<< "\t" << cm[11] << "f," << endl
-											<< "\t" << cm[16] << "f," << endl;
-								// Col 2 (B mult): cm[2], cm[7], cm[12], cm[17]
-								cxform_data << "\t" << cm[2] << "f," << endl
-											<< "\t" << cm[7] << "f," << endl
-											<< "\t" << cm[12] << "f," << endl
-											<< "\t" << cm[17] << "f," << endl;
-								// Col 3 (A mult): cm[3], cm[8], cm[13], cm[18]
-								cxform_data << "\t" << cm[3] << "f," << endl
-											<< "\t" << cm[8] << "f," << endl
-											<< "\t" << cm[13] << "f," << endl
-											<< "\t" << cm[18] << "f," << endl;
-								// Additive (RGBA bias / 255): cm[4], cm[9], cm[14], cm[19]
-								cxform_data << "\t" << cm[4] << "f/255.0f," << endl
-											<< "\t" << cm[9] << "f/255.0f," << endl
-											<< "\t" << cm[14] << "f/255.0f," << endl
-											<< "\t" << cm[19] << "f/255.0f," << endl
-											<< std::defaultfloat;
-
-								current_cxform += 1;
+								po_cm.apply(cm);
 								if (all_filter_count < 16) {
 									auto& cf = all_filters[all_filter_count++];
 									memset(&cf, 0, sizeof(cf));
@@ -4834,10 +4991,12 @@ namespace SWFRecomp
 					}
 				}
 
-				// If ColorMatrixFilter provided a cxform, use it (compose with existing if any)
+				// ColorMatrixFilters: one cxform = placement cx ∘ CM_n ∘ … ∘ CM_1.
 				if (has_color_matrix)
 				{
-					cxform_id = color_matrix_cxform_id;
+					po_cm.emit(cxform_data, po_cx_mult, po_cx_add);
+					cxform_id = (u32) current_cxform;
+					current_cxform += 1;
 				}
 
 				// Parse clip actions if present
@@ -6013,6 +6172,10 @@ namespace SWFRecomp
 							}
 
 							u32 cxform_id = 0;
+							// Raw placement cxform terms, for composing a PlaceObject3 ColorMatrix
+							// into it (PlaceCmCompose).
+							s32 sp_cx_mult[4] = {256, 256, 256, 256};
+							s32 sp_cx_add[4] = {0, 0, 0, 0};
 							if (has_color)
 							{
 								// Parse CXFORMWITHALPHA
@@ -6071,6 +6234,8 @@ namespace SWFRecomp
 								}
 
 								cxform_id = (u32) current_cxform;
+								sp_cx_mult[0] = mult_r; sp_cx_mult[1] = mult_g; sp_cx_mult[2] = mult_b; sp_cx_mult[3] = mult_a;
+								sp_cx_add[0] = add_r; sp_cx_add[1] = add_g; sp_cx_add[2] = add_b; sp_cx_add[3] = add_a;
 
 								cxform_data << "\t" << to_string(mult_r) << "/256.0f," << endl
 											<< "\t" << "0.0f," << endl
@@ -6133,9 +6298,12 @@ namespace SWFRecomp
 							float sp_filter_r = 0, sp_filter_g = 0, sp_filter_b = 0, sp_filter_a = 0;
 							float sp_filter_strength = 1.0f, sp_filter_angle = 0, sp_filter_distance = 0;
 							float sp_highlight_r = 0, sp_highlight_g = 0, sp_highlight_b = 0, sp_highlight_a = 0;
+							PlaceCmCompose sp_cm;
 
+							const unsigned char* sp_filter_list_start = NULL;
 							if (is_sprite_po3 && sp_has_filter_list)
 							{
+								sp_filter_list_start = (const unsigned char*) cur_pos;
 								u8 num_filters = *(u8*) cur_pos; cur_pos += 1;
 								for (u8 f = 0; f < num_filters; f++)
 								{
@@ -6244,7 +6412,7 @@ namespace SWFRecomp
 												sp_blur_x = (float)(s32)gg_bx/65536.0f; sp_blur_y = (float)(s32)gg_by/65536.0f;
 												sp_filter_angle = (float)(s32)gg_ang/65536.0f; sp_filter_distance = (float)(s32)gg_dist/65536.0f;
 												sp_filter_strength = (float)gg_str/256.0f;
-												sp_filter_quality = gg_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_quality = gg_fl & 0x0F; if (!sp_filter_quality) sp_filter_quality = 1;
 												sp_filter_flags = (gg_fl >> 5) & 0x07;
 											}
 											break;
@@ -6261,7 +6429,14 @@ namespace SWFRecomp
 											}
 											break;
 										}
-										case 6: cur_pos += 80; break;
+										case 6: // ColorMatrixFilter: folded into the placement
+										{       // cxform after the list, as in the root arm.
+											float cm[20];
+											memcpy(cm, cur_pos, 80);
+											cur_pos += 80;
+											sp_cm.apply(cm);
+											break;
+										}
 										case 7: // GradientBevelFilter
 										{
 											u8 nc = *(u8*) cur_pos; cur_pos += 1;
@@ -6293,7 +6468,7 @@ namespace SWFRecomp
 												sp_blur_x = (float)(s32)gb_bx/65536.0f; sp_blur_y = (float)(s32)gb_by/65536.0f;
 												sp_filter_angle = (float)(s32)gb_ang/65536.0f; sp_filter_distance = (float)(s32)gb_dist/65536.0f;
 												sp_filter_strength = (float)gb_str/256.0f;
-												sp_filter_quality = gb_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_quality = gb_fl & 0x0F; if (!sp_filter_quality) sp_filter_quality = 1;
 												// Mapped to type 4: bevel flag layout (bit0 onTop,
 												// bit1 compositeSource, bit2 knockout, bit3 inner).
 												sp_filter_flags = (gb_fl >> 4) & 0x0F;
@@ -6302,6 +6477,12 @@ namespace SWFRecomp
 										}
 									}
 								}
+							}
+							if (sp_cm.any)
+							{
+								sp_cm.emit(cxform_data, sp_cx_mult, sp_cx_add);
+								cxform_id = (u32) current_cxform;
+								current_cxform += 1;
 							}
 
 							if (is_sprite_po3 && sp_has_blend_mode)
@@ -6629,6 +6810,12 @@ namespace SWFRecomp
 										<< sp_highlight_a << "f);"
 										<< std::defaultfloat << endl;
 								}
+							}
+							if (sp_filter_list_start != NULL)
+							{
+								static unsigned s_sprite_filter_site = 0;
+								emitSpriteFilterList(sprite_definitions, depth,
+								                     sp_filter_list_start, s_sprite_filter_site++);
 							}
 
 							{
