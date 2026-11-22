@@ -1,0 +1,5 @@
+**Pixel axis: blend modes, masks, layers, colour transforms.** Categories as needed. Fidelity-prove first.
+
+Failing at `08fdbcad6`: `visual/blend_modes/layer_alpha` 66744, `layer_erase` 66949, `shader_as_mask` 2100, `avm2/blend_scroll` 296, `from_shumway/MaskTest-2` 7162, `from_shumway/acid/acid-mask` (3 comparisons ~9.4-12k, max 124-128), `avm2/bitmapdata_colortransform` 726 (max 125), `from_gnash/place_object_test` 38238, `from_shumway/acid/acid-morph` 26377, `from_shumway/bitmapbuttons` 618042, `avm1/netstream_play_flv_screen` 44751, `visual/cache_as_bitmap/avm1_color` 1200 (re-goldened to Flash; we match Ruffle's sidecar: report-only unless you find a Flash-fidelity fix), `avm2/blend_shader_luma_lighten` (NO-GO: needs PBJ→WGSL; one line). Skip `acid-clip` (nearpass slot).
+
+The `layer_alpha`/`layer_erase` pair (alpha/erase blend needs an isolated transparency group) and the acid-mask family look like shared mechanisms; prove that. For each: mechanism, owner (`render_webgpu.c` blend/layer paths, mask stencil), price, and a measured prototype for the cheapest with the canary md5 sweep. New pipelines use `MSAA_SAMPLES`, never a literal 4.

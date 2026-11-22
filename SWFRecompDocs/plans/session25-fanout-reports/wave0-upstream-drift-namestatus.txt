@@ -1,0 +1,49 @@
+M	CONTRIBUTING.md
+M	Cargo.lock
+M	Cargo.toml
+M	core/src/avm2/globals/flash/display/shader_job.rs
+M	core/src/avm2/globals/flash/net/local_connection.rs
+M	core/src/avm2/globals/flash/text/engine/text_block.rs
+M	render/pixel_bender/assembly_tests/tests/special_opcodes/test.pbj
+M	render/pixel_bender/src/assembly.rs
+M	render/wgpu/src/backend.rs
+M	render/wgpu/src/pixel_bender.rs
+M	tests/src/execute.rs
+M	tests/src/flashplayer/config.rs
+M	tests/src/flashplayer/environment/linux.rs
+M	tests/src/flashplayer/environment/unsupported.rs
+A	tests/tests/swfs/avm2/local_connection_allow_networking/Test.as
+A	tests/tests/swfs/avm2/local_connection_allow_networking/output.all.txt
+A	tests/tests/swfs/avm2/local_connection_allow_networking/output.internal.txt
+A	tests/tests/swfs/avm2/local_connection_allow_networking/output.none.txt
+A	tests/tests/swfs/avm2/local_connection_allow_networking/test.swf
+A	tests/tests/swfs/avm2/local_connection_allow_networking/test.toml
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/Test.as
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float.pbasm
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float.pbj
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float2.pbasm
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float2.pbj
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float3.pbasm
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float3.pbj
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float4.pbasm
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/opdiv_float4.pbj
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/output.txt
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/test.swf
+A	tests/tests/swfs/avm2/pixelbender_shaderjob_output_channels/test.toml
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/SpaceAB.sfd
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/SpaceAB.ttf
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/Test.as
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/output.ruffle.txt
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/output.txt
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/spaceab.swf
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/test.swf
+A	tests/tests/swfs/avm2/textblock_recreate_text_line_width/test.toml
+3ac8dcb07 tests: Test LocalConnection with allowNetworking
+562a59507 avm2: Check allowNetworking in LocalConnection
+8d5f96d74 tests: Run Flash Player on Xvfb when executing tests
+76d96f63e tests: Add avm2/pixelbender_shaderjob_output_channels test
+9051addab pixelbender: Encode the coordinate size of smpl instructions
+b9929aaf3 avm2: Allow 1/2-channel ShaderJob outputs for non-BitmapData targets
+f6c489f84 chore: Update url to 2.5.9
+5d629cec4 avm2: Apply the width to TextLines reused by recreateTextLine
+e4e3c0208 tests: Add avm2/textblock_recreate_text_line_width test
