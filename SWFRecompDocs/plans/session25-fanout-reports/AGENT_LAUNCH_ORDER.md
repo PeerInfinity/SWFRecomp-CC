@@ -44,7 +44,7 @@ handshake sent).
 | w2-textfield-vn | w1-textfield-vn P0-P21 | trace gnash `TextField-v6/v7/v8` → ruffle_matched | session_018CoDi4kG6RDoukZHuF7UbE |
 | w2-edittext-span-model | w1-textfield-vn §4 | trace `edittext_set_text_same` (pass), `_after_edits` (rm) | session_018CoDi43SuykYDpM156pYNz — DELIVERED, LANDED (+2 trace, both Flash-exact pass incl. the KF row; replaceText was unimplemented; TextField-v7/v8 +12 lines; 0 px moves) |
 | w2-avm2-cm-copyfrom | w1-pixel-drawing D+E | px `bitmapdata_draw_filters`, `graphics_direct_commands` (unpriced) | session_018CoDi8AeP44PYDaUTrzWMN — DELIVERED, LANDED (+2 px `bitmapdata_draw_filters`, `graphics_direct_commands`; gradients band) |
-| w2-avm1-with-scope | w1-pixel-drawing C residual | trace DrawingApiTest lines (flip unpriced) | session_018CoDi645BCNVuhoF2enBcy |
+| w2-avm1-with-scope | w1-pixel-drawing C residual | trace DrawingApiTest lines (flip unpriced) | session_018CoDi645BCNVuhoF2enBcy — DELIVERED, LANDED (+1 trace `DrawingApiTest` → ruffle_matched; root cause incl. a gcc -O2 strict-aliasing miscompile dropping bare clip-method arg counts) |
 
 ## Grading runs
 
