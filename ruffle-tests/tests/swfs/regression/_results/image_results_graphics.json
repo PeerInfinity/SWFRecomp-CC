@@ -1,26 +1,86 @@
 {
   "metadata": {
-    "timestamp": "2026-11-22T20:56:29.509984+00:00",
+    "timestamp": "2026-11-22T21:58:25.660907+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "9e24c763ca3a16f1f0c5032f6a6f4793316fddac",
+    "git_sha": "485eb555c3f9f85d3f4aedf17b9d655267b6aeb0",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45065076248",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45065076248",
+    "run_id": "45069424445",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45069424445",
     "run_attempt": "1"
   },
-  "tests_with_comparisons": 20,
-  "comparisons": 20,
+  "tests_with_comparisons": 23,
+  "comparisons": 23,
   "ignored": 0,
-  "pass": 17,
+  "pass": 20,
   "fail": 0,
   "skip": 3,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 85.0,
+  "pass_rate": 87.0,
   "results": [
+    {
+      "suite": "regression",
+      "test": "avm1_dynclip_color_transform",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_nested_po3_filters",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
     {
       "suite": "regression",
       "test": "avm1_parent_child_bitmap_fill",
@@ -154,6 +214,36 @@
       "width": 550,
       "height": 300,
       "total_channels": 660000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_runtime_filters_cm_bitmap",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 550,
+      "height": 400,
+      "total_channels": 880000,
       "diff_channels": 0,
       "mean_diff": 0.0,
       "checks": [

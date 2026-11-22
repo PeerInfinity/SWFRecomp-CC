@@ -6,15 +6,15 @@
     "total_available": 780,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 16,
+    "ignored_count": 15,
     "filtered": true
   },
-  "total": 764,
-  "pass": 740,
+  "total": 765,
+  "pass": 741,
   "ruffle_matched": 17,
   "fail": 7,
   "pass_rate": 96.9,
-  "effective_pass": 757,
+  "effective_pass": 758,
   "effective_pass_rate": 99.1,
   "breakdown": {
     "output_mismatch": 7,
@@ -7824,6 +7824,22 @@
         "matching_lines": 6
       },
       "duration": 0.91,
+      "status": "pass"
+    },
+    {
+      "test": "netstream_play_flv_screen",
+      "phases": {
+        "recomp": 0.023,
+        "compile": 29.451,
+        "run": 0.012
+      },
+      "num_frames": 60,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 29.49,
       "status": "pass"
     },
     {

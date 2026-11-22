@@ -12,7 +12,7 @@
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
 | audio | 4 | 5 | 80.0% | [details](ruffle-tests/tests/swfs/audio/_results/results_filtered.md) |
-| avm1 | 740 | 764 | 96.9% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
+| avm1 | 741 | 765 | 96.9% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
 | avm2 | 1280 | 1302 | 98.3% | [details](ruffle-tests/tests/swfs/avm2/_results/results_filtered.md) |
 | fonts | 8 | 9 | 88.9% | [details](ruffle-tests/tests/swfs/fonts/_results/results_filtered.md) |
 | from_avmplus | 1533 | 1572 | 97.5% | [details](ruffle-tests/tests/swfs/from_avmplus/_results/results_filtered.md) |
@@ -31,9 +31,9 @@
 | text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
 | timeline | 14 | 17 | 82.4% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
 | visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
-| **Total** | **4397** | **4643** | **94.7%** | |
+| **Total** | **4398** | **4644** | **94.7%** | |
 
-*64 tests ignored.*
+*63 tests ignored.*
 
 ## Line-Level Accuracy
 
@@ -119,11 +119,11 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm1
 
-- **Pass:** 740/764 (96.9%)
-- **Ignored:** 16 tests
+- **Pass:** 741/765 (96.9%)
+- **Ignored:** 15 tests
 - **Duration:** 51m00s across 30 shards
 - **Lines:** 115,895/119,408 matching (97.1%)
-- **Avg test duration:** 3.9s — slowest: `root_button_mode` (23.5s)
+- **Avg test duration:** 3.9s — slowest: `netstream_play_flv_screen` (29.5s)
 
 ### avm2
 
