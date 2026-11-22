@@ -1,0 +1,4 @@
+f1 tf.w=109 tf.h=20 sh.w=15 sh.h=14 mo.w=10 mo.h=20 hit=true
+child text=BOUND type=object
+f2 tf.w=109 tf.h=20 sh.w=15 sh.h=14 mo.w=10 mo.h=20 hit=true
+child text=BOUND type=object

@@ -44,21 +44,38 @@ void* ng_get_root_display_obj(void)
 	return &ng_root_display_obj;
 }
 
+// Grow a per-character metadata table (doubling). These registries were fixed
+// arrays (64-256 entries) that silently DROPPED every character past the cap:
+// Metanet "N" defines 197 EditTexts, 291 shapes and 86 morph shapes, so its
+// late HUD fields (time readout, level name) never got a TextField wrapper and
+// late shapes/morphs had no bounds (`_width` 0) — n-tile-color-hud slice.
+// Returns 0 (caller drops the entry, as before) only on OOM.
+static int ng_table_grow(void** table, size_t* cap, size_t elem, size_t initial)
+{
+	size_t ncap = (*cap == 0) ? initial : *cap * 2;
+	void* t = realloc(*table, ncap * elem);
+	if (t == NULL) return 0;
+	memset((char*)t + *cap * elem, 0, (ncap - *cap) * elem);
+	*table = t;
+	*cap = ncap;
+	return 1;
+}
+
 // ---------------------------------------------------------------------------
 // Character bounds registry (shapes/morph shapes)
 // ---------------------------------------------------------------------------
-#define MAX_CHAR_BOUNDS_NG 256
-static struct {
+static struct ng_char_bounds_ent {
 	size_t char_id;
 	s32 xmin, xmax, ymin, ymax;  // twips
-} ng_char_bounds[MAX_CHAR_BOUNDS_NG];
+} *ng_char_bounds;
+static size_t ng_char_bounds_cap = 0;
 static size_t ng_char_bounds_count = 0;
 
-#define MAX_MORPH_END_BOUNDS_NG 64
-static struct {
+static struct ng_morph_end_bounds_ent {
 	size_t char_id;
 	s32 xmin, xmax, ymin, ymax;  // twips (end shape bounds)
-} ng_morph_end_bounds[MAX_MORPH_END_BOUNDS_NG];
+} *ng_morph_end_bounds;
+static size_t ng_morph_end_bounds_cap = 0;
 static size_t ng_morph_end_bounds_count = 0;
 
 void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax)
@@ -77,7 +94,7 @@ void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 yma
 			return;
 		}
 	}
-	if (ng_char_bounds_count >= MAX_CHAR_BOUNDS_NG) return;
+	if (ng_char_bounds_count >= ng_char_bounds_cap && !ng_table_grow((void**)&ng_char_bounds, &ng_char_bounds_cap, sizeof(*ng_char_bounds), 256)) return;
 	ng_char_bounds[ng_char_bounds_count].char_id = char_id;
 	ng_char_bounds[ng_char_bounds_count].xmin = xmin;
 	ng_char_bounds[ng_char_bounds_count].xmax = xmax;
@@ -96,7 +113,7 @@ void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s3
 			return;
 		}
 	}
-	if (ng_morph_end_bounds_count >= MAX_MORPH_END_BOUNDS_NG) return;
+	if (ng_morph_end_bounds_count >= ng_morph_end_bounds_cap && !ng_table_grow((void**)&ng_morph_end_bounds, &ng_morph_end_bounds_cap, sizeof(*ng_morph_end_bounds), 64)) return;
 	ng_morph_end_bounds[ng_morph_end_bounds_count].char_id = char_id;
 	ng_morph_end_bounds[ng_morph_end_bounds_count].xmin = xmin;
 	ng_morph_end_bounds[ng_morph_end_bounds_count].xmax = xmax;
@@ -152,8 +169,7 @@ int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
 // ---------------------------------------------------------------------------
 // Path data registry (vector-path hit testing)
 // ---------------------------------------------------------------------------
-#define MAX_CHAR_PATHS_NG 256
-static struct {
+static struct ng_char_paths_ent {
 	size_t char_id;
 	size_t path_offset;
 	size_t path_size;
@@ -164,11 +180,11 @@ static struct {
 	// reason: a loaded child's offset against the root's array is either the
 	// wrong outline or an out-of-bounds read.
 	const float (*table)[3];
-} ng_char_paths[MAX_CHAR_PATHS_NG];
+} *ng_char_paths;
+static size_t ng_char_paths_cap = 0;
 static size_t ng_char_paths_count = 0;
 
-#define MAX_MORPH_PATHS_NG 64
-static struct {
+static struct ng_morph_paths_ent {
 	size_t char_id;
 	size_t path_offset;
 	size_t path_size;
@@ -176,11 +192,12 @@ static struct {
 	// path offsets are numbered in ITS path_data. Without this a child's
 	// hitTest(x, y, true) on a morph shape walked the root's outline.
 	const float (*table)[3];
-} ng_morph_paths[MAX_MORPH_PATHS_NG];
+} *ng_morph_paths;
+static size_t ng_morph_paths_cap = 0;
 static size_t ng_morph_paths_count = 0;
 
-#define MAX_WINDING_NG 64
-static size_t ng_winding_ids[MAX_WINDING_NG];
+static size_t* ng_winding_ids;
+static size_t ng_winding_ids_cap = 0;
 static size_t ng_winding_count = 0;
 
 // The path_data table of the movie whose tagInit is running (NULL = main).
@@ -210,7 +227,7 @@ void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size)
 			return;
 		}
 	}
-	if (ng_char_paths_count >= MAX_CHAR_PATHS_NG) return;
+	if (ng_char_paths_count >= ng_char_paths_cap && !ng_table_grow((void**)&ng_char_paths, &ng_char_paths_cap, sizeof(*ng_char_paths), 256)) return;
 	ng_char_paths[ng_char_paths_count].char_id = char_id;
 	ng_char_paths[ng_char_paths_count].path_offset = path_offset;
 	ng_char_paths[ng_char_paths_count].path_size = path_size;
@@ -240,7 +257,7 @@ void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size)
 			return;
 		}
 	}
-	if (ng_morph_paths_count >= MAX_MORPH_PATHS_NG) return;
+	if (ng_morph_paths_count >= ng_morph_paths_cap && !ng_table_grow((void**)&ng_morph_paths, &ng_morph_paths_cap, sizeof(*ng_morph_paths), 64)) return;
 	ng_morph_paths[ng_morph_paths_count].char_id = char_id;
 	ng_morph_paths[ng_morph_paths_count].path_offset = path_offset;
 	ng_morph_paths[ng_morph_paths_count].path_size = path_size;
@@ -273,7 +290,7 @@ void ng_record_text_path_table(size_t char_id)
 			return;
 		}
 	}
-	if (ng_char_paths_count >= MAX_CHAR_PATHS_NG) return;
+	if (ng_char_paths_count >= ng_char_paths_cap && !ng_table_grow((void**)&ng_char_paths, &ng_char_paths_cap, sizeof(*ng_char_paths), 256)) return;
 	ng_char_paths[ng_char_paths_count].char_id = char_id;
 	ng_char_paths[ng_char_paths_count].path_offset = 0;
 	ng_char_paths[ng_char_paths_count].path_size = 0;   // no run: see above
@@ -286,7 +303,8 @@ void ng_record_char_winding(size_t char_id)
 	// Idempotent per char_id (see ng_record_char_bounds).
 	for (size_t i = 0; i < ng_winding_count; i++)
 		if (ng_winding_ids[i] == char_id) return;
-	if (ng_winding_count < MAX_WINDING_NG)
+	if (ng_winding_count < ng_winding_ids_cap
+	    || ng_table_grow((void**)&ng_winding_ids, &ng_winding_ids_cap, sizeof(*ng_winding_ids), 64))
 		ng_winding_ids[ng_winding_count++] = char_id;
 }
 
@@ -1057,8 +1075,7 @@ int ng_getFontItalic(u16 font_id)
 // ---------------------------------------------------------------------------
 // TextField property registry
 // ---------------------------------------------------------------------------
-#define MAX_TEXTFIELDS_NG 64
-static struct {
+static struct ng_textfields_ent {
 	size_t char_id;
 	char plain_text[1024];
 	char raw_html_text[1024];
@@ -1078,7 +1095,9 @@ static struct {
 	float csm_thickness;
 	float csm_sharpness;
 	int csm_applied;
-} ng_textfields[MAX_TEXTFIELDS_NG];
+	u8 src_swf_version;   // see ng_getTextFieldSrcSwfVersion
+} *ng_textfields;
+static size_t ng_textfields_cap = 0;
 static size_t ng_textfield_count = 0;
 
 int ng_find_textfield(size_t char_id)
@@ -1091,11 +1110,10 @@ int ng_find_textfield(size_t char_id)
 // SWF version of the movie whose DefineEditText defined each slot (an
 // ImportAssets child like gnash Dejagnu.swf defines its fields with
 // g_swf_version transiently set to its own version). 0 = unknown.
-static u8 ng_textfield_src_swf_version[MAX_TEXTFIELDS_NG];
 int ng_getTextFieldSrcSwfVersion(int tf_idx)
 {
-	if (tf_idx < 0 || tf_idx >= MAX_TEXTFIELDS_NG) return 0;
-	return ng_textfield_src_swf_version[tf_idx];
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+	return ng_textfields[tf_idx].src_swf_version;
 }
 
 void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
@@ -1114,13 +1132,13 @@ void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
 	if (_existing >= 0) {
 		i = (size_t)_existing;
 	} else {
-		if (ng_textfield_count >= MAX_TEXTFIELDS_NG) return;
+		if (ng_textfield_count >= ng_textfields_cap && !ng_table_grow((void**)&ng_textfields, &ng_textfields_cap, sizeof(*ng_textfields), 256)) return;
 		i = ng_textfield_count++;
 	}
 	ng_textfields[i].char_id = char_id;
 	{
 		extern int g_swf_version;
-		ng_textfield_src_swf_version[i] = (u8) g_swf_version;
+		ng_textfields[i].src_swf_version = (u8) g_swf_version;
 	}
 	strncpy(ng_textfields[i].plain_text, plain_text ? plain_text : "", sizeof(ng_textfields[i].plain_text) - 1);
 	ng_textfields[i].plain_text[sizeof(ng_textfields[i].plain_text) - 1] = '\0';

@@ -3016,9 +3016,13 @@ typedef struct { DisplayObject* obj; u32 original_id; } CxformOverride;
 static CxformOverride g_cxform_overrides[MAX_CXFORM_OVERRIDES];
 static int g_cxform_override_count;
 
+static int g_attached_cx_cache_n;   // attached_mc_world_cxform slot dedupe
 static void cxform_overrides_reset(void)
 {
 	g_cxform_override_count = 0;
+	// Called at both per-frame rewinds of g_next_dynamic_cxform_slot: every
+	// cached dynamic slot is about to be reused for other content.
+	g_attached_cx_cache_n = 0;
 }
 
 static void cxform_overrides_push(DisplayObject* obj, u32 original_id)
@@ -3735,6 +3739,9 @@ static void cab_snap_root_leaf(SWFAppContext* app_context, DisplayObject* obj)
 	renderer_write_transform(context, slot, snapped);
 }
 
+#ifndef NO_GRAPHICS
+static int attached_mc_local_cxform(float out[20], const MovieClip* mc);
+#endif
 // `parent_cx` carries the parent's concatenated colour transform as VALUES
 // (NULL = identity). Passing values rather than the parent's GPU slot id is
 // what lets this compose instead of inherit — the slot itself can't be read
@@ -3910,22 +3917,23 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 		// already here; what was missing was the parent's VALUES.
 		float own_cx[20];
 		int have_own = 0;
+		int attached_own_cx = 0;
 		if (obj->cx_overridden) {
 			// Timeline-placed child whose entry carries a runtime cxform
 			// (mcSyncAlphaToDisplayObj writes through mc->display_obj, which
 			// IS this entry for timeline children).
 			build_cxform_from_obj(own_cx, obj);
 			have_own = 1;
-		} else if (attached_mc != NULL && (attached_mc->as_set_flags & 32)) {
+		} else if (attached_mc != NULL
+		           && ((attached_mc->as_set_flags & 32)
+		               || attached_mc_local_cxform(own_cx, attached_mc))) {
 			// attachMovie-placed child: its display_obj is a STANDALONE
 			// struct (see build_attached_mc_local_xform), so runtime state
-			// lives on the MC — mirror the spatial overlay and build an
-			// alpha-only cxform from mc->alpha.
-			memset(own_cx, 0, sizeof(own_cx));
-			own_cx[0] = own_cx[5] = own_cx[10] = 1.0f;
-			own_cx[15] = attached_mc->alpha / 100.0f;
-			if (own_cx[15] < 0.0f) own_cx[15] = 0.0f;
+			// lives on the MC — mirror the spatial overlay and build the
+			// cxform from mc->cx_* (Color) and mc->alpha (_alpha).
+			attached_mc_local_cxform(own_cx, attached_mc);
 			have_own = 1;
+			attached_own_cx = 1;
 		} else {
 			// Static PlaceObject cxform on this entry — previously only ever
 			// consulted at the ROOT call sites, and silently dropped here.
@@ -3979,7 +3987,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 			eff_slot = parent_cxform_id;
 		} else if (eff_cx_valid
 		           && (parent_cx != NULL || obj->cx_overridden || own_rt_cm
-		               || (attached_mc != NULL && (attached_mc->as_set_flags & 32)))) {
+		               || attached_own_cx)) {
 			u32 cx_slot = g_next_dynamic_cxform_slot;
 			if (cx_slot < g_cxform_slot_capacity) {
 				g_next_dynamic_cxform_slot++;
@@ -8089,6 +8097,148 @@ static void compose_root_text_instance(SWFAppContext* app_context,
 }
 #endif
 
+#ifndef NO_GRAPHICS
+// An attachMovie'd / dynamic clip's colour transform as values, from its AS
+// state: Color.setRGB / setTransform / transform.colorTransform keep mc->cx_*
+// (setLocalCTRaw mirrors them there whether or not a display entry resolves),
+// `_alpha` keeps mc->alpha. The clip's STANDALONE display_obj is a container
+// that is never drawn itself, so nothing ever read the tint: N's ~900
+// `new Color(tileMC).setRGB(0x797A88)` tiles rendered the raw #333
+// (n-tile-color-hud slice). Returns 1 when non-identity.
+static int attached_mc_local_cxform(float out[20], const MovieClip* mc)
+{
+	memset(out, 0, 20 * sizeof(float));
+	// Parentless clips (_root, _levelN roots) never take this route, and
+	// getOrCreateLevel's HCALLOC leaves their cx_* / alpha at 0 (= black).
+	if (mc->parent == NULL) { cx_set_identity(out); return 0; }
+	out[0]  = mc->cx_ra / 100.0f;
+	out[5]  = mc->cx_ga / 100.0f;
+	out[10] = mc->cx_ba / 100.0f;
+	out[15] = mc->alpha / 100.0f;
+	if (out[15] < 0.0f) out[15] = 0.0f;
+	out[16] = mc->cx_rb / 255.0f;
+	out[17] = mc->cx_gb / 255.0f;
+	out[18] = mc->cx_bb / 255.0f;
+	out[19] = mc->cx_ab / 255.0f;
+	return !cx_is_identity(out);
+}
+
+// World colour of attached clip `mc` (its own, composed under every
+// non-root ancestor's AS-set one: a standalone nested attach is drawn by its
+// own render_attached_child call, not through the parent's compose), minted
+// into a dynamic cxform slot for compose_children's `parent_cx` /
+// `parent_cxform_id`. Slots are deduplicated per frame: there are only 256
+// and a tile map tints hundreds of clips with ONE colour.
+#define ATTACHED_CX_CACHE 8
+static float g_attached_cx_cache[ATTACHED_CX_CACHE][20];
+static u32 g_attached_cx_cache_slot[ATTACHED_CX_CACHE];
+static int attached_mc_world_cxform(const MovieClip* mc, float out[20], u32* slot)
+{
+	extern MovieClip root_movieclip;
+	int any = attached_mc_local_cxform(out, mc);
+	int guard = 0;
+	for (const MovieClip* p = mc->parent; p != NULL && p != &root_movieclip && guard < 64;
+	     p = p->parent, guard++)
+	{
+		float P[20], t[20];
+		if (!attached_mc_local_cxform(P, p)) continue;
+		compose_cxform20(t, P, out);
+		memcpy(out, t, sizeof(t));
+		any = 1;
+	}
+	if (!any || cx_is_identity(out)) return 0;
+	for (int k = 0; k < g_attached_cx_cache_n; k++) {
+		if (memcmp(g_attached_cx_cache[k], out, 20 * sizeof(float)) == 0) {
+			*slot = g_attached_cx_cache_slot[k];
+			return 1;
+		}
+	}
+	if (g_next_dynamic_cxform_slot >= g_cxform_slot_capacity) return 0;
+	u32 s = g_next_dynamic_cxform_slot++;
+	renderer_write_cxform(context, s, out);
+	if (g_attached_cx_cache_n < ATTACHED_CX_CACHE) {
+		memcpy(g_attached_cx_cache[g_attached_cx_cache_n], out, 20 * sizeof(float));
+		g_attached_cx_cache_slot[g_attached_cx_cache_n++] = s;
+	}
+	*slot = s;
+	return 1;
+}
+#endif
+
+#ifndef NO_GRAPHICS
+// Flash render order for the attached (child_mc_cache) post-loop passes:
+// _root's children by depth, each subtree in depth order under its parent.
+// child_mc_cache is CREATION order, so a clip made early in a high buffer
+// drew UNDER clips attached later into lower buffers. N builds its GUI layer
+// (spritebuffer2100: time bar, level name) at startup and its tiles
+// (spritebuffer1700) at level load, so the wall tiles painted over the whole
+// HUD (n-tile-color-hud slice). Key = the depth path from the top of the
+// chain (shorter path = ancestor = drawn first), prefixed with the level so
+// _levelN content stays above _level0. Ties (impossible for live siblings)
+// fall back to cache order, keeping the sort deterministic.
+#define ATTACHED_ORDER_KEY 12
+typedef struct { MovieClip* mc; int idx; int n; int key[ATTACHED_ORDER_KEY + 1]; } AttachedOrderEnt;
+static AttachedOrderEnt* g_attached_order;
+static int g_attached_order_cap;
+static int attached_order_cmp(const void* a, const void* b)
+{
+	const AttachedOrderEnt* x = (const AttachedOrderEnt*) a;
+	const AttachedOrderEnt* y = (const AttachedOrderEnt*) b;
+	int n = x->n < y->n ? x->n : y->n;
+	for (int k = 0; k < n; k++)
+		if (x->key[k] != y->key[k]) return x->key[k] < y->key[k] ? -1 : 1;
+	if (x->n != y->n) return x->n < y->n ? -1 : 1;
+	return x->idx - y->idx;
+}
+// Sorts `list` (n clips, cache order) in place into render order.
+static void attached_sort_render_order(MovieClip** list, int n)
+{
+	extern MovieClip root_movieclip;
+	if (n < 2) return;
+	if (n > g_attached_order_cap) {
+		int cap = n + 256;
+		AttachedOrderEnt* g = (AttachedOrderEnt*) realloc(g_attached_order, (size_t) cap * sizeof(AttachedOrderEnt));
+		if (g == NULL) return;   // keep cache order
+		g_attached_order = g;
+		g_attached_order_cap = cap;
+	}
+	for (int i = 0; i < n; i++) {
+		AttachedOrderEnt* e = &g_attached_order[i];
+		e->mc = list[i];
+		e->idx = i;
+		int path[64];
+		int len = 0;
+		const MovieClip* c = list[i];
+		while (c != NULL && c != &root_movieclip && len < 64) {
+			path[len++] = c->depth;
+			if (c->parent == NULL) break;   // a _levelN root
+			c = c->parent;
+		}
+		// Level prefix: 0 under _root, 1 + level depth for _levelN chains.
+		e->key[0] = (c == &root_movieclip || c == NULL) ? 0 : 1 + (c->depth + 16384);
+		if (c != NULL && c != &root_movieclip && len > 0) len--;   // the level root itself
+		int m = len < ATTACHED_ORDER_KEY ? len : ATTACHED_ORDER_KEY;
+		for (int k = 0; k < m; k++) e->key[1 + k] = path[len - 1 - k];
+		e->n = 1 + m;
+	}
+	qsort(g_attached_order, (size_t) n, sizeof(AttachedOrderEnt), attached_order_cmp);
+	for (int i = 0; i < n; i++) list[i] = g_attached_order[i].mc;
+}
+static MovieClip** g_attached_pass_list;
+static int g_attached_pass_cap;
+static MovieClip** attached_pass_list(int need)
+{
+	if (need > g_attached_pass_cap) {
+		int cap = need + 256;
+		MovieClip** l = (MovieClip**) realloc(g_attached_pass_list, (size_t) cap * sizeof(MovieClip*));
+		if (l == NULL) return NULL;
+		g_attached_pass_list = l;
+		g_attached_pass_cap = cap;
+	}
+	return g_attached_pass_list;
+}
+#endif
+
 // Re-render current display list state (for headless per-tick image capture).
 // Only does the rendering pass — no frame script processing, no sprite init, etc.
 #ifdef OFFSCREEN_RENDER
@@ -8422,8 +8572,20 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	{
 		extern MovieClip* child_mc_cache[];
 		extern int child_mc_count;
+		// Depth order, as tagShowFrame's pass (attached_sort_render_order).
+		MovieClip** order = attached_pass_list(child_mc_count);
+		int order_n = 0;
 		for (int i = 0; i < child_mc_count; i++) {
 			MovieClip* mc = child_mc_cache[i];
+			if (mc == NULL) continue;
+			if (mc->depth == INT_MIN) continue;
+			if (mc->parent != &root_movieclip) continue;
+			if (order != NULL) order[order_n++] = mc;
+		}
+		if (order != NULL) attached_sort_render_order(order, order_n);
+		int pass_n = (order != NULL) ? order_n : child_mc_count;
+		for (int i = 0; i < pass_n; i++) {
+			MovieClip* mc = (order != NULL) ? order[i] : child_mc_cache[i];
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;
 			if (mc->parent != &root_movieclip) continue;
@@ -8449,8 +8611,12 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (mc->as_set_flags != 0) {
 				apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
 			}
+			float att_cx[20];
+			u32 att_cx_slot = 0;
+			int att_has_cx = attached_mc_world_cxform(mc, att_cx, &att_cx_slot);
 			compose_children(app_context, d->sprite_display_list,
-				d->sprite_max_depth, mc_xform, NULL, 0);
+				d->sprite_max_depth, mc_xform,
+				att_has_cx ? att_cx : NULL, att_cx_slot);
 			actionRenderMCDrawingsInline(mc, drawing_render_cb, NULL);
 			render_display_list(app_context, d->sprite_display_list,
 				d->sprite_max_depth);
@@ -8668,8 +8834,12 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
 	float mc_xform[16];
 	hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
+	float att_cx[20];
+	u32 att_cx_slot = 0;
+	int att_has_cx = attached_mc_world_cxform(mc, att_cx, &att_cx_slot);
 	compose_children(app_context, d->sprite_display_list,
-		d->sprite_max_depth, mc_xform, NULL, 0);
+		d->sprite_max_depth, mc_xform,
+		att_has_cx ? att_cx : NULL, att_cx_slot);
 	// setMask maskee: dynamic clips with display-list content get the same
 	// stencil push/restore as timeline entries (mask defect B).
 	MovieClip* avm1_masker = (MovieClip*)actionAvm1MaskerForMC(mc);
@@ -9491,6 +9661,10 @@ void tagShowFrame(SWFAppContext* app_context)
 	{
 		extern MovieClip* child_mc_cache[];
 		extern int child_mc_count;
+		// Gather in cache order, then draw in depth order
+		// (attached_sort_render_order). Falls back to cache order on OOM.
+		MovieClip** order = attached_pass_list(child_mc_count);
+		int order_n = 0;
 		for (int i = 0; i < child_mc_count; i++) {
 			MovieClip* mc = child_mc_cache[i];
 			if (mc == NULL) continue;
@@ -9509,7 +9683,13 @@ void tagShowFrame(SWFAppContext* app_context)
 			// correctly layer above all timeline content.
 			if (attached_parent_dl_index(mc) >= 0) continue;
 #endif
-			render_attached_child(app_context, mc);
+			if (order != NULL) order[order_n++] = mc;
+			else render_attached_child(app_context, mc);
+		}
+		if (order != NULL) {
+			attached_sort_render_order(order, order_n);
+			for (int i = 0; i < order_n; i++)
+				render_attached_child(app_context, order[i]);
 		}
 	}
 
