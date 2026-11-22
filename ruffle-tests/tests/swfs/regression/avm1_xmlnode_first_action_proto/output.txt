@@ -1,0 +1,2 @@
+XMLNode.prototype hOP typeof: function
+XMLNode.prototype.hOP(zz): false
