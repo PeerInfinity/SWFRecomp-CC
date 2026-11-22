@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-21T23:52:47.775790+00:00",
-    "old_git_sha": "161ecf124012e98f5652a344cac20090858666e5",
-    "new_timestamp": "2026-11-22T04:05:39.664655+00:00",
-    "new_git_sha": "10b5dff69c36c511d91cffaa7db502f91e881cba",
+    "old_timestamp": "2026-11-22T04:05:39.664655+00:00",
+    "old_git_sha": "10b5dff69c36c511d91cffaa7db502f91e881cba",
+    "new_timestamp": "2026-11-22T07:25:23.201043+00:00",
+    "new_git_sha": "9561027db32b619f6a6044e7e833a1a0ac824ab3",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 108,
+    "old_pass": 111,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 108,
-    "old_total": 108,
+    "old_effective_pass": 111,
+    "old_total": 111,
     "old_pass_rate": 100.0,
-    "new_pass": 111,
+    "new_pass": 114,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 111,
-    "new_total": 111,
+    "new_effective_pass": 114,
+    "new_total": 114,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,45 +25,45 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 108,
+    "unchanged": 111,
     "added": 3,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_runtime_filters",
+      "test": "avm1_array_native_own_method",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
       }
     },
     {
-      "test": "avm1_xml_first_action_proto",
+      "test": "avm1_attached_clip_tagorder",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
       }
     },
     {
-      "test": "avm1_xmlnode_first_action_proto",
+      "test": "avm1_attached_clip_tagorder_nonroot",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
       }
     }
   ]
