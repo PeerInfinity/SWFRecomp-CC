@@ -43,3 +43,4 @@ handshake sent).
 
 | run | mode / categories / images | code | result |
 |---|---|---|---|
+| 45060637552 | graphics / full / **images** | 2f7be1710 (drift-avm2 +2 trace; blend-mask +3 px; pixel-text +3 px) | pending (Pages dry run 45060640334) |
