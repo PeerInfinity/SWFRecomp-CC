@@ -6,26 +6,26 @@
 
 **Run Duration**: 207m 31s
 
-**Filtered**: 38 tests ignored out of 1336 available
+**Filtered**: 34 tests ignored out of 1336 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 1298 |
-| Passing | **1272** (98.0%) |
+| Total tests | 1302 |
+| Passing | **1272** (97.7%) |
 | Ruffle-matched | 20 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **1292** (99.5%) |
-| Failing | 6 |
-| Total expected lines | 158455 |
-| Matching lines | 157006 (99.1%) |
-| Mismatched lines | 1449 |
+| Effective pass | **1292** (99.2%) |
+| Failing | 10 |
+| Total expected lines | 158649 |
+| Matching lines | 157007 (99.0%) |
+| Mismatched lines | 1642 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 6 | 100.0% |
+| Output Mismatch | 10 | 100.0% |
 
 ## Passing Tests
 
@@ -1357,7 +1357,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**6 tests** with output mismatch, sorted by match rate (best first)
+**10 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -1365,5 +1365,9 @@ No timeouts.
 | 2 | `primitive_bound_methods` | 45.5% | 5/11 | 11 | 11 |  |
 | 3 | `soundchannel_position_after_end` | 33.3% | 2/6 | 6 | 6 |  |
 | 4 | `bitmapdata_encode` | 17.7% | 26/147 | 31 | 147 |  |
-| 5 | `worker_terminate` | 1.8% | 1/56 | 3 | 56 |  |
-| 6 | `textline_metrics` | 0.0% | 0/20 | 20 | 20 |  |
+| 5 | `netstream_play_stop_replay` | 9.1% | 1/11 | 1 | 11 |  |
+| 6 | `worker_terminate` | 1.8% | 1/56 | 3 | 56 |  |
+| 7 | `audio_computespectrum` | 0.0% | 0/118 | 0 | 118 |  |
+| 8 | `netstream_play_flv` | 0.0% | 0/16 | 1 | 16 |  |
+| 9 | `netstream_seek_flv` | 0.0% | 0/49 | 1 | 49 |  |
+| 10 | `textline_metrics` | 0.0% | 0/20 | 20 | 20 |  |
