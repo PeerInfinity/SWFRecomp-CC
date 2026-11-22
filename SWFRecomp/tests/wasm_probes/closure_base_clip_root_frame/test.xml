@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="1">
+  <Header framerate="30" frames="1">
+    <size>
+      <Rectangle left="0" right="4000" top="0" bottom="3000"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color>
+          <Color red="255" green="255" blue="255"/>
+        </color>
+      </SetBackgroundColor>
+      <DefineSprite objectID="20480" frames="1">
+        <tags>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <Export>
+        <symbols>
+          <Symbol objectID="20480" name="__Packages.Test"/>
+        </symbols>
+      </Export>
+      <DoInitAction sprite="20480">
+        <actions>
+          <Dictionary>
+            <strings>
+              <String value="Test"/>
+              <String value="_global"/>
+              <String value="prototype"/>
+              <String value="main"/>
+              <String value="_root"/>
+              <String value="LIMIT"/>
+              <String value="f"/>
+              <String value="BC: fn "/>
+              <String value=" "/>
+              <String value="Gui"/>
+              <String value="Display"/>
+              <String value="BC: method "/>
+              <String value="gui"/>
+              <String value="c"/>
+              <String value="createEmptyMovieClip"/>
+              <String value="onEnterFrame"/>
+              <String value="BC: handler LIMIT="/>
+              <String value="BC: done"/>
+              <String value="ASSetPropFlags"/>
+            </strings>
+          </Dictionary>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="0"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <LogicalNOT/>
+          <LogicalNOT/>
+          <BranchIfTrue byteOffset="438"/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="1"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="0"/>
+            </items>
+          </PushData>
+          <DeclareFunction2 name="" argc="0" regc="3" preloadParent="0" preloadRoot="0" suppressSuper="0" preloadSuper="1" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+            <args/>
+            <actions/>
+          </DeclareFunction2>
+          <StoreRegister reg="0"/>
+          <SetMember/>
+          <PushData>
+            <items>
+              <StackRegister reg="0"/>
+              <StackDictionaryLookup index="2"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <StoreRegister reg="1"/>
+          <Pop/>
+          <PushData>
+            <items>
+              <StackRegister reg="0"/>
+              <StackDictionaryLookup index="3"/>
+            </items>
+          </PushData>
+          <DeclareFunction2 name="" argc="1" regc="4" preloadParent="0" preloadRoot="0" suppressSuper="1" preloadSuper="0" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+            <args>
+              <Parameter reg="2" name="mc"/>
+            </args>
+            <actions>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="5"/>
+                  <StackInteger value="17"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <DeclareFunction2 name="" argc="1" regc="3" preloadParent="0" preloadRoot="0" suppressSuper="1" preloadSuper="0" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+                <args>
+                  <Parameter reg="2" name="id"/>
+                </args>
+                <actions>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="7"/>
+                      <StackRegister reg="2"/>
+                    </items>
+                  </PushData>
+                  <AddTyped/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="8"/>
+                    </items>
+                  </PushData>
+                  <AddTyped/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="5"/>
+                    </items>
+                  </PushData>
+                  <GetVariable/>
+                  <PushData>
+                    <items>
+                      <StackRegister reg="2"/>
+                    </items>
+                  </PushData>
+                  <LessThanTyped/>
+                  <AddTyped/>
+                  <Trace/>
+                </actions>
+              </DeclareFunction2>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="9"/>
+                </items>
+              </PushData>
+              <DeclareFunction2 name="" argc="0" regc="2" preloadParent="0" preloadRoot="0" suppressSuper="1" preloadSuper="0" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+                <args/>
+                <actions/>
+              </DeclareFunction2>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="9"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="2"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="10"/>
+                </items>
+              </PushData>
+              <DeclareFunction2 name="" argc="1" regc="3" preloadParent="0" preloadRoot="0" suppressSuper="1" preloadSuper="0" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+                <args>
+                  <Parameter reg="2" name="id"/>
+                </args>
+                <actions>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="11"/>
+                      <StackRegister reg="2"/>
+                    </items>
+                  </PushData>
+                  <AddTyped/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="8"/>
+                    </items>
+                  </PushData>
+                  <AddTyped/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="5"/>
+                    </items>
+                  </PushData>
+                  <GetVariable/>
+                  <PushData>
+                    <items>
+                      <StackRegister reg="2"/>
+                    </items>
+                  </PushData>
+                  <LessThanTyped/>
+                  <AddTyped/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="8"/>
+                    </items>
+                  </PushData>
+                  <AddTyped/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="5"/>
+                    </items>
+                  </PushData>
+                  <GetVariable/>
+                  <AddTyped/>
+                  <Trace/>
+                </actions>
+              </DeclareFunction2>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="12"/>
+                  <StackInteger value="0"/>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="9"/>
+                </items>
+              </PushData>
+              <NewMethod/>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="13"/>
+                  <StackInteger value="2"/>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="14"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <StoreRegister reg="3"/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="15"/>
+                </items>
+              </PushData>
+              <DeclareFunction2 name="" argc="0" regc="3" preloadParent="0" preloadRoot="0" suppressSuper="1" preloadSuper="0" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+                <args/>
+                <actions>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="16"/>
+                      <StackDictionaryLookup index="5"/>
+                    </items>
+                  </PushData>
+                  <GetVariable/>
+                  <AddTyped/>
+                  <Trace/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="6"/>
+                    </items>
+                  </PushData>
+                  <GetVariable/>
+                  <StoreRegister reg="2"/>
+                  <Pop/>
+                  <PushData>
+                    <items>
+                      <StackInteger value="18"/>
+                      <StackInteger value="1"/>
+                      <StackRegister reg="2"/>
+                      <StackUndefined/>
+                    </items>
+                  </PushData>
+                  <CallMethod/>
+                  <Pop/>
+                  <PushData>
+                    <items>
+                      <StackInteger value="18"/>
+                      <StackInteger value="1"/>
+                      <StackDictionaryLookup index="4"/>
+                    </items>
+                  </PushData>
+                  <GetVariable/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="6"/>
+                    </items>
+                  </PushData>
+                  <CallMethod/>
+                  <Pop/>
+                  <PushData>
+                    <items>
+                      <StackInteger value="27"/>
+                      <StackInteger value="1"/>
+                      <StackDictionaryLookup index="4"/>
+                    </items>
+                  </PushData>
+                  <GetVariable/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="12"/>
+                    </items>
+                  </PushData>
+                  <GetMember/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="10"/>
+                    </items>
+                  </PushData>
+                  <CallMethod/>
+                  <Pop/>
+                  <PushData>
+                    <items>
+                      <StackRegister reg="1"/>
+                      <StackDictionaryLookup index="15"/>
+                    </items>
+                  </PushData>
+                  <Delete/>
+                  <Pop/>
+                  <PushData>
+                    <items>
+                      <StackDictionaryLookup index="17"/>
+                    </items>
+                  </PushData>
+                  <Trace/>
+                </actions>
+              </DeclareFunction2>
+              <SetMember/>
+            </actions>
+          </DeclareFunction2>
+          <SetMember/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+              <StackNull/>
+              <StackRegister reg="1"/>
+              <StackInteger value="3"/>
+              <StackDictionaryLookup index="18"/>
+            </items>
+          </PushData>
+          <CallFunction/>
+          <Pop/>
+          <EndAction/>
+        </actions>
+      </DoInitAction>
+      <DoAction>
+        <actions>
+          <Dictionary>
+            <strings>
+              <String value="MTASC_MAIN"/>
+              <String value="this"/>
+              <String value="Test"/>
+              <String value="main"/>
+            </strings>
+          </Dictionary>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="0"/>
+            </items>
+          </PushData>
+          <StoreRegister reg="0"/>
+          <Pop/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="1"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+              <StackDictionaryLookup index="2"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="3"/>
+            </items>
+          </PushData>
+          <CallMethod/>
+          <Pop/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

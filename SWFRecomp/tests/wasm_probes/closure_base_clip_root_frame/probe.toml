@@ -1,0 +1,5 @@
+known_red = false
+golden_source = "ruffle"
+settle_seconds = 2.0
+trace_prefix = "BC:"
+description = "N 'play game' (2026-11-22): swf.c now sets g_current_context=_root before tagMain in every graphics build (was OFFSCREEN_RENDER only), so root-frame DefineFunction captures base_clip=_root in browser-WASM. expected_trace.txt = Ruffle exporter trace; CI twin: ruffle-tests regression/avm1_closure_base_clip_root_frame."

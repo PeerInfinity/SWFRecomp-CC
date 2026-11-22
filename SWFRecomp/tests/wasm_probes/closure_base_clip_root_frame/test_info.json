@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "Functions defined by the ROOT frame-1 script must capture base_clip=_root, so a call from a child clip's onEnterFrame reads _root timeline vars. Browser-WASM ran frame 1 with g_current_context=NULL (OFFSCREEN-only context set in swf.c) -> base_clip=NULL -> caller-context lookup -> undefined. N 'play game'.",
+    "width": 200,
+    "height": 150,
+    "swf_version": 6
+  },
+  "opcodes": {
+    "tested": ["DefineFunction2", "GetVariable", "CallFunction", "CallMethod"]
+  }
+}

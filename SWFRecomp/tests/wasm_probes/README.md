@@ -117,6 +117,7 @@ adjudication set — one probe per suspicious cluster in
 | `droptarget_scripted` | D — gate inventory | red, **does not adjudicate** | `_droptarget` after a scripted `startDrag`/`stopDrag` with no pointer input. browser reads `""` — and so does **Ruffle**, so the red here is native-vs-browser, not Flash-vs-browser. See the caveat row below. |
 | `delete_child_mc` | D — gate inventory | green | `delete child` on a timeline child returns false and leaves `typeof` `"movieclip"`. The gated assignment at action.c:43861 is redundant with the unconditional `success = false` above it — the gate is a genuine no-op. |
 | `var_textfield_sync` | D — gate inventory | green | `var bound = "CHANGED"` refreshes the bound EditText. browser matches on **both** `text` and `length`, so the field's property bag really tracks the write and the gated `ng_syncVarToTextFields` call in `actionDefineLocal` has an equivalent un-gated path. |
+| `closure_base_clip_root_frame` | A — regression | green | Root-frame-1 functions capture `base_clip=_root` in browser-WASM. `swf.c` now sets `g_current_context=_root` before `tagMain` in every graphics build (it was OFFSCREEN-only). Trace-asserted (`trace_prefix = "BC:"`). Verified red without the fix (`handler LIMIT=` empty, bare call lost). N "play game", 2026-11-22. |
 
 ### Caveats on the group-D probes
 

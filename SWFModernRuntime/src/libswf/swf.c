@@ -1879,16 +1879,22 @@ void swfStart(SWFAppContext* app_context)
 
 	tagInit(app_context);
 
-#ifdef OFFSCREEN_RENDER
 	// Set root movieclip as default execution context (for 'this' resolution).
 	// Mirrors swf_core.c / swf_headless.c. Without this g_current_context is
 	// NULL when frame_0 runs, breaking actions that resolve through the
 	// current MC (e.g., DefineFunction / SetVariable inside imported SWFs).
+	// Every graphics build, not just OFFSCREEN_RENDER: in browser-WASM a NULL
+	// context made each root-frame DefineFunction capture base_clip=NULL, so
+	// the SWF6+ closure switch never fired and _root-defined functions read
+	// their free variables from the CALLER's clip. N's "play game" button
+	// (on(release) inside MenuMC) -> gui.Display(GUI_PLAYMENU) saw
+	// GUI_LAST_STRING_INDEX as undefined and took the text-bar branch.
+	// Fixtures: regression/avm1_closure_base_clip_root_frame (CI) +
+	// wasm_probes/closure_base_clip_root_frame (browser config).
 	{
 		extern MovieClip root_movieclip;
 		actionSetCurrentContext(&root_movieclip);
 	}
-#endif
 
 	tagMain(app_context);
 
