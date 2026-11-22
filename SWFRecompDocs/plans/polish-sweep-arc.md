@@ -3295,8 +3295,19 @@ no-graphics builds carry no libavcodec by design. One known, predicted row.
 ### 24.4 Left on the board (session 24)
 
 **Trace** (62 failing graphics rows on the intersection):
-- **AVM1 runtime `mc.filters = [...]` is never rendered on any clip** (w2-dynclip-transform R1) — game-visible; 1 corpus
-  row (`empty_child_filter_bounds`, now 24876 after the transform fix).
+- ~~AVM1 runtime `mc.filters = [...]` never rendered~~ **DONE post-s23** (`77545c5ac`, one-task cloud session
+  `avm1-runtime-filters`; `regression/avm1_runtime_filters` has a Ruffle golden). Leftover leads (report §6 / "New
+  unclaimed leads"):
+  - **L1** the AVM1 `filters` GETTER for SWF-authored (PlaceObject3) filters only resolves ROOT-depth entries
+    (`ng_objRootDepth`): a filtered clip nested in a sprite reads back `[]`. Trace-only, no corpus row measured — probe first.
+  - ColorMatrix / Convolution / DisplacementMap runtime filters are lowered to nothing (no corpus row). Mechanism: compose
+    CM into the entry's `cx_*` (placed) or the group blit (dynamic).
+  - A dynamic filter root's `attachBitmap` bitmaps, text fields and attached timeline children are not in the filter layer
+    (Drawing-API paths only). Mechanism: run `actionIterateAttachedBitmaps` + the text walk under the same root filter in
+    `dyn_filter_root_draw`. Game-visible; no corpus row.
+  - Dynamic-clip colour transform not applied to filter output (dynclip R3, pre-existing).
+- ~~Browser-WASM attached-clip timelines~~ **DONE post-s23** (`161ecf124`, local one-task session; 4
+  `regression/avm1_attached_clip_*` fixtures).
 - Attach-tick frame-1 order. **Refined in s24 (oracle-checked):** Ruffle runs an attached clip's frame-1 actions in
   TAG order — a child's frame 1 runs at its PlaceObject, so child-first only when the PlaceObject precedes the clip's
   own DoAction; with DoAction first, Ruffle prints the parent first. Both our paths (CI attach-init drain, browser live
@@ -3312,7 +3323,8 @@ no-graphics builds carry no libavcodec by design. One known, predicted row.
   `weird_number_bound_methods` (bound-method cache), `worker_terminate`, `textline_metrics` (recompiler DefineFont4),
   e4x residuals (`bug_564468` caseless CDATA → pass; `misc_errors` #1095).
 - Harness: `G-d` tick emulation (`num_ticks` with runtime `stage.frameRate` ≠ header) — HOLD until a row proves a gain.
-- Unchanged NO-GOs: `MovieClip-v8`, action_order family, `globals_monkeypatch` (rewritten upstream), `GradientFillTest`,
+- Unchanged NO-GOs: `MovieClip-v8` (runtime filters gave +10 checks → 1034/43 failing; the `filters` block is clean
+  except the 1194 `ch.toString()` Array-ctor-override check — price the other 42 separately before any slot), action_order family, `globals_monkeypatch` (rewritten upstream), `GradientFillTest`,
   `external_interface_monkeypatch`.
 
 **Pixels.** See `graphics-fanout-playbook.md` §22.

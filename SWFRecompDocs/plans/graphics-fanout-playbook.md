@@ -1302,8 +1302,10 @@ comparisons, all passing). Interim `44935781892`: 529/610 (+6). Final `449441470
 
 ### Left on the board (session 24)
 
-- **AVM1 runtime `filters` never rendered** (`empty_child_filter_bounds` 24876; game-visible). Transform/alpha
-  inheritance of nested dynamic clips was fixed this session (`c216160c4`, correctness, 0 flips).
+- ~~AVM1 runtime `filters` never rendered~~ **DONE post-s23** (`77545c5ac`): `empty_child_filter_bounds` predicted
+  fail→pass (0 outliers, max 1). Leftovers (game-visible, no corpus rows): ColorMatrix/Convolution/DisplacementMap
+  runtime filters draw nothing; a dynamic filter root's bitmaps/text/attached children skip the filter layer; gradient
+  filters keep the single-colour approximation. Detail: `polish-sweep-arc.md` §24.4.
 - Zero-headroom rows: `bevel_inner/outer/full`, `glow_with_alpha_strength` (18/18), `fills_and_lines` (126 channels at
   tol), `fallback_preferences` (0 outliers spare), `edittext_border_filters`; `text-bind` 587/600.
 - `bevel` y=305 checker tie: oracle needs Ruffle's own test runner at `quality=low` (the exporter has no quality option).
