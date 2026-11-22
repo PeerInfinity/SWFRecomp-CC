@@ -124,6 +124,9 @@ SwiftShader ticks are slow, so a 150 ms tap can miss the per-tick
   (graphics full+images). They report the
   `regression/avm1_closure_base_clip_root_frame` row and any regressions. The
   change is CI byte-identical apart from the new row.
+  **Result:** interim 2 `45065076248` (graphics full+images, at `9e24c763c`,
+  which includes `8615da904`): the row **passes**, with 0 trace and 0 pixel
+  regressions corpus-wide.
 - **Pages:** dry run `45063270405` succeeded. Real deploy `45063635099`
   succeeded on a rerun; the first attempt failed with a transient GitHub
   artifact-API error ("No artifacts named github-pages"). The live
