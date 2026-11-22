@@ -1,0 +1,12 @@
+outer.one n=1
+outer.one 0.blurX=6 1.blurX=undefined 0.matrix.length=undefined
+outer.two n=2
+outer.two 0.blurX=4 1.blurX=7 0.matrix.length=undefined
+outer.cm n=1
+outer.cm 0.blurX=undefined 1.blurX=undefined 0.matrix.length=20
+rootone n=1
+rootone 0.blurX=6 1.blurX=undefined 0.matrix.length=undefined
+roottwo n=2
+roottwo 0.blurX=4 1.blurX=7 0.matrix.length=undefined
+rootcm n=1
+rootcm 0.blurX=undefined 1.blurX=undefined 0.matrix.length=20

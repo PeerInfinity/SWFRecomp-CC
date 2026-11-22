@@ -18190,10 +18190,19 @@ static ActionVar stylesheetParseCSS(SWFAppContext* app_context, ActionVar* args,
 	return result;
 }
 
-// StyleSheet.load(url) — stub
+// StyleSheet.load(url): Ruffle style_sheet.rs `load` + loader.rs
+// `load_stylesheet`: returns true and, a tick later, calls this.parse(body)
+// then this.onLoad(<parse result>) — or onLoad(false) when the fetch fails.
+// Rides the deferred LoadVars queue with the stylesheet flag set.
+static int g_lv_enqueue_ss = 0;
+static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj);
 static ActionVar stylesheetLoad(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
-	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
-	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_UNDEFINED;
+	ActionVar result = {0}; result.type = ACTION_STACK_VALUE_BOOLEAN;
+	if (this_obj == NULL || arg_count < 1) return result;
+	g_lv_enqueue_ss = 1;
+	result = builtin_loadvars_load(app_context, args, arg_count, registers, this_obj);
+	g_lv_enqueue_ss = 0;
 	return result;
 }
 
@@ -40316,6 +40325,23 @@ ASObject* actionCreateXmlDocument(SWFAppContext* app_context, const char* utf8, 
 	return doc;
 }
 
+// AMF0 XML read (avm1_amf.c). Ruffle amf.rs `instantiate_amf0_xml` (f6dd758c2):
+// with the global `XML` binding gone, Flash hands back an object with NO
+// prototype (no toString, no constructor, no nodes). Otherwise the built-in
+// document (a monkeypatched XML constructor is not modelled).
+ASObject* avm1AmfCreateXmlForRead(SWFAppContext* app_context, const char* utf8, u32 len)
+{
+	if (global_object != NULL)
+	{
+		ASProperty* gp = findPropertyRaw(global_object, "XML", 3);
+		if (gp != NULL && gp->getter == NULL
+		    && gp->value.type != ACTION_STACK_VALUE_FUNCTION
+		    && gp->value.type != ACTION_STACK_VALUE_OBJECT)
+			return allocObject(app_context, 4);
+	}
+	return actionCreateXmlDocument(app_context, utf8, len);
+}
+
 // Stage.align normalization: filter to L/T/R/B chars (case-insensitive), uppercase, deduplicate, canonical order
 static void normalizeStageAlign(const char* input, u32 input_len, char* out, u32* out_len)
 {
@@ -42870,6 +42896,8 @@ static ActionVar builtin_loadvars_getBytesTotal(SWFAppContext* app_context, Acti
 // (number, string, null, undefined).
 // Our offline implementation never fires onLoad because the "network" never
 // completes.
+static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj);
 static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
 	ActionVar* registers, void* this_obj)
 {
@@ -42897,6 +42925,14 @@ static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, Action
 	VAL(double, &bv.data.numeric_value) = 0.0;
 	setPropertyWithFlags(app_context, target, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
 	setPropertyWithFlags(app_context, target, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
+	// The response lands in the TARGET exactly like `target.load(url)`: the
+	// fixture's file is the reply (Ruffle loads the URL into the target;
+	// load_vars expects the target's onLoad). XML targets keep the no-op.
+	if (args[0].type == ACTION_STACK_VALUE_STRING && target->native_type != NATIVE_XML)
+	{
+		ActionVar la[1]; la[0] = args[0];
+		(void) builtin_loadvars_load(app_context, la, 1, NULL, target);
+	}
 	ret.data.numeric_value = 1;
 	return ret;
 }
@@ -42910,6 +42946,7 @@ typedef struct PendingLoadVarsLoad {
 	u32 content_u16_len;    // length in u16 code units
 	int content_bytes;      // original UTF-8 byte count (for _bytesLoaded/_bytesTotal)
 	int success;            // 0 = failure (file missing), 1 = success
+	int is_stylesheet;      // StyleSheet.load: parse() + onLoad(result), no onData
 } PendingLoadVarsLoad;
 static PendingLoadVarsLoad g_pending_lv_loads[MAX_PENDING_LV_LOADS];
 static int g_pending_lv_load_count = 0;
@@ -42921,16 +42958,17 @@ int actionHasPendingLoadVarsLoads(void) { return g_pending_lv_load_count > 0; }
 // recompiler-emitted `arguments`-object setup works inside the callback body.
 // Handles both DefineFunction (type 1, pops args off stack) and
 // DefineFunction2 (type 2, reads args from args[] param).
-static void fireLoadVarsCallback(SWFAppContext* app_context, ASObject* obj,
+static ActionVar fireLoadVarsCallback(SWFAppContext* app_context, ASObject* obj,
 	const char* name, u32 name_len, ActionVar* cb_args, u32 cb_arg_count)
 {
+	ActionVar cb_ret = {0}; cb_ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	ActionVar* handler = getPropertyWithPrototype(obj, name, name_len);
-	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return cb_ret;
 	ASFunction* func = (ASFunction*)(uintptr_t) handler->data.numeric_value;
-	if (func == NULL) return;
+	if (func == NULL) return cb_ret;
 
 	g_special_depth++;
-	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return cb_ret; }
 
 	// Migrated to the unified invokeFunctionValue core (Function-Dispatch
 	// Consolidation, Stage 4). Behavior-preserving: the old ritual pushed the
@@ -42978,11 +43016,12 @@ static void fireLoadVarsCallback(SWFAppContext* app_context, ASObject* obj,
 	if (g_swf_version >= 6 && func->base_clip != NULL)
 		g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, NULL);
 	g_call_depth++;
-	(void) invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
+	cb_ret = invokeFunctionValue(app_context, func, &this_var, cb_args, cb_arg_count, &opts);
 	g_call_depth--;
 	g_current_context = _flv_saved_base;
 
 	g_special_depth--;
+	return cb_ret;
 }
 
 // Called from swf_core.c frame loop. Fires onData on each pending LoadVars
@@ -43014,6 +43053,22 @@ void processLoadVarsLoads(SWFAppContext* app_context)
 			PendingLoadVarsLoad* p = &local[i];
 			ASObject* lv = p->lv;
 			if (lv == NULL) continue;
+
+			if (p->is_stylesheet) {
+				ActionVar ok = {0}; ok.type = ACTION_STACK_VALUE_BOOLEAN;
+				if (p->success && p->content_u16 != NULL) {
+					ActionVar src = {0};
+					src.type = ACTION_STACK_VALUE_STRING;
+					src.str_size = p->content_u16_len;
+					src.data.numeric_value = (u64)(uintptr_t) p->content_u16;
+					ActionVar pr = fireLoadVarsCallback(app_context, lv, "parse", 5, &src, 1);
+					ok.data.numeric_value = (pr.type == ACTION_STACK_VALUE_BOOLEAN)
+						? (pr.data.numeric_value != 0) : 0;
+				}
+				fireLoadVarsCallback(app_context, lv, "onLoad", 6, &ok, 1);
+				releaseObject(app_context, lv);
+				continue;
+			}
 
 			// On success, update _bytesLoaded / _bytesTotal to the final
 			// content length before dispatching onData.
@@ -43093,6 +43148,8 @@ static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* ar
 	if (url_utf8[0] == '\0') return ret;
 
 	// Initial state: _bytesLoaded = 0 (F64), _bytesTotal = undefined, loaded = false.
+	// (Not for StyleSheet.load: a StyleSheet carries no load-state properties.)
+	if (!g_lv_enqueue_ss) {
 	{
 		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
 		VAL(double, &bv.data.numeric_value) = 0.0;
@@ -43106,6 +43163,7 @@ static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* ar
 		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
 		setProperty(app_context, lv, "loaded", 6, &lf);
 	}
+	}
 
 	extern DataFileEntry* findDataFile(const char* name);
 	DataFileEntry* data = findDataFile(url_utf8);
@@ -43114,6 +43172,7 @@ static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* ar
 	if (g_pending_lv_load_count < MAX_PENDING_LV_LOADS) {
 		PendingLoadVarsLoad* p = &g_pending_lv_loads[g_pending_lv_load_count++];
 		p->lv = lv;
+		p->is_stylesheet = g_lv_enqueue_ss;
 		retainObject(lv);
 		if (data != NULL && data->content != NULL && data->content_length > 0) {
 			// Keep the raw byte count for _bytesLoaded/_bytesTotal (matches
@@ -43794,6 +43853,14 @@ static void initArrayProto(SWFAppContext* app_context, ASArray* arr) {
 		pv.data.numeric_value = (u64)ver_arr_proto;
 		setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
 	}
+}
+
+// AMF0 reader hook (avm1_amf.c): an ECMA array read off the wire gets the same
+// props/__proto__ link a script-built array has, so `instanceof Array` holds even
+// once named keys force a props sidecar (amf0_array_matrix, LC Mixed).
+void avm1AmfInitArrayProto(SWFAppContext* app_context, ASArray* arr)
+{
+	initArrayProto(app_context, arr);
 }
 
 // Filter clone method: shallow-copies all own properties to a new filter object
@@ -71493,7 +71560,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (prop != NULL) {
 					prop->getter = (void*)getter;
 					prop->setter = (void*)setter;
-					if (_addprop_created) prop->flags |= PROPERTY_FLAG_ENUMERABLE;
+					if (_addprop_created) {
+						prop->flags |= PROPERTY_FLAG_ENUMERABLE;
+						// for-in walks arr->enum_keys once any key is tracked, so an accessor-only
+						// key must join it too (localconnection_serialize_sparse_array_getters).
+						arrayTrackKey(arr, prop_name_ap, prop_name_ap_len);
+					}
 					result = 1; // boolean true
 				}
 				} // _valid_accessors

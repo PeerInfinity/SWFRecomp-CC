@@ -74,16 +74,9 @@
 # fixture from the test directory. Each is an ordinary missing-implementation
 # row, so each now carries its own measured reason. Statuses at `aeebf9ede`
 # (run 31877239992). Prune on `pass`, per the header criterion.
-#   load_vars             29/35 (avm1). The first 29 lines — every `LoadVars`
-#                         API assertion, `decode`, `getBytesLoaded`, and the
-#                         `onData` payload on line 35 — all match. Missing is
-#                         exactly ONE of the two expected `Load: true /
-#                         this.myVar / this.also / this.loaded` blocks: the
-#                         fixture completes two loads of `testvars.txt` (one via
-#                         `sendAndLoad(..., loadVars2, 'POST')`, one via
-#                         `load()`), and only one of them dispatches `onLoad`.
-#                         4 lines + a blank. A near-pass re-triage lead, not a
-#                         capability gap.
+#   load_vars             RESOLVED 2026-11-21 (s24 w1-avm1-tail): passes; pruned.
+#                         It was 29/35: `LoadVars.sendAndLoad` never delivered
+#                         to its target (now queued through the target's load).
 #   loadvariables_method  RESOLVED 2026-09-11 (session 19): now passes 7/7 and is
 #                         pruned from the list below. It was: 0/7, we emit NOTHING —
 #                         `MovieClip.loadVariables` was a
@@ -97,18 +90,10 @@
 #                         `Navigator::fetch:` block is already emitted for other
 #                         tests via `log_fetch = true` + `utils.c
 #                         swf_log_navigate`, so nothing else is missing.
-#   stylesheet_load       1/49 (avm1). `TextField.StyleSheet.load(url)` is a
-#                         literal stub — `stylesheetLoad()` in action.c ~:17028
-#                         is commented "— stub" and returns `undefined`, which
-#                         is the single wrong line we emit (`undefined` where
-#                         Flash prints `true`). Every remaining line is
-#                         cascade: no `onLoad`, so no `parse()`, so all four
-#                         `getStyle()` blocks are absent. `StyleSheet.parse` and
-#                         `getStyle` themselves already work (the sibling
-#                         `stylesheet` tests pass), so this is one function.
+#   stylesheet_load       RESOLVED 2026-11-21 (s24 w1-avm1-tail): passes; pruned.
+#                         It was 1/49: `StyleSheet.load` was a stub (now rides
+#                         the deferred LoadVars queue, then parse() + onLoad()).
 form_loader_encoding_4
-load_vars
-stylesheet_load
 
 # --- XML networking/sockets ---
 # (xml_socket, xml_socket_close_in_handler, xml_socket_connect_null,

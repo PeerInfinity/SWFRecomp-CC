@@ -13,19 +13,21 @@ Parallel LOCAL one-task session: `n-perf-ab` (Windows real-GPU frame-rate A/B of
 | # | slug | axis | task | session id |
 |---|---|---|---|---|
 | 1 | w1-native-proto | trace | AVM1 native builtin prototypes + lazy prototypes (9 rows, cross-cutting) || session_018CoDi6uqrzRVevzzxY9Y3o — DELIVERED; prototype LANDED directly (+2 ledger: `lazy_prototype_shared`, `video_prototype_lazy`; 0 riders/47) |
-| 2 | w1-avm1-tail | trace | AVM1 + gnash/shumway tail triage (~27 rows) + filters-getter L1 || session_018CoDi4M3bEUKQMx1tkwhVv |
+| 2 | w1-avm1-tail | trace | AVM1 + gnash/shumway tail triage (~27 rows) + filters-getter L1 || session_018CoDi4M3bEUKQMx1tkwhVv — DELIVERED; prototype LANDED directly (+5: `amf0_array_matrix`, `localconnection_serialize_sparse_array_getters`, `localconnection_xml_unavailable`, `load_vars`, `stylesheet_load`; last two pruned from ignored_tests.txt) |
 | 3 | w1-avm2-tail | trace | AVM2 tail triage (~20 rows) || session_018CoDi67sPWpLegcVfoqSfP |
 | 4 | w1-attach-order | trace | attach-tick tag order, action_order family, MovieClip-v8 buckets || session_018CoDi4TVY3qMVvqEyLqBSt |
 | 5 | w1-pixel-text | pixel | acid-color-0, per-line ascent/descent, static_text_offstage, text-bind, definefont4 || session_018CoDi7fh5vYVwYccb2ey2L |
-| 6 | w1-pixel-bitmap | pixel | JPEG encoder, ShaderFilter, draw_cab_quality, quality=low hairline, runtime-filter leftovers || session_018CoDi4KP8AqoumFHJqZ626 |
+| 6 | w1-pixel-bitmap | pixel | JPEG encoder, ShaderFilter, draw_cab_quality, quality=low hairline, runtime-filter leftovers || session_018CoDi4KP8AqoumFHJqZ626 — DELIVERED; GO +3 px +1 trace → wave 2 `w2-bitmap-encode-shader` |
 
 ## Wave 2 (implementation, cloud)
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
 | (landed direct) w1-native-proto prototype | w1-native-proto | avm1 `lazy_prototype_shared`, `video_prototype_lazy` (trace +2; `text_format_prototype_lazy` improves, no flip) | — |
+| (landed direct) w1-avm1-tail prototype | w1-avm1-tail ranks 1-2 | avm1 `amf0_array_matrix`, `localconnection_serialize_sparse_array_getters`, `localconnection_xml_unavailable`, `load_vars`, `stylesheet_load` (trace +5; load_vars/stylesheet_load are ignored rows → count in unfiltered totals) | — |
 
 ## Grading runs
 
 | run | mode / categories / images | code | result |
 |---|---|---|---|
+| 44972916356 | graphics / full / no | 336749f14 (native-proto) | pending |

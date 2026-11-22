@@ -910,6 +910,8 @@ typedef struct
 } Amf0Rd;
 
 static ActionVar rd0_value(Amf0Rd* r);
+void avm1AmfInitArrayProto(SWFAppContext* app_context, ASArray* arr);
+ASObject* avm1AmfCreateXmlForRead(SWFAppContext* app_context, const char* utf8, u32 len);
 
 static ActionVar rd_undef(void)
 {
@@ -1190,6 +1192,7 @@ static ActionVar rd0_value(Amf0Rd* r)
 			// LC LeadingSpace Length 4 for a lone " 3" key).
 			unsigned long declared = rd_u32(r);
 			ASArray* arr = allocArray(r->app, 4);
+			avm1AmfInitArrayProto(r->app, arr);
 			out.type = ACTION_STACK_VALUE_ARRAY;
 			out.data.numeric_value = (u64) (uintptr_t) arr;
 			int slot = rd_ref_claim(r, out);
@@ -1240,13 +1243,16 @@ static ActionVar rd0_value(Amf0Rd* r)
 			unsigned long len = rd_u32(r);
 			const unsigned char* q = rd_bytes(r, (size_t) len);
 			if (q == NULL) break;
-			ASObject* doc = actionCreateXmlDocument(r->app, (const char*) q,
+			ASObject* doc = avm1AmfCreateXmlForRead(r->app, (const char*) q,
 			                                        (u32) len);
 			if (doc != NULL)
 			{
 				out.type = ACTION_STACK_VALUE_OBJECT;
 				out.data.numeric_value = (u64) (uintptr_t) doc;
-				rd_ref_claim(r, out);
+				// LocalConnection (Ruffle `deserialize_lso_value`): an XML value
+				// does NOT take a reference slot on read, although the writer
+				// counted one, so later references shift (f6dd758c2).
+				if (!r->lc_refs) rd_ref_claim(r, out);
 			}
 			break;
 		}
