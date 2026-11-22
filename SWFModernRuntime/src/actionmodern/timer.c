@@ -351,12 +351,12 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 		// clip, so there is no gate to compute against the switched version.
 		//
 		// this_var = &t->object: the core derives the same obj/mc ABI receiver
-		// the arm used to compute by hand. INV_EVENT_THIS_MC on type-1 only —
-		// the core's "set when the receiver is an MC" is exactly the old
-		// `if (mc != NULL)`, and the type-2 arm never set it. No local scope
-		// frame, no this-stack, no exec-func swap in either arm (preserved by
-		// leaving those flags clear); depth bracket stays out here because the
-		// path never had the g_max_call_depth halt check. The core additionally
+		// the arm used to compute by hand. INV_EVENT_THIS_MC is "set when the
+		// receiver is an MC" (the old `if (mc != NULL)`); the type-2 arm now
+		// sets it too, with INV_MC_THIS_NULL_PTR (see below). No local scope
+		// frame on type-1 (type-2 gets one, below), no this-stack, no
+		// exec-func swap (preserved by leaving those flags clear); depth
+		// bracket stays out here because the path never had the g_max_call_depth halt check. The core additionally
 		// clamps/pads type-1 args to param_count (the TYPE1_ARG_ORDER fix,
 		// regression/timer_type1_args), bounds + copies scope_mc on the
 		// captured-scope push (was stale), and NULL-checks the function
@@ -364,7 +364,31 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 		u32 _tm_flags = (method_func->function_type == 2)
 			? (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_VERSION_SWITCH)
 			: (INV_EVENT_THIS_MC | INV_VERSION_SWITCH);
-		InvokeOpts _tm_opts = { .flags = _tm_flags };
+		// Type-2 method on a MOVIECLIP receiver (s25 w2-netstream-flv-screen).
+		// A DefineFunction2 body's preload-this tags a non-NULL ABI this_obj as
+		// ACTION_STACK_VALUE_OBJECT, so passing the raw MovieClip* made every
+		// `this.x` read go through the ASObject path and come back undefined
+		// (setInterval(this, "doAutoResize", ...) on an AS2 class instance
+		// registered onto an attached clip: mx.video.VideoPlayer never saw its
+		// own _autoResizeIntervalID, never dispatched "ready", and FLVPlayback
+		// kept the player _visible=false — avm1/netstream_play_flv_screen
+		// rendered blank). Use the same MC receiver convention as CallMethod
+		// (action.c, _sc_flags): NULL ABI this + g_event_this_mc.
+		if (method_func->function_type == 2 && mc != NULL)
+			_tm_flags |= INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
+		// A type-2 body that neither preloads nor suppresses `this` /
+		// `arguments` reads them by name off its activation frame, which this
+		// arm never built (GetVariable("this") / `arguments` were unbound in
+		// a setInterval(obj, "m") callee). Same activation as the onLoad
+		// dispatcher's type-2 arm: local frame + INV_ACT_THIS/ARGUMENTS
+		// (both gated inside the core on the callee's own preload/suppress bits).
+		u8 _tm_act = 0;
+		if (method_func->function_type == 2)
+		{
+			_tm_flags |= INV_LOCAL_SCOPE;
+			_tm_act = INV_ACT_THIS | INV_ACT_ARGUMENTS;
+		}
+		InvokeOpts _tm_opts = { .flags = _tm_flags, .act_flags = _tm_act };
 		g_call_depth++;
 		actionInvokeFunctionValue(app_context, method_func, &t->object,
 			t->extra_arg_count > 0 ? t->extra_args : NULL,
