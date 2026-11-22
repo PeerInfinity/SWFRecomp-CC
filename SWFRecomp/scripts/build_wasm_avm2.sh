@@ -209,7 +209,9 @@ echo "=== Linking ${NAME}.js / ${NAME}.wasm ==="
 # _avm2_ei_dispatch: the ExternalInterface addCallback dispatcher (host JS ->
 # registered AS3 callback; avm2_external.c). _malloc/_free back its EM_ASM
 # string marshaling (module-scope _malloc is only present when exported).
-EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_avm2_ei_dispatch","_malloc","_free"]'
+# _avm2_so_flush_all / _avm2_so_reload: the SharedObject host-hook exports
+# (avm2_amf.c; SWFRecompDocs/guides/avm2-sharedobject-host-hook.md).
+EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_avm2_ei_dispatch","_avm2_so_flush_all","_avm2_so_reload","_malloc","_free"]'
 # INITIAL_MEMORY is committed + zero-filled RESIDENT at page load (before the
 # user hits Start), so it is the pre-Start footprint. The o1heap arena (now
 # 512 MB, memory/heap.c) lands lazily at Start via ALLOW_MEMORY_GROWTH, so

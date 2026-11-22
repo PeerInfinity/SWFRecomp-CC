@@ -80,7 +80,7 @@ if [ "${IS_AVM2}" = true ]; then
     EXTRA_DEFINES=(-DSWF_AVM2 "-DMOCK_DATE_TIME=${MOCK_DATE_TIME}LL"
         "-DSWF_FILE_SIZE=${SWF_FILE_SIZE}" "-DSWF_ONDISK_SIZE=${SWF_ONDISK_SIZE}"
         "-DSWF_URL=\"${SWF_URL}\"")
-    EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_avm2_ei_dispatch","_malloc","_free"]'
+    EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_avm2_ei_dispatch","_avm2_so_flush_all","_avm2_so_reload","_malloc","_free"]'
 else
     # Display-list JSON bridge + framebuffer capture exports (debug tooling),
     # same as build_test.sh's graphics wasm builds.

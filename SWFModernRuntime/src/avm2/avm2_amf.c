@@ -1978,6 +1978,15 @@ static Avm2Value net_get_class_by_alias(Avm2Activation* act)
 // to a .sol file + AMF `size` accounting are NOT modeled (the full shared_object
 // test needs the two-run .sol harness); flush reports "flushed" so the common
 // getLocal/data/flush path works (shared_object_no_root).
+//
+// HOST HOOK (browser wasm only): when the page installs
+// Module.swfSharedObjectHost = { load, store }, persistence goes through it:
+// the FIRST getLocal of a key calls load() and AMF3-decodes the bytes into
+// `data`; flush() AMF3-encodes `data` and calls store(bytes); clear() calls
+// store(null). The exports avm2_so_flush_all() / avm2_so_reload() serve the
+// host between ticks. With no hook installed NOTHING here encodes, decodes or
+// calls out — memory-only, exactly the pre-hook behaviour (every native build
+// and CI). Contract: SWFRecompDocs/guides/avm2-sharedobject-host-hook.md.
 // ---------------------------------------------------------------------------
 
 typedef struct Avm2SharedObjectExt
@@ -1993,9 +2002,19 @@ static Avm2Object* this_obj_amf(Avm2Activation* act)
 	return act->this_val.kind == AVM2_VALUE_OBJECT ? act->this_val.u.obj : NULL;
 }
 
-typedef struct SoCacheEntry { char* name; Avm2Object* obj; } SoCacheEntry;
+// name = full storage key; as_name / as_path = getLocal's own arguments as
+// AS3 passed them (as_path NULL when localPath was omitted/null) — what the
+// host hook is handed.
+typedef struct SoCacheEntry
+{
+	char* name;
+	Avm2Object* obj;
+	char* as_name;
+	char* as_path;
+} SoCacheEntry;
 static SoCacheEntry g_so_cache[64];
 static uint32_t g_so_cache_count;
+static Avm2Context* g_so_ctx;
 
 // GC root marker (Stage 11): the per-name SharedObject cache. Each entry's
 // SharedObject instance (and its dynamic `data` object, reached by tracing the
@@ -2027,6 +2046,173 @@ static Avm2Object* so_new_data(Avm2Context* ctx)
 	return v.u.obj;
 }
 
+// ---- host hook transport --------------------------------------------------
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
+#define SO_HOST_HOOK 1
+#include <emscripten.h>
+
+// 1 when Module.swfSharedObjectHost is installed (checked per call: the host
+// may install it at any time before the SWF's first getLocal).
+static int so_host_present(void)
+{
+	return EM_ASM_INT({
+		var h = Module['swfSharedObjectHost'];
+		return (h && typeof h === 'object') ? 1 : 0;
+	});
+}
+
+// host.load(name, localPath, key) -> Uint8Array | ArrayBuffer | number[] |
+// base64 string | null/undefined. Returns a malloc'd copy (caller frees) and
+// its length, or NULL for "no bytes" (absent load, threw, null, empty).
+static unsigned char* so_host_load(const char* name, const char* path,
+                                   const char* key, uint32_t* out_len)
+{
+	*out_len = 0;
+	int len = 0;
+	unsigned char* p = (unsigned char*) (intptr_t) EM_ASM_INT({
+		var h = Module['swfSharedObjectHost'];
+		if (!h || typeof h.load !== 'function') return 0;
+		var r;
+		try { r = h.load(UTF8ToString($0), $1 ? UTF8ToString($1) : null,
+		                 UTF8ToString($2)); }
+		catch (e) { console.error('swfSharedObjectHost.load threw', e); return 0; }
+		if (r === null || r === undefined) return 0;
+		var u8;
+		if (typeof r === 'string')
+		{
+			var bin;
+			try { bin = atob(r); } catch (e) { return 0; }
+			u8 = new Uint8Array(bin.length);
+			for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+		}
+		else if (r instanceof Uint8Array) u8 = r;
+		else if (r instanceof ArrayBuffer) u8 = new Uint8Array(r);
+		else if (ArrayBuffer.isView(r)) u8 = new Uint8Array(r.buffer, r.byteOffset, r.byteLength);
+		else if (Array.isArray(r)) u8 = Uint8Array.from(r);
+		else return 0;
+		if (u8.length === 0) return 0;
+		var p = _malloc(u8.length);
+		HEAPU8.set(u8, p);
+		HEAP32[$3 >> 2] = u8.length;
+		return p;
+	}, name, path, key, &len);
+	if (p != NULL) *out_len = (uint32_t) len;
+	return p;
+}
+
+// host.store(name, localPath, bytes, key); bytes is a fresh Uint8Array copy,
+// or null = delete the entry (clear()).
+static void so_host_store(const char* name, const char* path, const char* key,
+                          const unsigned char* bytes, uint32_t len)
+{
+	EM_ASM({
+		var h = Module['swfSharedObjectHost'];
+		if (!h || typeof h.store !== 'function') return;
+		var b = $3 ? HEAPU8.slice($3, $3 + $4) : null;
+		try { h.store(UTF8ToString($0), $1 ? UTF8ToString($1) : null, b,
+		              UTF8ToString($2)); }
+		catch (e) { console.error('swfSharedObjectHost.store threw', e); }
+	}, name, path, key, bytes, len);
+}
+#endif
+
+#ifdef SO_HOST_HOOK
+// AMF3-encode `data` as one value (malloc'd, caller frees); NULL on an
+// encoder throw (e.g. a writeExternal that throws).
+static unsigned char* so_encode_data(Avm2Context* ctx, Avm2Object* data, uint32_t* out_len)
+{
+	*out_len = 0;
+	Amf3Wr w;
+	memset(&w, 0, sizeof(w));
+	w.ctx = ctx;
+	w.out.ctx = ctx;
+	unsigned char* volatile out = NULL;
+	Avm2TryFrame tf;
+	avm2_try_push_catch_all_silent(ctx, &tf);
+	if (setjmp(tf.jb) == 0)
+	{
+		w3_value(&w, avm2_object_value(data));
+		size_t n = 0;
+		out = amf_copy_out(&w, &n);   // frees w
+		*out_len = (uint32_t) n;
+	}
+	else
+	{
+		amf_wr_free(&w);
+	}
+	avm2_try_pop_frame(&tf);
+	return out;
+}
+
+// Decode `bytes` (one AMF3 value, which must be an object) and repopulate
+// `data` IN PLACE: delete its dynamic props, then copy the decoded object's
+// enumerable props in. Returns 1 on success; on a decode failure / non-object
+// returns 0 with `data` untouched.
+static int so_restore_into(Avm2Context* ctx, Avm2Object* data,
+                           const unsigned char* bytes, uint32_t n)
+{
+	volatile int ok = 0;
+	Rd r;
+	memset(&r, 0, sizeof(r));
+	r.ctx = ctx;
+	r.p = bytes;
+	r.n = n;
+	Avm2TryFrame tf;
+	avm2_try_push_catch_all_silent(ctx, &tf);
+	if (setjmp(tf.jb) == 0)
+	{
+		Avm2Value v = rd3_value(&r);
+		if (v.kind == AVM2_VALUE_OBJECT && v.u.obj != NULL)
+		{
+			Avm2Object* src = v.u.obj;
+			// Drop the old dynamic props (names snapshotted first).
+			uint32_t cap = 16, cnt = 0;
+			const Avm2String** names = malloc(cap * sizeof(*names));
+			for (uint32_t i = avm2_object_next_enumerant(data, 0); i != 0;
+			     i = avm2_object_next_enumerant(data, i))
+			{
+				if (cnt == cap) { cap *= 2; names = realloc(names, cap * sizeof(*names)); }
+				names[cnt++] = avm2_coerce_to_string(ctx, avm2_object_enumerant_name(ctx, data, i));
+			}
+			for (uint32_t i = 0; i < cnt; i++)
+				avm2_object_delete_dynamic(data, names[i]->utf8, names[i]->len);
+			free(names);
+			Avm2Value dv = avm2_object_value(data);
+			for (uint32_t i = avm2_object_next_enumerant(src, 0); i != 0;
+			     i = avm2_object_next_enumerant(src, i))
+			{
+				const Avm2String* k = avm2_coerce_to_string(ctx, avm2_object_enumerant_name(ctx, src, i));
+				avm2_set_public_property(ctx, dv, k->utf8, k->len,
+				                         avm2_object_enumerant_value(ctx, src, i));
+			}
+			ok = 1;
+		}
+	}
+	avm2_try_pop_frame(&tf);
+	amf_rd_free(&r);
+	return ok;
+}
+
+static SoCacheEntry* so_entry_of(Avm2Object* obj)
+{
+	for (uint32_t i = 0; i < g_so_cache_count; i++)
+		if (g_so_cache[i].obj == obj) return &g_so_cache[i];
+	return NULL;
+}
+
+static void so_store_entry(Avm2Context* ctx, SoCacheEntry* e)
+{
+	Avm2SharedObjectExt* ext = so_ext_of(ctx, e->obj);
+	if (ext == NULL) return;
+	if (ext->data == NULL) ext->data = so_new_data(ctx);
+	uint32_t n = 0;
+	unsigned char* b = so_encode_data(ctx, ext->data, &n);
+	if (b == NULL) return;
+	so_host_store(e->as_name, e->as_path, e->name, b, n);
+	free(b);
+}
+#endif
+
 // Port of Ruffle core/src/shared_object.rs::local_shared_object_key: the
 // storage key "host/localPath/name" for getLocal(name, localPath, secure)
 // from the root movie's URL, or 0 when Flash can't create the shared object
@@ -2034,6 +2220,8 @@ static Avm2Object* so_new_data(Avm2Context* ctx)
 // localPath, a localPath that is not a '/'-bounded prefix of the SWF path,
 // secure=true from a non-https movie, and any path segment starting with '.'.
 static Avm2Value so_get_or_create(Avm2Context* ctx, const Avm2String* name);
+static Avm2Value so_get_or_create_hooked(Avm2Context* ctx, const Avm2String* name,
+                                         const char* as_name, const char* as_path);
 
 static int so_full_key(const char* name, const char* local_path, int secure,
                        char* out, size_t out_cap)
@@ -2115,7 +2303,9 @@ static Avm2Value so_get_local(Avm2Activation* act)
 		avm2_throw_error(ctx, ctx->builtins.error_class,
 		                 "Error #2134: Cannot create SharedObject.");
 	}
-	return so_get_or_create(ctx, avm2_string_new(ctx, key, (uint32_t) strlen(key)));
+	return so_get_or_create_hooked(ctx, avm2_string_new(ctx, key, (uint32_t) strlen(key)),
+	                               avm2_string_cstr(ctx, name),
+	                               local_path != NULL ? avm2_string_cstr(ctx, local_path) : NULL);
 }
 
 // getRemote keeps the pre-#2134 name-keyed model (no RTMP; nothing in the
@@ -2129,6 +2319,22 @@ static Avm2Value so_get_remote(Avm2Activation* act)
 }
 
 static Avm2Value so_get_or_create(Avm2Context* ctx, const Avm2String* name)
+{
+	return so_get_or_create_hooked(ctx, name, NULL, NULL);
+}
+
+static char* so_strdup(Avm2Context* ctx, const char* s)
+{
+	if (s == NULL) return NULL;
+	size_t n = strlen(s);
+	char* c = avm2_alloc(ctx, n + 1);
+	memcpy(c, s, n + 1);
+	return c;
+}
+
+// as_name NULL = not a getLocal (getRemote): never hooked.
+static Avm2Value so_get_or_create_hooked(Avm2Context* ctx, const Avm2String* name,
+                                         const char* as_name, const char* as_path)
 {
 	// Same-run identity: return the cached instance for this full key.
 	for (uint32_t i = 0; i < g_so_cache_count; i++)
@@ -2147,7 +2353,23 @@ static Avm2Value so_get_or_create(Avm2Context* ctx, const Avm2String* name)
 		copy[name->len] = '\0';
 		g_so_cache[g_so_cache_count].name = copy;
 		g_so_cache[g_so_cache_count].obj = v.u.obj;
+		g_so_cache[g_so_cache_count].as_name = so_strdup(ctx, as_name);
+		g_so_cache[g_so_cache_count].as_path = so_strdup(ctx, as_path);
 		g_so_cache_count++;
+#ifdef SO_HOST_HOOK
+		// First getLocal of this key in the page's life: ask the host once.
+		// (Later getLocals — including after clear() — hit the cache above.)
+		if (as_name != NULL && ext != NULL && so_host_present())
+		{
+			uint32_t n = 0;
+			unsigned char* b = so_host_load(as_name, as_path, copy, &n);
+			if (b != NULL)
+			{
+				so_restore_into(ctx, ext->data, b, n);
+				free(b);
+			}
+		}
+#endif
 	}
 	return v;
 }
@@ -2168,6 +2390,13 @@ static Avm2Value so_get_size(Avm2Activation* act)
 
 static Avm2Value so_flush(Avm2Activation* act)
 {
+#ifdef SO_HOST_HOOK
+	if (so_ext_of(act->ctx, this_obj_amf(act)) != NULL && so_host_present())
+	{
+		SoCacheEntry* e = so_entry_of(this_obj_amf(act));
+		if (e != NULL && e->as_name != NULL) so_store_entry(act->ctx, e);
+	}
+#endif
 	// SharedObjectFlushStatus.FLUSHED
 	return avm2_string(avm2_string_from_literal(act->ctx, "flushed"));
 }
@@ -2176,8 +2405,65 @@ static Avm2Value so_clear(Avm2Activation* act)
 {
 	Avm2SharedObjectExt* ext = so_ext_of(act->ctx, this_obj_amf(act));
 	if (ext != NULL) ext->data = so_new_data(act->ctx);
+#ifdef SO_HOST_HOOK
+	if (ext != NULL && so_host_present())
+	{
+		SoCacheEntry* e = so_entry_of(this_obj_amf(act));
+		if (e != NULL && e->as_name != NULL)
+			so_host_store(e->as_name, e->as_path, e->name, NULL, 0);
+	}
+#endif
 	return avm2_undefined();
 }
+
+#ifdef SO_HOST_HOOK
+// Host exports. Call ONLY between ticks (never from inside an AVM2 callback):
+// they allocate and may run AS3 (writeExternal / dynamicPropertyWriter), and
+// the collector's invariants assume the VM is quiescent at entry.
+
+// Flush every live getLocal'd SharedObject through store(). Returns the
+// number stored (0 when no hook is installed).
+EMSCRIPTEN_KEEPALIVE int avm2_so_flush_all(void)
+{
+	Avm2Context* ctx = g_so_ctx;
+	if (ctx == NULL || !so_host_present()) return 0;
+	int n = 0;
+	for (uint32_t i = 0; i < g_so_cache_count; i++)
+	{
+		if (g_so_cache[i].as_name == NULL) continue;
+		so_store_entry(ctx, &g_so_cache[i]);
+		n++;
+	}
+	return n;
+}
+
+// reloadSharedObject(name, localPath): fetch bytes via load() and repopulate
+// the EXISTING data object in place (aliases of so.data see the new values).
+// localPath NULL/"" matches a getLocal that passed none. 1 = restored;
+// 0 = never getLocal'd, no hook, no bytes, or decode failure (data untouched).
+EMSCRIPTEN_KEEPALIVE int avm2_so_reload(const char* name, const char* local_path)
+{
+	Avm2Context* ctx = g_so_ctx;
+	if (ctx == NULL || name == NULL || !so_host_present()) return 0;
+	if (local_path != NULL && local_path[0] == '\0') local_path = NULL;
+	char key[1024];
+	if (!so_full_key(name, local_path, 0, key, sizeof(key))) return 0;
+	SoCacheEntry* e = NULL;
+	for (uint32_t i = 0; i < g_so_cache_count; i++)
+		if (g_so_cache[i].as_name != NULL && strcmp(g_so_cache[i].name, key) == 0)
+			e = &g_so_cache[i];
+	if (e == NULL) return 0;
+	Avm2SharedObjectExt* ext = so_ext_of(ctx, e->obj);
+	if (ext == NULL) return 0;
+	if (ext->data == NULL) ext->data = so_new_data(ctx);
+	uint32_t n = 0;
+	unsigned char* b = so_host_load(e->as_name, e->as_path, e->name, &n);
+	if (b == NULL) return 0;
+	int ok = so_restore_into(ctx, ext->data, b, n);
+	free(b);
+	return ok;
+}
+#endif
 
 static Avm2Value so_noop(Avm2Activation* act)
 {
@@ -2278,6 +2564,7 @@ void avm2_register_amf(Avm2Context* ctx)
 	// flash.net.SharedObject (extends EventDispatcher).
 	{
 		g_so_cache_count = 0;
+		g_so_ctx = ctx;
 		Avm2Class* so = avm2_builtin_class(ctx, "flash.net", "SharedObject",
 		                                   b->event_dispatcher_class);
 		so->native_ext_size = sizeof(Avm2SharedObjectExt);

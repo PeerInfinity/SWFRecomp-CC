@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SharedObject host-hook probe</title>
+</head>
+<body>
+<canvas id="canvas" width="200" height="150"></canvas>
+<button id="btn-run" disabled>Run SWF</button>
+<script>
+  // Reference host for SWFRecompDocs/guides/avm2-sharedobject-host-hook.md.
+  // The driver seeds window.__soLoadAnswer (base64 string, Uint8Array or null)
+  // through an init script; every hook call is recorded in window.__soLog.
+  window.__soLog = [];
+  window.__runtimeReady = false;
+  function b64(u8) { var s = ''; for (var i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s); }
+  window.Module = {
+    locateFile: function (p) { return p; },
+    canvas: document.getElementById('canvas'),
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.log('[err] ' + t); },
+    onRuntimeInitialized: function () { window.__runtimeReady = true; },
+    swfSharedObjectHost: {
+      load: function (name, localPath, key) {
+        var a = (window.__soLoadAnswer === undefined) ? null : window.__soLoadAnswer;
+        window.__soLog.push({ op: 'load', name: name, localPath: localPath, key: key,
+                              answered: a === null ? null : (typeof a === 'string' ? 'b64' : 'u8') });
+        console.log('[host] load(' + name + ', ' + localPath + ', ' + key + ') -> ' + (a === null ? 'null' : 'bytes'));
+        return a;
+      },
+      store: function (name, localPath, bytes, key) {
+        window.__soLog.push({ op: 'store', name: name, localPath: localPath, key: key,
+                              isU8: bytes instanceof Uint8Array,
+                              b64: bytes === null ? null : b64(bytes),
+                              len: bytes === null ? null : bytes.length });
+        console.log('[host] store(' + name + ', ' + localPath + ', ' + (bytes === null ? 'null' : bytes.length + ' bytes') + ', ' + key + ')');
+      },
+    },
+  };
+  (function waitReady(n) {
+    if (window.__runtimeReady) document.getElementById('btn-run').disabled = false;
+    else if (n > 0) setTimeout(function () { waitReady(n - 1); }, 50);
+  })(600);
+  document.getElementById('btn-run').addEventListener('click', function () {
+    this.disabled = true;
+    Module.ccall('runSWF', null, [], [], { async: true });
+  });
+</script>
+<script src="sohook.js"></script>
+</body>
+</html>
