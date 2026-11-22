@@ -10277,6 +10277,38 @@ static void getConcatMatrixForMC(MovieClip* mc,
 	}
 }
 
+// s25 w1-pixel-drawing PROTOTYPE: world matrix (a,b,c,d in units, tx/ty in
+// TWIPS) of the nearest timeline-placed (display_obj != NULL), non-root
+// ancestor of a dynamic clip, crossing only dynamic intermediate parents.
+// Returns 0 when the dynamic chain ends at _root (no extra composition).
+int actionGetPlacedAncestorWorldMatrix(void* mc_v, double out[6])
+{
+	MovieClip* mc = (MovieClip*) mc_v;
+	int guard = 0;
+	for (MovieClip* p = mc ? mc->parent : NULL; p != NULL && guard < 64; p = p->parent, guard++) {
+		if (p == &root_movieclip || p->depth == INT_MIN) return 0;
+		if (p->display_obj == NULL) continue;
+		double a, b, c, d, tx, ty;
+		getConcatMatrixForMC(p, &a, &b, &c, &d, &tx, &ty);
+		out[0] = a; out[1] = b; out[2] = c; out[3] = d;
+		out[4] = tx * 20.0; out[5] = ty * 20.0;
+		return 1;
+	}
+	return 0;
+}
+
+// s25 w1-pixel-drawing PROTOTYPE: full world matrix of `mc` (tx/ty in twips).
+int actionGetMCWorldMatrixTwips(void* mc_v, double out[6])
+{
+	MovieClip* mc = (MovieClip*) mc_v;
+	if (mc == NULL) return 0;
+	double a, b, c, d, tx, ty;
+	getConcatMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
+	out[0] = a; out[1] = b; out[2] = c; out[3] = d;
+	out[4] = tx * 20.0; out[5] = ty * 20.0;
+	return 1;
+}
+
 // Compose two CTs in raw Fixed8 (outer applied after inner).
 static void composeCTRaw(
 	s16 o_ra, s16 o_ga, s16 o_ba, s16 o_aa, s16 o_rb, s16 o_gb, s16 o_bb, s16 o_ab,
@@ -30926,6 +30958,10 @@ static int drawingCmdWindingHitTest(const DrawingState* ds,
 	for (u32 i = 0; i < ds->cmd_count; i++) {
 		const DrawCmd* c = &ds->cmds[i];
 		if (c->type == 0) {
+			// s25 PROTOTYPE: every sub-path of the pending fill auto-closes,
+			// not just the last one (gnash DrawingApiTest inv3).
+			if (has_start && (cx != fsx || cy != fsy))
+				winding += drawingWindingLine(tx_px, ty_px, cx, cy, fsx, fsy);
 			cx = c->x; cy = c->y;
 			fsx = cx; fsy = cy;
 			has_start = 1;
@@ -30961,7 +30997,62 @@ static int drawingCmdWindingHitTest(const DrawingState* ds,
 	if (has_start && (cx != fsx || cy != fsy)) {
 		winding += drawingWindingLine(tx_px, ty_px, cx, cy, fsx, fsy);
 	}
-	return winding != 0;
+	return (winding & 1) != 0;  // s25 PROTOTYPE: EvenOdd (Ruffle drawing default)
+}
+
+// s25 w1-pixel-drawing PROTOTYPE: port of Ruffle shape_utils
+// draw_command_stroke_hit_test / hit_test_stroke over the PENDING command list
+// (round caps/joins: distance to the closest point of each segment). Curves are
+// flattened finely; Ruffle solves the cubic exactly, which only differs on the
+// stroke boundary itself.
+static int drawingSegDistHit(double px, double py, double x0, double y0,
+	double x1, double y1, double hw)
+{
+	if (px < fmin(x0, x1) - hw || px > fmax(x0, x1) + hw) return 0;
+	if (py < fmin(y0, y1) - hw || py > fmax(y0, y1) + hw) return 0;
+	double abx = x1 - x0, aby = y1 - y0, apx = px - x0, apy = py - y0;
+	double dot_a = abx * apx + aby * apy, dist;
+	if (dot_a <= 0.0) dist = apx * apx + apy * apy;
+	else {
+		double bpx = px - x1, bpy = py - y1;
+		double dot_b = abx * bpx + aby * bpy;
+		if (dot_b >= 0.0) dist = bpx * bpx + bpy * bpy;
+		else {
+			double len = abx * abx + aby * aby;
+			double ex = apx - dot_a * abx / len, ey = apy - dot_a * aby / len;
+			dist = ex * ex + ey * ey;
+		}
+	}
+	return dist <= hw * hw;
+}
+
+static int drawingCmdStrokeHitTest(const DrawingState* ds, double px, double py,
+	double hw, int close_fill)
+{
+	if (ds == NULL || ds->cmd_count == 0) return 0;
+	double cx = 0.0, cy = 0.0, fsx = 0.0, fsy = 0.0;
+	int has_start = 0;
+	for (u32 i = 0; i < ds->cmd_count; i++) {
+		const DrawCmd* c = &ds->cmds[i];
+		if (c->type == 0) { cx = fsx = c->x; cy = fsy = c->y; has_start = 1; continue; }
+		if (!has_start) { fsx = cx; fsy = cy; has_start = 1; }
+		if (c->type == 1) {
+			if (drawingSegDistHit(px, py, cx, cy, c->x, c->y, hw)) return 1;
+		} else if (c->type == 2) {
+			double sx = cx, sy = cy, prx = sx, pry = sy;
+			for (int k = 1; k <= 64; k++) {
+				double t = k / 64.0, u = 1.0 - t;
+				double qx = u*u*sx + 2*u*t*(double)c->cx + t*t*(double)c->x;
+				double qy = u*u*sy + 2*u*t*(double)c->cy + t*t*(double)c->y;
+				if (drawingSegDistHit(px, py, prx, pry, qx, qy, hw)) return 1;
+				prx = qx; pry = qy;
+			}
+		}
+		cx = c->x; cy = c->y;
+	}
+	if (close_fill && has_start && (cx != fsx || cy != fsy))
+		if (drawingSegDistHit(px, py, cx, cy, fsx, fsy, hw)) return 1;
+	return 0;
 }
 
 static void drawingUpdateBounds(MovieClip* mc, float x, float y)
@@ -31569,6 +31660,49 @@ static u32 drawing_emit_stroke_join(float* out,
 
 // (Re)build the stroke triangle geometry for `path` at the given half-width
 // (twips) from the retained contour polyline (path->stroke_poly, in pixels).
+static void drawingUnionTranslucentStroke(DrawPath* path)
+{
+	if (path->line_verts == NULL || path->line_vert_count < 6) return;
+	int translucent = 0;
+	if (path->has_line_gradient) {
+		for (int i = 0; i < 256; i++)
+			if (path->line_gradient_ramp[i * 4 + 3] != 255) { translucent = 1; break; }
+	} else {
+		translucent = path->line_a < 0.999f;
+	}
+	if (!translucent) return;
+	TESStesselator* tess = tessNewTess(NULL);
+	if (tess == NULL) return;
+	u32 ntri_in = path->line_vert_count / 3;
+	for (u32 t = 0; t < ntri_in; t++) {
+		float* v = &path->line_verts[t * 6];
+		float area = (v[2] - v[0]) * (v[5] - v[1]) - (v[4] - v[0]) * (v[3] - v[1]);
+		if (fabsf(area) < 1e-4f) continue;
+		float tri[6];
+		if (area > 0) { memcpy(tri, v, sizeof(tri)); }
+		else { tri[0]=v[0]; tri[1]=v[1]; tri[2]=v[4]; tri[3]=v[5]; tri[4]=v[2]; tri[5]=v[3]; }
+		tessAddContour(tess, 2, tri, sizeof(float) * 2, 3);
+	}
+	if (tessTesselate(tess, TESS_WINDING_NONZERO, TESS_POLYGONS, 3, 2, NULL)) {
+		const TESSreal* verts = tessGetVertices(tess);
+		const TESSindex* elems = tessGetElements(tess);
+		int ntris = tessGetElementCount(tess);
+		float* out = (float*)malloc((size_t)(ntris > 0 ? ntris : 1) * 6 * sizeof(float));
+		if (out != NULL) {
+			for (int i = 0; i < ntris; i++)
+				for (int j = 0; j < 3; j++) {
+					TESSindex idx = elems[i * 3 + j];
+					out[i*6 + j*2]     = verts[idx * 2];
+					out[i*6 + j*2 + 1] = verts[idx * 2 + 1];
+				}
+			free(path->line_verts);
+			path->line_verts = out;
+			path->line_vert_count = (u32)ntris * 3;
+		}
+	}
+	tessDeleteTess(tess);
+}
+
 // Called once at finalize with the nominal half-width and again at render time
 // whenever the MC's on-screen scale changes enough to alter Flash's minimum-1px
 // stroke width. Frees and reallocates path->line_verts.
@@ -31695,6 +31829,13 @@ static void drawingBuildStroke(DrawPath* path, float half_w)
 		#undef _DR_EMIT_JOIN
 		#undef _DR_EMIT_STROKE_SEG
 		path->line_vert_count = wv;
+		// s25 w1-pixel-drawing PROTOTYPE: a translucent stroke is one coverage
+		// region in Flash (the outline is filled once), but our per-segment
+		// quads + join wedges overlap at every corner and blend twice there.
+		// Re-tessellate the triangle soup as a non-zero UNION (every triangle
+		// normalised CCW first) so each pixel is covered once. Opaque strokes
+		// are left alone (overlap is invisible, and md5-stable).
+		drawingUnionTranslucentStroke(path);
 	}
 	#undef _DR_CONTOUR_EXPLICIT_CLOSED
 	#undef _DR_CONTOUR_NEEDS_CLOSE
@@ -31845,8 +31986,10 @@ static void drawingFinalizePath(DrawingState* ds)
 				tessAddContour(tess, 2, &twips_poly[cstart * 2], sizeof(float) * 2, n);
 				contributing_contours++;
 			}
+			// s25 w1-pixel-drawing PROTOTYPE: Ruffle Drawing::new uses
+			// default_winding_rule = FillRule::EvenOdd for the drawing API.
 			if (contributing_contours > 0 &&
-			    tessTesselate(tess, TESS_WINDING_NONZERO, TESS_POLYGONS, 3, 2, NULL)) {
+			    tessTesselate(tess, TESS_WINDING_ODD, TESS_POLYGONS, 3, 2, NULL)) {
 				const TESSreal* verts = tessGetVertices(tess);
 				const TESSindex* elems = tessGetElements(tess);
 				int ntris = tessGetElementCount(tess);
@@ -32526,6 +32669,56 @@ float actionDynamicFilterGroupAlpha(void* root_mc)
 	return a;
 }
 
+// s25 w1-pixel-drawing PROTOTYPE: Flash paints a clip's Graphics BENEATH its
+// children (Ruffle MovieClip::render_self: drawing.render, then children).
+// The renderer now draws a sprite's (and the root's) Drawing-API paths inline,
+// right before its child list, and the global pass below skips those clips.
+#define DRAW_INLINE_MAX 256
+static MovieClip* g_draw_inline_done[DRAW_INLINE_MAX];
+static int g_draw_inline_count = 0;
+void actionDrawingInlineReset(void) { g_draw_inline_count = 0; }
+static int drawingInlineDone(const MovieClip* mc)
+{
+	for (int i = 0; i < g_draw_inline_count; i++)
+		if (g_draw_inline_done[i] == mc) return 1;
+	return 0;
+}
+void* actionFindMCForDisplayObj(const void* obj)
+{
+	if (obj == NULL) return NULL;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc != NULL && mc->depth != INT_MIN && mc->display_obj == obj) return mc;
+	}
+	// attachMovie keeps a STANDALONE display_obj separate from the list entry
+	// being rendered: fall back to a UNIQUE instance-name match among
+	// drawing clips (prototype heuristic; wave 2 should link entry <-> mc).
+	const DisplayObject* d = (const DisplayObject*) obj;
+	if (d->instance_name == NULL) return NULL;
+	MovieClip* found = NULL;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN || mc->drawing_state == NULL) continue;
+		if (strcmp(mc->name, d->instance_name) != 0) continue;
+		if (found != NULL) return NULL;
+		found = mc;
+	}
+	return found;
+}
+int actionRenderMCDrawingsInline(void* mc_v, DrawingRenderCallback cb, void* user_data)
+{
+	MovieClip* mc = (MovieClip*) mc_v;
+	if (mc == NULL || mc->drawing_state == NULL || !mc->visible) return 0;
+	if (mc->is_mask || mc->mask_mc != NULL) return 0;   // masked routes unchanged
+	if (g_draw_inline_count >= DRAW_INLINE_MAX) return 0;
+	g_draw_inline_done[g_draw_inline_count++] = mc;
+	DrawingRenderInfo infos[64];
+	int n = fillDrawingInfos(mc, infos, 64);
+	for (int j = 0; j < n; j++) cb(&infos[j], user_data);
+	return n;
+}
+void* actionGetRootMC(void) { return &root_movieclip; }
+
 int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
 {
 	int count = 0;
@@ -32555,6 +32748,7 @@ int actionIterateDrawings(DrawingRenderCallback cb, void* user_data)
 		}
 		DrawingState* ds = (DrawingState*)mc->drawing_state;
 		if (ds == NULL) continue;
+		if (drawingInlineDone(mc)) continue;
 
 		DrawingRenderInfo infos[64];
 		int n = fillDrawingInfos(mc, infos, 64);
@@ -65093,6 +65287,18 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		for (int _s = (int)scope_depth - 1; _s >= 0; _s--) {
 			if (scope_is_with[_s] && scope_mc[_s] != NULL) { _with_mc = scope_mc[_s]; break; }
 		}
+		// s25 w1-pixel-drawing PROTOTYPE: a bare `lineStyle(...)` in a frame
+		// script resolves MovieClip.prototype.lineStyle on the timeline itself.
+		if (_with_mc == NULL && (
+		    (func_name_len == 9 && strncmp(func_name, "lineStyle", 9) == 0) ||
+		    (func_name_len == 6 && (strncmp(func_name, "lineTo", 6) == 0 || strncmp(func_name, "moveTo", 6) == 0)) ||
+		    (func_name_len == 7 && (strncmp(func_name, "curveTo", 7) == 0 || strncmp(func_name, "endFill", 7) == 0)) ||
+		    (func_name_len == 9 && strncmp(func_name, "beginFill", 9) == 0) ||
+		    (func_name_len == 5 && strncmp(func_name, "clear", 5) == 0)))
+		{
+			_with_mc = actionGetBaseClip();
+			if (_with_mc == NULL) _with_mc = &root_movieclip;
+		}
 		if (_with_mc != NULL) {
 			int _draw_handled = 1;
 			if (func_name_len == 9 && strncmp(func_name, "beginFill", 9) == 0) {
@@ -65108,7 +65314,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ds->fill_g = ((rgb >> 8) & 0xFF) / 255.0f;
 				ds->fill_b = (rgb & 0xFF) / 255.0f;
 				ds->fill_a = alpha;
-				ds->has_fill = 1;
+				ds->has_fill = (num_args >= 1) ? 1 : 0;  // s25 PROTOTYPE: beginFill() = no fill
 				ds->has_gradient = 0;
 			} else if (func_name_len == 7 && strncmp(func_name, "endFill", 7) == 0) {
 				if (_with_mc->drawing_state != NULL) {
@@ -66773,7 +66979,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			_bm_n.type = ACTION_STACK_VALUE_F32;
 			VAL(float, &_bm_n.data.numeric_value) = (float)num_args;
 			pushVar(app_context, &_bm_n);
-			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_current_context);
+			// s25 w1-pixel-drawing PROTOTYPE: inside `with (clip)` the WITH
+			// object is searched first (gnash DrawingApiTest:126 `with (a) {
+			// hitTest(...) }`), so the bare call targets that clip.
+			MovieClip* _bm_target = g_current_context;
+			for (int _s = (int)scope_depth - 1; _s >= 0; _s--)
+				if (scope_is_with[_s] && scope_mc[_s] != NULL) { _bm_target = scope_mc[_s]; break; }
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_bm_target);
 			PUSH_STR(func_name, func_name_len);
 			actionCallMethod(app_context, str_buffer);
 			return;
@@ -76493,9 +76705,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									// behavior (Flash excludes bottom-right corner via the
 									// half-open y interval), which the previous "any cmds →
 									// hit" fallback over-approximated.
-									if (_hds->path_count == 0 && _hds->cmd_count > 0) {
-										if (drawingCmdWindingHitTest(_hds, dlx, dly))
+									// s25 w1-pixel-drawing PROTOTYPE: Ruffle Drawing::hit_test
+									// order: the pending fill (auto-closes) only when a fill
+									// style is live, then the pending stroke by distance.
+									if (_hds->cmd_count > 0) {
+										int _pf = _hds->has_fill || _hds->has_gradient || _hds->has_bitmap_fill;
+										if (_pf && drawingCmdWindingHitTest(_hds, dlx, dly))
 											hit = 1;
+										if (!hit && _hds->has_line) {
+											double _sx = sqrt(_hwa*_hwa + _hwb*_hwb), _sy = sqrt(_hwc*_hwc + _hwd*_hwd);
+											double _ws = (_sx > _sy) ? _sx : _sy;
+											double _minw = (_ws > 0.0) ? 1.0 / _ws : 1.0;
+											double _w = (_hds->line_w > _minw) ? _hds->line_w : _minw;
+											if (drawingCmdStrokeHitTest(_hds, dlx, dly, 0.5 * _w, _pf))
+												hit = 1;
+										}
 									}
 									for (u32 _hdp = 0; _hdp < _hds->path_count && !hit; _hdp++) {
 										DrawPath* _hdpath = &_hds->paths[_hdp];
@@ -76733,7 +76957,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ds->fill_g = ((rgb >> 8) & 0xFF) / 255.0f;
 				ds->fill_b = (rgb & 0xFF) / 255.0f;
 				ds->fill_a = alpha;
-				ds->has_fill = 1;
+				// s25 PROTOTYPE: Ruffle begin_fill: no argument = set_fill_style(None).
+				ds->has_fill = (num_args >= 1) ? 1 : 0;
 				ds->has_gradient = 0;  // solid fill clears gradient
 			}
 			if (args != NULL) FREE(args);

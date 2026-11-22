@@ -631,3 +631,10 @@ avm2/bitmapdata_colortransform              # aMult-only Flash bug, AVM2 twin  1
 visual/edittext/edittext_device_transform_basic     # device-font scale at render  2 cmp
 visual/edittext/edittext_device_transform_negative  # reflected device field       1 cmp
 visual/edittext/edittext_gutter                     # inverted gutter mask         1 cmp
+# s25 w1-pixel-drawing: runtime Drawing-API z-order + attached/dynamic transforms,
+# translucent stroke joins (no double blend), even-odd Drawing-API hitTest.
+# tier=1
+visual/drawing_api/drawing_order            # z-order + attached-clip transform  1 cmp
+visual/cache_as_bitmap/drawing_api          # dynamic child of a placed cab sprite 1 cmp
+# tier=2
+avm1/movieclip_line_gradient_style          # only translucent runtime stroke (band) 1 cmp

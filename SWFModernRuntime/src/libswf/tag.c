@@ -3142,6 +3142,8 @@ static void dyn_mc_compose_parent_chain(float xform[16], const MovieClip* mc)
 	}
 }
 
+static int cab_snap_delta(DisplayObject* obj, const float world[16],
+                          float* dx, float* dy);
 static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 {
 	extern MovieClip* child_mc_cache[];
@@ -3154,13 +3156,38 @@ static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 		// resets g_next_dynamic_xform_slot, so stashed IDs are invalid).
 		mc->dynamic_xform_slot = 0;
 		if (mc->depth == INT_MIN) continue;       // removed
-		if (mc->display_obj != NULL) continue;    // placed — handled by display_list loop
+		if (mc->display_obj != NULL) {
+			// s25 w1-pixel-drawing PROTOTYPE: a clip WITH a display entry
+			// draws its Drawing-API paths through last_transform_id, the
+			// baked LOCAL slot. That misses AS-set _x/_y (attachMovie'd clips
+			// keep slot 0) and every ancestor. Give a drawing clip that is
+			// AS-moved or nested a world slot. Root-level timeline clips with
+			// no AS edits keep the old route (local == world there).
+			if (mc->drawing_state == NULL) continue;
+			if (mc->as_set_flags == 0 && (mc->parent == NULL || mc->parent == &root_movieclip)) continue;
+			extern int actionGetMCWorldMatrixTwips(void* mc_v, double out[6]);
+			double w[6];
+			if (!actionGetMCWorldMatrixTwips(mc, w)) continue;
+			u32 ws = g_next_dynamic_xform_slot;
+			if (ws >= g_xform_slot_capacity) continue;
+			g_next_dynamic_xform_slot++;
+			float wx[16] = { (float)w[0], (float)w[1], 0, 0, (float)w[2], (float)w[3], 0, 0,
+			                 0, 0, 1, 0, (float)w[4], (float)w[5], 0, 1 };
+			renderer_write_transform(context, ws, wx);
+			mc->dynamic_xform_slot = ws;
+			mc->dyn_xform_lin[0] = wx[0]; mc->dyn_xform_lin[1] = wx[1];
+			mc->dyn_xform_lin[2] = wx[4]; mc->dyn_xform_lin[3] = wx[5];
+			continue;
+		}
 		// s23 w2-dynclip-transform: a dynamic child of a dynamic parent must
 		// inherit the parent's AS-set transform (Flash composes the whole
 		// chain; empty_child_filter_bounds drew both clips' parts unscaled at
 		// the origin). Only the fully-dynamic chain composes here.
 		int chain_xf = dyn_mc_chain_has_xform(mc);
-		if (mc->as_set_flags == 0 && !chain_xf) continue;  // identity — fall through to last_transform_id
+		extern int actionGetPlacedAncestorWorldMatrix(void* mc_v, double out[6]);
+		double placed_w[6];
+		int has_placed = actionGetPlacedAncestorWorldMatrix(mc, placed_w);
+		if (mc->as_set_flags == 0 && !chain_xf && !has_placed) continue;  // identity — fall through to last_transform_id
 
 		u32 new_slot = g_next_dynamic_xform_slot;
 		if (new_slot >= g_xform_slot_capacity) continue;  // exhausted
@@ -3180,6 +3207,31 @@ static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 		if (mc->as_set_flags != 0)
 			apply_as_transform(xform, mc, (u8)(1|2|4|8|16));
 		if (chain_xf) dyn_mc_compose_parent_chain(xform, mc);
+		// s25 w1-pixel-drawing PROTOTYPE: the dynamic chain ends at a
+		// timeline-placed sprite; compose its world matrix on top.
+		if (has_placed) {
+			float a = xform[0], b = xform[1], c = xform[4], d = xform[5];
+			float tx = xform[12], ty = xform[13];
+			xform[0]  = (float)(placed_w[0] * a  + placed_w[2] * b);
+			xform[1]  = (float)(placed_w[1] * a  + placed_w[3] * b);
+			xform[4]  = (float)(placed_w[0] * c  + placed_w[2] * d);
+			xform[5]  = (float)(placed_w[1] * c  + placed_w[3] * d);
+			xform[12] = (float)(placed_w[0] * tx + placed_w[2] * ty + placed_w[4]);
+			xform[13] = (float)(placed_w[1] * tx + placed_w[3] * ty + placed_w[5]);
+			// The placed ancestor's cacheAsBitmap / filter blit snap carries
+			// its whole subtree (Ruffle blits the cache texture once).
+			MovieClip* pa = mc->parent;
+			while (pa != NULL && pa->display_obj == NULL) pa = pa->parent;
+			if (pa != NULL) {
+				float pw[16] = { (float)placed_w[0], (float)placed_w[1], 0, 0,
+				                 (float)placed_w[2], (float)placed_w[3], 0, 0,
+				                 0, 0, 1, 0, (float)placed_w[4], (float)placed_w[5], 0, 1 };
+				float sdx, sdy;
+				if (cab_snap_delta((DisplayObject*)pa->display_obj, pw, &sdx, &sdy)) {
+					xform[12] += sdx; xform[13] += sdy;
+				}
+			}
+		}
 
 		renderer_write_transform(context, new_slot, xform);
 		mc->dynamic_xform_slot = new_slot;
@@ -3940,6 +3992,12 @@ static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
 // the layer composite would write colour. It just draws into the stencil as
 // usual, which is all a mask needs.
 static int g_clip_mask_capture = 0;
+extern void actionDrawingInlineReset(void);
+extern void* actionFindMCForDisplayObj(const void* obj);
+extern int actionRenderMCDrawingsInline(void* mc_v, DrawingRenderCallback cb, void* user_data);
+extern void* actionGetRootMC(void);
+static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data);
+
 
 // ---------------------------------------------------------------------------
 // AVM1 setMask (mask defect B) — paint-time pairing hooks
@@ -4213,6 +4271,8 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 			}
 			break;
 		case CHAR_TYPE_SPRITE:
+			if (!g_clip_mask_capture)
+				actionRenderMCDrawingsInline(actionFindMCForDisplayObj(obj), drawing_render_cb, NULL);
 			if (obj->sprite_display_list != NULL)
 				render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 			break;
@@ -5150,6 +5210,8 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				break;
 
 			case CHAR_TYPE_SPRITE:
+				if (!g_clip_mask_capture)
+					actionRenderMCDrawingsInline(actionFindMCForDisplayObj(obj), drawing_render_cb, NULL);
 				if (obj->sprite_display_list != NULL)
 					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 				break;
@@ -7964,6 +8026,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	// loop below never visits, so it is flushed first.
 	actionBeginTextFieldDepthPass((int) max_depth);
 	tf_draw_at_root_depth(app_context, 0, (int) max_depth);
+	actionDrawingInlineReset();
+	actionRenderMCDrawingsInline(actionGetRootMC(), drawing_render_cb, NULL);
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
 		// End an active clip BEFORE the empty-depth skip, matching
@@ -8103,6 +8167,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			}
 			compose_children(app_context, d->sprite_display_list,
 				d->sprite_max_depth, mc_xform, NULL, 0);
+			actionRenderMCDrawingsInline(mc, drawing_render_cb, NULL);
 			render_display_list(app_context, d->sprite_display_list,
 				d->sprite_max_depth);
 		}
@@ -8327,6 +8392,7 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	u32 avm1_mask_saved_clip = 0;
 	if (avm1_masker != NULL)
 		avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
+	actionRenderMCDrawingsInline(mc, drawing_render_cb, NULL);
 	render_display_list(app_context, d->sprite_display_list,
 		d->sprite_max_depth);
 	if (avm1_masker != NULL)
@@ -8962,6 +9028,8 @@ void tagShowFrame(SWFAppContext* app_context)
 	// loop below never visits, so it is flushed first.
 	actionBeginTextFieldDepthPass((int) max_depth);
 	tf_draw_at_root_depth(app_context, 0, (int) max_depth);
+	actionDrawingInlineReset();
+	actionRenderMCDrawingsInline(actionGetRootMC(), drawing_render_cb, NULL);
 
 	for (size_t i = 1; i <= max_depth; ++i)
 	{
