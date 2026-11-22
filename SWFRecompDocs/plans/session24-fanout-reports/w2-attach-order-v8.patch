@@ -1,0 +1,768 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 6c20201e..d2d411b8 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -9730,12 +9730,14 @@ static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc
+ 	ActionVar mc_val = {0};
+ 	mc_val.type = ACTION_STACK_VALUE_MOVIECLIP;
+ 	mc_val.data.numeric_value = (u64) mc;
+-	setProperty(app_context, transform, "__mc__", 6, &mc_val);
++	// The internal back-pointer slot is not enumerable (MovieClip-v8 for-in check).
++	setPropertyWithFlags(app_context, transform, "__mc__", 6, &mc_val, PROPERTY_FLAGS_DONTENUM);
+ 
+ 	// Set up addProperty virtual getters/setters for each property
+ 	setAddProperty(app_context, transform, "matrix",                    6,  &g_transform_matrix_getter_func,      &g_transform_matrix_setter_func);
+-	setAddProperty(app_context, transform, "colorTransform",           14,  &g_transform_ct_getter_func,          &g_transform_ct_setter_func);
++	// Insertion order = Flash's for-in order: matrix, concatenatedMatrix, colorTransform, ...
+ 	setAddProperty(app_context, transform, "concatenatedMatrix",       18,  &g_transform_concat_mat_getter_func,  NULL);
++	setAddProperty(app_context, transform, "colorTransform",           14,  &g_transform_ct_getter_func,          &g_transform_ct_setter_func);
+ 	setAddProperty(app_context, transform, "concatenatedColorTransform", 26, &g_transform_concat_ct_getter_func,  NULL);
+ 	setAddProperty(app_context, transform, "pixelBounds",              11,  &g_transform_pix_bounds_getter_func,  NULL);
+ 
+@@ -10517,6 +10519,8 @@ static ActionVar transformConcatCTGetter(SWFAppContext* app_context, ActionVar*
+ 	return r;
+ }
+ 
++static double propToDouble(ASObject* obj, const char* name, u32 name_len);
++void actionCallMethod(SWFAppContext* app_context, char* str_buffer);
+ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	(void)args; (void)arg_count; (void)registers;
+@@ -10533,6 +10537,54 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
+ 	double _pb_xmin_tw, _pb_ymin_tw, _pb_xmax_tw, _pb_ymax_tw;
+ 	int _pb_has = resolveMCDisplayList(mc, &_pb_dl, &_pb_dl_max)
+ 		&& ng_localBoundsOfDL(_pb_dl, _pb_dl_max, &_pb_xmin_tw, &_pb_ymin_tw, &_pb_xmax_tw, &_pb_ymax_tw);
++	{
++		// Ruffle GET_PIXEL_BOUNDS == clip.getBounds() in world space.
++		// Reuse the full getBounds engine (drawing API, dynamic children, text).
++		ActionVar n_var = {0};
++		n_var.type = ACTION_STACK_VALUE_F32;
++		VAL(float, &n_var.data.numeric_value) = 0.0f;
++		pushVar(app_context, &n_var);
++		ActionVar mv = {0}; mv.type = ACTION_STACK_VALUE_MOVIECLIP; mv.data.numeric_value = (u64) mc;
++		pushVar(app_context, &mv);
++		PUSH_STR("getBounds", 9);
++		char _pb_sb[17];
++		actionCallMethod(app_context, _pb_sb);
++		ActionVar gb; popVar(app_context, &gb);
++		_pb_has = 0;
++		if (gb.type == ACTION_STACK_VALUE_OBJECT && gb.data.numeric_value) {
++			ASObject* bo = (ASObject*) gb.data.numeric_value;
++			double x0 = propToDouble(bo, "xMin", 4), x1 = propToDouble(bo, "xMax", 4);
++			double y0 = propToDouble(bo, "yMin", 4), y1 = propToDouble(bo, "yMax", 4);
++			if (!isnan(x0) && !isnan(y0) && !(x0 > 6710886.0 && x1 > 6710886.0)) {
++				_pb_xmin_tw = x0 * 20.0; _pb_xmax_tw = x1 * 20.0;
++				_pb_ymin_tw = y0 * 20.0; _pb_ymax_tw = y1 * 20.0;
++				_pb_has = 1;
++			}
++		}
++		// Union each live dynamic child's full bounds (recursive, via its own
++		// getBounds(mc)); the getBounds engine only folds a dynamic child's OWN
++		// drawing, missing grandchildren (MovieClip.as container.draw3).
++		{
++			extern MovieClip* child_mc_cache[]; extern int child_mc_count;
++			for (int ci = 0; ci < child_mc_count; ci++) {
++				MovieClip* c = child_mc_cache[ci];
++				if (!c || c->depth == INT_MIN || c->parent != mc) continue;
++				ActionVar a0 = mv; ActionVar one = {0}; one.type = ACTION_STACK_VALUE_F32; VAL(float,&one.data.numeric_value)=1.0f;
++				pushVar(app_context, &a0); pushVar(app_context, &one);
++				ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_MOVIECLIP; cv.data.numeric_value=(u64)c; pushVar(app_context,&cv);
++				PUSH_STR("getBounds", 9); actionCallMethod(app_context, _pb_sb);
++				ActionVar cb; popVar(app_context, &cb);
++				if (cb.type != ACTION_STACK_VALUE_OBJECT || !cb.data.numeric_value) continue;
++				ASObject* o = (ASObject*) cb.data.numeric_value;
++				double x0 = propToDouble(o,"xMin",4), y0 = propToDouble(o,"yMin",4);
++				double x1 = propToDouble(o,"xMax",4), y1 = propToDouble(o,"yMax",4);
++				if (isnan(x0) || isnan(y0) || (x0 > 6710886.0 && x1 > 6710886.0)) continue;
++				if (!_pb_has) { _pb_xmin_tw = x0*20; _pb_xmax_tw = x1*20; _pb_ymin_tw = y0*20; _pb_ymax_tw = y1*20; _pb_has = 1; continue; }
++				if (x0*20 < _pb_xmin_tw) _pb_xmin_tw = x0*20; if (x1*20 > _pb_xmax_tw) _pb_xmax_tw = x1*20;
++				if (y0*20 < _pb_ymin_tw) _pb_ymin_tw = y0*20; if (y1*20 > _pb_ymax_tw) _pb_ymax_tw = y1*20;
++			}
++		}
++	}
+ 	if (!_pb_has) {
+ 		if (mc->loaded_image_width > 0) {
+ 			// Image-loaded MC: return image dimensions as pixelBounds
+@@ -55438,7 +55490,11 @@ void actionSetMember(SWFAppContext* app_context)
+ 				} else if (value_var.type == ACTION_STACK_VALUE_F64 || value_var.type == ACTION_STACK_VALUE_F32) {
+ 					// Numeric: truncate to byte, check valid range
+ 					double d = varToDouble(&value_var);
+-					int idx = (int)d & 0xFF;
++					// f64 -> wrapping u8 (Ruffle f64_to_wrapping_u8); `(int)d` is
++					// UB for out-of-range d (0xffffffff must wrap to 255).
++					double _t = isfinite(d) ? fmod(trunc(d), 256.0) : 0.0;
++					if (_t < 0) _t += 256.0;
++					int idx = (int)_t;
+ 					if (idx >= 0 && idx <= 14) {
+ 						mc->blend_mode = (u8)idx;
+ 					}
+@@ -59917,6 +59973,12 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 		// (which yields undefined for unset values).
+ 		if (mc != NULL && g_swf_version >= 8 && prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
+ 		{
++			// `flash.geom.Transform = 1` (or deleted) => `mc.transform` is undefined
++			// (Ruffle instantiates it through the live class).
++			if (!flashGeomClassAvailable("Transform", 9)) {
++				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
++				return;
++			}
+ 			ASObject* transform = createTransformObject(app_context, mc);
+ 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)transform);
+ 			return;
+@@ -65026,6 +65088,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 					// (Flash semantics — not half) at both endpoints with the current
+ 					// segment's thickness.
+ 					float h = ds->has_line ? ds->line_w : 0.0f;
++					if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
+ 					if (ds->pen_set) {
+ 						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
+ 						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
+@@ -65044,6 +65107,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+ 					drawingEnsurePen(ds);   // implicit start at the origin
+ 					float h = ds->has_line ? ds->line_w : 0.0f;
++					if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
+ 					if (ds->pen_set) {
+ 						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
+ 						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
+@@ -71784,10 +71848,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				u8 _am_saved_call_this_type = g_call_this_type;
+ 				if (_am_t2 && !_am_script)
+ 					g_call_this_type = ACTION_STACK_VALUE_ARRAY;
++				// A native own-property method (`a.toString =
++				// Array.prototype.toString`) names itself through
++				// g_current_executing_func (builtin_array_method); publish it.
++				ASFunction* _am_prev_exec = g_current_executing_func;
++				if (_am_t2 && !_am_script)
++					g_current_executing_func = func;
+ 				g_call_depth++;
+ 				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
+ 				                                       args, num_args, &opts);
+ 				g_call_depth--;
++				g_current_executing_func = _am_prev_exec;
+ 				g_call_this_type = _am_saved_call_this_type;
+ 
+ 				popSuperContext();
+@@ -76540,6 +76611,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				DrawingState* ds = getOrCreateDrawingState(mc);
+ 				drawingEnsurePen(ds);   // implicit start at the origin
+ 				float h = ds->has_line ? ds->line_w : 0.0f;
++				if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
+ 				if (ds->pen_set) {
+ 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
+ 					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);
+@@ -76565,6 +76637,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				DrawingState* ds = getOrCreateDrawingState(mc);
+ 				drawingEnsurePen(ds);   // implicit start at the origin
+ 				float h = ds->has_line ? ds->line_w : 0.0f;
++				if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
+ 				if (ds->pen_set) {
+ 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
+ 					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index 19ab5ab1..eb6abd0a 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -10441,6 +10441,39 @@ void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, Movie
+ }
+ #endif
+ 
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++// Script-only (Phase 2) PlaceObject: placement already happened in Phase 1, so
++// the tag is a no-op -- EXCEPT inside the attachMovie init replay
++// (aq_dispatch_pending_attach_init sets g_attach_tagorder_parent), where a
++// child sprite's frame-1 init runs right here, AT its PlaceObject (Flash/Ruffle
++// tag order: `PlaceObject; DoAction` traces the child first), instead of after
++// the attached clip's whole frame-1 script. The later
++// process_sprite_needs_init_public pass skips the child (sprite_needs_init is
++// cleared by the init). Shared by tagPlaceObject2 (and so PlaceObject3 /
++// WithClipActions, which delegate to it) and tagPlaceObject2Ratio.
++static void ng_script_only_place(SWFAppContext* app_context, size_t depth, size_t char_id)
++{
++	extern MovieClip* g_attach_tagorder_parent;
++	if (g_attach_tagorder_parent != NULL && g_attach_init_active
++	    && depth <= max_depth && char_id != 0 && display_list[depth].char_id == char_id
++	    && display_list[depth].sprite_needs_init
++	    && char_id < dictionary_capacity
++	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
++	{
++		// Cleared for the child's own init: a nested script-only replay
++		// inside it walks the CHILD's display list, so it must not resolve
++		// grandchildren against the attached clip (they keep the
++		// after-the-frame order there).
++		MovieClip* parent = g_attach_tagorder_parent;
++		g_attach_tagorder_parent = NULL;
++		g_script_only_mode = 0;
++		process_sprite_init_at_depth(app_context, parent, depth);
++		g_script_only_mode = 1;
++		g_attach_tagorder_parent = parent;
++	}
++}
++#endif
++
+ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth, u8 is_replace)
+ {
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+@@ -10512,7 +10545,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
+ 
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+ 	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
+-	if (g_script_only_mode) return;
++	if (g_script_only_mode) {
++		ng_script_only_place(app_context, depth, char_id);
++		return;
++	}
+ 
+ 	// Button-state-change preservation: when ng_update_button_states_in_dl
+ 	// is re-running a state function and this (depth, char_id) matches the
+@@ -11475,6 +11511,14 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
+ {
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+ 	if (g_tag_skip_mode) return;
++	// Same Phase-2 contract as tagPlaceObject2: placement is already done.
++	// Without this a script-only replay RE-PLACED the child from scratch
++	// (tagSetInstanceName is a script-only no-op, so it lost its name, and its
++	// timeline/frame-1 init were reset).
++	if (g_script_only_mode) {
++		ng_script_only_place(app_context, depth, char_id);
++		return;
++	}
+ #endif
+ 	ng_ensureDisplayListSize(app_context, depth);
+ 
+diff --git a/SWFModernRuntime/src/libswf/tag_stubs.c b/SWFModernRuntime/src/libswf/tag_stubs.c
+index 59299b38..93ec5403 100644
+--- a/SWFModernRuntime/src/libswf/tag_stubs.c
++++ b/SWFModernRuntime/src/libswf/tag_stubs.c
+@@ -215,6 +215,10 @@ typedef struct {
+ 	                        // non-root attachMovie (see aq_dispatch_pending_attach_init).
+ } PendingAttachInit;
+ 
++// Set by aq_dispatch_pending_attach_init around the attached clip's script-only
++// frame-1 replay: tagPlaceObject2 runs a child sprite's frame-1 init AT its
++// PlaceObject (Flash/Ruffle tag order) instead of after the whole frame.
++MovieClip* g_attach_tagorder_parent = NULL;
+ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* user)
+ {
+ 	PendingAttachInit* pai = (PendingAttachInit*) user;
+@@ -288,7 +292,10 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
+ 		ng_set_script_only_mode(1);
+ 		actionAttachInitEnter();
+ 		actionDeferredSpriteInitEnter();
++		MovieClip* _ato_saved = g_attach_tagorder_parent;
++		g_attach_tagorder_parent = mc;
+ 		pai->func(app_context);
++		g_attach_tagorder_parent = _ato_saved;
+ 		actionDeferredSpriteInitLeave();
+ 		actionAttachInitLeave();
+ 		ng_set_script_only_mode(0);
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 717bfd1c..4048d2b6 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -106,10 +106,13 @@ arms cannot be reached any other way.
+ | `avm2_e4x_parse_bounded` | **collectable E4X** (seedling-wasm-leak L1). E4X used to be immortal (every node a GC root, every XML/XMLList wrapper pinned), so a game re-parsing a level document per room swap (Seedling) kept them all: the leaking runtime OOMs in a 64 MB arena (and in 256); the fixed one sweeps ~8,070 nodes per collection at a flat 5.14 MB with 1,035 live objects. The live half is a liveness lock under `AVM2_GC_STRESS=1`: identity across ticks, `parent()` navigation from a leaf held alone (the rest of its tree must survive), a detached subtree, attribute lists, namespaces, a list whose target object only the list reaches, and a `setNotification` closure. Also guards the E4X scratch frees (serializer builder, in-scope namespace lists, parser stacks) |
+ | `avm2_strbuf_stale_prefix` | **append-in-place string buffers keep stale prefixes intact** (s22 w2-strbuf; `avm2_string_concat` → `strbuf_append`, `avm2_value.c`). A long `s += x` writes `x` into `s`'s buffer and returns a new header sharing the bytes, so the OLD header `p` loses `utf8[len] == '\0'`. Every row reads such a stale prefix after a later append, each through a different consumer (length, `==`, indexOf/lastIndexOf, charAt/slice, Number/parseInt, split, RegExp match, a property key), plus two branches off one stale prefix (`x1`/`x2`: the second must not clobber the first) and a prefix left behind while the frontier keeps growing in place (`b`). A consumer that read `utf8` as a C string would print `Number(q)=75`, not `7`. **A behavior LOCK, not a repro**: byte-identical on the pre-buffer baseline. Hand-assembled ABC (`create_test_swf.py`, top-level script code, no mxmlc in the cloud); the numeric rows pad with spaces, not zeros, because `avm2_string_to_f64` caps its digit copy at 380 characters (a separate open defect). Expected output is derived from ECMA-262 semantics; Ruffle confirmation is a w2-strbuf LOCAL ORACLE REQUEST |
+ | `avm1_closure_method_scope` | closures keep their DEFINING scope when invoked through `actionCallMethod`'s object / array-own-method / String.prototype arms, the type-2 `NewMethod` constructor path, and `objectToPrimitive`'s valueOf during `==` (s22 w2-as-core "M5", `0cea97b3e`; before it, `n`/`tag`/`s`/`k` traced `undefined`). MTASC SWF7 (`create_test_swf.sh`); expected output from the Ruffle exporter at `45366370e`. Fails on `0cea97b3e~1`, passes after, both modes |
+-| `avm1_attached_clip_natural_timeline` | **attachMovie'd clips run their REAL timeline every tick** (frame tags, DoActions, nested children) in Ruffle's newest-first exec-list order with the root last: a 1-frame container (`holder`) and a frame-1-`stop()`ped one (`stopper`) still animate their children, a playing clip (`multi`) loops itself and its child. CI-mode pump landed s23 (`3cdde8be0`); s24 shares it with browser-WASM. Attached clips' frame 1 puts the DoAction BEFORE the child's PlaceObject: Ruffle runs attach-tick frame-1 actions in TAG order (oracle-checked) and we always run the clip's own DoAction first, so this order keeps the attach tick graded without depending on that open difference (`polish-sweep-arc.md` §24.4). Oracle: local Ruffle exporter, 8 frames |
++| `avm1_attached_clip_natural_timeline` | **attachMovie'd clips run their REAL timeline every tick** (frame tags, DoActions, nested children) in Ruffle's newest-first exec-list order with the root last: a 1-frame container (`holder`) and a frame-1-`stop()`ped one (`stopper`) still animate their children, a playing clip (`multi`) loops itself and its child. CI-mode pump landed s23 (`3cdde8be0`); s24 shares it with browser-WASM. Attached clips' frame 1 puts the DoAction BEFORE the child's PlaceObject (the attach tick's tag-order rule is pinned separately by `avm1_attached_clip_tagorder`, which flips that order). Oracle: local Ruffle exporter, 8 frames |
+ | `avm1_attached_clip_natural_timeline_nonroot` | the same, attached into a timeline-placed container `c` -- the CI modes also register such a clip in `c`'s display list as a lookup/render alias, and before s24 `c`'s own timeline walk advanced the alias's children a SECOND time per tick (`kid anim f1` -> `f3`). Alias now flagged `DisplayObject::attach_registration` and skipped by the timeline walks. Ruffle output byte-identical to the root variant |
+ | `avm1_attached_clip_goto_play` | **an attached clip's `gotoAndPlay(T)` shows T now and plays T+1 next tick**, forward (`gotoAndPlay(4)` -> f4, f5) and backward (`gotoAndPlay(2)` -> f2, f3). Before s24 the attached-clip pump read `sprite_current_frame` as the SHOWN frame while `ng_gotoFrameByMC` writes the NEXT one, so it wrapped to f1 after the forward goto and skipped f3 after the backward one. Attached roots now use NEXT semantics like every display-list entry (`ng_record_attached_playable` starts them at 1). Oracle: local Ruffle exporter, 9 frames |
+ | `avm1_attached_clip_goto_play_nonroot` | the same through a timeline-placed container `c` (`c.a.gotoAndPlay`); Ruffle output identical to the root variant |
++| `avm1_attached_clip_tagorder` | **an attached clip's frame-1 tags run in TAG order on the attach tick**: with `PlaceObject(child); DoAction` the child's frame 1 traces first (`kid2 anim f1` before `s stopper f1`, `kid3 anim f1` before `m multi f1`). The CI modes replay the attached clip's frame 1 in script-only mode (`aq_dispatch_pending_attach_init`), where PlaceObject was a no-op and the children's frame 1 ran only after the whole frame; `ng_script_only_place` (`tag.c`) now runs a child's init AT its PlaceObject inside that replay (s24 `w2-attach-order-v8`; `tagPlaceObject2Ratio` got the same script-only guard -- it had none and RE-PLACED the child, dropping its name). Browser-WASM's live attach arm is not covered. Same clips as `avm1_attached_clip_natural_timeline` with frame 1 flipped (the s23 probe SWF, md5 `82368d06`). Oracle: local Ruffle exporter `0ddd12b6a`, 8 frames |
++| `avm1_attached_clip_tagorder_nonroot` | the same, attached into a timeline-placed container `c`; Ruffle output byte-identical to the root variant (`0ddd12b6a`) |
++| `avm1_array_native_own_method` | **an Array.prototype native installed as an array's OWN method runs** (`ch.toString = backup.prototype.toString` after `_global.Array` was rebound): the array own-method arm of `actionCallMethod` invoked the native without publishing `g_current_executing_func`, so `builtin_array_method` could not name itself and returned `undefined` (`lit call: undefined`, `filters call: undefined`). The `_global.Array` rebound is what routes the call off the `callArrayMethod` fast path. Corpus instance: gnash `MovieClip-v8` (MovieClip.as:1194). s24 `w2-attach-order-v8`. Oracle: local Ruffle exporter `0ddd12b6a`, 1 frame |
+ | `avm1_runtime_filters` | **AVM1 runtime `clip.filters = [...]` renders** (post-s23 `avm1-runtime-filters`). Before it the setter only stored the array; nothing lowered it onto a display entry, and a `createEmptyMovieClip` clip had no entry to carry one. Five cases, one frame: A a timeline sprite with a GlowFilter set by script; B the setter SNAPSHOTS (mutating the source array after assignment does not change the render; `B 2` = blurX of the read-back clone); C `filters = null` clears; D a dynamic clip with two overlapping Drawing-API children at `_alpha 50` and a 9-arg DropShadowFilter (group alpha: the overlap is uniform; also locks the ctor argument order, which used to make this an INNER shadow); E a dynamic clip with a BevelFilter. Hand-assembled SWF 8 (`create_test_swf.py`, regenerates byte-identically). Expected trace and `output.expected.png` from the local Ruffle exporter at `0ddd12b6a`; our render matched it at 0 differing pixels |
+ | `avm1_xml_first_action_proto` | **a lazily-initialized builtin prototype must link to Object.prototype even when the movie names the class BEFORE Object.prototype exists** (s24 `w2-textformat-ctor` §2). The very first action is `typeof XML.prototype.hasOwnProperty`: `initXMLPrototype` used to link `__proto__` only `if (g_object_prototype != NULL)`, so the prototype had no parent and both rows traced `undefined`. Now linked through `getObjectPrototype()` (also TextFormat, StyleSheet). Hand-assembled SWF8 (`create_test_swf.py` writes every probe_<X>; this dir is `probe_XML`). Expected output from the local Ruffle exporter at `0ddd12b6a` |
+ | `avm1_xmlnode_first_action_proto` | the same for `XMLNode.prototype` (`probe_XMLNode`); Ruffle output at `0ddd12b6a` |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/create_test_swf.py
+new file mode 100644
+index 00000000..33d73a93
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/create_test_swf.py
+@@ -0,0 +1,50 @@
++#!/usr/bin/env python3
++"""avm1_array_native_own_method: an Array.prototype NATIVE installed as an
++array's OWN method (`ch.toString = backup.prototype.toString; ch.toString()`)
++runs, after `_global.Array` was rebound to a plain function.
++
++The rebound disables the callArrayMethod fast path, so the call goes through
++actionCallMethod's array own-method arm, which invoked the native via
++invokeFunctionValue without publishing g_current_executing_func;
++builtin_array_method names itself from that global, saw NULL and returned
++undefined (`lit call: undefined`). Fixed s24 (w2-attach-order-v8); the gnash
++MovieClip-v8 check at MovieClip.as:1194 (`_root.filters` array) is the corpus
++instance. Two rows: an array literal (`lit`) and a `_root.filters` array.
++
++Expected output: Ruffle exporter (local build, 0ddd12b6a) --frames 1 trace
++(session24-fanout-reports/w1-attach-order-oracle/).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import struct,sys
++def tag(code,data):
++    return struct.pack('<H',(code<<6)|len(data))+data if len(data)<63 else struct.pack('<HI',(code<<6)|0x3f,len(data))+data
++def s(x): return x.encode()+b'\0'
++def push(*items):
++    b=b''
++    for it in items:
++        if isinstance(it,str): b+=b'\x00'+s(it)
++        elif isinstance(it,int): b+=b'\x07'+struct.pack('<i',it)
++    return b'\x96'+struct.pack('<H',len(b))+b
++GV=b'\x1c'; GM=b'\x4e'; SV=b'\x1d'; SM=b'\x4f'; TR=b'\x26'; CM=b'\x52'; NM=b'\x53'; IA=b'\x42'; TYPEOF=b'\x44'; ADD2=b'\x47'
++def deffn(body): return b'\x9b'+struct.pack('<H',3+len(body)-len(body)+2+1)[:0]+struct.pack('<H',1+2+2)+b'\x00'+struct.pack('<H',0)+struct.pack('<H',len(body))+body
++code=b''
++# _root.filters = [new flash.filters.BlurFilter()]
++code+=push('_root')+GV+push('filters')+push(0,'flash')+GV+push('filters')+GM+push('BlurFilter')+NM+push(1)+IA+SM
++code+=push('backup')+push('_global')+GV+push('Array')+GM+SV
++code+=push('_global')+GV+push('Array')+deffn(b'')+SM
++for src in ['lit','filters']:
++    code+=push('ch')
++    if src=='lit': code+=push(2,1,2)+IA
++    else: code+=push('_root')+GV+push('filters')+GM
++    code+=SV
++    code+=push(src+' typeof ch.toString before: ')+push('ch')+GV+push('toString')+GM+TYPEOF+ADD2+TR
++    code+=push('ch')+GV+push('toString')+push('backup')+GV+push('prototype')+GM+push('toString')+GM+SM
++    code+=push(src+' typeof ch.toString after: ')+push('ch')+GV+push('toString')+GM+TYPEOF+ADD2+TR
++    code+=push(src+' call: ')+push(0,'ch')+GV+push('toString')+CM+ADD2+TR
++    code+=push(src+' len: ')+push('ch')+GV+push('length')+GM+ADD2+TR
++code+=push('_global')+GV+push('Array')+push('backup')+GV+SM
++body=tag(69,struct.pack('<I',0))+tag(9,b'\xff\xff\xff')+tag(12,code+b'\0')+tag(1,b'')+tag(0,b'')
++nb=13; bits='{:05b}'.format(nb)+''.join('{:013b}'.format(v) for v in (0,4000,0,3000)); bits+='0'*((8-len(bits)%8)%8)
++rect=int(bits,2).to_bytes(len(bits)//8,'big'); hdr=rect+struct.pack('<HH',30<<8,1)
++open(sys.argv[1],'wb').write(b'FWS'+bytes([8])+struct.pack('<I',8+len(hdr)+len(body))+hdr+body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/output.txt b/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/output.txt
+new file mode 100644
+index 00000000..2e2a3bea
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/output.txt
+@@ -0,0 +1,8 @@
++lit typeof ch.toString before: function
++lit typeof ch.toString after: function
++lit call: 1,2
++lit len: 2
++filters typeof ch.toString before: function
++filters typeof ch.toString after: function
++filters call: [object Object]
++filters len: 1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/test.swf b/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..7cec9a6cac860810d13da6a5f7f41fafc769733e
+GIT binary patch
+literal 827
+zcmc&y%TB{E5S+F|X#uIgIfWnrM?L@!lu(shB9Q~f%8Bw4Rvo$Sp+DjazsA3WO;p-M
+zY63TWvOKf1v*Vq=`@_cpkm70z;|sX#VRjBWFa4q@o(2~LY7<yUArve<0^*FTNUoqy
+zK>(eYvsK!}Tms?nwVYRE_}YNkBd+7=ArP?eW1XW^TO?crj8i#@Jxj?pa3?Lmr&0BT
+zr;mUzg&xD~(^I8f-JFTO26(1ywaFt9+hKaIgs)__Oza?vg^V6-Y|AZu4E&&QXRmh$
+zftq1Up8&ZON|f?&n*yG;TYIyZGV5$jft9{P#(BvbZNsH8n?B#jCb=lNJX+QzDOh?*
+tR0?-DO3U9-#J9Vj{GY6DI{W{g*V(@QPnnJP{Lb7C?__-mJWOfnz5%!^+Ry+1
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/test.toml b/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/test.toml
+new file mode 100644
+index 00000000..dbee897f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_array_native_own_method/test.toml
+@@ -0,0 +1 @@
++num_frames = 1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline/create_test_swf.py
+index b2f087ea..ff4dca6f 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline/create_test_swf.py
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline/create_test_swf.py
+@@ -17,10 +17,11 @@ Pins (session 24, browser follow-up of s23 w2-attached-timeline `3cdde8be0`):
+ 
+ Every attached clip's frame 1 has its DoAction BEFORE the PlaceObject of its
+ child. Ruffle runs frame-1 actions in TAG order on the attach tick (child
+-first when the PlaceObject comes first: oracle-checked in s24); we run the
+-attached clip's own frame-1 DoAction first regardless. This order keeps the
+-attach tick graded without depending on that open difference
+-(SWFRecompDocs/plans/session23-fanout-reports/browser-attached-timeline-report.md).
++first when the PlaceObject comes first). Until s24 w2-attach-order-v8 the CI
++modes ran the attached clip's own DoAction first regardless, so this fixture
++kept that order; the PlaceObject-first order is now pinned by
++avm1_attached_clip_tagorder{,_nonroot} (browser-WASM's live attach arm still
++runs the clip's DoAction first: HOLD).
+ 
+ Expected output: Ruffle exporter (local build) --frames 8 trace; root and
+ non-root variants are byte-identical in Ruffle.
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline_nonroot/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline_nonroot/create_test_swf.py
+index b2f087ea..ff4dca6f 100644
+--- a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline_nonroot/create_test_swf.py
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_natural_timeline_nonroot/create_test_swf.py
+@@ -17,10 +17,11 @@ Pins (session 24, browser follow-up of s23 w2-attached-timeline `3cdde8be0`):
+ 
+ Every attached clip's frame 1 has its DoAction BEFORE the PlaceObject of its
+ child. Ruffle runs frame-1 actions in TAG order on the attach tick (child
+-first when the PlaceObject comes first: oracle-checked in s24); we run the
+-attached clip's own frame-1 DoAction first regardless. This order keeps the
+-attach tick graded without depending on that open difference
+-(SWFRecompDocs/plans/session23-fanout-reports/browser-attached-timeline-report.md).
++first when the PlaceObject comes first). Until s24 w2-attach-order-v8 the CI
++modes ran the attached clip's own DoAction first regardless, so this fixture
++kept that order; the PlaceObject-first order is now pinned by
++avm1_attached_clip_tagorder{,_nonroot} (browser-WASM's live attach arm still
++runs the clip's DoAction first: HOLD).
+ 
+ Expected output: Ruffle exporter (local build) --frames 8 trace; root and
+ non-root variants are byte-identical in Ruffle.
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/create_test_swf.py
+new file mode 100644
+index 00000000..efdb8884
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/create_test_swf.py
+@@ -0,0 +1,111 @@
++#!/usr/bin/env python3
++"""avm1_attached_clip_tagorder: an attachMovie'd clip's frame-1 tags run in TAG
++order on the attach tick -- a child placed BEFORE the clip's DoAction runs its
++own frame 1 first.
++
++Same clips as avm1_attached_clip_natural_timeline, with each attached clip's
++frame 1 flipped to `PlaceObject(child); DoAction` (the s23 w2 attached-timeline
++probe, `session23-fanout-reports/w2-attached-timeline-probe/make_probe_swf.py`,
++md5 82368d06 for the root variant). Expected attach tick:
++`kid anim f1, kid2 anim f1, s stopper f1, kid3 anim f1, m multi f1`.
++
++Before s24 (w2-attach-order-v8) the CI modes ran the attached clip's own
++DoAction first regardless of tag order: aq_dispatch_pending_attach_init replays
++frame 1 in script-only mode (PlaceObject a no-op) and only afterwards
++process_sprite_needs_init_public ran the children's frame 1. Now
++ng_script_only_place (tag.c) runs a child's frame-1 init AT its PlaceObject
++inside that replay. Browser-WASM's live attach arm is not covered (HOLD).
++
++NON-ROOT variant (`_nonroot`): the clips are attached into a timeline-placed
++container `c`.
++
++Expected output: Ruffle exporter (local build, 0ddd12b6a) --frames 8 trace;
++root and non-root variants are byte-identical in Ruffle
++(session24-fanout-reports/w1-attach-order-oracle/).
++
++Usage: create_test_swf.py <out.swf> [nonroot]
++"""
++import struct
++import sys
++
++
++def tag(code, data):
++    if len(data) < 63:
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode() + b'\0'
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++GETVAR = b'\x1c'
++GETMEM = b'\x4e'
++ADD2 = b'\x47'
++TRACE = b'\x26'
++STOP = b'\x07'
++POP = b'\x17'
++CALLM = b'\x52'
++
++
++def trace_self(label):  # trace(this._name + label + this._currentframe)
++    return (push('this') + GETVAR + push('_name') + GETMEM + push(label) + ADD2
++            + push('this') + GETVAR + push('_currentframe') + GETMEM + ADD2 + TRACE)
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name):
++    return tag(26, bytes([0x02 | 0x20]) + struct.pack('<HH', depth, cid) + s(name))
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++HOST = 'c' if len(sys.argv) > 2 and sys.argv[2] == 'nonroot' else '_root'
++
++anim = sprite(3, [doaction(trace_self(' anim f')) for _ in range(3)])
++holder = sprite(2, [place(1, 3, 'kid')])  # 1-frame container, no script
++stopper = sprite(4, [place(1, 3, 'kid2') + doaction(trace_self(' stopper f') + STOP)]
++                 + [doaction(trace_self(' stopper f')) for _ in range(2)])
++multi = sprite(5, [place(1, 3, 'kid3') + doaction(trace_self(' multi f'))]
++               + [doaction(trace_self(' multi f')) for _ in range(2)])
++container = sprite(6, [b''])  # only emitted for the non-root variant (oracle SWF bytes)
++exp = tag(56, struct.pack('<H', 3) + struct.pack('<H', 2) + s('holder')
++          + struct.pack('<H', 4) + s('stopper') + struct.pack('<H', 5) + s('multi'))
++
++
++def attach(lib, name, depth):  # HOST.attachMovie(lib, name, depth); pop
++    return push(depth, name, lib, 3, HOST) + GETVAR + push('attachMovie') + CALLM + POP
++
++
++root_f1 = doaction(attach('holder', 'h', 1) + attach('stopper', 's', 2) + attach('multi', 'm', 3))
++if HOST == 'c':
++    root_f1 = place(10, 6, 'c') + root_f1
++root_f2 = doaction(push('root f2') + TRACE)
++body = (tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + anim + holder + stopper + multi
++        + (container if HOST == 'c' else b'') + exp + root_f1 + SHOW + root_f2 + SHOW + doaction(STOP) + SHOW + tag(0, b''))
++nb = 13
++bits = '{:05b}'.format(nb) + ''.join('{:013b}'.format(v) for v in (0, 4000, 0, 3000))
++bits += '0' * ((8 - len(bits) % 8) % 8)
++rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++hdr_rest = rect + struct.pack('<HH', 30 << 8, 3)
++total = 8 + len(hdr_rest) + len(body)
++open(sys.argv[1], 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/output.txt b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/output.txt
+new file mode 100644
+index 00000000..abb379d3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/output.txt
+@@ -0,0 +1,34 @@
++kid anim f1
++kid2 anim f1
++s stopper f1
++kid3 anim f1
++m multi f1
++kid3 anim f2
++m multi f2
++kid2 anim f2
++kid anim f2
++root f2
++kid3 anim f3
++m multi f3
++kid2 anim f3
++kid anim f3
++kid3 anim f1
++m multi f1
++kid2 anim f1
++kid anim f1
++kid3 anim f2
++m multi f2
++kid2 anim f2
++kid anim f2
++kid3 anim f3
++m multi f3
++kid2 anim f3
++kid anim f3
++kid3 anim f1
++m multi f1
++kid2 anim f1
++kid anim f1
++kid3 anim f2
++m multi f2
++kid2 anim f2
++kid anim f2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/test.swf b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..49b5a93a1c56ccada70f67a27ca95e71fca30892
+GIT binary patch
+literal 1007
+zcmd5*u};G<6uiW=CJ2g{7-%74-~-ABP*G?n7+_#TQJW|hO;R~7{{SBlKCCMvI|Ca_
+zIfsB?sM?`JohY&5^UK}&UGMI8^IZTjjykBl0*3+@d*JB0GY;>KQ^D&@oO4#x0TZhn
+z%|ZhAX^@1tE<C^wQkD1-`hO6+L<}ZchpCBliR_=CvzC>BsprDMQ~lVX*atNvQDEkM
+z^0~n;&%X<83h2$XVw+avCL51Ky@VUGwBvF`)mB~1>i;0O+CTlL)Zd-Uc#Haz$;hZB
+z)R%nMu@um12)Kx|(J<6J|LR2PM5&DqyjTaCkPhDr&ks~GO6+=_Wrh*i0Rm%!L41`x
+sst`B(MGMlkh@AI#mtfJBg9?$L`uTzlbhRODBrOR)YQtvE6}HuYFY&tY=l}o!
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/test.toml b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/test.toml
+new file mode 100644
+index 00000000..fc915e37
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder/test.toml
+@@ -0,0 +1 @@
++num_frames = 8
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/create_test_swf.py
+new file mode 100644
+index 00000000..efdb8884
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/create_test_swf.py
+@@ -0,0 +1,111 @@
++#!/usr/bin/env python3
++"""avm1_attached_clip_tagorder: an attachMovie'd clip's frame-1 tags run in TAG
++order on the attach tick -- a child placed BEFORE the clip's DoAction runs its
++own frame 1 first.
++
++Same clips as avm1_attached_clip_natural_timeline, with each attached clip's
++frame 1 flipped to `PlaceObject(child); DoAction` (the s23 w2 attached-timeline
++probe, `session23-fanout-reports/w2-attached-timeline-probe/make_probe_swf.py`,
++md5 82368d06 for the root variant). Expected attach tick:
++`kid anim f1, kid2 anim f1, s stopper f1, kid3 anim f1, m multi f1`.
++
++Before s24 (w2-attach-order-v8) the CI modes ran the attached clip's own
++DoAction first regardless of tag order: aq_dispatch_pending_attach_init replays
++frame 1 in script-only mode (PlaceObject a no-op) and only afterwards
++process_sprite_needs_init_public ran the children's frame 1. Now
++ng_script_only_place (tag.c) runs a child's frame-1 init AT its PlaceObject
++inside that replay. Browser-WASM's live attach arm is not covered (HOLD).
++
++NON-ROOT variant (`_nonroot`): the clips are attached into a timeline-placed
++container `c`.
++
++Expected output: Ruffle exporter (local build, 0ddd12b6a) --frames 8 trace;
++root and non-root variants are byte-identical in Ruffle
++(session24-fanout-reports/w1-attach-order-oracle/).
++
++Usage: create_test_swf.py <out.swf> [nonroot]
++"""
++import struct
++import sys
++
++
++def tag(code, data):
++    if len(data) < 63:
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode() + b'\0'
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++GETVAR = b'\x1c'
++GETMEM = b'\x4e'
++ADD2 = b'\x47'
++TRACE = b'\x26'
++STOP = b'\x07'
++POP = b'\x17'
++CALLM = b'\x52'
++
++
++def trace_self(label):  # trace(this._name + label + this._currentframe)
++    return (push('this') + GETVAR + push('_name') + GETMEM + push(label) + ADD2
++            + push('this') + GETVAR + push('_currentframe') + GETMEM + ADD2 + TRACE)
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name):
++    return tag(26, bytes([0x02 | 0x20]) + struct.pack('<HH', depth, cid) + s(name))
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++HOST = 'c' if len(sys.argv) > 2 and sys.argv[2] == 'nonroot' else '_root'
++
++anim = sprite(3, [doaction(trace_self(' anim f')) for _ in range(3)])
++holder = sprite(2, [place(1, 3, 'kid')])  # 1-frame container, no script
++stopper = sprite(4, [place(1, 3, 'kid2') + doaction(trace_self(' stopper f') + STOP)]
++                 + [doaction(trace_self(' stopper f')) for _ in range(2)])
++multi = sprite(5, [place(1, 3, 'kid3') + doaction(trace_self(' multi f'))]
++               + [doaction(trace_self(' multi f')) for _ in range(2)])
++container = sprite(6, [b''])  # only emitted for the non-root variant (oracle SWF bytes)
++exp = tag(56, struct.pack('<H', 3) + struct.pack('<H', 2) + s('holder')
++          + struct.pack('<H', 4) + s('stopper') + struct.pack('<H', 5) + s('multi'))
++
++
++def attach(lib, name, depth):  # HOST.attachMovie(lib, name, depth); pop
++    return push(depth, name, lib, 3, HOST) + GETVAR + push('attachMovie') + CALLM + POP
++
++
++root_f1 = doaction(attach('holder', 'h', 1) + attach('stopper', 's', 2) + attach('multi', 'm', 3))
++if HOST == 'c':
++    root_f1 = place(10, 6, 'c') + root_f1
++root_f2 = doaction(push('root f2') + TRACE)
++body = (tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + anim + holder + stopper + multi
++        + (container if HOST == 'c' else b'') + exp + root_f1 + SHOW + root_f2 + SHOW + doaction(STOP) + SHOW + tag(0, b''))
++nb = 13
++bits = '{:05b}'.format(nb) + ''.join('{:013b}'.format(v) for v in (0, 4000, 0, 3000))
++bits += '0' * ((8 - len(bits) % 8) % 8)
++rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++hdr_rest = rect + struct.pack('<HH', 30 << 8, 3)
++total = 8 + len(hdr_rest) + len(body)
++open(sys.argv[1], 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/output.txt b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/output.txt
+new file mode 100644
+index 00000000..abb379d3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/output.txt
+@@ -0,0 +1,34 @@
++kid anim f1
++kid2 anim f1
++s stopper f1
++kid3 anim f1
++m multi f1
++kid3 anim f2
++m multi f2
++kid2 anim f2
++kid anim f2
++root f2
++kid3 anim f3
++m multi f3
++kid2 anim f3
++kid anim f3
++kid3 anim f1
++m multi f1
++kid2 anim f1
++kid anim f1
++kid3 anim f2
++m multi f2
++kid2 anim f2
++kid anim f2
++kid3 anim f3
++m multi f3
++kid2 anim f3
++kid anim f3
++kid3 anim f1
++m multi f1
++kid2 anim f1
++kid anim f1
++kid3 anim f2
++m multi f2
++kid2 anim f2
++kid anim f2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/test.swf b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7fd3825b365fe416584964563bb3138aa0db5db
+GIT binary patch
+literal 1014
+zcmd5*u};G<6uiVVAr%xc6{G@D2R@*D02PIHf&m6b6s3t0(Il1Q@(T#q^G)omjQjx-
+z14}uFfM96Vp+g<ZvHUJCcjx!|*H`Nw0*G+XMeP;X7dYJpN6(ycIB(nvKF8vOyTSrg
+z6z6CaHgJ=ANq~#O0bDPQ6F0=*4`Pc5e<Ed&s!*25!6CXUnF)AtOc;2u+6Kkm#zPVX
+zrp_nVHJ&{F209ebpJ~Mgt;kh29tUy(H|)}mvn6F)b~3I1o!n~w^dC`wZzkh9^(T{&
+ziWg8{@?FJLz_Vkq8oHFZ*AOrfWusvrSqatM(vwmp?yYtm7JQoWq)pj@ZSc*0`uWCY
+zcY%Obu?cued46=B-NgYeo5e0{Q%7^o@1nsxc(aNosQx|&O!5t(J5y$va>EXE>zP7V
+G9PkAyMD5W4
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/test.toml b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/test.toml
+new file mode 100644
+index 00000000..fc915e37
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_tagorder_nonroot/test.toml
+@@ -0,0 +1 @@
++num_frames = 8

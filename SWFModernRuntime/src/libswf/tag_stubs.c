@@ -215,6 +215,10 @@ typedef struct {
 	                        // non-root attachMovie (see aq_dispatch_pending_attach_init).
 } PendingAttachInit;
 
+// Set by aq_dispatch_pending_attach_init around the attached clip's script-only
+// frame-1 replay: tagPlaceObject2 runs a child sprite's frame-1 init AT its
+// PlaceObject (Flash/Ruffle tag order) instead of after the whole frame.
+MovieClip* g_attach_tagorder_parent = NULL;
 static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* user)
 {
 	PendingAttachInit* pai = (PendingAttachInit*) user;
@@ -288,7 +292,10 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 		ng_set_script_only_mode(1);
 		actionAttachInitEnter();
 		actionDeferredSpriteInitEnter();
+		MovieClip* _ato_saved = g_attach_tagorder_parent;
+		g_attach_tagorder_parent = mc;
 		pai->func(app_context);
+		g_attach_tagorder_parent = _ato_saved;
 		actionDeferredSpriteInitLeave();
 		actionAttachInitLeave();
 		ng_set_script_only_mode(0);

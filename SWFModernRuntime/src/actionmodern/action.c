@@ -9730,12 +9730,14 @@ static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc
 	ActionVar mc_val = {0};
 	mc_val.type = ACTION_STACK_VALUE_MOVIECLIP;
 	mc_val.data.numeric_value = (u64) mc;
-	setProperty(app_context, transform, "__mc__", 6, &mc_val);
+	// The internal back-pointer slot is not enumerable (MovieClip-v8 for-in check).
+	setPropertyWithFlags(app_context, transform, "__mc__", 6, &mc_val, PROPERTY_FLAGS_DONTENUM);
 
 	// Set up addProperty virtual getters/setters for each property
 	setAddProperty(app_context, transform, "matrix",                    6,  &g_transform_matrix_getter_func,      &g_transform_matrix_setter_func);
-	setAddProperty(app_context, transform, "colorTransform",           14,  &g_transform_ct_getter_func,          &g_transform_ct_setter_func);
+	// Insertion order = Flash's for-in order: matrix, concatenatedMatrix, colorTransform, ...
 	setAddProperty(app_context, transform, "concatenatedMatrix",       18,  &g_transform_concat_mat_getter_func,  NULL);
+	setAddProperty(app_context, transform, "colorTransform",           14,  &g_transform_ct_getter_func,          &g_transform_ct_setter_func);
 	setAddProperty(app_context, transform, "concatenatedColorTransform", 26, &g_transform_concat_ct_getter_func,  NULL);
 	setAddProperty(app_context, transform, "pixelBounds",              11,  &g_transform_pix_bounds_getter_func,  NULL);
 
@@ -10517,6 +10519,8 @@ static ActionVar transformConcatCTGetter(SWFAppContext* app_context, ActionVar* 
 	return r;
 }
 
+static double propToDouble(ASObject* obj, const char* name, u32 name_len);
+void actionCallMethod(SWFAppContext* app_context, char* str_buffer);
 static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)args; (void)arg_count; (void)registers;
@@ -10533,6 +10537,54 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	double _pb_xmin_tw, _pb_ymin_tw, _pb_xmax_tw, _pb_ymax_tw;
 	int _pb_has = resolveMCDisplayList(mc, &_pb_dl, &_pb_dl_max)
 		&& ng_localBoundsOfDL(_pb_dl, _pb_dl_max, &_pb_xmin_tw, &_pb_ymin_tw, &_pb_xmax_tw, &_pb_ymax_tw);
+	{
+		// Ruffle GET_PIXEL_BOUNDS == clip.getBounds() in world space.
+		// Reuse the full getBounds engine (drawing API, dynamic children, text).
+		ActionVar n_var = {0};
+		n_var.type = ACTION_STACK_VALUE_F32;
+		VAL(float, &n_var.data.numeric_value) = 0.0f;
+		pushVar(app_context, &n_var);
+		ActionVar mv = {0}; mv.type = ACTION_STACK_VALUE_MOVIECLIP; mv.data.numeric_value = (u64) mc;
+		pushVar(app_context, &mv);
+		PUSH_STR("getBounds", 9);
+		char _pb_sb[17];
+		actionCallMethod(app_context, _pb_sb);
+		ActionVar gb; popVar(app_context, &gb);
+		_pb_has = 0;
+		if (gb.type == ACTION_STACK_VALUE_OBJECT && gb.data.numeric_value) {
+			ASObject* bo = (ASObject*) gb.data.numeric_value;
+			double x0 = propToDouble(bo, "xMin", 4), x1 = propToDouble(bo, "xMax", 4);
+			double y0 = propToDouble(bo, "yMin", 4), y1 = propToDouble(bo, "yMax", 4);
+			if (!isnan(x0) && !isnan(y0) && !(x0 > 6710886.0 && x1 > 6710886.0)) {
+				_pb_xmin_tw = x0 * 20.0; _pb_xmax_tw = x1 * 20.0;
+				_pb_ymin_tw = y0 * 20.0; _pb_ymax_tw = y1 * 20.0;
+				_pb_has = 1;
+			}
+		}
+		// Union each live dynamic child's full bounds (recursive, via its own
+		// getBounds(mc)); the getBounds engine only folds a dynamic child's OWN
+		// drawing, missing grandchildren (MovieClip.as container.draw3).
+		{
+			extern MovieClip* child_mc_cache[]; extern int child_mc_count;
+			for (int ci = 0; ci < child_mc_count; ci++) {
+				MovieClip* c = child_mc_cache[ci];
+				if (!c || c->depth == INT_MIN || c->parent != mc) continue;
+				ActionVar a0 = mv; ActionVar one = {0}; one.type = ACTION_STACK_VALUE_F32; VAL(float,&one.data.numeric_value)=1.0f;
+				pushVar(app_context, &a0); pushVar(app_context, &one);
+				ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_MOVIECLIP; cv.data.numeric_value=(u64)c; pushVar(app_context,&cv);
+				PUSH_STR("getBounds", 9); actionCallMethod(app_context, _pb_sb);
+				ActionVar cb; popVar(app_context, &cb);
+				if (cb.type != ACTION_STACK_VALUE_OBJECT || !cb.data.numeric_value) continue;
+				ASObject* o = (ASObject*) cb.data.numeric_value;
+				double x0 = propToDouble(o,"xMin",4), y0 = propToDouble(o,"yMin",4);
+				double x1 = propToDouble(o,"xMax",4), y1 = propToDouble(o,"yMax",4);
+				if (isnan(x0) || isnan(y0) || (x0 > 6710886.0 && x1 > 6710886.0)) continue;
+				if (!_pb_has) { _pb_xmin_tw = x0*20; _pb_xmax_tw = x1*20; _pb_ymin_tw = y0*20; _pb_ymax_tw = y1*20; _pb_has = 1; continue; }
+				if (x0*20 < _pb_xmin_tw) _pb_xmin_tw = x0*20; if (x1*20 > _pb_xmax_tw) _pb_xmax_tw = x1*20;
+				if (y0*20 < _pb_ymin_tw) _pb_ymin_tw = y0*20; if (y1*20 > _pb_ymax_tw) _pb_ymax_tw = y1*20;
+			}
+		}
+	}
 	if (!_pb_has) {
 		if (mc->loaded_image_width > 0) {
 			// Image-loaded MC: return image dimensions as pixelBounds
@@ -55438,7 +55490,11 @@ void actionSetMember(SWFAppContext* app_context)
 				} else if (value_var.type == ACTION_STACK_VALUE_F64 || value_var.type == ACTION_STACK_VALUE_F32) {
 					// Numeric: truncate to byte, check valid range
 					double d = varToDouble(&value_var);
-					int idx = (int)d & 0xFF;
+					// f64 -> wrapping u8 (Ruffle f64_to_wrapping_u8); `(int)d` is
+					// UB for out-of-range d (0xffffffff must wrap to 255).
+					double _t = isfinite(d) ? fmod(trunc(d), 256.0) : 0.0;
+					if (_t < 0) _t += 256.0;
+					int idx = (int)_t;
 					if (idx >= 0 && idx <= 14) {
 						mc->blend_mode = (u8)idx;
 					}
@@ -59917,6 +59973,12 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 		// (which yields undefined for unset values).
 		if (mc != NULL && g_swf_version >= 8 && prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
 		{
+			// `flash.geom.Transform = 1` (or deleted) => `mc.transform` is undefined
+			// (Ruffle instantiates it through the live class).
+			if (!flashGeomClassAvailable("Transform", 9)) {
+				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				return;
+			}
 			ASObject* transform = createTransformObject(app_context, mc);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)transform);
 			return;
@@ -65026,6 +65088,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// (Flash semantics — not half) at both endpoints with the current
 					// segment's thickness.
 					float h = ds->has_line ? ds->line_w : 0.0f;
+					if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
 					if (ds->pen_set) {
 						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
 						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
@@ -65044,6 +65107,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
 					drawingEnsurePen(ds);   // implicit start at the origin
 					float h = ds->has_line ? ds->line_w : 0.0f;
+					if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
 					if (ds->pen_set) {
 						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
 						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
@@ -71784,10 +71848,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				u8 _am_saved_call_this_type = g_call_this_type;
 				if (_am_t2 && !_am_script)
 					g_call_this_type = ACTION_STACK_VALUE_ARRAY;
+				// A native own-property method (`a.toString =
+				// Array.prototype.toString`) names itself through
+				// g_current_executing_func (builtin_array_method); publish it.
+				ASFunction* _am_prev_exec = g_current_executing_func;
+				if (_am_t2 && !_am_script)
+					g_current_executing_func = func;
 				g_call_depth++;
 				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
 				                                       args, num_args, &opts);
 				g_call_depth--;
+				g_current_executing_func = _am_prev_exec;
 				g_call_this_type = _am_saved_call_this_type;
 
 				popSuperContext();
@@ -76540,6 +76611,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				DrawingState* ds = getOrCreateDrawingState(mc);
 				drawingEnsurePen(ds);   // implicit start at the origin
 				float h = ds->has_line ? ds->line_w : 0.0f;
+				if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
 				if (ds->pen_set) {
 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
 					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);
@@ -76565,6 +76637,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				DrawingState* ds = getOrCreateDrawingState(mc);
 				drawingEnsurePen(ds);   // implicit start at the origin
 				float h = ds->has_line ? ds->line_w : 0.0f;
+				if (g_swf_version >= 8) h *= 0.5f; // SWF8+: half thickness per side (SWF<=7: full)
 				if (ds->pen_set) {
 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
 					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);

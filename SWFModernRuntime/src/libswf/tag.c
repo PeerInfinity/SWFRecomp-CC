@@ -10441,6 +10441,39 @@ void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, Movie
 }
 #endif
 
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Script-only (Phase 2) PlaceObject: placement already happened in Phase 1, so
+// the tag is a no-op -- EXCEPT inside the attachMovie init replay
+// (aq_dispatch_pending_attach_init sets g_attach_tagorder_parent), where a
+// child sprite's frame-1 init runs right here, AT its PlaceObject (Flash/Ruffle
+// tag order: `PlaceObject; DoAction` traces the child first), instead of after
+// the attached clip's whole frame-1 script. The later
+// process_sprite_needs_init_public pass skips the child (sprite_needs_init is
+// cleared by the init). Shared by tagPlaceObject2 (and so PlaceObject3 /
+// WithClipActions, which delegate to it) and tagPlaceObject2Ratio.
+static void ng_script_only_place(SWFAppContext* app_context, size_t depth, size_t char_id)
+{
+	extern MovieClip* g_attach_tagorder_parent;
+	if (g_attach_tagorder_parent != NULL && g_attach_init_active
+	    && depth <= max_depth && char_id != 0 && display_list[depth].char_id == char_id
+	    && display_list[depth].sprite_needs_init
+	    && char_id < dictionary_capacity
+	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
+	{
+		// Cleared for the child's own init: a nested script-only replay
+		// inside it walks the CHILD's display list, so it must not resolve
+		// grandchildren against the attached clip (they keep the
+		// after-the-frame order there).
+		MovieClip* parent = g_attach_tagorder_parent;
+		g_attach_tagorder_parent = NULL;
+		g_script_only_mode = 0;
+		process_sprite_init_at_depth(app_context, parent, depth);
+		g_script_only_mode = 1;
+		g_attach_tagorder_parent = parent;
+	}
+}
+#endif
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth, u8 is_replace)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
@@ -10512,7 +10545,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
-	if (g_script_only_mode) return;
+	if (g_script_only_mode) {
+		ng_script_only_place(app_context, depth, char_id);
+		return;
+	}
 
 	// Button-state-change preservation: when ng_update_button_states_in_dl
 	// is re-running a state function and this (depth, char_id) matches the
@@ -11475,6 +11511,14 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
+	// Same Phase-2 contract as tagPlaceObject2: placement is already done.
+	// Without this a script-only replay RE-PLACED the child from scratch
+	// (tagSetInstanceName is a script-only no-op, so it lost its name, and its
+	// timeline/frame-1 init were reset).
+	if (g_script_only_mode) {
+		ng_script_only_place(app_context, depth, char_id);
+		return;
+	}
 #endif
 	ng_ensureDisplayListSize(app_context, depth);
 

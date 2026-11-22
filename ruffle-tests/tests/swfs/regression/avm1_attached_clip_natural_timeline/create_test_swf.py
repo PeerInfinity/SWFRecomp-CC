@@ -17,10 +17,11 @@ Pins (session 24, browser follow-up of s23 w2-attached-timeline `3cdde8be0`):
 
 Every attached clip's frame 1 has its DoAction BEFORE the PlaceObject of its
 child. Ruffle runs frame-1 actions in TAG order on the attach tick (child
-first when the PlaceObject comes first: oracle-checked in s24); we run the
-attached clip's own frame-1 DoAction first regardless. This order keeps the
-attach tick graded without depending on that open difference
-(SWFRecompDocs/plans/session23-fanout-reports/browser-attached-timeline-report.md).
+first when the PlaceObject comes first). Until s24 w2-attach-order-v8 the CI
+modes ran the attached clip's own DoAction first regardless, so this fixture
+kept that order; the PlaceObject-first order is now pinned by
+avm1_attached_clip_tagorder{,_nonroot} (browser-WASM's live attach arm still
+runs the clip's DoAction first: HOLD).
 
 Expected output: Ruffle exporter (local build) --frames 8 trace; root and
 non-root variants are byte-identical in Ruffle.
