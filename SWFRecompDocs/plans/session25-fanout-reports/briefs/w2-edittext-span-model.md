@@ -1,0 +1,7 @@
+**AVM1 plain-field per-character format (span) model → `edittext_set_text_same` (+1 pass) and `_after_edits` (KF, +1 ruffle_matched).** From `w1-textfield-vn` §4 (report on master). Priced L.
+
+Baselines: `edittext_set_text_same` 28/70 (no KF, so a flip is a **pass**), `edittext_set_text_same_after_edits` 30/98 (KF; 68 diffs, 33 ours-only, so its flip is ruffle_matched). Read the w1 §4 analysis first. Then design and implement the model Flash uses for a plain (non-HTML) field's text spans: setting `text` to the same value, `replaceText`/`replaceSel` edits, `setTextFormat` ranges, and how the format spans survive or reset. Today that lives in `TFRun`/`tf_styled_runs_from_html` in `action.c`. Ruffle reference: `core/src/html/text_format.rs` `FormatSpans` (`set_text`, `replace_text`, span merge/normalize) and `edit_text.rs` `set_text`.
+
+Deliver a measured implementation; if it can't finish in-session, give a staged plan with measured partial lines. Sweep: every `avm1` TextField/EditText/TextFormat row (trace + image), gnash `TextField-v*`, shumway text rows, `regression/avm1_*text*`, both modes, and the render canary for text rows (the s24 45-test text sweep set).
+
+Siblings: `w2-textfield-vn` (TextField prototype/props, Selection focus, createTextField), and `w2-acid-text-kerning` (font kerning tables and the advance loop). All three edit `action.c` TextField code. Self-localize: put the span model in new static helpers, list every function you touch, and rebase onto origin/master at delivery. `n-play-game` owns button/mouse dispatch.

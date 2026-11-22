@@ -1,0 +1,555 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d2d411b8..4b5bc1d2 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -30978,6 +30978,15 @@ static void drawingGenerateGradientRamp(
+ 	                    GRADIENT_RAMP_TRUNC, out_ramp);
+ }
+ 
++static float drawingFixed16(float v)
++{
++	if (!isfinite(v)) return 0.0f;
++	double s = (double) (v * 65536.0f);
++	if (s >= 2147483647.0) s = 2147483647.0;
++	if (s <= -2147483648.0) s = -2147483648.0;
++	return (float) ((double) (int32_t) s / 65536.0);
++}
++
+ // Build a 4x4 column-major gradient matrix from "box" parameters.
+ // Maps gradient space [-16384, 16384] → stage space (twips).
+ static void drawingBuildGradientBoxMatrix(float x, float y, float w, float h, float r, float* out)
+@@ -30985,16 +30994,20 @@ static void drawingBuildGradientBoxMatrix(float x, float y, float w, float h, fl
+ 	// Same as Ruffle: create_gradient_box
+ 	float scale_x = w / 1638.4f;  // w / (16384/10)
+ 	float scale_y = h / 1638.4f;
+-	float tx = (x + w / 2.0f) * 20.0f;  // center, in twips
+-	float ty = (y + h / 2.0f) * 20.0f;
++	// Ruffle create_gradient_box: Twips::from_pixels(x) + Twips::from_pixels(w/2),
++	// each truncated toward zero (swf Twips::from_pixels).
++	float tx = (float) ((int32_t) ((double) x * 20.0) + (int32_t) ((double) (w / 2.0f) * 20.0));
++	float ty = (float) ((int32_t) ((double) y * 20.0) + (int32_t) ((double) (h / 2.0f) * 20.0));
+ 	float cos_r = cosf(r), sin_r = sinf(r);
+ 
+ 	// Column-major 4x4 (same layout as recompileMatrix)
+ 	memset(out, 0, 16 * sizeof(float));
+-	out[0]  = cos_r * scale_x;    // a
+-	out[1]  = sin_r * scale_y;    // b
+-	out[4]  = -sin_r * scale_x;   // c
+-	out[5]  = cos_r * scale_y;    // d
++	// The FillStyle stores an swf::Matrix: a-d become Fixed16 (truncating
++	// Fixed16::from_f32), which is what Ruffle's shader then sees.
++	out[0]  = drawingFixed16(cos_r * scale_x);    // a
++	out[1]  = drawingFixed16(sin_r * scale_y);    // b
++	out[4]  = drawingFixed16(-sin_r * scale_x);   // c
++	out[5]  = drawingFixed16(cos_r * scale_y);    // d
+ 	out[10] = 1.0f;
+ 	out[12] = tx;
+ 	out[13] = ty;
+@@ -31006,13 +31019,13 @@ static void drawingBuildGradientAbcdMatrix(float a, float b, float c, float d,
+ 	float tx_pixels, float ty_pixels, float* out)
+ {
+ 	memset(out, 0, 16 * sizeof(float));
+-	out[0]  = a;
+-	out[1]  = b;
+-	out[4]  = c;
+-	out[5]  = d;
++	out[0]  = drawingFixed16(a);
++	out[1]  = drawingFixed16(b);
++	out[4]  = drawingFixed16(c);
++	out[5]  = drawingFixed16(d);
+ 	out[10] = 1.0f;
+-	out[12] = tx_pixels * 20.0f;  // pixels → twips
+-	out[13] = ty_pixels * 20.0f;
++	out[12] = (float) (int32_t) ((double) tx_pixels * 20.0);  // Twips::from_pixels
++	out[13] = (float) (int32_t) ((double) ty_pixels * 20.0);
+ 	out[15] = 1.0f;
+ }
+ 
+@@ -31126,7 +31139,8 @@ static void applyGradientFillToMC(SWFAppContext* app_context, MovieClip* mc,
+ 		// spread it shifted the infinitely compressed cycles around the focal
+ 		// singularity, producing the bulk of this test's gradient diff.
+ 		focal = truncf(focal * 256.0f) / 256.0f;
+-		if (focal > 0.98f) focal = 0.98f; else if (focal < -0.98f) focal = -0.98f;
++		// +-0.98 clamp happens in the gradient shader (render_webgpu.c), after
++		// the exact Fixed8 value is encoded.
+ 	}
+ 
+ 	// Build gradient matrix
+@@ -31256,7 +31270,8 @@ static void applyLineGradientStyleToMC(SWFAppContext* app_context, MovieClip* mc
+ 		if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;
+ 		// Fixed8 truncation + renderer clamp; see beginGradientFill above.
+ 		focal = truncf(focal * 256.0f) / 256.0f;
+-		if (focal > 0.98f) focal = 0.98f; else if (focal < -0.98f) focal = -0.98f;
++		// +-0.98 clamp happens in the gradient shader (render_webgpu.c), after
++		// the exact Fixed8 value is encoded.
+ 	}
+ 
+ 	DrawingState* ds = getOrCreateDrawingState(mc);
+diff --git a/SWFModernRuntime/src/avm2/avm2_bitmap.c b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+index ee2b5b98..7ad8fd13 100644
+--- a/SWFModernRuntime/src/avm2/avm2_bitmap.c
++++ b/SWFModernRuntime/src/avm2/avm2_bitmap.c
+@@ -2293,6 +2293,37 @@ static uint32_t blend_over_round(uint32_t dest, uint32_t src)
+ // honours dst->transparency and blends with blend_over_round.
+ // `w*` maps bitmap-local twips -> dst-pixel*20, the same convention
+ // avm2_cpu_raster_shape uses.
++// One-sample GPU coverage of triangle (a,b,c) at (cx,cy), all in 1/256 px,
++// y down: Vulkan/D3D top-left rule (a centre on a top or left edge is in).
++static int bd_tri_covers(long long ax, long long ay, long long bx, long long by,
++                         long long qx, long long qy, long long cx, long long cy)
++{
++	long long area = (bx - ax) * (qy - ay) - (by - ay) * (qx - ax);
++	if (area == 0) return 0;
++	if (area < 0)
++	{
++		long long tx = bx, ty = by;
++		bx = qx; by = qy; qx = tx; qy = ty;
++	}
++	long long X[3] = { ax, bx, qx }, Y[3] = { ay, by, qy };
++	for (int e = 0; e < 3; e++)
++	{
++		long long x0 = X[e], y0 = Y[e], x1 = X[(e + 1) % 3], y1 = Y[(e + 1) % 3];
++		long long w = (x1 - x0) * (cy - y0) - (y1 - y0) * (cx - x0);
++		if (w > 0) continue;
++		if (w < 0) return 0;
++		long long ddy = y1 - y0, ddx = x1 - x0;
++		if (!((ddy == 0 && ddx > 0) || ddy < 0)) return 0;
++	}
++	return 1;
++}
++
++static int bd_quad_covers(const long long* qx, const long long* qy, long long cx, long long cy)
++{
++	return bd_tri_covers(qx[0], qy[0], qx[1], qy[1], qx[2], qy[2], cx, cy)
++	    || bd_tri_covers(qx[0], qy[0], qx[2], qy[2], qx[3], qy[3], cx, cy);
++}
++
+ static void bd_draw_bitmap_node(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                                 Avm2DisplayObjectExt* ext,
+                                 double wa, double wb, double wc, double wd,
+@@ -2940,17 +2971,33 @@ static Avm2Value bd_draw(Avm2Activation* act)
+ 		if (px1 > (int) dst->width) px1 = (int) dst->width;
+ 		if (py1 > (int) dst->height) py1 = (int) dst->height;
+ 		double ia = md / det, ic = -mc / det, ib = -mb / det, id = ma / det;
++		// Coverage as Ruffle's GPU quad (two triangles 0-1-2, 0-2-3) at one
++		// sample: corners snapped to 1/256 px, pixel centre owned by the
++		// top-left fill rule. An edge through pixel centres (a 45-degree
++		// rotation) is a pure tie the back-projection floor() resolved the
++		// opposite way on both diagonals (avm2/bitmapdata_draw_rotation).
++		long long qx[4], qy[4];
++		for (int k = 0; k < 4; k++)
++		{
++			double sxk = (k == 1 || k == 2) ? sw : 0.0;
++			double syk = (k >= 2) ? sh : 0.0;
++			qx[k] = llround((ma * sxk + mc * syk + mtx) * 256.0);
++			qy[k] = llround((mb * sxk + md * syk + mty) * 256.0);
++		}
+ 		for (int dy = py0; dy < py1; dy++)
+ 		{
+ 			for (int dx = px0; dx < px1; dx++)
+ 			{
+ 				double ex = (dx + 0.5) - mtx;
+ 				double ey = (dy + 0.5) - mty;
++				long long cx = (long long) dx * 256 + 128, cy = (long long) dy * 256 + 128;
++				if (!bd_quad_covers(qx, qy, cx, cy)) continue;
+ 				int spx = (int) floor(ia * ex + ic * ey);
+ 				int spy = (int) floor(ib * ex + id * ey);
+-				if (spx < 0 || spy < 0
+-				    || spx >= (int) src->width || spy >= (int) src->height)
+-					continue;
++				if (spx < 0) spx = 0;
++				if (spy < 0) spy = 0;
++				if (spx >= (int) src->width) spx = (int) src->width - 1;
++				if (spy >= (int) src->height) spy = (int) src->height - 1;
+ 				uint32_t color = bd_get_raw(src, (uint32_t) spx, (uint32_t) spy);
+ 				if (has_cxform)
+ 				{
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index eb6abd0a..a981178a 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -3616,6 +3616,19 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
+ 		}
+ 		float composed[16];
+ 		hit_test_mat4_multiply(composed, parent_composed, local_xform);
++		// Ruffle TransformStack::push -> render/src/matrix.rs `Matrix * Matrix`:
++		// the composed translation is round_ties_even(a*tx + c*ty) (f32) plus
++		// the parent's integer-twip translation. A float world matrix put
++		// nested edges a fraction of a twip off and flipped pixel-centre ties.
++		{
++			float rx = parent_composed[0] * local_xform[12] + parent_composed[4] * local_xform[13];
++			float ry = parent_composed[1] * local_xform[12] + parent_composed[5] * local_xform[13];
++			if (isfinite(rx) && isfinite(ry) && fabsf(rx) < 2.0e9f && fabsf(ry) < 2.0e9f)
++			{
++				composed[12] = nearbyintf(rx) + parent_composed[12];
++				composed[13] = nearbyintf(ry) + parent_composed[13];
++			}
++		}
+ 
+ 		// MovieClip.scrollRect, the TRANSLATE half (Ruffle
+ 		// display_object.rs:1189 `transform_stack.push(translate(-x_min,
+diff --git a/SWFModernRuntime/src/rendering/render_webgpu.c b/SWFModernRuntime/src/rendering/render_webgpu.c
+index 7b0f45f8..98ba0ddc 100644
+--- a/SWFModernRuntime/src/rendering/render_webgpu.c
++++ b/SWFModernRuntime/src/rendering/render_webgpu.c
+@@ -151,7 +151,7 @@ static const char* vertex_wgsl =
+ "    let inv_pos = inv_mats[out.v_style_id] * pos;\n"
+ "    var focal_z = 0.0;\n"
+ "    if (out.v_style_type == 0x13u) {\n"
+-"      focal_z = (f32(style_upper) - 32768.0) / 16384.0;\n"
++"      focal_z = clamp((f32(style_upper) - 32768.0) / 16384.0, -0.98, 0.98);\n"
+ "    }\n"
+ "    out.v_args = vec4f(inv_pos.xy, focal_z, f32(spread_mode) + f32(is_linear_rgb) * 4.0);\n"
+ "  } else if ((out.v_style_type & 0xF0u) == 0x40u) {\n"
+@@ -3509,7 +3509,14 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
+ 	u32 sx = (u32)gradient_type | ((u32)spread_mode << 8) | ((u32)interpolation << 10);
+ 
+ 	// Style Y: gradient_id in lower 16, focal_encoded in upper 16
+-	u16 focal_encoded = (u16)(focal_ratio * 16384.0f + 32768.0f);
++	// Fixed8 focal ratios are exact in 1/16384 units; the +-0.98 clamp is
++	// applied in f32 in the shader, as Ruffle's wgpu backend does (lib.rs
++	// `focal_point.to_f32().clamp(-0.98, 0.98)`). Clamping to 0.98 here first
++	// encoded 0.97998 (16056/16384).
++	float focal_enc_src = focal_ratio;
++	if (focal_enc_src > 1.99f) focal_enc_src = 1.99f;
++	if (focal_enc_src < -1.99f) focal_enc_src = -1.99f;
++	u16 focal_encoded = (u16)(focal_enc_src * 16384.0f + 32768.0f);
+ 	u32 sy = (u32)grad_id | ((u32)focal_encoded << 16);
+ 
+ 	u32* verts = (u32*)malloc(vertex_count * 4 * sizeof(u32));
+diff --git a/SWFRecomp/include/swf.hpp b/SWFRecomp/include/swf.hpp
+index bfbdeaa3..11ec1a87 100644
+--- a/SWFRecomp/include/swf.hpp
++++ b/SWFRecomp/include/swf.hpp
+@@ -526,6 +526,8 @@ namespace SWFRecomp
+ 		void constructEdges(std::vector<Path>& paths, std::vector<Node>& nodes);
+ 		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations = 100000, size_t max_cycles = 8000);
+ 		void fillShape(Shape& shape, std::vector<Tri>& tris);
++		bool drawLinesLyon(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
++		                   double offset_scale);
+ 		void drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
+ 		               double offset_scale = 1.0);
+ 	};
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index d7031443..1851891a 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -11980,11 +11980,318 @@ namespace SWFRecomp
+ 		tris.push_back(t);
+ 	}
+ 
++	// lyon_tessellation 1.0.15 stroke join model (the tessellator Ruffle
++	// strokes with, render/src/tessellator.rs). Each edge is a quad between
++	// per-vertex SIDE POINTS, and a join's side points are lyon's:
++	//  - a vertex inside a flattened curve (`flattened_step`): ONE miter vertex
++	//    on each side, position +- normal*hw, no join geometry;
++	//  - a vertex joining two SWF edges (`compute_join_side_positions_fixed_
++	//    width`): the inner (back) side is the single miter vertex, the outer
++	//    (front) side keeps both perpendicular offsets, joined by the interior
++	//    triangle plus the round arc / bevel; an unclipped miter puts a single
++	//    vertex on both sides; a sharp fold falls back to the old overlapping
++	//    quads + fan.
++	// The previous builder overlapped two perpendicular-offset quads at every
++	// vertex, so the inner side of each join bulged by a sliver past lyon's
++	// miter point: invisible except on exact pixel-centre ties, which at
++	// quality = "low" flip whole pixels (doubleAndRegister (106,23)).
++	// Computed in y-down (lyon's frame) so the edge diagonal and the side
++	// choice mirror lyon's; a Levien point is recognised by its nonzero
++	// sub-twip remainder (SWF anchors are whole twips).
++	namespace
++	{
++		struct LyonSide
++		{
++			double prev_x, prev_y, next_x, next_y;
++		};
++	}
++
++	bool SWF::drawLinesLyon(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
++	                        double offset_scale)
++	{
++		u16 width = style.width;
++		const u8 join_style = style.line_join;
++		const double miter_limit = style.miter_limit;
++
++		if (width != 0 && width < 20)
++		{
++			width = 20;
++		}
++		else if (width == 0)
++		{
++			return true;
++		}
++
++		const size_t n = path.verts.size();
++		if (n < 2)
++		{
++			return false;
++		}
++
++		const double hw = width/2.0;
++		const double ohw = hw*offset_scale;
++		const bool closed = n > 2 && path.verts.back().x == path.verts[0].x
++		                    && path.verts.back().y == path.verts[0].y
++		                    && path.verts.back().fx_frac == path.verts[0].fx_frac
++		                    && path.verts.back().fy_frac == path.verts[0].fy_frac;
++
++		// y-down positions
++		std::vector<double> px(n), py(n);
++		for (size_t i = 0; i < n; ++i)
++		{
++			px[i] = strokeX(path.verts[i]);
++			py[i] = -strokeY(path.verts[i]);
++		}
++
++		// Edge k = verts[k] -> verts[k+1]; reject zero-length edges (fall back).
++		const size_t ne = n - 1;
++		std::vector<double> tx(ne), ty(ne), len(ne);
++		for (size_t k = 0; k < ne; ++k)
++		{
++			double dx = px[k + 1] - px[k], dy = py[k + 1] - py[k];
++			double l = sqrt(dx*dx + dy*dy);
++			if (!(l > 0.0))
++			{
++				return false;
++			}
++			tx[k] = dx/l; ty[k] = dy/l; len[k] = l;
++		}
++
++		// side points (y-down), index 0 = POSITIVE, 1 = NEGATIVE
++		std::vector<LyonSide> sp[2];
++		sp[0].resize(n); sp[1].resize(n);
++		std::vector<u8> join_kind(n, 0);   // 0 none/end, 1 curve, 2 edge join, 3 fold
++		std::vector<int> front_side(n, 0);
++		std::vector<u8> front_single(n, 0);
++
++		auto setPerp = [&](size_t i, long prev_e, long next_e)
++		{
++			for (int s = 0; s < 2; ++s)
++			{
++				const double sg = s == 0 ? 1.0 : -1.0;
++				size_t pe = prev_e >= 0 ? (size_t) prev_e : (size_t) next_e;
++				size_t ne_ = next_e >= 0 ? (size_t) next_e : (size_t) prev_e;
++				sp[s][i].prev_x = px[i] + sg*(-ty[pe])*ohw;
++				sp[s][i].prev_y = py[i] + sg*(tx[pe])*ohw;
++				sp[s][i].next_x = px[i] + sg*(-ty[ne_])*ohw;
++				sp[s][i].next_y = py[i] + sg*(tx[ne_])*ohw;
++			}
++		};
++
++		const size_t last_join = closed ? n - 1 : n - 1;
++		for (size_t i = 0; i < n; ++i)
++		{
++			long pe, nx_e;
++			if (i == 0)
++			{
++				pe = closed ? (long) ne - 1 : -1;
++				nx_e = 0;
++			}
++			else if (i == n - 1)
++			{
++				pe = (long) ne - 1;
++				nx_e = -1;
++			}
++			else
++			{
++				pe = (long) i - 1;
++				nx_e = (long) i;
++			}
++			setPerp(i, pe, nx_e);
++			if (pe < 0 || nx_e < 0 || (closed && i == n - 1))
++			{
++				continue;
++			}
++			(void) last_join;
++
++			const double t0x = tx[pe], t0y = ty[pe], t1x = tx[nx_e], t1y = ty[nx_e];
++			// lyon math_utils::compute_normal
++			double nmx, nmy;
++			{
++				const double n1x = -t0y, n1y = t0x;
++				double vx = t0x + t1x, vy = t0y + t1y;
++				if (vx*vx + vy*vy < 1e-4)
++				{
++					nmx = 0.0; nmy = 0.0;
++				}
++				else
++				{
++					double l = sqrt(vx*vx + vy*vy);
++					double tgx = vx/l, tgy = vy/l;
++					double nx_ = -tgy, ny_ = tgx;
++					double inv_len = nx_*n1x + ny_*n1y;
++					if (fabs(inv_len) < 1e-4)
++					{
++						nmx = n1x; nmy = n1y;
++					}
++					else
++					{
++						nmx = nx_/inv_len; nmy = ny_/inv_len;
++					}
++				}
++			}
++
++			const Vertex& v = path.verts[i];
++			const bool curve_interior = (v.fx_frac != 0 || v.fy_frac != 0);
++
++			if (curve_interior)
++			{
++				join_kind[i] = 1;
++				for (int s = 0; s < 2; ++s)
++				{
++					const double sg = s == 0 ? 1.0 : -1.0;
++					double mx = px[i] + sg*nmx*ohw, my = py[i] + sg*nmy*ohw;
++					sp[s][i] = { mx, my, mx, my };
++				}
++				continue;
++			}
++
++			const double cross = t0x*t1y - t0y*t1x;
++			const int front = cross >= 0.0 ? 1 : 0;
++			const int back = 1 - front;
++			const double fsg = front == 0 ? 1.0 : -1.0;
++			const double fnx = fsg*nmx, fny = fsg*nmy;
++			const bool unclipped_miter = join_style == 2 && miter_limit >= 1.0
++			                             && !(fnx*fnx + fny*fny > miter_limit*miter_limit*4.0);
++			bool fold = false;
++			if (!unclipped_miter && (t1x*t0x + t1y*t0y) < 0.0)
++			{
++				const double ex = fnx*hw, ey = fny*hw;
++				double d_next = ex*(-t1x) + ey*(-t1y) - len[nx_e];
++				double d_prev = ex*t0x + ey*t0y - len[pe];
++				if (std::min(d_next, d_prev) > 0.0 || (nmx*nmx + nmy*nmy) < 1e-5)
++				{
++					fold = true;
++				}
++			}
++			if (fold)
++			{
++				join_kind[i] = 3;
++				continue;
++			}
++			join_kind[i] = 2;
++			front_side[i] = front;
++			{
++				const double bsg = back == 0 ? 1.0 : -1.0;
++				double mx = px[i] + bsg*nmx*ohw, my = py[i] + bsg*nmy*ohw;
++				sp[back][i] = { mx, my, mx, my };
++			}
++			if (unclipped_miter)
++			{
++				double mx = px[i] + fsg*nmx*ohw, my = py[i] + fsg*nmy*ohw;
++				sp[front][i] = { mx, my, mx, my };
++				front_single[i] = 1;
++			}
++		}
++		if (closed)
++		{
++			sp[0][n - 1] = sp[0][0];
++			sp[1][n - 1] = sp[1][0];
++		}
++
++		auto V = [&](double x, double y, const Vertex& src) -> Vertex
++		{
++			return strokeVertex(x, -y, src.morph_index);
++		};
++
++		// Edges (lyon add_edge_triangles): (p0_neg, p0_pos, p1_pos), (p0_neg, p1_pos, p1_neg)
++		for (size_t k = 0; k < ne; ++k)
++		{
++			const Vertex& a = path.verts[k];
++			const Vertex& b = path.verts[k + 1];
++			Vertex p0_pos = V(sp[0][k].next_x, sp[0][k].next_y, a);
++			Vertex p0_neg = V(sp[1][k].next_x, sp[1][k].next_y, a);
++			Vertex p1_pos = V(sp[0][k + 1].prev_x, sp[0][k + 1].prev_y, b);
++			Vertex p1_neg = V(sp[1][k + 1].prev_x, sp[1][k + 1].prev_y, b);
++			Tri t;
++			t.verts[0] = p0_neg; t.verts[1] = p0_pos; t.verts[2] = p1_pos;
++			tris.push_back(t);
++			t.verts[0] = p0_neg; t.verts[1] = p1_pos; t.verts[2] = p1_neg;
++			tris.push_back(t);
++		}
++
++		// Joins
++		for (size_t i = 0; i < n; ++i)
++		{
++			if (closed && i == n - 1)
++			{
++				continue;
++			}
++			if (join_kind[i] == 3)
++			{
++				const Vertex& a = path.verts[i == 0 ? n - 2 : i - 1];
++				const Vertex& c = path.verts[i + 1];
++				drawLineJoin(a, path.verts[i], c, hw, join_style, miter_limit, tris, offset_scale);
++				continue;
++			}
++			if (join_kind[i] != 2 || front_single[i])
++			{
++				continue;
++			}
++			const Vertex& b = path.verts[i];
++			const int f = front_side[i];
++			const int bk = 1 - f;
++			Vertex fp = V(sp[f][i].prev_x, sp[f][i].prev_y, b);
++			Vertex fn_ = V(sp[f][i].next_x, sp[f][i].next_y, b);
++			Vertex bs = V(sp[bk][i].prev_x, sp[bk][i].prev_y, b);
++			Tri t;
++			t.verts[0] = bs; t.verts[1] = fp; t.verts[2] = fn_;
++			tris.push_back(t);
++			if (join_style == 0)
++			{
++				// Angles from the unit side normals (not the offset points), so
++				// the offset_scale = 0 centre pass keeps the same arc count.
++				const size_t pe_i = (i == 0) ? ne - 1 : i - 1;
++				const size_t ne_i = i;
++				const double sgf = f == 0 ? 1.0 : -1.0;
++				double a0 = atan2(sgf*tx[pe_i], sgf*(-ty[pe_i]));
++				double a1 = atan2(sgf*tx[ne_i], sgf*(-ty[ne_i]));
++				double d = a1 - a0;
++				while (d > M_PI) d -= 2.0*M_PI;
++				while (d < -M_PI) d += 2.0*M_PI;
++				const int segs = strokeArcSegments(hw, fabs(d));
++				Vertex last = fp;
++				for (int s = 1; s < segs; ++s)
++				{
++					double ang = a0 + d*s/segs;
++					Vertex m = V(px[i] + ohw*cos(ang), py[i] + ohw*sin(ang), b);
++					t.verts[0] = fp; t.verts[1] = last; t.verts[2] = m;
++					if (s > 1) tris.push_back(t);
++					last = m;
++				}
++				if (segs > 1)
++				{
++					t.verts[0] = fp; t.verts[1] = last; t.verts[2] = fn_;
++					tris.push_back(t);
++				}
++			}
++		}
++
++		if (!closed)
++		{
++			drawLineCap(path.verts[0], path.verts[1], hw, style.start_cap, tris, offset_scale);
++			drawLineCap(path.verts.back(), path.verts[n - 2], hw, style.end_cap, tris, offset_scale);
++		}
++		return true;
++	}
++
+ 	void SWF::drawLines(const Path& path, const LineStyle& style, std::vector<Tri>& tris,
+ 	                    double offset_scale)
+ 	{
+ 		u16 width = style.width;
+ 
++#ifndef SWFRECOMP_OLD_STROKE
++		if (getenv("SWFRECOMP_OLD_STROKE") == nullptr)
++		{
++			std::vector<Tri> lyon_tris;
++			if (drawLinesLyon(path, style, lyon_tris, offset_scale))
++			{
++				tris.insert(tris.end(), lyon_tris.begin(), lyon_tris.end());
++				return;
++			}
++		}
++#endif
++
+ 		// LINESTYLE2 cap/join words. Pre-v4 shapes leave these at 0, which is
+ 		// the round-everything geometry this builder has always drawn.
+ 		const u8 join_style = style.line_join;

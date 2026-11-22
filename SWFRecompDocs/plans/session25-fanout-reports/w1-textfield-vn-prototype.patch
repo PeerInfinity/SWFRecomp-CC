@@ -1,0 +1,269 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index d2d411b8..020ab4bd 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -17147,6 +17147,17 @@ static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj); //
+ // field, so addListener/broadcastMessage operate on the wrong array.
+ static void installTextFieldBroadcaster(SWFAppContext* app_context, MovieClip* mc); // forward decl
+ 
++// 1 when this TextField clip was defined by an SWF5 movie (an ImportAssets
++// child such as gnash Dejagnu.swf): an SWF5 field is typeof "movieclip", not
++// instanceof TextField, and has no TextField surface (TextField.as:42-45).
++static int tfIsSwf5Sourced(MovieClip* mc)
++{
++	extern int ng_getTextFieldSrcSwfVersion(int tf_idx);
++	if (mc == NULL || mc->ng_textfield_idx < 0) return 0;
++	int sv = ng_getTextFieldSrcSwfVersion(mc->ng_textfield_idx);
++	return sv != 0 && sv < 6;
++}
++
+ static void initTextFieldPrototype(SWFAppContext* app_context)
+ {
+ 	// Two-stage init: SWF5 run (e.g. via Dejagnu.swf child-SWF init) allocates the
+@@ -17217,12 +17228,12 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
+ 		9, 13, 11
+ 	};
+ 
+-	// Register in REVERSE order so that for-in enumeration (LIFO stack) yields forward order.
+-	// Flash enumerates TextField props as: styleSheet first, gridFitType last.
+-	for (int i = 34; i >= 0; i--)
+-	{
+-		setProperty(app_context, proto, tf_prop_names[i], tf_prop_lens[i], &undef_val);
+-	}
++	// The 35 native props are NOT defined here: Flash adds them to
++	// TextField.prototype on the first TextField instantiation (gnash
++	// TextField.as:86-112 `!TextField.prototype.hasOwnProperty('background')`
++	// before, :175-200 true after createTextField). See
++	// textFieldDefineProtoProps, called from installTextFieldBroadcaster.
++	(void) tf_prop_names; (void) tf_prop_lens;
+ 
+ 	// Add 8 method functions (DontEnum — they don't show up in for..in)
+ 	struct {
+@@ -17326,6 +17337,42 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
+ 	g_textfield_constructor_init = 2; // full SWF6+ init complete
+ }
+ 
++// First-instantiation definition of the 35 native TextField properties on
++// TextField.prototype (see initTextFieldPrototype). One-shot, SWF6+.
++static int g_tf_proto_props_defined = 0;
++static void textFieldDefineProtoProps(SWFAppContext* app_context)
++{
++	if (g_tf_proto_props_defined || g_swf_version < 6) return;
++	initTextFieldPrototype(app_context);
++	if (g_textfield_constructor_init < 2) return;
++	ASObject* proto = g_textfield_constructor.prototype_obj;
++	if (proto == NULL) return;
++	g_tf_proto_props_defined = 1;
++	static const char* names[] = {
++		"styleSheet", "mouseWheelEnabled", "condenseWhite", "restrict",
++		"textHeight", "textWidth", "bottomScroll", "length",
++		"selectable", "multiline", "password", "wordWrap",
++		"background", "border", "html", "embedFonts",
++		"maxChars", "maxhscroll", "hscroll", "variable",
++		"htmlText", "type", "text", "autoSize",
++		"tabIndex", "textColor", "backgroundColor", "borderColor",
++		"maxscroll", "scroll", "filters", "sharpness",
++		"thickness", "antiAliasType", "gridFitType"
++	};
++	ActionVar undef_val = {0};
++	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
++	// Register in REVERSE order so that for-in enumeration (LIFO stack) yields forward order.
++	for (int i = 34; i >= 0; i--)
++	{
++		u32 l = (u32) strlen(names[i]);
++		// A script may already have assigned one of these names on the
++		// prototype; Flash's native definition would replace it, but keep
++		// the conservative behaviour of not clobbering user data.
++		if (findPropertyRaw(proto, names[i], l) != NULL) continue;
++		setProperty(app_context, proto, names[i], l, &undef_val);
++	}
++}
++
+ // ============================================================
+ // StyleSheet Implementation
+ // ============================================================
+@@ -23784,11 +23831,12 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char*
+ 				}
+ 				ASObject* props = (ASObject*) mc->dynamic_props;
+ 				props->native_type = NATIVE_TEXTFIELD;
++				mc->ng_textfield_idx = tf_idx; // read by installTextFieldBroadcaster
+ 				installTextFieldBroadcaster(app_context, mc);
+ 				// Set __proto__ to TextField.prototype (SWF6+ only — in SWF5,
+ 				// MC textfields are not instanceof TextField).
+ 				initTextFieldPrototype(app_context);
+-				if (g_swf_version >= 6 && g_textfield_constructor.prototype_obj != NULL) {
++				if (g_swf_version >= 6 && !tfIsSwf5Sourced(mc) && g_textfield_constructor.prototype_obj != NULL) {
+ 					ActionVar proto_val = {0};
+ 					proto_val.type = ACTION_STACK_VALUE_OBJECT;
+ 					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+@@ -24036,12 +24084,13 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char*
+ 				}
+ 				ASObject* props = (ASObject*) mc->dynamic_props;
+ 				props->native_type = NATIVE_TEXTFIELD;
++				mc->ng_textfield_idx = ng_getTextFieldIdx(depth); // read by installTextFieldBroadcaster
+ 				installTextFieldBroadcaster(app_context, mc);
+ 
+ 				// Set __proto__ to TextField.prototype (SWF6+ only — in SWF5,
+ 				// MC textfields are not instanceof TextField).
+ 				initTextFieldPrototype(app_context);
+-				if (g_swf_version >= 6 && g_textfield_constructor.prototype_obj != NULL) {
++				if (g_swf_version >= 6 && !tfIsSwf5Sourced(mc) && g_textfield_constructor.prototype_obj != NULL) {
+ 					ActionVar proto_val = {0};
+ 					proto_val.type = ACTION_STACK_VALUE_OBJECT;
+ 					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+@@ -40471,9 +40520,24 @@ static void installTextFieldBroadcaster(SWFAppContext* app_context, MovieClip* m
+     if (props == NULL) return;
+     // Idempotent: the clone/timeline paths can re-enter for the same field,
+     // and re-initializing would drop listeners the script already added.
++    // A field defined by an SWF5 movie (ImportAssets child, e.g. gnash
++    // Dejagnu.swf's _xtrace_win) is an SWF5 field: no TextField surface and
++    // no first-instantiation prototype definition (TextField.as:42-45, 86).
++    if (tfIsSwf5Sourced(mc)) return;
++    textFieldDefineProtoProps(app_context);
+     if (getProperty(props, "_listeners", 10) != NULL) return;
+ 
+-    installAsBroadcaster(app_context, props);
++    // Only `_listeners` is own on the instance (Ruffle edit_text.rs
++    // initialize_listeners; gnash TextField.as:169-171
++    // `!tf.hasOwnProperty('broadcastMessage')`): the methods are inherited
++    // from TextField.prototype, which AsBroadcaster.initialize ran on.
++    {
++        ASArray* la = allocArray(app_context, 4);
++        ActionVar lv = {0};
++        lv.type = ACTION_STACK_VALUE_ARRAY;
++        lv.data.numeric_value = (u64)(uintptr_t) la;
++        setPropertyWithFlags(app_context, props, "_listeners", 10, &lv, PROPERTY_FLAG_WRITABLE);
++    }
+ 
+     ActionVar* lp = getProperty(props, "_listeners", 10);
+     if (lp == NULL || lp->type != ACTION_STACK_VALUE_ARRAY) return;
+@@ -40690,6 +40754,20 @@ typedef struct {
+ static char g_clipboard_text[1024] = {0};
+ static size_t g_clipboard_len = 0;
+ static int g_tf_select_all = 0;  // 1 = entire text field is selected
++// Programmatic focus selects the field's text AS OF THE FOCUS CALL
++// (Ruffle focus_tracker.rs update_edittext_selection: for_range(0, len)).
++// g_tf_select_all is lazy (it tracks the CURRENT text length), so on an empty
++// field the range is collapsed (0,0) and must not grow with text assigned
++// later (gnash TextField.as:1069-1077: setFocus(empty), text=..., replaceSel
++// inserts at 0).
++static int tfSetFocusSelectAll(MovieClip* mc)
++{
++	ASObject* props = (mc != NULL) ? (ASObject*) mc->dynamic_props : NULL;
++	if (props == NULL) return 1;
++	ActionVar* tp = getProperty(props, "text", 4);
++	if (tp != NULL && tp->type == ACTION_STACK_VALUE_STRING && tp->str_size == 0) return 0;
++	return 1;
++}
+ static MovieClip* g_pending_onchanged_mc = NULL;  // Deferred onChanged after replaceSel
+ 
+ // Flush the deferred onChanged handler queued by replaceSel, if any.
+@@ -50574,6 +50652,11 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
+ 					type_str = "object";
+ 					break;
+ 				}
++				if (mc && MC_IS_TEXTFIELD(mc) && tfIsSwf5Sourced(mc))
++				{
++					type_str = "movieclip";
++					break;
++				}
+ 				if (mc && MC_IS_TEXTFIELD(mc) && g_swf_version >= 6)
+ 				{
+ 					type_str = "object";
+@@ -60773,6 +60856,10 @@ void actionNewObject(SWFAppContext* app_context)
+ 		ASObject* tf_obj = allocObject(app_context, 4);
+ 		tf_obj->native_type = NATIVE_TEXTFIELD;
+ 		initTextFieldPrototype(app_context);
++		// `new TextField()` is a first instantiation too (Flash-authored
++		// avm1/textfield_props_swf6 enumerates the native props on
++		// TextField.prototype right after it).
++		textFieldDefineProtoProps(app_context);
+ 		if (g_textfield_constructor.prototype_obj != NULL)
+ 		{
+ 			ActionVar proto_var = {0};
+@@ -65943,13 +66030,25 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 				const uint16_t* _ctf_name_u16 = varGetU16Ptr(&args[0]);
+ 				u16_to_utf8(_ctf_name_u16, args[0].str_size, _ctf_name_buf, sizeof(_ctf_name_buf));
+ 				inst_name = _ctf_name_buf;
++			} else if (args[0].type == ACTION_STACK_VALUE_F64 || args[0].type == ACTION_STACK_VALUE_F32) {
++				// createTextField(3, ...) names the field "3" (TextField.as:1045).
++				char str_buffer[17];
++				ActionVar _nc = args[0];
++				pushVar(app_context, &_nc);
++				convertString(app_context, str_buffer);
++				u32 _nl = VAL(u32, &STACK[SP + 8]);
++				const uint16_t* _np = (const uint16_t*) VAL(u64, &STACK[SP + 16]);
++				int _nn = (_np != NULL && _nl > 0) ? u16_to_utf8(_np, _nl, _ctf_name_buf, (int) sizeof(_ctf_name_buf) - 1) : 0;
++				POP();
++				_ctf_name_buf[_nn] = '\0';
++				inst_name = _ctf_name_buf;
+ 			}
+-			int depth_val = (int) varToDouble(&args[1]);
++			double _dv = varToDoubleSimple(&args[1]);
++			int depth_val = (isnan(_dv) || isinf(_dv)) ? 0 : (int) _dv;
+ 			double x = varToDoubleSimple(&args[2]);
+ 			double y = varToDoubleSimple(&args[3]);
+ 			double w = varToDoubleSimple(&args[4]);
+ 			double h = varToDoubleSimple(&args[5]);
+-			(void)depth_val;
+ 
+ 			// Flash truncates createTextField coordinates to integers (NaN/Inf → 0)
+ 			int xi = (isnan(x) || isinf(x)) ? 0 : (int)x;
+@@ -65963,6 +66062,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 			child->width = (float) abs(wi);
+ 			child->height = (float) abs(hi);
+ 			child->ng_textfield_idx = -2; // dynamically created textfield
++			if (child->depth == 0) child->depth = depth_val; // getDepth (TextField.as:808/1046)
+ 
+ 			if (child->dynamic_props == NULL) {
+ 				child->dynamic_props = (void*) allocDynamicProps(app_context, 32);
+@@ -79695,7 +79795,7 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
+ 		g_tab_hovered_mc = new_mc;
+ 		g_mouse_hovered_mc = NULL;
+ 		if (MC_IS_TEXTFIELD(new_mc)) {
+-			g_tf_select_all = 1;
++			g_tf_select_all = tfSetFocusSelectAll(new_mc);
+ 			// Flash reports 0/0/0 for Selection.getBeginIndex/getCaretIndex/getEndIndex
+ 			// immediately after programmatic setFocus (even though visual is select-all)
+ 			g_selection_begin = 0;
+@@ -79712,7 +79812,7 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
+ 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
+ 	// Programmatic setFocus selects all text (mouse click does not)
+ 	if (MC_IS_TEXTFIELD(new_mc)) {
+-		g_tf_select_all = 1;
++		g_tf_select_all = tfSetFocusSelectAll(new_mc);
+ 		g_selection_begin = 0;
+ 		g_selection_caret = 0;
+ 		g_selection_end = 0;
+diff --git a/SWFModernRuntime/src/libswf/ng_shared.c b/SWFModernRuntime/src/libswf/ng_shared.c
+index 1ef3ce7d..49bef6cd 100644
+--- a/SWFModernRuntime/src/libswf/ng_shared.c
++++ b/SWFModernRuntime/src/libswf/ng_shared.c
+@@ -1054,6 +1054,16 @@ int ng_find_textfield(size_t char_id)
+ 	return -1;
+ }
+ 
++// SWF version of the movie whose DefineEditText defined each slot (an
++// ImportAssets child like gnash Dejagnu.swf defines its fields with
++// g_swf_version transiently set to its own version). 0 = unknown.
++static u8 ng_textfield_src_swf_version[MAX_TEXTFIELDS_NG];
++int ng_getTextFieldSrcSwfVersion(int tf_idx)
++{
++	if (tf_idx < 0 || tf_idx >= MAX_TEXTFIELDS_NG) return 0;
++	return ng_textfield_src_swf_version[tf_idx];
++}
++
+ void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
+     const char* plain_text, const char* raw_html_text, u32 text_color,
+     u16 font_id, u16 font_height, s16 max_length,
+@@ -1074,6 +1084,10 @@ void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
+ 		i = ng_textfield_count++;
+ 	}
+ 	ng_textfields[i].char_id = char_id;
++	{
++		extern int g_swf_version;
++		ng_textfield_src_swf_version[i] = (u8) g_swf_version;
++	}
+ 	strncpy(ng_textfields[i].plain_text, plain_text ? plain_text : "", sizeof(ng_textfields[i].plain_text) - 1);
+ 	ng_textfields[i].plain_text[sizeof(ng_textfields[i].plain_text) - 1] = '\0';
+ 	strncpy(ng_textfields[i].raw_html_text, raw_html_text ? raw_html_text : "", sizeof(ng_textfields[i].raw_html_text) - 1);
