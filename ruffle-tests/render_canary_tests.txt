@@ -671,3 +671,8 @@ avm2/bitmapdata_draw_filters                # AVM2 CM on stage AND in draw()    
 avm2/graphics_direct_commands               # copyFrom + 0.25-alpha dashes      1 cmp
 # tier=2
 avm2/graphics_gradients                     # translucent AVM2 gradient strokes (band) 1 cmp
+# s25 w2-textfield-vn: createTextField fields (default 12px device face, runtime
+# `variable` binding, `_global.TextField` construction). The standing set had
+# only incidental createTextField users; this one is a plain created field.
+# tier=1
+avm1/movieclip_create_text_field                    # createTextField render     1 cmp

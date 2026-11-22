@@ -1088,6 +1088,16 @@ int ng_find_textfield(size_t char_id)
 	return -1;
 }
 
+// SWF version of the movie whose DefineEditText defined each slot (an
+// ImportAssets child like gnash Dejagnu.swf defines its fields with
+// g_swf_version transiently set to its own version). 0 = unknown.
+static u8 ng_textfield_src_swf_version[MAX_TEXTFIELDS_NG];
+int ng_getTextFieldSrcSwfVersion(int tf_idx)
+{
+	if (tf_idx < 0 || tf_idx >= MAX_TEXTFIELDS_NG) return 0;
+	return ng_textfield_src_swf_version[tf_idx];
+}
+
 void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,
@@ -1108,6 +1118,10 @@ void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
 		i = ng_textfield_count++;
 	}
 	ng_textfields[i].char_id = char_id;
+	{
+		extern int g_swf_version;
+		ng_textfield_src_swf_version[i] = (u8) g_swf_version;
+	}
 	strncpy(ng_textfields[i].plain_text, plain_text ? plain_text : "", sizeof(ng_textfields[i].plain_text) - 1);
 	ng_textfields[i].plain_text[sizeof(ng_textfields[i].plain_text) - 1] = '\0';
 	strncpy(ng_textfields[i].raw_html_text, raw_html_text ? raw_html_text : "", sizeof(ng_textfields[i].raw_html_text) - 1);
@@ -1762,6 +1776,31 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 					break;
 				}
 				char_pos = next_pos;
+			}
+			// SWF7 and below: when at most ONE character of a too-wide first
+			// word fits, Flash gives up wrapping and lays the rest of the line
+			// out unbroken (Ruffle html/line_wrapping.rs wrap_line:
+			// `if line_end <= 1 { return None }` for !swf8; gnash
+			// TextField.as:972-976 `_width = 10` keeps textWidth 63 below v8).
+			if (!is_swf8) {
+				int fit_chars = 0, fit_w = 0;
+				for (size_t p = seg_start; p < seg_end; ) {
+					size_t np = p;
+					ng_decode_utf8_char(text, seg_end, &np);
+					int w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, np, letter_spacing_twips);
+					if (w > cur_avail) break;
+					fit_chars++; fit_w = w; p = np;
+					if (fit_chars > 1) break;
+				}
+				(void)fit_w;
+				if (fit_chars <= 1) {
+					int rest_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, text_len, letter_spacing_twips);
+					cur_line_w += rest_w;
+					trimmed_line_w = cur_line_w;
+					if (trimmed_line_w > max_line_w) max_line_w = trimmed_line_w;
+					if (cur_line_w > max_line_w_full) max_line_w_full = cur_line_w;
+					break;
+				}
 			}
 			if (last_fitting_pos == (int)seg_start) {
 				size_t tmp = seg_start;
