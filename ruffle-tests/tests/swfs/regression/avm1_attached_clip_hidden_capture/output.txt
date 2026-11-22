@@ -1,0 +1,6 @@
+r1 a=true b=false c=true a.cf=1
+r2 a=true b=true c=true a.cf=2
+r3 a=false b=true c=true a.cf=3
+r4 a=false b=true c=true a.cf=1
+r5 a=false b=true c=true a.cf=2
+r6 a=false b=true c=true a.cf=3

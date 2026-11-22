@@ -8428,6 +8428,10 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (mc->depth == INT_MIN) continue;
 			if (mc->parent != &root_movieclip) continue;
 			if (mc->display_obj == NULL) continue;
+			// AS-set _visible=false: tagShowFrame's pass skips it inside
+			// render_attached_child; this capture pass drew it anyway, so a
+			// hidden root-attached clip showed up in every captured image.
+			if (!mc->visible) continue;
 			uintptr_t dl_lo = (uintptr_t)display_list;
 			uintptr_t dl_hi = dl_lo + display_list_capacity * sizeof(DisplayObject);
 			uintptr_t dobj = (uintptr_t)mc->display_obj;
