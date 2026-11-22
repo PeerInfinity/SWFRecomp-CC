@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-22T03:10:05.662024+00:00",
-    "git_sha": "6b2054090f33673434c8597643431e1fdcf56287",
-    "duration_seconds": 193.89,
+    "timestamp": "2026-11-22T04:48:29.178628+00:00",
+    "git_sha": "3f803679d02fa05c52c453dfca7f7b013abb0165",
+    "duration_seconds": 227.49,
     "total_available": 12,
     "shards": 30,
     "expected_shards": 30,
@@ -21,9 +21,9 @@
     {
       "test": "auto_size/height",
       "phases": {
-        "recomp": 0.056,
-        "compile": 24.281,
-        "run": 0.591
+        "recomp": 0.068,
+        "compile": 33.727,
+        "run": 1.034
       },
       "num_frames": 1,
       "lines": {
@@ -31,7 +31,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 24.98,
+      "duration": 34.91,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -40,7 +40,30 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 300,
+            "height": 250,
+            "total_channels": 300000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 3,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 3,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -49,8 +72,8 @@
       "test": "auto_size/return",
       "phases": {
         "recomp": 0.043,
-        "compile": 23.028,
-        "run": 0.543
+        "compile": 24.325,
+        "run": 0.551
       },
       "num_frames": 1,
       "lines": {
@@ -58,7 +81,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 23.7,
+      "duration": 25.01,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -67,7 +90,30 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 375,
+            "total_channels": 825000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 18,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 18,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -75,9 +121,9 @@
     {
       "test": "auto_size/width",
       "phases": {
-        "recomp": 0.043,
-        "compile": 23.59,
-        "run": 0.221
+        "recomp": 0.042,
+        "compile": 23.001,
+        "run": 0.219
       },
       "num_frames": 1,
       "lines": {
@@ -85,7 +131,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 23.93,
+      "duration": 23.34,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -94,7 +140,30 @@
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 500,
+            "height": 350,
+            "total_channels": 700000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 18,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 18,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -102,9 +171,9 @@
     {
       "test": "br_at_start",
       "phases": {
-        "recomp": 0.017,
-        "compile": 1.302,
-        "run": 0.203
+        "recomp": 0.018,
+        "compile": 1.353,
+        "run": 0.211
       },
       "num_frames": 1,
       "lines": {
@@ -112,16 +181,39 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 1.65,
+      "duration": 1.71,
       "image_comparisons": {
         "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 1672 outliers exceed limit of 8, max difference 255",
-          "max_diff": 255,
+          "status": "pass",
+          "message": "Image check passed: 4 outliers (limit 8), max difference 160",
+          "max_diff": 160,
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 400,
+            "total_channels": 880000,
+            "max_diff": 160,
+            "diff_channels": 2272,
+            "mean_diff": 0.0997,
+            "checks": [
+              {
+                "tolerance": 128,
+                "max_outliers": 8,
+                "outliers": 4,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 4,
+            "max_outliers": 8,
+            "tolerance": 128,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -130,8 +222,8 @@
       "test": "html_entity_parsing",
       "phases": {
         "recomp": 0.004,
-        "compile": 6.472,
-        "run": 0.186
+        "compile": 6.506,
+        "run": 0.187
       },
       "num_frames": 1,
       "lines": {
@@ -139,15 +231,15 @@
         "expected_lines": 213,
         "matching_lines": 213
       },
-      "duration": 6.67,
+      "duration": 6.7,
       "status": "pass"
     },
     {
       "test": "html_entity_whitespace",
       "phases": {
         "recomp": 0.003,
-        "compile": 1.22,
-        "run": 0.183
+        "compile": 1.286,
+        "run": 0.191
       },
       "num_frames": 1,
       "lines": {
@@ -155,15 +247,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 1.41,
+      "duration": 1.48,
       "status": "pass"
     },
     {
       "test": "links_in_scrolled_text",
       "phases": {
-        "recomp": 0.031,
-        "compile": 1.389,
-        "run": 0.214
+        "recomp": 0.045,
+        "compile": 1.916,
+        "run": 0.273
       },
       "num_frames": 2,
       "lines": {
@@ -171,15 +263,15 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 1.64,
+      "duration": 2.24,
       "status": "pass"
     },
     {
       "test": "style_changes_in_html",
       "phases": {
-        "recomp": 0.012,
-        "compile": 15.187,
-        "run": 0.166
+        "recomp": 0.017,
+        "compile": 18.299,
+        "run": 0.203
       },
       "num_frames": 1,
       "lines": {
@@ -187,16 +279,39 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.43,
+      "duration": 18.59,
       "image_comparisons": {
         "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 24998 outliers exceed limit of 0, max difference 103",
-          "max_diff": 103,
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
           "trigger": [
             "last_frame"
           ],
-          "known_failure": false
+          "known_failure": false,
+          "stats": {
+            "width": 550,
+            "height": 175,
+            "total_channels": 385000,
+            "max_diff": 0,
+            "diff_channels": 0,
+            "mean_diff": 0.0,
+            "checks": [
+              {
+                "tolerance": 0,
+                "max_outliers": 0,
+                "outliers": 0,
+                "passed": true
+              }
+            ],
+            "applicable_checks": 1,
+            "failed_checks": 0,
+            "outliers": 0,
+            "max_outliers": 0,
+            "tolerance": 0,
+            "excess_outliers": 0
+          },
+          "expected_source": "repo"
         }
       },
       "status": "pass"
@@ -204,9 +319,9 @@
     {
       "test": "text_caret_placement_align",
       "phases": {
-        "recomp": 0.068,
-        "compile": 28.132,
-        "run": 0.331
+        "recomp": 0.036,
+        "compile": 23.439,
+        "run": 0.235
       },
       "num_frames": 2,
       "lines": {
@@ -214,15 +329,15 @@
         "expected_lines": 248,
         "matching_lines": 248
       },
-      "duration": 28.55,
+      "duration": 23.72,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_leading",
       "phases": {
-        "recomp": 0.037,
-        "compile": 23.907,
-        "run": 0.222
+        "recomp": 0.063,
+        "compile": 32.124,
+        "run": 0.311
       },
       "num_frames": 2,
       "lines": {
@@ -230,15 +345,15 @@
         "expected_lines": 244,
         "matching_lines": 244
       },
-      "duration": 24.17,
+      "duration": 32.52,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_scroll",
       "phases": {
-        "recomp": 0.037,
-        "compile": 23.735,
-        "run": 0.209
+        "recomp": 0.064,
+        "compile": 31.294,
+        "run": 0.279
       },
       "num_frames": 2,
       "lines": {
@@ -246,15 +361,15 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 23.99,
+      "duration": 31.65,
       "status": "pass"
     },
     {
       "test": "text_caret_placement_translated_bounds",
       "phases": {
-        "recomp": 0.03,
-        "compile": 17.158,
-        "run": 0.186
+        "recomp": 0.053,
+        "compile": 24.857,
+        "run": 0.267
       },
       "num_frames": 2,
       "lines": {
@@ -262,7 +377,7 @@
         "expected_lines": 140,
         "matching_lines": 140
       },
-      "duration": 17.38,
+      "duration": 25.19,
       "status": "pass"
     }
   ]
