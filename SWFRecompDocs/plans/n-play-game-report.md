@@ -117,10 +117,27 @@ SwiftShader ticks are slow, so a 150 ms tap can miss the per-tick
 4. The in-game time bar (`timeMC`) did not show in the SwiftShader
    screenshots. Unverified; check on real GPU before filing.
 
-## 7. CI
+## 7. CI + Pages
 
-`ruffle-tests.yml` mode=graphics on the landing commit; see the commit trailer
-below for the run id and result.
+- **CI:** handed to the s25 coordinator. To avoid two runs publishing to
+  `ruffle-test-results` at once, `8615da904` rides their next grading run
+  (graphics full+images). They report the
+  `regression/avm1_closure_base_clip_root_frame` row and any regressions. The
+  change is CI byte-identical apart from the new row.
+- **Pages:** dry run `45063270405` succeeded. Real deploy `45063635099`
+  succeeded on a rerun; the first attempt failed with a transient GitHub
+  artifact-API error ("No artifacts named github-pages"). The live
+  `recompiler/build_info.json` reports commit `8615da9`.
+- **Live verification:** `tools/browser-test/live_recompiler_run.py` uploads
+  the fixture SWF to the LIVE recompiler page, then runs "Build & run in
+  browser". Its trace matches Ruffle (`BC: handler LIMIT=17`, `fn 18 true` ×2,
+  `method 27 true 17`, `done`). One attempt died on the known wasmer
+  "oneshot canceled" intermittent; rerun it if that happens.
+- **New lead (not chased):** in the in-browser recompiler's graphics host
+  (DYNAMIC_HOST), the fixture's 5-line block repeats every tick. Ruffle and the
+  `demo.html` build (wasm probe: exactly 5 lines) run it once. That host path
+  appears to re-run a 1-frame root's frame-1 DoAction each tick. Check against
+  an older deploy before calling it a regression; it is likely pre-existing.
 
 ## Tools added
 
@@ -128,6 +145,8 @@ below for the run id and result.
   input_click.json, README). The README covers the stale-build gotcha:
   `build_test.sh` does **not** re-run the recompiler when `test.swf` changes,
   so delete `RecompiledScripts/` first.
+- `tools/browser-test/live_recompiler_run.py`: drives the live (or local)
+  in-browser recompiler page end to end and prints the run's trace.
 - `tools/divergence/game_drive/n_click_probe.py`: generic browser driver
   (`click@x,y`, `key@K`, `hold@K,sec`, `wait@s`, screenshots per action),
   usable for any flasharchive demo.
