@@ -7460,21 +7460,21 @@ static int tl_str_eq(const Avm2String* s, const char* lit)
 	size_t n = strlen(lit);
 	return s != NULL && s->len == n && memcmp(s->utf8, lit, n) == 0;
 }
-static int tl_metric(Avm2Activation* act, int want_desc, double* out)
+// The EMBEDDED_CFF face a block's content names (see above), and its size.
+static const Avm2Cff4FontData* tl_block_face(Avm2Context* ctx, Avm2Object* block,
+                                             double* size_out)
 {
-	if (avm2_generated_cff4_font_count == 0) return 0;   // DYNAMIC_HOST: NULL until set
-	Avm2TextLineExt* tl = this_tl(act);
-	if (tl == NULL || tl->text_block == NULL) return 0;
-	Avm2Context* ctx = act->ctx;
-	Avm2Value c = avm2_get_public_property(ctx, avm2_object_value(tl->text_block), "content", 7, NULL);
-	if (c.kind != AVM2_VALUE_OBJECT) return 0;
+	if (avm2_generated_cff4_font_count == 0) return NULL;   // DYNAMIC_HOST: NULL until set
+	if (block == NULL) return NULL;
+	Avm2Value c = avm2_get_public_property(ctx, avm2_object_value(block), "content", 7, NULL);
+	if (c.kind != AVM2_VALUE_OBJECT) return NULL;
 	Avm2Value ef = avm2_get_public_property(ctx, c, "elementFormat", 13, NULL);
-	if (ef.kind != AVM2_VALUE_OBJECT) return 0;
+	if (ef.kind != AVM2_VALUE_OBJECT) return NULL;
 	double size = avm2_coerce_to_number(ctx, avm2_get_public_property(ctx, ef, "fontSize", 8, NULL));
 	Avm2Value fd = avm2_get_public_property(ctx, ef, "fontDescription", 15, NULL);
-	if (fd.kind != AVM2_VALUE_OBJECT) return 0;
+	if (fd.kind != AVM2_VALUE_OBJECT) return NULL;
 	const Avm2String* lookup = avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontLookup", 10, NULL));
-	if (!tl_str_eq(lookup, "embeddedCFF")) return 0;
+	if (!tl_str_eq(lookup, "embeddedCFF")) return NULL;
 	const Avm2String* name = avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontName", 8, NULL));
 	int bold = tl_str_eq(avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontWeight", 10, NULL)), "bold");
 	int italic = tl_str_eq(avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontPosture", 11, NULL)), "italic");
@@ -7488,9 +7488,80 @@ static int tl_metric(Avm2Activation* act, int want_desc, double* out)
 		if ((f->bold != 0) == bold && (f->italic != 0) == italic) { hit = f; break; }
 		if (hit == NULL) hit = f;
 	}
+	if (hit != NULL && size_out != NULL) *size_out = size;
+	return hit;
+}
+static double tl_face_metric(const Avm2Cff4FontData* f, double size, int want_desc)
+{
+	double em = (double) (want_desc ? -f->typo_descender : f->typo_ascender) / f->units_per_em;
+	return round(size * em * 20.0) / 20.0;
+}
+static int tl_metric(Avm2Activation* act, int want_desc, double* out)
+{
+	Avm2TextLineExt* tl = this_tl(act);
+	if (tl == NULL) return 0;
+	double size = 0;
+	const Avm2Cff4FontData* hit = tl_block_face(act->ctx, tl->text_block, &size);
 	if (hit == NULL) return 0;
-	double em = (double) (want_desc ? -hit->typo_descender : hit->typo_ascender) / hit->units_per_em;
-	*out = round(size * em * 20.0) / 20.0;
+	*out = tl_face_metric(hit, size, want_desc);
+	return 1;
+}
+static int tl_face_advance(const Avm2Cff4FontData* f, uint32_t cp, uint32_t* adv)
+{
+	uint32_t lo = 0, hi = f->adv_count;
+	while (lo < hi)
+	{
+		uint32_t mid = (lo + hi) / 2;
+		uint32_t c = f->adv[2 * mid];
+		if (c == cp) { *adv = f->adv[2 * mid + 1]; return 1; }
+		if (c < cp) lo = mid + 1; else hi = mid;
+	}
+	return 0;
+}
+// Lay out the line's logical box: x from 0 to the summed hmtx advances of
+// its substring (one em-scaled total, rounded to twips once: SpaceAB's
+// 24x1000 + 5x999 units at 20px reads 579.9, not 580), y from -ascent to
+// +descent (textblock_recreate_text_line_width). Controls take no advance.
+// A code point the face does not map leaves the box unset (bounds stay
+// empty, the pre-layout behaviour) rather than guess a fallback face.
+static void tl_layout_box(Avm2Context* ctx, Avm2TextLineExt* tl,
+                          const Avm2String* text)
+{
+	tl->box_valid = 0;
+	double size = 0;
+	const Avm2Cff4FontData* f = tl_block_face(ctx, tl->text_block, &size);
+	if (f == NULL || f->adv == NULL || f->adv_count == 0 || text == NULL) return;
+	uint64_t units = 0;
+	uint32_t i = u16_to_byte(text, tl->begin_index);
+	uint32_t end = u16_to_byte(text, tl->end_index);
+	while (i < end && i < text->len)
+	{
+		const unsigned char* b = (const unsigned char*) text->utf8 + i;
+		uint32_t cp, n;
+		if (b[0] < 0x80) { cp = b[0]; n = 1; }
+		else if (b[0] < 0xE0) { cp = ((b[0] & 0x1Fu) << 6) | (b[1] & 0x3Fu); n = 2; }
+		else if (b[0] < 0xF0) { cp = ((b[0] & 0x0Fu) << 12) | ((b[1] & 0x3Fu) << 6) | (b[2] & 0x3Fu); n = 3; }
+		else { cp = ((b[0] & 0x07u) << 18) | ((b[1] & 0x3Fu) << 12) | ((b[2] & 0x3Fu) << 6) | (b[3] & 0x3Fu); n = 4; }
+		i += n;
+		if (cp < 0x20 || cp == 0x2028 || cp == 0x2029) continue;
+		uint32_t a;
+		if (!tl_face_advance(f, cp, &a)) return;
+		units += a;
+	}
+	tl->box_w = round((double) units * size * 20.0 / f->units_per_em);
+	tl->box_asc = tl_face_metric(f, size, 0) * 20.0;
+	tl->box_desc = tl_face_metric(f, size, 1) * 20.0;
+	tl->box_valid = 1;
+}
+int avm2_text_textline_box(Avm2Object* line, double* xmin, double* xmax,
+                           double* ymin, double* ymax)
+{
+	Avm2TextLineExt* tl = textline_ext_of(line);
+	if (tl == NULL || !tl->box_valid) return 0;
+	*xmin = 0;
+	*xmax = tl->box_w;
+	*ymin = -tl->box_asc;
+	*ymax = tl->box_desc;
 	return 1;
 }
 static Avm2Value tl_get_ascent(Avm2Activation* act)
@@ -7984,6 +8055,7 @@ static Avm2Value tb_do_create_text_line(Avm2Activation* act, Avm2Object* prev,
 		tl->previous_line = prev;
 		pl->next_line = line;
 	}
+	tl_layout_box(ctx, tl, text);
 	tl->block_chain = tb->lines_head;
 	tb->lines_head = line;
 	tb->creation_result = fte_lit(ctx, "success");
@@ -8059,12 +8131,37 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 	// sequence at the tail of textblock_line_changes recreates five released
 	// lines in a row, and each one is the NEXT call's previousLine — so
 	// without this the chain fails its own #2004 argument check.
+	// TextBlock.as: `textLine.userData = null` runs before DoCreateTextLine,
+	// so it holds even when the block turns out to be complete.
+	tl->user_data = avm2_null();
+	// DoCreateTextLine re-runs the line split on the CURRENT content (Ruffle
+	// text_block.rs do_create_text_line with line_to_use): a block whose
+	// content changed since the line was made re-measures, and a complete
+	// block returns null without touching the line.
+	Avm2TextBlockExt* tbx = this_tb(act);
+	const Avm2String* text = (tbx != NULL && tbx->content != NULL)
+		? ce_text_of(ctx, tbx->content) : NULL;
+	if (text == NULL) text = empty_string(ctx);
+	uint32_t text_u16 = u16_length(text);
+	uint32_t pos = pl != NULL ? pl->end_index : 0;
+	uint32_t next = pos <= text_u16 ? next_line_break(text, pos) : pos;
+	if (pos > text_u16 || text_u16 == 0 || (next == text_u16 && pos == next))
+	{
+		if (tbx != NULL) tbx->creation_result = fte_lit(ctx, "complete");
+		return avm2_null();
+	}
 	tl->validity = fte_lit(ctx, "valid");
 	tl->text_block = this_obj(act);
 	tl->hide_block_from_script = 0;
 	tl->specified_width = width;
+	tl->raw_text_length = next - pos;
+	tl->begin_index = pos;
+	tl->end_index = next;
+	tl->line_index = pl != NULL ? pl->line_index + 1 : 0;
 	tl->previous_line = prev;
 	if (pl != NULL) pl->next_line = tlv.u.obj;
+	if (tbx != NULL) tbx->creation_result = fte_lit(ctx, "success");
+	tl_layout_box(ctx, tl, text);
 	// Recreation also clears the line's SCRIPT-visible state. Ruffle does it in
 	// two places and Flash agrees with both (textblock_recreateline traces
 	// `null` for userData and `0` for y immediately after the call):
@@ -8074,7 +8171,6 @@ static Avm2Value tb_recreate_text_line(Avm2Activation* act)
 	//   * TextLine::reset_properties (text_line.rs:92-97) zeroes x and y before
 	//     the re-layout; the line keeps its identity, so a stale y would
 	//     survive otherwise.
-	tl->user_data = avm2_null();
 	tl->display.mtx_tx = 0;
 	tl->display.mtx_ty = 0;
 	// The recreated line becomes the tail of the chain; the line that used to

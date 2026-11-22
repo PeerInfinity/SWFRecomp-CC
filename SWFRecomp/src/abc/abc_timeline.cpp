@@ -2,6 +2,7 @@
 // reader over the decompressed stream; emission contract in
 // SWFModernRuntime/include/avm2/avm2_abc.h ("Static timeline tables").
 
+#include <algorithm>
 #include <abc/abc_timeline.hpp>
 #include <abc/abc_devicefont.hpp>
 #include <abc/abc_glyph_flatten.hpp>
@@ -961,7 +962,7 @@ struct Scanner
 	// DefineFont4 (CFF / EMBEDDED_CFF) faces: name, style and the OpenType
 	// OS/2 typo ascender/descender + head unitsPerEm, for flash.text.engine
 	// TextLine metrics (s24 w2-avm2-small-natives). Glyphs are not decoded.
-	struct Cff4Def { std::string name; bool bold, italic; int asc, desc, upem; };
+	struct Cff4Def { std::string name; bool bold, italic; int asc, desc, upem; std::vector<std::pair<uint32_t, uint32_t>> adv; };
 	std::vector<Cff4Def> cff4;
 	std::vector<StaticTextDef> statictexts;
 	std::vector<BitmapAsset> bitmaps;
@@ -1463,6 +1464,7 @@ struct Scanner
 				auto be32 = [&](size_t o) -> uint32_t { return o + 4 <= flen ? (be16(o) << 16) | be16(o + 2) : 0; };
 				cd.asc = cd.desc = 0; cd.upem = 0;
 				uint32_t nt = (fl & 0x04) ? be16(4) : 0;
+				size_t hhea = 0, hmtx = 0, cmap = 0;
 				for (uint32_t t = 0; t < nt; t++)
 				{
 					size_t rec = 12 + 16 * (size_t) t;
@@ -1475,6 +1477,65 @@ struct Scanner
 					}
 					else if (memcmp(f + rec, "head", 4) == 0)
 						cd.upem = (int) be16((size_t) off + 18);
+					else if (memcmp(f + rec, "hhea", 4) == 0) hhea = off;
+					else if (memcmp(f + rec, "hmtx", 4) == 0) hmtx = off;
+					else if (memcmp(f + rec, "cmap", 4) == 0) cmap = off;
+				}
+				// cmap (format 12, else format 4) -> glyph -> hmtx advance, for
+				// TextLine logical widths. Absent tables leave adv empty.
+				if (hhea && hmtx && cmap)
+				{
+					uint32_t nhm = be16(hhea + 34);
+					auto advance_of = [&](uint32_t g) -> uint32_t {
+						if (nhm == 0) return 0;
+						uint32_t i = g < nhm ? g : nhm - 1;
+						return be16(hmtx + 4 * (size_t) i);
+					};
+					size_t sub4 = 0, sub12 = 0;
+					uint32_t nsub = be16(cmap + 2);
+					for (uint32_t k = 0; k < nsub; k++)
+					{
+						size_t r = cmap + 4 + 8 * (size_t) k;
+						uint32_t pid = be16(r), eid = be16(r + 2);
+						size_t so = cmap + be32(r + 4);
+						uint32_t fmt = be16(so);
+						if (fmt == 12 && (pid == 0 || (pid == 3 && eid == 10))) sub12 = so;
+						else if (fmt == 4 && (pid == 0 || (pid == 3 && eid == 1)) && !sub4) sub4 = so;
+					}
+					if (sub12)
+					{
+						uint32_t ng = be32(sub12 + 12);
+						for (uint32_t k = 0; k < ng && k < 65536; k++)
+						{
+							size_t g = sub12 + 16 + 12 * (size_t) k;
+							uint32_t c0 = be32(g), c1 = be32(g + 4), g0 = be32(g + 8);
+							for (uint32_t c = c0; c <= c1 && c - c0 < 65536; c++)
+								cd.adv.push_back({ c, advance_of(g0 + (c - c0)) });
+						}
+					}
+					else if (sub4)
+					{
+						uint32_t segx2 = be16(sub4 + 6);
+						size_t ends = sub4 + 14, starts = ends + segx2 + 2;
+						size_t deltas = starts + segx2, ros = deltas + segx2;
+						for (uint32_t k = 0; k < segx2 / 2; k++)
+						{
+							uint32_t e = be16(ends + 2 * k), st = be16(starts + 2 * k);
+							uint32_t d = be16(deltas + 2 * k), ro = be16(ros + 2 * k);
+							for (uint32_t c = st; c <= e && c != 0xFFFF; c++)
+							{
+								uint32_t g;
+								if (ro == 0) g = (c + d) & 0xFFFF;
+								else
+								{
+									g = be16(ros + 2 * k + ro + 2 * (size_t) (c - st));
+									if (g != 0) g = (g + d) & 0xFFFF;
+								}
+								if (g != 0) cd.adv.push_back({ c, advance_of(g) });
+							}
+						}
+					}
+					std::sort(cd.adv.begin(), cd.adv.end());
 				}
 				if (cd.upem > 0) cff4.push_back(cd);
 				break;
@@ -2302,10 +2363,22 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 		// DefineFont4 typo metrics (Avm2Cff4FontData, avm2_abc.h). Main
 		// movie only, like the device fonts: TextLine reads one player-level
 		// table. An empty table still defines both symbols.
-		out << "\n// DefineFont4 (CFF) faces: name, bold, italic, typo ascender, typo descender, unitsPerEm.\n";
-		out << "const Avm2Cff4FontData avm2_generated_cff4_fonts[] = {";
-		for (auto& c : sc.cff4)
+		out << "\n// DefineFont4 (CFF) faces: name, bold, italic, typo ascender, typo descender, unitsPerEm, advances.\n";
+		for (size_t ci = 0; ci < sc.cff4.size(); ci++)
 		{
+			if (sc.cff4[ci].adv.empty()) continue;
+			out << "static const uint32_t avm2_cff4_adv_" << ci << "[] = {";
+			size_t n = 0;
+			for (auto& a : sc.cff4[ci].adv)
+			{
+				out << (n++ % 8 == 0 ? "\n\t" : " ") << a.first << ", " << a.second << ",";
+			}
+			out << "\n};\n";
+		}
+		out << "const Avm2Cff4FontData avm2_generated_cff4_fonts[] = {";
+		for (size_t ci = 0; ci < sc.cff4.size(); ci++)
+		{
+			auto& c = sc.cff4[ci];
 			out << " { \"";
 			for (unsigned char ch : c.name)
 			{
@@ -2319,7 +2392,9 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 				else out << (char) ch;
 			}
 			out << "\", " << (int) c.bold << ", " << (int) c.italic << ", " << c.asc << ", "
-			    << c.desc << ", " << c.upem << " },";
+			    << c.desc << ", " << c.upem << ", ";
+			if (c.adv.empty()) out << "0, 0 },";
+			else out << "avm2_cff4_adv_" << ci << ", " << c.adv.size() << " },";
 		}
 		if (sc.cff4.empty()) out << " { 0, 0, 0, 0, 0, 0 }";
 		out << " };\nconst uint32_t avm2_generated_cff4_font_count = " << sc.cff4.size() << ";\n";

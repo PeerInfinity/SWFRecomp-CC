@@ -935,7 +935,15 @@ typedef struct Avm2TextLineExt
 	// validity = "static" hides the block from SCRIPT while the line stays in
 	// the block's chain (still walkable, still releasable) — see avm2_text.c.
 	uint8_t hide_block_from_script;
+	// Logical line box (twips, line-local, baseline at y=0) from an
+	// EMBEDDED_CFF face's advances + typo metrics; contributes to the
+	// TextLine's display bounds when box_valid (avm2_text_textline_box).
+	uint8_t box_valid;
+	double box_w, box_asc, box_desc;
 } Avm2TextLineExt;
+// TextLine self bounds (twips); returns 0 when the line has no laid-out box.
+int avm2_text_textline_box(Avm2Object* line, double* xmin, double* xmax,
+                           double* ymin, double* ymax);
 // Wire the FTE surface onto the TextLine class shell (created by
 // avm2_register_display so it gets the concrete display alloc hook).
 void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline);

@@ -907,6 +907,7 @@ static Rect display_self_bounds(const Avm2DisplayObjectExt* ext)
 }
 
 // bounds_with_transform: self bounds + children, all through `m`.
+static Avm2Class* g_textline_class;   // defined with the TextLine alloc hook
 static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
                                   const Mat* m, Rect* acc)
 {
@@ -943,6 +944,17 @@ static void bounds_with_transform(Avm2Context* ctx, Avm2Object* obj,
 				self.xmax = (double) bw * 20.0;
 				self.ymin = 0;
 				self.ymax = (double) bh * 20.0;
+			}
+		}
+		// flash.text.engine.TextLine: its laid-out logical box (advances x
+		// ascent+descent, avm2_text.c tl_layout_box) is its own content.
+		if (obj->cls == g_textline_class && g_textline_class != NULL)
+		{
+			Rect lb;
+			if (avm2_text_textline_box(obj, &lb.xmin, &lb.xmax, &lb.ymin, &lb.ymax))
+			{
+				lb.valid = 1;
+				rect_union_xform(acc, &lb, m);
 			}
 		}
 		rect_union_xform(acc, &self, m);

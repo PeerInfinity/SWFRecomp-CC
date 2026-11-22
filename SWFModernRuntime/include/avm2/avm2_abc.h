@@ -515,6 +515,11 @@ typedef struct Avm2Cff4FontData
 	int16_t typo_ascender;
 	int16_t typo_descender;
 	uint16_t units_per_em;
+	// cmap -> hmtx advance widths (font units), sorted by code point:
+	// adv[2*i] = Unicode code point, adv[2*i+1] = advance. NULL/0 when the
+	// face carries no usable cmap/hmtx (TextLine bounds then stay empty).
+	const uint32_t* adv;
+	uint32_t adv_count;
 } Avm2Cff4FontData;
 
 // One rendered glyph of a TextField, as collected by

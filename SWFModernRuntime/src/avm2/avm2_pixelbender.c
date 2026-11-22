@@ -2081,8 +2081,12 @@ static int pb_run_job(Avm2Context* ctx, Avm2ShaderJobExt* job)
 			out_w = (job->width > 0) ? (uint32_t) job->width : 0;
 			out_h = (job->height > 0) ? (uint32_t) job->height : 0;
 		}
-		// The output-channel gate fires before anything is rendered.
-		if (out_channels != 3 && out_channels != 4) err = 2162;
+		// The output-channel gate fires before anything is rendered. Flash
+		// only rejects a 1/2-channel (float/float2) output for a BitmapData
+		// target; ByteArray / Vector.<Number> targets take it as-is
+		// (Ruffle b9929aaf3, avm2/pixelbender_shaderjob_output_channels).
+		int narrow_ok = (out_channels == 1 || out_channels == 2) && target_bd == NULL;
+		if (out_channels != 3 && out_channels != 4 && !narrow_ok) err = 2162;
 	}
 
 	// ---- run ------------------------------------------------------------
