@@ -1,0 +1,375 @@
+diff --git a/SWFModernRuntime/include/actionmodern/action.h b/SWFModernRuntime/include/actionmodern/action.h
+index 4133979a..a4255f7e 100644
+--- a/SWFModernRuntime/include/actionmodern/action.h
++++ b/SWFModernRuntime/include/actionmodern/action.h
+@@ -891,6 +891,7 @@ typedef struct TextFieldGlyphRun {
+     u16 font_height; // twips
+     u8 align;        // 0=left, 1=right, 2=center, 3=justify
+     u8 bullet;       // non-zero when the run is inside <li>
++    u16 font_id;     // s24: per-run EMBEDDED face (<b>/<i>/<font face>), 0 = info->font_id
+ } TextFieldGlyphRun;
+ 
+ // Text field glyph rendering info (used by tag.c for headless glyph rendering)
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 9d5063ca..7ed37c38 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -22964,6 +22964,20 @@ void actionDropTextFieldBindingForTF(MovieClip* container, MovieClip* tf_mc)
+ // In NO_GRAPHICS / OFFSCREEN_RENDER the full tf_* run-table system is used.
+ // In WASM graphics mode the tf_* system isn't compiled, so we fall back to
+ // a simple <...> tag-strip when projecting plain text into props["text"].
++// s24 w1-pixel-text: the HTML run table stores leading in whole pixels
++// (tf_get_defaults truncates the DefineEditText tag's twips), but Ruffle keeps
++// the TextFormat leading as an f64 pixel value and lays out with
++// Twips::from_pixels(span.leading) (html/layout.rs line_leading_adjustment).
++// When a run's leading is just the tag default, keep the tag's exact twips.
++static double tf_run_leading_twips(MovieClip* mc, s16 run_leading_px)
++{
++	if (mc != NULL && mc->ng_textfield_idx >= 0) {
++		s16 tag_tw = ng_getTextFieldLeading(mc->ng_textfield_idx);
++		if ((s16)(tag_tw / 20) == run_leading_px) return (double)tag_tw;
++	}
++	return (double)(run_leading_px * 20);
++}
++
+ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
+ 	const uint16_t* html_u16, u32 html_u16_len)
+ {
+@@ -23049,7 +23063,7 @@ static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
+ 			if (existing_ld == NULL || existing_ld->type != ACTION_STACK_VALUE_F64) {
+ 				ActionVar ld_val = {0};
+ 				ld_val.type = ACTION_STACK_VALUE_F64;
+-				VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
++				VAL(double, &ld_val.data.numeric_value) = tf_run_leading_twips(mc, first_run->leading);
+ 				setProperty(app_context, props, "_tf_leading", 11, &ld_val);
+ 			}
+ 		}
+@@ -29467,6 +29481,7 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
+ 			out_runs[run_count].font_height = stack[sp].font_height; \
+ 			out_runs[run_count].align = stack[sp].align; \
+ 			out_runs[run_count].bullet = stack[sp].bullet; \
++			out_runs[run_count].font_id = 0; \
+ 			run_count++; \
+ 		} \
+ 		cur_run_start = out_pos; \
+@@ -29850,6 +29865,18 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				// its top line right after the field acquired an MC wrapper.
+ 				_tfg_runs[ri].align = r->align;
+ 				_tfg_runs[ri].bullet = 0;
++				_tfg_runs[ri].font_id = 0;
++				// s24 w1-pixel-text prototype: a run whose <b>/<i>/<font face>
++				// names a DIFFERENT embedded face draws with that face (Ruffle
++				// html/layout.rs resolve_font is per span). Embedded fields only.
++				if (mc->ng_textfield_idx >= 0
++				    && (ng_getTextFieldFlags(mc->ng_textfield_idx) & 0x0080)
++				    && r->font_name[0] != '\0') {
++					u16 _rf = 0;
++					if (ng_findEmbeddedFontId(r->font_name, r->bold, r->italic, &_rf)
++					    && _rf != font_id)
++						_tfg_runs[ri].font_id = _rf;
++				}
+ 			}
+ 			runs_out = _tfg_runs;
+ 			run_count_out = rc;
+@@ -29873,6 +29900,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				_tfg_runs[0].font_height = font_height;
+ 				_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
+ 				_tfg_runs[0].bullet = 0;
++				_tfg_runs[0].font_id = 0;
+ 				runs_out = _tfg_runs;
+ 				run_count_out = 1;
+ 			} else {
+@@ -29895,6 +29923,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 					_tfg_runs[0].font_height = font_height;
+ 					_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
+ 					_tfg_runs[0].bullet = 0;
++					_tfg_runs[0].font_id = 0;
+ 					runs_out = _tfg_runs;
+ 					run_count_out = 1;
+ 				}
+@@ -30306,6 +30335,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 					otf_html_runs[ri].font_height = (u16)r->font_height;
+ 					otf_html_runs[ri].align = r->align;
+ 					otf_html_runs[ri].bullet = 0;
++					otf_html_runs[ri].font_id = 0;
+ 				}
+ 				emit_runs = otf_html_runs;
+ 				emit_run_count = rc;
+@@ -30333,6 +30363,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+ 		otf_html_runs[0].font_height = font_height;
+ 		otf_html_runs[0].align = (u8)ng_getTextFieldAlign(tf_idx);
+ 		otf_html_runs[0].bullet = 0;
++		otf_html_runs[0].font_id = 0;
+ 		emit_runs = otf_html_runs;
+ 		emit_run_count = 1;
+ 	}
+@@ -55722,7 +55753,7 @@ void actionSetMember(SWFAppContext* app_context)
+ 								// No existing leading set — use the parsed default
+ 								ActionVar ld_val = {0};
+ 								ld_val.type = ACTION_STACK_VALUE_F64;
+-								VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
++								VAL(double, &ld_val.data.numeric_value) = tf_run_leading_twips(mc, first_run->leading);
+ 								setProperty(app_context, props, "_tf_leading", 11, &ld_val);
+ 							}
+ 							// If _tf_leading already exists (from setTextFormat/setNewTextFormat),
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index ef65c749..156e5e17 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -2920,6 +2920,16 @@ static void xform_overrides_restore(void)
+ static DisplayObject* g_text_glyph_overrides[MAX_TEXT_GLYPH_OVERRIDES];
+ static int g_text_glyph_override_count;
+ static void text_glyph_overrides_reset(void) { g_text_glyph_override_count = 0; }
++// s24 w1-pixel-text prototype: root DefineText instances whose PLACED tag
++// bounds miss the stage are not drawn (Flash decides from the DefineText
++// TextBounds, not from the glyphs; visual/static_text_offstage).
++#define MAX_TEXT_CULLED 64
++static const DisplayObject* g_text_culled[MAX_TEXT_CULLED];
++static int g_text_culled_count = 0;
++static int text_is_culled(const DisplayObject* o) {
++	for (int i = 0; i < g_text_culled_count; i++) if (g_text_culled[i] == o) return 1;
++	return 0;
++}
+ static void text_glyph_overrides_push(DisplayObject* obj)
+ {
+ 	if (g_text_glyph_override_count < MAX_TEXT_GLYPH_OVERRIDES)
+@@ -4142,6 +4152,7 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
+ 			// the skip fires wherever dynamic glyph rendering does — including
+ 			// browser-WASM graphics (USE_WEBGPU without OFFSCREEN_RENDER).
+ 			if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
++			if (text_is_culled(obj)) break;
+ #endif
+ 			{
+ 			u32 _tg_base = obj->text_glyph_xform_base ? obj->text_glyph_xform_base
+@@ -6782,6 +6793,16 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 	if (em_square == 0) return;
+ 
+ 	size_t glyph_base = ng_font_get_glyph_base(font_idx);
++	// s24 w1-pixel-text prototype: per-run embedded face (runs[].font_id).
++	int run_font_idx = font_idx; int run_em = em_square; size_t run_gbase = glyph_base;
++	u16 run_fid_cached = 0;
++#define TF_RESOLVE_RUN_FONT(fid) do { u16 _f = (fid); if (_f != run_fid_cached) { \
++		run_fid_cached = _f; int _fi = _f ? ng_find_font_with_metrics(_f) : -1; \
++		s16 _a, _d; int _em = 1024; \
++		if (_fi >= 0 && ng_font_get_metrics(_fi, &_a, &_d, &_em) && _em) { \
++			run_font_idx = _fi; run_em = _em; run_gbase = ng_font_get_glyph_base(_fi); \
++		} else { run_font_idx = font_idx; run_em = em_square; run_gbase = glyph_base; } \
++	} } while (0)
+ 
+ 	// 2px gutter on each side (Flash text field internal padding)
+ 	float gutter_twips = 40.0f;
+@@ -6938,11 +6959,12 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 				continue;
+ 			}
+ 
+-			int glyph_idx = ng_font_find_glyph(font_idx, cp);
++			TF_RESOLVE_RUN_FONT((info->runs && run_idx < info->run_count && pos > (size_t)info->runs[run_idx].byte_start) ? info->runs[run_idx].font_id : 0);
++			int glyph_idx = ng_font_find_glyph(run_font_idx, cp);
+ 			if (glyph_idx < 0) continue;
+-			s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
++			s32 adv = ng_font_glyph_advance_by_idx(run_font_idx, glyph_idx);
+ 			if (adv >= 0 && cur_par < MAX_TF_PARAGRAPHS) {
+-				float scale = (float)cur_fh / (float)em_square;
++				float scale = (float)cur_fh / (float)run_em;
+ 				pars[cur_par].width += tf_glyph_advance_twips(adv, scale, info->device_font);
+ 			}
+ 		}
+@@ -6993,7 +7015,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		float remaining = usable_line_width - bul - pars[p].width;
+ 		float offset = 0.0f;
+ 		if (pars[p].align == 1) offset = remaining;            // right
+-		else if (pars[p].align == 2) offset = remaining * 0.5f;// center
++		else if (pars[p].align == 2) offset = getenv("TF_CENTER_TW") ? (float)((s32)remaining / 2) : remaining * 0.5f;// center
+ 		// justify: fall back to left for single-glyph paragraphs
+ 		if (offset < 0.0f) offset = 0.0f;
+ 		par_x_offset[p] = (float)first_line_left_off + bul + offset;
+@@ -7216,13 +7238,19 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 			continue;
+ 		}
+ 
+-		int glyph_idx = ng_font_find_glyph(font_idx, cp);
++		TF_RESOLVE_RUN_FONT((info->runs && run_idx < info->run_count && pos > (size_t)info->runs[run_idx].byte_start) ? info->runs[run_idx].font_id : 0);
++		int glyph_idx = ng_font_find_glyph(run_font_idx, cp);
+ 		if (glyph_idx < 0) continue; // missing glyph — skip
+ 
+-		float scale = (float)cur_fh / (float)em_square;
+-		float r = ((cur_color >> 16) & 0xFF) / 255.0f;
+-		float g = ((cur_color >> 8) & 0xFF) / 255.0f;
+-		float b = (cur_color & 0xFF) / 255.0f;
++		float scale = (float)cur_fh / (float)run_em;
++		// s24 w1-pixel-text prototype: Ruffle colours glyphs with a colour
++		// transform, set_mult_color -> Fixed8::from_f32(c / 255.0) (truncated
++		// to 1/256), so 0x99 draws as 152 and 0xCC as 203 (font_like.rs:98).
++#define TF_FIXED8_MULT(c) ((float)(s32)(((float)(c) / 255.0f) * 256.0f) / 256.0f)
++		float r = TF_FIXED8_MULT((cur_color >> 16) & 0xFF);
++		float g = TF_FIXED8_MULT((cur_color >> 8) & 0xFF);
++		float b = TF_FIXED8_MULT(cur_color & 0xFF);
++#undef TF_FIXED8_MULT
+ 		// Selected glyphs draw white over the black selection box (see the
+ 		// selection block above). caret_count was bumped for THIS char already.
+ 		if (sel_invert_lo >= 0 && (int)caret_count - 1 >= sel_invert_lo
+@@ -7231,7 +7259,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		}
+ 
+ 		// Global glyph index
+-		size_t global_idx = glyph_base + (size_t)glyph_idx;
++		size_t global_idx = run_gbase + (size_t)glyph_idx;
+ 		// Skip the glyph-shape read/draw when there's no outline to draw:
+ 		//  - the built-in fallback font carries metrics + advances only, and
+ 		//  - a trace-only SWF (or a metrics-only embedded font) emits a tiny
+@@ -7240,7 +7268,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		// Bound-check against the actual glyph_data length (4 u32 per glyph).
+ 		// The pen still advances below for layout either way.
+ 		if (line_no >= hidden_lines
+-		    && !ng_font_is_builtin(font_idx) && (4 * global_idx + 1) < glyph_data_entries) {
++		    && !ng_font_is_builtin(run_font_idx) && (4 * global_idx + 1) < glyph_data_entries) {
+ 		// glyph_base is already a COMBINED glyph index (tagDefineFontGlyphBase
+ 		// re-bases it), and the generated `glyph_data` / `shape_data` symbols
+ 		// are only the ROOT's prefix of the combined tables once a child movie
+@@ -7268,12 +7296,13 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
+ 		} // end glyph-outline-available guard
+ 
+ 		// Advance x by glyph advance width
+-		s32 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
++		s32 adv = ng_font_glyph_advance_by_idx(run_font_idx, glyph_idx);
+ 		if (adv >= 0) {
+ 			x_pos += tf_glyph_advance_twips(adv, scale, info->device_font);
+ 		}
+ 	}
+ 	#undef MAX_TF_PARAGRAPHS
++#undef TF_RESOLVE_RUN_FONT
+ 
+ 	// Caret at (or past) the end of the text — pen is at its final position.
+ 	// (Empty field: the draw loop never ran, so x_pos is still the synthesised
+@@ -7607,6 +7636,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 		g_xform_slot_capacity = context->xform_slot_count;
+ 		xform_overrides_reset();
+ 		text_glyph_overrides_reset();
++		g_text_culled_count = 0;
+ 
+ 		u32 orig_cxform_count = app_context->cxform_data_size > 0
+ 			? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 1;
+@@ -7761,9 +7791,51 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 		}
+ 		else if (ch->type == CHAR_TYPE_TEXT)
+ 		{
+-			renderer_compose_text_transforms(context,
+-				app_context->transform_data,
+-				obj->transform_id, ch->transform_start, ch->text_size);
++			// s24 w1-pixel-text prototype: the glyph slots are CHARACTER-shared,
++			// so two root instances of one DefineText composed in place collapse
++			// onto the last writer (visual/static_text_offstage: the (0,0)
++			// corner marker drew at (396,296)). Same per-instance dynamic run
++			// compose_children allocates for nested text.
++			u32 tgbase = g_next_dynamic_xform_slot;
++			if (ch->text_size > 0 && tgbase + (u32)ch->text_size <= g_xform_slot_capacity) {
++				g_next_dynamic_xform_slot += (u32)ch->text_size;
++				text_glyph_overrides_push(obj);
++				obj->text_glyph_xform_base = tgbase;
++				const float* tf_all = (const float*)app_context->transform_data;
++				const float* place_m = tf_all + obj->transform_id * 16;
++				{
++					extern MovieClip root_movieclip;
++					s32 bx0, bx1, by0, by1;
++					// Filters grow the culling bounds (the shadow of the cyan text
++					// below the stage still reaches it); filtered instances are
++					// never culled here (wave 2: grow by the filter extent).
++					if (root_movieclip.as_set_flags == 0 && obj->filter_type == 0
++					    && ng_getCharBounds(obj->char_id, &bx0, &bx1, &by0, &by1)
++					    && g_text_culled_count < MAX_TEXT_CULLED) {
++						float mnx = 1e30f, mny = 1e30f, mxx = -1e30f, mxy = -1e30f;
++						for (int k = 0; k < 4; k++) {
++							float lx = (k & 1) ? (float)bx1 : (float)bx0;
++							float ly = (k & 2) ? (float)by1 : (float)by0;
++							float wx = place_m[0] * lx + place_m[4] * ly + place_m[12];
++							float wy = place_m[1] * lx + place_m[5] * ly + place_m[13];
++							if (wx < mnx) mnx = wx; if (wx > mxx) mxx = wx;
++							if (wy < mny) mny = wy; if (wy > mxy) mxy = wy;
++						}
++						float sw = (float)app_context->width * 20.0f, sh = (float)app_context->height * 20.0f;
++						if (mxx <= 0.0f || mxy <= 0.0f || mnx >= sw || mny >= sh)
++							g_text_culled[g_text_culled_count++] = obj;
++					}
++				}
++				for (size_t j = 0; j < ch->text_size; j++) {
++					float gc[16];
++					hit_test_mat4_multiply(gc, place_m, tf_all + (ch->transform_start + (u32)j) * 16);
++					renderer_write_transform(context, tgbase + (u32)j, gc);
++				}
++			} else {
++				renderer_compose_text_transforms(context,
++					app_context->transform_data,
++					obj->transform_id, ch->transform_start, ch->text_size);
++			}
+ 		}
+ 	}
+ 	}
+@@ -8535,6 +8607,7 @@ void tagShowFrame(SWFAppContext* app_context)
+ 		g_xform_slot_capacity = context->xform_slot_count;
+ 		xform_overrides_reset();
+ 		text_glyph_overrides_reset();
++		g_text_culled_count = 0;
+ 
+ 		u32 orig_cxform_count = app_context->cxform_data_size > 0
+ 			? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 1;
+diff --git a/SWFRecomp/src/swf.cpp b/SWFRecomp/src/swf.cpp
+index d7031443..54f9d933 100644
+--- a/SWFRecomp/src/swf.cpp
++++ b/SWFRecomp/src/swf.cpp
+@@ -1816,6 +1816,25 @@ namespace SWFRecomp
+ 
+ 				size_t bitmap_start = current_bitmap_pixel;
+ 
++				// s24 prototype (experiment): straight-alpha texels with a == 0 take
++				// the mean colour of their a > 0 neighbours, so bilinear sampling
++				// in straight space does not bleed black into the edge.
++				std::vector<u32> _dil;
++				if (have_alpha && getenv("SWFRECOMP_JPEG3_DILATE")) {
++					_dil.assign((size_t)(w*h), 0xFFFFFFFFu);
++					for (int yy = 0; yy < (int)h; yy++) for (int xx = 0; xx < (int)w; xx++) {
++						size_t ii = (size_t)yy*w + xx; if (alpha_data[ii] != 0) continue;
++						u32 sr=0,sg=0,sb=0,n=0;
++						for (int dy=-1; dy<=1; dy++) for (int dx=-1; dx<=1; dx++) {
++							int nx=xx+dx, ny=yy+dy; if (nx<0||ny<0||nx>=(int)w||ny>=(int)h) continue;
++							size_t jj=(size_t)ny*w+nx; u32 na=alpha_data[jj]; if (!na) continue;
++							const u8* q = decompressed + jj*(size_t)decoded_channels;
++							u32 r0=q[0]<na?q[0]:na, g0=q[1]<na?q[1]:na, b0=q[2]<na?q[2]:na;
++							sr+=(r0*255+na/2)/na; sg+=(g0*255+na/2)/na; sb+=(b0*255+na/2)/na; n++;
++						}
++						if (n) _dil[ii] = ((sr/n)<<16)|((sg/n)<<8)|(sb/n);
++					}
++				}
+ 				for (size_t i = 0; i < (size_t)(w * h); i++)
+ 				{
+ 					const u8* px = decompressed + i * (size_t) decoded_channels;
+@@ -1824,10 +1843,27 @@ namespace SWFRecomp
+ 					else if (decoded_channels == 4) a = px[3];
+ 					else                       a = 0xFF;
+ 
++					// s24 w1-pixel-text prototype: DefineBitsJPEG3/4 colour is
++					// PREMULTIPLIED by the alpha plane; Flash (and Ruffle
++					// render/src/utils.rs:235-242) clamps each channel to alpha.
++					// Our bitmap tables are straight alpha, so un-premultiply.
++					u32 c0 = px[0], c1 = px[1], c2 = px[2];
++					if (have_alpha) {
++						if (c0 > a) c0 = a;
++						if (c1 > a) c1 = a;
++						if (c2 > a) c2 = a;
++						if (a == 0) { c0 = c1 = c2 = 0;
++							if (!_dil.empty() && _dil[i] != 0xFFFFFFFFu) { c0 = _dil[i]>>16; c1 = (_dil[i]>>8)&255; c2 = _dil[i]&255; } }
++						else if (a < 255) {
++							c0 = (c0 * 255 + a / 2) / a;
++							c1 = (c1 * 255 + a / 2) / a;
++							c2 = (c2 * 255 + a / 2) / a;
++						}
++					}
+ 					payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
+-								<< "\t0x" << (u32) px[0] << "," << endl
+-								<< "\t0x" << (u32) px[1] << "," << endl
+-								<< "\t0x" << (u32) px[2] << "," << endl
++								<< "\t0x" << c0 << "," << endl
++								<< "\t0x" << c1 << "," << endl
++								<< "\t0x" << c2 << "," << endl
+ 								<< "\t0x" << (u32) a << "," << endl;
+ 
+ 					current_bitmap_pixel += 1;

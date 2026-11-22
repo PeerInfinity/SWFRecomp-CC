@@ -1,0 +1,213 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 9d5063ca..5e4529a3 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -9730,12 +9730,20 @@ static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc
+ 	ActionVar mc_val = {0};
+ 	mc_val.type = ACTION_STACK_VALUE_MOVIECLIP;
+ 	mc_val.data.numeric_value = (u64) mc;
++	if (getenv("SWFR_NO_MCV8") == NULL) // s24 w1 proto: internal slot is not enumerable
++		setPropertyWithFlags(app_context, transform, "__mc__", 6, &mc_val, PROPERTY_FLAGS_DONTENUM);
++	else
+ 	setProperty(app_context, transform, "__mc__", 6, &mc_val);
+ 
+ 	// Set up addProperty virtual getters/setters for each property
+ 	setAddProperty(app_context, transform, "matrix",                    6,  &g_transform_matrix_getter_func,      &g_transform_matrix_setter_func);
++	if (getenv("SWFR_NO_MCV8") == NULL) { // s24 w1 proto: Flash enum order (matrix, concatenatedMatrix, colorTransform, ...)
++	setAddProperty(app_context, transform, "concatenatedMatrix",       18,  &g_transform_concat_mat_getter_func,  NULL);
++	setAddProperty(app_context, transform, "colorTransform",           14,  &g_transform_ct_getter_func,          &g_transform_ct_setter_func);
++	} else {
+ 	setAddProperty(app_context, transform, "colorTransform",           14,  &g_transform_ct_getter_func,          &g_transform_ct_setter_func);
+ 	setAddProperty(app_context, transform, "concatenatedMatrix",       18,  &g_transform_concat_mat_getter_func,  NULL);
++	}
+ 	setAddProperty(app_context, transform, "concatenatedColorTransform", 26, &g_transform_concat_ct_getter_func,  NULL);
+ 	setAddProperty(app_context, transform, "pixelBounds",              11,  &g_transform_pix_bounds_getter_func,  NULL);
+ 
+@@ -10517,6 +10525,8 @@ static ActionVar transformConcatCTGetter(SWFAppContext* app_context, ActionVar*
+ 	return r;
+ }
+ 
++static double propToDouble(ASObject* obj, const char* name, u32 name_len);
++void actionCallMethod(SWFAppContext* app_context, char* str_buffer);
+ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+ {
+ 	(void)args; (void)arg_count; (void)registers;
+@@ -10533,6 +10543,54 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
+ 	double _pb_xmin_tw, _pb_ymin_tw, _pb_xmax_tw, _pb_ymax_tw;
+ 	int _pb_has = resolveMCDisplayList(mc, &_pb_dl, &_pb_dl_max)
+ 		&& ng_localBoundsOfDL(_pb_dl, _pb_dl_max, &_pb_xmin_tw, &_pb_ymin_tw, &_pb_xmax_tw, &_pb_ymax_tw);
++	if (getenv("SWFR_NO_PIXB") == NULL) {
++		// s24 w1 proto: Ruffle GET_PIXEL_BOUNDS == clip.getBounds() in world space.
++		// Reuse the full getBounds engine (drawing API, dynamic children, text).
++		ActionVar n_var = {0};
++		n_var.type = ACTION_STACK_VALUE_F32;
++		VAL(float, &n_var.data.numeric_value) = 0.0f;
++		pushVar(app_context, &n_var);
++		ActionVar mv = {0}; mv.type = ACTION_STACK_VALUE_MOVIECLIP; mv.data.numeric_value = (u64) mc;
++		pushVar(app_context, &mv);
++		PUSH_STR("getBounds", 9);
++		char _pb_sb[17];
++		actionCallMethod(app_context, _pb_sb);
++		ActionVar gb; popVar(app_context, &gb);
++		_pb_has = 0;
++		if (gb.type == ACTION_STACK_VALUE_OBJECT && gb.data.numeric_value) {
++			ASObject* bo = (ASObject*) gb.data.numeric_value;
++			double x0 = propToDouble(bo, "xMin", 4), x1 = propToDouble(bo, "xMax", 4);
++			double y0 = propToDouble(bo, "yMin", 4), y1 = propToDouble(bo, "yMax", 4);
++			if (!isnan(x0) && !isnan(y0) && !(x0 > 6710886.0 && x1 > 6710886.0)) {
++				_pb_xmin_tw = x0 * 20.0; _pb_xmax_tw = x1 * 20.0;
++				_pb_ymin_tw = y0 * 20.0; _pb_ymax_tw = y1 * 20.0;
++				_pb_has = 1;
++			}
++		}
++		// Union each live dynamic child's full bounds (recursive, via its own
++		// getBounds(mc)); the getBounds engine only folds a dynamic child's OWN
++		// drawing, missing grandchildren (MovieClip.as container.draw3).
++		{
++			extern MovieClip* child_mc_cache[]; extern int child_mc_count;
++			for (int ci = 0; ci < child_mc_count; ci++) {
++				MovieClip* c = child_mc_cache[ci];
++				if (!c || c->depth == INT_MIN || c->parent != mc) continue;
++				ActionVar a0 = mv; ActionVar one = {0}; one.type = ACTION_STACK_VALUE_F32; VAL(float,&one.data.numeric_value)=1.0f;
++				pushVar(app_context, &a0); pushVar(app_context, &one);
++				ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_MOVIECLIP; cv.data.numeric_value=(u64)c; pushVar(app_context,&cv);
++				PUSH_STR("getBounds", 9); actionCallMethod(app_context, _pb_sb);
++				ActionVar cb; popVar(app_context, &cb);
++				if (cb.type != ACTION_STACK_VALUE_OBJECT || !cb.data.numeric_value) continue;
++				ASObject* o = (ASObject*) cb.data.numeric_value;
++				double x0 = propToDouble(o,"xMin",4), y0 = propToDouble(o,"yMin",4);
++				double x1 = propToDouble(o,"xMax",4), y1 = propToDouble(o,"yMax",4);
++				if (isnan(x0) || isnan(y0) || (x0 > 6710886.0 && x1 > 6710886.0)) continue;
++				if (!_pb_has) { _pb_xmin_tw = x0*20; _pb_xmax_tw = x1*20; _pb_ymin_tw = y0*20; _pb_ymax_tw = y1*20; _pb_has = 1; continue; }
++				if (x0*20 < _pb_xmin_tw) _pb_xmin_tw = x0*20; if (x1*20 > _pb_xmax_tw) _pb_xmax_tw = x1*20;
++				if (y0*20 < _pb_ymin_tw) _pb_ymin_tw = y0*20; if (y1*20 > _pb_ymax_tw) _pb_ymax_tw = y1*20;
++			}
++		}
++	}
+ 	if (!_pb_has) {
+ 		if (mc->loaded_image_width > 0) {
+ 			// Image-loaded MC: return image dimensions as pixelBounds
+@@ -55094,6 +55152,11 @@ void actionSetMember(SWFAppContext* app_context)
+ 					// Numeric: truncate to byte, check valid range
+ 					double d = varToDouble(&value_var);
+ 					int idx = (int)d & 0xFF;
++					if (getenv("SWFR_NO_MCV8") == NULL) { // s24 w1 proto: f64 -> wrapping u8 (Ruffle f64_to_wrapping_u8)
++						double _t = isfinite(d) ? fmod(trunc(d), 256.0) : 0.0;
++						if (_t < 0) _t += 256.0;
++						idx = (int)_t;
++					}
+ 					if (idx >= 0 && idx <= 14) {
+ 						mc->blend_mode = (u8)idx;
+ 					}
+@@ -59570,6 +59633,10 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 		// (which yields undefined for unset values).
+ 		if (mc != NULL && g_swf_version >= 8 && prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
+ 		{
++			if (getenv("SWFR_NO_MCV8") == NULL && !flashGeomClassAvailable("Transform", 9)) { // s24 w1 proto
++				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
++				return;
++			}
+ 			ASObject* transform = createTransformObject(app_context, mc);
+ 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)transform);
+ 			return;
+@@ -64806,6 +64873,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 					// (Flash semantics — not half) at both endpoints with the current
+ 					// segment's thickness.
+ 					float h = ds->has_line ? ds->line_w : 0.0f;
++					if (g_swf_version >= 8 && getenv("SWFR_NO_MCV8") == NULL) h *= 0.5f; // s24 w1 proto: SWF8 half-thickness
+ 					if (ds->pen_set) {
+ 						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
+ 						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
+@@ -64824,6 +64892,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+ 					drawingEnsurePen(ds);   // implicit start at the origin
+ 					float h = ds->has_line ? ds->line_w : 0.0f;
++					if (g_swf_version >= 8 && getenv("SWFR_NO_MCV8") == NULL) h *= 0.5f; // s24 w1 proto: SWF8 half-thickness
+ 					if (ds->pen_set) {
+ 						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
+ 						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
+@@ -71559,10 +71628,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				u8 _am_saved_call_this_type = g_call_this_type;
+ 				if (_am_t2 && !_am_script)
+ 					g_call_this_type = ACTION_STACK_VALUE_ARRAY;
++				// s24 w1 proto: a native own-property method (`a.toString =
++				// Array.prototype.toString`) names itself through
++				// g_current_executing_func (builtin_array_method); publish it.
++				ASFunction* _am_prev_exec = g_current_executing_func;
++				if (_am_t2 && !_am_script && getenv("SWFR_NO_ARRNAT") == NULL)
++					g_current_executing_func = func;
+ 				g_call_depth++;
+ 				ActionVar result = invokeFunctionValue(app_context, func, &this_var,
+ 				                                       args, num_args, &opts);
+ 				g_call_depth--;
++				g_current_executing_func = _am_prev_exec;
+ 				g_call_this_type = _am_saved_call_this_type;
+ 
+ 				popSuperContext();
+@@ -76315,6 +76391,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				DrawingState* ds = getOrCreateDrawingState(mc);
+ 				drawingEnsurePen(ds);   // implicit start at the origin
+ 				float h = ds->has_line ? ds->line_w : 0.0f;
++				if (g_swf_version >= 8 && getenv("SWFR_NO_MCV8") == NULL) h *= 0.5f; // s24 w1 proto: SWF8 half-thickness
+ 				if (ds->pen_set) {
+ 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
+ 					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);
+@@ -76340,6 +76417,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				DrawingState* ds = getOrCreateDrawingState(mc);
+ 				drawingEnsurePen(ds);   // implicit start at the origin
+ 				float h = ds->has_line ? ds->line_w : 0.0f;
++				if (g_swf_version >= 8 && getenv("SWFR_NO_MCV8") == NULL) h *= 0.5f; // s24 w1 proto: SWF8 half-thickness
+ 				if (ds->pen_set) {
+ 					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
+ 					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index ef65c749..15105b41 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -10371,7 +10371,22 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
+ 
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+ 	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
+-	if (g_script_only_mode) return;
++	// s24 w1-attach-order PROTOTYPE: inside the attachMovie init replay, a child
++	// sprite's frame 1 runs AT its PlaceObject (Ruffle/Flash tag order), not after
++	// the attached clip's whole frame-1 script.
++	if (g_script_only_mode) {
++		extern MovieClip* g_attach_tagorder_parent;
++		if (g_attach_tagorder_parent != NULL && g_attach_init_active
++		    && depth <= max_depth && display_list[depth].char_id == char_id
++		    && display_list[depth].sprite_needs_init
++		    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
++		{
++			g_script_only_mode = 0;
++			process_sprite_init_at_depth(app_context, g_attach_tagorder_parent, depth);
++			g_script_only_mode = 1;
++		}
++		return;
++	}
+ 
+ 	// Button-state-change preservation: when ng_update_button_states_in_dl
+ 	// is re-running a state function and this (depth, char_id) matches the
+diff --git a/SWFModernRuntime/src/libswf/tag_stubs.c b/SWFModernRuntime/src/libswf/tag_stubs.c
+index 59299b38..39027eaf 100644
+--- a/SWFModernRuntime/src/libswf/tag_stubs.c
++++ b/SWFModernRuntime/src/libswf/tag_stubs.c
+@@ -215,6 +215,7 @@ typedef struct {
+ 	                        // non-root attachMovie (see aq_dispatch_pending_attach_init).
+ } PendingAttachInit;
+ 
++MovieClip* g_attach_tagorder_parent = NULL; // s24 w1-attach-order prototype
+ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* user)
+ {
+ 	PendingAttachInit* pai = (PendingAttachInit*) user;
+@@ -288,7 +289,10 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
+ 		ng_set_script_only_mode(1);
+ 		actionAttachInitEnter();
+ 		actionDeferredSpriteInitEnter();
++		MovieClip* _ato_saved = g_attach_tagorder_parent;
++		g_attach_tagorder_parent = (getenv("SWFR_NO_ATTACH_TAGORDER") == NULL) ? mc : NULL;
+ 		pai->func(app_context);
++		g_attach_tagorder_parent = _ato_saved;
+ 		actionDeferredSpriteInitLeave();
+ 		actionAttachInitLeave();
+ 		ng_set_script_only_mode(0);
