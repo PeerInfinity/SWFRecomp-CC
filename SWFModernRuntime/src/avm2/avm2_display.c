@@ -20629,6 +20629,9 @@ static Avm2Object* g_avm2_alpha_masker = NULL;
 // is skipped exactly once, for that object only — a descendant with its own
 // blendMode is untouched by it.
 static Avm2Object* g_avm2_blend_wrapped = NULL;
+// s25 layer groups: LAYER (2) groups currently open in an offscreen; ALPHA /
+// ERASE are only honoured when > 0 (twin of tag.c g_layer_group_depth).
+static int g_avm2_layer_group_depth = 0;
 
 static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
                                      Avm2DisplayObjectExt* ext,
@@ -20759,9 +20762,12 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 		uint8_t bm = ext->blend_mode_id;
 		// Alpha (11) / Erase (12) with no Layer above them are IGNORED by
 		// Flash — the draw is dropped entirely (ruffle
-		// render/wgpu/src/surface.rs:239-244). We have no layer groups, so
-		// "no layer above" is unconditionally true, exactly as in tag.c.
-		int blend_skip = (bm == 11 || bm == 12);
+		// render/wgpu/src/surface.rs:239-244, nearest_layer: only
+		// BlendMode::Layer opens a group). Inside a LAYER group they draw
+		// per draw with the dst*=a / dst*=1-a pipelines (s25 layer groups,
+		// the twin of tag.c's g_layer_group_depth).
+		int blend_skip = (bm == 11 || bm == 12)
+			&& g_avm2_layer_group_depth == 0;
 		// Filter and blend both want filter_tex_a, so a filtered node keeps
 		// the legacy per-draw blend pipeline (tag.c's `filter_type == 0`).
 		int blend_layered = !blend_skip && ext->filter_count == 0
@@ -20777,7 +20783,9 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 			renderer_suspend_pass(context);
 			renderer_capture_backdrop(context, bm);
 			renderer_begin_offscreen_pass(context);
+			if (bm == 2) g_avm2_layer_group_depth++;
 			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+			if (bm == 2) g_avm2_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
 			// The stencil reference is read from the context inside
@@ -20785,11 +20793,28 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 			renderer_composite_blend(context, bm,
 				renderer_clip_ref(context) > 0 ? 1 : 0);
 		}
+		else if ((bm == 11 || bm == 12 || (bm == 2 && ext->filter_count == 0))
+		         && renderer_begin_child_layer(context))
+		{
+			// s25 w2 exact layer groups (tag.c render_display_list twin): an
+			// ALPHA / ERASE node inside a group, or a LAYER nested in a
+			// filter/blend offscreen, renders into its own child layer and
+			// composites once (alpha/erase.wgsl, or premultiplied over).
+			if (bm == 2) g_avm2_layer_group_depth++;
+			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+			if (bm == 2) g_avm2_layer_group_depth--;
+			renderer_end_child_layer(context, bm);
+		}
 		else
 		{
+			// Per-draw fallback. A filtered LAYER node's filter offscreen IS
+			// its group, so ALPHA / ERASE descendants are honoured in it.
+			int filtered_layer = bm == 2 && ext->filter_count > 0;
+			if (filtered_layer) g_avm2_layer_group_depth++;
 			renderer_set_blend_mode(context, bm);
 			avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
 			renderer_set_blend_mode(context, 0);
+			if (filtered_layer) g_avm2_layer_group_depth--;
 		}
 		g_avm2_blend_wrapped = saved_blend;
 		return;

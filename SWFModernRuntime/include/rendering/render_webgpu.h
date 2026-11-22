@@ -393,6 +393,16 @@ typedef struct WebGPURenderContext
 	// s25 layer groups: per-draw ALPHA (11) / ERASE (12) inside a LAYER group
 	WGPURenderPipeline blend_alpha_pipeline;
 	WGPURenderPipeline blend_erase_pipeline;
+	// s25 w2 exact layer groups: a LIFO stack of child layers nested in the
+	// open offscreen (render_webgpu_begin/end_child_layer) and their
+	// composites (0 = ALPHA, 1 = ERASE, 2 = LAYER premultiplied over).
+	struct WebGPUChildLayerSet
+	{
+		WGPUTexture tex, msaa, ds;
+		WGPUTextureView view, msaa_view, ds_view;
+	} child_layers[4];
+	WGPURenderPipeline child_layer_pipeline[3];
+	int child_layer_open;              // levels currently open
 } WebGPURenderContext;
 
 // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should
@@ -531,6 +541,13 @@ int  render_webgpu_blend_mode_is_layered(WebGPURenderContext* context, u8 blend_
 void render_webgpu_capture_backdrop(WebGPURenderContext* context, u8 blend_mode);
 // Composite the layer in filter_tex_a into the resumed main pass.
 void render_webgpu_composite_blend(WebGPURenderContext* context, u8 blend_mode, u32 stencil_ref);
+// s25 w2: open a child layer nested in the current offscreen (returns 0 and
+// changes nothing when it cannot: the open offscreen is neither the outermost
+// one nor our innermost child layer, a padded filter capture, or the stack is
+// full); end_child_layer composites the innermost one into its parent
+// offscreen as ALPHA (11), ERASE (12) or premultiplied over (anything else).
+int  render_webgpu_begin_child_layer(WebGPURenderContext* context);
+void render_webgpu_end_child_layer(WebGPURenderContext* context, u8 blend_mode);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
 
 #ifdef OFFSCREEN_RENDER

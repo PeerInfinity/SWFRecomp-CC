@@ -5417,6 +5417,231 @@ void render_webgpu_composite_blend(WebGPURenderContext* ctx, u8 blend_mode, u32 
 	wgpuBindGroupRelease(bg);
 }
 
+// --- s25 w2 exact layer groups: a child layer NESTED in the open offscreen ---
+//
+// Flash/Ruffle apply ALPHA (11) / ERASE (12) to the child's OWN composite
+// (ruffle render/wgpu/src/surface.rs: the child is drawn into its own surface,
+// then shaders/blend/{alpha,erase}.wgsl writes `parent * src.a` /
+// `parent * (1 - src.a)` into the nearest LAYER, discarding where src.a == 0).
+// The per-draw pipelines (blend_alpha/erase_pipeline) match that only when the
+// child's draws do not overlap. begin_child_layer ends the open offscreen pass
+// (the LAYER group, or a filter/blend layer that a LAYER child sits in), swaps
+// a child texture set (child_layers[level]) in for filter_tex_a/msaa/ds and
+// opens a fresh cleared offscreen pass on it; end_child_layer closes it, swaps
+// back, resumes the parent offscreen with loadOp=Load and composites the child
+// layer with one fullscreen quad. Mode 2 (a LAYER nested in an offscreen) uses
+// premultiplied over. Up to CHILD_LAYER_MAX levels, each nested directly in
+// the previous one: when the open offscreen is not the outermost one or our
+// own innermost child layer, with a padded filter capture open, or with the
+// stack full, begin returns 0 and the caller keeps the per-draw model.
+#define CHILD_SWAP(T, a, b) do { T t_ = (a); (a) = (b); (b) = t_; } while (0)
+
+static const char* child_layer_wgsl =
+	"@group(0) @binding(0) var in_tex: texture_2d<f32>;\n"
+	"@group(0) @binding(1) var in_samp: sampler;\n"
+	"struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }\n"
+	"@vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {\n"
+	"  var positions = array<vec2f, 6>(\n"
+	"    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),\n"
+	"    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)\n"
+	"  );\n"
+	"  var uvs = array<vec2f, 6>(\n"
+	"    vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(0.0, 0.0),\n"
+	"    vec2f(0.0, 0.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0)\n"
+	"  );\n"
+	"  var out: VSOut;\n"
+	"  out.pos = vec4f(positions[vi], 0.0, 1.0);\n"
+	"  out.uv = uvs[vi];\n"
+	"  return out;\n"
+	"}\n"
+	// alpha.wgsl / erase.wgsl: `if (src.a > 0.0) { ... } else { discard; }`
+	"@fragment fn fs_alpha_erase(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"  let c = textureSample(in_tex, in_samp, uv);\n"
+	"  if (c.a <= 0.0) { discard; }\n"
+	"  return c;\n"
+	"}\n"
+	"@fragment fn fs_over(@location(0) uv: vec2f) -> @location(0) vec4f {\n"
+	"  return textureSample(in_tex, in_samp, uv);\n"
+	"}\n";
+
+#define CHILD_LAYER_MAX ((int) (sizeof(((WebGPURenderContext*)0)->child_layers) / sizeof(((WebGPURenderContext*)0)->child_layers[0])))
+
+static int ensure_child_layer_resources(WebGPURenderContext* ctx, int level)
+{
+	render_webgpu_ensure_filter_resources(ctx);
+	render_webgpu_ensure_blend_resources(ctx);
+	struct WebGPUChildLayerSet* cs = &ctx->child_layers[level];
+	if (cs->tex == NULL)
+	{
+		WGPUTextureDescriptor td = {0};
+		td.label = WGPU_LABEL("child_layer_tex");
+		td.dimension = WGPUTextureDimension_2D;
+		td.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
+		td.format = ctx->surface_format;
+		td.mipLevelCount = 1;
+		td.sampleCount = 1;
+		td.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding
+		         | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc;
+		cs->tex = wgpuDeviceCreateTexture(ctx->device, &td);
+		td.label = WGPU_LABEL("child_layer_msaa");
+		td.sampleCount = MSAA_SAMPLES;
+		td.usage = WGPUTextureUsage_RenderAttachment;
+		cs->msaa = wgpuDeviceCreateTexture(ctx->device, &td);
+		td.label = WGPU_LABEL("child_layer_ds");
+		td.format = WGPUTextureFormat_Depth24PlusStencil8;
+		cs->ds = wgpuDeviceCreateTexture(ctx->device, &td);
+		WGPUTextureViewDescriptor vd = {0};
+		vd.mipLevelCount = 1;
+		vd.arrayLayerCount = 1;
+		cs->view = wgpuTextureCreateView(cs->tex, &vd);
+		cs->msaa_view = wgpuTextureCreateView(cs->msaa, NULL);
+		cs->ds_view = wgpuTextureCreateView(cs->ds, &vd);
+	}
+	if (ctx->child_layer_pipeline[0] != NULL) return cs->view != NULL;
+
+	// Bindings 0/1 of composite_bgl (binding 2, the params buffer, is unused).
+	WGPUShaderModule sm = create_shader(ctx->device, child_layer_wgsl, "child_layer_shader");
+	WGPUColorTargetState ct = {0};
+	ct.format = ctx->surface_format;
+	ct.writeMask = WGPUColorWriteMask_All;
+	WGPUFragmentState fs = {0};
+	fs.module = sm;
+	fs.targetCount = 1;
+	fs.targets = &ct;
+	WGPUDepthStencilState ds = {0};
+	ds.format = WGPUTextureFormat_Depth24PlusStencil8;
+	ds.depthWriteEnabled = 0;
+	ds.depthCompare = WGPUCompareFunction_Always;
+	ds.stencilFront.compare = WGPUCompareFunction_Equal;
+	ds.stencilFront.failOp = WGPUStencilOperation_Keep;
+	ds.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+	ds.stencilFront.passOp = WGPUStencilOperation_Keep;
+	ds.stencilBack = ds.stencilFront;
+	ds.stencilReadMask = 0xFF;
+	ds.stencilWriteMask = 0x00;
+	WGPURenderPipelineDescriptor rpd = {0};
+	rpd.layout = ctx->composite_pipeline_layout;
+	rpd.vertex.module = sm;
+	rpd.vertex.entryPoint = WGPU_LABEL("vs_main");
+	rpd.fragment = &fs;
+	rpd.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+	rpd.multisample.count = MSAA_SAMPLES;
+	rpd.multisample.mask = 0xFFFFFFFF;
+	rpd.depthStencil = &ds;
+	for (int k = 0; k < 3; k++)
+	{
+		// 0 = ALPHA: dst *= src.a; 1 = ERASE: dst *= 1 - src.a (colour AND
+		// alpha); 2 = LAYER: premultiplied over.
+		WGPUBlendState bs = {0};
+		bs.color.srcFactor = k == 2 ? WGPUBlendFactor_One : WGPUBlendFactor_Zero;
+		bs.color.dstFactor = k == 0 ? WGPUBlendFactor_SrcAlpha : WGPUBlendFactor_OneMinusSrcAlpha;
+		bs.color.operation = WGPUBlendOperation_Add;
+		bs.alpha = bs.color;
+		ct.blend = &bs;
+		fs.entryPoint = k == 2 ? WGPU_LABEL("fs_over") : WGPU_LABEL("fs_alpha_erase");
+		rpd.label = WGPU_LABEL(k == 0 ? "child_layer_alpha" : k == 1 ? "child_layer_erase" : "child_layer_over");
+		ctx->child_layer_pipeline[k] = wgpuDeviceCreateRenderPipeline(ctx->device, &rpd);
+	}
+	wgpuShaderModuleRelease(sm);
+	return ctx->child_layer_pipeline[0] != NULL && cs->view != NULL;
+}
+
+// LIFO: level L's set holds the PARENT's textures while L is open.
+static void child_layer_swap(WebGPURenderContext* ctx, int level)
+{
+	struct WebGPUChildLayerSet* cs = &ctx->child_layers[level];
+	CHILD_SWAP(WGPUTexture, ctx->filter_tex_a, cs->tex);
+	CHILD_SWAP(WGPUTextureView, ctx->filter_view_a, cs->view);
+	CHILD_SWAP(WGPUTexture, ctx->filter_msaa_texture, cs->msaa);
+	CHILD_SWAP(WGPUTextureView, ctx->filter_msaa_view, cs->msaa_view);
+	CHILD_SWAP(WGPUTexture, ctx->filter_ds_texture, cs->ds);
+	CHILD_SWAP(WGPUTextureView, ctx->filter_ds_view, cs->ds_view);
+}
+
+int render_webgpu_begin_child_layer(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok || ctx->render_pass == NULL) return 0;
+	int level = ctx->child_layer_open;
+	// The open offscreen must be the outermost one or a child layer of ours:
+	// any other nesting (a filter/blend offscreen opened INSIDE a child layer)
+	// is not on this stack.
+	if (level >= CHILD_LAYER_MAX || ctx->offscreen_depth != 1 + level
+	    || ctx->filter_pad != 0) return 0;
+	if (!ensure_child_layer_resources(ctx, level)) return 0;
+	wgpuRenderPassEncoderEnd(ctx->render_pass);
+	wgpuRenderPassEncoderRelease(ctx->render_pass);
+	ctx->render_pass = NULL;
+	child_layer_swap(ctx, level);
+	int saved_pad_request = ctx->filter_pad_request;
+	ctx->filter_pad_request = 0;
+	render_webgpu_begin_offscreen_pass(ctx);   // clears; offscreen_depth -> 2; parks clip
+	ctx->filter_pad_request = saved_pad_request;
+	ctx->child_layer_open = level + 1;
+	return 1;
+}
+
+void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
+{
+	if (!ctx->renderer_ok || ctx->child_layer_open <= 0) return;
+	int level = --ctx->child_layer_open;
+	render_webgpu_end_offscreen_pass(ctx);      // offscreen_depth -> parent; un-parks clip
+	child_layer_swap(ctx, level);
+
+	// Resume the parent offscreen (its colour AND its stencil: begin_offscreen
+	// stores the stencil so a clip open around this child survives the break).
+	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#if MSAA_SAMPLES == 1
+	color_att.view = ctx->filter_view_a;
+	color_att.resolveTarget = NULL;
+#else
+	color_att.view = ctx->filter_msaa_view;
+	color_att.resolveTarget = ctx->filter_view_a;
+#endif
+	color_att.loadOp = WGPULoadOp_Load;
+	color_att.storeOp = WGPUStoreOp_Store;
+	WGPURenderPassDepthStencilAttachment ds_att = {0};
+	ds_att.view = ctx->filter_ds_view;
+	ds_att.depthLoadOp = WGPULoadOp_Clear;
+	ds_att.depthStoreOp = WGPUStoreOp_Discard;
+	ds_att.depthClearValue = 1.0f;
+	ds_att.stencilLoadOp = WGPULoadOp_Load;
+	ds_att.stencilStoreOp = WGPUStoreOp_Store;
+	WGPURenderPassDescriptor rp_desc = {0};
+	rp_desc.label = WGPU_LABEL("offscreen_pass_resume");
+	rp_desc.colorAttachmentCount = 1;
+	rp_desc.colorAttachments = &color_att;
+	rp_desc.depthStencilAttachment = &ds_att;
+	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+
+	int k = blend_mode == 11 ? 0 : blend_mode == 12 ? 1 : 2;
+	WGPUBindGroupEntry e[3] = {0};
+	e[0].binding = 0;
+	e[0].textureView = ctx->child_layers[level].view;   // swapped back: the child's layer
+	e[1].binding = 1;
+	e[1].sampler = ctx->filter_sampler;
+	e[2].binding = 2;
+	e[2].buffer = ctx->blend_params_buf;
+	e[2].size = 32;
+	WGPUBindGroupDescriptor bd = {0};
+	bd.layout = ctx->composite_bgl;
+	bd.entryCount = 3;
+	bd.entries = e;
+	WGPUBindGroup bg = wgpuDeviceCreateBindGroup(ctx->device, &bd);
+	if (bg != NULL && ctx->child_layer_pipeline[k] != NULL)
+	{
+		wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->child_layer_pipeline[k]);
+		wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, bg, 0, NULL);
+		wgpuRenderPassEncoderSetStencilReference(ctx->render_pass, ctx->mask_ref);
+		wgpuRenderPassEncoderDraw(ctx->render_pass, 6, 1, 0, 0);
+	}
+	if (bg != NULL) wgpuBindGroupRelease(bg);
+	restore_draw_pipeline(ctx);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+}
+
 static void pad_finish(WebGPURenderContext* ctx); // padded filter layer, below
 
 void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
@@ -5730,7 +5955,7 @@ void render_webgpu_begin_offscreen_pass(WebGPURenderContext* ctx)
 	ds_att.depthStoreOp = WGPUStoreOp_Discard;
 	ds_att.depthClearValue = 1.0f;
 	ds_att.stencilLoadOp = WGPULoadOp_Clear;
-	ds_att.stencilStoreOp = WGPUStoreOp_Discard;
+	ds_att.stencilStoreOp = WGPUStoreOp_Store;   // s25: end_child_layer reloads it
 	ds_att.stencilClearValue = 0;
 
 	WGPURenderPassDescriptor rp_desc = {0};
@@ -6583,6 +6808,18 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	if (ctx->blend_params_buf) wgpuBufferRelease(ctx->blend_params_buf);
 	if (ctx->filter_ds_view) wgpuTextureViewRelease(ctx->filter_ds_view);
 	if (ctx->filter_ds_texture) wgpuTextureRelease(ctx->filter_ds_texture);
+	for (int k = 0; k < 3; k++)
+		if (ctx->child_layer_pipeline[k]) wgpuRenderPipelineRelease(ctx->child_layer_pipeline[k]);
+	for (int k = 0; k < CHILD_LAYER_MAX; k++)
+	{
+		struct WebGPUChildLayerSet* cs = &ctx->child_layers[k];
+		if (cs->view) wgpuTextureViewRelease(cs->view);
+		if (cs->msaa_view) wgpuTextureViewRelease(cs->msaa_view);
+		if (cs->ds_view) wgpuTextureViewRelease(cs->ds_view);
+		if (cs->tex) wgpuTextureRelease(cs->tex);
+		if (cs->msaa) wgpuTextureRelease(cs->msaa);
+		if (cs->ds) wgpuTextureRelease(cs->ds);
+	}
 	if (ctx->compute_pipeline)
 		wgpuComputePipelineRelease(ctx->compute_pipeline);
 

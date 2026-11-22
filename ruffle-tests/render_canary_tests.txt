@@ -643,3 +643,12 @@ avm1/movieclip_line_gradient_style          # only translucent runtime stroke (b
 # gradient's texture row). The only corpus SWF with such a list.
 # tier=1
 from_shumway/acid/acid-morph                        # morph ramp row count       2 cmp
+# s25 w2-avm2-layer-groups: exact (nested child-layer) model + the AVM2 port. The
+# corpus rows above have single-shape children, where per-draw == exact; these see
+# the child's own composite (overlap), a LAYER nested in an ADD offscreen, and the
+# avm2_display.c arm. Analytic goldens, CONFIRMED by the Ruffle exporter (0ddd12b6a,
+# coordinator): 0 px differ on all four analytic fixtures; max 0 at tol 2.
+# tier=1
+regression/layer_group_overlap_alpha        # overlapping ALPHA child (exact)  1 cmp
+regression/layer_group_in_add_alpha         # LAYER inside ADD offscreen       1 cmp
+regression/avm2_layer_group_overlap_alpha   # AVM2 arm, overlapping ALPHA      1 cmp

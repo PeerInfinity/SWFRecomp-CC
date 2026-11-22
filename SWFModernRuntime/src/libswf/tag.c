@@ -4993,8 +4993,19 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			{
 				if (g_layer_group_depth == 0)
 					continue;
-				// s25 prototype: inside a LAYER group, multiply (alpha) or
-				// cut (erase) the group's offscreen by this subtree's alpha.
+				// s25 w2 exact model: the subtree renders into its OWN child
+				// layer, which then multiplies (alpha) or cuts (erase) the
+				// group once (ruffle alpha/erase.wgsl). Overlapping draws
+				// inside the child composite normally first.
+				if (renderer_begin_child_layer(context))
+				{
+					render_single_object(app_context, obj);
+					renderer_end_child_layer(context, obj->blend_mode);
+					continue;
+				}
+				// Fallback (the group is not the open offscreen, or a child
+				// layer is already open): s25 per-draw model, multiply (alpha)
+				// or cut (erase) the group's offscreen by each draw's alpha.
 				renderer_set_blend_mode(context, obj->blend_mode);
 				render_single_object(app_context, obj);
 				renderer_set_blend_mode(context, 0);
@@ -5013,6 +5024,18 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				renderer_resume_pass(context);
 				renderer_composite_blend(context, obj->blend_mode,
 					active_clip_depth > 0 ? 1 : 0);
+				continue;
+			}
+			// s25 w2: a LAYER nested in a filter/blend offscreen (where
+			// is_layered refuses) still isolates its subtree: one child layer
+			// in that offscreen, composited premultiplied-over.
+			if (obj->blend_mode == 2 && obj->filter_type == 0
+			    && renderer_begin_child_layer(context))
+			{
+				g_layer_group_depth++;
+				render_single_object(app_context, obj);
+				g_layer_group_depth--;
+				renderer_end_child_layer(context, 2);
 				continue;
 			}
 		}
@@ -5148,7 +5171,10 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		if (obj->filter_type != 0 && !g_clip_mask_capture
 		    && g_filter_capture_depth == 0)
 		{
+			// s25 w2: a filtered LAYER entry's filter offscreen IS its group.
+			if (obj->blend_mode == 2) g_layer_group_depth++;
 			render_filtered_object(app_context, obj);
+			if (obj->blend_mode == 2) g_layer_group_depth--;
 		}
 		else
 		switch (ch->type)
@@ -7733,7 +7759,10 @@ static void render_filtered_root_entry(SWFAppContext* app_context,
 		g_tf_filter_max_depth = max_depth_i;
 	}
 	g_filter_root_entry = 1;
+	// s25 w2: a filtered LAYER entry's filter offscreen IS its group.
+	if (obj->blend_mode == 2) g_layer_group_depth++;
 	render_filtered_object(app_context, obj);
+	if (obj->blend_mode == 2) g_layer_group_depth--;
 	g_filter_root_entry = 0;
 	if (tf) {
 		g_tf_filter_obj = NULL;

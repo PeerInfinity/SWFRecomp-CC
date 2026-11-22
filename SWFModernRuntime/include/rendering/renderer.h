@@ -74,6 +74,8 @@ typedef WebGPURenderContext RenderContext;
 #define renderer_blend_mode_is_layered(ctx, m)         render_webgpu_blend_mode_is_layered(ctx, m)
 #define renderer_capture_backdrop(ctx, m)              render_webgpu_capture_backdrop(ctx, m)
 #define renderer_composite_blend(ctx, m, sr)           render_webgpu_composite_blend(ctx, m, sr)
+#define renderer_begin_child_layer(ctx)                render_webgpu_begin_child_layer(ctx)
+#define renderer_end_child_layer(ctx, m)               render_webgpu_end_child_layer(ctx, m)
 
 #ifdef OFFSCREEN_RENDER
 #define renderer_request_capture(ctx)                  render_webgpu_request_capture(ctx)
@@ -138,5 +140,7 @@ typedef FlashbangContext RenderContext;
 #define renderer_blend_mode_is_layered(ctx, m)         (0)
 #define renderer_capture_backdrop(ctx, m)              ((void)0)
 #define renderer_composite_blend(ctx, m, sr)           ((void)0)
+#define renderer_begin_child_layer(ctx)                (0)
+#define renderer_end_child_layer(ctx, m)               ((void)0)
 
 #endif
