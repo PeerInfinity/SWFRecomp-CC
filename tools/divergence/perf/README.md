@@ -13,6 +13,8 @@ same SWF, in the same browser — to track down why Ruffle outperforms us in WAS
 | `n_ruffle_perf.py` | Drives `n_ruffle.html`, reads `__rufflePerf*`, reports tick/render/total mean·median·p90·p95·max. |
 | `n_swfrecomp_perf.py` | Same, against our deployed `docs2/demo.html?test=flasharchive/N&perfhud=1`, reading `__swfPerf`. |
 | `cdp_profile.py` | Chrome DevTools-Protocol sampling profile of either runtime, self-time by function. |
+| `n_ab_win.py` | **Real-GPU** (Windows `python.exe` via WSL interop) A/B sampler for N: drains every `__swfPerf` / `__rufflePerf*` sample, cuts the run into scene windows, and prints frame-CPU mean/median/p95, delivered fps and CPU duty (ms/s), with screenshots per window. Used for the s24 attached-pump A/B (`SWFRecompDocs/plans/session23-fanout-reports/browser-attached-timeline-report.md` §6). |
+| `n_cdp_win.py` | Real-GPU CDP sampling profile of our N build, **self + inclusive** per function (inclusive attributes pumps whose cost sits in callees). Note: binaryen inlines single-call-site functions, so their cost may show as the caller's self time (e.g. `runSWF`). |
 
 ## Build the profiling Ruffle bundle
 

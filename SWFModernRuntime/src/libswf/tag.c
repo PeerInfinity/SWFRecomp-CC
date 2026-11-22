@@ -2137,6 +2137,13 @@ static void ng_attached_run_tree(SWFAppContext* app_context, DisplayObject* obj,
 			if (obj->sprite_display_list == NULL || ds[k] > obj->sprite_max_depth) break;
 			DisplayObject* c = &obj->sprite_display_list[ds[k]];
 			if (c->char_id == 0) continue;
+			// Inert child: no child list and its own playhead won't move, so
+			// the recursive call would return without doing anything. Skip it
+			// before ng_attached_child_mc's O(child_mc_count) name lookup,
+			// which is pure.
+			if ((c->sprite_display_list == NULL || c->sprite_max_depth == 0)
+			    && (dictionary[c->char_id].sprite_frame_count <= 1 || !c->sprite_is_playing))
+				continue;
 			ng_attached_run_tree(app_context, c, depth_lvl + 1,
 			                     ng_attached_child_mc(self_mc, c->instance_name));
 		}
@@ -2200,6 +2207,17 @@ static void ng_sync_attach_registration(MovieClip* mc)
 	e->sprite_dl_capacity = d->sprite_dl_capacity;
 }
 
+// Pump root ordering key (a total order): newest place_seq first; equal seqs keep their
+// child_mc_cache scan order (what the old stable insertion sort produced).
+typedef struct { size_t seq; int idx; MovieClip* mc; } NgAttRoot;
+static int ng_att_root_cmp(const void* a, const void* b)
+{
+	const NgAttRoot* x = (const NgAttRoot*)a;
+	const NgAttRoot* y = (const NgAttRoot*)b;
+	if (x->seq != y->seq) return x->seq > y->seq ? -1 : 1;
+	return x->idx < y->idx ? -1 : (x->idx > y->idx);
+}
+
 void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 {
 	if (catch_up_mode) return;
@@ -2208,9 +2226,17 @@ void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 	// Collect the eligible attached roots, then run them newest-attached
 	// first (Ruffle avm1 clip_exec_list order; see ng_stamp_attach_seq).
 	// Their frame scripts are QUEUED, not run inline, so nothing this pass
-	// runs can create or remove another attached root.
+	// runs can create or remove another attached root (so the static
+	// buffer is never re-entered).
+	//
+	// Sorted over cached seqs (below). This was an insertion sort that
+	// dereferenced roots[k-1]->display_obj per step: child_mc_cache holds
+	// attached clips oldest-first, so every insert shifted the whole array.
+	// With N's ~900 attached tiles that was ~400k shifts, ~1.6 ms per tick
+	// on real-GPU Chrome (session23 browser-attached-timeline report,
+	// "Real-GPU perf A/B (N)").
 	#define NG_ATT_ROOT_CAP 1024
-	MovieClip* roots[NG_ATT_ROOT_CAP];
+	static NgAttRoot roots[NG_ATT_ROOT_CAP];
 	int nroots = 0;
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
@@ -2228,17 +2254,30 @@ void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 		if (nroots == NG_ATT_ROOT_CAP) { ng_attached_run_tree(app_context, obj, 0, mc); continue; }
-		size_t seq = obj->place_seq;
-		int k = nroots++;
-		while (k > 0 && ((DisplayObject*)roots[k - 1]->display_obj)->place_seq < seq) { roots[k] = roots[k - 1]; k--; }
-		roots[k] = mc;
+		roots[nroots].seq = obj->place_seq;
+		roots[nroots].idx = nroots;
+		roots[nroots].mc = mc;
+		nroots++;
+	}
+	// child_mc_cache is mostly oldest-first, so reverse, then insertion-sort
+	// by cached key: near-linear on this input. (musl's qsort smoothsort
+	// cost ~0.3 ms/tick on N here.) The key is a total order, so the result
+	// is the same as any correct sort.
+	for (int a = 0, b = nroots - 1; a < b; a++, b--) {
+		NgAttRoot t = roots[a]; roots[a] = roots[b]; roots[b] = t;
+	}
+	for (int i = 1; i < nroots; i++) {
+		NgAttRoot cur = roots[i];
+		int k = i;
+		while (k > 0 && ng_att_root_cmp(&roots[k - 1], &cur) > 0) { roots[k] = roots[k - 1]; k--; }
+		roots[k] = cur;
 	}
 	// Run each clip's natural timeline (frame tags + DoActions) and its
 	// nested children's, not just its counter. A stop()'d or 1-frame
 	// clip's own playhead stays put, but its children still play.
 	for (int k = 0; k < nroots; k++) {
-		ng_attached_run_tree(app_context, (DisplayObject*)roots[k]->display_obj, 0, roots[k]);
-		ng_sync_attach_registration(roots[k]);
+		ng_attached_run_tree(app_context, (DisplayObject*)roots[k].mc->display_obj, 0, roots[k].mc);
+		ng_sync_attach_registration(roots[k].mc);
 	}
 	#undef NG_ATT_ROOT_CAP
 }
