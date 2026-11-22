@@ -32,12 +32,12 @@ handshake sent).
 | (landed direct) w1-drift-avm2 prototype | w1-drift-avm2 | trace `pixelbender_shaderjob_output_channels`, `textblock_recreate_text_line_width` (+2) | — |
 | (landed direct) w1-pixel-blend-mask prototype | w1-pixel-blend-mask 1+2 | px `layer_alpha`, `layer_erase`, `bitmapdata_colortransform` (+3) | — |
 | (landed direct) w1-pixel-text prototype | w1-pixel-text A+B | px `edittext_device_transform_basic`, `edittext_device_transform_negative`, `edittext_gutter` (+3) | — |
-| w2-avm1-filters | w1-avm1-filters-complete 1+2+3a+4 (+XS side bugs) | 0 corpus; new `regression/avm1_runtime_filters_cm_bitmap`, `avm1_nested_po3_filters` | |
-| w2-dynclip-cxform | w1-avm1-filters-complete 5+3b | 0 corpus expected; new `regression/avm1_dynclip_color_transform` | |
-| w2-acid-text-kerning | w1-pixel-text C | px `acid-text` (likely, unmeasured) | |
-| w2-netstream-flv-screen | w1-pixel-blend-mask L1 | px `netstream_play_flv_screen` (possible; ignored row → prune) | |
-| w2-avm2-layer-groups | w1-pixel-blend-mask L4+L5 | 0 corpus; fixtures | |
-| w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | |
+| w2-avm1-filters | w1-avm1-filters-complete 1+2+3a+4 (+XS side bugs) | 0 corpus; new `regression/avm1_runtime_filters_cm_bitmap`, `avm1_nested_po3_filters` | session_018CoDi6SmBg5ngKPi9f1Fi1 |
+| w2-dynclip-cxform | w1-avm1-filters-complete 5+3b | 0 corpus expected; new `regression/avm1_dynclip_color_transform` | session_018CoDi86KRFXMH7buLiVYv9 |
+| w2-acid-text-kerning | w1-pixel-text C | px `acid-text` (likely, unmeasured) | session_018CoDi5bPZfEpmUKXk6hibE |
+| w2-netstream-flv-screen | w1-pixel-blend-mask L1 | px `netstream_play_flv_screen` (possible; ignored row → prune) | session_018CoDi3Vyahsk5YixoaurwN |
+| w2-avm2-layer-groups | w1-pixel-blend-mask L4+L5 | 0 corpus; fixtures | session_018CoDi4yHAmxMG1pYf1JQnB |
+| w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | session_018CoDi5kNpLqLbTbXGooXKw |
 
 ## Grading runs
 
