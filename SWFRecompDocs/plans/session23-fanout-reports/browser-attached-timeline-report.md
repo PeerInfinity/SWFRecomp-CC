@@ -77,6 +77,11 @@ The work found three more browser blockers and two CI-mode bugs in the shared pu
   - **Doodle Jump:** the game the root-attach guard was written for. The menu still animates after 18 s (no hang). Gameplay spawns platforms; platform clips (`cloud`, 4 frames) stay on their gotoAndStop'd type. No errors.
   - **N:** two regressions found and fixed (§3: tileMC gotoAndStop, hidden inputBox fields). The menu matches the Ruffle exporter frames, and the demo levels cycle. No `bar` / 4096-cap explosion, the v1 hazard.
 
+- **CI** at `161ecf124`, `categories=all`:
+  - graphics `44960857582` and no-graphics `44960860384`: both `success`, WASM link-smoke included.
+  - `corpus_status_diff` over the 4646-row intersection: **0 gains, 0 regressions, 0 status moves** in both modes. Graphics effective 4584; no-graphics 4583 (the `audio/aac` mode gap).
+  - The 4 new `regression/avm1_attached_clip_*` rows pass in both modes (regression 108/108).
+
 ## 5. Left open / next slice
 
 1. **Attach-tick frame-1 tag order** (§1, s24 board).
