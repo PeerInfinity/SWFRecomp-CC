@@ -3501,6 +3501,7 @@ static ActionVar builtin_return_zero(SWFAppContext* app_context, ActionVar* args
 // --- NetConnection connect/close implementation ---
 
 static ActionVar makeStringActionVar(SWFAppContext* app_context, const char* str, u32 len);
+static void tf_ps_drop(MovieClip* mc); // s25 span model (see TFPlainSpans)
 static ASFunction g_nc_connect_func;
 static ASFunction g_nc_close_func;
 
@@ -22863,6 +22864,7 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	// Inherit SWF version from parent; overridden by loadMovie
 	mc->swf_version = parent ? parent->swf_version : (u16)g_swf_version;
 	mc->ng_textfield_idx = -1;
+	tf_ps_drop(mc); // a recycled address must not inherit a dead field's spans
 	// Color transform defaults for dynamic MCs
 	mc->cx_ra = 100.0f; mc->cx_ga = 100.0f; mc->cx_ba = 100.0f; mc->cx_aa = 100.0f;
 
@@ -29018,6 +29020,595 @@ static void tf_condense_white(TFRunTable* table, int swf_version) {
 	(void)table; (void)swf_version;
 }
 // (was: #endif — inner TF helpers)
+
+// =============================================
+// s25 w2-edittext-span-model: AVM1 per-character format span model (PSM)
+// =============================================
+// Flash keeps, for EVERY TextField (plain or HTML), a list of per-character
+// format spans plus a "new text format" (Ruffle html/text_format.rs
+// FormatSpans: spans + default_format). The HTML path already has that in
+// TFRunTable; a plain field had none, so setTextFormat on a plain field was
+// invisible to getTextFormat(i) and setNewTextFormat to getNewTextFormat.
+// This side table is the AVM1-observable model for the character-level
+// properties (size, color, font, bold, italic, underline). It does NOT feed
+// the renderer (field-wide _tf_* bookkeeping is unchanged), so it moves no
+// pixels; the renderer can consume it later.
+//
+// Rules (Flash output.txt of avm1/edittext_set_text_same{,_after_edits};
+// Ruffle edit_text.rs set_text / set_html_text, avm1 text_field.rs):
+//   text = s        same text and no force -> no-op (spans kept); else one
+//                   span of the new text format. The force flag is consumed.
+//   setNewTextFormat  merge into the new text format; force the next
+//                   text/htmlText assignment (Ruffle force_next_text_update).
+//   setTextFormat   format the range's spans; flags untouched.
+//   textColor = c   recolor every span and the new text format.
+//   replaceText(a,b,s)  new text format := format of the char at a (last
+//                   char when a == length); [a,b) becomes s in that format.
+//   replaceSel(s)   s == "" is a no-op. Otherwise s is inserted at the
+//                   selection in the new text format, the new text format
+//                   becomes the format of the char after the caret, and every
+//                   later same-text assignment re-formats (Flash lines 66/98 of
+//                   _after_edits; Ruffle does neither) until the text changes.
+typedef struct {
+	double size;        // px
+	u32 color;
+	char font[64];
+	s8 bold, italic, underline;
+} TFPSFmt;
+typedef struct { u32 len; TFPSFmt f; } TFPSSpan;
+#define TF_PS_MAX_SPANS  64
+#define TF_PS_MAX_TABLES 64
+typedef struct {
+	MovieClip* mc;
+	u32 stamp;
+	u8 has_spans;    // spans[] describe props.text (else: uniform field base)
+	u8 force_next;   // setNewTextFormat: next text/htmlText assignment applies
+	u8 edit_sticky;  // replaceSel(non-empty): same-text assignments re-format
+	u8 newfmt_set;   // newfmt changed from the field base (HTML defaults follow it)
+	TFPSFmt newfmt;
+	u32 span_count;
+	TFPSSpan spans[TF_PS_MAX_SPANS];
+} TFPlainSpans;
+static TFPlainSpans g_tf_ps_tables[TF_PS_MAX_TABLES];
+static u32 g_tf_ps_stamp;
+
+static TFPlainSpans* tf_ps_find(MovieClip* mc)
+{
+	if (mc == NULL) return NULL;
+	for (int i = 0; i < TF_PS_MAX_TABLES; i++)
+		if (g_tf_ps_tables[i].mc == mc) { g_tf_ps_tables[i].stamp = ++g_tf_ps_stamp; return &g_tf_ps_tables[i]; }
+	return NULL;
+}
+
+// Read the character-level properties of a TextFormat object into a record
+// (only properties present with the right type are taken).
+static void tf_ps_merge_from_obj(TFPSFmt* f, ASObject* o)
+{
+	if (o == NULL) return;
+	ActionVar* p = getProperty(o, "size", 4);
+	if (p != NULL && p->type == ACTION_STACK_VALUE_F64) {
+		double v; memcpy(&v, &p->data.numeric_value, sizeof(double));
+		if (!isnan(v) && !isinf(v)) f->size = v;
+	}
+	p = getProperty(o, "color", 5);
+	if (p != NULL && p->type == ACTION_STACK_VALUE_F64) {
+		double v; memcpy(&v, &p->data.numeric_value, sizeof(double));
+		f->color = (u32)ecmaToInt32(v) & 0x00FFFFFF;
+	}
+	p = getProperty(o, "font", 4);
+	if (p != NULL && p->type == ACTION_STACK_VALUE_STRING) {
+		size_t n = u16_to_utf8(varGetU16Ptr(p), p->str_size, f->font, sizeof(f->font));
+		f->font[n < sizeof(f->font) - 1 ? n : sizeof(f->font) - 1] = '\0';
+	}
+	p = getProperty(o, "bold", 4);
+	if (p != NULL && p->type == ACTION_STACK_VALUE_BOOLEAN) f->bold = p->data.numeric_value ? 1 : 0;
+	p = getProperty(o, "italic", 6);
+	if (p != NULL && p->type == ACTION_STACK_VALUE_BOOLEAN) f->italic = p->data.numeric_value ? 1 : 0;
+	p = getProperty(o, "underline", 9);
+	if (p != NULL && p->type == ACTION_STACK_VALUE_BOOLEAN) f->underline = p->data.numeric_value ? 1 : 0;
+}
+
+static void tf_ps_from_run(TFPSFmt* f, const TFRun* r)
+{
+	f->size = (double)(r->font_height / 20);
+	f->color = r->color & 0x00FFFFFF;
+	strncpy(f->font, r->font_name, sizeof(f->font) - 1);
+	f->font[sizeof(f->font) - 1] = '\0';
+	f->bold = r->bold; f->italic = r->italic; f->underline = r->underline;
+}
+
+// Apply a record to an HTML run (the new text format is the default of a
+// re-parse / text reset of an HTML field).
+static void tf_ps_to_run(const TFPSFmt* f, TFRun* r)
+{
+	if (f->size > 0) r->font_height = (s16)(f->size * 20);
+	r->color = f->color & 0x00FFFFFF;
+	if (f->font[0] != '\0') { strncpy(r->font_name, f->font, 63); r->font_name[63] = '\0'; }
+	r->bold = (u8)f->bold; r->italic = (u8)f->italic; r->underline = (u8)f->underline;
+}
+
+static int tf_ps_fmt_eq(const TFPSFmt* a, const TFPSFmt* b)
+{
+	return a->size == b->size && a->color == b->color && a->bold == b->bold &&
+	       a->italic == b->italic && a->underline == b->underline && strcmp(a->font, b->font) == 0;
+}
+
+static u32 tf_ps_text_len(MovieClip* mc)
+{
+	if (mc->dynamic_props == NULL) return 0;
+	ActionVar* t = getProperty((ASObject*)mc->dynamic_props, "text", 4);
+	return (t != NULL && t->type == ACTION_STACK_VALUE_STRING) ? t->str_size : 0;
+}
+
+// The field's base character format: what the pre-PSM getNewTextFormat /
+// getTextFormat return for an unformatted field (tag/createTextField
+// defaults + textColor).
+static void tf_ps_base_fmt(SWFAppContext* app_context, MovieClip* mc, TFPSFmt* f)
+{
+	memset(f, 0, sizeof(*f));
+	f->size = 12;
+	strcpy(f->font, "Times New Roman");
+	ASObject* tf = createTextFormatFromField(app_context, mc->ng_textfield_idx, 1, 1, -1);
+	tf_ps_merge_from_obj(f, tf);
+	if (mc->dynamic_props != NULL) {
+		ActionVar* tc = getProperty((ASObject*)mc->dynamic_props, "textColor", 9);
+		if (tc != NULL && tc->type == ACTION_STACK_VALUE_F64) {
+			double v; memcpy(&v, &tc->data.numeric_value, sizeof(double));
+			f->color = (u32)v & 0x00FFFFFF;
+		}
+	}
+}
+
+static TFPlainSpans* tf_ps_get(SWFAppContext* app_context, MovieClip* mc)
+{
+	TFPlainSpans* ps = tf_ps_find(mc);
+	if (ps != NULL) return ps;
+	int slot = -1;
+	for (int i = 0; i < TF_PS_MAX_TABLES; i++)
+		if (g_tf_ps_tables[i].mc == NULL) { slot = i; break; }
+	if (slot < 0) {   // evict the least recently used
+		slot = 0;
+		for (int i = 1; i < TF_PS_MAX_TABLES; i++)
+			if (g_tf_ps_tables[i].stamp < g_tf_ps_tables[slot].stamp) slot = i;
+	}
+	ps = &g_tf_ps_tables[slot];
+	memset(ps, 0, sizeof(*ps));
+	ps->mc = mc;
+	ps->stamp = ++g_tf_ps_stamp;
+	tf_ps_base_fmt(app_context, mc, &ps->newfmt);
+	return ps;
+}
+
+// Forget a field's spans (its clip is gone or became a different field).
+static void tf_ps_drop(MovieClip* mc)
+{
+	TFPlainSpans* ps = tf_ps_find(mc);
+	if (ps != NULL) memset(ps, 0, sizeof(*ps));
+}
+
+static void tf_ps_reset_spans(TFPlainSpans* ps, u32 len, const TFPSFmt* f)
+{
+	ps->has_spans = 1;
+	ps->span_count = 0;
+	if (len > 0) { ps->spans[0].len = len; ps->spans[0].f = *f; ps->span_count = 1; }
+}
+
+// Make spans[] describe the current text: seeded with the base format, and
+// re-fitted when the text changed through a path the model does not see
+// (keyboard input, variable binding): extra chars take the last span.
+static void tf_ps_ensure_spans(SWFAppContext* app_context, MovieClip* mc, TFPlainSpans* ps)
+{
+	u32 len = tf_ps_text_len(mc);
+	if (!ps->has_spans) {
+		TFPSFmt base; tf_ps_base_fmt(app_context, mc, &base);
+		tf_ps_reset_spans(ps, len, &base);
+		return;
+	}
+	u32 total = 0;
+	for (u32 i = 0; i < ps->span_count; i++) total += ps->spans[i].len;
+	if (total == len) return;
+	if (total < len) {
+		if (ps->span_count == 0) { tf_ps_reset_spans(ps, len, &ps->newfmt); return; }
+		ps->spans[ps->span_count - 1].len += len - total;
+	} else {
+		u32 acc = 0, n = 0;
+		for (; n < ps->span_count && acc < len; n++) {
+			if (acc + ps->spans[n].len > len) ps->spans[n].len = len - acc;
+			acc += ps->spans[n].len;
+		}
+		ps->span_count = n;
+	}
+}
+
+// Merge equal neighbours and drop empty spans (FormatSpans::normalize).
+static void tf_ps_normalize(TFPlainSpans* ps)
+{
+	u32 o = 0;
+	for (u32 i = 0; i < ps->span_count; i++) {
+		if (ps->spans[i].len == 0) continue;
+		if (o > 0 && tf_ps_fmt_eq(&ps->spans[o - 1].f, &ps->spans[i].f)) { ps->spans[o - 1].len += ps->spans[i].len; continue; }
+		ps->spans[o++] = ps->spans[i];
+	}
+	ps->span_count = o;
+}
+
+// Split so a span boundary falls at pos; returns the index of the span that
+// starts at pos (span_count when pos is the end).
+static u32 tf_ps_split_at(TFPlainSpans* ps, u32 pos)
+{
+	u32 acc = 0;
+	for (u32 i = 0; i < ps->span_count; i++) {
+		if (acc == pos) return i;
+		if (pos < acc + ps->spans[i].len) {
+			if (ps->span_count >= TF_PS_MAX_SPANS) return i + 1; // full: coarse boundary
+			memmove(&ps->spans[i + 2], &ps->spans[i + 1], (ps->span_count - i - 1) * sizeof(TFPSSpan));
+			ps->spans[i + 1] = ps->spans[i];
+			ps->spans[i + 1].len = acc + ps->spans[i].len - pos;
+			ps->spans[i].len = pos - acc;
+			ps->span_count++;
+			return i + 1;
+		}
+		acc += ps->spans[i].len;
+	}
+	return ps->span_count;
+}
+
+static const TFPSFmt* tf_ps_fmt_at(TFPlainSpans* ps, u32 pos)
+{
+	u32 acc = 0;
+	for (u32 i = 0; i < ps->span_count; i++) {
+		if (pos < acc + ps->spans[i].len) return &ps->spans[i].f;
+		acc += ps->spans[i].len;
+	}
+	return NULL;
+}
+
+// Replace [from, to) (clamped by the caller) by `ins` chars of format f.
+static void tf_ps_replace(TFPlainSpans* ps, u32 from, u32 to, u32 ins, const TFPSFmt* f)
+{
+	u32 a = tf_ps_split_at(ps, from);
+	u32 b = tf_ps_split_at(ps, to);
+	if (b < a) b = a;
+	memmove(&ps->spans[a], &ps->spans[b], (ps->span_count - b) * sizeof(TFPSSpan));
+	ps->span_count -= (b - a);
+	if (ins > 0 && ps->span_count < TF_PS_MAX_SPANS) {
+		memmove(&ps->spans[a + 1], &ps->spans[a], (ps->span_count - a) * sizeof(TFPSSpan));
+		ps->spans[a].len = ins;
+		ps->spans[a].f = *f;
+		ps->span_count++;
+	} else if (ins > 0 && a > 0) {
+		ps->spans[a - 1].len += ins;
+	}
+	tf_ps_normalize(ps);
+}
+
+// setTextFormat on a field without an HTML run table.
+static void tf_ps_set_text_format(SWFAppContext* app_context, MovieClip* mc, u32 begin, u32 end, ASObject* fmt)
+{
+	TFPlainSpans* ps = tf_ps_get(app_context, mc);
+	tf_ps_ensure_spans(app_context, mc, ps);
+	u32 len = tf_ps_text_len(mc);
+	if (end > len) end = len;
+	if (begin >= end) return;
+	u32 a = tf_ps_split_at(ps, begin);
+	u32 b = tf_ps_split_at(ps, end);
+	for (u32 i = a; i < b && i < ps->span_count; i++) {
+		TFPSFmt* f = &ps->spans[i].f;
+		double old_size = f->size;
+		tf_ps_merge_from_obj(f, fmt);
+		if (!(f->size > 0)) f->size = old_size;   // size must stay positive
+	}
+	tf_ps_normalize(ps);
+}
+
+static void tf_ps_set_new_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* fmt)
+{
+	TFPlainSpans* ps = tf_ps_get(app_context, mc);
+	double old_size = ps->newfmt.size;
+	tf_ps_merge_from_obj(&ps->newfmt, fmt);
+	if (!(ps->newfmt.size > 0)) ps->newfmt.size = old_size;
+	ps->force_next = 1;
+	ps->newfmt_set = 1;
+}
+
+static void tf_ps_set_text_color(SWFAppContext* app_context, MovieClip* mc, u32 color)
+{
+	TFPlainSpans* ps = tf_ps_get(app_context, mc);
+	tf_ps_ensure_spans(app_context, mc, ps);
+	for (u32 i = 0; i < ps->span_count; i++) ps->spans[i].f.color = color & 0x00FFFFFF;
+	ps->newfmt.color = color & 0x00FFFFFF;
+	ps->newfmt_set = 1;
+	tf_ps_normalize(ps);
+}
+
+// text / htmlText assignment. Returns 1 when the assignment is a format no-op
+// (same text, not forced): spans and any HTML run table must be kept.
+static int tf_ps_text_assign(MovieClip* mc, const ActionVar* value)
+{
+	TFPlainSpans* ps = tf_ps_find(mc);
+	int force = 0, sticky = 0;
+	if (ps != NULL) { force = ps->force_next; sticky = ps->edit_sticky; ps->force_next = 0; }
+	int equal = 0;
+	if (mc->dynamic_props != NULL && value->type == ACTION_STACK_VALUE_STRING) {
+		ActionVar* t = getProperty((ASObject*)mc->dynamic_props, "text", 4);
+		if (t != NULL && t->type == ACTION_STACK_VALUE_STRING && t->str_size == value->str_size) {
+			const uint16_t* a = varGetU16Ptr(t);
+			const uint16_t* b = varGetU16Ptr((ActionVar*)value);
+			equal = (t->str_size == 0) || (a != NULL && b != NULL &&
+				memcmp(a, b, t->str_size * sizeof(uint16_t)) == 0);
+		}
+	}
+	int same = equal && !force && !sticky;
+	if (ps != NULL && !same) {
+		u32 len = (value->type == ACTION_STACK_VALUE_STRING) ? value->str_size : 0;
+		tf_ps_reset_spans(ps, len, &ps->newfmt);
+		if (!equal) ps->edit_sticky = 0;
+	}
+	return same;
+}
+
+// htmlText assignment on an HTML field whose run table exists: no-op when the
+// value equals the current serialization and no force is pending (Ruffle
+// set_html_text). Consumes the force flag.
+static int tf_ps_html_assign_same(MovieClip* mc, TFRunTable* table, int ser_mode, const ActionVar* value)
+{
+	TFPlainSpans* ps = tf_ps_find(mc);
+	int force = 0;
+	if (ps != NULL) { force = ps->force_next; ps->force_next = 0; }
+	if (force || table == NULL || value->type != ACTION_STACK_VALUE_STRING) return 0;
+	char* cur = tf_serialize_html(table, ser_mode);
+	if (cur == NULL) return 0;
+	char buf[16384];
+	const uint16_t* u = varGetU16Ptr((ActionVar*)value);
+	size_t n = (u != NULL && value->str_size > 0) ? u16_to_utf8(u, value->str_size, buf, sizeof(buf)) : 0;
+	buf[n < sizeof(buf) - 1 ? n : sizeof(buf) - 1] = '\0';
+	int same = strcmp(cur, buf) == 0;
+	free(cur);
+	return same;
+}
+
+// HTML runs: the format of plain character `pos` (UTF-16 index as `text`
+// reports it), for replaceText's new-text-format rule.
+static int tf_table_plain_to_byte(TFRunTable* table, u32 pos, int is_multiline, u32* out_byte);
+static TFRun* tf_table_run_at_plain(TFRunTable* table, u32 pos, int is_multiline)
+{
+	u32 bi;
+	if (!tf_table_plain_to_byte(table, pos, is_multiline, &bi)) return NULL;
+	for (u32 i = 0; i < table->run_count; i++) {
+		TFRun* r = &table->runs[i];
+		if (r->length > 0 && bi >= r->start && bi < r->start + r->length) return r;
+	}
+	return NULL;
+}
+
+// Map a plain-text index (UTF-16 units of tf_get_plain_text's output) to a
+// byte offset in table->text. Returns 0 when pos is past the end (then
+// *out_byte = text_len).
+static int tf_table_plain_to_byte(TFRunTable* table, u32 pos, int is_multiline, u32* out_byte)
+{
+	int cw8_space = (!is_multiline && table->condense_white && table->swf_version >= 8);
+	u32 pi = 0;
+	int last_space = 0;
+	for (u32 i = 0; i < table->text_len; ) {
+		unsigned char c = (unsigned char)table->text[i];
+		u32 units, bytes;
+		if (c == '\n') { units = 1; bytes = 1; last_space = 0; }
+		else if (c == (unsigned char)SENTINEL_TAG_BREAK || c == (unsigned char)SENTINEL_BR_BREAK) {
+			bytes = 1;
+			if (is_multiline || table->swf_version <= 6) units = 1;
+			else if (cw8_space && pi > 0 && !last_space) units = 1;
+			else units = 0;
+			last_space = (units == 1 && cw8_space && !(is_multiline || table->swf_version <= 6));
+		} else {
+			bytes = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+			units = bytes == 4 ? 2 : 1;
+			last_space = (c == ' ');
+		}
+		if (units > 0 && pi == pos) { *out_byte = i; return 1; }
+		pi += units;
+		i += bytes;
+		if (pi > pos) { *out_byte = i; return 1; }
+	}
+	*out_byte = table->text_len;
+	return 0;
+}
+
+// replaceText / replaceSel on an HTML run table: replace plain [from, to)
+// with utf8 `ins`, which takes the run format `fmt` when given (else the
+// format of the run it lands in).
+static void tf_table_replace(TFRunTable* table, u32 from, u32 to, const char* ins, u32 ins_len,
+                             int is_multiline, const TFPSFmt* fmt)
+{
+	u32 bf, bt;
+	tf_table_plain_to_byte(table, from, is_multiline, &bf);
+	tf_table_plain_to_byte(table, to, is_multiline, &bt);
+	if (bt < bf) bt = bf;
+	u32 del = bt - bf;
+	if (table->text_len - del + ins_len >= sizeof(table->text)) return;
+	// Template run for the inserted bytes.
+	TFRun tmpl; int have_tmpl = 0;
+	for (u32 i = 0; i < table->run_count && !have_tmpl; i++) {
+		TFRun* r = &table->runs[i];
+		if (r->length > 0 && bf >= r->start && bf < r->start + r->length) { tmpl = *r; have_tmpl = 1; }
+	}
+	for (u32 i = table->run_count; i > 0 && !have_tmpl; i--) {
+		TFRun* r = &table->runs[i - 1];
+		if (r->length > 0 && r->start + r->length <= bf) { tmpl = *r; have_tmpl = 1; }
+	}
+	if (!have_tmpl) {
+		if (table->run_count == 0) return;
+		tmpl = table->runs[0];
+	}
+	if (fmt != NULL) tf_ps_to_run(fmt, &tmpl);
+	// Text bytes ('\r' is stored as a content newline).
+	memmove(&table->text[bf + ins_len], &table->text[bt], table->text_len - bt);
+	for (u32 k = 0; k < ins_len; k++) table->text[bf + k] = (ins[k] == '\r') ? '\n' : ins[k];
+	table->text_len = table->text_len - del + ins_len;
+	table->text[table->text_len] = '\0';
+	// Runs: cut [bf, bt), shift the tail by ins_len - del, insert one run.
+	TFRun out[TF_MAX_RUNS]; u32 on = 0; int inserted = 0;
+	for (u32 i = 0; i < table->run_count; i++) {
+		TFRun r = table->runs[i];
+		u32 rs = r.start, re = r.start + r.length;
+		if (r.length == 0) {
+			if (rs >= bt) r.start = rs - del + ins_len;
+			else if (rs > bf) r.start = bf;
+			if (on < TF_MAX_RUNS) out[on++] = r;
+			continue;
+		}
+		if (!inserted && rs >= bf && ins_len > 0 && on < TF_MAX_RUNS) {
+			out[on] = tmpl; out[on].start = bf; out[on].length = ins_len; on++; inserted = 1;
+		}
+		if (re <= bf) { if (on < TF_MAX_RUNS) out[on++] = r; continue; }
+		if (rs >= bt) { r.start = rs - del + ins_len; if (on < TF_MAX_RUNS) out[on++] = r; continue; }
+		// Overlaps the cut: keep the head and/or the tail.
+		if (rs < bf) {
+			TFRun h = r; h.length = bf - rs;
+			if (on < TF_MAX_RUNS) out[on++] = h;
+			if (!inserted && ins_len > 0 && on < TF_MAX_RUNS) {
+				out[on] = tmpl; out[on].start = bf; out[on].length = ins_len; on++; inserted = 1;
+			}
+		}
+		if (re > bt) {
+			if (!inserted && ins_len > 0 && on < TF_MAX_RUNS) {
+				out[on] = tmpl; out[on].start = bf; out[on].length = ins_len; on++; inserted = 1;
+			}
+			TFRun t = r; t.start = bf + ins_len; t.length = re - bt;
+			if (on < TF_MAX_RUNS) out[on++] = t;
+		}
+	}
+	if (!inserted && ins_len > 0 && on < TF_MAX_RUNS) {
+		out[on] = tmpl; out[on].start = bf; out[on].length = ins_len; on++;
+	}
+	memcpy(table->runs, out, on * sizeof(TFRun));
+	table->run_count = on;
+}
+
+static int tf_ps_is_multiline(MovieClip* mc)
+{
+	if (mc->dynamic_props == NULL) return 0;
+	ActionVar* ml = getProperty((ASObject*)mc->dynamic_props, "multiline", 9);
+	return ml != NULL && ml->type == ACTION_STACK_VALUE_BOOLEAN && ml->data.numeric_value;
+}
+
+// The format state edit shared by replaceText / replaceSel. Called BEFORE the
+// caller stores the new text; [from, to) are clamped to the old length.
+// is_sel selects replaceSel's rules.
+static void tf_ps_on_replace(SWFAppContext* app_context, MovieClip* mc, u32 from, u32 to,
+                             const uint16_t* ins_u16, u32 ins_len, int is_sel)
+{
+	u32 old_len = tf_ps_text_len(mc);
+	TFRunTable* table = tf_find_table(mc);
+	if (table != NULL && table->run_count == 0) table = NULL;
+	int ml = tf_ps_is_multiline(mc);
+	TFPlainSpans* ps = tf_ps_find(mc);
+	if (ps == NULL && (table != NULL || is_sel)) ps = tf_ps_get(app_context, mc);
+	if (ps != NULL && table == NULL) tf_ps_ensure_spans(app_context, mc, ps);
+	TFPSFmt ins_fmt;
+	if (ps != NULL) {
+		if (!is_sel && old_len > 0) {
+			// replaceText: the new text format becomes the format at `from`.
+			u32 at = from < old_len ? from : old_len - 1;
+			if (table != NULL) {
+				TFRun* r = tf_table_run_at_plain(table, at, ml);
+				if (r != NULL) tf_ps_from_run(&ps->newfmt, r);
+			} else {
+				const TFPSFmt* f = tf_ps_fmt_at(ps, at);
+				if (f != NULL) ps->newfmt = *f;
+			}
+		}
+		ins_fmt = ps->newfmt;
+		ps->newfmt_set = 1;
+	}
+	if (table != NULL) {
+		char buf[16384];
+		size_t n = (ins_u16 != NULL && ins_len > 0) ? u16_to_utf8(ins_u16, ins_len, buf, sizeof(buf)) : 0;
+		if (n >= sizeof(buf)) n = sizeof(buf) - 1;
+		tf_table_replace(table, from, to, buf, (u32)n, ml, ps != NULL ? &ins_fmt : NULL);
+	} else if (ps != NULL) {
+		tf_ps_replace(ps, from, to, ins_len, &ins_fmt);
+	}
+	if (is_sel && ps != NULL) {
+		// replaceSel: the new text format follows the caret.
+		u32 caret = from + ins_len;
+		if (table != NULL) {
+			TFRun* r = tf_table_run_at_plain(table, caret, ml);
+			if (r != NULL) tf_ps_from_run(&ps->newfmt, r);
+		} else {
+			const TFPSFmt* f = tf_ps_fmt_at(ps, caret);
+			if (f != NULL) ps->newfmt = *f;
+		}
+		ps->edit_sticky = 1;
+	}
+}
+
+// getTextFormat overlay for a field without an HTML run table.
+// Returns 1 when the model answered (the caller skips its textColor override).
+static int tf_ps_overlay_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* tf, u32 begin, u32 end)
+{
+	TFPlainSpans* ps = tf_ps_find(mc);
+	if (ps == NULL || !ps->has_spans || begin >= end) return 0;
+	tf_ps_ensure_spans(app_context, mc, ps);
+	const TFPSFmt* first = NULL;
+	int mix_size = 0, mix_color = 0, mix_font = 0, mix_b = 0, mix_i = 0, mix_u = 0;
+	u32 acc = 0;
+	for (u32 i = 0; i < ps->span_count; i++) {
+		u32 s = acc, e = acc + ps->spans[i].len;
+		acc = e;
+		if (e <= begin || s >= end) continue;
+		const TFPSFmt* f = &ps->spans[i].f;
+		if (first == NULL) { first = f; continue; }
+		if (f->size != first->size) mix_size = 1;
+		if (f->color != first->color) mix_color = 1;
+		if (strcmp(f->font, first->font) != 0) mix_font = 1;
+		if (f->bold != first->bold) mix_b = 1;
+		if (f->italic != first->italic) mix_i = 1;
+		if (f->underline != first->underline) mix_u = 1;
+	}
+	if (first == NULL) return 0;
+	ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_NULL;
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &v.data.numeric_value) = first->size;
+	setProperty(app_context, tf, "size", 4, mix_size ? &nv : &v);
+	VAL(double, &v.data.numeric_value) = (double)first->color;
+	setProperty(app_context, tf, "color", 5, mix_color ? &nv : &v);
+	if (mix_font) setProperty(app_context, tf, "font", 4, &nv);
+	else if (first->font[0] != '\0') {
+		ActionVar fv = makeStringActionVar(app_context, first->font, strlen(first->font));
+		setProperty(app_context, tf, "font", 4, &fv);
+	}
+	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN;
+	bv.data.numeric_value = first->bold;
+	setProperty(app_context, tf, "bold", 4, mix_b ? &nv : &bv);
+	bv.data.numeric_value = first->italic;
+	setProperty(app_context, tf, "italic", 6, mix_i ? &nv : &bv);
+	bv.data.numeric_value = first->underline;
+	setProperty(app_context, tf, "underline", 9, mix_u ? &nv : &bv);
+	return 1;
+}
+
+// getNewTextFormat overlay.
+static void tf_ps_overlay_new_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* tf)
+{
+	TFPlainSpans* ps = tf_ps_find(mc);
+	if (ps == NULL) return;
+	const TFPSFmt* f = &ps->newfmt;
+	ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &v.data.numeric_value) = f->size;
+	setProperty(app_context, tf, "size", 4, &v);
+	VAL(double, &v.data.numeric_value) = (double)f->color;
+	setProperty(app_context, tf, "color", 5, &v);
+	if (f->font[0] != '\0') {
+		ActionVar fv = makeStringActionVar(app_context, f->font, strlen(f->font));
+		setProperty(app_context, tf, "font", 4, &fv);
+	}
+	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN;
+	bv.data.numeric_value = f->bold;      setProperty(app_context, tf, "bold", 4, &bv);
+	bv.data.numeric_value = f->italic;    setProperty(app_context, tf, "italic", 6, &bv);
+	bv.data.numeric_value = f->underline; setProperty(app_context, tf, "underline", 9, &bv);
+}
+// ---- end s25 w2-edittext-span-model ----
 
 // Sync variable → all text fields bound to var_name
 // Called when a variable is set via SetVariable/DefineLocal/etc.
@@ -56146,6 +56737,9 @@ void actionSetMember(SWFAppContext* app_context)
 				u32 masked = (u32)ival & 0x00FFFFFF;
 				value_var.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &value_var.data.numeric_value) = (double)masked;
+				// s25 span model: textColor recolors every span + the new format.
+				if (MC_IS_TEXTFIELD(mc) && prop_name[0] == 't')
+					tf_ps_set_text_color(app_context, mc, masked);
 			}
 			// Frame properties are read-only MovieClip-only props; writes to them
 			// on a TextField are silently ignored (TextField.as:616/620/624) — and
@@ -56290,6 +56884,11 @@ void actionSetMember(SWFAppContext* app_context)
 			// TextField text: update length when text is set
 			if (strcmp(prop_name, "text") == 0 && mc->dynamic_props != NULL)
 			{
+				// s25 span model: same text (no pending force) keeps every format,
+				// including an HTML field's runs; otherwise one span of the new
+				// text format. Runs before the old text is overwritten.
+				int _ps_same = MC_IS_TEXTFIELD(mc) ? tf_ps_text_assign(mc, &value_var) : 0;
+				TFPlainSpans* _ps_nf = MC_IS_TEXTFIELD(mc) ? tf_ps_find(mc) : NULL;
 				// Update length property (str_size is UTF-16 code unit count)
 				u32 _txt_len = 0;
 				if (value_var.type == ACTION_STACK_VALUE_STRING)
@@ -56330,7 +56929,7 @@ void actionSetMember(SWFAppContext* app_context)
 					int _ts_is_html = 0;
 					if (_ts_html != NULL && _ts_html->type == ACTION_STACK_VALUE_BOOLEAN && _ts_html->data.numeric_value)
 						_ts_is_html = 1;
-					if (_ts_is_html) {
+					if (_ts_is_html && !_ps_same) {
 						const uint16_t* _ts_u16 = varGetU16Ptr(&value_var);
 						char _ts_buf[16384];
 						if (_ts_u16 && value_var.str_size > 0)
@@ -56347,6 +56946,7 @@ void actionSetMember(SWFAppContext* app_context)
 							double _tcd; memcpy(&_tcd, &_ts_tc->data.numeric_value, sizeof(double));
 							_ts_def.color = (u32)_tcd & 0x00FFFFFF;
 						}
+						if (_ps_nf != NULL && _ps_nf->newfmt_set) tf_ps_to_run(&_ps_nf->newfmt, &_ts_def);
 						// Store text without \r→\n conversion for now — just create runs
 						_ts_table->run_count = 0;
 						_ts_table->text_len = 0;
@@ -56385,7 +56985,7 @@ void actionSetMember(SWFAppContext* app_context)
 								pstart = pi + 1;
 							}
 						}
-					} else {
+					} else if (!_ts_is_html) {
 						// Non-HTML field: invalidate any existing run table so a
 						// subsequent render falls back to props.text. Without this,
 						// runs that were populated by an earlier styleSheet=null
@@ -56414,6 +57014,15 @@ void actionSetMember(SWFAppContext* app_context)
 				ActionVar* html_flag = getProperty(props, "html", 4);
 				if (html_flag != NULL && html_flag->type == ACTION_STACK_VALUE_BOOLEAN && html_flag->data.numeric_value)
 				{
+					// s25 span model: re-assigning the current serialization with no
+					// pending force is a no-op (Ruffle set_html_text).
+					{
+						int _ps_mode = tf_ps_is_multiline(mc);
+						ActionVar* _ps_ss = getProperty(props, "styleSheet", 10);
+						if (_ps_ss != NULL && _ps_ss->type == ACTION_STACK_VALUE_OBJECT) _ps_mode = -1;
+						if (tf_ps_html_assign_same(mc, tf_find_table(mc), _ps_mode, &value_var))
+							goto _ps_html_same;
+					}
 					// Clear raw-content flag (HTML parsing path)
 					ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
 					setProperty(app_context, props, "_tf_raw_content", 15, &_rc_zero);
@@ -56449,6 +57058,13 @@ void actionSetMember(SWFAppContext* app_context)
 					if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
 						double tc_d; memcpy(&tc_d, &tc_prop->data.numeric_value, sizeof(double));
 						defaults.color = (u32)tc_d & 0x00FFFFFF;
+					}
+					{
+						TFPlainSpans* _ps_nf = tf_ps_find(mc);
+						if (_ps_nf != NULL) {
+							if (_ps_nf->newfmt_set) tf_ps_to_run(&_ps_nf->newfmt, &defaults);
+							_ps_nf->has_spans = 0; // the run table is the span model now
+						}
 					}
 					{
 						ActionVar* _css_ss = getProperty(props, "styleSheet", 10);
@@ -56529,6 +57145,7 @@ void actionSetMember(SWFAppContext* app_context)
 					len_val.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &len_val.data.numeric_value) = (double)text_u16_len;
 					setProperty(app_context, props, "length", 6, &len_val);
+					_ps_html_same: ;
 				}
 				else
 				{
@@ -56593,6 +57210,7 @@ void actionSetMember(SWFAppContext* app_context)
 						ActionVar _rc_one = {0}; _rc_one.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &_rc_one.data.numeric_value) = 1.0;
 						setProperty(app_context, props, "_tf_raw_content", 15, &_rc_one);
+						tf_ps_text_assign(mc, &value_var); // s25 span model (text synonym)
 						setProperty(app_context, props, "text", 4, &value_var);
 						ActionVar len_val = {0};
 						len_val.type = ACTION_STACK_VALUE_F64;
@@ -75201,6 +75819,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							r->block_indent = (s16)v;
 						}
 					}
+				} else {
+					// s25 span model: a field without HTML runs keeps per-char
+					// formats in its TFPlainSpans.
+					ActionVar* _ps_fa = (num_args == 1) ? &args[0] : (num_args == 2) ? &args[1]
+						: (num_args >= 3) ? &args[2] : NULL;
+					if (_ps_fa != NULL && _ps_fa->type == ACTION_STACK_VALUE_OBJECT && _ps_fa->data.numeric_value != 0) {
+						u32 _ps_b = 0, _ps_e = 0xFFFFFFFFu;
+						if (num_args >= 2) {
+							_ps_b = stf_bi < 0 ? 0 : (u32)stf_bi;
+							_ps_e = stf_ei < 0 ? 0 : (u32)stf_ei;
+						}
+						tf_ps_set_text_format(app_context, mc, _ps_b, _ps_e, (ASObject*)_ps_fa->data.numeric_value);
+					}
 				}
 			}
 			stf_done:
@@ -75223,6 +75854,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// setNewTextFormat(fmt): set the default format for newly-typed text
 			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 				ASObject* fmt_obj = (ASObject*) args[0].data.numeric_value;
+				tf_ps_set_new_text_format(app_context, mc, fmt_obj); // s25 span model
 				// Apply color to textColor
 				ActionVar* color_prop = getProperty(fmt_obj, "color", 5);
 				if (color_prop != NULL && color_prop->type == ACTION_STACK_VALUE_F64 && mc->dynamic_props != NULL) {
@@ -75482,11 +76114,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
+			// s25 span model: a field without HTML runs answers from its spans.
+			int gtf_ps_done = 0;
+			{
+				TFRunTable* _ps_rt = tf_find_table(mc);
+				if ((_ps_rt == NULL || _ps_rt->run_count == 0) && has_text)
+					gtf_ps_done = tf_ps_overlay_text_format(app_context, mc, tf, gtf_begin, gtf_end);
+			}
 			// Override color with current textColor from dynamic_props
 			// Only for whole-text getTextFormat() (no args) — range queries use format run colors
 			// Only when field has text (empty fields return null for color)
 			// (A mixed-color range stays null.)
-			if (num_args < 1 && has_text && !gtf_color_mixed && mc->dynamic_props != NULL) {
+			if (num_args < 1 && has_text && !gtf_color_mixed && !gtf_ps_done && mc->dynamic_props != NULL) {
 				ActionVar* tc_prop = getProperty((ASObject*) mc->dynamic_props, "textColor", 9);
 				if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
 					setProperty(app_context, tf, "color", 5, tc_prop);
@@ -75534,11 +76173,68 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, tf, "indent", 6, ind_prop);
 				}
 			}
+			tf_ps_overlay_new_text_format(app_context, mc, tf); // s25 span model
 			if (args != NULL) FREE(args);
 			ActionVar result = {0};
 			result.type = ACTION_STACK_VALUE_OBJECT;
 			result.data.numeric_value = (u64) tf;
 			pushVar(app_context, &result);
+			return;
+		}
+		else if (method_name_len == 11 && strncasecmp(method_name, "replaceText", 11) == 0 && MC_IS_TEXTFIELD(mc))
+		{
+			// s25 w2-edittext-span-model: replaceText(begin, end, text) (SWF7+;
+			// in SWF6 TextField.prototype.replaceText is undefined). Flash (gnash
+			// TextField.as:1138-1169, Flash-recorded): fewer than 3 args, a
+			// negative index, or end < begin is a no-op; an undefined text is
+			// "undefined"; both indices clamp to the length. (Ruffle avm1
+			// text_field.rs replace_text instead coerces missing args and maps
+			// negatives to 0.) Formats: tf_ps_on_replace.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			if (g_swf_version >= 7 && num_args >= 3) {
+				double _rt_fd = num_args >= 1 ? coerceVarToNumber(app_context, &args[0]) : NAN;
+				double _rt_td = num_args >= 2 ? coerceVarToNumber(app_context, &args[1]) : NAN;
+				ActionVar _rt_sv = {0};
+				_rt_sv.type = ACTION_STACK_VALUE_UNDEFINED;
+				if (num_args >= 3) _rt_sv = args[2];
+				PUSH(_rt_sv.type, _rt_sv.data.numeric_value);
+				convertString(app_context, NULL);
+				popVar(app_context, &_rt_sv);
+				const uint16_t* _rt_ins = NULL; u32 _rt_ins_len = 0;
+				if (_rt_sv.type == ACTION_STACK_VALUE_STRING) { _rt_ins = varGetU16Ptr(&_rt_sv); _rt_ins_len = _rt_sv.str_size; }
+				u32 _rt_from = (isnan(_rt_fd) || _rt_fd <= 0) ? 0 : (_rt_fd >= 4294967295.0 ? 0xFFFFFFFFu : (u32)_rt_fd);
+				u32 _rt_to = (isnan(_rt_td) || _rt_td <= 0) ? 0 : (_rt_td >= 4294967295.0 ? 0xFFFFFFFFu : (u32)_rt_td);
+				if (_rt_to >= _rt_from && !(_rt_fd < 0) && !(_rt_td < 0)) {
+					if (mc->dynamic_props == NULL) mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
+					ASObject* _rt_props = (ASObject*) mc->dynamic_props;
+					const uint16_t* _rt_old = NULL; u32 _rt_old_len = 0;
+					ActionVar* _rt_tp = getProperty(_rt_props, "text", 4);
+					if (_rt_tp != NULL && _rt_tp->type == ACTION_STACK_VALUE_STRING) { _rt_old = varGetU16Ptr(_rt_tp); _rt_old_len = _rt_tp->str_size; }
+					if (_rt_from > _rt_old_len) _rt_from = _rt_old_len;
+					if (_rt_to > _rt_old_len) _rt_to = _rt_old_len;
+					tf_ps_on_replace(app_context, mc, _rt_from, _rt_to, _rt_ins, _rt_ins_len, 0);
+					u32 _rt_len = _rt_from + _rt_ins_len + (_rt_old_len - _rt_to);
+					uint16_t* _rt_buf = (uint16_t*) malloc((_rt_len + 1) * sizeof(uint16_t));
+					if (_rt_from > 0) memcpy(_rt_buf, _rt_old, _rt_from * sizeof(uint16_t));
+					if (_rt_ins_len > 0) memcpy(_rt_buf + _rt_from, _rt_ins, _rt_ins_len * sizeof(uint16_t));
+					if (_rt_old_len > _rt_to) memcpy(_rt_buf + _rt_from + _rt_ins_len, _rt_old + _rt_to, (_rt_old_len - _rt_to) * sizeof(uint16_t));
+					_rt_buf[_rt_len] = 0;
+					ActionVar _rt_nt = {0};
+					_rt_nt.type = ACTION_STACK_VALUE_STRING;
+					_rt_nt.data.numeric_value = (u64)(uintptr_t)_rt_buf;
+					_rt_nt.str_size = _rt_len;
+					setProperty(app_context, _rt_props, "text", 4, &_rt_nt);
+					ActionVar _rt_lv = {0};
+					_rt_lv.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_rt_lv.data.numeric_value) = (double)_rt_len;
+					setProperty(app_context, _rt_props, "length", 6, &_rt_lv);
+					ng_syncTextToVar(app_context, mc, &_rt_nt);
+					applyAutoSize(app_context, mc, 0);
+				}
+			}
+#endif
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
 			return;
 		}
 		else if (method_name_len == 10 && strncasecmp(method_name, "replaceSel", 10) == 0)
@@ -75595,6 +76291,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (sel_end > (int)old_u16_len) sel_end = (int)old_u16_len;
 			if (sel_begin > sel_end) { int tmp = sel_begin; sel_begin = sel_end; sel_end = tmp; }
 
+			// s25 span model: replaceSel("") on a caret is a pure no-op in Flash
+			// (avm1/edittext_set_text_same_after_edits: the new text format and
+			// a pending setNewTextFormat force both survive).
+			if (new_u16_len == 0 && sel_begin == sel_end) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+			TFRunTable* _ps_rs_rt = tf_find_table(mc);
+			int _ps_rs_edited = (_ps_rs_rt != NULL && _ps_rs_rt->run_count > 0);
+			tf_ps_on_replace(app_context, mc, (u32)sel_begin, (u32)sel_end, new_u16, new_u16_len, 1);
+
 			// Build new text: old[0..sel_begin] + new_text + old[sel_end..]
 			u32 prefix_len = (u32)sel_begin;
 			u32 suffix_len = old_u16_len - (u32)sel_end;
@@ -75625,8 +76333,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			VAL(double, &len_val.data.numeric_value) = (double)result_len;
 			setProperty(app_context, rs_props, "length", 6, &len_val);
 
-			// Drop the stale run table so the renderer reads the updated `text`.
-			tf_invalidate_run_table(mc);
+			// Drop the stale run table so the renderer reads the updated `text`
+			// (an HTML run table was edited in place by tf_ps_on_replace).
+			if (!_ps_rs_edited) tf_invalidate_run_table(mc);
 
 			// Update selection: caret moves to end of inserted text, begin=end=caret
 			int new_caret = sel_begin + (int)new_u16_len;
