@@ -168,4 +168,8 @@ __attribute__((export_name("get_avm2_device_fonts")))
 const void* get_avm2_device_fonts(void) { return avm2_generated_device_fonts; }
 __attribute__((export_name("get_avm2_device_font_count")))
 int get_avm2_device_font_count(void) { return (int)avm2_generated_device_font_count; }
+__attribute__((export_name("get_avm2_cff4_fonts")))
+const void* get_avm2_cff4_fonts(void) { return avm2_generated_cff4_fonts; }
+__attribute__((export_name("get_avm2_cff4_font_count")))
+int get_avm2_cff4_font_count(void) { return (int)avm2_generated_cff4_font_count; }
 #endif

@@ -224,6 +224,11 @@ unsigned char* avm2_amf3_write_value_tagged(Avm2Context* ctx, Avm2Value v,
 Avm2Value avm2_amf0_read_value(Avm2Context* ctx, const unsigned char* p, size_t n);
 void avm2_register_date(Avm2Context* ctx); // Date (ECMA-262 §15.9 + AS3)
 void avm2_register_external(Avm2Context* ctx);  // flash.external.ExternalInterface
+// flash.system.Worker (avm2_globals.c): drain the pending-worker queue once
+// per tick (Ruffle Avm2::update_pending_workers): New -> Running for started
+// workers, one `workerState` event per announced state change. Workers queued
+// by those handlers wait for the next tick. No-op on an empty queue.
+void avm2_worker_poll(Avm2Context* ctx);
 
 // Date instance state (avm2_date.c). `millis` is the ECMA time value: ms
 // since the epoch in UTC, or NaN for an invalid Date.

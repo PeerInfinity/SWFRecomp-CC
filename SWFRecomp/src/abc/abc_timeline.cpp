@@ -55,6 +55,7 @@ enum
 	TAG_DEFINE_FONT2 = 48,
 	TAG_CSM_TEXT_SETTINGS = 74,
 	TAG_DEFINE_FONT3 = 75,
+	TAG_DEFINE_FONT4 = 91,
 	TAG_FRAME_LABEL = 43,
 	TAG_DEFINE_MORPH_SHAPE = 46,
 	TAG_DEFINE_VIDEO_STREAM = 60,
@@ -957,6 +958,11 @@ struct Scanner
 	std::vector<ButtonDef> buttons;
 	std::vector<EditTextDef> edittexts;
 	std::vector<FontDef> fonts;
+	// DefineFont4 (CFF / EMBEDDED_CFF) faces: name, style and the OpenType
+	// OS/2 typo ascender/descender + head unitsPerEm, for flash.text.engine
+	// TextLine metrics (s24 w2-avm2-small-natives). Glyphs are not decoded.
+	struct Cff4Def { std::string name; bool bold, italic; int asc, desc, upem; };
+	std::vector<Cff4Def> cff4;
 	std::vector<StaticTextDef> statictexts;
 	std::vector<BitmapAsset> bitmaps;
 	// JPEGTables (tag 8) payload: the shared tables a plain DefineBits needs.
@@ -1434,6 +1440,43 @@ struct Scanner
 				memcpy(&cs.thickness, &th, 4);
 				memcpy(&cs.sharpness, &sh, 4);
 				csm.push_back(cs);
+				break;
+			}
+			case TAG_DEFINE_FONT4:
+			{
+				// SWF 10 spec: FontID u16; flags u8 (reserved:5, HasFontData,
+				// Italic, Bold); FontName (NUL-terminated); FontData = an
+				// OpenType/CFF file. Walk its table directory for OS/2
+				// sTypoAscender/sTypoDescender (offsets 68/70) and head
+				// unitsPerEm (offset 18). A face without font data or
+				// without a head table is skipped (runtime keeps 12 / 3).
+				Scanner::Cff4Def cd;
+				body.u16();
+				uint8_t fl = body.u8();
+				cd.italic = (fl & 0x02) != 0;
+				cd.bold = (fl & 0x01) != 0;
+				while (body.p < body.end && *body.p != 0) cd.name += (char) *body.p++;
+				if (body.p < body.end) body.p++;
+				const uint8_t* f = body.p;
+				size_t flen = (size_t) (body.end - body.p);
+				auto be16 = [&](size_t o) -> uint32_t { return o + 2 <= flen ? ((uint32_t) f[o] << 8) | f[o + 1] : 0; };
+				auto be32 = [&](size_t o) -> uint32_t { return o + 4 <= flen ? (be16(o) << 16) | be16(o + 2) : 0; };
+				cd.asc = cd.desc = 0; cd.upem = 0;
+				uint32_t nt = (fl & 0x04) ? be16(4) : 0;
+				for (uint32_t t = 0; t < nt; t++)
+				{
+					size_t rec = 12 + 16 * (size_t) t;
+					if (rec + 16 > flen) break;
+					uint32_t off = be32(rec + 8);
+					if (memcmp(f + rec, "OS/2", 4) == 0)
+					{
+						cd.asc = (int16_t) be16((size_t) off + 68);
+						cd.desc = (int16_t) be16((size_t) off + 70);
+					}
+					else if (memcmp(f + rec, "head", 4) == 0)
+						cd.upem = (int) be16((size_t) off + 18);
+				}
+				if (cd.upem > 0) cff4.push_back(cd);
 				break;
 			}
 			case TAG_DEFINE_FONT2:
@@ -2256,6 +2299,30 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
 	if (info.symbol_prefix.empty())
 	{
 		emitDeviceFonts(out);
+		// DefineFont4 typo metrics (Avm2Cff4FontData, avm2_abc.h). Main
+		// movie only, like the device fonts: TextLine reads one player-level
+		// table. An empty table still defines both symbols.
+		out << "\n// DefineFont4 (CFF) faces: name, bold, italic, typo ascender, typo descender, unitsPerEm.\n";
+		out << "const Avm2Cff4FontData avm2_generated_cff4_fonts[] = {";
+		for (auto& c : sc.cff4)
+		{
+			out << " { \"";
+			for (unsigned char ch : c.name)
+			{
+				if (ch == '"' || ch == '\\') out << '\\' << (char) ch;
+				else if (ch < 0x20 || ch >= 0x7f)
+				{
+					char esc[8];
+					snprintf(esc, sizeof(esc), "\\%03o", ch);
+					out << esc;
+				}
+				else out << (char) ch;
+			}
+			out << "\", " << (int) c.bold << ", " << (int) c.italic << ", " << c.asc << ", "
+			    << c.desc << ", " << c.upem << " },";
+		}
+		if (sc.cff4.empty()) out << " { 0, 0, 0, 0, 0, 0 }";
+		out << " };\nconst uint32_t avm2_generated_cff4_font_count = " << sc.cff4.size() << ";\n";
 	}
 
 	// Static text (DefineText/2): a flat glyph-placement table + per-char range

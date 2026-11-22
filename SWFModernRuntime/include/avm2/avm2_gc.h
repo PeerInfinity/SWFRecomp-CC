@@ -117,6 +117,8 @@ void avm2_gc_mark_roots_media(Avm2Context* ctx);
 void avm2_gc_mark_roots_net(Avm2Context* ctx);
 void avm2_gc_mark_roots_globals(Avm2Context* ctx);
 void avm2_gc_mark_roots_external(Avm2Context* ctx);
+// avm2_ops.c: closures bound to primitive receivers (atom-keyed side cache).
+void avm2_gc_mark_roots_bound_cache(void);
 
 // Weak-registry prune (avm2_display.c): the orphan list holds WEAK references
 // (Ruffle OrphanManager stores DisplayObjectWeak — an otherwise-unreachable

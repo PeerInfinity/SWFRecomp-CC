@@ -791,6 +791,7 @@ void runSWF_avm2(SWFAppContext* app_context)
 			if (setjmp(top.jb) == 0)
 			{
 				avm2_display_run_tick(ctx);
+				avm2_worker_poll(ctx);  // flash.system.Worker workerState events
 				avm2_media_poll(ctx);   // Event.SOUND_COMPLETE for drained channels
 				double present_start = emscripten_get_now();
 				int close = avm2_render_present(ctx);
@@ -881,6 +882,7 @@ void runSWF_avm2(SWFAppContext* app_context)
 		if (setjmp(top.jb) == 0)
 		{
 			avm2_display_run_tick(ctx);
+			avm2_worker_poll(ctx);  // flash.system.Worker workerState events
 			// SOUND_COMPLETE poll: no-op in NO_GRAPHICS; in native graphics
 			// nothing drains a channel (no sink), so this never fires in the
 			// trace harness — trace-inert by construction.

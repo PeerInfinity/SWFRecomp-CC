@@ -161,3 +161,35 @@ which C cannot see; it defaults to Linux (matching Ruffle-web) until this reads
 `navigator.platform`. And `$version=` can now come **out** of the divergence harness's
 `NOISE_PATTERNS`, since both sides agree under the pin — that filter was hiding a real
 comparison.
+
+---
+
+## AVM2 bound methods on String receivers: one closure per string *pointer*
+
+**Test**: `avm2/primitive_bound_methods` (`known_failure = true`; s24 w2-avm2-small-natives,
+2026-11-22). Lives here because `avm2/_investigation/` has no compat-tweaks file.
+
+**What we did**: reading a method trait off a primitive receiver (`"abc".AS3::toString`,
+`(true).AS3::toString`, `(0).f`) goes through an atom-keyed side cache in
+`bind_method_entry`, so the same receiver yields the same closure (`===` is true). The
+key models avmplus's receiver atom: booleans by value; int-valued Numbers (not `-0`) as
+the int atom, so `(0.0).f === (0).f`; `-0`, `NaN` and other non-integral doubles are never
+cached (a fresh box per read); a **String keys on its `Avm2String*` pointer**. Interned
+literals therefore share and a concat result does not.
+
+**Why this is a compat tweak, not Flash parity**: Flash's line 2,
+`("ab"+"c").AS3::toString === ("ab"+"c").AS3::toString` → `true`, cannot be produced by
+any receiver-atom model that also gives line 1 (`("ab"+"c")` vs the literal `"abc"`) →
+`false`. Ruffle's `ValueKey` compares strings by pointer too and prints `false` for line 2,
+which is what we print. The row ends **ruffle_matched** (10/11 against Flash). The
+companion row `avm2/weird_number_bound_methods` is a full Flash pass (12/12) under the same
+cache, because there Ruffle keys Numbers by bit pattern (`-0`/`NaN` share) while Flash and we
+do not.
+
+**Risk / how to revisit**: reverse-engineering Flash line 2 needs an avmplus source read
+(`MethodEnv` / `MethodClosure` caching, or concat-result string caching) before trying the
+Flash pass. Cache misses only evict (the full key is compared), and every cached closure
+holds its receiver in `fn_receiver`, so a string address cannot be recycled while cached.
+
+**File**: `SWFModernRuntime/src/avm2/avm2_ops.c`, `bind_method_entry()` / `pbm_key()`; GC
+root `avm2_gc_mark_roots_bound_cache()`.

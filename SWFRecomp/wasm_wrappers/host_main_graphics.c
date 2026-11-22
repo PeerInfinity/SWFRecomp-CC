@@ -200,6 +200,8 @@ const Avm2FontData* avm2_generated_fonts = NULL;
 uint32_t avm2_generated_font_count = 0;
 const Avm2FontData* avm2_generated_device_fonts = NULL;
 uint32_t avm2_generated_device_font_count = 0;
+const Avm2Cff4FontData* avm2_generated_cff4_fonts = NULL;
+uint32_t avm2_generated_cff4_font_count = 0;
 const Avm2StaticGlyph* avm2_generated_static_glyphs = NULL;
 uint32_t avm2_generated_static_glyph_count = 0;
 const Avm2StaticTextData* avm2_generated_statictexts = NULL;
@@ -248,6 +250,13 @@ void setAvm2Tables(const Avm2MovieTables* t, const uint32_t* abc_frames, const u
     avm2_generated_symbol_class_frames = symbol_class_frames;
     avm2_generated_device_fonts = device_fonts;
     avm2_generated_device_font_count = (uint32_t)device_font_count;
+}
+// DefineFont4 typo-metric table (TextLine ascent/descent, avm2_text.c). A
+// separate setter so a guest bundle built before the table existed still
+// loads: guest_loader.js calls it only when the guest exports the getters.
+EMSCRIPTEN_KEEPALIVE void setAvm2Cff4Fonts(const Avm2Cff4FontData* fonts, int count) {
+    avm2_generated_cff4_fonts = fonts;
+    avm2_generated_cff4_font_count = (uint32_t)count;
 }
 EMSCRIPTEN_KEEPALIVE void setAvm2DrawTables(void* color, void* uninv, void* gradient, void* morph_end_color) {
     color_data = (float (*)[4])color;

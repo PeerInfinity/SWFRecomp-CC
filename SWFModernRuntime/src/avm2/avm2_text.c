@@ -7447,6 +7447,60 @@ static Avm2Value tl_set_user_data(Avm2Activation* act)
 // line in the arc reads a real metric — the layout core never measures.
 static Avm2Value tl_const_12(Avm2Activation* act) { (void) act; return avm2_number(12.0); }
 static Avm2Value tl_const_3(Avm2Activation* act) { (void) act; return avm2_number(3.0); }
+// TextLine ascent/descent from a DefineFont4 (EMBEDDED_CFF) face's OS/2 typo
+// metrics: size * typo / unitsPerEm, rounded to twips (Ruffle
+// Twips::to_pixels). Applies when the line's block content has an
+// ElementFormat whose FontDescription says fontLookup "embeddedCFF" and names
+// a face in avm2_generated_cff4_fonts (avm2_abc.h; the browser host fills the
+// same table through setAvm2Cff4Fonts). A face matching fontWeight/fontPosture
+// wins; otherwise the first face with that name. Anything else keeps the
+// 12 / 3 stubs above (s24 w2-avm2-small-natives).
+static int tl_str_eq(const Avm2String* s, const char* lit)
+{
+	size_t n = strlen(lit);
+	return s != NULL && s->len == n && memcmp(s->utf8, lit, n) == 0;
+}
+static int tl_metric(Avm2Activation* act, int want_desc, double* out)
+{
+	if (avm2_generated_cff4_font_count == 0) return 0;   // DYNAMIC_HOST: NULL until set
+	Avm2TextLineExt* tl = this_tl(act);
+	if (tl == NULL || tl->text_block == NULL) return 0;
+	Avm2Context* ctx = act->ctx;
+	Avm2Value c = avm2_get_public_property(ctx, avm2_object_value(tl->text_block), "content", 7, NULL);
+	if (c.kind != AVM2_VALUE_OBJECT) return 0;
+	Avm2Value ef = avm2_get_public_property(ctx, c, "elementFormat", 13, NULL);
+	if (ef.kind != AVM2_VALUE_OBJECT) return 0;
+	double size = avm2_coerce_to_number(ctx, avm2_get_public_property(ctx, ef, "fontSize", 8, NULL));
+	Avm2Value fd = avm2_get_public_property(ctx, ef, "fontDescription", 15, NULL);
+	if (fd.kind != AVM2_VALUE_OBJECT) return 0;
+	const Avm2String* lookup = avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontLookup", 10, NULL));
+	if (!tl_str_eq(lookup, "embeddedCFF")) return 0;
+	const Avm2String* name = avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontName", 8, NULL));
+	int bold = tl_str_eq(avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontWeight", 10, NULL)), "bold");
+	int italic = tl_str_eq(avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontPosture", 11, NULL)), "italic");
+	const Avm2Cff4FontData* hit = NULL;
+	for (uint32_t i = 0; i < avm2_generated_cff4_font_count; i++)
+	{
+		const Avm2Cff4FontData* f = &avm2_generated_cff4_fonts[i];
+		if (f->name == NULL || f->units_per_em == 0 || name == NULL
+		    || strlen(f->name) != name->len
+		    || memcmp(f->name, name->utf8, name->len) != 0) continue;
+		if ((f->bold != 0) == bold && (f->italic != 0) == italic) { hit = f; break; }
+		if (hit == NULL) hit = f;
+	}
+	if (hit == NULL) return 0;
+	double em = (double) (want_desc ? -hit->typo_descender : hit->typo_ascender) / hit->units_per_em;
+	*out = round(size * em * 20.0) / 20.0;
+	return 1;
+}
+static Avm2Value tl_get_ascent(Avm2Activation* act)
+{
+	double v; return avm2_number(tl_metric(act, 0, &v) ? v : 12.0);
+}
+static Avm2Value tl_get_descent(Avm2Activation* act)
+{
+	double v; return avm2_number(tl_metric(act, 1, &v) ? v : 3.0);
+}
 static Avm2Value tl_const_0(Avm2Activation* act) { (void) act; return avm2_number(0.0); }
 static Avm2Value tl_const_1(Avm2Activation* act) { (void) act; return avm2_number(1.0); }
 static Avm2Value tl_const_false(Avm2Activation* act) { (void) act; return avm2_bool(false); }
@@ -8166,10 +8220,10 @@ void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
 	avm2_builtin_add_getter(ctx, textline, "nextLine", tl_get_next_line);
 	avm2_builtin_add_getset(ctx, textline, "validity", tl_get_validity,
 	                        tl_set_validity);
-	avm2_builtin_add_getter(ctx, textline, "ascent", tl_const_12);
-	avm2_builtin_add_getter(ctx, textline, "totalAscent", tl_const_12);
-	avm2_builtin_add_getter(ctx, textline, "descent", tl_const_3);
-	avm2_builtin_add_getter(ctx, textline, "totalDescent", tl_const_3);
+	avm2_builtin_add_getter(ctx, textline, "ascent", tl_get_ascent);
+	avm2_builtin_add_getter(ctx, textline, "totalAscent", tl_get_ascent);
+	avm2_builtin_add_getter(ctx, textline, "descent", tl_get_descent);
+	avm2_builtin_add_getter(ctx, textline, "totalDescent", tl_get_descent);
 	avm2_builtin_add_getter(ctx, textline, "unjustifiedTextWidth",
 	                        tl_get_specified_width);
 	avm2_builtin_add_getter(ctx, textline, "textWidth", tl_const_0);

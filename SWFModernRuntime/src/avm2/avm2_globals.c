@@ -6543,6 +6543,7 @@ static Avm2Class* g_appdomain_class;
 // the script may drop its only other reference and keep using the memory
 // opcodes.
 void avm2_gc_mark_roots_platform_stubs(void);
+void avm2_gc_mark_roots_worker(void);
 
 void avm2_gc_mark_roots_globals(Avm2Context* ctx)
 {
@@ -6550,6 +6551,7 @@ void avm2_gc_mark_roots_globals(Avm2Context* ctx)
 		avm2_gc_mark_object(s->obj);
 	avm2_gc_mark_object(ctx->domain_memory);
 	avm2_gc_mark_roots_platform_stubs();
+	avm2_gc_mark_roots_worker();
 }
 
 // An ApplicationDomain instance carries the scope it stands for in its
@@ -7393,6 +7395,131 @@ static Avm2Value crypto_generate_random_bytes(Avm2Activation* act)
 	return v;
 }
 
+// flash.system.Worker / WorkerDomain state machine (s24 w2-avm2-small-natives),
+// a port of Ruffle avm2/object/worker_object.rs + globals/flash/system/
+// worker.rs + worker_domain.rs. Only the primordial worker ever runs code: a
+// background worker is a state record (new -> running -> terminated) whose
+// changes are announced by avm2_worker_poll, called once per tick from
+// avm2_main.c beside avm2_media_poll.
+typedef struct WorkerExt
+{
+	Avm2EventDispatcherExt dispatcher;   // MUST be first
+	uint8_t primordial, started, state, announced;   // state: 0 new 1 running 2 terminated
+} WorkerExt;
+static Avm2Class* g_worker_class;
+static Avm2Object* g_worker_primordial;
+static Avm2Object* g_worker_domain;
+static Avm2Class* g_worker_domain_class;
+#define WORKER_PENDING_MAX 64
+static Avm2Object* g_worker_pending[WORKER_PENDING_MAX];
+static int g_worker_pending_count;
+// The batch being announced: rooted while its workerState handlers run.
+static Avm2Object* g_worker_batch[WORKER_PENDING_MAX];
+static int g_worker_batch_count;
+
+static WorkerExt* worker_ext(Avm2Activation* act)
+{
+	if (act->this_val.kind != AVM2_VALUE_OBJECT) return NULL;
+	Avm2Object* o = act->this_val.u.obj;
+	return (o->cls == g_worker_class) ? (WorkerExt*) o->native_ext : NULL;
+}
+static Avm2Object* worker_mint(Avm2Context* ctx, int primordial)
+{
+	Avm2Value v = avm2_class_construct(ctx, g_worker_class, NULL, 0);
+	WorkerExt* w = (WorkerExt*) v.u.obj->native_ext;
+	w->primordial = (uint8_t) primordial;
+	w->state = primordial ? 1 : 0;
+	return v.u.obj;
+}
+static void worker_queue(Avm2Object* o)
+{
+	if (g_worker_pending_count < WORKER_PENDING_MAX)
+		g_worker_pending[g_worker_pending_count++] = o;
+}
+static Avm2Value worker_get_current(Avm2Activation* act)
+{
+	if (g_worker_primordial == NULL) g_worker_primordial = worker_mint(act->ctx, 1);
+	return avm2_object_value(g_worker_primordial);
+}
+static Avm2Value worker_get_is_primordial(Avm2Activation* act)
+{
+	WorkerExt* w = worker_ext(act);
+	return avm2_bool(w != NULL && w->primordial);
+}
+static Avm2Value worker_get_state(Avm2Activation* act)
+{
+	WorkerExt* w = worker_ext(act);
+	static const char* names[] = { "new", "running", "terminated" };
+	return avm2_string(avm2_string_from_literal(act->ctx, names[w != NULL ? w->state : 0]));
+}
+static Avm2Value worker_start(Avm2Activation* act)
+{
+	WorkerExt* w = worker_ext(act);
+	if (w == NULL) return avm2_undefined();
+	if (w->primordial || w->started)
+		avm2_throw_error(act->ctx, act->ctx->builtins.illegal_operation_error_class, "%s",
+		                 "Error #1511: Worker is already started.");
+	w->started = 1;
+	worker_queue(act->this_val.u.obj);
+	return avm2_undefined();
+}
+static Avm2Value worker_terminate(Avm2Activation* act)
+{
+	WorkerExt* w = worker_ext(act);
+	if (w == NULL) return avm2_bool(false);
+	if (w->primordial)
+		avm2_throw_error(act->ctx, act->ctx->builtins.illegal_operation_error_class, "%s",
+		                 "Error #3732: Worker.terminate is only available for background workers.");
+	if (!w->started || w->state == 2) return avm2_bool(false);
+	w->state = 2;
+	worker_queue(act->this_val.u.obj);
+	return avm2_bool(true);
+}
+static Avm2Value worker_domain_get_current(Avm2Activation* act)
+{
+	if (g_worker_domain == NULL && g_worker_domain_class != NULL)
+		g_worker_domain = avm2_class_construct(act->ctx, g_worker_domain_class, NULL, 0).u.obj;
+	return g_worker_domain != NULL ? avm2_object_value(g_worker_domain) : avm2_null();
+}
+static Avm2Value worker_domain_create_worker(Avm2Activation* act)
+{
+	if (act->argc == 0 || act->args[0].kind == AVM2_VALUE_NULL
+	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
+		avm2_throw_error(act->ctx, act->ctx->builtins.type_error_class, "%s",
+		                 "Error #2007: Parameter swf must be non-null.");
+	return avm2_object_value(worker_mint(act->ctx, 0));
+}
+// Ruffle Avm2::update_pending_workers (declared in avm2_globals.h).
+void avm2_worker_poll(Avm2Context* ctx)
+{
+	int count = g_worker_pending_count;
+	if (count == 0) return;
+	Avm2Object** batch = g_worker_batch;
+	memcpy(batch, g_worker_pending, (size_t) count * sizeof(Avm2Object*));
+	g_worker_batch_count = count;
+	g_worker_pending_count = 0;   // handlers queue into the next drain
+	for (int i = 0; i < count; i++)
+	{
+		WorkerExt* w = (WorkerExt*) batch[i]->native_ext;
+		if (w->primordial) continue;
+		if (w->started && w->state == 0) w->state = 1;
+		if (w->announced != w->state)
+		{
+			w->announced = w->state;
+			Avm2Object* ev = avm2_event_new(ctx, avm2_string_from_literal(ctx, "workerState"), 0, 0);
+			if (ev != NULL) avm2_dispatch_event(ctx, batch[i], ev);
+		}
+	}
+	g_worker_batch_count = 0;
+}
+void avm2_gc_mark_roots_worker(void)
+{
+	avm2_gc_mark_object(g_worker_primordial);
+	avm2_gc_mark_object(g_worker_domain);
+	for (int i = 0; i < g_worker_pending_count; i++) avm2_gc_mark_object(g_worker_pending[i]);
+	for (int i = 0; i < g_worker_batch_count; i++) avm2_gc_mark_object(g_worker_batch[i]);
+}
+
 static void register_platform_stubs(Avm2Context* ctx)
 {
 	Avm2Class* obj = ctx->builtins.object_class;
@@ -7431,6 +7558,19 @@ static void register_platform_stubs(Avm2Context* ctx)
 	avm2_builtin_add_static_getset(ctx, made[7], "isSupported", stub_false, NULL);
 	// GameInputControl is [Ruffle(Abstract)] but `dynamic`.
 	made[9]->flags &= ~(uint32_t) AVM2_CLASS_FLAG_SEALED;
+	// Worker / WorkerDomain members (see WorkerExt above).
+	g_worker_class = made[6];
+	made[6]->native_init = stub_native_init_abstract_script_only;
+	made[6]->native_ext_size = sizeof(WorkerExt);
+	avm2_builtin_add_static_getset(ctx, made[6], "current", worker_get_current, NULL);
+	avm2_builtin_add_getset(ctx, made[6], "isPrimordial", worker_get_is_primordial, NULL);
+	avm2_builtin_add_getset(ctx, made[6], "state", worker_get_state, NULL);
+	avm2_builtin_add_method(ctx, made[6], "start", worker_start);
+	avm2_builtin_add_method(ctx, made[6], "terminate", worker_terminate);
+	made[7]->native_init = stub_native_init_abstract_script_only;
+	avm2_builtin_add_static_getset(ctx, made[7], "current", worker_domain_get_current, NULL);
+	avm2_builtin_add_method(ctx, made[7], "createWorker", worker_domain_create_worker);
+	g_worker_domain_class = made[7];
 
 	// flash.system.SecurityDomain — see secdomain_native_init.
 	{

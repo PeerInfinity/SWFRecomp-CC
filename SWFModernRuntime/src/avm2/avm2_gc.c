@@ -1006,6 +1006,7 @@ static void gc_collect(Avm2Context* ctx)
 	avm2_gc_mark_roots_amf(ctx);
 	g_why_parent = NULL; WHY_SET("root:media", 0);
 	avm2_gc_mark_roots_media(ctx);
+	avm2_gc_mark_roots_bound_cache();   // avm2_ops.c primitive bound methods
 	g_why_parent = NULL; WHY_SET("root:net", 0);
 	avm2_gc_mark_roots_net(ctx);
 	g_why_parent = NULL; WHY_SET("root:external", 0);

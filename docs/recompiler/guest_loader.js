@@ -188,6 +188,10 @@ export async function runGuest({ guestBytes, hostDir = "host/", canvas, log = ()
         host._setAvm2Tables(g.get_avm2_movie_tables(), g.get_avm2_abc_frames(), g.get_avm2_abc_lazy(),
                             g.get_avm2_symbol_class_frames(), g.get_avm2_device_fonts(), g.get_avm2_device_font_count());
         host._setAvm2DrawTables(g.get_color_data(), g.get_uninv_mat_data(), g.get_gradient_data(), g.get_morph_end_color_data());
+        // DefineFont4 typo metrics (TextLine ascent/descent). Optional on both
+        // sides so a guest or host built before the table existed still runs.
+        if (host._setAvm2Cff4Fonts && g.get_avm2_cff4_fonts)
+            host._setAvm2Cff4Fonts(g.get_avm2_cff4_fonts(), g.get_avm2_cff4_font_count());
     }
 
     // The JSPI frame loop resumes from promise continuations, so a trap inside a

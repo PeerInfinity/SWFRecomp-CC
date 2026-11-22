@@ -15,6 +15,7 @@
 #include <avm2/avm2_e4x.h>
 #include <avm2/avm2_error.h>
 #include <avm2/avm2_globals.h>
+#include <avm2/avm2_gc.h>
 #include <avm2/avm2_main.h>
 #include <avm2/avm2_object.h>
 #include <memory/heap.h>
@@ -516,10 +517,64 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
 	return 0;
 }
 
+// Primitive-receiver bound-method cache (s24 w2-avm2-small-natives).
+// avmplus caches a method's bound closure per receiver ATOM: an int-valued
+// Number (not -0) is an int atom, so (0.0).f === (0).f; any other double is a
+// freshly boxed atom per read (-0.0 and NaN never share); a String atom is its
+// pointer (interned literals share, a concat result does not; this is also
+// Ruffle's ValueKey, see avm2 RUFFLE_COMPAT_TWEAKS.md); booleans by value.
+// Direct-mapped: a collision only evicts, it never aliases (the full key is
+// compared). Each cached closure holds its receiver in fn_receiver, so a
+// String key can never be reused by a recycled address while it is cached.
+// GC root: avm2_gc_mark_roots_bound_cache.
+#define PBM_SLOTS 1024
+typedef struct { const void* entry; uint32_t kind; int64_t key; Avm2Object* fn; } PrimBound;
+static PrimBound g_pbm[PBM_SLOTS];
+void avm2_gc_mark_roots_bound_cache(void)
+{
+	for (int i = 0; i < PBM_SLOTS; i++)
+		if (g_pbm[i].fn != NULL) avm2_gc_mark_object(g_pbm[i].fn);
+}
+static int pbm_key(Avm2Value v, uint32_t* kind, int64_t* key)
+{
+	switch (v.kind)
+	{
+	case AVM2_VALUE_BOOL: *kind = 2; *key = v.u.b ? 1 : 0; return 1;
+	case AVM2_VALUE_INTEGER: *kind = 3; *key = v.u.i; return 1;
+	case AVM2_VALUE_NUMBER:
+	{
+		double d = v.u.d;
+		if (d != d || (d == 0.0 && signbit(d))) return 0;
+		if (d < -4503599627370496.0 || d > 4503599627370495.0) return 0;
+		if ((double) (int64_t) d != d) return 0;
+		*kind = 3; *key = (int64_t) d; return 1;
+	}
+	case AVM2_VALUE_STRING: *kind = 5; *key = (int64_t) (intptr_t) v.u.str; return 1;
+	default: return 0;
+	}
+}
+
 // Bind a method trait into a bound-method closure, cached per receiver so
-// obj.method === obj.method holds (Ruffle get_bound_method).
+// obj.method === obj.method holds (Ruffle get_bound_method). Objects cache on
+// the holder; primitives go through the atom-keyed side cache above.
 static Avm2Value bind_method_entry(Avm2Context* ctx, const Avm2PropEntry* e, Avm2Value recv)
 {
+	{
+		uint32_t kind; int64_t key;
+		if (recv.kind != AVM2_VALUE_OBJECT && pbm_key(recv, &kind, &key))
+		{
+			uint64_t h = ((uint64_t) (uintptr_t) e * 0x9E3779B97F4A7C15ull)
+			           ^ ((uint64_t) key * 0xC2B2AE3D27D4EB4Full) ^ kind;
+			PrimBound* slot = &g_pbm[(h >> 32) & (PBM_SLOTS - 1)];
+			if (slot->fn != NULL && slot->entry == e && slot->kind == kind
+			    && slot->key == key)
+				return avm2_object_value(slot->fn);
+			Avm2Object* f = avm2_function_new(ctx, &e->method, e->defining_class,
+			                                  e->method_scope, recv, true);
+			slot->entry = e; slot->kind = kind; slot->key = key; slot->fn = f;
+			return avm2_object_value(f);
+		}
+	}
 	Avm2Object* holder = (recv.kind == AVM2_VALUE_OBJECT) ? recv.u.obj : NULL;
 	if (holder != NULL)
 	{

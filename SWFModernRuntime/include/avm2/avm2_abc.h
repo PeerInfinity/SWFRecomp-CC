@@ -503,6 +503,20 @@ typedef struct Avm2FontData
 	uint32_t fallback_count;
 } Avm2FontData;
 
+// A DefineFont4 (tag 91, EMBEDDED_CFF) face, as far as flash.text.engine
+// TextLine metrics need it: the OpenType OS/2 typo ascender/descender and the
+// head unitsPerEm (font units; descender is negative). Glyph outlines are not
+// carried. Main movie only (avm2_generated_cff4_fonts below).
+typedef struct Avm2Cff4FontData
+{
+	const char* name;   // DefineFont4 FontName (UTF-8)
+	uint8_t bold;
+	uint8_t italic;
+	int16_t typo_ascender;
+	int16_t typo_descender;
+	uint16_t units_per_em;
+} Avm2Cff4FontData;
+
 // One rendered glyph of a TextField, as collected by
 // avm2_edittext_collect_glyphs (avm2_text.c) for BitmapData.draw: placement
 // is field-local twips (layout_to_local applied), color is the span's
@@ -650,11 +664,14 @@ extern const uint32_t avm2_generated_edittext_count;
 extern const Avm2FontData avm2_generated_fonts[];
 extern const uint32_t avm2_generated_font_count;
 #endif
-// Device faces declared in the test harness's test.toml (B9). Player-level
-// state, so only the main movie's table exists (never symbol-prefixed).
+// Device faces declared in the test harness's test.toml (B9), and the main
+// movie's DefineFont4 faces (TextLine metrics). Player-level state, so only
+// the main movie's tables exist (never symbol-prefixed).
 #ifdef DYNAMIC_HOST
 extern const Avm2FontData* avm2_generated_device_fonts;
 extern uint32_t avm2_generated_device_font_count;
+extern const Avm2Cff4FontData* avm2_generated_cff4_fonts;
+extern uint32_t avm2_generated_cff4_font_count;
 extern const Avm2StaticGlyph* avm2_generated_static_glyphs;
 extern uint32_t avm2_generated_static_glyph_count;
 extern const Avm2StaticTextData* avm2_generated_statictexts;
@@ -672,6 +689,8 @@ extern uint32_t avm2_generated_bg_color;       // 0xRRGGBB (SetBackgroundColor)
 #else
 extern const Avm2FontData avm2_generated_device_fonts[];
 extern const uint32_t avm2_generated_device_font_count;
+extern const Avm2Cff4FontData avm2_generated_cff4_fonts[];
+extern const uint32_t avm2_generated_cff4_font_count;
 extern const Avm2StaticGlyph avm2_generated_static_glyphs[];
 extern const uint32_t avm2_generated_static_glyph_count;
 extern const Avm2StaticTextData avm2_generated_statictexts[];
