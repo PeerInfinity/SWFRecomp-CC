@@ -6,26 +6,26 @@
 
 **Run Duration**: 62m 25s
 
-**Filtered**: 18 tests ignored out of 780 available
+**Filtered**: 16 tests ignored out of 780 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 762 |
-| Passing | **732** (96.1%) |
+| Total tests | 764 |
+| Passing | **732** (95.8%) |
 | Ruffle-matched | 17 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **749** (98.3%) |
-| Failing | 13 |
-| Total expected lines | 119324 |
-| Matching lines | 115757 (97.0%) |
-| Mismatched lines | 3567 |
+| Effective pass | **749** (98.0%) |
+| Failing | 15 |
+| Total expected lines | 119408 |
+| Matching lines | 115787 (97.0%) |
+| Mismatched lines | 3621 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 13 | 100.0% |
+| Output Mismatch | 15 | 100.0% |
 
 ## Passing Tests
 
@@ -794,16 +794,17 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**6 tests** within reach
+**7 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
 | 1 | `amf0_array_matrix` | 98.0% | 49 | 50 | 1 |  |
 | 2 | `localconnection_serialize_sparse_array_getters` | 96.2% | 25 | 26 | 1 |  |
 | 3 | `video_prototype_lazy` | 95.2% | 20 | 21 | 1 |  |
-| 4 | `lazy_prototype_shared` | 75.0% | 6 | 8 | 2 |  |
-| 5 | `text_format_get_text_extent_own` | 52.6% | 10 | 19 | 9 |  |
-| 6 | `video_prototype_lazy_swf6_child` | 50.0% | 4 | 8 | 4 |  |
+| 4 | `load_vars` | 82.9% | 29 | 35 | 6 | [48](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) |
+| 5 | `lazy_prototype_shared` | 75.0% | 6 | 8 | 2 |  |
+| 6 | `text_format_get_text_extent_own` | 52.6% | 10 | 19 | 9 |  |
+| 7 | `video_prototype_lazy_swf6_child` | 50.0% | 4 | 8 | 4 |  |
 
 ## Segfaults
 
@@ -819,23 +820,25 @@ No timeouts.
 
 ## All Output Mismatches
 
-**13 tests** with output mismatch, sorted by match rate (best first)
+**15 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `amf0_array_matrix` | 98.0% | 49/50 | 50 | 50 |  |
 | 2 | `localconnection_serialize_sparse_array_getters` | 96.2% | 25/26 | 26 | 26 |  |
 | 3 | `video_prototype_lazy` | 95.2% | 20/21 | 21 | 21 |  |
-| 4 | `lazy_prototype_shared` | 75.0% | 6/8 | 8 | 8 |  |
-| 5 | `text_format_get_text_extent_own` | 52.6% | 10/19 | 19 | 19 |  |
-| 6 | `video_prototype_lazy_swf6_child` | 50.0% | 4/8 | 8 | 8 |  |
-| 7 | `edittext_set_text_same` | 40.0% | 28/70 | 70 | 70 |  |
-| 8 | `localconnection_xml_unavailable` | 31.0% | 9/29 | 29 | 23 |  |
-| 9 | `edittext_set_text_same_after_edits` | 30.6% | 30/98 | 98 | 98 |  |
-| 10 | `set_property_values/swf4` | 19.9% | 346/1743 | 1743 | 1571 |  |
-| 11 | `text_format_prototype_lazy` | 17.1% | 6/35 | 27 | 35 |  |
-| 12 | `globals_monkeypatch` | 14.4% | 44/306 | 221 | 306 |  |
-| 13 | `external_interface_monkeypatch` | 2.9% | 4/139 | 65 | 139 |  |
+| 4 | `load_vars` | 82.9% | 29/35 | 30 | 35 | [48](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) |
+| 5 | `lazy_prototype_shared` | 75.0% | 6/8 | 8 | 8 |  |
+| 6 | `text_format_get_text_extent_own` | 52.6% | 10/19 | 19 | 19 |  |
+| 7 | `video_prototype_lazy_swf6_child` | 50.0% | 4/8 | 8 | 8 |  |
+| 8 | `edittext_set_text_same` | 40.0% | 28/70 | 70 | 70 |  |
+| 9 | `localconnection_xml_unavailable` | 31.0% | 9/29 | 29 | 23 |  |
+| 10 | `edittext_set_text_same_after_edits` | 30.6% | 30/98 | 98 | 98 |  |
+| 11 | `set_property_values/swf4` | 19.9% | 346/1743 | 1743 | 1571 |  |
+| 12 | `text_format_prototype_lazy` | 17.1% | 6/35 | 27 | 35 |  |
+| 13 | `globals_monkeypatch` | 14.4% | 44/306 | 221 | 306 |  |
+| 14 | `external_interface_monkeypatch` | 2.9% | 4/139 | 65 | 139 |  |
+| 15 | `stylesheet_load` | 2.0% | 1/49 | 2 | 49 | [48](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) |
 
 ## Investigation Documents
 
@@ -888,7 +891,7 @@ No timeouts.
 | 45 | [GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN.md) | 1 | 1 | 0 |
 | 46 | [GLOBALS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/GLOBALS_PLAN.md) | 26 | 26 | 0 |
 | 47 | [HIT_TESTING_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/HIT_TESTING_PLAN.md) | 16 | 16 | 0 |
-| 48 | [IGNORED_INFRASTRUCTURE_TESTS.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) | 18 | 18 | 0 |
+| 48 | [IGNORED_INFRASTRUCTURE_TESTS.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md) | 20 | 18 | 2 |
 | 49 | [infinite_recursion_function.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/infinite_recursion_function.md) | 3 | 3 | 0 |
 | 50 | [INPUT_DEAD_KEYS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/INPUT_DEAD_KEYS_PLAN.md) | 1 | 1 | 0 |
 | 51 | [issue_768.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/issue_768.md) | 1 | 1 | 0 |

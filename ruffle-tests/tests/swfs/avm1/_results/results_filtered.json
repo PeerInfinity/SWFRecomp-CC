@@ -6,18 +6,18 @@
     "total_available": 780,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 18,
+    "ignored_count": 16,
     "filtered": true
   },
-  "total": 762,
+  "total": 764,
   "pass": 732,
   "ruffle_matched": 17,
-  "fail": 13,
-  "pass_rate": 96.1,
+  "fail": 15,
+  "pass_rate": 95.8,
   "effective_pass": 749,
-  "effective_pass_rate": 98.3,
+  "effective_pass_rate": 98.0,
   "breakdown": {
-    "output_mismatch": 13,
+    "output_mismatch": 15,
     "ruffle_matched": 17
   },
   "tests": [
@@ -6169,6 +6169,25 @@
       "detail": "diffs 3 \u2286 ruffle 3"
     },
     {
+      "test": "load_vars",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 0.947,
+        "run": 0.002
+      },
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 35,
+        "matching_lines": 29
+      },
+      "duration": 0.95,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=30, expected=35)",
+      "actual_output": "... (24 lines before) ...\nLoad: true\nthis.myVar: Hurray\nthis.also: The test passed\nthis.loaded: true\n\ndata: myVar=Hurray&also=The%20test%20passed",
+      "expected_output": "... (24 lines before) ...\nLoad: true\nthis.myVar: Hurray\nthis.also: The test passed\nthis.loaded: true\n\nLoad: true\nthis.myVar: Hurray\nthis.also: The test passed\nthis.loaded: true\n\ndata: myVar=Hurray&also=The%20test%20passed"
+    },
+    {
       "test": "loadmovie",
       "phases": {
         "recomp": 0.003,
@@ -9776,6 +9795,25 @@
       },
       "duration": 1.55,
       "status": "pass"
+    },
+    {
+      "test": "stylesheet_load",
+      "phases": {
+        "recomp": 0.003,
+        "compile": 1.065,
+        "run": 0.002
+      },
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 49,
+        "matching_lines": 1
+      },
+      "duration": 1.07,
+      "status": "output_mismatch",
+      "detail": "48 line(s) differ (actual=2, expected=49)",
+      "actual_output": "/// Load valid\nundefined",
+      "expected_output": "/// Load valid\ntrue\nstyleSheet.parse()\nonLoad(true)\nstyleSheet.getStyle(\"a\") = {\n    \"color\" = string \"blue \"\n}\nstyleSheet.getStyle(\"b\") = {\n    \"color\" = string \"red \"\n}\nstyleSheet.getStyle(\"nonexistant\") = null\n\n/// Load valid2 (merged or not?)\ntrue\nstyleSheet.parse()\nonLoad(true)\nstyleSheet.getStyle(\"a\") = {\n    \"fontStyle\" = string \"italic \"\n}\nstyleSheet.getStyle(\"b\") = {\n    \"color\" = string \"red \"\n}\nstyleSheet.getStyle(\"nonexistant\") = null\n\n/// Load invalid\ntrue\nstyleSheet.parse()\nonLoad(false)\nstyleSheet.getStyle(\"a\") = {\n    \"fontStyle\" = string \"italic \"\n}\nstyleSheet.getStyle(\"b\") = {\n    \"color\" = string \"red \"\n}\nstyleSheet.getStyle(\"nonexistant\") = null\n\n/// Load non existant\ntrue\nonLoad(false)\nstyleSheet.getStyle(\"a\") = {\n    \"fontStyle\" = string \"italic \"\n}\nstyleSheet.getStyle(\"b\") = {\n    \"color\" = string \"red \"\n}\nstyleSheet.getStyle(\"nonexistant\") = null\n\n/// Load no value\nfalse"
     },
     {
       "test": "stylesheet_transform",
