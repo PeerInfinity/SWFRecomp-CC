@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "timestamp": "2026-11-21T21:08:33.346924+00:00",
-    "git_sha": "9a970370e096ca421802a4616b7acb9f32972031",
+    "timestamp": "2026-11-22T00:07:39.368124+00:00",
+    "git_sha": "161ecf124012e98f5652a344cac20090858666e5",
     "duration_seconds": 1.08,
     "total_available": 3
   },
@@ -20,8 +20,8 @@
       "test": "global_instance_decls",
       "phases": {
         "recomp": 0.004,
-        "compile": 0.65,
-        "run": 0.021
+        "compile": 0.662,
+        "run": 0.019
       },
       "num_frames": 1,
       "lines": {
@@ -29,7 +29,7 @@
         "expected_lines": 853,
         "matching_lines": 379
       },
-      "duration": 0.68,
+      "duration": 0.69,
       "status": "output_mismatch",
       "detail": "474 line(s) differ (actual=786, expected=853)",
       "actual_output": "_global.TextSnapshot, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  getCount, DONT_ENUM, type=[function with prototype]\n  setSelected, DONT_ENUM, type=[function]\n  getSelected, DONT_ENUM, type=[function with prototype]\n  getText, DONT_ENUM, type=[function with prototype]\n  getSelectedText, DONT_ENUM, type=[function with prototype]\n  hitTestTextNearPos, DONT_ENUM, type=[function with prototype]\n  findText, DONT_ENUM, type=[function with prototype]\n  setSelectColor, DONT_ENUM, type=[function]\n  getTextRunInfo, DONT_ENUM, type=[function]\n_global.PrintJob, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.MovieClipLoader, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  _listeners, own, DONT_ENUM, type=[object]\n_global.LocalConnection, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.textRenderer, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.flash.automation.Configuration, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  getTestAutomationConfiguration, DONT_ENUM, type=[function]\n  getDeviceConfiguration, DONT_ENUM, type=[function]\n  setDeviceConfiguration, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.ActionGenerator, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  generateAction, DONT_ENUM, type=[function]\n  generateActions, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.StageCapture, instance=[undefined], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.external.ExternalInterface, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function with prototype]\n_global.flash.net.FileReferenceList, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n... (736 lines after) ...",
@@ -39,8 +39,8 @@
       "test": "global_proto_decls",
       "phases": {
         "recomp": 0.003,
-        "compile": 0.143,
-        "run": 0.021
+        "compile": 0.139,
+        "run": 0.02
       },
       "num_frames": 1,
       "lines": {
@@ -58,7 +58,7 @@
       "test": "global_proto_decls_delete",
       "phases": {
         "recomp": 0.003,
-        "compile": 0.117,
+        "compile": 0.116,
         "run": 0.012
       },
       "num_frames": 1,

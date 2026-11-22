@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-21 20:48 UTC
+**Date**: 2026-11-22 00:07 UTC
 
-**Git SHA**: `9a970370e0`
+**Git SHA**: `161ecf1240`
 
-**Run Duration**: 5m 31s
+**Run Duration**: 5m 29s
 
 ## Summary
 
@@ -33,17 +33,17 @@
 |---|------|-------|----------|-------|
 | 1 | `button_test1` | 31 | 2.0s |  |
 | 2 | `edittext_test1` | 47 | 18.0s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 17.7s |  |
-| 4 | `hello` | 4 | 2.4s |  |
-| 5 | `mouse_drag_test` | 12 | 22.6s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 19.1s |  |
-| 7 | `movieclip_destruction_test3` | 18 | 18.2s |  |
-| 8 | `movieclip_destruction_test4` | 40 | 17.5s |  |
-| 9 | `opcode_guard_test2` | 24 | 19.4s |  |
-| 10 | `soft_reference_test1` | 45 | 18.6s |  |
-| 11 | `stackscope` | 11 | 23.4s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 17.6s |  |
+| 4 | `hello` | 4 | 17.7s |  |
+| 5 | `mouse_drag_test` | 12 | 23.7s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 15.9s |  |
+| 7 | `movieclip_destruction_test3` | 18 | 17.8s |  |
+| 8 | `movieclip_destruction_test4` | 40 | 17.9s |  |
+| 9 | `opcode_guard_test2` | 24 | 18.8s |  |
+| 10 | `soft_reference_test1` | 45 | 18.2s |  |
+| 11 | `stackscope` | 11 | 16.2s |  |
 | 12 | `submoviegetvar` | 4 | 18.2s |  |
-| 13 | `swf4opcode` | 117 | 19.1s |  |
+| 13 | `swf4opcode` | 117 | 25.0s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,11 +51,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 24.1s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 24.0s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.9s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 18.6s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 17.9s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 18.6s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 17.8s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.9s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 26.9s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 18.8s |  |
 
 ## Near-Passing Tests
 
