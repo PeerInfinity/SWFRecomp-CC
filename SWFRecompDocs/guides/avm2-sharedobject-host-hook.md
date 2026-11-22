@@ -208,3 +208,24 @@ and the id length).
     boot.
 
   Uses headed WSLg Chrome by default, or `HEADLESS=1`.
+
+## 8. Closeout (2026-11-22, slice RE3 (i))
+
+- **Built:** runtime hook + 2 exports in `avm2_amf.c` (746c39489); exports
+  added to both wasm link lines; browser contract test (18/18 PASS, headed WSLg
+  Chrome); this doc.
+- **Native, no hook:** all 12 AVM2 `amf_*` rows plus `shared_object_get_local_error`
+  and `shared_object_no_root` PASS locally in graphics mode; a no-graphics
+  spot-check (`shared_object_no_root`, `amf_custom_obj`) also PASSES.
+- **Measurements:** §6 (save size) and §5 (the startSave copy-outs aren't
+  copies; the post-deliver `new Game` reads the restored save; caveats about
+  the new-game arm's time reset, botStart's sweep, and a flush-all before the
+  reload).
+- **CI:** `ruffle-tests.yml` mode=graphics categories=full, run `45043930556`.
+  It was still queued at closeout. The local watcher was reaped by the
+  low-memory guard and was not restarted, so the results merge and the
+  regression report are still owed. Pages: the dry run `45043932663` and the
+  real deploy `45044622468` both succeeded.
+- **Not done:** a live Seedling reload on the real p4h page. The copy-out
+  answer comes from reading the AS3. A p4h test wasm was building in the
+  session scratchpad at closeout.
