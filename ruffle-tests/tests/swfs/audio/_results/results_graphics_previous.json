@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-22T03:10:05.672284+00:00",
-    "git_sha": "6b2054090f33673434c8597643431e1fdcf56287",
-    "duration_seconds": 68.92,
+    "timestamp": "2026-11-22T04:48:29.192230+00:00",
+    "git_sha": "3f803679d02fa05c52c453dfca7f7b013abb0165",
+    "duration_seconds": 108.31,
     "total_available": 5,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "aac",
       "phases": {
         "recomp": 0.009,
-        "compile": 7.798,
-        "run": 0.687
+        "compile": 30.429,
+        "run": 0.812
       },
       "num_frames": 400,
       "lines": {
@@ -29,15 +29,15 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 8.5,
+      "duration": 31.26,
       "status": "pass"
     },
     {
       "test": "g711",
       "phases": {
         "recomp": 0.005,
-        "compile": 6.851,
-        "run": 0.801
+        "compile": 22.849,
+        "run": 0.786
       },
       "num_frames": 600,
       "lines": {
@@ -45,15 +45,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 7.66,
+      "duration": 23.65,
       "status": "pass"
     },
     {
       "test": "g711_event_alaw",
       "phases": {
-        "recomp": 0.003,
-        "compile": 17.336,
-        "run": 0.174
+        "recomp": 0.004,
+        "compile": 17.252,
+        "run": 0.173
       },
       "num_frames": 2,
       "lines": {
@@ -61,15 +61,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.52,
+      "duration": 17.43,
       "status": "pass"
     },
     {
       "test": "g711_event_mulaw",
       "phases": {
         "recomp": 0.003,
-        "compile": 16.81,
-        "run": 0.164
+        "compile": 17.296,
+        "run": 0.171
       },
       "num_frames": 2,
       "lines": {
@@ -77,15 +77,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.98,
+      "duration": 17.48,
       "status": "pass"
     },
     {
       "test": "stream_incomplete_loop",
       "phases": {
         "recomp": 0.007,
-        "compile": 17.771,
-        "run": 0.313
+        "compile": 18.007,
+        "run": 0.316
       },
       "num_frames": 120,
       "lines": {
@@ -93,7 +93,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 18.1,
+      "duration": 18.33,
       "status": "pass"
     }
   ]

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-22T03:10:05.696261+00:00",
-    "old_git_sha": "6b2054090f33673434c8597643431e1fdcf56287",
-    "new_timestamp": "2026-11-22T04:48:29.229612+00:00",
-    "new_git_sha": "3f803679d02fa05c52c453dfca7f7b013abb0165",
+    "old_timestamp": "2026-11-22T04:48:29.229612+00:00",
+    "old_git_sha": "3f803679d02fa05c52c453dfca7f7b013abb0165",
+    "new_timestamp": "2026-11-22T07:06:16.511874+00:00",
+    "new_git_sha": "9561027db32b619f6a6044e7e833a1a0ac824ab3",
     "partial": false,
     "same_commit": false
   },
@@ -13,10 +13,10 @@
     "old_effective_pass": 111,
     "old_total": 111,
     "old_pass_rate": 100.0,
-    "new_pass": 111,
+    "new_pass": 114,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 111,
-    "new_total": 111,
+    "new_effective_pass": 114,
+    "new_total": 114,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -26,8 +26,45 @@
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 111,
-    "added": 0,
+    "added": 3,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "avm1_array_native_own_method",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "avm1_attached_clip_tagorder",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      }
+    },
+    {
+      "test": "avm1_attached_clip_tagorder_nonroot",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 34,
+        "expected_lines": 34,
+        "matching_lines": 34
+      }
+    }
+  ]
 }

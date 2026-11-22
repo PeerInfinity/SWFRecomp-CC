@@ -1,15 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6b2054090f33` (2026-11-22T03:10:05.696261+00:00)
-**Current:** `3f803679d02f` (2026-11-22T04:48:29.229612+00:00)
+**Previous:** `3f803679d02f` (2026-11-22T04:48:29.229612+00:00)
+**Current:** `9561027db32b` (2026-11-22T07:06:16.511874+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 111 | 111 | 0 |
-| Total | 111 | 111 | 0 |
+| Passing | 111 | 114 | +3 |
+| Total | 111 | 114 | +3 |
 | Pass rate | 100.0% | 100.0% | 0% |
 | Mismatched lines | 0 | 0 | 0 |
 
-No changes detected.
+## Added Tests (3)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `avm1_array_native_own_method` | pass | 8/8 |
+| `avm1_attached_clip_tagorder` | pass | 34/34 |
+| `avm1_attached_clip_tagorder_nonroot` | pass | 34/34 |
