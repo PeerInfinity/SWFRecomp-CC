@@ -23,7 +23,7 @@ handshake sent).
 | 5 | w1-pixel-nearpass | pixel | ~17 small-excess comparisons | session_018CoDi459cXj5v4ThUCiZ74 |
 | 6 | w1-pixel-text | pixel | acid-text*, captions, hardwrap, stylesheet, edittext device transform/gutter, static_text_offstage (c), acid-color-0 | session_018CoDi7WfMsx8cJhBoubZ9c — DELIVERED; prototype LANDED directly `20cd63b32` (+3 px: `edittext_device_transform_basic`, `_negative`, `edittext_gutter`; firing probe 116 tests) → w2-acid-text-kerning; button-bound EditText (`String_path_variable_button`) HELD until n-play-game lands |
 | 7 | w1-pixel-blend-mask | pixel | layer_alpha/erase, masks, colortransform, place_object_test, bitmapbuttons | session_018CoDi3WCycTC59VRC5FWW5 — DELIVERED; prototype LANDED directly `ee9ea8738` (+3 px: `layer_alpha`, `layer_erase`, `bitmapdata_colortransform`; canary 164/164; s21 layer NO-GO refuted) → w2-avm2-layer-groups, w2-netstream-flv-screen, w2-acid-morph-gradient |
-| 8 | w1-pixel-drawing | both | drawing API, strokes, bitmap fills, dithering; DrawingApiTest hitTest plan | session_018CoDi7j4VX9FRpURSWw5EY |
+| 8 | w1-pixel-drawing | both | drawing API, strokes, bitmap fills, dithering; DrawingApiTest hitTest plan | session_018CoDi7j4VX9FRpURSWw5EY — DELIVERED; prototype LANDED directly `0f35012bd` (+2 px `drawing_order`, `cache_as_bitmap/drawing_api`; band line_gradient_style 1023→33; DrawingApiTest 12→5+2 lines, plan of record refuted; sweep 177 cmp) → w2-avm2-cm-copyfrom, w2-avm1-with-scope |
 
 ## Wave 2 (implementation, cloud)
 
@@ -33,12 +33,15 @@ handshake sent).
 | (landed direct) w1-pixel-blend-mask prototype | w1-pixel-blend-mask 1+2 | px `layer_alpha`, `layer_erase`, `bitmapdata_colortransform` (+3) | — |
 | (landed direct) w1-avm1-proto-timeline prototype | w1-avm1-proto-timeline L4+L5+item 2 | trace `text_format_prototype_lazy` (+1); fixtures `avm1_attached_clip_tagorder_ratio/_po3`, `avm1_array_generic_receivers` | — |
 | (landed direct) w1-pixel-text prototype | w1-pixel-text A+B | px `edittext_device_transform_basic`, `edittext_device_transform_negative`, `edittext_gutter` (+3) | — |
+| (landed direct) w1-pixel-drawing prototype | w1-pixel-drawing A+B+C | px `drawing_order`, `cache_as_bitmap/drawing_api` (+2) | — |
 | w2-avm1-filters | w1-avm1-filters-complete 1+2+3a+4 (+XS side bugs) | 0 corpus; new `regression/avm1_runtime_filters_cm_bitmap`, `avm1_nested_po3_filters` | session_018CoDi6SmBg5ngKPi9f1Fi1 |
 | w2-dynclip-cxform | w1-avm1-filters-complete 5+3b | 0 corpus expected; new `regression/avm1_dynclip_color_transform` | session_018CoDi86KRFXMH7buLiVYv9 |
 | w2-acid-text-kerning | w1-pixel-text C | px `acid-text` (likely, unmeasured) | session_018CoDi5bPZfEpmUKXk6hibE |
 | w2-netstream-flv-screen | w1-pixel-blend-mask L1 | px `netstream_play_flv_screen` (possible; ignored row → prune) | session_018CoDi3Vyahsk5YixoaurwN |
 | w2-avm2-layer-groups | w1-pixel-blend-mask L4+L5 | 0 corpus; fixtures | session_018CoDi4yHAmxMG1pYf1JQnB |
-| w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | session_018CoDi5kNpLqLbTbXGooXKw |
+| w2-acid-morph-gradient | w1-pixel-blend-mask L2 | px `acid-morph` (unpriced) | session_018CoDi5kNpLqLbTbXGooXKw — DELIVERED, LANDED `78f15f639` (+1 px `acid-morph`; premise refuted: recompiler morph ramp over-emitted rows; generated C identical for 122 SWFs). NB commit trailer carries the worker's session URL by mistake |
+| w2-avm2-cm-copyfrom | w1-pixel-drawing D+E | px `bitmapdata_draw_filters`, `graphics_direct_commands` (unpriced) | |
+| w2-avm1-with-scope | w1-pixel-drawing C residual | trace DrawingApiTest lines (flip unpriced) | |
 
 ## Grading runs
 
