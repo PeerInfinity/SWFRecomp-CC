@@ -34,6 +34,10 @@ extern int g_tag_skip_mode;
 
 #include <limits.h>  // INT_MIN (freed-MC sentinel depth)
 
+// s25 prototype: number of LAYER (blend mode 2) groups currently being drawn
+// into an offscreen; Alpha/Erase are only honoured when > 0.
+static int g_layer_group_depth = 0;
+
 // --- Per-frame-walk MovieClip resolution cache -----------------------------
 // The hot per-frame tree walks (advance_sprite_children_only,
 // presync_nested_cf_recurse, ...) resolve each sprite node's MovieClip* by
@@ -4926,14 +4930,25 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		{
 			// Alpha / Erase with no Layer above them: Flash drops the draw.
 			if (obj->blend_mode == 11 || obj->blend_mode == 12)
+			{
+				if (g_layer_group_depth == 0)
+					continue;
+				// s25 prototype: inside a LAYER group, multiply (alpha) or
+				// cut (erase) the group's offscreen by this subtree's alpha.
+				renderer_set_blend_mode(context, obj->blend_mode);
+				render_single_object(app_context, obj);
+				renderer_set_blend_mode(context, 0);
 				continue;
+			}
 			if (obj->filter_type == 0
 			    && renderer_blend_mode_is_layered(context, obj->blend_mode))
 			{
 				renderer_suspend_pass(context);
 				renderer_capture_backdrop(context, obj->blend_mode);
 				renderer_begin_offscreen_pass(context);
+				if (obj->blend_mode == 2) g_layer_group_depth++;
 				render_single_object(app_context, obj);
+				if (obj->blend_mode == 2) g_layer_group_depth--;
 				renderer_end_offscreen_pass(context);
 				renderer_resume_pass(context);
 				renderer_composite_blend(context, obj->blend_mode,
@@ -8012,7 +8027,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		// "An Alpha or Erase with no Layer above it should be ignored"). We have no
 		// layer groups yet, so "no layer above" is unconditionally true. When layer
 		// groups land, this condition becomes a layer-stack query.
-		int blend_skip = (obj->blend_mode == 11 || obj->blend_mode == 12);
+		int blend_skip = (obj->blend_mode == 11 || obj->blend_mode == 12)
+			&& g_layer_group_depth == 0;
 		// Non-trivial blend modes render the object's whole subtree into a layer
 		// and composite it once. Filter+blend on the same object both want
 		// filter_tex_a, so blend keeps the legacy per-draw pipeline there.
@@ -8034,7 +8050,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			renderer_suspend_pass(context);
 			renderer_capture_backdrop(context, obj->blend_mode);
 			renderer_begin_offscreen_pass(context);
+			if (obj->blend_mode == 2) g_layer_group_depth++;
 			render_single_object(app_context, obj);
+			if (obj->blend_mode == 2) g_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
 			renderer_composite_blend(context, obj->blend_mode,
@@ -9028,7 +9046,8 @@ void tagShowFrame(SWFAppContext* app_context)
 
 		// Alpha (11) / Erase (12) with no Layer above them are IGNORED by Flash;
 		// see the matching comment in the stage display loop.
-		int blend_skip = (obj->blend_mode == 11 || obj->blend_mode == 12);
+		int blend_skip = (obj->blend_mode == 11 || obj->blend_mode == 12)
+			&& g_layer_group_depth == 0;
 		// Non-trivial blend modes render into their own layer and composite once.
 		int blend_layered = !blend_skip && obj->filter_type == 0
 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
@@ -9054,7 +9073,9 @@ void tagShowFrame(SWFAppContext* app_context)
 			renderer_suspend_pass(context);
 			renderer_capture_backdrop(context, obj->blend_mode);
 			renderer_begin_offscreen_pass(context);
+			if (obj->blend_mode == 2) g_layer_group_depth++;
 			render_single_object(app_context, obj);
+			if (obj->blend_mode == 2) g_layer_group_depth--;
 			renderer_end_offscreen_pass(context);
 			renderer_resume_pass(context);
 			renderer_composite_blend(context, obj->blend_mode,

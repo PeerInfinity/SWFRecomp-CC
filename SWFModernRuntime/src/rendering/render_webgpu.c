@@ -341,8 +341,7 @@ static const char* fragment_wgsl =
 "  return c;\n"
 "}\n"
 "\n"
-"@fragment\n"
-"fn fs_main(in: FragmentInput) -> @location(0) vec4f {\n"
+"fn shade_main(in: FragmentInput) -> vec4f {\n"
 "  // Compute ONLY the texture sample the fill type actually needs, so a solid-colour\n"
 "  // fragment does zero texture ops (the common case for fill-heavy/high-overdraw\n"
 "  // content). Two WGSL facts make this legal inside non-uniform branches:\n"
@@ -392,6 +391,18 @@ static const char* fragment_wgsl =
 "  // without the guard that column masked at 25 percent instead of 0.\n"
 "  if ((in.v_style_type & 0xF0u) == 0x40u && color.a <= 0.0) { return color; }\n"
 "  return apply_cxform(color, in.v_cxform_id);\n"
+"}\n"
+"\n"
+"@fragment\n"
+"fn fs_main(in: FragmentInput) -> @location(0) vec4f { return shade_main(in); }\n"
+"\n"
+// s25 layer groups: ruffle's alpha/erase blend shaders `discard` where the
+// child's (8-bit) layer alpha is 0, leaving the group untouched there.
+"@fragment\n"
+"fn fs_alpha_layer(in: FragmentInput) -> @location(0) vec4f {\n"
+"  let c = shade_main(in);\n"
+"  if (c.a * 255.0 < 0.5) { discard; }\n"
+"  return c;\n"
 "}\n";
 
 static const char* compute_wgsl =
@@ -2523,6 +2534,30 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		assert(ctx->blend_subtract_pipeline != NULL);
 	}
 
+	// s25 layer groups. Alpha (11): dst *= src.a; Erase (12): dst *= 1 - src.a,
+	// on colour AND alpha (ruffle shaders/blend/{alpha,erase}.wgsl). Only ever
+	// bound inside a LAYER group's offscreen pass (tag.c g_layer_group_depth).
+	for (int ae = 0; ae < 2; ae++)
+	{
+		WGPUBlendFactor f = ae == 0 ? WGPUBlendFactor_SrcAlpha : WGPUBlendFactor_OneMinusSrcAlpha;
+		WGPUBlendState bs = {0};
+		bs.color.srcFactor = WGPUBlendFactor_Zero;
+		bs.color.dstFactor = f;
+		bs.color.operation = WGPUBlendOperation_Add;
+		bs.alpha = bs.color;
+		WGPUColorTargetState ct_ae = color_target;
+		ct_ae.blend = &bs;
+		WGPUFragmentState fs_ae = frag_state;
+		fs_ae.targets = &ct_ae;
+		fs_ae.entryPoint.data = "fs_alpha_layer";
+		fs_ae.entryPoint.length = 14;
+		rp_desc.label = WGPU_LABEL(ae == 0 ? "blend_alpha_pipeline" : "blend_erase_pipeline");
+		rp_desc.fragment = &fs_ae;
+		WGPURenderPipeline pl = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(pl != NULL);
+		if (ae == 0) ctx->blend_alpha_pipeline = pl; else ctx->blend_erase_pipeline = pl;
+	}
+
 	// Premultiplied alpha (for attached BitmapData): One / OneMinusSrcAlpha
 	{
 		WGPUBlendState blend_premul = {0};
@@ -3918,6 +3953,8 @@ void render_webgpu_set_blend_mode(WebGPURenderContext* ctx, u8 blend_mode)
 		case 6: pipeline = ctx->blend_darken_pipeline; break;
 		case 8: pipeline = ctx->blend_add_pipeline; break;
 		case 9: pipeline = ctx->blend_subtract_pipeline; break;
+		case 11: pipeline = ctx->blend_alpha_pipeline; break;
+		case 12: pipeline = ctx->blend_erase_pipeline; break;
 		default:
 			// Normal or unsupported — and this is also how the display loops
 			// UNDO a blend mode (`set_blend_mode(context, 0)`), so it has to
@@ -5011,7 +5048,7 @@ void render_webgpu_ensure_filter_resources(WebGPURenderContext* ctx)
 // (0,0,0,0) and draws into with SrcAlpha/OneMinusSrcAlpha — so it comes out
 // PREMULTIPLIED, exactly ruffle's layer surface.
 
-static int blend_mode_is_trivial_layer(u8 m) { return m == 4 || m == 8 || m == 9; }
+static int blend_mode_is_trivial_layer(u8 m) { return m == 2 || m == 4 || m == 8 || m == 9; }
 static int blend_mode_is_complex(u8 m)
 {
 	return m == 3 || m == 5 || m == 6 || m == 7 || m == 10 || m == 13 || m == 14;
@@ -5185,8 +5222,9 @@ static void render_webgpu_ensure_blend_resources(WebGPURenderContext* ctx)
 			{ 4, WGPUBlendFactor_OneMinusSrc, WGPUBlendOperation_Add,             "blend_layer_screen" },
 			{ 8, WGPUBlendFactor_One,         WGPUBlendOperation_Add,             "blend_layer_add" },
 			{ 9, WGPUBlendFactor_One,         WGPUBlendOperation_ReverseSubtract, "blend_layer_subtract" },
+			{ 2, WGPUBlendFactor_OneMinusSrcAlpha, WGPUBlendOperation_Add,         "blend_layer_layer" },
 		};
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 4; i++)
 		{
 			WGPUBlendState bs = {0};
 			bs.color.srcFactor = WGPUBlendFactor_One;

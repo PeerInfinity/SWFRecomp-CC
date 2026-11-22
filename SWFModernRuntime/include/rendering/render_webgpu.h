@@ -390,6 +390,9 @@ typedef struct WebGPURenderContext
 		WGPUBuffer stage_buf;          // padded stage_to_ndc
 		WGPUBindGroup vertex_uniform_bg; // vertex_uniform_bg twin over stage_buf
 	} pad_sets[8];
+	// s25 layer groups: per-draw ALPHA (11) / ERASE (12) inside a LAYER group
+	WGPURenderPipeline blend_alpha_pipeline;
+	WGPURenderPipeline blend_erase_pipeline;
 } WebGPURenderContext;
 
 // SWF fill-style byte for a bitmap fill, and the ONLY place a caller should

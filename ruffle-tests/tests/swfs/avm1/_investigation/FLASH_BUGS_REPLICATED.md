@@ -147,6 +147,11 @@ if (aMult > 1.0 && rMult == 1.0 && gMult == 1.0 && bMult == 1.0 &&
 }
 ```
 
+**AVM2 twin (s25, `w1-pixel-blend-mask`)**: `avm2/bitmapdata_colortransform` has the same row (bitmap 4, last line).
+`bd_color_transform` in `SWFModernRuntime/src/avm2/avm2_bitmap.c` now returns early when
+`rm == gm == bm == 256 && am >= 256` and every offset is 0 (Ruffle's condition `a_multiply >= ONE`, so the identity
+transform is skipped too). Measured 726 outliers → 0.
+
 **Impact**: Without this fix, pixels in the aMult-only row had exactly 2x the expected
 RGB values (726 outliers at tolerance 5, max diff 125). With the fix, 0 outliers.
 

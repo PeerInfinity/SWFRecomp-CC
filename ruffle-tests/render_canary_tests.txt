@@ -617,3 +617,11 @@ text/br_at_start                            # fractional tag leading           1
 # tier=1
 avm2/bitmapdata_encode_jpeg_visual          # JPEG encode round trip (tol 14)  1 cmp
 avm2/pixelbender_effect_glassDisplace_shaderfilter # ShaderFilter display + applyFilter 1 cmp
+# s25 w1-pixel-blend-mask: layer groups (LAYER isolates its subtree; ALPHA/ERASE
+# children composite into it) + AVM2 BitmapData.colorTransform aMult-only no-op.
+# The standing set had no LAYER/ALPHA/ERASE member. Both layer rows are zero-headroom
+# on max_diff (max == tolerance).
+# tier=1
+visual/blend_modes/layer_alpha              # LAYER + ALPHA child (tol 2)  1 cmp
+visual/blend_modes/layer_erase              # LAYER + ERASE child (tol 3)  1 cmp
+avm2/bitmapdata_colortransform              # aMult-only Flash bug, AVM2 twin  1 cmp

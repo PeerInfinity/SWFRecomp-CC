@@ -1918,6 +1918,13 @@ static Avm2Value bd_color_transform(Avm2Activation* act)
 	int16_t bo = (int16_t) read_prop_num(ctx, ctv, "blueOffset");
 	int16_t ao = (int16_t) read_prop_num(ctx, ctv, "alphaOffset");
 
+	// Flash bug (FLASH_BUGS_REPLICATED.md, AVM1 twin in action.c): a transform
+	// whose only non-default term is alphaMultiplier >= 1 leaves the bitmap
+	// untouched (ruffle core/src/bitmap/operations.rs color_transform).
+	if (rm == 256 && gm == 256 && bm == 256 && am >= 256
+	    && ro == 0 && go == 0 && bo == 0 && ao == 0)
+		return avm2_undefined();
+
 	uint32_t x_min = rx < 0 ? 0 : (uint32_t) rx;
 	uint32_t y_min = ry < 0 ? 0 : (uint32_t) ry;
 	int64_t xmv = (int64_t) rx + rw, ymv = (int64_t) ry + rh;
