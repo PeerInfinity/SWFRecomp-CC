@@ -1,0 +1,827 @@
+diff --git a/SWFModernRuntime/include/avm2/avm2_globals.h b/SWFModernRuntime/include/avm2/avm2_globals.h
+index 7bab78c8..df5e6cf4 100644
+--- a/SWFModernRuntime/include/avm2/avm2_globals.h
++++ b/SWFModernRuntime/include/avm2/avm2_globals.h
+@@ -878,6 +878,10 @@ int avm2_net_netstream_video_frame(const Avm2Object* ns, const uint32_t** out_ar
+ // silence). Returns 1 when at least one stream has audio. Feeds
+ // SoundMixer.computeSpectrum.
+ int avm2_net_netstream_audio_window(float* out, int frames);
++#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
++void avm2_media_harness_mix(int64_t clock, int frames);
++void avm2_media_harness_window(float* out, int64_t blk, int frames);
++#endif
+ // The movie's LocalConnection domain (avm2_globals.c owns the URL parsing).
+ const char* avm2_local_connection_domain(void);
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_gc.c b/SWFModernRuntime/src/avm2/avm2_gc.c
+index 9b617156..8c31a157 100644
+--- a/SWFModernRuntime/src/avm2/avm2_gc.c
++++ b/SWFModernRuntime/src/avm2/avm2_gc.c
+@@ -1006,6 +1006,7 @@ static void gc_collect(Avm2Context* ctx)
+ 	avm2_gc_mark_roots_amf(ctx);
+ 	g_why_parent = NULL; WHY_SET("root:media", 0);
+ 	avm2_gc_mark_roots_media(ctx);
++	{ extern void avm2_ops_mark_bound_cache(void); avm2_ops_mark_bound_cache(); }
+ 	g_why_parent = NULL; WHY_SET("root:net", 0);
+ 	avm2_gc_mark_roots_net(ctx);
+ 	g_why_parent = NULL; WHY_SET("root:external", 0);
+diff --git a/SWFModernRuntime/src/avm2/avm2_globals.c b/SWFModernRuntime/src/avm2/avm2_globals.c
+index e09c0f93..28641aea 100644
+--- a/SWFModernRuntime/src/avm2/avm2_globals.c
++++ b/SWFModernRuntime/src/avm2/avm2_globals.c
+@@ -6543,6 +6543,7 @@ static Avm2Class* g_appdomain_class;
+ // the script may drop its only other reference and keep using the memory
+ // opcodes.
+ void avm2_gc_mark_roots_platform_stubs(void);
++void avm2_gc_mark_roots_worker(void);
+ 
+ void avm2_gc_mark_roots_globals(Avm2Context* ctx)
+ {
+@@ -6550,6 +6551,7 @@ void avm2_gc_mark_roots_globals(Avm2Context* ctx)
+ 		avm2_gc_mark_object(s->obj);
+ 	avm2_gc_mark_object(ctx->domain_memory);
+ 	avm2_gc_mark_roots_platform_stubs();
++	avm2_gc_mark_roots_worker();
+ }
+ 
+ // An ApplicationDomain instance carries the scope it stands for in its
+@@ -7393,6 +7395,131 @@ static Avm2Value crypto_generate_random_bytes(Avm2Activation* act)
+ 	return v;
+ }
+ 
++// PROTOTYPE (s24 w1-avm2-tail): flash.system.Worker state machine, port of
++// Ruffle avm2/object/worker_object.rs + globals/flash/system/worker*.rs.
++typedef struct WorkerExt
++{
++	Avm2EventDispatcherExt dispatcher;   // MUST be first
++	uint8_t primordial, started, state, announced;   // state: 0 new 1 running 2 terminated
++} WorkerExt;
++static Avm2Class* g_worker_class;
++static Avm2Object* g_worker_primordial;
++static Avm2Object* g_worker_domain;
++static Avm2Class* g_worker_domain_class;
++#define WORKER_PENDING_MAX 64
++static Avm2Object* g_worker_pending[WORKER_PENDING_MAX];
++static int g_worker_pending_count;
++
++static WorkerExt* worker_ext(Avm2Activation* act)
++{
++	if (act->this_val.kind != AVM2_VALUE_OBJECT) return NULL;
++	Avm2Object* o = act->this_val.u.obj;
++	return (o->cls == g_worker_class) ? (WorkerExt*) o->native_ext : NULL;
++}
++static Avm2Object* worker_mint(Avm2Context* ctx, int primordial)
++{
++	Avm2Value v = avm2_class_construct(ctx, g_worker_class, NULL, 0);
++	WorkerExt* w = (WorkerExt*) v.u.obj->native_ext;
++	w->primordial = (uint8_t) primordial;
++	w->state = primordial ? 1 : 0;
++	return v.u.obj;
++}
++static _Noreturn void worker_throw_frame(Avm2Context* ctx, const char* frame,
++                                         Avm2Class* cls, const char* msg)
++{
++	(void) frame;   // the native call already carries its own frame
++	avm2_throw_error(ctx, cls, "%s", msg);
++}
++static void worker_queue(Avm2Object* o)
++{
++	if (g_worker_pending_count < WORKER_PENDING_MAX)
++		g_worker_pending[g_worker_pending_count++] = o;
++}
++static Avm2Value worker_get_current(Avm2Activation* act)
++{
++	if (g_worker_primordial == NULL) g_worker_primordial = worker_mint(act->ctx, 1);
++	return avm2_object_value(g_worker_primordial);
++}
++static Avm2Value worker_get_is_primordial(Avm2Activation* act)
++{
++	WorkerExt* w = worker_ext(act);
++	return avm2_bool(w != NULL && w->primordial);
++}
++static Avm2Value worker_get_state(Avm2Activation* act)
++{
++	WorkerExt* w = worker_ext(act);
++	static const char* names[] = { "new", "running", "terminated" };
++	return avm2_string(avm2_string_from_literal(act->ctx, names[w != NULL ? w->state : 0]));
++}
++static Avm2Value worker_start(Avm2Activation* act)
++{
++	WorkerExt* w = worker_ext(act);
++	if (w == NULL) return avm2_undefined();
++	if (w->primordial || w->started)
++		worker_throw_frame(act->ctx, "flash.system::Worker/start",
++		                   act->ctx->builtins.illegal_operation_error_class,
++		                   "Error #1511: Worker is already started.");
++	w->started = 1;
++	worker_queue(act->this_val.u.obj);
++	return avm2_undefined();
++}
++static Avm2Value worker_terminate(Avm2Activation* act)
++{
++	WorkerExt* w = worker_ext(act);
++	if (w == NULL) return avm2_bool(false);
++	if (w->primordial)
++		worker_throw_frame(act->ctx, "flash.system::Worker/terminate",
++		                   act->ctx->builtins.illegal_operation_error_class,
++		                   "Error #3732: Worker.terminate is only available for background workers.");
++	if (!w->started || w->state == 2) return avm2_bool(false);
++	w->state = 2;
++	worker_queue(act->this_val.u.obj);
++	return avm2_bool(true);
++}
++static Avm2Value worker_domain_get_current(Avm2Activation* act)
++{
++	if (g_worker_domain == NULL && g_worker_domain_class != NULL)
++		g_worker_domain = avm2_class_construct(act->ctx, g_worker_domain_class, NULL, 0).u.obj;
++	return g_worker_domain != NULL ? avm2_object_value(g_worker_domain) : avm2_null();
++}
++static Avm2Value worker_domain_create_worker(Avm2Activation* act)
++{
++	if (act->argc == 0 || act->args[0].kind == AVM2_VALUE_NULL
++	    || act->args[0].kind == AVM2_VALUE_UNDEFINED)
++		worker_throw_frame(act->ctx, "flash.system::WorkerDomain/createWorker",
++		                   act->ctx->builtins.type_error_class,
++		                   "Error #2007: Parameter swf must be non-null.");
++	return avm2_object_value(worker_mint(act->ctx, 0));
++}
++// Ruffle Avm2::update_pending_workers: workers queued by the handlers wait
++// for the next call.
++void avm2_worker_poll(Avm2Context* ctx)
++{
++	int count = g_worker_pending_count;
++	if (count == 0) return;
++	Avm2Object* batch[WORKER_PENDING_MAX];
++	memcpy(batch, g_worker_pending, (size_t) count * sizeof(Avm2Object*));
++	g_worker_pending_count = 0;
++	for (int i = 0; i < count; i++)
++	{
++		WorkerExt* w = (WorkerExt*) batch[i]->native_ext;
++		if (w->primordial) continue;
++		if (w->started && w->state == 0) w->state = 1;
++		if (w->announced != w->state)
++		{
++			w->announced = w->state;
++			Avm2Object* ev = avm2_event_new(ctx, avm2_string_from_literal(ctx, "workerState"), 0, 0);
++			if (ev != NULL) avm2_dispatch_event(ctx, batch[i], ev);
++		}
++	}
++}
++void avm2_gc_mark_roots_worker(void)
++{
++	avm2_gc_mark_object(g_worker_primordial);
++	avm2_gc_mark_object(g_worker_domain);
++	for (int i = 0; i < g_worker_pending_count; i++) avm2_gc_mark_object(g_worker_pending[i]);
++}
++
+ static void register_platform_stubs(Avm2Context* ctx)
+ {
+ 	Avm2Class* obj = ctx->builtins.object_class;
+@@ -7431,6 +7558,19 @@ static void register_platform_stubs(Avm2Context* ctx)
+ 	avm2_builtin_add_static_getset(ctx, made[7], "isSupported", stub_false, NULL);
+ 	// GameInputControl is [Ruffle(Abstract)] but `dynamic`.
+ 	made[9]->flags &= ~(uint32_t) AVM2_CLASS_FLAG_SEALED;
++	// PROTOTYPE: Worker / WorkerDomain members.
++	g_worker_class = made[6];
++	made[6]->native_init = stub_native_init_abstract_script_only;
++	made[6]->native_ext_size = sizeof(WorkerExt);
++	avm2_builtin_add_static_getset(ctx, made[6], "current", worker_get_current, NULL);
++	avm2_builtin_add_getset(ctx, made[6], "isPrimordial", worker_get_is_primordial, NULL);
++	avm2_builtin_add_getset(ctx, made[6], "state", worker_get_state, NULL);
++	avm2_builtin_add_method(ctx, made[6], "start", worker_start);
++	avm2_builtin_add_method(ctx, made[6], "terminate", worker_terminate);
++	made[7]->native_init = stub_native_init_abstract_script_only;
++	avm2_builtin_add_static_getset(ctx, made[7], "current", worker_domain_get_current, NULL);
++	avm2_builtin_add_method(ctx, made[7], "createWorker", worker_domain_create_worker);
++	g_worker_domain_class = made[7];
+ 
+ 	// flash.system.SecurityDomain — see secdomain_native_init.
+ 	{
+diff --git a/SWFModernRuntime/src/avm2/avm2_media.c b/SWFModernRuntime/src/avm2/avm2_media.c
+index 26f6a842..38e74a6c 100644
+--- a/SWFModernRuntime/src/avm2/avm2_media.c
++++ b/SWFModernRuntime/src/avm2/avm2_media.c
+@@ -210,6 +210,12 @@ typedef struct Avm2SoundChannelExt
+ 	// identically in no-graphics and graphics (mode parity).
+ 	double sim_elapsed_ms, sim_duration_ms;
+ 	uint8_t sim_live;
++	// Set when the simulated clock drained (not on stop()): position then
++	// reports sim_final_ms, the sound's own length (Ruffle bcac30c19 —
++	// audio.rs sets a finished AVM2 channel's position to its duration).
++	uint8_t sim_done;
++	double sim_final_ms;
++	double mixer_len_ms;   // the playing sound's length (mixer drain -> position)
+ } Avm2SoundChannelExt;
+ 
+ static void sound_channel_native_init(Avm2Context* ctx, Avm2Object* obj)
+@@ -307,6 +313,7 @@ static Avm2Value sc_get_position(Avm2Activation* act)
+ 	Avm2SoundChannelExt* sc = this_sc(act);
+ 	if (sc == NULL) return avm2_number(0.0);
+ 	if (sc->sim_live) return avm2_number(sc->sim_elapsed_ms);
++	if (sc->sim_done) return avm2_number(sc->sim_final_ms);
+ #ifndef NO_GRAPHICS
+ 	// Live mixer playback clock (browser builds; in the native test harness
+ 	// nothing pulls audio_mix, so an active channel reports 0 — trace-inert).
+@@ -416,6 +423,48 @@ void avm2_media_register_mixer_transform(Avm2Context* ctx, Avm2Class* cls)
+ 	                        sm_set_sound_transform);
+ }
+ 
++#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
++// PROTOTYPE (s24 w1-avm2-tail): with_audio harness mixer tap. Ruffle's
++// TestAudioBackend mixes round(2*44100/fps)/2 frames per tick; avm2_net.c's
++// ns_video_tick advances the shared mixer clock and calls this with the
++// frames of that tick, so the real mixer (embedded Sound channels) is pulled
++// on the same clock as the NetStream tap and its output is kept in a ring
++// keyed by absolute clock frame for computeSpectrum.
++#define HM_RING 16384
++static float g_hm_ring[HM_RING * 2];
++static int64_t g_hm_written;      // absolute clock frames mixed so far
++static SWFAppContext* g_hm_app;
++void avm2_media_harness_mix(int64_t clock, int frames)
++{
++	if (g_hm_app == NULL || g_hm_app->audio_ctx == NULL || frames <= 0)
++	{
++		g_hm_written = clock + frames;
++		return;
++	}
++	static float buf[HM_RING * 2];
++	if (frames > HM_RING) frames = HM_RING;
++	audio_mix((AudioContext*) g_hm_app->audio_ctx, buf, (size_t) frames, 2, 44100);
++	for (int k = 0; k < frames; k++)
++	{
++		size_t r = (size_t) ((clock + k) & (HM_RING - 1)) * 2;
++		g_hm_ring[r] = buf[k * 2];
++		g_hm_ring[r + 1] = buf[k * 2 + 1];
++	}
++	g_hm_written = clock + frames;
++}
++void avm2_media_harness_window(float* out, int64_t blk, int frames)
++{
++	for (int k = 0; k < frames; k++)
++	{
++		int64_t idx = blk + k;
++		if (idx < 0 || idx >= g_hm_written || idx < g_hm_written - HM_RING) continue;
++		size_t r = (size_t) (idx & (HM_RING - 1)) * 2;
++		out[(size_t) k * 2] += g_hm_ring[r];
++		out[(size_t) k * 2 + 1] += g_hm_ring[r + 1];
++	}
++}
++#endif
++
+ // SoundMixer.computeSpectrum(outputArray, FFTMode = false, stretchFactor = 0)
+ // — port of Ruffle sound_mixer.rs compute_spectrum over the mix history.
+ // The history is the last 512 stereo frames of the NetStream audio tap
+@@ -797,6 +846,7 @@ static Avm2Value sound_play(Avm2Activation* act)
+ 			sc->mixer_gen = gen;
+ 			sc->mixer_live = 1;
+ 			g_live_channels[mch] = ch;
++			sc->mixer_len_ms = sound_length_ms(s);
+ 		}
+ 	}
+ #endif
+@@ -813,11 +863,41 @@ static Avm2Value sound_play(Avm2Activation* act)
+ 			if (g_sim_channels[i] != NULL) continue;
+ 			sc->sim_elapsed_ms = position > 0.0 ? position : 0.0;
+ 			sc->sim_duration_ms = s->ext_duration_ms;
++			sc->sim_final_ms = s->ext_duration_ms;
+ 			sc->sim_live = 1;
+ 			g_sim_channels[i] = ch;
+ 			break;
+ 		}
+ 	}
++#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
++	g_hm_app = ctx->app;
++#endif
++#ifdef SWF_HARNESS_WITH_AUDIO
++	// PROTOTYPE (s24 w1-avm2-tail): test.toml `with_audio = true` means
++	// Ruffle's test framework runs a real (TestAudioBackend) mixer, so
++	// embedded sounds drain and soundComplete fires. Nothing pulls audio_mix
++	// in the native harness, so simulate the embedded clock the same way the
++	// URL path above does: each of max(loops,1) passes plays start..length.
++	if (ch != NULL && s->has_sound && sound_length_ms(s) > 0.0
++	    && !((Avm2SoundChannelExt*) ch->native_ext)->mixer_live)
++	{
++		Avm2SoundChannelExt* sc = (Avm2SoundChannelExt*) ch->native_ext;
++		int32_t loops = act->argc > 1 ? avm2_coerce_to_i32(ctx, act->args[1]) : 0;
++		if (loops < 1) loops = 1;
++		double len = sound_length_ms(s);
++		double start = position > 0.0 ? position : 0.0;
++		for (int i = 0; i < AVM2_MAX_SIM_CHANNELS; i++)
++		{
++			if (g_sim_channels[i] != NULL) continue;
++			sc->sim_elapsed_ms = start;
++			sc->sim_duration_ms = start + (double) loops * (len - start);
++			sc->sim_final_ms = len;
++			sc->sim_live = 1;
++			g_sim_channels[i] = ch;
++			break;
++		}
++	}
++#endif
+ 	return avm2_object_value(ch);
+ }
+ 
+@@ -1309,7 +1389,17 @@ static void media_poll_simulated(Avm2Context* ctx)
+ 		// Unregister BEFORE dispatch: the handler may start a new playback.
+ 		sc->sim_elapsed_ms = sc->sim_duration_ms;
+ 		sc->sim_live = 0;
++		sc->sim_done = 1;
+ 		g_sim_channels[i] = NULL;
++#ifndef NO_GRAPHICS
++		if (sc->mixer_live)
++		{
++			audio_channel_stop(ctx->app, sc->mixer_ch, sc->mixer_gen);
++			if (g_live_channels[sc->mixer_ch] == obj)
++				g_live_channels[sc->mixer_ch] = NULL;
++			sc->mixer_live = 0;
++		}
++#endif
+ 		Avm2Object* ev = avm2_event_new(
+ 			ctx, avm2_string_from_literal(ctx, "soundComplete"), 0, 0);
+ 		if (ev != NULL) avm2_dispatch_event(ctx, obj, ev);
+@@ -1321,6 +1411,7 @@ static void media_poll_simulated(Avm2Context* ctx)
+ // caller wraps it in the tick's catch-all try frame).
+ void avm2_media_poll(Avm2Context* ctx)
+ {
++	{ extern void avm2_worker_poll(Avm2Context*); avm2_worker_poll(ctx); }
+ 	media_poll_simulated(ctx);
+ #ifndef NO_GRAPHICS
+ 	for (int i = 0; i < MAX_SOUND_CHANNELS; i++)
+@@ -1334,6 +1425,8 @@ void avm2_media_poll(Avm2Context* ctx)
+ 		// on this same (now free) mixer slot.
+ 		g_live_channels[i] = NULL;
+ 		sc->mixer_live = 0;
++		sc->sim_done = 1;
++		sc->sim_final_ms = sc->mixer_len_ms;
+ 		Avm2Object* ev = avm2_event_new(
+ 			ctx, avm2_string_from_literal(ctx, "soundComplete"), 0, 0);
+ 		avm2_dispatch_event(ctx, obj, ev);
+diff --git a/SWFModernRuntime/src/avm2/avm2_net.c b/SWFModernRuntime/src/avm2/avm2_net.c
+index 8a558b5a..44344fec 100644
+--- a/SWFModernRuntime/src/avm2/avm2_net.c
++++ b/SWFModernRuntime/src/avm2/avm2_net.c
+@@ -2321,6 +2321,11 @@ typedef struct NsVideoStream
+ 	uint32_t* argb;               // last decoded frame, premultiplied ARGB
+ 	int w, h;
+ 	NsAudio audio;                // FLV audio tap (computeSpectrum)
++	// PROTOTYPE (s24 w1-avm2-tail): Ruffle streams.rs status-event state.
++	uint8_t playing;
++	uint8_t has_seek;
++	double queued_seek_ms;
++	uint32_t gen;                 // bumped by every play(): "source replaced"
+ } NsVideoStream;
+ 
+ #define NS_MAX_VIDEO_STREAMS 8
+@@ -2368,6 +2373,9 @@ static void ns_video_start(Avm2Object* ns, const unsigned char* data, size_t len
+ 	v->offset = off + 4;   // first PreviousTagSize
+ 	v->stream_time = 0;
+ 	v->loaded = 0;
++	v->playing = 1;
++	v->has_seek = 0;
++	v->gen++;
+ }
+ 
+ static void ns_video_store_frame(NsVideoStream* v, unsigned char* rgba, int w, int h)
+@@ -2439,8 +2447,73 @@ static void ns_video_tag(NsVideoStream* v, const unsigned char* body, size_t siz
+ 		ns_video_store_frame(v, rgba, w, h);
+ }
+ 
++static Avm2Context* g_ns_ctx;
++static void ns_status(Avm2Object* ns, const char* code, const char* desc)
++{
++	if (g_ns_ctx == NULL || ns == NULL) return;
++	static const char* const k3[3] = { "code", "description", "level" };
++	static const char* const k2[2] = { "code", "level" };
++	const char* v3[3] = { code, desc, "status" };
++	const char* v2[2] = { code, "status" };
++	Avm2Object* ev = desc != NULL
++		? avm2_net_status_event_new(g_ns_ctx, k3, v3, 3)
++		: avm2_net_status_event_new(g_ns_ctx, k2, v2, 2);
++	if (ev != NULL) avm2_dispatch_event(g_ns_ctx, ns, ev);
++}
++
++// Ruffle execute_seek over the bundled bytes: snap to the keyframe at or
++// before (backward) / at or after (forward) the offset.
++static void ns_execute_seek(NsVideoStream* v, double offset)
++{
++	ns_status(v->ns, "NetStream.Seek.Notify", NULL);
++	if (v->stream_time != offset)
++	{
++		size_t off = ((size_t) v->data[5] << 24) | ((size_t) v->data[6] << 16)
++		           | ((size_t) v->data[7] << 8) | (size_t) v->data[8];
++		if (off < 9 || off > v->len) off = 9;
++		off += 4;
++		int back = v->stream_time > offset;
++		size_t best = (size_t) -1; double best_ts = 0;
++		while (off + 11 <= v->len)
++		{
++			const unsigned char* t = v->data + off;
++			size_t sz = ((size_t) t[1] << 16) | ((size_t) t[2] << 8) | t[3];
++			uint32_t ts = ((uint32_t) t[7] << 24) | ((uint32_t) t[4] << 16)
++			            | ((uint32_t) t[5] << 8) | t[6];
++			if (off + 11 + sz > v->len) break;
++			int key = (t[0] & 0x1F) == 9 && sz > 0 && (t[11] >> 4) == 1;
++			if (key)
++			{
++				if (back ? ts <= offset : ts >= offset)
++				{
++					if (!back) { best = off; best_ts = ts; break; }
++					best = off; best_ts = ts;
++				}
++			}
++			off += 11 + sz + 4;
++		}
++		if (best != (size_t) -1) { v->offset = best; v->stream_time = best_ts; }
++	}
++	ns_status(v->ns, "NetStream.Seek.Complete", "Seek Complete -1");
++}
++
+ static void ns_video_tick_one(NsVideoStream* v, double dt)
+ {
++	if (v->loaded && v->has_seek)
++	{
++		v->has_seek = 0;
++		ns_execute_seek(v, v->queued_seek_ms);
++	}
++	if (v->loaded && !v->playing) return;
++	if (!v->loaded)
++	{
++		v->loaded = 1;
++		// Ruffle load_buffer: the bytes arrive -> Buffer.Full.
++		ns_status(v->ns, "NetStream.Buffer.Full", NULL);
++		return;
++	}
++	uint32_t gen = v->gen;
++	int underrun = 1, last_lookahead = 0;
+ 	if (!v->loaded)
+ 	{
+ 		v->loaded = 1;
+@@ -2459,7 +2532,8 @@ static void ns_video_tick_one(NsVideoStream* v, double dt)
+ 		size_t body = off + 11;
+ 		if (body + tag_size > v->len) break;   // truncated: end of data
+ 		int lookahead = (double) ts >= max_time;
+-		if (lookahead && lookahead_audio_left == 0) break;
++		last_lookahead = lookahead;
++		if (lookahead && lookahead_audio_left == 0) { underrun = 0; break; }
+ 		if (tag_type == 8 && lookahead) lookahead_audio_left--;
+ 		if (tag_type == 9 && !lookahead) ns_video_tag(v, v->data + body, tag_size);
+ 		if (tag_type == 8 && !lookahead) ns_audio_tag(&v->audio, ts, v->data + body, tag_size);
+@@ -2467,6 +2541,16 @@ static void ns_video_tick_one(NsVideoStream* v, double dt)
+ 		if (!lookahead) v->offset = off;
+ 	}
+ 	v->stream_time = max_time;
++	if (underrun && !last_lookahead)
++	{
++		ns_status(v->ns, "NetStream.Buffer.Flush", NULL);
++		ns_status(v->ns, "NetStream.Play.Stop", NULL);
++		if (v->gen == gen)
++		{
++			ns_status(v->ns, "NetStream.Buffer.Empty", NULL);
++			v->playing = 0;
++		}
++	}
+ }
+ 
+ static void ns_video_tick(void)
+@@ -2486,7 +2570,13 @@ static void ns_video_tick(void)
+ 	}
+ 	// The previous Ruffle tick's mix (see g_ns_mix_frames).
+ 	if (g_ns_mix_primed)
+-		g_ns_mix_frames += (int64_t) floor(2.0 * NS_AUDIO_RATE / fps + 0.5) / 2;
++	{
++		int64_t nf = (int64_t) floor(2.0 * NS_AUDIO_RATE / fps + 0.5) / 2;
++#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
++		avm2_media_harness_mix(g_ns_mix_frames, (int) nf);
++#endif
++		g_ns_mix_frames += nf;
++	}
+ 	g_ns_mix_primed = 1;
+ }
+ 
+@@ -2510,6 +2600,10 @@ int avm2_net_netstream_audio_window(float* out, int frames)
+ 	memset(out, 0, (size_t) frames * 2 * sizeof(float));
+ 	int64_t blk = (g_ns_mix_frames / 1024) * 1024 - 1024;
+ 	int any = 0;
++#if defined(SWF_HARNESS_WITH_AUDIO) && !defined(NO_GRAPHICS)
++	avm2_media_harness_window(out, blk, frames);
++	any = 1;
++#endif
+ 	for (int i = 0; i < g_ns_video_count; i++)
+ 	{
+ 		NsVideoStream* v = &g_ns_video[i];
+@@ -2556,7 +2650,10 @@ static Avm2Value ns_play(Avm2Activation* act)
+ 	if (d == NULL) d = findDataFile(name);
+ 	if (d == NULL || d->content == NULL) return avm2_undefined();
+ 
++	g_ns_ctx = act->ctx;
+ 	ns_video_start(self, (const unsigned char*) d->content, (size_t) d->content_length);
++	if (ns_video_find(self) != NULL)
++		ns_status(self, "NetStream.Play.Start", NULL);
+ 
+ 	size_t mlen = 0;
+ 	const unsigned char* meta = flv_find_metadata(
+@@ -2571,6 +2668,51 @@ static Avm2Value ns_play(Avm2Activation* act)
+ 	return avm2_undefined();
+ }
+ 
++static Avm2Value ns_get_time_proto(Avm2Activation* act)
++{
++	Avm2Object* self = net2_this(act);
++	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
++	return avm2_number(v != NULL ? v->stream_time / 1000.0 : 0.0);
++}
++static Avm2Value ns_seek_proto(Avm2Activation* act)
++{
++	Avm2Object* self = net2_this(act);
++	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
++	if (v == NULL) return avm2_undefined();
++	g_ns_ctx = act->ctx;
++	double ms = (act->argc > 0 ? avm2_coerce_to_number(act->ctx, act->args[0]) : 0.0) * 1000.0;
++	v->queued_seek_ms = ms;
++	v->has_seek = 1;
++	char d[64];
++	snprintf(d, sizeof d, "Start Seeking %llu", (unsigned long long) (ms > 0 ? ms : 0));
++	ns_status(self, "NetStream.SeekStart.Notify", d);
++	return avm2_undefined();
++}
++static Avm2Value ns_pause_proto(Avm2Activation* act)
++{
++	Avm2Object* self = net2_this(act);
++	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
++	if (v == NULL) return avm2_undefined();
++	g_ns_ctx = act->ctx;
++	v->playing = 0;
++	ns_status(self, "NetStream.Pause.Notify", "Pausing");
++	return avm2_undefined();
++}
++static Avm2Value ns_resume_proto(Avm2Activation* act)
++{
++	Avm2Object* self = net2_this(act);
++	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
++	if (v != NULL) v->playing = 1;
++	return avm2_undefined();
++}
++static Avm2Value ns_toggle_proto(Avm2Activation* act)
++{
++	Avm2Object* self = net2_this(act);
++	NsVideoStream* v = self != NULL ? ns_video_find(self) : NULL;
++	if (v != NULL) v->playing = !v->playing;
++	return avm2_undefined();
++}
++
+ // Per-tick drain, called from avm2_display_run_tick's executor-drain point
+ // (beside the NetConnection flush). The client is whatever `client` holds at
+ // delivery time, and a client without an onMetaData property is silent —
+@@ -2680,16 +2822,16 @@ static void register_net_stream(Avm2Context* ctx)
+ 	cls->native_ext_size = sizeof(Avm2NetStreamExt);
+ 
+ 	avm2_builtin_add_getset(ctx, cls, "client", ns_get_client, ns_set_client);
+-	avm2_builtin_add_getter(ctx, cls, "time", ns_get_zero);
++	avm2_builtin_add_getter(ctx, cls, "time", ns_get_time_proto);
+ 	avm2_builtin_add_getter(ctx, cls, "bytesLoaded", ns_get_zero);
+ 	avm2_builtin_add_getter(ctx, cls, "bytesTotal", ns_get_zero);
+ 	avm2_builtin_add_getter(ctx, cls, "currentFPS", ns_get_zero);
+ 	avm2_builtin_add_getter(ctx, cls, "bufferLength", ns_get_zero);
+ 	avm2_builtin_add_method(ctx, cls, "play", ns_play);
+-	avm2_builtin_add_method(ctx, cls, "pause", net2_noop);
+-	avm2_builtin_add_method(ctx, cls, "resume", net2_noop);
+-	avm2_builtin_add_method(ctx, cls, "togglePause", net2_noop);
+-	avm2_builtin_add_method(ctx, cls, "seek", net2_noop);
++	avm2_builtin_add_method(ctx, cls, "pause", ns_pause_proto);
++	avm2_builtin_add_method(ctx, cls, "resume", ns_resume_proto);
++	avm2_builtin_add_method(ctx, cls, "togglePause", ns_toggle_proto);
++	avm2_builtin_add_method(ctx, cls, "seek", ns_seek_proto);
+ 	avm2_builtin_add_method(ctx, cls, "close", net2_noop);
+ 	avm2_builtin_add_method(ctx, cls, "dispose", net2_noop);
+ 
+diff --git a/SWFModernRuntime/src/avm2/avm2_ops.c b/SWFModernRuntime/src/avm2/avm2_ops.c
+index da3aa519..6ae8c4a2 100644
+--- a/SWFModernRuntime/src/avm2/avm2_ops.c
++++ b/SWFModernRuntime/src/avm2/avm2_ops.c
+@@ -15,6 +15,7 @@
+ #include <avm2/avm2_e4x.h>
+ #include <avm2/avm2_error.h>
+ #include <avm2/avm2_globals.h>
++#include <avm2/avm2_gc.h>
+ #include <avm2/avm2_main.h>
+ #include <avm2/avm2_object.h>
+ #include <memory/heap.h>
+@@ -518,8 +519,57 @@ static int resolve_mn(Avm2Activation* act, Avm2Value recv, uint32_t mn_idx, Reso
+ 
+ // Bind a method trait into a bound-method closure, cached per receiver so
+ // obj.method === obj.method holds (Ruffle get_bound_method).
++// PROTOTYPE (s24 w1-avm2-tail): primitive-receiver bound-method cache.
++// avmplus caches a method's bound closure per receiver ATOM: an int-valued
++// Number (not -0) is an int atom, so (0.0).f === (0).f; any other double is a
++// freshly boxed atom per read (-0.0 and NaN never share); a String atom is its
++// pointer (interned literals share, a concat result does not); booleans by
++// value. Direct-mapped and GC-rooted (avm2_ops_mark_bound_cache).
++#define PBM_SLOTS 1024
++typedef struct { const void* entry; uint32_t kind; int64_t key; Avm2Object* fn; } PrimBound;
++static PrimBound g_pbm[PBM_SLOTS];
++void avm2_ops_mark_bound_cache(void)
++{
++	for (int i = 0; i < PBM_SLOTS; i++)
++		if (g_pbm[i].fn != NULL) avm2_gc_mark_object(g_pbm[i].fn);
++}
++static int pbm_key(Avm2Value v, uint32_t* kind, int64_t* key)
++{
++	switch (v.kind)
++	{
++	case AVM2_VALUE_BOOL: *kind = 2; *key = v.u.b ? 1 : 0; return 1;
++	case AVM2_VALUE_INTEGER: *kind = 3; *key = v.u.i; return 1;
++	case AVM2_VALUE_NUMBER:
++	{
++		double d = v.u.d;
++		if (d != d || d == 0.0 && signbit(d)) return 0;
++		if (d < -4503599627370496.0 || d > 4503599627370495.0) return 0;
++		if ((double) (int64_t) d != d) return 0;
++		*kind = 3; *key = (int64_t) d; return 1;
++	}
++	case AVM2_VALUE_STRING: *kind = 5; *key = (int64_t) (intptr_t) v.u.str; return 1;
++	default: return 0;
++	}
++}
++
+ static Avm2Value bind_method_entry(Avm2Context* ctx, const Avm2PropEntry* e, Avm2Value recv)
+ {
++	{
++		uint32_t kind; int64_t key;
++		if (recv.kind != AVM2_VALUE_OBJECT && pbm_key(recv, &kind, &key))
++		{
++			uint64_t h = ((uint64_t) (uintptr_t) e * 0x9E3779B97F4A7C15ull)
++			           ^ ((uint64_t) key * 0xC2B2AE3D27D4EB4Full) ^ kind;
++			PrimBound* slot = &g_pbm[(h >> 32) & (PBM_SLOTS - 1)];
++			if (slot->fn != NULL && slot->entry == e && slot->kind == kind
++			    && slot->key == key)
++				return avm2_object_value(slot->fn);
++			Avm2Object* f = avm2_function_new(ctx, &e->method, e->defining_class,
++			                                  e->method_scope, recv, true);
++			slot->entry = e; slot->kind = kind; slot->key = key; slot->fn = f;
++			return avm2_object_value(f);
++		}
++	}
+ 	Avm2Object* holder = (recv.kind == AVM2_VALUE_OBJECT) ? recv.u.obj : NULL;
+ 	if (holder != NULL)
+ 	{
+diff --git a/SWFModernRuntime/src/avm2/avm2_text.c b/SWFModernRuntime/src/avm2/avm2_text.c
+index 078ef179..46b3be2b 100644
+--- a/SWFModernRuntime/src/avm2/avm2_text.c
++++ b/SWFModernRuntime/src/avm2/avm2_text.c
+@@ -7447,6 +7447,54 @@ static Avm2Value tl_set_user_data(Avm2Activation* act)
+ // line in the arc reads a real metric — the layout core never measures.
+ static Avm2Value tl_const_12(Avm2Activation* act) { (void) act; return avm2_number(12.0); }
+ static Avm2Value tl_const_3(Avm2Activation* act) { (void) act; return avm2_number(3.0); }
++// PROTOTYPE (s24 w1-avm2-tail): TextLine ascent/descent from a DefineFont4
++// (EMBEDDED_CFF) face's OS/2 typo metrics, size * typo / upem rounded to
++// twips (Ruffle Twips::to_pixels). Falls back to the 12 / 3 stubs.
++#if !defined(DYNAMIC_HOST)
++typedef struct { const char* name; int bold, italic, asc, desc, upem; } TlCff4;
++extern const TlCff4 avm2_generated_cff4_fonts[] __attribute__((weak));
++extern const unsigned avm2_generated_cff4_font_count __attribute__((weak));
++#endif
++static int tl_metric(Avm2Activation* act, int want_desc, double* out)
++{
++#if !defined(DYNAMIC_HOST)
++	if (&avm2_generated_cff4_font_count == NULL || avm2_generated_cff4_font_count == 0)
++		return 0;
++	Avm2TextLineExt* tl = this_tl(act);
++	if (tl == NULL || tl->text_block == NULL) return 0;
++	Avm2Context* ctx = act->ctx;
++	Avm2Value c = avm2_get_public_property(ctx, avm2_object_value(tl->text_block), "content", 7, NULL);
++	if (c.kind != AVM2_VALUE_OBJECT) return 0;
++	Avm2Value ef = avm2_get_public_property(ctx, c, "elementFormat", 13, NULL);
++	if (ef.kind != AVM2_VALUE_OBJECT) return 0;
++	double size = avm2_coerce_to_number(ctx, avm2_get_public_property(ctx, ef, "fontSize", 8, NULL));
++	Avm2Value fd = avm2_get_public_property(ctx, ef, "fontDescription", 15, NULL);
++	if (fd.kind != AVM2_VALUE_OBJECT) return 0;
++	const Avm2String* lookup = avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontLookup", 10, NULL));
++	const Avm2String* name = avm2_coerce_to_string(ctx, avm2_get_public_property(ctx, fd, "fontName", 8, NULL));
++	if (lookup->len != 11 || memcmp(lookup->utf8, "embeddedCFF", 11) != 0) return 0;
++	for (unsigned i = 0; i < avm2_generated_cff4_font_count; i++)
++	{
++		const TlCff4* f = &avm2_generated_cff4_fonts[i];
++		if (f->name == NULL || strlen(f->name) != name->len
++		    || memcmp(f->name, name->utf8, name->len) != 0) continue;
++		double em = (double) (want_desc ? -f->desc : f->asc) / f->upem;
++		*out = round(size * em * 20.0) / 20.0;
++		return 1;
++	}
++#else
++	(void) act; (void) want_desc; (void) out;
++#endif
++	return 0;
++}
++static Avm2Value tl_get_ascent(Avm2Activation* act)
++{
++	double v; return avm2_number(tl_metric(act, 0, &v) ? v : 12.0);
++}
++static Avm2Value tl_get_descent(Avm2Activation* act)
++{
++	double v; return avm2_number(tl_metric(act, 1, &v) ? v : 3.0);
++}
+ static Avm2Value tl_const_0(Avm2Activation* act) { (void) act; return avm2_number(0.0); }
+ static Avm2Value tl_const_1(Avm2Activation* act) { (void) act; return avm2_number(1.0); }
+ static Avm2Value tl_const_false(Avm2Activation* act) { (void) act; return avm2_bool(false); }
+@@ -8166,10 +8214,10 @@ void avm2_text_init_textline_class(Avm2Context* ctx, Avm2Class* textline)
+ 	avm2_builtin_add_getter(ctx, textline, "nextLine", tl_get_next_line);
+ 	avm2_builtin_add_getset(ctx, textline, "validity", tl_get_validity,
+ 	                        tl_set_validity);
+-	avm2_builtin_add_getter(ctx, textline, "ascent", tl_const_12);
+-	avm2_builtin_add_getter(ctx, textline, "totalAscent", tl_const_12);
+-	avm2_builtin_add_getter(ctx, textline, "descent", tl_const_3);
+-	avm2_builtin_add_getter(ctx, textline, "totalDescent", tl_const_3);
++	avm2_builtin_add_getter(ctx, textline, "ascent", tl_get_ascent);
++	avm2_builtin_add_getter(ctx, textline, "totalAscent", tl_get_ascent);
++	avm2_builtin_add_getter(ctx, textline, "descent", tl_get_descent);
++	avm2_builtin_add_getter(ctx, textline, "totalDescent", tl_get_descent);
+ 	avm2_builtin_add_getter(ctx, textline, "unjustifiedTextWidth",
+ 	                        tl_get_specified_width);
+ 	avm2_builtin_add_getter(ctx, textline, "textWidth", tl_const_0);
+diff --git a/SWFRecomp/src/abc/abc_timeline.cpp b/SWFRecomp/src/abc/abc_timeline.cpp
+index 118caab2..01fb9d40 100644
+--- a/SWFRecomp/src/abc/abc_timeline.cpp
++++ b/SWFRecomp/src/abc/abc_timeline.cpp
+@@ -55,6 +55,7 @@ enum
+ 	TAG_DEFINE_FONT2 = 48,
+ 	TAG_CSM_TEXT_SETTINGS = 74,
+ 	TAG_DEFINE_FONT3 = 75,
++	TAG_DEFINE_FONT4_PROTO = 91,
+ 	TAG_FRAME_LABEL = 43,
+ 	TAG_DEFINE_MORPH_SHAPE = 46,
+ 	TAG_DEFINE_VIDEO_STREAM = 60,
+@@ -957,6 +958,9 @@ struct Scanner
+ 	std::vector<ButtonDef> buttons;
+ 	std::vector<EditTextDef> edittexts;
+ 	std::vector<FontDef> fonts;
++	// PROTOTYPE (s24 w1-avm2-tail): DefineFont4 (CFF) name + OS/2 typo metrics.
++	struct Cff4Def { std::string name; bool bold, italic; int asc, desc, upem; };
++	std::vector<Cff4Def> cff4;
+ 	std::vector<StaticTextDef> statictexts;
+ 	std::vector<BitmapAsset> bitmaps;
+ 	// JPEGTables (tag 8) payload: the shared tables a plain DefineBits needs.
+@@ -1436,6 +1440,36 @@ struct Scanner
+ 				csm.push_back(cs);
+ 				break;
+ 			}
++			case TAG_DEFINE_FONT4_PROTO:
++			{
++				Scanner::Cff4Def cd;
++				body.u16();
++				uint8_t fl = body.u8();
++				cd.italic = (fl & 0x02) != 0;
++				cd.bold = (fl & 0x01) != 0;
++				while (body.p < body.end && *body.p != 0) cd.name += (char) *body.p++;
++				if (body.p < body.end) body.p++;
++				const uint8_t* f = body.p;
++				size_t flen = (size_t) (body.end - body.p);
++				auto be16 = [&](size_t o) -> uint32_t { return o + 2 <= flen ? ((uint32_t) f[o] << 8) | f[o + 1] : 0; };
++				auto be32 = [&](size_t o) -> uint32_t { return o + 4 <= flen ? (be16(o) << 16) | be16(o + 2) : 0; };
++				cd.asc = cd.desc = 0; cd.upem = 0;
++				uint32_t nt = (fl & 0x04) ? be16(4) : 0;
++				for (uint32_t t = 0; t < nt; t++)
++				{
++					size_t rec = 12 + 16 * (size_t) t;
++					uint32_t off = be32(rec + 8);
++					if (memcmp(f + rec, "OS/2", 4) == 0)
++					{
++						cd.asc = (int16_t) be16(off + 68);
++						cd.desc = (int16_t) be16(off + 70);
++					}
++					else if (memcmp(f + rec, "head", 4) == 0)
++						cd.upem = (int) be16(off + 18);
++				}
++				if (cd.upem > 0) cff4.push_back(cd);
++				break;
++			}
+ 			case TAG_DEFINE_FONT2:
+ 			case TAG_DEFINE_FONT3:
+ 			{
+@@ -2256,6 +2290,12 @@ void emitAvm2Timeline(const uint8_t* tags_start, const uint8_t* end,
+ 	if (info.symbol_prefix.empty())
+ 	{
+ 		emitDeviceFonts(out);
++		out << "\n// PROTOTYPE: DefineFont4 typo metrics (name, bold, italic, asc, desc, upem).\n";
++		out << "const struct { const char* name; int bold, italic, asc, desc, upem; } avm2_generated_cff4_fonts[] = {";
++		for (auto& c : sc.cff4)
++			out << " { \"" << c.name << "\", " << c.bold << ", " << c.italic << ", " << c.asc << ", " << c.desc << ", " << c.upem << " },";
++		if (sc.cff4.empty()) out << " { 0, 0, 0, 0, 0, 0 }";
++		out << " };\nconst unsigned avm2_generated_cff4_font_count = " << sc.cff4.size() << ";\n";
+ 	}
+ 
+ 	// Static text (DefineText/2): a flat glyph-placement table + per-char range
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index e10cda2e..3bad0905 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -3012,6 +3012,10 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
+         extra_defines.append("-DSWF_RUNTIME_AIR=1")
+     if get_player_mode_is_release(test_dir):
+         extra_defines.append("-DSWF_PLAYER_MODE_RELEASE=1")
++    if re.search(r'^\s*with_audio\s*=\s*true\s*$',
++                 (test_dir / "test.toml").read_text() if (test_dir / "test.toml").exists() else "",
++                 re.MULTILINE):
++        extra_defines.append("-DSWF_HARNESS_WITH_AUDIO=1")
+     _gpu_layers = get_gpu_max_texture_array_layers(test_dir)
+     if _gpu_layers is not None:
+         extra_defines.append(f"-DSWF_GPU_MAX_TEXTURE_ARRAY_LAYERS={_gpu_layers}")

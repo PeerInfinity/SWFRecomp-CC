@@ -1,0 +1,9 @@
+**Implement `w1-avm2-tail` L1 + L2 as a landable patch** (report `SWFRecompDocs/plans/session24-fanout-reports/w1-avm2-tail-report.md` §1, §2, §8 W2-a; start from the L1/L2 hunks of `w1-avm2-tail-prototype.patch`). Categories to download: `avm2 audio mixed_avm`.
+
+EXPECTED-FLIP LEDGER: trace (graphics) `avm2/netstream_play_flv`, `avm2/netstream_play_stop_replay`, `avm2/netstream_seek_flv`, `avm2/soundchannel_position_after_end`, `avm2/audio_computespectrum` → pass. No-graphics: the same minus `audio_computespectrum` (documented gap, like `audio/aac`). Pixel: `netstream_seek_flv` image stays PASS with an expected md5 change (max 156 → 146); state any other image md5 move. `soundchannel_position` / `soundchannel_soundcomplete` must stay ruffle_matched.
+
+1. Keep the `with_audio` gate exactly as Ruffle's backend selection (`verify_output.py` → `-DSWF_HARNESS_WITH_AUDIO=1`); the report measured that forcing it on for all tests is a regression trap.
+2. Before landing, read Ruffle `net_stream.rs` for `resume()`/`togglePause()` (`Unpause.Notify`, lead 1) and implement it if it is a few lines.
+3. Prune the 4 entries from `ruffle-tests/tests/swfs/avm2/ignored_tests.txt` (`audio_computespectrum`, `netstream_play_flv`, `netstream_play_stop_replay`, `netstream_seek_flv`), keeping `soundchannel_position` / `_soundcomplete`.
+4. Re-run the report's L1 (17-row) and L2 (30-row) sweeps against clean origin/master, both modes for the headline rows; the render canary A/B for the NetStream image rows.
+Siblings: `w2-avm2-small-natives` edits `avm2_ops.c` / `avm2_gc.c` / `avm2_text.c` / `avm2_globals.c` (Worker) / `avm2_main.c` — avoid `avm2_main.c`; `w2-bitmap-encode-shader` edits `avm2_bitmap.c` / `avm2_pixelbender.c` / `verify_output.py` copy list (keep your `verify_output.py` hunk small and separate).
