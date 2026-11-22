@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-22T02:31:50.883961+00:00",
-    "old_git_sha": "336749f1425c5e0ea59060c35379d3a1ca3e6588",
-    "new_timestamp": "2026-11-22T03:10:05.696261+00:00",
-    "new_git_sha": "6b2054090f33673434c8597643431e1fdcf56287",
+    "old_timestamp": "2026-11-22T03:10:05.696261+00:00",
+    "old_git_sha": "6b2054090f33673434c8597643431e1fdcf56287",
+    "new_timestamp": "2026-11-22T04:48:29.229612+00:00",
+    "new_git_sha": "3f803679d02fa05c52c453dfca7f7b013abb0165",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 109,
+    "old_pass": 111,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 109,
-    "old_total": 109,
+    "old_effective_pass": 111,
+    "old_total": 111,
     "old_pass_rate": 100.0,
     "new_pass": 111,
     "new_ruffle_matched": 0,
@@ -25,34 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 109,
-    "added": 2,
+    "unchanged": 111,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1_xml_first_action_proto",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1_xmlnode_first_action_proto",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    }
-  ]
+  "changes": []
 }
