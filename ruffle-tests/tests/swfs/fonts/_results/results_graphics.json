@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-22T04:48:29.196587+00:00",
-    "git_sha": "3f803679d02fa05c52c453dfca7f7b013abb0165",
-    "duration_seconds": 163.65,
+    "timestamp": "2026-11-22T07:06:16.486580+00:00",
+    "git_sha": "9561027db32b619f6a6044e7e833a1a0ac824ab3",
+    "duration_seconds": 177.09,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
@@ -20,8 +20,8 @@
       "test": "device_font_glyph_fallback",
       "phases": {
         "recomp": 0.016,
-        "compile": 30.032,
-        "run": 0.231
+        "compile": 30.694,
+        "run": 0.236
       },
       "num_frames": 1,
       "lines": {
@@ -29,15 +29,15 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 30.29,
+      "duration": 30.96,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
         "recomp": 0.007,
-        "compile": 23.403,
-        "run": 0.547
+        "compile": 24.959,
+        "run": 0.542
       },
       "num_frames": 1,
       "lines": {
@@ -45,7 +45,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 23.98,
+      "duration": 25.53,
       "image_comparisons": {
         "embedded__output": {
           "status": "pass",
@@ -123,9 +123,9 @@
     {
       "test": "device_font_list",
       "phases": {
-        "recomp": 0.009,
-        "compile": 23.318,
-        "run": 0.185
+        "recomp": 0.016,
+        "compile": 29.66,
+        "run": 0.23
       },
       "num_frames": 1,
       "lines": {
@@ -133,15 +133,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 23.52,
+      "duration": 29.92,
       "status": "pass"
     },
     {
       "test": "device_font_name_case",
       "phases": {
         "recomp": 0.007,
-        "compile": 1.338,
-        "run": 0.182
+        "compile": 1.321,
+        "run": 0.185
       },
       "num_frames": 1,
       "lines": {
@@ -149,15 +149,15 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 1.53,
+      "duration": 1.52,
       "status": "pass"
     },
     {
       "test": "device_font_no_ink",
       "phases": {
-        "recomp": 0.007,
-        "compile": 23.404,
-        "run": 0.184
+        "recomp": 0.014,
+        "compile": 31.82,
+        "run": 0.245
       },
       "num_frames": 1,
       "lines": {
@@ -165,7 +165,7 @@
         "expected_lines": 18,
         "matching_lines": 4
       },
-      "duration": 23.62,
+      "duration": 32.11,
       "image_comparisons": {
         "embedded__output": {
           "status": "pass",
@@ -246,9 +246,9 @@
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.153,
-        "compile": 24.164,
-        "run": 0.462
+        "recomp": 0.148,
+        "compile": 23.382,
+        "run": 0.453
       },
       "num_frames": 1,
       "lines": {
@@ -256,7 +256,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 25.08,
+      "duration": 24.29,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -296,9 +296,9 @@
     {
       "test": "embed_matching/match_style",
       "phases": {
-        "recomp": 0.025,
-        "compile": 9.1,
-        "run": 0.503
+        "recomp": 0.017,
+        "compile": 6.999,
+        "run": 0.395
       },
       "num_frames": 1,
       "lines": {
@@ -306,7 +306,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 9.75,
+      "duration": 7.51,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -346,9 +346,9 @@
     {
       "test": "embed_matching/no_font_found",
       "phases": {
-        "recomp": 0.009,
-        "compile": 7.495,
-        "run": 0.21
+        "recomp": 0.006,
+        "compile": 6.717,
+        "run": 0.188
       },
       "num_frames": 1,
       "lines": {
@@ -356,7 +356,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.84,
+      "duration": 7.0,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -397,8 +397,8 @@
       "test": "embed_name_lookup",
       "phases": {
         "recomp": 0.012,
-        "compile": 17.462,
-        "run": 0.267
+        "compile": 17.653,
+        "run": 0.272
       },
       "num_frames": 1,
       "lines": {
@@ -406,7 +406,7 @@
         "expected_lines": 242,
         "matching_lines": 242
       },
-      "duration": 17.75,
+      "duration": 17.94,
       "status": "pass"
     }
   ]
