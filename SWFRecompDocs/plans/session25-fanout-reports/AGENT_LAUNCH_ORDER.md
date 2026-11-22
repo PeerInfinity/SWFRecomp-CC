@@ -51,3 +51,4 @@ handshake sent).
 | run | mode / categories / images | code | result |
 |---|---|---|---|
 | 45060637552 | graphics / full / **images** | 2f7be1710 (drift-avm2 +2 trace; blend-mask +3 px; pixel-text +3 px) | **DONE, ledger exact**: trace 4613 → 4615 eff / 4662 (+2 by name: `pixelbender_shaderjob_output_channels`, `textblock_recreate_text_line_width`), 0 regressions; pixels 538 → 544 (+6 by name), 0 regressions. Pages dry run 45060640334 success. Results merge (this commit series) |
+| 45065076248 | graphics / full / **images** | 9e24c763c (+ proto-timeline +1 trace/3 fixtures; pixel-drawing +2 px; acid-morph +1 px; layer-groups 6 fixtures; n-play-game 8615da904 1 fixture) | pending (Pages dry run 45065078933) |
