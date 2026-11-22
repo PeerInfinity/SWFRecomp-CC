@@ -16,14 +16,14 @@ handshake sent).
 
 | # | slug | axis | task | session id |
 |---|---|---|---|---|
-| 1 | w1-drift-avm2 | trace | 3 new upstream AVM2 rows (ShaderJob 1/2-channel, recreateTextLine width, LC allowNetworking) | |
-| 2 | w1-textfield-vn | trace | gnash TextField-v6/7/8 plan of record (13 phases) + edittext_set_text_same pair | |
-| 3 | w1-avm1-proto-timeline | trace | loaded-root goto routing, TextFormat accessors, attach L4/L5/L2 (oracles in hand) | |
-| 4 | w1-avm1-filters-complete | both | AVM1 PO3 multi-filter, getter depth, CM/Convolution/DM, dynamic-root bitmaps/text | |
-| 5 | w1-pixel-nearpass | pixel | ~17 small-excess comparisons | |
-| 6 | w1-pixel-text | pixel | acid-text*, captions, hardwrap, stylesheet, edittext device transform/gutter, static_text_offstage (c), acid-color-0 | |
-| 7 | w1-pixel-blend-mask | pixel | layer_alpha/erase, masks, colortransform, place_object_test, bitmapbuttons | |
-| 8 | w1-pixel-drawing | both | drawing API, strokes, bitmap fills, dithering; DrawingApiTest hitTest plan | |
+| 1 | w1-drift-avm2 | trace | 3 new upstream AVM2 rows (ShaderJob 1/2-channel, recreateTextLine width, LC allowNetworking) | session_018CoDi6J5YQJTWUQrMyZKvW |
+| 2 | w1-textfield-vn | trace | gnash TextField-v6/7/8 plan of record (13 phases) + edittext_set_text_same pair | session_018CoDi6KKD2sWxiZX1qXQHn |
+| 3 | w1-avm1-proto-timeline | trace | loaded-root goto routing, TextFormat accessors, attach L4/L5/L2 (oracles in hand) | session_018CoDi7npxwH9NpjHNi23Dm |
+| 4 | w1-avm1-filters-complete | both | AVM1 PO3 multi-filter, getter depth, CM/Convolution/DM, dynamic-root bitmaps/text | session_018CoDi7rZSo5uSZfocqWxZk |
+| 5 | w1-pixel-nearpass | pixel | ~17 small-excess comparisons | session_018CoDi459cXj5v4ThUCiZ74 |
+| 6 | w1-pixel-text | pixel | acid-text*, captions, hardwrap, stylesheet, edittext device transform/gutter, static_text_offstage (c), acid-color-0 | session_018CoDi7WfMsx8cJhBoubZ9c |
+| 7 | w1-pixel-blend-mask | pixel | layer_alpha/erase, masks, colortransform, place_object_test, bitmapbuttons | session_018CoDi3WCycTC59VRC5FWW5 |
+| 8 | w1-pixel-drawing | both | drawing API, strokes, bitmap fills, dithering; DrawingApiTest hitTest plan | session_018CoDi7j4VX9FRpURSWw5EY |
 
 ## Wave 2 (implementation, cloud)
 
