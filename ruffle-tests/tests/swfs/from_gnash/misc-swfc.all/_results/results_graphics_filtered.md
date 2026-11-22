@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-22 01:00 UTC
+**Date**: 2026-11-22 02:31 UTC
 
-**Git SHA**: `ff2e2e9d60`
+**Git SHA**: `336749f142`
 
-**Run Duration**: 5m 18s
+**Run Duration**: 5m 27s
 
 **Filtered**: 2 tests ignored out of 20 available
 
@@ -27,19 +27,19 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 2.0s |  |
-| 2 | `edittext_test1` | 47 | 18.8s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 18.4s |  |
-| 4 | `hello` | 4 | 1.6s |  |
-| 5 | `mouse_drag_test` | 12 | 18.0s |  |
-| 6 | `movieclip_destruction_test2` | 56 | 18.9s |  |
-| 7 | `movieclip_destruction_test3` | 18 | 17.8s |  |
-| 8 | `movieclip_destruction_test4` | 40 | 18.2s |  |
-| 9 | `opcode_guard_test2` | 24 | 23.7s |  |
-| 10 | `soft_reference_test1` | 45 | 18.3s |  |
-| 11 | `stackscope` | 11 | 23.3s |  |
-| 12 | `submoviegetvar` | 4 | 17.2s |  |
-| 13 | `swf4opcode` | 117 | 18.8s |  |
+| 1 | `button_test1` | 31 | 1.9s |  |
+| 2 | `edittext_test1` | 47 | 20.1s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 17.9s |  |
+| 4 | `hello` | 4 | 2.0s |  |
+| 5 | `mouse_drag_test` | 12 | 18.2s |  |
+| 6 | `movieclip_destruction_test2` | 56 | 18.1s |  |
+| 7 | `movieclip_destruction_test3` | 18 | 24.7s |  |
+| 8 | `movieclip_destruction_test4` | 40 | 18.6s |  |
+| 9 | `opcode_guard_test2` | 24 | 15.7s |  |
+| 10 | `soft_reference_test1` | 45 | 18.0s |  |
+| 11 | `stackscope` | 11 | 17.3s |  |
+| 12 | `submoviegetvar` | 4 | 17.4s |  |
+| 13 | `swf4opcode` | 117 | 25.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -47,11 +47,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 11 | 14 | 18.2s |  |
-| 2 | `action_execution_order_test12` | 2 | 2 | 23.6s |  |
-| 3 | `gotoFrameFromInterval2` | 18 | 18 | 1.9s |  |
-| 4 | `movieclip_destruction_test1` | 43 | 52 | 20.2s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 18.9s |  |
+| 1 | `action_execution_order_test10` | 11 | 14 | 24.0s |  |
+| 2 | `action_execution_order_test12` | 2 | 2 | 19.3s |  |
+| 3 | `gotoFrameFromInterval2` | 18 | 18 | 2.0s |  |
+| 4 | `movieclip_destruction_test1` | 43 | 52 | 25.7s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 20.4s |  |
 
 ## Near-Passing Tests
 

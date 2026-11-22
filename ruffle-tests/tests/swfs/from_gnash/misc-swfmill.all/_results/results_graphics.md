@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-22 01:00 UTC
+**Date**: 2026-11-22 02:31 UTC
 
-**Git SHA**: `ff2e2e9d60`
+**Git SHA**: `336749f142`
 
-**Run Duration**: 6m 7s
+**Run Duration**: 6m 15s
 
 ## Summary
 
@@ -25,24 +25,24 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 17.7s |  |
-| 2 | `background` | 0 | 22.6s |  |
-| 3 | `dict_callframe` | 3 | 17.5s |  |
-| 4 | `dict_cross` | 3 | 17.5s |  |
+| 1 | `afunc_dict` | 2 | 22.5s |  |
+| 2 | `background` | 0 | 17.7s |  |
+| 3 | `dict_callframe` | 3 | 17.0s |  |
+| 4 | `dict_cross` | 3 | 18.2s |  |
 | 5 | `dict_event` | 5 | 17.6s |  |
-| 6 | `dict_override` | 2 | 17.5s |  |
-| 7 | `func_dict` | 3 | 17.3s |  |
-| 8 | `initaction_in_definesprite` | 2 | 17.9s |  |
-| 9 | `jump_after_end` | 3 | 17.2s |  |
-| 10 | `jump_to_prev_block` | 1 | 18.5s |  |
-| 11 | `missing_bitmap` | 0 | 17.9s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 16.3s |  |
-| 13 | `registers` | 36 | 17.8s |  |
-| 14 | `tags_after_last_showframe` | 1 | 22.8s |  |
-| 15 | `trace-as2/arguments` | 8 | 18.0s |  |
+| 6 | `dict_override` | 2 | 17.4s |  |
+| 7 | `func_dict` | 3 | 18.0s |  |
+| 8 | `initaction_in_definesprite` | 2 | 17.6s |  |
+| 9 | `jump_after_end` | 3 | 17.3s |  |
+| 10 | `jump_to_prev_block` | 1 | 24.7s |  |
+| 11 | `missing_bitmap` | 0 | 17.2s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 23.4s |  |
+| 13 | `registers` | 36 | 18.0s |  |
+| 14 | `tags_after_last_showframe` | 1 | 14.9s |  |
+| 15 | `trace-as2/arguments` | 8 | 19.5s |  |
 | 16 | `trace-as2/root_onload` | 4 | 17.5s |  |
-| 17 | `trace-as2/shortstack` | 2 | 17.3s |  |
-| 18 | `trace-as2/super` | 8 | 22.8s |  |
+| 17 | `trace-as2/shortstack` | 2 | 17.4s |  |
+| 18 | `trace-as2/super` | 8 | 17.3s |  |
 | 19 | `trace-as2/this` | 8 | 17.1s |  |
 
 ## Ruffle-Matched Tests
@@ -51,7 +51,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 17.8s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 23.9s |  |
 
 ## Near-Passing Tests
 
