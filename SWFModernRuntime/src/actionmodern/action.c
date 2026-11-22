@@ -17285,6 +17285,49 @@ static ASFunction g_ss_methods[8]; // transform, setStyle, getStyle, getStyleNam
 static void initTextFormatPrototype(SWFAppContext* app_context); // forward decl
 static ASFunction g_textformat_constructor; // forward decl
 
+// lazily-defined native prototype properties
+// (Ruffle property_decl::define_lazy_proto_properties). ONE player-wide set of
+// prototype objects, shared by every class (Video width/height, TextFormat
+// fields): a prototype that got one class's lazy properties never gets
+// another's (avm1/lazy_prototype_shared). Returns 1 when newly marked.
+#define MAX_LAZY_PROTOS 128
+static ASObject* g_lazy_protos[MAX_LAZY_PROTOS];
+static int g_lazy_proto_count = 0;
+static int lazyProtoMarkInitialized(ASObject* proto)
+{
+	if (proto == NULL) return 0;
+	for (int i = 0; i < g_lazy_proto_count; i++)
+		if (g_lazy_protos[i] == proto) return 0;
+	if (g_lazy_proto_count >= MAX_LAZY_PROTOS) return 0;
+	// Keep the object alive so its address can never be reused by a fresh
+	// prototype that would then be wrongly treated as already recorded.
+	retainObject(proto);
+	g_lazy_protos[g_lazy_proto_count++] = proto;
+	return 1;
+}
+static const char* const g_tf_lazy_names[17] = {
+	"font", "size", "color", "url", "target", "bold", "italic",
+	"underline", "align", "leftMargin", "rightMargin", "indent",
+	"leading", "blockIndent", "tabStops", "bullet", "display"
+};
+// The TextFormat fields, defined on the prototype a NEW TextFormat gets.
+// Our TextFormat keeps its fields as own data properties (Flash: native data
+// behind prototype accessors), so the prototype copies are inert undefined
+// slots, overwriting what is there -- except on a prototype that is itself a
+// TextFormat, whose own data slots ARE its fields (an accessor would read them).
+static void textFormatDefineLazyProps(SWFAppContext* app_context, ASObject* proto)
+{
+	if (!lazyProtoMarkInitialized(proto)) return;
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+	for (int i = 0; i < 17; i++) {
+		u32 l = (u32) strlen(g_tf_lazy_names[i]);
+		if (proto->native_type == NATIVE_TEXTFORMAT && findPropertyRaw(proto, g_tf_lazy_names[i], l) != NULL)
+			continue;
+		setPropertyWithFlags(app_context, proto, g_tf_lazy_names[i], l, &undef_val, PROPERTY_FLAGS_DEFAULT);
+	}
+}
+
 // Helper: create a fresh TextFormat object with all null props + display="block", kerning=false
 static ASObject* createBlankTextFormat(SWFAppContext* app_context) {
 	initTextFormatPrototype(app_context);
@@ -18751,6 +18794,8 @@ static void initTextFormatPrototype(SWFAppContext* app_context);
 static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_idx, int has_text, int is_new_text_format, int override_align) {
 	initTextFormatPrototype(app_context);
 	ASObject* tf_obj = allocObject(app_context, 24);
+	if (g_textformat_constructor.prototype_obj != NULL)
+		textFormatDefineLazyProps(app_context, g_textformat_constructor.prototype_obj);
 	if (g_textformat_constructor.prototype_obj != NULL) {
 		ActionVar proto_var = {0};
 		proto_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -19099,23 +19144,7 @@ static void initTextFormatPrototype(SWFAppContext* app_context) {
 		function_registry[function_count++] = &g_textformat_fn_getTextExtent;
 	setupNativeFuncOwnProps(app_context, &g_textformat_fn_getTextExtent);
 
-	// Install the 17 TextFormat own properties on the prototype as undefined.
-	// Flash's TextFormat.prototype ships with these as own properties (Gnash
-	// TextFormat-v5..v7 checks TextFormat.prototype.hasOwnProperty(name)).
-	// Order doesn't matter for hasOwnProperty checks.
-	{
-		ActionVar undef_val = {0};
-		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
-		static const char* tfp_names[17] = {
-			"font", "size", "color", "url", "target", "bold", "italic",
-			"underline", "align", "leftMargin", "rightMargin", "indent",
-			"leading", "blockIndent", "tabStops", "bullet", "display"
-		};
-		for (int i = 0; i < 17; i++) {
-			setPropertyWithFlags(app_context, proto, tfp_names[i],
-				(u32)strlen(tfp_names[i]), &undef_val, PROPERTY_FLAGS_DEFAULT);
-		}
-	}
+	// The 17 TextFormat fields are defined LAZILY (textFormatDefineLazyProps).
 
 	if (function_count < MAX_FUNCTIONS)
 		function_registry[function_count++] = &g_textformat_constructor;
@@ -41309,9 +41338,6 @@ static void initVideoPrototype(SWFAppContext* app_context, ASFunction* ctor)
 // Ruffle d900f711d / c8a03ccd3 (avm1/globals/video.rs); tests
 // avm1/video_width_height, avm1/video_prototype_lazy, gnash NetStream-SquareTest.
 
-#define MAX_VIDEO_LAZY_PROTOS 64
-static ASObject* g_video_lazy_protos[MAX_VIDEO_LAZY_PROTOS];
-static int g_video_lazy_proto_count = 0;
 
 #define MAX_VIDEO_INST_STATES 32
 typedef struct {
@@ -41515,14 +41541,7 @@ static ActionVar videoAttachVideo(SWFAppContext* app_context, ActionVar* args, u
 
 static void videoDefineLazyProps(SWFAppContext* app_context, ASObject* proto)
 {
-	if (proto == NULL) return;
-	for (int i = 0; i < g_video_lazy_proto_count; i++)
-		if (g_video_lazy_protos[i] == proto) return;
-	if (g_video_lazy_proto_count >= MAX_VIDEO_LAZY_PROTOS) return;
-	// Keep the object alive so its address can never be reused by a fresh
-	// prototype that would then be wrongly treated as already recorded.
-	retainObject(proto);
-	g_video_lazy_protos[g_video_lazy_proto_count++] = proto;
+	if (!lazyProtoMarkInitialized(proto)) return;
 	if (g_video_width_getter.advanced_func == NULL)
 	{
 		g_video_width_getter.function_type = 2;
@@ -41581,6 +41600,25 @@ void actionOnVideoPlaced(SWFAppContext* app_context, const char* instance_name, 
 			ActionVar pv = as_get(app_context, &fv, "prototype");
 			if (pv.type == ACTION_STACK_VALUE_OBJECT)
 				proto = (ASObject*)(uintptr_t) pv.data.numeric_value;
+			else if (pv.type == ACTION_STACK_VALUE_ARRAY)
+			{
+				// an Array prototype gets the lazy props
+				// in its non-index bag; the instance __proto__ keeps ARRAY type.
+				ASArray* arr = (ASArray*)(uintptr_t) pv.data.numeric_value;
+				if (arr->props == NULL) { arr->props = allocObject(app_context, 4); retainObject(arr->props); }
+				videoDefineLazyProps(app_context, arr->props);
+				if (mc != NULL && mcIsTimelineVideo(mc))
+				{
+					if (mc->dynamic_props == NULL)
+						mc->dynamic_props = (void*) allocDynamicProps(app_context, 8);
+					setPropertyWithFlags(app_context, (ASObject*) mc->dynamic_props, "__proto__", 9, &pv,
+					                     PROPERTY_FLAGS_DONTENUM);
+					VideoInstState* st = videoInstState(mc, 1);
+					memset(st, 0, sizeof(*st));
+					st->mc = mc;
+				}
+				return;
+			}
 		}
 	}
 	if (proto == NULL) return;
@@ -58353,6 +58391,8 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 			ActionVar* _proto_var = getProperty((ASObject*)mc->dynamic_props, "__proto__", 9);
 			if (_proto_var != NULL && _proto_var->type == ACTION_STACK_VALUE_OBJECT)
 				_proto_cur = (ASObject*)_proto_var->data.numeric_value;
+			else if (_proto_var != NULL && _proto_var->type == ACTION_STACK_VALUE_ARRAY)
+				_proto_cur = ((ASArray*)(uintptr_t)_proto_var->data.numeric_value)->props;
 			int _proto_depth = 0;
 			const int MAX_PROTO_DEPTH = 100;
 			while (_proto_cur != NULL && _proto_depth < MAX_PROTO_DEPTH)
@@ -60445,6 +60485,8 @@ void actionNewObject(SWFAppContext* app_context)
 		initTextFormatPrototype(app_context);
 		ASObject* tf_obj = allocObject(app_context, 24);
 		tf_obj->native_type = NATIVE_TEXTFORMAT;
+		if (g_textformat_constructor.prototype_obj != NULL)
+			textFormatDefineLazyProps(app_context, g_textformat_constructor.prototype_obj);
 		if (g_textformat_constructor.prototype_obj != NULL) {
 			ActionVar proto_var = {0};
 			proto_var.type = ACTION_STACK_VALUE_OBJECT;

@@ -12,7 +12,7 @@ Parallel LOCAL one-task session: `n-perf-ab` (Windows real-GPU frame-rate A/B of
 
 | # | slug | axis | task | session id |
 |---|---|---|---|---|
-| 1 | w1-native-proto | trace | AVM1 native builtin prototypes + lazy prototypes (9 rows, cross-cutting) || session_018CoDi6uqrzRVevzzxY9Y3o |
+| 1 | w1-native-proto | trace | AVM1 native builtin prototypes + lazy prototypes (9 rows, cross-cutting) || session_018CoDi6uqrzRVevzzxY9Y3o — DELIVERED; prototype LANDED directly (+2 ledger: `lazy_prototype_shared`, `video_prototype_lazy`; 0 riders/47) |
 | 2 | w1-avm1-tail | trace | AVM1 + gnash/shumway tail triage (~27 rows) + filters-getter L1 || session_018CoDi4M3bEUKQMx1tkwhVv |
 | 3 | w1-avm2-tail | trace | AVM2 tail triage (~20 rows) || session_018CoDi67sPWpLegcVfoqSfP |
 | 4 | w1-attach-order | trace | attach-tick tag order, action_order family, MovieClip-v8 buckets || session_018CoDi4TVY3qMVvqEyLqBSt |
@@ -23,6 +23,7 @@ Parallel LOCAL one-task session: `n-perf-ab` (Windows real-GPU frame-rate A/B of
 
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
+| (landed direct) w1-native-proto prototype | w1-native-proto | avm1 `lazy_prototype_shared`, `video_prototype_lazy` (trace +2; `text_format_prototype_lazy` improves, no flip) | — |
 
 ## Grading runs
 
