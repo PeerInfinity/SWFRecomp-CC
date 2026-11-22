@@ -229,3 +229,11 @@ and the id length).
 - **Not done:** a live Seedling reload on the real p4h page. The copy-out
   answer comes from reading the AS3. A p4h test wasm was building in the
   session scratchpad at closeout.
+- **Follow-up, same day:** the p4h test wasm on 746c39489 was built and
+  handed to server-data-7 at `~/CC/so-hook-test-build-746c39489/` (wasm md5
+  `629b2a6e24a835bb4355d6852faf756d`). In a smoke run on the real build, boot
+  made one `load("shrumsave", null, "localhost/test.swf/shrumsave")`, and
+  flush-all stored a **real 4203 B** save (5604 B base64; the vanilla-stamped
+  boot save), close to §6's 4215 B replica. A reload of those bytes returned 1,
+  with no page errors. The launching session (swfrecomp-cc-0e) took over the
+  CI run `45043930556`: the results merge and the regression report.
