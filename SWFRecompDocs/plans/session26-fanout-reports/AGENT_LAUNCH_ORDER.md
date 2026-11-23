@@ -46,5 +46,5 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched 02:15 UTC at wave-2 st
 
 | run | mode / categories / images | code | result |
 |---|---|---|---|
-| 45094460914 | graphics / full / **images** | 509768d1d (drift +1 trace; trace-tail-audit +1 trace; pixel-nearpass +2 px; recompiler → Pages dry run 45094486900 success) | **DONE, ledger exact**: trace 4639 → 4641 eff / 4680 (+2: `file_reference_upload_request`, gnash `sound`), 0 regressions; pixels +2 (`morph_test1 frame1`, `filters/bevel`) → 574 / 624, 0 regressions. Results `d78d6702c` |
+| 45094460914 | graphics / full / **images** | 509768d1d (drift +1 trace; trace-tail-audit +1 trace; pixel-nearpass +2 px; recompiler → Pages dry run 45094486900 FAILED at 'Set up job' (actions/configure-pages download timeout, infra), re-dispatched 45101106488) | **DONE, ledger exact**: trace 4639 → 4641 eff / 4680 (+2: `file_reference_upload_request`, gnash `sound`), 0 regressions; pixels +2 (`morph_test1 frame1`, `filters/bevel`) → 574 / 624, 0 regressions. Results `d78d6702c` |
 | 45096347136 | no-graphics / full | 876e66704 (+ attached-button (a)+(b): tag.c NO_GRAPHICS arm) | queued |
