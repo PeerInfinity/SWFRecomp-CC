@@ -19,7 +19,7 @@
 | from_gnash/actionscript.all | 148 | 240 | 61.7% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) |
 | from_gnash/misc-ming.all | 69 | 110 | 62.7% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_filtered.md) |
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_filtered.md) |
-| from_gnash/misc-swfc.all | 13 | 18 | 72.2% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_filtered.md) |
+| from_gnash/misc-swfc.all | 13 | 19 | 68.4% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_filtered.md) |
 | from_gnash/misc-swfmill.all | 19 | 20 | 95.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_filtered.md) |
 | from_shumway | 214 | 223 | 96.0% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_filtered.md) |
 | from_shumway/avm1 | 47 | 47 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
@@ -31,9 +31,9 @@
 | text | 12 | 12 | 100% | [details](ruffle-tests/tests/swfs/text/_results/results_filtered.md) |
 | timeline | 14 | 17 | 82.4% | [details](ruffle-tests/tests/swfs/timeline/_results/results_filtered.md) |
 | visual | 149 | 151 | 98.7% | [details](ruffle-tests/tests/swfs/visual/_results/results_filtered.md) |
-| **Total** | **4420** | **4664** | **94.8%** | |
+| **Total** | **4420** | **4665** | **94.7%** | |
 
-*63 tests ignored.*
+*62 tests ignored.*
 
 ## Line-Level Accuracy
 
@@ -47,7 +47,7 @@
 | from_gnash/actionscript.all | 30,601 | 32,104 | 95.3% |
 | from_gnash/misc-ming.all | 4,256 | 5,206 | 81.8% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
-| from_gnash/misc-swfc.all | 469 | 555 | 84.5% |
+| from_gnash/misc-swfc.all | 476 | 562 | 84.7% |
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 2,362 | 2,409 | 98.0% |
 | from_shumway/avm1 | 491 | 491 | 100% |
@@ -59,7 +59,7 @@
 | text | 979 | 979 | 100% |
 | timeline | 365 | 371 | 98.4% |
 | visual | 301 | 350 | 86.0% |
-| **Total** | **400,957** | **409,001** | **98.0%** |
+| **Total** | **400,964** | **409,008** | **98.0%** |
 
 ## Failure Breakdown
 
@@ -73,7 +73,7 @@
 | from_gnash/actionscript.all | - | 92 |
 | from_gnash/misc-ming.all | 7 | 34 |
 | from_gnash/misc-mtasc.all | - | 2 |
-| from_gnash/misc-swfc.all | - | 5 |
+| from_gnash/misc-swfc.all | 1 | 5 |
 | from_gnash/misc-swfmill.all | - | 1 |
 | from_shumway | 1 | 8 |
 | from_shumway/avm1 | - | - |
@@ -85,7 +85,7 @@
 | text | - | - |
 | timeline | - | 3 |
 | visual | - | 2 |
-| **Total** | **16** | **228** |
+| **Total** | **17** | **228** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -93,6 +93,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Test | Match Rate |
 |-------|------|----------:|
+| from_gnash/misc-swfc.all | sound | 100% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test11 | 81% |
 
 ## Flash-Spec Results
@@ -168,11 +169,11 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### from_gnash/misc-swfc.all
 
-- **Pass:** 13/18 (72.2%)
-- **Ignored:** 2 tests
+- **Pass:** 13/19 (68.4%)
+- **Ignored:** 1 tests
 - **Duration:** 5m18s across 30 shards
-- **Lines:** 469/555 matching (84.5%)
-- **Avg test duration:** 16.6s — slowest: `soft_reference_test1` (25.6s)
+- **Lines:** 476/562 matching (84.7%)
+- **Avg test duration:** 16.7s — slowest: `soft_reference_test1` (25.6s)
 
 ### from_gnash/misc-swfmill.all
 

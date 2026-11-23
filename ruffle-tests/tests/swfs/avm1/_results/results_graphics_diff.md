@@ -1,28 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `485eb555c3f9` (2026-11-22T21:58:22.611349+00:00)
-**Current:** `697669e5f98f` (2026-11-22T23:56:07.210257+00:00)
+**Previous:** `697669e5f98f` (2026-11-22T23:56:07.210257+00:00)
+**Current:** `509768d1d323` (2026-11-23T02:33:26.423368+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 745 | 745 | 0 |
-| Total | 780 | 781 | +1 |
-| Pass rate | 95.5% | 95.4% | -0.1% |
-| Mismatched lines | 12469 | 12614 | +145 |
-|   Decreased | | | -10 |
+| Passing | 745 | 746 | +1 |
+| Total | 781 | 781 | 0 |
+| Pass rate | 95.4% | 95.5% | +0.1% |
+| Mismatched lines | 12614 | 12443 | -171 |
+|   Decreased | | | -171 |
 
-## Added Tests (1)
+## Newly Passing (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `file_reference_upload_request` | output_mismatch | 3/158 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `file_reference_upload_request` | output_mismatch | 3/158 | 158/158 |
 
-## Line Count Changed (3)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `global_instance_decls` | output_mismatch | 12/758 | 17/758 | -5 |
-| `globals_monkeypatch` | output_mismatch | 44/306 | 49/306 | -5 |
-| `global_proto_decls` | output_mismatch | 50/4562 | 50/4562 | 0 |
+| `bitmap_data_thorough/pixelDissolve` | output_mismatch | 1335/1371 | 1351/1371 | -16 |
