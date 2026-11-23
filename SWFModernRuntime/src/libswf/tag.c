@@ -497,6 +497,33 @@ extern int ng_find_button(size_t char_id);
 extern int ng_find_textfield(size_t char_id);
 extern unsigned int ng_increment_auto_instance_counter(void);
 
+// The MovieClip that owns sprite entry `obj`, by its instance name. The name
+// lookup is GLOBAL (first clip with that name anywhere), so when two clips
+// share a name the hit can be a different clip than obj's own. If the hit is
+// bound to some other display object, prefer a same-named clip already bound
+// to this exact entry (s26 n-pixel-pass: an attachMovie'd clip's nested child
+// `kid` next to a timeline `_root.kid` -- the pump pre-binds the child's clip
+// to the entry it advances, see ng_attached_run_tree). The scan runs only on
+// that mismatch. Every build (the advance_sprite_frames _currentframe sync
+// below is shared; exec_sprite_frame is CI-mode only).
+static MovieClip* ng_mc_for_sprite_obj(DisplayObject* obj)
+{
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+	if (obj == NULL || obj->instance_name == NULL) return NULL;
+	MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
+	if (mc != NULL && mc->display_obj != NULL && mc->display_obj != (void*)obj) {
+		extern MovieClip* child_mc_cache[];
+		extern int child_mc_count;
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* c = child_mc_cache[i];
+			if (c != NULL && c != mc && c->display_obj == (void*)obj && c->depth != INT_MIN
+			    && strcmp(c->name, obj->instance_name) == 0)
+				return c;
+		}
+	}
+	return mc;
+}
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 
 int actionEagerInitActive(void) {
@@ -571,32 +598,6 @@ extern int g_settarget_context_changed;
 extern MovieClip* g_settarget_saved_context;
 extern MovieClip* g_current_context;
 extern void actionSetCurrentContext(MovieClip* mc);
-
-// The MovieClip that owns sprite entry `obj`, by its instance name. The name
-// lookup is GLOBAL (first clip with that name anywhere), so when two clips
-// share a name the hit can be a different clip than obj's own. If the hit is
-// bound to some other display object, prefer a same-named clip already bound
-// to this exact entry (s26 n-pixel-pass: an attachMovie'd clip's nested child
-// `kid` next to a timeline `_root.kid` -- the pump pre-binds the child's clip
-// to the entry it advances, see ng_attached_run_tree). The scan runs only on
-// that mismatch.
-static MovieClip* ng_mc_for_sprite_obj(DisplayObject* obj)
-{
-	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
-	if (obj == NULL || obj->instance_name == NULL) return NULL;
-	MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
-	if (mc != NULL && mc->display_obj != NULL && mc->display_obj != (void*)obj) {
-		extern MovieClip* child_mc_cache[];
-		extern int child_mc_count;
-		for (int i = 0; i < child_mc_count; i++) {
-			MovieClip* c = child_mc_cache[i];
-			if (c != NULL && c != mc && c->display_obj == (void*)obj && c->depth != INT_MIN
-			    && strcmp(c->name, obj->instance_name) == 0)
-				return c;
-		}
-	}
-	return mc;
-}
 
 // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
 void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
