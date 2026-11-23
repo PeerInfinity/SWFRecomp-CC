@@ -107,6 +107,10 @@ on, the **coin square reappeared**, even though `_visible` traced `false`. A
   unchanged. Handed to the s25 coordinator, who folds this SHA into its next
   grading run (interim 4 or the final). No CI run was dispatched from this
   session, to avoid racing on `ruffle-test-results`.
+  **Result:** s25 FINAL grading run at `697669e5f`, which includes `2afd3e36d`
+  (graphics `45078991452` + no-graphics `45079002150`):
+  `regression/avm1_attached_clip_hidden_capture` PASSES on both image and
+  trace, with 0 regressions corpus-wide.
 - **Pages:** no deploy needed. No browser-visible code changed, and
   `tagRerenderFrame` is `#ifdef OFFSCREEN_RENDER`.
 
