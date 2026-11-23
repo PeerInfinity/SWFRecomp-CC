@@ -26,6 +26,14 @@ Tooling notes: memory `n-play-game-click`.
 - The exporter never fires timers and renders HIGH quality only (memory `ruffle-exporter-oracle-limits`).
 - WSL Chrome is SwiftShader: fine for function, never for perf.
 
+5. **Coordinator request (s26, before anything else browser-side): re-check N's "play game" click in the browser AND
+   natively.** s26 landed `876e66704`: attached-clip button dispatch now runs in the CI modes, and the browser-only
+   root-context override for button actions (`_btn_action_ctx = &root_movieclip` under `g_btn_attached_walk`) was
+   REMOVED, because `8615da904` fixed its real cause. Per `session26-fanout-reports/w1-attached-button-dispatch-report.md`
+   LOCAL ORACLE REQUESTS 2: (i) native `run_native.py n_click.swf native_run --frames 120 --input input_click.json`
+   should now open episode select natively; (ii) browser: "play game" must still open episode select. Report the
+   result to the coordinator by message as soon as you have it. No Pages deploy may happen until it passes.
+
 ## Constraints
 
 - **Memory ruling (Robert, 2026-11-22; memory `one-heavy-build-shared-lock`):** every memory-heavy local build (emcc/wasm,

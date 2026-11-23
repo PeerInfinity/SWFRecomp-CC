@@ -1,0 +1,10 @@
+# s26 wave-2 sibling file map (who edits what; self-localize)
+
+| slot | files / functions |
+|---|---|
+| w2-loaded-shell-phase2 | `action.c` loaded-movie paths (`actionChildMovieGoto`, `actionGotoFrame` routing, path resolution, `actionInvalidateCachedMovieClip`), `tag.c` `collect_attached_standalone`, shell arms in clip events / button walk, `tag_stubs.c` `ng_findChildEntryDepth`, `ng_shared.c` `ng_enumerateChildren` |
+| w2-attached-holder-render | `tag.c` `render_attached_child`, attached depth pass, `ng_update_button_states*` pick order; `action.c` `actionTryBindTextFieldVariable` path branch |
+| w2-avm2-applyfilter-kernels | `avm2_bitmap.c` (`bd_apply_filter`, `bd_draw_*`), `avm2_filter_from_object`; maybe `action.c` `bitmapDataApplyFilter` |
+| w2-acid-clip-fill-region | shape fill-region / tessellation (`SWFRecomp` shape converter or runtime tessellation), text glyph geometry |
+| w2-cm-chain-cab-edge | `SWFRecomp` `swf.cpp` `PlaceCmCompose`, `tag.c` `render_filtered_core` (type-6 arm), cacheAsBitmap capture/bounds |
+| local `n-pixel-pass` (one-task session) | may touch `tag.c` / `action.c` / `ng_shared.c` / `swf.c` (N rendering, browser enterFrame) |
