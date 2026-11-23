@@ -23734,6 +23734,11 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 		}
 	} else {
 		simple_binding_mc = (tf_mc->parent != NULL) ? tf_mc->parent : &root_movieclip;
+		// Ruffle edit_text.rs try_bind_text_field_variable: a field inside an
+		// AVM1 button binds on the first non-button ancestor (the button's
+		// parent timeline). visual/text/String_path_variable_button.
+		while (simple_binding_mc->is_button_mc && simple_binding_mc->parent != NULL)
+			simple_binding_mc = simple_binding_mc->parent;
 		if (simple_binding_mc->dynamic_props == NULL) {
 			simple_binding_mc->dynamic_props = (void*) allocDynamicProps(app_context, 4);
 		}
