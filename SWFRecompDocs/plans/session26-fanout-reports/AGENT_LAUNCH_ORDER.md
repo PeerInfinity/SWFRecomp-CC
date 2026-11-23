@@ -7,7 +7,7 @@ Baseline: s25 FINAL — graphics/full/images `45078991452` (results `9277f3799`)
 (results `dffc41cf2`), code `697669e5f`. Read at `9277f3799`: trace 4636 eff / 4677 rows (41 failing); pixels 572/624
 (561/613 on the s24 set). No wave-0 run (only docs since).
 Upstream `3ac8dcb07..3e98d9ba6` (5 commits) — `wave0-upstream-drift-namestatus.txt`.
-Parallel LOCAL one-task session: `n-pixel-pass` (launched at wave-2 start).
+Parallel LOCAL one-task session: `n-pixel-pass` (launched 02:15 UTC at wave-2 start, run.UsMIbJFi, handshake sent; carries the N play-game re-check for 876e66704).
 
 ## Wave 1 (diagnosis, cloud)
 
@@ -36,8 +36,8 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched at wave-2 start).
 | w2-loaded-shell-phase2 | w1-per-movie-displaylist phases 2–5 | 0 corpus expected; fixtures (oracle-gated) | session_018CoDi3qAjMx8NTxuARGv4B |
 | w2-attached-holder-render | w1-attached-button-dispatch leads | 0 corpus; holder render fixture (exporter golden archived) + button-order fixtures | session_018CoDi6mwbQ8ti45PPishTC |
 | w2-avm2-applyfilter-kernels | w1-pixel-layer-colour §5/§6 lead 1 | 0 flips likely (destpoint_edges −90k ch); fixture | session_018CoDi3QyC6rq1emewZ6Qio |
-| w2-acid-clip-fill-region | w1-pixel-nearpass leads 1–3 | px  (≤50 %), bevel headroom, acid-text-6 | session_018CoDi4EesSxTLA7Sbzmj5P |
-| w2-cm-chain-cab-edge | w1-pixel-layer-colour §3 HOLD + lead 2 | px  (unpriced); CM chain fixtures | session_018CoDi3eaG9cg1bPYFHbXKC |
+| w2-acid-clip-fill-region | w1-pixel-nearpass leads 1–3 | px `acid-clip` (≤50 %), bevel headroom, acid-text-6 | session_018CoDi4EesSxTLA7Sbzmj5P |
+| w2-cm-chain-cab-edge | w1-pixel-layer-colour §3 HOLD + lead 2 | px `cache_as_bitmap/avm1_color` (unpriced); CM chain fixtures | session_018CoDi3eaG9cg1bPYFHbXKC |
 
 ## Grading runs
 
