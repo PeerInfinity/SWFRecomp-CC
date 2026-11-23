@@ -1,0 +1,13 @@
+root f1
+root ef c=1 p=undefined cf=
+root ef c=2 p=movieclip cf=1
+p f1
+p f2
+root ef c=3 p=movieclip cf=2
+p f3
+root ef c=4 p=movieclip cf=3
+p f4 remove
+root ef c=5 p=undefined cf=
+root ef c=6 p=undefined cf=
+root ef c=7 p=undefined cf=
+root ef c=8 p=undefined cf=

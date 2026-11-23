@@ -1118,14 +1118,7 @@ void tagMain(SWFAppContext* app_context)
 		}
 #ifdef OFFSCREEN_RENDER
 
-		// Promote this tick's freshly-attached multi-frame clips to active so the
-		// pump advances them STARTING NEXT tick (PROGRESS #15). After the deferred
-		// attach-init drain (inside frame_func) so a clip's frame-1 this.stop()
-		// has applied before it is ever advanced. Mirrors swf_core.c.
-		{
-			extern void ng_promote_attached_playheads(void);
-			ng_promote_attached_playheads();
-		}
+		// (Attached-clip promotion moved below the SCRIPT drain, s26 n-levels.)
 
 		// Phase 3: advance nested sprite children (deferred from Phase 1
 		// via g_advance_defer_nested above).
@@ -1136,6 +1129,33 @@ void tagMain(SWFAppContext* app_context)
 		// Drain any sprite SCRIPT entries queued during advance_*_sprite_frames
 		// that the recompiler-emitted in-frame drain didn't cover.
 		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+
+#ifdef OFFSCREEN_RENDER
+		// s26 n-levels: run attachMovie frame-1 (attach-init) scripts queued
+		// after this tick's tagShowFrame drain -- by the drain just above, which
+		// is also where a stopped root's deferred _root.onEnterFrame fires
+		// (n-exec-order root-last). Only tagShowFrame drained AQ_KIND_ATTACH_INIT,
+		// so on a stopped root (no frame func; N's whole game) a clip attached
+		// from onEnterFrame never ran its frame-1 script. Ruffle runs it the
+		// same frame, after the attaching handler. Mirrors swf_core.c.
+		{
+			extern void ng_fire_pending_attach_inits(SWFAppContext*);
+			ng_fire_pending_attach_inits(app_context);
+		}
+
+		// Promote this tick's freshly-attached multi-frame clips to active so the
+		// pump advances them STARTING NEXT tick (PROGRESS #15). After the
+		// attach-init drains (tagShowFrame's and the one above) so a clip's
+		// frame-1 this.stop() has applied before it is ever advanced, and after
+		// the SCRIPT drain that fires a stopped root's deferred onEnterFrame: a
+		// clip that handler attached is promoted THIS tick and advances next
+		// frame, like Ruffle (promoted before it, N's particles ran one frame
+		// late in graphics only). Same slot as swf_core.c.
+		{
+			extern void ng_promote_attached_playheads(void);
+			ng_promote_attached_playheads();
+		}
+#endif
 
 		// Apply any sprite-frame-script gotoAndPlay that targeted its OWN sprite
 		// WITHIN this tick (#10). Sprite scripts only run in the drain above, so

@@ -27,6 +27,12 @@ class NDrive {
 	// CLIPDIFF: with OBJHASH, also trace "ND clip+ path" / "ND clip- path" for
 	// clips appearing/disappearing two levels under _root (+ their _currentframe).
 	static var CLIPDIFF:Boolean = false;
+	// WORLDHASH (with OBJHASH, s26 n-levels): also append o=<n>:<hash>, an
+	// order-dependent hash over N's own object list (_root.objects.objArray:
+	// drones, thwumps, mines, gold, doors...) of OBJ_TYPE + pos to 1e-3. The
+	// h= clip walk only sees pooled GUI/effect clips, never level objects.
+	// OBJDUMP: at each attempt's first tick, trace "ND obj <i> type=<T> x= y=".
+	static var OBJDUMP:Boolean = false;
 	static var lastSet:Object;
 	static var freezeLeft:Number = 0;
 	static var freezeLabel:String = "";
@@ -110,7 +116,30 @@ class NDrive {
 		trace("NF a=" + attempt + " t=" + t + " x=" + p.pos.x + " y=" + p.pos.y
 			+ " vx=" + (p.pos.x - p.oldpos.x) + " vy=" + (p.pos.y - p.oldpos.y)
 			+ " st=" + p.curState + " k=" + (ks == "" ? "-" : ks) + " time=" + r.game.playerCurTime
-			+ (OBJHASH ? " h=" + NDrive.clipPosHash() : ""));
+			+ (OBJHASH ? " h=" + NDrive.clipPosHash() + " o=" + NDrive.worldHash() : ""));
+		if (OBJDUMP && t == 0) NDrive.dumpObjects();
+	}
+	static function worldHash():String {
+		var arr:Array = r.objects.objArray;
+		if (arr == undefined) return "-";
+		var hv:Number = 0;
+		var n:Number = 0;
+		for (var i:Number = 0; i < arr.length; i++) {
+			var o:Object = arr[i];
+			if (o == undefined || o.pos == undefined) continue;
+			n++;
+			hv = (hv * 31 + Math.round(o.pos.x * 1000) * 7 + Math.round(o.pos.y * 1000) + Number(o.OBJ_TYPE)) % 1000000007;
+		}
+		return n + ":" + hv;
+	}
+	static function dumpObjects():Void {
+		var arr:Array = r.objects.objArray;
+		for (var i:Number = 0; i < arr.length; i++) {
+			var o:Object = arr[i];
+			trace("ND obj " + i + " type=" + o.OBJ_TYPE + " x=" + o.pos.x + " y=" + o.pos.y
+				+ (o.trigger != undefined ? " trig=" + o.trigger.pos.x + "," + o.trigger.pos.y : "")
+				+ (o.doorpos != undefined ? " door=" + o.doorpos.x + "," + o.doorpos.y + " trap=" + o.isTrap + " locked=" + o.isLocked : ""));
+		}
 	}
 	static function clipPosHash():String {
 		var n:Number = 0;
@@ -183,8 +212,19 @@ class NDrive {
 					trace("ND startgame frame=" + frame);
 					installHooks();
 					r.gamedata.LoadEpisodeNum(0);
-					for (var i:Number = 0; i < START_LEVEL; i++) r.gamedata.IncrementCurrentLevel();
-					r.App_StartNewGame();
+					if (START_LEVEL > 0) {
+						// App_StartNewGame hard-codes App_LoadLevel(0, ...): bumping
+						// curLevel alone only renamed level 0 (s26 n-levels). Same
+						// body, loading the current level's map instead.
+						for (var i:Number = 0; i < START_LEVEL; i++) r.gamedata.IncrementCurrentLevel();
+						r.console.Show();
+						var snd:Sound = new Sound();
+						snd.stop();
+						r.game.InitNewGame();
+						r.App_PlayerDeathEvent = r.App_PlayerDeathEvent_Normal;
+						r.App_LevelPassedEvent = r.App_LevelPassedEvent_Normal;
+						r.App_LoadLevel(r.gamedata.GetCurrentLevelID(), r.App_StartPreLevelPause);
+					} else r.App_StartNewGame();
 				}
 			}
 			return;

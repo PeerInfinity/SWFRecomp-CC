@@ -1175,6 +1175,16 @@ void swfStart(SWFAppContext* app_context)
 			// runs after funcs).
 			actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
 
+			// s26 n-levels: attachMovie frame-1 (attach-init) scripts queued
+			// after this tick's tagShowFrame -- notably by a stopped root's
+			// deferred _root.onEnterFrame, which fires at the end of the drain
+			// above. Only tagShowFrame drained AQ_KIND_ATTACH_INIT, so with the
+			// root stopped they never ran. Before the promote below.
+			{
+				extern void ng_fire_pending_attach_inits(SWFAppContext*);
+				ng_fire_pending_attach_inits(app_context);
+			}
+
 			// Apply any sprite-frame-script gotoAndPlay that targeted its OWN
 			// sprite WITHIN this tick (#10). Sprite scripts only run in the drain
 			// above, so the manual flag is set too late for the advance passes;
@@ -1249,6 +1259,12 @@ void swfStart(SWFAppContext* app_context)
 			// drain doesn't fire — same orphaned-script issue as the
 			// is_playing=0 branch above).
 			actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+			// s26 n-levels: attach-init scripts of clips the handlers above
+			// attached (no tagShowFrame runs here either).
+			{
+				extern void ng_fire_pending_attach_inits(SWFAppContext*);
+				ng_fire_pending_attach_inits(app_context);
+			}
 
 			// Same-tick self gotoAndPlay application (#10); see the playing branch.
 			ng_apply_pending_sprite_self_gotos(app_context);
