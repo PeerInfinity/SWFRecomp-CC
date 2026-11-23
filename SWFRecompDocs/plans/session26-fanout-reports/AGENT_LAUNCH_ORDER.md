@@ -33,6 +33,11 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched at wave-2 start).
 | (landed direct) w1-pixel-layer-colour prototype | w1-pixel-layer-colour 1+2+3 | 0 corpus; fixtures `layer_group_filtered_child`, `avm2_layer_group_filtered_child`, `avm1_placed_drawing_color` | — |
 | (landed direct) w1-per-movie-displaylist phase 1 | w1-per-movie-displaylist | trace `avm1/video_prototype_lazy_swf6_child` (+1) | — |
 | (landed direct) w1-trace-tail-audit prototype | w1-trace-tail-audit P1–P3 | trace `from_gnash/misc-swfc.all/sound` (+1); lines pixelDissolve 1335→1351, matrix_accuracy_test1 10→12 | — |
+| w2-loaded-shell-phase2 | w1-per-movie-displaylist phases 2–5 | 0 corpus expected; fixtures (oracle-gated) | session_018CoDi3qAjMx8NTxuARGv4B |
+| w2-attached-holder-render | w1-attached-button-dispatch leads | 0 corpus; holder render fixture (exporter golden archived) + button-order fixtures | session_018CoDi6mwbQ8ti45PPishTC |
+| w2-avm2-applyfilter-kernels | w1-pixel-layer-colour §5/§6 lead 1 | 0 flips likely (destpoint_edges −90k ch); fixture | session_018CoDi3QyC6rq1emewZ6Qio |
+| w2-acid-clip-fill-region | w1-pixel-nearpass leads 1–3 | px  (≤50 %), bevel headroom, acid-text-6 | session_018CoDi4EesSxTLA7Sbzmj5P |
+| w2-cm-chain-cab-edge | w1-pixel-layer-colour §3 HOLD + lead 2 | px  (unpriced); CM chain fixtures | session_018CoDi3eaG9cg1bPYFHbXKC |
 
 ## Grading runs
 
