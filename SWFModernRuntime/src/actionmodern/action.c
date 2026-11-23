@@ -42026,8 +42026,12 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 
 	// Ruffle's post-action drag refresh (`Player::update()` tail, player.rs:2433):
 	// the dragged clip's `_droptarget` snapshot is recomputed once a frame, AFTER
-	// this frame's enterFrame handlers have read the previous value.
-	ng_update_drag_droptarget();
+	// this frame's enterFrame handlers have read the previous value. When the
+	// root arm is deferred (g_root_ef_pending) the refresh waits for it too
+	// (bit 4, run by actionFireDeferredRootEnterFrame) — otherwise _root's
+	// onEnterFrame reads the NEXT pick (avm1/hitarea_remove_owner_drag, sweep).
+	if (g_root_ef_pending) g_root_ef_pending |= 4;
+	else ng_update_drag_droptarget();
 
 	// Mark all dynamic MCs (without display_obj) as eligible for next tick's enterFrame.
 	// This ensures MCs created by createEmptyMovieClip don't fire onEnterFrame on
@@ -42122,6 +42126,8 @@ void actionFireDeferredRootEnterFrame(SWFAppContext* app_context)
 	}
 	if (pending & 2)
 		actionDispatchRootVarMapEnterFrame(app_context);
+	if (pending & 4)
+		ng_update_drag_droptarget();
 }
 
 // Check if any onEnterFrame handlers are registered (root or child MCs).
@@ -67647,6 +67653,18 @@ static void cfDelegateToMCMethod(SWFAppContext* app_context, char* str_buffer,
 // (a sprite's own frame script, a tellTarget block, or a closure's base clip,
 // all of which set g_current_context). *shadowed = 1 when a `with` plain
 // object carries the name itself (the caller keeps its own path).
+// s26 final-grading fix: the timeline-navigation stubs keep their own arms
+// (the `_is_mc_nav` / path-target handling above). Routing them through the
+// generic stub delegation re-entered CallMethod's goto from a frame script and
+// overran the AS stack in no-graphics (gnash callFunction_test,
+// "_root:mc1:gotoAndStop" -> SEGFAULT).
+static int cfIsTimelineNavName(const char* n)
+{
+	return n != NULL && (strcmp(n, "gotoAndStop") == 0 || strcmp(n, "gotoAndPlay") == 0 ||
+		strcmp(n, "play") == 0 || strcmp(n, "stop") == 0 ||
+		strcmp(n, "nextFrame") == 0 || strcmp(n, "prevFrame") == 0);
+}
+
 static MovieClip* cfBareMCReceiver(const char* name, u32 name_len, int* shadowed)
 {
 	extern MovieClip root_movieclip;
@@ -69784,7 +69802,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		// "built-in constructor as plain function" branch and pushed undefined.
 		if (func != NULL && func >= &g_mc_method_funcs[0] &&
 		    func < &g_mc_method_funcs[MC_METHOD_COUNT] &&
-		    func->advanced_func != (Function2Ptr) builtin_mc_meth)
+		    func->advanced_func != (Function2Ptr) builtin_mc_meth &&
+		    !cfIsTimelineNavName(func->name))
 		{
 			extern MovieClip root_movieclip;
 			MovieClip* _rcv = NULL;

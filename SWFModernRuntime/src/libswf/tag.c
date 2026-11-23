@@ -7093,6 +7093,8 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 		static int s_root_last = -1;
 		if (s_root_last < 0) {
 			const char* ev = getenv("SWF_EXEC_ORDER_ROOT_LAST");
+			// Default ON; SWF_EXEC_ORDER_ROOT_LAST=0 opts out. The deferred
+			// root arm also defers the _droptarget refresh (action.c bit 4).
 			s_root_last = !(ev && ev[0] == '0');
 		}
 		g_defer_root_enterframe = s_root_last;
