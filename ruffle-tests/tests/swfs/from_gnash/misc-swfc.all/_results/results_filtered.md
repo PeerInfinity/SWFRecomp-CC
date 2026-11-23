@@ -6,20 +6,26 @@
 
 **Run Duration**: 5m 18s
 
-**Filtered**: 2 tests ignored out of 20 available
+**Filtered**: 1 tests ignored out of 20 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 18 |
-| Passing | **13** (72.2%) |
+| Total tests | 19 |
+| Passing | **13** (68.4%) |
 | Ruffle-matched | 5 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **18** (100.0%) |
-| Failing | 0 |
-| Total expected lines | 555 |
-| Matching lines | 469 (84.5%) |
+| Effective pass | **18** (94.7%) |
+| Failing | 1 |
+| Total expected lines | 562 |
+| Matching lines | 476 (84.7%) |
 | Mismatched lines | 86 |
+
+### Failure Breakdown
+
+| Category | Count | % of Failures |
+|----------|-------|---------------|
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
@@ -57,9 +63,11 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `sound` | 58.3% | 7 | 12 | 5 |  |
 
 ## Segfaults
 
@@ -75,6 +83,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**0 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
-No output mismatches.
+| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
+|---|------|------------|----------------|--------|----------|-------|
+| 1 | `sound` | 58.3% | 7/12 | 12 | 7 |  |

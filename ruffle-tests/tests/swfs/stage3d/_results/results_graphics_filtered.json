@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-22T23:56:07.357631+00:00",
-    "git_sha": "697669e5f98fdfdf0174f666cfcf8d722efe7198",
-    "duration_seconds": 84.15,
+    "timestamp": "2026-11-23T02:33:26.508888+00:00",
+    "git_sha": "509768d1d3232d596df969dfb2d0fe9831096163",
+    "duration_seconds": 94.24,
     "total_available": 8,
     "shards": 30,
     "expected_shards": 30,
@@ -21,9 +21,9 @@
     {
       "test": "draw_to_bitmap_data_unconfigured",
       "phases": {
-        "recomp": 0.005,
-        "compile": 23.86,
-        "run": 0.215
+        "recomp": 0.008,
+        "compile": 30.836,
+        "run": 0.278
       },
       "num_frames": 1,
       "lines": {
@@ -31,15 +31,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 24.09,
+      "duration": 31.14,
       "status": "pass"
     },
     {
       "test": "request_matching_profiles",
       "phases": {
-        "recomp": 0.008,
-        "compile": 3.049,
-        "run": 0.203
+        "recomp": 0.007,
+        "compile": 6.259,
+        "run": 0.18
       },
       "num_frames": 126,
       "lines": {
@@ -47,15 +47,15 @@
         "expected_lines": 190,
         "matching_lines": 190
       },
-      "duration": 3.27,
+      "duration": 6.46,
       "status": "pass"
     },
     {
       "test": "request_profiles",
       "phases": {
-        "recomp": 0.007,
-        "compile": 9.362,
-        "run": 0.25
+        "recomp": 0.004,
+        "compile": 6.718,
+        "run": 0.19
       },
       "num_frames": 12,
       "lines": {
@@ -63,15 +63,15 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 9.63,
+      "duration": 6.92,
       "status": "pass"
     },
     {
       "test": "sampler_odd_size",
       "phases": {
-        "recomp": 0.014,
-        "compile": 8.869,
-        "run": 0.264
+        "recomp": 0.025,
+        "compile": 12.248,
+        "run": 0.362
       },
       "num_frames": 1,
       "lines": {
@@ -79,7 +79,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 9.3,
+      "duration": 12.88,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -119,9 +119,9 @@
     {
       "test": "scissor_rectangle",
       "phases": {
-        "recomp": 0.015,
-        "compile": 7.428,
-        "run": 0.23
+        "recomp": 0.014,
+        "compile": 8.842,
+        "run": 0.258
       },
       "num_frames": 1,
       "lines": {
@@ -129,7 +129,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.79,
+      "duration": 9.25,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -169,9 +169,9 @@
     {
       "test": "scissor_rectangle_invalid",
       "phases": {
-        "recomp": 0.013,
-        "compile": 8.576,
-        "run": 0.248
+        "recomp": 0.014,
+        "compile": 8.726,
+        "run": 0.257
       },
       "num_frames": 1,
       "lines": {
@@ -179,7 +179,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 8.97,
+      "duration": 9.13,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -220,8 +220,8 @@
       "test": "unbound_texture",
       "phases": {
         "recomp": 0.013,
-        "compile": 8.619,
-        "run": 0.248
+        "compile": 8.624,
+        "run": 0.249
       },
       "num_frames": 1,
       "lines": {
@@ -229,7 +229,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 8.97,
+      "duration": 8.98,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -269,9 +269,9 @@
     {
       "test": "unbound_texture_multiple",
       "phases": {
-        "recomp": 0.021,
-        "compile": 11.407,
-        "run": 0.331
+        "recomp": 0.014,
+        "compile": 8.847,
+        "run": 0.256
       },
       "num_frames": 1,
       "lines": {
@@ -279,7 +279,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 11.88,
+      "duration": 9.21,
       "image_comparisons": {
         "output": {
           "status": "pass",
