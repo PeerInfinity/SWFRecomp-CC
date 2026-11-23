@@ -13876,7 +13876,12 @@ static ActionVar bitmapDataPixelDissolve(SWFAppContext* app_context, ActionVar* 
     uint32_t premul_fill = dest_bmp->transparent ? premultiplyAlpha(fill_color) : (fill_color | 0xFF000000);
 
     u32 seq_len = (u32)(eff_w * eff_h);
-    if (num_pixels > (int)seq_len) num_pixels = (int)seq_len;
+    // PROTO(w1-trace-tail-audit): Flash's own oracle (bitmap_data_thorough/
+    // pixelDissolve) writes EVERY pixel for a negative numPixels (an unsigned
+    // count, clamped), and returns randomSeed unchanged for numPixels == 0
+    // (pixel (0,0) is still written below).
+    if (num_pixels < 0 || num_pixels > (int)seq_len) num_pixels = (int)seq_len;
+    int pd_return_seed = (num_pixels == 0);
 
     // Write pixel (0,0) unconditionally
     {
@@ -13926,7 +13931,7 @@ static ActionVar bitmapDataPixelDissolve(SWFAppContext* app_context, ActionVar* 
         }
     }
 
-    r = makeF64((double)(int32_t)raw_idx);
+    r = makeF64(pd_return_seed ? (double)random_seed : (double)(int32_t)raw_idx);
     return r;
 }
 
@@ -16026,8 +16031,11 @@ static double spvTwipsQuantizePixels(double px)
 static float spvTwipsTruncatePixels(double px)
 {
 	double t = trunc(px * 20.0);
-	if (t < (double)INT32_MIN) t = (double)INT32_MIN;
-	else if (t > (double)INT32_MAX) t = (double)INT32_MAX;
+	// PROTO(w1-trace-tail-audit): Flash 10 (gnash matrix_accuracy_test1
+	// output.fp10.txt) stores an out-of-range coordinate as INT32_MIN twips on
+	// BOTH sides (the x86 cvttsd2si "integer indefinite"), not Rust's saturate:
+	// `_x = 1073741823` reads back -107374182.4.
+	if (t < (double)INT32_MIN || t > (double)INT32_MAX) t = (double)INT32_MIN;
 	return (float)(t / 20.0);
 }
 
@@ -68249,19 +68257,23 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			_mc_nav_name_len = func_name_len - _mc_nav_container_len - 1;
 		}
 
-		if (_mc_nav_name_len == 11 && strncmp(_mc_nav_name, "gotoAndStop", 11) == 0) { _is_mc_nav = 1; _mc_nav_play = 0; }
-		else if (_mc_nav_name_len == 11 && strncmp(_mc_nav_name, "gotoAndPlay", 11) == 0) { _is_mc_nav = 1; _mc_nav_play = 1; }
-		else if (_mc_nav_name_len == 4 && strncmp(_mc_nav_name, "stop", 4) == 0) { _is_mc_nav = 2; }
-		else if (_mc_nav_name_len == 4 && strncmp(_mc_nav_name, "play", 4) == 0) { _is_mc_nav = 3; }
-		else if (_mc_nav_name_len == 9 && strncmp(_mc_nav_name, "prevFrame", 9) == 0) { _is_mc_nav = 4; }
-		else if (_mc_nav_name_len == 9 && strncmp(_mc_nav_name, "nextFrame", 9) == 0) { _is_mc_nav = 5; }
-		else if (_mc_nav_name_len == 14 && strncmp(_mc_nav_name, "getBytesLoaded", 14) == 0) { _is_mc_nav = 6; }
-		else if (_mc_nav_name_len == 13 && strncmp(_mc_nav_name, "getBytesTotal", 13) == 0) { _is_mc_nav = 7; }
+		// PROTO(w1-trace-tail-audit): SWF<=6 identifiers are case-insensitive, so
+		// `gotoandPlay(5)` (gnash misc-swfc.all/sound, SWF6) must reach the nav arm.
+#define _MC_NAV_NCMP(a, b, n) (g_swf_version <= 6 ? strncasecmp((a), (b), (n)) : strncmp((a), (b), (n)))
+		if (_mc_nav_name_len == 11 && _MC_NAV_NCMP(_mc_nav_name, "gotoAndStop", 11) == 0) { _is_mc_nav = 1; _mc_nav_play = 0; }
+		else if (_mc_nav_name_len == 11 && _MC_NAV_NCMP(_mc_nav_name, "gotoAndPlay", 11) == 0) { _is_mc_nav = 1; _mc_nav_play = 1; }
+		else if (_mc_nav_name_len == 4 && _MC_NAV_NCMP(_mc_nav_name, "stop", 4) == 0) { _is_mc_nav = 2; }
+		else if (_mc_nav_name_len == 4 && _MC_NAV_NCMP(_mc_nav_name, "play", 4) == 0) { _is_mc_nav = 3; }
+		else if (_mc_nav_name_len == 9 && _MC_NAV_NCMP(_mc_nav_name, "prevFrame", 9) == 0) { _is_mc_nav = 4; }
+		else if (_mc_nav_name_len == 9 && _MC_NAV_NCMP(_mc_nav_name, "nextFrame", 9) == 0) { _is_mc_nav = 5; }
+		else if (_mc_nav_name_len == 14 && _MC_NAV_NCMP(_mc_nav_name, "getBytesLoaded", 14) == 0) { _is_mc_nav = 6; }
+		else if (_mc_nav_name_len == 13 && _MC_NAV_NCMP(_mc_nav_name, "getBytesTotal", 13) == 0) { _is_mc_nav = 7; }
 		// getDepth() called as a bare function (not method) — operates on current context MC.
 		// MovieClip.prototype.getDepth is a type-1 stub (NULL simple_func) that would
 		// otherwise fall through to the "Built-in constructor as plain function" branch
 		// and push undefined. Mirrors actionCallMethod's MOVIECLIP getDepth dispatch.
-		else if (_mc_nav_name_len == 8 && strncmp(_mc_nav_name, "getDepth", 8) == 0) { _is_mc_nav = 8; }
+		else if (_mc_nav_name_len == 8 && _MC_NAV_NCMP(_mc_nav_name, "getDepth", 8) == 0) { _is_mc_nav = 8; }
+#undef _MC_NAV_NCMP
 
 		if (_is_mc_nav)
 		{

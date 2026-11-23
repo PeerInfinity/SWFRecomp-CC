@@ -465,7 +465,9 @@ question.
 per version are part of TextField-vN's permanent diff set and won't
 get closed unless the Gnash test is itself updated upstream.
 
-### sound (misc-swfc.all) — interactive Flash session trace, no sound-position simulation
+### sound (misc-swfc.all) — RESOLVED s26 (was: interactive Flash session trace, no sound-position simulation)
+
+**RESOLVED (s26, `SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §1):** the reason below was wrong. With position 0 the frame-6 condition is TRUE, so a faithful player loops forever (the expected output's truncation). We fell through because `gotoandPlay` (SWF6, case-insensitive) missed the case-sensitive nav arm in `actionCallFunction`. Fixed; the row passes in both modes and is out of the suite ignore list.
 
 **Source:** `gnash/testsuite/misc-swfc.all/sound.sc`. The test loads an
 audio file, calls `snd.start(0,0)`, then enters a frame-6 loop that calls
@@ -790,7 +792,7 @@ means reimplementing Flash hairline hinting at disproportionate risk.
 | ~~Error-v6~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v7~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v8~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
-| sound (misc-swfc) | 5 | Interactive Flash session trace; expected output truncates mid-test waiting for sound playback. We have no audio backend, so the frame-6 loop exits immediately. | No audio simulation; test design assumes wall-clock playback | gnash/testsuite/misc-swfc.all/sound.sc |
+| ~~sound (misc-swfc)~~ RESOLVED s26 | 5 | Interactive Flash session trace; expected output truncates mid-test waiting for sound playback. We have no audio backend, so the frame-6 loop exits immediately. | No audio simulation; test design assumes wall-clock playback | gnash/testsuite/misc-swfc.all/sound.sc |
 | opcode_guard_test (misc-ming) | 8 | Gnash's expected output omits the `Target not found` warning on a failed `setTarget`; we and Ruffle both emit it. We are MORE correct than Ruffle on the test's mc1 event-handler assertions, so the resulting line shift puts our diff indices outside Ruffle's diff set — the verify_output.py subset_match cannot promote us. | Match Flash/Ruffle (warning emitted); cannot suppress without breaking AVM1 tell_target_invalid / path_string etc. | Ruffle source `core/src/avm1/globals/movie_clip.rs` set_target trace |
 | argstest-v6 (actionscript.all) | 5000+ | Native objects walked by the test (PrintJob, MovieClipLoader, …) are unimplemented / carry placeholder prototypes; recursive for-in descent multiplies the divergence (7731 actual vs 2192 expected). Ruffle under-emits (~1298 lines), so our diff is not a subset. | Enumeration coverage/order divergence, not a callable-API bug | ECMA-262 §12.6.4 (enumeration order unspecified) |
 | argstest-v7 (actionscript.all) | 5000+ | Same as argstest-v6 (7731 actual vs 2061 expected). | Same | Same |

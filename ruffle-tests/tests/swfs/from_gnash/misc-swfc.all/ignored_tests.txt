@@ -10,14 +10,8 @@
 # Re-triaged 2026-08-01 against _results/results_graphics.json at feb8882b0:
 # both entries are still `output_mismatch`, so nothing was pruned here.
 
-# sound — interactive Flash session timing trace; requires sound-position
-# wall-clock simulation we don't implement. Expected output truncates at line 7
-# (PASSED: snd.position == 0) — Flash's loop in frame 6 runs gotoAndPlay(5)
-# until snd.position+100 < snd.duration becomes false. Without audio playback
-# our snd.position stays at 0, so we exit the loop immediately and reach the
-# totals(2) call, producing extra trailing lines. See REMAINING_TAIL_TRIAGE
-# Path (b) recommendation.
-sound
+# (s26: `sound` pruned — the ignore reason was wrong; it was SWF6 case-insensitive
+# `gotoandPlay` dispatch, fixed in actionCallFunction. w1-trace-tail-audit report §1.)
 
 # matrix_accuracy_test1 — MovieClip transform values at INT_MIN/INT_MAX twip
 # boundaries. Most diff lines are FAILED in both expected and ours (Gnash own
