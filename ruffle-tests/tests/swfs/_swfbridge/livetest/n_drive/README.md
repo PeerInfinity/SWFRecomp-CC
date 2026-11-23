@@ -74,3 +74,29 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
 - Native: `python3 ../dj_probe/run_native.py n_drive.swf <dir> --frames 1800
   --capture-ticks <shot frames>` (set `SWFRECOMP_COMPILE_TIMEOUT=1500` on a
   loaded machine; N's C build takes 3–4 min).
+
+## s26 n-levels additions
+
+- **`START_LEVEL` now really loads level k.** N's `App_StartNewGame` hard-codes
+  `App_LoadLevel(0, …)`, so before this fix the knob only bumped `curLevel`:
+  you got level 0's map under level k's *name*. The probe now runs the same body
+  with `App_LoadLevel(gamedata.GetCurrentLevelID(), App_StartPreLevelPause)`.
+  Any "levels 1–4" result from before s26 n-levels was level 0 four times.
+- `OBJHASH=true` now also appends **`o=<n>:<hash>`**, an order-dependent hash over
+  N's own object list (`_root.objects.objArray`: drones, thwumps, mines, gold,
+  doors, …) of `OBJ_TYPE` + `pos` to 1e-3. `h=` (the clip walk) never sees
+  level objects; it sees only pooled GUI/effect clips.
+- `OBJDUMP=true`: at each attempt's tick 0, prints `ND obj <i> type=<T> x= y=`,
+  plus the switch (`trig=`) for exits and `door= trap= locked=` for doors.
+  Types are N's `OBJTYPE_*`: 0 gold, 1 bounce block, 2 launchpad, 3 turret,
+  4 floor guard, 5 player, 6 drone, 7 one-way, 8 thwump, 9 test door,
+  10 homing launcher, 11 exit, 12 mine.
+- `TRACKOBJ=<i>` (authoring): one `NT t= ob=x,y` line per tick for object i.
+  Use it for the thwump or drone that a route has to dodge or ride.
+- `search.py LEVEL PREFIX CAND…`: runs `PREFIX|CAND` attempts in one exporter
+  session via `author.py`. Per attempt it prints the final position and state,
+  the last standing position, and the switch/exit/non-autokill kill events.
+  This is how the routes were built: grow a prefix one landing at a time.
+- `routes_ep0.txt`: the replayed scripts for levels 2 (thwumps) and 4 (drone).
+  Each has an enemy-death attempt followed by a completing attempt. Record:
+  `SWFRecompDocs/plans/n-levels-report.md`.

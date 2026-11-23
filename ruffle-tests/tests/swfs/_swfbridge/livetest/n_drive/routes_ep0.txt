@@ -1,0 +1,8 @@
+# Episode 0 routes (s26 n-levels). One line per level: build.sh SCRIPT with START_LEVEL=<n>.
+# Attempts are '/'-separated; AUTOKILL=true for the replay (a route that exits never reaches its autokill).
+# level 2 "all about thwumps": a0 = stand under the corridor thwump (crushed t=114);
+#   a1 = sidestep, ride the corridor thwump up, switch t=507, lure + ride the left thwump, cross the right thwump, exit t=1144; a2 = level 3 loads.
+2 200:-/70:-|14:R|30:-|20:J|20:LJ|10:J|260:-|50:L|20:-|40:L|5:-|20:R|30:RJ|12:R|10:L|316:-|12:R|60:-|18:R|26:RJ|30:-|90:R/60:R
+# level 4 "lockness": a0 = stepping-stone doors to the ledge, switch t=453, killed by the chasing drone t=508;
+#   a1 = same with a faster last hop: switch t=444, exit t=476; a2 = next level.
+4 40:R|40:-|8:J|15:RJ|38:J|20:-|4:J|18:RJ|40:J|20:-|4:J|22:RJ|36:J|20:-|14:RJ|50:J|20:-|18:RJ|46:J|60:R/40:R|40:-|8:J|15:RJ|38:J|20:-|4:J|18:RJ|40:J|20:-|4:J|22:RJ|36:J|20:-|14:RJ|50:J|20:-|30:RJ|80:R/60:R

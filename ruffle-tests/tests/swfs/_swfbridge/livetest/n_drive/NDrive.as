@@ -33,6 +33,9 @@ class NDrive {
 	// h= clip walk only sees pooled GUI/effect clips, never level objects.
 	// OBJDUMP: at each attempt's first tick, trace "ND obj <i> type=<T> x= y=".
 	static var OBJDUMP:Boolean = false;
+	// TRACKOBJ (authoring): objArray index traced once per game tick as
+	// "NT t= ob=x,y" (-1 = off). E.g. a thwump or drone a route must dodge.
+	static var TRACKOBJ:Number = -1;
 	static var lastSet:Object;
 	static var freezeLeft:Number = 0;
 	static var freezeLabel:String = "";
@@ -118,6 +121,7 @@ class NDrive {
 			+ " st=" + p.curState + " k=" + (ks == "" ? "-" : ks) + " time=" + r.game.playerCurTime
 			+ (OBJHASH ? " h=" + NDrive.clipPosHash() + " o=" + NDrive.worldHash() : ""));
 		if (OBJDUMP && t == 0) NDrive.dumpObjects();
+		if (TRACKOBJ >= 0) { var tob:Object = r.objects.objArray[TRACKOBJ]; trace("NT t=" + t + " ob=" + tob.pos.x + "," + tob.pos.y); }
 	}
 	static function worldHash():String {
 		var arr:Array = r.objects.objArray;
