@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T03:52:23.823016+00:00",
-    "old_git_sha": "a18a9cc61d54539528600434a21156f38760ea58",
-    "new_timestamp": "2026-11-23T07:07:13.953547+00:00",
-    "new_git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
+    "old_timestamp": "2026-11-23T07:07:13.953547+00:00",
+    "old_git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
+    "new_timestamp": "2026-11-23T19:43:31.787050+00:00",
+    "new_git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 142,
+    "old_pass": 158,
     "old_ruffle_matched": 0,
-    "old_effective_pass": 142,
-    "old_total": 142,
+    "old_effective_pass": 158,
+    "old_total": 158,
     "old_pass_rate": 100.0,
-    "new_pass": 158,
+    "new_pass": 170,
     "new_ruffle_matched": 0,
-    "new_effective_pass": 158,
-    "new_total": 158,
+    "new_effective_pass": 170,
+    "new_total": 170,
     "new_pass_rate": 100.0,
     "old_mismatched_lines": 0,
     "new_mismatched_lines": 0,
@@ -25,97 +25,13 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 142,
-    "added": 16,
+    "unchanged": 158,
+    "added": 12,
     "removed": 0
   },
   "changes": [
     {
-      "test": "avm1_cxform_override_overflow",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1_edittext_placed_cxform_script",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "avm1_filter_list_overflow",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1_func2_param_register_oob",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "avm1_jpeg3_alpha_bitmap",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "avm1_key_isdown_protected",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    },
-    {
-      "test": "avm1_long_text_layout",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1_many_defs_registry",
+      "test": "avm1_attach_from_stopped_root_enterframe",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -127,19 +43,7 @@
       }
     },
     {
-      "test": "avm1_many_functions_registry",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    },
-    {
-      "test": "avm1_pixelbounds_dynamic_child",
+      "test": "avm1_attached_clip_holder_render",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -151,43 +55,19 @@
       }
     },
     {
-      "test": "avm1_po3_color_matrix_live",
+      "test": "avm1_button_pick_order",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 9
       }
     },
     {
-      "test": "avm1_po3_color_matrix_live_clear",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "avm1_po3_color_matrix_live_nested",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "avm1_remove_same_name_other_parent",
+      "test": "avm1_button_textfield_path_binding",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
@@ -199,27 +79,99 @@
       }
     },
     {
-      "test": "avm1_removed_clip_dprops_gc",
+      "test": "avm1_edittext_html_delete_runs",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
       }
     },
     {
-      "test": "avm1_timer_clock_model",
+      "test": "avm1_edittext_placed_cxform",
       "change_type": "added",
       "old_status": null,
       "new_status": "pass",
       "old_lines": null,
       "new_lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "avm1_exec_order_attached_selfremove",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 18
+      }
+    },
+    {
+      "test": "avm1_mc_resolve",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "avm1_set_new_text_format_render",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "avm1_textfield_x_bounds_offset",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      }
+    },
+    {
+      "test": "avm1_wrap_giveup_mixed_runs",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "ei_mc_this_receiver",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
       }
     }
   ]

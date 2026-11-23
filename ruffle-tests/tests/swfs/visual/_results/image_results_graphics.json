@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T07:07:17.003447+00:00",
+    "timestamp": "2026-11-23T19:43:34.871314+00:00",
     "suite": "visual",
     "stem": "results_graphics",
-    "git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
+    "git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45114820633",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45114820633",
+    "run_id": "45240685954",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45240685954",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 148,
   "comparisons": 241,
   "ignored": 2,
-  "pass": 235,
-  "fail": 6,
+  "pass": 234,
+  "fail": 7,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 3,
   "ruffle_matched_fail": 1,
-  "pass_rate": 97.5,
+  "pass_rate": 97.1,
   "results": [
     {
       "suite": "visual",
@@ -4063,14 +4063,14 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 5",
-      "max_diff": 5,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
       "expected_source": "repo",
       "width": 800,
       "height": 800,
       "total_channels": 2560000,
-      "diff_channels": 1547925,
-      "mean_diff": 0.6475,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
       "checks": [
         {
           "tolerance": 5,
@@ -4122,29 +4122,30 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 6",
-      "max_diff": 6,
+      "status": "fail",
+      "message": "Image comparison failed: 205332 outliers exceed limit of 0, max difference 9",
+      "reason": "pixel_mismatch",
+      "max_diff": 9,
       "expected_source": "repo",
       "width": 800,
       "height": 800,
       "total_channels": 2560000,
-      "diff_channels": 343254,
-      "mean_diff": 0.4876,
+      "diff_channels": 1026687,
+      "mean_diff": 1.7717,
       "checks": [
         {
           "tolerance": 6,
           "max_outliers": 0,
-          "outliers": 0,
-          "passed": true
+          "outliers": 205332,
+          "passed": false
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 0,
-      "outliers": 0,
+      "failed_checks": 1,
+      "outliers": 205332,
       "max_outliers": 0,
       "tolerance": 6,
-      "excess_outliers": 0
+      "excess_outliers": 205332
     },
     {
       "suite": "visual",
