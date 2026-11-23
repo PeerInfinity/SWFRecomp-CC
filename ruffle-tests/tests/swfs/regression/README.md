@@ -145,3 +145,5 @@ arms cannot be reached any other way.
 | `avm1_po3_color_matrix_live` | **PlaceObject3 ColorMatrix chains the recompile-time fold can't express exactly** (a clamp between passes, alpha read from colour) run as live filter passes (s26 `w2-cm-chain-cab-edge`). Generator `create_test_swf.py` builds all three. Ruffle exporter `0ddd12b6a` render pixel-identical |
 | `avm1_po3_color_matrix_live_nested` | the same chain on a sprite-nested placement; Ruffle render pixel-identical |
 | `avm1_po3_color_matrix_live_clear` | `mc.filters = []` drops the live authored chain; Ruffle render pixel-identical |
+| `avm1_jpeg3_alpha_bitmap` | **DefineBitsJPEG3 colour with an alpha plane is premultiplied: clamp to alpha + un-premultiply at emit** (s26 `w2-text-cx-jpeg3`). Golden = Ruffle exporter `0ddd12b6a` render (our lavapipe render within max 1, tol 3) |
+| `avm1_edittext_placed_cxform_script` | EditText colour transform, the script/wrapper path: trace lock (`s1.f=II` …), Ruffle trace identical. The image twin is held (border-corner residual) |

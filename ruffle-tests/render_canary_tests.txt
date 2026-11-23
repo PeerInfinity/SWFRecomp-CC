@@ -716,3 +716,7 @@ visual/static_text_offstage                            # AVM1 draw() of a timeli
 avm2/pixelbender_dithering                             # AVM2 bitmap-fill shape, CPU draw()   1 cmp
 # tier=2
 from_shumway/bitmapbuttons                             # AVM2 static-bitmap GPU upload (band) 1 cmp
+# s26 w2-text-cx-jpeg3: colour transform on AVM1/timeline EditText; DefineBitsJPEG3 un-premultiply at emit.
+# tier=2
+from_shumway/acid/acid-color-0                         # EditText cxform + JPEG3 alpha band   1 cmp
+regression/avm1_jpeg3_alpha_bitmap                     # JPEG3 un-premultiply (exporter golden) 1 cmp

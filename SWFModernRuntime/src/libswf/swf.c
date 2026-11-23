@@ -1755,6 +1755,7 @@ void swfStart(SWFAppContext* app_context)
 	context->bitmap_data_size = app_context->bitmap_data_size;
 	context->cxform_data = app_context->cxform_data;
 	context->cxform_data_size = app_context->cxform_data_size;
+	actionTextFieldCxSetApp(app_context);  // s26 w2-text-cx-jpeg3: EditText colour transform
 
 	// Allocate stack into app_context (use system malloc, not heap - stack is allocated before heap_init)
 	app_context->stack = (char*) malloc(INITIAL_STACK_SIZE);

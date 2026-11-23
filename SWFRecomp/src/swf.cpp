@@ -2055,10 +2055,34 @@ namespace SWFRecomp
 					else if (decoded_channels == 4) a = px[3];
 					else                       a = 0xFF;
 
+					// s26 w2-text-cx-jpeg3 (acid-color-0 chain step 2):
+					// DefineBitsJPEG3/4 colour with a JPEG alpha plane is
+					// PREMULTIPLIED. Flash clamps each channel to alpha
+					// (Ruffle render/src/utils.rs decode_define_bits_jpeg,
+					// "Flash Player clamps color to the alpha value") and
+					// treats the result as premultiplied. Our bitmap tables
+					// are STRAIGHT alpha (the renderer premultiplies), so
+					// un-premultiply here; emitting the raw colour made the
+					// renderer premultiply twice (dark-grey alpha fringes).
+					u32 c0 = px[0], c1 = px[1], c2 = px[2];
+					if (have_alpha)
+					{
+						if (c0 > a) c0 = a;
+						if (c1 > a) c1 = a;
+						if (c2 > a) c2 = a;
+						if (a == 0) { c0 = c1 = c2 = 0; }
+						else if (a < 255)
+						{
+							c0 = (c0 * 255 + a / 2) / a;
+							c1 = (c1 * 255 + a / 2) / a;
+							c2 = (c2 * 255 + a / 2) / a;
+						}
+					}
+
 					payloadSink(bitmap_data) << std::hex << std::uppercase << std::setw(2)
-								<< "\t0x" << (u32) px[0] << "," << endl
-								<< "\t0x" << (u32) px[1] << "," << endl
-								<< "\t0x" << (u32) px[2] << "," << endl
+								<< "\t0x" << c0 << "," << endl
+								<< "\t0x" << c1 << "," << endl
+								<< "\t0x" << c2 << "," << endl
 								<< "\t0x" << (u32) a << "," << endl;
 
 					current_bitmap_pixel += 1;

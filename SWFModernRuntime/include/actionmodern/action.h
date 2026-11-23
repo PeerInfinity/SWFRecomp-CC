@@ -906,6 +906,9 @@ typedef struct TextFieldRenderInfo {
 // For each text field, calls callback with the render info and user data.
 typedef void (*TextFieldRenderCallback)(const TextFieldRenderInfo* info, void* user_data);
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data);
+// s26 w2-text-cx-jpeg3: the app context whose baked cxform table the AVM1/
+// timeline text iterators read for the EditText colour transform (swfStart).
+void actionTextFieldCxSetApp(SWFAppContext* app_context);
 
 // EditText z-order window (s17 w2-gfx-edittext-bg). Ruffle paints a field's
 // background/border/glyphs from render_self, i.e. at the field's own display

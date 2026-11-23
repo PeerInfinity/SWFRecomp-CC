@@ -30888,6 +30888,113 @@ int actionHasTextFieldAtDepth(int swf_depth)
 	return g_tf_depth_present[swf_depth];
 }
 
+// s26 w2-text-cx-jpeg3 (acid-color-0 chain step 1): the colour transform of an
+// AVM1/timeline EditText. TextFieldRenderInfo / TextFieldGlyphInfo carry
+// literal RGB and the renderer draws box + glyphs with cxform slot 0, so no
+// PlaceObject CXFORM (or Color override) on the field or any ancestor ever
+// reached the text: acid-color-0's green "ABC" and green "Hello" box drew in
+// their untransformed colours. Ruffle composes the field's world colour
+// transform into the text colour (edit_text.rs render_self ->
+// set_mult_color under context.transform_stack). We compose the RGB diag
+// mult + add of every entry on the chain here and apply it on the CPU to the
+// background, border, default text colour and every run colour. ALPHA is
+// deliberately untouched: _alpha / cx alpha already reach text through the
+// existing group-alpha routes, so composing it here would apply it twice.
+// `g_tf_cx_app` is set once by swfStart (actionTextFieldCxSetApp); the baked
+// table is app_context->cxform_data (the combined table once a child movie is
+// linked), indexed by the entry's ORIGINAL slot (tag_entry_baked_cxform_id).
+static SWFAppContext* g_tf_cx_app = NULL;
+static float g_tf_cx_mult[3] = { 1.0f, 1.0f, 1.0f };
+static float g_tf_cx_add[3]  = { 0.0f, 0.0f, 0.0f };
+static int g_tf_cx_on = 0;
+
+void actionTextFieldCxSetApp(SWFAppContext* app_context)
+{
+	g_tf_cx_app = app_context;
+}
+
+#ifndef NO_GRAPHICS
+extern u32 tag_entry_baked_cxform_id(const DisplayObject* obj);
+
+// The RGB part of one display entry's own colour transform. 0 = identity.
+static int tf_entry_cx(const DisplayObject* obj, float mult[3], float add[3])
+{
+	if (obj == NULL) return 0;
+	if (obj->cx_overridden) {
+		mult[0] = (float)(obj->cx_ra / 100.0); mult[1] = (float)(obj->cx_ga / 100.0);
+		mult[2] = (float)(obj->cx_ba / 100.0);
+		add[0] = (float)(obj->cx_rb / 255.0); add[1] = (float)(obj->cx_gb / 255.0);
+		add[2] = (float)(obj->cx_bb / 255.0);
+	} else {
+		SWFAppContext* app = g_tf_cx_app;
+		if (app == NULL || app->cxform_data == NULL) return 0;
+		u32 baked = (app->cxform_data_size > 0)
+			? (u32)(app->cxform_data_size / (20 * sizeof(float))) : 0;
+		u32 id = tag_entry_baked_cxform_id(obj);
+		if (id == 0 || id >= baked) return 0;
+		const float* c = (const float*)app->cxform_data + (size_t)id * 20;
+		mult[0] = c[0]; mult[1] = c[5]; mult[2] = c[10];
+		add[0] = c[16]; add[1] = c[17]; add[2] = c[18];
+	}
+	for (int i = 0; i < 3; i++)
+		if (mult[i] != 1.0f || add[i] != 0.0f) return 1;
+	return 0;
+}
+
+// Compose `obj`'s own transform UNDER the running g_tf_cx (outer o inner).
+static void tf_cx_push_entry(const DisplayObject* obj)
+{
+	float m[3], a[3];
+	if (!tf_entry_cx(obj, m, a)) return;
+	for (int i = 0; i < 3; i++) {
+		g_tf_cx_add[i] = g_tf_cx_mult[i] * a[i] + g_tf_cx_add[i];
+		g_tf_cx_mult[i] = g_tf_cx_mult[i] * m[i];
+	}
+	g_tf_cx_on = 1;
+}
+
+static void tf_cx_reset(void)
+{
+	for (int i = 0; i < 3; i++) { g_tf_cx_mult[i] = 1.0f; g_tf_cx_add[i] = 0.0f; }
+	g_tf_cx_on = 0;
+}
+
+// World colour transform of a TextField MovieClip: its own display entry and
+// every ancestor's, outermost first.
+static void tf_cx_for_mc(MovieClip* mc)
+{
+	tf_cx_reset();
+	MovieClip* chain[64];
+	int n = 0;
+	for (MovieClip* m = mc; m != NULL && m != &root_movieclip && n < 64; m = m->parent)
+		chain[n++] = m;
+	for (int k = n - 1; k >= 0; k--) {
+		if (chain[k]->depth == INT_MIN) continue;
+		const DisplayObject* e = (const DisplayObject*)chain[k]->display_obj;
+		if (e == NULL) e = resolveMCDisplayEntry(chain[k]);
+		tf_cx_push_entry(e);
+	}
+}
+#else
+static void tf_cx_for_mc(MovieClip* mc) { (void)mc; }
+#endif
+
+// Apply the current text colour transform to a 24-bit RGB.
+static u32 tf_cx_rgb(u32 rgb)
+{
+	rgb &= 0x00FFFFFF;
+	if (!g_tf_cx_on) return rgb;
+	u32 out = 0;
+	for (int i = 0; i < 3; i++) {
+		int sh = 16 - 8 * i;
+		float v = (float)((rgb >> sh) & 0xFF) / 255.0f * g_tf_cx_mult[i] + g_tf_cx_add[i];
+		if (v < 0.0f) v = 0.0f;
+		if (v > 1.0f) v = 1.0f;
+		out |= (u32)(v * 255.0f + 0.5f) << sh;
+	}
+	return out;
+}
+
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 {
 	int count = 0;
@@ -30962,10 +31069,11 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 		}
 
 		TextFieldRenderInfo info;
+		tf_cx_for_mc(mc);
 		info.has_background = has_bg;
-		info.background_color = bg_color;
+		info.background_color = tf_cx_rgb(bg_color);
 		info.has_border = has_border;
-		info.border_color = bd_color;
+		info.border_color = tf_cx_rgb(bd_color);
 		info.x = vis_off_x;
 		info.y = vis_off_y;
 		// The box is the DefineEditText bounds RECT, so a tag-defined field
@@ -31366,6 +31474,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		// glyphs (Flash; fonts/embed_matching/no_font_found's golden is blank).
 		if (tf_embedded_font_missing(mc, font_id)) continue;
 
+		tf_cx_for_mc(mc);
 		// Get text color (fallback when no run table or run color missing)
 		u32 text_color = 0x000000;
 		{
@@ -31437,7 +31546,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				TFRun* r = &table->runs[ri];
 				_tfg_runs[ri].byte_start = r->start;
 				_tfg_runs[ri].byte_length = r->length;
-				_tfg_runs[ri].color = r->color & 0x00FFFFFF;
+				_tfg_runs[ri].color = tf_cx_rgb(r->color);
 				_tfg_runs[ri].font_height = (u16)r->font_height;
 				// align/bullet drive the renderer's per-paragraph x layout. _tfg_runs
 				// is a shared static buffer reused across fields, so failing to set
@@ -31479,7 +31588,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				utf8_len = 0;
 				_tfg_runs[0].byte_start = 0;
 				_tfg_runs[0].byte_length = 0;
-				_tfg_runs[0].color = text_color & 0x00FFFFFF;
+				_tfg_runs[0].color = tf_cx_rgb(text_color);
 				_tfg_runs[0].font_height = font_height;
 				_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
 				_tfg_runs[0].bullet = 0;
@@ -31503,7 +31612,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				if (mc->ng_textfield_idx >= 0) {
 					_tfg_runs[0].byte_start = 0;
 					_tfg_runs[0].byte_length = (u32)utf8_len;
-					_tfg_runs[0].color = text_color & 0x00FFFFFF;
+					_tfg_runs[0].color = tf_cx_rgb(text_color);
 					_tfg_runs[0].font_height = font_height;
 					_tfg_runs[0].align = (u8)ng_getTextFieldAlign(mc->ng_textfield_idx);
 					_tfg_runs[0].bullet = 0;
@@ -31598,7 +31707,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		TextFieldGlyphInfo info;
 		info.font_id = font_id;
 		info.font_height = font_height;
-		info.text_color = text_color;
+		info.text_color = tf_cx_rgb(text_color);
 		info.x = world_x + vis_off_x;
 		info.y = world_y + vis_off_y;
 		info.w = mc->width;
@@ -31824,9 +31933,9 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	if (render_cb && (has_bg || has_border)) {
 		TextFieldRenderInfo render_info = {0};
 		render_info.has_background = has_bg;
-		render_info.background_color = 0xFFFFFF;
+		render_info.background_color = tf_cx_rgb(0xFFFFFF);
 		render_info.has_border = has_border;
-		render_info.border_color = 0x000000;
+		render_info.border_color = tf_cx_rgb(0x000000);
 		render_info.x = field_x_px;
 		render_info.y = field_y_px;
 		// Flash includes the +1 edge pixel on positive-dimension fields.
@@ -31916,7 +32025,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 					TFRun* r = &otf_html_table.runs[ri];
 					otf_html_runs[ri].byte_start = r->start;
 					otf_html_runs[ri].byte_length = r->length;
-					otf_html_runs[ri].color = r->color & 0x00FFFFFF;
+					otf_html_runs[ri].color = tf_cx_rgb(r->color);
 					otf_html_runs[ri].font_height = (u16)r->font_height;
 					otf_html_runs[ri].align = r->align;
 					otf_html_runs[ri].bullet = 0;
@@ -31945,7 +32054,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	if (emit_runs == NULL) {
 		otf_html_runs[0].byte_start = 0;
 		otf_html_runs[0].byte_length = (u32)text_len;
-		otf_html_runs[0].color = text_color & 0x00FFFFFF;
+		otf_html_runs[0].color = tf_cx_rgb(text_color);
 		otf_html_runs[0].font_height = font_height;
 		otf_html_runs[0].align = (u8)ng_getTextFieldAlign(tf_idx);
 		otf_html_runs[0].bullet = 0;
@@ -31958,7 +32067,7 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 	TextFieldGlyphInfo info = {0};
 	info.font_id = font_id;
 	info.font_height = font_height;
-	info.text_color = text_color;
+	info.text_color = tf_cx_rgb(text_color);
 	info.x = field_x_px;
 	info.y = field_y_px;
 	info.w = field_w_px;
@@ -31987,6 +32096,13 @@ static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
 extern int tag_root_edittext_is_filtered(const DisplayObject* obj);
 extern DisplayObject* display_list;
 
+// s26 w2-text-cx-jpeg3: the orphan walk carries the running ancestor colour
+// transform down the display-list recursion (g_tf_cx_*), saved and restored
+// around each sprite / field.
+#define OTF_CX_SAVE() float _cxm[3], _cxa[3]; int _cxon = g_tf_cx_on; \
+	memcpy(_cxm, g_tf_cx_mult, sizeof _cxm); memcpy(_cxa, g_tf_cx_add, sizeof _cxa)
+#define OTF_CX_RESTORE() do { memcpy(g_tf_cx_mult, _cxm, sizeof _cxm); \
+	memcpy(g_tf_cx_add, _cxa, sizeof _cxa); g_tf_cx_on = _cxon; } while (0)
 static void otf_walk_dl(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max,
 	MovieClip* parent_mc, float parent_tx_px, float parent_ty_px,
@@ -32025,8 +32141,11 @@ static void otf_walk_dl(SWFAppContext* app_context,
 				continue;
 			MovieClip* tf_mc = otf_find_child_mc(parent_mc, obj->instance_name);
 			if (tf_mc == NULL || !MC_IS_TEXTFIELD(tf_mc)) {
+				OTF_CX_SAVE();
+				tf_cx_push_entry(obj);
 				otf_emit_textfield(app_context, tf_idx, obj,
 					world_x, world_y, render_cb, glyph_cb, user_data);
+				OTF_CX_RESTORE();
 				if (count) (*count)++;
 			}
 			continue;
@@ -32049,10 +32168,13 @@ static void otf_walk_dl(SWFAppContext* app_context,
 		    && obj->sprite_display_list != NULL)
 		{
 			MovieClip* child_mc = otf_find_child_mc(parent_mc, obj->instance_name);
+			OTF_CX_SAVE();
+			tf_cx_push_entry(obj);
 			otf_walk_dl(app_context,
 				obj->sprite_display_list, obj->sprite_max_depth,
 				child_mc, world_x, world_y,
 				render_cb, glyph_cb, user_data, count);
+			OTF_CX_RESTORE();
 		}
 	}
 }
@@ -32065,8 +32187,10 @@ int actionIterateOrphanTextFields(SWFAppContext* app_context,
 	extern size_t max_depth;
 	extern MovieClip root_movieclip;
 	int count = 0;
+	tf_cx_reset();
 	otf_walk_dl(app_context, display_list, max_depth, &root_movieclip,
 		0.0f, 0.0f, render_cb, glyph_cb, user_data, &count);
+	tf_cx_reset();
 	return count;
 }
 
@@ -32091,9 +32215,12 @@ int actionEmitOrphanRootTextField(SWFAppContext* app_context, int depth,
 	if (tf_mc != NULL && MC_IS_TEXTFIELD(tf_mc)) return 0;
 	u32 tid = ng_get_original_transform_id(obj);
 	float (*otd)[16] = ng_entryTransformData(obj);
+	tf_cx_reset();
+	tf_cx_push_entry(obj);
 	otf_emit_textfield(app_context, tf_idx, obj,
 		otd[tid][12] / 20.0f, otd[tid][13] / 20.0f,
 		render_cb, glyph_cb, user_data);
+	tf_cx_reset();
 	return 1;
 }
 

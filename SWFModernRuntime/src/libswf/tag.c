@@ -3159,6 +3159,15 @@ static u32 cxform_original_id(const DisplayObject* obj)
 	return obj->cxform_id;
 }
 
+// s26 w2-text-cx-jpeg3: the same lookup for action.c's AVM1/timeline text
+// colour transform (actionIterateTextFields / ...Glyphs / the orphan walk),
+// which can run while compose_children has an entry re-pointed at an
+// inherited or minted GPU-only slot.
+u32 tag_entry_baked_cxform_id(const DisplayObject* obj)
+{
+	return cxform_original_id(obj);
+}
+
 static void cxform_overrides_restore(void)
 {
 	for (int i = g_cxform_override_count - 1; i >= 0; --i)
