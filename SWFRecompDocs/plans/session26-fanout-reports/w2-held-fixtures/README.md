@@ -6,7 +6,7 @@
   the fixture with Ruffle's trace once those match (or a Flash capture says otherwise).
 - `avm2_bitmapdata_draw_filtered` (same slot): Flash model (Ruffle's draw() ignores filters by design); needs a FLASH
   capture.
-- `avm1_edittext_placed_cxform` (w2-text-cx-jpeg3): the Ruffle exporter render (`output.ruffle-0ddd12b6a.png`) differs from
+- **LANDED by w2-edittext-border-cx (s26):** the corners are the oracle machine's Dx12-only line-as-rect rasterizer, not a cx bug; landed with a 19-channel corner budget. Original note: `avm1_edittext_placed_cxform` (w2-text-cx-jpeg3): the Ruffle exporter render (`output.ruffle-0ddd12b6a.png`) differs from
   our lavapipe after-render by **9 px (max 64), all on EditText border/background box CORNERS** under a colour
   transform. Ruffle draws them partly covered, e.g. (64,255,64) where we have (0,255,0). The before-render had every
   field black, so the colour fix itself is confirmed. Lead: the border-corner rule under a cxform. Land the fixture with

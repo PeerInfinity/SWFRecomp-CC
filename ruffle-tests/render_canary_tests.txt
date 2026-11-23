@@ -733,3 +733,6 @@ visual/filters/blur_fractional                         # 6-bit size truncation, 
 # s26 w2-attached-holder-render: clip attached under a createEmptyMovieClip holder (OFFSCREEN attached passes).
 # tier=1
 regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased holder        1 cmp
+# s26 w2-edittext-border-cx: EditText under a placement cxform (corner-budgeted exporter golden); integer-twip centring.
+# tier=1
+regression/avm1_edittext_placed_cxform                 # EditText cxform, 19-ch corner budget  1 cmp

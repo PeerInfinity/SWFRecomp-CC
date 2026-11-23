@@ -7813,7 +7813,14 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		float remaining = usable_line_width - bul - pars[p].width;
 		float offset = 0.0f;
 		if (pars[p].align == 1) offset = remaining;            // right
-		else if (pars[p].align == 2) offset = remaining * 0.5f;// center
+		else if (pars[p].align == 2) {                          // center
+			// s26 w2-edittext-border-cx (acid-color-0 chain step 4): Ruffle
+			// centres in whole TWIPS — `misalignment / 2` on the i32 Twips
+			// newtype (html/layout.rs ~325), truncating toward zero — not
+			// half a float twip. A half-twip remainder moved the glyph
+			// edges of acid-color-0's centred "Hello" field.
+			offset = (float)(((s32)lrintf(remaining)) / 2);
+		}
 		// justify: fall back to left for single-glyph paragraphs
 		if (offset < 0.0f) offset = 0.0f;
 		par_x_offset[p] = (float)first_line_left_off + bul + offset;
