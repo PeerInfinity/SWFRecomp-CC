@@ -20,7 +20,7 @@ New files:
 - `regression/avm1_loaded_shell_consumers/`: `create_test_swf.py`, `test.swf`, `child.swf`, `test.toml`, `output.txt`.
 - `SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-parked/avm1_loaded_timeline_holder/`: the
   **parked** Phase-3 fixture (generator, SWFs, predicted golden). It is NOT in `regression/`, because Phase 3 is a HOLD
-  (§4).
+  (§1, "Deliberately not done").
 - This report and `w2-loaded-shell-phase2.patch`.
 
 The `output.txt` goldens are **PREDICTED**. Each one is our post-fix output, hand-checked against the Flash/Ruffle rule
@@ -80,7 +80,7 @@ adds is four new `regression/` rows and four latent bugs closed.
      `clip.f` is undefined and the body never runs.
 
    This is exactly the pair the wave-1 report names as breaking under a list swap, and this is the measured reason.
-   Reverted. See §4 for the completion mechanism.
+   Reverted. The completion mechanism is in §1, under "Deliberately not done".
 
 ## 1. Mechanism and patch scope (functions touched; siblings take note)
 
