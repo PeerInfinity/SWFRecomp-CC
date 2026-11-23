@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T03:52:26.789367+00:00",
+    "timestamp": "2026-11-23T07:07:17.003447+00:00",
     "suite": "visual",
     "stem": "results_graphics",
-    "git_sha": "a18a9cc61d54539528600434a21156f38760ea58",
+    "git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45104409805",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45104409805",
+    "run_id": "45114820633",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45114820633",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 148,
   "comparisons": 241,
   "ignored": 2,
-  "pass": 234,
-  "fail": 7,
+  "pass": 235,
+  "fail": 6,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 3,
   "ruffle_matched_fail": 1,
-  "pass_rate": 97.1,
+  "pass_rate": 97.5,
   "results": [
     {
       "suite": "visual",
@@ -6479,30 +6479,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 9600 outliers exceed limit of 0, max difference 255",
-      "reason": "pixel_mismatch",
-      "max_diff": 255,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
       "expected_source": "repo",
       "width": 400,
       "height": 300,
       "total_channels": 480000,
-      "diff_channels": 9600,
-      "mean_diff": 5.1,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
       "checks": [
         {
           "tolerance": 2,
           "max_outliers": 0,
-          "outliers": 9600,
-          "passed": false
+          "outliers": 0,
+          "passed": true
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 1,
-      "outliers": 9600,
+      "failed_checks": 0,
+      "outliers": 0,
       "max_outliers": 0,
       "tolerance": 2,
-      "excess_outliers": 9600
+      "excess_outliers": 0
     },
     {
       "suite": "visual",

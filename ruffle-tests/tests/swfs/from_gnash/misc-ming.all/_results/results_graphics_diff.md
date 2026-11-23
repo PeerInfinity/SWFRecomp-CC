@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `509768d1d323` (2026-11-23T02:33:26.537386+00:00)
-**Current:** `a18a9cc61d54` (2026-11-23T03:52:23.849545+00:00)
+**Previous:** `a18a9cc61d54` (2026-11-23T03:52:23.849545+00:00)
+**Current:** `da9b49b17a0a` (2026-11-23T07:07:13.980626+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 69 | 69 | 0 |
+| Passing | 69 | 70 | +1 |
 | Total | 111 | 111 | 0 |
-| Pass rate | 62.2% | 62.2% | 0% |
-| Mismatched lines | 985 | 990 | +5 |
-|   Increased | | | +5 |
+| Pass rate | 62.2% | 63.1% | +0.9% |
+| Mismatched lines | 990 | 965 | -25 |
+|   Decreased | | | -25 |
 
-## Line Count Changed (1)
+## Newly Passing (1)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `callFunction_test` | ruffle_matched | 5/11 | 0/11 | +5 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `BitmapDataDraw` | ruffle_matched | 31/56 | 56/56 |

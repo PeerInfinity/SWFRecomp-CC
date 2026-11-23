@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T03:52:26.801887+00:00",
+    "timestamp": "2026-11-23T07:07:17.017108+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "a18a9cc61d54539528600434a21156f38760ea58",
+    "git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45104409805",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45104409805",
+    "run_id": "45114820633",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45114820633",
     "run_attempt": "1"
   },
-  "tests_with_comparisons": 28,
-  "comparisons": 28,
+  "tests_with_comparisons": 34,
+  "comparisons": 34,
   "ignored": 0,
-  "pass": 25,
+  "pass": 31,
   "fail": 0,
   "skip": 3,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 89.3,
+  "pass_rate": 91.2,
   "results": [
     {
       "suite": "regression",
@@ -83,6 +83,36 @@
     },
     {
       "suite": "regression",
+      "test": "avm1_cxform_override_overflow",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 200,
+      "height": 150,
+      "total_channels": 120000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
       "test": "avm1_dynclip_color_transform",
       "comparison": "output",
       "trace_status": "pass",
@@ -94,6 +124,66 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_jpeg3_alpha_bitmap",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 1",
+      "max_diff": 1,
+      "expected_source": "repo",
+      "width": 140,
+      "height": 80,
+      "total_channels": 44800,
+      "diff_channels": 16,
+      "mean_diff": 0.0004,
+      "checks": [
+        {
+          "tolerance": 3,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 3,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_long_text_layout",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 200,
+      "height": 150,
+      "total_channels": 120000,
       "diff_channels": 0,
       "mean_diff": 0.0,
       "checks": [
@@ -274,6 +364,96 @@
       "width": 400,
       "height": 180,
       "total_channels": 288000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_po3_color_matrix_live",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 200,
+      "height": 150,
+      "total_channels": 120000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_po3_color_matrix_live_clear",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 200,
+      "height": 150,
+      "total_channels": 120000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_po3_color_matrix_live_nested",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 200,
+      "height": 150,
+      "total_channels": 120000,
       "diff_channels": 0,
       "mean_diff": 0.0,
       "checks": [
