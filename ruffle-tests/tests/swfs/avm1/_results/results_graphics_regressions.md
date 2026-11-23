@@ -14,4 +14,4 @@ Tests that **fail** in trace mode but **pass** in graphics mode.
 
 | # | Test | Trace Status | Detail |
 |---|------|---------------|--------|
-| 1 | `video_prototype_lazy_swf6_child` | Output Mismatch | 4/8 lines match |
+| 1 | `hitarea_remove_owner_drag` | Output Mismatch | 6/10 lines match |
