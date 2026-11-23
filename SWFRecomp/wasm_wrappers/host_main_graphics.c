@@ -118,6 +118,14 @@ void configureAppContext(int frame_count, int fps, int swf_version, int width, i
 EMSCRIPTEN_KEEPALIVE void setFrameFuncs(frame_func* funcs) { app_context.frame_funcs = funcs; }
 EMSCRIPTEN_KEEPALIVE void setTagInit(void (*func)(SWFAppContext*)) { tagInit_func = func; }
 
+// draws.c tables read directly by avm2_cpu_raster.c (generated_data.h, DYNAMIC_HOST pointer form). Defined for
+// BOTH host variants since s26 w2-tail-bitmap-draw: the AVM1 BitmapData.draw() timeline arm rasterizes through
+// avm2_cpu_raster.c too. The AVM1 setters below fill them; the AVM2 loader uses setAvm2DrawTables.
+float (*color_data)[4] = NULL;
+float* uninv_mat_data = NULL;
+u8 (*gradient_data)[4] = NULL;
+float (*morph_end_color_data)[4] = NULL;
+
 EMSCRIPTEN_KEEPALIVE void setShapeData(void* data, int size) {
     app_context.shape_data = (char*)data; app_context.shape_data_size = size;
     shape_data = (u32 (*)[4])data;
@@ -128,6 +136,7 @@ EMSCRIPTEN_KEEPALIVE void setTransformData(void* data, int size) {
 }
 EMSCRIPTEN_KEEPALIVE void setColorData(void* data, int size) {
     app_context.color_data = (char*)data; app_context.color_data_size = size;
+    color_data = (float (*)[4])data;
 }
 EMSCRIPTEN_KEEPALIVE void setStageToNdc(float* matrix) { app_context.stage_to_ndc = matrix; }
 EMSCRIPTEN_KEEPALIVE void setBitmapInfo(int count, int highest_w, int highest_h) {
@@ -137,9 +146,11 @@ EMSCRIPTEN_KEEPALIVE void setBitmapInfo(int count, int highest_w, int highest_h)
 }
 EMSCRIPTEN_KEEPALIVE void setUninvMatData(void* data, int size) {
     app_context.uninv_mat_data = (char*)data; app_context.uninv_mat_data_size = size;
+    uninv_mat_data = (float*)data;
 }
 EMSCRIPTEN_KEEPALIVE void setGradientData(void* data, int size) {
     app_context.gradient_data = (char*)data; app_context.gradient_data_size = size;
+    gradient_data = (u8 (*)[4])data;
 }
 EMSCRIPTEN_KEEPALIVE void setBitmapData(void* data, int size) {
     app_context.bitmap_data = (char*)data; app_context.bitmap_data_size = size;
@@ -162,6 +173,7 @@ EMSCRIPTEN_KEEPALIVE void setMorphData(void* shape, int shape_size, void* color,
     app_context.morph_end_shape_data = (char*)shape; app_context.morph_end_shape_data_size = shape_size;
     app_context.morph_end_color_data = (char*)color; app_context.morph_end_color_data_size = color_size;
     morph_end_shape_data = (float (*)[2])shape;
+    morph_end_color_data = (float (*)[4])color;
 }
 EMSCRIPTEN_KEEPALIVE void setFrameLabels(void* data, int count) {
     frame_label_data = (FrameLabelEntry*)data;
@@ -216,11 +228,7 @@ const int32_t* avm2_generated_stage_rect = NULL;
 uint16_t avm2_generated_frame_rate = 0;
 uint16_t avm2_generated_header_frames = 0;
 uint32_t avm2_generated_bg_color = 0;
-// draws.c tables the AVM2 runtime reads directly (generated_data.h).
-float (*color_data)[4] = NULL;
-float* uninv_mat_data = NULL;
-u8 (*gradient_data)[4] = NULL;
-float (*morph_end_color_data)[4] = NULL;
+// draws.c tables (color/uninv/gradient/morph_end_color) are defined above for BOTH host variants.
 
 EMSCRIPTEN_KEEPALIVE
 void setAvm2Tables(const Avm2MovieTables* t, const uint32_t* abc_frames, const uint8_t* abc_lazy,
