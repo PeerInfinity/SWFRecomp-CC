@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T02:33:26.493310+00:00",
-    "git_sha": "509768d1d3232d596df969dfb2d0fe9831096163",
-    "duration_seconds": 158.57,
+    "timestamp": "2026-11-23T03:52:23.804418+00:00",
+    "git_sha": "a18a9cc61d54539528600434a21156f38760ea58",
+    "duration_seconds": 148.67,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30,
@@ -23,9 +23,9 @@
     {
       "test": "device_font_glyph_fallback",
       "phases": {
-        "recomp": 0.016,
-        "compile": 31.039,
-        "run": 0.275
+        "recomp": 0.014,
+        "compile": 30.038,
+        "run": 0.25
       },
       "num_frames": 1,
       "lines": {
@@ -33,15 +33,15 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 31.34,
+      "duration": 30.31,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
-        "recomp": 0.011,
-        "compile": 18.22,
-        "run": 0.374
+        "recomp": 0.012,
+        "compile": 24.216,
+        "run": 0.483
       },
       "num_frames": 1,
       "lines": {
@@ -49,7 +49,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 18.63,
+      "duration": 24.74,
       "image_comparisons": {
         "embedded__output": {
           "status": "pass",
@@ -128,8 +128,8 @@
       "test": "device_font_list",
       "phases": {
         "recomp": 0.009,
-        "compile": 23.601,
-        "run": 0.213
+        "compile": 23.727,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -137,15 +137,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 23.83,
+      "duration": 23.96,
       "status": "pass"
     },
     {
       "test": "device_font_name_case",
       "phases": {
         "recomp": 0.013,
-        "compile": 2.053,
-        "run": 0.287
+        "compile": 2.054,
+        "run": 0.29
       },
       "num_frames": 1,
       "lines": {
@@ -160,8 +160,8 @@
       "test": "device_font_no_ink",
       "phases": {
         "recomp": 0.007,
-        "compile": 23.876,
-        "run": 0.219
+        "compile": 24.148,
+        "run": 0.215
       },
       "num_frames": 1,
       "lines": {
@@ -169,7 +169,7 @@
         "expected_lines": 18,
         "matching_lines": 4
       },
-      "duration": 24.12,
+      "duration": 24.39,
       "image_comparisons": {
         "embedded__output": {
           "status": "pass",
@@ -250,9 +250,9 @@
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.158,
-        "compile": 24.297,
-        "run": 0.483
+        "recomp": 0.159,
+        "compile": 25.203,
+        "run": 0.494
       },
       "num_frames": 1,
       "lines": {
@@ -260,7 +260,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 25.24,
+      "duration": 26.16,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -300,9 +300,9 @@
     {
       "test": "embed_matching/match_style",
       "phases": {
-        "recomp": 0.017,
-        "compile": 6.716,
-        "run": 0.408
+        "recomp": 0.016,
+        "compile": 6.865,
+        "run": 0.416
       },
       "num_frames": 1,
       "lines": {
@@ -310,7 +310,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.23,
+      "duration": 7.39,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -351,8 +351,8 @@
       "test": "embed_matching/no_font_found",
       "phases": {
         "recomp": 0.005,
-        "compile": 6.748,
-        "run": 0.22
+        "compile": 6.721,
+        "run": 0.218
       },
       "num_frames": 1,
       "lines": {
@@ -360,7 +360,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 7.07,
+      "duration": 7.04,
       "image_comparisons": {
         "output": {
           "status": "pass",
@@ -401,8 +401,8 @@
       "test": "embed_name_lookup",
       "phases": {
         "recomp": 0.012,
-        "compile": 18.121,
-        "run": 0.302
+        "compile": 1.688,
+        "run": 0.316
       },
       "num_frames": 1,
       "lines": {
@@ -410,7 +410,7 @@
         "expected_lines": 242,
         "matching_lines": 242
       },
-      "duration": 18.44,
+      "duration": 2.02,
       "status": "pass"
     }
   ]
