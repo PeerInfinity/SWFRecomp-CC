@@ -3428,3 +3428,114 @@ patch ledger by name, 0 pass→fail, 0 other status moves; plus 5 new `regressio
   `GradientFillTest`, `external_interface_monkeypatch`, the avm2 ACCEPTED/RvF set in w1-avm2-tail §0.3.
 
 **Pixels.** See `graphics-fanout-playbook.md` §23.
+
+## 26. Session 25 (2026-11-22) — dual-axis fan-out #17, CLOUD-FIRST, full size: trace +9 (4622/4662 intersection eff), pixels +22 (561/613; 572/624 with 11 new fixture comparisons), ZERO regressions in either axis or either mode; N playable in the browser
+
+Commits `ca14fe02f..3bc8372fb` on master (19 code commits + docs; every report, patch, probe and oracle under
+`session25-fanout-reports/`). Cloud-first (user directive 2026-10-16, re-confirmed 2026-11-22), **full size by user
+direction** (fan-outs also use expiring credits; memory `fanout-credits-diminishing-returns-ok`): 8 wave-1 + 14 wave-2
+cloud sessions (env "SWFRecomp fan-out", Opus), all delivered, 0 lost; 5 wave-1 prototypes landed directly. In parallel,
+a ladder of LOCAL one-task sessions on N: `n-play-game` → `n-gold-residue` → `n-tile-color-hud` → `n-level-complete`
+(running at closeout). Local CPU: merges, single-row spot-checks of every landing, two hand 3-way merges, ~12
+Ruffle-exporter oracle runs.
+
+**Baselines read fresh.** Trace = the SharedObject-hook CI run `45043930556` at `746c39489` (results `7f945eb41`: 4613
+eff, 49 failing). Pixels = the s24 final images run `44986836161` (`08fdbcad6`: 539/613); the only code between was the
+browser-only SharedObject hook, so no wave-0 images run. Upstream drift `bcac30c19..3ac8dcb07` (9 commits, 3 new AVM2 rows).
+
+**Grading runs.**
+
+| run | code | trace (graphics) | pixels | no-graphics |
+|---|---|---|---|---|
+| `45060637552` | drift-avm2, blend-mask, pixel-text | +2 by name | +6 by name | — |
+| `45065076248` | + proto-timeline, pixel-drawing, acid-morph, layer-groups, `n-play-game` | +1 | +3; 6 layer-group fixtures pass | — |
+| `45069424445` | + netstream-flv-screen, kerning, dynclip-cxform, avm1-filters, cm-copyfrom, span-model | +2 | +4; 3 fixtures pass | — |
+| `45078991452` / `45079002150` (FINAL) | + with-scope, textfield-vn, nearpass-land, `n-gold-residue`, `n-tile-color-hud` | **+4** (all → ruffle_matched) | **+9**; `bevel` band 732 → 3 | **+7** on the s24 NG intersection, 0 regressions |
+
+Every gain in every run was on a patch ledger, by name; 0 pass→fail; 0 other status moves. Mode parity exact apart from
+the two predicted graphics-only rows (`audio/aac`, `audio_computespectrum`). Pages: real deploy `45081434401` at
+`5a1d7b4e0` (the upload + deploy steps ran — see §26.3).
+
+### 26.1 Ledger (trace +9 intersection; pixels +22)
+
+| patch | trace | pixels | notes |
+|---|---:|---:|---|
+| `1a10f176e` w1-drift-avm2 | +2 | | `pixelbender_shaderjob_output_channels`, `textblock_recreate_text_line_width` (KF, real pass; Ruffle still fails line 4); LC `allow_networking` row is drift already passing |
+| `5b50cd4a0` w1-avm1-proto-timeline | +1 | | `text_format_prototype_lazy` (s24 "L" refuted); attach L4 + L5 fixed; 3 fixtures |
+| `600d15597` w2-edittext-span-model | +2 | | `edittext_set_text_same` + `_after_edits` (KF, **Flash-exact pass**); `TextField.replaceText` was unimplemented |
+| `23e2af881` w2-avm1-with-scope | +1 | | `DrawingApiTest` → rm; **gcc -O2 strict-aliasing miscompile** dropped bare clip-method arg counts |
+| `4dd9d2865` w2-textfield-vn | +3 | | gnash `TextField-v6/v7/v8` → rm (P0–P21) |
+| `ee9ea8738` w1-pixel-blend-mask | | +3 | `layer_alpha`, `layer_erase` (s21 NO-GO refuted), `bitmapdata_colortransform` |
+| `20cd63b32` w1-pixel-text | | +3 | `edittext_device_transform_basic/_negative`, `edittext_gutter` |
+| `0f35012bd` w1-pixel-drawing | | +2 | `drawing_order`, `cache_as_bitmap/drawing_api`; DrawingApiTest 12 → 5+2 lines |
+| `78f15f639` w2-acid-morph-gradient | | +1 | `acid-morph`: recompiler morph ramp over-emitted rows (not morph lerp) |
+| `a6ce01d5b` w2-netstream-flv-screen | | +1 | `netstream_play_flv_screen`: `setInterval(clip, "m")` type-2 `this` was undefined (RVF entry refuted, removed) |
+| `7d1d2bd6e` w2-acid-text-kerning | | +1 | `acid-text`: DefineFont2/3 kerning |
+| `c4ccaf2be` w2-avm2-cm-copyfrom | | +2 | `bitmapdata_draw_filters`, `graphics_direct_commands` |
+| `697669e5f` w2-nearpass-land | | +9 | `bitmapdata_draw_rotation`, `gradient_focal_point`, `acid-gradient`, `acid-gc`, `doubleAndRegister`, `acid-scale`, `acid-gradient-2`, `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style` (lyon stroke joins, focal shader clamp, Matrix*Matrix rounding) |
+| `a281b60d4` w2-avm2-layer-groups | | 0 | exact nested child layer + AVM2 port; 6 fixtures |
+| `d83fbab22` w2-dynclip-cxform, `f2325de53` w2-avm1-filters | | 0 | game-visible: Drawing-API clip `Color`, runtime CM, nested PO3 filter lists; 3 fixtures |
+| `8615da904`, `2afd3e36d`, `be31edbfd` (N one-task sessions) | | 0 | browser root-context closures; hidden-clip capture; attached-sprite `Color` + depth-ordered attached pass + growable char registries; 3 fixtures |
+
+**New `regression/` fixtures (15)**, every golden from an oracle outside SWFRecomp (Ruffle exporter `0ddd12b6a`, mostly
+coordinator-run, or an upstream golden proven equivalent): `avm1_attached_clip_tagorder_ratio/_po3`,
+`avm1_array_generic_receivers`, 6 `*layer_group*`, `avm1_dynclip_color_transform`, `avm1_nested_po3_filters`,
+`avm1_runtime_filters_cm_bitmap`, `avm1_closure_base_clip_root_frame`, `avm1_attached_clip_hidden_capture`,
+`avm1_attached_clip_color`. All pass in CI.
+
+### 26.2 Standing verdicts that fell
+
+- **"layer_alpha/erase: zero flips" (s21)**: its premise (no-layer twins fail) fell with s22 float-verts; +2.
+- **"text_format_prototype_lazy needs the L accessor model" (s24)**: the read half sufficed (S–M).
+- **"edittext_set_text_same_after_edits lands as ruffle_matched only"**: Flash-exact pass via two Flash rules Ruffle lacks.
+- **DrawingApiTest plan of record** (3 hitTest phases): wrong phases, wrong winding rule (Ruffle: EvenOdd), and 4 of 12
+  lines were AVM1 scope; the rest a compiler miscompile.
+- **TextField-vN plan Phase 2** (props per instance): Flash defines them on the PROTOTYPE at first instantiation; a hidden
+  P0 (SWF5-imported fields) blocked it.
+- **RVF "netstream_play_flv_screen asset stamp"**: the golden is a correct render; our timer `this` bug blanked it.
+- **"acid-morph = morph gradient interpolation"**: nothing on screen at tick 30 is a morph; a recompiler ramp emitter bug.
+- **"N play game is a click bug"**: browser root-frame closures captured `base_clip = NULL`.
+- **"N coin streaks are residue / a 161ecf124 regression"**: authored collect morphs, Ruffle shows them too.
+- **"N dark tiles = browser parity gap"**: CI was wrong too (NULL parent cxform for attached sprites).
+
+### 26.3 Method notes (deltas vs s24)
+
+- **Full-size fan-out on a thin board still paid** (+9/+22 with 0 regressions), because the slate funded larger arcs (L
+  phases of plans of record) and the pixel tail, and wave 2 grew to 14 slots as reports landed.
+- **Coordinator-run oracles mid-wave** (~12 exporter runs) turned "analytic" or "predicted" goldens into confirmed ones,
+  and caught a probe bug (my `make_l1.py` used 0x53 NewMethod for NewObject).
+- **Exporter oracle limits** (memory `ruffle-exporter-oracle-limits`): it never fires timers; it renders HIGH quality only
+  (compare twin-vs-original, not exporter-vs-quality-low golden); it rejects a negative-width RECT.
+- **Two-patch interactions are real**: avm1-filters × dynclip-cxform broke a fixture through a factored helper that
+  missed new struct fields (stack garbage). Proved by a pre-dynclip worktree, then fixed. Partial clone blocks
+  `git apply --3way`; `git merge-file` against the branch's merge-base works.
+- **A shared working tree with local one-task sessions** needs `git apply --cached` + worktree apply when files
+  overlap, and committing from the index; verify the peer's residual diff is byte-identical afterwards.
+- **A green Pages `dry_run` deploys nothing** (memory `pages-dry-run-is-not-a-deploy`): check that the Deploy step ran.
+
+### 26.4 Left on the board (session 26)
+
+**Trace** (40 failing graphics rows on the intersection):
+- **N**: the `n-level-complete` one-task session (level exit/door/transition, death/retry vs Ruffle) is running; its
+  report sets the next N line.
+- `avm1/video_prototype_lazy_swf6_child`: routing a loaded root's goto is cheap, but the child's placements then collide
+  with the parent's depths in the shared display list. Needs per-movie display lists (L; `child-timeline-advance.md` §2.2).
+- **Runtime robustness sweep:** `ng_shared.c` still has fixed `MAX_*` caps that silently drop (buttons 64, fonts 32,
+  videos 32, sounds 128, exports 1024; s25 made text fields/shapes/morphs growable). Plus the one remaining
+  float-through-u64 store (`action.c` ~10605); consider an `-fno-strict-aliasing` audit.
+- AVM1 leftovers from s25 reports: sibling bare-call arms that ignore `with` (`createTextField` hard-codes root, …);
+  type-2 dispatch arms missing the MC-receiver flag pair (w2-netstream L2) and the function-form timer arm (L3); hairline
+  (`lineStyle(0)`) Drawing-API hitTest; CallMethod `createTextField` depth/numeric-name residual; keyboard/IME edit paths
+  drop HTML run tables; `setNewTextFormat` writes `textColor`; `replace_at_depth` for createTextField/createEmptyMovieClip;
+  device-text x-scale for DefineEditText device fields; the SWF≤7 wrap give-up rule in other wrap loops.
+- Button-bound EditText (`visual/text/String_path_variable_button`, pixel; held during `n-play-game`, now free).
+- **Browser/native gaps (from the N sessions):** native/OFFSCREEN never dispatches button events inside attachMovie'd
+  clips (`ng_update_button_states_attached` is browser-only; a CI-visible change); browser `getBounds(_root)` returns
+  6710886 on N's menu children; `Color.getRGB/getTransform` return undefined in non-OFFSCREEN builds; the live in-browser
+  recompiler's DYNAMIC_HOST repeats a 1-frame root's frame-1 trace every tick; `build_test.sh` doesn't re-run the
+  recompiler when test.swf changes; `inject_tracer.py` default `--min-version 8` breaks SWF6 games.
+- Unchanged NO-GOs: action_order family, `global_proto_decls(_delete)`, `global_instance_decls`, `native_objects_swf6`,
+  `globals_monkeypatch` (+5 lines s25, still KF), `GradientFillTest`, `external_interface_monkeypatch`, the avm2
+  ACCEPTED/RvF set.
+
+**Pixels.** See `graphics-fanout-playbook.md` §24.

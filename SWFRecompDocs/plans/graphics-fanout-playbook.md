@@ -1375,3 +1375,55 @@ sessions on lavapipe; every landed hunk had a CI-grade before leg (md5 = CI actu
 
 - Interim images run folded the parallel perf fix (`10b5dff69`) in rather than spending a separate graphics run on it.
 - Wave 1 sized to the board (6 slots); pixel slots each priced ≤ 3 flips and every priced flip landed.
+
+## 24. Session-25 state of the board (2026-11-22)
+
+Baseline: the s24 final images run `44986836161` (`08fdbcad6`), **539 / 613** (the only code between was the browser-only
+SharedObject hook). Interims `45060637552` (+6), `45065076248` (+3), `45069424445` (+4); final `45078991452` at
+`697669e5f` (+9). **561 / 613 on the baseline comparisons (+22, every flip on a ledger by name, 0 pass→fail)**;
+572 / 624 counting 11 new regression-fixture comparisons, all passing. Trace side: `polish-sweep-arc.md` §26. All
+pixel work ran in cloud sessions on lavapipe with CI-grade fidelity proven per row (before md5 == CI actual).
+
+| patch | flips | comparisons |
+|---|---:|---|
+| `697669e5f` w2-nearpass-land (lyon stroke joins in the recompiler; focal clamp in the shader; Ruffle Matrix*Matrix translation rounding; rotated `draw()` coverage; AVM1 Drawing-API gradient matrix Fixed16 + linearRGB/alpha ramp) | +9 | `bitmapdata_draw_rotation`, `gradient_focal_point`, `acid-gradient`, `acid-gc`, `doubleAndRegister`, `acid-scale`, `acid-gradient-2`, `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style` |
+| `ee9ea8738` w1-pixel-blend-mask (layer groups; AVM2 colorTransform aMult-only bug) | +3 | `layer_alpha`, `layer_erase`, `bitmapdata_colortransform` |
+| `20cd63b32` w1-pixel-text (device-font layout→local scale at render; narrow-field inverted gutter mask) | +3 | `edittext_device_transform_basic`, `_negative`, `edittext_gutter` |
+| `0f35012bd` w1-pixel-drawing (runtime Drawing-API z-order + transforms; translucent stroke joins once) | +2 | `drawing_order`, `cache_as_bitmap/drawing_api` |
+| `c4ccaf2be` w2-avm2-cm-copyfrom (AVM2 ColorMatrixFilter GPU + draw(); `Graphics.copyFrom`; lineStyle byte alpha) | +2 | `bitmapdata_draw_filters`, `graphics_direct_commands` |
+| `78f15f639` w2-acid-morph-gradient (recompiler morph ramp) | +1 | `acid-morph` |
+| `a6ce01d5b` w2-netstream-flv-screen (timer method-form `this`) | +1 | `netstream_play_flv_screen` (out of `ignored_tests.txt`) |
+| `7d1d2bd6e` w2-acid-text-kerning (DefineFont2/3 kerning) | +1 | `acid-text` |
+| `a281b60d4`, `d83fbab22`, `f2325de53`, `be31edbfd`, `2afd3e36d` | 0 (game-visible) | exact layer groups + AVM2 port; Drawing-API clip `Color`; nested PO3 filter lists + runtime CM; attached-sprite `Color` + depth-ordered attached pass; hidden-clip capture |
+
+- **Zero-headroom watch list additions:** `layer_alpha`/`layer_erase` (max == tol), `graphics_direct_commands` (tol 64:
+  262/300), `acid-morph` (5400/5600, 2517/2600).
+- **Refutations:** acid-mask is an AA model (not a mask mechanism); `MaskTest-2` is a device-font row byte-identical to
+  Ruffle's sidecar; the morph "gradient lerp" premise; `BeginBitmapFill` is 71 % device-font label; `bitmapdata_draw_filters`
+  is a filter row, not a drawing row.
+
+### Left on the board (session 26)
+
+- **`visual/filters/bevel` is 3 pixels from a flip** (732 → 3 excess after `697669e5f`; residual (456,28), (19,294),
+  (19,299), stem/serif pixels; w2-nearpass-land report §New leads 1).
+- AVM2 twin of the Drawing-API gradient ramp fix (`avm2_display.c` `gfx_gen_ramp` still `GRADIENT_RAMP_LINEAR_U8` with
+  rounded alpha); the CPU `BitmapData.draw` gradient sampler (`SAMPLE_GRADIENT_RAMP` nearest) vs Ruffle.
+- `visual/static_text_offstage` 9600 (AVM1 `BitmapData.draw` timeline arm, sub-mechanism (c)); `pixelbender_dithering`
+  (CPU bitmap-fill arm); `acid-color-0` (JPEG3 alpha edges + ring + centring); `String_path_variable_button` (button-bound
+  EditText; now free after `n-play-game`).
+- Layer groups: N1 (a filtered object inside a layered offscreen — unverified hazard, S to check), N3 (group cxform on the
+  composite). AVM1/timeline ColorMatrix with off-diagonal terms through the new `renderer_run_color_matrix` pass.
+  `BitmapData.draw()` of a source with blur/glow/drop-shadow filters.
+- Colour: Drawing-API content of placed/attached clips; dynamic-under-placed colour + matrix inheritance (w2-dynclip §leads).
+- Filters: authored ConvolutionFilter renders as a blur (neither Flash nor Ruffle); AVM1 runtime DisplacementMap; gradient
+  filters' single-colour approximation (no Ruffle oracle; Flash capture needed).
+- Kerning: the trace-side twin (`textWidth`/`getCharBoundaries`; oracle-gated) and `letter_spacing` in glyph runs.
+- Unchanged NO-GOs: `blend_shader_luma_lighten` (PBJ→WGSL; L6 CPU-PixelBender route is the live alternative), `bitmapbuttons`,
+  `place_object_test`, `blend_scroll`, `bitmapdata_opaque`, `h263`, `definefont4`, F/G device-font + FlashType text rows
+  (record dispositions so they stop being re-diagnosed), `font_lookup_as3` (RVF entry to write).
+
+### Process notes added in session 25
+
+- Fan-outs run full size when the user wants the credits used; a thin board is filled with plan-of-record arcs.
+- Pixel fixtures: an "analytic" golden must be confirmed against the Ruffle exporter before landing; when the test runs at
+  `quality = "low"`, compare exporter(twin) vs exporter(original) instead (the exporter renders high only).
