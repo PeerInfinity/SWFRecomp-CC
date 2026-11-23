@@ -20547,6 +20547,10 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	// Plain blur has no composition flags and keeps the legacy blit-back.
 	int legacy = !(is_shadow || is_glow || is_bevel);
 
+	// s26 w1-pixel-layer-colour (N1, AVM2 twin of tag.c render_filtered_core):
+	// inside an open layered offscreen, capture into parked textures and
+	// composite back into the group (render_webgpu_begin_nested_filter).
+	int nested_filter = renderer_begin_nested_filter(context);
 	renderer_suspend_pass(context);
 	// s23 padded filter layer (render_webgpu.h "PADDED filter layer"): when the
 	// last filter's input can cross the stage edge, capture into a layer
@@ -20648,6 +20652,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	if (legacy)
 	{
 		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+		if (nested_filter) renderer_end_nested_filter(context);
 		g_avm2_filter_active = saved_active;
 		return;
 	}
@@ -20707,6 +20712,7 @@ static void avm2_render_filtered(Avm2Context* ctx, Avm2Object* obj,
 	if (draw_source_after)
 		avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
 
+	if (nested_filter) renderer_end_nested_filter(context);
 	g_avm2_filter_active = saved_active;
 }
 

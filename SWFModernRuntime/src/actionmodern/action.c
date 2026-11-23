@@ -33072,6 +33072,10 @@ static float dynMcChainAlpha(const MovieClip* mc)
 
 // Iterator for rendering: calls cb for each filled/stroked path across all MCs.
 // Helper to fill DrawingRenderInfo array for an MC's drawing paths
+// s26 w1-pixel-layer-colour: the world cxform slot of the display entry whose
+// Drawing-API content actionRenderMCDrawingsInlineEntryCx is drawing (a
+// PLACED or attached clip). 0 = none (dynamic clips keep dynamic_cxform_slot).
+static u32 g_fill_entry_cx_slot = 0;
 static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 {
 	DrawingState* ds = (DrawingState*)mc->drawing_state;
@@ -33085,7 +33089,12 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 	// MCs render with cxform_id 0, so this is the only channel the AS alpha
 	// can reach; gradient/bitmap drawing fills don't get the fold yet).
 	float as_alpha_mul = 1.0f;
-	if ((mc->as_set_flags & 32) && mc != g_dyn_alpha_root) {
+	// s26: a placed/attached clip drawn through its entry's world cxform slot
+	// gets `_alpha` from that slot (mcSyncAlphaToDisplayObj writes cx_aa), so
+	// the fold would apply it twice.
+	int use_entry_cx = (g_fill_entry_cx_slot != 0 && mc->display_obj != NULL
+	                    && mc->dynamic_cxform_slot == 0);
+	if ((mc->as_set_flags & 32) && mc != g_dyn_alpha_root && !use_entry_cx) {
 		as_alpha_mul = mc->alpha / 100.0f;
 		if (as_alpha_mul < 0.0f) as_alpha_mul = 0.0f;
 		if (as_alpha_mul > 1.0f) as_alpha_mul = 1.0f;
@@ -33162,7 +33171,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		// dynamic ancestors) — tag.c apply_dynamic_mc_transforms mints the
 		// slot. Its alpha multiplier is left at 1: `_alpha` stays the fold
 		// above. 0 (identity) for placed clips and untinted dynamic ones.
-		info->cxform_id = mc->dynamic_cxform_slot;
+		info->cxform_id = use_entry_cx ? g_fill_entry_cx_slot : mc->dynamic_cxform_slot;
 
 		// Flash renders every stroke at a minimum of 1 on-screen pixel. Our
 		// stroke geometry is baked in local twips, so re-expand it whenever the
@@ -33611,6 +33620,18 @@ int actionRenderMCDrawingsInline(void* mc_v, DrawingRenderCallback cb, void* use
 	DrawingRenderInfo infos[64];
 	int n = fillDrawingInfos(mc, infos, 64);
 	for (int j = 0; j < n; j++) cb(&infos[j], user_data);
+	return n;
+}
+// s26 w1-pixel-layer-colour: as actionRenderMCDrawingsInline, but the clip's
+// Drawing-API paths take `entry_cx_slot` (the display entry's composed world
+// cxform: placement CXFORM, Color/_alpha override, ancestors) — Flash colours a
+// placed clip's script drawings with the clip's own colour transform.
+int actionRenderMCDrawingsInlineEntryCx(void* mc_v, DrawingRenderCallback cb, void* user_data, u32 entry_cx_slot)
+{
+	u32 saved = g_fill_entry_cx_slot;
+	g_fill_entry_cx_slot = entry_cx_slot;
+	int n = actionRenderMCDrawingsInline(mc_v, cb, user_data);
+	g_fill_entry_cx_slot = saved;
 	return n;
 }
 void* actionGetRootMC(void) { return &root_movieclip; }

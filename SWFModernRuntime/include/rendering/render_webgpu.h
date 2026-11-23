@@ -554,6 +554,8 @@ void render_webgpu_composite_blend(WebGPURenderContext* context, u8 blend_mode, 
 // offscreen as ALPHA (11), ERASE (12) or premultiplied over (anything else).
 int  render_webgpu_begin_child_layer(WebGPURenderContext* context);
 void render_webgpu_end_child_layer(WebGPURenderContext* context, u8 blend_mode);
+int  render_webgpu_begin_nested_filter(WebGPURenderContext* context);   // s26 N1
+void render_webgpu_end_nested_filter(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
 
 #ifdef OFFSCREEN_RENDER

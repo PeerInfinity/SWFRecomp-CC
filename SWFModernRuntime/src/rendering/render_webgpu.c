@@ -5649,6 +5649,114 @@ void render_webgpu_end_child_layer(WebGPURenderContext* ctx, u8 blend_mode)
 	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
 }
 
+// s26 w1-pixel-layer-colour (layer-group lead N1): a FILTERED object inside an
+// open layered offscreen (a LAYER/ADD/MULTIPLY/... group, or a child layer).
+// The filter capture's begin_offscreen_pass renders into filter_tex_a, which IS
+// the open group: it cleared everything the group had drawn so far, and the
+// filter's resume_pass then resumed the MAIN surface, so the filtered object and
+// every later group child landed outside the group. Fix: park the group's
+// texture set in the next child-layer slot (fresh textures become filter_tex_a
+// for the capture + ping-pong), and while parked, resume_pass resumes the
+// GROUP (colour + stencil Load) instead of the main surface, so the filter
+// composite lands in the group. end_nested_filter swaps back and resumes it.
+static int g_nested_filter_level = -1;
+// The group's complex-blend BACKDROP lives in filter_tex_b (capture_backdrop),
+// which the filter's blur ping-pong overwrites: park it too.
+static WGPUTexture g_nested_b_tex[CHILD_LAYER_MAX];
+static WGPUTextureView g_nested_b_view[CHILD_LAYER_MAX];
+static int nested_b_swap(WebGPURenderContext* ctx, int level)
+{
+	if (g_nested_b_tex[level] == NULL)
+	{
+		WGPUTextureDescriptor td = {0};
+		td.label = WGPU_LABEL("nested_filter_b");
+		td.dimension = WGPUTextureDimension_2D;
+		td.size = (WGPUExtent3D){(u32)ctx->width, (u32)ctx->height, 1};
+		td.format = ctx->surface_format;
+		td.mipLevelCount = 1;
+		td.sampleCount = 1;
+		td.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding
+		         | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc;
+		g_nested_b_tex[level] = wgpuDeviceCreateTexture(ctx->device, &td);
+		if (g_nested_b_tex[level] == NULL) return 0;
+		WGPUTextureViewDescriptor vd = {0};
+		vd.mipLevelCount = 1;
+		vd.arrayLayerCount = 1;
+		g_nested_b_view[level] = wgpuTextureCreateView(g_nested_b_tex[level], &vd);
+		if (g_nested_b_view[level] == NULL) return 0;
+	}
+	WGPUTexture t = ctx->filter_tex_b; ctx->filter_tex_b = g_nested_b_tex[level]; g_nested_b_tex[level] = t;
+	WGPUTextureView v = ctx->filter_view_b; ctx->filter_view_b = g_nested_b_view[level]; g_nested_b_view[level] = v;
+	return 1;
+}
+static void begin_group_pass_on(WebGPURenderContext* ctx, WGPUTextureView view,
+                                WGPUTextureView msaa_view, WGPUTextureView ds_view)
+{
+	WGPURenderPassColorAttachment color_att = {0};
+	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#if MSAA_SAMPLES == 1
+	(void)msaa_view;
+	color_att.view = view;
+	color_att.resolveTarget = NULL;
+#else
+	color_att.view = msaa_view;
+	color_att.resolveTarget = view;
+#endif
+	color_att.loadOp = WGPULoadOp_Load;
+	color_att.storeOp = WGPUStoreOp_Store;
+	WGPURenderPassDepthStencilAttachment ds_att = {0};
+	ds_att.view = ds_view;
+	ds_att.depthLoadOp = WGPULoadOp_Clear;
+	ds_att.depthStoreOp = WGPUStoreOp_Discard;
+	ds_att.depthClearValue = 1.0f;
+	ds_att.stencilLoadOp = WGPULoadOp_Load;
+	ds_att.stencilStoreOp = WGPUStoreOp_Store;
+	WGPURenderPassDescriptor rp_desc = {0};
+	rp_desc.label = WGPU_LABEL("nested_filter_group_resume");
+	rp_desc.colorAttachmentCount = 1;
+	rp_desc.colorAttachments = &color_att;
+	rp_desc.depthStencilAttachment = &ds_att;
+	ctx->render_pass = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &rp_desc);
+	restore_draw_pipeline(ctx);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 0, ctx->vertex_storage_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 2, ctx->fragment_sampler_bg, 0, NULL);
+	wgpuRenderPassEncoderSetBindGroup(ctx->render_pass, 1, ctx->vertex_uniform_bg, 0, NULL);
+}
+
+int render_webgpu_begin_nested_filter(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok || ctx->render_pass == NULL || g_nested_filter_level >= 0) return 0;
+	int level = ctx->child_layer_open;
+	if (ctx->offscreen_depth < 1 || level >= CHILD_LAYER_MAX
+	    || ctx->offscreen_depth != 1 + level || ctx->filter_pad != 0) return 0;
+	if (!ensure_child_layer_resources(ctx, level)) return 0;
+	if (!nested_b_swap(ctx, level)) return 0;
+	wgpuRenderPassEncoderEnd(ctx->render_pass);
+	wgpuRenderPassEncoderRelease(ctx->render_pass);
+	ctx->render_pass = NULL;
+	child_layer_swap(ctx, level);       // slot `level` now holds the GROUP's set
+	ctx->child_layer_open = level + 1;
+	g_nested_filter_level = level;
+	return 1;
+}
+
+void render_webgpu_end_nested_filter(WebGPURenderContext* ctx)
+{
+	if (!ctx->renderer_ok || g_nested_filter_level < 0) return;
+	int level = g_nested_filter_level;
+	g_nested_filter_level = -1;
+	if (ctx->render_pass)
+	{
+		wgpuRenderPassEncoderEnd(ctx->render_pass);
+		wgpuRenderPassEncoderRelease(ctx->render_pass);
+		ctx->render_pass = NULL;
+	}
+	child_layer_swap(ctx, level);       // the group is filter_tex_a again
+	nested_b_swap(ctx, level);          // and its backdrop filter_tex_b
+	ctx->child_layer_open = level;
+	begin_group_pass_on(ctx, ctx->filter_view_a, ctx->filter_msaa_view, ctx->filter_ds_view);
+}
+
 static void pad_finish(WebGPURenderContext* ctx); // padded filter layer, below
 
 void render_webgpu_suspend_pass(WebGPURenderContext* ctx)
@@ -5666,6 +5774,12 @@ void render_webgpu_resume_pass(WebGPURenderContext* ctx)
 {
 	if (!ctx->renderer_ok) return;
 	pad_finish(ctx);
+	if (g_nested_filter_level >= 0)
+	{
+		struct WebGPUChildLayerSet* cs = &ctx->child_layers[g_nested_filter_level];
+		begin_group_pass_on(ctx, cs->view, cs->msaa_view, cs->ds_view);
+		return;
+	}
 	// Resume the main render pass with loadOp=Load to preserve existing content + stencil
 	WGPURenderPassColorAttachment color_att = {0};
 	color_att.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
@@ -6973,6 +7087,14 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 {
 	(void)app_context;
 	release_color_matrix_resources();
+
+	// Nested-filter backdrop twins (render_webgpu_begin_nested_filter). Only
+	// unparked twins live here; a parked one is in ctx->filter_tex_b.
+	for (int k = 0; k < CHILD_LAYER_MAX; k++)
+	{
+		if (g_nested_b_view[k]) { wgpuTextureViewRelease(g_nested_b_view[k]); g_nested_b_view[k] = NULL; }
+		if (g_nested_b_tex[k]) { wgpuTextureRelease(g_nested_b_tex[k]); g_nested_b_tex[k] = NULL; }
+	}
 
 	// Release pipelines
 	if (ctx->render_pipeline)

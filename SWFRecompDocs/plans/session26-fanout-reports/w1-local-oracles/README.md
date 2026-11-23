@@ -10,3 +10,11 @@
   worker's lead 1: OFFSCREEN leaves `h.m2` white.
 - `3_joystick` knob request (w1-pixel-nearpass): **not satisfiable**. The row is mouse-driven (`input.json`) and the
   exporter has no input replay. Ruffle's test runner could replay the input, but it exposes no world matrix.
+
+## w1-pixel-layer-colour (`layer-colour/`)
+- `layer_group_filtered_child`, `avm2_layer_group_filtered_child`, `avm1_placed_drawing_color`: the exporter frame-1
+  renders are **pixel-identical (max 0)** to the worker's analytic goldens; `avm1_placed_drawing_color` traces `done`.
+  Goldens confirmed; fixtures landed in `regression/`.
+- `cm_offdiag` probe: Ruffle leaves the gap at (140,30) **white (255,255,255)**, not the ≈(127,127,255) that report §3
+  HOLD (a) predicted for "Flash/Ruffle". So HOLD (a) (alpha bias fills the filter bounds) is not a Ruffle behaviour:
+  it needs a Flash capture or a re-derivation before anyone funds it.

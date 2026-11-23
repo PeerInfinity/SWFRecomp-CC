@@ -3203,24 +3203,61 @@ static int dyn_cx_is_identity(const float cx[20])
 // every dynamic ancestor's (the same chain dyn_mc_compose_parent_chain walks
 // for the matrix; it stops at _root or the first placed / attached clip).
 // Returns 1 when the result is non-identity.
+static void build_cxform_from_obj(float out[20], const DisplayObject* obj);
+// s26 w1-pixel-layer-colour (w2-dynclip §6 limit 1): the dynamic chain ends at
+// a PLACED ancestor (or _root). Compose that ancestor's own colour transform
+// and every placed ancestor above it: its runtime override (Color / _alpha,
+// cx_overridden) or its baked PlaceObject CXFORM. Called from
+// apply_dynamic_mc_transforms, which runs BEFORE compose_children rewrites
+// entry slots, so an entry's cxform_id is still its own (baked) slot here.
+static SWFAppContext* g_placed_anchor_app = NULL;   // set by apply_dynamic_mc_transforms
+static void placed_anchor_world_cxform(float out[20], const MovieClip* mc)
+{
+	SWFAppContext* app_context = g_placed_anchor_app;
+	if (app_context == NULL) return;
+	const MovieClip* p = mc->parent;
+	int guard = 0;
+	while (p != NULL && p != &root_movieclip && p->display_obj == NULL && guard++ < 64)
+		p = p->parent;
+	GEN_EXTERN_CXFORM_DATA;
+	u32 baked = (app_context->cxform_data_size > 0)
+		? (u32)(app_context->cxform_data_size / (20 * sizeof(float))) : 0;
+	for (; p != NULL && p != &root_movieclip && guard++ < 128; p = p->parent)
+	{
+		const DisplayObject* e = (const DisplayObject*) p->display_obj;
+		if (e == NULL || p->depth == INT_MIN) continue;
+		float own[20], t[20];
+		if (e->cx_overridden) build_cxform_from_obj(own, e);
+		else if (e->cxform_id != 0 && e->cxform_id < baked)
+			memcpy(own, (const float*)app_context->cxform_data + e->cxform_id * 20, sizeof(own));
+		else continue;
+		compose_cxform20(t, own, out);
+		memcpy(out, t, sizeof(t));
+	}
+}
+
 static int dyn_mc_world_cxform(float out[20], const MovieClip* mc, int self_post)
 {
 	dyn_mc_local_cxform(out, mc, self_post);
 	int guard = 0;
+	const MovieClip* top = mc;
 	for (MovieClip* p = dyn_mc_dynamic_parent(mc); p != NULL && guard < 64;
 	     p = dyn_mc_dynamic_parent(p), guard++)
 	{
+		top = p;
 		float P[20], t[20];
 		dyn_mc_local_cxform(P, p, 0);
 		if (dyn_cx_is_identity(P)) continue;
 		compose_cxform20(t, P, out);
 		memcpy(out, t, sizeof(t));
 	}
+	placed_anchor_world_cxform(out, top);
 	return !dyn_cx_is_identity(out);
 }
 
 static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
 {
+	g_placed_anchor_app = app_context;
 	extern MovieClip* child_mc_cache[];
 	extern int child_mc_count;
 
@@ -4178,7 +4215,12 @@ static int cxform_forces_invisible(SWFAppContext* app_context, u32 cxform_id)
 	const float* cx = (const float*)app_context->cxform_data + cxform_id * 20;
 	// 20-float layout: 4x4 column-major mult (alpha mult at [15]) + vec4 add
 	// (alpha add at [19]); see apply_cxform in render_webgpu.c.
-	return (cx[15] <= 0.0001f && cx[19] <= 0.0001f);
+	// s26 w1-pixel-layer-colour: the WHOLE output-alpha row ([3],[7],[11],
+	// [15]), not just a->a. A folded PlaceObject3 ColorMatrix whose alpha
+	// row reads colour (e.g. A' = 0.5 R, a->a = 0) is visible; only when no
+	// input can raise alpha above 0 is the entry invisible.
+	return (cx[3] <= 0.0001f && cx[7] <= 0.0001f && cx[11] <= 0.0001f
+	        && cx[15] <= 0.0001f && cx[19] <= 0.0001f);
 }
 
 // Helper: render a single object into the current render pass
@@ -4191,6 +4233,7 @@ static int g_clip_mask_capture = 0;
 extern void actionDrawingInlineReset(void);
 extern void* actionFindMCForDisplayObj(const void* obj);
 extern int actionRenderMCDrawingsInline(void* mc_v, DrawingRenderCallback cb, void* user_data);
+extern int actionRenderMCDrawingsInlineEntryCx(void* mc_v, DrawingRenderCallback cb, void* user_data, u32 entry_cx_slot);
 extern void* actionGetRootMC(void);
 static void drawing_render_cb(const DrawingRenderInfo* info, void* user_data);
 
@@ -4468,7 +4511,7 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 			break;
 		case CHAR_TYPE_SPRITE:
 			if (!g_clip_mask_capture)
-				actionRenderMCDrawingsInline(actionFindMCForDisplayObj(obj), drawing_render_cb, NULL);
+				actionRenderMCDrawingsInlineEntryCx(actionFindMCForDisplayObj(obj), drawing_render_cb, NULL, obj->cxform_id);
 			if (obj->sprite_display_list != NULL)
 				render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 			break;
@@ -4949,6 +4992,13 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 	int shader_composite = (draw_source_after || draw_source_before) ? 0 : f_composite;
 
 	g_filter_capture_depth++;
+	// s26 w1-pixel-layer-colour (lead N1): a filtered object drawn INSIDE an
+	// open layered offscreen (blend group / child layer) captures into fresh
+	// textures while the group's are parked, and its composite resumes the
+	// GROUP, not the main surface (render_webgpu_begin_nested_filter). It used
+	// to clear the group and land on the main surface. Refuses (0) outside
+	// any offscreen, so the root/unnested path is unchanged.
+	int nested = renderer_begin_nested_filter(context);
 	renderer_suspend_pass(context);
 	// s23 padded filter layer: capture into a layer padded by the filter's
 	// reach when the object may cross the stage edge, so its off-stage part
@@ -5041,12 +5091,14 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 	if (group)
 	{
 		renderer_composite_filtered_alpha(context, src->group_alpha);
+		if (nested) renderer_end_nested_filter(context);
 		g_filter_capture_depth--;
 		return;
 	}
 	if (legacy)
 	{
 		renderer_composite_filtered(context, 0.0f, 0.0f, 0, 0, 0, 0);
+		if (nested) renderer_end_nested_filter(context);
 		g_filter_capture_depth--;
 		return;
 	}
@@ -5122,6 +5174,7 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 	if (draw_source_after)
 		filtered_draw_source(app_context, obj, src);
 
+	if (nested) renderer_end_nested_filter(context);
 	g_filter_capture_depth--;
 }
 
@@ -5456,7 +5509,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 
 			case CHAR_TYPE_SPRITE:
 				if (!g_clip_mask_capture)
-					actionRenderMCDrawingsInline(actionFindMCForDisplayObj(obj), drawing_render_cb, NULL);
+					actionRenderMCDrawingsInlineEntryCx(actionFindMCForDisplayObj(obj), drawing_render_cb, NULL, obj->cxform_id);
 				if (obj->sprite_display_list != NULL)
 					render_display_list(app_context, obj->sprite_display_list, obj->sprite_max_depth);
 				break;
@@ -8624,7 +8677,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			compose_children(app_context, d->sprite_display_list,
 				d->sprite_max_depth, mc_xform,
 				att_has_cx ? att_cx : NULL, att_cx_slot);
-			actionRenderMCDrawingsInline(mc, drawing_render_cb, NULL);
+			actionRenderMCDrawingsInlineEntryCx(mc, drawing_render_cb, NULL,
+				att_has_cx ? att_cx_slot : 0);
 			render_display_list(app_context, d->sprite_display_list,
 				d->sprite_max_depth);
 		}
@@ -8853,7 +8907,8 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	u32 avm1_mask_saved_clip = 0;
 	if (avm1_masker != NULL)
 		avm1_mask_saved_clip = avm1_mask_push(app_context, avm1_masker);
-	actionRenderMCDrawingsInline(mc, drawing_render_cb, NULL);
+	actionRenderMCDrawingsInlineEntryCx(mc, drawing_render_cb, NULL,
+		att_has_cx ? att_cx_slot : 0);
 	render_display_list(app_context, d->sprite_display_list,
 		d->sprite_max_depth);
 	if (avm1_masker != NULL)
