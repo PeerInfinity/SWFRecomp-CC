@@ -11,3 +11,4 @@
 | w2-tail-bitmap-draw | `action.c` `rasterizeMovieClipToBitmap` + new `bd1_*` statics; `avm2_cpu_raster.c`; `avm2_display.c` `resolve_shape_geom`, `avm2_render_init`; `tag.c` new `ng_getBitmapByIndex`; `swf.cpp` bitmap-fill `shape_renderable`; build lists (verify_output.py, CMake, WASM scripts) |
 | w2-blendshader-cpu-pbj | `avm2_pixelbender.c` (new `avm2_pixelbender_run_blend`); `avm2_display.c` blend-shader render-walk arm, `do_blendshader_set` |
 | w2-text-cx-jpeg3 | `action.c` AVM1 text iterators (EditText cxform); text render in `tag.c`/`swf.c`; `swf.cpp` JPEG3/4 emit |
+| w2-robustness-land | `ng_shared.c` registries (buttons/videos/fonts/exports/sounds), `tag.c` `tagDoInitActionGuarded`, `tagSetSpriteLabels`, `ng_registerBitmapMetadata` table, cxform-override stack, filter side tables, `registered_class.c`, `action.h` `VAL()`, build flags everywhere, recompiler DefineFunction2 register clamp |

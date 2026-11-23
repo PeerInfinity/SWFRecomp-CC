@@ -18,3 +18,20 @@
 - `cm_offdiag` probe: Ruffle leaves the gap at (140,30) **white (255,255,255)**, not the ≈(127,127,255) that report §3
   HOLD (a) predicted for "Flash/Ruffle". So HOLD (a) (alpha bias fills the filter bounds) is not a Ruffle behaviour:
   it needs a Flash capture or a re-derivation before anyone funds it.
+
+## w1-runtime-robustness (`robustness/`)
+- `avm1_many_defs_registry` (`-f 6`) and `avm1_pixelbounds_dynamic_child` (`-f 1`), SWFs generated from the
+  prototype's `create_test_swf.py`: the exporter traces are **byte-identical to the worker's predicted outputs**,
+  including `f1 ic=1` twice and `init ic=1` once. Use them as the `output.txt` goldens.
+
+## w1-avm1-dispatch-scope (`dispatch-scope/`)
+- Exporter, 8 fixtures: `bare_mc_method_scope`, `type2_mc_receiver_dispatch`, `hittest_hairline`,
+  `create_text_field_depth`, `set_new_text_format_color`, `device_edittext_xscale`, `wrap_giveup_mixed_runs` and
+  `mc_resolve`. **All 8 match the staged analytic `output.txt` byte for byte.**
+- Ruffle test runner (an old Feb-2026 debug binary; it fires timers and replays input):
+  - `timer_function_form_activation` **passes**.
+  - `edittext_html_typed_runs` **differs on the second keystroke**. After typing "D" at index 0, Ruffle reports
+    `c0=c1=c2=0`, where the fixture predicts 16711680. The first keystroke (append) agrees.
+  - That fixture is HELD out of `regression/` until a current Ruffle runner or Flash settles it.
+- `wrap_giveup_mixed_runs` and `mc_resolve` are oracle-confirmed, but our build still fails them (HOLD items 7b and
+  `__resolve`). They stay in the fixtures dir for the wave-2 slot.
