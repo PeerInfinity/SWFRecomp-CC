@@ -1,0 +1,6 @@
+# s26 w2-avm2-applyfilter-kernels. output.txt is PROVISIONAL (our own output,
+# 2026-11-23) pending the Ruffle exporter --trace-log run requested in
+# SWFRecompDocs/plans/session26-fanout-reports/w2-avm2-applyfilter-kernels-report.md
+# (LOCAL ORACLE REQUESTS). Ruffle is a valid oracle for applyFilter Glow /
+# DropShadow / Bevel (its applyFilter IS its GPU filter pass).
+num_frames = 1

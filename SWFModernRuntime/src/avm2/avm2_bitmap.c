@@ -2538,8 +2538,9 @@ static void bd_draw_masked(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 // that row's known_failure). CPU form: raster the node's subtree into a
 // transparent layer at alpha 1, run each non-identity ColorMatrixFilter over
 // it in list order (color_matrix_pixel, the applyFilter arm's kernel), then
-// compose the layer with the node's alpha. Other filter kinds stay unapplied
-// here, exactly as before this arm existed.
+// compose the layer with the node's alpha. s26: Blur / Glow / DropShadow /
+// Bevel / Convolution run here too (bd_filter_is_cpu_drawable); Displacement,
+// Shader and the gradient kinds stay unapplied.
 static uint32_t color_matrix_pixel(uint32_t straight, const float* m);
 static Avm2Object* g_bd_cm_skip = NULL;   // node being captured (no re-entry)
 
@@ -2550,14 +2551,46 @@ static int bd_cm_is_identity(const float* m)
 	return 1;
 }
 
+// s26 w2-avm2-applyfilter-kernels: the layer arm also runs the CPU kernels
+// for Blur / Glow / DropShadow / Bevel / Convolution, Flash's draw() model
+// (the source's own filters land in the drawn bitmap). Ruffle does NOT do this
+// (operations.rs draw: use_bitmap_cache false), so no exporter golden is
+// valid for it; see the w2 report's LOCAL ORACLE REQUESTS.
+static int bd_filter_is_cpu_drawable(const Avm2FilterVal* f)
+{
+	switch (f->kind)
+	{
+		case AVM2_FILTER_COLOR_MATRIX: return !bd_cm_is_identity(f->cm);
+		case AVM2_FILTER_BLUR:
+			return f->quality > 0 && (f->blur_x > 65536 || f->blur_y > 65536);
+		case AVM2_FILTER_GLOW:
+		case AVM2_FILTER_DROP_SHADOW:
+		case AVM2_FILTER_BEVEL:
+			return 1;
+		case AVM2_FILTER_CONVOLUTION:
+			return f->conv_cols > 0 && f->conv_rows > 0 && f->conv_matrix != NULL;
+		default: return 0;
+	}
+}
+
 static int bd_node_has_cm(const Avm2DisplayObjectExt* ext)
 {
 	for (uint32_t i = 0; i < ext->filter_count; i++)
-		if (ext->filters[i].kind == AVM2_FILTER_COLOR_MATRIX
-		    && !bd_cm_is_identity(ext->filters[i].cm))
+		if (bd_filter_is_cpu_drawable(&ext->filters[i]))
 			return 1;
 	return 0;
 }
+
+static uint32_t* bd_blur_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
+                                       const PixelRegion* region,
+                                       const Avm2FilterVal* f);
+static uint32_t* bd_glowlike_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
+                                           const PixelRegion* region,
+                                           const Avm2FilterVal* f);
+static uint32_t* bd_convolve_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
+                                           const PixelRegion* region,
+                                           const Avm2FilterVal* f, int grow,
+                                           int ext[4]);
 
 static void bd_draw_cm_filtered(Avm2Context* ctx, Avm2BitmapDataExt* dst,
                                 Avm2Object* obj, Avm2DisplayObjectExt* ext,
@@ -2577,9 +2610,28 @@ static void bd_draw_cm_filtered(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	for (uint32_t k = 0; k < ext->filter_count; k++)
 	{
 		const Avm2FilterVal* f = &ext->filters[k];
-		if (f->kind != AVM2_FILTER_COLOR_MATRIX || bd_cm_is_identity(f->cm)) continue;
-		for (size_t i = 0; i < n; i++)
-			layer[i] = premul(color_matrix_pixel(unmul(layer[i]), f->cm), 1);
+		if (!bd_filter_is_cpu_drawable(f)) continue;
+		if (f->kind == AVM2_FILTER_COLOR_MATRIX)
+		{
+			for (size_t i = 0; i < n; i++)
+				layer[i] = premul(color_matrix_pixel(unmul(layer[i]), f->cm), 1);
+			continue;
+		}
+		// The layer is the whole target, so the kernel's region is the whole
+		// layer and its region-sized output replaces it in place.
+		ldst.pixels = layer;
+		PixelRegion whole = pr_whole(dst->width, dst->height);
+		uint32_t* res = NULL;
+		int cext[4];
+		if (f->kind == AVM2_FILTER_BLUR)
+			res = bd_blur_source_region(ctx, &ldst, &whole, f);
+		else if (f->kind == AVM2_FILTER_CONVOLUTION)
+			res = bd_convolve_source_region(ctx, &ldst, &whole, f, 0, cext);
+		else
+			res = bd_glowlike_source_region(ctx, &ldst, &whole, f);
+		if (res == NULL) continue;
+		memcpy(layer, res, n * sizeof(uint32_t));
+		heap_free(ctx->app, res);
 	}
 	int opaque_dst = !dst->transparency;
 	for (size_t i = 0; i < n; i++)
@@ -3539,6 +3591,293 @@ static uint32_t* bd_displace_source_region(Avm2Context* ctx, Avm2BitmapDataExt* 
 	return out;
 }
 
+// ---------------------------------------------------------------------------
+// Glow / DropShadow / Bevel on the CPU (s26 w2-avm2-applyfilter-kernels).
+//
+// A straight port of ruffle's wgpu passes: render/wgpu/src/filters/{glow,
+// drop_shadow,bevel}.rs plus shaders/filter/{glow,bevel}.wgsl. Ruffle is the
+// oracle for applyFilter here (its GPU path IS its applyFilter), and per cell
+// it lands on the same count against Flash as our blur cells already do.
+//
+// Conventions, straight from the passes:
+//   * the blur is the existing bd_blur_source_region (blur.rs: a source.size
+//     target), or, when no blur pass runs, the WHOLE source texture;
+//   * blur_uv = (source pixel centre + offset) / SOURCE TEXTURE size, sampled
+//     NEAREST + clamp, and an out-of-0..1 uv reads 0 (the shader's own test).
+//     Note the blurred texture is source.size, so a sub-rect source indexes it
+//     with whole-texture uv: that is ruffle's own quirk, kept verbatim;
+//   * colours and the source are premultiplied; the output is the shader's
+//     vec4 written to an Rgba8Unorm target (saturate, round to nearest);
+//   * DropShadow = Glow at (-cos(angle) * distance, -sin(angle) * distance),
+//     composite_source = !hideObject; AS3 GlowFilter always composites.
+//     Bevel samples the blur at +offset (highlight side) and -offset (shadow).
+// The output is a region-sized PREMULTIPLIED buffer, the same contract as the
+// blur and displacement arms, so bd_apply_filter copies it the same way.
+// ---------------------------------------------------------------------------
+
+static float fk_sat(float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); }
+
+static uint32_t fk_unorm(float v)
+{
+	return (uint32_t) floorf(fk_sat(v) * 255.0f + 0.5f);
+}
+
+static uint32_t fk_store(const float c[4])
+{
+	return CMK(fk_unorm(c[0]), fk_unorm(c[1]), fk_unorm(c[2]), fk_unorm(c[3]));
+}
+
+typedef struct
+{
+	const uint32_t* px;
+	int w, h;
+} FkTex;
+
+// textureSample(blurred, nearest-clamp, uv).a with the shader's 0..1 test.
+static float fk_blur_alpha(const FkTex* t, float u, float v)
+{
+	if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) return 0.0f;
+	int x = (int) floorf(u * (float) t->w), y = (int) floorf(v * (float) t->h);
+	if (x < 0) x = 0; else if (x >= t->w) x = t->w - 1;
+	if (y < 0) y = 0; else if (y >= t->h) y = t->h - 1;
+	return (float) CA(t->px[(size_t) y * (size_t) t->w + (size_t) x]) / 255.0f;
+}
+
+static int fk_is_glowlike(uint8_t kind)
+{
+	return kind == AVM2_FILTER_GLOW || kind == AVM2_FILTER_DROP_SHADOW
+	       || kind == AVM2_FILTER_BEVEL;
+}
+
+static uint32_t* bd_glowlike_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
+                                           const PixelRegion* region,
+                                           const Avm2FilterVal* f)
+{
+	int rw = (int) pr_w(region), rh = (int) pr_h(region);
+	if (rw <= 0 || rh <= 0 || src->width == 0 || src->height == 0) return NULL;
+	uint32_t* blurred = bd_blur_source_region(ctx, src, region, f);
+	FkTex bt;
+	if (blurred != NULL) { bt.px = blurred; bt.w = rw; bt.h = rh; }
+	else { bt.px = src->pixels; bt.w = (int) src->width; bt.h = (int) src->height; }
+
+	float sw = (float) src->width, sh = (float) src->height;
+	float dist = (float) ((double) f->distance / 65536.0);
+	float ang = (float) ((double) f->angle / 65536.0);
+	float offx = 0.0f, offy = 0.0f;
+	if (f->kind == AVM2_FILTER_DROP_SHADOW)
+	{
+		offx = -(cosf(ang) * dist);
+		offy = -(sinf(ang) * dist);
+	}
+	else if (f->kind == AVM2_FILTER_BEVEL)
+	{
+		offx = cosf(ang) * dist;
+		offy = sinf(ang) * dist;
+	}
+	float strength = (float) f->strength / 256.0f;
+	int knockout = f->knockout != 0;
+	// Glow colour: straight rgb, its alpha folded in by the shader.
+	float gc[4] = { (float) CR(f->color) / 255.0f, (float) CG(f->color) / 255.0f,
+	                (float) CB(f->color) / 255.0f, (float) f->alpha / 255.0f };
+	// Bevel colours: premultiplied on the host (bevel.rs).
+	float hi[4] = { (float) CR(f->color2) / 255.0f, (float) CG(f->color2) / 255.0f,
+	                (float) CB(f->color2) / 255.0f, (float) f->alpha2 / 255.0f };
+	float sh_c[4] = { gc[0], gc[1], gc[2], gc[3] };
+	for (int i = 0; i < 3; i++) { hi[i] *= hi[3]; sh_c[i] *= sh_c[3]; }
+	int composite = 1;
+	if (f->kind == AVM2_FILTER_DROP_SHADOW) composite = !f->hide_object;
+	int bevel_type = f->on_top ? 2 : (f->inner ? 1 : 0);
+
+	size_t n = (size_t) rw * (size_t) rh;
+	uint32_t* out = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
+	for (int y = 0; y < rh; y++)
+	{
+		float cy = (float) region->y_min + (float) y + 0.5f;
+		for (int x = 0; x < rw; x++)
+		{
+			float cx = (float) region->x_min + (float) x + 0.5f;
+			uint32_t dr = bd_get_raw(src, region->x_min + (uint32_t) x,
+			                         region->y_min + (uint32_t) y);
+			float d[4] = { (float) CR(dr) / 255.0f, (float) CG(dr) / 255.0f,
+			               (float) CB(dr) / 255.0f, (float) CA(dr) / 255.0f };
+			float c[4];
+			if (f->kind == AVM2_FILTER_BEVEL)
+			{
+				float bl = fk_blur_alpha(&bt, (cx + offx) / sw, (cy + offy) / sh);
+				float br = fk_blur_alpha(&bt, (cx - offx) / sw, (cy - offy) / sh);
+				float ha = fk_sat((bl - br) * strength);
+				float sa = fk_sat((br - bl) * strength);
+				float g[4];
+				for (int i = 0; i < 4; i++) g[i] = hi[i] * ha + sh_c[i] * sa;
+				int outer = (bevel_type == 0 || bevel_type == 2);
+				int inner = (bevel_type == 1 || bevel_type == 2);
+				for (int i = 0; i < 4; i++)
+				{
+					if (inner && outer)
+						c[i] = knockout ? g[i] : d[i] - d[i] * g[3] + g[i];
+					else if (inner)
+						c[i] = knockout ? g[i] * d[3] : g[i] * d[3] + d[i] * (1.0f - g[3]);
+					else
+						c[i] = knockout ? g[i] - g[i] * d[3] : d[i] + g[i] - g[i] * d[3];
+				}
+			}
+			else
+			{
+				float blur = fk_blur_alpha(&bt, (cx + offx) / sw, (cy + offy) / sh);
+				float col[4] = { gc[0], gc[1], gc[2], 1.0f };
+				if (f->inner)
+				{
+					float a = gc[3] * fk_sat((1.0f - blur) * strength);
+					for (int i = 0; i < 4; i++)
+						c[i] = (!knockout && composite)
+						       ? col[i] * a * d[3] + d[i] * (1.0f - a)
+						       : col[i] * a * d[3];
+				}
+				else
+				{
+					float a = gc[3] * fk_sat(blur * strength);
+					for (int i = 0; i < 4; i++)
+					{
+						if (knockout) c[i] = col[i] * a * (1.0f - d[3]);
+						else if (composite) c[i] = col[i] * a * (1.0f - d[3]) + d[i];
+						else c[i] = col[i] * a;
+					}
+				}
+			}
+			out[(size_t) y * (size_t) rw + (size_t) x] = fk_store(c);
+		}
+	}
+	if (blurred != NULL) heap_free(ctx->app, blurred);
+	return out;
+}
+
+// ---------------------------------------------------------------------------
+// ConvolutionFilter on the CPU — FLASH semantics, not ruffle's.
+//
+// Ruffle has no convolution pass (render/wgpu/src/filters.rs lists it as
+// unsupported) and its applyFilter falls back to a straight copy. Flash
+// convolves. Model, fitted to the Flash golden of avm2/
+// bitmapdata_applyfilter_destpoint_edges cell 7 (sharpen 3x3, destPoint
+// -10,-10) where it reproduces EVERY channel (0 over tolerance 1; the copy
+// fallback is 5035):
+//   * taps read the PREMULTIPLIED storage form (integer, (c*a+127)/255);
+//   * channel = round(sum(m * tap) / divisor + bias), alpha too unless
+//     preserveAlpha (then the centre tap's alpha); colour clamped to
+//     [0, alpha] so the result stays a valid premultiplied pixel;
+//   * taps outside the source rect clamp to its edge (clamp=true) or read the
+//     filter's colour/alpha (clamp=false);
+//   * the OUTPUT grows by the kernel reach: the golden fills the column and
+//     row just past the source's right/bottom edge (a 3x3 reaches one pixel).
+// `ext` receives the left/top/right/bottom growth.
+// ---------------------------------------------------------------------------
+static uint32_t* bd_convolve_source_region(Avm2Context* ctx, Avm2BitmapDataExt* src,
+                                           const PixelRegion* region,
+                                           const Avm2FilterVal* f, int grow,
+                                           int ext[4])
+{
+	int rw = (int) pr_w(region), rh = (int) pr_h(region);
+	int cols = f->conv_cols, rows = f->conv_rows;
+	ext[0] = ext[1] = ext[2] = ext[3] = 0;
+	if (rw <= 0 || rh <= 0 || cols <= 0 || rows <= 0 || f->conv_matrix == NULL
+	    || f->conv_len < (uint32_t) (cols * rows))
+		return NULL;
+	int cx = cols / 2, cy = rows / 2;
+	if (grow)
+	{
+		ext[0] = cols - 1 - cx; ext[1] = rows - 1 - cy;
+		ext[2] = cx;            ext[3] = cy;
+	}
+	int ow = rw + ext[0] + ext[2], oh = rh + ext[1] + ext[3];
+	double div = (double) f->divisor;
+	if (div == 0.0 || !isfinite(div)) div = 1.0;
+	double bias = (double) f->bias;
+	uint32_t oob = premul(CMK(CR(f->color), CG(f->color), CB(f->color), f->alpha), 1);
+	int x0 = (int) region->x_min, y0 = (int) region->y_min;
+	size_t n = (size_t) ow * (size_t) oh;
+	uint32_t* out = (uint32_t*) avm2_alloc(ctx, (uint32_t) (n * sizeof(uint32_t)));
+	for (int oy = 0; oy < oh; oy++)
+	{
+		int py = y0 - ext[1] + oy;
+		for (int ox = 0; ox < ow; ox++)
+		{
+			int px = x0 - ext[0] + ox;
+			double acc[4] = { 0.0, 0.0, 0.0, 0.0 };   // A, R, G, B
+			uint32_t centre = 0;
+			for (int j = 0; j < rows; j++)
+			{
+				for (int i = 0; i < cols; i++)
+				{
+					int tx = px + i - cx, ty = py + j - cy;
+					uint32_t t;
+					int inside = tx >= x0 && tx < x0 + rw && ty >= y0 && ty < y0 + rh;
+					if (inside || f->clamp)
+					{
+						if (tx < x0) tx = x0; else if (tx >= x0 + rw) tx = x0 + rw - 1;
+						if (ty < y0) ty = y0; else if (ty >= y0 + rh) ty = y0 + rh - 1;
+						t = bd_get_raw(src, (uint32_t) tx, (uint32_t) ty);
+					}
+					else
+					{
+						t = oob;
+					}
+					if (i == cx && j == cy) centre = t;
+					double m = (double) f->conv_matrix[j * cols + i];
+					if (m == 0.0) continue;
+					acc[0] += m * (double) CA(t);
+					acc[1] += m * (double) CR(t);
+					acc[2] += m * (double) CG(t);
+					acc[3] += m * (double) CB(t);
+				}
+			}
+			int ch[4];
+			for (int k = 0; k < 4; k++)
+			{
+				double v = floor(acc[k] / div + bias + 0.5);
+				ch[k] = v < 0.0 ? 0 : (v > 255.0 ? 255 : (int) v);
+			}
+			if (f->preserve_alpha) ch[0] = (int) CA(centre);
+			for (int k = 1; k < 4; k++) if (ch[k] > ch[0]) ch[k] = ch[0];
+			out[(size_t) oy * (size_t) ow + (size_t) ox] =
+				CMK((uint32_t) ch[1], (uint32_t) ch[2], (uint32_t) ch[3], (uint32_t) ch[0]);
+		}
+	}
+	return out;
+}
+
+// applyFilter's Convolution arm: convolve the clamped source rect (grown by
+// the kernel reach) and write it at destPoint, the output's source-space
+// origin mapping to destPoint exactly as the other arms map src_region.x_min.
+// An opaque target stores the un-premultiplied colour at alpha 0xFF (the
+// avm2/bitmapdata_applyfilter_identity Flash trace: 0x8000FF00 lands as
+// 0xFF00FF00, not darkened).
+static void bd_apply_convolution(Avm2Context* ctx, Avm2BitmapDataExt* dst,
+                                 Avm2BitmapDataExt* src, int32_t sx, int32_t sy,
+                                 int32_t sw, int32_t sh, int32_t dx, int32_t dy,
+                                 const Avm2FilterVal* f)
+{
+	PixelRegion src_region = pr_for_region_i32(sx, sy, sw, sh);
+	pr_clamp(&src_region, src->width, src->height);
+	int ext[4];
+	uint32_t* conv = bd_convolve_source_region(ctx, src, &src_region, f, 1, ext);
+	if (conv == NULL) return;
+	int ow = (int) pr_w(&src_region) + ext[0] + ext[2];
+	int oh = (int) pr_h(&src_region) + ext[1] + ext[3];
+	for (int oy = 0; oy < oh; oy++)
+	{
+		int64_t ty = (int64_t) dy - ext[1] + oy;
+		if (ty < 0 || ty >= (int64_t) dst->height) continue;
+		for (int ox = 0; ox < ow; ox++)
+		{
+			int64_t tx = (int64_t) dx - ext[0] + ox;
+			if (tx < 0 || tx >= (int64_t) dst->width) continue;
+			uint32_t c = conv[(size_t) oy * (size_t) ow + (size_t) ox];
+			if (!dst->transparency) c = with_alpha(unmul(c), 0xFF);
+			bd_set_raw(dst, (uint32_t) tx, (uint32_t) ty, c);
+		}
+	}
+	heap_free(ctx->app, conv);
+}
+
 static Avm2Value bd_apply_filter(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -3589,23 +3928,33 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 		return avm2_undefined();
 	}
 
-	// A gradient bevel/glow with no blur AND no distance contributes nothing
-	// over the composited source, so the whole pass is a straight copy. Any
-	// other kind we do not raster stays a no-op (matching the pre-arc stub).
-	int passthrough = (f.kind == AVM2_FILTER_GRADIENT_GLOW
-	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL)
-	                  && f.blur_x == 0 && f.blur_y == 0 && f.distance == 0;
-	// ConvolutionFilter is in ruffle's unsupported set
-	// (render/wgpu/src/filters.rs), so applyFilter falls through to
+	// GradientGlow / GradientBevel / an empty-matrix Convolution: ruffle's
+	// is_filter_supported is false, so applyFilter falls through to
 	// copy_on_cpu(merge_alpha = false) -- "until we support these filters,
-	// treat this like a copy". We match that. NOTE: this is RUFFLE parity, not
-	// Flash parity: a non-identity kernel should convolve. See
-	// ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md.
-	passthrough = passthrough || (f.kind == AVM2_FILTER_CONVOLUTION);
+	// treat this like a copy". (Before s26 a gradient filter WITH blur or
+	// distance was a no-op here, which matched neither ruffle nor Flash.)
+	// Convolution itself now convolves with Flash's semantics
+	// (bd_convolve_source_region); see RUFFLE_VS_FLASH_DIFFERENCES.md.
+	int passthrough = (f.kind == AVM2_FILTER_GRADIENT_GLOW
+	                   || f.kind == AVM2_FILTER_GRADIENT_BEVEL);
+	int is_conv = (f.kind == AVM2_FILTER_CONVOLUTION);
+	if (is_conv && (f.conv_cols == 0 || f.conv_rows == 0 || f.conv_matrix == NULL))
+	{
+		is_conv = 0;
+		passthrough = 1;
+	}
 	int is_blur = (f.kind == AVM2_FILTER_BLUR);
 	int is_displace = (f.kind == AVM2_FILTER_DISPLACEMENT_MAP);
-	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur && !is_displace)
+	int is_glow = fk_is_glowlike(f.kind);
+	if (f.kind != AVM2_FILTER_COLOR_MATRIX && !passthrough && !is_blur && !is_displace
+	    && !is_glow && !is_conv)
 	{
+		avm2_filter_release(ctx, &f);
+		return avm2_undefined();
+	}
+	if (is_conv)
+	{
+		bd_apply_convolution(ctx, dst, src, sx, sy, sw, sh, dx, dy, &f);
 		avm2_filter_release(ctx, &f);
 		return avm2_undefined();
 	}
@@ -3622,6 +3971,12 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	{
 		blurred = bd_blur_source_region(ctx, src, &src_region, &f);
 	}
+	else if (is_glow)
+	{
+		// Glow/DropShadow/Bevel always produce a target (ruffle's apply()
+		// returns Some for all three), so a NULL here is only an empty rect.
+		blurred = bd_glowlike_source_region(ctx, src, &src_region, &f);
+	}
 	else if (is_displace)
 	{
 		// The map is not in Avm2FilterVal (it round-trips to null); read it off
@@ -3631,7 +3986,7 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 			ctx, avm2_filter_map_bitmap(ctx, fv.u.obj));
 		blurred = bd_displace_source_region(ctx, src, &src_region, &f, map);
 	}
-	if ((is_blur || is_displace) && blurred == NULL)
+	if ((is_blur || is_displace || is_glow) && blurred == NULL)
 	{
 		avm2_filter_release(ctx, &f);
 		return avm2_undefined();

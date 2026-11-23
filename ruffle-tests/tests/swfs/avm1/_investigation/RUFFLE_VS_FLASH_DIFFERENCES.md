@@ -649,3 +649,25 @@ rows passing and leave `_quality_low` failing — i.e. match Ruffle against Flas
 **Decision**: match Flash (user ruling 2026-09-29). Net pixel effect: +3 (`acid-bitmap-draw_quality_high`,
 `_quality_low`, `acid-bitmapData-draw`) / −2 (the two rows above). The two rows stay visible fails; they are not
 added to an ignore list (a disposition, not an accepted diff).
+
+## AVM2 `applyFilter` ConvolutionFilter: Flash convolves, Ruffle copies (pixel axis)
+
+**Tests**: `avm2/bitmapdata_applyfilter_destpoint_edges` cell 7 (count 7, x 100..199 / y 100..199:
+`ConvolutionFilter(3, 3, [0,-1,0,-1,5,-1,0,-1,0])` at destPoint (-10,-10)). The row is `known_failure` and does not
+flip on this alone (other cells keep Flash-only blur edge semantics).
+
+**Ruffle** has no convolution pass: `render/wgpu/src/filters.rs` lists `ConvolutionFilter` as unsupported, so
+`core/src/bitmap/operations.rs::apply_filter` falls back to `copy_on_cpu(merge_alpha = false)`. `output.ruffle.png`
+shows the unfiltered source in cell 7 (5035 channels off Flash).
+
+**Flash** convolves. Model fitted to its golden (session 26 `w2-avm2-applyfilter-kernels`): taps read the
+PREMULTIPLIED integer form; `channel = round(sum / divisor + bias)`; alpha is the centre tap's when `preserveAlpha`;
+colour clamped to `[0, alpha]`; taps outside the source rect clamp to its edge (`clamp = true`) or read
+`color`/`alpha` (`clamp = false`); and the output GROWS by the kernel reach (the golden fills the column and row just
+past the source's right and bottom edges). This model gives 0 channels over tolerance 1 on cell 7.
+
+**Ours** (`avm2_bitmap.c` `bd_convolve_source_region` / `bd_apply_convolution`): the Flash model. `clamp = false`,
+`preserveAlpha = false`, a non-unit divisor and even-sized kernels follow the same formula. No Flash golden covers
+them yet.
+
+**Decision**: match Flash (rule 3). Cell 7 goes from 5035 channels to 0; Ruffle's copy is not replicated.

@@ -698,3 +698,6 @@ regression/avm1_placed_drawing_color                   # placed Drawing-API cxfo
 from_shumway/acid/acid-clip                         # layer-N stroke under layer-N+1 fill 1 cmp
 from_shumway/3_joystick                             # same; tol-128 headroom 1 level      1 cmp
 from_shumway/acid/acid-text-6                       # DefineText glyph tx rounded to twips 2 cmp
+# s26 w2-avm2-applyfilter-kernels: CPU Glow/DropShadow/Bevel/Convolution in applyFilter.
+# tier=1
+avm2/bitmapdata_applyfilter_destpoint_edges         # KF band 149477 -> 30394          1 cmp

@@ -71,33 +71,15 @@ Ruffle commit 3891fb824 (Feb 2026) by Kamil Jarosz.
 
 ---
 
-## AVM2 `BitmapData.applyFilter` treats `ConvolutionFilter` as a plain copy
+## ~~AVM2 `BitmapData.applyFilter` treats `ConvolutionFilter` as a plain copy~~ (RETIRED s26)
 
-**Affected tests**: `avm2/bitmapdata_applyfilter_identity`
-
-**What we did**: `bd_apply_filter` adds `ConvolutionFilter` to the `passthrough` set, so
-`applyFilter` with a ConvolutionFilter copies the source region into the destination
-(un-premultiply -> re-premultiply, `merge_alpha = false`) instead of convolving:
-
-```c
-passthrough = passthrough || (f.kind == AVM2_FILTER_CONVOLUTION);
-```
-
-**Why**: Ruffle does not implement ConvolutionFilter either — it is in the unsupported arm
-of `render/wgpu/src/filters.rs:286`, so `is_filter_supported` is false and
-`core/src/bitmap/operations.rs:1252-1276` falls through to
-`copy_on_cpu(..., merge_alpha = false)` with the comment *"Until we support these filters,
-treat this like a copy."* The fixture uses a 1x1 identity kernel, for which a copy IS the
-correct Flash answer, so the graded lines are right for the right reason.
-
-**Risk / why this is a compat tweak, not Flash parity**: a NON-identity kernel would be
-wrong — Flash would convolve and we would copy. Nothing in the corpus grades that today
-(`avm2/convolution_filter` passes and only grades the filter object's own properties), and
-a real CPU convolution is a much larger slice with zero additional graded lines. If a
-future test grades a non-identity kernel, this entry is the thing to remove: implement the
-convolution and drop the `passthrough` arm.
-
-**File**: `SWFModernRuntime/src/avm2/avm2_bitmap.c` — `bd_apply_filter()`
+**Retired 2026-11-23 (s26 `w2-avm2-applyfilter-kernels`).** `bd_apply_filter` now convolves
+with Flash's semantics (`bd_convolve_source_region`), fitted to the Flash golden of
+`avm2/bitmapdata_applyfilter_destpoint_edges` cell 7 (3x3 sharpen at destPoint -10,-10):
+0 channels over tolerance 1 there, against 5035 for the old copy. `avm2/bitmapdata_applyfilter_identity`
+(1x1 identity kernel) still passes. The Flash-vs-Ruffle split is now recorded in
+`RUFFLE_VS_FLASH_DIFFERENCES.md` ("AVM2 `applyFilter` ConvolutionFilter"). Only an empty
+(0-column or 0-row) matrix still takes the copy path.
 
 ---
 
