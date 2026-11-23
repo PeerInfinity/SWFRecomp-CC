@@ -421,9 +421,19 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
 		u32 _tf_flags = (func->function_type == 2)
 			? (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_VERSION_SWITCH)
 			: INV_VERSION_SWITCH;
-		InvokeOpts _tf_opts = { .flags = _tf_flags };
+		// s26 w1-avm1-dispatch-scope PROTOTYPE (item 2, s25 L3): a fresh local
+		// activation for both types (Ruffle timer.rs Avm1Function -> func.call(
+		// .., this = Undefined, params) -> Avm1Function::exec new_local_scope):
+		// `var` stays local (it leaked onto the timeline), `arguments` and
+		// `this` (= undefined) are bound by name.
+		_tf_flags |= INV_LOCAL_SCOPE;
+		if (func->function_type == 1) _tf_flags |= INV_BIND_THIS;
+		u8 _tf_act = INV_ACT_THIS | INV_ACT_ARGUMENTS;
+		ActionVar _tf_this = {0};
+		_tf_this.type = ACTION_STACK_VALUE_UNDEFINED;
+		InvokeOpts _tf_opts = { .flags = _tf_flags, .act_flags = _tf_act };
 		g_call_depth++;
-		actionInvokeFunctionValue(app_context, func, NULL,
+		actionInvokeFunctionValue(app_context, func, &_tf_this,
 			t->extra_arg_count > 0 ? t->extra_args : NULL,
 			t->extra_arg_count, &_tf_opts);
 		g_call_depth--;

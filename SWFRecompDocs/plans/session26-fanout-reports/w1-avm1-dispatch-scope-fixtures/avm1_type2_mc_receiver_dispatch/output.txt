@@ -1,0 +1,7 @@
+callmethod: mc v=7
+call/apply: mc v=7
+call/apply: mc v=7
+watch: mc v=7
+getter: mc v=7
+getter->g
+broadcast: mc v=7

@@ -1,0 +1,3 @@
+before: c0=16711680 c1=16711680
+changed: text=ABC c0=16711680 c1=16711680 c2=0 n=3
+changed: text=DABC c0=16711680 c1=16711680 c2=16711680 n=4

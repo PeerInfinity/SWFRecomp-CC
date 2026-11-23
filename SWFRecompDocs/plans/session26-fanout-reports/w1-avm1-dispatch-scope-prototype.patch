@@ -1,0 +1,373 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 50320e80..c372cc89 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -3618,6 +3618,12 @@ static void invokeWatchCallback(SWFAppContext* app_context, ASFunction* wf,
+ 	if (clear_owns && _wargs[3].type == ACTION_STACK_VALUE_STRING)
+ 		_wargs[3].data.string_data.owns_memory = false;
+ 
++	// s26 w1-avm1-dispatch-scope PROTOTYPE (item 2, s25 L2): a type-2 watcher
++	// on a MovieClip must not receive the raw MovieClip* as its ABI `this`
++	// (the preload-this prologue tags it OBJECT and every this.x read misses).
++	if (this_var != NULL && this_var->type == ACTION_STACK_VALUE_MOVIECLIP &&
++	    wf->function_type == 2)
++		flags |= INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
+ 	InvokeOpts opts = { .flags = flags };
+ 	g_call_depth++;
+ 	ActionVar _wret = invokeFunctionValue(app_context, wf, this_var, _wargs, num_args, &opts);
+@@ -29723,6 +29729,35 @@ static void tf_ps_on_replace(SWFAppContext* app_context, MovieClip* mc, u32 from
+ 	}
+ }
+ 
++// s26 w1-avm1-dispatch-scope PROTOTYPE (item 5): the format edit for typed
++// input (keyboard / IME). Ruffle html/text_format.rs FormatSpans::replace_text:
++// the inserted text takes the format of the span AFTER the replaced range, or
++// the new-text format when appending. Edits the run table in place instead of
++// dropping it (which lost every <font> run of an HTML field on a keystroke).
++// Returns 1 when it handled the field (caller must not invalidate the table).
++static int tf_ps_on_typed(SWFAppContext* app_context, MovieClip* mc, u32 from, u32 to,
++                          const uint16_t* ins_u16, u32 ins_len)
++{
++	TFRunTable* table = tf_find_table(mc);
++	if (table == NULL || table->run_count == 0) return 0;
++	u32 old_len = tf_ps_text_len(mc);
++	if (from > old_len) from = old_len;
++	if (to > old_len) to = old_len;
++	int ml = tf_ps_is_multiline(mc);
++	TFPlainSpans* ps = tf_ps_get(app_context, mc);
++	if (ps == NULL) return 0;
++	TFPSFmt ins_fmt = ps->newfmt;
++	if (to < old_len) {
++		TFRun* r = tf_table_run_at_plain(table, to, ml);
++		if (r != NULL) tf_ps_from_run(&ins_fmt, r);
++	}
++	char buf[16384];
++	size_t n = (ins_u16 != NULL && ins_len > 0) ? u16_to_utf8(ins_u16, ins_len, buf, sizeof(buf)) : 0;
++	if (n >= sizeof(buf)) n = sizeof(buf) - 1;
++	tf_table_replace(table, from, to, buf, (u32)n, ml, &ins_fmt);
++	return 1;
++}
++
+ // getTextFormat overlay for a field without an HTML run table.
+ // Returns 1 when the model answered (the caller skips its textColor override).
+ static int tf_ps_overlay_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* tf, u32 begin, u32 end)
+@@ -58791,7 +58826,16 @@ static __attribute__((noinline)) int computeTextFieldDimension(
+ 		// field's local space, i.e. scaled by d/a of the concatenated matrix
+ 		// (Ruffle edit_text.rs layout_to_local_matrix device_font_scale_x;
+ 		// gnash TextField.as:905-908 `_xscale = 200` halves textWidth).
+-		if (dyn_device_face) {
++		// s26 w1-avm1-dispatch-scope PROTOTYPE (item 7): also a timeline
++		// DefineEditText device field (no UseOutlines flag 0x0080, and no
++		// runtime embedFonts = true): Ruffle applies it to every FontType::Device.
++		int _dev_et = 0;
++		if (mc->ng_textfield_idx == -2 ||
++		    (mc->ng_textfield_idx >= 0 && !(ng_getTextFieldFlags(mc->ng_textfield_idx) & 0x0080))) {
++			ActionVar* _ef = getProperty((ASObject*)mc->dynamic_props, "embedFonts", 10);
++			_dev_et = !(_ef != NULL && _ef->type == ACTION_STACK_VALUE_BOOLEAN && _ef->data.numeric_value);
++		}
++		if (dyn_device_face || _dev_et) {
+ 			double sx = 1.0, sy = 1.0;
+ 			for (MovieClip* m = mc; m != NULL; m = m->parent) {
+ 				sx *= (double) m->xscale / 100.0;
+@@ -66275,6 +66319,28 @@ static void cfDelegateToMCMethod(SWFAppContext* app_context, char* str_buffer,
+ 	actionCallMethod(app_context, str_buffer);
+ }
+ 
++// s26 w1-avm1-dispatch-scope PROTOTYPE: the clip a bare MovieClip-method name
++// resolves on (Ruffle action_call_function -> get_variable -> Callable(scope
++// object, fn)): the innermost `with` clip, else the current target clip
++// (a sprite's own frame script, a tellTarget block, or a closure's base clip,
++// all of which set g_current_context). *shadowed = 1 when a `with` plain
++// object carries the name itself (the caller keeps its own path).
++static MovieClip* cfBareMCReceiver(const char* name, u32 name_len, int* shadowed)
++{
++	extern MovieClip root_movieclip;
++	*shadowed = 0;
++	for (int _s = (int)scope_depth - 1; _s >= 0; _s--) {
++		if (!scope_is_with[_s]) continue;
++		if (scope_mc[_s] != NULL) return scope_mc[_s];
++		if (scope_chain[_s] != NULL &&
++		    findPropertyStructWithPrototype(scope_chain[_s], name, name_len) != NULL) {
++			*shadowed = 1;
++			return NULL;
++		}
++	}
++	return g_current_context ? g_current_context : &root_movieclip;
++}
++
+ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ {
+ 	if (g_execution_halted) return;
+@@ -67338,6 +67404,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	// In Flash, calling createTextField() as a free function acts on the current MovieClip scope (_root).
+ 	else if (func_name_len == 15 && strncmp(func_name, "createTextField", 15) == 0)
+ 	{
++		// s26 PROTOTYPE: the receiver is the with-clip / target clip, not _root.
++		{
++			extern MovieClip root_movieclip;
++			int _sh = 0;
++			MovieClip* _rcv = cfBareMCReceiver(func_name, func_name_len, &_sh);
++			if (!_sh && _rcv != NULL && _rcv != &root_movieclip) {
++				cfDelegateToMCMethod(app_context, str_buffer, _rcv,
++					func_name, func_name_len, args, num_args);
++				return;
++			}
++		}
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+ 		if (num_args >= 6) {
+ 			extern MovieClip root_movieclip;
+@@ -67363,6 +67440,24 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 			}
+ 			double _dv = varToDoubleSimple(&args[1]);
+ 			int depth_val = (isnan(_dv) || isinf(_dv)) ? 0 : (int) _dv;
++
++			// s26 PROTOTYPE (item 6): replace_at_depth — the previous dynamic
++			// occupant of (parent, depth) is removed (Ruffle movie_clip.rs
++			// create_text_field -> replace_at_depth), as createEmptyMovieClip does.
++			for (int _rdi = 0; _rdi < child_mc_count; _rdi++) {
++				if (child_mc_cache[_rdi] != NULL && child_mc_cache[_rdi]->parent == mc &&
++				    child_mc_cache[_rdi]->depth == depth_val) {
++					if (mc->dynamic_props != NULL) {
++						ActionVar _undef = {0};
++						_undef.type = ACTION_STACK_VALUE_UNDEFINED;
++						setProperty(app_context, (ASObject*)mc->dynamic_props,
++							child_mc_cache[_rdi]->name, strlen(child_mc_cache[_rdi]->name), &_undef);
++					}
++					child_mc_cache[_rdi]->depth = INT_MIN;
++					child_mc_cache[_rdi] = NULL;
++					break;
++				}
++			}
+ 			double x = varToDoubleSimple(&args[2]);
+ 			double y = varToDoubleSimple(&args[3]);
+ 			double w = varToDoubleSimple(&args[4]);
+@@ -67701,6 +67796,18 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	// attachMovie(linkageId, newName, depth [, initObject]) — MC method called as CallFunction
+ 	else if (func_name_len == 11 && strncmp(func_name, "attachMovie", 11) == 0)
+ 	{
++		// s26 PROTOTYPE: inside `with (clip)` the receiver is the with-clip.
++		{
++			extern MovieClip root_movieclip;
++			int _sh = 0;
++			MovieClip* _rcv = cfBareMCReceiver(func_name, func_name_len, &_sh);
++			MovieClip* _cur = g_current_context ? g_current_context : &root_movieclip;
++			if (!_sh && _rcv != NULL && _rcv != _cur) {
++				cfDelegateToMCMethod(app_context, str_buffer, _rcv,
++					func_name, func_name_len, args, num_args);
++				return;
++			}
++		}
+ 		// Runs in all three builds (NO_GRAPHICS, OFFSCREEN_RENDER, browser-WASM).
+ 		if (num_args >= 3) {
+ 			extern MovieClip root_movieclip;
+@@ -67845,6 +67952,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	// getNextHighestDepth() — as a global function, operates on root
+ 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
+ 	{
++		// s26 PROTOTYPE: with-clip / target clip, not a hard-coded _root.
++		{
++			extern MovieClip root_movieclip;
++			int _sh = 0;
++			MovieClip* _rcv = cfBareMCReceiver(func_name, func_name_len, &_sh);
++			if (!_sh && _rcv != NULL && _rcv != &root_movieclip) {
++				cfDelegateToMCMethod(app_context, str_buffer, _rcv,
++					func_name, func_name_len, args, num_args);
++				return;
++			}
++		}
+ 		if (args != NULL) FREE(args);
+ 		extern MovieClip root_movieclip;
+ 		MovieClip* parent_mc = &root_movieclip;
+@@ -67865,6 +67983,18 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 	// form). Checking both lets clones placed at SWF-space depths still resolve.
+ 	else if (func_name_len == 18 && strncmp(func_name, "getInstanceAtDepth", 18) == 0)
+ 	{
++		// s26 PROTOTYPE: inside `with (clip)` the receiver is the with-clip.
++		{
++			extern MovieClip root_movieclip;
++			int _sh = 0;
++			MovieClip* _rcv = cfBareMCReceiver(func_name, func_name_len, &_sh);
++			MovieClip* _cur = g_current_context ? g_current_context : &root_movieclip;
++			if (!_sh && _rcv != NULL && _rcv != _cur) {
++				cfDelegateToMCMethod(app_context, str_buffer, _rcv,
++					func_name, func_name_len, args, num_args);
++				return;
++			}
++		}
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+ 		extern MovieClip root_movieclip;
+ 		MovieClip* parent_mc = g_current_context ? g_current_context : &root_movieclip;
+@@ -68051,6 +68181,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 				if (_mc_target == NULL) _mc_target = g_current_context;
+ 			}
+ 
++			// s26 PROTOTYPE: stop/play/prevFrame/nextFrame were no-ops here;
++			// run the CallMethod MOVIECLIP arm on the resolved clip instead.
++			if (_mc_target != NULL && _is_mc_nav >= 2 && _is_mc_nav <= 5) {
++				cfDelegateToMCMethod(app_context, str_buffer, _mc_target,
++					_mc_nav_name, _mc_nav_name_len, args, num_args);
++				return;
++			}
+ 			if (_mc_target != NULL) {
+ 				if (_is_mc_nav == 1 && num_args >= 1) {
+ 					// gotoAndStop / gotoAndPlay — all modes. Was
+@@ -68316,6 +68453,30 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 			}
+ 		}
+ 
++		// s26 w1-avm1-dispatch-scope PROTOTYPE: a bare name that resolved to a
++		// native MovieClip.prototype stub (swapDepths, localToGlobal, setMask,
++		// ...) runs that method on the clip the scope chain found it on
++		// (Ruffle Callable(scope_obj, fn)); before, the stub fell through to the
++		// "built-in constructor as plain function" branch and pushed undefined.
++		if (func != NULL && func >= &g_mc_method_funcs[0] &&
++		    func < &g_mc_method_funcs[MC_METHOD_COUNT] &&
++		    func->advanced_func != (Function2Ptr) builtin_mc_meth)
++		{
++			extern MovieClip root_movieclip;
++			MovieClip* _rcv = NULL;
++			if (has_callable_this) {
++				if (callable_this.type == ACTION_STACK_VALUE_MOVIECLIP)
++					_rcv = (MovieClip*)(uintptr_t)callable_this.data.numeric_value;
++			} else {
++				_rcv = g_current_context ? g_current_context : &root_movieclip;
++			}
++			if (_rcv != NULL) {
++				cfDelegateToMCMethod(app_context, str_buffer, _rcv,
++					func->name, (u32)strlen(func->name), args, num_args);
++				return;
++			}
++		}
++
+ 		if (func != NULL && g_call_depth >= g_max_call_depth - 1)
+ 		{
+ 			// Recursion depth limit reached - halt all script execution
+@@ -75246,13 +75407,35 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 					const uint16_t* _mctf_name_u16 = varGetU16Ptr(&args[0]);
+ 					u16_to_utf8(_mctf_name_u16, args[0].str_size, _mctf_name_buf, sizeof(_mctf_name_buf));
+ 					inst_name = _mctf_name_buf;
++				} else if (args[0].type == ACTION_STACK_VALUE_F64 || args[0].type == ACTION_STACK_VALUE_F32) {
++					// s26 PROTOTYPE (item 4): a numeric name is ToString'd ("3").
++					varToStringBuf(app_context, &args[0], _mctf_name_buf, sizeof(_mctf_name_buf));
++					inst_name = _mctf_name_buf;
+ 				}
+-				int depth_val = (int) varToDoubleSimple(&args[1]);
++				double _mdv = varToDoubleSimple(&args[1]);
++				int depth_val = (isnan(_mdv) || isinf(_mdv)) ? 0 : (int) _mdv;
+ 				double x = varToDoubleSimple(&args[2]);
+ 				double y = varToDoubleSimple(&args[3]);
+ 				double w = varToDoubleSimple(&args[4]);
+ 				double h = varToDoubleSimple(&args[5]);
+-				(void)depth_val;
++
++				// s26 PROTOTYPE (item 6): replace_at_depth — the previous dynamic
++				// occupant of (parent, depth) is removed (Ruffle movie_clip.rs
++				// create_text_field -> replace_at_depth), as createEmptyMovieClip does.
++				for (int _rdi = 0; _rdi < child_mc_count; _rdi++) {
++					if (child_mc_cache[_rdi] != NULL && child_mc_cache[_rdi]->parent == mc &&
++					    child_mc_cache[_rdi]->depth == depth_val) {
++						if (mc->dynamic_props != NULL) {
++							ActionVar _undef = {0};
++							_undef.type = ACTION_STACK_VALUE_UNDEFINED;
++							setProperty(app_context, (ASObject*)mc->dynamic_props,
++								child_mc_cache[_rdi]->name, strlen(child_mc_cache[_rdi]->name), &_undef);
++						}
++						child_mc_cache[_rdi]->depth = INT_MIN;
++						child_mc_cache[_rdi] = NULL;
++						break;
++					}
++				}
+ 
+ 				// Flash truncates createTextField coordinates to integers (NaN/Inf → 0)
+ 				int xi = (isnan(x) || isinf(x)) ? 0 : (int)x;
+@@ -75267,6 +75450,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				child->width = (float) abs(wi);
+ 				child->height = (float) abs(hi);
+ 				child->ng_textfield_idx = -2; // dynamically created textfield (no static metadata, but still a TF)
++				if (child->depth == 0) child->depth = depth_val; // s26 PROTOTYPE (item 4): getDepth
+ 
+ 				// Set up dynamic_props with TextField defaults
+ 				if (child->dynamic_props == NULL) {
+@@ -78009,6 +78193,32 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 											if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)))
+ 												hit = 1;
+ 										}
++										// s26 w1-avm1-dispatch-scope PROTOTYPE (item 3): a committed
++										// stroke thinner than one screen pixel (hairline lineStyle(0)
++										// included) is hit by distance to its retained polyline at
++										// Ruffle's half-width 0.5 * max(width, 1 screen px)
++										// (shape_utils draw_command_stroke_hit_test). Its line_verts
++										// are only scale-rebuilt by the graphics renderer, so before
++										// this the triangle test missed in no-graphics (and before
++										// the first render) and hit after it.
++										if (!hit && _hdpath->has_line && _hdpath->stroke_poly != NULL) {
++											double _csx = sqrt(_hwa*_hwa + _hwb*_hwb), _csy = sqrt(_hwc*_hwc + _hwd*_hwd);
++											double _cws = (_csx > _csy) ? _csx : _csy;
++											double _cminw = (_cws > 0.0) ? 1.0 / _cws : 1.0;
++											if ((double)_hdpath->line_width <= _cminw) {
++												double _chw = 0.5 * _cminw;
++												const float* _cp = _hdpath->stroke_poly;
++												for (u32 _cci = 0; _cci < _hdpath->stroke_contour_count && !hit; _cci++) {
++													u32 _ccs = _hdpath->stroke_contours[_cci];
++													u32 _cce = (_cci + 1 < _hdpath->stroke_contour_count) ? _hdpath->stroke_contours[_cci + 1] : _hdpath->stroke_poly_count;
++													for (u32 _cvi = _ccs; _cvi + 1 < _cce && !hit; _cvi++)
++														if (drawingSegDistHit(dlx, dly, _cp[_cvi*2], _cp[_cvi*2+1], _cp[_cvi*2+2], _cp[_cvi*2+3], _chw)) hit = 1;
++													if (!hit && _hdpath->stroke_filled && _cce > _ccs + 2)
++														if (drawingSegDistHit(dlx, dly, _cp[(_cce-1)*2], _cp[(_cce-1)*2+1], _cp[_ccs*2], _cp[_ccs*2+1], _chw)) hit = 1;
++												}
++												continue;  // hairline: distance only, skip its line triangles
++											}
++										}
+ 										// Test line triangles
+ 										for (u32 _hdv = 0; _hdv + 5 < _hdpath->line_vert_count * 2 && !hit; _hdv += 6) {
+ 											float* lv = &_hdpath->line_verts[_hdv];
+@@ -83715,6 +83925,11 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
+ 	u32 new_caret = del_lo + ch_u16_len;
+ 	if (new_caret > u16_len) new_caret = u16_len;
+ 
++	// s26 PROTOTYPE (item 5): edit the run table in place (before the text
++	// store, as tf_ps_on_replace requires). No maxChars truncation case.
++	int _typed_in_place = 0;
++	if ((int)u16_len == (int)(del_lo + ch_u16_len + tail_len))
++		_typed_in_place = tf_ps_on_typed(app_context, g_focused_mc, del_lo, del_hi, ch_u16, ch_u16_len);
+ 	// Set text property
+ 	ActionVar new_text = {0};
+ 	new_text.type = ACTION_STACK_VALUE_STRING;
+@@ -83737,8 +83952,9 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
+ 	g_selection_end = (int)new_caret;
+ 	g_selection_caret = (int)new_caret;
+ 
+-	// Drop the stale run table so the renderer reads the updated `text`.
+-	tf_invalidate_run_table(g_focused_mc);
++	// Drop the stale run table so the renderer reads the updated `text`
++	// (s26 PROTOTYPE: unless the typed edit was applied to it in place).
++	if (!_typed_in_place) tf_invalidate_run_table(g_focused_mc);
+ 
+ 	// Fire onChanged callback
+ 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+diff --git a/SWFModernRuntime/src/actionmodern/timer.c b/SWFModernRuntime/src/actionmodern/timer.c
+index 296832dc..e37fe864 100644
+--- a/SWFModernRuntime/src/actionmodern/timer.c
++++ b/SWFModernRuntime/src/actionmodern/timer.c
+@@ -421,9 +421,19 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
+ 		u32 _tf_flags = (func->function_type == 2)
+ 			? (INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH | INV_VERSION_SWITCH)
+ 			: INV_VERSION_SWITCH;
+-		InvokeOpts _tf_opts = { .flags = _tf_flags };
++		// s26 w1-avm1-dispatch-scope PROTOTYPE (item 2, s25 L3): a fresh local
++		// activation for both types (Ruffle timer.rs Avm1Function -> func.call(
++		// .., this = Undefined, params) -> Avm1Function::exec new_local_scope):
++		// `var` stays local (it leaked onto the timeline), `arguments` and
++		// `this` (= undefined) are bound by name.
++		_tf_flags |= INV_LOCAL_SCOPE;
++		if (func->function_type == 1) _tf_flags |= INV_BIND_THIS;
++		u8 _tf_act = INV_ACT_THIS | INV_ACT_ARGUMENTS;
++		ActionVar _tf_this = {0};
++		_tf_this.type = ACTION_STACK_VALUE_UNDEFINED;
++		InvokeOpts _tf_opts = { .flags = _tf_flags, .act_flags = _tf_act };
+ 		g_call_depth++;
+-		actionInvokeFunctionValue(app_context, func, NULL,
++		actionInvokeFunctionValue(app_context, func, &_tf_this,
+ 			t->extra_arg_count > 0 ? t->extra_args : NULL,
+ 			t->extra_arg_count, &_tf_opts);
+ 		g_call_depth--;
