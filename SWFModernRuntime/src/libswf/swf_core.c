@@ -1578,6 +1578,12 @@ void swfStart(SWFAppContext* app_context)
 			if (actionActionQueuePending() > 0)
 				actionDrainAllInPriorityOrder(app_context);
 		}
+		// s26 n-exec-order: never carry a deferred root onEnterFrame across
+		// the tick boundary (tick with no drain at all after the flush).
+		{
+			extern void actionFireDeferredRootEnterFrame(SWFAppContext*);
+			actionFireDeferredRootEnterFrame(app_context);
+		}
 
 		// After-tick hook (for test harness / external interface injection)
 		{

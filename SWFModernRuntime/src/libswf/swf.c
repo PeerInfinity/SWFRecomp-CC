@@ -1470,6 +1470,12 @@ void tagMain(SWFAppContext* app_context)
 			if (actionActionQueuePending() > 0)
 				actionDrainAllInPriorityOrder(app_context);
 		}
+		// s26 n-exec-order: never carry a deferred root onEnterFrame across
+		// the tick boundary (tick with no drain at all after the flush).
+		{
+			extern void actionFireDeferredRootEnterFrame(SWFAppContext*);
+			actionFireDeferredRootEnterFrame(app_context);
+		}
 #ifndef OFFSCREEN_RENDER
 		// Browser-WASM: promote this tick's attachMovie'd clips so the pump above
 		// runs them from NEXT tick — after every drain that can run their queued

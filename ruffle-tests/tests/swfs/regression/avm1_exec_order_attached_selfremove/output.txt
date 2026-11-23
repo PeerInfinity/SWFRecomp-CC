@@ -1,0 +1,18 @@
+root f1
+a f1
+a ef
+a f2
+root ef a=movieclip b=undefined
+root f2
+a ef
+a f3 remove
+root ef a=undefined b=undefined
+root f3
+root ef a=undefined b=undefined
+root f4
+root ef a=undefined b=undefined
+root f5
+root ef a=undefined b=undefined
+root f6
+root ef a=undefined b=undefined
+root ef a=undefined b=undefined

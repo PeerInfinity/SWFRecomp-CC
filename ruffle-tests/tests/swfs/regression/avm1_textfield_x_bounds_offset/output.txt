@@ -1,0 +1,10 @@
+f1._x=48
+f1._y=28
+f2._x=46
+f2._y=98
+s.fld._x=8
+s.fld._y=8
+h.fld._x=8
+h.fld._y=8
+h.fld._x=10
+f1._y=7

@@ -33,6 +33,19 @@ static size_t g_aq_cap = 0;
 // actionDrainSuppressEnter for rationale.
 static int g_drain_suppress_depth = 0;
 
+// s26 n-exec-order: fire _root's deferred onEnterFrame (action.c
+// g_defer_root_enterframe) right before the first root DoAction of the tick
+// pops, so every child frame script queued ahead of it has already run —
+// Ruffle's exec-list order (clips newest-first, _root last; per clip
+// enterFrame THEN frame script).
+static void aq_dispatch_script(SWFAppContext* app_context, void* user);
+extern void actionFireDeferredRootEnterFrame(SWFAppContext* app_context);
+static inline void aq_pre_dispatch(SWFAppContext* app_context, const ActionQueueEntry* e)
+{
+	if (e->fn == aq_dispatch_script && !e->is_unload)
+		actionFireDeferredRootEnterFrame(app_context);
+}
+
 void actionDrainSuppressEnter(void) { g_drain_suppress_depth++; }
 void actionDrainSuppressLeave(void) { g_drain_suppress_depth--; }
 int  actionDrainSuppressed(void)    { return g_drain_suppress_depth; }
@@ -179,6 +192,7 @@ static void aq_drain(SWFAppContext* app_context, const DrainFilter* f)
 				continue;
 			}
 		}
+		aq_pre_dispatch(app_context, &entry);
 		entry.fn(app_context, entry.user);
 	}
 }
@@ -298,6 +312,9 @@ void actionDrainAllInPriorityOrder(SWFAppContext* app_context)
 		}
 		aq_drain_one_onload_or_script(app_context);
 	}
+	// No root DoAction this tick (or it already ran): fire any still-deferred
+	// root onEnterFrame now, after the drained child scripts.
+	actionFireDeferredRootEnterFrame(app_context);
 }
 
 // Pop and dispatch a single ONLOAD/SCRIPT entry (highest priority, FIFO).
@@ -329,6 +346,7 @@ static int aq_drain_one_onload_or_script(SWFAppContext* app_context)
 			return 1;
 		}
 	}
+	aq_pre_dispatch(app_context, &entry);
 	entry.fn(app_context, entry.user);
 	if (entry.is_unload) {
 		int has_more_unload = 0;
@@ -396,6 +414,7 @@ void actionDrainOnloadScriptAbove(SWFAppContext* app_context, size_t floor)
 				continue;
 			}
 		}
+		aq_pre_dispatch(app_context, &entry);
 		entry.fn(app_context, entry.user);
 		if (entry.is_unload) {
 			int has_more_unload = 0;
@@ -469,6 +488,7 @@ void actionDrainOnloadAndScript(SWFAppContext* app_context)
 				continue;
 			}
 		}
+		aq_pre_dispatch(app_context, &entry);
 		entry.fn(app_context, entry.user);
 		// After dispatching an UNLOAD, if no more unload entries remain in the
 		// queue, fire pending Mark/Invalidate so the next SCRIPT sees the
@@ -494,6 +514,8 @@ void actionDrainActionQueueByKind(SWFAppContext* app_context,
 		.is_unload_filter = -1,
 	};
 	aq_drain(app_context, &f);
+	if (kind_filter == AQ_KIND_SCRIPT)
+		actionFireDeferredRootEnterFrame(app_context);
 }
 
 void* actionQueuePopMatching(ActionQueueKind kind_filter,

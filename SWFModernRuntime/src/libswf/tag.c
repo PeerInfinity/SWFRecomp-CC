@@ -6967,9 +6967,21 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	// which the root walk above structurally can't reach.
 	dispatch_attached_clip_enterframe(app_context);
 #endif
-	// Dispatch AS2 mc.onEnterFrame property handlers
-	actionDispatchEnterFrameHandlers(app_context);
-	actionDispatchRootVarMapEnterFrame(app_context);
+	// Dispatch AS2 mc.onEnterFrame property handlers. s26 n-exec-order: the
+	// ROOT arms are deferred to after this tick's queued child frame scripts
+	// (action.c g_defer_root_enterframe / actionFireDeferredRootEnterFrame).
+	{
+		extern int g_defer_root_enterframe;
+		static int s_root_last = -1;
+		if (s_root_last < 0) {
+			const char* ev = getenv("SWF_EXEC_ORDER_ROOT_LAST");
+			s_root_last = !(ev && ev[0] == '0');
+		}
+		g_defer_root_enterframe = s_root_last;
+		actionDispatchEnterFrameHandlers(app_context);
+		actionDispatchRootVarMapEnterFrame(app_context);
+		g_defer_root_enterframe = 0;
+	}
 }
 
 // Flag to suppress tagShowFrame side effects during actionCall invocations.

@@ -1,0 +1,38 @@
+tl f1
+root f1
+a f1
+a ef
+tl ef
+root ef a=movieclip b=undefined
+tl f2
+a f2
+root f2
+b f1
+b ef
+a ef
+tl ef
+root ef a=movieclip b=movieclip
+tl f3
+b f2
+a f3 remove
+root f3
+b ef
+tl ef
+root ef a=undefined b=movieclip
+tl f4
+b f3 remove
+root f4
+tl ef
+root ef a=undefined b=undefined
+tl f1
+root f5
+tl ef
+root ef a=undefined b=undefined
+tl f2
+root f6
+tl ef
+root ef a=undefined b=undefined
+tl f3
+tl ef
+root ef a=undefined b=undefined
+tl f4

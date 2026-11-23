@@ -23281,6 +23281,7 @@ int g_enterframe_new_mc_start = -1;  // -1 = no skip
 // Root MC enterFrame does not fire on the first tick (first tick fires LOAD/frame script).
 // Set to true after the first tagShowFrame completes.
 int g_root_enterframe_eligible = 0;
+double actionTextFieldBoundsOffset(MovieClip* mc, int axis);   // defined near getMCBuiltinProperty
 
 // _level management: _level0 is always root_movieclip.
 // Higher levels are synthetic MCs created by loadMovieNum/loadClip.
@@ -41824,9 +41825,67 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
     }
 }
 
+// s26 n-exec-order: Ruffle's AVM1 frame (avm1/runtime.rs::run_frame +
+// movie_clip.rs::run_frame_avm1) walks the exec list newest-first and, per
+// clip, queues its enterFrame and THEN its frame script — _root (the oldest
+// clip) last. So a child's frame script (e.g. a last-frame removeMovieClip)
+// runs BEFORE _root.onEnterFrame observes it. tagFlushPendingEnterFrame sets
+// g_defer_root_enterframe around its dispatch: the root arms only record
+// g_root_ef_pending, and actionFireDeferredRootEnterFrame fires them right
+// before the first root DoAction pops from the action queue, or at the end of
+// the tick's drain when root has none. Fixture:
+// regression/avm1_exec_order_attached_selfremove.
+int g_defer_root_enterframe = 0;
+static int g_root_ef_pending = 0;   // bit0 dynamic_props arm, bit1 var_map arm
 // Dispatch AS2 mc.onEnterFrame property handlers for all cached MovieClips.
 // Flag to indicate we're inside enterFrame dispatch — gotos should be deferred
 int g_inside_enterframe_dispatch = 0;
+
+static void dispatch_root_dprops_enterframe(SWFAppContext* app_context)
+{
+	{
+		extern MovieClip root_movieclip;
+		ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
+		if (root_props != NULL) {
+			ActionVar* ef_prop = getProperty(root_props, "onEnterFrame", 12);
+			if (ef_prop != NULL && ef_prop->type == ACTION_STACK_VALUE_FUNCTION) {
+				ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
+				if (func != NULL) {
+					MovieClip* saved_ctx = g_current_context;
+					actionSetCurrentContext(&root_movieclip);
+					// Version switch normalized (pass (b) remainder, item 1):
+					// run the handler at its DEFINING movie's SWF version like
+					// the children arm, not the ambient host version.
+					// regression/root_enterframe_cross_swf_version flips on this.
+					// The type-2-only base-clip switch (an asymmetry vs the
+					// children arm's both-types switch, and vs this arm's type-1
+					// no-base-clip) moves INTO the arm under the CALLER-version
+					// gate (g_swf_version read before the invoke, exactly the
+					// value the old INV_BASE_CLIP read pre-switch) so it never
+					// pairs with INV_VERSION_SWITCH. Type-1 keeps no local frame
+					// AND no base clip (both preserved-by-omission). The core's
+					// clamp/pad covers a param'd type-1 handler as above.
+					ActionVar _ref_this = {0};
+					_ref_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+					_ref_this.data.numeric_value = (u64)(uintptr_t)&root_movieclip;
+					MovieClip* _ref_saved_base = g_current_context;
+					if (func->function_type == 2 && g_swf_version >= 6 && func->base_clip != NULL)
+						g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, &root_movieclip);
+					u32 _ref_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
+					if (func->function_type == 2)
+						_ref_flags |= INV_MC_THIS_NULL_PTR;
+					InvokeOpts _ref_opts = { .flags = _ref_flags };
+					g_call_depth++;
+					invokeFunctionValue(app_context, func, &_ref_this, NULL, 0, &_ref_opts);
+					g_call_depth--;
+					g_current_context = _ref_saved_base;
+					actionSetCurrentContext(saved_ctx);
+				}
+			}
+		}
+	}
+}
+
 
 // Called from tagShowFrame after sprite/button initialization. Iterates the
 // MC cache in reverse creation order (most recently created = highest depth = front)
@@ -41940,47 +41999,13 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 	// Dispatch root MovieClip last (after children).
 	// Skip on the first tick — root's first frame fires LOAD (frame script),
 	// not enterFrame. The flag is set after the first tagShowFrame completes.
+	// s26 n-exec-order: under tagFlushPendingEnterFrame the root arm is
+	// DEFERRED to after this tick's queued child frame scripts (see
+	// actionFireDeferredRootEnterFrame).
 	if (g_root_enterframe_eligible)
 	{
-		extern MovieClip root_movieclip;
-		ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
-		if (root_props != NULL) {
-			ActionVar* ef_prop = getProperty(root_props, "onEnterFrame", 12);
-			if (ef_prop != NULL && ef_prop->type == ACTION_STACK_VALUE_FUNCTION) {
-				ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
-				if (func != NULL) {
-					MovieClip* saved_ctx = g_current_context;
-					actionSetCurrentContext(&root_movieclip);
-					// Version switch normalized (pass (b) remainder, item 1):
-					// run the handler at its DEFINING movie's SWF version like
-					// the children arm, not the ambient host version.
-					// regression/root_enterframe_cross_swf_version flips on this.
-					// The type-2-only base-clip switch (an asymmetry vs the
-					// children arm's both-types switch, and vs this arm's type-1
-					// no-base-clip) moves INTO the arm under the CALLER-version
-					// gate (g_swf_version read before the invoke, exactly the
-					// value the old INV_BASE_CLIP read pre-switch) so it never
-					// pairs with INV_VERSION_SWITCH. Type-1 keeps no local frame
-					// AND no base clip (both preserved-by-omission). The core's
-					// clamp/pad covers a param'd type-1 handler as above.
-					ActionVar _ref_this = {0};
-					_ref_this.type = ACTION_STACK_VALUE_MOVIECLIP;
-					_ref_this.data.numeric_value = (u64)(uintptr_t)&root_movieclip;
-					MovieClip* _ref_saved_base = g_current_context;
-					if (func->function_type == 2 && g_swf_version >= 6 && func->base_clip != NULL)
-						g_current_context = actionClosureBaseClip(app_context, (MovieClip*)func->base_clip, &root_movieclip);
-					u32 _ref_flags = INV_CAPTURED_SCOPE | INV_VERSION_SWITCH | INV_EVENT_THIS_MC;
-					if (func->function_type == 2)
-						_ref_flags |= INV_MC_THIS_NULL_PTR;
-					InvokeOpts _ref_opts = { .flags = _ref_flags };
-					g_call_depth++;
-					invokeFunctionValue(app_context, func, &_ref_this, NULL, 0, &_ref_opts);
-					g_call_depth--;
-					g_current_context = _ref_saved_base;
-					actionSetCurrentContext(saved_ctx);
-				}
-			}
-		}
+		if (g_defer_root_enterframe) g_root_ef_pending |= 1;
+		else dispatch_root_dprops_enterframe(app_context);
 	}
 
 	g_inside_enterframe_dispatch = 0;
@@ -42021,6 +42046,7 @@ void actionMarkDynamicMCsEnterFrameEligible(void)
 void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context)
 {
 	extern MovieClip root_movieclip;
+	if (g_defer_root_enterframe) { g_root_ef_pending |= 2; return; }
 	ActionVar* ef_var = getVariable("onEnterFrame", 12);
 	if (ef_var == NULL || ef_var->type != ACTION_STACK_VALUE_FUNCTION)
 		return;
@@ -42066,6 +42092,22 @@ void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context)
 	InvokeOpts _rvm_opts = { .flags = _rvm_flags };
 	invokeFunctionValue(app_context, func, &_rvm_this, NULL, 0, &_rvm_opts);
 	actionSetCurrentContext(saved_ctx);
+}
+
+// See g_defer_root_enterframe. Idempotent; a no-op when nothing is pending.
+void actionFireDeferredRootEnterFrame(SWFAppContext* app_context)
+{
+	int pending = g_root_ef_pending;
+	if (!pending) return;
+	g_root_ef_pending = 0;
+	if (pending & 1) {
+		int saved_inside = g_inside_enterframe_dispatch;
+		g_inside_enterframe_dispatch = 1;
+		dispatch_root_dprops_enterframe(app_context);
+		g_inside_enterframe_dispatch = saved_inside;
+	}
+	if (pending & 2)
+		actionDispatchRootVarMapEnterFrame(app_context);
 }
 
 // Check if any onEnterFrame handlers are registered (root or child MCs).
@@ -52658,12 +52700,18 @@ void actionGetProperty(SWFAppContext* app_context)
 				if (_dep != SIZE_MAX) {
 					double _dx;
 					if (ng_getTransformXY_d(_dep, &_dx, NULL)) {
+						// Root-DL field: same fold as the GetMember arm (scale only).
+						_dx += actionTextFieldBoundsOffset(mc, 0);
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
 						return;
 					}
 				}
 			}
 			{ double _dx = mc ? spvTwipsQuantizePixels((double)mc->x) : 0.0;
+			  if (mc && !(mc->as_set_flags & 1)) {
+				  extern double actionTextFieldBoundsOffset(MovieClip*, int);
+				  _dx += actionTextFieldBoundsOffset(mc, 0);
+			  }
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx)); return; }
 		case 1:  // _y
 			if (mc) syncTransformIfNeeded(mc);
@@ -52672,12 +52720,18 @@ void actionGetProperty(SWFAppContext* app_context)
 				if (_dep != SIZE_MAX) {
 					double _dy;
 					if (ng_getTransformXY_d(_dep, NULL, &_dy)) {
+						// Root-DL field: same fold as the GetMember arm (scale only).
+						_dy += actionTextFieldBoundsOffset(mc, 1);
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
 						return;
 					}
 				}
 			}
 			{ double _dy = mc ? spvTwipsQuantizePixels((double)mc->y) : 0.0;
+			  if (mc && !(mc->as_set_flags & 2)) {
+				  extern double actionTextFieldBoundsOffset(MovieClip*, int);
+				  _dy += actionTextFieldBoundsOffset(mc, 1);
+			  }
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
 		case 2:  // _xscale
 			if (mc) syncTransformIfNeeded(mc);
@@ -61372,6 +61426,12 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 						const float* _xf = _ctd ? _ctd[_tid]
 						                        : (const float*)app_context->transform_data + _tid * 16;
 						double _dx = (double)_xf[12] / 20.0;
+						if (mc->ng_textfield_idx >= 0) {
+							// Browser twin of the native arm's bounds fold.
+							s32 bxmin, bxmax, bymin, bymax;
+							ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
+							_dx += (_xf[0] * (double)bxmin + _xf[4] * (double)bymin) / 20.0;
+						}
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
 						return;
 					}
@@ -61382,6 +61442,10 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 				// in float; snap recovers exact 0.05 in double).
 				{
 					double dx = spvTwipsQuantizePixels((double)mc->x);
+					if (!(mc->as_set_flags & 1)) {
+						extern double actionTextFieldBoundsOffset(MovieClip*, int);
+						dx += actionTextFieldBoundsOffset(mc, 0);
+					}
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dx)); return;
 				} }
 			if (strcasecmp(prop_name, "_y") == 0) {
@@ -61431,6 +61495,12 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 						const float* _xf = _ctd ? _ctd[_tid]
 						                        : (const float*)app_context->transform_data + _tid * 16;
 						double _dy = (double)_xf[13] / 20.0;
+						if (mc->ng_textfield_idx >= 0) {
+							// Browser twin of the native arm's bounds fold.
+							s32 bxmin, bxmax, bymin, bymax;
+							ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
+							_dy += (_xf[1] * (double)bxmin + _xf[5] * (double)bymin) / 20.0;
+						}
 						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
 						return;
 					}
@@ -61440,6 +61510,10 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 				// for full precision (mirrors `_x` path above).
 				{
 					double dy = spvTwipsQuantizePixels((double)mc->y);
+					if (!(mc->as_set_flags & 2)) {
+						extern double actionTextFieldBoundsOffset(MovieClip*, int);
+						dy += actionTextFieldBoundsOffset(mc, 1);
+					}
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dy)); return;
 				} }
 			if (strcasecmp(prop_name, "_xscale") == 0) {
@@ -65962,6 +66036,24 @@ static void actionTrace_str(SWFAppContext* app_context, const char* msg)
 
 // Helper: get a MovieClip built-in property by name into result.
 // Returns 1 if property was found, 0 otherwise.
+// s26 n-exec-order goal 2: a TextField's `_x`/`_y` include its DefineEditText
+// bounds min scaled by the field's own scale (Ruffle edit_text.rs x()/y() +
+// bounds_x_offset; Flash-verified by gnash misc-ming EmbeddedFontTest). The
+// root-display-list arms of the getters already fold it in via the placement
+// matrix; this covers every field the root name lookup does not reach (nested
+// in a sprite or an attachMovie'd clip) and the browser arm. AS-set values are
+// returned as set (the setter stores the requested value), so callers apply
+// this only when the axis is NOT AS-set. Fixture:
+// regression/avm1_textfield_x_bounds_offset.
+double actionTextFieldBoundsOffset(MovieClip* mc, int axis)
+{
+	if (mc == NULL || mc->ng_textfield_idx < 0) return 0.0;
+	s32 bxmin, bxmax, bymin, bymax;
+	ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
+	if (axis == 0) return (double)mc->xscale / 100.0 * (double)bxmin / 20.0;
+	return (double)mc->yscale / 100.0 * (double)bymin / 20.0;
+}
+
 static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, ActionVar* result)
 {
 	if (name_len < 2 || name[0] != '_') return 0;
