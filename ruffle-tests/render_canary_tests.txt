@@ -730,3 +730,6 @@ regression/avm1_long_text_layout            # > 32 paragraphs, align     1 cmp
 # tier=1
 avm2/bitmapdata_filter_sourcerect                      # sub-rect blur reads beyond the rect   1 cmp
 visual/filters/blur_fractional                         # 6-bit size truncation, opaque symbol  1 cmp
+# s26 w2-attached-holder-render: clip attached under a createEmptyMovieClip holder (OFFSCREEN attached passes).
+# tier=1
+regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased holder        1 cmp

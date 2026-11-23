@@ -1015,7 +1015,19 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 			extern MovieClip root_movieclip;
 			int is_path_var = (strchr(var_name, '.') != NULL);
 			MovieClip* tf_parent = g_current_context ? g_current_context : &root_movieclip;
-			if (is_path_var || tf_parent == &root_movieclip)
+			if (is_path_var && tf_parent->is_button_mc) {
+				// A path resolves from the field's first non-button ancestor
+				// (Ruffle try_bind_text_field_variable), not from the button
+				// clip whose state function is placing it (regression
+				// avm1_button_textfield_path_binding).
+				MovieClip* scope = tf_parent;
+				while (scope->is_button_mc && scope->parent != NULL)
+					scope = scope->parent;
+				MovieClip* saved_ctx = g_current_context;
+				actionSetCurrentContext(scope);
+				actionInitTextFieldVariable(app_context, var_name, init_text);
+				actionSetCurrentContext(saved_ctx);
+			} else if (is_path_var || tf_parent == &root_movieclip)
 				actionInitTextFieldVariable(app_context, var_name, init_text);
 		}
 	}

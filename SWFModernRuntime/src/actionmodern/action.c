@@ -23951,11 +23951,25 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 		prop_name = last_dot + 1;
 		prop_name_len = (u32)strlen(prop_name);
 
+		// Ruffle resolve_variable_path(parent, path): a path resolves from
+		// the field's parent, climbed past AVM1 buttons as in the simple
+		// branch below, not from whatever context is current (the button
+		// clip while its state function places the field).
+		// regression avm1_button_textfield_path_binding.
+		MovieClip* path_scope = NULL;
+		if (tf_mc->parent != NULL && tf_mc->parent->is_button_mc) {
+			path_scope = tf_mc->parent;
+			while (path_scope->is_button_mc && path_scope->parent != NULL)
+				path_scope = path_scope->parent;
+		}
+		MovieClip* path_saved_ctx = g_current_context;
+		if (path_scope != NULL) actionSetCurrentContext(path_scope);
 		PUSH_STR(var_name, container_path_len);
 		actionGetVariable(app_context);
 		ActionVar cvar;
 		peekVar(app_context, &cvar);
 		POP();
+		if (path_scope != NULL) actionSetCurrentContext(path_saved_ctx);
 
 		if (cvar.type == ACTION_STACK_VALUE_OBJECT) {
 			container = (ASObject*) VAL(u64, &cvar.data.numeric_value);

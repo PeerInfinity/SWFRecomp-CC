@@ -1,0 +1,883 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 239787b6..a984abd9 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -23713,11 +23713,25 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
+ 		prop_name = last_dot + 1;
+ 		prop_name_len = (u32)strlen(prop_name);
+ 
++		// Ruffle resolve_variable_path(parent, path): a path resolves from
++		// the field's parent, climbed past AVM1 buttons as in the simple
++		// branch below, not from whatever context is current (the button
++		// clip while its state function places the field).
++		// regression avm1_button_textfield_path_binding.
++		MovieClip* path_scope = NULL;
++		if (tf_mc->parent != NULL && tf_mc->parent->is_button_mc) {
++			path_scope = tf_mc->parent;
++			while (path_scope->is_button_mc && path_scope->parent != NULL)
++				path_scope = path_scope->parent;
++		}
++		MovieClip* path_saved_ctx = g_current_context;
++		if (path_scope != NULL) actionSetCurrentContext(path_scope);
+ 		PUSH_STR(var_name, container_path_len);
+ 		actionGetVariable(app_context);
+ 		ActionVar cvar;
+ 		peekVar(app_context, &cvar);
+ 		POP();
++		if (path_scope != NULL) actionSetCurrentContext(path_saved_ctx);
+ 
+ 		if (cvar.type == ACTION_STACK_VALUE_OBJECT) {
+ 			container = (ASObject*) VAL(u64, &cvar.data.numeric_value);
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index f15cdcdc..f8530bd7 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -5647,6 +5647,60 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
+ // behaviour; ng_update_button_states_in_level sets it for an AVM1 child level.
+ static const float (*g_btn_hit_td)[16] = NULL;
+ 
++// s26 w2-attached-holder-render: ng_update_button_states runs the walk below
++// in three phases so that (a) ONE topmost interactive object wins across the
++// root walk AND the attached (child_mc_cache) walk, by Flash render order, and
++// (b) the OLD hovered button's rollOut/dragOut fires before the NEW one's
++// rollOver (Ruffle player.rs update_mouse_state: RollOut{cur} then
++// RollOver{new}).
++//   BTN_PHASE_LEGACY: single pass, first hit in visit order wins (the
++//                     AVM1-under-AVM2 level walk keeps this).
++//   BTN_PHASE_PICK:   collect, per walk unit, its first hit (button or
++//                     button-mode sprite) with its render-order key; no state
++//                     change, no actions. The greatest key wins.
++//   BTN_PHASE_LEAVE:  every button except the winner, as a forced miss.
++//   BTN_PHASE_ENTER:  the winner only, with its real hit test.
++// The key is the depth path from the stage (level prefix, then the AS depth
++// of each enclosing clip, then the entry's own depth): a longer path with an
++// equal prefix is a descendant, drawn above its ancestor; greater = on top.
++enum { BTN_PHASE_LEGACY = 0, BTN_PHASE_PICK, BTN_PHASE_LEAVE, BTN_PHASE_ENTER };
++#define BTN_PICK_PATH_MAX 48
++static int g_btn_phase = BTN_PHASE_LEGACY;
++static int g_btn_path[BTN_PICK_PATH_MAX];
++static int g_btn_path_n;
++static int g_btn_pick_key[BTN_PICK_PATH_MAX];
++static int g_btn_pick_key_n;               // 0 = no winner yet
++static DisplayObject* g_btn_pick_obj;      // winning DefineButton entry
++static MovieClip* g_btn_pick_sprite;       // winning button-mode sprite
++
++static void btn_path_push(int v)
++{
++	if (g_btn_path_n < BTN_PICK_PATH_MAX) g_btn_path[g_btn_path_n] = v;
++	g_btn_path_n++;
++}
++static void btn_path_pop(void) { if (g_btn_path_n > 0) g_btn_path_n--; }
++
++// PICK phase: offer the entry at list index `idx` (current path + idx).
++static void btn_pick_offer(DisplayObject* obj, MovieClip* sprite_mc, size_t idx)
++{
++	int key[BTN_PICK_PATH_MAX];
++	int n = g_btn_path_n < BTN_PICK_PATH_MAX - 1 ? g_btn_path_n : BTN_PICK_PATH_MAX - 1;
++	memcpy(key, g_btn_path, (size_t) n * sizeof(int));
++	key[n++] = (int) idx - 16384;            // SWF depth -> AS depth units
++	if (g_btn_pick_key_n > 0) {
++		int m = n < g_btn_pick_key_n ? n : g_btn_pick_key_n;
++		int cmp = 0;
++		for (int k = 0; k < m && cmp == 0; k++)
++			if (key[k] != g_btn_pick_key[k]) cmp = key[k] < g_btn_pick_key[k] ? -1 : 1;
++		if (cmp == 0) cmp = n < g_btn_pick_key_n ? -1 : (n > g_btn_pick_key_n ? 1 : 0);
++		if (cmp <= 0) return;                // ties keep the earlier unit
++	}
++	memcpy(g_btn_pick_key, key, (size_t) n * sizeof(int));
++	g_btn_pick_key_n = n;
++	g_btn_pick_obj = obj;
++	g_btn_pick_sprite = sprite_mc;
++}
++
+ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 	DisplayObject* dl, size_t dl_max,
+ 	const float* parent_xf, MovieClip* parent_mc,
+@@ -5724,7 +5778,14 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 						break;
+ 					}
+ 				}
+-				if (sprite_mc != NULL && !*found_hover &&
++				if (g_btn_phase == BTN_PHASE_LEAVE || g_btn_phase == BTN_PHASE_ENTER)
++				{
++					// The pick already decided: only the winning sprite
++					// claims (its inner buttons stay untouched, as before).
++					if (sprite_mc != NULL && sprite_mc == g_btn_pick_sprite)
++						continue;
++				}
++				else if (sprite_mc != NULL && !*found_hover &&
+ 				    (actionMCHasButtonHandlers(sprite_mc) || has_mouse_clip_event))
+ 				{
+ 					float mx_px = app_context->mouse.stage_x / 20.0f;
+@@ -5732,6 +5793,8 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 					if (actionMCMouseInsidePick(sprite_mc, mx_px, my_px))
+ 					{
+ 						*found_hover = 1;
++						if (g_btn_phase == BTN_PHASE_PICK)
++							btn_pick_offer(NULL, sprite_mc, i);
+ 						continue;
+ 					}
+ 				}
+@@ -5744,11 +5807,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 				// so parent_mc falls back to root). Pong's "2 Player" button
+ 				// (button_20 inside the unnamed sprite_26) does a bare Play to
+ 				// advance sprite_26 frame 0→1 (the Enter Names screen).
++				btn_path_push((int)i - 16384);
+ 				ng_update_button_states_in_dl(app_context,
+ 					obj->sprite_display_list, obj->sprite_max_depth,
+ 					child_parent_xf, sprite_mc ? sprite_mc : parent_mc,
+ 					obj,
+ 					found_hover);
++				btn_path_pop();
+ 			}
+ 			continue;
+ 		}
+@@ -5776,15 +5841,23 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 
+ 			// A button is not a timeline; keep the same enclosing sprite for
+ 			// any buttons nested in this button's state display list.
++			btn_path_push((int)i - 16384);
+ 			ng_update_button_states_in_dl(app_context,
+ 				obj->sprite_display_list, obj->sprite_max_depth,
+ 				child_parent_xf, btn_mc ? btn_mc : parent_mc,
+ 				enclosing_sprite_obj,
+ 				found_hover);
++			btn_path_pop();
+ 		}
+ 
++		// Two-phase pick (see BTN_PHASE_*): LEAVE skips the winner, ENTER
++		// processes only the winner.
++		if (g_btn_phase == BTN_PHASE_LEAVE && obj == g_btn_pick_obj) continue;
++		if (g_btn_phase == BTN_PHASE_ENTER && obj != g_btn_pick_obj) continue;
++
+ 		u8 old_state = obj->button_state;
+ 		u8 new_state = old_state;
++		int hit_now = 0;
+ 
+ 		// Check _visible and enabled on the button's MovieClip
+ 		int mc_visible = actionGetMCVisible(app_context, obj->instance_name, parent_mc);
+@@ -5837,6 +5910,7 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 				if (hit)
+ 				{
+ 					*found_hover = 1;
++					hit_now = 1;
+ 					if (app_context->mouse.button_down)
+ 						new_state = 2;
+ 					else
+@@ -5861,6 +5935,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
+ 				new_state = 0;
+ 		}
+ 
++		// PICK phase: record this unit's hit, change nothing.
++		if (g_btn_phase == BTN_PHASE_PICK)
++		{
++			if (hit_now) btn_pick_offer(obj, NULL, i);
++			continue;
++		}
++
+ 		// When disabled: Ruffle-compatible state tracking.
+ 		if (!mc_enabled)
+ 		{
+@@ -6318,16 +6399,62 @@ int ng_update_button_states(SWFAppContext* app_context)
+ 		1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1
+ 	};
+ 
+-	int found_hover = 0;
+-	ng_update_button_states_in_dl(app_context,
+-		display_list, max_depth,
+-		identity, &root_movieclip,
+-		NULL,
+-		&found_hover);
+-	// The root display_list above misses DefineButton2 buttons that live inside
+-	// attachMovie'd / createEmptyMovieClip'd clips (e.g. N's entire menuMC UI).
+-	// Walk those too, in every mode (regression avm1_attached_clip_button_click).
+-	ng_update_button_states_attached(app_context, &found_hover);
++	// The root display_list misses DefineButton2 buttons that live inside
++	// attachMovie'd / createEmptyMovieClip'd clips (e.g. N's entire menuMC UI),
++	// so the attached walk covers those, in every mode (regression
++	// avm1_attached_clip_button_click). Both walks run in the three phases of
++	// BTN_PHASE_* so the topmost button wins across them and the old button's
++	// rollOut precedes the new one's rollOver (regression
++	// avm1_button_pick_order). Re-entrant: an action fired in LEAVE/ENTER that
++	// re-enters here gets a full pick of its own, then the outer state returns.
++	int saved_phase = g_btn_phase;
++	DisplayObject* saved_obj = g_btn_pick_obj;
++	MovieClip* saved_sprite = g_btn_pick_sprite;
++	int saved_key_n = g_btn_pick_key_n;
++	int saved_path_n = g_btn_path_n;
++	int saved_key[BTN_PICK_PATH_MAX];
++	int saved_path[BTN_PICK_PATH_MAX];
++	memcpy(saved_key, g_btn_pick_key, sizeof(saved_key));
++	memcpy(saved_path, g_btn_path, sizeof(saved_path));
++
++	// PICK
++	g_btn_phase = BTN_PHASE_PICK;
++	g_btn_pick_obj = NULL;
++	g_btn_pick_sprite = NULL;
++	g_btn_pick_key_n = 0;
++	int unit_hover = 0;
++	g_btn_path_n = 0;
++	btn_path_push(0);
++	ng_update_button_states_in_dl(app_context, display_list, max_depth,
++		identity, &root_movieclip, NULL, &unit_hover);
++	g_btn_path_n = 0;
++	ng_update_button_states_attached(app_context, &unit_hover);
++	int found_hover = g_btn_pick_key_n > 0;
++
++	// LEAVE: everything but the winner sees a miss (found_hover forced).
++	g_btn_phase = BTN_PHASE_LEAVE;
++	int forced = 1;
++	ng_update_button_states_in_dl(app_context, display_list, max_depth,
++		identity, &root_movieclip, NULL, &forced);
++	forced = 1;
++	ng_update_button_states_attached(app_context, &forced);
++
++	// ENTER: the winning button, with its real hit test.
++	if (g_btn_pick_obj != NULL) {
++		g_btn_phase = BTN_PHASE_ENTER;
++		int enter_hover = 0;
++		ng_update_button_states_in_dl(app_context, display_list, max_depth,
++			identity, &root_movieclip, NULL, &enter_hover);
++		ng_update_button_states_attached(app_context, &enter_hover);
++	}
++
++	g_btn_phase = saved_phase;
++	g_btn_pick_obj = saved_obj;
++	g_btn_pick_sprite = saved_sprite;
++	g_btn_pick_key_n = saved_key_n;
++	g_btn_path_n = saved_path_n;
++	memcpy(g_btn_pick_key, saved_key, sizeof(saved_key));
++	memcpy(g_btn_path, saved_path, sizeof(saved_path));
+ 	return found_hover;
+ }
+ 
+@@ -8339,6 +8466,34 @@ static MovieClip** attached_pass_list(int need)
+ }
+ #endif
+ 
++#ifdef OFFSCREEN_RENDER
++static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, float out[16]);
++// s26 w2-attached-holder-render: OFFSCREEN membership of the post-loop
++// attached pass. Root-attached clips always. A NON-root attached clip is
++// normally drawn through ng_attachMovie's attach_registration alias in its
++// parent's sprite_display_list (tag_stubs.c, CI modes), so the pass must skip
++// it (else it draws twice). But that alias is written only when the parent has
++// a display_obj WITH a sprite_display_list. A clip attached under a holder
++// that has neither (e.g. `h = createEmptyMovieClip(); h.attachMovie(...)`) had
++// no render route at all in OFFSCREEN (white where Flash/Ruffle draw it). Admit
++// exactly that unaliased set; the chain must be live and reach _root (levels
++// are not rendered by this pass for root-attached clips either).
++static int offscreen_attached_pass_member(MovieClip* mc)
++{
++	extern MovieClip root_movieclip;
++	if (mc->parent == &root_movieclip) return 1;
++	MovieClip* p = mc->parent;
++	if (p == NULL) return 0;
++	if (p->display_obj != NULL
++	    && ((DisplayObject*)p->display_obj)->sprite_display_list != NULL)
++		return 0;                                  // aliased: drawn by the parent
++	for (MovieClip* a = p; a != &root_movieclip; a = a->parent) {
++		if (a == NULL || a->depth == INT_MIN) return 0;
++	}
++	return 1;
++}
++#endif
++
+ // Re-render current display list state (for headless per-tick image capture).
+ // Only does the rendering pass — no frame script processing, no sprite init, etc.
+ #ifdef OFFSCREEN_RENDER
+@@ -8679,7 +8834,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			MovieClip* mc = child_mc_cache[i];
+ 			if (mc == NULL) continue;
+ 			if (mc->depth == INT_MIN) continue;
+-			if (mc->parent != &root_movieclip) continue;
++			if (!offscreen_attached_pass_member(mc)) continue;
+ 			if (order != NULL) order[order_n++] = mc;
+ 		}
+ 		if (order != NULL) attached_sort_render_order(order, order_n);
+@@ -8688,7 +8843,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 			MovieClip* mc = (order != NULL) ? order[i] : child_mc_cache[i];
+ 			if (mc == NULL) continue;
+ 			if (mc->depth == INT_MIN) continue;
+-			if (mc->parent != &root_movieclip) continue;
++			if (!offscreen_attached_pass_member(mc)) continue;
+ 			if (mc->display_obj == NULL && mc->loaded_dl_shell == NULL) continue;
+ 			// AS-set _visible=false: tagShowFrame's pass skips it inside
+ 			// render_attached_child; this capture pass drew it anyway, so a
+@@ -8709,7 +8864,21 @@ void tagRerenderFrame(SWFAppContext* app_context)
+ 				0.0f, 0.0f, 1.0f, 0.0f,
+ 				0.0f, 0.0f, 0.0f, 1.0f,
+ 			};
+-			if (mc->as_set_flags != 0) {
++			if (mc->parent != &root_movieclip) {
++				// Unaliased nested attach (offscreen_attached_pass_member):
++				// world = parent chain x own AS transform, as
++				// render_attached_child; hidden ancestors hide it.
++				int hidden = 0;
++				for (MovieClip* a = mc->parent; a != &root_movieclip; a = a->parent)
++					if (!a->visible) { hidden = 1; break; }
++				if (hidden) continue;
++				float pw[16];
++				compute_mc_world_xform(app_context, mc->parent, pw);
++				float loc[16];
++				memcpy(loc, mc_xform, sizeof(loc));
++				apply_as_transform(loc, mc, (u8)(1|2|4|8|16));
++				hit_test_mat4_multiply(mc_xform, pw, loc);
++			} else if (mc->as_set_flags != 0) {
+ 				apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
+ 			}
+ 			float att_cx[20];
+@@ -8997,6 +9166,26 @@ static void btn_attached_world_xform(SWFAppContext* app_context, MovieClip* mc,
+ // topmost-button semantics stay consistent. (N's main menu — menuMC built via
+ // gfx.CreateSprite = buffer.attachMovie — was entirely unreachable before this,
+ // so its H/S/Q/N menu clicks were dead while keyboard worked.)
++// PICK key prefix of an attached clip: level prefix (0 = under _root, as
++// attached_sort_render_order), then the AS depth of every clip from the top of
++// the chain down to `mc` itself.
++static void btn_path_set_mc_chain(MovieClip* mc)
++{
++	int chain[BTN_PICK_PATH_MAX];
++	int len = 0;
++	const MovieClip* c = mc;
++	while (c != NULL && c != &root_movieclip && len < BTN_PICK_PATH_MAX - 1) {
++		chain[len++] = c->depth;
++		if (c->parent == NULL) break;   // a _levelN root
++		c = c->parent;
++	}
++	int level = (c == &root_movieclip || c == NULL) ? 0 : 1 + (c->depth + 16384);
++	if (level != 0 && len > 0) len--;  // the level root itself
++	g_btn_path_n = 0;
++	btn_path_push(level);
++	for (int k = len - 1; k >= 0; k--) btn_path_push(chain[k]);
++}
++
+ static void ng_update_button_states_attached(SWFAppContext* app_context, int* found_hover)
+ {
+ 	extern MovieClip* child_mc_cache[];
+@@ -9035,8 +9224,14 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ 		g_btn_attached_walk = 1;
+ #endif
++		// Two-phase pick: each attached clip is its own PICK unit (first hit
++		// in its top-down walk), keyed under the clip's depth chain.
++		int unit_hover = 0;
++		int* hover = (g_btn_phase == BTN_PHASE_PICK) ? &unit_hover : found_hover;
++		if (g_btn_phase == BTN_PHASE_PICK) btn_path_set_mc_chain(mc);
+ 		ng_update_button_states_in_dl(app_context, d->sprite_display_list,
+-			d->sprite_max_depth, mc_xform, mc, d, found_hover);
++			d->sprite_max_depth, mc_xform, mc, d, hover);
++		g_btn_path_n = 0;
+ 		g_btn_attached_walk = 0;
+ 	}
+ }
+@@ -9801,11 +9996,11 @@ void tagShowFrame(SWFAppContext* app_context)
+ 			if (mc == NULL) continue;
+ 			if (mc->depth == INT_MIN) continue;            // removed
+ #ifdef OFFSCREEN_RENDER
+-			// Graphics-native / headless keep the original root-only behavior
+-			// (trace-based suites; rendering non-root attaches here is a
+-			// browser-WASM-only feature, kept out of these modes to stay
+-			// byte-identical). Browser-WASM falls through to the general path.
+-			if (mc->parent != &root_movieclip) continue;
++			// Graphics-native: root-attached clips, plus nested attaches that
++			// have no attach_registration alias in a parent sprite_display_list
++			// (offscreen_attached_pass_member; aliased ones are drawn by their
++			// parent's recursion). Browser-WASM falls through to the general path.
++			if (!offscreen_attached_pass_member(mc)) continue;
+ #else
+ 			// Clips parented to a timeline object were already drawn at their
+ 			// parent's depth by the interleave in the main render loop above.
+diff --git a/SWFModernRuntime/src/libswf/tag_stubs.c b/SWFModernRuntime/src/libswf/tag_stubs.c
+index 93ec5403..0f44f82e 100644
+--- a/SWFModernRuntime/src/libswf/tag_stubs.c
++++ b/SWFModernRuntime/src/libswf/tag_stubs.c
+@@ -976,7 +976,19 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
+ 			extern MovieClip root_movieclip;
+ 			int is_path_var = (strchr(var_name, '.') != NULL);
+ 			MovieClip* tf_parent = g_current_context ? g_current_context : &root_movieclip;
+-			if (is_path_var || tf_parent == &root_movieclip)
++			if (is_path_var && tf_parent->is_button_mc) {
++				// A path resolves from the field's first non-button ancestor
++				// (Ruffle try_bind_text_field_variable), not from the button
++				// clip whose state function is placing it (regression
++				// avm1_button_textfield_path_binding).
++				MovieClip* scope = tf_parent;
++				while (scope->is_button_mc && scope->parent != NULL)
++					scope = scope->parent;
++				MovieClip* saved_ctx = g_current_context;
++				actionSetCurrentContext(scope);
++				actionInitTextFieldVariable(app_context, var_name, init_text);
++				actionSetCurrentContext(saved_ctx);
++			} else if (is_path_var || tf_parent == &root_movieclip)
+ 				actionInitTextFieldVariable(app_context, var_name, init_text);
+ 		}
+ 	}
+diff --git a/ruffle-tests/render_canary_tests.txt b/ruffle-tests/render_canary_tests.txt
+index 368dda9d..a94fac04 100644
+--- a/ruffle-tests/render_canary_tests.txt
++++ b/ruffle-tests/render_canary_tests.txt
+@@ -693,3 +693,6 @@ visual/filters/bevel                                # stb midpoint trunc, zero h
+ regression/layer_group_filtered_child                  # N1 nested filter in LAYER/MULTIPLY  1 cmp
+ regression/avm2_layer_group_filtered_child             # N1 AVM2 twin                         1 cmp
+ regression/avm1_placed_drawing_color                   # placed Drawing-API cxform            1 cmp
++# s26 w2-attached-holder-render: clip attached under a createEmptyMovieClip holder (OFFSCREEN attached passes).
++# tier=1
++regression/avm1_attached_clip_holder_render           # h.m2 under an unaliased holder        1 cmp
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 33de3945..bb0b3269 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -132,6 +132,9 @@ arms cannot be reached any other way.
+ | `avm1_attached_clip_color` | **`Color.setRGB` on attachMovie'd SPRITE clips renders, and composes down to attached children** (N tile-colour slice, 2026-11-22). `render_attached_child` / `tagRerenderFrame`'s root-attached pass composed the clip's `sprite_display_list` with a NULL parent colour, so `mc->cx_*` (and a standalone attached clip's `_alpha`) never reached its leaves: N's ~825 `new Color(tileMC).setRGB(0x797A88)` wall tiles drew raw #333. Root-attached grey squares: `a` tinted, `p` tinted with an attached white child `k` (must take `p`'s tint), `c` control. Trace (`getRGB`) + image from the Ruffle exporter; image 0 px. N's own buffer-attach case is browser-only (OFFSCREEN draws root attaches only) |
+ | `avm1_many_chars_registry` | **character metadata past ng_shared.c's old fixed-table caps** (N HUD slice, 2026-11-22). EditTexts (64), shape bounds/paths (256), morph bounds/paths (64) and winding ids (64) lived in fixed arrays that silently DROPPED every later character; N's 197 EditTexts lost its HUD fields (no TextField wrapper → no text, `_width` 0). 70 EditTexts + 300 shapes + 70 morphs; the attached sprites place the LAST of each; trace `_width`/`_height`, `hitTest`, and the bound variable text via the auto-named child. Ruffle exporter golden; trace-only |
+ | `avm1_attached_clip_button_click` | **DefineButton2 buttons inside attachMovie'd clips receive mouse events in the CI modes** (s26 `w1-attached-button-dispatch`, PROTOTYPE): `ng_update_button_states_attached` (`tag.c`) was browser-only, so a root-attached clip (`m`) and one attached under a `createEmptyMovieClip` holder (`h.m2`) never fired; one attached under a TIMELINE clip (`c.m3`) was reached only through its `attach_registration` alias with an identity transform (`m3._x` ignored). Also pins `this` = the clip holding the button (the browser root-context override is removed). `input.json` mouse injection. Oracle: hand-derived, PENDING Ruffle test runner |
++| `avm1_attached_clip_holder_render` | **OFFSCREEN renders a clip attached under a `createEmptyMovieClip` holder** (s26 `w2-attached-holder-render`): same SWF as `avm1_attached_clip_button_click`; `h.m2` had no `attach_registration` alias (the holder has no `sprite_display_list`) and the OFFSCREEN attached passes drew root-attached clips only, so it rendered white. `tag.c` `offscreen_attached_pass_member`. Golden: Ruffle exporter `0ddd12b6a` frame 0 |
++| `avm1_button_pick_order` | **One topmost button across the root and attached walks, and rollOut before rollOver** (s26 `w2-attached-holder-render`): attached clip over a timeline button wins; of two overlapping attached clips the higher depth wins (not `child_mc_cache` order); X→Y hand-off between root timeline buttons fires X rollOut first. `tag.c` `ng_update_button_states` PICK/LEAVE/ENTER phases. `input.json`. Oracle: predicted from Ruffle `player.rs`, PENDING Ruffle test runner |
++| `avm1_button_textfield_path_binding` | **Path variables of EditTexts inside a button resolve from the first non-button ancestor** (s26 `w2-attached-holder-render`): `_parent.pv` binds `_root.pv`, not `s.pv` (`action.c` `actionTryBindTextFieldVariable` path branch, `tag_stubs.c` `ng_on_place_object2` seeding). Oracle: predicted from Ruffle `edit_text.rs`, PENDING exporter trace |
+ | `layer_group_filtered_child` | **a filtered child inside a LAYER / MULTIPLY group renders INTO the group** (s26 `w1-pixel-layer-colour` N1: the filter pass used to clear the group offscreen and composite onto the main surface). Generator `create_fixtures.py` (builds all three s26 layer-colour fixtures). Analytic golden; Ruffle exporter `0ddd12b6a` render pixel-identical |
+ | `avm2_layer_group_filtered_child` | the same SWF as an AS3 movie (`avm2_render_filtered` twin); Ruffle render pixel-identical |
+ | `avm1_placed_drawing_color` | **Drawing-API content of PLACED clips takes the entry's colour transform** (CXFORM, `Color.setRGB`, CXFORM alpha, dynamic-under-placed colour) + a PlaceObject3 ColorMatrix whose alpha row reads colour is not culled; Ruffle render pixel-identical |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/create_test_swf.py
+new file mode 100644
+index 00000000..34773ab5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/create_test_swf.py
+@@ -0,0 +1,29 @@
++#!/usr/bin/env python3
++"""avm1_attached_clip_holder_render: OFFSCREEN renders a clip attached under a
++createEmptyMovieClip holder (s26 w2-attached-holder-render).
++
++The SWF is byte-identical to ../avm1_attached_clip_button_click/test.swf (this
++script just runs that generator): three attached copies of the red 100x100
++`menu` square, `m` (root-attached, at 50,50), `h.m2` (attached under
++`h = _root.createEmptyMovieClip("h", 2)`, h at 200,50) and `c.m3` (attached
++under a timeline clip scaled 50% x, at 100,180).
++
++Before s26 the OFFSCREEN attached passes (tagShowFrame / tagRerenderFrame)
++drew only root-attached clips and relied on ng_attachMovie's
++attach_registration alias for nested ones; a holder with no
++sprite_display_list gets no alias, so `h.m2` rendered white.
++
++Golden output.expected.png: Ruffle exporter at 0ddd12b6a, frame 0 (archived
++as SWFRecompDocs/plans/session26-fanout-reports/w1-local-oracles/
++attached_clip_button_click.exporter-0ddd12b6a.f0.png). Pixel-aligned solid
++squares, no AA, so tolerance 1 / max_outliers 0.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import runpy
++import sys
++
++here = os.path.dirname(os.path.abspath(__file__))
++sys.argv = [sys.argv[0], sys.argv[1]]
++runpy.run_path(os.path.join(here, '..', 'avm1_attached_clip_button_click', 'create_test_swf.py'), run_name='__main__')
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/output.expected.png b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/output.expected.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..b4e30e0f63d33db482b625b8112792ba1db765e0
+GIT binary patch
+literal 3290
+zcmeAS@N?(olHy`uVBq!ia0y~yV4MKNIvi|3k+<8Q9%5kNS?KBF7*fIb_5kw&mB?ww
+zKK?I%*L&j3@*?l#b-A~<K~ZMUylGzR=NTC*z57|VJ*#S2yLI-}^|#EzV@t1whR1$g
+z?_2<)ft>$UEO0^hQNa-uAR+(OPuTIQUSRfrVU=~i<c~aC_1}<V-L6-wRs)In{s&-s
+z)#`s=M+HX%WHd31$c%96zbLTI_$q(y8887<?Her#NGu6Xh5p~{@n?QQF|fA%JKt@z
+zejP#e>u9?Q)X*GlQ{rx9hphWG|0t+r-Sw)Tu?a*0*}twU?|`(yR@K`MJ;BHFjD5R>
+VBF$am6@Yyf22WQ%mvv4FO#lG_j-UVl
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/output.txt b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/output.txt
+new file mode 100644
+index 00000000..6848e054
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/output.txt
+@@ -0,0 +1 @@
++attached
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/test.swf b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..394271518fedb22fbcc3fadb67ee2878e6e06d3a
+GIT binary patch
+literal 588
+zcmZuuJx{_=6g{P+Um)UQ69Y&b>gFH=o08ziqQT(cD7Cz#BrPTFgTP?o;Ns}gAK>cZ
+z=;q33;vaD2H@MW>VndC-G=0rE=bn4+?a9@pa+U+85Enq<6{ra~+5nw)E{dWj2<YM9
+zjvfIKq2=Q4^8)e(Zc8scR9m?s-jsVH$V9`sKzcgcbcGVY?LmM_SODt2=Qy1S^KojR
+zM(PZ$rSzD`Yz6r&s}MW#SrEh=pk%qEk~z!_Sj>K?A~k-Hb_8m0!-r^5!CcJ~7=NiH
+z0U}&B9OF?kG-~r+rx!lIN@WX&Vw19mTac3xTr8EcNR_zuJ&)5QYk<kQY1!xAWWdnX
+zL!w<GRMJc#?~}HZ#bzm{12$yZ(&|o4Hv!9MCTGX)h|dz|wlf%^TaBIUmHRw(PqB>q
+sPihK~47iLP>;6X8(-9lL#MZxJ`is_{+gOF@Cn0F_%SEt03^`fvHyv7ZGynhq
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/test.toml b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/test.toml
+new file mode 100644
+index 00000000..f1a32aa4
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_attached_clip_holder_render/test.toml
+@@ -0,0 +1,5 @@
++num_frames = 1
++
++[image_comparisons.output]
++tolerance = 1
++max_outliers = 0
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/create_test_swf.py
+new file mode 100644
+index 00000000..98135a51
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/create_test_swf.py
+@@ -0,0 +1,151 @@
++#!/usr/bin/env python3
++"""avm1_button_pick_order: which DefineButton2 wins the mouse pick, and the
++order of rollOut/rollOver at a hand-off (s26 w2-attached-holder-render).
++
++Pins down (Flash/Ruffle: one topmost interactive object; the OLD button's
++rollOut fires before the NEW button's rollOver):
++  1. An attachMovie'd clip `m` (AS depth 1 -> above every timeline depth)
++     over a ROOT TIMELINE button `T` at the same place: `m`'s button wins,
++     `T` never fires.
++  2. Two attached clips at the same place, `lo` attached FIRST at depth 3,
++     `hi` attached SECOND at depth 5: `hi` (higher depth) wins, although
++     child_mc_cache holds `lo` first.
++  3. A direct hand-off between two adjacent ROOT timeline buttons, `X`
++     (depth 2) -> `Y` (depth 3; the top-down walk visits Y first): X rollOut
++     must precede Y rollOver.
++  4. A hand-off from an attached button (`hi`) to a timeline button (`X`).
++Each button's condition actions trace `this + " <name> <event>"`.
++
++Before s26 the CI modes walked the root display list first and the attached
++clips in creation order, firing transitions as each button was visited.
++
++Expected output: predicted from Flash/Ruffle semantics; ORACLE REQUESTED
++(Ruffle test runner with input.json, w2-attached-holder-render report).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import struct
++import sys
++
++
++def tag(code, data):
++    if len(data) < 63:
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode() + b'\0'
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++GETVAR, SETMEM, CALLM, POP, ADD2, TRACE, STOP = b'\x1c', b'\x4f', b'\x52', b'\x17', b'\x47', b'\x26', b'\x07'
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++SHOW = tag(1, b'')
++
++
++def sbits(v, n):
++    return format(v & ((1 << n) - 1), '0%db' % n)
++
++
++def matrix(tx, ty):  # translate-only MATRIX (pixels)
++    tx, ty = tx * 20, ty * 20
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb) + sbits(tx, nb) + sbits(ty, nb)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def square_shape(sid, px, rgb):
++    w = px * 20
++    nb = (w).bit_length() + 1
++    bits = '{:05b}'.format(nb) + ''.join(sbits(v, nb) for v in (0, w, 0, w))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++    body = struct.pack('<H', sid) + rect + b'\x01\x00' + bytes(rgb) + b'\x00'
++    b = '0001' + '0000' + '0' + '0' + '0' + '0' + '1' + '1' + '00001' + '0' + '0' + '1'
++    for dx, dy in ((w, 0), (0, w), (-w, 0), (0, -w)):
++        b += '1' + '1' + format(nb - 2, '04b') + '1' + sbits(dx, nb) + sbits(dy, nb)
++    b += '000000'
++    b += '0' * ((8 - len(b) % 8) % 8)
++    body += int(b, 2).to_bytes(len(b) // 8, 'big')
++    return tag(2, body)
++
++
++def trace_this(label):  # trace(this + label)
++    return push('this') + GETVAR + push(label) + ADD2 + TRACE
++
++
++CONDS = [(0x01, 'rollOver'), (0x02, 'rollOut'), (0x04, 'press'), (0x08, 'release')]
++
++
++def button2(bid, shape_id, name):
++    rec = bytes([0x0f]) + struct.pack('<HH', shape_id, 1) + b'\x00' + b'\x00'
++    recs = rec + b'\x00'
++    acts = b''
++    for i, (flag, ev) in enumerate(CONDS):
++        a = trace_this(' %s %s' % (name, ev)) + b'\x00'
++        body = bytes([flag, 0]) + a
++        size = 0 if i == len(CONDS) - 1 else 2 + len(body)
++        acts += struct.pack('<H', size) + body
++    return tag(34, struct.pack('<HB', bid, 0) + struct.pack('<H', 2 + len(recs)) + recs + acts)
++
++
++def place(depth, cid):
++    return tag(26, bytes([0x02]) + struct.pack('<HH', depth, cid))
++
++
++def place_at(depth, cid, tx, ty):
++    return tag(26, bytes([0x02 | 0x04]) + struct.pack('<HH', depth, cid) + matrix(tx, ty))
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def setprop(target, prop, val):
++    return push(target) + GETVAR + push(prop, val) + SETMEM
++
++
++def attach(name, export, depth, x, y):
++    return (push(depth, name, export, 3, '_root') + GETVAR + push('attachMovie') + CALLM + POP
++            + setprop(name, '_x', x) + setprop(name, '_y', y))
++
++
++defs = square_shape(1, 100, (255, 0, 0))
++# timeline buttons T, X, Y and the buttons inside exported sprites A, L, H
++for bid, nm in ((10, 'T'), (11, 'X'), (12, 'Y'), (13, 'A'), (14, 'L'), (15, 'H')):
++    defs += button2(bid, 1, nm)
++for sid, bid in ((20, 13), (21, 14), (22, 15)):
++    defs += sprite(sid, [place(1, bid)])
++exports = [(20, 'A'), (21, 'L'), (22, 'H')]
++defs += tag(56, struct.pack('<H', len(exports)) + b''.join(struct.pack('<H', c) + s(n) for c, n in exports))
++
++root_f1 = (place_at(1, 10, 50, 50) + place_at(2, 11, 200, 50) + place_at(3, 12, 300, 50)
++           + doaction(attach('m', 'A', 1, 50, 50)
++                      + attach('lo', 'L', 3, 50, 180)
++                      + attach('hi', 'H', 5, 50, 180)
++                      + push('attached') + TRACE + STOP))
++body = tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + defs + root_f1 + SHOW + tag(0, b'')
++nb = 15
++bits = '{:05b}'.format(nb) + ''.join('{:015b}'.format(v) for v in (0, 8000, 0, 6000))
++bits += '0' * ((8 - len(bits) % 8) % 8)
++rect = int(bits, 2).to_bytes(len(bits) // 8, 'big')
++hdr_rest = rect + struct.pack('<HH', 30 << 8, 1)
++total = 8 + len(hdr_rest) + len(body)
++open(sys.argv[1], 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/input.json b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/input.json
+new file mode 100644
+index 00000000..64d19e4b
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/input.json
+@@ -0,0 +1,13 @@
++[
++  {"type": "Wait"},
++  {"type": "MouseMove", "pos": [100, 100]},
++  {"type": "Wait"},
++  {"type": "MouseMove", "pos": [100, 230]},
++  {"type": "Wait"},
++  {"type": "MouseMove", "pos": [250, 100]},
++  {"type": "Wait"},
++  {"type": "MouseMove", "pos": [350, 100]},
++  {"type": "Wait"},
++  {"type": "MouseMove", "pos": [380, 290]},
++  {"type": "Wait"}
++]
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/output.txt b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/output.txt
+new file mode 100644
+index 00000000..b33f4bd1
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/output.txt
+@@ -0,0 +1,9 @@
++attached
++_level0.m A rollOver
++_level0.m A rollOut
++_level0.hi H rollOver
++_level0.hi H rollOut
++_level0 X rollOver
++_level0 X rollOut
++_level0 Y rollOver
++_level0 Y rollOut
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/test.swf b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d5df8fa3203925f25dcde8aab8daebe69a8a8362
+GIT binary patch
+literal 1333
+zcma)+zfQtX7{yOpY(b!C!XIN4anaqxRUsN>z+luwoP=l-NH8@}jSeI%4jN}3z}3aU
+z!NkEw;5B#vCl)+F!KS9YHci@`?|i4fdz<g>ogN1_XMj5>Js|u6q$TXmgV&Bc7z|z@
+zp^U9IZwUjcbCLDe9<)QW^tUpWvvLGq!Dkj`hj&b(pVulM9Tl*uwI-H2Q6O`YX_)nT
+z@z!Wye+?PPPDA9^aAOVYX#|{ghBM&0VKke=DiCy5?QWxPRGP-HJ|+qah)N<N+u%u5
+z@+D%on~0#kdvqouvJIX@XTC)2b`$Z>_!8wrM7F_`DCbMWZa0xGAS#H6Y=b9J!Iy~L
+zZlaigC@&(i4W2}KUm|w@5_Lmyj@E-JONb)NLFk4O6G69y<V1*#1YK7UM-B-TkVGDj
+zsw(lPC;KbeCsmaZ#$sRk2HzD#u=Lq(VOvRXj5{f4qiMbZ+ckw>!+FCrt?@)xEUR)+
+zJuq);298o4makX{(Q^lFgWjT3yPs$ac2eC0fkdeRfJRrWQ)KS@=v&O?IR;c~;3EH#
+WOXJ_%sW{E$(KBADafvl;w4*<YRRhle
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/test.toml b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/test.toml
+new file mode 100644
+index 00000000..b0e41731
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_button_pick_order/test.toml
+@@ -0,0 +1 @@
++num_frames = 12
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/create_test_swf.py
+new file mode 100644
+index 00000000..30255d97
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/create_test_swf.py
+@@ -0,0 +1,107 @@
++#!/usr/bin/env python3
++"""avm1_button_textfield_path_binding: binding scope of EditText variables that
++live inside a DefineButton2 state (s26 w2-attached-holder-render).
++
++Ruffle edit_text.rs try_bind_text_field_variable climbs from the field's
++parent past every AVM1 button, then resolves the variable path from that clip
++(resolve_variable_path(parent, path)). Sprite `s` (root depth 1) holds button
++`b`, whose UP state holds three EditTexts with initial text:
++  "_parent.pv" = "P"  -> resolved from s: _parent = _root  -> _root.pv = "P"
++  "pv2"        = "Q"  -> simple name, binds on s           -> s.pv2 = "Q"
++  "_root.av"   = "A"  -> absolute path                     -> _root.av = "A"
++With no existing variable, the field's non-empty text seeds the variable.
++Before s26 the path branch ran actionGetVariable in the CURRENT context (the
++button clip during its state function), so "_parent.pv" landed on s.
++
++Expected output: predicted from Ruffle's source; ORACLE REQUESTED (Ruffle
++exporter --trace-log, w2-attached-holder-render report).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import struct
++import sys
++
++
++def tag(code, data):
++    if len(data) < 63:
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode() + b'\0'
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        b += b'\x00' + s(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++GETVAR, ADD2, TRACE, STOP = b'\x1c', b'\x47', b'\x26', b'\x07'
++SHOW = tag(1, b'')
++
++
++def sbits(v, n):
++    return format(v & ((1 << n) - 1), '0%db' % n)
++
++
++def rect(x0, x1, y0, y1):
++    nb = max(abs(v).bit_length() for v in (x0, x1, y0, y1)) + 1
++    bits = '{:05b}'.format(nb) + ''.join(sbits(v, nb) for v in (x0, x1, y0, y1))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def matrix_ty(ty):
++    ty *= 20
++    nb = abs(ty).bit_length() + 1
++    bits = '00' + '{:05b}'.format(nb) + sbits(0, nb) + sbits(ty, nb)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def square_shape(sid, px):
++    w = px * 20
++    nb = w.bit_length() + 1
++    body = struct.pack('<H', sid) + rect(0, w, 0, w) + b'\x01\x00\xff\x00\x00' + b'\x00'
++    b = '0001' + '0000' + '0' + '0' + '0' + '0' + '1' + '1' + '00001' + '0' + '0' + '1'
++    for dx, dy in ((w, 0), (0, w), (-w, 0), (0, -w)):
++        b += '1' + '1' + format(nb - 2, '04b') + '1' + sbits(dx, nb) + sbits(dy, nb)
++    b += '000000'
++    b += '0' * ((8 - len(b) % 8) % 8)
++    return tag(2, body + int(b, 2).to_bytes(len(b) // 8, 'big'))
++
++
++def edit_text(cid, var, text):
++    # HasText | ReadOnly; no font (device default), no layout.
++    return tag(37, struct.pack('<H', cid) + rect(0, 2000, 0, 400) + bytes([0x80 | 0x08, 0x00])
++               + s(var) + s(text))
++
++
++def button2(bid, hit_shape, recs_up):
++    recs = bytes([0x08]) + struct.pack('<HH', hit_shape, 1) + b'\x00' + b'\x00'   # HIT
++    for depth, cid, ty in recs_up:                                                # UP
++        recs += bytes([0x01]) + struct.pack('<HH', cid, depth + 1) + matrix_ty(ty) + b'\x00'
++    recs += b'\x00'
++    return tag(34, struct.pack('<HB', bid, 0) + struct.pack('<H', 0) + recs)
++
++
++def trace_expr(label, var):  # trace(label + var)
++    return push(label, var) + GETVAR + ADD2 + TRACE
++
++
++defs = (square_shape(1, 100) + edit_text(2, '_parent.pv', 'P') + edit_text(3, 'pv2', 'Q')
++        + edit_text(4, '_root.av', 'A')
++        + button2(5, 1, [(1, 2, 0), (2, 3, 25), (3, 4, 50)]))
++# sprite s: button `b` at depth 1
++sprite_s = tag(39, struct.pack('<HH', 6, 1) + tag(26, bytes([0x02 | 0x20]) + struct.pack('<HH', 1, 5) + s('b'))
++               + SHOW + tag(0, b''))
++f1 = tag(26, bytes([0x02 | 0x20]) + struct.pack('<HH', 1, 6) + s('s')) + SHOW
++f2 = tag(12, trace_expr('_root.pv=', '_root.pv') + trace_expr('s.pv=', 's.pv')
++         + trace_expr('s.pv2=', 's.pv2') + trace_expr('_root.av=', '_root.av') + STOP + b'\0') + SHOW
++body = tag(69, struct.pack('<I', 0)) + tag(9, b'\xff\xff\xff') + defs + sprite_s + f1 + f2 + tag(0, b'')
++hdr_rest = rect(0, 8000, 0, 6000) + struct.pack('<HH', 30 << 8, 2)
++total = 8 + len(hdr_rest) + len(body)
++open(sys.argv[1], 'wb').write(b'FWS' + bytes([8]) + struct.pack('<I', total) + hdr_rest + body)
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/output.txt b/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/output.txt
+new file mode 100644
+index 00000000..476d6343
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/output.txt
+@@ -0,0 +1,4 @@
++_root.pv=P
++s.pv=undefined
++s.pv2=Q
++_root.av=A
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/test.swf b/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c6f3e42ca175d9f9c6a142049b93af9c88d828d9
+GIT binary patch
+literal 315
+zcmYL@u};EJ6o$WhTS}W$(FB+f5(nKFx*8P&ffYicZnPw>as#BBNjH50X2M2T+<gk)
+zg10EAt+D5x<eu}Llm9=%m#KTFz);)5PeNNWxJ06_(=^?o2zf{(6{*k*|MqaCI_Bg2
+zJLIaTeO^6X?D)wSGZQV}-q&3dGiKsh<;27R6P`W0M6=~$vF=7OPwd@FX6h<21f|Iy
+z%EF?a`70ZnCY>JqdX6l8I@gK{bA%L)!%CV*D-^J4K%s8p`?91py4jq;O70V!eL1QX
+Ub@0c69R5p0rG(rn64l)F1R1$MYybcN
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/test.toml b/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/test.toml
+new file mode 100644
+index 00000000..ded2e363
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_button_textfield_path_binding/test.toml
+@@ -0,0 +1 @@
++num_frames = 2

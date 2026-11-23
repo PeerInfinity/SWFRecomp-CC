@@ -5764,6 +5764,60 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
 // behaviour; ng_update_button_states_in_level sets it for an AVM1 child level.
 static const float (*g_btn_hit_td)[16] = NULL;
 
+// s26 w2-attached-holder-render: ng_update_button_states runs the walk below
+// in three phases so that (a) ONE topmost interactive object wins across the
+// root walk AND the attached (child_mc_cache) walk, by Flash render order, and
+// (b) the OLD hovered button's rollOut/dragOut fires before the NEW one's
+// rollOver (Ruffle player.rs update_mouse_state: RollOut{cur} then
+// RollOver{new}).
+//   BTN_PHASE_LEGACY: single pass, first hit in visit order wins (the
+//                     AVM1-under-AVM2 level walk keeps this).
+//   BTN_PHASE_PICK:   collect, per walk unit, its first hit (button or
+//                     button-mode sprite) with its render-order key; no state
+//                     change, no actions. The greatest key wins.
+//   BTN_PHASE_LEAVE:  every button except the winner, as a forced miss.
+//   BTN_PHASE_ENTER:  the winner only, with its real hit test.
+// The key is the depth path from the stage (level prefix, then the AS depth
+// of each enclosing clip, then the entry's own depth): a longer path with an
+// equal prefix is a descendant, drawn above its ancestor; greater = on top.
+enum { BTN_PHASE_LEGACY = 0, BTN_PHASE_PICK, BTN_PHASE_LEAVE, BTN_PHASE_ENTER };
+#define BTN_PICK_PATH_MAX 48
+static int g_btn_phase = BTN_PHASE_LEGACY;
+static int g_btn_path[BTN_PICK_PATH_MAX];
+static int g_btn_path_n;
+static int g_btn_pick_key[BTN_PICK_PATH_MAX];
+static int g_btn_pick_key_n;               // 0 = no winner yet
+static DisplayObject* g_btn_pick_obj;      // winning DefineButton entry
+static MovieClip* g_btn_pick_sprite;       // winning button-mode sprite
+
+static void btn_path_push(int v)
+{
+	if (g_btn_path_n < BTN_PICK_PATH_MAX) g_btn_path[g_btn_path_n] = v;
+	g_btn_path_n++;
+}
+static void btn_path_pop(void) { if (g_btn_path_n > 0) g_btn_path_n--; }
+
+// PICK phase: offer the entry at list index `idx` (current path + idx).
+static void btn_pick_offer(DisplayObject* obj, MovieClip* sprite_mc, size_t idx)
+{
+	int key[BTN_PICK_PATH_MAX];
+	int n = g_btn_path_n < BTN_PICK_PATH_MAX - 1 ? g_btn_path_n : BTN_PICK_PATH_MAX - 1;
+	memcpy(key, g_btn_path, (size_t) n * sizeof(int));
+	key[n++] = (int) idx - 16384;            // SWF depth -> AS depth units
+	if (g_btn_pick_key_n > 0) {
+		int m = n < g_btn_pick_key_n ? n : g_btn_pick_key_n;
+		int cmp = 0;
+		for (int k = 0; k < m && cmp == 0; k++)
+			if (key[k] != g_btn_pick_key[k]) cmp = key[k] < g_btn_pick_key[k] ? -1 : 1;
+		if (cmp == 0) cmp = n < g_btn_pick_key_n ? -1 : (n > g_btn_pick_key_n ? 1 : 0);
+		if (cmp <= 0) return;                // ties keep the earlier unit
+	}
+	memcpy(g_btn_pick_key, key, (size_t) n * sizeof(int));
+	g_btn_pick_key_n = n;
+	g_btn_pick_obj = obj;
+	g_btn_pick_sprite = sprite_mc;
+}
+
 static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max,
 	const float* parent_xf, MovieClip* parent_mc,
@@ -5841,7 +5895,14 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 						break;
 					}
 				}
-				if (sprite_mc != NULL && !*found_hover &&
+				if (g_btn_phase == BTN_PHASE_LEAVE || g_btn_phase == BTN_PHASE_ENTER)
+				{
+					// The pick already decided: only the winning sprite
+					// claims (its inner buttons stay untouched, as before).
+					if (sprite_mc != NULL && sprite_mc == g_btn_pick_sprite)
+						continue;
+				}
+				else if (sprite_mc != NULL && !*found_hover &&
 				    (actionMCHasButtonHandlers(sprite_mc) || has_mouse_clip_event))
 				{
 					float mx_px = app_context->mouse.stage_x / 20.0f;
@@ -5849,6 +5910,8 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 					if (actionMCMouseInsidePick(sprite_mc, mx_px, my_px))
 					{
 						*found_hover = 1;
+						if (g_btn_phase == BTN_PHASE_PICK)
+							btn_pick_offer(NULL, sprite_mc, i);
 						continue;
 					}
 				}
@@ -5861,11 +5924,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				// so parent_mc falls back to root). Pong's "2 Player" button
 				// (button_20 inside the unnamed sprite_26) does a bare Play to
 				// advance sprite_26 frame 0→1 (the Enter Names screen).
+				btn_path_push((int)i - 16384);
 				ng_update_button_states_in_dl(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					child_parent_xf, sprite_mc ? sprite_mc : parent_mc,
 					obj,
 					found_hover);
+				btn_path_pop();
 			}
 			continue;
 		}
@@ -5893,15 +5958,23 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 
 			// A button is not a timeline; keep the same enclosing sprite for
 			// any buttons nested in this button's state display list.
+			btn_path_push((int)i - 16384);
 			ng_update_button_states_in_dl(app_context,
 				obj->sprite_display_list, obj->sprite_max_depth,
 				child_parent_xf, btn_mc ? btn_mc : parent_mc,
 				enclosing_sprite_obj,
 				found_hover);
+			btn_path_pop();
 		}
+
+		// Two-phase pick (see BTN_PHASE_*): LEAVE skips the winner, ENTER
+		// processes only the winner.
+		if (g_btn_phase == BTN_PHASE_LEAVE && obj == g_btn_pick_obj) continue;
+		if (g_btn_phase == BTN_PHASE_ENTER && obj != g_btn_pick_obj) continue;
 
 		u8 old_state = obj->button_state;
 		u8 new_state = old_state;
+		int hit_now = 0;
 
 		// Check _visible and enabled on the button's MovieClip
 		int mc_visible = actionGetMCVisible(app_context, obj->instance_name, parent_mc);
@@ -5954,6 +6027,7 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				if (hit)
 				{
 					*found_hover = 1;
+					hit_now = 1;
 					if (app_context->mouse.button_down)
 						new_state = 2;
 					else
@@ -5976,6 +6050,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				new_state = 3;
 			else
 				new_state = 0;
+		}
+
+		// PICK phase: record this unit's hit, change nothing.
+		if (g_btn_phase == BTN_PHASE_PICK)
+		{
+			if (hit_now) btn_pick_offer(obj, NULL, i);
+			continue;
 		}
 
 		// When disabled: Ruffle-compatible state tracking.
@@ -6435,16 +6516,62 @@ int ng_update_button_states(SWFAppContext* app_context)
 		1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1
 	};
 
-	int found_hover = 0;
-	ng_update_button_states_in_dl(app_context,
-		display_list, max_depth,
-		identity, &root_movieclip,
-		NULL,
-		&found_hover);
-	// The root display_list above misses DefineButton2 buttons that live inside
-	// attachMovie'd / createEmptyMovieClip'd clips (e.g. N's entire menuMC UI).
-	// Walk those too, in every mode (regression avm1_attached_clip_button_click).
-	ng_update_button_states_attached(app_context, &found_hover);
+	// The root display_list misses DefineButton2 buttons that live inside
+	// attachMovie'd / createEmptyMovieClip'd clips (e.g. N's entire menuMC UI),
+	// so the attached walk covers those, in every mode (regression
+	// avm1_attached_clip_button_click). Both walks run in the three phases of
+	// BTN_PHASE_* so the topmost button wins across them and the old button's
+	// rollOut precedes the new one's rollOver (regression
+	// avm1_button_pick_order). Re-entrant: an action fired in LEAVE/ENTER that
+	// re-enters here gets a full pick of its own, then the outer state returns.
+	int saved_phase = g_btn_phase;
+	DisplayObject* saved_obj = g_btn_pick_obj;
+	MovieClip* saved_sprite = g_btn_pick_sprite;
+	int saved_key_n = g_btn_pick_key_n;
+	int saved_path_n = g_btn_path_n;
+	int saved_key[BTN_PICK_PATH_MAX];
+	int saved_path[BTN_PICK_PATH_MAX];
+	memcpy(saved_key, g_btn_pick_key, sizeof(saved_key));
+	memcpy(saved_path, g_btn_path, sizeof(saved_path));
+
+	// PICK
+	g_btn_phase = BTN_PHASE_PICK;
+	g_btn_pick_obj = NULL;
+	g_btn_pick_sprite = NULL;
+	g_btn_pick_key_n = 0;
+	int unit_hover = 0;
+	g_btn_path_n = 0;
+	btn_path_push(0);
+	ng_update_button_states_in_dl(app_context, display_list, max_depth,
+		identity, &root_movieclip, NULL, &unit_hover);
+	g_btn_path_n = 0;
+	ng_update_button_states_attached(app_context, &unit_hover);
+	int found_hover = g_btn_pick_key_n > 0;
+
+	// LEAVE: everything but the winner sees a miss (found_hover forced).
+	g_btn_phase = BTN_PHASE_LEAVE;
+	int forced = 1;
+	ng_update_button_states_in_dl(app_context, display_list, max_depth,
+		identity, &root_movieclip, NULL, &forced);
+	forced = 1;
+	ng_update_button_states_attached(app_context, &forced);
+
+	// ENTER: the winning button, with its real hit test.
+	if (g_btn_pick_obj != NULL) {
+		g_btn_phase = BTN_PHASE_ENTER;
+		int enter_hover = 0;
+		ng_update_button_states_in_dl(app_context, display_list, max_depth,
+			identity, &root_movieclip, NULL, &enter_hover);
+		ng_update_button_states_attached(app_context, &enter_hover);
+	}
+
+	g_btn_phase = saved_phase;
+	g_btn_pick_obj = saved_obj;
+	g_btn_pick_sprite = saved_sprite;
+	g_btn_pick_key_n = saved_key_n;
+	g_btn_path_n = saved_path_n;
+	memcpy(g_btn_pick_key, saved_key, sizeof(saved_key));
+	memcpy(g_btn_path, saved_path, sizeof(saved_path));
 	return found_hover;
 }
 
@@ -8519,6 +8646,34 @@ static MovieClip** attached_pass_list(int need)
 }
 #endif
 
+#ifdef OFFSCREEN_RENDER
+static void compute_mc_world_xform(SWFAppContext* app_context, MovieClip* mc, float out[16]);
+// s26 w2-attached-holder-render: OFFSCREEN membership of the post-loop
+// attached pass. Root-attached clips always. A NON-root attached clip is
+// normally drawn through ng_attachMovie's attach_registration alias in its
+// parent's sprite_display_list (tag_stubs.c, CI modes), so the pass must skip
+// it (else it draws twice). But that alias is written only when the parent has
+// a display_obj WITH a sprite_display_list. A clip attached under a holder
+// that has neither (e.g. `h = createEmptyMovieClip(); h.attachMovie(...)`) had
+// no render route at all in OFFSCREEN (white where Flash/Ruffle draw it). Admit
+// exactly that unaliased set; the chain must be live and reach _root (levels
+// are not rendered by this pass for root-attached clips either).
+static int offscreen_attached_pass_member(MovieClip* mc)
+{
+	extern MovieClip root_movieclip;
+	if (mc->parent == &root_movieclip) return 1;
+	MovieClip* p = mc->parent;
+	if (p == NULL) return 0;
+	if (p->display_obj != NULL
+	    && ((DisplayObject*)p->display_obj)->sprite_display_list != NULL)
+		return 0;                                  // aliased: drawn by the parent
+	for (MovieClip* a = p; a != &root_movieclip; a = a->parent) {
+		if (a == NULL || a->depth == INT_MIN) return 0;
+	}
+	return 1;
+}
+#endif
+
 // Re-render current display list state (for headless per-tick image capture).
 // Only does the rendering pass — no frame script processing, no sprite init, etc.
 #ifdef OFFSCREEN_RENDER
@@ -8859,7 +9014,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			MovieClip* mc = child_mc_cache[i];
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;
-			if (mc->parent != &root_movieclip) continue;
+			if (!offscreen_attached_pass_member(mc)) continue;
 			if (order != NULL) order[order_n++] = mc;
 		}
 		if (order != NULL) attached_sort_render_order(order, order_n);
@@ -8868,7 +9023,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			MovieClip* mc = (order != NULL) ? order[i] : child_mc_cache[i];
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;
-			if (mc->parent != &root_movieclip) continue;
+			if (!offscreen_attached_pass_member(mc)) continue;
 			if (mc->display_obj == NULL && mc->loaded_dl_shell == NULL) continue;
 			// AS-set _visible=false: tagShowFrame's pass skips it inside
 			// render_attached_child; this capture pass drew it anyway, so a
@@ -8889,7 +9044,21 @@ void tagRerenderFrame(SWFAppContext* app_context)
 				0.0f, 0.0f, 1.0f, 0.0f,
 				0.0f, 0.0f, 0.0f, 1.0f,
 			};
-			if (mc->as_set_flags != 0) {
+			if (mc->parent != &root_movieclip) {
+				// Unaliased nested attach (offscreen_attached_pass_member):
+				// world = parent chain x own AS transform, as
+				// render_attached_child; hidden ancestors hide it.
+				int hidden = 0;
+				for (MovieClip* a = mc->parent; a != &root_movieclip; a = a->parent)
+					if (!a->visible) { hidden = 1; break; }
+				if (hidden) continue;
+				float pw[16];
+				compute_mc_world_xform(app_context, mc->parent, pw);
+				float loc[16];
+				memcpy(loc, mc_xform, sizeof(loc));
+				apply_as_transform(loc, mc, (u8)(1|2|4|8|16));
+				hit_test_mat4_multiply(mc_xform, pw, loc);
+			} else if (mc->as_set_flags != 0) {
 				apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
 			}
 			float att_cx[20];
@@ -9177,6 +9346,26 @@ static void btn_attached_world_xform(SWFAppContext* app_context, MovieClip* mc, 
 // topmost-button semantics stay consistent. (N's main menu — menuMC built via
 // gfx.CreateSprite = buffer.attachMovie — was entirely unreachable before this,
 // so its H/S/Q/N menu clicks were dead while keyboard worked.)
+// PICK key prefix of an attached clip: level prefix (0 = under _root, as
+// attached_sort_render_order), then the AS depth of every clip from the top of
+// the chain down to `mc` itself.
+static void btn_path_set_mc_chain(MovieClip* mc)
+{
+	int chain[BTN_PICK_PATH_MAX];
+	int len = 0;
+	const MovieClip* c = mc;
+	while (c != NULL && c != &root_movieclip && len < BTN_PICK_PATH_MAX - 1) {
+		chain[len++] = c->depth;
+		if (c->parent == NULL) break;   // a _levelN root
+		c = c->parent;
+	}
+	int level = (c == &root_movieclip || c == NULL) ? 0 : 1 + (c->depth + 16384);
+	if (level != 0 && len > 0) len--;  // the level root itself
+	g_btn_path_n = 0;
+	btn_path_push(level);
+	for (int k = len - 1; k >= 0; k--) btn_path_push(chain[k]);
+}
+
 static void ng_update_button_states_attached(SWFAppContext* app_context, int* found_hover)
 {
 	extern MovieClip* child_mc_cache[];
@@ -9215,8 +9404,14 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
 #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 		g_btn_attached_walk = 1;
 #endif
+		// Two-phase pick: each attached clip is its own PICK unit (first hit
+		// in its top-down walk), keyed under the clip's depth chain.
+		int unit_hover = 0;
+		int* hover = (g_btn_phase == BTN_PHASE_PICK) ? &unit_hover : found_hover;
+		if (g_btn_phase == BTN_PHASE_PICK) btn_path_set_mc_chain(mc);
 		ng_update_button_states_in_dl(app_context, d->sprite_display_list,
-			d->sprite_max_depth, mc_xform, mc, d, found_hover);
+			d->sprite_max_depth, mc_xform, mc, d, hover);
+		g_btn_path_n = 0;
 		g_btn_attached_walk = 0;
 	}
 }
@@ -9981,11 +10176,11 @@ void tagShowFrame(SWFAppContext* app_context)
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;            // removed
 #ifdef OFFSCREEN_RENDER
-			// Graphics-native / headless keep the original root-only behavior
-			// (trace-based suites; rendering non-root attaches here is a
-			// browser-WASM-only feature, kept out of these modes to stay
-			// byte-identical). Browser-WASM falls through to the general path.
-			if (mc->parent != &root_movieclip) continue;
+			// Graphics-native: root-attached clips, plus nested attaches that
+			// have no attach_registration alias in a parent sprite_display_list
+			// (offscreen_attached_pass_member; aliased ones are drawn by their
+			// parent's recursion). Browser-WASM falls through to the general path.
+			if (!offscreen_attached_pass_member(mc)) continue;
 #else
 			// Clips parented to a timeline object were already drawn at their
 			// parent's depth by the interleave in the main render loop above.
