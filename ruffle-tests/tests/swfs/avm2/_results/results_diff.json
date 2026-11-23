@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-22T08:44:18.541737+00:00",
-    "old_git_sha": "513653e94312a0296c2b5629517360f1231ea3bb",
-    "new_timestamp": "2026-11-22T23:31:11.628318+00:00",
-    "new_git_sha": "697669e5f98fdfdf0174f666cfcf8d722efe7198",
+    "old_timestamp": "2026-11-22T23:31:11.628318+00:00",
+    "old_git_sha": "697669e5f98fdfdf0174f666cfcf8d722efe7198",
+    "new_timestamp": "2026-11-23T02:55:02.067427+00:00",
+    "new_git_sha": "876e6670414ebd2a81c5dd234f3e46645b3886cf",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 1281,
+    "old_pass": 1284,
     "old_ruffle_matched": 45,
-    "old_effective_pass": 1326,
-    "old_total": 1336,
+    "old_effective_pass": 1329,
+    "old_total": 1339,
     "old_pass_rate": 95.9,
     "new_pass": 1284,
     "new_ruffle_matched": 45,
@@ -25,46 +25,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 1336,
-    "added": 3,
+    "unchanged": 1339,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "local_connection_allow_networking",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "pixelbender_shaderjob_output_channels",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
-      }
-    },
-    {
-      "test": "textblock_recreate_text_line_width",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    }
-  ]
+  "changes": []
 }
