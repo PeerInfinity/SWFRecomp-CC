@@ -866,18 +866,15 @@ jobs:
           # gotoFrame2Test (misc-ming) and gotoFrameFromInterval2 (misc-swfc)
           # were excluded as "hanging" in 4b79110d6; both are now fixed and
           # grade PASS / ruffle_matched, so they are no longer excluded.
-          # gotoFrameFromInterval (no "2") stays excluded: it is a
-          # known_failure runaway where both we AND Ruffle diverge from Flash
-          # (Ruffle's own output.ruffle.txt is an unbounded runaway). It hangs
-          # to the 30s per-test timeout with no pass-rate upside, so grading it
-          # would only burn ~30s of CI per run. See
-          # ruffle-tests/tests/swfs/_investigation/NEW_UPSTREAM_TESTS_TRIAGE.md.
+          # gotoFrameFromInterval (no "2") was excluded as a runaway until s26:
+          # its 0.0001 ms setInterval now coerces to int32 and runs on the Ruffle
+          # timer clock (w2-robustness-land + w2-timer-semantics), so it finishes
+          # in < 1 s and grades ruffle_matched (known_failure upstream).
           python3 ruffle-tests/verify_output.py -v \
             --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_SWFC_DIR" \
             --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
-            --shard="$SHARD" $IMAGE_ARGS \
-            --exclude=gotoFrameFromInterval || true
+            --shard="$SHARD" $IMAGE_ARGS || true
 
       - name: Upload Gnash results
         if: always()

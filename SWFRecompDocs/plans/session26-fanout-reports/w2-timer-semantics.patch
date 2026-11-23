@@ -1,0 +1,771 @@
+diff --git a/SWFModernRuntime/src/actionmodern/timer.c b/SWFModernRuntime/src/actionmodern/timer.c
+index e37fe8642..ae5fa7802 100644
+--- a/SWFModernRuntime/src/actionmodern/timer.c
++++ b/SWFModernRuntime/src/actionmodern/timer.c
+@@ -27,8 +27,11 @@ typedef struct {
+ 	int active;                // 0 = empty slot, 1 = active
+ 	int id;                    // sequential ID (1, 2, 3, ...)
+ 	int is_interval;           // 1 = repeating (setInterval), 0 = one-shot (setTimeout)
+-	double delay_ms;           // delay in milliseconds
+-	double elapsed_ms;         // accumulated time since last fire (or since creation)
++	// Clock model (s26 w2-timer-semantics): Ruffle core/src/timer.rs.
++	// tick_us is the absolute due time on g_timer_cur_us (microseconds);
++	// interval_us = max(int32 delay, TIMER_MIN_INTERVAL_MS) * 1000.
++	uint64_t tick_us;
++	uint64_t interval_us;
+ 
+ 	// Callback — either function-form or method-form
+ 	int is_method;             // 0 = function, 1 = method on object
+@@ -44,6 +47,37 @@ typedef struct {
+ static TimerEntry g_timers[MAX_TIMERS];
+ static int g_next_timer_id = 1;
+ 
++// Timer clock (s26 w2-timer-semantics). A port of Ruffle's Timers
++// (core/src/timer.rs), which is what the corpus goldens agree with:
++// * the clock is an integer microsecond counter advanced once per
++//   processTimers call by (u64)(frame_ms * 1000) (Timers::update_timers,
++//   TIMER_SCALE = 1000);
++// * a timer created at clock C with int32 delay d is due at
++//   C + max(d, 10) * 1000 (add_timer, MIN_INTERVAL = 10 ms) — so a 0 /
++//   negative / NaN delay is a 10 ms timer, and setInterval(f, 0) REPEATS
++//   (it used to fire once and then deactivate);
++// * a timer fires while its due time is STRICTLY before the clock, earliest
++//   due time first; a repeating timer then moves its due time forward by one
++//   interval (catch-up: several fires in one update are possible);
++// * at most TIMER_MAX_TICKS (10) fires per update in total; on the 11th the
++//   clock is pulled back to just before that timer (tick - 100 us) and the
++//   update ends (MAX_TICKS);
++// * a timer created inside a callback is due >= 10 ms after the CURRENT
++//   clock, so it never fires in the update that created it.
++// Ties on the due time fire in id (creation) order; Ruffle's BinaryHeap
++// order for ties is a heap-layout accident (it alternates 1,2,2,1,... for
++// two equal intervals), so creation order is the deliberate choice here.
++#define TIMER_MIN_INTERVAL_MS 10
++#define TIMER_MAX_TICKS 10
++static uint64_t g_timer_cur_us = 0;
++
++static uint64_t timerIntervalUs(double delay_int32)
++{
++	int32_t d = (int32_t) delay_int32;
++	if (d < TIMER_MIN_INTERVAL_MS) d = TIMER_MIN_INTERVAL_MS;
++	return (uint64_t) d * 1000u;
++}
++
+ // ASFunction globals for the 4 top-level timer builtins. Populated by
+ // initTimerFunctions() on first accessor use.
+ static ASFunction g_setInterval_func;
+@@ -74,6 +108,25 @@ static double timerCoerceToNumber(SWFAppContext* app_context, ActionVar* v)
+ 	return NAN;
+ }
+ 
++// The delay is an int32 millisecond count: Ruffle coerces it with
++// coerce_to_i32 (avm1/globals.rs create_timer), i.e. ECMA ToInt32 — NaN/Inf
++// -> 0, truncate toward zero, wrap mod 2^32. Keeping the raw double let a
++// sub-millisecond delay (gnash misc-swfc gotoFrameFromInterval: 0.0001 ms)
++// fire up to processTimers' 10000-iteration safety limit EVERY tick; that
++// test's callback appends to a string each fire, so the run grew memory
++// quadratically until the OOM killer took it (~17 s). As an int it is 0, i.e.
++// a 10 ms timer under the clock model above (s26 w2-robustness-land; the
++// zero-delay fire-once arm it originally fell into was replaced by
++// s26 w2-timer-semantics).
++static double timerDelayToInt32(double d)
++{
++	if (isnan(d) || isinf(d)) return 0.0;
++	d = trunc(d);
++	double m = fmod(d, 4294967296.0);
++	if (m < 0) m += 4294967296.0;
++	return (double) (int32_t) (uint32_t) m;
++}
++
+ static int timerIsString(ActionVar* v)
+ {
+ 	return v->type == ACTION_STACK_VALUE_STRING;
+@@ -174,8 +227,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
+ 			pushUndefined(app_context);
+ 			return;
+ 		}
+-		double delay = timerCoerceToNumber(app_context, &args[2]);
+-		if (isnan(delay)) delay = 0.0;
++		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[2]));
+ 
+ 		// Find empty slot
+ 		int slot = -1;
+@@ -196,8 +248,8 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
+ 		t->active = 1;
+ 		t->id = g_next_timer_id++;
+ 		t->is_interval = is_interval;
+-		t->delay_ms = delay;
+-		t->elapsed_ms = 0.0;
++		t->interval_us = timerIntervalUs(delay);
++		t->tick_us = g_timer_cur_us + t->interval_us;
+ 		t->is_method = 1;
+ 		t->object = args[0]; // shallow copy (object pointer)
+ 		strncpy(t->method_name, method_buf, sizeof(t->method_name) - 1);
+@@ -234,8 +286,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
+ 			pushUndefined(app_context);
+ 			return;
+ 		}
+-		double delay = timerCoerceToNumber(app_context, &args[1]);
+-		if (isnan(delay)) delay = 0.0;
++		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[1]));
+ 
+ 		// Find empty slot
+ 		int slot = -1;
+@@ -256,8 +307,8 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
+ 		t->active = 1;
+ 		t->id = g_next_timer_id++;
+ 		t->is_interval = is_interval;
+-		t->delay_ms = delay;
+-		t->elapsed_ms = 0.0;
++		t->interval_us = timerIntervalUs(delay);
++		t->tick_us = g_timer_cur_us + t->interval_us;
+ 		t->is_method = 0;
+ 		t->func = args[0]; // shallow copy (function pointer)
+ 
+@@ -451,61 +502,75 @@ static void fireTimerCallback(SWFAppContext* app_context, TimerEntry* t)
+ // frame_duration_ms = 1000.0 / fps
+ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ {
+-	// Advance all timers by frame_duration_ms
++	// Ruffle Timers::update_timers: advance the clock first (also when no
++	// timer is active, so a later timer is scheduled against the real time).
++	g_timer_cur_us += (uint64_t) (frame_duration_ms * 1000.0);
++
++	// Method-form timers whose target clip was removed can never fire
++	// again (Ruffle cancels them when they come due, below); drop them now
++	// as before so they do not keep hasActiveTimers() — the headless exit
++	// condition — true until their due time.
+ 	for (int i = 0; i < MAX_TIMERS; i++)
+ 	{
+-		if (g_timers[i].active)
+-			g_timers[i].elapsed_ms += frame_duration_ms;
++		if (!g_timers[i].active || !g_timers[i].is_method ||
++		    g_timers[i].object.type != ACTION_STACK_VALUE_MOVIECLIP) continue;
++		MovieClip* tmc = (MovieClip*)(uintptr_t)g_timers[i].object.data.numeric_value;
++		if (tmc == NULL || tmc->depth == INT_MIN) g_timers[i].active = 0;
+ 	}
+ 
+-	// Fire eligible timers. May fire multiple times per frame if delay is short.
+-	// Fire lowest ID first when multiple timers are ready at the same time.
+-	int fired_any;
+-	int iteration_limit = 10000; // safety limit to prevent infinite loops
+-	do {
+-		fired_any = 0;
+-		if (--iteration_limit <= 0) break;
+-
++	int tick_count = 0;
++	for (;;)
++	{
++		// Earliest due active timer (ties: lowest id = creation order).
++		int best = -1;
+ 		for (int i = 0; i < MAX_TIMERS; i++)
+ 		{
+ 			if (!g_timers[i].active) continue;
++			if (best < 0 || g_timers[i].tick_us < g_timers[best].tick_us ||
++			    (g_timers[i].tick_us == g_timers[best].tick_us && g_timers[i].id < g_timers[best].id))
++				best = i;
++		}
++		if (best < 0 || !(g_timers[best].tick_us < g_timer_cur_us)) break;
+ 
+-			// Deactivate method-form timers whose target MC has been removed
+-			if (g_timers[i].is_method && g_timers[i].object.type == ACTION_STACK_VALUE_MOVIECLIP) {
+-				MovieClip* tmc = (MovieClip*)(uintptr_t)g_timers[i].object.data.numeric_value;
+-				if (tmc == NULL || tmc->depth == INT_MIN) {
+-					g_timers[i].active = 0;
+-					continue;
+-				}
+-			}
++		TimerEntry* t = &g_timers[best];
++		if (++tick_count > TIMER_MAX_TICKS)
++		{
++			g_timer_cur_us = t->tick_us - 100;
++			break;
++		}
+ 
+-			if (g_timers[i].elapsed_ms < g_timers[i].delay_ms) continue;
++		// A method-form timer whose target clip was removed is cancelled at
++		// fire time without a call (Ruffle: avm1_removed() -> cancel_timer).
++		int cancel = 0;
++		if (t->is_method && t->object.type == ACTION_STACK_VALUE_MOVIECLIP)
++		{
++			MovieClip* tmc = (MovieClip*)(uintptr_t)t->object.data.numeric_value;
++			if (tmc == NULL || tmc->depth == INT_MIN) cancel = 1;
++		}
+ 
+-			// Fire this timer's callback
+-			fireTimerCallback(app_context, &g_timers[i]);
+-			fired_any = 1;
++		int expected_id = t->id;
++		if (!cancel)
++		{
++			fireTimerCallback(app_context, t);
+ 
++			// Ruffle runs Player::run_actions after every callback.
+ 			// Fire deferred onChanged from replaceSel (if any)
+ 			actionFlushPendingOnChanged(app_context);
+-
+ 			// Flush pending onLoads queued by attachMovie during this timer callback
+ 			actionFlushPendingOnLoads(app_context);
++		}
+ 
+-			if (g_timers[i].is_interval)
+-			{
+-				// Repeating: subtract one delay period
+-				g_timers[i].elapsed_ms -= g_timers[i].delay_ms;
+-				// If delay is 0, prevent infinite loop
+-				if (g_timers[i].delay_ms <= 0) g_timers[i].active = 0;
+-			}
++		// The callback may have cleared this timer (or cleared it and a new
++		// one reused the slot): only reschedule the entry it fired.
++		if (t->active && t->id == expected_id)
++		{
++			if (!t->is_interval || cancel)
++				t->active = 0;
+ 			else
+-			{
+-				// One-shot: deactivate
+-				g_timers[i].active = 0;
+-			}
+-			break; // Re-scan from beginning (firing may have cleared other timers)
++				t->tick_us += t->interval_us;
+ 		}
+-	} while (fired_any);
++		if (g_execution_halted) break;
++	}
+ }
+ 
+ // Check if any timers are active
+diff --git a/ruffle-tests/tests/swfs/regression/README.md b/ruffle-tests/tests/swfs/regression/README.md
+index 9411eb9bd..98348862c 100644
+--- a/ruffle-tests/tests/swfs/regression/README.md
++++ b/ruffle-tests/tests/swfs/regression/README.md
+@@ -147,3 +147,4 @@ arms cannot be reached any other way.
+ | `avm1_po3_color_matrix_live_clear` | `mc.filters = []` drops the live authored chain; Ruffle render pixel-identical |
+ | `avm1_jpeg3_alpha_bitmap` | **DefineBitsJPEG3 colour with an alpha plane is premultiplied: clamp to alpha + un-premultiply at emit** (s26 `w2-text-cx-jpeg3`). Golden = Ruffle exporter `0ddd12b6a` render (our lavapipe render within max 1, tol 3) |
+ | `avm1_edittext_placed_cxform_script` | EditText colour transform, the script/wrapper path: trace lock (`s1.f=II` …), Ruffle trace identical. The image twin is held (border-corner residual) |
++| `avm1_timer_clock_model` | **the AVM1 timer clock is Ruffle's `core/src/timer.rs` model** (s26 `w2-timer-semantics`): 0/negative delay = 10 ms floor and `setInterval(f, 0)` REPEATS, earliest-due-first firing (not slot order), strict `tick < clock` (a 100 ms timeout at 10 fps fires in the 2nd update), a timer created in a callback waits for the next update, ≤ 10 fires per update. Golden analytic (Ruffle-source simulation incl. BinaryHeap tie order); Ruffle test-runner confirmation requested |
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/avm1asm.py
+new file mode 100644
+index 000000000..3e9c9b49d
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/create_test_swf.py
+new file mode 100644
+index 000000000..55e0a77eb
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/create_test_swf.py
+@@ -0,0 +1,91 @@
++#!/usr/bin/env python3
++"""avm1_timer_clock_model: the AVM1 setInterval/setTimeout clock (processTimers
++/ actionTimerSetInterval in SWFModernRuntime/src/actionmodern/timer.c), at
++10 fps (100 ms frames, so every delay boundary is exact):
++
++  F1  setInterval(fz, 0)            a 0 delay REPEATS (10 ms floor): 3 fires in
++                                    the first update, then fz clears itself
++  F2  setInterval(fa, 30), setTimeout(fb, 20), setTimeout(fe, 100)
++                                    earliest due time first (b@20 before
++                                    a@30,60,90 — not slot/creation order);
++                                    e@100 is NOT due in the update whose clock
++                                    reaches exactly 100 ms (strict <) -> F3;
++                                    fb's setTimeout(fn, 0) is created against
++                                    the current clock, so it fires next update
++  F4  setInterval(fc, 10), setInterval(fc, 13)
++                                    16 fires are due per update; at most 10
++                                    run (Ruffle MAX_TICKS) -> cnt=10 each frame
++  F7  clears both; F8 sees cnt=0.
++
++s26 w2-timer-semantics. GOLDEN IS ANALYTIC (Ruffle-source-derived; the Ruffle
++exporter never fires timers): core/src/timer.rs Timers::update_timers /
++add_timer (MIN_INTERVAL 10, MAX_TICKS 10, TIMER_SCALE 1000, `tick_time <
++cur_time`), avm1/globals.rs create_timer (coerce_to_i32), tests/framework
++runner.rs (run_frame then update_timers(frame_time) per tick). Computed by a
++line-for-line simulation of that model INCLUDING std BinaryHeap tie order
++(the fixture has no observable ties). A Ruffle test-runner confirmation is
++requested under LOCAL ORACLE REQUESTS in
++SWFRecompDocs/plans/session26-fanout-reports/w2-timer-semantics-report.md.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from avm1asm import *  # noqa
++
++T = trace_concat
++FRAME = get('_root._currentframe')
++
++
++def setroot(name, code):
++    """_root.name = <code>"""
++    return push('_root') + GETVAR + push(name) + code + SETMEM
++
++
++def incr(name):
++    return setroot(name, get('_root.' + name) + push(1) + ADD2)
++
++
++def clear(name):
++    return get('_root.' + name) + push(1, 'clearInterval') + CALLF + POP
++
++
++def if_eq(name, val, body):
++    # if (_root.name == val) body   (If jumps over body when NOT equal)
++    cond = get('_root.' + name) + push(val) + EQ2 + op(0x12)  # Not
++    return cond + op(0x9d, struct.pack('<h', len(body))) + body
++
++
++def start(var, kind, fn, delay):
++    """_root.var = kind(fn, delay)   (var None: discard the id)"""
++    call = push(delay) + fn + push(2, kind) + CALLF
++    return setroot(var, call) if var else call + POP
++
++
++fz = deffunc1('', [], incr('zn') + T('z', get('_root.zn'), ' f', FRAME) + if_eq('zn', 3, clear('z')))
++fa = deffunc1('', [], incr('an') + T('a', get('_root.an'), ' f', FRAME) + if_eq('an', 4, clear('a')))
++fn = deffunc1('', [], T('n f', FRAME))
++fb = deffunc1('', [], T('b f', FRAME) + start(None, 'setTimeout', fn, 0))
++fe = deffunc1('', [], T('e f', FRAME))
++fc = deffunc1('', [], incr('cnt'))
++
++
++def cnt_frame(n, extra=b''):
++    return T('F%d cnt=' % n, get('_root.cnt')) + setroot('cnt', push(0)) + extra
++
++
++frames = [
++    T('F1') + setroot('zn', push(0)) + start('z', 'setInterval', fz, 0),
++    T('F2') + setroot('an', push(0)) + start('a', 'setInterval', fa, 30)
++    + start(None, 'setTimeout', fb, 20) + start(None, 'setTimeout', fe, 100),
++    T('F3'),
++    T('F4') + setroot('cnt', push(0)) + start('c1', 'setInterval', fc, 10) + start('c2', 'setInterval', fc, 13),
++    cnt_frame(5),
++    cnt_frame(6),
++    cnt_frame(7, clear('c1') + clear('c2')),
++    cnt_frame(8),
++    T('F9 end') + STOP,
++]
++open(sys.argv[1], 'wb').write(swf(7, b'', [doaction(f) for f in frames], fps=10))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/golden_scenario.py b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/golden_scenario.py
+new file mode 100644
+index 000000000..5ad2c39dc
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/golden_scenario.py
+@@ -0,0 +1,32 @@
++"""Prints the avm1_timer_clock_model trace under three timer models (ruffle =
++core/src/timer.rs incl. std BinaryHeap tie order -> output.txt; ours_new = this
++patch; ours_old = pre-patch processTimers). Usage: python3 golden_scenario.py"""
++import sys; import os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from ruffle_timer_sim import run
++def V(p,k,d=0): return p.vars.get(k,d)
++def fz(p):
++    p.vars['zn']=V(p,'zn')+1; p.trace('z%d f%d'%(p.vars['zn'],p.frame))
++    if p.vars['zn']==3: p.clear(p.vars['z'])
++def fa(p):
++    p.vars['an']=V(p,'an')+1; p.trace('a%d f%d'%(p.vars['an'],p.frame))
++    if p.vars['an']==4: p.clear(p.vars['a'])
++def fn2(p): p.trace('n f%d'%p.frame)
++def fb(p):
++    p.trace('b f%d'%p.frame); p.add(fn2,0,True)
++def fe(p): p.trace('e f%d'%p.frame)
++def fc(p): p.vars['cnt']=V(p,'cnt')+1
++def F1(p): p.trace('F1'); p.vars['z']=p.add(fz,0,False)
++def F2(p):
++    p.trace('F2'); p.vars['a']=p.add(fa,30,False); p.add(fb,20,True); p.add(fe,100,True)
++def F3(p): p.trace('F3')
++def F4(p):
++    p.trace('F4'); p.vars['cnt']=0; p.vars['c1']=p.add(fc,10,False); p.vars['c2']=p.add(fc,13,False)
++def Fcnt(n,clear=False):
++    def f(p):
++        p.trace('F%d cnt=%d'%(n,V(p,'cnt'))); p.vars['cnt']=0
++        if clear: p.clear(p.vars['c1']); p.clear(p.vars['c2'])
++    return f
++frames={1:F1,2:F2,3:F3,4:F4,5:Fcnt(5),6:Fcnt(6),7:Fcnt(7,True),8:Fcnt(8),9:lambda p:p.trace('F9 end')}
++for m in ['ruffle','ours_new','ours_old']:
++    o=run(m,frames,9)
++    print('==',m); print('\n'.join(o))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/output.txt b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/output.txt
+new file mode 100644
+index 000000000..521b13fe1
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/output.txt
+@@ -0,0 +1,19 @@
++F1
++z1 f1
++z2 f1
++z3 f1
++F2
++b f2
++a1 f2
++a2 f2
++a3 f2
++F3
++e f3
++n f3
++a4 f3
++F4
++F5 cnt=10
++F6 cnt=10
++F7 cnt=10
++F8 cnt=0
++F9 end
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/ruffle_timer_sim.py b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/ruffle_timer_sim.py
+new file mode 100644
+index 000000000..3e139d884
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/ruffle_timer_sim.py
+@@ -0,0 +1,136 @@
++"""Simulator of timer models for the avm1_timer_clock_model fixture.
++model='ruffle'  : core/src/timer.rs incl. std BinaryHeap tie order
++model='ours_new': id-ordered ties (the patch)
++model='ours_old': origin/master processTimers (elapsed>=delay, slot order, 0-delay fires once)
++"""
++import sys
++FPS=10
++FRAME_MS=1000.0/FPS
++
++class RHeap:  # Rust std BinaryHeap (max-heap on key; key = -tick)
++    def __init__(s): s.d=[]
++    def gt(s,a,b): return a['tick']<b['tick']   # a > b in reversed ord
++    def le(s,a,b): return not s.gt(a,b)
++    def sift_up(s,start,pos):
++        el=s.d[pos]
++        while pos>start:
++            par=(pos-1)//2
++            if s.le(el,s.d[par]): break
++            s.d[pos]=s.d[par]; pos=par
++        s.d[pos]=el; return pos
++    def sift_down_range(s,pos,end):
++        el=s.d[pos]; child=2*pos+1
++        while child<=end-2 if end>=2 else False:
++            child+= 1 if s.le(s.d[child],s.d[child+1]) else 0
++            if not s.gt(s.d[child],el) and True:
++                # hole.element() >= hole.get(child) -> return
++                if not s.gt(s.d[child],el): s.d[pos]=el; return
++            s.d[pos]=s.d[child]; pos=child; child=2*pos+1
++        if child==end-1 and s.gt(s.d[child],el):
++            s.d[pos]=s.d[child]; pos=child
++        s.d[pos]=el
++    def push(s,x): s.d.append(x); s.sift_up(0,len(s.d)-1)
++    def peek(s): return s.d[0] if s.d else None
++    def pop(s):
++        item=s.d.pop()
++        if s.d:
++            item,s.d[0]=s.d[0],item
++            # sift_down_to_bottom(0)
++            end=len(s.d); pos=0; el=s.d[0]; child=1
++            while end>=2 and child<=end-2:
++                child+= 1 if s.le(s.d[child],s.d[child+1]) else 0
++                s.d[pos]=s.d[child]; pos=child; child=2*pos+1
++            if child==end-1: s.d[pos]=s.d[child]; pos=child
++            s.d[pos]=el
++            s.sift_up(0,pos)
++        return item
++    def peek_mut_done(s): s.sift_down_range(0,len(s.d))
++    def retain(s,f):
++        n=len(s.d); rb=n; i=0; nd=[]
++        for e in s.d:
++            if not f(e) and i<rb: rb=i
++            elif f(e): nd.append(e)
++            i+=1
++        s.d=nd
++        if rb==len(s.d): return
++        tail=len(s.d)-rb
++        import math
++        if rb<tail: better=True
++        else: better= 2*len(s.d) < tail*int(math.log2(rb))
++        if better:
++            k=len(s.d)//2
++            while k>0:
++                k-=1; s.sift_down_range(k,len(s.d))
++        else:
++            for j in range(rb,len(s.d)): s.sift_up(0,j)
++    def __len__(s): return len(s.d)
++    def ids(s): return [t['id'] for t in s.d]
++
++class Player:
++    def __init__(s,model):
++        s.model=model; s.cur=0; s.nid=0; s.out=[]; s.vars={}
++        s.heap=RHeap(); s.list=[]   # list for ours models (slot order)
++        s.frame=0
++    def add(s,cb,delay,timeout):
++        s.nid+=1; i=s.nid
++        if s.model=='ours_old':
++            s.list.append(dict(id=i,cb=cb,delay=float(delay),el=0.0,timeout=timeout))
++        else:
++            iv=max(int(delay),10)*1000
++            t=dict(id=i,cb=cb,tick=s.cur+iv,iv=iv,timeout=timeout)
++            if s.model=='ruffle': s.heap.push(t)
++            else: s.list.append(t)
++        return i
++    def clear(s,i):
++        if s.model=='ruffle': s.heap.retain(lambda t:t['id']!=i)
++        else: s.list=[t for t in s.list if t['id']!=i]
++    def update(s):
++        if s.model=='ours_old':
++            for t in s.list: t['el']+=FRAME_MS
++            lim=10000
++            while True:
++                lim-=1
++                if lim<=0: break
++                fired=False
++                for t in list(s.list):
++                    if t not in s.list: continue
++                    if t['el']<t['delay']: continue
++                    t['cb'](s); fired=True
++                    if t in s.list:
++                        if not t['timeout']:
++                            t['el']-=t['delay']
++                            if t['delay']<=0: s.list.remove(t)
++                        else: s.list.remove(t)
++                    break
++                if not fired: break
++            return
++        s.cur+=int(FRAME_MS*1000)
++        ticks=0
++        while True:
++            if s.model=='ruffle':
++                t=s.heap.peek()
++            else:
++                t=min(s.list,key=lambda x:(x['tick'],x['id'])) if s.list else None
++            if t is None or not (t['tick']<s.cur): break
++            ticks+=1
++            if ticks>10: s.cur=t['tick']-100; break
++            eid=t['id']; t['cb'](s)
++            if s.model=='ruffle':
++                if not len(s.heap): break
++                top=s.heap.peek()
++                if top['id']==eid:
++                    if top['timeout']: s.heap.pop()
++                    else: top['tick']+=top['iv']; s.heap.peek_mut_done()
++            else:
++                if t in s.list:
++                    if t['timeout']: s.list.remove(t)
++                    else: t['tick']+=t['iv']
++    def trace(s,x): s.out.append(x)
++
++def run(model, frames, nframes):
++    p=Player(model)
++    for f in range(1,nframes+1):
++        p.frame=f
++        if f in frames: frames[f](p)
++        p.update()
++    return p.out
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/test.swf b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb4182f25a09401ac18b09df27c58da977b847bc
+GIT binary patch
+literal 1507
+zcmcJP&q~8U5XL{7me_)pmVzK6Jr%)I>;FTkpfvQ-9uz!EOt&Dksl>DgPd>$Z5W)8l
+zd>Nm@Q=Q#3>843UBlecr-S3<E%}m=@7y3sIxI^(3czZ-4kMk1fcb1vWW-V=V1>jkr
+zT}O@Uz_l|TyVw$;2OB&GiUB?KNTZ|R<e9{Qcc>TUZzF15AxC~NdfXF<UNMAobpS&Z
+zEK*+9#BrGI4jgmD&^2O`mGY#EPWdH+-B3!>uFET)Kdd1$osR7?XKD`7+~8&C8BxeR
+za~I(rPSMh`bRY>eB81FjLZ&3NO_B+O#M^NB6j>rfBGD^p3HkEGH-V5z{=Xz7I$8;e
+zoQk4xL+w-Zj_uxjusk?B@}2#Yccn$6E^kL{JaI+);-loz4|4N7SZWWNg}f%`U=KAp
+z7@wpq1N-5@AOx1}1{)IE9fEJw<xwHXjJ}mF`>&%RbvWYZRn-wr4e7M@4^9$5O905z
+zf5$<U3U0=gv9zduar5qb3l_*6{z>M^&*mtt%rd_Ecl)69$3vaGJ7HMIY11Q_b&anQ
+O?~^LC`>5#@0lol;@kOct
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/test.toml b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/test.toml
+new file mode 100644
+index 000000000..b0e417313
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_timer_clock_model/test.toml
+@@ -0,0 +1 @@
++num_frames = 12

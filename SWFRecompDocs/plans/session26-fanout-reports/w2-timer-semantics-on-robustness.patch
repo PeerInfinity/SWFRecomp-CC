@@ -1,0 +1,202 @@
+--- a/SWFModernRuntime/src/actionmodern/timer.c	2026-11-23 04:39:12.261631738 +0000
++++ b/SWFModernRuntime/src/actionmodern/timer.c	2026-11-23 04:42:31.452004930 +0000
+@@ -27,8 +27,11 @@
+ 	int active;                // 0 = empty slot, 1 = active
+ 	int id;                    // sequential ID (1, 2, 3, ...)
+ 	int is_interval;           // 1 = repeating (setInterval), 0 = one-shot (setTimeout)
+-	double delay_ms;           // delay in milliseconds
+-	double elapsed_ms;         // accumulated time since last fire (or since creation)
++	// Clock model (s26 w2-timer-semantics): Ruffle core/src/timer.rs.
++	// tick_us is the absolute due time on g_timer_cur_us (microseconds);
++	// interval_us = max(int32 delay, TIMER_MIN_INTERVAL_MS) * 1000.
++	uint64_t tick_us;
++	uint64_t interval_us;
+ 
+ 	// Callback — either function-form or method-form
+ 	int is_method;             // 0 = function, 1 = method on object
+@@ -44,6 +47,37 @@
+ static TimerEntry g_timers[MAX_TIMERS];
+ static int g_next_timer_id = 1;
+ 
++// Timer clock (s26 w2-timer-semantics). A port of Ruffle's Timers
++// (core/src/timer.rs), which is what the corpus goldens agree with:
++// * the clock is an integer microsecond counter advanced once per
++//   processTimers call by (u64)(frame_ms * 1000) (Timers::update_timers,
++//   TIMER_SCALE = 1000);
++// * a timer created at clock C with int32 delay d is due at
++//   C + max(d, 10) * 1000 (add_timer, MIN_INTERVAL = 10 ms) — so a 0 /
++//   negative / NaN delay is a 10 ms timer, and setInterval(f, 0) REPEATS
++//   (it used to fire once and then deactivate);
++// * a timer fires while its due time is STRICTLY before the clock, earliest
++//   due time first; a repeating timer then moves its due time forward by one
++//   interval (catch-up: several fires in one update are possible);
++// * at most TIMER_MAX_TICKS (10) fires per update in total; on the 11th the
++//   clock is pulled back to just before that timer (tick - 100 us) and the
++//   update ends (MAX_TICKS);
++// * a timer created inside a callback is due >= 10 ms after the CURRENT
++//   clock, so it never fires in the update that created it.
++// Ties on the due time fire in id (creation) order; Ruffle's BinaryHeap
++// order for ties is a heap-layout accident (it alternates 1,2,2,1,... for
++// two equal intervals), so creation order is the deliberate choice here.
++#define TIMER_MIN_INTERVAL_MS 10
++#define TIMER_MAX_TICKS 10
++static uint64_t g_timer_cur_us = 0;
++
++static uint64_t timerIntervalUs(double delay_int32)
++{
++	int32_t d = (int32_t) delay_int32;
++	if (d < TIMER_MIN_INTERVAL_MS) d = TIMER_MIN_INTERVAL_MS;
++	return (uint64_t) d * 1000u;
++}
++
+ // ASFunction globals for the 4 top-level timer builtins. Populated by
+ // initTimerFunctions() on first accessor use.
+ static ASFunction g_setInterval_func;
+@@ -80,8 +114,10 @@
+ // sub-millisecond delay (gnash misc-swfc gotoFrameFromInterval: 0.0001 ms)
+ // fire up to processTimers' 10000-iteration safety limit EVERY tick; that
+ // test's callback appends to a string each fire, so the run grew memory
+-// quadratically until the OOM killer took it (~17 s). As an int it is 0 and
+-// takes the existing zero-delay arm below (s26 w2-robustness-land).
++// quadratically until the OOM killer took it (~17 s). As an int it is 0, i.e.
++// a 10 ms timer under the clock model above (s26 w2-robustness-land; the
++// zero-delay fire-once arm it originally fell into was replaced by
++// s26 w2-timer-semantics).
+ static double timerDelayToInt32(double d)
+ {
+ 	if (isnan(d) || isinf(d)) return 0.0;
+@@ -212,8 +248,8 @@
+ 		t->active = 1;
+ 		t->id = g_next_timer_id++;
+ 		t->is_interval = is_interval;
+-		t->delay_ms = delay;
+-		t->elapsed_ms = 0.0;
++		t->interval_us = timerIntervalUs(delay);
++		t->tick_us = g_timer_cur_us + t->interval_us;
+ 		t->is_method = 1;
+ 		t->object = args[0]; // shallow copy (object pointer)
+ 		strncpy(t->method_name, method_buf, sizeof(t->method_name) - 1);
+@@ -271,8 +307,8 @@
+ 		t->active = 1;
+ 		t->id = g_next_timer_id++;
+ 		t->is_interval = is_interval;
+-		t->delay_ms = delay;
+-		t->elapsed_ms = 0.0;
++		t->interval_us = timerIntervalUs(delay);
++		t->tick_us = g_timer_cur_us + t->interval_us;
+ 		t->is_method = 0;
+ 		t->func = args[0]; // shallow copy (function pointer)
+ 
+@@ -466,61 +502,75 @@
+ // frame_duration_ms = 1000.0 / fps
+ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
+ {
+-	// Advance all timers by frame_duration_ms
++	// Ruffle Timers::update_timers: advance the clock first (also when no
++	// timer is active, so a later timer is scheduled against the real time).
++	g_timer_cur_us += (uint64_t) (frame_duration_ms * 1000.0);
++
++	// Method-form timers whose target clip was removed can never fire
++	// again (Ruffle cancels them when they come due, below); drop them now
++	// as before so they do not keep hasActiveTimers() — the headless exit
++	// condition — true until their due time.
+ 	for (int i = 0; i < MAX_TIMERS; i++)
+ 	{
+-		if (g_timers[i].active)
+-			g_timers[i].elapsed_ms += frame_duration_ms;
++		if (!g_timers[i].active || !g_timers[i].is_method ||
++		    g_timers[i].object.type != ACTION_STACK_VALUE_MOVIECLIP) continue;
++		MovieClip* tmc = (MovieClip*)(uintptr_t)g_timers[i].object.data.numeric_value;
++		if (tmc == NULL || tmc->depth == INT_MIN) g_timers[i].active = 0;
+ 	}
+ 
+-	// Fire eligible timers. May fire multiple times per frame if delay is short.
+-	// Fire lowest ID first when multiple timers are ready at the same time.
+-	int fired_any;
+-	int iteration_limit = 10000; // safety limit to prevent infinite loops
+-	do {
+-		fired_any = 0;
+-		if (--iteration_limit <= 0) break;
+-
++	int tick_count = 0;
++	for (;;)
++	{
++		// Earliest due active timer (ties: lowest id = creation order).
++		int best = -1;
+ 		for (int i = 0; i < MAX_TIMERS; i++)
+ 		{
+ 			if (!g_timers[i].active) continue;
++			if (best < 0 || g_timers[i].tick_us < g_timers[best].tick_us ||
++			    (g_timers[i].tick_us == g_timers[best].tick_us && g_timers[i].id < g_timers[best].id))
++				best = i;
++		}
++		if (best < 0 || !(g_timers[best].tick_us < g_timer_cur_us)) break;
+ 
+-			// Deactivate method-form timers whose target MC has been removed
+-			if (g_timers[i].is_method && g_timers[i].object.type == ACTION_STACK_VALUE_MOVIECLIP) {
+-				MovieClip* tmc = (MovieClip*)(uintptr_t)g_timers[i].object.data.numeric_value;
+-				if (tmc == NULL || tmc->depth == INT_MIN) {
+-					g_timers[i].active = 0;
+-					continue;
+-				}
+-			}
++		TimerEntry* t = &g_timers[best];
++		if (++tick_count > TIMER_MAX_TICKS)
++		{
++			g_timer_cur_us = t->tick_us - 100;
++			break;
++		}
+ 
+-			if (g_timers[i].elapsed_ms < g_timers[i].delay_ms) continue;
++		// A method-form timer whose target clip was removed is cancelled at
++		// fire time without a call (Ruffle: avm1_removed() -> cancel_timer).
++		int cancel = 0;
++		if (t->is_method && t->object.type == ACTION_STACK_VALUE_MOVIECLIP)
++		{
++			MovieClip* tmc = (MovieClip*)(uintptr_t)t->object.data.numeric_value;
++			if (tmc == NULL || tmc->depth == INT_MIN) cancel = 1;
++		}
+ 
+-			// Fire this timer's callback
+-			fireTimerCallback(app_context, &g_timers[i]);
+-			fired_any = 1;
++		int expected_id = t->id;
++		if (!cancel)
++		{
++			fireTimerCallback(app_context, t);
+ 
++			// Ruffle runs Player::run_actions after every callback.
+ 			// Fire deferred onChanged from replaceSel (if any)
+ 			actionFlushPendingOnChanged(app_context);
+-
+ 			// Flush pending onLoads queued by attachMovie during this timer callback
+ 			actionFlushPendingOnLoads(app_context);
++		}
+ 
+-			if (g_timers[i].is_interval)
+-			{
+-				// Repeating: subtract one delay period
+-				g_timers[i].elapsed_ms -= g_timers[i].delay_ms;
+-				// If delay is 0, prevent infinite loop
+-				if (g_timers[i].delay_ms <= 0) g_timers[i].active = 0;
+-			}
++		// The callback may have cleared this timer (or cleared it and a new
++		// one reused the slot): only reschedule the entry it fired.
++		if (t->active && t->id == expected_id)
++		{
++			if (!t->is_interval || cancel)
++				t->active = 0;
+ 			else
+-			{
+-				// One-shot: deactivate
+-				g_timers[i].active = 0;
+-			}
+-			break; // Re-scan from beginning (firing may have cleared other timers)
++				t->tick_us += t->interval_us;
+ 		}
+-	} while (fired_any);
++		if (g_execution_halted) break;
++	}
+ }
+ 
+ // Check if any timers are active
