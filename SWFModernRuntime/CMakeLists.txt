@@ -48,6 +48,9 @@ set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/video_codec.c
     ${PROJECT_SOURCE_DIR}/src/utils.c
     ${PROJECT_SOURCE_DIR}/src/amf_packet.c
+    # AVM1 BitmapData.draw()'s timeline arm uses the CPU shape rasterizer
+    # (s26 w2-tail-bitmap-draw); it is self-contained (generated tables only).
+    ${PROJECT_SOURCE_DIR}/src/avm2/avm2_cpu_raster.c
 
     # Compile hashmap file directly to avoid undefined symbols on Linux
     ${PROJECT_SOURCE_DIR}/lib/c-hashmap/map.c

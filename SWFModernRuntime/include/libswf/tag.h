@@ -337,6 +337,10 @@ int32_t ng_getSoundDuration(u16 char_id);
 // `pixels` already has the emitting movie's base folded in.
 int ng_getBitmapMetadata(u16 char_id, const u8** out_pixels, size_t* out_size, u32* out_width, u32* out_height);
 void ng_registerBitmapMetadata(u16 char_id, const u8* pixels, size_t size, u32 width, u32 height);
+// CPU access to a timeline bitmap by its registration index (= renderer upload
+// order = the recompiler's bitmap-fill style id), root movie only. Used by the
+// CPU bitmap-fill arm in avm2_cpu_raster.c (AVM1 BitmapData.draw()).
+int ng_getBitmapByIndex(u32 idx, const u8** out_pixels, u32* out_width, u32* out_height);
 extern u8 g_current_movie_id;
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);

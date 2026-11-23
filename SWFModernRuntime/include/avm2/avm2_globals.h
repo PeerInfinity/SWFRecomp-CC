@@ -502,10 +502,10 @@ typedef struct Avm2DisplayObjectExt
 	// (apply_place_object, Ruffle display_object.rs:2514).
 	uint8_t transformed_by_script;
 	uint16_t char_id;            // 0 = script-created (or root)
-	// Renderable shape geometry (solid/stroke/gradient fills), resolved from
-	// char_id at place-time (avm2_generated_shape_geom). shape_vert_count == 0
-	// means "no renderable shape to draw" (script-created, sprite, bitmap-fill
-	// shape, or unresolved) — the render walk then draws nothing for this node.
+	// Renderable shape geometry (solid/stroke/gradient/bitmap fills), resolved
+	// from char_id at place-time (avm2_generated_shape_geom). shape_vert_count
+	// == 0 means "no renderable shape to draw" (script-created, sprite, a loaded
+	// child's bitmap-fill shape, or unresolved) — the walk then draws nothing.
 	uint32_t shape_vert_offset;
 	uint32_t shape_vert_count;
 	// T6 morph (DefineMorphShape): is_morph_shape routes this node through the

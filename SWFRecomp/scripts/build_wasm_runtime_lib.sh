@@ -62,6 +62,7 @@ SOURCES=(
     "${SWFMODERN_SRC}/libswf/tag.c"
     "${SWFMODERN_SRC}/libswf/tag_stubs.c"
     "${SWFMODERN_SRC}/libswf/hit_test.c"
+    "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c"
     "${SWFMODERN_SRC}/memory/heap.c"
     "${SWFMODERN_ROOT}/lib/c-hashmap/map.c"
     "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c"

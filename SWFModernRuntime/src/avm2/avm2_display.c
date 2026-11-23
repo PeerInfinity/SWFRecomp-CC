@@ -575,14 +575,19 @@ static void resolve_static_text(Avm2DisplayObjectExt* ext, uint16_t char_id)
 
 // Resolve a placed character's renderable shape geometry onto its ext.
 // Called at place-time so the render walk needs no per-frame lookup. Clears
-// the range for anything that isn't a renderable shape (sprite, bitmap-fill
-// shape, script-created, or unresolved char). "Renderable" = solid (T1),
-// stroke (T2), and gradient (T3) fills; bitmap-fill shapes stay deferred.
+// the range for anything that isn't a renderable shape (sprite, script-created,
+// unresolved char, or a LOADED CHILD's bitmap-fill shape). renderable 1 =
+// solid (T1) / stroke (T2) / gradient (T3) only; 2 = also has a bitmap fill
+// (0x40-0x43, s26 w2-tail-bitmap-draw), whose style id indexes the ROOT's
+// embedded-bitmap table (avm2_render_init's static upload, the CPU arm's
+// avm2_cpu_raster_embedded_rgba). A child movie's ids are movie-local and it
+// has no static bitmap slots yet, so its bitmap-fill shapes stay undrawn.
 static void resolve_shape_geom(Avm2DisplayObjectExt* ext, uint16_t char_id)
 {
 	const Avm2MovieTables* owner = NULL;
 	const Avm2ShapeGeom* sg = shape_geom_for_in(char_id, &owner);
-	if (sg != NULL && sg->renderable && sg->vert_count > 0)
+	if (sg != NULL && sg->renderable != 0 && sg->vert_count > 0
+	    && (sg->renderable != 2 || owner == NULL))
 	{
 		// This is the AVM2 twin of tagDefineShape's re-base: the one moment
 		// the DEFINING movie is known. Both offsets are numbered from 0 in
@@ -21637,6 +21642,23 @@ void avm2_render_init(Avm2Context* ctx)
 		? (uint32_t) (app->cxform_data_size / (20 * sizeof(float))) : 1;
 
 	renderer_init(app, context);
+	// Static bitmaps for timeline BITMAP FILLS (0x40-0x43, s26
+	// w2-tail-bitmap-draw). AVM2 never runs defineBitmap/finalizeBitmaps, so
+	// the static pools were empty and a bitmap-filled shape sampled nothing.
+	// Upload the root's embedded table in emission order (= the recompiler's
+	// fill style id; a failed decode still takes its slot, uploaded as NULL).
+	if (context->bitmap_count > 0 && context->renderer_ok)
+	{
+		for (uint32_t i = 0; i < avm2_generated_bitmap_count
+		                     && i < (uint32_t) context->bitmap_count; i++)
+		{
+			uint32_t bw = avm2_generated_bitmaps[i].width;
+			uint32_t bh = avm2_generated_bitmaps[i].height;
+			const uint8_t* px = avm2_cpu_raster_embedded_rgba(i, &bw, &bh);
+			renderer_upload_bitmap(context, px, (size_t) bw * bh * 4, bw, bh);
+		}
+		renderer_finalize_bitmaps(context);
+	}
 #ifdef OFFSCREEN_RENDER
 	// Capture triggers are a graphics-native-test concept (CAPTURE_TRIGGERS env);
 	// capture.c isn't linked in the browser build.

@@ -10939,15 +10939,18 @@ namespace SWFRecomp
 				}
 				
 				size_t tris_size = 0;
-				// AVM2 shape-render gate: true iff every emitted triangle of this
-				// DefineShape uses a fill class the AVM2 walk + WGSL shader can
-				// render today — solid (T1), stroke (T2, 0x80000000), and gradient
-				// (T3, linear/radial/focal). Cleared below only when a BITMAP fill
-				// group (0x40-0x43) is tessellated: bitmap-fill timeline shapes are
-				// deferred (they need a static bitmap atlas; a later tranche). Only
-				// meaningful for non-morph, non-font DefineShapes (the ones recorded
-				// into avm2_shape_geom).
-				bool shape_renderable = true;
+				// AVM2 shape-render class (Avm2ShapeGeom.renderable): every fill
+				// class is drawable — solid (T1), stroke (T2, 0x80000000),
+				// gradient (T3, linear/radial/focal) and, since s26
+				// (w2-tail-bitmap-draw), BITMAP fills (0x40-0x43), which the AVM2
+				// walk samples from the root's static bitmap upload. The flag
+				// still records "has a bitmap fill" (emitted as renderable = 2)
+				// because a bitmap style id is movie-local: the runtime keeps a
+				// LOADED child's bitmap-fill shapes out of the walk until child
+				// movies get their own static bitmap slots (resolve_shape_geom).
+				// Only meaningful for non-morph, non-font DefineShapes (the ones
+				// recorded into avm2_shape_geom).
+				bool shape_has_bitmap_fill = false;
 				size_t morph_end_start_vertex = current_morph_end_vertex;
 
 				// Non-morph fills, grouped per (layer, fill id) by the directed-edge
@@ -11257,13 +11260,12 @@ namespace SWFRecomp
 							style_type_packed |= ((u32) fs.gradient.spread_mode << 8);
 						style_type_packed |= (((u32) fs.gradient.interpolation_mode & 1u) << 10);
 						}
-						// Only a BITMAP fill (0x40-0x43) makes the shape
-						// unrenderable this tranche — solid (T1) and gradient
-						// (T3, 0x10/0x12/0x13) are shader-handled. Empty groups
-						// leave the flag untouched.
+						// A BITMAP fill (0x40-0x43) marks the shape renderable = 2
+						// (see shape_has_bitmap_fill). Empty groups leave the flag
+						// untouched.
 						if (fs.type >= FILL_BITMAP_REPEAT && !tris.empty())
 						{
-							shape_renderable = false;
+							shape_has_bitmap_fill = true;
 						}
 
 						for (Tri t : tris)
@@ -11374,8 +11376,8 @@ namespace SWFRecomp
 						}
 
 						// T2: strokes are shader-handled (0x80000000 style, shaded
-						// as solids via the color index), so a stroke run no longer
-						// makes the shape unrenderable — it does not clear the flag.
+						// as solids via the color index); a stroke run does not
+						// touch shape_has_bitmap_fill.
 
 						for (Tri t : tris)
 						{
@@ -11500,7 +11502,9 @@ namespace SWFRecomp
 						// runtime-tris path (renderer_draw_tris / avm2_cpu_raster).
 						abc::Avm2ShapeGeomRec geom;
 						geom.char_id = shape_id;
-						geom.renderable = shape_renderable ? 1 : 0;
+						// The AVM2 morph path (ratio-lerp tris) shades solids
+						// only, so a bitmap-fill morph stays undrawn (0) as before.
+						geom.renderable = shape_has_bitmap_fill ? 0 : 1;
 						geom.vert_offset = (uint32_t) (3 * current_tri);
 						geom.vert_count = (uint32_t) (3 * tris_size);
 						geom.morph_end_offset = (uint32_t) morph_end_start_vertex;
@@ -11519,7 +11523,7 @@ namespace SWFRecomp
 						// only when a DoABC tag created the emitter.)
 						abc::Avm2ShapeGeomRec geom;
 						geom.char_id = shape_id;
-						geom.renderable = shape_renderable ? 1 : 0;
+						geom.renderable = shape_has_bitmap_fill ? 2 : 1;
 						geom.vert_offset = (uint32_t) (3 * current_tri);
 						geom.vert_count = (uint32_t) (3 * tris_size);
 						geom.morph_end_offset = 0;

@@ -65,6 +65,7 @@ RUNTIME_C=(
     libswf/swf.c libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
     libswf/ng_shared.c libswf/hit_test.c libswf/graphics_stubs.c
     libswf/stb_image_impl.c
+    avm2/avm2_cpu_raster.c
     audio/audio.c audio/audio_output_web.c
     rendering/render_webgpu.c
     memory/heap.c

@@ -28,6 +28,10 @@
 #include <stdlib.h>
 
 #include "avm2/avm2_cpu_raster.h"
+#ifdef SWF_AVM2
+#include <avm2/avm2_abc.h>
+#include <zlib.h>
+#endif
 
 // Resident recompiler geometry tables, defined in the generated draws.c and
 // linked into every build (both graphics and no-graphics — see verify_output.py
@@ -222,7 +226,95 @@ typedef struct {
 	// sampled linear ramp back to sRGB (linearRGB interpolation).
 	const uint8_t* ramp;
 	int linear_out;
+	// Bitmap fill (0x40-0x43, s26 w2-tail-bitmap-draw). Straight RGBA8
+	// texels; (ia..ity) map shape twips -> bitmap px.
+	const uint8_t* bmp;
+	int bmp_w, bmp_h, bmp_repeat, bmp_smooth;
 } RasterCtx;
+
+// libswf/tag.c (declared in libswf/tag.h, which this TU does not include).
+int ng_getBitmapByIndex(uint32_t idx, const uint8_t** out_pixels,
+                        uint32_t* out_width, uint32_t* out_height);
+
+#ifdef SWF_AVM2
+// AVM2 embedded bitmap `i` (emission order = the recompiler's bitmap-fill style
+// id) as straight RGBA. A zlib-DEFLATEd table entry (z_len != 0) is inflated
+// once and cached for the run; the GPU static-bitmap upload (avm2_display.c
+// avm2_render_init) and the CPU bitmap-fill arm below share the cache.
+const uint8_t* avm2_cpu_raster_embedded_rgba(uint32_t i, uint32_t* out_w, uint32_t* out_h)
+{
+	static const uint8_t** s_px = NULL;
+	static uint32_t s_n = 0;
+	if (i >= avm2_generated_bitmap_count) return NULL;
+	const Avm2BitmapData* eb = &avm2_generated_bitmaps[i];
+	if (eb->rgba == NULL || eb->width == 0 || eb->height == 0) return NULL;
+	*out_w = eb->width; *out_h = eb->height;
+	if (eb->z_len == 0) return eb->rgba;
+	if (s_n < avm2_generated_bitmap_count)
+	{
+		const uint8_t** grown = (const uint8_t**) realloc((void*) s_px,
+			avm2_generated_bitmap_count * sizeof(*s_px));
+		if (grown == NULL) return NULL;
+		for (uint32_t k = s_n; k < avm2_generated_bitmap_count; k++) grown[k] = NULL;
+		s_px = grown; s_n = avm2_generated_bitmap_count;
+	}
+	if (s_px[i] == NULL)
+	{
+		uLongf n = (uLongf) eb->width * eb->height * 4;
+		uint8_t* d = (uint8_t*) malloc(n);
+		if (d != NULL && uncompress(d, &n, eb->rgba, eb->z_len) != Z_OK)
+		{ free(d); d = NULL; }
+		s_px[i] = d;   // a failed inflate is retried next call (rare)
+	}
+	return s_px[i];
+}
+#endif
+
+static inline uint32_t bmp_texel(const RasterCtx* R, int x, int y)
+{
+	if (R->bmp_repeat) {
+		x %= R->bmp_w; if (x < 0) x += R->bmp_w;
+		y %= R->bmp_h; if (y < 0) y += R->bmp_h;
+	} else {
+		if (x < 0) x = 0; if (x >= R->bmp_w) x = R->bmp_w - 1;
+		if (y < 0) y = 0; if (y >= R->bmp_h) y = R->bmp_h - 1;
+	}
+	const uint8_t* p = R->bmp + ((size_t) y * R->bmp_w + x) * 4;
+	return ((uint32_t) p[3] << 24) | ((uint32_t) p[0] << 16) | ((uint32_t) p[1] << 8) | p[2];
+}
+
+static uint32_t bmp_sample(const RasterCtx* R, double u, double v)
+{
+	uint32_t c;
+	if (!R->bmp_smooth) {
+		// Nearest: a pixel centre on (or within float noise of) a texel
+		// boundary takes the LOWER texel. Measured on avm2/pixelbender_dithering
+		// (y scale exactly 1.5 px/texel, so every third row is a tie): exact
+		// floor 20153 outliers, ties-to-lower 8614, flat for eps 1e-6..1e-3.
+		c = bmp_texel(R, (int) floor(u - 1e-6), (int) floor(v - 1e-6));
+	} else {
+		double fu = u - 0.5, fv = v - 0.5;
+		int x0 = (int) floor(fu), y0 = (int) floor(fv);
+		double tx = fu - x0, ty = fv - y0;
+		uint32_t q[4] = { bmp_texel(R, x0, y0), bmp_texel(R, x0 + 1, y0),
+		                  bmp_texel(R, x0, y0 + 1), bmp_texel(R, x0 + 1, y0 + 1) };
+		double acc[4] = { 0, 0, 0, 0 };
+		double wq[4] = { (1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty };
+		for (int k = 0; k < 4; k++)
+			for (int ch = 0; ch < 4; ch++)
+				acc[ch] += wq[k] * (double) ((q[k] >> (24 - 8 * ch)) & 0xFF);
+		c = 0;
+		for (int ch = 0; ch < 4; ch++) {
+			uint32_t b = (uint32_t) (acc[ch] + 0.5); if (b > 255) b = 255;
+			c |= b << (24 - 8 * ch);
+		}
+	}
+	if (R->node_alpha < 0.999) {
+		uint32_t sa = (uint32_t) (((c >> 24) & 0xFF) * R->node_alpha + 0.5);
+		c = (c & 0x00FFFFFFu) | (sa << 24);
+	}
+	return c;
+}
 
 // sRGB EOTF^-1 for linearRGB gradient output (mirror render_webgpu.c fs_main).
 static inline double cpu_linear_to_srgb(double c)
@@ -442,7 +534,19 @@ static void raster_tri_aa(RasterCtx* R,
 			if (mask == 0) continue;
 
 			uint32_t straight;
-			if (!R->is_gradient)
+			if (R->bmp != NULL)
+			{
+				double qx = (double) px + 0.5, qy = (double) py + 0.5;
+				double w0 = ((bx - ax) * (qy - ay) - (by - ay) * (qx - ax)) * sgn;
+				double w1 = ((cx - bx) * (qy - by) - (cy - by) * (qx - bx)) * sgn;
+				double w2 = ((ax - cx) * (qy - cy) - (ay - cy) * (qx - cx)) * sgn;
+				double aA = w1 * inv_area, aB = w2 * inv_area, aC = w0 * inv_area;
+				double sx = aA * R->sx0 + aB * R->sx1 + aC * R->sx2;
+				double sy = aA * R->sy0 + aB * R->sy1 + aC * R->sy2;
+				straight = bmp_sample(R, R->ia * sx + R->ic * sy + R->itx,
+				                      R->ib * sx + R->id * sy + R->ity);
+			}
+			else if (!R->is_gradient)
 				straight = R->solid_argb;
 			else
 			{
@@ -523,7 +627,15 @@ static void raster_tri(RasterCtx* R,
 				continue;
 
 			uint32_t straight;
-			if (!R->is_gradient)
+			if (R->bmp != NULL)
+			{
+				double aA = w1 * inv_area, aB = w2 * inv_area, aC = w0 * inv_area;
+				double sx = aA * R->sx0 + aB * R->sx1 + aC * R->sx2;
+				double sy = aA * R->sy0 + aB * R->sy1 + aC * R->sy2;
+				straight = bmp_sample(R, R->ia * sx + R->ic * sy + R->itx,
+				                      R->ib * sx + R->id * sy + R->ity);
+			}
+			else if (!R->is_gradient)
 			{
 				straight = R->solid_argb;
 			}
@@ -586,10 +698,11 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 		uint32_t style_index  = sd[i0][3];
 		uint32_t style_type   = style_packed & 0xFFu;
 
-		// Only solid (0x00, incl. strokes) and gradients (0x10/0x12/0x13) this
-		// tranche. Bitmap fills (0x40-0x43) and anything else are skipped.
+		// Solid (0x00, incl. strokes), gradients (0x10/0x12/0x13) and bitmap
+		// fills (0x40-0x43); anything else is skipped.
 		int is_grad = ((style_type & 0xF0u) == 0x10u);
-		if (style_type != 0x00u && !is_grad) continue;
+		int is_bmp = ((style_type & 0xF0u) == 0x40u);
+		if (style_type != 0x00u && !is_grad && !is_bmp) continue;
 
 		// Shape-local twips vertices.
 		double sx[3], sy[3], dX[3], dY[3];
@@ -607,6 +720,46 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
 		R.buf = buf; R.W = W; R.H = H;
 		R.node_alpha = node_alpha;
 		R.ramp = NULL; R.linear_out = 0;   // static path: use gradient_data row
+		R.bmp = NULL;
+
+		if (is_bmp)
+		{
+			uint32_t bid = style_index & 0xFFFFu;
+			uint32_t mid = (style_index >> 16) & 0xFFFFu;
+			const uint8_t* bp; uint32_t bw, bh;
+			int _ok = ng_getBitmapByIndex(bid, &bp, &bw, &bh);
+#ifdef SWF_AVM2
+			// AVM2 never runs defineBitmap: the style id indexes the
+			// embedded-bitmap table in emission order. Root movie only --
+			// resolve_shape_geom keeps a loaded child's bitmap-fill shapes
+			// (movie-local ids) out of the walk.
+			if (!_ok)
+			{
+				bp = avm2_cpu_raster_embedded_rgba(bid, &bw, &bh);
+				_ok = bp != NULL;
+			}
+#endif
+			if (!_ok || bw == 0 || bh == 0) continue;
+			R.bmp = bp; R.bmp_w = (int) bw; R.bmp_h = (int) bh;
+			R.bmp_repeat = (style_type == 0x40u || style_type == 0x42u);
+			R.bmp_smooth = (style_type == 0x40u || style_type == 0x41u);
+			R.is_gradient = 0;
+			R.sx0 = sx[0]; R.sy0 = sy[0];
+			R.sx1 = sx[1]; R.sy1 = sy[1];
+			R.sx2 = sx[2]; R.sy2 = sy[2];
+			const float* m = cpu_uninv_mat_table() + (size_t) mid * 16;
+			double _ia = m[0], _ib = m[1], _ic = m[4], _id = m[5];
+			double _itx = m[12], _ity = m[13];
+			double _det = _ia * _id - _ib * _ic;
+			if (_det == 0.0) continue;
+			double _inv = 1.0 / _det;
+			R.ia =  _id * _inv;  R.ib = -_ib * _inv;
+			R.ic = -_ic * _inv;  R.id =  _ia * _inv;
+			R.itx = (_ic * _ity - _id * _itx) * _inv;
+			R.ity = (_ib * _itx - _ia * _ity) * _inv;
+			raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
+			continue;
+		}
 
 		if (!is_grad)
 		{
@@ -671,7 +824,7 @@ void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
 	RasterCtx R;
 	R.buf = buf; R.W = W; R.H = H;
 	R.node_alpha = node_alpha;
-	R.ramp = NULL; R.linear_out = 0;
+	R.ramp = NULL; R.linear_out = 0; R.bmp = NULL;
 
 	if (fill->kind == 2)
 	{
@@ -795,7 +948,7 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
 		RasterCtx R;
 		R.buf = buf; R.W = W; R.H = H;
 		R.node_alpha = node_alpha;
-		R.ramp = NULL; R.linear_out = 0;
+		R.ramp = NULL; R.linear_out = 0; R.bmp = NULL;
 		R.is_gradient = 0;
 		R.solid_argb = (a_out << 24) | (cr << 16) | (cg << 8) | cb;
 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);

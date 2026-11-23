@@ -2684,7 +2684,6 @@ AVM2_CORE_SOURCES = [
     "src/avm2/avm2_pixelbender.c",
     "src/avm2/avm2_filters.c",
     "src/avm2/avm2_bitmap.c",
-    "src/avm2/avm2_cpu_raster.c",
     "src/avm2/avm2_media.c",
     "src/avm2/avm2_external.c",
     "src/avm2/avm2_flixel.c",
@@ -2728,6 +2727,9 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "src/utils.c",
         "src/amf_packet.c",
         "src/libswf/tag.c",
+        # AVM1 BitmapData.draw() rasterizes timeline shapes/text through the CPU
+        # shape rasterizer (s26 w2-tail-bitmap-draw), so it is base, not AVM2-only.
+        "src/avm2/avm2_cpu_raster.c",
         "src/libswf/tag_stubs.c",
         "src/libswf/shape_hit_test.c",
         "src/libswf/ng_shared.c",

@@ -20,12 +20,18 @@
 //
 // Fill classes this tranche: solid (0x00), strokes (packed 0x80000000 -> low
 // byte 0x00 -> solid via colour index), and gradients (0x10 linear / 0x12
-// radial / 0x13 focal, pad/reflect/repeat). Bitmap fills (0x40-0x43) and masks
+// radial / 0x13 focal, pad/reflect/repeat), bitmap fills (0x40-0x43: style id
+// = low 16 bits, fill matrix = uninv_mat_data[high 16 bits]; texels from
+// ng_getBitmapByIndex, else (AVM2) avm2_cpu_raster_embedded_rgba). Masks
 // (clip_depth, T7) are skipped.
 // 4x-sample anti-aliasing for the shape / tris / morph entry points below.
 // Off by default; BitmapData.draw() turns it on around its source walk.
 // Returns the previous setting.
 int avm2_cpu_raster_set_aa(int on);
+
+// AVM2 builds only (defined under SWF_AVM2): embedded bitmap `i` as straight
+// RGBA (inflated once and cached); NULL if absent or undecodable.
+const uint8_t* avm2_cpu_raster_embedded_rgba(uint32_t i, uint32_t* out_w, uint32_t* out_h);
 
 void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
                            uint32_t vert_offset, uint32_t vert_count,

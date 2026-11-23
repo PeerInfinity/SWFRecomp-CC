@@ -100,6 +100,7 @@ if [ "$RUN_ONLY" != true ]; then
         utils.c amf_packet.c
         libswf/tag.c libswf/tag_stubs.c libswf/shape_hit_test.c
         libswf/ng_shared.c libswf/hit_test.c libswf/stb_image_impl.c
+        avm2/avm2_cpu_raster.c
         memory/heap.c
     )
     for s in "${COMMON_SRCS[@]}"; do cp "${SWFMODERN_SRC}/${s}" "${BUILD_DIR}/"; done

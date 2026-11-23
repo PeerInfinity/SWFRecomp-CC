@@ -710,3 +710,9 @@ visual/blend_modes/shader_as_mask                   # KF band 2100 -> 366       
 regression/avm1_po3_color_matrix_live                  # per-pass clamp + alpha-from-colour (exporter golden)  1 cmp
 regression/avm1_po3_color_matrix_live_nested           # sprite-nested arm, same golden                     1 cmp
 regression/avm1_po3_color_matrix_live_clear            # `filters = []` drops the live chain                1 cmp
+# s26 w2-tail-bitmap-draw: AVM1 draw() timeline arm, AVM2 timeline bitmap fills + static-bitmap upload.
+# tier=1
+visual/static_text_offstage                            # AVM1 draw() of a timeline DefineText 1 cmp
+avm2/pixelbender_dithering                             # AVM2 bitmap-fill shape, CPU draw()   1 cmp
+# tier=2
+from_shumway/bitmapbuttons                             # AVM2 static-bitmap GPU upload (band) 1 cmp

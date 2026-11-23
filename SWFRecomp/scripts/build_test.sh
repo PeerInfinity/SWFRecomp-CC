@@ -207,6 +207,7 @@ if [ "$GRAPHICS_FLAG" = true ]; then
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c" "${BUILD_DIR}/"  # AVM1 draw() timeline arm
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/graphics_stubs.c" "${BUILD_DIR}/"
@@ -227,6 +228,7 @@ else
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/avm2/avm2_cpu_raster.c" "${BUILD_DIR}/"  # AVM1 draw() timeline arm
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
 fi
 

@@ -14614,6 +14614,150 @@ typedef struct {
     double ro, go, bo, ao;
 } DrawColorTransform;
 
+// AVM1 BitmapData.draw() timeline arm (s26 w2-tail-bitmap-draw). The source
+// MC's own display list (DefineShape / DefineText placed by its timeline) was
+// never drawn -- only Drawing-API paths and child MCs were
+// (visual/static_text_offstage). Each entry is rasterized through the AVM2 CPU
+// shape rasterizer (avm2_cpu_raster_shape: same shape_data tables, mirrors the
+// WGSL fill, incl. bitmap fills 0x40-0x43) into a premultiplied scratch; the
+// placement / static-text cxform and the draw() colorTransform are then applied
+// and the result composited source-over onto the (straight-ARGB) AVM1 bitmap.
+// rasterizeMovieClipToBitmap interleaves these entries with the clip's child
+// MCs by depth. Root-movie tables only: a loaded child movie's static-text
+// glyph slots and bitmap style ids are movie-local (see the s26 report).
+#include <avm2/avm2_cpu_raster.h>
+static SWFAppContext* g_bd1_draw_app = NULL;   // set by bitmapDataDraw
+static uint32_t* g_bd1_scratch = NULL;
+static size_t g_bd1_scratch_n = 0;
+
+static void bd1_apply_cx_over(BitmapDataNative* dest, const uint32_t* scr,
+                              const float* cx20, const DrawColorTransform* cx,
+                              int dx0, int dy0, int dx1, int dy1,
+                              const uint8_t* stencil, uint8_t stencil_write_value,
+                              uint8_t* stencil_out)
+{
+	int w = dest->width;
+	for (int y = dy0; y < dy1; y++) {
+		for (int x = dx0; x < dx1; x++) {
+			size_t i = (size_t)y * w + x;
+			uint32_t p = scr[i];
+			uint32_t pa = p >> 24;
+			if (pa == 0) continue;
+			if (stencil && !stencil[i]) continue;
+			if (stencil_out) { stencil_out[i] = stencil_write_value; continue; }
+			double a = pa / 255.0;
+			double in[4] = { ((p >> 16) & 0xFF) / 255.0 / a, ((p >> 8) & 0xFF) / 255.0 / a,
+			                 (p & 0xFF) / 255.0 / a, a };
+			double o[4];
+			if (cx20) {
+				for (int k = 0; k < 4; k++) {
+					o[k] = cx20[16 + k];
+					for (int j = 0; j < 4; j++) o[k] += cx20[j * 4 + k] * in[j];
+				}
+			} else { for (int k = 0; k < 4; k++) o[k] = in[k]; }
+			if (cx) {
+				o[0] = o[0] * cx->rm + cx->ro / 255.0; o[1] = o[1] * cx->gm + cx->go / 255.0;
+				o[2] = o[2] * cx->bm + cx->bo / 255.0; o[3] = o[3] * cx->am + cx->ao / 255.0;
+			}
+			for (int k = 0; k < 4; k++) { if (o[k] < 0) o[k] = 0; if (o[k] > 1) o[k] = 1; }
+			uint32_t d = dest->pixels[i];
+			double sa = o[3], da = dest->transparent ? ((d >> 24) & 0xFF) / 255.0 : 1.0;
+			double oa = sa + da * (1.0 - sa);
+			double rc[3];
+			for (int k = 0; k < 3; k++) {
+				double dc = ((d >> (16 - 8 * k)) & 0xFF) / 255.0;
+				rc[k] = oa > 0 ? (o[k] * sa + dc * da * (1.0 - sa)) / oa : 0;
+			}
+			uint32_t A = dest->transparent ? (uint32_t)(oa * 255.0 + 0.5) : 0xFF;
+			dest->pixels[i] = (A << 24) | ((uint32_t)(rc[0] * 255.0 + 0.5) << 16)
+			                | ((uint32_t)(rc[1] * 255.0 + 0.5) << 8) | (uint32_t)(rc[2] * 255.0 + 0.5);
+		}
+	}
+}
+
+// The source clip's timeline display list, or NULL when there is nothing the
+// timeline arm can draw (no draw() app context, no dictionary).
+static DisplayObject* bd1_timeline_list(MovieClip* mc, size_t* out_n)
+{
+	*out_n = 0;
+	if (g_bd1_draw_app == NULL || mc == NULL || mc->display_obj == NULL || dictionary == NULL)
+		return NULL;
+	DisplayObject* self = (DisplayObject*) mc->display_obj;
+	if (self->sprite_display_list == NULL) return NULL;
+	*out_n = (size_t) self->sprite_max_depth + 1;
+	return self->sprite_display_list;
+}
+
+// Draw ONE timeline entry (a DefineShape or static DefineText; anything else
+// is skipped: sprites come through the child-MC recursion, EditTexts render
+// dynamically, clip-depth entries are masks).
+static void bd1_draw_timeline_entry(BitmapDataNative* dest, const DisplayObject* o,
+                                    double ma, double mb, double mc_, double md,
+                                    double mtx, double mty,
+                                    int dx0, int dy0, int dx1, int dy1,
+                                    const uint8_t* stencil, uint8_t stencil_write_value,
+                                    uint8_t* stencil_out, const DrawColorTransform* cx)
+{
+	SWFAppContext* app = g_bd1_draw_app;
+	if (o->char_id == 0 || o->clip_depth > 0 || o->as_hidden) return;
+	Character* ch = &dictionary[o->char_id];
+	if (ch->type != CHAR_TYPE_SHAPE && ch->type != CHAR_TYPE_TEXT) return;
+	if (ch->type == CHAR_TYPE_TEXT && ng_getCharTextfieldIdx(o->char_id) >= 0) return;
+	if (dx1 <= dx0 || dy1 <= dy0) return;
+	size_t n = (size_t) dest->width * dest->height;
+	if (g_bd1_scratch_n < n) {
+		free(g_bd1_scratch);
+		g_bd1_scratch = (uint32_t*) malloc(n * sizeof(uint32_t));
+		g_bd1_scratch_n = g_bd1_scratch ? n : 0;
+		if (!g_bd1_scratch) return;
+	}
+	// Only the clip rect is ever read back, so only it needs clearing.
+	for (int y = dy0; y < dy1; y++)
+		memset(g_bd1_scratch + (size_t) y * dest->width + dx0, 0,
+		       (size_t) (dx1 - dx0) * sizeof(uint32_t));
+	const float* tf_all = o->place_transform_data
+		? (const float*) o->place_transform_data : (const float*) app->transform_data;
+	const float* pm = tf_all + (size_t) o->transform_id * 16;
+	// placement (twips->twips) under outer (src px -> dest px), in twips.
+	double pa = ma * pm[0] + mc_ * pm[1], pb = mb * pm[0] + md * pm[1];
+	double pc = ma * pm[4] + mc_ * pm[5], pd = mb * pm[4] + md * pm[5];
+	double ptx = ma * pm[12] + mc_ * pm[13] + 20.0 * mtx;
+	double pty = mb * pm[12] + md * pm[13] + 20.0 * mty;
+	const float* cx20 = NULL;
+#ifndef NO_GRAPHICS
+	const float* cxd = (const float*) app->cxform_data;
+	size_t ncx = app->cxform_data_size / (20 * sizeof(float));
+#endif
+	if (ch->type == CHAR_TYPE_SHAPE) {
+		avm2_cpu_raster_shape(g_bd1_scratch, dest->width, dest->height, 1,
+		                      (uint32_t) ch->shape_offset, (uint32_t) ch->size,
+		                      pa, pb, pc, pd, ptx, pty, 1.0);
+#ifndef NO_GRAPHICS
+		if (o->cxform_id != 0 && o->cxform_id < ncx) cx20 = cxd + (size_t) o->cxform_id * 20;
+#endif
+	} else {
+		const float* tfd = (const float*) app->transform_data;
+		for (size_t j = 0; j < ch->text_size; j++) {
+			size_t gi = 4 * (size_t) app->text_data[ch->text_start + j];
+			const float* g = tfd + (ch->transform_start + j) * 16;
+			double ga = pa * g[0] + pc * g[1], gb = pb * g[0] + pd * g[1];
+			double gc = pa * g[4] + pc * g[5], gd = pb * g[4] + pd * g[5];
+			double gtx = pa * g[12] + pc * g[13] + ptx;
+			double gty = pb * g[12] + pd * g[13] + pty;
+			avm2_cpu_raster_shape(g_bd1_scratch, dest->width, dest->height, 1,
+			                      app->glyph_data[gi], app->glyph_data[gi + 1],
+			                      ga, gb, gc, gd, gtx, gty, 1.0);
+		}
+#ifndef NO_GRAPHICS
+		// Static text is coloured through its baked cxform (zero RGB mult +
+		// colour add), the same row render_single_object feeds the GPU.
+		if (ch->cxform_id < ncx) cx20 = cxd + (size_t) ch->cxform_id * 20;
+#endif
+	}
+	bd1_apply_cx_over(dest, g_bd1_scratch, cx20, cx, dx0, dy0, dx1, dy1,
+	                  stencil, stencil_write_value, stencil_out);
+}
+
 // Rasterize a MovieClip's finalized drawing paths into `dest_pixels`/`stencil`,
 // then recursively rasterize children (dynamic MCs on child_mc_cache).
 // - `dest_pixels` may be NULL when we're only writing a stencil.
@@ -14910,7 +15054,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
 
     // Recursively render children. The registry holds dynamic child MCs in no
     // particular order — we render them in ascending depth so the higher depth
-    // paints over the lower one (Flash's z-order).
+    // paints over the lower one (Flash's z-order). The clip's own timeline
+    // shapes / static texts (bd1_draw_timeline_entry) are interleaved with them
+    // by depth: display-list slot d is SWF depth d = AS depth d - 16384
+    // (16383 inside a button, the bias action.c's depth sync uses).
     int render_count = 0;
     MovieClip* ordered[128];
     for (int i = 0; i < child_mc_count; i++) {
@@ -14935,8 +15082,18 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         }
         ordered[j + 1] = key;
     }
-    for (int i = 0; i < render_count; i++) {
-        MovieClip* child = ordered[i];
+    size_t tl_n = 0, tl_i = 0;
+    DisplayObject* tl = bd1_timeline_list(mc, &tl_n);
+    long tl_bias = mc->is_button_mc ? 16383 : 16384;
+    for (int i = 0; i <= render_count; i++) {
+        MovieClip* child = (i < render_count) ? ordered[i] : NULL;
+        while (tl != NULL && tl_i < tl_n
+               && (child == NULL || (long) tl_i - tl_bias < (long) child->depth)) {
+            bd1_draw_timeline_entry(dest, &tl[tl_i++], ma, mb, mc_, md, mtx, mty,
+                                    dx0, dy0, dx1, dy1,
+                                    stencil, stencil_write_value, stencil_out, cx);
+        }
+        if (child == NULL) break;
         // Child local transform: translate (x, y) then scale (xscale%, yscale%)
         // then rotate (rotation degrees). Flash's convention is S*R*T (scale
         // and rotate about origin, then translate).
@@ -14944,8 +15101,12 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         double sy = child->yscale / 100.0;
         double rot = child->rotation * (3.14159265358979323846 / 180.0);
         double cr = cos(rot), sr = sin(rot);
+        // Include the decomposed skew (Ruffle's rotation_y = rotation + skew).
+        // Without it a sheared timeline child (gnash BitmapDataDraw's mc5
+        // under mc4) lands on the wrong pixels.
+        double ry = rot + (double) child->skew;
         double la = sx * cr,  lb = sx * sr;
-        double lc = -sy * sr, ld = sy * cr;
+        double lc = -sy * sin(ry), ld = sy * cos(ry);
         double ltx = child->x, lty = child->y;
         double ca = ma * la + mc_ * lb;
         double cb = mb * la + md  * lb;
@@ -14994,6 +15155,7 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
 
     // MovieClip source: rasterize the MC's drawing-API paths into the dest bitmap.
     if (src_mc != NULL) {
+        g_bd1_draw_app = app_context;
         // Extract matrix (arg1) — defaults to identity
         double ma = 1, mb = 0, mcc = 0, md = 1, mtx = 0, mty = 0;
         if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT && args[1].data.numeric_value != 0) {
@@ -15078,9 +15240,16 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
             }
         }
 
+        // The timeline arm's CPU raster anti-aliases like AVM2 bd_draw (Flash
+        // AAs vector draw() whatever the stage quality). The setMask stencil
+        // pass above stays aliased (a binary mask), as do the Drawing-API
+        // RASTER_TRI paths, which do not go through avm2_cpu_raster. (AA on vs
+        // off is md5-identical on every graded AVM1 draw() row, s26.)
+        int bd1_prev_aa = avm2_cpu_raster_set_aa(1);
         rasterizeMovieClipToBitmap(dest_bmp, src_mc, ma, mb, mcc, md, mtx, mty,
                                    dx0, dy0, dx1, dy1,
                                    stencil_buf, 0, NULL, cx_ptr);
+        avm2_cpu_raster_set_aa(bd1_prev_aa);
         if (stencil_buf) free(stencil_buf);
         r = makeF64(0);
         return r;

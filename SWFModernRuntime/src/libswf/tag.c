@@ -15320,6 +15320,18 @@ int ng_getBitmapMetadata(u16 char_id, const u8** out_pixels, size_t* out_size, u
 	return 0;
 }
 
+// CPU access to a timeline bitmap by its registration (= renderer upload /
+// shape style id) index, for the CPU bitmap-fill arm in avm2_cpu_raster.c
+// (s26 w2-tail-bitmap-draw). Root movie only (no child re-basing).
+int ng_getBitmapByIndex(u32 idx, const u8** out_pixels, u32* out_width, u32* out_height)
+{
+	if ((int) idx >= g_bitmap_def_count || g_bitmap_defs[idx].pixels == NULL) return 0;
+	*out_pixels = g_bitmap_defs[idx].pixels;
+	*out_width = g_bitmap_defs[idx].width;
+	*out_height = g_bitmap_defs[idx].height;
+	return 1;
+}
+
 void ng_registerBitmapMetadata(u16 char_id, const u8* pixels, size_t size, u32 width, u32 height)
 {
 	if (g_bitmap_def_count < MAX_BITMAP_DEFS) {
