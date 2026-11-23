@@ -190,8 +190,9 @@ sandbox_type_remote
 # (string_relational_compare removed 2026-08-01 — now `pass` in BOTH avm1 and
 #  avm2 (verified locally). The RUFFLE_VS_FLASH_DIFFERENCES.md entry has been
 #  marked RESOLVED in the same change; see it for what changed.)
-# globals_swf5: Ruffle exposes LocalConnection/NetConnection/Video in SWF5; Flash hides them.
-# Gnash tests (LocalConnection-v5, NetConnection-v5, Video-v5) confirm Flash behavior.
+# globals_swf5: we hide LocalConnection/NetConnection/Video in SWF5 (gnash -v5 semantics,
+# keeps 3 gnash passes); a Flash capture shows them VISIBLE (s24 §3, s26 trace-tail-audit),
+# so Ruffle's expected output is Flash-correct here. 294/304. See RvF "SWF5 Constructor Visibility".
 globals_swf5
 # Global decls tests: Ruffle's expected output has Object.prototype methods as ENUMERABLE
 # (Flash uses DONT_ENUM) and constructor as own property on all objects (Flash inherits it).
@@ -221,13 +222,13 @@ tab_ordering_properties_tab_index_edge_case
 # not merely ruffle_matched. Do not re-add.
 
 # --- Shape hit test accuracy limits ---
-# 329/338 lines pass. Remaining 9 diffs at exact geometric boundaries:
-# Noto Sans glyph outlines vs Flash device fonts (7), morph boundary precision (1),
-# Drawing API stroke tessellation (1). See ACCEPTED_DIFFS.md Category 8.
+# 332/338 lines pass. Remaining 6 diffs at exact geometric boundaries:
+# Noto Sans glyph outlines vs Flash device fonts (5), morph boundary precision (1).
+# See ACCEPTED_DIFFS.md Category 8 (s26 recount).
 movieclip_hittest_shapeflag
 
 # --- Flash-specific Feistel return value & coercion ---
-# 97.2% match (1333/1371). Test is `known_failure.panic` upstream — Ruffle
+# 98.5% match (1351/1371; s26 trace-tail-audit P2). Test is `known_failure.panic` upstream — Ruffle
 # panics during execution and emits no `output.ruffle.txt` we could subset
 # against. The remaining diffs are all in the Feistel raw_perm_index return
 # value and the dest pixel placement, which depend on Flash's exact

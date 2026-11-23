@@ -620,8 +620,8 @@ Worked example — `PrintJob` (`initPrintJobPrototype`, `action.c:32701`):
   properties on the instance.
 
 The recursive descent then multiplies every divergence: our actual output
-is **7731 lines** (argstest-v6), 7731 (v7), 8093 (v8) versus expected 2192 /
-2061 / 2434 — a ~3.5× blow-up.
+is **2644 lines** (argstest-v6), 2644 (v7), 3006 (v8) versus expected 2192 /
+2061 / 2434 — a ~1.2–1.3× blow-up (s26 recount; was 7731/7731/8093).
 
 **Why not RM-eligible:** all three are `known_failure = true` upstream with
 `output.fpN.ruffle.txt` sidecars, but Ruffle's own output is only ~1298
@@ -650,35 +650,47 @@ test drives MovieClip transforms (`_x`, `_y`, `_xscale`, `_width`,
 `_height`) to extreme values that land on the integer boundaries of the
 twips fixed-point representation, then reads them back.
 
-**Example diff (8/18 lines differ):**
+**Oracle (corrected s26, `SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §3):**
+the graded file is `output.fp10.txt` (`verify_output.py` picks the highest
+`player_options.version`). Both `output.fp9.txt` and `output.fp10.txt` are
+**Flash** captures (one Ruffle subtest per Flash version), not Gnash's own
+output. Under Flash 9 all 15 assertions pass; under Flash 10 five of gnash's
+assertions fail *in Flash itself*, so the expected `FAILED:` lines are Flash
+10's real values.
+
+**Status:** 12/18 (was 10/18; +2 in s26 P3). The `_x`/`_y` lines now match:
+the script sets `mc1._x = 1073741823` (`_y = 1073741568`), ≈ 2.1e10 twips,
+out of i32 range. FP9 wraps mod 2³²; FP10 stores **INT32_MIN**
+(`-107374182.4`, x86 `cvttsd2si` "integer indefinite", for positive
+overflow too). We used to saturate to INT32_MAX (`107374182.35`); out of
+range on either side now stores INT32_MIN.
+
+**Example diff (remaining 6/18 lines):**
 ```
-- FAILED: mc1._x: expected: "-1" , obtained: "-107374182.4"
-+ FAILED: mc1._x: expected: "-1" , obtained: "1073741824"
 - PASSED: mc1._xscale == 4294967295
 + FAILED: mc1._xscale: expected: "4294967295" , obtained: "4294967296"
-- FAILED: mc1._width: expected: "2359295" , obtained: "3276800"
-+ FAILED: mc1._width: expected: "2359295" , obtained: "4294967296"
 ```
+The other residual lines are Flash 10's `_width` (`3276800`) and `_height`
+(`983040`) `FAILED:` lines, which we do not reproduce, and the knock-on
+`#passed`/`#failed` totals.
 
-**Root cause:** twips arithmetic at the `INT_MIN`/`INT_MAX` boundary. Most
-lines are already `FAILED` in *both* the expected output and ours — Gnash's
-own captured output disagrees with Flash here (the test's `output.fp9.txt` /
-`output.fp10.txt` are themselves wrong vs. Flash). The residual diff is
-off-by-one (`4294967296` = 2³² vs expected `4294967295` = 2³²−1, the `u32`
-wrap of `-1`) and off-by-a-factor wrap behavior at the fixed-point
-representation limits.
+**Root cause of the residual:** `_xscale = 4294967295` reads back
+`4294967296` because our scale is stored as `float` (fixing it changes the
+storage type on `MovieClip`: M, wide). The `_width`/`_height` values
+`3276800`/`983040` are Flash 10's matrix internals at extreme scale; the
+model is unknown and Ruffle panics on this row. A full flip is L.
 
 **Why not RM-eligible:** `test.toml` declares
 `known_failure.panic = "attempt to subtract with overflow"` — Ruffle
 *panics* on this test and ships **no** `output.ruffle.txt` sidecar, so there
 is no Ruffle diff to subset-match against.
 
-**Decision:** Accept. There is no realistic path to PASS worth the effort:
-Gnash's expected output is itself slightly wrong vs. Flash, and matching it
-would require replicating a specific Flash integer-wrap quirk at twip
-boundaries that no real-world SWF exercises. Added to
-`from_gnash/misc-swfc.all/ignored_tests.txt`. See
-`incomplete/MATRIX_ACCURACY_TEST1_DECISION.md` for the decision path.
+**Decision:** Accept. The remaining lines need a float→double scale storage
+change plus an unknown Flash 10 extreme-scale matrix model, which no
+real-world SWF exercises. Added to
+`from_gnash/misc-swfc.all/ignored_tests.txt`. (The older decision doc,
+`complete/MATRIX_ACCURACY_TEST1_DECISION.md` — previously cited under a
+wrong `incomplete/` path — predates the s26 oracle correction.)
 
 ---
 
@@ -794,8 +806,8 @@ means reimplementing Flash hairline hinting at disproportionate risk.
 | ~~Error-v8~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~sound (misc-swfc)~~ RESOLVED s26 | 5 | Interactive Flash session trace; expected output truncates mid-test waiting for sound playback. We have no audio backend, so the frame-6 loop exits immediately. | No audio simulation; test design assumes wall-clock playback | gnash/testsuite/misc-swfc.all/sound.sc |
 | opcode_guard_test (misc-ming) | 8 | Gnash's expected output omits the `Target not found` warning on a failed `setTarget`; we and Ruffle both emit it. We are MORE correct than Ruffle on the test's mc1 event-handler assertions, so the resulting line shift puts our diff indices outside Ruffle's diff set — the verify_output.py subset_match cannot promote us. | Match Flash/Ruffle (warning emitted); cannot suppress without breaking AVM1 tell_target_invalid / path_string etc. | Ruffle source `core/src/avm1/globals/movie_clip.rs` set_target trace |
-| argstest-v6 (actionscript.all) | 5000+ | Native objects walked by the test (PrintJob, MovieClipLoader, …) are unimplemented / carry placeholder prototypes; recursive for-in descent multiplies the divergence (7731 actual vs 2192 expected). Ruffle under-emits (~1298 lines), so our diff is not a subset. | Enumeration coverage/order divergence, not a callable-API bug | ECMA-262 §12.6.4 (enumeration order unspecified) |
-| argstest-v7 (actionscript.all) | 5000+ | Same as argstest-v6 (7731 actual vs 2061 expected). | Same | Same |
+| argstest-v6 (actionscript.all) | 5000+ | Native objects walked by the test (PrintJob, MovieClipLoader, …) are unimplemented / carry placeholder prototypes; recursive for-in descent multiplies the divergence (2644 actual vs 2192 expected). Ruffle under-emits (~1298 lines), so our diff is not a subset. | Enumeration coverage/order divergence, not a callable-API bug | ECMA-262 §12.6.4 (enumeration order unspecified) |
+| argstest-v7 (actionscript.all) | 5000+ | Same as argstest-v6 (2644 actual vs 2061 expected). | Same | Same |
 | argstest-v8 (actionscript.all) | 5000+ | Same as argstest-v6 (8093 actual vs 2434 expected). | Same | Same |
-| matrix_accuracy_test1 (misc-swfc) | 8 | Twips arithmetic at INT_MIN/INT_MAX boundaries. Most lines already FAILED in both expected and ours (Gnash's own output disagrees with Flash); residual is off-by-one u32-wrap (`2³²` vs `2³²−1`). Ruffle panics on this test, no `output.ruffle.txt`, so no subset-match. | Off-by-one at fixed-point representation limits | Twips fixed-point; Gnash expected itself wrong vs Flash |
+| matrix_accuracy_test1 (misc-swfc) | 6 (was 8) | Twips arithmetic at INT_MIN/INT_MAX boundaries. Oracle is a Flash 10 capture (`output.fp10.txt`; FP9 passes all 15). `_x`/`_y` INT32_MIN overflow fixed s26; residual is float `_xscale` (`2³²` vs `2³²−1`) and Flash 10 extreme-scale `_width`/`_height`. Ruffle panics on this test, no `output.ruffle.txt`, so no subset-match. | Float scale storage + unknown FP10 matrix internals | Twips fixed-point; Flash 10 capture (s26 w1-trace-tail-audit §3) |
 | register_class/RegisterClassTest4 (misc-ming) | 25 | Flash-quirky construct/load/unload cycle. Ruffle itself diverges from Flash by 33+ lines (continues the cycle past the dejagnu summary). Both we and Ruffle reorder `load` differently from Flash, but at different indices, so subset_match cannot promote. Multiple structural attempts at the underlying sprite-rewind / inter-tag UNLOAD machinery have regressed RCT4 itself by ~10 lines with no plan-target gain (see `blocked/INTER_TAG_UNLOAD_PLAN.md` and `blocked/SPRITE_REWIND_IDENTITY_PLAN.md` 2026-05-03 entries). | Differently-divergent from Ruffle (load ordering opposite direction; we additionally lose per-cycle counter and drop the trailing post-summary block) | `gnash/testsuite/misc-ming.all/RegisterClassTest4.c` |

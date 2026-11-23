@@ -155,9 +155,19 @@ This pattern repeats for every prototype object in the test (~50+ prototypes × 
 
 **Test:** `globals_swf5`
 
-In Flash Player, `LocalConnection`, `NetConnection`, and `Video` are not accessible in SWF5 — `typeof(LocalConnection)` returns `"undefined"`. This is confirmed by Gnash test suite tests (`LocalConnection-v5`, `NetConnection-v5`, `Video-v5`) which specifically assert these are undefined in SWF5.
+> **Correction (s24 `w1-native-proto-report.md` §3, re-confirmed s26 `w1-trace-tail-audit-report.md` §5).**
+> The original rationale below ("Flash hides them") is refuted. `globals_swf5` is `known_failure = true`, and
+> `output.ruffle.txt` differs from `output.txt` **only at line 136** — so `output.txt`, which is Flash's capture,
+> shows LocalConnection/NetConnection/Video **visible** (`[type Function] / function / object`) in SWF5, and Ruffle
+> matches Flash there. Gnash's `LocalConnection-v5`, `NetConnection-v5`, `Video-v5` (Flash-unverified here) assert
+> hidden; all three are `known_failure` and `pass` for us. **We follow gnash because flipping costs 3 known_failure
+> passes** (they would demote to `ruffle_matched`, a regression), and `globals_swf5` would still fail on line 136
+> (`typeof TextField.prototype` at SWF5: Flash `undefined`, Ruffle and we `object`; the TextField-gate family —
+> do not chase it). This entry is therefore a deliberate gnash-over-Flash choice, not a Ruffle-vs-Flash difference.
 
-Ruffle's `globals_swf5` test expects all three to be visible as `[type Function]` in SWF5. Our implementation uses `flash_flags=0x0080` (hidden by SWF5 version mask `0x7480`) to match Flash's behavior.
+Original (refuted) text: In Flash Player, `LocalConnection`, `NetConnection`, and `Video` are not accessible in SWF5 — `typeof(LocalConnection)` returns `"undefined"`. This is confirmed by Gnash test suite tests (`LocalConnection-v5`, `NetConnection-v5`, `Video-v5`) which specifically assert these are undefined in SWF5.
+
+Ruffle's `globals_swf5` test expects all three to be visible as `[type Function]` in SWF5. Our implementation uses `flash_flags=0x0080` (hidden by SWF5 version mask `0x7480`) to follow the gnash v5 tests.
 
 ```diff
 - [type Function]    // LocalConnection (line 66)
@@ -170,9 +180,9 @@ Ruffle's `globals_swf5` test expects all three to be visible as `[type Function]
 
 Same pattern for NetConnection (lines 90-92) and Video (lines 146-148).
 
-**Impact:** 9 diff lines (3 constructors × 3 lines each: value, typeof, own_props).
+**Impact:** 10 diff lines: 9 (3 constructors × 3 lines each: value, typeof, own_props) plus line 136 (`typeof TextField.prototype`). The row is 294/304 (10 lines since at least s18; the old "295/304, 9 lines" was never the count).
 
-**Decision:** Keep Flash-correct behavior (hidden in SWF5). Gnash tests `LocalConnection-v5`, `NetConnection-v5`, `Video-v5` confirm this is correct. Accept `globals_swf5` at 295/304 as a Ruffle-vs-Flash difference.
+**Decision:** Keep hiding them in SWF5 to keep the gnash `LocalConnection-v5`, `NetConnection-v5`, `Video-v5` passes (Flash's own capture shows them visible). Accept `globals_swf5` at 294/304; keep the ignore entry.
 
 ## PlaceObject Before DefineSprite (Place-Before-Define)
 
@@ -307,6 +317,10 @@ specified anywhere; each player just exposes its own property store:
 > `toString, value, toNumber, toBoolean, valueOf`. That is Tamarin's
 > `InlineHashtable` slot/bucket layout, not insertion order. Three engines,
 > three orders — see `ACCEPTED_DIFFS.md` Category 12 for the full table.
+> (s26 `w1-trace-tail-audit` §6: avmplus order is pointer-hashed — keyed on
+> interned-string addresses — so it is not reproducible either. Neither
+> `loader_load` nor `bom` is `known_failure`: Ruffle passes both, so their
+> `output.txt` is Ruffle's own hashbrown order, not a Flash capture.)
 >
 > **The decisions in this section are unchanged**: Ruffle's expectations for
 > `loader_load` and `bom` are still its own `hashbrown` bucket order and still

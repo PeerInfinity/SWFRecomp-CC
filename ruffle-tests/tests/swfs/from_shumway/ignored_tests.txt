@@ -78,6 +78,11 @@
 #                           Flash's 34 — we report MORE objects under the point
 #                           than Flash does. Hit-test containment breadth, the
 #                           same family as the avm2 hit-test rows.
+#   esc                     (reason added s26 `w1-trace-tail-audit` §6; NOT
+#                           known_failure upstream) `output_mismatch` 0/2 —
+#                           runtime ESC compile + `loadBytes` of generated ABC:
+#                           AOT ceiling (Cat 13 class). The #1009 in its script
+#                           init is a robustness lead only; fixing it caps at 1/2.
 # None is an accepted diff. Prune each the moment it reaches `pass`.
 MaskTest-3
 avm1movie
@@ -85,3 +90,8 @@ esc
 flash_net_SharedObject
 flash_text_TextField2
 getobjectsunderpoint
+
+# --- Accepted diffs (see avm1/_investigation/ACCEPTED_DIFFS.md Category 9) ---
+# JPEG decoder parity: Flash 200d04 vs ours/libjpeg-turbo 220a06, 1 of 2 lines.
+# Prune criterion: a decoder that reproduces Flash's IDCT/upsampling lands.
+bitmapdata/getpixel-from-embedded

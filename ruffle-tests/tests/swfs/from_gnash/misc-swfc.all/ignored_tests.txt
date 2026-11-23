@@ -14,10 +14,10 @@
 # `gotoandPlay` dispatch, fixed in actionCallFunction. w1-trace-tail-audit report §1.)
 
 # matrix_accuracy_test1 — MovieClip transform values at INT_MIN/INT_MAX twip
-# boundaries. Most diff lines are FAILED in both expected and ours (Gnash own
-# output disagrees with Flash); residual is off-by-one u32-wrap (2^32 vs
-# 2^32-1). Ruffle panics on this test (known_failure.panic) and ships no
-# output.ruffle.txt, so no ruffle_matched promotion path exists.
-# See _investigation/ACCEPTED_DIFFS.md Category 4 and
-# _investigation/incomplete/MATRIX_ACCURACY_TEST1_DECISION.md.
+# boundaries. The graded oracle is a Flash 10 capture (output.fp10.txt; FP9
+# passes all 15), not Gnash's own output (s26 correction). _x/_y INT32_MIN
+# overflow fixed s26 (12/18); residual is float _xscale (2^32 vs 2^32-1) and
+# Flash 10 extreme-scale _width/_height. Ruffle panics on this test
+# (known_failure.panic) and ships no output.ruffle.txt, so no ruffle_matched
+# promotion path exists. See _investigation/ACCEPTED_DIFFS.md Category 4.
 matrix_accuracy_test1

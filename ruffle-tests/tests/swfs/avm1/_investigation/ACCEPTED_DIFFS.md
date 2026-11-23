@@ -394,10 +394,10 @@ the 293-line test causes this 4-line known-failure test to fail.
 
 **Decision:** Accept; Ruffle known failure, contradicts `tab_ordering_properties` expectations.
 
-### `bitmap_data_thorough/pixelDissolve` — Flash-specific Feistel return value (Ruffle panics)
+### `bitmap_data_thorough/pixelDissolve` — Flash's dissolve permutation is not Ruffle's Feistel (Ruffle panics)
 
 > **Axis note (2026-08-01, session 9 pixel triage).** This entry is **trace-axis
-> only** — the ~38 diffs are output *lines*. The test has no `[image_comparisons]`
+> only** — the diffs (~38 then, 20 since s26) are output *lines*. The test has no `[image_comparisons]`
 > block at all, so it disposes of nothing on the pixel side; earlier triage
 > prototypes wrongly carried it as an image disposition.
 
@@ -410,24 +410,35 @@ num_frames = 1
 known_failure.panic = "attempt to add with overflow"
 ```
 
-**Status:** 1333 / 1371 (97.2%) match. Remaining 38 diff lines are all in the
-`pixelDissolve` return value (Feistel `raw_perm_index`) and the dest pixel
-positions chosen by the Feistel permutation, for calls where `random_seed` is
-something other than a plain finite integer (e.g. `null`, `undefined`,
-`objLooksLikeNum.valueOf()`).
+**Status:** 1351 / 1371 (98.5%) match (was 1333, then 1335; +16 in s26
+`w1-trace-tail-audit`). The remaining 20 diff lines are the `pixelDissolve`
+return value and the dest pixel positions chosen by the permutation.
+
+**Mechanism (corrected s26, `SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md` §2):**
+Flash's dissolve permutation is not Ruffle's guessed Feistel: plain integer
+seeds diverge too, and Flash returns indices our permutation cannot reach.
+(The earlier text blamed coercion of non-integer seeds — `null`, `undefined`,
+`valueOf` — which was wrong.) On the 2×2 transparent block, seeds 0 / 2 / −1 / −2
+give Flash 2 / 1 / 2 / 1 vs ours 1 / 3 / 0 / 3, and Flash's `2` is unreachable
+from any start index under Ruffle's 1-round Feistel (`operations.rs:1748`,
+ported in `action.c`). Seeds 2 and 10 also differ, so Flash keys on more than
+`seed mod 4`; a 60-variant brute force matched at most 7/11 data points.
+
+**Fixed by s26 P2 (the +16):** `numPixels == 0` (`null`/`undefined`/`{}`/`0`)
+now returns `randomSeed` unchanged and still writes pixel (0,0); `numPixels < 0`
+is clamped to the full sequence length (Flash writes every pixel). The two
+return values on the negative-count blocks stay wrong (permutation lines).
 
 Ruffle panics with `attempt to add with overflow` while running this test, so
 no `output.ruffle.txt` exists for `ruffle_subset_match` to promote us. The
-expected `output.txt` was produced by Flash Player itself. Without a Flash
-oracle, we can't determine whether Flash's coercion path is `coerce_to_i32`
-(invokes `valueOf`), some plain integer cast, or something else entirely for
-each arg type — and small differences in the seed change the entire Feistel
-sequence.
+expected `output.txt` was produced by Flash Player itself and IS the oracle;
+the Ruffle exporter cannot help because Ruffle's permutation is the guess
+being refuted.
 
 **Decision:** Accept; Ruffle known-failure (panic) prevents `ruffle_matched`
-promotion, and matching Flash exactly requires reverse-engineering Adobe's
-exact coercion semantics. Most pixel placements (and all sentinel return
-codes for missing/invalid args) match.
+promotion, and the remaining 20 lines need Flash's real permutation (L,
+unknowable without many more Flash captures). All sentinel return codes for
+missing/invalid args match.
 
 ---
 
@@ -435,10 +446,12 @@ codes for missing/invalid args) match.
 
 Tests where shape-accurate `hitTest(x, y, true)` results differ due to inherent
 differences in font glyph outlines, morph boundary precision, and Drawing API
-stroke tessellation accuracy. 329/338 lines pass; the remaining 9 are at exact
-geometric boundaries where our implementation disagrees with Ruffle's.
+stroke tessellation accuracy. 332/338 lines pass; the remaining **6** (lines 71,
+171–177 and 296; was 9 — corrected s26 `w1-trace-tail-audit` §5, first flagged s24
+`w1-avm1-tail` lead 3) are at exact geometric boundaries where our implementation
+disagrees with Ruffle's.
 
-### `movieclip_hittest_shapeflag` — Noto Sans vs Flash device font glyph outlines (7 diff lines)
+### `movieclip_hittest_shapeflag` — Noto Sans vs Flash device font glyph outlines (5 diff lines; was 7)
 
 **Example diff (text glyph boundary):**
 ```
@@ -449,7 +462,8 @@ geometric boundaries where our implementation disagrees with Ruffle's.
 
 Hit testing against text glyphs uses Noto Sans TTF outlines (our device font substitute).
 Flash Player uses its own proprietary built-in device fonts with different glyph outlines.
-At coordinates near glyph curve boundaries (lines 71, 163, 165, 167, 171, 175, 177), the
+At coordinates near glyph curve boundaries (originally lines 71, 163, 165, 167, 171, 175, 177;
+as of s26 only line 71 and the 171–177 run still differ), the
 Noto Sans outline includes or excludes the test point differently than Flash's font.
 
 Not fixable without Flash's actual glyph outlines, which are proprietary.
@@ -473,7 +487,7 @@ technically correct within their precision domains.
 
 **Decision:** Accept; inherent floating-point vs integer precision difference at exact boundary.
 
-### `movieclip_hittest_shapeflag` — Drawing API stroke tessellation (1 diff line)
+### `movieclip_hittest_shapeflag` — Drawing API stroke tessellation (0 diff lines as of s26; was 1)
 
 **Example diff (scribble curve boundary):**
 ```
@@ -481,6 +495,8 @@ technically correct within their precision domains.
 - false
 + true
 ```
+
+(s26: line 137 is no longer in the diff set — the audit lists only 71, 171–177, 296.)
 
 Line 137: A stroke-only Drawing API shape ("scribble") is hit-tested near a curve boundary.
 Our stroke hit testing uses quad expansion (perpendicular rectangles around flattened curve
@@ -676,6 +692,31 @@ The trace axis is separately triaged in `ruffle-tests/tests/swfs/avm2/ignored_te
 statement and says nothing about the pixels. Measured at run `31647430265`
 (`bf585e448`). Re-triage with the video/decoder arc — it is a live pixel row, not
 a capped one.
+
+### `from_shumway/bitmapdata/getpixel-from-embedded` — JPEG decoder parity (1 diff line of 2; trace axis)
+
+<!-- image-axis: none -->
+
+Added s26 (`SWFRecompDocs/plans/session26-fanout-reports/w1-trace-tail-audit-report.md`
+§6; recommended by s24 `w1-avm1-tail` and s22 `w1-trace-tail` §10, standing NO-GO
+"a disposition, not a fix" since s19/s20). Same family as the video rows above — a
+still-image decoder this time, not a video codec.
+
+```diff
+  908a8c
+- 200d04
++ 220a06
+```
+
+`getPixel(100, 100)` on an embedded DefineBits/JPEG2 (140×140, 4:2:0, gd-jpeg/IJG
+q90). Pillow (libjpeg-turbo, ISLOW, fancy upsampling) gives `220a06` — exactly ours;
+ffmpeg planes with replicate upsampling give `200b06`; Flash is `200d04`. No
+standard decoder configuration reproduces Flash's decoder. Upstream marks the row
+`known_failure.ruffle_check = false` because Ruffle's own JPEG output is
+platform-variable too, and there is no `output.ruffle.txt`.
+
+**Decision:** Accept; matching would mean reverse-engineering Flash's JPEG
+decoder (IDCT + chroma upsampling) for one pixel. (Ignored in `from_shumway/ignored_tests.txt` as `bitmapdata/getpixel-from-embedded`, s26.)
 
 ---
 
@@ -1024,14 +1065,15 @@ assertion actually fails, it is a real bug and does not belong here.
 
 Source (`Test.as:19-24`) enumerates the literal
 `{ length:4, company:"netscape", year:2000, 0:"zero" }`. Three engines, three
-different orders — and **none of them is insertion order**:
+different orders. None is *source* order, but ours is AVM2 `newobject`
+insertion order (corrected s26 `w1-trace-tail-audit` §6 — see below):
 
 | engine | order |
 |---|---|
 | avmplus (`output.txt`, the graded oracle) | `0, company, year, length` |
 | Ruffle (`output.ruffle.txt`) | `year, company, length, 0` |
 | ours | `0, year, company, length` |
-| (insertion order, for reference) | `length, company, year, 0` |
+| (source order, for reference) | `length, company, year, 0` |
 
 ```diff
   object[0] PASSED!
@@ -1046,7 +1088,10 @@ All 16 assertions PASS on both sides; the test is checking `object[prop]` values
 and `properties.length`, and every one of those checks succeeds. Our leading `0`
 is our documented integer-keys-first dynamic-property rule, which also matches
 modern ECMAScript (ES2015 `OrdinaryOwnPropertyKeys`: integer-like keys ascending,
-then string keys in insertion order).
+then string keys in insertion order). Our string-key order `year, company,
+length` is that insertion order: AVM2 `newobject` pops the pushed name/value
+pairs last pair first, so the object literal's properties are *inserted* in
+reverse source order — not source order.
 
 ### `from_avmplus/ecma3/Statements/eforin_002` (10 diff lines of 10)
 
@@ -1243,19 +1288,20 @@ Category 14 NO-GO documented here — is untouched and unaffected.
 | ~~`movieclip_state_values`~~ | ~~Missing feature~~ | ~~75~~ | **REMOVED** — now PASS (114/114) via image loading support |
 | ~~`string_paths_reference_launder`~~ | ~~Ruffle known failure (stack_push)~~ | ~~2~~ | **RESOLVED 2026-08-01** — now PASS; we match Flash where Ruffle does not. De-listed from `ruffle-tests/ignored_tests.txt` |
 | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
-| `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 5 (was 7; s26) | Accept; proprietary Flash font metrics |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
-| `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
-| `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 (trace lines; **no image comparison exists**) | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 0 (was 1; line 137 no longer differs, s26) | Accept; tessellation boundary |
+| `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash's dissolve permutation is not Ruffle's Feistel (corrected s26) | 20 (trace lines; **no image comparison exists**; was ~38) | Accept; 98.5% match, no Ruffle oracle for `ruffle_matched` |
 | `avm1/netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision (Category 9) | **44** image outliers, max diff **3** (was ~52k/64, then 1654/8) | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render. Mechanism corrected twice: the colour half was `sws_scale` (ported exactly, 2026-08-06) and the second half was the missing deblocking filter (ported 2026-08-12); the residual is Spark IDCT precision × the GPU sample-stretch |
 | `visual/video/deblocking` | Spark IDCT precision on the least-quantised stream (Category 9) — deblocking filter + flags byte + `MAX_EMBEDDED_VIDEO_STREAMS` 8→16 all landed 2026-08-12 | **104** image outlier channels, max **4**, mean 0.0 (was 2 906 999 / 255) | Accept (image axis only; trace passes). 11 of 12 streams byte-exact; all 104 channels are one Cb level on chroma row 232 of stream 9, whose planes have no remainder lane — decoder precision, not the filter |
 | `visual/video/colorconversion/h263` | Spark IDCT precision after the exact BT.601 port (Category 9) | 10 808 image outlier channels, max 2 | Accept (image axis only; trace passes). Every `idct_algo` arm still fails `max_outliers = 0`, and the closest one is a float IDCT = CI determinism hazard |
+| `from_shumway/bitmapdata/getpixel-from-embedded` | JPEG decoder parity: Flash `200d04` vs ours/libjpeg-turbo `220a06` (Category 9) | 1 of 2 (trace) | Accept; no standard decoder configuration reproduces Flash; Ruffle is platform-variable (`known_failure.ruffle_check = false`), no `output.ruffle.txt`. Added s26 |
 | ~~`visual/simple_shapes/masks`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
 | ~~`visual/simple_shapes/masks_equal_clipdepth`~~ | ~~Graphics: 1-sample rasteriser tie (Category 11)~~ | **0** | **RESOLVED 2026-10-16 (s22 `w2-float-verts`) — vertex quantization, not a tie; image-axis exclusion withdrawn** |
 | `avm2/verify_method_info_duplicate` | Cross-test inconsistent Flash captures (Category 2) — the trailing `#1065` contradicts the PASSING `verify_method_info_oob` | 1 of 2 | Accept; the +1 is only reachable by keying the error on `1121`, which would demote `_oob` to `ruffle_matched`. Suite-local ignore only |
 | ~~`watch_special_recursion_swf7`~~ (= `watch_recursion_swf7`) | ~~Deep watch re-entrancy (SWF7) + o2 addProperty/watch interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 1042/1042. De-listed from `ignored_tests.txt`; see Category 10** |
 | ~~`watch_special_recursion_double_swf7`~~ (= `watch_recursion_double_swf7`) | ~~Deep mutual watch re-entrancy (130-deep, overflows C stack) + o2 interplay~~ | **0** | **RESOLVED 2026-08-12 — passes 3118/3118. De-listed; see Category 10** |
-| `from_avmplus/ecma3/Statements/eforin_001` | Implementation-defined `for...in` order (Category 12) | 4 of 16 | Accept; every line is `PASSED!` on both sides, only the sequence differs; avmplus, Ruffle and we produce three different orders and none is insertion order |
+| `from_avmplus/ecma3/Statements/eforin_001` | Implementation-defined `for...in` order (Category 12) | 4 of 16 | Accept; every line is `PASSED!` on both sides, only the sequence differs; avmplus, Ruffle and we produce three different orders; ours is `newobject` insertion order (last pair first), not source order |
 | `from_avmplus/ecma3/Statements/eforin_002` | Implementation-defined `for...in` order (Category 12) | 10 of 10 | Accept; ours IS insertion order (the ES2015+ rule); `ruffle_matched` unreachable because Ruffle's order differs from ours too |
 | `avm2/loader_applicationDomain` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 4 of 4 | Accept; would require shipping an AVM2 interpreter |
 | `avm2/swz` | AOT ceiling: runtime-loaded Flex `framework_*.swz` ABC (Category 13) | 2 of 2 | Accept; same mechanism as `loader_applicationDomain` |

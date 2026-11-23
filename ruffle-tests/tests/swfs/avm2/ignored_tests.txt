@@ -239,9 +239,11 @@ swz
 # would buy nothing and mislabel the pixel board.
 #
 # loader_load, bom: Ruffle enumerates AVM2 dynamic properties in hashbrown
-#   bucket order; URLVariables.toString joins in `for (p in this)` order. We and
-#   Flash use insertion order. Unreproducible without emulating FNV-1a + the
-#   hashbrown SIMD bucket layout. bom's ceiling is 6/9, loader_load's 126/128.
+#   bucket order; URLVariables.toString joins in `for (p in this)` order. We use
+#   insertion order (NOT Flash's: avmplus order is pointer-hashed; neither row is
+#   known_failure — s26 w1-trace-tail-audit §6). Unreproducible without emulating
+#   FNV-1a + the hashbrown SIMD bucket layout. bom's ceiling is 6/9,
+#   loader_load's 126/128.
 #   avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md
 #   "AVM2 dynamic-property enumeration order: URLVariables.toString".
 # dependent_strings: the test calls text.ruffle::isDependent() under

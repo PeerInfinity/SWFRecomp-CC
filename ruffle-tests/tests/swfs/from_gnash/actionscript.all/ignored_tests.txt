@@ -26,8 +26,9 @@
 # objects the test descends into (PrintJob, MovieClipLoader, LocalConnection,
 # textRenderer, System.IME, ...) are unimplemented / carry placeholder
 # prototypes, so for-in coverage and order diverge and the recursive descent
-# multiplies it to a ~3.5x line blow-up (7731/7731/8093 actual vs
-# 2192/2061/2434 expected). known_failure upstream, but Ruffle under-emits
+# multiplies it to a ~1.2-1.3x line blow-up (2644/2644/3006 actual vs
+# 2192/2061/2434 expected; counts refreshed s26 w1-trace-tail-audit, were
+# 7731/7731/8093). known_failure upstream, but Ruffle under-emits
 # (~1298 lines) so our diff is not a subset -> no ruffle_matched promotion.
 # See _investigation/ACCEPTED_DIFFS.md Category 3 and
 # _investigation/incomplete/ARGSTEST_VN_DECISION.md.
