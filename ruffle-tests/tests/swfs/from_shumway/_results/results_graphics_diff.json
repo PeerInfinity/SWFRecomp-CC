@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T19:43:31.795355+00:00",
-    "old_git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
-    "new_timestamp": "2026-11-23T22:39:55.428710+00:00",
-    "new_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
+    "old_timestamp": "2026-11-23T22:39:55.428710+00:00",
+    "old_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
+    "new_timestamp": "2026-11-23T23:56:29.059738+00:00",
+    "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 214,
@@ -13,21 +16,119 @@
     "old_effective_pass": 227,
     "old_total": 229,
     "old_pass_rate": 93.4,
-    "new_pass": 214,
-    "new_ruffle_matched": 13,
-    "new_effective_pass": 227,
-    "new_total": 229,
-    "new_pass_rate": 93.4,
+    "new_pass": 207,
+    "new_ruffle_matched": 12,
+    "new_effective_pass": 219,
+    "new_total": 221,
+    "new_pass_rate": 93.7,
     "old_mismatched_lines": 77,
-    "new_mismatched_lines": 77,
+    "new_mismatched_lines": 57,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 229,
+    "unchanged": 221,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 8
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3-loader/LoaderTest2",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/bug1093712/loader",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/bug1157243/empty",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/bug1157243/invalid",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/events/loader-events",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "ruffle_matched",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 16
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/loaderinfo/Preloader",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as3-loader/loaderinfo/loaded-content-properties",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 48,
+        "expected_lines": 48,
+        "matching_lines": 48
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1/array",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    }
+  ]
 }

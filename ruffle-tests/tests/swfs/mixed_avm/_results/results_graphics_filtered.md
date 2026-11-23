@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-11-23 22:39 UTC
+**Date**: 2026-11-23 23:56 UTC
 
-**Git SHA**: `7e14f54dd9`
+**Git SHA**: `005bea42a2`
 
-**Run Duration**: 1m 25s
+**Run Duration**: 1m 18s
 
 **Filtered**: 0 tests ignored out of 12 available
 
@@ -12,14 +12,12 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 12 |
-| Passing | **10** (83.3%) |
-| Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **11** (91.7%) |
+| Total tests | 11 |
+| Passing | **10** (90.9%) |
 | Failing | 1 |
-| Total expected lines | 79 |
-| Matching lines | 57 (72.2%) |
-| Mismatched lines | 22 |
+| Total expected lines | 53 |
+| Matching lines | 49 (92.5%) |
+| Mismatched lines | 4 |
 
 ### Failure Breakdown
 
@@ -33,24 +31,16 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `avm1_doabc` | 1 | 1.5s |  |
-| 2 | `avm1_loads_avm2_doaction` | 2 | 1.5s |  |
-| 3 | `avm1_sprite_sc_ignored` | 3 | 18.5s |  |
+| 1 | `avm1_doabc` | 1 | 1.4s |  |
+| 2 | `avm1_loads_avm2_doaction` | 2 | 2.4s |  |
+| 3 | `avm1_sprite_sc_ignored` | 3 | 18.3s |  |
 | 4 | `avm2_doaction` | 1 | 6.7s |  |
-| 5 | `avm2_loads_avm1` | 14 | 6.8s |  |
+| 5 | `avm2_loads_avm1` | 14 | 9.3s |  |
 | 6 | `avm2_loads_avm1_doabc` | 4 | 6.9s |  |
 | 7 | `avm2_loads_avm1_loads_avm2_doabc` | 3 | 9.7s |  |
-| 8 | `avm2_loads_avm1_loads_into_root` | 2 | 7.0s |  |
-| 9 | `avm2_loads_avm1_v10` | 8 | 7.3s |  |
-| 10 | `avm2_loads_avm1_v9` | 8 | 7.3s |  |
-
-## Ruffle-Matched Tests
-
-**1 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
-
-| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
-|---|------|-----------|--------------|----------|-------|
-| 1 | `avm2_loads_avm1_events` | 18 | 18 | 10.1s |  |
+| 8 | `avm2_loads_avm1_loads_into_root` | 2 | 6.9s |  |
+| 9 | `avm2_loads_avm1_v10` | 8 | 7.2s |  |
+| 10 | `avm2_loads_avm1_v9` | 8 | 7.1s |  |
 
 ## Near-Passing Tests
 

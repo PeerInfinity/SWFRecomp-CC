@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T22:39:56.878558+00:00",
+    "timestamp": "2026-11-23T23:56:31.777713+00:00",
     "suite": "stage3d",
     "stem": "results_graphics",
-    "git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
+    "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
     "source": "results_graphics.json",
-    "incomplete": false,
-    "run_id": "45273227748",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45273227748",
+    "incomplete": true,
+    "run_id": "45284922078",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45284922078",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 5,
   "comparisons": 5,
   "ignored": 0,
-  "pass": 5,
+  "pass": 4,
   "fail": 0,
-  "skip": 0,
+  "skip": 1,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 100.0,
+  "pass_rate": 80.0,
   "results": [
     {
       "suite": "stage3d",
@@ -145,31 +145,11 @@
       "suite": "stage3d",
       "test": "unbound_texture_multiple",
       "comparison": "output",
-      "trace_status": "pass",
+      "trace_status": null,
       "known_failure": false,
-      "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
-      "max_diff": 0,
-      "expected_source": "repo",
-      "width": 550,
-      "height": 400,
-      "total_channels": 880000,
-      "diff_channels": 0,
-      "mean_diff": 0.0,
-      "checks": [
-        {
-          "tolerance": 1,
-          "max_outliers": 0,
-          "outliers": 0,
-          "passed": true
-        }
-      ],
-      "applicable_checks": 1,
-      "failed_checks": 0,
-      "outliers": 0,
-      "max_outliers": 0,
-      "tolerance": 1,
-      "excess_outliers": 0
+      "status": "skip",
+      "reason": "test_not_run",
+      "message": "no image comparison recorded for this run"
     }
   ]
 }

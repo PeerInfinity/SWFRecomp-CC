@@ -1,17 +1,17 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-23 22:39 UTC
+**Date**: 2026-11-23 23:56 UTC
 
-**Git SHA**: `7e14f54dd9`
+**Git SHA**: `005bea42a2`
 
-**Run Duration**: 1m 29s
+**Run Duration**: 1m 22s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 8 |
-| Passing | **8** (100.0%) |
+| Total tests | 7 |
+| Passing | **7** (100.0%) |
 | Failing | 0 |
 | Total expected lines | 216 |
 | Matching lines | 216 (100.0%) |
@@ -19,18 +19,17 @@
 
 ## Passing Tests
 
-**8 tests passing**
+**7 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `draw_to_bitmap_data_unconfigured` | 8 | 24.4s |  |
-| 2 | `request_matching_profiles` | 190 | 9.1s |  |
-| 3 | `request_profiles` | 16 | 7.0s |  |
-| 4 | `sampler_odd_size` | 1 | 9.2s |  |
-| 5 | `scissor_rectangle` | 0 | 8.5s |  |
-| 6 | `scissor_rectangle_invalid` | 1 | 9.0s |  |
+| 1 | `draw_to_bitmap_data_unconfigured` | 8 | 23.9s |  |
+| 2 | `request_matching_profiles` | 190 | 9.3s |  |
+| 3 | `request_profiles` | 16 | 9.8s |  |
+| 4 | `sampler_odd_size` | 1 | 9.1s |  |
+| 5 | `scissor_rectangle` | 0 | 9.1s |  |
+| 6 | `scissor_rectangle_invalid` | 1 | 11.9s |  |
 | 7 | `unbound_texture` | 0 | 9.1s |  |
-| 8 | `unbound_texture_multiple` | 0 | 12.8s |  |
 
 ## Near-Passing Tests
 

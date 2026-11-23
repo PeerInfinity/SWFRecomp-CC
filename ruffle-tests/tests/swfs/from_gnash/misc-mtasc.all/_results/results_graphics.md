@@ -1,23 +1,23 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-23 22:39 UTC
+**Date**: 2026-11-23 23:56 UTC
 
-**Git SHA**: `7e14f54dd9`
+**Git SHA**: `005bea42a2`
 
-**Run Duration**: 1m 49s
+**Run Duration**: 1m 54s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 9 |
-| Passing | **7** (77.8%) |
-| Ruffle-matched | 2 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **9** (100.0%) |
+| Total tests | 8 |
+| Passing | **7** (87.5%) |
+| Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **8** (100.0%) |
 | Failing | 0 |
-| Total expected lines | 231 |
-| Matching lines | 211 (91.3%) |
-| Mismatched lines | 20 |
+| Total expected lines | 163 |
+| Matching lines | 162 (99.4%) |
+| Mismatched lines | 1 |
 
 ## Passing Tests
 
@@ -25,22 +25,21 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 2.0s |  |
-| 2 | `exception` | 35 | 19.9s |  |
-| 3 | `function_test` | 26 | 19.3s |  |
+| 1 | `enum` | 19 | 2.1s |  |
+| 2 | `exception` | 35 | 25.4s |  |
+| 3 | `function_test` | 26 | 19.0s |  |
 | 4 | `hello` | 8 | 1.9s |  |
-| 5 | `implementsOpTest` | 28 | 19.0s |  |
+| 5 | `implementsOpTest` | 28 | 24.2s |  |
 | 6 | `inheritance` | 22 | 19.1s |  |
 | 7 | `super_test1` | 17 | 3.1s |  |
 
 ## Ruffle-Matched Tests
 
-**2 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**1 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `TextFieldTest` | 1 | 1 | 19.4s |  |
-| 2 | `levels` | 19 | 21 | 5.2s |  |
+| 1 | `TextFieldTest` | 1 | 1 | 18.7s |  |
 
 ## Near-Passing Tests
 

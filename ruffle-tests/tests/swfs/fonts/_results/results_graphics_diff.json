@@ -1,11 +1,14 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T19:43:31.768477+00:00",
-    "old_git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
-    "new_timestamp": "2026-11-23T22:39:55.401654+00:00",
-    "new_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
+    "old_timestamp": "2026-11-23T22:39:55.401654+00:00",
+    "old_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
+    "new_timestamp": "2026-11-23T23:56:29.022878+00:00",
+    "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 1,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 8,
@@ -13,11 +16,11 @@
     "old_effective_pass": 9,
     "old_total": 9,
     "old_pass_rate": 88.9,
-    "new_pass": 8,
+    "new_pass": 7,
     "new_ruffle_matched": 1,
-    "new_effective_pass": 9,
-    "new_total": 9,
-    "new_pass_rate": 88.9,
+    "new_effective_pass": 8,
+    "new_total": 8,
+    "new_pass_rate": 87.5,
     "old_mismatched_lines": 14,
     "new_mismatched_lines": 14,
     "increased_mismatches": 0,
@@ -25,9 +28,23 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 9,
+    "unchanged": 8,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 1
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "embed_matching/no_font_found",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    }
+  ]
 }
