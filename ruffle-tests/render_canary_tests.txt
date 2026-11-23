@@ -705,3 +705,8 @@ avm2/bitmapdata_applyfilter_destpoint_edges         # KF band 149477 -> 30394   
 # tier=1
 avm2/blend_shader_luma_lighten                      # CPU PBJ blend, 3 tiers           1 cmp
 visual/blend_modes/shader_as_mask                   # KF band 2100 -> 366               1 cmp
+# s26 w2-cm-chain-cab-edge: PlaceObject3 ColorMatrix chains the fold cannot express run as live filter passes.
+# tier=1
+regression/avm1_po3_color_matrix_live                  # per-pass clamp + alpha-from-colour (exporter golden)  1 cmp
+regression/avm1_po3_color_matrix_live_nested           # sprite-nested arm, same golden                     1 cmp
+regression/avm1_po3_color_matrix_live_clear            # `filters = []` drops the live chain                1 cmp

@@ -207,9 +207,56 @@ struct PlaceCmCompose
 			for (int c = 0; c < 5; c++)
 				m[r][c] = (r == c) ? 1.0 : 0.0;
 	}
+	// s26 w2-cm-chain-cab-edge: where the fold is NOT exact.
+	//  - clamp_bites: a CM after the first receives a colour the previous
+	//    pass clamped (Ruffle color_matrix.wgsl clamps every pass to [0,1]):
+	//    the cumulative map so far can leave [0,1] on the unit cube.
+	//    Grey 200, x2 then x0.5: Ruffle 128, the fold 200.
+	//  - edge_inexact: the pass reads colour into alpha, or alpha into colour.
+	//    The filter sees an AA edge pixel UNPREMULTIPLIED (coverage k in a),
+	//    the fold sees the fragment's straight colour before coverage, so the
+	//    two differ by k on every edge (A' = 0.5 R: Ruffle a = 0.5 k, the
+	//    fold 0.5 k^2).
+	//  - abias: an alpha bias > 0. Kept FOLDED on purpose: our CM pass runs on
+	//    a stage-sized layer and would paint the bias over the whole stage,
+	//    where Ruffle's a = 0 texels divide by zero and stay empty (exporter:
+	//    the gap of w1 probe cm_offdiag stays white).
+	int count = 0;
+	bool clamp_bites = false, edge_inexact = false, abias = false;
+	bool cumulative_in_range() const
+	{
+		for (int r = 0; r < 4; r++)
+		{
+			double lo = m[r][4] / 255.0, hi = m[r][4] / 255.0;
+			for (int c = 0; c < 4; c++)
+			{
+				if (m[r][c] < 0.0) lo += m[r][c];
+				else hi += m[r][c];
+			}
+			if (lo < -1e-6 || hi > 1.0 + 1e-6) return false;
+		}
+		return true;
+	}
+	// The CMs go LIVE (filter passes, tagSetColorMatrixLive) instead of being
+	// folded when the fold is inexact and the placement cx is the identity.
+	// With a placement cx the runtime would apply cx BEFORE the pass (it draws
+	// the source with its cxform), so the fold stays the better approximation.
+	bool live(const s32 mult[4], const s32 add[4]) const
+	{
+		if (!any || abias || !(clamp_bites || edge_inexact)) return false;
+		for (int r = 0; r < 4; r++)
+			if (mult[r] != 256 || add[r] != 0) return false;
+		return true;
+	}
 	// this = cm ∘ this  (cm = the next ColorMatrixFilter in the list)
 	void apply(const float cm[20])
 	{
+		if (count > 0 && !cumulative_in_range()) clamp_bites = true;
+		if (cm[15] != 0.0f || cm[16] != 0.0f || cm[17] != 0.0f || cm[19] < 0.0f
+		    || cm[3] != 0.0f || cm[8] != 0.0f || cm[13] != 0.0f)
+			edge_inexact = true;
+		if (cm[19] > 0.0f) abias = true;
+		count++;
 		double out[4][5];
 		for (int r = 0; r < 4; r++)
 		{
@@ -4991,8 +5038,11 @@ namespace SWFRecomp
 					}
 				}
 
-				// ColorMatrixFilters: one cxform = placement cx ∘ CM_n ∘ … ∘ CM_1.
-				if (has_color_matrix)
+				// ColorMatrixFilters: one cxform = placement cx ∘ CM_n ∘ … ∘ CM_1,
+				// unless the fold is inexact (PlaceCmCompose::live): then the
+				// list's type-6 members render as filter passes.
+				bool cm_live = has_color_matrix && po_cm.live(po_cx_mult, po_cx_add);
+				if (has_color_matrix && !cm_live)
 				{
 					po_cm.emit(cxform_data, po_cx_mult, po_cx_add);
 					cxform_id = (u32) current_cxform;
@@ -5410,6 +5460,8 @@ namespace SWFRecomp
 					}
 
 					context.tag_main << "\ttagEndFilterList(app_context, " << to_string(depth) << ");" << endl;
+					if (cm_live)
+						context.tag_main << "\ttagSetColorMatrixLive(app_context, " << to_string(depth) << ");" << endl;
 				}
 
 				break;
@@ -6478,7 +6530,8 @@ namespace SWFRecomp
 									}
 								}
 							}
-							if (sp_cm.any)
+							bool sp_cm_live = sp_cm.live(sp_cx_mult, sp_cx_add);
+							if (sp_cm.any && !sp_cm_live)
 							{
 								sp_cm.emit(cxform_data, sp_cx_mult, sp_cx_add);
 								cxform_id = (u32) current_cxform;
@@ -6816,6 +6869,9 @@ namespace SWFRecomp
 								static unsigned s_sprite_filter_site = 0;
 								emitSpriteFilterList(sprite_definitions, depth,
 								                     sp_filter_list_start, s_sprite_filter_site++);
+								if (sp_cm_live)
+									sprite_definitions << "\ttagSetColorMatrixLive(app_context, "
+									                   << to_string(depth) << ");" << endl;
 							}
 
 							{

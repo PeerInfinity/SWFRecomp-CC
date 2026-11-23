@@ -355,6 +355,12 @@ typedef struct DisplayObject
 	// deliberately NOT flagged — their root registration entry shares the child
 	// list and is already walked (flagging them would double-fire).
 	u8 attach_standalone;
+
+	// s26 w2-cm-chain-cab-edge: 1 when this placement's ColorMatrix filter-list
+	// members are rendered as live filter passes instead of being folded into
+	// its cxform (tagSetColorMatrixLive; tag.c obj_filter_routed). Placement-
+	// scoped like filter_chain, and cleared with it.
+	u8 cm_live;
 } DisplayObject;
 
 typedef struct KeyState {

@@ -46108,6 +46108,10 @@ static int avm1McHasRuntimeFilters(const MovieClip* mc)
 static void avm1ApplyRuntimeFiltersToEntry(DisplayObject* d, const FilterListData* fl)
 {
 	if (d == NULL) return;
+	// s26 w2-cm-chain-cab-edge: the authored list's LIVE ColorMatrix members
+	// (tagSetColorMatrixLive) go with it; a runtime CM keeps the fold
+	// (tag.c obj_runtime_cm), so leaving cm_live set would run it twice.
+	d->cm_live = 0;
 	if (fl == NULL || fl->count == 0)
 	{
 		d->filter_type = 0;

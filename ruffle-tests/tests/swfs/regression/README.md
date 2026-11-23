@@ -142,3 +142,6 @@ arms cannot be reached any other way.
 | `avm1_device_edittext_xscale` | device-font DefineEditText `textWidth` follows `_xscale` (§7a). Ruffle exporter trace identical |
 | `avm1_hittest_hairline` | committed `lineStyle(0)` paths are hittable in no-graphics too (§3; mode parity). Ruffle exporter trace identical |
 | `avm1_set_new_text_format_color` | `textColor` reads `setNewTextFormat`'s colour (Ruffle getter semantics; trace lock for the §5b render HOLD). Ruffle exporter trace identical |
+| `avm1_po3_color_matrix_live` | **PlaceObject3 ColorMatrix chains the recompile-time fold can't express exactly** (a clamp between passes, alpha read from colour) run as live filter passes (s26 `w2-cm-chain-cab-edge`). Generator `create_test_swf.py` builds all three. Ruffle exporter `0ddd12b6a` render pixel-identical |
+| `avm1_po3_color_matrix_live_nested` | the same chain on a sprite-nested placement; Ruffle render pixel-identical |
+| `avm1_po3_color_matrix_live_clear` | `mc.filters = []` drops the live authored chain; Ruffle render pixel-identical |

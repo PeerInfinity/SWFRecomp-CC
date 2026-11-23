@@ -3711,10 +3711,24 @@ static inline float morph_lerp_color_u8(float start, float end, float t)
 // CPU-side transform table, which a dynamic slot has no entry in).
 static int opaque_bg_local_bounds(DisplayObject* obj, float* b);
 
+// s26 w2-cm-chain-cab-edge: an entry whose PlaceObject3 ColorMatrixFilters the
+// recompiler could NOT fold exactly into its placement cxform
+// (swf.cpp PlaceCmCompose::live: a clamp between chained CMs, or an alpha row
+// that reads colour / RGB rows that read alpha, which an AA edge
+// unpremultiplies differently) carries them as LIVE type-6 chain members
+// (tagSetColorMatrixLive). Such an entry takes the filter route even with no
+// type 1-4 filter (filter_type == 0), and render_filtered_core runs each CM as
+// a per-texel pass (renderer_run_color_matrix), like avm2_render_filtered.
+static inline int obj_filter_routed(const DisplayObject* obj)
+{
+	return obj->filter_type != 0
+	    || (obj->cm_live && obj->filter_chain != NULL);
+}
+
 // Entries Ruffle bitmap-caches: explicit cacheAsBitmap, or any filter list.
 static inline int cab_snaps(const DisplayObject* obj)
 {
-	return obj->cache_as_bitmap || obj->filter_type != 0;
+	return obj->cache_as_bitmap || obj_filter_routed(obj);
 }
 
 // World-space AABB minimum of `obj`'s local bounds under `world`, in twips.
@@ -4724,6 +4738,9 @@ static int build_filter_chain(const DisplayObject* obj,
 		}
 		u8 t = fl->entries[i].type;
 		if (t >= 1 && t <= 4) chain[n++] = &fl->entries[i];
+		// Live (unfolded) ColorMatrix members run in list order
+		// (tagSetColorMatrixLive); folded ones are already in the cxform.
+		else if (t == 6 && obj->cm_live) chain[n++] = &fl->entries[i];
 	}
 	if (n == 0)
 	{
@@ -5169,6 +5186,17 @@ static void render_filtered_core(SWFAppContext* app_context, DisplayObject* obj,
 	{
 		const FilterListEntry* f = chain[fi];
 		int f_last = (fi == chain_n - 1);
+		// s26 w2-cm-chain-cab-edge: a LIVE ColorMatrix member is a per-texel
+		// pass in place on the layer, at any position in the chain, clamped
+		// per pass on unpremultiplied colour (Ruffle color_matrix.wgsl). As
+		// the LAST member it composites through the legacy blit-back, like a
+		// blur (`legacy` below: last->type is not 2/3/4). Same arm as
+		// avm2_display.c avm2_render_filtered.
+		if (f->type == 6)
+		{
+			renderer_run_color_matrix(context, f->cm_matrix);
+			continue;
+		}
 		// The layer the last filter receives is this chain's "source".
 		if (chained && f_last)
 			renderer_snapshot_filter_source(context);
@@ -5396,7 +5424,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				renderer_set_blend_mode(context, 0);
 				continue;
 			}
-			if (obj->filter_type == 0
+			if (!obj_filter_routed(obj)
 			    && renderer_blend_mode_is_layered(context, obj->blend_mode))
 			{
 				renderer_suspend_pass(context);
@@ -5414,7 +5442,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			// s25 w2: a LAYER nested in a filter/blend offscreen (where
 			// is_layered refuses) still isolates its subtree: one child layer
 			// in that offscreen, composited premultiplied-over.
-			if (obj->blend_mode == 2 && obj->filter_type == 0
+			if (obj->blend_mode == 2 && !obj_filter_routed(obj)
 			    && renderer_begin_child_layer(context))
 			{
 				g_layer_group_depth++;
@@ -5553,7 +5581,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		//
 		// Gated on !g_clip_mask_capture like the blend arm above: a filtered
 		// masker contributes its raw silhouette to the stencil.
-		if (obj->filter_type != 0 && !g_clip_mask_capture
+		if (obj_filter_routed(obj) && !g_clip_mask_capture
 		    && g_filter_capture_depth == 0)
 		{
 			// s25 w2: a filtered LAYER entry's filter offscreen IS its group.
@@ -8160,7 +8188,7 @@ static void tf_draw_at_root_depth(SWFAppContext* app_context, int depth,
 // entries never reach render_filtered_object.
 int tag_root_edittext_is_filtered(const DisplayObject* obj)
 {
-	if (obj == NULL || obj->char_id == 0 || obj->filter_type == 0) return 0;
+	if (obj == NULL || obj->char_id == 0 || !obj_filter_routed(obj)) return 0;
 	if (obj->clip_depth > 0) return 0;
 	if (obj->blend_mode == 11 || obj->blend_mode == 12) return 0;
 	// No dictionary-type test: an EditText with empty initial text is never
@@ -8699,7 +8727,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		// Non-trivial blend modes render the object's whole subtree into a layer
 		// and composite it once. Filter+blend on the same object both want
 		// filter_tex_a, so blend keeps the legacy per-draw pipeline there.
-		int blend_layered = !blend_skip && obj->filter_type == 0
+		int blend_layered = !blend_skip && !obj_filter_routed(obj)
 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
 		// setMask maskee: the masker's geometry becomes the stencil for this
 		// entry's paint, restored (not ended) afterwards.
@@ -8724,7 +8752,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			renderer_resume_pass(context);
 			renderer_composite_blend(context, obj->blend_mode,
 				active_clip_depth > 0 ? 1 : 0);
-		} else if (obj->filter_type != 0) {
+		} else if (obj_filter_routed(obj)) {
 			render_filtered_root_entry(app_context, obj, (int) i, (int) max_depth);
 			if (obj->blend_mode > 1 && !blend_layered)
 				renderer_set_blend_mode(context, obj->blend_mode);
@@ -9774,7 +9802,7 @@ void tagShowFrame(SWFAppContext* app_context)
 		int blend_skip = (obj->blend_mode == 11 || obj->blend_mode == 12)
 			&& g_layer_group_depth == 0;
 		// Non-trivial blend modes render into their own layer and composite once.
-		int blend_layered = !blend_skip && obj->filter_type == 0
+		int blend_layered = !blend_skip && !obj_filter_routed(obj)
 			&& renderer_blend_mode_is_layered(context, obj->blend_mode);
 
 		// setMask maskee: push the masker's geometry as this entry's stencil.
@@ -9807,7 +9835,7 @@ void tagShowFrame(SWFAppContext* app_context)
 				active_clip_depth > 0 ? 1 : 0);
 		}
 		// Check if this object has a visual filter
-		else if (obj->filter_type != 0)
+		else if (obj_filter_routed(obj))
 		{
 			render_filtered_root_entry(app_context, obj, (int) i, (int) max_depth);
 
@@ -11988,6 +12016,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// tagSetFilter) re-links it. Clearing here stops a re-placed depth from
 	// inheriting the previous occupant's list.
 	display_list[depth].filter_chain = NULL;
+	display_list[depth].cm_live = 0;
 	display_list[depth].depth_swapped = 0;
 	display_list[depth].attach_registration = 0;
 	// Restore persistent button state if the same character is being re-placed
@@ -12587,6 +12616,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	// tagSetFilter) re-links it. Clearing here stops a re-placed depth from
 	// inheriting the previous occupant's list.
 	display_list[depth].filter_chain = NULL;
+	display_list[depth].cm_live = 0;
 	display_list[depth].depth_swapped = 0;
 	display_list[depth].attach_registration = 0;
 	// Restore persistent button state if the same character is being re-placed
@@ -14685,6 +14715,23 @@ void tagEndFilterList(SWFAppContext* app_context, size_t depth)
 {
 	(void)app_context; (void)depth;
 	g_current_filter_list = NULL;
+}
+
+// s26 w2-cm-chain-cab-edge: the recompiler emits this right after the filter
+// list of a placement whose ColorMatrixFilters it did NOT fold into the
+// placement cxform (swf.cpp PlaceCmCompose::live). The list's type-6 members
+// then render as filter passes (obj_filter_routed / build_filter_chain).
+// `depth` addresses the current display_list, so a sprite frame (which runs
+// with the sprite's own list swapped in) marks its own entry, exactly like
+// tagBeginFilterListAt.
+void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth)
+{
+	(void)app_context;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	if (g_script_only_mode || g_tag_skip_mode) return;
+#endif
+	if (depth <= max_depth)
+		display_list[depth].cm_live = 1;
 }
 
 const FilterListData* ng_getFilterListDataByDepth(size_t depth)

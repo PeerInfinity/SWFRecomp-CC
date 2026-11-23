@@ -199,6 +199,7 @@ void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
     float blur_x, float blur_y, float angle, float distance, float strength,
     u8 quality, u8 flags);
 void tagEndFilterList(SWFAppContext* app_context, size_t depth);
+void tagSetColorMatrixLive(SWFAppContext* app_context, size_t depth);
 const FilterListData* ng_getFilterListDataByDepth(size_t depth);
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);

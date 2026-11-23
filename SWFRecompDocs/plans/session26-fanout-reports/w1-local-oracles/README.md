@@ -35,3 +35,7 @@
   - That fixture is HELD out of `regression/` until a current Ruffle runner or Flash settles it.
 - `wrap_giveup_mixed_runs` and `mc_resolve` are oracle-confirmed, but our build still fails them (HOLD items 7b and
   `__resolve`). They stay in the fixtures dir for the wave-2 slot.
+
+## w2-cm-chain-cab-edge (`cm-chain/`)
+- `avm1_po3_color_matrix_live{,_nested,_clear}`: the exporter renders are **pixel-identical (max 0)** to the shipped
+  goldens, and the `_clear` trace (`done`) matches.
