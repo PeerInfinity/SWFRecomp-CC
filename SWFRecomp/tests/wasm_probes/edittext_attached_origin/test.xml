@@ -1,0 +1,1310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="1">
+  <!--
+    edittext_attached_origin (s26 n-collector-uaf goal 2). Code = MTASC build of
+    Probe.as (mtasc -main -header 240:310:30 Probe.as -version 6, swfmill swf2xml),
+    with the font + EditText + sprite + Export block below spliced in by hand.
+    Browser-WASM bug: EditTexts inside attachMovie'd clips were drawn only once
+    AS touched the field, and a wrapper minted early sat 2 px up-left (mc->x/y
+    seeded 0 instead of the +2,+2 placement). golden_ruffle.png / ruffle_trace.txt
+    = Ruffle exporter.
+  -->
+  <Header framerate="30" frames="1">
+    <size>
+      <Rectangle left="0" right="4800" top="0" bottom="6200"/>
+    </size>
+    <tags>
+      <SetBackgroundColor>
+        <color>
+          <Color red="255" green="255" blue="255"/>
+        </color>
+      </SetBackgroundColor>
+      <!-- DefineFont2 "ProbeSans": glyphs H,g from DejaVu Sans (free license), via swfmill simple import. -->
+      <DefineFont2 objectID="10" isShiftJIS="0" isUnicode="0" isANSII="0" wideGlyphOffsets="1" italic="0" bold="0" language="0" name="ProbeSans" ascent="950" descent="241" leading="205">
+        <glyphs>
+          <Glyph map="72">
+            <GlyphShape>
+              <edges>
+                <ShapeSetup x="100" y="-747" fillStyle0="1"/>
+                <LineTo x="101" y="0"/>
+                <LineTo x="0" y="306"/>
+                <LineTo x="367" y="0"/>
+                <LineTo x="0" y="-306"/>
+                <LineTo x="101" y="0"/>
+                <LineTo x="0" y="747"/>
+                <LineTo x="-101" y="0"/>
+                <LineTo x="0" y="-356"/>
+                <LineTo x="-367" y="0"/>
+                <LineTo x="0" y="356"/>
+                <LineTo x="-101" y="0"/>
+                <LineTo x="0" y="-747"/>
+                <ShapeSetup/>
+              </edges>
+            </GlyphShape>
+          </Glyph>
+          <Glyph map="103">
+            <GlyphShape>
+              <edges>
+                <ShapeSetup x="465" y="-287" fillStyle0="1"/>
+                <CurveTo x1="0" y1="-100" x2="-41" y2="-55"/>
+                <CurveTo x1="-42" y1="-55" x2="-74" y2="0"/>
+                <CurveTo x1="-74" y1="0" x2="-41" y2="55"/>
+                <CurveTo x1="-42" y1="55" x2="0" y2="100"/>
+                <CurveTo x1="0" y1="100" x2="42" y2="55"/>
+                <CurveTo x1="41" y1="55" x2="74" y2="0"/>
+                <CurveTo x1="74" y1="0" x2="42" y2="-55"/>
+                <CurveTo x1="41" y1="-55" x2="0" y2="-100"/>
+                <ShapeSetup x="557" y="-70" fillStyle0="1"/>
+                <CurveTo x1="0" y1="143" x2="-64" y2="70"/>
+                <CurveTo x1="-63" y1="70" x2="-131" y2="0"/>
+                <CurveTo x1="-49" y1="0" x2="-43" y2="-7"/>
+                <CurveTo x1="-43" y1="-7" x2="-40" y2="-15"/>
+                <LineTo x="0" y="-90"/>
+                <CurveTo x1="40" y1="22" x2="40" y2="10"/>
+                <CurveTo x1="39" y1="11" x2="41" y2="0"/>
+                <CurveTo x1="91" y1="0" x2="45" y2="-47"/>
+                <CurveTo x1="45" y1="-48" x2="0" y2="-95"/>
+                <LineTo x="0" y="-46"/>
+                <CurveTo x1="-29" y1="50" x2="-44" y2="24"/>
+                <CurveTo x1="-45" y1="25" x2="-62" y2="0"/>
+                <CurveTo x1="-103" y1="0" x2="-63" y2="-79"/>
+                <CurveTo x1="-63" y1="-78" x2="0" y2="-130"/>
+                <CurveTo x1="0" y1="-130" x2="63" y2="-78"/>
+                <CurveTo x1="63" y1="-79" x2="103" y2="0"/>
+                <CurveTo x1="62" y1="0" x2="45" y2="25"/>
+                <CurveTo x1="44" y1="24" x2="29" y2="50"/>
+                <LineTo x="0" y="-85"/>
+                <LineTo x="92" y="0"/>
+                <LineTo x="0" y="490"/>
+                <ShapeSetup/>
+              </edges>
+            </GlyphShape>
+          </Glyph>
+        </glyphs>
+        <advance>
+          <Short value="771"/>
+          <Short value="651"/>
+        </advance>
+        <bounds>
+          <Rectangle left="100" right="669" top="-747" bottom="0"/>
+          <Rectangle left="56" right="557" top="-574" bottom="213"/>
+        </bounds>
+        <wideKerning/>
+      </DefineFont2>
+      <DefineEditText objectID="1" wordWrap="0" multiLine="0" password="0"
+                      readOnly="1" variableName="" autoSize="0" hasLayout="1" notSelectable="1"
+                      hasBorder="1" isHTML="0" useOutlines="1" fontRef="10" fontHeight="320"
+                      align="0" leftMargin="0" rightMargin="0" indent="0"
+                      leading="40" initialText="Hg">
+        <size><Rectangle left="-40" right="1960" top="-40" bottom="560"/></size>
+        <color><Color red="0" green="0" blue="0" alpha="255"/></color>
+      </DefineEditText>
+      <DefineSprite objectID="2" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="1" name="fld">
+            <transform><Transform transX="40" transY="40"/></transform>
+          </PlaceObject2>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <Export>
+        <symbols>
+          <Symbol objectID="2" name="lbl"/>
+        </symbols>
+      </Export>
+      <DefineEditText objectID="3" wordWrap="0" multiLine="0" password="0"
+                      readOnly="1" variableName="v" autoSize="0" hasLayout="1" notSelectable="1"
+                      hasBorder="1" isHTML="0" useOutlines="1" fontRef="10" fontHeight="320"
+                      align="0" leftMargin="0" rightMargin="0" indent="0"
+                      leading="40" initialText="">
+        <size><Rectangle left="-40" right="1960" top="-40" bottom="560"/></size>
+        <color><Color red="0" green="0" blue="0" alpha="255"/></color>
+      </DefineEditText>
+      <DefineSprite objectID="4" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="3" name="fldv">
+            <transform><Transform transX="40" transY="40"/></transform>
+          </PlaceObject2>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <Export>
+        <symbols>
+          <Symbol objectID="4" name="lblv"/>
+        </symbols>
+      </Export>
+      <DefineEditText objectID="5" wordWrap="0" multiLine="0" password="0"
+                      readOnly="1" variableName="txt" autoSize="0" hasLayout="1" notSelectable="1"
+                      hasBorder="1" isHTML="0" useOutlines="1" fontRef="10" fontHeight="320"
+                      align="0" leftMargin="0" rightMargin="0" indent="0"
+                      leading="40" initialText="">
+        <size><Rectangle left="-40" right="1960" top="-40" bottom="560"/></size>
+        <color><Color red="0" green="0" blue="0" alpha="255"/></color>
+      </DefineEditText>
+      <DefineSprite objectID="6" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="5">
+            <transform><Transform transX="40" transY="40"/></transform>
+          </PlaceObject2>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <DefineSprite objectID="7" frames="1">
+        <tags>
+          <PlaceObject2 replace="0" depth="1" objectID="6" name="box">
+            <transform><Transform transX="0" transY="0"/></transform>
+          </PlaceObject2>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <Export>
+        <symbols>
+          <Symbol objectID="7" name="lblN"/>
+        </symbols>
+      </Export>
+      <DefineSprite objectID="20480" frames="1">
+        <tags>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <Export>
+        <symbols>
+          <Symbol objectID="20480" name="__Packages.Probe"/>
+        </symbols>
+      </Export>
+      <DoInitAction sprite="20480">
+        <actions>
+          <Dictionary>
+            <strings>
+              <String value="Probe"/>
+              <String value="_global"/>
+              <String value="prototype"/>
+              <String value="main"/>
+              <String value="_root"/>
+              <String value="bufA"/>
+              <String value="createEmptyMovieClip"/>
+              <String value="_x"/>
+              <String value="_y"/>
+              <String value="a"/>
+              <String value="lbl"/>
+              <String value="attachMovie"/>
+              <String value="b"/>
+              <String value="bufC"/>
+              <String value="c"/>
+              <String value="fld"/>
+              <String value="text"/>
+              <String value="d"/>
+              <String value="bufE"/>
+              <String value="inner"/>
+              <String value="e"/>
+              <String value="bufF"/>
+              <String value="f"/>
+              <String value="gH"/>
+              <String value="bufG"/>
+              <String value="g"/>
+              <String value="lblv"/>
+              <String value="v"/>
+              <String value="Hg"/>
+              <String value="h"/>
+              <String value="bufI"/>
+              <String value="i"/>
+              <String value="lblN"/>
+              <String value="box"/>
+              <String value="txt"/>
+              <String value="j"/>
+              <String value="bufK"/>
+              <String value="k"/>
+              <String value="l"/>
+              <String value="TO: touched="/>
+              <String value=" f="/>
+              <String value="ASSetPropFlags"/>
+            </strings>
+          </Dictionary>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="0"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <LogicalNOT/>
+          <LogicalNOT/>
+          <BranchIfTrue byteOffset="1439"/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="1"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="0"/>
+            </items>
+          </PushData>
+          <DeclareFunction2 name="" argc="0" regc="3" preloadParent="0" preloadRoot="0" suppressSuper="0" preloadSuper="1" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+            <args/>
+            <actions/>
+          </DeclareFunction2>
+          <StoreRegister reg="0"/>
+          <SetMember/>
+          <PushData>
+            <items>
+              <StackRegister reg="0"/>
+              <StackDictionaryLookup index="2"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <StoreRegister reg="1"/>
+          <Pop/>
+          <PushData>
+            <items>
+              <StackRegister reg="0"/>
+              <StackDictionaryLookup index="3"/>
+            </items>
+          </PushData>
+          <DeclareFunction2 name="" argc="1" regc="5" preloadParent="0" preloadRoot="0" suppressSuper="1" preloadSuper="0" suppressArguments="1" preloadArguments="0" suppressThis="0" preloadThis="1" reserved="0" preloadGlobal="0">
+            <args>
+              <Parameter reg="2" name="mc"/>
+            </args>
+            <actions>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="4"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <StoreRegister reg="3"/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="5"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="5"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="5"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="9"/>
+                  <StackDictionaryLookup index="10"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="5"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackInteger value="2"/>
+                  <StackDictionaryLookup index="12"/>
+                  <StackDictionaryLookup index="10"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="12"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="130"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="12"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="3"/>
+                  <StackDictionaryLookup index="13"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="14"/>
+                  <StackDictionaryLookup index="10"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="13"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="13"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="14"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="13"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="14"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="70"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="13"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="14"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="15"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="16"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <StoreRegister reg="4"/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackInteger value="4"/>
+                  <StackDictionaryLookup index="17"/>
+                  <StackDictionaryLookup index="10"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="17"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="130"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="17"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="70"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="4"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="17"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="15"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="16"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <AddTyped/>
+              <StoreRegister reg="4"/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackInteger value="5"/>
+                  <StackDictionaryLookup index="18"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="18"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="18"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="120"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="19"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="18"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="20"/>
+                  <StackDictionaryLookup index="10"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="18"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="19"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackInteger value="6"/>
+                  <StackDictionaryLookup index="21"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="21"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="130"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="21"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="120"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="22"/>
+                  <StackDictionaryLookup index="10"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="21"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="21"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="22"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="15"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="16"/>
+                  <StackDictionaryLookup index="23"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="7"/>
+                  <StackDictionaryLookup index="24"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="24"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="24"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="170"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="25"/>
+                  <StackDictionaryLookup index="26"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="24"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="24"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="25"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="27"/>
+                  <StackDictionaryLookup index="28"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="8"/>
+                  <StackDictionaryLookup index="29"/>
+                  <StackDictionaryLookup index="26"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="29"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="130"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="29"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="170"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="29"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="27"/>
+                  <StackDictionaryLookup index="28"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="9"/>
+                  <StackDictionaryLookup index="30"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="30"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="30"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="220"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="31"/>
+                  <StackDictionaryLookup index="32"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="30"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="30"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="31"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="34"/>
+                  <StackDictionaryLookup index="28"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="10"/>
+                  <StackDictionaryLookup index="35"/>
+                  <StackDictionaryLookup index="32"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="35"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="130"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="35"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="220"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="35"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="34"/>
+                  <StackDictionaryLookup index="28"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="11"/>
+                  <StackDictionaryLookup index="36"/>
+                  <StackInteger value="2"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="6"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="36"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="20"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="36"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="260"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="1"/>
+                  <StackDictionaryLookup index="37"/>
+                  <StackDictionaryLookup index="32"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="36"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="36"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="37"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="0"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="36"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="37"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="10"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="36"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="37"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="34"/>
+                  <StackDictionaryLookup index="28"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackInteger value="12"/>
+                  <StackDictionaryLookup index="38"/>
+                  <StackDictionaryLookup index="32"/>
+                  <StackInteger value="3"/>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="11"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="38"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="130"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="38"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="260"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="38"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="7"/>
+                  <StackInteger value="0"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="38"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="8"/>
+                  <StackInteger value="10"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="38"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="33"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="34"/>
+                  <StackDictionaryLookup index="28"/>
+                </items>
+              </PushData>
+              <SetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="39"/>
+                  <StackRegister reg="4"/>
+                </items>
+              </PushData>
+              <AddTyped/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="40"/>
+                </items>
+              </PushData>
+              <AddTyped/>
+              <PushData>
+                <items>
+                  <StackRegister reg="3"/>
+                  <StackDictionaryLookup index="21"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="22"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="15"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <PushData>
+                <items>
+                  <StackDictionaryLookup index="16"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <AddTyped/>
+              <Trace/>
+            </actions>
+          </DeclareFunction2>
+          <SetMember/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+              <StackNull/>
+              <StackRegister reg="1"/>
+              <StackInteger value="3"/>
+              <StackDictionaryLookup index="41"/>
+            </items>
+          </PushData>
+          <CallFunction/>
+          <Pop/>
+          <EndAction/>
+        </actions>
+      </DoInitAction>
+      <DoAction>
+        <actions>
+          <Dictionary>
+            <strings>
+              <String value="MTASC_MAIN"/>
+              <String value="this"/>
+              <String value="Probe"/>
+              <String value="main"/>
+            </strings>
+          </Dictionary>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="0"/>
+            </items>
+          </PushData>
+          <StoreRegister reg="0"/>
+          <Pop/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="1"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+              <StackDictionaryLookup index="2"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackDictionaryLookup index="3"/>
+            </items>
+          </PushData>
+          <CallMethod/>
+          <Pop/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

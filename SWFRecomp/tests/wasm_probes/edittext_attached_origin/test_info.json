@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "EditText (Flash-IDE shape: bounds min -2,-2 px, placed +2,+2) inside exported sprite 'lbl', attached into a createEmptyMovieClip buffer at (20,20) and onto _root at (20,80). Ruffle draws both bordered boxes with their top-left at the attach point. Browser-WASM drew text 2 px up-left in N's attached HUD buffers (s26 n-pixel-pass report section 3).",
+    "width": 240,
+    "height": 310,
+    "swf_version": 6
+  },
+  "opcodes": {
+    "tested": ["attachMovie", "DefineEditText"]
+  }
+}

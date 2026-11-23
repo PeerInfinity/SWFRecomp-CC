@@ -1,0 +1,9 @@
+golden_source = "ruffle"
+trace_prefix = "TO:"
+settle_seconds = 2.0
+description = "Browser EditText origin inside attached clips (s26 n-collector-uaf goal 2): bordered field boxes at (20,20) [in a createEmptyMovieClip buffer] and (20,80) [on _root]."
+# Glyph/border anti-aliasing differs from Ruffle by up to 64 per channel; a
+# misplaced field (the bug: 2 px up-left) moves whole 1-px borders and glyph
+# stems (delta 255, ~750 px per field).
+channel_threshold = 96
+pixel_threshold = 20

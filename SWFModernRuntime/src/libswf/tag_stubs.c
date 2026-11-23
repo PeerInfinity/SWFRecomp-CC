@@ -411,6 +411,31 @@ static void ng_register_instance_on_parent_dprops(SWFAppContext* app_context,
 	}
 }
 
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+// Browser-WASM twin of ng_on_place_object2's Phase B for an attachMovie'd
+// subtree: find-or-create the wrapper of every EditText placed in `dl`
+// (recursing through placed sprites, whose wrappers parent the fields).
+static void ng_eager_attached_textfield_wrappers(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc, int nest)
+{
+	extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext*, const char*, MovieClip*);
+	if (dl == NULL || parent_mc == NULL || nest > 32) return;
+	for (size_t d = 1; d <= dl_max; d++) {
+		DisplayObject* obj = &dl[d];
+		if (obj->char_id == 0 || obj->instance_name == NULL) continue;
+		if (ng_find_textfield(obj->char_id) >= 0) {
+			actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+		} else if (obj->char_id < INITIAL_DICTIONARY_CAPACITY
+		           && dictionary[obj->char_id].type == CHAR_TYPE_SPRITE
+		           && obj->sprite_display_list != NULL && obj->sprite_max_depth > 0) {
+			MovieClip* smc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			ng_eager_attached_textfield_wrappers(app_context, obj->sprite_display_list,
+				obj->sprite_max_depth, smc, nest + 1);
+		}
+	}
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // ng_attachMovie — instantiate an exported library symbol at runtime
 // ---------------------------------------------------------------------------
@@ -681,6 +706,19 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		display_list = saved_dl;
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
+
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM: give the attached subtree's EditTexts their AVM1
+		// wrappers now (n-collector-uaf goal 2). The CI modes create them at
+		// placement (ng_on_place_object2 Phase B), which browser-WASM skips, so
+		// a field nobody named from AS — N's HUD timer (an unnamed field bound
+		// by variableName inside the timeIndicator symbol's "txtbox" sprite) —
+		// had no wrapper: actionIterateTextFieldGlyphs never drew it until
+		// some later lazy path minted one. Same resolver AS member access uses,
+		// run with the root display list restored, as it would be from AS.
+		ng_eager_attached_textfield_wrappers(app_context,
+			dobj->sprite_display_list, dobj->sprite_max_depth, new_mc, 0);
+#endif
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Queue the frame function for deferred script execution
