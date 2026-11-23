@@ -437,6 +437,8 @@ static int    g_btn_state_active = 0;
 // dispatch (clicks fire) but SKIP the visual repopulation (button stays in its
 // initially-placed UP graphics). Trade-off: no hover color-shift animation for
 // attached-clip buttons — a separate deeper render fix would be needed for that.
+// Browser-WASM only: the CI modes (NO_GRAPHICS / OFFSCREEN_RENDER) run the same
+// attached walk with repopulation on, which renders UP/OVER/DOWN correctly there.
 static int    g_btn_attached_walk = 0;
 
 // Phase 1e: transient enumeration of removed button-state children.
@@ -5528,14 +5530,11 @@ static Character* resolve_hit_shape(size_t hit_char_id, u32* out_hit_transform_i
 	return NULL;
 }
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-// Browser-WASM only: also update DefineButton2 states inside attachMovie'd /
-// createEmptyMovieClip'd clips (child_mc_cache), which live outside the root
-// display_list. Defined below, after compute_mc_world_xform/render_attached_child.
-// Gated like the AS2-button-fire block below — NO_GRAPHICS / OFFSCREEN
-// dispatch attached-clip buttons via their own per-event / process_sprite path.
+// All modes (browser-WASM, OFFSCREEN, NO_GRAPHICS): also update DefineButton2
+// states inside attachMovie'd / createEmptyMovieClip'd clips (child_mc_cache),
+// which live outside the root display_list. Defined below, after
+// compute_mc_world_xform/render_attached_child.
 static void ng_update_button_states_attached(SWFAppContext* app_context, int* found_hover);
-#endif
 
 // Button hit testing + state machine + action dispatch.
 // Runs on every mouse event (in NO_GRAPHICS mode) so that transitions fire
@@ -5573,6 +5572,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		// walks the render list looking for interactive children.
 		if (ch->type == CHAR_TYPE_SPRITE)
 		{
+			// CI modes alias a clip attached under a timeline parent into the
+			// parent's sprite_display_list (tag_stubs.c ng_attachMovie,
+			// attach_registration). Its transform there is slot 0 (identity), so
+			// it would hit-test at the parent's origin, and its button state
+			// would be stepped twice per event. ng_update_button_states_attached
+			// walks it under its real world transform instead.
+			if (obj->attach_registration) continue;
 			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
 			{
 				const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
@@ -6030,22 +6036,12 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 					MovieClip* saved_ctx = g_current_context;
 					DisplayObject* saved_sprite_obj = g_current_sprite_obj;
 					MovieClip* _btn_action_ctx = parent_mc;
-					// Attached-clip buttons (browser-WASM, e.g. N's menuMC, deeply
-					// nested under root via createEmptyMovieClip+attachMovie): resolve
-					// the action's unqualified variables/functions against ROOT, where
-					// AVM1 game globals live. Our function-call dispatch inherits the
-					// caller's g_current_context instead of switching to each callee's
-					// home timeline, so a `_root.foo()` chain run with parent_mc =
-					// instance31 (chid112) resolves `gui`/`userdata` on instance31 →
-					// undefined → no navigation. Root-placed DefineButton2 buttons
-					// already get root context (their parent IS root); this makes the
-					// nested ones behave the same. g_current_sprite_obj stays the
-					// enclosing sprite below, so bare Play/Stop/GotoFrame still target
-					// the button's own timeline. (g_btn_attached_walk is only ever set
-					// inside the browser-WASM attached-button walk → no effect in
-					// OFFSCREEN/NO_GRAPHICS.)
-					if (g_btn_attached_walk)
-						_btn_action_ctx = &root_movieclip;
+					// Attached-clip buttons used to be forced to ROOT context here
+					// (browser-only), a workaround for root-frame-1 functions storing
+					// base_clip = NULL in browser-WASM. n-play-game fixed that at the
+					// root (swf.c swfStart), so every button now runs in its parent
+					// clip as in Flash (`this` = the clip holding the button;
+					// regression avm1_attached_clip_button_click).
 					actionSetCurrentContext(_btn_action_ctx);
 					// Establish the "current sprite" so a bare Play/Stop/GotoFrame
 					// in the button's action targets the timeline CONTAINING the
@@ -6235,12 +6231,10 @@ int ng_update_button_states(SWFAppContext* app_context)
 		identity, &root_movieclip,
 		NULL,
 		&found_hover);
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM: the root display_list above misses DefineButton2 buttons
-	// that live inside attachMovie'd / createEmptyMovieClip'd clips (e.g. N's
-	// entire menuMC UI). Walk those too.
+	// The root display_list above misses DefineButton2 buttons that live inside
+	// attachMovie'd / createEmptyMovieClip'd clips (e.g. N's entire menuMC UI).
+	// Walk those too, in every mode (regression avm1_attached_clip_button_click).
 	ng_update_button_states_attached(app_context, &found_hover);
-#endif
 	return found_hover;
 }
 
@@ -8866,7 +8860,27 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 		renderer_restore_clip(context, avm1_mask_saved_clip);
 }
 
-#if !defined(NO_GRAPHICS)
+#endif // !NO_GRAPHICS (compute_mc_world_xform / render_attached_child)
+
+// Stage-space matrix of an attached clip for the attached-button walk.
+// Graphics builds (browser + OFFSCREEN) share render_attached_child's
+// composition; NO_GRAPHICS has no compose pass, so it uses action.c's
+// MovieClip-property chain (the same one mc_get_local_mouse/hitTest use).
+static void btn_attached_world_xform(SWFAppContext* app_context, MovieClip* mc, float out[16])
+{
+#ifndef NO_GRAPHICS
+	float parent_world[16];
+	compute_mc_world_xform(app_context, mc->parent, parent_world);
+	float mc_local[16] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
+	apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
+	hit_test_mat4_multiply(out, parent_world, mc_local);
+#else
+	(void)app_context;
+	extern void actionMCStageMatrix16(MovieClip* mc, float out[16]);
+	actionMCStageMatrix16(mc, out);
+#endif
+}
+
 // Update DefineButton2 hover/press/release state for buttons that live inside
 // attachMovie'd / createEmptyMovieClip'd clips (child_mc_cache), which are NOT
 // in the root display_list and so are missed by ng_update_button_states' root
@@ -8908,20 +8922,19 @@ static void ng_update_button_states_attached(SWFAppContext* app_context, int* fo
 			if (!a->visible) { hidden_anc = 1; break; }
 		if (hidden_anc) continue;
 		// World transform of this attached clip (mirror render_attached_child).
-		float parent_world[16];
-		compute_mc_world_xform(app_context, mc->parent, parent_world);
-		float mc_local[16] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
-		apply_as_transform(mc_local, mc, (u8)(1|2|4|8|16));
 		float mc_xform[16];
-		hit_test_mat4_multiply(mc_xform, parent_world, mc_local);
+		btn_attached_world_xform(app_context, mc, mc_xform);
+		// The state-graphics repopulation skip (g_btn_attached_walk) works
+		// around browser-WASM's render_attached_child compose pass only; the
+		// CI modes repopulate like any other button.
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 		g_btn_attached_walk = 1;
+#endif
 		ng_update_button_states_in_dl(app_context, d->sprite_display_list,
 			d->sprite_max_depth, mc_xform, mc, d, found_hover);
 		g_btn_attached_walk = 0;
 	}
 }
-#endif // !NO_GRAPHICS
-#endif
 
 void tagShowFrame(SWFAppContext* app_context)
 {

@@ -30346,6 +30346,17 @@ static void tf_world_matrix(MovieClip* mc,
 	*out_tx = (float)wtx; *out_ty = (float)wty;
 }
 
+// 4x4 column-major stage (twips) matrix of an MC for tag.c's NO_GRAPHICS
+// attached-clip button walk (ng_update_button_states_attached).
+void actionMCStageMatrix16(MovieClip* mc, float out[16])
+{
+	float a, b, c, d, tx, ty;
+	tf_world_matrix(mc, &a, &b, &c, &d, &tx, &ty);
+	for (int i = 0; i < 16; i++) out[i] = 0.0f;
+	out[0] = a; out[1] = b; out[4] = c; out[5] = d;
+	out[10] = 1.0f; out[12] = tx; out[13] = ty; out[15] = 1.0f;
+}
+
 // Ruffle's device-font transform cull (core/src/display_object/edit_text.rs
 // `is_transform_positive_scale_only`, called from `render_self` ~2698): an
 // EditText that is NOT using embedded font outlines is not rendered at all
