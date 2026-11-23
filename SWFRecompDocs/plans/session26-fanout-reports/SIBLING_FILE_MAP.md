@@ -12,3 +12,8 @@
 | w2-blendshader-cpu-pbj | `avm2_pixelbender.c` (new `avm2_pixelbender_run_blend`); `avm2_display.c` blend-shader render-walk arm, `do_blendshader_set` |
 | w2-text-cx-jpeg3 | `action.c` AVM1 text iterators (EditText cxform); text render in `tag.c`/`swf.c`; `swf.cpp` JPEG3/4 emit |
 | w2-robustness-land | `ng_shared.c` registries (buttons/videos/fonts/exports/sounds), `tag.c` `tagDoInitActionGuarded`, `tagSetSpriteLabels`, `ng_registerBitmapMetadata` table, cxform-override stack, filter side tables, `registered_class.c`, `action.h` `VAL()`, build flags everywhere, recompiler DefineFunction2 register clamp |
+| w2-timer-semantics | `timer.c` (`processTimers`, `actionTimerSetInterval`) |
+| w2-applyfilter-edge-growth | `avm2_bitmap.c` `bd_apply_filter`, `bd_glowlike_source_region` |
+| w2-edittext-border-cx | `tag.c` EditText border/background render under cx, `par_x_offset`; `render_webgpu.c` sampling (step 3, only if sweep-clean) |
+| w2-avm1-text-resolve | `action.c` GetMember MC miss → `invokeResolveFunction`, text edit paths (`actionTextControlCut`, Backspace/Delete, IME), plain-field render colour; `ng_shared.c` `ng_computeScrollMixedFont`; `tag.c` render wrap |
+| local `n-collector-uaf` | `action.c` clip-removal registry exits, TextFieldGlyphInfo builders (browser EditText origin); `tag_stubs.c` `clone_depth_evict` |
