@@ -1,0 +1,1235 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 239787b6a..a06ecac08 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -22083,6 +22083,12 @@ static int g_shape_alias_resolution = 0;
+ // Resolve a slash-separated MC path (e.g., "/clip1/clip2", "../clip1/clip2", "clip2")
+ // relative to a starting MC. Returns the target MC or NULL if not found.
+ // Does NOT handle colon — caller should split on ':' first.
++DisplayObject* actionHolderShellList(MovieClip* mc, size_t* out_max);
++// s26 w2 phase 2: a dynamic holder with a loaded movie descends into its shell.
++#define SLASH_PATH_SHELL_DESCEND(m) do { \
++		size_t _shm = 0; DisplayObject* _shl = actionHolderShellList((m), &_shm); \
++		if (_shl != NULL) { cur_sprite_dl = _shl; cur_sprite_max = _shm; } \
++	} while (0)
+ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
+ 	g_shape_alias_resolution = 0;
+ 	if (path_len == 0 || start_mc == NULL) return NULL;
+@@ -22107,6 +22113,8 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
+ 			cur_sprite_dl = dobj->sprite_display_list;
+ 			cur_sprite_max = dobj->sprite_max_depth;
+ 		}
++	} else {
++		SLASH_PATH_SHELL_DESCEND(mc);
+ 	}
+ 	// If not found via display_obj, try navigating from root using MC name chain
+ 	if (cur_sprite_dl == NULL && mc != &root_movieclip && mc->name[0] != '\0') {
+@@ -22271,6 +22279,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
+ 					if (_cc_hit != NULL && _cc_hit->display_obj == NULL) {
+ 						mc = _cc_hit;
+ 						cur_sprite_dl = NULL; cur_sprite_max = 0;
++						SLASH_PATH_SHELL_DESCEND(mc);
+ 						goto slash_path_segment_done;
+ 					}
+ 				}
+@@ -22290,6 +22299,8 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
+ 									cur_sprite_dl = dobj->sprite_display_list;
+ 									cur_sprite_max = dobj->sprite_max_depth;
+ 								}
++							} else {
++								SLASH_PATH_SHELL_DESCEND(dp_mc);
+ 							}
+ 							goto slash_path_segment_done;
+ 						}
+@@ -24950,6 +24961,31 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
+ 	// `_root.v2` (avm1/video_prototype_lazy_swf6_child).
+ 	extern MovieClip* actionCurrentChildMovieMC(void);
+ 	MovieClip* _inv_want_parent = (actionCurrentChildMovieMC() != NULL) ? g_current_context : NULL;
++	// s26 w2: the general form of the same bug. (name, depth) is not a key
++	// across parents: two sprites that each place `btn` at depth 1 share it, and
++	// the first-cached one died whichever list the RemoveObject2 ran on
++	// (regression/avm1_remove_same_name_other_parent). The entry being removed
++	// is display_list[swf_depth] of the ACTIVE list; a clip bound to exactly that
++	// entry (mc->display_obj) is the one to invalidate, so its parent wins.
++	{
++		extern DisplayObject* display_list;
++		extern size_t max_depth;
++		if (swf_depth >= 1 && (size_t)swf_depth <= max_depth && display_list != NULL) {
++			DisplayObject* _inv_entry = &display_list[swf_depth];
++			for (int i = 0; i < child_mc_count; i++) {
++				MovieClip* c = child_mc_cache[i];
++				if (c != NULL && !c->pending_removal && c->depth != INT_MIN
++				    && c->display_obj == (void*)_inv_entry
++				    && (c->depth == as_depth || c->depth == swf_depth || c->depth == shifted_depth)
++				    && strcmp(c->name, name) == 0) {
++					// Prefer this clip's parent (a NULL parent keeps the old
++					// first-match rule).
++					if (c->parent != NULL) _inv_want_parent = c->parent;
++					break;
++				}
++			}
++		}
++	}
+ 	if (_inv_want_parent != NULL) {
+ 		int _hit = 0;
+ 		for (int i = 0; i < child_mc_count; i++) {
+@@ -25904,6 +25940,25 @@ DisplayObject* actionChildMovieShell(SWFAppContext* app_context, MovieClip* mc,
+ 	return (DisplayObject*)mc->loaded_dl_shell;
+ }
+ 
++// s26 w2 phase 2: the loaded movie's top-level child list of a dynamic
++// clip-target holder (its shell), with the LIVE max depth: while the movie's
++// own frame runs the shell is the active display_list and its stored
++// sprite_max_depth is only written back at swap-out (the getMember shell arm's
++// rule). NULL when the holder has no shell or it has a display_obj (then the
++// display_obj's sprite list is authoritative and every caller already walks it).
++DisplayObject* actionHolderShellList(MovieClip* mc, size_t* out_max)
++{
++	if (out_max) *out_max = 0;
++	if (mc == NULL || mc->display_obj != NULL || mc->loaded_dl_shell == NULL) return NULL;
++	DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
++	DisplayObject* l = sh->sprite_display_list;
++	if (l == NULL) return NULL;
++	extern DisplayObject* display_list;
++	extern size_t max_depth;
++	if (out_max) *out_max = (l == display_list) ? max_depth : sh->sprite_max_depth;
++	return l;
++}
++
+ typedef struct {
+ 	DisplayObject* owner;
+ 	DisplayObject* dl;
+@@ -25940,6 +25995,30 @@ static void childDLSwapOut(ChildDLSwap* s)
+ 	s->on = 0;
+ }
+ 
++// s26 w2 phase 5: unloadMovie / unloadClip on a holder whose movie lives in a
++// shell. Ruffle avm1_unload_movie -> transform_to_unloaded_state ->
++// replace_with_movie(empty) swaps in a fresh ChildContainer synchronously for a
++// non-root clip, so the movie's children are gone (and stop rendering) at once.
++// Removal goes through tagRemoveObject2 on the swapped-in shell, the same loop
++// the reload path uses, so onUnload fires and cached MovieClips invalidate.
++void actionClearChildMovieShell(SWFAppContext* app_context, MovieClip* mc)
++{
++	if (mc == NULL || mc->loaded_dl_shell == NULL) return;
++	DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
++	if (sh->sprite_display_list == NULL) return;
++	extern DisplayObject* display_list;
++	extern size_t max_depth;
++	ChildDLSwap sw;
++	childDLSwapIn(sh, &sw);
++	if (sw.on || display_list == sh->sprite_display_list) {
++		for (size_t d = max_depth; d >= 1; d--) {
++			if (display_list[d].char_id == 0) continue;
++			tagRemoveObject2(app_context, d);
++		}
++	}
++	childDLSwapOut(&sw);
++}
++
+ // holder.gotoAndStop(n) / gotoAndPlay(n) on a loaded movie's holder: move the
+ // loaded movie's OWN playhead (the advance entry owns the cursor), not the
+ // root's. Tags-only catch-up under the movie's full context swap. Returns 1
+@@ -25948,7 +26027,18 @@ static void childDLSwapOut(ChildDLSwap* s)
+ int actionChildMovieGoto(SWFAppContext* app_context, MovieClip* mc, size_t frame0, int play)
+ {
+ 	LevelAdvanceEntry* e = childMovieEntryFor(mc);
+-	if (e == NULL || e->entry == NULL || e->entry->frame_funcs == NULL) return 0;
++	if (e == NULL || e->entry == NULL || e->entry->frame_funcs == NULL) {
++		// s26 w2 phase 4 bullet 3: a ONE-frame loaded movie never registers an
++		// advance entry, so it has no cursor to move -- but it is still a loaded
++		// movie, and a goto on it must not fall through to a name-keyed sprite
++		// goto (or the root goto). The shell is the marker a clip-target holder
++		// got a movie at all.
++		if (mc != NULL && mc->loaded_dl_shell != NULL) {
++			mc->currentframe = 1;
++			return 1;
++		}
++		return 0;
++	}
+ 	MovieEntry* entry = e->entry;
+ 	if (entry->frame_count == 0) return 0;
+ 	if (frame0 >= entry->frame_count) frame0 = entry->frame_count - 1;
+@@ -25999,6 +26089,26 @@ int actionChildMovieGoto(SWFAppContext* app_context, MovieClip* mc, size_t frame
+ 		quit_swf = 0;
+ 		fn(app_context);
+ 	}
++	// s26 w2 phase 4 bullet 2: the target frame's DoAction. Flash queues it
++	// behind the running action list. Done only when the goto came from the
++	// movie's OWN code (the driver / loader frame drain that is running it is
++	// under this same context swap and picks the queued script up, exactly the
++	// way swf.c's root goto leaves its target script to the caller's drain).
++	// A goto issued from the parent (holder.gotoAndStop in a parent frame) keeps
++	// the phase-1 HOLD: draining it here would run unrelated queued parent
++	// scripts under the child's context.
++	if (_saved_child_mc == mc && entry->frame_funcs[frame0] != NULL) {
++		extern int g_tag_skip_mode;
++		int _sts = g_tag_skip_mode;
++		catch_up_mode = 0;
++		catch_up_backward = 0;
++		g_tag_skip_mode = 1;
++		actionDrainSuppressEnter();
++		quit_swf = 0;
++		entry->frame_funcs[frame0](app_context);
++		actionDrainSuppressLeave();
++		g_tag_skip_mode = _sts;
++	}
+ 	catch_up_mode = _scm; catch_up_backward = _scb;
+ 	quit_swf = _sq; is_playing = _sp; next_frame = _sn; manual_next_frame = _sm;
+ 	g_child_movie_advance_mc = _saved_child_mc;
+@@ -26019,6 +26129,31 @@ int actionChildMovieGoto(SWFAppContext* app_context, MovieClip* mc, size_t frame
+ 	return 1;
+ }
+ 
++// s26 w2 phase 4 bullet 1: a BARE goto (ActionGotoFrame / NextFrame /
++// PrevFrame / numeric GotoFrame2, no target) issued by a loaded movie's own
++// root-timeline frame code. The running context is then the holder itself.
++// `rel`: 0 = absolute frame0, +1 = nextFrame, -1 = prevFrame. Every form stops
++// the playhead unless `play` (Ruffle goto_frame(.., stop=true); GotoFrame2
++// play=1 is gotoAndPlay). Returns 1 when handled.
++int actionChildMovieBareGoto(SWFAppContext* app_context, long frame0, int rel, int play)
++{
++	MovieClip* mc = g_child_movie_advance_mc;
++	if (mc == NULL || g_current_context != mc) return 0;
++	LevelAdvanceEntry* e = childMovieEntryFor(mc);
++	if (rel != 0) {
++		long shown = (e != NULL && e->current_frame > 0) ? (long)e->current_frame - 1 : 0;
++		long fc = (e != NULL && e->entry != NULL) ? (long)e->entry->frame_count : 1;
++		frame0 = shown + rel;
++		if (frame0 < 0 || frame0 >= fc) frame0 = shown;  // at an end: stop only
++	}
++	if (frame0 < 0) frame0 = 0;
++	if (!actionChildMovieGoto(app_context, mc, (size_t)frame0, play)) {
++		// Not a movie this runtime tracks; still never the root's playhead.
++		return 1;
++	}
++	return 1;
++}
++
+ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ {
+ 	if (g_level_advance_count == 0) return;
+@@ -26165,6 +26300,14 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ 			g_child_movie_advance_mc = e.mc;
+ 			quit_swf = 0;
+ 			is_playing = 1;
++			// s26 w2: publish the frame being run as the live cursor ("shown",
++			// 1-based) so a goto the frame issues on its own timeline
++			// (actionChildMovieGoto) measures from the right frame; the read-back
++			// below carries whatever cursor the frame left behind.
++			{
++				LevelAdvanceEntry* _lv = childMovieEntryFor(e.mc);
++				if (_lv != NULL) _lv->current_frame = e.current_frame + 1;
++			}
+ 			fn(app_context);
+ 			g_child_movie_advance_mc = _saved_child_mc;
+ 			// A stop() inside the frame just run wrote the LIVE table slot, but
+@@ -26217,6 +26360,9 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
+ 					continue;
+ 				}
+ 				e.playing = _live->playing;
++				// A goto from inside the frame moved the cursor; the increment
++				// below turns it back into the same "shown" value.
++				if (_live->current_frame >= 1) e.current_frame = _live->current_frame - 1;
+ 			}
+ 			quit_swf = _saved_quit;
+ 			is_playing = _saved_is_playing;
+@@ -35661,6 +35807,10 @@ void actionPrevFrame(SWFAppContext* app_context)
+ {
+ 	// Suppress unused parameter warning
+ 	(void)app_context;
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	// s26 w2: a loaded movie's own frame code -> its own playhead.
++	if (actionChildMovieBareGoto(app_context, 0, -1, 0)) return;
++#endif
+ 
+ 	// Access global frame control variables
+ 	extern size_t current_frame;
+@@ -36973,6 +37123,18 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
+ 							(u32)strlen(_ec->instance_name), &_ecs);
+ 				}
+ 			}
++		} else if (mc->loaded_dl_shell != NULL) {
++			// s26 w2 phase 2: a loaded movie's children live in the holder's
++			// shell; the name-keyed root lookup below never finds them.
++			size_t _shmax = 0;
++			DisplayObject* _shl = actionHolderShellList(mc, &_shmax);
++			for (size_t _ed = 1; _shl != NULL && _ed <= _shmax; _ed++) {
++				DisplayObject* _ec = &_shl[_ed];
++				if (_ec->char_id == 0) continue;
++				if (_ec->instance_name != NULL && _ec->instance_name[0] != '\0')
++					enum_child_callback(_ec->instance_name,
++						(u32)strlen(_ec->instance_name), &_ecs);
++			}
+ 		} else {
+ 			ng_enumerateChildren(mc->name, enum_child_callback, &_ecs);
+ 		}
+@@ -37277,6 +37439,8 @@ void actionNextFrame(SWFAppContext* app_context)
+ 	extern int manual_next_frame;
+ 
+ #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	// s26 w2: a loaded movie's own frame code -> its own playhead.
++	if (actionChildMovieBareGoto(app_context, 0, +1, 0)) return;
+ 	extern int g_settarget_explicit_root;
+ 	if (ng_isInsideSpriteInit() && g_settarget_explicit_root) {
+ 		// SetTarget("_root") + NextFrame from inside sprite init:
+@@ -37948,6 +38112,8 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
+ 	extern int g_settarget_none;
+ 	// SWF7+ SetTarget2(undefined) sets target to None — GotoFrame is a no-op
+ 	if (g_settarget_none) return;
++	// s26 w2: a loaded movie's own frame code -> its own playhead.
++	if (actionChildMovieBareGoto(app_context, (long)frame, 0, 0)) return;
+ 	if (ng_isInsideSprite()) {
+ 		if (g_settarget_explicit_root) {
+ 			// SetTarget("_root") was called — target is root.
+@@ -38517,6 +38683,11 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
+ 			return;
+ 		}
+ 	}
++#endif
++#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
++	// s26 w2: a loaded movie's own frame code -> its own playhead (numeric
++	// frames; a label still resolves against the root's label table -- HOLD).
++	if (actionChildMovieBareGoto(app_context, (long)frame_final - 1, 0, play_flag)) return;
+ #endif
+ 	actionGotoFrame(app_context, (u16)(frame_final - 1));
+ 
+@@ -39418,6 +39589,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
+ 			// path above. No deferred property reset (see comment there).
+ 			if (mc != NULL && mc != &root_movieclip) {
+ 				actionUnregisterLevelAdvance(mc);
++				actionClearChildMovieShell(app_context, mc);  // s26 w2 phase 5
+ 			}
+ 			return;
+ 		}
+@@ -40250,6 +40422,7 @@ static ActionVar builtin_mcl_unloadClip(SWFAppContext* app_context, ActionVar* a
+     // TEST FAILURE.
+     if (target_mc != &root_movieclip) {
+         actionUnregisterLevelAdvance(target_mc);
++        actionClearChildMovieShell(app_context, target_mc);  // s26 w2 phase 5
+     }
+ 
+     VAL(u64, &result.data.numeric_value) = 1;
+@@ -53458,6 +53631,17 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
+ 									(u32)strlen(_ec->instance_name), &_ecs);
+ 						}
+ 					}
++				} else if (mc->loaded_dl_shell != NULL) {
++					// s26 w2 phase 2: the holder's shell (see actionEnumerate).
++					size_t _shmax = 0;
++					DisplayObject* _shl = actionHolderShellList(mc, &_shmax);
++					for (size_t _ed = 1; _shl != NULL && _ed <= _shmax; _ed++) {
++						DisplayObject* _ec = &_shl[_ed];
++						if (_ec->char_id == 0) continue;
++						if (_ec->instance_name != NULL && _ec->instance_name[0] != '\0')
++							enum_child_callback(_ec->instance_name,
++								(u32)strlen(_ec->instance_name), &_ecs);
++					}
+ 				} else {
+ 					ng_enumerateChildren(mc->name, enum_child_callback, &_ecs);
+ 				}
+@@ -54998,6 +55182,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
+ 				// avm1/unloadmovienum.
+ 				if (_gu2_mc != &root_movieclip) {
+ 					actionUnregisterLevelAdvance(_gu2_mc);
++					actionClearChildMovieShell(app_context, _gu2_mc);  // s26 w2 phase 5
+ 				}
+ 				// Defer marking MC as unloaded until next frame (Flash defers unload state)
+ 				if (g_deferred_unload_mc_count < MAX_DEFERRED_UNLOADS) {
+@@ -79475,6 +79660,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
+ 				// "TEST FAILURE" trace in graphics mode, where the main loop does
+ 				// not exit early on root stop. Key test: avm1/unloadmovie_method.
+ 				actionUnregisterLevelAdvance(mc);
++				actionClearChildMovieShell(app_context, mc);  // s26 w2 phase 5
+ 				DisplayObject* _ul_dobj = (DisplayObject*) mc->display_obj;
+ #if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+ 				// Capture (before the clear below zeroes sprite_max_depth) whether
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index f15cdcdca..f3c9eba94 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -6380,8 +6380,24 @@ static size_t collect_attached_standalone(DisplayObject** out_d, MovieClip** out
+ 	for (int i = 0; i < child_mc_count && n < ATTACHED_STANDALONE_CAP; i++)
+ 	{
+ 		MovieClip* mc = child_mc_cache[i];
+-		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
++		if (mc == NULL || mc->depth == INT_MIN) continue;
+ 		if (mc->avm1_removed) continue;
++		// s26 w2 phase 2: a dynamic clip-target holder's loaded movie lives in
++		// the holder's shell (MovieClip.loaded_dl_shell, phase 1), which no
++		// root walk reaches. Yield (shell, holder) so clip-event enterFrame, the
++		// init upgrade and the keep-alive probe see the movie's children.
++		if (mc->display_obj == NULL && mc->loaded_dl_shell != NULL) {
++			DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
++			if (mc->unloaded || sh->sprite_display_list == NULL || sh->sprite_max_depth == 0) continue;
++			int sdup = 0;
++			for (size_t k = 0; k < n; k++) if (out_d[k] == sh) { sdup = 1; break; }
++			if (sdup) continue;
++			out_d[n] = sh;
++			out_mc[n] = mc;
++			n++;
++			continue;
++		}
++		if (mc->display_obj == NULL) continue;
+ 		DisplayObject* d = (DisplayObject*)mc->display_obj;
+ 		if (!d->attach_standalone || d->char_id == 0) continue;
+ 		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
+@@ -6601,7 +6617,8 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
+ 				memcpy(ad, g_att_sa_d, att_n * sizeof(DisplayObject*));
+ 				memcpy(am, g_att_sa_mc, att_n * sizeof(MovieClip*));
+ 				for (size_t k = 0; k < att_n; k++) {
+-					if (am[k]->depth == INT_MIN || am[k]->display_obj != (void*)ad[k]) continue;
++					if (am[k]->depth == INT_MIN) continue;
++					if (am[k]->display_obj != (void*)ad[k] && am[k]->loaded_dl_shell != (void*)ad[k]) continue;
+ 					dispatch_enterframe_clip_actions_recursive(app_context,
+ 						ad[k]->sprite_display_list, ad[k]->sprite_max_depth, am[k]);
+ 				}
+diff --git a/ruffle-tests/tests/swfs/regression/_lib/avm1asm.py b/ruffle-tests/tests/swfs/regression/_lib/avm1asm.py
+new file mode 100644
+index 000000000..5dc0e3a63
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/_lib/avm1asm.py
+@@ -0,0 +1,285 @@
++"""Tiny AVM1 SWF assembler shared by the s26 loaded-shell regression fixtures.
++
++Not a test directory (no test.swf): verify_output.py's discovery skips it.
++Every generator that imports this does `sys.path.insert(0, HERE.parent / '_lib')`.
++
++Only what the fixtures need: uncompressed SWF, sprites, PlaceObject2 (with
++optional onClipEvent records), RemoveObject2, DoAction, and the action records
++for push / variables / members / method calls / trace / string concat / goto.
++"""
++import struct
++
++
++# ---------------------------------------------------------------- tags
++def tag(code, data):
++    if len(data) < 0x3F:
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3F, len(data)) + data
++
++
++class Bits:
++    def __init__(self):
++        self.bits = []
++
++    def u(self, value, n):
++        for i in range(n - 1, -1, -1):
++            self.bits.append((value >> i) & 1)
++        return self
++
++    def s(self, value, n):
++        return self.u(value & ((1 << n) - 1), n)
++
++    def bytes(self):
++        out = bytearray()
++        for i in range(0, len(self.bits), 8):
++            chunk = self.bits[i:i + 8]
++            byte = 0
++            for b in chunk:
++                byte = (byte << 1) | b
++            byte <<= (8 - len(chunk))
++            out.append(byte)
++        return bytes(out)
++
++
++def matrix_translate(tx, ty):
++    nbits = max(tx.bit_length(), ty.bit_length(), 1) + 1
++    return Bits().u(0, 1).u(0, 1).u(nbits, 5).s(tx, nbits).s(ty, nbits).bytes()
++
++
++def show_frame():
++    return tag(1, b'')
++
++
++def end_tag():
++    return struct.pack('<H', 0)
++
++
++def define_sprite(char_id, frames_bodies):
++    """frames_bodies: list of per-frame tag bytes (ShowFrame appended)."""
++    body = b''.join(fb + show_frame() for fb in frames_bodies) + end_tag()
++    return tag(39, struct.pack('<HH', char_id, len(frames_bodies)) + body)
++
++
++def define_shape_rect(char_id, w_px, h_px, rgb=(255, 0, 0)):
++    """DefineShape (code 2): one solid-filled rectangle (0,0)-(w,h)."""
++    w, h = w_px * 20, h_px * 20
++    nb = max(w.bit_length(), h.bit_length()) + 1
++    rect = Bits().u(nb, 5).s(0, nb).s(w, nb).s(0, nb).s(h, nb).bytes()
++    fills = bytes([1, 0x00]) + bytes(rgb)          # 1 solid fill
++    lines = bytes([0])                              # no line styles
++    b = Bits().u(1, 4).u(0, 4)                      # NumFillBits=1, NumLineBits=0
++    # StyleChange: MoveTo + FillStyle0 (flags: StateMoveTo=1, StateFillStyle0=1)
++    mb = nb
++    b.u(0, 1).u(0, 1).u(0, 1).u(0, 1).u(1, 1).u(1, 1)
++    b.u(mb, 5).s(0, mb).s(0, mb)
++    b.u(1, 1)                                       # FillStyle0 = 1
++    def straight(dx, dy):
++        n = max(abs(dx).bit_length(), abs(dy).bit_length()) + 1
++        b.u(1, 1).u(1, 1).u(n - 2, 4)
++        if dx != 0 and dy != 0:
++            b.u(1, 1).s(dx, n).s(dy, n)
++        elif dx != 0:
++            b.u(0, 1).u(0, 1).s(dx, n)
++        else:
++            b.u(0, 1).u(1, 1).s(dy, n)
++    straight(w, 0)
++    straight(0, h)
++    straight(-w, 0)
++    straight(0, -h)
++    b.u(0, 1).u(0, 5)                               # EndShapeRecord
++    return tag(2, struct.pack('<H', char_id) + rect + fills + lines + b.bytes())
++
++
++# PlaceObject2 clip-event flags (SWF6+ 32-bit form).
++EV_LOAD = 0x00000001
++EV_ENTER_FRAME = 0x00000002
++EV_UNLOAD = 0x00000004
++
++
++def place_object2(depth, char_id=None, name=None, tx=None, ty=None,
++                  move=False, clip_actions=None, swf_version=8):
++    """clip_actions: list of (event_flags, action_bytes_without_end)."""
++    flags = 0
++    if move:
++        flags |= 0x01
++    if char_id is not None:
++        flags |= 0x02
++    if tx is not None:
++        flags |= 0x04
++    if name is not None:
++        flags |= 0x20
++    if clip_actions:
++        flags |= 0x80
++    data = struct.pack('<BH', flags, depth)
++    if char_id is not None:
++        data += struct.pack('<H', char_id)
++    if tx is not None:
++        data += matrix_translate(tx, ty)
++    if name is not None:
++        data += name.encode('ascii') + b'\x00'
++    if clip_actions:
++        assert swf_version >= 6
++        all_flags = 0
++        for f, _ in clip_actions:
++            all_flags |= f
++        data += struct.pack('<HI', 0, all_flags)
++        for f, body in clip_actions:
++            body = body + b'\x00'
++            data += struct.pack('<II', f, len(body)) + body
++        data += struct.pack('<I', 0)
++    return tag(26, data)
++
++
++def remove_object2(depth):
++    return tag(28, struct.pack('<H', depth))
++
++
++def do_action(body):
++    return tag(12, body + b'\x00')
++
++
++def swf_file(path, frames, version=8, frame_rate=30, w=200, h=200, prefix=b''):
++    """frames: list of per-frame tag bytes. `prefix` goes before frame 1
++    (definitions). Writes an uncompressed SWF."""
++    W, H = w * 20, h * 20
++    nb = max(W.bit_length(), H.bit_length()) + 1
++    rect = Bits().u(nb, 5).s(0, nb).s(W, nb).s(0, nb).s(H, nb).bytes()
++    tags = tag(9, bytes([255, 255, 255]))           # SetBackgroundColor
++    tags += prefix
++    tags += b''.join(f + show_frame() for f in frames) + end_tag()
++    body = rect + struct.pack('<H', frame_rate << 8) + struct.pack('<H', len(frames)) + tags
++    length = 8 + len(body)
++    path.write_bytes(b'FWS' + struct.pack('<BI', version, length) + body)
++    print(f'Created {path} (SWF{version}, {len(frames)} frames, {length} bytes)')
++
++
++# ------------------------------------------------------------- actions
++def _rec(code, payload=b''):
++    if code < 0x80:
++        return bytes([code])
++    return bytes([code]) + struct.pack('<H', len(payload)) + payload
++
++
++def push(*vals):
++    """Push strings, ints, floats, True/False, None (=null) in order."""
++    p = b''
++    for v in vals:
++        if v is None:
++            p += b'\x02'
++        elif v is True or v is False:
++            p += b'\x05' + bytes([1 if v else 0])
++        elif isinstance(v, int):
++            p += b'\x07' + struct.pack('<i', v)
++        elif isinstance(v, float):
++            p += b'\x06' + struct.pack('<d', v)[4:] + struct.pack('<d', v)[:4]
++        else:
++            p += b'\x00' + v.encode('latin-1') + b'\x00'
++    return _rec(0x96, p)
++
++
++POP = _rec(0x17)
++TRACE = _rec(0x26)
++ADD2 = _rec(0x47)
++GET_VARIABLE = _rec(0x1C)
++SET_VARIABLE = _rec(0x1D)
++GET_MEMBER = _rec(0x4E)
++SET_MEMBER = _rec(0x4F)
++CALL_METHOD = _rec(0x52)
++CALL_FUNCTION = _rec(0x3D)
++TYPEOF = _rec(0x44)
++EQUALS2 = _rec(0x49)
++STRICT_EQUALS = _rec(0x66)
++STOP = _rec(0x07)
++PLAY = _rec(0x06)
++NEXT_FRAME = _rec(0x04)
++PREV_FRAME = _rec(0x05)
++ENUMERATE2 = _rec(0x55)
++TARGET_PATH = _rec(0x45)
++
++
++def goto_frame(frame0):
++    """ActionGotoFrame (0x81): bare gotoAndStop(frame0+1) is GotoFrame+Stop."""
++    return _rec(0x81, struct.pack('<H', frame0))
++
++
++def trace_str(s):
++    return push(s) + TRACE
++
++
++def get_var(name):
++    return push(name) + GET_VARIABLE
++
++
++def get_path(*parts):
++    """get_path('h', '_currentframe') => h._currentframe via GetVariable+GetMember."""
++    code = get_var(parts[0])
++    for p in parts[1:]:
++        code += push(p) + GET_MEMBER
++    return code
++
++
++def concat(*pieces):
++    """Each piece: a literal str, or bytes (code leaving one value on the stack).
++    Emits left-to-right Add2 (string + anything)."""
++    code = b''
++    for i, pc in enumerate(pieces):
++        code += push(pc) if isinstance(pc, str) else pc
++        if i > 0:
++            code += ADD2
++    return code
++
++
++def trace_expr(*pieces):
++    return concat(*pieces) + TRACE
++
++
++def call_method(obj_code, method, *args_code, discard=True):
++    """obj.method(args...). args_code: bytes or literal values."""
++    code = b''
++    for a in reversed(args_code):
++        code += a if isinstance(a, bytes) else push(a)
++    code += push(len(args_code)) + obj_code + push(method) + CALL_METHOD
++    if discard:
++        code += POP
++    return code
++
++
++def set_member(obj_code, name, value_code):
++    return obj_code + push(name) + (value_code if isinstance(value_code, bytes) else push(value_code)) + SET_MEMBER
++
++
++def set_var(name, value_code):
++    return push(name) + (value_code if isinstance(value_code, bytes) else push(value_code)) + SET_VARIABLE
++
++
++# ------------------------------------------------------- branches / regs
++def store_register(r):
++    return _rec(0x87, bytes([r]))
++
++
++def push_register(r):
++    return _rec(0x96, b'\x04' + bytes([r]))
++
++
++def _jump_like(code, offset):
++    return _rec(code, struct.pack('<h', offset))
++
++
++def if_(offset):
++    return _jump_like(0x9D, offset)
++
++
++def jump(offset):
++    return _jump_like(0x99, offset)
++
++
++def for_in_concat(obj_code, var_name, sep=','):
++    """var_name = ''; for (k in obj) var_name = var_name + k + sep;"""
++    head = set_var(var_name, '') + obj_code + ENUMERATE2
++    # loop body (after the If): var_name = var_name + r0 + sep
++    body = push(var_name) + get_var(var_name) + push_register(0) + ADD2 + push(sep) + ADD2 + SET_VARIABLE
++    test = store_register(0) + push(None) + EQUALS2
++    # If jumps over body + the back jump (5 bytes)
++    loop = test + if_(len(body) + 5) + body
++    back = jump(-(len(loop) + 5))
++    return head + loop + back
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd742237031ed71b9e0973e484114459af45954b
+GIT binary patch
+literal 72
+zcmZ<@59aV-U|`5#kau8UzresC$IRf&^#A{VPUdMW3=GMJ3~CGx3{Z{{n8Oc|F=kL}
+OWMW`sU<b-GFaQAX{0p`K
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/child2.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/child2.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..17235279d0272b463a75c3a4db663f21140deb7f
+GIT binary patch
+literal 67
+zcmZ<@59V-YU|`5#kau8UzresC$IRf&^#A{VF6L=03=AoT3~DS44h)<So)Lo@f@2Kk
+HFfafBu%ino
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/child3.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/child3.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d79fa5c1c79ca9b18967d2aa23a8c2c163d33847
+GIT binary patch
+literal 46
+zcmZ<@59ZKgU|`5#kau8UzresC$H?H!^#A{Ve&%T`3=FA;3~G%`KzVis2OtRm*YF5f
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/create_test_swf.py
+new file mode 100644
+index 000000000..3fde6584e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/create_test_swf.py
+@@ -0,0 +1,94 @@
++#!/usr/bin/env python3
++r"""Build test.swf + child.swf + child2.swf + child3.swf for
++regression/avm1_loaded_bare_goto (s26 w2-loaded-shell-phase2, phase 4).
++
++WHAT THIS PINS DOWN
++-------------------
++**A bare (target-less) goto in a LOADED movie's own frame code moves THAT
++movie's playhead, never the parent's.**
++
++`gotoAndStop(2)` written in a loaded movie's frame script compiles to
++ActionGotoFrame(1) + ActionStop with no target, and `nextFrame()` to
++ActionNextFrame. Before the fix both reached the runtime's ROOT goto
++(`actionGotoFrame` / `actionNextFrame` -> next_frame / manual_next_frame,
++which are the MAIN movie's globals), so a child's own goto rewound or advanced
++the parent: the "last frame rewinds parent" family through a different door.
++The method form (`this.gotoAndStop`) was already routed in phase 1
++(`actionChildMovieGoto`, a6a696bf2).
++
++THE SHAPE
++---------
++    parent test.swf (SWF8, 10 frames, hand-assembled)
++      f1: createEmptyMovieClip h@1, g@2, k@3
++          h.loadMovie(child.swf) g.loadMovie(child2.swf) k.loadMovie(child3.swf)
++      f2..f10: trace "p<_root._currentframe> h<..> g<..> k<..>"
++      f5: also k.gotoAndStop(1)          (method form on a ONE-frame holder)
++      f10: stop
++
++    child.swf  (3 frames)  f1 "c1" | f2 "c2" | f3 "c3"; gotoAndStop(2)  (bare)
++    child2.swf (3 frames)  f1 "d1"; nextFrame() (bare) | f2 "d2" | f3 "d3"
++    child3.swf (1 frame)   f1 "e1"; gotoAndStop(1) (bare, on its only frame)
++
++WHAT EACH ROW DISCRIMINATES
++---------------------------
++  * the `p<N>` sequence must run 2,3,...,10 exactly once each: any child goto
++    that leaked to the root repeats or skips a parent frame (child3's
++    goto(1) would rewind the parent to frame 1 and re-run the loads).
++  * `h` must read 1,2,3 then pin at 2, with a second "c2" (Flash runs the
++    goto target frame's DoAction).
++  * `g` must pin at 2 after "d1","d2"; "d3" must never print.
++  * `k` stays 1; neither the bare goto nor the parent's k.gotoAndStop(1)
++    moves anything (a one-frame movie has no advance entry -- phase 4 bullet 3).
++
++GOLDEN: output.txt is PREDICTED (SWFRecomp post-fix output, hand-checked
++against the Flash rules above). LOCAL ORACLE REQUEST in
++SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
++"""
++import sys
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa: E402,F401,F403
++
++
++def parent():
++    f1 = b''
++    for name, depth, url in (('h', 1, 'child.swf'), ('g', 2, 'child2.swf'), ('k', 3, 'child3.swf')):
++        f1 += call_method(get_var('_root'), 'createEmptyMovieClip', name, depth)
++        f1 += call_method(get_var(name), 'loadMovie', url)
++    f1 += trace_str('p1')
++    frames = [do_action(f1)]
++    for n in range(2, 11):
++        code = b''
++        if n == 5:
++            code += call_method(get_var('k'), 'gotoAndStop', 1)
++        code += trace_expr('p', get_path('_root', '_currentframe'),
++                           ' h', get_path('h', '_currentframe'),
++                           ' g', get_path('g', '_currentframe'),
++                           ' k', get_path('k', '_currentframe'))
++        if n == 10:
++            code += STOP
++        frames.append(do_action(code))
++    swf_file(HERE / 'test.swf', frames, version=8)
++
++
++def children():
++    swf_file(HERE / 'child.swf', [
++        do_action(trace_str('c1')),
++        do_action(trace_str('c2')),
++        do_action(trace_str('c3') + goto_frame(1) + STOP),
++    ], version=8)
++    swf_file(HERE / 'child2.swf', [
++        do_action(trace_str('d1') + NEXT_FRAME),
++        do_action(trace_str('d2')),
++        do_action(trace_str('d3')),
++    ], version=8)
++    swf_file(HERE / 'child3.swf', [
++        do_action(trace_str('e1') + goto_frame(0) + STOP),
++    ], version=8)
++
++
++if __name__ == '__main__':
++    children()
++    parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/output.txt
+new file mode 100644
+index 000000000..ab6fe91f0
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/output.txt
+@@ -0,0 +1,17 @@
++p1
++c1
++d1
++d2
++e1
++p2 h1 g2 k1
++c2
++p3 h2 g2 k1
++c3
++c2
++p4 h2 g2 k1
++p5 h2 g2 k1
++p6 h2 g2 k1
++p7 h2 g2 k1
++p8 h2 g2 k1
++p9 h2 g2 k1
++p10 h2 g2 k1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..07bc5ba3bb059b16ef8892a1b7abfc5e9acc95b7
+GIT binary patch
+literal 1771
+zcmZ<@59WBy#=wxlAn(Ayeu05Oj*G#W>Hq)#_RMaK3=Gp)8Q6go!!%})5)h9G#A9b*
+zh%d^|FJX|GCdR;!T$GwvlIogUP*UleUzVBboRe9=5F|d08z_~LnUkVdT%Lwzk_<>P
+zCqFR-tO2ALW;D>EbW$zifm&pQVN*KLg;;C?S_1Y`Hn}z#W7w39#U>U8h5|zdH3kO;
+zd*%sHD+^FUj~^J2$)!a_sd*)7MTxno41Vs@fVvbi7~CO2E;9|6l5~g?kPmSw$%ZHa
+zISq@FQFoz-Ix*q36BLiITmhqj=?N6byuh@ZUy|>bml9l(56%KWiO~pWP#`8?M>7Z_
+T`w!*tnmG6hI(A?Q%)kHuf5yG&
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/test.toml
+new file mode 100644
+index 000000000..b0e417313
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_bare_goto/test.toml
+@@ -0,0 +1 @@
++num_frames = 12
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c20aa25287f7388ea924e784a303621a976a5707
+GIT binary patch
+literal 88
+zcmZ<@59WwqU|`5#kau8UzresC$H?H!^#A|=6P%0;j0_GysU>X7Kui{fL?DL=iaCMw
+ZG!_Pi<O&8gAd`WilTD2YtSSkt2>_Y83?Kji
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/create_test_swf.py
+new file mode 100644
+index 000000000..377609d5e
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/create_test_swf.py
+@@ -0,0 +1,78 @@
++#!/usr/bin/env python3
++r"""Build test.swf + child.swf for regression/avm1_loaded_shell_consumers
++(s26 w2-loaded-shell-phase2, phase 2).
++
++WHAT THIS PINS DOWN
++-------------------
++**The per-tick walks and name resolvers see a loaded movie's children in the
++holder's own list (the "shell", phase 1 a6a696bf2), and ONLY there.**
++Phase 1 moved a clip target's placements out of the parent's global display
++list into the holder's shell and taught the renderer, getMember, the sprite
++advance and the realloc rebase about it. Every other consumer still looked
++only at the root list, so a loaded child was invisible to it (or, via the old
++root-name fallback, visible under the wrong parent).
++
++THE SHAPE
++---------
++    parent test.swf (SWF8, 6 frames)
++      f1: timeline sprite `px`@1 ; createEmptyMovieClip h@1 ; h.loadMovie(child.swf)
++      f2..f6: one row per consumer (below)
++    child.swf (SWF8, 1 frame)
++      sprite `a`@1 with onClipEvent(enterFrame){ trace("cx") }
++      sprite `b`@2
++
++ROWS
++  * `cx` once per tick: clip-event enterFrame dispatch over the shell
++    (tag.c collect_attached_standalone).
++  * `in:` for (k in h): the holder enumerates its timeline children
++    (ng_enumerateChildren). Order is a PREDICTION (Flash enumerates newest
++    first) -- the oracle decides.
++  * `ev:` typeof eval("h.a"), `sl:` typeof eval("/h/b"): string/slash path
++    resolution through the holder (resolveSlashPathToMC); `sp:` eval("/px")
++    is the root-list control.
++  * (NOT asserted: `typeof _root.a` reads "movieclip" on the first tick and
++    undefined after -- a pre-existing actionGetMemberImpl root-arm leak,
++    reported as a lead in the w2 report; Flash gives undefined throughout.)
++  * `tp:` targetPath(h.a) = _level0.h.a.
++
++GOLDEN: output.txt is PREDICTED; see LOCAL ORACLE REQUESTS in
++SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
++"""
++import sys
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa: E402,F401,F403
++
++
++def parent():
++    defs = define_sprite(2, [b''])
++    f1 = place_object2(1, char_id=2, name='px', tx=0, ty=0)
++    f1 += do_action(call_method(get_var('_root'), 'createEmptyMovieClip', 'h', 1)
++                    + call_method(get_var('h'), 'loadMovie', 'child.swf'))
++    frames = [f1]
++    for n in range(2, 7):
++        code = trace_expr('t', get_path('_root', '_currentframe'))
++        code += for_in_concat(get_var('h'), 's') + trace_expr('in:', get_var('s'))
++        code += trace_expr('ev:', get_var('h.a') + TYPEOF,
++                           ' sl:', get_var('/h/b') + TYPEOF,
++                           ' sp:', get_var('/px') + TYPEOF,
++                           ' tp:', get_path('h', 'a') + TARGET_PATH)
++        if n == 6:
++            code += STOP
++        frames.append(do_action(code))
++    swf_file(HERE / 'test.swf', frames, version=8, prefix=defs)
++
++
++def child():
++    defs = define_sprite(1, [b''])
++    f1 = place_object2(1, char_id=1, name='a', tx=0, ty=0,
++                       clip_actions=[(EV_ENTER_FRAME, trace_str('cx'))])
++    f1 += place_object2(2, char_id=1, name='b', tx=0, ty=0)
++    swf_file(HERE / 'child.swf', [f1], version=8, prefix=defs)
++
++
++if __name__ == '__main__':
++    child()
++    parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/output.txt
+new file mode 100644
+index 000000000..5f5cbb3fe
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/output.txt
+@@ -0,0 +1,21 @@
++cx
++t2
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++cx
++t3
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++cx
++t4
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++cx
++t5
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++cx
++t6
++in:b,a,
++ev:movieclip sl:movieclip sp:movieclip tp:_level0.h.a
++cx
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..6dce4226136eaf9af79bdf68a905b463a3331f9d
+GIT binary patch
+literal 1259
+zcmeHGF;2rU6n$|*0%Bl;#f46pP_uVwrBW;gI)D%(3azUIrA_3R0w+M?0G2v%AI7S1
+z3l0&!0~LZ3Ak^vmKfnLq^S6C`dA|AX0SOMe2o}J;j~=V4>Sc?;K^MT2A39+0P~4;A
+z-VkCo5I8ovw$NtGW&v=e@?3+PU0|qWtYv>v=!esMmdak17C758+q9LW*{D_Cjem9G
+zb~DT4QC&b}((kyhUrPFi!VZZIZ<Uf$Jy!8VVjx26r-ZR)8lT?y#UmLt<p1QEp;<d7
+zM$O|y^dM|<2+^1`EGs$-(rJ6epq2#4837cNRt$b5j1M%+tWBk~ijwI18!aqK)QD!a
+gqUsu~N5!pJj6q+7>!Yo2?e9Ivw}1K90{U#g2YFcr!T<mO
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/test.toml
+new file mode 100644
+index 000000000..645406241
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_shell_consumers/test.toml
+@@ -0,0 +1 @@
++num_frames = 7
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/child.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/child.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c0e69bccf45cb738507f6d29ff3d2587ce41f941
+GIT binary patch
+literal 118
+zcmZ<@59TOiU|`5#kau8UzresC$Hd^w^#A|=`3#H<5ez8|j1z#2|3DQ2ya@~pm6Gh*
+z3Qy+9Y;It<$jJnhX=h_&1X3&v4nQT{Y-)@QObkLNQWz2$IGLxhFfb$=GN=LNpd2GG
+Hhk*eAiscmC
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/create_test_swf.py
+new file mode 100644
+index 000000000..0ded99ec2
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/create_test_swf.py
+@@ -0,0 +1,74 @@
++#!/usr/bin/env python3
++r"""Build test.swf + child.swf for regression/avm1_loaded_unload_shell
++(s26 w2-loaded-shell-phase2, phase 5).
++
++WHAT THIS PINS DOWN
++-------------------
++**unloadMovie() on a clip-target holder takes the loaded movie's children away
++at once.** Since phase 1 (a6a696bf2) a clip target's movie places into the
++holder's own list (the "shell", MovieClip.loaded_dl_shell). The unload paths
++only unregistered the playhead, so the movie stopped advancing but its
++children stayed in the shell: still resolvable as `h.a` and still rendered.
++Ruffle avm1_unload_movie (non-root) -> transform_to_unloaded_state ->
++replace_with_movie(empty movie) replaces the clip's ChildContainer
++synchronously.
++
++THE SHAPE
++---------
++    parent test.swf (SWF8, 6 frames)
++      f1: createEmptyMovieClip h@1; h.loadMovie("child.swf")
++          createEmptyMovieClip g@2; g.loadMovie("child.swf")    (control)
++      f3: trace a:<typeof h.a> ; h.unloadMovie() ; trace b:<typeof h.a>
++      f4..f6: trace t<N> h:<typeof h.a> g:<typeof g.a>
++    child.swf (SWF8, 2 frames): f1 places sprite "a" (a red box) + "c1",
++                                f2 "c2"
++
++  * `b:` must already be undefined (synchronous for a non-root clip).
++  * `h:` stays undefined on later ticks; `g:` (never unloaded) stays movieclip.
++  * after the unload h's movie no longer traces (only g's c1/c2 continue).
++
++GOLDEN: output.txt is PREDICTED; see LOCAL ORACLE REQUESTS in
++SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
++"""
++import sys
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa: E402,F401,F403
++
++
++def typeof_of(*path):
++    return get_path(*path) + TYPEOF
++
++
++def parent():
++    f1 = b''
++    for name, depth in (('h', 1), ('g', 2)):
++        f1 += call_method(get_var('_root'), 'createEmptyMovieClip', name, depth)
++        f1 += call_method(get_var(name), 'loadMovie', 'child.swf')
++    frames = [do_action(f1), do_action(trace_expr('t', get_path('_root', '_currentframe')))]
++    f3 = trace_expr('a:', typeof_of('h', 'a'))
++    f3 += call_method(get_var('h'), 'unloadMovie')
++    f3 += trace_expr('b:', typeof_of('h', 'a'))
++    frames.append(do_action(f3))
++    for n in (4, 5, 6):
++        code = trace_expr('t', get_path('_root', '_currentframe'),
++                          ' h:', typeof_of('h', 'a'), ' g:', typeof_of('g', 'a'))
++        if n == 6:
++            code += STOP
++        frames.append(do_action(code))
++    swf_file(HERE / 'test.swf', frames, version=8)
++
++
++def child():
++    defs = define_shape_rect(1, 40, 40, (255, 0, 0)) + define_sprite(2, [place_object2(1, char_id=1, tx=0, ty=0)])
++    swf_file(HERE / 'child.swf', [
++        place_object2(1, char_id=2, name='a', tx=200, ty=200) + do_action(trace_str('c1')),
++        do_action(trace_str('c2')),
++    ], version=8, prefix=defs)
++
++
++if __name__ == '__main__':
++    child()
++    parent()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/output.txt b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/output.txt
+new file mode 100644
+index 000000000..cdbe26e93
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/output.txt
+@@ -0,0 +1,14 @@
++c1
++c1
++t2
++c2
++c2
++a:movieclip
++b:undefined
++c1
++t4 h:undefined g:movieclip
++c2
++t5 h:undefined g:movieclip
++c1
++t6 h:undefined g:movieclip
++c2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/test.swf b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..559fdd0080f78a2c0007d81b6034b00833d0b9af
+GIT binary patch
+literal 671
+zcmZ<@59XN9#K4fjAn(Ayeu05Oj*Y>Y>Hq)#_RN<V7#OCpGO#m(Xl9TS5D%!9VH!IF
+zLwr$wehGujG%*H-<f7EXl2q5+f|5$#{Ibkc=bX#}h9L22+(4;}%$yXx;_@^!lVm`W
+zIr)hxU=1L}Fr$GMrBltKbf5##EMjnAP-g~trv$|t{6HTimlhSJ=9Q!sCFZ6w__?bA
+zmD)20f&9zDz>sJK4FnmG=0pZR7k4#~qk+<J30?+<(mWJj0W~IJ(Fis<5~`D+Lx9#W
+jC}dbMxI<zA;Q+8iI#dGWSGddQV?h)ReZUU%0s{j8$rh8E
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/test.toml b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/test.toml
+new file mode 100644
+index 000000000..c9072e537
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_loaded_unload_shell/test.toml
+@@ -0,0 +1 @@
++num_frames = 6
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/create_test_swf.py
+new file mode 100644
+index 000000000..06fb46911
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/create_test_swf.py
+@@ -0,0 +1,67 @@
++#!/usr/bin/env python3
++r"""Build test.swf for regression/avm1_remove_same_name_other_parent
++(s26 w2-loaded-shell-phase2: the general parent-blind invalidation lead).
++
++WHAT THIS PINS DOWN
++-------------------
++**A timeline RemoveObject2 invalidates the clip IT removed, not a same-named
++clip at the same depth under a different parent.**
++`actionInvalidateCachedMovieClip(name, swf_depth)` used to take the first
++live cached MovieClip with that (name, depth), whatever its parent. Two
++sprites that each place a child `btn` at depth 1 share that key, so when one
++sprite's timeline removes its `btn`, whichever `btn` was cached FIRST died.
++
++THE SHAPE (SWF8, hand-assembled)
++    sprite A (id 2): 1 frame, empty            -- the `btn` symbol
++    sprite S1 (id 3): f1 place A as btn@1 | f2 RemoveObject2(1); stop()
++    sprite S2 (id 4): f1 place A as btn@1 | f2 stop()
++    root f1: place S2 as s2@1 THEN S1 as s1@2 (child clips are built eagerly
++             in placement order, so s2's `btn` is the first-cached one)
++             and set s2.btn.v = "keep", s1.btn.v = "gone"
++    root f2..f4: trace s1:<typeof s1.btn> s2:<typeof s2.btn> n:<s2.btn._name>
++                 v:<s2.btn.v>
++
++  * from f2 on, s1.btn is undefined and s2.btn stays a movieclip named btn
++    that still carries v:keep. The bug kills s2's cached clip; typeof/_name
++    still look right (the next lookup rebuilds a fresh clip from s2's display
++    entry) but the rebuilt clip has lost `v` -> v:undefined.
++
++GOLDEN: output.txt is PREDICTED; see LOCAL ORACLE REQUESTS in
++SWFRecompDocs/plans/session26-fanout-reports/w2-loaded-shell-phase2-report.md.
++"""
++import sys
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++sys.path.insert(0, str(HERE.parent / '_lib'))
++from avm1asm import *  # noqa: E402,F401,F403
++
++
++def row(prefix):
++    return trace_expr(prefix, ' s1:', get_path('s1', 'btn') + TYPEOF,
++                      ' s2:', get_path('s2', 'btn') + TYPEOF,
++                      ' n:', get_path('s2', 'btn', '_name'),
++                      ' v:', get_path('s2', 'btn', 'v'))
++
++
++def main():
++    defs = define_sprite(2, [b''])
++    defs += define_sprite(3, [place_object2(1, char_id=2, name='btn', tx=0, ty=0),
++                              remove_object2(1) + do_action(STOP)])
++    defs += define_sprite(4, [place_object2(1, char_id=2, name='btn', tx=0, ty=0),
++                              do_action(STOP)])
++    # s2 (the keeper) is placed FIRST so its `btn` is created and cached first:
++    # child MovieClips are built eagerly in placement order.
++    f1 = place_object2(1, char_id=4, name='s2', tx=0, ty=0)
++    f1 += place_object2(2, char_id=3, name='s1', tx=0, ty=0)
++    f1 += do_action(set_member(get_path('s2', 'btn'), 'v', 'keep')
++                    + set_member(get_path('s1', 'btn'), 'v', 'gone')
++                    + trace_expr('f1 s2:', get_path('s2', 'btn') + TYPEOF,
++                               ' s1:', get_path('s1', 'btn') + TYPEOF))
++                    
++    frames = [f1, do_action(row('f2')), do_action(row('f3')), do_action(row('f4') + STOP)]
++    swf_file(HERE / 'test.swf', frames, version=8, prefix=defs)
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/output.txt b/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/output.txt
+new file mode 100644
+index 000000000..2f1169ce7
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/output.txt
+@@ -0,0 +1,4 @@
++f1 s2:movieclip s1:movieclip
++f2 s1:undefined s2:movieclip n:btn v:keep
++f3 s1:undefined s2:movieclip n:btn v:keep
++f4 s1:undefined s2:movieclip n:btn v:keep
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/test.swf b/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..739852e917c580ac48dcafccc71b1b66cfb50c81
+GIT binary patch
+literal 700
+zcmd6lu?~VT6h*IX75E3EOzxl)3nmiTaBy%mnt&!oG{LyKt8>4`4{&sM@Kf+nFfm$p
+z)1j|@r}y4A9ZtsPg#k;n`!H@mOJKnAJil5DHS_^IEDnZKqf?_vV7^Ofn;Ep?h63)E
+z&;V8QSez3yG8a@c@S=9$^8;y1fuhlrbtvITa$pbH09J9l#Yh2;7FcZ3m;e(<96NKp
+zZ?PaOgzU`m5Pk^-VTaQD{8YtATxI){E~Ut(lzI<MK9t{1bv<bS({#3u5tY<lOQ~x|
+TpOLzM6Y2bVrQSb8D*xRREJTI-
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/test.toml b/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/test.toml
+new file mode 100644
+index 000000000..1e15fdf27
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_remove_same_name_other_parent/test.toml
+@@ -0,0 +1 @@
++num_frames = 5

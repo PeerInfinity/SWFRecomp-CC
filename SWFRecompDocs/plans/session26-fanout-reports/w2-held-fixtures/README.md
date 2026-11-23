@@ -12,3 +12,14 @@
   field black, so the colour fix itself is confirmed. Lead: the border-corner rule under a cxform. Land the fixture with
   the exporter golden once the corners match. Its script twin `regression/avm1_edittext_placed_cxform_script` landed
   trace-only; its trace matches Ruffle.
+- `avm1_loaded_bare_goto`, `avm1_loaded_unload_shell`, `avm1_loaded_shell_consumers` (w2-loaded-shell-phase2): these
+  goldens are PREDICTED. The Ruffle **exporter** cannot serve them: it never loads the child SWFs. Ruffle's **test
+  runner** (an old Feb-2026 debug binary) disagrees with each one (`*.ruffle-runner-diff.txt`; `<` = Ruffle,
+  `>` = predicted):
+  - `bare_goto`: child-load order within a tick (`e1` before `d1`) and where `p4` falls;
+  - `unload_shell`: Ruffle still reports `b:movieclip` right after `h.unloadMovie()` (the unload is NOT synchronous
+    there) and prints one fewer `c2`;
+  - `shell_consumers`: one fewer `cx`.
+
+  The code landed (latent-bug fixes, sweep-clean). The fixtures need a current Ruffle runner, or a re-derivation of
+  load/unload tick timing, before they land. `avm1_remove_same_name_other_parent` landed (exporter trace identical).

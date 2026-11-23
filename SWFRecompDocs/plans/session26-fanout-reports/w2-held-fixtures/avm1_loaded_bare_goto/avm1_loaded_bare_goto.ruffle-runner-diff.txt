@@ -1,0 +1,28 @@
+Diff < left / right > :
+ p1
+<e1
+<d1
+ c1
+<p2 h1 g2 k1
+>d1
+ d2
+>e1
+>p2 h1 g2 k1
+ c2
+ p3 h2 g2 k1
+ c3
+<p4 h2 g2 k1
+ c2
+>p4 h2 g2 k1
+ p5 h2 g2 k1
+ p6 h2 g2 k1
+ p7 h2 g2 k1
+ p8 h2 g2 k1
+ p9 h2 g2 k1
+ p10 h2 g2 k1
+ 
+
+
+
+
+failures:

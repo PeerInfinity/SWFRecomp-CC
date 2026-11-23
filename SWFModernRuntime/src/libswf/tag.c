@@ -6497,8 +6497,24 @@ static size_t collect_attached_standalone(DisplayObject** out_d, MovieClip** out
 	for (int i = 0; i < child_mc_count && n < ATTACHED_STANDALONE_CAP; i++)
 	{
 		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->depth == INT_MIN || mc->display_obj == NULL) continue;
+		if (mc == NULL || mc->depth == INT_MIN) continue;
 		if (mc->avm1_removed) continue;
+		// s26 w2 phase 2: a dynamic clip-target holder's loaded movie lives in
+		// the holder's shell (MovieClip.loaded_dl_shell, phase 1), which no
+		// root walk reaches. Yield (shell, holder) so clip-event enterFrame, the
+		// init upgrade and the keep-alive probe see the movie's children.
+		if (mc->display_obj == NULL && mc->loaded_dl_shell != NULL) {
+			DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
+			if (mc->unloaded || sh->sprite_display_list == NULL || sh->sprite_max_depth == 0) continue;
+			int sdup = 0;
+			for (size_t k = 0; k < n; k++) if (out_d[k] == sh) { sdup = 1; break; }
+			if (sdup) continue;
+			out_d[n] = sh;
+			out_mc[n] = mc;
+			n++;
+			continue;
+		}
+		if (mc->display_obj == NULL) continue;
 		DisplayObject* d = (DisplayObject*)mc->display_obj;
 		if (!d->attach_standalone || d->char_id == 0) continue;
 		if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) continue;
@@ -6718,7 +6734,8 @@ static void dispatch_enterframe_clip_actions_impl(SWFAppContext* app_context,
 				memcpy(ad, g_att_sa_d, att_n * sizeof(DisplayObject*));
 				memcpy(am, g_att_sa_mc, att_n * sizeof(MovieClip*));
 				for (size_t k = 0; k < att_n; k++) {
-					if (am[k]->depth == INT_MIN || am[k]->display_obj != (void*)ad[k]) continue;
+					if (am[k]->depth == INT_MIN) continue;
+					if (am[k]->display_obj != (void*)ad[k] && am[k]->loaded_dl_shell != (void*)ad[k]) continue;
 					dispatch_enterframe_clip_actions_recursive(app_context,
 						ad[k]->sprite_display_list, ad[k]->sprite_max_depth, am[k]);
 				}

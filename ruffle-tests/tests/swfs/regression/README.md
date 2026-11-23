@@ -154,3 +154,4 @@ arms cannot be reached any other way.
 | `avm1_long_text_layout` | > 32 paragraphs / > 256 lines lay out and scroll (`maxscroll=293`); golden = Ruffle exporter render + trace |
 | `avm1_many_functions_registry` | > 2048 named top-level functions are all defined; Ruffle trace identical |
 | `avm1_func2_param_register_oob` | a DefineFunction2 parameter register ≥ RegisterCount is ignored (was a C stack smash); Ruffle trace identical |
+| `avm1_remove_same_name_other_parent` | removing `btn` from one sprite does not invalidate a same-named, same-depth `btn` (with script state) under another parent (s26 `w2-loaded-shell-phase2`, `actionInvalidateCachedMovieClip`). Generator uses `../_lib/avm1asm.py`. Ruffle exporter `0ddd12b6a` trace identical |
