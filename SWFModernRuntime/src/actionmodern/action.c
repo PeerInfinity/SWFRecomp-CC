@@ -43740,6 +43740,142 @@ static int filerefClassifyUrl(const char* url)
 	return FR_FETCH_ERROR;
 }
 
+// caf02173c: `?debug-error-statuscode=<code>` fails with that status; the code
+// is everything after the `=` (Rust `str::parse::<u16>()`, so trailing junk
+// such as `&x` makes it 0), and a bare `?debug-error-statuscode` is 0.
+static int filerefUrlStatus(const char* url)
+{
+	const char* p = strstr(url, "?debug-error-statuscode");
+	if (p == NULL) return 0;
+	p += strlen("?debug-error-statuscode");
+	if (*p != '=') return 0;
+	p++;
+	if (*p == '+') p++;
+	if (*p == '\0') return 0;
+	long v = 0;
+	for (; *p != '\0'; p++)
+	{
+		if (*p < '0' || *p > '9') return 0;
+		v = v * 10 + (*p - '0');
+		if (v > 65535) return 0;
+	}
+	return (int) v;
+}
+
+// ---------------------------------------------------------------------------
+// FileReference.upload request body (Ruffle a1ca48f83, loader.rs::upload_file)
+// ---------------------------------------------------------------------------
+// Flash Player's layout: a `Filename` part, one part per postData variable,
+// the file part under the given field name, an `Upload`=`Submit Query` part
+// and the closing boundary, every line CRLF-terminated. Quotes and line
+// breaks in part names are percent-encoded. The boundary is Ruffle's fixed
+// one (Flash's is random), which is what the test navigator logs.
+#define FR_FORM_BOUNDARY "----------ruffleformboundaryei4ch2ei4gl6"
+
+typedef struct FrBuf
+{
+	unsigned char* data;
+	size_t len;
+	size_t cap;
+} FrBuf;
+
+static void frbufPut(FrBuf* b, const void* src, size_t n)
+{
+	if (b->len + n + 1 > b->cap)
+	{
+		size_t cap = b->cap ? b->cap : 512;
+		while (cap < b->len + n + 1) cap <<= 1;
+		unsigned char* nd = (unsigned char*) realloc(b->data, cap);
+		if (nd == NULL) return;
+		b->data = nd;
+		b->cap = cap;
+	}
+	memcpy(b->data + b->len, src, n);
+	b->len += n;
+	b->data[b->len] = 0;
+}
+
+static void frbufLit(FrBuf* b, const char* s) { frbufPut(b, s, strlen(s)); }
+
+static int frContainsBoundary(const unsigned char* s, size_t n)
+{
+	size_t bl = strlen(FR_FORM_BOUNDARY);
+	if (n < bl) return 0;
+	for (size_t i = 0; i + bl <= n; i++)
+		if (memcmp(s + i, FR_FORM_BOUNDARY, bl) == 0) return 1;
+	return 0;
+}
+
+// escape_form_data_name: " -> %22, CR -> %0D, LF -> %0A.
+static void frPutEscapedName(FrBuf* b, const char* s, size_t n)
+{
+	for (size_t i = 0; i < n; i++)
+	{
+		if (s[i] == '"') frbufLit(b, "%22");
+		else if (s[i] == '\r') frbufLit(b, "%0D");
+		else if (s[i] == '\n') frbufLit(b, "%0A");
+		else frbufPut(b, &s[i], 1);
+	}
+}
+
+// One part. Returns 1 when the ESCAPED name, the escaped file name or the
+// value contains the boundary (Ruffle checks after escaping).
+static int frAddField(FrBuf* b, const char* name, size_t name_len,
+                      const char* filename,
+                      const unsigned char* value, size_t value_len)
+{
+	frbufLit(b, "--" FR_FORM_BOUNDARY "\r\nContent-Disposition: form-data; name=\"");
+	size_t name_at = b->len;
+	frPutEscapedName(b, name, name_len);
+	int hit = frContainsBoundary(b->data + name_at, b->len - name_at);
+	frbufLit(b, "\"");
+	if (filename != NULL)
+	{
+		frbufLit(b, "; filename=\"");
+		size_t fn_at = b->len;
+		frPutEscapedName(b, filename, strlen(filename));
+		hit |= frContainsBoundary(b->data + fn_at, b->len - fn_at);
+		frbufLit(b, "\"\r\nContent-Type: application/octet-stream");
+	}
+	frbufLit(b, "\r\n\r\n");
+	frbufPut(b, value, value_len);
+	frbufLit(b, "\r\n");
+	hit |= frContainsBoundary(value, value_len);
+	return hit;
+}
+
+// form_urlencoded::parse over postData: `&`-separated, empty pieces skipped,
+// split at the first `=`, `+` and %XX decoded (urlDecode above). Each pair
+// becomes one plain part.
+static int frAddPostData(FrBuf* b, const char* post_data)
+{
+	int hit = 0;
+	size_t n = strlen(post_data);
+	char* copy = (char*) malloc(n + 1);
+	if (copy == NULL) return 0;
+	memcpy(copy, post_data, n + 1);
+	char* p = copy;
+	while (*p != '\0' || p == copy)
+	{
+		char* amp = strchr(p, '&');
+		if (amp != NULL) *amp = '\0';
+		if (*p != '\0')
+		{
+			char* eq = strchr(p, '=');
+			char* val = (char*) "";
+			if (eq != NULL) { *eq = '\0'; val = eq + 1; }
+			urlDecode(p);
+			urlDecode(val);
+			hit |= frAddField(b, p, strlen(p), NULL,
+			                  (const unsigned char*) val, strlen(val));
+		}
+		if (amp == NULL) break;
+		p = amp + 1;
+	}
+	free(copy);
+	return hit;
+}
+
 // Rust url::Url::parse, only as far as the corpus needs it: an absolute URL
 // must start with a scheme. "@" and "baddomain" have none, and that is the
 // whole of download()'s two false cases. The path is returned because a
@@ -43795,6 +43931,13 @@ typedef struct FileRefOp
 	char url[512];
 	char file_name[256];
 	u32 data_len;
+	// upload() only: the multipart/form-data request body (malloc'd, owned by
+	// the op), the HTTP status a `?debug-error-statuscode=<n>` URL answers, and
+	// whether the body had to be refused because a part contains the boundary.
+	unsigned char* body;
+	size_t body_len;
+	int status;
+	int cancelled;
 } FileRefOp;
 static FileRefOp g_fileref_ops[MAX_FILEREF_OPS];
 
@@ -43895,16 +44038,63 @@ static void filerefUploadResolve(void* target, int code)
 	ASObject* obj = op->obj;
 	if (obj == NULL || app_context == NULL) { op->in_use = 0; return; }
 
+	// A part containing the boundary: Ruffle returns Error::Cancelled before
+	// fetching, so nothing is logged and no event fires.
+	if (op->cancelled)
+	{
+		free(op->body);
+		op->body = NULL;
+		op->in_use = 0;
+		return;
+	}
+
+	// The test navigator logs the request first (caf02173c moved the log ahead
+	// of its debug-URL answers), so it lands between the script that called
+	// upload() and onOpen. Multipart bodies are logged as text with CR shown
+	// as a literal `\r` (body_is_form == 2).
+	swf_log_fetch_queue(op->url, strlen(op->url), "POST", 4, NULL, 0,
+	                    "multipart/form-data; boundary=" FR_FORM_BOUNDARY,
+	                    strlen("multipart/form-data; boundary=" FR_FORM_BOUNDARY),
+	                    op->body, op->body_len, 1, 2);
+	swf_log_fetch_flush();
+	free(op->body);
+	op->body = NULL;
+
 	filerefBroadcast(app_context, obj, "onOpen");
 	switch (code)
 	{
 	case FR_FETCH_OK:
 		filerefBroadcastProgress(app_context, obj, op->data_len, op->data_len);
 		filerefBroadcast(app_context, obj, "onComplete");
+		// wait_for_full_response: a non-empty body is handed to
+		// onUploadCompleteData(file, data). `?debug-success-empty` answers "".
+		if (strstr(op->url, "?debug-success-empty") == NULL)
+		{
+			ActionVar bargs[3];
+			bargs[0] = makeStringActionVar(app_context, "onUploadCompleteData", 20);
+			memset(&bargs[1], 0, sizeof(ActionVar));
+			bargs[1].type = ACTION_STACK_VALUE_OBJECT;
+			bargs[1].data.numeric_value = (u64) obj;
+			bargs[2] = makeStringActionVar(app_context, SWF_DIALOG_CONTENTS,
+			                               SWF_DIALOG_CONTENTS_LEN);
+			builtin_broadcaster_broadcastMessage(app_context, bargs, 3, NULL, (void*) obj);
+		}
 		break;
 	case FR_FETCH_STATUS:
 		filerefBroadcastProgress(app_context, obj, op->data_len, op->data_len);
-		filerefBroadcast(app_context, obj, "onHTTPError");
+		{
+			// onHTTPError(file, status): HttpNotOk carries the status code.
+			ActionVar bargs[3];
+			bargs[0] = makeStringActionVar(app_context, "onHTTPError", 11);
+			memset(&bargs[1], 0, sizeof(ActionVar));
+			bargs[1].type = ACTION_STACK_VALUE_OBJECT;
+			bargs[1].data.numeric_value = (u64) obj;
+			memset(&bargs[2], 0, sizeof(ActionVar));
+			bargs[2].type = ACTION_STACK_VALUE_F64;
+			double d = (double) op->status;
+			memcpy(&bargs[2].data.numeric_value, &d, sizeof(double));
+			builtin_broadcaster_broadcastMessage(app_context, bargs, 3, NULL, (void*) obj);
+		}
 		break;
 	default:
 		// InvalidDomain, and a plain fetch error, both surface as onIOError.
@@ -43972,11 +44162,56 @@ static ActionVar builtin_fileref_upload(SWFAppContext* app_context, ActionVar* a
 	if (!filerefParseUrl(url, scheme, sizeof(scheme), NULL, 0)) return ret;
 	if (strcmp(scheme, "http") != 0 && strcmp(scheme, "https") != 0) return ret;
 
+	// File name: the selection's `name` ("file" if somehow absent).
+	char file_name[256];
+	snprintf(file_name, sizeof(file_name), "file");
+	{
+		ActionVar* nv = getProperty(obj, "name", 4);
+		if (nv != NULL && nv->type == ACTION_STACK_VALUE_STRING)
+			filerefCoerceString(app_context, nv, file_name, sizeof(file_name));
+	}
+	// Field name: args[1], with undefined/null (or absent) meaning "Filedata".
+	char field_name[256];
+	snprintf(field_name, sizeof(field_name), "Filedata");
+	if (arg_count > 1 && args[1].type != ACTION_STACK_VALUE_UNDEFINED
+	    && args[1].type != ACTION_STACK_VALUE_NULL)
+		filerefCoerceString(app_context, &args[1], field_name, sizeof(field_name));
+	// postData: Ruffle keeps it in a native slot behind a prototype
+	// getter/setter; our prototype shape is Flash's (no postData), so a plain
+	// assignment lands as an ordinary property and is read back here.
+	char* post_data = NULL;
+	{
+		ActionVar* pv = getPropertyWithPrototype(obj, "postData", 8);
+		if (pv != NULL && pv->type != ACTION_STACK_VALUE_UNDEFINED)
+		{
+			post_data = (char*) malloc(8192);
+			if (post_data != NULL)
+				filerefCoerceString(app_context, pv, post_data, 8192);
+		}
+	}
+
 	FileRefOp* op = filerefOpAlloc();
-	if (op == NULL) return ret;
+	if (op == NULL) { free(post_data); return ret; }
 	op->obj = obj;
 	op->data_len = st->data_len;
 	snprintf(op->url, sizeof(op->url), "%s", url);
+	op->status = filerefUrlStatus(url);
+	{
+		FrBuf b = { NULL, 0, 0 };
+		int hit = frAddField(&b, "Filename", 8, NULL,
+		                     (const unsigned char*) file_name, strlen(file_name));
+		if (post_data != NULL) hit |= frAddPostData(&b, post_data);
+		hit |= frAddField(&b, field_name, strlen(field_name), file_name,
+		                  (const unsigned char*) SWF_DIALOG_CONTENTS,
+		                  SWF_DIALOG_CONTENTS_LEN);
+		hit |= frAddField(&b, "Upload", 6, NULL,
+		                  (const unsigned char*) "Submit Query", 12);
+		frbufLit(&b, "--" FR_FORM_BOUNDARY "--\r\n");
+		op->body = b.data;
+		op->body_len = b.len;
+		op->cancelled = hit;
+	}
+	free(post_data);
 
 	g_file_dialog_app = app_context;
 	retainObject(obj);

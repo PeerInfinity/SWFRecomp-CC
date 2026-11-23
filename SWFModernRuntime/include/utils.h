@@ -56,7 +56,8 @@ typedef struct SwfLogPair
 // (Ruffle's `None`, which also forces the method to GET at the call site) from
 // an empty one. `body_is_form` selects Ruffle's two body renderings: the
 // verbatim text used for application/x-www-form-urlencoded, or Rust's
-// `{:02X?}` slice debug ("[41, 3D, 62]") for anything else.
+// `{:02X?}` slice debug ("[41, 3D, 62]") for anything else. `body_is_form == 2`
+// is multipart/form-data: text with each CR rendered as a literal `\r`.
 void swf_log_fetch_queue(const char* url, size_t url_len,
                          const char* method, size_t method_len,
                          const SwfLogPair* headers, size_t header_count,

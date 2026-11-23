@@ -206,7 +206,21 @@ void swf_log_fetch_queue(const char* url, size_t url_len,
 		logbuf_lit(&b, "\n  Mime-Type: ");
 		logbuf_put(&b, mime, mime_len);
 		logbuf_lit(&b, "\n  Body: ");
-		if (body_is_form) logbuf_put(&b, (const char*) body, body_len);
+		if (body_is_form == 2)
+		{
+			// multipart/form-data (caf02173c): text, with every CR shown as a
+			// literal `\r` because the line endings are part of the format.
+			size_t i0 = 0;
+			for (size_t i = 0; i < body_len; i++)
+			{
+				if (body[i] != '\r') continue;
+				logbuf_put(&b, (const char*) body + i0, i - i0);
+				logbuf_lit(&b, "\\r");
+				i0 = i + 1;
+			}
+			logbuf_put(&b, (const char*) body + i0, body_len - i0);
+		}
+		else if (body_is_form) logbuf_put(&b, (const char*) body, body_len);
 		else logbuf_hex_slice(&b, body, body_len);
 	}
 	logbuf_lit(&b, "\n");
