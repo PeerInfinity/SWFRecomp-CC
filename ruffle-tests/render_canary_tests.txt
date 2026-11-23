@@ -725,3 +725,8 @@ regression/avm1_jpeg3_alpha_bitmap                     # JPEG3 un-premultiply (e
 # tier=2
 regression/avm1_cxform_override_overflow    # > 256 cxform-override pushes 1 cmp
 regression/avm1_long_text_layout            # > 32 paragraphs, align     1 cmp
+# s26 w2-applyfilter-edge-growth: Flash applyFilter blur model (whole-source taps, grown output, 6-bit size,
+# X-then-Y passes) + opaque no-alpha symbol BitmapData.
+# tier=1
+avm2/bitmapdata_filter_sourcerect                      # sub-rect blur reads beyond the rect   1 cmp
+visual/filters/blur_fractional                         # 6-bit size truncation, opaque symbol  1 cmp

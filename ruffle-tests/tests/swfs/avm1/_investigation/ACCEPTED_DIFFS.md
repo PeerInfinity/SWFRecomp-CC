@@ -166,6 +166,26 @@ entry.
 
 ---
 
+### `visual/filters/blur_quality` (image) — golden contradicts `visual/filters/blur_fractional` on identical filters (s26)
+
+<!-- image-axis: visual/filters/blur_quality output -->
+
+**Diff:** pass → fail after `w2-applyfilter-edge-growth` (205 332 outliers, max diff 9 vs tolerance 6), all of it in
+12 cells: quality ≥ 7 with an even blur size.
+
+**Why it can't be fixed:** both tests blur the same `Image` symbol (md5-identical PNG) with the same
+`applyFilter(image, rect(0,0,80,80), Point(0,0), filter)`, at the same SWF version, by the same author in the same
+week. Yet `blur_quality`'s golden is +1 level per pass relative to `blur_fractional`'s golden on identical
+`BlurFilter(n,1,1)` cells (+1 on ~18 k of 19 200 channels for n = 2, 3, 4, 6, 7, 8; identical for 5 and 9). That bias
+compounds with quality. No single model passes both goldens. Ours is the integer Flash model fitted offline, and it
+reproduces `blur_fractional`, `avm2/bitmapdata_applyfilter_destpoint_edges` and `avm2/bitmapdata_filter_sourcerect`
+exactly (max diff 0–1). The old pass was Ruffle's quantised weight accidentally reproducing the even-size bias, inside
+the upstream tolerance of 6. Evidence:
+`SWFRecompDocs/plans/session26-fanout-reports/w2-applyfilter-edge-growth-report.md` §3.
+
+**Decision:** keep the Flash-consistent model. The trace row still passes and is NOT ignored. **Prune criterion:** a
+fresh Flash capture of either test re-decides which golden is wrong.
+
 ## Category 3: Flash Implementation Quirks We Do Not Replicate
 
 Undocumented or locale-specific behaviors of Flash Player's built-in functions that
@@ -932,7 +952,7 @@ materially above ~359 channels, this entry does not cover it.
 
 <!-- image-axis: none -->
 
-**RESOLVED 2026-09-28 (s21, `w2-noto-d1`).** The recompiler now emits NotoSans
+**SUPERSEDED s26:** since `w2-applyfilter-edge-growth`, this row fails again for a different reason: its golden is Ruffle-generated and crops at the sourceRect, while Flash grows the output. See `RUFFLE_VS_FLASH_DIFFERENCES.md` §`bitmapdata_applyfilter_blur`. **RESOLVED 2026-09-28 (s21, `w2-noto-d1`).** The recompiler now emits NotoSans
 outlines for `with_default_font` tests and device fields use Noto's real
 ascent/descent there; this comparison renders at 0 outliers / max diff 2 locally.
 The image-axis exclusion is withdrawn; the history below is kept for reference.

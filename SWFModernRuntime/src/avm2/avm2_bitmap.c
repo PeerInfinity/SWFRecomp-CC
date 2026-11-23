@@ -820,7 +820,7 @@ static void bd_seed_embedded(Avm2Context* ctx, Avm2BitmapDataExt* bd,
 {
 	bd->width = emb->width;
 	bd->height = emb->height;
-	bd->transparency = 1;
+	bd->transparency = 1;   // settled below, once the pixels are known
 	bd->disposed = 0;
 	avm2_bitmapdata_touch(bd);
 	uint32_t n = (uint32_t) emb->width * emb->height;
@@ -868,6 +868,22 @@ static void bd_seed_embedded(Avm2Context* ctx, Avm2BitmapDataExt* bd,
 		}
 	}
 	free(inflated);
+	// s26 w2-applyfilter-edge-growth: an asset WITHOUT alpha (DefineBits /
+	// JPEG2 / DefineBitsLossless v1) seeds an OPAQUE BitmapData, as Flash's
+	// Loader does for a no-alpha PNG/JPEG (avm2/loader_bitmap_transparency
+	// traces `false`). Ruffle's fill_bitmap_data_from_symbol always passes
+	// true. Visible in applyFilter: its edge taps read transparent, so an
+	// opaque bitmap keeps alpha 255 there (visual/filters/blur_fractional's
+	// Flash golden: in-place blur of a lossless-v1 symbol, edges intact).
+	// A JPEG2 tag may smuggle a PNG/GIF with real alpha while the table
+	// flag says 0, so any alpha < 255 keeps the bitmap transparent.
+	if (!emb->transparency && rgba != NULL)
+	{
+		int opaque = 1;
+		for (uint32_t i = 0; i < n && opaque; i++)
+			if (CA(bd->pixels[i]) != 0xFF) opaque = 0;
+		if (opaque) bd->transparency = 0;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -3878,6 +3894,404 @@ static void bd_apply_convolution(Avm2Context* ctx, Avm2BitmapDataExt* dst,
 	heap_free(ctx->app, conv);
 }
 
+// ---------------------------------------------------------------------------
+// applyFilter's Blur / Glow / DropShadow / Bevel: FLASH's model
+// (s26 w2-applyfilter-edge-growth).
+//
+// Fitted offline against three Flash goldens and reproducing each exactly:
+// avm2/bitmapdata_applyfilter_destpoint_edges (all 13 blur-based cells, 0
+// over tolerance 1; ruffle's own render is ~35k), avm2/
+// bitmapdata_filter_sourcerect (max diff 0; was 1603 outliers) and visual/
+// filters/blur_fractional (max diff 0, tolerance 0 on all 100 cells). It
+// does NOT match visual/filters/blur_quality at quality >= 7: that golden
+// disagrees with blur_fractional's on the IDENTICAL filter (BlurFilter(n,1,1)
+// on the same image; +1 on ~95% of channels, compounding per pass), so no
+// single model fits both. Where it departs from the ruffle port above
+// (bd_blur_source_region / bd_glowlike_source_region, which stay in use for
+// draw()'s filter layer):
+//   * the blur runs over the WHOLE source bitmap, transparent only outside
+//     the bitmap itself (filter_sourcerect: real pixels beyond a sub-rect
+//     sourceRect bleed into the edge), and the OUTPUT is the sourceRect GROWN
+//     by the reach, quality * (m + 1) per axis (ruffle clamps at the texture
+//     edge and crops to the rect);
+//   * the size keeps 6 significant bits (fb_kernel), the fractional outer tap
+//     weighs exactly (radius - m), not floor((radius - m) * 255) / 255, and
+//     each pass is floor(sum / size);
+//   * all quality X passes run first, then all Y passes (not X,Y,X,Y);
+//   * Glow/DS/Bevel sample the blurred alpha BILINEARLY at the true
+//     fractional offset, floored to a whole 0..255 level, and their output
+//     rect is the source rect grown by the blur reach shifted by the
+//     TRUNCATED offset (DropShadow 4 @ 45deg, blur 4: +0 left/top, +4
+//     right/bottom; Bevel the same reach on every side). The colour maths
+//     after the sample is the ruffle shader's (bd_glowlike_source_region).
+// Scratch buffers are calloc'd (a quality-15 blur of 255 grows the rect by
+// ~1.9k px per side), and a failed allocation leaves the target untouched.
+// ---------------------------------------------------------------------------
+typedef struct
+{
+	int m;          // unit-weight taps [-m, m]
+	double frac;    // weight of the taps at +-(m + 1)
+	double fs;      // divisor (the blur size)
+} FlashBlurK;
+
+static int fb_kernel(double size, FlashBlurK* k)
+{
+	if (size > 255.0) size = 255.0;
+	if (!(size > 1.0)) return 0;
+	// Flash keeps 6 significant bits of the size (truncated): steps of 1/32
+	// in [1,2), 1/16 in [2,4), 1/8 in [4,8), 1/4 in [8,16) ... Fitted on the
+	// visual/filters/blur_fractional Flash golden, where it reproduces every
+	// channel of all 100 cells exactly (BlurFilter(8.2) == BlurFilter(8)).
+	{
+		int e;
+		frexp(size, &e);                       // size = f * 2^e, f in [0.5, 1)
+		double step = ldexp(1.0, e - 6);
+		size = floor(size / step) * step;
+	}
+	float fs = (float) size;
+	if (!(fs > 1.0f)) return 0;
+	float radius = (fs - 1.0f) * 0.5f;
+	float mf = ceilf(radius) - 1.0f;
+	k->m = (int) mf;
+	k->frac = (double) (radius - mf);
+	k->fs = (double) fs;
+	return 1;
+}
+
+// One axis over a w*h grid, taps outside the grid read 0.
+static void fb_axis_pass(const uint32_t* in, uint32_t* out, int w, int h,
+                         int horizontal, const FlashBlurK* k)
+{
+	int n_along = horizontal ? w : h, n_across = horizontal ? h : w;
+	size_t s_along = horizontal ? 1 : (size_t) w;
+	size_t s_across = horizontal ? (size_t) w : 1;
+	int m = k->m;
+	for (int a = 0; a < n_across; a++)
+	{
+		const uint32_t* line = in + (size_t) a * s_across;
+		uint32_t* oline = out + (size_t) a * s_across;
+#define FB_TAP(j) (((j) < 0 || (j) >= n_along) ? 0u : line[(size_t) (j) * s_along])
+		int32_t sum[4] = { 0, 0, 0, 0 };
+		for (int t = -m; t <= m; t++)
+		{
+			uint32_t c = FB_TAP(t);
+			sum[0] += (int32_t) CA(c); sum[1] += (int32_t) CR(c);
+			sum[2] += (int32_t) CG(c); sum[3] += (int32_t) CB(c);
+		}
+		for (int i = 0; i < n_along; i++)
+		{
+			uint32_t lo = FB_TAP(i - m - 1), hi = FB_TAP(i + m + 1);
+			int32_t edge[4] = {
+				(int32_t) (CA(lo) + CA(hi)), (int32_t) (CR(lo) + CR(hi)),
+				(int32_t) (CG(lo) + CG(hi)), (int32_t) (CB(lo) + CB(hi))
+			};
+			uint32_t ch[4];
+			for (int c = 0; c < 4; c++)
+			{
+				double v = floor(((double) sum[c] + k->frac * (double) edge[c]) / k->fs + 1e-9);
+				ch[c] = v <= 0.0 ? 0u : (v >= 255.0 ? 255u : (uint32_t) v);
+			}
+			oline[(size_t) i * s_along] = CMK(ch[1], ch[2], ch[3], ch[0]);
+			uint32_t add = FB_TAP(i + m + 1), drop = FB_TAP(i - m);
+			sum[0] += (int32_t) CA(add) - (int32_t) CA(drop);
+			sum[1] += (int32_t) CR(add) - (int32_t) CR(drop);
+			sum[2] += (int32_t) CG(add) - (int32_t) CG(drop);
+			sum[3] += (int32_t) CB(add) - (int32_t) CB(drop);
+		}
+#undef FB_TAP
+	}
+}
+
+// The blur reach of `f` per axis (0 on an axis with no pass); returns 0 when
+// no pass runs at all (quality 0 or both axes <= 1 px).
+static int fb_reach(const Avm2FilterVal* f, FlashBlurK* kx, FlashBlurK* ky,
+                    int* has_x, int* has_y, int* ex, int* ey)
+{
+	int q = f->quality;
+	*has_x = q > 0 && fb_kernel((double) f->blur_x / 65536.0, kx);
+	*has_y = q > 0 && fb_kernel((double) f->blur_y / 65536.0, ky);
+	*ex = *has_x ? q * (kx->m + 1) : 0;
+	*ey = *has_y ? q * (ky->m + 1) : 0;
+	return *has_x || *has_y;
+}
+
+// Blur the WHOLE source bitmap (transparent only outside the bitmap itself:
+// the filter_sourcerect Flash golden bleeds real pixels from beyond a
+// sub-rect sourceRect into the grown edge) and return the calloc'd window
+// `region` grown by (gx, gy) on each side. With no pass, the window is a
+// plain copy. NULL on allocation failure.
+static uint32_t* fb_blur_window(Avm2BitmapDataExt* src, const PixelRegion* region,
+                                const Avm2FilterVal* f, int gx, int gy)
+{
+	int rw = (int) pr_w(region), rh = (int) pr_h(region);
+	FlashBlurK kx, ky;
+	int has_x, has_y, ex, ey;
+	int any = fb_reach(f, &kx, &ky, &has_x, &has_y, &ex, &ey);
+	int q = f->quality;
+	// Input window: the output window plus the reach of every pass.
+	int ix = gx + ex, iy = gy + ey;
+	int w = rw + 2 * ix, h = rh + 2 * iy;
+	size_t n = (size_t) w * (size_t) h;
+	uint32_t* cur = (uint32_t*) calloc(n, sizeof(uint32_t));
+	uint32_t* other = any ? (uint32_t*) calloc(n, sizeof(uint32_t)) : NULL;
+	if (cur == NULL || (any && other == NULL))
+	{
+		free(cur); free(other);
+		return NULL;
+	}
+	int64_t x0 = (int64_t) region->x_min - ix, y0 = (int64_t) region->y_min - iy;
+	for (int y = 0; y < h; y++)
+	{
+		int64_t sy = y0 + y;
+		if (sy < 0 || sy >= (int64_t) src->height) continue;
+		int64_t a = x0 < 0 ? 0 : x0;
+		int64_t b = x0 + w > (int64_t) src->width ? (int64_t) src->width : x0 + w;
+		if (b > a)
+			memcpy(cur + (size_t) y * (size_t) w + (size_t) (a - x0),
+			       src->pixels + (size_t) sy * src->width + (size_t) a,
+			       (size_t) (b - a) * sizeof(uint32_t));
+	}
+	for (int axis = 0; axis < 2; axis++)
+	{
+		int horizontal = (axis == 0);
+		if (!(horizontal ? has_x : has_y)) continue;
+		for (int p = 0; p < q; p++)
+		{
+			fb_axis_pass(cur, other, w, h, horizontal, horizontal ? &kx : &ky);
+			uint32_t* swap = cur; cur = other; other = swap;
+		}
+	}
+	free(other);
+	// Crop the output window (the input margin's reach band is dropped).
+	int ow = rw + 2 * gx, oh = rh + 2 * gy;
+	uint32_t* out = (uint32_t*) malloc((size_t) ow * (size_t) oh * sizeof(uint32_t));
+	if (out != NULL)
+	{
+		for (int y = 0; y < oh; y++)
+			memcpy(out + (size_t) y * (size_t) ow,
+			       cur + (size_t) (y + ey) * (size_t) w + (size_t) ex,
+			       (size_t) ow * sizeof(uint32_t));
+	}
+	free(cur);
+	return out;
+}
+
+// applyFilter's BlurFilter: the rect grown by the reach. NULL when no pass
+// runs (ruffle leaves the target untouched there too) or on no memory.
+static uint32_t* fb_blur_region(Avm2BitmapDataExt* src, const PixelRegion* region,
+                                const Avm2FilterVal* f, int* ex, int* ey)
+{
+	FlashBlurK kx, ky;
+	int has_x, has_y;
+	*ex = *ey = 0;
+	if (pr_w(region) == 0 || pr_h(region) == 0) return NULL;
+	if (!fb_reach(f, &kx, &ky, &has_x, &has_y, ex, ey)) return NULL;
+	return fb_blur_window(src, region, f, *ex, *ey);
+}
+
+// Bilinear sample of the blurred grid's alpha at grid position (px, py),
+// zero outside, floored to a whole level, as 0..1.
+static float fb_alpha_at(const uint32_t* g, int w, int h, double px, double py)
+{
+	double x0f = floor(px), y0f = floor(py);
+	double tx = px - x0f, ty = py - y0f;
+	int x0 = (int) x0f, y0 = (int) y0f;
+	double a[4];
+	for (int j = 0; j < 2; j++)
+	{
+		for (int i = 0; i < 2; i++)
+		{
+			int x = x0 + i, y = y0 + j;
+			a[j * 2 + i] = (x < 0 || y < 0 || x >= w || y >= h)
+			               ? 0.0 : (double) CA(g[(size_t) y * (size_t) w + (size_t) x]);
+		}
+	}
+	double v = (a[0] * (1.0 - tx) + a[1] * tx) * (1.0 - ty) + (a[2] * (1.0 - tx) + a[3] * tx) * ty;
+	v = floor(v + 1e-6);
+	if (v < 0.0) v = 0.0; else if (v > 255.0) v = 255.0;
+	return (float) v / 255.0f;
+}
+
+// Glow / DropShadow / Bevel over `region`, Flash model. Returns a calloc'd
+// premultiplied grid of the region grown by g[0..3] = left, top, right, bottom.
+static uint32_t* fb_glowlike_region(Avm2BitmapDataExt* src, const PixelRegion* region,
+                                    const Avm2FilterVal* f, int g[4])
+{
+	int rw = (int) pr_w(region), rh = (int) pr_h(region);
+	g[0] = g[1] = g[2] = g[3] = 0;
+	if (rw <= 0 || rh <= 0) return NULL;
+	FlashBlurK kx, ky;
+	int has_x, has_y, ex, ey;
+	fb_reach(f, &kx, &ky, &has_x, &has_y, &ex, &ey);
+
+	float dist = (float) ((double) f->distance / 65536.0);
+	float ang = (float) ((double) f->angle / 65536.0);
+	float cx_off = 0.0f, cy_off = 0.0f;       // +offset = shadow / highlight-sample side
+	if (f->kind != AVM2_FILTER_GLOW)
+	{
+		cx_off = cosf(ang) * dist;
+		cy_off = sinf(ang) * dist;
+	}
+	int iox = (int) cx_off, ioy = (int) cy_off;   // truncated
+	if (f->kind == AVM2_FILTER_DROP_SHADOW)
+	{
+		g[0] = ex - iox > 0 ? ex - iox : 0; g[2] = ex + iox > 0 ? ex + iox : 0;
+		g[1] = ey - ioy > 0 ? ey - ioy : 0; g[3] = ey + ioy > 0 ? ey + ioy : 0;
+	}
+	else if (f->kind == AVM2_FILTER_BEVEL)
+	{
+		g[0] = g[2] = ex + (iox < 0 ? -iox : iox);
+		g[1] = g[3] = ey + (ioy < 0 ? -ioy : ioy);
+	}
+	else
+	{
+		g[0] = g[2] = ex;
+		g[1] = g[3] = ey;
+	}
+	int ow = rw + g[0] + g[2], oh = rh + g[1] + g[3];
+	// The blur window must cover every bilinear tap: the grown rect plus the
+	// offset plus one texel.
+	int mx = (g[0] > g[2] ? g[0] : g[2]) + (int) ceilf(fabsf(cx_off)) + 1;
+	int my = (g[1] > g[3] ? g[1] : g[3]) + (int) ceilf(fabsf(cy_off)) + 1;
+	uint32_t* bl = fb_blur_window(src, region, f, mx, my);
+	if (bl == NULL) return NULL;
+	int bw = rw + 2 * mx, bh = rh + 2 * my;
+	uint32_t* out = (uint32_t*) calloc((size_t) ow * (size_t) oh, sizeof(uint32_t));
+	if (out == NULL) { free(bl); return NULL; }
+
+	float strength = (float) f->strength / 256.0f;
+	int knockout = f->knockout != 0;
+	float gc[4] = { (float) CR(f->color) / 255.0f, (float) CG(f->color) / 255.0f,
+	                (float) CB(f->color) / 255.0f, (float) f->alpha / 255.0f };
+	float hi[4] = { (float) CR(f->color2) / 255.0f, (float) CG(f->color2) / 255.0f,
+	                (float) CB(f->color2) / 255.0f, (float) f->alpha2 / 255.0f };
+	float sh_c[4] = { gc[0], gc[1], gc[2], gc[3] };
+	for (int i = 0; i < 3; i++) { hi[i] *= hi[3]; sh_c[i] *= sh_c[3]; }
+	int composite = 1;
+	if (f->kind == AVM2_FILTER_DROP_SHADOW) composite = !f->hide_object;
+	int bevel_type = f->on_top ? 2 : (f->inner ? 1 : 0);
+
+	for (int oy = 0; oy < oh; oy++)
+	{
+		int ry = oy - g[1];                       // region-relative
+		double by = (double) (ry + my);           // blur-window position
+		int64_t sy = (int64_t) region->y_min + ry;
+		for (int ox = 0; ox < ow; ox++)
+		{
+			int rx = ox - g[0];
+			double bx = (double) (rx + mx);
+			int64_t sx = (int64_t) region->x_min + rx;
+			// The object term reads the real source pixel (whole bitmap, as
+			// the blur does); only outside the bitmap is it transparent.
+			uint32_t dr = 0;
+			if (sx >= 0 && sy >= 0 && sx < (int64_t) src->width && sy < (int64_t) src->height)
+				dr = bd_get_raw(src, (uint32_t) sx, (uint32_t) sy);
+			float d[4] = { (float) CR(dr) / 255.0f, (float) CG(dr) / 255.0f,
+			               (float) CB(dr) / 255.0f, (float) CA(dr) / 255.0f };
+			float c[4];
+			if (f->kind == AVM2_FILTER_BEVEL)
+			{
+				float b_l = fb_alpha_at(bl, bw, bh, bx + (double) cx_off, by + (double) cy_off);
+				float b_r = fb_alpha_at(bl, bw, bh, bx - (double) cx_off, by - (double) cy_off);
+				float ha = fk_sat((b_l - b_r) * strength);
+				float sa = fk_sat((b_r - b_l) * strength);
+				float gg[4];
+				for (int i = 0; i < 4; i++) gg[i] = hi[i] * ha + sh_c[i] * sa;
+				int outer = (bevel_type == 0 || bevel_type == 2);
+				int inner = (bevel_type == 1 || bevel_type == 2);
+				for (int i = 0; i < 4; i++)
+				{
+					if (inner && outer)
+						c[i] = knockout ? gg[i] : d[i] - d[i] * gg[3] + gg[i];
+					else if (inner)
+						c[i] = knockout ? gg[i] * d[3] : gg[i] * d[3] + d[i] * (1.0f - gg[3]);
+					else
+						c[i] = knockout ? gg[i] - gg[i] * d[3] : d[i] + gg[i] - gg[i] * d[3];
+				}
+			}
+			else
+			{
+				// The shadow lands at +offset, so it samples the blur at -offset.
+				float blur = fb_alpha_at(bl, bw, bh, bx - (double) cx_off, by - (double) cy_off);
+				float col[4] = { gc[0], gc[1], gc[2], 1.0f };
+				if (f->inner)
+				{
+					float a = gc[3] * fk_sat((1.0f - blur) * strength);
+					for (int i = 0; i < 4; i++)
+						c[i] = (!knockout && composite)
+						       ? col[i] * a * d[3] + d[i] * (1.0f - a)
+						       : col[i] * a * d[3];
+				}
+				else
+				{
+					float a = gc[3] * fk_sat(blur * strength);
+					for (int i = 0; i < 4; i++)
+					{
+						if (knockout) c[i] = col[i] * a * (1.0f - d[3]);
+						else if (composite) c[i] = col[i] * a * (1.0f - d[3]) + d[i];
+						else c[i] = col[i] * a;
+					}
+				}
+			}
+			out[(size_t) oy * (size_t) ow + (size_t) ox] = fk_store(c);
+		}
+	}
+	free(bl);
+	return out;
+}
+
+// Write a grown premultiplied grid whose top-left lands at (x0, y0) in `dst`,
+// clipped to it; an opaque target keeps alpha 0xFF (RGB stays premultiplied,
+// as the old blur arm and ruffle's copy_pixels_to_bitmapdata do).
+static void fb_write_grid(Avm2BitmapDataExt* dst, const uint32_t* grid, int w, int h,
+                          int64_t x0, int64_t y0)
+{
+	for (int y = 0; y < h; y++)
+	{
+		int64_t ty = y0 + y;
+		if (ty < 0 || ty >= (int64_t) dst->height) continue;
+		for (int x = 0; x < w; x++)
+		{
+			int64_t tx = x0 + x;
+			if (tx < 0 || tx >= (int64_t) dst->width) continue;
+			uint32_t c = grid[(size_t) y * (size_t) w + (size_t) x];
+			bd_set_raw(dst, (uint32_t) tx, (uint32_t) ty,
+			           dst->transparency ? c : with_alpha(c, 0xFF));
+		}
+	}
+}
+
+// Flash-model applyFilter for Blur and Glow/DS/Bevel. Returns 1 if handled.
+static int fb_apply_grown(Avm2BitmapDataExt* dst, Avm2BitmapDataExt* src,
+                          int32_t sx, int32_t sy, int32_t sw, int32_t sh,
+                          int32_t dx, int32_t dy, const Avm2FilterVal* f)
+{
+	PixelRegion r = pr_for_region_i32(sx, sy, sw, sh);
+	pr_clamp(&r, src->width, src->height);
+	int rw = (int) pr_w(&r), rh = (int) pr_h(&r);
+	if (rw <= 0 || rh <= 0) return 1;
+	uint32_t* grid;
+	int g[4];
+	if (f->kind == AVM2_FILTER_BLUR)
+	{
+		int ex, ey;
+		grid = fb_blur_region(src, &r, f, &ex, &ey);
+		g[0] = g[2] = ex; g[1] = g[3] = ey;
+	}
+	else
+	{
+		grid = fb_glowlike_region(src, &r, f, g);
+	}
+	if (grid == NULL) return 1;   // no pass / no memory: target untouched
+	// The CLAMPED rect's origin maps to destPoint, as in the other arms
+	// (pr_clamp_intersection with op = src_region.x_min/y_min).
+	int64_t ox = (int64_t) dx - g[0];
+	int64_t oy = (int64_t) dy - g[1];
+	fb_write_grid(dst, grid, rw + g[0] + g[2], rh + g[1] + g[3], ox, oy);
+	free(grid);
+	return 1;
+}
+
 static Avm2Value bd_apply_filter(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -3958,6 +4372,12 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 		avm2_filter_release(ctx, &f);
 		return avm2_undefined();
 	}
+	if (is_blur || is_glow)
+	{
+		fb_apply_grown(dst, src, sx, sy, sw, sh, dx, dy, &f);
+		avm2_filter_release(ctx, &f);
+		return avm2_undefined();
+	}
 
 	PixelRegion src_region = pr_for_region_i32(sx, sy, sw, sh);
 	pr_clamp(&src_region, src->width, src->height);
@@ -3967,17 +4387,7 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 	uint32_t* blurred = NULL;
 	uint32_t blur_ox = src_region.x_min, blur_oy = src_region.y_min;
 	uint32_t blur_pitch = pr_w(&src_region);
-	if (is_blur)
-	{
-		blurred = bd_blur_source_region(ctx, src, &src_region, &f);
-	}
-	else if (is_glow)
-	{
-		// Glow/DropShadow/Bevel always produce a target (ruffle's apply()
-		// returns Some for all three), so a NULL here is only an empty rect.
-		blurred = bd_glowlike_source_region(ctx, src, &src_region, &f);
-	}
-	else if (is_displace)
+	if (is_displace)
 	{
 		// The map is not in Avm2FilterVal (it round-trips to null); read it off
 		// the AS filter object. No map => ruffle's is_filter_supported is still
@@ -3986,7 +4396,7 @@ static Avm2Value bd_apply_filter(Avm2Activation* act)
 			ctx, avm2_filter_map_bitmap(ctx, fv.u.obj));
 		blurred = bd_displace_source_region(ctx, src, &src_region, &f, map);
 	}
-	if ((is_blur || is_displace || is_glow) && blurred == NULL)
+	if (is_displace && blurred == NULL)
 	{
 		avm2_filter_release(ctx, &f);
 		return avm2_undefined();

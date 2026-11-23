@@ -671,3 +671,21 @@ past the source's right and bottom edges). This model gives 0 channels over tole
 them yet.
 
 **Decision**: match Flash (rule 3). Cell 7 goes from 5035 channels to 0; Ruffle's copy is not replicated.
+
+### `avm2/bitmapdata_applyfilter_blur` (image) — golden is Ruffle's own blur, cropped at the sourceRect (s26)
+
+<!-- image-axis: avm2/bitmapdata_applyfilter_blur output -->
+
+**Diff:** pass → fail after `w2-applyfilter-edge-growth` (39 351 outliers, max diff 238). The residual is the grown
+ring at each cell's sourceRect edge.
+
+**Why we match Flash and not Ruffle:** `git log --follow` on the golden shows 9 rewrites, each bundled with a Ruffle
+blur change (`e73389aa7`, `b140029e9`, `c0e932422`, `7e96a2fda`, `4ac13de2f`, `1aa2ac28c`, `0076d6586`, `e14b92ae3`,
+`2e721fdcb`), so the image is Ruffle's output. Ruffle crops `applyFilter` at the sourceRect. Flash grows the output
+by the filter reach and reads the real source pixels beyond the rect: `avm2/bitmapdata_filter_sourcerect`'s Flash
+golden, with the same sub-rect geometry, now matches at max diff 0, and `bitmapdata_applyfilter_destpoint_edges` flips
+to pass.
+
+**Decision:** match Flash (user ruling 2026-09-29, Flash over Ruffle). **Prune criterion:** a Flash capture of this
+SWF (s26 local oracle request) re-grades it.
+
