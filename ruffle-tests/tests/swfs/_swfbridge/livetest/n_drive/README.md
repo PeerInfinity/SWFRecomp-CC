@@ -57,7 +57,8 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   line — an order-independent integer hash (positions ×100, rounded) of every
   clip two levels under `_root`, so drones/thwumps/doors moving differently
   diverge even when they never touch the player; `FREEZE=""` disables the
-  level-0 freeze points. N is SWF6 = case-insensitive: a probe member must not
+  level-0 freeze points; `CLIPDIFF=true` (with OBJHASH) traces `ND clip+/clip-`
+  path + `_currentframe` for clips appearing/disappearing. N is SWF6 = case-insensitive: a probe member must not
   differ from another only by case (`objHash` IS `OBJHASH`).
 - `build.sh "<script>" [out.swf]` — MTASC with the script baked in, splice into
   N at **`--min-version 6`** (N is SWF 6 and case-insensitive; v8 breaks it).
