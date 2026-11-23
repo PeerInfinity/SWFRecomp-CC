@@ -17,7 +17,7 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched at wave-2 start).
 | 2 | w1-runtime-robustness | trace | `ng_shared.c` fixed MAX_* caps, float-through-u64 store, `-fno-strict-aliasing` audit | session_018CoDi4WHDYx1GAABAqcRbo |
 | 3 | w1-avm1-dispatch-scope | trace | arc §26.4 AVM1 leftovers (bare-call `with`, type-2 flags, function-form timer, hairline hitTest, …) | session_018CoDi41gFdju4MePGmDgyc |
 | 4 | w1-attached-button-dispatch | both | native `ng_update_button_states_attached` + `String_path_variable_button` | session_018CoDi7Ln3aUjgDoPY2rvxY |
-| 5 | w1-pixel-nearpass | pixel | bevel (3 px), small-excess rows, AVM2 `gfx_gen_ramp` + CPU gradient sampler | session_018CoDi6LaNQmB7xc3hvABEr |
+| 5 | w1-pixel-nearpass | pixel | bevel (3 px), small-excess rows, AVM2 `gfx_gen_ramp` + CPU gradient sampler | session_018CoDi6LaNQmB7xc3hvABEr — DELIVERED; prototype LANDED directly `509768d1d` (+2 px `morph_test1 frame1` (sprite-nested EditText z-order), `filters/bevel` (stb midpoint trunc, recompiler; zero headroom 6/6); AVM2 `gfx_gen_ramp` twin NO-GO (moves away from Flash); oracle request 3_joystick unsatisfiable — mouse-driven `input.json`, exporter has no input replay) |
 | 6 | w1-pixel-layer-colour | pixel | layer N1/N3, AVM1 off-diagonal CM, draw() of filtered sources, Drawing-API colour | session_018CoDi6ZWEvZmb1sAonaudB |
 | 7 | w1-pixel-tail | pixel | static_text_offstage (c), pixelbender_dithering, acid-color-0, disposition records | session_018CoDi69tgZvsTJJmyB7xMV |
 | 8 | w1-per-movie-displaylist | trace | per-movie display lists (`video_prototype_lazy_swf6_child`), L arc | session_018CoDi7W2f8gCE4qKFtnijA |
@@ -28,9 +28,11 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched at wave-2 start).
 | slug | from | ledger (expected) | session id |
 |---|---|---|---|
 | (landed direct) w1-drift prototype | w1-drift | trace `avm1/file_reference_upload_request` (+1) | — |
+| (landed direct) w1-pixel-nearpass prototype | w1-pixel-nearpass T+M | px `from_gnash/misc-ming.all/morph_test1` frame1, `visual/filters/bevel` (+2) | — |
 | (landed direct) w1-trace-tail-audit prototype | w1-trace-tail-audit P1–P3 | trace `from_gnash/misc-swfc.all/sound` (+1); lines pixelDissolve 1335→1351, matrix_accuracy_test1 10→12 | — |
 
 ## Grading runs
 
 | run | mode / categories / images | code | result |
 |---|---|---|---|
+| 45094460914 | graphics / full / **images** | 509768d1d (drift +1 trace; trace-tail-audit +1 trace; pixel-nearpass +2 px; recompiler → Pages dry run 45094486900) | running |
