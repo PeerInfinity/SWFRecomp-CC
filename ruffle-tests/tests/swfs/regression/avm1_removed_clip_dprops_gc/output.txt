@@ -1,0 +1,14 @@
+before: movieclip s
+removed: movieclip 
+self after removal: tag= local= c=0
+f=20 keep=movieclip n=0 m=0 label= payload= self=
+f=40 keep=movieclip n=0 m=0 label= payload= self=
+f=60 keep=movieclip n=0 m=0 label= payload= self=
+f=80 keep=movieclip n=0 m=0 label= payload= self=
+f=100 keep=movieclip n=0 m=0 label= payload= self=
+f=120 keep=movieclip n=0 m=0 label= payload= self=
+f=140 keep=movieclip n=0 m=0 label= payload= self=
+f=160 keep=movieclip n=0 m=0 label= payload= self=
+f=180 keep=movieclip n=0 m=0 label= payload= self=
+f=200 keep=movieclip n=0 m=0 label= payload= self=
+done

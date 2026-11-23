@@ -25464,8 +25464,13 @@ void actionQueueDynamicChildUnloads(MovieClip* parent_mc)
 void actionReclaimDeadChildMCSlots(void)
 {
 	for (int i = 0; i < child_mc_count; i++) {
-		if (child_mc_cache[i] != NULL && child_mc_cache[i]->depth == INT_MIN)
+		if (child_mc_cache[i] != NULL && child_mc_cache[i]->depth == INT_MIN) {
+			// Leaving the registry ends the collector's rooting of the dead
+			// clip's dynamic_props; detach them first so the MC never keeps a
+			// field at swept memory (n-collector-uaf).
+			actionDeferDpropsRelease(NULL, child_mc_cache[i]);
 			child_mc_cache[i] = NULL;
+		}
 	}
 	while (child_mc_count > 0 && child_mc_cache[child_mc_count - 1] == NULL)
 		child_mc_count--;
@@ -27756,6 +27761,7 @@ void actionRewindCleanup(SWFAppContext* app_context)
 			// there is a user variable and survives removal (typeof stays
 			// 'movieclip'; see actionInvalidateCachedMovieClip).
 			ch->depth = INT_MIN;
+			actionDeferDpropsRelease(app_context, ch);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 			child_mc_cache[i] = NULL;
 		}
 	}
@@ -65204,12 +65210,14 @@ void actionRemoveSprite(SWFAppContext* app_context)
 				// stays 'movieclip', MovieClip.as:996 umc; member access
 				// soft-ref rebinds via mcResolveSoftRef when a same-named
 				// clip reappears).
-				// Mark as removed — keep dynamic_props intact until pending unload fires
+				// Mark as removed. Its dynamic_props are detached where it leaves the
+					// registry below (Ruffle: a removed clip has no members, even via `this`).
 				_rs_mc->avm1_removed = 1;
 				_rs_mc->depth = INT_MIN;
 				// Also mark all descendant MCs as removed (children, grandchildren, etc.)
 				for (int _rs_j = 0; _rs_j < child_mc_count; _rs_j++) {
 					if (child_mc_cache[_rs_j] == _rs_mc) {
+						actionDeferDpropsRelease(app_context, _rs_mc);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 						child_mc_cache[_rs_j] = NULL;
 					} else if (child_mc_cache[_rs_j] != NULL) {
 						// Check if this MC is a descendant of the removed MC
@@ -65218,6 +65226,7 @@ void actionRemoveSprite(SWFAppContext* app_context)
 							if (_rs_anc == _rs_mc) {
 								child_mc_cache[_rs_j]->avm1_removed = 1;
 								child_mc_cache[_rs_j]->depth = INT_MIN;
+								actionDeferDpropsRelease(app_context, child_mc_cache[_rs_j]);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 								child_mc_cache[_rs_j] = NULL;
 								break;
 							}
@@ -68180,6 +68189,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							child_mc_cache[_rdi]->name, strlen(child_mc_cache[_rdi]->name), &_undef);
 					}
 					child_mc_cache[_rdi]->depth = INT_MIN;
+					actionDeferDpropsRelease(app_context, child_mc_cache[_rdi]);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 					child_mc_cache[_rdi] = NULL;
 					break;
 				}
@@ -68437,6 +68447,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						setProperty(app_context, (ASObject*)mc->dynamic_props,
 							child_mc_cache[_di]->name, strlen(child_mc_cache[_di]->name), &undef_var);
 					}
+					actionDeferDpropsRelease(app_context, child_mc_cache[_di]);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 					child_mc_cache[_di] = NULL;
 					break;
 				}
@@ -75156,6 +75167,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							for (int _ai = 0; _ai < child_mc_count; _ai++) {
 								if (child_mc_cache[_ai] == _apply_mc) { child_mc_cache[_ai] = NULL; break; }
 							}
+							actionDeferDpropsRelease(app_context, _apply_mc);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 							// Clear display list entry so GetVariable doesn't re-find it
 							{
 								extern size_t ng_findDisplayEntryByName(const char* name);
@@ -76114,6 +76126,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					break;
 				}
 			}
+			actionDeferDpropsRelease(app_context, mc);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 			// Drop the parent-dprops instance binding and mark the wrapper
 			// dead so name reads fall through to "not found" and a later
 			// create at the same name rebinds (gnash TextField.as:805-817:
@@ -76166,6 +76179,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								child_mc_cache[_rdi]->name, strlen(child_mc_cache[_rdi]->name), &_undef);
 						}
 						child_mc_cache[_rdi]->depth = INT_MIN;
+						actionDeferDpropsRelease(app_context, child_mc_cache[_rdi]);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 						child_mc_cache[_rdi] = NULL;
 						break;
 					}
@@ -76604,6 +76618,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								child_mc_cache[_dci]->name, strlen(child_mc_cache[_dci]->name), &_undef);
 						}
 						child_mc_cache[_dci]->depth = INT_MIN;
+						actionDeferDpropsRelease(app_context, child_mc_cache[_dci]);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 						child_mc_cache[_dci] = NULL;
 						break;
 					}
@@ -79721,12 +79736,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// auto-registers there (de-conflation), so any MOVIECLIP
 					// entry is a USER variable — Flash keeps it across removal
 					// (typeof stays 'movieclip', MovieClip.as:996 umc).
-					// Mark as removed — keep dynamic_props intact until pending unload fires
+					// Mark as removed. Its dynamic_props are detached where it leaves the
+					// registry below (Ruffle: a removed clip has no members, even via `this`).
 					mc->avm1_removed = 1;
 					mc->depth = INT_MIN;
 					// Remove from child_mc_cache
 					for (int _rmc_i = 0; _rmc_i < child_mc_count; _rmc_i++) {
 						if (child_mc_cache[_rmc_i] == mc) {
+							actionDeferDpropsRelease(app_context, mc);  // evicted from the registry => no longer a GC root (n-collector-uaf)
 							child_mc_cache[_rmc_i] = NULL;
 							break;
 						}

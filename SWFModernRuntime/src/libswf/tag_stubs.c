@@ -104,6 +104,7 @@ static void clone_depth_evict(SWFAppContext* app_context, int swf_depth, MovieCl
 						evicted = child_mc_cache[ci];
 						evicted->avm1_removed = 1;
 						evicted->depth = INT_MIN;
+						actionDeferDpropsRelease(app_context, evicted);  // registry exit => no GC root (n-collector-uaf)
 						child_mc_cache[ci] = NULL;
 						break;
 					}
