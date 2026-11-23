@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-11-23 02:33 UTC
+**Date**: 2026-11-23 03:52 UTC
 
-**Git SHA**: `509768d1d3`
+**Git SHA**: `a18a9cc61d`
 
-**Run Duration**: 1m 53s
+**Run Duration**: 1m 56s
 
 ## Summary
 
@@ -25,13 +25,13 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 0.9s |  |
-| 2 | `exception` | 35 | 18.7s |  |
-| 3 | `function_test` | 26 | 24.6s |  |
-| 4 | `hello` | 8 | 1.8s |  |
-| 5 | `implementsOpTest` | 28 | 19.1s |  |
-| 6 | `inheritance` | 22 | 18.4s |  |
-| 7 | `super_test1` | 17 | 2.0s |  |
+| 1 | `enum` | 19 | 2.2s |  |
+| 2 | `exception` | 35 | 18.8s |  |
+| 3 | `function_test` | 26 | 24.9s |  |
+| 4 | `hello` | 8 | 1.9s |  |
+| 5 | `implementsOpTest` | 28 | 19.8s |  |
+| 6 | `inheritance` | 22 | 18.9s |  |
+| 7 | `super_test1` | 17 | 2.1s |  |
 
 ## Ruffle-Matched Tests
 
@@ -39,8 +39,8 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `TextFieldTest` | 1 | 1 | 24.1s |  |
-| 2 | `levels` | 19 | 21 | 3.5s |  |
+| 1 | `TextFieldTest` | 1 | 1 | 23.6s |  |
+| 2 | `levels` | 19 | 21 | 3.6s |  |
 
 ## Near-Passing Tests
 
