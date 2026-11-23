@@ -1092,6 +1092,7 @@ void tagMain(SWFAppContext* app_context)
 			if (g_enterframe_flush_pending)
 				tagFlushPendingEnterFrame(app_context);
 		}
+#endif  // OFFSCREEN_RENDER — the eligibility mark below runs in every swf.c build
 
 		// Mark dynamic MCs (createEmptyMovieClip, etc. — no display_obj)
 		// as eligible for the NEXT tick's enterFrame dispatch. Mirrors
@@ -1103,10 +1104,19 @@ void tagMain(SWFAppContext* app_context)
 		// mc2.onEnterFrame never fires from the main loop, was only
 		// firing via the post-quit drain (and firing too many times
 		// there). Key test: avm1/create_empty_movie_clip.
+		//
+		// NOT gated on OFFSCREEN_RENDER (s26 n-pixel-pass): browser-WASM used
+		// to skip this mark, so a clip created by root frame 1's DoAction
+		// (which runs AFTER that tick's pre-DoAction flush) only became
+		// eligible at the end of tick 2's dispatch: its first onEnterFrame
+		// came one frame after the root's, a constant off-by-one (N's
+		// injected probe reached "startgame" at frame 27 vs native/Ruffle 28).
+		// Probe: SWFRecomp/tests/wasm_probes/enterframe_count_injected_clip.
 		{
 			extern void actionMarkDynamicMCsEnterFrameEligible(void);
 			actionMarkDynamicMCsEnterFrameEligible();
 		}
+#ifdef OFFSCREEN_RENDER
 
 		// Promote this tick's freshly-attached multi-frame clips to active so the
 		// pump advances them STARTING NEXT tick (PROGRESS #15). After the deferred

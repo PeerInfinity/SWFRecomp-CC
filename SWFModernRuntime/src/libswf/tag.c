@@ -572,6 +572,32 @@ extern MovieClip* g_settarget_saved_context;
 extern MovieClip* g_current_context;
 extern void actionSetCurrentContext(MovieClip* mc);
 
+// The MovieClip that owns sprite entry `obj`, by its instance name. The name
+// lookup is GLOBAL (first clip with that name anywhere), so when two clips
+// share a name the hit can be a different clip than obj's own. If the hit is
+// bound to some other display object, prefer a same-named clip already bound
+// to this exact entry (s26 n-pixel-pass: an attachMovie'd clip's nested child
+// `kid` next to a timeline `_root.kid` -- the pump pre-binds the child's clip
+// to the entry it advances, see ng_attached_run_tree). The scan runs only on
+// that mismatch.
+static MovieClip* ng_mc_for_sprite_obj(DisplayObject* obj)
+{
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+	if (obj == NULL || obj->instance_name == NULL) return NULL;
+	MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
+	if (mc != NULL && mc->display_obj != NULL && mc->display_obj != (void*)obj) {
+		extern MovieClip* child_mc_cache[];
+		extern int child_mc_count;
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* c = child_mc_cache[i];
+			if (c != NULL && c != mc && c->display_obj == (void*)obj && c->depth != INT_MIN
+			    && strcmp(c->name, obj->instance_name) == 0)
+				return c;
+		}
+	}
+	return mc;
+}
+
 // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
 void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
 {
@@ -584,8 +610,7 @@ void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_fun
 	{
 		// Find existing MC (no creation) to avoid spurious auto-named MC entries
 		// during advance_sprite_frames display-list loop-back re-execution.
-		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
-		MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
+		MovieClip* mc = ng_mc_for_sprite_obj(obj);
 		if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); actionSetBaseClip(mc); }
 	}
 
@@ -1660,8 +1685,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// (mirrors swf_core.c's update of root_movieclip.currentframe).
 		if (obj->instance_name != NULL)
 		{
-			extern MovieClip* actionFindMovieClipByName(const char* instance_name);
-			MovieClip* smc = actionFindMovieClipByName(obj->instance_name);
+			MovieClip* smc = ng_mc_for_sprite_obj(obj);
 			if (smc) smc->currentframe = (int)frame + 1;
 		}
 
@@ -2198,6 +2222,23 @@ static void ng_attached_run_tree(SWFAppContext* app_context, DisplayObject* obj,
 	// The attached root's display_obj has no instance_name, so the advance
 	// helper cannot resolve its MovieClip: run its frame under its own context.
 	if (self_mc && obj->instance_name == NULL) { actionSetCurrentContext(self_mc); actionSetBaseClip(self_mc); }
+	// A NAMED nested child resolves its clip by name inside the advance
+	// (exec_sprite_frame binds display_obj + context; the natural-advance
+	// _currentframe sync). Pre-bind self_mc to the live entry so
+	// ng_mc_for_sprite_obj picks it even when another clip shares the name
+	// (s26 n-pixel-pass, ASan-pinned heap-use-after-free on N's episode-select
+	// menu: the GLOBAL hit got display_obj = &tmp[1], was never repointed, and
+	// read freed memory after free(tmp) below). Repointed to obj after the
+	// copy-back.
+	if (self_mc && obj->instance_name != NULL) self_mc->display_obj = (void*)&tmp[1];
+	// Unknown self_mc: the name lookup binds whatever clip it finds to &tmp[1].
+	MovieClip* name_hit = NULL;
+	void* name_hit_prev = NULL;
+	if (self_mc == NULL && obj->instance_name != NULL) {
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		name_hit = actionFindMovieClipByName(obj->instance_name);
+		if (name_hit) name_hit_prev = name_hit->display_obj;
+	}
 	advance_sprite_frames(app_context);
 	actionSetCurrentContext(saved_ctx2);
 	actionSetBaseClip(saved_base2);
@@ -2207,6 +2248,12 @@ static void ng_attached_run_tree(SWFAppContext* app_context, DisplayObject* obj,
 	// queued frame-script payloads captured &tmp[1]: repoint them at obj
 	actionQueueRebaseSpriteObjPayloads(out_dl, 2 * sizeof(DisplayObject), (char*)obj - sizeof(DisplayObject));
 	if (out_dl != tmp) { free(tmp); tmp = out_dl; } // defensive: helper never grows a 1-entry list
+	// Unknown self_mc: exec_sprite_frame bound the global name hit to &tmp[1].
+	// Never leave it pointing into tmp: back to obj if that is what it held
+	// (or it held nothing), else to its own previous display object.
+	if (name_hit != NULL && name_hit->display_obj == (void*)&tmp[1])
+		name_hit->display_obj = (name_hit_prev == NULL || name_hit_prev == (void*)obj)
+		                        ? (void*)obj : name_hit_prev;
 	size_t next = tmp[1].sprite_current_frame;
 	*obj = tmp[1];
 	free(tmp);

@@ -1,0 +1,10 @@
+EF: start
+EF: clip 1 root=0
+EF: root 1 clip=1
+EF: clip 2 root=1
+EF: root 2 clip=2
+EF: clip 3 root=2
+EF: root 3 clip=3
+EF: clip 4 root=3
+EF: root 4 clip=4
+EF: done

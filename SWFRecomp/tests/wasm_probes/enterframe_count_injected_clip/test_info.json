@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "Frame-1 createEmptyMovieClip + clip.onEnterFrame + _root.onEnterFrame on a 1-frame SWF6 root (N's shape: frame 1 sets _root.onEnterFrame=RunApp then the timeline ends). Ruffle: clip 1 root=0, root 1 clip=1, ... Browser-WASM ran the clip's handler one frame late relative to the root's (N's injected probe reached 'startgame' at frame 27 vs 28).",
+    "width": 200,
+    "height": 150,
+    "swf_version": 6
+  },
+  "opcodes": {
+    "tested": ["CreateEmptyMovieClip", "onEnterFrame"]
+  }
+}

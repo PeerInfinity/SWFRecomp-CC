@@ -55,6 +55,10 @@ async def main(which, secs):
             await pg.wait_for_selector("#btn-run:not([disabled])", timeout=60000)
             await pg.click("#btn-run")
             canvas = pg.locator("#canvas")
+            if os.environ.get("NDRIVE_STAGE_PX", "1") == "1":
+                # Show the canvas at stage size (792x600 CSS px, DPR 1) so the
+                # screenshot is 1:1 with the exporter's PNGs (no 881->792 resample).
+                await pg.add_style_tag(content="#canvas{width:792px!important;height:600px!important;max-width:none!important}")
         else:
             await pg.goto(f"http://127.0.0.1:{PORT}/examples/flasharchive/N_drive_ruffle/index.html", wait_until="load")
             canvas = pg.locator("#c")

@@ -1,0 +1,5 @@
+known_red = false
+golden_source = "ruffle"
+settle_seconds = 2.0
+trace_prefix = "EF:"
+description = "N injected-clip enterFrame off-by-one (2026-11-22): a 1-frame root whose frame-1 script creates a clip with onEnterFrame and sets _root.onEnterFrame. Ruffle fires both from the first frame after frame 1, clip before root. expected_trace.txt = Ruffle exporter trace."

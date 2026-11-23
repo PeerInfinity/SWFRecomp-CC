@@ -43,7 +43,7 @@ async def main(test, actions):
         await pg.goto(f"http://127.0.0.1:{PORT}/demo.html?test={test}", wait_until="load", timeout=30000)
         await pg.wait_for_selector("#btn-run:not([disabled])", timeout=60000)
         await pg.click("#btn-run")
-        await asyncio.sleep(6.0)
+        await asyncio.sleep(float(os.environ.get("N_CLICK_SETTLE", "6.0")))  # N_CLICK_SETTLE=3.5 clicks before n_click's tick-60 direct calls
         box = await pg.locator("#canvas").bounding_box()
         lines.append(f"--- canvas box {box}")
         for i, a in enumerate(actions):
