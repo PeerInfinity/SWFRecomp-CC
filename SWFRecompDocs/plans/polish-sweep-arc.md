@@ -3516,8 +3516,12 @@ coordinator-run, or an upstream golden proven equivalent): `avm1_attached_clip_t
 ### 26.4 Left on the board (session 26)
 
 **Trace** (40 failing graphics rows on the intersection):
-- **N**: the `n-level-complete` one-task session (level exit/door/transition, death/retry vs Ruffle) is running; its
-  report sets the next N line.
+- **N**: `n-level-complete` (`5c0a4dcdb`, `n-level-complete-report.md`) found **no runtime divergence**: level 0
+  completes, level 1 loads and plays, and death/retry works. All 1528 game ticks are byte-identical across the Ruffle
+  exporter, Ruffle web, native and browser WASM. Next N line: the frame-locked native-vs-exporter pixel pass (report §4; it
+  was stopped by a low-memory kill); pin the browser-only injected-clip enterFrame off-by-one (frame 27 vs 28) with a
+  `wasm_probe`; then drive episode 0 levels 1–4. Candidate fixture: Ruffle ignores `Key.isDown = f` unless
+  `ASSetPropFlags` clears the flags first (report §5.2; unverified for us).
 - `avm1/video_prototype_lazy_swf6_child`: routing a loaded root's goto is cheap, but the child's placements then collide
   with the parent's depths in the shared display list. Needs per-movie display lists (L; `child-timeline-advance.md` §2.2).
 - **Runtime robustness sweep:** `ng_shared.c` still has fixed `MAX_*` caps that silently drop (buttons 64, fonts 32,
