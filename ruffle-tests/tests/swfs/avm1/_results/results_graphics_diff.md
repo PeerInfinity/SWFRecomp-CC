@@ -1,28 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9e24c763ca3a` (2026-11-22T20:56:27.152923+00:00)
-**Current:** `485eb555c3f9` (2026-11-22T21:58:22.611349+00:00)
+**Previous:** `485eb555c3f9` (2026-11-22T21:58:22.611349+00:00)
+**Current:** `697669e5f98f` (2026-11-22T23:56:07.210257+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 743 | 745 | +2 |
-| Total | 780 | 780 | 0 |
-| Pass rate | 95.3% | 95.5% | +0.2% |
-| Mismatched lines | 12571 | 12469 | -102 |
-|   Decreased | | | -110 |
-|   Increased | | | +8 |
+| Passing | 745 | 745 | 0 |
+| Total | 780 | 781 | +1 |
+| Pass rate | 95.5% | 95.4% | -0.1% |
+| Mismatched lines | 12469 | 12614 | +145 |
+|   Decreased | | | -10 |
 
-## Newly Passing (2)
+## Added Tests (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `edittext_set_text_same` | output_mismatch | 28/70 | 70/70 |
-| `edittext_set_text_same_after_edits` | output_mismatch | 30/98 | 98/98 |
+| Test | Status | Lines |
+|------|--------|-------|
+| `file_reference_upload_request` | output_mismatch | 3/158 |
 
-## Line Count Changed (1)
+## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `global_instance_decls` | output_mismatch | 20/758 | 12/758 | +8 |
+| `global_instance_decls` | output_mismatch | 12/758 | 17/758 | -5 |
+| `globals_monkeypatch` | output_mismatch | 44/306 | 49/306 | -5 |
+| `global_proto_decls` | output_mismatch | 50/4562 | 50/4562 | 0 |
