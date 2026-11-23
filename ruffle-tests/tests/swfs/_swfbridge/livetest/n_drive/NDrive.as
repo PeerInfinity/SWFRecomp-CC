@@ -36,6 +36,9 @@ class NDrive {
 	// TRACKOBJ (authoring): objArray index traced once per game tick as
 	// "NT t= ob=x,y" (-1 = off). E.g. a thwump or drone a route must dodge.
 	static var TRACKOBJ:Number = -1;
+	// TRACKGOLD (s26 n-gold-streaks): after each RunApp, one "NG f= i= cf= v=" line
+	// per gold object whose clip is off its NOT_COLLECTED frame 1.
+	static var TRACKGOLD:Boolean = false;
 	static var lastSet:Object;
 	static var freezeLeft:Number = 0;
 	static var freezeLabel:String = "";
@@ -123,6 +126,14 @@ class NDrive {
 		if (OBJDUMP && t == 0) NDrive.dumpObjects();
 		if (TRACKOBJ >= 0) { var tob:Object = r.objects.objArray[TRACKOBJ]; trace("NT t=" + t + " ob=" + tob.pos.x + "," + tob.pos.y); }
 	}
+	static function goldTrace():Void {
+		var arr:Array = r.objects.objArray;
+		for (var i:Number = 0; i < arr.length; i++) {
+			var o:Object = arr[i];
+			if (o == undefined || Number(o.OBJ_TYPE) != 0 || o.mc == undefined) continue;
+			if (o.mc._currentframe != 1) trace("NG f=" + frame + " t=" + r.game.tickCounter + " i=" + i + " cf=" + o.mc._currentframe + " v=" + o.mc._visible);
+		}
+	}
 	static function worldHash():String {
 		var arr:Array = r.objects.objArray;
 		if (arr == undefined) return "-";
@@ -205,7 +216,7 @@ class NDrive {
 		frame++;
 		if (FRAMELOCK && !locked && r.RunApp != undefined && r.onEnterFrame == r.RunApp) {
 			locked = true;
-			r.onEnterFrame = function():Void { NDrive.preFrame(); NDrive.r.RunApp(); };
+			r.onEnterFrame = function():Void { NDrive.preFrame(); NDrive.r.RunApp(); if (NDrive.TRACKGOLD) NDrive.goldTrace(); };
 			trace("ND framelock on frame=" + frame);
 		}
 		if (!started) {

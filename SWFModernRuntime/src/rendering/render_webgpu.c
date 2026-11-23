@@ -3233,6 +3233,70 @@ void render_webgpu_draw_shape(WebGPURenderContext* ctx, size_t offset,
 }
 
 // ---------------------------------------------------------------------------
+// render_webgpu_draw_morph — one morph-shape INSTANCE at its own ratio.
+// A DefineMorphShape has ONE vertex region (morph_start_offset) shared by every
+// instance. The old path lerped into that region at compose time with
+// queue writes, so when two instances of the same morph sat at different
+// ratios in one frame, every draw used the LAST writer's geometry (N's gold
+// pickups: coins collected 1-3 frames apart all streaked at one coin's ratio,
+// reading as streaks 2-3 frames late; s26 n-gold-streaks). Lerp per draw into
+// the per-frame dynamic vertex region instead, and give the morph's solid
+// fill colours their own dynamic colour slots so a colour/alpha morph is
+// per-instance too. Falls back to the shared region when the dynamic pools
+// are full (the old behaviour).
+// ---------------------------------------------------------------------------
+static inline void stage_dyn_verts(WebGPURenderContext* ctx, u32 vert_base,
+	const void* verts, u32 vcount);
+static inline void stage_dyn_color(WebGPURenderContext* ctx, u32 color_idx,
+	const float color[4]);
+void render_webgpu_draw_morph(WebGPURenderContext* ctx, size_t start_offset,
+	size_t num_verts, const u32* start_verts, const float* end_xy, float t,
+	u32 color_start, u32 color_count, const float* interp_colors,
+	u32 transform_id, u32 cxform_id)
+{
+	if (!ctx->renderer_ok || num_verts == 0) return;
+	num_verts = mask_stencil_vert_count(ctx, start_offset, num_verts);
+	if (ctx->dynamic_vertex_used + num_verts > MAX_DYNAMIC_VERTICES
+		|| (color_count > 0 && ctx->dynamic_rect_count + color_count > MAX_DYNAMIC_RECTS))
+	{
+		render_webgpu_draw_shape(ctx, start_offset, num_verts, transform_id, cxform_id);
+		return;
+	}
+	u32* verts = (u32*) malloc(num_verts * 4 * sizeof(u32));
+	if (verts == NULL) return;
+	u32 color_base = 0;
+	if (color_count > 0) {
+		color_base = ctx->dynamic_color_base + ctx->dynamic_rect_count;
+		ctx->dynamic_rect_count += color_count;
+		for (u32 c = 0; c < color_count; c++)
+			stage_dyn_color(ctx, color_base + c, &interp_colors[c * 4]);
+	}
+	for (size_t v = 0; v < num_verts; v++) {
+		union { float f; u32 u; } sx, sy, ix, iy;
+		sx.u = start_verts[v * 4 + 0];
+		sy.u = start_verts[v * 4 + 1];
+		ix.f = sx.f + t * (end_xy[v * 2 + 0] - sx.f);
+		iy.f = sy.f + t * (end_xy[v * 2 + 1] - sy.f);
+		u32 style_x = start_verts[v * 4 + 2];
+		u32 style_y = start_verts[v * 4 + 3];
+		if (color_count > 0 && (style_x & 0xFFu) == 0x00u) {
+			u32 ci = style_y & 0xFFFFu;
+			if (ci >= color_start && ci < color_start + color_count)
+				style_y = (style_y & 0xFFFF0000u) | ((color_base + (ci - color_start)) & 0xFFFFu);
+		}
+		verts[v * 4 + 0] = ix.u;
+		verts[v * 4 + 1] = iy.u;
+		verts[v * 4 + 2] = style_x;
+		verts[v * 4 + 3] = style_y;
+	}
+	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	ctx->dynamic_vertex_used += (u32) num_verts;
+	stage_dyn_verts(ctx, vert_base, verts, (u32) num_verts);
+	free(verts);
+	render_webgpu_draw_shape(ctx, vert_base, num_verts, transform_id, cxform_id);
+}
+
+// ---------------------------------------------------------------------------
 // Dynamic vertex/color staging — accumulate into a CPU mirror of the dynamic
 // region, flushed by render_webgpu_close_pass as one writeBuffer per buffer
 // (instead of one tiny writeBuffer per shape). See dyn_vtx_staging in the header.

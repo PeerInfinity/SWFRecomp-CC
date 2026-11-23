@@ -3699,6 +3699,36 @@ static inline float morph_lerp_color_u8(float start, float end, float t)
 	return (float) (u32) (a_w * su + b_w * eu) / 255.0f;
 }
 
+// Draw one morph-shape instance at ITS ratio (renderer_draw_morph lerps into
+// per-frame dynamic vertices/colour slots). The compose passes used to lerp
+// into the character's single shared vertex region, so two instances of one
+// morph at different ratios in one frame both drew the last-composed ratio
+// (N's gold pickups, s26 n-gold-streaks).
+static void draw_morph_instance(SWFAppContext* app_context, const Character* ch,
+	u16 ratio, u32 transform_id, u32 cxform_id)
+{
+	float t = (float) ratio / 65535.0f;
+	const u32* start = (const u32*) (app_context->shape_data + ch->morph_start_offset * 4 * sizeof(u32));
+	const float* end = (const float*) (app_context->morph_end_shape_data + ch->morph_end_offset * 2 * sizeof(float));
+	float colors_stack[16 * 4];
+	float* colors = colors_stack;
+	u32 ncol = (u32) ch->morph_color_count;
+	if (ncol > 16) {
+		colors = (float*) malloc((size_t) ncol * 4 * sizeof(float));
+		if (colors == NULL) ncol = 0, colors = colors_stack;
+	}
+	for (u32 c = 0; c < ncol; c++) {
+		const float* sc = (const float*) (app_context->color_data) + (ch->morph_color_start + c) * 4;
+		const float* ec = (const float*) (app_context->morph_end_color_data) + (ch->morph_end_color_start + c) * 4;
+		for (int k = 0; k < 4; k++)
+			colors[c * 4 + k] = morph_lerp_color_u8(sc[k], ec[k], t);
+	}
+	renderer_draw_morph(context, ch->morph_start_offset, ch->morph_start_size,
+		start, end, t, (u32) ch->morph_color_start, ncol, colors,
+		transform_id, cxform_id);
+	if (colors != colors_stack) free(colors);
+}
+
 // ---------------------------------------------------------------------------
 // cacheAsBitmap PixelSnapping::Always (s17)
 // ---------------------------------------------------------------------------
@@ -4229,46 +4259,10 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 				break;
 
 			case CHAR_TYPE_MORPH_SHAPE:
-			{
-				float t = (float)obj->ratio / 65535.0f;
-				size_t num_verts = ch->morph_start_size;
-
-				u32* start = (u32*)(app_context->shape_data + ch->morph_start_offset * 4 * sizeof(u32));
-				float* end = (float*)(app_context->morph_end_shape_data + ch->morph_end_offset * 2 * sizeof(float));
-				u32* scratch = (u32*)malloc(num_verts * 4 * sizeof(u32));
-
-				for (size_t v = 0; v < num_verts; v++)
-				{
-					float sx = *(float*)&start[v*4 + 0];
-					float sy = *(float*)&start[v*4 + 1];
-					float ex = end[v*2 + 0];
-					float ey = end[v*2 + 1];
-					float ix = sx + t * (ex - sx);
-					float iy = sy + t * (ey - sy);
-					scratch[v*4 + 0] = *(u32*)&ix;
-					scratch[v*4 + 1] = *(u32*)&iy;
-					scratch[v*4 + 2] = start[v*4 + 2];
-					scratch[v*4 + 3] = start[v*4 + 3];
-				}
-
-				renderer_update_vertices(context,
-					ch->morph_start_offset * 4 * sizeof(u32),
-					scratch, num_verts * 4 * sizeof(u32));
-				free(scratch);
-
-				for (size_t c = 0; c < ch->morph_color_count; c++)
-				{
-					float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
-					float* ec = (float*)(app_context->morph_end_color_data) + (ch->morph_end_color_start + c) * 4;
-					float interp[4];
-					for (int k = 0; k < 4; k++)
-						interp[k] = morph_lerp_color_u8(sc[k], ec[k], t);
-					renderer_update_colors(context,
-						(ch->morph_color_start + c) * 4 * sizeof(float),
-						interp, 4 * sizeof(float));
-				}
+				// Lerped per instance at draw time (draw_morph_instance): a
+				// compose-time write to the character's shared vertex region made
+				// every instance draw the last-composed ratio.
 				break;
-			}
 
 			case CHAR_TYPE_SPRITE:
 			{
@@ -4619,8 +4613,7 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 				obj->transform_id, obj->cxform_id);
 			break;
 		case CHAR_TYPE_MORPH_SHAPE:
-			renderer_draw_shape(context, ch->morph_start_offset, ch->morph_start_size,
-				obj->transform_id, obj->cxform_id);
+			draw_morph_instance(app_context, ch, obj->ratio, obj->transform_id, obj->cxform_id);
 			break;
 		case CHAR_TYPE_TEXT:
 #ifndef NO_GRAPHICS
@@ -5501,8 +5494,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			else if (mch->type == CHAR_TYPE_MORPH_SHAPE)
 			{
 				renderer_begin_clip_mask(context);
-				renderer_draw_shape(context, mch->morph_start_offset, mch->morph_start_size,
-					obj->transform_id, obj->cxform_id);
+				draw_morph_instance(app_context, mch, obj->ratio, obj->transform_id, obj->cxform_id);
 				renderer_end_clip_mask(context);
 				active_clip_depth = obj->clip_depth;
 			}
@@ -5614,8 +5606,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				break;
 
 			case CHAR_TYPE_MORPH_SHAPE:
-				renderer_draw_shape(context, ch->morph_start_offset, ch->morph_start_size,
-					obj->transform_id, obj->cxform_id);
+				draw_morph_instance(app_context, ch, obj->ratio, obj->transform_id, obj->cxform_id);
 				break;
 
 			case CHAR_TYPE_TEXT:
@@ -8283,8 +8274,7 @@ static void draw_mc_mask_geometry(SWFAppContext* app_context, MovieClip* masker)
 			renderer_draw_shape(context, mch->shape_offset, mch->size,
 				md->transform_id, md->cxform_id);
 		} else if (mch->type == CHAR_TYPE_MORPH_SHAPE) {
-			renderer_draw_shape(context, mch->morph_start_offset, mch->morph_start_size,
-				md->transform_id, md->cxform_id);
+			draw_morph_instance(app_context, mch, md->ratio, md->transform_id, md->cxform_id);
 		} else if ((mch->type == CHAR_TYPE_SPRITE || mch->type == CHAR_TYPE_BUTTON)
 		           && md->sprite_display_list != NULL) {
 			render_display_list(app_context, md->sprite_display_list, md->sprite_max_depth);
@@ -9925,46 +9915,8 @@ void tagShowFrame(SWFAppContext* app_context)
 		{
 			compose_root_text_instance(app_context, obj, ch);
 		}
-		else if (ch->type == CHAR_TYPE_MORPH_SHAPE)
-		{
-			float t = (float)obj->ratio / 65535.0f;
-			size_t num_verts = ch->morph_start_size;
-
-			u32* start = (u32*)(app_context->shape_data + ch->morph_start_offset * 4 * sizeof(u32));
-			float* end = (float*)(app_context->morph_end_shape_data + ch->morph_end_offset * 2 * sizeof(float));
-			u32* scratch = (u32*)malloc(num_verts * 4 * sizeof(u32));
-
-			for (size_t v = 0; v < num_verts; v++)
-			{
-				float sx = *(float*)&start[v*4 + 0];
-				float sy = *(float*)&start[v*4 + 1];
-				float ex = end[v*2 + 0];
-				float ey = end[v*2 + 1];
-				float ix = sx + t * (ex - sx);
-				float iy = sy + t * (ey - sy);
-				scratch[v*4 + 0] = *(u32*)&ix;
-				scratch[v*4 + 1] = *(u32*)&iy;
-				scratch[v*4 + 2] = start[v*4 + 2];
-				scratch[v*4 + 3] = start[v*4 + 3];
-			}
-
-			renderer_update_vertices(context,
-				ch->morph_start_offset * 4 * sizeof(u32),
-				scratch, num_verts * 4 * sizeof(u32));
-			free(scratch);
-
-			for (size_t c = 0; c < ch->morph_color_count; c++)
-			{
-				float* sc = (float*)(app_context->color_data) + (ch->morph_color_start + c) * 4;
-				float* ec = (float*)(app_context->morph_end_color_data) + (ch->morph_end_color_start + c) * 4;
-				float interp[4];
-				for (int k = 0; k < 4; k++)
-					interp[k] = morph_lerp_color_u8(sc[k], ec[k], t);
-				renderer_update_colors(context,
-					(ch->morph_color_start + c) * 4 * sizeof(float),
-					interp, 4 * sizeof(float));
-			}
-		}
+		// CHAR_TYPE_MORPH_SHAPE: lerped per instance at draw time
+		// (draw_morph_instance), not into the shared vertex region here.
 	}
 
 	renderer_open_pass(context);

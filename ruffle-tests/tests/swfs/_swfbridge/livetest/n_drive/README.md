@@ -100,3 +100,14 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
 - `routes_ep0.txt`: the replayed scripts for levels 2 (thwumps) and 4 (drone).
   Each has an enemy-death attempt followed by a completing attempt. Record:
   `SWFRecompDocs/plans/n-levels-report.md`.
+
+## s26 n-gold-streaks additions
+
+- `TRACKGOLD=true`: after each `RunApp` (FRAMELOCK wrapper), one
+  `NG f=<frame> t=<tick> i=<objArray index> cf=<_currentframe> v=<_visible>`
+  line per gold object whose clip is off frame 1 (NOT_COLLECTED). It showed
+  that the pickup timelines are frame-identical on both players, so the "late
+  streaks" were render-side: every instance of a morph drew the last-composed
+  instance's ratio. Fixed in the runtime; fixture
+  `regression/avm1_morph_instances_ratio`. Record:
+  `SWFRecompDocs/plans/n-gold-streaks-report.md`.
