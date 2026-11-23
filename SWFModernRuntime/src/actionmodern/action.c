@@ -7206,15 +7206,30 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	// FUNCTION thisObj → NULL), and the type-1 "this" bind has always carried an
 	// OBJECT tag even for a MOVIECLIP pointer. Passing cb->this_obj through as
 	// this_var would change the derived this_is_mc and the bind's observable tag
-	// (typeof this) — preserve the collapse exactly. The OBJECT-tag-on-MC-pointer
-	// is a latent type-confusion quirk; normalization-review candidate.
+	// (typeof this) — preserve the collapse exactly. (A MOVIECLIP receiver
+	// keeps its own tag: s26 w2-avm1-text-resolve, below.)
 	void* this_obj = NULL;
 	if (cb->this_obj.type == ACTION_STACK_VALUE_OBJECT ||
 	    cb->this_obj.type == ACTION_STACK_VALUE_MOVIECLIP)
 		this_obj = (void*)(uintptr_t)cb->this_obj.data.numeric_value;
 
 	ActionVar this_var = {0};
-	if (this_obj != NULL)
+	u32 _ei_mc_flags = 0;
+	if (this_obj != NULL && cb->this_obj.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// s26 w2-avm1-text-resolve: a MovieClip receiver
+		// (addCallback(name, clip, fn)) binds the CLIP, with the
+		// INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR pairing every other
+		// MOVIECLIP-this dispatcher uses: a type-2 callee's preload_this
+		// resolves the clip (it used to take the raw MovieClip* as an
+		// OBJECT, so this.x missed), and a type-1 bind carries the clip's
+		// own tag (typeof this == "movieclip"; Ruffle external.rs
+		// Callback::Avm1 calls method with `this` as stored).
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+		_ei_mc_flags = INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
+	}
+	else if (this_obj != NULL)
 	{
 		this_var.type = ACTION_STACK_VALUE_OBJECT;
 		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
@@ -7252,7 +7267,7 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
 	// event-this, no exec-func (a preload_arguments callee keeps reading the
 	// stale g_prev_executing_func — current behavior), no ctor context.
 	u32 ei_flags = INV_DEPTH_GUARD | INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
-	               INV_LOCAL_SCOPE | INV_VERSION_SWITCH;
+	               INV_LOCAL_SCOPE | INV_VERSION_SWITCH | _ei_mc_flags;
 	if (func->function_type == 1)
 		ei_flags |= INV_BIND_THIS;
 	MovieClip* _ei_saved_base = g_current_context;
@@ -9323,8 +9338,20 @@ static ASFunction* findResolveMethod(SWFAppContext* app_context, ASObject* obj)
 // inert details (captured-before-local scope order; type-1 arg padding to
 // param_count) that cannot affect a __resolve body, whose local scope only ever
 // holds "this" and whose one declared param is the name string.
+static ActionVar invokeResolveFunctionEx(SWFAppContext* app_context, ASFunction* func, void* this_obj,
+                                          const char* prop_name, u32 prop_name_len, MovieClip* recv_mc);
 static ActionVar invokeResolveFunction(SWFAppContext* app_context, ASFunction* func, void* this_obj,
                                         const char* prop_name, u32 prop_name_len)
+{
+	return invokeResolveFunctionEx(app_context, func, this_obj, prop_name, prop_name_len, NULL);
+}
+
+// recv_mc != NULL: the receiver is a MovieClip (s26 w2-avm1-text-resolve; the
+// GetMember MOVIECLIP miss path). `this` binds the CLIP, and a type-2 body gets
+// the same INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR pairing every other
+// MOVIECLIP-this dispatcher uses, so its preload_this resolves the clip.
+static ActionVar invokeResolveFunctionEx(SWFAppContext* app_context, ASFunction* func, void* this_obj,
+                                          const char* prop_name, u32 prop_name_len, MovieClip* recv_mc)
 {
 	ActionVar undef = {0};
 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
@@ -9345,10 +9372,16 @@ static ActionVar invokeResolveFunction(SWFAppContext* app_context, ASFunction* f
 	ActionVar this_var = {0};
 	this_var.type = ACTION_STACK_VALUE_OBJECT;
 	this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+	u16 _mc_this_flags = 0;
+	if (recv_mc != NULL) {
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.data.numeric_value = (u64)(uintptr_t)recv_mc;
+		_mc_this_flags = (u16)(INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR);
+	}
 
 	InvokeOpts opts = { .flags = (u16)(INV_DEPTH_GUARD | INV_CAPTURED_SCOPE |
 	                                   INV_FORCE_CAPTURED_WITH | INV_LOCAL_SCOPE |
-	                                   INV_BIND_THIS | INV_BASE_CLIP),
+	                                   INV_BIND_THIS | INV_BASE_CLIP | _mc_this_flags),
 	                    .super_depth = 0 };
 	return invokeFunctionValue(app_context, func, &this_var, &name_arg, 1, &opts);
 }
@@ -30029,6 +30062,11 @@ static void tf_ps_set_text_format(SWFAppContext* app_context, MovieClip* mc, u32
 static void tf_ps_set_new_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* fmt)
 {
 	TFPlainSpans* ps = tf_ps_get(app_context, mc);
+	// s26 w2-avm1-text-resolve (item 5b): pin the text the field already
+	// holds to its CURRENT format before the caller writes textColor (the
+	// base format reads it), so neither getTextFormat nor the render of that
+	// text picks up the new-text colour.
+	tf_ps_ensure_spans(app_context, mc, ps);
 	double old_size = ps->newfmt.size;
 	tf_ps_merge_from_obj(&ps->newfmt, fmt);
 	if (!(ps->newfmt.size > 0)) ps->newfmt.size = old_size;
@@ -30267,8 +30305,9 @@ static void tf_ps_on_replace(SWFAppContext* app_context, MovieClip* mc, u32 from
 	}
 }
 
-// s26 w1-avm1-dispatch-scope PROTOTYPE (item 5): the format edit for typed
-// input (keyboard / IME). Ruffle html/text_format.rs FormatSpans::replace_text:
+// s26 w1-avm1-dispatch-scope (item 5): the format edit for typed input
+// (keyboard / IME) and, with ins_len = 0, for Backspace / Delete (s26
+// w2-avm1-text-resolve). Ruffle html/text_format.rs FormatSpans::replace_text:
 // the inserted text takes the format of the span AFTER the replaced range, or
 // the new-text format when appending. Edits the run table in place instead of
 // dropping it (which lost every <font> run of an HTML field on a keystroke).
@@ -30294,6 +30333,62 @@ static int tf_ps_on_typed(SWFAppContext* app_context, MovieClip* mc, u32 from, u
 	if (n >= sizeof(buf)) n = sizeof(buf) - 1;
 	tf_table_replace(table, from, to, buf, (u32)n, ml, &ins_fmt);
 	return 1;
+}
+
+static u32 tf_cx_rgb(u32 rgb);
+
+// s26 w2-avm1-text-resolve (item 5b): the render colours of a plain (no run
+// table) field from its TFPlainSpans (Ruffle renders FormatSpans; textColor /
+// new_text_format only seed new text). Non-touching lookup (no LRU stamp
+// bump: rendering must not change which span table is evicted). Returns 0
+// when the field has no span model (caller keeps textColor). Uniform colour:
+// writes *io_color and returns 1. Mixed colours: fills out_runs[] by UTF-8
+// byte range and returns the run count (> 1). Chars past the model's length
+// take the last span (tf_ps_ensure_spans' rule).
+static int tf_ps_render_runs(MovieClip* mc, const char* utf8, size_t utf8_len, u32* io_color,
+                             u16 font_height, u8 align, TextFieldGlyphRun* out_runs)
+{
+	TFPlainSpans* ps = NULL;
+	for (int i = 0; i < TF_PS_MAX_TABLES; i++)
+		if (g_tf_ps_tables[i].mc == mc) { ps = &g_tf_ps_tables[i]; break; }
+	if (ps == NULL || !ps->has_spans || ps->span_count == 0) return 0;
+	int uniform = 1;
+	for (u32 i = 1; i < ps->span_count; i++)
+		if (ps->spans[i].f.color != ps->spans[0].f.color) { uniform = 0; break; }
+	if (uniform) { *io_color = ps->spans[0].f.color; return 1; }
+	int n = 0;
+	u32 si = 0, left = ps->spans[0].len;
+	size_t b = 0, run_start = 0;
+	while (b < utf8_len) {
+		while (left == 0 && si + 1 < ps->span_count) { si++; left = ps->spans[si].len; }
+		u32 cur = si;
+		unsigned char c = (unsigned char)utf8[b];
+		size_t nb = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+		u32 units = nb == 4 ? 2 : 1;
+		b += nb; if (b > utf8_len) b = utf8_len;
+		left = left > units ? left - units : 0;
+		int boundary = (b >= utf8_len);
+		if (!boundary && left == 0 && si + 1 < ps->span_count) {
+			u32 nx = si + 1;
+			while (nx + 1 < ps->span_count && ps->spans[nx].len == 0) nx++;
+			boundary = (ps->spans[nx].f.color != ps->spans[cur].f.color);
+		}
+		if (boundary) {
+			if (n >= TF_MAX_RUNS) break;
+			TextFieldGlyphRun* r = &out_runs[n++];
+			r->byte_start = (u32)run_start;
+			r->byte_length = (u32)(b - run_start);
+			r->color = tf_cx_rgb(ps->spans[cur].f.color);
+			r->font_height = font_height;
+			r->align = align;
+			r->bullet = 0;
+			r->font_id = 0;
+			r->kerning = 0;
+			run_start = b;
+		}
+	}
+	if (n <= 1) { *io_color = ps->spans[0].f.color; return 1; }
+	return n;
 }
 
 // getTextFormat overlay for a field without an HTML run table.
@@ -31778,6 +31873,20 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 				utf8_len = strlen(_tfg_utf8);
 				if (utf8_len == 0) continue;
 				text_utf8 = _tfg_utf8;
+				// s26 w2-avm1-text-resolve (item 5b): a plain field paints its
+				// span model's colours, not `textColor` (which setNewTextFormat
+				// also writes, as Ruffle's getter reads new_text_format: the
+				// text already in the field keeps its colour), and
+				// setTextFormat on a plain field (span model only) now shows.
+				int _ps_nruns = tf_ps_render_runs(mc, _tfg_utf8, utf8_len, &text_color,
+				                                  font_height,
+				                                  mc->ng_textfield_idx >= 0
+				                                      ? (u8)ng_getTextFieldAlign(mc->ng_textfield_idx) : 0,
+				                                  _tfg_runs);
+				if (_ps_nruns > 1) {
+					runs_out = _tfg_runs;
+					run_count_out = _ps_nruns;
+				} else
 				// Synthesize a single run carrying the DefineEditText tag's static
 				// alignment so the renderer's paragraph layout applies center /
 				// right alignment. Without a run, the renderer defaults cur_align
@@ -62535,6 +62644,37 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 			}
 		}
 
+		// s26 w2-avm1-text-resolve: a missing member on a MovieClip calls its
+		// `__resolve` (Ruffle Object::get -> get_opt(.., call_resolve_fn=true)
+		// for stage objects too): the clip's own bag (and its explicit
+		// registerClass chain), else MovieClip.prototype's chain.
+		if (mc != NULL)
+		{
+			ASFunction* _mc_res = NULL;
+			int _mc_res_blocked = 0;
+			if (mc->dynamic_props != NULL)
+			{
+				ASObject* _dp = (ASObject*)mc->dynamic_props;
+				_mc_res = findResolveMethod(app_context, _dp);
+				// An own non-function __resolve shadows the prototype's.
+				if (_mc_res == NULL && findPropertyRaw(_dp, "__resolve", 9) != NULL)
+					_mc_res_blocked = 1;
+			}
+			if (_mc_res == NULL && !_mc_res_blocked && !_mc_explicit_proto && !mcIsTimelineVideo(mc))
+			{
+				int _rv = mc->swf_version ? mc->swf_version : g_swf_version;
+				ASObject* _mp = getMovieClipPrototype(_rv);
+				if (_mp != NULL) _mc_res = findResolveMethod(app_context, _mp);
+			}
+			if (_mc_res != NULL)
+			{
+				ActionVar result = invokeResolveFunctionEx(app_context, _mc_res, mc->dynamic_props,
+				                                           prop_name, prop_name_len, mc);
+				pushVar(app_context, &result);
+				return;
+			}
+		}
+
 		pushUndefined(app_context);
 	}
 	else if ((obj_var.type == ACTION_STACK_VALUE_F32 ||
@@ -69027,7 +69167,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		}
 		builtin_handled = 1;
 	}
-	// getNextHighestDepth() — as a global function, operates on root
+	// getNextHighestDepth() — bare call: the with-clip / target clip
+	// (cfBareMCReceiver); the root walk below serves a root receiver.
 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
 	{
 		// s26 PROTOTYPE: with-clip / target clip, not a hard-coded _root.
@@ -69294,14 +69435,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							ng_gotoFrameByMC(app_context, _mc_target, _gf0, _mc_nav_play);
 						}
 					}
-				} else if (_is_mc_nav == 2) {
-					// stop — no-op for dynamic clips (they don't advance)
-				} else if (_is_mc_nav == 3) {
-					// play — no-op for dynamic clips
-				} else if (_is_mc_nav == 4) {
-					// prevFrame
-				} else if (_is_mc_nav == 5) {
-					// nextFrame
+				} else if (_is_mc_nav >= 2 && _is_mc_nav <= 5) {
+					// stop / play / prevFrame / nextFrame: unreachable — delegated
+					// to the CallMethod MOVIECLIP arm above (s26).
 				} else if (_is_mc_nav == 6) {
 					// getBytesLoaded — returns 0 on failed/unloaded loads (Flash doesn't report -1 for loaded bytes)
 					if (args != NULL) FREE(args);
@@ -84392,6 +84528,11 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 		memcpy(result_u16 + prefix_len, old_u16 + del_end, suffix_len * sizeof(uint16_t));
 	result_u16[result_len] = 0;
 
+	// s26 w2-avm1-text-resolve (item 5a): cut [del_start, del_end) out of the
+	// HTML run table in place (Ruffle replace_text(.., "")) instead of
+	// dropping every <font> run; before the text store, as tf_ps_on_typed needs.
+	int _del_in_place = tf_ps_on_typed(app_context, g_focused_mc, (u32)del_start, (u32)del_end, NULL, 0);
+
 	ActionVar new_text = {0};
 	new_text.type = ACTION_STACK_VALUE_STRING;
 	new_text.data.numeric_value = (u64)(uintptr_t)result_u16;
@@ -84408,7 +84549,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 	g_selection_caret = del_start;
 
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
-	tf_invalidate_run_table(g_focused_mc);
+	if (!_del_in_place) tf_invalidate_run_table(g_focused_mc);
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
@@ -84475,6 +84616,11 @@ void actionTextControlDelete(SWFAppContext* app_context)
 		memcpy(result_u16 + prefix_len, old_u16 + del_end, suffix_len * sizeof(uint16_t));
 	result_u16[result_len] = 0;
 
+	// s26 w2-avm1-text-resolve (item 5a): cut [del_start, del_end) out of the
+	// HTML run table in place (Ruffle replace_text(.., "")) instead of
+	// dropping every <font> run; before the text store, as tf_ps_on_typed needs.
+	int _del_in_place = tf_ps_on_typed(app_context, g_focused_mc, (u32)del_start, (u32)del_end, NULL, 0);
+
 	ActionVar new_text = {0};
 	new_text.type = ACTION_STACK_VALUE_STRING;
 	new_text.data.numeric_value = (u64)(uintptr_t)result_u16;
@@ -84492,7 +84638,7 @@ void actionTextControlDelete(SWFAppContext* app_context)
 	g_selection_caret = del_start;
 
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
-	tf_invalidate_run_table(g_focused_mc);
+	if (!_del_in_place) tf_invalidate_run_table(g_focused_mc);
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
@@ -84841,6 +84987,19 @@ void actionTextFieldImeCompose(SWFAppContext* app_context, const char* text,
 	// Build new text
 	u32 new_len;
 	uint16_t* new_u16;
+	// s26 w2-avm1-text-resolve (item 5a): the replaced range, for the in-place
+	// run-table edit below (captured before ime_start/ime_len move).
+	u32 _ime_from, _ime_to;
+	if (g_ime_data.active) {
+		_ime_from = g_ime_data.ime_start;
+		_ime_to = g_ime_data.ime_start + g_ime_data.ime_len;
+	} else {
+		u32 _c = (g_selection_caret >= 0) ? (u32)g_selection_caret : old_u16_len;
+		if (_c > old_u16_len) _c = old_u16_len;
+		_ime_from = _ime_to = _c;
+	}
+	int _ime_in_place = tf_ps_on_typed(app_context, g_focused_mc, _ime_from, _ime_to,
+	                                   preedit_u16, preedit_u16_len);
 	if (g_ime_data.active) {
 		// Replace existing composition range [ime_start, ime_start+ime_len) with preedit
 		u32 before = g_ime_data.ime_start;
@@ -84884,7 +85043,7 @@ void actionTextFieldImeCompose(SWFAppContext* app_context, const char* text,
 
 	// Sync to variable binding
 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
-	tf_invalidate_run_table(g_focused_mc);
+	if (!_ime_in_place) tf_invalidate_run_table(g_focused_mc);
 
 	// Update selection/caret to end of composition
 	int new_caret = (int)(g_ime_data.ime_start + g_ime_data.ime_len);

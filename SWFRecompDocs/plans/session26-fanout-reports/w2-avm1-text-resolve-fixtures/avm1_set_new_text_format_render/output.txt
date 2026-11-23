@@ -1,0 +1,5 @@
+f1 textColor=16711680
+f1 span0.color=0
+f2 textColor=0
+f3 textColor=0
+f4 textColor=16711680

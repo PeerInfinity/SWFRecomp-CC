@@ -1,0 +1,5 @@
+registered
+t2 this.v=7 name=m typeof=movieclip
+result=ok2
+t1 this.v=7 name=m typeof=movieclip
+result=ok1

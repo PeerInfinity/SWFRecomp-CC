@@ -1,0 +1,1260 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 22eae734..26f9a390 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -7193,15 +7193,30 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
+ 	// FUNCTION thisObj → NULL), and the type-1 "this" bind has always carried an
+ 	// OBJECT tag even for a MOVIECLIP pointer. Passing cb->this_obj through as
+ 	// this_var would change the derived this_is_mc and the bind's observable tag
+-	// (typeof this) — preserve the collapse exactly. The OBJECT-tag-on-MC-pointer
+-	// is a latent type-confusion quirk; normalization-review candidate.
++	// (typeof this) — preserve the collapse exactly. (A MOVIECLIP receiver
++	// keeps its own tag: s26 w2-avm1-text-resolve, below.)
+ 	void* this_obj = NULL;
+ 	if (cb->this_obj.type == ACTION_STACK_VALUE_OBJECT ||
+ 	    cb->this_obj.type == ACTION_STACK_VALUE_MOVIECLIP)
+ 		this_obj = (void*)(uintptr_t)cb->this_obj.data.numeric_value;
+ 
+ 	ActionVar this_var = {0};
+-	if (this_obj != NULL)
++	u32 _ei_mc_flags = 0;
++	if (this_obj != NULL && cb->this_obj.type == ACTION_STACK_VALUE_MOVIECLIP)
++	{
++		// s26 w2-avm1-text-resolve: a MovieClip receiver
++		// (addCallback(name, clip, fn)) binds the CLIP, with the
++		// INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR pairing every other
++		// MOVIECLIP-this dispatcher uses: a type-2 callee's preload_this
++		// resolves the clip (it used to take the raw MovieClip* as an
++		// OBJECT, so this.x missed), and a type-1 bind carries the clip's
++		// own tag (typeof this == "movieclip"; Ruffle external.rs
++		// Callback::Avm1 calls method with `this` as stored).
++		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
++		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
++		_ei_mc_flags = INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR;
++	}
++	else if (this_obj != NULL)
+ 	{
+ 		this_var.type = ACTION_STACK_VALUE_OBJECT;
+ 		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+@@ -7239,7 +7254,7 @@ ActionVar actionEI_callInternalInterface(SWFAppContext* app_context, const char*
+ 	// event-this, no exec-func (a preload_arguments callee keeps reading the
+ 	// stale g_prev_executing_func — current behavior), no ctor context.
+ 	u32 ei_flags = INV_DEPTH_GUARD | INV_CAPTURED_SCOPE | INV_FORCE_CAPTURED_WITH |
+-	               INV_LOCAL_SCOPE | INV_VERSION_SWITCH;
++	               INV_LOCAL_SCOPE | INV_VERSION_SWITCH | _ei_mc_flags;
+ 	if (func->function_type == 1)
+ 		ei_flags |= INV_BIND_THIS;
+ 	MovieClip* _ei_saved_base = g_current_context;
+@@ -9310,8 +9325,20 @@ static ASFunction* findResolveMethod(SWFAppContext* app_context, ASObject* obj)
+ // inert details (captured-before-local scope order; type-1 arg padding to
+ // param_count) that cannot affect a __resolve body, whose local scope only ever
+ // holds "this" and whose one declared param is the name string.
++static ActionVar invokeResolveFunctionEx(SWFAppContext* app_context, ASFunction* func, void* this_obj,
++                                          const char* prop_name, u32 prop_name_len, MovieClip* recv_mc);
+ static ActionVar invokeResolveFunction(SWFAppContext* app_context, ASFunction* func, void* this_obj,
+                                         const char* prop_name, u32 prop_name_len)
++{
++	return invokeResolveFunctionEx(app_context, func, this_obj, prop_name, prop_name_len, NULL);
++}
++
++// recv_mc != NULL: the receiver is a MovieClip (s26 w2-avm1-text-resolve; the
++// GetMember MOVIECLIP miss path). `this` binds the CLIP, and a type-2 body gets
++// the same INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR pairing every other
++// MOVIECLIP-this dispatcher uses, so its preload_this resolves the clip.
++static ActionVar invokeResolveFunctionEx(SWFAppContext* app_context, ASFunction* func, void* this_obj,
++                                          const char* prop_name, u32 prop_name_len, MovieClip* recv_mc)
+ {
+ 	ActionVar undef = {0};
+ 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+@@ -9332,10 +9359,16 @@ static ActionVar invokeResolveFunction(SWFAppContext* app_context, ASFunction* f
+ 	ActionVar this_var = {0};
+ 	this_var.type = ACTION_STACK_VALUE_OBJECT;
+ 	this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
++	u16 _mc_this_flags = 0;
++	if (recv_mc != NULL) {
++		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
++		this_var.data.numeric_value = (u64)(uintptr_t)recv_mc;
++		_mc_this_flags = (u16)(INV_EVENT_THIS_MC | INV_MC_THIS_NULL_PTR);
++	}
+ 
+ 	InvokeOpts opts = { .flags = (u16)(INV_DEPTH_GUARD | INV_CAPTURED_SCOPE |
+ 	                                   INV_FORCE_CAPTURED_WITH | INV_LOCAL_SCOPE |
+-	                                   INV_BIND_THIS | INV_BASE_CLIP),
++	                                   INV_BIND_THIS | INV_BASE_CLIP | _mc_this_flags),
+ 	                    .super_depth = 0 };
+ 	return invokeFunctionValue(app_context, func, &this_var, &name_arg, 1, &opts);
+ }
+@@ -29854,6 +29887,11 @@ static void tf_ps_set_text_format(SWFAppContext* app_context, MovieClip* mc, u32
+ static void tf_ps_set_new_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* fmt)
+ {
+ 	TFPlainSpans* ps = tf_ps_get(app_context, mc);
++	// s26 w2-avm1-text-resolve (item 5b): pin the text the field already
++	// holds to its CURRENT format before the caller writes textColor (the
++	// base format reads it), so neither getTextFormat nor the render of that
++	// text picks up the new-text colour.
++	tf_ps_ensure_spans(app_context, mc, ps);
+ 	double old_size = ps->newfmt.size;
+ 	tf_ps_merge_from_obj(&ps->newfmt, fmt);
+ 	if (!(ps->newfmt.size > 0)) ps->newfmt.size = old_size;
+@@ -30092,8 +30130,9 @@ static void tf_ps_on_replace(SWFAppContext* app_context, MovieClip* mc, u32 from
+ 	}
+ }
+ 
+-// s26 w1-avm1-dispatch-scope PROTOTYPE (item 5): the format edit for typed
+-// input (keyboard / IME). Ruffle html/text_format.rs FormatSpans::replace_text:
++// s26 w1-avm1-dispatch-scope (item 5): the format edit for typed input
++// (keyboard / IME) and, with ins_len = 0, for Backspace / Delete (s26
++// w2-avm1-text-resolve). Ruffle html/text_format.rs FormatSpans::replace_text:
+ // the inserted text takes the format of the span AFTER the replaced range, or
+ // the new-text format when appending. Edits the run table in place instead of
+ // dropping it (which lost every <font> run of an HTML field on a keystroke).
+@@ -30121,6 +30160,62 @@ static int tf_ps_on_typed(SWFAppContext* app_context, MovieClip* mc, u32 from, u
+ 	return 1;
+ }
+ 
++static u32 tf_cx_rgb(u32 rgb);
++
++// s26 w2-avm1-text-resolve (item 5b): the render colours of a plain (no run
++// table) field from its TFPlainSpans (Ruffle renders FormatSpans; textColor /
++// new_text_format only seed new text). Non-touching lookup (no LRU stamp
++// bump: rendering must not change which span table is evicted). Returns 0
++// when the field has no span model (caller keeps textColor). Uniform colour:
++// writes *io_color and returns 1. Mixed colours: fills out_runs[] by UTF-8
++// byte range and returns the run count (> 1). Chars past the model's length
++// take the last span (tf_ps_ensure_spans' rule).
++static int tf_ps_render_runs(MovieClip* mc, const char* utf8, size_t utf8_len, u32* io_color,
++                             u16 font_height, u8 align, TextFieldGlyphRun* out_runs)
++{
++	TFPlainSpans* ps = NULL;
++	for (int i = 0; i < TF_PS_MAX_TABLES; i++)
++		if (g_tf_ps_tables[i].mc == mc) { ps = &g_tf_ps_tables[i]; break; }
++	if (ps == NULL || !ps->has_spans || ps->span_count == 0) return 0;
++	int uniform = 1;
++	for (u32 i = 1; i < ps->span_count; i++)
++		if (ps->spans[i].f.color != ps->spans[0].f.color) { uniform = 0; break; }
++	if (uniform) { *io_color = ps->spans[0].f.color; return 1; }
++	int n = 0;
++	u32 si = 0, left = ps->spans[0].len;
++	size_t b = 0, run_start = 0;
++	while (b < utf8_len) {
++		while (left == 0 && si + 1 < ps->span_count) { si++; left = ps->spans[si].len; }
++		u32 cur = si;
++		unsigned char c = (unsigned char)utf8[b];
++		size_t nb = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
++		u32 units = nb == 4 ? 2 : 1;
++		b += nb; if (b > utf8_len) b = utf8_len;
++		left = left > units ? left - units : 0;
++		int boundary = (b >= utf8_len);
++		if (!boundary && left == 0 && si + 1 < ps->span_count) {
++			u32 nx = si + 1;
++			while (nx + 1 < ps->span_count && ps->spans[nx].len == 0) nx++;
++			boundary = (ps->spans[nx].f.color != ps->spans[cur].f.color);
++		}
++		if (boundary) {
++			if (n >= TF_MAX_RUNS) break;
++			TextFieldGlyphRun* r = &out_runs[n++];
++			r->byte_start = (u32)run_start;
++			r->byte_length = (u32)(b - run_start);
++			r->color = tf_cx_rgb(ps->spans[cur].f.color);
++			r->font_height = font_height;
++			r->align = align;
++			r->bullet = 0;
++			r->font_id = 0;
++			r->kerning = 0;
++			run_start = b;
++		}
++	}
++	if (n <= 1) { *io_color = ps->spans[0].f.color; return 1; }
++	return n;
++}
++
+ // getTextFormat overlay for a field without an HTML run table.
+ // Returns 1 when the model answered (the caller skips its textColor override).
+ static int tf_ps_overlay_text_format(SWFAppContext* app_context, MovieClip* mc, ASObject* tf, u32 begin, u32 end)
+@@ -31603,6 +31698,20 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+ 				utf8_len = strlen(_tfg_utf8);
+ 				if (utf8_len == 0) continue;
+ 				text_utf8 = _tfg_utf8;
++				// s26 w2-avm1-text-resolve (item 5b): a plain field paints its
++				// span model's colours, not `textColor` (which setNewTextFormat
++				// also writes, as Ruffle's getter reads new_text_format: the
++				// text already in the field keeps its colour), and
++				// setTextFormat on a plain field (span model only) now shows.
++				int _ps_nruns = tf_ps_render_runs(mc, _tfg_utf8, utf8_len, &text_color,
++				                                  font_height,
++				                                  mc->ng_textfield_idx >= 0
++				                                      ? (u8)ng_getTextFieldAlign(mc->ng_textfield_idx) : 0,
++				                                  _tfg_runs);
++				if (_ps_nruns > 1) {
++					runs_out = _tfg_runs;
++					run_count_out = _ps_nruns;
++				} else
+ 				// Synthesize a single run carrying the DefineEditText tag's static
+ 				// alignment so the renderer's paragraph layout applies center /
+ 				// right alignment. Without a run, the renderer defaults cur_align
+@@ -62321,6 +62430,37 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
+ 			}
+ 		}
+ 
++		// s26 w2-avm1-text-resolve: a missing member on a MovieClip calls its
++		// `__resolve` (Ruffle Object::get -> get_opt(.., call_resolve_fn=true)
++		// for stage objects too): the clip's own bag (and its explicit
++		// registerClass chain), else MovieClip.prototype's chain.
++		if (mc != NULL)
++		{
++			ASFunction* _mc_res = NULL;
++			int _mc_res_blocked = 0;
++			if (mc->dynamic_props != NULL)
++			{
++				ASObject* _dp = (ASObject*)mc->dynamic_props;
++				_mc_res = findResolveMethod(app_context, _dp);
++				// An own non-function __resolve shadows the prototype's.
++				if (_mc_res == NULL && findPropertyRaw(_dp, "__resolve", 9) != NULL)
++					_mc_res_blocked = 1;
++			}
++			if (_mc_res == NULL && !_mc_res_blocked && !_mc_explicit_proto && !mcIsTimelineVideo(mc))
++			{
++				int _rv = mc->swf_version ? mc->swf_version : g_swf_version;
++				ASObject* _mp = getMovieClipPrototype(_rv);
++				if (_mp != NULL) _mc_res = findResolveMethod(app_context, _mp);
++			}
++			if (_mc_res != NULL)
++			{
++				ActionVar result = invokeResolveFunctionEx(app_context, _mc_res, mc->dynamic_props,
++				                                           prop_name, prop_name_len, mc);
++				pushVar(app_context, &result);
++				return;
++			}
++		}
++
+ 		pushUndefined(app_context);
+ 	}
+ 	else if ((obj_var.type == ACTION_STACK_VALUE_F32 ||
+@@ -68813,7 +68953,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 		}
+ 		builtin_handled = 1;
+ 	}
+-	// getNextHighestDepth() — as a global function, operates on root
++	// getNextHighestDepth() — bare call: the with-clip / target clip
++	// (cfBareMCReceiver); the root walk below serves a root receiver.
+ 	else if (func_name_len == 19 && strncmp(func_name, "getNextHighestDepth", 19) == 0)
+ 	{
+ 		// s26 PROTOTYPE: with-clip / target clip, not a hard-coded _root.
+@@ -69080,14 +69221,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
+ 							ng_gotoFrameByMC(app_context, _mc_target, _gf0, _mc_nav_play);
+ 						}
+ 					}
+-				} else if (_is_mc_nav == 2) {
+-					// stop — no-op for dynamic clips (they don't advance)
+-				} else if (_is_mc_nav == 3) {
+-					// play — no-op for dynamic clips
+-				} else if (_is_mc_nav == 4) {
+-					// prevFrame
+-				} else if (_is_mc_nav == 5) {
+-					// nextFrame
++				} else if (_is_mc_nav >= 2 && _is_mc_nav <= 5) {
++					// stop / play / prevFrame / nextFrame: unreachable — delegated
++					// to the CallMethod MOVIECLIP arm above (s26).
+ 				} else if (_is_mc_nav == 6) {
+ 					// getBytesLoaded — returns 0 on failed/unloaded loads (Flash doesn't report -1 for loaded bytes)
+ 					if (args != NULL) FREE(args);
+@@ -84177,6 +84313,11 @@ void actionTextControlBackspace(SWFAppContext* app_context)
+ 		memcpy(result_u16 + prefix_len, old_u16 + del_end, suffix_len * sizeof(uint16_t));
+ 	result_u16[result_len] = 0;
+ 
++	// s26 w2-avm1-text-resolve (item 5a): cut [del_start, del_end) out of the
++	// HTML run table in place (Ruffle replace_text(.., "")) instead of
++	// dropping every <font> run; before the text store, as tf_ps_on_typed needs.
++	int _del_in_place = tf_ps_on_typed(app_context, g_focused_mc, (u32)del_start, (u32)del_end, NULL, 0);
++
+ 	ActionVar new_text = {0};
+ 	new_text.type = ACTION_STACK_VALUE_STRING;
+ 	new_text.data.numeric_value = (u64)(uintptr_t)result_u16;
+@@ -84193,7 +84334,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
+ 	g_selection_caret = del_start;
+ 
+ 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+-	tf_invalidate_run_table(g_focused_mc);
++	if (!_del_in_place) tf_invalidate_run_table(g_focused_mc);
+ 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+ }
+ 
+@@ -84260,6 +84401,11 @@ void actionTextControlDelete(SWFAppContext* app_context)
+ 		memcpy(result_u16 + prefix_len, old_u16 + del_end, suffix_len * sizeof(uint16_t));
+ 	result_u16[result_len] = 0;
+ 
++	// s26 w2-avm1-text-resolve (item 5a): cut [del_start, del_end) out of the
++	// HTML run table in place (Ruffle replace_text(.., "")) instead of
++	// dropping every <font> run; before the text store, as tf_ps_on_typed needs.
++	int _del_in_place = tf_ps_on_typed(app_context, g_focused_mc, (u32)del_start, (u32)del_end, NULL, 0);
++
+ 	ActionVar new_text = {0};
+ 	new_text.type = ACTION_STACK_VALUE_STRING;
+ 	new_text.data.numeric_value = (u64)(uintptr_t)result_u16;
+@@ -84277,7 +84423,7 @@ void actionTextControlDelete(SWFAppContext* app_context)
+ 	g_selection_caret = del_start;
+ 
+ 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+-	tf_invalidate_run_table(g_focused_mc);
++	if (!_del_in_place) tf_invalidate_run_table(g_focused_mc);
+ 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
+ }
+ 
+@@ -84626,6 +84772,19 @@ void actionTextFieldImeCompose(SWFAppContext* app_context, const char* text,
+ 	// Build new text
+ 	u32 new_len;
+ 	uint16_t* new_u16;
++	// s26 w2-avm1-text-resolve (item 5a): the replaced range, for the in-place
++	// run-table edit below (captured before ime_start/ime_len move).
++	u32 _ime_from, _ime_to;
++	if (g_ime_data.active) {
++		_ime_from = g_ime_data.ime_start;
++		_ime_to = g_ime_data.ime_start + g_ime_data.ime_len;
++	} else {
++		u32 _c = (g_selection_caret >= 0) ? (u32)g_selection_caret : old_u16_len;
++		if (_c > old_u16_len) _c = old_u16_len;
++		_ime_from = _ime_to = _c;
++	}
++	int _ime_in_place = tf_ps_on_typed(app_context, g_focused_mc, _ime_from, _ime_to,
++	                                   preedit_u16, preedit_u16_len);
+ 	if (g_ime_data.active) {
+ 		// Replace existing composition range [ime_start, ime_start+ime_len) with preedit
+ 		u32 before = g_ime_data.ime_start;
+@@ -84669,7 +84828,7 @@ void actionTextFieldImeCompose(SWFAppContext* app_context, const char* text,
+ 
+ 	// Sync to variable binding
+ 	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+-	tf_invalidate_run_table(g_focused_mc);
++	if (!_ime_in_place) tf_invalidate_run_table(g_focused_mc);
+ 
+ 	// Update selection/caret to end of composition
+ 	int new_caret = (int)(g_ime_data.ime_start + g_ime_data.ime_len);
+diff --git a/SWFModernRuntime/src/libswf/ng_shared.c b/SWFModernRuntime/src/libswf/ng_shared.c
+index 62d1bb6e..0e5a8b74 100644
+--- a/SWFModernRuntime/src/libswf/ng_shared.c
++++ b/SWFModernRuntime/src/libswf/ng_shared.c
+@@ -2260,6 +2260,39 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
+ 						if (is_swf8 && last_fitting_pos > seg_start && char_w > cur_avail) break;
+ 						char_pos = next_pos;
+ 					}
++					// SWF7 and below: when at most ONE character of a too-wide
++					// first word fits, Flash gives up wrapping and the rest of
++					// this hard line is laid out unbroken (Ruffle
++					// html/line_wrapping.rs wrap_line `if line_end <= 1 { return
++					// None }`; every later span then sees remaining_width < 0 and
++					// gives up too). Same rule as ng_wrap_count_lines' !is_swf8
++					// block (s26 w2-avm1-text-resolve, item 7b).
++					if (!is_swf8) {
++						int fit_chars = 0;
++						for (size_t p = seg_start; p < seg_end; ) {
++							size_t np = p;
++							ng_decode_utf8_char(hline, seg_end, &np);
++							int w = ng_measure_substr_mixed_twips(fi, em,
++								text, line_start + seg_start, line_start + np, letter_spacing_twips,
++								run_starts, run_lengths, run_font_heights, run_count, base_font_height);
++							if (w > cur_avail) break;
++							fit_chars++; p = np;
++							if (fit_chars > 1) break;
++						}
++						if (fit_chars <= 1) {
++							if (run_count > 0) {
++								for (int r = 0; r < run_count; r++) {
++									u32 rs = run_starts[r], rl = run_lengths[r];
++									if (rs < (u32)(line_start + hline_len) && rs + rl > (u32)(line_start + seg_start)) {
++										if (run_font_heights[r] > cur_line_max_fh) cur_line_max_fh = run_font_heights[r];
++									}
++								}
++							}
++							cur_line_w = 1; // non-empty line; closed after the loop
++							seg_start = hline_len;
++							continue;
++						}
++					}
+ 					if (last_fitting_pos == seg_start) {
+ 						size_t tmp = seg_start;
+ 						ng_decode_utf8_char(hline, seg_end, &tmp);
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/create_test_swf.py
+new file mode 100644
+index 00000000..cfc6dd59
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/create_test_swf.py
+@@ -0,0 +1,34 @@
++#!/usr/bin/env python3
++"""avm1_mc_resolve: `__resolve` set on a MovieClip is called for a missing
++member read (GetMember), with `this` = the clip; a present member, a child
++clip and a built-in property do not call it.
++
++s26 w1-avm1-dispatch-scope (found while auditing item 2). Ruffle
++core/src/avm1/object.rs Object::get -> get_opt(.., call_resolve_fn = true)
++-> find_resolve_method / resolve.call("__resolve", this, [name]); a
++MovieClip is an ordinary Object for this path (StageObject).
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
++from avm1asm import *  # noqa
++
++T = trace_concat
++R1, R2 = Reg(1), Reg(2)
++res = deffunc2('', ['n'], T('resolve(', push(R2), ') this=', push(R1) + push('_name') + GETMEM)
++               + push('R_') + push(R2) + ADD2 + RETURN, nregs=4, flags=PRELOAD_THIS, first_param_reg=2)
++f1 = (
++    callm('_root', 'createEmptyMovieClip', 'mc', 1)
++    + callm('mc', 'createEmptyMovieClip', 'kid', 1)
++    + get('mc') + push('v', 7) + SETMEM
++    + get('mc') + push('__resolve') + res + SETMEM
++    + T('missing: ', get('mc.zzz'))
++    + T('present: ', get('mc.v'))
++    + T('child: ', get('mc.kid._name'))
++    + T('builtin: ', get('mc._name'))
++    + STOP
++)
++open(sys.argv[1], 'wb').write(swf(8, b'', [doaction(f1)]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/output.txt b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/output.txt
+new file mode 100644
+index 00000000..b9a4e5f5
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/output.txt
+@@ -0,0 +1,5 @@
++resolve(zzz) this=mc
++missing: R_zzz
++present: 7
++child: kid
++builtin: mc
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/test.swf b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..8aa07bcaaab1a7b357c317f3e26302b56d1f8644
+GIT binary patch
+literal 419
+zcmaJ-y-ve05dQ3@a)AM{z=BXG1h0U^k5nKNtyBiasH7G>kvLIeB9VzFVDyZ{WAJd{
+z93>DIyx4d5{he<g?kArD$g%qYe7)gF;Cc^yX0mCT%Tdikw*|!)kj8LhD9KN!fT+ka
+zi$k{$#D!j2eUs+)^)9PO&l1Y9JaF3`^O@Ga)Sy-Rm)AokKn2BKSh&8o!_HBm%Pgrh
+z-nkM81f;<g*bm+01WqE5A&1B5)NZIeN9bFkjc!({#ymXss>`UuUMw8TrBs$=p3bKD
+zu^a<+UAK4!<ZPjh9Rfx^r<Y^5ctgp0IApfpfBx5)g&tohv1Eo=|E+yC#Tx<Nh%#RH
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/test.toml b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/test.toml
+new file mode 100644
+index 00000000..c030260b
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_mc_resolve/test.toml
+@@ -0,0 +1,3 @@
++# s26 w1-avm1-dispatch-scope fixture, landed by w2-avm1-text-resolve.
++# Golden = Ruffle exporter 0ddd12b6a (byte-identical).
++num_frames = 2
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/avm1asm.py b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/create_test_swf.py b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/create_test_swf.py
+new file mode 100644
+index 00000000..d25506f8
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/create_test_swf.py
+@@ -0,0 +1,37 @@
++#!/usr/bin/env python3
++"""avm1_wrap_giveup_mixed_runs: SWF<=7 word wrap gives up on a first word too
++wide for the field (at most one character fits) and lays the line out
++unbroken -- also for a field whose HTML runs mix font sizes (the
++textHeight/scroll path of mixed runs), not only for plain text. A SWF8 twin
++breaks the word per character.
++
++s26 w1-avm1-dispatch-scope item 7. Ruffle core/src/html/layout.rs /
++line_wrapping: `if line_end <= 1 { return None }` (give up) for swf < 8.
++
++Usage: create_test_swf.py <out.swf> <swf_version>
++"""
++import os
++import sys
++
++sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
++from avm1asm import *  # noqa
++
++T = trace_concat
++ver = int(sys.argv[2]) if len(sys.argv) > 2 else 7
++
++
++def field(name, depth, html):
++    code = callm('this', 'createTextField', name, depth, 10, 10, 12, 200)
++    for k, v in (('multiline', True), ('wordWrap', True), ('html', True)):
++        code += get(name) + push(k, v) + SETMEM
++    return code + get(name) + push('htmlText', html) + SETMEM
++
++
++f1 = (
++    field('p', 1, "<font size='12'>HelloWorld</font>")
++    + field('m', 2, "<font size='12'>Hello</font><font size='20'>World</font>")
++    + T('plain: maxscroll=', get('p.maxscroll'), ' bottomScroll=', get('p.bottomScroll'))
++    + T('mixed: maxscroll=', get('m.maxscroll'), ' bottomScroll=', get('m.bottomScroll'))
++    + STOP
++)
++open(sys.argv[1], 'wb').write(swf(ver, b'', [doaction(f1)]))
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/output.txt b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/output.txt
+new file mode 100644
+index 00000000..ea59299f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/output.txt
+@@ -0,0 +1,2 @@
++plain: maxscroll=1 bottomScroll=1
++mixed: maxscroll=1 bottomScroll=1
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/test.swf b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..9af27f8b4dfa77ff3730a3973ac8cf58170ad085
+GIT binary patch
+literal 636
+zcmb7=%}T>S6opS(YQ%qW;U-8|W+iHu(ni73y0Tz|tYb6MftgH6MhwM;PcduX!x!+a
+z;vH-x)E0FXm&>_l4)?o*D0E*Mz!bZ0!22tX9Q5}=@48Wz<z+LZq4D5;kmPRJvhiIU
+z>gcCw!Cj-yP|*{f!!wjH&RDG3JuCEpGm+r#&@`>vGuwcC5}FI1GPImgrBnK|%91FH
+zr*(N9m}n{L(#e-(!-4LjN_9KuGuHFZJAQD(giw*nMAALAqX45-0K`VS{0l&?0I>QJ
+z04py5SgHRjz<l>QT<6RW7Pt=Rq9W$$MO(&2KF*X7JyiGHB(_S$?a=H2?FXf`lHuGr
+gtgJggeM0VIL)nrSEcuab0sfe6txK|9T+!h_0WGke^8f$<
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/test.toml b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/test.toml
+new file mode 100644
+index 00000000..594b88d3
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/avm1_wrap_giveup_mixed_runs/test.toml
+@@ -0,0 +1,3 @@
++# s26 w1-avm1-dispatch-scope fixture, landed by w2-avm1-text-resolve. SWF7: build with
++# `create_test_swf.py test.swf 7`. Golden = Ruffle exporter 0ddd12b6a (byte-identical).
++num_frames = 2
+diff --git a/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/avm1asm.py b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/avm1asm.py
+new file mode 100644
+index 00000000..3e9c9b49
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/avm1asm.py
+@@ -0,0 +1,192 @@
++"""Tiny AVM1 / SWF assembler shared by the s26 w1-avm1-dispatch-scope fixtures.
++
++Every helper returns raw bytes. Stdlib only. Names follow the SWF spec.
++"""
++import struct
++
++
++def tag(code, data):
++    if len(data) < 63 and code not in (20, 21, 35, 36):
++        return struct.pack('<H', (code << 6) | len(data)) + data
++    return struct.pack('<HI', (code << 6) | 0x3f, len(data)) + data
++
++
++def s(x):
++    return x.encode('utf-8') + b'\0'
++
++
++class Reg:
++    def __init__(self, n):
++        self.n = n
++
++
++UNDEF = object()
++NULL = object()
++
++
++def push(*items):
++    b = b''
++    for it in items:
++        if isinstance(it, Reg):
++            b += b'\x04' + bytes([it.n])
++        elif it is UNDEF:
++            b += b'\x03'
++        elif it is NULL:
++            b += b'\x02'
++        elif isinstance(it, bool):
++            b += b'\x05' + bytes([1 if it else 0])
++        elif isinstance(it, str):
++            b += b'\x00' + s(it)
++        elif isinstance(it, int):
++            b += b'\x07' + struct.pack('<i', it)
++        elif isinstance(it, float):
++            b += b'\x06' + struct.pack('<d', it)[4:] + struct.pack('<d', it)[:4]
++        else:
++            raise TypeError(it)
++    return b'\x96' + struct.pack('<H', len(b)) + b
++
++
++def op(code, payload=b''):
++    if code >= 0x80:
++        return bytes([code]) + struct.pack('<H', len(payload)) + payload
++    return bytes([code])
++
++
++GETVAR = op(0x1c)
++SETVAR = op(0x1d)
++GETMEM = op(0x4e)
++SETMEM = op(0x4f)
++ADD2 = op(0x47)
++TRACE = op(0x26)
++STOP = op(0x07)
++POP = op(0x17)
++CALLM = op(0x52)
++CALLF = op(0x3d)
++TYPEOF = op(0x44)
++INITOBJ = op(0x43)
++DEFLOCAL = op(0x3c)
++RETURN = op(0x3e)
++NEWOBJ = op(0x40)
++EQ2 = op(0x49)
++
++
++def settarget(name):
++    return op(0x8b, s(name))
++
++
++def with_block(body):
++    return op(0x94, struct.pack('<H', len(body))) + body
++
++
++PRELOAD_THIS = 0x0001
++SUPPRESS_THIS = 0x0002
++PRELOAD_ARGUMENTS = 0x0004
++
++
++def deffunc2(name, params, body, nregs=4, flags=0, first_param_reg=1):
++    """DefineFunction2; params in registers first_param_reg.. (0 = by name).
++    flags: PRELOAD_THIS puts this in r1, so pass first_param_reg=2."""
++    p = s(name) + struct.pack('<HBH', len(params), nregs, flags)
++    for i, pn in enumerate(params):
++        p += bytes([(i + first_param_reg) if first_param_reg else 0]) + s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x8e, p) + body
++
++
++def deffunc1(name, params, body):
++    p = s(name) + struct.pack('<H', len(params))
++    for pn in params:
++        p += s(pn)
++    p += struct.pack('<H', len(body))
++    return op(0x9b, p) + body
++
++
++def get(path):
++    """Push the value at a dotted path: a.b.c -> GetVariable a, GetMember b, c."""
++    parts = path.split('.')
++    code = push(parts[0]) + GETVAR
++    for q in parts[1:]:
++        code += push(q) + GETMEM
++    return code
++
++
++def callm(target, meth, *args, keep=False):
++    """target.meth(args) via CallMethod; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args)) + get(target) + push(meth) + CALLM
++    return code if keep else code + POP
++
++
++def callf(name, *args, keep=False):
++    """bare name(args) via CallFunction; pops the result unless keep."""
++    code = push(*reversed(args)) if args else b''
++    code += push(len(args), name) + CALLF
++    return code if keep else code + POP
++
++
++def trace_concat(*parts):
++    """trace(p0 + p1 + ...): str parts are literals, bytes parts are code that
++    leaves one value on the stack."""
++    code = b''
++    first = True
++    for p in parts:
++        code += push(p) if isinstance(p, str) else p
++        if not first:
++            code += ADD2
++        first = False
++    return code + TRACE
++
++
++def typeof_(path):
++    return get(path) + TYPEOF
++
++
++def doaction(a):
++    return tag(12, a + b'\0')
++
++
++def place(depth, cid, name, x=0, y=0):
++    flags = 0x02 | 0x20
++    data = struct.pack('<HH', depth, cid)
++    if x or y:
++        flags |= 0x04
++        data += matrix_translate(x, y)
++    return tag(26, bytes([flags]) + data + s(name))
++
++
++def matrix_translate(x, y):
++    tx, ty = int(x * 20), int(y * 20)
++    nb = max(abs(tx).bit_length(), abs(ty).bit_length()) + 1
++    bits = '0' + '0' + '{:05b}'.format(nb)
++    for v in (tx, ty):
++        bits += format(v & ((1 << nb) - 1), '0{}b'.format(nb))
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++SHOW = tag(1, b'')
++
++
++def sprite(cid, frames):
++    body = b''.join(f + SHOW for f in frames) + tag(0, b'')
++    return tag(39, struct.pack('<HH', cid, len(frames)) + body)
++
++
++def export(cid, name):
++    return tag(56, struct.pack('<HH', 1, cid) + s(name))
++
++
++def rect(xmin, xmax, ymin, ymax):
++    vals = (xmin, xmax, ymin, ymax)
++    nb = max(max(abs(v).bit_length() for v in vals) + 1, 1)
++    bits = '{:05b}'.format(nb) + ''.join(format(v & ((1 << nb) - 1), '0{}b'.format(nb)) for v in vals)
++    bits += '0' * ((8 - len(bits) % 8) % 8)
++    return int(bits, 2).to_bytes(len(bits) // 8, 'big')
++
++
++def swf(version, defs, root_frames, w=400, h=300, fps=30, as3=False):
++    body = (tag(69, struct.pack('<I', 0x08 if as3 else 0)) + tag(9, b'\xff\xff\xff') + defs
++            + b''.join(f + SHOW for f in root_frames) + tag(0, b''))
++    hdr_rest = rect(0, w * 20, 0, h * 20) + struct.pack('<HH', fps << 8, len(root_frames))
++    total = 8 + len(hdr_rest) + len(body)
++    return b'FWS' + bytes([version]) + struct.pack('<I', total) + hdr_rest + body
+diff --git a/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/create_test_swf.py b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/create_test_swf.py
+new file mode 100644
+index 00000000..f22d0085
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/create_test_swf.py
+@@ -0,0 +1,43 @@
++#!/usr/bin/env python3
++"""ei_mc_this_receiver: ExternalInterface.addCallback(name, clip, fn) calls fn
++with `this` = the clip, for a DefineFunction2 (preload-this) and a plain
++DefineFunction callback.
++
++s26 w2-avm1-text-resolve (w1-avm1-dispatch-scope lead: the type-2 flag pair
++missing in actionEI_callInternalInterface). Golden is ANALYTIC (Ruffle
++core/src/external.rs Callback::Avm1 -> method.call(name, activation, this,
++args) with the stored `this`; the exporter has no ExternalInterface host).
++test_harness.c invokes "t2" then "t1" after frame 1.
++
++Usage: create_test_swf.py <out.swf>
++"""
++import os
++import sys
++
++HERE = os.path.dirname(os.path.abspath(__file__))
++sys.path.insert(0, os.path.join(HERE, '..', '..', 'w1-avm1-dispatch-scope-fixtures'))
++from avm1asm import *  # noqa
++
++T = trace_concat
++R1 = Reg(1)
++f2 = deffunc2('', [], T('t2 this.v=', push(R1) + push('v') + GETMEM,
++                         ' name=', push(R1) + push('_name') + GETMEM,
++                         ' typeof=', push(R1) + TYPEOF) + push('ok2') + RETURN,
++              nregs=2, flags=PRELOAD_THIS, first_param_reg=2)
++f1 = deffunc1('', [], T('t1 this.v=', get('this.v'), ' name=', get('this._name'),
++                         ' typeof=', push('this') + GETVAR + TYPEOF) + push('ok1') + RETURN)
++
++
++def add_cb(name, fn):
++    return (fn + push('m') + GETVAR + push(name, 3) + get('flash.external.ExternalInterface')
++            + push('addCallback') + CALLM + POP)
++
++
++main = (
++    callm('_root', 'createEmptyMovieClip', 'm', 1)
++    + get('m') + push('v', 7) + SETMEM
++    + add_cb('t2', f2)
++    + add_cb('t1', f1)
++    + T('registered')
++)
++open(sys.argv[1], 'wb').write(swf(8, b'', [doaction(main)]))
+diff --git a/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/output.txt b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/output.txt
+new file mode 100644
+index 00000000..ba48fc5f
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/output.txt
+@@ -0,0 +1,5 @@
++registered
++t2 this.v=7 name=m typeof=movieclip
++result=ok2
++t1 this.v=7 name=m typeof=movieclip
++result=ok1
+diff --git a/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test.swf b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test.swf
+new file mode 100644
+index 0000000000000000000000000000000000000000..93dda36e9577a17dc8146ec18942cb84233568cf
+GIT binary patch
+literal 514
+zcmb`DKTiTN7{-5hsE0;ljEOG9Ffp3Ij+y{o9K=Ki-Asi77Y^=nG#A<U1dd%?{2qQ1
+zKMlSWftcuKm$vWI=U*@H?~1+;Df@5mKI6ord4Q~jKcCOf3m+cXB7tl$!fq1Cb8G;Q
+zS&|q^_6RzeRz|l*shM6Ud88Y0lyZA)3yxC~J~@F<xOtH?_#O|~T`;w>8AOxQypHwR
+z@Ejwj9Xd*RtVX&{xB#4?8#r)BKr>Bs(p$pKup-e&hBeNXuG>zYKoq~?_F^>|NEjjO
+zXQQ*RifP+JXno(V#xm`xj#$_|P~C1r#qpEs45iAes6&4dy1EX%B_>ipbbm{}M*oh#
+cdb8?K{n?@VUme_sXSyFvq^Isu;X*2X0<|Z4LjV8(
+
+literal 0
+HcmV?d00001
+
+diff --git a/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test.toml b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test.toml
+new file mode 100644
+index 00000000..4e288da0
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test.toml
+@@ -0,0 +1,3 @@
++# s26 w2-avm1-text-resolve. Golden ANALYTIC (Ruffle external.rs Callback::Avm1;
++# no EI host in the exporter). Segfaults on master before the fix.
++num_frames = 2
+diff --git a/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test_harness.c b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test_harness.c
+new file mode 100644
+index 00000000..0ec4d0ec
+--- /dev/null
++++ b/ruffle-tests/tests/swfs/regression/ei_mc_this_receiver/test_harness.c
+@@ -0,0 +1,52 @@
++/*
++ * Test harness for ei_mc_this_receiver (s26 w2-avm1-text-resolve).
++ *
++ * The SWF registers two callbacks with a MovieClip receiver via
++ * ExternalInterface.addCallback(name, m, fn): "t2" (DefineFunction2,
++ * preload this) and "t1" (DefineFunction). After frame 1 we invoke both
++ * through actionEI_callInternalInterface; each traces this.v / this._name /
++ * typeof this, which must be the clip's (Ruffle external.rs Callback::Avm1).
++ */
++
++#include <stdio.h>
++#include <string.h>
++#include <swf.h>
++#include <action.h>
++#include <stackvalue.h>
++
++static ActionVar mock_external_call(SWFAppContext* ctx, const char* name, ActionVar* args, int arg_count)
++{
++	(void)ctx; (void)name; (void)args; (void)arg_count;
++	/* Only present so ExternalInterface.addCallback sees an available host. */
++	ActionVar result = {0};
++	result.type = ACTION_STACK_VALUE_NULL;
++	return result;
++}
++
++static void print_result(SWFAppContext* ctx, ActionVar* result)
++{
++	(void)ctx;
++	if (result->type == ACTION_STACK_VALUE_STRING) {
++		char buf[256];
++		int len = ei_actionvar_to_utf8(result, buf, sizeof(buf));
++		printf("result=%.*s\n", len, buf);
++	} else {
++		printf("result=(type %d)\n", (int)result->type);
++	}
++}
++
++static void after_tick(SWFAppContext* ctx, int tick)
++{
++	if (tick != 1) return;
++	ActionVar r2 = actionEI_callInternalInterface(ctx, "t2", NULL, 0);
++	print_result(ctx, &r2);
++	ActionVar r1 = actionEI_callInternalInterface(ctx, "t1", NULL, 0);
++	print_result(ctx, &r1);
++}
++
++void test_harness_init(SWFAppContext* ctx)
++{
++	(void)ctx;
++	g_external_call_handler = mock_external_call;
++	g_after_tick_handler = after_tick;
++}

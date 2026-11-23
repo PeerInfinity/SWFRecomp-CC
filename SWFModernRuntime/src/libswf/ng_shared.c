@@ -2318,6 +2318,39 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 						if (is_swf8 && last_fitting_pos > seg_start && char_w > cur_avail) break;
 						char_pos = next_pos;
 					}
+					// SWF7 and below: when at most ONE character of a too-wide
+					// first word fits, Flash gives up wrapping and the rest of
+					// this hard line is laid out unbroken (Ruffle
+					// html/line_wrapping.rs wrap_line `if line_end <= 1 { return
+					// None }`; every later span then sees remaining_width < 0 and
+					// gives up too). Same rule as ng_wrap_count_lines' !is_swf8
+					// block (s26 w2-avm1-text-resolve, item 7b).
+					if (!is_swf8) {
+						int fit_chars = 0;
+						for (size_t p = seg_start; p < seg_end; ) {
+							size_t np = p;
+							ng_decode_utf8_char(hline, seg_end, &np);
+							int w = ng_measure_substr_mixed_twips(fi, em,
+								text, line_start + seg_start, line_start + np, letter_spacing_twips,
+								run_starts, run_lengths, run_font_heights, run_count, base_font_height);
+							if (w > cur_avail) break;
+							fit_chars++; p = np;
+							if (fit_chars > 1) break;
+						}
+						if (fit_chars <= 1) {
+							if (run_count > 0) {
+								for (int r = 0; r < run_count; r++) {
+									u32 rs = run_starts[r], rl = run_lengths[r];
+									if (rs < (u32)(line_start + hline_len) && rs + rl > (u32)(line_start + seg_start)) {
+										if (run_font_heights[r] > cur_line_max_fh) cur_line_max_fh = run_font_heights[r];
+									}
+								}
+							}
+							cur_line_w = 1; // non-empty line; closed after the loop
+							seg_start = hline_len;
+							continue;
+						}
+					}
 					if (last_fitting_pos == seg_start) {
 						size_t tmp = seg_start;
 						ng_decode_utf8_char(hline, seg_end, &tmp);

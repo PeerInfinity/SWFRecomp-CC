@@ -1,0 +1,3 @@
+# s26 w1-avm1-dispatch-scope fixture, landed by w2-avm1-text-resolve.
+# Golden = Ruffle exporter 0ddd12b6a (byte-identical).
+num_frames = 2

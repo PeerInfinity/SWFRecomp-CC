@@ -1,0 +1,2 @@
+plain: maxscroll=1 bottomScroll=1
+mixed: maxscroll=1 bottomScroll=1

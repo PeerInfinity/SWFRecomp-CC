@@ -1,0 +1,3 @@
+# s26 w2-avm1-text-resolve. Golden ANALYTIC (Ruffle external.rs Callback::Avm1;
+# no EI host in the exporter). Segfaults on master before the fix.
+num_frames = 2
