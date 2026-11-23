@@ -1,0 +1,473 @@
+diff --git a/SWFModernRuntime/src/actionmodern/action.c b/SWFModernRuntime/src/actionmodern/action.c
+index 50320e80..4af3937a 100644
+--- a/SWFModernRuntime/src/actionmodern/action.c
++++ b/SWFModernRuntime/src/actionmodern/action.c
+@@ -14603,6 +14603,131 @@ typedef struct {
+     double ro, go, bo, ao;
+ } DrawColorTransform;
+ 
++// s26 w1-pixel-tail PROTOTYPE: AVM1 BitmapData.draw() timeline arm. The source
++// MC's own display list (DefineShape / DefineText placed by its timeline) was
++// never drawn -- only Drawing-API paths and child MCs were
++// (visual/static_text_offstage sub-mechanism (c)). Each entry is rasterized
++// through the AVM2 CPU shape rasterizer (avm2_cpu_raster_shape: same shape_data
++// tables, mirrors the WGSL fill) into a premultiplied scratch, then the
++// placement / text cxform is applied and the result composited "over" dest.
++#include <avm2/avm2_cpu_raster.h>
++static SWFAppContext* g_bd1_draw_app = NULL;
++static uint32_t* g_bd1_scratch = NULL;
++static size_t g_bd1_scratch_n = 0;
++
++static void bd1_apply_cx_over(BitmapDataNative* dest, const uint32_t* scr,
++                              const float* cx20, const DrawColorTransform* cx,
++                              int dx0, int dy0, int dx1, int dy1,
++                              const uint8_t* stencil, uint8_t stencil_write_value,
++                              uint8_t* stencil_out)
++{
++	int w = dest->width;
++	for (int y = dy0; y < dy1; y++) {
++		for (int x = dx0; x < dx1; x++) {
++			size_t i = (size_t)y * w + x;
++			uint32_t p = scr[i];
++			uint32_t pa = p >> 24;
++			if (pa == 0) continue;
++			if (stencil && !stencil[i]) continue;
++			if (stencil_out) { stencil_out[i] = stencil_write_value; continue; }
++			double a = pa / 255.0;
++			double in[4] = { ((p >> 16) & 0xFF) / 255.0 / a, ((p >> 8) & 0xFF) / 255.0 / a,
++			                 (p & 0xFF) / 255.0 / a, a };
++			double o[4];
++			if (cx20) {
++				for (int k = 0; k < 4; k++) {
++					o[k] = cx20[16 + k];
++					for (int j = 0; j < 4; j++) o[k] += cx20[j * 4 + k] * in[j];
++				}
++			} else { for (int k = 0; k < 4; k++) o[k] = in[k]; }
++			if (cx) {
++				o[0] = o[0] * cx->rm + cx->ro / 255.0; o[1] = o[1] * cx->gm + cx->go / 255.0;
++				o[2] = o[2] * cx->bm + cx->bo / 255.0; o[3] = o[3] * cx->am + cx->ao / 255.0;
++			}
++			for (int k = 0; k < 4; k++) { if (o[k] < 0) o[k] = 0; if (o[k] > 1) o[k] = 1; }
++			uint32_t d = dest->pixels[i];
++			double sa = o[3], da = dest->transparent ? ((d >> 24) & 0xFF) / 255.0 : 1.0;
++			double oa = sa + da * (1.0 - sa);
++			double rc[3];
++			for (int k = 0; k < 3; k++) {
++				double dc = ((d >> (16 - 8 * k)) & 0xFF) / 255.0;
++				rc[k] = oa > 0 ? (o[k] * sa + dc * da * (1.0 - sa)) / oa : 0;
++			}
++			uint32_t A = dest->transparent ? (uint32_t)(oa * 255.0 + 0.5) : 0xFF;
++			dest->pixels[i] = (A << 24) | ((uint32_t)(rc[0] * 255.0 + 0.5) << 16)
++			                | ((uint32_t)(rc[1] * 255.0 + 0.5) << 8) | (uint32_t)(rc[2] * 255.0 + 0.5);
++		}
++	}
++}
++
++static void bd1_draw_timeline_entries(BitmapDataNative* dest, MovieClip* mc,
++                                      double ma, double mb, double mc_, double md,
++                                      double mtx, double mty,
++                                      int dx0, int dy0, int dx1, int dy1,
++                                      const uint8_t* stencil, uint8_t stencil_write_value,
++                                      uint8_t* stencil_out, const DrawColorTransform* cx)
++{
++	SWFAppContext* app = g_bd1_draw_app;
++	if (app == NULL || mc == NULL || mc->display_obj == NULL || dictionary == NULL) return;
++	DisplayObject* self = (DisplayObject*) mc->display_obj;
++	DisplayObject* dl = self->sprite_display_list;
++	if (dl == NULL) return;
++	size_t n = (size_t) dest->width * dest->height;
++	if (g_bd1_scratch_n < n) {
++		free(g_bd1_scratch);
++		g_bd1_scratch = (uint32_t*) malloc(n * sizeof(uint32_t));
++		g_bd1_scratch_n = g_bd1_scratch ? n : 0;
++		if (!g_bd1_scratch) return;
++	}
++	for (size_t i = 0; i <= self->sprite_max_depth; i++) {
++		DisplayObject* o = &dl[i];
++		if (o->char_id == 0 || o->clip_depth > 0 || o->as_hidden) continue;
++		Character* ch = &dictionary[o->char_id];
++		if (ch->type != CHAR_TYPE_SHAPE && ch->type != CHAR_TYPE_TEXT) continue;
++		if (ch->type == CHAR_TYPE_TEXT && ng_getCharTextfieldIdx(o->char_id) >= 0) continue;
++		const float* tf_all = o->place_transform_data
++			? (const float*) o->place_transform_data : (const float*) app->transform_data;
++		const float* pm = tf_all + (size_t) o->transform_id * 16;
++		// placement (twips->twips) under outer (src px -> dest px), in twips.
++		double pa = ma * pm[0] + mc_ * pm[1], pb = mb * pm[0] + md * pm[1];
++		double pc = ma * pm[4] + mc_ * pm[5], pd = mb * pm[4] + md * pm[5];
++		double ptx = ma * pm[12] + mc_ * pm[13] + 20.0 * mtx;
++		double pty = mb * pm[12] + md * pm[13] + 20.0 * mty;
++		memset(g_bd1_scratch, 0, n * sizeof(uint32_t));
++		const float* cx20 = NULL;
++#ifndef NO_GRAPHICS
++		const float* cxd = (const float*) app->cxform_data;
++		size_t ncx = app->cxform_data_size / (20 * sizeof(float));
++#endif
++		if (ch->type == CHAR_TYPE_SHAPE) {
++			avm2_cpu_raster_shape(g_bd1_scratch, dest->width, dest->height, 1,
++			                      (uint32_t) ch->shape_offset, (uint32_t) ch->size,
++			                      pa, pb, pc, pd, ptx, pty, 1.0);
++#ifndef NO_GRAPHICS
++			if (o->cxform_id != 0 && o->cxform_id < ncx) cx20 = cxd + (size_t) o->cxform_id * 20;
++#endif
++		} else {
++			const float* tfd = (const float*) app->transform_data;
++			for (size_t j = 0; j < ch->text_size; j++) {
++				size_t gi = 4 * (size_t) app->text_data[ch->text_start + j];
++				const float* g = tfd + (ch->transform_start + j) * 16;
++				double ga = pa * g[0] + pc * g[1], gb = pb * g[0] + pd * g[1];
++				double gc = pa * g[4] + pc * g[5], gd = pb * g[4] + pd * g[5];
++				double gtx = pa * g[12] + pc * g[13] + ptx;
++				double gty = pb * g[12] + pd * g[13] + pty;
++				avm2_cpu_raster_shape(g_bd1_scratch, dest->width, dest->height, 1,
++				                      app->glyph_data[gi], app->glyph_data[gi + 1],
++				                      ga, gb, gc, gd, gtx, gty, 1.0);
++			}
++#ifndef NO_GRAPHICS
++			if (ch->cxform_id < ncx) cx20 = cxd + (size_t) ch->cxform_id * 20;
++#endif
++		}
++		bd1_apply_cx_over(dest, g_bd1_scratch, cx20, cx, dx0, dy0, dx1, dy1,
++		                  stencil, stencil_write_value, stencil_out);
++	}
++}
++
+ // Rasterize a MovieClip's finalized drawing paths into `dest_pixels`/`stencil`,
+ // then recursively rasterize children (dynamic MCs on child_mc_cache).
+ // - `dest_pixels` may be NULL when we're only writing a stencil.
+@@ -14897,6 +15022,9 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+ 
+     #undef RASTER_TRI
+ 
++    bd1_draw_timeline_entries(dest, mc, ma, mb, mc_, md, mtx, mty, dx0, dy0, dx1, dy1,
++                              stencil, stencil_write_value, stencil_out, cx);
++
+     // Recursively render children. The registry holds dynamic child MCs in no
+     // particular order — we render them in ascending depth so the higher depth
+     // paints over the lower one (Flash's z-order).
+@@ -14933,8 +15061,12 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+         double sy = child->yscale / 100.0;
+         double rot = child->rotation * (3.14159265358979323846 / 180.0);
+         double cr = cos(rot), sr = sin(rot);
++        // s26 w1-pixel-tail: include the decomposed skew (Ruffle's rotation_y =
++        // rotation + skew). Without it a sheared timeline child (gnash
++        // BitmapDataDraw's mc5 under mc4) lands on the wrong pixels.
++        double ry = rot + (double) child->skew;
+         double la = sx * cr,  lb = sx * sr;
+-        double lc = -sy * sr, ld = sy * cr;
++        double lc = -sy * sin(ry), ld = sy * cos(ry);
+         double ltx = child->x, lty = child->y;
+         double ca = ma * la + mc_ * lb;
+         double cb = mb * la + md  * lb;
+@@ -14983,6 +15115,7 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
+ 
+     // MovieClip source: rasterize the MC's drawing-API paths into the dest bitmap.
+     if (src_mc != NULL) {
++        g_bd1_draw_app = app_context;
+         // Extract matrix (arg1) — defaults to identity
+         double ma = 1, mb = 0, mcc = 0, md = 1, mtx = 0, mty = 0;
+         if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT && args[1].data.numeric_value != 0) {
+diff --git a/SWFModernRuntime/src/avm2/avm2_cpu_raster.c b/SWFModernRuntime/src/avm2/avm2_cpu_raster.c
+index 874fff43..1c28b582 100644
+--- a/SWFModernRuntime/src/avm2/avm2_cpu_raster.c
++++ b/SWFModernRuntime/src/avm2/avm2_cpu_raster.c
+@@ -26,8 +26,13 @@
+ #include <stddef.h>
+ #include <math.h>
+ #include <stdlib.h>
++#include <stdio.h>
+ 
+ #include "avm2/avm2_cpu_raster.h"
++#ifdef SWF_AVM2
++#include <avm2/avm2_abc.h>
++#include <zlib.h>
++#endif
+ 
+ // Resident recompiler geometry tables, defined in the generated draws.c and
+ // linked into every build (both graphics and no-graphics — see verify_output.py
+@@ -222,8 +227,61 @@ typedef struct {
+ 	// sampled linear ramp back to sRGB (linearRGB interpolation).
+ 	const uint8_t* ramp;
+ 	int linear_out;
++	// s26 w1-pixel-tail PROTOTYPE: bitmap fill (0x40-0x43). Straight RGBA8
++	// texels; (ia..ity) map shape twips -> bitmap px.
++	const uint8_t* bmp;
++	int bmp_w, bmp_h, bmp_repeat, bmp_smooth;
+ } RasterCtx;
+ 
++int ng_getBitmapByIndex(uint32_t idx, const uint8_t** out_pixels,
++                        uint32_t* out_width, uint32_t* out_height);
++
++static inline uint32_t bmp_texel(const RasterCtx* R, int x, int y)
++{
++	if (R->bmp_repeat) {
++		x %= R->bmp_w; if (x < 0) x += R->bmp_w;
++		y %= R->bmp_h; if (y < 0) y += R->bmp_h;
++	} else {
++		if (x < 0) x = 0; if (x >= R->bmp_w) x = R->bmp_w - 1;
++		if (y < 0) y = 0; if (y >= R->bmp_h) y = R->bmp_h - 1;
++	}
++	const uint8_t* p = R->bmp + ((size_t) y * R->bmp_w + x) * 4;
++	return ((uint32_t) p[3] << 24) | ((uint32_t) p[0] << 16) | ((uint32_t) p[1] << 8) | p[2];
++}
++
++static uint32_t bmp_sample(const RasterCtx* R, double u, double v)
++{
++	uint32_t c;
++	if (!R->bmp_smooth) {
++		// Nearest: a pixel centre on (or within float noise of) a texel
++		// boundary takes the LOWER texel. Measured on avm2/pixelbender_dithering
++		// (y scale exactly 1.5 px/texel, so every third row is a tie): exact
++		// floor 20153 outliers, ties-to-lower 8614, flat for eps 1e-6..1e-3.
++		c = bmp_texel(R, (int) floor(u - 1e-6), (int) floor(v - 1e-6));
++	} else {
++		double fu = u - 0.5, fv = v - 0.5;
++		int x0 = (int) floor(fu), y0 = (int) floor(fv);
++		double tx = fu - x0, ty = fv - y0;
++		uint32_t q[4] = { bmp_texel(R, x0, y0), bmp_texel(R, x0 + 1, y0),
++		                  bmp_texel(R, x0, y0 + 1), bmp_texel(R, x0 + 1, y0 + 1) };
++		double acc[4] = { 0, 0, 0, 0 };
++		double wq[4] = { (1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty };
++		for (int k = 0; k < 4; k++)
++			for (int ch = 0; ch < 4; ch++)
++				acc[ch] += wq[k] * (double) ((q[k] >> (24 - 8 * ch)) & 0xFF);
++		c = 0;
++		for (int ch = 0; ch < 4; ch++) {
++			uint32_t b = (uint32_t) (acc[ch] + 0.5); if (b > 255) b = 255;
++			c |= b << (24 - 8 * ch);
++		}
++	}
++	if (R->node_alpha < 0.999) {
++		uint32_t sa = (uint32_t) (((c >> 24) & 0xFF) * R->node_alpha + 0.5);
++		c = (c & 0x00FFFFFFu) | (sa << 24);
++	}
++	return c;
++}
++
+ // sRGB EOTF^-1 for linearRGB gradient output (mirror render_webgpu.c fs_main).
+ static inline double cpu_linear_to_srgb(double c)
+ {
+@@ -442,7 +500,19 @@ static void raster_tri_aa(RasterCtx* R,
+ 			if (mask == 0) continue;
+ 
+ 			uint32_t straight;
+-			if (!R->is_gradient)
++			if (R->bmp != NULL)
++			{
++				double qx = (double) px + 0.5, qy = (double) py + 0.5;
++				double w0 = ((bx - ax) * (qy - ay) - (by - ay) * (qx - ax)) * sgn;
++				double w1 = ((cx - bx) * (qy - by) - (cy - by) * (qx - bx)) * sgn;
++				double w2 = ((ax - cx) * (qy - cy) - (ay - cy) * (qx - cx)) * sgn;
++				double aA = w1 * inv_area, aB = w2 * inv_area, aC = w0 * inv_area;
++				double sx = aA * R->sx0 + aB * R->sx1 + aC * R->sx2;
++				double sy = aA * R->sy0 + aB * R->sy1 + aC * R->sy2;
++				straight = bmp_sample(R, R->ia * sx + R->ic * sy + R->itx,
++				                      R->ib * sx + R->id * sy + R->ity);
++			}
++			else if (!R->is_gradient)
+ 				straight = R->solid_argb;
+ 			else
+ 			{
+@@ -523,7 +593,15 @@ static void raster_tri(RasterCtx* R,
+ 				continue;
+ 
+ 			uint32_t straight;
+-			if (!R->is_gradient)
++			if (R->bmp != NULL)
++			{
++				double aA = w1 * inv_area, aB = w2 * inv_area, aC = w0 * inv_area;
++				double sx = aA * R->sx0 + aB * R->sx1 + aC * R->sx2;
++				double sy = aA * R->sy0 + aB * R->sy1 + aC * R->sy2;
++				straight = bmp_sample(R, R->ia * sx + R->ic * sy + R->itx,
++				                      R->ib * sx + R->id * sy + R->ity);
++			}
++			else if (!R->is_gradient)
+ 			{
+ 				straight = R->solid_argb;
+ 			}
+@@ -589,7 +667,8 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
+ 		// Only solid (0x00, incl. strokes) and gradients (0x10/0x12/0x13) this
+ 		// tranche. Bitmap fills (0x40-0x43) and anything else are skipped.
+ 		int is_grad = ((style_type & 0xF0u) == 0x10u);
+-		if (style_type != 0x00u && !is_grad) continue;
++		int is_bmp = ((style_type & 0xF0u) == 0x40u);
++		if (style_type != 0x00u && !is_grad && !is_bmp) continue;
+ 
+ 		// Shape-local twips vertices.
+ 		double sx[3], sy[3], dX[3], dY[3];
+@@ -607,6 +686,63 @@ void avm2_cpu_raster_shape(uint32_t* buf, int W, int H, int transparent,
+ 		R.buf = buf; R.W = W; R.H = H;
+ 		R.node_alpha = node_alpha;
+ 		R.ramp = NULL; R.linear_out = 0;   // static path: use gradient_data row
++		R.bmp = NULL;
++
++		if (is_bmp)
++		{
++			uint32_t bid = style_index & 0xFFFFu;
++			uint32_t mid = (style_index >> 16) & 0xFFFFu;
++			const uint8_t* bp; uint32_t bw, bh;
++			int _ok = ng_getBitmapByIndex(bid, &bp, &bw, &bh);
++#ifdef SWF_AVM2
++			// AVM2 never runs defineBitmap; the recompiler's style id indexes
++			// the embedded-bitmap table in emission order (PROTOTYPE: verify
++			// for multi-bitmap / child movies).
++			if (!_ok && bid < avm2_generated_bitmap_count
++			    && avm2_generated_bitmaps[bid].rgba != NULL)
++			{
++				const Avm2BitmapData* eb = &avm2_generated_bitmaps[bid];
++				bw = eb->width; bh = eb->height;
++				bp = eb->rgba;
++				if (eb->z_len != 0)
++				{
++					static const Avm2BitmapData* s_eb = NULL;
++					static uint8_t* s_px = NULL;
++					if (s_eb != eb)
++					{
++						free(s_px);
++						uLongf n = (uLongf) bw * bh * 4;
++						s_px = (uint8_t*) malloc(n);
++						if (s_px && uncompress(s_px, &n, eb->rgba, eb->z_len) != Z_OK)
++						{ free(s_px); s_px = NULL; }
++						s_eb = eb;
++					}
++					bp = s_px;
++				}
++				_ok = bp != NULL;
++			}
++#endif
++			if (!_ok || bw == 0 || bh == 0) continue;
++			R.bmp = bp; R.bmp_w = (int) bw; R.bmp_h = (int) bh;
++			R.bmp_repeat = (style_type == 0x40u || style_type == 0x42u);
++			R.bmp_smooth = (style_type == 0x40u || style_type == 0x41u);
++			R.is_gradient = 0;
++			R.sx0 = sx[0]; R.sy0 = sy[0];
++			R.sx1 = sx[1]; R.sy1 = sy[1];
++			R.sx2 = sx[2]; R.sy2 = sy[2];
++			const float* m = cpu_uninv_mat_table() + (size_t) mid * 16;
++			double _ia = m[0], _ib = m[1], _ic = m[4], _id = m[5];
++			double _itx = m[12], _ity = m[13];
++			double _det = _ia * _id - _ib * _ic;
++			if (_det == 0.0) continue;
++			double _inv = 1.0 / _det;
++			R.ia =  _id * _inv;  R.ib = -_ib * _inv;
++			R.ic = -_ic * _inv;  R.id =  _ia * _inv;
++			R.itx = (_ic * _ity - _id * _itx) * _inv;
++			R.ity = (_ib * _itx - _ia * _ity) * _inv;
++			raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
++			continue;
++		}
+ 
+ 		if (!is_grad)
+ 		{
+@@ -671,7 +807,7 @@ void avm2_cpu_raster_tris(uint32_t* buf, int W, int H, int transparent,
+ 	RasterCtx R;
+ 	R.buf = buf; R.W = W; R.H = H;
+ 	R.node_alpha = node_alpha;
+-	R.ramp = NULL; R.linear_out = 0;
++	R.ramp = NULL; R.linear_out = 0; R.bmp = NULL;
+ 
+ 	if (fill->kind == 2)
+ 	{
+@@ -795,7 +931,7 @@ void avm2_cpu_raster_morph(uint32_t* buf, int W, int H, int transparent,
+ 		RasterCtx R;
+ 		R.buf = buf; R.W = W; R.H = H;
+ 		R.node_alpha = node_alpha;
+-		R.ramp = NULL; R.linear_out = 0;
++		R.ramp = NULL; R.linear_out = 0; R.bmp = NULL;
+ 		R.is_gradient = 0;
+ 		R.solid_argb = (a_out << 24) | (cr << 16) | (cg << 8) | cb;
+ 		raster_tri(&R, dX[0], dY[0], dX[1], dY[1], dX[2], dY[2]);
+diff --git a/SWFModernRuntime/src/avm2/avm2_display.c b/SWFModernRuntime/src/avm2/avm2_display.c
+index 6b766e39..e0ca1e58 100644
+--- a/SWFModernRuntime/src/avm2/avm2_display.c
++++ b/SWFModernRuntime/src/avm2/avm2_display.c
+@@ -15,6 +15,7 @@
+ // One ext struct (Avm2DisplayObjectExt) serves the whole ladder.
+ 
+ #include <math.h>
++#include <zlib.h>
+ #include <stddef.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -582,7 +583,7 @@ static void resolve_shape_geom(Avm2DisplayObjectExt* ext, uint16_t char_id)
+ {
+ 	const Avm2MovieTables* owner = NULL;
+ 	const Avm2ShapeGeom* sg = shape_geom_for_in(char_id, &owner);
+-	if (sg != NULL && sg->renderable && sg->vert_count > 0)
++	if (sg != NULL && sg->vert_count > 0)  // s26 proto: bitmap-fill shapes too
+ 	{
+ 		// This is the AVM2 twin of tagDefineShape's re-base: the one moment
+ 		// the DEFINING movie is known. Both offsets are numbered from 0 in
+@@ -21371,6 +21372,30 @@ void avm2_render_init(Avm2Context* ctx)
+ 		? (uint32_t) (app->cxform_data_size / (20 * sizeof(float))) : 1;
+ 
+ 	renderer_init(app, context);
++	// s26 w1-pixel-tail PROTOTYPE: static bitmaps for timeline BITMAP FILLS
++	// (0x40-0x43). AVM2 never runs defineBitmap/finalizeBitmaps, so the static
++	// pools were empty and a bitmap-filled shape sampled nothing. Upload the
++	// embedded table in emission order (= the recompiler's fill style id).
++	if (context->bitmap_count > 0 && context->renderer_ok)
++	{
++		for (uint32_t i = 0; i < avm2_generated_bitmap_count
++		                     && i < (uint32_t) context->bitmap_count; i++)
++		{
++			const Avm2BitmapData* eb = &avm2_generated_bitmaps[i];
++			const uint8_t* px = eb->rgba;
++			if (px != NULL && eb->z_len != 0)
++			{
++				uLongf n = (uLongf) eb->width * eb->height * 4;
++				uint8_t* d = (uint8_t*) malloc(n);   // lives for the run
++				if (d != NULL && uncompress(d, &n, eb->rgba, eb->z_len) != Z_OK)
++				{ free(d); d = NULL; }
++				px = d;
++			}
++			renderer_upload_bitmap(context, px, (size_t) eb->width * eb->height * 4,
++			                       eb->width, eb->height);
++		}
++		renderer_finalize_bitmaps(context);
++	}
+ #ifdef OFFSCREEN_RENDER
+ 	// Capture triggers are a graphics-native-test concept (CAPTURE_TRIGGERS env);
+ 	// capture.c isn't linked in the browser build.
+diff --git a/SWFModernRuntime/src/libswf/tag.c b/SWFModernRuntime/src/libswf/tag.c
+index fd286be4..ff6921bc 100644
+--- a/SWFModernRuntime/src/libswf/tag.c
++++ b/SWFModernRuntime/src/libswf/tag.c
+@@ -15073,6 +15073,18 @@ int ng_getBitmapMetadata(u16 char_id, const u8** out_pixels, size_t* out_size, u
+ 	return 0;
+ }
+ 
++// s26 w1-pixel-tail PROTOTYPE: CPU access to a timeline bitmap by its
++// registration (= renderer upload / shape style id) index, for the CPU
++// bitmap-fill arm in avm2_cpu_raster.c. Root movie only (no child re-basing).
++int ng_getBitmapByIndex(u32 idx, const u8** out_pixels, u32* out_width, u32* out_height)
++{
++	if ((int) idx >= g_bitmap_def_count || g_bitmap_defs[idx].pixels == NULL) return 0;
++	*out_pixels = g_bitmap_defs[idx].pixels;
++	*out_width = g_bitmap_defs[idx].width;
++	*out_height = g_bitmap_defs[idx].height;
++	return 1;
++}
++
+ void ng_registerBitmapMetadata(u16 char_id, const u8* pixels, size_t size, u32 width, u32 height)
+ {
+ 	if (g_bitmap_def_count < MAX_BITMAP_DEFS) {
+diff --git a/ruffle-tests/verify_output.py b/ruffle-tests/verify_output.py
+index 6e65e72d..c4fed26e 100644
+--- a/ruffle-tests/verify_output.py
++++ b/ruffle-tests/verify_output.py
+@@ -2684,7 +2684,6 @@ AVM2_CORE_SOURCES = [
+     "src/avm2/avm2_pixelbender.c",
+     "src/avm2/avm2_filters.c",
+     "src/avm2/avm2_bitmap.c",
+-    "src/avm2/avm2_cpu_raster.c",
+     "src/avm2/avm2_media.c",
+     "src/avm2/avm2_external.c",
+     "src/avm2/avm2_flixel.c",
+@@ -2728,6 +2727,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
+         "src/utils.c",
+         "src/amf_packet.c",
+         "src/libswf/tag.c",
++        "src/avm2/avm2_cpu_raster.c",  # s26 w1-pixel-tail prototype: AVM1 draw() timeline arm
+         "src/libswf/tag_stubs.c",
+         "src/libswf/shape_hit_test.c",
+         "src/libswf/ng_shared.c",
