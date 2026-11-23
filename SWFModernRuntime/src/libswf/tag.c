@@ -2224,9 +2224,49 @@ static int ng_att_root_cmp(const void* a, const void* b)
 	return x->idx < y->idx ? -1 : (x->idx > y->idx);
 }
 
+// s26 per-movie display list (phase 1): sprites a loaded movie placed into a
+// dynamic holder's shell (MovieClip.loaded_dl_shell) are in no list the root
+// advance walks, so their timelines would freeze. Run the same sprite advance
+// over each shell, swapped in as the active list, under the holder's context
+// (the shape ng_attached_run_tree uses for an attached clip's own list).
+// Nested children advance inline (no Phase-3 deferral) -- HOLD: exec order.
+static void ng_advance_child_movie_shells(SWFAppContext* app_context)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+	extern int g_advance_defer_nested;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->loaded_dl_shell == NULL || mc->display_obj != NULL) continue;
+		if (mc->depth == INT_MIN || mc->avm1_removed || mc->unloaded) continue;
+		DisplayObject* sh = (DisplayObject*)mc->loaded_dl_shell;
+		if (sh->sprite_display_list == NULL || sh->sprite_max_depth == 0) continue;
+		DisplayObject* saved_dl = display_list;
+		size_t saved_max = max_depth, saved_cap = display_list_capacity;
+		display_list = sh->sprite_display_list;
+		max_depth = sh->sprite_max_depth;
+		display_list_capacity = sh->sprite_dl_capacity;
+		int saved_defer = g_advance_defer_nested;
+		g_advance_defer_nested = 0;
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* saved_base = actionGetBaseClip();
+		actionSetCurrentContext(mc);
+		actionSetBaseClip(mc);
+		advance_sprite_frames(app_context);
+		actionSetCurrentContext(saved_ctx);
+		actionSetBaseClip(saved_base);
+		g_advance_defer_nested = saved_defer;
+		sh->sprite_display_list = display_list;
+		sh->sprite_max_depth = max_depth;
+		sh->sprite_dl_capacity = display_list_capacity;
+		display_list = saved_dl; max_depth = saved_max; display_list_capacity = saved_cap;
+	}
+}
+
 void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 {
 	if (catch_up_mode) return;
+	ng_advance_child_movie_shells(app_context);
 	extern MovieClip* child_mc_cache[];
 	extern int child_mc_count;
 	// Collect the eligible attached roots, then run them newest-attached
@@ -8649,17 +8689,18 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			if (mc == NULL) continue;
 			if (mc->depth == INT_MIN) continue;
 			if (mc->parent != &root_movieclip) continue;
-			if (mc->display_obj == NULL) continue;
+			if (mc->display_obj == NULL && mc->loaded_dl_shell == NULL) continue;
 			// AS-set _visible=false: tagShowFrame's pass skips it inside
 			// render_attached_child; this capture pass drew it anyway, so a
 			// hidden root-attached clip showed up in every captured image.
 			if (!mc->visible) continue;
 			uintptr_t dl_lo = (uintptr_t)display_list;
 			uintptr_t dl_hi = dl_lo + display_list_capacity * sizeof(DisplayObject);
-			uintptr_t dobj = (uintptr_t)mc->display_obj;
+			DisplayObject* d = mc->display_obj ? (DisplayObject*)mc->display_obj
+			                                   : (DisplayObject*)mc->loaded_dl_shell;
+			uintptr_t dobj = (uintptr_t)d;
 			if (dobj >= dl_lo && dobj < dl_hi) continue;
 
-			DisplayObject* d = (DisplayObject*)mc->display_obj;
 			if (d->sprite_display_list == NULL || d->sprite_max_depth == 0)
 				continue;
 			float mc_xform[16] = {
@@ -8843,10 +8884,19 @@ static int attached_parent_dl_index(MovieClip* mc)
 // post-loop root-attached pass in tagShowFrame. No-op when the clip has no
 // sprite content, is hidden, has a hidden ancestor, or is a timeline-placed
 // root child already drawn by the main display loop.
+// s26 per-movie display list: a dynamic holder's loaded movie lives in the
+// holder's shell (MovieClip.loaded_dl_shell), not in display_obj.
+static DisplayObject* mc_content_dobj(MovieClip* mc)
+{
+	if (mc->display_obj != NULL) return (DisplayObject*)mc->display_obj;
+	return (DisplayObject*)mc->loaded_dl_shell;
+}
+
 static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 {
 	extern MovieClip root_movieclip;
-	if (mc->display_obj == NULL) return;            // no sprite content
+	DisplayObject* _content = mc_content_dobj(mc);
+	if (_content == NULL) return;                   // no sprite content
 	if (!mc->visible) return;                       // AS-set _visible=false
 	// A live setMask masker is stencil-only, never ordinary content
 	// (mask defect B).
@@ -8855,10 +8905,10 @@ static void render_attached_child(SWFAppContext* app_context, MovieClip* mc)
 	// already drawn by the main render loop.
 	uintptr_t dl_lo = (uintptr_t)display_list;
 	uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
-	uintptr_t dobj = (uintptr_t)mc->display_obj;
+	uintptr_t dobj = (uintptr_t)_content;
 	if (dobj >= dl_lo && dobj < dl_hi) return;
 
-	DisplayObject* d = (DisplayObject*)mc->display_obj;
+	DisplayObject* d = _content;
 	if (d->sprite_display_list == NULL || d->sprite_max_depth == 0) return;
 	// Skip timeline-placed NESTED children. The global-display_list guard above
 	// only catches ROOT timeline children; a sprite nested inside another sprite
@@ -13010,6 +13060,15 @@ void ng_spriteDLRealloc(SWFAppContext* app_context, DisplayObject** base_io,
 		MovieClip* m = child_mc_cache[i];
 		if (m != NULL && m->display_obj != NULL)
 			dlr_rebase_copies_recurse((DisplayObject*)m->display_obj, 0);
+		// s26 per-movie display list: a holder's shell owns a base copy too.
+		if (m != NULL && m->loaded_dl_shell != NULL) {
+			DisplayObject* sh = (DisplayObject*)m->loaded_dl_shell;
+			if (sh->sprite_display_list == old_base) {
+				sh->sprite_display_list = new_base;
+				sh->sprite_dl_capacity = new_cap;
+			}
+			dlr_rebase_copies_recurse(sh, 0);
+		}
 	}
 
 	FREE(old_base);

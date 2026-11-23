@@ -24943,12 +24943,31 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 {
 	int as_depth = swf_depth - 16384;
 	int shifted_depth = -(int)swf_depth - 1 - 16384;
+	// s26 per-movie display list: while a loaded movie's frame runs, its
+	// children share (name, depth) keys with the parent's (both lists start at
+	// depth 1), so prefer the clip whose parent is the running holder context.
+	// Without this a child's RemoveObject2 of `v2` invalidated the PARENT's
+	// `_root.v2` (avm1/video_prototype_lazy_swf6_child).
+	extern MovieClip* actionCurrentChildMovieMC(void);
+	MovieClip* _inv_want_parent = (actionCurrentChildMovieMC() != NULL) ? g_current_context : NULL;
+	if (_inv_want_parent != NULL) {
+		int _hit = 0;
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* c = child_mc_cache[i];
+			if (c != NULL && !c->pending_removal && c->depth != INT_MIN
+			    && c->parent == _inv_want_parent
+			    && (c->depth == as_depth || c->depth == swf_depth || c->depth == shifted_depth)
+			    && strcmp(c->name, name) == 0) { _hit = 1; break; }
+		}
+		if (!_hit) _inv_want_parent = NULL;
+	}
 	// actionFireOnUnload may have already shifted the MC's depth even when the MC
 	// has no clip-event UNLOAD or recursive-child UNLOAD (the AS-level handler is
 	// counted in has_unload, so this case is uncommon, but a depth-only AS-level
 	// onUnload that returns early without preserving state could still land here).
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
+		    (_inv_want_parent == NULL || child_mc_cache[i]->parent == _inv_want_parent) &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
 		    (child_mc_cache[i]->depth == as_depth ||
@@ -25860,6 +25879,146 @@ static void actionClearChildMoviePlacements(SWFAppContext* app_context, MovieCli
 	}
 }
 
+// ---------------------------------------------------------------------------
+// s26 per-movie display list, phase 1 (w1-per-movie-displaylist prototype).
+//
+// A clip-target holder with no display_obj gets a heap SHELL DisplayObject
+// whose sprite_display_list is the loaded movie's own top-level child list.
+// The loaders, the advance driver and actionChildMovieGoto swap it in as the
+// active `display_list` around every frame call of the movie, exactly the way
+// a _levelN target's private list is swapped, so the movie's PlaceObject2 at
+// depth N no longer collides with the parent's depth N.
+// Only for non-level, non-root holders that have no display_obj.
+DisplayObject* actionChildMovieShell(SWFAppContext* app_context, MovieClip* mc, int create)
+{
+	extern MovieClip root_movieclip;
+	if (mc == NULL || mc == &root_movieclip || mc->parent == NULL) return NULL;
+	if (mc->display_obj != NULL) return NULL;
+	if (mc->loaded_dl_shell == NULL && create) {
+		DisplayObject* s = (DisplayObject*)HCALLOC(1, sizeof(DisplayObject));
+		s->sprite_dl_capacity = INITIAL_SPRITE_DL_CAPACITY;
+		s->sprite_display_list = (DisplayObject*)HCALLOC(s->sprite_dl_capacity, sizeof(DisplayObject));
+		s->sprite_max_depth = 0;
+		mc->loaded_dl_shell = s;
+	}
+	return (DisplayObject*)mc->loaded_dl_shell;
+}
+
+typedef struct {
+	DisplayObject* owner;
+	DisplayObject* dl;
+	size_t max, cap;
+	int on;
+} ChildDLSwap;
+
+static void childDLSwapIn(DisplayObject* owner, ChildDLSwap* s)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern size_t display_list_capacity;
+	s->on = 0;
+	s->owner = owner;
+	if (owner == NULL || owner->sprite_display_list == NULL) return;
+	if (display_list == owner->sprite_display_list) return;  // already active (re-entrant goto)
+	s->dl = display_list; s->max = max_depth; s->cap = display_list_capacity;
+	display_list = owner->sprite_display_list;
+	max_depth = owner->sprite_max_depth;
+	display_list_capacity = owner->sprite_dl_capacity;
+	s->on = 1;
+}
+
+static void childDLSwapOut(ChildDLSwap* s)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern size_t display_list_capacity;
+	if (!s->on) return;
+	s->owner->sprite_display_list = display_list;
+	s->owner->sprite_max_depth = max_depth;
+	s->owner->sprite_dl_capacity = display_list_capacity;
+	display_list = s->dl; max_depth = s->max; display_list_capacity = s->cap;
+	s->on = 0;
+}
+
+// holder.gotoAndStop(n) / gotoAndPlay(n) on a loaded movie's holder: move the
+// loaded movie's OWN playhead (the advance entry owns the cursor), not the
+// root's. Tags-only catch-up under the movie's full context swap. Returns 1
+// when handled. HOLD: the target frame's DoAction is suppressed (Flash queues
+// it) and a backward goto clears every placement (no survives_rewind).
+int actionChildMovieGoto(SWFAppContext* app_context, MovieClip* mc, size_t frame0, int play)
+{
+	LevelAdvanceEntry* e = childMovieEntryFor(mc);
+	if (e == NULL || e->entry == NULL || e->entry->frame_funcs == NULL) return 0;
+	MovieEntry* entry = e->entry;
+	if (entry->frame_count == 0) return 0;
+	if (frame0 >= entry->frame_count) frame0 = entry->frame_count - 1;
+	size_t shown = e->current_frame > 0 ? e->current_frame - 1 : 0;
+	e->playing = (u8)(play ? 1 : 0);
+	if (frame0 == shown) return 1;
+
+	int _saved_ver = g_swf_version;
+	ASObject* _saved_global = global_object;
+	int _saved_child_init = g_child_swf_init;
+	u8 _saved_movie_id = g_current_movie_id;
+	MovieClip* _saved_ctx = g_current_context;
+	g_swf_version = entry->swf_version;
+	g_child_swf_init = 1;
+	g_current_movie_id = entry->movie_id;
+	ensureSecondaryGlobalInit(app_context, entry->swf_version);
+	if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+	else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+	actionSetCurrentContext(mc);
+	DisplayObject* owner = mc->display_obj ? (DisplayObject*)mc->display_obj : actionChildMovieShell(app_context, mc, 1);
+	ChildDLSwap sw;
+	childDLSwapIn(owner, &sw);
+	extern float (*g_active_transform_data)[16];
+	float (*_saved_td)[16] = g_active_transform_data;
+	if (entry->transform_data_ptr != NULL) g_active_transform_data = entry->transform_data_ptr;
+	MovieClip* _saved_child_mc = g_child_movie_advance_mc;
+	g_child_movie_advance_mc = mc;
+	extern int quit_swf;
+	extern int is_playing;
+	extern size_t next_frame;
+	extern int manual_next_frame;
+	extern int catch_up_mode;
+	extern int catch_up_backward;
+	int _sq = quit_swf, _sp = is_playing, _sm = manual_next_frame;
+	size_t _sn = next_frame;
+	int _scm = catch_up_mode, _scb = catch_up_backward;
+
+	size_t from = shown + 1;
+	if (frame0 < shown) {
+		actionClearChildMoviePlacements(app_context, mc);
+		from = 0;
+	}
+	catch_up_mode = 1;
+	catch_up_backward = (frame0 < shown) ? 1 : 0;
+	for (size_t f = from; f <= frame0; f++) {
+		frame_func fn = entry->frame_funcs[f];
+		if (fn == NULL) continue;
+		quit_swf = 0;
+		fn(app_context);
+	}
+	catch_up_mode = _scm; catch_up_backward = _scb;
+	quit_swf = _sq; is_playing = _sp; next_frame = _sn; manual_next_frame = _sm;
+	g_child_movie_advance_mc = _saved_child_mc;
+	g_active_transform_data = _saved_td;
+	childDLSwapOut(&sw);
+	actionSetCurrentContext(_saved_ctx);
+	g_swf_version = _saved_ver;
+	global_object = _saved_global;
+	g_child_swf_init = _saved_child_init;
+	g_current_movie_id = _saved_movie_id;
+
+	e = childMovieEntryFor(mc);
+	if (e != NULL) {
+		e->current_frame = frame0 + 1;
+		e->playing = (u8)(play ? 1 : 0);
+	}
+	mc->currentframe = (int)(frame0 + 1);
+	return 1;
+}
+
 void actionAdvancePlayingLevels(SWFAppContext* app_context)
 {
 	if (g_level_advance_count == 0) return;
@@ -25929,7 +26088,8 @@ void actionAdvancePlayingLevels(SWFAppContext* app_context)
 			DisplayObject* _saved_dl = NULL;
 			size_t _saved_max = 0, _saved_cap = 0;
 			int _did_swap = 0;
-			DisplayObject* dobj = e.mc->display_obj ? (DisplayObject*)e.mc->display_obj : NULL;
+			DisplayObject* dobj = e.mc->display_obj ? (DisplayObject*)e.mc->display_obj
+			                                        : actionChildMovieShell(app_context, e.mc, 1);
 			if (dobj != NULL && dobj->sprite_display_list != NULL) {
 				_saved_dl = display_list;
 				_saved_max = max_depth;
@@ -26870,6 +27030,21 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		// all) breaks avm1/movieclip_invalid_get_bounds_1..8; swapping the list
 		// on top of that additionally breaks avm1/swf{5_to_6,6_to_5}_cross_call.
 		// Both measured. See SWFRecompDocs/status/child-timeline-advance.md.
+		DisplayObject* _shell = NULL;
+		if (!loads[i].is_level && (_shell = actionChildMovieShell(app_context, mc, 1)) != NULL) {
+			_saved_dl = display_list;
+			_saved_max = max_depth;
+			_saved_cap = display_list_capacity;
+			display_list = _shell->sprite_display_list;
+			max_depth = _shell->sprite_max_depth;
+			display_list_capacity = _shell->sprite_dl_capacity;
+			_did_swap = 1;
+			// A fresh load replaces the holder's previous movie's children.
+			for (size_t _cd = max_depth; _cd >= 1; _cd--) {
+				if (display_list[_cd].char_id == 0) continue;
+				tagRemoveObject2(app_context, _cd);
+			}
+		}
 		if (loads[i].is_level) {
 			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
 			// Lazily attach a display_obj + private sprite_display_list to a
@@ -26980,7 +27155,7 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 
 		// Restore display_list if swapped
 		if (_did_swap) {
-			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
+			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : _shell;
 			if (dobj != NULL) {
 				dobj->sprite_display_list = display_list;
 				dobj->sprite_max_depth = max_depth;
@@ -40531,6 +40706,20 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 }
             }
 
+            // s26 per-movie display list: a dynamic clip target's movie places
+            // into the holder's own shell list, not the parent's global list.
+            DisplayObject* _p2_shell = actionChildMovieShell(app_context, loads[i].target, 1);
+            ChildDLSwap _p2_sw;
+            _p2_sw.on = 0;
+            if (_p2_shell != NULL) {
+                childDLSwapIn(_p2_shell, &_p2_sw);
+                if (_p2_sw.on) {
+                    for (size_t _cd = max_depth; _cd >= 1; _cd--) {
+                        if (display_list[_cd].char_id == 0) continue;
+                        tagRemoveObject2(app_context, _cd);
+                    }
+                }
+            }
             loads[i].entry->init_func(app_context);
             // Register multi-frame MCL targets for per-tick frame advancement.
             // Phase 2 only runs frame_funcs[0]; without this, frame_funcs[1..N-1]
@@ -40558,6 +40747,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 next_frame = _p2_saved_next_frame;
                 manual_next_frame = _p2_saved_manual_next;
             }
+            childDLSwapOut(&_p2_sw);
 
             // Restore transform_data
             if (_p2_saved_td != NULL) {
@@ -60936,6 +61126,58 @@ static void actionGetMemberImpl(SWFAppContext* app_context)
 			}
 			// First try direct child lookup via mc->display_obj (works even during nested init)
 			size_t child_depth = SIZE_MAX;
+			// s26 per-movie display list: a dynamic holder's loaded movie keeps
+			// its children in the holder's shell. That list is authoritative for
+			// the holder (no root-level fallback, which is what the shared list
+			// used to give it by accident).
+			if (mc->display_obj == NULL && mc->loaded_dl_shell != NULL) {
+				DisplayObject* _sh = (DisplayObject*)mc->loaded_dl_shell;
+				size_t _scd = SIZE_MAX;
+				// While the movie's own frame runs, the shell IS the active
+				// display_list and its sprite_max_depth is only written back at
+				// swap-out, so read the live globals then.
+				extern DisplayObject* display_list;
+				extern size_t max_depth;
+				DisplayObject* _shl = _sh->sprite_display_list;
+				size_t _shmax = (_shl != NULL && _shl == display_list) ? max_depth : _sh->sprite_max_depth;
+				if (_shl != NULL) {
+					for (size_t _cd = 1; _cd <= _shmax; _cd++) {
+						DisplayObject* _ch = &_shl[_cd];
+						if (_ch->char_id == 0 || _ch->instance_name == NULL) continue;
+						if (swf_name_match(_ch->instance_name, child_name_buf)) { _scd = _cd; break; }
+					}
+				}
+				if (_scd != SIZE_MAX) {
+					extern Character* dictionary;
+					DisplayObject* _ce = &_shl[_scd];
+					size_t _cid = _ce->char_id;
+					CharacterType _ctype = dictionary[_cid].type;
+					if (g_swf_version < 6 && _ctype == CHAR_TYPE_BUTTON) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+						return;
+					}
+					extern int ng_isScriptableChar(size_t char_id);
+					if (!ng_isScriptableChar(_cid)) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+						return;
+					}
+					MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
+					if (child_mc != NULL) {
+						if (!child_mc->depth_swapped) child_mc->depth = (int)_scd - 16384;
+						if (_ctype == CHAR_TYPE_BUTTON) child_mc->is_button_mc = 1;
+						child_mc->display_obj = (void*)_ce;
+						extern void ng_getDisplayObjTranslation(void* dobj_ptr, float* tx, float* ty);
+						float _dtx, _dty;
+						ng_getDisplayObjTranslation(child_mc->display_obj, &_dtx, &_dty);
+						if (!(child_mc->as_set_flags & 1)) child_mc->x = _dtx;
+						if (!(child_mc->as_set_flags & 2)) child_mc->y = _dty;
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+						return;
+					}
+				}
+				child_depth = SIZE_MAX;
+				goto getmember_no_root_fallback;
+			}
 			if (mc->display_obj != NULL) {
 				DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
 				if (parent_dobj->sprite_display_list != NULL) {
@@ -75088,6 +75330,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							}
 						}
 						if (is_play) is_playing = 1;
+					} else if (actionChildMovieGoto(app_context, mc, frame0, is_play)) {
+						// s26: a loaded movie's holder -- its own playhead.
 					} else if (!ng_gotoFrameByMC(app_context, mc, frame0, is_play)) {
 						actionGotoFrame(app_context, frame0);
 						if (is_play) is_playing = 1;
@@ -75282,6 +75526,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								ng_executeGotoTagsOnly(app_context);
 							}
 						}
+					} else if (actionChildMovieGoto(app_context, mc, frame0, 0)) {
 					} else if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
 						if (current_frame > 0) {
 							actionGotoFrame(app_context, (u16)(current_frame - 1));
@@ -75320,6 +75565,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							ng_executeGotoTagsOnly(app_context);
 						}
 					}
+				} else if (actionChildMovieGoto(app_context, mc, frame0, 0)) {
 				} else if (!ng_gotoFrameByMC(app_context, mc, frame0, 0)) {
 					actionNextFrame(app_context);
 				}

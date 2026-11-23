@@ -174,6 +174,16 @@ struct MovieClip {
 	u8 dyn_cm_flags;
 	float dyn_cm[20];
 	float dyn_cm_post[20];
+	// s26 per-movie display list (phase 1): the private child list of a
+	// loaded movie's CLIP-TARGET holder that has no display_obj (a
+	// createEmptyMovieClip holder). `DisplayObject*` kept as void*; a heap
+	// shell whose sprite_display_list / sprite_max_depth / sprite_dl_capacity
+	// own the loaded movie's top-level placements, so they no longer share
+	// depth keys with the parent's global display_list. Deliberately NOT
+	// display_obj: handing a dynamic holder a display_obj is a measured
+	// corpus regression (child-timeline-advance.md section 2.2). Allocated by
+	// actionChildMovieShell, swapped in around every frame call of the movie.
+	void* loaded_dl_shell;
 };
 
 // s21 w2-px-b: 1 while a `transform.matrix =` assignment's exact f32 a/b/c/d
