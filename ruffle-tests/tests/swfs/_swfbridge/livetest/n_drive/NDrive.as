@@ -16,6 +16,18 @@ class NDrive {
 	static var locked:Boolean = false;
 	static var FREEZE:String = "0:250,0:330,1:200,1:409,1:520,1:663,2:60";
 	static var FREEZE_FRAMES:Number = 30;
+	// START_LEVEL: episode-0 level to start on (IncrementCurrentLevel that many
+	// times before App_StartNewGame). OBJHASH: append h=<n> to every NF line, an
+	// order-independent integer hash of the positions of every MovieClip two
+	// levels under _root (N's object/enemy clips), so drones/thwumps diverging
+	// shows up even when they never touch the player. (N is SWF6 = case-
+	// insensitive: the hash method must not be named objHash, which IS OBJHASH.)
+	static var START_LEVEL:Number = 0;
+	static var OBJHASH:Boolean = false;
+	// CLIPDIFF: with OBJHASH, also trace "ND clip+ path" / "ND clip- path" for
+	// clips appearing/disappearing two levels under _root (+ their _currentframe).
+	static var CLIPDIFF:Boolean = false;
+	static var lastSet:Object;
 	static var freezeLeft:Number = 0;
 	static var freezeLabel:String = "";
 	static var PHASE_WAIT:Number = 40;
@@ -97,7 +109,33 @@ class NDrive {
 		var p:Object = r.player;
 		trace("NF a=" + attempt + " t=" + t + " x=" + p.pos.x + " y=" + p.pos.y
 			+ " vx=" + (p.pos.x - p.oldpos.x) + " vy=" + (p.pos.y - p.oldpos.y)
-			+ " st=" + p.curState + " k=" + (ks == "" ? "-" : ks) + " time=" + r.game.playerCurTime);
+			+ " st=" + p.curState + " k=" + (ks == "" ? "-" : ks) + " time=" + r.game.playerCurTime
+			+ (OBJHASH ? " h=" + NDrive.clipPosHash() : ""));
+	}
+	static function clipPosHash():String {
+		var n:Number = 0;
+		var sx:Number = 0;
+		var sy:Number = 0;
+		var cur:Object = new Object();
+		for (var a in r) {
+			var c:Object = r[a];
+			if (typeof(c) != "movieclip" || a == "__ndrive__") continue;
+			for (var b in c) {
+				var d:Object = c[b];
+				if (typeof(d) != "movieclip" || d._parent != c) continue;
+				n++; sx += Math.round(d._x * 100); sy += Math.round(d._y * 100);
+				if (CLIPDIFF) cur[a + "." + b] = d._currentframe + "/" + d._totalframes;
+			}
+		}
+		if (CLIPDIFF) {
+			var t:Number = r.game.tickCounter;
+			if (lastSet != undefined) {
+				for (var k in cur) if (lastSet[k] == undefined) trace("ND clip+ t=" + t + " " + k + " cf=" + cur[k]);
+				for (var k2 in lastSet) if (cur[k2] == undefined) trace("ND clip- t=" + t + " " + k2 + " lastcf=" + lastSet[k2]);
+			}
+			lastSet = cur;
+		}
+		return n + ":" + sx + ":" + sy;
 	}
 	// Event hooks (NLoader pattern): chain to N's originals, only add a trace.
 	static function installHooks():Void {
@@ -145,6 +183,7 @@ class NDrive {
 					trace("ND startgame frame=" + frame);
 					installHooks();
 					r.gamedata.LoadEpisodeNum(0);
+					for (var i:Number = 0; i < START_LEVEL; i++) r.gamedata.IncrementCurrentLevel();
 					r.App_StartNewGame();
 				}
 			}

@@ -51,6 +51,14 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
 
 ## Tools
 
+- Env knobs for `build.sh` (s26 n-pixel-pass): `START_LEVEL=k` starts on
+  episode-0 level k (`gamedata.IncrementCurrentLevel` k times before
+  `App_StartNewGame`); `OBJHASH=true` appends `h=<n>:<Σx>:<Σy>` to every NF
+  line — an order-independent integer hash (positions ×100, rounded) of every
+  clip two levels under `_root`, so drones/thwumps/doors moving differently
+  diverge even when they never touch the player; `FREEZE=""` disables the
+  level-0 freeze points. N is SWF6 = case-insensitive: a probe member must not
+  differ from another only by case (`objHash` IS `OBJHASH`).
 - `build.sh "<script>" [out.swf]` — MTASC with the script baked in, splice into
   N at **`--min-version 6`** (N is SWF 6 and case-insensitive; v8 breaks it).
   `AUTOKILL=true` makes the probe kill the player when an attempt's script ends

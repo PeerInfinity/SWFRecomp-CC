@@ -1,0 +1,8 @@
+assign: replaced=false same_as_orig=true
+call: false
+enum: []
+delete: false still=function
+after ASSetPropFlags: replaced=true
+call: true
+restored=true
+user prop: 5
