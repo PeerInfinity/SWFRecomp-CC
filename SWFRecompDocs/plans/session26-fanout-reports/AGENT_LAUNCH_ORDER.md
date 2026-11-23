@@ -7,7 +7,7 @@ Baseline: s25 FINAL — graphics/full/images `45078991452` (results `9277f3799`)
 (results `dffc41cf2`), code `697669e5f`. Read at `9277f3799`: trace 4636 eff / 4677 rows (41 failing); pixels 572/624
 (561/613 on the s24 set). No wave-0 run (only docs since).
 Upstream `3ac8dcb07..3e98d9ba6` (5 commits) — `wave0-upstream-drift-namestatus.txt`.
-Parallel LOCAL one-task session: `n-pixel-pass` (launched 02:15 UTC at wave-2 start, run.UsMIbJFi, handshake sent; carries the N play-game re-check for 876e66704).
+Parallel LOCAL one-task session: `n-pixel-pass` — landed `8301fd233` + `495dbde90` (attached-pump UAF/hijack fix exposed natively by 876e66704; browser enterFrame off-by-one; fixture `avm1_attached_clip_samename_child`; N play-game re-check PASSES native + browser) (launched 02:15 UTC at wave-2 start, run.UsMIbJFi, handshake sent; carries the N play-game re-check for 876e66704).
 
 ## Wave 1 (diagnosis, cloud)
 
@@ -35,11 +35,11 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched 02:15 UTC at wave-2 st
 | (landed direct) w1-trace-tail-audit prototype | w1-trace-tail-audit P1–P3 | trace `from_gnash/misc-swfc.all/sound` (+1); lines pixelDissolve 1335→1351, matrix_accuracy_test1 10→12 | — |
 | w2-loaded-shell-phase2 | w1-per-movie-displaylist phases 2–5 | 0 corpus expected; fixtures (oracle-gated) | session_018CoDi3qAjMx8NTxuARGv4B |
 | w2-attached-holder-render | w1-attached-button-dispatch leads | 0 corpus; holder render fixture (exporter golden archived) + button-order fixtures | session_018CoDi6mwbQ8ti45PPishTC |
-| w2-avm2-applyfilter-kernels | w1-pixel-layer-colour §5/§6 lead 1 | 0 flips likely (destpoint_edges −90k ch); fixture | session_018CoDi3QyC6rq1emewZ6Qio |
-| w2-acid-clip-fill-region | w1-pixel-nearpass leads 1–3 | px `acid-clip` (≤50 %), bevel headroom, acid-text-6 | session_018CoDi4EesSxTLA7Sbzmj5P |
+| w2-avm2-applyfilter-kernels | w1-pixel-layer-colour §5/§6 lead 1 | 0 flips likely (destpoint_edges −90k ch); fixture | session_018CoDi3QyC6rq1emewZ6Qio — DELIVERED, LANDED `18a58261a` (0 flips: destpoint_edges 149477 → 30394; fixtures HELD: Ruffle trace ±1–2 on 6/23 lines; draw-filtered needs Flash) |
+| w2-acid-clip-fill-region | w1-pixel-nearpass leads 1–3 | px `acid-clip` (≤50 %), bevel headroom, acid-text-6 | session_018CoDi4EesSxTLA7Sbzmj5P — DELIVERED, LANDED `5f4db0e60` (+4 px cmp: `acid-clip`, `3_joystick` (1 level headroom), `acid-text-6` output+frame5; w1 "char 6 region order" refuted: cross-layer stroke order; bevel O 2 px HOLD) |
 | w2-cm-chain-cab-edge | w1-pixel-layer-colour §3 HOLD + lead 2 | px `cache_as_bitmap/avm1_color` (unpriced); CM chain fixtures | session_018CoDi3eaG9cg1bPYFHbXKC |
 | w2-tail-bitmap-draw | w1-pixel-tail §1+§2 | px `visual/static_text_offstage`, `avm2/pixelbender_dithering` (+2); trace gnash `BitmapDataDraw` rm → pass; band `bitmapbuttons` | session_018CoDi4RBPJBRoWYRoa2SFa |
-| w2-blendshader-cpu-pbj | w1-pixel-tail §4b | px `avm2/blend_shader_luma_lighten` (odds good); rider `shader_as_mask` | session_018CoDi7FDvcL7M7FaHUNJxk |
+| w2-blendshader-cpu-pbj | w1-pixel-tail §4b | px `avm2/blend_shader_luma_lighten` (odds good); rider `shader_as_mask` | session_018CoDi7FDvcL7M7FaHUNJxk — DELIVERED, LANDED `b66bfdfc8` (+1 px `blend_shader_luma_lighten`; `shader_as_mask` KF 2100 → 366) |
 | w2-text-cx-jpeg3 | w1-pixel-tail §3 | 0 flips (acid-color-0 band 17315 → ~325); fixtures | session_018CoDi4MjmBxavJc5ewGTWY |
 
 ## Grading runs
@@ -47,4 +47,4 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched 02:15 UTC at wave-2 st
 | run | mode / categories / images | code | result |
 |---|---|---|---|
 | 45094460914 | graphics / full / **images** | 509768d1d (drift +1 trace; trace-tail-audit +1 trace; pixel-nearpass +2 px; recompiler → Pages dry run 45094486900 FAILED at 'Set up job' (actions/configure-pages download timeout, infra), re-dispatched 45101106488) | **DONE, ledger exact**: trace 4639 → 4641 eff / 4680 (+2: `file_reference_upload_request`, gnash `sound`), 0 regressions; pixels +2 (`morph_test1 frame1`, `filters/bevel`) → 574 / 624, 0 regressions. Results `d78d6702c` |
-| 45096347136 | no-graphics / full | 876e66704 (+ attached-button (a)+(b): tag.c NO_GRAPHICS arm) | queued |
+| 45096347136 | no-graphics / full | 876e66704 (+ attached-button (a)+(b): tag.c NO_GRAPHICS arm) | **DONE, ledger exact**: 4637 → 4639 eff / 4680 (+2: `file_reference_upload_request`, gnash `sound`), 0 regressions; new `avm1_attached_clip_button_click` passes. Results `3d82dac3f` |
