@@ -30404,9 +30404,36 @@ static int tf_ancestor_hidden(MovieClip* mc)
 	return 0;
 }
 
+// s26 w1-pixel-nearpass PROTOTYPE: a field nested inside a ROOT-TIMELINE
+// sprite is painted right after its root ancestor (anchor = ancestor depth + 1,
+// i.e. the pre-draw window of the next depth), not in the end-of-frame REST
+// pass, so later root depths cover it (Ruffle paints it from the sprite's
+// render_self). from_gnash/misc-ming.all/morph_test1 frame1: the Dejagnu xtrace
+// field (sprite depth 1) must sit UNDER the depth-2 morph. Returns the window
+// depth, or -1 (REST) when the field has no root-timeline ancestor.
+static int tf_nested_anchor_depth(MovieClip* mc, int swf_max_depth)
+{
+	extern MovieClip root_movieclip;
+	if (mc->parent == NULL || mc->parent == &root_movieclip) return -1;
+	MovieClip* a = mc->parent;
+	int guard = 0;
+	while (a->parent != NULL && a->parent != &root_movieclip && guard++ < 256) a = a->parent;
+	if (a->parent != &root_movieclip) return -1;
+	if (a->depth < TF_TIMELINE_DEPTH_BASE || a->depth > TF_TIMELINE_DEPTH_BASE + swf_max_depth) return -1;
+	int d = a->depth - TF_TIMELINE_DEPTH_BASE + 1;
+	return (d > swf_max_depth) ? -1 : d;
+}
+
 static int tf_window_skip(MovieClip* mc)
 {
 	if (g_tf_window_mode == TF_WINDOW_ALL) return 0;
+	{
+		int nd = tf_nested_anchor_depth(mc, g_tf_window_max_depth);
+		if (nd >= 0) {
+			if (g_tf_window_mode == TF_WINDOW_AT_DEPTH) return nd != g_tf_window_depth;
+			return 1;   // REST: already painted at its anchor
+		}
+	}
 	// Only ROOT-timeline fields carry a root display-list depth
 	// (mc->depth = swf_depth - 16384). Dynamic fields keep AS-space depths
 	// (>= 0) and sprite children are relative to their own parent, so both
@@ -30442,6 +30469,10 @@ void actionBeginTextFieldDepthPass(int swf_max_depth)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->depth == INT_MIN) continue;
 		if (!MC_IS_TEXTFIELD(mc)) continue;
+		{
+			int nd = tf_nested_anchor_depth(mc, swf_max_depth);
+			if (nd >= 0) { g_tf_depth_present[nd] = 1; continue; }
+		}
 		if (mc->parent != &root_movieclip) continue;
 		int d = mc->depth - TF_TIMELINE_DEPTH_BASE;
 		if (d < 0 || d > swf_max_depth) continue;

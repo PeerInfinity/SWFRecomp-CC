@@ -1655,12 +1655,18 @@ STBTT_DEF int stbtt_IsGlyphEmpty(const stbtt_fontinfo *info, int glyph_index)
    return numberOfContours == 0;
 }
 
+// SWFRecomp (s26 w1-pixel-nearpass): implied on-curve midpoints TRUNCATE toward
+// zero, as Ruffle does: ttf-parser lerps in f32 (exact .5) and font_face.rs
+// GlyphToDrawing stores Twips::new(x as i32) / Twips::new(-y as i32). Upstream
+// stb floors (>>1), which puts a negative-y midpoint 1 font unit lower.
+#define STBTT__MID(a,b) (((stbtt_int32)(a) + (stbtt_int32)(b)) / 2)
+
 static int stbtt__close_shape(stbtt_vertex *vertices, int num_vertices, int was_off, int start_off,
     stbtt_int32 sx, stbtt_int32 sy, stbtt_int32 scx, stbtt_int32 scy, stbtt_int32 cx, stbtt_int32 cy)
 {
    if (start_off) {
       if (was_off)
-         stbtt_setvertex(&vertices[num_vertices++], STBTT_vcurve, (cx+scx)>>1, (cy+scy)>>1, cx,cy);
+         stbtt_setvertex(&vertices[num_vertices++], STBTT_vcurve, STBTT__MID(cx,scx), STBTT__MID(cy,scy), cx,cy);
       stbtt_setvertex(&vertices[num_vertices++], STBTT_vcurve, sx,sy,scx,scy);
    } else {
       if (was_off)
@@ -1776,8 +1782,8 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
                scy = y;
                if (!(vertices[off+i+1].type & 1)) {
                   // next point is also a curve point, so interpolate an on-point curve
-                  sx = (x + (stbtt_int32) vertices[off+i+1].x) >> 1;
-                  sy = (y + (stbtt_int32) vertices[off+i+1].y) >> 1;
+                  sx = STBTT__MID(x, (stbtt_int32) vertices[off+i+1].x);
+                  sy = STBTT__MID(y, (stbtt_int32) vertices[off+i+1].y);
                } else {
                   // otherwise just use the next point as our start point
                   sx = (stbtt_int32) vertices[off+i+1].x;
@@ -1795,7 +1801,7 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
          } else {
             if (!(flags & 1)) { // if it's a curve
                if (was_off) // two off-curve control points in a row means interpolate an on-curve midpoint
-                  stbtt_setvertex(&vertices[num_vertices++], STBTT_vcurve, (cx+x)>>1, (cy+y)>>1, cx, cy);
+                  stbtt_setvertex(&vertices[num_vertices++], STBTT_vcurve, STBTT__MID(cx,x), STBTT__MID(cy,y), cx, cy);
                cx = x;
                cy = y;
                was_off = 1;
