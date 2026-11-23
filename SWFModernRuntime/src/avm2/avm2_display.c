@@ -1956,7 +1956,11 @@ static void set_blend_mode_name(Avm2Context* ctx, Avm2Object* obj, const char* n
 	avm2_object_set_dynamic(ctx, obj, "__blendMode", 11,
 		avm2_string(avm2_string_from_literal(ctx, name)))->dont_enum = 1;
 	Avm2DisplayObjectExt* bext = avm2_display_ext_of(ctx, obj);
-	if (bext != NULL) bext->blend_mode_id = blend_mode_id_from_name(name);
+	if (bext != NULL)
+	{
+		bext->blend_mode_id = blend_mode_id_from_name(name);
+		bext->blend_shader_on = 0;
+	}
 }
 
 static void set_cache_as_bitmap(Avm2Context* ctx, Avm2Object* obj, int on)
@@ -13221,15 +13225,22 @@ static Avm2Value do_blendmode_set(Avm2Activation* act)
 		// derived (from the matched table entry, so it cannot disagree).
 		Avm2DisplayObjectExt* bext = avm2_display_ext_of(ctx, self);
 		if (bext != NULL)
+		{
 			bext->blend_mode_id = blend_mode_id_from_name(known[matched]);
+			// blendShader survives a blendMode change: switching back to
+			// "shader" re-arms the stored Shader (display_object.rs keeps
+			// it in `blend_shader`).
+			Avm2Value* bs = avm2_object_find_dynamic(self, "__blendShader", 13);
+			bext->blend_shader_on = strcmp(known[matched], "shader") == 0
+				&& bs != NULL && bs->kind == AVM2_VALUE_OBJECT;
+		}
 	}
 	return avm2_undefined();
 }
 
 // blendShader is write-only in DisplayObject.as. Assigning a usable Shader
 // also flips blendMode to "shader" (display_object.rs:2108-2111), and that
-// survives a later blendMode change — we only have to model the flip, since
-// nothing reads the shader back.
+// survives a later blendMode change.
 static Avm2Value do_blendshader_set(Avm2Activation* act)
 {
 	Avm2Context* ctx = act->ctx;
@@ -13249,9 +13260,17 @@ static Avm2Value do_blendshader_set(Avm2Activation* act)
 	{
 		avm2_object_set_dynamic(ctx, self, "__blendMode", 11,
 			avm2_string(avm2_string_from_literal(ctx, "shader")))->dont_enum = 1;
-		// No shader-blend backend: the render walk treats "shader" as normal.
+		// The Shader itself rides in a dont_enum dyn slot (GC-traced); the
+		// render walk runs it through the CPU PixelBender evaluator
+		// (avm2_render_blend_shader). blend_mode_id stays 0 so the GPU blend
+		// arm never sees "shader".
+		avm2_object_set_dynamic(ctx, self, "__blendShader", 13, v)->dont_enum = 1;
 		Avm2DisplayObjectExt* bext = avm2_display_ext_of(ctx, self);
-		if (bext != NULL) bext->blend_mode_id = 0;
+		if (bext != NULL)
+		{
+			bext->blend_mode_id = 0;
+			bext->blend_shader_on = 1;
+		}
 	}
 	return avm2_undefined();
 }
@@ -18632,12 +18651,22 @@ static void avm2_cpu_composite_bitmap(Avm2Context* ctx, Avm2Object* obj,
 	}
 }
 
+// Stop-at-node mode for avm2_cpu_walk (s26 w2-blendshader-cpu-pbj): when
+// g_cpu_walk_stop_at is set, the walk paints everything BELOW that object in
+// paint order and stops on reaching it (its subtree and everything above it
+// are skipped) — the CPU backdrop of a blendShader node. g_cpu_walk_stopped
+// latches once the node is reached. Both are NULL/0 for the debug dump.
+static Avm2Object* g_cpu_walk_stop_at = NULL;
+static int g_cpu_walk_stopped = 0;
+
 // Depth-ordered CPU composite walk (back-to-front paint order), accumulating
 // world matrix + concatenated alpha — the CPU twin of avm2_render_node.
 static void avm2_cpu_walk(Avm2Context* ctx, Avm2Object* obj,
                           const Mat* parent_world, double parent_alpha,
                           uint32_t* fb, int fbw, int fbh)
 {
+	if (g_cpu_walk_stopped) return;
+	if (obj == g_cpu_walk_stop_at && obj != NULL) { g_cpu_walk_stopped = 1; return; }
 	Avm2DisplayObjectExt* ext = avm2_display_ext_of(ctx, obj);
 	if (ext == NULL) return;
 	if (!ext->is_stage && !ext->visible) return;
@@ -20826,6 +20855,16 @@ static Avm2Object* g_avm2_blend_wrapped = NULL;
 // ERASE are only honoured when > 0 (twin of tag.c g_layer_group_depth).
 static int g_avm2_layer_group_depth = 0;
 
+// blendShader backdrop root (s26 w2-blendshader-cpu-pbj). The CPU backdrop of a
+// shader-blended node is the target it is about to be composited into, i.e.
+// everything painted before it into that target. On the main pass that is the
+// stage on its opaque background colour (root NULL). The alpha-mask arm draws
+// its masker and maskee each into a freshly CLEARED offscreen layer; there the
+// root is that layer's object, drawn under `g_bs_root_world` (the world it is
+// rendered with) onto transparent black.
+static Avm2Object* g_bs_root = NULL;
+static Mat g_bs_root_world;
+
 static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
                                      Avm2DisplayObjectExt* ext,
                                      Avm2DisplayObjectExt* mext,
@@ -20858,7 +20897,13 @@ static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
 	g_avm2_filter_active = 1;
 	g_avm2_alpha_masker = ext->mask;
 	g_avm2_alpha_maskee = NULL;
+	Avm2Object* saved_bs_root = g_bs_root;
+	Mat saved_bs_world = g_bs_root_world;
+	g_bs_root = ext->mask;
+	g_bs_root_world = mpw;
 	avm2_render_node(ctx, ext->mask, &mpw, 1.0, &AVM2_CX_IDENTITY);
+	g_bs_root = saved_bs_root;
+	g_bs_root_world = saved_bs_world;
 	renderer_end_offscreen_pass(context);
 	if (mext->filter_count > 0)
 		avm2_filter_layer_in_place(ctx, mext);
@@ -20872,7 +20917,11 @@ static void avm2_render_alpha_masked(Avm2Context* ctx, Avm2Object* obj,
 	g_avm2_alpha_masker = saved_masker;
 	g_avm2_alpha_maskee = obj;
 	g_avm2_filter_active = saved_filter;
+	g_bs_root = obj;
+	g_bs_root_world = *parent_world;
 	avm2_render_node(ctx, obj, parent_world, parent_alpha, parent_cx);
+	g_bs_root = saved_bs_root;
+	g_bs_root_world = saved_bs_world;
 	renderer_end_offscreen_pass(context);
 
 	renderer_resume_pass(context);
@@ -20924,6 +20973,199 @@ static int avm2_z_project(const Mat* world, double tz, Mat* out)
 	return 1;
 }
 
+// ---------------------------------------------------------------------------
+// DisplayObject.blendShader through the CPU PixelBender evaluator (s26
+// w2-blendshader-cpu-pbj, the "L6" route; Ruffle surface.rs Chunk::Blend
+// ChunkBlendMode::Shader runs the kernel on the GPU via naga-pixelbender).
+//
+// Ruffle renders the node into its own layer, then runs the kernel in
+// ShaderMode::Filter with input 0 = the parent target's blend buffer (the
+// backdrop) and input 1 = the layer, writing the result over the target. Both
+// inputs are premultiplied render targets and the kernel reads them raw.
+// Here, over the node's pixel bounds (clipped to the stage):
+//   bg = CPU walk of everything painted before the node into the same target
+//        (avm2_cpu_walk in stop-at-node mode from the backdrop root),
+//   fg = CPU walk of the node subtree onto transparent black,
+//   out = PBJ(bg, fg), drawn as a dynamic bitmap quad at the bounds origin.
+// The quad is premultiplied OVER; `out` already contains the backdrop, so
+// where it is opaque that is the replace Ruffle does.
+// Ruffle writes the WHOLE target; outside the node's bounds fg is transparent
+// black, which leaves the backdrop alone for every corpus kernel. Limitations
+// (both CPU walks): no colour transforms, masks, filters, blend modes or
+// scrollRects below/inside the node.
+// The output is cached per node on an exact content stamp (both input buffers,
+// the bounds and avm2_pixelbender_filter_stamp), so a static scene evaluates
+// the kernel once.
+// ---------------------------------------------------------------------------
+typedef struct Avm2BsCache
+{
+	const Avm2DisplayObjectExt* owner;
+	uint64_t stamp;
+	uint32_t w, h;
+	uint32_t* out;
+	struct Avm2BsCache* next;
+} Avm2BsCache;
+static Avm2BsCache* g_bs_cache = NULL;
+
+static uint64_t bs_hash_px(uint64_t h, const uint32_t* px, size_t n)
+{
+	for (size_t i = 0; i < n; i++) { h ^= px[i]; h *= 1099511628211ull; }
+	return h;
+}
+
+// Returns 1 when the node was handled (drawn, or nothing visible), 0 to fall
+// back to a NORMAL draw.
+static int avm2_render_blend_shader(Avm2Context* ctx, Avm2Object* obj,
+                                    Avm2DisplayObjectExt* ext,
+                                    const Mat* parent_world, double parent_alpha)
+{
+	Avm2Value* sv = avm2_object_find_dynamic(obj, "__blendShader", 13);
+	if (sv == NULL || sv->kind != AVM2_VALUE_OBJECT) return 0;
+	Avm2Value shader = *sv;
+
+	int fbw = (int) ((avm2_generated_stage_rect[1]
+	                  - avm2_generated_stage_rect[0]) / 20);
+	int fbh = (int) ((avm2_generated_stage_rect[3]
+	                  - avm2_generated_stage_rect[2]) / 20);
+	if (fbw <= 0 || fbh <= 0) return 0;
+
+	Mat own = ext_matrix(ext);
+	Mat world = mat_mul(parent_world, &own);
+	Rect acc = { 0, 0, 0, 0, 0 };
+	bounds_with_transform(ctx, obj, &world, &acc);
+	if (!acc.valid) return 1;
+	int x0 = (int) floor(acc.xmin / 20.0), y0 = (int) floor(acc.ymin / 20.0);
+	int x1 = (int) ceil(acc.xmax / 20.0), y1 = (int) ceil(acc.ymax / 20.0);
+	if (x0 < 0) x0 = 0;
+	if (y0 < 0) y0 = 0;
+	if (x1 > fbw) x1 = fbw;
+	if (y1 > fbh) y1 = fbh;
+	if (x1 <= x0 || y1 <= y0) return 1;
+	uint32_t w = (uint32_t) (x1 - x0), h = (uint32_t) (y1 - y0);
+	if (!renderer_fit_dynamic_bitmap(context, w, h)) return 0;
+
+	size_t n = (size_t) w * h;
+	uint32_t* bg = (uint32_t*) malloc(n * sizeof(uint32_t));
+	uint32_t* fg = (uint32_t*) calloc(n, sizeof(uint32_t));
+	if (bg == NULL || fg == NULL) { free(bg); free(fg); return 0; }
+
+	// Shift stage pixel (x0, y0) to the buffers' origin.
+	Mat shift = mat_identity();
+	shift.tx = -(double) x0 * 20.0;
+	shift.ty = -(double) y0 * 20.0;
+
+	// bg: everything before the node in its target.
+	Avm2Object* root = g_bs_root;
+	if (root == NULL)
+	{
+		uint32_t c = 0xFF000000u | (g_stage_color & 0xFFFFFFu);
+		for (size_t i = 0; i < n; i++) bg[i] = c;
+		root = ctx->stage;
+	}
+	else
+		memset(bg, 0, n * sizeof(uint32_t));
+	if (root != NULL && root != obj)
+	{
+		Mat rw = (root == g_bs_root) ? g_bs_root_world : mat_identity();
+		// avm2_cpu_walk composes the root's OWN matrix; g_bs_root_world is
+		// its parent's world.
+		Mat rws = mat_mul(&shift, &rw);
+		Avm2Object* saved_stop = g_cpu_walk_stop_at;
+		int saved_stopped = g_cpu_walk_stopped;
+		g_cpu_walk_stop_at = obj;
+		g_cpu_walk_stopped = 0;
+		avm2_cpu_walk(ctx, root, &rws, 1.0, bg, (int) w, (int) h);
+		g_cpu_walk_stop_at = saved_stop;
+		g_cpu_walk_stopped = saved_stopped;
+	}
+
+	// fg: the node subtree alone.
+	{
+		Mat pws = mat_mul(&shift, parent_world);
+		Avm2Object* saved_stop = g_cpu_walk_stop_at;
+		int saved_stopped = g_cpu_walk_stopped;
+		g_cpu_walk_stop_at = NULL;
+		g_cpu_walk_stopped = 0;
+		avm2_cpu_walk(ctx, obj, &pws, parent_alpha, fg, (int) w, (int) h);
+		g_cpu_walk_stop_at = saved_stop;
+		g_cpu_walk_stopped = saved_stopped;
+	}
+
+	uint64_t stamp = 1469598103934665603ull;
+	{
+		uint64_t parts[5] = { avm2_pixelbender_filter_stamp(ctx, shader),
+		                      (uint64_t) (uint32_t) x0, (uint64_t) (uint32_t) y0,
+		                      w, h };
+		for (int k = 0; k < 5; k++) { stamp ^= parts[k]; stamp *= 1099511628211ull; }
+		stamp = bs_hash_px(stamp, bg, n);
+		stamp = bs_hash_px(stamp, fg, n);
+		if (parts[0] == 0) stamp = 0;   // uncacheable (ByteArray/Vector input)
+	}
+
+	Avm2BsCache* e = g_bs_cache;
+	while (e != NULL && e->owner != ext) e = e->next;
+	if (e == NULL || stamp == 0 || e->stamp != stamp || e->out == NULL
+	    || e->w != w || e->h != h)
+	{
+		if (e == NULL)
+		{
+			e = (Avm2BsCache*) calloc(1, sizeof(Avm2BsCache));
+			if (e == NULL) { free(bg); free(fg); return 0; }
+			e->owner = ext;
+			e->next = g_bs_cache;
+			g_bs_cache = e;
+		}
+		free(e->out);
+		e->out = (uint32_t*) calloc(n, sizeof(uint32_t));
+		e->stamp = 0;
+		Avm2BitmapDataExt bbd, fbd, obd;
+		memset(&bbd, 0, sizeof(bbd));
+		bbd.width = w;
+		bbd.height = h;
+		bbd.transparency = 1;
+		fbd = bbd;
+		obd = bbd;
+		bbd.pixels = bg;
+		fbd.pixels = fg;
+		obd.pixels = e->out;
+		if (e->out == NULL
+		    || !avm2_pixelbender_run_blend(ctx, shader, &bbd, &fbd, &obd))
+		{
+			free(e->out);
+			e->out = NULL;
+			free(bg);
+			free(fg);
+			return 0;
+		}
+		e->w = w;
+		e->h = h;
+		e->stamp = stamp;
+	}
+	free(bg);
+	free(fg);
+
+	// The kernel output REPLACES the target over the node's bounds (Flash:
+	// visual/blend_modes/shader_as_mask's top band is (a+b)/2 shown as-is,
+	// 422800 where an OVER draw gives Ruffle's 425d73). The bitmap quad is
+	// premultiplied OVER, so clear the rect first: on the opaque main pass a
+	// replace is indistinguishable from drawing over opaque black; in a
+	// cleared alpha-mask layer the rect ERASEs to transparent black (the
+	// per-draw dst *= 1 - src.a pipeline). Stage-space draws: identity
+	// transform slot 0, no colour transform (the node's alpha is in fg).
+	float rx = (float) x0 * 20.0f, ry = (float) y0 * 20.0f;
+	float rw = (float) w * 20.0f, rh = (float) h * 20.0f;
+	if (g_bs_root != NULL)
+	{
+		renderer_set_blend_mode(context, 12);
+		renderer_draw_rect(context, rx, ry, rw, rh, 0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
+		renderer_set_blend_mode(context, 0);
+	}
+	else
+		renderer_draw_rect(context, rx, ry, rw, rh, 0.0f, 0.0f, 0.0f, 1.0f, 0, 0);
+	renderer_draw_bitmap_quad_scaled(context, e->out, w, h, w, h, rx, ry, 0, 0);
+	return 1;
+}
+
 static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
                              const Mat* parent_world, double parent_alpha,
                              const Avm2Cx* parent_cx)
@@ -20949,6 +21191,24 @@ static void avm2_render_node(Avm2Context* ctx, Avm2Object* obj,
 	// render_webgpu_blend_mode_is_layered already refuses to nest layers
 	// (offscreen_depth > 0 -> the inner one falls back to the per-draw
 	// pipeline).
+	// DisplayObject.blendShader (avm2_render_blend_shader). Only where the
+	// backdrop is known: the main pass, or an alpha-mask layer (g_bs_root).
+	// Inside any other offscreen (filters, layered blends, layer groups) and
+	// in a stencil mask capture the node draws as NORMAL, as before (Ruffle
+	// asserts shader blends never reach a mask). A masked or scrollRect'd
+	// shader node also keeps the old NORMAL path: the CPU walks clip neither.
+	if (ext->blend_shader_on && ext->blend_mode_id <= 1
+	    && g_avm2_mask_capture == 0 && ext->filter_count == 0
+	    && (g_bs_root != NULL
+	        || (g_avm2_filter_active == 0 && g_avm2_layer_group_depth == 0
+	            && g_avm2_blend_wrapped == NULL))
+	    && (ext->is_stage || ext->visible)
+	    && ext->mask == NULL && !ext->sr_committed
+	    && !(ext->maskee != NULL && obj != g_avm2_alpha_masker))
+	{
+		if (avm2_render_blend_shader(ctx, obj, ext, parent_world, parent_alpha))
+			return;
+	}
 	if (ext->blend_mode_id > 1 && obj != g_avm2_blend_wrapped
 	    && g_avm2_mask_capture == 0)
 	{

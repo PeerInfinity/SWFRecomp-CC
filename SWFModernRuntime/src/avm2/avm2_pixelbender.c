@@ -1239,6 +1239,8 @@ static void pb_store_matrix(PbEval* ev, const PbjReg* dst, const PbMat* m)
 // supplied directly (a filter source / applyFilter destination).
 static int g_pb_filter_mode = 0;
 static const Avm2BitmapDataExt* g_pb_tex0_override = NULL;
+// blendShader mode (avm2_pixelbender_run_blend): input 1 := the foreground.
+static const Avm2BitmapDataExt* g_pb_tex1_override = NULL;
 static Avm2BitmapDataExt* g_pb_target_override = NULL;
 // ShaderFilter extensions: output pixel (x, y) evaluates outCoord at
 // (x + off_x + 0.5, y + off_y + 0.5) in SOURCE space (off = -left/-top).
@@ -1833,6 +1835,26 @@ int avm2_pixelbender_run_filter(Avm2Context* ctx, Avm2Value shader,
 	return err == 0;
 }
 
+// Run `shader` as a blendShader (Ruffle surface.rs Chunk::Blend
+// ChunkBlendMode::Shader): ShaderMode::Filter with input 0 := the backdrop
+// (`bg`, the parent target's blend buffer) and input 1 := the blended
+// object's own layer (`fg`). Both are PREMULTIPLIED ARGB render targets and
+// the kernel sees the premultiplied values as-is; the output (written over all
+// of `dst`) is drawn back as premultiplied pixels. bg, fg and dst share one
+// origin (output pixel (x, y) samples (x + 0.5, y + 0.5) of both). Never
+// throws; returns 0 when the shader is unusable.
+int avm2_pixelbender_run_blend(Avm2Context* ctx, Avm2Value shader,
+                               const Avm2BitmapDataExt* bg,
+                               const Avm2BitmapDataExt* fg,
+                               Avm2BitmapDataExt* dst)
+{
+	if (fg == NULL) return 0;
+	g_pb_tex1_override = fg;
+	int ok = avm2_pixelbender_run_filter(ctx, shader, bg, dst, 0, 0);
+	g_pb_tex1_override = NULL;
+	return ok;
+}
+
 // Cache stamp for a ShaderFilter's output: changes whenever anything the
 // filter run reads, other than input 0 (the caller keys that on its own
 // BitmapData version), may have changed: any shader-parameter write, the
@@ -1939,6 +1961,16 @@ static int pb_run_job(Avm2Context* ctx, Avm2ShaderJobExt* job)
 			t->h = g_pb_tex0_override->height;
 			t->channels = 4;
 			t->bgra = g_pb_tex0_override->pixels;
+			continue;
+		}
+		if (p->is_texture && g_pb_tex1_override != NULL && p->tex_index == 1)
+		{
+			PbTexture* t = &ev.tex[1];
+			t->present = 1;
+			t->w = g_pb_tex1_override->width;
+			t->h = g_pb_tex1_override->height;
+			t->channels = 4;
+			t->bgra = g_pb_tex1_override->pixels;
 			continue;
 		}
 		if (p->is_texture)

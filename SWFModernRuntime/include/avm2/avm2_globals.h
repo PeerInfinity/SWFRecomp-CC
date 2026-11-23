@@ -716,6 +716,12 @@ typedef struct Avm2DisplayObjectExt
 	// those three methods throws Error #2094 instead of recursing. The
 	// implicit removal inside addChild/addChildAt neither sets nor checks it.
 	uint8_t being_removed_by_avm2;
+
+	// s26 w2-blendshader-cpu-pbj: 1 while this object blends through its
+	// blendShader (blendMode "shader" with a usable Shader stored in the
+	// `__blendShader` dyn slot). blend_mode_id stays 0 for it; the render walk
+	// takes the CPU PixelBender arm (avm2_render_blend_shader) instead.
+	uint8_t blend_shader_on;
 } Avm2DisplayObjectExt;
 
 // Compatibility alias: MovieClip state is the shared display ext.
@@ -993,6 +999,13 @@ int avm2_pixelbender_run_filter(Avm2Context* ctx, Avm2Value shader,
                                 const Avm2BitmapDataExt* src, Avm2BitmapDataExt* dst,
                                 int32_t off_x, int32_t off_y);
 uint64_t avm2_pixelbender_filter_stamp(Avm2Context* ctx, Avm2Value shader);
+// blendShader (s26 w2-blendshader-cpu-pbj): run_filter with input 0 := bg
+// (backdrop) and input 1 := fg (the object's layer), all premultiplied ARGB
+// at one origin, output over all of dst. Never throws; 0 if unusable.
+int avm2_pixelbender_run_blend(Avm2Context* ctx, Avm2Value shader,
+                               const Avm2BitmapDataExt* bg,
+                               const Avm2BitmapDataExt* fg,
+                               Avm2BitmapDataExt* dst);
 // NULL when the value is not a BitmapData (subclasses included).
 Avm2BitmapDataExt* avm2_bitmapdata_ext_of(Avm2Context* ctx, Avm2Value v);
 // Bitmap self-bounds hook for avm2_display.c: 1 + w/h (pixels) if obj is a

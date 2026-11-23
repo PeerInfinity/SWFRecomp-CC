@@ -701,3 +701,7 @@ from_shumway/acid/acid-text-6                       # DefineText glyph tx rounde
 # s26 w2-avm2-applyfilter-kernels: CPU Glow/DropShadow/Bevel/Convolution in applyFilter.
 # tier=1
 avm2/bitmapdata_applyfilter_destpoint_edges         # KF band 149477 -> 30394          1 cmp
+# s26 w2-blendshader-cpu-pbj: AVM2 blendShader via the CPU PixelBender evaluator.
+# tier=1
+avm2/blend_shader_luma_lighten                      # CPU PBJ blend, 3 tiers           1 cmp
+visual/blend_modes/shader_as_mask                   # KF band 2100 -> 366               1 cmp
