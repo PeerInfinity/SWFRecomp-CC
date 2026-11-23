@@ -1,0 +1,67 @@
+# n_drive — deterministic input script for N (level completion + death/retry)
+
+Injected-AS probe that plays Metanet's **N** through its real game flow with a
+fixed, game-tick-indexed input script, so the same run can be replayed on any
+player (Ruffle exporter, Ruffle web, our native build, our browser WASM) and
+compared tick by tick. Record: `SWFRecompDocs/plans/n-level-complete-report.md`.
+
+N is **not** open source: never commit `N.swf`, the injected `n_drive.swf`, or
+decompiled N source. `*.swf` is gitignored.
+
+## How it drives N
+
+- **Input.** N reads input once per game tick in `NinjaGame.GetInputState_Normal`
+  via `Key.isDown(KEYDEF_L/R/J)`. The probe replaces `Key.isDown` (Ruffle marks
+  `Key`'s methods protected, so it first calls `ASSetPropFlags(Key,"isDown",0,7)`)
+  and answers from the script, keyed on `game.tickCounter`. Space (32) is pressed
+  by phase: pre-level, post-level and the retry prompt each get Space after
+  `PHASE_WAIT` (40) frames. Everything else reads as not pressed.
+- **Start.** When the main menu is up (`TickApp == App_Tick_MainMenu`) for 10
+  frames, the probe calls `gamedata.LoadEpisodeNum(0)` + `App_StartNewGame()`,
+  which is what "play game" → episode 00 does. From there it is N's own flow:
+  `App_LoadLevel` → pre-level → `App_PlayGame` → … The menu clicks themselves
+  were verified in earlier slices (`n_click_probe.py`).
+- **Frame lock (`FRAMELOCK`, default on).** N runs `(now - APP_GAMETIME_t0 +
+  REMAINDER) / 25 ms` game ticks per frame from wall-clock `getTimer()`, so a
+  slower player runs more ticks per frame. The probe wraps
+  `_root.onEnterFrame` (= `RunApp`) and, before each call, sets
+  `APP_GAMETIME_t0 = getTimer()` and `REMAINDER = 1.5 ticks`: exactly one game
+  tick per frame on every player. Game logic is identical either way (it is
+  per tick); the lock makes frame-based visuals (timeline animations, N's eased
+  HUD timer) comparable frame for frame.
+- **Freeze points (`FREEZE`, "attempt:tick,…").** At those ticks the next 30
+  frames get a negative tick budget (zero ticks). The probe prints
+  `ND shot <label> frame=N` at freeze frame 10; menu phases print a shot at
+  their frame 20. Harnesses screenshot on that line.
+- **Telemetry.** One `NF a=<attempt> t=<tick> x= y= vx= vy= st= k= time=` line
+  per game tick (printed from the first input read of the tick, full double
+  precision), `ND phase a->b`, and `ND EV switch|exit|kill` from thin wrappers
+  on `ExitObject.PlayerHitTrigger/PlayerHitExit` and `NinjaGame.KillPlayer`.
+
+## The script (`script.txt`)
+
+Attempts are joined by `/`; each is `ticks:KEYS|…` (`KEYS` ⊆ `LRJ`, `-` = none).
+An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
+
+| attempt | level | what happens |
+|---|---|---|
+| 0 | Episode 0 Level 0 "the motherlode" | launchpad + alcove wall-jump, fall to the floor → **fall death at t=293** (N's `KillPlayer` type 4) → retry prompt → Space |
+| 1 | same, retried | launchpad wall-climb → octagon top → y=216 one-ways → switch ledge → top corridor → S-tube → **switch t=408** → out through the one-way → platforms → trapezoid → **door t=663** → post-level → Space |
+| 2 | Episode 0 Level 1 "cloud city" | run right 120 ticks (proves level 1 loads and plays) |
+
+## Tools
+
+- `build.sh "<script>" [out.swf]` — MTASC with the script baked in, splice into
+  N at **`--min-version 6`** (N is SWF 6 and case-insensitive; v8 breaks it).
+  `AUTOKILL=true` makes the probe kill the player when an attempt's script ends
+  (authoring only).
+- `author.py [--every N] [--nokill] [--frames F] "<attempt>" …` — TAS-style
+  authoring on the local Ruffle exporter (~10–30 s per batch). With AUTOKILL,
+  several candidate attempts run in one exporter session via N's retry flow.
+- `ruffle_exporter_trace.txt` — the reference trace (wall-clock mode).
+- Browser: `tools/divergence/game_drive/n_drive_compare.py ours|ruffle`
+  (needs `docs2/examples/flasharchive/N_drive` built from this SWF and
+  `N_drive_ruffle` = the N_ruffle page + this SWF + a `traceObserver`).
+- Native: `python3 ../dj_probe/run_native.py n_drive.swf <dir> --frames 1800
+  --capture-ticks <shot frames>` (set `SWFRECOMP_COMPILE_TIMEOUT=1500` on a
+  loaded machine; N's C build takes 3–4 min).
