@@ -13,15 +13,15 @@ Parallel LOCAL one-task session: `n-pixel-pass` (launched at wave-2 start).
 
 | # | slug | axis | task | session id |
 |---|---|---|---|---|
-| 1 | w1-drift | both | 5 upstream commits: `file_reference_upload_request`, `pixelbender_conditional`, `vp6_inter_frames` | |
-| 2 | w1-runtime-robustness | trace | `ng_shared.c` fixed MAX_* caps, float-through-u64 store, `-fno-strict-aliasing` audit | |
-| 3 | w1-avm1-dispatch-scope | trace | arc §26.4 AVM1 leftovers (bare-call `with`, type-2 flags, function-form timer, hairline hitTest, …) | |
-| 4 | w1-attached-button-dispatch | both | native `ng_update_button_states_attached` + `String_path_variable_button` | |
-| 5 | w1-pixel-nearpass | pixel | bevel (3 px), small-excess rows, AVM2 `gfx_gen_ramp` + CPU gradient sampler | |
-| 6 | w1-pixel-layer-colour | pixel | layer N1/N3, AVM1 off-diagonal CM, draw() of filtered sources, Drawing-API colour | |
-| 7 | w1-pixel-tail | pixel | static_text_offstage (c), pixelbender_dithering, acid-color-0, disposition records | |
-| 8 | w1-per-movie-displaylist | trace | per-movie display lists (`video_prototype_lazy_swf6_child`), L arc | |
-| 9 | w1-trace-tail-audit | trace | re-audit every unowned failing trace row's disposition | |
+| 1 | w1-drift | both | 5 upstream commits: `file_reference_upload_request`, `pixelbender_conditional`, `vp6_inter_frames` | session_018CoDi5YzTbaDjXQv7Wga2a |
+| 2 | w1-runtime-robustness | trace | `ng_shared.c` fixed MAX_* caps, float-through-u64 store, `-fno-strict-aliasing` audit | session_018CoDi4WHDYx1GAABAqcRbo |
+| 3 | w1-avm1-dispatch-scope | trace | arc §26.4 AVM1 leftovers (bare-call `with`, type-2 flags, function-form timer, hairline hitTest, …) | session_018CoDi41gFdju4MePGmDgyc |
+| 4 | w1-attached-button-dispatch | both | native `ng_update_button_states_attached` + `String_path_variable_button` | session_018CoDi7Ln3aUjgDoPY2rvxY |
+| 5 | w1-pixel-nearpass | pixel | bevel (3 px), small-excess rows, AVM2 `gfx_gen_ramp` + CPU gradient sampler | session_018CoDi6LaNQmB7xc3hvABEr |
+| 6 | w1-pixel-layer-colour | pixel | layer N1/N3, AVM1 off-diagonal CM, draw() of filtered sources, Drawing-API colour | session_018CoDi6ZWEvZmb1sAonaudB |
+| 7 | w1-pixel-tail | pixel | static_text_offstage (c), pixelbender_dithering, acid-color-0, disposition records | session_018CoDi69tgZvsTJJmyB7xMV |
+| 8 | w1-per-movie-displaylist | trace | per-movie display lists (`video_prototype_lazy_swf6_child`), L arc | session_018CoDi7W2f8gCE4qKFtnijA |
+| 9 | w1-trace-tail-audit | trace | re-audit every unowned failing trace row's disposition | session_018CoDi6RBRjLbbF7nJnBmFk |
 
 ## Wave 2 (implementation, cloud)
 
