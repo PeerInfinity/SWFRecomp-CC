@@ -1,17 +1,17 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 746/781 passing | Graphics: 745/781 passing
+Trace: 746/781 passing | Graphics: 747/781 passing
 
-## Graphics Regressions (1 tests)
+## Graphics Regressions (0 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-| # | Test | Graphics Status | Detail |
-|---|------|-----------------|--------|
-| 1 | `hitarea_sweep` | Output Mismatch | 20/34 lines match |
+No regressions.
 
-## Graphics Improvements (0 tests)
+## Graphics Improvements (1 tests)
 
 Tests that **fail** in trace mode but **pass** in graphics mode.
 
-No improvements.
+| # | Test | Trace Status | Detail |
+|---|------|---------------|--------|
+| 1 | `hitarea_remove_owner_drag` | Output Mismatch | 6/10 lines match |

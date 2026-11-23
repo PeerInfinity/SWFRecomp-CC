@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T19:43:34.735199+00:00",
+    "timestamp": "2026-11-23T22:39:56.736390+00:00",
     "suite": "avm2",
     "stem": "results_graphics",
-    "git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
+    "git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45240685954",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45240685954",
+    "run_id": "45273227748",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45273227748",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 114,
   "comparisons": 129,
   "ignored": 1,
-  "pass": 117,
-  "fail": 12,
+  "pass": 116,
+  "fail": 13,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 6,
   "ruffle_matched_fail": 1,
-  "pass_rate": 90.7,
+  "pass_rate": 89.9,
   "results": [
     {
       "suite": "avm2",
@@ -2991,29 +2991,30 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "pass",
-      "message": "Image check passed: 8614 outliers (limit 19929), max difference 255",
+      "status": "fail",
+      "message": "Image comparison failed: 34301 outliers exceed limit of 32500, max difference 255",
+      "reason": "pixel_mismatch",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 1280,
       "height": 720,
       "total_channels": 3686400,
-      "diff_channels": 8614,
-      "mean_diff": 0.5959,
+      "diff_channels": 34301,
+      "mean_diff": 2.3727,
       "checks": [
         {
           "tolerance": 1,
-          "max_outliers": 19929,
-          "outliers": 8614,
-          "passed": true
+          "max_outliers": 32500,
+          "outliers": 34301,
+          "passed": false
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 0,
-      "outliers": 8614,
-      "max_outliers": 19929,
+      "failed_checks": 1,
+      "outliers": 34301,
+      "max_outliers": 32500,
       "tolerance": 1,
-      "excess_outliers": 0
+      "excess_outliers": 1801
     },
     {
       "suite": "avm2",

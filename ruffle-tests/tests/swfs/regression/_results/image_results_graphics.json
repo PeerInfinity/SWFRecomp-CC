@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T19:43:34.885446+00:00",
+    "timestamp": "2026-11-23T22:39:56.890165+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
+    "git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45240685954",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45240685954",
+    "run_id": "45273227748",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45273227748",
     "run_attempt": "1"
   },
-  "tests_with_comparisons": 37,
-  "comparisons": 37,
+  "tests_with_comparisons": 38,
+  "comparisons": 38,
   "ignored": 0,
-  "pass": 34,
+  "pass": 35,
   "fail": 0,
   "skip": 3,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 91.9,
+  "pass_rate": 92.1,
   "results": [
     {
       "suite": "regression",
@@ -259,6 +259,36 @@
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_morph_instances_ratio",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 320,
+      "height": 100,
+      "total_channels": 128000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 0,
       "excess_outliers": 0
     },
     {

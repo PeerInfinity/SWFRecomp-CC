@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T07:07:13.863068+00:00",
-    "old_git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
-    "new_timestamp": "2026-11-23T19:43:31.697661+00:00",
-    "new_git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
+    "old_timestamp": "2026-11-23T19:43:31.697661+00:00",
+    "old_git_sha": "1396f1e10b657975604f8dd7f37a2071f2efda5c",
+    "new_timestamp": "2026-11-23T22:39:55.330372+00:00",
+    "new_git_sha": "7e14f54dd96181b5b5f37465a1c226bd798e7c9e",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 747,
+    "old_pass": 745,
     "old_ruffle_matched": 22,
-    "old_effective_pass": 769,
+    "old_effective_pass": 767,
     "old_total": 781,
-    "old_pass_rate": 95.6,
-    "new_pass": 745,
+    "old_pass_rate": 95.4,
+    "new_pass": 747,
     "new_ruffle_matched": 22,
-    "new_effective_pass": 767,
+    "new_effective_pass": 769,
     "new_total": 781,
-    "new_pass_rate": 95.4,
-    "old_mismatched_lines": 12439,
-    "new_mismatched_lines": 12456,
-    "increased_mismatches": 17,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 2,
+    "new_pass_rate": 95.6,
+    "old_mismatched_lines": 12456,
+    "new_mismatched_lines": 12439,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 17,
+    "newly_passing": 2,
+    "newly_failing": 0,
     "status_changed": 2,
     "unchanged": 779,
     "added": 0,
@@ -33,33 +33,33 @@
     {
       "test": "hitarea_remove_owner_drag",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      },
-      "new_lines": {
         "actual_lines": 9,
         "expected_lines": 10,
         "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
       }
     },
     {
       "test": "hitarea_sweep",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 33,
-        "expected_lines": 33,
-        "matching_lines": 33
-      },
-      "new_lines": {
         "actual_lines": 34,
         "expected_lines": 33,
         "matching_lines": 20
+      },
+      "new_lines": {
+        "actual_lines": 33,
+        "expected_lines": 33,
+        "matching_lines": 33
       }
     }
   ]
