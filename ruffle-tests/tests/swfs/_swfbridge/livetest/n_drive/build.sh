@@ -12,6 +12,8 @@ sed -e "s#static var SCRIPT:String = \"\";#static var SCRIPT:String = \"$1\";#" 
     -e "s|static var START_LEVEL:Number = 0;|static var START_LEVEL:Number = ${START_LEVEL:-0};|" \
     -e "s|static var OBJHASH:Boolean = false;|static var OBJHASH:Boolean = ${OBJHASH:-false};|" \
     -e "s|static var CLIPDIFF:Boolean = false;|static var CLIPDIFF:Boolean = ${CLIPDIFF:-false};|" \
+    -e "s|static var RANDCOUNT:Boolean = false;|static var RANDCOUNT:Boolean = ${RANDCOUNT:-false};|" \
+    -e "s|static var CLIPPOS:String = \"\";|static var CLIPPOS:String = \"${CLIPPOS:-}\";|" \
     -e "s|static var OBJDUMP:Boolean = false;|static var OBJDUMP:Boolean = ${OBJDUMP:-false};|" \
     -e "s|static var TRACKOBJ:Number = -1;|static var TRACKOBJ:Number = ${TRACKOBJ:--1};|" \
     -e "s|static var TRACKGOLD:Boolean = false;|static var TRACKGOLD:Boolean = ${TRACKGOLD:-false};|" \

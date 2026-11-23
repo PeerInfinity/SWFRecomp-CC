@@ -27,6 +27,13 @@ class NDrive {
 	// CLIPDIFF: with OBJHASH, also trace "ND clip+ path" / "ND clip- path" for
 	// clips appearing/disappearing two levels under _root (+ their _currentframe).
 	static var CLIPDIFF:Boolean = false;
+	// CLIPPOS "lo:hi" (with OBJHASH, s26 n-browser-pfx): for ticks lo..hi of every
+	// attempt, trace "ND cp t= path x= y= cf=" for each clip the h= walk hashes.
+	static var CLIPPOS:String = "";
+	// RANDCOUNT (s26 n-browser-pfx): wrap Math.random and append rc=<calls so far>
+	// to every NF line, to find where two players' RNG streams fall out of step.
+	static var RANDCOUNT:Boolean = false;
+	static var rc:Number = 0;
 	// WORLDHASH (with OBJHASH, s26 n-levels): also append o=<n>:<hash>, an
 	// order-dependent hash over N's own object list (_root.objects.objArray:
 	// drones, thwumps, mines, gold, doors...) of OBJ_TYPE + pos to 1e-3. The
@@ -62,6 +69,12 @@ class NDrive {
 		K.__ndOrig = K.isDown;
 		_global.ASSetPropFlags(K, "isDown", 0, 7);
 		K.isDown = function(k:Number):Boolean { return NDrive.isDown(k); };
+		if (RANDCOUNT) {
+			var M:Object = _global.Math;
+			M.__ndRand = M.random;
+			_global.ASSetPropFlags(M, "random", 0, 7);
+			M.random = function():Number { NDrive.rc++; return _global.Math.__ndRand(); };
+		}
 		var clip:MovieClip = _root.createEmptyMovieClip("__ndrive__", DEPTH);
 		clip.onEnterFrame = function():Void { NDrive.tickFn(); };
 		trace("ND start replaced=" + (K.isDown != K.__ndOrig) + " same=" + (K == Key) + " test=" + Key.isDown(32));
@@ -122,7 +135,8 @@ class NDrive {
 		trace("NF a=" + attempt + " t=" + t + " x=" + p.pos.x + " y=" + p.pos.y
 			+ " vx=" + (p.pos.x - p.oldpos.x) + " vy=" + (p.pos.y - p.oldpos.y)
 			+ " st=" + p.curState + " k=" + (ks == "" ? "-" : ks) + " time=" + r.game.playerCurTime
-			+ (OBJHASH ? " h=" + NDrive.clipPosHash() + " o=" + NDrive.worldHash() : ""));
+			+ (OBJHASH ? " h=" + NDrive.clipPosHash() + " o=" + NDrive.worldHash() : "")
+			+ (RANDCOUNT ? " rc=" + NDrive.rc : ""));
 		if (OBJDUMP && t == 0) NDrive.dumpObjects();
 		if (TRACKOBJ >= 0) { var tob:Object = r.objects.objArray[TRACKOBJ]; trace("NT t=" + t + " ob=" + tob.pos.x + "," + tob.pos.y); }
 	}
@@ -161,6 +175,12 @@ class NDrive {
 		var sx:Number = 0;
 		var sy:Number = 0;
 		var cur:Object = new Object();
+		var cpOn:Boolean = false;
+		var ct:Number = r.game.tickCounter;
+		if (CLIPPOS != "") {
+			var cpr:Array = CLIPPOS.split(":");
+			cpOn = ct >= Number(cpr[0]) && ct <= Number(cpr[1]);
+		}
 		for (var a in r) {
 			var c:Object = r[a];
 			if (typeof(c) != "movieclip" || a == "__ndrive__") continue;
@@ -169,6 +189,7 @@ class NDrive {
 				if (typeof(d) != "movieclip" || d._parent != c) continue;
 				n++; sx += Math.round(d._x * 100); sy += Math.round(d._y * 100);
 				if (CLIPDIFF) cur[a + "." + b] = d._currentframe + "/" + d._totalframes;
+				if (cpOn) trace("ND cp t=" + ct + " " + a + "." + b + " x=" + d._x + " y=" + d._y + " cf=" + d._currentframe);
 			}
 		}
 		if (CLIPDIFF) {

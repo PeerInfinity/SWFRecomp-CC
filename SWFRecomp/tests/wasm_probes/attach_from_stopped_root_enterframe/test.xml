@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<swf version="6" compressed="0">
+  <Header framerate="30" frames="1">
+    <size>
+      <Rectangle left="0" right="4000" top="0" bottom="3000"/>
+    </size>
+    <tags>
+      <FileAttributes hasMetaData="0" useNetwork="0"/>
+      <SetBackgroundColor>
+        <color>
+          <Color red="255" green="255" blue="255"/>
+        </color>
+      </SetBackgroundColor>
+      <DefineSprite objectID="3" frames="4">
+        <tags>
+          <DoAction>
+            <actions>
+              <PushData>
+                <items>
+                  <StackString value="PF: "/>
+                </items>
+              </PushData>
+              <PushData>
+                <items>
+                  <StackString value="this"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackString value="_name"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <AddTyped/>
+              <PushData>
+                <items>
+                  <StackString value=" f1"/>
+                </items>
+              </PushData>
+              <AddTyped/>
+              <Trace/>
+              <EndAction/>
+            </actions>
+          </DoAction>
+          <ShowFrame/>
+          <DoAction>
+            <actions>
+              <PushData>
+                <items>
+                  <StackString value="PF: "/>
+                </items>
+              </PushData>
+              <PushData>
+                <items>
+                  <StackString value="this"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackString value="_name"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <AddTyped/>
+              <PushData>
+                <items>
+                  <StackString value=" f2"/>
+                </items>
+              </PushData>
+              <AddTyped/>
+              <Trace/>
+              <EndAction/>
+            </actions>
+          </DoAction>
+          <ShowFrame/>
+          <DoAction>
+            <actions>
+              <PushData>
+                <items>
+                  <StackString value="PF: "/>
+                </items>
+              </PushData>
+              <PushData>
+                <items>
+                  <StackString value="this"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackString value="_name"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <AddTyped/>
+              <PushData>
+                <items>
+                  <StackString value=" f3"/>
+                </items>
+              </PushData>
+              <AddTyped/>
+              <Trace/>
+              <EndAction/>
+            </actions>
+          </DoAction>
+          <ShowFrame/>
+          <DoAction>
+            <actions>
+              <PushData>
+                <items>
+                  <StackString value="PF: "/>
+                </items>
+              </PushData>
+              <PushData>
+                <items>
+                  <StackString value="this"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackString value="_name"/>
+                </items>
+              </PushData>
+              <GetMember/>
+              <AddTyped/>
+              <PushData>
+                <items>
+                  <StackString value=" f4 remove"/>
+                </items>
+              </PushData>
+              <AddTyped/>
+              <Trace/>
+              <PushData>
+                <items>
+                  <StackInteger value="0"/>
+                  <StackString value="this"/>
+                </items>
+              </PushData>
+              <GetVariable/>
+              <PushData>
+                <items>
+                  <StackString value="removeMovieClip"/>
+                </items>
+              </PushData>
+              <CallMethod/>
+              <Pop/>
+              <EndAction/>
+            </actions>
+          </DoAction>
+          <ShowFrame/>
+          <End/>
+        </tags>
+      </DefineSprite>
+      <Export>
+        <symbols>
+          <Symbol objectID="3" name="pfx"/>
+        </symbols>
+      </Export>
+      <DoAction>
+        <actions>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="c"/>
+              <StackInteger value="0"/>
+            </items>
+          </PushData>
+          <SetMember/>
+          <PushData>
+            <items>
+              <StackInteger value="5"/>
+              <StackString value="h"/>
+              <StackInteger value="2"/>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="createEmptyMovieClip"/>
+            </items>
+          </PushData>
+          <CallMethod/>
+          <Pop/>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="onEnterFrame"/>
+            </items>
+          </PushData>
+          <DeclareFunction name="" argc="0" length="355">
+            <args/>
+          </DeclareFunction>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+            </items>
+          </PushData>
+          <AddTyped/>
+          <SetMember/>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <PushData>
+            <items>
+              <StackInteger value="2"/>
+            </items>
+          </PushData>
+          <EqualTyped/>
+          <LogicalNOT/>
+          <BranchIfTrue byteOffset="60"/>
+          <PushData>
+            <items>
+              <StackInteger value="1"/>
+              <StackString value="pfx0"/>
+              <StackString value="pfx"/>
+              <StackInteger value="3"/>
+            </items>
+          </PushData>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="h"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <PushData>
+            <items>
+              <StackString value="attachMovie"/>
+            </items>
+          </PushData>
+          <CallMethod/>
+          <Pop/>
+          <PushData>
+            <items>
+              <StackString value="PF: root ef c="/>
+            </items>
+          </PushData>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <AddTyped/>
+          <PushData>
+            <items>
+              <StackString value=" p="/>
+            </items>
+          </PushData>
+          <AddTyped/>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="h"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <PushData>
+            <items>
+              <StackString value="pfx0"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <TypeOf/>
+          <AddTyped/>
+          <PushData>
+            <items>
+              <StackString value=" cf="/>
+            </items>
+          </PushData>
+          <AddTyped/>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="h"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <PushData>
+            <items>
+              <StackString value="pfx0"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <PushData>
+            <items>
+              <StackString value="_currentframe"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <AddTyped/>
+          <Trace/>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="c"/>
+            </items>
+          </PushData>
+          <GetMember/>
+          <PushData>
+            <items>
+              <StackInteger value="8"/>
+            </items>
+          </PushData>
+          <EqualTyped/>
+          <LogicalNOT/>
+          <BranchIfTrue byteOffset="48"/>
+          <PushData>
+            <items>
+              <StackString value="PF: done"/>
+            </items>
+          </PushData>
+          <Trace/>
+          <PushData>
+            <items>
+              <StackString value="_root"/>
+            </items>
+          </PushData>
+          <GetVariable/>
+          <PushData>
+            <items>
+              <StackString value="onEnterFrame"/>
+              <StackInteger value="0"/>
+            </items>
+          </PushData>
+          <SetMember/>
+          <SetMember/>
+          <PushData>
+            <items>
+              <StackString value="PF: root f1"/>
+            </items>
+          </PushData>
+          <Trace/>
+          <Stop/>
+          <EndAction/>
+        </actions>
+      </DoAction>
+      <ShowFrame/>
+      <End/>
+    </tags>
+  </Header>
+</swf>

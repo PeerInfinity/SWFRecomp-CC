@@ -1,0 +1,5 @@
+known_red = false
+golden_source = "ruffle"
+settle_seconds = 5.0
+trace_prefix = "PF:"
+description = "N pfx self-removal (s26 n-browser-pfx): a STOPPED root's _root.onEnterFrame attachMovie's a 4-frame clip whose frame 4 removeMovieClip()s itself. Browser-WASM removed it 2 ticks late vs Ruffle/native. expected_trace.txt = Ruffle exporter trace. Generator: create_test_swf.py (shape of regression/avm1_attach_from_stopped_root_enterframe, PF: prefix, stops after c=8)."

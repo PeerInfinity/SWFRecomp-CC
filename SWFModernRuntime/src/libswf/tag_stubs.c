@@ -841,36 +841,13 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		ng_record_attached_playable(new_mc);
 	}
 
-#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
-	// Browser-WASM one-shot particle auto-advance (Metanet "N"). N's
-	// ParticleManager attachMovie's every effect (dust, blood, laser spark/charge,
-	// ...) as "pfx"+depth into a cyclic ring buffer and relies on each clip's OWN
-	// timeline playing forward to a final-frame this.removeMovieClip() to clean
-	// itself up. (s24: every OTHER attached clip now plays its real timeline via
-	// the shared ng_advance_attached_clip_playheads pump; that pump SKIPS
-	// natural_oneshot clips for the morph-ratio reason in
-	// advance_attached_clip_natural.) Before this flag, browser-WASM had no
-	// auto-advance for attachMovie'd clips' own timelines, so a particle FROZE
-	// on frame 1 forever — leaving the "leftover
-	// laser/death lines" the user sees AND a permanent pile of full-opacity
-	// particle sprites whose overdraw is N's dominant GPU cost (user A/B-confirmed:
-	// skipping particle draws recovers fps far more than skipping the tile grid).
-	// Flag genuine auto-play particles (attached during normal play, not catch-up;
-	// multi-frame) so advance_attached_clip_natural plays them forward (placement
-	// tags) and removes them on wrap. NAME-gated to "pfx*" to stay surgical: it
-	// cannot touch GUI/HUD clips (the v1 broad auto-advance exploded timeIndicator
-	// `bar`), and it matches exactly the clips the user's SkipParticles A/B hid.
-	if (!catch_up_mode && new_mc->display_obj != NULL && new_name != NULL
-	    && strncmp(new_name, "pfx", 3) == 0
-	    && dictionary[char_id].sprite_frame_count > 1) {
-		extern size_t g_tick_count;
-		DisplayObject* pdo = (DisplayObject*)new_mc->display_obj;
-		pdo->natural_oneshot = 1;
-		pdo->sprite_is_playing = 1;
-		pdo->sprite_current_frame = 1;        // frame 0 shown at attach; frame 1 next
-		pdo->placed_at_tick = g_tick_count;   // show frame 1 this tick, advance next
-	}
-#endif
+	// (s26 n-browser-pfx: browser-WASM used to flag "pfx*" clips natural_oneshot
+	// here and count them down placement-free outside the shared pump, because
+	// attached morphs could not draw per-instance ratios. c948d0e61 fixed that,
+	// so N's particles now play their real timeline -- frame scripts included,
+	// so their own last-frame removeMovieClip() -- like every other attached clip
+	// and like native/Ruffle. The countdown ran 1 tick late and removed on wrap,
+	// 2 ticks late. Probe: wasm_probes/attach_from_stopped_root_enterframe.)
 
 	return new_mc;
 }

@@ -2365,10 +2365,6 @@ void ng_advance_attached_clip_playheads(SWFAppContext* app_context)
 		DisplayObject* obj = (DisplayObject*)mc->display_obj;
 		if (obj == NULL) continue;
 		if (obj->sprite_manual_next_frame) continue;     // a pending goto handles its own nav
-		// Browser-WASM "pfx*" one-shot morph particles keep their dedicated
-		// counter path (advance_attached_clip_natural): re-running their
-		// placement tags draws ratio-0 morph geometry under ratio-N matrices.
-		if (obj->natural_oneshot) continue;
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
@@ -2804,117 +2800,6 @@ void advance_attached_clip_frames(SWFAppContext* app_context)
 		max_depth = saved_max;
 		display_list_capacity = saved_cap;
 		{ extern size_t g_tick_count; d->placed_at_tick = g_tick_count; }
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Browser-WASM per-tick countdown of one-shot "pfx*" PARTICLE clips only.
-//
-// s24: every other attached clip — including the explicitly gotoAndPlay'd coins
-// and drones this pass was written for (v2 below) — now plays its real timeline
-// (frame tags + DoActions + nested children) through the pump shared with the CI
-// modes, ng_advance_attached_clip_playheads, called from swf.c's tick. That pump
-// skips natural_oneshot clips, which stay here for the morph-ratio reason below.
-// History of the gotoAndPlay'd half, kept for the record:
-//
-// Browser-WASM has no auto-advance for standalone attachMovie'd clips' own
-// timelines (advance_attached_clip_frames only services pending MANUAL navs; the
-// OFFSCREEN ng_advance_attached_clip_playheads counter pump is gated out). So a
-// coin's mc.gotoAndPlay("COLLECTED") (GoldObject.Dissapear) or a drone's
-// gotoAndPlay("...prefire") jumps once via ng_gotoFrameByMC and then FREEZES — the
-// disappear/transition animation never plays, leaving the clip on screen forever
-// (visual bug + needless overdraw).
-//
-// SAFETY (this is v2 — v1 advanced ALL is_playing clips and ran their frame
-// scripts, which let timeIndicator-class GUI clips re-create child clips every
-// tick and exploded `bar` to the 4096 cap):
-//   * Only clips with goto_play_active (set ONLY by ng_gotoFrameByMC(play=1)) are
-//     touched — never default-is_playing GUI/HUD clips.
-//   * Frames run with catch_up_mode=1 → PLACEMENT TAGS ONLY, NO DoAction. Nothing
-//     can attachMovie/createEmptyMovieClip from a frame script, so no chain
-//     reaction. (Trade-off: an animation whose end-frame *script* does the next
-//     transition won't transition — it just animates to its last frame.)
-//   * child_mc_count is snapshotted before the loop, so any clip created this tick
-//     can't be swept into the same pass.
-//   * One-shot: when the playhead wraps to frame 0 the clip stops (no loop), so a
-//     gotoAndPlay to a label plays forward once and parks on its last frame
-//     (matches a disappear/transition ending in stop()).
-// Browser-WASM only (OFFSCREEN keeps its counter pump; NO_GRAPHICS not
-// built here) → CI byte-identical, not CI-observable.
-void advance_attached_clip_natural(SWFAppContext* app_context)
-{
-	extern MovieClip* child_mc_cache[];
-	extern int child_mc_count;
-	extern size_t g_tick_count;
-	if (catch_up_mode) return;
-	uintptr_t dl_lo = (uintptr_t)display_list;
-	uintptr_t dl_hi = dl_lo + (uintptr_t)display_list_capacity * sizeof(DisplayObject);
-	int n = child_mc_count;   // snapshot: clips created this pass must not cascade in
-	for (int i = 0; i < n; i++)
-	{
-		MovieClip* mc = child_mc_cache[i];
-		if (mc == NULL || mc->depth == INT_MIN || mc->avm1_removed) continue;
-		if (mc->display_obj == NULL) continue;
-		DisplayObject* d = (DisplayObject*)mc->display_obj;
-		// One-shot particles only ("pfx*", REMOVED on wrap to mimic their
-		// final-frame removeMovieClip — see ng_attachMovie flagging).
-		int is_oneshot = d->natural_oneshot;
-		if (!is_oneshot) continue;
-		// Standalone attached clips only — timeline-placed clips advance via
-		// advance_sprite_frames (the flag is inert on them).
-		if ((uintptr_t)d >= dl_lo && (uintptr_t)d < dl_hi) continue;
-		if (!d->sprite_is_playing) { d->natural_oneshot = 0; continue; }
-		if (d->sprite_manual_next_frame) continue;
-		if (d->placed_at_tick == g_tick_count) continue; // placed this tick -> show frame 1 first
-		if (d->char_id == 0) { d->natural_oneshot = 0; continue; }
-		Character* ch = &dictionary[d->char_id];
-		if (ch->type != CHAR_TYPE_SPRITE || ch->sprite_frame_count <= 1) { d->natural_oneshot = 0; continue; }
-		size_t fc = ch->sprite_frame_count;
-
-		// sprite_current_frame is the NEXT frame to execute (ng_gotoFrameByMC left
-		// it at (target+1)%fc; a fresh attach leaves it at 1). If it wrapped to 0 the
-		// one-shot animation has played its last frame.
-		size_t frame = d->sprite_current_frame;
-		if (frame == 0)
-		{
-			if (is_oneshot)
-			{
-				// Particle reached the end of its authored lifetime: the SWF's final
-				// frame would call this.removeMovieClip() (never executed — we don't run
-				// the particle's frame scripts) — do the removal directly so the clip
-				// stops rendering and its child_mc_cache slot can be reclaimed (no
-				// leftover line, no overdraw).
-				extern void actionInvalidateCachedMovieClipDirect(SWFAppContext*, MovieClip*);
-				d->sprite_is_playing = 0;
-				d->natural_oneshot = 0;
-				actionInvalidateCachedMovieClipDirect(app_context, mc);
-				continue;
-			}
-			d->sprite_is_playing = 0;
-			continue;
-		}
-
-		if (is_oneshot)
-		{
-			// Attached morph-shape particles ("pfx*" — DefineLaserCharge/Spark etc.
-			// are DefineMorphShapes animated by per-frame RATIO) CANNOT be ratio-
-			// interpolated per-instance in this renderer: morph interpolation runs as
-			// a per-character pre-pass into a SHARED vertex buffer over the ROOT
-			// display_list only (tag.c ~5802), and render_display_list draws attached
-			// morphs at morph_start_offset (ratio 0). Re-running each frame's placement
-			// tags would apply that frame's MATRIX (authored for the ratio-N morphed
-			// geometry) to the ratio-0 geometry actually drawn → corrupt scale/position
-			// (the user's "data looks corrupt"). So DON'T re-run placement tags: keep
-			// the particle at its consistent attach-time frame-0 appearance and just
-			// count its authored lifetime down, then remove on wrap (above). This keeps
-			// the leftover-line + overdraw fix (the particle still self-removes) without
-			// the morph mismatch. Trade-off: the particle doesn't play its grow/fade
-			// in-between frames (a faithful version needs per-instance morph vertex
-			// buffers — a separate renderer change).
-			d->sprite_current_frame = (frame + 1) % fc;
-			mc->currentframe = (int)frame + 1;
-			continue;
-		}
 	}
 }
 
@@ -9594,13 +9479,6 @@ void tagShowFrame(SWFAppContext* app_context)
 		// Apply deferred gotoAndStop/Play navs on attachMovie'd clips (e.g.
 		// Doodle Jump platforms) and build their nested sprite sub-lists.
 		advance_attached_clip_frames(app_context);
-		// Play EXPLICITLY gotoAndPlay'd standalone attached clips forward one frame
-		// (coins' COLLECTED disappear, drones' prefire). Placement-tags-only +
-		// flag-gated + count-snapshot → safe (see advance_attached_clip_natural).
-		{
-			extern void advance_attached_clip_natural(SWFAppContext* app_context);
-			advance_attached_clip_natural(app_context);
-		}
 	}
 	// Upgrade sprite_initialized 1→2 so dispatch_enterframe_clip_actions
 	// fires from the next tick. tagPlaceObject2 in browser-WASM marks
@@ -15351,7 +15229,7 @@ int hasPlayingSprites(void)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->attached_playable == 0 || mc->avm1_removed || mc->depth == INT_MIN) continue;
 		DisplayObject* d = (DisplayObject*)mc->display_obj;
-		if (d == NULL || d->char_id == 0 || d->natural_oneshot) continue;
+		if (d == NULL || d->char_id == 0) continue;
 		Character* ch = &dictionary[d->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 		if (ch->sprite_frame_count > 1 && (d->sprite_is_playing || d->sprite_manual_next_frame)) return 1;

@@ -111,3 +111,18 @@ An attempt starts when N enters `App_Tick_RunningGame` from pre-level.
   instance's ratio. Fixed in the runtime; fixture
   `regression/avm1_morph_instances_ratio`. Record:
   `SWFRecompDocs/plans/n-gold-streaks-report.md`.
+
+## s26 n-browser-pfx additions
+
+- `CLIPPOS=lo:hi` (with OBJHASH): for game ticks lo..hi, one
+  `ND cp t= <path> x= y= cf=` line per clip the `h=` walk hashes. Use it to name
+  the clip behind an `h=` diff (it found N's `SpawnWallDust` particle).
+- `RANDCOUNT=true`: wraps `Math.random` (after `ASSetPropFlags`) and appends
+  `rc=<calls so far>` to every NF line, to tell "different number of draws"
+  from "different values".
+- **Browser vs exporter is only comparable on RNG-dependent values with a seeded
+  build**: build the browser N_drive with
+  `EMCC_CFLAGS=-DMOCK_DATE_TIME=981152406000 build_test.sh flasharchive/N_drive wasm --graphics`
+  (native through verify_output/run_native.py already defines it). With it, the
+  level 3 route is byte-identical exporter = browser on every NF field incl.
+  `h=`/`o=`. Record: `SWFRecompDocs/plans/n-browser-pfx-report.md`.

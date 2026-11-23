@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "Stopped SWF6 root; _root.onEnterFrame attaches a 4-frame self-removing pfx into a createEmptyMovieClip holder on its 2nd call (N's spawn particles). Ruffle: p f1+f2 the attach tick, f3, f4 remove, gone at root ef c=5.",
+    "width": 200,
+    "height": 150,
+    "swf_version": 6
+  },
+  "opcodes": {
+    "tested": ["AttachMovie", "RemoveMovieClip", "onEnterFrame"]
+  }
+}

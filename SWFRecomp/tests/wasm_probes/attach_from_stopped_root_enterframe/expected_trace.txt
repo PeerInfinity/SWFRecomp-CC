@@ -1,0 +1,14 @@
+PF: root f1
+PF: root ef c=1 p=undefined cf=
+PF: root ef c=2 p=movieclip cf=1
+PF: pfx0 f1
+PF: pfx0 f2
+PF: root ef c=3 p=movieclip cf=2
+PF: pfx0 f3
+PF: root ef c=4 p=movieclip cf=3
+PF: pfx0 f4 remove
+PF: root ef c=5 p=undefined cf=
+PF: root ef c=6 p=undefined cf=
+PF: root ef c=7 p=undefined cf=
+PF: root ef c=8 p=undefined cf=
+PF: done

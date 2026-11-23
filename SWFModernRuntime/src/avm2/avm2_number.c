@@ -485,14 +485,19 @@ static const uint32_t avm2_random_xor_masks[31] = {
 
 static int32_t avm2_random_pure_hasher(int32_t iSeed)
 {
-	const int32_t c1 = 1376312589L;
-	const int32_t c2 = 789221L;
-	const int32_t c3 = 15731L;
-	iSeed = ((iSeed << 13) ^ iSeed) - (iSeed >> 21);
-	int32_t iResult = (iSeed * (iSeed * iSeed * c3 + c2) + c1) & 0x7FFFFFFF;
-	iResult += iSeed;
-	iResult = ((iResult << 13) ^ iResult) - (iResult >> 21);
-	return iResult;
+	// uint32_t wrapping arithmetic: the int32_t form was signed-overflow UB
+	// that emcc folded differently from gcc (browser-WASM drew a different
+	// sequence from the same seed). Same fix as actionmodern/math.c
+	// RandomPureHasher (s26 n-browser-pfx).
+	const uint32_t c1 = 1376312589u;
+	const uint32_t c2 = 789221u;
+	const uint32_t c3 = 15731u;
+	uint32_t s = (uint32_t) iSeed;
+	s = ((s << 13) ^ s) - (uint32_t) ((int32_t) s >> 21);
+	uint32_t r = (s * (s * s * c3 + c2) + c1) & 0x7FFFFFFFu;
+	r += s;
+	r = ((r << 13) ^ r) - (uint32_t) ((int32_t) r >> 21);
+	return (int32_t) r;
 }
 
 // The build's own boot seed. MOCK_DATE_TIME is a -D and the artifact hash is
@@ -527,7 +532,7 @@ static int32_t avm2_random_next(Avm2RandomFast* r)
 		r->uValue >>= 1;
 	}
 	int32_t aNum = (int32_t) r->uValue;
-	aNum = avm2_random_pure_hasher(aNum * 71L);
+	aNum = avm2_random_pure_hasher((int32_t) ((uint32_t) aNum * 71u));
 	return aNum & 0x7FFFFFFF;
 }
 

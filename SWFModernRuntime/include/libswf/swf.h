@@ -189,7 +189,6 @@ typedef struct DisplayObject
 	size_t sprite_current_frame;
 	u8 sprite_is_playing;         // 0=stopped, 1=playing (default 1)
 	u8 attach_registration;       // CI modes: this entry is ng_attachMovie's REGISTRATION copy of a non-root attached clip in its parent's sprite_display_list (lookup/render alias sharing the clip's child-list buffer). Its timeline is owned by ng_advance_attached_clip_playheads, so the timeline advance walks skip it (else its children double-advance). Cleared by tagPlaceObject2.
-	u8 natural_oneshot;          // browser-WASM: set at attach for auto-play one-shot particle clips (ParticleManager "pfx*"); advance_attached_clip_natural plays them forward (placement tags) and REMOVES them on wrap (mimics their last-frame removeMovieClip). Fixes Metanet N leftover laser/death lines + the particle-overdraw fps cost (both gone when the stuck particle self-removes). See [[n-laser-is-frozen-particle-sprite-not-drawing-api]].
 	int sprite_manual_next_frame;  // pending manual frame nav
 	size_t sprite_next_frame;      // target frame
 	char* instance_name;           // from PlaceObject2 HasName (or NULL)

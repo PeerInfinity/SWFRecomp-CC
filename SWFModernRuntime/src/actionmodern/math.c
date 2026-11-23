@@ -242,18 +242,26 @@ static int32_t RandomFastNext(TRandomFast *pRandomFast) {
 	return (int32_t)pRandomFast->uValue;
 }
 
-// Hash function for additional randomness
+// Hash function for additional randomness.
+// All arithmetic is done in uint32_t so it WRAPS (avmplus/Ruffle semantics:
+// Ruffle uses wrapping_mul/wrapping_add). The old int32_t form relied on
+// signed-overflow UB: gcc happened to wrap, but emcc/clang -O2 folded it
+// differently, so browser-WASM drew a different Math.random() sequence from
+// the same seed (4th draw onward) than native and Ruffle (s26 n-browser-pfx:
+// N's wall-dust particle _y). ">> 21" stays an arithmetic shift of the
+// signed value, as in avmplus.
 static int32_t RandomPureHasher(int32_t iSeed) {
-	const int32_t c1 = 1376312589L;
-	const int32_t c2 = 789221L;
-	const int32_t c3 = 15731L;
+	const uint32_t c1 = 1376312589u;
+	const uint32_t c2 = 789221u;
+	const uint32_t c3 = 15731u;
 
-	iSeed = ((iSeed << 13) ^ iSeed) - (iSeed >> 21);
-	int32_t iResult = (iSeed * (iSeed * iSeed * c3 + c2) + c1) & kRandomPureMax;
-	iResult += iSeed;
-	iResult = ((iResult << 13) ^ iResult) - (iResult >> 21);
+	uint32_t s = (uint32_t)iSeed;
+	s = ((s << 13) ^ s) - (uint32_t)((int32_t)s >> 21);
+	uint32_t r = (s * (s * s * c3 + c2) + c1) & (uint32_t)kRandomPureMax;
+	r += s;
+	r = ((r << 13) ^ r) - (uint32_t)((int32_t)r >> 21);
 
-	return iResult;
+	return (int32_t)r;
 }
 
 // Generate a random number (avmplus implementation)
@@ -271,7 +279,7 @@ static int32_t GenerateRandomNumber(TRandomFast *pRandomFast) {
 	}
 
 	int32_t aNum = RandomFastNext(pRandomFast);
-	aNum = RandomPureHasher(aNum * 71L);
+	aNum = RandomPureHasher((int32_t)((uint32_t)aNum * 71u));
 	return aNum & kRandomPureMax;
 }
 
