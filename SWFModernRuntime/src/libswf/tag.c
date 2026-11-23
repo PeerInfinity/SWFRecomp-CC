@@ -34,6 +34,31 @@ extern int g_tag_skip_mode;
 
 #include <limits.h>  // INT_MIN (freed-MC sentinel depth)
 
+// s26 w2-acid-clip-fill-region: compose a static-text (DefineText) glyph
+// transform onto its parent the way Ruffle's transform stack does. Ruffle
+// renders each glyph under `parent * Matrix{a=d=height/em, tx/ty=pen}`, and
+// `Matrix * Matrix` (render/src/matrix.rs) ROUNDS the composed translation to
+// whole twips: tx = round_to_i32(a*pen_x + c*pen_y) + parent.tx (f32,
+// round-ties-even). A plain f32 compose keeps the sub-twip pen offset, which
+// moves a glyph stem whose edge sits near a pixel centre to the other side of
+// it at quality LOW (from_shumway/acid/acid-text-6: 66 + 4 stem pixels, all of
+// them; an f64 model with the rounding reproduces the golden exactly). The
+// linear part is the plain product. Known approximation: the recompiler folds
+// the DefineText matrix's own translation into the pen (one rounding where
+// Ruffle has two: place*text_matrix, then *glyph) — exact when that
+// translation is 0 or the parent scale is 1.
+static inline void tag_text_glyph_compose(float* out, const float* parent, const float* glyph)
+{
+	hit_test_mat4_multiply(out, parent, glyph);
+	float tx = parent[0] * glyph[12] + parent[4] * glyph[13];
+	float ty = parent[1] * glyph[12] + parent[5] * glyph[13];
+	if (fabsf(tx) < 2.0e9f && fabsf(ty) < 2.0e9f)  // also false for NaN
+	{
+		out[12] = rintf(tx) + parent[12];
+		out[13] = rintf(ty) + parent[13];
+	}
+}
+
 // s25 prototype: number of LAYER (blend mode 2) groups currently being drawn
 // into an offscreen; Alpha/Erase are only honoured when > 0.
 static int g_layer_group_depth = 0;
@@ -4118,7 +4143,7 @@ static void compose_children(SWFAppContext* app_context, DisplayObject* dl,
 					{
 						const float* glyph_local = &transforms[(ch->transform_start + (u32)j) * 16];
 						float glyph_composed[16];
-						hit_test_mat4_multiply(glyph_composed, composed, glyph_local);
+						tag_text_glyph_compose(glyph_composed, composed, glyph_local);
 						u32 dst = tg_dyn ? (tgbase + (u32)j) : (ch->transform_start + (u32)j);
 						renderer_write_transform(context, dst, glyph_composed);
 					}
@@ -8191,7 +8216,7 @@ static void compose_root_text_instance(SWFAppContext* app_context,
 	}
 	for (size_t j = 0; j < ch->text_size; j++) {
 		float gc[16];
-		hit_test_mat4_multiply(gc, place_m, tf_all + (ch->transform_start + (u32)j) * 16);
+		tag_text_glyph_compose(gc, place_m, tf_all + (ch->transform_start + (u32)j) * 16);
 		renderer_write_transform(context, tgbase + (u32)j, gc);
 	}
 }

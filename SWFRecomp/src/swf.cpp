@@ -10894,6 +10894,17 @@ namespace SWFRecomp
 				bool shape_renderable = true;
 				size_t morph_end_start_vertex = current_morph_end_vertex;
 
+				// Non-morph fills, grouped per (layer, fill id) by the directed-edge
+				// fill model below and emitted by the stroke loop further down, so
+				// each layer's fills and strokes interleave (see emit_layer_fills).
+				struct FillGroup
+				{
+					u32 fsl;
+					u32 inner_fill;
+					std::vector<std::vector<Vertex>> contours;
+				};
+				std::vector<FillGroup> layer_fill_groups;
+
 				// Only morph shapes keep the earcut path: morph needs a per-vertex
 				// morph_index that libtess2 can't preserve (it invents vertices at
 				// intersections). Plain DefineShape fills AND embedded DefineFont
@@ -11016,15 +11027,8 @@ namespace SWFRecomp
 					// positive fill: johnson's undirected cycle finder instead synthesizes
 					// a spurious enclosing contour in the same even-odd group, and the
 					// island's two same-fill crossings cancel it to empty.
-					const int winding_rule = shape_uses_nonzero_winding ? TESS_WINDING_NONZERO : TESS_WINDING_ODD;
 
-					struct FillGroup
-					{
-						u32 fsl;
-						u32 inner_fill;
-						std::vector<std::vector<Vertex>> contours;
-					};
-					std::vector<FillGroup> groups;
+					std::vector<FillGroup>& groups = layer_fill_groups;
 					std::unordered_map<u64, size_t> group_index;
 
 					auto link_same_pt = [](const Vertex& a, const Vertex& b)
@@ -11138,8 +11142,51 @@ namespace SWFRecomp
 							return a.inner_fill < b.inner_fill;
 						});
 
-					for (FillGroup& g : groups)
+				}
+
+				// Start positions indexed by morph_index, the inverse map of
+				// morph_end_positions. The fill arm below can write an end vertex
+				// absolutely (an earcut vertex IS a path vertex), but a stroke
+				// vertex is an offset corner invented by drawLines/drawLineJoin/
+				// drawLineCap, so its end position is
+				//     stroke_vertex + (end_position - start_position)
+				// of the source path vertex whose morph_index it inherited. An
+				// entry keeps morph_index == -1 until it is filled, which marks it
+				// as "no source vertex" (the fallback below then freezes it).
+				std::vector<Vertex> morph_start_positions;
+
+				if (is_morph && morph_vertex_counter > 0)
+				{
+					morph_start_positions.resize((size_t) morph_vertex_counter);
+
+					for (size_t i = 0; i < paths.size(); ++i)
 					{
+						for (const Vertex& pv : paths[i].verts)
+						{
+							if (pv.morph_index >= 0
+							    && (size_t) pv.morph_index < morph_start_positions.size())
+							{
+								morph_start_positions[pv.morph_index] = pv;
+							}
+						}
+					}
+				}
+
+				// Emit the fill groups of every layer <= `layer` not yet emitted.
+				// Ruffle's ShapeConverter::flush_layer draws a layer's fills (in
+				// style-id order) and then its strokes, layer by layer; a stroke of
+				// layer N must not cover a fill of layer N+1 (from_shumway
+				// acid-clip: one DefineShape4 with three StateNewStyles layers).
+				// Groups are sorted by (layer, fill id); fill_style_list and
+				// line_style_list advance together on every StateNewStyles.
+				const int winding_rule = shape_uses_nonzero_winding ? TESS_WINDING_NONZERO : TESS_WINDING_ODD;
+				size_t next_fill_group = 0;
+				auto emit_layer_fills = [&](u32 layer)
+				{
+					while (next_fill_group < layer_fill_groups.size()
+					       && layer_fill_groups[next_fill_group].fsl <= layer)
+					{
+						FillGroup& g = layer_fill_groups[next_fill_group++];
 						std::vector<Tri> tris;
 
 						tessellateContours(g.contours, winding_rule, tris, true);
@@ -11180,38 +11227,12 @@ namespace SWFRecomp
 							}
 						}
 					}
-				}
-
-				// Start positions indexed by morph_index, the inverse map of
-				// morph_end_positions. The fill arm below can write an end vertex
-				// absolutely (an earcut vertex IS a path vertex), but a stroke
-				// vertex is an offset corner invented by drawLines/drawLineJoin/
-				// drawLineCap, so its end position is
-				//     stroke_vertex + (end_position - start_position)
-				// of the source path vertex whose morph_index it inherited. An
-				// entry keeps morph_index == -1 until it is filled, which marks it
-				// as "no source vertex" (the fallback below then freezes it).
-				std::vector<Vertex> morph_start_positions;
-
-				if (is_morph && morph_vertex_counter > 0)
-				{
-					morph_start_positions.resize((size_t) morph_vertex_counter);
-
-					for (size_t i = 0; i < paths.size(); ++i)
-					{
-						for (const Vertex& pv : paths[i].verts)
-						{
-							if (pv.morph_index >= 0
-							    && (size_t) pv.morph_index < morph_start_positions.size())
-							{
-								morph_start_positions[pv.morph_index] = pv;
-							}
-						}
-					}
-				}
+				};
 
 				for (size_t i = 0; i < paths.size(); ++i)
 				{
+					emit_layer_fills(paths[i].line_style_list);
+
 					u8 line_style_i = paths[i].line_style;
 
 					// A LineStyle index past its LINESTYLEARRAY (malformed or
@@ -11374,6 +11395,10 @@ namespace SWFRecomp
 						}
 					}
 				}
+
+				// Fills of layers with no path past them (or every layer, for a
+				// shape with no paths in its last layers) still draw.
+				emit_layer_fills(UINT32_MAX);
 
 				// Lockstep assertion for the morph tables: this character's
 				// morph_end_shape_data run must be exactly as long as its

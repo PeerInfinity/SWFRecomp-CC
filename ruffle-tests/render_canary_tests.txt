@@ -693,3 +693,8 @@ visual/filters/bevel                                # stb midpoint trunc, zero h
 regression/layer_group_filtered_child                  # N1 nested filter in LAYER/MULTIPLY  1 cmp
 regression/avm2_layer_group_filtered_child             # N1 AVM2 twin                         1 cmp
 regression/avm1_placed_drawing_color                   # placed Drawing-API cxform            1 cmp
+# s26 w2-acid-clip-fill-region: per-layer fill/stroke interleave (StateNewStyles layers).
+# tier=1
+from_shumway/acid/acid-clip                         # layer-N stroke under layer-N+1 fill 1 cmp
+from_shumway/3_joystick                             # same; tol-128 headroom 1 level      1 cmp
+from_shumway/acid/acid-text-6                       # DefineText glyph tx rounded to twips 2 cmp

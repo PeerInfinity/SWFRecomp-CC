@@ -4342,6 +4342,17 @@ void render_webgpu_compose_text_transforms(WebGPURenderContext* ctx,
 
 		float composed[16];
 		mat4_multiply(composed, place_xform, glyph_xform);
+		// Whole-twip glyph translation, as tag.c tag_text_glyph_compose
+		// (Ruffle `Matrix * Matrix` rounds the composed tx/ty).
+		{
+			float tx = place_xform[0] * glyph_xform[12] + place_xform[4] * glyph_xform[13];
+			float ty = place_xform[1] * glyph_xform[12] + place_xform[5] * glyph_xform[13];
+			if (fabsf(tx) < 2.0e9f && fabsf(ty) < 2.0e9f)
+			{
+				composed[12] = rintf(tx) + place_xform[12];
+				composed[13] = rintf(ty) + place_xform[13];
+			}
+		}
 
 		// Write composed transform to the GPU buffer at the glyph's slot
 		xform_slot_write(ctx, glyph_xform_id, composed);
