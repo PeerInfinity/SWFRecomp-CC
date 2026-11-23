@@ -6,3 +6,9 @@
 # level 4 "lockness": a0 = stepping-stone doors to the ledge, switch t=453, killed by the chasing drone t=508;
 #   a1 = same with a faster last hop: switch t=444, exit t=476; a2 = next level.
 4 40:R|40:-|8:J|15:RJ|38:J|20:-|4:J|18:RJ|40:J|20:-|4:J|22:RJ|36:J|20:-|14:RJ|50:J|20:-|18:RJ|46:J|60:R/40:R|40:-|8:J|15:RJ|38:J|20:-|4:J|18:RJ|40:J|20:-|4:J|22:RJ|36:J|20:-|14:RJ|50:J|20:-|30:RJ|80:R/60:R
+# level 3 "the box, the box!" (s26 n-gold-streaks; no enemies): a0 = left launchpad into the left box, key t~134 (opens the
+#   bottom-right door), hop the left pad, run through the door onto the right pad, wall-jump onto the right-wall one-way
+#   (708,324), hold-J (45 ticks) onto (708,252), hop to (660,204), climb the switch box's left face with a wall-jump,
+#   switch t=762, chimney bounce back onto the roof, run left onto the central box, jump the U's right wall: exit t=966;
+#   a1 = level 4 loads. Exporter = native graphics (1096 NF/ND lines incl. h=/o=) = browser (player + o= on all 966 a0 ticks).
+3 60:L|20:-|54:R|90:L|30:L|16:R|20:RJ|165:R|4:LJ|24:-|12:R|20:-|45:J|30:-|20:J|25:LJ|3:-|10:R|20:-|6:L|8:J|18:RJ|1:R|1:J|20:RJ|42:R|30:L|30:LJ|60:L|8:L|45:LJ|5:-|20:R|40:-/60:R
