@@ -720,3 +720,8 @@ from_shumway/bitmapbuttons                             # AVM2 static-bitmap GPU 
 # tier=2
 from_shumway/acid/acid-color-0                         # EditText cxform + JPEG3 alpha band   1 cmp
 regression/avm1_jpeg3_alpha_bitmap                     # JPEG3 un-premultiply (exporter golden) 1 cmp
+# s26 w2-robustness-land: fixed-cap overflow witnesses (exporter PNG goldens
+# landed, coordinator-run).
+# tier=2
+regression/avm1_cxform_override_overflow    # > 256 cxform-override pushes 1 cmp
+regression/avm1_long_text_layout            # > 32 paragraphs, align     1 cmp

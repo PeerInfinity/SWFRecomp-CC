@@ -115,6 +115,9 @@ if (WIN32)
 target_compile_options(${PROJECT_NAME} PRIVATE)
 else()
 target_compile_options(${PROJECT_NAME} PRIVATE -Wno-format-truncation)
+# VAL()/stack type puns (actionmodern/action.h): never let TBAA reorder or
+# drop them, whatever CMAKE_BUILD_TYPE picks for -O.
+target_compile_options(${PROJECT_NAME} PRIVATE -fno-strict-aliasing)
 endif()
 
 set(RENAME_ZCONF OFF)

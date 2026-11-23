@@ -49,6 +49,7 @@ CFLAGS=(
     -matomics -mbulk-memory
     -std=gnu17
     -O2
+    -fno-strict-aliasing
     -Wall
     -Wno-unused-variable
 )

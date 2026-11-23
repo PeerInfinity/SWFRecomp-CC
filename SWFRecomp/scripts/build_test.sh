@@ -365,7 +365,7 @@ if [ "$TARGET" == "wasm" ]; then
             -s STACK_SIZE=8MB \
             -sASYNCIFY \
             -sASYNCIFY_STACK_SIZE=65536 \
-            -O2
+            -O2 -fno-strict-aliasing
     else
         emcc \
             *.c \
@@ -384,7 +384,7 @@ if [ "$TARGET" == "wasm" ]; then
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=24MB \
             -s STACK_SIZE=8MB \
-            -O2
+            -O2 -fno-strict-aliasing
     fi
 
     echo ""
@@ -452,6 +452,7 @@ else
         -Wall \
         -Wno-unused-variable \
         -std=c17 \
+        -fno-strict-aliasing \
         -o "${OUTPUT_NAME}" \
         -lm $NATIVE_EXTRA_LIBS
 

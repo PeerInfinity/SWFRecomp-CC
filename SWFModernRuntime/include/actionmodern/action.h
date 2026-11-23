@@ -309,8 +309,30 @@ int actionGetMCVisible(SWFAppContext* app_context, const char* instance_name, Mo
 // Returns the 'enabled' property for the named button MC (1=enabled, 0=disabled; defaults to 1)
 int actionGetMCEnabled(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
 
-// VAL macro must be defined before other macros that use it
-#define VAL(type, x) *((type*) x)
+// VAL macro must be defined before other macros that use it.
+//
+// VAL(type, ptr) is the runtime's (and the generated code's) type pun: number
+// payloads live in ActionVar.data.numeric_value (a u64) and in the char-typed
+// STACK buffer, and are read/written as float/double/u32/... through VAL.
+// A plain `*((type*) x)` cast is undefined behaviour under C's strict-aliasing
+// rule, and gcc -O2 really does drop such stores (s25 w2-avm1-with-scope
+// miscompile; s26 w1-runtime-robustness §3/§4 probe). The may_alias typedefs
+// below tell gcc/clang that every VAL access may alias any object, which makes
+// all ~950 VAL sites (runtime + generated code) well-defined regardless of the
+// build's -fstrict-aliasing setting. The attribute must sit on a TYPEDEF: gcc
+// ignores it on a cast's pointee type (measured). VAL is only ever used with
+// the single-token types below; a new one needs a VAL_ma_<type> typedef.
+typedef u8     __attribute__((__may_alias__)) VAL_ma_u8;
+typedef u16    __attribute__((__may_alias__)) VAL_ma_u16;
+typedef u32    __attribute__((__may_alias__)) VAL_ma_u32;
+typedef u64    __attribute__((__may_alias__)) VAL_ma_u64;
+typedef s8     __attribute__((__may_alias__)) VAL_ma_s8;
+typedef s16    __attribute__((__may_alias__)) VAL_ma_s16;
+typedef s32    __attribute__((__may_alias__)) VAL_ma_s32;
+typedef s64    __attribute__((__may_alias__)) VAL_ma_s64;
+typedef float  __attribute__((__may_alias__)) VAL_ma_float;
+typedef double __attribute__((__may_alias__)) VAL_ma_double;
+#define VAL(type, x) (*((VAL_ma_##type*) (x)))
 
 // Stack macros - use STACK, SP, OLDSP from swf.h (app_context->stack, etc.)
 #define PUSH(t, v) \

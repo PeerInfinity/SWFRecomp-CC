@@ -74,6 +74,23 @@ static double timerCoerceToNumber(SWFAppContext* app_context, ActionVar* v)
 	return NAN;
 }
 
+// The delay is an int32 millisecond count: Ruffle coerces it with
+// coerce_to_i32 (avm1/globals.rs create_timer), i.e. ECMA ToInt32 — NaN/Inf
+// -> 0, truncate toward zero, wrap mod 2^32. Keeping the raw double let a
+// sub-millisecond delay (gnash misc-swfc gotoFrameFromInterval: 0.0001 ms)
+// fire up to processTimers' 10000-iteration safety limit EVERY tick; that
+// test's callback appends to a string each fire, so the run grew memory
+// quadratically until the OOM killer took it (~17 s). As an int it is 0 and
+// takes the existing zero-delay arm below (s26 w2-robustness-land).
+static double timerDelayToInt32(double d)
+{
+	if (isnan(d) || isinf(d)) return 0.0;
+	d = trunc(d);
+	double m = fmod(d, 4294967296.0);
+	if (m < 0) m += 4294967296.0;
+	return (double) (int32_t) (uint32_t) m;
+}
+
 static int timerIsString(ActionVar* v)
 {
 	return v->type == ACTION_STACK_VALUE_STRING;
@@ -174,8 +191,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
 			pushUndefined(app_context);
 			return;
 		}
-		double delay = timerCoerceToNumber(app_context, &args[2]);
-		if (isnan(delay)) delay = 0.0;
+		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[2]));
 
 		// Find empty slot
 		int slot = -1;
@@ -234,8 +250,7 @@ void actionTimerSetInterval(SWFAppContext* app_context, ActionVar* args, u32 num
 			pushUndefined(app_context);
 			return;
 		}
-		double delay = timerCoerceToNumber(app_context, &args[1]);
-		if (isnan(delay)) delay = 0.0;
+		double delay = timerDelayToInt32(timerCoerceToNumber(app_context, &args[1]));
 
 		// Find empty slot
 		int slot = -1;

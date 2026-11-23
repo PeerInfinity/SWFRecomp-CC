@@ -1,0 +1,13 @@
+f1 ic=1
+f1 ic=1
+btn1 typeof=object w=10
+btnN typeof=object w=10
+font1 tw=20 fontN tw=40
+vid1 typeof=object w=64
+vidN typeof=object w=103
+snd1 dur=100 sndN dur=200
+exp0 typeof=movieclip expN typeof=movieclip
+cls0 k=cls clsN k=cls
+bmp1 1x1 bmpN 3x2
+lbl1 cf=3 lblN cf=3
+init ic=1

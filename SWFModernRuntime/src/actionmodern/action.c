@@ -945,10 +945,23 @@ static void invokeVirtualSetter(SWFAppContext* app_context, ASProperty* prop, vo
 static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* ctor,
     void* this_obj, ActionVar* args, u32 num_args, ActionVar* out_result);
 
-// Function registry
-#define MAX_FUNCTIONS 2048
-static ASFunction* function_registry[MAX_FUNCTIONS];
+// Function registry. Growable (s26 w2-robustness-land): it was a fixed 2048,
+// and a named DefineFunction past the cap printed "ERROR: Function registry
+// full" and was NOT defined (natives use part of the table). Every append
+// site keeps its `function_count < MAX_FUNCTIONS` guard: MAX_FUNCTIONS now
+// evaluates function_registry_room(), which first makes room for one more
+// entry and returns the live capacity, so the guard only fails on OOM.
+static ASFunction** function_registry = NULL;
 static u32 function_count = 0;
+static size_t function_registry_cap = 0;
+static u32 function_registry_room(void)
+{
+	if (function_count >= function_registry_cap)
+		ng_table_grow((void**) &function_registry, &function_registry_cap,
+		              sizeof(*function_registry), 2048);
+	return (u32) function_registry_cap;
+}
+#define MAX_FUNCTIONS function_registry_room()
 
 // Exposed via action_internal.h so subsystem files (date.c, etc.) can
 // register the native functions they create.
@@ -10608,7 +10621,12 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 			for (int ci = 0; ci < child_mc_count; ci++) {
 				MovieClip* c = child_mc_cache[ci];
 				if (!c || c->depth == INT_MIN || c->parent != mc) continue;
-				ActionVar a0 = mv; ActionVar one = {0}; one.type = ACTION_STACK_VALUE_F32; VAL(float,&one.data.numeric_value)=1.0f;
+				ActionVar a0 = mv;
+				// Arg count 1 as F64 via makeF64 (memcpy): the old
+				// `VAL(float, &one.data.numeric_value) = 1.0f` stored a float through
+				// the u64 member that pushVar then reads -- the strict-aliasing class
+				// gcc -O2 miscompiled in s25 (cfDelegateToMCMethod).
+				ActionVar one = makeF64(1.0);
 				pushVar(app_context, &a0); pushVar(app_context, &one);
 				ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_MOVIECLIP; cv.data.numeric_value=(u64)c; pushVar(app_context,&cv);
 				PUSH_STR("getBounds", 9); actionCallMethod(app_context, _pb_sb);

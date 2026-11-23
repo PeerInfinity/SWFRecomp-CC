@@ -168,6 +168,9 @@ export async function compileGuest(result, setStatus) {
         "-I/project/shim", "-I/project", "-I/project/include", "-I/project/include/actionmodern",
         "-I/project/include/libswf", "-I/project/include/memory",
         "-O1", "-w",
+        // VAL()/stack type puns are only well-defined without TBAA (clang runs
+        // it at -O1); mirrors every native/emcc build path.
+        "-fno-strict-aliasing",
         // The clang driver preset already adds --import-memory/--shared-memory.
         `-Wl,--export-table,--global-base=${arena},--allow-undefined,--export-all,--no-entry,-z,stack-size=8388608`,
         "-o", "/project/guest.wasm",

@@ -3213,6 +3213,11 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "-w",
         "-std=c17",
         opt_level,
+        # The runtime and generated code type-pun numbers through VAL() and
+        # the char STACK buffer; gcc's -O2 TBAA has dropped such stores (s25
+        # with-scope miscompile). VAL() is may_alias now (action.h); this flag
+        # covers the remaining raw puns. Same flag on every build path.
+        "-fno-strict-aliasing",
         # SWF_DEBUG_INFO=1 adds line tables (function names + file:line, no
         # locals) so a core dump captured by SWF_CORE_CAPTURE_DIR yields a
         # readable backtrace instead of bare symbol names. -g1 does not change
@@ -3525,7 +3530,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
 
     emcc_args = c_files + extra_defines + includes + [
         "-w", "-Wno-error=implicit-function-declaration",
-        "-O2", "-include", "zlib.h",
+        "-O2", "-fno-strict-aliasing", "-include", "zlib.h",
         "-sWASM=1",
         "-sALLOW_MEMORY_GROWTH=1",
         "-sUSE_ZLIB=1",

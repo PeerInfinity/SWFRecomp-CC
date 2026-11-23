@@ -123,7 +123,7 @@ for src in "${SRC}"/*.c; do
     o="$(opt_for "$(basename "${src}")")"
     printf '  %-28s %s\n' "$(basename "${src}")" "${o}"
     emcc -DUSE_WEBGPU "${EXTRA_DEFINES[@]}" "${SIMD[@]}" --use-port=emdawnwebgpu \
-        "${INCLUDES[@]}" "${WARN[@]}" "${o}" -c "${src}" -o "${obj}"
+        "${INCLUDES[@]}" "${WARN[@]}" "${o}" -fno-strict-aliasing -c "${src}" -o "${obj}"
     N=$((N+1))
 done
 echo "  (${N} TUs compiled)"

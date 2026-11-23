@@ -200,7 +200,7 @@ for src in "${ALL_SRC[@]}"; do
     o="$(opt_for "$(basename "${src}")")"
     printf '  %-28s %s\n' "$(basename "${src}")" "${o}"
     emcc "${DEFINES[@]}" "${SIMD_FLAGS[@]}" "${EXTRA_CFLAGS_ARR[@]}" --use-port=emdawnwebgpu "${INCLUDES[@]}" "${WARN[@]}" \
-        "${o}" -c "${src}" -o "${obj}"
+        "${o}" -fno-strict-aliasing -c "${src}" -o "${obj}"
     NCOMPILED=$((NCOMPILED+1))
 done
 echo "  (${NCOMPILED} TUs (re)compiled)"

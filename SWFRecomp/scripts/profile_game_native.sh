@@ -168,7 +168,7 @@ if [ "$RUN_ONLY" != true ]; then
         -I"${SWFMODERN_INC}/libswf" -I"${SWFMODERN_INC}/memory"
         -I"${SWFMODERN_ROOT}/lib/c-hashmap"
         "${MODE_INCLUDES[@]}"
-        -w -std=c17 -O2 -g -fno-omit-frame-pointer
+        -w -std=c17 -O2 -g -fno-omit-frame-pointer -fno-strict-aliasing
     )
 
     CC=(gcc)

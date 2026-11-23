@@ -29,7 +29,9 @@ set(SOURCES
     ${CMAKE_SOURCE_DIR}/src/abc/abc_tool.cpp
 )
 
-target_compile_options(${PROJECT_NAME} PRIVATE)
+# The recompiler reads SWF fields through VAL() byte-buffer puns too
+# (src/action/action.cpp, swf.cpp, field.cpp): keep TBAA off for them.
+target_compile_options(${PROJECT_NAME} PRIVATE -fno-strict-aliasing)
 
 set(RENAME_ZCONF OFF)
 

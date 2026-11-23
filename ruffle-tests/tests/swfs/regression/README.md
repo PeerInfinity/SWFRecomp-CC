@@ -147,3 +147,10 @@ arms cannot be reached any other way.
 | `avm1_po3_color_matrix_live_clear` | `mc.filters = []` drops the live authored chain; Ruffle render pixel-identical |
 | `avm1_jpeg3_alpha_bitmap` | **DefineBitsJPEG3 colour with an alpha plane is premultiplied: clamp to alpha + un-premultiply at emit** (s26 `w2-text-cx-jpeg3`). Golden = Ruffle exporter `0ddd12b6a` render (our lavapipe render within max 1, tol 3) |
 | `avm1_edittext_placed_cxform_script` | EditText colour transform, the script/wrapper path: trace lock (`s1.f=II` …), Ruffle trace identical. The image twin is held (border-corner residual) |
+| `avm1_many_defs_registry` | **definition registries past their old fixed caps** (70 buttons, 40 fonts, 40 videos, 130 sounds, 1030 exports, 130 registerClass, 130 bitmaps, 260 labelled sprites, `#initclip` id 805) are all recorded (s26 `w1-runtime-robustness` / `w2-robustness-land`). Ruffle exporter `0ddd12b6a` trace byte-identical |
+| `avm1_pixelbounds_dynamic_child` | `_pixelBounds`-style getBounds union over a dynamic child (the float-through-u64 store fixed to `makeF64`); Ruffle trace identical |
+| `avm1_cxform_override_overflow` | > 256 cxform-override pushes in one frame are restored (300 tinted children, retint); golden = Ruffle exporter render |
+| `avm1_filter_list_overflow` | > 32 filtered root depths keep their filter lists (`filters` getter); Ruffle trace identical |
+| `avm1_long_text_layout` | > 32 paragraphs / > 256 lines lay out and scroll (`maxscroll=293`); golden = Ruffle exporter render + trace |
+| `avm1_many_functions_registry` | > 2048 named top-level functions are all defined; Ruffle trace identical |
+| `avm1_func2_param_register_oob` | a DefineFunction2 parameter register ≥ RegisterCount is ignored (was a C stack smash); Ruffle trace identical |

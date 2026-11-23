@@ -640,6 +640,9 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
     double ma, double mb, double mc, double md, double mtx, double mty,
     double test_x, double test_y);
 void ng_record_button(size_t char_id);
+// Doubling growth for the per-definition registries (ng_shared.c). Zero-fills
+// the new tail; 0 only on OOM (the caller then drops the entry).
+int ng_table_grow(void** table, size_t* cap, size_t elem, size_t initial);
 void ng_record_textfield_props(SWFAppContext* app_context, size_t char_id,
     const char* plain_text, const char* raw_html_text, u32 text_color,
     u16 font_id, u16 font_height, s16 max_length,

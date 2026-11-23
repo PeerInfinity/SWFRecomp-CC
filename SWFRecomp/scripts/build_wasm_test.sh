@@ -89,6 +89,7 @@ CFLAGS=(
     -include string.h
     -std=c17
     -O2
+    -fno-strict-aliasing
     -Wall
     -Wno-unused-variable
     -Wno-unused-but-set-variable

@@ -50,7 +50,7 @@ void* ng_get_root_display_obj(void)
 // late HUD fields (time readout, level name) never got a TextField wrapper and
 // late shapes/morphs had no bounds (`_width` 0) — n-tile-color-hud slice.
 // Returns 0 (caller drops the entry, as before) only on OOM.
-static int ng_table_grow(void** table, size_t* cap, size_t elem, size_t initial)
+int ng_table_grow(void** table, size_t* cap, size_t elem, size_t initial)
 {
 	size_t ncap = (*cap == 0) ? initial : *cap * 2;
 	void* t = realloc(*table, ncap * elem);
@@ -346,8 +346,10 @@ int ng_uses_nonzero_winding(size_t char_id)
 // ---------------------------------------------------------------------------
 // Button char_id registry (for typeof discrimination)
 // ---------------------------------------------------------------------------
-#define MAX_BUTTONS_NG 64
-static size_t ng_button_ids[MAX_BUTTONS_NG];
+// Growable (was a fixed 64: the 65th DefineButton was not a button, so its
+// instance typed as "movieclip" and lost its button state machine).
+static size_t* ng_button_ids;
+static size_t ng_button_ids_cap = 0;
 static size_t ng_button_count = 0;
 
 int ng_find_button(size_t char_id)
@@ -359,25 +361,29 @@ int ng_find_button(size_t char_id)
 
 void ng_record_button(size_t char_id)
 {
-	if (ng_button_count < MAX_BUTTONS_NG && !ng_find_button(char_id))
-		ng_button_ids[ng_button_count++] = char_id;
+	if (ng_find_button(char_id)) return;
+	if (ng_button_count >= ng_button_ids_cap
+	    && !ng_table_grow((void**)&ng_button_ids, &ng_button_ids_cap, sizeof(*ng_button_ids), 64)) return;
+	ng_button_ids[ng_button_count++] = char_id;
 }
 
 // ---------------------------------------------------------------------------
 // Video stream char_id registry
 // ---------------------------------------------------------------------------
-#define MAX_VIDEOS_NG 32
-static size_t ng_video_ids[MAX_VIDEOS_NG];
-static u16    ng_video_widths[MAX_VIDEOS_NG];
-static u16    ng_video_heights[MAX_VIDEOS_NG];
-static u8     ng_video_codecs[MAX_VIDEOS_NG];
-static u8     ng_video_deblocking[MAX_VIDEOS_NG];
+// Growable (was five fixed 32-entry parallel arrays: the 33rd DefineVideoStream
+// was not a video, so its instance became a plain movieclip).
+static struct ng_video_ent {
+	size_t id;
+	u16 width, height;
+	u8 codec, deblocking;
+} *ng_videos;
+static size_t ng_videos_cap = 0;
 static size_t ng_video_count = 0;
 
 int ng_find_video(size_t char_id)
 {
 	for (size_t i = 0; i < ng_video_count; i++)
-		if (ng_video_ids[i] == char_id) return 1;
+		if (ng_videos[i].id == char_id) return 1;
 	return 0;
 }
 
@@ -387,21 +393,21 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 hei
 	(void)app_context;
 	// Idempotent per char_id (see ng_record_char_bounds).
 	for (size_t i = 0; i < ng_video_count; i++) {
-		if (ng_video_ids[i] == (size_t)char_id) {
-			ng_video_widths[i] = width; ng_video_heights[i] = height;
-			ng_video_codecs[i] = codec_id;
-			ng_video_deblocking[i] = deblocking;
+		if (ng_videos[i].id == (size_t)char_id) {
+			ng_videos[i].width = width; ng_videos[i].height = height;
+			ng_videos[i].codec = codec_id;
+			ng_videos[i].deblocking = deblocking;
 			return;
 		}
 	}
-	if (ng_video_count < MAX_VIDEOS_NG) {
-		ng_video_ids[ng_video_count] = (size_t)char_id;
-		ng_video_widths[ng_video_count] = width;
-		ng_video_heights[ng_video_count] = height;
-		ng_video_codecs[ng_video_count] = codec_id;
-		ng_video_deblocking[ng_video_count] = deblocking;
-		ng_video_count++;
-	}
+	if (ng_video_count >= ng_videos_cap
+	    && !ng_table_grow((void**)&ng_videos, &ng_videos_cap, sizeof(*ng_videos), 32)) return;
+	ng_videos[ng_video_count].id = (size_t)char_id;
+	ng_videos[ng_video_count].width = width;
+	ng_videos[ng_video_count].height = height;
+	ng_videos[ng_video_count].codec = codec_id;
+	ng_videos[ng_video_count].deblocking = deblocking;
+	ng_video_count++;
 }
 
 int ng_isVideoChar(size_t char_id)
@@ -415,10 +421,10 @@ int ng_isVideoChar(size_t char_id)
 int ng_getVideoDimensions(size_t char_id, u16* out_w, u16* out_h)
 {
 	for (size_t i = 0; i < ng_video_count; i++) {
-		if (ng_video_ids[i] == char_id) {
-			if (ng_video_widths[i] == 0 || ng_video_heights[i] == 0) return 0;
-			if (out_w) *out_w = ng_video_widths[i];
-			if (out_h) *out_h = ng_video_heights[i];
+		if (ng_videos[i].id == char_id) {
+			if (ng_videos[i].width == 0 || ng_videos[i].height == 0) return 0;
+			if (out_w) *out_w = ng_videos[i].width;
+			if (out_h) *out_h = ng_videos[i].height;
 			return 1;
 		}
 	}
@@ -430,7 +436,7 @@ int ng_getVideoDimensions(size_t char_id, u16* out_w, u16* out_h)
 u8 ng_getVideoCodec(size_t char_id)
 {
 	for (size_t i = 0; i < ng_video_count; i++)
-		if (ng_video_ids[i] == char_id) return ng_video_codecs[i];
+		if (ng_videos[i].id == char_id) return ng_videos[i].codec;
 	return 0;
 }
 
@@ -440,7 +446,7 @@ u8 ng_getVideoCodec(size_t char_id)
 u8 ng_getVideoDeblocking(size_t char_id)
 {
 	for (size_t i = 0; i < ng_video_count; i++)
-		if (ng_video_ids[i] == char_id) return ng_video_deblocking[i];
+		if (ng_videos[i].id == char_id) return ng_videos[i].deblocking;
 	return 0;
 }
 
@@ -469,9 +475,14 @@ int ng_getCharTextfieldIdx(size_t char_id)
 // ---------------------------------------------------------------------------
 // Font info registry
 // ---------------------------------------------------------------------------
-#define MAX_FONTS_NG 32
-#define MAX_FONT_GLYPHS 512
-static struct {
+// Growable (was a fixed 32: the 33rd font had no metrics, so its text
+// measured 0). Plain realloc like the be31edbfd tables: ng_getFontName's
+// callers use the returned name before any later font registration. The
+// code/advance tables are read IN PLACE (ext_codes / ext_advances): every
+// caller passes static storage (the generated `static const font_N_codes[]`,
+// the device-font table, the built-in Noto arrays), so a font is no longer
+// truncated to its first 512 glyphs.
+static struct ng_font_ent {
 	u16 font_id;
 	char name[128];
 	int bold;
@@ -481,16 +492,12 @@ static struct {
 	s16 descent;
 	s16 leading;
 	int em_square;
-	u16 code_table[MAX_FONT_GLYPHS];
-	/* u16 on the wire (Ruffle Glyph::advance: u16); s32 keeps 33000 intact
-	   and leaves -1 free as the "no such glyph" sentinel. */
-	s32 advance_table[MAX_FONT_GLYPHS];
 	size_t glyph_count;
 	size_t glyph_base;
 	int is_builtin;
-	/* Test-harness device faces (ng_register_device_font): the code/advance
-	   tables live in the generated device_fonts.c and are read in place, so a
-	   full-BMP face is not truncated to MAX_FONT_GLYPHS. NULL otherwise. */
+	/* Code / advance tables, read in place (see above). Advances are u16 on
+	   the wire (Ruffle Glyph::advance: u16); s32 keeps 33000 intact and leaves
+	   -1 free as the "no such glyph" sentinel. NULL until metrics arrive. */
 	const u16* ext_codes;
 	const s32* ext_advances;
 	/* s25 w2-acid-text-kerning: DefineFont2/3 kerning table, read in place
@@ -498,11 +505,20 @@ static struct {
 	   units), sorted by (left << 16 | right). NULL / 0 when the font has none. */
 	const s32* kern_pairs;
 	size_t kern_count;
-} ng_fonts[MAX_FONTS_NG];
+} *ng_fonts;
+static size_t ng_fonts_cap = 0;
 
-#define NG_FONT_CODE(fi, j) (ng_fonts[fi].ext_codes ? ng_fonts[fi].ext_codes[j] : ng_fonts[fi].code_table[j])
-#define NG_FONT_ADV(fi, j) (ng_fonts[fi].ext_advances ? ng_fonts[fi].ext_advances[j] : ng_fonts[fi].advance_table[j])
+#define NG_FONT_CODE(fi, j) (ng_fonts[fi].ext_codes[j])
+#define NG_FONT_ADV(fi, j) (ng_fonts[fi].ext_advances[j])
 static size_t ng_font_count = 0;
+
+// Make slot ng_font_count usable; 0 only on OOM (the caller drops the font,
+// as the fixed table used to).
+static int ng_font_slot_reserve(void)
+{
+	return ng_font_count < ng_fonts_cap
+	    || ng_table_grow((void**)&ng_fonts, &ng_fonts_cap, sizeof(*ng_fonts), 32);
+}
 
 // Built-in Noto Sans fallback font for createTextField (no embedded font).
 static const u16 builtin_noto_sans_codes[] = {
@@ -539,7 +555,7 @@ static void ng_ensure_builtin_font(void)
 {
 	if (ng_builtin_font_registered) return;
 	ng_builtin_font_registered = 1;
-	if (ng_font_count >= MAX_FONTS_NG) return;
+	if (!ng_font_slot_reserve()) return;
 	size_t idx = ng_font_count++;
 	ng_fonts[idx].font_id = 0;
 	strncpy(ng_fonts[idx].name, "Noto Sans", sizeof(ng_fonts[idx].name) - 1);
@@ -552,10 +568,8 @@ static void ng_ensure_builtin_font(void)
 	ng_fonts[idx].leading = BUILTIN_NOTO_SANS_LEADING;
 	ng_fonts[idx].em_square = BUILTIN_NOTO_SANS_EM;
 	ng_fonts[idx].glyph_count = BUILTIN_NOTO_SANS_GLYPH_COUNT;
-	for (size_t j = 0; j < BUILTIN_NOTO_SANS_GLYPH_COUNT; j++) {
-		ng_fonts[idx].code_table[j] = builtin_noto_sans_codes[j];
-		ng_fonts[idx].advance_table[j] = builtin_noto_sans_advances[j];
-	}
+	ng_fonts[idx].ext_codes = builtin_noto_sans_codes;
+	ng_fonts[idx].ext_advances = builtin_noto_sans_advances;
 }
 
 static int ng_find_font(u16 font_id)
@@ -645,7 +659,7 @@ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, i
 		if (ng_fonts[i].font_id == font_id) { slot = i; break; }
 	}
 	if (slot == ng_font_count) {
-		if (ng_font_count >= MAX_FONTS_NG) return;
+		if (!ng_font_slot_reserve()) return;
 		ng_font_count++;
 	}
 	ng_fonts[slot].font_id = font_id;
@@ -667,12 +681,11 @@ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
 			ng_fonts[i].descent = descent;
 			ng_fonts[i].leading = leading;
 			ng_fonts[i].em_square = em_square;
-			size_t count = glyph_count < MAX_FONT_GLYPHS ? glyph_count : MAX_FONT_GLYPHS;
-			ng_fonts[i].glyph_count = count;
-			for (size_t j = 0; j < count; j++) {
-				ng_fonts[i].code_table[j] = code_table[j];
-				ng_fonts[i].advance_table[j] = advance_table[j];
-			}
+			// In place: the generated tables are `static const` (was a copy
+			// truncated to the first 512 glyphs).
+			ng_fonts[i].glyph_count = (code_table && advance_table) ? glyph_count : 0;
+			ng_fonts[i].ext_codes = code_table;
+			ng_fonts[i].ext_advances = advance_table;
 			return;
 		}
 	}
@@ -752,11 +765,13 @@ u16 ng_findFontIdByName(const char* name)
 //      the first registration of a key wins. DefineFontName never registers.
 // The recompiler drops FontInfo / Export events whose character id is not yet
 // defined, which is what Flash does. Lookup is case-insensitive.
-#define MAX_FONT_NAMES_NG 256
-static struct { char name[128]; u16 font_id; u8 bold; u8 italic; } ng_font_names[MAX_FONT_NAMES_NG];
+// Both growable (were fixed 256: tagRegisterFontExport sees EVERY export, so a
+// font exported after the 256th linkage name was not resolvable by name).
+static struct ng_font_name_ent { char name[128]; u16 font_id; u8 bold; u8 italic; } *ng_font_names;
+static size_t ng_font_names_cap = 0;
 static size_t ng_font_name_count = 0;
-#define MAX_FONT_EXPORTS_NG 256
-static struct { char name[128]; u16 char_id; u8 is_font; } ng_font_exports[MAX_FONT_EXPORTS_NG];
+static struct ng_font_export_ent { char name[128]; u16 char_id; u8 is_font; } *ng_font_exports;
+static size_t ng_font_exports_cap = 0;
 static size_t ng_font_export_count = 0;
 
 static void ng_add_font_name(u16 font_id, const char* name, int bold, int italic)
@@ -767,7 +782,8 @@ static void ng_add_font_name(u16 font_id, const char* name, int bold, int italic
 		    strcasecmp(ng_font_names[i].name, name) == 0)
 			return; // first registration wins
 	}
-	if (ng_font_name_count >= MAX_FONT_NAMES_NG) return;
+	if (ng_font_name_count >= ng_font_names_cap
+	    && !ng_table_grow((void**)&ng_font_names, &ng_font_names_cap, sizeof(*ng_font_names), 256)) return;
 	size_t s = ng_font_name_count++;
 	strncpy(ng_font_names[s].name, name, sizeof(ng_font_names[s].name) - 1);
 	ng_font_names[s].name[sizeof(ng_font_names[s].name) - 1] = '\0';
@@ -805,7 +821,8 @@ void tagRegisterFontExport(SWFAppContext* app_context, const char* name, u16 cha
 		if (strcasecmp(ng_font_exports[i].name, name) == 0) { s = i; break; }
 	}
 	if (s == ng_font_export_count) {
-		if (ng_font_export_count >= MAX_FONT_EXPORTS_NG) return;
+		if (ng_font_export_count >= ng_font_exports_cap
+		    && !ng_table_grow((void**)&ng_font_exports, &ng_font_exports_cap, sizeof(*ng_font_exports), 256)) return;
 		ng_font_export_count++;
 	}
 	strncpy(ng_font_exports[s].name, name, sizeof(ng_font_exports[s].name) - 1);
@@ -856,13 +873,13 @@ int ng_findEmbeddedFontId(const char* name, int bold, int italic, u16* out_id)
 }
 
 // TextFormat font name → font id for the AVM1 TextField paths; 0 (the builtin
-// device font) when the SWF embeds no font of that name. The legacy
-// one-name-per-font scan is only consulted if the registry overflowed.
+// device font) when the SWF embeds no font of that name. (The name registry
+// is growable now, so the old overflow fallback to the one-name-per-font scan
+// is gone: it can only overflow on OOM.)
 u16 ng_resolveTextFormatFontId(const char* name, int bold, int italic)
 {
 	u16 id = 0;
 	if (ng_findEmbeddedFontId(name, bold, italic, &id)) return id;
-	if (ng_font_name_count >= MAX_FONT_NAMES_NG) return ng_findFontIdByName(name);
 	// No embedded face: a test.toml `[fonts.*]` device face of that name
 	// (Ruffle html/layout.rs device path), else 0 = the default device font.
 	return ng_resolveDeviceFontId(name, bold, italic);
@@ -958,8 +975,9 @@ int ng_device_font_list(const char* name, uint32_t len, int bold, int italic,
 // measurement paths (ng_computeTextWidth & co.) use that face's advances.
 // ---------------------------------------------------------------------------
 #define NG_DEVICE_FONT_ID_BASE 0xFF00u
-#define MAX_DEVICE_FONTS_NG 16
-static struct { char name[128]; u8 bold; u8 italic; u16 font_id; } ng_device_fonts[MAX_DEVICE_FONTS_NG];
+// Growable (was a fixed 16, and a 33rd ng_fonts slot also refused it).
+static struct ng_device_font_ent { char name[128]; u8 bold; u8 italic; u16 font_id; } *ng_device_fonts;
+static size_t ng_device_fonts_cap = 0;
 static size_t ng_device_font_count = 0;
 static int ng_device_fonts_loaded = 0;
 
@@ -970,7 +988,10 @@ void ng_register_device_font(const char* name, int bold, int italic,
     const u16* codes, const s32* advances, size_t glyph_count)
 {
 	if (name == NULL || name[0] == '\0' || glyph_count == 0) return;
-	if (ng_device_font_count >= MAX_DEVICE_FONTS_NG || ng_font_count >= MAX_FONTS_NG) return;
+	if (ng_device_font_count >= 0xFFu) return;   // font ids NG_DEVICE_FONT_ID_BASE + k stay u16
+	if (ng_device_font_count >= ng_device_fonts_cap
+	    && !ng_table_grow((void**)&ng_device_fonts, &ng_device_fonts_cap, sizeof(*ng_device_fonts), 16)) return;
+	if (!ng_font_slot_reserve()) return;
 	size_t k = ng_device_font_count++;
 	u16 fid = (u16)(NG_DEVICE_FONT_ID_BASE + k);
 	strncpy(ng_device_fonts[k].name, name, sizeof(ng_device_fonts[k].name) - 1);
@@ -1305,13 +1326,17 @@ int ng_getTextFieldIdxByCharId(size_t char_id)
 // ---------------------------------------------------------------------------
 // Exported symbols registry (DoExportAssets → attachMovie linkage)
 // ---------------------------------------------------------------------------
-#define MAX_EXPORTED_SYMBOLS 1024
-static struct {
-	char name[128];
+// Growable (was a fixed 1024: every distinct linkage name past it was
+// dropped, so attachMovie / registerClass / Sound.attachSound on it failed).
+// `name` is heap-owned and never moves: ng_getExportNameForCharId and
+// ng_forEachExportName hand the pointer out across a later table growth.
+static struct ng_export_ent {
+	char* name;
 	size_t char_id;
 	u8 swf_version;
 	u8 movie_id;
-} ng_exported_symbols[MAX_EXPORTED_SYMBOLS];
+} *ng_exported_symbols;
+static size_t ng_exported_symbols_cap = 0;
 static size_t ng_exported_symbol_count = 0;
 
 u8 g_current_movie_id = 0;
@@ -1338,9 +1363,14 @@ static void ng_register_export_entry(const char* name, size_t char_id,
 			return;
 		}
 	}
-	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
-		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, name, 127);
-		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
+	if (ng_exported_symbol_count < ng_exported_symbols_cap
+	    || ng_table_grow((void**)&ng_exported_symbols, &ng_exported_symbols_cap, sizeof(*ng_exported_symbols), 1024)) {
+		// 127-byte truncation kept from the fixed char[128] field.
+		size_t n = strlen(name); if (n > 127) n = 127;
+		char* nm = (char*) malloc(n + 1);
+		if (nm == NULL) return;
+		memcpy(nm, name, n); nm[n] = '\0';
+		ng_exported_symbols[ng_exported_symbol_count].name = nm;
 		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
 		ng_exported_symbols[ng_exported_symbol_count].swf_version = swf_version;
 		ng_exported_symbols[ng_exported_symbol_count].movie_id = movie_id;
@@ -1452,12 +1482,14 @@ void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const 
 // ---------------------------------------------------------------------------
 // Sound metadata registry
 // ---------------------------------------------------------------------------
-#define MAX_SOUND_METADATA 128
-static struct {
+// Growable (was a fixed 128: Sound.duration / position math of every later
+// DefineSound read undefined).
+static struct ng_sound_meta_ent {
 	u16 char_id;
 	u8 rate;
 	u32 sample_count;
-} g_sound_metadata[MAX_SOUND_METADATA];
+} *g_sound_metadata;
+static size_t g_sound_metadata_cap = 0;
 static size_t g_sound_metadata_count = 0;
 
 int32_t ng_getSoundDuration(u16 char_id)
@@ -1475,7 +1507,8 @@ int32_t ng_getSoundDuration(u16 char_id)
 
 void ng_registerSoundMetadata(u16 sound_id, u8 rate, u32 sample_count)
 {
-	if (g_sound_metadata_count < MAX_SOUND_METADATA) {
+	if (g_sound_metadata_count < g_sound_metadata_cap
+	    || ng_table_grow((void**)&g_sound_metadata, &g_sound_metadata_cap, sizeof(*g_sound_metadata), 128)) {
 		g_sound_metadata[g_sound_metadata_count].char_id = sound_id;
 		g_sound_metadata[g_sound_metadata_count].rate = rate;
 		g_sound_metadata[g_sound_metadata_count].sample_count = sample_count;
@@ -2097,6 +2130,22 @@ static int ng_measure_substr_mixed_twips(int font_idx, int em,
 	return w;
 }
 
+// ng_computeScrollMixedFont's line tables: move from the caller's inline
+// arrays to the heap (then double). 0 only on OOM (line dropped, as before).
+static int ng_layout_lines_grow(int** offs, int** exts, int* cap, int* offs_inline, int* exts_inline)
+{
+	int ncap = *cap * 2;
+	int* no = (int*) malloc((size_t) ncap * sizeof(int));
+	int* ne = (int*) malloc((size_t) ncap * sizeof(int));
+	if (no == NULL || ne == NULL) { free(no); free(ne); return 0; }
+	memcpy(no, *offs, (size_t) *cap * sizeof(int));
+	memcpy(ne, *exts, (size_t) *cap * sizeof(int));
+	if (*offs != offs_inline) free(*offs);
+	if (*exts != exts_inline) free(*exts);
+	*offs = no; *exts = ne; *cap = ncap;
+	return 1;
+}
+
 void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_twips,
     const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
@@ -2113,9 +2162,18 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 	int em = ng_fonts[fi].em_square;
 	if (em <= 0) em = 1024;
 
-	#define MAX_LAYOUT_LINES 256
-	int line_offsets[MAX_LAYOUT_LINES];
-	int line_extents[MAX_LAYOUT_LINES];
+	// Line tables: 256 inline, growing onto the heap past that (s26
+	// w2-robustness-land; it was a fixed 256, so line 257+ of a long field
+	// was not recorded and maxscroll / bottomScroll / textHeight saturated).
+	// MAX_LAYOUT_LINES is the live capacity, so the reads below stay bounded.
+	#define LAYOUT_LINES_INLINE 256
+	int line_offsets_inline[LAYOUT_LINES_INLINE];
+	int line_extents_inline[LAYOUT_LINES_INLINE];
+	int* line_offsets = line_offsets_inline;
+	int* line_extents = line_extents_inline;
+	int layout_cap = LAYOUT_LINES_INLINE;
+	#define MAX_LAYOUT_LINES layout_cap
+	#define LAYOUT_LINE_ROOM(i) ((i) < layout_cap || ng_layout_lines_grow(&line_offsets, &line_extents, &layout_cap, line_offsets_inline, line_extents_inline))
 	int total_visual_lines = 0;
 
 	#define GET_FONT_HEIGHT_AT(pos) ({ \
@@ -2172,7 +2230,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 			}
 
 			last_line_was_empty = (hline_len == 0 && is_end);
-			if (total_visual_lines < MAX_LAYOUT_LINES) {
+			if (LAYOUT_LINE_ROOM(total_visual_lines)) {
 				line_offsets[total_visual_lines] = cursor_y;
 				line_extents[total_visual_lines] = cursor_y + lh;
 			}
@@ -2271,7 +2329,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 					int desc = (int)((float)ng_fonts[fi].descent * (float)fh / (float)em);
 					int lh = asc + desc;
 					if (total_visual_lines == 0) lh += (int)leading_twips;
-					if (total_visual_lines < MAX_LAYOUT_LINES) {
+					if (LAYOUT_LINE_ROOM(total_visual_lines)) {
 						line_offsets[total_visual_lines] = cursor_y;
 						line_extents[total_visual_lines] = cursor_y + lh;
 					}
@@ -2288,7 +2346,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 					int desc = (int)((float)ng_fonts[fi].descent * (float)fh / (float)em);
 					int lh = asc + desc;
 					if (total_visual_lines == 0) lh += (int)leading_twips;
-					if (total_visual_lines < MAX_LAYOUT_LINES) {
+					if (LAYOUT_LINE_ROOM(total_visual_lines)) {
 						line_offsets[total_visual_lines] = cursor_y;
 						line_extents[total_visual_lines] = cursor_y + lh;
 					}
@@ -2307,7 +2365,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 			int desc = (int)((float)ng_fonts[fi].descent * (float)fh / (float)em);
 			int lh = asc + desc;
 			if (total_visual_lines == 0) lh += (int)leading_twips;
-			if (total_visual_lines < MAX_LAYOUT_LINES) {
+			if (LAYOUT_LINE_ROOM(total_visual_lines)) {
 				line_offsets[total_visual_lines] = cursor_y;
 				line_extents[total_visual_lines] = cursor_y + lh;
 			}
@@ -2322,6 +2380,8 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 		if (out_maxscroll) *out_maxscroll = 1;
 		if (out_bottomscroll) *out_bottomscroll = 1;
 		if (out_text_height_twips) *out_text_height_twips = 0;
+		if (line_offsets != line_offsets_inline) free(line_offsets);
+		if (line_extents != line_extents_inline) free(line_extents);
 		return;
 	}
 
@@ -2375,7 +2435,11 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 		if (bottomscroll < 1) bottomscroll = 1;
 		*out_bottomscroll = bottomscroll;
 	}
+	if (line_offsets != line_offsets_inline) free(line_offsets);
+	if (line_extents != line_extents_inline) free(line_extents);
 	#undef MAX_LAYOUT_LINES
+	#undef LAYOUT_LINE_ROOM
+	#undef LAYOUT_LINES_INLINE
 	#undef GET_FONT_HEIGHT_AT
 }
 

@@ -1926,6 +1926,19 @@ namespace SWFRecomp
 						func_def << "\t\tsetVariableByName(\"" << params[i].second << "\", &_undef_" << i << ");" << endl;
 						func_def << "\t}" << endl;
 					}
+					else if ((int)params[i].first >= (int)register_count)
+					{
+						// Malformed DefineFunction2: the parameter's register is
+						// outside the function's register_count. regs[] is sized
+						// from register_count / preloads / body register uses
+						// only, so storing here wrote past the C array and
+						// smashed the stack. Ruffle ignores the write
+						// (avm1/function.rs param loop -> Activation::
+						// set_local_register, a no-op past local_registers),
+						// so the parameter is simply not bound.
+						func_def << "\t// param " << i << " register " << (int)params[i].first
+						         << " >= register_count " << (int)register_count << ": ignored (Ruffle set_local_register)" << endl;
+					}
 					else
 					{
 						// Register parameter (regs[] is already zeroed to UNDEFINED)

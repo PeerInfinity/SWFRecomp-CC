@@ -12,7 +12,7 @@
 #include <actionmodern/object.h>  // swfGcMarkVar (Stage 3 collector root marker)
 #include <ctype.h>
 
-#define VAL(type, x) *((type*) x)
+// VAL comes from actionmodern/action.h (may_alias typedef form).
 
 // For SWF <= 6, fold a variable name to lowercase (ASCII only since hashmap keys are typically ASCII)
 // Returns a stack-allocated buffer valid until next call

@@ -96,7 +96,7 @@ EMCC_FLAGS=(
     -I"${SWFMODERN_INC}/memory" -I"${SWFMODERN_INC}/rendering" -I"${SWFMODERN_INC}/audio"
     -I"${SWFMODERN_ROOT}/lib/c-hashmap" -I"${SWFMODERN_ROOT}/lib/o1heap" -I"${SWFMODERN_ROOT}/lib/stb"
     -I"${SWFMODERN_ROOT}/third_party/libtess2"
-    -O2
+    -O2 -fno-strict-aliasing  # VAL()/stack puns: see actionmodern/action.h VAL comment
 )
 LINK_EXTRA=()
 if [ "${AVM2}" = "1" ]; then

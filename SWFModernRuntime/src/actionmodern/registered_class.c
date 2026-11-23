@@ -33,7 +33,9 @@ extern int ng_forEachExportName(size_t char_id, int (*callback)(const char* name
 // case-insensitive (SWF<=6). Registration uses the calling code's SWF
 // version; lookup uses the new MC's movie SWF version. The two registries
 // are completely separate.
-#define MAX_REGISTERED_CLASSES 128
+// Both registries are growable (were a fixed 128 each: the 129th registerClass
+// symbol was silently not registered). Initial capacity:
+#define REGISTERED_CLASSES_INITIAL 128
 
 typedef struct {
 	char symbol_name[128];
@@ -49,11 +51,13 @@ typedef struct {
 } RegisteredClassEntry;
 
 // Case-sensitive registry (SWF7+)
-static RegisteredClassEntry g_registered_classes_cs[MAX_REGISTERED_CLASSES];
+static RegisteredClassEntry* g_registered_classes_cs;
+static size_t g_registered_classes_cs_cap = 0;
 static size_t g_registered_class_count_cs = 0;
 
 // Case-insensitive registry (SWF<=6) — keys stored as lowercase
-static RegisteredClassEntry g_registered_classes_ci[MAX_REGISTERED_CLASSES];
+static RegisteredClassEntry* g_registered_classes_ci;
+static size_t g_registered_classes_ci_cap = 0;
 static size_t g_registered_class_count_ci = 0;
 
 static void _toLowerBuf(char* dst, const char* src, size_t max_len)
@@ -158,7 +162,9 @@ static void registerClassForSymbolVersion(const char* symbol_name, void* constru
 				return;
 			}
 		}
-		if (g_registered_class_count_cs < MAX_REGISTERED_CLASSES)
+		if (g_registered_class_count_cs < g_registered_classes_cs_cap
+		    || ng_table_grow((void**)&g_registered_classes_cs, &g_registered_classes_cs_cap,
+		                     sizeof(RegisteredClassEntry), REGISTERED_CLASSES_INITIAL))
 		{
 			strncpy(g_registered_classes_cs[g_registered_class_count_cs].symbol_name, symbol_name, 127);
 			g_registered_classes_cs[g_registered_class_count_cs].symbol_name[127] = '\0';
@@ -184,7 +190,9 @@ static void registerClassForSymbolVersion(const char* symbol_name, void* constru
 				return;
 			}
 		}
-		if (g_registered_class_count_ci < MAX_REGISTERED_CLASSES)
+		if (g_registered_class_count_ci < g_registered_classes_ci_cap
+		    || ng_table_grow((void**)&g_registered_classes_ci, &g_registered_classes_ci_cap,
+		                     sizeof(RegisteredClassEntry), REGISTERED_CLASSES_INITIAL))
 		{
 			strncpy(g_registered_classes_ci[g_registered_class_count_ci].symbol_name, lower, 127);
 			g_registered_classes_ci[g_registered_class_count_ci].symbol_name[127] = '\0';

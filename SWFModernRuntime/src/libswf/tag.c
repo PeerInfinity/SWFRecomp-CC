@@ -3125,10 +3125,15 @@ u32 ng_get_original_transform_id(DisplayObject* obj)
 static u32 g_next_dynamic_cxform_slot;   // next available slot in cxform_buffer
 static u32 g_cxform_slot_capacity;       // total slots available
 
-// Save/restore stack for cxform_id overrides during render
-#define MAX_CXFORM_OVERRIDES 256
+// Save/restore stack for cxform_id overrides during render. Growable (s26
+// w2-robustness-land): it was a fixed 256-entry array whose overflow pushes
+// were silently NOT recorded, so a tinted container with > 256 children left
+// stale dynamic cxform ids on those children into the next frame, where the
+// dynamic slot has been reused for other content. Pushes are recorded for
+// inherited parent slots too, not only the dynamic slots.
 typedef struct { DisplayObject* obj; u32 original_id; } CxformOverride;
-static CxformOverride g_cxform_overrides[MAX_CXFORM_OVERRIDES];
+static CxformOverride* g_cxform_overrides;
+static size_t g_cxform_override_cap;
 static int g_cxform_override_count;
 
 static int g_attached_cx_cache_n;   // attached_mc_world_cxform slot dedupe
@@ -3142,7 +3147,9 @@ static void cxform_overrides_reset(void)
 
 static void cxform_overrides_push(DisplayObject* obj, u32 original_id)
 {
-	if (g_cxform_override_count < MAX_CXFORM_OVERRIDES)
+	if ((size_t) g_cxform_override_count < g_cxform_override_cap
+		|| ng_table_grow((void**) &g_cxform_overrides, &g_cxform_override_cap,
+		                 sizeof(*g_cxform_overrides), 256))
 	{
 		g_cxform_overrides[g_cxform_override_count].obj = obj;
 		g_cxform_overrides[g_cxform_override_count].original_id = original_id;
@@ -7357,6 +7364,37 @@ static inline float tf_line_pitch_twips(s16 ascent, s16 descent, int em_square,
 // Ruffle's `EditText::render_self` which pushes a mask at
 // `bounds.grow_x(-GUTTER)` — gutter-inset horizontally, full height
 // vertically. Without this, long text overflows into neighboring fields.
+// Paragraph record for textfield_glyph_render_cb's measure pass.
+typedef struct {
+	size_t start_byte;
+	size_t end_byte;
+	float width;     // in twips, sum of glyph advances
+	u8 align;        // 0=left, 1=right, 2=center, 3=justify
+	u8 bullet;
+	u16 first_fh;    // font_height of first run covering this paragraph
+} TfParagraph;
+#define TF_PARS_INLINE 32
+
+// Make pars[idx] / par_x[idx] addressable, moving the tables from the caller's
+// inline arrays to the heap (then doubling) as needed. 0 only on OOM, where
+// the caller drops the paragraph exactly as the old fixed cap did.
+static int tf_pars_room(TfParagraph** pars, float** par_x, int* cap,
+                        TfParagraph* pars_inline, float* par_x_inline, int idx)
+{
+	if (idx < *cap) return 1;
+	int ncap = *cap * 2;
+	while (ncap <= idx) ncap *= 2;
+	TfParagraph* np = (TfParagraph*) malloc((size_t) ncap * sizeof(TfParagraph));
+	float* nx = (float*) malloc((size_t) ncap * sizeof(float));
+	if (np == NULL || nx == NULL) { free(np); free(nx); return 0; }
+	memcpy(np, *pars, (size_t) *cap * sizeof(TfParagraph));
+	memcpy(nx, *par_x, (size_t) *cap * sizeof(float));
+	if (*pars != pars_inline) free(*pars);
+	if (*par_x != par_x_inline) free(*par_x);
+	*pars = np; *par_x = nx; *cap = ncap;
+	return 1;
+}
+
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
 {
 	GEN_EXTERN_SHAPE_DATA;
@@ -7481,15 +7519,16 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	// or the SENTINEL 0xFE/0xFF bytes. Each paragraph inherits align/bullet
 	// from the run that covers its first byte. Mirrors Ruffle's
 	// per-paragraph layout in core/src/html/layout.rs.
-	#define MAX_TF_PARAGRAPHS 32
-	struct {
-		size_t start_byte;
-		size_t end_byte;
-		float width;     // in twips, sum of glyph advances
-		u8 align;        // 0=left, 1=right, 2=center, 3=justify
-		u8 bullet;
-		u16 first_fh;    // font_height of first run covering this paragraph
-	} pars[MAX_TF_PARAGRAPHS];
+	// Paragraph table: 32 inline, growing onto the heap past that (s26
+	// w2-robustness-land; it was a fixed 32, so paragraph 33+ of a long field
+	// lost its align / bullet / indent offset and drew left-aligned). Local,
+	// not static, so a nested render of another field cannot clobber it.
+	TfParagraph pars_inline[TF_PARS_INLINE];
+	float par_x_inline[TF_PARS_INLINE];
+	TfParagraph* pars = pars_inline;
+	float* par_x_offset = par_x_inline;
+	int pars_cap = TF_PARS_INLINE;
+	#define MAX_TF_PARAGRAPHS_ROOM(i) tf_pars_room(&pars, &par_x_offset, &pars_cap, pars_inline, par_x_inline, (i))
 	int par_count = 0;
 	{
 		size_t pos = 0;
@@ -7521,7 +7560,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 				}
 			}
 
-			if (!par_has_run && cur_par < MAX_TF_PARAGRAPHS) {
+			if (!par_has_run && MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
 				pars[cur_par].align = cur_align;
 				pars[cur_par].bullet = cur_bullet;
 				pars[cur_par].first_fh = cur_fh;
@@ -7546,11 +7585,11 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			}
 
 			if (cp == '\n' || cp == '\r') {
-				if (cur_par < MAX_TF_PARAGRAPHS) {
+				if (MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
 					pars[cur_par].end_byte = pos;
 					cur_par++;
 				}
-				if (cur_par < MAX_TF_PARAGRAPHS) {
+				if (MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
 					pars[cur_par].start_byte = pos;
 					pars[cur_par].width = 0.0f;
 					pars[cur_par].align = 0;
@@ -7565,13 +7604,13 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			int glyph_idx = ng_font_find_glyph(run_font_idx, cp);
 			if (glyph_idx < 0) continue;
 			s32 adv = ng_font_glyph_advance_by_idx(run_font_idx, glyph_idx);
-			if (adv >= 0 && cur_par < MAX_TF_PARAGRAPHS) {
+			if (adv >= 0 && MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
 				float scale = (float)cur_fh / (float)run_em;
 				adv += tf_kern_units(info, run_idx, run_font_idx, cp, pos);
 				pars[cur_par].width += tf_glyph_advance_twips(adv, scale, info->device_font);
 			}
 		}
-		if (par_has_run && cur_par < MAX_TF_PARAGRAPHS) {
+		if (par_has_run && MAX_TF_PARAGRAPHS_ROOM(cur_par)) {
 			pars[cur_par].end_byte = text_len;
 			cur_par++;
 		}
@@ -7612,7 +7651,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	float right_off = (float)(info->right_margin_twips > 0 ? info->right_margin_twips : 0);
 	float usable_line_width = line_width - (float)first_line_left_off - right_off;
 	if (usable_line_width < 0.0f) usable_line_width = 0.0f;
-	float par_x_offset[MAX_TF_PARAGRAPHS] = {0};
+	memset(par_x_offset, 0, (size_t) pars_cap * sizeof(float));
 	for (int p = 0; p < par_count; p++) {
 		float bul = pars[p].bullet ? 720.0f : 0.0f;
 		float remaining = usable_line_width - bul - pars[p].width;
@@ -7909,7 +7948,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			x_pos += tf_glyph_advance_twips(adv, scale, info->device_font);
 		}
 	}
-	#undef MAX_TF_PARAGRAPHS
+	#undef MAX_TF_PARAGRAPHS_ROOM
 #undef TF_RESOLVE_RUN_FONT
 
 	// Caret at (or past) the end of the text — pen is at its final position.
@@ -7958,6 +7997,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			cr, cg, cb, 1.0f, 0, 0);
 	}
 #endif
+	if (pars != pars_inline) free(pars);
+	if (par_x_offset != par_x_inline) free(par_x_offset);
 }
 
 // Helper: render a single drawing path (fill + stroke), handling gradients
@@ -14080,33 +14121,41 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 // (e.g. char_id=1 for both parent's and child's DoInitAction sprite)
 // don't shadow each other. Used by both the per-frame init prologue
 // (top-level DoInitAction) and the sprite-internal DoInitAction emission.
-#define MAX_INIT_ACTION_MOVIES 8
-#define MAX_INIT_ACTION_CHARS 512
-static u8 g_init_action_done[MAX_INIT_ACTION_MOVIES][MAX_INIT_ACTION_CHARS];
+// One bit per (movie, char_id) over the full u16 id space (was a fixed
+// [8][512] byte table: a DoInitAction on a sprite id >= 512 was never marked
+// done, so its once-only guard was off, and movies >= 8 aliased movie 0).
+// Rows are allocated lazily (8 KiB per movie that runs an init action).
+static u8* g_init_action_done[256];
 
 void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_func action)
 {
 	u8 movie = g_current_movie_id;
-	if (movie >= MAX_INIT_ACTION_MOVIES) movie = 0;
-	if (char_id < MAX_INIT_ACTION_CHARS && g_init_action_done[movie][char_id])
-		return;
-	if (char_id < MAX_INIT_ACTION_CHARS)
-		g_init_action_done[movie][char_id] = 1;
+	size_t id = char_id & 0xFFFF;
+	u8* row = g_init_action_done[movie];
+	if (row == NULL) row = g_init_action_done[movie] = (u8*) calloc(65536 / 8, 1);
+	if (row != NULL) {
+		if (row[id >> 3] & (1u << (id & 7))) return;
+		row[id >> 3] |= (u8)(1u << (id & 7));
+	}
 	action(app_context);
 }
 
 // Per-sprite frame label storage (separate from Character union)
-#define MAX_SPRITE_LABEL_ENTRIES 256
-static struct {
+// Growable (was a fixed 256: gotoAndStop("label") on the 257th labelled
+// sprite found no label and stayed on frame 1).
+static struct sprite_label_ent {
 	size_t char_id;
 	FrameLabelEntry* labels;
 	size_t count;
-} sprite_label_store[MAX_SPRITE_LABEL_ENTRIES];
+} *sprite_label_store;
+static size_t sprite_label_store_cap = 0;
 static size_t sprite_label_store_count = 0;
 
 void tagSetSpriteLabels(size_t char_id, FrameLabelEntry* labels, size_t count)
 {
-	if (sprite_label_store_count >= MAX_SPRITE_LABEL_ENTRIES) return;
+	if (sprite_label_store_count >= sprite_label_store_cap
+	    && !ng_table_grow((void**)&sprite_label_store, &sprite_label_store_cap,
+	                      sizeof(*sprite_label_store), 256)) return;
 	sprite_label_store[sprite_label_store_count].char_id = char_id;
 	sprite_label_store[sprite_label_store_count].labels = labels;
 	sprite_label_store[sprite_label_store_count].count = count;
@@ -14499,24 +14548,37 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 	}
 }
 
-// Extended filter data side table (for ColorMatrix, Convolution, Gradient filters)
-#define MAX_EXT_FILTERS 32
-static ExtFilterData g_ext_filters[MAX_EXT_FILTERS];
+// Extended filter data side table (for ColorMatrix, Convolution, Gradient
+// filters), keyed by root depth. Growable (s26 w2-robustness-land): it was a
+// fixed 32-entry table, so the 33rd+ filtered root depth silently lost its
+// filter. Entries are individually allocated (pointer-stable): callers hold
+// the ExtFilterData* that getOrCreateExtFilter / ng_getExtFilterDataByDepth
+// hand out, so the backing table may move but an entry never does.
+static ExtFilterData** g_ext_filters;
+static size_t g_ext_filter_cap;
 static int g_ext_filter_count = 0;
 
 // Parallel depth array for the ext filter side table
-static size_t g_ext_filter_depths[MAX_EXT_FILTERS];
+static size_t* g_ext_filter_depths;
+static size_t g_ext_filter_depths_cap;
 
 static ExtFilterData* getOrCreateExtFilter(size_t depth)
 {
 	for (int i = 0; i < g_ext_filter_count; i++) {
-		if (g_ext_filter_depths[i] == depth) return &g_ext_filters[i];
+		if (g_ext_filter_depths[i] == depth) return g_ext_filters[i];
 	}
-	if (g_ext_filter_count >= MAX_EXT_FILTERS) return NULL;
+	if ((size_t) g_ext_filter_count >= g_ext_filter_cap
+		&& !ng_table_grow((void**) &g_ext_filters, &g_ext_filter_cap, sizeof(*g_ext_filters), 32))
+		return NULL;
+	if ((size_t) g_ext_filter_count >= g_ext_filter_depths_cap
+		&& !ng_table_grow((void**) &g_ext_filter_depths, &g_ext_filter_depths_cap, sizeof(*g_ext_filter_depths), 32))
+		return NULL;
+	ExtFilterData* ef = (ExtFilterData*) calloc(1, sizeof(ExtFilterData));
+	if (ef == NULL) return NULL;
 	int idx = g_ext_filter_count++;
-	memset(&g_ext_filters[idx], 0, sizeof(ExtFilterData));
+	g_ext_filters[idx] = ef;
 	g_ext_filter_depths[idx] = depth;
-	return &g_ext_filters[idx];
+	return ef;
 }
 
 void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20)
@@ -14581,28 +14643,36 @@ const ExtFilterData* ng_getExtFilterDataByDepth(size_t depth)
 {
 	if (depth == (size_t)-1) return NULL;
 	for (int i = 0; i < g_ext_filter_count; i++) {
-		if (g_ext_filter_depths[i] == depth) return &g_ext_filters[i];
+		if (g_ext_filter_depths[i] == depth) return g_ext_filters[i];
 	}
 	return NULL;
 }
 
 
-// Multi-filter list storage
-#define MAX_FILTER_LISTS 32
-static FilterListData g_filter_lists[MAX_FILTER_LISTS];
+// Multi-filter list storage, keyed by root depth. Growable (s26
+// w2-robustness-land; was a fixed 32, so the 33rd+ filtered root depth lost its
+// filter list). Pointer-stable: display_list[depth].filter_chain and
+// g_current_filter_list point INTO entries, so each list is allocated on its
+// own and only the pointer table grows.
+static FilterListData** g_filter_lists;
+static size_t g_filter_list_cap;
 static int g_filter_list_count = 0;
 static FilterListData* g_current_filter_list = NULL; // list being built
 
 static FilterListData* getOrCreateFilterList(size_t depth)
 {
 	for (int i = 0; i < g_filter_list_count; i++) {
-		if (g_filter_lists[i].depth == depth) return &g_filter_lists[i];
+		if (g_filter_lists[i]->depth == depth) return g_filter_lists[i];
 	}
-	if (g_filter_list_count >= MAX_FILTER_LISTS) return NULL;
+	if ((size_t) g_filter_list_count >= g_filter_list_cap
+		&& !ng_table_grow((void**) &g_filter_lists, &g_filter_list_cap, sizeof(*g_filter_lists), 32))
+		return NULL;
+	FilterListData* fl = (FilterListData*) calloc(1, sizeof(FilterListData));
+	if (fl == NULL) return NULL;
 	int idx = g_filter_list_count++;
-	memset(&g_filter_lists[idx], 0, sizeof(FilterListData));
-	g_filter_lists[idx].depth = depth;
-	return &g_filter_lists[idx];
+	g_filter_lists[idx] = fl;
+	fl->depth = depth;
+	return fl;
 }
 
 void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count)
@@ -14747,8 +14817,8 @@ const FilterListData* ng_getFilterListDataByDepth(size_t depth)
 {
 	if (depth == (size_t)-1) return NULL;
 	for (int i = 0; i < g_filter_list_count; i++) {
-		if (g_filter_lists[i].depth == depth && g_filter_lists[i].count > 0)
-			return &g_filter_lists[i];
+		if (g_filter_lists[i]->depth == depth && g_filter_lists[i]->count > 0)
+			return g_filter_lists[i];
 	}
 	return NULL;
 }
@@ -15308,11 +15378,13 @@ void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target
 }
 
 // Bitmap metadata registry (shared across all build modes)
-#define MAX_BITMAP_DEFS 128
+// Growable (was a fixed 128: BitmapData.loadBitmap of the 129th bitmap
+// returned undefined; Bloxorz defines 516 bitmaps).
 // `pixels` is an absolute pointer into the DEFINING movie's bitmap_data, not an
 // offset: a loaded child SWF owns a separate array, so an offset on its own
 // names nothing (see defineBitmap in tag.h).
-static struct { u16 char_id; const u8* pixels; size_t size; u32 width; u32 height; } g_bitmap_defs[MAX_BITMAP_DEFS];
+static struct bitmap_def_ent { u16 char_id; const u8* pixels; size_t size; u32 width; u32 height; } *g_bitmap_defs;
+static size_t g_bitmap_defs_cap = 0;
 static int g_bitmap_def_count = 0;
 
 int ng_getBitmapMetadata(u16 char_id, const u8** out_pixels, size_t* out_size, u32* out_width, u32* out_height)
@@ -15343,7 +15415,8 @@ int ng_getBitmapByIndex(u32 idx, const u8** out_pixels, u32* out_width, u32* out
 
 void ng_registerBitmapMetadata(u16 char_id, const u8* pixels, size_t size, u32 width, u32 height)
 {
-	if (g_bitmap_def_count < MAX_BITMAP_DEFS) {
+	if ((size_t)g_bitmap_def_count < g_bitmap_defs_cap
+	    || ng_table_grow((void**)&g_bitmap_defs, &g_bitmap_defs_cap, sizeof(*g_bitmap_defs), 128)) {
 		g_bitmap_defs[g_bitmap_def_count].char_id = char_id;
 		g_bitmap_defs[g_bitmap_def_count].pixels = pixels;
 		g_bitmap_defs[g_bitmap_def_count].size = size;
