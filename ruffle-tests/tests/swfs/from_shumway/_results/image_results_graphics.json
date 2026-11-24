@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-24T01:36:22.536602+00:00",
+    "timestamp": "2026-11-24T03:17:04.798500+00:00",
     "suite": "from_shumway",
     "stem": "results_graphics",
-    "git_sha": "d70f2c0aa67fd0701e0d0fe02ebf2e6c3d7e62c2",
+    "git_sha": "b8d3b736aaefa1b4dd3c960a140545c307eb2236",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45300086369",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45300086369",
+    "run_id": "45312833576",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45312833576",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 71,
   "comparisons": 123,
   "ignored": 0,
-  "pass": 106,
-  "fail": 17,
+  "pass": 107,
+  "fail": 16,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 14,
   "ruffle_matched_fail": 5,
-  "pass_rate": 86.2,
+  "pass_rate": 87.0,
   "results": [
     {
       "suite": "from_shumway",
@@ -1656,30 +1656,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 308 outliers exceed limit of 3, max difference 255",
-      "reason": "pixel_mismatch",
+      "status": "pass",
+      "message": "Image check passed: 3 outliers (limit 3), max difference 255",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 1024,
       "height": 1024,
       "total_channels": 4194304,
-      "diff_channels": 45227,
-      "mean_diff": 0.0116,
+      "diff_channels": 43755,
+      "mean_diff": 0.0107,
       "checks": [
         {
           "tolerance": 3,
           "max_outliers": 3,
-          "outliers": 308,
-          "passed": false
+          "outliers": 3,
+          "passed": true
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 1,
-      "outliers": 308,
+      "failed_checks": 0,
+      "outliers": 3,
       "max_outliers": 3,
       "tolerance": 3,
-      "excess_outliers": 305
+      "excess_outliers": 0
     },
     {
       "suite": "from_shumway",
@@ -1742,8 +1741,8 @@
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 67282,
-      "mean_diff": 0.081,
+      "diff_channels": 28634,
+      "mean_diff": 0.036,
       "checks": [
         {
           "tolerance": 4,
@@ -1766,19 +1765,19 @@
       "trace_status": "pass",
       "known_failure": false,
       "status": "pass",
-      "message": "Image check passed: 0 outliers (limit 0), max difference 15 (2 checks)",
-      "max_diff": 15,
+      "message": "Image check passed: 0 outliers (limit 0), max difference 16 (2 checks)",
+      "max_diff": 16,
       "expected_source": "repo",
       "width": 550,
       "height": 400,
       "total_channels": 880000,
-      "diff_channels": 74358,
-      "mean_diff": 0.1657,
+      "diff_channels": 86612,
+      "mean_diff": 0.1911,
       "checks": [
         {
           "tolerance": 5,
           "max_outliers": 2500,
-          "outliers": 2036,
+          "outliers": 2144,
           "passed": true
         },
         {

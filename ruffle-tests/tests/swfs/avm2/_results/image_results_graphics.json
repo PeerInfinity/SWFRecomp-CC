@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-24T01:36:22.362836+00:00",
+    "timestamp": "2026-11-24T03:17:04.625094+00:00",
     "suite": "avm2",
     "stem": "results_graphics",
-    "git_sha": "d70f2c0aa67fd0701e0d0fe02ebf2e6c3d7e62c2",
+    "git_sha": "b8d3b736aaefa1b4dd3c960a140545c307eb2236",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45300086369",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45300086369",
+    "run_id": "45312833576",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45312833576",
     "run_attempt": "1"
   },
   "tests_with_comparisons": 114,
   "comparisons": 129,
   "ignored": 1,
-  "pass": 116,
-  "fail": 13,
+  "pass": 117,
+  "fail": 12,
   "skip": 0,
   "no_render": 0,
   "fail_known_failure": 6,
   "ruffle_matched_fail": 1,
-  "pass_rate": 89.9,
+  "pass_rate": 90.7,
   "results": [
     {
       "suite": "avm2",
@@ -2991,30 +2991,29 @@
       "comparison": "output",
       "trace_status": "pass",
       "known_failure": false,
-      "status": "fail",
-      "message": "Image comparison failed: 34301 outliers exceed limit of 32500, max difference 255",
-      "reason": "pixel_mismatch",
+      "status": "pass",
+      "message": "Image check passed: 9413 outliers (limit 32500), max difference 255",
       "max_diff": 255,
       "expected_source": "repo",
       "width": 1280,
       "height": 720,
       "total_channels": 3686400,
-      "diff_channels": 34301,
-      "mean_diff": 2.3727,
+      "diff_channels": 9413,
+      "mean_diff": 0.6511,
       "checks": [
         {
           "tolerance": 1,
           "max_outliers": 32500,
-          "outliers": 34301,
-          "passed": false
+          "outliers": 9413,
+          "passed": true
         }
       ],
       "applicable_checks": 1,
-      "failed_checks": 1,
-      "outliers": 34301,
+      "failed_checks": 0,
+      "outliers": 9413,
       "max_outliers": 32500,
       "tolerance": 1,
-      "excess_outliers": 1801
+      "excess_outliers": 0
     },
     {
       "suite": "avm2",
