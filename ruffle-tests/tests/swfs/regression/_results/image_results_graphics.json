@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T07:07:17.017108+00:00",
+    "timestamp": "2026-11-24T00:49:39.247000+00:00",
     "suite": "regression",
     "stem": "results_graphics",
-    "git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
+    "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
     "source": "results_graphics.json",
     "incomplete": false,
-    "run_id": "45114820633",
-    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45114820633",
-    "run_attempt": "1"
+    "run_id": "45284922078",
+    "run_url": "https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/45284922078",
+    "run_attempt": "2"
   },
-  "tests_with_comparisons": 34,
-  "comparisons": 34,
+  "tests_with_comparisons": 38,
+  "comparisons": 38,
   "ignored": 0,
-  "pass": 31,
+  "pass": 35,
   "fail": 0,
   "skip": 3,
   "no_render": 0,
   "fail_known_failure": 0,
   "ruffle_matched_fail": 0,
-  "pass_rate": 91.2,
+  "pass_rate": 92.1,
   "results": [
     {
       "suite": "regression",
@@ -64,6 +64,36 @@
       "width": 200,
       "height": 100,
       "total_channels": 80000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 1,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_attached_clip_holder_render",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 400,
+      "height": 300,
+      "total_channels": 480000,
       "diff_channels": 0,
       "mean_diff": 0.0,
       "checks": [
@@ -143,6 +173,36 @@
     },
     {
       "suite": "regression",
+      "test": "avm1_edittext_placed_cxform",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 19 outliers (limit 19), max difference 64",
+      "max_diff": 64,
+      "expected_source": "repo",
+      "width": 180,
+      "height": 150,
+      "total_channels": 108000,
+      "diff_channels": 19,
+      "mean_diff": 0.0101,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 19,
+          "outliers": 19,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 19,
+      "max_outliers": 19,
+      "tolerance": 2,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
       "test": "avm1_jpeg3_alpha_bitmap",
       "comparison": "output",
       "trace_status": "pass",
@@ -199,6 +259,36 @@
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_morph_instances_ratio",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 320,
+      "height": 100,
+      "total_channels": 128000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 0,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 0,
       "excess_outliers": 0
     },
     {
@@ -529,6 +619,36 @@
       "outliers": 0,
       "max_outliers": 0,
       "tolerance": 1,
+      "excess_outliers": 0
+    },
+    {
+      "suite": "regression",
+      "test": "avm1_set_new_text_format_render",
+      "comparison": "output",
+      "trace_status": "pass",
+      "known_failure": false,
+      "status": "pass",
+      "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+      "max_diff": 0,
+      "expected_source": "repo",
+      "width": 180,
+      "height": 150,
+      "total_channels": 108000,
+      "diff_channels": 0,
+      "mean_diff": 0.0,
+      "checks": [
+        {
+          "tolerance": 2,
+          "max_outliers": 0,
+          "outliers": 0,
+          "passed": true
+        }
+      ],
+      "applicable_checks": 1,
+      "failed_checks": 0,
+      "outliers": 0,
+      "max_outliers": 0,
+      "tolerance": 2,
       "excess_outliers": 0
     },
     {

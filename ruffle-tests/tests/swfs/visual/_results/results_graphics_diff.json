@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-11-23T03:52:23.808004+00:00",
-    "old_git_sha": "a18a9cc61d54539528600434a21156f38760ea58",
-    "new_timestamp": "2026-11-23T07:07:13.938619+00:00",
-    "new_git_sha": "da9b49b17a0affd45024f7b06baefdb0546f71a1",
+    "old_timestamp": "2026-11-23T23:56:29.027900+00:00",
+    "old_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "new_timestamp": "2026-11-24T00:49:36.301014+00:00",
+    "new_git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
     "partial": false,
-    "same_commit": false
+    "same_commit": true
   },
   "summary": {
-    "old_pass": 149,
+    "old_pass": 144,
     "old_ruffle_matched": 2,
-    "old_effective_pass": 151,
-    "old_total": 151,
-    "old_pass_rate": 98.7,
+    "old_effective_pass": 146,
+    "old_total": 146,
+    "old_pass_rate": 98.6,
     "new_pass": 149,
     "new_ruffle_matched": 2,
     "new_effective_pass": 151,
@@ -25,9 +25,70 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 151,
-    "added": 0,
+    "unchanged": 146,
+    "added": 5,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "cache_as_bitmap/edittext_scroll",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "cache_as_bitmap/edittext_selection",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "cache_as_bitmap/masks",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "cache_as_bitmap/morph",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "cache_as_bitmap/nested_color_transform",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      }
+    }
+  ]
 }

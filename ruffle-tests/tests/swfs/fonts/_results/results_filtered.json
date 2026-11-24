@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-11-23T02:55:02.126522+00:00",
-    "git_sha": "876e6670414ebd2a81c5dd234f3e46645b3886cf",
-    "duration_seconds": 145.91,
+    "timestamp": "2026-11-24T00:12:43.560553+00:00",
+    "git_sha": "005bea42a286627166e5a667a45f77537e6ae09c",
+    "duration_seconds": 155.25,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30,
@@ -23,9 +23,9 @@
     {
       "test": "device_font_glyph_fallback",
       "phases": {
-        "recomp": 0.008,
-        "compile": 22.422,
-        "run": 0.004
+        "recomp": 0.007,
+        "compile": 22.208,
+        "run": 0.003
       },
       "num_frames": 1,
       "lines": {
@@ -33,15 +33,15 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 22.44,
+      "duration": 22.22,
       "status": "pass"
     },
     {
       "test": "device_font_kerning",
       "phases": {
-        "recomp": 0.007,
-        "compile": 23.185,
-        "run": 0.004
+        "recomp": 0.013,
+        "compile": 31.548,
+        "run": 0.006
       },
       "num_frames": 1,
       "lines": {
@@ -49,15 +49,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 23.2,
+      "duration": 31.58,
       "status": "pass"
     },
     {
       "test": "device_font_list",
       "phases": {
         "recomp": 0.009,
-        "compile": 22.938,
-        "run": 0.004
+        "compile": 23.236,
+        "run": 0.003
       },
       "num_frames": 1,
       "lines": {
@@ -65,15 +65,15 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 22.96,
+      "duration": 23.25,
       "status": "pass"
     },
     {
       "test": "device_font_name_case",
       "phases": {
-        "recomp": 0.009,
-        "compile": 1.009,
-        "run": 0.003
+        "recomp": 0.007,
+        "compile": 0.968,
+        "run": 0.002
       },
       "num_frames": 1,
       "lines": {
@@ -81,14 +81,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 1.02,
+      "duration": 0.98,
       "status": "pass"
     },
     {
       "test": "device_font_no_ink",
       "phases": {
         "recomp": 0.007,
-        "compile": 22.994,
+        "compile": 23.485,
         "run": 0.004
       },
       "num_frames": 1,
@@ -97,7 +97,7 @@
         "expected_lines": 18,
         "matching_lines": 4
       },
-      "duration": 23.01,
+      "duration": 23.5,
       "ruffle_diff_count": 14,
       "ours_diff_count": 14,
       "status": "ruffle_matched",
@@ -106,8 +106,8 @@
     {
       "test": "embed_matching/fallback_preferences",
       "phases": {
-        "recomp": 0.159,
-        "compile": 23.969,
+        "recomp": 0.156,
+        "compile": 23.862,
         "run": 0.004
       },
       "num_frames": 1,
@@ -116,14 +116,14 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 24.14,
+      "duration": 24.03,
       "status": "pass"
     },
     {
       "test": "embed_matching/match_style",
       "phases": {
         "recomp": 0.017,
-        "compile": 6.017,
+        "compile": 6.01,
         "run": 0.004
       },
       "num_frames": 1,
@@ -138,9 +138,9 @@
     {
       "test": "embed_matching/no_font_found",
       "phases": {
-        "recomp": 0.006,
-        "compile": 5.902,
-        "run": 0.004
+        "recomp": 0.005,
+        "compile": 5.695,
+        "run": 0.003
       },
       "num_frames": 1,
       "lines": {
@@ -148,15 +148,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 5.92,
+      "duration": 5.71,
       "status": "pass"
     },
     {
       "test": "embed_name_lookup",
       "phases": {
-        "recomp": 0.015,
-        "compile": 16.889,
-        "run": 0.007
+        "recomp": 0.012,
+        "compile": 17.638,
+        "run": 0.006
       },
       "num_frames": 1,
       "lines": {
@@ -164,7 +164,7 @@
         "expected_lines": 242,
         "matching_lines": 242
       },
-      "duration": 16.91,
+      "duration": 17.66,
       "status": "pass"
     }
   ]
