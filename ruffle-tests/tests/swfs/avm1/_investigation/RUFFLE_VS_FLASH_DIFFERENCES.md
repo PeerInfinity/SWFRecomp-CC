@@ -731,3 +731,30 @@ Ruffle's `replace_text` at index 0 gives the new character the default format (`
 
 **Decision:** match Flash (user ruling: Flash over Ruffle). The fixture's golden is Flash's output. **Prune
 criterion:** Ruffle's `replace_text` inherits the run format at index 0.
+
+## `visual/filters/blur_quality` (image): the golden is not Flash, and ours is pixel-identical to Flash (s27 golden-provenance)
+
+**Test:** `visual/filters/blur_quality`
+
+<!-- image-axis: visual/filters/blur_quality output -->
+
+**Diff (ours vs the upstream golden, CI `dc5d2936a`):** 205 332 outlier channels at tolerance 6, max diff 9. Every
+one is in the quality ≥ 7, even-size cells (ACCEPTED_DIFFS Category 2 has the s26 analysis).
+
+**Flash:** the s27 golden-provenance sweep captured this SWF in Flash Player 32 LNX (wrapper `draw()`, tick 1, quality
+from `test.toml`). Our CI render (`origin/ruffle-image-results` `3c450b5c0`) equals that capture **exactly**: 0
+channels over tolerance 6, max diff 0. The upstream golden is 342 229 px off Flash (max 9). The sibling
+`visual/filters/blur_fractional` golden is Flash-exact. That settles s26's "the two goldens contradict each other": the
+`blur_quality` golden is the wrong one. Its upstream history begins at `5f840bf103` "tests: Add a visual test for blur
+filter quality" (2023-07-24) and has no Flash-reference commit. Evidence:
+`SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md` (table row plus the re-priced board), Flash PNG
+`golden-provenance/visual__filters__blur_quality__output.png`.
+
+**Decision:** match Flash (user ruling: Flash over Ruffle). The image row stays failing against the Ruffle golden,
+and the failure is dispositioned here. The trace row passes and is NOT ignored.
+
+**Scope of this image-axis disposition:** `visual/filters/blur_quality output` at up to ~205 k outliers / max diff 9
+against the golden. Any ours-vs-Flash-PNG difference over tolerance 6 is NOT covered: re-triage the blur path.
+
+**Prune criterion:** upstream replaces the golden with a Flash reference (then the row passes outright), or our render
+drifts off the Flash PNG.

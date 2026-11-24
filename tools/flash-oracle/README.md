@@ -136,10 +136,43 @@ Traces: `cargo testutils execute` is byte-identical on `avm1/add2`, `avm2/add`, 
 `output.txt` disagrees with Flash: `avm1/movieclip_hittest`, at "Square, no scale / square.hitTest(50, 50)", where Flash
 gives `false` and the golden says `true`.
 
+## Golden sweep (`sweep_goldens.py`, s27)
+
+```bash
+python3 tools/flash-oracle/sweep_goldens.py <test rel to root> --root ruffle-tests/tests/swfs --out-dir D [--screen | --direct]
+```
+
+- **What it does.**
+  - Captures every numeric `trigger` tick in one wrapper run.
+  - Grades each comparison with ALL of its `checks`, using Ruffle semantics.
+  - Writes `D/<test>[.screen|.direct].json` and the Flash PNGs to `D/png/`.
+  - `validate_images.py` only grades the first comparison at the last tick.
+- **`--screen`:** one projector run per trigger tick, since the hold only happens at the last captured tick.
+- **`--direct`:** the SWF runs as the REAL root, and the Xvfb window is grabbed after it settles. The tick is NOT
+  pinned, so use it only for static content.
+  - It is needed for the ~50 AVM2 tests whose document-class constructor touches `stage`. In a Loader child `stage`
+    is null, so under the wrapper they die with `TypeError #1009` before tick 1.
+  - It is also needed for runtime-load tests (AVM1 `loadMovie` never loads under the wrapper).
+  - A modal dialog (e.g. `FileReference.save`) covers the stage and spoils the crop.
+- **`mm.cfg PreloadSwf` root agent: tried and ruled out.** The preload SWF runs (for AVM1 and AVM2 roots), but the
+  main movie gets a NEW Stage. The preload's `stage` becomes null, and no stage event of the main movie reaches it.
+- **Window-size race (direct mode, traces AND images).**
+  - The projector window starts at about 640×480 and shrinks to the SWF size later.
+  - SWFs narrower than 640 stay show-all scaled: the drawing area measured 640×468 for a 500×250 SWF.
+  - 550-wide stages can still be scaled during their first frames under parallel load (`displayobject_scrollrect`'s
+    concatenatedMatrix came out ×640/550).
+  - Coordinate-dependent direct traces (`hitTest*`, `concatenatedMatrix`, mouse coords) are therefore unreliable
+    unless run serially and checked.
+  - Wrapper captures set NO_SCALE and are immune.
+- **The README's validation goldens.** The two rows below were validated against upstream goldens NEWER than our
+  mirror. Ruffle re-baked them as Flash references on 2026-11-23 (`5128d3943`, `7facc1fcc`). Against our mirror's
+  older goldens, Flash is 22 953 px / 23 380 px off.
+- Results of the full sweep: `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`.
+
 ## Files
 
 - `flashenv.py`: player environments (Linux temp-HOME + Xvfb; Windows interop) and the SWF header parse/patch.
-- `run_trace.py`, `run_image.py`, `validate_images.py`: the CLIs above.
+- `run_trace.py`, `run_image.py`, `validate_images.py`, `sweep_goldens.py`: the CLIs above.
 - `capture/CaptureWrapper.as` + `build.sh` → `CaptureWrapper.swf` (committed, 4.7 KB).
 - `xgrab/xgrab.c`: X window tree, root screenshot (PPM), and XTest typing.
 - `probes/tick_avm1`, `probes/tick_avm2`: the tick-alignment probes (MTASC / mxmlc sources + SWFs).

@@ -186,6 +186,15 @@ the upstream tolerance of 6. Evidence:
 **Decision:** keep the Flash-consistent model. The trace row still passes and is NOT ignored. **Prune criterion:** a
 fresh Flash capture of either test re-decides which golden is wrong.
 
+**s27: prune criterion MET (golden-provenance sweep).** Flash Player 32 LNX captures of both SWFs:
+- `blur_fractional`'s golden is Flash-exact.
+- `blur_quality`'s golden is 342 229 px off Flash (max 9).
+- Our CI render of `blur_quality` equals the Flash capture at 0 px.
+
+The golden is therefore not "internally inconsistent"; it is simply not Flash. The disposition now lives in
+`RUFFLE_VS_FLASH_DIFFERENCES.md` §"`visual/filters/blur_quality` (image): the golden is not Flash". This entry is kept
+for the s26 mechanism analysis only. Evidence: `SWFRecompDocs/plans/session27-fanout-reports/golden-provenance.md`.
+
 ## Category 3: Flash Implementation Quirks We Do Not Replicate
 
 Undocumented or locale-specific behaviors of Flash Player's built-in functions that
