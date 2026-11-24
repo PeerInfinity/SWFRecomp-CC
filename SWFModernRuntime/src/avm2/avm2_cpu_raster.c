@@ -288,10 +288,14 @@ static uint32_t bmp_sample(const RasterCtx* R, double u, double v)
 	uint32_t c;
 	if (!R->bmp_smooth) {
 		// Nearest: a pixel centre on (or within float noise of) a texel
-		// boundary takes the LOWER texel. Measured on avm2/pixelbender_dithering
-		// (y scale exactly 1.5 px/texel, so every third row is a tie): exact
-		// floor 20153 outliers, ties-to-lower 8614, flat for eps 1e-6..1e-3.
-		c = bmp_texel(R, (int) floor(u - 1e-6), (int) floor(v - 1e-6));
+		// boundary takes the UPPER texel (floor of the exact coordinate), as
+		// Flash Player does. avm2/pixelbender_dithering (y scale exactly 1.5
+		// px/texel, so every third row is a tie) against its Flash Player
+		// golden (upstream 5128d3943, limit 32500): ties-to-lower 34301
+		// outliers, exact floor 9416, ties-to-upper 9413. (s26 chose
+		// ties-to-lower against the old Ruffle-made golden, 8614 vs 20153:
+		// Ruffle's GPU nearest sampler rounds these ties down; Flash doesn't.)
+		c = bmp_texel(R, (int) floor(u + 1e-6), (int) floor(v + 1e-6));
 	} else {
 		double fu = u - 0.5, fv = v - 0.5;
 		int x0 = (int) floor(fu), y0 = (int) floor(fv);

@@ -1,0 +1,10 @@
+num_frames = 1
+
+# HELD (s27 w1-text-wordwrap): expected PNG + output.txt must come from the
+# Ruffle exporter (LOCAL ORACLE REQUEST). Until then output.txt is OURS.
+[image_comparisons.output]
+tolerance = 1
+max_outliers = 0
+
+[player_options]
+with_renderer = { optional = false }
