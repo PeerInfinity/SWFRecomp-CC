@@ -1,0 +1,8 @@
+**AVM2 text tail** (w1-text-glyph-fidelity §2b, §5, leads 2, 5, 6). Categories: `avm2`, `visual`, `regression`.
+
+1. **AVM2 DefineText TextMatrix linear part (S–M):** `abc_timeline.cpp parseDefineText` keeps only T.t, and `Avm2StaticGlyph` has no linear part. Emit the per-record TextMatrix linear part (a trailing field of `Avm2StaticTextData`), keep the pen in text space, and compose `world * T.lin` in `avm2_render_statictext` and `avm2_cpu_raster_statictext`. Fixture `session27-fanout-reports/w1-text-glyph-fidelity-fixtures/avm2_definetext_matrix/`: its analytic golden **== FLASH draw() at 0 px** (`SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-text-glyph-fidelity/avm2_definetext_matrix/flash.png`) and == the exporter. Land it.
+2. **`definefont4` glyph half (S–M):** feed DefineFont4 CFF outlines through the existing stb_truetype + flattener path in `abc_devicefont.cpp` (`appendGlyphOutline`). The TextLine render half stays the arc; deliver the glyphs plus a measured plan for the TextLine draw.
+3. **AVM2 selection rect tint:** ours tints selection rects with `cxid`; Ruffle doesn't (and draws selected glyphs with an identity cx). Build a fixture (AS3 needs mxmlc, which the cloud lacks: hand-assemble the ABC or put the AS source under LOCAL ORACLE REQUESTS for the coordinator to compile and capture in FLASH). No change without the Flash verdict.
+4. Re-check `definefont4`, `font_lookup_as3` after your changes (md5 = CI today).
+
+Siblings: `w2-avm1-text-layout` (AVM1 text), `w2-draw-cx-text` (`avm2_cpu_raster_*` callers in `avm2_bitmap.c`). You own `avm2_cpu_raster_statictext`; coordinate by keeping your change inside it.

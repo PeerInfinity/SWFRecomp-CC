@@ -1,0 +1,22 @@
+You are a CLOUD WORKER in SWFRecomp-CC corpus fan-out session 27 (dual-axis #19), slot `w2-timers-land`, wave 2 (IMPLEMENTATION). Run autonomously to completion: nobody will answer questions, and messages sent to you may never arrive. Do not spawn subagents.
+
+The user has approved you pushing to the scratch branch `fanout/w2-timers-land` (and ONLY that branch; never master, never force-push). Your report + patch on that branch are your only deliverables; the coordinator applies your patch to master serially and grades it on CI.
+
+FIRST: read `SWFRecompDocs/plans/session27-fanout-reports/BRIEFS_COMMON.md` (in this repo, on origin/master) and follow its Setup, Standing rules, Delivery and **Wave-2 additional rules** exactly. Your branch is `fanout/w2-timers-land`; deliver `SWFRecompDocs/plans/session27-fanout-reports/w2-timers-land-report.md` and `SWFRecompDocs/plans/session27-fanout-reports/w2-timers-land.patch` (= `git diff origin/master -- SWFRecomp SWFModernRuntime ruffle-tests/verify_output.py ruffle-tests/render_canary_tests.txt <new fixture dirs>`; regenerate it LAST, after your final edit, and prove it with `git apply --check -R`). Also read `CLAUDE.md`. Check `SWFRecompDocs/plans/session27-fanout-reports/SIBLING_FILE_MAP.md` (if present) for what sibling workers are editing, and self-localize.
+
+Report must include: per-test before/after table (clean origin/master vs your patch, same box) for every headline test; the regression-suite and canary results; an EXPECTED-FLIP LEDGER (test names, both trace and pixel axes) the coordinator will check CI against; every NEW file listed at the top; anything you could not finish, with its completion mechanism.
+
+---- YOUR TASK ----
+**Land the timers + robustness prototype, then the root-goto-from-timer bug, against FLASH** (w1-timers-robustness). Categories: `from_gnash`, `avm1`, `regression`.
+
+Start from `session27-fanout-reports/w1-timers-robustness-prototype.patch` (recompiler DoInitAction emission, `tag.c` goto-init queue, `swf.c`/`swf_core.c` catch-up, `timer.c`, caps, dead `tagSetFilter*` removal). Its measured ledger: `from_gnash/misc-ming.all/init_action/InitActionTest2` ruffle_matched → **pass**; 4 rows change bytes; 0 regressions.
+
+**Flash oracles (coordinator-run):** `SWFRecompDocs/plans/session27-fanout-reports/w1-local-oracles/w1-timers-robustness/<gen>_<mode>/` holds `test.swf`, `test.toml`, `flash.wrapped.txt` (num_frames cut), `flash.direct.txt` and `ruffle.txt` for: `goto_skipped_init_{script,timer}`, `timer_method_form`, `timer_native_method_play`, `timer_root_goto_stopped_{gs,nf}`, `caps_{timers,clone,watch}`. **Flash fires timers and runs DoInitActions at frame time; Ruffle's exporter does neither (preload inits, no timers), so Flash is the ONLY oracle here.** Use Flash's traces as the fixture goldens (`regression/avm1_timer_*`, `avm1_goto_skipped_init_*`, `avm1_*_overflow`). Where the cut makes a trace timing-sensitive, design the fixture so a stable prefix decides it.
+
+1. Land the prototype; make each fixture match Flash. The report's rule 2 ("inits run after the issuing script") and `action_execution_order_test12`'s unexplained line: check them against the Flash goto_skipped traces.
+2. **Lead 2: root `gotoAndStop`/`nextFrame` from a timer callback never runs the target frame's DoAction** (both modes; `timer_root_goto_stopped_{gs,nf}` Flash traces show the expected lines). Owner: the `action.c` root goto arms outside the frame loop. M, game-visible (menus, slideshows).
+3. **Lead 3:** the no-graphics twin (`swf_core.c`): a root goto from a timer never runs the target DoAction. Make both modes agree.
+4. Smalls: `actionEI_addCallback` returns true when it drops at the cap (lead 4); the clone-depth table forgets removed clones (lead 5); watch names ≥ 64 chars (lead 7); the load-queue caps (`MAX_PENDING_MCL_LOADS` 16 etc., lead 6) to growable where a game could reach them.
+5. **This touches no-graphics-only code** (`swf_core.c`) and the recompiler: run every headline in BOTH modes with `--recompile`, and say so at the top of the report (the coordinator runs the no-graphics CI leg).
+
+Siblings: `w2-exec-order-land` (`swf.c tagMain` eligibility slot, `actionDispatchEnterFrameHandlers`, same-frame DoInitAction order). Coordinate through the sibling map: you own the DoInitAction emission + goto-init queue, they own frame-loop eligibility and enterFrame dispatch.
